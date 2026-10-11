@@ -124,18 +124,14 @@ internal static class HttpRequestHeadFormatter
         StringBuilder head = new();
         AppendRequestLine(head, framing.Method, url, forwardProxy, options);
         string? hostLine = FormatHostLine(url, options.FollowedToAnotherHost ? [] : customHeaders);
-        if (hostLine is not null)
-        {
-            head.Append(hostLine).Append("\r\n");
-        }
-
+        AppendHostLine(head, hostLine);
         AppendAlways(head, "Proxy-Authorization", proxyAuthorization);
         AppendAuthorization(head, customHeaders, authorization);
         AppendUnlessOverridden(head, customHeaders, "Range", range);
         AppendUnlessOverridden(head, customHeaders, "Content-Range", framing.ContentRange);
         AppendClientHeaders(head, customHeaders, options);
-        AppendUnlessOverridden(head, [.. customHeaders, .. proxyHeaders], "Proxy-Connection", forwardProxy ? "Keep-Alive" : null);
-        AppendUnlessOverridden(head, customHeaders, "Transfer-Encoding", framing.Body is not null && framing.KnownLength is null ? "chunked" : null);
+        AppendProxyConnection(head, customHeaders, proxyHeaders, forwardProxy);
+        AppendUnlessOverridden(head, customHeaders, "Transfer-Encoding", ChunkedWhenUnknownLength(framing));
         AppendUnlessOverridden(head, customHeaders, "Alt-Used", AltUsedOf(options.AltSvcRoute));
         AppendH2cUpgrade(head, upgradesToH2c);
         AppendAlways(head, "Cookie", cookie);
@@ -405,12 +401,45 @@ internal static class HttpRequestHeadFormatter
             .Where(header => header.Names(ContentTypeName))
             .Select(header => header.Entry[(ContentTypeName.Length + 1)..].TrimStart(' '))
             .FirstOrDefault();
-        return framing is { Body.ContentType: { } bodyType }
-            && userType is not null
-            && bodyType.StartsWith(FormBoundaryPrefix, StringComparison.Ordinal)
-            ? $"{userType}; boundary={bodyType[FormBoundaryPrefix.Length..]}"
+        return userType is not null && FormBoundaryOf(framing) is { } boundary
+            ? $"{userType}; boundary={boundary}"
             : null;
     }
+
+    /// <summary>
+    /// Gives the boundary of <paramref name="framing" />'s <c>multipart/form-data</c> body, or
+    /// <see langword="null" /> when it has no body or the body is not such a form.
+    /// </summary>
+    private static string? FormBoundaryOf(HttpRequestFraming framing) =>
+        framing is { Body.ContentType: { } bodyType } && bodyType.StartsWith(FormBoundaryPrefix, StringComparison.Ordinal)
+            ? bodyType[FormBoundaryPrefix.Length..]
+            : null;
+
+    /// <summary>
+    /// Appends the <c>Host</c> line when <paramref name="hostLine" /> is not
+    /// <see langword="null" />.
+    /// </summary>
+    private static void AppendHostLine(StringBuilder head, string? hostLine)
+    {
+        if (hostLine is not null)
+        {
+            head.Append(hostLine).Append("\r\n");
+        }
+    }
+
+    /// <summary>
+    /// Gives <c>chunked</c> as the <c>Transfer-Encoding</c> value for a body of unknown length,
+    /// else <see langword="null" />.
+    /// </summary>
+    private static string? ChunkedWhenUnknownLength(HttpRequestFraming framing) =>
+        framing.Body is not null && framing.KnownLength is null ? "chunked" : null;
+
+    /// <summary>
+    /// Appends <c>Proxy-Connection: Keep-Alive</c> for a <paramref name="forwardProxy" /> unless
+    /// an <c>-H</c> or <c>--proxy-header</c> value names <c>Proxy-Connection</c>.
+    /// </summary>
+    private static void AppendProxyConnection(StringBuilder head, HttpCustomHeader[] customHeaders, HttpCustomHeader[] proxyHeaders, bool forwardProxy) =>
+        AppendUnlessOverridden(head, [.. customHeaders, .. proxyHeaders], "Proxy-Connection", forwardProxy ? "Keep-Alive" : null);
 
     /// <summary>
     /// Tells whether <c>TE: gzip</c> is sent: for <c>--tr-encoding</c>, unless an <c>-H</c>
