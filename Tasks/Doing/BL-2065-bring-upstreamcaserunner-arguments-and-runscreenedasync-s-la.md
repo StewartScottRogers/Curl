@@ -36,3 +36,4 @@ The build's `CA1502` passes them, because the page uses the coverage report's co
 ## Log
 
 - 2026-10-11: Created.
+- 2026-10-11: Backlog -> Doing.
