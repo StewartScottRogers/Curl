@@ -8,7 +8,7 @@ depends-on: [BL-2031, BL-2029, BL-2030]
 touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests, Curl.Authentication.UnitLibrary, Curl.Authentication.UnitTests, Curl.Conformance.UnitTests]
 requirement: none
 created: 2026-10-10
-completed:
+completed: 2026-10-10
 ---
 # BL-1999 — Re-close GF-0003: On Windows the NTLM type-1 message is SSPI's (flags 0xa2088207 plus VERSION), but curl -V does not list SSPI, so the !SSPI cases run and differ
 
@@ -37,33 +37,33 @@ Make Curl's advertised features match its behaviour. On Windows, add SSPI to the
 
 ## Acceptance criteria
 
-- [ ] `behaviour:test67`: Curl answers what curl 8.21.0 answers, `upstream test67 passes`, so the item measures `match`.
-- [ ] `behaviour:test68`: Curl answers what curl 8.21.0 answers, `upstream test68 passes`, so the item measures `match`.
-- [ ] `behaviour:test81`: Curl answers what curl 8.21.0 answers, `upstream test81 passes`, so the item measures `match`.
-- [ ] `behaviour:test89`: Curl answers what curl 8.21.0 answers, `upstream test89 passes`, so the item measures `match`.
-- [ ] `behaviour:test91`: Curl answers what curl 8.21.0 answers, `upstream test91 passes`, so the item measures `match`.
-- [ ] `behaviour:test150`: Curl answers what curl 8.21.0 answers, `upstream test150 passes`, so the item measures `match`.
-- [ ] `behaviour:test162`: Curl answers what curl 8.21.0 answers, `upstream test162 passes`, so the item measures `match`.
-- [ ] `behaviour:test169`: Curl answers what curl 8.21.0 answers, `upstream test169 passes`, so the item measures `match`.
-- [ ] `behaviour:test170`: Curl answers what curl 8.21.0 answers, `upstream test170 passes`, so the item measures `match`.
-- [ ] `behaviour:test176`: Curl answers what curl 8.21.0 answers, `upstream test176 passes`, so the item measures `match`.
-- [ ] `behaviour:test239`: Curl answers what curl 8.21.0 answers, `upstream test239 passes`, so the item measures `match`.
-- [ ] `behaviour:test243`: Curl answers what curl 8.21.0 answers, `upstream test243 passes`, so the item measures `match`.
-- [ ] `behaviour:test267`: Curl answers what curl 8.21.0 answers, `upstream test267 passes`, so the item measures `match`.
-- [ ] `behaviour:test776`: Curl answers what curl 8.21.0 answers, `upstream test776 passes`, so the item measures `match`.
-- [ ] `behaviour:test1215`: Curl answers what curl 8.21.0 answers, `upstream test1215 passes`, so the item measures `match`.
-- [ ] `behaviour:test775`: Curl answers what curl 8.21.0 answers, `upstream test775 passes`, so the item measures `match`.
-- [ ] `behaviour:test822`: Curl answers what curl 8.21.0 answers, `upstream test822 passes`, so the item measures `match`.
-- [ ] `behaviour:test827`: Curl answers what curl 8.21.0 answers, `upstream test827 passes`, so the item measures `match`.
-- [ ] `behaviour:test831`: Curl answers what curl 8.21.0 answers, `upstream test831 passes`, so the item measures `match`.
-- [ ] `behaviour:test868`: Curl answers what curl 8.21.0 answers, `upstream test868 passes`, so the item measures `match`.
-- [ ] `behaviour:test873`: Curl answers what curl 8.21.0 answers, `upstream test873 passes`, so the item measures `match`.
-- [ ] `behaviour:test877`: Curl answers what curl 8.21.0 answers, `upstream test877 passes`, so the item measures `match`.
-- [ ] `behaviour:test906`: Curl answers what curl 8.21.0 answers, `upstream test906 passes`, so the item measures `match`.
-- [ ] `behaviour:test921`: Curl answers what curl 8.21.0 answers, `upstream test921 passes`, so the item measures `match`.
-- [ ] `behaviour:test933`: Curl answers what curl 8.21.0 answers, `upstream test933 passes`, so the item measures `match`.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
-- [ ] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
+- [x] `behaviour:test67`: Curl answers what curl 8.21.0 answers, `upstream test67 passes`, so the item measures `match`.
+- [x] `behaviour:test68`: Curl answers what curl 8.21.0 answers, `upstream test68 passes`, so the item measures `match`.
+- [x] `behaviour:test81`: Curl answers what curl 8.21.0 answers, `upstream test81 passes`, so the item measures `match`.
+- [x] `behaviour:test89`: Curl answers what curl 8.21.0 answers, `upstream test89 passes`, so the item measures `match`.
+- [x] `behaviour:test91`: Curl answers what curl 8.21.0 answers, `upstream test91 passes`, so the item measures `match`.
+- [x] `behaviour:test150`: Curl answers what curl 8.21.0 answers, `upstream test150 passes`, so the item measures `match`.
+- [x] `behaviour:test162`: Curl answers what curl 8.21.0 answers, `upstream test162 passes`, so the item measures `match`.
+- [x] `behaviour:test169`: Curl answers what curl 8.21.0 answers, `upstream test169 passes`, so the item measures `match`.
+- [x] `behaviour:test170`: Curl answers what curl 8.21.0 answers, `upstream test170 passes`, so the item measures `match`.
+- [x] `behaviour:test176`: Curl answers what curl 8.21.0 answers, `upstream test176 passes`, so the item measures `match`.
+- [x] `behaviour:test239`: Curl answers what curl 8.21.0 answers, `upstream test239 passes`, so the item measures `match`.
+- [x] `behaviour:test243`: Curl answers what curl 8.21.0 answers, `upstream test243 passes`, so the item measures `match`.
+- [x] `behaviour:test267`: Curl answers what curl 8.21.0 answers, `upstream test267 passes`, so the item measures `match`.
+- [x] `behaviour:test776`: Curl answers what curl 8.21.0 answers, `upstream test776 passes`, so the item measures `match`.
+- [x] `behaviour:test1215`: Curl answers what curl 8.21.0 answers, `upstream test1215 passes`, so the item measures `match`.
+- [x] `behaviour:test775`: Curl answers what curl 8.21.0 answers, `upstream test775 passes`, so the item measures `match`.
+- [x] `behaviour:test822`: Curl answers what curl 8.21.0 answers, `upstream test822 passes`, so the item measures `match`.
+- [x] `behaviour:test827`: Curl answers what curl 8.21.0 answers, `upstream test827 passes`, so the item measures `match`.
+- [x] `behaviour:test831`: Curl answers what curl 8.21.0 answers, `upstream test831 passes`, so the item measures `match`.
+- [x] `behaviour:test868`: Curl answers what curl 8.21.0 answers, `upstream test868 passes`, so the item measures `match`.
+- [x] `behaviour:test873`: Curl answers what curl 8.21.0 answers, `upstream test873 passes`, so the item measures `match`.
+- [x] `behaviour:test877`: Curl answers what curl 8.21.0 answers, `upstream test877 passes`, so the item measures `match`.
+- [x] `behaviour:test906`: Curl answers what curl 8.21.0 answers, `upstream test906 passes`, so the item measures `match`.
+- [x] `behaviour:test921`: Curl answers what curl 8.21.0 answers, `upstream test921 passes`, so the item measures `match`.
+- [x] `behaviour:test933`: Curl answers what curl 8.21.0 answers, `upstream test933 passes`, so the item measures `match`.
+- [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
+- [x] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
 
 ## Notes
 
@@ -71,6 +71,7 @@ Make Curl's advertised features match its behaviour. On Windows, add SSPI to the
 - Fixed here (Curl.Authentication): `NtlmHttpAuthenticator` failed a hand-built context's over-long type 3 with SSPI's exit 94 whenever `matchesSspiBuild` was set (Windows). A run that answers NTLM with `HandBuiltNtlmSecurityContext` is the non-SSPI build, so it now fails as curl's own NTLM does, exit 100. test775 and test776 now pass in the harness and are listed in `PassingUpstreamCases.txt`; the executable is unchanged (its Windows NTLM contexts are SSPI's). Added `Curl.Conformance.UnitTests` to touches for the passing list; no task in Doing names it.
 - Still differing in the harness, filed: BL-2029 (type-1 request of a POST/PUT must send `Content-Length: 0`: test170, 176, 239, 243, 267; touches `Curl.Protocol.Http`, which BL-2007 holds now) and BL-2030 (test169, origin Digest after proxy NTLM).
 - No option changed, so `--ai-help` needs nothing.
+- Second claim (2026-10-10): BL-2029, BL-2030 and BL-2031 are Done. All 25 items (67, 68, 81, 89, 91, 150, 162, 169, 170, 176, 239, 243, 267, 775, 776, 822, 827, 831, 868, 873, 877, 906, 921, 933, 1215) are listed in `Curl.Conformance.UnitTests/PassingUpstreamCases.txt`, which fails the build when a listed case fails, and the fast tests are green, so no code change was needed here. The gap closes only when the next gap analysis re-measures them (ADR-0433).
 
 ## Log
 
@@ -78,3 +79,4 @@ Make Curl's advertised features match its behaviour. On Windows, add SSPI to the
 - 2026-10-10: Backlog -> Doing.
 - 2026-10-10: Doing -> Backlog. Waits on BL-2031 (gap tool must compose hand-built NTLM; interactive only), BL-2029 (NTLM POST Content-Length: 0) and BL-2030 (test169); test775/776 fixed here
 - 2026-10-10: Backlog -> Doing.
+- 2026-10-10: Doing -> Done. All 25 GF-0003 cases pass in the conformance harness after BL-2029, BL-2030 and BL-2031
