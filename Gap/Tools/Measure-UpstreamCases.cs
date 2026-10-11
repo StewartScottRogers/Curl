@@ -44,6 +44,8 @@
 //            (<git root>/usr/bin/perl.exe), by an absolute path with forward slashes. With no perl
 //            %PERL stays as written, so the runner skips the case for it and the converter
 //            (ConvertTo-BehaviourMeasurement.ps1) files it as unmeasured, no-perl.
+// REPLY escapes (BL-2012): \xHH and \x{H...} in a <servercmd> REPLY line are expanded to the byte
+// they name, as ftpserver.pl's eval "qq{...}" does; the runner expands \r, \n, \t and \\ itself.
 // "--self-test" instead checks these substitutions and prints a PASS or FAIL line per check.
 //
 // Known limit: UpstreamCaseRunner.CurlVersion is the constant "8.21.0", so %VERSION in a newer
@@ -125,7 +127,7 @@ await Parallel.ForEachAsync(
     async (index, _) =>
     {
         int number = ordered[index];
-        byte[] testFile = SubstituteHostVariables(await File.ReadAllBytesAsync(Path.Combine(testDataFolder, $"test{number}")), testsFolder, perl);
+        byte[] testFile = ReplyEscapes.ExpandReplyHexEscapes(SubstituteHostVariables(await File.ReadAllBytesAsync(Path.Combine(testDataFolder, $"test{number}")), testsFolder, perl));
         DirectoryInfo logDirectory = Directory.CreateDirectory(Path.Combine(logFolder, $"test{number}-{Guid.NewGuid():N}"));
         Stopwatch stopwatch = Stopwatch.StartNew();
         UpstreamCaseOutcome outcome = await RunCaseAsync(number, testFile, logDirectory, platform, timeLimit, caseHangLimit);
@@ -272,6 +274,14 @@ static int RunSelfTest()
     Check(Substitute("%PERL %SRCDIR/x.pl", "/usr/bin/perl") == "/usr/bin/perl /rel/tests/x.pl", "%PERL is the perl found");
     Check(Substitute("%PERL -e 1", null) == "%PERL -e 1", "with no perl, %PERL stays as written for the runner to skip");
     Check(Substitute("http://%HOSTIP:%HTTPPORT/1 100%", "/usr/bin/perl") == "http://%HOSTIP:%HTTPPORT/1 100%", "other variables and a lone percent are untouched");
+
+    string Expand(string file) =>
+        System.Text.Encoding.Latin1.GetString(ReplyEscapes.ExpandReplyHexEscapes(System.Text.Encoding.Latin1.GetBytes(file)));
+
+    Check(Expand("<servercmd>\nREPLY PASS 230 logged\\x00 in\n</servercmd>") == "<servercmd>\nREPLY PASS 230 logged\0 in\n</servercmd>", "\\x00 in a REPLY line is a NUL byte (test2108)");
+    Check(Expand("<servercmd>\nREPLY USER 331 \\x41\\x{42}\\x4 \\x5c\\x0d\\x0a!\n</servercmd>") == "<servercmd>\nREPLY USER 331 AB\u0004 \\\\\\r\\n!\n</servercmd>", "\\xHH, \\x{H} and \\xH expand; a backslash, CR or LF is left for the runner as \\\\, \\r, \\n");
+    Check(Expand("<servercmd>\nREPLY PASS 230 a\\\\x41\\r\\n\\t\\@\n</servercmd>") == "<servercmd>\nREPLY PASS 230 a\\\\x41\\r\\n\\t\\@\n</servercmd>", "\\\\, \\r, \\n, \\t and \\@ are left for the runner, so \\\\x41 stays");
+    Check(Expand("<servercmd>\nCAPA \\x41\n</servercmd>\n<data>\\x41</data>") == "<servercmd>\nCAPA \\x41\n</servercmd>\n<data>\\x41</data>", "only REPLY lines inside <servercmd> expand");
     return failed ? 1 : 0;
 }
 
@@ -387,5 +397,82 @@ internal sealed class LoopbackOnlyDnsResolver : IDnsResolver
             : string.Equals(host, "ip6-localhost", StringComparison.OrdinalIgnoreCase) ? [IPAddress.IPv6Loopback]
             : [];
         return ValueTask.FromResult(addresses);
+    }
+}
+
+// Expands the Perl hex escapes \xHH and \x{H...} in the REPLY lines of a case's <servercmd>, as
+// ftpserver.pl's eval "qq{...}" of the reply text does (test2108's "logged\x00 in" sends a real NUL,
+// BL-2012). \r, \n, \t, \\ and any other backslash pair are left as written: the runner's
+// LineProtocolServerCommands expands those itself, so a pair is copied whole and "\\x00" stays a
+// backslash before x00; an expanded backslash, CR or LF (\x5c, \x0d, \x0a) is written as \\, \r or
+// \n, so the runner expands it and the case's lines stay as they were.
+internal static class ReplyEscapes
+{
+    public static byte[] ExpandReplyHexEscapes(byte[] testFile)
+    {
+        string text = System.Text.Encoding.Latin1.GetString(testFile);
+        int start = text.IndexOf("<servercmd>", StringComparison.Ordinal);
+        int end = start < 0 ? -1 : text.IndexOf("</servercmd>", start, StringComparison.Ordinal);
+        if (end < 0 || !text.AsSpan(start, end - start).Contains("\\x", StringComparison.Ordinal))
+        {
+            return testFile;
+        }
+
+        string[] lines = text[start..end].Split('\n');
+        for (int index = 0; index < lines.Length; index++)
+        {
+            if (lines[index].TrimStart().StartsWith("REPLY ", StringComparison.Ordinal))
+            {
+                lines[index] = ExpandHexEscapes(lines[index]);
+            }
+        }
+
+        return System.Text.Encoding.Latin1.GetBytes(string.Concat(text.AsSpan(0, start), string.Join('\n', lines), text.AsSpan(end)));
+    }
+
+    // One REPLY line with its \xHH and \x{H...} escapes expanded (Perl takes up to two hex digits
+    // after \x, none giving NUL, and any number inside braces); every other backslash pair is copied whole.
+    private static string ExpandHexEscapes(string line)
+    {
+        System.Text.StringBuilder expanded = new();
+        for (int index = 0; index < line.Length; index++)
+        {
+            if (line[index] != '\\' || index + 1 >= line.Length)
+            {
+                expanded.Append(line[index]);
+                continue;
+            }
+
+            if (line[index + 1] != 'x')
+            {
+                expanded.Append(line, index, 2);
+                index++;
+                continue;
+            }
+
+            (string digits, int resume) = ReadHexDigits(line, index + 2);
+            int value = digits.Length == 0 ? 0 : int.Parse(digits, NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture) & 0xFF;
+            expanded.Append(value switch { '\\' => "\\\\", '\r' => "\\r", '\n' => "\\n", _ => ((char)value).ToString() });
+            index = resume - 1;
+        }
+
+        return expanded.ToString();
+    }
+
+    // The hex digits after \x at digitsStart - inside braces, or up to two bare ones - and the index after them.
+    private static (string Digits, int Resume) ReadHexDigits(string line, int digitsStart)
+    {
+        if (digitsStart < line.Length && line[digitsStart] == '{' && line.IndexOf('}', digitsStart) is int close and > 0)
+        {
+            return (line[(digitsStart + 1)..close], close + 1);
+        }
+
+        int digitsEnd = digitsStart;
+        while (digitsEnd < line.Length && digitsEnd - digitsStart < 2 && Uri.IsHexDigit(line[digitsEnd]))
+        {
+            digitsEnd++;
+        }
+
+        return (line[digitsStart..digitsEnd], digitsEnd);
     }
 }
