@@ -60,3 +60,4 @@ In Curl.Authentication.UnitLibrary (ChallengeSaslExchange, SecurityContextSaslEx
 - 2026-10-10: Created.
 - 2026-10-10: Backlog -> Doing.
 - 2026-10-10: Doing -> Backlog. Waits on BL-2026: Curl already cancels with * and downgrades to PLAIN on a loopback replay of all six cases; the 'got the end' comes from the gap harness, which only an interactive session may read
+- 2026-10-11: Backlog -> Doing.
