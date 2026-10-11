@@ -64,6 +64,8 @@ internal sealed class ImapResponder : ILineProtocolResponder
 
     private readonly List<string> receivedCommandLines = [];
 
+    private readonly UpstreamProtocolDump receivedCommandLineDump = new();
+
     private readonly List<string> deleted = [];
 
     private readonly StringBuilder upload = new();
@@ -96,6 +98,9 @@ internal sealed class ImapResponder : ILineProtocolResponder
     /// </summary>
     public IReadOnlyList<string> ReceivedCommandLines => receivedCommandLines;
 
+    /// <summary>Gets <see cref="ReceivedCommandLines"/>, each numbered in the order of all servers' writes.</summary>
+    internal IReadOnlyList<UpstreamProtocolDumpEntry> ReceivedCommandLineDump => receivedCommandLineDump.Entries;
+
     /// <summary>
     /// Gets the last <c>APPEND</c> literal as ftpserver.pl stores it for <c>&lt;verify&gt;&lt;upload&gt;</c>:
     /// its first n bytes, without the CRLF that ends the command.
@@ -111,6 +116,7 @@ internal sealed class ImapResponder : ILineProtocolResponder
         }
 
         receivedCommandLines.Add(commandLine + "\r\n");
+        receivedCommandLineDump.Record(Encoding.Latin1.GetBytes(receivedCommandLines[^1]));
         if (!TrySplitCommand(commandLine, out string command, out string arguments))
         {
             return Reply(commandLine + " BAD Command\r\n", closesConnection: true);

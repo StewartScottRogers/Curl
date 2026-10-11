@@ -10,6 +10,17 @@ namespace Curl.Conformance;
 public sealed class LineProtocolServerCommandsTests
 {
     [TestMethod]
+    public void TryFindReply_ReplyLfLine_EndsTheTextInABareLineFeedAndIsNoKeywordLine()
+    {
+        // test891: "REPLYLF AUTH +" answers AUTH with "+\n"; it must not be read as an AUTH line.
+        LineProtocolServerCommands commands = Read("AUTH CRAM-MD5\nREPLYLF AUTH +\n");
+
+        Assert.IsTrue(commands.TryFindReply("AUTH", out byte[] reply));
+        Assert.AreEqual("+\n", Encoding.Latin1.GetString(reply));
+        CollectionAssert.AreEqual(new[] { "CRAM-MD5" }, commands.AuthenticationMechanisms.ToArray());
+    }
+
+    [TestMethod]
     public void TryFindFullTextReply_QuotedCommandAndArgument_IsFoundForThatFullTextOnly()
     {
         LineProtocolServerCommands commands = Read("REPLY \"AUTHENTICATE CRAM-MD5\" + Rubbish\n");
