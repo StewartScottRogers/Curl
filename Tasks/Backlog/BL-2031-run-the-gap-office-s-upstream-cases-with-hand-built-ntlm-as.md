@@ -6,7 +6,6 @@ assignee: Claude
 pipeline: feature
 depends-on: []
 touches: [Curl.Console]
-lane: no
 requirement: none
 created: 2026-10-10
 completed:
@@ -36,12 +35,14 @@ build because `UpstreamCurlPlatform` lists no `SSPI`. Reword it.
 
 ## Acceptance criteria
 
-- [ ] The measuring tool passes `usesHandBuiltNtlm: true` to `CurlComposition.CreateRunner`.
-- [ ] Re-measuring 67,81,775 with the tool on Windows gives `match` for all three.
+- [x] The measuring tool passes `usesHandBuiltNtlm: true` to `CurlComposition.CreateRunner`.
+- [x] Re-measuring 67,81,775 with the tool on Windows gives `match` for all three.
 - [ ] `HandBuiltNtlmSecurityContextFactory`'s summary says why the harness runs Curl as the non-SSPI build without claiming `curl -V` lists no SSPI.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests are green.
+- [x] `dotnet build -warnaserror` is clean and the fast tests are green.
 
 ## Notes
+
+- 2026-10-10 (interactive, gap PR #108 e52f2c111): criterion 1 is met through InProcessCurl, which passes usesHandBuiltNtlm: true on every overload since BL-2033; CurlComposition.CreateRunner is internal and the tool goes only through InProcessCurl. 67, 81 and 775 measure match (so do 68, 89, 91, 150, 162, 822, 827, 831, 868, 873, 877, 906, 921, 933, 1215 and 776). Left for a lane, product code only: reword lines 8-10 of the summary in Curl.Console/HandBuiltNtlmSecurityContextFactory.cs, e.g. 'the harness runs Curl as the non-SSPI build because the harness's platform feature list (UpstreamCurlPlatform) has no SSPI, so the !SSPI NTLM cases run'. lane: no removed.
 
 ## Log
 

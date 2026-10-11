@@ -6,7 +6,6 @@ assignee: Claude
 pipeline: feature
 depends-on: []
 touches: [Curl.Console, Curl.Console.UnitTests]
-lane: no
 requirement: none
 created: 2026-10-10
 completed:
@@ -38,8 +37,8 @@ In Curl.Console's -O/-J output naming: with -J and -L and no Content-Disposition
 
 ## Acceptance criteria
 
-- [ ] `behaviour:test1642`: Curl answers what curl 8.21.0 answers, `upstream test1642 passes`, so the item measures `match`.
-- [ ] `behaviour:test1643`: Curl answers what curl 8.21.0 answers, `upstream test1643 passes`, so the item measures `match`.
+- [x] `behaviour:test1642`: Curl answers what curl 8.21.0 answers, `upstream test1642 passes`, so the item measures `match`.
+- [x] `behaviour:test1643`: Curl answers what curl 8.21.0 answers, `upstream test1643 passes`, so the item measures `match`.
 - [ ] `behaviour:test3036`: Curl answers what curl 8.21.0 answers, `reference curl exits 23; stdout 0 bytes: `, so the item measures `match`.
 - [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
 - [ ] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
@@ -58,6 +57,8 @@ In Curl.Console's -O/-J output naming: with -J and -L and no Content-Disposition
   for BL-1849). Added `lane: no`: an interactive session should rerun the finding's
   reproduction command, check that it measured a current Curl build, and fix what then
   differs - or record that the items now pass for the next gap run. No code changed.
+
+- 2026-10-10 (interactive, gap PR #108 2fd5b394d): the gap tool passes test1642 and test1643 on the current build, and both measure match. test3036's gap comes from the reference cross-check (Measure-ReferenceCrossCheck.ps1), not the harness, and reproduces 3 times out of 3. Both binaries exit 23 with the same request bytes, and the first attempt reports 'write of 51 bytes' in both. On the retry, real curl ends 'curl: (23) client returned ERROR on write of 16 bytes' and Curl's Release build ends 'write of 128 bytes'. Left for a lane, in Curl.Console: report curl's byte count for the failed write on the retry of an -OJ --no-clobber --retry transfer (test3036). lane: no removed.
 
 ## Log
 

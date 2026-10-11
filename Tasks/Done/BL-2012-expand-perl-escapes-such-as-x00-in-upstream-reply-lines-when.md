@@ -9,7 +9,7 @@ touches: [*]
 lane: no
 requirement: none
 created: 2026-10-10
-completed:
+completed: 2026-10-10
 ---
 # BL-2012 — Expand Perl escapes such as \x00 in upstream REPLY lines when measuring upstream cases so test2108 measures match
 
@@ -25,11 +25,13 @@ The gap analysis office's upstream-case runner (`Measure-UpstreamCases.cs` in th
 
 ## Acceptance criteria
 
-- [ ] The runner expands at least `\xHH`, `\r`, `\n`, `\t` and `\\` in `REPLY` text, as `ftpserver.pl`'s `qq{}` evaluation does.
-- [ ] Re-measuring upstream case 2108 with the runner reports `match`.
+- [x] The runner expands at least `\xHH`, `\r`, `\n`, `\t` and `\\` in `REPLY` text, as `ftpserver.pl`'s `qq{}` evaluation does.
+- [x] Re-measuring upstream case 2108 with the runner reports `match`.
 
 ## Notes
 
 ## Log
 
 - 2026-10-10: Created.
+- 2026-10-10: Backlog -> Doing.
+- 2026-10-10: Doing -> Done. The gap tool expands \xHH escapes in REPLY lines; test2108 now passes (gap PR #108, 3bc090188)

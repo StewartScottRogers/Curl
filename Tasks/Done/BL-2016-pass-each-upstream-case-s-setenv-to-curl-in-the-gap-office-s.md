@@ -9,7 +9,7 @@ touches: []
 lane: no
 requirement: none
 created: 2026-10-10
-completed:
+completed: 2026-10-10
 ---
 # BL-2016 — Pass each upstream case's setenv to Curl in the gap office's upstream-case measuring tool through InProcessCurl's environment overload
 
@@ -26,11 +26,13 @@ The gap office's upstream-case measuring tool (the file-based app GF-0047's repr
 
 ## Acceptance criteria
 
-- [ ] The tool passes each case's environment to `InProcessCurl`, and GF-0047's reproduce command reports test1249, 436, 724, 725, 731, 740 and 741 as passing.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
+- [x] The tool passes each case's environment to `InProcessCurl`, and GF-0047's reproduce command reports test1249, 436, 724, 725, 731, 740 and 741 as passing.
+- [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
 
 ## Notes
 
 ## Log
 
 - 2026-10-10: Created.
+- 2026-10-10: Backlog -> Doing.
+- 2026-10-10: Doing -> Done. The gap tool runs each upstream case with its setenv as Curl's environment; test1249, 433, 436, 724, 725, 731, 740 and 741 now pass (gap PR #108, a7329e849)
