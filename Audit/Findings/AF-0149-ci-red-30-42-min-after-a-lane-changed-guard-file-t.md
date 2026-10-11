@@ -3,19 +3,19 @@ id: AF-0149
 title: CI red 30.42 min after a lane changed guard file task-board.ps1 on work/dark-factory (run 37931431648)
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: closed
+reason: Re-audit 2026-10-11_0051.md: the reproduction no longer reproduces.
 key: process:logs:CI-run-37931431648:ci-red
 reproduction: none
-task: none
-tasks:
+task: BL-1968
+tasks: BL-1968
 found: 2026-10-10
 found-at: 1b27494521dec4bdaa3fe60c8dc7a3fc73874253
 scorecard: 2026-10-10_0123.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-11
+closed-how: reliable-reaudit
+closed-by: 2026-10-11_0051.md
 ---
 # AF-0149 - CI red 30.42 min after a lane changed guard file task-board.ps1 on work/dark-factory (run 37931431648)
 
@@ -42,6 +42,10 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-10-11 | 2026-10-11_0051.md | reproduces: no | The reproduction on the 20261010-012326 logs still shows the old spell (runId 37931431648, 30.42 min, 2026-10-09T12:45:17Z). Ran the CI red rule over this window: ciRedMinutes 92.12 with spells 38030548658, 38047662088 and 38093700231, caused by test4001, test475 and an NTLM proxy test. None followed a lane change to a guard file: git log since 2026-10-10 on task-board.ps1, guard-audit-paths.ps1, .claude/settings.json, .github/workflows/ci.yml and Audit/ shows only the audit's own commits (60f05b4de scorecard, 8266e6843 baseline).
+
 ## Log
 
 - 2026-10-10: filed proposed.
+- 2026-10-10: proposed -> accepted.
+- 2026-10-11: accepted -> closed. Re-audit 2026-10-11_0051.md: the reproduction no longer reproduces.

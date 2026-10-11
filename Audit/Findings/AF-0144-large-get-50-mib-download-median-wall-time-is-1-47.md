@@ -3,12 +3,12 @@ id: AF-0144
 title: large-get (50 MiB download) median wall time is 1.47x curl's
 auditor: performance
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: performance:large-get:slower-than-curl
 reproduction: none
-task: none
-tasks:
+task: BL-2043
+tasks: BL-1963, BL-2043
 found: 2026-10-10
 found-at: 1b27494521dec4bdaa3fe60c8dc7a3fc73874253
 scorecard: 2026-10-10_0123.md
@@ -42,6 +42,9 @@ powershell -NoProfile -File Audit/Tools/Measure-Performance.ps1 -Iterations 20 -
 
 ## Re-audits
 
+- 2026-10-11 | 2026-10-11_0051.md | reproduces: yes | Ran the reproduction at 20 iterations: large-get curl median 92 ms, candidate 128 ms, 1.39x, still over the 1.25x threshold (the finding recorded 1.47x). HttpResponseBodyReader.cs now receives 102400 bytes per read, but still writes in 16384-byte pieces.
+
 ## Log
 
 - 2026-10-10: filed proposed.
+- 2026-10-10: proposed -> accepted.

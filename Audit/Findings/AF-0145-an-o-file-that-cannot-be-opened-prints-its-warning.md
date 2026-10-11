@@ -3,12 +3,12 @@ id: AF-0145
 title: An -o file that cannot be opened prints its Warning line inside the progress-meter row instead of after the meter's closing newline
 auditor: conformance
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: conformance:Curl.Console/CurlCommandRunner.cs:output-open-warning-after-meter:stderr
 reproduction: none
-task: none
-tasks:
+task: BL-1964
+tasks: BL-1964
 found: 2026-10-10
 found-at: 1b27494521dec4bdaa3fe60c8dc7a3fc73874253
 scorecard: 2026-10-10_0123.md
@@ -42,6 +42,9 @@ $o="$env:TEMP\ac-odir"; $a=@('--output','missing.txt/f.txt','http://127.0.0.1:50
 
 ## Re-audits
 
+- 2026-10-11 | 2026-10-11_0051.md | not re-audited | overlaps planted defect PD-201 in Curl.Console/CurlCommandRunner.cs, so the auditor's verdict (reproduces no) is set aside: Ran the reproduction against curl 8.21.0 (x86_64-w64-mingw32, Schannel): 'curl: 1 / Curl: 1' - Curl's 'Warning: Failed' line now starts a line, as curl's does; both exit 23.
+
 ## Log
 
 - 2026-10-10: filed proposed.
+- 2026-10-10: proposed -> accepted.

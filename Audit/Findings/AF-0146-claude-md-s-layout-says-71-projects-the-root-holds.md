@@ -3,12 +3,12 @@ id: AF-0146
 title: CLAUDE.md's layout says 71 projects; the root holds 73 Curl.* projects
 auditor: truthfulness
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: truthfulness:CLAUDE.md:RepositoryLayoutProjectCount:false-statement
 reproduction: none
-task: none
-tasks:
+task: BL-1965
+tasks: BL-1965
 found: 2026-10-10
 found-at: 1b27494521dec4bdaa3fe60c8dc7a3fc73874253
 scorecard: 2026-10-10_0123.md
@@ -42,6 +42,9 @@ Select-String -Path CLAUDE.md -Pattern '\d+ projects, one flat' | ForEach-Object
 
 ## Re-audits
 
+- 2026-10-11 | 2026-10-11_0051.md | reproduces: no | Ran the reproduction from the tree root. Select-String printed '...                            73 projects, one flat alphabetical run', and the count of Curl.* directories holding a .csproj was 73. CLAUDE.md's layout count matches the root, so the finding no longer reproduces.
+
 ## Log
 
 - 2026-10-10: filed proposed.
+- 2026-10-10: proposed -> accepted.

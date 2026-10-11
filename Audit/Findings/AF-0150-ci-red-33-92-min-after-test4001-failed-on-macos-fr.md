@@ -3,12 +3,12 @@ id: AF-0150
 title: CI red 33.92 min after test4001 failed on macOS from BL-1947's commit (run 38030548658)
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: process:logs:CI-run-38030548658:ci-red
 reproduction: none
-task: none
-tasks:
+task: BL-2055
+tasks: BL-1969, BL-2045, BL-2055
 found: 2026-10-10
 found-at: 1b27494521dec4bdaa3fe60c8dc7a3fc73874253
 scorecard: 2026-10-10_0123.md
@@ -42,6 +42,9 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-10-11 | 2026-10-11_0051.md | reproduces: yes | The reproduction on the 20261010-012326 logs shows 'run 38030548658 failure on 1c6aa1ac: test4001 on macOS only' and 'filed BL-1949' at 23:43:05. The same cause, a test that passes in the Windows-only lane tests but fails on Linux/macOS from a lane's commit and keeps CI red over 30 min, crosses again in this window. Run 38047662088: test475 failed on Linux+macOS from BL-1907's commit 7b6794f4, and CI was red 32 min (11:19:01Z to 11:51:01Z) until BL-1957's fix b1124f69. The same 38030548658 spell (33.92 min) also reappears in this window's ciRedSpells.
+
 ## Log
 
 - 2026-10-10: filed proposed.
+- 2026-10-10: proposed -> accepted.

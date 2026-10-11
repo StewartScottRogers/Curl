@@ -3,19 +3,19 @@ id: AF-0143
 title: MontgomeryModulus.MinusTwo's loop bound 'index >= 0' can become 'index > 0' with no test failing
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: closed
+reason: Re-audit 2026-10-11_0051.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
 key: quality:Curl.Cryptography.UnitLibrary/MontgomeryModulus.cs:MinusTwo-ge:surviving-mutant
 reproduction: mutation Curl.Cryptography.UnitLibrary/MontgomeryModulus.cs:117:>=
-task: none
-tasks:
+task: BL-1962
+tasks: BL-1962
 found: 2026-10-10
 found-at: 1b27494521dec4bdaa3fe60c8dc7a3fc73874253
 scorecard: 2026-10-10_0123.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-11
+closed-how: mechanical
+closed-by: 2026-10-11_0051.md
 ---
 # AF-0143 - MontgomeryModulus.MinusTwo's loop bound 'index >= 0' can become 'index > 0' with no test failing
 
@@ -42,6 +42,10 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Crypt
 
 ## Re-audits
 
+- 2026-10-11 | 2026-10-11_0051.md | reproduces: no | Ran the -Site reproduction (MontgomeryModulus.cs:117:>=, -Member MinusTwo): resolvedLine 117, `index >= 0` -> `index > 0`, outcome killed. Runner's targeted mutation rerun on the clean audited commit: killed.
+
 ## Log
 
 - 2026-10-10: filed proposed.
+- 2026-10-10: proposed -> accepted.
+- 2026-10-11: accepted -> closed. Re-audit 2026-10-11_0051.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.

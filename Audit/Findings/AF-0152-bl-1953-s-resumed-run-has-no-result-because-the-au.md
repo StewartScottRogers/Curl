@@ -3,19 +3,19 @@ id: AF-0152
 title: BL-1953's resumed run has no result because the audit copied the logs 1 s after it started
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: closed
+reason: Re-audit 2026-10-11_0051.md: the reproduction no longer reproduces.
 key: process:BL-1953:BL-1953-resumed-run:unfinished-run
 reproduction: none
-task: none
-tasks:
+task: BL-1971
+tasks: BL-1971
 found: 2026-10-10
 found-at: 1b27494521dec4bdaa3fe60c8dc7a3fc73874253
 scorecard: 2026-10-10_0123.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-11
+closed-how: reliable-reaudit
+closed-by: 2026-10-11_0051.md
 ---
 # AF-0152 - BL-1953's resumed run has no result because the audit copied the logs 1 s after it started
 
@@ -42,6 +42,10 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-10-11 | 2026-10-11_0051.md | reproduces: no | The reproduction on the 20261010-012326 logs lists BL-1953-20261010-011807-L1.jsonl and BL-1953-20261010-012305-L1-resumed.jsonl. In this window the resumed run has a result and is not in unfinishedRuns. Ran the rule over this window: no unfinished run was cut short by the log copy. The last shift (DarkFactory-20261010-213213) ended at 22:01:28, about 3 h before the copy (log folder written 00:53 on 10-11). BL-2035's run stopped from a lane script error, and BL-2999's file matches no shift or claim (see its finding).
+
 ## Log
 
 - 2026-10-10: filed proposed.
+- 2026-10-10: proposed -> accepted.
+- 2026-10-11: accepted -> closed. Re-audit 2026-10-11_0051.md: the reproduction no longer reproduces.
