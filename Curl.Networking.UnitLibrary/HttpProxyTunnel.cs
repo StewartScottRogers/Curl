@@ -196,11 +196,12 @@ internal static class HttpProxyTunnel
             return HttpProxyTunnelReply.Failed("CONNECT response too large");
         }
 
-        if (header[^1] != '\n')
-        {
-            return null;
-        }
+        return header[^1] == '\n' ? ReplyAfterLineEnd(header, ref lineStart, forConnectUdp) : null;
+    }
 
+    // The reply once the LF just added ends a line, or null while more is to be read.
+    private static HttpProxyTunnelReply? ReplyAfterLineEnd(List<byte> header, ref int lineStart, bool forConnectUdp)
+    {
         if (header.Count > MaximumHeaderBytes)
         {
             return HttpProxyTunnelReply.Failed(

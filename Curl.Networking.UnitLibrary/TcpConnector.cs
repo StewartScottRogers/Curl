@@ -1757,16 +1757,10 @@ public sealed partial class TcpConnector(
             return (null, false, null);
         }
 
-        string? answer;
-        try
+        var (answer, authenticationFailure) = await AskAuthenticatorToAnswer407Async(reply, tunnel, sentAuthorization, sentAnswersChallenge, cancellationToken).ConfigureAwait(false);
+        if (authenticationFailure is not null)
         {
-            answer = sentAuthorization is null || AnswersStaleDigest(sentAuthorization, reply)
-                ? await CreateProxyAuthorizationAsync(tunnel.Destination, tunnel.Proxy, reply.ProxyAuthenticate, tunnel.AuthenticatorEvents, cancellationToken).ConfigureAwait(false)
-                : await ProxyAuthenticator.ContinueAuthorizationAsync(ProxyAuthRequestOf(tunnel.Destination, tunnel.Proxy) with { Events = tunnel.AuthenticatorEvents }, sentAuthorization, !sentAnswersChallenge, reply.ProxyAuthenticate, cancellationToken).ConfigureAwait(false);
-        }
-        catch (HttpAuthenticationFailedException failure)
-        {
-            return (null, false, ConnectResult.Failed(failure.ExitCode, failure.Message));
+            return (null, false, authenticationFailure);
         }
 
         if (string.IsNullOrEmpty(answer))
@@ -1780,6 +1774,33 @@ public sealed partial class TcpConnector(
         return reply.LeavesConnectionReusable
             ? await DiscardRejectedBodyAsync(connection, reply, answer, tunnel.Target.Events, cancellationToken).ConfigureAwait(false)
             : (answer, false, null);
+    }
+
+    /// <summary>
+    /// Asks the authenticator for the <c>Proxy-Authorization</c> that answers the <c>407</c>
+    /// <paramref name="reply" />: afresh when the CONNECT sent none or the reply marks its Digest
+    /// nonce stale, else as the next leg of the handshake behind
+    /// <paramref name="sentAuthorization" />. A failure the authenticator reports is returned as
+    /// the tunnel's failure with its exit code.
+    /// </summary>
+    private async ValueTask<(string? Answer, ConnectResult? Failure)> AskAuthenticatorToAnswer407Async(
+        HttpProxyTunnelReply reply,
+        TunnelRequest tunnel,
+        string? sentAuthorization,
+        bool sentAnswersChallenge,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var answer = sentAuthorization is null || AnswersStaleDigest(sentAuthorization, reply)
+                ? await CreateProxyAuthorizationAsync(tunnel.Destination, tunnel.Proxy, reply.ProxyAuthenticate, tunnel.AuthenticatorEvents, cancellationToken).ConfigureAwait(false)
+                : await ProxyAuthenticator.ContinueAuthorizationAsync(ProxyAuthRequestOf(tunnel.Destination, tunnel.Proxy) with { Events = tunnel.AuthenticatorEvents }, sentAuthorization, !sentAnswersChallenge, reply.ProxyAuthenticate, cancellationToken).ConfigureAwait(false);
+            return (answer, null);
+        }
+        catch (HttpAuthenticationFailedException failure)
+        {
+            return (null, ConnectResult.Failed(failure.ExitCode, failure.Message));
+        }
     }
 
     /// <summary>
