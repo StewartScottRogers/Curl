@@ -5,10 +5,10 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests, Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests]
+touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests, Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests, Curl.Conformance.UnitTests]
 requirement: none
 created: 2026-10-11
-completed:
+completed: 2026-10-11
 ---
 # BL-2077 — Re-close GF-0018: -F multipart bodies differ: custom Content-Type, several files in one -F, quoted file names with , ; "
 
@@ -37,16 +37,32 @@ In Curl.Cli.UnitLibrary's -F parser and the multipart writer it feeds: merge a u
 
 ## Acceptance criteria
 
-- [ ] `behaviour:test277`: Curl answers what curl 8.21.0 answers, `reference curl exits 0; stdout 0 bytes: `, so the item measures `match`.
-- [ ] `behaviour:test669`: Curl answers what curl 8.21.0 answers, `upstream test669 passes`, so the item measures `match`.
-- [ ] `behaviour:test1133`: Curl answers what curl 8.21.0 answers, `reference curl exits 0; stdout 0 bytes: `, so the item measures `match`.
-- [ ] `behaviour:test1315`: Curl answers what curl 8.21.0 answers, `reference curl exits 0; stdout 0 bytes: `, so the item measures `match`.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
-- [ ] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
+- [x] `behaviour:test277`: Curl answers what curl 8.21.0 answers, `reference curl exits 0; stdout 0 bytes: `, so the item measures `match`.
+- [x] `behaviour:test669`: Curl answers what curl 8.21.0 answers, `upstream test669 passes`, so the item measures `match`.
+- [x] `behaviour:test1133`: Curl answers what curl 8.21.0 answers, `reference curl exits 0; stdout 0 bytes: `, so the item measures `match`.
+- [x] `behaviour:test1315`: Curl answers what curl 8.21.0 answers, `reference curl exits 0; stdout 0 bytes: `, so the item measures `match`.
+- [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
+- [x] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
 
 ## Notes
+
+- 2026-10-11, lane 2: no product code needed changing. `HttpRequestHeadFormatter.FormContentTypeOf`
+  (BL-1811, BL-1972, kept through BL-2061) already sends the `-H` Content-Type with
+  `; boundary=` in the generated header's place after `Content-Length`. Run through the
+  in-repo upstream harness (`UpstreamCase_RunThroughCurl_HoldsTheRatchet`, which judges
+  against each case's `<verify>`), tests 277, 669, 1133 and 1315 all pass on this commit.
+  669, 1133 and 1315 were already on `Curl.Conformance.UnitTests/PassingUpstreamCases.txt`;
+  277 was not, so it is added now and the ratchet holds it. `Curl.Conformance.UnitTests` is
+  added to `touches` for that one line; no task in Doing names it.
+- The finding's evidence for 277 (`Content-Type: text/info` at line 5, before
+  `Content-Length`) is the pre-BL-1811 order, so the gap run measured a Curl that does not
+  hold these fixes - the same pattern BL-2074 and BL-2075 recorded. No `--ai-help` change:
+  no option changed. If the next gap run still measures these items as differing, an
+  interactive session should check which Curl binary `Gap/Tools/Measure-UpstreamCases.cs`
+  runs, since lanes may not read `Gap/`.
 
 ## Log
 
 - 2026-10-11: Created.
 - 2026-10-11: Backlog -> Doing.
+- 2026-10-11: Doing -> Done. Tests 277, 669, 1133 and 1315 pass the in-repo upstream harness; 277 added to the ratchet
