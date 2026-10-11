@@ -1351,7 +1351,7 @@ public sealed class HttpProtocolHandler(
             AcceptsHttp09 = options.AllowHttp09Reply,
             IsHeadRequest = context.NoBody,
             IgnoresContentLength = options.IgnoreContentLength,
-            IsThroughHttpProxy = options.ForwardProxy is { Kind: ProxyKind.Http or ProxyKind.Http10 or ProxyKind.Https },
+            IsThroughHttpProxy = IsThroughHttpProxy(options),
             IsSwitchedToHttp2 = () => IsSwitchedToHttp2(connection),
             DefersFrom = (statusLine, header) => plan.Framing.Body is not StreamBody && IsAuthChallenge(plan, statusLine, header),
         };
@@ -1763,7 +1763,7 @@ public sealed class HttpProtocolHandler(
     {
         HttpRequestOptions options = plan.Options;
         if (!discardsBody
-            || !HttpConnectionPersistence.KeepsAlive(head, plan.Context.NoBody, options.Raw, options.IgnoreContentLength, options.TransferEncoding))
+            || !HttpConnectionPersistence.KeepsAlive(head, plan.Context.NoBody, options.Raw, options.IgnoreContentLength, options.TransferEncoding, IsThroughHttpProxy(options)))
         {
             return;
         }
@@ -1932,7 +1932,7 @@ public sealed class HttpProtocolHandler(
     private static bool KeepsAlive(HttpRequestPlan plan, HttpResponseHead head, HttpRequestBodyWriter upload, HttpResponseHeadReader headReader, HttpBodyDelivery delivery, IHttpStreamSession? streams) =>
         DeliveredWhole(head, upload, headReader, delivery)
             && (streams?.AcceptsNewStreams
-                ?? HttpConnectionPersistence.KeepsAlive(head, plan.Context.NoBody || !headReader.EndedAtEmptyLine, plan.Options.Raw, plan.Options.IgnoreContentLength, plan.Options.TransferEncoding));
+                ?? HttpConnectionPersistence.KeepsAlive(head, plan.Context.NoBody || !headReader.EndedAtEmptyLine, plan.Options.Raw, plan.Options.IgnoreContentLength, plan.Options.TransferEncoding, IsThroughHttpProxy(plan.Options)));
 
     /// <summary>
     /// Decides whether the connection is reported left intact although the server closed it
@@ -2117,7 +2117,7 @@ public sealed class HttpProtocolHandler(
         return discardsBody
             && delivery == HttpBodyDelivery.Deliver
             && requestStream is null
-            && !HttpConnectionPersistence.KeepsAlive(head, plan.Context.NoBody, options.Raw, options.IgnoreContentLength, options.TransferEncoding);
+            && !HttpConnectionPersistence.KeepsAlive(head, plan.Context.NoBody, options.Raw, options.IgnoreContentLength, options.TransferEncoding, IsThroughHttpProxy(options));
     }
 
     /// <summary>
@@ -2461,7 +2461,14 @@ public sealed class HttpProtocolHandler(
         bodyStopped
             && head.StatusLine.StatusCode == 417
             && plan.Options.Fail != HttpFailMode.Fail
-            && HttpConnectionPersistence.KeepsAlive(head, plan.Context.NoBody, plan.Options.Raw, plan.Options.IgnoreContentLength, plan.Options.TransferEncoding);
+            && HttpConnectionPersistence.KeepsAlive(head, plan.Context.NoBody, plan.Options.Raw, plan.Options.IgnoreContentLength, plan.Options.TransferEncoding, IsThroughHttpProxy(plan.Options));
+
+    /// <summary>
+    /// Decides whether the transfer goes through an HTTP proxy, where curl 8.21.0 reads
+    /// <c>Proxy-Connection</c> headers (<c>conn->bits.httpproxy</c> in <c>lib/http.c</c>).
+    /// </summary>
+    private static bool IsThroughHttpProxy(HttpRequestOptions options) =>
+        options.ForwardProxy is { Kind: ProxyKind.Http or ProxyKind.Http10 or ProxyKind.Https };
 
     /// <summary>
     /// Decides whether a response is answered with one more request, and with what

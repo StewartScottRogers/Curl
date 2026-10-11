@@ -144,6 +144,44 @@ public sealed partial class HttpProtocolHandlerTests
     }
 
     /// <summary>
+    /// Upstream test258's shape: a 407 Digest challenge that closes its connection with
+    /// <c>Proxy-Connection: close</c> rather than <c>Connection: close</c> is answered on a new
+    /// connection, as curl 8.21.0 closes an HTTP/1.1 proxy connection on that header
+    /// (<c>lib/http.c</c>), and the transfer ends with exit 0.
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_ProxyDigestChallengeWithProxyConnectionClose_AnswersItOnANewConnection()
+    {
+        const string challengeHead =
+            "HTTP/1.1 407 Proxy Authentication Required\r\nProxy-Authenticate: Digest realm=\"r\", nonce=\"abc\", qop=\"auth\"\r\nProxy-Connection: close\r\nContent-Length: 0\r\n\r\n";
+        const string digest = "Proxy-Authorization: Digest username=\"u\", realm=\"r\", nonce=\"abc\", uri=\"/\", "
+            + "cnonce=\"8c2728ea340ca45e0fc1411a44d914b4\", nc=00000001, qop=auth, response=\"7c30003a2d4e99796b67ba30c0234996\"\r\n";
+        foreach (int chunkSize in ChunkSizes)
+        {
+            TurnTakingConnection first = new(chunkSize, challengeHead);
+            TurnTakingConnection second = new(chunkSize, ClosingOkHead + "ok");
+            QueueConnector connector = QueueConnector.For(first, second);
+            MemoryStream output = new();
+            Diagnostics.Arrange("chunk size", chunkSize);
+            Diagnostics.Arrange("scripted responses", "407 Digest with Proxy-Connection: close, then 200 ok on a new connection");
+
+            TransferResult result = await ProxyChallengeHandler(connector, HttpAuthSchemes.Digest, "8c2728ea340ca45e0fc1411a44d914b4")
+                .ExecuteAsync(ProxyChallengeContext(output));
+
+            WriteResult(result);
+            Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+            Diagnostics.Diff("first request", OneLine(ProxyRequestStart + ProxyRequestEnd), OneLine(first.Written));
+            Diagnostics.Diff("second request", OneLine(ProxyRequestStart + digest + ProxyRequestEnd), OneLine(second.Written));
+            Diagnostics.Assert("connections", 2, connector.Targets.Count);
+            Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
+            Assert.AreEqual(ProxyRequestStart + ProxyRequestEnd, first.Written, $"Chunk size {chunkSize}");
+            Assert.AreEqual(ProxyRequestStart + digest + ProxyRequestEnd, second.Written, $"Chunk size {chunkSize}");
+            Assert.AreEqual("ok", Latin1(output.ToArray()), $"Chunk size {chunkSize}");
+            Assert.HasCount(2, connector.Targets, $"Chunk size {chunkSize}");
+        }
+    }
+
+    /// <summary>
     /// Measured: <c>--proxy-digest</c> against a 407 that keeps the connection open sends the
     /// Digest answer on the same connection.
     /// </summary>
