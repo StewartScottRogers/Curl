@@ -6,6 +6,7 @@ assignee: Claude
 pipeline: feature
 depends-on: []
 touches: [Curl.Protocol.Pop3.UnitLibrary, Curl.Protocol.Pop3.UnitTests]
+lane: no
 requirement: none
 created: 2026-10-11
 completed:
@@ -43,7 +44,25 @@ In Curl.Protocol.Pop3.UnitLibrary's Pop3Login, send AUTH CRAM-MD5 when CAPA offe
 
 ## Notes
 
+- 2026-10-11, dark factory lane 4: Interactive only. Curl's side already matches curl
+  8.21.0: BL-1991 measured test891's exchange with `Record-CurlExchange.ps1` (CAPA listing
+  only `SASL CRAM-MD5`, `+` then bare LF) and real curl and Curl sent byte-identical
+  streams (`CAPA`, `AUTH CRAM-MD5`, the CRAM-MD5 answer), both exit 67; a unit test pins it.
+  Read again this run: `Pop3ControlChannel` ends a line at LF with or without CR, and
+  `SaslAuthenticator`/`SaslMechanismRanking` choose CRAM-MD5 with `-u user:secret`. Curl
+  sends nothing after `CAPA` only when no mechanism is chosen and `CAPA` lacks `USER`, so
+  the gap run's "got the end" most likely comes from how `Gap/Tools/Measure-UpstreamCases.cs`
+  serves test891 (its `CAPA` reply or its `REPLYLF` handling), which the audit guard
+  refuses a lane to read (the local upstream copy under `%LOCALAPPDATA%\Curl\gap` is
+  refused too). No code changed.
+- Remove `lane: no` once an interactive session has run the finding's reproduce command
+  (`dotnet run --file Gap/Tools/Measure-UpstreamCases.cs -- ... 891`), read the bytes the
+  harness served and Curl sent, and either fixed the harness (then this task closes on the
+  next gap run) or written under these Notes the exact server bytes after which Curl stops,
+  so a lane can reproduce them in a `Pop3ProtocolHandler` unit test.
+
 ## Log
 
 - 2026-10-11: Created.
 - 2026-10-11: Backlog -> Doing.
+- 2026-10-11: Doing -> Backlog. Interactive only: Curl already matches curl on test891 (BL-1991); the gap office's measuring harness, which lanes may not read, must be checked (see Notes)
