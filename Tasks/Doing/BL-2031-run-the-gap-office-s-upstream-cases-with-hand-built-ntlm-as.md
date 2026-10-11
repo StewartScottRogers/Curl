@@ -47,3 +47,4 @@ build because `UpstreamCurlPlatform` lists no `SSPI`. Reword it.
 ## Log
 
 - 2026-10-10: Created.
+- 2026-10-10: Backlog -> Doing.
