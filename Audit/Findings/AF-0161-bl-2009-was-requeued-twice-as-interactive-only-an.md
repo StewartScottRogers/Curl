@@ -3,8 +3,8 @@ id: AF-0161
 title: BL-2009 was requeued twice as interactive only; an interactive commit removed its lane: no between the two lane claims
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: process:BL-2009:BL-2009:redone-work
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Log
 
 - 2026-10-11: filed proposed.
+- 2026-10-11: proposed -> accepted.
