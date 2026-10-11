@@ -33,3 +33,4 @@ BL-2003 did this for the 401/407 retry inside `HttpProtocolHandler` (`ThrowIfChu
 ## Log
 
 - 2026-10-10: Created.
+- 2026-10-10: Backlog -> Doing.
