@@ -5,10 +5,10 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Console]
+touches: [Curl.Console, Curl.Console.UnitTests]
 requirement: none
 created: 2026-10-10
-completed:
+completed: 2026-10-10
 ---
 # BL-1964 — Fix AF-0145: An -o file that cannot be opened prints its Warning line inside the progress-meter row instead of after the meter's closing newline
 
@@ -41,12 +41,21 @@ The finding closes only when a later re-audit by the conformance auditor confirm
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Cause: `TransferIntoOutputFileAsync` printed the `-o` open warning as soon as the transfer returned, before `WriteProgressAsync` wrote the meter's closing newline, so the warning landed on the live meter row and the newline became a stray blank line.
+- Fix: the warning is held as `RunningTransferState.OutputFileOpenWarning` and printed by `WriteProgressAndAbandonedRetryWarningAsync` right after the meter (before any abandoned-retry warning). Under `-#` it is still printed at once: the bar writes its newline after the failure lines, and no measurement says otherwise. The retried-attempt path (`SettleRetriedOutputFileAsync`, upstream test 3036) was left as it is, since its order is pinned by that measured test.
+- `touches` widened to `Curl.Console.UnitTests` for the regression test; no task in Doing on origin/work/dark-factory named it (only BL-2038, Curl.Conformance.*).
+- Test: `CurlCommandRunnerStartedTransferProgressMeterTests.RunAsync_StartedEmptyTransferToUnopenableOutputFile_WritesTheOpenWarningAfterTheMetersNewline`.
+- Reproduction rerun 2026-10-10 on a Release build: `curl: 1 / Curl: 1`. Remaining difference: curl draws three more zero rows (its success done rows) before the newline; filed as BL-2039.
+- Under `-#` the immediate print is pinned by `CurlCommandRunnerProgressBarTests.RunAsync_ProgressBarWithAnUnopenableOutputFile_WritesTheOpenWarningBeforeTheBar` (covers the helper's other branch).
+- Fast tests: Curl.Console.UnitTests 2783 passed, 25 skipped; whole solution fast run had no failures.
 
 ## Log
 
 - 2026-10-10: Created.
 - 2026-10-10: Backlog -> Doing.
+- 2026-10-10: Doing -> Done. An -o file that cannot be opened prints its Warning line after the progress meter's closing newline, as curl 8.21.0 does
