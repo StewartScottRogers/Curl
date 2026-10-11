@@ -83,3 +83,4 @@ Re-measure after the InProcessCurl rewiring of behaviour:in-process-runner-bypas
 - 2026-10-10: Doing -> Backlog. Waits on BL-1997 (InProcessCurl runs TcpConnector); re-measure GF-0046 after it, then fix what still stops test713-715
 - 2026-10-10: Backlog -> Doing.
 - 2026-10-10: Doing -> Backlog. Waits on BL-2035 (harness relays CONNECT to FTP ports; diagnose test713's data connection); --connect-to fix for FTP data connections left uncommitted
+- 2026-10-10: Backlog -> Doing.
