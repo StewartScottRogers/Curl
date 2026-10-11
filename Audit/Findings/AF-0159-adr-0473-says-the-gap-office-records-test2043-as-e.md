@@ -3,8 +3,8 @@ id: AF-0159
 title: ADR-0473 says the gap office records test2043 as excluded with an internet-host reason; the gap converter has no such rule and records it as unmeasured
 auditor: truthfulness
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: truthfulness:Documentation/Planning/Decisions/ADR-0473-upstream-test2043-is-measured-excluded-because-it-checks-a-live-internet-host.md:ADR-0473:stale-adr
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Run from the repository root:
 ## Log
 
 - 2026-10-11: filed proposed.
+- 2026-10-11: proposed -> accepted.
