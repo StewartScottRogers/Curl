@@ -295,6 +295,7 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
     {
         if (!HasBody(head, noBody))
         {
+            ReportUnreadBody(head, noBody);
             return;
         }
 
@@ -315,6 +316,24 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
         {
             contentDecoder?.Dispose();
         }
+    }
+
+    /// <summary>
+    /// Reports the body <c>-I</c> leaves unread as nothing downloaded out of its Content-Length,
+    /// so the progress meter draws the rows curl 8.21.0 draws for a HEAD response: their Total
+    /// is the Content-Length, or 0 for a 204 or 304, without one, or under
+    /// <c>--ignore-content-length</c> (measured, BL-2049 Notes). Any other bodiless response
+    /// reports nothing.
+    /// </summary>
+    private void ReportUnreadBody(HttpResponseHead head, bool noBody)
+    {
+        if (!noBody)
+        {
+            return;
+        }
+
+        bool lengthCounts = HasBody(head, noBody: false) && !IgnoresContentLength;
+        Progress.ReportDownloaded(0, lengthCounts ? HttpContentLength.Find(head.Headers) : null);
     }
 
     /// <summary>

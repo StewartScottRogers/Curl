@@ -5,10 +5,10 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Protocol.Http.UnitLibrary]
+touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests]
 requirement: none
 created: 2026-10-11
-completed:
+completed: 2026-10-11
 ---
 # BL-2049 — Fix AF-0156: -I (HEAD) progress meter stops after the all-zero row; curl 8.21.0 draws three more rows with the Content-Length as Total
 
@@ -41,12 +41,18 @@ The finding closes only when a later re-audit by the conformance auditor confirm
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Measured curl 8.21.0 (mingw, Schannel) with Record-CurlExchange.ps1 on -I: every HEAD response draws the zero row then three more rows. Their Total is the Content-Length (6 for `Content-Length: 6`), and 0 for a response without one and for a 204 with `Content-Length: 6`.
+- Fix: `HttpResponseBodyReader.CopyAsync` now reports 0 bytes out of the Content-Length for a body -I leaves unread (`ReportUnreadBody`), null for 204/304 or --ignore-content-length (the latter by curl's rule that it drops the length, not measured). Bodiless responses without -I still report nothing; not measured here, left as they were. `ExpectedLength` stays unset for -I, so the exit 28 message is unchanged.
+- Added Curl.Protocol.Http.UnitTests to touches for the new test `CopyAsync_ResponseWithNoBody_ReportsProgressAsCurlDraws`; no task in Doing on origin/work/dark-factory names it.
+- Reproduction after the fix: curl rows with Total 6: 3 / Curl: 3. Every branch of the new method is hit by the test's five rows; Measure-CodeQuality.ps1 not run (cost; one 8-line method, complexity 3).
 
 ## Log
 
 - 2026-10-11: Created.
 - 2026-10-11: Backlog -> Doing.
+- 2026-10-11: Doing -> Done. -I progress rows now match curl 8.21.0; AF-0156 reproduction gives 3 / 3

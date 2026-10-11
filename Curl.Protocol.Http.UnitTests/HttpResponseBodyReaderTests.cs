@@ -99,6 +99,28 @@ public sealed class HttpResponseBodyReaderTests
     }
 
     [TestMethod]
+    [DataRow("HTTP/1.1 200 OK\r\nContent-Length: 6\r\n\r\n", true, false, "down 0/6", DisplayName = "-I reports the Content-Length")]
+    [DataRow("HTTP/1.1 200 OK\r\nX: y\r\n\r\n", true, false, "down 0/?", DisplayName = "-I without Content-Length")]
+    [DataRow("HTTP/1.1 204 No Content\r\nContent-Length: 6\r\n\r\n", true, false, "down 0/?", DisplayName = "-I 204 ignores the Content-Length")]
+    [DataRow("HTTP/1.1 200 OK\r\nContent-Length: 6\r\n\r\n", true, true, "down 0/?", DisplayName = "-I under --ignore-content-length")]
+    [DataRow("HTTP/1.1 204 No Content\r\nContent-Length: 6\r\n\r\n", false, false, "", DisplayName = "204 without -I reports nothing")]
+    public async Task CopyAsync_ResponseWithNoBody_ReportsProgressAsCurlDraws(string response, bool noBody, bool ignoresContentLength, string expected)
+    {
+        Diagnostics.Bytes("scripted response", Encoding.Latin1.GetBytes(response));
+        Diagnostics.Arrange("noBody, ignoresContentLength", $"{noBody}, {ignoresContentLength}");
+        ScriptedConnection connection = Connection(response, 65536);
+        HttpResponseHead head = await new HttpResponseHeadReader(connection).ReadAsync(CancellationToken.None);
+        RecordingTransferProgress progress = new();
+        HttpResponseBodyReader reader = new(connection) { Progress = new HttpTransferProgress(progress), IgnoresContentLength = ignoresContentLength };
+
+        await reader.CopyAsync(head, noBody, new FailingWriteStream(), false, false, CancellationToken.None);
+
+        string actual = string.Join(" | ", progress.Downloads);
+        Diagnostics.Assert("download reports", expected, actual);
+        Assert.AreEqual(expected, actual);
+    }
+
+    [TestMethod]
     [DataRow(true, 200, false, DisplayName = "HEAD request")]
     [DataRow(false, 204, false, DisplayName = "204")]
     [DataRow(false, 304, false, DisplayName = "304")]
