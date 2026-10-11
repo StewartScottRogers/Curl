@@ -106,6 +106,30 @@ public sealed partial class TcpConnectorQuicTests
     }
 
     [TestMethod]
+    public async Task ConnectAsync_ASecondTimeAfterAFailedQuicConnectForTheSameTarget_StartsAFreshFilterAsTheQuicAttemptWasTakenOnce()
+    {
+        // AF-0154: the QUIC attempt kept for the TCP attempt after it is taken once, so a later
+        // connect to the same target does not go on from it again.
+        var opener = new QuicServerChannelOpener { ServerFor = _ => Server(closeAfterClientHello: 0x1) };
+        var events = new RecordingTransferEvents();
+        var connector = TracingConnector(opener, "h2");
+        var target = Target(events);
+        Diagnostics.Arrange("connects to one target", "QUIC (refused), TCP, TCP");
+
+        await ConnectMultiplexedAsync(connector, target);
+        var first = await ConnectAsync(connector, target);
+        events.Info.Clear();
+        var second = await ConnectAsync(connector, target);
+
+        ActFilterLines(events);
+        Diagnostics.Assert("first filter line", "[HTTPS-CONNECT] added", FilterLines(events)[0]);
+        Assert.IsNotNull(first.Connection);
+        Assert.IsNotNull(second.Connection);
+        Assert.AreEqual("[HTTPS-CONNECT] added", FilterLines(events)[0]);
+        CollectionAssert.DoesNotContain(FilterLines(events), "[HTTPS-CONNECT] h3 baller failed, starting h2");
+    }
+
+    [TestMethod]
     public async Task ConnectAsync_WhileTheQuicConnectForTheSameTargetIsStillConnecting_CallsItInconclusiveAndCountsBothSockets()
     {
         // curl 8.22.0 --http3 against a silent QUIC peer (BL-1284 Notes).

@@ -31,8 +31,7 @@ scheme (case-insensitive) and returns exit 1, `Protocol "<scheme>" not supported
 none is, or `Protocol "<scheme>" is disabled` when `--proto` excludes it; either refusal is
 also reported to the transfer's events, as curl 8.21.0's `-v` writes it (BL-805), as is the
 `RedirectFollower`'s `(in redirect)` refusal. Two handlers claiming one scheme make its
-constructor throw. It is not yet wired
-into `Curl.Console`.
+constructor throw. `CurlComposition` in `Curl.Console` constructs it.
 
 `ByteRangeParser` is the one place `-r`/`--range` text becomes the `ByteRange` a handler
 receives on `ITransferContext.Range`, read as libcurl 8.21.0's `Curl_range` reads it; text
@@ -66,20 +65,20 @@ on a 301 or 302 without `--post301`/`--post302`, every 303 but a POST under `--p
 `--retry-delay`) after curl 8.21.0's transient failures: exit 28, 6, 5 or 12
 (`: timeout`), under `--retry-connrefused` an exit 7 whose `TransferResult.IsConnectionRefused`
 is set (`: connection refused`; any other exit 7 only under `--retry-all-errors`), or an http(s) status 408, 429, 500, 502, 503, 504, 522 or 524 on a
-success or a `-f` exit 22 (`: HTTP error`). It waits a `Retry-After`
+success or a `-f` exit 22 (`: HTTP error`), or an FTP or FTPS 4xx reply (`: FTP error`). It waits a `Retry-After`
 (`RetryAfterHeader`, capped at six hours) when one asks for a wait, else the fixed
 delay, else curl's backoff (1 s doubling to 10 min, advanced only when used), with
 `Task.Delay` on the context's `TimeProvider`, and hands each retried attempt and its
 `TransferRetryWarning` line (`Warning: Problem : HTTP error. Retrying in 1 second. 3
-retries left.`) to the caller, which prints and wraps it and readies the output. It is
-not yet wired into `Curl.Console` (BL-241).
+retries left.`) to the caller, which prints and wraps it and readies the output.
+`Curl.Console`'s `CurlCommandRunner` is that caller (BL-241).
 
 `UrlSchemeGuesser` gives a URL typed without a scheme the one curl 8.21.0 guesses: the
 scheme its host prefix implies (`ftp.`, `dict.`, `ldap.`, `imap.`, `smtp.`, `pop3.`, any
 case), otherwise `http`. On Windows a single letter and a colon is a drive prefix, not a
 scheme, so `--proto-default file Z:/dir/file` fetches `file://Z:/dir/file` (BL-1851,
 upstream test1146). It only prepends `<scheme>://`; rejecting a malformed URL is left
-to the URL parser. It is not yet wired into `Curl.Console`.
+to the URL parser. `Curl.Console`'s `CurlCommandRunner` calls `AddScheme` for it.
 
 `ProxySelector` chooses the `ProxyEndpoint` curl 8.21.0 would use for a URL from `-x`,
 `--noproxy` and the proxy environment variables (ADR-0024). It reads the environment only
@@ -88,8 +87,8 @@ production passes `Environment.GetEnvironmentVariable`, and tests pass a diction
 the real environment. `NoProxyMatcher` is the `--noproxy`/`NO_PROXY` list, and
 `ProxyUrlParser` turns proxy text into an endpoint or curl's exit 5 or 7 failure. Text with
 no scheme is the kind of the option that gave it (`-x` is HTTP, `--socks5` is SOCKS5, the
-environment is always HTTP) and `socks://` is SOCKS4 (BL-269). It is not yet wired into
-`Curl.Console` (BL-238).
+environment is always HTTP) and `socks://` is SOCKS4 (BL-269). `CurlComposition` in
+`Curl.Console` constructs it (BL-238).
 
 `Multipart\MultipartFormBodyBuilder` turns `MultipartFormPart`s into the `multipart/form-data`
 `StreamBody` curl 8.21.0 sends for `-F`, byte for byte (ADR-0027): headers chosen as
@@ -106,7 +105,7 @@ builder is given whole, never closing it, so the body keeps its `Content-Length`
 one it opens the path `-` as before (BL-275). A file that cannot seek declares the length
 `UnseekableFileLength` gives it (ADR-0097); one that can declares its length, except a device
 under `/dev/` off Windows, which `SeekableFileLength` sends chunked as libcurl does
-(ADR-0104). Names and file names are escaped as `MultipartNameEscaping` says: `%22`, `%0D`, `%0A` by default, `\\` and `\"` under `--form-escape` (BL-625). It is not yet wired into `Curl.Console`.
+(ADR-0104). Names and file names are escaped as `MultipartNameEscaping` says: `%22`, `%0D`, `%0A` by default, `\\` and `\"` under `--form-escape` (BL-625). `Curl.Console` builds every `-F` body with it.
 
 `Globbing\UrlGlob` is curl 8.21.0's URL globbing (ADR-0032): `TryParse` reads `{a,b}` sets
 and `[1-10]`, `[01-10]`, `[a-z:2]` ranges as `tool_urlglob.c` does, failing with exit 3 and
@@ -120,8 +119,7 @@ replaces `#N` and `#<name>` in an `-o` name; `UrlGlobMatch.TryResolveOutputFileN
 fails a `#<name>` naming no glob as curl does (exit 43, `no glob exists with this name`); its overload taking the `-T` upload match looks a name up there too, after the URL's globs, and `Curl.Console` calls it for every transfer (BL-1443). `UrlGlobMatch.ResolveOutputFileName` is the name curl
 writes to: as written under `-g`, otherwise substituted and, when the caller passes
 `OperatingSystem.IsWindows()`, sanitized by `WindowsOutputFileNameSanitizer` as curl's
-Windows build does (control characters and `| < > " ? *` become `_`; BL-283). It is not
-yet wired into `Curl.Console` (BL-240).
+Windows build does (control characters and `| < > " ? *` become `_`; BL-283).
 
 `IpfsGatewayRewriter` turns an `ipfs://<cid>/<path>` or `ipns://<name>/<path>` URL into the
 gateway URL curl 8.21.0 fetches: gateway from `--ipfs-gateway`, else `IPFS_GATEWAY`, else
@@ -130,8 +128,8 @@ reads the environment and the file only through the two `Func<string, string?>` 
 constructed with. No gateway is `IpfsGatewayFailure.GatewayDetectionFailed` (exit 37,
 `IPFS automatic gateway detection failed`); an unusable gateway or path is
 `MalformedTargetUrl` (exit 3, `malformed target URL`); both are tool messages, printed as
-`curl: <message>` with no `(<code>)`. It is not yet wired into `Curl.Console` (BL-240), and
-`--ipfs-gateway` is not yet parsed (BL-353).
+`curl: <message>` with no `(<code>)`. `Curl.Console` uses it for `ipfs://` and `ipns://` URLs, and
+`--ipfs-gateway` is parsed by `Curl.Cli.UnitLibrary`'s option table (BL-240, BL-353).
 
 `AltSvc\AltSvcCache` is the `--alt-svc` cache (ADR-0175, BL-622): `ReadFile` takes curl
 8.21.0's alt-svc file text (lines read strictly by `AltSvcFileLineParser`, expired entries
@@ -153,5 +151,5 @@ file text (`[.]host "date"` lines read by `HstsFileLineParser`, dates by `CurlDa
 host's entry or its longest `includeSubDomains` parent, removing expired entries it passes,
 and `FormatFile` writes curl's file byte for byte with the caller's line ending, or `null`
 when an expiry is past the platform's `gmtime` limit and curl would leave the file as it was.
-Time comes from the injected `TimeProvider`; it touches no file. It is not yet wired into
-`Curl.Console` (BL-621).
+Time comes from the injected `TimeProvider`; it touches no file. `Curl.Console`'s
+`HstsCacheFile` reads and writes it for `--hsts` (BL-621).

@@ -99,6 +99,28 @@ public sealed class HttpResponseBodyReaderTests
     }
 
     [TestMethod]
+    [DataRow("HTTP/1.1 200 OK\r\nContent-Length: 6\r\n\r\n", true, false, "down 0/6", DisplayName = "-I reports the Content-Length")]
+    [DataRow("HTTP/1.1 200 OK\r\nX: y\r\n\r\n", true, false, "down 0/?", DisplayName = "-I without Content-Length")]
+    [DataRow("HTTP/1.1 204 No Content\r\nContent-Length: 6\r\n\r\n", true, false, "down 0/?", DisplayName = "-I 204 ignores the Content-Length")]
+    [DataRow("HTTP/1.1 200 OK\r\nContent-Length: 6\r\n\r\n", true, true, "down 0/?", DisplayName = "-I under --ignore-content-length")]
+    [DataRow("HTTP/1.1 204 No Content\r\nContent-Length: 6\r\n\r\n", false, false, "", DisplayName = "204 without -I reports nothing")]
+    public async Task CopyAsync_ResponseWithNoBody_ReportsProgressAsCurlDraws(string response, bool noBody, bool ignoresContentLength, string expected)
+    {
+        Diagnostics.Bytes("scripted response", Encoding.Latin1.GetBytes(response));
+        Diagnostics.Arrange("noBody, ignoresContentLength", $"{noBody}, {ignoresContentLength}");
+        ScriptedConnection connection = Connection(response, 65536);
+        HttpResponseHead head = await new HttpResponseHeadReader(connection).ReadAsync(CancellationToken.None);
+        RecordingTransferProgress progress = new();
+        HttpResponseBodyReader reader = new(connection) { Progress = new HttpTransferProgress(progress), IgnoresContentLength = ignoresContentLength };
+
+        await reader.CopyAsync(head, noBody, new FailingWriteStream(), false, false, CancellationToken.None);
+
+        string actual = string.Join(" | ", progress.Downloads);
+        Diagnostics.Assert("download reports", expected, actual);
+        Assert.AreEqual(expected, actual);
+    }
+
+    [TestMethod]
     [DataRow(true, 200, false, DisplayName = "HEAD request")]
     [DataRow(false, 204, false, DisplayName = "204")]
     [DataRow(false, 304, false, DisplayName = "304")]
@@ -207,25 +229,74 @@ public sealed class HttpResponseBodyReaderTests
     [TestMethod]
     public async Task CopyAsync_OutputFailsAfterAcceptingSomeBytes_ReportsThemAndTheBytesBefore()
     {
-        Diagnostics.Arrange("body", "20000 zero bytes read to close, output accepts 100 bytes of the second write");
+        Diagnostics.Arrange("body", "20000 zero bytes read to close in one read, output accepts 16484 bytes of it");
         ScriptedConnection connection = new(new byte[20000], 65536);
-        FailingWriteStream output = new(2, new OutputWriteFailedException(100, "Full."));
-        HttpResponseBodyReader reader = new(connection);
+        FailingWriteStream output = new(1, new OutputWriteFailedException(16484, "Full."));
+        RecordingTransferEvents events = new();
+        HttpResponseBodyReader reader = new(connection) { Events = events };
 
         HttpTransferException thrown = await Assert.ThrowsExactlyAsync<HttpTransferException>(
             async () => await reader.CopyAsync(Head(string.Empty), false, output, false, false, CancellationToken.None));
 
+        int[] eventSizes = [.. events.Events.Select(text => text.Length - 2)];
         Diagnostics.Act("exception", $"{thrown.GetType().Name}, exit {(int)thrown.ExitCode} ({thrown.ExitCode}): {thrown.Message}");
         Diagnostics.Act("BytesWritten", reader.BytesWritten);
-        Diagnostics.Act("bytes in output", output.ToArray().Length);
+        Diagnostics.Act("data event sizes", string.Join(", ", eventSizes));
         Diagnostics.Assert("exit code", CurlExitCode.WriteError, thrown.ExitCode);
         Diagnostics.Assert("message", "Failure writing output to destination, passed 3616 returned 100", thrown.Message);
         Diagnostics.Assert("BytesWritten", 16384L, reader.BytesWritten);
-        Diagnostics.Assert("bytes in output", 16384, output.ToArray().Length);
+        Diagnostics.Assert("data event sizes", "16384, 3616", string.Join(", ", eventSizes));
         Assert.AreEqual(CurlExitCode.WriteError, thrown.ExitCode);
         Assert.AreEqual("Failure writing output to destination, passed 3616 returned 100", thrown.Message);
         Assert.AreEqual(16384L, reader.BytesWritten);
-        Assert.HasCount(16384, output.ToArray());
+        CollectionAssert.AreEqual(new[] { 16384, 3616 }, eventSizes);
+    }
+
+    [TestMethod]
+    public async Task CopyAsync_OutputFailsInTheFirstPieceOfALargeRead_ReportsOnlyThatPiecesDataEvent()
+    {
+        // AF-0144, BL-2043: one read is one write, and a failure reports the data events up to
+        // the 16384-byte client write curl would have stopped in.
+        Diagnostics.Arrange("body", "40000 zero bytes, Content-Length: 40000, in one read; output accepts 10 bytes");
+        ScriptedConnection connection = new(new byte[40000], 65536);
+        FailingWriteStream output = new(1, new OutputWriteFailedException(10, "Full."));
+        RecordingTransferEvents events = new();
+        HttpResponseBodyReader reader = new(connection) { Events = events };
+
+        HttpTransferException thrown = await Assert.ThrowsExactlyAsync<HttpTransferException>(
+            async () => await reader.CopyAsync(Head("Content-Length: 40000"), false, output, false, false, CancellationToken.None));
+
+        int[] eventSizes = [.. events.Events.Select(text => text.Length - 2)];
+        Diagnostics.Act("message", thrown.Message);
+        Diagnostics.Act("data event sizes", string.Join(", ", eventSizes));
+        Diagnostics.Assert("message", "Failure writing output to destination, passed 16384 returned 10", thrown.Message);
+        Diagnostics.Assert("data event sizes", "16384", string.Join(", ", eventSizes));
+        Assert.AreEqual("Failure writing output to destination, passed 16384 returned 10", thrown.Message);
+        CollectionAssert.AreEqual(new[] { 16384 }, eventSizes);
+        Assert.AreEqual(0L, reader.BytesWritten);
+    }
+
+    [TestMethod]
+    public async Task CopyAsync_LargeReadWithoutDecoding_WritesItOnceAndReportsItIn16KiBDataEvents()
+    {
+        // AF-0144, BL-2043: one write per read costs a file output a sixth of the writes, while
+        // -v still shows curl's 16384-byte client writes.
+        Diagnostics.Arrange("body", "40000 zero bytes, Content-Length: 40000, in one read");
+        ScriptedConnection connection = new(new byte[40000], 65536);
+        FailingWriteStream output = new();
+        RecordingTransferEvents events = new();
+        HttpResponseBodyReader reader = new(connection) { Events = events };
+
+        await reader.CopyAsync(Head("Content-Length: 40000"), false, output, false, false, CancellationToken.None);
+
+        int[] eventSizes = [.. events.Events.Select(text => text.Length - 2)];
+        Diagnostics.Act("write sizes", string.Join(", ", output.WriteSizes));
+        Diagnostics.Act("data event sizes", string.Join(", ", eventSizes));
+        Diagnostics.Assert("write sizes", "40000", string.Join(", ", output.WriteSizes));
+        Diagnostics.Assert("data event sizes", "16384, 16384, 7232", string.Join(", ", eventSizes));
+        CollectionAssert.AreEqual(new[] { 40000 }, output.WriteSizes);
+        CollectionAssert.AreEqual(new[] { 16384, 16384, 7232 }, eventSizes);
+        Assert.AreEqual(40000L, reader.BytesWritten);
     }
 
     [TestMethod]
@@ -427,15 +498,16 @@ public sealed class HttpResponseBodyReaderTests
 
         Diagnostics.Act("write sizes", string.Join(", ", output.WriteSizes));
         Diagnostics.Diff("body", body, output.ToArray());
-        Diagnostics.Assert("write sizes", "16384, 16384, 7232", string.Join(", ", output.WriteSizes));
+        Diagnostics.Assert("write sizes", "40000", string.Join(", ", output.WriteSizes));
         CollectionAssert.AreEqual(body, output.ToArray());
-        CollectionAssert.AreEqual(new[] { 16384, 16384, 7232 }, output.WriteSizes);
+        CollectionAssert.AreEqual(new[] { 40000 }, output.WriteSizes);
     }
 
     [TestMethod]
-    public async Task CopyAsync_LargeReadToCloseBody_ReadsInCurlsReceiveSizeAndWritesInPiecesOfTheWriteSize()
+    public async Task CopyAsync_LargeReadToCloseBody_ReadsInCurlsReceiveSizeAndWritesEachReadOnce()
     {
-        // AF-0144: a 50 MiB download read 16 KiB at a time took 1.47 times curl's wall time.
+        // AF-0144: a 50 MiB download read 16 KiB at a time took 1.47 times curl's wall time, and
+        // written 16 KiB at a time still 1.39 times (BL-2043).
         byte[] body = Enumerable.Range(0, 250000).Select(index => (byte)index).ToArray();
         Diagnostics.Arrange("body length", body.Length);
         ScriptedConnection connection = new(body, 1048576);
@@ -447,10 +519,9 @@ public sealed class HttpResponseBodyReaderTests
         Diagnostics.Act("write sizes", string.Join(", ", output.WriteSizes));
         Diagnostics.Diff("body", body, output.ToArray());
         Diagnostics.Assert("reads: 102400, 102400, 45200, then the close", 4, connection.ReadCount);
-        Diagnostics.Assert("largest write", HttpResponseBodyReader.WriteSize, output.WriteSizes.Max());
+        Diagnostics.Assert("write sizes", "102400, 102400, 45200", string.Join(", ", output.WriteSizes));
         Assert.AreEqual(4, connection.ReadCount);
-        Assert.AreEqual(HttpResponseBodyReader.WriteSize, output.WriteSizes.Max());
-        Assert.HasCount(17, output.WriteSizes);
+        CollectionAssert.AreEqual(new[] { 102400, 102400, 45200 }, output.WriteSizes);
         CollectionAssert.AreEqual(body, output.ToArray());
     }
 

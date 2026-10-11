@@ -226,7 +226,7 @@ internal static class CurlComposition
     /// scheme curl 8.21.0 picks among those <c>--basic</c>, <c>--digest</c>, <c>--ntlm</c>, <c>--negotiate</c> and <c>--anyauth</c>
     /// allow, with a <see cref="BasicAndBearerAuthenticator" /> for Basic, Bearer
     /// (<c>--oauth2-bearer</c>) and the first request, and a <see cref="DigestAuthenticator" />
-    /// drawing each client nonce from <see cref="DigestClientNonce.CreateRandom" />, both encoding
+    /// drawing each client nonce from the matched build's <see cref="DigestClientNonce.ForBuild" />, both encoding
     /// credentials in the platform's encoding (<see cref="CredentialEncoding.ForPlatform" />),
     /// and a <see cref="NegotiateHttpAuthenticator" /> and an <see cref="NtlmHttpAuthenticator" /> over <paramref name="securityContexts" />
     /// for <c>--negotiate</c> and <c>--ntlm</c> (ADR-0176, ADR-0181), a refused NTLM Type 2 message failing the transfer
@@ -240,10 +240,11 @@ internal static class CurlComposition
     internal static RankedHttpAuthenticator CreateHttpAuthenticator(ISecurityContextFactory securityContexts, NegotiateOptions? negotiateOptions = null, IDiagnosticLog? diagnosticLog = null)
     {
         Encoding credentialEncoding = CredentialEncoding.ForPlatform(OperatingSystem.IsWindows());
+        bool digestMatchesSspiBuild = MatchesSspiBuild(securityContexts);
 
         return new RankedHttpAuthenticator(
             new BasicAndBearerAuthenticator(credentialEncoding),
-            new DigestAuthenticator(credentialEncoding, DigestClientNonce.CreateRandom, diagnosticLog, matchesSspiBuild: MatchesSspiBuild(securityContexts)),
+            new DigestAuthenticator(credentialEncoding, DigestClientNonce.ForBuild(digestMatchesSspiBuild), diagnosticLog, matchesSspiBuild: digestMatchesSspiBuild),
             new NegotiateHttpAuthenticator(securityContexts, negotiateOptions, diagnosticLog: diagnosticLog),
             new NtlmHttpAuthenticator(securityContexts, matchesSspiBuild: OperatingSystem.IsWindows(), diagnosticLog),
             diagnosticLog);

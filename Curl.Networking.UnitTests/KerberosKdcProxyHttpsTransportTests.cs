@@ -130,6 +130,25 @@ public sealed partial class KerberosKdcProxyHttpsTransportTests
     }
 
     [TestMethod]
+    public async Task PostAsync_ReplyExactlyAtTheLimit_ReturnsTheBody()
+    {
+        const string head = "HTTP/1.1 200 OK\r\n\r\n";
+        byte[] body = new byte[KerberosKdcProxyHttpsTransport.MaximumReplyLength - head.Length];
+        body[^1] = 0xAA;
+        FakeConnector connector = new();
+        connector.BytesToRead.Add(Reply(head, body));
+        KerberosKdcProxyHttpsTransport transport = OverPlaintext(connector, new ManualTimeProvider());
+        Diagnostics.Arrange("reply length", KerberosKdcProxyHttpsTransport.MaximumReplyLength);
+
+        byte[] reply = await PostAsync(transport, "proxy", 443, "", new byte[] { 0x30 }, CancellationToken.None);
+
+        Diagnostics.Assert("body length", body.Length, reply.Length);
+        Diagnostics.Assert("last body byte", (byte)0xAA, reply[^1]);
+        Assert.HasCount(body.Length, reply);
+        Assert.AreEqual((byte)0xAA, reply[^1]);
+    }
+
+    [TestMethod]
     public async Task PostAsync_ProxyRefusesOrFailsTls_ThrowsIOExceptionWithTheConnectorsMessage()
     {
         FakeConnector connector = new() { Failure = ConnectResult.Failed(CurlExitCode.SslConnectError, "TLS connect error") };

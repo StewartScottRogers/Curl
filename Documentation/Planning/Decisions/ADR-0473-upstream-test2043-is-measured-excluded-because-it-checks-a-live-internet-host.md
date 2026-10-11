@@ -37,16 +37,17 @@ pin which revocation errors the option lets through.
 
 1. test2043 stays skipped by `UpstreamCaseScreening` in the in-process ratchet (ADR-0455, decision
    2) and is not added to `PassingUpstreamCases.txt`.
-2. The gap office measures `behaviour:test2043` as `excluded`, with the reason "reaches
+2. The gap office is to measure `behaviour:test2043` as `excluded`, with the reason "reaches
    revoked.badssl.com on the internet; `--ssl-no-revoke` is pinned by unit tests (ADR-0473)", so
-   gap finding GF-0001's item can close.
-3. The same holds for any other upstream case the screening skips because it reaches a named
-   internet host with no `<server>`: it is `excluded` with that reason, never a stand-in that
+   gap finding GF-0001's item can close. This is intent: today `Gap/Tools/ConvertTo-BehaviourMeasurement.ps1`
+   has no internet-host rule, so it records the skipped case as `unmeasured` (`harness-unsupported`).
+3. The same is intended for any other upstream case the screening skips because it reaches a named
+   internet host with no `<server>`: it is to be `excluded` with that reason, never a stand-in that
    answers for the public host.
 
 ## Consequences
 
 GF-0001's last item closes on a re-measurement that records `excluded` with a reason, as the gap
-office's rules allow. Applying the exclusion in the gap office's own measurement lives under
-`Gap/`, which the dark factory never reads or changes, so it is left to an interactive session's next
-gap run.
+office's rules allow, once the converter has the rule. Adding that rule to the gap office's own
+measurement lives under `Gap/`, which the dark factory never reads or changes, so it is left to an
+interactive session, and the exclusion takes effect with the gap run after it.
