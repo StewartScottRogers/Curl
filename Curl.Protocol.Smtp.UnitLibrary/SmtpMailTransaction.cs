@@ -197,7 +197,7 @@ internal sealed class SmtpMailTransaction(
         byte[] buffer = new byte[ReadBufferSize];
         byte[] pending = [];
         int read;
-        while ((read = await upload.ReadAsync(buffer, context.CancellationToken).ConfigureAwait(false)) > 0)
+        while ((read = await ReadMessageAsync(upload, buffer, pending, expected).ConfigureAwait(false)) > 0)
         {
             trace.BodyRead(read);
             await SendMessageBytesAsync(pending, expected).ConfigureAwait(false);
@@ -224,6 +224,28 @@ internal sealed class SmtpMailTransaction(
 
         trace.Enter("STOP");
         return TransferResult.Success(0);
+    }
+
+    /// <summary>
+    /// Reads the next piece of the message; a read that fails with
+    /// <see cref="RequestBodyReadFailedException" /> first sends the <paramref name="pending" />
+    /// piece held back for the end-of-data mark, as curl 8.21.0 sends the bytes of a <c>7bit</c>
+    /// part before the byte it refuses (measured, BL-2025).
+    /// </summary>
+    private async ValueTask<int> ReadMessageAsync(Stream upload, byte[] buffer, byte[] pending, long? expected)
+    {
+        RequestBodyReadFailedException refusal;
+        try
+        {
+            return await upload.ReadAsync(buffer, context.CancellationToken).ConfigureAwait(false);
+        }
+        catch (RequestBodyReadFailedException failure)
+        {
+            refusal = failure;
+        }
+
+        await SendMessageBytesAsync(pending, expected).ConfigureAwait(false);
+        throw refusal;
     }
 
     /// <summary>Sends <paramref name="bytes" /> after <c>DATA</c>; nothing at all when there are none.</summary>

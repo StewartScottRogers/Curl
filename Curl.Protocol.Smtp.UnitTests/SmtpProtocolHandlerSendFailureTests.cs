@@ -308,6 +308,22 @@ public sealed class SmtpProtocolHandlerSendFailureTests
         Assert.AreEqual(Ehlo + Envelope, run.Sent);
     }
 
+    [TestMethod]
+    public async Task ExecuteAsync_MessageReadRefusedAfterSomeBytes_SendsThoseBytesThenFailsWithExit26()
+    {
+        // -F "=@b.txt;encoder=7bit" with b.txt holding A, 0xE9, B, LF: curl 8.21.0 sends the part
+        // headers and the A after DATA, then fails with exit 26 and sends no QUIT (measured, BL-2025).
+        ScriptedConnection connection = new(Bytes(Greeting), Bytes(EhloReply), Bytes(Ok), Bytes(Ok), Bytes(StartData), Bytes(Accepted), Bytes(Bye));
+        TransferContext context = MailContext(new RecordingTransferEvents(), upload: new RefusingReadStream("headers\r\n\r\nA"u8.ToArray()));
+
+        SmtpRun run = await SmtpRun.ExecuteAsync(Diagnostics, context, connection);
+
+        Diagnostics.AssertValues("exit code", CurlExitCode.ReadError, run.Result.ExitCode);
+        Assert.AreEqual(CurlExitCode.ReadError, run.Result.ExitCode);
+        Diagnostics.Diff("sent", Ehlo + Envelope + "headers\r\n\r\nA", run.Sent);
+        Assert.AreEqual(Ehlo + Envelope + "headers\r\n\r\nA", run.Sent);
+    }
+
     private static ScriptedConnection Conversation(int writesBeforeFailure, Exception failure) =>
         new(Bytes(Greeting), Bytes(EhloReply), Bytes(Ok), Bytes(Ok), Bytes(StartData), Bytes(Accepted), Bytes(Bye))
         {
@@ -325,15 +341,25 @@ public sealed class SmtpProtocolHandlerSendFailureTests
         CancellationToken = cancellationToken,
     };
 
-    /// <summary>A seekable upload of known length whose every read is refused, as a 7bit part's byte above 127 refuses it.</summary>
-    private sealed class RefusingReadStream : MemoryStream
+    /// <summary>
+    /// A seekable upload of known length whose first read gives the bytes before a refused one,
+    /// none by default, and whose next read is refused, as a 7bit part's byte above 127 refuses it.
+    /// </summary>
+    private sealed class RefusingReadStream(byte[]? before = null) : MemoryStream(new byte[8])
     {
-        public RefusingReadStream()
-            : base(new byte[8])
-        {
-        }
+        private byte[]? unread = before;
 
-        public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default) =>
-            throw new RequestBodyReadFailedException("read error getting mime data");
+        public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            if (unread is null)
+            {
+                throw new RequestBodyReadFailedException("read error getting mime data");
+            }
+
+            unread.CopyTo(buffer);
+            int read = unread.Length;
+            unread = null;
+            return ValueTask.FromResult(read);
+        }
     }
 }
