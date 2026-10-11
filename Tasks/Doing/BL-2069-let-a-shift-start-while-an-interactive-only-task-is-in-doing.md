@@ -6,6 +6,7 @@ assignee: Claude
 pipeline: direct
 depends-on: []
 touches: [RunDarkFactory.ps1]
+lane: no
 requirement: none
 created: 2026-10-11
 completed:
