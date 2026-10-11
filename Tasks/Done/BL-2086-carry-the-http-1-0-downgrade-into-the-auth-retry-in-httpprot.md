@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests]
 requirement: none
 created: 2026-10-11
-completed:
+completed: 2026-10-11
 ---
 # BL-2086 — Carry the HTTP/1.0 downgrade into the auth retry in HttpProtocolHandler.RetryOfAsync (upstream test1071)
 
@@ -40,3 +40,4 @@ Source: re-measurement of the gap findings with the fixed gap harness (PR #119, 
 
 - 2026-10-11: Created.
 - 2026-10-11: Backlog -> Doing.
+- 2026-10-11: Doing -> Done. HTTP/1.0 challenge now makes the auth retry go out as HTTP/1.0; build clean, fast tests green
