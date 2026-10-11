@@ -47,3 +47,4 @@ Find which side drops the CR. If Curl.Protocol.Smtp.UnitLibrary's SmtpCommandTra
 ## Log
 
 - 2026-10-10: Created.
+- 2026-10-10: Backlog -> Doing.
