@@ -3304,6 +3304,14 @@ Rules for this unattended run, in addition to CLAUDE.md:
    not block. And leave work a Backlog task already covers to that task rather than doing
    it here (AF-0148: BL-1936 was moved to Backlog for dependencies that were already Done,
    moved back 16 seconds later, and then did BL-1945's work, so BL-1945's run found nothing to do).
+   When you must add `lane: no` because only an interactive session can do the work, write
+   under Notes the exact step it must take before a lane can have the task ("Remove lane: no
+   once <what> is done"). And when a task you claimed has Notes recording an earlier
+   "Interactive only" requeue, check in your first turns that this step was taken: if the
+   same reason still holds, requeue at once with `lane: no` restored and say what is still
+   missing, without reproducing it again (AF-0161: BL-2009 was requeued as interactive only
+   twice, 28 turns and $2.43 in all, because an interactive commit removed `lane: no` without
+   resolving the reason the first lane gave).
 4. When the task reaches Done with dotnet build clean and the fast tests green, commit
    by logical unit (Conventional Commits, including the task file) and push the current
    branch yourself with git, per the standing authorization in CLAUDE.md. Never push to
@@ -3416,6 +3424,14 @@ Rules for this unattended run, in addition to CLAUDE.md:
    leave work a Backlog task already covers to that task rather than doing it here
    (AF-0148: BL-1936 was moved to Backlog for dependencies that were already Done, moved
    back 16 seconds later, and then did BL-1945's work, so BL-1945's run found nothing to do).
+   When you must add `lane: no` because only an interactive session can do the work, write
+   under Notes the exact step it must take before a lane can have the task ("Remove lane: no
+   once <what> is done"). And when a task you claimed has Notes recording an earlier
+   "Interactive only" requeue, check in your first turns that this step was taken: if the
+   same reason still holds, requeue at once with `lane: no` restored and say what is still
+   missing, without reproducing it again (AF-0161: BL-2009 was requeued as interactive only
+   twice, 28 turns and $2.43 in all, because an interactive commit removed `lane: no` without
+   resolving the reason the first lane gave).
 5. When the task reaches Done with dotnet build clean and the fast tests green, commit
    by logical unit (Conventional Commits, including the task file). Do NOT push, pull,
    rebase, merge or switch branches: the shift integrates your commits.

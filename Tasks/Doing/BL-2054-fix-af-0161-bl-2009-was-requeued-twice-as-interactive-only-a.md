@@ -41,10 +41,12 @@ The finding closes only when a later re-audit by the process auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Fix: both run prompts in RunDarkFactory.ps1 (single-lane and lane) now tell a lane to write under Notes the step an interactive session must take before a lane can have the task, and to requeue at once, without reproducing, when a reclaimed task shows an earlier "Interactive only" requeue whose reason still holds. The finding's reproduction is a log of past events; the second claim can no longer burn a full run.
 
 ## Log
 
