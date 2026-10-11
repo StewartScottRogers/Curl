@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Core.UnitLibrary, Curl.Core.UnitTests, Curl.Protocol.Abstractions.UnitLibrary, Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests, Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
 requirement: none
 created: 2026-10-10
-completed:
+completed: 2026-10-10
 ---
 # BL-2037 — Fail a -L redirect hop of a stdin upload with exit 25 after an HTTP/1.0 server's 3xx (upstream test1073, GF-0007)
 
@@ -24,13 +24,27 @@ BL-2003 did this for the 401/407 retry inside `HttpProtocolHandler` (`ThrowIfChu
 
 ## Acceptance criteria
 
-- [ ] Upstream test1073 passes in `UpstreamConformanceTests.UpstreamCase_RunThroughCurl_HoldsTheRatchet` and 1073 is on `PassingUpstreamCases.txt`.
-- [ ] A unit test in `Curl.Core.UnitTests` and one in `Curl.Protocol.Http.UnitTests` pin the exit 25 for a redirect hop after an HTTP/1.0 response with a body of unknown length.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests are green. No option changes, so `--ai-help` is unaffected.
+- [x] Upstream test1073 passes in `UpstreamConformanceTests.UpstreamCase_RunThroughCurl_HoldsTheRatchet` and 1073 is on `PassingUpstreamCases.txt`.
+- [x] A unit test in `Curl.Core.UnitTests` and one in `Curl.Protocol.Http.UnitTests` pin the exit 25 for a redirect hop after an HTTP/1.0 response with a body of unknown length.
+- [x] `dotnet build -warnaserror` is clean and the fast tests are green. No option changes, so `--ai-help` is unaffected.
 
 ## Notes
+
+- New `HttpRequestOptions.EarlierResponseWasHttp10` (Abstractions). `RedirectFollower` sets it on
+  every hop after any hop whose `TransferReport.HttpVersion` was 1.0 (sticky, as curl's
+  `http_neg.rcvd_min` is per transfer). `HttpRequestFraming.IsHttp10` treats it as `-0` (so
+  `RefusesUnknownLength` fails a chunked stdin hop with exit 25, and no `Expect` is added), and
+  `HttpProtocolHandler` formats the hop's request line as HTTP/1.0, the same downgrade test1074's
+  pooled connection gets. Chose the request-line downgrade too, not only the refusal, so a
+  known-length hop's head stays consistent with curl's HTTP/1.0 request (no Expect, `HTTP/1.0`).
+- `Curl.Core.UnitTests` cannot produce exit 25 with its scripted handler, so its test
+  (`FollowAsync_AfterAnHttp10Response_SendsEveryLaterHopAsHttp10`) pins that the flag reaches every
+  later hop; the exit 25 itself is pinned in `Curl.Protocol.Http.UnitTests`
+  (`ExecuteAsync_RedirectHopAfterAnHttp10ResponseWithBodyOfUnknownLength_FailsWithExit25AndSendsNothing`),
+  plus a known-length hop that sends an `HTTP/1.0` request line.
 
 ## Log
 
 - 2026-10-10: Created.
 - 2026-10-10: Backlog -> Doing.
+- 2026-10-10: Doing -> Done. test1073 passes: a -L hop after an HTTP/1.0 response goes out as HTTP/1.0 and a stdin upload fails it with exit 25
