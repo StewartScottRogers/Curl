@@ -8,7 +8,7 @@ depends-on: []
 touches: [RunDarkFactory.ps1]
 requirement: none
 created: 2026-10-11
-completed:
+completed: 2026-10-11
 ---
 # BL-2054 — Fix AF-0161: BL-2009 was requeued twice as interactive only; an interactive commit removed its lane: no between the two lane claims
 
@@ -52,3 +52,4 @@ The finding closes only when a later re-audit by the process auditor confirms th
 
 - 2026-10-11: Created.
 - 2026-10-11: Backlog -> Doing.
+- 2026-10-11: Doing -> Done. Run prompts now record the interactive step before lane: no and recheck it on reclaim
