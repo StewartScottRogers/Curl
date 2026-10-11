@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Console, Curl.Console.UnitTests, Curl.Cli.UnitLibrary, Curl.Cli.UnitTests, Curl.Conformance.UnitTests/PassingUpstreamCases.txt, Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests]
 requirement: none
 created: 2026-10-10
-completed:
+completed: 2026-10-10
 ---
 # BL-2017 — Print the default config file Note without -v as curl 8.21.0 does for upstream test433 (curlrc found through XDG_CONFIG_HOME)
 
@@ -41,3 +41,4 @@ Upstream test433 passes through Curl: with the default config file found through
 
 - 2026-10-10: Created.
 - 2026-10-10: Backlog -> Doing.
+- 2026-10-10: Doing -> Done. test433 passes and is listed: the harness passes runtests.pl's trace options, reads every setenv part and wraps at COLUMNS; the note rule was already curl's
