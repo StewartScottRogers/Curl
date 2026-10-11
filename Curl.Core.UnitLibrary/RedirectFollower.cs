@@ -621,10 +621,22 @@ public sealed class RedirectFollower(
     /// <c>AUTHENTICATE</c> and no <c>LOGIN</c> after an HTTP redirect to IMAP on another host
     /// (upstream test779, BL-2090).
     /// </summary>
-    private static MailRequestOptions? HopMail(MailRequestOptions? mail, bool sendCredentials) =>
-        mail is null || sendCredentials || mail.BearerToken is null
-            ? mail
-            : mail with { BearerToken = null, BearerTokenWithheld = true };
+    private static MailRequestOptions? HopMail(ITransferContext first, bool sendCredentials)
+    {
+        MailRequestOptions? mail = first.Mail;
+        if (sendCredentials)
+        {
+            return mail;
+        }
+
+        if (mail is null)
+        {
+            // An HTTP first URL carries no mail options, but its --oauth2-bearer token is withheld all the same.
+            return first.Http?.BearerToken is null ? null : new MailRequestOptions { BearerTokenWithheld = true };
+        }
+
+        return mail.BearerToken is null ? mail : mail with { BearerToken = null, BearerTokenWithheld = true };
+    }
 
     private static TransferContext NextHop(
         ITransferContext first,
@@ -652,7 +664,7 @@ public sealed class RedirectFollower(
             HeaderOutput = first.HeaderOutput,
             PostData = bodyDropped ? null : first.PostData,
             Credentials = selectHopCredentials is null ? HopCredentials(first, url, sendCredentials) : selectHopCredentials(url),
-            Mail = HopMail(first.Mail, sendCredentials),
+            Mail = HopMail(first, sendCredentials),
             TelnetOptions = first.TelnetOptions,
             TftpBlockSize = first.TftpBlockSize,
             TftpNoOptions = first.TftpNoOptions,

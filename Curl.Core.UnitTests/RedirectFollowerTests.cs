@@ -841,6 +841,21 @@ public sealed class RedirectFollowerTests
     }
 
     [TestMethod]
+    [DataRow("http://localhost:18203/next", true, DisplayName = "other-host")]
+    [DataRow("http://127.0.0.1:18203/next", false, DisplayName = "same-origin")]
+    public async Task FollowAsync_HttpBearerTokenWithoutMailOptions_MarksTheMailTokenWithheldOnAnotherHost(string target, bool withheld)
+    {
+        // Upstream test779: the first URL is http, so it has no mail options, yet the hop to imap must know.
+        ScriptedHandler handler = new(Redirect(302, target), Ok(200, 0));
+
+        await Follow(handler, Context(Location() with { BearerToken = "s3cr3t" }));
+
+        MailRequestOptions? mail = handler.Contexts[1].Mail;
+        Diagnostics.Assert("mail?.BearerTokenWithheld", withheld, mail?.BearerTokenWithheld ?? false);
+        Assert.AreEqual(withheld, mail?.BearerTokenWithheld ?? false);
+    }
+
+    [TestMethod]
     public async Task FollowAsync_NoMailOptions_HopHasNone()
     {
         ScriptedHandler handler = new(Redirect(302, "http://localhost:18203/next"), Ok(200, 0));
