@@ -46,6 +46,9 @@
 //            (ConvertTo-BehaviourMeasurement.ps1) files it as unmeasured, no-perl.
 // REPLY escapes (BL-2012): \xHH and \x{H...} in a <servercmd> REPLY line are expanded to the byte
 // they name, as ftpserver.pl's eval "qq{...}" does; the runner expands \r, \n, \t and \\ itself.
+// Disabled cases (BL-2027): a case the release's tests/data/DISABLED lists (its %if blocks tested
+// against the harness platform's features) is not run; it is written Skipped with the detail
+// "disabled upstream", which ConvertTo-BehaviourMeasurement.ps1 measures excluded, disabled-upstream.
 // "--self-test" instead checks these substitutions and prints a PASS or FAIL line per check.
 //
 // Known limit: UpstreamCaseRunner.CurlVersion is the constant "8.21.0", so %VERSION in a newer
@@ -111,6 +114,10 @@ string commit = ReadCommit();
 string releaseCopy = Path.Combine(Path.GetDirectoryName(outputPath)!, "upstream-release");
 string testsFolder = NameTestsFolder((Path.GetDirectoryName(testDataFolder.TrimEnd('\\', '/')) ?? testDataFolder).Replace('\\', '/'), releaseCopy);
 string? perl = FindPerl();
+string disabledFile = Path.Combine(testDataFolder, "DISABLED");
+IReadOnlySet<int> disabledCases = File.Exists(disabledFile)
+    ? DisabledCases.Read(File.ReadAllLines(disabledFile), platform.Features)
+    : new HashSet<int>();
 
 // Some cases name a file relative to curl's working folder (upstream runs them from tests/,
 // e.g. "-o %"); run them all from the log folder so such files go where the run deletes them,
@@ -128,9 +135,10 @@ await Parallel.ForEachAsync(
     {
         int number = ordered[index];
         byte[] testFile = ReplyEscapes.ExpandReplyHexEscapes(SubstituteHostVariables(await File.ReadAllBytesAsync(Path.Combine(testDataFolder, $"test{number}")), testsFolder, perl));
-        DirectoryInfo logDirectory = Directory.CreateDirectory(Path.Combine(logFolder, $"test{number}-{Guid.NewGuid():N}"));
         Stopwatch stopwatch = Stopwatch.StartNew();
-        UpstreamCaseOutcome outcome = await RunCaseAsync(number, testFile, logDirectory, platform, timeLimit, caseHangLimit);
+        UpstreamCaseOutcome outcome = disabledCases.Contains(number)
+            ? UpstreamCaseOutcome.Skipped(DisabledCases.Reason)
+            : await RunCaseAsync(number, testFile, Directory.CreateDirectory(Path.Combine(logFolder, $"test{number}-{Guid.NewGuid():N}")), platform, timeLimit, caseHangLimit);
         results[index] = (number, outcome, stopwatch.ElapsedMilliseconds);
         int done = Interlocked.Increment(ref finished);
         if (done % 100 == 0 || done == ordered.Length)
@@ -282,6 +290,13 @@ static int RunSelfTest()
     Check(Expand("<servercmd>\nREPLY USER 331 \\x41\\x{42}\\x4 \\x5c\\x0d\\x0a!\n</servercmd>") == "<servercmd>\nREPLY USER 331 AB\u0004 \\\\\\r\\n!\n</servercmd>", "\\xHH, \\x{H} and \\xH expand; a backslash, CR or LF is left for the runner as \\\\, \\r, \\n");
     Check(Expand("<servercmd>\nREPLY PASS 230 a\\\\x41\\r\\n\\t\\@\n</servercmd>") == "<servercmd>\nREPLY PASS 230 a\\\\x41\\r\\n\\t\\@\n</servercmd>", "\\\\, \\r, \\n, \\t and \\@ are left for the runner, so \\\\x41 stays");
     Check(Expand("<servercmd>\nCAPA \\x41\n</servercmd>\n<data>\\x41</data>") == "<servercmd>\nCAPA \\x41\n</servercmd>\n<data>\\x41</data>", "only REPLY lines inside <servercmd> expand");
+
+    string[] disabledFile = ["# 1", "", "323", "  938 # SASL", "%if WinIDN", "165", "%endif", "%if win32", "%if !Unicode", "%if libidn2", "1560", "%else", "1561", "%endif", "1448", "%endif", "%endif"];
+    string Disabled(params string[] features) =>
+        string.Join(',', DisabledCases.Read(disabledFile, features.ToHashSet(StringComparer.Ordinal)).Order());
+    Check(Disabled() == "323,938", "DISABLED: a listed number is disabled, a comment and a blank line are not, and a false %if hides its block");
+    Check(Disabled("win32") == "323,938,1448,1561", "DISABLED: %if !<feature> holds without the feature, and %else takes the other branch");
+    Check(Disabled("win32", "Unicode", "WinIDN") == "165,323,938", "DISABLED: nested blocks inside a false %if stay hidden");
     return failed ? 1 : 0;
 }
 
@@ -397,6 +412,66 @@ internal sealed class LoopbackOnlyDnsResolver : IDnsResolver
             : string.Equals(host, "ip6-localhost", StringComparison.OrdinalIgnoreCase) ? [IPAddress.IPv6Loopback]
             : [];
         return ValueTask.FromResult(addresses);
+    }
+}
+
+// The cases a release's tests/data/DISABLED lists, which upstream's runtests.pl does not run, so
+// this tool skips them with Reason and the converter measures them excluded, disabled-upstream
+// (BL-2027). The file is preprocessed as runtests.pl does: %if <feature>, %if !<feature>, %else
+// and %endif nest and test the harness platform's features, as UpstreamTestConditionalLines does
+// for a case; a kept line that starts with # (after spaces) is a comment, and any other kept line
+// names the case of its first run of digits.
+internal static class DisabledCases
+{
+    public const string Reason = "disabled upstream";
+
+    public static IReadOnlySet<int> Read(IEnumerable<string> lines, IReadOnlySet<string> features)
+    {
+        HashSet<int> disabled = [];
+        Stack<(bool Enclosing, bool Alternative)> open = new();
+        bool show = true;
+        foreach (string line in lines)
+        {
+            string trimmed = line.TrimStart(' ');
+            if (trimmed.StartsWith("%if ", StringComparison.Ordinal))
+            {
+                string condition = new([.. trimmed[4..].TakeWhile(character => char.IsAsciiLetterOrDigit(character) || character is '!' or '_' or '-')]);
+                bool holds = features.Contains(condition.TrimStart('!')) != condition.StartsWith('!');
+                open.Push((show, show && !holds));
+                show = show && holds;
+            }
+            else if (trimmed.StartsWith("%else", StringComparison.Ordinal) && open.Count > 0)
+            {
+                show = open.Peek().Alternative;
+            }
+            else if (trimmed.StartsWith("%endif", StringComparison.Ordinal) && open.Count > 0)
+            {
+                show = open.Pop().Enclosing;
+            }
+            else if (show && !trimmed.StartsWith('#') && FirstNumber(trimmed) is int number)
+            {
+                disabled.Add(number);
+            }
+        }
+
+        return disabled;
+    }
+
+    private static int? FirstNumber(string line)
+    {
+        int start = line.AsSpan().IndexOfAnyInRange('0', '9');
+        if (start < 0)
+        {
+            return null;
+        }
+
+        int end = start;
+        while (end < line.Length && char.IsAsciiDigit(line[end]))
+        {
+            end++;
+        }
+
+        return int.TryParse(line.AsSpan(start, end - start), NumberStyles.None, CultureInfo.InvariantCulture, out int number) ? number : null;
     }
 }
 
