@@ -77,3 +77,4 @@ Make Curl's advertised features match its behaviour. On Windows, add SSPI to the
 - 2026-10-10: Created.
 - 2026-10-10: Backlog -> Doing.
 - 2026-10-10: Doing -> Backlog. Waits on BL-2031 (gap tool must compose hand-built NTLM; interactive only), BL-2029 (NTLM POST Content-Length: 0) and BL-2030 (test169); test775/776 fixed here
+- 2026-10-10: Backlog -> Doing.
