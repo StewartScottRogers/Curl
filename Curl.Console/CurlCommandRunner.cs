@@ -3807,7 +3807,8 @@ internal sealed class CurlCommandRunner(
     }
 
     /// <summary>
-    /// Writes the transfer's progress meter (<see cref="WriteProgressAsync" />), then the warning
+    /// Writes the transfer's progress meter (<see cref="WriteProgressAsync" />), then the held
+    /// <c>-o</c> open warning (<see cref="RunningTransferState.OutputFileOpenWarning" />), then the warning
     /// <c>--retry</c> gave up its retries with, if any, unless <c>-s</c>: curl 8.21.0 printed
     /// test366's <c>Retry-After</c> warning after the meter's last line, not inside it (measured
     /// 2026-10-10, BL-2008 Notes).
@@ -3824,6 +3825,12 @@ internal sealed class CurlCommandRunner(
         bool toStandardOutput)
     {
         TransferResult written = await WriteProgressAsync(options, result, resumeFrom, toStandardOutput).ConfigureAwait(false);
+        if (Running.OutputFileOpenWarning is { } openWarning)
+        {
+            Running.OutputFileOpenWarning = null;
+            await WriteErrorLineAsync(openWarning).ConfigureAwait(false);
+        }
+
         if (Running.AbandonedRetryWarning is { } warning)
         {
             await WriteWarningUnlessSilentAsync(options, warning).ConfigureAwait(false);
@@ -4561,11 +4568,31 @@ internal sealed class CurlCommandRunner(
 
             if (!options.Silent && output.OpenFailureWarning is { } warning)
             {
-                await WriteErrorLineAsync(warning).ConfigureAwait(false);
+                await WriteOrHoldOutputFileOpenWarningAsync(warning).ConfigureAwait(false);
             }
 
             return completed;
         }
+    }
+
+    /// <summary>
+    /// Prints an <c>-o</c> file's <c>Warning: Failed to open the file</c> line now under <c>-#</c>,
+    /// whose bar writes its newline after the failure lines, and otherwise holds it as
+    /// <see cref="RunningTransferState.OutputFileOpenWarning" /> for
+    /// <see cref="WriteProgressAndAbandonedRetryWarningAsync" /> to print after the progress
+    /// meter's closing newline, where curl 8.21.0 prints it (AF-0145, BL-1964).
+    /// </summary>
+    /// <param name="warning">The warning line.</param>
+    /// <returns>A task that completes when the line is written or held.</returns>
+    private async Task WriteOrHoldOutputFileOpenWarningAsync(string warning)
+    {
+        if (Running.ProgressBar is not null)
+        {
+            await WriteErrorLineAsync(warning).ConfigureAwait(false);
+            return;
+        }
+
+        Running.OutputFileOpenWarning = warning;
     }
 
     /// <summary>

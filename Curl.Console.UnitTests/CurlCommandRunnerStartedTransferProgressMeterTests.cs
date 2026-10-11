@@ -108,6 +108,30 @@ public sealed class CurlCommandRunnerStartedTransferProgressMeterTests
         Assert.AreEqual(Meter + RangeErrorLine + RangeErrorLine, StandardErrorText);
     }
 
+    [TestMethod]
+    public async Task RunAsync_StartedEmptyTransferToUnopenableOutputFile_WritesTheOpenWarningAfterTheMetersNewline()
+    {
+        // curl 8.21.0 (Schannel) for --output missing.txt/f.txt of an empty body ended its stderr
+        // with the meter row, its newline, then the warning, and no blank line (AF-0145, BL-1964).
+        outputFiles.UnwritablePaths.Add("missing.txt/f.txt");
+        RecordingProtocolHandler handler = new("http", context =>
+        {
+            context.Progress.ReportTransferStarted();
+
+            return ValueTask.FromResult(TransferResult.Success(0));
+        });
+        Diagnostics.Arrange("handler", "reports the transfer started, then succeeds with no body");
+        Diagnostics.Arrange("unwritable paths", "missing.txt/f.txt");
+
+        int exitCode = await RunAsync(["--output", "missing.txt/f.txt", SourceUrl], handler);
+
+        string expected = Meter + "Warning: Failed to open the file missing.txt/f.txt: No such file or directory" + NewLine;
+        Diagnostics.Assert("exit code", 23, exitCode);
+        Assert.AreEqual(23, exitCode);
+        Diagnostics.Diff("stderr", Lf(expected), Lf(StandardErrorText));
+        Assert.AreEqual(expected, StandardErrorText);
+    }
+
     private static string Lf(string text) => text.Replace("\r\n", "\n", StringComparison.Ordinal);
 
     private static RecordingProtocolHandler StartedThenFailing() =>

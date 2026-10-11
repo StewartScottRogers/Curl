@@ -181,6 +181,23 @@ public sealed class CurlCommandRunnerProgressBarTests
     }
 
     [TestMethod]
+    public async Task RunAsync_ProgressBarWithAnUnopenableOutputFile_WritesTheOpenWarningBeforeTheBar()
+    {
+        // Under -# the open warning is not held for after the meter (BL-1964): the bar's
+        // newline comes after the failure lines, so the warning goes out as the transfer ends.
+        outputFiles.UnwritablePaths.Add("out");
+        Diagnostics.Arrange("unwritable paths", "out");
+        Diagnostics.Arrange("handler", "http reports the transfer started, then succeeds with no body");
+        int exitCode = await RunAsync(["-#", HttpUrl, "-o", "out"], StartedHandler("http", 0));
+
+        string warningLine = "Warning: Failed to open the file out: No such file or directory" + NewLine;
+        Diagnostics.Assert("exit code", 23, exitCode);
+        Diagnostics.Diff("stderr starts with", Visible(warningLine), Visible(StandardErrorText));
+        Assert.AreEqual(23, exitCode);
+        StringAssert.StartsWith(StandardErrorText, warningLine);
+    }
+
+    [TestMethod]
     public async Task RunAsync_ProgressBarContinueAt5OnAFailedResume_WritesTheBarThenTheFailureLineThenTheNewline()
     {
         Diagnostics.Arrange("handler", "file reports the transfer started, then fails with 36");
