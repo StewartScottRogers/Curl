@@ -54,3 +54,4 @@ In Curl.Cli.UnitLibrary's --url option (CommandLineOptionTable / its applier), s
 - 2026-10-11: Created.
 - 2026-10-11: Backlog -> Doing.
 - 2026-10-11: Doing -> Backlog. Needs Curl.Console (CurlComposition must hand the injected stdin to the data file reader), which BL-2073 in Doing touches
+- 2026-10-11: Backlog -> Doing.
