@@ -300,7 +300,7 @@ public sealed class UpstreamCaseRunner(
         IConnector servers = sshServer?.InFrontOf(mqtt) ?? mqtt;
         // A CONNECT through the http-proxy to a mail port or the FTP control or passive port reaches that stand-in
         // (test1319 to 1321, BL-2011; test714 and test715, BL-2035).
-        server.TunnelServerForPort = port => port is Pop3ServerConnector.Pop3Port or ImapServerConnector.ImapPort or SmtpServerConnector.SmtpPort or FtpServerConnector.FtpPort or FtpServerConnector.PassivePort ? pop3 : null;
+        server.TunnelServerForPort = port => TunnelledPorts.Contains(port) ? pop3 : null;
         UpstreamCurlInvocation invocation = new(arguments, standardOutput, standardError, standardInput, servers, tftp, EnvironmentVariables(testCase)) { ConnectionListener = ftp.ActiveModeListener };
         (int exitCode, string? failure) = await RunCurlAsync(invocation, server).ConfigureAwait(false);
         if (failure is not null)
@@ -373,6 +373,8 @@ public sealed class UpstreamCaseRunner(
             ? new FtpsServerConnector(HttpsServerConnector.LoadCertificate(Path.Combine(certificateDirectory, "certs", HttpsServerConnector.DefaultCertificateFile)), ftp)
             : ftp;
 
+    private static readonly int[] TunnelledPorts = [Pop3ServerConnector.Pop3Port, ImapServerConnector.ImapPort, SmtpServerConnector.SmtpPort, FtpServerConnector.FtpPort, FtpServerConnector.PassivePort];
+
     private static TimeProvider ServerClock(List<string> arguments) =>
         CurlTimerOptions.AnyIn(arguments) ? TimeProvider.System : new WaitSkippingTimeProvider();
 
@@ -421,14 +423,19 @@ public sealed class UpstreamCaseRunner(
     {
         UpstreamTestSection command = testCase.Find("client", "command")!;
         string option = command.GetAttribute("option") ?? string.Empty;
-        bool writesOutputFile = !option.Contains("no-output", StringComparison.Ordinal)
-            && (testCase.Find("verify", "stdout") is null || option.Contains("force-output", StringComparison.Ordinal));
-        List<string> arguments = writesOutputFile ? ["--output", outputFile] : [];
+        List<string> arguments = WritesOutputFile(testCase, option) ? ["--output", outputFile] : [];
         arguments.AddRange(option.Contains("no-include", StringComparison.Ordinal) ? [] : ["--include"]);
-        arguments.AddRange([option.Contains("binary-trace", StringComparison.Ordinal) ? "--trace" : "--trace-ascii", traceFile, "--trace-config", "all", "--trace-time"]);
+        arguments.AddRange(TraceArguments(option, traceFile));
         arguments.AddRange(UpstreamCommandLineSplitter.Split(UpstreamTestPartBodies.Text(command)).Arguments);
         return arguments;
     }
+
+    private static bool WritesOutputFile(UpstreamTestCase testCase, string option) =>
+        !option.Contains("no-output", StringComparison.Ordinal)
+        && (testCase.Find("verify", "stdout") is null || option.Contains("force-output", StringComparison.Ordinal));
+
+    private static string[] TraceArguments(string option, string traceFile) =>
+        [option.Contains("binary-trace", StringComparison.Ordinal) ? "--trace" : "--trace-ascii", traceFile, "--trace-config", "all", "--trace-time"];
 
     private static void WriteClientFiles(UpstreamTestCase testCase)
     {

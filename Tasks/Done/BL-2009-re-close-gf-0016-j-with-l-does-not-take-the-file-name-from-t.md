@@ -9,7 +9,7 @@ touches: [Curl.Console, Curl.Console.UnitTests]
 lane: no
 requirement: none
 created: 2026-10-10
-completed:
+completed: 2026-10-11
 ---
 # BL-2009 — Re-close GF-0016: -J with -L does not take the file name from the last Location, and -OJ --no-clobber --retry differs
 
@@ -40,9 +40,9 @@ In Curl.Console's -O/-J output naming: with -J and -L and no Content-Disposition
 
 - [x] `behaviour:test1642`: Curl answers what curl 8.21.0 answers, `upstream test1642 passes`, so the item measures `match`.
 - [x] `behaviour:test1643`: Curl answers what curl 8.21.0 answers, `upstream test1643 passes`, so the item measures `match`.
-- [ ] `behaviour:test3036`: Curl answers what curl 8.21.0 answers, `reference curl exits 23; stdout 0 bytes: `, so the item measures `match`.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
-- [ ] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
+- [x] `behaviour:test3036`: Curl answers what curl 8.21.0 answers, `reference curl exits 23; stdout 0 bytes: `, so the item measures `match`.
+- [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
+- [x] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md). No option changed.
 
 ## Notes
 
@@ -79,6 +79,16 @@ In Curl.Console's -O/-J output naming: with -J and -L and no Content-Disposition
   Record-CurlExchange against both binaries, and fix Curl.Console if they then differ. No code
   changed.
 
+- 2026-10-11 (interactive): the cross-check runs the case as Expand-UpstreamCase.cs expands it,
+  which adds `--include` (upstream's runner does unless the command says no-include); the
+  lanes' replays had no `-i`. Replayed the exact command line (`--max-time 20 --include ...
+  --output-dir C:/curl-xc/log/3036/present -OJ --retry 1 --retry-all-errors`, LF-only reply,
+  20 connections) with Record-CurlExchange: curl 8.21.0 fails the retry on its first header
+  write, the 16-byte status line; Curl's RemoteHeaderNameStream passed the whole 128-byte head
+  to the -i output in one write. Fix e3cf683d3: once a Content-Disposition has named the file,
+  the lines go on one write each. After it, stderr and request bytes are identical to curl's.
+  The gap item re-measures on the next gap run.
+
 ## Log
 
 - 2026-10-10: Created.
@@ -86,3 +96,5 @@ In Curl.Console's -O/-J output naming: with -J and -L and no Content-Disposition
 - 2026-10-10: Doing -> Backlog. Interactive only: the gap harness and upstream cache for test1642/1643/3036 are refused to lanes, and no difference reproduces with Record-CurlExchange; added lane: no
 - 2026-10-10: Backlog -> Doing.
 - 2026-10-10: Doing -> Backlog. Interactive only: test3036's retry difference (16 vs 128 bytes) appears only in the gap office's cross-check, which lanes may not read; with Record-CurlExchange, CRLF and LF-only replies, curl 8.21.0 and Curl print identical stderr; added lane: no
+- 2026-10-11: Backlog -> Doing.
+- 2026-10-11: Doing -> Done. test3036's retry now fails on the status line as curl 8.21.0's does (e3cf683d3); test1642/1643 already matched

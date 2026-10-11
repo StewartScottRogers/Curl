@@ -225,6 +225,17 @@ internal static class HttpRedirectLocation
             return 3;
         }
 
+        return AppendUnescaped(encoded, value, index, inQuery);
+    }
+
+    /// <summary>
+    /// Appends the character at <paramref name="index" />, which does not start a percent
+    /// escape: a space as <c>+</c> in the query, a space or byte above 0x7E escaped, else itself.
+    /// Returns how many characters it took.
+    /// </summary>
+    private static int AppendUnescaped(StringBuilder encoded, string value, int index, bool inQuery)
+    {
+        char character = value[index];
         if (character == ' ' && inQuery)
         {
             encoded.Append('+');

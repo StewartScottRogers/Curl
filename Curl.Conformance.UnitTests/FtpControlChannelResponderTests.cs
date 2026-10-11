@@ -86,6 +86,15 @@ public sealed class FtpControlChannelResponderTests
     }
 
     [TestMethod]
+    public void Answer_FullCommandLineReply_AnswersThatLineOnlyAndLeavesTheCommandToItsDefault()
+    {
+        FtpControlChannelResponder responder = Create("REPLY \"CWD a\" 550 no a\n");
+
+        Assert.AreEqual("550 no a\r\n", Encoding.Latin1.GetString(responder.Answer("CWD a").Bytes.Span));
+        Assert.StartsWith("250 ", Encoding.Latin1.GetString(responder.Answer("CWD b").Bytes.Span), StringComparison.Ordinal);
+    }
+
+    [TestMethod]
     [DataRow(new[] { "CWD a/b" }, "/a/b")]
     [DataRow(new[] { "CWD a/b/" }, "/a/b")]
     [DataRow(new[] { "CWD a", "CWD b" }, "/a/b")]

@@ -270,22 +270,11 @@ public sealed class HttpProtocolHandler(
         ArgumentNullException.ThrowIfNull(context);
 
         long started = context.TimeProvider.GetTimestamp();
-        HttpRequestOptions options = context.Http ?? new HttpRequestOptions();
+        HttpRequestOptions options = OptionsOf(context);
         HttpRequestFraming framing = HttpRequestFraming.Of(options, HttpRequestHeadFormatter.CustomHeadersOf(options.Headers, options), context.NoBody, context.Upload, context.ResumeFrom, context.RangeText, context.ResumeUploadFromUnknownOffset, context.ConvertLineEndings);
-        HttpAuthRequest authRequest = new(
-            framing.Method,
-            context.Url,
-            options.RequestTarget ?? HttpUrlText.RequestTarget(context.Url),
-            context.Credentials,
-            options.BearerToken,
-            AllowedSchemesOf(options),
-            IsProxy: false)
-        {
-            Events = context.Events,
-            AwsSigV4 = AwsSigV4InputsOf(context, options, framing),
-        };
+        HttpAuthRequest authRequest = OriginAuthRequestOf(context, options, framing);
         ProxyEndpoint? forwardProxy = ForwardProxyOf(context.Url, options);
-        HttpAuthRequest? proxyAuthRequest = forwardProxy is null ? null : ProxyAuthRequestOf(authRequest, forwardProxy);
+        HttpAuthRequest? proxyAuthRequest = ProxyAuthRequestOrNull(authRequest, forwardProxy);
         using HttpTransferDeadline deadline = new(context);
         HttpInfoLineRecorder authorizationLines = new();
         HttpInfoLineRecorder proxyAuthorizationLines = new();
@@ -306,11 +295,48 @@ public sealed class HttpProtocolHandler(
             ProxyAuthorizationInfoLines = proxyAuthorizationLines.Lines,
             RedirectsFollowed = options.RedirectsFollowed,
         };
-        TransferResult result = Http3RefusalOf(plan) is { } refusal
-            ? await ExchangeWithoutHttp3Async(plan, refusal).ConfigureAwait(false)
-            : await ConnectAndExchangeAsync(plan, earlier: null).ConfigureAwait(false);
+        TransferResult result = await ExchangeOfPlanAsync(plan).ConfigureAwait(false);
         return plan.OpenedConnection ? WithFirstAuthorizationFailure(result, authRequest, authorizationLines.Lines) : result;
     }
+
+    /// <summary>
+    /// Gives the options the transfer asked for, or the defaults when it asked for none.
+    /// </summary>
+    private static HttpRequestOptions OptionsOf(ITransferContext context) =>
+        context.Http ?? new HttpRequestOptions();
+
+    /// <summary>
+    /// Makes the authentication request for the origin server of the transfer's first request.
+    /// </summary>
+    private static HttpAuthRequest OriginAuthRequestOf(ITransferContext context, HttpRequestOptions options, HttpRequestFraming framing) =>
+        new(
+            framing.Method,
+            context.Url,
+            options.RequestTarget ?? HttpUrlText.RequestTarget(context.Url),
+            context.Credentials,
+            options.BearerToken,
+            AllowedSchemesOf(options),
+            IsProxy: false)
+        {
+            Events = context.Events,
+            AwsSigV4 = AwsSigV4InputsOf(context, options, framing),
+        };
+
+    /// <summary>
+    /// Makes the authentication request for a forward proxy, or gives <see langword="null" />
+    /// when there is none.
+    /// </summary>
+    private HttpAuthRequest? ProxyAuthRequestOrNull(HttpAuthRequest authRequest, ProxyEndpoint? forwardProxy) =>
+        forwardProxy is null ? null : ProxyAuthRequestOf(authRequest, forwardProxy);
+
+    /// <summary>
+    /// Sends the plan's first request: refused or tried without HTTP/3 when
+    /// <see cref="Http3RefusalOf" /> says so, else connected and exchanged as asked.
+    /// </summary>
+    private async ValueTask<TransferResult> ExchangeOfPlanAsync(HttpRequestPlan plan) =>
+        Http3RefusalOf(plan) is { } refusal
+            ? await ExchangeWithoutHttp3Async(plan, refusal).ConfigureAwait(false)
+            : await ConnectAndExchangeAsync(plan, earlier: null).ConfigureAwait(false);
 
     /// <summary>
     /// Decides whether the transfer's first request goes as a probe with an empty body: a Digest
@@ -364,10 +390,13 @@ public sealed class HttpProtocolHandler(
     /// picked (<see cref="HttpRequestOptions.AuthSchemePicked" />) alone when it is one of
     /// <see cref="HttpRequestOptions.AuthSchemes" />, as libcurl 8.21.0 keeps its picked scheme
     /// across redirects and so sends Basic before any challenge (upstream test1088, BL-1819);
-    /// otherwise every scheme allowed.
+    /// otherwise every scheme allowed. NTLM and Negotiate are not kept: they authenticate a
+    /// connection, so the first request of the next hop carries no <c>Authorization</c> and
+    /// probes again (upstream test90, BL-2059; measured on curl 8.21.0 with <c>--anyauth -L</c>).
     /// </summary>
     private static HttpAuthSchemes AllowedSchemesOf(HttpRequestOptions options) =>
-        options.AuthSchemePicked != HttpAuthSchemes.None && (options.AuthSchemes & options.AuthSchemePicked) == options.AuthSchemePicked
+        options.AuthSchemePicked is not (HttpAuthSchemes.None or HttpAuthSchemes.Ntlm or HttpAuthSchemes.Negotiate)
+        && (options.AuthSchemes & options.AuthSchemePicked) == options.AuthSchemePicked
             ? options.AuthSchemePicked
             : options.AuthSchemes;
 
@@ -1106,61 +1135,11 @@ public sealed class HttpProtocolHandler(
         IConnection responseConnection = framing.AwaitsContinue
             ? new HttpContinueWaitConnection(timedConnection) { ContinueWait = options.ContinueWait }
             : timedConnection;
-        HttpRequestBodyWriter upload = new(connection)
-        {
-            SharedHeadLength = framing.AwaitsContinue ? 0 : request.Length,
-            HeldHead = request,
-            IsUpload = framing.IsUpload,
-            Progress = plan.Progress,
-            Events = context.Events,
-            EarlyResponseWatch = responseConnection as HttpContinueWaitConnection,
-            TracesReaders = TracesReadersOf(requestStream),
-        };
-        HttpExchange exchange = new(connect, connection, framing.Method, request.Length, upload, earlier, newConnection)
-        {
-            UsedProxy = options.ForwardProxy is not null,
-            Started = plan.Started,
-            TimeProvider = context.TimeProvider,
-            ResponseConnection = timedConnection,
-            RedirectCount = plan.RedirectsFollowed - options.RedirectsFollowed,
-            AuthSchemePicked = AuthSchemePickedBy(plan),
-        };
+        HttpRequestBodyWriter upload = CreateUpload(plan, connection, responseConnection, requestStream, request);
+        HttpExchange exchange = CreateExchange(plan, connect, connection, timedConnection, request.Length, upload, earlier, newConnection);
         HttpExchangeLog exchangeLog = HttpExchangeLog.For(context.DiagnosticLog, streams);
-        HttpResponseBodyReader body = new(responseConnection)
-        {
-            PassesTransferCoding = options.Raw,
-            IgnoresContentLength = options.IgnoreContentLength,
-            LimitsFileSize = HttpDownloadConditions.LimitOf(context.MaxFileSize) is not null,
-            DecodesTransferCoding = options.TransferEncoding,
-            Log = exchangeLog,
-            HeadersStoredBefore = HeadersStoredBefore(earlier, options, connect),
-        };
-        int cookiesStored = 0;
-        HttpAuthProblemLines originProblems = new();
-        HttpAuthProblemLines proxyProblems = new();
-        HttpResponseHeadReader headReader = new(responseConnection)
-        {
-            Events = context.Events,
-            HeadersStoredBefore = body.HeadersStoredBefore,
-            LineReporting = line => (requestStream as Http3StreamConnection)?.EchoResponseLineBefore(line),
-            LineReported = line => EchoResponseLineAfter(requestStream, connection, line),
-            StatusLineReported = statusLine => ReportUploadRewind(plan, statusLine, upload),
-            HeaderReceived = (statusLine, header) =>
-            {
-                ReportAuthProblemLines(plan, statusLine, header, originProblems, proxyProblems);
-                cookiesStored = StoreCookie(context, options, header, cookiesStored);
-                StoreAltSvc(context, options.AltSvcStore, statusLine.Version, header);
-                StoreHsts(context, options.HstsStore, header);
-            },
-            FindRefusal = head => body.FindHeadRefusal(head, context.NoBody, DecodesContent(options)),
-            IsHttp2OrHttp3 = requestStream is not null,
-            AcceptsHttp09 = options.AllowHttp09Reply,
-            IsHeadRequest = context.NoBody,
-            IgnoresContentLength = options.IgnoreContentLength,
-            IsThroughHttpProxy = options.ForwardProxy is { Kind: ProxyKind.Http or ProxyKind.Http10 or ProxyKind.Https },
-            IsSwitchedToHttp2 = () => IsSwitchedToHttp2(connection),
-            DefersFrom = (statusLine, header) => framing.Body is not StreamBody && IsAuthChallenge(plan, statusLine, header),
-        };
+        HttpResponseBodyReader body = CreateBodyReader(plan, connect, responseConnection, exchangeLog, earlier);
+        HttpResponseHeadReader headReader = CreateHeadReader(plan, responseConnection, connection, requestStream, body, upload);
         HttpRequestPlan? retry = null;
         HttpResponseHead? actedOn = null;
         HttpBodyDelivery delivery = HttpBodyDelivery.Deliver;
@@ -1205,23 +1184,11 @@ public sealed class HttpProtocolHandler(
         }
         catch (HttpTransferException failure)
         {
-            headReader.ReportHeldLines();
-            ReportReceiveFailure(context.Events, failure);
-            exchangeLog.Failed(failure.ExitCode, failure);
-            TransferResult failed = TransferResult.Failure(failure.ExitCode, failure.Message, body.BytesWritten)
-                with
-            { Report = exchange.Report(body) };
-            return FailedOutcome(plan, reusedConnection: !newConnection, upload, headReader, failure, failed);
+            return OutcomeOfFailure(plan, exchange, body, exchangeLog, headReader, upload, !newConnection, failure);
         }
         catch (OperationCanceledException canceled) when (plan.Deadline.EndedByLimit)
         {
-            headReader.ReportHeldLines();
-            exchangeLog.Failed(CurlExitCode.OperationTimedOut, canceled);
-            string message = HttpTransferMessages.OperationTimedOut(plan.Deadline.OperationElapsedMilliseconds, body.BytesWritten, body.ExpectedLength);
-            TransferResult timedOut = TransferResult.Failure(CurlExitCode.OperationTimedOut, message, body.BytesWritten)
-                with
-            { Report = exchange.Report(body) };
-            return new HttpAttemptOutcome(timedOut, null, KeepsAlive: false);
+            return OutcomeOfTimeout(plan, exchange, body, exchangeLog, headReader, canceled);
         }
 
         ReportTransferDone(requestStream, connect);
@@ -1231,6 +1198,162 @@ public sealed class HttpProtocolHandler(
         {
             LeftIntactAfterServerClosed = LeftIntactAfterServerClosed(plan, actedOn, upload, headReader, delivery),
             UpgradedSession = UpgradedSessionOf(connection),
+        };
+    }
+
+    /// <summary>
+    /// Reports a failed exchange's held header lines and the failure, and gives the attempt's
+    /// outcome carrying the failure's exit code and the report as far as the exchange got.
+    /// </summary>
+    private static HttpAttemptOutcome OutcomeOfFailure(
+        HttpRequestPlan plan,
+        HttpExchange exchange,
+        HttpResponseBodyReader body,
+        HttpExchangeLog exchangeLog,
+        HttpResponseHeadReader headReader,
+        HttpRequestBodyWriter upload,
+        bool reusedConnection,
+        HttpTransferException failure)
+    {
+        headReader.ReportHeldLines();
+        ReportReceiveFailure(plan.Context.Events, failure);
+        exchangeLog.Failed(failure.ExitCode, failure);
+        TransferResult failed = TransferResult.Failure(failure.ExitCode, failure.Message, body.BytesWritten)
+            with
+        { Report = exchange.Report(body) };
+        return FailedOutcome(plan, reusedConnection, upload, headReader, failure, failed);
+    }
+
+    /// <summary>
+    /// Reports a timed-out exchange's held header lines, and gives the attempt's outcome: exit
+    /// 28 with the report as far as the exchange got, on a connection that is not kept.
+    /// </summary>
+    private static HttpAttemptOutcome OutcomeOfTimeout(
+        HttpRequestPlan plan,
+        HttpExchange exchange,
+        HttpResponseBodyReader body,
+        HttpExchangeLog exchangeLog,
+        HttpResponseHeadReader headReader,
+        OperationCanceledException canceled)
+    {
+        headReader.ReportHeldLines();
+        exchangeLog.Failed(CurlExitCode.OperationTimedOut, canceled);
+        string message = HttpTransferMessages.OperationTimedOut(plan.Deadline.OperationElapsedMilliseconds, body.BytesWritten, body.ExpectedLength);
+        TransferResult timedOut = TransferResult.Failure(CurlExitCode.OperationTimedOut, message, body.BytesWritten)
+            with
+        { Report = exchange.Report(body) };
+        return new HttpAttemptOutcome(timedOut, null, KeepsAlive: false);
+    }
+
+    /// <summary>
+    /// Builds the request body writer of an exchange: holding the request head back when it
+    /// awaits <c>100 Continue</c>, otherwise sharing it with the body's first write.
+    /// </summary>
+    private HttpRequestBodyWriter CreateUpload(
+        HttpRequestPlan plan,
+        IConnection connection,
+        IConnection responseConnection,
+        IHttpStreamConnection? requestStream,
+        byte[] request)
+    {
+        HttpRequestFraming framing = plan.Framing;
+        return new HttpRequestBodyWriter(connection)
+        {
+            SharedHeadLength = framing.AwaitsContinue ? 0 : request.Length,
+            HeldHead = request,
+            IsUpload = framing.IsUpload,
+            Progress = plan.Progress,
+            Events = plan.Context.Events,
+            EarlyResponseWatch = responseConnection as HttpContinueWaitConnection,
+            TracesReaders = TracesReadersOf(requestStream),
+        };
+    }
+
+    /// <summary>
+    /// Builds the record of an exchange that <see cref="HttpExchange.Report" /> turns into the
+    /// transfer's report.
+    /// </summary>
+    private static HttpExchange CreateExchange(
+        HttpRequestPlan plan,
+        ConnectResult connect,
+        IConnection connection,
+        HttpFirstByteTimingConnection timedConnection,
+        int headSize,
+        HttpRequestBodyWriter upload,
+        TransferReport? earlier,
+        bool newConnection) =>
+        new(connect, connection, plan.Framing.Method, headSize, upload, earlier, newConnection)
+        {
+            UsedProxy = plan.Options.ForwardProxy is not null,
+            Started = plan.Started,
+            TimeProvider = plan.Context.TimeProvider,
+            ResponseConnection = timedConnection,
+            RedirectCount = plan.RedirectsFollowed - plan.Options.RedirectsFollowed,
+            AuthSchemePicked = AuthSchemePickedBy(plan),
+        };
+
+    /// <summary>
+    /// Builds the response body reader of an exchange from the transfer's options.
+    /// </summary>
+    private static HttpResponseBodyReader CreateBodyReader(
+        HttpRequestPlan plan,
+        ConnectResult connect,
+        IConnection responseConnection,
+        HttpExchangeLog exchangeLog,
+        TransferReport? earlier)
+    {
+        HttpRequestOptions options = plan.Options;
+        return new HttpResponseBodyReader(responseConnection)
+        {
+            PassesTransferCoding = options.Raw,
+            IgnoresContentLength = options.IgnoreContentLength,
+            LimitsFileSize = HttpDownloadConditions.LimitOf(plan.Context.MaxFileSize) is not null,
+            DecodesTransferCoding = options.TransferEncoding,
+            Log = exchangeLog,
+            HeadersStoredBefore = HeadersStoredBefore(earlier, options, connect),
+        };
+    }
+
+    /// <summary>
+    /// Builds the response head reader of an exchange, wired to report auth problems and the
+    /// upload rewind, to store cookies, Alt-Svc and HSTS from the headers it reads, and to
+    /// echo the response line on the stream it came from.
+    /// </summary>
+    private HttpResponseHeadReader CreateHeadReader(
+        HttpRequestPlan plan,
+        IConnection responseConnection,
+        IConnection connection,
+        IHttpStreamConnection? requestStream,
+        HttpResponseBodyReader body,
+        HttpRequestBodyWriter upload)
+    {
+        ITransferContext context = plan.Context;
+        HttpRequestOptions options = plan.Options;
+        int cookiesStored = 0;
+        HttpAuthProblemLines originProblems = new();
+        HttpAuthProblemLines proxyProblems = new();
+        return new HttpResponseHeadReader(responseConnection)
+        {
+            Events = context.Events,
+            HeadersStoredBefore = body.HeadersStoredBefore,
+            LineReporting = line => (requestStream as Http3StreamConnection)?.EchoResponseLineBefore(line),
+            LineReported = line => EchoResponseLineAfter(requestStream, connection, line),
+            StatusLineReported = statusLine => ReportUploadRewind(plan, statusLine, upload),
+            HeaderReceived = (statusLine, header) =>
+            {
+                ReportAuthProblemLines(plan, statusLine, header, originProblems, proxyProblems);
+                cookiesStored = StoreCookie(context, options, header, cookiesStored);
+                StoreAltSvc(context, options.AltSvcStore, statusLine.Version, header);
+                StoreHsts(context, options.HstsStore, header);
+            },
+            FindRefusal = head => body.FindHeadRefusal(head, context.NoBody, DecodesContent(options)),
+            IsHttp2OrHttp3 = requestStream is not null,
+            AcceptsHttp09 = options.AllowHttp09Reply,
+            IsHeadRequest = context.NoBody,
+            IgnoresContentLength = options.IgnoreContentLength,
+            IsThroughHttpProxy = options.ForwardProxy is { Kind: ProxyKind.Http or ProxyKind.Http10 or ProxyKind.Https },
+            IsSwitchedToHttp2 = () => IsSwitchedToHttp2(connection),
+            DefersFrom = (statusLine, header) => plan.Framing.Body is not StreamBody && IsAuthChallenge(plan, statusLine, header),
         };
     }
 
@@ -1615,14 +1738,17 @@ public sealed class HttpProtocolHandler(
     /// </summary>
     private static void ReportAuthRetryRewind(HttpRequestPlan plan, HttpResponseHead head, HttpRequestPlan? retry)
     {
-        if (retry is not null
-            && head.StatusLine.StatusCode is 401 or 407
-            && plan.Framing.Body is not null
-            && plan.Framing.KnownLength != 0)
+        if (retry is not null && head.StatusLine.StatusCode is 401 or 407 && SentNonEmptyBody(plan))
         {
             plan.Context.Events.ReportInfo(HttpConnectionInfoLines.NeedToRewindUpload);
         }
     }
+
+    /// <summary>
+    /// Tells whether the request carries a body that is not known to be empty.
+    /// </summary>
+    private static bool SentNonEmptyBody(HttpRequestPlan plan) =>
+        plan.Framing.Body is not null && plan.Framing.KnownLength != 0;
 
     /// <summary>
     /// Reports that a body is read only to be discarded, as curl 8.21.0 does before the
@@ -2224,11 +2350,24 @@ public sealed class HttpProtocolHandler(
             return authorized;
         }
 
-        if (plan.ProbedFraming is not null && head.StatusLine.StatusCode is >= 200 and < 300)
+        if (plan.ProbedFraming is not null && head.StatusLine.StatusCode / 100 == 2)
         {
             return plan.WithProbedBody();
         }
 
+        return RetryWithoutExpect(plan, head, bodyLeftUnsent, upload);
+    }
+
+    /// <summary>
+    /// Gives the same request without <c>Expect</c> and with the body <paramref name="upload" />
+    /// rewinds for a 417 <see cref="RetriesWithoutExpect" /> accepts; <see langword="null" />
+    /// for any other response.
+    /// </summary>
+    /// <exception cref="HttpTransferException">
+    /// The resend would pass <see cref="HttpRequestOptions.MaxRedirects" /> (exit 47).
+    /// </exception>
+    private static HttpRequestPlan? RetryWithoutExpect(HttpRequestPlan plan, HttpResponseHead head, bool bodyLeftUnsent, HttpRequestBodyWriter upload)
+    {
         if (!RetriesWithoutExpect(plan, head, bodyLeftUnsent || upload.CutShort))
         {
             return null;
@@ -2730,12 +2869,12 @@ public sealed class HttpProtocolHandler(
             TransferReport report = new()
             {
                 Method = method,
-                RequestSize = (earlier?.RequestSize ?? 0) + headSize + upload.BytesWritten,
+                RequestSize = RequestSizeSoFar() + headSize + upload.BytesWritten,
                 UploadSize = upload.BytesWritten,
                 DownloadSize = body.BytesWritten,
                 DeliveredSize = body.BytesDelivered,
                 HeaderSize = earlier?.HeaderSize ?? connect.ProxyConnectHeaderBytes,
-                ConnectionCount = (earlier?.ConnectionCount ?? 0) + (newConnection ? 1 : 0),
+                ConnectionCount = ConnectionCountSoFar() + (newConnection ? 1 : 0),
                 RedirectCount = RedirectCount,
                 ResponseHeadersStored = body.HeadersStored,
                 AuthSchemePicked = AuthSchemePicked,
@@ -2744,16 +2883,23 @@ public sealed class HttpProtocolHandler(
                 LocalEndPoint = connect.LocalEndPoint ?? connection.LocalEndPoint as IPEndPoint,
                 PeerCertificates = connect.PeerCertificates,
                 RemoteEndPoint = connection.RemoteEndPoint as IPEndPoint,
-                Timings = new TransferTimings(
-                    Started,
-                    connect.Timings,
-                    RequestReady,
-                    RequestSent,
-                    ResponseConnection.FirstByteReceived,
-                    TimeProvider.GetTimestamp()),
+                Timings = TimingsNow(),
             };
             return Head is null ? report : WithHead(report, Head) with { RedirectUrl = RedirectUrl };
         }
+
+        private long RequestSizeSoFar() => earlier?.RequestSize ?? 0;
+
+        private int ConnectionCountSoFar() => earlier?.ConnectionCount ?? 0;
+
+        private TransferTimings TimingsNow() =>
+            new(
+                Started,
+                connect.Timings,
+                RequestReady,
+                RequestSent,
+                ResponseConnection.FirstByteReceived,
+                TimeProvider.GetTimestamp());
 
         private static TransferReport WithHead(TransferReport report, HttpResponseHead head) =>
             report with

@@ -116,7 +116,7 @@ internal sealed class ImapResponder : ILineProtocolResponder
             return Reply(commandLine + " BAD Command\r\n", closesConnection: true);
         }
 
-        if (serverCommands.TryFindReply(command, out byte[] customReply))
+        if (serverCommands.TryFindFullTextReply(command, arguments, out byte[] customReply) || serverCommands.TryFindReply(command, out customReply))
         {
             return new LineProtocolReply(customReply, false);
         }

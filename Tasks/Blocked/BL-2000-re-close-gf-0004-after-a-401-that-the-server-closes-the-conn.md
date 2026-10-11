@@ -4,7 +4,7 @@ title: Re-close GF-0004: After a 401 that the server closes the connection on, t
 priority: High
 assignee: Claude
 pipeline: feature
-depends-on: [BL-2018, BL-2019]
+depends-on: [BL-2018, BL-2019, BL-2059]
 touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests]
 requirement: none
 created: 2026-10-10
@@ -63,9 +63,12 @@ In Curl.Protocol.Http.UnitLibrary's HttpProtocolHandler, treat a connection that
   - RST close (zero linger): the same, exit 0, both GETs.
   - Server half-closes (FIN, keeps reading): curl writes `Connection 0 seems to be dead` and `shutting down connection #0` and never writes to #0. Curl writes the 219-byte retry to #0, reads EOF, then retries fresh, exit 0. A real divergence in `-v` lines and bytes sent, filed as BL-2018.
 - None of these reproduces the measured "the second request never reaches the server". So the harness server's `swsclose` handling (or a stale Curl binary in the gap run) has to be checked by an interactive session: BL-2019 (lane: no). Parked in Backlog on BL-2018 and BL-2019; no code changed here.
+- 2026-10-11 (interactive, BL-2019): BL-2018 is the fix. The 2026-10-10_0657 gap run measured commit 124a991e4, which predates BL-2018's be13ca91f; on the gap branch at 2fd5b394d (which has it) the gap harness passes 14 of the 15 items (64, 69, 76, 153, 388, 1079, 1095, 1229, 1437, 2061, 2062, 2063, 2076, 2091). The harness's sws stand-in, after a `swsclose` reply, accepts and drops later writes and then reads 0 (`SwsHttpServerConnection.Send`, `closes` branch) - a half-close as BL-2018 handles. test90 fails for another cause: after `--anyauth -L` Curl's first request to the redirect target already carries the NTLM type 1, where curl sends none. Filed as BL-2059 and added to `depends-on`. The 14 boxes stay unticked until the next gap run measures them `match`.
 
 ## Log
 
 - 2026-10-10: Created.
 - 2026-10-10: Backlog -> Doing.
 - 2026-10-10: Doing -> Backlog. Waits on BL-2018 (curl's dead-connection check before a same-connection retry) and BL-2019 (interactive: reproduce GF-0004 in the guarded gap harness); BL-1797's fix already holds for FIN and RST closes on loopback
+- 2026-10-11: Backlog -> Doing.
+- 2026-10-11: Doing -> Blocked. Stewart: dark factory its runs of the last day already cost 2.08 of its 2.27 US dollar cost cap, so it was not run again; split the task; see Z:\repos\Curl.logs\BL-2000-*.jsonl

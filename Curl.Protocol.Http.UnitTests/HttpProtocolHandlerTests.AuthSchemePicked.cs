@@ -65,6 +65,25 @@ public sealed partial class HttpProtocolHandlerTests
     }
 
     [TestMethod]
+    [DataRow(HttpAuthSchemes.Ntlm)]
+    [DataRow(HttpAuthSchemes.Negotiate)]
+    public async Task ExecuteAsync_EarlierHopPickedAConnectionScheme_ProbesAgainWithEverySchemeAllowed(HttpAuthSchemes picked)
+    {
+        // Measured: curl 8.21.0 --anyauth -L against NTLM 401s sends GET /one, type 1, ...,
+        // then GET /two with no Authorization (Record-CurlExchange.ps1; upstream test90).
+        TurnTakingConnection connection = new(65536, OkHead + "ok");
+        ScriptedAuthenticator authenticator = new(null, null);
+        Diagnostics.Arrange("earlier hop picked", picked);
+
+        TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), authenticator).ExecuteAsync(PickedSchemeContext(picked));
+
+        WriteResult(result);
+        Assert.AreEqual(PlainRequest, connection.Written);
+        Diagnostics.Assert("schemes allowed", HttpAuthSchemes.Any, authenticator.Calls.Single().Request.AllowedSchemes);
+        Assert.AreEqual(HttpAuthSchemes.Any, authenticator.Calls.Single().Request.AllowedSchemes);
+    }
+
+    [TestMethod]
     [DataRow("Digest x", HttpAuthSchemes.Digest)]
     [DataRow("NTLM x", HttpAuthSchemes.Ntlm)]
     [DataRow("Negotiate x", HttpAuthSchemes.Negotiate)]

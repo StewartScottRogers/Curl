@@ -182,6 +182,18 @@ public sealed class SmtpResponderTests
     public void Answer_Base64LineOf512CharactersAndPadding_IsACommand() =>
         Assert.IsFalse(Create(string.Empty).Answer(new string('A', 512) + "==").ClosesConnection);
 
+    [TestMethod]
+    [DataRow("AUTH CRAM-MD5", "334 Rubbish\r\n")]
+    [DataRow("AUTH PLAIN", "334 PLAIN supported\r\n")]
+    [DataRow("*", "501 AUTH exchange cancelled by client\r\n")]
+    [DataRow("AUTH LOGIN", "500 AUTH is not dealt with!\r\n")]
+    public void Answer_FullTextReply_IsAnsweredBeforeTheCommandReply(string commandLine, string expected)
+    {
+        SmtpResponder responder = Create("AUTH CRAM-MD5 PLAIN\nREPLY \"AUTH CRAM-MD5\" 334 Rubbish\nREPLY * 501 AUTH exchange cancelled by client\nREPLY \"AUTH PLAIN\" 334 PLAIN supported\n");
+
+        Assert.AreEqual(expected, Encoding.Latin1.GetString(responder.Answer(commandLine).Bytes.Span));
+    }
+
     private static SmtpResponder Create(string serverCommands) =>
         new(LineProtocolServerCommands.Read(Encoding.Latin1.GetBytes(serverCommands)), new Dictionary<string, byte[]>());
 }

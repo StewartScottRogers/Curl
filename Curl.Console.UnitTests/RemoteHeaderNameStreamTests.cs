@@ -107,6 +107,52 @@ public sealed class RemoteHeaderNameStreamTests
         Assert.AreEqual(0, passedOn.Length);
     }
 
+    /// <summary>
+    /// Upstream test 3036 under <c>-i</c>, as the gap office's cross-check runs it: the retry's head
+    /// goes to a file the first attempt's <c>Content-Disposition</c> named but could not open, and
+    /// curl 8.21.0 fails on its first header write, the status line, reporting
+    /// <c>write of 16 bytes</c> for an LF-only head (measured with Record-CurlExchange.ps1 on
+    /// 2026-10-11, BL-2009), not the whole head's length.
+    /// </summary>
+    [TestMethod]
+    public async Task WriteAsync_RetriedHeadIntoANamedFileThatCannotOpen_FailsOnTheStatusLine()
+    {
+        files.UnwritablePaths.Add("present/MMM3036MMM");
+        DeferredOutputFileStream output = new(files, "present/curl_response", FileWriteMode.Truncate);
+        string head = "HTTP/1.1 200 OK\nContent-Length: 6\nConnection: close\nContent-Disposition: inline; filename=\"MMM3036MMM\"\nContent-Type: text/html\n\n";
+        Diagnostics.Arrange("unwritable files", "present/MMM3036MMM");
+        Diagnostics.Arrange("head, both attempts", head);
+
+        await Assert.ThrowsExactlyAsync<IOException>(
+            async () => await new RemoteHeaderNameStream(output, output, name => "present/" + name).WriteAsync(Encoding.ASCII.GetBytes(head)));
+        (TransferResult first, _) = output.SettleRetriedAttempt(TransferResult.Failure(CurlExitCode.WriteError, "failed"));
+        await Assert.ThrowsExactlyAsync<IOException>(
+            async () => await new RemoteHeaderNameStream(output, output, name => "present/" + name).WriteAsync(Encoding.ASCII.GetBytes(head)));
+        TransferResult retry = await output.CompleteAsync(TransferResult.Failure(CurlExitCode.WriteError, "failed"));
+        Diagnostics.Act("first / retry", $"{first.ErrorMessage} / {retry.ErrorMessage}");
+
+        Diagnostics.Assert("first / retry", "client returned ERROR on write of 51 bytes / client returned ERROR on write of 16 bytes", $"{first.ErrorMessage} / {retry.ErrorMessage}");
+        Assert.AreEqual("client returned ERROR on write of 51 bytes", first.ErrorMessage);
+        Assert.AreEqual("client returned ERROR on write of 16 bytes", retry.ErrorMessage);
+    }
+
+    [TestMethod]
+    public async Task WriteAsync_HeadAfterTheFileIsNamed_PassesEveryLineOn()
+    {
+        DeferredOutputFileStream output = new(files, "u.txt", FileWriteMode.Truncate);
+        RemoteHeaderNameStream stream = new(output, passedOn, name => name);
+        string second = "HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n";
+        Diagnostics.Arrange("heads in order", "a 200 naming x.txt, then a 200 naming none");
+
+        await stream.WriteAsync(Encoding.ASCII.GetBytes("HTTP/1.1 200 OK\r\n" + Disposition));
+        passedOn.SetLength(0);
+        await stream.WriteAsync(Encoding.ASCII.GetBytes(second));
+        Diagnostics.Bytes("passed on", passedOn.ToArray());
+
+        Diagnostics.Diff("passed on", second, Encoding.ASCII.GetString(passedOn.ToArray()));
+        Assert.AreEqual(second, Encoding.ASCII.GetString(passedOn.ToArray()));
+    }
+
     [TestMethod]
     public async Task WriteAsync_FileCreatedAfterTheNameIsChosen_IsNotOverwritten()
     {

@@ -332,15 +332,27 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
     /// <returns><see langword="true" /> when the transfer tunnels because of <c>--connect-to</c>.</returns>
     internal static bool ConnectToTunnelsThroughProxy(CommandLineOptions options, CurlUrl url, ProxyEndpoint? proxy)
     {
-        if (proxy is not { Kind: ProxyKind.Http or ProxyKind.Http10 or ProxyKind.Https } || options.ConnectToEntries.Count == 0)
+        if (!IsHttpOrHttpsProxy(proxy) || options.ConnectToEntries.Count == 0)
         {
             return false;
         }
 
         Networking.ConnectDestination destination = new Networking.ConnectToMappings(options.ConnectToEntries).Map(url.Host, url.Port);
-        return destination is { IsMapped: true, ParseError: null }
-            && (destination.Port != url.Port || !string.Equals(destination.Host, url.Host, StringComparison.OrdinalIgnoreCase));
+        return destination is { IsMapped: true, ParseError: null } && IsAnotherHostOrPort(destination, url);
     }
+
+    /// <summary>Whether <paramref name="proxy" /> is an HTTP, HTTP/1.0 or HTTPS proxy, which CONNECT can tunnel through.</summary>
+    /// <param name="proxy">The transfer's proxy, or <see langword="null" /> for none.</param>
+    /// <returns><see langword="true" /> for a proxy of one of those kinds.</returns>
+    private static bool IsHttpOrHttpsProxy(ProxyEndpoint? proxy) =>
+        proxy is { Kind: ProxyKind.Http or ProxyKind.Http10 or ProxyKind.Https };
+
+    /// <summary>Whether <paramref name="destination" /> names a different port or host (ignoring case) than <paramref name="url" />.</summary>
+    /// <param name="destination">Where a <c>--connect-to</c> mapping sends the URL.</param>
+    /// <param name="url">The URL to transfer.</param>
+    /// <returns><see langword="true" /> when the mapping moves the connection off the URL's own host and port.</returns>
+    private static bool IsAnotherHostOrPort(Networking.ConnectDestination destination, CurlUrl url) =>
+        destination.Port != url.Port || !string.Equals(destination.Host, url.Host, StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
     /// Gets <paramref name="events" /> writing each CONNECT reply head a tunnelling proxy sends to
@@ -355,7 +367,7 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
     /// <param name="headerOutput">The transfer's header output, or <see langword="null" /> for none.</param>
     /// <returns>The events the context carries.</returns>
     private static ITransferEvents EventsWritingConnectReplyHeads(CommandLineOptions options, ProxyEndpoint? proxy, ITransferEvents events, Stream? headerOutput) =>
-        proxy is { Kind: ProxyKind.Http or ProxyKind.Http10 or ProxyKind.Https } && headerOutput is not null && !options.SuppressConnectHeaders
+        IsHttpOrHttpsProxy(proxy) && headerOutput is not null && !options.SuppressConnectHeaders
             ? new ConnectReplyHeadWritingEvents(events, headerOutput)
             : events;
 

@@ -4053,6 +4053,12 @@ function Test-WorktreeDirty {
     return [bool](@(git -C $Dir status --porcelain 2>$null) | Where-Object { $_ })
 }
 
+function Test-InteractiveOnlyTask([string]$Path) {
+    # True when the task file says lane: no. No lane ever claims such a task, so one in Doing
+    # is held by an interactive session, not orphaned by a lane (BL-2069).
+    return (Get-Content -Raw -LiteralPath $Path) -match '(?m)^lane: no\s*$'
+}
+
 function Get-OrphanAction {
     # What shift start does with task $Id, in Doing but held by no lane of the previous shift
     # (BL-1071): adopt it into the one lane worktree with uncommitted work, so that lane
@@ -4634,8 +4640,9 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
     # Tasks in Doing are only allowed when a previous shift's lane holds each of them and that
     # lane is dead - a shift stopped mid-task, or killed while waiting for tokens. Those lanes
     # are adopted: their worktrees are left as they are and they resume the task. An orphan,
-    # held by no lane, is settled by Get-OrphanAction (BL-1071).
-    $stuck = @(Get-ChildItem (Join-Path $Root 'Tasks\Doing') -Filter 'BL-*.md' -ErrorAction SilentlyContinue | ForEach-Object { Get-TaskIdFromFileName $_.Name })
+    # held by no lane, is settled by Get-OrphanAction (BL-1071). An interactive-only task
+    # (lane: no) in Doing is an interactive session's, so it is left alone (BL-2069).
+    $stuck = @(Get-ChildItem (Join-Path $Root 'Tasks\Doing') -Filter 'BL-*.md' -ErrorAction SilentlyContinue | Where-Object { -not (Test-InteractiveOnlyTask $_.FullName) } | ForEach-Object { Get-TaskIdFromFileName $_.Name })
     $adopt = @{}
     if ($stuck.Count) {
         $previous = Get-ChildItem $LogDir -Directory -Filter 'lanes-*' -ErrorAction SilentlyContinue | Sort-Object Name | Select-Object -Last 1
@@ -5048,7 +5055,7 @@ if ($Lane) {
     $branch = (git -C $Root rev-parse --abbrev-ref HEAD).Trim()
     if ($branch -in 'master', 'main') { Stop-ShiftStart "on $branch; switch to a feature branch"; exit 1 }
     if (Get-Dirty) { Stop-ShiftStart 'working tree not clean; commit or stash first'; exit 1 }
-    $stuck = @(Get-ChildItem (Join-Path $Root 'Tasks\Doing') -Filter 'BL-*.md' -ErrorAction SilentlyContinue)
+    $stuck = @(Get-ChildItem (Join-Path $Root 'Tasks\Doing') -Filter 'BL-*.md' -ErrorAction SilentlyContinue | Where-Object { -not (Test-InteractiveOnlyTask $_.FullName) })
     if ($stuck.Count) { Stop-ShiftStart "task already in Doing: $($stuck[0].Name)"; exit 1 }
 }
 

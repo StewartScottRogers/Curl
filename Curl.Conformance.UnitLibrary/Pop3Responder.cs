@@ -74,7 +74,7 @@ internal sealed class Pop3Responder : ILineProtocolResponder
             return Reply("-ERR Unrecognized command\r\n", closesConnection: true);
         }
 
-        if (serverCommands.TryFindReply(command, out byte[] customReply))
+        if (serverCommands.TryFindFullTextReply(command, argument, out byte[] customReply) || serverCommands.TryFindReply(command, out customReply))
         {
             return new LineProtocolReply(customReply, false);
         }

@@ -290,27 +290,52 @@ internal sealed class HttpRequestFraming
     /// </param>
     private static HttpRequestFraming OfBody(string method, HttpRequestBody body, HttpCustomHeader[] customHeaders, bool isHttp10, HttpUploadResume? upload = null, string? rangeText = null, bool convertLineEndings = false)
     {
-        long? unconvertedLength = body is BytesBody bytes ? bytes.Content.Length : ((StreamBody)body).Length;
+        long? unconvertedLength = LengthOf(body);
         long? length = convertLineEndings ? null : unconvertedLength;
         body = convertLineEndings ? WithCrlfLineEndings(body) : body;
         bool wantsExpect = WantsExpect(unconvertedLength, isHttp10);
-        bool namesExpect = customHeaders.Any(header => header.Names("Expect"));
-        bool namesTransferEncoding = customHeaders.Any(header => header.Names(TransferEncodingName));
-        bool asksForChunked = AsksForChunked(customHeaders);
-        bool isChunked = namesTransferEncoding ? asksForChunked : length is null;
-        bool awaitsContinue = namesExpect ? AsksForContinue(customHeaders) : wantsExpect;
+        bool namesExpect = NamesAny(customHeaders, "Expect");
+        bool namesTransferEncoding = NamesAny(customHeaders, TransferEncodingName);
+        bool chunksForUnknownLength = length is null && !namesTransferEncoding;
         return new HttpRequestFraming(
             method,
             body,
             length,
-            isChunked,
+            ChunkedBy(customHeaders, namesTransferEncoding, length),
             wantsExpect && !namesExpect,
-            awaitsContinue,
-            isHttp10 && length is null && !namesTransferEncoding,
+            ContinueAwaitedBy(customHeaders, namesExpect, wantsExpect),
+            isHttp10 && chunksForUnknownLength,
             upload,
             ContentRangeOf(upload, rangeText, length),
-            chunksForUnknownLength: length is null && !namesTransferEncoding);
+            chunksForUnknownLength: chunksForUnknownLength);
     }
+
+    /// <summary>
+    /// Gives the length of <paramref name="body" /> in bytes, or <see langword="null" /> when it
+    /// is a stream of unknown length.
+    /// </summary>
+    private static long? LengthOf(HttpRequestBody body) =>
+        body is BytesBody bytes ? bytes.Content.Length : ((StreamBody)body).Length;
+
+    /// <summary>
+    /// Tells whether any <c>-H</c> value names <paramref name="name" />.
+    /// </summary>
+    private static bool NamesAny(HttpCustomHeader[] customHeaders, string name) =>
+        customHeaders.Any(header => header.Names(name));
+
+    /// <summary>
+    /// Tells whether the body is sent chunked: as the first <c>Transfer-Encoding</c>
+    /// <c>-H</c> value asks when one is named, else when its <paramref name="length" /> is unknown.
+    /// </summary>
+    private static bool ChunkedBy(HttpCustomHeader[] customHeaders, bool namesTransferEncoding, long? length) =>
+        namesTransferEncoding ? AsksForChunked(customHeaders) : length is null;
+
+    /// <summary>
+    /// Tells whether the request waits for <c>100 Continue</c>: as the first <c>Expect</c>
+    /// <c>-H</c> value asks when one is named, else as <paramref name="wantsExpect" /> says.
+    /// </summary>
+    private static bool ContinueAwaitedBy(HttpCustomHeader[] customHeaders, bool namesExpect, bool wantsExpect) =>
+        namesExpect ? AsksForContinue(customHeaders) : wantsExpect;
 
     /// <summary>
     /// Gives the <c>-r</c> <paramref name="rangeText" /> a request with <paramref name="body" /> on
