@@ -27,7 +27,10 @@ order:
    findings on `audit`, whose pull request it merges once CI is green. Never commit a finding on
    `work/dark-factory` - the CI audit guard fails any audit path changed there. `-WhatIf` shows
    what it would file without changing anything. The script refuses to run inside a dark factory
-   process.
+   process. Run it against a freshly fetched `work/dark-factory`, and before pushing rebase onto
+   it, run `task-board.ps1 dedupe -Since <the commit rebased onto>` and rewrite any renumbered ID
+   in its finding, so a task the gap office filed meanwhile keeps its ID. The Audit tab's release
+   (`.github/workflows/release-approved-findings.yml`) already does this (BL-2013).
 4. **The factory works the tasks** like any other: they change product code, not audit paths, so
    lanes may take them. The finding stays `accepted` while its task is worked and after it is
    Done; only evidence closes it - a later re-audit that finds the reproduction no longer
