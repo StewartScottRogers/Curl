@@ -52,9 +52,15 @@ internal sealed class UpstreamProtocolDump
     /// <param name="sources">Each server's bytes and the writes they came from.</param>
     /// <returns>The protocol dump.</returns>
     public static byte[] Merge(IReadOnlyList<(ReadOnlyMemory<byte> Bytes, IReadOnlyList<UpstreamProtocolDumpEntry> Entries)> sources) =>
-        sources.Count(source => source.Bytes.Length > 0) > 1
-            ? [.. sources.SelectMany(source => source.Entries).OrderBy(entry => entry.Sequence).SelectMany(entry => entry.Bytes)]
-            : [.. sources.SelectMany(source => source.Bytes.ToArray())];
+        sources.Count(source => source.Bytes.Length > 0) > 1 ? InWriteOrder(sources) : OneAfterAnother(sources);
+
+    // Every write of every source, in the order it happened.
+    private static byte[] InWriteOrder(IReadOnlyList<(ReadOnlyMemory<byte> Bytes, IReadOnlyList<UpstreamProtocolDumpEntry> Entries)> sources) =>
+        [.. sources.SelectMany(source => source.Entries).OrderBy(entry => entry.Sequence).SelectMany(entry => entry.Bytes)];
+
+    // Each source's bytes, one source after another.
+    private static byte[] OneAfterAnother(IReadOnlyList<(ReadOnlyMemory<byte> Bytes, IReadOnlyList<UpstreamProtocolDumpEntry> Entries)> sources) =>
+        [.. sources.SelectMany(source => source.Bytes.ToArray())];
 
     /// <summary>Records one write.</summary>
     /// <param name="written">The bytes.</param>

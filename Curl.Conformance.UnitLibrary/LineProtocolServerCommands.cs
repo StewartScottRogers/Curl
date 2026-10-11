@@ -183,11 +183,15 @@ internal sealed class LineProtocolServerCommands
     private static bool TryReadReply(string line, out string command, out byte[] reply)
     {
         string[] fields = line.Split(' ', 3);
-        bool isReply = fields is ["REPLY" or "REPLYLF", _, _];
-        command = isReply ? fields[1] : string.Empty;
-        reply = isReply ? Encoding.Latin1.GetBytes(PerlDoubleQuoted(fields[2]) + (fields[0] == "REPLYLF" ? "\n" : "\r\n")) : [];
-        return isReply;
+        string? lineEnd = fields.Length == 3 ? ReplyLineEnd(fields[0]) : null;
+        command = lineEnd is null ? string.Empty : fields[1];
+        reply = lineEnd is null ? [] : Encoding.Latin1.GetBytes(PerlDoubleQuoted(fields[2]) + lineEnd);
+        return lineEnd is not null;
     }
+
+    /// <summary>The line end a reply keyword gives its text: CRLF for <c>REPLY</c>, a bare LF for <c>REPLYLF</c>; null for any other word.</summary>
+    private static string? ReplyLineEnd(string keyword) =>
+        keyword switch { "REPLY" => "\r\n", "REPLYLF" => "\n", _ => null };
 
     /// <summary>
     /// Reads reply text as ftpserver.pl's <c>eval "qq{...}"</c> does: <c>\r</c>, <c>\n</c> and
