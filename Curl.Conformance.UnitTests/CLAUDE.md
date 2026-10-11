@@ -29,8 +29,9 @@ every vendored case through curl in process (`CurlComposition.CreateRunner`, rea
 of ADR-0013 decision 5: a case on `PassingUpstreamCases.txt` must pass, and fails with its
 first difference (or skip reason) if it stops; any other case is `Inconclusive` with its skip
 reason, its first difference, or a note that it passes and can be listed. A listed case that
-runs out of time (curl past 20 seconds, or the whole case past 30) is run once more before it
-is judged, since a stall of a busy CI runner can hold any case that long (BL-1859). When a change makes
+fails is run once more before it is judged, since a stall of a busy CI runner can hold any case
+past a time limit - the harness's (curl past 20 seconds, or the whole case past 30; BL-1859) or
+the case's own, as test303's `-m 8` (BL-2093). When a change makes
 a case pass, add its number to the list in the same commit.
 
 ## Pass rate

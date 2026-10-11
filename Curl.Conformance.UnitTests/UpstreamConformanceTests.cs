@@ -78,11 +78,12 @@ public sealed class UpstreamConformanceTests
         }
 
         // A stall of the whole CI runner can hold a listed case past a time limit that it
-        // finishes in milliseconds elsewhere (test1484, BL-1859), so a listed case that ran out of
-        // time gets one more attempt; a case that really hangs runs out of time again and fails.
-        if (isListed && RanOutOfTime(outcome))
+        // finishes in milliseconds elsewhere - the harness's own (test1484, BL-1859) or the case's,
+        // as test303's -m 8 expired before its reply arrived on Linux (BL-2093) - so a listed case
+        // that fails gets one more attempt; a case that really broke fails again.
+        if (isListed && outcome.Kind == UpstreamCaseOutcomeKind.Failed)
         {
-            diagnostics.Act("first attempt ran out of time", outcome.Detail);
+            diagnostics.Act("first attempt failed", outcome.Detail);
             using (diagnostics.Phase("run case through curl again"))
             {
                 outcome = await RunCaseOnceAsync(testNumber, testFile);
@@ -353,11 +354,6 @@ public sealed class UpstreamConformanceTests
 
     private static readonly string CaseHangLimitMessage =
         $"the case did not finish within {CaseHangLimit.TotalSeconds.ToString(CultureInfo.InvariantCulture)} seconds";
-
-    // The runner's own words for a curl run past TimeLimit, and this class's for a case past CaseHangLimit.
-    private static bool RanOutOfTime(UpstreamCaseOutcome outcome) =>
-        outcome.Kind == UpstreamCaseOutcomeKind.Failed
-        && (outcome.Detail == CaseHangLimitMessage || outcome.Detail.StartsWith("curl did not finish within ", StringComparison.Ordinal));
 
     // GF-0002 (BL-1998): a tool outside the test projects, such as the gap office's, reaches Curl only
     // through the public InProcessCurl, over the in-memory connector or the production TcpConnector with
