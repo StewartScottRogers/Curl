@@ -3,8 +3,8 @@ id: AF-0157
 title: Curl.Core.UnitLibrary/CLAUDE.md says seven classes are not yet wired into Curl.Console and --ipfs-gateway is not yet parsed; all are wired and the option is parsed
 auditor: truthfulness
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: truthfulness:Curl.Core.UnitLibrary/CLAUDE.md:not-yet-wired-into-Curl.Console:false-statement
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Run from the repository root:
 ## Log
 
 - 2026-10-11: filed proposed.
+- 2026-10-11: proposed -> accepted.
