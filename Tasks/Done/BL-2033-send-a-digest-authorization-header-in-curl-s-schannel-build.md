@@ -8,7 +8,7 @@ depends-on: [BL-2022]
 touches: [Curl.Console, Curl.Console.UnitTests]
 requirement: none
 created: 2026-10-10
-completed:
+completed: 2026-10-10
 ---
 # BL-2033 — Send a Digest Authorization header in curl's Schannel-build form on Windows
 
@@ -24,10 +24,10 @@ Measure with `Record-CurlExchange.ps1 -OutDirectory <dir> -Port <p> -HalfCloseAf
 
 ## Acceptance criteria
 
-- [ ] On Windows the Digest `Authorization` value `Curl.Console` sends matches curl 8.21.0's bytes for the command above (measured, recorded under Notes).
-- [ ] Off Windows the value keeps the `, ` form (no test on Windows changes it).
-- [ ] `dotnet build -warnaserror` is clean and the fast tests are green; Curl.Console keeps 100% line and branch coverage.
-- [ ] No option changes, so `--ai-help` needs nothing; say so under Notes.
+- [x] On Windows the Digest `Authorization` value `Curl.Console` sends matches curl 8.21.0's bytes for the command above (measured, recorded under Notes).
+- [x] Off Windows the value keeps the `, ` form (no test on Windows changes it).
+- [x] `dotnet build -warnaserror` is clean and the fast tests are green; Curl.Console keeps 100% line and branch coverage.
+- [x] No option changes, so `--ai-help` needs nothing; say so under Notes.
 
 ## Notes
 
@@ -39,3 +39,4 @@ Measure with `Record-CurlExchange.ps1 -OutDirectory <dir> -Port <p> -HalfCloseAf
 
 - 2026-10-10: Created.
 - 2026-10-10: Backlog -> Doing.
+- 2026-10-10: Doing -> Done. Digest header matches the Schannel build on Windows
