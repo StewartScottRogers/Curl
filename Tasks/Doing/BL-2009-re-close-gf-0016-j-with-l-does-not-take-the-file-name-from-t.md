@@ -65,3 +65,4 @@ In Curl.Console's -O/-J output naming: with -J and -L and no Content-Disposition
 - 2026-10-10: Created.
 - 2026-10-10: Backlog -> Doing.
 - 2026-10-10: Doing -> Backlog. Interactive only: the gap harness and upstream cache for test1642/1643/3036 are refused to lanes, and no difference reproduces with Record-CurlExchange; added lane: no
+- 2026-10-10: Backlog -> Doing.
