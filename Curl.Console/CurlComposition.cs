@@ -1222,7 +1222,8 @@ internal static class CurlComposition
     /// </param>
     /// <param name="readEnvironmentVariable">
     /// Reads every environment variable the run reads - the proxy variables, <c>IPFS_GATEWAY</c>,
-    /// <c>HOME</c> for the netrc file and the rest - so a test gives one run its own environment
+    /// <c>HOME</c> for the netrc file, <c>COLUMNS</c> for the width warnings and notes wrap at
+    /// (<see cref="TerminalColumns" />, no console consulted; BL-2017) and the rest - so a test gives one run its own environment
     /// without touching the process's (BL-1928); <see langword="null" /> for a run that reads none.
     /// </param>
     /// <param name="ftpListener">Listens for FTP's active-mode (<c>-P</c>) data connections; a <see cref="TcpConnectionListener" /> when <see langword="null" /> (BL-1907).</param>
@@ -1253,6 +1254,7 @@ internal static class CurlComposition
             standardError,
             standardInput,
             OperatingSystem.IsWindows(),
+            terminalColumns: TerminalColumns.Resolve(environment(TerminalColumns.ColumnsVariableName), () => null),
             writesProgressMeter: writesProgressMeter,
             writeOutFileOpener: writeOutFileOpener,
             writeOutTimeDialect: WriteOutTimeDialectFor(OperatingSystem.IsWindows()),

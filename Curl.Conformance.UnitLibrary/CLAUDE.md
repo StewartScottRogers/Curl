@@ -199,7 +199,7 @@ outside the case's log directory; before expansion `UpstreamTestDirectoryComposi
 `%PWD/%LOGDIR` to `%LOGDIR` (the absolute log directory, so the composition names the file there on
 every platform) and `%SRCDIR/libtest/test610.pl` / `test613.pl` to `./libtest/...`, as
 `runtests.pl`'s default `$srcdir` names them; any other `%SRCDIR` has no value and skips the case
-(ADR-0458, BL-1944); curl's `--output` is `%LOGDIR/curl%TESTNUMBER.out`, as `runtests.pl` names it;
+(ADR-0458, BL-1944); curl's `--output` is `%LOGDIR/curl%TESTNUMBER.out`, as `runtests.pl` names it, and `--trace-ascii %LOGDIR/trace%TESTNUMBER --trace-config all --trace-time` follow `--include` as `runtests.pl` passes them, so the default config file's note prints as test433 expects (BL-2017);
 `%PWD` elsewhere has a value only when the caller names a tests
 directory, and `%CERTDIR` only when it names a certificate directory: the folder holding
 upstream's `certs` folder, since cases name `%CERTDIR/certs/test-ca.crt` (BL-1922; the
@@ -209,7 +209,7 @@ the case's log directory, splits `<client><command>` with `UpstreamCommandLineSp
 the shell `runtests.pl` uses would, and runs curl through an `UpstreamCurlInvocation` against
 the `sws` emulation and `TftpServerConnector`. The invocation's
 `EnvironmentVariables` is the whole environment the run reads (BL-1892): each `NAME=value` line
-of `<client><setenv>`, after expansion (so `%HOSTIP` and the rest are already replaced), with an
+of every `<client><setenv>` part (`getpart` joins them; BL-2017), after expansion (so `%HOSTIP` and the rest are already replaced), with an
 empty value kept as an empty variable and a line with no `=` (or a `#` comment) left out, as
 `runtests.pl` unsets such a name; nothing else is in it, so a run without `<setenv>` sees no
 variable and nothing is left to restore. The conformance tests hand it to
