@@ -270,22 +270,11 @@ public sealed class HttpProtocolHandler(
         ArgumentNullException.ThrowIfNull(context);
 
         long started = context.TimeProvider.GetTimestamp();
-        HttpRequestOptions options = context.Http ?? new HttpRequestOptions();
+        HttpRequestOptions options = OptionsOf(context);
         HttpRequestFraming framing = HttpRequestFraming.Of(options, HttpRequestHeadFormatter.CustomHeadersOf(options.Headers, options), context.NoBody, context.Upload, context.ResumeFrom, context.RangeText, context.ResumeUploadFromUnknownOffset, context.ConvertLineEndings);
-        HttpAuthRequest authRequest = new(
-            framing.Method,
-            context.Url,
-            options.RequestTarget ?? HttpUrlText.RequestTarget(context.Url),
-            context.Credentials,
-            options.BearerToken,
-            AllowedSchemesOf(options),
-            IsProxy: false)
-        {
-            Events = context.Events,
-            AwsSigV4 = AwsSigV4InputsOf(context, options, framing),
-        };
+        HttpAuthRequest authRequest = OriginAuthRequestOf(context, options, framing);
         ProxyEndpoint? forwardProxy = ForwardProxyOf(context.Url, options);
-        HttpAuthRequest? proxyAuthRequest = forwardProxy is null ? null : ProxyAuthRequestOf(authRequest, forwardProxy);
+        HttpAuthRequest? proxyAuthRequest = ProxyAuthRequestOrNull(authRequest, forwardProxy);
         using HttpTransferDeadline deadline = new(context);
         HttpInfoLineRecorder authorizationLines = new();
         HttpInfoLineRecorder proxyAuthorizationLines = new();
@@ -306,11 +295,48 @@ public sealed class HttpProtocolHandler(
             ProxyAuthorizationInfoLines = proxyAuthorizationLines.Lines,
             RedirectsFollowed = options.RedirectsFollowed,
         };
-        TransferResult result = Http3RefusalOf(plan) is { } refusal
-            ? await ExchangeWithoutHttp3Async(plan, refusal).ConfigureAwait(false)
-            : await ConnectAndExchangeAsync(plan, earlier: null).ConfigureAwait(false);
+        TransferResult result = await ExchangeOfPlanAsync(plan).ConfigureAwait(false);
         return plan.OpenedConnection ? WithFirstAuthorizationFailure(result, authRequest, authorizationLines.Lines) : result;
     }
+
+    /// <summary>
+    /// Gives the options the transfer asked for, or the defaults when it asked for none.
+    /// </summary>
+    private static HttpRequestOptions OptionsOf(ITransferContext context) =>
+        context.Http ?? new HttpRequestOptions();
+
+    /// <summary>
+    /// Makes the authentication request for the origin server of the transfer's first request.
+    /// </summary>
+    private static HttpAuthRequest OriginAuthRequestOf(ITransferContext context, HttpRequestOptions options, HttpRequestFraming framing) =>
+        new(
+            framing.Method,
+            context.Url,
+            options.RequestTarget ?? HttpUrlText.RequestTarget(context.Url),
+            context.Credentials,
+            options.BearerToken,
+            AllowedSchemesOf(options),
+            IsProxy: false)
+        {
+            Events = context.Events,
+            AwsSigV4 = AwsSigV4InputsOf(context, options, framing),
+        };
+
+    /// <summary>
+    /// Makes the authentication request for a forward proxy, or gives <see langword="null" />
+    /// when there is none.
+    /// </summary>
+    private HttpAuthRequest? ProxyAuthRequestOrNull(HttpAuthRequest authRequest, ProxyEndpoint? forwardProxy) =>
+        forwardProxy is null ? null : ProxyAuthRequestOf(authRequest, forwardProxy);
+
+    /// <summary>
+    /// Sends the plan's first request: refused or tried without HTTP/3 when
+    /// <see cref="Http3RefusalOf" /> says so, else connected and exchanged as asked.
+    /// </summary>
+    private async ValueTask<TransferResult> ExchangeOfPlanAsync(HttpRequestPlan plan) =>
+        Http3RefusalOf(plan) is { } refusal
+            ? await ExchangeWithoutHttp3Async(plan, refusal).ConfigureAwait(false)
+            : await ConnectAndExchangeAsync(plan, earlier: null).ConfigureAwait(false);
 
     /// <summary>
     /// Decides whether the transfer's first request goes as a probe with an empty body: a Digest
@@ -2324,11 +2350,24 @@ public sealed class HttpProtocolHandler(
             return authorized;
         }
 
-        if (plan.ProbedFraming is not null && head.StatusLine.StatusCode is >= 200 and < 300)
+        if (plan.ProbedFraming is not null && head.StatusLine.StatusCode / 100 == 2)
         {
             return plan.WithProbedBody();
         }
 
+        return RetryWithoutExpect(plan, head, bodyLeftUnsent, upload);
+    }
+
+    /// <summary>
+    /// Gives the same request without <c>Expect</c> and with the body <paramref name="upload" />
+    /// rewinds for a 417 <see cref="RetriesWithoutExpect" /> accepts; <see langword="null" />
+    /// for any other response.
+    /// </summary>
+    /// <exception cref="HttpTransferException">
+    /// The resend would pass <see cref="HttpRequestOptions.MaxRedirects" /> (exit 47).
+    /// </exception>
+    private static HttpRequestPlan? RetryWithoutExpect(HttpRequestPlan plan, HttpResponseHead head, bool bodyLeftUnsent, HttpRequestBodyWriter upload)
+    {
         if (!RetriesWithoutExpect(plan, head, bodyLeftUnsent || upload.CutShort))
         {
             return null;

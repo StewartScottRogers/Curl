@@ -338,15 +338,22 @@ internal static class HttpRequestHeadFormatter
         foreach (HttpCustomHeader header in customHeaders)
         {
             if (header.SentLine is { } line
-                && !header.Names(ConnectionName)
-                && !(leavesOutContentType && header.Names(ContentTypeName))
-                && !(leavesOutContentLength && header.Names(ContentLengthName))
+                && !IsLeftOutByName(header, leavesOutContentType, leavesOutContentLength)
                 && !(hostLineWritten && line.StartsWith("Host:", StringComparison.OrdinalIgnoreCase)))
             {
                 head.Append(line).Append("\r\n");
             }
         }
     }
+
+    /// <summary>
+    /// Tells whether <paramref name="header" /> names <c>Connection</c>, or <c>Content-Type</c>
+    /// or <c>Content-Length</c> when the matching flag says that one is left out.
+    /// </summary>
+    private static bool IsLeftOutByName(HttpCustomHeader header, bool leavesOutContentType, bool leavesOutContentLength) =>
+        header.Names(ConnectionName)
+            || (leavesOutContentType && header.Names(ContentTypeName))
+            || (leavesOutContentLength && header.Names(ContentLengthName));
 
     /// <summary>
     /// Gives the <c>Content-Length</c> value: the body's length, or <see langword="null" /> when

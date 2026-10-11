@@ -541,6 +541,26 @@ public sealed partial class HttpProtocolHandlerTests
     }
 
     /// <summary>
+    /// A probe answered with a 500, neither a challenge nor a 2xx, is the transfer's result: the
+    /// body is never sent.
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_DigestProbeAnsweredWithAServerError_EndsWithoutSendingTheBody()
+    {
+        TurnTakingConnection connection = new(65536, "HTTP/1.1 500 Internal Server Error\r\nContent-Length: 2\r\n\r\nno");
+        TransferContext context = DigestPostContext(new MemoryStream());
+        Diagnostics.Arrange("url, body, schemes", $"{AuthUrl}, -d hello, --digest, a server answering 500");
+
+        TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), new ScriptedAuthenticator(null, null)).ExecuteAsync(context);
+
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.HasCount(1, connection.Written.Split("POST ", StringSplitOptions.RemoveEmptyEntries), connection.Written);
+        Assert.DoesNotContain("hello", connection.Written);
+    }
+
+    /// <summary>
     /// The probe's <c>Content-Length: 0</c> replaces an <c>-H</c> <c>Content-Length</c> line,
     /// which goes only with the answer to the challenge, as upstream test1284 expects of curl
     /// 8.21.0 (BL-1835).
