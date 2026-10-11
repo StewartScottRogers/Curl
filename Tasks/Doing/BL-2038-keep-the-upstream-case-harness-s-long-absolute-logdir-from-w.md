@@ -52,3 +52,4 @@ absolute `%LOGDIR` wrap a `Note:` or `Warning:` line that runtests.pl's short `l
 ## Log
 
 - 2026-10-10: Created.
+- 2026-10-10: Backlog -> Doing.
