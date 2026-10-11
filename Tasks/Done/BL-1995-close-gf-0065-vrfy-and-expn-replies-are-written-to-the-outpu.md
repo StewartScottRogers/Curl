@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Smtp.UnitLibrary, Curl.Protocol.Smtp.UnitTests, Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests]
 requirement: none
 created: 2026-10-10
-completed:
+completed: 2026-10-10
 ---
 # BL-1995 — Close GF-0065: VRFY and EXPN replies are written to the output with LF where curl writes the server's CR LF
 
@@ -35,16 +35,21 @@ Find which side drops the CR. If Curl.Protocol.Smtp.UnitLibrary's SmtpCommandTra
 
 ## Acceptance criteria
 
-- [ ] `behaviour:test924`: Curl answers what curl 8.21.0 answers, `upstream test924 passes`, so the item measures `match`.
-- [ ] `behaviour:test925`: Curl answers what curl 8.21.0 answers, `upstream test925 passes`, so the item measures `match`.
-- [ ] `behaviour:test927`: Curl answers what curl 8.21.0 answers, `upstream test927 passes`, so the item measures `match`.
-- [ ] `behaviour:test950`: Curl answers what curl 8.21.0 answers, `upstream test950 passes`, so the item measures `match`.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
-- [ ] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
+- [x] `behaviour:test924`: Curl answers what curl 8.21.0 answers, `upstream test924 passes`, so the item measures `match`.
+- [x] `behaviour:test925`: Curl answers what curl 8.21.0 answers, `upstream test925 passes`, so the item measures `match`.
+- [x] `behaviour:test927`: Curl answers what curl 8.21.0 answers, `upstream test927 passes`, so the item measures `match`.
+- [x] `behaviour:test950`: Curl answers what curl 8.21.0 answers, `upstream test950 passes`, so the item measures `match`.
+- [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
+- [x] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
 
 ## Notes
+
+- Cause: the conformance harness, not Curl. `SmtpServerConnector` handed `SmtpResponder` the raw `<reply>` parts, so a `crlf="yes"` `<data>` went out with bare LF, and Curl (which passes reply line ends through as they arrive, ADR-0135) wrote LF. It now serves each part through `UpstreamTestPartBodies.Served`, as `Pop3ServerConnector` and `ImapServerConnector` already do. Curl.Protocol.Smtp.UnitLibrary needed no change.
+- Pinned by `SmtpServerConnectorTests.ConnectAsync_VrfyWithCrlfReplyData_SendsTheReplyLinesWithCrlf`; 924, 925, 927 and 950 now pass the ratchet and are listed in `PassingUpstreamCases.txt`.
+- No option changed, so `--ai-help` is untouched. Coverage not re-measured: a one-line lambda-to-method-group change on an already covered line.
 
 ## Log
 
 - 2026-10-10: Created.
 - 2026-10-10: Backlog -> Doing.
+- 2026-10-10: Doing -> Done. SMTP stand-in serves crlf=yes reply data with CR LF, so upstream tests 924, 925, 927 and 950 pass

@@ -8,7 +8,9 @@ namespace Curl.Conformance;
 /// the SMTP side of upstream's <c>tests/ftpserver.pl</c> (at <c>curl-8_21_0</c>) for one case, and
 /// which hands every other connection to the server it wraps. Each connection to
 /// <see cref="SmtpPort"/> gets its own <see cref="SmtpResponder"/> answering from the case's
-/// <c>&lt;servercmd&gt;</c> and <c>&lt;reply&gt;</c> parts. No socket is opened.
+/// <c>&lt;servercmd&gt;</c> and <c>&lt;reply&gt;</c> parts, each with the line endings its
+/// <c>crlf</c> attribute forces, as <c>prepro</c> forces them before ftpserver.pl reads the part.
+/// No socket is opened.
 /// </summary>
 /// <param name="testCase">The expanded case whose <c>&lt;servercmd&gt;</c> and <c>&lt;reply&gt;</c> parts the server answers from.</param>
 /// <param name="backend">The server every connection not to <see cref="SmtpPort"/> reaches.</param>
@@ -50,7 +52,7 @@ public sealed class SmtpServerConnector(UpstreamTestCase testCase, IConnector ba
     {
         SmtpResponder responder = new(
             LineProtocolServerCommands.Read((testCase.Find("reply", "servercmd")?.Content ?? ReadOnlyMemory<byte>.Empty).Span),
-            testCase.Sections.Where(part => part.Section == "reply").ToDictionary(part => part.Name, part => part.Content.ToArray(), StringComparer.Ordinal));
+            testCase.Sections.Where(part => part.Section == "reply").ToDictionary(part => part.Name, UpstreamTestPartBodies.Served, StringComparer.Ordinal));
         responders.Add(responder);
         return responder;
     }
