@@ -8,7 +8,7 @@ depends-on: []
 touches: [RunDarkFactory.ps1]
 requirement: none
 created: 2026-10-11
-completed:
+completed: 2026-10-11
 ---
 # BL-2045 — Re-fix AF-0150: CI red 33.92 min after test4001 failed on macOS from BL-1947's commit (run 38030548658)
 
@@ -45,12 +45,15 @@ The finding closes only when a later re-audit by the process auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+No code change. The reproduction reads a past audit log (the 33.92 min spell was before BL-1969 cut CiConfirmMinutes 30 -> 5, ADR-0465), so it cannot change. The re-audit's second example (run 38047662088, test475 on Linux+macOS) is a two-platform failure, which Get-CiVerdicts already files as a regression on the first heartbeat; its 32 min is task claim + fix + CI duration, not watch delay. `RunDarkFactory.ps1 -TestCiWatch` passes. Nothing further in the watch can shorten that without a threshold or CI change.
 
 ## Log
 
 - 2026-10-11: Created.
 - 2026-10-11: Backlog -> Doing.
+- 2026-10-11: Doing -> Done. Watch delay already cut to 5 min (ADR-0465); remaining red time is fix latency
