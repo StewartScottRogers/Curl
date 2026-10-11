@@ -43,3 +43,4 @@ Reproduce: `dotnet run --file Gap/Tools/Measure-UpstreamCases.cs -- "$env:LOCALA
 ## Log
 
 - 2026-10-10: Created.
+- 2026-10-11: Backlog -> Doing.
