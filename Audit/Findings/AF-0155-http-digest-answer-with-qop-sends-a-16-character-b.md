@@ -3,8 +3,8 @@ id: AF-0155
 title: HTTP Digest answer with qop sends a 16-character base64 cnonce where curl 8.21.0 sends 32 lower-case hex digits
 auditor: conformance
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: conformance:Curl.Authentication.UnitLibrary/DigestClientNonce.cs:CreateRandom:request
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ $o="$env:TEMP\ac-cn"; $r=@('HTTP/1.1 401 Unauthorized\r\nWWW-Authenticate: Diges
 ## Log
 
 - 2026-10-11: filed proposed.
+- 2026-10-11: proposed -> accepted.
