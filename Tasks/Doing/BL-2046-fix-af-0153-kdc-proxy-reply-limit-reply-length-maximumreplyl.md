@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Networking.UnitLibrary]
+touches: [Curl.Networking.UnitLibrary, Curl.Networking.UnitTests]
 requirement: none
 created: 2026-10-11
 completed:
@@ -41,10 +41,14 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Added `PostAsync_ReplyExactlyAtTheLimit_ReturnsTheBody` to `Curl.Networking.UnitTests/KerberosKdcProxyHttpsTransportTests.cs`: a 200 reply of exactly `MaximumReplyLength` bytes returns its body, so the `>=` mutant now fails it. No production change: the `>` is right (MIT accepts a reply at the limit).
+- `touches` widened to `Curl.Networking.UnitTests`, where the test lives; no task in Doing on `origin/work/dark-factory` (BL-2043, BL-2050) names it.
+- The finding's reproduction (`Audit/Tools/Invoke-MutationTest.ps1`) is refused to lanes by the audit guard, so the mutant was checked by hand: with line 133 changed to `>=`, the new test failed (1 failed, 19 passed); reverted, all 20 pass. The quality auditor's re-audit confirms it.
 
 ## Log
 
