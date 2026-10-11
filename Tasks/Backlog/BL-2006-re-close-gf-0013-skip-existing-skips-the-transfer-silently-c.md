@@ -4,7 +4,7 @@ title: Re-close GF-0013: --skip-existing skips the transfer silently; curl write
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: []
+depends-on: [BL-2038]
 touches: [Curl.Console, Curl.Console.UnitTests]
 requirement: none
 created: 2026-10-10
@@ -45,7 +45,21 @@ In Curl.Console, where --skip-existing decides to skip a transfer, write curl 8.
 
 ## Notes
 
+- Measured 2026-10-10 (lane 2): upstream tests 994, 996 and 1491 (curl-8_21_0 tag) expect the note
+  because runtests.pl (runner.pm) adds `--trace-ascii $LOGDIR/trace<N> --trace-time` to every
+  command, and curl 8.21.0's `notef` prints only with a trace type set. The built Curl.Console
+  prints `Note: skips transfer, "log/there" exists locally` for test996's command line with those
+  options, and both notes for test994's glob. No Curl.Console change is needed; the finding's
+  suggestion (print without a trace option) would break drop-in compatibility (ADR-0447).
+- The ratchet now runs those options (BL-2017), and the only difference left is the harness's: its
+  absolute `%LOGDIR` (~100 characters) makes Curl wrap the note at 79 columns as curl does, where
+  runtests.pl's `COLUMNS=79` with `log/` keeps it on one line. Filed as BL-2038 (touches
+  Curl.Conformance.UnitLibrary and Curl.Conformance.UnitTests, which overlap BL-2037's
+  `Curl.Conformance.UnitTests/PassingUpstreamCases.txt`, in Doing); this task depends on it.
+  Once it is Done, this task only has to confirm the three cases pass and close.
+
 ## Log
 
 - 2026-10-10: Created.
 - 2026-10-10: Backlog -> Doing.
+- 2026-10-10: Doing -> Backlog. Waits on BL-2038: Curl already prints the note under runtests' trace options; the upstream harness's long absolute LOGDIR wraps it
