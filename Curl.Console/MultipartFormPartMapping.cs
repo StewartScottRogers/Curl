@@ -25,12 +25,18 @@ internal static class MultipartFormPartMapping
 
     /// <summary>
     /// The escaping the builder gives names and file names: <see cref="MultipartNameEscaping.Backslash" />
-    /// under <c>--form-escape</c>, otherwise curl's default <see cref="MultipartNameEscaping.Percent" /> (BL-625).
+    /// under <c>--form-escape</c> or for a MIME mail message to an <c>smtp</c>, <c>smtps</c>, <c>imap</c>
+    /// or <c>imaps</c> URL, as libcurl 8.21.0's <c>escape_string</c> picks its table for the mail
+    /// strategy (upstream test1187, BL-2091), otherwise curl's default
+    /// <see cref="MultipartNameEscaping.Percent" /> (BL-625).
     /// </summary>
     /// <param name="options">The option group whose form is being built.</param>
-    /// <returns>The escaping <see cref="CommandLineOptions.FormEscape" /> asks for.</returns>
-    internal static MultipartNameEscaping NameEscapingOf(CommandLineOptions options) =>
-        options.FormEscape ? MultipartNameEscaping.Backslash : MultipartNameEscaping.Percent;
+    /// <param name="scheme">The transfer URL's scheme.</param>
+    /// <returns>The escaping <see cref="CommandLineOptions.FormEscape" /> and <paramref name="scheme" /> ask for.</returns>
+    internal static MultipartNameEscaping NameEscapingOf(CommandLineOptions options, string scheme) =>
+        options.FormEscape || MailRequestOptionsMapping.SendsFormAsMimeMessage(scheme)
+            ? MultipartNameEscaping.Backslash
+            : MultipartNameEscaping.Percent;
 
     /// <summary>
     /// The request <c>Content-Type</c> the builder chooses the parts' disposition by, read as

@@ -67,6 +67,31 @@ public sealed class MultipartFormPartMappingTests
         Assert.IsNull(parts[1].Encoder);
     }
 
+    [TestMethod]
+    [DataRow("smtp", false, MultipartNameEscaping.Backslash)]
+    [DataRow("SMTPS", false, MultipartNameEscaping.Backslash)]
+    [DataRow("imap", false, MultipartNameEscaping.Backslash)]
+    [DataRow("imaps", false, MultipartNameEscaping.Backslash)]
+    [DataRow("http", false, MultipartNameEscaping.Percent)]
+    [DataRow("https", false, MultipartNameEscaping.Percent)]
+    [DataRow("http", true, MultipartNameEscaping.Backslash)]
+    [DataRow("smtp", true, MultipartNameEscaping.Backslash)]
+    public void NameEscapingOf_SchemeAndFormEscape_PicksBackslashForMailOrFormEscapeElsePercent(
+        string scheme, bool formEscape, MultipartNameEscaping expected)
+    {
+        Diagnostics.Arrange("scheme", scheme);
+        Diagnostics.Arrange("--form-escape", formEscape);
+        string[] arguments = formEscape ? ["--form-escape", "-F", "a=b", "http://example.com/"] : ["-F", "a=b", "http://example.com/"];
+        CommandLineParseResult parsed = CommandLineParser.Parse(arguments, _ => true);
+        Assert.IsTrue(parsed.IsAccepted);
+
+        MultipartNameEscaping escaping = MultipartFormPartMapping.NameEscapingOf(parsed.Options, scheme);
+        Diagnostics.Act("escaping", escaping);
+
+        Diagnostics.Assert("escaping", expected, escaping);
+        Assert.AreEqual(expected, escaping);
+    }
+
     private IReadOnlyList<MultipartFormPart> Map(params string[] arguments)
     {
         CommandLineParseResult parsed = CommandLineParser.Parse([.. arguments, "http://example.com/"], _ => true);

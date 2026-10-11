@@ -3523,7 +3523,7 @@ internal sealed class CurlCommandRunner(
         }
 
         bool mimeMessage = MailRequestOptionsMapping.SendsFormAsMimeMessage(transferUrl.Scheme);
-        MultipartFormBuildResult form = await BuildFormAsync(options, mimeMessage).ConfigureAwait(false);
+        MultipartFormBuildResult form = await BuildFormAsync(options, transferUrl.Scheme, mimeMessage).ConfigureAwait(false);
         if (!form.IsBuilt)
         {
             return form.Failure;
@@ -3547,18 +3547,19 @@ internal sealed class CurlCommandRunner(
     /// <paramref name="mimeMessage" /> is set, otherwise as the HTTP form body (BL-1988).
     /// </summary>
     /// <param name="options">The parsed command line.</param>
+    /// <param name="scheme">The transfer URL's scheme, which picks the names' escaping.</param>
     /// <param name="mimeMessage">Whether the parts are a mail message rather than a form.</param>
     /// <returns>The body, or the failure that stops the transfer before it connects.</returns>
-    private ValueTask<MultipartFormBuildResult> BuildFormAsync(CommandLineOptions options, bool mimeMessage) =>
+    private ValueTask<MultipartFormBuildResult> BuildFormAsync(CommandLineOptions options, string scheme, bool mimeMessage) =>
         mimeMessage
             ? formBodyBuilder.BuildMailMessageAsync(
                 MultipartFormPartMapping.FromCommandLine(options.FormParts),
-                MultipartFormPartMapping.NameEscapingOf(options),
+                MultipartFormPartMapping.NameEscapingOf(options, scheme),
                 options.Headers,
                 CancellationToken.None)
             : formBodyBuilder.BuildAsync(
                 MultipartFormPartMapping.FromCommandLine(options.FormParts),
-                MultipartFormPartMapping.NameEscapingOf(options),
+                MultipartFormPartMapping.NameEscapingOf(options, scheme),
                 MultipartFormPartMapping.RequestContentTypeOf(options),
                 CancellationToken.None);
 

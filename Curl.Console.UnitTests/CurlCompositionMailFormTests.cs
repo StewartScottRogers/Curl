@@ -46,6 +46,28 @@ public sealed class CurlCompositionMailFormTests
     }
 
     [TestMethod]
+    public async Task RunAsync_FormWithQuoteAndBackslashInFileNameToSmtp_EscapesThemWithBackslashes()
+    {
+        // Upstream test1187's form: the mail strategy escapes the file name as --form-escape does.
+        ScriptedConnector connector = new([Encoding.ASCII.GetBytes(SmtpReplies)]);
+        const string Message =
+            "Content-Type: multipart/mixed; boundary=B\r\nMime-Version: 1.0\r\n\r\n--B\r\n\r\nThis is the mail text\r\n"
+            + "--B\r\nContent-Disposition: attachment; filename=\"strange\\\\file\\\"name\"\r\n\r\nFile content\r\n--B--\r\n";
+        long size = Message.Replace("B", new string('-', 46), StringComparison.Ordinal).Length;
+
+        (int exitCode, string written, string standardError) = await RunAsync(
+            connector,
+            ["--mail-from", "a@b", "--mail-rcpt", "c@d", "-F", "=This is the mail text",
+                "-F", "=File content;filename=\"strange\\file\\\"name\"", "smtp://127.0.0.1:18025/example.com"]);
+
+        AssertWritten(
+            $"EHLO example.com\r\nMAIL FROM:<a@b> SIZE={size}\r\nRCPT TO:<c@d>\r\nDATA\r\n" + Message + ".\r\nQUIT\r\n",
+            written);
+        Assert.AreEqual(string.Empty, standardError);
+        Assert.AreEqual(0, exitCode);
+    }
+
+    [TestMethod]
     public async Task RunAsync_QuotedPrintableFormToSmtp_SendsNoSize()
     {
         ScriptedConnector connector = new([Encoding.ASCII.GetBytes(SmtpReplies)]);
