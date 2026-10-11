@@ -8,7 +8,7 @@ depends-on: [BL-2038]
 touches: [Curl.Console, Curl.Console.UnitTests]
 requirement: none
 created: 2026-10-10
-completed:
+completed: 2026-10-10
 ---
 # BL-2006 — Re-close GF-0013: --skip-existing skips the transfer silently; curl writes 'Note: skips transfer, <file> exists locally'
 
@@ -37,11 +37,11 @@ In Curl.Console, where --skip-existing decides to skip a transfer, write curl 8.
 
 ## Acceptance criteria
 
-- [ ] `behaviour:test994`: Curl answers what curl 8.21.0 answers, `upstream test994 passes`, so the item measures `match`.
-- [ ] `behaviour:test996`: Curl answers what curl 8.21.0 answers, `upstream test996 passes`, so the item measures `match`.
-- [ ] `behaviour:test1491`: Curl answers what curl 8.21.0 answers, `upstream test1491 passes`, so the item measures `match`.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
-- [ ] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
+- [x] `behaviour:test994`: Curl answers what curl 8.21.0 answers, `upstream test994 passes`, so the item measures `match`.
+- [x] `behaviour:test996`: Curl answers what curl 8.21.0 answers, `upstream test996 passes`, so the item measures `match`.
+- [x] `behaviour:test1491`: Curl answers what curl 8.21.0 answers, `upstream test1491 passes`, so the item measures `match`.
+- [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
+- [x] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
 
 ## Notes
 
@@ -58,9 +58,15 @@ In Curl.Console, where --skip-existing decides to skip a transfer, write curl 8.
   `Curl.Conformance.UnitTests/PassingUpstreamCases.txt`, in Doing); this task depends on it.
   Once it is Done, this task only has to confirm the three cases pass and close.
 
+- 2026-10-10 (lane 1): Confirmed. BL-2038 (commit 1a4d3d592) lists 994, 996 and 1491 in
+  `Curl.Conformance.UnitTests/PassingUpstreamCases.txt`, so the ratchet fails the build if any of
+  them stops passing; the fast tests are green with them listed. No Curl.Console change was needed
+  (ADR-0447). `--ai-help` unchanged: no option was added or changed.
+
 ## Log
 
 - 2026-10-10: Created.
 - 2026-10-10: Backlog -> Doing.
 - 2026-10-10: Doing -> Backlog. Waits on BL-2038: Curl already prints the note under runtests' trace options; the upstream harness's long absolute LOGDIR wraps it
 - 2026-10-10: Backlog -> Doing.
+- 2026-10-10: Doing -> Done. Upstream tests 994, 996 and 1491 pass through Curl and are held by the conformance ratchet (BL-2038)
