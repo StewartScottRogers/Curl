@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests, Curl.Console, Curl.Console.UnitTests, Curl.Conformance.UnitTests]
 requirement: none
 created: 2026-10-11
-completed:
+completed: 2026-10-11
 ---
 # BL-2076 — Re-close GF-0011: --url @file and --url @- are taken as a literal URL instead of a list of URLs to read
 
@@ -57,3 +57,4 @@ In Curl.Cli.UnitLibrary's --url option (CommandLineOptionTable / its applier), s
 - 2026-10-11: Backlog -> Doing.
 - 2026-10-11: Doing -> Backlog. Needs Curl.Console (CurlComposition must hand the injected stdin to the data file reader), which BL-2073 in Doing touches
 - 2026-10-11: Backlog -> Doing.
+- 2026-10-11: Doing -> Done. In-process @- reads the runner's standard input; upstream test 488 passes in process, 489 and 2012 already did
