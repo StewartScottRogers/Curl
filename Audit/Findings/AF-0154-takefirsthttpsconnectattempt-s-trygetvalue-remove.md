@@ -3,8 +3,8 @@ id: AF-0154
 title: TakeFirstHttpsConnectAttempt's `TryGetValue(...) && Remove(...)` can become `||` with no test failing: the first attempt is no longer taken once
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Networking.UnitLibrary/TcpConnector.QuicHttpsConnect.cs:TakeFirstHttpsConnectAttempt-and:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/TcpConnector.QuicHttpsConnect.cs:118:&&
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Netwo
 ## Log
 
 - 2026-10-11: filed proposed.
+- 2026-10-11: proposed -> accepted.
