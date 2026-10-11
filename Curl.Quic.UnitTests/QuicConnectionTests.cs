@@ -323,6 +323,33 @@ public sealed class QuicConnectionTests
 
     [TestMethod]
     [Timeout(QuicTest.HangTimeoutMilliseconds)]
+    public async Task Loop_StreamChangeWhileTheReceiveWaits_WakesTheLoopToSendIt()
+    {
+        Diagnostics.Arrange("payload", "woken (5 bytes, fin) written while the loop's receive waits on a silenced channel");
+        (QuicConnection connection, QuicTestLiveChannel channel, _) = await ConnectAsync();
+        await using (connection)
+        {
+            IMultiplexedStream stream = await connection.OpenBidirectionalStreamAsync(CancellationToken.None);
+            channel.Silence();
+            await channel.WaitUntilReceiveWaitsAsync();
+
+            using (Diagnostics.Phase("data transfer"))
+            {
+                // No datagram and no timer can end that receive now; only the wake this write raises does.
+                await stream.WriteAsync("woken"u8.ToArray(), endStream: true, CancellationToken.None);
+                await channel.WaitUntilSentAsync(() => channel.Sent<QuicStreamFrame>().Count == 1);
+            }
+
+            QuicStreamFrame sent = channel.Sent<QuicStreamFrame>()[0];
+            Diagnostics.Act("STREAM frame sent", $"stream {sent.StreamId}, fin {sent.IsFin}");
+            Diagnostics.Assert("stream 0 with fin", "stream 0, fin True", $"stream {sent.StreamId}, fin {sent.IsFin}");
+            Assert.AreEqual(0UL, sent.StreamId);
+            Assert.IsTrue(sent.IsFin);
+        }
+    }
+
+    [TestMethod]
+    [Timeout(QuicTest.HangTimeoutMilliseconds)]
     public async Task Loop_UnacknowledgedStreamData_IsProbedWhenTheLossDetectionTimerFires()
     {
         Diagnostics.Arrange("payload", "lost (4 bytes, fin) on a silenced channel");
