@@ -51,3 +51,4 @@ In Curl.Protocol.Imap.UnitLibrary, keep an IMAP connection open after a transfer
 ## Log
 
 - 2026-10-11: Created.
+- 2026-10-11: Backlog -> Doing.
