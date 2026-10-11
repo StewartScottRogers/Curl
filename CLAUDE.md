@@ -44,7 +44,11 @@ coverage, cyclomatic complexity of at most 10 per method, and a CRAP score of at
 All four are measured with tooling the solution already has - the coverage collector the
 MSTest meta-package brings, and the SDK's own `CA1502` analyzer - so no package is needed
 for any of it. Complexity is enforced at build time: the threshold lives in
-`CodeMetricsConfig.txt` and warnings are errors, so a method at 11 breaks the build. The
+`CodeMetricsConfig.txt` and warnings are errors, so a method at 11 breaks the build. CI
+enforces all four: its `quality` job (Windows) runs `Measure-CodeQuality.ps1`, which
+measures complexity from the coverage report as the coverage page does - stricter than
+`CA1502` for async methods and lambdas - and fails when any member is outside a gate, so a
+red quality job blocks the shift-end merge to `master` (BL-2068). The
 `coverage-auditor` agent measures the rest and files the gaps as tasks. Thresholds in
 `CodeMetricsConfig.txt` are Stewart's to change; never raise one to make code pass.
 Coverage is measured from the fast tests only (`TestCategory!=Integration`), so moving a
