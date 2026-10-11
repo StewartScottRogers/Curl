@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Ftp.UnitLibrary, Curl.Protocol.Ftp.UnitTests]
 requirement: none
 created: 2026-10-11
-completed:
+completed: 2026-10-11
 ---
 # BL-2063 — Bring FtpSession.SecureControlAsync under the complexity gate
 
@@ -34,3 +34,4 @@ Split into TryAuthMechanismAsync and RefuseOrLeavePlaintext; Measure-CodeQuality
 
 - 2026-10-11: Created.
 - 2026-10-11: Backlog -> Doing.
+- 2026-10-11: Doing -> Done. Split SecureControlAsync; Ftp library 0 failing members, 100/100 coverage
