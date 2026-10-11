@@ -15,7 +15,7 @@ One item per upstream `tests/data` case, keyed `behaviour:test<N>`:
 | `match` | The in-process harness ran the case and it passed, or the cross-check found the reference curl agreeing with Curl where the case's `<verify>` does not (`reason` is `reference-diverges`). |
 | `gap` | The case failed. `actual` holds the harness's first difference, `expected` is `upstream test<N> passes`, and `attributes.keywords` holds the case's `<info><keywords>`. |
 | `unmeasured` | The harness could not run the case; `reason` says why (`Gap-Format.md` section 4, area `behaviour`). |
-| `excluded` | The case is not a curl tool case on this platform (`libcurl-api`, `libcurl-unit-test`, `debug-build-only`, `platform:<os>`, `reference-lacks:<feature>`). |
+| `excluded` | The case is not a curl tool case on this platform (`libcurl-api`, `libcurl-unit-test`, `debug-build-only`, `platform:<os>`, `reference-lacks:<feature>`), or upstream's own suite does not run it (`disabled-upstream`: the release's `tests/data/DISABLED` lists it). |
 
 The harness's first difference is one of these shapes (`Curl.Conformance.UnitLibrary`,
 `UpstreamFirstDifference` and `UpstreamCaseVerification`):

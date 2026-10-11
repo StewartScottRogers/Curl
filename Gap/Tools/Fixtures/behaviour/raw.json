@@ -18,6 +18,7 @@
     { "number": 11, "kind": "Skipped", "detail": "the harness has no value for %PWD", "milliseconds": 1 },
     { "number": 12, "kind": "Skipped", "detail": "the harness has no value for %HTTPSPORT", "milliseconds": 1 },
     { "number": 13, "kind": "Skipped", "detail": "the harness has no value for %PERL", "milliseconds": 1 },
-    { "number": 14, "kind": "Skipped", "detail": "the harness has no value for %PERL, %NOLISTENPORT", "milliseconds": 1 }
+    { "number": 14, "kind": "Skipped", "detail": "the harness has no value for %PERL, %NOLISTENPORT", "milliseconds": 1 },
+    { "number": 15, "kind": "Skipped", "detail": "disabled upstream", "milliseconds": 0 }
   ]
 }
