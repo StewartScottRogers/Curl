@@ -30,3 +30,4 @@ BL-2085 made `HttpConnectionPersistence.KeepsAlive` honour `Proxy-Connection: cl
 ## Log
 
 - 2026-10-11: Created.
+- 2026-10-11: Backlog -> Doing.
