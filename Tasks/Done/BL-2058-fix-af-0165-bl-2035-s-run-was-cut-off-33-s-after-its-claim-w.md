@@ -8,7 +8,7 @@ depends-on: []
 touches: [RunDarkFactory.ps1]
 requirement: none
 created: 2026-10-11
-completed:
+completed: 2026-10-11
 ---
 # BL-2058 — Fix AF-0165: BL-2035's run was cut off 33 s after its claim when the lane script crashed ('Cannot bind argument to parameter Path'), leaving the task idle until the next shift
 
@@ -41,12 +41,14 @@ The finding closes only when a later re-audit by the process auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+- 2026-10-11: No code change. The crash (Get-ToolLabel calling Split-Path on the empty file_path of an Edit whose input used `path`) was fixed by BL-2036 (commit ecc53446c, 2026-10-10 18:34), after the 16:27 crash in the finding. That fix also guards tracing and resumes a task left in Doing after a script error. `RunDarkFactory.ps1 -TestToolLabels` passes here, including "Edit naming path (BL-2035)". The finding's reproduction reads the old 2026-10-10 logs, so its unfinishedRuns entry for that run stays; a re-audit on newer logs is the check.
 
 ## Log
 
 - 2026-10-11: Created.
 - 2026-10-11: Backlog -> Doing.
+- 2026-10-11: Doing -> Done. Already fixed by BL-2036 (ecc53446c); -TestToolLabels passes
