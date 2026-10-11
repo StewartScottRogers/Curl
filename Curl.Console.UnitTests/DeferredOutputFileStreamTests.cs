@@ -252,6 +252,35 @@ public sealed class DeferredOutputFileStreamTests
     }
 
     [TestMethod]
+    public void TruncateForRetry_FileNotYetOpened_OpensNothing()
+    {
+        using DeferredOutputFileStream stream = new(fileSystem, "a.txt", FileWriteMode.Truncate);
+        Diagnostics.Arrange("file", "a.txt, never written");
+
+        stream.TruncateForRetry();
+        Diagnostics.Act("file opened", fileSystem.Written.ContainsKey("a.txt"));
+
+        Diagnostics.Assert("file opened", false, fileSystem.Written.ContainsKey("a.txt"));
+        Assert.IsFalse(fileSystem.Written.ContainsKey("a.txt"));
+    }
+
+    [TestMethod]
+    public async Task TruncateForRetry_FileThatCannotSeek_LeavesItAsItIs()
+    {
+        using DeferredOutputFileStream stream = new(fileSystem, "a.txt", FileWriteMode.Truncate);
+        await stream.WriteAsync(new byte[] { 1, 2, 3 }.AsMemory());
+        MemoryStream opened = fileSystem.Written["a.txt"];
+        opened.Dispose();
+        Diagnostics.Arrange("file", "a.txt, closed under the stream so it cannot seek");
+
+        stream.TruncateForRetry();
+        Diagnostics.Act("file can seek", opened.CanSeek);
+
+        Diagnostics.Assert("file can seek", false, opened.CanSeek);
+        Assert.IsFalse(opened.CanSeek);
+    }
+
+    [TestMethod]
     public async Task CompleteAsync_AfterWrites_ReturnsTheHandlersResult()
     {
         using DeferredOutputFileStream stream = new(fileSystem, "a.txt", FileWriteMode.Truncate);

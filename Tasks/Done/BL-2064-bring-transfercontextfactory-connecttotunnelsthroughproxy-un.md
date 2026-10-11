@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Console, Curl.Console.UnitTests]
 requirement: none
 created: 2026-10-11
-completed:
+completed: 2026-10-11
 ---
 # BL-2064 — Bring TransferContextFactory.ConnectToTunnelsThroughProxy under the complexity gate
 
@@ -22,13 +22,16 @@ The coverage page (<https://stewartscottrogers.github.io/Curl/coverage/>, measur
 
 ## Acceptance criteria
 
-- [ ] `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Console` reports no member outside a gate, at 100% line and branch coverage.
-- [ ] No existing test was changed or removed to get there; any new member has its own tests.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Console` reports no member outside a gate, at 100% line and branch coverage.
+- [x] No existing test was changed or removed to get there; any new member has its own tests.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Split `ConnectToTunnelsThroughProxy` into `IsHttpOrHttpsProxy` and `IsAnotherHostOrPort` (the first also serves `EventsWritingConnectReplyHeads`). Measure-CodeQuality showed one more failing member, `DeferredOutputFileStream.TruncateForRetry` (branch 75%, from BL-2008); added two tests for its unopened and cannot-seek paths. Curl.Console now measures 100% line, 100% branch, 0 failing.
 
 ## Log
 
 - 2026-10-11: Created.
 - 2026-10-11: Backlog -> Doing.
+- 2026-10-11: Doing -> Done. Split into smaller members; Curl.Console measures 100% line and branch, 0 failing
