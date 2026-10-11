@@ -10,9 +10,11 @@ namespace Curl.Protocol.Http;
 /// </summary>
 /// <remarks>
 /// The bytes read along with the head are written first, as one write; after them each
-/// read of at most <see cref="ReceiveSize" /> bytes is written as it arrives, in writes of at most
-/// <see cref="WriteSize" /> bytes, so a
-/// failed write reports the same <c>passed</c> size curl does. A Content-Length body stops
+/// read of at most <see cref="ReceiveSize" /> bytes is written as it arrives, as one write, and
+/// then reported as data events of at most <see cref="WriteSize" /> bytes, curl's client writes;
+/// a failed write reports the <c>passed</c> and <c>returned</c> of the client write the output
+/// stopped in, as curl does, and the data events up to that one (AF-0144, BL-2043, ADR-0477).
+/// A Content-Length body stops
 /// at its length and ignores anything the peer sends past it. A chunked body wins over a
 /// Content-Length, which is still checked; its data is written as it is decoded, each run of
 /// chunk data within one read as one write, and its trailers are kept in
@@ -22,8 +24,9 @@ namespace Curl.Protocol.Http;
 internal sealed class HttpResponseBodyReader(IConnection connection)
 {
     /// <summary>
-    /// The most bytes one write passes to the output: curl 8.21.0's largest client write, the
-    /// <c>passed 16384</c> it reports when the output fails on a large body (measured).
+    /// Curl 8.21.0's largest client write, the <c>passed 16384</c> it reports when the output
+    /// fails on a large body (measured): the most bytes one data event reports, and the piece a
+    /// failed write of a whole read is reported in.
     /// </summary>
     internal const int WriteSize = 16384;
 
@@ -33,6 +36,9 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
     /// download takes a sixth of the reads <see cref="WriteSize" /> would (AF-0144, BL-1963).
     /// </summary>
     internal const int ReceiveSize = 102400;
+
+    /// <summary>The piece size of a write that is reported, when it fails, as one piece.</summary>
+    private const int WholeWrite = int.MaxValue;
 
     private HttpChunkedDecoder? decoder;
 
@@ -344,12 +350,17 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
                 return;
             }
 
-            remaining -= await WriteInPiecesAsync(output, buffer.AsMemory(0, read), cancellationToken).ConfigureAwait(false);
+            ReadOnlyMemory<byte> received = buffer.AsMemory(0, read);
+            remaining -= contentDecoder is null
+                ? await WriteReadAsync(output, received, cancellationToken).ConfigureAwait(false)
+                : await WriteInPiecesAsync(output, received, cancellationToken).ConfigureAwait(false);
         }
     }
 
     /// <summary>
-    /// Reports and writes one read's bytes in pieces of at most <see cref="WriteSize" />.
+    /// Reports and writes one read's bytes in pieces of at most <see cref="WriteSize" />, for a
+    /// body that is decoded before it is written, whose output accepts decoded bytes that a
+    /// failed write of the whole read could not be reported in curl's pieces by.
     /// </summary>
     /// <returns>How many bytes were written.</returns>
     private async ValueTask<int> WriteInPiecesAsync(Stream output, ReadOnlyMemory<byte> bytes, CancellationToken cancellationToken)
@@ -363,6 +374,46 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
         }
 
         return written;
+    }
+
+    /// <summary>
+    /// Writes one read's bytes as one write, which costs a file output a sixth of the writes
+    /// that pieces of <see cref="WriteSize" /> would (AF-0144, BL-2043), then reports them as
+    /// data events in pieces of at most <see cref="WriteSize" />, each followed by the count
+    /// downloaded once any of it is written: all of them, or, when the write fails, those up to
+    /// and including the piece it stopped in, as curl's client writes would.
+    /// </summary>
+    /// <returns>How many bytes were written.</returns>
+    private async ValueTask<int> WriteReadAsync(Stream output, ReadOnlyMemory<byte> bytes, CancellationToken cancellationToken)
+    {
+        long before = BytesWritten;
+        try
+        {
+            return await WriteAsync(output, bytes, WriteSize, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            ReportPieces(bytes, (int)(BytesWritten - before), before);
+        }
+    }
+
+    /// <summary>
+    /// Reports a read's pieces up to and including the one holding byte
+    /// <paramref name="stoppedAt" />, each as a data event and then, when any of it was written,
+    /// as the count downloaded after it.
+    /// </summary>
+    private void ReportPieces(ReadOnlyMemory<byte> bytes, int stoppedAt, long before)
+    {
+        int reported = (int)Math.Min(bytes.Length, ((long)(stoppedAt / WriteSize) + 1) * WriteSize);
+        for (int start = 0; start < reported; start += WriteSize)
+        {
+            int end = Math.Min(start + WriteSize, reported);
+            ReportReceived(bytes[start..end]);
+            if (stoppedAt > start)
+            {
+                Progress.ReportDownloaded(before + Math.Min(end, stoppedAt), ExpectedLength);
+            }
+        }
     }
 
     /// <summary>
@@ -460,8 +511,18 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
         }
     }
 
-    private static HttpTransferException WriteFailed(int passed, int returned) =>
-        new(CurlExitCode.WriteError, HttpTransferMessages.OutputWriteFailed(passed, returned));
+    /// <summary>
+    /// Builds the exit 23 failure of a write of <paramref name="length" /> bytes that the output
+    /// accepted <paramref name="accepted" /> of, reported as curl reports the client write of at
+    /// most <paramref name="pieceSize" /> bytes it stopped in; the whole pieces before that one
+    /// count as written.
+    /// </summary>
+    private HttpTransferException WriteFailed(int length, int accepted, int pieceSize)
+    {
+        int pieceStart = Math.Min(accepted, length - 1) / pieceSize * pieceSize;
+        BytesWritten += pieceStart;
+        return new(CurlExitCode.WriteError, HttpTransferMessages.OutputWriteFailed(Math.Min(pieceSize, length - pieceStart), accepted - pieceStart));
+    }
 
     [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder<>))]
     private async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken)
@@ -488,24 +549,36 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
 
     /// <summary>
     /// Writes <paramref name="bytes" />, or as many as <see cref="MaximumBodySize" /> allows and
-    /// then fails with exit 63.
+    /// then fails with exit 63. A failed write is reported in the piece of at most
+    /// <paramref name="pieceSize" /> bytes it stopped in (<see cref="WriteFailed" />).
     /// </summary>
     [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder<>))]
-    private async ValueTask<int> WriteAsync(Stream output, ReadOnlyMemory<byte> bytes, CancellationToken cancellationToken)
+    private async ValueTask<int> WriteAsync(Stream output, ReadOnlyMemory<byte> bytes, int pieceSize, CancellationToken cancellationToken)
     {
         if (bytes.Length > RoomLeft)
         {
-            await WriteWithinLimitAsync(output, bytes[..(int)RoomLeft], cancellationToken).ConfigureAwait(false);
+            await WriteWithinLimitAsync(output, bytes[..(int)RoomLeft], pieceSize, cancellationToken).ConfigureAwait(false);
             throw new HttpTransferException(
                 CurlExitCode.FilesizeExceeded,
                 HttpTransferMessages.FileSizeLimitExceeded(MaximumBodySize.GetValueOrDefault(), BytesWritten));
         }
 
-        return await WriteWithinLimitAsync(output, bytes, cancellationToken).ConfigureAwait(false);
+        return await WriteWithinLimitAsync(output, bytes, pieceSize, cancellationToken).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Writes <paramref name="bytes" /> as one write, reported whole when it fails.
+    /// </summary>
+    private ValueTask<int> WriteAsync(Stream output, ReadOnlyMemory<byte> bytes, CancellationToken cancellationToken) =>
+        WriteAsync(output, bytes, WholeWrite, cancellationToken);
+
+    /// <summary>
+    /// Writes <paramref name="bytes" /> and reports the count downloaded after it, except for a
+    /// write in pieces smaller than <see cref="WholeWrite" />, whose caller reports it piece by
+    /// piece (<see cref="WriteReadAsync" />).
+    /// </summary>
     [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder<>))]
-    private async ValueTask<int> WriteWithinLimitAsync(Stream output, ReadOnlyMemory<byte> bytes, CancellationToken cancellationToken)
+    private async ValueTask<int> WriteWithinLimitAsync(Stream output, ReadOnlyMemory<byte> bytes, int pieceSize, CancellationToken cancellationToken)
     {
         if (bytes.IsEmpty)
         {
@@ -518,15 +591,19 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
         }
         catch (OutputWriteFailedException failure)
         {
-            throw WriteFailed(bytes.Length, failure.BytesAccepted);
+            throw WriteFailed(bytes.Length, failure.BytesAccepted, pieceSize);
         }
         catch (IOException)
         {
-            throw WriteFailed(bytes.Length, 0);
+            throw WriteFailed(bytes.Length, 0, pieceSize);
         }
 
         BytesWritten += bytes.Length;
-        Progress.ReportDownloaded(BytesWritten, ExpectedLength);
+        if (pieceSize == WholeWrite)
+        {
+            Progress.ReportDownloaded(BytesWritten, ExpectedLength);
+        }
+
         return bytes.Length;
     }
 }
