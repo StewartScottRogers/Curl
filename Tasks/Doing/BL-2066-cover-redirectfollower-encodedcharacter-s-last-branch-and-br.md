@@ -36,3 +36,4 @@ Behaviour does not change.
 ## Log
 
 - 2026-10-11: Created.
+- 2026-10-11: Backlog -> Doing.
