@@ -30,3 +30,4 @@ BL-2090 made Curl send nothing after `CAPABILITY` and exit 67 after an HTTP redi
 ## Log
 
 - 2026-10-11: Created.
+- 2026-10-11: Backlog -> Doing.
