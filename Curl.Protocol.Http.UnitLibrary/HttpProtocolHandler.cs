@@ -364,10 +364,13 @@ public sealed class HttpProtocolHandler(
     /// picked (<see cref="HttpRequestOptions.AuthSchemePicked" />) alone when it is one of
     /// <see cref="HttpRequestOptions.AuthSchemes" />, as libcurl 8.21.0 keeps its picked scheme
     /// across redirects and so sends Basic before any challenge (upstream test1088, BL-1819);
-    /// otherwise every scheme allowed.
+    /// otherwise every scheme allowed. NTLM and Negotiate are not kept: they authenticate a
+    /// connection, so the first request of the next hop carries no <c>Authorization</c> and
+    /// probes again (upstream test90, BL-2059; measured on curl 8.21.0 with <c>--anyauth -L</c>).
     /// </summary>
     private static HttpAuthSchemes AllowedSchemesOf(HttpRequestOptions options) =>
-        options.AuthSchemePicked != HttpAuthSchemes.None && (options.AuthSchemes & options.AuthSchemePicked) == options.AuthSchemePicked
+        options.AuthSchemePicked is not (HttpAuthSchemes.None or HttpAuthSchemes.Ntlm or HttpAuthSchemes.Negotiate)
+        && (options.AuthSchemes & options.AuthSchemePicked) == options.AuthSchemePicked
             ? options.AuthSchemePicked
             : options.AuthSchemes;
 

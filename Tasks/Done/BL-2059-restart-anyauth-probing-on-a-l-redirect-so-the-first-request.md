@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests]
 requirement: none
 created: 2026-10-11
-completed:
+completed: 2026-10-11
 ---
 # BL-2059 — Restart --anyauth probing on a -L redirect, so the first request to the new URL carries no Authorization (upstream test90)
 
@@ -24,13 +24,17 @@ Start in `Curl.Protocol.Http.UnitLibrary` where a followed redirect builds its n
 
 ## Acceptance criteria
 
-- [ ] A unit test in `Curl.Protocol.Http.UnitTests` pins that with `--anyauth` and `-L` the first request to the redirect target carries no `Authorization:` header, and that the second carries the scheme its 401 picked.
-- [ ] The test's expected requests come from a real curl 8.21.0 exchange recorded with `Record-CurlExchange.ps1`, named in Notes.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] A unit test in `Curl.Protocol.Http.UnitTests` pins that with `--anyauth` and `-L` the first request to the redirect target carries no `Authorization:` header, and that the second carries the scheme its 401 picked.
+- [x] The test's expected requests come from a real curl 8.21.0 exchange recorded with `Record-CurlExchange.ps1`, named in Notes.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Measured with Record-CurlExchange.ps1 on curl 8.21.0 (Schannel): `--anyauth -u testuser:testpass -L` against NTLM 401s answered by a 301 to /two. `GET /two` first request carries no Authorization; `GET /one` likewise. Basic is still kept across hops (test1088, BL-1819).
+- Decision: a picked NTLM or Negotiate (connection schemes) is not kept for the next hop in `AllowedSchemesOf`; Basic, Digest, Bearer still are. Unit test: `ExecuteAsync_EarlierHopPickedAConnectionScheme_ProbesAgainWithEverySchemeAllowed`.
 
 ## Log
 
 - 2026-10-11: Created.
 - 2026-10-11: Backlog -> Doing.
+- 2026-10-11: Doing -> Done. NTLM/Negotiate no longer kept across -L hops
