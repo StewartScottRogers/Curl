@@ -63,3 +63,4 @@ In Curl.Console, where --skip-existing decides to skip a transfer, write curl 8.
 - 2026-10-10: Created.
 - 2026-10-10: Backlog -> Doing.
 - 2026-10-10: Doing -> Backlog. Waits on BL-2038: Curl already prints the note under runtests' trace options; the upstream harness's long absolute LOGDIR wraps it
+- 2026-10-10: Backlog -> Doing.
