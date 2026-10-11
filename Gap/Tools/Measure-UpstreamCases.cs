@@ -19,7 +19,10 @@
 // empty for a passed one.
 //
 // Wiring, copied from Curl.Conformance.UnitTests/UpstreamConformanceTests.cs: curl runs in
-// process through Curl.Console's public InProcessCurl (BL-1750), the platform is Windows or Unix
+// process through Curl.Console's public InProcessCurl (BL-1750) over TcpConnector with its dial
+// and name lookup replaced (copies of that project's InMemoryServerTcpDialer and
+// LoopbackOnlyDnsResolver, below), with the case's <client><setenv> as the whole environment
+// Curl reads (BL-2016), the platform is Windows or Unix
 // by OS, the runner's time limit is 20 seconds and a case still running after 30 seconds is
 // judged failed. Cases run in parallel, up to Environment.ProcessorCount at once, each with its
 // own %LOGDIR under <out.json's folder>/upstream-case-logs, which must hold no blank (the runner
@@ -49,9 +52,13 @@
 #:project ../../Curl.Console/Curl.Console.csproj
 using System.Diagnostics;
 using System.Globalization;
+using System.Net;
+using System.Net.Sockets;
 using System.Text.Json;
 using Curl.Conformance;
 using Curl.Console;
+using Curl.Networking;
+using Curl.Protocol.Abstractions;
 
 if (IsSelfTestRequest(args))
 {
@@ -162,14 +169,19 @@ await using (Utf8JsonWriter json = new(output, new JsonWriterOptions { Indented 
 Console.WriteLine(string.Join(", ", results.GroupBy(result => result.Outcome.Kind).OrderBy(group => group.Key).Select(group => $"{group.Key} {group.Count()}")));
 return 0;
 
-static Task<int> RunCurlAsync(UpstreamCurlInvocation invocation) =>
-    InProcessCurl.RunAsync(
-        invocation.Arguments,
-        invocation.StandardOutput,
-        invocation.StandardError,
-        invocation.StandardInput,
-        invocation.Connector,
-        invocation.DatagramConnector);
+// Curl as UpstreamConformanceTests.RunCurlAsync runs it: every TCP dial reaches the case's in-memory
+// servers through TcpConnector, names resolve as on upstream's test machine, the case's <setenv> is
+// the whole environment Curl reads (BL-2016), and an active-mode FTP case's listener takes the data
+// connection (BL-1978).
+static Task<int> RunCurlAsync(UpstreamCurlInvocation invocation)
+{
+    Func<string, string?> readEnvironmentVariable = name => invocation.EnvironmentVariables.GetValueOrDefault(name);
+    InMemoryServerTcpDialer dialer = new(invocation.Connector);
+    LoopbackOnlyDnsResolver resolver = new();
+    return invocation.ConnectionListener is { } ftpListener
+        ? InProcessCurl.RunAsync(invocation.Arguments, invocation.StandardOutput, invocation.StandardError, invocation.StandardInput, dialer, resolver, invocation.DatagramConnector, readEnvironmentVariable, ftpListener)
+        : InProcessCurl.RunAsync(invocation.Arguments, invocation.StandardOutput, invocation.StandardError, invocation.StandardInput, dialer, resolver, invocation.DatagramConnector, readEnvironmentVariable);
+}
 
 // Runs one case in its own log folder, which is deleted afterwards, and judges a hang or a throw failed.
 static async Task<UpstreamCaseOutcome> RunCaseAsync(int number, byte[] testFile, DirectoryInfo logDirectory, UpstreamCurlPlatform platform, TimeSpan timeLimit, TimeSpan caseHangLimit)
@@ -325,5 +337,55 @@ static void DeleteLogDirectory(DirectoryInfo logDirectory)
     }
     catch (UnauthorizedAccessException)
     {
+    }
+}
+
+// A copy of Curl.Conformance.UnitTests' InMemoryServerTcpDialer (internal there): dials every TCP
+// connection TcpConnector opens into the case's in-memory server, the unspecified address failing
+// to connect (test1293) and a refused connect reaching TcpConnector as the system reports one.
+internal sealed class InMemoryServerTcpDialer(IConnector server) : ITcpDialer
+{
+    public async ValueTask<DialedTcpConnection> DialAsync(IPEndPoint endPoint, CancellationToken cancellationToken)
+    {
+        if (endPoint.Address.Equals(IPAddress.Any) || endPoint.Address.Equals(IPAddress.IPv6Any))
+        {
+            throw new SocketException((int)SocketError.AddressNotAvailable);
+        }
+
+        ConnectResult connected = await server.ConnectAsync(new ConnectTarget(endPoint.Address.ToString(), endPoint.Port, false), cancellationToken);
+        if (connected.IsConnectionRefused)
+        {
+            throw new SocketException((int)SocketError.ConnectionRefused);
+        }
+
+        IConnection connection = connected.Connection
+            ?? throw new IOException($"The in-memory server refused the connection: {connected.ErrorMessage}");
+        return new DialedTcpConnection(connection, connection.LocalEndPoint as IPEndPoint ?? new IPEndPoint(IPAddress.Loopback, 0));
+    }
+
+    public ValueTask<DialedTcpConnection> DialFromAsync(IPEndPoint endPoint, IPEndPoint localEndPoint, int localPortCount, CancellationToken cancellationToken) =>
+        DialAsync(endPoint, cancellationToken);
+
+    public async ValueTask<IConnection> DialUnixSocketAsync(UnixSocketAddress address, CancellationToken cancellationToken)
+    {
+        ConnectResult connected = await server.ConnectAsync(new ConnectTarget(address.Path, 1, false), cancellationToken);
+        return connected.Connection
+            ?? throw new IOException($"The in-memory server refused the connection: {connected.ErrorMessage}");
+    }
+}
+
+// A copy of Curl.Conformance.UnitTests' LoopbackOnlyDnsResolver (internal there): an address literal
+// is itself, localhost and every name under .localhost are ::1 and 127.0.0.1, ip6-localhost is ::1,
+// and every other name does not resolve.
+internal sealed class LoopbackOnlyDnsResolver : IDnsResolver
+{
+    public ValueTask<IReadOnlyList<IPAddress>> ResolveAsync(string host, CancellationToken cancellationToken)
+    {
+        IReadOnlyList<IPAddress> addresses =
+            IPAddress.TryParse(host.Trim('[', ']'), out IPAddress? literal) ? [literal]
+            : string.Equals(host, "localhost", StringComparison.OrdinalIgnoreCase) || host.EndsWith(".localhost", StringComparison.OrdinalIgnoreCase) ? [IPAddress.IPv6Loopback, IPAddress.Loopback]
+            : string.Equals(host, "ip6-localhost", StringComparison.OrdinalIgnoreCase) ? [IPAddress.IPv6Loopback]
+            : [];
+        return ValueTask.FromResult(addresses);
     }
 }
