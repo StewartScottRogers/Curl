@@ -3,8 +3,8 @@ id: AF-0158
 title: KerberosFileError.UnsupportedType says only FILE: or DIR: caches can store a credential; CredentialCacheStore.Store also stores into KCM:
 auditor: truthfulness
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: truthfulness:Curl.Kerberos.UnitLibrary/KerberosFileError.cs:UnsupportedType:false-doc-comment
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Run from the repository root:
 ## Log
 
 - 2026-10-11: filed proposed.
+- 2026-10-11: proposed -> accepted.
