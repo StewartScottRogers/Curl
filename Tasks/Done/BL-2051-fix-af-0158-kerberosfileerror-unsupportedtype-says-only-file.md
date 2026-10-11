@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Kerberos.UnitLibrary]
 requirement: none
 created: 2026-10-11
-completed:
+completed: 2026-10-11
 ---
 # BL-2051 — Fix AF-0158: KerberosFileError.UnsupportedType says only FILE: or DIR: caches can store a credential; CredentialCacheStore.Store also stores into KCM:
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- KerberosFileError.UnsupportedType doc now lists FILE:, DIR: and KCM: for storing a credential in a cache, as CredentialCacheStore.Store does (KCM_OP_STORE, BL-891). Doc-only; no behaviour change. Build clean, fast tests green.
 
 ## Log
 
 - 2026-10-11: Created.
 - 2026-10-11: Backlog -> Doing.
+- 2026-10-11: Doing -> Done. KerberosFileError.UnsupportedType doc lists KCM: among the cache types a credential can be stored in

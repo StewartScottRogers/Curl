@@ -16,10 +16,10 @@ public enum KerberosFileError
     NotFound,
 
     /// <summary>
-    /// The name's type prefix is one this library does not read: anything but <c>FILE:</c>,
-    /// <c>DIR:</c> or <c>KCM:</c> for a credential cache, anything but <c>FILE:</c> or
-    /// <c>DIR:</c> for storing a credential in one, and anything but <c>FILE:</c> or
-    /// <c>WRFILE:</c> for a keytab.
+    /// The name's type prefix is one this library does not support: anything but
+    /// <c>FILE:</c>, <c>DIR:</c> or <c>KCM:</c> for reading a credential cache, the same
+    /// <c>FILE:</c>, <c>DIR:</c> or <c>KCM:</c> for storing a credential in one, and anything
+    /// but <c>FILE:</c> or <c>WRFILE:</c> for a keytab.
     /// </summary>
     UnsupportedType,
 
