@@ -1,5 +1,5 @@
 ---
-id: BL-2098
+id: BL-2099
 title: Apply strippart to the upload in the conformance harness and list upstream test1187
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-11
 completed:
 ---
-# BL-2098 — Apply strippart to the upload in the conformance harness and list upstream test1187
+# BL-2099 — Apply strippart to the upload in the conformance harness and list upstream test1187
 
 ## Goal
 
