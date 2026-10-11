@@ -3,8 +3,8 @@ id: AF-0163
 title: CI red 32 min after test475 failed on Linux and macOS from BL-1907's commit 7b6794f4 (run 38047662088)
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: process:logs:test475:ci-red
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Log
 
 - 2026-10-11: filed proposed.
+- 2026-10-11: proposed -> accepted.
