@@ -62,7 +62,9 @@
     requeued, blocked, parked or open).
 
 .PARAMETER Since
-    The first day to count, e.g. 2026-09-29. Logs, runs and CI runs before it are skipped.
+    The first day to count, e.g. 2026-09-29, in local time. Logs, runs and CI runs before it
+    are skipped. A CI run's UTC start is compared with -Since converted to UTC, so a run from
+    the evening before, whose UTC date is already -Since's, is not counted (BL-2055).
 
 .PARAMETER LogRoot
     The factory's log folder. Default: <repo>.logs beside the repository.
@@ -151,7 +153,7 @@ function Get-CiRedSpells([object[]]$Runs, [datetime]$From) {
     # red, so the process auditor can name the spell, not only the total (BL-1366).
     $finished = @($Runs | Where-Object { $_.status -eq 'completed' -and $_.conclusion -in 'success', 'failure' } |
         ForEach-Object { [pscustomobject]@{ Id = $_.databaseId; Conclusion = $_.conclusion; Created = ([datetimeoffset]$_.createdAt).UtcDateTime; Ended = ([datetimeoffset]$_.updatedAt).UtcDateTime } } |
-        Where-Object { $_.Created -ge $From.ToUniversalTime() -or $_.Created.Date -ge $From.Date } | Sort-Object Created)
+        Where-Object { $_.Created -ge $From.ToUniversalTime() } | Sort-Object Created)
     $spells = @()
     $redSince = $null; $redRun = $null
     foreach ($run in $finished) {
