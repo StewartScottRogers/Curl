@@ -32,3 +32,4 @@ BL-2091 made mail MIME (smtp, imap) escape `-F` names and file names with backsl
 ## Log
 
 - 2026-10-11: Created.
+- 2026-10-11: Backlog -> Doing.
