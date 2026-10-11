@@ -4,16 +4,16 @@ title: SMTP AUTH PLAIN over two URLs with -: sends an empty authorization identi
 area: behaviour
 key: behaviour:smtp-plain-message-on-connection-reuse
 severity: High
-status: open
+status: closed
 scope: target
 introduced-in:
 opened: 2026-10-10_0657
-closed:
+closed: 2026-10-10_2142
 regression: false
 items: [behaviour:test938]
 touches: [Curl.Authentication.UnitLibrary, Curl.Authentication.UnitTests, Curl.Protocol.Smtp.UnitLibrary, Curl.Protocol.Smtp.UnitTests]
 task: BL-1992
-tasks: [BL-1992]
+tasks: [BL-1992, BL-2027]
 ---
 # GF-0062 - SMTP AUTH PLAIN over two URLs with -: sends an empty authorization identity; upstream expects user, user, password
 
@@ -32,8 +32,10 @@ Measure test938's command line against the reference with Record-CurlExchange.ps
 ## Measurements
 
 - 2026-10-10_0657: 1 of 1 items are gaps.
+- 2026-10-10_2142: 0 of 1 items are gaps (behaviour:test938 excluded, disabled-upstream).
 
 ## Log
 
 - 2026-10-10_0657: Opened by gap-behaviour.
 - 2026-10-10_0756: Filed BL-1992.
+- 2026-10-10_2142: Closed: BL-2027's re-measurement (Measure-UpstreamCases.cs, case 938, then ConvertTo-BehaviourMeasurement.ps1) measured every item as excluded, reason disabled-upstream: curl 8.21.0 lists 938 in tests/data/DISABLED, and BL-1992 measured real curl 8.21.0 sending the same PLAIN message as Curl (ADR-0470).

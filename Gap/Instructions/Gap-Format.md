@@ -274,6 +274,7 @@ The rest, by area:
 | | `libcurl-unit-test` | `excluded` | A libcurl unit test (`<tool>unit...`). |
 | | `debug-build-only` | `excluded` | The case needs a debug build (`Debug`, `TrackMemory`, `unittest`). |
 | | `platform:<os>` | `excluded` | The case runs only on another platform. |
+| | `disabled-upstream` | `excluded` | The release's `tests/data/DISABLED` lists the case, so upstream's own test suite does not run it. |
 
 ```json
 {

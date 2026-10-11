@@ -16,6 +16,10 @@
     <client><features> and <info><keywords> parts (upstream's docs/tests/FILEFORMAT.md;
     Curl.Conformance.UnitLibrary/UpstreamTestCaseParser.cs reads them the same way). The
     first rule that fits wins, in this order:
+      0. the harness's reason is "disabled
+         upstream" (the release's
+         tests/data/DISABLED lists the case,
+         BL-2027)                             -> excluded, disabled-upstream
       1. <tool> names a lib... program        -> excluded, libcurl-api
       2. <tool> names a unit... program       -> excluded, libcurl-unit-test
       3. <features> needs Debug, TrackMemory
@@ -123,8 +127,9 @@ function Read-CaseTags([string] $Folder, [int] $Number) {
     return $tags
 }
 
-# The state and reason of a skipped case, by rules 1 to 7 in order.
+# The state and reason of a skipped case, by rules 0 to 7 in order.
 function Get-SkippedVerdict($Tags, [string] $Detail, [string[]] $Available) {
+    if ($Detail -eq 'disabled upstream') { return @('excluded', 'disabled-upstream') }
     if ($Tags.Tool -like 'lib*') { return @('excluded', 'libcurl-api') }
     if ($Tags.Tool -like 'unit*') { return @('excluded', 'libcurl-unit-test') }
     $needed = @($Tags.Features | Where-Object { -not $_.StartsWith('!') })
@@ -227,6 +232,7 @@ function Invoke-SelfTest {
         $s = @{}; foreach ($i in $m.items) { $s[$i.key] = $i }
         function Is($Key, $State, $Reason) { return ($s[$Key].state -eq $State -and $s[$Key].reason -eq $Reason) }
 
+        Report ((Is 'behaviour:test15' 'excluded' 'disabled-upstream') -and $s['behaviour:test15'].evidence -eq 'disabled upstream') 'rule 0: a case upstream lists in DISABLED gives excluded disabled-upstream'
         Report (Is 'behaviour:test1' 'excluded' 'libcurl-api') 'rule 1: a lib... tool gives excluded libcurl-api'
         Report (Is 'behaviour:test2' 'excluded' 'libcurl-unit-test') 'rule 2: a unit... tool gives excluded libcurl-unit-test'
         Report (Is 'behaviour:test3' 'excluded' 'debug-build-only') 'rule 3: a Debug, TrackMemory or unittest feature gives excluded debug-build-only'
@@ -244,7 +250,7 @@ function Invoke-SelfTest {
         Report ($null -eq $m.reference -and $m.referenceFallback -eq 'docs' -and $m.targetVersion -eq '9.9.9') 'with no reference, reference is null with the docs fallback'
         $c = $m.counts
         $reasonTotal = 0; foreach ($p in $m.reasons.PSObject.Properties) { $reasonTotal += [int]$p.Value }
-        Report ($c.x -eq $c.match -and $c.y -eq ($c.match + $c.gap + $c.unmeasured) -and ($c.match + $c.gap + $c.unmeasured + $c.excluded) -eq @($m.items).Count -and @($m.items).Count -eq 14) 'counts add up to the case count'
+        Report ($c.x -eq $c.match -and $c.y -eq ($c.match + $c.gap + $c.unmeasured) -and ($c.match + $c.gap + $c.unmeasured + $c.excluded) -eq @($m.items).Count -and @($m.items).Count -eq 15) 'counts add up to the case count'
         Report ($reasonTotal -eq ($c.unmeasured + $c.excluded) -and $m.reasons.'libcurl-api' -eq 2 -and $m.reasons.'unknown-variable' -eq 4 -and $m.reasons.'no-perl' -eq 1) 'the per-reason summary adds up to unmeasured plus excluded'
 
         Invoke-Conversion $raw $data @('http', 'IPv6') 'curl 9.9.9 (fake) libcurl/9.9.9' '9.9.9' $out | Out-Null
