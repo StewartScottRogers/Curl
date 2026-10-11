@@ -3,8 +3,8 @@ id: AF-0163
 title: CI red 32 min after test475 failed on Linux and macOS from BL-1907's commit 7b6794f4 (run 38047662088)
 auditor: process
 severity: Low
-status: accepted
-reason: 
+status: closed
+reason: Stewart rejected it on 2026-10-11: the red spell was prompt filing and claiming, not a factory defect (BL-2056).
 key: process:logs:test475:ci-red
 reproduction: none
 task: BL-2056
@@ -13,9 +13,9 @@ found: 2026-10-11
 found-at: 22f394602532a6922adbc7fa91b3739b62d2112a
 scorecard: 2026-10-11_0051.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-11
+closed-how: stewart
+closed-by: stewart
 ---
 # AF-0163 - CI red 32 min after test475 failed on Linux and macOS from BL-1907's commit 7b6794f4 (run 38047662088)
 
@@ -46,3 +46,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 - 2026-10-11: filed proposed.
 - 2026-10-11: proposed -> accepted.
+- 2026-10-11: accepted -> closed. Stewart rejected it on 2026-10-11: the red spell was prompt filing and claiming, not a factory defect (BL-2056).
