@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Console, Curl.Console.UnitTests]
 requirement: none
 created: 2026-10-10
-completed:
+completed: 2026-10-10
 ---
 # BL-2040 — Print the -o open warning before the meter's newline when a body write cannot open the file
 
@@ -22,14 +22,17 @@ Found while doing BL-2039. Measured 2026-10-10 with `Record-CurlExchange.ps1 -Re
 
 ## Acceptance criteria
 
-- [ ] For the 5-byte case above, Curl's stderr equals curl 8.21.0's byte for byte apart from timing-dependent fields.
-- [ ] The empty-body case of BL-2039 (`CurlCommandRunnerStartedTransferProgressMeterTests`) still passes.
-- [ ] A unit test in `Curl.Console.UnitTests` pins the zero row, the warning, the newline and the `curl: (23)` line.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] For the 5-byte case above, Curl's stderr equals curl 8.21.0's byte for byte apart from timing-dependent fields.
+- [x] The empty-body case of BL-2039 (`CurlCommandRunnerStartedTransferProgressMeterTests`) still passes.
+- [x] A unit test in `Curl.Console.UnitTests` pins the zero row, the warning, the newline and the `curl: (23)` line.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- 2026-10-10: `TakeMeterEndLines` (Curl.Console/CurlCommandRunner.cs) puts a held `-o` open warning on the meter row, before the meter's newline, unless `SucceededBeforeOutputFileCreationFailed` (the empty-file case of BL-1964/BL-2039, which keeps it after the newline). Pinned by `RunAsync_BodyWriteToUnopenableOutputFile_WritesTheOpenWarningOnTheMeterRowBeforeItsNewline`. Measured with `Record-CurlExchange.ps1` (`-Curl dotnet run --project Curl.Console --no-build`) against curl 8.21.0: stderr byte-identical, both exit 23.
 
 ## Log
 
 - 2026-10-10: Created.
 - 2026-10-10: Backlog -> Doing.
+- 2026-10-10: Doing -> Done. Warning now printed on the meter row before its newline; stderr matches curl 8.21.0 byte for byte

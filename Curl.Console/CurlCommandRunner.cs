@@ -4075,7 +4075,7 @@ internal sealed class CurlCommandRunner(
         if (EndsWithProgressMeter(options, result, state, toStandardOutput))
         {
             FinishTransferProgress(state, result);
-            await WriteErrorLinesAsync([.. TakeProgressMeterHeaderLines(state, resumeFrom), state.Progress.TakeUnwrittenStatusLines()])
+            await WriteErrorLinesAsync([.. TakeProgressMeterHeaderLines(state, resumeFrom), .. TakeMeterEndLines(state)])
                 .ConfigureAwait(false);
         }
 
@@ -4083,6 +4083,28 @@ internal sealed class CurlCommandRunner(
         eventStandardError!.Release();
 
         return result;
+    }
+
+    /// <summary>
+    /// Gives the lines that end the progress meter: its status lines not yet written, each
+    /// written with a newline after it. A held <c>-o</c> open warning of a body write that
+    /// failed goes on the meter's row, before the meter's newline, as curl 8.21.0 prints it when
+    /// the first write fails (BL-2040); one for an empty file created after a success stays held
+    /// for after the newline (BL-1964, BL-2039).
+    /// </summary>
+    /// <param name="state">The transfer's state.</param>
+    /// <returns>The status lines, or the status lines with the warning, then the meter's newline.</returns>
+    private static string[] TakeMeterEndLines(RunningTransferState state)
+    {
+        string statusLines = state.Progress.TakeUnwrittenStatusLines();
+        if (state.OutputFileOpenWarning is not { } warning || state.SucceededBeforeOutputFileCreationFailed)
+        {
+            return [statusLines];
+        }
+
+        state.OutputFileOpenWarning = null;
+
+        return [statusLines + warning, string.Empty];
     }
 
     /// <summary>
