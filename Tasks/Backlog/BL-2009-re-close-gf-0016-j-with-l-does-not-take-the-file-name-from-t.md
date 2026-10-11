@@ -6,6 +6,7 @@ assignee: Claude
 pipeline: feature
 depends-on: []
 touches: [Curl.Console, Curl.Console.UnitTests]
+lane: no
 requirement: none
 created: 2026-10-10
 completed:
@@ -60,9 +61,28 @@ In Curl.Console's -O/-J output naming: with -J and -L and no Content-Disposition
 
 - 2026-10-10 (interactive, gap PR #108 2fd5b394d): the gap tool passes test1642 and test1643 on the current build, and both measure match. test3036's gap comes from the reference cross-check (Measure-ReferenceCrossCheck.ps1), not the harness, and reproduces 3 times out of 3. Both binaries exit 23 with the same request bytes, and the first attempt reports 'write of 51 bytes' in both. On the retry, real curl ends 'curl: (23) client returned ERROR on write of 16 bytes' and Curl's Release build ends 'write of 128 bytes'. Left for a lane, in Curl.Console: report curl's byte count for the failed write on the retry of an -OJ --no-clobber --retry transfer (test3036). lane: no removed.
 
+- 2026-10-10 (dark factory lane 1): the retry's 16 vs 128 bytes does not reproduce outside
+  the cross-check. Replayed test3036's exchange with `Record-CurlExchange.ps1` (`-Connections 2`,
+  the same reply both times, `http://127.0.0.1:<port>/3036 --no-clobber --output-dir present -OJ
+  --retry 1 --retry-all-errors --no-progress-meter`, `present` a file) with upstream's LF-only
+  head (`HTTP/1.1 200 OK`, `Content-Length: 6`, `Connection: close`, the `Content-Disposition`
+  line, `Content-Type: text/html`, body `-foo-\n`). curl 8.21.0 (Schannel) and this tree's Debug
+  build print byte-identical stderr: `write of 51 bytes` (the LF-only `Content-Disposition` line),
+  the retry warning, then `write of 6 bytes` (the body), exit 23. With CRLF lines it is 52 then 6
+  for both (BL-1849). The numbers in the finding fit a different exchange on the cross-check's second
+  connection: 16 is the length of `HTTP/1.1 200 OK\n` and 128 is the whole LF-only head above. So
+  curl failed its retry at the status line and Curl wrote the head as one block. That points at
+  what `Measure-ReferenceCrossCheck.ps1` serves or runs for the second attempt (a different reply,
+  `-i`, or an old Release build), which only the gap office's files show, and the audit guard
+  refuses those to lanes. Added `lane: no` again. An interactive session should capture the
+  cross-check's second request and reply (its request.bin and the bytes sent), replay them with
+  Record-CurlExchange against both binaries, and fix Curl.Console if they then differ. No code
+  changed.
+
 ## Log
 
 - 2026-10-10: Created.
 - 2026-10-10: Backlog -> Doing.
 - 2026-10-10: Doing -> Backlog. Interactive only: the gap harness and upstream cache for test1642/1643/3036 are refused to lanes, and no difference reproduces with Record-CurlExchange; added lane: no
 - 2026-10-10: Backlog -> Doing.
+- 2026-10-10: Doing -> Backlog. Interactive only: test3036's retry difference (16 vs 128 bytes) appears only in the gap office's cross-check, which lanes may not read; with Record-CurlExchange, CRLF and LF-only replies, curl 8.21.0 and Curl print identical stderr; added lane: no
