@@ -45,12 +45,15 @@ It refuses inside a dark factory process and while a shift runs.
 | `-NoTasks` | Files no tasks on `work/dark-factory`. |
 | `-NoPullRequest` | Opens no pull request. |
 | `-NoCommit` | Writes everything into the gap worktree but commits, pushes and files nothing. |
-| `-SelfTest` | Checks the script's own logic against faked `git`, `gh` and `claude`. |
+| `-SelfTest` | Checks the script's own logic against faked `git`, `gh` and `claude`, and the task renumbering against two real clones of a throwaway board. |
 
 A run builds the measured commit in a detached worktree, runs each area's `Measure-*` tool,
 has each area's analyst group the gaps by cause, writes findings and a scorecard on the
 `gap` branch, opens its pull request to `master` (never merging it), and files the findings'
-tasks on `work/dark-factory`. Its run folder, kept for reading, is
+tasks on `work/dark-factory`. Tasks are numbered from the board as fetched just before filing,
+and before each push the run rebases them and runs `task-board.ps1 dedupe` against the commit
+it rebased onto, rewriting any renumbered ID in the findings, so tasks the audit office filed
+meanwhile keep their IDs (BL-2013). Its run folder, kept for reading, is
 `<repo>.gap\<yyyy-MM-dd_HHmm>\` beside the checkout: `gap.log`, `run.json`,
 `measurements\<area>.json`, `reports\gap-<area>.md` and `data.json`. The script's help
 (`Get-Help Gap\RunGapAnalysis.ps1 -Full`) lists every step.
