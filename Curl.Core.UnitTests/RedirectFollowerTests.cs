@@ -73,6 +73,7 @@ public sealed class RedirectFollowerTests
     [DataRow("http://h/#x?a b", "http://h/#x?a%20b", DisplayName = "question mark in the fragment")]
     [DataRow("http://h/?n=Ø¢", "http://h/?n=%D8%A2", DisplayName = "raw bytes as themselves (upstream test1138)")]
     [DataRow("http://h/x~", "http://h/x~", DisplayName = "ASCII unchanged")]
+    [DataRow("http://h/Ā", "http://h/Ā", DisplayName = "character above Latin-1 unchanged")]
     public void EncodedForFollow_Target_EncodesAsCurlFollows(string target, string expected) =>
         Assert.AreEqual(expected, RedirectFollower.EncodedForFollow(target));
 

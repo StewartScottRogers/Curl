@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Core.UnitLibrary, Curl.Core.UnitTests]
 requirement: none
 created: 2026-10-11
-completed:
+completed: 2026-10-11
 ---
 # BL-2066 — Cover RedirectFollower.EncodedCharacter's last branch and bring MultipartPartHeaders.ChooseContentType under the complexity gate
 
@@ -27,13 +27,16 @@ Behaviour does not change.
 
 ## Acceptance criteria
 
-- [ ] `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Core.UnitLibrary` reports no member outside a gate, at 100% line and 100% branch coverage.
-- [ ] No existing test was changed or removed to get there; any new member has its own tests.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Core.UnitLibrary` reports no member outside a gate, at 100% line and 100% branch coverage.
+- [x] No existing test was changed or removed to get there; any new member has its own tests.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Also split UrlSchemeGuesser.HasScheme(string, bool) (compiled complexity 14) with IsWindowsDrivePrefix; it surfaced in the same measurement. Behaviour unchanged. Added one EncodedForFollow row (character above Latin-1) for the missing branch.
 
 ## Log
 
 - 2026-10-11: Created.
 - 2026-10-11: Backlog -> Doing.
+- 2026-10-11: Doing -> Done. Branch covered, ChooseContentType and HasScheme split; Core library 0 failing members

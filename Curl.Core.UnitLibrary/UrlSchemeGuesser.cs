@@ -88,7 +88,7 @@ public static class UrlSchemeGuesser
     {
         ArgumentNullException.ThrowIfNull(url);
 
-        if (url.Length == 0 || !char.IsAsciiLetter(url[0]) || (runsOnWindows && url.Length > 1 && url[1] == ':'))
+        if (url.Length == 0 || !char.IsAsciiLetter(url[0]) || IsWindowsDrivePrefix(url, runsOnWindows))
         {
             return false;
         }
@@ -101,6 +101,9 @@ public static class UrlSchemeGuesser
 
         return url.AsSpan(index).StartsWith(":/", StringComparison.Ordinal);
     }
+
+    private static bool IsWindowsDrivePrefix(string url, bool runsOnWindows) =>
+        runsOnWindows && url.Length > 1 && url[1] == ':';
 
     /// <summary>Guesses the scheme for <paramref name="url" />, which names none.</summary>
     /// <param name="url">The URL as the command line gave it, without a scheme.</param>

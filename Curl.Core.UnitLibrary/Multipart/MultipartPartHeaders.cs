@@ -110,9 +110,11 @@ internal static class MultipartPartHeaders
         }
 
         string? contentType = DefaultContentType(part, fileName);
-        bool plainTextGoesUnlabelled = part.Kind != MultipartFormPartKind.Multipart && (forMail || fileName is null);
-        return plainTextGoesUnlabelled && IsContentType(contentType, "text/plain") ? null : contentType;
+        return PlainTextGoesUnlabelled(part, fileName, forMail) && IsContentType(contentType, "text/plain") ? null : contentType;
     }
+
+    private static bool PlainTextGoesUnlabelled(MultipartFormPart part, string? fileName, bool forMail) =>
+        part.Kind != MultipartFormPartKind.Multipart && (forMail || fileName is null);
 
     private static string? FileNameOf(MultipartFormPart part) =>
         part.FileName ?? (part.Kind == MultipartFormPartKind.FileUpload ? BaseName(part.Content) : null);
