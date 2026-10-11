@@ -88,7 +88,7 @@ public sealed class PoolingConnector : IConnector, IAsyncDisposable
     /// <see cref="WaitsForMultiplexing" /> that opens new connections through
     /// <paramref name="innerConnector" /> instead, so what it opens is numbered in this pool's
     /// sequence; its <see cref="DisposeAsync" /> leaves the cache to this connector's owner. FTP's
-    /// passive data connections go through one over <see cref="TcpConnector.WithoutConnectTimeout" /> (BL-797).
+    /// passive data connections go through one over <see cref="TcpConnector.ForFtpDataConnections" /> (BL-797).
     /// </summary>
     /// <param name="innerConnector">Opens a connection when the cache has none for the key.</param>
     /// <returns>The connector.</returns>

@@ -528,19 +528,19 @@ public sealed partial class TcpConnector(
     /// </para>
     /// </remarks>
     public ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, CancellationToken cancellationToken) =>
-        ConnectWithinAsync(target, _connectTimeout, cancellationToken);
+        ConnectWithinAsync(target, _connectTimeout, appliesConnectTo: true, cancellationToken);
 
     /// <summary>
-    /// Gives a connector that connects exactly as this one does, through the same DNS cache,
-    /// <c>--resolve</c> entries, <c>--connect-to</c> mappings and connection numbering, but that
-    /// holds no connect to <c>--connect-timeout</c>: only the caller's cancellation, or the
-    /// system giving up on a dial, ends it. It is FTP's passive data connection's connector, which
-    /// curl 8.21.0 does not hold to <c>--connect-timeout</c> (measured, BL-797 Notes).
+    /// Gives FTP's passive data connection's connector: it connects as this one does, through the
+    /// same DNS cache, <c>--resolve</c> entries and connection numbering, but holds no connect to
+    /// <c>--connect-timeout</c>, so only the caller's cancellation, or the system giving up on a
+    /// dial, ends it (measured, BL-797 Notes), and applies no <c>--connect-to</c> mapping, as
+    /// curl 8.21.0 maps only the control connection (upstream test713, BL-1976).
     /// </summary>
     /// <returns>The connector.</returns>
-    public IConnector WithoutConnectTimeout() => new ConnectTimeoutFreeConnector(this);
+    public IConnector ForFtpDataConnections() => new FtpDataConnector(this);
 
-    private async ValueTask<ConnectResult> ConnectWithinAsync(ConnectTarget target, TimeSpan connectLimit, CancellationToken cancellationToken)
+    private async ValueTask<ConnectResult> ConnectWithinAsync(ConnectTarget target, TimeSpan connectLimit, bool appliesConnectTo, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(target);
 
@@ -549,7 +549,7 @@ public sealed partial class TcpConnector(
         var log = new NetworkDiagnosticLog(target.DiagnosticLog);
         try
         {
-            var result = await ConnectAndNumberAsync(target, connectLimit, cancellationToken).ConfigureAwait(false);
+            var result = await ConnectAndNumberAsync(target, connectLimit, appliesConnectTo, cancellationToken).ConfigureAwait(false);
             if (result.Connection is null)
             {
                 log.Failed(DiagnosticLogComponents.Connect, result.ExitCode, result.ErrorMessage);
@@ -564,11 +564,13 @@ public sealed partial class TcpConnector(
         }
     }
 
-    private async ValueTask<ConnectResult> ConnectAndNumberAsync(ConnectTarget target, TimeSpan connectLimit, CancellationToken cancellationToken)
+    private async ValueTask<ConnectResult> ConnectAndNumberAsync(ConnectTarget target, TimeSpan connectLimit, bool appliesConnectTo, CancellationToken cancellationToken)
     {
         var started = timeProvider.GetTimestamp();
         LoadResolveEntriesUnlessLoaded(target.Events);
-        var destination = DestinationOf(target);
+        var destination = appliesConnectTo
+            ? DestinationOf(target)
+            : new ConnectDestination(target.Host, target.Port, IsMapped: false, ParseError: null);
         if ((_resolveOverrides.ParseError ?? destination.ParseError) is { } parseError)
         {
             return ConnectResult.Failed(CurlExitCode.SetoptOptionSyntax, parseError);
@@ -2312,13 +2314,14 @@ public sealed partial class TcpConnector(
     }
 
     /// <summary>
-    /// <see cref="WithoutConnectTimeout" />'s connector: the owner's connect under the longest
-    /// delay a .NET timer takes, about 49.7 days, in place of the connect timeout.
+    /// <see cref="ForFtpDataConnections" />'s connector: the owner's connect to the target as
+    /// given, no <c>--connect-to</c> mapping applied, under the longest delay a .NET timer takes,
+    /// about 49.7 days, in place of the connect timeout.
     /// </summary>
-    private sealed class ConnectTimeoutFreeConnector(TcpConnector owner) : IConnector
+    private sealed class FtpDataConnector(TcpConnector owner) : IConnector
     {
         public ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, CancellationToken cancellationToken) =>
-            owner.ConnectWithinAsync(target, LongestTimerDelay, cancellationToken);
+            owner.ConnectWithinAsync(target, LongestTimerDelay, appliesConnectTo: false, cancellationToken);
     }
 
     /// <summary>

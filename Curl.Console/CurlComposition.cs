@@ -210,15 +210,16 @@ internal static class CurlComposition
 
     /// <summary>
     /// The connector FTP's passive data connections go through: the option group's pooling
-    /// connector over its TCP connector's <see cref="TcpConnector.WithoutConnectTimeout" />, so
-    /// they share the pool's numbering and the connector's DNS cache, <c>--resolve</c> and
-    /// <c>--connect-to</c>, but only <c>-m</c> or the system's own connect timeout ends one, as
-    /// curl 8.21.0 does not hold it to <c>--connect-timeout</c> (measured, ADR-0286, BL-797).
+    /// connector over its TCP connector's <see cref="TcpConnector.ForFtpDataConnections" />, so
+    /// they share the pool's numbering and the connector's DNS cache and <c>--resolve</c>, but
+    /// take no <c>--connect-to</c> mapping, as curl 8.21.0 maps only the control connection
+    /// (upstream test713, BL-1976), and only <c>-m</c> or the system's own connect timeout ends
+    /// one, as curl 8.21.0 does not hold it to <c>--connect-timeout</c> (measured, ADR-0286, BL-797).
     /// </summary>
     /// <param name="transports">The option group's connectors.</param>
     /// <returns>The connector.</returns>
     internal static IConnector FtpDataConnectorOf(CurlTransports transports) =>
-        transports.PoolingConnector.Over(transports.TcpConnector.WithoutConnectTimeout());
+        transports.PoolingConnector.Over(transports.TcpConnector.ForFtpDataConnections());
 
     /// <summary>
     /// Creates the HTTP authenticator: a <see cref="RankedHttpAuthenticator" /> that answers the
