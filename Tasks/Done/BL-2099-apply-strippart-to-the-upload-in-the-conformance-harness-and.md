@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests]
 requirement: none
 created: 2026-10-11
-completed:
+completed: 2026-10-11
 ---
 # BL-2099 — Apply strippart to the upload in the conformance harness and list upstream test1187
 
@@ -35,3 +35,4 @@ BL-2091 made mail MIME (smtp, imap) escape `-F` names and file names with backsl
 
 - 2026-10-11: Created.
 - 2026-10-11: Backlog -> Doing.
+- 2026-10-11: Doing -> Done. strippart runs on the upload; test1187 passes and is listed
