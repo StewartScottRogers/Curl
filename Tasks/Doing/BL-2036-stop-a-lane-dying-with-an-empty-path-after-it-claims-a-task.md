@@ -37,3 +37,4 @@ The shift then ended with the alarm, leaving BL-2035 in Doing. Nothing ran until
 ## Log
 
 - 2026-10-10: Created.
+- 2026-10-10: Backlog -> Doing.
