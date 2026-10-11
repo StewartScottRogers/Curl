@@ -8,7 +8,7 @@ depends-on: [BL-2086]
 touches: [Curl.Conformance.UnitTests]
 requirement: none
 created: 2026-10-11
-completed:
+completed: 2026-10-11
 ---
 # BL-2098 — Add upstream test1071 to PassingUpstreamCases.txt
 
@@ -22,12 +22,15 @@ BL-2086 made the authentication retry after an HTTP/1.0 response go out as HTTP/
 
 ## Acceptance criteria
 
-- [ ] test1071 passes in process through the conformance runner and is listed in `Curl.Conformance.UnitTests/PassingUpstreamCases.txt`.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests are green.
+- [x] test1071 passes in process through the conformance runner and is listed in `Curl.Conformance.UnitTests/PassingUpstreamCases.txt`.
+- [x] `dotnet build -warnaserror` is clean and the fast tests are green.
 
 ## Notes
+
+- 2026-10-11: Added 1071 between 1070 and 1072. `dotnet build -warnaserror` clean; the fast suite is green, Curl.Conformance.UnitTests 2655 passed, 0 failed, with test1071 listed.
 
 ## Log
 
 - 2026-10-11: Created.
 - 2026-10-11: Backlog -> Doing.
+- 2026-10-11: Doing -> Done. test1071 listed in PassingUpstreamCases.txt and passing; build clean, fast tests green
