@@ -100,9 +100,80 @@ public sealed class MultipartFormBodyBuilderMailTests
 
         diagnostics.Assert("is built", true, result.IsBuilt);
         Assert.IsTrue(result.IsBuilt);
+        await AssertSentBeforeRefusalAsync(
+            result,
+            $"Content-Type: multipart/mixed; boundary={B}\r\nMime-Version: 1.0\r\n\r\n--{B}\r\n"
+            + "Content-Disposition: attachment; filename=\"b.txt\"\r\nContent-Transfer-Encoding: 7bit\r\n\r\nA");
+    }
+
+    [TestMethod]
+    public async Task SevenBitTextAboveOneHundredTwentySevenSendsTheBytesBeforeItThenFails()
+    {
+        // -F "=AéB;encoder=7bit": curl 8.21.0 builds the message, sends MAIL with its SIZE= and
+        // DATA, then the part headers and the A, then fails with exit 26 (measured, BL-2025).
+        const string B = "------------------------hXp3I0f1iBBtDtGkyMatVe";
+        MultipartFormBuildResult result = await BuildMailAsync(
+            [B],
+            NoHeaders,
+            new MultipartFormPart(null, MultipartFormPartKind.Text, "AéB", null, null, NoHeaders, NoParts) { Encoder = "7bit" });
+
+        Assert.IsTrue(result.IsBuilt);
+        TestDiagnostics.For(TestContext).Assert("length is known", true, result.Body.Length is not null);
+        Assert.IsNotNull(result.Body.Length);
+        await AssertSentBeforeRefusalAsync(
+            result,
+            $"Content-Type: multipart/mixed; boundary={B}\r\nMime-Version: 1.0\r\n\r\n--{B}\r\n"
+            + "Content-Transfer-Encoding: 7bit\r\n\r\nA");
+    }
+
+    [TestMethod]
+    public async Task QuotedPrintablePartLeavesTheMessageSizeUnknownAndUnseekable()
+    {
+        // -F "=@m.txt;encoder=quoted-printable": curl 8.21.0 sends MAIL FROM with no SIZE= and
+        // refuses to APPEND it to IMAP, exit 25, as the message's size is unknown (measured, BL-2025).
+        const string B = "------------------------SYrs9NokL0hBbO6azfkoIl";
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        MultipartFormBuildResult result = await BuildMailAsync(
+            [B],
+            NoHeaders,
+            new MultipartFormPart(null, MultipartFormPartKind.FileUpload, "m.txt", null, null, NoHeaders, NoParts) { Encoder = "quoted-printable" },
+            new MultipartFormPart(null, MultipartFormPartKind.Text, "hi", null, null, NoHeaders, NoParts) { Encoder = "base64" });
+
+        Assert.IsTrue(result.IsBuilt);
         await using Stream content = result.Body.Content;
-        RequestBodyReadFailedException failure = await Assert.ThrowsExactlyAsync<RequestBodyReadFailedException>(
-            () => content.CopyToAsync(Stream.Null, TestContext.CancellationToken));
+        diagnostics.Assert("length", null, result.Body.Length);
+        Assert.IsNull(result.Body.Length);
+        diagnostics.Assert("can seek", false, content.CanSeek);
+        Assert.IsFalse(content.CanSeek);
+        using MemoryStream copy = new();
+        await content.CopyToAsync(copy, TestContext.CancellationToken);
+        string expected = $"Content-Type: multipart/mixed; boundary={B}\r\nMime-Version: 1.0\r\n\r\n--{B}\r\n"
+            + "Content-Disposition: attachment; filename=\"m.txt\"\r\nContent-Transfer-Encoding: quoted-printable\r\n\r\n"
+            + $"Some text\r\n\r\n--{B}\r\nContent-Transfer-Encoding: base64\r\n\r\naGk=\r\n--{B}--\r\n";
+        string actual = Encoding.Latin1.GetString(copy.ToArray());
+        diagnostics.Diff("message", expected, actual);
+        Assert.AreEqual(expected, actual);
+    }
+
+    private async Task AssertSentBeforeRefusalAsync(MultipartFormBuildResult result, string expectedBeforeRefusal)
+    {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Assert("is built", true, result.IsBuilt);
+        Assert.IsTrue(result.IsBuilt);
+        await using Stream content = result.Body.Content;
+        using MemoryStream sent = new();
+        byte[] buffer = new byte[4096];
+        RequestBodyReadFailedException failure = await Assert.ThrowsExactlyAsync<RequestBodyReadFailedException>(async () =>
+        {
+            int read;
+            while ((read = await content.ReadAsync(buffer, TestContext.CancellationToken)) > 0)
+            {
+                sent.Write(buffer, 0, read);
+            }
+        });
+        string actual = Encoding.Latin1.GetString(sent.ToArray());
+        diagnostics.Diff("sent before the refusal", expectedBeforeRefusal, actual);
+        Assert.AreEqual(expectedBeforeRefusal, actual);
         diagnostics.Assert("message", MultipartFormBodyBuilder.ReadFailedMessage, failure.Message);
         Assert.AreEqual(MultipartFormBodyBuilder.ReadFailedMessage, failure.Message);
     }

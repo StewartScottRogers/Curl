@@ -48,11 +48,12 @@ internal sealed class MultipartBodySegments(Encoding textEncoding) : IDisposable
     }
 
     /// <summary>Hands every segment to one stream, which then owns them.</summary>
+    /// <param name="allowsSeeking">Whether the body seeks when every segment seeks.</param>
     /// <returns>The body, read segment by segment.</returns>
-    internal ConcatenatedReadStream ToStream()
+    internal ConcatenatedReadStream ToStream(bool allowsSeeking = true)
     {
         FlushText();
-        ConcatenatedReadStream body = new([.. segments]);
+        ConcatenatedReadStream body = new([.. segments], allowsSeeking);
         segments.Clear();
         return body;
     }

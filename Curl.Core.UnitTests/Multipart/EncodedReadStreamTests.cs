@@ -86,13 +86,16 @@ public sealed class EncodedReadStreamTests
     }
 
     [TestMethod]
-    public void ARefusedByteFailsTheReadThatReachesIt()
+    public void ARefusedByteFailsTheReadAfterTheBytesBeforeIt()
     {
         var diagnostics = TestDiagnostics.For(TestContext);
         diagnostics.Arrange("encoding", "7bit");
         diagnostics.Arrange("source", "[0x41, 0xE9]");
         using EncodedReadStream stream = MultipartPartEncoder.Find("7bit")!.EncodeWhileReading(new MemoryStream([0x41, 0xE9]), 2);
 
+        int first = stream.ReadByte();
+        diagnostics.Assert("first byte", 0x41, first);
+        Assert.AreEqual(0x41, first);
         RequestBodyReadFailedException refused = Assert.ThrowsExactly<RequestBodyReadFailedException>(() => stream.ReadByte());
 
         diagnostics.Act("exception", $"{refused.GetType().Name}: {refused.Message}");
