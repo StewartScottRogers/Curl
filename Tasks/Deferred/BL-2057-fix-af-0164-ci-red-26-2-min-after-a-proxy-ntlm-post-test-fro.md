@@ -53,3 +53,5 @@ The finding closes only when a later re-audit by the process auditor confirms th
 - 2026-10-11: Created.
 - 2026-10-11: Backlog -> Doing.
 - 2026-10-11: Doing -> Blocked. Stewart: reject AF-0164 (the spell shows prompt filing and claiming; cancelled runs were other lanes' pushes, and the reproduction reads a past audit's logs)?
+- 2026-10-11: Blocked -> Doing.
+- 2026-10-11: Doing -> Deferred. No work: Stewart closed its finding on 2026-10-11 (closed-how: stewart) as not a factory defect - the red spell was prompt filing and claiming.
