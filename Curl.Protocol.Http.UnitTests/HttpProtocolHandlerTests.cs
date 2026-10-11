@@ -473,20 +473,37 @@ public sealed partial class HttpProtocolHandlerTests
 
         WriteResult(result);
         Diagnostics.Assert("exit code", CurlExitCode.WriteError, result.ExitCode);
-        Diagnostics.Assert("error text", $"Failure writing output to destination, passed {FoldedHead.Length} returned 0", result.ErrorMessage);
+        Diagnostics.Assert("error text", "Failure writing output to destination, passed 17 returned 0", result.ErrorMessage);
         Diagnostics.Assert("output length", 0L, output.Length);
         Assert.AreEqual(CurlExitCode.WriteError, result.ExitCode);
-        Assert.AreEqual($"Failure writing output to destination, passed {FoldedHead.Length} returned 0", result.ErrorMessage);
+        Assert.AreEqual("Failure writing output to destination, passed 17 returned 0", result.ErrorMessage);
         Assert.AreEqual(0L, output.Length);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_HeaderOutput_WritesEachHeaderLineSeparately()
+    {
+        FailingWriteStream headerOutput = new();
+        Diagnostics.Arrange("scripted response", OneLine(Head + "hello"));
+
+        TransferResult result = await Handler(QueueConnector.For(Connection(Head + "hello", 65536)))
+            .ExecuteAsync(Context("http://example.com/", new MemoryStream(), headerOutput));
+
+        WriteResult(result);
+        Diagnostics.Assert("write sizes", "17,26,15,19,2", string.Join(",", headerOutput.WriteSizes));
+        Diagnostics.Assert("header bytes", OneLine(FoldedHead), OneLine(Latin1(headerOutput.ToArray())));
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        CollectionAssert.AreEqual(new[] { 17, 26, 15, 19, 2 }, headerOutput.WriteSizes);
+        Assert.AreEqual(FoldedHead, Latin1(headerOutput.ToArray()));
     }
 
     [TestMethod]
     public async Task ExecuteAsync_HeaderOutputRefusesPartOfTheTrailers_FailsWithExit23()
     {
         const string response = "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n2\r\nhi\r\n0\r\nX-Trailer: t\r\n\r\n";
-        FailingWriteStream headerOutput = new(2, new OutputWriteFailedException(4, "Refused."));
+        FailingWriteStream headerOutput = new(4, new OutputWriteFailedException(4, "Refused."));
         Diagnostics.Arrange("scripted response", OneLine(response));
-        Diagnostics.Arrange("header output", "fails its second write after 4 bytes");
+        Diagnostics.Arrange("header output", "fails its fourth write, the trailer line, after 4 bytes");
 
         TransferResult result = await Handler(QueueConnector.For(Connection(response, 65536)))
             .ExecuteAsync(Context("http://example.com/", new MemoryStream(), headerOutput));

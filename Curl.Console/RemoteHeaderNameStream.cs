@@ -46,6 +46,8 @@ internal sealed class RemoteHeaderNameStream(
 
     private int statusClass;
 
+    private MemoryStream? heldHead;
+
     /// <inheritdoc />
     public override bool CanRead => false;
 
@@ -95,31 +97,49 @@ internal sealed class RemoteHeaderNameStream(
     /// an earlier response - the lines go on one write each, as curl 8.21.0 writes each header line,
     /// so a file that cannot be opened fails on the first line: under <c>-i</c> curl's retry of
     /// upstream test 3036 reports <c>write of 16 bytes</c>, the status line, not the whole head
-    /// (measured with Record-CurlExchange.ps1 on 2026-10-11, BL-2009). Until then the lines go on
-    /// together, after the <c>Content-Disposition</c> line has opened the file they land in.
+    /// (measured with Record-CurlExchange.ps1 on 2026-10-11, BL-2009). Until then a head's lines,
+    /// from its status line to its empty line, are held and go on together once the head ends,
+    /// after the <c>Content-Disposition</c> line has opened the file they land in - whether the
+    /// handler writes the head at once or a line at a time (BL-2092).
     /// </remarks>
     public override async ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default)
     {
-        bool forwardsLineByLine = output.NamedByContentDisposition;
         for (ReadOnlyMemory<byte> rest = buffer; !rest.IsEmpty; rest = rest[LineLength(rest.Span)..])
         {
-            await ReadLineAsync(rest[..LineLength(rest.Span)].ToArray(), cancellationToken).ConfigureAwait(false);
+            ReadOnlyMemory<byte> line = rest[..LineLength(rest.Span)];
+            bool forwardsLineByLine = output.NamedByContentDisposition;
+            await ReadLineAsync(line.ToArray(), cancellationToken).ConfigureAwait(false);
+            if (headerOutput is not null)
+            {
+                await ForwardLineAsync(headerOutput, line, forwardsLineByLine, cancellationToken).ConfigureAwait(false);
+            }
         }
+    }
 
-        if (headerOutput is null)
+    /// <summary>
+    /// Writes one header line on, or holds it with the rest of its head until the head's empty
+    /// line when the file was not yet named as the line arrived.
+    /// </summary>
+    /// <param name="target">Where the header lines go.</param>
+    /// <param name="line">One header line, its line feed included.</param>
+    /// <param name="forwardsLineByLine">Whether a <c>Content-Disposition</c> had named the file before the line.</param>
+    /// <param name="cancellationToken">Cancels the write.</param>
+    /// <returns>A task that completes when the line is written or held.</returns>
+    private async ValueTask ForwardLineAsync(Stream target, ReadOnlyMemory<byte> line, bool forwardsLineByLine, CancellationToken cancellationToken)
+    {
+        if (heldHead is null && (forwardsLineByLine || !line.Span.StartsWith(StatusLinePrefix)))
         {
+            await target.WriteAsync(line, cancellationToken).ConfigureAwait(false);
             return;
         }
 
-        if (!forwardsLineByLine)
+        heldHead ??= new MemoryStream();
+        heldHead.Write(line.Span);
+        if (line.Span.TrimEnd("\r\n"u8).IsEmpty)
         {
-            await headerOutput.WriteAsync(buffer, cancellationToken).ConfigureAwait(false);
-            return;
-        }
-
-        for (ReadOnlyMemory<byte> rest = buffer; !rest.IsEmpty; rest = rest[LineLength(rest.Span)..])
-        {
-            await headerOutput.WriteAsync(rest[..LineLength(rest.Span)], cancellationToken).ConfigureAwait(false);
+            byte[] head = heldHead.ToArray();
+            heldHead = null;
+            await target.WriteAsync(head, cancellationToken).ConfigureAwait(false);
         }
     }
 
