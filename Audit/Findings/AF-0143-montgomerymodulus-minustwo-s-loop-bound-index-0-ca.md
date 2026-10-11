@@ -7,8 +7,8 @@ status: closed
 reason: Re-audit 2026-10-11_0051.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
 key: quality:Curl.Cryptography.UnitLibrary/MontgomeryModulus.cs:MinusTwo-ge:surviving-mutant
 reproduction: mutation Curl.Cryptography.UnitLibrary/MontgomeryModulus.cs:117:>=
-task: none
-tasks:
+task: BL-1962
+tasks: BL-1962
 found: 2026-10-10
 found-at: 1b27494521dec4bdaa3fe60c8dc7a3fc73874253
 scorecard: 2026-10-10_0123.md
@@ -47,4 +47,5 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Crypt
 ## Log
 
 - 2026-10-10: filed proposed.
-- 2026-10-11: proposed -> closed. Re-audit 2026-10-11_0051.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
+- 2026-10-10: proposed -> accepted.
+- 2026-10-11: accepted -> closed. Re-audit 2026-10-11_0051.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.

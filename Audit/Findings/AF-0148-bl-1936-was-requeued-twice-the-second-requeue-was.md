@@ -7,8 +7,8 @@ status: closed
 reason: Re-audit 2026-10-11_0051.md: the reproduction no longer reproduces.
 key: process:BL-1936:BL-1936:redone-work
 reproduction: none
-task: none
-tasks:
+task: BL-1967
+tasks: BL-1967
 found: 2026-10-10
 found-at: 1b27494521dec4bdaa3fe60c8dc7a3fc73874253
 scorecard: 2026-10-10_0123.md
@@ -47,4 +47,5 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Log
 
 - 2026-10-10: filed proposed.
-- 2026-10-11: proposed -> closed. Re-audit 2026-10-11_0051.md: the reproduction no longer reproduces.
+- 2026-10-10: proposed -> accepted.
+- 2026-10-11: accepted -> closed. Re-audit 2026-10-11_0051.md: the reproduction no longer reproduces.

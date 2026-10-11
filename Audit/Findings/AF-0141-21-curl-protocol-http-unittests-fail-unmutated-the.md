@@ -3,12 +3,12 @@ id: AF-0141
 title: 21 Curl.Protocol.Http.UnitTests fail unmutated: the verbose 'auth using' line appends the user's password
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Protocol.Http.UnitLibrary/HttpAuthUsingLines.cs:AuthUsing:baseline-failure
 reproduction: none
-task: none
-tasks:
+task: BL-1960
+tasks: BL-1960
 found: 2026-10-10
 found-at: 1b27494521dec4bdaa3fe60c8dc7a3fc73874253
 scorecard: 2026-10-10_0123.md
@@ -47,3 +47,4 @@ dotnet test Curl.Protocol.Http.UnitTests -c Release -nologo --filter "FullyQuali
 ## Log
 
 - 2026-10-10: filed proposed.
+- 2026-10-10: proposed -> accepted.
