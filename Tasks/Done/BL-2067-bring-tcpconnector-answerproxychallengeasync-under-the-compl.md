@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary, Curl.Networking.UnitTests]
 requirement: none
 created: 2026-10-11
-completed:
+completed: 2026-10-11
 ---
 # BL-2067 — Bring TcpConnector.AnswerProxyChallengeAsync under the complexity gate
 
@@ -22,13 +22,16 @@ The coverage page (<https://stewartscottrogers.github.io/Curl/coverage/>, measur
 
 ## Acceptance criteria
 
-- [ ] `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Networking.UnitLibrary` reports no member outside a gate, at 100% line and branch coverage.
-- [ ] No existing test was changed or removed to get there; any new member has its own tests.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Networking.UnitLibrary` reports no member outside a gate, at 100% line and branch coverage.
+- [x] No existing test was changed or removed to get there; any new member has its own tests.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Extracted TcpConnector.AskAuthenticatorToAnswer407Async from AnswerProxyChallengeAsync. The measurement then showed HttpProxyTunnel.ReplyAfterLatestByte at complexity 14 in the same library, so it was split too (ReplyAfterLineEnd). Behaviour unchanged. Measure-CodeQuality.ps1 -Library Curl.Networking.UnitLibrary: 0 failing members, 100% line and branch, worst CRAP 10.
 
 ## Log
 
 - 2026-10-11: Created.
 - 2026-10-11: Backlog -> Doing.
+- 2026-10-11: Doing -> Done. Complexity gate met
