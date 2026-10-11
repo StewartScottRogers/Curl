@@ -3,8 +3,8 @@ id: AF-0160
 title: BL-1976 was claimed 3 times and requeued twice, then blocked by the per-task cost cap; its fix sat in a stash until BL-2041 landed it
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: process:BL-1976:BL-1976:redone-work
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Log
 
 - 2026-10-11: filed proposed.
+- 2026-10-11: proposed -> accepted.
