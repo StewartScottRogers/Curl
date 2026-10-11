@@ -46,7 +46,10 @@ The finding closes only when a later re-audit by the process auditor confirms th
 
 ## Notes
 
+- 2026-10-11 (lane 7): The spell splits into: red 16:12 to BL-2032 filed 16:13:44 (about 1.5 min), filed to claimed 16:18:08 (4.5 min), claimed to fix pushed 16:21:39 (3.5 min), then 17 min of 7 cancelled runs, each superseded by another lane's push, before green at 16:39:06. The script files High and claims by priority; the cancelled runs are CI concurrency cancelling older commits as lanes push. No `RunDarkFactory.ps1` defect shows. The reproduction reads a past audit's logs, so no code change can make it give the expected result; only a later audit can. The 92-minute total is a sum with other spells (AF-0162, AF-0163). No code changed.
+
 ## Log
 
 - 2026-10-11: Created.
 - 2026-10-11: Backlog -> Doing.
+- 2026-10-11: Doing -> Blocked. Stewart: reject AF-0164 (the spell shows prompt filing and claiming; cancelled runs were other lanes' pushes, and the reproduction reads a past audit's logs)?
