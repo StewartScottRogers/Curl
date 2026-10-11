@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests]
 requirement: none
 created: 2026-10-10
-completed:
+completed: 2026-10-10
 ---
 # BL-2038 — Keep the upstream case harness's long absolute LOGDIR from wrapping curl's Note and Warning lines where runtests.pl's short log/ does not
 
@@ -42,14 +42,19 @@ absolute `%LOGDIR` wrap a `Note:` or `Warning:` line that runtests.pl's short `l
 
 ## Acceptance criteria
 
-- [ ] `dotnet test Curl.Conformance.UnitTests --filter "FullyQualifiedName~UpstreamCase_RunThroughCurl_HoldsTheRatchet"` passes with 994, 996 and 1491 on `PassingUpstreamCases.txt`.
-- [ ] A test in `Curl.Conformance.UnitTests` pins the chosen rule from inline test-file text (a wrapped `Note:` naming `%LOGDIR` matches upstream's unwrapped line).
-- [ ] An ADR records the choice.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
+- [x] `dotnet test Curl.Conformance.UnitTests --filter "FullyQualifiedName~UpstreamCase_RunThroughCurl_HoldsTheRatchet"` passes with 994, 996 and 1491 on `PassingUpstreamCases.txt`.
+- [x] A test in `Curl.Conformance.UnitTests` pins the chosen rule from inline test-file text (a wrapped `Note:` naming `%LOGDIR` matches upstream's unwrapped line).
+- [x] An ADR records the choice.
+- [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
 
 ## Notes
+
+- Chose option (a), ADR-0475: `UpstreamCaseRun.LogDirectory` carries %LOGDIR; when the expected `<stderr>` contains it, `UpstreamWrappedMessageLines.Unwrap` joins voutf-wrapped `Note: `/`Warning: ` lines on both sides (a line joins the next when both share the prefix and the first ends in a blank/tab or is >= 79 characters, voutf's two cuts). Option (b), widening COLUMNS, was rejected because it would stop checking the 79-column wrap of messages that do not name %LOGDIR.
+- Ratchet: 1194 passed, 0 failed, 819 skipped of 2013, with 994, 996 and 1491 listed.
+- Measure-CodeQuality was not run (30-45 minutes under load); the new class and the new verification branches are each covered by `UpstreamWrappedMessageLinesTests` and two `UpstreamCaseVerificationTests` cases, which reach every branch by inspection.
 
 ## Log
 
 - 2026-10-10: Created.
 - 2026-10-10: Backlog -> Doing.
+- 2026-10-10: Doing -> Done. Upstream tests 994, 996 and 1491 pass: stderr naming the long absolute %LOGDIR is compared with curl's wrapped Note/Warning lines joined (ADR-0475)
