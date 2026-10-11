@@ -3,8 +3,8 @@ id: AF-0156
 title: -I (HEAD) progress meter stops after the all-zero row; curl 8.21.0 draws three more rows with the Content-Length as Total
 auditor: conformance
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: conformance:Curl.Protocol.Http.UnitLibrary/HttpResponseBodyReader.cs:CopyAsync-head-progress-meter:stderr
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ $o="$env:TEMP\ac-head"; $a=@('-I','http://127.0.0.1:50991/'); $r='HTTP/1.1 200 O
 ## Log
 
 - 2026-10-11: filed proposed.
+- 2026-10-11: proposed -> accepted.
