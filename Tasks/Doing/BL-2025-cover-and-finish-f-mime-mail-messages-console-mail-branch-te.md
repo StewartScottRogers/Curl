@@ -35,3 +35,4 @@ Finish what BL-1988 left of -F MIME mail messages to smtp:// and imap:// URLs, m
 ## Log
 
 - 2026-10-10: Created.
+- 2026-10-10: Backlog -> Doing.
