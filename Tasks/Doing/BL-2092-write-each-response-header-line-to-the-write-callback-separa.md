@@ -24,12 +24,25 @@ Source: re-measurement of the gap findings with the fixed gap harness (PR #119, 
 
 ## Acceptance criteria
 
-- [ ] The case that produces `client returned ERROR on write of 17 bytes` is identified and recorded in the task Notes.
-- [ ] A new MSTest (Curl.Console.UnitTests and/or Curl.Protocol.Http.UnitTests, no network) shows a failing write callback is called once per header line and the reported byte count is that first line's length (17 bytes for that case), and existing header output bytes are unchanged.
-- [ ] Add test489 (or the case identified above) to `Curl.Conformance.UnitTests/PassingUpstreamCases.txt` once it passes in process.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
+- [x] The case that produces `client returned ERROR on write of 17 bytes` is identified and recorded in the task Notes.
+- [x] A new MSTest (Curl.Console.UnitTests and/or Curl.Protocol.Http.UnitTests, no network) shows a failing write callback is called once per header line and the reported byte count is that first line's length (17 bytes for that case), and existing header output bytes are unchanged.
+- [x] Add test489 (or the case identified above) to `Curl.Conformance.UnitTests/PassingUpstreamCases.txt` once it passes in process.
+- [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
 
 ## Notes
+
+- The 17-byte case: the gap harness's raw output sits under `Gap/`, which lanes may not read,
+  so it was identified from the numbers: 17 is `HTTP/1.1 200 OK` plus CR LF, the first line
+  of an `-i` head written to an `-o` file that cannot be opened (`-i -o <unopenable>`); 261
+  was the whole head. test489 itself was already in `PassingUpstreamCases.txt` (line 397), so
+  that list needed no change. Pinned in `CurlCommandRunnerRetryTests.RunAsync_IncludedHeadersToAnUnopenableFile_ReportsTheFirstHeaderLinesLength`.
+- Fix: `HttpProtocolHandler.WriteHeadersAsync` writes head and trailer bytes one line per
+  write (`ExecuteAsync_HeaderOutput_WritesEachHeaderLineSeparately` pins 17,26,15,19,2 and
+  unchanged bytes). `RemoteHeaderNameStream` (`-J`) now holds a head's lines from its status
+  line to its empty line until the file is named, so test1310's `-J -i` file still gets
+  every header line; two of its unit tests gained the head's empty line they had left out.
+- Measure-CodeQuality.ps1 was not run (run cost cap); the new branches are covered by the
+  tests above.
 
 ## Log
 
