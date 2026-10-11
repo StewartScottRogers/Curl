@@ -5,7 +5,7 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests]
+touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests, Curl.Console, Curl.Console.UnitTests]
 requirement: none
 created: 2026-10-11
 completed:
@@ -45,7 +45,12 @@ In Curl.Cli.UnitLibrary's --url option (CommandLineOptionTable / its applier), s
 
 ## Notes
 
+- 2026-10-11 (lane 3), found before any edit: the Cli side is already right. `CommandLineOptionTable.AddUrl` reads `@file`/`@-` (BL-1804), and the ratchet `Curl.Conformance.UnitTests/PassingUpstreamCases.txt` already lists 489 and 2012 as passing in process. 488 (`--url @-`) is not listed. Cause: `Curl.Console/CurlComposition.cs`'s `CreateRunner` overloads (lines ~1100-1270) pass the injected `standardInput` only to telnet and never pass a `configFileReader`. So `CurlCommandRunner.DataFileReader` falls back to `DiskDataFileReader.ForProcess`, which reads `Console.OpenStandardInput()`, not the caller's stream. Every in-process `@-` (`--url @-`, `-d @-`, `-K -` and the rest) reads the host process's console. Fix: have `CreateRunner` build a `DiskDataFileReader` whose `openStandardInput` returns the injected `standardInput` and pass it as `configFileReader`. Add an `InProcessCurlTests` case for `--url @-`, then add 488 to the ratchet list. The ratchet file is in Curl.Conformance.UnitTests, which also needs adding to `touches` when the task is next claimed, if no live task holds it.
+- `Curl.Console` and `Curl.Console.UnitTests` were added to `touches` for that fix. BL-2073 (in Doing) touches them, so the task goes back to Backlog until BL-2073 is done.
+- 489/2012 evidence (the file path taken as a literal URL) is not reproduced in this tree, either in process (ratchet) or by `curl.exe` (BL-2004). If the next gap run still shows it, an interactive session must check which build `Gap/Tools/Measure-UpstreamCases.cs` runs. A lane may not read `Gap/`.
+
 ## Log
 
 - 2026-10-11: Created.
 - 2026-10-11: Backlog -> Doing.
+- 2026-10-11: Doing -> Backlog. Needs Curl.Console (CurlComposition must hand the injected stdin to the data file reader), which BL-2073 in Doing touches
