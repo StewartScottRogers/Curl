@@ -15,8 +15,9 @@ One executable per protocol, each a subset of Curl:
   authentication, output). Native AOT then trims every other protocol out of the binary.
 - Each accepts curl's command line for its own options, byte for byte: same options,
   same output, same exit codes.
-- Each has its own `--help`, `--ai-help` and `--manual`, covering only that protocol's
-  options and the global ones.
+- Each has its own filtered `--help`, `--ai-help` and `--manual`, covering only that
+  protocol's options and the global ones (decision 1, decided by Stewart 2026-10-11).
+  `curl-ftp --help all` lists about 80-100 options, not curl's ~270.
 - A URL or option for another protocol behaves as it does in a curl built without that
   protocol.
 - Each also runs as an MCP server for AI agents, started with a flag on the same
@@ -42,20 +43,29 @@ One executable per protocol, each a subset of Curl:
 |---|---|---|
 | Composition takes a protocol set, plus one pilot (`curl-ftp`) end to end | 10-15 | Easy to medium |
 | Tag every option (about 270) with the protocols it applies to, generated from the "Protocols:" lines in upstream `docs/cmdline-opts/*.md` | ~5 | Medium |
-| Filtered `--help`, `--ai-help`, `--manual`, and `-V`'s Protocols and Features lines | ~5 | Easy |
+| Filtered `--help` (every form: the default page, `all`, and each category), `--ai-help`, `--manual`, and `-V`'s Protocols and Features lines, each pinned by its own tests since no real curl prints them | ~8 | Easy to medium |
+| A check that every option's protocol tag is right: each option a sub-console's help lists must work there, and each it leaves out must be one curl would ignore or refuse there | ~3 | Medium |
 | Match curl's behaviour for a left-out protocol or option ("Protocol "x" not supported", "the installed libcurl version does not support this", exit codes) | ~5 | Medium |
 | The other 16 sub-consoles, once the pilot works | ~40 | Easy |
 | CI and publishing (17 native AOT publishes), and gap office reference builds of curl with protocols disabled | ~10 | Medium; slowest to run |
 
-**Total: about 70-90 tasks, 4-6 dark factory shifts, 2-4 days of wall time.**
+**Total: about 75-95 tasks, 4-6 dark factory shifts, 2-4 days of wall time.**
 
 ### Hard parts
 
-1. **Filtered help is a departure from curl.** Real curl's `--help` lists every option
-   whatever its build leaves out; a left-out option fails only when used. A filtered help
-   page therefore matches no curl build. See decision 1.
+1. **Filtered help is a deliberate departure from curl (decision 1).** Real curl's
+   `--help` lists every option whatever its build leaves out; a left-out option fails only
+   when used. So a sub-console's help output matches no curl build:
+   - The gap office cannot measure help output against a reference; it is pinned by
+     Curl's own tests instead, and the gap office excludes it with that reason.
+   - Everything except help - option parsing, output bytes, exit codes - still matches a
+     curl built with only that protocol and is measured against one.
+   - The sub-console's help says so, so nobody mistakes it for curl's: the departure is
+     recorded in an ADR, and the full `curl` executable keeps curl's unfiltered help.
 2. **Options are not tagged per protocol yet.** `connection`, `tls`, `auth` and `proxy`
-   categories span many protocols, so each option needs an explicit protocol list.
+   categories span many protocols, so each option needs an explicit protocol list. With
+   filtered help a wrong tag is visible to users: it hides an option that works or shows
+   one that does nothing.
 3. **Protocols lean on each other.** WebSocket and RTSP need HTTP; FTP, IMAP and others
    tunnel through HTTP proxies (CONNECT); redirects cross protocols (HTTP to IMAP).
    Default: do what curl does - `--disable-http` also removes HTTP proxies.
@@ -90,11 +100,17 @@ One executable per protocol, each a subset of Curl:
 
 ## Decisions
 
-### Stewart's (ask before starting)
+### Stewart's
 
-1. **Filtered help or curl-matching help?** Filtered shows only the protocol's options but
-   matches no real curl. Matching keeps each sub-console a drop-in for a curl built with
-   only that protocol.
+1. **Filtered help or curl-matching help? Decided 2026-10-11: filtered.** Each
+   sub-console's `--help` (every form), `--ai-help`, `--manual` and MCP tool descriptions
+   list only its own protocol's options and the global ones. Considered and not chosen:
+   help matching curl byte for byte (a drop-in for a reduced curl build, but listing
+   options that do nothing there), and a hybrid that kept `--help` matching curl while
+   filtering only `--ai-help`.
+
+Still to ask before starting:
+
 2. **Thin or rich MCP tools?** Recommendation: thin first, rich later for the protocols
    agents actually use.
 3. **Hand-built MCP layer or Microsoft's MCP SDK package?** Hand-built is the standing rule
@@ -113,7 +129,7 @@ One executable per protocol, each a subset of Curl:
 
 ## How to start
 
-1. Stewart answers decisions 1-4.
+1. Stewart answers decisions 2-4 (decision 1 is made).
 2. Claude writes the ADRs for its own decisions.
 3. `task-planner` files Part 1 as tasks, pilot first (`curl-ftp`), the other 16 depending on it.
 4. Part 2 is filed once the pilot sub-console works, MCP library first, then one server per
