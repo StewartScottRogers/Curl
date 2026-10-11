@@ -59,3 +59,4 @@ Source: re-measurement of the gap findings with the fixed gap harness (PR #119, 
 - 2026-10-11: Backlog -> Doing.
 - 2026-10-11: Doing -> Backlog. touches Curl.Protocol.Http.UnitLibrary/UnitTests (held by BL-2085) and Curl.Conformance.UnitTests (held by BL-2093); cause and measurements in Notes
 - 2026-10-11: Backlog -> Doing.
+- 2026-10-11: Doing -> Blocked. Stewart: dark factory its runs of the last day already cost 1.16 of its 2.10 US dollar cost cap, so it was not run again; split the task; see Z:\repos\Curl.logs\BL-2087-*.jsonl
