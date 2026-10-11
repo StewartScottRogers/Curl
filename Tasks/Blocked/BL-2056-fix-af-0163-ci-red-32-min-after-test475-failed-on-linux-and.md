@@ -46,6 +46,11 @@ The finding closes only when a later re-audit by the process auditor confirms th
 
 ## Notes
 
+- 2026-10-11 (lane 7): Read `Invoke-CiWatch`, `New-CiFailureTasks`, `Get-CiVerdicts` and `Invoke-Claim` in `RunDarkFactory.ps1`. The 32-minute spell splits into: red to filed 3 min (a two-platform failure is filed at once, no `CiConfirmMinutes` wait), filed to claimed 16 min, claimed to fix pushed 6 min, push to green CI 8 min. Filing is already prompt and High, and `Invoke-Claim` already takes the highest priority ready task via `task-board.ps1 next`. The 16 minutes were the shift's only lane finishing the task it held; no script defect shows in that. Dropping a running task for a CI fix would be a new preemption feature, and `task-board.ps1`, which owns claim order, is a guard file (interactive only).
+- The ID collision (BL-1957) is already handled: `Invoke-RenumberDuplicates` / BL-2014 renumber the later task, and the log shows exactly that at 04:27:29.
+- The reproduction reads a past audit's logs, so no code change can make it give the expected result; only a later audit can.
+- No code changed. Needs Stewart to reject AF-0163 as a single-lane wait, or to ask for lane preemption as a feature.
+
 ## Log
 
 - 2026-10-11: Created.
