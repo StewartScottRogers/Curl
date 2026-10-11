@@ -9,6 +9,7 @@ touches: [Curl.Protocol.Imap.UnitLibrary, Curl.Protocol.Imap.UnitTests, Curl.Con
 requirement: none
 created: 2026-10-11
 completed:
+lane: no
 ---
 # BL-2080 — Re-close GF-0057: IMAP logs out after every URL instead of reusing the connection, and every connection's tags start with A where curl uses one letter per connection
 
@@ -47,6 +48,25 @@ In Curl.Protocol.Imap.UnitLibrary, keep an IMAP connection open after a transfer
 - [ ] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
 
 ## Notes
+
+- 2026-10-11, lane 3 (interactive only): the gap could not be reproduced from a lane.
+  BL-1987's fix (0ea0145bb, ADR-0469) is on `master` and was there before gap run
+  2026-10-11. Measured with `Record-CurlExchange.ps1 -Imap` and this tree's curl
+  (`dotnet run --no-build --project Curl.Console`): test804's two URLs
+  (`;MAILINDEX=123/;SECTION=1`, `;MAILINDEX=456/;SECTION=2.3`, `-u user:secret`) give
+  A001 CAPABILITY, A002 AUTHENTICATE PLAIN, A003 SELECT, A004 FETCH 123 BODY[1],
+  A005 FETCH 456 BODY[2.3], A006 LOGOUT on one connection, exit 0 - test804's expected
+  sequence. So the measured A005 LOGOUT depends on something in the upstream case, its
+  server or how the harness invokes Curl, as for GF-0051/BL-2079 (FTP, same cause class).
+  The two-user case (test836, B001) could not be checked here: the recorder serves one
+  connection only. The reproduction (`Gap/Tools/Measure-UpstreamCases.cs`) and the
+  upstream data under `%LOCALAPPDATA%\Curl\gap\` are refused to lanes by the audit guard.
+- Remove `lane: no` once an interactive session has run
+  `Measure-UpstreamCases.cs ... 804,815,836,779` on the current tree, captured test804's
+  and test836's protocol transcripts, and written under Notes which reply, step or harness
+  difference makes Curl send LOGOUT after the first URL and tag a second connection A001,
+  so a lane can fix it without the Gap paths. BL-2079 has the same open question for FTP;
+  one harness investigation likely answers both.
 
 ## Log
 
