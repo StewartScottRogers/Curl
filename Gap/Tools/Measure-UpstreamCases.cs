@@ -22,7 +22,9 @@
 // process through Curl.Console's public InProcessCurl (BL-1750) over TcpConnector with its dial
 // and name lookup replaced (copies of that project's InMemoryServerTcpDialer and
 // LoopbackOnlyDnsResolver, below), with the case's <client><setenv> as the whole environment
-// Curl reads (BL-2016), the platform is Windows or Unix
+// Curl reads (BL-2016) and NTLM answered by curl's own hand-built messages rather than SSPI, which
+// InProcessCurl composes with usesHandBuiltNtlm: true as the conformance harness does (ADR-0455,
+// BL-2033), so the !SSPI NTLM cases match on Windows (BL-2031, GF-0003), the platform is Windows or Unix
 // by OS, the runner's time limit is 20 seconds and a case still running after 30 seconds is
 // judged failed. Cases run in parallel, up to Environment.ProcessorCount at once, each with its
 // own %LOGDIR under <out.json's folder>/upstream-case-logs, which must hold no blank (the runner
