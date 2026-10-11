@@ -6,10 +6,9 @@ assignee: Claude
 pipeline: direct
 depends-on: []
 touches: [RunDarkFactory.ps1]
-lane: no
 requirement: none
 created: 2026-10-11
-completed:
+completed: 2026-10-11
 ---
 # BL-2069 — Let a shift start while an interactive-only task is in Doing
 
@@ -25,7 +24,7 @@ On 2026-10-11 at 08:03 the shift refused to start: "BL-2013 is in Doing and held
 
 - [x] Both shift-start checks in `RunDarkFactory.ps1` (the lane shift's orphan settling and the single-lane shift's "task already in Doing") skip a task whose file says `lane: no`, through `Test-InteractiveOnlyTask`.
 - [x] `RunDarkFactory.ps1` parses with no errors, and `Test-InteractiveOnlyTask`'s pattern matches BL-2013 (`lane: no`) and not BL-2061.
-- [ ] A shift started with BL-2013 in Doing claims lane tasks instead of refusing.
+- [x] A shift started with BL-2013 in Doing claims lane tasks instead of refusing.
 
 ## Notes
 
@@ -33,3 +32,4 @@ On 2026-10-11 at 08:03 the shift refused to start: "BL-2013 is in Doing and held
 
 - 2026-10-11: Created.
 - 2026-10-11: Backlog -> Doing.
+- 2026-10-11: Doing -> Done. Shift 20261011-080512 started with BL-2013 and BL-2069 (lane: no) in Doing and claimed 6 lane tasks.
