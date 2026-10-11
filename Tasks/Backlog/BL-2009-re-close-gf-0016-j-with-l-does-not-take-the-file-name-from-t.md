@@ -6,6 +6,7 @@ assignee: Claude
 pipeline: feature
 depends-on: []
 touches: [Curl.Console, Curl.Console.UnitTests]
+lane: no
 requirement: none
 created: 2026-10-10
 completed:
@@ -45,7 +46,21 @@ In Curl.Console's -O/-J output naming: with -J and -L and no Content-Disposition
 
 ## Notes
 
+- 2026-10-10 (dark factory lane 1): both earlier fixes (BL-1809's 7af76995b, BL-1849's
+  b727ac21d) were on `master` before the gap run of 2026-10-10 06:57, yet it still measures
+  the gap. Replayed with `Record-CurlExchange.ps1` against curl 8.21.0 (Schannel) and this
+  tree's Curl, `-J -L -O --output-dir <dir>`: a 301 with a relative `Location: /16420002`,
+  a 301 with an absolute Location and a body, and two hops (`/dir/16430002` then
+  `16430003?x=1`). Every case saves the same file (`16420002` or `16430003`, `12345`) with
+  the same exit code; no difference reproduces. What the gap harness sends for test1642,
+  test1643 and test3036, and how it runs Curl, is only in `Gap/Tools/Measure-UpstreamCases.cs`
+  and the gap office's upstream cache, both of which the audit guard refuses to lanes (as
+  for BL-1849). Added `lane: no`: an interactive session should rerun the finding's
+  reproduction command, check that it measured a current Curl build, and fix what then
+  differs - or record that the items now pass for the next gap run. No code changed.
+
 ## Log
 
 - 2026-10-10: Created.
 - 2026-10-10: Backlog -> Doing.
+- 2026-10-10: Doing -> Backlog. Interactive only: the gap harness and upstream cache for test1642/1643/3036 are refused to lanes, and no difference reproduces with Record-CurlExchange; added lane: no
