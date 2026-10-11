@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Console, Curl.Console.UnitTests]
+touches: [Curl.Console, Curl.Console.UnitTests, Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests, Curl.Conformance.UnitTests]
 requirement: none
 created: 2026-10-11
 completed:
@@ -31,7 +31,30 @@ Source: re-measurement of the gap findings with the fixed gap harness (PR #119, 
 
 ## Notes
 
+- 2026-10-11, lane 3 (no code changed): measured and located the cause before any edit.
+  - Real curl 8.21.0 (Schannel, Git for Windows), `Record-CurlExchange.ps1 -Connections 2`
+    with a `401` (`WWW-Authenticate: Basic`, `Content-Length: 0`, kept alive) to
+    `-T <46-byte file> -u testuser:testpass --anyauth`: standard error is the two header
+    lines (each `\r\n`), then one status line per request, each starting `\r  0 ...` (the
+    zero line) and ending `\r\n` after its done draws (`\r100    46    0     0  100    46 ...`).
+    That run sent 3 requests (3 lines). So each request of the retried transfer draws its
+    own zero line and done lines, exactly as a redirect hop does (`FinishRedirectHop`).
+  - Cause in Curl: `TransferProgressRecorder.ReportTransferStarted` already starts a new
+    line on a repeat report, and `HttpProtocolHandler.ConnectAndExchangeAsync` (line ~662)
+    reports it once per connection. A retry on the same kept-alive connection
+    (`RetryOnSameConnection` loop, line ~976) never reports it again, so Curl draws one
+    line for the whole transfer. The fix is to call `plan.Progress.ReportTransferStarted()`
+    for each same-connection retry in `Curl.Protocol.Http.UnitLibrary`, plus a Console
+    test pinning two lines; probably no `Curl.Console` change at all.
+  - test1075 and test1072 already pass in process (`UpstreamCase_RunThroughCurl_HoldsTheRatchet`
+    reports "passes"), since upstream does not check stderr; adding them to
+    `Curl.Conformance.UnitTests/PassingUpstreamCases.txt` needs that project.
+  - Added `Curl.Protocol.Http.UnitLibrary`, `Curl.Protocol.Http.UnitTests` (held by BL-2085)
+    and `Curl.Conformance.UnitTests` (held by BL-2093) to `touches`, so requeued.
+  - `--ai-help` needs no change: no option is added or changed.
+
 ## Log
 
 - 2026-10-11: Created.
 - 2026-10-11: Backlog -> Doing.
+- 2026-10-11: Doing -> Backlog. touches Curl.Protocol.Http.UnitLibrary/UnitTests (held by BL-2085) and Curl.Conformance.UnitTests (held by BL-2093); cause and measurements in Notes
