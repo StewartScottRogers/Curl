@@ -22,12 +22,14 @@ BL-2091 made mail MIME (smtp, imap) escape `-F` names and file names with backsl
 
 ## Acceptance criteria
 
-- [ ] An MSTest in Curl.Conformance.UnitTests shows `<strippart>` applied to the upload before it is compared, from inline test-file text.
-- [ ] `1187` is on `Curl.Conformance.UnitTests/PassingUpstreamCases.txt` and the ratchet passes.
-- [ ] No previously listed case starts failing.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
+- [x] An MSTest in Curl.Conformance.UnitTests shows `<strippart>` applied to the upload before it is compared, from inline test-file text.
+- [x] `1187` is on `Curl.Conformance.UnitTests/PassingUpstreamCases.txt` and the ratchet passes.
+- [x] No previously listed case starts failing.
+- [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
 
 ## Notes
+
+- runtests.pl at curl-8_21_0 runs each `<strippart>` line on the stored upload's lines (no `<strip>`) before comparing with `<upload>`; `CompareUpload` now does the same through the existing `Strip` helper. Test: `FindFirstDifference_Upload_RunsStrippartOnTheUploadedMessageBeforeComparing`. 1187 passes and is listed; the conformance ratchet and all fast tests are green.
 
 ## Log
 

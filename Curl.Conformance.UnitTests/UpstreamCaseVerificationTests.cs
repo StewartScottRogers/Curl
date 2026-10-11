@@ -76,6 +76,20 @@ public sealed class UpstreamCaseVerificationTests
     }
 
     [TestMethod]
+    public void FindFirstDifference_Upload_RunsStrippartOnTheUploadedMessageBeforeComparing()
+    {
+        string sections = "<verify>\n<strippart>\ns/boundary=-*[A-Za-z0-9]*/boundary=----/\n</strippart>\n"
+            + "<upload crlf=\"yes\">\nContent-Type: multipart/mixed; boundary=----\n.\n</upload>\n</verify>\n";
+
+        string? matching = Verify(sections, new UpstreamCaseRun(0, [], [], [], [])
+        {
+            UploadedBytes = Bytes("Content-Type: multipart/mixed; boundary=------------aB3dE6gH9\r\n.\r\n"),
+        });
+
+        Assert.IsNull(matching);
+    }
+
+    [TestMethod]
     public void FindFirstDifference_ReplyData_IsComparedWithTheOutputFile()
     {
         string sections = "<reply>\n<data crlf=\"headers\">\nHTTP/1.1 200 OK\n\nbody\n</data>\n</reply>\n";
