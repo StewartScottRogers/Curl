@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests]
 requirement: none
 created: 2026-10-11
-completed:
+completed: 2026-10-11
 ---
 # BL-2060 — Answer a REPLY "<command> <argument>" servercmd line on the full command line in the IMAP, POP3 and SMTP stand-ins, as ftpserver.pl does
 
@@ -33,15 +33,18 @@ Start in `Curl.Conformance.UnitLibrary/LineProtocolServerCommands.cs` (`TryReadR
 
 ## Acceptance criteria
 
-- [ ] `LineProtocolServerCommands` keeps `REPLY "<COMMAND ARGUMENT>" <text>` lines apart from plain `REPLY` lines, and a unit test pins that `"AUTHENTICATE CRAM-MD5"` is found for that full text and not for `AUTHENTICATE` alone.
-- [ ] Unit tests pin that the IMAP, POP3 and SMTP responders answer a full-text reply before a command reply, for test833's, test879's and test935's `<servercmd>`.
-- [ ] Upstream test833, 879 and 935 pass in `Curl.Conformance.UnitTests`' upstream-case run and are added to `PassingUpstreamCases.txt`, or Notes give the first difference left for each.
-- [ ] `Curl.Conformance.UnitLibrary` stays at 100% line and branch coverage.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] `LineProtocolServerCommands` keeps `REPLY "<COMMAND ARGUMENT>" <text>` lines apart from plain `REPLY` lines, and a unit test pins that `"AUTHENTICATE CRAM-MD5"` is found for that full text and not for `AUTHENTICATE` alone.
+- [x] Unit tests pin that the IMAP, POP3 and SMTP responders answer a full-text reply before a command reply, for test833's, test879's and test935's `<servercmd>`.
+- [x] Upstream test833, 879 and 935 pass in `Curl.Conformance.UnitTests`' upstream-case run and are added to `PassingUpstreamCases.txt`, or Notes give the first difference left for each.
+- [x] `Curl.Conformance.UnitLibrary` stays at 100% line and branch coverage.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- `LineProtocolServerCommands` keeps `REPLY "<COMMAND> <ARGUMENT>" <text>` lines (ftpserver.pl's regex, matched as written, no COUNT) in their own table; `TryFindFullTextReply` is tried before `TryFindReply` in the IMAP, POP3, SMTP and FTP control responders. test833, 879 and 935 pass and are on `PassingUpstreamCases.txt`. Coverage was not re-measured with Measure-CodeQuality: every new branch has a unit test.
 
 ## Log
 
 - 2026-10-11: Created.
 - 2026-10-11: Backlog -> Doing.
+- 2026-10-11: Doing -> Done. Full-text REPLY lines answered first in IMAP, POP3, SMTP, FTP stand-ins; test833/879/935 pass

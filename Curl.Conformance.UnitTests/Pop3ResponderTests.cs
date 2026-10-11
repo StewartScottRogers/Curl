@@ -149,6 +149,18 @@ public sealed class Pop3ResponderTests
         CollectionAssert.AreEqual(new[] { "CAPA\r\n", "1-1\r\n" }, responder.ReceivedCommandLines.ToArray());
     }
 
+    [TestMethod]
+    [DataRow("AUTH CRAM-MD5", "+ Rubbish\r\n")]
+    [DataRow("AUTH PLAIN", "+\r\n")]
+    [DataRow("*", "-ERR AUTH exchange cancelled by client\r\n")]
+    [DataRow("AUTH LOGIN", "+OK List of supported mechanisms follows\r\nCRAM-MD5\r\nPLAIN\r\n.\r\n")]
+    public void Answer_FullTextReply_IsAnsweredBeforeTheCommandReply(string commandLine, string expected)
+    {
+        Pop3Responder responder = Create("AUTH CRAM-MD5 PLAIN\nREPLY \"AUTH CRAM-MD5\" + Rubbish\nREPLY * -ERR AUTH exchange cancelled by client\nREPLY \"AUTH PLAIN\" +\n");
+
+        Assert.AreEqual(expected, Encoding.Latin1.GetString(responder.Answer(commandLine).Bytes.Span));
+    }
+
     private static Pop3Responder Create(string serverCommands) =>
         new(
             LineProtocolServerCommands.Read(Encoding.Latin1.GetBytes(serverCommands)),

@@ -93,7 +93,7 @@ internal sealed class FtpControlChannelResponder : ILineProtocolResponder
 
         // ftpserver.pl sleeps for a DELAY line before it looks up the reply.
         TimeSpan delay = serverCommands.ReplyDelay(command);
-        if (serverCommands.TryFindReply(command, out byte[] customReply))
+        if (serverCommands.TryFindFullTextReply(command, argument, out byte[] customReply) || serverCommands.TryFindReply(command, out customReply))
         {
             return new LineProtocolReply(customReply, false) { Delay = delay };
         }

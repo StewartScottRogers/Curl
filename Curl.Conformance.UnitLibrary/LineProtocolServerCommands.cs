@@ -8,7 +8,7 @@ namespace Curl.Conformance;
 /// upstream's <c>tests/ftpserver.pl</c> (at <c>curl-8_21_0</c>) reads them:
 /// <c>REPLY &lt;command&gt; &lt;text&gt;</c> replaces the server's answer to that command with the
 /// text and a CRLF (command names are matched without regard to case; a later line for the same
-/// command wins), and <c>COUNT &lt;COMMAND&gt; &lt;n&gt;</c> takes that reply away after n uses; <c>CAPA</c> lists the capabilities the server announces, split on spaces outside
+/// command wins; <c>REPLY "&lt;COMMAND&gt; &lt;ARGUMENT&gt;" &lt;text&gt;</c> is kept apart, under the whole command line, and tried first), and <c>COUNT &lt;COMMAND&gt; &lt;n&gt;</c> takes that reply away after n uses; <c>CAPA</c> lists the capabilities the server announces, split on spaces outside
 /// double quotes with the quotes removed; <c>AUTH</c> lists its authentication mechanisms, split on
 /// spaces; <c>POSTFETCH &lt;text&gt;</c> gives the text IMAP sends before the <c>)</c> that ends a
 /// <c>FETCH</c> response; <c>DELAY &lt;COMMAND&gt; &lt;seconds&gt;</c> gives how long the reply to that command waits. A later <c>CAPA</c>, <c>AUTH</c> or <c>POSTFETCH</c> line replaces an earlier one. Other lines are left for
@@ -18,15 +18,20 @@ internal sealed class LineProtocolServerCommands
 {
     private static readonly Regex DelayLine = new(@"DELAY ([A-Z]+) (\d*)", RegexOptions.CultureInvariant);
 
+    private static readonly Regex FullTextReplyLine = new(@"REPLY ""([A-Z]+ [A-Za-z0-9+\-./=* ]+)"" (.*)", RegexOptions.CultureInvariant);
+
     private readonly Dictionary<string, byte[]> replies;
+
+    private readonly Dictionary<string, byte[]> fullTextReplies;
 
     private readonly Dictionary<string, int> remainingUses;
 
     private readonly Dictionary<string, TimeSpan> delays;
 
-    private LineProtocolServerCommands(Dictionary<string, byte[]> replies, Dictionary<string, int> remainingUses, Dictionary<string, TimeSpan> delays, string[] capabilities, string[] authenticationMechanisms, string postFetch)
+    private LineProtocolServerCommands(Dictionary<string, byte[]> replies, Dictionary<string, byte[]> fullTextReplies, Dictionary<string, int> remainingUses, Dictionary<string, TimeSpan> delays, string[] capabilities, string[] authenticationMechanisms, string postFetch)
     {
         this.replies = replies;
+        this.fullTextReplies = fullTextReplies;
         this.remainingUses = remainingUses;
         this.delays = delays;
         Capabilities = capabilities;
@@ -52,6 +57,7 @@ internal sealed class LineProtocolServerCommands
         List<(string Keyword, string Argument)> keywordLines = ReadKeywordLines(lines);
         return new LineProtocolServerCommands(
             ReadReplies(lines),
+            ReadFullTextReplies(lines),
             ReadUseCounts(lines),
             ReadDelays(lines),
             ReadCapabilities(keywordLines),
@@ -64,13 +70,26 @@ internal sealed class LineProtocolServerCommands
         Dictionary<string, byte[]> replies = new(StringComparer.OrdinalIgnoreCase);
         foreach (string line in lines)
         {
-            if (TryReadReply(line, out string command, out byte[] reply))
+            if (!FullTextReplyLine.IsMatch(line) && TryReadReply(line, out string command, out byte[] reply))
             {
                 replies[command] = reply;
             }
         }
 
         return replies;
+    }
+
+    // REPLY "<COMMAND> <ARGUMENT>" <text>: ftpserver.pl checks this branch before the plain REPLY one
+    // and keeps the text under the whole command line, matched as written.
+    private static Dictionary<string, byte[]> ReadFullTextReplies(List<string> lines)
+    {
+        Dictionary<string, byte[]> fullTextReplies = new(StringComparer.Ordinal);
+        foreach (Match fullTextReply in lines.Select(line => FullTextReplyLine.Match(line)).Where(match => match.Success))
+        {
+            fullTextReplies[fullTextReply.Groups[1].Value] = Encoding.Latin1.GetBytes(PerlDoubleQuoted(fullTextReply.Groups[2].Value) + "\r\n");
+        }
+
+        return fullTextReplies;
     }
 
     // COUNT <COMMAND> <n>: ftpserver.pl blanks the command's REPLY after n uses (Perl's number of
@@ -144,6 +163,17 @@ internal sealed class LineProtocolServerCommands
 
         return true;
     }
+
+    /// <summary>
+    /// Finds the reply <c>&lt;servercmd&gt;</c> gives for a whole command line, <c>REPLY "&lt;COMMAND&gt; &lt;ARGUMENT&gt;" &lt;text&gt;</c>,
+    /// which ftpserver.pl tries before the reply for the command alone. It takes no <c>COUNT</c>.
+    /// </summary>
+    /// <param name="command">The command name as the client wrote it.</param>
+    /// <param name="argument">The rest of the line; <see langword="null"/> or empty when there is none.</param>
+    /// <param name="reply">The reply bytes, with their CRLF, when one is given.</param>
+    /// <returns>Whether <c>&lt;servercmd&gt;</c> gives a reply for exactly that command line.</returns>
+    public bool TryFindFullTextReply(string command, string? argument, out byte[] reply) =>
+        fullTextReplies.TryGetValue(string.IsNullOrEmpty(argument) ? command : command + " " + argument, out reply!);
 
     /// <summary>Reads <c>REPLY &lt;command&gt; &lt;text&gt;</c>: the command and the text with its CRLF.</summary>
     private static bool TryReadReply(string line, out string command, out byte[] reply)

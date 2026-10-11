@@ -224,6 +224,19 @@ public sealed class ImapResponderTests
         Assert.AreEqual("A2 OK CREATE completed\r\n", Answer(responder, "A2 CREATE box"));
     }
 
+    [TestMethod]
+    [DataRow("A002 AUTHENTICATE CRAM-MD5", "+ Rubbish\r\n")]
+    [DataRow("A002 AUTHENTICATE PLAIN", "+\r\n")]
+    [DataRow("A003 AUTHENTICATE", "A003 BAD AUTHENTICATE is not dealt with!\r\n")]
+    [DataRow("A003 AUTHENTICATE LOGIN", "A003 BAD AUTHENTICATE is not dealt with!\r\n")]
+    [DataRow("*", "A002 NO AUTH exchange cancelled by client\r\n")]
+    public void Answer_FullTextReply_IsAnsweredBeforeTheCommandReply(string commandLine, string expected)
+    {
+        ImapResponder responder = Create("AUTH CRAM-MD5 PLAIN\nREPLY \"AUTHENTICATE CRAM-MD5\" + Rubbish\nREPLY * A002 NO AUTH exchange cancelled by client\nREPLY \"AUTHENTICATE PLAIN\" +\n");
+
+        Assert.AreEqual(expected, Answer(responder, commandLine));
+    }
+
     private static ImapResponder Create(string serverCommands) =>
         new(LineProtocolServerCommands.Read(Encoding.Latin1.GetBytes(serverCommands)), new Dictionary<string, byte[]> { ["data"] = Encoding.Latin1.GetBytes("mail\r\n") });
 
