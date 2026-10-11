@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Core.UnitLibrary]
 requirement: none
 created: 2026-10-11
-completed:
+completed: 2026-10-11
 ---
 # BL-2050 — Fix AF-0157: Curl.Core.UnitLibrary/CLAUDE.md says seven classes are not yet wired into Curl.Console and --ipfs-gateway is not yet parsed; all are wired and the option is parsed
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Replaced all seven "not yet wired" claims in `Curl.Core.UnitLibrary/CLAUDE.md` with where `Curl.Console` uses each class, dropped "`--ipfs-gateway` is not yet parsed", and added the FTP/FTPS 4xx retry reason (`: FTP error`). Reproduction now prints 0. Docs only; build clean, fast tests green.
 
 ## Log
 
 - 2026-10-11: Created.
 - 2026-10-11: Backlog -> Doing.
+- 2026-10-11: Doing -> Done. Curl.Core.UnitLibrary/CLAUDE.md no longer says classes are unwired; reproduction prints 0
