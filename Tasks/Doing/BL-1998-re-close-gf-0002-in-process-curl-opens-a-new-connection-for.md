@@ -55,3 +55,4 @@ In Curl.Console, make InProcessCurl.RunAsync create a run ConnectionCache and pa
 ## Log
 
 - 2026-10-10: Created.
+- 2026-10-10: Backlog -> Doing.
