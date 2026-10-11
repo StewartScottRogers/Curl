@@ -48,3 +48,4 @@ In Curl.Console's retry loop: on a 429 with Retry-After, keep the 429's output w
 ## Log
 
 - 2026-10-10: Created.
+- 2026-10-10: Backlog -> Doing.
