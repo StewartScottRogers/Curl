@@ -43,3 +43,4 @@ wake token (not the timer and not stop) cancels the receive. Never use `Thread.S
 ## Log
 
 - 2026-10-11: Created from Quality gates run 38159879622 (gap PR #117).
+- 2026-10-11: Backlog -> Doing.
