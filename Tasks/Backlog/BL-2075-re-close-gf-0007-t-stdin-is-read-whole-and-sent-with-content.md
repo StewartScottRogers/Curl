@@ -63,6 +63,7 @@ In Curl.Protocol.Http.UnitLibrary (HttpRequestFraming, HttpRequestBodyWriter), t
   and 1069 and copied under these Notes the exact Curl binary, command line and stdin the gap
   tool used, with Curl's actual request bytes and exit code, so a lane can fix the cause without
   reading `Gap/`.
+- 2026-10-11: Product defects found by re-measuring with the fixed gap harness (PR #119) are filed as BL-2087 and BL-2088.
 
 ## Log
 

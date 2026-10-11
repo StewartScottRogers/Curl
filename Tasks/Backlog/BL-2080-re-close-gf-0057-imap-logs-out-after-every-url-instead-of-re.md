@@ -67,6 +67,7 @@ In Curl.Protocol.Imap.UnitLibrary, keep an IMAP connection open after a transfer
   difference makes Curl send LOGOUT after the first URL and tag a second connection A001,
   so a lane can fix it without the Gap paths. BL-2079 has the same open question for FTP;
   one harness investigation likely answers both.
+- 2026-10-11: Product defects found by re-measuring with the fixed gap harness (PR #119) are filed as BL-2089 and BL-2090.
 
 ## Log
 

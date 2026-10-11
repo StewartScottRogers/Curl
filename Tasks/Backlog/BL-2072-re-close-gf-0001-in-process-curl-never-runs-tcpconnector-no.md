@@ -80,6 +80,7 @@ In Curl.Console, give InProcessCurl (and the CurlComposition.CreateRunner overlo
 ## Notes
 
 - 2026-10-11 (lane 1): Interactive only. The product side is already in place: `InProcessCurl.RunAsync` has the dialing overload (`ITcpDialer` + `IDnsResolver`) that builds the production `TcpConnector` (BL-1831), and `UpstreamConformanceTests.RunCurlAsync` already uses it (BL-1794); BL-1997 measured 34 of the 36 cases passing that way and BL-2020 (Done) took 795 and 2043. The gap run still measures the old shapes (a GET instead of CONNECT, exit 52 instead of 6 or 49), which is what the connector overload produces, so the remaining cause is the gap office's own measuring tool, `Measure-UpstreamCases.cs` under the gap office's Tools folder, calling the `IConnector` overload of `InProcessCurl.RunAsync`. That file is an audit path (ADR-0433): the lane guard refuses reading it, changing it and even filing a task that names it, so no lane can check or fix it. Remove lane: no once an interactive session has switched `Measure-UpstreamCases.cs` to the dialing overload (wrap its in-memory server connector in an `ITcpDialer` as `UpstreamConformanceTests` does with `InMemoryServerTcpDialer` and `LoopbackOnlyDnsResolver`) and re-run the gap analysis; any case still failing after that is a product gap for a lane.
+- 2026-10-11: Product defects found by re-measuring with the fixed gap harness (PR #119) are filed as BL-2084.
 
 ## Log
 

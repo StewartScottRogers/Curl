@@ -67,6 +67,7 @@ In Curl.Protocol.Http.UnitLibrary, make HttpProtocolHandler.MayRetry and the upl
   1030, 259 and 258 and copied under these Notes each case's `<reply>`, `<servercmd>`,
   `<command>`, expected `<protocol>` and Curl's actual request bytes and stderr, so a
   lane can fix the cause without reading `Gap/`.
+- 2026-10-11: Product defects found by re-measuring with the fixed gap harness (PR #119) are filed as BL-2085, BL-2086 and BL-2087.
 
 ## Log
 

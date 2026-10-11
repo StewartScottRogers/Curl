@@ -64,6 +64,7 @@ In Curl.Console's mail mapping (MailRequestOptionsMapping), treat -F parts on an
   parts there (argument quoting, the binary used, or a difference in the case), so a lane
   can fix it without the gap office's paths. The harness investigation BL-2079 and
   BL-2080 wait on likely answers this one too.
+- 2026-10-11: Product defects found by re-measuring with the fixed gap harness (PR #119) are filed as BL-2091.
 
 ## Log
 
