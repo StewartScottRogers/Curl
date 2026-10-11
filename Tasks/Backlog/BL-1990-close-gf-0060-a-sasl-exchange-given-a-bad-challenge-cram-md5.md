@@ -4,7 +4,7 @@ title: Close GF-0060: A SASL exchange given a bad challenge (CRAM-MD5 rubbish, a
 priority: High
 assignee: Claude
 pipeline: feature
-depends-on: [BL-2026]
+depends-on: [BL-2026, BL-2060]
 touches: [Curl.Authentication.UnitLibrary, Curl.Authentication.UnitTests, Curl.Protocol.Imap.UnitLibrary, Curl.Protocol.Imap.UnitTests, Curl.Protocol.Pop3.UnitLibrary, Curl.Protocol.Pop3.UnitTests, Curl.Protocol.Smtp.UnitLibrary, Curl.Protocol.Smtp.UnitTests]
 requirement: none
 created: 2026-10-10
@@ -52,6 +52,7 @@ In Curl.Authentication.UnitLibrary (ChallengeSaslExchange, SecurityContextSaslEx
   - test879 shape (POP3 CRAM-MD5) and test936 shape (SMTP NTLM, `334 Rubbish`): `*`, then `AUTH PLAIN` and the PLAIN message, then `RETR` / `MAIL FROM`.
   - The same paths are pinned by `ImapProtocolHandlerSaslCancelTests`, `Pop3ProtocolHandlerSaslCancelTests` and `SmtpProtocolHandlerSaslCancelTests` (BL-1220 and its POP3/SMTP twins).
 - So "got the end" right after `AUTHENTICATE`/`AUTH` comes from the gap harness, which lanes may not read (ADR-0433 guard). All six cases give a quoted command with an argument (`REPLY "AUTHENTICATE CRAM-MD5" + Rubbish`); a harness that does not match those would never send the `+`/`334`. Filed BL-2026 (interactive only) to find the cause in the harness, and parked this task behind it. No code changed.
+- 2026-10-11 (interactive, BL-2026): confirmed, the cause is in the harness's mail stand-ins. Under the gap harness at 2fd5b394d, test833's `-v` shows `> A002 AUTHENTICATE CRAM-MD5`, `< A002 BAD AUTHENTICATE is not dealt with!`, and Curl exits 67 (`Login denied`). test834 is the same for NTLM. `LineProtocolServerCommands.TryReadReply` stores `REPLY "AUTHENTICATE CRAM-MD5" + Rubbish` under the command `"AUTHENTICATE`, where `ftpserver.pl` keeps it as a full-text reply for `AUTHENTICATE CRAM-MD5`. Filed BL-2060 (lane-eligible, `Curl.Conformance.UnitLibrary`) and added it to `depends-on`. The harness runs no SSPI: `SSPI` is off in `UpstreamCurlPlatform`, so the `!SSPI` cases 834, 880 and 936 run, and `InProcessCurl` answers NTLM with the hand-built messages (BL-2033). Once BL-2060 lands, this task needs only the next gap run to measure the six items.
 
 
 ## Log

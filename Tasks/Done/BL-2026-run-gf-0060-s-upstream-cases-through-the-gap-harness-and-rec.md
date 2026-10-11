@@ -9,7 +9,7 @@ touches: [Curl.Protocol.Imap.UnitLibrary]
 lane: no
 requirement: none
 created: 2026-10-10
-completed:
+completed: 2026-10-11
 ---
 # BL-2026 — Run GF-0060's upstream cases through the gap harness and record why Curl's SASL cancel and downgrade measure as 'got the end'
 
@@ -31,15 +31,32 @@ Reproduce: `dotnet run --file Gap/Tools/Measure-UpstreamCases.cs -- "$env:LOCALA
 
 ## Acceptance criteria
 
-- [ ] Notes say which Curl binary the harness runs and from which commit it was built.
-- [ ] Notes say how the harness's server handles a `REPLY "<command with argument>" <reply>` line, with the code line.
-- [ ] Notes hold Curl's `-v` stderr and exit code for test833 and test834 under the harness.
-- [ ] Notes say whether the harness skips `!SSPI` cases when Curl runs with SSPI.
-- [ ] The harness cause is fixed on the `gap` branch, or a lane-eligible Curl task is filed for a Curl cause and added to BL-1990's `depends-on`.
+- [x] Notes say which Curl binary the harness runs and from which commit it was built.
+- [x] Notes say how the harness's server handles a `REPLY "<command with argument>" <reply>` line, with the code line.
+- [x] Notes hold Curl's `-v` stderr and exit code for test833 and test834 under the harness.
+- [x] Notes say whether the harness skips `!SSPI` cases when Curl runs with SSPI.
+- [x] The harness cause is fixed on the `gap` branch, or a lane-eligible Curl task is filed for a Curl cause and added to BL-1990's `depends-on`.
 
 ## Notes
+
+- 2026-10-11 (interactive). **Binary:** the harness compiles `Curl.Console` from the gap worktree's source (`#:project ../../Curl.Console/Curl.Console.csproj`) and calls `InProcessCurl.RunAsync`; the run JSON's `commit` names it. This session ran the gap branch at 2fd5b394d. All six cases still fail there with "got the end".
+- **`REPLY "<command> <argument>"`:** mishandled. `Curl.Conformance.UnitLibrary/LineProtocolServerCommands.cs:151` (`TryReadReply`) splits the line at its first two blanks, so `REPLY "AUTHENTICATE CRAM-MD5" + Rubbish` is stored under the command `"AUTHENTICATE` with the text `CRAM-MD5" + Rubbish`. `ImapResponder.Answer` looks up `AUTHENTICATE`, finds nothing, and answers `A002 BAD AUTHENTICATE is not dealt with!` (`ImapResponder.cs:126`). `ftpserver.pl` at `curl-8_21_0` keeps such a line as a full-text reply keyed by `AUTHENTICATE CRAM-MD5` (line 2835), and checks it before the command reply (around line 3302).
+- **`-v` under the harness** (copies of the cases with `-v --stderr <file>` added). Both exit 67:
+  ```
+  test833: > A001 CAPABILITY
+           < * CAPABILITY IMAP4 AUTH=CRAM-MD5 AUTH=PLAIN pingpong test server
+           < A001 OK CAPABILITY completed
+           > A002 AUTHENTICATE CRAM-MD5
+           < A002 BAD AUTHENTICATE is not dealt with!
+           * closing connection #0
+           curl: (67) Login denied
+  test834: the same with AUTH=NTLM and `> A002 AUTHENTICATE NTLM`, then BAD, exit 67.
+  ```
+- **`!SSPI`:** the harness does not skip them, and need not. `UpstreamCurlPlatform` leaves `SSPI` out of the features (Curl's `curl -V` does not list it), so 834, 880 and 936 run, and `InProcessCurl` answers NTLM with the hand-built messages (BL-2033).
+- **Fix:** the cause is in `Curl.Conformance.UnitLibrary`, which lanes may change, so it is filed as lane-eligible BL-2060 and added to BL-1990's `depends-on`. No change on the `gap` branch.
 
 ## Log
 
 - 2026-10-10: Created.
 - 2026-10-11: Backlog -> Doing.
+- 2026-10-11: Doing -> Done. GF-0060 cause recorded: the mail stand-ins store REPLY "AUTHENTICATE X" under a quoted first word, so the server answers BAD; fix filed as lane task BL-2060
