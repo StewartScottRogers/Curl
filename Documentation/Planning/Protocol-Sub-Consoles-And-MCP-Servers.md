@@ -1,6 +1,6 @@
-# Protocol sub-consoles with matching MCP servers
+# Protocol sub-consoles with matching MCP servers and skills
 
-**Status: proposal, not started.** Nothing in this document exists in the code yet.
+**Status: proposal, not started; decisions 1-4 and 7-10 made, 5 and 6 open.** Nothing in this document exists in the code yet.
 It is the reference for when Stewart asks for the work to begin. Estimates date from
 2026-10-11.
 
@@ -20,7 +20,7 @@ One executable per protocol, each a subset of Curl:
   `curl-ftp --help all` lists about 80-100 options, not curl's ~270.
 - A URL or option for another protocol behaves as it does in a curl built without that
   protocol.
-- Each also runs as an MCP server for AI agents, started with a flag on the same
+- Each also runs as an MCP server for AI agents, wrapped in a Claude Code skill (Part 3), started with a flag on the same
   executable (`curl-ftp --mcp`, stdio transport), so the console and its MCP server never
   drift apart.
 
@@ -89,48 +89,128 @@ Typed tools (`ftp_list`, `ftp_get`, `smtp_send`, `imap_fetch` and the like, each
 own JSON schema) are left out by decision 2. Adding them later for one protocol is about
 3-5 tasks on top of its simple tool, which stays.
 
+
 ### Hard parts
 
-1. **No package.** Microsoft's C# MCP SDK is a NuGet package; the base-class-library-only
-   rule means hand-building the MCP layer unless Stewart approves the package (decision 3).
+1. **Hand-built MCP layer (decision 3).** There is no package: framing, the `initialize`
+   version negotiation and cancellation are written and tested here, and each MCP
+   specification revision is followed by hand. The scope is small - stdio only, one tool per
+   server - which is what keeps this cheap.
 2. **Safety.** An agent with curl can reach any host, write files, send credentials and
-   upload local files. Each server needs limits, with careful defaults.
+   upload local files. Each server needs limits, with careful defaults, since the servers
+   ship publicly (decision 4).
 3. **Output.** Binary bodies need base64 or resource links; large transfers need caps;
    long transfers need progress and cancellation passed through.
 4. **No reference to compare against.** The consoles can be measured byte for byte against
    real curl; the MCP layer only against the MCP specification, with hand-written tests.
 
+## Part 3: the skills and the plugin
+
+Each protocol gets a Claude Code skill (`SKILL.md`) wrapped around its MCP server, and all
+of them ship together as one Claude Code plugin, `curl-protocols` (decision 9).
+
+- **The skill's job:** its frontmatter description tells an agent when to use the protocol;
+  its body says how to use it well - recipes, safety rules, what each exit code means and
+  what to do next. Only the one-line description is always in context; the body loads when
+  a task needs that protocol. So the MCP tool's own description stays short, and the
+  detailed help lives in the skill.
+- **MCP or command line (decision 10):** the skill uses the `<protocol>_run` MCP tool when
+  the server is connected and falls back to running the sub-console on the command line
+  when it is not.
+- **Kept true:** each skill's option reference is generated from its sub-console's filtered
+  `--ai-help`; only the recipes are written by hand, and a test fails the build when a skill
+  names an option its sub-console does not have.
+
+### The plugin
+
+| Piece | Choice |
+|---|---|
+| Where it is published | A plugin marketplace file in the Curl repository (`.claude-plugin/marketplace.json`); the repository is public under the MIT licence |
+| What it holds | The skills (one per sub-console) and each MCP server's configuration |
+| The binaries | Native `curl-ftp`, `curl-http` and the rest for Windows, Linux and macOS, downloaded from GitHub Releases (decision 7) |
+| Versioning | One version for the whole plugin, with a changelog per version |
+
+One plugin, not one per protocol: a single install gives everything, unused skills cost
+almost nothing in context, and one version number is what Surl pins.
+
+### Surl
+
+Surl (<https://github.com/StewartScottRogers/Surl>, curl's server-side counterpart) uses
+the plugin as its test client:
+
+1. Surl's `.claude/settings.json` adds the Curl marketplace and enables `curl-protocols`,
+   so every Surl session, its dark factory lanes included, has it without a manual install.
+2. Surl pins a plugin version, so a change in Curl never breaks Surl's tests unannounced;
+   Surl moves to a new version on purpose.
+3. A Surl session starts a Surl server and drives it with that protocol's `<protocol>_run`
+   tool, with the skill telling the agent how to read the result.
+
+Enabling the plugin in Surl and writing Surl's tests with it are Surl tasks, not Curl tasks.
+
+### Work
+
+| Piece | Tasks | Difficulty |
+|---|---|---|
+| Skill generator: frontmatter, and an option reference built from the filtered `--ai-help` | 3-5 | Easy |
+| A test that fails when a skill names an option its sub-console lacks | 2-3 | Easy |
+| Hand-written recipes and safety notes, one per protocol, checked against real curl | ~17 | Easy, but needs real measurement |
+| Plugin and marketplace files, an install check in CI | 3-5 | Easy to medium |
+| Release workflow publishing the binaries (decision 7), plugin README, changelog | 5-7 | Medium |
+
+**Total: about 33-47 tasks, about 1-2 shifts after the MCP servers.** For only the
+first protocols (decision 6), about 15-20.
+
 ## Decisions
 
-### Stewart's
+| # | Decision | Answer | Decided |
+|---|---|---|---|
+| 1 | Help | Filtered | Stewart, 2026-10-11 |
+| 2 | MCP tools | Simple: one `<protocol>_run` tool per server | Stewart, 2026-10-11 |
+| 3 | MCP layer | Hand-built, no package | Stewart, 2026-10-11 |
+| 4 | Purpose | Public distribution, and the test client for Surl | Stewart, 2026-10-11 |
+| 5 | When it starts | Open | - |
+| 6 | Which protocols first | Open | - |
+| 7 | How they ship | GitHub Releases under a standing exception, CI green on all three platforms | Stewart, 2026-10-11 |
+| 8 | Who reaches the MCP servers | Local stdio only | Stewart, 2026-10-11 |
+| 9 | Packaging | One Claude Code plugin, `curl-protocols`, published from the Curl repository | Stewart, 2026-10-11 |
+| 10 | A skill without MCP | Falls back to the sub-console's command line | Stewart, 2026-10-11 |
 
-1. **Filtered help or curl-matching help? Decided 2026-10-11: filtered.** Each
-   sub-console's `--help` (every form), `--ai-help`, `--manual` and MCP tool descriptions
-   list only its own protocol's options and the global ones. Considered and not chosen:
-   help matching curl byte for byte (a drop-in for a reduced curl build, but listing
-   options that do nothing there), and a hybrid that kept `--help` matching curl while
-   filtering only `--ai-help`.
+Decisions 3 and 7-10 are Claude's recommendations, which Stewart accepted on 2026-10-11.
 
-2. **Simple or typed MCP tools? Decided 2026-10-11: simple.** Each MCP server has one
-   tool, `<protocol>_run`, that takes curl arguments, so the MCP server can do exactly what
-   its sub-console can and nothing else. Considered and not chosen for now: typed tools per
-   operation, which can be added later for the protocols agents use most.
+### Stewart's, with reasons
 
-Still to ask before starting:
+1. **Filtered help.** Each sub-console's `--help` (every form), `--ai-help`, `--manual` and
+   MCP tool descriptions list only its own protocol's options and the global ones.
+   Considered and not chosen: help matching curl byte for byte (a drop-in for a reduced curl
+   build, but listing options that do nothing there), and a hybrid that kept `--help`
+   matching curl while filtering only `--ai-help`.
+2. **Simple MCP tools.** One tool, `<protocol>_run`, that takes curl arguments, so the MCP
+   server does exactly what its sub-console does and nothing else. Typed tools per
+   operation can be added later for the protocols agents use most.
+3. **Hand-built MCP layer.** It keeps the base-class-library-only rule, gives public users
+   the smallest native binaries with no runtime or extra packages to trust, and keeps all of
+   it under the quality gates. Microsoft's MCP SDK package becomes the better choice only if
+   the servers later need network transport or richer MCP features.
+4. **Purpose.** Public distribution, and Stewart's own use as the test client when testing
+   the Surl repository.
+7. **Releases under a standing exception.** CI publishes a GitHub Release of the binaries
+   and the plugin when a sub-console or plugin version changes, only when CI passed on
+   Windows, Linux and macOS for that commit. The exception takes effect when it is written
+   into CLAUDE.md's "Git and GitHub" section at the start of Part 3; until then every
+   release or tag is asked for.
+8. **Local stdio only.** Public users and Surl both run the servers on their own machines,
+   so nothing is exposed to the network and no authentication is needed.
+9. **One plugin.** One install, one version for Surl to pin, and unused skills cost almost
+   nothing in context.
+10. **Command-line fallback.** The skills work in Claude Code even when MCP is not connected.
 
-3. **Hand-built MCP layer or Microsoft's MCP SDK package?** Hand-built is the standing rule
-   and the default; the package needs explicit approval.
-4. **What it is for** - smaller binaries, simpler help for people or agents, or separately
-   shipped products - since each changes the design a little.
+### Still to ask before starting
+
 5. **When it starts** - before or after the gap and audit work on the board; the dark
-   factory works one board, so this sets the order.
-6. **Which protocols first** - all 17, or the ones in use (for example HTTP, FTP, SMTP);
-   fewer cuts Part 1's 75-95 tasks a lot.
-7. **How they ship** - built by CI only, or released; each release or tag needs Stewart's
-   sign-off.
-8. **Who can reach the MCP servers** - local stdio only (an agent on the machine starts
-   the server), or also over the network, which needs authentication and is a larger
-   security decision.
+   factory works one board, so this sets the order. Recommendation: after it clears.
+6. **Which protocols first** - all 17, or a pilot (`curl-ftp`) and then HTTP, SMTP, IMAP
+   and SFTP, with the other 12 waiting until asked. Recommendation: the pilot and those
+   four, about half of Part 1's work.
 
 ### Claude's (decide under the delegation, record as ADRs)
 
@@ -139,13 +219,18 @@ Still to ask before starting:
   The protocol set must be fixed at build time, not by a runtime flag, or AOT keeps every
   protocol in the binary.
 - Which shared pieces each sub-console carries (HTTP proxy, redirects, authentication).
+- How sub-consoles group schemes (whether HTTPS, WebSocket and HTTP/3 belong in
+  `curl-http`, SCP and SFTP in `curl-ssh`).
 - The MCP flag's name and the safety defaults.
+- How the skills are generated, and how the plugin fetches the binaries for each platform.
 
 ## How to start
 
-1. Stewart answers decisions 3-8 (decisions 1 and 2 are made).
-2. Claude writes the ADRs for its own decisions.
-3. `task-planner` files Part 1 as tasks, pilot first (`curl-ftp`), the other 16 depending on it.
+1. Stewart answers decisions 5 and 6.
+2. Claude writes the ADRs for its own decisions, and adds the release exception
+   (decision 7) to CLAUDE.md.
+3. `task-planner` files Part 1 as tasks, pilot first (`curl-ftp`), the rest depending on it.
 4. Part 2 is filed once the pilot sub-console works, MCP library first, then one server per
-   sub-console.
-5. The dark factory works the tasks; the gap office gains a per-sub-console reference measurement.
+   sub-console; Part 3 once the first MCP server works.
+5. The dark factory works the tasks; the gap office gains a per-sub-console reference
+   measurement; Surl enables the plugin once its first release is out.
