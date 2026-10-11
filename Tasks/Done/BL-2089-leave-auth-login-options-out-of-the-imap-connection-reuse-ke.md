@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Imap.UnitLibrary, Curl.Protocol.Imap.UnitTests, Curl.Conformance.UnitTests]
 requirement: none
 created: 2026-10-11
-completed:
+completed: 2026-10-11
 ---
 # BL-2089 — Leave AUTH= login options out of the IMAP connection reuse key (upstream test1982)
 
@@ -38,3 +38,4 @@ Source: re-measurement of the gap findings with the fixed gap harness (PR #119, 
 
 - 2026-10-11: Created.
 - 2026-10-11: Backlog -> Doing.
+- 2026-10-11: Doing -> Done. IMAP reuse key ignores ;AUTH= options; test1982 passes in process
