@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Console, Curl.Console.UnitTests, Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests]
 requirement: none
 created: 2026-10-11
-completed:
+completed: 2026-10-11
 ---
 # BL-2092 — Write each response header line to the write callback separately (upstream test489 stderr byte counts)
 
@@ -48,3 +48,4 @@ Source: re-measurement of the gap findings with the fixed gap harness (PR #119, 
 
 - 2026-10-11: Created.
 - 2026-10-11: Backlog -> Doing.
+- 2026-10-11: Doing -> Done. Header lines written one per write; -i -o unopenable reports 17 bytes
