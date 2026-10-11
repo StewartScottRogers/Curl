@@ -80,12 +80,14 @@ One executable per protocol, each a subset of Curl:
 |---|---|---|
 | Shared `Curl.Mcp.UnitLibrary`: JSON-RPC over stdio, lifecycle (`initialize`, `tools/list`, `tools/call`), tool schemas, progress and cancellation notifications, AOT-safe `System.Text.Json` source generation | 10-15 | Medium |
 | Safety controls: allowed hosts, an output folder, whether local file reads (`-T`, `-F @file`, `-d @file`) and credential options are allowed, size caps on returned bodies | 5-8 | Medium; mostly design |
-| **Thin** tools: one `<protocol>_run` tool per sub-console taking curl arguments, its description taken from that protocol's `--ai-help` | ~17 | Easy |
-| **Or rich** tools: typed tools such as `ftp_list`, `ftp_get`, `smtp_send`, `imap_fetch`, with JSON schemas | 50-85 | Medium |
+| Simple tools (decision 2): one `<protocol>_run` tool per sub-console, taking curl's arguments for that protocol and returning exit code, stdout and stderr; its description is that protocol's filtered `--ai-help` | ~17 | Easy |
 | CI smoke test per server: start it, check `tools/list`, run one `tools/call` against a loopback server | ~5 | Easy |
 
-**Thin: about 35-45 tasks, about 2 shifts after the sub-consoles.**
-**Rich: about 70-110 tasks, about 4-6 shifts.**
+**Total: about 35-45 tasks, about 2 shifts after the sub-consoles.**
+
+Typed tools (`ftp_list`, `ftp_get`, `smtp_send`, `imap_fetch` and the like, each with its
+own JSON schema) are left out by decision 2. Adding them later for one protocol is about
+3-5 tasks on top of its simple tool, which stays.
 
 ### Hard parts
 
@@ -109,14 +111,26 @@ One executable per protocol, each a subset of Curl:
    options that do nothing there), and a hybrid that kept `--help` matching curl while
    filtering only `--ai-help`.
 
+2. **Simple or typed MCP tools? Decided 2026-10-11: simple.** Each MCP server has one
+   tool, `<protocol>_run`, that takes curl arguments, so the MCP server can do exactly what
+   its sub-console can and nothing else. Considered and not chosen for now: typed tools per
+   operation, which can be added later for the protocols agents use most.
+
 Still to ask before starting:
 
-2. **Thin or rich MCP tools?** Recommendation: thin first, rich later for the protocols
-   agents actually use.
 3. **Hand-built MCP layer or Microsoft's MCP SDK package?** Hand-built is the standing rule
    and the default; the package needs explicit approval.
 4. **What it is for** - smaller binaries, simpler help for people or agents, or separately
    shipped products - since each changes the design a little.
+5. **When it starts** - before or after the gap and audit work on the board; the dark
+   factory works one board, so this sets the order.
+6. **Which protocols first** - all 17, or the ones in use (for example HTTP, FTP, SMTP);
+   fewer cuts Part 1's 75-95 tasks a lot.
+7. **How they ship** - built by CI only, or released; each release or tag needs Stewart's
+   sign-off.
+8. **Who can reach the MCP servers** - local stdio only (an agent on the machine starts
+   the server), or also over the network, which needs authentication and is a larger
+   security decision.
 
 ### Claude's (decide under the delegation, record as ADRs)
 
@@ -129,7 +143,7 @@ Still to ask before starting:
 
 ## How to start
 
-1. Stewart answers decisions 2-4 (decision 1 is made).
+1. Stewart answers decisions 3-8 (decisions 1 and 2 are made).
 2. Claude writes the ADRs for its own decisions.
 3. `task-planner` files Part 1 as tasks, pilot first (`curl-ftp`), the other 16 depending on it.
 4. Part 2 is filed once the pilot sub-console works, MCP library first, then one server per
