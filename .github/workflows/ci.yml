@@ -70,3 +70,31 @@ jobs:
 
       - name: Fast tests
         run: dotnet test -c Release --no-build --filter "TestCategory!=Integration"
+
+  # The four quality gates (CLAUDE.md "Quality gates"): 100% line and branch coverage,
+  # complexity at most 10 and CRAP at most 30 for every member, measured as the coverage
+  # page measures them. The build's CA1502 counts complexity on the source and can pass a
+  # method the coverage report counts above 10, so this job is what keeps the page green:
+  # Measure-CodeQuality.ps1 exits 1 when any member is outside a gate (BL-2068). Windows
+  # only, where the gates are measured, as gource.yml's coverage job does.
+  quality:
+    name: Quality gates (windows-latest)
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Measure coverage, complexity and CRAP
+        shell: pwsh
+        run: |
+          powershell -NoProfile -ExecutionPolicy Bypass -File Measure-CodeQuality.ps1 -JsonPath "$env:RUNNER_TEMP\coverage.json"
+          $code = $LASTEXITCODE
+          if (-not (Test-Path "$env:RUNNER_TEMP\coverage.json")) { throw 'Measure-CodeQuality.ps1 wrote no JSON' }
+          foreach ($m in @((Get-Content "$env:RUNNER_TEMP\coverage.json" -Raw | ConvertFrom-Json).failing)) {
+            Write-Host "::error file=$($m.file.Replace('\', '/')),line=$($m.line)::$($m.member) is outside a gate: $($m.fails -join ', ')"
+          }
+          exit $code
