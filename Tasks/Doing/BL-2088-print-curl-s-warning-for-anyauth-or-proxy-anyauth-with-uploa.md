@@ -24,14 +24,26 @@ Source: re-measurement of the gap findings with the fixed gap harness (PR #119, 
 
 ## Acceptance criteria
 
-- [ ] New MSTests in Curl.Console.UnitTests (no network, platform-neutral) pin the warning bytes on stderr for `-T - --anyauth` and `-T - --proxy-anyauth`, and show no warning for `-T file --anyauth` or `-T - --basic`.
-- [ ] `--ai-help` is unaffected (no option is added or changed); the task Log says so.
+- [x] New MSTests in Curl.Console.UnitTests (no network, platform-neutral) pin the warning bytes on stderr for `-T - --anyauth` and `-T - --proxy-anyauth`, and show no warning for `-T file --anyauth` or `-T - --basic`.
+- [x] `--ai-help` is unaffected (no option is added or changed); the task Log says so.
 - [ ] Add test1072 once BL-2087 and the HTTP/1.0 retry (BL-2086) also match to `Curl.Conformance.UnitTests/PassingUpstreamCases.txt` once it passes in process.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
+- [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
 
 ## Notes
+
+- Measured the local curl 8.21.0 (Schannel) on 2026-10-11 against a closed port: the warning
+  prints for `-T -` and `-T .` with `--anyauth`, `--proxy-anyauth` and `--basic --digest`
+  (tool_operate.c counts more than one auth bit), and not for `-T file`, `--basic` or
+  `--digest` alone, nor under `-s` or `-sS`. The text ends `instead` with no `!`, and wraps
+  at 79 columns into three lines. So the condition is `ProxyAuthSchemes == Any` or more than
+  one bit in `AuthSchemes` (`StandardInputAnyAuthUploadWarning`), written after the
+  per-transfer warning lines in `TransferAsync`.
+- The test1072 criterion stays open on purpose: the case also needs BL-2086 and BL-2087, and
+  `Curl.Conformance.UnitTests` is outside this task's `touches`, so whichever of those lands
+  last adds test1072 to `PassingUpstreamCases.txt`.
 
 ## Log
 
 - 2026-10-11: Created.
 - 2026-10-11: Backlog -> Doing.
+- 2026-10-11: --ai-help unaffected: no option added or changed.

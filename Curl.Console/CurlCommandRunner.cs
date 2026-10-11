@@ -3332,6 +3332,10 @@ internal sealed class CurlCommandRunner(
             }
 
             await WriteErrorLinesAsync(dispatch.WarningLinesBeforeEachTransfer).ConfigureAwait(false);
+            if (StandardInputAnyAuthUploadWarning.AppliesTo(options, uploadFile))
+            {
+                await WriteErrorLineAsync(StandardInputAnyAuthUploadWarning.Text).ConfigureAwait(false);
+            }
         }
 
         await WriteCustomRequestLinesAsync(options, uploadFile).ConfigureAwait(false);
