@@ -8,7 +8,7 @@ depends-on: [BL-2085]
 touches: [Curl.Conformance.UnitTests]
 requirement: none
 created: 2026-10-11
-completed:
+completed: 2026-10-11
 ---
 # BL-2097 — Add upstream test258 to PassingUpstreamCases.txt
 
@@ -22,12 +22,15 @@ BL-2085 made `HttpConnectionPersistence.KeepsAlive` honour `Proxy-Connection: cl
 
 ## Acceptance criteria
 
-- [ ] `258` is in `Curl.Conformance.UnitTests/PassingUpstreamCases.txt` and the conformance ratchet passes, or a task names what still makes test258 fail.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests are green.
+- [x] `258` is in `Curl.Conformance.UnitTests/PassingUpstreamCases.txt` and the conformance ratchet passes, or a task names what still makes test258 fail.
+- [x] `dotnet build -warnaserror` is clean and the fast tests are green.
 
 ## Notes
+
+Ran test258 in process through the ratchet: it passes with BL-2085's fix, so 258 is listed. No design decision needed.
 
 ## Log
 
 - 2026-10-11: Created.
 - 2026-10-11: Backlog -> Doing.
+- 2026-10-11: Doing -> Done. test258 passes; 258 added to PassingUpstreamCases.txt, conformance project green
