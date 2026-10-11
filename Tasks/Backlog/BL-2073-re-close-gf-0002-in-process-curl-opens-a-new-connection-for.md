@@ -6,6 +6,7 @@ assignee: Claude
 pipeline: feature
 depends-on: []
 touches: [Curl.Console, Curl.Console.UnitTests, Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests]
+lane: no
 requirement: none
 created: 2026-10-11
 completed:
@@ -52,7 +53,26 @@ In Curl.Console, make InProcessCurl.RunAsync create a run ConnectionCache and pa
 
 ## Notes
 
+- 2026-10-11 (lane 1, at 6f57301f6): the finding's suggested fix is already in the product.
+  `InProcessCurl.RunAsync` (both overloads) passes `runConnections: new ConnectionCache(...)`
+  since 7ae8cbcf8 (2026-10-08), so `GroupConnectorOf` wraps the connector in a `PoolingConnector`.
+  `UpstreamConformanceTests.InProcessCurl_ConnectionReuseCase_Passes` runs all ten items
+  (48, 338, 435, 471, 1074, 1134, 1418, 1419, 1421, 1479) through the public `InProcessCurl`.
+  It runs each over the in-memory connector and over the TcpConnector. All 20 rows pass here.
+  So whatever still measures the gap is outside Curl.Console and Curl.Conformance.
+  Two candidates remain:
+  - the gap run measured a ref older than 7ae8cbcf8;
+  - `Gap/Tools/Measure-UpstreamCases.cs` calls Curl differently, e.g. through its own connector
+    or an older overload.
+  A lane cannot read or run `Gap/` (the audit guard refuses it, ADR-0433), so this is interactive only.
+- Remove `lane: no` once an interactive session has run
+  `dotnet run --file Gap/Tools/Measure-UpstreamCases.cs` for 48,338,435,471,1074,1134,1418,1419,1421,1479
+  on the current `work/dark-factory`. If every item now matches, close GF-0002 on the next gap run
+  and finish this task. If items still fail, write under Notes how the tool's call differs from
+  `InProcessCurl_ConnectionReuseCase_Passes`, so that a lane can reproduce the failure in Curl.Conformance.UnitTests.
+
 ## Log
 
 - 2026-10-11: Created.
 - 2026-10-11: Backlog -> Doing.
+- 2026-10-11: Doing -> Backlog. Interactive only: all ten items pass through InProcessCurl in UpstreamConformanceTests; what still fails is the gap office's measuring tool or a stale gap run, which a lane cannot read
