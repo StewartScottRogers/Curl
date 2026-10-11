@@ -51,3 +51,4 @@ In Curl.Protocol.Http.UnitLibrary (HttpRequestFraming, HttpRequestBodyWriter), t
 ## Log
 
 - 2026-10-10: Created.
+- 2026-10-10: Backlog -> Doing.
