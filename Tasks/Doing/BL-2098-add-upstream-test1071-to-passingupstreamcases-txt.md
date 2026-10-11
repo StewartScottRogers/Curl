@@ -30,3 +30,4 @@ BL-2086 made the authentication retry after an HTTP/1.0 response go out as HTTP/
 ## Log
 
 - 2026-10-11: Created.
+- 2026-10-11: Backlog -> Doing.
