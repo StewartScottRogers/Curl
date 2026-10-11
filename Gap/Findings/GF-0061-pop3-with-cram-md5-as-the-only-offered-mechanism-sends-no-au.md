@@ -32,6 +32,7 @@ In Curl.Protocol.Pop3.UnitLibrary's Pop3Login, send AUTH CRAM-MD5 when CAPA offe
 ## Measurements
 
 - 2026-10-10_0657: 1 of 1 items are gaps.
+- 2026-10-11_0936: 1 of 1 items are gaps.
 
 ## Log
 

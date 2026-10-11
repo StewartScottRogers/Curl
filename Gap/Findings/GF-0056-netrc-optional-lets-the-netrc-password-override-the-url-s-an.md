@@ -4,11 +4,11 @@ title: --netrc-optional lets the netrc password override the URL's, and a .netrc
 area: behaviour
 key: behaviour:netrc-url-credentials-and-nul-byte
 severity: High
-status: open
+status: closed
 scope: target
 introduced-in:
 opened: 2026-10-10_0657
-closed:
+closed: 2026-10-11_0936
 regression: false
 items: [behaviour:test381, behaviour:test793]
 touches: [Curl.Console, Curl.Console.UnitTests, Curl.Authentication.UnitLibrary, Curl.Authentication.UnitTests]
@@ -32,8 +32,10 @@ In Curl.Console's TransferCredentialLookup, under --netrc-optional, keep a passw
 ## Measurements
 
 - 2026-10-10_0657: 2 of 2 items are gaps.
+- 2026-10-11_0936: 0 of 2 items are gaps.
 
 ## Log
 
 - 2026-10-10_0657: Opened by gap-behaviour.
 - 2026-10-10_0756: Filed BL-1986.
+- 2026-10-11_0936: Closed: run 2026-10-11_0936 measured every item as match or excluded.

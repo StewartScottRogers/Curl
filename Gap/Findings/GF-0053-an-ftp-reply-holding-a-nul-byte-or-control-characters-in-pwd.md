@@ -4,11 +4,11 @@ title: An FTP reply holding a NUL byte or control characters (in PWD's path) is 
 area: behaviour
 key: behaviour:ftp-control-reply-not-validated
 severity: High
-status: open
+status: closed
 scope: target
 introduced-in:
 opened: 2026-10-10_0657
-closed:
+closed: 2026-10-11_0936
 regression: false
 items: [behaviour:test3217, behaviour:test3218, behaviour:test2108]
 touches: [Curl.Protocol.Ftp.UnitLibrary, Curl.Protocol.Ftp.UnitTests]
@@ -32,8 +32,10 @@ In Curl.Protocol.Ftp.UnitLibrary's control-reply reader, fail with exit 8 (weird
 ## Measurements
 
 - 2026-10-10_0657: 3 of 3 items are gaps.
+- 2026-10-11_0936: 0 of 3 items are gaps.
 
 ## Log
 
 - 2026-10-10_0657: Opened by gap-behaviour.
 - 2026-10-10_0756: Filed BL-1983.
+- 2026-10-11_0936: Closed: run 2026-10-11_0936 measured every item as match or excluded.

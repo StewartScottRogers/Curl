@@ -186,6 +186,7 @@ Bring these items to Curl when the target moves to 8.22.0.
 
 - 2026-10-08_2029: 6 of 154 items are gaps. 62 not in this run's measurement.
 - 2026-10-10_0657: 12 of 154 items are gaps. 62 not in this run's measurement.
+- 2026-10-11_0936: 3 of 154 items are gaps. 62 not in this run's measurement.
 
 ## Log
 

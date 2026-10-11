@@ -4,11 +4,11 @@ title: After a 401 that the server closes the connection on, the authenticated r
 area: behaviour
 key: behaviour:auth-retry-lost-when-server-closes-after-challenge
 severity: Critical
-status: open
+status: closed
 scope: target
 introduced-in:
 opened: 2026-10-08_1640
-closed:
+closed: 2026-10-11_0936
 regression: false
 items: [behaviour:test64, behaviour:test69, behaviour:test76, behaviour:test90, behaviour:test153, behaviour:test388, behaviour:test1079, behaviour:test1095, behaviour:test1229, behaviour:test1437, behaviour:test2061, behaviour:test2062, behaviour:test2063, behaviour:test2076, behaviour:test2091]
 touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests]
@@ -34,9 +34,11 @@ In Curl.Protocol.Http.UnitLibrary's HttpProtocolHandler, treat a connection that
 - 2026-10-08_1640: 15 of 15 items are gaps.
 - 2026-10-08_2029: 3 of 15 items are gaps.
 - 2026-10-10_0657: 3 of 15 items are gaps.
+- 2026-10-11_0936: 0 of 15 items are gaps.
 
 ## Log
 
 - 2026-10-08_1640: Opened by gap-behaviour.
 - 2026-10-08_1731: Filed BL-1797.
 - 2026-10-10_0756: Filed BL-2000.
+- 2026-10-11_0936: Closed: run 2026-10-11_0936 measured every item as match or excluded.

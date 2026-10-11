@@ -4,11 +4,11 @@ title: A backslash in a URL path is sent as '/', where curl sends it as written
 area: behaviour
 key: behaviour:url-path-backslash-rewritten
 severity: High
-status: open
+status: closed
 scope: target
 introduced-in:
 opened: 2026-10-10_0657
-closed:
+closed: 2026-10-11_0936
 regression: false
 items: [behaviour:test214]
 touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests, Curl.Core.UnitLibrary, Curl.Core.UnitTests]
@@ -32,8 +32,10 @@ In Curl.Cli.UnitLibrary's URL globbing (ADR-0032), unescape only the glob charac
 ## Measurements
 
 - 2026-10-10_0657: 1 of 1 items are gaps.
+- 2026-10-11_0936: 0 of 1 items are gaps.
 
 ## Log
 
 - 2026-10-10_0657: Opened by gap-behaviour.
 - 2026-10-10_0756: Filed BL-1996.
+- 2026-10-11_0936: Closed: run 2026-10-11_0936 measured every item as match or excluded.

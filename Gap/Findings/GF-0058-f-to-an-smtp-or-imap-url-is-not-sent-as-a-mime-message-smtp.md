@@ -32,6 +32,7 @@ In Curl.Console's mail mapping (MailRequestOptionsMapping), treat -F parts on an
 ## Measurements
 
 - 2026-10-10_0657: 5 of 5 items are gaps.
+- 2026-10-11_0936: 4 of 5 items are gaps.
 
 ## Log
 

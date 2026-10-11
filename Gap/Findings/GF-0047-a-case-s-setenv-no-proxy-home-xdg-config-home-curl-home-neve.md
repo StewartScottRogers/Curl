@@ -4,11 +4,11 @@ title: A case's <setenv> (NO_PROXY, HOME, XDG_CONFIG_HOME, CURL_HOME) never reac
 area: behaviour
 key: behaviour:in-process-runner-ignores-case-environment
 severity: High
-status: open
+status: closed
 scope: target
 introduced-in:
 opened: 2026-10-10_0657
-closed:
+closed: 2026-10-11_0936
 regression: false
 items: [behaviour:test1249, behaviour:test433, behaviour:test436, behaviour:test724, behaviour:test725, behaviour:test731, behaviour:test740, behaviour:test741]
 touches: [Curl.Console, Curl.Console.UnitTests, Curl.Cli.UnitLibrary, Curl.Cli.UnitTests]
@@ -32,8 +32,10 @@ Pass readEnvironmentVariable through InProcessCurl's new overload (behaviour:in-
 ## Measurements
 
 - 2026-10-10_0657: 8 of 8 items are gaps.
+- 2026-10-11_0936: 0 of 8 items are gaps.
 
 ## Log
 
 - 2026-10-10_0657: Opened by gap-behaviour.
 - 2026-10-10_0756: Filed BL-1977.
+- 2026-10-11_0936: Closed: run 2026-10-11_0936 measured every item as match or excluded.

@@ -4,11 +4,11 @@ title: FTP active mode (-P) hangs in process: the FTP stand-in's PORT/EPRT canno
 area: behaviour
 key: behaviour:in-process-runner-lacks-ftp-active-listener
 severity: High
-status: open
+status: closed
 scope: target
 introduced-in:
 opened: 2026-10-10_0657
-closed:
+closed: 2026-10-11_0936
 regression: false
 items: [behaviour:test101, behaviour:test103, behaviour:test108, behaviour:test251, behaviour:test1414, behaviour:test1206, behaviour:test1207, behaviour:test1211]
 touches: [Curl.Console, Curl.Console.UnitTests, Curl.Protocol.Ftp.UnitLibrary, Curl.Protocol.Ftp.UnitTests]
@@ -32,8 +32,10 @@ Pass the ftpListener through InProcessCurl's new overload (behaviour:in-process-
 ## Measurements
 
 - 2026-10-10_0657: 8 of 8 items are gaps.
+- 2026-10-11_0936: 0 of 8 items are gaps.
 
 ## Log
 
 - 2026-10-10_0657: Opened by gap-behaviour.
 - 2026-10-10_0756: Filed BL-1978.
+- 2026-10-11_0936: Closed: run 2026-10-11_0936 measured every item as match or excluded.
