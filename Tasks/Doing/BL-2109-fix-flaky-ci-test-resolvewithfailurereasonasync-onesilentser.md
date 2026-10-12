@@ -38,3 +38,4 @@ assert on the waits the resolver asked for, not on wall-clock time.
 ## Log
 
 - 2026-10-12: Created.
+- 2026-10-12: Backlog -> Doing.
