@@ -1,5 +1,10 @@
 {
   "$reference": "curl 9.9.9 (fake)",
+  "$referenceFeatures": [ "alt-svc", "SSL" ],
+  "environment:NETRC": {
+    "reference": { "exitCode": 0, "stdout": "", "stderr": "", "request": "GET / HTTP/1.1\r\n\r\n", "written": "absent" },
+    "candidate": { "exitCode": 0, "stdout": "", "stderr": "", "request": "GET / HTTP/1.1\r\n\r\n", "written": "CLIENT_RANDOM x1" }
+  },
   "environment:http_proxy": {
     "reference": { "exitCode": 0, "stdout": "", "stderr": "", "request": "GET http://gap.invalid/ HTTP/1.1\r\n\r\n" },
     "candidate": { "exitCode": 0, "stdout": "", "stderr": "", "request": "GET http://gap.invalid/ HTTP/1.1\r\n\r\n" }
