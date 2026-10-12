@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Imap.UnitLibrary, Curl.Protocol.Imap.UnitTests, Curl.Console, Curl.Console.UnitTests]
 requirement: none
 created: 2026-10-11
-completed:
+completed: 2026-10-12
 lane: no
 ---
 # BL-2080 — Re-close GF-0057: IMAP logs out after every URL instead of reusing the connection, and every connection's tags start with A where curl uses one letter per connection
@@ -38,14 +38,14 @@ In Curl.Protocol.Imap.UnitLibrary, keep an IMAP connection open after a transfer
 
 ## Acceptance criteria
 
-- [ ] `behaviour:test1982`: Curl answers what curl 8.21.0 answers, `upstream test1982 passes`, so the item measures `match`.
-- [ ] `behaviour:test804`: Curl answers what curl 8.21.0 answers, `upstream test804 passes`, so the item measures `match`.
-- [ ] `behaviour:test815`: Curl answers what curl 8.21.0 answers, `upstream test815 passes`, so the item measures `match`.
-- [ ] `behaviour:test816`: Curl answers what curl 8.21.0 answers, `upstream test816 passes`, so the item measures `match`.
-- [ ] `behaviour:test836`: Curl answers what curl 8.21.0 answers, as the Evidence above shows, so the item measures `match`.
-- [ ] `behaviour:test779`: Curl answers what curl 8.21.0 answers, `upstream test779 passes`, so the item measures `match`.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
-- [ ] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
+- [x] `behaviour:test1982`: Curl answers what curl 8.21.0 answers, `upstream test1982 passes`, so the item measures `match`.
+- [x] `behaviour:test804`: Curl answers what curl 8.21.0 answers, `upstream test804 passes`, so the item measures `match`.
+- [x] `behaviour:test815`: Curl answers what curl 8.21.0 answers, `upstream test815 passes`, so the item measures `match`.
+- [x] `behaviour:test816`: Curl answers what curl 8.21.0 answers, `upstream test816 passes`, so the item measures `match`.
+- [x] `behaviour:test836`: Curl answers what curl 8.21.0 answers, as the Evidence above shows, so the item measures `match`.
+- [x] `behaviour:test779`: Curl answers what curl 8.21.0 answers, `upstream test779 passes`, so the item measures `match`.
+- [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
+- [x] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
 
 ## Notes
 
@@ -75,3 +75,8 @@ In Curl.Protocol.Imap.UnitLibrary, keep an IMAP connection open after a transfer
 - 2026-10-11: Backlog -> Doing.
 - 2026-10-11: Doing -> Backlog. requeue as interactive only; this tree keeps the IMAP connection for a test804-shaped run, so GF-0057 differs only under the gap harness, whose paths lanes cannot read
 - 2026-10-11: Backlog -> Deferred. product fixes BL-2084..BL-2092 are done (BL-2087 blocked on the cost cap); this task closes when the next gap run re-measures its items
+
+Closed by evidence: gap run 2026-10-11_1950 (gap PR #121) closed its finding.
+- 2026-10-12: Deferred -> Backlog. gap run 2026-10-11_1950 closed its finding
+- 2026-10-12: Backlog -> Doing. gap run 2026-10-11_1950 closed its finding
+- 2026-10-12: Doing -> Done. gap run 2026-10-11_1950 closed its finding
