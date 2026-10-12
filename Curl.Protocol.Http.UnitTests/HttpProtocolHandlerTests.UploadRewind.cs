@@ -8,7 +8,8 @@ namespace Curl.Protocol.Http;
 /// Pins <c>Need to rewind upload for next request</c>: curl 8.21.0 writes it under plain <c>-v</c> right
 /// after the status line of a <c>3xx</c> that <c>-L</c> may follow when the request sent a body that is not
 /// empty, whether the redirect then sends the body again (<c>307</c>) or drops it (<c>302</c>), and not
-/// without <c>-L</c>, after a <c>404</c>, or for <c>-d ''</c> (measured 2026-10-02, BL-1213 Notes).
+/// without <c>-L</c>, after a <c>400</c> (the first status past the <c>3xx</c> range, AF-0168) or a
+/// <c>404</c>, or for <c>-d ''</c> (measured 2026-10-02, BL-1213 Notes).
 /// </summary>
 public sealed partial class HttpProtocolHandlerTests
 {
@@ -48,6 +49,7 @@ public sealed partial class HttpProtocolHandlerTests
     }
 
     [TestMethod]
+    [DataRow("HTTP/1.1 400 Bad Request")]
     [DataRow("HTTP/1.1 404 Not Found")]
     [DataRow("HTTP/1.1 200 OK")]
     public async Task ExecuteAsync_ResponseThatIsNotARedirectAfterABody_ReportsNoRewind(string statusLine)

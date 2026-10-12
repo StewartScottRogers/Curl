@@ -5,7 +5,7 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Protocol.Http.UnitLibrary]
+touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests]
 requirement: none
 created: 2026-10-12
 completed:
@@ -45,6 +45,10 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 - [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Fix is test-only: `ExecuteAsync_ResponseThatIsNotARedirectAfterABody_ReportsNoRewind` gains a `HTTP/1.1 400 Bad Request` row, the first status past the 3xx range, so the `< 400` -> `<= 400` mutant now fails it (checked by hand: under the mutant the row fails with "rewind lines: expected 0, actual 1"). The production check was already right. No rewind line after a 400 follows the 3xx-only rule curl 8.21.0 was measured to follow (BL-1213 Notes).
+- Added `Curl.Protocol.Http.UnitTests` to `touches`: the test lives there, and no other task in Doing names it.
+- The finding's own reproduction is an audit-office tool a lane may not run; the quality auditor's re-audit runs it.
 
 ## Log
 
