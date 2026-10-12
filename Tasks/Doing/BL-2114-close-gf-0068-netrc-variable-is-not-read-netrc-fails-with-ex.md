@@ -44,3 +44,4 @@ Make the netrc file lookup behind --netrc (Curl.Cli.UnitLibrary NetrcUse, and th
 ## Log
 
 - 2026-10-12: Created.
+- 2026-10-12: Backlog -> Doing.
