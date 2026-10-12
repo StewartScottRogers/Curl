@@ -36,6 +36,7 @@ Make Curl's advertised features match its behaviour. On Windows, add SSPI to the
 - 2026-10-10_0657: 25 of 25 items are gaps.
 - 2026-10-11_0936: 0 of 25 items are gaps.
 - 2026-10-11_1950: 0 of 25 items are gaps.
+- 2026-10-12_0951: 0 of 25 items are gaps.
 
 ## Log
 
