@@ -311,7 +311,18 @@ public sealed class UpstreamCaseRunner(
         File.WriteAllBytes($"{logDirectory}/stdout{testNumber}", standardOutput.ToArray());
         File.WriteAllBytes($"{logDirectory}/stderr{testNumber}", standardError.ToArray());
         // Read before the postcheck, as before: only the SSH upload is read after it.
-        byte[] receivedBytes = [.. server.ReceivedBytes.Span, .. ftp.ReceivedBytes.Span, .. smtp.ProtocolLog.Span, .. imap.ProtocolLog.Span, .. pop3.ProtocolLog.Span, .. mqtt.ProtocolLog.Span, .. tftp.ProtocolLog.Span];
+        // Upstream's servers all append to one server.input, so a case that reaches several
+        // (test2002, test2003) sees their lines in the order curl sent them.
+        byte[] receivedBytes = UpstreamProtocolDump.Merge(
+        [
+            (server.ReceivedBytes, server.ReceivedDump),
+            (ftp.ReceivedBytes, ftp.ReceivedDump),
+            (smtp.ProtocolLog, smtp.ProtocolDump),
+            (imap.ProtocolLog, imap.ProtocolDump),
+            (pop3.ProtocolLog, pop3.ProtocolDump),
+            (mqtt.ProtocolLog, mqtt.ProtocolDump),
+            (tftp.ProtocolLog, tftp.ProtocolDump),
+        ]);
         byte[] outputFileBytes = ReadOutputFile(outputFile);
         return Judge(testCase, () => new UpstreamCaseRun(exitCode, standardOutput.ToArray(), standardError.ToArray(), receivedBytes, outputFileBytes)
         {

@@ -14,7 +14,8 @@ namespace Curl.Conformance;
 /// Checked in this order: <c>&lt;protocol&gt;</c> against the bytes the server received, with
 /// <c>&lt;strip&gt;</c> lines removed from both and <c>&lt;strippart&gt;</c> run on the received
 /// lines; <c>&lt;proxy&gt;</c> the same way against the bytes the http-proxy server on
-/// <c>%PROXYPORT</c> received, as <c>runtests.pl</c> compares its proxy log; the <c>--output</c> file against <c>&lt;datacheck&gt;</c> (and <c>&lt;datacheck1&gt;</c> to
+/// <c>%PROXYPORT</c> received, as <c>runtests.pl</c> compares its proxy log; <c>&lt;upload&gt;</c>
+/// against the uploaded message with <c>&lt;strippart&gt;</c> run on it but no <c>&lt;strip&gt;</c>; the <c>--output</c> file against <c>&lt;datacheck&gt;</c> (and <c>&lt;datacheck1&gt;</c> to
 /// <c>&lt;datacheck9&gt;</c> after it), or <c>&lt;data&gt;</c> when there is none, unless
 /// <c>&lt;data&gt;</c> says <c>nocheck</c> or both are empty and it does not say <c>sendzero</c>;
 /// <c>&lt;stdout&gt;</c> and <c>&lt;stderr&gt;</c> with <c>&lt;stripfile&gt;</c> run on the output;
@@ -84,8 +85,8 @@ internal static class UpstreamCaseVerification
         return UpstreamFirstDifference.Describe($"<verify><{partName}>", expected, actual);
     }
 
-    // runtests.pl runs each <strippart> line on the stored upload's lines, but no <strip>, then
-    // compares it with <upload> (test1187 normalises its random MIME boundary this way).
+    // runtests.pl runs each <strippart> line on the stored upload, as on the protocol, but no <strip>,
+    // then compares it with <upload>: test646 and test1187 cut their random MIME boundary that way.
     private static string? CompareUpload(UpstreamTestCase testCase, byte[] uploaded) =>
         testCase.Find("verify", "upload") is { } part
             ? UpstreamFirstDifference.Describe("<verify><upload>", Expected(part), Strip(uploaded, [], Substitutions(testCase, "strippart")))

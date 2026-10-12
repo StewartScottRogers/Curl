@@ -30,6 +30,9 @@ public sealed class Pop3ServerConnector(UpstreamTestCase testCase, IConnector ba
     public ReadOnlyMemory<byte> ProtocolLog =>
         Encoding.Latin1.GetBytes(string.Concat(responders.SelectMany(responder => responder.ReceivedCommandLines)));
 
+    /// <summary>The command lines of <see cref="ProtocolLog"/>, each numbered in the order of all servers' writes.</summary>
+    internal IReadOnlyList<UpstreamProtocolDumpEntry> ProtocolDump => [.. responders.SelectMany(responder => responder.ReceivedCommandLineDump)];
+
     /// <summary>Opens a POP3 connection when <paramref name="target"/>'s port is <see cref="Pop3Port"/>, otherwise a connection to the wrapped server.</summary>
     /// <param name="target">The host and port to connect to.</param>
     /// <param name="cancellationToken">Passed to the server the connection reaches.</param>

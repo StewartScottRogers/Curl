@@ -90,6 +90,18 @@ public sealed class UpstreamCaseVerificationTests
     }
 
     [TestMethod]
+    public void FindFirstDifference_Upload_RunsStrippartOnTheUploadedMessage()
+    {
+        // test646: runtests.pl runs <strippart> on the stored upload, which cuts curl's random MIME boundary.
+        string sections = "<verify>\n<strippart>\ns/boundary=-+[A-Za-z0-9]*/boundary=---/\n</strippart>\n"
+            + "<upload crlf=\"yes\">\nContent-Type: multipart/mixed; boundary=---\n</upload>\n</verify>\n";
+
+        string? difference = Verify(sections, new UpstreamCaseRun(0, [], [], [], []) { UploadedBytes = Bytes("Content-Type: multipart/mixed; boundary=------Ab12\r\n") });
+        ExpectDifference(null, difference);
+        Assert.IsNull(difference);
+    }
+
+    [TestMethod]
     public void FindFirstDifference_ReplyData_IsComparedWithTheOutputFile()
     {
         string sections = "<reply>\n<data crlf=\"headers\">\nHTTP/1.1 200 OK\n\nbody\n</data>\n</reply>\n";

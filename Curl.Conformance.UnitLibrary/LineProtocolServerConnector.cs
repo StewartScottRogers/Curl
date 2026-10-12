@@ -45,6 +45,9 @@ internal sealed class LineProtocolServerConnector : IConnector
     /// </summary>
     public ReadOnlyMemory<byte> ReceivedBytes => recording.Bytes;
 
+    /// <summary>The writes <see cref="ReceivedBytes"/> came from, each numbered in the order of all servers' writes.</summary>
+    public IReadOnlyList<UpstreamProtocolDumpEntry> ReceivedDump => recording.Dump;
+
     /// <summary>Opens a new in-memory connection, its remote end point 127.0.0.1 at the target's port.</summary>
     /// <param name="target">Gives only the remote end point's port: every host and port reaches the same server.</param>
     /// <param name="cancellationToken">Not observed; the connection opens at once.</param>

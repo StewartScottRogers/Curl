@@ -103,6 +103,9 @@ public sealed class SwsHttpServerConnector : IConnector
     /// </summary>
     public ReadOnlyMemory<byte> ReceivedBytes => recording.Bytes;
 
+    /// <summary>The writes <see cref="ReceivedBytes"/> came from, each numbered in the order of all servers' writes.</summary>
+    internal IReadOnlyList<UpstreamProtocolDumpEntry> ReceivedDump => recording.Dump;
+
     /// <summary>
     /// Every byte received on connections to <see cref="ProxyPort"/>, recorded as
     /// <see cref="ReceivedBytes"/> records the rest, for <c>&lt;verify&gt;&lt;proxy&gt;</c>.

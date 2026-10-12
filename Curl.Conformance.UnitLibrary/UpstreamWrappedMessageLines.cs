@@ -4,9 +4,11 @@ namespace Curl.Conformance;
 
 /// <summary>
 /// Joins the lines curl 8.21.0's <c>warnf</c> and <c>notef</c> (<c>voutf</c> in <c>src/tool_msgs.c</c>)
-/// wrap a <c>Warning: </c> or <c>Note: </c> message into, so a message naming the harness's long
-/// absolute <c>%LOGDIR</c> compares equal to the one line <c>runtests.pl</c>'s short <c>log</c> keeps
-/// it on (ADR-0475).
+/// wrap a <c>Warning: </c> or <c>Note: </c> message into, and the lines it wraps a <c>curl: </c>
+/// error into (test411's <c>curl: cannot read config from '%LOGDIR/missing'</c>, which Curl wraps
+/// as curl does when standard error is not a terminal, <c>Curl.Cli.WrappedMessage</c>), so a
+/// message naming the harness's long absolute <c>%LOGDIR</c> compares equal to the one line
+/// <c>runtests.pl</c>'s short <c>log</c> keeps it on (ADR-0475).
 /// </summary>
 /// <remarks>
 /// <c>voutf</c> cuts a message longer than <c>COLUMNS</c> (79 under <c>runtests.pl</c>) after its
@@ -20,9 +22,9 @@ internal static class UpstreamWrappedMessageLines
     /// <summary>The terminal width <c>runtests.pl</c> sets, <c>COLUMNS=79</c>.</summary>
     public const int DefaultColumns = 79;
 
-    private static readonly string[] Prefixes = ["Warning: ", "Note: "];
+    private static readonly string[] Prefixes = ["Warning: ", "Note: ", "curl: "];
 
-    /// <summary>Joins every wrapped <c>Warning: </c> or <c>Note: </c> message in <paramref name="body"/> back onto one line.</summary>
+    /// <summary>Joins every wrapped <c>Warning: </c>, <c>Note: </c> or <c>curl: </c> message in <paramref name="body"/> back onto one line.</summary>
     /// <param name="body">Standard error bytes, read as Latin-1.</param>
     /// <returns>The bytes with each wrapped message on one line.</returns>
     public static byte[] Unwrap(byte[] body)

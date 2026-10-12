@@ -10,7 +10,8 @@ namespace Curl.Conformance;
 /// sws keeps one monitor flag for the whole server: a request's <c>&lt;servercmd&gt;</c> sets it,
 /// and the next connection close records the line and clears it. Connections are written on many
 /// threads at once when curl runs transfers in parallel, so every member takes one lock, and the
-/// bytes of one write stay together (BL-1647).
+/// bytes of one write stay together (BL-1647). Each write is numbered in <see cref="Dump"/>, so
+/// the runner can interleave this server's dump with the other servers' (test2003).
 /// </remarks>
 internal sealed class SwsServerRecording
 {
@@ -18,41 +19,24 @@ internal sealed class SwsServerRecording
 
     private readonly Lock gate = new();
 
-    private readonly List<byte> bytes = [];
+    private readonly UpstreamProtocolDump dump = new();
 
     private bool monitorArmed;
 
     /// <summary>Every byte recorded so far.</summary>
-    public byte[] Bytes
-    {
-        get
-        {
-            lock (gate)
-            {
-                return [.. bytes];
-            }
-        }
-    }
+    public byte[] Bytes => dump.Bytes;
+
+    /// <summary>Every write recorded so far, each numbered in the order of all servers' writes.</summary>
+    public IReadOnlyList<UpstreamProtocolDumpEntry> Dump => dump.Entries;
 
     /// <summary>Records bytes a client wrote.</summary>
     /// <param name="received">The bytes.</param>
-    public void Record(ReadOnlySpan<byte> received)
-    {
-        lock (gate)
-        {
-            bytes.AddRange(received);
-        }
-    }
+    public void Record(ReadOnlySpan<byte> received) => dump.Record(received);
 
     /// <summary>Forgets the last bytes recorded, ones sws never read into its protocol dump.</summary>
     /// <param name="count">How many of the last bytes to forget.</param>
-    public void Forget(int count)
-    {
-        lock (gate)
-        {
-            bytes.RemoveRange(bytes.Count - count, count);
-        }
-    }
+    public void Forget(int count) => dump.Forget(count);
+
     /// <summary>Arms the monitor, as sws does when it reads <c>connection-monitor</c> for a request.</summary>
     public void ArmDisconnectMonitor()
     {
@@ -69,7 +53,7 @@ internal sealed class SwsServerRecording
         {
             if (monitorArmed)
             {
-                bytes.AddRange(DisconnectLine);
+                dump.Record(DisconnectLine);
                 monitorArmed = false;
             }
         }
