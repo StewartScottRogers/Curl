@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Http.UnitLibrary]
 requirement: none
 created: 2026-10-12
-completed:
+completed: 2026-10-12
 ---
 # BL-2101 — Fix AF-0166: HttpRequestFraming's default chunksForUnknownLength = false can become true with no test failing: a bodyless GET's auth retry to an HTTP/1.0 server fails with exit 25
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Added `HttpRequestFramingTests.Of_NoBody_NeverChunksForUnknownLength` (bodyless GET and HEAD over -0, GET over 1.1): pins `ChunksForUnknownLength` and `IsChunked` false. The lane audit guard refuses running `Audit/Tools/Invoke-MutationTest.ps1`, so the mutant was applied by hand (`= true` at HttpRequestFraming.cs:45): the -0 GET and -0 HEAD rows failed, then the mutant was reverted. A re-audit should confirm with the finding's own command.
 
 ## Log
 
 - 2026-10-12: Created.
 - 2026-10-12: Backlog -> Doing.
+- 2026-10-12: Doing -> Done. Bodyless framing's ChunksForUnknownLength pinned by a test that kills the AF-0166 mutant
