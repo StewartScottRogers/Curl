@@ -49,11 +49,22 @@ internal static class ConfigFileApplier
             return CommandLineRefusal.ConfigFileUnreadable(spelledOption, path, options.ErrorsHidden, WrappedMessage.TerminalColumns(options.ReadEnvironmentVariable("COLUMNS")));
         }
 
+        int readableLength = ConfigFileSyntax.ReadableLength(contents);
         options.OpenConfigFileCount++;
-        CommandLineRefusal? refusal = ApplyLines(options, shownName, contents, spelledOption, pathExists, dataFileReader);
+        CommandLineRefusal? refusal = ApplyLines(options, shownName, contents[..readableLength], spelledOption, pathExists, dataFileReader);
         options.OpenConfigFileCount--;
-        return refusal;
+        return refusal ?? RefusalForUnreadableLine(options, path, spelledOption, readableLength < contents.Length);
     }
+
+    /// <summary>
+    /// The refusal for a <c>-K</c> file whose readable lines were all applied but which has a line too
+    /// long to read (<see cref="ConfigFileSyntax.UnreadableLineLength"/>): curl 8.21.0 reports it as a file
+    /// it cannot read, exit 26, its message hidden when an earlier line turned <c>-s</c> on.
+    /// </summary>
+    private static CommandLineRefusal? RefusalForUnreadableLine(CommandLineOptions options, string path, string spelledOption, bool hasUnreadableLine) =>
+        hasUnreadableLine
+            ? CommandLineRefusal.ConfigFileUnreadable(spelledOption, path, options.ErrorsHidden, WrappedMessage.TerminalColumns(options.ReadEnvironmentVariable("COLUMNS")))
+            : null;
 
     /// <summary>
     /// Reads the first of <paramref name="candidatePaths"/> that can be read as curl's default config
@@ -82,7 +93,8 @@ internal static class ConfigFileApplier
     private static void ApplyDefaultFileLines(CommandLineOptions options, string path, byte[] contents, Func<string, bool> pathExists, IDataFileReader dataFileReader)
     {
         options.ReadingConfigFileAsWireText = ReadsAsWireText(options, contents);
-        foreach (ConfigFileLine line in ReadLines(options, path, contents))
+        int readableLength = ConfigFileSyntax.ReadableLength(contents);
+        foreach (ConfigFileLine line in ReadLines(options, path, contents[..readableLength]))
         {
             options.AddWarningLinesUnlessSilent(line.WarningLines);
             CommandLineRefusal? lineRefusal = CommandLineParser.ApplyConfigFileLine(options, line.Option, line.Parameter, pathExists, dataFileReader);
@@ -95,6 +107,12 @@ internal static class ConfigFileApplier
         }
 
         options.ReadingConfigFileAsWireText = false;
+        if (readableLength < contents.Length)
+        {
+            options.AddErrorLines(CommandLineRefusal.ConfigFileUnreadableLines(path, options.ErrorsHidden, WrappedMessage.TerminalColumns(options.ReadEnvironmentVariable("COLUMNS"))));
+            return;
+        }
+
         options.DefaultConfigFile = path;
     }
 
