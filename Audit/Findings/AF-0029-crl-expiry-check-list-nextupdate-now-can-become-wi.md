@@ -3,8 +3,8 @@ id: AF-0029
 title: CRL expiry check `list.NextUpdate < now` can become `<=` with no test failing
 auditor: quality
 severity: Medium
-status: accepted
-reason: 
+status: closed
+reason: Stewart closed it on 2026-10-12: its re-audit of 2026-10-07 found it no longer reproduces (CertificateRevocationListFile.cs reads <= and a test kills the reverse mutant); no second confirmation came.
 key: quality:Curl.Networking.UnitLibrary/CertificateRevocationListFile.cs:DateRefusal-lt:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/CertificateRevocationListFile.cs:116:<
 task: BL-1371
@@ -13,9 +13,9 @@ found: 2026-10-03
 found-at: d1db9881553d55cd92c0e74bb41561c3dea9ea84
 scorecard: 2026-10-03_1233.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-12
+closed-how: stewart
+closed-by: stewart
 ---
 # AF-0029 - CRL expiry check `list.NextUpdate < now` can become `<=` with no test failing
 
@@ -58,3 +58,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Netwo
 
 - 2026-10-03: filed proposed.
 - 2026-10-03: proposed -> accepted.
+- 2026-10-12: accepted -> closed. Stewart closed it on 2026-10-12: its re-audit of 2026-10-07 found it no longer reproduces (CertificateRevocationListFile.cs reads <= and a test kills the reverse mutant); no second confirmation came.
