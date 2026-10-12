@@ -87,3 +87,4 @@ In Curl.Console, give InProcessCurl (and the CurlComposition.CreateRunner overlo
 - 2026-10-11: Created.
 - 2026-10-11: Backlog -> Doing.
 - 2026-10-11: Doing -> Backlog. Interactive only: the gap office's Measure-UpstreamCases.cs still calls the IConnector overload of InProcessCurl.RunAsync; lanes may not read or change it
+- 2026-10-11: Backlog -> Deferred. product fixes BL-2084..BL-2092 are done (BL-2087 blocked on the cost cap); this task closes when the next gap run re-measures its items

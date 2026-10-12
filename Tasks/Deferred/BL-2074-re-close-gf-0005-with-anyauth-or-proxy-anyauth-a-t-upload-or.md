@@ -74,3 +74,4 @@ In Curl.Protocol.Http.UnitLibrary, make HttpProtocolHandler.MayRetry and the upl
 - 2026-10-11: Created.
 - 2026-10-11: Backlog -> Doing.
 - 2026-10-11: Doing -> Backlog. Interactive only: reproducing GF-0005 needs the gap office's tools and upstream data, which lanes may not read; lane measurements show the resend working (see Notes)
+- 2026-10-11: Backlog -> Deferred. product fixes BL-2084..BL-2092 are done (BL-2087 blocked on the cost cap); this task closes when the next gap run re-measures its items

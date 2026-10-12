@@ -71,3 +71,4 @@ In Curl.Console's mail mapping (MailRequestOptionsMapping), treat -F parts on an
 - 2026-10-11: Created.
 - 2026-10-11: Backlog -> Doing.
 - 2026-10-11: Doing -> Backlog. requeue as interactive only; this tree sends test646's MIME message (MAIL FROM, DATA, no VRFY), so GF-0058 differs only under the gap harness, whose paths lanes cannot read
+- 2026-10-11: Backlog -> Deferred. product fixes BL-2084..BL-2092 are done (BL-2087 blocked on the cost cap); this task closes when the next gap run re-measures its items
