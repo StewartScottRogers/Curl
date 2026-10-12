@@ -40,3 +40,4 @@ task is too big for one run and should be split, so it stays in Blocked.
 ## Log
 
 - 2026-10-12: Created.
+- 2026-10-12: Backlog -> Doing.
