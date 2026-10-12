@@ -9,7 +9,7 @@ touches: [Gap/Tools]
 lane: no
 requirement: none
 created: 2026-10-12
-completed:
+completed: 2026-10-12
 ---
 # BL-2112 — Gap environment: probe COLUMNS and SHELL
 
@@ -23,13 +23,16 @@ Gap run 2026-10-11_1950 scored environment 24/42 (57.1%): every measured item ma
 
 ## Acceptance criteria
 
-- [ ] `COLUMNS` has a recipe comparing the `-#` progress bar width under a set `COLUMNS`.
-- [ ] `SHELL` has a recipe for whatever curl 8.21.0 uses it for (found in its source or docs and recorded in Notes), or an exclusion with that reason.
-- [ ] `Measure-EnvironmentGap.ps1 -SelfTest` passes, and a local run measures neither as no-probe.
+- [x] `COLUMNS` has a recipe comparing the `-#` progress bar width under a set `COLUMNS`.
+- [x] `SHELL` has a recipe for whatever curl 8.21.0 uses it for (found in its source or docs and recorded in Notes), or an exclusion with that reason.
+- [x] `Measure-EnvironmentGap.ps1 -SelfTest` passes, and a local run measures neither as no-probe.
 
 ## Notes
+
+SHELL: curl 8.21.0 reads it only in src/tool_vms.c (is_vms_shell(), telling the DCL shell from a Unix shell for exit codes), which only the VMS build compiles, so the item is excluded as platform:vms (PR #124).
 
 ## Log
 
 - 2026-10-12: Created.
 - 2026-10-12: Backlog -> Doing. interactive: gap environment probes
+- 2026-10-12: Doing -> Done. PR #124 merged: recipes or exclusions for all 18 no-probe environment items

@@ -9,7 +9,7 @@ touches: [Gap/Tools]
 lane: no
 requirement: none
 created: 2026-10-12
-completed:
+completed: 2026-10-12
 ---
 # BL-2111 — Gap environment: probe CURL_CA_BUNDLE, SSL_CERT_FILE, SSL_CERT_DIR and SSLKEYLOGFILE over a loopback TLS server
 
@@ -23,8 +23,8 @@ Gap run 2026-10-11_1950 scored environment 24/42 (57.1%): every measured item ma
 
 ## Acceptance criteria
 
-- [ ] `CURL_CA_BUNDLE`, `SSL_CERT_FILE`, `SSL_CERT_DIR` and `SSLKEYLOGFILE` each have a recipe over a loopback TLS server with a throwaway certificate, or an exclusion with a reason where the Schannel reference ignores the variable (measured, not assumed).
-- [ ] `Measure-EnvironmentGap.ps1 -SelfTest` passes, and a local run measures none of the four as no-probe.
+- [x] `CURL_CA_BUNDLE`, `SSL_CERT_FILE`, `SSL_CERT_DIR` and `SSLKEYLOGFILE` each have a recipe over a loopback TLS server with a throwaway certificate, or an exclusion with a reason where the Schannel reference ignores the variable (measured, not assumed).
+- [x] `Measure-EnvironmentGap.ps1 -SelfTest` passes, and a local run measures none of the four as no-probe.
 
 ## Notes
 
@@ -32,3 +32,4 @@ Gap run 2026-10-11_1950 scored environment 24/42 (57.1%): every measured item ma
 
 - 2026-10-12: Created.
 - 2026-10-12: Backlog -> Doing. interactive: gap environment probes
+- 2026-10-12: Doing -> Done. PR #124 merged: recipes or exclusions for all 18 no-probe environment items
