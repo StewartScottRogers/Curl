@@ -8,7 +8,7 @@ method second. It reads `<run>/measurements/environment.json`, written by
 
 | Key | Kind | A gap means |
 | --- | --- | --- |
-| `environment:<NAME>` | variable | Curl reads the variable differently: exit code, stdout, stderr or, for a proxy variable, the request bytes the loopback proxy received. |
+| `environment:<NAME>` | variable | Curl reads the variable differently: exit code, stdout, stderr or, for a recipe with a loopback server (the proxy variables, `NETRC` and the TLS variables), the request bytes the server received and, for `SSLKEYLOGFILE`, what was written to the file it names. |
 | `environment:config-path:<n>` | config-path | Curl does not read, or reads differently, a config file in location `<n>` of `docs/cmdline-opts/config.md`. |
 | `environment:config-syntax:<slug>` | config-syntax | Curl parses one config-file syntax rule differently. |
 
@@ -23,8 +23,8 @@ powershell -NoProfile -File Gap\Tools\Measure-EnvironmentGap.ps1 -OutFile <temp>
 
 Every `gap` item goes in exactly one group, chosen by the mechanism that reads it:
 
-1. **Proxy variables** (`http_proxy`, `HTTPS_PROXY`, `ALL_PROXY`, `NO_PROXY` and their
-   case forms): one group per cause, keyed `environment:proxy-<cause>`. Curl picks the
+1. **Proxy variables** (`http_proxy`, `HTTPS_PROXY`, `ALL_PROXY`, `NO_PROXY`,
+   `[scheme]_proxy`, `[url-protocol]_PROXY` and their case forms): one group per cause, keyed `environment:proxy-<cause>`. Curl picks the
    proxy in `Curl.Core.UnitLibrary`'s `ProxySelector` and matches `NO_PROXY` in
    `NoProxyMatcher`.
 2. **Config-file locations** (`config-path:<n>`): one group, `environment:config-file-search`,
