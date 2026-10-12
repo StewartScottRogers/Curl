@@ -3,8 +3,8 @@ id: AF-0155
 title: HTTP Digest answer with qop sends a 16-character base64 cnonce where curl 8.21.0 sends 32 lower-case hex digits
 auditor: conformance
 severity: Medium
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-11_1638.md: the reproduction no longer reproduces.
 key: conformance:Curl.Authentication.UnitLibrary/DigestClientNonce.cs:CreateRandom:request
 reproduction: none
 task: BL-2048
@@ -13,9 +13,9 @@ found: 2026-10-11
 found-at: 22f394602532a6922adbc7fa91b3739b62d2112a
 scorecard: 2026-10-11_0051.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-11
+closed-how: reliable-reaudit
+closed-by: 2026-10-11_1638.md
 ---
 # AF-0155 - HTTP Digest answer with qop sends a 16-character base64 cnonce where curl 8.21.0 sends 32 lower-case hex digits
 
@@ -42,7 +42,10 @@ $o="$env:TEMP\ac-cn"; $r=@('HTTP/1.1 401 Unauthorized\r\nWWW-Authenticate: Diges
 
 ## Re-audits
 
+- 2026-10-11 | 2026-10-11_1638.md | reproduces: no | Ran the reproduction: curl's cnonce is 776a23768bb0291e12434cabb382cf32 and Curl's is a8b24e0b365d9b4f4968481ee87bd544. Both are 32 lower-case hex digits.
+
 ## Log
 
 - 2026-10-11: filed proposed.
 - 2026-10-11: proposed -> accepted.
+- 2026-10-11: accepted -> closed. Re-audit 2026-10-11_1638.md: the reproduction no longer reproduces.
