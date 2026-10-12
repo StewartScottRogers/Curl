@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary, Curl.Networking.UnitTests]
 requirement: none
 created: 2026-10-12
-completed:
+completed: 2026-10-12
 ---
 # BL-2113 — Close GF-0067: A name under .localhost goes to the system resolver and fails with exit 6, where curl resolves it to 127.0.0.1 and ::1
 
@@ -35,13 +35,16 @@ In Curl.Networking.UnitLibrary, change SystemDnsResolver.ResolveAsync (the produ
 
 ## Acceptance criteria
 
-- [ ] `behaviour:test389`: Curl answers what curl 8.21.0 answers, `reference curl exits 0; stdout 0 bytes: `, so the item measures `match`.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
-- [ ] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
+- [x] `behaviour:test389`: Curl answers what curl 8.21.0 answers, `reference curl exits 0; stdout 0 bytes: `, so the item measures `match`.
+- [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
+- [x] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
 
 ## Notes
+
+- 2026-10-12: SystemDnsResolver now answers localhost and names under .localhost with ::1 then 127.0.0.1 without calling the lookup delegate, through the shared TcpConnector.IsLocalhost. Measured on the built curl.exe: `curl -s -o NUL http://curlmachine.localhost:1/` exits 7 (was 6), as the reference does. No TcpConnector test added: TcpConnector already keeps a localhost answer whole under -4/-6 (ADR-0143) and its tests use fake resolvers, so the fix lives and is tested in SystemDnsResolverTests. No option changed, so --ai-help is unaffected.
 
 ## Log
 
 - 2026-10-12: Created.
 - 2026-10-12: Backlog -> Doing.
+- 2026-10-12: Doing -> Done. SystemDnsResolver answers .localhost names with ::1 and 127.0.0.1; curlmachine.localhost now dials loopback as curl does (test389)

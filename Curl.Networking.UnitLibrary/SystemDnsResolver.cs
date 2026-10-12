@@ -14,10 +14,14 @@ namespace Curl.Networking;
 /// A host the system resolver cannot resolve, or one longer than the 255 characters
 /// <see cref="Dns" /> accepts, yields an empty list rather than an exception, which <see cref="TcpConnector" /> reports as
 /// <see cref="CurlExitCode.CouldntResolveHost" />. An address literal <see cref="Dns" />
-/// refuses, the any-address such as host <c>0</c>, resolves to itself.
+/// refuses, the any-address such as host <c>0</c>, resolves to itself. <c>localhost</c> and every
+/// name under <c>.localhost</c> resolve to <c>::1</c> and <c>127.0.0.1</c> without a lookup, as
+/// curl answers them itself.
 /// </remarks>
 public sealed class SystemDnsResolver : IDnsResolver
 {
+    private static readonly IPAddress[] LocalhostAddresses = [IPAddress.IPv6Loopback, IPAddress.Loopback];
+
     private readonly Func<string, CancellationToken, Task<IPAddress[]>> _lookUpHostAddresses;
 
     /// <summary>
@@ -48,11 +52,20 @@ public sealed class SystemDnsResolver : IDnsResolver
     /// it reports the host cannot be resolved or refuses it as longer than 255 characters.
     /// An address literal the system resolver refuses - the any-address, such as host
     /// <c>0</c> - is returned as itself, so the connect fails as curl's does with
-    /// <see cref="CurlExitCode.CouldntConnect" />.
+    /// <see cref="CurlExitCode.CouldntConnect" />. <c>localhost</c> and every name under
+    /// <c>.localhost</c> are <c>::1</c> then <c>127.0.0.1</c>, without asking the system resolver.
     /// </returns>
     public async ValueTask<IReadOnlyList<IPAddress>> ResolveAsync(string host, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(host);
+
+        if (TcpConnector.IsLocalhost(host))
+        {
+            // curl 8.21.0 answers localhost and every name under .localhost itself and never
+            // asks the system resolver: curl -4 http://curlmachine.localhost/ dials 127.0.0.1
+            // (test389, BL-2113).
+            return LocalhostAddresses;
+        }
 
         try
         {
