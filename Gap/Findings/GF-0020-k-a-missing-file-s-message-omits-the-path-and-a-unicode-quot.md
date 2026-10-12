@@ -4,11 +4,11 @@ title: -K: a missing file's message omits the path, and a Unicode quote in a con
 area: behaviour
 key: behaviour:config-file-reading
 severity: High
-status: open
+status: closed
 scope: target
 introduced-in:
 opened: 2026-10-08_1640
-closed:
+closed: 2026-10-11_1950
 regression: false
 items: [behaviour:test411, behaviour:test470]
 touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests]
@@ -35,6 +35,7 @@ In Curl.Cli.UnitLibrary's config-file reader: put the quoted path in 'cannot rea
 - 2026-10-08_2029: 2 of 2 items are gaps.
 - 2026-10-10_0657: 1 of 2 items are gaps.
 - 2026-10-11_0936: 1 of 2 items are gaps.
+- 2026-10-11_1950: 0 of 2 items are gaps.
 
 ## Log
 
@@ -42,3 +43,4 @@ In Curl.Cli.UnitLibrary's config-file reader: put the quoted path in 'cannot rea
 - 2026-10-08_1731: Filed BL-1813.
 - 2026-10-10_0756: Filed BL-1973.
 - 2026-10-11_1029: Filed BL-2078.
+- 2026-10-11_1950: Closed: run 2026-10-11_1950 measured every item as match or excluded.

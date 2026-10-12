@@ -35,6 +35,7 @@ In Curl.Cookies.UnitLibrary: strip a trailing dot from both the Domain attribute
 - 2026-10-08_2029: 1 of 2 items are gaps.
 - 2026-10-10_0657: 0 of 2 items are gaps.
 - 2026-10-11_0936: 0 of 2 items are gaps.
+- 2026-10-11_1950: 0 of 2 items are gaps.
 
 ## Log
 

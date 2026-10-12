@@ -4,11 +4,11 @@ title: In process, Curl opens a new connection for every request, so connection-
 area: behaviour
 key: behaviour:in-process-runner-has-no-connection-pool
 severity: Critical
-status: open
+status: closed
 scope: target
 introduced-in:
 opened: 2026-10-08_1640
-closed:
+closed: 2026-10-11_1950
 regression: false
 items: [behaviour:test338, behaviour:test1421, behaviour:test1134, behaviour:test48, behaviour:test1418, behaviour:test1419, behaviour:test435, behaviour:test1074, behaviour:test1479, behaviour:test471]
 touches: [Curl.Console, Curl.Console.UnitTests, Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests]
@@ -35,6 +35,7 @@ In Curl.Console, make InProcessCurl.RunAsync create a run ConnectionCache and pa
 - 2026-10-08_2029: 1 of 10 items are gaps.
 - 2026-10-10_0657: 1 of 10 items are gaps.
 - 2026-10-11_0936: 1 of 10 items are gaps.
+- 2026-10-11_1950: 0 of 10 items are gaps.
 
 ## Log
 
@@ -42,3 +43,4 @@ In Curl.Console, make InProcessCurl.RunAsync create a run ConnectionCache and pa
 - 2026-10-08_1731: Filed BL-1795.
 - 2026-10-10_0756: Filed BL-1998.
 - 2026-10-11_1029: Filed BL-2073.
+- 2026-10-11_1950: Closed: run 2026-10-11_1950 measured every item as match or excluded.
