@@ -284,8 +284,8 @@ no user name, the URL's percent-decoded user name and password are sent (`http:/
 `zz:`, `http://:x@host/` sends `:x`, `http://@host/` nothing), replacing a `-u :pw` whole (BL-791).
 Under `-n`, `--netrc-file` or `--netrc-optional` the netrc file has its say too, and the runner keeps them as the running transfer's
 `LookedUpCredentials`, which `TransferContextFactory` puts on every attempt's context in place of
-`-u`'s. A `-u` with a user name wins and no file is read. The file is the `--netrc-file` one, else
-`.netrc` in `HOME` (on Windows `_netrc` after it, and `USERPROFILE` when `HOME` is not set), read
+`-u`'s. A `-u` with a user name wins and no file is read. The file is the `--netrc-file` one, else the one a
+non-empty `NETRC` names (BL-2114), else `.netrc` in `HOME` (on Windows `_netrc` after it, and `USERPROFILE` when `HOME` is not set), read
 through the runner's `IDataFileReader` and environment. The URL's percent-decoded user name picks
 the entry (`Curl.Authentication`'s `NetrcFile`), whose password beats the URL's; an entry with no
 login takes the URL's user name, and one with no password sends an empty one, never the URL's

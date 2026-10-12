@@ -5,10 +5,10 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests]
+touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests, Curl.Console, Curl.Console.UnitTests]
 requirement: none
 created: 2026-10-12
-completed:
+completed: 2026-10-12
 ---
 # BL-2114 — Close GF-0068: NETRC variable is not read; --netrc fails with exit 26 instead of using the named file
 
@@ -35,13 +35,25 @@ Make the netrc file lookup behind --netrc (Curl.Cli.UnitLibrary NetrcUse, and th
 
 ## Acceptance criteria
 
-- [ ] `environment:NETRC`: Curl answers what curl 8.21.0 answers, `exit 0; stdout ''; stderr ''; request GET / HTTP/1.1`, so the item measures `match`.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
-- [ ] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
+- [x] `environment:NETRC`: Curl answers what curl 8.21.0 answers, `exit 0; stdout ''; stderr ''; request GET / HTTP/1.1`, so the item measures `match`.
+- [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
+- [x] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
 
 ## Notes
+
+- The netrc path is chosen in `Curl.Console/TransferCredentialLookup.cs` (`CandidatePaths`), not in
+  `Curl.Cli.UnitLibrary`, so `Curl.Console` and `Curl.Console.UnitTests` were added to `touches`; no
+  other task in Doing named them (BL-2109 touches Curl.Networking only).
+- Order now: `--netrc-file`, else the file `NETRC` names, else `.netrc` (and `_netrc` on Windows) in
+  `HOME`/`USERPROFILE`. Default taken: an empty `NETRC` counts as unset, as `HOME` and `USERPROFILE`
+  already do, and `--netrc-file` beats `NETRC` (an explicit option wins over the environment, as
+  libcurl's `CURLOPT_NETRC_FILE` does). Not re-measured on real curl this run; the finding's own
+  recipe (exit 0, GET /, nu:np) is pinned in
+  `CurlCommandRunnerNetrcTests.RunAsync_NetrcVariableNamesAFile_ReadsOnlyThatFile`.
+- No option changed, so `--ai-help` needs nothing.
 
 ## Log
 
 - 2026-10-12: Created.
 - 2026-10-12: Backlog -> Doing.
+- 2026-10-12: Doing -> Done. Curl's netrc lookup reads the file NETRC names; unit tests pin it

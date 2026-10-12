@@ -20,7 +20,7 @@ namespace Curl.Console;
 /// noticed; <c>-u :</c> or <c>-u :pw</c> has no user name and does not count, so the URL's user
 /// name and password replace it whole. With no netrc option, the URL's credentials are sent when
 /// it gives a user name or a password (<see cref="CredentialsWrittenInUrl" />). Otherwise the file
-/// is the <c>--netrc-file</c> one, or <c>.netrc</c> in <c>HOME</c>, with <c>_netrc</c> after it on
+/// is the <c>--netrc-file</c> one, else the one a non-empty <c>NETRC</c> names, or <c>.netrc</c> in <c>HOME</c>, with <c>_netrc</c> after it on
 /// Windows, where <c>USERPROFILE</c> stands in when <c>HOME</c> is not set. A file that cannot be
 /// read, a directory included, fails the transfer with <c>(26) .netrc error: no such file</c>
 /// unless <c>--netrc-optional</c> is in effect, and a malformed one with
@@ -52,7 +52,7 @@ namespace Curl.Console;
 /// <param name="fileReader">Reads the netrc file.</param>
 /// <param name="readEnvironmentVariable">
 /// Returns an environment variable's value, or <see langword="null" /> when it is not set; read
-/// for <c>HOME</c> and, on Windows, <c>USERPROFILE</c>.
+/// for <c>NETRC</c>, <c>HOME</c> and, on Windows, <c>USERPROFILE</c>.
 /// </param>
 /// <param name="runsOnWindows">Whether the default location is looked for as curl's Windows build does.</param>
 /// <param name="diagnosticLog">Where a matching netrc entry is logged, by host and login only (BL-1151); <see langword="null" /> logs nothing.</param>
@@ -366,12 +366,13 @@ internal sealed class TransferCredentialLookup(
     /// </summary>
     /// <param name="options">The option group, which may name the file.</param>
     /// <returns>
-    /// The <c>--netrc-file</c> path alone; else <c>.netrc</c> in the home directory, then on Windows
+    /// The <c>--netrc-file</c> path alone; else the <c>NETRC</c> variable's path alone, when it is set
+    /// and not empty (GF-0068, BL-2114); else <c>.netrc</c> in the home directory, then on Windows
     /// <c>_netrc</c> there; else nothing when there is no home directory.
     /// </returns>
     private IEnumerable<string> CandidatePaths(CommandLineOptions options)
     {
-        if (options.NetrcFile is { } file)
+        if ((options.NetrcFile ?? NonEmpty(readEnvironmentVariable("NETRC"))) is { } file)
         {
             return [file];
         }
