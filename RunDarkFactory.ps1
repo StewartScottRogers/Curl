@@ -63,6 +63,10 @@
     goes to Blocked (AF-0096: BL-1609's five claims cost $5.17). A task run that
     reaches the cap stops; like a timed-out run, its partial work is stashed and the task
     goes to Blocked for Stewart, since it is too big for one run and wants splitting.
+    A task Blocked by that refusal ("so it was not run again") comes back by itself
+    (BL-2117): before every claim, the shift's first included, the requeue that returns
+    tasks whose blockers are Done also moves it to Backlog once its runs of the last 24
+    hours leave $1 or more of the cap. One whose own run stopped at the cap stays Blocked.
     -TaskBudgetUsd 0 removes the cap. -TestTaskBudget proves the arithmetic.
 
     THE MODEL PER TASK
@@ -1961,6 +1965,17 @@ function Test-TaskCapSpent {
     return ($Cap -gt 0 -and $SpentUsd -gt 0 -and ($Cap - $SpentUsd) -lt 1.0)
 }
 
+function Test-CapBlockRequeueDue {
+    # Whether a Blocked task may go back to Backlog because the cost cap's daily rule
+    # (AF-0096) no longer holds for it (BL-2117): its Blocked reason is the daily-rule
+    # refusal ("so it was not run again") and its runs of the last day now leave $1 or more
+    # of -Cap. A task blocked because a run itself stopped at the cap ("stopped at its ...
+    # cost cap") is too big for one run and stays Blocked to be split.
+    param([string]$Reason, [double]$Cap, [double]$SpentUsd)
+    if ($Reason -notmatch 'so it was not run again' -or $Reason -match 'stopped at its .* cost cap') { return $false }
+    return -not (Test-TaskCapSpent $Cap $SpentUsd)
+}
+
 function Get-TaskCapSpentWhy {
     # Why a freshly claimed task must not run again, or '' when it may (AF-0096).
     param([string]$Id)
@@ -2134,6 +2149,14 @@ if ($TestModelChoice) {
     $cases += ,@('runs, tasks and dollars per model for a shift', 'models: opus 1 runs 1 tasks $4.00; sonnet 2 runs 1 tasks $1.75', (Get-ModelCostSummary $dir '^BL-\d+-20261007-100000(-L\d+)?[-.]'))
     $cases += ,@('the same for one lane', 'models: sonnet 2 runs 1 tasks $1.75', (Get-ModelCostSummary $dir '^BL-\d+-20261007-100000-L1[-.]'))
     $cases += ,@('the model line leaves costs readable', '0.5,1.25,4,9', ((@(Get-RecentRunCosts $dir) | Sort-Object) -join ','))
+    # A task the daily rule blocked goes back to Backlog once its 24-hour window has passed;
+    # one blocked because a run stopped at the cap stays Blocked (BL-2117).
+    $refused = '2026-10-11: Doing -> Blocked. Stewart: dark factory its runs of the last day already cost 1.16 of its 2.10 US dollar cost cap, so it was not run again; split the task; see x'
+    $stopped = '2026-10-11: Doing -> Blocked. Stewart: dark factory stopped at its 3.2 US dollar cost cap (4 times the median run, at least $3, at most -TaskBudgetUsd, less its runs of the last day), so split the task; see x'
+    $cases += ,@('a refused task is requeued once its last day leaves 1 dollar', 'True,True', "$((Test-CapBlockRequeueDue $refused 2.10 0), (Test-CapBlockRequeueDue $refused 2.10 1.10) -join ',')")
+    $cases += ,@('a refused task stays Blocked while its cap is still spent', 'False', "$(Test-CapBlockRequeueDue $refused 2.10 1.16)")
+    $cases += ,@('a run that stopped at the cap is never requeued', 'False,False', "$((Test-CapBlockRequeueDue $stopped 3.2 0), (Test-CapBlockRequeueDue $stopped 0 0) -join ',')")
+    $cases += ,@('a task blocked for another reason is not requeued by the cap', 'False', "$(Test-CapBlockRequeueDue '2026-10-11: Doing -> Blocked. Stewart: which package?' 3 0)")
     Remove-Item -Recurse -Force $dir
     $failed = 0
     foreach ($case in $cases) {
@@ -2183,6 +2206,14 @@ if ($TestTaskBudget) {
     $cases += ,@('a task with no runs has not spent its cap', 'False', "$(Test-TaskCapSpent 0.5 0)")
     $cases += ,@('-TaskBudgetUsd 0 is never spent', 'False', "$(Test-TaskCapSpent 0 9)")
     $cases += ,@('BL-1609 stops after its third run', 'False,False,True', "$((Test-TaskCapSpent 3.21 0.41), (Test-TaskCapSpent 3.21 1.56), (Test-TaskCapSpent 3.21 3.59) -join ',')")
+    # A task the daily rule blocked goes back to Backlog once its 24-hour window has passed;
+    # one blocked because a run stopped at the cap stays Blocked (BL-2117).
+    $refused = '2026-10-11: Doing -> Blocked. Stewart: dark factory its runs of the last day already cost 1.16 of its 2.10 US dollar cost cap, so it was not run again; split the task; see x'
+    $stopped = '2026-10-11: Doing -> Blocked. Stewart: dark factory stopped at its 3.2 US dollar cost cap (4 times the median run, at least $3, at most -TaskBudgetUsd, less its runs of the last day), so split the task; see x'
+    $cases += ,@('a refused task is requeued once its last day leaves 1 dollar', 'True,True', "$((Test-CapBlockRequeueDue $refused 2.10 0), (Test-CapBlockRequeueDue $refused 2.10 1.10) -join ',')")
+    $cases += ,@('a refused task stays Blocked while its cap is still spent', 'False', "$(Test-CapBlockRequeueDue $refused 2.10 1.16)")
+    $cases += ,@('a run that stopped at the cap is never requeued', 'False,False', "$((Test-CapBlockRequeueDue $stopped 3.2 0), (Test-CapBlockRequeueDue $stopped 0 0) -join ',')")
+    $cases += ,@('a task blocked for another reason is not requeued by the cap', 'False', "$(Test-CapBlockRequeueDue '2026-10-11: Doing -> Blocked. Stewart: which package?' 3 0)")
     Remove-Item -Recurse -Force $dir
     $failed = 0
     foreach ($case in $cases) {
@@ -2236,11 +2267,20 @@ function Test-TaskDone {
 function Invoke-Requeue {
     # Moves back to Backlog every Blocked task whose blocker was only other tasks that are
     # now all Done: a last Log line that names BL-### IDs and is not a question for
-    # Stewart. Returns the IDs it moved.
+    # Stewart. Also every task the cost cap's daily rule blocked whose 24-hour spending
+    # window has since passed (BL-2117, Test-CapBlockRequeueDue). Returns the IDs it moved.
     $moved = @()
+    $cap = $null
     foreach ($f in Get-ChildItem (Join-Path $Root 'Tasks\Blocked') -Filter 'BL-*.md' -ErrorAction SilentlyContinue) {
         $id = Get-TaskIdFromFileName $f.Name
         $reason = Get-LastLogLine $id
+        if ($reason -match 'so it was not run again') {
+            if ($null -eq $cap) { $cap = Get-RunBudgetUsd $TaskBudgetUsd @(Get-RecentRunCosts $LogDir) }
+            if (-not (Test-CapBlockRequeueDue $reason $cap (Get-TaskSpentUsd $LogDir $id))) { continue }
+            Invoke-Board @('move', '-Id', $id, '-To', 'Backlog', '-Reason', 'Cost cap window passed: its runs of the last 24 hours now leave 1 US dollar or more of its cost cap, so the cost cap allows a fresh run') | Out-Null
+            if ((Get-TaskState $id) -eq 'Backlog') { $moved += $id; Write-Trace $id 'requeue' 'cost cap window passed' 'Cyan' }
+            continue
+        }
         if ($reason -match 'Stewart') { continue }
         $waits = @(Get-TaskIdsNamed $reason | Where-Object { $_ -ne $id })
         if (-not $waits.Count -or @($waits | Where-Object { -not (Test-TaskDone $_) }).Count) { continue }
