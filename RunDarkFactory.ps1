@@ -45,11 +45,11 @@
 
     COST CAP
 
-    Each headless run is capped with claude's --max-budget-usd at 2.7 times the median cost
-    of the newest 40 task runs in the log folder, never below $2 and never above
-    -TaskBudgetUsd (default $6; AF-0004, AF-0033, ADR-0288, ADR-0407). 2.7 rather than 3
-    because claude checks the cap between turns, so a run can end one turn's cost above
-    it; with fewer than 10 logged runs the cap is -TaskBudgetUsd itself. A turn that waits
+    Each headless run is capped with claude's --max-budget-usd at 4 times the median cost
+    of the newest 40 task runs in the log folder, never below $3 and never above
+    -TaskBudgetUsd (default $10; AF-0004, AF-0033, ADR-0288, ADR-0407, ADR-0478). claude
+    checks the cap between turns, so a run can end one turn's cost above it; with fewer
+    than 10 logged runs the cap is -TaskBudgetUsd itself. A turn that waits
     on subagents spends all of theirs before the next check, so the prompt allows one
     subagent at a time (AF-0052: five in parallel took BL-1458 $1.77 past its cap; AF-0097:
     five Sonnet test-writers in one message cost BL-1486 $2.97 of its $4.65; AF-0098: three
@@ -357,9 +357,9 @@ param(
     # overtime run of a quarter of this (at least 30 min) and is Blocked if killed again.
     [int]$TaskMinutes = 120,
     # The most a single headless run may cost, in US dollars (claude's
-    # --max-budget-usd); the cap is 2.7 times the median recent run up to this, and a run
-    # that reaches it has its task filed as Blocked. 0 means no cap (ADR-0288, ADR-0407).
-    [double]$TaskBudgetUsd = 6,
+    # --max-budget-usd); the cap is 4 times the median recent run, at least $3, up to
+    # this, and a run that reaches it has its task filed as Blocked. 0 means no cap (ADR-0288, ADR-0407, ADR-0478).
+    [double]$TaskBudgetUsd = 10,
     # Model for every run, or auto (the default) to choose one per task; see THE MODEL PER
     # TASK above. "opus" is the moving alias RunClaude.cmd also uses.
     [string]$Model = $(if ($env:CLAUDE_MODEL) { $env:CLAUDE_MODEL } else { 'auto' }),
@@ -403,7 +403,7 @@ param(
     # -Reason text, status lines and file names, and that a wait logs next's reason line
     # rather than a WARNING printed before it, and exit.
     [switch]$TestTaskIds,
-    # Prove the cost cap follows 2.7 times the median recent run cost (AF-0033), and exit.
+    # Prove the cost cap follows 4 times the median recent run cost (AF-0033), and exit.
     [switch]$TestTaskBudget,
     # Prove the choice of model per task (BL-1705), and exit.
     [switch]$TestModelChoice,
@@ -1905,9 +1905,9 @@ function Get-MedianCost {
 }
 
 function Get-RunBudgetUsd {
-    # The cost cap for the next headless run (AF-0033, ADR-0407): 2.7 times the median of
-    # the recent task runs' costs, so a run that ends one turn above it still stays under
-    # three times the median, never above -TaskBudgetUsd and never below $2. Fewer than 10
+    # The cost cap for the next headless run (AF-0033, ADR-0407, ADR-0478): 4 times the
+    # median of the recent task runs' costs, so a task that needs a few more turns than most
+    # still finishes, never above -TaskBudgetUsd and never below $3. Fewer than 10
     # recent costs leaves -TaskBudgetUsd as it is; -TaskBudgetUsd 0 means no cap.
     # -SpentUsd is what the task's earlier runs of the last day already cost (AF-0095): it
     # comes off the cap, down to $1, so a task requeued and run again stays near one cap
@@ -1915,7 +1915,7 @@ function Get-RunBudgetUsd {
     param([double]$Ceiling, [double[]]$RecentCosts, [double]$SpentUsd = 0)
     if ($Ceiling -le 0) { return 0.0 }
     $costs = @($RecentCosts | Where-Object { $_ -gt 0 })
-    $cap = if ($costs.Count -lt 10) { $Ceiling } else { [math]::Min($Ceiling, [math]::Max(2.0, [math]::Round(2.7 * (Get-MedianCost $costs), 2))) }
+    $cap = if ($costs.Count -lt 10) { $Ceiling } else { [math]::Min($Ceiling, [math]::Max(3.0, [math]::Round(4.0 * (Get-MedianCost $costs), 2))) }
     if ($SpentUsd -le 0) { return $cap }
     return [math]::Max(1.0, [math]::Round($cap - $SpentUsd, 2))
 }
@@ -2152,11 +2152,10 @@ if ($TestTaskBudget) {
         ,@('median of an odd list', '2', "$(Get-MedianCost 3.0, 1.0, 2.0)")
         ,@('median of an even list', '1.5', "$(Get-MedianCost 1.0, 2.0, 4.0, 1.0)")
         ,@('median of nothing', '0', "$(Get-MedianCost @())")
-        ,@('cap at 2.7 times the median 1.3', '3.51', "$(Get-RunBudgetUsd 6 $twelve)")
-        ,@('cap under three times the median with a turn over it', 'True', "$((Get-RunBudgetUsd 6 $twelve) + 0.3 -lt 3 * (Get-MedianCost $twelve))")
+        ,@('cap at 4 times the median 1.3', '5.2', "$(Get-RunBudgetUsd 10 $twelve)")
         ,@('cap held at -TaskBudgetUsd', '3', "$(Get-RunBudgetUsd 3 $twelve)")
-        ,@('cap floor of 2 dollars', '2', "$(Get-RunBudgetUsd 6 ([double[]](0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1)))")
-        ,@('fewer than 10 costs keeps -TaskBudgetUsd', '6', "$(Get-RunBudgetUsd 6 ([double[]](1.0, 1.0, 1.0)))")
+        ,@('cap floor of 3 dollars', '3', "$(Get-RunBudgetUsd 10 ([double[]](0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1)))")
+        ,@('fewer than 10 costs keeps -TaskBudgetUsd', '10', "$(Get-RunBudgetUsd 10 ([double[]](1.0, 1.0, 1.0)))")
         ,@('-TaskBudgetUsd 0 is no cap', '0', "$(Get-RunBudgetUsd 0 $twelve)")
         ,@('no log folder gives no costs', '0', "$(@(Get-RecentRunCosts (Join-Path ([IO.Path]::GetTempPath()) 'no-such-dark-factory-logs')).Count)"))
     $dir = Join-Path ([IO.Path]::GetTempPath()) "DarkFactoryBudget-$PID"
@@ -2174,9 +2173,9 @@ if ($TestTaskBudget) {
     Set-Content (Join-Path $dir 'BL-2-20261003-100000-L3-resolve.jsonl') '{"type":"result","total_cost_usd":9}'
     $cases += ,@('a task spent its last day of task and resumed runs only', '3.5', "$(Get-TaskSpentUsd $dir 'BL-2')")
     $cases += ,@('a task with no runs spent nothing', '0', "$(Get-TaskSpentUsd $dir 'BL-9')")
-    $cases += ,@('earlier runs come off the cap', '2.01', "$(Get-RunBudgetUsd 6 $twelve 1.5)")
-    $cases += ,@('a spent cap still leaves 1 dollar', '1', "$(Get-RunBudgetUsd 6 $twelve 5.73)")
-    $cases += ,@('earlier runs come off -TaskBudgetUsd too', '4', "$(Get-RunBudgetUsd 6 ([double[]](1.0, 1.0, 1.0)) 2)")
+    $cases += ,@('earlier runs come off the cap', '3.7', "$(Get-RunBudgetUsd 10 $twelve 1.5)")
+    $cases += ,@('a spent cap still leaves 1 dollar', '1', "$(Get-RunBudgetUsd 10 $twelve 4.73)")
+    $cases += ,@('earlier runs come off -TaskBudgetUsd too', '8', "$(Get-RunBudgetUsd 10 ([double[]](1.0, 1.0, 1.0)) 2)")
     $cases += ,@('-TaskBudgetUsd 0 stays no cap after spending', '0', "$(Get-RunBudgetUsd 0 $twelve 2)")
     # A task whose runs of the last day left less than $1 of its cap is not run again (AF-0096).
     $cases += ,@('a cap with 1 dollar or more left is not spent', 'False', "$(Test-TaskCapSpent 3.21 2.21)")
@@ -3706,7 +3705,7 @@ function Invoke-TaskRun {
     # lanes build at once: a tool call past its timeout is moved to the background, and a
     # headless run that then ends its reply to wait for it exits with the task still in
     # Doing (BL-855). It inherits CURL_DARK_FACTORY_LANE.
-    # The cost cap (AF-0004, AF-0033): the run stops once it has cost 2.7 times the median
+    # The cost cap (AF-0004, AF-0033): the run stops once it has cost 4 times the median
     # recent run, at most -TaskBudgetUsd, less what the task's runs of the last day cost
     # (AF-0095). Read before this run's log exists, so it never counts itself.
     Close-UnfinishedRunLogs $LogDir $Id $raw
@@ -5223,7 +5222,7 @@ while ($true) {
         $why = if ($capWhy) { $capWhy }
             elseif ($run.TimedOut -and $inOvertime) { "timed out after $TaskMinutes min and again after $overtimeMinutes min of overtime" }
             elseif ($run.TimedOut) { "timed out after $TaskMinutes min" }
-            elseif (Test-BudgetSpent) { "stopped at its $($script:RunBudgetUsd) US dollar cost cap (2.7 times the median run, at most -TaskBudgetUsd, less its runs of the last day), so split the task" } else { "run ended in Doing, exit $($run.ExitCode)" }
+            elseif (Test-BudgetSpent) { "stopped at its $($script:RunBudgetUsd) US dollar cost cap (4 times the median run, at least $3, at most -TaskBudgetUsd, less its runs of the last day), so split the task" } else { "run ended in Doing, exit $($run.ExitCode)" }
         Save-StrayChanges $id
         $seeLog = if ($capWhy) { Join-Path $LogDir "$id-*.jsonl" } else { Join-Path $LogDir "$id-$Stamp$LaneTag.jsonl" }
         Invoke-Board @('move', '-Id', $id, '-To', 'Blocked', '-Reason', "Stewart: dark factory $why; see $seeLog") | Out-Null

@@ -40,12 +40,14 @@ such findings, or a later audit-branch change can move the auditor's bar.
 
 ## Acceptance criteria
 
-- [ ] `Get-RunBudgetUsd` uses 4.0 times the median, a $3 floor, and `-TaskBudgetUsd` defaults to 10.
-- [ ] Every comment, the header help and the Blocked reason say 4 times, $3 and $10. No "2.7" about the cap is left in `RunDarkFactory.ps1`.
-- [ ] `RunDarkFactory.ps1 -TestTaskBudget` passes, with its cases updated to the new numbers (for example, a median of 1.3 gives a cap of 5.2).
-- [ ] A new ADR, "Decided by Claude under Stewart's delegation", supersedes ADR-0407's numbers and says why. ADR-0407's status names it.
+- [x] `Get-RunBudgetUsd` uses 4.0 times the median, a $3 floor, and `-TaskBudgetUsd` defaults to 10.
+- [x] Every comment, the header help and the Blocked reason say 4 times, $3 and $10. No "2.7" about the cap is left in `RunDarkFactory.ps1`.
+- [x] `RunDarkFactory.ps1 -TestTaskBudget` passes, with its cases updated to the new numbers (for example, a median of 1.3 gives a cap of 5.2).
+- [x] A new ADR, "Decided by Claude under Stewart's delegation", supersedes ADR-0407's numbers and says why. ADR-0407's status names it.
 
 ## Notes
+
+- Decision recorded in ADR-0478 (supersedes ADR-0407's numbers). The -TestTaskBudget case "cap under three times the median with a turn over it" was removed: 4 times the median is meant to pass that bar. Spent-cap cases moved to the new ceiling of 10 (5.2 - 1.5 = 3.7; 5.2 - 4.73 floors at 1; 10 - 2 = 8). -TestTaskBudget: all 21 cases PASS.
 
 ## Log
 
