@@ -3928,8 +3928,24 @@ internal sealed class CurlCommandRunner(
             return null;
         }
 
-        return RemoteNamePath(options, RemoteFileName.FromUrlPath(url.AbsolutePath) ?? RemoteFileName.Fallback);
+        return RemoteNamePath(options, RemoteFileName.FromUrlPath(RemoteNameUrlPath(transfer, url)) ?? RemoteFileName.Fallback);
     }
+
+    /// <summary>
+    /// The URL path <see cref="RemoteFileName" /> takes the remote name from: the URL's path, less the
+    /// file name <see cref="UploadUrl.AppendLocalFileNameWhenUrlNamesNoFile" /> appended for a <c>-T</c>
+    /// upload, since curl 8.21.0 names the file from the URL as given, so <c>-T f.txt -O http://h/</c>
+    /// warns and saves to <see cref="RemoteFileName.Fallback" /> rather than over <c>f.txt</c>
+    /// (measured 2026-10-12, AF-0170, BL-2105).
+    /// </summary>
+    /// <param name="transfer">The transfer, which names its URL as given and its <c>-T</c> file.</param>
+    /// <param name="url">The transfer's URL, the upload's file name appended.</param>
+    /// <returns>The path.</returns>
+    private static string RemoteNameUrlPath(UrlTransfer transfer, CurlUrl url) =>
+        transfer.UploadFile is { } uploadFile
+        && UploadUrl.AppendLocalFileNameWhenUrlNamesNoFile(transfer.Url, uploadFile) != transfer.Url
+            ? url.AbsolutePath[..(url.AbsolutePath.LastIndexOf('/') + 1)]
+            : url.AbsolutePath;
 
     /// <summary>
     /// Whether <see cref="ResolveOutputFile" /> will fall back to <see cref="RemoteFileName.Fallback" />
@@ -3947,7 +3963,7 @@ internal sealed class CurlCommandRunner(
         transfer.OutputFileName is null
         && transfer.UsesRemoteName
         && TryParseTransferUrl(QueryUrl.Append(url, options), options, out CurlUrl? parsed, out _)
-        && RemoteFileName.FromUrlPath(parsed.AbsolutePath) is null;
+        && RemoteFileName.FromUrlPath(RemoteNameUrlPath(transfer, parsed)) is null;
 
     /// <summary>
     /// Turns a remote file name, from the URL or a <c>Content-Disposition</c> header, into the

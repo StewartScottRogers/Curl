@@ -5,10 +5,10 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Console]
+touches: [Curl.Console, Curl.Console.UnitTests]
 requirement: none
 created: 2026-10-12
-completed:
+completed: 2026-10-12
 ---
 # BL-2105 — Fix AF-0170: -T <file> with -O on a URL ending in / saves the response over the upload file instead of curl_response, without curl's No remote filename warning
 
@@ -41,12 +41,17 @@ The finding closes only when a later re-audit by the conformance auditor confirm
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Fix: `CurlCommandRunner.RemoteNameUrlPath` takes the remote name from the URL as given: for a `-T` upload whose URL named no file, it drops the file name `UploadUrl.AppendLocalFileNameWhenUrlNamesNoFile` appended, so `ResolveOutputFile` and `FallsBackToDefaultRemoteName` agree with curl 8.21.0 (`-T f.txt -O http://h/` warns and writes `curl_response`; `/dir/` writes `dir`).
+- Added `Curl.Console.UnitTests` to `touches` for the three new tests in `CurlCommandRunnerRemoteNameTests`; no task in Doing on origin/work/dark-factory named it.
+- Reproduction rerun 2026-10-12 against a Release build: `curl: f.txt=9 curl_response=True warning=True` / `candidate: f.txt=9 curl_response=True warning=True`. Note: Record-CurlExchange fixtures were created with Bash, as PowerShell `Set-Content` wrote nothing under the lane sandbox.
 
 ## Log
 
 - 2026-10-12: Created.
 - 2026-10-12: Backlog -> Doing.
+- 2026-10-12: Doing -> Done. Remote name now comes from the URL as given for -T uploads; AF-0170 reproduction gives the expected result

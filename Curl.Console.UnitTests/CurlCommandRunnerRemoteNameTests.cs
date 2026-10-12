@@ -78,6 +78,44 @@ public sealed class CurlCommandRunnerRemoteNameTests
     }
 
     [TestMethod]
+    public async Task RunAsync_UploadToRootPathWithRemoteName_WarnsAndWritesCurlResponseNotTheUploadFile()
+    {
+        int exitCode = await RunAsync([Ok], "-T", "f.txt", "-O", Host + "/");
+
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("files written", "curl_response", WrittenNames);
+        Diagnostics.Diff("stderr", "Warning: No remote filename, uses \"curl_response\"\n", Lf(StandardErrorText));
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual("curl_response", WrittenNames);
+        Assert.AreEqual("hello", WrittenText("curl_response"));
+        Assert.AreEqual("Warning: No remote filename, uses \"curl_response\"" + NewLine, StandardErrorText);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_UploadToDirectoryPathWithRemoteName_WritesTheDirectoryNameNotTheUploadFile()
+    {
+        int exitCode = await RunAsync([Ok], "-sS", "-T", "f.txt", "-O", Host + "/dir/");
+
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("files written", "dir", WrittenNames);
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual("dir", WrittenNames);
+        Assert.AreEqual("hello", WrittenText("dir"));
+    }
+
+    [TestMethod]
+    public async Task RunAsync_UploadToNamedFileWithRemoteName_WritesTheUrlFileName()
+    {
+        int exitCode = await RunAsync([Ok], "-sS", "-T", "f.txt", "-O", Host + "/dir/x.txt");
+
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("files written", "x.txt", WrittenNames);
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual("x.txt", WrittenNames);
+        Assert.AreEqual("hello", WrittenText("x.txt"));
+    }
+
+    [TestMethod]
     public async Task RunAsync_SilentRemoteNameOfRootPath_DoesNotWarn()
     {
         int exitCode = await RunAsync([Ok], "-sS", "-O", Host);
