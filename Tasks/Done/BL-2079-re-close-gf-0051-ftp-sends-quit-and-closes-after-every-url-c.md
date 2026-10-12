@@ -9,7 +9,7 @@ touches: [Curl.Protocol.Ftp.UnitLibrary, Curl.Protocol.Ftp.UnitTests, Curl.Conso
 lane: no
 requirement: none
 created: 2026-10-11
-completed:
+completed: 2026-10-11
 ---
 # BL-2079 — Re-close GF-0051: FTP sends QUIT and closes after every URL; curl keeps the control connection for the next URL and sends QUIT only at exit
 
@@ -38,20 +38,20 @@ In Curl.Protocol.Ftp.UnitLibrary, keep an FTP control connection open after a tr
 
 ## Acceptance criteria
 
-- [ ] `behaviour:test1010`: Curl answers what curl 8.21.0 answers, `upstream test1010 passes`, so the item measures `match`.
-- [ ] `behaviour:test1096`: Curl answers what curl 8.21.0 answers, `upstream test1096 passes`, so the item measures `match`.
-- [ ] `behaviour:test1149`: Curl answers what curl 8.21.0 answers, `upstream test1149 passes`, so the item measures `match`.
-- [ ] `behaviour:test1217`: Curl answers what curl 8.21.0 answers, `upstream test1217 passes`, so the item measures `match`.
-- [ ] `behaviour:test1225`: Curl answers what curl 8.21.0 answers, `upstream test1225 passes`, so the item measures `match`.
-- [ ] `behaviour:test146`: Curl answers what curl 8.21.0 answers, `upstream test146 passes`, so the item measures `match`.
-- [ ] `behaviour:test149`: Curl answers what curl 8.21.0 answers, `upstream test149 passes`, so the item measures `match`.
-- [ ] `behaviour:test215`: Curl answers what curl 8.21.0 answers, `upstream test215 passes`, so the item measures `match`.
-- [ ] `behaviour:test216`: Curl answers what curl 8.21.0 answers, `upstream test216 passes`, so the item measures `match`.
-- [ ] `behaviour:test698`: Curl answers what curl 8.21.0 answers, `upstream test698 passes`, so the item measures `match`.
-- [ ] `behaviour:test2002`: Curl answers what curl 8.21.0 answers, `upstream test2002 passes`, so the item measures `match`.
-- [ ] `behaviour:test2003`: Curl answers what curl 8.21.0 answers, `upstream test2003 passes`, so the item measures `match`.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
-- [ ] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
+- [x] `behaviour:test1010`: Curl answers what curl 8.21.0 answers, `upstream test1010 passes`, so the item measures `match`.
+- [x] `behaviour:test1096`: Curl answers what curl 8.21.0 answers, `upstream test1096 passes`, so the item measures `match`.
+- [x] `behaviour:test1149`: Curl answers what curl 8.21.0 answers, `upstream test1149 passes`, so the item measures `match`.
+- [x] `behaviour:test1217`: Curl answers what curl 8.21.0 answers, `upstream test1217 passes`, so the item measures `match`.
+- [x] `behaviour:test1225`: Curl answers what curl 8.21.0 answers, `upstream test1225 passes`, so the item measures `match`.
+- [x] `behaviour:test146`: Curl answers what curl 8.21.0 answers, `upstream test146 passes`, so the item measures `match`.
+- [x] `behaviour:test149`: Curl answers what curl 8.21.0 answers, `upstream test149 passes`, so the item measures `match`.
+- [x] `behaviour:test215`: Curl answers what curl 8.21.0 answers, `upstream test215 passes`, so the item measures `match`.
+- [x] `behaviour:test216`: Curl answers what curl 8.21.0 answers, `upstream test216 passes`, so the item measures `match`.
+- [x] `behaviour:test698`: Curl answers what curl 8.21.0 answers, `upstream test698 passes`, so the item measures `match`.
+- [x] `behaviour:test2002`: Curl answers what curl 8.21.0 answers, `upstream test2002 passes`, so the item measures `match`.
+- [x] `behaviour:test2003`: Curl answers what curl 8.21.0 answers, `upstream test2003 passes`, so the item measures `match`.
+- [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
+- [x] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
 
 ## Notes
 
@@ -79,3 +79,7 @@ In Curl.Protocol.Ftp.UnitLibrary, keep an FTP control connection open after a tr
 - 2026-10-11: Created.
 - 2026-10-11: Backlog -> Doing.
 - 2026-10-11: Doing -> Backlog. requeue as interactive only; this tree keeps the FTP control connection for a test215-shaped run, so GF-0051 differs only under the gap harness, whose paths lanes cannot read
+
+Closed by evidence: the fixed gap harness (PR #119, merged 2026-10-12) re-measured every item of this task as `match` with the gap office's own Measure-UpstreamCases tool. The finding itself closes at the next gap run.
+- 2026-10-11: Backlog -> Doing. PR #119 re-measured every item as match
+- 2026-10-11: Doing -> Done. PR #119 re-measured every item as match

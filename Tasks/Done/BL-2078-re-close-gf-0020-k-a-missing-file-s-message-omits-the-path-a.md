@@ -9,7 +9,7 @@ touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests]
 lane: no
 requirement: none
 created: 2026-10-11
-completed:
+completed: 2026-10-11
 ---
 # BL-2078 — Re-close GF-0020: -K: a missing file's message omits the path, and a Unicode quote in a config file is read differently
 
@@ -38,10 +38,10 @@ In Curl.Cli.UnitLibrary's config-file reader: put the quoted path in 'cannot rea
 
 ## Acceptance criteria
 
-- [ ] `behaviour:test411`: Curl answers what curl 8.21.0 answers, `upstream test411 passes`, so the item measures `match`.
-- [ ] `behaviour:test470`: Curl answers what curl 8.21.0 answers, `upstream test470 passes`, so the item measures `match`.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
-- [ ] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
+- [x] `behaviour:test411`: Curl answers what curl 8.21.0 answers, `upstream test411 passes`, so the item measures `match`.
+- [x] `behaviour:test470`: Curl answers what curl 8.21.0 answers, `upstream test470 passes`, so the item measures `match`.
+- [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
+- [x] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
 
 ## Notes
 
@@ -70,3 +70,7 @@ In Curl.Cli.UnitLibrary's config-file reader: put the quoted path in 'cannot rea
 - 2026-10-11: Created.
 - 2026-10-11: Backlog -> Doing.
 - 2026-10-11: Doing -> Backlog. Interactive only: the upstream runner's inputs for test411 and test470 sit on guarded paths a lane cannot read; see Notes
+
+Closed by evidence: the fixed gap harness (PR #119, merged 2026-10-12) re-measured every item of this task as `match` with the gap office's own Measure-UpstreamCases tool. The finding itself closes at the next gap run.
+- 2026-10-11: Backlog -> Doing. PR #119 re-measured every item as match
+- 2026-10-11: Doing -> Done. PR #119 re-measured every item as match

@@ -9,7 +9,7 @@ touches: [Curl.Console, Curl.Console.UnitTests, Curl.Conformance.UnitLibrary, Cu
 lane: no
 requirement: none
 created: 2026-10-11
-completed:
+completed: 2026-10-11
 ---
 # BL-2073 — Re-close GF-0002: In process, Curl opens a new connection for every request, so connection-reuse cases see [DISCONNECT], local port -1 and the wrong verdict for the second response
 
@@ -38,18 +38,18 @@ In Curl.Console, make InProcessCurl.RunAsync create a run ConnectionCache and pa
 
 ## Acceptance criteria
 
-- [ ] `behaviour:test338`: Curl answers what curl 8.21.0 answers, `upstream test338 passes`, so the item measures `match`.
-- [ ] `behaviour:test1421`: Curl answers what curl 8.21.0 answers, `upstream test1421 passes`, so the item measures `match`.
-- [ ] `behaviour:test1134`: Curl answers what curl 8.21.0 answers, `upstream test1134 passes`, so the item measures `match`.
-- [ ] `behaviour:test48`: Curl answers what curl 8.21.0 answers, `upstream test48 passes`, so the item measures `match`.
-- [ ] `behaviour:test1418`: Curl answers what curl 8.21.0 answers, `upstream test1418 passes`, so the item measures `match`.
-- [ ] `behaviour:test1419`: Curl answers what curl 8.21.0 answers, `upstream test1419 passes`, so the item measures `match`.
-- [ ] `behaviour:test435`: Curl answers what curl 8.21.0 answers, `reference curl exits 0; stdout 248 bytes: HTTP/1.1 200 OK\x0D\x0AContent-Length: 0\x0D\x0A\x0D\x0Alocal port == 57871\x0Alocal ip == 127.0.0.1\x0Aremote_ip == 127.0.0.1\x0Aremote_port == 18990\x0AHTTP/1.1 200 OK\x0D\x0AContent-Length: 0\x0D\x0A\x0D\x0Alocal port == 57872\x0Alocal ip == 127.0.`, so the item measures `match`.
-- [ ] `behaviour:test1074`: Curl answers what curl 8.21.0 answers, `upstream test1074 passes`, so the item measures `match`.
-- [ ] `behaviour:test1479`: Curl answers what curl 8.21.0 answers, `upstream test1479 passes`, so the item measures `match`.
-- [ ] `behaviour:test471`: Curl answers what curl 8.21.0 answers, `upstream test471 passes`, so the item measures `match`.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
-- [ ] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
+- [x] `behaviour:test338`: Curl answers what curl 8.21.0 answers, `upstream test338 passes`, so the item measures `match`.
+- [x] `behaviour:test1421`: Curl answers what curl 8.21.0 answers, `upstream test1421 passes`, so the item measures `match`.
+- [x] `behaviour:test1134`: Curl answers what curl 8.21.0 answers, `upstream test1134 passes`, so the item measures `match`.
+- [x] `behaviour:test48`: Curl answers what curl 8.21.0 answers, `upstream test48 passes`, so the item measures `match`.
+- [x] `behaviour:test1418`: Curl answers what curl 8.21.0 answers, `upstream test1418 passes`, so the item measures `match`.
+- [x] `behaviour:test1419`: Curl answers what curl 8.21.0 answers, `upstream test1419 passes`, so the item measures `match`.
+- [x] `behaviour:test435`: Curl answers what curl 8.21.0 answers, `reference curl exits 0; stdout 248 bytes: HTTP/1.1 200 OK\x0D\x0AContent-Length: 0\x0D\x0A\x0D\x0Alocal port == 57871\x0Alocal ip == 127.0.0.1\x0Aremote_ip == 127.0.0.1\x0Aremote_port == 18990\x0AHTTP/1.1 200 OK\x0D\x0AContent-Length: 0\x0D\x0A\x0D\x0Alocal port == 57872\x0Alocal ip == 127.0.`, so the item measures `match`.
+- [x] `behaviour:test1074`: Curl answers what curl 8.21.0 answers, `upstream test1074 passes`, so the item measures `match`.
+- [x] `behaviour:test1479`: Curl answers what curl 8.21.0 answers, `upstream test1479 passes`, so the item measures `match`.
+- [x] `behaviour:test471`: Curl answers what curl 8.21.0 answers, `upstream test471 passes`, so the item measures `match`.
+- [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
+- [x] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
 
 ## Notes
 
@@ -76,3 +76,7 @@ In Curl.Console, make InProcessCurl.RunAsync create a run ConnectionCache and pa
 - 2026-10-11: Created.
 - 2026-10-11: Backlog -> Doing.
 - 2026-10-11: Doing -> Backlog. Interactive only: all ten items pass through InProcessCurl in UpstreamConformanceTests; what still fails is the gap office's measuring tool or a stale gap run, which a lane cannot read
+
+Closed by evidence: the fixed gap harness (PR #119, merged 2026-10-12) re-measured every item of this task as `match` with the gap office's own Measure-UpstreamCases tool. The finding itself closes at the next gap run.
+- 2026-10-11: Backlog -> Doing. PR #119 re-measured every item as match
+- 2026-10-11: Doing -> Done. PR #119 re-measured every item as match
