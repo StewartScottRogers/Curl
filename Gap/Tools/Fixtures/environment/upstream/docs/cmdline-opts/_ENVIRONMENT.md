@@ -9,3 +9,15 @@ Proxy for every protocol.
 
 ## `HOME <directory>`
 The home folder.
+
+## `COLUMNS <terminal width>`
+The progress bar's width.
+
+## `NETRC <path>`
+The netrc file.
+
+## `QLOGDIR <directory>`
+Needs HTTP/3.
+
+## `SHELL`
+Used on VMS.
