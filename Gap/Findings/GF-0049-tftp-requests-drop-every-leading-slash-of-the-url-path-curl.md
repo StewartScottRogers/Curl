@@ -33,6 +33,7 @@ In Curl.Protocol.Tftp.UnitLibrary's TftpRequestFile.FromUrlPath, remove exactly 
 
 - 2026-10-10_0657: 15 of 15 items are gaps.
 - 2026-10-11_0936: 0 of 15 items are gaps.
+- 2026-10-11_1950: 0 of 15 items are gaps.
 
 ## Log
 

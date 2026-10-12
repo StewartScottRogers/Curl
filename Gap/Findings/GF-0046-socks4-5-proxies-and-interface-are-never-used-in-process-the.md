@@ -33,6 +33,7 @@ Re-measure after the InProcessCurl rewiring of behaviour:in-process-runner-bypas
 
 - 2026-10-10_0657: 12 of 12 items are gaps.
 - 2026-10-11_0936: 0 of 12 items are gaps.
+- 2026-10-11_1950: 0 of 12 items are gaps.
 
 ## Log
 

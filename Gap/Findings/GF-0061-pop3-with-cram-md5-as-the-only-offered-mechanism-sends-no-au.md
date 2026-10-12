@@ -4,11 +4,11 @@ title: POP3 with CRAM-MD5 as the only offered mechanism sends no AUTH at all
 area: behaviour
 key: behaviour:pop3-cram-md5-not-attempted
 severity: High
-status: open
+status: closed
 scope: target
 introduced-in:
 opened: 2026-10-10_0657
-closed:
+closed: 2026-10-11_1950
 regression: false
 items: [behaviour:test891]
 touches: [Curl.Protocol.Pop3.UnitLibrary, Curl.Protocol.Pop3.UnitTests]
@@ -33,9 +33,11 @@ In Curl.Protocol.Pop3.UnitLibrary's Pop3Login, send AUTH CRAM-MD5 when CAPA offe
 
 - 2026-10-10_0657: 1 of 1 items are gaps.
 - 2026-10-11_0936: 1 of 1 items are gaps.
+- 2026-10-11_1950: 0 of 1 items are gaps.
 
 ## Log
 
 - 2026-10-10_0657: Opened by gap-behaviour.
 - 2026-10-10_0756: Filed BL-1991.
 - 2026-10-11_1029: Filed BL-2082.
+- 2026-10-11_1950: Closed: run 2026-10-11_1950 measured every item as match or excluded.
