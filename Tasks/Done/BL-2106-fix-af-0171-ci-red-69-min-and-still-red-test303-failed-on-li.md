@@ -8,7 +8,7 @@ depends-on: []
 touches: [RunDarkFactory.ps1]
 requirement: none
 created: 2026-10-12
-completed:
+completed: 2026-10-12
 ---
 # BL-2106 — Fix AF-0171: CI red 69+ min and still red: test303 failed on Linux on 0d18262, then two failures naming no test went unfiled
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the process auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Cause: Get-CiRuns dropped a failed run whose log named no test, compiler error or audit-guard line ("nothing to file"), so no task was ever filed. Fix: Get-CiFailures now files such a run by the failing job and step (Kind job, key "job <job> step <step>"), which the existing verdict and filing path handle. Covered by new -TestCiWatch checks. Process-auditor re-audit must confirm.
 
 ## Log
 
 - 2026-10-12: Created.
 - 2026-10-12: Backlog -> Doing.
+- 2026-10-12: Doing -> Done. CI watch now files a failed run that names no test by its failing job and step

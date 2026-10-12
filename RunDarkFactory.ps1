@@ -2634,6 +2634,21 @@ function Get-CiFailures {
             $current[$job] = $null
         }
     }
+    # A run that failed with no test, compiler error or audit-guard line in its log (a crashed
+    # test host, a timeout, a job step that broke) is still red: file it by the job and step
+    # the log names, so the spell does not stay open unfiled (AF-0171).
+    if (-not $found.Count) {
+        foreach ($raw in $Log) {
+            $parts = "$raw" -split "`t", 3
+            if ($parts.Count -lt 3 -or -not $parts[0].Trim() -or $parts[0] -eq 'UNKNOWN STEP') { continue }
+            $key = "job $($parts[0].Trim()) step $($parts[1].Trim())"
+            $text = ($parts[2] -replace '^\d{4}-\d\d-\d\dT[\d:.]+Z ?', '').Trim()
+            if (-not $found.Contains($key)) {
+                $found[$key] = [pscustomobject]@{ Key = $key; Kind = 'job'; Platforms = @(Get-CiPlatform $parts[0].Trim()); Project = ''; Message = '' }
+            }
+            if (-not $found[$key].Message -and $text -match '(?i)error|fail|timed? ?out|cancel|exit code') { $found[$key].Message = $text }
+        }
+    }
     return @($found.Values)
 }
 
@@ -3111,10 +3126,14 @@ if ($TestCiWatch) {
     # The case that failed live: a run with one failing test was dropped as if it had none.
     $script:ciListJson = '[{"conclusion":"failure","databaseId":36690174792,"headSha":"b86b15dfc80d1dea7a5733c9b73fd263a17533b3","status":"completed","updatedAt":"2026-09-30T08:35:42Z"},{"conclusion":"cancelled","databaseId":1,"headSha":"x","status":"completed","updatedAt":"2026-09-30T08:31:26Z"},{"conclusion":"failure","databaseId":36671448420,"headSha":"bfd523f47edea0e8d7826a657606353aa2b6b462","status":"completed","updatedAt":"2026-09-30T05:05:30Z"},{"conclusion":"failure","databaseId":99,"headSha":"9999999999","status":"completed","updatedAt":"2026-09-30T05:00:00Z"},{"conclusion":"success","databaseId":36689969747,"headSha":"c4083da8fbe96c97b45499a41bab397f52fadce4","status":"completed","updatedAt":"2026-09-30T08:33:40Z"}]'
     $single = Get-CiRuns -Branch 'work' -ListRuns $listed -ReadLog $readLog
-    & $check 'one failing test keeps its run' '36690174792 1 macOS; 36689969747 0 ' `
+    & $check 'one failing test keeps its run; a nameless failure is kept by its job and step' '36690174792 1 macOS; 36671448420 1 Linux; 36689969747 0 ' `
         (($single | ForEach-Object { "$($_.Id) $(@($_.Failures).Count) $(@($_.Failures | ForEach-Object { $_.Platforms }) -join '+')" }) -join '; ')
-    & $check 'unreadable and nameless failures traced' 'run 36671448420 failure on bfd523f4: its log names no failing test or build error; nothing to file|run 99 failure on 99999999: cannot read its log with gh run view --log-failed; trying again next heartbeat' `
+    & $check 'unreadable failures traced' 'run 99 failure on 99999999: cannot read its log with gh run view --log-failed; trying again next heartbeat' `
         ((@($traced) | Sort-Object) -join '|')
+    $nameless = @(Get-CiFailures @("${ubuntu}2026-09-30T05:05:00.0000000Z ##[error]Process completed with exit code 1."))
+    & $check 'a failure naming no test is filed by its job and step (AF-0171)' 'job Build and test (ubuntu-latest) step Fast tests|job|Linux|##[error]Process completed with exit code 1.' `
+        "$($nameless[0].Key)|$($nameless[0].Kind)|$($nameless[0].Platforms -join '+')|$($nameless[0].Message)"
+    & $check 'an empty log names no failure' '0' "$(@(Get-CiFailures @()).Count)"
     $traced.Clear()
     $script:ciListJson = $null
     $first = Get-CiRuns -Branch 'work' -ListRuns $listed -ReadLog $readLog
