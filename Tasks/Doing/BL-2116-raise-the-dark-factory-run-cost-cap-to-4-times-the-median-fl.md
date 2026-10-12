@@ -50,3 +50,4 @@ such findings, or a later audit-branch change can move the auditor's bar.
 ## Log
 
 - 2026-10-12: Created.
+- 2026-10-12: Backlog -> Doing.
