@@ -12,8 +12,8 @@ closed:
 regression: false
 items: [environment:NETRC]
 touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests]
-task:
-tasks: []
+task: BL-2114
+tasks: [BL-2114]
 ---
 # GF-0068 - NETRC variable is not read; --netrc fails with exit 26 instead of using the named file
 
@@ -36,3 +36,4 @@ Make the netrc file lookup behind --netrc (Curl.Cli.UnitLibrary NetrcUse, and th
 ## Log
 
 - 2026-10-12_0951: Opened by gap-environment.
+- 2026-10-12_1039: Filed BL-2114.

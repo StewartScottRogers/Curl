@@ -12,8 +12,8 @@ closed:
 regression: false
 items: [environment:config-syntax:line-length-limit]
 touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests]
-task:
-tasks: []
+task: BL-2115
+tasks: [BL-2115]
 ---
 # GF-0069 - A config-file line over 10 MB is accepted; upstream rejects the file with 'cannot read config'
 
@@ -36,3 +36,4 @@ Add the 10 MB (10485760-byte) per-line limit that docs/cmdline-opts/config.md st
 ## Log
 
 - 2026-10-12_0951: Opened by gap-environment.
+- 2026-10-12_1039: Filed BL-2115.

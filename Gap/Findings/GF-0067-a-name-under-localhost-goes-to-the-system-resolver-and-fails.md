@@ -12,8 +12,8 @@ closed:
 regression: false
 items: [behaviour:test389]
 touches: [Curl.Networking.UnitLibrary, Curl.Networking.UnitTests]
-task:
-tasks: []
+task: BL-2113
+tasks: [BL-2113]
 ---
 # GF-0067 - A name under .localhost goes to the system resolver and fails with exit 6, where curl resolves it to 127.0.0.1 and ::1
 
@@ -36,3 +36,4 @@ In Curl.Networking.UnitLibrary, change SystemDnsResolver.ResolveAsync (the produ
 ## Log
 
 - 2026-10-12_0951: Opened by gap-behaviour.
+- 2026-10-12_1039: Filed BL-2113.
