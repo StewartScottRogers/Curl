@@ -3,8 +3,8 @@ id: AF-0161
 title: BL-2009 was requeued twice as interactive only; an interactive commit removed its lane: no between the two lane claims
 auditor: process
 severity: Low
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-11_1638.md: the reproduction no longer reproduces.
 key: process:BL-2009:BL-2009:redone-work
 reproduction: none
 task: BL-2054
@@ -13,9 +13,9 @@ found: 2026-10-11
 found-at: 22f394602532a6922adbc7fa91b3739b62d2112a
 scorecard: 2026-10-11_0051.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-11
+closed-how: reliable-reaudit
+closed-by: 2026-10-11_1638.md
 ---
 # AF-0161 - BL-2009 was requeued twice as interactive only; an interactive commit removed its lane: no between the two lane claims
 
@@ -42,7 +42,10 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-10-11 | 2026-10-11_1638.md | reproduces: no | Over this window, 9 tasks were requeued as interactive only, each once: BL-2072, 2073, 2074, 2075, 2078, 2079, 2080, 2081 and 2082. Each now carries 'lane: no' in its front matter, and none was claimed by a lane again. No task was requeued twice as interactive only.
+
 ## Log
 
 - 2026-10-11: filed proposed.
 - 2026-10-11: proposed -> accepted.
+- 2026-10-11: accepted -> closed. Re-audit 2026-10-11_1638.md: the reproduction no longer reproduces.

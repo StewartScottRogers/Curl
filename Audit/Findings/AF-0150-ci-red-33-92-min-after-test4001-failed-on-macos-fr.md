@@ -43,6 +43,7 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Re-audits
 
 - 2026-10-11 | 2026-10-11_0051.md | reproduces: yes | The reproduction on the 20261010-012326 logs shows 'run 38030548658 failure on 1c6aa1ac: test4001 on macOS only' and 'filed BL-1949' at 23:43:05. The same cause, a test that passes in the Windows-only lane tests but fails on Linux/macOS from a lane's commit and keeps CI red over 30 min, crosses again in this window. Run 38047662088: test475 failed on Linux+macOS from BL-1907's commit 7b6794f4, and CI was red 32 min (11:19:01Z to 11:51:01Z) until BL-1957's fix b1124f69. The same 38030548658 spell (33.92 min) also reappears in this window's ciRedSpells.
+- 2026-10-11 | 2026-10-11_1638.md | reproduces: yes | The CI red rule crosses again with the same cause, a test failing off Windows on a factory commit. Run 38178740830 (test303 on Linux, commit 0d18262, BL-2076's completion) started a spell at 22:12:33Z, 69 min and still red at the window's end. BL-2093 was filed 14.3 min after the failure and was Done at 22:34Z. Later failures on b362b84 and c811b9e named no test and were not filed. ciRedMinutes 169.97.
 
 ## Log
 

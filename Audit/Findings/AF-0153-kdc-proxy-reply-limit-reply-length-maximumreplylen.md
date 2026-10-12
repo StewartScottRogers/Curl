@@ -3,8 +3,8 @@ id: AF-0153
 title: KDC proxy reply limit `reply.Length > MaximumReplyLength` can become `>=` with no test failing
 auditor: quality
 severity: Medium
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-11_1638.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
 key: quality:Curl.Networking.UnitLibrary/KerberosKdcProxyHttpsTransport.cs:ReadToEndAsync-gt:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/KerberosKdcProxyHttpsTransport.cs:133:>
 task: BL-2046
@@ -13,9 +13,9 @@ found: 2026-10-11
 found-at: 22f394602532a6922adbc7fa91b3739b62d2112a
 scorecard: 2026-10-11_0051.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-11
+closed-how: mechanical
+closed-by: 2026-10-11_1638.md
 ---
 # AF-0153 - KDC proxy reply limit `reply.Length > MaximumReplyLength` can become `>=` with no test failing
 
@@ -42,7 +42,10 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Netwo
 
 ## Re-audits
 
+- 2026-10-11 | 2026-10-11_1638.md | reproduces: no | Ran -Site Curl.Networking.UnitLibrary/KerberosKdcProxyHttpsTransport.cs:133:> -Member ReadToEndAsync -ExcludeBaselineFailures -TimeoutSeconds 600: resolvedLine 133, outcome killed (killed 1, survived 0). Runner's targeted mutation rerun on the clean audited commit: killed.
+
 ## Log
 
 - 2026-10-11: filed proposed.
 - 2026-10-11: proposed -> accepted.
+- 2026-10-11: accepted -> closed. Re-audit 2026-10-11_1638.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
