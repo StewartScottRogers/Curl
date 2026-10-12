@@ -3,12 +3,12 @@ id: AF-0170
 title: -T <file> with -O on a URL ending in / saves the response over the upload file instead of curl_response, without curl's No remote filename warning
 auditor: conformance
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: conformance:--remote-name:upload-file-name:stdout
 reproduction: none
-task: none
-tasks:
+task: BL-2105
+tasks: BL-2105
 found: 2026-10-11
 found-at: d8245edb7b661211c6628e9062e9939934939fb2
 scorecard: 2026-10-11_1638.md
@@ -45,3 +45,4 @@ $r=(Get-Location).Path; $o="$env:TEMP\ac-tO"; foreach($s in 'curl','candidate'){
 ## Log
 
 - 2026-10-11: filed proposed.
+- 2026-10-11: proposed -> accepted.

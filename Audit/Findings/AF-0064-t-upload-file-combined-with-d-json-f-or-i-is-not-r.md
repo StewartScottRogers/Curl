@@ -3,8 +3,8 @@ id: AF-0064
 title: -T / --upload-file combined with -d, --json, -F or -I is not refused: Curl sends a PUT and exits 0 where curl warns and exits 2
 auditor: conformance
 severity: High
-status: accepted
-reason: 
+status: closed
+reason: Stewart closed it on 2026-10-12: two re-audits (2026-10-11_0051, 2026-10-11_1638) found it no longer reproduces (curl and Curl both exit 2); both verdicts were set aside only because planted defect PD-201 sat in the same file.
 key: conformance:Curl.Console/CurlCommandRunner.cs:upload-file-method-conflict:exit-code
 reproduction: none
 task: BL-1683
@@ -13,9 +13,9 @@ found: 2026-10-07
 found-at: 0fcb5afc262ef32bb48ad058cf1f4a2b2c68d511
 scorecard: 2026-10-07_1336.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-12
+closed-how: stewart
+closed-by: stewart
 ---
 # AF-0064 - -T / --upload-file combined with -d, --json, -F or -I is not refused: Curl sends a PUT and exits 0 where curl warns and exits 2
 
@@ -55,3 +55,4 @@ $o="$env:TEMP\af-put"; $a=@('-d','a=1','-T','CLAUDE.md','http://127.0.0.1:50999/
 
 - 2026-10-07: filed proposed.
 - 2026-10-07: proposed -> accepted.
+- 2026-10-12: accepted -> closed. Stewart closed it on 2026-10-12: two re-audits (2026-10-11_0051, 2026-10-11_1638) found it no longer reproduces (curl and Curl both exit 2); both verdicts were set aside only because planted defect PD-201 sat in the same file.

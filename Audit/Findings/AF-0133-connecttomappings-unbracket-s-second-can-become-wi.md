@@ -3,8 +3,8 @@ id: AF-0133
 title: ConnectToMappings.Unbracket's second '&&' can become '||' with no test failing: --connect-to hosts ending in ']' are stripped, and ']' throws
 auditor: quality
 severity: Medium
-status: accepted
-reason: 
+status: closed
+reason: Stewart closed it on 2026-10-12: its re-audit of 2026-10-09 found it no longer reproduces; no second confirmation came.
 key: quality:Curl.Networking.UnitLibrary/ConnectToMappings.cs:Unbracket-and:surviving-mutant
 reproduction: none
 task: BL-1885
@@ -13,9 +13,9 @@ found: 2026-10-09
 found-at: 71f3acef7ec0d988d2d6b5d967a7b7300156cf44
 scorecard: 2026-10-09_0647.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-12
+closed-how: stewart
+closed-by: stewart
 ---
 # AF-0133 - ConnectToMappings.Unbracket's second '&&' can become '||' with no test failing: --connect-to hosts ending in ']' are stripped, and ']' throws
 
@@ -51,3 +51,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Library Curl.Ne
 
 - 2026-10-09: filed proposed.
 - 2026-10-09: proposed -> accepted.
+- 2026-10-12: accepted -> closed. Stewart closed it on 2026-10-12: its re-audit of 2026-10-09 found it no longer reproduces; no second confirmation came.

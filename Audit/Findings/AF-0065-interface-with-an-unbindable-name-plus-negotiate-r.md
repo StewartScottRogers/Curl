@@ -3,8 +3,8 @@ id: AF-0065
 title: --interface with an unbindable name plus --negotiate reports the Negotiate SSPI failure instead of curl's interface-binding failure
 auditor: conformance
 severity: Low
-status: accepted
-reason: 
+status: closed
+reason: Stewart closed it on 2026-10-12: two re-audits (2026-10-11_0051, 2026-10-11_1638) found it no longer reproduces (both exit 45); both verdicts were set aside only because planted defect PD-201 sat in the same file.
 key: conformance:Curl.Console/CurlCommandRunner.cs:--interface:stderr
 reproduction: none
 task: BL-1684
@@ -13,9 +13,9 @@ found: 2026-10-07
 found-at: 0fcb5afc262ef32bb48ad058cf1f4a2b2c68d511
 scorecard: 2026-10-07_1336.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-12
+closed-how: stewart
+closed-by: stewart
 ---
 # AF-0065 - --interface with an unbindable name plus --negotiate reports the Negotiate SSPI failure instead of curl's interface-binding failure
 
@@ -55,3 +55,4 @@ $o="$env:TEMP\af-if"; $a=@('--interface','@f.txt','--negotiate','-s','-S','http:
 
 - 2026-10-07: filed proposed.
 - 2026-10-07: proposed -> accepted.
+- 2026-10-12: accepted -> closed. Stewart closed it on 2026-10-12: two re-audits (2026-10-11_0051, 2026-10-11_1638) found it no longer reproduces (both exit 45); both verdicts were set aside only because planted defect PD-201 sat in the same file.
