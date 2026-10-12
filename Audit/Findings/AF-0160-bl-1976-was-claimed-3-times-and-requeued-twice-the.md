@@ -3,8 +3,8 @@ id: AF-0160
 title: BL-1976 was claimed 3 times and requeued twice, then blocked by the per-task cost cap; its fix sat in a stash until BL-2041 landed it
 auditor: process
 severity: Low
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-11_1638.md: the reproduction no longer reproduces.
 key: process:BL-1976:BL-1976:redone-work
 reproduction: none
 task: BL-2053
@@ -13,9 +13,9 @@ found: 2026-10-11
 found-at: 22f394602532a6922adbc7fa91b3739b62d2112a
 scorecard: 2026-10-11_0051.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-11
+closed-how: reliable-reaudit
+closed-by: 2026-10-11_1638.md
 ---
 # AF-0160 - BL-1976 was claimed 3 times and requeued twice, then blocked by the per-task cost cap; its fix sat in a stash until BL-2041 landed it
 
@@ -42,7 +42,10 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-10-11 | 2026-10-11_1638.md | reproduces: no | Ran the redone-work rule over this window. No real task was claimed 3 times or requeued twice before a cost-cap block. This window's cost-cap blocks are BL-2000 (2.08 of 2.27, 1 claim), BL-1990 (2.04 of 2.00, 1 claim) and BL-2087. BL-2087 had 2 claims and 1 requeue: the requeue was for touches held by BL-2085/BL-2093, and its first run spent $1.16. Its Notes record 'no code changed', so no fix sits in a stash.
+
 ## Log
 
 - 2026-10-11: filed proposed.
 - 2026-10-11: proposed -> accepted.
+- 2026-10-11: accepted -> closed. Re-audit 2026-10-11_1638.md: the reproduction no longer reproduces.

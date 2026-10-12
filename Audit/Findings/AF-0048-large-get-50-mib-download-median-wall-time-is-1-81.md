@@ -3,8 +3,8 @@ id: AF-0048
 title: large-get (50 MiB download) median wall time is 1.81x curl's
 auditor: performance
 severity: Medium
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-11_1638.md: the reproduction no longer reproduces.
 key: performance:Curl.Protocol.Http.UnitLibrary/HttpResponseBodyReader.cs:large-get:slower-than-curl
 reproduction: none
 task: BL-1675
@@ -13,9 +13,9 @@ found: 2026-10-07
 found-at: 5a627a2fb4baf7b4b2662dc309939ec576dcad20
 scorecard: 2026-10-07_0844.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-11
+closed-how: reliable-reaudit
+closed-by: 2026-10-11_1638.md
 ---
 # AF-0048 - large-get (50 MiB download) median wall time is 1.81x curl's
 
@@ -50,8 +50,10 @@ powershell -NoProfile -File Audit/Tools/Measure-Performance.ps1 -Iterations 20 -
 - 2026-10-10 | 2026-10-10_0123.md | reproduces: yes | Ran the reproduction at 20 iterations. large-get curl median 84 ms, candidate 123.5 ms, ratio 1.47x. That is lower than the 1.81x recorded but still over the 1.25x threshold.
 - 2026-10-11 | 2026-10-11_0051.md | reproduces: yes | still reported
 - 2026-10-11 | 2026-10-11_0051.md | reproduces: yes | Ran the reproduction at 20 iterations: large-get curl median 92 ms, candidate 128 ms, 1.39x, still over the 1.25x threshold (the finding recorded 1.81x, so it is smaller but not fixed).
+- 2026-10-11 | 2026-10-11_1638.md | reproduces: no | Ran Measure-Performance.ps1 -Iterations 20: large-get curl median 101 ms, candidate median 117.5 ms, ratio 1.16x, under the 1.25x threshold (the finding recorded 1.81x).
 
 ## Log
 
 - 2026-10-07: filed proposed.
 - 2026-10-07: proposed -> accepted.
+- 2026-10-11: accepted -> closed. Re-audit 2026-10-11_1638.md: the reproduction no longer reproduces.

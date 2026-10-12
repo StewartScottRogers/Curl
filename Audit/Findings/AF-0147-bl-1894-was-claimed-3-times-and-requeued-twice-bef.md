@@ -3,8 +3,8 @@ id: AF-0147
 title: BL-1894 was claimed 3 times and requeued twice before one run finished it
 auditor: process
 severity: Low
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-11_1638.md: the reproduction no longer reproduces.
 key: process:BL-1894:BL-1894:redone-work
 reproduction: none
 task: BL-2044
@@ -13,9 +13,9 @@ found: 2026-10-10
 found-at: 1b27494521dec4bdaa3fe60c8dc7a3fc73874253
 scorecard: 2026-10-10_0123.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-11
+closed-how: reliable-reaudit
+closed-by: 2026-10-11_1638.md
 ---
 # AF-0147 - BL-1894 was claimed 3 times and requeued twice before one run finished it
 
@@ -43,8 +43,10 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Re-audits
 
 - 2026-10-11 | 2026-10-11_0051.md | reproduces: yes | Ran the reproduction on the 20261010-012326 logs: BL-1894 claim at 19:12:18 (L2), 22:47:35 and 00:44:34 (L1), and REQUEUE at 19:14:03 and 22:53:20. Then ran the rule over this window (-Since 2026-10-10): the same cause, a task claimed before its prerequisite was Done and requeued to wait, crosses again. BL-1976 was claimed 3 times (13:27:22 L3, 16:17:57 L1, 18:19:53 L1) and requeued twice ('Waits on BL-1997' at 13:36:41, 'Waits on BL-2035' at 16:26:16), then blocked by the cost cap.
+- 2026-10-11 | 2026-10-11_1638.md | reproduces: no | Ran the redone-work rule over this window (-Since 2026-10-11, 6 shifts, 39 tasks Done). tasksClaimedMoreThanOnce 3, requeues 14. The real lane traces have no task claimed 3 times or requeued twice for prerequisites. BL-2076 had 2 claims and 1 requeue (touches held by BL-2073). BL-2087 had 2 claims, 1 requeue, then a cost-cap block. 9 gap re-close tasks were each requeued once. Only BL-2085 crosses, and only through the lane 9 trace (cause 'Run ended without a commit'). That trace contradicts the coordinator log (see process:BL-2085:BL-2085:redone-work), and the cause is not AF-0147's.
 
 ## Log
 
 - 2026-10-10: filed proposed.
 - 2026-10-10: proposed -> accepted.
+- 2026-10-11: accepted -> closed. Re-audit 2026-10-11_1638.md: the reproduction no longer reproduces.

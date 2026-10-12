@@ -3,8 +3,8 @@ id: AF-0144
 title: large-get (50 MiB download) median wall time is 1.47x curl's
 auditor: performance
 severity: Medium
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-11_1638.md: the reproduction no longer reproduces.
 key: performance:large-get:slower-than-curl
 reproduction: none
 task: BL-2043
@@ -13,9 +13,9 @@ found: 2026-10-10
 found-at: 1b27494521dec4bdaa3fe60c8dc7a3fc73874253
 scorecard: 2026-10-10_0123.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-11
+closed-how: reliable-reaudit
+closed-by: 2026-10-11_1638.md
 ---
 # AF-0144 - large-get (50 MiB download) median wall time is 1.47x curl's
 
@@ -43,8 +43,10 @@ powershell -NoProfile -File Audit/Tools/Measure-Performance.ps1 -Iterations 20 -
 ## Re-audits
 
 - 2026-10-11 | 2026-10-11_0051.md | reproduces: yes | Ran the reproduction at 20 iterations: large-get curl median 92 ms, candidate 128 ms, 1.39x, still over the 1.25x threshold (the finding recorded 1.47x). HttpResponseBodyReader.cs now receives 102400 bytes per read, but still writes in 16384-byte pieces.
+- 2026-10-11 | 2026-10-11_1638.md | reproduces: no | Same run: large-get curl 101 ms, candidate 117.5 ms, ratio 1.16x, under the 1.25x threshold (the finding recorded 1.47x).
 
 ## Log
 
 - 2026-10-10: filed proposed.
 - 2026-10-10: proposed -> accepted.
+- 2026-10-11: accepted -> closed. Re-audit 2026-10-11_1638.md: the reproduction no longer reproduces.

@@ -42,6 +42,8 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-10-11 | 2026-10-11_1638.md | not re-audited | overlaps planted defect PD-503 in BL-2095-20261011-161534-L9.jsonl, so the auditor's verdict (reproduces no) is set aside: Ran the unfinished-runs rule over this window. Select-String 'Cannot bind argument|script error' over every DarkFactory-*.log found 0 matches. The only unfinished run, BL-2095-20261011-161534-L9.jsonl, follows no claim, so it is not a run cut off seconds after its claim by a lane-script crash. Every traced claim in the window ends in DONE, REQUEUE or BLOCKED.
+
 ## Log
 
 - 2026-10-11: filed proposed.

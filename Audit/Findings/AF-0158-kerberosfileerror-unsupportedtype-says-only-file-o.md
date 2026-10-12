@@ -3,8 +3,8 @@ id: AF-0158
 title: KerberosFileError.UnsupportedType says only FILE: or DIR: caches can store a credential; CredentialCacheStore.Store also stores into KCM:
 auditor: truthfulness
 severity: Low
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-11_1638.md: the reproduction no longer reproduces.
 key: truthfulness:Curl.Kerberos.UnitLibrary/KerberosFileError.cs:UnsupportedType:false-doc-comment
 reproduction: none
 task: BL-2051
@@ -13,9 +13,9 @@ found: 2026-10-11
 found-at: 22f394602532a6922adbc7fa91b3739b62d2112a
 scorecard: 2026-10-11_0051.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-11
+closed-how: reliable-reaudit
+closed-by: 2026-10-11_1638.md
 ---
 # AF-0158 - KerberosFileError.UnsupportedType says only FILE: or DIR: caches can store a credential; CredentialCacheStore.Store also stores into KCM:
 
@@ -42,7 +42,10 @@ Run from the repository root:
 
 ## Re-audits
 
+- 2026-10-11 | 2026-10-11_1638.md | reproduces: no | Ran the reproduction: KerberosFileError.cs now reads '/// <c>FILE:</c>, <c>DIR:</c> or <c>KCM:</c> for storing a credential in one, and anything', matching CredentialCacheStore.cs 'StoreMarshalled(credential, bytes => StoreKcmCredential(parsed.Residual, bytes));'.
+
 ## Log
 
 - 2026-10-11: filed proposed.
 - 2026-10-11: proposed -> accepted.
+- 2026-10-11: accepted -> closed. Re-audit 2026-10-11_1638.md: the reproduction no longer reproduces.

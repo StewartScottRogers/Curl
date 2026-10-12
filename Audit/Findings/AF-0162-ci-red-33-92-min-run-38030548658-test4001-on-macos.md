@@ -3,8 +3,8 @@ id: AF-0162
 title: CI red 33.92 min (run 38030548658, test4001 on macOS); the same spell as AF-0150, counted again because -Since is applied in UTC
 auditor: process
 severity: Low
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-11_1638.md: the reproduction no longer reproduces.
 key: process:logs:test4001:ci-red
 reproduction: none
 task: BL-2055
@@ -13,9 +13,9 @@ found: 2026-10-11
 found-at: 22f394602532a6922adbc7fa91b3739b62d2112a
 scorecard: 2026-10-11_0051.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-11
+closed-how: reliable-reaudit
+closed-by: 2026-10-11_1638.md
 ---
 # AF-0162 - CI red 33.92 min (run 38030548658, test4001 on macOS); the same spell as AF-0150, counted again because -Since is applied in UTC
 
@@ -42,7 +42,10 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-10-11 | 2026-10-11_1638.md | reproduces: no | Ran the tool with -Since 2026-10-11. The tool now compares CI run start with -Since converted to UTC (Measure-FactoryProcess.ps1:66-67, 156). ciRedSpells start at 16:12:04Z, 18:05:00Z and 22:12:33Z, all inside the window. Run 38030548658 is not among them, and no spell from an earlier audit's window is counted again.
+
 ## Log
 
 - 2026-10-11: filed proposed.
 - 2026-10-11: proposed -> accepted.
+- 2026-10-11: accepted -> closed. Re-audit 2026-10-11_1638.md: the reproduction no longer reproduces.
