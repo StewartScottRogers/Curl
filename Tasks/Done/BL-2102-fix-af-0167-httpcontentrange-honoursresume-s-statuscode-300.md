@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Http.UnitLibrary]
 requirement: none
 created: 2026-10-12
-completed:
+completed: 2026-10-12
 ---
 # BL-2102 — Fix AF-0167: HttpContentRange.HonoursResume's 'statusCode < 300' can become '<= 300' with no test failing: a 300 with Content-Range '*' is taken as a resume
 
@@ -41,12 +41,16 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded. (Checked by applying the same mutant by hand; see Notes.)
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Added two `HonoursResume_ReadsTheFirstNumber` rows pinning the 2xx/3xx boundary for the asterisk form: 299 with `bytes */105` honours the resume, 300 does not. The production code was already right; only the test was missing.
+- The audit guard refuses a lane running `Audit/Tools/Invoke-MutationTest.ps1`, so the mutant was applied by hand instead: with `return statusCode <= 300;` the row "asterisk on a 300, the first 3xx" fails (1 of 11 `HttpContentRangeTests` fail), and with the code restored all pass. The re-audit runs the finding's own reproduction.
 
 ## Log
 
 - 2026-10-12: Created.
 - 2026-10-12: Backlog -> Doing.
+- 2026-10-12: Doing -> Done. Test rows pin 299 and 300 for the asterisk Content-Range; the <= 300 mutant now fails a test
