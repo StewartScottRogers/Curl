@@ -46,6 +46,9 @@ The finding closes only when a later re-audit by the process auditor confirms th
 
 ## Notes
 
+- The per-run cost cap (2.7 times the median, AF-0033/0095/0096) already exists; the BL-2043 logs are not in this lane's checkout, so the overshoot could not be re-measured. The reproduction reads past logs, so it can only change once a re-audit measures new runs.
+- Fix: the run prompts' cost rule (both copies in RunDarkFactory.ps1) now says to stop editing a file after two failed test passes on it, file the rest and requeue, which is the pattern behind BL-2043 (14 edits, then 4 more).
+
 ## Log
 
 - 2026-10-12: Created.
