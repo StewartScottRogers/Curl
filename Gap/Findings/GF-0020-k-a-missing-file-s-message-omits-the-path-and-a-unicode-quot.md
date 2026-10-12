@@ -36,6 +36,7 @@ In Curl.Cli.UnitLibrary's config-file reader: put the quoted path in 'cannot rea
 - 2026-10-10_0657: 1 of 2 items are gaps.
 - 2026-10-11_0936: 1 of 2 items are gaps.
 - 2026-10-11_1950: 0 of 2 items are gaps.
+- 2026-10-12_0951: 0 of 2 items are gaps.
 
 ## Log
 

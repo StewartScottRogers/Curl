@@ -1,0 +1,39 @@
+---
+id: GF-0068
+title: NETRC variable is not read; --netrc fails with exit 26 instead of using the named file
+area: environment
+key: environment:netrc-variable-ignored
+severity: High
+status: open
+scope: target
+introduced-in:
+opened: 2026-10-12_0951
+closed:
+regression: false
+items: [environment:NETRC]
+touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests]
+task: BL-2114
+tasks: [BL-2114]
+---
+# GF-0068 - NETRC variable is not read; --netrc fails with exit 26 instead of using the named file
+
+## Summary
+
+Curl differs from upstream curl in environment: NETRC variable is not read; --netrc fails with exit 26 instead of using the named file.
+
+## Evidence
+
+Recipe: NETRC=<folder>/gap-netrc (file holds 'machine 127.0.0.1 login gapuser password gappass'), 'curl -s --netrc http://127.0.0.1:<port>/'. Expected: exit 0; stdout ''; stderr ''; request GET / HTTP/1.1. Actual: exit 26; stdout ''; stderr ''; request none. A search of Curl.Cli.UnitLibrary/NetrcUse.cs finds no NETRC variable lookup. Reproduce: powershell -NoProfile -File Gap\Tools\Measure-EnvironmentGap.ps1 -OutFile $env:TEMP\environment.json
+
+## Suggestion
+
+Make the netrc file lookup behind --netrc (Curl.Cli.UnitLibrary NetrcUse, and the code that opens the file) read the NETRC environment variable and use the named file, as docs/cmdline-opts/_ENVIRONMENT.md and docs/libcurl/libcurl-env.md (NETRC) describe. Fall back to the home-directory .netrc (_netrc on Windows) only when NETRC is unset. Add unit tests with an injected environment.
+
+## Measurements
+
+- 2026-10-12_0951: 1 of 1 items are gaps.
+
+## Log
+
+- 2026-10-12_0951: Opened by gap-environment.
+- 2026-10-12_1039: Filed BL-2114.
