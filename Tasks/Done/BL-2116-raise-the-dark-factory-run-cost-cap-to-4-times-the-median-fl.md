@@ -8,7 +8,7 @@ depends-on: []
 touches: [RunDarkFactory.ps1, Documentation/Planning/Decisions]
 requirement: none
 created: 2026-10-12
-completed:
+completed: 2026-10-12
 ---
 # BL-2116 — Raise the dark factory run cost cap to 4 times the median, floor 3 USD, ceiling 10 USD
 
@@ -53,3 +53,4 @@ such findings, or a later audit-branch change can move the auditor's bar.
 
 - 2026-10-12: Created.
 - 2026-10-12: Backlog -> Doing.
+- 2026-10-12: Doing -> Done. Cap is 4 times the median, $3 floor, $10 default ceiling; ADR-0478; -TestTaskBudget passes
