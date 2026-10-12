@@ -3,8 +3,8 @@ id: AF-0172
 title: BL-2043 cost $3.66, 5.2 times the $0.70 median task cost: 75 turns and a rebase-conflict run
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: process:BL-2043:BL-2043:cost-outlier
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Log
 
 - 2026-10-11: filed proposed.
+- 2026-10-11: proposed -> accepted.
