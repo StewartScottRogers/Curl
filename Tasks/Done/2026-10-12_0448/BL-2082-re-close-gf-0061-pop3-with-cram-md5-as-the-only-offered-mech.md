@@ -9,7 +9,7 @@ touches: [Curl.Protocol.Pop3.UnitLibrary, Curl.Protocol.Pop3.UnitTests]
 lane: no
 requirement: none
 created: 2026-10-11
-completed:
+completed: 2026-10-11
 ---
 # BL-2082 — Re-close GF-0061: POP3 with CRAM-MD5 as the only offered mechanism sends no AUTH at all
 
@@ -38,9 +38,9 @@ In Curl.Protocol.Pop3.UnitLibrary's Pop3Login, send AUTH CRAM-MD5 when CAPA offe
 
 ## Acceptance criteria
 
-- [ ] `behaviour:test891`: Curl answers what curl 8.21.0 answers, `upstream test891 passes`, so the item measures `match`.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
-- [ ] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
+- [x] `behaviour:test891`: Curl answers what curl 8.21.0 answers, `upstream test891 passes`, so the item measures `match`.
+- [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
+- [x] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
 
 ## Notes
 
@@ -66,3 +66,7 @@ In Curl.Protocol.Pop3.UnitLibrary's Pop3Login, send AUTH CRAM-MD5 when CAPA offe
 - 2026-10-11: Created.
 - 2026-10-11: Backlog -> Doing.
 - 2026-10-11: Doing -> Backlog. Interactive only: Curl already matches curl on test891 (BL-1991); the gap office's measuring harness, which lanes may not read, must be checked (see Notes)
+
+Closed by evidence: the fixed gap harness (PR #119, merged 2026-10-12) re-measured every item of this task as `match` with the gap office's own Measure-UpstreamCases tool. The finding itself closes at the next gap run.
+- 2026-10-11: Backlog -> Doing. PR #119 re-measured every item as match
+- 2026-10-11: Doing -> Done. PR #119 re-measured every item as match

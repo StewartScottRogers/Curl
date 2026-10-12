@@ -2634,6 +2634,21 @@ function Get-CiFailures {
             $current[$job] = $null
         }
     }
+    # A run that failed with no test, compiler error or audit-guard line in its log (a crashed
+    # test host, a timeout, a job step that broke) is still red: file it by the job and step
+    # the log names, so the spell does not stay open unfiled (AF-0171).
+    if (-not $found.Count) {
+        foreach ($raw in $Log) {
+            $parts = "$raw" -split "`t", 3
+            if ($parts.Count -lt 3 -or -not $parts[0].Trim() -or $parts[0] -eq 'UNKNOWN STEP') { continue }
+            $key = "job $($parts[0].Trim()) step $($parts[1].Trim())"
+            $text = ($parts[2] -replace '^\d{4}-\d\d-\d\dT[\d:.]+Z ?', '').Trim()
+            if (-not $found.Contains($key)) {
+                $found[$key] = [pscustomobject]@{ Key = $key; Kind = 'job'; Platforms = @(Get-CiPlatform $parts[0].Trim()); Project = ''; Message = '' }
+            }
+            if (-not $found[$key].Message -and $text -match '(?i)error|fail|timed? ?out|cancel|exit code') { $found[$key].Message = $text }
+        }
+    }
     return @($found.Values)
 }
 
@@ -3111,10 +3126,14 @@ if ($TestCiWatch) {
     # The case that failed live: a run with one failing test was dropped as if it had none.
     $script:ciListJson = '[{"conclusion":"failure","databaseId":36690174792,"headSha":"b86b15dfc80d1dea7a5733c9b73fd263a17533b3","status":"completed","updatedAt":"2026-09-30T08:35:42Z"},{"conclusion":"cancelled","databaseId":1,"headSha":"x","status":"completed","updatedAt":"2026-09-30T08:31:26Z"},{"conclusion":"failure","databaseId":36671448420,"headSha":"bfd523f47edea0e8d7826a657606353aa2b6b462","status":"completed","updatedAt":"2026-09-30T05:05:30Z"},{"conclusion":"failure","databaseId":99,"headSha":"9999999999","status":"completed","updatedAt":"2026-09-30T05:00:00Z"},{"conclusion":"success","databaseId":36689969747,"headSha":"c4083da8fbe96c97b45499a41bab397f52fadce4","status":"completed","updatedAt":"2026-09-30T08:33:40Z"}]'
     $single = Get-CiRuns -Branch 'work' -ListRuns $listed -ReadLog $readLog
-    & $check 'one failing test keeps its run' '36690174792 1 macOS; 36689969747 0 ' `
+    & $check 'one failing test keeps its run; a nameless failure is kept by its job and step' '36690174792 1 macOS; 36671448420 1 Linux; 36689969747 0 ' `
         (($single | ForEach-Object { "$($_.Id) $(@($_.Failures).Count) $(@($_.Failures | ForEach-Object { $_.Platforms }) -join '+')" }) -join '; ')
-    & $check 'unreadable and nameless failures traced' 'run 36671448420 failure on bfd523f4: its log names no failing test or build error; nothing to file|run 99 failure on 99999999: cannot read its log with gh run view --log-failed; trying again next heartbeat' `
+    & $check 'unreadable failures traced' 'run 99 failure on 99999999: cannot read its log with gh run view --log-failed; trying again next heartbeat' `
         ((@($traced) | Sort-Object) -join '|')
+    $nameless = @(Get-CiFailures @("${ubuntu}2026-09-30T05:05:00.0000000Z ##[error]Process completed with exit code 1."))
+    & $check 'a failure naming no test is filed by its job and step (AF-0171)' 'job Build and test (ubuntu-latest) step Fast tests|job|Linux|##[error]Process completed with exit code 1.' `
+        "$($nameless[0].Key)|$($nameless[0].Kind)|$($nameless[0].Platforms -join '+')|$($nameless[0].Message)"
+    & $check 'an empty log names no failure' '0' "$(@(Get-CiFailures @()).Count)"
     $traced.Clear()
     $script:ciListJson = $null
     $first = Get-CiRuns -Branch 'work' -ListRuns $listed -ReadLog $readLog
@@ -3330,7 +3349,7 @@ Rules for this unattended run, in addition to CLAUDE.md:
    parallel all spend inside one turn and carry the run past the cap (AF-0052, AF-0100, AF-0102, AF-0104).
    Run a test project once per change, not in a loop of reruns to hunt a flaky test: when
    one passes alone and fails in the run, file a task for it with the board script and
-   carry on (AF-0105: about 15 test runs, three of them reruns in a loop, took BL-1499 to $3.86; AF-0106: 66 turns on a flaky cookie test cost BL-1619 $3.32 before it was parked, and a fresh lane finished it in 2.4 minutes for $0.46; AF-0107: BL-1682 cost $3.76 over three runs, 48 turns in one of them spent measuring without fixing, so park what is left as a task rather than measure again; AF-0108: 41 test runs in 45 Bash calls took BL-1645 to $3.75 in one 28-minute run, so run the fast tests once when the change is done, not after every edit; AF-0109: 38 mentions of dotnet test in one 76-turn run took BL-1556 to $3.68, 3.1 times the median; AF-0110: three Opus sub-agents in one 15-turn run took BL-1587 to $3.68, 3.1 times the median, so do the work yourself and start a sub-agent only when it saves more than it costs; AF-0111: 117 tool calls and no Read in one 118-turn run took BL-1557 to $3.63, 3.05 times the median, so read a file once with Read and batch independent calls into one turn).
+   carry on (AF-0105: about 15 test runs, three of them reruns in a loop, took BL-1499 to $3.86; AF-0106: 66 turns on a flaky cookie test cost BL-1619 $3.32 before it was parked, and a fresh lane finished it in 2.4 minutes for $0.46; AF-0107: BL-1682 cost $3.76 over three runs, 48 turns in one of them spent measuring without fixing, so park what is left as a task rather than measure again; AF-0108: 41 test runs in 45 Bash calls took BL-1645 to $3.75 in one 28-minute run, so run the fast tests once when the change is done, not after every edit; AF-0109: 38 mentions of dotnet test in one 76-turn run took BL-1556 to $3.68, 3.1 times the median; AF-0110: three Opus sub-agents in one 15-turn run took BL-1587 to $3.68, 3.1 times the median, so do the work yourself and start a sub-agent only when it saves more than it costs; AF-0111: 117 tool calls and no Read in one 118-turn run took BL-1557 to $3.63, 3.05 times the median, so read a file once with Read and batch independent calls into one turn; AF-0172: 14 edits to one file and a failed test pass sent back for 4 more took BL-2043 to $3.66, 5.2 times the median, so when a test pass fails twice on the same file, stop editing it, file what is left as a task and move this one to Backlog, rather than a third round of edit and test).
 8. The shift kills this run at {DEADLINE}, {MINUTES} minutes after it started, and a
    killed run ends Blocked. While other lanes build, one Measure-CodeQuality.ps1 run can
    take 30 to 45 minutes: run it once per library you changed, with -ReportPath, and
@@ -3449,7 +3468,7 @@ Rules for this unattended run, in addition to CLAUDE.md:
    parallel all spend inside one turn and carry the run past the cap (AF-0052, AF-0100, AF-0102, AF-0104).
    Run a test project once per change, not in a loop of reruns to hunt a flaky test: when
    one passes alone and fails in the run, file a task for it with the board script and
-   carry on (AF-0105: about 15 test runs, three of them reruns in a loop, took BL-1499 to $3.86; AF-0106: 66 turns on a flaky cookie test cost BL-1619 $3.32 before it was parked, and a fresh lane finished it in 2.4 minutes for $0.46; AF-0107: BL-1682 cost $3.76 over three runs, 48 turns in one of them spent measuring without fixing, so park what is left as a task rather than measure again; AF-0108: 41 test runs in 45 Bash calls took BL-1645 to $3.75 in one 28-minute run, so run the fast tests once when the change is done, not after every edit; AF-0109: 38 mentions of dotnet test in one 76-turn run took BL-1556 to $3.68, 3.1 times the median; AF-0110: three Opus sub-agents in one 15-turn run took BL-1587 to $3.68, 3.1 times the median, so do the work yourself and start a sub-agent only when it saves more than it costs; AF-0111: 117 tool calls and no Read in one 118-turn run took BL-1557 to $3.63, 3.05 times the median, so read a file once with Read and batch independent calls into one turn).
+   carry on (AF-0105: about 15 test runs, three of them reruns in a loop, took BL-1499 to $3.86; AF-0106: 66 turns on a flaky cookie test cost BL-1619 $3.32 before it was parked, and a fresh lane finished it in 2.4 minutes for $0.46; AF-0107: BL-1682 cost $3.76 over three runs, 48 turns in one of them spent measuring without fixing, so park what is left as a task rather than measure again; AF-0108: 41 test runs in 45 Bash calls took BL-1645 to $3.75 in one 28-minute run, so run the fast tests once when the change is done, not after every edit; AF-0109: 38 mentions of dotnet test in one 76-turn run took BL-1556 to $3.68, 3.1 times the median; AF-0110: three Opus sub-agents in one 15-turn run took BL-1587 to $3.68, 3.1 times the median, so do the work yourself and start a sub-agent only when it saves more than it costs; AF-0111: 117 tool calls and no Read in one 118-turn run took BL-1557 to $3.63, 3.05 times the median, so read a file once with Read and batch independent calls into one turn; AF-0172: 14 edits to one file and a failed test pass sent back for 4 more took BL-2043 to $3.66, 5.2 times the median, so when a test pass fails twice on the same file, stop editing it, file what is left as a task and move this one to Backlog, rather than a third round of edit and test).
 9. The shift kills this run at {DEADLINE}, {MINUTES} minutes after it started, and a
    killed run ends Blocked. While other lanes build, one Measure-CodeQuality.ps1 run can
    take 30 to 45 minutes: run it once per library you changed, with -ReportPath, and

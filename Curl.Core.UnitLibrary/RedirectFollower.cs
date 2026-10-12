@@ -615,6 +615,29 @@ public sealed class RedirectFollower(
         header.StartsWith("Authorization:", StringComparison.OrdinalIgnoreCase)
         || header.StartsWith("Cookie:", StringComparison.OrdinalIgnoreCase);
 
+    /// <summary>
+    /// The mail options a hop carries: the first hop's, with the <c>--oauth2-bearer</c> token
+    /// withheld from a hop that may not be sent credentials, as curl 8.21.0 sends no
+    /// <c>AUTHENTICATE</c> and no <c>LOGIN</c> after an HTTP redirect to IMAP on another host
+    /// (upstream test779, BL-2090).
+    /// </summary>
+    private static MailRequestOptions? HopMail(ITransferContext first, bool sendCredentials)
+    {
+        MailRequestOptions? mail = first.Mail;
+        if (sendCredentials)
+        {
+            return mail;
+        }
+
+        if (mail is null)
+        {
+            // An HTTP first URL carries no mail options, but its --oauth2-bearer token is withheld all the same.
+            return first.Http?.BearerToken is null ? null : new MailRequestOptions { BearerTokenWithheld = true };
+        }
+
+        return mail.BearerToken is null ? mail : mail with { BearerToken = null, BearerTokenWithheld = true };
+    }
+
     private static TransferContext NextHop(
         ITransferContext first,
         CurlUrl previousUrl,
@@ -641,6 +664,7 @@ public sealed class RedirectFollower(
             HeaderOutput = first.HeaderOutput,
             PostData = bodyDropped ? null : first.PostData,
             Credentials = selectHopCredentials is null ? HopCredentials(first, url, sendCredentials) : selectHopCredentials(url),
+            Mail = HopMail(first, sendCredentials),
             TelnetOptions = first.TelnetOptions,
             TftpBlockSize = first.TftpBlockSize,
             TftpNoOptions = first.TftpNoOptions,

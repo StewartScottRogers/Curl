@@ -112,6 +112,44 @@ public sealed class SystemDnsResolverTests
     }
 
     [TestMethod]
+    [DataRow("0", "0.0.0.0")]
+    [DataRow("0.0.0.0", "0.0.0.0")]
+    [DataRow("::", "::")]
+    public async Task ResolveAsync_WhenLookupRefusesAnyAddressWithArgumentException_ReturnsTheLiteral(string host, string expected)
+    {
+        // Dns.GetHostAddressesAsync throws ArgumentException for the any-address. curl 8.21.0
+        // (Schannel) resolves it to itself and fails the connect, which TcpConnector reports
+        // as CouldntConnect: curl http://0 -> exit 7, curl: (7) Failed to connect to
+        // 0.0.0.0:80 after 0 ms: Could not connect to server (measured 2026-10-11; test1293).
+        var resolver = new SystemDnsResolver(
+            (_, _) => Task.FromException<IPAddress[]>(new ArgumentException("IPv4 address 0.0.0.0 and IPv6 address ::0 are unspecified addresses that cannot be used as a target address.", "hostNameOrAddress")));
+
+        Diagnostics.Arrange("host, lookup failure", $"{host}, ArgumentException");
+
+        var addresses = await resolver.ResolveAsync(host, CancellationToken.None);
+
+        Diagnostics.Act("addresses", string.Join(", ", addresses));
+        Diagnostics.Assert("addresses", expected, string.Join(", ", addresses));
+
+        CollectionAssert.AreEqual(new[] { IPAddress.Parse(expected) }, addresses.ToArray());
+    }
+
+    [TestMethod]
+    public async Task ResolveAsync_WhenLookupThrowsArgumentExceptionForAName_LetsItEscape()
+    {
+        var resolver = new SystemDnsResolver(
+            (_, _) => Task.FromException<IPAddress[]>(new ArgumentException("refused", "hostNameOrAddress")));
+
+        Diagnostics.Arrange("host, lookup failure", "host.example, ArgumentException");
+
+        var exception = await Assert.ThrowsExactlyAsync<ArgumentException>(
+            async () => await resolver.ResolveAsync("host.example", CancellationToken.None));
+
+        Diagnostics.Act("exception", exception.GetType().Name);
+        Diagnostics.Assert("exception", nameof(ArgumentException), exception.GetType().Name);
+    }
+
+    [TestMethod]
     public async Task ResolveAsync_WithWhitespaceHost_ThrowsArgumentException()
     {
         var resolver = new SystemDnsResolver();

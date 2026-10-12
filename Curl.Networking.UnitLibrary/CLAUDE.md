@@ -261,7 +261,9 @@ after curl's `Alt-svc connecting from [h1]H:P to [h1]H2:P2` line, and `Connectio
 the alternative too.
 
 `SystemDnsResolver` reports a host `Dns` refuses as over 255 characters as not resolved, so it
-is exit 6 (exit 5 for a proxy) as in curl 8.21.0, which accepts hosts up to 65535 bytes. Every
+is exit 6 (exit 5 for a proxy) as in curl 8.21.0, which accepts hosts up to 65535 bytes, and
+an address literal `Dns` refuses with `ArgumentException` (the any-address, host `0`) as itself,
+so the dial fails with exit 7 as curl's does (BL-2084). Every
 `Could not resolve host:` and `Could not resolve proxy:` message goes through `CurlErrorBuffer`,
 which cuts it to 255 characters as curl's 256-byte error buffer does (ADR-0072).
 

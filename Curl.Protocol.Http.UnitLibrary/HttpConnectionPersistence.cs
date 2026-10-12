@@ -27,24 +27,36 @@ internal static class HttpConnectionPersistence
     /// <see langword="true" /> for <c>--tr-encoding</c>, which reads a body with a
     /// Transfer-Encoding that is not chunked until the server closes.
     /// </param>
+    /// <param name="throughHttpProxy">
+    /// <see langword="true" /> when the transfer goes through an HTTP proxy, where curl honours
+    /// <c>Proxy-Connection: close</c>.
+    /// </param>
     /// <returns><see langword="true" /> when the next request may be sent on the same connection.</returns>
     internal static bool KeepsAlive(
         HttpResponseHead head,
         bool noBody,
         bool passesTransferCoding = false,
         bool ignoresContentLength = false,
-        bool decodesTransferCoding = false)
+        bool decodesTransferCoding = false,
+        bool throughHttpProxy = false)
     {
-        if (NamesConnectionOption(head, "close"))
+        if (AsksToClose(head, throughHttpProxy))
         {
             return false;
         }
 
         bool persistentVersion = head.StatusLine.Version >= new Version(1, 1) || NamesConnectionOption(head, "keep-alive");
-        return persistentVersion
-            && !(HttpResponseBodyReader.HasBody(head, noBody)
-                && HttpResponseBodyFraming.Of(head.Headers, passesTransferCoding, ignoresContentLength, decodesTransferCoding).RunsToClose);
+        return persistentVersion && !BodyRunsToClose(head, noBody, passesTransferCoding, ignoresContentLength, decodesTransferCoding);
     }
+
+    // Connection: close, or Proxy-Connection: close from an HTTP/1.1 proxy.
+    private static bool AsksToClose(HttpResponseHead head, bool throughHttpProxy) =>
+        NamesConnectionOption(head, "close") || (throughHttpProxy && ClosesHttp11Proxy(head));
+
+    // A body that only the server's close ends, so the connection cannot carry another request.
+    private static bool BodyRunsToClose(HttpResponseHead head, bool noBody, bool passesTransferCoding, bool ignoresContentLength, bool decodesTransferCoding) =>
+        HttpResponseBodyReader.HasBody(head, noBody)
+        && HttpResponseBodyFraming.Of(head.Headers, passesTransferCoding, ignoresContentLength, decodesTransferCoding).RunsToClose;
 
     /// <summary>
     /// Decides whether curl 8.21.0 leaves the connection that carried <paramref name="head" />
@@ -128,6 +140,12 @@ internal static class HttpConnectionPersistence
             && string.Equals(headerLine[..colon], "Proxy-Connection", StringComparison.OrdinalIgnoreCase)
             && NamesOption(headerLine[(colon + 1)..], option);
     }
+
+    private static bool ClosesHttp11Proxy(HttpResponseHead head) =>
+        head.StatusLine.Version == new Version(1, 1)
+            && head.Headers
+                .Where(header => string.Equals(header.Name, "Proxy-Connection", StringComparison.OrdinalIgnoreCase))
+                .Any(header => NamesOption(header.Value, "close"));
 
     private static bool NamesConnectionOption(HttpResponseHead head, string option) =>
         head.Headers

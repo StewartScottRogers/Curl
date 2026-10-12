@@ -21,6 +21,8 @@ public sealed class HttpContentRangeTests
     [DataRow(206, "bytes 99999999999999999999-", false, DisplayName = "too large")]
     [DataRow(200, "bytes */105", true, DisplayName = "asterisk on a 2xx fetches everything")]
     [DataRow(200, "bytes", true, DisplayName = "no start on a 2xx fetches everything")]
+    [DataRow(299, "bytes */105", true, DisplayName = "asterisk on a 299, the last 2xx, fetches everything")]
+    [DataRow(300, "bytes */105", false, DisplayName = "asterisk on a 300, the first 3xx")]
     [DataRow(404, "bytes */105", false, DisplayName = "asterisk on a 404")]
     public void HonoursResume_ReadsTheFirstNumber(int statusCode, string value, bool expected)
     {

@@ -77,6 +77,13 @@ public sealed record MailRequestOptions
     public string? BearerToken { get; init; }
 
     /// <summary>
+    /// Gets a value indicating whether <c>--oauth2-bearer</c> was given but a followed redirect
+    /// to another host withheld its token, so curl still prefers only the bearer mechanisms and
+    /// never falls back to <c>LOGIN</c> (upstream test779, BL-2090).
+    /// </summary>
+    public bool BearerTokenWithheld { get; init; }
+
+    /// <summary>
     /// Gets the service name from <c>--service-name</c>, or <see langword="null" /> for the
     /// scheme's default (<c>smtp</c>, <c>pop</c> or <c>imap</c>).
     /// </summary>

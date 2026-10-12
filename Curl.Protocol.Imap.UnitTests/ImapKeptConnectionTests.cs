@@ -67,7 +67,7 @@ public sealed class ImapKeptConnectionTests
     [DataRow("imap://127.0.0.1/INBOX;UIDVALIDITY=x;UID=2", "A003 UID FETCH 2 BODY[]\r\n", DisplayName = "UIDVALIDITY not a number")]
     public async Task ExecuteAsync_KeptConnectionWithInboxSelected_SelectsOnlyWhenTheUrlAsksForAnotherSelection(string url, string expectedSent)
     {
-        var kept = new ImapKeptConnection(new ScriptedConnection(), "\0\0\0None", 'A', TimeProvider.System);
+        var kept = new ImapKeptConnection(new ScriptedConnection(), "\0\0None", 'A', TimeProvider.System);
         kept.Remember(2, "INBOX", 7);
         var connection = new PoolingScriptedConnection(
             Read("* 1 EXISTS\r\nA003 OK SELECT completed\r\n"), Read("* 2 FETCH (BODY[] {2}\r\nhi)\r\nA003 OK FETCH completed\r\n"), Read("A004 OK FETCH completed\r\n"));
@@ -82,7 +82,7 @@ public sealed class ImapKeptConnectionTests
     [TestMethod]
     public async Task ExecuteAsync_KeptConnectionWithoutAReportedUidValidity_IsNotSelectedAgain()
     {
-        var kept = new ImapKeptConnection(new ScriptedConnection(), "\0\0\0None", 'A', TimeProvider.System);
+        var kept = new ImapKeptConnection(new ScriptedConnection(), "\0\0None", 'A', TimeProvider.System);
         kept.Remember(2, "INBOX", null);
         var connection = new PoolingScriptedConnection(Read("* 2 FETCH (BODY[] {2}\r\nhi)\r\nA003 OK FETCH completed\r\n"));
         connection.TryHoldSession(kept);
@@ -115,6 +115,49 @@ public sealed class ImapKeptConnectionTests
         Assert.AreEqual(
             "B001 CAPABILITY\r\nB002 LOGIN user.two secret\r\nB003 SELECT 836\r\nB004 FETCH 2 BODY[]\r\n",
             Encoding.Latin1.GetString(second.Sent));
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_SecondUrlChangingOnlyTheLoginOptions_ReusesTheConnectionAsUpstreamTest1982()
+    {
+        var connection = new PoolingScriptedConnection(
+            Read(Greeting), Read(Capability), Read("A002 OK LOGIN completed\r\n"), Read("A003 OK SELECT completed\r\n"),
+            Read("* 1 FETCH (BODY[] {1}\r\na)\r\nA004 OK FETCH completed\r\n"),
+            Read("* 2 FETCH (UID 2 BODY[] {1}\r\nb)\r\nA005 OK FETCH completed\r\n"),
+            Read("* BYE\r\nA006 OK LOGOUT completed\r\n"));
+        var handler = new ImapProtocolHandler(Reusing(connection), new QueuedTlsProvider());
+
+        await handler.ExecuteAsync(Context("imap://127.0.0.1/1982/;MAILINDEX=1", Stream.Null, user: "user.one"));
+        TransferResult second = await handler.ExecuteAsync(Context("imap://user.one:secret;AUTH=XOAUTH2@127.0.0.1/1982/;UID=2", Stream.Null, user: "user.one"));
+        await connection.CloseAsync();
+
+        Assert.AreEqual(TransferResult.Success(1), second);
+        Assert.AreEqual(
+            "A001 CAPABILITY\r\nA002 LOGIN user.one secret\r\nA003 SELECT 1982\r\nA004 FETCH 1 BODY[]\r\nA005 UID FETCH 2 BODY[]\r\nA006 LOGOUT\r\n",
+            Encoding.Latin1.GetString(connection.Sent));
+    }
+
+    [TestMethod]
+    [DataRow("user.one", "secret", TransportSecurityLevel.None, true, DisplayName = "only the login options differ")]
+    [DataRow("user.two", "secret", TransportSecurityLevel.None, false, DisplayName = "another user")]
+    [DataRow("user.one", "other", TransportSecurityLevel.None, false, DisplayName = "another password")]
+    [DataRow("user.one", "secret", TransportSecurityLevel.Required, false, DisplayName = "another TLS level")]
+    public void Serves_KeyOfASecondTransfer_MatchesOnlyTheSameUserPasswordAndTlsLevel(string user, string password, TransportSecurityLevel level, bool expected)
+    {
+        var first = new TransferContext { Url = CurlUrl.Parse("imap://127.0.0.1/1982"), Output = Stream.Null, Credentials = new NetworkCredential("user.one", "secret") };
+        var second = new TransferContext
+        {
+            Url = CurlUrl.Parse("imap://127.0.0.1/1982"),
+            Output = Stream.Null,
+            Credentials = new NetworkCredential(user, password),
+            Mail = new MailRequestOptions { LoginOptions = "AUTH=XOAUTH2" },
+            SslLevel = level,
+        };
+        var kept = new ImapKeptConnection(new ScriptedConnection(), ImapKeptConnection.LoginKeyOf(first), 'A', TimeProvider.System);
+
+        bool serves = kept.Serves(ImapKeptConnection.LoginKeyOf(second));
+
+        Assert.AreEqual(expected, serves);
     }
 
     [TestMethod]

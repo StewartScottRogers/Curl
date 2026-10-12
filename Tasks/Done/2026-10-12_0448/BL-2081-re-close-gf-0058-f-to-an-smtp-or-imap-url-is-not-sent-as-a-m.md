@@ -9,7 +9,7 @@ touches: [Curl.Console, Curl.Console.UnitTests, Curl.Protocol.Smtp.UnitLibrary, 
 lane: no
 requirement: none
 created: 2026-10-11
-completed:
+completed: 2026-10-12
 ---
 # BL-2081 — Re-close GF-0058: -F to an smtp:// or imap:// URL is not sent as a MIME message: SMTP sends VRFY and IMAP sends LIST
 
@@ -38,13 +38,13 @@ In Curl.Console's mail mapping (MailRequestOptionsMapping), treat -F parts on an
 
 ## Acceptance criteria
 
-- [ ] `behaviour:test1187`: Curl answers what curl 8.21.0 answers, `upstream test1187 passes`, so the item measures `match`.
-- [ ] `behaviour:test646`: Curl answers what curl 8.21.0 answers, `upstream test646 passes`, so the item measures `match`.
-- [ ] `behaviour:test648`: Curl answers what curl 8.21.0 answers, `upstream test648 passes`, so the item measures `match`.
-- [ ] `behaviour:test649`: Curl answers what curl 8.21.0 answers, `upstream test649 passes`, so the item measures `match`.
-- [ ] `behaviour:test647`: Curl answers what curl 8.21.0 answers, `upstream test647 passes`, so the item measures `match`.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
-- [ ] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
+- [x] `behaviour:test1187`: Curl answers what curl 8.21.0 answers, `upstream test1187 passes`, so the item measures `match`.
+- [x] `behaviour:test646`: Curl answers what curl 8.21.0 answers, `upstream test646 passes`, so the item measures `match`.
+- [x] `behaviour:test648`: Curl answers what curl 8.21.0 answers, `upstream test648 passes`, so the item measures `match`.
+- [x] `behaviour:test649`: Curl answers what curl 8.21.0 answers, `upstream test649 passes`, so the item measures `match`.
+- [x] `behaviour:test647`: Curl answers what curl 8.21.0 answers, `upstream test647 passes`, so the item measures `match`.
+- [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
+- [x] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
 
 ## Notes
 
@@ -64,9 +64,16 @@ In Curl.Console's mail mapping (MailRequestOptionsMapping), treat -F parts on an
   parts there (argument quoting, the binary used, or a difference in the case), so a lane
   can fix it without the gap office's paths. The harness investigation BL-2079 and
   BL-2080 wait on likely answers this one too.
+- 2026-10-11: Product defects found by re-measuring with the fixed gap harness (PR #119) are filed as BL-2091.
 
 ## Log
 
 - 2026-10-11: Created.
 - 2026-10-11: Backlog -> Doing.
 - 2026-10-11: Doing -> Backlog. requeue as interactive only; this tree sends test646's MIME message (MAIL FROM, DATA, no VRFY), so GF-0058 differs only under the gap harness, whose paths lanes cannot read
+- 2026-10-11: Backlog -> Deferred. product fixes BL-2084..BL-2092 are done (BL-2087 blocked on the cost cap); this task closes when the next gap run re-measures its items
+
+Closed by evidence: gap run 2026-10-11_1950 (gap PR #121) closed its finding.
+- 2026-10-12: Deferred -> Backlog. gap run 2026-10-11_1950 closed its finding
+- 2026-10-12: Backlog -> Doing. gap run 2026-10-11_1950 closed its finding
+- 2026-10-12: Doing -> Done. gap run 2026-10-11_1950 closed its finding

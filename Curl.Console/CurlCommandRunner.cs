@@ -3332,6 +3332,10 @@ internal sealed class CurlCommandRunner(
             }
 
             await WriteErrorLinesAsync(dispatch.WarningLinesBeforeEachTransfer).ConfigureAwait(false);
+            if (StandardInputAnyAuthUploadWarning.AppliesTo(options, uploadFile))
+            {
+                await WriteErrorLineAsync(StandardInputAnyAuthUploadWarning.Text).ConfigureAwait(false);
+            }
         }
 
         await WriteCustomRequestLinesAsync(options, uploadFile).ConfigureAwait(false);
@@ -3519,7 +3523,7 @@ internal sealed class CurlCommandRunner(
         }
 
         bool mimeMessage = MailRequestOptionsMapping.SendsFormAsMimeMessage(transferUrl.Scheme);
-        MultipartFormBuildResult form = await BuildFormAsync(options, mimeMessage).ConfigureAwait(false);
+        MultipartFormBuildResult form = await BuildFormAsync(options, transferUrl.Scheme, mimeMessage).ConfigureAwait(false);
         if (!form.IsBuilt)
         {
             return form.Failure;
@@ -3543,18 +3547,19 @@ internal sealed class CurlCommandRunner(
     /// <paramref name="mimeMessage" /> is set, otherwise as the HTTP form body (BL-1988).
     /// </summary>
     /// <param name="options">The parsed command line.</param>
+    /// <param name="scheme">The transfer URL's scheme, which picks the names' escaping.</param>
     /// <param name="mimeMessage">Whether the parts are a mail message rather than a form.</param>
     /// <returns>The body, or the failure that stops the transfer before it connects.</returns>
-    private ValueTask<MultipartFormBuildResult> BuildFormAsync(CommandLineOptions options, bool mimeMessage) =>
+    private ValueTask<MultipartFormBuildResult> BuildFormAsync(CommandLineOptions options, string scheme, bool mimeMessage) =>
         mimeMessage
             ? formBodyBuilder.BuildMailMessageAsync(
                 MultipartFormPartMapping.FromCommandLine(options.FormParts),
-                MultipartFormPartMapping.NameEscapingOf(options),
+                MultipartFormPartMapping.NameEscapingOf(options, scheme),
                 options.Headers,
                 CancellationToken.None)
             : formBodyBuilder.BuildAsync(
                 MultipartFormPartMapping.FromCommandLine(options.FormParts),
-                MultipartFormPartMapping.NameEscapingOf(options),
+                MultipartFormPartMapping.NameEscapingOf(options, scheme),
                 MultipartFormPartMapping.RequestContentTypeOf(options),
                 CancellationToken.None);
 
@@ -3923,8 +3928,24 @@ internal sealed class CurlCommandRunner(
             return null;
         }
 
-        return RemoteNamePath(options, RemoteFileName.FromUrlPath(url.AbsolutePath) ?? RemoteFileName.Fallback);
+        return RemoteNamePath(options, RemoteFileName.FromUrlPath(RemoteNameUrlPath(transfer, url)) ?? RemoteFileName.Fallback);
     }
+
+    /// <summary>
+    /// The URL path <see cref="RemoteFileName" /> takes the remote name from: the URL's path, less the
+    /// file name <see cref="UploadUrl.AppendLocalFileNameWhenUrlNamesNoFile" /> appended for a <c>-T</c>
+    /// upload, since curl 8.21.0 names the file from the URL as given, so <c>-T f.txt -O http://h/</c>
+    /// warns and saves to <see cref="RemoteFileName.Fallback" /> rather than over <c>f.txt</c>
+    /// (measured 2026-10-12, AF-0170, BL-2105).
+    /// </summary>
+    /// <param name="transfer">The transfer, which names its URL as given and its <c>-T</c> file.</param>
+    /// <param name="url">The transfer's URL, the upload's file name appended.</param>
+    /// <returns>The path.</returns>
+    private static string RemoteNameUrlPath(UrlTransfer transfer, CurlUrl url) =>
+        transfer.UploadFile is { } uploadFile
+        && UploadUrl.AppendLocalFileNameWhenUrlNamesNoFile(transfer.Url, uploadFile) != transfer.Url
+            ? url.AbsolutePath[..(url.AbsolutePath.LastIndexOf('/') + 1)]
+            : url.AbsolutePath;
 
     /// <summary>
     /// Whether <see cref="ResolveOutputFile" /> will fall back to <see cref="RemoteFileName.Fallback" />
@@ -3942,7 +3963,7 @@ internal sealed class CurlCommandRunner(
         transfer.OutputFileName is null
         && transfer.UsesRemoteName
         && TryParseTransferUrl(QueryUrl.Append(url, options), options, out CurlUrl? parsed, out _)
-        && RemoteFileName.FromUrlPath(parsed.AbsolutePath) is null;
+        && RemoteFileName.FromUrlPath(RemoteNameUrlPath(transfer, parsed)) is null;
 
     /// <summary>
     /// Turns a remote file name, from the URL or a <c>Content-Disposition</c> header, into the

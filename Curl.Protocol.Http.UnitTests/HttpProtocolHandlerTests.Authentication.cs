@@ -331,6 +331,59 @@ public sealed partial class HttpProtocolHandlerTests
     }
 
     /// <summary>
+    /// The answer to a 401 from an HTTP/1.0 server that closes the connection goes out as
+    /// HTTP/1.0 on the new connection, body and all, as upstream test1071 expects of curl
+    /// 8.21.0 (BL-2086).
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_Http10ChallengeToASeekableStreamBody_SendsTheRetryAsHttp10()
+    {
+        string http10Challenge = ClosingChallengeHead.Replace("HTTP/1.1", "HTTP/1.0", StringComparison.Ordinal);
+        TurnTakingConnection first = new(65536, http10Challenge + "nope");
+        TurnTakingConnection second = new(65536, OkHead + "ok");
+        ScriptedAuthenticator authenticator = new(null, DigestValue);
+        MemoryStream output = new();
+        TransferContext context = AuthContext(output, null, new HttpRequestOptions { Body = new StreamBody(new MemoryStream("hello"u8.ToArray()), 5, "application/octet-stream") });
+        Diagnostics.Arrange("scripted responses", OneLine(http10Challenge + "nope") + " then " + OneLine(OkHead + "ok"));
+
+        TransferResult result = await new HttpProtocolHandler(QueueConnector.For(first, second), authenticator).ExecuteAsync(context);
+
+        WriteResult(result);
+        string firstLine = first.Written[..first.Written.IndexOf("\r\n", StringComparison.Ordinal)];
+        string retryLine = second.Written[..second.Written.IndexOf("\r\n", StringComparison.Ordinal)];
+        Diagnostics.Assert("retry request line", firstLine.Replace("HTTP/1.1", "HTTP/1.0", StringComparison.Ordinal), retryLine);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.EndsWith(" HTTP/1.1", firstLine);
+        Assert.AreEqual(firstLine.Replace("HTTP/1.1", "HTTP/1.0", StringComparison.Ordinal), retryLine);
+        Assert.Contains("\r\nAuthorization: " + DigestValue + "\r\n", second.Written);
+        Assert.EndsWith("\r\nContent-Length: 5\r\nContent-Type: application/octet-stream\r\n\r\nhello", second.Written);
+    }
+
+    /// <summary>
+    /// The answer to a 401 from an HTTP/1.1 server that closes the connection still goes out
+    /// as HTTP/1.1 on the new connection (BL-2086).
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_Http11ChallengeToASeekableStreamBody_SendsTheRetryAsHttp11()
+    {
+        TurnTakingConnection first = new(65536, ClosingChallengeHead + "nope");
+        TurnTakingConnection second = new(65536, OkHead + "ok");
+        ScriptedAuthenticator authenticator = new(null, DigestValue);
+        MemoryStream output = new();
+        TransferContext context = AuthContext(output, null, new HttpRequestOptions { Body = new StreamBody(new MemoryStream("hello"u8.ToArray()), 5, "application/octet-stream") });
+        Diagnostics.Arrange("scripted responses", OneLine(ClosingChallengeHead + "nope") + " then " + OneLine(OkHead + "ok"));
+
+        TransferResult result = await new HttpProtocolHandler(QueueConnector.For(first, second), authenticator).ExecuteAsync(context);
+
+        WriteResult(result);
+        string retryLine = second.Written[..second.Written.IndexOf("\r\n", StringComparison.Ordinal)];
+        Diagnostics.Assert("retry request line ends", " HTTP/1.1", retryLine);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.EndsWith(" HTTP/1.1", retryLine);
+        Assert.EndsWith("\r\n\r\nhello", second.Written);
+    }
+
+    /// <summary>
     /// A stream body that cannot seek, as stdin cannot, has been read by the time the 401
     /// arrives and cannot be sent again, so the 401 is the result (BL-181 Notes, ADR-0034).
     /// </summary>

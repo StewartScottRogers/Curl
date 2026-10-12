@@ -152,6 +152,24 @@ public sealed class HttpRequestFramingTests
         Assert.IsFalse(framing.IsUpload);
     }
 
+    // AF-0166: a bodyless request has no body to chunk, so an auth or proxy-auth retry after an
+    // HTTP/1.0 server's 401 or 407 is never failed with exit 25 as a chunked resend.
+    [TestMethod]
+    [DataRow(false, HttpVersionPreference.Http10, DisplayName = "-0 GET does not chunk")]
+    [DataRow(true, HttpVersionPreference.Http10, DisplayName = "-0 -I HEAD does not chunk")]
+    [DataRow(false, HttpVersionPreference.Http11, DisplayName = "GET does not chunk")]
+    public void Of_NoBody_NeverChunksForUnknownLength(bool noBody, HttpVersionPreference version)
+    {
+        HttpRequestOptions options = new() { Version = version };
+
+        HttpRequestFraming framing = FramingOf(options, [], noBody: noBody);
+
+        Diagnostics.Assert("framing.ChunksForUnknownLength", false, framing.ChunksForUnknownLength);
+        Assert.IsFalse(framing.ChunksForUnknownLength);
+        Diagnostics.Assert("framing.IsChunked", false, framing.IsChunked);
+        Assert.IsFalse(framing.IsChunked);
+    }
+
     [TestMethod]
     [DataRow(null, "HEAD", DisplayName = "-I sends HEAD")]
     [DataRow("GET", "GET", DisplayName = "-I -X GET sends GET")]

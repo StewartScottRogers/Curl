@@ -144,7 +144,7 @@ public sealed class RemoteHeaderNameStreamTests
         string second = "HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n";
         Diagnostics.Arrange("heads in order", "a 200 naming x.txt, then a 200 naming none");
 
-        await stream.WriteAsync(Encoding.ASCII.GetBytes("HTTP/1.1 200 OK\r\n" + Disposition));
+        await stream.WriteAsync(Encoding.ASCII.GetBytes("HTTP/1.1 200 OK\r\n" + Disposition + "\r\n"));
         passedOn.SetLength(0);
         await stream.WriteAsync(Encoding.ASCII.GetBytes(second));
         Diagnostics.Bytes("passed on", passedOn.ToArray());
@@ -202,7 +202,7 @@ public sealed class RemoteHeaderNameStreamTests
     {
         DeferredOutputFileStream output = new(files, "u.txt", FileWriteMode.Truncate);
         RemoteHeaderNameStream stream = new(output, passedOn, name => name);
-        byte[] head = Encoding.ASCII.GetBytes("xHTTP/1.1 200 OK\r\n" + Disposition);
+        byte[] head = Encoding.ASCII.GetBytes("xHTTP/1.1 200 OK\r\n" + Disposition + "\r\n");
         Diagnostics.Arrange("buffer offset / count", $"1 / {head.Length - 1}");
         Diagnostics.Bytes("buffer", head);
 

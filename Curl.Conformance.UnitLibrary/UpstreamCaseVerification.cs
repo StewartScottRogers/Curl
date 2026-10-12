@@ -85,8 +85,8 @@ internal static class UpstreamCaseVerification
         return UpstreamFirstDifference.Describe($"<verify><{partName}>", expected, actual);
     }
 
-    // runtests.pl runs <strippart> on the stored message, as on the protocol, but no <strip>, then
-    // compares it with <upload>: test646's random MIME boundary is cut to fixed dashes that way.
+    // runtests.pl runs each <strippart> line on the stored upload, as on the protocol, but no <strip>,
+    // then compares it with <upload>: test646 and test1187 cut their random MIME boundary that way.
     private static string? CompareUpload(UpstreamTestCase testCase, byte[] uploaded) =>
         testCase.Find("verify", "upload") is { } part
             ? UpstreamFirstDifference.Describe("<verify><upload>", Expected(part), Strip(uploaded, [], Substitutions(testCase, "strippart")))

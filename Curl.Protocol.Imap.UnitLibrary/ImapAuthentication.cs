@@ -231,8 +231,16 @@ internal sealed class ImapAuthentication(ImapControlChannel channel, ISaslAuthen
     /// Whether <c>LOGIN</c> may be sent: there is a user, the options allow it and the server
     /// did not advertise <c>LOGINDISABLED</c>.
     /// </summary>
-    private static bool MayLogIn(SaslRequest request, ImapLoginOptions options, IReadOnlySet<string> capabilities) =>
-        request.Credential is not null && options.AllowsLogin && !capabilities.Contains("LOGINDISABLED");
+    private bool MayLogIn(SaslRequest request, ImapLoginOptions options, IReadOnlySet<string> capabilities) =>
+        request.Credential is not null && options.AllowsLogin && !capabilities.Contains("LOGINDISABLED") && !BearerWithheld(options);
+
+    /// <summary>
+    /// Whether a redirect withheld the <c>--oauth2-bearer</c> token and no <c>AUTH=</c> option
+    /// names a mechanism, so curl's preferred mechanisms are the bearer ones alone and it
+    /// never falls back to <c>LOGIN</c> (upstream test779, BL-2090).
+    /// </summary>
+    private bool BearerWithheld(ImapLoginOptions options) =>
+        context.Mail is { BearerTokenWithheld: true } && !options.NamesMechanisms;
 
     private static string Encode(byte[] message) => message.Length == 0 ? "=" : Convert.ToBase64String(message);
 

@@ -696,6 +696,34 @@ public sealed class CurlCommandRunnerRetryTests
     }
 
     /// <summary>
+    /// An <c>-i -o</c> file that cannot be opened fails the first header line's write, so the
+    /// error names that line's 17 bytes (<c>HTTP/1.1 200 OK</c> and CR LF), not the whole head's,
+    /// as curl 8.21.0 calls its write callback once per header line (BL-2092).
+    /// </summary>
+    [TestMethod]
+    public async Task RunAsync_IncludedHeadersToAnUnopenableFile_ReportsTheFirstHeaderLinesLength()
+    {
+        const string response = "HTTP/1.1 200 OK\r\nContent-Length: 6\r\nConnection: close\r\nContent-Type: text/html\r\n\r\n-foo-\n";
+        outputFiles.UnwritablePaths.Add("present/x.txt");
+        Diagnostics.Arrange("unwritable files", "present/x.txt");
+        ScriptedConnector server = new(new[] { response }.Select(Encoding.Latin1.GetBytes));
+        string expected = "Warning: Failed to open the file present/x.txt: No such file or directory" + NewLine
+            + "curl: (23) client returned ERROR on write of 17 bytes" + NewLine;
+
+        int exitCode = await RunAsync(
+            server,
+            writesProgressMeter: false,
+            "http://127.0.0.1:18241/", "--no-progress-meter", "-i", "-o", "present/x.txt");
+
+        Diagnostics.Assert("exit code", (int)CurlExitCode.WriteError, exitCode);
+        Diagnostics.Diff("stderr", Lf(expected), Lf(StandardErrorText));
+        Assert.AreEqual((int)CurlExitCode.WriteError, exitCode);
+        Assert.AreEqual(expected, StandardErrorText);
+        Assert.AreEqual(string.Empty, StandardOutputText);
+        Assert.IsEmpty(outputFiles.Written);
+    }
+
+    /// <summary>
     /// Under <c>-sS</c> the test3036 run keeps each attempt's error line and drops the warnings,
     /// the open failures' as the retry's, as curl 8.21.0 does (measured with Record-CurlExchange.ps1
     /// on 2026-10-09, BL-1849 Notes).

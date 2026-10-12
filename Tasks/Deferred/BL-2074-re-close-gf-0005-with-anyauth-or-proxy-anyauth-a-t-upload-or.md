@@ -67,9 +67,11 @@ In Curl.Protocol.Http.UnitLibrary, make HttpProtocolHandler.MayRetry and the upl
   1030, 259 and 258 and copied under these Notes each case's `<reply>`, `<servercmd>`,
   `<command>`, expected `<protocol>` and Curl's actual request bytes and stderr, so a
   lane can fix the cause without reading `Gap/`.
+- 2026-10-11: Product defects found by re-measuring with the fixed gap harness (PR #119) are filed as BL-2085, BL-2086 and BL-2087.
 
 ## Log
 
 - 2026-10-11: Created.
 - 2026-10-11: Backlog -> Doing.
 - 2026-10-11: Doing -> Backlog. Interactive only: reproducing GF-0005 needs the gap office's tools and upstream data, which lanes may not read; lane measurements show the resend working (see Notes)
+- 2026-10-11: Backlog -> Deferred. product fixes BL-2084..BL-2092 are done (BL-2087 blocked on the cost cap); this task closes when the next gap run re-measures its items

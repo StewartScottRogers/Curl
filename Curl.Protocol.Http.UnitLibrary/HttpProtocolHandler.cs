@@ -1351,7 +1351,7 @@ public sealed class HttpProtocolHandler(
             AcceptsHttp09 = options.AllowHttp09Reply,
             IsHeadRequest = context.NoBody,
             IgnoresContentLength = options.IgnoreContentLength,
-            IsThroughHttpProxy = options.ForwardProxy is { Kind: ProxyKind.Http or ProxyKind.Http10 or ProxyKind.Https },
+            IsThroughHttpProxy = IsThroughHttpProxy(options),
             IsSwitchedToHttp2 = () => IsSwitchedToHttp2(connection),
             DefersFrom = (statusLine, header) => plan.Framing.Body is not StreamBody && IsAuthChallenge(plan, statusLine, header),
         };
@@ -1763,7 +1763,7 @@ public sealed class HttpProtocolHandler(
     {
         HttpRequestOptions options = plan.Options;
         if (!discardsBody
-            || !HttpConnectionPersistence.KeepsAlive(head, plan.Context.NoBody, options.Raw, options.IgnoreContentLength, options.TransferEncoding))
+            || !HttpConnectionPersistence.KeepsAlive(head, plan.Context.NoBody, options.Raw, options.IgnoreContentLength, options.TransferEncoding, IsThroughHttpProxy(options)))
         {
             return;
         }
@@ -1932,7 +1932,7 @@ public sealed class HttpProtocolHandler(
     private static bool KeepsAlive(HttpRequestPlan plan, HttpResponseHead head, HttpRequestBodyWriter upload, HttpResponseHeadReader headReader, HttpBodyDelivery delivery, IHttpStreamSession? streams) =>
         DeliveredWhole(head, upload, headReader, delivery)
             && (streams?.AcceptsNewStreams
-                ?? HttpConnectionPersistence.KeepsAlive(head, plan.Context.NoBody || !headReader.EndedAtEmptyLine, plan.Options.Raw, plan.Options.IgnoreContentLength, plan.Options.TransferEncoding));
+                ?? HttpConnectionPersistence.KeepsAlive(head, plan.Context.NoBody || !headReader.EndedAtEmptyLine, plan.Options.Raw, plan.Options.IgnoreContentLength, plan.Options.TransferEncoding, IsThroughHttpProxy(plan.Options)));
 
     /// <summary>
     /// Decides whether the connection is reported left intact although the server closed it
@@ -2117,7 +2117,7 @@ public sealed class HttpProtocolHandler(
         return discardsBody
             && delivery == HttpBodyDelivery.Deliver
             && requestStream is null
-            && !HttpConnectionPersistence.KeepsAlive(head, plan.Context.NoBody, options.Raw, options.IgnoreContentLength, options.TransferEncoding);
+            && !HttpConnectionPersistence.KeepsAlive(head, plan.Context.NoBody, options.Raw, options.IgnoreContentLength, options.TransferEncoding, IsThroughHttpProxy(options));
     }
 
     /// <summary>
@@ -2340,14 +2340,14 @@ public sealed class HttpProtocolHandler(
         {
             ThrowIfChunkedResendToHttp10(plan, head);
             RewindForResend(plan, upload);
-            return plan.WithProxyAuthorization(proxyAuthorization, RepeatAuthorization(plan));
+            return plan.WithProxyAuthorization(proxyAuthorization, RepeatAuthorization(plan)).DowngradedAfter(head);
         }
 
         if (await RetryWithAuthorizationAsync(plan, head, cancellationToken).ConfigureAwait(false) is { } authorized)
         {
             ThrowIfChunkedResendToHttp10(plan, head);
             RewindForResend(plan, upload);
-            return authorized;
+            return authorized.DowngradedAfter(head);
         }
 
         if (plan.ProbedFraming is not null && head.StatusLine.StatusCode / 100 == 2)
@@ -2461,7 +2461,14 @@ public sealed class HttpProtocolHandler(
         bodyStopped
             && head.StatusLine.StatusCode == 417
             && plan.Options.Fail != HttpFailMode.Fail
-            && HttpConnectionPersistence.KeepsAlive(head, plan.Context.NoBody, plan.Options.Raw, plan.Options.IgnoreContentLength, plan.Options.TransferEncoding);
+            && HttpConnectionPersistence.KeepsAlive(head, plan.Context.NoBody, plan.Options.Raw, plan.Options.IgnoreContentLength, plan.Options.TransferEncoding, IsThroughHttpProxy(plan.Options));
+
+    /// <summary>
+    /// Decides whether the transfer goes through an HTTP proxy, where curl 8.21.0 reads
+    /// <c>Proxy-Connection</c> headers (<c>conn->bits.httpproxy</c> in <c>lib/http.c</c>).
+    /// </summary>
+    private static bool IsThroughHttpProxy(HttpRequestOptions options) =>
+        options.ForwardProxy is { Kind: ProxyKind.Http or ProxyKind.Http10 or ProxyKind.Https };
 
     /// <summary>
     /// Decides whether a response is answered with one more request, and with what
@@ -2740,28 +2747,44 @@ public sealed class HttpProtocolHandler(
     }
 
     /// <summary>
-    /// Writes head or trailer bytes to the header output as one write, or nothing when there
-    /// is no header output or no bytes.
+    /// Writes head or trailer bytes to the header output one line at a time, each line with
+    /// its line feed, as curl 8.21.0 calls its write callback once per header line; nothing
+    /// when there is no header output. A failed write reports that line's length, so an
+    /// <c>-i -o</c> file that cannot be opened gives <c>client returned ERROR on write of 17
+    /// bytes</c> for <c>HTTP/1.1 200 OK</c> (BL-2092).
     /// </summary>
     /// <exception cref="HttpTransferException">The header output failed the write (exit 23).</exception>
     private static async ValueTask WriteHeadersAsync(Stream? headerOutput, ReadOnlyMemory<byte> bytes, CancellationToken cancellationToken)
     {
-        if (headerOutput is null || bytes.IsEmpty)
+        if (headerOutput is null)
         {
             return;
         }
 
+        while (!bytes.IsEmpty)
+        {
+            int lineFeed = bytes.Span.IndexOf((byte)'\n');
+            int lineLength = lineFeed < 0 ? bytes.Length : lineFeed + 1;
+            await WriteHeaderLineAsync(headerOutput, bytes[..lineLength], cancellationToken).ConfigureAwait(false);
+            bytes = bytes[lineLength..];
+        }
+    }
+
+    /// <summary>Writes one header line to the header output in one write.</summary>
+    /// <exception cref="HttpTransferException">The header output failed the write (exit 23).</exception>
+    private static async ValueTask WriteHeaderLineAsync(Stream headerOutput, ReadOnlyMemory<byte> line, CancellationToken cancellationToken)
+    {
         try
         {
-            await headerOutput.WriteAsync(bytes, cancellationToken).ConfigureAwait(false);
+            await headerOutput.WriteAsync(line, cancellationToken).ConfigureAwait(false);
         }
         catch (OutputWriteFailedException failure)
         {
-            throw WriteFailed(bytes.Length, failure.BytesAccepted);
+            throw WriteFailed(line.Length, failure.BytesAccepted);
         }
         catch (IOException)
         {
-            throw WriteFailed(bytes.Length, 0);
+            throw WriteFailed(line.Length, 0);
         }
     }
 
@@ -2937,7 +2960,7 @@ public sealed class HttpProtocolHandler(
         public ITransferContext Context { get; } = Context;
 
         /// <summary>Gets the transfer's HTTP options, defaults when it has none.</summary>
-        public HttpRequestOptions Options { get; } = Options;
+        public HttpRequestOptions Options { get; private set; } = Options;
 
         /// <summary>Gets the request's method and body framing.</summary>
         public HttpRequestFraming Framing { get; } = Framing;
@@ -3167,6 +3190,24 @@ public sealed class HttpProtocolHandler(
             {
                 ServerCertificate = Context.Url.Scheme == "https" && connect.PeerCertificates is [var certificate, ..] ? certificate : default,
             };
+
+        /// <summary>
+        /// Marks this retry to go out as HTTP/1.0 when <paramref name="head" />, the response it
+        /// answers, was HTTP/1.0 (<see cref="HttpRequestOptions.EarlierResponseWasHttp10" />), as
+        /// curl 8.21.0 keeps the downgrade on the new connection an HTTP/1.0 server leaves it
+        /// (upstream test1071, BL-2086).
+        /// </summary>
+        /// <param name="head">The response the retry answers.</param>
+        /// <returns>This plan.</returns>
+        public HttpRequestPlan DowngradedAfter(HttpResponseHead head)
+        {
+            if (head.StatusLine.Version == HttpVersion.Version10)
+            {
+                Options = Options with { EarlierResponseWasHttp10 = true };
+            }
+
+            return this;
+        }
 
         /// <summary>
         /// Makes the retry that answers a challenge with <paramref name="authorization" /> and
