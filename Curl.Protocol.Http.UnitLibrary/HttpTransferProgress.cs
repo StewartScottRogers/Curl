@@ -4,10 +4,11 @@ namespace Curl.Protocol.Http;
 
 /// <summary>
 /// Passes one HTTP transfer's progress to the context's <see cref="ITransferProgress" />, keeping
-/// the sink's promises across the handler's retries (ADR-0065): "transfer started" is reported at
-/// most once, however many connections the transfer opens, and a byte count below one already
-/// reported is dropped, so a body sent again for an authentication retry or a resend without
-/// <c>Expect</c> never makes a running total go backwards.
+/// the sink's promises across the handler's retries (ADR-0065): "transfer started" is reported
+/// once for the first connection, however many it opens, and once more for each request a
+/// response asks for (<see cref="ReportRequestRetried" />), which starts its own meter line as a
+/// redirect hop does; within one request a byte count below one already reported is dropped, so
+/// a running total never goes backwards.
 /// </summary>
 /// <param name="sink">Where the reports go.</param>
 internal sealed class HttpTransferProgress(ITransferProgress sink)
@@ -33,6 +34,20 @@ internal sealed class HttpTransferProgress(ITransferProgress sink)
             started = true;
             sink.ReportTransferStarted();
         }
+    }
+
+    /// <summary>
+    /// Reports that a request a response asked for - an authentication retry or a resend without
+    /// <c>Expect</c> - starts, as "transfer started" again, and counts its bytes from zero: curl
+    /// 8.21.0 draws each request of such a transfer on a progress-meter line of its own, as it
+    /// draws each redirect hop (measured, BL-2087 Notes).
+    /// </summary>
+    internal void ReportRequestRetried()
+    {
+        started = true;
+        downloaded = -1;
+        uploaded = -1;
+        sink.ReportTransferStarted();
     }
 
     /// <summary>

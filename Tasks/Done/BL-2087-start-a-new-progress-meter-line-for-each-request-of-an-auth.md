@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Console, Curl.Console.UnitTests, Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests, Curl.Conformance.UnitTests]
 requirement: none
 created: 2026-10-11
-completed:
+completed: 2026-10-12
 ---
 # BL-2087 — Start a new progress-meter line for each request of an auth-retried transfer (upstream test1075, test1072)
 
@@ -24,10 +24,10 @@ Source: re-measurement of the gap findings with the fixed gap harness (PR #119, 
 
 ## Acceptance criteria
 
-- [ ] New MSTests in Curl.Console.UnitTests (no network, platform-neutral) show a transfer whose first request is answered 401 and retried produces two meter lines with the stderr bytes real curl 8.21.0 gives, and a transfer without a retry still produces one.
-- [ ] `--ai-help` needs no change (no option is added or changed); the task Log says so.
-- [ ] Add test1075 and, once the rest of its output matches, test1072 to `Curl.Conformance.UnitTests/PassingUpstreamCases.txt` once it passes in process.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
+- [x] New MSTests in Curl.Console.UnitTests (no network, platform-neutral) show a transfer whose first request is answered 401 and retried produces two meter lines with the stderr bytes real curl 8.21.0 gives, and a transfer without a retry still produces one.
+- [x] `--ai-help` needs no change (no option is added or changed); the task Log says so.
+- [x] Add test1075 and, once the rest of its output matches, test1072 to `Curl.Conformance.UnitTests/PassingUpstreamCases.txt` once it passes in process.
+- [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
 
 ## Notes
 
@@ -53,6 +53,8 @@ Source: re-measurement of the gap findings with the fixed gap harness (PR #119, 
     and `Curl.Conformance.UnitTests` (held by BL-2093) to `touches`, so requeued.
   - `--ai-help` needs no change: no option is added or changed.
 
+- 2026-10-12, lane 1: implemented as lane 3 located it, in `Curl.Protocol.Http.UnitLibrary` only (no `Curl.Console` change). Decided: a pooled connection that dies before its response and is resent keeps one line (unchanged, not measured); only a retry a response asks for (401/407 challenge, 417 resend) starts a new line, matching curl's `newurl` follow. New tests: `CurlCommandRunnerAuthRetryProgressMeterTests` (two lines after a 401, one without a retry), `HttpTransferProgressTests.ReportRequestRetried_*`; three `HttpProtocolHandlerTests.Progress` expectations updated to report "started" per request.
+
 ## Log
 
 - 2026-10-11: Created.
@@ -62,3 +64,4 @@ Source: re-measurement of the gap findings with the fixed gap harness (PR #119, 
 - 2026-10-11: Doing -> Blocked. Stewart: dark factory its runs of the last day already cost 1.16 of its 2.10 US dollar cost cap, so it was not run again; split the task; see Z:\repos\Curl.logs\BL-2087-*.jsonl
 - 2026-10-12: Blocked -> Backlog. its earlier runs are more than 24 hours old, so the cost cap allows a fresh run
 - 2026-10-12: Backlog -> Doing.
+- 2026-10-12: Doing -> Done. each request of an auth-retried transfer reports transfer started again, so the meter draws a line per request; --ai-help needs no change (no option added or changed); test1072 and test1075 already listed

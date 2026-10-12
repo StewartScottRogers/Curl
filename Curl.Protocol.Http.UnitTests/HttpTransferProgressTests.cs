@@ -26,6 +26,27 @@ public sealed class HttpTransferProgressTests
     }
 
     [TestMethod]
+    public void ReportRequestRetried_AfterCounts_PassesStartedAgainAndCountsFromZero()
+    {
+        RecordingTransferProgress sink = new();
+        HttpTransferProgress progress = new(sink);
+        Diagnostics.Arrange("calls", "started, up 5 of 5, down 4 of 4, retried, up 0 of 5, down 0 of 2, started");
+
+        progress.ReportTransferStarted();
+        progress.ReportUploaded(5, 5);
+        progress.ReportDownloaded(4, 4);
+        progress.ReportRequestRetried();
+        progress.ReportUploaded(0, 5);
+        progress.ReportDownloaded(0, 2);
+        progress.ReportTransferStarted();
+
+        string[] expected = ["started", "up 5/5", "down 4/4", "started", "up 0/5", "down 0/2"];
+        Diagnostics.Act("reports", string.Join(" | ", sink.Reports));
+        Diagnostics.Assert("reports", string.Join(" | ", expected), string.Join(" | ", sink.Reports));
+        CollectionAssert.AreEqual(expected, sink.Reports.ToArray());
+    }
+
+    [TestMethod]
     public void ReportTransferDone_PassesItOn()
     {
         RecordingTransferProgress sink = new();

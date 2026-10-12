@@ -211,7 +211,7 @@ public sealed partial class HttpProtocolHandlerTests
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_ChallengeToABytesBody_ReportsTheResentBodyWithoutGoingBack()
+    public async Task ExecuteAsync_ChallengeToABytesBody_ReportsTheResentBodyFromZeroAfterStartingAgain()
     {
         foreach (int chunkSize in ChunkSizes)
         {
@@ -228,14 +228,14 @@ public sealed partial class HttpProtocolHandlerTests
             WriteReports(progress);
             Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
-            Diagnostics.Assert("non-download reports", "started, up 0/5, up 5/5, up 5/5, done", string.Join(", ", progress.Reports.Where(IsNotDownload)));
-            CollectionAssert.AreEqual(new[] { "started", "up 0/5", "up 5/5", "up 5/5", "done" }, progress.Reports.Where(IsNotDownload).ToArray(), $"Chunk size {chunkSize}");
+            Diagnostics.Assert("non-download reports", "started, up 0/5, up 5/5, started, up 0/5, up 5/5, done", string.Join(", ", progress.Reports.Where(IsNotDownload)));
+            CollectionAssert.AreEqual(new[] { "started", "up 0/5", "up 5/5", "started", "up 0/5", "up 5/5", "done" }, progress.Reports.Where(IsNotDownload).ToArray(), $"Chunk size {chunkSize}");
             AssertRunningTotals(progress.Downloads, 2, "2", chunkSize);
         }
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_ChallengeWithConnectionClose_ReportsStartedOnceAcrossBothConnections()
+    public async Task ExecuteAsync_ChallengeWithConnectionClose_ReportsStartedForEachRequest()
     {
         TurnTakingConnection first = new(65536, ClosingChallengeHead + "nope");
         TurnTakingConnection second = new(65536, OkHead + "ok");
@@ -246,8 +246,8 @@ public sealed partial class HttpProtocolHandlerTests
             .ExecuteAsync(ProgressContext(AuthUrl, progress));
 
         WriteReports(progress);
-        Diagnostics.Assert("progress reports", "started, down 0/2, down 2/2, done", string.Join(", ", progress.Reports));
-        CollectionAssert.AreEqual(new[] { "started", "down 0/2", "down 2/2", "done" }, progress.Reports.ToArray());
+        Diagnostics.Assert("progress reports", "started, started, down 0/2, down 2/2, done", string.Join(", ", progress.Reports));
+        CollectionAssert.AreEqual(new[] { "started", "started", "down 0/2", "down 2/2", "done" }, progress.Reports.ToArray());
     }
 
     [TestMethod]
@@ -289,8 +289,8 @@ public sealed partial class HttpProtocolHandlerTests
         WriteReports(progress);
         Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
-        Diagnostics.Assert("progress reports", "started, down 0/2, down 2/2, done", string.Join(", ", progress.Reports));
-        CollectionAssert.AreEqual(new[] { "started", "down 0/2", "down 2/2", "done" }, progress.Reports.ToArray());
+        Diagnostics.Assert("progress reports", "started, started, down 0/2, down 2/2, done", string.Join(", ", progress.Reports));
+        CollectionAssert.AreEqual(new[] { "started", "started", "down 0/2", "down 2/2", "done" }, progress.Reports.ToArray());
         WriteExpectedLines("last two events", ["progress done", "* Connection #0 to host 127.0.0.1:18183 left intact"], events.Events.TakeLast(2));
         CollectionAssert.AreEqual(new[] { "progress done", "* Connection #0 to host 127.0.0.1:18183 left intact" }, events.Events.TakeLast(2).ToArray());
     }
