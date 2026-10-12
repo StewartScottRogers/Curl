@@ -250,6 +250,35 @@ public sealed partial class TcpConnectorTests
     }
 
     [TestMethod]
+    public async Task ConnectAsync_WhenAReportingProvidersHandshakeFails_LogsNoHandshakeCompleted()
+    {
+        var log = new RecordingDiagnosticLog(DiagnosticLogLevel.Info);
+        var tlsProvider = new FakeTlsProvider { FailureToReturn = ConnectResult.Failed(CurlExitCode.SslConnectError, "handshake refused") };
+        var connector = CreateConnector(new FakeDnsResolver(Loopback), ConnectingDialer(), tlsProvider);
+
+        await ConnectLoggedAsync(connector, new ConnectTarget("example.com", 443, UseTls: true) { DiagnosticLog = log });
+
+        Assert.IsEmpty(log.At(DiagnosticLogLevel.Info, DiagnosticLogComponents.Tls));
+        CollectionAssert.AreEqual(new[] { "failed with SslConnectError (35): handshake refused" }, log.At(DiagnosticLogLevel.Error, DiagnosticLogComponents.Tls));
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_WhenAProviderThatCannotReportFailsTheHandshake_LogsNoHandshakeCompleted()
+    {
+        var log = new RecordingDiagnosticLog(DiagnosticLogLevel.Info);
+        var connector = new TcpConnector(
+            new FakeDnsResolver(Loopback),
+            ConnectingDialer(),
+            new SequencedTlsProvider(ConnectResult.Failed(CurlExitCode.SslConnectError, "handshake refused")),
+            new ManualTimeProvider());
+
+        await ConnectLoggedAsync(connector, new ConnectTarget("example.com", 443, UseTls: true) { DiagnosticLog = log });
+
+        Assert.IsEmpty(log.At(DiagnosticLogLevel.Info, DiagnosticLogComponents.Tls));
+        CollectionAssert.AreEqual(new[] { "failed with SslConnectError (35): handshake refused" }, log.At(DiagnosticLogLevel.Error, DiagnosticLogComponents.Tls));
+    }
+
+    [TestMethod]
     public async Task ConnectAsync_WhenTheConnectTimesOut_LogsOperationTimedOutAtError()
     {
         var log = new RecordingDiagnosticLog(DiagnosticLogLevel.Error);

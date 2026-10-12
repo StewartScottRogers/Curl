@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Networking.UnitLibrary]
+touches: [Curl.Networking.UnitLibrary, Curl.Networking.UnitTests]
 requirement: none
 created: 2026-10-12
-completed:
+completed: 2026-10-12
 ---
 # BL-2104 — Fix AF-0169: TcpConnector.LoggedFailure's 'return true' can become 'return false' with no test failing: a failed TLS handshake is also logged as completed
 
@@ -41,12 +41,26 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Test-only fix, done directly rather than through the `/feature` stages: production code was
+  right, only the assertion was missing. Two tests in `TcpConnectorTests.DiagnosticLog.cs` log at
+  `info`, fail the handshake (reporting `FakeTlsProvider` and non-reporting `SequencedTlsProvider`,
+  one per `LoggedFailure` caller) and assert no `tls` `info` line and exactly the one `error` line.
+- Added `Curl.Networking.UnitTests` to `touches` (the library's own test project); no task in
+  Doing on `origin/work/dark-factory` names it.
+- `Audit/Tools/Invoke-MutationTest.ps1` is refused to lanes by the audit guard, so the mutant was
+  applied by hand (`return true;` -> `return false;` at `TcpConnector.cs:2267`): both new tests
+  fail under it and pass without it. The re-audit runs the tool itself.
+- Verified: `dotnet build` 0 warnings, 0 errors; `Curl.Networking.UnitTests` fast run 3161
+  passed, 29 skipped, 0 failed. Only that test project changed, so the other projects' tests were
+  not rerun. Coverage is unchanged: no production line changed.
 
 ## Log
 
 - 2026-10-12: Created.
 - 2026-10-12: Backlog -> Doing.
+- 2026-10-12: Doing -> Done. A failed TLS handshake's diagnostic log is asserted to hold no handshake-completed line; the LoggedFailure mutant is killed
