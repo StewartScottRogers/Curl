@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: process:BL-2043:BL-2043:cost-outlier
 reproduction: none
-task: none
-tasks:
+task: BL-2107
+tasks: BL-2107
 found: 2026-10-11
 found-at: d8245edb7b661211c6628e9062e9939934939fb2
 scorecard: 2026-10-11_1638.md

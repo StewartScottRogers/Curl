@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: conformance:--remote-name:upload-file-name:stdout
 reproduction: none
-task: none
-tasks:
+task: BL-2105
+tasks: BL-2105
 found: 2026-10-11
 found-at: d8245edb7b661211c6628e9062e9939934939fb2
 scorecard: 2026-10-11_1638.md
