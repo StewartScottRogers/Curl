@@ -4,11 +4,11 @@ title: IMAP logs out after every URL instead of reusing the connection, and ever
 area: behaviour
 key: behaviour:imap-connection-not-reused-and-tag-letter-fixed
 severity: High
-status: open
+status: closed
 scope: target
 introduced-in:
 opened: 2026-10-10_0657
-closed:
+closed: 2026-10-11_1950
 regression: false
 items: [behaviour:test1982, behaviour:test804, behaviour:test815, behaviour:test816, behaviour:test836, behaviour:test779]
 touches: [Curl.Protocol.Imap.UnitLibrary, Curl.Protocol.Imap.UnitTests, Curl.Console, Curl.Console.UnitTests]
@@ -33,9 +33,11 @@ In Curl.Protocol.Imap.UnitLibrary, keep an IMAP connection open after a transfer
 
 - 2026-10-10_0657: 6 of 6 items are gaps.
 - 2026-10-11_0936: 2 of 6 items are gaps.
+- 2026-10-11_1950: 0 of 6 items are gaps.
 
 ## Log
 
 - 2026-10-10_0657: Opened by gap-behaviour.
 - 2026-10-10_0756: Filed BL-1987.
 - 2026-10-11_1029: Filed BL-2080.
+- 2026-10-11_1950: Closed: run 2026-10-11_1950 measured every item as match or excluded.

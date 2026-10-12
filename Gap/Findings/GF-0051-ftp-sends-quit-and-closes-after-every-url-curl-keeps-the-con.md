@@ -4,11 +4,11 @@ title: FTP sends QUIT and closes after every URL; curl keeps the control connect
 area: behaviour
 key: behaviour:ftp-control-connection-not-reused
 severity: High
-status: open
+status: closed
 scope: target
 introduced-in:
 opened: 2026-10-10_0657
-closed:
+closed: 2026-10-11_1950
 regression: false
 items: [behaviour:test1010, behaviour:test1096, behaviour:test1149, behaviour:test1217, behaviour:test1225, behaviour:test146, behaviour:test149, behaviour:test215, behaviour:test216, behaviour:test698, behaviour:test2002, behaviour:test2003]
 touches: [Curl.Protocol.Ftp.UnitLibrary, Curl.Protocol.Ftp.UnitTests, Curl.Console, Curl.Console.UnitTests]
@@ -33,9 +33,11 @@ In Curl.Protocol.Ftp.UnitLibrary, keep an FTP control connection open after a tr
 
 - 2026-10-10_0657: 12 of 12 items are gaps.
 - 2026-10-11_0936: 2 of 12 items are gaps.
+- 2026-10-11_1950: 0 of 12 items are gaps.
 
 ## Log
 
 - 2026-10-10_0657: Opened by gap-behaviour.
 - 2026-10-10_0756: Filed BL-1981.
 - 2026-10-11_1029: Filed BL-2079.
+- 2026-10-11_1950: Closed: run 2026-10-11_1950 measured every item as match or excluded.
