@@ -30,6 +30,8 @@ internal sealed class SmtpResponder : ILineProtocolResponder
 
     private readonly List<string> receivedCommandLines = [];
 
+    private readonly UpstreamProtocolDump receivedCommandLineDump = new();
+
     private readonly StringBuilder upload = new();
 
     private readonly Dictionary<string, Func<string?, string>> defaultAnswers;
@@ -63,6 +65,9 @@ internal sealed class SmtpResponder : ILineProtocolResponder
     /// </summary>
     public IReadOnlyList<string> ReceivedCommandLines => receivedCommandLines;
 
+    /// <summary>Gets <see cref="ReceivedCommandLines"/>, each numbered in the order of all servers' writes.</summary>
+    internal IReadOnlyList<UpstreamProtocolDumpEntry> ReceivedCommandLineDump => receivedCommandLineDump.Entries;
+
     /// <summary>
     /// Gets the last <c>DATA</c> message as ftpserver.pl stores it for <c>&lt;verify&gt;&lt;upload&gt;</c>:
     /// every line as sent, dots not unstuffed, each with a CRLF, through the terminating <c>.</c> line.
@@ -80,6 +85,7 @@ internal sealed class SmtpResponder : ILineProtocolResponder
         }
 
         receivedCommandLines.Add(commandLine + "\r\n");
+        receivedCommandLineDump.Record(Encoding.Latin1.GetBytes(receivedCommandLines[^1]));
         if (!TrySplitCommand(commandLine, out string command, out string? argument))
         {
             return Reply("500 Unrecognized command\r\n", closesConnection: true);

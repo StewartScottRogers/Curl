@@ -11,7 +11,7 @@
 
       1. reads the request until the header block ends (CRLF CRLF) and, when the
          headers carry Content-Length or Transfer-Encoding: chunked, until the body has
-         arrived - each read waits at most one second, so a body that never comes
+         arrived - each read waits at most one second (RequestReadMilliseconds), so a body that never comes
          ends the read instead of hanging it;
       2. records the raw request bytes;
       3. sends that connection's canned response and closes the connection.
@@ -108,6 +108,14 @@
     Each read then waits up to five seconds, so curl's one-second wait for
     100 Continue does not end the read early. Use it to measure a response that arrives
     while the body is being sent (BL-319, BL-395).
+
+.PARAMETER RequestReadMilliseconds
+    How long each read of an HTTP request waits for its next byte before the request is
+    taken as it stands and answered. Default 1000. Give more than 1000 to wait out curl's
+    one-second wait for 100 Continue before it sends a body, so the response comes only
+    once the whole request is in, as upstream's sws answers (the gap office's
+    cross-check passes 3000). Ignored with RespondAfterBodyBytes, whose reads wait five
+    seconds.
 
 .PARAMETER StandardInput
     What curl reads from standard input, with the same backslash escapes as Response.
@@ -630,6 +638,7 @@ param(
     [ValidateRange(0, 600000)] [int] $HoldOpenMilliseconds = 0,
     [ValidateRange(0, 1000)] [int] $AnswerHeldRequests = 0,
     [ValidateRange(-1, [int]::MaxValue)] [int] $RespondAfterBodyBytes = -1,
+    [ValidateRange(1, 600000)] [int] $RequestReadMilliseconds = 1000,
     [string] $StandardInput = '',
     [switch] $Ftp,
     [string[]] $FtpReply = @(),
@@ -767,7 +776,7 @@ function ConvertTo-CommandLineArgument {
 # The server runs in its own runspace so curl can run in this one. It returns one
 # byte array per connection served.
 $serveConnections = {
-    param($Listener, $ResponseBytes, [int] $ConnectionCount, [int] $DelayMilliseconds, [bool] $ResetConnections, [int] $EarlyResponseBodyBytes, $TlsCertificate, [int] $HoldOpen, [bool] $CloseNotify, [int] $AnswerHeld, [bool] $ResetAfterAnswer, [bool] $HalfClose)
+    param($Listener, $ResponseBytes, [int] $ConnectionCount, [int] $DelayMilliseconds, [bool] $ResetConnections, [int] $EarlyResponseBodyBytes, $TlsCertificate, [int] $HoldOpen, [bool] $CloseNotify, [int] $AnswerHeld, [bool] $ResetAfterAnswer, [bool] $HalfClose, [int] $RequestRead)
 
     Set-StrictMode -Version Latest
     $ErrorActionPreference = 'Stop'
@@ -819,14 +828,14 @@ $serveConnections = {
                     continue
                 }
             }
-            $stream.ReadTimeout = if ($EarlyResponseBodyBytes -ge 0) { 5000 } else { 1000 }
+            $stream.ReadTimeout = if ($EarlyResponseBodyBytes -ge 0) { 5000 } else { $RequestRead }
             $buffer = New-Object byte[] 65536
             $received = New-Object System.IO.MemoryStream
             while (-not (Test-RequestComplete -Received $received.GetBuffer() -Length ([int] $received.Length))) {
                 try {
                     $count = $stream.Read($buffer, 0, $buffer.Length)
                 } catch [System.IO.IOException] {
-                    break  # One second without a byte: take what arrived.
+                    break  # The read wait passed without a byte: take what arrived.
                 }
                 if ($count -le 0) { break }
                 $received.Write($buffer, 0, $count)
@@ -3113,7 +3122,7 @@ try {
     } elseif ($Script) {
         [void] $server.AddScript($serveScriptedSession).AddArgument($listener).AddArgument($scriptSteps).AddArgument($transcript).AddArgument($tlsCertificate).AddArgument([bool] $Tls).AddArgument($ScriptIdleMilliseconds).AddArgument($ScriptGapMilliseconds).AddArgument($sessionHelpers.ToString())
     } else {
-        [void] $server.AddScript($serveConnections).AddArgument($listener).AddArgument($responseBytes).AddArgument($Connections).AddArgument($ResponseDelayMilliseconds).AddArgument([bool] $Reset).AddArgument($RespondAfterBodyBytes).AddArgument($tlsCertificate).AddArgument($HoldOpenMilliseconds).AddArgument([bool] $TlsCloseNotify).AddArgument($AnswerHeldRequests).AddArgument([bool] $ResetAfterResponse).AddArgument([bool] $HalfCloseAfterResponse)
+        [void] $server.AddScript($serveConnections).AddArgument($listener).AddArgument($responseBytes).AddArgument($Connections).AddArgument($ResponseDelayMilliseconds).AddArgument([bool] $Reset).AddArgument($RespondAfterBodyBytes).AddArgument($tlsCertificate).AddArgument($HoldOpenMilliseconds).AddArgument([bool] $TlsCloseNotify).AddArgument($AnswerHeldRequests).AddArgument([bool] $ResetAfterResponse).AddArgument([bool] $HalfCloseAfterResponse).AddArgument($RequestReadMilliseconds)
     }
     if ($null -ne $server) { $serverRun = $server.BeginInvoke() }
 

@@ -30,6 +30,9 @@ public sealed class ImapServerConnector(UpstreamTestCase testCase, IConnector ba
     public ReadOnlyMemory<byte> ProtocolLog =>
         Encoding.Latin1.GetBytes(string.Concat(responders.SelectMany(responder => responder.ReceivedCommandLines)));
 
+    /// <summary>The command lines of <see cref="ProtocolLog"/>, each numbered in the order of all servers' writes.</summary>
+    internal IReadOnlyList<UpstreamProtocolDumpEntry> ProtocolDump => [.. responders.SelectMany(responder => responder.ReceivedCommandLineDump)];
+
     /// <summary>
     /// Gets the last <c>APPEND</c> literal any connection received, as ftpserver.pl stores it for
     /// <c>&lt;verify&gt;&lt;upload&gt;</c>, or nothing when none was sent.

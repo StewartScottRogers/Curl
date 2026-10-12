@@ -29,6 +29,9 @@ public sealed class MqttServerConnector(UpstreamTestCase testCase, IConnector ba
     /// <summary>The protocol dump: one line per packet, as mqttd's <c>logprotocol</c> writes it.</summary>
     public ReadOnlyMemory<byte> ProtocolLog => recording.Bytes;
 
+    /// <summary>The writes of <see cref="ProtocolLog"/>, each numbered in the order of all servers' writes.</summary>
+    internal IReadOnlyList<UpstreamProtocolDumpEntry> ProtocolDump => recording.Dump;
+
     /// <summary>Opens an in-memory connection to the mqttd emulation when <paramref name="target"/>'s port is <see cref="MqttPort"/>, otherwise a connection to the wrapped server.</summary>
     /// <param name="target">The host and port to connect to.</param>
     /// <param name="cancellationToken">Passed to the wrapped server.</param>

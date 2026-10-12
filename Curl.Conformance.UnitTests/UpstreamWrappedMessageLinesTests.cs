@@ -31,6 +31,22 @@ public sealed class UpstreamWrappedMessageLinesTests
     }
 
     [TestMethod]
+    public void Unwrap_ErrorCutAfterABlankAndAtTheFullWidth_ComparesEqualToTheErrorOnOneLine()
+    {
+        // test411: "curl: cannot read config from '<long %LOGDIR>/missing'" wraps after "from " where
+        // the expected stderr keeps it on one line; both unwrap to the same bytes.
+        string path = "'" + new string('p', 72) + "/missing'";
+        string fullWidth = "curl: '" + new string('p', 72);
+        string wrapped = "curl: cannot read config from \r\n" + fullWidth + "\r\ncurl: /missing'\r\ncurl: option -K: error\r\n";
+        string oneLine = "curl: cannot read config from " + path + "\r\ncurl: option -K: error\r\n";
+
+        string unwrapped = Unwrap(wrapped);
+
+        Assert.AreEqual(Unwrap(oneLine), unwrapped);
+        StringAssert.StartsWith(unwrapped, "curl: cannot read config from " + path);
+    }
+
+    [TestMethod]
     public void Unwrap_SeparateMessages_LeavesThemOnTheirOwnLines()
     {
         string text = "Note: one\nNote: two\nWarning: \nNote: three\ncurl: (6) x\nNote: last ";

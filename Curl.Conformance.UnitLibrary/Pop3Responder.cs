@@ -36,6 +36,8 @@ internal sealed class Pop3Responder : ILineProtocolResponder
 
     private readonly List<string> receivedCommandLines = [];
 
+    private readonly UpstreamProtocolDump receivedCommandLineDump = new();
+
     private readonly List<string> deletedMessages = [];
 
     private readonly Dictionary<string, Func<string?, string>> defaultAnswers;
@@ -62,6 +64,9 @@ internal sealed class Pop3Responder : ILineProtocolResponder
     /// </summary>
     public IReadOnlyList<string> ReceivedCommandLines => receivedCommandLines;
 
+    /// <summary>Gets <see cref="ReceivedCommandLines"/>, each numbered in the order of all servers' writes.</summary>
+    internal IReadOnlyList<UpstreamProtocolDumpEntry> ReceivedCommandLineDump => receivedCommandLineDump.Entries;
+
     /// <summary>Gets the message numbers <c>DELE</c> marked since the last <c>RSET</c> or <c>QUIT</c>.</summary>
     public IReadOnlyList<string> DeletedMessages => deletedMessages;
 
@@ -69,6 +74,7 @@ internal sealed class Pop3Responder : ILineProtocolResponder
     public LineProtocolReply Answer(string commandLine)
     {
         receivedCommandLines.Add(commandLine + "\r\n");
+        receivedCommandLineDump.Record(Encoding.Latin1.GetBytes(receivedCommandLines[^1]));
         if (!TrySplitCommand(commandLine, out string command, out string? argument))
         {
             return Reply("-ERR Unrecognized command\r\n", closesConnection: true);

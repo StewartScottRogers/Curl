@@ -50,6 +50,9 @@ public sealed class FtpServerConnector : IConnector
     /// </summary>
     public ReadOnlyMemory<byte> ReceivedBytes => controlChannel.ReceivedBytes;
 
+    /// <summary>The writes <see cref="ReceivedBytes"/> came from, each numbered in the order of all servers' writes.</summary>
+    internal IReadOnlyList<UpstreamProtocolDumpEntry> ReceivedDump => controlChannel.ReceivedDump;
+
     /// <summary>Gets the listener curl's active mode (<c>-P</c>) listens on, which <c>PORT</c> and <c>EPRT</c> connect to: an in-memory port, no socket.</summary>
     public IConnectionListener ActiveModeListener => activeModeListener;
 

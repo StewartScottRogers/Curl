@@ -7,7 +7,7 @@ namespace Curl.Conformance;
 /// The <c>REPLY</c>, <c>CAPA</c> and <c>AUTH</c> lines of a case's <c>&lt;servercmd&gt;</c>, as
 /// upstream's <c>tests/ftpserver.pl</c> (at <c>curl-8_21_0</c>) reads them:
 /// <c>REPLY &lt;command&gt; &lt;text&gt;</c> replaces the server's answer to that command with the
-/// text and a CRLF (command names are matched without regard to case; a later line for the same
+/// text and a CRLF (<c>REPLYLF</c> the same with a bare LF; command names are matched without regard to case; a later line for the same
 /// command wins; <c>REPLY "&lt;COMMAND&gt; &lt;ARGUMENT&gt;" &lt;text&gt;</c> is kept apart, under the whole command line, and tried first), and <c>COUNT &lt;COMMAND&gt; &lt;n&gt;</c> takes that reply away after n uses; <c>CAPA</c> lists the capabilities the server announces, split on spaces outside
 /// double quotes with the quotes removed; <c>AUTH</c> lists its authentication mechanisms, split on
 /// spaces; <c>POSTFETCH &lt;text&gt;</c> gives the text IMAP sends before the <c>)</c> that ends a
@@ -175,15 +175,23 @@ internal sealed class LineProtocolServerCommands
     public bool TryFindFullTextReply(string command, string? argument, out byte[] reply) =>
         fullTextReplies.TryGetValue(string.IsNullOrEmpty(argument) ? command : command + " " + argument, out reply!);
 
-    /// <summary>Reads <c>REPLY &lt;command&gt; &lt;text&gt;</c>: the command and the text with its CRLF.</summary>
+    /// <summary>
+    /// Reads <c>REPLY &lt;command&gt; &lt;text&gt;</c>: the command and the text with its CRLF; or
+    /// <c>REPLYLF &lt;command&gt; &lt;text&gt;</c>, whose text ends in a bare LF instead, as
+    /// ftpserver.pl's <c>REPLY(LF|)</c> branch reads it (upstream test891).
+    /// </summary>
     private static bool TryReadReply(string line, out string command, out byte[] reply)
     {
-        bool isReply = line.Split(' ', 3) is ["REPLY", _, _];
         string[] fields = line.Split(' ', 3);
-        command = isReply ? fields[1] : string.Empty;
-        reply = isReply ? Encoding.Latin1.GetBytes(PerlDoubleQuoted(fields[2]) + "\r\n") : [];
-        return isReply;
+        string? lineEnd = fields.Length == 3 ? ReplyLineEnd(fields[0]) : null;
+        command = lineEnd is null ? string.Empty : fields[1];
+        reply = lineEnd is null ? [] : Encoding.Latin1.GetBytes(PerlDoubleQuoted(fields[2]) + lineEnd);
+        return lineEnd is not null;
     }
+
+    /// <summary>The line end a reply keyword gives its text: CRLF for <c>REPLY</c>, a bare LF for <c>REPLYLF</c>; null for any other word.</summary>
+    private static string? ReplyLineEnd(string keyword) =>
+        keyword switch { "REPLY" => "\r\n", "REPLYLF" => "\n", _ => null };
 
     /// <summary>
     /// Reads reply text as ftpserver.pl's <c>eval "qq{...}"</c> does: <c>\r</c>, <c>\n</c> and
