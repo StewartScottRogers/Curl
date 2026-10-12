@@ -44,3 +44,4 @@ In Curl.Networking.UnitLibrary, change SystemDnsResolver.ResolveAsync (the produ
 ## Log
 
 - 2026-10-12: Created.
+- 2026-10-12: Backlog -> Doing.
