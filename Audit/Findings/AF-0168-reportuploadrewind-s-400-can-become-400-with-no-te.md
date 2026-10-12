@@ -3,8 +3,8 @@ id: AF-0168
 title: ReportUploadRewind's '< 400' can become '<= 400' with no test failing: a 400 after a -L upload writes a false 'Need to rewind upload' verbose line
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Protocol.Http.UnitLibrary/HttpProtocolHandler.cs:ReportUploadRewind-le:surviving-mutant
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Proto
 ## Log
 
 - 2026-10-11: filed proposed.
+- 2026-10-11: proposed -> accepted.
