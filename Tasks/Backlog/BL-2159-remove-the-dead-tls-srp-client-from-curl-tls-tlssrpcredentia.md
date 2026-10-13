@@ -1,5 +1,5 @@
 ---
-id: BL-2157
+id: BL-2159
 title: Remove the dead TLS-SRP client from Curl.Tls: TlsSrpCredentials, Tls12ClientSettings.SrpCredentials, the SRP key exchange, SrpClient, SrpGroup, SrpExtension, Tls12SrpParameters and the SRP suites
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-13
 completed:
 ---
-# BL-2157 — Remove the dead TLS-SRP client from Curl.Tls: TlsSrpCredentials, Tls12ClientSettings.SrpCredentials, the SRP key exchange, SrpClient, SrpGroup, SrpExtension, Tls12SrpParameters and the SRP suites
+# BL-2159 — Remove the dead TLS-SRP client from Curl.Tls: TlsSrpCredentials, Tls12ClientSettings.SrpCredentials, the SRP key exchange, SrpClient, SrpGroup, SrpExtension, Tls12SrpParameters and the SRP suites
 
 ## Goal
 

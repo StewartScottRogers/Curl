@@ -35,7 +35,7 @@ BL-2142 turned the six options into `CommandLineOption.NoFunctionValue` rows, so
 
 ## Notes
 
-- Split (rule 4, first pass): the Curl.Tls half - `TlsSrpCredentials` and the whole SRP key exchange it feeds (`SrpClient`, `SrpGroup`, `SrpExtension`, `Tls12SrpParameters`, the SRP suites) - is far larger than the task's list suggests, so it went to BL-2157. Nothing outside Curl.Tls reaches it any more, so the first acceptance criterion holds outside Curl.Tls here and inside it once BL-2157 is done.
+- Split (rule 4, first pass): the Curl.Tls half - `TlsSrpCredentials` and the whole SRP key exchange it feeds (`SrpClient`, `SrpGroup`, `SrpExtension`, `Tls12SrpParameters`, the SRP suites) - is far larger than the task's list suggests, so it went to BL-2159. Nothing outside Curl.Tls reaches it any more, so the first acceptance criterion holds outside Curl.Tls here and inside it once BL-2159 is done.
 - Removed: `CommandLineOptions`' six properties; the Console mapping; `TlsClientOptions.TlsUser/TlsPassword/TlsAuthType`; `TlsSrp`; the SRP paths of `HandBuiltTlsProvider` (SRP suites, exit 43, OpenSSL handshake-failure text for `--tlsuser`); `TlsClientRouting`'s TLS-SRP row; their tests. The tests pinning that the options carry nothing (`TlsClientOptionsMappingTests`, `CommandLineNoFunctionOptionTests`) stay.
 - `Features:`: curl 8.22.0's `lib/version.c` (curl-8_22_0 tag, fetched 2026-10-13) has no `TLS-SRP` feature; 8.21.0's listed it under `USE_TLS_SRP`. So `CurlVersionText.FeaturesLine` drops it. `Curl.Conformance.UnitLibrary`'s `UpstreamCurlPlatform` still lists it, outside `touches`: filed as BL-2158.
 - ADR-0229 and ADR-0328 marked superseded by ADR-0480; added to `touches` (no task in Doing on origin/work/dark-factory names Documentation).
@@ -46,4 +46,4 @@ BL-2142 turned the six options into `CommandLineOption.NoFunctionValue` rows, so
 
 - 2026-10-13: Created.
 - 2026-10-13: Backlog -> Doing.
-- 2026-10-13: Doing -> Done. TLS-SRP plumbing removed from Cli, Console and Networking; Features line drops TLS-SRP; Curl.Tls half split to BL-2157, Conformance list to BL-2158
+- 2026-10-13: Doing -> Done. TLS-SRP plumbing removed from Cli, Console and Networking; Features line drops TLS-SRP; Curl.Tls half split to BL-2159, Conformance list to BL-2158
