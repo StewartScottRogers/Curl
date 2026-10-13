@@ -62,8 +62,8 @@ log file it rests on, as `logs/<file>` (the lane trace, the run log, or `logs/ci
 
 ## 3. Not your subject
 
-Do not judge the code the tasks produced; the quality, security, performance, conformance and
-truthfulness auditors do that.
+Do not judge the code the tasks produced; the quality, security, conformance and truthfulness
+auditors do that.
 
 ## Severity
 

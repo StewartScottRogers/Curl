@@ -56,7 +56,9 @@
 
 .PARAMETER Auditors
     The auditors to run, in any order; they run in the fixed order quality, security,
-    performance, conformance, truthfulness, process. Default all six.
+    conformance, truthfulness, process. Default all five. (The performance auditor was retired
+    on 2026-10-13, BL-2132: Curl does not aim to match curl's speed, memory or size; the
+    conformance auditor checks hangs and transfers under load.)
 
 .PARAMETER Planted
     Defects to plant: at least one per selected auditor, at most 10. Default 8.
@@ -79,8 +81,10 @@
     Start the audit in a new herdr tab (a console window outside herdr) and return at once.
 
 .PARAMETER SelfTest
-    Check the refusals on a faked process list, the -Auditors warnings, and the seeder's avoided
-    files and manifest check on scratch findings and task paths.
+    Check the refusals on a faked process list, the -Auditors warnings, that the auditor list,
+    the -Auditors default and help, the models, the methods and the agent files agree on the five
+    auditors (and that the retired performance auditor is gone and refused), and the seeder's
+    avoided files and manifest check on scratch findings and task paths.
 
 .EXAMPLE
     Audit\RunAudit.cmd -NewTab
@@ -89,7 +93,7 @@
 #>
 param(
     [string]$Ref = 'origin/work/dark-factory',
-    [string[]]$Auditors = @('quality', 'security', 'performance', 'conformance', 'truthfulness', 'process'),
+    [string[]]$Auditors = @('quality', 'security', 'conformance', 'truthfulness', 'process'),
     [ValidateRange(1, 10)][int]$Planted = 8,
     [int]$Seed = -1,
     [switch]$DryRun,
@@ -103,11 +107,11 @@ $ErrorActionPreference = 'Stop'
 # shared .git, beside which the factory keeps <repo>.logs and the audit keeps <repo>.audit.
 $commonGit = "$(& git -C $PSScriptRoot rev-parse --path-format=absolute --git-common-dir 2>$null)".Trim()
 $repo = if ($commonGit) { Split-Path ($commonGit -replace '/', '\') -Parent } else { (Resolve-Path (Join-Path $PSScriptRoot '..')).Path }
-$Order = @('quality', 'security', 'performance', 'conformance', 'truthfulness', 'process')
+$Order = @('quality', 'security', 'conformance', 'truthfulness', 'process')
 # quality, truthfulness and process moved from Sonnet to Opus (Stewart, 2026-10-03, BL-1364): on Sonnet they
 # cut their methods short in three audits running, even when told to run every step.
-$Models = @{ quality = 'opus'; security = 'opus'; performance = 'sonnet'; conformance = 'opus'; truthfulness = 'opus'; process = 'opus'; seeder = 'sonnet' }
-$Method = @{ quality = 'Quality'; security = 'Security'; performance = 'Performance'; conformance = 'Conformance'; truthfulness = 'Truthfulness'; process = 'Process' }
+$Models = @{ quality = 'opus'; security = 'opus'; conformance = 'opus'; truthfulness = 'opus'; process = 'opus'; seeder = 'sonnet' }
+$Method = @{ quality = 'Quality'; security = 'Security'; conformance = 'Conformance'; truthfulness = 'Truthfulness'; process = 'Process' }
 $Dot = [char]0x00B7
 $Started = Get-Date
 $Stamp = $Started.ToString('yyyyMMdd-HHmmss')
@@ -213,6 +217,12 @@ function Get-SkippedAuditorWarnings([string]$Findings, [string[]]$Chosen) {
     return $warnings
 }
 
+function Get-UnknownAuditorMessage([string]$Name) {
+    # Why -Auditors refuses a name; the retired performance auditor says so (BL-2132).
+    if ($Name -eq 'performance') { return "The performance auditor was retired on 2026-10-13 (BL-2132): Curl does not aim to match curl's speed, memory or size, and the conformance auditor checks hangs and transfers under load. Auditors: $($Order -join ', ')." }
+    return "Unknown auditor '$Name'. Auditors: $($Order -join ', ')."
+}
+
 function Get-FindingField([string]$Text, [string]$Name) {
     if ($Text -match "(?m)^$([regex]::Escape($Name)):[ \t]*([^\r\n]*)") { return $Matches[1].Trim() }
     return ''
@@ -313,6 +323,20 @@ if ($SelfTest) {
         Check 'leaving out an auditor with accepted findings warns, naming them' ($warnings.Count -eq 1 -and $warnings[0] -eq 'Warning: -Auditors leaves out quality, which has 1 accepted findings this audit will not re-audit: AF-0001.') "$warnings"
         Check 'running every auditor warns about nothing' (@(Get-SkippedAuditorWarnings $scratch $Order).Count -eq 0) 'none'
 
+        # BL-2132: five auditors; the performance auditor is retired. The list, the default, the
+        # -Auditors help, the models, the methods and the agent files agree.
+        $five = 'quality,security,conformance,truthfulness,process'
+        $paramText = [regex]::Match([IO.File]::ReadAllText($PSCommandPath), "\[string\[\]\]\`$Auditors = @\(([^)]*)\)").Groups[1].Value -replace "[' ]", ''
+        Check 'the auditor order and the -Auditors default are the five' (($Order -join ',') -eq $five -and $paramText -eq $five) "order $($Order -join ','); default $paramText"
+        $helpText = [regex]::Replace([IO.File]::ReadAllText($PSCommandPath), '\s+', ' ')
+        Check 'the -Auditors help names the five in order' ($helpText -match 'they run in the fixed order quality, security, conformance, truthfulness, process\. Default all five\.') 'help'
+        $root = Split-Path $PSScriptRoot -Parent
+        $missing = @($Order | Where-Object { -not $Models[$_] -or -not (Test-Path -LiteralPath (Join-Path $root ".claude\agents\audit-$_.md")) -or -not (Test-Path -LiteralPath (Join-Path $PSScriptRoot "Instructions\$($Method[$_]).md")) })
+        Check 'each auditor has a model, an agent and a method' ($missing.Count -eq 0) "missing: $($missing -join ',')"
+        $retiredLeft = @((Join-Path $root '.claude\agents\audit-performance.md'), (Join-Path $PSScriptRoot 'Instructions\Performance.md'), (Join-Path $PSScriptRoot 'Tools\Measure-Performance.ps1')) | Where-Object { Test-Path -LiteralPath $_ }
+        Check 'the retired performance auditor has no model, agent, method or tool' (-not $Models.ContainsKey('performance') -and -not $Method.ContainsKey('performance') -and @($retiredLeft).Count -eq 0) "left: $(@($retiredLeft) -join ', ')"
+        Check '-Auditors performance is refused, saying it is retired' ((Get-UnknownAuditorMessage 'performance') -like '*retired*' -and (Get-UnknownAuditorMessage 'nonesuch') -like "Unknown auditor 'nonesuch'*") (Get-UnknownAuditorMessage 'performance')
+
         # BL-2108: files of findings awaiting a re-audit, and the manifest check.
         $awaitDir = Join-Path $scratch 'await'
         New-Item -ItemType Directory -Force $awaitDir | Out-Null
@@ -379,7 +403,7 @@ $refusal = Get-RefusalReason $processes $env:CURL_DARK_FACTORY_LANE $AlongsideSh
 if ($refusal) { Write-Host $refusal; exit 1 }
 
 $Auditors = @($Auditors | ForEach-Object { $_ -split ',' } | ForEach-Object { $_.Trim().ToLowerInvariant() } | Where-Object { $_ })
-foreach ($a in $Auditors) { if ($Order -notcontains $a) { Write-Host "Unknown auditor '$a'. Auditors: $($Order -join ', ')."; exit 1 } }
+foreach ($a in $Auditors) { if ($Order -notcontains $a) { Write-Host (Get-UnknownAuditorMessage $a); exit 1 } }
 $Selected = @($Order | Where-Object { $Auditors -contains $_ })
 if ($Planted -lt $Selected.Count) { Write-Host "-Planted $Planted is fewer than the $($Selected.Count) auditors selected; each needs at least one."; exit 1 }
 if ($Seed -lt 0) { $Seed = [int]($Started.Ticks % 1000000007) }
@@ -509,7 +533,7 @@ try {
     Invoke-Git @('-C', $auditTree, 'push', '-q', 'origin', 'audit') | Out-Null
     $openPr = "$(& gh pr list --head audit --base master --state open --json url --jq '.[0].url' 2>$null)".Trim()
     if (-not $openPr) {
-        $table = ((Get-Content -LiteralPath $scorecard -Raw) -split '## Performance')[0]
+        $table = ((Get-Content -LiteralPath $scorecard -Raw) -split '## Process')[0]
         $body = Join-Path $RunDir 'pr-body.md'
         [IO.File]::WriteAllText($body, "Audit $Stamp of ``$auditedCommit`` ($Ref).`n`n$table`nAn interactive session merges this once CI is green on all three platforms (Stewart's standing exception, 2026-09-30); this runner never merges it. Stewart accepts or rejects each finding (Audit/Triage.md).`n", $Utf8)
         $openPr = "$(& gh pr create --base master --head audit --title "Audit $Stamp" --body-file $body 2>&1)".Trim()

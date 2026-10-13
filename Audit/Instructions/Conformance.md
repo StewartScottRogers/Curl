@@ -50,14 +50,51 @@ Several cases often share one cause - the same option refused, the same message 
 differently. Group them: one finding, one `key`, per cause, listing every case number it
 covers in the evidence.
 
-## 4. Deliberate divergences (phase 2 only)
+## 4. Transfers under load
+
+Curl never aims to match real curl's speed, memory or binary size - C curl will always be
+faster and smaller (Stewart, 2026-10-13, BL-2132) - so never report a time, a memory figure,
+a size or a ratio against curl as a finding. Performance matters only when it breaks
+behaviour: a hang, a run that never finishes, quadratic blow-up on a large input, or a
+transfer that fails under load where curl succeeds. A script can tell those apart, so they
+are conformance failures. From the audited tree's root:
+
+```powershell
+powershell -NoProfile -File Audit/Tools/Test-TransfersUnderLoad.ps1 -OutDirectory <temp folder>\load
+```
+
+It publishes Curl.Console as the native AOT binary that ships, runs four fixed heavy transfers
+(`large-get`, `many-chunks`, `many-headers`, `many-redirects`) through it and through the
+reference curl, once each under a generous time limit, and writes `load.json`, `load.md`,
+`publish.log` and each run's folder. It takes several minutes: the recorder spends about a
+minute preparing the 50 MiB body for each `large-get` run.
+
+- A scenario whose `differences` is not empty is a finding. Curl's exit `timeout` where curl
+  finished is kind `hang` (High; Critical for `large-get`, a plain download); a different exit
+  code is kind `exit-code`; the same exit code with different output bytes is kind `output`.
+  The evidence gives both outcomes from `load.json` and the cause, from the code along that
+  scenario's path: a loop that re-reads, re-copies or re-scans everything received so far on
+  each chunk, header or hop; a wait for an event that never comes; a limit curl does not have.
+  If you cannot find the cause, report the finding anyway and say so. The reproduction is the
+  tool's command with `-Scenario <name>`, curl's outcome as the expected result and Curl's as
+  the actual.
+- If the publish fails, the tool exits 1 and runs nothing. That is a **Critical** finding,
+  kind `publish-failed`: the native AOT binary is what ships. Its evidence is the error lines
+  in `publish.log`.
+- Each distinct `warning IL2` or `warning IL3` line in `publish.log` is a **Medium** finding,
+  kind `aot-warning`: trimmed or AOT-compiled code can behave differently from the build the
+  differential run tested. Evidence: the warning line; reproduction: the publish.
+
+Report `loadDifferences` (`load.json`'s `different`) in `metrics`.
+
+## 5. Deliberate divergences (phase 2 only)
 
 After every phase-1 finding is written down, check `Documentation/Planning/Decisions/` for an
 ADR that records the divergence as deliberate (for example, a feature real curl's Schannel build
 lacks that Curl implements). Annotate the finding with it ("explained by ADR-NNNN: ...") - never
 delete it. An undocumented divergence stays a finding as it is.
 
-## 5. Name the reference
+## 6. Name the reference
 
 State the reference curl's `--version` first line in your summary and in every finding's
 evidence: a conformance claim means nothing without the curl it was measured against.
@@ -76,8 +113,10 @@ evidence: a conformance claim means nothing without the curl it was measured aga
 
 Follow the key rule in [Report-Format.md](Report-Format.md). `<where>` is the option or area
 (`--libcurl`, `exit-codes`, `write-out`), and kinds are `exit-code`, `stdout`, `stderr`,
-`request` and `refused-option`.
+`request` and `refused-option`. For step 4, `<where>` is the scenario (`large-get`,
+`many-chunks`, `many-headers`, `many-redirects`) or `publish`, and the kinds are `hang`,
+`exit-code`, `output`, `publish-failed` and `aot-warning`.
 
 ## Method counts
 
-Run every step above on every audit; re-audits come on top, never instead. Report `method.casesRun` in `metrics` ([Report-Format.md](Report-Format.md#method-counts)): a report without them marks you unreliable (BL-1364).
+Run every step above on every audit; re-audits come on top, never instead. Report `method.casesRun` and `method.loadScenariosRun` in `metrics` ([Report-Format.md](Report-Format.md#method-counts)): a report without them marks you unreliable (BL-1364).
