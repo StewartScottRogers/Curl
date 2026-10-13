@@ -11,10 +11,10 @@
     pinned, and tests never download anything - only this script does.
 
 .PARAMETER Tag
-    The curl release tag, as named in https://github.com/curl/curl/tags, e.g. curl-8_21_0.
+    The curl release tag, as named in https://github.com/curl/curl/tags, e.g. curl-8_22_0.
 
 .EXAMPLE
-    powershell -NoProfile -ExecutionPolicy Bypass -File Update-UpstreamTestData.ps1 -Tag curl-8_21_0
+    powershell -NoProfile -ExecutionPolicy Bypass -File Update-UpstreamTestData.ps1 -Tag curl-8_22_0
 #>
 [CmdletBinding()]
 param(
