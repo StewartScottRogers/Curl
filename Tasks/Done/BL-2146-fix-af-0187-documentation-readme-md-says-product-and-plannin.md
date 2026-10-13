@@ -8,7 +8,7 @@ depends-on: []
 touches: [Documentation]
 requirement: none
 created: 2026-10-13
-completed:
+completed: 2026-10-13
 ---
 # BL-2146 — Fix AF-0187: Documentation/README.md says Product/ and Planning/ are unfilled scaffolds and ADR-0001 is the only decision; there are 474 ADRs and 107 requirements
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Rewrote "Status of these documents" in Documentation/README.md: no counts hard-coded (they go stale), points at FR rows, ADRs, and the remaining TODO marker. Reproduction now gives 0;474;107. Docs-only change; no code touched.
 
 ## Log
 
 - 2026-10-13: Created.
 - 2026-10-13: Backlog -> Doing.
+- 2026-10-13: Doing -> Done. README status section rewritten; reproduction gives 0;474;107
