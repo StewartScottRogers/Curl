@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Protocol.Http.UnitLibrary]
+touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests]
 requirement: none
 created: 2026-10-13
-completed:
+completed: 2026-10-13
 ---
 # BL-2139 — Fix AF-0180: HttpContinueWaitConnection.ReadStatusLineAsync's 'IndexOf(...) < 0' can become '<= 0' with no test failing: a reply starting with a bare LF no longer ends the 100-continue wait at once
 
@@ -41,12 +41,23 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Test-only fix: `HttpContinueWaitConnectionTests.WaitForContinueAsync_ReplyStartsWithABareLineFeed_StopsReadingAtItAndLeavesTheBodyUnsent`
+  feeds `\nHTTP/1.1 100 Continue\r\n\r\n` followed by a reset, at 1-byte and 64 KB reads. The original stops
+  at the line feed, leaves the body unsent and replays `\n`. The `<= 0` mutant reads on into the reset, so its
+  status-line read faults and the first replay read throws. The production code was already right.
+- Added `Curl.Protocol.Http.UnitTests` to `touches`: the test lives there. No task in Doing on
+  `origin/work/dark-factory` named it (BL-2128, BL-2138, BL-2142, BL-2146 checked).
+- The audit guard refuses lanes `Audit/Tools/Invoke-MutationTest.ps1`, so the mutant was checked by hand:
+  `< 0` was changed to `<= 0` at line 170 and the test class was run (1 failed, the new test; 28 passed),
+  then the source was restored. The quality auditor's re-audit is still what closes AF-0180.
 
 ## Log
 
 - 2026-10-13: Created.
 - 2026-10-13: Backlog -> Doing.
+- 2026-10-13: Doing -> Done. A reply starting with a bare LF is now pinned to end the 100-continue wait at once; the <= 0 mutant at HttpContinueWaitConnection.cs:170 is killed

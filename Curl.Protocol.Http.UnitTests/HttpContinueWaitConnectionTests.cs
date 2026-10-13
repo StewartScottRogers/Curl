@@ -164,6 +164,30 @@ public sealed class HttpContinueWaitConnectionTests
     }
 
     [TestMethod]
+    public async Task WaitForContinueAsync_ReplyStartsWithABareLineFeed_StopsReadingAtItAndLeavesTheBodyUnsent()
+    {
+        // The read after the reply fails, so a wait that read past the first line feed
+        // would fault and the replay would throw at once instead of returning the reply (AF-0180).
+        const string response = "\nHTTP/1.1 100 Continue\r\n\r\n";
+        IOException failure = new("Reset.");
+        Diagnostics.Arrange("response", Visible(response));
+        foreach (int chunkSize in ChunkSizes)
+        {
+            HttpContinueWaitConnection connection = new(new ScriptedConnection(Encoding.Latin1.GetBytes(response), chunkSize, null, failure));
+
+            bool sends = await connection.WaitForContinueAsync(new FakeTimeProvider(DateTimeOffset.UnixEpoch), CancellationToken.None);
+            byte[] first = new byte[1];
+            int read = await connection.ReadAsync(first, CancellationToken.None);
+
+            Diagnostics.Act($"sends the body at chunk size {chunkSize}", sends);
+            Diagnostics.Assert($"first replayed byte at chunk size {chunkSize}", "\\n", Visible(Encoding.Latin1.GetString(first, 0, read)));
+            Assert.IsFalse(sends, $"Chunk size {chunkSize}");
+            Assert.AreEqual(1, read, $"Chunk size {chunkSize}");
+            Assert.AreEqual((byte)'\n', first[0], $"Chunk size {chunkSize}");
+        }
+    }
+
+    [TestMethod]
     public async Task WaitForContinueAsync_LineLongerThanTheLineLimit_StopsReadingAndLeavesTheBodyUnsent()
     {
         byte[] response = Encoding.ASCII.GetBytes(new string('H', HttpLineReader.MaximumLineLength + 5));
