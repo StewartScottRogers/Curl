@@ -6,6 +6,7 @@ assignee: Claude
 pipeline: direct
 depends-on: []
 touches: [RunDarkFactory.ps1]
+lane: no
 requirement: none
 created: 2026-10-13
 completed:
@@ -46,7 +47,10 @@ The finding closes only when a later re-audit by the process auditor confirms th
 
 ## Notes
 
+Interactive only. The log copy and the unfinishedRuns count belong to the audit office tooling, which a lane may not read or change. RunDarkFactory.ps1 writes each run log correctly and cannot know a copy was taken mid-run. Fix: the audit skips or marks logs of runs still live (newest write within a few minutes, or task still in Doing) when copying alongside a shift. Remove lane: no once an interactive session has confirmed that audit-side change is wanted and works on the audit branch.
+
 ## Log
 
 - 2026-10-13: Created.
 - 2026-10-13: Backlog -> Doing.
+- 2026-10-13: Doing -> Backlog. Interactive only: the fix is in the audit office tooling, which lanes cannot touch; lane: no added
