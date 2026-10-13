@@ -56,3 +56,4 @@ Keep `-text` in `.gitattributes` for the new extension.
 ## Log
 
 - 2026-10-13: Created.
+- 2026-10-13: Backlog -> Doing.
