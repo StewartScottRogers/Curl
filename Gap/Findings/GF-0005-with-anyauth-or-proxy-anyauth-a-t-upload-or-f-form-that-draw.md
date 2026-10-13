@@ -4,11 +4,11 @@ title: With --anyauth or --proxy-anyauth, a -T upload or -F form that draws a 40
 area: behaviour
 key: behaviour:auth-retry-not-sent-for-upload-or-form-body
 severity: High
-status: open
+status: closed
 scope: target
 introduced-in:
 opened: 2026-10-08_1640
-closed:
+closed: 2026-10-13_1406
 regression: false
 items: [behaviour:test154, behaviour:test155, behaviour:test258, behaviour:test259, behaviour:test1030, behaviour:test1071, behaviour:test1075]
 touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests]
@@ -38,6 +38,7 @@ In Curl.Protocol.Http.UnitLibrary, make HttpProtocolHandler.MayRetry and the upl
 - 2026-10-11_1950: 1 of 7 items are gaps.
 - 2026-10-12_0951: 1 of 7 items are gaps.
 - 2026-10-12_2042: 1 of 7 items are gaps.
+- 2026-10-13_1406: 0 of 7 items are gaps.
 
 ## Log
 
@@ -45,3 +46,4 @@ In Curl.Protocol.Http.UnitLibrary, make HttpProtocolHandler.MayRetry and the upl
 - 2026-10-08_1731: Filed BL-1798.
 - 2026-10-10_0756: Filed BL-2001.
 - 2026-10-11_1029: Filed BL-2074.
+- 2026-10-13_1406: Closed: run 2026-10-13_1406 measured every item as match or excluded.

@@ -4,11 +4,11 @@ title: Upstream curl 8.22.0 changed options items
 area: options
 key: options:newest
 severity: High
-status: open
+status: closed
 scope: target
 introduced-in: 8.22.0
 opened: 2026-10-09_0050
-closed:
+closed: 2026-10-13_1406
 regression: false
 items: [options:--httpsig-algo, options:--httpsig-headers, options:--httpsig-key, options:--httpsig-keyid]
 touches: []
@@ -40,8 +40,10 @@ Bring these items to Curl when the target moves to 8.22.0.
 - 2026-10-11_1950: 0 of 4 items are gaps. 4 not in this run's measurement.
 - 2026-10-12_0951: 0 of 4 items are gaps. 4 not in this run's measurement.
 - 2026-10-12_2042: 0 of 4 items are gaps. 4 not in this run's measurement.
+- 2026-10-13_1406: 0 of 4 items are gaps.
 
 ## Log
 
 - 2026-10-09_0050: Opened from the release diff 8.21.0 to 8.22.0.
 - 2026-10-13: Scope newest -> target: ADR-0479 moves the targeted version to 8.22.0 (BL-2128).
+- 2026-10-13_1406: Closed: run 2026-10-13_1406 measured every item as match or excluded.
