@@ -8,7 +8,7 @@ depends-on: []
 touches: [RunDarkFactory.ps1]
 requirement: none
 created: 2026-10-13
-completed:
+completed: 2026-10-13
 ---
 # BL-2149 — Fix AF-0190: BL-2131 cost $3.11, 6.1 times the median task cost, over 70 turns of sliced code reading
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the process auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Cause: a 70-turn run sliced the same files with 56 Bash sed/grep calls. Fix: the run prompt in RunDarkFactory.ps1 (both copies of rule 8 or 9) now carries an AF-0190 clause: Read a file once, and decide touches once. Same mechanism as AF-0172 (BL-2107). The cost cap itself is ADR-0478.
 
 ## Log
 
 - 2026-10-13: Created.
 - 2026-10-13: Backlog -> Doing.
+- 2026-10-13: Doing -> Done. Run prompt now tells a run to Read files once instead of slicing them (AF-0190)
