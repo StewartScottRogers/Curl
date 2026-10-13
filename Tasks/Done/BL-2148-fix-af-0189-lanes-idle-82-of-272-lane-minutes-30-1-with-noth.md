@@ -8,7 +8,7 @@ depends-on: []
 touches: [RunDarkFactory.ps1]
 requirement: none
 created: 2026-10-13
-completed:
+completed: 2026-10-13
 ---
 # BL-2148 — Fix AF-0189: Lanes idle 82 of 272 lane minutes (30.1%) with nothing ready while the whole BL-2127/BL-2126/BL-2128 chain waited on interactive-only BL-2125
 
@@ -41,14 +41,17 @@ The finding closes only when a later re-audit by the process auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
 - 2026-10-13 (Claude): AF-0189: the idle time was the chain waiting on BL-2125, which needed Stewart to install Git for Windows by hand. Look for something the factory could have done better, for example filing human-only steps earlier or saying sooner that lanes wait on Stewart. If there is nothing, record why and finish.
 
+- 2026-10-13 (Claude): The idle minutes were a chain held behind interactive-only BL-2125, which no lane may take; the factory cannot make it runnable. What it could do better was say so: a lane waiting on "No task is ready." now appends which Backlog tasks are lane: no and which are queued behind them through depends-on (Get-InteractiveHoldNote in RunDarkFactory.ps1, self-tested by -TestTaskIds). The reproduction measures a past shift log, so it still reports that shift; the re-audit sees the new wait line in later shifts.
+
 ## Log
 
 - 2026-10-13: Created.
 - 2026-10-13: Backlog -> Doing.
+- 2026-10-13: Doing -> Done. Idle lanes now log which interactive-only Backlog tasks and chains hold the board

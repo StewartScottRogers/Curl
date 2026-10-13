@@ -1878,8 +1878,48 @@ function Get-NeedsStewartId {
     return ''
 }
 
+function Get-InteractiveHoldNote {
+    # When a lane waits with nothing ready: the Backlog tasks that only an interactive session
+    # can run (lane: no) and the tasks queued behind them through depends-on, as one sentence
+    # for the wait line, or '' when no Backlog task is held that way (AF-0189: three lanes sat
+    # idle for 78 minutes behind interactive-only BL-2125 without the log saying so).
+    param([string]$BacklogDir)
+    $tasks = @{}
+    foreach ($file in @(Get-ChildItem -LiteralPath $BacklogDir -Filter 'BL-*.md' -ErrorAction SilentlyContinue)) {
+        $id = Get-TaskIdFromFileName $file.Name
+        if (-not $id) { continue }
+        $text = Get-Content -Raw -LiteralPath $file.FullName
+        $deps = if ($text -match '(?m)^depends-on:\s*\[(.*)\]\s*$') { @(Get-TaskIdsNamed $Matches[1]) } else { @() }
+        $tasks[$id] = @{ Interactive = ($text -match '(?m)^lane: no\s*$'); Deps = $deps }
+    }
+    $interactive = @($tasks.Keys | Where-Object { $tasks[$_].Interactive } | Sort-Object)
+    if (-not $interactive.Count) { return '' }
+    $held = @($interactive)
+    do {
+        $grew = $false
+        foreach ($id in @($tasks.Keys | Sort-Object)) {
+            if ($held -contains $id) { continue }
+            if (@($tasks[$id].Deps | Where-Object { $held -contains $_ }).Count) { $held += $id; $grew = $true }
+        }
+    } while ($grew)
+    $behind = @($held | Where-Object { $interactive -notcontains $_ })
+    $note = "interactive only, waiting on Stewart or an interactive session: $($interactive -join ', ')"
+    if ($behind.Count) { $note += "; queued behind them: $($behind -join ', ')" }
+    return $note
+}
+
 if ($TestTaskIds) {
+    $holdDir = Join-Path ([IO.Path]::GetTempPath()) "hold-$([guid]::NewGuid().ToString('N'))"
+    New-Item -ItemType Directory -Path $holdDir | Out-Null
+    Set-Content -LiteralPath (Join-Path $holdDir 'BL-1-a.md') -Value "depends-on: []`nlane: no"
+    Set-Content -LiteralPath (Join-Path $holdDir 'BL-2-b.md') -Value 'depends-on: [BL-1]'
+    Set-Content -LiteralPath (Join-Path $holdDir 'BL-3-c.md') -Value 'depends-on: [BL-2]'
+    Set-Content -LiteralPath (Join-Path $holdDir 'BL-4-d.md') -Value 'depends-on: []'
+    $holdNote = Get-InteractiveHoldNote $holdDir
+    Remove-Item -LiteralPath $holdDir -Recurse -Force
     $cases = @(
+        ,@('an interactive-only task and the chain behind it', 'interactive only, waiting on Stewart or an interactive session: BL-1; queued behind them: BL-2, BL-3', $holdNote)
+        ,@('no Backlog directory holds nothing', '', (Get-InteractiveHoldNote (Join-Path ([IO.Path]::GetTempPath()) 'no-such-backlog-dir')))
         ,@('next offers a four-digit ID', 'BL-1003', (Get-NextTaskId "BL-1003  pipeline: direct  Tasks\Backlog\BL-1003-x.md"))
         ,@('next offers a three-digit ID', 'BL-992', (Get-NextTaskId 'BL-992  pipeline: direct  Tasks\Backlog\BL-992-x.md'))
         ,@('next offers nothing', '', (Get-NextTaskId 'No task is ready.'))
@@ -5215,7 +5255,12 @@ while ($true) {
         Write-Heartbeat 'claim'
         $claim = Invoke-Claim -Skip (@($attempted.Keys) + @(Get-ShiftRequeued) | Select-Object -Unique)
         if ($claim.None) { $stopWhy = 'nothing ready'; break }
-        if ($claim.Wait) { Write-Trace '-' 'wait' $claim.Why 'DarkGray'; Write-Heartbeat 'wait' (Get-Short $claim.Why 80); Start-Sleep -Seconds 60; continue }
+        if ($claim.Wait) {
+            if ($claim.Why -match '^No task is ready') {
+                $holdNote = Get-InteractiveHoldNote (Join-Path $Root 'Tasks\Backlog')
+                if ($holdNote) { $claim.Why = "$($claim.Why) Backlog is $holdNote" }
+            }
+            Write-Trace '-' 'wait' $claim.Why 'DarkGray'; Write-Heartbeat 'wait' (Get-Short $claim.Why 80); Start-Sleep -Seconds 60; continue }
         $id = $claim.Id
     } else {
         Set-HeartbeatTask ''
