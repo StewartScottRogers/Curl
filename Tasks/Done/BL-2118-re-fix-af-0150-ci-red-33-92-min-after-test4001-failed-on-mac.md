@@ -8,7 +8,7 @@ depends-on: []
 touches: [RunDarkFactory.ps1]
 requirement: none
 created: 2026-10-13
-completed:
+completed: 2026-10-12
 ---
 # BL-2118 — Re-fix AF-0150: CI red 33.92 min after test4001 failed on macOS from BL-1947's commit (run 38030548658)
 
@@ -45,12 +45,15 @@ The finding closes only when a later re-audit by the process auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Cause: Get-CiFailures only fell back to filing a failed job by its step when the whole run named no failure. A run with a named test failure (test303, Linux) plus a failed Quality-gates job filed only the test, so the later quality failures stayed unfiled for 301 min. Fix: the fallback now applies to every failed job that has no named failure of its own. Test added to -TestCiWatch (38 checks pass).
 
 ## Log
 
 - 2026-10-13: Created.
 - 2026-10-12: Backlog -> Doing.
+- 2026-10-12: Doing -> Done. CI watch files a failed job beside named test failures, so a red spell no longer stays unfiled

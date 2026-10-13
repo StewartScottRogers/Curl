@@ -2675,18 +2675,23 @@ function Get-CiFailures {
     }
     # A run that failed with no test, compiler error or audit-guard line in its log (a crashed
     # test host, a timeout, a job step that broke) is still red: file it by the job and step
-    # the log names, so the spell does not stay open unfiled (AF-0171).
-    if (-not $found.Count) {
-        foreach ($raw in $Log) {
-            $parts = "$raw" -split "`t", 3
-            if ($parts.Count -lt 3 -or -not $parts[0].Trim() -or $parts[0] -eq 'UNKNOWN STEP') { continue }
-            $key = "job $($parts[0].Trim()) step $($parts[1].Trim())"
-            $text = ($parts[2] -replace '^\d{4}-\d\d-\d\dT[\d:.]+Z ?', '').Trim()
-            if (-not $found.Contains($key)) {
-                $found[$key] = [pscustomobject]@{ Key = $key; Kind = 'job'; Platforms = @(Get-CiPlatform $parts[0].Trim()); Project = ''; Message = '' }
-            }
-            if (-not $found[$key].Message -and $text -match '(?i)error|fail|timed? ?out|cancel|exit code') { $found[$key].Message = $text }
+    # the log names, so the spell does not stay open unfiled (AF-0171). That holds for every
+    # failed job, not only when the whole run names nothing: a Linux test failure beside a
+    # failed Quality-gates job left the quality failure unfiled for 301 minutes (AF-0150).
+    $namedJobs = @{}
+    foreach ($item in $found.Values) {
+        foreach ($platform in $item.Platforms) { $namedJobs[$platform] = $true }
+    }
+    foreach ($raw in $Log) {
+        $parts = "$raw" -split "`t", 3
+        if ($parts.Count -lt 3 -or -not $parts[0].Trim() -or $parts[0] -eq 'UNKNOWN STEP') { continue }
+        if ($namedJobs.ContainsKey((Get-CiPlatform $parts[0].Trim()))) { continue }
+        $key = "job $($parts[0].Trim()) step $($parts[1].Trim())"
+        $text = ($parts[2] -replace '^\d{4}-\d\d-\d\dT[\d:.]+Z ?', '').Trim()
+        if (-not $found.Contains($key)) {
+            $found[$key] = [pscustomobject]@{ Key = $key; Kind = 'job'; Platforms = @(Get-CiPlatform $parts[0].Trim()); Project = ''; Message = '' }
         }
+        if (-not $found[$key].Message -and $text -match '(?i)error|fail|timed? ?out|cancel|exit code') { $found[$key].Message = $text }
     }
     return @($found.Values)
 }
@@ -3172,6 +3177,12 @@ if ($TestCiWatch) {
     $nameless = @(Get-CiFailures @("${ubuntu}2026-09-30T05:05:00.0000000Z ##[error]Process completed with exit code 1."))
     & $check 'a failure naming no test is filed by its job and step (AF-0171)' 'job Build and test (ubuntu-latest) step Fast tests|job|Linux|##[error]Process completed with exit code 1.' `
         "$($nameless[0].Key)|$($nameless[0].Kind)|$($nameless[0].Platforms -join '+')|$($nameless[0].Message)"
+    $mixed = @(Get-CiFailures @(
+        "${ubuntu}2026-10-11T22:12:00.0000000Z   Failed test303 [5 ms]"
+        "${ubuntu}2026-10-11T22:12:01.0000000Z Failed!  - Failed:     1, Passed:     9 - Curl.Cli.UnitTests.dll (net10.0)"
+        "quality${t}Measure code quality${t}2026-10-11T22:13:00.0000000Z ##[error]Process completed with exit code 1."))
+    & $check 'a red job beside a named test failure is filed too (AF-0150)' 'test303|test; job quality step Measure code quality|job' `
+        (($mixed | ForEach-Object { "$($_.Key)|$($_.Kind)" }) -join '; ')
     & $check 'an empty log names no failure' '0' "$(@(Get-CiFailures @()).Count)"
     $traced.Clear()
     $script:ciListJson = $null
