@@ -42,6 +42,8 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Proto
 
 ## Re-audits
 
+- 2026-10-12 | 2026-10-12_1653.md | reproduces: no | Ran Invoke-MutationTest.ps1 -Site Curl.Protocol.Http.UnitLibrary/HttpProtocolHandler.cs:1473:< -Member ReportUploadRewind -ExcludeBaselineFailures -TimeoutSeconds 120: the site moved and resolved to line 1491 in ReportUploadRewind, '&& statusLine.StatusCode is >= 300 and < 400' -> '<= 400', outcome killed (7829 ms). The baseline excluded the same 21 failing tests.
+
 ## Log
 
 - 2026-10-11: filed proposed.

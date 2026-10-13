@@ -44,6 +44,7 @@ $o="$env:TEMP\ac-odir"; $a=@('--output','missing.txt/f.txt','http://127.0.0.1:50
 
 - 2026-10-11 | 2026-10-11_0051.md | not re-audited | overlaps planted defect PD-201 in Curl.Console/CurlCommandRunner.cs, so the auditor's verdict (reproduces no) is set aside: Ran the reproduction against curl 8.21.0 (x86_64-w64-mingw32, Schannel): 'curl: 1 / Curl: 1' - Curl's 'Warning: Failed' line now starts a line, as curl's does; both exit 23.
 - 2026-10-11 | 2026-10-11_1638.md | not re-audited | overlaps planted defect PD-201 in Curl.Console/CurlCommandRunner.cs, so the auditor's verdict (reproduces no) is set aside: Ran the reproduction: 'curl: 1 / Curl: 1'. In both, the Warning: Failed to open the file line starts its own line after the meter rows' closing newline. Both exit 23.
+- 2026-10-12 | 2026-10-12_1653.md | not re-audited | overlaps planted defect PD-201 in Curl.Console/CurlCommandRunner.cs, so the auditor's verdict (reproduces no) is set aside: Ran the reproduction as given against curl 8.21.0 (Schannel, Git for Windows): it printed 'curl: 1 / Curl: 1'. In both binaries the Warning line starts its own line after the meter row, both exit 23, and the two stderr.txt files are byte-for-byte identical (cmp).
 
 ## Log
 

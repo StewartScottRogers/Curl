@@ -3,8 +3,8 @@ id: AF-0172
 title: BL-2043 cost $3.66, 5.2 times the $0.70 median task cost: 75 turns and a rebase-conflict run
 auditor: process
 severity: Low
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-12_1653.md: the reproduction no longer reproduces.
 key: process:BL-2043:BL-2043:cost-outlier
 reproduction: none
 task: BL-2107
@@ -13,9 +13,9 @@ found: 2026-10-11
 found-at: d8245edb7b661211c6628e9062e9939934939fb2
 scorecard: 2026-10-11_1638.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-12
+closed-how: reliable-reaudit
+closed-by: 2026-10-12_1653.md
 ---
 # AF-0172 - BL-2043 cost $3.66, 5.2 times the $0.70 median task cost: 75 turns and a rebase-conflict run
 
@@ -42,7 +42,10 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-10-12 | 2026-10-12_1653.md | reproduces: no | The original reproduction still lists BL-2043 at $3.66 against a $0.71 median in the old window. In this window (14 tasks done), the median task costs $0.978 and the costliest is BL-2087 at $1.63 (1.67 times), followed by BL-2105 $1.63, BL-2115 $1.46, BL-2114 $1.13 and BL-2116 $1.11. No task exceeds 3 times the median.
+
 ## Log
 
 - 2026-10-11: filed proposed.
 - 2026-10-11: proposed -> accepted.
+- 2026-10-12: accepted -> closed. Re-audit 2026-10-12_1653.md: the reproduction no longer reproduces.

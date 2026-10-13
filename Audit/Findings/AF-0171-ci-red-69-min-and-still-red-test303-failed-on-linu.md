@@ -42,6 +42,8 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-10-12 | 2026-10-12_1653.md | reproduces: yes | The original reproduction still shows the old spell (69 min, stillRed true). Over this window, the spell's end can now be measured: 301.1 min, ending 2026-10-12T03:13:39Z. The same cause appears in this window's logs. At 04:45:53-04:46:01, logs/DarkFactory-20261012-044428.log records four failed runs (38190842002, 38184717609, 38183634772, 38182483664) as 'its log names no failing test or build error; nothing to file'. They were Quality-gates failures. An interactive session fixed them through BL-2100 about 3.5 h after the first. BL-2106 (98e18e27, 04:49 local) changed the CI watch after that, and no later failure in the window has tested it yet.
+
 ## Log
 
 - 2026-10-11: filed proposed.

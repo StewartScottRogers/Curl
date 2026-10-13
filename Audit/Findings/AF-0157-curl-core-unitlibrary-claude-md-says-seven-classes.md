@@ -43,6 +43,7 @@ Run from the repository root:
 ## Re-audits
 
 - 2026-10-11 | 2026-10-11_1638.md | not re-audited | overlaps planted defect PD-201 in Curl.Console/CurlCommandRunner.cs, so the auditor's verdict (reproduces no) is set aside: Ran the reproduction: (Select-String Curl.Core.UnitLibrary/CLAUDE.md 'not yet wired').Count is 0. The wiring patterns are found in CurlCommandRunner.cs, CurlComposition.cs and TransferDispatch.cs, and the CLAUDE.md now says Curl.Console constructs or calls each class and that --ipfs-gateway is parsed by Curl.Cli.UnitLibrary's option table.
+- 2026-10-12 | 2026-10-12_1653.md | not re-audited | overlaps planted defect PD-201 in Curl.Console/CurlCommandRunner.cs, so the auditor's verdict (reproduces no) is set aside: Ran the reproduction. (Select-String -Path Curl.Core.UnitLibrary/CLAUDE.md -Pattern 'not yet wired').Count is 0, and the wiring patterns match in CurlCommandRunner.cs, CurlComposition.cs and TransferDispatch.cs. Curl.Core.UnitLibrary/CLAUDE.md:131-132 now says 'Curl.Console uses it for ipfs:// and ipns:// URLs, and --ipfs-gateway is parsed by Curl.Cli.UnitLibrary's option table'.
 
 ## Log
 
