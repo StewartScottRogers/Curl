@@ -32,3 +32,4 @@ The second of the three fixes Stewart chose on 2026-10-13 instead of converting 
 ## Log
 
 - 2026-10-13: Created.
+- 2026-10-13: Backlog -> Doing.
