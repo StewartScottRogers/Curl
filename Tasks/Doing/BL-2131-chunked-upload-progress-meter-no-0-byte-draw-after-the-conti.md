@@ -39,3 +39,4 @@ Measure real curl with `Record-CurlExchange.ps1` before pinning any figures.
 ## Log
 
 - 2026-10-13: Created.
+- 2026-10-13: Backlog -> Doing.
