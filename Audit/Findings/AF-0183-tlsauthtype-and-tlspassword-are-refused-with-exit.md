@@ -3,8 +3,8 @@ id: AF-0183
 title: --tlsauthtype and --tlspassword are refused with exit 2; the reference curl warns they are deprecated and exits 0
 auditor: conformance
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: conformance:--tlsauthtype:refused-on-schannel:refused-option
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ foreach($a in @(@('--tlsauthtype','1','http://127.0.0.1:50961/'),@('--tlspasswor
 ## Log
 
 - 2026-10-13: filed proposed.
+- 2026-10-13: proposed -> accepted.
