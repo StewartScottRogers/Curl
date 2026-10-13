@@ -56,3 +56,4 @@ reason. Stewart decided this in chat on 2026-10-13.
 ## Log
 
 - 2026-10-13: Created.
+- 2026-10-13: Backlog -> Doing. interactive session
