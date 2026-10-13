@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: security:Curl.Tls.UnitLibrary/SrpClient.cs:SrpClient.ComputePremasterSecret:secret-dependent-branch
 reproduction: none
-task: none
-tasks:
+task: BL-2141
+tasks: BL-2141
 found: 2026-10-13
 found-at: c86d04eeb8477108eb6d9195bb036a4ddaecc5fc
 scorecard: 2026-10-13_0925.md

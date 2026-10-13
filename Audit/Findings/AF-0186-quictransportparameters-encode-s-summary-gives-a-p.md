@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: truthfulness:Curl.Quic.UnitLibrary/QuicTransportParameters.cs:Encode:false-doc-comment
 reproduction: none
-task: none
-tasks:
+task: BL-2145
+tasks: BL-2145
 found: 2026-10-13
 found-at: c86d04eeb8477108eb6d9195bb036a4ddaecc5fc
 scorecard: 2026-10-13_0925.md
