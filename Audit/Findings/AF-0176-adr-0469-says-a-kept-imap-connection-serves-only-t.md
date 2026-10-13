@@ -42,6 +42,8 @@ Run from the repository root:
 
 ## Re-audits
 
+- 2026-10-13 | 2026-10-13_0925.md | reproduces: no | Ran the reproduction: 'same user, password, login options' count in ADR-0469 = 0; 'LoginOptions' count in ImapKeptConnection.cs = 0. ADR-0469 decision 2 (lines 25-27) now says 'A kept connection serves only the same user, password and --ssl level; the login options (;AUTH= or --login-options) are not part of that key'. That matches ImapKeptConnection.LoginKeyOf and Serves (line 63, key == loginKey).
+
 ## Log
 
 - 2026-10-12: filed proposed.

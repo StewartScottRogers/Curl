@@ -1,0 +1,47 @@
+---
+id: AF-0187
+title: Documentation/README.md says Product/ and Planning/ are unfilled scaffolds and ADR-0001 is the only decision; there are 474 ADRs and 107 requirements
+auditor: truthfulness
+severity: Medium
+status: proposed
+reason:
+key: truthfulness:Documentation/README.md:Status-of-these-documents:false-statement
+reproduction: none
+task: none
+tasks:
+found: 2026-10-13
+found-at: c86d04eeb8477108eb6d9195bb036a4ddaecc5fc
+scorecard: 2026-10-13_0925.md
+duplicate-of:
+closed:
+closed-how:
+closed-by:
+---
+# AF-0187 - Documentation/README.md says Product/ and Planning/ are unfilled scaffolds and ADR-0001 is the only decision; there are 474 ADRs and 107 requirements
+
+## Summary
+
+Medium finding from the truthfulness auditor at `Documentation/README.md:25`: Documentation/README.md says Product/ and Planning/ are unfilled scaffolds and ADR-0001 is the only decision; there are 474 ADRs and 107 requirements. Reported by an auditor flagged unreliable in 2026-10-13_0925.md.
+
+## Evidence
+
+Location: `Documentation/README.md:25`
+
+Lines 25-31: 'The files under Product/ and Planning/ are **scaffolds**: correct structure, headings and prompts, but the product-specific content is not filled in. ... deliberately contain no invented requirements, dates or scope. ... Planning/Decisions/ADR-0001 is the exception - it records an actual decision and is complete.' In fact Documentation/Planning/Decisions holds 474 ADR-*.md files, almost all Accepted. Documentation/Product/Requirements.md has 107 FR rows that name built behaviour and the tests that show it (e.g. FR-061, FR-093), and only one TODO left (NFR-001, line 361). The file was last changed by commit e41a1d73d and was never updated as the documents filled in. An agent reading it would think the requirements and decisions are empty and could ignore them.
+
+## Reproduction
+
+Run from the repository root:
+
+```powershell
+"$((Select-String -Path Documentation/README.md -Pattern 'ADR-0001. is the exception').Count);$((Get-ChildItem Documentation/Planning/Decisions -Filter 'ADR-*.md').Count);$((Select-String -Path Documentation/Product/Requirements.md -Pattern '^\| FR-').Count)"
+```
+
+- Expected: 0;<n>;<m>: the README no longer claims ADR-0001 is the only decision, and describes the filled-in documents.
+- Actual: 1;474;107
+
+## Re-audits
+
+## Log
+
+- 2026-10-13: filed proposed.
