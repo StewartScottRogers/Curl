@@ -46,6 +46,14 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Notes
 
+- 2026-10-13 (Claude): AF-0174 is most likely the audit's own planted defect, not a real one.
+  Audit 20261012-165355's manifest (`Z:\repos\Curl.audit\20261012-165355\manifest.json`)
+  lists PD-102 at `Curl.Protocol.Http.UnitLibrary/HttpAuthUsingLines.cs:28`. It made the
+  verbose "auth using" line append the password, which the 21 failing tests catch. CI was
+  green on the audited commit 4e6ddbc5b (run 38324482077). Check that the real tree's
+  `HttpAuthUsingLines.AuthUsing` writes no password and that those 21 tests pass. If both
+  hold, there is nothing to fix: record that in the Log and finish the task.
+
 ## Log
 
 - 2026-10-13: Created.
