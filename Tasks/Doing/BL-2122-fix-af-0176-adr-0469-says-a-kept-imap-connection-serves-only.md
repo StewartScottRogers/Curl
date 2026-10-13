@@ -46,6 +46,8 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 
 ## Notes
 
+- ADR-0469 decision 2 now lists only user, password and `--ssl` level in the reuse key and says why login options are left out (upstream test1982, BL-2089). Markdown-only change; no code touched, so build and tests are unaffected.
+
 ## Log
 
 - 2026-10-13: Created.
