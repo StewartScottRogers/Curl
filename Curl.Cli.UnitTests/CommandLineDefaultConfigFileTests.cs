@@ -371,6 +371,31 @@ public sealed class CommandLineDefaultConfigFileTests
         Assert.IsFalse(result.Refusal!.FoundAtTransferSetup);
     }
 
+    [TestMethod]
+    public void Parse_DefaultConfigFileWithALineTooLongToRead_PrintsCannotReadConfigAndReadsTheCommandLine()
+    {
+        // GF-0069, curl 8.21.0 on 2026-10-12: a .curlrc comment line one byte over 10 MiB, then
+        // write-out = gap-config-hit, printed only curl: cannot read config from '<file>' (wrapped), exit 0.
+        CommandLineParseResult result = Parse([Url], "#" + new string('a', 10485760) + "\nwrite-out = gap-config-hit\n");
+
+        string message = string.Concat(result.WarningLines.Select(line => line["curl: ".Length..]));
+        TestDiagnostics.For(TestContext).Assert("warning lines joined", $"cannot read config from '{Curlrc}'", message);
+        Assert.IsTrue(result.IsAccepted);
+        Assert.AreEqual($"cannot read config from '{Curlrc}'", message);
+        Assert.IsNull(result.Options.WriteOut);
+        Assert.IsNull(result.Options.DefaultConfigFile);
+    }
+
+    [TestMethod]
+    public void Parse_DefaultConfigFileWithSilentBeforeALineTooLongToRead_HidesTheMessage()
+    {
+        CommandLineParseResult result = Parse([Url], "silent\n#" + new string('a', 10485760) + "\n");
+
+        AssertWarningLines([], result);
+        Assert.IsTrue(result.IsAccepted);
+        Assert.IsEmpty(result.WarningLines);
+    }
+
     private CommandLineParseResult Parse(IReadOnlyList<string> arguments, string? curlrc)
     {
         RecordingDataFileReader reader = new();

@@ -30,10 +30,49 @@ namespace Curl.Cli;
 /// It is probably a mistake. Consider double quotes.</c> and keeps the quote. An empty unquoted
 /// parameter is no parameter.</item>
 /// </list>
-/// Not modelled: a NUL byte ending a line early, and the 10 MiB line limit.
+/// Not modelled: a NUL byte ending a line early. The 10 MiB line limit is <see cref="ReadableLength"/>.
 /// </remarks>
 internal static class ConfigFileSyntax
 {
+    /// <summary>
+    /// The shortest line, counting its LF, curl 8.21.0 cannot read: its line buffer holds 10 MiB
+    /// (10485760 bytes) with the line's terminating NUL. Measured with the local curl 8.21.0 on
+    /// 2026-10-12: a comment line of 10485758 bytes and its LF is read, one of 10485759 and its LF
+    /// is not, and a last line of 10485759 bytes with no LF is read; a CR before the LF is not counted.
+    /// </summary>
+    internal const int UnreadableLineLength = 10 * 1024 * 1024;
+
+    /// <summary>
+    /// How many of <paramref name="contents"/>'s bytes curl reads before a line it cannot read: all of
+    /// them, or the bytes before the first line of <see cref="UnreadableLineLength"/> or more.
+    /// </summary>
+    /// <param name="contents">The file's bytes.</param>
+    /// <returns>The length of the readable start of <paramref name="contents"/>.</returns>
+    internal static int ReadableLength(byte[] contents)
+    {
+        int lineStart = 0;
+        while (lineStart < contents.Length)
+        {
+            int lineFeed = Array.IndexOf(contents, (byte)'\n', lineStart);
+            int lineEnd = lineFeed < 0 ? contents.Length : lineFeed + 1;
+            if (CountedLineLength(contents, lineStart, lineEnd) >= UnreadableLineLength)
+            {
+                return lineStart;
+            }
+
+            lineStart = lineEnd;
+        }
+
+        return contents.Length;
+    }
+
+    /// <summary>The line's length as curl's buffer counts it: a CR LF is read as one LF.</summary>
+    private static int CountedLineLength(byte[] contents, int lineStart, int lineEnd)
+    {
+        bool endsInCarriageReturnLineFeed = lineEnd - lineStart >= 2 && contents[lineEnd - 1] == '\n' && contents[lineEnd - 2] == '\r';
+        return lineEnd - lineStart - (endsInCarriageReturnLineFeed ? 1 : 0);
+    }
+
     /// <summary>The characters C's <c>isspace</c> accepts, which end an unquoted parameter.</summary>
     private static readonly SearchValues<char> WhiteSpace = SearchValues.Create(" \t\n\v\f\r");
 

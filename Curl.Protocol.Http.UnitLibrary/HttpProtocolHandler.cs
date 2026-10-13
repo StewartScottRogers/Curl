@@ -659,7 +659,7 @@ public sealed class HttpProtocolHandler(
 
         plan.OpenedConnection = true;
         plan.TakeServerCertificateFrom(connect);
-        plan.Progress.ReportTransferStarted();
+        ReportRequestStarted(plan, earlier);
 
         HttpAttemptOutcome outcome;
         await using (connection.ConfigureAwait(false))
@@ -676,6 +676,23 @@ public sealed class HttpProtocolHandler(
         return outcome.Retry is { } reconnect
             ? await ConnectAndExchangeAsync(reconnect, outcome.Result.Report).ConfigureAwait(false)
             : outcome.Result;
+    }
+
+    /// <summary>
+    /// Reports the progress of a request now connected: the transfer started for the first, and a
+    /// retried request starting for one a response asked for (<paramref name="earlier" /> set),
+    /// which curl 8.21.0 draws on a new progress-meter line (BL-2087).
+    /// </summary>
+    private static void ReportRequestStarted(HttpRequestPlan plan, TransferReport? earlier)
+    {
+        if (earlier is null)
+        {
+            plan.Progress.ReportTransferStarted();
+        }
+        else
+        {
+            plan.Progress.ReportRequestRetried();
+        }
     }
 
     /// <summary>
@@ -976,6 +993,7 @@ public sealed class HttpProtocolHandler(
         while (RetryOnSameConnection(outcome, connection) is { } retry)
         {
             ReportRetryOnSameConnection(retry, connect);
+            retry.Progress.ReportRequestRetried();
             HttpRequestPlan next = streams is null ? retry : retry.ForHttp2OrHttp3();
             outcome = await ExchangeAsync(next, connect, connection, outcome.Result.Report, newConnection: false, streams).ConfigureAwait(false);
         }

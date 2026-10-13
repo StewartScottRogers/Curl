@@ -420,9 +420,22 @@ public sealed class CommandLineRefusal
     internal static CommandLineRefusal ConfigFileUnreadable(string spelledOption, string file, bool errorsHidden, int terminalColumns) =>
         new(
             CurlExitCode.ReadError,
-            errorsHidden ? [] : WrappedMessage.Lines("curl: ", CannotReadConfigMessage(file), terminalColumns),
+            ConfigFileUnreadableLines(file, errorsHidden, terminalColumns),
             spelledOption,
             ReadErrorReason);
+
+    /// <summary>
+    /// The lines <c>curl: cannot read config from '&lt;file&gt;'</c>, wrapped at <paramref name="terminalColumns"/>
+    /// as curl wraps them, or none when <paramref name="errorsHidden"/>. curl 8.21.0 prints them alone, and
+    /// goes on with the command line, when the default config file has a line too long to read
+    /// (<see cref="ConfigFileSyntax.UnreadableLineLength"/>, GF-0069).
+    /// </summary>
+    /// <param name="file">The file name as given.</param>
+    /// <param name="errorsHidden"><see langword="true"/> when <c>-s</c> without <c>-S</c> is in effect.</param>
+    /// <param name="terminalColumns">The width the message wraps at: <see cref="WrappedMessage.TerminalColumns"/> of the parse's <c>COLUMNS</c>.</param>
+    /// <returns>The lines, without terminators.</returns>
+    internal static IReadOnlyList<string> ConfigFileUnreadableLines(string file, bool errorsHidden, int terminalColumns) =>
+        errorsHidden ? [] : WrappedMessage.Lines("curl: ", CannotReadConfigMessage(file), terminalColumns);
 
     /// <summary>
     /// Refuses a <c>-K</c> / <c>--config</c> read while <see cref="MaximumConfigFileDepth"/> files are

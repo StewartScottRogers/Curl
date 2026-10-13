@@ -67,6 +67,53 @@ public sealed class CurlCommandRunnerNetrcTests
     }
 
     [TestMethod]
+    [DataRow(true)]
+    [DataRow(false)]
+    public async Task RunAsync_NetrcVariableNamesAFile_ReadsOnlyThatFile(bool runsOnWindows)
+    {
+        // NETRC=<dir>/gap-netrc, curl -s --netrc <url>: exit 0, GET / with nu:np (GF-0068, BL-2114).
+        environment["NETRC"] = "gap-netrc";
+        dataFiles.Files["gap-netrc"] = Encoding.UTF8.GetBytes(Entry);
+
+        int exitCode = await RunAsync(["-s", "--netrc", Url], runsOnWindows);
+
+        string[] expectedPathsRead = ["gap-netrc"];
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("paths read", Joined(expectedPathsRead), Joined(dataFiles.PathsRead));
+        Assert.AreEqual(0, exitCode);
+        AssertSent("nu", "np");
+        Assert.AreEqual(string.Empty, StandardErrorText);
+        CollectionAssert.AreEqual(expectedPathsRead, dataFiles.PathsRead);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_NetrcFileOptionAndNetrcVariable_ReadsTheOptionsFile()
+    {
+        // "." exists on every platform, so the parser's existence check passes.
+        environment["NETRC"] = "gap-netrc";
+        dataFiles.Files["."] = Encoding.UTF8.GetBytes(Entry);
+        dataFiles.Files["gap-netrc"] = Encoding.UTF8.GetBytes("machine 127.0.0.1 login other password other\n");
+
+        await RunAsync(["-s", "--netrc-file", ".", Url], runsOnWindows: false);
+
+        string[] expectedPathsRead = ["."];
+        Diagnostics.Assert("paths read", Joined(expectedPathsRead), Joined(dataFiles.PathsRead));
+        AssertSent("nu", "np");
+        CollectionAssert.AreEqual(expectedPathsRead, dataFiles.PathsRead);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_EmptyNetrcVariable_LooksInTheHomeDirectory()
+    {
+        environment["NETRC"] = string.Empty;
+        dataFiles.Files["home/.netrc"] = Encoding.UTF8.GetBytes(Entry);
+
+        await RunAsync(["-s", "-n", Url], runsOnWindows: false);
+
+        AssertSent("nu", "np");
+    }
+
+    [TestMethod]
     public async Task RunAsync_BothNetrcNamesOnWindows_ReadsDotNetrcFirst()
     {
         // HOME holding .netrc (login dot) and _netrc (login under): Basic ZG90OmRw (dot:dp).
