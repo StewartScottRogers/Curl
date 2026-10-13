@@ -3,8 +3,8 @@ id: AF-0184
 title: --proto or --proto-redir naming an unknown scheme only warns and runs (exit 0); the reference curl refuses it as badly used (exit 2)
 auditor: conformance
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: conformance:--proto:unrecognized-protocol:exit-code
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ $a=@('--proto-redir','x','http://127.0.0.1:50961/'); foreach($p in @(@('curl','C
 ## Log
 
 - 2026-10-13: filed proposed.
+- 2026-10-13: proposed -> accepted.
