@@ -12,8 +12,8 @@ closed:
 regression: true
 items: [behaviour:test838, behaviour:test840, behaviour:test884, behaviour:test886, behaviour:test943, behaviour:test945]
 touches: [Curl.Authentication.UnitLibrary, Curl.Authentication.UnitTests, Curl.Protocol.Imap.UnitLibrary, Curl.Protocol.Imap.UnitTests, Curl.Protocol.Pop3.UnitLibrary, Curl.Protocol.Pop3.UnitTests, Curl.Protocol.Smtp.UnitLibrary, Curl.Protocol.Smtp.UnitTests]
-task: BL-1989
-tasks: [BL-1989]
+task: BL-2161
+tasks: [BL-1989, BL-2161]
 ---
 # GF-0059 - ;AUTH=EXTERNAL with no user name skips SASL; curl sends AUTH EXTERNAL with an empty (=) response
 
@@ -44,3 +44,4 @@ In Curl.Authentication.UnitLibrary's SaslAuthenticator/SaslMechanismRanking and 
 - 2026-10-10_0756: Filed BL-1989.
 - 2026-10-11_0936: Closed: run 2026-10-11_0936 measured every item as match or excluded.
 - 2026-10-13_1406: Reopened as a regression: run 2026-10-13_1406 measured behaviour:test838, behaviour:test884, behaviour:test943 as gap again.
+- 2026-10-13_1457: Filed BL-2161.

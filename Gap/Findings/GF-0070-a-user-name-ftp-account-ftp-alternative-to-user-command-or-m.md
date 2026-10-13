@@ -12,8 +12,8 @@ closed:
 regression: false
 items: [behaviour:test2110, behaviour:test2114, behaviour:test2115, behaviour:test2116]
 touches: [Curl.Protocol.Ftp.UnitLibrary, Curl.Protocol.Ftp.UnitTests, Curl.Protocol.Smtp.UnitLibrary, Curl.Protocol.Smtp.UnitTests]
-task:
-tasks: []
+task: BL-2162
+tasks: [BL-2162]
 ---
 # GF-0070 - A user name, FTP account, --ftp-alternative-to-user command or --mail-from address holding CR LF is sent to the server instead of failing with exit 43
 
@@ -36,3 +36,4 @@ Reject a CR or LF in any value Curl writes into a protocol command line with exi
 ## Log
 
 - 2026-10-13_1406: Opened by gap-behaviour.
+- 2026-10-13_1457: Filed BL-2162.

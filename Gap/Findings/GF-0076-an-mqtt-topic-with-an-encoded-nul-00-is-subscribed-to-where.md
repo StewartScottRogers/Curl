@@ -12,8 +12,8 @@ closed:
 regression: false
 items: [behaviour:test2109]
 touches: [Curl.Protocol.Mqtt.UnitLibrary, Curl.Protocol.Mqtt.UnitTests]
-task:
-tasks: []
+task: BL-2168
+tasks: [BL-2168]
 ---
 # GF-0076 - An MQTT topic with an encoded NUL (%00) is subscribed to, where curl fails with exit 3 before SUBSCRIBE
 
@@ -36,3 +36,4 @@ In Curl.Protocol.Mqtt.UnitLibrary, make MqttTopic.Decode (or MqttSession before 
 ## Log
 
 - 2026-10-13_1406: Opened by gap-behaviour.
+- 2026-10-13_1457: Filed BL-2168.

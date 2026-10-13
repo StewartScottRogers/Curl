@@ -12,8 +12,8 @@ closed:
 regression: false
 items: [behaviour:test675, behaviour:test1498]
 touches: [Curl.Console, Curl.Console.UnitTests]
-task:
-tasks: []
+task: BL-2170
+tasks: [BL-2170]
 ---
 # GF-0078 - The progress meter on stderr ends its lines differently from the reference curl (an extra restarted line for a second URL, a final line feed after -T .)
 
@@ -36,3 +36,4 @@ In Curl.Console (ProgressMeterLines and the meter's line endings), match the ref
 ## Log
 
 - 2026-10-13_1406: Opened by gap-behaviour.
+- 2026-10-13_1457: Filed BL-2170.

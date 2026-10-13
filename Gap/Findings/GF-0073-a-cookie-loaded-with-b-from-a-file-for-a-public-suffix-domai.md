@@ -12,8 +12,8 @@ closed:
 regression: false
 items: [behaviour:test409]
 touches: [Curl.Cookies.UnitLibrary, Curl.Cookies.UnitTests]
-task:
-tasks: []
+task: BL-2165
+tasks: [BL-2165]
 ---
 # GF-0073 - A cookie loaded with -b from a file for a public suffix domain (.co.uk) is sent, where curl drops it
 
@@ -36,3 +36,4 @@ In Curl.Cookies.UnitLibrary, apply the Public Suffix List to cookies loaded from
 ## Log
 
 - 2026-10-13_1406: Opened by gap-behaviour.
+- 2026-10-13_1457: Filed BL-2165.

@@ -12,8 +12,8 @@ closed:
 regression: false
 items: [behaviour:test3203]
 touches: [Curl.Protocol.File.UnitLibrary, Curl.Protocol.File.UnitTests]
-task:
-tasks: []
+task: BL-2166
+tasks: [BL-2166]
 ---
 # GF-0074 - A file:// URL naming a directory lists nothing on Windows, where curl 8.22.0 writes its entry names
 
@@ -36,3 +36,4 @@ In Curl.Protocol.File.UnitLibrary, list directories on Windows as curl 8.22.0 do
 ## Log
 
 - 2026-10-13_1406: Opened by gap-behaviour.
+- 2026-10-13_1457: Filed BL-2166.

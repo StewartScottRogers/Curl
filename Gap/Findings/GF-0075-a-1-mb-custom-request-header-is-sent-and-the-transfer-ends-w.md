@@ -12,8 +12,8 @@ closed:
 regression: false
 items: [behaviour:test3229]
 touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests]
-task:
-tasks: []
+task: BL-2167
+tasks: [BL-2167]
 ---
 # GF-0075 - A 1 MB custom request header is sent and the transfer ends with exit 52, where curl refuses it with exit 100
 
@@ -36,3 +36,4 @@ In Curl.Protocol.Http.UnitLibrary, cap the request head as curl 8.22.0's request
 ## Log
 
 - 2026-10-13_1406: Opened by gap-behaviour.
+- 2026-10-13_1457: Filed BL-2167.

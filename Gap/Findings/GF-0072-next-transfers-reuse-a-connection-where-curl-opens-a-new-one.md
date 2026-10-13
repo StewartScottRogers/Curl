@@ -12,8 +12,8 @@ closed:
 regression: false
 items: [behaviour:test2051, behaviour:test3225]
 touches: [Curl.Console, Curl.Console.UnitTests, Curl.Networking.UnitLibrary, Curl.Networking.UnitTests]
-task:
-tasks: []
+task: BL-2164
+tasks: [BL-2164]
 ---
 # GF-0072 - --next transfers reuse a connection where curl opens a new one (another host name at the same --resolve address) and open one where curl reuses (only --connect-to differs)
 
@@ -36,3 +36,4 @@ Align the connection match with curl 8.22.0's. In Curl.Console's OptionGroupConn
 ## Log
 
 - 2026-10-13_1406: Opened by gap-behaviour.
+- 2026-10-13_1457: Filed BL-2164.

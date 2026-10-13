@@ -12,8 +12,8 @@ closed:
 regression: false
 items: [behaviour:test2113]
 touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests]
-task:
-tasks: []
+task: BL-2163
+tasks: [BL-2163]
 ---
 # GF-0071 - A custom 'Authorization : value' header (white space before the colon) is still sent after -L redirects to another host
 
@@ -36,3 +36,4 @@ In Curl.Protocol.Http.UnitLibrary, make HttpCustomHeader.Names compare the heade
 ## Log
 
 - 2026-10-13_1406: Opened by gap-behaviour.
+- 2026-10-13_1457: Filed BL-2163.

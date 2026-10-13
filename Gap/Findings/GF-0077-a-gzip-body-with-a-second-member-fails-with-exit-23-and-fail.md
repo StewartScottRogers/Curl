@@ -12,8 +12,8 @@ closed:
 regression: false
 items: [behaviour:test2305]
 touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests]
-task:
-tasks: []
+task: BL-2169
+tasks: [BL-2169]
 ---
 # GF-0077 - A gzip body with a second member fails with exit 23 and 'Failed writing received data to disk/application' where curl says 'Multi-member gzip response not supported'
 
@@ -36,3 +36,4 @@ In Curl.Protocol.Http.UnitLibrary, when HttpContentCodingDecoder finds a second 
 ## Log
 
 - 2026-10-13_1406: Opened by gap-behaviour.
+- 2026-10-13_1457: Filed BL-2169.
