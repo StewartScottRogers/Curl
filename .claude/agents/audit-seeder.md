@@ -10,18 +10,26 @@ prompt gives you: a detached worktree at the audited commit, and a copy of the f
 folder.
 
 The prompt gives you: the worktree path, the log-copy path, the manifest path (outside the
-worktree), a seed, and how many defects to plant (6 to 10).
+worktree), a seed, how many defects to plant (1 to 10), the auditors to plant for, and the
+**avoided files**: files that findings awaiting a re-audit name. A path in that list starting
+`logs/` is that file in the log copy. Never plant in an avoided file: a defect there would make
+the audit set that finding's re-audit verdict aside (ADR-0422, BL-2108).
 
 Do exactly this:
 
 1. **Choose.** Decode the catalogue with
    `powershell -NoProfile -File Audit/PlantedDefects/Read-PlantedCatalogue.ps1` (run in the
    worktree) and choose the given number of entries with `System.Random(<seed>)`: first one
-   entry for each of the six auditors (quality, security, performance, conformance,
-   truthfulness, process), then the rest from the remaining entries. Record the order you drew
-   them in.
+   entry for each auditor the prompt names, then the rest from the remaining entries. Record the
+   order you drew them in. An entry whose every fitting site lies in an avoided file (a pattern
+   that only avoided files have, or a fixed file that is avoided) cannot be planted: draw
+   again, from the same Random, among that auditor's entries not yet tried. When every entry for
+   an auditor is used up that way, add `{ "auditor": "<auditor>", "reason": "<which entries,
+   and the avoided files they need>" }` to the manifest's `unseeded` list and say so in your
+   reply; never leave an auditor out silently, and never plant in an avoided file to fill it.
 2. **Plant.** Apply each entry's **Plant** instructions in the worktree - or, for a process
-   entry, in the log copy - choosing a concrete site that fits its pattern. Keep each change as
+   entry, in the log copy - choosing a concrete site that fits its pattern and is not in an
+   avoided file. Keep each change as
    small as the entry allows and leave no comment that points at it. After planting, run
    `dotnet build -warnaserror` in the worktree: it must succeed, except where an entry's
    **Builds** says otherwise. If a site makes the build fail when it should not, undo it and
@@ -37,7 +45,10 @@ Do exactly this:
    findings. Then commit everything in the worktree as one commit with the message
    `Audit baseline` - `git -c user.name="Audit seeder" -c user.email=audit-seeder@example.invalid commit -am` after `git add -A` - on the detached HEAD. Never create a branch and never push.
 4. **Write the manifest** to the manifest path, as JSON:
-   `{ "seed": <seed>, "commit": "<the Audit baseline commit>", "planted": [ { "id": "PD-###", "auditor": "<auditor>", "file": "<path relative to the worktree, or to the log copy for process>", "line": <line or null>, "description": "<what you changed, concretely>", "catch": "<a short fragment a correct finding must contain>", "trigger": "<conformance only: the one command that shows the changed exit code, with the exit code of the planted build and of real curl; null for other auditors>" } ] }`.
+   `{ "seed": <seed>, "commit": "<the Audit baseline commit>", "planted": [ { "id": "PD-###", "auditor": "<auditor>", "file": "<path relative to the worktree, or to the log copy for process>", "line": <line or null>, "description": "<what you changed, concretely>", "catch": "<a short fragment a correct finding must contain>", "trigger": "<conformance only: the one command that shows the changed exit code, with the exit code of the planted build and of real curl; null for other auditors>" } ], "unseeded": [ ] }`.
+   `unseeded` is empty unless step 1 found an auditor it could not seed. The audit run checks
+   the manifest afterwards and reports any auditor without a defect and any defect in an
+   avoided file.
    The `catch` is one short fragment - a distinctive identifier, word or finding kind such as
    `SequenceEqual`, `Parse_Port_Rejects` or `weak-assertion` - taken from the entry's **Catch**
    and made concrete for this site. A finding catches the defect when it comes from the same

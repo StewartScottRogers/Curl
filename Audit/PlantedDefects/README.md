@@ -26,6 +26,10 @@ every audit path.
 The `audit-seeder` agent (`.claude/agents/audit-seeder.md`) decodes the catalogue, picks the
 defects for one audit with a seed - at least one per auditor - and plants them in a detached
 worktree at the audited commit (process defects go in a copy of the log folder, never the real
-one). It deletes `Audit/PlantedDefects/`, `Audit/Findings/` and `Audit/Scorecards/` from that
-worktree, commits it as `Audit baseline` on no branch, and writes a manifest of what it planted
-outside the worktree, where only the scorecard (BL-1017) reads it.
+one). It plants nothing in the files `RunAudit.ps1` tells it to avoid - those named by accepted
+findings whose tasks are all Done, which wait on a re-audit a plant there would set aside
+(BL-2108) - drawing another entry, or listing the auditor as `unseeded`, when an entry fits only
+such files. It deletes `Audit/PlantedDefects/`, `Audit/Findings/` and `Audit/Scorecards/` from
+that worktree, commits it as `Audit baseline` on no branch, and writes a manifest of what it
+planted outside the worktree, which only the audit runner's own steps read: `RunAudit.ps1`'s
+manifest check, `Write-AuditFindings.ps1` and `Write-AuditScorecard.ps1` (BL-1017).
