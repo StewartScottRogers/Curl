@@ -3,8 +3,8 @@ id: AF-0192
 title: BL-2127's run log ends mid-Bash with no result because the audit copied the logs 2.3 minutes into a live run
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: process:logs:BL-2127:unfinished-run
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Log
 
 - 2026-10-13: filed proposed.
+- 2026-10-13: proposed -> accepted.
