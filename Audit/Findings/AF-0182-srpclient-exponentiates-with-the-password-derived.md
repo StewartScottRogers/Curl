@@ -3,8 +3,8 @@ id: AF-0182
 title: SrpClient exponentiates with the password-derived x and private a through variable-time BigInteger.ModPow
 auditor: security
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: security:Curl.Tls.UnitLibrary/SrpClient.cs:SrpClient.ComputePremasterSecret:secret-dependent-branch
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Curl.Tls.UnitLibrary/SrpClient.cs -Pattern 'BigInteger\.ModP
 ## Log
 
 - 2026-10-13: filed proposed.
+- 2026-10-13: proposed -> accepted.
