@@ -3,12 +3,12 @@ id: AF-0178
 title: CI on work/dark-factory red 301.1 min (run 38178740830): test303 flake, then four Quality-gates failures the CI watch never filed
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: process:logs:run-38178740830:ci-red
 reproduction: none
-task: none
-tasks:
+task: BL-2124
+tasks: BL-2124
 found: 2026-10-12
 found-at: 4e6ddbc5b33356117bfec6778ba550ab61454a99
 scorecard: 2026-10-12_1653.md
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Log
 
 - 2026-10-12: filed proposed.
+- 2026-10-12: proposed -> accepted.
