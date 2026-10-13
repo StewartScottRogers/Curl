@@ -8,7 +8,7 @@ depends-on: []
 touches: [Documentation]
 requirement: none
 created: 2026-10-13
-completed:
+completed: 2026-10-12
 ---
 # BL-2122 — Fix AF-0176: ADR-0469 says a kept IMAP connection serves only the same login options; the reuse key leaves login options out
 
@@ -41,8 +41,8 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -52,3 +52,4 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 
 - 2026-10-13: Created.
 - 2026-10-12: Backlog -> Doing.
+- 2026-10-12: Doing -> Done. ADR-0469 decision 2 amended to match the reuse key
