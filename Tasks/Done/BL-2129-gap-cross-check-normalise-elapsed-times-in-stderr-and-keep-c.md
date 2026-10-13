@@ -9,7 +9,7 @@ touches: [Gap/Tools]
 lane: no
 requirement: none
 created: 2026-10-13
-completed:
+completed: 2026-10-13
 ---
 # BL-2129 — Gap cross-check: normalise elapsed times in stderr and keep connections alive as sws does
 
@@ -28,10 +28,10 @@ Gap paths are interactive only; lands through a pull request from a branch built
 
 ## Acceptance criteria
 
-- [ ] `Read-Recording` replaces `after <n> ms` and `after <n> milliseconds` in stderr with a fixed token before comparing, like the ephemeral port masking.
-- [ ] The cross-check's recordings keep a connection alive after a response unless the response says `Connection: close` or the case uses `swsclose`, using `Record-CurlExchange.ps1`'s HoldOpen and AnswerHeld parameters.
-- [ ] The script's self-test has a fixture for each rule and passes.
-- [ ] Re-running the cross-check on test1293 and test1075 against a current Release build gives agreement (no "stderr differs").
+- [x] `Read-Recording` replaces `after <n> ms` and `after <n> milliseconds` in stderr with a fixed token before comparing, like the ephemeral port masking.
+- [x] The cross-check's recordings keep a connection alive after a response unless the response says `Connection: close` or the case uses `swsclose`, using `Record-CurlExchange.ps1`'s HoldOpen and AnswerHeld parameters.
+- [x] The script's self-test has a fixture for each rule and passes.
+- [x] Re-running the cross-check on test1293 and test1075 against a current Release build gives agreement (no "stderr differs").
 
 ## Notes
 
@@ -39,3 +39,4 @@ Gap paths are interactive only; lands through a pull request from a branch built
 
 - 2026-10-13: Created.
 - 2026-10-13: Backlog -> Doing. interactive session
+- 2026-10-13: Doing -> Done. PR #130 merged: elapsed times masked, connections kept alive as sws does
