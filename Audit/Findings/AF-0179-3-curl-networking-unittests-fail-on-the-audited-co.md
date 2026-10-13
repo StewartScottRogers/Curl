@@ -3,8 +3,8 @@ id: AF-0179
 title: 3 Curl.Networking.UnitTests fail on the audited commit: TlsReader.Take has no bounds check, so a truncated ECHConfigList throws IndexOutOfRangeException
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Tls.UnitLibrary/TlsReader.cs:Take:failing-test
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ dotnet test Curl.Networking.UnitTests --filter "FullyQualifiedName~HandBuiltTlsP
 ## Log
 
 - 2026-10-13: filed proposed.
+- 2026-10-13: proposed -> accepted.
