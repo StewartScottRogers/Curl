@@ -3,8 +3,8 @@ id: AF-0173
 title: HttpLineReader.MakeRoom's 'start == 0' can become 'start != 0' with no test failing: a status line of 16 KB or more is read as a closed connection
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Protocol.Http.UnitLibrary/HttpLineReader.cs:MakeRoom-eq:surviving-mutant
 reproduction: mutation Curl.Protocol.Http.UnitLibrary/HttpLineReader.cs:163:==
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Proto
 ## Log
 
 - 2026-10-12: filed proposed.
+- 2026-10-12: proposed -> accepted.
