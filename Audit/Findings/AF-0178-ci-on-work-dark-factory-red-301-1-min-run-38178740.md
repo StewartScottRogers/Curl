@@ -3,8 +3,8 @@ id: AF-0178
 title: CI on work/dark-factory red 301.1 min (run 38178740830): test303 flake, then four Quality-gates failures the CI watch never filed
 auditor: process
 severity: Low
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-13_0925.md: the reproduction no longer reproduces.
 key: process:logs:run-38178740830:ci-red
 reproduction: none
 task: BL-2124
@@ -13,9 +13,9 @@ found: 2026-10-12
 found-at: 4e6ddbc5b33356117bfec6778ba550ab61454a99
 scorecard: 2026-10-12_1653.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-13
+closed-how: reliable-reaudit
+closed-by: 2026-10-13_0925.md
 ---
 # AF-0178 - CI on work/dark-factory red 301.1 min (run 38178740830): test303 flake, then four Quality-gates failures the CI watch never filed
 
@@ -42,7 +42,10 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-10-13 | 2026-10-13_0925.md | reproduces: no | Ran the reproduction: the old window still shows the 301.1-min spell (2026-10-11T22:12:33Z to 2026-10-12T03:13:39Z) and four 'names no failing test' lines in DarkFactory-20261012-044428.log. In this window (10 tasks Done, BL-2118 and BL-2124 changed the CI watch): ciRedMinutes 0, no spells, and 0 'names no failing test' lines in any DarkFactory log. No unfiled failure exists.
+
 ## Log
 
 - 2026-10-12: filed proposed.
 - 2026-10-12: proposed -> accepted.
+- 2026-10-13: accepted -> closed. Re-audit 2026-10-13_0925.md: the reproduction no longer reproduces.

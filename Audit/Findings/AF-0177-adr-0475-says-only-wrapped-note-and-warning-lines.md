@@ -42,6 +42,8 @@ Run from the repository root:
 
 ## Re-audits
 
+- 2026-10-13 | 2026-10-13_0925.md | reproduces: no | Ran the reproduction: Prefixes with 'curl: ' in UpstreamWrappedMessageLines.cs = 1 (line 25: ["Warning: ", "Note: ", "curl: "]); 'curl: ' in ADR-0475 = 1. ADR-0475 line 34 now names the curl: prefix, citing test411's wrapped 'curl: cannot read config from' error. Residual imprecision: the ADR title and line 27 still mention only Note: and Warning: lines.
+
 ## Log
 
 - 2026-10-12: filed proposed.

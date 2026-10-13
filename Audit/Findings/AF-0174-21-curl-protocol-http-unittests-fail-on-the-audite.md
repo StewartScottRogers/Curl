@@ -42,6 +42,8 @@ Select-String -Path Curl.Protocol.Http.UnitLibrary/HttpAuthUsingLines.cs -Patter
 
 ## Re-audits
 
+- 2026-10-13 | 2026-10-13_0925.md | reproduces: no | Ran the reproduction: Select-String -Path Curl.Protocol.Http.UnitLibrary/HttpAuthUsingLines.cs -Pattern "password '" gave no match. AuthUsing now formats only "... auth using {scheme} with user '{UserName}'". The unmutated Curl.Protocol.Http.UnitTests baseline in every mutation run passed with no tests excluded.
+
 ## Log
 
 - 2026-10-12: filed proposed.

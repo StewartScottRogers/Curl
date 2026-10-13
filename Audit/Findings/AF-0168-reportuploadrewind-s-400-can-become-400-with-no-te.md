@@ -3,8 +3,8 @@ id: AF-0168
 title: ReportUploadRewind's '< 400' can become '<= 400' with no test failing: a 400 after a -L upload writes a false 'Need to rewind upload' verbose line
 auditor: quality
 severity: High
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-13_0925.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-10-12_1653.md, 2026-10-13_0925.md).
 key: quality:Curl.Protocol.Http.UnitLibrary/HttpProtocolHandler.cs:ReportUploadRewind-le:surviving-mutant
 reproduction: none
 task: BL-2103
@@ -13,9 +13,9 @@ found: 2026-10-11
 found-at: d8245edb7b661211c6628e9062e9939934939fb2
 scorecard: 2026-10-11_1638.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-13
+closed-how: consecutive
+closed-by: 2026-10-12_1653.md, 2026-10-13_0925.md
 ---
 # AF-0168 - ReportUploadRewind's '< 400' can become '<= 400' with no test failing: a 400 after a -L upload writes a false 'Need to rewind upload' verbose line
 
@@ -43,8 +43,10 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Proto
 ## Re-audits
 
 - 2026-10-12 | 2026-10-12_1653.md | reproduces: no | Ran Invoke-MutationTest.ps1 -Site Curl.Protocol.Http.UnitLibrary/HttpProtocolHandler.cs:1473:< -Member ReportUploadRewind -ExcludeBaselineFailures -TimeoutSeconds 120: the site moved and resolved to line 1491 in ReportUploadRewind, '&& statusLine.StatusCode is >= 300 and < 400' -> '<= 400', outcome killed (7829 ms). The baseline excluded the same 21 failing tests.
+- 2026-10-13 | 2026-10-13_0925.md | reproduces: no | Ran the -Site reproduction: HttpProtocolHandler.cs:1473:< (ReportUploadRewind), outcome killed.
 
 ## Log
 
 - 2026-10-11: filed proposed.
 - 2026-10-11: proposed -> accepted.
+- 2026-10-13: accepted -> closed. Re-audit 2026-10-13_0925.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-10-12_1653.md, 2026-10-13_0925.md).

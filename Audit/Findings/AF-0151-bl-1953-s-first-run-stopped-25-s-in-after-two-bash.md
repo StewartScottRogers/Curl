@@ -3,8 +3,8 @@ id: AF-0151
 title: BL-1953's first run stopped 25 s in, after two Bash calls returned exit code 107, with no result; the lane called it an API failure
 auditor: process
 severity: Low
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-13_0925.md: the reproduction no longer reproduces.
 key: process:BL-1953:BL-1953-first-run:unfinished-run
 reproduction: none
 task: BL-1970
@@ -13,9 +13,9 @@ found: 2026-10-10
 found-at: 1b27494521dec4bdaa3fe60c8dc7a3fc73874253
 scorecard: 2026-10-10_0123.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-13
+closed-how: reliable-reaudit
+closed-by: 2026-10-13_0925.md
 ---
 # AF-0151 - BL-1953's first run stopped 25 s in, after two Bash calls returned exit code 107, with no result; the lane called it an API failure
 
@@ -45,8 +45,10 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 - 2026-10-11 | 2026-10-11_0051.md | not re-audited | overlaps planted defect PD-503 in BL-2999-20261010-181711-L9.jsonl, so the auditor's verdict (reproduces no) is set aside: The reproduction on the 20261010-012326 logs still shows the 'Exit code 107' tool_results in BL-1953-20261010-011807-L1.jsonl. Ran the rule over this window: unfinishedRuns is BL-2035-20261010-161355-L1.jsonl (lane script error 'Cannot bind argument to parameter Path') and BL-2999-20261010-181711-L9.jsonl (no matching claim). Neither stopped after Exit code 107. The only run in this window with 'Exit code 107', BL-1970-20261010-080057-L1.jsonl, has 1 result event and reached DONE at 13:44:05. That task added a synthetic result to Invoke-TaskRun.
 - 2026-10-11 | 2026-10-11_1638.md | not re-audited | overlaps planted defect PD-503 in BL-2095-20261011-161534-L9.jsonl, so the auditor's verdict (reproduces no) is set aside: Ran the unfinished-runs rule over this window (39 tasks Done). Select-String 'Exit code 107' over every *.jsonl in the log folder found 0 matches. unfinishedRuns holds only BL-2095-20261011-161534-L9.jsonl. That file has no tool call at all and no claim in any lane log, so it is not a run stopped seconds in after Bash calls returned exit code 107.
 - 2026-10-12 | 2026-10-12_1653.md | not re-audited | overlaps planted defect PD-503 in BL-9999-20261012-120000-L9.jsonl, so the auditor's verdict (reproduces no) is set aside: The original reproduction still shows 'Exit code 107' at line 14 of the old BL-1953 trace. This window has 3 shifts and 14 tasks done. Its unfinishedRuns holds only BL-9999-20261012-120000-L9.jsonl, which made no Bash call and returned no exit code. No jsonl file in this window's logs contains 'Exit code 107', and the other 14 run logs each end in a result event.
+- 2026-10-13 | 2026-10-13_0925.md | reproduces: no | Ran the reproduction: the old window still lists the BL-1953 runs as unfinished, with 'Exit code 107'. In this window, unfinishedRuns has BL-2127 (still live at copy time, 2.3 min of real work, mid dotnet test) and BL-2987 (not a factory run). Neither has 'Exit code 107' (0 matches across all 11 traces), and none ends seconds after its claim with no result. The other 9 traces each end in a result line.
 
 ## Log
 
 - 2026-10-10: filed proposed.
 - 2026-10-10: proposed -> accepted.
+- 2026-10-13: accepted -> closed. Re-audit 2026-10-13_0925.md: the reproduction no longer reproduces.
