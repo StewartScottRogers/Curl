@@ -9,7 +9,7 @@ touches: [Audit/RunAudit.ps1]
 lane: no
 requirement: none
 created: 2026-10-13
-completed:
+completed: 2026-10-13
 ---
 # BL-2133 — RunAudit sets its herdr tab caption on every early exit, not only at the end
 
@@ -38,11 +38,11 @@ once CI is green on all three platforms.
 
 ## Acceptance criteria
 
-- [ ] Every exit path of `RunAudit.ps1` started with `-NewTab` sets a final caption that ends in "read": "done, read" on success, "FAILED, read" on an error (a `trap` or `try`/`finally` covers thrown errors), and "REFUSED, read" when it refuses to start.
-- [ ] `RunAudit.ps1 -SelfTest` proves the final caption for success, a thrown error and a refusal.
-- [ ] The script's help says so.
+- [x] Every exit path of `RunAudit.ps1` started with `-NewTab` sets a final caption that ends in "read": "done, read" on success, "FAILED, read" on an error (a `trap` or `try`/`finally` covers thrown errors), and "REFUSED, read" when it refuses to start.
+- [x] `RunAudit.ps1 -SelfTest` proves the final caption for success, a thrown error and a refusal.
+- [x] The script's help says so.
 
-- [ ] <!-- A statement someone else can check from the repository without asking a question. -->
+- [x] <!-- A statement someone else can check from the repository without asking a question. -->
 
 ## Notes
 
@@ -50,3 +50,4 @@ once CI is green on all three platforms.
 
 - 2026-10-13: Created.
 - 2026-10-13: Backlog -> Doing. interactive session
+- 2026-10-13: Doing -> Done. PR #134 merged: every RunAudit exit sets a caption ending in read
