@@ -51,6 +51,20 @@ internal sealed class PublicSuffixList
             && (lowerHost == lowerDomain || lowerDomain.Length > UnregistrableSuffix(lowerHost).Length);
     }
 
+    /// <summary>
+    /// curl 8.22.0's rule (RFC 6265 section 5.3, step 5) for a <c>Domain</c> attribute that names a public suffix
+    /// and is the request host itself: the cookie is kept as a host-only cookie, so <c>Domain=localhost</c> from
+    /// <c>localhost</c> is written to the jar as <c>localhost FALSE</c> (upstream test798, BL-2134).
+    /// </summary>
+    /// <param name="host">The request host.</param>
+    /// <param name="cookieDomain">The cookie's domain.</param>
+    public bool IsPublicSuffixNamingTheHost(string host, string cookieDomain)
+    {
+        string lowerHost = WithoutTrailingDot(host).ToLowerInvariant();
+        string lowerDomain = WithoutTrailingDot(cookieDomain).ToLowerInvariant();
+        return lowerHost == lowerDomain && IsPublicSuffix(lowerDomain);
+    }
+
     /// <summary><paramref name="name"/> without its one trailing dot, or unchanged when it has none.</summary>
     private static string WithoutTrailingDot(string name) => name.EndsWith('.') ? name[..^1] : name;
 

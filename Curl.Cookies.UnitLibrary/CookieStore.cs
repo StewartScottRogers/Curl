@@ -472,8 +472,11 @@ public sealed class CookieStore : ICookieStore
     /// <see cref="storeLock"/>. The <c>-v</c> line is <c>Added</c> or <c>Replaced cookie …</c>, or the
     /// refusal <see cref="RefusalOf"/> gives.
     /// </summary>
-    private ReceivedCookieOutcome StoreReceived(Cookie cookie, string host, bool secureOrigin)
+    private ReceivedCookieOutcome StoreReceived(Cookie received, string host, bool secureOrigin)
     {
+        Cookie cookie = received.IncludesSubdomains && PublicSuffixList.Embedded.IsPublicSuffixNamingTheHost(host, received.Domain!)
+            ? received with { IncludesSubdomains = false }
+            : received;
         if (RefusalOf(cookie, host, secureOrigin) is string refusal)
         {
             return new ReceivedCookieOutcome(IsStored: false, refusal);

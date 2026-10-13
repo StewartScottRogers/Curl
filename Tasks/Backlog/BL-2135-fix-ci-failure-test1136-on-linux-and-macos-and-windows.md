@@ -30,6 +30,9 @@ Lanes test only on Windows, so reproduce with `gh run view 38431484503 --log-fai
 
 ## Notes
 
+- 2026-10-13: BL-2134's fix (a public-suffix `Domain` naming the host is kept host-only, curl 8.22.0)
+  makes test1136 pass locally too; this task should only need to confirm CI is green.
+
 ## Log
 
 - 2026-10-13: Created.

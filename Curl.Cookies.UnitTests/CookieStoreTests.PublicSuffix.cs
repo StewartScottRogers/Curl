@@ -50,6 +50,28 @@ public sealed partial class CookieStoreTests
         Assert.AreEqual(storedDomain, store.Cookies.Single().Domain);
     }
 
+    /// <summary>
+    /// curl 8.22.0 keeps a cookie whose <c>Domain</c> is a public suffix naming the request host itself as a
+    /// host-only cookie (upstream test798, BL-2134); a registrable domain naming the host stays a domain cookie.
+    /// </summary>
+    [TestMethod]
+    [DataRow("localhost", "Domain=localhost", false, DisplayName = "A single label set by itself (upstream test798)")]
+    [DataRow("co.uk", "Domain=co.uk", false, DisplayName = "An ICANN suffix set by itself")]
+    [DataRow("co.uk.", "Domain=CO.UK.", false, DisplayName = "An ICANN suffix set by itself in upper case with a trailing dot")]
+    [DataRow("example.com", "Domain=example.com", true, DisplayName = "A registrable domain set by itself")]
+    [DataRow("www.example.com", "Domain=example.com", true, DisplayName = "A registrable domain set by a subdomain")]
+    public void StoreFromResponse_DomainNamesTheHost_IncludesSubdomainsOnlyWhenNotAPublicSuffix(string host, string domainAttribute, bool includesSubdomains)
+    {
+        CookieStore store = new();
+        Diagnostics.ArrangeSetCookies(CurlUrl.Parse($"http://{host}/"), [$"n=v; Path=/; {domainAttribute}"], Now);
+
+        store.StoreFromResponse(CurlUrl.Parse($"http://{host}/"), [$"n=v; Path=/; {domainAttribute}"], Now, NoTransferEvents.Instance);
+        Diagnostics.ActCookies("stored cookies", store.Cookies);
+
+        Diagnostics.Assert("includes subdomains", includesSubdomains, store.Cookies.Single().IncludesSubdomains);
+        Assert.AreEqual(includesSubdomains, store.Cookies.Single().IncludesSubdomains);
+    }
+
     /// <summary>A 255-character host kept its host-only cookie; a 256-character one was dropped.</summary>
     [TestMethod]
     [DataRow("example.com", 1, DisplayName = "255 characters")]

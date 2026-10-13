@@ -25,6 +25,8 @@ public sealed class NetscapeCookieFileTests
     /// Measured: <c>curl -c jar.txt http://localhost:18221/p/x</c>, the response setting <c>a=1; Path=/</c>,
     /// <c>h=2; HttpOnly; Path=/p</c>, <c>d=3; Domain=localhost; Max-Age=3600</c>, <c>s=4; Secure; HttpOnly</c>
     /// and <c>q="x y"</c>. Newest first, <c>#HttpOnly_</c> before the domain, a dot before a domain cookie's.
+    /// curl 8.22.0 keeps <c>d</c> host-only, since <c>localhost</c> is a public suffix naming the host itself
+    /// (upstream test798, BL-2134); 8.21.0 wrote it as <c>.localhost TRUE</c>.
     /// </summary>
     [TestMethod]
     public void WriteCookieJar_ReceivedCookies_MatchesCurlsJarByteForByte()
@@ -42,7 +44,7 @@ public sealed class NetscapeCookieFileTests
             Header
             + "localhost\tFALSE\t/p\tFALSE\t0\tq\t\"x y\"\r\n"
             + "#HttpOnly_localhost\tFALSE\t/p\tTRUE\t0\ts\t4\r\n"
-            + ".localhost\tTRUE\t/p\tFALSE\t1790467138\td\t3\r\n"
+            + "localhost\tFALSE\t/p\tFALSE\t1790467138\td\t3\r\n"
             + "#HttpOnly_localhost\tFALSE\t/p\tFALSE\t0\th\t2\r\n"
             + "localhost\tFALSE\t/\tFALSE\t0\ta\t1\r\n";
         Diagnostics.AssertText("cookie jar", expected, actual);
