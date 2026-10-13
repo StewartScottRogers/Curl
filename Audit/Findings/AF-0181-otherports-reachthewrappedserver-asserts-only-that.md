@@ -3,8 +3,8 @@ id: AF-0181
 title: OtherPorts_ReachTheWrappedServer asserts only that some non-MQTT connection exists, not that it is the wrapped server's
 auditor: quality
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Conformance.UnitTests/MqttServerConnectorTests.cs:OtherPorts_ReachTheWrappedServer:weak-assertion
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Curl.Conformance.UnitTests/MqttServerConnectorTests.cs -Patt
 ## Log
 
 - 2026-10-13: filed proposed.
+- 2026-10-13: proposed -> accepted.
