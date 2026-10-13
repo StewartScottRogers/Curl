@@ -3,8 +3,8 @@ id: AF-0171
 title: CI red 69+ min and still red: test303 failed on Linux on 0d18262, then two failures naming no test went unfiled
 auditor: process
 severity: Low
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-13_0925.md: the reproduction no longer reproduces.
 key: process:logs:38178740830:ci-red
 reproduction: none
 task: BL-2106
@@ -13,9 +13,9 @@ found: 2026-10-11
 found-at: d8245edb7b661211c6628e9062e9939934939fb2
 scorecard: 2026-10-11_1638.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-13
+closed-how: reliable-reaudit
+closed-by: 2026-10-13_0925.md
 ---
 # AF-0171 - CI red 69+ min and still red: test303 failed on Linux on 0d18262, then two failures naming no test went unfiled
 
@@ -43,8 +43,10 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Re-audits
 
 - 2026-10-12 | 2026-10-12_1653.md | reproduces: yes | The original reproduction still shows the old spell (69 min, stillRed true). Over this window, the spell's end can now be measured: 301.1 min, ending 2026-10-12T03:13:39Z. The same cause appears in this window's logs. At 04:45:53-04:46:01, logs/DarkFactory-20261012-044428.log records four failed runs (38190842002, 38184717609, 38183634772, 38182483664) as 'its log names no failing test or build error; nothing to file'. They were Quality-gates failures. An interactive session fixed them through BL-2100 about 3.5 h after the first. BL-2106 (98e18e27, 04:49 local) changed the CI watch after that, and no later failure in the window has tested it yet.
+- 2026-10-13 | 2026-10-13_0925.md | reproduces: no | Ran the reproduction: the old window still shows run 38178740830 with 69 min and stillRed True, plus 'names no failing test or build error; nothing to~' for runs 38182483664 and 38183634772. In this window: ciRedMinutes 0, no ciRedSpells, and no CI failure on work/dark-factory at all. Every coordinator 'ci' line in DarkFactory-20261012-154706/215436, 20261013-061911/092151 reads 'success ... nothing to file'. The PR merges #126 and #129 had green CI.
 
 ## Log
 
 - 2026-10-11: filed proposed.
 - 2026-10-11: proposed -> accepted.
+- 2026-10-13: accepted -> closed. Re-audit 2026-10-13_0925.md: the reproduction no longer reproduces.

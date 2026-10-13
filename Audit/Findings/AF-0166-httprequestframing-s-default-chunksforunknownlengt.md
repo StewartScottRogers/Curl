@@ -3,8 +3,8 @@ id: AF-0166
 title: HttpRequestFraming's default chunksForUnknownLength = false can become true with no test failing: a bodyless GET's auth retry to an HTTP/1.0 server fails with exit 25
 auditor: quality
 severity: High
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-13_0925.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-10-12_1653.md, 2026-10-13_0925.md).
 key: quality:Curl.Protocol.Http.UnitLibrary/HttpRequestFraming.cs:HttpRequestFraming-true:surviving-mutant
 reproduction: none
 task: BL-2101
@@ -13,9 +13,9 @@ found: 2026-10-11
 found-at: d8245edb7b661211c6628e9062e9939934939fb2
 scorecard: 2026-10-11_1638.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-13
+closed-how: consecutive
+closed-by: 2026-10-12_1653.md, 2026-10-13_0925.md
 ---
 # AF-0166 - HttpRequestFraming's default chunksForUnknownLength = false can become true with no test failing: a bodyless GET's auth retry to an HTTP/1.0 server fails with exit 25
 
@@ -43,8 +43,10 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Proto
 ## Re-audits
 
 - 2026-10-12 | 2026-10-12_1653.md | reproduces: no | Ran Invoke-MutationTest.ps1 -Site Curl.Protocol.Http.UnitLibrary/HttpRequestFraming.cs:45:false -Member HttpRequestFraming -ExcludeBaselineFailures -TimeoutSeconds 120: resolvedLine 45, 'bool chunksForUnknownLength = false)' -> 'true)', outcome killed (7486 ms). The baseline excluded 21 failing HttpAuthUsingLines-related tests.
+- 2026-10-13 | 2026-10-13_0925.md | reproduces: no | Ran the -Site reproduction: HttpRequestFraming.cs:45 'bool chunksForUnknownLength = false)' -> 'true)' resolved at line 45, outcome killed (killed 1, survived 0), no excluded tests.
 
 ## Log
 
 - 2026-10-11: filed proposed.
 - 2026-10-11: proposed -> accepted.
+- 2026-10-13: accepted -> closed. Re-audit 2026-10-13_0925.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-10-12_1653.md, 2026-10-13_0925.md).

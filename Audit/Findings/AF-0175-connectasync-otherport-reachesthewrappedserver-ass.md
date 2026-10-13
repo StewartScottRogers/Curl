@@ -42,6 +42,8 @@ Select-String -Path Curl.Conformance.UnitTests/NoListenPortConnectorTests.cs -Pa
 
 ## Re-audits
 
+- 2026-10-13 | 2026-10-13_0925.md | reproduces: no | Ran the reproduction: the Assert lines of ConnectAsync_OtherPort_ReachesTheWrappedServer are now 'SwsHttpServerConnection connection = Assert.IsInstanceOfType<SwsHttpServerConnection>(result.Connection);', 'Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);' and 'Assert.AreEqual(new IPEndPoint(IPAddress.Loopback, 8990), connection.RemoteEndPoint);', so the test now pins the wrapped server's connection.
+
 ## Log
 
 - 2026-10-12: filed proposed.

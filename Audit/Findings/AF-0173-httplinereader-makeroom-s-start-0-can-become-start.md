@@ -3,8 +3,8 @@ id: AF-0173
 title: HttpLineReader.MakeRoom's 'start == 0' can become 'start != 0' with no test failing: a status line of 16 KB or more is read as a closed connection
 auditor: quality
 severity: High
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-13_0925.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
 key: quality:Curl.Protocol.Http.UnitLibrary/HttpLineReader.cs:MakeRoom-eq:surviving-mutant
 reproduction: mutation Curl.Protocol.Http.UnitLibrary/HttpLineReader.cs:163:==
 task: BL-2119
@@ -13,9 +13,9 @@ found: 2026-10-12
 found-at: 4e6ddbc5b33356117bfec6778ba550ab61454a99
 scorecard: 2026-10-12_1653.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-13
+closed-how: mechanical
+closed-by: 2026-10-13_0925.md
 ---
 # AF-0173 - HttpLineReader.MakeRoom's 'start == 0' can become 'start != 0' with no test failing: a status line of 16 KB or more is read as a closed connection
 
@@ -42,7 +42,10 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Proto
 
 ## Re-audits
 
+- 2026-10-13 | 2026-10-13_0925.md | reproduces: no | Ran the -Site reproduction: HttpLineReader.cs:163 'if (start == 0)' -> 'if (start != 0)' (MakeRoom) resolved at line 163, outcome killed in 8.4 s; no excluded tests. Runner's targeted mutation rerun on the clean audited commit: killed.
+
 ## Log
 
 - 2026-10-12: filed proposed.
 - 2026-10-12: proposed -> accepted.
+- 2026-10-13: accepted -> closed. Re-audit 2026-10-13_0925.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.

@@ -3,8 +3,8 @@ id: AF-0167
 title: HttpContentRange.HonoursResume's 'statusCode < 300' can become '<= 300' with no test failing: a 300 with Content-Range '*' is taken as a resume
 auditor: quality
 severity: High
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-13_0925.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-10-12_1653.md, 2026-10-13_0925.md).
 key: quality:Curl.Protocol.Http.UnitLibrary/HttpContentRange.cs:HonoursResume-le:surviving-mutant
 reproduction: none
 task: BL-2102
@@ -13,9 +13,9 @@ found: 2026-10-11
 found-at: d8245edb7b661211c6628e9062e9939934939fb2
 scorecard: 2026-10-11_1638.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-13
+closed-how: consecutive
+closed-by: 2026-10-12_1653.md, 2026-10-13_0925.md
 ---
 # AF-0167 - HttpContentRange.HonoursResume's 'statusCode < 300' can become '<= 300' with no test failing: a 300 with Content-Range '*' is taken as a resume
 
@@ -43,8 +43,10 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Proto
 ## Re-audits
 
 - 2026-10-12 | 2026-10-12_1653.md | reproduces: no | Ran Invoke-MutationTest.ps1 -Site Curl.Protocol.Http.UnitLibrary/HttpContentRange.cs:39:< -Member HonoursResume -ExcludeBaselineFailures -TimeoutSeconds 120: resolvedLine 39, 'return statusCode < 300;' -> '<= 300', outcome killed (7470 ms). The baseline excluded the same 21 failing tests.
+- 2026-10-13 | 2026-10-13_0925.md | reproduces: no | Ran the -Site reproduction: HttpContentRange.cs:39:< (HonoursResume) resolved at line 39, outcome killed.
 
 ## Log
 
 - 2026-10-11: filed proposed.
 - 2026-10-11: proposed -> accepted.
+- 2026-10-13: accepted -> closed. Re-audit 2026-10-13_0925.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-10-12_1653.md, 2026-10-13_0925.md).

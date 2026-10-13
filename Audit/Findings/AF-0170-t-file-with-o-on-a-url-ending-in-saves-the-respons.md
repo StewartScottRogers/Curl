@@ -43,6 +43,7 @@ $r=(Get-Location).Path; $o="$env:TEMP\ac-tO"; foreach($s in 'curl','candidate'){
 ## Re-audits
 
 - 2026-10-12 | 2026-10-12_1653.md | not re-audited | overlaps planted defect PD-201 in Curl.Console/CurlCommandRunner.cs, so the auditor's verdict (reproduces no) is set aside: As given, the reproduction cannot tell on this machine: Set-Content -NoNewline silently creates no file (Windows PowerShell 5.1.26100 and pwsh), so f.txt never exists and both binaries fail to open it. I reran it with the same setup written as [IO.File]::WriteAllText("$o\$s\f.txt",'file body'), everything else unchanged: 'curl: f.txt=9 curl_response=True warning=True exit=0' and 'candidate: f.txt=9 curl_response=True warning=True exit=0'. Both sent the same PUT /f.txt with a 9-byte body. Curl now saves to curl_response and prints curl's 'No remote filename' warning, and leaves the upload file untouched.
+- 2026-10-13 | 2026-10-13_0925.md | reproduces: no | Ran the reproduction with the reference path changed from mingw64 to ucrt64\bin\curl.exe (curl 8.22.0). On this machine 'Set-Content -NoNewline <path> <value>' silently created no file: the first run showed exit 26 'cannot open f.txt' for both binaries. The rerun created f.txt with [IO.File]::WriteAllText, everything else verbatim. Output: 'curl: f.txt=9 curl_response=True warning=True' and 'candidate: f.txt=9 curl_response=True warning=True'. Both exit 0 and both print 'Warning: No remote filename, uses "curl_response"'.
 
 ## Log
 
