@@ -31,3 +31,4 @@ BL-2136 re-measured the `--help` pages (`Curl.Cli.UnitTests/HelpReference/help*.
 ## Log
 
 - 2026-10-13: Created.
+- 2026-10-13: Backlog -> Doing.
