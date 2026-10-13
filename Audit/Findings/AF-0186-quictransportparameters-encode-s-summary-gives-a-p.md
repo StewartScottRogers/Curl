@@ -3,8 +3,8 @@ id: AF-0186
 title: QuicTransportParameters.Encode's summary gives a parameter order the code does not write
 auditor: truthfulness
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: truthfulness:Curl.Quic.UnitLibrary/QuicTransportParameters.cs:Encode:false-doc-comment
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Run from the repository root:
 ## Log
 
 - 2026-10-13: filed proposed.
+- 2026-10-13: proposed -> accepted.
