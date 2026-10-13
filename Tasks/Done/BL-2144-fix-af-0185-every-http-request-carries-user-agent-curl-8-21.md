@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Http.UnitLibrary]
 requirement: none
 created: 2026-10-13
-completed:
+completed: 2026-10-13
 ---
 # BL-2144 — Fix AF-0185: Every HTTP request carries User-Agent: curl/8.21.0 (and --version says 8.21.0); the reference curl sends curl/8.22.0
 
@@ -41,14 +41,16 @@ The finding closes only when a later re-audit by the conformance auditor confirm
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
 - 2026-10-13 (Claude): AF-0185 is probably already fixed: BL-2127 (f649c00aa, Curl reports itself as curl 8.22.0) landed just after the audited commit c86d04eeb. Check that -V and the User-Agent say 8.22.0 on work/dark-factory; if so, record that and finish.
+- 2026-10-13 (Claude, lane 9): Confirmed already fixed by BL-2127 (f649c00aa, an ancestor of this lane's HEAD); no code change. Every default User-Agent constant (HttpRequestHeadFormatter, RtspRequestFormatter, WsUpgradeRequestFormatter, TftpMasqueRequest, HttpProxyTunnelOptions, LibcurlSourceCode) says `curl/8.22.0`. The finding's reproduction against a fresh Release build of Curl.Console: `curl: User-Agent: curl/8.22.0`, `candidate: User-Agent: curl/8.22.0`; `curl.exe -V` first line `curl 8.22.0 (x86_64-w64-mingw32) libcurl/8.22.0 Schannel`. `dotnet build` clean, fast tests green.
 
 ## Log
 
 - 2026-10-13: Created.
 - 2026-10-13: Backlog -> Doing.
+- 2026-10-13: Doing -> Done. AF-0185 already fixed by BL-2127; reproduction gives curl/8.22.0 for both binaries
