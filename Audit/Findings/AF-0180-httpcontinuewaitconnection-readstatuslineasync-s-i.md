@@ -3,8 +3,8 @@ id: AF-0180
 title: HttpContinueWaitConnection.ReadStatusLineAsync's 'IndexOf(...) < 0' can become '<= 0' with no test failing: a reply starting with a bare LF no longer ends the 100-continue wait at once
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Protocol.Http.UnitLibrary/HttpContinueWaitConnection.cs:ReadStatusLineAsync-lt:surviving-mutant
 reproduction: mutation Curl.Protocol.Http.UnitLibrary/HttpContinueWaitConnection.cs:170:<
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Proto
 ## Log
 
 - 2026-10-13: filed proposed.
+- 2026-10-13: proposed -> accepted.
