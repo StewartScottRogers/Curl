@@ -3,9 +3,9 @@ using Curl.Testing;
 namespace Curl.Cli;
 
 /// <summary>
-/// Pins <see cref="CurlHelpText"/> to curl 8.21.0's own help pages. Every file under
-/// <c>HelpReference</c> (embedded in this assembly) is what the mingw reference build (<c>/mingw64/bin/curl</c>) printed to a
-/// redirected standard output on 2026-09-27, with its CR LF line ends made LF: <c>help.txt</c> is
+/// Pins <see cref="CurlHelpText"/> to curl 8.22.0's own help pages. Every file under
+/// <c>HelpReference</c> (embedded in this assembly) is what the mingw Schannel reference build of curl 8.22.0 printed to a
+/// redirected standard output on 2026-10-13 (BL-2136), with its CR LF line ends made LF: <c>help.txt</c> is
 /// <c>curl -h</c>, <c>help-&lt;subject&gt;.txt</c> is <c>curl --help &lt;subject&gt;</c>, and a
 /// <c>-&lt;n&gt;-columns</c> file was printed with <c>COLUMNS=&lt;n&gt;</c> set. The rest run at the
 /// default 79 columns curl uses when nothing gives a width.
@@ -33,6 +33,7 @@ public sealed class CurlHelpTextTests
     [DataRow("http", "help-http.txt")]
     [DataRow("imap", "help-imap.txt")]
     [DataRow("ldap", "help-ldap.txt")]
+    [DataRow("mqtt", "help-mqtt.txt")]
     [DataRow("output", "help-output.txt")]
     [DataRow("pop3", "help-pop3.txt")]
     [DataRow("post", "help-post.txt")]
@@ -72,12 +73,12 @@ public sealed class CurlHelpTextTests
     [TestMethod]
     public void Lines_Usage_JoinedWithCrLf_IsTheMeasuredByteCount()
     {
-        // curl -h > file on Windows wrote 1290 bytes: 23 lines, each ended with CR LF.
+        // curl 8.22.0 -h > file on Windows wrote 1291 bytes: 23 lines, each ended with CR LF.
         IReadOnlyList<string> lines = Lines(null, CurlHelpText.DefaultColumns);
 
         int length = string.Concat(lines.Select(line => line + "\r\n")).Length;
-        Diagnostics.Assert("length joined with CR LF", 1290, length);
-        Assert.AreEqual(1290, string.Concat(lines.Select(line => line + "\r\n")).Length);
+        Diagnostics.Assert("length joined with CR LF", 1291, length);
+        Assert.AreEqual(1291, string.Concat(lines.Select(line => line + "\r\n")).Length);
     }
 
     [TestMethod]
@@ -99,18 +100,18 @@ public sealed class CurlHelpTextTests
     {
         IReadOnlyList<string> lines = Lines(null, 1);
 
-        Diagnostics.Assert("second line", " -d, --data <data>  HTTP POST data", lines[1]);
-        Assert.AreEqual(" -d, --data <data>  HTTP POST data", lines[1]);
+        Diagnostics.Assert("second line", " -d, --data <data>  Post data", lines[1]);
+        Assert.AreEqual(" -d, --data <data>  Post data", lines[1]);
         int listStart = lines.ToList().IndexOf("Use \"--help category\" to get an overview of all categories, which are:") + 1;
         Diagnostics.Act("category list start", listStart);
         Diagnostics.Assert("line at list start", "\"\"", "\"" + lines[listStart] + "\"");
         Diagnostics.Assert("first category line", "\"auth, \"", "\"" + lines[listStart + 1] + "\"");
-        Diagnostics.Assert("twenty-fourth category line", "\"upload, \"", "\"" + lines[listStart + 24] + "\"");
-        Diagnostics.Assert("last category line", "verbose.", lines[listStart + 25]);
+        Diagnostics.Assert("twenty-fifth category line", "\"upload, \"", "\"" + lines[listStart + 25] + "\"");
+        Diagnostics.Assert("last category line", "verbose.", lines[listStart + 26]);
         Assert.AreEqual(string.Empty, lines[listStart]);
         Assert.AreEqual("auth, ", lines[listStart + 1]);
-        Assert.AreEqual("upload, ", lines[listStart + 24]);
-        Assert.AreEqual("verbose.", lines[listStart + 25]);
+        Assert.AreEqual("upload, ", lines[listStart + 25]);
+        Assert.AreEqual("verbose.", lines[listStart + 26]);
     }
 
     [TestMethod]

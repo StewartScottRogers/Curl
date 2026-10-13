@@ -1,5 +1,5 @@
 Usage: curl [options...] <url>
- -d, --data <data>  HTTP POST data
+ -d, --data <data>  Post data
  -f, --fail  Fail fast with no output on HTTP errors
  -I, --head  Show document info only
  -H, --header <header/@file>  Pass custom header(s) to server
@@ -20,10 +20,10 @@ auth, connection,
 curl, deprecated, 
 dns, file, ftp, 
 global, http, imap, 
-ldap, output, pop3, 
-post, proxy, scp, 
-sftp, smtp, ssh, 
-telnet, tftp, 
+ldap, mqtt, output, 
+pop3, post, proxy, 
+scp, sftp, smtp, 
+ssh, telnet, tftp, 
 timeout, tls, 
 upload, verbose.
 Use "--help all" to list all options
