@@ -43,6 +43,8 @@ public sealed class CurlCommandRunnerAuthRetryProgressMeterTests
     private readonly MemoryStream standardError = new();
     private readonly ManualTimeProvider clock = new();
 
+    private Stream standardInput = new MemoryStream();
+
     public TestContext TestContext { get; set; } = null!;
 
     private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
@@ -61,6 +63,27 @@ public sealed class CurlCommandRunnerAuthRetryProgressMeterTests
         Diagnostics.Diff("stderr", Lf(expected), Lf(StandardErrorText));
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual(expected, StandardErrorText);
+    }
+
+    /// <summary>
+    /// A 401 from an HTTP/1.0 server to a <c>-T -</c> upload: curl 8.21.0 reconnects for the
+    /// retry and draws it a new zero status line before failing it with exit 25 (upstream
+    /// test1072, BL-2130), so the meter has two lines.
+    /// </summary>
+    [TestMethod]
+    public async Task RunAsync_Http10401ToAStdinUpload_WritesAStatusLineForTheRetryThenExits25()
+    {
+        standardInput = new MemoryStream("hello"u8.ToArray());
+        string http10Unauthorized = Unauthorized.Replace("HTTP/1.1", "HTTP/1.0", StringComparison.Ordinal);
+
+        int exitCode = await RunAsync([http10Unauthorized, Ok], "-T", "-", "--anyauth", "-u", "testuser:testpass", "-o", "out.txt", Url);
+
+        string[] meterLines = Lf(StandardErrorText).Split('\n')[2..^1];
+        Diagnostics.Assert("exit code", 25, exitCode);
+        Diagnostics.Assert("status lines", 2, meterLines.Count(line => line.StartsWith(Zero, StringComparison.Ordinal)));
+        Assert.AreEqual(25, exitCode);
+        Assert.AreEqual(2, meterLines.Count(line => line.StartsWith(Zero, StringComparison.Ordinal)));
+        Assert.EndsWith("curl: (25) Chunky upload is not supported by HTTP 1.0" + NewLine, StandardErrorText);
     }
 
     [TestMethod]
@@ -99,7 +122,7 @@ public sealed class CurlCommandRunnerAuthRetryProgressMeterTests
                     outputFiles,
                     standardOutput,
                     standardError,
-                    new MemoryStream(),
+                    standardInput,
                     runsOnWindows: false,
                     writesProgressMeter: true,
                     timeProvider: clock)

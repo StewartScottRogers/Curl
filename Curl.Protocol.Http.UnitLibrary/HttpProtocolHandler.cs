@@ -1166,6 +1166,7 @@ public sealed class HttpProtocolHandler(
         try
         {
             ThrowIfRefused(framing);
+            ThrowIfChunkedResendToHttp10(plan);
             ThrowIfAuthorizationFailed(plan);
             exchange.RequestReady = context.TimeProvider.GetTimestamp();
             bool bodyLeftUnsent = await SendBodyAsync(context, framing, responseConnection, upload, cancellationToken).ConfigureAwait(false);
@@ -2356,14 +2357,12 @@ public sealed class HttpProtocolHandler(
         EndUnchallengedAuthorizations(plan, head.StatusLine.StatusCode);
         if (await RetryProxyAuthorizationAsync(plan, head, cancellationToken).ConfigureAwait(false) is { } proxyAuthorization)
         {
-            ThrowIfChunkedResendToHttp10(plan, head);
             RewindForResend(plan, upload);
             return plan.WithProxyAuthorization(proxyAuthorization, RepeatAuthorization(plan)).DowngradedAfter(head);
         }
 
         if (await RetryWithAuthorizationAsync(plan, head, cancellationToken).ConfigureAwait(false) is { } authorized)
         {
-            ThrowIfChunkedResendToHttp10(plan, head);
             RewindForResend(plan, upload);
             return authorized.DowngradedAfter(head);
         }
@@ -2401,8 +2400,9 @@ public sealed class HttpProtocolHandler(
     /// Seeks a stream body that <paramref name="upload" /> began reading back to where it
     /// began, so an authentication retry sends it again whole, as curl 8.21.0 rewinds a
     /// <c>-T</c> file or a <c>-F</c> form before it answers a 401 or 407 (upstream test1030,
-    /// test259). Only a seekable stream reaches here (<see cref="MayRetry" />); a body of bytes
-    /// needs nothing.
+    /// test259). A stream that cannot seek reaches here only on its way to an HTTP/1.0 server
+    /// (<see cref="MayRetry" />), and is left as it is, as that retry fails before sending it
+    /// (<see cref="ThrowIfChunkedResendToHttp10" />); a body of bytes needs nothing.
     /// </summary>
     private static void RewindForResend(HttpRequestPlan plan, HttpRequestBodyWriter upload)
     {
@@ -2642,7 +2642,7 @@ public sealed class HttpProtocolHandler(
     /// none, or a stream that can seek back to its start, as a <c>-T</c> file or a <c>-F</c> form
     /// of files can, which curl 8.21.0 rewinds and resends whole (upstream test1030, test259); not
     /// a stream that cannot, such as stdin (ADR-0034), unless the response came from an HTTP/1.0
-    /// server, when the retry fails before rewinding (<see cref="ThrowIfChunkedResendToHttp10" />).
+    /// server, when the retry fails on its new connection (<see cref="ThrowIfChunkedResendToHttp10" />).
     /// </summary>
     private static bool MayRetry(HttpRequestPlan plan, HttpResponseHead head, int statusCode) =>
         head.StatusLine.StatusCode == statusCode
@@ -2657,15 +2657,16 @@ public sealed class HttpProtocolHandler(
         plan.Framing.ChunksForUnknownLength && head.StatusLine.Version == HttpVersion.Version10;
 
     /// <summary>
-    /// Fails the retry that answers <paramref name="head" /> before it rewinds or sends anything when
-    /// it would resend a body chunked for its unknown length to a server that answered HTTP/1.0, as
-    /// curl 8.21.0 sends that retry as HTTP/1.0 and fails it with exit 25
-    /// <c>Chunky upload is not supported by HTTP 1.0</c> (upstream test1072).
+    /// Fails, before any byte of it is sent, a retry that resends a body chunked for its unknown
+    /// length to a server that answered HTTP/1.0 (<see cref="HttpRequestPlan.DowngradedAfter" />),
+    /// as curl 8.21.0 reconnects, reports the retried request, and fails it while building it on
+    /// the new connection with exit 25 <c>Chunky upload is not supported by HTTP 1.0</c>
+    /// (BL-2130; upstream test1072).
     /// </summary>
-    /// <exception cref="HttpTransferException">The retry would be such a resend (exit 25).</exception>
-    private static void ThrowIfChunkedResendToHttp10(HttpRequestPlan plan, HttpResponseHead head)
+    /// <exception cref="HttpTransferException">The request is such a resend (exit 25).</exception>
+    private static void ThrowIfChunkedResendToHttp10(HttpRequestPlan plan)
     {
-        if (ResendsChunkedToHttp10(plan, head))
+        if (plan.Framing.ChunksForUnknownLength && plan.Options.EarlierResponseWasHttp10)
         {
             throw new HttpTransferException(CurlExitCode.UploadFailed, HttpTransferMessages.ChunkedUploadNeedsHttp11);
         }

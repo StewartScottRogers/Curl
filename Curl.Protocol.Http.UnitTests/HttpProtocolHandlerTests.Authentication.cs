@@ -407,26 +407,42 @@ public sealed partial class HttpProtocolHandlerTests
 
     /// <summary>
     /// A body chunked for its unknown length, as stdin's is, drawing a 401 from an HTTP/1.0
-    /// server: curl 8.21.0 would send the answer as HTTP/1.0, which cannot carry it, and fails
-    /// with exit 25 before sending anything more (upstream test1072).
+    /// server: curl 8.21.0 says it needs to rewind the upload, closes the HTTP/1.0 connection,
+    /// connects again for the answer, which goes out as HTTP/1.0 and cannot carry the body, and
+    /// fails it with exit 25 before writing a byte to the new connection (BL-2130, upstream test1072).
     /// </summary>
     [TestMethod]
-    public async Task ExecuteAsync_Http10ChallengeToABodyOfUnknownLength_ReturnsUploadFailed()
+    public async Task ExecuteAsync_Http10ChallengeToABodyOfUnknownLength_ReconnectsThenReturnsUploadFailed()
     {
         string http10Challenge = ChallengeHead.Replace("HTTP/1.1", "HTTP/1.0", StringComparison.Ordinal);
-        TurnTakingConnection connection = new(65536, http10Challenge + "nope", OkHead + "ok");
+        TurnTakingConnection first = new(65536, http10Challenge + "nope");
+        TurnTakingConnection second = new(65536, OkHead + "ok");
         ScriptedAuthenticator authenticator = new(null, DigestValue);
         MemoryStream output = new();
-        TransferContext context = AuthContext(output, null, new HttpRequestOptions { Body = new StreamBody(new UnseekableStream("hello"u8.ToArray()), null, "application/octet-stream") });
+        RecordingTransferEvents events = new();
+        TransferContext context = new()
+        {
+            Url = CurlUrl.Parse(AuthUrl),
+            Output = output,
+            Http = new HttpRequestOptions { Body = new StreamBody(new UnseekableStream("hello"u8.ToArray()), null, "application/octet-stream") },
+            Events = events,
+        };
         Diagnostics.Arrange("url, body, response", $"{AuthUrl}, an unseekable stream body of unknown length, {OneLine(http10Challenge)}");
 
-        TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), authenticator).ExecuteAsync(context);
+        TransferResult result = await new HttpProtocolHandler(QueueConnector.For(first, second), authenticator).ExecuteAsync(context);
 
         WriteResult(result);
+        WriteEvents("events", events.Events);
         Diagnostics.Assert("exit code", CurlExitCode.UploadFailed, result.ExitCode);
+        Diagnostics.Assert("bytes written to the second connection", 0, second.Written.Length);
         Assert.AreEqual(CurlExitCode.UploadFailed, result.ExitCode);
         Assert.AreEqual("Chunky upload is not supported by HTTP 1.0", result.ErrorMessage);
         Assert.AreEqual(string.Empty, Latin1(output.ToArray()));
+        Assert.AreEqual(2, result.Report!.ConnectionCount);
+        Assert.AreEqual(string.Empty, second.Written);
+        CollectionAssert.IsSubsetOf(
+            new[] { "* Need to rewind upload for next request", "* Issue another request to this URL: 'http://127.0.0.1:18183/a'" },
+            events.Events);
     }
 
     [TestMethod]
