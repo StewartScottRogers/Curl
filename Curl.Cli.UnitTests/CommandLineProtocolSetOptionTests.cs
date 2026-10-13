@@ -114,67 +114,83 @@ public sealed class CommandLineProtocolSetOptionTests
     }
 
     [TestMethod]
-    [DataRow("http,bogus", new[] { "Warning: unrecognized protocol 'bogus'" }, DisplayName = "unknown name")]
-    [DataRow("+bogus,-nope", new[] { "Warning: unrecognized protocol 'bogus'", "Warning: unrecognized protocol 'nope'" }, DisplayName = "modifier not repeated")]
-    [DataRow("++http", new[] { "Warning: unrecognized protocol '+http'" }, DisplayName = "only one modifier")]
-    [DataRow("+", new[] { "Warning: unrecognized protocol ''" }, DisplayName = "modifier alone")]
-    [DataRow("*", new[] { "Warning: unrecognized protocol '*'" }, DisplayName = "star")]
-    [DataRow(" http , bogus", new[] { "Warning: unrecognized protocol ' http '", "Warning: unrecognized protocol ' bogus'" }, DisplayName = "spaces kept")]
-    [DataRow("ipfs,ws,wss,rtmp,scp", new[] { "Warning: unrecognized protocol 'ipfs'", "Warning: unrecognized protocol 'rtmp'" }, DisplayName = "ipfs and rtmp unknown")]
-    [DataRow("-bogus", new[] { "Warning: unrecognized protocol 'bogus'" }, DisplayName = "removing unknown")]
-    [DataRow("http,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", new[] { "Warning: unrecognized protocol 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'" }, DisplayName = "name cut to 31 characters")]
-    [DataRow("+bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", new[] { "Warning: unrecognized protocol 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'" }, DisplayName = "cut after the modifier")]
-    public void Parse_ProtoNamingUnknownSchemes_WarnsAndKeepsEveryScheme(string value, string[] expectedWarnings)
+    [DataRow("--proto", "x", "x", DisplayName = "unknown name alone")]
+    [DataRow("--proto", "http,bogus", "bogus", DisplayName = "unknown after a known one")]
+    [DataRow("--proto", "+bogus,-nope", "bogus", DisplayName = "stops at the first unknown, modifier not repeated")]
+    [DataRow("--proto", "++http", "+http", DisplayName = "only one modifier")]
+    [DataRow("--proto", "+", "", DisplayName = "modifier alone")]
+    [DataRow("--proto", "=", "", DisplayName = "= alone")]
+    [DataRow("--proto", "=,http", "", DisplayName = "= alone, then http")]
+    [DataRow("--proto", "=bogus", "bogus", DisplayName = "=unknown")]
+    [DataRow("--proto", "=bogus,http", "bogus", DisplayName = "=unknown, then http")]
+    [DataRow("--proto", "-bogus", "bogus", DisplayName = "removing unknown")]
+    [DataRow("--proto", "x,-all", "x", DisplayName = "unknown before -all")]
+    [DataRow("--proto", "*", "*", DisplayName = "star")]
+    [DataRow("--proto", " http , bogus", " http ", DisplayName = "spaces kept")]
+    [DataRow("--proto", "ws,ipfs,rtmp", "ipfs", DisplayName = "ipfs unknown")]
+    [DataRow("--proto", "rtmp", "rtmp", DisplayName = "rtmp unknown")]
+    [DataRow("--proto", "http,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", DisplayName = "name cut to 31 characters")]
+    [DataRow("--proto", "+bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", DisplayName = "cut after the modifier")]
+    [DataRow("--proto-redir", "x", "x", DisplayName = "proto-redir unknown")]
+    [DataRow("--proto-redir", "=bogus", "bogus", DisplayName = "proto-redir =unknown")]
+    public void Parse_ProtoNamingUnknownScheme_RefusesAsBadlyUsedAfterNamingIt(string option, string value, string expectedName)
     {
-        CommandLineParseResult result = Parse(["--proto", value, Url]);
+        CommandLineParseResult result = Parse([option, value, Url]);
 
-        AssertWarnings(expectedWarnings, result);
-        Assert.IsTrue(result.IsAccepted);
-        CollectionAssert.AreEqual(expectedWarnings, result.WarningLines.ToArray());
-        AssertSchemes(EveryKnownScheme, result.Options.AllowedProtocols);
-    }
-
-    [TestMethod]
-    [DataRow("=bogus,http", DisplayName = "=unknown empties, then http")]
-    [DataRow("=,http", DisplayName = "= alone empties, then http")]
-    public void Parse_ProtoSettingUnknownThenKnown_WarnsAndAllowsOnlyTheKnown(string value)
-    {
-        CommandLineParseResult result = Parse(["--proto", value, Url]);
-
-        Diagnostics.Assert("warning count", 1, result.WarningLines.Count);
-        Assert.IsTrue(result.IsAccepted);
-        Assert.HasCount(1, result.WarningLines);
-        AssertSchemes(["http"], result.Options.AllowedProtocols);
-    }
-
-    [TestMethod]
-    public void Parse_ProtoNamingUnknownAfterSilent_DropsTheWarning()
-    {
-        CommandLineParseResult result = Parse(["-s", "--proto", "http,bogus", Url]);
-
-        AssertWarnings([], result);
-        Assert.IsTrue(result.IsAccepted);
+        string[] expectedLines =
+        [
+            $"curl: unrecognized protocol '{expectedName}'",
+            $"curl: option {option}: is badly used here",
+            CommandLineRefusal.TryHelpLine,
+        ];
+        AssertRefusal(CurlExitCode.FailedInit, expectedLines, result);
+        Assert.IsFalse(result.IsAccepted);
+        Assert.AreEqual(CurlExitCode.FailedInit, result.Refusal.ExitCode);
+        CollectionAssert.AreEqual(expectedLines, result.Refusal.StandardErrorLines.ToArray());
         Assert.IsEmpty(result.WarningLines);
     }
 
     [TestMethod]
-    [DataRow("--proto", "-all", new string[0], DisplayName = "-all")]
-    [DataRow("--proto", "=http,-http", new string[0], DisplayName = "set then remove")]
-    [DataRow("--proto", "=bogus", new[] { "Warning: unrecognized protocol 'bogus'" }, DisplayName = "=unknown")]
-    [DataRow("--proto", "=", new[] { "Warning: unrecognized protocol ''" }, DisplayName = "= alone")]
-    [DataRow("--proto-redir", "=bogus", new[] { "Warning: unrecognized protocol 'bogus'" }, DisplayName = "proto-redir =unknown")]
-    public void Parse_ProtoLeavingNoScheme_RefusesAsBadlyUsedAfterItsWarnings(string option, string value, string[] expectedWarnings)
+    public void Parse_ProtoNamingUnknownAfterSilent_RefusesWithoutNamingIt()
+    {
+        CommandLineParseResult result = Parse(["-s", "--proto", "http,bogus", Url]);
+
+        AssertRefusal(CurlExitCode.FailedInit, ["curl: option --proto: is badly used here", CommandLineRefusal.TryHelpLine], result);
+        Assert.IsFalse(result.IsAccepted);
+        CollectionAssert.AreEqual(
+            new[] { "curl: option --proto: is badly used here", CommandLineRefusal.TryHelpLine },
+            result.Refusal.StandardErrorLines.ToArray());
+    }
+
+    [TestMethod]
+    public void Parse_ProtoNamingUnknownAfterSilentAndShowError_RefusesNamingIt()
+    {
+        CommandLineParseResult result = Parse(["-sS", "--proto", "bogus", Url]);
+
+        AssertRefusal(
+            CurlExitCode.FailedInit,
+            ["curl: unrecognized protocol 'bogus'", "curl: option --proto: is badly used here", CommandLineRefusal.TryHelpLine],
+            result);
+        Assert.IsFalse(result.IsAccepted);
+        Assert.AreEqual("curl: unrecognized protocol 'bogus'", result.Refusal.StandardErrorLines[0]);
+    }
+
+    [TestMethod]
+    [DataRow("--proto", "-all", DisplayName = "-all")]
+    [DataRow("--proto", "=http,-http", DisplayName = "set then remove")]
+    [DataRow("--proto-redir", "-all", DisplayName = "proto-redir -all")]
+    public void Parse_ProtoLeavingNoScheme_RefusesAsBadlyUsed(string option, string value)
     {
         CommandLineParseResult result = Parse([option, value, Url]);
 
         AssertRefusal(CurlExitCode.FailedInit, [$"curl: option {option}: is badly used here", CommandLineRefusal.TryHelpLine], result);
-        AssertWarnings(expectedWarnings, result);
+        AssertWarnings([], result);
         Assert.IsFalse(result.IsAccepted);
         Assert.AreEqual(CurlExitCode.FailedInit, result.Refusal.ExitCode);
         CollectionAssert.AreEqual(
             new[] { $"curl: option {option}: is badly used here", CommandLineRefusal.TryHelpLine },
             result.Refusal.StandardErrorLines.ToArray());
-        CollectionAssert.AreEqual(expectedWarnings, result.WarningLines.ToArray());
+        Assert.IsEmpty(result.WarningLines);
     }
 
     [TestMethod]

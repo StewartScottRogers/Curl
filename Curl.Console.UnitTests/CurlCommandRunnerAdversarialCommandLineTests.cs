@@ -112,13 +112,13 @@ public sealed class CurlCommandRunnerAdversarialCommandLineTests
     }
 
     [TestMethod]
-    public async Task RunAsync_ProtoWithOnlyAnUnknownProtocol_WarnsThenPrintsBadlyUsedAndExitsFailedInit()
+    public async Task RunAsync_ProtoWithOnlyAnUnknownProtocol_NamesItThenPrintsBadlyUsedAndExitsFailedInit()
     {
         RunResult result = await RunAsync(["--proto", "=bogus", Url]);
 
         AssertRefusedBeforeAnyTransfer(
             result,
-            "Warning: unrecognized protocol 'bogus'" + Environment.NewLine
+            "curl: unrecognized protocol 'bogus'" + Environment.NewLine
             + "curl: option --proto: is badly used here" + Environment.NewLine
             + TryHelpLine);
     }
