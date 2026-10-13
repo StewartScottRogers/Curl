@@ -1208,14 +1208,18 @@ public static class CommandLineOptionTable
 
     /// <summary>
     /// Records a <c>--proto</c> or <c>--proto-redir</c> value read by <see cref="CommandLineProtocolSet"/>,
-    /// warning (unless silent) about each name curl does not know, or refuses with
-    /// <see cref="CommandLineRefusal.BadlyUsedHere"/>, after those warnings, a value that allows no scheme.
+    /// or refuses with <see cref="CommandLineRefusal.UnrecognizedProtocol"/> a value naming a scheme curl does
+    /// not know and with <see cref="CommandLineRefusal.BadlyUsedHere"/> a value that allows no scheme, as curl
+    /// 8.22.0 does (BL-2143).
     /// </summary>
     private static CommandLineRefusal? SetAllowedProtocols(CommandLineOptions options, string value, string spelledOption, Action<IReadOnlySet<string>> set)
     {
-        List<string> warningLines = [];
-        IReadOnlySet<string>? allowed = CommandLineProtocolSet.Read(value, warningLines);
-        options.AddWarningLinesUnlessSilent(warningLines);
+        IReadOnlySet<string>? allowed = CommandLineProtocolSet.Read(value, out string? unrecognizedName);
+        if (unrecognizedName is not null)
+        {
+            return CommandLineRefusal.UnrecognizedProtocol(spelledOption, unrecognizedName, options.ErrorsHidden);
+        }
+
         if (allowed is null)
         {
             return CommandLineRefusal.BadlyUsedHere(spelledOption);

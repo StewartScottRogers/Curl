@@ -4,7 +4,7 @@ namespace Curl.Cli;
 
 /// <summary>
 /// Reads the value of <c>--proto</c> and <c>--proto-redir</c> into the set of schemes it allows, and the
-/// value of <c>--proto-default</c> into one scheme, with curl 8.21.0's syntax and warnings.
+/// value of <c>--proto-default</c> into one scheme, with curl 8.22.0's syntax and refusals.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -12,25 +12,25 @@ namespace Curl.Cli;
 /// <see cref="KnownSchemes"/>, whatever an earlier <c>--proto</c> left. Empty items are skipped. An item may
 /// start with one modifier: <c>+</c> adds the scheme (the same as none), <c>-</c> removes it, <c>=</c> makes it
 /// the only one. The name after the modifier is matched case-insensitively, and <c>all</c> stands for every
-/// known scheme. A name curl does not know is warned about with
-/// <see cref="CommandLineWarning.UnrecognizedProtocol(string)"/>, showing at most its first 31 characters, and
-/// changes nothing unless its modifier is <c>=</c>, which still empties the set. A value that leaves the set
-/// empty is refused as badly used.
+/// known scheme. The first name curl does not know ends the reading: the caller refuses the option with
+/// <see cref="CommandLineRefusal.UnrecognizedProtocol(string, string, bool)"/>, repeating at most the name's
+/// first 31 characters. A value that leaves the set empty is refused as badly used.
 /// </para>
 /// <para>
-/// Measured with <c>Record-CurlExchange.ps1</c> against the Windows curl 8.21.0 on 2026-09-28 (BL-522):
-/// <c>=http,https</c>, <c>-all,+http</c>, <c>HTTP</c>, <c>=HtTp</c> and an empty value are taken silently;
-/// <c>http,bogus</c> warns once; <c>++http</c> warns about <c>+http</c>; <c>=,http</c> and <c>+</c> warn about
-/// <c>''</c>; <c>' http , bogus'</c> warns about <c>' http '</c> and <c>' bogus'</c>; <c>-all</c>,
-/// <c>=http,-http</c>, <c>=bogus</c> and <c>=</c> are refused, the last two after their warning; <c>ipfs</c>,
-/// <c>rtmp</c> and <c>smb</c> are unknown to that build. <c>smb</c> and <c>smbs</c> are known all the same,
-/// as the Linux (OpenSSL) curl 8.18.0 knows them, since Curl serves both (BL-598, BL-1099).
+/// Measured against the Windows curl 8.22.0 on 2026-10-13 (BL-2143, AF-0184): <c>x</c>, <c>http,bogus</c>,
+/// <c>=bogus</c>, <c>-bogus</c>, <c>x,-all</c>, <c>ipfs</c>, <c>rtmp</c> and <c>smb</c> print
+/// <c>curl: unrecognized protocol '&lt;name&gt;'</c>, then <c>is badly used here</c> and the try-help line, and
+/// exit 2 sending nothing, for <c>--proto-redir</c> too; <c>++http</c> repeats <c>+http</c>, <c>+</c> and
+/// <c>=,http</c> repeat <c>''</c>, and a long name is cut to 31 characters; <c>-s</c> drops the first line and
+/// <c>-sS</c> keeps it; <c>HTTP</c> is taken. curl 8.21.0 only warned and went on (BL-522). <c>smb</c> and
+/// <c>smbs</c> are known all the same, as the Linux (OpenSSL) build knows them, since Curl serves both
+/// (BL-598, BL-1099).
 /// </para>
 /// </remarks>
 internal static class CommandLineProtocolSet
 {
-    /// <summary>The longest name curl 8.21.0 repeats in its unrecognized-protocol warning.</summary>
-    private const int LongestWarnedName = 31;
+    /// <summary>The longest name curl 8.22.0 repeats in its unrecognized-protocol line.</summary>
+    private const int LongestRepeatedName = 31;
 
     /// <summary>
     /// The schemes curl 8.21.0 knows for these options: the <c>Protocols:</c> line of the Windows (Schannel)
@@ -46,19 +46,27 @@ internal static class CommandLineProtocolSet
         "wss");
 
     /// <summary>
-    /// Reads a <c>--proto</c> or <c>--proto-redir</c> value into the schemes it allows.
+    /// Reads a <c>--proto</c> or <c>--proto-redir</c> value into the schemes it allows, stopping at the first
+    /// name curl does not know.
     /// </summary>
     /// <param name="value">The value exactly as given.</param>
-    /// <param name="warningLines">Where each unrecognized-protocol warning is appended, in the order met.</param>
-    /// <returns>The allowed schemes, lowercase; <see langword="null"/> when the value leaves none.</returns>
-    internal static FrozenSet<string>? Read(string value, List<string> warningLines)
+    /// <param name="unrecognizedName">
+    /// The first name curl does not know, without its modifier and cut to its first 31 characters, as curl
+    /// repeats it; <see langword="null"/> when every name is known.
+    /// </param>
+    /// <returns>
+    /// The allowed schemes, lowercase; <see langword="null"/> when a name is unrecognized or the value leaves none.
+    /// </returns>
+    internal static FrozenSet<string>? Read(string value, out string? unrecognizedName)
     {
         HashSet<string> allowed = new(KnownSchemes, StringComparer.Ordinal);
+        unrecognizedName = null;
         foreach (string item in value.Split(','))
         {
-            if (item.Length > 0)
+            unrecognizedName = item.Length == 0 ? null : ApplyItem(allowed, item);
+            if (unrecognizedName is not null)
             {
-                ApplyItem(allowed, item, warningLines);
+                return null;
             }
         }
 
@@ -74,17 +82,27 @@ internal static class CommandLineProtocolSet
     internal static string? KnownScheme(string name) =>
         KnownSchemes.TryGetValue(name, out string? scheme) ? scheme : null;
 
-    private static void ApplyItem(HashSet<string> allowed, string item, List<string> warningLines)
+    /// <summary>
+    /// Applies one non-empty item to <paramref name="allowed"/>, or returns its name, as curl repeats it, when
+    /// curl does not know it.
+    /// </summary>
+    private static string? ApplyItem(HashSet<string> allowed, string item)
     {
         char modifier = SplitModifier(item, out string name);
         if (string.Equals(name, "all", StringComparison.OrdinalIgnoreCase))
         {
             ApplyToAll(allowed, modifier);
+            return null;
         }
-        else
+
+        string? scheme = KnownScheme(name);
+        if (scheme is null)
         {
-            ApplyToName(allowed, modifier, name, warningLines);
+            return name[..Math.Min(name.Length, LongestRepeatedName)];
         }
+
+        ApplyToScheme(allowed, modifier, scheme);
+        return null;
     }
 
     /// <summary>
@@ -103,26 +121,20 @@ internal static class CommandLineProtocolSet
         return '+';
     }
 
-    private static void ApplyToName(HashSet<string> allowed, char modifier, string name, List<string> warningLines)
+    private static void ApplyToScheme(HashSet<string> allowed, char modifier, string scheme)
     {
-        string? scheme = KnownScheme(name);
+        if (modifier == '-')
+        {
+            allowed.Remove(scheme);
+            return;
+        }
+
         if (modifier == '=')
         {
             allowed.Clear();
         }
 
-        if (scheme is null)
-        {
-            warningLines.Add(CommandLineWarning.UnrecognizedProtocol(name[..Math.Min(name.Length, LongestWarnedName)]));
-        }
-        else if (modifier == '-')
-        {
-            allowed.Remove(scheme);
-        }
-        else
-        {
-            allowed.Add(scheme);
-        }
+        allowed.Add(scheme);
     }
 
     private static void ApplyToAll(HashSet<string> allowed, char modifier)

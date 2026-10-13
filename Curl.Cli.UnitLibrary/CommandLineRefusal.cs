@@ -517,6 +517,27 @@ public sealed class CommandLineRefusal
             "is badly used here");
 
     /// <summary>
+    /// Refuses a <c>--proto</c> or <c>--proto-redir</c> value naming a scheme curl does not know:
+    /// <c>curl: unrecognized protocol '&lt;name&gt;'</c> (hidden when <paramref name="errorsHidden"/>),
+    /// <c>curl: option &lt;spelled&gt;: is badly used here</c> and the try-help line.
+    /// </summary>
+    /// <remarks>
+    /// Measured with the Windows curl 8.22.0 on 2026-10-13 (BL-2143, AF-0184): <c>--proto x</c>,
+    /// <c>--proto http,bogus</c> and <c>--proto-redir x</c> exit 2 with these lines and send nothing; <c>-s</c>
+    /// drops the first and <c>-sS</c> keeps it. curl 8.21.0 only warned and went on.
+    /// </remarks>
+    /// <param name="spelledOption">The whole argument as typed.</param>
+    /// <param name="name">The name as curl repeats it: without its modifier, cut to its first 31 characters.</param>
+    /// <param name="errorsHidden"><see langword="true"/> when <c>-s</c> without <c>-S</c> is in effect.</param>
+    /// <returns>The refusal.</returns>
+    internal static CommandLineRefusal UnrecognizedProtocol(string spelledOption, string name, bool errorsHidden) =>
+        new(
+            CurlExitCode.FailedInit,
+            ErrorMessageLines(errorsHidden, $"unrecognized protocol '{name}'"),
+            spelledOption,
+            "is badly used here");
+
+    /// <summary>
     /// Refuses a <c>--tls-max</c> read after a minimum TLS version above it, or given as <c>default</c> after
     /// any minimum: <c>curl: --tls-max set lower than minimum accepted version</c> (hidden when
     /// <paramref name="errorsHidden"/>), <c>curl: option &lt;spelled&gt;: is badly used here</c> and the

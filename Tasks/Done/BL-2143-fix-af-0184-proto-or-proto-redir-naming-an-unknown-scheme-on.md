@@ -5,10 +5,10 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Cli.UnitLibrary]
+touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests, Curl.Console.UnitTests]
 requirement: none
 created: 2026-10-13
-completed:
+completed: 2026-10-13
 ---
 # BL-2143 — Fix AF-0184: --proto or --proto-redir naming an unknown scheme only warns and runs (exit 0); the reference curl refuses it as badly used (exit 2)
 
@@ -41,12 +41,18 @@ The finding closes only when a later re-audit by the conformance auditor confirm
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Measured the Windows curl 8.22.0 (Git ucrt64) on 2026-10-13: `--proto x`, `http,bogus`, `=bogus`, `-bogus`, `++http`, `+`, `=,http`, `x,-all`, `ipfs`, `rtmp`, `smb` and a 46-character name all print `curl: unrecognized protocol '<name>'` (name cut to 31), `is badly used here` and the try-help line, and exit 2; `--proto-redir x` the same; `-s` drops the first line, `-s -S` keeps it. The first unknown name ends the reading. Matched under ADR-0479 (Curl targets 8.22.0), so no new ADR.
+- `smb` stays known: Curl serves it and the OpenSSL build knows it (ADR-0189), as before.
+- Added `Curl.Cli.UnitTests` and `Curl.Console.UnitTests` to `touches`: their tests pinned the old warning; no task in Doing names either.
+- The `Curl.Console/bin/Release` binary was out of this sandbox's reach, so the reproduction ran through `dotnet run --project Curl.Console`: `--proto-redir x` exits 2 with curl's three lines.
 
 ## Log
 
 - 2026-10-13: Created.
 - 2026-10-13: Backlog -> Doing.
+- 2026-10-13: Doing -> Done. --proto and --proto-redir refuse an unknown scheme with curl 8.22.0's lines and exit 2; build clean, fast tests green

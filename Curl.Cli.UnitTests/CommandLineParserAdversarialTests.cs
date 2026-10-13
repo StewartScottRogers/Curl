@@ -176,12 +176,12 @@ public sealed class CommandLineParserAdversarialTests
     }
 
     [TestMethod]
-    public void Parse_ProtoWithOnlyAnUnknownProtocolAfterEquals_WarnsAndRefusesAsBadlyUsed()
+    public void Parse_ProtoWithOnlyAnUnknownProtocolAfterEquals_RefusesAsBadlyUsedAfterNamingIt()
     {
         CommandLineParseResult result = Parse(["--proto", "=bogus", Url]);
 
-        AssertRefused(result, CurlExitCode.FailedInit, "curl: option --proto: is badly used here");
-        CollectionAssert.AreEqual(new[] { "Warning: unrecognized protocol 'bogus'" }, result.WarningLines.ToArray());
+        AssertRefused(result, CurlExitCode.FailedInit, "curl: unrecognized protocol 'bogus'", "curl: option --proto: is badly used here");
+        Assert.IsEmpty(result.WarningLines);
     }
 
     [TestMethod]
