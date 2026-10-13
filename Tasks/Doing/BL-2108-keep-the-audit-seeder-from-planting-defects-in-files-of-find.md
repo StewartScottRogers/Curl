@@ -42,3 +42,4 @@ done on the `audit` branch.
 ## Log
 
 - 2026-10-12: Created.
+- 2026-10-13: Backlog -> Doing. interactive session

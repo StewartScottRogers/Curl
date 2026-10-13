@@ -59,3 +59,4 @@ that would change it, for example a matched reference build becoming available.
 ## Log
 
 - 2026-10-08: Created.
+- 2026-10-13: Backlog -> Doing. interactive session
