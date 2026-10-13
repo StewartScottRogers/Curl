@@ -1,10 +1,10 @@
 ---
 id: AF-0005
-title: chunked is slow
-auditor: performance
+title: BL-77 claimed four times
+auditor: process
 severity: High
 status: proposed
-key: performance:Curl.Protocol.Http.UnitLibrary/HttpResponseBodyReader.cs:chunked:slow
+key: process:logs:BL-77:redone-work
 task: none
 found: 2026-10-01
 found-at: 1111111
@@ -12,7 +12,7 @@ scorecard: 2026-10-01_0900.md
 closed: 
 closed-by: 
 ---
-# AF-0005 - chunked is slow
+# AF-0005 - BL-77 claimed four times
 
 ## Summary
 

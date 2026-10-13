@@ -56,6 +56,15 @@ Four layers keep the factory off them:
 
 ### 2. Six read-only specialist auditors, one job each
 
+> **Amended 2026-10-13 (BL-2132), by Stewart's decision:** the performance auditor is retired,
+> leaving five. C curl will always be faster and smaller than a C# program, so Curl never tries
+> to match or beat it on speed, memory or binary size; only behaviour must match. Performance
+> counts only when it breaks behaviour - a hang, a timeout, quadratic blow-up, a transfer that
+> fails under load - and the conformance auditor now checks that, running heavy transfers
+> through both binaries with `Audit/Tools/Test-TransfersUnderLoad.ps1`. Models have also moved
+> since this table: every auditor runs on Opus (BL-1364). The table below is the original
+> decision.
+
 | Auditor | Job | Model |
 | --- | --- | --- |
 | quality | Tests that do not check what their name claims, weak assertions, hand-built mutation testing | Sonnet |

@@ -1,8 +1,8 @@
 # Rules every auditor follows
 
 Read this file first, before your own instructions (`Audit/Instructions/<Auditor>.md`).
-These seven rules apply to every auditor - quality, security, performance, conformance,
-truthfulness and process - and your own instructions add to them, never relax them. They
+These seven rules apply to every auditor - quality, security, conformance, truthfulness and
+process - and your own instructions add to them, never relax them. They
 keep each audit independent of the dark factory it audits and make every finding
 checkable by someone else. The design is
 [ADR-0267](../../Documentation/Planning/Decisions/ADR-0267-an-independent-audit-office-audits-the-dark-factory-from-outside-its-reach.md).
