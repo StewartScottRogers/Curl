@@ -2678,13 +2678,20 @@ function Get-CiFailures {
     # the log names, so the spell does not stay open unfiled (AF-0171). That holds for every
     # failed job, not only when the whole run names nothing: a Linux test failure beside a
     # failed Quality-gates job left the quality failure unfiled for 301 minutes (AF-0150).
+    $unknownOnly = -not $found.Count
     $namedJobs = @{}
     foreach ($item in $found.Values) {
         foreach ($platform in $item.Platforms) { $namedJobs[$platform] = $true }
     }
     foreach ($raw in $Log) {
         $parts = "$raw" -split "`t", 3
-        if ($parts.Count -lt 3 -or -not $parts[0].Trim() -or $parts[0] -eq 'UNKNOWN STEP') { continue }
+        if ($parts.Count -lt 3 -or -not $parts[0].Trim()) { continue }
+        # gh prints UNKNOWN STEP where it cannot tie a line to a job. Such lines file the run only
+        # when nothing else in it is named, so a run that names no test is never dropped (AF-0178).
+        if ($parts[0] -eq 'UNKNOWN STEP') {
+            if (-not $unknownOnly) { continue }
+            $parts = @('unknown job', $parts[1], $parts[2])
+        }
         if ($namedJobs.ContainsKey((Get-CiPlatform $parts[0].Trim()))) { continue }
         $key = "job $($parts[0].Trim()) step $($parts[1].Trim())"
         $text = ($parts[2] -replace '^\d{4}-\d\d-\d\dT[\d:.]+Z ?', '').Trim()
@@ -2905,7 +2912,12 @@ function Get-CiRuns {
         if ($conclusion -eq 'failure' -and -not $script:CiWatch.Failures.ContainsKey($id)) {
             $log = & $ReadLog $id
             if ($null -eq $log) { Write-CiRunLine -RunId $id -Line "failure on ${on}: cannot read its log with gh run view --log-failed; trying again next heartbeat"; continue }
-            $script:CiWatch.Failures[$id] = @(Get-CiFailures $log)
+            $named = @(Get-CiFailures $log)
+            # A failed run whose --log-failed is empty is still red: file it by the run (AF-0178).
+            if (-not $named.Count) {
+                $named = @([pscustomobject]@{ Key = 'job unknown job step unknown step'; Kind = 'job'; Platforms = @('unknown job'); Project = ''; Message = 'the run failed and gh run view --log-failed printed no line' })
+            }
+            $script:CiWatch.Failures[$id] = $named
         }
         # Assigned apart from the if: an if statement's output is unrolled, so one failure came
         # back as a bare object, and Windows PowerShell gives a bare object no Count - a run
@@ -3183,7 +3195,14 @@ if ($TestCiWatch) {
         "quality${t}Measure code quality${t}2026-10-11T22:13:00.0000000Z ##[error]Process completed with exit code 1."))
     & $check 'a red job beside a named test failure is filed too (AF-0150)' 'test303|test; job quality step Measure code quality|job' `
         (($mixed | ForEach-Object { "$($_.Key)|$($_.Kind)" }) -join '; ')
+    $unknownJob = @(Get-CiFailures @("UNKNOWN STEP${t}Measure code quality${t}2026-10-11T23:15:00.0000000Z ##[error]Process completed with exit code 1."))
+    & $check 'a failure whose job gh cannot name is still filed (AF-0178)' 'job unknown job step Measure code quality|job' `
+        "$($unknownJob[0].Key)|$($unknownJob[0].Kind)"
     & $check 'an empty log names no failure' '0' "$(@(Get-CiFailures @()).Count)"
+    $script:CiWatch = @{ CheckedAt = [datetime]::MinValue; Failures = @{}; Settled = @{}; Logged = @{}; AuditTasks = @{}; Off = $false }
+    $emptyRuns = @(Get-CiRuns -Branch 'b' -ListRuns { '[{"databaseId":901,"status":"completed","conclusion":"failure","headSha":"abcdef0123","updatedAt":"2026-10-11T23:15:00Z"}]' } -ReadLog { , @() })
+    & $check 'a failed run with an empty log is filed by the run (AF-0178)' '1|job unknown job step unknown step' `
+        "$($emptyRuns.Count)|$($emptyRuns[0].Failures[0].Key)"
     $traced.Clear()
     $script:ciListJson = $null
     $first = Get-CiRuns -Branch 'work' -ListRuns $listed -ReadLog $readLog

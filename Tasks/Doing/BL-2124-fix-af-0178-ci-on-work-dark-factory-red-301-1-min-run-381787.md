@@ -46,6 +46,8 @@ The finding closes only when a later re-audit by the process auditor confirms th
 
 ## Notes
 
+- BL-2118 already made Get-CiFailures file a red job beside a named test failure. What still dropped a run was a log whose lines gh tags `UNKNOWN STEP` (job unnamed) or that is empty: Get-CiFailures skipped those, so Get-CiRuns printed "names no failing test ... nothing to file". Now such lines file as `job unknown job step <step>` (only when the run names nothing else), and a failed run with an empty `--log-failed` files as `job unknown job step unknown step`. Self-tests added to `-TestCiWatch`; all pass. Only RunDarkFactory.ps1 changed, so no C# build or test run applies.
+
 ## Log
 
 - 2026-10-13: Created.
