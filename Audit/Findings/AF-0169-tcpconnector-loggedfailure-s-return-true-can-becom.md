@@ -42,6 +42,8 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Netwo
 
 ## Re-audits
 
+- 2026-10-12 | 2026-10-12_1653.md | reproduces: no | Ran Invoke-MutationTest.ps1 -Site Curl.Networking.UnitLibrary/TcpConnector.cs:2267:true -Member LoggedFailure -ExcludeBaselineFailures -TimeoutSeconds 120: resolvedLine 2267, 'return true;' -> 'return false;', outcome killed (6021 ms), no excluded tests.
+
 ## Log
 
 - 2026-10-11: filed proposed.

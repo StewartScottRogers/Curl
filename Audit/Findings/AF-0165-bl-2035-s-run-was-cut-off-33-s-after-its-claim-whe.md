@@ -3,8 +3,8 @@ id: AF-0165
 title: BL-2035's run was cut off 33 s after its claim when the lane script crashed ('Cannot bind argument to parameter Path'), leaving the task idle until the next shift
 auditor: process
 severity: Low
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-12_1653.md: the reproduction no longer reproduces.
 key: process:BL-2035:BL-2035:unfinished-run
 reproduction: none
 task: BL-2058
@@ -13,9 +13,9 @@ found: 2026-10-11
 found-at: 22f394602532a6922adbc7fa91b3739b62d2112a
 scorecard: 2026-10-11_0051.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-12
+closed-how: reliable-reaudit
+closed-by: 2026-10-12_1653.md
 ---
 # AF-0165 - BL-2035's run was cut off 33 s after its claim when the lane script crashed ('Cannot bind argument to parameter Path'), leaving the task idle until the next shift
 
@@ -43,8 +43,10 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Re-audits
 
 - 2026-10-11 | 2026-10-11_1638.md | not re-audited | overlaps planted defect PD-503 in BL-2095-20261011-161534-L9.jsonl, so the auditor's verdict (reproduces no) is set aside: Ran the unfinished-runs rule over this window. Select-String 'Cannot bind argument|script error' over every DarkFactory-*.log found 0 matches. The only unfinished run, BL-2095-20261011-161534-L9.jsonl, follows no claim, so it is not a run cut off seconds after its claim by a lane-script crash. Every traced claim in the window ends in DONE, REQUEUE or BLOCKED.
+- 2026-10-12 | 2026-10-12_1653.md | reproduces: no | The original reproduction still shows the old 16:27:01 'Cannot bind argument to parameter Path' line and 'end (script error)'. This window has 3 shifts and 14 tasks done. Select-String for 'ERROR|script error|Cannot bind' over every DarkFactory-20261012-*.log finds nothing. Every lane ended 'nothing ready' or 'retired' with blocked=0 requeued=0 stalled=0. requeues is 0 and tasksClaimedMoreThanOnce is 0.
 
 ## Log
 
 - 2026-10-11: filed proposed.
 - 2026-10-11: proposed -> accepted.
+- 2026-10-12: accepted -> closed. Re-audit 2026-10-12_1653.md: the reproduction no longer reproduces.

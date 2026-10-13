@@ -43,6 +43,7 @@ Run from the repository root:
 ## Re-audits
 
 - 2026-10-11 | 2026-10-11_1638.md | not re-audited | Ran the reproduction: Gap/Tools/ConvertTo-BehaviourMeasurement.ps1 still has 0 lines matching 'internet|test2043' and 5 "return @('excluded'" rules, so the converter still has no internet-host rule. The finding's defect was ADR-0473 stating as fact that the gap office records test2043 as excluded, and that statement has since been rewritten as intent: Decision 2 now reads 'This is intent: today Gap/Tools/ConvertTo-BehaviourMeasurement.ps1 has no internet-host rule, so it records the skipped case as unmeasured (harness-unsupported)'. The reproduction checks only the converter, not the ADR's wording, so it cannot tell whether the false statement remains: not re-audited.
+- 2026-10-12 | 2026-10-12_1653.md | not re-audited | Ran the reproduction. It printed 0 then 5, the same as before, because it checks only the gap converter, which still has no internet-host or test2043 rule. But the defect was in ADR-0473's wording, and that has changed. Decision 2 now reads: 'This is intent: today Gap/Tools/ConvertTo-BehaviourMeasurement.ps1 has no internet-host rule, so it records the skipped case as unmeasured (harness-unsupported)', which is true of the converter. The reproduction cannot show whether the ADR now writes intent as intent, so it cannot tell whether the finding is fixed. Recorded as not re-audited.
 
 ## Log
 

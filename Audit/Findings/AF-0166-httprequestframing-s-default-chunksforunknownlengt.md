@@ -42,6 +42,8 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Proto
 
 ## Re-audits
 
+- 2026-10-12 | 2026-10-12_1653.md | reproduces: no | Ran Invoke-MutationTest.ps1 -Site Curl.Protocol.Http.UnitLibrary/HttpRequestFraming.cs:45:false -Member HttpRequestFraming -ExcludeBaselineFailures -TimeoutSeconds 120: resolvedLine 45, 'bool chunksForUnknownLength = false)' -> 'true)', outcome killed (7486 ms). The baseline excluded 21 failing HttpAuthUsingLines-related tests.
+
 ## Log
 
 - 2026-10-11: filed proposed.

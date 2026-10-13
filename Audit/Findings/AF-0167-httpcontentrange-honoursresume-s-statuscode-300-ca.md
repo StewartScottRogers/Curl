@@ -42,6 +42,8 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Proto
 
 ## Re-audits
 
+- 2026-10-12 | 2026-10-12_1653.md | reproduces: no | Ran Invoke-MutationTest.ps1 -Site Curl.Protocol.Http.UnitLibrary/HttpContentRange.cs:39:< -Member HonoursResume -ExcludeBaselineFailures -TimeoutSeconds 120: resolvedLine 39, 'return statusCode < 300;' -> '<= 300', outcome killed (7470 ms). The baseline excluded the same 21 failing tests.
+
 ## Log
 
 - 2026-10-11: filed proposed.
