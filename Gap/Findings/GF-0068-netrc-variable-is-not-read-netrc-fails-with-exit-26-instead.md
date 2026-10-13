@@ -4,11 +4,11 @@ title: NETRC variable is not read; --netrc fails with exit 26 instead of using t
 area: environment
 key: environment:netrc-variable-ignored
 severity: High
-status: open
+status: closed
 scope: target
 introduced-in:
 opened: 2026-10-12_0951
-closed:
+closed: 2026-10-12_2042
 regression: false
 items: [environment:NETRC]
 touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests]
@@ -32,8 +32,10 @@ Make the netrc file lookup behind --netrc (Curl.Cli.UnitLibrary NetrcUse, and th
 ## Measurements
 
 - 2026-10-12_0951: 1 of 1 items are gaps.
+- 2026-10-12_2042: 0 of 1 items are gaps.
 
 ## Log
 
 - 2026-10-12_0951: Opened by gap-environment.
 - 2026-10-12_1039: Filed BL-2114.
+- 2026-10-12_2042: Closed: run 2026-10-12_2042 measured every item as match or excluded.

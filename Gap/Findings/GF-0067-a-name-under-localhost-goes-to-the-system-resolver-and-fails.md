@@ -4,11 +4,11 @@ title: A name under .localhost goes to the system resolver and fails with exit 6
 area: behaviour
 key: behaviour:localhost-subdomain-not-resolved-to-loopback
 severity: Critical
-status: open
+status: closed
 scope: target
 introduced-in:
 opened: 2026-10-12_0951
-closed:
+closed: 2026-10-12_2042
 regression: false
 items: [behaviour:test389]
 touches: [Curl.Networking.UnitLibrary, Curl.Networking.UnitTests]
@@ -32,8 +32,10 @@ In Curl.Networking.UnitLibrary, change SystemDnsResolver.ResolveAsync (the produ
 ## Measurements
 
 - 2026-10-12_0951: 1 of 1 items are gaps.
+- 2026-10-12_2042: 0 of 1 items are gaps.
 
 ## Log
 
 - 2026-10-12_0951: Opened by gap-behaviour.
 - 2026-10-12_1039: Filed BL-2113.
+- 2026-10-12_2042: Closed: run 2026-10-12_2042 measured every item as match or excluded.

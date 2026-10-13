@@ -37,6 +37,7 @@ In Curl.Protocol.Http.UnitLibrary, when --digest is chosen for the origin or the
 - 2026-10-11_0936: 0 of 15 items are gaps.
 - 2026-10-11_1950: 0 of 15 items are gaps.
 - 2026-10-12_0951: 0 of 15 items are gaps.
+- 2026-10-12_2042: 0 of 15 items are gaps.
 
 ## Log
 

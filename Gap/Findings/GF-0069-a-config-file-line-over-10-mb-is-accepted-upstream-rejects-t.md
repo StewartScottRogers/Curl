@@ -4,11 +4,11 @@ title: A config-file line over 10 MB is accepted; upstream rejects the file with
 area: environment
 key: environment:config-syntax-line-length-limit
 severity: Medium
-status: open
+status: closed
 scope: target
 introduced-in:
 opened: 2026-10-12_0951
-closed:
+closed: 2026-10-12_2042
 regression: false
 items: [environment:config-syntax:line-length-limit]
 touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests]
@@ -32,8 +32,10 @@ Add the 10 MB (10485760-byte) per-line limit that docs/cmdline-opts/config.md st
 ## Measurements
 
 - 2026-10-12_0951: 1 of 1 items are gaps.
+- 2026-10-12_2042: 0 of 1 items are gaps.
 
 ## Log
 
 - 2026-10-12_0951: Opened by gap-environment.
 - 2026-10-12_1039: Filed BL-2115.
+- 2026-10-12_2042: Closed: run 2026-10-12_2042 measured every item as match or excluded.
