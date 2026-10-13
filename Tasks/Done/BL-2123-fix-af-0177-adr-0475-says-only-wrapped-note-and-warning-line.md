@@ -8,7 +8,7 @@ depends-on: []
 touches: [Documentation]
 requirement: none
 created: 2026-10-13
-completed:
+completed: 2026-10-12
 ---
 # BL-2123 — Fix AF-0177: ADR-0475 says only wrapped Note: and Warning: lines are joined; Unwrap also joins wrapped curl: error lines
 
@@ -41,12 +41,17 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- ADR-0475's decision paragraph and its README index row now name `curl: ` as a third joined prefix (test411). Reproduction now gives 1 then 1.
+- Documentation-only change (no code touched), so no build or test run was needed.
+- `Curl.Conformance.UnitLibrary/CLAUDE.md:233` carries the same two-prefix wording but is outside this task's `touches`; left unchanged.
 
 ## Log
 
 - 2026-10-13: Created.
 - 2026-10-12: Backlog -> Doing.
+- 2026-10-12: Doing -> Done. ADR-0475 and its index row name the curl: prefix; AF-0177 reproduction gives 1 then 1

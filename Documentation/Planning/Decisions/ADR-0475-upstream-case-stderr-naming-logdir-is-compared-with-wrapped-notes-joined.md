@@ -31,7 +31,7 @@ Two ways out were weighed:
 The second. `UpstreamCaseRun.LogDirectory` carries the case's `%LOGDIR`, and
 `UpstreamCaseVerification` passes both sides of the `<stderr>` comparison through
 `UpstreamWrappedMessageLines.Unwrap` only when the expected body contains it. A line is joined to
-the next when both start with the same `Note: ` or `Warning: ` prefix and the first ends in a blank
+the next when both start with the same `Note: `, `Warning: ` or `curl: ` prefix (the last for test411's wrapped `curl: cannot read config from` error) and the first ends in a blank
 or tab or is at least 79 characters long (`voutf`'s two cuts); the next line's prefix is dropped.
 
 ## Consequences
