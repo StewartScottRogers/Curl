@@ -35,8 +35,9 @@
     file is deleted once hashed.
 
 .PARAMETER Curl
-    The reference curl. Default: curl 8.21.0 from Git for Windows (mingw64), as
-    Record-CurlExchange.ps1 finds it.
+    The reference curl. Default: Git for Windows' curl, found as Record-CurlExchange.ps1 finds
+    it: ucrt64\bin\curl.exe first (Git 2.56.0 and later, curl 8.22.0), then mingw64\bin\curl.exe,
+    beside git.exe and then under Program Files\Git.
 
 .PARAMETER Candidate
     The executable under test. Default: Curl.Console of this repository, published first as a
@@ -88,14 +89,19 @@ $LargeBytes = 50MB
 
 function Get-ReferenceCurl {
     if ($Curl) { return (Resolve-Path $Curl).Path }
+    # Git for Windows 2.56.0 moved its curl from mingw64\bin to ucrt64\bin: try ucrt64 first,
+    # then mingw64, beside git.exe and then under Program Files.
+    $roots = @()
     $git = Get-Command git.exe -ErrorAction SilentlyContinue
-    if ($git) {
-        $found = Join-Path (Split-Path (Split-Path $git.Source -Parent) -Parent) 'mingw64\bin\curl.exe'
-        if (Test-Path -LiteralPath $found) { return $found }
+    if ($git) { $roots += Split-Path (Split-Path $git.Source -Parent) -Parent }
+    $roots += Join-Path $env:ProgramFiles 'Git'
+    foreach ($root in $roots) {
+        foreach ($folder in 'ucrt64', 'mingw64') {
+            $found = Join-Path $root "$folder\bin\curl.exe"
+            if (Test-Path -LiteralPath $found) { return $found }
+        }
     }
-    $found = Join-Path $env:ProgramFiles 'Git\mingw64\bin\curl.exe'
-    if (Test-Path -LiteralPath $found) { return $found }
-    throw 'The reference curl (Git for Windows mingw64\bin\curl.exe) was not found; pass -Curl.'
+    throw 'The reference curl (Git for Windows ucrt64\bin\curl.exe or mingw64\bin\curl.exe) was not found; pass -Curl.'
 }
 
 function Get-Scenarios {

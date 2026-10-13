@@ -39,7 +39,10 @@ Do exactly this:
    pools plus `http://127.0.0.1:PORT/`, e.g. via `Record-CurlExchange.ps1`) against the planted
    build and against real curl. The exit code (or stderr) must differ. If it does not, undo the
    site and choose another; never keep a conformance plant that needs a URL the tool does not
-   generate. Keep the one command and both outcomes for the manifest's `trigger`.
+   generate. A load plant's **Trigger** is instead a `Audit/Tools/Test-TransfersUnderLoad.ps1
+   -Scenario <name>` run, with `-Candidate` naming the planted build: real curl must finish and
+   the planted build must time out or exit differently. Keep the one command and both outcomes
+   for the manifest's `trigger`.
 3. **Hide and commit.** Delete `Audit/PlantedDefects/`, `Audit/Findings/` and
    `Audit/Scorecards/` from the worktree, so an auditor that looks cannot see the answers or old
    findings. Then commit everything in the worktree as one commit with the message

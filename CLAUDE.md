@@ -171,15 +171,20 @@ script, run by `task-board.ps1`, whispers the Backlog's depth ("Backlog depth, 6
 after a move takes a task out of `Backlog`, once per burst of moves (BL-1182). All of it is silent while `%LOCALAPPDATA%\Curl\audio-off` exists (BL-1317), and so are the dark factory's alarm, chimes and spoken notices: `RunDarkFactory.ps1` checks the file at each sound, so it reaches a shift already running, shows the alarm and notices on screen only and never touches the volume (BL-1456). `-QuietAlarm` is then not needed; it silences a shift the same way whether or not the file exists.
 ## Audit office
 An independent team of AI auditors audits the dark factory and the code it produced, from
-outside the factory's reach (ADR-0267; `Audit/README.md` maps the folder). Six read-only
+outside the factory's reach (ADR-0267; `Audit/README.md` maps the folder). Five read-only
 auditors, each reading `Audit/Instructions/Auditor-Rules.md` and its own method there:
 
 - `audit-quality` (Opus): tests whose names lie, weak assertions, mutants no test kills.
 - `audit-security` (Opus): fuzzing, constant-time secret comparisons, secrets in output.
-- `audit-performance` (Sonnet): Curl's native build against real curl on six transfers.
-- `audit-conformance` (Opus): generated command lines through real curl and Curl.
+- `audit-conformance` (Opus): generated command lines through real curl and Curl, and heavy
+  transfers through both for hangs, quadratic blow-up and failures under load.
 - `audit-truthfulness` (Opus): names, doc comments, documents, ADRs and script help.
 - `audit-process` (Opus): the factory's logs, git history and CI runs.
+
+No audit compares Curl's speed, memory or binary size with curl's (Stewart, 2026-10-13): C curl
+will always be faster and smaller, so Curl never tries to match or beat it there; only behaviour
+must match, and performance counts only when it breaks behaviour. The `audit-performance`
+auditor was retired that day (BL-2132).
 
 `audit-seeder` (Sonnet) plants known defects from the encoded catalogue in
 `Audit/PlantedDefects/` before each audit, at least one per auditor, so each auditor's
@@ -201,7 +206,7 @@ in "Git and GitHub"). A lane that meets an audit path stops and leaves it to an 
 session.
 
 Run an audit with `Audit\RunAudit.cmd -NewTab` (in herdr, like the factory; never with
-`Start-Process`). `-Auditors` picks some of the six (and warns about any left out that have
+`Start-Process`). `-Auditors` picks some of the five (and warns about any left out that have
 accepted findings, which go un-re-audited), `-Planted` the defect count (default
 8), `-Ref` the commit (default `origin/work/dark-factory`), `-DryRun` prints the plan. It
 refuses inside a factory process and while a shift runs; `-AlongsideShift` runs it anyway,

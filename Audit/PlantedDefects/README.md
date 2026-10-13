@@ -13,7 +13,9 @@ every audit path.
 
 - `Catalogue.md.b64` - the catalogue, base64-encoded so that its text never appears in a search
   of the repository (BL-1028). It lists at least three defects per auditor (quality, security,
-  performance, conformance, truthfulness, process), each with an `id` (`PD-###`), the auditor
+  conformance, truthfulness, process; the retired performance auditor's speed and memory
+  plants were removed on 2026-10-13, BL-2132, and a conformance plant for a hang under load
+  took their place), each with an `id` (`PD-###`), the auditor
   and finding kind it tests, what the defect is, how to plant it in general terms (a pattern to
   find and a change to make, so it still applies as the code moves on), whether the solution
   still builds, and how a correct finding is recognised.
