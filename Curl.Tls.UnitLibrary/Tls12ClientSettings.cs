@@ -3,7 +3,7 @@ namespace Curl.Tls;
 /// <summary>
 /// What one TLS 1.2, 1.1 or 1.0 client handshake offers and presents. The ClientHello
 /// carries <c>renegotiation_info</c> (empty: Curl never renegotiates), <c>server_name</c>,
-/// <c>srp</c> with <see cref="SrpCredentials" />, <c>ec_point_formats</c>, <c>supported_groups</c>, <c>session_ticket</c>,
+/// <c>ec_point_formats</c>, <c>supported_groups</c>, <c>session_ticket</c>,
 /// <c>status_request</c>, ALPN, <c>encrypt_then_mac</c>, <c>extended_master_secret</c> and,
 /// when TLS 1.2 is offered, <c>signature_algorithms</c>, in <see cref="ExtensionOrder" />
 /// (OpenSSL's by default), with any of <see cref="FixedExtensions" /> sent verbatim in their place.
@@ -134,17 +134,9 @@ public sealed record Tls12ClientSettings
     public bool InsertEmptyFragment { get; init; } = true;
 
     /// <summary>
-    /// Gets the user name and password for TLS-SRP (RFC 5054), or <see langword="null" />: with
-    /// them the ClientHello carries the <c>srp</c> extension and the SRP suites in
-    /// <see cref="CipherSuites" />; without them, as in OpenSSL, it offers no SRP suite.
-    /// </summary>
-    public TlsSrpCredentials? SrpCredentials { get; init; }
-
-    /// <summary>
     /// Gets the suites the ClientHello carries: <see cref="CipherSuites" /> without those that
     /// need TLS 1.2 when <see cref="MaximumVersion" /> is below it, as OpenSSL leaves out a
-    /// suite the highest offered version cannot run, and without the SRP suites when there are
-    /// no <see cref="SrpCredentials" />.
+    /// suite the highest offered version cannot run.
     /// </summary>
     internal IReadOnlyList<ushort> OfferedCipherSuites => [.. CipherSuites.Where(IsOffered)];
 
@@ -152,7 +144,7 @@ public sealed record Tls12ClientSettings
     {
         Tls12CipherSuite? suite = Tls12CipherSuite.Find(code);
         return suite is null
-            || ((MaximumVersion == TlsProtocolVersion.Tls12 || !suite.RequiresTls12) && (SrpCredentials is not null || suite.KeyExchange != Tls12KeyExchange.Srp));
+            || MaximumVersion == TlsProtocolVersion.Tls12 || !suite.RequiresTls12;
     }
 
     /// <summary>Throws when the settings cannot drive a handshake.</summary>

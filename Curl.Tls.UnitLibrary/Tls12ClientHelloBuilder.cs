@@ -31,12 +31,6 @@ internal static class Tls12ClientHelloBuilder
             extensions.Add(ServerNameExtension.EncodeHostName(settings.ServerName));
         }
 
-        // OpenSSL sends srp after server_name (and max_fragment_length, which Curl never sends).
-        if (settings.SrpCredentials is not null)
-        {
-            extensions.Add(SrpExtension.Encode(Encoding.UTF8.GetBytes(settings.SrpCredentials.UserName)));
-        }
-
         // With no group to offer, OpenSSL sends neither ec_point_formats nor supported_groups
         // (measured with --tls-max 1.2 --curves '?bogus', BL-1094).
         if (settings.SupportedGroups.Count > 0)

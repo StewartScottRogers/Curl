@@ -10,8 +10,7 @@ public enum Tls12Authentication
     Ecdsa,
 
     /// <summary>
-    /// No certificate: the <c>_anon_</c> suites and the plain <c>SRP_SHA</c> suites (where the
-    /// password authenticates both sides) send no Certificate and an unsigned ServerKeyExchange.
+    /// No certificate: the <c>_anon_</c> suites send no Certificate and an unsigned ServerKeyExchange.
     /// </summary>
     Anonymous,
 
