@@ -3,12 +3,12 @@ id: AF-0174
 title: 21 Curl.Protocol.Http.UnitTests fail on the audited commit: HttpAuthUsingLines.AuthUsing writes the user's password into the verbose 'auth using' line
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Protocol.Http.UnitLibrary/HttpAuthUsingLines.cs:AuthUsing:failing-test
 reproduction: none
-task: none
-tasks:
+task: BL-2120
+tasks: BL-2120
 found: 2026-10-12
 found-at: 4e6ddbc5b33356117bfec6778ba550ab61454a99
 scorecard: 2026-10-12_1653.md
@@ -45,3 +45,4 @@ Select-String -Path Curl.Protocol.Http.UnitLibrary/HttpAuthUsingLines.cs -Patter
 ## Log
 
 - 2026-10-12: filed proposed.
+- 2026-10-12: proposed -> accepted.

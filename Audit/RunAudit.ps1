@@ -21,7 +21,14 @@
          written since the last scorecard (seven days when there is none) from <repo>.logs into
          <stamp>\logs, with the CI runs saved there as ci-runs.json.
       4. audit-seeder plants -Planted defects (at least one per selected auditor) with -Seed and
-         writes <stamp>\manifest.json; it commits the planted tree as "Audit baseline".
+         writes <stamp>\manifest.json; it commits the planted tree as "Audit baseline". It is
+         told the files to avoid - every file in the "Location:" line of an accepted finding on
+         the audit branch whose tasks are all in Tasks/Done at the audited commit, so no plant
+         sets that finding's re-audit verdict aside (BL-2108) - and writes them to
+         <stamp>\avoid-files.txt. When every catalogue entry for an auditor fits only avoided
+         files, it draws another entry or lists the auditor under "unseeded" in the manifest.
+         The run then checks the manifest and warns, in its log and the scorecard commit's
+         message, about any selected auditor left unseeded and any defect in an avoided file.
       5. Each selected auditor in the fixed order, one at a time, in the planted tree, with its
          open findings from the audit branch to re-audit; its reply goes to
          <stamp>\reports\<auditor>.md. A planted tree left changed afterwards marks that auditor
@@ -64,13 +71,16 @@
     to the measured burn. The lane-marker refusal still applies. Decided by Claude, 2026-09-30.
 
 .PARAMETER DryRun
-    Do step 1, then print what every other step would run, and change nothing.
+    Do step 1, then print what every other step would run, and change nothing. Step 4 lists the
+    files the seeder must avoid, each with the findings naming it, read from this copy's
+    Audit/Findings and the Tasks folder at -Ref as it stands before the fetch.
 
 .PARAMETER NewTab
     Start the audit in a new herdr tab (a console window outside herdr) and return at once.
 
 .PARAMETER SelfTest
-    Check the refusals on a faked process list.
+    Check the refusals on a faked process list, the -Auditors warnings, and the seeder's avoided
+    files and manifest check on scratch findings and task paths.
 
 .EXAMPLE
     Audit\RunAudit.cmd -NewTab
@@ -203,6 +213,80 @@ function Get-SkippedAuditorWarnings([string]$Findings, [string[]]$Chosen) {
     return $warnings
 }
 
+function Get-FindingField([string]$Text, [string]$Name) {
+    if ($Text -match "(?m)^$([regex]::Escape($Name)):[ \t]*([^\r\n]*)") { return $Matches[1].Trim() }
+    return ''
+}
+
+function Get-ReauditAwaitedFiles([string]$Findings, [string[]]$TaskPaths) {
+    # The files the seeder must not plant in (BL-2108): those a finding awaiting a re-audit names
+    # in its "Location:" line. A finding awaits a re-audit while it is accepted and every one of
+    # its tasks - its task, its tasks list, and any BL-###-fix-/re-fix- task file naming it, as
+    # Test-AuditDue.ps1 counts them - is in Tasks/Done at the audited commit. Unlike
+    # Test-AuditDue's reaudit-pending count, a finding that already has one verdict since its fix
+    # still counts: it stays accepted until a second verdict or a clean rerun closes it, and a
+    # plant in its file would set that verdict aside too (ADR-0422's overlap rule).
+    # Returns one object per such finding: Id, Auditor, Files (paths with any :line removed).
+    $awaited = @()
+    $paths = @($TaskPaths | Where-Object { $_ } | ForEach-Object { "$_" -replace '\\', '/' })
+    foreach ($f in @(Get-ChildItem -LiteralPath $Findings -Filter 'AF-*.md' -ErrorAction SilentlyContinue | Sort-Object Name)) {
+        $t = [IO.File]::ReadAllText($f.FullName)
+        if ((Get-FindingField $t 'status') -ne 'accepted') { continue }
+        $id = Get-FindingField $t 'id'
+        $ids = @(@((Get-FindingField $t 'task'), @((Get-FindingField $t 'tasks') -split ',\s*')) | Where-Object { $_ -match '^BL-\d+$' })
+        $slug = $id.ToLowerInvariant()
+        $ids += @($paths | ForEach-Object { $_.Substring($_.LastIndexOf('/') + 1) } | Where-Object { $_ -match '^BL-\d+-(re-)?fix-' -and $_ -match "\b$slug\b" } | ForEach-Object { ($_ -split '-')[0..1] -join '-' })
+        $ids = @($ids | Sort-Object -Unique)
+        if (-not $ids.Count) { continue }
+        $done = $true
+        foreach ($taskId in $ids) {
+            $path = @($paths | Where-Object { $_.Substring($_.LastIndexOf('/') + 1) -like "$taskId-*" } | Select-Object -First 1)
+            if (-not $path.Count -or $path[0] -notmatch '^Tasks/Done/') { $done = $false; break }
+        }
+        if (-not $done) { continue }
+        $location = if ($t -match '(?m)^Location: `([^`]*)`') { $Matches[1] } else { '' }
+        $files = @($location -split ',\s*' | ForEach-Object { ($_ -replace '\\', '/' -replace ':\d+(-\d+)?$', '').Trim() } | Where-Object { $_ -and $_ -notmatch '[{}]' } | Sort-Object -Unique)
+        if ($files.Count) { $awaited += [pscustomobject]@{ Id = $id; Auditor = Get-FindingField $t 'auditor'; Files = $files } }
+    }
+    return $awaited
+}
+
+function Test-AvoidedFile([string]$Planted, [string]$Avoided) {
+    # The same file: equal, or one path ending with the other. A process finding names its log as
+    # logs/<name>, where the manifest names it relative to the log copy.
+    $p = ("$Planted" -replace '\\', '/').Trim().TrimStart('/')
+    $a = ("$Avoided" -replace '\\', '/').Trim().TrimStart('/')
+    if (-not $p -or -not $a) { return $false }
+    return ($p -ieq $a) -or $p.EndsWith('/' + $a, [StringComparison]::OrdinalIgnoreCase) -or $a.EndsWith('/' + $p, [StringComparison]::OrdinalIgnoreCase)
+}
+
+function Get-SeedingProblems($Manifest, [string[]]$Chosen, [string[]]$AvoidFiles) {
+    # What the seeder's manifest gets wrong against the run's rules (BL-2108): an auditor with no
+    # planted defect (with the seeder's reason when its "unseeded" list gives one), and a defect
+    # planted in a file a finding awaiting a re-audit names.
+    $problems = @()
+    $planted = @($Manifest.planted | Where-Object { $_ })
+    $reasons = @{}
+    foreach ($u in @($Manifest.unseeded | Where-Object { $_ })) { $reasons["$($u.auditor)"] = "$($u.reason)" }
+    foreach ($a in $Chosen) {
+        if (@($planted | Where-Object { "$($_.auditor)" -eq $a }).Count) { continue }
+        $why = if ($reasons[$a]) { ": $($reasons[$a])" } else { ': the manifest names no defect for it' }
+        $problems += "Could not seed $a$why. Its catch rate this audit is '-'."
+    }
+    foreach ($p in $planted) {
+        $hit = @($AvoidFiles | Where-Object { Test-AvoidedFile "$($p.file)" $_ } | Select-Object -First 1)
+        if ($hit.Count) { $problems += "Planted defect $($p.id) ($($p.auditor)) sits in $($p.file), a file a finding awaiting a re-audit names ($($hit[0])); that finding's verdict may be set aside." }
+    }
+    return $problems
+}
+
+function Get-AvoidPromptLines([object[]]$Awaited) {
+    # The seeder prompt's avoid list, one file per line with the findings that name it.
+    $byFile = [ordered]@{}
+    foreach ($w in $Awaited) { foreach ($file in $w.Files) { if (-not $byFile.Contains($file)) { $byFile[$file] = @() }; $byFile[$file] += $w.Id } }
+    return @($byFile.Keys | ForEach-Object { "- $_ ($($byFile[$_] -join ', '))" })
+}
+
 # ------------------------------------------------------------------ self-test
 
 if ($SelfTest) {
@@ -228,6 +312,32 @@ if ($SelfTest) {
         $warnings = @(Get-SkippedAuditorWarnings $scratch @('security', 'process'))
         Check 'leaving out an auditor with accepted findings warns, naming them' ($warnings.Count -eq 1 -and $warnings[0] -eq 'Warning: -Auditors leaves out quality, which has 1 accepted findings this audit will not re-audit: AF-0001.') "$warnings"
         Check 'running every auditor warns about nothing' (@(Get-SkippedAuditorWarnings $scratch $Order).Count -eq 0) 'none'
+
+        # BL-2108: files of findings awaiting a re-audit, and the manifest check.
+        $awaitDir = Join-Path $scratch 'await'
+        New-Item -ItemType Directory -Force $awaitDir | Out-Null
+        $finding = { param($Id, $Auditor, $Status, $Task, $Location) [IO.File]::WriteAllText((Join-Path $awaitDir "$Id-x.md"), "---`nid: $Id`nauditor: $Auditor`nstatus: $Status`ntask: $Task`ntasks: $Task`n---`n## Evidence`n`nLocation: ``$Location```n") }
+        & $finding 'AF-0010' 'conformance' 'accepted' 'BL-10' 'Curl.Console/CurlCommandRunner.cs:1310'
+        & $finding 'AF-0011' 'quality' 'accepted' 'BL-11' 'Curl.Cli.UnitLibrary/A.cs:5'
+        & $finding 'AF-0012' 'process' 'accepted' 'BL-12' 'logs/ci-runs.json'
+        & $finding 'AF-0013' 'security' 'closed' 'BL-13' 'Curl.Tls.UnitLibrary/B.cs'
+        & $finding 'AF-0014' 'truthfulness' 'accepted' 'BL-14' 'README.md:3, Documentation/C.md'
+        & $finding 'AF-0015' 'quality' 'accepted' 'none' 'Curl.Core.UnitLibrary/D.cs'
+        $tasks = @('Tasks/Done/2026-10-10/BL-10-fix-af-0010-x.md', 'Tasks/Doing/BL-11-fix-af-0011-x.md', 'Tasks/Done/BL-12-fix-af-0012-x.md',
+            'Tasks/Done/BL-13-fix-af-0013-x.md', 'Tasks/Done/BL-14-fix-af-0014-x.md', 'Tasks/Backlog/BL-20-re-fix-af-0012-y.md')
+        $awaited = @(Get-ReauditAwaitedFiles $awaitDir $tasks)
+        $ids = ($awaited | ForEach-Object { $_.Id }) -join ','
+        Check 'an accepted finding whose tasks are all Done awaits a re-audit; an open task, an open Re-fix, closed or task-less does not' ($ids -eq 'AF-0010,AF-0014') $ids
+        $avoid = @($awaited | ForEach-Object { $_.Files } | Sort-Object -Unique)
+        Check 'the files to avoid come from Location, without line numbers, every comma-separated path' (($avoid -join ',') -eq 'Curl.Console/CurlCommandRunner.cs,Documentation/C.md,README.md') ($avoid -join ',')
+        $lines = @(Get-AvoidPromptLines $awaited)
+        Check 'the seeder prompt lists each avoided file with the findings naming it' ($lines[0] -eq '- Curl.Console/CurlCommandRunner.cs (AF-0010)' -and $lines.Count -eq 3) ($lines -join ' / ')
+        Check 'a log-copy path matches a process finding''s logs/ path' ((Test-AvoidedFile 'ci-runs.json' 'logs/ci-runs.json') -and -not (Test-AvoidedFile 'a-ci-runs.json' 'logs/ci-runs.json')) 'log'
+        $good = [pscustomobject]@{ planted = @([pscustomobject]@{ id = 'PD-201'; auditor = 'conformance'; file = 'Curl.Console/Other.cs' }, [pscustomobject]@{ id = 'PD-101'; auditor = 'quality'; file = 'Curl.Core.UnitTests/T.cs' }) }
+        Check 'a manifest that seeds every auditor outside the avoided files has no problems' (@(Get-SeedingProblems $good @('quality', 'conformance') $avoid).Count -eq 0) 'none'
+        $bad = [pscustomobject]@{ planted = @([pscustomobject]@{ id = 'PD-201'; auditor = 'conformance'; file = 'Curl.Console\CurlCommandRunner.cs' }); unseeded = @([pscustomobject]@{ auditor = 'quality'; reason = 'every quality entry fits only avoided files' }) }
+        $problems = @(Get-SeedingProblems $bad @('quality', 'conformance', 'process') $avoid)
+        Check 'an unseeded auditor is reported with the seeder''s reason, a silent gap too, and a plant in an avoided file' ($problems.Count -eq 3 -and $problems[0] -like 'Could not seed quality: every quality entry*' -and $problems[1] -like 'Could not seed process: the manifest names no defect*' -and $problems[2] -like 'Planted defect PD-201 *CurlCommandRunner.cs*') ($problems -join ' / ')
     }
     finally { Remove-Item -Recurse -Force -LiteralPath $scratch -ErrorAction SilentlyContinue }
     exit $(if ($failed) { 1 } else { 0 })
@@ -279,7 +389,10 @@ if ($DryRun) {
     Get-SkippedAuditorWarnings (Join-Path $PSScriptRoot 'Findings') $Selected | ForEach-Object { Write-Host "  $_" }
     Write-Host "  2. git fetch origin; the worktree that has branch audit checked out, or git worktree add $AuditRoot\audit-branch audit (from origin/audit, else origin/master); git merge origin/master there"
     Write-Host "  3. git worktree add --detach $RunDir\planted $Ref; overlay Audit/Instructions, Audit/Tools, Audit/PlantedDefects and .claude/agents/audit-*.md from the audit branch; copy logs changed since the last scorecard from $repo.logs to $RunDir\logs; gh run list ... > $RunDir\logs\ci-runs.json"
-    Write-Host "  4. claude -p --agent audit-seeder --model sonnet ... (seed $Seed, $Planted defects, manifest $RunDir\manifest.json)"
+    $awaited = @(Get-ReauditAwaitedFiles (Join-Path $PSScriptRoot 'Findings') @(Invoke-Git @('-C', $repo, 'ls-tree', '-r', '--name-only', $Ref, '--', 'Tasks') -AllowFailure))
+    Write-Host "  4. claude -p --agent audit-seeder --model sonnet ... (seed $Seed, $Planted defects, manifest $RunDir\manifest.json), avoiding $(@($awaited | ForEach-Object { $_.Files } | Sort-Object -Unique).Count) files named by $($awaited.Count) findings awaiting a re-audit (findings here, tasks at $Ref before the fetch):"
+    Get-AvoidPromptLines $awaited | ForEach-Object { Write-Host "       $_" }
+    Write-Host "     then check the manifest: every auditor seeded, no defect in an avoided file"
     foreach ($a in $Selected) { Write-Host "  5. claude -p --agent audit-$a --model $($Models[$a]) ... > $RunDir\reports\$a.md (scratch $RunDir\scratch\$a)" }
     Write-Host "  6. Write-AuditScorecard.ps1 -ReliabilityOnly; Write-AuditFindings.ps1 -Tree $RunDir\planted -RerunReproductions (mechanical reruns on the clean, unplanted $Ref commit); Write-AuditScorecard.ps1 (into the audit branch)"
     Write-Host "  7. git commit -m 'audit: scorecard $Stamp'; git push origin audit; gh pr create --base master --head audit (unless one is open; never merged here)"
@@ -339,10 +452,19 @@ try {
     # 4. seed
     Set-Caption 'seeding'
     $manifest = Join-Path $RunDir 'manifest.json'
-    $seedPrompt = "Seed an audit. Worktree: $plantedTree (detached at $auditedCommit). Log copy: $logs. Manifest path: $manifest. Seed: $Seed. Count: $Planted. Plant at least one defect for each of these auditors: $($Selected -join ', '), and only for them. Follow your instructions exactly; change nothing outside the worktree, the log copy and the manifest path."
+    $awaited = @(Get-ReauditAwaitedFiles (Join-Path $auditTree 'Audit\Findings') @(Invoke-Git @('-C', $repo, 'ls-tree', '-r', '--name-only', $auditedCommit, '--', 'Tasks')))
+    $avoidFiles = @($awaited | ForEach-Object { $_.Files } | Sort-Object -Unique)
+    $avoidLines = @(Get-AvoidPromptLines $awaited)
+    [IO.File]::WriteAllText((Join-Path $RunDir 'avoid-files.txt'), (($avoidLines | ForEach-Object { "$_`r`n" }) -join ''), $Utf8)
+    Write-Step "seeder avoids $($avoidFiles.Count) files named by $($awaited.Count) findings awaiting a re-audit$(if ($avoidFiles.Count) { ': ' + ($avoidFiles -join ', ') })"
+    $avoidPrompt = if ($avoidLines.Count) { " Avoided files - plant nothing in these, because findings awaiting a re-audit name them (a path starting logs/ is that file in the log copy):`n" + ($avoidLines -join "`n") + "`n" } else { ' Avoided files: none.' }
+    $seedPrompt = "Seed an audit. Worktree: $plantedTree (detached at $auditedCommit). Log copy: $logs. Manifest path: $manifest. Seed: $Seed. Count: $Planted. Plant at least one defect for each of these auditors: $($Selected -join ', '), and only for them.$avoidPrompt Follow your instructions exactly; change nothing outside the worktree, the log copy and the manifest path."
     $null = Invoke-Agent 'audit-seeder' $Models.seeder $seedPrompt $auditTree (Join-Path $RunDir 'seeder.md')
     if (-not (Test-Path -LiteralPath $manifest)) { throw 'The seeder wrote no manifest.' }
-    Write-Step "seeded: $(@((Get-Content -LiteralPath $manifest -Raw | ConvertFrom-Json).planted).Count) defects"
+    $seeded = Get-Content -LiteralPath $manifest -Raw | ConvertFrom-Json
+    Write-Step "seeded: $(@($seeded.planted).Count) defects"
+    $seedingProblems = @(Get-SeedingProblems $seeded $Selected $avoidFiles)
+    $seedingProblems | ForEach-Object { Write-Step "Warning: $_" }
 
     # 5. the auditors
     $changedTree = @()
@@ -383,7 +505,7 @@ try {
 
     # 7. commit, push, pull request
     Invoke-Git @('-C', $auditTree, 'add', '-A', '--', 'Audit/Findings', 'Audit/Scorecards') | Out-Null
-    Invoke-Git @('-C', $auditTree, '-c', 'user.name=Audit runner', '-c', 'user.email=audit-runner@example.invalid', 'commit', '-q', '-m', "audit: scorecard $Stamp", '-m', "$findingsLine. Audited $auditedCommit; auditors $($Selected -join ', '); seed $Seed.") | Out-Null
+    Invoke-Git @('-C', $auditTree, '-c', 'user.name=Audit runner', '-c', 'user.email=audit-runner@example.invalid', 'commit', '-q', '-m', "audit: scorecard $Stamp", '-m', "$findingsLine. Audited $auditedCommit; auditors $($Selected -join ', '); seed $Seed.$(if ($seedingProblems.Count) { ' ' + ($seedingProblems -join ' ') })") | Out-Null
     Invoke-Git @('-C', $auditTree, 'push', '-q', 'origin', 'audit') | Out-Null
     $openPr = "$(& gh pr list --head audit --base master --state open --json url --jq '.[0].url' 2>$null)".Trim()
     if (-not $openPr) {
