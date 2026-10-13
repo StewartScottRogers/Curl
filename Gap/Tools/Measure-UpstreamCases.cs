@@ -56,8 +56,8 @@
 // "disabled upstream", which ConvertTo-BehaviourMeasurement.ps1 measures excluded, disabled-upstream.
 // "--self-test" instead checks these substitutions and prints a PASS or FAIL line per check.
 //
-// Known limit: UpstreamCaseRunner.CurlVersion is the constant "8.21.0", so %VERSION in a newer
-// release's cases is substituted with 8.21.0 until retargeting (BL-1748) changes it.
+// Known limit: UpstreamCaseRunner.CurlVersion is a constant ("8.22.0" since BL-2127), so %VERSION in
+// a newer release's cases is substituted with it until the next retarget ADR moves it (ADR-0479).
 #:project ../../Curl.Conformance.UnitLibrary/Curl.Conformance.UnitLibrary.csproj
 #:project ../../Curl.Console/Curl.Console.csproj
 using System.Diagnostics;

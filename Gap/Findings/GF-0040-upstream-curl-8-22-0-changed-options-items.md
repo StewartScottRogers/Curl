@@ -5,7 +5,7 @@ area: options
 key: options:newest
 severity: High
 status: open
-scope: newest
+scope: target
 introduced-in: 8.22.0
 opened: 2026-10-09_0050
 closed:
@@ -44,3 +44,4 @@ Bring these items to Curl when the target moves to 8.22.0.
 ## Log
 
 - 2026-10-09_0050: Opened from the release diff 8.21.0 to 8.22.0.
+- 2026-10-13: Scope newest -> target: ADR-0479 moves the targeted version to 8.22.0 (BL-2128).

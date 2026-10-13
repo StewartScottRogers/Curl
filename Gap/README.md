@@ -6,7 +6,7 @@ exit codes, environment variables and config files, and the behaviour of upstrea
 `tests/data` cases - and narrows that distance over time
 ([ADR-0433](../Documentation/Planning/Decisions/ADR-0433-a-gap-analysis-office-measures-curl-against-upstream-curl-releases.md)).
 The yardstick is upstream's release data, never Curl's own tables: the release tarball of the
-targeted version (`Baselines/target.json`, 8.21.0 today), its documents and test cases, and
+targeted version (`Baselines/target.json`, 8.22.0 today, ADR-0479), its documents and test cases, and
 the matched reference curl build for that version (the Schannel mingw curl of Git for
 Windows on Windows, the curl on `PATH` on Linux and macOS). The file formats are in
 [`Instructions/Gap-Format.md`](Instructions/Gap-Format.md).
