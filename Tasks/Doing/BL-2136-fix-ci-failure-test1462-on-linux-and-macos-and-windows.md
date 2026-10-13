@@ -34,3 +34,4 @@ Lanes test only on Windows, so reproduce with `gh run view 38431484503 --log-fai
 
 - 2026-10-13: Created.
 - 2026-10-13: Cause (lane 1, BL-2134 integration): BL-2126 re-vendored upstream test data at curl-8_22_0, whose `--help category` lists a new `mqtt  MQTT protocol` row. Curl.Cli still prints curl 8.21.0's help pages. test1462 was taken off `PassingUpstreamCases.txt` so the combined tree is green; put it back once fixed. Fix: add `CurlHelpCategories.Mqtt` and its row in `CurlHelpText.Categories`, and re-measure every `Curl.Cli.UnitTests/HelpReference` fixture against curl 8.22.0 - the usage page also lists `mqtt` and `-d, --data` now reads "Post data", so diff all of them, not only the category list. Keep `--ai-help` right.
+- 2026-10-13: Backlog -> Doing.
