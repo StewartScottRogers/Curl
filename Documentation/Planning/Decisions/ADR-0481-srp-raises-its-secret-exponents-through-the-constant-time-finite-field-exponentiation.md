@@ -1,6 +1,6 @@
 # ADR-0481 — SRP raises its secret exponents through the constant-time finite-field exponentiation
 
-- **Status:** Accepted
+- **Status:** Superseded by [ADR-0480](ADR-0480-the-six-tls-srp-options-warn-with-no-function-as-curl-8-22-0-does.md): curl 8.22.0 dropped TLS-SRP, and BL-2159 removed `SrpClient` with the rest of the TLS-SRP client
 - **Date:** 2026-10-13
 - **Amends:** ADR-0229 (which put `SrpClient`'s arithmetic on `System.Numerics.BigInteger`)
 

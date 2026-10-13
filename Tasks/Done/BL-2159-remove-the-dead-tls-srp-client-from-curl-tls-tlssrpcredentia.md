@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: [BL-2152]
-touches: [Curl.Tls.UnitLibrary, Curl.Tls.UnitTests]
+touches: [Curl.Tls.UnitLibrary, Curl.Tls.UnitTests, Documentation/Planning/Decisions/ADR-0481-srp-raises-its-secret-exponents-through-the-constant-time-finite-field-exponentiation.md, Documentation/Planning/Decisions/README.md]
 requirement: none
 created: 2026-10-13
-completed:
+completed: 2026-10-13
 ---
 # BL-2159 — Remove the dead TLS-SRP client from Curl.Tls: TlsSrpCredentials, Tls12ClientSettings.SrpCredentials, the SRP key exchange, SrpClient, SrpGroup, SrpExtension, Tls12SrpParameters and the SRP suites
 
@@ -22,12 +22,18 @@ BL-2152 removed every Curl.Networking path that set `Tls12ClientSettings.SrpCred
 
 ## Acceptance criteria
 
-- [ ] `git grep -n 'Srp' -- Curl.Tls.UnitLibrary` finds nothing but `TlsExtensionType.Srp` if it is kept.
-- [ ] `dotnet build` and the fast tests pass, and Curl.Tls.UnitLibrary stays at 100% line and branch coverage.
+- [x] `git grep -n 'Srp' -- Curl.Tls.UnitLibrary` finds nothing but `TlsExtensionType.Srp` if it is kept.
+- [x] `dotnet build` and the fast tests pass, and Curl.Tls.UnitLibrary stays at 100% line and branch coverage.
 
 ## Notes
+
+- Kept `TlsExtensionType.Srp`: `ClientHelloProfileMapping` in Curl.Networking and `Tls12ClientSettings.DefaultExtensionOrder` still name extension 12 in OpenSSL's order; nothing sends it any more. `git grep -n Srp -- Curl.Tls.UnitLibrary` finds only those two lines.
+- Also removed `Tls12TestServer.CheckClientFinished` (only the SRP wrong-password test turned it off) and `Tls12TestServer.Integer`; `Tls12CipherSuiteTests` now pins 104 suites and checks the SRP suite 0xc020 is gone.
+- Added ADR-0481 and the Decisions README to `touches`: the task asks for ADR-0481 to be marked superseded by ADR-0480, and no task in Doing on origin/work/dark-factory names either file.
+- Measured with `Measure-CodeQuality.ps1 -Library Curl.Tls.UnitLibrary`: 100% line, 100% branch, 0 failing members.
 
 ## Log
 
 - 2026-10-13: Created.
 - 2026-10-13: Backlog -> Doing.
+- 2026-10-13: Doing -> Done. Curl.Tls carries no TLS-SRP code: SrpClient, SrpGroup, SrpExtension, Tls12SrpParameters, TlsSrpCredentials, SrpCredentials, the SRP key exchange and nine SRP suites removed; Curl.Tls at 100% line and branch coverage
