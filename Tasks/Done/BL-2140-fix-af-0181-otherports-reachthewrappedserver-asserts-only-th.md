@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.UnitTests]
 requirement: none
 created: 2026-10-13
-completed:
+completed: 2026-10-13
 ---
 # BL-2140 — Fix AF-0181: OtherPorts_ReachTheWrappedServer asserts only that some non-MQTT connection exists, not that it is the wrapped server's
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+OtherPorts_ReachTheWrappedServer now asserts, as its sibling NoListenPortConnectorTests.ConnectAsync_OtherPort_ReachesTheWrappedServer does (AF-0175), that the connection is an SwsHttpServerConnection, the exit code is Ok and RemoteEndPoint is 127.0.0.1:8990. The reproduction finds no match. Test-only change, so no ADR and no coverage run. Build clean, every fast test project passed.
 
 ## Log
 
 - 2026-10-13: Created.
 - 2026-10-13: Backlog -> Doing.
+- 2026-10-13: Doing -> Done. MqttServerConnectorTests.OtherPorts_ReachTheWrappedServer asserts an SwsHttpServerConnection to 127.0.0.1:8990
