@@ -38,3 +38,4 @@ BL-2142 turned the six options into `CommandLineOption.NoFunctionValue` rows, so
 ## Log
 
 - 2026-10-13: Created.
+- 2026-10-13: Backlog -> Doing.
