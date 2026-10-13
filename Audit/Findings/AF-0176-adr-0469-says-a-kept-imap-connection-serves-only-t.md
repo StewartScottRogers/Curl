@@ -3,8 +3,8 @@ id: AF-0176
 title: ADR-0469 says a kept IMAP connection serves only the same login options; the reuse key leaves login options out
 auditor: truthfulness
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: truthfulness:Documentation/Planning/Decisions/ADR-0469-imap-keeps-its-connection-for-the-next-url-and-tags-by-connection-number.md:ImapKeptConnection.LoginKeyOf:stale-adr
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Run from the repository root:
 ## Log
 
 - 2026-10-12: filed proposed.
+- 2026-10-12: proposed -> accepted.
