@@ -3,8 +3,8 @@ id: AF-0177
 title: ADR-0475 says only wrapped Note: and Warning: lines are joined; Unwrap also joins wrapped curl: error lines
 auditor: truthfulness
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: truthfulness:Documentation/Planning/Decisions/ADR-0475-upstream-case-stderr-naming-logdir-is-compared-with-wrapped-notes-joined.md:UpstreamWrappedMessageLines.Unwrap:stale-adr
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Run from the repository root:
 ## Log
 
 - 2026-10-12: filed proposed.
+- 2026-10-12: proposed -> accepted.
