@@ -3,8 +3,8 @@ id: AF-0185
 title: Every HTTP request carries User-Agent: curl/8.21.0 (and --version says 8.21.0); the reference curl sends curl/8.22.0
 auditor: conformance
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: conformance:User-Agent:curl-version:request
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ $a=@('-s','http://127.0.0.1:50961/'); foreach($p in @(@('curl','C:\Program Files
 ## Log
 
 - 2026-10-13: filed proposed.
+- 2026-10-13: proposed -> accepted.
