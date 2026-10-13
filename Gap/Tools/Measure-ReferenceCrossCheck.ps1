@@ -33,9 +33,17 @@
     compared, in that order; the first that differs is the difference. Each read of a
     request waits up to 3 seconds for its next byte (Record-CurlExchange.ps1
     -RequestReadMilliseconds 3000), longer than curl's 1-second wait for 100 Continue, so
-    the server answers only once the whole request is in, as upstream's sws does. Before
-    comparing, stderr loses its progress meter lines (the "% Total" and "Dload" header lines
-    and the lines of digits, colons and dashes), whose times differ from run to run; every
+    the server answers only once the whole request is in, as upstream's sws does. After a
+    response the server keeps the connection open, as sws does, unless the response holds
+    sws's "swsclose" or its head a Connection: close header: it waits for curl to hang up or
+    for 1.5 seconds without a byte, and answers up to 20 more requests on the connection
+    with the same <data> (Record-CurlExchange.ps1 -HoldOpenMilliseconds 1500
+    -AnswerHeldRequests 20); a server that closed at once would leave each binary to race
+    the close its own way (test1075). Before comparing, stderr loses its progress meter
+    lines (the "% Total" and "Dload" header lines and the lines of digits, colons and
+    dashes), whose times differ from run to run, and the number in every "after <n> ms" and
+    "after <n> milliseconds" becomes one fixed token, since how long a connect or a transfer
+    took differs too (test1293); every
     multipart boundary= the request names is replaced by one fixed token in the request and
     stdout; and every number from 32768 to 65535 in the request, stdout and stderr by
     another, since each binary's source port is the system's pick. No <strip> rule of the
@@ -75,7 +83,7 @@
     Each binary's command line starts --max-time <this>, so a run that would wait forever
     ends; a case's own -m comes later and still wins. Default 20. The server answers up to
     20 connections, each with the same <data>, as upstream's server does for a followed
-    redirect.
+    redirect (and up to 20 more requests on each kept-alive one).
 
 .PARAMETER WorkDirectory
     Where each case's %LOGDIR and recorded outputs go; it must hold no blank, as upstream's
@@ -100,7 +108,8 @@
 .PARAMETER SelfTest
     Runs the script on Gap/Tools/Fixtures/crosscheck (a measurement, an expansion and
     recorded results) and prints one PASS or FAIL line per check: the four combinations
-    and the selection rule's counts.
+    and the selection rule's counts, the stderr, boundary and port masking, and when the
+    server keeps a connection alive.
 
 .EXAMPLE
     pwsh -File Gap\Tools\Measure-ReferenceCrossCheck.ps1 -Measurement behaviour.json -TestsData $env:LOCALAPPDATA\Curl\gap\upstream\8.21.0\tests\data -OutFile behaviour-crosschecked.json -Limit 50
@@ -178,19 +187,40 @@ function Set-FixedEphemeralPorts([byte[]] $Bytes) {
     return ,([byte[]]$latin1.GetBytes($text))
 }
 
+# Text with the number in every "after <n> ms" and "after <n> milliseconds" replaced by a fixed
+# token: curl names how long a connect or a transfer took ("Failed to connect to 0.0.0.0 port 80
+# after 16 ms", "Operation timed out after 1001 milliseconds"), and that time differs from run to
+# run and binary to binary (test1293). The unit is kept, so "ms" against "milliseconds" is seen.
+function Set-FixedElapsedTimes([string] $Text) {
+    return [regex]::Replace($Text, '(?<=\bafter )[0-9]+(?= (?:ms|milliseconds)\b)', '<elapsed>')
+}
+
 function Read-Recording([string] $Folder) {
     $exit = ''
     if (Test-Path -LiteralPath (Join-Path $Folder 'exitcode.txt')) { $exit = ([System.IO.File]::ReadAllText((Join-Path $Folder 'exitcode.txt'))).Trim() }
     $request = Read-Bytes (Join-Path $Folder 'request.bin')
     $latin1 = [System.Text.Encoding]::GetEncoding(28591)
-    # The progress meter goes first: its lines hold numbers in the ephemeral range too.
-    $stderr = Remove-ProgressMeter (Read-Bytes (Join-Path $Folder 'stderr.txt'))
+    # The progress meter goes first: its lines hold numbers in the ephemeral range too. Elapsed
+    # times go next, so an elapsed time from 32768 ms up is not read as a port.
+    $stderr = Set-FixedElapsedTimes (Remove-ProgressMeter (Read-Bytes (Join-Path $Folder 'stderr.txt')))
     return [pscustomobject]@{
         ExitCode = $exit
         Request = Set-FixedEphemeralPorts (Set-FixedMultipartBoundary $request $request)
         Stdout = Set-FixedEphemeralPorts (Set-FixedMultipartBoundary (Read-Bytes (Join-Path $Folder 'stdout.bin')) $request)
         Stderr = $latin1.GetString((Set-FixedEphemeralPorts ([byte[]]$latin1.GetBytes($stderr))))
     }
+}
+
+# Whether the loopback server keeps a connection open after sending this response, as upstream's
+# sws does: it closes only when the response holds "swsclose" anywhere (sws's own instruction,
+# which upstream puts in the status line or body) or its head has a Connection: close header.
+function Test-KeepsConnectionAlive([byte[]] $Response) {
+    $text = [System.Text.Encoding]::GetEncoding(28591).GetString($Response)
+    if ($text.Contains('swsclose')) { return $false }
+    $headEnd = $text.IndexOf("`r`n`r`n")
+    if ($headEnd -lt 0) { $headEnd = $text.IndexOf("`n`n") }
+    $head = if ($headEnd -ge 0) { $text.Substring(0, $headEnd) } else { $text }
+    return -not ($head -match '(?im)^Connection:[^\r\n]*\bclose\b')
 }
 
 function Get-FirstByteDifference([byte[]] $A, [byte[]] $B) {
@@ -243,8 +273,15 @@ function Invoke-Recording($Case, [string] $Curl, [string] $LogRoot, [string] $Ou
     $recorder = Join-Path (Split-Path (Split-Path $PSScriptRoot -Parent) -Parent) 'Record-CurlExchange.ps1'
     # --max-time first, so a case's own -m still wins; a curl that would wait forever ends.
     $arguments = [string[]](@('--max-time', [string]$CaseTimeLimitSeconds) + @($Case.arguments))
-    $response = ConvertTo-EscapedBytes ([Convert]::FromBase64String($Case.response))
+    $responseBytes = [byte[]][Convert]::FromBase64String($Case.response)
+    $response = ConvertTo-EscapedBytes $responseBytes
     $stdin = ConvertTo-EscapedBytes ([Convert]::FromBase64String($Case.standardInput))
+    # A kept-alive connection stays open after each response, as sws keeps it, until curl hangs
+    # up or sends nothing for 1.5 seconds, and up to 20 more requests on it are answered with the
+    # same <data>: closing it at once makes each binary race the server's close its own way
+    # (test1075's keep-alive 401 before the authenticated retry).
+    $holdOpen = @{}
+    if (Test-KeepsConnectionAlive $responseBytes) { $holdOpen = @{ HoldOpenMilliseconds = 1500; AnswerHeldRequests = 20 } }
     # The binary starts in the case's own fresh %LOGDIR, as upstream's runner starts it, so a
     # relative file an upstream command names (-D %, -o out) lands there; the folder is
     # deleted afterwards and nothing is written into the caller's directory (BL-1840).
@@ -252,7 +289,7 @@ function Invoke-Recording($Case, [string] $Curl, [string] $LogRoot, [string] $Ou
         # Each read of a request waits up to 3 seconds, so curl's 1-second wait for 100 Continue
         # before it sends a body does not end the read early: upstream's sws reads the whole
         # request before it answers (test60, test1068).
-        Invoke-InScratchDirectory $logDirectory { & $recorder -Port $Port -Response $response -Connections 20 -CurlArgs $arguments -OutDirectory $Out -Curl $Curl -StandardInput $stdin -RequestReadMilliseconds 3000 | Out-Null }
+        Invoke-InScratchDirectory $logDirectory { & $recorder -Port $Port -Response $response -Connections 20 -CurlArgs $arguments -OutDirectory $Out -Curl $Curl -StandardInput $stdin -RequestReadMilliseconds 3000 @holdOpen | Out-Null }
     }
     finally { Remove-Item -LiteralPath $logDirectory -Recurse -Force -ErrorAction SilentlyContinue }
 }
@@ -369,6 +406,13 @@ if ($SelfTest) {
         $nested = $latin1.GetBytes("Content-Type: text/info; boundary=---outer`r`n`r`n-----outer`r`nContent-Type: multipart/mixed; boundary=---inner`r`n`r`n-----inner--`r`n")
         Report ($latin1.GetString((Set-FixedMultipartBoundary $nested $nested)) -eq "Content-Type: text/info; boundary=<multipart-boundary>`r`n`r`n--<multipart-boundary>`r`nContent-Type: multipart/mixed; boundary=<multipart-boundary>`r`n`r`n--<multipart-boundary>--`r`n") 'every boundary= the request names is fixed, a nested one and a non-multipart Content-Type''s too (test277, test1133)'
         Report ($latin1.GetString((Set-FixedEphemeralPorts $latin1.GetBytes("PROXY TCP4 127.0.0.1 127.0.0.1 55052 18990`r`nlocal port == 32768 65535 32767 65536 123456`r`n"))) -eq "PROXY TCP4 127.0.0.1 127.0.0.1 <ephemeral-port> 18990`r`nlocal port == <ephemeral-port> <ephemeral-port> 32767 65536 123456`r`n") 'numbers 32768 to 65535 are fixed, as a source port; others are kept (test1455, test435)'
+        Report ($s['behaviour:test10'].state -eq 'match' -and $null -eq $s['behaviour:test10'].reason) 'recordings that differ only in an elapsed time in stderr agree (test1293)'
+        Report ((Set-FixedElapsedTimes "after 16 ms: x`nafter 1001 milliseconds with`nafter 7 seconds`nafter 5 msx`n") -ceq "after <elapsed> ms: x`nafter <elapsed> milliseconds with`nafter 7 seconds`nafter 5 msx`n") 'after <n> ms and after <n> milliseconds lose their number; other numbers are kept'
+        $keepAlive = $latin1.GetBytes("HTTP/1.1 401 Authorization Required`r`nContent-Length: 0`r`n`r`n")
+        $connectionClose = $latin1.GetBytes("HTTP/1.1 200 OK`r`nContent-Length: 6`r`nconnection:  Close`r`n`r`n-foo-`n")
+        $swsclose = $latin1.GetBytes("HTTP/1.0 200 OK swsclose`r`nContent-Length: 6`r`n`r`n-foo-`n")
+        $closeInBody = $latin1.GetBytes("HTTP/1.1 200 OK`r`nContent-Length: 18`r`n`r`nConnection: close`n")
+        Report ((Test-KeepsConnectionAlive $keepAlive) -and -not (Test-KeepsConnectionAlive $connectionClose) -and -not (Test-KeepsConnectionAlive $swsclose) -and (Test-KeepsConnectionAlive $closeInBody)) 'a connection is kept alive unless the response head says Connection: close or the response holds swsclose (test1075)'
         $x = $r.crossCheck
         $callerDirectory = Join-Path ([System.IO.Path]::GetTempPath()) ("crosscheck-selftest-caller-{0}" -f [guid]::NewGuid())
         $caseDirectory = Join-Path ([System.IO.Path]::GetTempPath()) ("crosscheck-selftest-case-{0}" -f [guid]::NewGuid())
@@ -396,12 +440,12 @@ if ($SelfTest) {
             Pop-Location
             Remove-Item -LiteralPath $callerDirectory, $caseDirectory -Recurse -Force -ErrorAction SilentlyContinue
         }
-        Report ($x.crossChecked -eq 6 -and $x.referenceDiverges -eq 1 -and $x.disagreements -eq 2) 'crossChecked 6, referenceDiverges 1, disagreements 2'
+        Report ($x.crossChecked -eq 7 -and $x.referenceDiverges -eq 1 -and $x.disagreements -eq 2) 'crossChecked 7, referenceDiverges 1, disagreements 2'
         Report ($x.leftOut['not-match-or-gap'] -eq 1 -and $x.leftOut['server-not-http-alone'] -eq 1 -and $x.leftOut['reply-not-one-data'] -eq 1 -and $x.leftOut['not-parsed'] -eq 0 -and $x.leftOut['limit'] -eq 0) 'selection counts each rule'
-        Report ($r.counts.match -eq 5 -and $r.counts.gap -eq 3 -and $r.counts.unmeasured -eq 1 -and $r.reasons.'reference-diverges' -eq 1) 'counts and reasons are recomputed'
+        Report ($r.counts.match -eq 6 -and $r.counts.gap -eq 3 -and $r.counts.unmeasured -eq 1 -and $r.reasons.'reference-diverges' -eq 1) 'counts and reasons are recomputed'
         $script:Limit = 2
         $l = Invoke-CrossCheck
-        Report ($l.crossCheck.crossChecked -eq 2 -and $l.crossCheck.leftOut['limit'] -eq 6) '-Limit caps the cases and counts the rest under limit'
+        Report ($l.crossCheck.crossChecked -eq 2 -and $l.crossCheck.leftOut['limit'] -eq 7) '-Limit caps the cases and counts the rest under limit'
     } finally {
         if (Test-Path -LiteralPath $script:OutFile) { Remove-Item -LiteralPath $script:OutFile -Force }
     }

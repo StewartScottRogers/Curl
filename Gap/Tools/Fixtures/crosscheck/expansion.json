@@ -75,6 +75,17 @@
       "response": "SFRUUC8xLjEgMjAwIE9LDQpDb250ZW50LUxlbmd0aDogNQ0KDQpoZWxsbw==",
       "standardInput": "",
       "clientFiles": []
+    },
+    {
+      "number": 10,
+      "leftOutBy": null,
+      "arguments": [
+        "http://0",
+        "http://127.0.0.1:18990/10"
+      ],
+      "response": "SFRUUC8xLjEgMjAwIE9LDQpDb250ZW50LUxlbmd0aDogNQ0KDQpoZWxsbw==",
+      "standardInput": "",
+      "clientFiles": []
     }
   ]
 }
