@@ -9,7 +9,7 @@ touches: [Documentation/Planning/Decisions/README.md]
 lane: no
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-13
 ---
 # BL-1748 — Decide whether Curl and the gap office retarget to curl 8.22.0
 
@@ -50,9 +50,9 @@ that would change it, for example a matched reference build becoming available.
 
 ## Acceptance criteria
 
-- [ ] A new ADR under `Documentation/Planning/Decisions/` records the decision, marked "Decided by Claude under Stewart's delegation", citing ADR-0433 and the measured counts.
-- [ ] `Documentation/Planning/Decisions/README.md`'s index lists it.
-- [ ] When the decision is to retarget, every follow-up task the ADR names exists on the board, with the `Gap/` ones marked `lane: no`. When it is not, the ADR states the condition for revisiting.
+- [x] A new ADR under `Documentation/Planning/Decisions/` records the decision, marked "Decided by Claude under Stewart's delegation", citing ADR-0433 and the measured counts.
+- [x] `Documentation/Planning/Decisions/README.md`'s index lists it.
+- [x] When the decision is to retarget, every follow-up task the ADR names exists on the board, with the `Gap/` ones marked `lane: no`. When it is not, the ADR states the condition for revisiting.
 
 ## Notes
 
@@ -60,3 +60,4 @@ that would change it, for example a matched reference build becoming available.
 
 - 2026-10-08: Created.
 - 2026-10-13: Backlog -> Doing. interactive session
+- 2026-10-13: Doing -> Done. ADR-0479: retarget to curl 8.22.0; follow-ups BL-2125..BL-2128 filed
