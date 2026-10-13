@@ -230,11 +230,11 @@ public static class CommandLineOptionTable
         CommandLineOption.Value("proxy-crlfile", null, SettingExistingFile("--proxy-crlfile", (options, file) => options.ProxyCertificateRevocationListFile = file)),
         CommandLineOption.Text("proxy-pinnedpubkey", null, (options, pins) => options.ProxyPinnedPublicKey = pins),
         CommandLineOption.NegatableFlag("proxy-ca-native", null, (options, on) => options.ProxyUseNativeCaStore = on),
+        CommandLineOption.NoFunctionValue("proxy-tlsuser"),
+        CommandLineOption.NoFunctionValue("proxy-tlspassword"),
+        CommandLineOption.NoFunctionValue("proxy-tlsauthtype"),
         CommandLineOption.NegatableFlag("proxy-ssl-auto-client-cert", null, (options, on) => options.ProxyAutoClientCertificate = on),
         CommandLineOption.NegatableFlag("proxy-ssl-allow-beast", null, (options, on) => options.ProxyAllowBeast = on),
-        CommandLineOption.Value("proxy-tlsuser", null, AcceptingEmpty((options, user) => options.ProxyTlsUser = user)).RefusedBySchannelBuild(),
-        CommandLineOption.Text("proxy-tlspassword", null, (options, password) => options.ProxyTlsPassword = password).RefusedBySchannelBuild(),
-        CommandLineOption.Value("proxy-tlsauthtype", null, (options, value, spelledOption, _, _) => SetTlsAuthType(value, spelledOption, type => options.ProxyTlsAuthType = type)).RefusedBySchannelBuild(),
         CommandLineOption.FileName("cert", 'E', (options, certificate) => options.ClientCertificate = certificate),
         CommandLineOption.FileName("key", null, (options, key) => options.PrivateKey = key),
         CommandLineOption.Text("cert-type", null, (options, type) => options.ClientCertificateType = type),
@@ -264,9 +264,9 @@ public static class CommandLineOptionTable
         CommandLineOption.FileName("ssl-sessions", null, (options, file) => options.SslSessionsFile = file).RefusedBySchannelBuild(),
         CommandLineOption.Text("engine", null, SetEngine),
         CommandLineOption.Flag("dump-ca-embed", null, options => options.CaEmbedDumpRequested = true),
-        CommandLineOption.Text("tlsuser", null, (options, user) => options.TlsUser = user).RefusedBySchannelBuild(),
-        CommandLineOption.Value("tlspassword", null, AcceptingEmpty((options, password) => options.TlsPassword = password)).RefusedBySchannelBuild(),
-        CommandLineOption.Value("tlsauthtype", null, (options, value, spelledOption, _, _) => SetTlsAuthType(value, spelledOption, type => options.TlsAuthType = type)).RefusedBySchannelBuild(),
+        CommandLineOption.NoFunctionValue("tlsuser"),
+        CommandLineOption.NoFunctionValue("tlspassword"),
+        CommandLineOption.NoFunctionValue("tlsauthtype"),
         CommandLineOption.Value("range", 'r', SetRange),
         CommandLineOption.Value("continue-at", 'C', SetResumeFrom),
         CommandLineOption.Value("max-filesize", null, SetMaxFileSize),
@@ -712,28 +712,6 @@ public static class CommandLineOptionTable
     {
         options.Engine = name;
         options.EngineListRequested = name == "list";
-    }
-
-    /// <summary>
-    /// Sets <see cref="CommandLineOptions.TlsAuthType"/> or <see cref="CommandLineOptions.ProxyTlsAuthType"/>
-    /// through <paramref name="setAuthType"/> as curl does for <c>--tlsauthtype</c> and <c>--proxy-tlsauthtype</c>:
-    /// an empty value is refused as blank, and any value but <c>SRP</c> (compared case-sensitively) with
-    /// <see cref="CommandLineRefusal.InstalledLibcurlDoesNotSupport"/>, the only type it supports.
-    /// </summary>
-    private static CommandLineRefusal? SetTlsAuthType(string value, string spelledOption, Action<string> setAuthType)
-    {
-        if (value.Length == 0)
-        {
-            return CommandLineRefusal.BlankArgument(spelledOption);
-        }
-
-        if (value != "SRP")
-        {
-            return CommandLineRefusal.InstalledLibcurlDoesNotSupport(spelledOption);
-        }
-
-        setAuthType(value);
-        return null;
     }
 
     /// <summary>

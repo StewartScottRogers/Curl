@@ -5,10 +5,10 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Cli.UnitLibrary]
+touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests, Curl.Console.UnitTests]
 requirement: none
 created: 2026-10-13
-completed:
+completed: 2026-10-13
 ---
 # BL-2142 — Fix AF-0183: --tlsauthtype and --tlspassword are refused with exit 2; the reference curl warns they are deprecated and exits 0
 
@@ -41,12 +41,17 @@ The finding closes only when a later re-audit by the conformance auditor confirm
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+- Measured curl 8.22.0 Schannel (2026-10-13): all six TLS-SRP options (`--tlsuser`, `--tlspassword`, `--tlsauthtype` and their `--proxy-` forms) warn `Warning: --<name> is deprecated and has no function anymore` with any value, empty included; `-s` first hides it; `--no-<name>` is not reversible; last-argument is `requires parameter`. So all six, not only the two the finding named, became `CommandLineOption.NoFunctionValue` rows on every platform (ADR-0480; ADR-0479 already retargets to 8.22.0).
+- `CommandLineOptions`' six TLS-SRP properties are now get-only and always null, kept so `Curl.Console`'s mapping still compiles; BL-2152 (filed) removes them, the mapping and the hand-built TLS-SRP client in Networking and Tls, and checks the OpenSSL `Features:` line.
+- Touches widened to `Curl.Cli.UnitTests` and `Curl.Console.UnitTests` for the tests that pinned the old refusal; no task in Doing on the shared branch (BL-2128, BL-2138) names either.
+- Reproduction rerun: `--tlsauthtype` and `--tlspassword` exit 0 for both curl and candidate. Fast tests: 34 projects passed, 0 failed. Measure-CodeQuality not run (only removed code and swapped rows to an existing, covered row builder); CI's quality job checks it.
 
 ## Log
 
 - 2026-10-13: Created.
 - 2026-10-13: Backlog -> Doing.
+- 2026-10-13: Doing -> Done. --tlsuser, --tlspassword, --tlsauthtype and their --proxy- forms warn 'is deprecated and has no function anymore' and run the transfer, as curl 8.22.0 does

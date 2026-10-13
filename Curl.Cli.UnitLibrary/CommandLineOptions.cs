@@ -273,8 +273,7 @@ public sealed class CommandLineOptions
     /// <summary>
     /// <see langword="true"/> when the command line is read as curl's Windows Schannel build reads it: that
     /// build's libcurl has no HTTP/2, HTTP/3, TLS-SRP or SSL session export, so <c>--http2</c>,
-    /// <c>--http2-prior-knowledge</c>, <c>--http3</c>, <c>--http3-only</c>, <c>--tlsuser</c>, <c>--tlspassword</c>,
-    /// <c>--tlsauthtype</c>, their three <c>--proxy-</c> forms and <c>--ssl-sessions</c> are refused with
+    /// <c>--http2-prior-knowledge</c>, <c>--http3</c>, <c>--http3-only</c> and <c>--ssl-sessions</c> are refused with
     /// <see cref="CommandLineRefusal.InstalledLibcurlDoesNotSupport"/> (<see cref="CommandLineOption.RefusedBySchannelBuild"/>,
     /// ADR-0397). Set by <see cref="CommandLineParser"/> for the platform it is asked to behave as.
     /// </summary>
@@ -1368,23 +1367,22 @@ public sealed class CommandLineOptions
     public bool ProxyAllowBeast { get; internal set; }
 
     /// <summary>
-    /// The <c>--proxy-tlsuser</c> TLS-SRP user name for the HTTPS proxy, verbatim, empty included, as curl 8.18.0
-    /// accepts it (measured, BL-1135), unlike <c>--tlsuser</c>; <see langword="null"/> when not given.
+    /// Always <see langword="null"/>: curl 8.22.0 takes <c>--proxy-tlsuser</c> only to warn that it is deprecated and has no
+    /// function anymore (ADR-0480), so nothing sets it. Kept for the code that still reads it until BL-2152 removes it.
     /// </summary>
-    public string? ProxyTlsUser { get; internal set; }
+    public string? ProxyTlsUser { get; }
 
     /// <summary>
-    /// The <c>--proxy-tlspassword</c> TLS-SRP password for the HTTPS proxy, verbatim; <see langword="null"/> when
-    /// not given. An empty value is refused as blank, as curl 8.18.0 refuses it (measured, BL-1135), unlike
-    /// <c>--tlspassword</c>.
+    /// Always <see langword="null"/>: curl 8.22.0 takes <c>--proxy-tlspassword</c> only to warn that it is deprecated and has no
+    /// function anymore (ADR-0480), so nothing sets it. Kept for the code that still reads it until BL-2152 removes it.
     /// </summary>
-    public string? ProxyTlsPassword { get; internal set; }
+    public string? ProxyTlsPassword { get; }
 
     /// <summary>
-    /// The <c>--proxy-tlsauthtype</c> value: <c>SRP</c>, the only type curl accepts (case-sensitively), or
-    /// <see langword="null"/> when not given.
+    /// Always <see langword="null"/>: curl 8.22.0 takes <c>--proxy-tlsauthtype</c> only to warn that it is deprecated and has no
+    /// function anymore (ADR-0480), so nothing sets it. Kept for the code that still reads it until BL-2152 removes it.
     /// </summary>
-    public string? ProxyTlsAuthType { get; internal set; }
+    public string? ProxyTlsAuthType { get; }
 
     /// <summary>
     /// The <c>-E</c> / <c>--cert</c> value, verbatim, with <c>certificate[:password]</c> not yet split;
@@ -1547,17 +1545,23 @@ public sealed class CommandLineOptions
     /// </summary>
     public string? Engine { get; internal set; }
 
-    /// <summary>The <c>--tlsuser</c> TLS-SRP user name, verbatim; <see langword="null"/> when not given. An empty value is refused as blank, as curl 8.21.0 refuses it.</summary>
-    public string? TlsUser { get; internal set; }
-
-    /// <summary>The <c>--tlspassword</c> TLS-SRP password, verbatim, empty included, as curl 8.21.0 accepts it; <see langword="null"/> when not given.</summary>
-    public string? TlsPassword { get; internal set; }
+    /// <summary>
+    /// Always <see langword="null"/>: curl 8.22.0 takes <c>--tlsuser</c> only to warn that it is deprecated and has no
+    /// function anymore (ADR-0480), so nothing sets it. Kept for the code that still reads it until BL-2152 removes it.
+    /// </summary>
+    public string? TlsUser { get; }
 
     /// <summary>
-    /// The <c>--tlsauthtype</c> value: <c>SRP</c>, the only type curl 8.21.0 accepts (case-sensitively), or
-    /// <see langword="null"/> when not given.
+    /// Always <see langword="null"/>: curl 8.22.0 takes <c>--tlspassword</c> only to warn that it is deprecated and has no
+    /// function anymore (ADR-0480), so nothing sets it. Kept for the code that still reads it until BL-2152 removes it.
     /// </summary>
-    public string? TlsAuthType { get; internal set; }
+    public string? TlsPassword { get; }
+
+    /// <summary>
+    /// Always <see langword="null"/>: curl 8.22.0 takes <c>--tlsauthtype</c> only to warn that it is deprecated and has no
+    /// function anymore (ADR-0480), so nothing sets it. Kept for the code that still reads it until BL-2152 removes it.
+    /// </summary>
+    public string? TlsAuthType { get; }
 
     /// <summary>
     /// The <c>--ssl-sessions</c> file TLS session tickets are loaded from before the transfers and saved to
