@@ -27,7 +27,7 @@ public sealed class UpstreamConformanceTests
     // The platform the conformance run stands for, with Perl's $^O for its precheck one-liners.
     private static readonly UpstreamCurlPlatform Platform =
         OperatingSystem.IsWindows() ? UpstreamCurlPlatform.Windows : OperatingSystem.IsMacOS() ? UpstreamCurlPlatform.MacOS : UpstreamCurlPlatform.Unix;
-    private const string UpstreamTestFileExtension = ".rawhttp";
+    private const string UpstreamTestFileExtension = ".curltest";
 
     // The runner fails a slow curl run itself after TimeLimit; this bounds the rest of the case
     // (expansion, screening, verification) so no row can hold up the fast suite, whatever it does.
@@ -53,7 +53,7 @@ public sealed class UpstreamConformanceTests
     // cases are run and reported but not held to the list (BL-1949).
     private static readonly IReadOnlySet<int> NeedsTls13ServerCases = new HashSet<int> { 4001 };
 
-    /// <summary>One row per vendored <c>test*.rawhttp</c> file, in test-number order.</summary>
+    /// <summary>One row per vendored <c>test*.curltest</c> file, in test-number order.</summary>
     public static IEnumerable<TestDataRow<int>> UpstreamCases =>
         Directory.GetFiles(UpstreamTestDataFolder, $"test*{UpstreamTestFileExtension}")
             .Select(path => Path.GetFileNameWithoutExtension(path))

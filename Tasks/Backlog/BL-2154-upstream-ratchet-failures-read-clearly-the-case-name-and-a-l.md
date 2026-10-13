@@ -18,7 +18,7 @@ A failing upstream case in `UpstreamConformanceTests` shows its upstream name in
 
 ## Context
 
-Stewart, 2026-10-13: he asked whether the `.rawhttp` upstream cases should become hand-written C# tests. Claude advised keeping them as vendored data (re-vendoring per curl release, which the gap office also runs), and fixing what makes them awkward. Stewart said do all three fixes; this is the first.
+Stewart, 2026-10-13: he asked whether the vendored upstream cases should become hand-written C# tests. Claude advised keeping them as vendored data (re-vendoring per curl release, which the gap office also runs), and fixing what makes them awkward. Stewart said do all three fixes; this is the first.
 
 Today the data-driven test `UpstreamCase_RunThroughCurl_HoldsTheRatchet(int)` names each row `test<N>` (`UpstreamConformanceTests.cs` around line 62). A failure reads like `<verify><file> (...jar798.txt) differs at byte 145 (line 5): expected "#HttpOnly_localhost\tFALSE\t/...`, which is hard to act on (CI run on 48919fca1, 2026-10-13). Each case's `<info><name>` holds upstream's one-line description. Start at `UpstreamFirstDifference` and `UpstreamCaseVerification` in `Curl.Conformance.UnitLibrary`.
 

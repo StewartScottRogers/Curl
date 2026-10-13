@@ -65,7 +65,7 @@ public sealed class UpstreamCaseScreeningTests
     public void FindSkipReason_FtpCaseWithFtpPortGivenTheRunnersValue_IsNotSkipped(int testNumber)
     {
         var diagnostics = TestDiagnostics.For(TestContext);
-        byte[] testFile = File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "UpstreamTestData", $"test{testNumber}.rawhttp"));
+        byte[] testFile = File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "UpstreamTestData", $"test{testNumber}.curltest"));
         Dictionary<string, string> variables = new(StringComparer.Ordinal) { ["HOSTIP"] = "127.0.0.1", ["FTPPORT"] = UpstreamCaseRunner.FtpPort, ["TESTNUMBER"] = testNumber.ToString(System.Globalization.CultureInfo.InvariantCulture) };
         UpstreamTestFileExpansion expansion = UpstreamTestFileExpander.Expand(testFile, variables, Features);
 
@@ -107,7 +107,7 @@ public sealed class UpstreamCaseScreeningTests
     public void FindSkipReason_FtpActiveModeOrUploadCase_IsNotSkippedForTheFtpStandIn(int testNumber)
     {
         var diagnostics = TestDiagnostics.For(TestContext);
-        byte[] testFile = File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "UpstreamTestData", $"test{testNumber}.rawhttp"));
+        byte[] testFile = File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "UpstreamTestData", $"test{testNumber}.curltest"));
         Dictionary<string, string> variables = new(StringComparer.Ordinal) { ["HOSTIP"] = "127.0.0.1", ["FTPPORT"] = UpstreamCaseRunner.FtpPort, ["TESTNUMBER"] = testNumber.ToString(CultureInfo.InvariantCulture) };
         UpstreamTestFileExpansion expansion = UpstreamTestFileExpander.Expand(testFile, variables, Features);
 
@@ -140,7 +140,7 @@ public sealed class UpstreamCaseScreeningTests
     public void FindSkipReason_FtpServerCommandCase_RunsUnlessItsAnswersAreTimed(int testNumber, string? expected)
     {
         var diagnostics = TestDiagnostics.For(TestContext);
-        byte[] testFile = File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "UpstreamTestData", $"test{testNumber}.rawhttp"));
+        byte[] testFile = File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "UpstreamTestData", $"test{testNumber}.curltest"));
         Dictionary<string, string> variables = new(StringComparer.Ordinal) { ["HOSTIP"] = "127.0.0.1", ["FTPPORT"] = UpstreamCaseRunner.FtpPort, ["FTPTIME2"] = "8", ["TESTNUMBER"] = testNumber.ToString(CultureInfo.InvariantCulture) };
         UpstreamTestFileExpansion expansion = UpstreamTestFileExpander.Expand(testFile, variables, Features);
 
@@ -164,7 +164,7 @@ public sealed class UpstreamCaseScreeningTests
     public void FindSkipReason_FtpsCase_RunsWithAValueForTheFtpsPort(int testNumber, string? expected)
     {
         var diagnostics = TestDiagnostics.For(TestContext);
-        byte[] testFile = File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "UpstreamTestData", $"test{testNumber}.rawhttp"));
+        byte[] testFile = File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "UpstreamTestData", $"test{testNumber}.curltest"));
         Dictionary<string, string> variables = new(StringComparer.Ordinal)
         {
             ["HOSTIP"] = "127.0.0.1",
@@ -260,7 +260,7 @@ public sealed class UpstreamCaseScreeningTests
     public void FindSkipReason_ProxyCaseGivenTheRunnersProxyPort_IsNotSkippedForProxyPort(int testNumber)
     {
         var diagnostics = TestDiagnostics.For(TestContext);
-        byte[] testFile = File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "UpstreamTestData", $"test{testNumber}.rawhttp"));
+        byte[] testFile = File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "UpstreamTestData", $"test{testNumber}.curltest"));
         Dictionary<string, string> variables = new(StringComparer.Ordinal) { ["HOSTIP"] = "127.0.0.1", ["HTTPPORT"] = UpstreamCaseRunner.HttpPort, ["PROXYPORT"] = UpstreamCaseRunner.ProxyPort, ["TESTNUMBER"] = testNumber.ToString(CultureInfo.InvariantCulture) };
         UpstreamTestFileExpansion expansion = UpstreamTestFileExpander.Expand(testFile, variables, Features);
 
@@ -277,7 +277,7 @@ public sealed class UpstreamCaseScreeningTests
     public void FindSkipReason_ImplicitTlsMailCaseGivenTheRunnersTlsPorts_IsNotSkipped(int testNumber)
     {
         var diagnostics = TestDiagnostics.For(TestContext);
-        byte[] testFile = File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "UpstreamTestData", $"test{testNumber}.rawhttp"));
+        byte[] testFile = File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "UpstreamTestData", $"test{testNumber}.curltest"));
         Dictionary<string, string> variables = new(StringComparer.Ordinal)
         {
             ["HOSTIP"] = "127.0.0.1",
@@ -298,7 +298,7 @@ public sealed class UpstreamCaseScreeningTests
     public void FindSkipReason_NoListenPortGivenTheRunnersValue_IsNotTheReason()
     {
         var diagnostics = TestDiagnostics.For(TestContext);
-        byte[] test19 = File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "UpstreamTestData", "test19.rawhttp"));
+        byte[] test19 = File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "UpstreamTestData", "test19.curltest"));
         Dictionary<string, string> variables = new(StringComparer.Ordinal) { ["HOSTIP"] = "127.0.0.1", ["NOLISTENPORT"] = UpstreamCaseRunner.NoListenPort };
         UpstreamTestFileExpansion expansion = UpstreamTestFileExpander.Expand(test19, variables, Features);
 

@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Conformance.UnitTests, Curl.Conformance.UnitLibrary]
+touches: [Curl.Conformance.UnitTests, Curl.Conformance.UnitLibrary, Documentation/Planning/Decisions/ADR-0482-a-fix-found-through-an-upstream-case-also-gets-a-focused-unit-test.md]
 requirement: none
 created: 2026-10-13
-completed:
+completed: 2026-10-13
 ---
 # BL-2157 — Rename the vendored upstream test cases from test<N>.rawhttp to test<N>.curltest
 
@@ -45,15 +45,18 @@ Keep `-text` in `.gitattributes` for the new extension.
 
 ## Acceptance criteria
 
-- [ ] Every `UpstreamTestData/test*.rawhttp` is now `test*.curltest` with identical bytes, and no `.rawhttp` file remains.
-- [ ] `grep -ri rawhttp` over the repository finds nothing outside `Tasks/Done` and the git history.
-- [ ] `Update-UpstreamTestData.ps1 -Tag curl-8_22_0` writes `.curltest` files and leaves `git status` empty.
-- [ ] `.gitattributes`, the csproj, the README and the tests use `.curltest`, and `UpstreamTestDataTests` still asserts 2,072 cases.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green, the ratchet included.
+- [x] Every `UpstreamTestData/test*.rawhttp` is now `test*.curltest` with identical bytes, and no `.rawhttp` file remains.
+- [x] `grep -ri rawhttp` over the repository finds nothing outside `Tasks/Done` and the git history.
+- [x] `Update-UpstreamTestData.ps1 -Tag curl-8_22_0` writes `.curltest` files and leaves `git status` empty.
+- [x] `.gitattributes`, the csproj, the README and the tests use `.curltest`, and `UpstreamTestDataTests` still asserts 2,072 cases.
+- [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green, the ratchet included.
 
 ## Notes
+
+- 2026-10-13 (lane 9): `Curl.Conformance.UnitLibrary` never named the extension; only the test project did. To meet "grep finds nothing", ADR-0482 (added to `touches`; no task in Doing names it) and the Backlog tasks BL-2154 and BL-2155 now say "vendored upstream cases" instead of `.rawhttp` cases. `UpstreamTestDataTests` doc comments still said curl 8.21.0 after BL-2153; they now say 8.22.0. `Update-UpstreamTestData.ps1 -Tag curl-8_22_0` after the rename changed no file. The README now says why the extension is `.curltest`.
 
 ## Log
 
 - 2026-10-13: Created.
 - 2026-10-13: Backlog -> Doing.
+- 2026-10-13: Doing -> Done. 2,072 upstream cases renamed to test<N>.curltest with git mv, bytes unchanged; script, gitattributes, csproj, README and tests use .curltest; build and fast tests green.

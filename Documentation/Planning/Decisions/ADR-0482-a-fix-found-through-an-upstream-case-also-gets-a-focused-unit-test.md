@@ -6,7 +6,7 @@
 
 ## Context
 
-Stewart chose three fixes on 2026-10-13 instead of converting the `.rawhttp` upstream
+Stewart chose three fixes on 2026-10-13 instead of converting the vendored upstream
 cases to hand-written C# tests. This is the third. The upstream cases (the ratchet, gap
 findings, audit conformance findings) run through the whole of Curl, so a fix they
 motivate can be proved only by the case, which needs the vendored upstream data. Lanes

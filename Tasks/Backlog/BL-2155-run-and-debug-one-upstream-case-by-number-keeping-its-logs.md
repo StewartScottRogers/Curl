@@ -18,7 +18,7 @@ A developer can run any single upstream case by its number, whether or not it is
 
 ## Context
 
-The second of the three fixes Stewart chose on 2026-10-13 instead of converting the `.rawhttp` cases to hand-written C# tests. Today only the cases in `PassingUpstreamCases.txt` run as rows, and each case's log folder (`bin/.../log/test<N>-<guid>`) is deleted or hard to find. The gap office's `Gap/Tools/Measure-UpstreamCases.cs` has a `--keep-logs` mode, but lanes cannot use `Gap/` paths, so the in-repo harness needs its own way.
+The second of the three fixes Stewart chose on 2026-10-13 instead of converting the vendored upstream cases to hand-written C# tests. Today only the cases in `PassingUpstreamCases.txt` run as rows, and each case's log folder (`bin/.../log/test<N>-<guid>`) is deleted or hard to find. The gap office's `Gap/Tools/Measure-UpstreamCases.cs` has a `--keep-logs` mode, but lanes cannot use `Gap/` paths, so the in-repo harness needs its own way.
 
 ## Acceptance criteria
 

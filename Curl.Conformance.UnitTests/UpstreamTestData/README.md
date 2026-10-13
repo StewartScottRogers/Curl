@@ -1,15 +1,16 @@
 # Upstream test data
 
 Every `test*` file from `tests/data` in curl at release tag **`curl-8_22_0`** (2072 files),
-stored here as `test*.rawhttp` byte for byte, with curl's `COPYING` notice from the same
-tag beside them. They are the
+stored here as `test*.curltest` byte for byte, with curl's `COPYING` notice from the same
+tag beside them. Each is one curl test case in `tests/data`'s own format (server reply, command
+line, expected results) for whatever protocols the case uses, hence `.curltest` (BL-2157). They are the
 upstream test cases the conformance harness runs (ADR-0013, decision 3: vendored and
 pinned; tests never download anything).
 
 - Source: https://github.com/curl/curl/tree/curl-8_22_0/tests/data
 - Licence: the curl licence, in `COPYING` here (https://curl.se/docs/copyright.html).
-- `.gitattributes` marks the `test*.rawhttp` files `-text`, so git keeps their line endings exactly.
-- `Curl.Conformance.UnitTests.csproj` copies the `test*.rawhttp` files and `COPYING` to the test
+- `.gitattributes` marks the `test*.curltest` files `-text`, so git keeps their line endings exactly.
+- `Curl.Conformance.UnitTests.csproj` copies the `test*.curltest` files and `COPYING` to the test
   output directory; `UpstreamTestDataTests` asserts the count.
 
 Do not edit these files by hand.
@@ -32,7 +33,7 @@ copies `certs/` to the test output beside the cases. `.gitattributes` marks them
 powershell -NoProfile -ExecutionPolicy Bypass -File Curl.Conformance.UnitTests\UpstreamTestData\Update-UpstreamTestData.ps1 -Tag curl-8_22_0
 ```
 
-The script downloads the tag's source archive from GitHub, replaces every `test*.rawhttp` file in
+The script downloads the tag's source archive from GitHub, replaces every `test*.curltest` file in
 this folder, every file in `certs/` (from `tests/certs`, build files and dot files left out) and
 `COPYING` wholesale, and prints the new count. After a refresh, update the
 tag and count in this README and `VendoredTestFileCount` in `UpstreamTestDataTests.cs`.

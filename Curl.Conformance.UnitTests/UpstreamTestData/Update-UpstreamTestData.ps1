@@ -4,7 +4,7 @@
 
 .DESCRIPTION
     Downloads the source archive of curl at -Tag from GitHub, then replaces every test* file
-    in this folder with the test* files of tests/data at that tag as test*.rawhttp, every
+    in this folder with the test* files of tests/data at that tag as test*.curltest, every
     file in certs\ with the files of tests/certs at that tag except its build files
     (Makefile.*, CMakeLists.txt) and dot files, and COPYING with curl's
     COPYING at that tag. Files are written byte for byte; the .gitattributes beside them marks
@@ -52,9 +52,9 @@ try {
         Where-Object { $_.Name -notlike 'Makefile*' -and $_.Name -ne 'CMakeLists.txt' -and -not $_.Name.StartsWith('.') })
     if ($upstreamCerts.Count -eq 0) { throw "No files found in tests/certs at $Tag." }
 
-    Get-ChildItem -LiteralPath $destination -File -Filter 'test*.rawhttp' | Remove-Item -Force
+    Get-ChildItem -LiteralPath $destination -File -Filter 'test*.curltest' | Remove-Item -Force
     foreach ($test in $upstreamTests) {
-        Copy-Item -LiteralPath $test.FullName -Destination (Join-Path $destination ($test.Name + '.rawhttp'))
+        Copy-Item -LiteralPath $test.FullName -Destination (Join-Path $destination ($test.Name + '.curltest'))
     }
     Copy-Item -LiteralPath (Join-Path $workFolder "$sourceRoot/COPYING") -Destination (Join-Path $destination 'COPYING') -Force
 

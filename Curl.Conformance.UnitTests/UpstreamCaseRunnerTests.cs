@@ -314,7 +314,7 @@ public sealed class UpstreamCaseRunnerTests
             await channel.SendAsync(new byte[] { 0, 4, 0, 1 }, received.RemoteEndPoint, CancellationToken.None);
             return 0;
         });
-        string testFile = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "UpstreamTestData", "test271.rawhttp"));
+        string testFile = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "UpstreamTestData", "test271.curltest"));
 
         UpstreamCaseOutcome outcome = await RunAsync(runner, testFile);
 
@@ -789,7 +789,7 @@ public sealed class UpstreamCaseRunnerTests
     public async Task RunAsync_Test1085_IsNotSkipped()
     {
         UpstreamCaseRunner runner = Runner(_ => Task.FromResult(45));
-        string testFile = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "UpstreamTestData", "test1085.rawhttp"));
+        string testFile = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "UpstreamTestData", "test1085.curltest"));
 
         UpstreamCaseOutcome outcome = await RunAsync(runner, testFile);
 
@@ -814,7 +814,7 @@ public sealed class UpstreamCaseRunnerTests
             commandLine = string.Join(' ', invocation.Arguments);
             return Task.FromResult(0);
         });
-        string testFile = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "UpstreamTestData", $"test{testNumber}.rawhttp"));
+        string testFile = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "UpstreamTestData", $"test{testNumber}.curltest"));
 
         UpstreamCaseOutcome outcome = await RunAsync(runner, testFile);
 
@@ -837,7 +837,7 @@ public sealed class UpstreamCaseRunnerTests
     {
         var diagnostics = TestDiagnostics.For(TestContext);
         UpstreamCaseRunner runner = Runner(_ => throw new AssertFailedException("curl must not run"));
-        string testFile = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "UpstreamTestData", $"test{testNumber}.rawhttp"));
+        string testFile = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "UpstreamTestData", $"test{testNumber}.curltest"));
 
         UpstreamCaseOutcome outcome = await RunAsync(runner, testFile);
 
