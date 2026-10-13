@@ -79,12 +79,18 @@
 
 .PARAMETER NewTab
     Start the audit in a new herdr tab (a console window outside herdr) and return at once.
+    Whatever way that run ends, its tab's caption ends in "read" (BL-2133): "done, read" when it
+    finishes (a -DryRun included), "FAILED, read" on any error (seeding, an auditor, the scorecard,
+    anything thrown), "REFUSED, read" when it refuses to start (a running shift, the lane marker,
+    an unknown auditor, too few -Planted). No tab is left captioned "starting" or "seeding".
 
 .PARAMETER SelfTest
     Check the refusals on a faked process list, the -Auditors warnings, that the auditor list,
     the -Auditors default and help, the models, the methods and the agent files agree on the five
     auditors (and that the retired performance auditor is gone and refused), and the seeder's
-    avoided files and manifest check on scratch findings and task paths.
+    avoided files and manifest check on scratch findings and task paths, and the final tab
+    caption of a finished run, a thrown error and a refusal (each run as a child process that
+    records its captions to a file instead of renaming a tab).
 
 .EXAMPLE
     Audit\RunAudit.cmd -NewTab
@@ -119,13 +125,21 @@ $Utf8 = New-Object Text.UTF8Encoding $false
 $AuditRoot = "$repo.audit"
 $RunDir = Join-Path $AuditRoot $Stamp
 $script:CostUsd = 0.0
+$script:CaptionsOn = $false
+
+# A terminating error outside the main try (the refusal checks, the dry run) still ends in a caption.
+trap {
+    Write-Host "audit failed: $($_.Exception.Message)"
+    Exit-Audit 'failed' 1
+}
 
 # ------------------------------------------------------------------ helpers
 
 function Write-Step([string]$Text) {
     $line = "$(Get-Date -Format 'HH:mm:ss') $Text"
     Write-Host $line
-    if (-not $DryRun -and (Test-Path -LiteralPath $RunDir)) { [IO.File]::AppendAllText((Join-Path $RunDir 'audit.log'), $line + "`r`n") }
+    # The log is a courtesy: a locked audit.log must never turn a step, or the failure handler, into a new failure.
+    if (-not $DryRun -and (Test-Path -LiteralPath $RunDir)) { try { [IO.File]::AppendAllText((Join-Path $RunDir 'audit.log'), $line + "`r`n") } catch { $null = $_ } }
 }
 
 function Invoke-Git([string[]]$Arguments, [switch]$AllowFailure) {
@@ -146,6 +160,14 @@ function Get-HerdrBin {
 
 function Set-Caption([string]$Phase) {
     # Captions this run's own tab "Audit HH:mm . <phase>", only when it is a tab this runner opened.
+    # It never throws: a caption that cannot be set must not hide the outcome it describes (BL-2133).
+    # CURL_RUNAUDIT_CAPTION_FILE (the self-test's) appends each phase to that file instead of renaming a tab.
+    if (-not $script:CaptionsOn) { return }
+    if ($env:CURL_RUNAUDIT_CAPTION_FILE) { [IO.File]::AppendAllText($env:CURL_RUNAUDIT_CAPTION_FILE, $Phase + "`r`n"); return }
+    try { Set-HerdrTabCaption $Phase } catch { $null = $_ }
+}
+
+function Set-HerdrTabCaption([string]$Phase) {
     $herdr = Get-HerdrBin
     if (-not $herdr -or -not $env:HERDR_TAB_ID) { return }
     $label = "$(((& $herdr tab get $env:HERDR_TAB_ID) -join "`n" | ConvertFrom-Json).result.tab.label)"
@@ -153,6 +175,13 @@ function Set-Caption([string]$Phase) {
     $caption = "Audit $($Started.ToString('HH:mm')) $Dot $Phase"
     if ($caption.Length -gt 48) { $caption = $caption.Substring(0, 47) + '~' }
     & $herdr tab rename $env:HERDR_TAB_ID $caption 2>&1 | Out-Null
+}
+
+function Exit-Audit([string]$Outcome, [int]$Code) {
+    # Every way a run started with -NewTab ends goes through here (or the trap, or the end of the main
+    # try): the tab's last caption always ends in "read", so no tab keeps a "running" caption (BL-2133).
+    Set-Caption $(switch ($Outcome) { 'done' { 'done, read' } 'refused' { 'REFUSED, read' } default { 'FAILED, read' } })
+    exit $Code
 }
 
 function Get-ShiftProcesses([object[]]$Processes) {
@@ -364,6 +393,34 @@ if ($SelfTest) {
         Check 'an unseeded auditor is reported with the seeder''s reason, a silent gap too, and a plant in an avoided file' ($problems.Count -eq 3 -and $problems[0] -like 'Could not seed quality: every quality entry*' -and $problems[1] -like 'Could not seed process: the manifest names no defect*' -and $problems[2] -like 'Planted defect PD-201 *CurlCommandRunner.cs*') ($problems -join ' / ')
     }
     finally { Remove-Item -Recurse -Force -LiteralPath $scratch -ErrorAction SilentlyContinue }
+
+    # BL-2133: the last caption of a run that ends each way. Each child records captions to a file
+    # (CURL_RUNAUDIT_CAPTION_FILE) instead of renaming a tab, with the factory lane marker cleared.
+    $hostExe = (Get-Process -Id $PID).Path
+    $lastCaption = {
+        param([string[]]$ScriptArguments, [string]$Fault)
+        $file = Join-Path ([IO.Path]::GetTempPath()) ('runaudit-captions-' + [guid]::NewGuid().ToString('N') + '.txt')
+        $saved = @{ CAP = $env:CURL_RUNAUDIT_CAPTION_FILE; FAULT = $env:CURL_RUNAUDIT_FAULT; LANE = $env:CURL_DARK_FACTORY_LANE }
+        try {
+            $env:CURL_RUNAUDIT_CAPTION_FILE = $file; $env:CURL_RUNAUDIT_FAULT = $Fault; $env:CURL_DARK_FACTORY_LANE = ''
+            $null = & $hostExe -NoProfile -ExecutionPolicy Bypass -File $PSCommandPath @ScriptArguments 2>&1
+            $code = $LASTEXITCODE
+            $lines = @(if (Test-Path -LiteralPath $file) { Get-Content -LiteralPath $file | Where-Object { $_ } })
+            return [pscustomobject]@{ Last = $(if ($lines.Count) { $lines[-1] } else { '' }); Code = $code }
+        }
+        finally {
+            $env:CURL_RUNAUDIT_CAPTION_FILE = $saved.CAP; $env:CURL_RUNAUDIT_FAULT = $saved.FAULT; $env:CURL_DARK_FACTORY_LANE = $saved.LANE
+            Remove-Item -LiteralPath $file -Force -ErrorAction SilentlyContinue
+        }
+    }
+    $done = & $lastCaption @('-DryRun', '-AlongsideShift') ''
+    Check 'a run that finishes ends with "done, read"' ($done.Last -eq 'done, read' -and $done.Code -eq 0) "last '$($done.Last)', exit $($done.Code)"
+    $thrown = & $lastCaption @('-DryRun', '-AlongsideShift') '1'
+    Check 'a run that throws ends with "FAILED, read"' ($thrown.Last -eq 'FAILED, read' -and $thrown.Code -eq 1) "last '$($thrown.Last)', exit $($thrown.Code)"
+    $fewPlanted = & $lastCaption @('-Planted', '1', '-AlongsideShift') ''
+    Check 'a run that refuses (too few -Planted) ends with "REFUSED, read"' ($fewPlanted.Last -eq 'REFUSED, read' -and $fewPlanted.Code -eq 1) "last '$($fewPlanted.Last)', exit $($fewPlanted.Code)"
+    $unknown = & $lastCaption @('-Auditors', 'nonesuch', '-AlongsideShift') ''
+    Check 'a run that refuses (unknown auditor) ends with "REFUSED, read"' ($unknown.Last -eq 'REFUSED, read' -and $unknown.Code -eq 1) "last '$($unknown.Last)', exit $($unknown.Code)"
     exit $(if ($failed) { 1 } else { 0 })
 }
 
@@ -398,14 +455,16 @@ if ($NewTab) {
 
 # ------------------------------------------------------------------ 1. refusals
 
+$script:CaptionsOn = $true
+if ($env:CURL_RUNAUDIT_FAULT -eq '1') { throw 'Injected fault (CURL_RUNAUDIT_FAULT, the self-test''s).' }
 $processes = @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Select-Object CommandLine)
 $refusal = Get-RefusalReason $processes $env:CURL_DARK_FACTORY_LANE $AlongsideShift.IsPresent
-if ($refusal) { Write-Host $refusal; exit 1 }
+if ($refusal) { Write-Host $refusal; Exit-Audit 'refused' 1 }
 
 $Auditors = @($Auditors | ForEach-Object { $_ -split ',' } | ForEach-Object { $_.Trim().ToLowerInvariant() } | Where-Object { $_ })
-foreach ($a in $Auditors) { if ($Order -notcontains $a) { Write-Host (Get-UnknownAuditorMessage $a); exit 1 } }
+foreach ($a in $Auditors) { if ($Order -notcontains $a) { Write-Host (Get-UnknownAuditorMessage $a); Exit-Audit 'refused' 1 } }
 $Selected = @($Order | Where-Object { $Auditors -contains $_ })
-if ($Planted -lt $Selected.Count) { Write-Host "-Planted $Planted is fewer than the $($Selected.Count) auditors selected; each needs at least one."; exit 1 }
+if ($Planted -lt $Selected.Count) { Write-Host "-Planted $Planted is fewer than the $($Selected.Count) auditors selected; each needs at least one."; Exit-Audit 'refused' 1 }
 if ($Seed -lt 0) { $Seed = [int]($Started.Ticks % 1000000007) }
 
 if ($DryRun) {
@@ -421,7 +480,7 @@ if ($DryRun) {
     Write-Host "  6. Write-AuditScorecard.ps1 -ReliabilityOnly; Write-AuditFindings.ps1 -Tree $RunDir\planted -RerunReproductions (mechanical reruns on the clean, unplanted $Ref commit); Write-AuditScorecard.ps1 (into the audit branch)"
     Write-Host "  7. git commit -m 'audit: scorecard $Stamp'; git push origin audit; gh pr create --base master --head audit (unless one is open; never merged here)"
     Write-Host "  8. git worktree remove --force $RunDir\planted"
-    exit 0
+    Exit-Audit 'done' 0
 }
 
 New-Item -ItemType Directory -Force $RunDir, (Join-Path $RunDir 'reports'), (Join-Path $RunDir 'scratch'), (Join-Path $RunDir 'logs') | Out-Null
@@ -542,9 +601,9 @@ try {
     Set-Caption 'done, read'
 }
 catch {
-    Write-Step "audit failed: $($_.Exception.Message)"
-    Set-Caption 'FAILED, read'
     $failedRun = $true
+    Set-Caption 'FAILED, read'
+    Write-Step "audit failed: $($_.Exception.Message)"
 }
 finally {
     # 8. clean up the planted tree; keep the run folder
