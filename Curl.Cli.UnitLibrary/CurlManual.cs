@@ -3,8 +3,8 @@ using System.Text;
 namespace Curl.Cli;
 
 /// <summary>
-/// The lines <c>-M</c> / <c>--manual</c> prints on standard output: curl 8.21.0's built-in manual, as the
-/// mingw reference build printed it (7849 lines, measured 2026-09-27), kept in the embedded resource
+/// The lines <c>-M</c> / <c>--manual</c> prints on standard output: curl 8.22.0's built-in manual, as the
+/// ucrt64 reference build printed it (7983 lines, measured 2026-10-13), kept in the embedded resource
 /// <c>CurlManual.txt</c>. It does not depend on the terminal width. The lines carry no line terminator;
 /// the console layer chooses the newline.
 /// </summary>

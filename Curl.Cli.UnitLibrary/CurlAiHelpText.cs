@@ -22,7 +22,7 @@ public static class CurlAiHelpText
 
     /// <summary>
     /// The rows <c>--ai-help</c> documents that curl's <c>--help</c> does not: Curl's own options, which
-    /// <see cref="CurlHelpTable"/> must not gain so <c>--help</c> stays byte-identical to curl 8.21.0.
+    /// <see cref="CurlHelpTable"/> must not gain so <c>--help</c> stays byte-identical to curl 8.22.0.
     /// </summary>
     private static readonly CurlHelpEntry[] CurlOnlyEntries =
     [

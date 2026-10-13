@@ -2,7 +2,7 @@ namespace Curl.Cli;
 
 /// <summary>
 /// The lines <c>--help &lt;option&gt;</c> prints on standard output (<c>--help -v</c>, <c>--help --verbose</c>,
-/// <c>--help --no-verbose</c>): that option's section of <see cref="CurlManual"/>, ported from curl 8.21.0's
+/// <c>--help --no-verbose</c>): that option's section of <see cref="CurlManual"/>, ported from curl 8.22.0's
 /// <c>tool_help</c> and <c>helpscan</c>. The subject is looked up in <see cref="CurlOptionAliasTable"/> by exact
 /// name (after dropping a <c>--no-</c> prefix, which only a boolean may carry) or by its single letter; the
 /// manual after <c>ALL OPTIONS</c> is searched for the option's heading and printed up to the next heading,

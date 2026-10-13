@@ -88,12 +88,12 @@ public sealed class CurlAiHelpTextTests
         string section = WrittenOptionSection(WrittenMarkdown("http"), "data");
 
         const string ExpectedStart = "## --data\n\n- Short form: `-d`\n- Argument: `<data>`\n- Repeat: yes, each use adds to the ones before it\n\nPost data.\n\n"
-            + "(HTTP MQTT) Send the specified data in a POST request to the HTTP server, in the same way that a browser does";
+            + "(HTTP MQTT) Send the specified data to a server.\n\nFor HTTP(S), this is done with the POST method in the same way that a browser does";
         Diagnostics.Diff("section start", ExpectedStart, section[..Math.Min(section.Length, ExpectedStart.Length)]);
         AssertContains("\n\nExamples:\n\n```\ncurl -d \"name=curl\" https://example.com\ncurl -d \"name=curl\" -d \"tool=cmdline\" https://example.com\ncurl -d @filename https://example.com\n```\n\n", section);
         Assert.StartsWith(
             "## --data\n\n- Short form: `-d`\n- Argument: `<data>`\n- Repeat: yes, each use adds to the ones before it\n\nPost data.\n\n"
-            + "(HTTP MQTT) Send the specified data in a POST request to the HTTP server, in the same way that a browser does",
+            + "(HTTP MQTT) Send the specified data to a server.\n\nFor HTTP(S), this is done with the POST method in the same way that a browser does",
             section);
         Assert.Contains("\n\nExamples:\n\n```\ncurl -d \"name=curl\" https://example.com\ncurl -d \"name=curl\" -d \"tool=cmdline\" https://example.com\ncurl -d @filename https://example.com\n```\n\n", section);
     }
