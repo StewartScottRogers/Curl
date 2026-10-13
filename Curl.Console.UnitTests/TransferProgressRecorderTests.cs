@@ -273,6 +273,24 @@ public sealed class TransferProgressRecorderTests
     }
 
     [TestMethod]
+    public void ReportRequestRetried_TwoSecondsIn_StartsANewLineWhoseSpentCountsFromTheFirstRequest()
+    {
+        // curl -T - --anyauth: the retried request's zero line shows Spent 00:02 (BL-2131 Notes).
+        TransferProgressRecorder recorder = new(clock);
+        recorder.ReportTransferStarted();
+        clock.Advance(2000);
+        Diagnostics.Arrange("reports", "started; after 2 s an authentication retry");
+
+        recorder.ReportRequestRetried();
+        string lastLine = recorder.StatusLines[(recorder.StatusLines.LastIndexOf('\r') + 1)..];
+        Diagnostics.Act("retried request's zero line", Visible(lastLine));
+
+        const string expected = "  0      0   0      0   0      0      0      0           00:02              0";
+        Diagnostics.Assert("retried request's zero line", expected, lastLine);
+        Assert.AreEqual(expected, lastLine);
+    }
+
+    [TestMethod]
     public void ReportTransferStarted_Repeated_EndsTheHopAndStartsTheNextFromZero()
     {
         TransferProgressRecorder recorder = new(clock);

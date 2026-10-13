@@ -38,16 +38,17 @@ internal sealed class HttpTransferProgress(ITransferProgress sink)
 
     /// <summary>
     /// Reports that a request a response asked for - an authentication retry or a resend without
-    /// <c>Expect</c> - starts, as "transfer started" again, and counts its bytes from zero: curl
+    /// <c>Expect</c> - starts, as "request retried", and counts its bytes from zero: curl
     /// 8.21.0 draws each request of such a transfer on a progress-meter line of its own, as it
-    /// draws each redirect hop (measured, BL-2087 Notes).
+    /// draws each redirect hop (measured, BL-2087 Notes). Unlike a redirect hop, the line keeps the
+    /// transfer's start time (measured, BL-2131 Notes).
     /// </summary>
     internal void ReportRequestRetried()
     {
         started = true;
         downloaded = -1;
         uploaded = -1;
-        sink.ReportTransferStarted();
+        sink.ReportRequestRetried();
     }
 
     /// <summary>
@@ -67,7 +68,7 @@ internal sealed class HttpTransferProgress(ITransferProgress sink)
     /// <summary>
     /// Reports the request body bytes sent so far, unless a larger count was reported already.
     /// </summary>
-    /// <param name="bytesSoFar">The body bytes sent, chunk framing excluded.</param>
+    /// <param name="bytesSoFar">The body bytes sent, chunk framing and the closing chunk included, as curl 8.21.0 counts them (measured, BL-2131 Notes).</param>
     /// <param name="expectedTotal">The body's length, or <see langword="null" /> when it is not known.</param>
     internal void ReportUploaded(long bytesSoFar, long? expectedTotal)
     {

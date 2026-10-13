@@ -40,4 +40,17 @@ public sealed class NoTransferProgressTests
         diagnostics.Act("calls made", 1);
         diagnostics.Assert("calls made", 1, 1);
     }
+
+    [TestMethod]
+    public void ReportRequestRetried_OnASinkThatDoesNotImplementIt_ReportsTheTransferStarted()
+    {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        ITransferProgress progress = new StubTransferProgress();
+        diagnostics.Arrange("sink", "ReportTransferStarted throws NotSupportedException");
+
+        NotSupportedException thrown = Assert.ThrowsExactly<NotSupportedException>(progress.ReportRequestRetried);
+
+        diagnostics.Act("thrown", thrown.GetType().Name);
+        diagnostics.Assert("thrown", nameof(NotSupportedException), thrown.GetType().Name);
+    }
 }

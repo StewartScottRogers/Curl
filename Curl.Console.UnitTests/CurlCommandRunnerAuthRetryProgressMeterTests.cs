@@ -33,6 +33,13 @@ public sealed class CurlCommandRunnerAuthRetryProgressMeterTests
     private const string FiveOfFiveIn40Milliseconds =
         "\r100      5 100      5   0      0    125      0                              0";
 
+    /// <summary>
+    /// Five of five bytes 80 ms after the transfer started, as the retried request keeps the
+    /// transfer's start (BL-2131 Notes): 5 * 1000000 / 80000 = 62 bytes per second.
+    /// </summary>
+    private const string FiveOfFiveIn80Milliseconds =
+        "\r100      5 100      5   0      0     62      0                              0";
+
     private static readonly string NewLine = Environment.NewLine;
 
     private static readonly string HeaderLines =
@@ -58,7 +65,7 @@ public sealed class CurlCommandRunnerAuthRetryProgressMeterTests
 
         string expected = HeaderLines
             + Zero + Zero + Zero + NewLine
-            + Zero + FiveOfFiveIn40Milliseconds + FiveOfFiveIn40Milliseconds + FiveOfFiveIn40Milliseconds + NewLine;
+            + Zero + FiveOfFiveIn80Milliseconds + FiveOfFiveIn80Milliseconds + FiveOfFiveIn80Milliseconds + NewLine;
         Diagnostics.Assert("exit code", 0, exitCode);
         Diagnostics.Diff("stderr", Lf(expected), Lf(StandardErrorText));
         Assert.AreEqual(0, exitCode);

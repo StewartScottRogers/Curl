@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests, Curl.Console, Curl.Console.UnitTests]
+touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests, Curl.Console, Curl.Console.UnitTests, Curl.Protocol.Abstractions.UnitLibrary, Curl.Protocol.Abstractions.UnitTests, Curl.Core.UnitLibrary, Curl.Core.UnitTests]
 requirement: none
 created: 2026-10-13
-completed:
+completed: 2026-10-13
 ---
 # BL-2131 — Chunked-upload progress meter: no 0-byte draw after the continue wait, count chunk framing, keep the transfer start across auth retries
 
@@ -28,11 +28,11 @@ Measure real curl with `Record-CurlExchange.ps1` before pinning any figures.
 
 ## Acceptance criteria
 
-- [ ] No progress line is drawn for the report made before the body when it comes after the continue wait.
-- [ ] For a chunked body the uploaded count includes chunk framing, as curl's does (pinned from a measurement).
-- [ ] The auth-retry start-time behaviour is measured against curl and matched; the Notes record the measurement.
-- [ ] Unit tests pin each of the three.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
+- [x] No progress line is drawn for the report made before the body when it comes after the continue wait.
+- [x] For a chunked body the uploaded count includes chunk framing, as curl's does (pinned from a measurement).
+- [x] The auth-retry start-time behaviour is measured against curl and matched; the Notes record the measurement.
+- [x] Unit tests pin each of the three.
+- [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
 
 ## Notes
 
@@ -40,3 +40,4 @@ Measure real curl with `Record-CurlExchange.ps1` before pinning any figures.
 
 - 2026-10-13: Created.
 - 2026-10-13: Backlog -> Doing.
+- 2026-10-13: Doing -> Done. Chunked-upload meter counts chunk framing, draws no 0-byte line after the continue wait, and an auth retry keeps the transfer start

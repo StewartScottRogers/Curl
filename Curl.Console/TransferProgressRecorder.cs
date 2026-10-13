@@ -130,7 +130,7 @@ internal sealed class TransferProgressRecorder : ITransferProgress
         this.writeLive = writeLive;
         this.eventOutput = eventOutput;
         this.parallelProgress = parallelProgress;
-        StartHop();
+        StartHop(restartsClock: true);
     }
 
     /// <summary>
@@ -151,14 +151,24 @@ internal sealed class TransferProgressRecorder : ITransferProgress
     /// redirect hop starting, which starts a new status line after the <c>-v</c> lines held
     /// since the hop before it reported done.
     /// </remarks>
-    public void ReportTransferStarted()
+    public void ReportTransferStarted() => StartRequest(restartsClock: true);
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// Starts a new status line as a redirect hop does, but keeps the transfer's start time, so the
+    /// line's Spent and average speeds count on from the first request, as curl 8.21.0 draws an
+    /// authentication retry (measured, BL-2131 Notes).
+    /// </remarks>
+    public void ReportRequestRetried() => StartRequest(restartsClock: false);
+
+    private void StartRequest(bool restartsClock)
     {
         if (HasTransferStarted)
         {
             eventOutput?.Release();
             FinishRedirectHop();
             statusLines.Append(Environment.NewLine);
-            StartHop();
+            StartHop(restartsClock);
         }
 
         HasTransferStarted = true;
@@ -267,11 +277,16 @@ internal sealed class TransferProgressRecorder : ITransferProgress
 
     /// <summary>
     /// Starts a hop now: every counter and speed sample back at zero, and the zero status line
-    /// drawn.
+    /// drawn. The start time moves to now only when <paramref name="restartsClock" /> says so.
     /// </summary>
-    private void StartHop()
+    /// <param name="restartsClock">Whether the hop starts the clock again: a redirect hop does, an authentication retry does not.</param>
+    private void StartHop(bool restartsClock)
     {
-        start = timeProvider.GetTimestamp();
+        if (restartsClock)
+        {
+            start = timeProvider.GetTimestamp();
+        }
+
         sampleCount = 0;
         downloaded = 0;
         downloadTotal = null;

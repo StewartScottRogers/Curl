@@ -94,8 +94,10 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
     internal bool IsUpload { get; init; }
 
     /// <summary>
-    /// Gets where the body bytes sent so far are reported, with the body's length when it is
-    /// known: once before the first byte and after each piece sent.
+    /// Gets where the body bytes sent so far (<see cref="BytesSent" />, chunk framing included) are
+    /// reported, with the body's length when it is known: after each piece and the closing chunk, and
+    /// once before the first byte unless the head waited for <c>100 Continue</c>, after which curl
+    /// 8.21.0 draws no 0-byte line (measured, BL-2131 Notes).
     /// </summary>
     internal HttpTransferProgress Progress { get; init; } = HttpTransferProgress.Silent;
 
@@ -148,7 +150,10 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
     internal async ValueTask WriteAsync(HttpRequestBody body, bool isChunked, CancellationToken cancellationToken)
     {
         expectedLength = body is BytesBody known ? known.Content.Length : ((StreamBody)body).Length;
-        Progress.ReportUploaded(BytesWritten, expectedLength);
+        if (EarlyResponseWatch is null)
+        {
+            Progress.ReportUploaded(BytesSent, expectedLength);
+        }
         ReportReaderAdded(body);
         if (body is BytesBody bytes)
         {
@@ -164,6 +169,7 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
         {
             await HttpConnectionSend.WriteAsync(connection, LastChunk, cancellationToken).ConfigureAwait(false);
             ReportSent(LastChunk);
+            Progress.ReportUploaded(BytesSent, expectedLength);
         }
 
         await HttpConnectionSend.FlushAsync(connection, cancellationToken).ConfigureAwait(false);
@@ -457,7 +463,7 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
 
         ReportSent(framed.Span);
         BytesWritten += piece.Length;
-        Progress.ReportUploaded(BytesWritten, expectedLength);
+        Progress.ReportUploaded(BytesSent, expectedLength);
     }
 
     /// <summary>

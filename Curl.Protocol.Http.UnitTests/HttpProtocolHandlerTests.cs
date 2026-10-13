@@ -662,6 +662,41 @@ public sealed partial class HttpProtocolHandlerTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_BodyAfterTheContinueWait_ReportsNoZeroUploadBeforeTheBody()
+    {
+        // curl -T - of 122 bytes: after the 1-second wait for 100-continue the meter's first line
+        // past the zero line is 128 bytes at 00:01, with no 0-byte line before it (BL-2131 Notes).
+        const string head = "POST / HTTP/1.1\r\nHost: 127.0.0.1:18081\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n"
+            + "Content-Length: 1048577\r\nContent-Type: application/x-www-form-urlencoded\r\nExpect: 100-continue\r\n\r\n";
+        TimeSpan continueWait = TimeSpan.FromSeconds(1);
+        FakeTimeProvider time = new(DateTimeOffset.UnixEpoch);
+        GatedConnection connection = new(Encoding.Latin1.GetBytes(NoContent), 65536, head.Length + 1048577);
+        RecordingTransferProgress progress = new();
+        HttpRequestOptions options = new() { Body = new BytesBody(new byte[1048577], "application/x-www-form-urlencoded"), ContinueWait = continueWait };
+        TransferContext context = new()
+        {
+            Url = CurlUrl.Parse("http://127.0.0.1:18081/"),
+            Output = new MemoryStream(),
+            Http = options,
+            TimeProvider = time,
+            Progress = progress,
+        };
+        Diagnostics.Arrange("body length, continue wait", "1048577, 1 s, no reply");
+
+        Task<TransferResult> transfer = Handler(QueueConnector.For(connection)).ExecuteAsync(context).AsTask();
+        await time.TimerCreatedAsync(continueWait);
+        time.Advance(continueWait);
+        TransferResult result = await transfer;
+
+        WriteResult(result);
+        Diagnostics.Act("upload reports", string.Join(", ", progress.Uploads));
+        Diagnostics.Assert("first upload report", "up 65536/1048577 or more", progress.Uploads[0]);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.DoesNotContain("up 0/1048577", progress.Uploads);
+        Assert.AreEqual("up 1048577/1048577", progress.Uploads[^1]);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_ContinueArrives_SendsTheBodyAndWritesBothHeads()
     {
         const string response = "HTTP/1.1 100 Continue\r\n\r\nHTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok";
