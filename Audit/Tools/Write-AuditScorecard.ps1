@@ -1,7 +1,7 @@
 <#
 .SYNOPSIS
     Writes one audit's scorecard: each auditor's findings, re-audits and catch rate, the
-    performance and process numbers, and the change since the previous scorecard.
+    process numbers, and the change since the previous scorecard.
 
 .DESCRIPTION
     Format: Audit/Scorecards/README.md and SCORECARD-TEMPLATE.md (BL-1001). RunAudit.ps1
@@ -21,13 +21,15 @@
       counts       New Critical..Low: finding files whose scorecard is this one, by severity.
                    Re-audited: the report's reaudits entries. Closed: findings whose closed-by ends
                    with this scorecard. Still open: that auditor's open (proposed, accepted, deferred or blocked) findings.
-      metrics      the performance and process tables come from those auditors' report
-                   metrics; a number from an unreliable auditor is followed by " (unreliable)".
+      metrics      the process table comes from the process auditor's report metrics; a
+                   number from an unreliable auditor is followed by " (unreliable)".
       attention    at the top: each accepted finding still open after more than 3 audits that ran
                    its auditor since it was accepted (stuck), and each auditor this audit did not
                    run that has accepted findings, which went un-re-audited (ADR-0422).
       change       deltas against the newest earlier scorecard in -ScorecardsDirectory, parsed
                    back from its tables; "first scorecard" and "-" deltas when there is none.
+                   A scorecard from before 2026-10-13 also has the retired performance
+                   auditor's row and table (BL-2132); they are read past.
 
     Numbers use invariant culture: counts whole, milliseconds and minutes one decimal, dollars
     two, catch rates whole percent; deltas carry a sign. The same inputs always give the same
@@ -93,10 +95,8 @@ $repo = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 # found and stays reliable (BL-1244).
 $ChangedTree = @($ChangedTree | ForEach-Object { "$_" -split ',' } | ForEach-Object { $_.Trim() } | Where-Object { $_ })
 $Inv = [Globalization.CultureInfo]::InvariantCulture
-$Auditors = @('quality', 'security', 'performance', 'conformance', 'truthfulness', 'process')
+$Auditors = @('quality', 'security', 'conformance', 'truthfulness', 'process')
 $Columns = @('NEW_CRITICAL', 'NEW_HIGH', 'NEW_MEDIUM', 'NEW_LOW', 'REAUDITED', 'CLOSED', 'STILL_OPEN', 'PLANTED_ASSIGNED', 'PLANTED_CAUGHT', 'CATCH_RATE')
-$Scenarios = @('startup', 'small-get', 'large-get', 'headers-verbose', 'chunked', 'redirects')
-$PerfFields = @('curl.medianMs', 'curl.p90Ms', 'curl.medianPeakWorkingSetBytes', 'candidate.medianMs', 'candidate.p90Ms', 'candidate.medianPeakWorkingSetBytes')
 $ProcessMetrics = @('tasksDone', 'medianTaskMinutes', 'p90TaskMinutes', 'tasksClaimedMoreThanOnce', 'requeues', 'resumedRuns', 'ciRedMinutes', 'laneIdleMinutes', 'waitOverlapMinutes', 'waitNothingReadyMinutes', 'tokensInput', 'tokensOutput', 'costUsd', 'costUsdPerTaskDone')
 $Utf8 = New-Object Text.UTF8Encoding $false
 
@@ -235,8 +235,7 @@ function Get-AttentionLines([object[]]$Findings, [string]$ScorecardName, $State)
 $MethodCounts = @{
     quality      = @('method.librariesMutated', 'method.testsRead')
     security     = @('method.fuzzTargets', 'method.timingSitesRead')
-    performance  = @('method.scenariosRun')
-    conformance  = @('method.casesRun')
+    conformance  = @('method.casesRun', 'method.loadScenariosRun')
     truthfulness = @('method.names', 'method.docComments', 'method.documentStatements', 'method.adrs', 'method.scriptStatements')
     process      = @('method.rulesChecked')
 }
@@ -289,14 +288,12 @@ function Get-Values($State, [string]$ScorecardName, [string]$FingerprintValue) {
         $v["${p}_CATCH_RATE"] = if ($s.Assigned) { 100.0 * $s.Caught / $s.Assigned } else { '-' }
         $v["${p}_RELIABLE"] = if ($s.Unreliable) { 'no' } else { 'yes' }
     }
-    foreach ($pair in @(@('performance', (@(foreach ($sc in $Scenarios) { foreach ($f in $PerfFields) { "$sc.$f" } }) + @('candidateBinaryBytes'))), @('process', $ProcessMetrics))) {
-        $s = $State.Auditors[$pair[0]]
-        foreach ($metric in $pair[1]) {
-            $name = ConvertTo-PlaceholderName $metric
-            if (-not $s.Ran) { $v[$name] = 'not run'; continue }
-            $value = if ($s.Report -and $s.Report.metrics -and $s.Report.metrics.PSObject.Properties[$metric]) { $s.Report.metrics.$metric } else { $null }
-            $v[$name] = if ($null -eq $value) { '-' } else { [double]$value }
-        }
+    $s = $State.Auditors['process']
+    foreach ($metric in $ProcessMetrics) {
+        $name = ConvertTo-PlaceholderName $metric
+        if (-not $s.Ran) { $v[$name] = 'not run'; continue }
+        $value = if ($s.Report -and $s.Report.metrics -and $s.Report.metrics.PSObject.Properties[$metric]) { $s.Report.metrics.$metric } else { $null }
+        $v[$name] = if ($null -eq $value) { '-' } else { [double]$value }
     }
     $v['FINGERPRINT'] = $FingerprintValue
     return $v
@@ -307,7 +304,6 @@ function Get-UnreliableNames($State) { return @($Auditors | Where-Object { $Stat
 function Test-FromUnreliable([string]$Name, $State) {
     # Which auditor's report a placeholder's number comes from, and whether it was unreliable.
     foreach ($a in $Auditors) { if ($Name -like "$($a.ToUpperInvariant())_*" -and $Name -notmatch '_(MODEL|PLANTED_ASSIGNED|PLANTED_CAUGHT|CATCH_RATE|RELIABLE)$') { return $State.Auditors[$a].Unreliable } }
-    if ($Name -eq 'CANDIDATE_BINARY_BYTES' -or $Name -match '^(STARTUP|SMALL_GET|LARGE_GET|HEADERS_VERBOSE|CHUNKED|REDIRECTS)_') { return $State.Auditors['performance'].Unreliable }
     if ($ProcessMetrics | Where-Object { (ConvertTo-PlaceholderName $_) -eq $Name }) { return $State.Auditors['process'].Unreliable }
     return $false
 }
@@ -333,11 +329,6 @@ function Read-PreviousValues([string]$Path) {
             for ($i = 0; $i -lt $Columns.Count; $i++) { $v["$($label.ToUpperInvariant())_$($Columns[$i])"] = $cells[$i + 2] }
             continue
         }
-        if ($Scenarios -contains $label) {
-            for ($i = 0; $i -lt $PerfFields.Count; $i++) { $v[(ConvertTo-PlaceholderName "$label.$($PerfFields[$i])")] = $cells[$i + 1] }
-            continue
-        }
-        if ($label -eq 'Curl native AOT') { $v['CANDIDATE_BINARY_BYTES'] = $cells[1]; continue }
         if ($label -match '^`(\w+)`$') { $v[(ConvertTo-PlaceholderName $Matches[1])] = $cells[1] }
     }
     return $v
@@ -394,7 +385,7 @@ if ($SelfTest) {
     try {
         $FindingsDirectory = Join-Path $fixture 'findings'
         $Manifest = Join-Path $fixture 'manifest.json'
-        $Models = @('quality=sonnet,security=opus,performance=sonnet,conformance=opus,truthfulness=sonnet,process=sonnet')
+        $Models = @('quality=sonnet,security=opus,conformance=opus,truthfulness=sonnet,process=sonnet')
         $Branch = 'master'; $Commit = 'abc1234'; $CostUsd = 12.4
         # The previous scorecard, from the previous reports, then this audit's.
         $ScorecardsDirectory = Join-Path $work 'a'
@@ -411,7 +402,7 @@ if ($SelfTest) {
         $Started = [datetime]'2026-10-14T09:30'; $Finished = [datetime]'2026-10-14T11:00'
         $state = Get-AuditState
         $rates = ($Auditors | ForEach-Object { $s = $state.Auditors[$_]; "$_ $($s.Caught)/$($s.Assigned)" }) -join ', '
-        Check 'catch rates per auditor' ($rates -eq 'quality 1/1, security 0/1, performance 1/1, conformance 0/1, truthfulness 1/1, process 1/1') $rates
+        Check 'catch rates per auditor' ($rates -eq 'quality 1/1, security 0/1, conformance 0/1, truthfulness 1/1, process 1/1') $rates
         $unreliable = (Get-UnreliableNames $state) -join ','
         Check 'the auditor that missed and the one with no block are unreliable, nobody else' ($unreliable -eq 'security,conformance') $unreliable
         $reauditOnly = [pscustomobject]@{ metrics = [pscustomobject]@{} }
@@ -426,11 +417,16 @@ if ($SelfTest) {
         $second = Write-Scorecard (Get-AuditState) 'fp-new'
         $text = [IO.File]::ReadAllText($first)
         $sections = @([regex]::Matches($text, '(?m)^## (.+)$') | ForEach-Object { $_.Groups[1].Value.Trim() }) -join '|'
-        Check 'sections in the template''s order' ($sections -eq 'Attention|Auditors|Performance|Process|Change since the previous scorecard|New findings') $sections
+        Check 'sections in the template''s order' ($sections -eq 'Attention|Auditors|Process|Change since the previous scorecard|New findings') $sections
         Check 'no placeholder left' ($text -notmatch '\{\{') 'none'
         Check 'the fingerprint is in the header' ($text -match '\| Auditor fingerprint \| fp-new \|') 'fp-new'
         Check 'previous scorecard and fingerprint change' ($text -match '\| Previous scorecard \| \[2026-10-07_0900\]\(2026-10-07_0900\.md\) \|' -and $text -match '\| Auditor fingerprint \| changed \|') 'linked, changed'
-        Check 'a delta: small-get Curl median 70.0 -> 78.0 is +8.0' ($text -match '(?m)^\| small-get \|.*\| \+8\.0 \|.*\|$' -or ($text -split '## Change since')[1] -match '\| small-get \| [^|]+ \| [^|]+ \| [^|]+ \| \+8\.0 \|') 'small-get delta'
+        Check 'a delta: tasksDone 18 -> 20 is +2' ((($text -split '## Change since')[1]) -match '(?m)^\| `tasksDone` \| \+2 \|$') 'tasksDone delta'
+        Check 'no performance auditor row or table' ($text -notmatch '(?m)^\| performance \|' -and $text -notmatch '(?m)^#+ Performance$') 'none'
+        $old = Join-Path $work 'old-scorecard.md'
+        [IO.File]::WriteAllText($old, "| quality | opus | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 100% | yes |`n| performance | sonnet | 2 | 0 | 0 | 0 | 0 | 0 | 2 | 1 | 1 | 100% | yes |`n## Performance`n`n| large-get | 60.0 | 80.0 | 9000000 | 70.0 | 90.0 | 9000000 |`n| Curl native AOT | 16021504 |`n")
+        $oldValues = Read-PreviousValues $old
+        Check 'a scorecard from before the performance auditor''s retirement is read past its row and table' ($oldValues['QUALITY_NEW_CRITICAL'] -eq '1' -and -not @($oldValues.Keys | Where-Object { $_ -like 'PERFORMANCE_*' -or $_ -like 'LARGE_GET_*' -or $_ -eq 'CANDIDATE_BINARY_BYTES' }).Count) "$(@($oldValues.Keys) -join ',')"
         Check 'a catch-rate delta in points: quality 0% -> 100% is +100' ((($text -split '## Change since')[1]) -match '(?m)^\| quality \|( [^|]+ \|){9} \+100 \|$') 'quality +100'
         Check 'unreliable numbers are marked' ($text -match '\| security \| opus \| 0 \(unreliable\) \|') 'security row'
         Check 'the model column comes from -Models' ($text -match '\| process \| sonnet \|' -and $text -match '\| security \| opus \|') 'process sonnet, security opus'
@@ -447,7 +443,7 @@ if ($SelfTest) {
         Check 'an accepted finding open after more than 3 audits of its auditor is listed as stuck, at the top' ($text -match '(?s)## Attention\r?\n\r?\n- Stuck: \[AF-0004\]\(\.\./Findings/AF-0004-stuck\.md\) - process - accepted and still open after 4 audits that ran its auditor; task BL-1\..*## Auditors') 'AF-0004, 4 audits'
         $previousText = [IO.File]::ReadAllText((Join-Path $work 'b\2026-10-07_0900.md'))
         Check 'three audits are not yet stuck' ($previousText -match '(?s)## Attention\r?\n\r?\nNone\.') 'None.'
-        $notRun = [pscustomobject]@{ Auditors = @{ quality = [pscustomobject]@{ Ran = $false }; security = [pscustomobject]@{ Ran = $true }; performance = [pscustomobject]@{ Ran = $true }; conformance = [pscustomobject]@{ Ran = $true }; truthfulness = [pscustomobject]@{ Ran = $true }; process = [pscustomobject]@{ Ran = $true } } }
+        $notRun = [pscustomobject]@{ Auditors = @{ quality = [pscustomobject]@{ Ran = $false }; security = [pscustomobject]@{ Ran = $true }; conformance = [pscustomobject]@{ Ran = $true }; truthfulness = [pscustomobject]@{ Ran = $true }; process = [pscustomobject]@{ Ran = $true } } }
         $accepted = @([pscustomobject]@{ Id = 'AF-0009'; Auditor = 'quality'; Status = 'accepted'; Accepted = ''; Name = 'AF-0009-x.md' }, [pscustomobject]@{ Id = 'AF-0010'; Auditor = 'quality'; Status = 'proposed'; Accepted = ''; Name = 'AF-0010-x.md' })
         $attention = Get-AttentionLines $accepted '2026-10-14_0930.md' $notRun
         Check 'an auditor left out with accepted findings is named' ($attention -eq '- Not run: quality has 1 accepted findings this audit did not re-audit: AF-0009.') $attention

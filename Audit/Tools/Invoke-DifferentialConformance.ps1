@@ -48,7 +48,9 @@
     The generator's seed. Default 0.
 
 .PARAMETER Curl
-    The reference curl. Default: Record-CurlExchange.ps1's (curl 8.21.0 from Git for Windows).
+    The reference curl. Default: Git for Windows' curl, found as Record-CurlExchange.ps1 finds
+    it: ucrt64\bin\curl.exe first (Git 2.56.0 and later, curl 8.22.0), then mingw64\bin\curl.exe,
+    beside git.exe and then under Program Files\Git.
 
 .PARAMETER Candidate
     The executable under test. Default: Curl.Console of this repository, built first with
@@ -137,14 +139,19 @@ $Normalisations = @(
 
 function Get-ReferenceCurl {
     if ($Curl) { return (Resolve-Path $Curl).Path }
+    # Git for Windows 2.56.0 moved its curl from mingw64\bin to ucrt64\bin: try ucrt64 first,
+    # then mingw64, beside git.exe and then under Program Files.
+    $roots = @()
     $git = Get-Command git.exe -ErrorAction SilentlyContinue
-    if ($git) {
-        $candidate = Join-Path (Split-Path (Split-Path $git.Source -Parent) -Parent) 'mingw64\bin\curl.exe'
-        if (Test-Path -LiteralPath $candidate) { return $candidate }
+    if ($git) { $roots += Split-Path (Split-Path $git.Source -Parent) -Parent }
+    $roots += Join-Path $env:ProgramFiles 'Git'
+    foreach ($root in $roots) {
+        foreach ($folder in 'ucrt64', 'mingw64') {
+            $candidate = Join-Path $root "$folder\bin\curl.exe"
+            if (Test-Path -LiteralPath $candidate) { return $candidate }
+        }
     }
-    $candidate = Join-Path $env:ProgramFiles 'Git\mingw64\bin\curl.exe'
-    if (Test-Path -LiteralPath $candidate) { return $candidate }
-    throw 'The reference curl (Git for Windows mingw64\bin\curl.exe) was not found; pass -Curl.'
+    throw 'The reference curl (Git for Windows ucrt64\bin\curl.exe or mingw64\bin\curl.exe) was not found; pass -Curl.'
 }
 
 function Get-OptionGrammar([string]$Exe) {

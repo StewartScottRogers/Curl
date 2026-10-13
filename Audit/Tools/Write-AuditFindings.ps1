@@ -8,8 +8,8 @@
     Audit/Findings/README.md, Audit/Findings/FINDING-TEMPLATE.md and
     Audit/Instructions/Report-Format.md (BL-1001).
 
-    For each auditor's report, in the fixed order quality, security, performance, conformance,
-    truthfulness, process (so new IDs are deterministic), it reads the last fenced json block of
+    For each auditor's report, in the fixed order quality, security, conformance, truthfulness,
+    process (so new IDs are deterministic), it reads the last fenced json block of
     <auditor>.md in -ReportDirectory and applies these rules:
 
       catch       A reported finding from the same auditor as a planted defect in -Manifest,
@@ -127,7 +127,7 @@ function ConvertTo-NameList([string[]]$Names) {
     return @($Names | ForEach-Object { "$_" -split ',' } | ForEach-Object { $_.Trim() } | Where-Object { $_ })
 }
 $Unreliable = ConvertTo-NameList $Unreliable
-$AuditorOrder = @('quality', 'security', 'performance', 'conformance', 'truthfulness', 'process')
+$AuditorOrder = @('quality', 'security', 'conformance', 'truthfulness', 'process')
 $Utf8 = New-Object Text.UTF8Encoding $false
 
 function Get-ReportBlock([string]$Path) {
@@ -579,7 +579,7 @@ if ($SelfTest) {
         $ReportDirectory = Join-Path $work 'reports'
         $Manifest = Join-Path $work 'manifest.json'
         # One comma-joined string, as RunAudit.ps1 passes it through powershell -File (BL-1244).
-        $Unreliable = ConvertTo-NameList @('performance,truthfulness-not-run'); $Scorecard = '2026-10-14_0930.md'; $Commit = 'abc1234'; $Date = '2026-10-14'
+        $Unreliable = ConvertTo-NameList @('process,truthfulness-not-run'); $Scorecard = '2026-10-14_0930.md'; $Commit = 'abc1234'; $Date = '2026-10-14'
         $before = @{}
         foreach ($f in Get-ChildItem -LiteralPath $FindingsDirectory -Filter 'AF-*.md') { $before[$f.Name] = [IO.File]::ReadAllText($f.FullName) }
         $line = Invoke-WriteFindings
@@ -607,9 +607,9 @@ if ($SelfTest) {
         $af3 = Text 'AF-0003'
         Check 'a rejected finding stays rejected and gains only a still-reported line' ($af3 -match '(?m)^status: rejected$' -and $af3 -match 'still reported') 'AF-0003'
         $af4 = Text 'AF-0004'
-        $af9 = Text 'AF-0009'
-        Check 'a key matching a closed finding files a new one naming it' ($af4 -ceq $before[(Split-Path (Get-ChildItem -LiteralPath $FindingsDirectory -Filter 'AF-0004-*.md').FullName -Leaf)] -and $af9 -match 'Reappeared; previously AF-0004') 'AF-0009'
-        Check 'an unreliable auditor''s new finding says so' ((Text 'AF-0008') -match 'flagged unreliable in 2026-10-14_0930.md') 'AF-0008'
+        $af8 = Text 'AF-0008'
+        Check 'a key matching a closed finding files a new one naming it' ($af4 -ceq $before[(Split-Path (Get-ChildItem -LiteralPath $FindingsDirectory -Filter 'AF-0004-*.md').FullName -Leaf)] -and $af8 -match 'Reappeared; previously AF-0004') 'AF-0008'
+        Check 'an unreliable auditor''s new finding says so' ((Text 'AF-0009') -match 'flagged unreliable in 2026-10-14_0930.md') 'AF-0009'
         Check 'a comma-joined -Unreliable is split into names' (((ConvertTo-NameList @('quality, process', 'security')) -join '|') -eq 'quality|process|security') 'quality|process|security'
         $templateFields = @([regex]::Matches([IO.File]::ReadAllText((Join-Path $repo 'Audit\Findings\FINDING-TEMPLATE.md')), '(?m)^([a-z-]+):') | ForEach-Object { $_.Groups[1].Value }) -join ','
         $newFields = @([regex]::Matches(($af7 -split '\r?\n---')[0], '(?m)^([a-z-]+):') | ForEach-Object { $_.Groups[1].Value }) -join ','

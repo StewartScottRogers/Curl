@@ -1,10 +1,12 @@
 # Audit scorecards
 
 One scorecard per audit: what was audited, by which auditor definitions, what each
-auditor found, how many of the defects planted for it it caught, the performance and
-process numbers, and how all of that changed since the previous audit. Every scorecard
-has the same sections, rows and columns in the same order, so two scorecards diff line
-by line and a trend shows as a changed cell. The design is
+auditor found, how many of the defects planted for it it caught, the process
+numbers, and how all of that changed since the previous audit. Every scorecard has the
+same sections, rows and columns in the same order, so two scorecards diff line by line and
+a trend shows as a changed cell. Scorecards written before 2026-10-13 also carry a
+`performance` row and a `## Performance` section, from the performance auditor retired
+that day (BL-2132); the writer reads past them. The design is
 [ADR-0267](../../Documentation/Planning/Decisions/ADR-0267-an-independent-audit-office-audits-the-dark-factory-from-outside-its-reach.md).
 
 `Audit/Tools/Write-AuditScorecard.ps1` (BL-1017) writes each scorecard from
@@ -29,18 +31,17 @@ than leaving its row out.
 | --- | --- | --- |
 | 1 | Header (`# Audit scorecard <date> <time>` and its table) | Date, audited branch, audited commit (full SHA), auditor fingerprint (from `Audit/Tools/Get-AuditorFingerprint.ps1`, planned BL-1002), planted-defect count, duration in minutes, token cost of the whole audit in US dollars. |
 | 2 | `## Attention` | What Stewart should look at first ([Attention](#attention)): stuck findings and auditors left out with accepted findings, or `None.`. |
-| 3 | `## Auditors` | One row per auditor, in the fixed order quality, security, performance, conformance, truthfulness, process (see [Auditor table](#auditor-table)). |
-| 4 | `## Performance` | The performance auditor's metrics: one row per scenario in the fixed order `startup`, `small-get`, `large-get`, `headers-verbose`, `chunked`, `redirects`, then the native AOT binary's size. |
-| 5 | `## Process` | The process auditor's metrics, one row each, in the order [Report-Format.md](../Instructions/Report-Format.md#process) lists them. |
-| 6 | `## Change since the previous scorecard` | The previous scorecard's name and whether the auditor fingerprint changed, then the numbers of sections 3, 4 and 5 as deltas, in the same rows and columns. |
-| 7 | `## New findings` | A link to each finding file this audit created. |
+| 3 | `## Auditors` | One row per auditor, in the fixed order quality, security, conformance, truthfulness, process (see [Auditor table](#auditor-table)). |
+| 4 | `## Process` | The process auditor's metrics, one row each, in the order [Report-Format.md](../Instructions/Report-Format.md#process) lists them. |
+| 5 | `## Change since the previous scorecard` | The previous scorecard's name and whether the auditor fingerprint changed, then the numbers of sections 3 and 4 as deltas, in the same rows and columns. |
+| 6 | `## New findings` | A link to each finding file this audit created. |
 
 ## Auditor table
 
 | Column | Value |
 | --- | --- |
-| Auditor | `quality`, `security`, `performance`, `conformance`, `truthfulness`, `process`, always in that order and always all six. |
-| Model | The model the auditor ran on. ADR-0267 fixes `opus` for security and conformance and `sonnet` for the other four. |
+| Auditor | `quality`, `security`, `conformance`, `truthfulness`, `process`, always in that order and always all five. |
+| Model | The model the auditor ran on. `RunAudit.ps1` sets it: `opus` for all five since BL-1364 moved quality, truthfulness and process off Sonnet. |
 | New Critical, New High, New Medium, New Low | Finding files this audit created for that auditor, by severity. A catch of a planted defect and a repeat of an open finding are not new findings. |
 | Re-audited | Findings of that auditor its report re-audited. |
 | Closed | Findings of that auditor this audit closed - by any path of the [closure rule](../Findings/README.md#closing), duplicates included - counted by the last scorecard in their `closed-by`. |
@@ -65,7 +66,7 @@ mechanical rerun agreeing, or a second consecutive "no" from it on a later audit
 word alone ([Findings/README.md](../Findings/README.md#closing), ADR-0422). Its new findings are still filed, with the
 flag in their Summary, and every number in this scorecard that comes from its report -
 its new-finding, re-audited, closed and still-open counts, and its metrics in the
-performance or process table - is followed by ` (unreliable)`, here and in the deltas.
+process table - is followed by ` (unreliable)`, here and in the deltas.
 
 ## Cell values
 
@@ -134,7 +135,7 @@ writer replaces every one. Names follow one rule, so a tool can derive them:
 | `{{DURATION_MINUTES}}` | Minutes from start to finish, whole number. |
 | `{{AUDIT_COST_USD}}` | The token cost of the whole audit in US dollars. |
 | `{{<AUDITOR>_<COLUMN>}}` | An auditor-table cell: `QUALITY_MODEL`, `SECURITY_NEW_HIGH`, `PROCESS_CATCH_RATE`. Columns: `MODEL`, `NEW_CRITICAL`, `NEW_HIGH`, `NEW_MEDIUM`, `NEW_LOW`, `REAUDITED`, `CLOSED`, `STILL_OPEN`, `PLANTED_ASSIGNED`, `PLANTED_CAUGHT`, `CATCH_RATE`, `RELIABLE`. |
-| `{{<METRIC>}}` | A metric named in [Report-Format.md](../Instructions/Report-Format.md#metrics), converted: `.` and `-` become `_`, an `_` goes before each upper-case letter, then all upper case. `small-get.curl.medianMs` is `{{SMALL_GET_CURL_MEDIAN_MS}}`, `costUsdPerTaskDone` is `{{COST_USD_PER_TASK_DONE}}`. |
+| `{{<METRIC>}}` | A metric named in [Report-Format.md](../Instructions/Report-Format.md#metrics), converted: `.` and `-` become `_`, an `_` goes before each upper-case letter, then all upper case. `medianTaskMinutes` is `{{MEDIAN_TASK_MINUTES}}`, `costUsdPerTaskDone` is `{{COST_USD_PER_TASK_DONE}}`. |
 | `{{PREVIOUS_SCORECARD}}`, `{{FINGERPRINT_CHANGE}}` | The first two lines of the change section. |
 | `{{DELTA_<NAME>}}` | The delta of the number `{{<NAME>}}` holds. |
 | `{{ATTENTION}}` | The lines of the attention section. |

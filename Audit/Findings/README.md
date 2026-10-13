@@ -37,7 +37,7 @@ set it.
 | --- | --- |
 | `id` | `AF-####`, the same as the file name. |
 | `title` | One line: what is wrong and where. |
-| `auditor` | The auditor that reported it: `quality`, `security`, `performance`, `conformance`, `truthfulness` or `process`. |
+| `auditor` | The auditor that reported it: `quality`, `security`, `conformance`, `truthfulness` or `process`; a finding filed before 2026-10-13 may say `performance`, the auditor retired that day (BL-2132). |
 | `severity` | `Critical`, `High`, `Medium` or `Low` (see [Severities](#severities)). |
 | `status` | `proposed`, `accepted`, `deferred`, `blocked`, `rejected` or `closed` (see [Statuses](#statuses)). |
 | `reason` | One line: why the latest status move was made. Empty for a `proposed` finding that has not moved. |

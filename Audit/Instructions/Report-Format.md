@@ -32,7 +32,7 @@ anything not in the block is lost to them. The rules every auditor follows are i
 
 | Key | Type | Value |
 | --- | --- | --- |
-| `auditor` | string | The auditor's name: `quality`, `security`, `performance`, `conformance`, `truthfulness` or `process`. |
+| `auditor` | string | The auditor's name: `quality`, `security`, `conformance`, `truthfulness` or `process`. |
 | `commit` | string | The full 40-character SHA of the commit the prompt names as audited, copied from the prompt. |
 | `fingerprint` | string | The auditor fingerprint the prompt gives (64 lowercase hex characters, from `Audit/Tools/Get-AuditorFingerprint.ps1`, BL-1002), copied from the prompt. |
 | `findings` | array | One object per finding, in the order found. |
@@ -74,7 +74,7 @@ quality:Curl.Cli.UnitTests/ParserTests.cs:Parse_Empty_Throws:weak-assertion
 | `<auditor>` | The auditor's name, the same as the block's `auditor`. |
 | `<where>` | The repository-relative path of the file the defect is in, with `/` separators, or `logs` or `commit` when the evidence is not in the audited tree. |
 | `<what>` | The stable name of the thing that is wrong: a type, member, test method, option, scenario or task ID. |
-| `<kind>` | What is wrong with it, a short lower-case kebab-case word from the vocabulary in the auditor's own instructions (`weak-assertion`, `non-constant-time-compare`, `slower-than-curl`, `exit-code-differs`). |
+| `<kind>` | What is wrong with it, a short lower-case kebab-case word from the vocabulary in the auditor's own instructions (`weak-assertion`, `non-constant-time-compare`, `hang`, `exit-code-differs`). |
 
 The key is stable across runs: it never contains a line number, a date, a measured
 value, a commit or anything else that changes while the issue stays the same. No part
@@ -99,30 +99,9 @@ is missing, `null` or 0 (BL-1364). Re-audits never count toward them.
 | --- | --- | --- |
 | quality | `method.librariesMutated`, `method.testsRead` | Libraries mutation-tested; tests read in full. |
 | security | `method.fuzzTargets`, `method.timingSitesRead` | Parsers fuzzed; secret-handling sites read for timing. |
-| performance | `method.scenariosRun` | Scenarios measured (six in a full run). |
-| conformance | `method.casesRun` | Generated command lines run through both binaries. |
+| conformance | `method.casesRun`, `method.loadScenariosRun` | Generated command lines run through both binaries; heavy-transfer scenarios run through both (four in a full run). |
 | truthfulness | `method.names`, `method.docComments`, `method.documentStatements`, `method.adrs`, `method.scriptStatements` | Items checked in steps 1 to 5. |
 | process | `method.rulesChecked` | Rules in its method checked against the measurements. |
-
-### performance
-
-From `Audit/Tools/Measure-Performance.ps1` (BL-1007). For each scenario, in this
-order: `startup`, `small-get`, `large-get`, `headers-verbose`, `chunked`, `redirects`:
-
-| Name | Unit | Meaning |
-| --- | --- | --- |
-| `<scenario>.curl.medianMs` | milliseconds | Median wall time of real curl over the run's iterations. |
-| `<scenario>.curl.p90Ms` | milliseconds | 90th-percentile wall time of real curl. |
-| `<scenario>.curl.medianPeakWorkingSetBytes` | bytes | Median peak working set of real curl. |
-| `<scenario>.candidate.medianMs` | milliseconds | The same, for Curl's native AOT build. |
-| `<scenario>.candidate.p90Ms` | milliseconds | The same, for Curl's native AOT build. |
-| `<scenario>.candidate.medianPeakWorkingSetBytes` | bytes | The same, for Curl's native AOT build. |
-
-Plus one name for the whole run:
-
-| Name | Unit | Meaning |
-| --- | --- | --- |
-| `candidateBinaryBytes` | bytes | Size of the published native AOT `Curl.Console` binary. |
 
 ### process
 
@@ -166,6 +145,7 @@ authoritative definition of each; units and a short meaning here:
 | --- | --- | --- |
 | `differentialCases` | count | Generated command lines run through both binaries by `Audit/Tools/Invoke-DifferentialConformance.ps1` (BL-1006). |
 | `differentialDifferences` | count | Cases whose request bytes, standard output, standard error or exit code differed. |
+| `loadDifferences` | count | Heavy-transfer scenarios of `Audit/Tools/Test-TransfersUnderLoad.ps1` (BL-2132) whose exit code (or `timeout`) or output bytes differed. |
 
 ### truthfulness
 
