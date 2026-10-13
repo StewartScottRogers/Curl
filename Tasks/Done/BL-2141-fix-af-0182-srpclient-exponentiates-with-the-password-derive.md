@@ -5,10 +5,10 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Tls.UnitLibrary]
+touches: [Curl.Tls.UnitLibrary, Curl.Tls.UnitTests]
 requirement: none
 created: 2026-10-13
-completed:
+completed: 2026-10-13
 ---
 # BL-2141 — Fix AF-0182: SrpClient exponentiates with the password-derived x and private a through variable-time BigInteger.ModPow
 
@@ -41,12 +41,17 @@ The finding closes only when a later re-audit by the security auditor confirms t
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Fix: `SrpClient` now raises every secret exponent (x, a, a + u * x) through `Curl.Cryptography`'s public `FiniteFieldDiffieHellman` (fixed-window Montgomery), on a group cached as `SrpGroup.ExponentiationGroup`; ADR-0481 records why (amends ADR-0229). The bases 0, 1 and N - 1, which that API refuses, are answered without exponentiation and pinned by `SrpClientTests.PremasterSecretOfADegenerateBasisIsItsPower`.
+- Added `Curl.Tls.UnitTests` to `touches` for that test: no task in Doing on `origin/work/dark-factory` named it.
+- Reproduction: `Select-String ... BigInteger.ModPow` on `SrpClient.cs` finds no match. `Measure-CodeQuality.ps1 -Library Curl.Tls.UnitLibrary`: 0 failing members. Full build clean, fast tests green.
 
 ## Log
 
 - 2026-10-13: Created.
 - 2026-10-13: Backlog -> Doing.
+- 2026-10-13: Doing -> Done. SrpClient's secret exponents run through the constant-time FiniteFieldDiffieHellman; reproduction finds no BigInteger.ModPow

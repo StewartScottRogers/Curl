@@ -144,6 +144,39 @@ public sealed class SrpClientTests
         CollectionAssert.AreEqual(ExpectedPremasterSecret, premasterSecret);
     }
 
+    // B - k * v of 0, 1 and N - 1 are the bases the constant-time exponentiation refuses
+    // (AF-0182); a of 1 to 8 gives a + u * x of both parities, which N - 1's power turns on.
+    [TestMethod]
+    [DataRow(0)]
+    [DataRow(1)]
+    [DataRow(-1)]
+    public void PremasterSecretOfADegenerateBasisIsItsPower(int basisOffset)
+    {
+        SrpGroup group = SrpGroup.Bits1024;
+        BigInteger n = Integer(group.Prime);
+        byte[] privateKey = SrpClient.ComputePrivateKey(Salt, Identity, Password);
+        BigInteger x = Integer(privateKey);
+        BigInteger kv = Integer(SrpClient.ComputeMultiplier(group)) * BigInteger.ModPow(2, x, n) % n;
+        byte[] serverPublicValue = ((kv + basisOffset + n) % n).ToByteArray(isUnsigned: true, isBigEndian: true);
+        Diagnostics.Arrange("B - k * v modulo N", basisOffset < 0 ? "N - 1" : basisOffset);
+        var parities = new HashSet<bool>();
+
+        for (byte a = 1; a <= 8; a++)
+        {
+            BigInteger u = Integer(SrpClient.ComputeScrambler(group, BigInteger.ModPow(2, a, n).ToByteArray(isUnsigned: true, isBigEndian: true), serverPublicValue));
+            BigInteger exponent = a + (u * x);
+            parities.Add(exponent.IsEven);
+            byte[] expected = BigInteger.ModPow((basisOffset + n) % n, exponent, n).ToByteArray(isUnsigned: true, isBigEndian: true);
+
+            byte[] premasterSecret = SrpClient.ComputePremasterSecret(group, privateKey, [a], serverPublicValue);
+
+            WriteResult($"premaster secret for a = {a}", expected, premasterSecret);
+            CollectionAssert.AreEqual(expected, premasterSecret);
+        }
+
+        Assert.HasCount(2, parities);
+    }
+
     [TestMethod]
     public void ScramblerPadsShortAndLeadingZeroValuesToTheLengthOfN()
     {

@@ -155,7 +155,9 @@ TLS-SRP (BL-704, ADR-0229), and Encrypted Client Hello (BL-706, ADR-0233).
   ClientHello's extensions follow OpenSSL's order.
 - TLS-SRP (RFC 5054, ADR-0229): `SrpGroup` holds Appendix A's seven groups (`Find` by N
   and g), `SrpClient` SRP-6a's pure functions (k, x, v, A, u and the premaster secret S,
-  SHA-1 over `BigInteger`). With `Tls12ClientSettings.SrpCredentials`
+  SHA-1 over `BigInteger`, every power of the secret x, a and a + u * x raised by
+  `Curl.Cryptography`'s constant-time `FiniteFieldDiffieHellman` on the group's cached
+  `ExponentiationGroup`, AF-0182). With `Tls12ClientSettings.SrpCredentials`
   (`TlsSrpCredentials`) the hello carries `srp` after `server_name` and the nine SRP
   suites (`Tls12KeyExchange.Srp`; plain SRP is `Tls12Authentication.Anonymous`, the others
   RSA or DSS); without it they are left out. `Tls12SrpParameters` is the ServerKeyExchange's

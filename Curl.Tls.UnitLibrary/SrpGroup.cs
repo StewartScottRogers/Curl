@@ -1,4 +1,5 @@
 using System.Numerics;
+using Curl.Cryptography;
 
 namespace Curl.Tls;
 
@@ -18,6 +19,8 @@ public sealed class SrpGroup
         this.generator = [generator];
         PrimeValue = new BigInteger(prime, isUnsigned: true, isBigEndian: true);
         GeneratorValue = generator;
+        _ = FiniteFieldDiffieHellmanGroup.TryCreate(prime, this.generator, out FiniteFieldDiffieHellmanGroup? exponentiationGroup);
+        ExponentiationGroup = exponentiationGroup!;
     }
 
     /// <summary>Gets the 1024-bit group, generator 2 (Appendix A.1).</summary>
@@ -133,6 +136,13 @@ public sealed class SrpGroup
     internal BigInteger PrimeValue { get; }
 
     internal BigInteger GeneratorValue { get; }
+
+    /// <summary>
+    /// Gets N and g as Curl.Cryptography's finite-field group, whose fixed-window Montgomery
+    /// exponentiation <see cref="SrpClient" /> raises the secret exponents x, a and a + u * x
+    /// with, so their bits never shape the running time (AF-0182).
+    /// </summary>
+    internal FiniteFieldDiffieHellmanGroup ExponentiationGroup { get; }
 
     /// <summary>
     /// Returns the group whose prime and generator have the values of

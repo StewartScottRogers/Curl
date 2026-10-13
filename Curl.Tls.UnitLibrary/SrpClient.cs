@@ -1,5 +1,6 @@
 using System.Numerics;
 using System.Security.Cryptography;
+using Curl.Cryptography;
 
 namespace Curl.Tls;
 
@@ -40,7 +41,7 @@ public static class SrpClient
     public static byte[] ComputeVerifier(SrpGroup group, ReadOnlySpan<byte> privateKey)
     {
         ArgumentNullException.ThrowIfNull(group);
-        return ToBytes(BigInteger.ModPow(group.GeneratorValue, ToInteger(privateKey), group.PrimeValue));
+        return RaiseGenerator(group, privateKey);
     }
 
     /// <summary>Returns the client's public value A = g^a % N, which its ClientKeyExchange carries.</summary>
@@ -50,7 +51,7 @@ public static class SrpClient
     public static byte[] ComputePublicValue(SrpGroup group, ReadOnlySpan<byte> privateValue)
     {
         ArgumentNullException.ThrowIfNull(group);
-        return ToBytes(BigInteger.ModPow(group.GeneratorValue, ToInteger(privateValue), group.PrimeValue));
+        return RaiseGenerator(group, privateValue);
     }
 
     /// <summary>Returns the scrambling parameter u = SHA1(PAD(A) | PAD(B)).</summary>
@@ -82,14 +83,56 @@ public static class SrpClient
         BigInteger k = ToInteger(ComputeMultiplier(group));
         BigInteger u = ToInteger(ComputeScrambler(group, ComputePublicValue(group, privateValue), serverPublicValue));
         BigInteger b = ToInteger(serverPublicValue);
-        BigInteger kv = k * BigInteger.ModPow(group.GeneratorValue, x, n) % n;
+        BigInteger kv = k * ToInteger(RaiseGenerator(group, privateKey)) % n;
         BigInteger basis = ((b - kv) % n + n) % n;
-        return ToBytes(BigInteger.ModPow(basis, ToInteger(privateValue) + (u * x), n));
+        BigInteger exponent = ToInteger(privateValue) + (u * x);
+        return Raise(group, basis, ToFixedLength(exponent, Math.Max(privateValue.Length, privateKey.Length + u.GetByteCount(isUnsigned: true)) + 1));
     }
 
     internal static BigInteger ToInteger(ReadOnlySpan<byte> value) => new(value, isUnsigned: true, isBigEndian: true);
 
     private static byte[] ToBytes(BigInteger value) => value.ToByteArray(isUnsigned: true, isBigEndian: true);
+
+    /// <summary>
+    /// Returns g^<paramref name="exponent" /> % N through Curl.Cryptography's fixed-window
+    /// Montgomery exponentiation, whose running time depends only on the exponent's length.
+    /// </summary>
+    private static byte[] RaiseGenerator(SrpGroup group, ReadOnlySpan<byte> exponent)
+    {
+        using FiniteFieldDiffieHellman power = new(group.ExponentiationGroup, exponent);
+        byte[] result = new byte[group.PrimeLength];
+        power.ComputePublicValue(result);
+        return ToBytes(ToInteger(result));
+    }
+
+    /// <summary>
+    /// Returns <paramref name="basis" />^<paramref name="exponent" /> % N for a basis below N,
+    /// through the same constant-time exponentiation. That exponentiation refuses the three
+    /// bases a peer's public value may not be - 0, 1 and N - 1 - whose powers need no
+    /// exponentiation: 0 and 1 are their own powers, and N - 1 raised to e is 1 when e is even
+    /// and N - 1 when it is odd. Only a server that already holds the verifier can steer B to
+    /// one of them.
+    /// </summary>
+    private static byte[] Raise(SrpGroup group, BigInteger basis, byte[] exponent)
+    {
+        using FiniteFieldDiffieHellman power = new(group.ExponentiationGroup, exponent);
+        byte[] result = new byte[group.PrimeLength];
+        if (power.TryComputeSharedSecret(ToBytes(basis), result))
+        {
+            return ToBytes(ToInteger(result));
+        }
+
+        bool isNegativeOne = basis == group.PrimeValue - 1;
+        return ToBytes(isNegativeOne && (exponent[^1] & 1) == 0 ? BigInteger.One : basis);
+    }
+
+    /// <summary>Writes <paramref name="value" /> big-endian into exactly <paramref name="length" /> bytes.</summary>
+    private static byte[] ToFixedLength(BigInteger value, int length)
+    {
+        byte[] bytes = new byte[length];
+        value.TryWriteBytes(bytes.AsSpan(length - value.GetByteCount(isUnsigned: true)), out _, isUnsigned: true, isBigEndian: true);
+        return bytes;
+    }
 
     private static byte[] Pad(ReadOnlySpan<byte> value, int length)
     {
