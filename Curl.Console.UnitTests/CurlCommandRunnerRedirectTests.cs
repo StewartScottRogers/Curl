@@ -27,7 +27,7 @@ public sealed class CurlCommandRunnerRedirectTests
 
     private const string Ok = OkHead + "hello";
 
-    private const string Request = "Host: 127.0.0.1:18244\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n";
+    private const string Request = "Host: 127.0.0.1:18244\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n\r\n";
 
     private static readonly string NewLine = Environment.NewLine;
 

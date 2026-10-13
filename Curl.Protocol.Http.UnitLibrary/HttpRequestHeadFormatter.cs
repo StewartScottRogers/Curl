@@ -42,7 +42,7 @@ internal static class HttpRequestHeadFormatter
     /// <summary>
     /// The <c>User-Agent</c> curl 8.21.0 sends when <c>-A</c> is not given.
     /// </summary>
-    internal const string DefaultUserAgent = "curl/8.21.0";
+    internal const string DefaultUserAgent = "curl/8.22.0";
 
     /// <summary>
     /// The <c>Accept-Encoding</c> value <c>--compressed</c> sends: curl 8.21.0's, the same

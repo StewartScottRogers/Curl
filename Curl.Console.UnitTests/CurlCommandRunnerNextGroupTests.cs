@@ -25,7 +25,7 @@ public sealed class CurlCommandRunnerNextGroupTests
 
     private const string Unreachable = "http://127.0.0.1:1/x";
 
-    private const string Head = "Host: 127.0.0.1:45909\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n";
+    private const string Head = "Host: 127.0.0.1:45909\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n";
 
     private const string Hi = "HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nhi";
 

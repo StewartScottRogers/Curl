@@ -12,7 +12,7 @@ namespace Curl.Protocol.Http;
 /// </summary>
 public sealed partial class HttpProtocolHandlerTests
 {
-    private const string EventsGetHead = "GET /f.txt HTTP/1.1\r\nHost: 127.0.0.1:18441\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n";
+    private const string EventsGetHead = "GET /f.txt HTTP/1.1\r\nHost: 127.0.0.1:18441\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n\r\n";
 
     [TestMethod]
     public async Task ExecuteAsync_MeasuredVerboseGet_ReportsTheMeasuredEventsInOrder()
@@ -125,7 +125,7 @@ public sealed partial class HttpProtocolHandlerTests
     {
         // curl -s -v -d hi http://127.0.0.1:18473/p -o o3: } [2 bytes data], then
         // "upload completely sent off: 2 bytes" instead of "Request completely sent off".
-        const string head = "POST /p HTTP/1.1\r\nHost: 127.0.0.1:18473\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n"
+        const string head = "POST /p HTTP/1.1\r\nHost: 127.0.0.1:18473\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n"
             + "Content-Length: 2\r\nContent-Type: application/x-www-form-urlencoded\r\n\r\n";
         ScriptedConnection connection = Connection("HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok", 65536, head + "hi");
         RecordingTransferEvents events = new();
@@ -176,7 +176,7 @@ public sealed partial class HttpProtocolHandlerTests
     {
         // curl -s -v -d '' http://127.0.0.1:18216/p: no data line, then "Request completely
         // sent off", not "upload completely sent off: 0 bytes" (BL-1216 Notes).
-        const string head = "POST /p HTTP/1.1\r\nHost: 127.0.0.1:18216\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n"
+        const string head = "POST /p HTTP/1.1\r\nHost: 127.0.0.1:18216\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n"
             + "Content-Length: 0\r\nContent-Type: application/x-www-form-urlencoded\r\n\r\n";
         ScriptedConnection connection = Connection("HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok", 65536, head);
         RecordingTransferEvents events = new();
@@ -207,7 +207,7 @@ public sealed partial class HttpProtocolHandlerTests
     {
         // curl -s -v -T empty.txt http://127.0.0.1:18217/u: "Content-Length: 0", no data
         // line, then "Request completely sent off" (BL-1216 Notes).
-        const string head = "PUT /u HTTP/1.1\r\nHost: 127.0.0.1:18217\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\nContent-Length: 0\r\n\r\n";
+        const string head = "PUT /u HTTP/1.1\r\nHost: 127.0.0.1:18217\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\nContent-Length: 0\r\n\r\n";
         ScriptedConnection connection = Connection("HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok", 65536, head);
         RecordingTransferEvents events = new();
         TransferContext context = new()
@@ -243,7 +243,7 @@ public sealed partial class HttpProtocolHandlerTests
         // printf abcde | curl -s --trace-ascii - -T - http://127.0.0.1:18475/u: "Done waiting
         // for 100-continue", Send data 10 bytes (5 CRLF abcde CRLF), Send data 5 bytes (0 CRLF
         // CRLF), "upload completely sent off: 15 bytes" (BL-407 and BL-449 Notes).
-        const string head = "PUT /u HTTP/1.1\r\nHost: 127.0.0.1:18475\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n"
+        const string head = "PUT /u HTTP/1.1\r\nHost: 127.0.0.1:18475\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n"
             + "Transfer-Encoding: chunked\r\nExpect: 100-continue\r\n\r\n";
         FakeTimeProvider time = new(DateTimeOffset.UnixEpoch);
         GatedConnection connection = new(Encoding.Latin1.GetBytes("HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok"), 65536, head.Length + 15);

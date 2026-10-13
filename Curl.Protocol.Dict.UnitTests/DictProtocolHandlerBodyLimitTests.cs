@@ -17,7 +17,7 @@ public sealed class DictProtocolHandlerBodyLimitTests
     /// <summary>The reply the measuring server sent.</summary>
     private const string MeasuredReply = "220 hi\r\n150 1 found\r\n151 \"hello\" wn\r\nhi\r\n.\r\n250 ok\r\n";
 
-    private const string MeasuredRequest = "CLIENT libcurl 8.21.0\r\nDEFINE ! hello\r\nQUIT\r\n";
+    private const string MeasuredRequest = "CLIENT libcurl 8.22.0\r\nDEFINE ! hello\r\nQUIT\r\n";
 
     /// <summary>Gets or sets the running test's context, which carries its diagnostics.</summary>
     public TestContext TestContext { get; set; } = null!;

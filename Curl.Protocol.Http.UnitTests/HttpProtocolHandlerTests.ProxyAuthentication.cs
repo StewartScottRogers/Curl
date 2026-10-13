@@ -40,7 +40,7 @@ public sealed partial class HttpProtocolHandlerTests
 
     private const string ProxyRequestStart = "GET http://example.invalid/ HTTP/1.1\r\nHost: example.invalid\r\n";
 
-    private const string ProxyRequestEnd = "User-Agent: curl/8.21.0\r\nAccept: */*\r\nProxy-Connection: Keep-Alive\r\n\r\n";
+    private const string ProxyRequestEnd = "User-Agent: curl/8.22.0\r\nAccept: */*\r\nProxy-Connection: Keep-Alive\r\n\r\n";
 
     private const string ProxyBasic = "Proxy-Authorization: Basic dTpw\r\n";
 

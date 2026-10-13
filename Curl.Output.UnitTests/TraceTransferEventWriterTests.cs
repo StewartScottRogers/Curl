@@ -326,7 +326,7 @@ public sealed class TraceTransferEventWriterTests
         });
         writer.ReportInfo("using HTTP/1.x");
         writer.ReportRequestHeader(Encoding.ASCII.GetBytes(
-            $"GET /f.txt HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n"));
+            $"GET /f.txt HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n\r\n"));
         writer.ReportInfo("Request completely sent off");
         writer.ReportResponseHeader("HTTP/1.1 200 OK\r\n"u8);
         writer.ReportResponseHeader("Content-Type: text/plain\r\n"u8);

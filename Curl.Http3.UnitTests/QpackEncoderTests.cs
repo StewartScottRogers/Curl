@@ -362,7 +362,7 @@ public sealed class QpackEncoderTests
     }
 
     [TestMethod]
-    [DataRow("user-agent", "curl/8.21.0", "ff20 0b 6375726c2f382e32312e30")]
+    [DataRow("user-agent", "curl/8.22.0", "ff20 0b 6375726c2f382e32322e30")]
     [DataRow("host", "a", "44 686f7374 01 61")]
     public void EncodeFieldSection_NameNghttp3Stores_IsInserted(string name, string value, string expectedEncoderStream)
     {

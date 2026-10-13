@@ -47,7 +47,7 @@ public sealed class CurlCompositionWsTests
         Diagnostics.Assert("standard output", "hello\x03\xe8" + "101 11 102 239", standardOutput);
         Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(
-            "GET /p HTTP/1.1\r\nHost: 127.0.0.1:47912\r\nAuthorization: Basic dXNlcjpwdw==\r\nUser-Agent: curl/8.21.0\r\n"
+            "GET /p HTTP/1.1\r\nHost: 127.0.0.1:47912\r\nAuthorization: Basic dXNlcjpwdw==\r\nUser-Agent: curl/8.22.0\r\n"
                 + "Accept: */*\r\nUpgrade: websocket\r\nSec-WebSocket-Version: 13\r\nSec-WebSocket-Key: <key>\r\n"
                 + "X-Test: 1\r\nConnection: Upgrade\r\n\r\n",
             WithKeyHidden(connector.Written));

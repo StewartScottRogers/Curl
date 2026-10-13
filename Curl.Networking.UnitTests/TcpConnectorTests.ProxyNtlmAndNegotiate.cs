@@ -236,7 +236,7 @@ public sealed partial class TcpConnectorTests
 
     private static string TokenConnect(string proxyAuthorization) =>
         "CONNECT example.test:80 HTTP/1.1\r\nHost: example.test:80\r\nProxy-Authorization: " + proxyAuthorization
-        + "\r\nUser-Agent: curl/8.21.0\r\nProxy-Connection: Keep-Alive\r\n\r\n";
+        + "\r\nUser-Agent: curl/8.22.0\r\nProxy-Connection: Keep-Alive\r\n\r\n";
 
     // The proxy authenticator the composition builds, its NTLM and Negotiate contexts made by tokens.
     private static (TcpConnector Connector, FakeTcpDialer Dialer) CreateTokenConnector(

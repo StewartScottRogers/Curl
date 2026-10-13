@@ -21,11 +21,11 @@ public sealed partial class HttpProtocolHandlerTests
 
     private const string Challenge = "Digest realm=\"r\", nonce=\"n\"";
 
-    private const string PlainRequest = "GET /a HTTP/1.1\r\nHost: 127.0.0.1:18183\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n";
+    private const string PlainRequest = "GET /a HTTP/1.1\r\nHost: 127.0.0.1:18183\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n\r\n";
 
-    private const string DigestRequest = "GET /a HTTP/1.1\r\nHost: 127.0.0.1:18183\r\nAuthorization: " + DigestValue + "\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n";
+    private const string DigestRequest = "GET /a HTTP/1.1\r\nHost: 127.0.0.1:18183\r\nAuthorization: " + DigestValue + "\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n\r\n";
 
-    private const string BasicRequest = "GET /a HTTP/1.1\r\nHost: 127.0.0.1:18183\r\nAuthorization: Basic dTpw\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n";
+    private const string BasicRequest = "GET /a HTTP/1.1\r\nHost: 127.0.0.1:18183\r\nAuthorization: Basic dTpw\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n\r\n";
 
     private const string ChallengeHead = "HTTP/1.1 401 Unauthorized\r\nWWW-Authenticate: " + Challenge + "\r\nContent-Length: 4\r\n\r\n";
 
@@ -299,8 +299,8 @@ public sealed partial class HttpProtocolHandlerTests
             Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
             Assert.AreEqual(
-                "POST /a HTTP/1.1\r\nHost: 127.0.0.1:18183\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n" + FormBody
-                + "POST /a HTTP/1.1\r\nHost: 127.0.0.1:18183\r\nAuthorization: Basic dTpw\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n" + FormBody,
+                "POST /a HTTP/1.1\r\nHost: 127.0.0.1:18183\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n" + FormBody
+                + "POST /a HTTP/1.1\r\nHost: 127.0.0.1:18183\r\nAuthorization: Basic dTpw\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n" + FormBody,
                 connection.Written,
                 $"Chunk size {chunkSize}");
             Assert.AreEqual("ok", Latin1(output.ToArray()), $"Chunk size {chunkSize}");

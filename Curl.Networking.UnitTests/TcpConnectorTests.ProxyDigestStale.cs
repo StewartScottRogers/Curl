@@ -23,12 +23,12 @@ public sealed partial class TcpConnectorTests
     private const string DigestConnectWithNonceA =
         "CONNECT example.test:80 HTTP/1.1\r\nHost: example.test:80\r\n"
         + "Proxy-Authorization: Digest username=\"u\", realm=\"r\", nonce=\"a\", uri=\"example.test:80\", cnonce=\"" + MeasuredClientNonceForA + "\", nc=00000001, qop=auth, response=\"261498e9636d101495da39e5ec43444f\"\r\n"
-        + "User-Agent: curl/8.21.0\r\nProxy-Connection: Keep-Alive\r\n\r\n";
+        + "User-Agent: curl/8.22.0\r\nProxy-Connection: Keep-Alive\r\n\r\n";
 
     private const string DigestConnectWithNonceB =
         "CONNECT example.test:80 HTTP/1.1\r\nHost: example.test:80\r\n"
         + "Proxy-Authorization: Digest username=\"u\", realm=\"r\", nonce=\"b\", uri=\"example.test:80\", cnonce=\"" + MeasuredClientNonceForB + "\", nc=00000001, qop=auth, response=\"c9f932550dc5be461ee0942fc8ad7d7d\"\r\n"
-        + "User-Agent: curl/8.21.0\r\nProxy-Connection: Keep-Alive\r\n\r\n";
+        + "User-Agent: curl/8.22.0\r\nProxy-Connection: Keep-Alive\r\n\r\n";
 
     [TestMethod]
     public async Task ConnectAsync_WithProxyDigest_WhenTheAnswerIsChallengedStale_AnswersAgainWithTheNewNonce()

@@ -23,7 +23,7 @@ namespace Curl.Protocol.Rtsp;
 internal static class RtspRequestFormatter
 {
     /// <summary>The <c>User-Agent</c> curl 8.21.0 sends when <c>-A</c> is not given.</summary>
-    internal const string DefaultUserAgent = "curl/8.21.0";
+    internal const string DefaultUserAgent = "curl/8.22.0";
 
     /// <summary>The exit 85 message for a <c>-H</c> header that names <c>CSeq</c>.</summary>
     internal const string CustomCSeqRefused = "CSeq cannot be set as a custom header.";

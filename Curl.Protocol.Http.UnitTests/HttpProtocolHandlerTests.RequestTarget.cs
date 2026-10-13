@@ -24,7 +24,7 @@ public sealed partial class HttpProtocolHandlerTests
         HttpRequestOptions options = new() { CustomMethod = "OPTIONS", RequestTarget = "*" };
 
         await AssertRequestAsync(
-            "OPTIONS * HTTP/1.1\r\nHost: 127.0.0.1:18186\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n",
+            "OPTIONS * HTTP/1.1\r\nHost: 127.0.0.1:18186\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n\r\n",
             CurlUrl.Parse("http://127.0.0.1:18186/a/b?q=1"),
             options);
     }
@@ -37,7 +37,7 @@ public sealed partial class HttpProtocolHandlerTests
     public async Task ExecuteAsync_PathAsIsDotSegments_SendsThemUnsquashed()
     {
         await AssertRequestAsync(
-            "GET /a/../b HTTP/1.1\r\nHost: 127.0.0.1:18187\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n",
+            "GET /a/../b HTTP/1.1\r\nHost: 127.0.0.1:18187\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n\r\n",
             CurlUrl.Parse("http://127.0.0.1:18187/a/../b", pathAsIs: true),
             null);
     }
@@ -49,7 +49,7 @@ public sealed partial class HttpProtocolHandlerTests
     public async Task ExecuteAsync_DotSegmentsWithoutPathAsIs_SendsThemSquashed()
     {
         await AssertRequestAsync(
-            "GET /b HTTP/1.1\r\nHost: 127.0.0.1:18188\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n",
+            "GET /b HTTP/1.1\r\nHost: 127.0.0.1:18188\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n\r\n",
             CurlUrl.Parse("http://127.0.0.1:18188/a/../b"),
             null);
     }

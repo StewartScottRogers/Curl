@@ -20,7 +20,7 @@ public sealed partial class HttpProtocolHandlerTests
     public async Task ExecuteAsync_FileUpload_SendsPutWithContentLengthAndNoContentType()
     {
         // curl -T f.txt http://127.0.0.1:18184/u, f.txt holding "hello".
-        const string expected = "PUT /u HTTP/1.1\r\nHost: 127.0.0.1:18184\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n"
+        const string expected = "PUT /u HTTP/1.1\r\nHost: 127.0.0.1:18184\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n"
             + "Content-Length: 5\r\n\r\nhello";
         foreach (int chunkSize in ChunkSizes)
         {
@@ -43,7 +43,7 @@ public sealed partial class HttpProtocolHandlerTests
     public async Task ExecuteAsync_StandardInputUpload_SendsItChunkedAfterTheOneSecondWait()
     {
         // printf hello | curl -T - http://127.0.0.1:18185/u
-        const string head = "PUT /u HTTP/1.1\r\nHost: 127.0.0.1:18185\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n"
+        const string head = "PUT /u HTTP/1.1\r\nHost: 127.0.0.1:18185\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n"
             + "Transfer-Encoding: chunked\r\nExpect: 100-continue\r\n\r\n";
         const string body = "5\r\nhello\r\n0\r\n\r\n";
         foreach (int chunkSize in ChunkSizes)
@@ -74,7 +74,7 @@ public sealed partial class HttpProtocolHandlerTests
     public async Task ExecuteAsync_LargeStandardInputUpload_SendsTheMeasuredChunkSizes()
     {
         // 200000 bytes | curl -T - http://127.0.0.1:18190/u: the head went out alone to wait, then chunks 65524, 65524, 65524, 3428.
-        const string head = "PUT /u HTTP/1.1\r\nHost: 127.0.0.1:18190\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n"
+        const string head = "PUT /u HTTP/1.1\r\nHost: 127.0.0.1:18190\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n"
             + "Transfer-Encoding: chunked\r\nExpect: 100-continue\r\n\r\n";
         string expected = head + Chunks(65524, 65524, 65524, 3428);
         FakeTimeProvider time = new(DateTimeOffset.UnixEpoch);
@@ -98,7 +98,7 @@ public sealed partial class HttpProtocolHandlerTests
     public async Task ExecuteAsync_LargeStandardInputUploadWithoutExpect_SharesTheFirstChunkWithTheHead()
     {
         // 200000 bytes | curl -H "Expect:" -T - http://127.0.0.1:18191/u: chunks 65416, 65524, 65524, 3536.
-        const string head = "PUT /u HTTP/1.1\r\nHost: 127.0.0.1:18191\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n"
+        const string head = "PUT /u HTTP/1.1\r\nHost: 127.0.0.1:18191\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n"
             + "Transfer-Encoding: chunked\r\n\r\n";
         string expected = head + Chunks(65416, 65524, 65524, 3536);
         ScriptedConnection connection = Connection(EmptyOk, 65536, expected);
@@ -119,7 +119,7 @@ public sealed partial class HttpProtocolHandlerTests
     {
         // curl -T big.bin http://127.0.0.1:18188/u, 100000 bytes locked from 70000:
         // the 104-byte head and 65432 bytes sent, then "client read function EOF fail, only 65432/100000 of needed bytes read".
-        const string head = "PUT /u HTTP/1.1\r\nHost: 127.0.0.1:18188\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n"
+        const string head = "PUT /u HTTP/1.1\r\nHost: 127.0.0.1:18188\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n"
             + "Content-Length: 100000\r\n\r\n";
         FailingReadStream upload = new(new byte[65432], int.MaxValue, new IOException("Lock violation."), 100000);
         ScriptedConnection connection = Connection(EmptyOk, 65536);

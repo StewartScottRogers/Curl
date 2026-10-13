@@ -24,11 +24,11 @@ public sealed class CurlAiHelpTextTests
     {
         string index = WrittenMarkdown(subject);
 
-        AssertHas("starts with the title", index.StartsWith("# curl --ai-help\n\nThis `curl` is curl 8.21.0 reimplemented in C#", StringComparison.Ordinal));
+        AssertHas("starts with the title", index.StartsWith("# curl --ai-help\n\nThis `curl` is curl 8.22.0 reimplemented in C#", StringComparison.Ordinal));
         AssertContains("\n## Categories\n", index);
         AssertContains("\n## Most-used options\n", index);
         AssertHas("ends with the run line", index.EndsWith("Run `curl --ai-help <category>` for one category's options in full, or `curl --ai-help all` for every option, the exit codes and the `--write-out` variables.\n", StringComparison.Ordinal));
-        Assert.StartsWith("# curl --ai-help\n\nThis `curl` is curl 8.21.0 reimplemented in C#", index);
+        Assert.StartsWith("# curl --ai-help\n\nThis `curl` is curl 8.22.0 reimplemented in C#", index);
         Assert.Contains("\n## Categories\n", index);
         Assert.Contains("\n## Most-used options\n", index);
         Assert.EndsWith("Run `curl --ai-help <category>` for one category's options in full, or `curl --ai-help all` for every option, the exit codes and the `--write-out` variables.\n", index);

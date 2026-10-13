@@ -531,7 +531,7 @@ public sealed class CurlCommandRunnerNetrcTests
 
         int exitCode = await RunAsync(["-s", "-S", "-n", Url], handler: HttpOver(server));
 
-        string expectedRequest = "GET / HTTP/1.1\r\nHost: 127.0.0.1:18505\r\nAuthorization: Basic bnU6bnA=\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n";
+        string expectedRequest = "GET / HTTP/1.1\r\nHost: 127.0.0.1:18505\r\nAuthorization: Basic bnU6bnA=\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n\r\n";
         Diagnostics.Bytes("request sent", server.Written);
         Diagnostics.Assert("exit code", 0, exitCode);
         Diagnostics.Diff("request sent", expectedRequest, Encoding.Latin1.GetString(server.Written));
@@ -578,7 +578,7 @@ public sealed class CurlCommandRunnerNetrcTests
 
         string[] requests = await RunRedirectedToLocalhostAsync(locationTrusted ? ["--location-trusted"] : []);
 
-        string expectedSecondRequest = "/b HTTP/1.1\r\nHost: localhost:18505\r\nAuthorization: Basic bHU6bHA=\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n";
+        string expectedSecondRequest = "/b HTTP/1.1\r\nHost: localhost:18505\r\nAuthorization: Basic bHU6bHA=\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n\r\n";
         Diagnostics.Diff("second request after GET", expectedSecondRequest, requests[1]);
         Assert.AreEqual(expectedSecondRequest, requests[1]);
     }
@@ -592,7 +592,7 @@ public sealed class CurlCommandRunnerNetrcTests
 
         string[] requests = await RunRedirectedToLocalhostAsync(["--location-trusted"]);
 
-        string expectedSecondRequest = "/b HTTP/1.1\r\nHost: localhost:18505\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n";
+        string expectedSecondRequest = "/b HTTP/1.1\r\nHost: localhost:18505\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n\r\n";
         Diagnostics.Diff("second request after GET", expectedSecondRequest, requests[1]);
         Assert.AreEqual(expectedSecondRequest, requests[1]);
     }

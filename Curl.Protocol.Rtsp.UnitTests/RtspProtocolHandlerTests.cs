@@ -16,7 +16,7 @@ namespace Curl.Protocol.Rtsp;
 [TestClass]
 public sealed class RtspProtocolHandlerTests
 {
-    private const string Request = "OPTIONS * RTSP/1.0\r\nCSeq: 1\r\nUser-Agent: curl/8.21.0\r\n\r\n";
+    private const string Request = "OPTIONS * RTSP/1.0\r\nCSeq: 1\r\nUser-Agent: curl/8.22.0\r\n\r\n";
 
     private const string Ok = "RTSP/1.0 200 OK\r\nCSeq: 1\r\nPublic: OPTIONS, DESCRIBE\r\n\r\n";
 
@@ -130,11 +130,11 @@ public sealed class RtspProtocolHandlerTests
     }
 
     [TestMethod]
-    [DataRow(null, "1-2", null, "OPTIONS * RTSP/1.0\r\nCSeq: 1\r\nRange: 1-2\r\nUser-Agent: curl/8.21.0\r\n\r\n")]
-    [DataRow(5L, null, null, "OPTIONS * RTSP/1.0\r\nCSeq: 1\r\nRange: 5-\r\nUser-Agent: curl/8.21.0\r\n\r\n")]
-    [DataRow(null, "1-2", "Range: npt=0-", "OPTIONS * RTSP/1.0\r\nCSeq: 1\r\nUser-Agent: curl/8.21.0\r\nRange: npt=0-\r\n\r\n")]
-    [DataRow(0L, null, null, "OPTIONS * RTSP/1.0\r\nCSeq: 1\r\nUser-Agent: curl/8.21.0\r\n\r\n")]
-    [DataRow(5L, "1-2", null, "OPTIONS * RTSP/1.0\r\nCSeq: 1\r\nRange: 5-\r\nUser-Agent: curl/8.21.0\r\n\r\n")]
+    [DataRow(null, "1-2", null, "OPTIONS * RTSP/1.0\r\nCSeq: 1\r\nRange: 1-2\r\nUser-Agent: curl/8.22.0\r\n\r\n")]
+    [DataRow(5L, null, null, "OPTIONS * RTSP/1.0\r\nCSeq: 1\r\nRange: 5-\r\nUser-Agent: curl/8.22.0\r\n\r\n")]
+    [DataRow(null, "1-2", "Range: npt=0-", "OPTIONS * RTSP/1.0\r\nCSeq: 1\r\nUser-Agent: curl/8.22.0\r\nRange: npt=0-\r\n\r\n")]
+    [DataRow(0L, null, null, "OPTIONS * RTSP/1.0\r\nCSeq: 1\r\nUser-Agent: curl/8.22.0\r\n\r\n")]
+    [DataRow(5L, "1-2", null, "OPTIONS * RTSP/1.0\r\nCSeq: 1\r\nRange: 5-\r\nUser-Agent: curl/8.22.0\r\n\r\n")]
     public async Task ExecuteAsync_ResumeAndRange_SendsCurlsRangeLine(long? resumeFrom, string? rangeText, string? header, string expected)
     {
         ScriptedConnection server = Server(Ok);
@@ -173,9 +173,9 @@ public sealed class RtspProtocolHandlerTests
 
         Diagnostics.ActResult(result);
         Diagnostics.ActSent(server.Sent);
-        Diagnostics.DiffText("request sent", "OPTIONS * RTSP/1.0\r\nCSeq: 1\r\nRange: 1-2\r\nReferer: http://r/\r\nUser-Agent: curl/8.21.0\r\n\r\n", server.Sent);
+        Diagnostics.DiffText("request sent", "OPTIONS * RTSP/1.0\r\nCSeq: 1\r\nRange: 1-2\r\nReferer: http://r/\r\nUser-Agent: curl/8.22.0\r\n\r\n", server.Sent);
         Assert.AreEqual(
-            "OPTIONS * RTSP/1.0\r\nCSeq: 1\r\nRange: 1-2\r\nReferer: http://r/\r\nUser-Agent: curl/8.21.0\r\n\r\n",
+            "OPTIONS * RTSP/1.0\r\nCSeq: 1\r\nRange: 1-2\r\nReferer: http://r/\r\nUser-Agent: curl/8.22.0\r\n\r\n",
             Encoding.Latin1.GetString(server.Sent));
     }
 
@@ -476,11 +476,11 @@ public sealed class RtspProtocolHandlerTests
         Diagnostics.ActResult(first);
         Diagnostics.ActResult(second);
         Diagnostics.ActSent(server.Sent);
-        Diagnostics.DiffText("requests sent", Request + "OPTIONS * RTSP/1.0\r\nCSeq: 2\r\nSession: 1234\r\nUser-Agent: curl/8.21.0\r\n\r\n", server.Sent);
+        Diagnostics.DiffText("requests sent", Request + "OPTIONS * RTSP/1.0\r\nCSeq: 2\r\nSession: 1234\r\nUser-Agent: curl/8.22.0\r\n\r\n", server.Sent);
         Assert.AreEqual(CurlExitCode.Ok, first.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, second.ExitCode);
         Assert.AreEqual(
-            Request + "OPTIONS * RTSP/1.0\r\nCSeq: 2\r\nSession: 1234\r\nUser-Agent: curl/8.21.0\r\n\r\n",
+            Request + "OPTIONS * RTSP/1.0\r\nCSeq: 2\r\nSession: 1234\r\nUser-Agent: curl/8.22.0\r\n\r\n",
             Encoding.Latin1.GetString(server.Sent));
     }
 
@@ -532,9 +532,9 @@ public sealed class RtspProtocolHandlerTests
 
         Diagnostics.ActSent(server.Sent);
         string sent = Encoding.Latin1.GetString(server.Sent);
-        const string expectedEnd = "CSeq: 2\r\nSession: \r\nUser-Agent: curl/8.21.0\r\n\r\n";
+        const string expectedEnd = "CSeq: 2\r\nSession: \r\nUser-Agent: curl/8.22.0\r\n\r\n";
         Diagnostics.Diff("requests sent end", expectedEnd, sent[^Math.Min(sent.Length, expectedEnd.Length)..]);
-        StringAssert.EndsWith(Encoding.Latin1.GetString(server.Sent), "CSeq: 2\r\nSession: \r\nUser-Agent: curl/8.21.0\r\n\r\n");
+        StringAssert.EndsWith(Encoding.Latin1.GetString(server.Sent), "CSeq: 2\r\nSession: \r\nUser-Agent: curl/8.22.0\r\n\r\n");
     }
 
     [TestMethod]
@@ -873,7 +873,7 @@ public sealed class RtspProtocolHandlerTests
         Diagnostics.ActResult(result);
         Diagnostics.AssertExitCode(CurlExitCode.Ok, result);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
-        Assert.AreEqual("OPTIONS * RTSP/1.0\r\nCSeq: 1\r\nUser-Agent: curl/8.21.0\r\nX-Session: 1\r\n\r\n", Encoding.Latin1.GetString(server.Sent));
+        Assert.AreEqual("OPTIONS * RTSP/1.0\r\nCSeq: 1\r\nUser-Agent: curl/8.22.0\r\nX-Session: 1\r\n\r\n", Encoding.Latin1.GetString(server.Sent));
     }
 
     [TestMethod]

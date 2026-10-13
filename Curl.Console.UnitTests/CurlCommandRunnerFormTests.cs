@@ -26,7 +26,7 @@ public sealed class CurlCommandRunnerFormTests
         "POST / HTTP/1.1\r\n"
         + "Host: 127.0.0.1:18233\r\n"
         + "Authorization: Basic dTpw\r\n"
-        + "User-Agent: curl/8.21.0\r\n"
+        + "User-Agent: curl/8.22.0\r\n"
         + "Accept: */*\r\n"
         + "Content-Length: 313\r\n"
         + "Content-Type: multipart/form-data; boundary=" + Boundary + "\r\n"
@@ -263,7 +263,7 @@ public sealed class CurlCommandRunnerFormTests
         Assert.AreEqual(
             "POST / HTTP/1.1\r\n"
             + "Host: 127.0.0.1:18233\r\n"
-            + "User-Agent: curl/8.21.0\r\n"
+            + "User-Agent: curl/8.22.0\r\n"
             + "Accept: */*\r\n"
             + "Content-Length: 187\r\n"
             + "Content-Type: multipart/form-data; boundary=" + Boundary + "\r\n"
@@ -314,7 +314,7 @@ public sealed class CurlCommandRunnerFormTests
             "request",
             "POST / HTTP/1.1\r\n"
             + "Host: 127.0.0.1:18233\r\n"
-            + "User-Agent: curl/8.21.0\r\n"
+            + "User-Agent: curl/8.22.0\r\n"
             + "Accept: */*\r\n"
             + "Content-Length: 173\r\n"
             + "Content-Type: multipart/form-data; boundary=" + boundary + "\r\n"
@@ -330,7 +330,7 @@ public sealed class CurlCommandRunnerFormTests
         Assert.AreEqual(
             "POST / HTTP/1.1\r\n"
             + "Host: 127.0.0.1:18233\r\n"
-            + "User-Agent: curl/8.21.0\r\n"
+            + "User-Agent: curl/8.22.0\r\n"
             + "Accept: */*\r\n"
             + "Content-Length: 173\r\n"
             + "Content-Type: multipart/form-data; boundary=" + boundary + "\r\n"
@@ -423,7 +423,7 @@ public sealed class CurlCommandRunnerFormTests
     private static string MeasuredRedirectRequest(string path) =>
         $"POST {path} HTTP/1.1\r\n"
         + "Host: 127.0.0.1:18298\r\n"
-        + "User-Agent: curl/8.21.0\r\n"
+        + "User-Agent: curl/8.22.0\r\n"
         + "Accept: */*\r\n"
         + "Content-Length: 297\r\n"
         + "Content-Type: multipart/form-data; boundary=" + RedirectBoundary + "\r\n"

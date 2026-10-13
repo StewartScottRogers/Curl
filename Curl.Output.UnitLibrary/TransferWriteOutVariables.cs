@@ -288,9 +288,9 @@ public sealed class TransferWriteOutVariables(
     /// <returns>The library version text.</returns>
     public static string FormatLibraryVersion(bool isWindows, bool isMacOS)
     {
-        return isWindows ? "libcurl/8.21.0 Schannel"
-            : isMacOS ? "libcurl/8.21.0 SecureTransport"
-            : "libcurl/8.21.0 OpenSSL";
+        return isWindows ? "libcurl/8.22.0 Schannel"
+            : isMacOS ? "libcurl/8.22.0 SecureTransport"
+            : "libcurl/8.22.0 OpenSSL";
     }
 
     /// <inheritdoc/>

@@ -15,7 +15,7 @@ namespace Curl.Protocol.Dict;
 [TestClass]
 public sealed class DictProtocolHandlerIoFailureTests
 {
-    private const string Request = "CLIENT libcurl 8.21.0\r\nDEFINE ! w\r\nQUIT\r\n";
+    private const string Request = "CLIENT libcurl 8.22.0\r\nDEFINE ! w\r\nQUIT\r\n";
 
     /// <summary>Gets or sets the running test's context, which carries its diagnostics.</summary>
     public TestContext TestContext { get; set; } = null!;

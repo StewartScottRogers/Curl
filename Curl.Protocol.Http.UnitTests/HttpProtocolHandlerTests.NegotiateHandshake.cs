@@ -108,7 +108,7 @@ public sealed partial class HttpProtocolHandlerTests
         "HTTP/1.1 401 Unauthorized\r\nWWW-Authenticate: Negotiate " + token + "\r\nContent-Length: 4\r\n\r\n";
 
     private static string NegotiateRequest(string token) =>
-        "GET /a HTTP/1.1\r\nHost: 127.0.0.1:18183\r\nAuthorization: Negotiate " + token + "\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n";
+        "GET /a HTTP/1.1\r\nHost: 127.0.0.1:18183\r\nAuthorization: Negotiate " + token + "\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n\r\n";
 
     private static TransferContext NegotiateContext(Stream output) =>
         new() { Url = CurlUrl.Parse(AuthUrl), Output = output, Credentials = new NetworkCredential(string.Empty, string.Empty), Http = new HttpRequestOptions { AuthSchemes = HttpAuthSchemes.Negotiate } };

@@ -163,9 +163,9 @@ public sealed partial class HttpProtocolHandlerTests
     [TestMethod]
     public async Task ExecuteAsync_417WhileSendingAFile_RewindsTheFileForTheResend()
     {
-        const string expectingPut = "PUT /p HTTP/1.1\r\nHost: 127.0.0.1:18260\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n"
+        const string expectingPut = "PUT /p HTTP/1.1\r\nHost: 127.0.0.1:18260\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n"
             + "Content-Length: 1048577\r\nExpect: 100-continue\r\n\r\n";
-        const string resentPut = "PUT /p HTTP/1.1\r\nHost: 127.0.0.1:18260\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n"
+        const string resentPut = "PUT /p HTTP/1.1\r\nHost: 127.0.0.1:18260\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n"
             + "Content-Length: 1048577\r\n\r\n";
         foreach (int chunkSize in ChunkSizes)
         {
@@ -203,9 +203,9 @@ public sealed partial class HttpProtocolHandlerTests
     [TestMethod]
     public async Task ExecuteAsync_417WhileSendingStandardInput_ResendsTheRestOfIt()
     {
-        const string expectingPut = "PUT /p HTTP/1.1\r\nHost: 127.0.0.1:18260\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n"
+        const string expectingPut = "PUT /p HTTP/1.1\r\nHost: 127.0.0.1:18260\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n"
             + "Transfer-Encoding: chunked\r\nExpect: 100-continue\r\n\r\n";
-        const string resentPut = "PUT /p HTTP/1.1\r\nHost: 127.0.0.1:18260\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n"
+        const string resentPut = "PUT /p HTTP/1.1\r\nHost: 127.0.0.1:18260\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n"
             + "Transfer-Encoding: chunked\r\n\r\n";
         byte[] standardInput = Encoding.Latin1.GetBytes(string.Concat(Enumerable.Range(0, 131072).Select(line => $"{line:D7}\n")));
         foreach (int chunkSize in ChunkSizes)

@@ -24,7 +24,7 @@ public sealed partial class HttpRequestHeadFormatterTests
         byte[] head = HttpRequestHeadFormatter.Format(ArrangedUrl(AltSvcOriginUrl), Arranged(options), cookie: "a=b");
 
         Assert.AreEqual(
-            ExpectedHead("GET / HTTP/1.1\r\nHost: localhost:18499\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\nReferer: http://r/\r\n"
+            ExpectedHead("GET / HTTP/1.1\r\nHost: localhost:18499\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\nReferer: http://r/\r\n"
                 + "Alt-Used: localhost:18443\r\nCookie: a=b\r\nX-A: 1\r\n\r\n", head),
             Encoding.Latin1.GetString(head));
     }
@@ -38,7 +38,7 @@ public sealed partial class HttpRequestHeadFormatterTests
         byte[] head = HttpRequestHeadFormatter.Format(ArrangedUrl(AltSvcOriginUrl), Arranged(options), cookie: "a=b");
 
         Assert.AreEqual(
-            ExpectedHead("GET / HTTP/1.1\r\nHost: localhost:18499\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\nReferer: http://r/\r\n"
+            ExpectedHead("GET / HTTP/1.1\r\nHost: localhost:18499\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\nReferer: http://r/\r\n"
                 + "Cookie: a=b\r\nAlt-Used: mine\r\nX-A: 1\r\n\r\n", head),
             Encoding.Latin1.GetString(head));
     }

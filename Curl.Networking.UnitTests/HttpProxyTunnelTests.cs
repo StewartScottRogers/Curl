@@ -32,9 +32,9 @@ public sealed class HttpProxyTunnelTests
             HttpProxy,
             HttpProxyTunnelOptions.Default, null);
 
-        AssertRequest("CONNECT example.com:80 HTTP/1.1\r\nHost: example.com:80\r\nUser-Agent: curl/8.21.0\r\nProxy-Connection: Keep-Alive\r\n\r\n", request);
+        AssertRequest("CONNECT example.com:80 HTTP/1.1\r\nHost: example.com:80\r\nUser-Agent: curl/8.22.0\r\nProxy-Connection: Keep-Alive\r\n\r\n", request);
         Assert.AreEqual(
-            "CONNECT example.com:80 HTTP/1.1\r\nHost: example.com:80\r\nUser-Agent: curl/8.21.0\r\nProxy-Connection: Keep-Alive\r\n\r\n",
+            "CONNECT example.com:80 HTTP/1.1\r\nHost: example.com:80\r\nUser-Agent: curl/8.22.0\r\nProxy-Connection: Keep-Alive\r\n\r\n",
             Encoding.Latin1.GetString(request));
     }
 
@@ -49,9 +49,9 @@ public sealed class HttpProxyTunnelTests
             HttpProxy,
             HttpProxyTunnelOptions.Default, "Basic dXNlcjpwQHNz");
 
-        AssertRequest("CONNECT example.com:8443 HTTP/1.1\r\nHost: example.com:8443\r\nProxy-Authorization: Basic dXNlcjpwQHNz\r\nUser-Agent: curl/8.21.0\r\nProxy-Connection: Keep-Alive\r\n\r\n", request);
+        AssertRequest("CONNECT example.com:8443 HTTP/1.1\r\nHost: example.com:8443\r\nProxy-Authorization: Basic dXNlcjpwQHNz\r\nUser-Agent: curl/8.22.0\r\nProxy-Connection: Keep-Alive\r\n\r\n", request);
         Assert.AreEqual(
-            "CONNECT example.com:8443 HTTP/1.1\r\nHost: example.com:8443\r\nProxy-Authorization: Basic dXNlcjpwQHNz\r\nUser-Agent: curl/8.21.0\r\nProxy-Connection: Keep-Alive\r\n\r\n",
+            "CONNECT example.com:8443 HTTP/1.1\r\nHost: example.com:8443\r\nProxy-Authorization: Basic dXNlcjpwQHNz\r\nUser-Agent: curl/8.22.0\r\nProxy-Connection: Keep-Alive\r\n\r\n",
             Encoding.Latin1.GetString(request));
     }
 
@@ -116,9 +116,9 @@ public sealed class HttpProxyTunnelTests
             HttpProxy,
             HttpProxyTunnelOptions.Default, null);
 
-        AssertRequest("CONNECT [::1]:81 HTTP/1.1\r\nHost: [::1]:81\r\nUser-Agent: curl/8.21.0\r\nProxy-Connection: Keep-Alive\r\n\r\n", request);
+        AssertRequest("CONNECT [::1]:81 HTTP/1.1\r\nHost: [::1]:81\r\nUser-Agent: curl/8.22.0\r\nProxy-Connection: Keep-Alive\r\n\r\n", request);
         Assert.AreEqual(
-            "CONNECT [::1]:81 HTTP/1.1\r\nHost: [::1]:81\r\nUser-Agent: curl/8.21.0\r\nProxy-Connection: Keep-Alive\r\n\r\n",
+            "CONNECT [::1]:81 HTTP/1.1\r\nHost: [::1]:81\r\nUser-Agent: curl/8.22.0\r\nProxy-Connection: Keep-Alive\r\n\r\n",
             Encoding.Latin1.GetString(request));
     }
 
@@ -148,9 +148,9 @@ public sealed class HttpProxyTunnelTests
             HttpProxy with { Kind = ProxyKind.Http10 },
             HttpProxyTunnelOptions.Default, null);
 
-        AssertRequest("CONNECT example.com:80 HTTP/1.0\r\nHost: example.com:80\r\nUser-Agent: curl/8.21.0\r\nProxy-Connection: Keep-Alive\r\n\r\n", request);
+        AssertRequest("CONNECT example.com:80 HTTP/1.0\r\nHost: example.com:80\r\nUser-Agent: curl/8.22.0\r\nProxy-Connection: Keep-Alive\r\n\r\n", request);
         Assert.AreEqual(
-            "CONNECT example.com:80 HTTP/1.0\r\nHost: example.com:80\r\nUser-Agent: curl/8.21.0\r\nProxy-Connection: Keep-Alive\r\n\r\n",
+            "CONNECT example.com:80 HTTP/1.0\r\nHost: example.com:80\r\nUser-Agent: curl/8.22.0\r\nProxy-Connection: Keep-Alive\r\n\r\n",
             Encoding.Latin1.GetString(request));
     }
 
@@ -190,17 +190,17 @@ public sealed class HttpProxyTunnelTests
     // Each expected request is the one curl 8.21.0 sent with
     // curl -s -x http://127.0.0.1:<port> -p <proxy headers> http://example.com/ (BL-347 Notes).
     [TestMethod]
-    [DataRow(new[] { "X-P: 1" }, "Host: example.com:80\r\nUser-Agent: curl/8.21.0\r\nProxy-Connection: Keep-Alive\r\nX-P: 1\r\n")]
+    [DataRow(new[] { "X-P: 1" }, "Host: example.com:80\r\nUser-Agent: curl/8.22.0\r\nProxy-Connection: Keep-Alive\r\nX-P: 1\r\n")]
     [DataRow(new[] { "User-Agent: x" }, "Host: example.com:80\r\nProxy-Connection: Keep-Alive\r\nUser-Agent: x\r\n")]
-    [DataRow(new[] { "Host: h" }, "User-Agent: curl/8.21.0\r\nProxy-Connection: Keep-Alive\r\nHost: h\r\n")]
-    [DataRow(new[] { "Proxy-Connection: close" }, "Host: example.com:80\r\nUser-Agent: curl/8.21.0\r\nProxy-Connection: close\r\n")]
+    [DataRow(new[] { "Host: h" }, "User-Agent: curl/8.22.0\r\nProxy-Connection: Keep-Alive\r\nHost: h\r\n")]
+    [DataRow(new[] { "Proxy-Connection: close" }, "Host: example.com:80\r\nUser-Agent: curl/8.22.0\r\nProxy-Connection: close\r\n")]
     [DataRow(new[] { "User-Agent:", "X-E;", "Proxy-Connection;" }, "Host: example.com:80\r\nX-E: \r\nProxy-Connection: \r\n")]
-    [DataRow(new[] { "X-P:   spaced  ", "X-T:\tt", "X-N:1" }, "Host: example.com:80\r\nUser-Agent: curl/8.21.0\r\nProxy-Connection: Keep-Alive\r\nX-P: spaced  \r\nX-T: t\r\nX-N: 1\r\n")]
-    [DataRow(new[] { "X-F; junk", "Bogus", ": novalue", "X-G:" }, "Host: example.com:80\r\nUser-Agent: curl/8.21.0\r\nProxy-Connection: Keep-Alive\r\n")]
+    [DataRow(new[] { "X-P:   spaced  ", "X-T:\tt", "X-N:1" }, "Host: example.com:80\r\nUser-Agent: curl/8.22.0\r\nProxy-Connection: Keep-Alive\r\nX-P: spaced  \r\nX-T: t\r\nX-N: 1\r\n")]
+    [DataRow(new[] { "X-F; junk", "Bogus", ": novalue", "X-G:" }, "Host: example.com:80\r\nUser-Agent: curl/8.22.0\r\nProxy-Connection: Keep-Alive\r\n")]
     [DataRow(new[] { "X-D: 1", "x-d: 2", "user-agent: lower" }, "Host: example.com:80\r\nProxy-Connection: Keep-Alive\r\nX-D: 1\r\nx-d: 2\r\nuser-agent: lower\r\n")]
-    [DataRow(new[] { "Host;", "Content-Length: 5", "Connection: close" }, "User-Agent: curl/8.21.0\r\nProxy-Connection: Keep-Alive\r\nHost: \r\nContent-Length: 5\r\nConnection: close\r\n")]
-    [DataRow(new[] { "Host; junk", "User-Agent", "Proxy-Connection;x" }, "User-Agent: curl/8.21.0\r\n")]
-    [DataRow(new[] { "X-S;: v", "X-C:v;w", "X-W: " }, "Host: example.com:80\r\nUser-Agent: curl/8.21.0\r\nProxy-Connection: Keep-Alive\r\nX-C: v;w\r\n")]
+    [DataRow(new[] { "Host;", "Content-Length: 5", "Connection: close" }, "User-Agent: curl/8.22.0\r\nProxy-Connection: Keep-Alive\r\nHost: \r\nContent-Length: 5\r\nConnection: close\r\n")]
+    [DataRow(new[] { "Host; junk", "User-Agent", "Proxy-Connection;x" }, "User-Agent: curl/8.22.0\r\n")]
+    [DataRow(new[] { "X-S;: v", "X-C:v;w", "X-W: " }, "Host: example.com:80\r\nUser-Agent: curl/8.22.0\r\nProxy-Connection: Keep-Alive\r\nX-C: v;w\r\n")]
     public void BuildConnectRequest_WithProxyHeaders_MatchesCurl(string[] proxyHeaders, string expectedHeaders)
     {
         ArrangeRequest("example.com:80", HttpProxy, "proxy headers " + string.Join(" | ", proxyHeaders), null);
@@ -226,9 +226,9 @@ public sealed class HttpProxyTunnelTests
             proxy,
             HttpProxyTunnelOptions.Default with { ProxyHeaders = ["Proxy-Authorization: Z", "X-B: 2"] }, "Basic dTpw");
 
-        AssertRequest("CONNECT example.com:80 HTTP/1.1\r\nHost: example.com:80\r\nUser-Agent: curl/8.21.0\r\nProxy-Connection: Keep-Alive\r\nProxy-Authorization: Z\r\nX-B: 2\r\n\r\n", request);
+        AssertRequest("CONNECT example.com:80 HTTP/1.1\r\nHost: example.com:80\r\nUser-Agent: curl/8.22.0\r\nProxy-Connection: Keep-Alive\r\nProxy-Authorization: Z\r\nX-B: 2\r\n\r\n", request);
         Assert.AreEqual(
-            "CONNECT example.com:80 HTTP/1.1\r\nHost: example.com:80\r\nUser-Agent: curl/8.21.0\r\nProxy-Connection: Keep-Alive\r\nProxy-Authorization: Z\r\nX-B: 2\r\n\r\n",
+            "CONNECT example.com:80 HTTP/1.1\r\nHost: example.com:80\r\nUser-Agent: curl/8.22.0\r\nProxy-Connection: Keep-Alive\r\nProxy-Authorization: Z\r\nX-B: 2\r\n\r\n",
             Encoding.Latin1.GetString(request));
     }
 
@@ -244,8 +244,8 @@ public sealed class HttpProxyTunnelTests
             proxy,
             HttpProxyTunnelOptions.Default with { ProxyHeaders = ["Host:", "Proxy-Authorization:", "Proxy-Connection:"] }, "Basic dTpw");
 
-        AssertRequest("CONNECT example.com:80 HTTP/1.1\r\nUser-Agent: curl/8.21.0\r\n\r\n", request);
-        Assert.AreEqual("CONNECT example.com:80 HTTP/1.1\r\nUser-Agent: curl/8.21.0\r\n\r\n", Encoding.Latin1.GetString(request));
+        AssertRequest("CONNECT example.com:80 HTTP/1.1\r\nUser-Agent: curl/8.22.0\r\n\r\n", request);
+        Assert.AreEqual("CONNECT example.com:80 HTTP/1.1\r\nUser-Agent: curl/8.22.0\r\n\r\n", Encoding.Latin1.GetString(request));
     }
 
     [TestMethod]

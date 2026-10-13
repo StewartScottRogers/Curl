@@ -18,7 +18,7 @@ namespace Curl.Protocol.Rtsp;
 [TestClass]
 public sealed class RtspProtocolHandlerVerboseTests
 {
-    private const string Request = "OPTIONS * RTSP/1.0\r\nCSeq: 1\r\nUser-Agent: curl/8.21.0\r\n\r\n";
+    private const string Request = "OPTIONS * RTSP/1.0\r\nCSeq: 1\r\nUser-Agent: curl/8.22.0\r\n\r\n";
 
     private const string RequestSent = "* Request completely sent off";
 
@@ -54,7 +54,7 @@ public sealed class RtspProtocolHandlerVerboseTests
 
         Diagnostics.AssertExitCode(CurlExitCode.Ok, result);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
-        Assert.AreEqual("OPTIONS * RTSP/1.0\r\nCSeq: 0\r\nUser-Agent: curl/8.21.0\r\n\r\n", Encoding.Latin1.GetString(server.Sent));
+        Assert.AreEqual("OPTIONS * RTSP/1.0\r\nCSeq: 0\r\nUser-Agent: curl/8.22.0\r\n\r\n", Encoding.Latin1.GetString(server.Sent));
         Assert.AreEqual("* Connection #3 to host 127.0.0.1:47950 left intact", transcript[^1]);
         Assert.IsTrue(server.IsMarkedReusable);
     }

@@ -45,7 +45,7 @@ public sealed partial class TcpConnectorQuicTests
         Assert.AreEqual(new IPEndPoint(TunnelProxyAddress, 3128), connection.RemoteEndPoint);
         Assert.AreEqual(
             "GET http://proxy.example:3128/.well-known/masque/udp/quic.test/443/ HTTP/1.1\r\n"
-                + "Host: proxy.example:3128\r\nUser-Agent: curl/8.21.0\r\nProxy-Connection: Keep-Alive\r\n"
+                + "Host: proxy.example:3128\r\nUser-Agent: curl/8.22.0\r\nProxy-Connection: Keep-Alive\r\n"
                 + "Connection: Upgrade\r\nUpgrade: connect-udp\r\nCapsule-Protocol: ?1\r\n\r\n",
             proxy.RequestHead);
         Assert.AreEqual(0x00, proxy.Written[proxy.RequestHead.Length], "a DATAGRAM capsule follows the head");
@@ -76,7 +76,7 @@ public sealed partial class TcpConnectorQuicTests
         Diagnostics.Assert("Proxy-Authorization present", true, proxy.RequestHead.Contains("Proxy-Authorization: Basic dTpw\r\n", StringComparison.Ordinal));
         Assert.AreEqual(
             "GET http://proxy.example:3128/.well-known/masque/udp/%3A%3A1/8443/ HTTP/1.0\r\n"
-                + "Host: proxy.example:3128\r\nProxy-Authorization: Basic dTpw\r\nUser-Agent: curl/8.21.0\r\nProxy-Connection: Keep-Alive\r\n"
+                + "Host: proxy.example:3128\r\nProxy-Authorization: Basic dTpw\r\nUser-Agent: curl/8.22.0\r\nProxy-Connection: Keep-Alive\r\n"
                 + "Connection: Upgrade\r\nUpgrade: connect-udp\r\nCapsule-Protocol: ?1\r\n\r\n",
             proxy.RequestHead);
     }

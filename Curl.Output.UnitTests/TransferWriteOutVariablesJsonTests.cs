@@ -16,7 +16,7 @@ public sealed class TransferWriteOutVariablesJsonTests
 
     /// <summary>The reference build's <c>curl_version</c>, so a test can pin curl's bytes whole.</summary>
     private const string ReferenceLibraryVersion =
-        "libcurl/8.21.0 Schannel zlib/1.3.2 brotli/1.2.0 zstd/1.5.7 libidn2/2.3.8 libpsl/0.21.5 libssh2/1.11.1 WinLDAP";
+        "libcurl/8.22.0 Schannel zlib/1.3.2 brotli/1.2.0 zstd/1.5.7 libidn2/2.3.8 libpsl/0.21.5 libssh2/1.11.1 WinLDAP";
 
     /// <summary>A clock whose timestamps are microseconds, so a test writes curl's microsecond values directly.</summary>
     private static readonly TimeProvider Clock = new MicrosecondTimeProvider();
@@ -263,10 +263,10 @@ public sealed class TransferWriteOutVariablesJsonTests
     }
 
     [TestMethod]
-    [DataRow(true, false, "libcurl/8.21.0 Schannel")]
-    [DataRow(true, true, "libcurl/8.21.0 Schannel")]
-    [DataRow(false, true, "libcurl/8.21.0 SecureTransport")]
-    [DataRow(false, false, "libcurl/8.21.0 OpenSSL")]
+    [DataRow(true, false, "libcurl/8.22.0 Schannel")]
+    [DataRow(true, true, "libcurl/8.22.0 Schannel")]
+    [DataRow(false, true, "libcurl/8.22.0 SecureTransport")]
+    [DataRow(false, false, "libcurl/8.22.0 OpenSSL")]
     public void FormatLibraryVersion_NamesThePlatformsTlsBackend(bool isWindows, bool isMacOS, string expected)
     {
         TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);

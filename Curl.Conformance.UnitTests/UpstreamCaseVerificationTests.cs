@@ -26,7 +26,7 @@ public sealed class UpstreamCaseVerificationTests
         string sections = "<verify>\n<protocol crlf=\"yes\">\nGET / HTTP/1.1\nDate: expected\nUser-Agent: curl/x\n</protocol>\n"
             + "<strip>\n^Date:\n</strip>\n<strippart>\ns/curl\\/[0-9.]+/curl\\/x/\n# comment\n</strippart>\n</verify>\n";
 
-        string? difference = Verify(sections, Run(received: "GET / HTTP/1.1\r\nDate: now\r\nUser-Agent: curl/8.21.0\r\n"));
+        string? difference = Verify(sections, Run(received: "GET / HTTP/1.1\r\nDate: now\r\nUser-Agent: curl/8.22.0\r\n"));
         ExpectDifference(null, difference);
         Assert.IsNull(difference);
     }

@@ -220,7 +220,7 @@ public sealed partial class HttpProtocolHandlerTests
     /// The <c>-T big.bin -H "Expect: 100-continue"</c> head: curl sends no <c>Expect</c> of its
     /// own, so the <c>-H</c> line takes its place among the custom headers.
     /// </summary>
-    private static string CustomExpectPut => "PUT /p HTTP/1.1\r\nHost: 127.0.0.1:18260\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n"
+    private static string CustomExpectPut => "PUT /p HTTP/1.1\r\nHost: 127.0.0.1:18260\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n"
         + "Expect: 100-continue\r\nContent-Length: 1048577\r\n\r\n";
 
     /// <summary>

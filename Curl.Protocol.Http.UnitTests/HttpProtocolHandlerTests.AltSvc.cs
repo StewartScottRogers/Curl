@@ -21,7 +21,7 @@ public sealed partial class HttpProtocolHandlerTests
     [TestMethod]
     public async Task ExecuteAsync_WithAnAltSvcRoute_ConnectsToTheOriginCarryingTheRouteAndSendsAltUsed()
     {
-        const string expected = "GET / HTTP/1.1\r\nHost: localhost:18499\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\nAlt-Used: localhost:18443\r\n\r\n";
+        const string expected = "GET / HTTP/1.1\r\nHost: localhost:18499\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\nAlt-Used: localhost:18443\r\n\r\n";
         AltSvcRoute route = new("h1", AltSvcAlternative18443);
         QueueConnector connector = QueueConnector.For(Connection(EmptyOkHead, 65536, expected));
         Diagnostics.Arrange("url, alt-svc route", $"{AltSvcHttpsUrl}, h1 -> localhost:18443");

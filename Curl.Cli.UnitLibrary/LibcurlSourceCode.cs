@@ -31,7 +31,7 @@ public static partial class LibcurlSourceCode
     /// <summary>The longest string, in bytes, a <c>curl_easy_setopt</c> line quotes in full; a longer one is cut and ends in <c>...</c>.</summary>
     public const int LongestQuotedString = 2000;
 
-    private const string DefaultUserAgent = "curl/8.21.0";
+    private const string DefaultUserAgent = "curl/8.22.0";
 
     private static readonly FrozenDictionary<byte, string> NamedEscapes = new Dictionary<byte, string>
     {

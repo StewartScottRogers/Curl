@@ -27,7 +27,7 @@ public sealed partial class HttpProtocolHandlerTests
     public async Task ExecuteAsync_HttpThroughProxy_SendsAbsoluteFormToTheProxy()
     {
         const string expected = "GET http://Example.com/a/b?c=d HTTP/1.1\r\nHost: Example.com\r\nProxy-Authorization: Basic dTpw\r\n"
-            + "User-Agent: curl/8.21.0\r\nAccept: */*\r\nProxy-Connection: Keep-Alive\r\n\r\n";
+            + "User-Agent: curl/8.22.0\r\nAccept: */*\r\nProxy-Connection: Keep-Alive\r\n\r\n";
         foreach (int chunkSize in ChunkSizes)
         {
             TurnTakingConnection connection = new(chunkSize, ProxyOkHead + "ok");
@@ -65,7 +65,7 @@ public sealed partial class HttpProtocolHandlerTests
     [TestMethod]
     public async Task ExecuteAsync_FtpThroughProxy_ForwardsAGetAndWritesTheProxysBody()
     {
-        const string expected = "GET ftp://example.com/f.txt HTTP/1.1\r\nHost: example.com:21\r\nUser-Agent: curl/8.21.0\r\n"
+        const string expected = "GET ftp://example.com/f.txt HTTP/1.1\r\nHost: example.com:21\r\nUser-Agent: curl/8.22.0\r\n"
             + "Accept: */*\r\nProxy-Connection: Keep-Alive\r\n\r\n";
         ProxyEndpoint proxy = new(ProxyKind.Http, "127.0.0.1", 18332, null);
         foreach (int chunkSize in ChunkSizes)
@@ -98,7 +98,7 @@ public sealed partial class HttpProtocolHandlerTests
     [TestMethod]
     public async Task ExecuteAsync_HttpThroughProxyWithProxyHeaders_SendsThemAfterTheCustomHeaders()
     {
-        const string expected = "GET http://example.com/ HTTP/1.1\r\nHost: example.com\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n"
+        const string expected = "GET http://example.com/ HTTP/1.1\r\nHost: example.com\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n"
             + "Proxy-Connection: Keep-Alive\r\nX-A: 1\r\nX-P: 1\r\n\r\n";
         foreach (int chunkSize in ChunkSizes)
         {
@@ -129,7 +129,7 @@ public sealed partial class HttpProtocolHandlerTests
     public async Task ExecuteAsync_ProxyAndOriginCredentials_SendsProxyAuthorizationFirst()
     {
         const string expected = "GET http://EXample.com/A%20b?q HTTP/1.1\r\nHost: EXample.com\r\nProxy-Authorization: Basic dTpw\r\n"
-            + "Authorization: Basic YTpi\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\nProxy-Connection: Keep-Alive\r\n\r\n";
+            + "Authorization: Basic YTpi\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\nProxy-Connection: Keep-Alive\r\n\r\n";
         foreach (int chunkSize in ChunkSizes)
         {
             TurnTakingConnection connection = new(chunkSize, ProxyOkHead + "ok");
@@ -164,7 +164,7 @@ public sealed partial class HttpProtocolHandlerTests
     public async Task ExecuteAsync_PostThroughProxyWithoutProxyCredential_SendsNoProxyAuthorization()
     {
         const string expected = "POST http://example.com/ HTTP/1.1\r\nHost: example.com\r\nAuthorization: Basic YTpi\r\n"
-            + "User-Agent: curl/8.21.0\r\nAccept: */*\r\nProxy-Connection: Keep-Alive\r\nContent-Length: 2\r\n"
+            + "User-Agent: curl/8.22.0\r\nAccept: */*\r\nProxy-Connection: Keep-Alive\r\nContent-Length: 2\r\n"
             + "Content-Type: application/x-www-form-urlencoded\r\n\r\nxy";
         foreach (int chunkSize in ChunkSizes)
         {
@@ -198,7 +198,7 @@ public sealed partial class HttpProtocolHandlerTests
     [TestMethod]
     public async Task ExecuteAsync_Http10Proxy_ForwardsLikeAnHttp11Proxy()
     {
-        const string expected = "HEAD http://example.com/h HTTP/1.1\r\nHost: example.com\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n"
+        const string expected = "HEAD http://example.com/h HTTP/1.1\r\nHost: example.com\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n"
             + "Proxy-Connection: Keep-Alive\r\n\r\n";
         foreach (int chunkSize in ChunkSizes)
         {
@@ -251,9 +251,9 @@ public sealed partial class HttpProtocolHandlerTests
     public async Task ExecuteAsync_AuthenticationRetryThroughProxy_KeepsTheProxyHeaders()
     {
         const string first = "GET http://127.0.0.1:18184/a HTTP/1.1\r\nHost: 127.0.0.1:18184\r\nProxy-Authorization: Basic dTpw\r\n"
-            + "User-Agent: curl/8.21.0\r\nAccept: */*\r\nProxy-Connection: Keep-Alive\r\n\r\n";
+            + "User-Agent: curl/8.22.0\r\nAccept: */*\r\nProxy-Connection: Keep-Alive\r\n\r\n";
         const string second = "GET http://127.0.0.1:18184/a HTTP/1.1\r\nHost: 127.0.0.1:18184\r\nProxy-Authorization: Basic dTpw\r\n"
-            + "Authorization: " + DigestValue + "\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\nProxy-Connection: Keep-Alive\r\n\r\n";
+            + "Authorization: " + DigestValue + "\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\nProxy-Connection: Keep-Alive\r\n\r\n";
         foreach (int chunkSize in ChunkSizes)
         {
             TurnTakingConnection connection = new(chunkSize, ChallengeHead + "nope", ProxyOkHead + "ok");
@@ -294,7 +294,7 @@ public sealed partial class HttpProtocolHandlerTests
         int port,
         bool useTls)
     {
-        const string expected = "GET /a?b HTTP/1.1\r\nHost: example.com\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n";
+        const string expected = "GET /a?b HTTP/1.1\r\nHost: example.com\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n\r\n";
         foreach (int chunkSize in ChunkSizes)
         {
             ProxyEndpoint proxy = new(kind, "127.0.0.1", 18183, new NetworkCredential("u", "p"));

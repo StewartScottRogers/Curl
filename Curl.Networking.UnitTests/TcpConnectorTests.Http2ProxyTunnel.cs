@@ -52,7 +52,7 @@ public sealed partial class TcpConnectorTests
         Assert.AreEqual(1, headers.StreamId);
         Assert.IsFalse(headers.HasFlag(Http2FrameFlags.EndStream));
         CollectionAssert.AreEqual(
-            new[] { ":method: CONNECT", ":authority: example.test:443", "user-agent: curl/8.21.0" },
+            new[] { ":method: CONNECT", ":authority: example.test:443", "user-agent: curl/8.22.0" },
             new HpackDecoder().Decode(Http2FramePayloadParser.ParseHeaders(headers).Fragment.Span).Select(field => $"{field.Name}: {field.Value}").ToArray());
 
         var connection = result.Connection!;

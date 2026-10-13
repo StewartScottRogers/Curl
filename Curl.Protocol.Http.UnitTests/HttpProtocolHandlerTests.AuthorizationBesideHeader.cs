@@ -13,7 +13,7 @@ namespace Curl.Protocol.Http;
 /// </content>
 public sealed partial class HttpProtocolHandlerTests
 {
-    private const string AuthorizationHeaderRequest = "GET /a HTTP/1.1\r\nHost: 127.0.0.1:18183\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\nAuthorization: x\r\n\r\n";
+    private const string AuthorizationHeaderRequest = "GET /a HTTP/1.1\r\nHost: 127.0.0.1:18183\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\nAuthorization: x\r\n\r\n";
 
     /// <summary>
     /// Measured: <c>curl --digest -u u:p -H "Authorization: x"</c> against a Digest 401 sends
@@ -37,11 +37,11 @@ public sealed partial class HttpProtocolHandlerTests
             Diagnostics.Diff(
                 "connection written",
                 AuthorizationHeaderRequest
-                + "GET /a HTTP/1.1\r\nHost: 127.0.0.1:18183\r\nAuthorization: " + DigestValue + "\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\nAuthorization: x\r\n\r\n",
+                + "GET /a HTTP/1.1\r\nHost: 127.0.0.1:18183\r\nAuthorization: " + DigestValue + "\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\nAuthorization: x\r\n\r\n",
                 connection.Written);
             Assert.AreEqual(
                 AuthorizationHeaderRequest
-                + "GET /a HTTP/1.1\r\nHost: 127.0.0.1:18183\r\nAuthorization: " + DigestValue + "\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\nAuthorization: x\r\n\r\n",
+                + "GET /a HTTP/1.1\r\nHost: 127.0.0.1:18183\r\nAuthorization: " + DigestValue + "\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\nAuthorization: x\r\n\r\n",
                 connection.Written,
                 $"Chunk size {chunkSize}");
         }
@@ -74,12 +74,12 @@ public sealed partial class HttpProtocolHandlerTests
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
             Diagnostics.Diff(
                 "connection written",
-                "GET /a HTTP/1.1\r\nHost: 127.0.0.1:18183\r\nAuthorization: NTLM T1\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\nAuthorization: x\r\n\r\n"
-                + "GET /a HTTP/1.1\r\nHost: 127.0.0.1:18183\r\nAuthorization: NTLM T3\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\nAuthorization: x\r\n\r\n",
+                "GET /a HTTP/1.1\r\nHost: 127.0.0.1:18183\r\nAuthorization: NTLM T1\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\nAuthorization: x\r\n\r\n"
+                + "GET /a HTTP/1.1\r\nHost: 127.0.0.1:18183\r\nAuthorization: NTLM T3\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\nAuthorization: x\r\n\r\n",
                 connection.Written);
             Assert.AreEqual(
-                "GET /a HTTP/1.1\r\nHost: 127.0.0.1:18183\r\nAuthorization: NTLM T1\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\nAuthorization: x\r\n\r\n"
-                + "GET /a HTTP/1.1\r\nHost: 127.0.0.1:18183\r\nAuthorization: NTLM T3\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\nAuthorization: x\r\n\r\n",
+                "GET /a HTTP/1.1\r\nHost: 127.0.0.1:18183\r\nAuthorization: NTLM T1\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\nAuthorization: x\r\n\r\n"
+                + "GET /a HTTP/1.1\r\nHost: 127.0.0.1:18183\r\nAuthorization: NTLM T3\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\nAuthorization: x\r\n\r\n",
                 connection.Written,
                 $"Chunk size {chunkSize}");
         }

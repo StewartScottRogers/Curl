@@ -32,7 +32,7 @@ public sealed class CurlCommandRunnerHeaderAndFailTests
 
     private const string NotFound = NotFoundHead + "nope!";
 
-    private const string Request = "Host: 127.0.0.1:18332\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n";
+    private const string Request = "Host: 127.0.0.1:18332\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n\r\n";
 
     private const string HeaderDumpedTwice = "HTTP/1.1 200 OK\r\nHTTP/1.1 200 OK\r\nContent-Length: 5\r\nContent-Length: 5\r\n\r\n\r\nhello";
 

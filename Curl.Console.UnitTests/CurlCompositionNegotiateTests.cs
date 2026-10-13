@@ -23,7 +23,7 @@ public sealed class CurlCompositionNegotiateTests
 
     private const string Url = "http://127.0.0.1:18527/p";
 
-    private const string Request = "GET /p HTTP/1.1\r\nHost: 127.0.0.1:18527\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n";
+    private const string Request = "GET /p HTTP/1.1\r\nHost: 127.0.0.1:18527\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n\r\n";
 
     private const string Unauthorized = "HTTP/1.1 401 Unauthorized\r\nWWW-Authenticate: Negotiate\r\nContent-Length: 4\r\n\r\ndeny";
 

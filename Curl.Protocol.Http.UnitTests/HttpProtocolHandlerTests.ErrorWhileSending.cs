@@ -71,7 +71,7 @@ public sealed partial class HttpProtocolHandlerTests
     [TestMethod]
     public async Task ExecuteAsync_500WhileSendingAFile_StopsSendingAndShutsTheConnection()
     {
-        const string expectingPut = "PUT /p HTTP/1.1\r\nHost: 127.0.0.1:18260\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n"
+        const string expectingPut = "PUT /p HTTP/1.1\r\nHost: 127.0.0.1:18260\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n"
             + "Content-Length: 1048577\r\nExpect: 100-continue\r\n\r\n";
         foreach (int chunkSize in ChunkSizes)
         {

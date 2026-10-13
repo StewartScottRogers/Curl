@@ -23,7 +23,7 @@ public sealed class CurlCompositionHttpTests
 
     private const string Url = "http://127.0.0.1:18231/";
 
-    private const string Head = "Host: 127.0.0.1:18231\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n";
+    private const string Head = "Host: 127.0.0.1:18231\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n";
 
     private const string FormBody = "Content-Type: application/x-www-form-urlencoded\r\n";
 
@@ -47,7 +47,7 @@ public sealed class CurlCompositionHttpTests
         Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual(
-            "GET /s HTTP/1.1\r\nHost: localhost:18232\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n",
+            "GET /s HTTP/1.1\r\nHost: localhost:18232\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n\r\n",
             Latin1(server.Written));
         Assert.AreEqual("hello", standardOutput);
         Assert.AreEqual(new ConnectTarget("localhost", 18232, true) { PoolScheme = "https" }, server.Targets.Single());
@@ -120,39 +120,39 @@ public sealed class CurlCompositionHttpTests
         DisplayName = "--url-query")]
     [DataRow(
         new[] { "--json", "{\"a\":1}", Url },
-        "POST / HTTP/1.1\r\nHost: 127.0.0.1:18231\r\nUser-Agent: curl/8.21.0\r\nContent-Type: application/json\r\nAccept: application/json\r\nContent-Length: 7\r\n\r\n{\"a\":1}",
+        "POST / HTTP/1.1\r\nHost: 127.0.0.1:18231\r\nUser-Agent: curl/8.22.0\r\nContent-Type: application/json\r\nAccept: application/json\r\nContent-Length: 7\r\n\r\n{\"a\":1}",
         DisplayName = "--json")]
     [DataRow(
         new[] { "--json", "{}", "-H", "Accept: text/x", Url },
-        "POST / HTTP/1.1\r\nHost: 127.0.0.1:18231\r\nUser-Agent: curl/8.21.0\r\nAccept: text/x\r\nContent-Type: application/json\r\nContent-Length: 2\r\n\r\n{}",
+        "POST / HTTP/1.1\r\nHost: 127.0.0.1:18231\r\nUser-Agent: curl/8.22.0\r\nAccept: text/x\r\nContent-Type: application/json\r\nContent-Length: 2\r\n\r\n{}",
         DisplayName = "--json with -H Accept")]
     [DataRow(
         new[] { "--json", "{}", "-H", "Content-Type: text/y", Url },
-        "POST / HTTP/1.1\r\nHost: 127.0.0.1:18231\r\nUser-Agent: curl/8.21.0\r\nContent-Type: text/y\r\nAccept: application/json\r\nContent-Length: 2\r\n\r\n{}",
+        "POST / HTTP/1.1\r\nHost: 127.0.0.1:18231\r\nUser-Agent: curl/8.22.0\r\nContent-Type: text/y\r\nAccept: application/json\r\nContent-Length: 2\r\n\r\n{}",
         DisplayName = "--json with -H Content-Type")]
     [DataRow(
         new[] { "--json", "{}", "-H", "Accept:", Url },
-        "POST / HTTP/1.1\r\nHost: 127.0.0.1:18231\r\nUser-Agent: curl/8.21.0\r\nContent-Type: application/json\r\nContent-Length: 2\r\n\r\n{}",
+        "POST / HTTP/1.1\r\nHost: 127.0.0.1:18231\r\nUser-Agent: curl/8.22.0\r\nContent-Type: application/json\r\nContent-Length: 2\r\n\r\n{}",
         DisplayName = "--json with -H Accept: removed")]
     [DataRow(
         new[] { "--json", "{}", "-H", "accept: x", Url },
-        "POST / HTTP/1.1\r\nHost: 127.0.0.1:18231\r\nUser-Agent: curl/8.21.0\r\naccept: x\r\nContent-Type: application/json\r\nContent-Length: 2\r\n\r\n{}",
+        "POST / HTTP/1.1\r\nHost: 127.0.0.1:18231\r\nUser-Agent: curl/8.22.0\r\naccept: x\r\nContent-Type: application/json\r\nContent-Length: 2\r\n\r\n{}",
         DisplayName = "--json with lower-case -H accept")]
     [DataRow(
         new[] { "-H", "X: 1", "--json", "a", "-H", "Y: 2", Url },
-        "POST / HTTP/1.1\r\nHost: 127.0.0.1:18231\r\nUser-Agent: curl/8.21.0\r\nX: 1\r\nY: 2\r\nContent-Type: application/json\r\nAccept: application/json\r\nContent-Length: 1\r\n\r\na",
+        "POST / HTTP/1.1\r\nHost: 127.0.0.1:18231\r\nUser-Agent: curl/8.22.0\r\nX: 1\r\nY: 2\r\nContent-Type: application/json\r\nAccept: application/json\r\nContent-Length: 1\r\n\r\na",
         DisplayName = "--json after every -H")]
     [DataRow(
         new[] { "-G", "--json", "a", Url },
-        "GET /?a HTTP/1.1\r\nHost: 127.0.0.1:18231\r\nUser-Agent: curl/8.21.0\r\nContent-Type: application/json\r\nAccept: application/json\r\n\r\n",
+        "GET /?a HTTP/1.1\r\nHost: 127.0.0.1:18231\r\nUser-Agent: curl/8.22.0\r\nContent-Type: application/json\r\nAccept: application/json\r\n\r\n",
         DisplayName = "-G --json")]
     [DataRow(
         new[] { "-u", "user:pw", Url },
-        "GET / HTTP/1.1\r\nHost: 127.0.0.1:18231\r\nAuthorization: Basic dXNlcjpwdw==\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n",
+        "GET / HTTP/1.1\r\nHost: 127.0.0.1:18231\r\nAuthorization: Basic dXNlcjpwdw==\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n\r\n",
         DisplayName = "-u")]
     [DataRow(
         new[] { "--oauth2-bearer", "tok", Url },
-        "GET / HTTP/1.1\r\nHost: 127.0.0.1:18231\r\nAuthorization: Bearer tok\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n",
+        "GET / HTTP/1.1\r\nHost: 127.0.0.1:18231\r\nAuthorization: Bearer tok\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n\r\n",
         DisplayName = "--oauth2-bearer")]
     [DataRow(
         new[] { "-b", "a=1; b=2", Url },
@@ -207,7 +207,7 @@ public sealed class CurlCompositionHttpTests
         Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual(
-            $"GET /p HTTP/1.1\r\n{Head}\r\nGET /p HTTP/1.1\r\nHost: 127.0.0.1:18231\r\n{sentAuthorization}\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n",
+            $"GET /p HTTP/1.1\r\n{Head}\r\nGET /p HTTP/1.1\r\nHost: 127.0.0.1:18231\r\n{sentAuthorization}\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n\r\n",
             Latin1(server.Written));
         Assert.AreEqual("hello", standardOutput);
     }

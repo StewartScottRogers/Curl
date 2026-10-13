@@ -27,7 +27,7 @@ public sealed class TftpHttpProxyTests
     private static readonly byte[] ExpectedRequest = Encoding.ASCII.GetBytes(
         "GET http://127.0.0.1:18331/.well-known/masque/udp/example.com/69/ HTTP/1.1\r\n" +
         "Host: 127.0.0.1:18331\r\n" +
-        "User-Agent: curl/8.21.0\r\n" +
+        "User-Agent: curl/8.22.0\r\n" +
         "Proxy-Connection: Keep-Alive\r\n" +
         "Connection: Upgrade\r\n" +
         "Upgrade: connect-udp\r\n" +
@@ -66,7 +66,7 @@ public sealed class TftpHttpProxyTests
         Assert.AreEqual(
             "GET http://127.0.0.1:18345/.well-known/masque/udp/example.com/69/ HTTP/1.0\r\n" +
             "Host: 127.0.0.1:18345\r\n" +
-            "User-Agent: curl/8.21.0\r\n" +
+            "User-Agent: curl/8.22.0\r\n" +
             "Proxy-Connection: Keep-Alive\r\n" +
             "Connection: Upgrade\r\n" +
             "Upgrade: connect-udp\r\n" +
@@ -234,7 +234,7 @@ public sealed class TftpHttpProxyTests
         Assert.AreEqual(
             "GET https://127.0.0.1:18398/.well-known/masque/udp/example.com/69/ HTTP/1.1\r\n" +
             "Host: 127.0.0.1:18398\r\n" +
-            "User-Agent: curl/8.21.0\r\n" +
+            "User-Agent: curl/8.22.0\r\n" +
             "Proxy-Connection: Keep-Alive\r\n" +
             "Connection: Upgrade\r\n" +
             "Upgrade: connect-udp\r\n" +

@@ -114,7 +114,7 @@ public sealed class UpstreamCaseRunner(
     public const string NoListenPort = "47";
 
     /// <summary>The value of <c>%VERSION</c>: the curl release Curl matches.</summary>
-    public const string CurlVersion = "8.21.0";
+    public const string CurlVersion = "8.22.0";
 
     private const string HostAddress = "127.0.0.1";
 

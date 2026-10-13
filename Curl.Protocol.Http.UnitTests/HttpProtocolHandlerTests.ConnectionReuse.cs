@@ -9,7 +9,7 @@ public sealed partial class HttpProtocolHandlerTests
 {
     private const string ReuseUrl = "http://127.0.0.1:18977/b";
 
-    private const string ReuseRequest = "GET /b HTTP/1.1\r\nHost: 127.0.0.1:18977\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n";
+    private const string ReuseRequest = "GET /b HTTP/1.1\r\nHost: 127.0.0.1:18977\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n\r\n";
 
     private const string KeepAliveResponse = "HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok";
 

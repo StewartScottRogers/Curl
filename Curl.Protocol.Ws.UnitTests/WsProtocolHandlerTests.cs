@@ -21,7 +21,7 @@ public sealed class WsProtocolHandlerTests
     private const string Request =
         "GET /chat HTTP/1.1\r\n" +
         "Host: 127.0.0.1:47901\r\n" +
-        "User-Agent: curl/8.21.0\r\n" +
+        "User-Agent: curl/8.22.0\r\n" +
         "Accept: */*\r\n" +
         "Upgrade: websocket\r\n" +
         "Sec-WebSocket-Version: 13\r\n" +
@@ -569,7 +569,7 @@ public sealed class WsProtocolHandlerTests
             "GET / HTTP/1.1\r\n" +
             "Host: 127.0.0.1:47901\r\n" +
             "Authorization: Negotiate YIIB\r\n" +
-            "User-Agent: curl/8.21.0\r\n" +
+            "User-Agent: curl/8.22.0\r\n" +
             "Accept: */*\r\n" +
             "Upgrade: websocket\r\n" +
             "Sec-WebSocket-Version: 13\r\n" +

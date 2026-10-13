@@ -21,7 +21,7 @@ public sealed partial class HttpProtocolHandlerTests
     {
         // curl -C 3 -T f.txt http://127.0.0.1:18332/up
         const string expected = "PUT /up HTTP/1.1\r\nHost: 127.0.0.1:18332\r\nContent-Range: bytes 3-9/10\r\n"
-            + "User-Agent: curl/8.21.0\r\nAccept: */*\r\nContent-Length: 7\r\n\r\ndefghij";
+            + "User-Agent: curl/8.22.0\r\nAccept: */*\r\nContent-Length: 7\r\n\r\ndefghij";
         foreach (int chunkSize in ChunkSizes)
         {
             ScriptedConnection connection = Connection(EmptyOk, chunkSize, expected);
@@ -39,7 +39,7 @@ public sealed partial class HttpProtocolHandlerTests
     public async Task ExecuteAsync_FileUploadResumedFromZero_SendsNoContentRange()
     {
         // curl -C 0 -T f.txt http://127.0.0.1:18334/up
-        const string expected = "PUT /up HTTP/1.1\r\nHost: 127.0.0.1:18334\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n"
+        const string expected = "PUT /up HTTP/1.1\r\nHost: 127.0.0.1:18334\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n"
             + "Content-Length: 10\r\n\r\nabcdefghij";
         ScriptedConnection connection = Connection(EmptyOk, 65536, expected);
 
@@ -54,7 +54,7 @@ public sealed partial class HttpProtocolHandlerTests
     public async Task ExecuteAsync_ResumedUploadWithAContentRangeHeader_SendsTheHeaderInItsPlace()
     {
         // curl -C 3 -T f.txt -H "Content-Range: bytes 9-9/10" http://127.0.0.1:18338/up
-        const string expected = "PUT /up HTTP/1.1\r\nHost: 127.0.0.1:18338\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n"
+        const string expected = "PUT /up HTTP/1.1\r\nHost: 127.0.0.1:18338\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n"
             + "Content-Range: bytes 9-9/10\r\nContent-Length: 7\r\n\r\ndefghij";
         ScriptedConnection connection = Connection(EmptyOk, 65536, expected);
         HttpRequestOptions http = new() { Headers = ["Content-Range: bytes 9-9/10"] };
@@ -104,7 +104,7 @@ public sealed partial class HttpProtocolHandlerTests
         // printf abcdefghij | curl -C 3 -T - http://127.0.0.1:18337/up: the unknown length counts
         // as -1, so the range is "bytes 3-1/2", and nothing of standard input is skipped.
         const string head = "PUT /up HTTP/1.1\r\nHost: 127.0.0.1:18337\r\nContent-Range: bytes 3-1/2\r\n"
-            + "User-Agent: curl/8.21.0\r\nAccept: */*\r\nTransfer-Encoding: chunked\r\nExpect: 100-continue\r\n\r\n";
+            + "User-Agent: curl/8.22.0\r\nAccept: */*\r\nTransfer-Encoding: chunked\r\nExpect: 100-continue\r\n\r\n";
         const string body = "a\r\nabcdefghij\r\n0\r\n\r\n";
         FakeTimeProvider time = new(DateTimeOffset.UnixEpoch);
         GatedConnection connection = new(Encoding.Latin1.GetBytes(EmptyOk), 65536, head.Length + body.Length);
@@ -128,7 +128,7 @@ public sealed partial class HttpProtocolHandlerTests
         // curl -C - -T f.txt http://127.0.0.1:18351/up, and with -o naming a 3-byte file
         // (port 18352): the upload's -C - is offset -1 whatever -o names (BL-351 Notes).
         string expected = $"PUT /up HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nContent-Range: bytes 0-9/10\r\n"
-            + "User-Agent: curl/8.21.0\r\nAccept: */*\r\nContent-Length: 10\r\n\r\nabcdefghij";
+            + "User-Agent: curl/8.22.0\r\nAccept: */*\r\nContent-Length: 10\r\n\r\nabcdefghij";
         ScriptedConnection connection = Connection(EmptyOk, 65536, expected);
 
         TransferResult result = await Handler(QueueConnector.For(connection))
@@ -144,7 +144,7 @@ public sealed partial class HttpProtocolHandlerTests
     {
         // curl -C - -T empty.txt http://127.0.0.1:18353/up
         const string expected = "PUT /up HTTP/1.1\r\nHost: 127.0.0.1:18353\r\nContent-Range: bytes 0--1/0\r\n"
-            + "User-Agent: curl/8.21.0\r\nAccept: */*\r\nContent-Length: 0\r\n\r\n";
+            + "User-Agent: curl/8.22.0\r\nAccept: */*\r\nContent-Length: 0\r\n\r\n";
         ScriptedConnection connection = Connection(EmptyOk, 65536, expected);
 
         TransferResult result = await Handler(QueueConnector.For(connection))
@@ -159,7 +159,7 @@ public sealed partial class HttpProtocolHandlerTests
     {
         // curl -C - -T - http://127.0.0.1:18354/up: the unknown length counts as -1.
         const string head = "PUT /up HTTP/1.1\r\nHost: 127.0.0.1:18354\r\nContent-Range: bytes 0--2/-1\r\n"
-            + "User-Agent: curl/8.21.0\r\nAccept: */*\r\nTransfer-Encoding: chunked\r\nExpect: 100-continue\r\n\r\n";
+            + "User-Agent: curl/8.22.0\r\nAccept: */*\r\nTransfer-Encoding: chunked\r\nExpect: 100-continue\r\n\r\n";
         const string body = "a\r\nabcdefghij\r\n0\r\n\r\n";
         FakeTimeProvider time = new(DateTimeOffset.UnixEpoch);
         GatedConnection connection = new(Encoding.Latin1.GetBytes(EmptyOk), 65536, head.Length + body.Length);

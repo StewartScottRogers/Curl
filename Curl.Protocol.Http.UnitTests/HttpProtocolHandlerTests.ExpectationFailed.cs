@@ -16,10 +16,10 @@ public sealed partial class HttpProtocolHandlerTests
 {
     private const string ExpectUrl = "http://127.0.0.1:18260/p";
 
-    private const string ExpectingHead = "POST /p HTTP/1.1\r\nHost: 127.0.0.1:18260\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n"
+    private const string ExpectingHead = "POST /p HTTP/1.1\r\nHost: 127.0.0.1:18260\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n"
         + "Content-Length: 1048577\r\nContent-Type: application/x-www-form-urlencoded\r\nExpect: 100-continue\r\n\r\n";
 
-    private const string ResentHead = "POST /p HTTP/1.1\r\nHost: 127.0.0.1:18260\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n"
+    private const string ResentHead = "POST /p HTTP/1.1\r\nHost: 127.0.0.1:18260\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n"
         + "Content-Length: 1048577\r\nContent-Type: application/x-www-form-urlencoded\r\n\r\n";
 
     private const string ExpectationFailedHead = "HTTP/1.1 417 Expectation Failed\r\nContent-Length: 0\r\n\r\n";
@@ -200,7 +200,7 @@ public sealed partial class HttpProtocolHandlerTests
     [TestMethod]
     public async Task ExecuteAsync_417ToACustomExpect_ResendsTheCustomLineWithoutWaiting()
     {
-        const string head = "POST /p HTTP/1.1\r\nHost: 127.0.0.1:18260\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n"
+        const string head = "POST /p HTTP/1.1\r\nHost: 127.0.0.1:18260\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n"
             + "Expect: 100-continue\r\nContent-Length: 2\r\nContent-Type: application/x-www-form-urlencoded\r\n\r\n";
         foreach (int chunkSize in ChunkSizes)
         {
@@ -236,7 +236,7 @@ public sealed partial class HttpProtocolHandlerTests
     [TestMethod]
     public async Task ExecuteAsync_417ToARequestWithNoBody_ReturnsItWithoutResending()
     {
-        const string getHead = "GET /p HTTP/1.1\r\nHost: 127.0.0.1:18260\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n";
+        const string getHead = "GET /p HTTP/1.1\r\nHost: 127.0.0.1:18260\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n\r\n";
         foreach (int chunkSize in ChunkSizes)
         {
             TurnTakingConnection connection = new(chunkSize, ExpectationFailedHead, OkHead + "ok");

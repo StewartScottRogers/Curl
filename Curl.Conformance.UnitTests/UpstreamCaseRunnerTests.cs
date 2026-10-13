@@ -32,7 +32,7 @@ public sealed class UpstreamCaseRunnerTests
         UpstreamCaseRunner runner = Runner(async invocation =>
         {
             arguments = [.. invocation.Arguments];
-            await ExchangeAsync(invocation.Connector, "GET /5 HTTP/1.1\r\nHost: 127.0.0.1:8990\r\nUser-Agent: curl/8.21.0\r\n\r\n", invocation.Arguments[1]);
+            await ExchangeAsync(invocation.Connector, "GET /5 HTTP/1.1\r\nHost: 127.0.0.1:8990\r\nUser-Agent: curl/8.22.0\r\n\r\n", invocation.Arguments[1]);
             return 0;
         });
 
@@ -239,7 +239,7 @@ public sealed class UpstreamCaseRunnerTests
         string testFile = HttpCase.Replace("</reply>", "<servercmd>\nwritedelay: 60000\n</servercmd>\n</reply>", StringComparison.Ordinal);
         UpstreamCaseRunner runner = Runner(async invocation =>
         {
-            await ExchangeAsync(invocation.Connector, "GET /5 HTTP/1.1\r\nHost: 127.0.0.1:8990\r\nUser-Agent: curl/8.21.0\r\n\r\n", invocation.Arguments[1]);
+            await ExchangeAsync(invocation.Connector, "GET /5 HTTP/1.1\r\nHost: 127.0.0.1:8990\r\nUser-Agent: curl/8.22.0\r\n\r\n", invocation.Arguments[1]);
             return 0;
         });
 
@@ -258,7 +258,7 @@ public sealed class UpstreamCaseRunnerTests
             .Replace("%TESTNUMBER\n</command>", "%TESTNUMBER -m 5\n</command>", StringComparison.Ordinal);
         UpstreamCaseRunner runner = Runner(async invocation =>
         {
-            await ExchangeAsync(invocation.Connector, "GET /5 HTTP/1.1\r\nHost: 127.0.0.1:8990\r\nUser-Agent: curl/8.21.0\r\n\r\n", invocation.Arguments[1]);
+            await ExchangeAsync(invocation.Connector, "GET /5 HTTP/1.1\r\nHost: 127.0.0.1:8990\r\nUser-Agent: curl/8.22.0\r\n\r\n", invocation.Arguments[1]);
             return 0;
         }, RealClockTimeLimit);
         long startedAt = TimeProvider.System.GetTimestamp();

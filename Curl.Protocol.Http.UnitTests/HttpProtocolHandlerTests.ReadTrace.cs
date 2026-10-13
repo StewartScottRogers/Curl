@@ -13,7 +13,7 @@ namespace Curl.Protocol.Http;
 /// </summary>
 public sealed partial class HttpProtocolHandlerTests
 {
-    private const string ReadTracePostHead = "POST / HTTP/1.1\r\nHost: 127.0.0.1:47811\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n"
+    private const string ReadTracePostHead = "POST / HTTP/1.1\r\nHost: 127.0.0.1:47811\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n"
         + "Content-Length: 2\r\nContent-Type: application/x-www-form-urlencoded\r\n\r\n";
 
     [TestMethod]
@@ -51,7 +51,7 @@ public sealed partial class HttpProtocolHandlerTests
     [TestMethod]
     public async Task ExecuteAsync_UploadTracingReaders_WritesTheUploadReadersLinesBeforeTheHead()
     {
-        const string head = "PUT /up.txt HTTP/1.1\r\nHost: 127.0.0.1:47811\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\nContent-Length: 3\r\n\r\n";
+        const string head = "PUT /up.txt HTTP/1.1\r\nHost: 127.0.0.1:47811\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\nContent-Length: 3\r\n\r\n";
         ScriptedConnection connection = Connection("HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nhi", 65536, head + "abc");
         RecordingTransferEvents events = new();
         TransferContext context = new()
@@ -91,7 +91,7 @@ public sealed partial class HttpProtocolHandlerTests
     public async Task ExecuteAsync_StdinUploadTracingReaders_WritesTheHeldBackReadsAroundTheHeadAndTheChunkedReadsAfterTheWait()
     {
         // printf abc | curl -sv --trace-config read -T - http://127.0.0.1:47811/up (BL-1214 Notes).
-        const string head = "PUT /up HTTP/1.1\r\nHost: 127.0.0.1:47811\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n"
+        const string head = "PUT /up HTTP/1.1\r\nHost: 127.0.0.1:47811\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n"
             + "Transfer-Encoding: chunked\r\nExpect: 100-continue\r\n\r\n";
         FakeTimeProvider time = new(DateTimeOffset.UnixEpoch);
         GatedConnection connection = new(Encoding.Latin1.GetBytes("HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nhi"), 65536, head.Length + 13);
@@ -146,7 +146,7 @@ public sealed partial class HttpProtocolHandlerTests
     {
         // curl -sv --trace-config read -F a=b http://127.0.0.1:47811/ (BL-1214 Notes).
         const string contentType = "multipart/form-data; boundary=------------------------Q8BOgKaJAf5dPmHW2bVJZk";
-        const string head = "POST / HTTP/1.1\r\nHost: 127.0.0.1:47811\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n"
+        const string head = "POST / HTTP/1.1\r\nHost: 127.0.0.1:47811\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n"
             + "Content-Length: 149\r\nContent-Type: " + contentType + "\r\n\r\n";
         byte[] form = new byte[149];
         ScriptedConnection connection = Connection("HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nhi", 65536);

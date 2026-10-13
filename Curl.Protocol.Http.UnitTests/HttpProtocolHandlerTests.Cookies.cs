@@ -25,7 +25,7 @@ public sealed partial class HttpProtocolHandlerTests
     [TestMethod]
     public async Task ExecuteAsync_CookieStoreGivesAValue_SendsItBeforeTheCustomHeaders()
     {
-        const string expected = "GET / HTTP/1.1\r\nHost: 127.0.0.1:18082\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\nCookie: j=k\r\nCookie: c=d\r\n\r\n";
+        const string expected = "GET / HTTP/1.1\r\nHost: 127.0.0.1:18082\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\nCookie: j=k\r\nCookie: c=d\r\n\r\n";
         foreach (int chunkSize in ChunkSizes)
         {
             ScriptedConnection connection = Connection(EmptyOkHead, chunkSize, expected);
@@ -52,7 +52,7 @@ public sealed partial class HttpProtocolHandlerTests
     public async Task ExecuteAsync_SendsCookieStringsOff_AsksForTheStoredCookiesAlone()
     {
         // A followed redirect to another origin sends only stored cookies (upstream test2015, BL-1846).
-        const string expected = "GET / HTTP/1.1\r\nHost: 127.0.0.1:18082\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\nCookie: j=k\r\n\r\n";
+        const string expected = "GET / HTTP/1.1\r\nHost: 127.0.0.1:18082\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\nCookie: j=k\r\n\r\n";
         ScriptedConnection connection = Connection(EmptyOkHead, 65536, expected);
         ScriptedCookieStore store = new("j=k");
         Diagnostics.Arrange("url, sends cookie strings", $"{CookieUrl}, false");
@@ -70,7 +70,7 @@ public sealed partial class HttpProtocolHandlerTests
     [TestMethod]
     public async Task ExecuteAsync_CookieStoreGivesNull_SendsNoCookieHeader()
     {
-        const string expected = "GET / HTTP/1.1\r\nHost: 127.0.0.1:18082\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n";
+        const string expected = "GET / HTTP/1.1\r\nHost: 127.0.0.1:18082\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n\r\n";
         ScriptedConnection connection = Connection(EmptyOkHead, 65536, expected);
         ScriptedCookieStore store = new();
         Diagnostics.Arrange("url, store cookie", $"{CookieUrl}, (none)");
@@ -458,8 +458,8 @@ public sealed partial class HttpProtocolHandlerTests
     public async Task ExecuteAsync_ChallengeSetsCookies_StoresThemAndAsksAgainForTheRetry()
     {
         const string challengeHead = "HTTP/1.1 401 Unauthorized\r\nSet-Cookie: s=1\r\nSet-Cookie: t=2\r\nWWW-Authenticate: Basic realm=\"x\"\r\nContent-Length: 0\r\n\r\n";
-        const string first = "GET / HTTP/1.1\r\nHost: 127.0.0.1:18083\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\nCookie: j=k\r\n\r\n";
-        const string retry = "GET / HTTP/1.1\r\nHost: 127.0.0.1:18083\r\nAuthorization: Basic dTpw\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\nCookie: t=2; s=1; j=k\r\n\r\n";
+        const string first = "GET / HTTP/1.1\r\nHost: 127.0.0.1:18083\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\nCookie: j=k\r\n\r\n";
+        const string retry = "GET / HTTP/1.1\r\nHost: 127.0.0.1:18083\r\nAuthorization: Basic dTpw\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\nCookie: t=2; s=1; j=k\r\n\r\n";
         foreach (int chunkSize in ChunkSizes)
         {
             TurnTakingConnection connection = new(chunkSize, challengeHead, EmptyOkHead);

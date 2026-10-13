@@ -1,7 +1,7 @@
 namespace Curl.Cli;
 
 /// <summary>
-/// The four lines <c>-V</c> / <c>--version</c> prints, as ADR-0021 decides: curl 8.21.0's version,
+/// The four lines <c>-V</c> / <c>--version</c> prints, as ADR-0021 decides: curl 8.22.0's version,
 /// release date and format, the TLS backend <c>SslStream</c> sits on as the one library named, and
 /// <c>Protocols:</c> and <c>Features:</c> listing only what Curl serves. The lines carry no line
 /// terminator; the console layer chooses the newline (CRLF on Windows, as the mingw reference writes).
@@ -14,7 +14,7 @@ namespace Curl.Cli;
 public static class CurlVersionText
 {
     /// <summary>The second line, the reference build's release date.</summary>
-    public const string ReleaseDateLine = "Release-Date: 2026-06-24";
+    public const string ReleaseDateLine = "Release-Date: 2026-09-02";
 
     /// <summary>
     /// The third line: the schemes the registered handlers serve, in curl's alphabetical order —
@@ -81,7 +81,7 @@ public static class CurlVersionText
             : [VersionLine(isWindows, isMacOS), ReleaseDateLine, ProtocolsLine, FeaturesLine];
 
     private static string VersionLine(bool isWindows, bool isMacOS) =>
-        isWindows ? "curl 8.21.0 (x86_64-w64-mingw32) libcurl/8.21.0 Schannel"
-        : isMacOS ? "curl 8.21.0 (aarch64-apple-darwin25.0.0) libcurl/8.21.0 SecureTransport"
-        : "curl 8.21.0 (x86_64-pc-linux-gnu) libcurl/8.21.0 OpenSSL";
+        isWindows ? "curl 8.22.0 (x86_64-w64-mingw32) libcurl/8.22.0 Schannel"
+        : isMacOS ? "curl 8.22.0 (aarch64-apple-darwin25.0.0) libcurl/8.22.0 SecureTransport"
+        : "curl 8.22.0 (x86_64-pc-linux-gnu) libcurl/8.22.0 OpenSSL";
 }

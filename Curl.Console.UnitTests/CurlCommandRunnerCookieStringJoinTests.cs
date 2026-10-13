@@ -18,7 +18,7 @@ public sealed class CurlCommandRunnerCookieStringJoinTests
 {
     private const string Url = "http://127.0.0.1:18231/";
 
-    private const string Head = "Host: 127.0.0.1:18231\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n";
+    private const string Head = "Host: 127.0.0.1:18231\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n";
 
     private const string Ok = "HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n";
 

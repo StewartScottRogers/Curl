@@ -31,7 +31,7 @@ public sealed class WsProtocolHandlerNegotiateTests
     private const string Request =
         "GET / HTTP/1.1\r\n" +
         "Host: 127.0.0.1:47955\r\n" +
-        "User-Agent: curl/8.21.0\r\n" +
+        "User-Agent: curl/8.22.0\r\n" +
         "Accept: */*\r\n" +
         "Upgrade: websocket\r\n" +
         "Sec-WebSocket-Version: 13\r\n" +

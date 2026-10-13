@@ -224,7 +224,7 @@ public sealed partial class TcpConnectorTests
         Assert.IsEmpty(resolver.ResolvedHosts);
         CollectionAssert.AreEqual(new[] { new IPEndPoint(Loopback, 38123) }, dialer.DialedEndPoints);
         Assert.AreEqual(
-            "CONNECT b.example:81 HTTP/1.1\r\nHost: b.example:81\r\nUser-Agent: curl/8.21.0\r\nProxy-Connection: Keep-Alive\r\n\r\n",
+            "CONNECT b.example:81 HTTP/1.1\r\nHost: b.example:81\r\nUser-Agent: curl/8.22.0\r\nProxy-Connection: Keep-Alive\r\n\r\n",
             Encoding.Latin1.GetString([.. proxyConnection.Written]));
     }
 

@@ -17,7 +17,7 @@ public sealed class LibcurlSourceCodeTransferFileTests
     private const string Buffer = "  curl_easy_setopt(curl, CURLOPT_BUFFERSIZE, 102400L);\n";
     private const string NoProgress = "  curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 1L);\n";
     private const string Upload = "  curl_easy_setopt(curl, CURLOPT_UPLOAD, 1L);\n";
-    private const string Agent = "  curl_easy_setopt(curl, CURLOPT_USERAGENT, \"curl/8.21.0\");\n";
+    private const string Agent = "  curl_easy_setopt(curl, CURLOPT_USERAGENT, \"curl/8.22.0\");\n";
     private const string MaxRedirs = "  curl_easy_setopt(curl, CURLOPT_MAXREDIRS, 50L);\n";
     private const string After = "  curl_easy_setopt(curl, CURLOPT_SSLVERSION, (long)CURL_SSLVERSION_TLSv1_2);\n  curl_easy_setopt(curl, CURLOPT_TCP_KEEPALIVE, 1L);\n";
     private const string InFileSize = "  curl_easy_setopt(curl, CURLOPT_INFILESIZE_LARGE, (curl_off_t)5);\n";
