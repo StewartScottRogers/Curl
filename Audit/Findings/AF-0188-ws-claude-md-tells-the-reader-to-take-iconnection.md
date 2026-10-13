@@ -3,8 +3,8 @@ id: AF-0188
 title: Ws CLAUDE.md tells the reader to take IConnection; WsProtocolHandler takes IConnector
 auditor: truthfulness
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: truthfulness:Curl.Protocol.Ws.UnitLibrary/CLAUDE.md:IConnection:false-statement
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Run from the repository root:
 ## Log
 
 - 2026-10-13: filed proposed.
+- 2026-10-13: proposed -> accepted.
