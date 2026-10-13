@@ -5,10 +5,10 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Protocol.Http.UnitLibrary]
+touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests]
 requirement: none
 created: 2026-10-13
-completed:
+completed: 2026-10-12
 ---
 # BL-2119 — Fix AF-0173: HttpLineReader.MakeRoom's 'start == 0' can become 'start != 0' with no test failing: a status line of 16 KB or more is read as a closed connection
 
@@ -41,12 +41,17 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Added `HttpLineReaderTests.ReadLineAsync_FirstStatusLineLongerThanTheFirstBuffer_ComesOutWhole`: a 20015-byte status line, the first line read, in 5000-byte reads, must come out whole with the rest kept. This pins the grow-versus-compact gate in `MakeRoom`; no production change was needed.
+- Verified by hand: with `if (start == 0)` changed to `if (start != 0)`, the new test fails (line read as null) and the other 5 pass; reverted, all pass. The audit tool (`Audit/Tools/Invoke-MutationTest.ps1`) is outside a lane's reach, so the re-audit runs the recorded reproduction.
+- Added `Curl.Protocol.Http.UnitTests` to `touches`: the test lives there; no task in Doing on `origin/work/dark-factory` names it (BL-2118, BL-2121, BL-2122 touch other paths).
 
 ## Log
 
 - 2026-10-13: Created.
 - 2026-10-12: Backlog -> Doing.
+- 2026-10-12: Doing -> Done. Test pins MakeRoom's grow gate; the AF-0173 mutant now fails it
