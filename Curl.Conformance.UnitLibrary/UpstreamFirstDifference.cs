@@ -23,7 +23,10 @@ internal static class UpstreamFirstDifference
     /// <param name="label">What is being compared, such as <c>&lt;verify&gt;&lt;stdout&gt;</c>.</param>
     /// <param name="expected">The expected bytes.</param>
     /// <param name="actual">The bytes produced.</param>
-    /// <returns>A sentence naming the byte offset, the line and both lines; <see langword="null"/> when they are equal.</returns>
+    /// <returns>
+    /// A sentence naming the byte offset, the line and both lines, then on the lines after it the
+    /// <see cref="UpstreamLineDifference"/> of the two; <see langword="null"/> when they are equal.
+    /// </returns>
     public static string? Describe(string label, byte[] expected, byte[] actual)
     {
         if (expected.AsSpan().SequenceEqual(actual))
@@ -33,7 +36,8 @@ internal static class UpstreamFirstDifference
 
         int offset = expected.AsSpan().CommonPrefixLength(actual);
         int line = expected.AsSpan(0, offset).Count((byte)'\n') + 1;
-        return $"{label} differs at byte {offset} (line {line}): expected {Show(LineAround(expected, offset))}, got {Show(LineAround(actual, offset))}";
+        return $"{label} differs at byte {offset} (line {line}): expected {Show(LineAround(expected, offset))}, got {Show(LineAround(actual, offset))}\n"
+            + UpstreamLineDifference.Show(expected, actual);
     }
 
     // The line holding the byte at offset, from its start to its line feed; empty past the end.
@@ -50,7 +54,10 @@ internal static class UpstreamFirstDifference
         return Encoding.Latin1.GetString(bytes, start, end - start);
     }
 
-    private static string Show(string line)
+    /// <summary>Quotes a line with its control characters escaped, cut after 200 characters; <c>the end</c> for none.</summary>
+    /// <param name="line">The line, as Latin-1 text.</param>
+    /// <returns>The quoted line.</returns>
+    public static string Show(string line)
     {
         if (line.Length == 0)
         {

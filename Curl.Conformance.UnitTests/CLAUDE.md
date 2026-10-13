@@ -25,7 +25,7 @@ class, so each production class still has one test class.
 `UpstreamConformanceTests.UpstreamCase_RunThroughCurl_HoldsTheRatchet` is the one
 data-driven method, in `TestCategory("Conformance")` and part of the fast suite, that runs
 every vendored case through curl in process (`CurlComposition.CreateRunner`, reached through
-`InternalsVisibleTo` on `Curl.Console`), one row per case named `test<N>`. It is the ratchet
+`InternalsVisibleTo` on `Curl.Console`), one row per case named by `UpstreamCaseDisplayName` (`test798 [http]: HTTP cookies in a folded header`) and carrying one test category per server it names, so `dotnet test --filter "TestCategory=ftp"` runs only the FTP cases. It is the ratchet
 of ADR-0013 decision 5: a case on `PassingUpstreamCases.txt` must pass, and fails with its
 first difference (or skip reason) if it stops; any other case is `Inconclusive` with its skip
 reason, its first difference, or a note that it passes and can be listed. A listed case that

@@ -53,13 +53,27 @@ public sealed class UpstreamConformanceTests
     // cases are run and reported but not held to the list (BL-1949).
     private static readonly IReadOnlySet<int> NeedsTls13ServerCases = new HashSet<int> { 4001 };
 
-    /// <summary>One row per vendored <c>test*.curltest</c> file, in test-number order.</summary>
+    /// <summary>
+    /// One row per vendored <c>test*.curltest</c> file, in test-number order, named by
+    /// <see cref="UpstreamCaseDisplayName"/> and carrying one test category per server the case
+    /// names, so <c>dotnet test --filter "TestCategory=ftp"</c> runs only the FTP cases.
+    /// </summary>
     public static IEnumerable<TestDataRow<int>> UpstreamCases =>
         Directory.GetFiles(UpstreamTestDataFolder, $"test*{UpstreamTestFileExtension}")
             .Select(path => Path.GetFileNameWithoutExtension(path))
             .Select(name => int.Parse(name["test".Length..], NumberStyles.None, CultureInfo.InvariantCulture))
             .Order()
-            .Select(number => new TestDataRow<int>(number) { DisplayName = $"test{number}" });
+            .Select(UpstreamCaseRow);
+
+    private static TestDataRow<int> UpstreamCaseRow(int testNumber)
+    {
+        UpstreamTestCase? testCase = UpstreamTestCaseParser.Parse(File.ReadAllBytes(Path.Combine(UpstreamTestDataFolder, $"test{testNumber}{UpstreamTestFileExtension}"))).TestCase;
+        return new TestDataRow<int>(testNumber)
+        {
+            DisplayName = UpstreamCaseDisplayName.For(testNumber, testCase),
+            TestCategories = [.. UpstreamCaseDisplayName.Servers(testCase)],
+        };
+    }
 
     [TestMethod]
     [TestCategory("Conformance")]
