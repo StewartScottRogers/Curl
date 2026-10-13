@@ -320,6 +320,10 @@ Each project folder may contain its own `CLAUDE.md` with project-specific rules;
   `--ai-help <category>` or `all` for the full reference. Every task that adds or
   changes a command-line option also keeps `--ai-help` right, and says so in its
   acceptance criteria.
+- **A fix found through an upstream case also gets a focused unit test.** Any product fix
+  found through an upstream case (the ratchet, a gap finding or an audit conformance
+  finding) also adds a focused unit test in the fixed library's own `.UnitTests` project,
+  so each library's tests stand alone without the upstream cases (ADR-0482).
 - Nullable reference types enabled, warnings treated as errors.
 - File-scoped namespaces; namespace matches folder path.
 - Central package management through `Directory.Packages.props`; never put a `Version` attribute on a `PackageReference` in a project file.

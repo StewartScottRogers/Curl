@@ -38,6 +38,11 @@ at its new path. It is the specification: its `Goal`, `Context` and
 As you go, record the plan's summary and anything learned under the task's `Notes`,
 and tick each acceptance box as you verify it.
 
+A fix found through an upstream case also gets a focused unit test: any product fix found
+through an upstream case (the ratchet, a gap finding or an audit conformance finding) also
+adds a focused unit test in the fixed library's own `.UnitTests` project, so each library's
+tests stand alone without the upstream cases (ADR-0482).
+
 Up to nine lanes run on this machine at once, each in its own worktree:
 - Measure with `Measure-CodeQuality.ps1 -Library <name>[,<name>...]`, naming every
   library the task changed in one call: it runs only the test projects that reach them,
