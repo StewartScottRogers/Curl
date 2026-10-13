@@ -3,8 +3,8 @@ id: AF-0175
 title: ConnectAsync_OtherPort_ReachesTheWrappedServer asserts only that some connection exists, not that it is the wrapped server's
 auditor: quality
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Conformance.UnitTests/NoListenPortConnectorTests.cs:ConnectAsync_OtherPort_ReachesTheWrappedServer:weak-assertion
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Curl.Conformance.UnitTests/NoListenPortConnectorTests.cs -Pa
 ## Log
 
 - 2026-10-12: filed proposed.
+- 2026-10-12: proposed -> accepted.
