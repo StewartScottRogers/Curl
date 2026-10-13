@@ -3,8 +3,8 @@ id: AF-0189
 title: Lanes idle 82 of 272 lane minutes (30.1%) with nothing ready while the whole BL-2127/BL-2126/BL-2128 chain waited on interactive-only BL-2125
 auditor: process
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: process:logs:BL-2125:empty-queue
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Log
 
 - 2026-10-13: filed proposed.
+- 2026-10-13: proposed -> accepted.
