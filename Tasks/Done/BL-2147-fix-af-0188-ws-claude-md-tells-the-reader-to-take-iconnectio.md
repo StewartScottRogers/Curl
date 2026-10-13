@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Ws.UnitLibrary]
 requirement: none
 created: 2026-10-13
-completed:
+completed: 2026-10-13
 ---
 # BL-2147 — Fix AF-0188: Ws CLAUDE.md tells the reader to take IConnection; WsProtocolHandler takes IConnector
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Ws CLAUDE.md now names the IConnector seam (ADR-0005), as Gopher's does. Docs only; no code changed.
 
 ## Log
 
 - 2026-10-13: Created.
 - 2026-10-13: Backlog -> Doing.
+- 2026-10-13: Doing -> Done. Ws CLAUDE.md names IConnector; reproduction gives 0;1

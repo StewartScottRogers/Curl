@@ -10,7 +10,11 @@ This library may reference `Curl.Protocol.Abstractions.UnitLibrary` and nothing
 else horizontal. Referencing another protocol library is a build break, and
 `Curl.Protocol.Abstractions.UnitTests` fails if one appears.
 
-Never construct a `Socket`, `SslStream` or `HttpClient` here. Take `IConnection`
+**Seam:** `IConnector` (ADR-0005). `WsProtocolHandler` takes an `IConnector` in its
+constructor and asks it for one connection per transfer; it never takes an
+`IConnection` there.
+
+Never construct a `Socket`, `SslStream` or `HttpClient` here. Take `IConnector`
 so the tests in the matching `.UnitTests` project can drive this code from a
 recorded byte stream with no network.
 
