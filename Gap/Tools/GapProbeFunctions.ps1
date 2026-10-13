@@ -73,25 +73,25 @@ function Get-GapLaunch {
 function Get-GapReferenceCurlPath {
     <#
     .SYNOPSIS
-        Finds the reference curl: Git for Windows' mingw64\bin\curl.exe on Windows (the
-        lookup Record-CurlExchange.ps1's Get-ReferenceCurlPath uses), curl on PATH
-        elsewhere; $null when there is none.
+        Finds the reference curl: Git for Windows' ucrt64\bin\curl.exe (from Git 2.56.0)
+        or mingw64\bin\curl.exe (before it) on Windows, the lookup Record-CurlExchange.ps1's
+        Get-ReferenceCurlPath uses; curl on PATH elsewhere; $null when there is none.
     #>
     if (-not $script:GapIsWindows) {
         $curl = Get-Command curl -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
         if ($null -ne $curl) { return $curl.Source }
         return $null
     }
+    # git.exe lives in <Git>\cmd or <Git>\bin.
+    $roots = @()
     $git = Get-Command git.exe -ErrorAction SilentlyContinue | Select-Object -First 1
-    if ($null -ne $git) {
-        # git.exe lives in <Git>\cmd or <Git>\bin; the reference curl in <Git>\mingw64\bin.
-        $gitRoot = Split-Path (Split-Path $git.Source -Parent) -Parent
-        $candidate = Join-Path $gitRoot 'mingw64\bin\curl.exe'
-        if (Test-Path -LiteralPath $candidate) { return $candidate }
-    }
-    if ($env:ProgramFiles) {
-        $candidate = Join-Path $env:ProgramFiles 'Git\mingw64\bin\curl.exe'
-        if (Test-Path -LiteralPath $candidate) { return $candidate }
+    if ($null -ne $git) { $roots += Split-Path (Split-Path $git.Source -Parent) -Parent }
+    if ($env:ProgramFiles) { $roots += Join-Path $env:ProgramFiles 'Git' }
+    foreach ($root in $roots) {
+        foreach ($folder in 'ucrt64\bin', 'mingw64\bin') {
+            $candidate = Join-Path (Join-Path $root $folder) 'curl.exe'
+            if (Test-Path -LiteralPath $candidate) { return $candidate }
+        }
     }
     return $null
 }

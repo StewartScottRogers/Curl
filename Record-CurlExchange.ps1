@@ -502,7 +502,7 @@
 
 .PARAMETER Curl
     The curl executable to run. Defaults to the reference build ADR-0009 and ADR-0018
-    name, curl 8.21.0 from Git for Windows' mingw64 directory, found beside git.exe.
+    name, curl from Git for Windows' ucrt64 directory (Git 2.56.0 on, curl 8.22.0) or mingw64 directory (before it), found beside git.exe.
 
 .PARAMETER ListenAddress
     The address the server (and, with -Ftp, its passive data listener, named in PASV's
@@ -705,16 +705,19 @@ if ($Http2 -and ($Ftp -or $Smtp -or $Imap -or $Pop3 -or $Script -or $NoServer -o
 if ($Http2 -and $PSVersionTable.PSVersion.Major -lt 7) { throw '-Http2 needs PowerShell 7 (pwsh): Windows PowerShell 5.1''s .NET Framework cannot pick a protocol by ALPN as a TLS server.' }
 
 function Get-ReferenceCurlPath {
-    $git = Get-Command git.exe -ErrorAction SilentlyContinue
-    if ($null -ne $git) {
-        # git.exe lives in <Git>\cmd or <Git>\bin; the reference curl in <Git>\mingw64\bin.
-        $gitRoot = Split-Path (Split-Path $git.Source -Parent) -Parent
-        $candidate = Join-Path $gitRoot 'mingw64\bin\curl.exe'
-        if (Test-Path -LiteralPath $candidate) { return $candidate }
+    # Git for Windows ships its curl in <Git>\ucrt64\bin from 2.56.0 (curl 8.22.0) and in
+    # <Git>\mingw64\bin before it; git.exe lives in <Git>\cmd or <Git>\bin.
+    $roots = @()
+    $git = Get-Command git.exe -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($null -ne $git) { $roots += Split-Path (Split-Path $git.Source -Parent) -Parent }
+    if ($env:ProgramFiles) { $roots += Join-Path $env:ProgramFiles 'Git' }
+    foreach ($root in $roots) {
+        foreach ($folder in 'ucrt64\bin', 'mingw64\bin') {
+            $candidate = Join-Path (Join-Path $root $folder) 'curl.exe'
+            if (Test-Path -LiteralPath $candidate) { return $candidate }
+        }
     }
-    $candidate = Join-Path $env:ProgramFiles 'Git\mingw64\bin\curl.exe'
-    if (Test-Path -LiteralPath $candidate) { return $candidate }
-    throw 'The reference curl (Git for Windows mingw64\bin\curl.exe) was not found; pass -Curl.'
+    throw 'The reference curl (Git for Windows ucrt64\bin\curl.exe or mingw64\bin\curl.exe) was not found; pass -Curl.'
 }
 
 function ConvertFrom-EscapedResponse {
