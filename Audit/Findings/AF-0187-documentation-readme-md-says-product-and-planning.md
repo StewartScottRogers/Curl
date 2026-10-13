@@ -3,8 +3,8 @@ id: AF-0187
 title: Documentation/README.md says Product/ and Planning/ are unfilled scaffolds and ADR-0001 is the only decision; there are 474 ADRs and 107 requirements
 auditor: truthfulness
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: truthfulness:Documentation/README.md:Status-of-these-documents:false-statement
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Run from the repository root:
 ## Log
 
 - 2026-10-13: filed proposed.
+- 2026-10-13: proposed -> accepted.
