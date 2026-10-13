@@ -58,6 +58,50 @@ public sealed class SystemDnsResolverTests
     }
 
     [TestMethod]
+    [DataRow("localhost")]
+    [DataRow("curlmachine.localhost")]
+    [DataRow("a.b.LOCALHOST")]
+    public async Task ResolveAsync_WithLocalhostName_ReturnsLoopbackAddressesWithoutLookingUp(string host)
+    {
+        // curl 8.21.0 answers localhost and every name under .localhost itself with ::1 and
+        // 127.0.0.1: curl -4 http://curlmachine.localhost:%HTTPPORT/389 connects (test389, BL-2113).
+        var lookups = 0;
+        var resolver = new SystemDnsResolver((_, _) =>
+        {
+            lookups++;
+            return Task.FromException<IPAddress[]>(new SocketException((int)SocketError.HostNotFound));
+        });
+
+        Diagnostics.Arrange("host", host);
+
+        var addresses = await resolver.ResolveAsync(host, CancellationToken.None);
+
+        Diagnostics.Act("addresses", string.Join(", ", addresses));
+        Diagnostics.Act("lookups", lookups);
+        Diagnostics.Assert("addresses", "::1, 127.0.0.1", string.Join(", ", addresses));
+        Diagnostics.Assert("lookups", 0, lookups);
+
+        CollectionAssert.AreEqual(new[] { IPAddress.IPv6Loopback, IPAddress.Loopback }, addresses.ToArray());
+        Assert.AreEqual(0, lookups);
+    }
+
+    [TestMethod]
+    public async Task ResolveAsync_WithNameEndingInLocalhostWithoutADot_LooksItUp()
+    {
+        IPAddress[] looked = [IPAddress.Parse("192.0.2.7")];
+        var resolver = new SystemDnsResolver((_, _) => Task.FromResult(looked));
+
+        Diagnostics.Arrange("host", "notlocalhost");
+
+        var addresses = await resolver.ResolveAsync("notlocalhost", CancellationToken.None);
+
+        Diagnostics.Act("addresses", string.Join(", ", addresses));
+        Diagnostics.Assert("addresses", "192.0.2.7", string.Join(", ", addresses));
+
+        CollectionAssert.AreEqual(looked, addresses.ToArray());
+    }
+
+    [TestMethod]
     public async Task ResolveAsync_WhenLookupThrowsSocketException_ReturnsNoAddresses()
     {
         var resolver = new SystemDnsResolver(

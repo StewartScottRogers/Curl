@@ -22,6 +22,9 @@ public sealed class ScriptedDnsSocketOpener(TimeProvider timeProvider, params (I
     /// <summary>Gets every query sent, in the order sent.</summary>
     public IReadOnlyList<SentDnsQuery> Sent => [.. _sent];
 
+    /// <summary>Raised after each query is recorded in <see cref="Sent" />.</summary>
+    public event Action? QueryRecorded;
+
     /// <inheritdoc />
     public IDatagramChannel OpenDatagramChannel(IPEndPoint server, IPAddress localAddress)
     {
@@ -41,8 +44,11 @@ public sealed class ScriptedDnsSocketOpener(TimeProvider timeProvider, params (I
     private ScriptedDnsServer ScriptFor(IPEndPoint server) =>
         servers.FirstOrDefault(entry => entry.EndPoint.Equals(server)).Server ?? ScriptedDnsServer.Silent;
 
-    private void Record(string transport, IPEndPoint server, IPAddress localAddress, byte[] query) =>
+    private void Record(string transport, IPEndPoint server, IPAddress localAddress, byte[] query)
+    {
         _sent.Enqueue(new SentDnsQuery(transport, server, localAddress, query, timeProvider.GetTimestamp()));
+        QueryRecorded?.Invoke();
+    }
 
     private sealed class ScriptedChannel(ScriptedDnsSocketOpener opener, IPEndPoint server, IPAddress localAddress, ScriptedDnsServer script) : IDatagramChannel
     {

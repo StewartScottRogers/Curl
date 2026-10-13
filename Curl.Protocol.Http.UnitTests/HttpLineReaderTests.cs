@@ -71,4 +71,21 @@ public sealed class HttpLineReaderTests
         Assert.AreEqual(longLine, Encoding.ASCII.GetString(first!));
         Assert.AreEqual(longLine, Encoding.ASCII.GetString(second!));
     }
+
+    [TestMethod]
+    public async Task ReadLineAsync_FirstStatusLineLongerThanTheFirstBuffer_ComesOutWhole()
+    {
+        string statusLine = "HTTP/1.1 200 " + new string('a', 20000) + "\r\n";
+        HttpLineReader reader = new(new ScriptedConnection(Encoding.ASCII.GetBytes(statusLine + "rest"), 5000));
+        Diagnostics.Arrange("lines, chunk size", "a 20015-byte status line first, then rest, 5000");
+
+        byte[]? line = await reader.ReadLineAsync(true, CancellationToken.None);
+        byte[] rest = reader.TakeRemaining();
+
+        Diagnostics.Act("line length", line is null ? "(none)" : line.Length.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        Diagnostics.Diff("status line", statusLine, line is null ? "(none)" : Encoding.ASCII.GetString(line));
+        Assert.IsNotNull(line);
+        Assert.AreEqual(statusLine, Encoding.ASCII.GetString(line));
+        Assert.AreEqual("rest", Encoding.ASCII.GetString(rest));
+    }
 }

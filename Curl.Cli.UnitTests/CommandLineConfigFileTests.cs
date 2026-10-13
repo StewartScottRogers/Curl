@@ -453,6 +453,54 @@ public sealed class CommandLineConfigFileTests
     }
 
     [TestMethod]
+    public void Parse_ConfigFileWithALineTooLongToRead_IsRefusedWithReadError()
+    {
+        // curl 8.21.0 on 2026-10-12: -K with a 10485759-byte comment line and its LF, exit 26 (GF-0069).
+        CommandLineParseResult result = Parse(["-K", "big.cfg", Url], ("big.cfg", "#" + new string('a', 10485758) + "\nsilent\n"));
+
+        TestDiagnostics.For(TestContext).Assert("Refusal.ExitCode", CurlExitCode.ReadError, result.Refusal?.ExitCode);
+        Assert.AreEqual(CurlExitCode.ReadError, result.Refusal!.ExitCode);
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                "curl: cannot read config from 'big.cfg'",
+                "curl: option -K: error encountered when reading a file",
+                TryHelp,
+            },
+            result.Refusal.StandardErrorLines.ToArray());
+    }
+
+    /// <summary>
+    /// curl 8.21.0 on 2026-10-12: the longest lines its 10 MiB line buffer reads - 10485758 bytes and
+    /// an LF, the same and a CR LF, and a last line of 10485759 bytes with no LF - are read.
+    /// </summary>
+    [TestMethod]
+    [DataRow("\n\nsilent\n#", 10485757, "\n")]
+    [DataRow("#", 10485757, "\r\n")]
+    [DataRow("#", 10485758, "")]
+    [DataRow("#", 10485757, "\r")]
+    public void Parse_ConfigFileWithTheLongestReadableLine_IsAccepted(string start, int fill, string end)
+    {
+        CommandLineParseResult result = Parse(["-K", "big.cfg", Url], ("big.cfg", start + new string('a', fill) + end));
+
+        TestDiagnostics.For(TestContext).Assert("accepted", true, result.IsAccepted);
+        Assert.IsTrue(result.IsAccepted);
+    }
+
+    [TestMethod]
+    public void Parse_ConfigFileWithSilentBeforeALineTooLongToRead_HidesTheCannotReadLine()
+    {
+        // curl 8.21.0 on 2026-10-12: silent, then the long line, printed only the option and try-help lines.
+        CommandLineParseResult result = Parse(["-K", "big.cfg", Url], ("big.cfg", "silent\n#" + new string('a', 10485759) + "\n"));
+
+        TestDiagnostics.For(TestContext).Assert("Refusal.ExitCode", CurlExitCode.ReadError, result.Refusal?.ExitCode);
+        Assert.AreEqual(CurlExitCode.ReadError, result.Refusal!.ExitCode);
+        CollectionAssert.AreEqual(
+            new[] { "curl: option -K: error encountered when reading a file", TryHelp },
+            result.Refusal.StandardErrorLines.ToArray());
+    }
+
+    [TestMethod]
     [DataRow("-K")]
     [DataRow("--config")]
     public void Parse_MissingConfigFile_IsRefusedWithReadError(string option)

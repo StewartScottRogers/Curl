@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
 
@@ -745,25 +744,37 @@ public sealed class DnsServerResolverTests
     /// Fires each attempt's timeout on <paramref name="time" /> once the <paramref name="concurrentQueries" />
     /// queries are all waiting, until <paramref name="lookup" /> ends. An attempt arms its timeout
     /// before it sends, so the clock moves only once <paramref name="opener" /> has recorded a send
-    /// for every timer armed; moving it between the two would stamp the send late.
+    /// for every timer armed; moving it between the two would stamp the send late. It waits for the
+    /// lookup to end, arm a timer or send a query rather than spinning, so it reads no real clock and
+    /// starves no other test's thread (BL-2109).
     /// </summary>
     private static async Task<T> RunOutTimeoutsAsync<T>(Task<T> lookup, TimerCountingTimeProvider time, ScriptedDnsSocketOpener opener, int concurrentQueries)
     {
-        while (true)
+        using var progress = new SemaphoreSlim(0);
+        void Signal() => progress.Release();
+        time.TimerCreated += Signal;
+        opener.QueryRecorded += Signal;
+        try
         {
-            var clock = Stopwatch.StartNew();
-            while (!lookup.IsCompleted && (time.Clock.PendingTimerCount < concurrentQueries || opener.Sent.Count < time.TimersCreated))
+            while (true)
             {
-                Assert.IsLessThan(10000L, clock.ElapsedMilliseconds, "The lookup neither finished nor waited.");
-                await Task.Yield();
-            }
+                while (!lookup.IsCompleted && (time.Clock.PendingTimerCount < concurrentQueries || opener.Sent.Count < time.TimersCreated))
+                {
+                    await Task.WhenAny(lookup, progress.WaitAsync());
+                }
 
-            if (lookup.IsCompleted)
-            {
-                return await lookup;
-            }
+                if (lookup.IsCompleted)
+                {
+                    return await lookup;
+                }
 
-            time.Clock.Advance(time.Clock.NextDueAt!.Value - time.GetTimestamp());
+                time.Clock.Advance(time.Clock.NextDueAt!.Value - time.GetTimestamp());
+            }
+        }
+        finally
+        {
+            time.TimerCreated -= Signal;
+            opener.QueryRecorded -= Signal;
         }
     }
 
@@ -835,8 +846,13 @@ public sealed class DnsServerResolverTests
         public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period)
         {
             Interlocked.Increment(ref _timersCreated);
-            return Clock.CreateTimer(callback, state, dueTime, period);
+            var timer = Clock.CreateTimer(callback, state, dueTime, period);
+            TimerCreated?.Invoke();
+            return timer;
         }
+
+        /// <summary>Raised after each timer is created and counted.</summary>
+        public event Action? TimerCreated;
     }
 
     /// <summary>Fills each request with the next queued bytes, then with a counter once the queue is empty.</summary>

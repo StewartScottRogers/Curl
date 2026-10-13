@@ -1,6 +1,6 @@
 # ADR-0407 — The run cost cap follows 2.7 times the median recent run
 
-- **Status:** Accepted
+- **Status:** Accepted; its numbers (2.7 times, $2 floor, default 6) superseded by [ADR-0478](ADR-0478-the-run-cost-cap-is-4-times-the-median-run-between-3-and-10-dollars.md) (4 times, $3 floor, default 10)
 - **Date:** 2026-10-03
 
 Decided by Claude under Stewart's delegation (root `CLAUDE.md`, "Decisions"), in BL-1377.
