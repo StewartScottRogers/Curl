@@ -50,6 +50,8 @@ their task follows CLAUDE.md's rule that such a piece lives in its own `Curl.<Ar
 
 ## Notes
 
+- 2026-10-13: the Windows reference is now Git 2.56.0's `ucrt64\bin\curl.exe` (curl 8.22.0), a **debug-enabled** build. Its `-V` starts with `WARNING: this libcurl is Debug-enabled, do not use in production` and its Features list `Debug`. When the target moves, strip that warning line from the reference's `-V` before comparing (the version and features measurements), and keep `Debug` excluded as `debug-build-only`. Normal transfers print no extra stderr (checked with Record-CurlExchange.ps1, BL-2125).
+
 ## Log
 
 - 2026-10-13: Created.
