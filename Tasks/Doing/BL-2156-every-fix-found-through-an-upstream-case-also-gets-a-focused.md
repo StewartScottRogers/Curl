@@ -31,3 +31,4 @@ The third of the three fixes Stewart chose on 2026-10-13 instead of converting t
 ## Log
 
 - 2026-10-13: Created.
+- 2026-10-13: Backlog -> Doing.
