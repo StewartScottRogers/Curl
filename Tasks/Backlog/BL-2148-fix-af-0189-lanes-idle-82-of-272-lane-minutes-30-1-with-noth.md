@@ -46,6 +46,8 @@ The finding closes only when a later re-audit by the process auditor confirms th
 
 ## Notes
 
+- 2026-10-13 (Claude): AF-0189: the idle time was the chain waiting on BL-2125, which needed Stewart to install Git for Windows by hand. Look for something the factory could have done better, for example filing human-only steps earlier or saying sooner that lanes wait on Stewart. If there is nothing, record why and finish.
+
 ## Log
 
 - 2026-10-13: Created.

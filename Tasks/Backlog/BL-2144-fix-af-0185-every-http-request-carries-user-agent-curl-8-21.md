@@ -46,6 +46,8 @@ The finding closes only when a later re-audit by the conformance auditor confirm
 
 ## Notes
 
+- 2026-10-13 (Claude): AF-0185 is probably already fixed: BL-2127 (f649c00aa, Curl reports itself as curl 8.22.0) landed just after the audited commit c86d04eeb. Check that -V and the User-Agent say 8.22.0 on work/dark-factory; if so, record that and finish.
+
 ## Log
 
 - 2026-10-13: Created.

@@ -46,6 +46,8 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Notes
 
+- 2026-10-13 (Claude): AF-0179 is most likely the audit's own planted defect: audit 20261013-092506's manifest plants a removed bounds check in TlsReader.Take, which these 3 tests catch. CI was green on the audited commit. Check that the real tree's TlsReader.Take checks the count and the 3 tests pass; if both hold, there is nothing to fix: record that and finish.
+
 ## Log
 
 - 2026-10-13: Created.
