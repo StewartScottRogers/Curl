@@ -35,3 +35,4 @@ Cause: `Curl.Protocol.Http.UnitLibrary/HttpProtocolHandler.cs` around lines 2359
 ## Log
 
 - 2026-10-13: Created.
+- 2026-10-13: Backlog -> Doing.
