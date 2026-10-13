@@ -2,32 +2,36 @@
 <testcase>
 <info>
 <keywords>
-HTTPS
-TLS-SRP
+HTTP
+HTTP GET
+HTTP added headers
 </keywords>
 </info>
 
 # Client-side
 <client>
 <server>
-https
+http
 </server>
-<features>
-TLS-SRP
-</features>
 <name>
-TLS-SRP to non-TLS-SRP server
+Reject a custom request header larger than the request buffer
 </name>
+<stdin>
+header "X-Large: %repeat[1048576 x x]%"
+</stdin>
 <command>
---insecure --tlsauthtype SRP --tlsuser jsmith --tlspassword badpass https://%HOSTIP:%HTTPSPORT/want/%TESTNUMBER
+-K - http://%HOSTIP:%HTTPPORT/%TESTNUMBER
 </command>
 </client>
 
 # Verify data after the test has been "shot"
 <verify>
+# 100 == CURLE_TOO_LARGE
 <errorcode>
-35
+100
 </errorcode>
+<limits>
+Maximum allocated: 6000000
+</limits>
 </verify>
-
 </testcase>

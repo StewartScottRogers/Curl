@@ -8,7 +8,7 @@ Today it holds `HarnessReferencesTests`, which pins that the harness library and
 the tests, and `UpstreamTestCaseParserTests`, which drive the test-file parser from
 inline test-file text, and `UpstreamTestFileExpanderTests`, which pin variable
 substitution, `%if` evaluation and the inline instructions against upstream's `prepro`, and
-`UpstreamTestDataTests`, which pin that the vendored `UpstreamTestData/` (curl 8.21.0's
+`UpstreamTestDataTests`, which pin that the vendored `UpstreamTestData/` (curl 8.22.0's
 `tests/data/test*` files and `COPYING`; see its `README.md`) is copied beside the tests,
 and `SwsHttpServerConnectorTests`, which pin the in-memory `sws` emulation's request framing,
 reply-part selection, connection closing, the `<servercmd>` commands that change framing
@@ -46,7 +46,7 @@ skipped cases are not runnable).
 | 2026-10-04 | 392 | 82 | 1539 | 474 | 82.7% |
 | 2026-10-07 | 559 | 162 | 1292 | 721 | 77.5% |
 
-The whole conformance run of 2013 cases takes about 8 seconds on the development machine and opens no socket: every
+The whole conformance run of 2072 cases takes about 8 seconds on the development machine and opens no socket: every
 connection goes to the in-memory `sws` emulation, and UDP to the in-memory `tftpd` emulation, `TftpServerConnector`.
 
 No sockets and no network, like every other `.UnitTests` project. Unlike the rule in

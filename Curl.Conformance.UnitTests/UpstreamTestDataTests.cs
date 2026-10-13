@@ -12,7 +12,7 @@ namespace Curl.Conformance;
 public sealed class UpstreamTestDataTests
 {
     /// <summary>The number of <c>test*</c> files in <c>tests/data</c> at <c>curl-8_21_0</c>.</summary>
-    private const int VendoredTestFileCount = 2013;
+    private const int VendoredTestFileCount = 2072;
 
     private static readonly string UpstreamTestDataFolder = Path.Combine(AppContext.BaseDirectory, "UpstreamTestData");
 

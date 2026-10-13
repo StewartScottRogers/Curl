@@ -2,32 +2,29 @@
 <testcase>
 <info>
 <keywords>
-HTTPS
-TLS-SRP
+multi
+wakeup
 </keywords>
 </info>
 
 # Client-side
 <client>
-<server>
-httptls+srp
-</server>
 <features>
-TLS-SRP
+wakeup
 </features>
+<server>
+</server>
+<tool>
+lib%TESTNUMBER
+</tool>
 <name>
-TLS-SRP with server cert checking
+wakeup, perform and poll needs to exit
 </name>
-<command> # no --insecure
---tlsauthtype SRP --tlsuser jsmith --tlspassword abc https://%HOSTIP:%HTTPTLSPORT/want/fails
+<command>
 </command>
 </client>
 
 # Verify data after the test has been "shot"
 <verify>
-<errorcode>
-60
-</errorcode>
 </verify>
-
 </testcase>
