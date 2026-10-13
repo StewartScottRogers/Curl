@@ -34,6 +34,39 @@ past a time limit - the harness's (curl past 20 seconds, or the whole case past 
 the case's own, as test303's `-m 8` (BL-2093). When a change makes
 a case pass, add its number to the list in the same commit.
 
+## Debugging one case
+
+`NamedUpstreamCase_RunThroughCurl_PassesAsAListedCaseMust` (`TestCategory("Manual")`, BL-2155)
+runs the one case `CURL_UPSTREAM_CASE` names, whether or not it is on `PassingUpstreamCases.txt`,
+and fails unless it passes, with the ratchet's message for it (first difference and the
+differing lines, or the skip reason). Without the variable `RunsOnlyWhenAnUpstreamCaseIsNamed`
+reports it skipped, so the fast command runs nothing extra. In Test Explorer, set the variable
+in a `.runsettings` file's `EnvironmentVariables` (or the shell Visual Studio starts from) and run
+the test by name.
+
+With `CURL_UPSTREAM_KEEP_LOGS=1`, every upstream case this class runs keeps its log folder
+(`bin/<configuration>/net10.0/log/test<N>-<guid>`: the case's files, curl's output, `trace<N>`)
+instead of deleting it, and prints `Kept the case's log folder: <path>` to the test's output
+(`--logger "console;verbosity=detailed"` shows it on the command line).
+
+PowerShell:
+
+```powershell
+$env:CURL_UPSTREAM_CASE = '798'; $env:CURL_UPSTREAM_KEEP_LOGS = '1'
+dotnet test Curl.Conformance.UnitTests --filter "TestCategory=Manual" --logger "console;verbosity=detailed"
+Remove-Item Env:CURL_UPSTREAM_CASE, Env:CURL_UPSTREAM_KEEP_LOGS
+```
+
+`cmd`:
+
+```cmd
+set CURL_UPSTREAM_CASE=798& set CURL_UPSTREAM_KEEP_LOGS=1
+dotnet test Curl.Conformance.UnitTests --filter "TestCategory=Manual" --logger "console;verbosity=detailed"
+```
+
+To keep the logs of the ratchet rows instead, set only `CURL_UPSTREAM_KEEP_LOGS=1` and filter by
+row name, for example `--filter "Name~test798 "`.
+
 ## Pass rate
 
 Recompute it from a run's results: listed cases over runnable cases (passing plus failing;

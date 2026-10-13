@@ -119,6 +119,30 @@ public sealed class UpstreamConformanceTests
         }
     }
 
+    // One case by number, listed or not, for a developer to debug (BL-2155): it fails unless the case
+    // passes, with the ratchet's message for it, and runs only when CURL_UPSTREAM_CASE names it.
+    [TestMethod]
+    [TestCategory("Manual")]
+    [RunsOnlyWhenAnUpstreamCaseIsNamed]
+    public async Task NamedUpstreamCase_RunThroughCurl_PassesAsAListedCaseMust()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        int testNumber = UpstreamCaseDebugSettings.Read(Environment.GetEnvironmentVariable).CaseNumber!.Value;
+        string testFilePath = Path.Combine(UpstreamTestDataFolder, $"test{testNumber}{UpstreamTestFileExtension}");
+        diagnostics.Arrange("upstream case number", testNumber);
+        diagnostics.Arrange("case is on the passing list", PassingCases.Contains(testNumber));
+        Assert.IsTrue(File.Exists(testFilePath), $"test{testNumber} is not a vendored upstream case: {testFilePath} does not exist");
+        byte[] testFile = await File.ReadAllBytesAsync(testFilePath);
+
+        UpstreamCaseOutcome outcome = await RunCaseOnceAsync(testNumber, testFile);
+
+        UpstreamCaseVerdict verdict = UpstreamCaseRatchet.Judge(testNumber, outcome, PassingCases.Contains(testNumber));
+        diagnostics.Act("verdict kind", verdict.Kind);
+        diagnostics.Act("verdict message", verdict.Message);
+        diagnostics.Assert("outcome kind is Passed", UpstreamCaseOutcomeKind.Passed, outcome.Kind);
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Passed, outcome.Kind, verdict.Message);
+    }
+
     // Cases whose <client><setenv> the runner now acts on (BL-1892): 63, 288, 708, 1101, 1249,
     // 1250 and 1265 set curl's proxy variables, 392 and 1136 TZ, 1143 MSYS2_ARG_CONV_EXCL; 428 shows a real
     // Curl difference (--variable %NAME imports the process environment, not the run's).
@@ -362,7 +386,7 @@ public sealed class UpstreamConformanceTests
         }
         finally
         {
-            DeleteLogDirectory(logDirectory);
+            DeleteOrKeepLogDirectory(logDirectory);
         }
     }
 
@@ -413,7 +437,7 @@ public sealed class UpstreamConformanceTests
         }
         finally
         {
-            DeleteLogDirectory(logDirectory);
+            DeleteOrKeepLogDirectory(logDirectory);
         }
     }
 
@@ -444,8 +468,15 @@ public sealed class UpstreamConformanceTests
     }
 
     // A run that timed out may still hold a file open; the temporary folder is left to the system then.
-    private static void DeleteLogDirectory(DirectoryInfo logDirectory)
+    // With CURL_UPSTREAM_KEEP_LOGS=1 the folder is kept and its path printed to the test's output (BL-2155).
+    private static void DeleteOrKeepLogDirectory(DirectoryInfo logDirectory)
     {
+        if (UpstreamCaseDebugSettings.Read(Environment.GetEnvironmentVariable).KeepsLogs)
+        {
+            System.Console.WriteLine(UpstreamCaseDebugSettings.KeptLogFolderLine(logDirectory.FullName));
+            return;
+        }
+
         try
         {
             logDirectory.Delete(recursive: true);
