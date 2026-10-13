@@ -1367,24 +1367,6 @@ public sealed class CommandLineOptions
     public bool ProxyAllowBeast { get; internal set; }
 
     /// <summary>
-    /// Always <see langword="null"/>: curl 8.22.0 takes <c>--proxy-tlsuser</c> only to warn that it is deprecated and has no
-    /// function anymore (ADR-0480), so nothing sets it. Kept for the code that still reads it until BL-2152 removes it.
-    /// </summary>
-    public string? ProxyTlsUser { get; }
-
-    /// <summary>
-    /// Always <see langword="null"/>: curl 8.22.0 takes <c>--proxy-tlspassword</c> only to warn that it is deprecated and has no
-    /// function anymore (ADR-0480), so nothing sets it. Kept for the code that still reads it until BL-2152 removes it.
-    /// </summary>
-    public string? ProxyTlsPassword { get; }
-
-    /// <summary>
-    /// Always <see langword="null"/>: curl 8.22.0 takes <c>--proxy-tlsauthtype</c> only to warn that it is deprecated and has no
-    /// function anymore (ADR-0480), so nothing sets it. Kept for the code that still reads it until BL-2152 removes it.
-    /// </summary>
-    public string? ProxyTlsAuthType { get; }
-
-    /// <summary>
     /// The <c>-E</c> / <c>--cert</c> value, verbatim, with <c>certificate[:password]</c> not yet split;
     /// <see langword="null"/> when not given. The last value wins.
     /// </summary>
@@ -1544,24 +1526,6 @@ public sealed class CommandLineOptions
     /// <see cref="EngineListRequested"/>. An empty value is refused as blank, as curl 8.21.0 refuses it.
     /// </summary>
     public string? Engine { get; internal set; }
-
-    /// <summary>
-    /// Always <see langword="null"/>: curl 8.22.0 takes <c>--tlsuser</c> only to warn that it is deprecated and has no
-    /// function anymore (ADR-0480), so nothing sets it. Kept for the code that still reads it until BL-2152 removes it.
-    /// </summary>
-    public string? TlsUser { get; }
-
-    /// <summary>
-    /// Always <see langword="null"/>: curl 8.22.0 takes <c>--tlspassword</c> only to warn that it is deprecated and has no
-    /// function anymore (ADR-0480), so nothing sets it. Kept for the code that still reads it until BL-2152 removes it.
-    /// </summary>
-    public string? TlsPassword { get; }
-
-    /// <summary>
-    /// Always <see langword="null"/>: curl 8.22.0 takes <c>--tlsauthtype</c> only to warn that it is deprecated and has no
-    /// function anymore (ADR-0480), so nothing sets it. Kept for the code that still reads it until BL-2152 removes it.
-    /// </summary>
-    public string? TlsAuthType { get; }
 
     /// <summary>
     /// The <c>--ssl-sessions</c> file TLS session tickets are loaded from before the transfers and saved to

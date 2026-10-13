@@ -30,7 +30,6 @@ public sealed class CommandLineTlsHandshakeOptionTests
 
         Diagnostics.Assert("curves", null, options.Curves);
         Diagnostics.Assert("TLS early data", false, options.TlsEarlyData);
-        Diagnostics.Assert("TLS auth type", null, options.TlsAuthType);
         Assert.IsNull(options.Curves);
         Assert.IsNull(options.SignatureAlgorithms);
         Assert.IsFalse(options.TlsEarlyData);
@@ -41,9 +40,6 @@ public sealed class CommandLineTlsHandshakeOptionTests
         Assert.IsNull(options.Engine);
         Assert.IsFalse(options.EngineListRequested);
         Assert.IsFalse(options.CaEmbedDumpRequested);
-        Assert.IsNull(options.TlsUser);
-        Assert.IsNull(options.TlsPassword);
-        Assert.IsNull(options.TlsAuthType);
     }
 
     [TestMethod]
@@ -386,9 +382,6 @@ public sealed class CommandLineTlsHandshakeOptionTests
             Diagnostics.Act("engine", options.Engine);
             Diagnostics.Act("engine list requested", options.EngineListRequested);
             Diagnostics.Act("CA embed dump requested", options.CaEmbedDumpRequested);
-            Diagnostics.Act("TLS user", options.TlsUser);
-            Diagnostics.Act("TLS password", options.TlsPassword);
-            Diagnostics.Act("TLS auth type", options.TlsAuthType);
         }
 
         return result;

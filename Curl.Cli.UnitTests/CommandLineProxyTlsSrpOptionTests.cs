@@ -21,19 +21,6 @@ public sealed class CommandLineProxyTlsSrpOptionTests
     private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
 
     [TestMethod]
-    public void Parse_NoneOfTheOptions_LeavesThemNotGiven()
-    {
-        CommandLineOptions options = Parse([Url]).Options!;
-
-        AssertText("proxy TLS user", null, options.ProxyTlsUser);
-        AssertText("proxy TLS password", null, options.ProxyTlsPassword);
-        AssertText("proxy TLS auth type", null, options.ProxyTlsAuthType);
-        Assert.IsNull(options.ProxyTlsUser);
-        Assert.IsNull(options.ProxyTlsPassword);
-        Assert.IsNull(options.ProxyTlsAuthType);
-    }
-
-    [TestMethod]
     [DataRow("--no-proxy-tlsuser")]
     [DataRow("--no-proxy-tlspassword")]
     [DataRow("--no-proxy-tlsauthtype")]

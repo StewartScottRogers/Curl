@@ -1,6 +1,6 @@
 # ADR-0229 — TLS-SRP runs RFC 5054 in the hand-built TLS 1.2 client as OpenSSL does
 
-- **Status:** Accepted
+- **Status:** Superseded by ADR-0480 (curl 8.22.0 dropped TLS-SRP; BL-2152 removed the TLS-SRP plumbing)
 - **Date:** 2026-09-29
 
 Decided by Claude under Stewart's delegation (root `CLAUDE.md`, "Decisions"), in BL-704.

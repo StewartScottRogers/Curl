@@ -91,12 +91,6 @@ public sealed class CommandLineNoFunctionOptionTests
         Diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
         CollectionAssert.AreEqual(new[] { Url }, result.Options.Urls.ToArray());
-        Assert.IsNull(result.Options.TlsUser);
-        Assert.IsNull(result.Options.TlsPassword);
-        Assert.IsNull(result.Options.TlsAuthType);
-        Assert.IsNull(result.Options.ProxyTlsUser);
-        Assert.IsNull(result.Options.ProxyTlsPassword);
-        Assert.IsNull(result.Options.ProxyTlsAuthType);
         CollectionAssert.AreEqual(new[] { Warning(argument[2..]) }, result.WarningLines.ToArray());
     }
 

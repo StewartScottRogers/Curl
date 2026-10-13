@@ -80,7 +80,6 @@ public sealed class TlsClientOptionsTests
 
         Diagnostics.Act("allow early data", options.AllowEarlyData);
         Diagnostics.Act("curves", options.Curves ?? "null");
-        Diagnostics.Act("tls user", options.TlsUser ?? "null");
         Diagnostics.Assert("allow early data", false, options.AllowEarlyData);
         Diagnostics.Assert("curves", "null", options.Curves ?? "null");
 
@@ -92,15 +91,12 @@ public sealed class TlsClientOptionsTests
         Assert.IsNull(options.EchConfigList);
         Assert.IsNull(options.SslSessionsFile);
         Assert.IsNull(options.Engine);
-        Assert.IsNull(options.TlsUser);
-        Assert.IsNull(options.TlsPassword);
-        Assert.IsNull(options.TlsAuthType);
     }
 
     [TestMethod]
     public void With_TheTenOptionsOfAdr0151_CopiesTheOptionsWithTheNewValues()
     {
-        Diagnostics.Arrange("changed values", "X25519, ECDSA+SHA256, early data, hard, example.com, AEX+DQ==, sess.bin, pkcs11, user, secret, SRP");
+        Diagnostics.Arrange("changed values", "X25519, ECDSA+SHA256, early data, hard, example.com, AEX+DQ==, sess.bin, pkcs11");
 
         var changed = new TlsClientOptions() with
         {
@@ -112,14 +108,10 @@ public sealed class TlsClientOptionsTests
             EchConfigList = "AEX+DQ==",
             SslSessionsFile = "sess.bin",
             Engine = "pkcs11",
-            TlsUser = "user",
-            TlsPassword = "secret",
-            TlsAuthType = "SRP",
         };
 
         Diagnostics.Act("curves", changed.Curves);
         Diagnostics.Act("ech", changed.Ech);
-        Diagnostics.Act("tls auth type", changed.TlsAuthType);
         Diagnostics.Assert("curves", "X25519", changed.Curves);
         Diagnostics.Assert("allow early data", true, changed.AllowEarlyData);
 
@@ -131,8 +123,5 @@ public sealed class TlsClientOptionsTests
         Assert.AreEqual("AEX+DQ==", changed.EchConfigList);
         Assert.AreEqual("sess.bin", changed.SslSessionsFile);
         Assert.AreEqual("pkcs11", changed.Engine);
-        Assert.AreEqual("user", changed.TlsUser);
-        Assert.AreEqual("secret", changed.TlsPassword);
-        Assert.AreEqual("SRP", changed.TlsAuthType);
     }
 }

@@ -135,19 +135,6 @@ namespace Curl.Networking;
 /// a crypto engine: as ADR-0151 decides, the console ignores it on Windows and fails the transfer
 /// before it connects elsewhere, so a handshake never sees one.
 /// </param>
-/// <param name="TlsUser">
-/// curl's <c>--tlsuser</c>: the TLS-SRP user name; <see langword="null" /> when not given. ADR-0151
-/// gives TLS-SRP to the hand-built client: <see cref="TlsClientRouting" /> sends it there and
-/// <see cref="TlsSrp" /> builds the login (ADR-0328).
-/// </param>
-/// <param name="TlsPassword">
-/// curl's <c>--tlspassword</c>: the TLS-SRP password, empty included; <see langword="null" /> when not
-/// given. Applied with <paramref name="TlsUser" /> (BL-712).
-/// </param>
-/// <param name="TlsAuthType">
-/// curl's <c>--tlsauthtype</c>: <c>SRP</c>, the only type the command line accepts, or
-/// <see langword="null" /> when not given.
-/// </param>
 /// <param name="RequireCertificateStatus">
 /// <see langword="true" /> for curl's <c>--cert-status</c>: the handshake asks for the server's stapled
 /// OCSP response and fails with exit 91 unless it vouches for the certificate. <c>SslStream</c>
@@ -210,9 +197,6 @@ public sealed record TlsClientOptions(
     string? EchConfigList = null,
     string? SslSessionsFile = null,
     string? Engine = null,
-    string? TlsUser = null,
-    string? TlsPassword = null,
-    string? TlsAuthType = null,
     bool RequireCertificateStatus = false,
     bool AutoClientCertificate = false,
     string? PinnedPublicKey = null,

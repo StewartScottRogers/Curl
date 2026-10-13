@@ -35,21 +35,20 @@ public static class CurlVersionText
     /// <summary>
     /// The fourth line: the curl features the code gives evidence for, in curl's order (alphabetical,
     /// ignoring case): the line for Linux and macOS, the OpenSSL reference build. <see cref="WindowsFeaturesLine"/>
-    /// is the Windows line, which drops <c>ECH</c>, <c>GSS-API</c>, <c>HTTP2</c>, <c>HTTP3</c> and <c>TLS-SRP</c>
+    /// is the Windows line, which drops <c>ECH</c>, <c>GSS-API</c>, <c>HTTP2</c> and <c>HTTP3</c>
     /// and adds <c>SSPI</c>. ADR-0021's four, plus <c>brotli</c> and <c>libz</c> now that the registered
     /// HTTP handler decodes <c>br</c>, <c>gzip</c> and <c>deflate</c> bodies, and <c>HTTP2</c> off Windows
     /// now that <c>--http2</c> is accepted (ADR-0141, Decision 5), and <c>GSS-API</c> off Windows, and
     /// <c>Kerberos</c> and <c>SPNEGO</c> on every platform, now that <c>--negotiate</c> is answered
     /// (ADR-0142, ADR-0176), <c>NTLM</c> on every platform now that <c>--ntlm</c> is (ADR-0181), and
-    /// <c>HTTP3</c> off Windows now that <c>--http3</c> and <c>--http3-only</c> work (ADR-0144), and
-    /// <c>TLS-SRP</c> off Windows now that <c>--tlsuser</c> and <c>--proxy-tlsuser</c> authenticate the
-    /// hand-built handshake with SRP (ADR-0328, BL-1135), after <c>SSL</c> as curl 8.18.0's OpenSSL build lists it.
+    /// <c>HTTP3</c> off Windows now that <c>--http3</c> and <c>--http3-only</c> work (ADR-0144).
+    /// No <c>TLS-SRP</c>: curl 8.22.0 dropped TLS-SRP, so its <c>lib/version.c</c> lists it no more (ADR-0480, BL-2152).
     /// BL-1417's audit added <c>alt-svc</c>, <c>ECH</c>, <c>HSTS</c>, <c>HTTPS-proxy</c>, <c>HTTPSRR</c>, <c>IDN</c>,
     /// <c>PSL</c>, <c>UnixSockets</c> and <c>zstd</c>, each with evidence in the code (ADR-0021 amendment).
     /// <c>threadsafe</c> on every platform, after <c>SSL</c> (and <c>SSPI</c>) as both reference builds list it,
     /// because Curl's process-wide set-up is thread-safe (ADR-0444, BL-1828).
     /// </summary>
-    public const string FeaturesLine = "Features: alt-svc AsynchDNS brotli ECH GSS-API HSTS HTTP2 HTTP3 HTTPS-proxy HTTPSRR IDN IPv6 Kerberos Largefile libz NTLM PSL SPNEGO SSL threadsafe TLS-SRP UnixSockets zstd";
+    public const string FeaturesLine = "Features: alt-svc AsynchDNS brotli ECH GSS-API HSTS HTTP2 HTTP3 HTTPS-proxy HTTPSRR IDN IPv6 Kerberos Largefile libz NTLM PSL SPNEGO SSL threadsafe UnixSockets zstd";
 
     /// <summary>
     /// The fourth line on Windows: <see cref="FeaturesLine"/> with <c>SSPI</c> after <c>SSL</c>, as the
@@ -60,8 +59,7 @@ public static class CurlVersionText
     /// Kerberos answer through SSPI there (ADR-0449, BL-1823), and without <c>HTTP2</c>, which the Schannel
     /// reference build does not list, though <c>--http2</c> still works (ADR-0450, BL-1824), and without
     /// <c>HTTP3</c>, which the Schannel reference build does not list, though <c>--http3</c> still works
-    /// (ADR-0451, BL-1825), and without <c>TLS-SRP</c>, which the Schannel reference build does not list,
-    /// though the TLS-SRP options still work (ADR-0452, BL-1826).
+    /// (ADR-0451, BL-1825).
     /// </summary>
     public const string WindowsFeaturesLine = "Features: alt-svc AsynchDNS brotli HSTS HTTPS-proxy HTTPSRR IDN IPv6 Kerberos Largefile libz NTLM PSL SPNEGO SSL SSPI threadsafe UnixSockets zstd";
 

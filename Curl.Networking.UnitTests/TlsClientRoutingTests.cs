@@ -250,24 +250,6 @@ public sealed class TlsClientRoutingTests
         Assert.AreEqual(TlsClientRoute.HandBuilt, TlsClientRouting.Choose(options));
     }
 
-    // ADR-0328's row: --tlsuser, since SslStream has no TLS-SRP; --tlspassword alone turns nothing on.
-    [TestMethod]
-    [DataRow("alice", "secret", TlsClientRoute.HandBuilt)]
-    [DataRow("alice", null, TlsClientRoute.HandBuilt)]
-    [DataRow(null, "secret", TlsClientRoute.SslStream)]
-    public void Choose_WithTlsSrpOptions_IsTheHandBuiltClientOnlyWithATlsUser(string? user, string? password, TlsClientRoute expected)
-    {
-        var options = new TlsClientOptions(TlsUser: user, TlsPassword: password);
-        Diagnostics.Arrange("options", options);
-
-        var actual = TlsClientRouting.Choose(options);
-
-        Diagnostics.Act("route", actual);
-        Diagnostics.Assert("route", expected, actual);
-
-        Assert.AreEqual(expected, TlsClientRouting.Choose(new TlsClientOptions(TlsUser: user, TlsPassword: password)));
-    }
-
     [TestMethod]
     public void Choose_WithNullOptions_ThrowsArgumentNullException()
     {
@@ -287,7 +269,6 @@ public sealed class TlsClientRoutingTests
         [new TlsClientOptions(Curves: "X25519"), "--curves or --sigalgs names the groups or signature algorithms"],
         [new TlsClientOptions(SslSessionsFile: "sessions.txt"), "--ssl-sessions imports and exports sessions"],
         [new TlsClientOptions(Ech: "grease"), "--ech offers Encrypted Client Hello"],
-        [new TlsClientOptions(TlsUser: "alice"), "--tlsuser turns on TLS-SRP"],
         [new TlsClientOptions(NoSessionId: true), "--no-sessionid turns off the session cache"],
         [new TlsClientOptions(AllowBeast: true, MinimumVersion: TlsVersion.Tls10), "--ssl-allow-beast with a TLS 1.0 minimum turns off the CBC split"],
         [new TlsClientOptions(AllowEarlyData: true), "--tls-earlydata sends 0-RTT early data"],
