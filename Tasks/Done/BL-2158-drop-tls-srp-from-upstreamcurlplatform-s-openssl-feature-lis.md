@@ -8,7 +8,7 @@ depends-on: [BL-2152]
 touches: [Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests]
 requirement: none
 created: 2026-10-13
-completed:
+completed: 2026-10-13
 ---
 # BL-2158 — Drop TLS-SRP from UpstreamCurlPlatform's OpenSSL feature list: curl 8.22.0's lib/version.c no longer lists it
 
@@ -22,8 +22,8 @@ curl 8.22.0's `lib/version.c` has no `TLS-SRP` feature (8.21.0 listed it under `
 
 ## Acceptance criteria
 
-- [ ] `git grep -n TLS-SRP -- Curl.Conformance.UnitLibrary Curl.Conformance.UnitTests` finds nothing.
-- [ ] `dotnet build` and the fast tests pass.
+- [x] `git grep -n TLS-SRP -- Curl.Conformance.UnitLibrary Curl.Conformance.UnitTests` finds nothing.
+- [x] `dotnet build` and the fast tests pass.
 
 ## Notes
 
@@ -31,3 +31,4 @@ curl 8.22.0's `lib/version.c` has no `TLS-SRP` feature (8.21.0 listed it under `
 
 - 2026-10-13: Created.
 - 2026-10-13: Backlog -> Doing.
+- 2026-10-13: Doing -> Done. TLS-SRP dropped from UpstreamCurlPlatform and its test; build clean, fast tests green

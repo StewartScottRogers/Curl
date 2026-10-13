@@ -36,7 +36,7 @@ public sealed class UpstreamCurlPlatform
     [
         "dict", "file", "gopher", "gophers", "http", "https", "ipfs", "mqtt", "telnet", "tftp", "ws", "wss",
         "alt-svc", "AsynchDNS", "brotli", "ECH", "GSS-API", "HSTS", "http/2", "h2c", "http/3", "HTTPS-proxy",
-        "HTTPSRR", "IDN", "IPv6", "Kerberos", "Largefile", "libz", "NTLM", "PSL", "SPNEGO", "SSL", "TLS-SRP",
+        "HTTPSRR", "IDN", "IPv6", "Kerberos", "Largefile", "libz", "NTLM", "PSL", "SPNEGO", "SSL",
         "UnixSockets", "zstd",
         "crypto", "cookies", "proxy", "Mime", "manual", "DoH", "digest", "aws", "netrc", "verbose-strings",
         "large-time", "large-size", "sha512-256", "SSLpinning",
