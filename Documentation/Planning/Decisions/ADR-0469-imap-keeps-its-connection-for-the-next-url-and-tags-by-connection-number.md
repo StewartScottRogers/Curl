@@ -22,8 +22,10 @@ tagged `A`.
    cache with an `ImapKeptConnection` holding the tag letter, the commands sent and the
    selected mailbox and UIDVALIDITY, instead of sending `LOGOUT`. Failures send `LOGOUT` and
    close, as before, as curl's `imap_done` closes a connection a transfer failed on.
-2. A kept connection serves only the same user, password, login options (`;AUTH=` or
-   `--login-options`) and `--ssl` level; one kept for another login is closed, with its
+2. A kept connection serves only the same user, password and `--ssl` level; the login
+   options (`;AUTH=` or `--login-options`) are not part of that key, because curl reuses a
+   connection whose URLs differ only in them (upstream test1982, BL-2089). One kept for
+   another login is closed, with its
    `LOGOUT`, before a new connection is made, which puts test 836's `A005 LOGOUT` before
    `B001 CAPABILITY`.
 3. A connection that `STARTTLS` upgraded is not kept and logs out as before: the secured

@@ -1,3 +1,4 @@
+using System.Net;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Conformance;
@@ -39,7 +40,9 @@ public sealed class NoListenPortConnectorTests
 
         ConnectResult result = await connector.ConnectAsync(new ConnectTarget("127.0.0.1", 8990, false), CancellationToken.None);
 
-        Assert.IsNotNull(result.Connection);
+        SwsHttpServerConnection connection = Assert.IsInstanceOfType<SwsHttpServerConnection>(result.Connection);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(new IPEndPoint(IPAddress.Loopback, 8990), connection.RemoteEndPoint);
     }
 }
 
