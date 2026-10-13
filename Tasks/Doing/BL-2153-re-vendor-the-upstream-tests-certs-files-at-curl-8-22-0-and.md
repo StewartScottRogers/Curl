@@ -44,3 +44,4 @@ Generating the certificate files themselves is BL-1923, not this task.
 ## Log
 
 - 2026-10-13: Created.
+- 2026-10-13: Backlog -> Doing.
