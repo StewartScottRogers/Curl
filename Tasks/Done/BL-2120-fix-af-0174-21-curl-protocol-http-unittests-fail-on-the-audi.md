@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Http.UnitLibrary]
 requirement: none
 created: 2026-10-13
-completed:
+completed: 2026-10-12
 ---
 # BL-2120 — Fix AF-0174: 21 Curl.Protocol.Http.UnitTests fail on the audited commit: HttpAuthUsingLines.AuthUsing writes the user's password into the verbose 'auth using' line
 
@@ -41,8 +41,8 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -54,7 +54,10 @@ The finding closes only when a later re-audit by the quality auditor confirms th
   `HttpAuthUsingLines.AuthUsing` writes no password and that those 21 tests pass. If both
   hold, there is nothing to fix: record that in the Log and finish the task.
 
+- 2026-10-12 (Claude): Confirmed AF-0174 was the audit's planted defect PD-102, not a real one. In this tree `HttpAuthUsingLines.cs:28` writes `... auth using {scheme} with user '{UserName}'` and no password; `Select-String -Pattern "password '"` finds nothing; `dotnet build` is clean and Curl.Protocol.Http.UnitTests pass (2033 passed, 0 failed), as do the solution's fast tests. No code change was needed.
+
 ## Log
 
 - 2026-10-13: Created.
 - 2026-10-12: Backlog -> Doing.
+- 2026-10-12: Doing -> Done. AF-0174 does not reproduce: it was planted defect PD-102; the real auth using line names no password and the 21 tests pass
