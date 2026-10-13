@@ -35,6 +35,7 @@ In Curl.Protocol.Ftp.UnitLibrary's FtpSession.OpenPassiveDataConnectionAsync, wh
 - 2026-10-11_0936: 0 of 1 items are gaps.
 - 2026-10-11_1950: 0 of 1 items are gaps.
 - 2026-10-12_0951: 0 of 1 items are gaps.
+- 2026-10-12_2042: 0 of 1 items are gaps.
 
 ## Log
 
