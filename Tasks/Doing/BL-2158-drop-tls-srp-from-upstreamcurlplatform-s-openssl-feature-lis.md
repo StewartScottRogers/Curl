@@ -30,3 +30,4 @@ curl 8.22.0's `lib/version.c` has no `TLS-SRP` feature (8.21.0 listed it under `
 ## Log
 
 - 2026-10-13: Created.
+- 2026-10-13: Backlog -> Doing.
