@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Quic.UnitLibrary]
 requirement: none
 created: 2026-10-13
-completed:
+completed: 2026-10-13
 ---
 # BL-2145 — Fix AF-0186: QuicTransportParameters.Encode's summary gives a parameter order the code does not write
 
@@ -41,12 +41,16 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Took the finding's second expected result, "a summary rewritten to the code's order": `Encode`'s summary now names the order the code writes - the connection IDs, `stateless_reset_token`, `max_idle_timeout`, `max_udp_payload_size`, the stream and connection limits, `ack_delay_exponent`, `max_ack_delay`, `disable_active_migration`, `active_connection_id_limit`, `preferred_address`, and `version_information` last. The code order is curl's wire order, so it stays; the reproduction prints the same parameter IDs as before, and they now match the summary.
+- Verified with `dotnet build Curl.Quic.UnitTests` (0 errors) and its fast tests (486 passed). The change is one doc comment, so no other project's build or tests can change.
 
 ## Log
 
 - 2026-10-13: Created.
 - 2026-10-13: Backlog -> Doing.
+- 2026-10-13: Doing -> Done. QuicTransportParameters.Encode's summary now gives the parameter order the code writes (AF-0186)

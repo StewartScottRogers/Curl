@@ -100,9 +100,13 @@ public sealed record QuicTransportParameters
 
     /// <summary>
     /// Writes the parameters that differ from their defaults, in curl's order: the
-    /// connection IDs, the stream and connection limits (bidirectional stream data before
-    /// unidirectional, then <c>initial_max_data</c>, then the stream counts), the remaining
-    /// integers, then <c>version_information</c> last.
+    /// connection IDs (original destination, initial source, retry source), then
+    /// <c>stateless_reset_token</c>, <c>max_idle_timeout</c> and <c>max_udp_payload_size</c>,
+    /// then the stream and connection limits (bidirectional stream data before
+    /// unidirectional, then <c>initial_max_data</c>, then the stream counts), then
+    /// <c>ack_delay_exponent</c>, <c>max_ack_delay</c>, <c>disable_active_migration</c>,
+    /// <c>active_connection_id_limit</c> and <c>preferred_address</c>, and
+    /// <c>version_information</c> last.
     /// </summary>
     /// <returns>The extension data.</returns>
     public byte[] Encode()
