@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: process:logs:run-38178740830:ci-red
 reproduction: none
-task: none
-tasks:
+task: BL-2124
+tasks: BL-2124
 found: 2026-10-12
 found-at: 4e6ddbc5b33356117bfec6778ba550ab61454a99
 scorecard: 2026-10-12_1653.md

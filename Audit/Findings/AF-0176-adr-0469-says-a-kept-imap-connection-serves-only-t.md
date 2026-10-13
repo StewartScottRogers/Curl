@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: truthfulness:Documentation/Planning/Decisions/ADR-0469-imap-keeps-its-connection-for-the-next-url-and-tags-by-connection-number.md:ImapKeptConnection.LoginKeyOf:stale-adr
 reproduction: none
-task: none
-tasks:
+task: BL-2122
+tasks: BL-2122
 found: 2026-10-12
 found-at: 4e6ddbc5b33356117bfec6778ba550ab61454a99
 scorecard: 2026-10-12_1653.md

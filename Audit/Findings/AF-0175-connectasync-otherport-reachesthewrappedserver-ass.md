@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: quality:Curl.Conformance.UnitTests/NoListenPortConnectorTests.cs:ConnectAsync_OtherPort_ReachesTheWrappedServer:weak-assertion
 reproduction: none
-task: none
-tasks:
+task: BL-2121
+tasks: BL-2121
 found: 2026-10-12
 found-at: 4e6ddbc5b33356117bfec6778ba550ab61454a99
 scorecard: 2026-10-12_1653.md

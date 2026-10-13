@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: truthfulness:Documentation/Planning/Decisions/ADR-0475-upstream-case-stderr-naming-logdir-is-compared-with-wrapped-notes-joined.md:UpstreamWrappedMessageLines.Unwrap:stale-adr
 reproduction: none
-task: none
-tasks:
+task: BL-2123
+tasks: BL-2123
 found: 2026-10-12
 found-at: 4e6ddbc5b33356117bfec6778ba550ab61454a99
 scorecard: 2026-10-12_1653.md
