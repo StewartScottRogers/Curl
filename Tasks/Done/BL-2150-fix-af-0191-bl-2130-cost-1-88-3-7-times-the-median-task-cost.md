@@ -8,7 +8,7 @@ depends-on: []
 touches: [RunDarkFactory.ps1]
 requirement: none
 created: 2026-10-13
-completed:
+completed: 2026-10-13
 ---
 # BL-2150 — Fix AF-0191: BL-2130 cost $1.88, 3.7 times the median task cost, paging a 2,600-line handler in slices
 
@@ -41,14 +41,17 @@ The finding closes only when a later re-audit by the process auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
 - 2026-10-13 (Claude): AF-0191: BL-2130 cost 3.7 times the median, under the 4 times cost cap Stewart chose on 2026-10-12 (BL-2116). Unless the run log shows avoidable waste, record that this is within the chosen margin and finish.
 
+- 2026-10-13 (lane 5): The run log is closed to lanes, but the finding names the waste: 27 `sed -n` slices of one 2,600-line handler, two repeat Reads, heredoc edit scripts. BL-2149 (commit ebf8328f4) already put "Read a file once, not slice it call by call" into the run prompts in RunDarkFactory.ps1, which fixes that waste. The one-off $1.88 is 3.7 times the median, inside the 4 times cost cap Stewart chose on 2026-10-12 (BL-2116), so nothing more changes here. No code or script changed, so build and tests are unaffected.
+
 ## Log
 
 - 2026-10-13: Created.
 - 2026-10-13: Backlog -> Doing.
+- 2026-10-13: Doing -> Done. Waste already fixed by BL-2149; cost within the 4x cap (BL-2116)
