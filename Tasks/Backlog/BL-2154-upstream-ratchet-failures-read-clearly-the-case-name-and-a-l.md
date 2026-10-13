@@ -4,7 +4,7 @@ title: Upstream ratchet failures read clearly: the case name and a line diff of 
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: []
+depends-on: [BL-2157]
 touches: [Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests]
 requirement: none
 created: 2026-10-13
@@ -30,6 +30,8 @@ Today the data-driven test `UpstreamCase_RunThroughCurl_HoldsTheRatchet(int)` na
 - [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
 
 ## Notes
+
+- 2026-10-13 (Claude): also put each case's protocols, from its <server> line, in the display name (for example test798 [http]: <name>), and give each row a test category per protocol, so dotnet test --filter "TestCategory=ftp" runs only the FTP cases. Do this after BL-2157 renames the files to .curltest.
 
 ## Log
 
