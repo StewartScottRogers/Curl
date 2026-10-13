@@ -30,3 +30,4 @@ BL-2152 removed every Curl.Networking path that set `Tls12ClientSettings.SrpCred
 ## Log
 
 - 2026-10-13: Created.
+- 2026-10-13: Backlog -> Doing.
