@@ -12,8 +12,8 @@ closed: 2026-10-13_1406
 regression: false
 items: [options:--httpsig-algo, options:--httpsig-headers, options:--httpsig-key, options:--httpsig-keyid]
 touches: []
-task:
-tasks: []
+task: BL-2171
+tasks: [BL-2171]
 ---
 # GF-0040 - Upstream curl 8.22.0 changed options items
 
@@ -47,3 +47,4 @@ Bring these items to Curl when the target moves to 8.22.0.
 - 2026-10-09_0050: Opened from the release diff 8.21.0 to 8.22.0.
 - 2026-10-13: Scope newest -> target: ADR-0479 moves the targeted version to 8.22.0 (BL-2128).
 - 2026-10-13_1406: Closed: run 2026-10-13_1406 measured every item as match or excluded.
+- 2026-10-13: Filed BL-2171 by hand: the Windows reference is built without the experimental --httpsig-* options, so this run measured them as match and closed the finding, but Curl implements them as an intended difference (CLAUDE.md "Decisions", ADR-0454 precedent; BL-2128).
