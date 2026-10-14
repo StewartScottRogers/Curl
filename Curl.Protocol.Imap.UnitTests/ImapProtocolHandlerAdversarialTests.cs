@@ -159,6 +159,27 @@ public sealed class ImapProtocolHandlerAdversarialTests
     }
 
     [TestMethod]
+    [DataRow("u\r\nA999 DELETE INBOX", "p", DisplayName = "user name with CR LF")]
+    [DataRow("u", "p\r\nA999 DELETE INBOX", DisplayName = "password with CR LF")]
+    [DataRow("u", "p\u001Fq", DisplayName = "password with 0x1F")]
+    public async Task ExecuteAsync_CredentialsWithControlByte_FailsWithExit43SendingNothing(string user, string password)
+    {
+        var context = new TransferContext
+        {
+            Url = CurlUrl.Parse(Host + "INBOX;UID=1"),
+            Output = new MemoryStream(),
+            Credentials = new System.Net.NetworkCredential(user, password),
+        };
+
+        // Measured on curl 8.22.0 (BL-2177): curl: (43) control code detected in credentials, before connecting.
+        Run run = await RunAsync(context, FetchConversation);
+
+        AssertResult(run, CurlExitCode.BadFunctionArgument);
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.BadFunctionArgument, "control code detected in credentials"), run.Result);
+        Assert.AreEqual(string.Empty, run.Sent);
+    }
+
+    [TestMethod]
     [DataRow("NOOP%0D%0AA999 DELETE INBOX", DisplayName = "percent-encoded CRLF")]
     [DataRow("NOOP\r\nA999 DELETE INBOX", DisplayName = "raw CRLF")]
     [DataRow("NOOP\nA999 DELETE INBOX", DisplayName = "raw LF")]

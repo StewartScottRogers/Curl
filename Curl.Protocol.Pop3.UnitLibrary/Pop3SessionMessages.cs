@@ -8,6 +8,9 @@ namespace Curl.Protocol.Pop3;
 /// </summary>
 internal static class Pop3SessionMessages
 {
+    /// <summary>The user name or password held a byte below 0x20 (exit 43), curl 8.22.0's text (BL-2177).</summary>
+    internal const string CredentialsHaveControlCode = "control code detected in credentials";
+
     /// <summary>The server closed the connection before a response was complete (exit 56).</summary>
     internal const string ResponseReadingFailed = "response reading failed (errno: 0)";
 

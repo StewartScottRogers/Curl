@@ -91,6 +91,29 @@ public sealed class SmtpProtocolHandlerMailExtensionTests
     }
 
     [TestMethod]
+    [DataRow("u\r\nRSET", "p", DisplayName = "user name with CR LF")]
+    [DataRow("u", "p\r\nRSET", DisplayName = "password with CR LF")]
+    [DataRow("u", "p\tq", DisplayName = "password with a tab")]
+    public async Task ExecuteAsync_CredentialsWithControlByte_FailsWithExit43SendingNothing(string user, string password)
+    {
+        var context = new TransferContext
+        {
+            Url = CurlUrl.Parse(Url),
+            Output = Stream.Null,
+            Upload = new MemoryStream(Encoding.Latin1.GetBytes(Message)),
+            Mail = Mail(),
+            Credentials = new NetworkCredential(user, password),
+        };
+
+        // Measured on curl 8.22.0 (BL-2177): curl: (43) control code detected in credentials, before connecting.
+        SmtpRun run = await SmtpRun.ExecuteAsync(
+            Diagnostics, context, new ScriptedConnection(Encoding.Latin1.GetBytes(Greeting + EhloReply + OneRecipientAccepted)), null);
+
+        Assert.AreEqual(string.Empty, run.Sent);
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.BadFunctionArgument, "control code detected in credentials"), run.Result);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_MailAuthWithLineBreakOnceAuthenticated_QuitsWithExit43BeforeMailFrom()
     {
         SmtpRun run = await RunAsync(

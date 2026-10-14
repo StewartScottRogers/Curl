@@ -58,6 +58,22 @@ public sealed class Pop3ProtocolHandlerAdversarialTests
         TransferResult.Failure(CurlExitCode.WeirdServerReply, "Weird server reply");
 
     [TestMethod]
+    [DataRow("u\r\nDELE 1", "p", DisplayName = "user name with CR LF")]
+    [DataRow("u", "p\r\nDELE 1", DisplayName = "password with CR LF")]
+    [DataRow("u\tv", "p", DisplayName = "user name with a tab")]
+    public async Task ExecuteAsync_CredentialsWithControlByte_FailsWithExit43BeforeConnecting(string user, string password)
+    {
+        // Measured on curl 8.22.0 (BL-2177): curl: (43) control code detected in credentials, before connecting.
+        Pop3Run run = await RunAsync(Url, new NetworkCredential(user, password), null, Greeting, UserOnlyCapaReply, "+OK\r\n", "+OK\r\n", Bye);
+
+        var expected = TransferResult.Failure(CurlExitCode.BadFunctionArgument, "control code detected in credentials");
+        Diagnostics.AssertResult(expected, run.Result);
+        Assert.AreEqual(expected, run.Result);
+        Assert.AreEqual(string.Empty, run.Sent);
+        Assert.IsEmpty(run.Connector.Targets);
+    }
+
+    [TestMethod]
     [DataRow("0", DisplayName = "message 0")]
     [DataRow("-1", DisplayName = "message -1")]
     [DataRow("2147483647", DisplayName = "message int.MaxValue")]
