@@ -217,6 +217,20 @@ public sealed class UpstreamCaseVerificationTests
     }
 
     [TestMethod]
+    public void FindFirstDifference_StderrInWarnMode_ComparesWrappedWarningsAsOneLine()
+    {
+        // curl 8.22.0's runtests.pl, mode="warn": each line loses "Warning: " and "\r", and its "\n" becomes a space.
+        string sections = "<verify>\n<stderr mode=\"warn\">\nWarning: a b c d\n</stderr>\n</verify>\n";
+
+        string? difference = Verify(sections, Run(standardError: "Warning: a b\r\nWarning: c d\r\n"));
+        ExpectDifference(null, difference);
+        Assert.IsNull(difference);
+        string? difference2 = Verify(sections, Run(standardError: "Warning: a b\r\nWarning: c e\r\n"));
+        ExpectPresent(difference2);
+        Assert.IsNotNull(difference2);
+    }
+
+    [TestMethod]
     public void FindFirstDifference_StderrNamingTheLogDirectory_MatchesCurlsNoteWrappedAt79Columns()
     {
         // test996 with a 100-character %LOGDIR: voutf cuts after "transfer, ", then at the full width.
