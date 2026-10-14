@@ -44,3 +44,4 @@ In Curl.Protocol.Http.UnitLibrary, when HttpContentCodingDecoder finds a second 
 ## Log
 
 - 2026-10-13: Created.
+- 2026-10-13: Backlog -> Doing.
