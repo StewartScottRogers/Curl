@@ -346,6 +346,52 @@ public sealed class DsaSignatureTests
     }
 
     [TestMethod]
+    [DataRow("RFC 6979 appendix A.2.1 (DSA, 1024 bits)", Prime1024, Subprime1024, Generator1024, PrivateKey1024, PublicKey1024)]
+    [DataRow("RFC 6979 appendix A.2.2 (DSA, 2048 bits)", Prime2048, Subprime2048, Generator2048, PrivateKey2048, PublicKey2048)]
+    public void ExportPublicKey_Rfc6979Key_GivesPublishedPublicKey(string source, string prime, string subprime, string generator, string privateKey, string expected)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        using DsaSignature key = new(Convert.FromHexString(prime), Convert.FromHexString(subprime), Convert.FromHexString(generator), Convert.FromHexString(privateKey));
+        byte[] publicKey = new byte[key.PublicKeyLength];
+        diagnostics.Arrange("vector source", source);
+        diagnostics.Bytes("private key x", Convert.FromHexString(privateKey));
+
+        key.ExportPublicKey(publicKey);
+        diagnostics.Act("public key y", Convert.ToHexString(publicKey));
+
+        diagnostics.Diff("public key y", Convert.FromHexString(expected), publicKey);
+        Assert.AreEqual(expected, Convert.ToHexString(publicKey));
+    }
+
+    [TestMethod]
+    public void ExportPublicKey_DestinationOneByteShort_Throws()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        using DsaSignature key = CreateKey1024();
+        diagnostics.Arrange("destination length", key.PublicKeyLength - 1);
+
+        ArgumentException exception = Assert.ThrowsExactly<ArgumentException>(() => key.ExportPublicKey(new byte[key.PublicKeyLength - 1]));
+        diagnostics.Act("exception", exception.GetType().Name);
+
+        diagnostics.Assert("parameter", "destination", exception.ParamName);
+        Assert.AreEqual("destination", exception.ParamName);
+    }
+
+    [TestMethod]
+    public void Dispose_ThenExportPublicKey_ThrowsObjectDisposedException()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        DsaSignature key = CreateKey1024();
+        diagnostics.Arrange("domain", "RFC 6979 appendix A.2.1 (DSA, 1024 bits)");
+
+        key.Dispose();
+
+        ObjectDisposedException exception = Assert.ThrowsExactly<ObjectDisposedException>(() => key.ExportPublicKey(new byte[128]));
+        diagnostics.Act("exception", exception.GetType().Name);
+        diagnostics.Assert("exception", nameof(ObjectDisposedException), exception.GetType().Name);
+    }
+
+    [TestMethod]
     [DataRow("SHA224", "23097D223405D8228642A477BDA255B32AADBCE4BDA0B3F7E36C9DA7", DisplayName = "SHA-224, FIPS 180-2 appendix B")]
     [DataRow("SHA256", "BA7816BF8F01CFEA414140DE5DAE2223B00361A396177A9CB410FF61F20015AD", DisplayName = "SHA-256, FIPS 180-2 appendix B")]
     public void HashData_Abc_GivesPublishedDigest(string hashName, string expected)
