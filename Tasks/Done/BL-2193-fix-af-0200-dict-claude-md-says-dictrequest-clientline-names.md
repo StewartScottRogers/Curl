@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Dict.UnitLibrary]
 requirement: none
 created: 2026-10-14
-completed:
+completed: 2026-10-13
 ---
 # BL-2193 — Fix AF-0200: Dict CLAUDE.md says DictRequest.ClientLine names libcurl 8.21.0; it is CLIENT libcurl 8.22.0
 
@@ -42,12 +42,15 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Docs-only edit to CLAUDE.md lines 27 and 43; build builds the Dict project and its 141 fast tests pass.
 
 ## Log
 
 - 2026-10-14: Created.
 - 2026-10-13: Backlog -> Doing.
+- 2026-10-13: Doing -> Done. Dict CLAUDE.md now names CLIENT libcurl 8.22.0
