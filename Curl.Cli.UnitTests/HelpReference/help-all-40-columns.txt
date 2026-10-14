@@ -87,6 +87,10 @@
      --http2-prior-knowledge  Use HTTP/2 without HTTP/1.1 Upgrade
      --http3  Use HTTP/3
      --http3-only  Use HTTP/3 only
+     --httpsig-algo <algorithm>  Algorithm for HTTP Message Signatures
+     --httpsig-headers <components>  Components to sign for HTTP Message Signatures
+     --httpsig-key <key/file>  Key for HTTP Message Signatures
+     --httpsig-keyid <id>  Key identifier for HTTP Message Signatures
      --ignore-content-length  Ignore the size of the remote resource
  -k, --insecure  Allow insecure server connections
      --interface <name>  Use network interface

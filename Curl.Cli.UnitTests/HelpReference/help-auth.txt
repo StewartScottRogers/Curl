@@ -5,6 +5,10 @@ auth: Authentication methods
      --delegation <LEVEL>           GSS-API delegation permission
      --digest                       HTTP Digest Authentication
      --ftp-account <data>           Account data string
+     --httpsig-algo <algorithm>     Algorithm for HTTP Message Signatures
+     --httpsig-headers <components>  Components to sign for HTTP Message Signatures
+     --httpsig-key <key/file>       Key for HTTP Message Signatures
+     --httpsig-keyid <id>           Key identifier for HTTP Message Signatures
      --location-trusted          As --location, but send secrets to other hosts
      --login-options <options>      Server login options
      --negotiate                    Use HTTP Negotiate (SPNEGO) authentication

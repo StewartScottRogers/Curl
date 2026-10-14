@@ -820,6 +820,33 @@ public sealed class CommandLineOptions
     public string? AwsSigV4 { get; internal set; }
 
     /// <summary>
+    /// The last <c>--httpsig-algo</c> value, verbatim and unchecked; <see langword="null"/> when not given.
+    /// An empty value is refused as blank. curl 8.22.0 checks it (<c>ed25519</c> or <c>hmac-sha256</c>)
+    /// only when it sets up an HTTP transfer (<c>src/config2setopts.c</c>, BL-2182).
+    /// </summary>
+    public string? HttpSignatureAlgorithm { get; internal set; }
+
+    /// <summary>
+    /// The last <c>--httpsig-key</c> value, verbatim: the hex key, or <c>@</c> and the name of a file
+    /// holding it, which curl 8.22.0 reads only when it sets up an HTTP transfer; <see langword="null"/>
+    /// when not given. An empty value is refused as blank.
+    /// </summary>
+    public string? HttpSignatureKey { get; internal set; }
+
+    /// <summary>
+    /// The last <c>--httpsig-keyid</c> value, verbatim; <see langword="null"/> when not given. An empty
+    /// value is refused as blank.
+    /// </summary>
+    public string? HttpSignatureKeyId { get; internal set; }
+
+    /// <summary>
+    /// The last <c>--httpsig-headers</c> value, verbatim and unparsed (the components to sign, such as
+    /// <c>method authority content-type:</c>); <see langword="null"/> when not given, meaning curl's
+    /// default set. An empty value is refused as blank.
+    /// </summary>
+    public string? HttpSignatureHeaders { get; internal set; }
+
+    /// <summary>
     /// The last <c>-x</c> / <c>--proxy</c>, <c>--proxy1.0</c>, <c>--socks4</c>, <c>--socks4a</c>, <c>--socks5</c> or
     /// <c>--socks5-hostname</c> value, with the kind of proxy that option names; <see langword="null"/>
     /// when none was given. curl 8.21.0 keeps one proxy: the last of these options wins, value and kind
