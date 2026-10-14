@@ -64,3 +64,4 @@ HMAC key there does not reproduce test 5002's, so use the tarball's file.
 - 2026-10-13: Created.
 - 2026-10-13: Backlog -> Doing.
 - 2026-10-13: Doing -> Backlog. Needs Curl.Console (signingClock on the dialing CreateRunner), which BL-2170 in Doing touches; retry once BL-2170 is Done
+- 2026-10-13: Backlog -> Doing.
