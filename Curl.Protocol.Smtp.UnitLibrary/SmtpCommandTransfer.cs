@@ -19,6 +19,9 @@ namespace Curl.Protocol.Smtp;
 /// address is not all ASCII, all in the argv bytes of <see cref="SmtpCommandLineText" />. The
 /// <c>-X</c> command and the recipient after it are sent as their argv bytes, unconverted,
 /// <c> SMTPUTF8</c> appended only to <c>EXPN</c>, in capitals, when advertised.</item>
+/// <item>A <c>VRFY</c> address holding a CR or LF is exit 43, <c>Refusing to send email address
+/// with a CR or LF</c>, before its <c>VRFY</c> is sent, and <c>QUIT</c> is still sent, as
+/// curl 8.22.0 does; a <c>-X</c> command's address is sent as it is, as curl's is (BL-2177).</item>
 /// <item>Every reply line is written to the output exactly as it arrived, line end included,
 /// unless <c>-I</c> asked for no body: each continuation line as it arrives, and the final
 /// line once the reply is accepted. A reply is accepted when it is 2xx, or 553 for a
@@ -112,6 +115,13 @@ internal sealed class SmtpCommandTransfer(
 
         foreach (string recipient in mail.Recipients)
         {
+            // Measured on curl 8.22.0 (BL-2177): a VRFY address holding CR or LF is exit 43 before
+            // VRFY is sent, and QUIT still follows; a -X command's address is sent as it is.
+            if (custom is null && recipient.AsSpan().IndexOfAny('\r', '\n') >= 0)
+            {
+                return TransferResult.Failure(CurlExitCode.BadFunctionArgument, SmtpSessionMessages.AddressHasLineBreak);
+            }
+
             string command = custom is null ? VerifyCommand(recipient) : CustomRecipientCommand(custom, recipient);
             if (await ExchangeAsync(command, recipientCommand: true).ConfigureAwait(false) is { } failure)
             {
