@@ -309,10 +309,25 @@ public sealed class CommandLineDefaultConfigFileTests
     {
         // BL-352: curl -v --bogus and curl -v (no URL) print the note, as an accepted -v does.
         // BL-2017: --trace-ascii, as runtests.pl passes it to upstream test433, prints it with no -v (measured on curl 8.21.0).
-        CommandLineParseResult result = Parse(arguments, "silent\n");
+        // BL-2173: the curlrc holds no -s, which hides the note in curl 8.22.0.
+        CommandLineParseResult result = Parse(arguments, "max-time 5\n");
 
         TestDiagnostics.For(TestContext).Assert("noted default config file", Curlrc, result.NotedDefaultConfigFile);
         Assert.AreEqual(Curlrc, result.NotedDefaultConfigFile);
+    }
+
+    [TestMethod]
+    [DataRow(new[] { "-v", "-s", Url })]
+    [DataRow(new[] { "-s", "-v", "--bogus", Url })]
+    [DataRow(new[] { "-v", "-s", "-S", Url })]
+    [DataRow(new[] { "--trace-ascii", "trace1740", "--silent", Url })]
+    public void Parse_SilentVerboseReadWithDefaultConfigFile_NotesNoFile(string[] arguments)
+    {
+        // BL-2173: curl 8.22.0's notef writes nothing under -s, -S or not; -v -s and -v -s --bogus printed no note (measured 2026-10-13).
+        CommandLineParseResult result = Parse(arguments, "max-time 5\n");
+
+        TestDiagnostics.For(TestContext).Assert("noted default config file", null, result.NotedDefaultConfigFile);
+        Assert.IsNull(result.NotedDefaultConfigFile);
     }
 
     [TestMethod]

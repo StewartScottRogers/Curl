@@ -142,7 +142,7 @@ namespace Curl.Console;
 /// curl 8.21.0 (measured 2026-09-27, BL-243). When a default config file was read and <c>-v</c> or a
 /// <c>--trace</c> option is on, the accepted command line's warning lines are followed by curl's
 /// <c>Note: Read config file from '&lt;path&gt;'</c>, wrapped as a warning is but with its own
-/// prefix, whether or not <c>-s</c> was given, before a <c>-V</c> version or the first transfer.
+/// prefix, unless <c>-s</c> was given (curl 8.22.0, BL-2173), before a <c>-V</c> version or the first transfer.
 /// </para>
 /// <para>
 /// URLs are transferred in command-line order; a failure does not stop the rest, and the
@@ -1658,7 +1658,7 @@ internal sealed class CurlCommandRunner(
     /// Waits, before a serial transfer starts, until <see cref="CommandLineOptions.MillisecondsBetweenTransferStarts" />
     /// have passed since the previous one started, as curl 8.21.0 does for <c>--rate</c>: the wait follows a
     /// failed transfer too, whole milliseconds are counted, and under <c>-v</c> or a <c>--trace</c> option,
-    /// <c>-s</c> or not, standard error first gets <c>Note: Transfer took &lt;n&gt; ms, waits &lt;m&gt;ms as set by --rate</c>
+    /// unless <c>-s</c> (curl 8.22.0, BL-2173), standard error first gets <c>Note: Transfer took &lt;n&gt; ms, waits &lt;m&gt;ms as set by --rate</c>
     /// (measured 2026-09-29, BL-650 Notes). Nothing waits before the first transfer or once the interval has passed.
     /// </summary>
     /// <param name="options">The transfer's option group.</param>
@@ -1671,7 +1671,7 @@ internal sealed class CurlCommandRunner(
             return;
         }
 
-        if (options.Trace != TraceKind.None)
+        if (ToolNotes.AreWritten(options))
         {
             await WriteErrorPiecesAsync(WarningLineWrapper.WrapNoteText($"Transfer took {took} ms, waits {wait}ms as set by --rate", terminalColumns))
                 .ConfigureAwait(false);
@@ -2062,7 +2062,7 @@ internal sealed class CurlCommandRunner(
     /// <summary>
     /// Under <c>--remove-on-error</c>, deletes the output file a failed transfer opened, as curl
     /// 8.21.0 does after the transfer's failure lines and before its <c>-w</c> output: under
-    /// <c>-v</c> or a <c>--trace</c> option, <c>-s</c> or not, standard error then gets
+    /// <c>-v</c> or a <c>--trace</c> option, unless <c>-s</c> (curl 8.22.0, BL-2173), standard error then gets
     /// <c>Note: Removed output file: &lt;file&gt;</c>, wrapped as a note is, and a file that
     /// cannot be deleted gets <c>Warning: Failed removing: &lt;file&gt;</c> unless <c>-s</c> was
     /// given, and off Windows one that is not a regular file, such as <c>/dev/null</c>, is left
@@ -2086,7 +2086,7 @@ internal sealed class CurlCommandRunner(
         {
             await WriteWarningUnlessSilentAsync(options, RemovalWarningLine(removal, openedFile)).ConfigureAwait(false);
         }
-        else if (options.Trace != TraceKind.None)
+        else if (ToolNotes.AreWritten(options))
         {
             await WriteErrorPiecesAsync(WarningLineWrapper.WrapNoteText($"Removed output file: {openedFile}", terminalColumns))
                 .ConfigureAwait(false);
@@ -3359,8 +3359,8 @@ internal sealed class CurlCommandRunner(
 
     /// <summary>
     /// Writes curl 8.21.0's <c>customrequest_helper</c> lines (<c>src/tool_helpers.c</c>) before a
-    /// transfer whose <c>-X</c> method is given: under <c>-v</c> or a <c>--trace</c> option, <c>-s</c>
-    /// or not, <c>Note: Unnecessary use of -X or --request, &lt;METHOD&gt; is already inferred.</c>
+    /// transfer whose <c>-X</c> method is given: under <c>-v</c> or a <c>--trace</c> option, unless
+    /// <c>-s</c> (curl 8.22.0, BL-2173), <c>Note: Unnecessary use of -X or --request, &lt;METHOD&gt; is already inferred.</c>
     /// when the method equals, ignoring case, the one <see cref="InferredRequestMethod" /> names;
     /// otherwise, when the method is <c>HEAD</c> in any case and <c>-s</c> was not given, the warning
     /// to use <c>-I</c> instead. Both wrap at <c>terminalColumns</c> (measured 2026-10-03, BL-1390).
@@ -3378,9 +3378,9 @@ internal sealed class CurlCommandRunner(
         string inferred = InferredRequestMethod(options, uploadFile);
         if (string.Equals(method, inferred, StringComparison.OrdinalIgnoreCase))
         {
-            await (options.Trace == TraceKind.None
-                ? Task.CompletedTask
-                : WriteErrorPiecesAsync(WarningLineWrapper.WrapNoteText($"Unnecessary use of -X or --request, {inferred} is already inferred.", terminalColumns)))
+            await (ToolNotes.AreWritten(options)
+                ? WriteErrorPiecesAsync(WarningLineWrapper.WrapNoteText($"Unnecessary use of -X or --request, {inferred} is already inferred.", terminalColumns))
+                : Task.CompletedTask)
                 .ConfigureAwait(false);
         }
         else if (string.Equals(method, "HEAD", StringComparison.OrdinalIgnoreCase) && !options.Silent)
@@ -3880,7 +3880,7 @@ internal sealed class CurlCommandRunner(
     /// Skips a transfer under <c>--skip-existing</c> because its output file is already there, as
     /// curl 8.21.0 does: nothing is connected, opened or written, no progress meter is drawn, and
     /// the transfer succeeds with <c>%{filename_effective}</c> naming the file. Under <c>-v</c> or a
-    /// <c>--trace</c> option, <c>-s</c> or not, standard error gets
+    /// <c>--trace</c> option, unless <c>-s</c> (curl 8.22.0, BL-2173), standard error gets
     /// <c>Note: skips transfer, "&lt;file&gt;" exists locally</c>, wrapped as a note is
     /// (measured 2026-09-28, BL-493 Notes).
     /// </summary>
@@ -3890,7 +3890,7 @@ internal sealed class CurlCommandRunner(
     private async Task<TransferResult> SkipExistingOutputFileAsync(CommandLineOptions options, string outputFile)
     {
         Running.OutputFileName = outputFile;
-        if (options.Trace != TraceKind.None)
+        if (ToolNotes.AreWritten(options))
         {
             await WriteErrorPiecesAsync(WarningLineWrapper.WrapNoteText($"skips transfer, \"{outputFile}\" exists locally", terminalColumns))
                 .ConfigureAwait(false);
@@ -4954,7 +4954,7 @@ internal sealed class CurlCommandRunner(
     /// <summary>
     /// Keeps a retried attempt's <c>-o</c> bytes for the next attempt to resume after, or cuts the
     /// file back, as curl 8.21.0's <c>retrycheck</c> does, noting either under <c>-v</c> or a
-    /// <c>--trace</c> option when the attempt wrote any: <c>Note: Keeping 5 bytes</c> or
+    /// <c>--trace</c> option without <c>-s</c> when the attempt wrote any: <c>Note: Keeping 5 bytes</c> or
     /// <c>Note: Throwing away 5 bytes</c> (measured 2026-10-03, BL-1402 Context). Only body bytes
     /// count, as curl's <c>outs-&gt;bytes</c> does: an attempt that wrote nothing but <c>-i</c>
     /// header lines leaves the file as it is, so test1633's and test1634's heads all stay, and
@@ -4981,7 +4981,7 @@ internal sealed class CurlCommandRunner(
             outputFile.LeaveForRetry();
         }
 
-        if (bytes > 0 && options.Trace != TraceKind.None)
+        if (bytes > 0 && ToolNotes.AreWritten(options))
         {
             string note = string.Create(CultureInfo.InvariantCulture, $"{(keeps ? "Keeping" : "Throwing away")} {bytes} bytes");
             await WriteErrorPiecesAsync(WarningLineWrapper.WrapNoteText(note, terminalColumns)).ConfigureAwait(false);
@@ -5232,7 +5232,7 @@ internal sealed class CurlCommandRunner(
     /// Writes curl 8.21.0's <c>Note: Read config file from '&lt;path&gt;'</c> for the default config
     /// file, wrapped at <c>terminalColumns</c>, when there is one to announce
     /// (<see cref="CommandLineParseResult.NotedDefaultConfigFile" />: one was read and <c>-v</c> or a
-    /// <c>--trace</c> option is on); <c>-s</c> does not hide it (measured 2026-09-27, BL-243).
+    /// <c>--trace</c> option is on and <c>-s</c> is not; measured 2026-09-27, BL-243, and on curl 8.22.0, BL-2173).
     /// </summary>
     /// <param name="path">The default config file to announce, or <see langword="null" /> for none.</param>
     /// <returns>A task that completes when the note, if any, is flushed.</returns>

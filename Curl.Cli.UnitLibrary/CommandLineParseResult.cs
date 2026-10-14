@@ -170,8 +170,9 @@ public sealed class CommandLineParseResult
 
     /// <summary>
     /// <see cref="CommandLineOptions.DefaultConfigFile"/> when <c>-v</c> or a <c>--trace</c> option is
-    /// on; otherwise <see langword="null"/>.
+    /// on and <c>-s</c> is not, as curl 8.22.0's <c>notef</c> writes it (measured 2026-10-13, BL-2173);
+    /// otherwise <see langword="null"/>.
     /// </summary>
     private static string? NotedDefaultConfigFileOf(CommandLineOptions options) =>
-        options.Trace == TraceKind.None ? null : options.DefaultConfigFile;
+        options.Trace == TraceKind.None || options.Silent ? null : options.DefaultConfigFile;
 }

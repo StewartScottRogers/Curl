@@ -12,7 +12,7 @@ internal static class TlsSessionFileLines
 {
     /// <summary>
     /// Loads the file <see cref="CommandLineOptions.SslSessionsFile" /> names. A file that does
-    /// not exist is no error: under <c>-v</c> or a trace curl notes
+    /// not exist is no error: under <c>-v</c> or a trace, unless <c>-s</c>, curl notes
     /// <c>Note: SSL session file does not exist (yet?): F</c>. Otherwise each line the cache
     /// refuses gives its warning, unless <c>-s</c>.
     /// </summary>
@@ -28,7 +28,7 @@ internal static class TlsSessionFileLines
 
         if (!File.Exists(file))
         {
-            return options.Trace == TraceKind.None ? [] : [$"Note: SSL session file does not exist (yet?): {file}"];
+            return ToolNotes.AreWritten(options) ? [$"Note: SSL session file does not exist (yet?): {file}"] : [];
         }
 
         IReadOnlyList<string> warnings = sessions.Import(File.ReadAllText(file), file);

@@ -44,8 +44,8 @@ arguments to `CurlCommandRunner`, which parses them, runs each URL and prints cu
 reads no `.curlrc`, which keeps tests off the real home directory), unless the first argument
 starts with `-q` or is `--disable`; `-K` files apply where they stand. Both are read through
 the injected `IDataFileReader`. Under `-v` or a `--trace` option an accepted command line then
-prints `Note: Read config file from '<path>'`, wrapped as a warning is and shown even with
-`-s` (BL-243; the refused-command-line cases are BL-352). `-o` files open on the first write through
+prints `Note: Read config file from '<path>'`, wrapped as a warning is and hidden by
+`-s` as every `Note: ` line is (`ToolNotes`, curl 8.22.0, BL-2173; BL-243; the refused-command-line cases are BL-352). `-o` files open on the first write through
 `DeferredOutputFileStream`, which is how curl's exit 23 message comes out right. The
 parser's warning lines are written to standard error before anything else.
 Every `Warning: ` line is wrapped by `WarningLineWrapper` as curl's `warnf` wraps it, at the
@@ -478,7 +478,7 @@ Under `--skip-existing` a transfer whose `-o` or `-O` file (after `--output-dir`
 `--create-dirs`) is already there, as a file or a directory (`IOutputPaths.Exists`), is not
 performed: no connection, no file opened, no progress meter, exit 0, and `-w` still runs with
 `%{http_code}` `000` and `%{filename_effective}` naming the file. Under `-v` or a `--trace`
-option, even with `-s`, standard error gets `Note: skips transfer, "<file>" exists locally`,
+option, unless `-s`, standard error gets `Note: skips transfer, "<file>" exists locally`,
 wrapped as a note is. The check comes before the proxy is chosen, so a bad `-x` does not fail a
 skipped transfer; later URLs still run, as in curl 8.21.0 (BL-493 Notes).
 
@@ -486,7 +486,7 @@ Under `--remove-on-error` a transfer that fails deletes the output file it opene
 `IOutputPaths.RemoveFile`, after its failure lines and progress-bar newline and before its
 `-w` output; the exit code and message stay the failure's. A file the transfer never opened - a
 `-f` failure that wrote no body, a failed connect - is left alone, even one there before. Under
-`-v` or a `--trace` option, even with `-s`, standard error gets `Note: Removed output file:
+`-v` or a `--trace` option, unless `-s`, standard error gets `Note: Removed output file:
 <file>`, wrapped as a note is; a file that cannot be deleted (`NUL` included) gets `Warning:
 Failed removing: <file>` unless `-s`. Off Windows a path that is not a regular file
 (`/dev/null`, as `NativeRegularFileTest`'s `stat` tells) is not deleted and gets `Warning:

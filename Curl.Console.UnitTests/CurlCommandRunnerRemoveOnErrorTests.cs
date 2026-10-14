@@ -150,12 +150,23 @@ public sealed class CurlCommandRunnerRemoveOnErrorTests
     }
 
     [TestMethod]
-    [DataRow("-v")]
-    [DataRow("-sv")]
-    public async Task RunAsync_RemoveOnErrorVerbose_PrintsTheWrappedNoteAfterTheFailureAndBeforeWriteOut(string verbose)
+    public async Task RunAsync_RemoveOnErrorSilentVerbose_PrintsNoNote()
+    {
+        // BL-2173: curl 8.22.0's notef writes nothing under -s, -S or not (measured 2026-10-13).
+        int exitCode = await RunAsync(
+            [CutShort], "-sv", "-S", "--no-progress-meter", "--remove-on-error", "-o", MeasuredPath, Url);
+
+        Diagnostics.Assert("exit code", 18, exitCode);
+        Assert.AreEqual(18, exitCode);
+        Diagnostics.Assert("stderr contains Note: ", false, StandardErrorText.Contains("Note: ", StringComparison.Ordinal));
+        Assert.DoesNotContain("Note: ", StandardErrorText);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_RemoveOnErrorVerbose_PrintsTheWrappedNoteAfterTheFailureAndBeforeWriteOut()
     {
         int exitCode = await RunAsync(
-            [CutShort], verbose, "-S", "--no-progress-meter", "--remove-on-error", "-w", "%{stderr}WE:%{filename_effective}\n", "-o", MeasuredPath, Url);
+            [CutShort], "-v", "-S", "--no-progress-meter", "--remove-on-error", "-w", "%{stderr}WE:%{filename_effective}\n", "-o", MeasuredPath, Url);
 
         Diagnostics.Assert("exit code", 18, exitCode);
         Assert.AreEqual(18, exitCode);

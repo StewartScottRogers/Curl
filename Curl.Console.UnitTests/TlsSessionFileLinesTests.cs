@@ -39,6 +39,7 @@ public sealed class TlsSessionFileLinesTests
                 "-v --ssl-sessions <file> https://h/",
                 TlsSessionFileLines.Load(sessions, Parse("-v", "--ssl-sessions", _file, "https://h/")),
                 [$"Note: SSL session file does not exist (yet?): {_file}"]).ToArray());
+        Assert.IsEmpty(Lines("load", "-sv --ssl-sessions <file> https://h/", TlsSessionFileLines.Load(sessions, Parse("-sv", "--ssl-sessions", _file, "https://h/")), []));
     }
 
     [TestMethod]
@@ -109,7 +110,7 @@ public sealed class TlsSessionFileLinesTests
     {
         var standardError = new MemoryStream();
         var fileSystem = new InMemoryFileSystem();
-        Diagnostics.Arrange("command line", "-sv --ssl-sessions <file> http://h:18234/");
+        Diagnostics.Arrange("command line", "-v --ssl-sessions <file> http://h:18234/");
         Diagnostics.Arrange("connector script", "connect fails: CouldntConnect");
 
         int exitCode = await new CurlCommandRunner(
@@ -122,7 +123,7 @@ public sealed class TlsSessionFileLinesTests
                 runsOnWindows: false,
                 parsesAsWindowsBuild: false,
                 tlsSessions: new TlsSessionCache(TimeProvider.System))
-            .RunAsync(["-sv", "--ssl-sessions", _file, "http://h:18234/"]);
+            .RunAsync(["-v", "--ssl-sessions", _file, "http://h:18234/"]);
         string error = Encoding.UTF8.GetString(standardError.ToArray());
         string fileText = File.ReadAllText(_file);
         Diagnostics.Act("exit code", exitCode);
