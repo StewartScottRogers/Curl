@@ -3470,6 +3470,13 @@ Rules for this unattended run, in addition to CLAUDE.md:
    task's `depends-on`, record what you measured under Notes, and move it to Backlog
    before then with a -Reason naming that task: the next lane then starts on the work
    that is left, not on measuring the task again (AF-0094).
+   Before committing a change to a library's production code, run Measure-CodeQuality.ps1
+   for that library once and fix any method past the complexity gate, so the push does not
+   turn the CI quality job red (AF-0213: BL-2177 pushed four methods past the gate with no
+   quality run and CI stayed red for 137 minutes). Never run a search over the whole
+   drive, such as `find /` or `Get-ChildItem C:\ -Recurse`, and never leave a command
+   running when you finish: the lane stays held until it ends (AF-0213: a `find / -maxdepth 6`
+   kept BL-2180's lane busy for 22 minutes after its run was done).
 
 End your reply with exactly one line, either
 FACTORY: DONE {ID} <what now works>
@@ -3589,6 +3596,13 @@ Rules for this unattended run, in addition to CLAUDE.md:
    task's `depends-on`, record what you measured under Notes, and move it to Backlog
    before then with a -Reason naming that task: the next lane then starts on the work
    that is left, not on measuring the task again (AF-0094).
+   Before committing a change to a library's production code, run Measure-CodeQuality.ps1
+   for that library once and fix any method past the complexity gate, so the push does not
+   turn the CI quality job red (AF-0213: BL-2177 pushed four methods past the gate with no
+   quality run and CI stayed red for 137 minutes). Never run a search over the whole
+   drive, such as `find /` or `Get-ChildItem C:\ -Recurse`, and never leave a command
+   running when you finish: the lane stays held until it ends (AF-0213: a `find / -maxdepth 6`
+   kept BL-2180's lane busy for 22 minutes after its run was done).
 
 End your reply with exactly one line, either
 FACTORY: DONE {ID} <what now works>

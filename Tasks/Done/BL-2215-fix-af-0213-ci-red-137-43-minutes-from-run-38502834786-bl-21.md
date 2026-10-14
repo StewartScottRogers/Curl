@@ -8,7 +8,7 @@ depends-on: []
 touches: [RunDarkFactory.ps1]
 requirement: none
 created: 2026-10-14
-completed:
+completed: 2026-10-14
 ---
 # BL-2215 — Fix AF-0213: CI red 137.43 minutes from run 38502834786: BL-2177 pushed four methods past the complexity gate without a quality run; the fix waited on a lane held by a stray find / and then on cancelled CI runs
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the process auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Fix: rule 8 of both run prompts in RunDarkFactory.ps1 now requires one Measure-CodeQuality.ps1 run per changed library before committing, and forbids drive-wide searches and leftover commands (AF-0213). The cancelled-CI-runs part is left as is: it follows from pushes landing while CI runs. Decided by Claude under Stewart delegation (prompt-level fix, no ADR needed).
 
 ## Log
 
 - 2026-10-14: Created.
 - 2026-10-14: Backlog -> Doing.
+- 2026-10-14: Doing -> Done. Run prompts now require a quality run per changed library and forbid drive-wide searches
