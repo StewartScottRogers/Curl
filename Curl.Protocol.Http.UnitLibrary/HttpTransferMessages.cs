@@ -339,6 +339,13 @@ internal static class HttpTransferMessages
     internal const string ReceivedDataWriteFailed = "Failed writing received data to disk/application";
 
     /// <summary>
+    /// The exit 23 message for a <c>--compressed</c> gzip body whose first member is followed,
+    /// in the same read, by the two bytes that start another gzip member, <c>1F 8B</c>
+    /// (measured with curl 8.22.0, upstream test2305, BL-2169 Notes).
+    /// </summary>
+    internal const string MultiMemberGzipNotSupported = "Multi-member gzip response not supported";
+
+    /// <summary>
     /// The exit 23 message for a decoded chunked body with bytes after the end of its gzip,
     /// zlib or Brotli stream (measured, BL-365 Notes).
     /// </summary>

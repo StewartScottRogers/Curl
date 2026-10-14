@@ -81,13 +81,15 @@ public sealed class HttpContentCodingDecoderTests
 
     /// <summary>
     /// Measured (BL-281 Notes): with <c>41 42</c> after the end of a gzip, zlib or Brotli
-    /// stream, or a second complete gzip member after the first, curl writes <c>hello</c>
-    /// and exits 23 with <c>Failed writing received data to disk/application</c>.
+    /// stream curl writes <c>hello</c> and exits 23 with
+    /// <c>Failed writing received data to disk/application</c>; curl 8.22.0 says the same for a
+    /// lone <c>1F</c> after a gzip member (BL-2169 Notes), and so for <c>1F 41</c>, which is not
+    /// a gzip member's start.
     /// </summary>
     [TestMethod]
     [DataRow("gzip", HttpContentDecoderTests.Gzip + "4142", DisplayName = "gzip, then 41 42")]
     [DataRow("gzip", HttpContentDecoderTests.Gzip + "1F", DisplayName = "gzip, then 1F")]
-    [DataRow("gzip", HttpContentDecoderTests.Gzip + GzipWorld, DisplayName = "gzip, then a second gzip member")]
+    [DataRow("gzip", HttpContentDecoderTests.Gzip + "1F41", DisplayName = "gzip, then 1F 41")]
     [DataRow("gzip", HttpContentDecoderTests.ZLib + "4142", DisplayName = "gzip label on a zlib stream, then 41 42")]
     [DataRow("deflate", HttpContentDecoderTests.ZLib + "4142", DisplayName = "zlib, then 41 42")]
     [DataRow("br", HttpContentDecoderTests.Brotli + "4142", DisplayName = "br, then 41 42")]
@@ -108,6 +110,30 @@ public sealed class HttpContentCodingDecoderTests
             Assert.AreEqual(CurlExitCode.WriteError, thrown.ExitCode, $"Chunk size {chunkSize}");
             Assert.AreEqual("Failed writing received data to disk/application", thrown.Message, $"Chunk size {chunkSize}");
         }
+    }
+
+    /// <summary>
+    /// Measured with curl 8.22.0 (upstream test2305, BL-2169 Notes): a gzip member followed in
+    /// the same read by a second member, or by just its magic bytes <c>1F 8B</c>, makes curl
+    /// write the first member's content and exit 23 with
+    /// <c>Multi-member gzip response not supported</c>.
+    /// </summary>
+    [TestMethod]
+    [DataRow(HttpContentDecoderTests.Gzip + GzipWorld, DisplayName = "gzip, then a second gzip member")]
+    [DataRow(HttpContentDecoderTests.Gzip + "1F8B", DisplayName = "gzip, then 1F 8B")]
+    public void Decode_SecondGzipMemberInTheSameRead_DecodesTheFirstThenThrowsExit23MultiMember(string encoded)
+    {
+        Diagnostics.Arrange("encoded", encoded);
+        List<byte> decoded = [];
+
+        HttpTransferException thrown = Assert.ThrowsExactly<HttpTransferException>(
+            () => DecodeInto(decoded, "gzip", HttpContentDecoderTests.Bytes(encoded), 65536));
+
+        Diagnostics.Act("decoded", Encoding.ASCII.GetString([.. decoded]));
+        Diagnostics.Assert("message", "Multi-member gzip response not supported", thrown.Message);
+        Assert.AreEqual("hello", Encoding.ASCII.GetString([.. decoded]));
+        Assert.AreEqual(CurlExitCode.WriteError, thrown.ExitCode);
+        Assert.AreEqual("Multi-member gzip response not supported", thrown.Message);
     }
 
     /// <summary>

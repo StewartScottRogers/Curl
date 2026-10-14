@@ -26,9 +26,11 @@ namespace Curl.Protocol.Http;
 /// written and the rest is dropped, as curl does.
 /// </para>
 /// <para>
-/// A body with bytes after the end of its gzip member, zlib stream or Brotli stream, a second
-/// gzip member included, has the stream decoded and then fails with exit 23
-/// <see cref="HttpTransferMessages.ReceivedDataWriteFailed" />, as curl does; bytes after a
+/// A body with bytes after the end of its gzip member, zlib stream or Brotli stream has the
+/// stream decoded and then fails with exit 23
+/// <see cref="HttpTransferMessages.ReceivedDataWriteFailed" />, as curl does, or with
+/// <see cref="HttpTransferMessages.MultiMemberGzipNotSupported" /> when the bytes after a gzip
+/// member start a second one in the same read (curl 8.22.0, BL-2169); bytes after a
 /// raw deflate stream are dropped (measured, BL-281 Notes). Brotli is decoded with
 /// <see cref="BrotliDecoder" />, which says how many bytes its stream used; the end of a gzip
 /// member or a zlib stream is found from its <see cref="HttpContentChecksumTrailer" />.
@@ -362,9 +364,17 @@ internal sealed class HttpContentCodingDecoder(HttpContentCoding coding) : IDisp
         ended = true;
         if (end < encoded.Length)
         {
-            throw BytesAfterTheEnd();
+            throw StartsAnotherGzipMember(encoded[end..]) ? MultiMemberGzip() : BytesAfterTheEnd();
         }
     }
+
+    /// <summary>
+    /// Tells whether the bytes after a gzip member's end, as far as they arrived in the same
+    /// read, start another gzip member: curl 8.22.0 names that case only when both magic bytes
+    /// are there, and a lone <c>1F</c> is any other trailing byte (measured, BL-2169 Notes).
+    /// </summary>
+    private bool StartsAnotherGzipMember(ReadOnlySpan<byte> after) =>
+        decompressor is GZipStream && after.Length >= 2 && after[0] == GzipFirstByte && after[1] == GzipSecondByte;
 
     private int ReadDecoded(Stream stream)
     {
@@ -382,4 +392,7 @@ internal sealed class HttpContentCodingDecoder(HttpContentCoding coding) : IDisp
 
     private static HttpTransferException BytesAfterTheEnd() =>
         new(CurlExitCode.WriteError, HttpTransferMessages.ReceivedDataWriteFailed);
+
+    private static HttpTransferException MultiMemberGzip() =>
+        new(CurlExitCode.WriteError, HttpTransferMessages.MultiMemberGzipNotSupported);
 }

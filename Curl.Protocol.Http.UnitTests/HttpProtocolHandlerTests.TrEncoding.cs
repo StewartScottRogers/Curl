@@ -95,19 +95,17 @@ public sealed partial class HttpProtocolHandlerTests
 
     /// <summary>
     /// Measured (BL-365 Notes): bytes after the end of a gzip member, a zlib stream or a Brotli
-    /// stream, a second gzip member included, write the first stream's <c>hello</c> and then fail
+    /// stream write the first stream's <c>hello</c> and then fail
     /// with exit 23, under <c>--tr-encoding</c> as under <c>--compressed</c>; inside chunks the
     /// message is the chunked one.
     /// </summary>
     [TestMethod]
     [DataRow("HTTP/1.1 200 OK\r\nTransfer-Encoding: gzip\r\n\r\n{gz}XYZ", false, WriteFailed, DisplayName = "TE gzip, then XYZ, to the close")]
     [DataRow("HTTP/1.1 200 OK\r\nContent-Length: 28\r\nTransfer-Encoding: gzip\r\n\r\n{gz}XYZ", false, WriteFailed, DisplayName = "TE gzip, then XYZ, Content-Length")]
-    [DataRow("HTTP/1.1 200 OK\r\nTransfer-Encoding: gzip\r\n\r\n{gz}{world}", false, WriteFailed, DisplayName = "TE gzip, then a second member")]
     [DataRow("HTTP/1.1 200 OK\r\nTransfer-Encoding: deflate\r\n\r\n{zlib}XYZ", false, WriteFailed, DisplayName = "TE deflate, then XYZ")]
     [DataRow("HTTP/1.1 200 OK\r\nTransfer-Encoding: br\r\n\r\n{br}XYZ", false, WriteFailed, DisplayName = "TE br, then XYZ")]
     [DataRow("HTTP/1.1 200 OK\r\nTransfer-Encoding: gzip, chunked\r\n\r\n1C\r\n{gz}XYZ\r\n0\r\n\r\n", false, "Failed reading the chunked-encoded stream", DisplayName = "TE gzip, chunked, then XYZ")]
     [DataRow("HTTP/1.1 200 OK\r\nContent-Encoding: gzip\r\n\r\n{gz}XYZ", true, WriteFailed, DisplayName = "CE gzip, then XYZ")]
-    [DataRow("HTTP/1.1 200 OK\r\nContent-Encoding: gzip\r\n\r\n{gz}{world}", true, WriteFailed, DisplayName = "CE gzip, then a second member")]
     [DataRow("HTTP/1.1 200 OK\r\nContent-Encoding: deflate\r\n\r\n{zlib}XYZ", true, WriteFailed, DisplayName = "CE deflate, then XYZ")]
     [DataRow("HTTP/1.1 200 OK\r\nContent-Encoding: gzip\r\nTransfer-Encoding: chunked\r\n\r\n1C\r\n{gz}XYZ\r\n0\r\n\r\n", true, "Failed reading the chunked-encoded stream", DisplayName = "CE gzip, chunked, then XYZ")]
     [DataRow("HTTP/1.1 200 OK\r\nContent-Encoding: gzip\r\nTransfer-Encoding: chunked\r\n\r\n19\r\n{gz}\r\n3\r\nXYZ\r\n0\r\n\r\n", true, "Failed reading the chunked-encoded stream", DisplayName = "CE gzip, chunked, then XYZ in its own chunk")]
@@ -130,6 +128,32 @@ public sealed partial class HttpProtocolHandlerTests
             Assert.AreEqual(message, result.ErrorMessage, $"Chunk size {chunkSize}");
             Assert.AreEqual("hello", Latin1(output.ToArray()), $"Chunk size {chunkSize}");
         }
+    }
+
+    /// <summary>
+    /// Measured with curl 8.22.0 (upstream test2305, BL-2169 Notes): a second gzip member that
+    /// arrives in the same read as the first writes the first member's <c>hello</c> and then
+    /// fails with exit 23 <c>Multi-member gzip response not supported</c>, under
+    /// <c>--tr-encoding</c> as under <c>--compressed</c>.
+    /// </summary>
+    [TestMethod]
+    [DataRow("HTTP/1.1 200 OK\r\nTransfer-Encoding: gzip\r\n\r\n{gz}{world}", false, DisplayName = "TE gzip, then a second member")]
+    [DataRow("HTTP/1.1 200 OK\r\nContent-Encoding: gzip\r\n\r\n{gz}{world}", true, DisplayName = "CE gzip, then a second member")]
+    public async Task ExecuteAsync_DecodedBodyWithASecondGzipMember_WritesTheFirstThenFailsWithExit23MultiMember(string response, bool compressed)
+    {
+        HttpRequestOptions options = new() { TransferEncoding = !compressed, Compressed = compressed };
+        string expected = compressed ? "GET /a HTTP/1.1\r\n" + LoopbackHeaders + "Accept-Encoding: deflate, gzip, br, zstd\r\n\r\n" : TrEncodingGet;
+        MemoryStream output = new();
+        WriteEncodingArrange(65536, response, compressed ? "--compressed" : "--tr-encoding");
+
+        TransferResult result = await Handler(QueueConnector.For(Connection(Encoded(response), 65536, expected)))
+            .ExecuteAsync(EncodingContext(output, options));
+
+        WriteResult(result);
+        Diagnostics.Assert("error text", "Multi-member gzip response not supported", result.ErrorMessage);
+        Assert.AreEqual(CurlExitCode.WriteError, result.ExitCode);
+        Assert.AreEqual("Multi-member gzip response not supported", result.ErrorMessage);
+        Assert.AreEqual("hello", Latin1(output.ToArray()));
     }
 
     [TestMethod]
