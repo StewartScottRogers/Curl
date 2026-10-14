@@ -153,6 +153,14 @@ internal sealed class RunningTransferState(
     internal bool UploadResumesFromUnknownOffset { get; set; }
 
     /// <summary>
+    /// Gets or sets a value indicating whether the transfer is a <c>-T .</c> upload, which curl
+    /// 8.22.0 reads from standard input without blocking under its own progress callback
+    /// (<c>tool_readbusy_cb</c>), so <c>Curl_pgrsDone</c> ends its meter with no newline
+    /// (upstream test1498, BL-2170).
+    /// </summary>
+    internal bool UploadsFromStandardInputWithoutBlocking { get; set; }
+
+    /// <summary>
     /// Gets or sets the credentials <see cref="TransferCredentialLookup" /> chose for the transfer, sent in
     /// place of the <c>-u</c> ones; <see langword="null" /> when neither the netrc file nor the URL had anything to say
     /// (tasks BL-505, BL-791).

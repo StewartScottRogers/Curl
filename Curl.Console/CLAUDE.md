@@ -412,7 +412,9 @@ After each successful transfer, after one `-f` failed with exit 22, and after on
 once its handler reported it past connect or open (BL-130), standard error gets curl's progress
 meter: `** Resuming transfer from byte position N` when it resumed past byte zero (N is `-1`
 for a `-T` upload under `-C -`, whatever the `-o` file holds, BL-416), the two
-header lines (`ProgressMeterLines`), the status lines, and one newline. The status lines come
+header lines (`ProgressMeterLines`), the status lines, and one newline - none for a `-T .` upload,
+which curl 8.22.0 reads under its own progress callback, so `Curl_pgrsDone` writes none (upstream
+test1498, BL-2170). The status lines come
 from `TransferProgressRecorder`, the transfer's `ITransferProgress` sink, which draws them on the
 runner's `TimeProvider` as curl 8.21.0's `progress_calc` and `progress_meter` do, with the fields
 `ProgressMeterFields` formats (`max6out`, `time2str`): the all-zero line when the transfer

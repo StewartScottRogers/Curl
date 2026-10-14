@@ -3489,6 +3489,7 @@ internal sealed class CurlCommandRunner(
         UrlTransfer transfer,
         Stream? headerOutput)
     {
+        Running.UploadsFromStandardInputWithoutBlocking = uploadFile == ".";
         if (uploadFile is null || UploadUrl.IsStandardInput(uploadFile))
         {
             Stream? standardInputUpload = uploadFile is null ? null : new StandardInputUploadStream(standardInput);
@@ -4140,14 +4141,36 @@ internal sealed class CurlCommandRunner(
         if (EndsWithProgressMeter(options, result, state, toStandardOutput))
         {
             FinishTransferProgress(state, result);
-            await WriteErrorLinesAsync([.. TakeProgressMeterHeaderLines(state, resumeFrom), .. TakeMeterEndLines(state)])
-                .ConfigureAwait(false);
+            await WriteMeterEndAsync(state, resumeFrom).ConfigureAwait(false);
         }
 
         // Every transfer runs after TransferEachUrlAsync has opened the event output.
         eventStandardError!.Release();
 
         return result;
+    }
+
+    /// <summary>
+    /// Writes the progress meter's header lines not yet written and the lines that end it. A
+    /// <c>-T .</c> upload's status lines get no newline after them: curl 8.22.0 reads that
+    /// standard input under its own progress callback, which keeps <c>Curl_pgrsDone</c> from
+    /// writing one (upstream test1498, BL-2170).
+    /// </summary>
+    /// <param name="state">The transfer's state.</param>
+    /// <param name="resumeFrom">The resolved <c>-C</c> offset, or <see langword="null" />.</param>
+    /// <returns>A task that completes when the lines are written.</returns>
+    private async Task WriteMeterEndAsync(RunningTransferState state, long? resumeFrom)
+    {
+        IReadOnlyList<string> headerLines = TakeProgressMeterHeaderLines(state, resumeFrom);
+        if (state.UploadsFromStandardInputWithoutBlocking && state.OutputFileOpenWarning is null)
+        {
+            await WriteErrorLinesAsync(headerLines).ConfigureAwait(false);
+            await WriteErrorTextAsync(state.Progress.TakeUnwrittenStatusLines()).ConfigureAwait(false);
+
+            return;
+        }
+
+        await WriteErrorLinesAsync([.. headerLines, .. TakeMeterEndLines(state)]).ConfigureAwait(false);
     }
 
     /// <summary>
