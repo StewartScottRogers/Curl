@@ -3,8 +3,8 @@ id: AF-0195
 title: AutomaticClientCertificate.Qualifies' expiry check can become exclusive with no test failing
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Networking.UnitLibrary/AutomaticClientCertificate.cs:Qualifies-le:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/AutomaticClientCertificate.cs:54:<=
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Netwo
 ## Log
 
 - 2026-10-13: filed proposed.
+- 2026-10-13: proposed -> accepted.
