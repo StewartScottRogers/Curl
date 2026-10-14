@@ -44,3 +44,4 @@ In Curl.Protocol.Mqtt.UnitLibrary, make MqttTopic.Decode (or MqttSession before 
 ## Log
 
 - 2026-10-13: Created.
+- 2026-10-13: Backlog -> Doing.
