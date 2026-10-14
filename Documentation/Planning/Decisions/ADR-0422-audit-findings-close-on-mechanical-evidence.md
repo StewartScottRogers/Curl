@@ -129,3 +129,33 @@ Decisions 2 and 3 now read:
   any test in the project's closure decides whether a mutant is killed.
 
 The 18 set-aside verdicts of audit 20261007-133608 were evaluated again with the corrected rules.
+
+## Amended 2026-10-14: a past run's cost closes when its task is Done
+
+Decided by Stewart, 2026-10-14 ("change it"); BL-2218.
+
+A process finding about one past run's cost (key `process:logs:<task>:cost-outlier`, for example
+AF-0204, "BL-2142 cost $3.11, 4.25 times the median") describes a run that already happened.
+History cannot change, so every re-audit said it still reproduced, and once its Fix task was Done
+`New-TasksFromAcceptedFindings.ps1` filed a `Re-fix` task (BL-2205 to BL-2208 for AF-0190,
+AF-0191, AF-0204 and AF-0205) whose lane could only record that nothing could be fixed. For such
+a finding the task is the only evidence there can be: its job is to look for avoidable waste in
+what drove the cost and fix the cause, or record that there is none.
+
+Decisions 2 and 5 gain one exception:
+
+- **Closure.** An accepted finding whose key ends in `:cost-outlier` closes with `closed-how:
+  task-done-historical`, `closed-by` the audit's scorecard and a reason, at the first audit
+  after it has at least one task and every task - its `task`, its `tasks`, and every
+  `BL-###-fix-`/`re-fix-` task file naming it, counted as `Test-AuditDue.ps1` counts them - is in
+  `Tasks/Done` at the audited commit. `Write-AuditFindings.ps1` closes it before reading any
+  report, so a re-audit of it is skipped, and `RunAudit.ps1` neither asks its auditor to re-audit
+  it nor has the seeder avoid its file.
+- **Reopen loop.** No `Re-fix` task is ever filed for such a finding, whatever its re-audits say.
+- **Visibility.** `Test-AuditDue.ps1` counts such findings as `close-pending:<n>` instead of
+  `reaudit-pending:<n>`.
+
+Every other finding follows the decisions above unchanged. AF-0190, AF-0191, AF-0204 and AF-0205
+were closed under this rule by an interactive session on 2026-10-14 (`closed-by: session`), their
+original tasks BL-2149, BL-2150, BL-2197 and BL-2198 being Done on `work/dark-factory`, and their
+Re-fix tasks BL-2205 to BL-2208 were moved to Done without a fix.

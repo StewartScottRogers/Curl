@@ -3,12 +3,12 @@ id: AF-0210
 title: %{redirect_url} is empty for a non-3xx response carrying Location; curl writes the resolved target
 auditor: conformance
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: conformance:Curl.Protocol.Http.UnitLibrary/HttpRedirectLocation.cs:redirect_url:stdout
 reproduction: none
-task: none
-tasks:
+task: BL-2212
+tasks: BL-2212
 found: 2026-10-14
 found-at: c1dedd04f2a8e1534e64b664312c5dacc66bdf4a
 scorecard: 2026-10-14_0453.md
@@ -45,3 +45,4 @@ foreach($p in @(@('curl','C:\Program Files\Git\ucrt64\bin\curl.exe'),@('candidat
 ## Log
 
 - 2026-10-14: filed proposed.
+- 2026-10-14: proposed -> accepted.

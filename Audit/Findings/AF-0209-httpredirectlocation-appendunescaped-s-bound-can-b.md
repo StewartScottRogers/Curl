@@ -3,12 +3,12 @@ id: AF-0209
 title: HttpRedirectLocation.AppendUnescaped's '> ~' bound can become '>= ~' with no test failing, so a redirect would escape '~'
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Protocol.Http.UnitLibrary/HttpRedirectLocation.cs:AppendUnescaped-gt:surviving-mutant
 reproduction: mutation Curl.Protocol.Http.UnitLibrary/HttpRedirectLocation.cs:245:>
-task: none
-tasks:
+task: BL-2211
+tasks: BL-2211
 found: 2026-10-14
 found-at: c1dedd04f2a8e1534e64b664312c5dacc66bdf4a
 scorecard: 2026-10-14_0453.md
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Proto
 ## Log
 
 - 2026-10-14: filed proposed.
+- 2026-10-14: proposed -> accepted.

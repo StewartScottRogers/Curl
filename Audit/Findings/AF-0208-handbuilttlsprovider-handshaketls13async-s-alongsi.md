@@ -3,12 +3,12 @@ id: AF-0208
 title: HandBuiltTlsProvider.HandshakeTls13Async's alongsideTls12: false can become true with no test failing
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Networking.UnitLibrary/HandBuiltTlsProvider.cs:HandshakeTls13Async-false:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/HandBuiltTlsProvider.cs:702:false
-task: none
-tasks:
+task: BL-2210
+tasks: BL-2210
 found: 2026-10-14
 found-at: c1dedd04f2a8e1534e64b664312c5dacc66bdf4a
 scorecard: 2026-10-14_0453.md
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Netwo
 ## Log
 
 - 2026-10-14: filed proposed.
+- 2026-10-14: proposed -> accepted.
