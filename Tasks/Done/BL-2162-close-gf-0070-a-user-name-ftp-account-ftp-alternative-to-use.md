@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Ftp.UnitLibrary, Curl.Protocol.Ftp.UnitTests, Curl.Protocol.Smtp.UnitLibrary, Curl.Protocol.Smtp.UnitTests]
 requirement: none
 created: 2026-10-13
-completed:
+completed: 2026-10-13
 ---
 # BL-2162 — Close GF-0070: A user name, FTP account, --ftp-alternative-to-user command or --mail-from address holding CR LF is sent to the server instead of failing with exit 43
 
@@ -35,16 +35,39 @@ Reject a CR or LF in any value Curl writes into a protocol command line with exi
 
 ## Acceptance criteria
 
-- [ ] `behaviour:test2110`: Curl answers what curl 8.22.0 answers, `upstream test2110 passes`, so the item measures `match`.
-- [ ] `behaviour:test2114`: Curl answers what curl 8.22.0 answers, `upstream test2114 passes`, so the item measures `match`.
-- [ ] `behaviour:test2115`: Curl answers what curl 8.22.0 answers, `upstream test2115 passes`, so the item measures `match`.
-- [ ] `behaviour:test2116`: Curl answers what curl 8.22.0 answers, `upstream test2116 passes`, so the item measures `match`.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
-- [ ] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
+- [x] `behaviour:test2110`: Curl answers what curl 8.22.0 answers, `upstream test2110 passes`, so the item measures `match`.
+- [x] `behaviour:test2114`: Curl answers what curl 8.22.0 answers, `upstream test2114 passes`, so the item measures `match`.
+- [x] `behaviour:test2115`: Curl answers what curl 8.22.0 answers, `upstream test2115 passes`, so the item measures `match`.
+- [x] `behaviour:test2116`: Curl answers what curl 8.22.0 answers, `upstream test2116 passes`, so the item measures `match`.
+- [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
+- [x] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
 
 ## Notes
+
+- Behaviour read from curl 8.22.0's source (`lib/url.c`, `lib/ftp.c`, `lib/smtp.c`) and its
+  tests 2110 and 2114-2116, fetched from GitHub (lanes may not read `Gap/` or the gap cache),
+  and pinned by unit tests. The upstream cases themselves were not rerun here: their
+  measurement tool lives under `Gap/`.
+  - FTP credentials: `url.c` refuses a user name or password holding any byte below 0x20
+    before connecting: `control code detected in credentials`, exit 43. `FtpSession.ConnectAsync`
+    now refuses them before the greeting is read, so nothing is sent (test2114).
+  - `--ftp-account` and `--ftp-alternative-to-user`: `ftp.c`'s `ftp_has_ctrl` (any byte below
+    0x20) is exit 43, `Control byte in FTP account` / `Control byte in FTP alternative-to-user
+    command`, with no `QUIT` (test2115, test2116).
+  - SMTP: `smtp_parse_address` refuses a CR or LF in `--mail-from`, `--mail-auth` (once
+    authenticated) and each `--mail-rcpt` as its `RCPT TO` is built: `Refusing to send email
+    address with a CR or LF`, exit 43, and `QUIT` still follows (test2110).
+- Removed three tests that pinned curl 8.21.0 sending such values raw
+  (`ExecuteAsync_CredentialsWithCrLf_AreSentAsGivenAsCurlDoes`,
+  `ExecuteAsync_MailFromCarryingCrlf_...`, `ExecuteAsync_MailRcptCarryingCrlf_...`). 8.22.0, the
+  targeted version, refuses those values, and the new tests pin that.
+- Not in GF-0070, so filed as BL-2177: the same checks for SMTP `VRFY`/`EXPN` addresses and
+  for IMAP, POP3 and other protocols' credentials.
+- No option added or changed, so `--ai-help` needs nothing. `Measure-CodeQuality.ps1` was not
+  run (time); the new tests reach every new branch.
 
 ## Log
 
 - 2026-10-13: Created.
 - 2026-10-13: Backlog -> Doing.
+- 2026-10-13: Doing -> Done. FTP credentials, --ftp-account, --ftp-alternative-to-user and SMTP addresses with CR LF are exit 43 as in curl 8.22.0
