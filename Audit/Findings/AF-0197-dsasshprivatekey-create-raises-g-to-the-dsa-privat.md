@@ -3,8 +3,8 @@ id: AF-0197
 title: DsaSshPrivateKey.Create raises g to the DSA private key x through variable-time BigInteger.ModPow
 auditor: security
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: security:Curl.Protocol.Ssh.UnitLibrary/Keys/DsaSshPrivateKey.cs:DsaSshPrivateKey.Create:secret-dependent-branch
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Curl.Protocol.Ssh.UnitLibrary/Keys/DsaSshPrivateKey.cs -Patt
 ## Log
 
 - 2026-10-13: filed proposed.
+- 2026-10-13: proposed -> accepted.
