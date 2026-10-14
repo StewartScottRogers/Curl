@@ -289,6 +289,26 @@ public sealed partial class TcpConnectorQuicTests
     }
 
     [TestMethod]
+    public async Task ConnectMultiplexedAsync_WhenTheProxyStallsExactlyTheConnectTimeout_FailsWithExit28()
+    {
+        var time = new ManualTimeProvider();
+        var connector = new TcpConnector(
+            new FakeDnsResolver(TunnelProxyAddress),
+            new StallingTcpDialer { OnStalled = () => time.Advance(1000) },
+            new FakeTlsProvider(),
+            time,
+            connectTimeout: TimeSpan.FromSeconds(1),
+            quicDialer: new QuicDialer(new QuicServerChannelOpener(), new TlsClientOptions(Insecure: true), true, time, SystemTlsRandomSource.Instance));
+        Diagnostics.Arrange("connect timeout", "1000 ms; the stalled proxy advances the clock exactly 1000 ms");
+
+        var result = await ConnectMultiplexedAsync(connector, TunnelTarget());
+
+        Diagnostics.Assert("exit code", CurlExitCode.OperationTimedOut, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.OperationTimedOut, result.ExitCode);
+        Assert.AreEqual("Connection timed out after 1000 milliseconds", result.ErrorMessage);
+    }
+
+    [TestMethod]
     public async Task ConnectMultiplexedAsync_WhenTheCallerCancelsTheTunnelBeforeTheTimeout_Throws()
     {
         using var caller = new CancellationTokenSource();
