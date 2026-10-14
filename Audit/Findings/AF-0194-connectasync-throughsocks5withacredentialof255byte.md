@@ -3,8 +3,8 @@ id: AF-0194
 title: ConnectAsync_ThroughSocks5WithACredentialOf255Bytes_SendsIt never checks what was sent, only exit 0
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Networking.UnitTests/TcpConnectorTests.Socks.cs:ConnectAsync_ThroughSocks5WithACredentialOf255Bytes_SendsIt:name-lies
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Curl.Networking.UnitTests/TcpConnectorTests.Socks.cs -Patter
 ## Log
 
 - 2026-10-13: filed proposed.
+- 2026-10-13: proposed -> accepted.
