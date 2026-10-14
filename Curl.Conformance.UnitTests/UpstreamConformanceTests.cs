@@ -349,25 +349,9 @@ public sealed class UpstreamConformanceTests
         Assert.IsEmpty(skippedForAVariable, string.Join("; ", skippedForAVariable));
     }
 
-    // The stand-in for upstream's test sshd, on %SSHPORT, with its account and fixed keys (BL-1916).
-    // On Windows Curl matches curl's WinCNG build, which reads no Ed25519 key and offers no
-    // ssh-ed25519 host key, so the client key files are the RSA pair and the fingerprints the
-    // RSA host key's; elsewhere the Ed25519 ones (BL-1954).
-    private static readonly UpstreamSshServer SshServer = OperatingSystem.IsWindows()
-        ? new(
-            () => new SshServerConnector(new SystemSshRandomSource()),
-            SshServerClientAccount.User,
-            Encoding.ASCII.GetBytes(SshServerRsaClientKey.PrivateKeyPem),
-            Encoding.ASCII.GetBytes(SshServerRsaClientKey.PublicKeyLine + "\n"),
-            SshServerRsaHostKey.Md5Fingerprint,
-            SshServerRsaHostKey.Sha256Fingerprint)
-        : new(
-            () => new SshServerConnector(new SystemSshRandomSource()),
-            SshServerClientAccount.User,
-            SshServerClientAccount.CreatePrivateKeyFile(),
-            SshServerClientAccount.CreatePublicKeyFile(),
-            SshServerHostKey.Md5Fingerprint,
-            SshServerHostKey.Sha256Fingerprint);
+    // The stand-in for upstream's test sshd, on %SSHPORT, for the platform's curl build:
+    // the RSA keys for curl's WinCNG build on Windows, the Ed25519 ones elsewhere (BL-1954, BL-2217).
+    private static readonly UpstreamSshServer SshServer = UpstreamSshServerFactory.Create(OperatingSystem.IsWindows());
 
     private static async Task<UpstreamCaseOutcome> RunCaseOnceAsync(int testNumber, byte[] testFile)
     {
@@ -473,13 +457,8 @@ public sealed class UpstreamConformanceTests
         public override DateTimeOffset GetUtcNow() => DateTimeOffset.UnixEpoch;
     }
 
-    private static string GenerateCertificates()
-    {
-        string certificateDirectory = Path.Combine(AppContext.BaseDirectory, "UpstreamCertificates");
-        new UpstreamTestCertificateGenerator(TimeProvider.System)
-            .Generate(Path.Combine(UpstreamTestDataFolder, "certs"), Path.Combine(certificateDirectory, "certs"));
-        return certificateDirectory;
-    }
+    private static string GenerateCertificates() => UpstreamCertificateFolder.Prepare(
+        Path.Combine(UpstreamTestDataFolder, "certs"), Path.Combine(AppContext.BaseDirectory, "UpstreamCertificates"), TimeProvider.System);
 
     // A run that timed out may still hold a file open; the temporary folder is left to the system then.
     // With CURL_UPSTREAM_KEEP_LOGS=1 the folder is kept and its path printed to the test's output (BL-2155).

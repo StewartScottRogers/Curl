@@ -87,8 +87,19 @@ the server's key names the fingerprint of the key its client agrees:
 
 Upstream's cases compute their key's fingerprints from the key its own `sshd` generates as
 `%SSHSRVMD5` and `%SSHSRVSHA256`; the case runner gives those variables the agreed key's two
-values (BL-1954): the RSA key's on Windows, the Ed25519 key's elsewhere, chosen by
-`UpstreamConformanceTests`, which `InternalsVisibleTo` lets read these internal keys.
+values (BL-1954): the RSA key's on Windows, the Ed25519 key's elsewhere.
+
+## The entry point: `UpstreamSshServerFactory`
+
+`UpstreamSshServerFactory.Create(windowsBuildOfCurl)` (BL-2217) builds the
+`UpstreamSshServer` record of `Curl.Conformance.UnitLibrary` (which this library references)
+that the case runner puts on `%SSHPORT`: a fresh `SshServerConnector` per case, user
+`curltest`, and for `true` (curl's WinCNG build) the `SshServerRsaClientKey` files and
+`SshServerRsaHostKey` fingerprints, for `false` the Ed25519 account files and
+`SshServerHostKey` fingerprints. It exists so `UpstreamConformanceTests` and the gap office's
+`Gap/Tools/Measure-UpstreamCases.cs` build the same server with one public call
+(`UpstreamSshServerFactory.Create(OperatingSystem.IsWindows())`), without reaching these
+internal keys.
 
 ## The client key
 

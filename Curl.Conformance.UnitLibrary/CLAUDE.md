@@ -196,7 +196,12 @@ other `test-*.prm` a P-256 key and a 300-day certificate the CA signs (`.key`, `
 certificate), with the subject and `x509v3` extensions the `.prm` names, including
 `test-localhost0h.prm`'s raw `DER:` subject alternative name. `.cacert` and `.crt` hold the PEM
 block without OpenSSL's text dump. An extension, key usage or name form it does not write
-throws `FormatException`.
+throws `FormatException`. `UpstreamCertificateFolder.Prepare(certsSourceDirectory,
+outputDirectory, timeProvider)` (BL-2217) is the entry point the conformance tests and the gap
+office's `Gap/Tools/Measure-UpstreamCases.cs` share: it runs the generator from a release's
+`tests/certs` folder into `<outputDirectory>/certs`, regenerating on every call, and returns
+`outputDirectory` to pass to `UpstreamCaseRunner.RunAsync` as `certificateDirectory`. Call it
+once per process and reuse the folder.
 
 `UpstreamCaseRunner.RunAsync` runs one case end to end (ADR-0013, decision 4): it expands
 the file for an `UpstreamCurlPlatform` (the features Curl reports and its null device),
@@ -295,8 +300,10 @@ variables have no value and the SSH cases skip. Given one, `%SSHPORT` is 9003
 stand-ins; `%USER` is its `User`; `%SFTP_PWD` and `%SCP_PWD` are empty, as `%LOGDIR` is already
 absolute; `%SSHSRVMD5` and `%SSHSRVSHA256` are its host key's fingerprints; and before curl runs
 its client key files are written as `%LOGDIR/server/curl_client_key` and `curl_client_key.pub`,
-as `sshserver.pl` writes them. The conformance tests pass the RSA client key and RSA host key
-fingerprints on Windows, where Curl matches curl's WinCNG build, and the Ed25519 ones elsewhere.
+as `sshserver.pl` writes them. That library's `UpstreamSshServerFactory.Create(windowsBuildOfCurl)`
+builds the record (BL-2217), for the conformance tests and the gap office's tool alike: the RSA
+client key and RSA host key fingerprints for curl's WinCNG build on Windows, the Ed25519 ones
+elsewhere.
 Screening lets `scp` and `sftp` cases run (BL-1917, BL-1918): the stand-in runs OpenSSH's `scp` source and sink and `sftp-server` on the
 real files under the case's log directory, so a download sends the `<client><file>` the case wrote and
 an upload writes `%LOGDIR/upload.%TESTNUMBER`, which the runner, given an SSH server, reads as the
