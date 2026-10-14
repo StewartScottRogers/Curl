@@ -40,3 +40,4 @@ Prefer the narrowest, general implementation: a Perl construct per case is accep
 ## Log
 
 - 2026-10-14: Created.
+- 2026-10-14: Backlog -> Doing.
