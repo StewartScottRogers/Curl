@@ -41,3 +41,4 @@ An IMAP or POP3 user name or password holding a byte below 0x20, and an SMTP `VR
 ## Log
 
 - 2026-10-13: Created.
+- 2026-10-13: Backlog -> Doing.
