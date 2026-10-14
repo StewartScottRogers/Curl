@@ -205,7 +205,7 @@ than `http`, `file` or `none`, a missing feature, a variable with no value, an u
 `<servercmd>` or strip line each skip it with a reason, and so does a file part naming a file
 outside the case's log directory; before expansion `UpstreamTestDirectoryComposition` rewrites
 `%PWD/%LOGDIR` to `%LOGDIR` (the absolute log directory, so the composition names the file there on
-every platform) and `%SRCDIR/libtest/test610.pl` / `test613.pl` to `./libtest/...`, as
+every platform; a file part named `log/<name>` and a `log/<name>` word in `<command>` become `%LOGDIR/<name>` too, as runtests.pl runs in the tests folder, BL-2202) and `%SRCDIR/libtest/test610.pl` / `test613.pl` to `./libtest/...`, as
 `runtests.pl`'s default `$srcdir` names them; any other `%SRCDIR` is the `sourceDirectory`
 `RunAsync` is given, with forward slashes (`UpstreamConformanceTests` passes `UpstreamTestData`,
 whose `data/` holds the httpsig key files, BL-2183), and with none it has no value and skips the case

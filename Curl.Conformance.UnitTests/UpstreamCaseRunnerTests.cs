@@ -111,6 +111,27 @@ public sealed class UpstreamCaseRunnerTests
     }
 
     [TestMethod]
+    public async Task RunAsync_ClientFileAndCommandNamedLogSlashName_AreTheLogDirectorysName()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        string logDirectory = CreateLogDirectory();
+        IReadOnlyList<string>? arguments = null;
+        UpstreamCaseRunner runner = Runner(invocation =>
+        {
+            arguments = invocation.Arguments;
+            return Task.FromResult(0);
+        });
+        string testFile = "<testcase>\n<client>\n<command>\n-T log/upload%TESTNUMBER\n</command>\n<file name=\"log/upload%TESTNUMBER\">\nputdata\n</file>\n</client>\n</testcase>\n";
+
+        UpstreamCaseOutcome outcome = await RunWithLogDirectoryAsync(runner, testFile, logDirectory);
+
+        diagnostics.Assert("outcome kind", UpstreamCaseOutcomeKind.Passed, outcome.Kind);
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Passed, outcome.Kind, outcome.Detail);
+        Assert.AreEqual("putdata\n", File.ReadAllText($"{logDirectory}/upload5"));
+        Assert.IsTrue(arguments!.Contains($"{logDirectory.Replace('\\', '/')}/upload5"), string.Join(" ", arguments!));
+    }
+
+    [TestMethod]
     [DataRow("headers", "GET / HTTP/1.0\r\n\r\nbody\n")]
     [DataRow("yes", "GET / HTTP/1.0\r\n\r\nbody\r\n")]
     public async Task RunAsync_StdinAndFileWithCrlf_AreGivenWithCrlfLineEndings(string crlf, string expected)

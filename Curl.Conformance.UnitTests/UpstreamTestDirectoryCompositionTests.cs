@@ -30,6 +30,20 @@ public sealed class UpstreamTestDirectoryCompositionTests
     }
 
     [TestMethod]
+    [DataRow("<file name=\"log/upload5018\">\nlog/x\n</file>\n<command>\nhttp://h/ -T log/upload5018 --x \"log/y\"\n</command>\nlog/z\n", "<file name=\"%LOGDIR/upload5018\">\nlog/x\n</file>\n<command>\nhttp://h/ -T %LOGDIR/upload5018 --x \"%LOGDIR/y\"\n</command>\nlog/z\n")]
+    [DataRow("<command>\n-T blog/x\n</command>\n<command>\n a log/b\n</command>", "<command>\n-T blog/x\n</command>\n<command>\n a %LOGDIR/b\n</command>")]
+    [DataRow("<command>\n log/unterminated", "<command>\n log/unterminated")]
+    public void Rewrite_LogFolderOfRuntests_BecomesTheCaseLogDirectoryInFileNamesAndCommandsOnly(string written, string expected)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+
+        string rewritten = Encoding.Latin1.GetString(UpstreamTestDirectoryComposition.Rewrite(Encoding.Latin1.GetBytes(written)));
+
+        diagnostics.Assert("rewritten", expected, rewritten);
+        Assert.AreEqual(expected, rewritten);
+    }
+
+    [TestMethod]
     public void Rewrite_EveryByteValue_IsKept()
     {
         var diagnostics = TestDiagnostics.For(TestContext);
