@@ -203,7 +203,7 @@ public sealed partial class TcpConnectorTests
         Assert.AreEqual(0, tlsProvider.HandshakeCount);
         CollectionAssert.AreEqual(new[] { new IPEndPoint(ProxyAddress, 3128) }, dialer.DialedEndPoints);
         Assert.AreEqual(
-            "CONNECT example.com:80 HTTP/1.1\r\nHost: example.com:80\r\nUser-Agent: curl/8.21.0\r\nProxy-Connection: Keep-Alive\r\n\r\n",
+            "CONNECT example.com:80 HTTP/1.1\r\nHost: example.com:80\r\nUser-Agent: curl/8.22.0\r\nProxy-Connection: Keep-Alive\r\n\r\n",
             Encoding.Latin1.GetString([.. proxyConnection.Written]));
     }
 

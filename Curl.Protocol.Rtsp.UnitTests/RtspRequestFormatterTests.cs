@@ -19,7 +19,7 @@ public sealed class RtspRequestFormatterTests
     [TestMethod]
     public void Format_NoOptions_WritesOptionsStarWithCSeqAndCurlsUserAgent()
     {
-        const string expected = "OPTIONS * RTSP/1.0\r\nCSeq: 1\r\nUser-Agent: curl/8.21.0\r\n\r\n";
+        const string expected = "OPTIONS * RTSP/1.0\r\nCSeq: 1\r\nUser-Agent: curl/8.22.0\r\n\r\n";
 
         string head = Format(new HttpRequestOptions());
 
@@ -42,7 +42,7 @@ public sealed class RtspRequestFormatterTests
     [TestMethod]
     public void Format_Authorization_WritesItAfterTheUserAgent()
     {
-        const string expected = "OPTIONS * RTSP/1.0\r\nCSeq: 1\r\nUser-Agent: curl/8.21.0\r\nAuthorization: Basic dTpw\r\n\r\n";
+        const string expected = "OPTIONS * RTSP/1.0\r\nCSeq: 1\r\nUser-Agent: curl/8.22.0\r\nAuthorization: Basic dTpw\r\n\r\n";
 
         string head = Format(new HttpRequestOptions(), authorization: "Basic dTpw");
 
@@ -53,7 +53,7 @@ public sealed class RtspRequestFormatterTests
     [TestMethod]
     public void Format_Referer_WritesItBetweenCSeqAndUserAgent()
     {
-        const string expected = "OPTIONS * RTSP/1.0\r\nCSeq: 1\r\nReferer: http://r/\r\nUser-Agent: curl/8.21.0\r\nAccept: application/sdp\r\n\r\n";
+        const string expected = "OPTIONS * RTSP/1.0\r\nCSeq: 1\r\nReferer: http://r/\r\nUser-Agent: curl/8.22.0\r\nAccept: application/sdp\r\n\r\n";
         var options = new HttpRequestOptions { Referer = "http://r/", Headers = ["Accept: application/sdp"] };
 
         string head = Format(options);
@@ -77,7 +77,7 @@ public sealed class RtspRequestFormatterTests
     [TestMethod]
     public void Format_CustomAuthorization_ReplacesTheAuthenticatorsValue()
     {
-        const string expected = "OPTIONS * RTSP/1.0\r\nCSeq: 1\r\nUser-Agent: curl/8.21.0\r\nAuthorization: Bearer t\r\n\r\n";
+        const string expected = "OPTIONS * RTSP/1.0\r\nCSeq: 1\r\nUser-Agent: curl/8.22.0\r\nAuthorization: Bearer t\r\n\r\n";
         var options = new HttpRequestOptions { Headers = ["Authorization: Bearer t"] };
 
         string head = Format(options, authorization: "Basic dTpw");
@@ -100,7 +100,7 @@ public sealed class RtspRequestFormatterTests
     [TestMethod]
     public void Format_SemicolonAndEmptyHeaders_SendsAnEmptyValueAndNothing()
     {
-        const string expected = "OPTIONS * RTSP/1.0\r\nCSeq: 1\r\nUser-Agent: curl/8.21.0\r\nX-Empty:\r\nReferer: other\r\n\r\n";
+        const string expected = "OPTIONS * RTSP/1.0\r\nCSeq: 1\r\nUser-Agent: curl/8.22.0\r\nX-Empty:\r\nReferer: other\r\n\r\n";
         var options = new HttpRequestOptions { Referer = "http://r/", Headers = ["X-Empty;", "X-Gone:", "Referer: other"] };
 
         string head = Format(options);
@@ -112,7 +112,7 @@ public sealed class RtspRequestFormatterTests
     [TestMethod]
     public void Format_HeaderWithoutSeparator_SendsNothing()
     {
-        const string expected = "OPTIONS * RTSP/1.0\r\nCSeq: 1\r\nUser-Agent: curl/8.21.0\r\n\r\n";
+        const string expected = "OPTIONS * RTSP/1.0\r\nCSeq: 1\r\nUser-Agent: curl/8.22.0\r\n\r\n";
 
         string head = Format(new HttpRequestOptions { Headers = ["Bare", ":x", ";", "X;y"] });
 
@@ -123,7 +123,7 @@ public sealed class RtspRequestFormatterTests
     [TestMethod]
     public void Format_Session_WritesItAfterCSeq()
     {
-        const string expected = "OPTIONS * RTSP/1.0\r\nCSeq: 2\r\nSession: 1234\r\nUser-Agent: curl/8.21.0\r\n\r\n";
+        const string expected = "OPTIONS * RTSP/1.0\r\nCSeq: 2\r\nSession: 1234\r\nUser-Agent: curl/8.22.0\r\n\r\n";
         Diagnostics.Arrange("method, target, CSeq, session, range", "OPTIONS, *, 2, 1234, (none)");
 
         byte[] head = RtspRequestFormatter.Format(RtspMethod.Options, "*", 2, "1234", null, new HttpRequestOptions(), null);
@@ -138,7 +138,7 @@ public sealed class RtspRequestFormatterTests
     [TestMethod]
     public void Format_RangeAndReferer_WritesRangeBeforeReferer()
     {
-        const string expected = "OPTIONS * RTSP/1.0\r\nCSeq: 1\r\nRange: 1-2\r\nReferer: http://r/\r\nUser-Agent: curl/8.21.0\r\n\r\n";
+        const string expected = "OPTIONS * RTSP/1.0\r\nCSeq: 1\r\nRange: 1-2\r\nReferer: http://r/\r\nUser-Agent: curl/8.22.0\r\n\r\n";
         var options = new HttpRequestOptions { Referer = "http://r/" };
 
         string head = Format(options, range: "1-2");
@@ -150,7 +150,7 @@ public sealed class RtspRequestFormatterTests
     [TestMethod]
     public void Format_SessionAndRange_WritesSessionBeforeRange()
     {
-        const string expected = "OPTIONS * RTSP/1.0\r\nCSeq: 2\r\nSession: 1234\r\nRange: 5-\r\nUser-Agent: curl/8.21.0\r\n\r\n";
+        const string expected = "OPTIONS * RTSP/1.0\r\nCSeq: 2\r\nSession: 1234\r\nRange: 5-\r\nUser-Agent: curl/8.22.0\r\n\r\n";
         Diagnostics.Arrange("method, target, CSeq, session, range", "OPTIONS, *, 2, 1234, 5-");
 
         byte[] head = RtspRequestFormatter.Format(RtspMethod.Options, "*", 2, "1234", "5-", new HttpRequestOptions(), null);
@@ -168,7 +168,7 @@ public sealed class RtspRequestFormatterTests
     [DataRow("RANGE: npt=0-")]
     public void Format_RangeHeaderOfAnyCase_SuppressesCurlsRange(string header)
     {
-        string expected = "OPTIONS * RTSP/1.0\r\nCSeq: 1\r\nUser-Agent: curl/8.21.0\r\n" + header + "\r\n\r\n";
+        string expected = "OPTIONS * RTSP/1.0\r\nCSeq: 1\r\nUser-Agent: curl/8.22.0\r\n" + header + "\r\n\r\n";
         var options = new HttpRequestOptions { Headers = [header] };
 
         string head = Format(options, range: "1-2");

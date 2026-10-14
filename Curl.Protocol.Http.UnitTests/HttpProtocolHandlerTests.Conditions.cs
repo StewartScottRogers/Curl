@@ -72,7 +72,7 @@ public sealed partial class HttpProtocolHandlerTests
     [TestMethod]
     public async Task ExecuteAsync_RangeOverriddenByHeader_SendsTheHeaderOnly()
     {
-        const string expected = "GET /f HTTP/1.1\r\nHost: 127.0.0.1:18832\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\nRange: bytes=1-2\r\n\r\n";
+        const string expected = "GET /f HTTP/1.1\r\nHost: 127.0.0.1:18832\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\nRange: bytes=1-2\r\n\r\n";
         TransferContext context = new TransferContext
         {
             Url = ConditionUrl(18832),
@@ -93,7 +93,7 @@ public sealed partial class HttpProtocolHandlerTests
     public async Task ExecuteAsync_EveryHeader_PutsRangeAfterAuthorizationAndTheConditionAfterCookie()
     {
         const string expected = "GET /f HTTP/1.1\r\nHost: 127.0.0.1:18831\r\nAuthorization: Basic dTpw\r\nRange: bytes=0-9\r\n"
-            + "User-Agent: curl/8.21.0\r\nAccept: */*\r\nAccept-Encoding: deflate, gzip, br, zstd\r\nReferer: ref\r\nCookie: a=b\r\n"
+            + "User-Agent: curl/8.22.0\r\nAccept: */*\r\nAccept-Encoding: deflate, gzip, br, zstd\r\nReferer: ref\r\nCookie: a=b\r\n"
             + "If-Modified-Since: Sun, 06 Nov 1994 08:49:37 GMT\r\nX-A: 1\r\n\r\n";
         TransferContext context = new TransferContext
         {
@@ -118,7 +118,7 @@ public sealed partial class HttpProtocolHandlerTests
     [TestMethod]
     public async Task ExecuteAsync_RangeWithARequestBody_SendsContentRangeAfterHost()
     {
-        const string expected = "POST /f HTTP/1.1\r\nHost: 127.0.0.1:18834\r\nContent-Range: bytes 0-9/1\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n"
+        const string expected = "POST /f HTTP/1.1\r\nHost: 127.0.0.1:18834\r\nContent-Range: bytes 0-9/1\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n"
             + "If-Modified-Since: Sun, 06 Nov 1994 08:49:37 GMT\r\nContent-Length: 1\r\nContent-Type: application/x-www-form-urlencoded\r\n\r\nx";
         TransferContext context = new TransferContext
         {
@@ -144,7 +144,7 @@ public sealed partial class HttpProtocolHandlerTests
     [DataRow(18844, "-0", DisplayName = "-d x -r -0")]
     public async Task ExecuteAsync_RangeTextWithARequestBody_SendsItAsTypedInContentRange(int port, string range)
     {
-        string expected = $"POST /f HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nContent-Range: bytes {range}/1\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n"
+        string expected = $"POST /f HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nContent-Range: bytes {range}/1\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n"
             + "Content-Length: 1\r\nContent-Type: application/x-www-form-urlencoded\r\n\r\nx";
         TransferContext context = new TransferContext
         {
@@ -165,7 +165,7 @@ public sealed partial class HttpProtocolHandlerTests
     [TestMethod]
     public async Task ExecuteAsync_RangeWithAPutBody_SendsContentRangeAfterHost()
     {
-        const string expected = "PUT /f HTTP/1.1\r\nHost: 127.0.0.1:18835\r\nContent-Range: bytes 100-/5\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n"
+        const string expected = "PUT /f HTTP/1.1\r\nHost: 127.0.0.1:18835\r\nContent-Range: bytes 100-/5\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n"
             + "Content-Length: 5\r\nContent-Type: application/x-www-form-urlencoded\r\n\r\nhello";
         TransferContext context = new TransferContext
         {
@@ -186,7 +186,7 @@ public sealed partial class HttpProtocolHandlerTests
     [TestMethod]
     public async Task ExecuteAsync_RangeWithABodyAndACustomContentRange_SendsTheCustomOneInItsPlace()
     {
-        const string expected = "POST /f HTTP/1.1\r\nHost: 127.0.0.1:18836\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\nContent-Range: foo\r\n"
+        const string expected = "POST /f HTTP/1.1\r\nHost: 127.0.0.1:18836\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\nContent-Range: foo\r\n"
             + "Content-Length: 1\r\nContent-Type: application/x-www-form-urlencoded\r\n\r\nx";
         TransferContext context = new TransferContext
         {
@@ -324,7 +324,7 @@ public sealed partial class HttpProtocolHandlerTests
     [TestMethod]
     public async Task ExecuteAsync_ResumeWithNoBody_SendsTheRangeAndWritesTheHead()
     {
-        const string expected = "HEAD /f HTTP/1.1\r\nHost: 127.0.0.1:18863\r\nRange: bytes=100-\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n";
+        const string expected = "HEAD /f HTTP/1.1\r\nHost: 127.0.0.1:18863\r\nRange: bytes=100-\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n\r\n";
         MemoryStream output = new();
         TransferContext context = new TransferContext { Url = ConditionUrl(18863), Output = output, ResumeFrom = 100, NoBody = true, HeaderOutput = output };
         Diagnostics.Arrange("resume from, no body, expected request", $"100, true, {OneLine(expected)}");
@@ -343,7 +343,7 @@ public sealed partial class HttpProtocolHandlerTests
     [DataRow(TimeConditionKind.IfUnmodifiedSince, "If-Unmodified-Since", DisplayName = "-z -date")]
     public async Task ExecuteAsync_TimeCondition_SendsItInRfc1123Form(TimeConditionKind kind, string name)
     {
-        string expected = $"GET /f HTTP/1.1\r\nHost: 127.0.0.1:18792\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n{name}: {ConditionDate}\r\n\r\n";
+        string expected = $"GET /f HTTP/1.1\r\nHost: 127.0.0.1:18792\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n{name}: {ConditionDate}\r\n\r\n";
         TransferContext context = new TransferContext
         {
             Url = ConditionUrl(18792),
@@ -362,7 +362,7 @@ public sealed partial class HttpProtocolHandlerTests
     [TestMethod]
     public async Task ExecuteAsync_TimeConditionOfTheLastTimeWindowsFormats_SendsIt()
     {
-        const string expected = "GET /f HTTP/1.1\r\nHost: 127.0.0.1:18798\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n"
+        const string expected = "GET /f HTTP/1.1\r\nHost: 127.0.0.1:18798\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n"
             + "If-Modified-Since: Thu, 01 Jan 3001 20:59:59 GMT\r\n\r\n";
         TransferContext context = new TransferContext
         {
@@ -385,7 +385,7 @@ public sealed partial class HttpProtocolHandlerTests
     public async Task ExecuteAsync_TimeConditionAfterTheYear9999_FailsWith43OnWindowsAndSendsTheClampedDateElsewhere(TimeConditionKind kind)
     {
         string name = kind == TimeConditionKind.IfModifiedSince ? "If-Modified-Since" : "If-Unmodified-Since";
-        string expected = $"GET /f HTTP/1.1\r\nHost: 127.0.0.1:18799\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n{name}: Fri, 31 Dec 9999 23:59:59 GMT\r\n\r\n";
+        string expected = $"GET /f HTTP/1.1\r\nHost: 127.0.0.1:18799\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n{name}: Fri, 31 Dec 9999 23:59:59 GMT\r\n\r\n";
         ScriptedConnection connection = Connection(WholeHead + "hello", 65536, OperatingSystem.IsWindows() ? null : expected);
         TransferContext context = new TransferContext
         {
@@ -421,7 +421,7 @@ public sealed partial class HttpProtocolHandlerTests
     [DataRow(TimeConditionKind.IfUnmodifiedSince, "If-Unmodified-Since", DisplayName = "-z \"-Mon, 01 Jan 40000 00:00:00 GMT\"")]
     public async Task ExecuteAsync_TimeConditionInYear40000_FailsWith43OnWindowsAndSendsTheFiveDigitYearElsewhere(TimeConditionKind kind, string name)
     {
-        string expected = $"GET /f HTTP/1.1\r\nHost: 127.0.0.1:18796\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n{name}: Sat, 01 Jan 40000 00:00:00 GMT\r\n\r\n";
+        string expected = $"GET /f HTTP/1.1\r\nHost: 127.0.0.1:18796\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n{name}: Sat, 01 Jan 40000 00:00:00 GMT\r\n\r\n";
         ScriptedConnection connection = Connection(WholeHead + "hello", 65536, OperatingSystem.IsWindows() ? null : expected);
         TransferContext context = new TransferContext
         {
@@ -451,7 +451,7 @@ public sealed partial class HttpProtocolHandlerTests
     [TestMethod]
     public async Task ExecuteAsync_TimeConditionOverriddenByHeader_SendsTheHeaderOnly()
     {
-        const string expected = "GET /f HTTP/1.1\r\nHost: 127.0.0.1:18833\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\nIf-Modified-Since: x\r\n\r\n";
+        const string expected = "GET /f HTTP/1.1\r\nHost: 127.0.0.1:18833\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\nIf-Modified-Since: x\r\n\r\n";
         TransferContext context = new TransferContext
         {
             Url = ConditionUrl(18833),
@@ -833,7 +833,7 @@ public sealed partial class HttpProtocolHandlerTests
     }
 
     private static string RangeRequest(int port, string range) =>
-        $"GET /f HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nRange: bytes={range}\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n";
+        $"GET /f HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nRange: bytes={range}\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n\r\n";
 
     private static TransferContext ConditionContext(int port, Stream output) =>
         new() { Url = ConditionUrl(port), Output = output };

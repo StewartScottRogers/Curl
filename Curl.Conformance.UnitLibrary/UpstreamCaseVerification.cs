@@ -27,7 +27,9 @@ namespace Curl.Conformance;
 /// A verify part whose body is the line <c>%EMPTY</c> expects no bytes at all.
 /// Expected bodies have <c>nonewline</c> and <c>crlf</c> applied. Under <c>mode="text"</c> both
 /// sides are normalized to CRLF, as upstream does on platforms that translate text, so the
-/// comparison does not depend on the platform's line endings. A stripped line that ends up empty
+/// comparison does not depend on the platform's line endings. Under <c>mode="warn"</c> (curl
+/// 8.22.0) each line of both sides loses its first <c>Warning: </c> and carriage return and its
+/// line feed becomes a space, so wrapped warnings compare as one line. A stripped line that ends up empty
 /// is dropped, as upstream drops it.
 /// </para>
 /// </remarks>
@@ -174,7 +176,12 @@ internal static class UpstreamCaseVerification
         part.Content.Span.SequenceEqual("%EMPTY\n"u8) ? [] : part.Content.ToArray();
 
     private static byte[] Normalized(byte[] body, UpstreamTestSection? part) =>
-        part?.GetAttribute("mode") == "text" ? UpstreamTestSectionLineEndings.NormalizeText(body) : body;
+        part?.GetAttribute("mode") switch
+        {
+            "text" => UpstreamTestSectionLineEndings.NormalizeText(body),
+            "warn" => UpstreamTestSectionLineEndings.NormalizeWarnings(body),
+            _ => body,
+        };
 
     private static UpstreamPerlSubstitution[] Substitutions(UpstreamTestCase testCase, string name) =>
         UpstreamTestPartBodies.Lines(testCase.Find("verify", name))

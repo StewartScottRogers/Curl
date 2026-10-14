@@ -225,6 +225,14 @@ public sealed record HttpRequestOptions
     public string? AwsSigV4 { get; init; }
 
     /// <summary>
+    /// Gets the <c>--httpsig-*</c> settings, or <see langword="null" /> when none of those options
+    /// is given. When given, every request to the origin is signed with an HTTP message
+    /// signature instead of any <see cref="AuthSchemes" /> (<see cref="HttpAuthRequest.HttpSignature" />),
+    /// and a followed redirect to another origin drops them unless <c>--location-trusted</c> (BL-2182).
+    /// </summary>
+    public HttpSignatureSettings? HttpSignature { get; init; }
+
+    /// <summary>
     /// Gets the proxy already chosen for this URL, or <see langword="null" /> to connect
     /// directly.
     /// </summary>

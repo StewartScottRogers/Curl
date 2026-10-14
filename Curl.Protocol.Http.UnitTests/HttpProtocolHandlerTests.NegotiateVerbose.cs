@@ -137,7 +137,7 @@ public sealed partial class HttpProtocolHandlerTests
         Assert.AreEqual("Server auth using Basic with user 'u'", events.Info.Single(line => line.StartsWith("Server auth", StringComparison.Ordinal)));
     }
 
-    private const string NegotiateVerboseRequest = "GET /a HTTP/1.1\r\nHost: 127.0.0.1:18183\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n";
+    private const string NegotiateVerboseRequest = "GET /a HTTP/1.1\r\nHost: 127.0.0.1:18183\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n\r\n";
 
     private static string[] ExpectedNegotiateWithoutATicketEvents(string failure, string quotedUser) =>
     [

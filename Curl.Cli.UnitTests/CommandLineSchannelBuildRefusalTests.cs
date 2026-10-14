@@ -6,8 +6,8 @@ namespace Curl.Cli;
 /// <summary>
 /// Pins the options curl's Windows Schannel build refuses because its libcurl was built without the
 /// feature (ADR-0397, audit finding AF-0022): <c>--http2</c>, <c>--http2-prior-knowledge</c>, <c>--http3</c>,
-/// <c>--http3-only</c>, <c>--tlsuser</c>, <c>--tlspassword</c>, <c>--tlsauthtype</c>, their <c>--proxy-</c> forms
-/// and <c>--ssl-sessions</c>. Every line was measured with curl 8.21.0 (x86_64-w64-mingw32) Schannel against
+/// <c>--http3-only</c>, <c>--proxy-http2</c> and <c>--ssl-sessions</c> (the TLS-SRP options only warn since
+/// curl 8.22.0, ADR-0480). Every line was measured with curl 8.21.0 (x86_64-w64-mingw32) Schannel against
 /// <c>http://127.0.0.1:1/</c> on 2026-10-02 (BL-1278). Each test parses as the Windows build explicitly,
 /// so it runs on every platform.
 /// </summary>
@@ -47,12 +47,6 @@ public sealed class CommandLineSchannelBuildRefusalTests
     }
 
     [TestMethod]
-    [DataRow("--tlsuser", "1")]
-    [DataRow("--tlspassword", "p")]
-    [DataRow("--tlsauthtype", "SRP")]
-    [DataRow("--proxy-tlsuser", "u")]
-    [DataRow("--proxy-tlspassword", "p")]
-    [DataRow("--proxy-tlsauthtype", "SRP")]
     [DataRow("--ssl-sessions", "f.txt")]
     public void Parse_ValueOptionTheSchannelBuildLacks_IsRefusedAsNotSupported(string spelledOption, string value)
     {
@@ -60,9 +54,6 @@ public sealed class CommandLineSchannelBuildRefusalTests
     }
 
     [TestMethod]
-    [DataRow("--tlsuser")]
-    [DataRow("--tlspassword")]
-    [DataRow("--tlsauthtype")]
     [DataRow("--ssl-sessions")]
     public void Parse_BlankValueOfAnOptionTheSchannelBuildLacks_IsRefusedAsNotSupportedNotAsBlank(string spelledOption)
     {
@@ -70,7 +61,6 @@ public sealed class CommandLineSchannelBuildRefusalTests
     }
 
     [TestMethod]
-    [DataRow("--tlsuser")]
     [DataRow("--ssl-sessions")]
     public void Parse_OptionTheSchannelBuildLacksAsTheLastArgument_IsRefusedAsRequiringAParameter(string spelledOption)
     {
@@ -95,7 +85,7 @@ public sealed class CommandLineSchannelBuildRefusalTests
     public void Parse_ConfigFileLineNamingAnOptionTheSchannelBuildLacks_IsRefusedAsNotSupported()
     {
         RecordingDataFileReader reader = new();
-        reader.Files["k.txt"] = "tlsuser = x\n"u8.ToArray();
+        reader.Files["k.txt"] = "ssl-sessions = x\n"u8.ToArray();
         Diagnostics.Bytes("k.txt", reader.Files["k.txt"]);
 
         CommandLineParseResult result = Parse(["-K", "k.txt", Url], parsed => CommandLineParser.Parse(parsed, _ => true, ConsolePasswordPrompt.ForProcessConsole, reader, isWindows: true));
@@ -104,8 +94,8 @@ public sealed class CommandLineSchannelBuildRefusalTests
             result,
             CurlExitCode.FailedInit,
             [
-                "curl: k.txt:1 config file option 'tlsuser' the installed libcurl version does ",
-                "curl: not support this",
+                "curl: k.txt:1 config file option 'ssl-sessions' the installed libcurl version ",
+                "curl: does not support this",
                 $"curl: option -K: {NotSupported}",
                 CommandLineRefusal.TryHelpLine,
             ]);
@@ -113,8 +103,8 @@ public sealed class CommandLineSchannelBuildRefusalTests
         CollectionAssert.AreEqual(
             new[]
             {
-                "curl: k.txt:1 config file option 'tlsuser' the installed libcurl version does ",
-                "curl: not support this",
+                "curl: k.txt:1 config file option 'ssl-sessions' the installed libcurl version ",
+                "curl: does not support this",
                 $"curl: option -K: {NotSupported}",
                 CommandLineRefusal.TryHelpLine,
             },
@@ -229,8 +219,6 @@ public sealed class CommandLineSchannelBuildRefusalTests
     [TestMethod]
     [DataRow("## --http2\n")]
     [DataRow("## --http3-only\n")]
-    [DataRow("## --tlsuser\n")]
-    [DataRow("## --proxy-tlsauthtype\n")]
     [DataRow("## --ssl-sessions\n")]
     [DataRow("## --proxy-http2\n")]
     public void AiHelp_SectionOfAnOptionTheSchannelBuildLacks_SaysWindowsRefusesIt(string heading)
@@ -244,6 +232,8 @@ public sealed class CommandLineSchannelBuildRefusalTests
     [TestMethod]
     [DataRow("## --http1.1\n")]
     [DataRow("## --tlsv1.2\n")]
+    [DataRow("## --tlsuser\n")]
+    [DataRow("## --proxy-tlsauthtype\n")]
     public void AiHelp_SectionOfAnOptionTheSchannelBuildHas_SaysNothingAboutWindows(string heading)
     {
         string section = AiHelpSection(heading);

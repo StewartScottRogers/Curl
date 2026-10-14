@@ -15,7 +15,7 @@ public sealed partial class HttpRequestHeadFormatterTests
 
     private const string UpgradeHeaders = "Upgrade: h2c\r\nHTTP2-Settings: AAMAAABkAAQAAQAAAAIAAAAA\r\n";
 
-    private const string UpgradeDefaultHeaders = "Host: 127.0.0.1:48720\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n";
+    private const string UpgradeDefaultHeaders = "Host: 127.0.0.1:48720\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n";
 
     [TestMethod]
     [DataRow("", "Connection: Upgrade, HTTP2-Settings\r\n", DisplayName = "--http2")]
@@ -82,7 +82,7 @@ public sealed partial class HttpRequestHeadFormatterTests
         byte[] head = HttpRequestHeadFormatter.Format(ArrangedUrl("http://example.test/"), Arranged(options), authorization: "Basic YTpi", forwardProxy: true, upgradesToH2c: true);
 
         Assert.AreEqual(
-            ExpectedHead("GET http://example.test/ HTTP/1.1\r\nHost: example.test\r\nAuthorization: Basic YTpi\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n"
+            ExpectedHead("GET http://example.test/ HTTP/1.1\r\nHost: example.test\r\nAuthorization: Basic YTpi\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n"
                 + "Proxy-Connection: Keep-Alive\r\n" + UpgradeHeaders + "Connection: Upgrade, HTTP2-Settings\r\n\r\n", head),
             Encoding.Latin1.GetString(head));
     }

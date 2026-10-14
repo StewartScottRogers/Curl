@@ -32,7 +32,7 @@ public sealed class UpstreamCaseRunnerTests
         UpstreamCaseRunner runner = Runner(async invocation =>
         {
             arguments = [.. invocation.Arguments];
-            await ExchangeAsync(invocation.Connector, "GET /5 HTTP/1.1\r\nHost: 127.0.0.1:8990\r\nUser-Agent: curl/8.21.0\r\n\r\n", invocation.Arguments[1]);
+            await ExchangeAsync(invocation.Connector, "GET /5 HTTP/1.1\r\nHost: 127.0.0.1:8990\r\nUser-Agent: curl/8.22.0\r\n\r\n", invocation.Arguments[1]);
             return 0;
         });
 
@@ -193,6 +193,24 @@ public sealed class UpstreamCaseRunnerTests
         Assert.AreEqual(UpstreamCaseOutcomeKind.Passed, outcome.Kind, outcome.Detail);
     }
 
+    // ADR-0488: off Windows a Schannel case is skipped as one only Windows' Curl runs; a case
+    // needing a feature no platform's Curl has is an ordinary skip.
+    [TestMethod]
+    [DataRow("SSL\nSchannel", true, "Curl lacks the feature Schannel")]
+    [DataRow("http\nDebug", false, "Curl lacks the feature Debug")]
+    public async Task RunAsync_CaseNeedingAFeatureThisPlatformLacks_SaysWhetherAnotherPlatformRunsIt(string caseFeatures, bool runsOnlyOnAnotherPlatform, string reason)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        UpstreamCaseRunner runner = Runner(_ => throw new AssertFailedException("curl must not run"));
+
+        UpstreamCaseOutcome outcome = await RunAsync(runner, $"<testcase>\n<client>\n<features>\n{caseFeatures}\n</features>\n<command>\na\n</command>\n</client>\n</testcase>\n");
+
+        diagnostics.Assert("runs only on another platform", runsOnlyOnAnotherPlatform, outcome.RunsOnlyOnAnotherPlatform);
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Skipped, outcome.Kind);
+        Assert.AreEqual(reason, outcome.Detail);
+        Assert.AreEqual(runsOnlyOnAnotherPlatform, outcome.RunsOnlyOnAnotherPlatform);
+    }
+
     [TestMethod]
     public async Task RunAsync_CurlThatNeverFinishes_FailsAfterTheTimeLimit()
     {
@@ -239,7 +257,7 @@ public sealed class UpstreamCaseRunnerTests
         string testFile = HttpCase.Replace("</reply>", "<servercmd>\nwritedelay: 60000\n</servercmd>\n</reply>", StringComparison.Ordinal);
         UpstreamCaseRunner runner = Runner(async invocation =>
         {
-            await ExchangeAsync(invocation.Connector, "GET /5 HTTP/1.1\r\nHost: 127.0.0.1:8990\r\nUser-Agent: curl/8.21.0\r\n\r\n", invocation.Arguments[1]);
+            await ExchangeAsync(invocation.Connector, "GET /5 HTTP/1.1\r\nHost: 127.0.0.1:8990\r\nUser-Agent: curl/8.22.0\r\n\r\n", invocation.Arguments[1]);
             return 0;
         });
 
@@ -258,7 +276,7 @@ public sealed class UpstreamCaseRunnerTests
             .Replace("%TESTNUMBER\n</command>", "%TESTNUMBER -m 5\n</command>", StringComparison.Ordinal);
         UpstreamCaseRunner runner = Runner(async invocation =>
         {
-            await ExchangeAsync(invocation.Connector, "GET /5 HTTP/1.1\r\nHost: 127.0.0.1:8990\r\nUser-Agent: curl/8.21.0\r\n\r\n", invocation.Arguments[1]);
+            await ExchangeAsync(invocation.Connector, "GET /5 HTTP/1.1\r\nHost: 127.0.0.1:8990\r\nUser-Agent: curl/8.22.0\r\n\r\n", invocation.Arguments[1]);
             return 0;
         }, RealClockTimeLimit);
         long startedAt = TimeProvider.System.GetTimestamp();
@@ -314,7 +332,7 @@ public sealed class UpstreamCaseRunnerTests
             await channel.SendAsync(new byte[] { 0, 4, 0, 1 }, received.RemoteEndPoint, CancellationToken.None);
             return 0;
         });
-        string testFile = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "UpstreamTestData", "test271.rawhttp"));
+        string testFile = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "UpstreamTestData", "test271.curltest"));
 
         UpstreamCaseOutcome outcome = await RunAsync(runner, testFile);
 
@@ -789,11 +807,73 @@ public sealed class UpstreamCaseRunnerTests
     public async Task RunAsync_Test1085_IsNotSkipped()
     {
         UpstreamCaseRunner runner = Runner(_ => Task.FromResult(45));
-        string testFile = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "UpstreamTestData", "test1085.rawhttp"));
+        string testFile = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "UpstreamTestData", "test1085.curltest"));
 
         UpstreamCaseOutcome outcome = await RunAsync(runner, testFile);
 
         Assert.AreEqual(UpstreamCaseOutcomeKind.Passed, outcome.Kind, outcome.Detail);
+    }
+
+    [TestMethod]
+    [DataRow(1200)]
+    [DataRow(1609)]
+    public async Task RunAsync_GopherCase_RunsCurlAtGopherPort(int testNumber)
+    {
+        string? commandLine = null;
+        UpstreamCaseRunner runner = Runner(invocation =>
+        {
+            commandLine = string.Join(' ', invocation.Arguments);
+            return Task.FromResult(0);
+        });
+        string testFile = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "UpstreamTestData", $"test{testNumber}.curltest"));
+
+        UpstreamCaseOutcome outcome = await RunAsync(runner, testFile);
+
+        Assert.AreNotEqual(UpstreamCaseOutcomeKind.Skipped, outcome.Kind, outcome.Detail);
+        Assert.Contains(":" + UpstreamCaseRunner.GopherPort + "/", commandLine!);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_GopherCase_RecordsTheSelectorForVerifyProtocol()
+    {
+        UpstreamCaseRunner runner = Runner(async invocation =>
+        {
+            ConnectResult connected = await invocation.Connector.ConnectAsync(new ConnectTarget("127.0.0.1", GopherServerConnector.GopherPort, false), CancellationToken.None);
+            await connected.Connection!.WriteAsync("/5\r\n"u8.ToArray(), CancellationToken.None);
+            return 0;
+        });
+
+        UpstreamCaseOutcome outcome = await RunAsync(runner, "<testcase>\n<client>\n<server>\ngopher\n</server>\n<command>\ngopher://%HOSTIP:%GOPHERPORT/1/%TESTNUMBER\n</command>\n</client>\n<verify>\n<protocol crlf=\"yes\">\n/%TESTNUMBER\n</protocol>\n</verify>\n</testcase>\n");
+
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Passed, outcome.Kind, outcome.Detail);
+    }
+
+    [TestMethod]
+    [DataRow(5028)]
+    [DataRow(2407)]
+    public async Task RunAsync_CaseNamingGopherOrHttp2Port_IsNotSkippedForAMissingPort(int testNumber)
+    {
+        UpstreamCaseRunner runner = Runner(_ => Task.FromResult(0));
+        string testFile = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "UpstreamTestData", $"test{testNumber}.curltest"));
+
+        UpstreamCaseOutcome outcome = await RunAsync(runner, testFile);
+
+        Assert.DoesNotContain("has no value", outcome.Detail ?? string.Empty);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_Http2Port_HasItsValue()
+    {
+        string? commandLine = null;
+        UpstreamCaseRunner runner = Runner(invocation =>
+        {
+            commandLine = string.Join(' ', invocation.Arguments);
+            return Task.FromResult(0);
+        });
+
+        await RunAsync(runner, "<testcase>\n<client>\n<server>\nhttp\n</server>\n<command>\nhttp://%HOSTIP:%HTTP2PORT/%TESTNUMBER\n</command>\n</client>\n<verify>\n</verify>\n</testcase>\n");
+
+        Assert.Contains(":" + UpstreamCaseRunner.Http2Port + "/", commandLine!);
     }
 
     [TestMethod]
@@ -814,7 +894,7 @@ public sealed class UpstreamCaseRunnerTests
             commandLine = string.Join(' ', invocation.Arguments);
             return Task.FromResult(0);
         });
-        string testFile = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "UpstreamTestData", $"test{testNumber}.rawhttp"));
+        string testFile = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "UpstreamTestData", $"test{testNumber}.curltest"));
 
         UpstreamCaseOutcome outcome = await RunAsync(runner, testFile);
 
@@ -837,7 +917,7 @@ public sealed class UpstreamCaseRunnerTests
     {
         var diagnostics = TestDiagnostics.For(TestContext);
         UpstreamCaseRunner runner = Runner(_ => throw new AssertFailedException("curl must not run"));
-        string testFile = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "UpstreamTestData", $"test{testNumber}.rawhttp"));
+        string testFile = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "UpstreamTestData", $"test{testNumber}.curltest"));
 
         UpstreamCaseOutcome outcome = await RunAsync(runner, testFile);
 

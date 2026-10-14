@@ -36,7 +36,7 @@ public sealed class UpstreamCurlPlatform
     [
         "dict", "file", "gopher", "gophers", "http", "https", "ipfs", "mqtt", "telnet", "tftp", "ws", "wss",
         "alt-svc", "AsynchDNS", "brotli", "ECH", "GSS-API", "HSTS", "http/2", "h2c", "http/3", "HTTPS-proxy",
-        "HTTPSRR", "IDN", "IPv6", "Kerberos", "Largefile", "libz", "NTLM", "PSL", "SPNEGO", "SSL", "TLS-SRP",
+        "HTTPSRR", "IDN", "IPv6", "Kerberos", "Largefile", "libz", "NTLM", "PSL", "SPNEGO", "SSL",
         "UnixSockets", "zstd",
         "crypto", "cookies", "proxy", "Mime", "manual", "DoH", "digest", "aws", "netrc", "verbose-strings",
         "large-time", "large-size", "sha512-256", "SSLpinning",
@@ -58,6 +58,9 @@ public sealed class UpstreamCurlPlatform
 
     /// <summary>macOS, where Curl matches curl's OpenSSL build as on Linux; only Perl's name for it differs.</summary>
     public static UpstreamCurlPlatform MacOS { get; } = new(["OpenSSL", "xattr"], "/dev/null", "darwin");
+
+    /// <summary>Every platform Curl's conformance run stands for: Windows, Linux and macOS.</summary>
+    public static IReadOnlyList<UpstreamCurlPlatform> All { get; } = [Windows, Unix, MacOS];
 
     /// <summary>The features Curl reports on this platform, case-sensitive as upstream spells them.</summary>
     public IReadOnlySet<string> Features { get; }

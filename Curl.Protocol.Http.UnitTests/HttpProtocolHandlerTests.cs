@@ -15,9 +15,9 @@ namespace Curl.Protocol.Http;
 [TestClass]
 public sealed partial class HttpProtocolHandlerTests
 {
-    private const string RootRequest = "GET / HTTP/1.1\r\nHost: example.com\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n";
+    private const string RootRequest = "GET / HTTP/1.1\r\nHost: example.com\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n\r\n";
 
-    private const string PathRequest = "GET /path?q=1 HTTP/1.1\r\nHost: example.com\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n";
+    private const string PathRequest = "GET /path?q=1 HTTP/1.1\r\nHost: example.com\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n\r\n";
 
     private const string Head = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nX-Folded: a\r\n  b\r\nContent-Length: 5\r\n\r\n";
 
@@ -372,7 +372,7 @@ public sealed partial class HttpProtocolHandlerTests
     [TestMethod]
     public async Task ExecuteAsync_CustomMethod_IsSentAndReported()
     {
-        const string request = "DELETE / HTTP/1.1\r\nHost: example.com\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n";
+        const string request = "DELETE / HTTP/1.1\r\nHost: example.com\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n\r\n";
         TransferContext context = new()
         {
             Url = CurlUrl.Parse("http://example.com/"),
@@ -541,7 +541,7 @@ public sealed partial class HttpProtocolHandlerTests
     public async Task ExecuteAsync_FormBody_SendsTheMeasuredPostAndReportsItsSize()
     {
         // curl -d x=1 http://127.0.0.1:18081/ (BL-175 Notes); -w reported size_request 151, size_upload 3.
-        const string request = "POST / HTTP/1.1\r\nHost: 127.0.0.1:18081\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n"
+        const string request = "POST / HTTP/1.1\r\nHost: 127.0.0.1:18081\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n"
             + "Content-Length: 3\r\nContent-Type: application/x-www-form-urlencoded\r\n\r\nx=1";
         foreach (int chunkSize in ChunkSizes)
         {
@@ -566,7 +566,7 @@ public sealed partial class HttpProtocolHandlerTests
     public async Task ExecuteAsync_JsonBody_SendsTheMeasuredContentTypeAndAccept()
     {
         // curl --json {"a":1} http://127.0.0.1:18081/ (BL-175 Notes).
-        const string request = "POST / HTTP/1.1\r\nHost: 127.0.0.1:18081\r\nUser-Agent: curl/8.21.0\r\n"
+        const string request = "POST / HTTP/1.1\r\nHost: 127.0.0.1:18081\r\nUser-Agent: curl/8.22.0\r\n"
             + "Content-Type: application/json\r\nAccept: application/json\r\nContent-Length: 7\r\n\r\n{\"a\":1}";
         HttpRequestOptions options = new()
         {
@@ -604,7 +604,7 @@ public sealed partial class HttpProtocolHandlerTests
     public async Task ExecuteAsync_BodyAboveOneMebibyteAndNoReply_SendsItAfterTheMeasuredOneSecondWait()
     {
         // curl --data-binary @b with 1048577 bytes: Expect: 100-continue, body sent 1.005 s later; size_request 1048753.
-        const string head = "POST / HTTP/1.1\r\nHost: 127.0.0.1:18081\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n"
+        const string head = "POST / HTTP/1.1\r\nHost: 127.0.0.1:18081\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n"
             + "Content-Length: 1048577\r\nContent-Type: application/x-www-form-urlencoded\r\nExpect: 100-continue\r\n\r\n";
         FakeTimeProvider time = new(DateTimeOffset.UnixEpoch);
         GatedConnection connection = new(Encoding.Latin1.GetBytes(NoContent), 65536, head.Length + 1048577);
@@ -637,7 +637,7 @@ public sealed partial class HttpProtocolHandlerTests
     {
         // curl --data-binary @b (2,000,000 bytes) --expect100-timeout 0.2 and 3: "Done waiting
         // for 100-continue" and then the body 200 ms and 3 s after the head (BL-624 Notes).
-        const string head = "POST / HTTP/1.1\r\nHost: 127.0.0.1:18081\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n"
+        const string head = "POST / HTTP/1.1\r\nHost: 127.0.0.1:18081\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n"
             + "Content-Length: 1048577\r\nContent-Type: application/x-www-form-urlencoded\r\nExpect: 100-continue\r\n\r\n";
         TimeSpan continueWait = TimeSpan.FromMilliseconds(milliseconds);
         FakeTimeProvider time = new(DateTimeOffset.UnixEpoch);
@@ -659,6 +659,41 @@ public sealed partial class HttpProtocolHandlerTests
         Diagnostics.Assert("written", head.Length + 1048577, connection.Written.Length);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.HasCount(head.Length + 1048577, connection.Written);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_BodyAfterTheContinueWait_ReportsNoZeroUploadBeforeTheBody()
+    {
+        // curl -T - of 122 bytes: after the 1-second wait for 100-continue the meter's first line
+        // past the zero line is 128 bytes at 00:01, with no 0-byte line before it (BL-2131 Notes).
+        const string head = "POST / HTTP/1.1\r\nHost: 127.0.0.1:18081\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n"
+            + "Content-Length: 1048577\r\nContent-Type: application/x-www-form-urlencoded\r\nExpect: 100-continue\r\n\r\n";
+        TimeSpan continueWait = TimeSpan.FromSeconds(1);
+        FakeTimeProvider time = new(DateTimeOffset.UnixEpoch);
+        GatedConnection connection = new(Encoding.Latin1.GetBytes(NoContent), 65536, head.Length + 1048577);
+        RecordingTransferProgress progress = new();
+        HttpRequestOptions options = new() { Body = new BytesBody(new byte[1048577], "application/x-www-form-urlencoded"), ContinueWait = continueWait };
+        TransferContext context = new()
+        {
+            Url = CurlUrl.Parse("http://127.0.0.1:18081/"),
+            Output = new MemoryStream(),
+            Http = options,
+            TimeProvider = time,
+            Progress = progress,
+        };
+        Diagnostics.Arrange("body length, continue wait", "1048577, 1 s, no reply");
+
+        Task<TransferResult> transfer = Handler(QueueConnector.For(connection)).ExecuteAsync(context).AsTask();
+        await time.TimerCreatedAsync(continueWait);
+        time.Advance(continueWait);
+        TransferResult result = await transfer;
+
+        WriteResult(result);
+        Diagnostics.Act("upload reports", string.Join(", ", progress.Uploads));
+        Diagnostics.Assert("first upload report", "up 65536/1048577 or more", progress.Uploads[0]);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.DoesNotContain("up 0/1048577", progress.Uploads);
+        Assert.AreEqual("up 1048577/1048577", progress.Uploads[^1]);
     }
 
     [TestMethod]
@@ -757,7 +792,7 @@ public sealed partial class HttpProtocolHandlerTests
     public async Task ExecuteAsync_NoBody_SendsTheMeasuredRequestAndWritesOnlyTheHead(string? customMethod, string method)
     {
         const string head = "HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\n";
-        string request = method + " /a?b HTTP/1.1\r\nHost: 127.0.0.1:18276\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n";
+        string request = method + " /a?b HTTP/1.1\r\nHost: 127.0.0.1:18276\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n\r\n";
         foreach (int chunkSize in ChunkSizes)
         {
             ScriptedConnection connection = Connection(head + "hello", chunkSize, request);
@@ -1056,7 +1091,7 @@ public sealed partial class HttpProtocolHandlerTests
     {
         byte[] gzip = HttpContentDecoderTests.Bytes(HttpContentDecoderTests.Gzip);
         string response = "HTTP/1.1 200 OK\r\nContent-Encoding: gzip\r\nContent-Length: 25\r\n\r\n" + Latin1(gzip);
-        string request = "GET / HTTP/1.1\r\nHost: example.com\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\nAccept-Encoding: deflate, gzip, br, zstd\r\n\r\n";
+        string request = "GET / HTTP/1.1\r\nHost: example.com\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\nAccept-Encoding: deflate, gzip, br, zstd\r\n\r\n";
         foreach (int chunkSize in ChunkSizes)
         {
             MemoryStream output = new();

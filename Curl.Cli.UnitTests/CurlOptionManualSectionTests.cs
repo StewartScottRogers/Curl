@@ -5,9 +5,10 @@ using Curl.Testing;
 namespace Curl.Cli;
 
 /// <summary>
-/// Pins <see cref="CurlOptionManualSection"/> to curl 8.21.0's <c>--help &lt;option&gt;</c>, measured on
-/// 2026-09-27 with the mingw reference build (Git for Windows' <c>mingw64\bin\curl.exe</c>) writing to a
-/// redirected standard output. <c>help-option-&lt;name&gt;.txt</c> under <c>HelpReference</c> is one section, its
+/// Pins <see cref="CurlOptionManualSection"/> to curl 8.22.0's <c>--help &lt;option&gt;</c>, measured on
+/// 2026-10-13 with the ucrt64 reference build (Git for Windows' <c>ucrt64\bin\curl.exe</c>) writing to a
+/// redirected standard output. That build is a debug build, which knows the <c>DEBUGBUILD</c> options
+/// <c>--test-duphandle</c> and <c>--test-event</c>; their four lines keep a release build's <c>incorrect</c>. <c>help-option-&lt;name&gt;.txt</c> under <c>HelpReference</c> is one section, its
 /// CR LF line ends made LF. <c>help-option-measurements.txt</c> holds one line per subject - every long name in
 /// curl's option list as <c>--name</c> and <c>--no-name</c>, every letter as <c>-x</c>, and some that name no
 /// option - with the byte count and SHA-256 of the standard output, and <c>incorrect</c> when standard error

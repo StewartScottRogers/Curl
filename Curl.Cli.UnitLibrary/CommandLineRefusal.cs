@@ -119,10 +119,10 @@ public sealed class CommandLineRefusal
 
     /// <summary>
     /// Refuses an option this build knows but cannot honour, as curl refuses an option its libcurl
-    /// was built without (ADR-0137) or a <c>--tlsauthtype</c> other than <c>SRP</c>,
+    /// was built without (ADR-0137),
     /// whether or not <c>-s</c> came first.
     /// </summary>
-    /// <param name="spelledOption">The whole argument as typed, such as <c>--tlsauthtype</c>.</param>
+    /// <param name="spelledOption">The whole argument as typed, such as <c>--ssl-sessions</c>.</param>
     /// <returns>A refusal reading <c>the installed libcurl version does not support this</c>.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="spelledOption"/> is <see langword="null"/>.</exception>
     public static CommandLineRefusal InstalledLibcurlDoesNotSupport(string spelledOption) =>
@@ -513,6 +513,27 @@ public sealed class CommandLineRefusal
         new(
             CurlExitCode.FailedInit,
             ErrorMessageLines(errorsHidden, "Minimum TLS version set higher than max"),
+            spelledOption,
+            "is badly used here");
+
+    /// <summary>
+    /// Refuses a <c>--proto</c> or <c>--proto-redir</c> value naming a scheme curl does not know:
+    /// <c>curl: unrecognized protocol '&lt;name&gt;'</c> (hidden when <paramref name="errorsHidden"/>),
+    /// <c>curl: option &lt;spelled&gt;: is badly used here</c> and the try-help line.
+    /// </summary>
+    /// <remarks>
+    /// Measured with the Windows curl 8.22.0 on 2026-10-13 (BL-2143, AF-0184): <c>--proto x</c>,
+    /// <c>--proto http,bogus</c> and <c>--proto-redir x</c> exit 2 with these lines and send nothing; <c>-s</c>
+    /// drops the first and <c>-sS</c> keeps it. curl 8.21.0 only warned and went on.
+    /// </remarks>
+    /// <param name="spelledOption">The whole argument as typed.</param>
+    /// <param name="name">The name as curl repeats it: without its modifier, cut to its first 31 characters.</param>
+    /// <param name="errorsHidden"><see langword="true"/> when <c>-s</c> without <c>-S</c> is in effect.</param>
+    /// <returns>The refusal.</returns>
+    internal static CommandLineRefusal UnrecognizedProtocol(string spelledOption, string name, bool errorsHidden) =>
+        new(
+            CurlExitCode.FailedInit,
+            ErrorMessageLines(errorsHidden, $"unrecognized protocol '{name}'"),
             spelledOption,
             "is badly used here");
 

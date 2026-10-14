@@ -74,7 +74,7 @@ public sealed class LibcurlSourceCodeTests
             Header
             + "  curl_easy_setopt(curl, CURLOPT_BUFFERSIZE, 102400L);\n"
             + "  curl_easy_setopt(curl, CURLOPT_URL, \"http://127.0.0.1:47652/\");\n"
-            + "  curl_easy_setopt(curl, CURLOPT_USERAGENT, \"curl/8.21.0\");\n"
+            + "  curl_easy_setopt(curl, CURLOPT_USERAGENT, \"curl/8.22.0\");\n"
             + "  curl_easy_setopt(curl, CURLOPT_MAXREDIRS, 50L);\n"
             + TlsAndKeepAlive
             + Perform
@@ -149,7 +149,7 @@ public sealed class LibcurlSourceCodeTests
 
         string source = GenerateSource([(Parse(url), url)]);
 
-        string expected = "  curl_easy_setopt(curl, CURLOPT_USERAGENT, \"curl/8.21.0\");\n" + schemeLines + TlsAndKeepAlive;
+        string expected = "  curl_easy_setopt(curl, CURLOPT_USERAGENT, \"curl/8.22.0\");\n" + schemeLines + TlsAndKeepAlive;
         Diagnostics.Assert("contains user agent, scheme lines and TLS lines", true, source.Contains(expected, StringComparison.Ordinal));
         StringAssert.Contains(source, expected);
     }
@@ -250,7 +250,7 @@ public sealed class LibcurlSourceCodeTests
         "  curl_easy_setopt(curl, CURLOPT_BUFFERSIZE, 102400L);\n"
         + $"  curl_easy_setopt(curl, CURLOPT_URL, \"http://127.0.0.1:47652/{path}\");\n"
         + "  curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 1L);\n"
-        + "  curl_easy_setopt(curl, CURLOPT_USERAGENT, \"curl/8.21.0\");\n"
+        + "  curl_easy_setopt(curl, CURLOPT_USERAGENT, \"curl/8.22.0\");\n"
         + "  curl_easy_setopt(curl, CURLOPT_MAXREDIRS, 50L);\n"
         + TlsAndKeepAlive
         + Perform;

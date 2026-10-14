@@ -16,21 +16,23 @@ public sealed class Tls12CipherSuiteTests
     [TestMethod]
     public void TheTableHoldsEveryFamilyAndNothingElse()
     {
-        Diagnostics.Arrange("codes looked up", "0x1301, the renegotiation SCSV, 0xc030, 0x0034");
+        Diagnostics.Arrange("codes looked up", "0x1301, the renegotiation SCSV, the SRP suite 0xc020, 0xc030, 0x0034");
 
         Tls12CipherSuite? tls13Suite = Tls12CipherSuite.Find(0x1301);
         Tls12CipherSuite? scsv = Tls12CipherSuite.Find(Tls12CipherSuite.EmptyRenegotiationInfoScsv);
+        Tls12CipherSuite? srpAes256Cbc = Tls12CipherSuite.Find(0xc020);
         Tls12CipherSuite? ecdheRsaAes256Gcm = Tls12CipherSuite.Find(0xc030);
         Tls12CipherSuite? dhAnonAes128Cbc = Tls12CipherSuite.Find(0x0034);
         Diagnostics.Act("suites in the table", Tls12CipherSuite.All.Count);
         Diagnostics.Act("0xc030", ecdheRsaAes256Gcm);
         Diagnostics.Act("0x0034", dhAnonAes128Cbc);
 
-        Diagnostics.Assert("suites in the table", 113, Tls12CipherSuite.All.Count);
-        Diagnostics.Assert("0x1301 and the SCSV are absent", "null, null", $"{tls13Suite?.ToString() ?? "null"}, {scsv?.ToString() ?? "null"}");
-        Assert.HasCount(113, Tls12CipherSuite.All);
+        Diagnostics.Assert("suites in the table", 104, Tls12CipherSuite.All.Count);
+        Diagnostics.Assert("0x1301, the SCSV and 0xc020 are absent", "null, null, null", $"{tls13Suite?.ToString() ?? "null"}, {scsv?.ToString() ?? "null"}, {srpAes256Cbc?.ToString() ?? "null"}");
+        Assert.HasCount(104, Tls12CipherSuite.All);
         Assert.IsNull(tls13Suite);
         Assert.IsNull(scsv);
+        Assert.IsNull(srpAes256Cbc);
         Assert.AreEqual(new Tls12CipherSuite(0xc030, Tls12KeyExchange.Ecdhe, Tls12Authentication.Rsa, Tls12BulkCipher.Aes256Gcm, Tls12MacAlgorithm.None, true), ecdheRsaAes256Gcm);
         Assert.AreEqual(new Tls12CipherSuite(0x0034, Tls12KeyExchange.Dhe, Tls12Authentication.Anonymous, Tls12BulkCipher.Aes128Cbc, Tls12MacAlgorithm.HmacSha1, false), dhAnonAes128Cbc);
     }

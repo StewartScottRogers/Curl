@@ -36,7 +36,7 @@ public sealed class WsUpgradeRequestFormatterTests
         string expected =
             "GET /chat HTTP/1.1\r\n" +
             "Host: 127.0.0.1:47901\r\n" +
-            "User-Agent: curl/8.21.0\r\n" +
+            "User-Agent: curl/8.22.0\r\n" +
             "Accept: */*\r\n" +
             UpgradeHeaders +
             "Connection: Upgrade\r\n" +
@@ -56,7 +56,7 @@ public sealed class WsUpgradeRequestFormatterTests
         string head = Encoding.Latin1.GetString(WsUpgradeRequestFormatter.Format(CurlUrl.Parse("ws://127.0.0.1:47901/"), new HttpRequestOptions(), "GET", Key, "Basic dXNlcjpwdw==", "1-2"));
 
         diagnostics.Act("upgrade request head", head);
-        const string expectedStart = "GET / HTTP/1.1\r\nHost: 127.0.0.1:47901\r\nAuthorization: Basic dXNlcjpwdw==\r\nRange: bytes=1-2\r\nUser-Agent: curl/8.21.0\r\n";
+        const string expectedStart = "GET / HTTP/1.1\r\nHost: 127.0.0.1:47901\r\nAuthorization: Basic dXNlcjpwdw==\r\nRange: bytes=1-2\r\nUser-Agent: curl/8.22.0\r\n";
         diagnostics.Assert("head starts with", expectedStart, head);
         StringAssert.StartsWith(head, expectedStart);
     }
@@ -122,7 +122,7 @@ public sealed class WsUpgradeRequestFormatterTests
         string expected =
             "POST / HTTP/1.1\r\n" +
             "Host: 127.0.0.1:47901\r\n" +
-            "User-Agent: curl/8.21.0\r\n" +
+            "User-Agent: curl/8.22.0\r\n" +
             "Accept: */*\r\n" +
             "Referer: http://ref/\r\n" +
             UpgradeHeaders +
@@ -170,7 +170,7 @@ public sealed class WsUpgradeRequestFormatterTests
         string head = Format("ws://h:81/", new HttpRequestOptions { Headers = ["host: other"] });
 
         diagnostics.Act("upgrade request head", head);
-        const string expectedStart = "GET / HTTP/1.1\r\nHost: other\r\nUser-Agent: curl/8.21.0\r\n";
+        const string expectedStart = "GET / HTTP/1.1\r\nHost: other\r\nUser-Agent: curl/8.22.0\r\n";
         diagnostics.Assert("head starts with", expectedStart, head);
         StringAssert.StartsWith(head, expectedStart);
         int count = CountOf(head, "other");
@@ -188,7 +188,7 @@ public sealed class WsUpgradeRequestFormatterTests
         string head = Format("ws://h:81/", new HttpRequestOptions { Headers = ["Host:"] });
 
         diagnostics.Act("upgrade request head", head);
-        const string expectedStart = "GET / HTTP/1.1\r\nUser-Agent: curl/8.21.0\r\n";
+        const string expectedStart = "GET / HTTP/1.1\r\nUser-Agent: curl/8.22.0\r\n";
         diagnostics.Assert("head starts with", expectedStart, head);
         StringAssert.StartsWith(head, expectedStart);
     }
@@ -203,7 +203,7 @@ public sealed class WsUpgradeRequestFormatterTests
         string head = Format("ws://h:81/", new HttpRequestOptions { Headers = ["Host:   "] });
 
         diagnostics.Act("upgrade request head", head);
-        const string expectedStart = "GET / HTTP/1.1\r\nHost:   \r\nUser-Agent: curl/8.21.0\r\n";
+        const string expectedStart = "GET / HTTP/1.1\r\nHost:   \r\nUser-Agent: curl/8.22.0\r\n";
         diagnostics.Assert("head starts with", expectedStart, head);
         StringAssert.StartsWith(head, expectedStart);
     }

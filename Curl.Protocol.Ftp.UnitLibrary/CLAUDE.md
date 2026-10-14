@@ -21,7 +21,10 @@ sends `TYPE A` under `-B` or a `;type=a` URL suffix (`FtpTypeCode`; an ASCII dow
 `PASS`; anything but `230` is exit 11), `--ftp-alternative-to-user` (sent once after a
 refused `USER` or `PASS`) and `--ftp-pret` (`PRET RETR <file>`, `PRET LIST`/`NLST` or
 `PRET STOR <file>` before the first of `EPSV`/`PASV`, never in active mode; anything but
-`200` is exit 84 with no `QUIT`), as curl 8.21.0 was measured to (BL-635). TLS: `ftps://` is TLS from the first byte, and `--ssl`,
+`200` is exit 84 with no `QUIT`), as curl 8.21.0 was measured to (BL-635). A user name or
+password, `--ftp-account` or `--ftp-alternative-to-user` command holding a byte below 0x20 is
+exit 43 before the command is built, with no `QUIT`; credentials are refused before any
+command is sent, as curl 8.22.0 does (BL-2162). TLS: `ftps://` is TLS from the first byte, and `--ssl`,
 `--ssl-reqd` and `--ftp-ssl-control` upgrade `ftp://` with `AUTH`, then `PBSZ` and `PROT`
 (ADR-0102 and its BL-437 addendum); under `--ftp-ssl-ccc` `CCC` follows `PROT`, a 5xx keeps
 TLS, and any other reply clears it through `IConnection.ClearTlsAsync` (plain text after it on

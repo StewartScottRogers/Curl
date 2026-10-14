@@ -20,7 +20,7 @@ public sealed class CurlCommandRunnerTransferEncodingTests
 
     private const string Http11RequestLine = "GET /a HTTP/1.1\r\n";
 
-    private const string DefaultHeaders = "Host: 127.0.0.1:18180\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n";
+    private const string DefaultHeaders = "Host: 127.0.0.1:18180\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n";
 
     private const string DefaultRequest = Http11RequestLine + DefaultHeaders + "\r\n";
 

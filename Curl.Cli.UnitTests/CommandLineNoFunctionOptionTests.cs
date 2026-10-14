@@ -68,6 +68,33 @@ public sealed class CommandLineNoFunctionOptionTests
     }
 
     [TestMethod]
+    [DataRow("--tlsauthtype", "1", true)]
+    [DataRow("--tlsauthtype", "SRP", false)]
+    [DataRow("--tlsauthtype", "", true)]
+    [DataRow("--tlspassword", "x", true)]
+    [DataRow("--tlspassword", "", false)]
+    [DataRow("--tlsuser", "u", true)]
+    [DataRow("--tlsuser", "", false)]
+    [DataRow("--proxy-tlsuser", "u", true)]
+    [DataRow("--proxy-tlspassword", "x", false)]
+    [DataRow("--proxy-tlsauthtype", "SRP", true)]
+    public void Parse_TlsSrpOptionOnEitherBuild_TakesItsValueAndWarns(string argument, string value, bool isWindows)
+    {
+        // curl 8.22.0 Schannel, 2026-10-13 (BL-2142, AF-0183): each of the six warns and the transfer runs, any value.
+        Diagnostics.Arrange("build", isWindows ? "Schannel" : "OpenSSL");
+        string[] arguments = [argument, value, Url];
+        Diagnostics.ArrangeArguments(arguments);
+
+        CommandLineParseResult result = CommandLineParser.Parse(arguments, _ => true, ConsolePasswordPrompt.ForProcessConsole, new RecordingDataFileReader(), isWindows);
+        Diagnostics.ActParse(result);
+
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
+        Assert.IsTrue(result.IsAccepted);
+        CollectionAssert.AreEqual(new[] { Url }, result.Options.Urls.ToArray());
+        CollectionAssert.AreEqual(new[] { Warning(argument[2..]) }, result.WarningLines.ToArray());
+    }
+
+    [TestMethod]
     [DataRow("--egd-file=x")]
     [DataRow("--egd-file=")]
     public void Parse_NoFunctionValueOptionWithAttachedValue_TakesItAndWarns(string argument)

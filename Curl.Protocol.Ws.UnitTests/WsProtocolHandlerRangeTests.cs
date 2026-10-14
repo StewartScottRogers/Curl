@@ -19,7 +19,7 @@ public sealed class WsProtocolHandlerRangeTests
         "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: xxx\r\n\r\n\x81\x05hello\x88\x00";
 
     private const string UpgradeHeaders =
-        "User-Agent: curl/8.21.0\r\n" +
+        "User-Agent: curl/8.22.0\r\n" +
         "Accept: */*\r\n" +
         "Upgrade: websocket\r\n" +
         "Sec-WebSocket-Version: 13\r\n" +

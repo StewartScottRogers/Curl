@@ -18,7 +18,7 @@ public sealed partial class TcpConnectorTests
     private const string TunnelEstablishedReply = "HTTP/1.1 200 Connection established\r\n\r\n";
 
     private const string TunnelConnectHead =
-        "CONNECT example.test:80 HTTP/1.1\r\nHost: example.test:80\r\nUser-Agent: curl/8.21.0\r\nProxy-Connection: Keep-Alive\r\n\r\n";
+        "CONNECT example.test:80 HTTP/1.1\r\nHost: example.test:80\r\nUser-Agent: curl/8.22.0\r\nProxy-Connection: Keep-Alive\r\n\r\n";
 
     private static readonly ProxyEndpoint TunnelProxy = new(ProxyKind.Http, "192.0.2.10", 3128, null);
 
@@ -44,7 +44,7 @@ public sealed partial class TcpConnectorTests
                 "* [H1-PROXY] CONNECT send",
                 "> CONNECT example.test:80 HTTP/1.1",
                 "> Host: example.test:80",
-                "> User-Agent: curl/8.21.0",
+                "> User-Agent: curl/8.22.0",
                 "> Proxy-Connection: Keep-Alive",
                 "> ",
                 "* [H1-PROXY] new tunnel state 'receive'",

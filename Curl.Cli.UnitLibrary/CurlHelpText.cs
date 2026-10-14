@@ -3,7 +3,7 @@ using System.Text;
 namespace Curl.Cli;
 
 /// <summary>
-/// The lines <c>-h</c> / <c>--help [subject]</c> prints on standard output, ported from curl 8.21.0's
+/// The lines <c>-h</c> / <c>--help [subject]</c> prints on standard output, ported from curl 8.22.0's
 /// <c>tool_help</c> over <see cref="CurlHelpTable"/>: the usage page with no subject, every option for
 /// <c>all</c>, the category list for <c>category</c>, one category's options for its name, and the
 /// category list after <c>Unknown category provided, ...</c> for anything else. Subjects match in any
@@ -31,6 +31,7 @@ public static class CurlHelpText
         ("http", "HTTP and HTTPS protocol", CurlHelpCategories.Http),
         ("imap", "IMAP protocol", CurlHelpCategories.Imap),
         ("ldap", "LDAP protocol", CurlHelpCategories.Ldap),
+        ("mqtt", "MQTT protocol", CurlHelpCategories.Mqtt),
         ("output", "File system output", CurlHelpCategories.Output),
         ("pop3", "POP3 protocol", CurlHelpCategories.Pop3),
         ("post", "HTTP POST specific", CurlHelpCategories.Post),

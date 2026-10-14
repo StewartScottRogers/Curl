@@ -180,6 +180,15 @@ internal static class FtpTransferMessages
     /// </summary>
     internal const string ClearCommandChannelFailed = "Failed to clear the command channel (CCC)";
 
+    /// <summary>The exit 43 message for a user name or password holding a byte below 0x20 (curl 8.22.0, BL-2162).</summary>
+    internal const string CredentialsHaveControlCode = "control code detected in credentials";
+
+    /// <summary>The exit 43 message for an <c>--ftp-account</c> holding a byte below 0x20 (curl 8.22.0, BL-2162).</summary>
+    internal const string AccountHasControlByte = "Control byte in FTP account";
+
+    /// <summary>The exit 43 message for an <c>--ftp-alternative-to-user</c> command holding a byte below 0x20 (curl 8.22.0, BL-2162).</summary>
+    internal const string AlternativeUserHasControlByte = "Control byte in FTP alternative-to-user command";
+
     /// <summary>The exit 67 message for a <c>332</c> reply to <c>USER</c> or <c>PASS</c> without <c>--ftp-account</c>.</summary>
     internal const string AccountRequested = "ACCT requested but none available";
 

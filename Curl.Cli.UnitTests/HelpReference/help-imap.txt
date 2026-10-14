@@ -1,9 +1,14 @@
 imap: IMAP protocol
  -F, --form <name=content>        Specify multipart MIME data
+     --form-escape                Escape form fields using backslash
      --form-string <name=string>  Specify multipart MIME data
  -H, --header <header/@file>      Pass custom header(s) to server
      --login-options <options>    Server login options
      --oauth2-bearer <token>      OAuth 2 Bearer Token
  -X, --request <method>           Specify request method to use
+     --sasl-authzid <identity>    Identity for SASL PLAIN authentication
+     --sasl-ir                    Initial response in SASL authentication
      --ssl                        Try enabling TLS
      --ssl-reqd                   Require SSL/TLS
+ -T, --upload-file <file>         Transfer local FILE to destination
+     --upload-flags <flags>       IMAP upload behavior

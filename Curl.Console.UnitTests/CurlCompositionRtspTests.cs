@@ -21,7 +21,7 @@ public sealed class CurlCompositionRtspTests
 
     private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
 
-    private const string Request = "OPTIONS * RTSP/1.0\r\nCSeq: 1\r\nUser-Agent: curl/8.21.0\r\n\r\n";
+    private const string Request = "OPTIONS * RTSP/1.0\r\nCSeq: 1\r\nUser-Agent: curl/8.22.0\r\n\r\n";
 
     private const string Ok = "RTSP/1.0 200 OK\r\nCSeq: 1\r\nPublic: OPTIONS, DESCRIBE\r\n\r\n";
 
@@ -31,7 +31,7 @@ public sealed class CurlCompositionRtspTests
     [
         "> OPTIONS * RTSP/1.0",
         "> CSeq: 1",
-        "> User-Agent: curl/8.21.0",
+        "> User-Agent: curl/8.22.0",
         "> ",
         "* Request completely sent off",
     ];
@@ -82,15 +82,15 @@ public sealed class CurlCompositionRtspTests
         Diagnostics.Act("standard output", standardOutput);
         Diagnostics.Act("standard error", standardError.Replace("\r", string.Empty, StringComparison.Ordinal));
         Diagnostics.Act("request written", Latin1.GetString(connector.Written));
-        Diagnostics.Assert("request written", "OPTIONS * RTSP/1.0\r\nCSeq: 1\r\nUser-Agent: curl/8.21.0\r\nAccept: application/sdp\r\n\r\n", Latin1.GetString(connector.Written));
+        Diagnostics.Assert("request written", "OPTIONS * RTSP/1.0\r\nCSeq: 1\r\nUser-Agent: curl/8.22.0\r\nAccept: application/sdp\r\n\r\n", Latin1.GetString(connector.Written));
         Diagnostics.Assert("exit code", 0, exitCode);
-        Assert.AreEqual("OPTIONS * RTSP/1.0\r\nCSeq: 1\r\nUser-Agent: curl/8.21.0\r\nAccept: application/sdp\r\n\r\n", Latin1.GetString(connector.Written));
+        Assert.AreEqual("OPTIONS * RTSP/1.0\r\nCSeq: 1\r\nUser-Agent: curl/8.22.0\r\nAccept: application/sdp\r\n\r\n", Latin1.GetString(connector.Written));
         Assert.AreEqual(string.Empty, standardOutput);
         Assert.AreEqual(
             Lines(
                 "> OPTIONS * RTSP/1.0",
                 "> CSeq: 1",
-                "> User-Agent: curl/8.21.0",
+                "> User-Agent: curl/8.22.0",
                 "> Accept: application/sdp",
                 "> ",
                 "* Request completely sent off",
@@ -231,7 +231,7 @@ public sealed class CurlCompositionRtspTests
         Diagnostics.Act("connection targets", connector.Targets.Count);
         Diagnostics.Assert("connection targets", 1, connector.Targets.Count);
         Diagnostics.Assert("exit code", 0, exitCode);
-        Assert.AreEqual(Request + "OPTIONS * RTSP/1.0\r\nCSeq: 0\r\nUser-Agent: curl/8.21.0\r\n\r\n", Latin1.GetString(connector.Written));
+        Assert.AreEqual(Request + "OPTIONS * RTSP/1.0\r\nCSeq: 0\r\nUser-Agent: curl/8.22.0\r\n\r\n", Latin1.GetString(connector.Written));
         Assert.HasCount(1, connector.Targets);
         StringAssert.Contains(
             standardError,

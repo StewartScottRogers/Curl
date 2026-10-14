@@ -172,13 +172,13 @@ public sealed class CurlCommandRunnerDisallowUsernameInUrlTests
         Diagnostics.Assert("stdout", "[1|http://u:p@127.0.0.1:18626/x||302|1]", StandardOutputText);
         Diagnostics.Diff(
             "request bytes",
-            "GET / HTTP/1.1\r\nHost: 127.0.0.1:18626\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n",
+            "GET / HTTP/1.1\r\nHost: 127.0.0.1:18626\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n\r\n",
             Encoding.Latin1.GetString(server.Written));
         Assert.AreEqual(67, exitCode);
         Assert.AreEqual(Refused + NewLine, StandardErrorText);
         Assert.AreEqual("[1|http://u:p@127.0.0.1:18626/x||302|1]", StandardOutputText);
         Assert.AreEqual(
-            "GET / HTTP/1.1\r\nHost: 127.0.0.1:18626\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n",
+            "GET / HTTP/1.1\r\nHost: 127.0.0.1:18626\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n\r\n",
             Encoding.Latin1.GetString(server.Written));
     }
 

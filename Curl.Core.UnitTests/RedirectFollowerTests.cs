@@ -811,6 +811,41 @@ public sealed class RedirectFollowerTests
     }
 
     [TestMethod]
+    [DataRow("http://localhost:18203/next", false, DisplayName = "other-host")]
+    [DataRow("http://127.0.0.1:18203/next", true, DisplayName = "same-origin")]
+    public async Task FollowAsync_HttpSignature_IsDroppedForAnotherOriginOnly(string target, bool signed)
+    {
+        // Upstream tests 5023 and 5024: curl 8.22.0 -L --httpsig-*, 302 to another host is sent
+        // unsigned; a same-origin hop is signed again (BL-2182).
+        ScriptedHandler handler = new(Redirect(302, target), Ok(200, 0));
+        HttpSignatureSettings settings = new("ed25519", "00", "k", null);
+
+        await Follow(handler, Context(Location() with { HttpSignature = settings }, credentials: false));
+
+        HttpSignatureSettings? hopSettings = handler.Contexts[1].Http!.HttpSignature;
+        Diagnostics.Assert("hop signed", signed, hopSettings is not null);
+        Assert.AreEqual(signed ? settings : null, hopSettings);
+    }
+
+    [TestMethod]
+    public async Task FollowAsync_OtherHostWithBlanksBeforeColon_DropsAuthorizationAndCookie()
+    {
+        // Upstream test2113: curl 8.22.0 -L -H "Authorization : s3cr3t", 302 to another host,
+        // sends no Authorization there (BL-2163); a value with no colon is not a credential.
+        ScriptedHandler handler = new(Redirect(302, "http://localhost:18203/next"), Ok(200, 0));
+        HttpRequestOptions http = Location() with
+        {
+            Headers = ["Authorization : s3cr3t", "Cookie\t: a=b", "Authorization", "X-Authorization: v"],
+        };
+
+        await Follow(handler, Context(http, credentials: false));
+
+        string[] expected = ["Authorization", "X-Authorization: v"];
+        Diagnostics.Assert("Headers", string.Join(", ", expected), string.Join(", ", handler.Contexts[1].Http!.Headers.ToArray()));
+        CollectionAssert.AreEqual(expected, handler.Contexts[1].Http!.Headers.ToArray());
+    }
+
+    [TestMethod]
     [DataRow("http://localhost:18203/next", null, true, DisplayName = "other-host")]
     [DataRow("http://127.0.0.1:18203/next", "s3cr3t", false, DisplayName = "same-origin")]
     public async Task FollowAsync_MailBearerToken_IsWithheldFromAnotherHost(string target, string? bearer, bool withheld)

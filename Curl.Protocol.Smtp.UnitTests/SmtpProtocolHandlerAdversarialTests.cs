@@ -109,36 +109,6 @@ public sealed class SmtpProtocolHandlerAdversarialTests
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_MailFromCarryingCrlf_SendsItRawAndReadsTheNextReplyForRcptAsCurlDoes()
-    {
-        // curl -K with mail-from = "a@b\r\nRSET": MAIL and the injected line go out as they
-        // are, the injected line's 502 is read as RCPT's reply, and curl exits 55.
-        SmtpRun run = await RunAsync(
-            Greeting + EhloReply + Ok + "502 Command not implemented\r\n" + Ok + Bye,
-            Body("hi"),
-            new MailRequestOptions { From = "a@b\r\nRSET", Recipients = ["c@d"] });
-
-        Assert.AreEqual("EHLO dom\r\nMAIL FROM:<a@b\r\nRSET>\r\nRCPT TO:<c@d>\r\n" + Quit, run.Sent);
-        Assert.AreEqual(CurlExitCode.SendError, run.Result.ExitCode);
-        Assert.AreEqual("RCPT failed: 502", run.Result.ErrorMessage);
-    }
-
-    [TestMethod]
-    public async Task ExecuteAsync_MailRcptCarryingCrlf_SendsItRawAndReadsTheNextReplyForDataAsCurlDoes()
-    {
-        // curl -K with mail-rcpt = "c@d\r\nRSET": the injected line's 502 is read as DATA's
-        // reply, and curl exits 55.
-        SmtpRun run = await RunAsync(
-            Greeting + EhloReply + Ok + Ok + "502 Command not implemented\r\n" + StartData + Bye,
-            Body("hi"),
-            new MailRequestOptions { From = "a@b", Recipients = ["c@d\r\nRSET"] });
-
-        Assert.AreEqual("EHLO dom\r\nMAIL FROM:<a@b>\r\nRCPT TO:<c@d\r\nRSET>\r\nDATA\r\n" + Quit, run.Sent);
-        Assert.AreEqual(CurlExitCode.SendError, run.Result.ExitCode);
-        Assert.AreEqual("DATA failed: 502", run.Result.ErrorMessage);
-    }
-
-    [TestMethod]
     [DataRow("199", DisplayName = "199, below the 2xx range")]
     [DataRow("999", DisplayName = "999, the largest code")]
     [DataRow("600", DisplayName = "600, no reply class")]

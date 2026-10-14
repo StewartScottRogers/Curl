@@ -108,13 +108,14 @@ public sealed class CurlCommandRunnerConfigFileTests
     }
 
     [TestMethod]
-    public async Task RunAsync_CurlrcReadWithSilentVerbose_StillPrintsTheNote()
+    public async Task RunAsync_CurlrcReadWithSilentVerbose_PrintsNoNote()
     {
+        // BL-2173: curl 8.22.0's notef writes nothing under -s (measured 2026-10-13).
         int exitCode = await RunAsync(["-s", "-v", Url]);
 
         Diagnostics.Assert("exit code", 0, exitCode);
-        Diagnostics.Assert("stderr", Visible(MeasuredNote), Visible(StandardErrorText));
-        Assert.AreEqual(MeasuredNote, StandardErrorText);
+        Diagnostics.Assert("stderr", string.Empty, Visible(StandardErrorText));
+        Assert.AreEqual(string.Empty, StandardErrorText);
     }
 
     [TestMethod]

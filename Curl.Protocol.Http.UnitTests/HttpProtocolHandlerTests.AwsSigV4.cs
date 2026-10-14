@@ -39,10 +39,10 @@ public sealed partial class HttpProtocolHandlerTests
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Diagnostics.Diff(
             "connection written",
-            "GET /a HTTP/1.1\r\nHost: 127.0.0.1:18183\r\nAuthorization: " + SignedValue + "\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\nX-A: 1\r\n\r\n",
+            "GET /a HTTP/1.1\r\nHost: 127.0.0.1:18183\r\nAuthorization: " + SignedValue + "\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\nX-A: 1\r\n\r\n",
             connection.Written);
         Assert.AreEqual(
-            "GET /a HTTP/1.1\r\nHost: 127.0.0.1:18183\r\nAuthorization: " + SignedValue + "\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\nX-A: 1\r\n\r\n",
+            "GET /a HTTP/1.1\r\nHost: 127.0.0.1:18183\r\nAuthorization: " + SignedValue + "\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\nX-A: 1\r\n\r\n",
             connection.Written);
         AwsSigV4Inputs inputs = authenticator.Calls.Single().Request.AwsSigV4!;
         Diagnostics.Assert("aws-sigv4 inputs", new AwsSigV4Inputs("aws:amz:us-east-1:s3", "127.0.0.1:18183", headers) { IsGetOrHead = true, PathAsIs = true }, inputs);

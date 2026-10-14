@@ -4,15 +4,15 @@ namespace Curl.Conformance;
 
 /// <summary>
 /// Pins the upstream test data vendored under <c>UpstreamTestData/</c> (ADR-0013, decision 3):
-/// every <c>tests/data/test*</c> file of curl 8.21.0, stored here as <c>test*.rawhttp</c>, and curl's
+/// every <c>tests/data/test*</c> file of curl 8.22.0, stored here as <c>test*.curltest</c>, and curl's
 /// <c>COPYING</c> notice are
 /// copied beside the tests, so no case ever has to download anything.
 /// </summary>
 [TestClass]
 public sealed class UpstreamTestDataTests
 {
-    /// <summary>The number of <c>test*</c> files in <c>tests/data</c> at <c>curl-8_21_0</c>.</summary>
-    private const int VendoredTestFileCount = 2013;
+    /// <summary>The number of <c>test*</c> files in <c>tests/data</c> at <c>curl-8_22_0</c>.</summary>
+    private const int VendoredTestFileCount = 2072;
 
     private static readonly string UpstreamTestDataFolder = Path.Combine(AppContext.BaseDirectory, "UpstreamTestData");
 
@@ -22,10 +22,10 @@ public sealed class UpstreamTestDataTests
     public void UpstreamTestData_CopiedBesideTheTests_HoldsEveryTestFileFromTheTag()
     {
         var diagnostics = TestDiagnostics.For(TestContext);
-        diagnostics.Arrange("pattern", "UpstreamTestData/test*.rawhttp");
+        diagnostics.Arrange("pattern", "UpstreamTestData/test*.curltest");
         diagnostics.Arrange("expected file count", VendoredTestFileCount);
 
-        string[] testFiles = Directory.GetFiles(UpstreamTestDataFolder, "test*.rawhttp");
+        string[] testFiles = Directory.GetFiles(UpstreamTestDataFolder, "test*.curltest");
 
         diagnostics.Act("file count", testFiles.Length);
         diagnostics.Assert("file count", VendoredTestFileCount, testFiles.Length);

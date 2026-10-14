@@ -63,7 +63,7 @@ public sealed class CurlCommandRunnerVersionTests
 
         Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
-        string expectedStart = "curl 8.21.0 (x86_64-w64-mingw32) libcurl/8.21.0 Schannel" + Environment.NewLine + "Release-Date: 2026-06-24";
+        string expectedStart = "curl 8.22.0 (x86_64-w64-mingw32) libcurl/8.22.0 Schannel" + Environment.NewLine + "Release-Date: 2026-09-02";
         string actual = Encoding.UTF8.GetString(standardOutput.ToArray());
         Diagnostics.Diff(
             "stdout start",
@@ -71,7 +71,7 @@ public sealed class CurlCommandRunnerVersionTests
             Normalized(actual)[..Math.Min(Normalized(actual).Length, Normalized(expectedStart).Length)]);
         StringAssert.StartsWith(
             Encoding.UTF8.GetString(standardOutput.ToArray()),
-            "curl 8.21.0 (x86_64-w64-mingw32) libcurl/8.21.0 Schannel" + Environment.NewLine + "Release-Date: 2026-06-24");
+            "curl 8.22.0 (x86_64-w64-mingw32) libcurl/8.22.0 Schannel" + Environment.NewLine + "Release-Date: 2026-09-02");
     }
 
     private static string Normalized(string text) => text.Replace("\r\n", "\n", StringComparison.Ordinal);

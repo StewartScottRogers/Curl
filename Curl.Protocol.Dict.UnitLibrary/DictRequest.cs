@@ -34,7 +34,7 @@ internal static class DictRequest
     /// so the bytes sent match curl 8.21.0; it is one constant so it can follow the version
     /// this project measures against.
     /// </summary>
-    public const string ClientLine = "CLIENT libcurl 8.21.0";
+    public const string ClientLine = "CLIENT libcurl 8.22.0";
 
     private const string QuitLine = "QUIT";
 

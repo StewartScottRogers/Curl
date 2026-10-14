@@ -21,7 +21,7 @@ namespace Curl.Protocol.Ws;
 internal static class WsUpgradeRequestFormatter
 {
     /// <summary>The <c>User-Agent</c> curl 8.21.0 sends when <c>-A</c> is not given.</summary>
-    internal const string DefaultUserAgent = "curl/8.21.0";
+    internal const string DefaultUserAgent = "curl/8.22.0";
 
     private const string HostName = "Host";
 

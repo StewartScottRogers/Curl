@@ -227,7 +227,7 @@ public sealed class QpackAdversarialTests
         Diagnostics.Arrange("encoder", "capacity 220, one blocked stream; a section on stream 4 that inserts");
         QpackEncoder encoder = new(220, 1);
         encoder.TrySetDynamicTableCapacity(220);
-        encoder.EncodeFieldSection(4, Fields(("user-agent", "curl/8.21.0")));
+        encoder.EncodeFieldSection(4, Fields(("user-agent", "curl/8.22.0")));
 
         encoder.ReadDecoderStream(FromHex("01 48"));
         encoder.ReadDecoderStream(FromHex("84"));
@@ -245,7 +245,7 @@ public sealed class QpackAdversarialTests
         QpackEncoder encoder = new(220, 2);
         QpackDecoder decoder = new(220, 2);
         encoder.TrySetDynamicTableCapacity(220);
-        var fields = Fields((":method", "GET"), ("user-agent", "curl/8.21.0"), ("accept", "*/*"));
+        var fields = Fields((":method", "GET"), ("user-agent", "curl/8.22.0"), ("accept", "*/*"));
         var sections = new[] { 0L, 4L, 8L }.Select(stream => (Stream: stream, Bytes: encoder.EncodeFieldSection(stream, fields))).ToArray();
 
         var blocked = Enumerable.Reverse(sections).Count(section => !decoder.TryDecodeFieldSection(section.Stream, section.Bytes, out _));
@@ -310,7 +310,7 @@ public sealed class QpackAdversarialTests
     {
         QpackEncoder encoder = new(220, 2);
         encoder.TrySetDynamicTableCapacity(220);
-        encoder.EncodeFieldSection(0, Fields(("user-agent", "curl/8.21.0")));
+        encoder.EncodeFieldSection(0, Fields(("user-agent", "curl/8.22.0")));
         return encoder;
     }
 

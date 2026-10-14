@@ -50,7 +50,7 @@ public sealed partial class TcpConnectorTests
         CollectionAssert.AreEqual(new IConnection[] { dialedConnection, proxyTls }, tlsProvider.ReceivedPlaintexts);
         Assert.IsEmpty(dialedConnection.Written);
         Assert.AreEqual(
-            "CONNECT example.com:443 HTTP/1.1\r\nHost: example.com:443\r\nUser-Agent: curl/8.21.0\r\nProxy-Connection: Keep-Alive\r\n\r\n",
+            "CONNECT example.com:443 HTTP/1.1\r\nHost: example.com:443\r\nUser-Agent: curl/8.22.0\r\nProxy-Connection: Keep-Alive\r\n\r\n",
             Encoding.Latin1.GetString([.. proxyTls.Written]));
         Assert.AreEqual(1, proxyTls.FlushCount);
         Assert.IsFalse(proxyTls.IsDisposed);

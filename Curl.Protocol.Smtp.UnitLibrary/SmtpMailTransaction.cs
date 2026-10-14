@@ -130,8 +130,24 @@ internal sealed class SmtpMailTransaction(
             ? " SIZE=" + known.ToString(CultureInfo.InvariantCulture)
             : string.Empty;
 
+    /// <summary>
+    /// Whether <paramref name="address" /> holds a CR or LF, which would end the command line
+    /// and let a second command follow it, as curl 8.22.0's <c>smtp_parse_address</c> refuses it.
+    /// </summary>
+    private static bool HasLineBreak(string? address) => address is not null && address.AsSpan().IndexOfAny('\r', '\n') >= 0;
+
+    private static TransferResult AddressRefused() =>
+        TransferResult.Failure(CurlExitCode.BadFunctionArgument, SmtpSessionMessages.AddressHasLineBreak);
+
     private async ValueTask<TransferResult?> SendEnvelopeAsync(MailRequestOptions mail, long? size)
     {
+        // Measured on curl 8.22.0 (upstream test2110): an address holding CR or LF is exit 43
+        // before MAIL FROM is sent, and QUIT still follows.
+        if (HasLineBreak(mail.From) || (extensions.Authenticated && HasLineBreak(mail.Auth)))
+        {
+            return AddressRefused();
+        }
+
         SmtpReply reply = await ExchangeAsync(MailCommand(mail, size), "MAIL").ConfigureAwait(false);
         if (!reply.IsCompletion)
         {
@@ -164,6 +180,11 @@ internal sealed class SmtpMailTransaction(
         int lastRefusal = 0;
         foreach (string recipient in mail.Recipients)
         {
+            if (HasLineBreak(recipient))
+            {
+                return AddressRefused();
+            }
+
             SmtpReply reply = await ExchangeAsync("RCPT TO:" + SmtpMailbox.Bracketed(recipient, commandLineText), "RCPT").ConfigureAwait(false);
             if (reply.IsCompletion)
             {

@@ -37,13 +37,13 @@ URL
     the command line.
 
     curl attempts to reuse connections  when doing multiple transfers, so  that
-    getting many files from  the same server do  not use multiple connects  and
+    getting many files from the same server does not use multiple  connects and
     setup handshakes. This improves  speed. Connection reuse  can only be  done
     for URLs  specified for  a single  command line  invocation  and cannot  be
     performed between separate curl runs.
 
-    Everything provided on the command line  that is not a command line  option
-    or its argument, curl assumes is a URL and treats it as such.
+    curl assumes everything provided on the command line that is not  a command
+    line option or its argument is a URL and treats it as such.
 
 GLOBBING
 
@@ -268,7 +268,7 @@ PROGRESS METER
 
 VERSION
 
-    This man page describes  curl 8.21.0. If you  use a later version,  chances
+    This man page describes  curl 8.22.0. If you  use a later version,  chances
     are this  man page  does  not fully  document  it. If  you use  an  earlier
     version, this document  tries to  include version  information about  which
     specific version that introduced changes.
@@ -836,16 +836,17 @@ ALL OPTIONS
 
 	    The file format of  the file to read  cookies from should be  plain
 	    HTTP headers  (Set-Cookie  style) or  the  Netscape/Mozilla  cookie
-	    file format.
+	    file format. We discourage the use of the HTTP header style.
 
 	    The file specified with --cookie is only used as input.  No cookies
 	    are written to that  file. To store  cookies, use the  --cookie-jar
 	    option.
 
-	    If you use the Set-Cookie file  format and do not specify a  domain
-	    then the  cookie is not  sent since  the domain  never matches.  To
-	    address this, set a domain in Set-Cookie line (doing that  includes
-	    subdomains) or preferably: use the Netscape format.
+	    If you read cookies from a plain HTTP headers file, make  sure each
+	    "Set-Cookie"  line  specifies  a  "Domain"  attribute.  Without  an
+	    explicit domain, the cookie cannot be reliably matched to a  target
+	    host and may be  applied in unexpected  ways. We suggest using  the
+	    Netscape file format instead.
 
 	    Users often  want  to  both read  cookies  from a  file  and  write
 	    updated  cookies back  to  a  file,  so  using  both  --cookie  and
@@ -976,11 +977,15 @@ ALL OPTIONS
 	    Added in 7.73.0. See also --ciphers.
 
     -d, --data <data>
-	    (HTTP MQTT) Send the specified data  in a POST request to the  HTTP
-	    server, in the same way that a browser does when a user  has filled
-	    in an HTML form  and presses the  submit button. This option  makes
-	    curl  pass  the   data  to  the   server  using  the   content-type
-	    application/x-www-form-urlencoded. Compared to --form.
+	    (HTTP MQTT) Send the specified data to a server.
+
+	    For HTTP(S), this  is done  with the  POST method in  the same  way
+	    that a browser  does when  a user has  filled in an  HTML form  and
+	    presses the submit button. This option makes curl pass the  data to
+	    the         server          using         the          content-type
+	    application/x-www-form-urlencoded.
+
+	    For MQTT, the data is sent as a PUBLISH.
 
 	    --data-raw  is  almost  the  same  but  does  not  have  a  special
 	    interpretation of the @ character. To post data purely binary,  you
@@ -1011,8 +1016,8 @@ ALL OPTIONS
 	     curl -d @filename https://example.com
 
 	    This  option  is  mutually   exclusive  with  --form,  --head   and
-	    --upload-file.  See   also  --data-binary,   --data-urlencode   and
-	    --data-raw.
+	    --upload-file.   See    also    --data-binary,    --data-urlencode,
+	    --data-raw and --form.
 
     --data-ascii <data>
 	    (HTTP) This  option is  an alias  for --data.  --data-ascii can  be
@@ -2388,6 +2393,120 @@ ALL OPTIONS
 	    --http1.1,   --http1.0,   --http2,   --http2-prior-knowledge    and
 	    --http3. Added in 7.88.0. See also --http1.1, --http2 and --http3.
 
+    --httpsig-algo <algorithm>
+	    (HTTP) **WARNING**:  this option  is experimental.  Do not  use  in
+	    production.  Sign  outgoing  HTTP  requests  using  RFC  9421  HTTP
+	    Message Signatures.
+
+	    This option  specifies which  signing algorithm  to use.  Supported
+	    values are ed25519  and hmac-sha256. If  not specified, ed25519  is
+	    used. Any other value causes curl to exit with an error.
+
+	    HTTP Message  Signatures are  enabled when  any of  --httpsig-algo,
+	    --httpsig-key, --httpsig-keyid or --httpsig-headers is given.  When
+	    enabled, --httpsig-key  and --httpsig-keyid  are required.  Without
+	    any of these options no signing is performed.
+
+	    By  default,  the  signed  components  are  "method",  "authority",
+	    "path",  and  "query"  (when  a  query  string  is  present).   Use
+	    --httpsig-headers to  override the  set of  components included  in
+	    the signature.  If --httpsig-algo  is provided  several times,  the
+	    last set value is used.
+
+	    Examples:
+	     curl --httpsig-key key.hex --httpsig-keyid "my-key" \
+		  https://example.com
+	     curl --httpsig-algo hmac-sha256 --httpsig-key secret.hex \
+		  --httpsig-keyid "shared" https://example.com
+
+	    Added  in  8.22.0.  See  also  --httpsig-key,  --httpsig-keyid  and
+	    --httpsig-headers.
+
+    --httpsig-headers <components>
+	    (HTTP) **WARNING**:  this option  is experimental.  Do not  use  in
+	    production. Space-separated list  of components to  include in  the
+	    RFC 9421 HTTP  Message Signature. Derived  components are given  as
+	    bare  names:  "method",  "authority",  "path",  and  "query".  HTTP
+	    header  fields  are  given  with  a  trailing  colon,  for  example
+	    "content-type:" and "content-digest:".
+
+	    If not specified, the default set is "method authority path"  (plus
+	    "query" when a query string is present in the URL).
+
+	    Signing request headers
+
+		Header components  are taken  from  "-H" /  "--header"  options
+		only. Headers curl adds by  default (such as "User-Agent")  are
+		not signed unless you set them explicitly, for example:
+
+		    curl --httpsig-algo ed25519 \
+		      --httpsig-key k.hex \
+		      --httpsig-keyid mykey \
+		      -H "User-Agent: MyApp/1.0" \
+		      --httpsig-headers \
+		      "method authority path user-agent:" \
+		      $URL
+
+		Each component may appear  only once. Duplicate identifiers  in
+		"--httpsig-headers" cause curl to exit with an error.
+
+	    If --httpsig-headers is provided several times, the last set  value
+	    is used.
+
+	    Example:
+	     curl --httpsig-algo ed25519 --httpsig-key key.hex \
+		  --httpsig-keyid "my-key" --httpsig-headers "method \
+		  authority content-type:" https://example.com
+
+	    Added  in  8.22.0.  See  also  --httpsig-algo,  --httpsig-key   and
+	    --httpsig-keyid.
+
+    --httpsig-key <key/file>
+	    (HTTP) **WARNING**:  this option  is experimental.  Do not  use  in
+	    production. The key to  use for RFC  9421 HTTP Message  Signatures.
+	    Provide it as-is, or  as "@filename". If  the argument starts  with
+	    an "@", the rest is treated as a file name for the key.
+
+	    The key is formatted as a series of hexadecimal digits in  a single
+	    line. For  ed25519,  this  is  the 32-byte  private  seed  (64  hex
+	    characters). For hmac-sha256, this is the shared secret. PEM  files
+	    are not supported.
+
+	    Generating Ed25519 keys
+
+		With OpenSSL 3:
+
+		    openssl genpkey -algorithm ED25519 -out k.pem
+		    openssl pkey -in k.pem -outform RAW -out k.raw
+		    xxd -p -c 64 k.raw | tr -d '\n' > k.hex
+
+		Use "@k.hex" with "--httpsig-key".
+
+	    If --httpsig-key is provided several  times, the last set value  is
+	    used.
+
+	    Examples:
+	     curl --httpsig-algo ed25519 --httpsig-key @key.hex \
+		  --httpsig-keyid "my-key" https://example.com
+	     curl --httpsig-key 123a56fb72197633bc --httpsig-keyid "my-key" \
+		  https://example.com
+
+	    Added in 8.22.0. See also --httpsig-algo and --httpsig-keyid.
+
+    --httpsig-keyid <id>
+	    (HTTP) **WARNING**:  this option  is experimental.  Do not  use  in
+	    production. The key identifier to include in the  "Signature-Input"
+	    header when  using RFC  9421 HTTP  Message Signatures.  This  value
+	    appears as the "keyid" parameter  and allows the server to look  up
+	    the  correct  verification  key.  If  --httpsig-keyid  is  provided
+	    several times, the last set value is used.
+
+	    Example:
+	     curl --httpsig-algo ed25519 --httpsig-key key.hex \
+		  --httpsig-keyid "my-key" https://example.com
+
+	    Added in 8.22.0. See also --httpsig-algo and --httpsig-key.
+
     --ignore-content-length
 	    (FTP HTTP)  For HTTP,  ignore the  Content-Length header.  This  is
 	    particularly useful for servers  running Apache 1.x, which  reports
@@ -2718,6 +2837,10 @@ ALL OPTIONS
 	    Append this option to any  ordinary curl command line, and you  get
 	    libcurl-using C  source code  written  to the  file that  does  the
 	    equivalent of what your command-line operation does.
+
+	    The source code  output should  be considered example  code and  is
+	    not production ready. You must double-check that the code  actually
+	    does what you want it do.
 
 	    This option is global  and does not need  to be specified for  each
 	    use of --next.  If --libcurl  is provided several  times, the  last
@@ -3716,8 +3839,8 @@ ALL OPTIONS
     --proto <protocols>
 	    Limit  what  protocols  to  allow  for  transfers.  Protocols   are
 	    evaluated left  to  right, are  comma  separated, and  are  each  a
-	    protocol name  or  'all',  optionally  prefixed  by  zero  or  more
-	    modifiers. Available modifiers are:
+	    protocol  name  or  'all',  optionally  prefixed  by  a   modifier.
+	    Available modifiers are:
 
 	    +
 
@@ -4267,6 +4390,8 @@ ALL OPTIONS
 	    See also --proxy-ciphers, --tls13-ciphers and --proxy.
 
     --proxy-tlsauthtype <type>
+	    Deprecated option. This has no functionality since 8.22.0.
+
 	    Set TLS authentication  type with HTTPS  proxy. The only  supported
 	    option is "SRP", for TLS-SRP (RFC 5054). This option works  only if
 	    the underlying libcurl is built with TLS-SRP support.
@@ -4282,6 +4407,8 @@ ALL OPTIONS
 	    See also --proxy, --proxy-tlsuser and --proxy-tlspassword.
 
     --proxy-tlspassword <string>
+	    Deprecated option. This has no functionality since 8.22.0.
+
 	    Set password to  use with the  TLS authentication method  specified
 	    with --proxy-tlsauthtype  when  using HTTPS  proxy.  Requires  that
 	    --proxy-tlsuser is set.
@@ -4299,6 +4426,8 @@ ALL OPTIONS
 	    See also --proxy and --proxy-tlsuser.
 
     --proxy-tlsuser <name>
+	    Deprecated option. This has no functionality since 8.22.0.
+
 	    Set username for use  for HTTPS proxy  with the TLS  authentication
 	    method   specified   with   --proxy-tlsauthtype.   Requires    that
 	    --proxy-tlspassword also is set.
@@ -5119,10 +5248,10 @@ ALL OPTIONS
 	    Added in 8.14.0. See also --ciphers.
 
     -s, --silent
-	    Silent or quiet mode. Do not show progress meter, warning  messages
-	    or error messages. Makes curl  mute. It still outputs the data  you
-	    ask  for,  potentially  even  to  the  terminal/stdout  unless  you
-	    redirect it.
+	    Silent or quiet mode.  Do not show  progress meter, note  messages,
+	    warning messages  or  error messages.  Makes  curl mute.  It  still
+	    outputs  the   data  you   ask  for,   potentially  even   to   the
+	    terminal/stdout unless you redirect it.
 
 	    Use --show-error in  addition to  this option  to disable  progress
 	    meter but still  show error messages.  Providing --silent  multiple
@@ -5763,13 +5892,15 @@ ALL OPTIONS
 	    See also --ciphers, --proxy-tls13-ciphers and --curves.
 
     --tlsauthtype <type>
-	    (TLS) Set TLS  authentication type. Currently,  the only  supported
-	    option  is  "SRP",  for  TLS-SRP  (RFC  5054).  If  --tlsuser   and
-	    --tlspassword are  specified but  --tlsauthtype is  not, then  this
-	    option defaults to "SRP". This option works only if the  underlying
-	    libcurl is built  with TLS-SRP support,  which requires OpenSSL  or
-	    GnuTLS with TLS-SRP support.  If --tlsauthtype is provided  several
-	    times, the last set value is used.
+	    (TLS) Deprecated option. This has no functionality since 8.22.0.
+
+	    Set TLS authentication type.  Currently, the only supported  option
+	    is "SRP", for  TLS-SRP (RFC 5054).  If --tlsuser and  --tlspassword
+	    are specified but --tlsauthtype is  not, then this option  defaults
+	    to "SRP".  This option  works  only if  the underlying  libcurl  is
+	    built with TLS-SRP support, which  requires OpenSSL or GnuTLS  with
+	    TLS-SRP support. If  --tlsauthtype is provided  several times,  the
+	    last set value is used.
 
 	    Example:
 	     curl --tlsauthtype SRP https://example.com
@@ -5777,8 +5908,10 @@ ALL OPTIONS
 	    See also --tlsuser.
 
     --tlspassword <string>
-	    (TLS) Set  password  to  use with  the  TLS  authentication  method
-	    specified with --tlsauthtype. Requires that --tlsuser is set.
+	    (TLS) Deprecated option. This has no functionality since 8.22.0.
+
+	    Set password to  use with the  TLS authentication method  specified
+	    with --tlsauthtype. Requires that --tlsuser is set.
 
 	    This option  does  not  work  with TLS  1.3.  If  --tlspassword  is
 	    provided several times, the last set value is used.
@@ -5789,9 +5922,10 @@ ALL OPTIONS
 	    See also --tlsuser.
 
     --tlsuser <name>
-	    (TLS) Set  username  for use  with  the TLS  authentication  method
-	    specified with --tlsauthtype. Requires  that --tlspassword also  is
-	    set.
+	    (TLS) Deprecated option. This has no functionality since 8.22.0.
+
+	    Set username for use with  the TLS authentication method  specified
+	    with --tlsauthtype. Requires that --tlspassword also is set.
 
 	    This option does not  work with TLS  1.3. If --tlsuser is  provided
 	    several times, the last set value is used.
@@ -6197,7 +6331,7 @@ ALL OPTIONS
 	    you can set it to a single space (" ").
 
 	    By  default,   curl   uses  curl/VERSION,   such   as   User-Agent:
-	    curl/8.21.0. If --user-agent  is provided several  times, the  last
+	    curl/8.22.0. If --user-agent  is provided several  times, the  last
 	    set value is used.
 
 	    Example:
@@ -6527,11 +6661,6 @@ ALL OPTIONS
 	    SSPI
 
 		SSPI is supported.
-
-	    TLS-SRP
-
-		SRP (Secure Remote  Password) authentication  is supported  for
-		TLS.
 
 	    Unicode
 
@@ -7246,11 +7375,16 @@ ALL OPTIONS
 	    When saving output to a file,  tell curl to store file metadata  in
 	    extended file  attributes.  Currently,  "curl"  is  stored  in  the
 	    "creator" attribute,  the URL  is  stored in  the  "xdg.origin.url"
-	    attribute  and, for  HTTP,  the  content  type  is  stored  in  the
-	    "mime_type"  attribute.  If  the  file  system  does  not   support
-	    extended  attributes,  a  warning  is  issued.  Providing   --xattr
-	    multiple  times  has  no  extra  effect.  Disable  it  again   with
-	    --no-xattr.
+	    attribute, for HTTP, the content type is stored in the  "mime_type"
+	    attribute,    and     if    set,     the    referrer     URL     in
+	    "user.xdg.referrer.url".  If  the  file  system  does  not  support
+	    extended attributes, a warning is issued.
+
+	    Since curl 8.22.0 this option  is also supported on Windows,  where
+	    it creates  an Alternate  Data Stream  named "Zone.Identifier".  It
+	    contains an  INI  formatted "ZoneTransfer"  section,  with  values:
+	    "HostUrl",  "ReferrerUrl"  (if  set).  Providing  --xattr  multiple
+	    times has no extra effect. Disable it again with --no-xattr.
 
 	    Example:
 	     curl --xattr -o storage https://example.com

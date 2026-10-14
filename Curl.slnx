@@ -70,6 +70,8 @@
   <Project Path="Curl.Http2.UnitTests/Curl.Http2.UnitTests.csproj" />
   <Project Path="Curl.Http3.UnitLibrary/Curl.Http3.UnitLibrary.csproj" />
   <Project Path="Curl.Http3.UnitTests/Curl.Http3.UnitTests.csproj" />
+  <Project Path="Curl.HttpMessageSignatures.UnitLibrary/Curl.HttpMessageSignatures.UnitLibrary.csproj" />
+  <Project Path="Curl.HttpMessageSignatures.UnitTests/Curl.HttpMessageSignatures.UnitTests.csproj" />
   <Project Path="Curl.Kerberos.UnitLibrary/Curl.Kerberos.UnitLibrary.csproj" />
   <Project Path="Curl.Kerberos.UnitTests/Curl.Kerberos.UnitTests.csproj" />
   <Project Path="Curl.Networking.IntegrationTests/Curl.Networking.IntegrationTests.csproj" />

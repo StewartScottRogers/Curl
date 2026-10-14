@@ -93,9 +93,30 @@ public sealed class ImapProtocolHandler : IProtocolHandler
     }
 
     /// <summary>
+    /// Whether <paramref name="value" /> holds a byte below 0x20, which curl 8.22.0 refuses in a
+    /// user name or password: a CR or LF would end a command line and let a second command follow it.
+    /// </summary>
+    private static bool HasControlByte(string? value) => value is not null && value.Any(character => character < ' ');
+
+    /// <summary>
     /// Connects, runs the session and writes the lines <c>-v</c> ends the transfer with.
     /// </summary>
     private async ValueTask<TransferResult> TransferAsync(ITransferContext context)
+    {
+        if (HasControlByte(context.Credentials?.UserName) || HasControlByte(context.Credentials?.Password))
+        {
+            // curl 8.22.0 refuses such credentials before it connects, so no command is sent (BL-2177).
+            return TransferResult.Failure(CurlExitCode.BadFunctionArgument, ImapSessionMessages.CredentialsHaveControlCode);
+        }
+
+        return await ConnectAndTransferAsync(context).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Connects, or reuses a kept connection for the same login, runs the session on it and
+    /// writes the lines <c>-v</c> ends the transfer with.
+    /// </summary>
+    private async ValueTask<TransferResult> ConnectAndTransferAsync(ITransferContext context)
     {
         CurlUrl url = context.Url;
         bool implicitTls = url.Scheme == ImplicitTlsScheme;

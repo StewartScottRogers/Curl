@@ -170,13 +170,15 @@ public sealed class MqttProtocolHandlerAdversarialTests
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_TopicWithEncodedNul_SubscribesWithTheNulByte()
+    public async Task ExecuteAsync_TopicWithEncodedNul_IsUrlMalformatWithoutSubscribing()
     {
+        // Upstream test 2109 (curl 8.22.0): the decoded NUL is rejected after CONNACK.
         ScriptedConnection connection = new(Connack);
 
-        await RunAsync(connection, "mqtt://h/a%00b", new RecordingStream());
+        TransferResult result = await RunAsync(connection, "mqtt://h/a%00b", new RecordingStream());
 
-        CollectionAssert.AreEqual(Concat(MeasuredConnect, Bytes("82 08 00 01 00 03", "a", "00", "b", "00")), connection.Written);
+        Assert.AreEqual(CurlExitCode.UrlMalformat, result.ExitCode);
+        CollectionAssert.AreEqual(MeasuredConnect, connection.Written);
     }
 
     // Invalid partitions: values outside the ranges the specification allows.

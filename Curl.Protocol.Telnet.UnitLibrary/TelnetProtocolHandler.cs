@@ -77,6 +77,9 @@ public sealed class TelnetProtocolHandler(IConnector connector) : IProtocolHandl
 
     private const string BadFunctionArgumentMessage = "A libcurl function was given a bad argument";
 
+    /// <summary>The user name or password held a byte below 0x20 (exit 43), curl 8.22.0's text (BL-2179).</summary>
+    private const string CredentialsHaveControlCode = "control code detected in credentials";
+
     /// <summary>
     /// The exit 55 message curl falls back to for a failed send with no socket error:
     /// <c>curl_easy_strerror(CURLE_SEND_ERROR)</c>.
@@ -122,6 +125,12 @@ public sealed class TelnetProtocolHandler(IConnector connector) : IProtocolHandl
         long sessionStarted = context.TimeProvider.GetTimestamp();
         long startedAt = context.OperationStarted ?? sessionStarted;
         var log = new TelnetDiagnosticLog(context.DiagnosticLog);
+        if (RefuseControlBytes(context.Credentials) is { } credentialsRefused)
+        {
+            log.Failed(credentialsRefused);
+            return credentialsRefused;
+        }
+
         CurlUrl url = context.Url;
         var target = new ConnectTarget(url.IdnHost, url.IsDefaultPort ? DefaultPort : url.Port, false)
         {
@@ -155,6 +164,15 @@ public sealed class TelnetProtocolHandler(IConnector connector) : IProtocolHandl
             return result;
         }
     }
+
+    /// <summary>
+    /// The exit 43 curl 8.22.0 refuses <paramref name="credentials" /> with before it connects when the
+    /// user name or password holds a byte below 0x20, or <see langword="null" /> when neither does (BL-2179).
+    /// </summary>
+    private static TransferResult? RefuseControlBytes(System.Net.NetworkCredential? credentials) =>
+        credentials is not null && (credentials.UserName.Any(character => character < ' ') || credentials.Password.Any(character => character < ' '))
+            ? TransferResult.Failure(CurlExitCode.BadFunctionArgument, CredentialsHaveControlCode)
+            : null;
 
     private static async Task<TransferResult> RunSessionAsync(
         IConnection connection,

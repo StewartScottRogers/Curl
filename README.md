@@ -112,4 +112,4 @@ RunDarkFactory.cmd -Hours 4 -MaxTasks 3
 
 ## Licence
 
-See [LICENSE.txt](LICENSE.txt).
+The curl licence (SPDX `curl`), the same licence curl itself uses; see [LICENSE.txt](LICENSE.txt) and [ADR-0486](Documentation/Planning/Decisions/ADR-0486-relicense-from-mit-to-the-curl-licence.md).

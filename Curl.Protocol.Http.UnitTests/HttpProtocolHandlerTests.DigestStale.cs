@@ -220,7 +220,7 @@ public sealed partial class HttpProtocolHandlerTests
     private static string StaleRequest(string? authorization) =>
         "GET / HTTP/1.1\r\nHost: 127.0.0.1:18148\r\n"
             + (authorization is null ? string.Empty : "Authorization: " + authorization + "\r\n")
-            + "User-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n";
+            + "User-Agent: curl/8.22.0\r\nAccept: */*\r\n\r\n";
 
     private static TransferContext StaleContext(Stream output, HttpAuthSchemes schemes = HttpAuthSchemes.Digest, ITransferEvents? events = null) =>
         new()

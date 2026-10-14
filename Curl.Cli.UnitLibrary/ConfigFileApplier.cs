@@ -127,7 +127,11 @@ internal static class ConfigFileApplier
         options.ConfigFileWireTextEncoding is not null && !System.Text.Unicode.Utf8.IsValid(contents);
 
     private static IReadOnlyList<ConfigFileLine> ReadLines(CommandLineOptions options, string shownName, byte[] contents) =>
-        ConfigFileSyntax.ReadLines(shownName, contents, options.ReadingConfigFileAsWireText ? options.ConfigFileWireTextEncoding! : System.Text.Encoding.UTF8);
+        ConfigFileSyntax.ReadLines(
+            shownName,
+            contents,
+            options.ReadingConfigFileAsWireText ? options.ConfigFileWireTextEncoding! : System.Text.Encoding.UTF8,
+            WrappedMessage.TerminalColumns(options.ReadEnvironmentVariable("COLUMNS")));
 
     private static CommandLineRefusal? ApplyLines(CommandLineOptions options, string shownName, byte[] contents, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader)
     {

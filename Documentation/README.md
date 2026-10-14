@@ -22,10 +22,16 @@ Explorer on the next project reload — no project file edit needed.
 
 ## Status of these documents
 
-The files under `Product/` and `Planning/` are **scaffolds**: correct structure,
-headings and prompts, but the product-specific content is not filled in. They were
-created alongside the solution and deliberately contain no invented requirements,
-dates or scope. Sections awaiting real content are marked `> **TODO**`.
+The files under `Product/` and `Planning/` are filled in and kept current with the
+code:
 
-`Planning/Decisions/ADR-0001` is the exception — it records an actual decision and
-is complete.
+- `Product/Requirements.md` lists the functional requirements (`FR-` rows), each
+  naming the built behaviour and the tests that show it.
+- `Planning/Decisions/` holds one Architecture Decision Record per decision
+  (`ADR-*.md`), almost all of them Accepted; its `README.md` indexes them.
+- `Planning/Roadmap.md` and `Product/Product-Overview.md` describe the plan and
+  the product.
+
+A section still awaiting real content is marked `> **TODO**` (for example, the
+non-functional requirement `NFR-001` in `Product/Requirements.md`); search for that
+marker to find what is left.

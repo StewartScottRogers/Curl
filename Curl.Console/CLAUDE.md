@@ -44,12 +44,12 @@ arguments to `CurlCommandRunner`, which parses them, runs each URL and prints cu
 reads no `.curlrc`, which keeps tests off the real home directory), unless the first argument
 starts with `-q` or is `--disable`; `-K` files apply where they stand. Both are read through
 the injected `IDataFileReader`. Under `-v` or a `--trace` option an accepted command line then
-prints `Note: Read config file from '<path>'`, wrapped as a warning is and shown even with
-`-s` (BL-243; the refused-command-line cases are BL-352). `-o` files open on the first write through
+prints `Note: Read config file from '<path>'`, wrapped as a warning is and hidden by
+`-s` as every `Note: ` line is (`ToolNotes`, curl 8.22.0, BL-2173; BL-243; the refused-command-line cases are BL-352). `-o` files open on the first write through
 `DeferredOutputFileStream`, which is how curl's exit 23 message comes out right. The
 parser's warning lines are written to standard error before anything else.
 Every `Warning: ` line is wrapped by `WarningLineWrapper` as curl's `warnf` wraps it, at the
-width `TerminalColumns` resolves (`COLUMNS` from 21 to 9999, else the standard-error
+width `TerminalColumns` resolves (`COLUMNS` from 21 to 10000, else the standard-error
 console, else 79).
 On Windows each `-o` name is first rewritten by `Curl.Core`'s `WindowsOutputFileNameSanitizer`
 (`"*<>?|` and control characters become `_`, as curl 8.21.0 does; not under `-g`, see below),
@@ -148,7 +148,10 @@ the `-G` / `--url-query` query with `QueryUrl` before the URL is parsed. `http` 
 platform's credential encoding, and Negotiate), which answers the scheme `-u`, `--basic`, `--digest`,
 `--negotiate`, `--anyauth` and `--oauth2-bearer` allow (`HttpRequestOptions.AuthSchemes` and `BearerToken`),
 wrapped for the HTTP handler alone in an `AwsSigV4HttpAuthenticator` that signs every request with
-`--aws-sigv4` in place of those schemes (`HttpRequestOptions.AwsSigV4`, ADR-0243).
+`--aws-sigv4` in place of those schemes (`HttpRequestOptions.AwsSigV4`, ADR-0243), itself wrapped in an
+`HttpSignatureHttpAuthenticator` that signs every request with the `--httpsig-*` options' `Signature-Input` and
+`Signature` lines in place of all of them (`HttpRequestOptions.HttpSignature`, BL-2182, ADR-0485); `HttpSignatureSetup`
+runs curl 8.22.0's setup checks for those options at each URL, refusing with exit 2, 26 or 43 and its `errorf` line.
 Negotiate's contexts come from `CurlComposition.CreateSecurityContextFactory`, ADR-0142's router:
 SSPI on Windows, elsewhere the system GSS-API with the hand-built SPNEGO and Kerberos behind it,
 reaching KDCs through `Curl.Networking`'s `KerberosKdcSocketTransport` over the run's connectors
@@ -409,7 +412,9 @@ After each successful transfer, after one `-f` failed with exit 22, and after on
 once its handler reported it past connect or open (BL-130), standard error gets curl's progress
 meter: `** Resuming transfer from byte position N` when it resumed past byte zero (N is `-1`
 for a `-T` upload under `-C -`, whatever the `-o` file holds, BL-416), the two
-header lines (`ProgressMeterLines`), the status lines, and one newline. The status lines come
+header lines (`ProgressMeterLines`), the status lines, and one newline - none for a `-T .` upload,
+which curl 8.22.0 reads under its own progress callback, so `Curl_pgrsDone` writes none (upstream
+test1498, BL-2170). The status lines come
 from `TransferProgressRecorder`, the transfer's `ITransferProgress` sink, which draws them on the
 runner's `TimeProvider` as curl 8.21.0's `progress_calc` and `progress_meter` do, with the fields
 `ProgressMeterFields` formats (`max6out`, `time2str`): the all-zero line when the transfer
@@ -478,7 +483,7 @@ Under `--skip-existing` a transfer whose `-o` or `-O` file (after `--output-dir`
 `--create-dirs`) is already there, as a file or a directory (`IOutputPaths.Exists`), is not
 performed: no connection, no file opened, no progress meter, exit 0, and `-w` still runs with
 `%{http_code}` `000` and `%{filename_effective}` naming the file. Under `-v` or a `--trace`
-option, even with `-s`, standard error gets `Note: skips transfer, "<file>" exists locally`,
+option, unless `-s`, standard error gets `Note: skips transfer, "<file>" exists locally`,
 wrapped as a note is. The check comes before the proxy is chosen, so a bad `-x` does not fail a
 skipped transfer; later URLs still run, as in curl 8.21.0 (BL-493 Notes).
 
@@ -486,7 +491,7 @@ Under `--remove-on-error` a transfer that fails deletes the output file it opene
 `IOutputPaths.RemoveFile`, after its failure lines and progress-bar newline and before its
 `-w` output; the exit code and message stay the failure's. A file the transfer never opened - a
 `-f` failure that wrote no body, a failed connect - is left alone, even one there before. Under
-`-v` or a `--trace` option, even with `-s`, standard error gets `Note: Removed output file:
+`-v` or a `--trace` option, unless `-s`, standard error gets `Note: Removed output file:
 <file>`, wrapped as a note is; a file that cannot be deleted (`NUL` included) gets `Warning:
 Failed removing: <file>` unless `-s`. Off Windows a path that is not a regular file
 (`/dev/null`, as `NativeRegularFileTest`'s `stat` tells) is not deleted and gets `Warning:

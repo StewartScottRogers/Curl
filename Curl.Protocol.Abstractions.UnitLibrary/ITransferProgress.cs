@@ -22,6 +22,15 @@ public interface ITransferProgress
     void ReportTransferStarted();
 
     /// <summary>
+    /// Reports that a request a response asked for within the same transfer - an authentication
+    /// retry or a resend without <c>Expect</c> - starts, with its byte counts from zero. curl 8.21.0
+    /// draws it on a progress-meter line of its own, as it draws a redirect hop, but keeps the
+    /// transfer's start time (measured, BL-2131 Notes). The default body reports it as
+    /// <see cref="ReportTransferStarted" />, so a sink that does not tell the two apart needs no change.
+    /// </summary>
+    void ReportRequestRetried() => ReportTransferStarted();
+
+    /// <summary>
     /// Reports the body bytes received so far in this transfer.
     /// </summary>
     /// <param name="bytesSoFar">The running total of body bytes received, never a delta and never decreasing.</param>

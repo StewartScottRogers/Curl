@@ -119,7 +119,7 @@ public sealed partial class HttpProtocolHandlerTests
     }
 
     private static string NtlmRequest(string token) =>
-        "GET /a HTTP/1.1\r\nHost: 127.0.0.1:18183\r\nAuthorization: NTLM " + token + "\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n";
+        "GET /a HTTP/1.1\r\nHost: 127.0.0.1:18183\r\nAuthorization: NTLM " + token + "\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n\r\n";
 
     private static TransferContext NtlmContext(Stream output) =>
         new() { Url = CurlUrl.Parse(AuthUrl), Output = output, Credentials = new NetworkCredential("u", "p"), Http = new HttpRequestOptions { AuthSchemes = HttpAuthSchemes.Ntlm } };

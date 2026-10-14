@@ -77,7 +77,7 @@ public sealed class CurlCommandRunnerRequestTargetTests
     }
 
     private static string Request(string requestLine, string host) =>
-        $"{requestLine}\r\nHost: {host}\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n";
+        $"{requestLine}\r\nHost: {host}\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n\r\n";
 
     private static string Lf(string text) => text.Replace("\r\n", "\n", StringComparison.Ordinal);
 

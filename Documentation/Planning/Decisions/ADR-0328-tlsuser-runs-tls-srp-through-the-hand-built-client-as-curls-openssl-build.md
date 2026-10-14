@@ -1,6 +1,6 @@
 # ADR-0328 — --tlsuser runs TLS-SRP through the hand-built client as curl's OpenSSL build does
 
-- **Status:** Accepted
+- **Status:** Superseded by ADR-0480 (curl 8.22.0 dropped TLS-SRP; BL-2152 removed the TLS-SRP plumbing)
 - **Date:** 2026-10-01
 
 Decided by Claude under Stewart's delegation (root `CLAUDE.md`, "Decisions"), in BL-712.

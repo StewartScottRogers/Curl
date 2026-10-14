@@ -53,8 +53,8 @@ internal static class TlsClientOptionsMapping
     /// <see cref="CommandLineOptions.TlsEarlyData" /> (as <see cref="TlsClientOptions.AllowEarlyData" />),
     /// <see cref="CommandLineOptions.Ech" />, <see cref="CommandLineOptions.EchPublicName" />,
     /// <see cref="CommandLineOptions.EchConfigList" />, <see cref="CommandLineOptions.SslSessionsFile" />,
-    /// <see cref="CommandLineOptions.Engine" />, <see cref="CommandLineOptions.TlsUser" />,
-    /// <see cref="CommandLineOptions.TlsPassword" /> and <see cref="CommandLineOptions.TlsAuthType" />; and
+    /// and <see cref="CommandLineOptions.Engine" /> (the three TLS-SRP options have no function since
+    /// curl 8.22.0, ADR-0480); and
     /// ADR-0191's <see cref="CommandLineOptions.RequireCertificateStatus" /> (<c>--cert-status</c>) and
     /// <see cref="CommandLineOptions.AutoClientCertificate" /> (<c>--ssl-auto-client-cert</c>); and
     /// ADR-0193's <see cref="CommandLineOptions.PinnedPublicKey" /> (<c>--pinnedpubkey</c>); and ADR-0197's
@@ -87,9 +87,6 @@ internal static class TlsClientOptionsMapping
             options.EchConfigList,
             options.SslSessionsFile,
             options.Engine,
-            options.TlsUser,
-            options.TlsPassword,
-            options.TlsAuthType,
             options.RequireCertificateStatus,
             options.AutoClientCertificate,
             options.PinnedPublicKey,
@@ -131,11 +128,7 @@ internal static class TlsClientOptionsMapping
     /// as <see cref="TlsClientOptions.AllowBeast" /> and <c>--no-sessionid</c> as <see cref="TlsClientOptions.NoSessionId" />, as for the target (BL-713);
     /// <see cref="CommandLineOptions.UseAlpn" /> (<c>--no-alpn</c>) as <see cref="TlsClientOptions.UseAlpn" />,
     /// since curl 8.21.0 offers no ALPN to the proxy under <c>--no-alpn</c> (measured, ADR-0190, BL-871);
-    /// <see cref="CommandLineOptions.ProxyTlsUser" /> (<c>--proxy-tlsuser</c>), <see cref="CommandLineOptions.ProxyTlsPassword" />
-    /// (<c>--proxy-tlspassword</c>) and <see cref="CommandLineOptions.ProxyTlsAuthType" /> (<c>--proxy-tlsauthtype</c>) as
-    /// <see cref="TlsClientOptions.TlsUser" />, <see cref="TlsClientOptions.TlsPassword" /> and
-    /// <see cref="TlsClientOptions.TlsAuthType" />, verbatim, so the proxy handshake runs TLS-SRP (BL-1135);
-    /// every other setting is its default. Neither the target's minimum nor <c>--tls-max</c> reaches the proxy: curl 8.21.0
+    /// the <c>--proxy-tlsuser</c> family has no function since curl 8.22.0 (ADR-0480); every other setting is its default. Neither the target's minimum nor <c>--tls-max</c> reaches the proxy: curl 8.21.0
     /// completes the handshake with a TLS 1.2-only HTTPS proxy under <c>--tlsv1.3</c> and under
     /// <c>--tls-max 1.1</c> (measured, BL-502).
     /// </returns>
@@ -157,10 +150,7 @@ internal static class TlsClientOptionsMapping
             CertificateRevocationListFile: options.ProxyCertificateRevocationListFile,
             UseAlpn: options.UseAlpn,
             NoSessionId: !options.ReuseSessionIds,
-            AllowBeast: options.ProxyAllowBeast,
-            TlsUser: options.ProxyTlsUser,
-            TlsPassword: options.ProxyTlsPassword,
-            TlsAuthType: options.ProxyTlsAuthType);
+            AllowBeast: options.ProxyAllowBeast);
 
     /// <summary>
     /// Maps the TLS options that reach the DNS-over-HTTPS server onto the <see cref="TlsClientOptions" />

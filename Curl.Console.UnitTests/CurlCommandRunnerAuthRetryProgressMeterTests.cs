@@ -33,6 +33,13 @@ public sealed class CurlCommandRunnerAuthRetryProgressMeterTests
     private const string FiveOfFiveIn40Milliseconds =
         "\r100      5 100      5   0      0    125      0                              0";
 
+    /// <summary>
+    /// Five of five bytes 80 ms after the transfer started, as the retried request keeps the
+    /// transfer's start (BL-2131 Notes): 5 * 1000000 / 80000 = 62 bytes per second.
+    /// </summary>
+    private const string FiveOfFiveIn80Milliseconds =
+        "\r100      5 100      5   0      0     62      0                              0";
+
     private static readonly string NewLine = Environment.NewLine;
 
     private static readonly string HeaderLines =
@@ -42,6 +49,8 @@ public sealed class CurlCommandRunnerAuthRetryProgressMeterTests
     private readonly MemoryStream standardOutput = new();
     private readonly MemoryStream standardError = new();
     private readonly ManualTimeProvider clock = new();
+
+    private Stream standardInput = new MemoryStream();
 
     public TestContext TestContext { get; set; } = null!;
 
@@ -56,11 +65,32 @@ public sealed class CurlCommandRunnerAuthRetryProgressMeterTests
 
         string expected = HeaderLines
             + Zero + Zero + Zero + NewLine
-            + Zero + FiveOfFiveIn40Milliseconds + FiveOfFiveIn40Milliseconds + FiveOfFiveIn40Milliseconds + NewLine;
+            + Zero + FiveOfFiveIn80Milliseconds + FiveOfFiveIn80Milliseconds + FiveOfFiveIn80Milliseconds + NewLine;
         Diagnostics.Assert("exit code", 0, exitCode);
         Diagnostics.Diff("stderr", Lf(expected), Lf(StandardErrorText));
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual(expected, StandardErrorText);
+    }
+
+    /// <summary>
+    /// A 401 from an HTTP/1.0 server to a <c>-T -</c> upload: curl 8.21.0 reconnects for the
+    /// retry and draws it a new zero status line before failing it with exit 25 (upstream
+    /// test1072, BL-2130), so the meter has two lines.
+    /// </summary>
+    [TestMethod]
+    public async Task RunAsync_Http10401ToAStdinUpload_WritesAStatusLineForTheRetryThenExits25()
+    {
+        standardInput = new MemoryStream("hello"u8.ToArray());
+        string http10Unauthorized = Unauthorized.Replace("HTTP/1.1", "HTTP/1.0", StringComparison.Ordinal);
+
+        int exitCode = await RunAsync([http10Unauthorized, Ok], "-T", "-", "--anyauth", "-u", "testuser:testpass", "-o", "out.txt", Url);
+
+        string[] meterLines = Lf(StandardErrorText).Split('\n')[2..^1];
+        Diagnostics.Assert("exit code", 25, exitCode);
+        Diagnostics.Assert("status lines", 2, meterLines.Count(line => line.StartsWith(Zero, StringComparison.Ordinal)));
+        Assert.AreEqual(25, exitCode);
+        Assert.AreEqual(2, meterLines.Count(line => line.StartsWith(Zero, StringComparison.Ordinal)));
+        Assert.EndsWith("curl: (25) Chunky upload is not supported by HTTP 1.0" + NewLine, StandardErrorText);
     }
 
     [TestMethod]
@@ -99,7 +129,7 @@ public sealed class CurlCommandRunnerAuthRetryProgressMeterTests
                     outputFiles,
                     standardOutput,
                     standardError,
-                    new MemoryStream(),
+                    standardInput,
                     runsOnWindows: false,
                     writesProgressMeter: true,
                     timeProvider: clock)

@@ -48,6 +48,9 @@ namespace Curl.Protocol.Ldap;
 /// <param name="logonTokenSource">Produces the logged-on user's tokens for the WinLDAP dialect's bind without <c>-u</c>.</param>
 public sealed class LdapProtocolHandler(IConnector connector, LdapDialect dialect, ILdapLogonTokenSource logonTokenSource) : IProtocolHandler
 {
+    /// <summary>The user name or password held a byte below 0x20 (exit 43), curl 8.22.0's text (BL-2179).</summary>
+    private const string CredentialsHaveControlCode = "control code detected in credentials";
+
     private const int DefaultPort = 389;
 
     private const int DefaultTlsPort = 636;
@@ -99,9 +102,23 @@ public sealed class LdapProtocolHandler(IConnector connector, LdapDialect dialec
         return result;
     }
 
+    /// <summary>
+    /// The exit 43 curl 8.22.0 refuses <paramref name="credentials" /> with before it connects when the
+    /// user name or password holds a byte below 0x20, or <see langword="null" /> when neither does (BL-2179).
+    /// </summary>
+    private static TransferResult? RefuseControlBytes(NetworkCredential? credentials) =>
+        credentials is not null && (credentials.UserName.Any(character => character < ' ') || credentials.Password.Any(character => character < ' '))
+            ? TransferResult.Failure(CurlExitCode.BadFunctionArgument, CredentialsHaveControlCode)
+            : null;
+
     // Reads the URL, connects, binds and searches; ExecuteAsync logs how it ended.
     private async ValueTask<TransferResult> ConnectAndSearchAsync(ITransferContext context)
     {
+        if (RefuseControlBytes(context.Credentials) is { } credentialsRefused)
+        {
+            return credentialsRefused;
+        }
+
         // The OpenLDAP build reads the URL before it connects and again to search; the Windows
         // build reads it only once connected.
         if (dialect == LdapDialect.OpenLdap && OpenLdapUrlReader.Read(context.Url).Failure is { } refused)

@@ -1878,8 +1878,48 @@ function Get-NeedsStewartId {
     return ''
 }
 
+function Get-InteractiveHoldNote {
+    # When a lane waits with nothing ready: the Backlog tasks that only an interactive session
+    # can run (lane: no) and the tasks queued behind them through depends-on, as one sentence
+    # for the wait line, or '' when no Backlog task is held that way (AF-0189: three lanes sat
+    # idle for 78 minutes behind interactive-only BL-2125 without the log saying so).
+    param([string]$BacklogDir)
+    $tasks = @{}
+    foreach ($file in @(Get-ChildItem -LiteralPath $BacklogDir -Filter 'BL-*.md' -ErrorAction SilentlyContinue)) {
+        $id = Get-TaskIdFromFileName $file.Name
+        if (-not $id) { continue }
+        $text = Get-Content -Raw -LiteralPath $file.FullName
+        $deps = if ($text -match '(?m)^depends-on:\s*\[(.*)\]\s*$') { @(Get-TaskIdsNamed $Matches[1]) } else { @() }
+        $tasks[$id] = @{ Interactive = ($text -match '(?m)^lane: no\s*$'); Deps = $deps }
+    }
+    $interactive = @($tasks.Keys | Where-Object { $tasks[$_].Interactive } | Sort-Object)
+    if (-not $interactive.Count) { return '' }
+    $held = @($interactive)
+    do {
+        $grew = $false
+        foreach ($id in @($tasks.Keys | Sort-Object)) {
+            if ($held -contains $id) { continue }
+            if (@($tasks[$id].Deps | Where-Object { $held -contains $_ }).Count) { $held += $id; $grew = $true }
+        }
+    } while ($grew)
+    $behind = @($held | Where-Object { $interactive -notcontains $_ })
+    $note = "interactive only, waiting on Stewart or an interactive session: $($interactive -join ', ')"
+    if ($behind.Count) { $note += "; queued behind them: $($behind -join ', ')" }
+    return $note
+}
+
 if ($TestTaskIds) {
+    $holdDir = Join-Path ([IO.Path]::GetTempPath()) "hold-$([guid]::NewGuid().ToString('N'))"
+    New-Item -ItemType Directory -Path $holdDir | Out-Null
+    Set-Content -LiteralPath (Join-Path $holdDir 'BL-1-a.md') -Value "depends-on: []`nlane: no"
+    Set-Content -LiteralPath (Join-Path $holdDir 'BL-2-b.md') -Value 'depends-on: [BL-1]'
+    Set-Content -LiteralPath (Join-Path $holdDir 'BL-3-c.md') -Value 'depends-on: [BL-2]'
+    Set-Content -LiteralPath (Join-Path $holdDir 'BL-4-d.md') -Value 'depends-on: []'
+    $holdNote = Get-InteractiveHoldNote $holdDir
+    Remove-Item -LiteralPath $holdDir -Recurse -Force
     $cases = @(
+        ,@('an interactive-only task and the chain behind it', 'interactive only, waiting on Stewart or an interactive session: BL-1; queued behind them: BL-2, BL-3', $holdNote)
+        ,@('no Backlog directory holds nothing', '', (Get-InteractiveHoldNote (Join-Path ([IO.Path]::GetTempPath()) 'no-such-backlog-dir')))
         ,@('next offers a four-digit ID', 'BL-1003', (Get-NextTaskId "BL-1003  pipeline: direct  Tasks\Backlog\BL-1003-x.md"))
         ,@('next offers a three-digit ID', 'BL-992', (Get-NextTaskId 'BL-992  pipeline: direct  Tasks\Backlog\BL-992-x.md'))
         ,@('next offers nothing', '', (Get-NextTaskId 'No task is ready.'))
@@ -3418,7 +3458,7 @@ Rules for this unattended run, in addition to CLAUDE.md:
    parallel all spend inside one turn and carry the run past the cap (AF-0052, AF-0100, AF-0102, AF-0104).
    Run a test project once per change, not in a loop of reruns to hunt a flaky test: when
    one passes alone and fails in the run, file a task for it with the board script and
-   carry on (AF-0105: about 15 test runs, three of them reruns in a loop, took BL-1499 to $3.86; AF-0106: 66 turns on a flaky cookie test cost BL-1619 $3.32 before it was parked, and a fresh lane finished it in 2.4 minutes for $0.46; AF-0107: BL-1682 cost $3.76 over three runs, 48 turns in one of them spent measuring without fixing, so park what is left as a task rather than measure again; AF-0108: 41 test runs in 45 Bash calls took BL-1645 to $3.75 in one 28-minute run, so run the fast tests once when the change is done, not after every edit; AF-0109: 38 mentions of dotnet test in one 76-turn run took BL-1556 to $3.68, 3.1 times the median; AF-0110: three Opus sub-agents in one 15-turn run took BL-1587 to $3.68, 3.1 times the median, so do the work yourself and start a sub-agent only when it saves more than it costs; AF-0111: 117 tool calls and no Read in one 118-turn run took BL-1557 to $3.63, 3.05 times the median, so read a file once with Read and batch independent calls into one turn; AF-0172: 14 edits to one file and a failed test pass sent back for 4 more took BL-2043 to $3.66, 5.2 times the median, so when a test pass fails twice on the same file, stop editing it, file what is left as a task and move this one to Backlog, rather than a third round of edit and test).
+   carry on (AF-0105: about 15 test runs, three of them reruns in a loop, took BL-1499 to $3.86; AF-0106: 66 turns on a flaky cookie test cost BL-1619 $3.32 before it was parked, and a fresh lane finished it in 2.4 minutes for $0.46; AF-0107: BL-1682 cost $3.76 over three runs, 48 turns in one of them spent measuring without fixing, so park what is left as a task rather than measure again; AF-0108: 41 test runs in 45 Bash calls took BL-1645 to $3.75 in one 28-minute run, so run the fast tests once when the change is done, not after every edit; AF-0109: 38 mentions of dotnet test in one 76-turn run took BL-1556 to $3.68, 3.1 times the median; AF-0110: three Opus sub-agents in one 15-turn run took BL-1587 to $3.68, 3.1 times the median, so do the work yourself and start a sub-agent only when it saves more than it costs; AF-0111: 117 tool calls and no Read in one 118-turn run took BL-1557 to $3.63, 3.05 times the median, so read a file once with Read and batch independent calls into one turn; AF-0172: 14 edits to one file and a failed test pass sent back for 4 more took BL-2043 to $3.66, 5.2 times the median, so when a test pass fails twice on the same file, stop editing it, file what is left as a task and move this one to Backlog, rather than a third round of edit and test; AF-0190: 56 Bash calls, most of them sed -n or grep slices of the same few files, took BL-2131 to $3.11, 6.1 times the median, each one a turn re-reading a 100k+ context, so Read a file once, whole or with a wide offset and limit, rather than slicing it call by call, and decide a task's touches once rather than rewriting them mid-run).
 8. The shift kills this run at {DEADLINE}, {MINUTES} minutes after it started, and a
    killed run ends Blocked. While other lanes build, one Measure-CodeQuality.ps1 run can
    take 30 to 45 minutes: run it once per library you changed, with -ReportPath, and
@@ -3537,7 +3577,7 @@ Rules for this unattended run, in addition to CLAUDE.md:
    parallel all spend inside one turn and carry the run past the cap (AF-0052, AF-0100, AF-0102, AF-0104).
    Run a test project once per change, not in a loop of reruns to hunt a flaky test: when
    one passes alone and fails in the run, file a task for it with the board script and
-   carry on (AF-0105: about 15 test runs, three of them reruns in a loop, took BL-1499 to $3.86; AF-0106: 66 turns on a flaky cookie test cost BL-1619 $3.32 before it was parked, and a fresh lane finished it in 2.4 minutes for $0.46; AF-0107: BL-1682 cost $3.76 over three runs, 48 turns in one of them spent measuring without fixing, so park what is left as a task rather than measure again; AF-0108: 41 test runs in 45 Bash calls took BL-1645 to $3.75 in one 28-minute run, so run the fast tests once when the change is done, not after every edit; AF-0109: 38 mentions of dotnet test in one 76-turn run took BL-1556 to $3.68, 3.1 times the median; AF-0110: three Opus sub-agents in one 15-turn run took BL-1587 to $3.68, 3.1 times the median, so do the work yourself and start a sub-agent only when it saves more than it costs; AF-0111: 117 tool calls and no Read in one 118-turn run took BL-1557 to $3.63, 3.05 times the median, so read a file once with Read and batch independent calls into one turn; AF-0172: 14 edits to one file and a failed test pass sent back for 4 more took BL-2043 to $3.66, 5.2 times the median, so when a test pass fails twice on the same file, stop editing it, file what is left as a task and move this one to Backlog, rather than a third round of edit and test).
+   carry on (AF-0105: about 15 test runs, three of them reruns in a loop, took BL-1499 to $3.86; AF-0106: 66 turns on a flaky cookie test cost BL-1619 $3.32 before it was parked, and a fresh lane finished it in 2.4 minutes for $0.46; AF-0107: BL-1682 cost $3.76 over three runs, 48 turns in one of them spent measuring without fixing, so park what is left as a task rather than measure again; AF-0108: 41 test runs in 45 Bash calls took BL-1645 to $3.75 in one 28-minute run, so run the fast tests once when the change is done, not after every edit; AF-0109: 38 mentions of dotnet test in one 76-turn run took BL-1556 to $3.68, 3.1 times the median; AF-0110: three Opus sub-agents in one 15-turn run took BL-1587 to $3.68, 3.1 times the median, so do the work yourself and start a sub-agent only when it saves more than it costs; AF-0111: 117 tool calls and no Read in one 118-turn run took BL-1557 to $3.63, 3.05 times the median, so read a file once with Read and batch independent calls into one turn; AF-0172: 14 edits to one file and a failed test pass sent back for 4 more took BL-2043 to $3.66, 5.2 times the median, so when a test pass fails twice on the same file, stop editing it, file what is left as a task and move this one to Backlog, rather than a third round of edit and test; AF-0190: 56 Bash calls, most of them sed -n or grep slices of the same few files, took BL-2131 to $3.11, 6.1 times the median, each one a turn re-reading a 100k+ context, so Read a file once, whole or with a wide offset and limit, rather than slicing it call by call, and decide a task's touches once rather than rewriting them mid-run).
 9. The shift kills this run at {DEADLINE}, {MINUTES} minutes after it started, and a
    killed run ends Blocked. While other lanes build, one Measure-CodeQuality.ps1 run can
    take 30 to 45 minutes: run it once per library you changed, with -ReportPath, and
@@ -5215,7 +5255,12 @@ while ($true) {
         Write-Heartbeat 'claim'
         $claim = Invoke-Claim -Skip (@($attempted.Keys) + @(Get-ShiftRequeued) | Select-Object -Unique)
         if ($claim.None) { $stopWhy = 'nothing ready'; break }
-        if ($claim.Wait) { Write-Trace '-' 'wait' $claim.Why 'DarkGray'; Write-Heartbeat 'wait' (Get-Short $claim.Why 80); Start-Sleep -Seconds 60; continue }
+        if ($claim.Wait) {
+            if ($claim.Why -match '^No task is ready') {
+                $holdNote = Get-InteractiveHoldNote (Join-Path $Root 'Tasks\Backlog')
+                if ($holdNote) { $claim.Why = "$($claim.Why) Backlog is $holdNote" }
+            }
+            Write-Trace '-' 'wait' $claim.Why 'DarkGray'; Write-Heartbeat 'wait' (Get-Short $claim.Why 80); Start-Sleep -Seconds 60; continue }
         $id = $claim.Id
     } else {
         Set-HeartbeatTask ''

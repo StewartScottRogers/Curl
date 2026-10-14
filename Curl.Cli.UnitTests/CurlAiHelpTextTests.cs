@@ -24,11 +24,11 @@ public sealed class CurlAiHelpTextTests
     {
         string index = WrittenMarkdown(subject);
 
-        AssertHas("starts with the title", index.StartsWith("# curl --ai-help\n\nThis `curl` is curl 8.21.0 reimplemented in C#", StringComparison.Ordinal));
+        AssertHas("starts with the title", index.StartsWith("# curl --ai-help\n\nThis `curl` is curl 8.22.0 reimplemented in C#", StringComparison.Ordinal));
         AssertContains("\n## Categories\n", index);
         AssertContains("\n## Most-used options\n", index);
         AssertHas("ends with the run line", index.EndsWith("Run `curl --ai-help <category>` for one category's options in full, or `curl --ai-help all` for every option, the exit codes and the `--write-out` variables.\n", StringComparison.Ordinal));
-        Assert.StartsWith("# curl --ai-help\n\nThis `curl` is curl 8.21.0 reimplemented in C#", index);
+        Assert.StartsWith("# curl --ai-help\n\nThis `curl` is curl 8.22.0 reimplemented in C#", index);
         Assert.Contains("\n## Categories\n", index);
         Assert.Contains("\n## Most-used options\n", index);
         Assert.EndsWith("Run `curl --ai-help <category>` for one category's options in full, or `curl --ai-help all` for every option, the exit codes and the `--write-out` variables.\n", index);
@@ -87,13 +87,13 @@ public sealed class CurlAiHelpTextTests
     {
         string section = WrittenOptionSection(WrittenMarkdown("http"), "data");
 
-        const string ExpectedStart = "## --data\n\n- Short form: `-d`\n- Argument: `<data>`\n- Repeat: yes, each use adds to the ones before it\n\nHTTP POST data.\n\n"
-            + "(HTTP MQTT) Send the specified data in a POST request to the HTTP server, in the same way that a browser does";
+        const string ExpectedStart = "## --data\n\n- Short form: `-d`\n- Argument: `<data>`\n- Repeat: yes, each use adds to the ones before it\n\nPost data.\n\n"
+            + "(HTTP MQTT) Send the specified data to a server.\n\nFor HTTP(S), this is done with the POST method in the same way that a browser does";
         Diagnostics.Diff("section start", ExpectedStart, section[..Math.Min(section.Length, ExpectedStart.Length)]);
         AssertContains("\n\nExamples:\n\n```\ncurl -d \"name=curl\" https://example.com\ncurl -d \"name=curl\" -d \"tool=cmdline\" https://example.com\ncurl -d @filename https://example.com\n```\n\n", section);
         Assert.StartsWith(
-            "## --data\n\n- Short form: `-d`\n- Argument: `<data>`\n- Repeat: yes, each use adds to the ones before it\n\nHTTP POST data.\n\n"
-            + "(HTTP MQTT) Send the specified data in a POST request to the HTTP server, in the same way that a browser does",
+            "## --data\n\n- Short form: `-d`\n- Argument: `<data>`\n- Repeat: yes, each use adds to the ones before it\n\nPost data.\n\n"
+            + "(HTTP MQTT) Send the specified data to a server.\n\nFor HTTP(S), this is done with the POST method in the same way that a browser does",
             section);
         Assert.Contains("\n\nExamples:\n\n```\ncurl -d \"name=curl\" https://example.com\ncurl -d \"name=curl\" -d \"tool=cmdline\" https://example.com\ncurl -d @filename https://example.com\n```\n\n", section);
     }

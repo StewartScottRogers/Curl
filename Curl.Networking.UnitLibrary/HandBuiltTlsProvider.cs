@@ -575,12 +575,6 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
             return (null, ConnectResult.Failed(CurlExitCode.SslCipher, cipherFailure), null);
         }
 
-        (suites, var srpFailure) = WithSrpSuites(events, suites);
-        if (srpFailure is not null)
-        {
-            return (null, srpFailure, null);
-        }
-
         var (profile, listFailure) = CurvesAndSignatureAlgorithms.Apply(Profile, _options);
         if (listFailure is not null)
         {
@@ -621,7 +615,6 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
                 {
                     RequestOcspStatus = _options.RequireCertificateStatus,
                     TimeProvider = _timeProvider,
-                    SrpCredentials = TlsSrp.CredentialsOf(_options),
                 },
                 clientCertificate,
                 new HandBuiltCertificateVerifier(_verification, chainPolicy, anchorsBesideSystemStore, revocationLists, targetHost)), null, null);
@@ -632,25 +625,6 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
             var (exitCode, message) = _verification.TrustAnchorsUnusable(exception);
             return (null, ConnectResult.Failed(exitCode, message), null);
         }
-    }
-
-    // --tlsuser: announce the login and offer OpenSSL's SRP cipher list, or fail with exit 43
-    // when no --tlspassword came with it, as curl's OpenSSL build does (ADR-0328).
-    private (IReadOnlyList<ushort>? Suites, ConnectResult? Failure) WithSrpSuites(ITransferEvents events, IReadOnlyList<ushort>? suites)
-    {
-        if (_options.TlsUser is null)
-        {
-            return (suites, null);
-        }
-
-        TlsSrp.ReportUser(events, _options);
-        if (_options.TlsPassword is null)
-        {
-            return (null, ConnectResult.Failed(CurlExitCode.BadFunctionArgument, TlsSrp.PasswordMissing));
-        }
-
-        TlsSrp.ReportCipherList(events, _options);
-        return (TlsSrp.OfferedSuites(_options, suites ?? Profile.CipherSuites), null);
     }
 
     // The handshake's outcome, or what it threw: the transport's failures and cancellation.
@@ -771,10 +745,10 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
 
     // The Schannel build ignores --sigalgs and --curves, so on Windows a handshake that fails
     // with either in force prints what the build that applies it prints (ADR-0151): OpenSSL's
-    // text for --sigalgs and --tlsuser (TLS-SRP, ADR-0328), and for --curves the
-    // handshake_failure alert as curl.se's LibreSSL build prints it (ADR-0284).
+    // text for --sigalgs, and for --curves the handshake_failure alert as curl.se's LibreSSL
+    // build prints it (ADR-0284).
     private string HandshakeFailureMessage(TlsHandshakeFailure failure) =>
-        !_matchesSchannelBuild || _options.SignatureAlgorithms is not null || _options.TlsUser is not null ? TlsFailureMessages.OpenSslHandBuiltHandshakeFailure(failure)
+        !_matchesSchannelBuild || _options.SignatureAlgorithms is not null ? TlsFailureMessages.OpenSslHandBuiltHandshakeFailure(failure)
         : _options.Curves is not null && IsHandshakeFailureAlertReceived(failure) ? TlsFailureMessages.LibreSslHandshakeFailureAlert
         : TlsFailureMessages.SchannelHandBuiltHandshakeFailure(failure, OffersOnlyVersionsBelowTls12);
 
@@ -811,9 +785,6 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
 
         // --tls-earlydata: offer early_data on the resumed session (BL-1105).
         internal bool OfferEarlyData { get; init; }
-
-        // --tlsuser and --tlspassword: the TLS-SRP login the TLS 1.2 ClientHello offers (ADR-0229).
-        internal TlsSrpCredentials? SrpCredentials { get; init; }
 
         internal TimeProvider TimeProvider { get; init; } = TimeProvider.System;
 
@@ -886,9 +857,7 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
             OfferEncryptThenMac = ClientHelloProfileMapping.Sends(Profile, TlsExtensionType.EncryptThenMac),
             PadHello = Profile.PadsTcpHello,
             ExtensionOrder = ClientHelloProfileMapping.Tls12ExtensionOrder(Profile, RequestOcspStatus),
-            FixedExtensions = ClientHelloProfileMapping.Tls12FixedExtensions(Profile),
-            SrpCredentials = SrpCredentials,
-            InsertEmptyFragment = InsertsEmptyFragment(options),
+            FixedExtensions = ClientHelloProfileMapping.Tls12FixedExtensions(Profile),            InsertEmptyFragment = InsertsEmptyFragment(options),
         };
 
         // Schannel's hello below a TLS 1.3 ceiling is in a record of that ceiling; a TLS 1.2

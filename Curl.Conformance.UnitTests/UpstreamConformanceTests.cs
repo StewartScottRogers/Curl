@@ -27,7 +27,7 @@ public sealed class UpstreamConformanceTests
     // The platform the conformance run stands for, with Perl's $^O for its precheck one-liners.
     private static readonly UpstreamCurlPlatform Platform =
         OperatingSystem.IsWindows() ? UpstreamCurlPlatform.Windows : OperatingSystem.IsMacOS() ? UpstreamCurlPlatform.MacOS : UpstreamCurlPlatform.Unix;
-    private const string UpstreamTestFileExtension = ".rawhttp";
+    private const string UpstreamTestFileExtension = ".curltest";
 
     // The runner fails a slow curl run itself after TimeLimit; this bounds the rest of the case
     // (expansion, screening, verification) so no row can hold up the fast suite, whatever it does.
@@ -53,13 +53,27 @@ public sealed class UpstreamConformanceTests
     // cases are run and reported but not held to the list (BL-1949).
     private static readonly IReadOnlySet<int> NeedsTls13ServerCases = new HashSet<int> { 4001 };
 
-    /// <summary>One row per vendored <c>test*.rawhttp</c> file, in test-number order.</summary>
+    /// <summary>
+    /// One row per vendored <c>test*.curltest</c> file, in test-number order, named by
+    /// <see cref="UpstreamCaseDisplayName"/> and carrying one test category per server the case
+    /// names, so <c>dotnet test --filter "TestCategory=ftp"</c> runs only the FTP cases.
+    /// </summary>
     public static IEnumerable<TestDataRow<int>> UpstreamCases =>
         Directory.GetFiles(UpstreamTestDataFolder, $"test*{UpstreamTestFileExtension}")
             .Select(path => Path.GetFileNameWithoutExtension(path))
             .Select(name => int.Parse(name["test".Length..], NumberStyles.None, CultureInfo.InvariantCulture))
             .Order()
-            .Select(number => new TestDataRow<int>(number) { DisplayName = $"test{number}" });
+            .Select(UpstreamCaseRow);
+
+    private static TestDataRow<int> UpstreamCaseRow(int testNumber)
+    {
+        UpstreamTestCase? testCase = UpstreamTestCaseParser.Parse(File.ReadAllBytes(Path.Combine(UpstreamTestDataFolder, $"test{testNumber}{UpstreamTestFileExtension}"))).TestCase;
+        return new TestDataRow<int>(testNumber)
+        {
+            DisplayName = UpstreamCaseDisplayName.For(testNumber, testCase),
+            TestCategories = [.. UpstreamCaseDisplayName.Servers(testCase)],
+        };
+    }
 
     [TestMethod]
     [TestCategory("Conformance")]
@@ -103,6 +117,30 @@ public sealed class UpstreamConformanceTests
                 Assert.Inconclusive(verdict.Message);
                 break;
         }
+    }
+
+    // One case by number, listed or not, for a developer to debug (BL-2155): it fails unless the case
+    // passes, with the ratchet's message for it, and runs only when CURL_UPSTREAM_CASE names it.
+    [TestMethod]
+    [TestCategory("Manual")]
+    [RunsOnlyWhenAnUpstreamCaseIsNamed]
+    public async Task NamedUpstreamCase_RunThroughCurl_PassesAsAListedCaseMust()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        int testNumber = UpstreamCaseDebugSettings.Read(Environment.GetEnvironmentVariable).CaseNumber!.Value;
+        string testFilePath = Path.Combine(UpstreamTestDataFolder, $"test{testNumber}{UpstreamTestFileExtension}");
+        diagnostics.Arrange("upstream case number", testNumber);
+        diagnostics.Arrange("case is on the passing list", PassingCases.Contains(testNumber));
+        Assert.IsTrue(File.Exists(testFilePath), $"test{testNumber} is not a vendored upstream case: {testFilePath} does not exist");
+        byte[] testFile = await File.ReadAllBytesAsync(testFilePath);
+
+        UpstreamCaseOutcome outcome = await RunCaseOnceAsync(testNumber, testFile);
+
+        UpstreamCaseVerdict verdict = UpstreamCaseRatchet.Judge(testNumber, outcome, PassingCases.Contains(testNumber));
+        diagnostics.Act("verdict kind", verdict.Kind);
+        diagnostics.Act("verdict message", verdict.Message);
+        diagnostics.Assert("outcome kind is Passed", UpstreamCaseOutcomeKind.Passed, outcome.Kind);
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Passed, outcome.Kind, verdict.Message);
     }
 
     // Cases whose <client><setenv> the runner now acts on (BL-1892): 63, 288, 708, 1101, 1249,
@@ -348,7 +386,7 @@ public sealed class UpstreamConformanceTests
         }
         finally
         {
-            DeleteLogDirectory(logDirectory);
+            DeleteOrKeepLogDirectory(logDirectory);
         }
     }
 
@@ -399,7 +437,7 @@ public sealed class UpstreamConformanceTests
         }
         finally
         {
-            DeleteLogDirectory(logDirectory);
+            DeleteOrKeepLogDirectory(logDirectory);
         }
     }
 
@@ -430,8 +468,15 @@ public sealed class UpstreamConformanceTests
     }
 
     // A run that timed out may still hold a file open; the temporary folder is left to the system then.
-    private static void DeleteLogDirectory(DirectoryInfo logDirectory)
+    // With CURL_UPSTREAM_KEEP_LOGS=1 the folder is kept and its path printed to the test's output (BL-2155).
+    private static void DeleteOrKeepLogDirectory(DirectoryInfo logDirectory)
     {
+        if (UpstreamCaseDebugSettings.Read(Environment.GetEnvironmentVariable).KeepsLogs)
+        {
+            System.Console.WriteLine(UpstreamCaseDebugSettings.KeptLogFolderLine(logDirectory.FullName));
+            return;
+        }
+
         try
         {
             logDirectory.Delete(recursive: true);

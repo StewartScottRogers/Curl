@@ -140,15 +140,6 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem, IConnectionNumbe
     }
 
     /// <summary>
-    /// Gets a value indicating whether a <c>file://</c> URL naming a directory lists the
-    /// directory's entry names, as curl 8.21.0's Linux and macOS builds do with
-    /// <c>opendir</c>/<c>readdir</c>, rather than failing with exit 37, as its Windows
-    /// build does because it cannot open a directory. It is the platform's answer unless a
-    /// test sets the other one.
-    /// </summary>
-    internal bool ListsDirectories { get; init; } = !OperatingSystem.IsWindows();
-
-    /// <summary>
     /// Gets the reader of a source's raw last-write time, for a time past 9999 that
     /// <see cref="FileOpenResult.LastWriteTimeUtc" /> cannot carry: <c>GetFileTime</c> on
     /// Windows, and none yet elsewhere. It is the platform's reader unless a test sets another.
@@ -439,21 +430,22 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem, IConnectionNumbe
 
     /// <summary>
     /// Picks the lister that serves an open which found a directory: the file system,
-    /// when this handler lists directories and the file system can list.
+    /// when the file system can list. curl 8.22.0 lists a directory on every platform:
+    /// <c>opendir</c>/<c>readdir</c> on Linux and macOS, <c>FindFirstFile</c> on Windows
+    /// (<c>win32_file_list</c>), which 8.21.0's Windows build could not.
     /// </summary>
     /// <param name="opened">The outcome of the open.</param>
     /// <returns>
-    /// The lister, or <see langword="null" /> when the open did not find a directory, this
-    /// handler answers a directory as the Windows build does, or the file system cannot
-    /// list - each of which keeps exit 37.
+    /// The lister, or <see langword="null" /> when the open did not find a directory or the
+    /// file system cannot list - each of which keeps exit 37.
     /// </returns>
     private IDirectoryLister? DirectoryListerFor(FileOpenResult opened) =>
-        opened.Status == FileAccessStatus.IsDirectory && ListsDirectories
+        opened.Status == FileAccessStatus.IsDirectory
             ? fileSystem as IDirectoryLister
             : null;
 
     /// <summary>
-    /// Lists a directory as curl 8.21.0's Linux and macOS builds do (<c>lib/file.c</c>,
+    /// Lists a directory as curl 8.22.0 does (<c>lib/file.c</c>,
     /// <c>file_do</c>): numbers the connection and starts the meter as for a file, then
     /// applies <c>-z</c>, writes the <c>-i</c> header block, stops there for <c>-I</c>, and
     /// writes the entry names.

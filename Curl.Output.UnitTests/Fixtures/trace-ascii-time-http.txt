@@ -4,7 +4,7 @@
 03:25:30.937000 => Send header, 84 bytes (0x54)
 0000: GET /f.txt HTTP/1.1
 0015: Host: 127.0.0.1:18292
-002c: User-Agent: curl/8.21.0
+002c: User-Agent: curl/8.22.0
 0045: Accept: */*
 0052: 
 03:25:30.937000 * Request completely sent off

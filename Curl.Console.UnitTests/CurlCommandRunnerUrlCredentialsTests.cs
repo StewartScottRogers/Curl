@@ -45,10 +45,10 @@ public sealed class CurlCommandRunnerUrlCredentialsTests
         Diagnostics.Diff(
             "request",
             Encoding.Latin1.GetBytes(
-                $"GET / HTTP/1.1\r\nHost: 127.0.0.1:47911\r\nAuthorization: Basic {encoded}\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n"),
+                $"GET / HTTP/1.1\r\nHost: 127.0.0.1:47911\r\nAuthorization: Basic {encoded}\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n\r\n"),
             server.Written);
         Assert.AreEqual(
-            $"GET / HTTP/1.1\r\nHost: 127.0.0.1:47911\r\nAuthorization: Basic {encoded}\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n",
+            $"GET / HTTP/1.1\r\nHost: 127.0.0.1:47911\r\nAuthorization: Basic {encoded}\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n\r\n",
             Encoding.Latin1.GetString(server.Written));
         Diagnostics.Assert("stderr length", 0L, standardError.Length);
         Assert.AreEqual(0, standardError.Length);
@@ -69,10 +69,10 @@ public sealed class CurlCommandRunnerUrlCredentialsTests
         Assert.AreEqual(0, exitCode);
         Diagnostics.Diff(
             "request",
-            Encoding.Latin1.GetBytes("GET / HTTP/1.1\r\nHost: 127.0.0.1:47911\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n"),
+            Encoding.Latin1.GetBytes("GET / HTTP/1.1\r\nHost: 127.0.0.1:47911\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n\r\n"),
             server.Written);
         Assert.AreEqual(
-            "GET / HTTP/1.1\r\nHost: 127.0.0.1:47911\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n",
+            "GET / HTTP/1.1\r\nHost: 127.0.0.1:47911\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n\r\n",
             Encoding.Latin1.GetString(server.Written));
     }
 

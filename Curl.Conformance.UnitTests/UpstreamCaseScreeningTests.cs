@@ -65,7 +65,7 @@ public sealed class UpstreamCaseScreeningTests
     public void FindSkipReason_FtpCaseWithFtpPortGivenTheRunnersValue_IsNotSkipped(int testNumber)
     {
         var diagnostics = TestDiagnostics.For(TestContext);
-        byte[] testFile = File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "UpstreamTestData", $"test{testNumber}.rawhttp"));
+        byte[] testFile = File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "UpstreamTestData", $"test{testNumber}.curltest"));
         Dictionary<string, string> variables = new(StringComparer.Ordinal) { ["HOSTIP"] = "127.0.0.1", ["FTPPORT"] = UpstreamCaseRunner.FtpPort, ["TESTNUMBER"] = testNumber.ToString(System.Globalization.CultureInfo.InvariantCulture) };
         UpstreamTestFileExpansion expansion = UpstreamTestFileExpander.Expand(testFile, variables, Features);
 
@@ -107,7 +107,7 @@ public sealed class UpstreamCaseScreeningTests
     public void FindSkipReason_FtpActiveModeOrUploadCase_IsNotSkippedForTheFtpStandIn(int testNumber)
     {
         var diagnostics = TestDiagnostics.For(TestContext);
-        byte[] testFile = File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "UpstreamTestData", $"test{testNumber}.rawhttp"));
+        byte[] testFile = File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "UpstreamTestData", $"test{testNumber}.curltest"));
         Dictionary<string, string> variables = new(StringComparer.Ordinal) { ["HOSTIP"] = "127.0.0.1", ["FTPPORT"] = UpstreamCaseRunner.FtpPort, ["TESTNUMBER"] = testNumber.ToString(CultureInfo.InvariantCulture) };
         UpstreamTestFileExpansion expansion = UpstreamTestFileExpander.Expand(testFile, variables, Features);
 
@@ -140,7 +140,7 @@ public sealed class UpstreamCaseScreeningTests
     public void FindSkipReason_FtpServerCommandCase_RunsUnlessItsAnswersAreTimed(int testNumber, string? expected)
     {
         var diagnostics = TestDiagnostics.For(TestContext);
-        byte[] testFile = File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "UpstreamTestData", $"test{testNumber}.rawhttp"));
+        byte[] testFile = File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "UpstreamTestData", $"test{testNumber}.curltest"));
         Dictionary<string, string> variables = new(StringComparer.Ordinal) { ["HOSTIP"] = "127.0.0.1", ["FTPPORT"] = UpstreamCaseRunner.FtpPort, ["FTPTIME2"] = "8", ["TESTNUMBER"] = testNumber.ToString(CultureInfo.InvariantCulture) };
         UpstreamTestFileExpansion expansion = UpstreamTestFileExpander.Expand(testFile, variables, Features);
 
@@ -164,7 +164,7 @@ public sealed class UpstreamCaseScreeningTests
     public void FindSkipReason_FtpsCase_RunsWithAValueForTheFtpsPort(int testNumber, string? expected)
     {
         var diagnostics = TestDiagnostics.For(TestContext);
-        byte[] testFile = File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "UpstreamTestData", $"test{testNumber}.rawhttp"));
+        byte[] testFile = File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "UpstreamTestData", $"test{testNumber}.curltest"));
         Dictionary<string, string> variables = new(StringComparer.Ordinal)
         {
             ["HOSTIP"] = "127.0.0.1",
@@ -260,7 +260,7 @@ public sealed class UpstreamCaseScreeningTests
     public void FindSkipReason_ProxyCaseGivenTheRunnersProxyPort_IsNotSkippedForProxyPort(int testNumber)
     {
         var diagnostics = TestDiagnostics.For(TestContext);
-        byte[] testFile = File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "UpstreamTestData", $"test{testNumber}.rawhttp"));
+        byte[] testFile = File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "UpstreamTestData", $"test{testNumber}.curltest"));
         Dictionary<string, string> variables = new(StringComparer.Ordinal) { ["HOSTIP"] = "127.0.0.1", ["HTTPPORT"] = UpstreamCaseRunner.HttpPort, ["PROXYPORT"] = UpstreamCaseRunner.ProxyPort, ["TESTNUMBER"] = testNumber.ToString(CultureInfo.InvariantCulture) };
         UpstreamTestFileExpansion expansion = UpstreamTestFileExpander.Expand(testFile, variables, Features);
 
@@ -277,7 +277,7 @@ public sealed class UpstreamCaseScreeningTests
     public void FindSkipReason_ImplicitTlsMailCaseGivenTheRunnersTlsPorts_IsNotSkipped(int testNumber)
     {
         var diagnostics = TestDiagnostics.For(TestContext);
-        byte[] testFile = File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "UpstreamTestData", $"test{testNumber}.rawhttp"));
+        byte[] testFile = File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "UpstreamTestData", $"test{testNumber}.curltest"));
         Dictionary<string, string> variables = new(StringComparer.Ordinal)
         {
             ["HOSTIP"] = "127.0.0.1",
@@ -298,7 +298,7 @@ public sealed class UpstreamCaseScreeningTests
     public void FindSkipReason_NoListenPortGivenTheRunnersValue_IsNotTheReason()
     {
         var diagnostics = TestDiagnostics.For(TestContext);
-        byte[] test19 = File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "UpstreamTestData", "test19.rawhttp"));
+        byte[] test19 = File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "UpstreamTestData", "test19.curltest"));
         Dictionary<string, string> variables = new(StringComparer.Ordinal) { ["HOSTIP"] = "127.0.0.1", ["NOLISTENPORT"] = UpstreamCaseRunner.NoListenPort };
         UpstreamTestFileExpansion expansion = UpstreamTestFileExpander.Expand(test19, variables, Features);
 
@@ -599,5 +599,41 @@ public sealed class UpstreamCaseScreeningTests
         UpstreamTestCase testCase = ParsedTestCase.From("<client>\n<server>\nhttp-proxy\n</server>\n<command>\nhttp://h/1\n</command>\n</client>\n");
 
         Assert.IsNull(UpstreamCaseScreening.FindSkipReason(CleanExpansion, testCase, Features));
+    }
+
+    // ADR-0488: a case another platform's Curl can run is skipped here for that platform's feature
+    // only; one no platform's Curl can run, or one this platform can, is not.
+    [TestMethod]
+    [DataRow("SSL\nSchannel", "linux", "Curl lacks the feature Schannel")]
+    [DataRow("SSL\nSchannel", "darwin", "Curl lacks the feature Schannel")]
+    [DataRow("!Schannel", "MSWin32", "the case needs Curl without the feature Schannel")]
+    [DataRow("OpenSSL", "MSWin32", "Curl lacks the feature OpenSSL")]
+    [DataRow("SSL\nSchannel", "MSWin32", null)]
+    [DataRow("Schannel\nDebug", "MSWin32", null)]
+    [DataRow("Schannel\nDebug", "linux", null)]
+    [DataRow("Schannel\nOpenSSL", "linux", null)]
+    [DataRow("http", "linux", null)]
+    public void FindFeatureOfAnotherPlatform_CaseFeatures_NamesOnlyAFeatureAnotherPlatformMeets(string caseFeatures, string operatingSystemName, string? expected)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        UpstreamCurlPlatform platform = UpstreamCurlPlatform.All.Single(candidate => candidate.OperatingSystemName == operatingSystemName);
+        UpstreamTestCase testCase = ParsedTestCase.From($"<client>\n<features>\n{caseFeatures}\n</features>\n</client>\n");
+        diagnostics.Arrange("case features", caseFeatures);
+        diagnostics.Arrange("platform", operatingSystemName);
+
+        string? reason = UpstreamCaseScreening.FindFeatureOfAnotherPlatform(testCase, platform.Features);
+
+        diagnostics.Act("reason", reason);
+        diagnostics.Assert("reason", expected ?? "null", reason ?? "null");
+        Assert.AreEqual(expected, reason);
+    }
+
+    [TestMethod]
+    public void FindFeatureOfAnotherPlatform_NullArgument_Throws()
+    {
+        UpstreamTestCase testCase = ParsedTestCase.From("<client>\n</client>\n");
+
+        Assert.ThrowsExactly<ArgumentNullException>(() => UpstreamCaseScreening.FindFeatureOfAnotherPlatform(null!, Features));
+        Assert.ThrowsExactly<ArgumentNullException>(() => UpstreamCaseScreening.FindFeatureOfAnotherPlatform(testCase, null!));
     }
 }

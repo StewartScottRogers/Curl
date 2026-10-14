@@ -12,7 +12,7 @@ public sealed partial class CurlCompositionProxyTests
     private const string EstablishedWithHeader = "HTTP/1.1 200 Connection established\r\nX-Proxy: yes\r\n\r\n";
 
     private const string ConnectRequest =
-        "CONNECT example.com:80 HTTP/1.1\r\nHost: example.com:80\r\nUser-Agent: curl/8.21.0\r\nProxy-Connection: Keep-Alive\r\n\r\n";
+        "CONNECT example.com:80 HTTP/1.1\r\nHost: example.com:80\r\nUser-Agent: curl/8.22.0\r\nProxy-Connection: Keep-Alive\r\n\r\n";
 
     [TestMethod]
     [DataRow("-i", DisplayName = "-i")]
@@ -98,7 +98,7 @@ public sealed partial class CurlCompositionProxyTests
         Diagnostics.Assert("run.ExitCode", 0, run.ExitCode);
         Assert.AreEqual(0, run.ExitCode);
         Assert.AreEqual(
-            ConnectRequest + "HEAD /a HTTP/1.1\r\nHost: example.com\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n",
+            ConnectRequest + "HEAD /a HTTP/1.1\r\nHost: example.com\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n\r\n",
             Latin1(server.Written));
         Diagnostics.Assert("run.StandardOutput", EstablishedWithHeader + "HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\n", run.StandardOutput);
         Assert.AreEqual(EstablishedWithHeader + "HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\n", run.StandardOutput);
@@ -115,7 +115,7 @@ public sealed partial class CurlCompositionProxyTests
         Diagnostics.Assert("run.ExitCode", 0, run.ExitCode);
         Assert.AreEqual(0, run.ExitCode);
         Assert.AreEqual(
-            "CONNECT example.com:80 HTTP/1.0\r\nHost: example.com:80\r\nUser-Agent: curl/8.21.0\r\nProxy-Connection: Keep-Alive\r\n\r\n" + TunnelledGet,
+            "CONNECT example.com:80 HTTP/1.0\r\nHost: example.com:80\r\nUser-Agent: curl/8.22.0\r\nProxy-Connection: Keep-Alive\r\n\r\n" + TunnelledGet,
             Latin1(server.Written));
         Diagnostics.Assert("run.StandardOutput", "HTTP/1.0 200 OK\r\n\r\n" + Hello, run.StandardOutput);
         Assert.AreEqual("HTTP/1.0 200 OK\r\n\r\n" + Hello, run.StandardOutput);

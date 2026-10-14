@@ -456,20 +456,6 @@ public sealed class TlsExtensionCodecTests
         AssertRejectsTruncationAndTrailingBytes(extension.Data, CertificateAuthoritiesExtension.Decode);
     }
 
-    [TestMethod]
-    public void SrpRoundTripsTheUserName()
-    {
-        Diagnostics.Arrange("user name", "user");
-
-        TlsExtension extension = SrpExtension.Encode("user"u8.ToArray());
-        Diagnostics.Act("encoded", Convert.ToHexStringLower(extension.Data));
-
-        Assert.AreEqual(TlsExtensionType.Srp, extension.Type);
-        Assert.AreEqual("0475736572", Convert.ToHexStringLower(extension.Data));
-        CollectionAssert.AreEqual("user"u8.ToArray(), SrpExtension.Decode(extension.Data).Value);
-        AssertRejectsTruncationAndTrailingBytes(extension.Data, SrpExtension.Decode);
-    }
-
     private void AssertRejectsTruncationAndTrailingBytes<T>(byte[] data, Func<byte[], TlsDecodeResult<T>> decode)
     {
         TlsAlertDescription? truncated = decode(data[..^1]).Alert;

@@ -56,6 +56,23 @@ public static class UpstreamTestSectionLineEndings
     public static byte[] NormalizeText(ReadOnlySpan<byte> body) =>
         Encoding.Latin1.GetBytes(Encoding.Latin1.GetString(body).Replace("\r\n", "\n", StringComparison.Ordinal).Replace("\n", "\r\n", StringComparison.Ordinal));
 
+    /// <summary>
+    /// <c>mode="warn"</c>: what curl 8.22.0's <c>runtests.pl</c> does to both sides of a stderr
+    /// comparison; on each line the first <c>Warning: </c> and the first carriage return are
+    /// removed and the line feed becomes a space, so a warning wrapped over several lines compares
+    /// equal to the same warning on one (upstream test459, test1712; BL-2172).
+    /// </summary>
+    /// <param name="body">The body.</param>
+    /// <returns>The body with every line so changed.</returns>
+    public static byte[] NormalizeWarnings(ReadOnlySpan<byte> body) =>
+        TransformLines(body, static (line, _) => (WithoutFirst(WithoutFirst(line, "Warning: "), "\r").Replace('\n', ' '), false));
+
+    private static string WithoutFirst(string line, string text)
+    {
+        int index = line.IndexOf(text, StringComparison.Ordinal);
+        return index < 0 ? line : line.Remove(index, text.Length);
+    }
+
     private static (string Line, bool WasHeader) ForceHeaderLineCrlf(string line, bool previousWasHeader)
     {
         if (UpstreamTestHeaderLine.LooksLikeHeader(line))

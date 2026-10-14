@@ -179,6 +179,22 @@ public sealed class LowSpeedWatchdogTests
     }
 
     [TestMethod]
+    public void WatchProgress_RequestRetried_PassesTheRetryOn()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("limit", 1);
+        using LowSpeedWatchdog watchdog = new(1, TimeSpan.FromSeconds(1), clock);
+        RecordingProgress recorded = new();
+        ITransferProgress progress = watchdog.WatchProgress(recorded);
+
+        progress.ReportRequestRetried();
+
+        diagnostics.Act("after retried", recorded.Last);
+        diagnostics.Assert("after retried", "retried", recorded.Last);
+        Assert.AreEqual("retried", recorded.Last);
+    }
+
+    [TestMethod]
     public void WatchProgress_PassesStartedDownloadedAndDoneReportsThrough()
     {
         var diagnostics = TestDiagnostics.For(TestContext);
@@ -366,6 +382,8 @@ public sealed class LowSpeedWatchdogTests
         public string Last { get; private set; } = string.Empty;
 
         public void ReportTransferStarted() => Last = "started";
+
+        public void ReportRequestRetried() => Last = "retried";
 
         public void ReportDownloaded(long bytesSoFar, long? expectedTotal) => Last = $"downloaded {bytesSoFar} of {expectedTotal}";
 

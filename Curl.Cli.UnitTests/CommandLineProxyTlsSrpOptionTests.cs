@@ -5,10 +5,9 @@ namespace Curl.Cli;
 
 /// <summary>
 /// Pins how the parser records <c>--proxy-tlsuser</c>, <c>--proxy-tlspassword</c> and
-/// <c>--proxy-tlsauthtype</c> (BL-1135), measured with curl 8.18.0's OpenSSL build on 2026-10-02: an empty
-/// <c>--proxy-tlsuser</c> is accepted while an empty <c>--proxy-tlspassword</c> is refused as blank, the
-/// opposite of <c>--tlsuser</c> and <c>--tlspassword</c>; <c>--proxy-tlsauthtype</c> refuses an empty value as
-/// blank and anything but <c>SRP</c> as unsupported; and none of the three is reversible with <c>--no-</c>.
+/// <c>--proxy-tlsauthtype</c>: since curl 8.22.0 each only warns that it has no function (ADR-0480, pinned by
+/// <see cref="CommandLineNoFunctionOptionTests"/>), so none records anything, none is reversible with
+/// <c>--no-</c>, and their <c>--ai-help</c> sections do not call them unsupported.
 /// </summary>
 [TestClass]
 public sealed class CommandLineProxyTlsSrpOptionTests
@@ -20,85 +19,6 @@ public sealed class CommandLineProxyTlsSrpOptionTests
     public TestContext TestContext { get; set; } = null!;
 
     private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
-
-    [TestMethod]
-    public void Parse_NoneOfTheOptions_LeavesThemNotGiven()
-    {
-        CommandLineOptions options = Parse([Url]).Options!;
-
-        AssertText("proxy TLS user", null, options.ProxyTlsUser);
-        AssertText("proxy TLS password", null, options.ProxyTlsPassword);
-        AssertText("proxy TLS auth type", null, options.ProxyTlsAuthType);
-        Assert.IsNull(options.ProxyTlsUser);
-        Assert.IsNull(options.ProxyTlsPassword);
-        Assert.IsNull(options.ProxyTlsAuthType);
-    }
-
-    [TestMethod]
-    public void Parse_EveryOption_RecordsTheLastValueVerbatimApartFromTheTargetOptions()
-    {
-        CommandLineParseResult result = Parse(
-        [
-            "--proxy-tlsuser", "u1", "--proxy-tlsuser", "proxyuser",
-            "--proxy-tlspassword", "p1", "--proxy-tlspassword", "proxysecret",
-            "--proxy-tlsauthtype", "SRP",
-            Url,
-        ]);
-
-        Assert.IsTrue(result.IsAccepted);
-        CommandLineOptions options = result.Options;
-        AssertText("proxy TLS user", "proxyuser", options.ProxyTlsUser);
-        AssertText("proxy TLS password", "proxysecret", options.ProxyTlsPassword);
-        AssertText("proxy TLS auth type", "SRP", options.ProxyTlsAuthType);
-        AssertText("TLS user", null, options.TlsUser);
-        AssertText("TLS password", null, options.TlsPassword);
-        AssertText("TLS auth type", null, options.TlsAuthType);
-        Assert.AreEqual("proxyuser", options.ProxyTlsUser);
-        Assert.AreEqual("proxysecret", options.ProxyTlsPassword);
-        Assert.AreEqual("SRP", options.ProxyTlsAuthType);
-        Assert.IsNull(options.TlsUser);
-        Assert.IsNull(options.TlsPassword);
-        Assert.IsNull(options.TlsAuthType);
-    }
-
-    [TestMethod]
-    public void Parse_EmptyProxyTlsUser_IsAccepted()
-    {
-        CommandLineParseResult result = Parse(["--proxy-tlsuser", string.Empty, Url]);
-
-        Assert.IsTrue(result.IsAccepted);
-        AssertText("proxy TLS user", string.Empty, result.Options.ProxyTlsUser);
-        Assert.AreEqual(string.Empty, result.Options.ProxyTlsUser);
-    }
-
-    [TestMethod]
-    [DataRow("--proxy-tlspassword")]
-    [DataRow("--proxy-tlsauthtype")]
-    public void Parse_EmptyValue_RefusesAsBlank(string spelledOption)
-    {
-        CommandLineParseResult result = Parse([spelledOption, string.Empty, Url]);
-
-        AssertRefusal([$"curl: option {spelledOption}: blank argument where content is expected", TryHelp], result);
-        Assert.AreEqual(CurlExitCode.FailedInit, result.Refusal!.ExitCode);
-        CollectionAssert.AreEqual(
-            new[] { $"curl: option {spelledOption}: blank argument where content is expected", TryHelp },
-            result.Refusal.StandardErrorLines.ToArray());
-    }
-
-    [TestMethod]
-    [DataRow("bogus")]
-    [DataRow("srp")]
-    [DataRow("SRP ")]
-    public void Parse_ProxyTlsAuthTypeOtherThanSrp_RefusesAsUnsupported(string value)
-    {
-        CommandLineParseResult result = Parse(["--proxy-tlsauthtype", value, Url]);
-
-        AssertRefusal(["curl: option --proxy-tlsauthtype: the installed libcurl version does not support this", TryHelp], result);
-        Assert.AreEqual(CurlExitCode.FailedInit, result.Refusal!.ExitCode);
-        CollectionAssert.AreEqual(
-            new[] { "curl: option --proxy-tlsauthtype: the installed libcurl version does not support this", TryHelp },
-            result.Refusal.StandardErrorLines.ToArray());
-    }
 
     [TestMethod]
     [DataRow("--no-proxy-tlsuser")]

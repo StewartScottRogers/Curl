@@ -87,7 +87,7 @@ internal static class CurlUrlHost
     {
         normalized = idnHost = string.Empty;
         string? decoded = PercentDecode(host);
-        if (decoded is null || decoded.Any(IsRejectedInName) || decoded.All(IsMappedToNothingOrDot))
+        if (decoded is null || !IsUsableName(decoded))
         {
             return false;
         }
@@ -97,6 +97,9 @@ internal static class CurlUrlHost
 
         return true;
     }
+
+    private static bool IsUsableName(string decoded) =>
+        !decoded.Any(IsRejectedInName) && !decoded.All(IsMappedToNothingOrDot);
 
     /// <summary>
     /// Percent-decodes a host name as UTF-8, leaving a <c>%</c> that does not start a

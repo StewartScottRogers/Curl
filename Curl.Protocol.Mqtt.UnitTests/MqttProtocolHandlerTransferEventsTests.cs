@@ -280,6 +280,17 @@ public sealed class MqttProtocolHandlerTransferEventsTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_TopicDecodedToNul_ReportsOnlyShuttingDown()
+    {
+        // curl's Curl_urldecode fails without failf, so -v shows no line for the message.
+        Run run = await RunAsync("mqtt://h/aa%00bb", Hex(Connack));
+
+        CollectionAssert.AreEqual(
+            DiffTranscript(ConnectAccepted().Concat(["* shutting down connection #0"]).ToArray()),
+            run.Transcript);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_UnexpectedPacketAfterSubscribe_ReportsOnlyShuttingDown()
     {
         Run run = await RunAsync("mqtt://h/t", Hex(Connack), Hex("40 02 00 01"));

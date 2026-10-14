@@ -247,8 +247,8 @@ internal static class FileTransferMessages
         ];
 
     /// <summary>
-    /// The pseudo-headers curl's Linux and macOS builds synthesise for a directory they
-    /// list: only <c>Last-Modified</c>, because curl 8.21.0's <c>file_do</c>
+    /// The pseudo-headers curl synthesises for a directory it lists: only
+    /// <c>Last-Modified</c>, because curl's <c>file_do</c>
     /// (<c>lib/file.c</c> lines 414-444) leaves a directory's size unknown and writes
     /// <c>Content-Length</c> and <c>Accept-ranges</c> only for a known size.
     /// </summary>

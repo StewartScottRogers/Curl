@@ -13,7 +13,7 @@ namespace Curl.Protocol.Dict;
 [TestClass]
 public sealed class DictProtocolHandlerTests
 {
-    private const string Client = "CLIENT libcurl 8.21.0\r\n";
+    private const string Client = "CLIENT libcurl 8.22.0\r\n";
 
     private const string Quit = "QUIT\r\n";
 

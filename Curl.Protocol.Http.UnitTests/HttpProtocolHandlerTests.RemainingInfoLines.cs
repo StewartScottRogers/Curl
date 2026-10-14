@@ -14,7 +14,7 @@ namespace Curl.Protocol.Http;
 /// </summary>
 public sealed partial class HttpProtocolHandlerTests
 {
-    private const string IgnoredGetHead = "GET /a HTTP/1.1\r\nHost: 127.0.0.1:18601\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n";
+    private const string IgnoredGetHead = "GET /a HTTP/1.1\r\nHost: 127.0.0.1:18601\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n\r\n";
 
     [TestMethod]
     public async Task ExecuteAsync_RedirectWithContentLengthFollowedPast_ReportsTheIgnoredBodyBeforeTheHeadsEmptyLine()

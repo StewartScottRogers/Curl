@@ -61,7 +61,7 @@ public sealed partial class CurlCompositionProxyTests
         List<Http2Frame> frames = await ReadFramesAsync(written[Http2Connection.ClientPreface.Length..]);
         Http2Frame connect = frames.First(frame => frame.Type == Http2FrameType.Headers);
         CollectionAssert.AreEqual(
-            new[] { ":method: CONNECT", ":authority: example.com:80", "user-agent: curl/8.21.0" },
+            new[] { ":method: CONNECT", ":authority: example.com:80", "user-agent: curl/8.22.0" },
             new HpackDecoder().Decode(Http2FramePayloadParser.ParseHeaders(connect).Fragment.Span).Select(field => $"{field.Name}: {field.Value}").ToArray());
         Http2Frame tunnelled = frames.First(frame => frame.Type == Http2FrameType.Data);
         Diagnostics.Assert("tunnelled.StreamId", 1, tunnelled.StreamId);

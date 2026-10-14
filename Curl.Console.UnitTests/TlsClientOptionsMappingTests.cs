@@ -212,7 +212,7 @@ public sealed class TlsClientOptionsMappingTests
     /// Parses <paramref name="arguments" /> as if every path exists, then maps the result.
     /// </summary>
     [TestMethod]
-    public void FromCommandLine_TheTenTlsOptionsOfAdr0151_CopiesEachVerbatim()
+    public void FromCommandLine_TheSevenTlsOptionsOfAdr0151StillInUse_CopiesEachVerbatim()
     {
         TlsClientOptions expected = new(
             Curves: "X25519",
@@ -222,15 +222,12 @@ public sealed class TlsClientOptionsMappingTests
             EchPublicName: "example.com",
             EchConfigList: "AEX+DQ==",
             SslSessionsFile: "sess.bin",
-            Engine: "pkcs11",
-            TlsUser: "user",
-            TlsPassword: "secret",
-            TlsAuthType: "SRP");
+            Engine: "pkcs11");
 
         TlsClientOptions mapped = Map(
             "--curves", "X25519", "--sigalgs", "rsa_pss_rsae_sha256", "--tls-earlydata", "--ech", "hard",
             "--ech", "pn:example.com", "--ech", "ecl:AEX+DQ==", "--ssl-sessions", "sess.bin", "--engine", "pkcs11",
-            "--tlsuser", "user", "--tlspassword", "secret", "--tlsauthtype", "SRP", Url);
+            Url);
 
         Diagnostics.Assert("target TLS options", expected, mapped);
         Assert.AreEqual(expected, mapped);
@@ -245,10 +242,10 @@ public sealed class TlsClientOptionsMappingTests
     }
 
     [TestMethod]
-    public void ProxyFromCommandLine_TheProxyTlsSrpOptions_CopiesEachVerbatim()
+    public void ProxyFromCommandLine_TheProxyTlsSrpOptions_CarryNothingSinceCurl8220()
     {
         Assert.AreEqual(
-            Expect(new TlsClientOptions(TlsUser: "proxyuser", TlsPassword: "proxysecret", TlsAuthType: "SRP")),
+            Expect(new TlsClientOptions()),
             MapProxy("--proxy-tlsuser", "proxyuser", "--proxy-tlspassword", "proxysecret", "--proxy-tlsauthtype", "SRP", Url));
     }
 

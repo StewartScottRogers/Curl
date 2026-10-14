@@ -15,7 +15,7 @@ public sealed partial class HttpProtocolHandlerTests
 {
     private const string LoopbackUrl = "http://127.0.0.1:18180/a";
 
-    private const string LoopbackHeaders = "Host: 127.0.0.1:18180\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n";
+    private const string LoopbackHeaders = "Host: 127.0.0.1:18180\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n";
 
     private const string LoopbackGet = "GET /a HTTP/1.1\r\n" + LoopbackHeaders + "\r\n";
 

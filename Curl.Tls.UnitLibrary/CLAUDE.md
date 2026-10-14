@@ -5,7 +5,7 @@ A hand-built TLS client for what `SslStream` cannot do, and for QUIC. ADR-0140
 decides what it does and when Curl uses it: always inside QUIC, where RFC 9001 hands
 handshake bytes to CRYPTO frames and takes secrets per encryption level, and over TCP
 only for what `SslStream` cannot offer (`--curves`, `--sigalgs`, `--tls-earlydata`,
-`--ssl-sessions`, `--no-sessionid`, `--ech`, TLS-SRP, `--cert-status`, TLS 1.0 and 1.1
+`--ssl-sessions`, `--no-sessionid`, `--ech`, `--cert-status`, TLS 1.0 and 1.1
 where the operating system disables them, `--ssl-allow-beast`). Everything else stays on
 `SslStreamTlsProvider` in `Curl.Networking.UnitLibrary`.
 
@@ -17,7 +17,7 @@ TLS 1.2, 1.1 and 1.0 PRF and record protection (BL-702, ADR-0150), the TLS 1.2,
 the stapled OCSP response check for `--cert-status` (BL-705, ADR-0173), TLS 1.3
 certificate decompression (BL-786, ADR-0199), TLS 1.3 and TLS 1.2 offered in one
 ClientHello (BL-821, ADR-0205), post-handshake client authentication (BL-880),
-TLS-SRP (BL-704, ADR-0229), and Encrypted Client Hello (BL-706, ADR-0233).
+and Encrypted Client Hello (BL-706, ADR-0233).
 
 - `HandshakeMessageReader` frames handshake bytes into `HandshakeMessage`s (type and
   body); an unknown type is `unexpected_message`.
@@ -73,7 +73,7 @@ TLS-SRP (BL-704, ADR-0229), and Encrypted Client Hello (BL-706, ADR-0233).
   The typed codecs those hellos needed: `EcPointFormatsExtension`,
   `SessionTicketExtension`, `ExtendedMasterSecretExtension`, `EncryptThenMacExtension`,
   `PostHandshakeAuthExtension`, `CompressCertificateExtension`; also
-  `CertificateAuthoritiesExtension` and `SrpExtension` from ADR-0140's supported list.
+  `CertificateAuthoritiesExtension` from ADR-0140's supported list.
 - `Tls13ClientSettings`: suites, groups, key share groups, signature algorithms, ALPN,
   legacy session ID on or off, the ClientHello extension order and verbatim extra
   extensions (`padding` in the order pads a 256-to-511-byte hello to 512).
@@ -134,7 +134,7 @@ TLS-SRP (BL-704, ADR-0229), and Encrypted Client Hello (BL-706, ADR-0233).
   sending the ChangeCipherSpec and its read state after the server's is accepted. Key
   exchanges: ECDHE (X25519, P-256/384/521, and x448 and brainpoolP256r1/384r1/512r1 when
   offered, ADR-0219), DHE with the server's group (1024 bits at
-  least, authenticated by RSA or DSA), RSA, anonymous and SRP; `Tls12CipherSuite` holds the 113
+  least, authenticated by RSA or DSA), RSA and anonymous; `Tls12CipherSuite` holds the 104
   suites the record layer can protect (`Tls12KeyExchange`, `Tls12Authentication`, bulk
   cipher, MAC, PRF). Covers the ServerKeyExchange signature (TLS 1.2 schemes, and TLS
   1.0/1.1's MD5+SHA-1 RSA and SHA-1 ECDSA and DSA; DSA is checked with
@@ -150,18 +150,9 @@ TLS-SRP (BL-704, ADR-0229), and Encrypted Client Hello (BL-706, ADR-0233).
   groups, TLS 1.2 signature algorithms, ALPN, `status_request`, whether to offer
   `session_ticket`, `extended_master_secret` and `encrypt_then_mac`, the session to
   resume, the client certificate, TLS 1.0 CBC's empty fragment
-  (`InsertEmptyFragment`, off for `--ssl-allow-beast`), `SrpCredentials`, and `PadHello`
+  (`InsertEmptyFragment`, off for `--ssl-allow-beast`), and `PadHello`
   (a 256-to-511-byte hello padded to 512, `padding` last, ADR-0365). The
   ClientHello's extensions follow OpenSSL's order.
-- TLS-SRP (RFC 5054, ADR-0229): `SrpGroup` holds Appendix A's seven groups (`Find` by N
-  and g), `SrpClient` SRP-6a's pure functions (k, x, v, A, u and the premaster secret S,
-  SHA-1 over `BigInteger`). With `Tls12ClientSettings.SrpCredentials`
-  (`TlsSrpCredentials`) the hello carries `srp` after `server_name` and the nine SRP
-  suites (`Tls12KeyExchange.Srp`; plain SRP is `Tls12Authentication.Anonymous`, the others
-  RSA or DSS); without it they are left out. `Tls12SrpParameters` is the ServerKeyExchange's
-  N, g, s and B: a group outside Appendix A is `insufficient_security`, a B of 0 or not
-  below N `illegal_parameter`, and a wrong password fails the server's Finished with
-  `decrypt_error`.
 - TLS 1.2 and below over a byte stream (ADR-0249): the internal `Tls12RecordLayer` reads
   whole records off the caller's `Stream`, removes their protection with the read state in
   force and writes under the write state in force; the ClientHello record carries TLS 1.0,
@@ -198,7 +189,7 @@ TLS-SRP (BL-704, ADR-0229), and Encrypted Client Hello (BL-706, ADR-0233).
   of the same lengths in the outer one, `early_data` in both or neither, and early data
   under the inner hello's early secret; a `pre_shared_key` in a ServerHello that rejected
   ECH is `illegal_parameter`. `EncryptedClientHelloExtension` is the extension codec.
-- `ITlsRandomSource` supplies the random, session ID, key shares, DHE exponent, SRP private value, RSA
+- `ITlsRandomSource` supplies the random, session ID, key shares, DHE exponent, RSA
   pre-master secret and ECH's inner random, HPKE ephemeral key and GREASE bytes;
   `SystemTlsRandomSource` is the production one.
 - `IServerCertificateVerifier` gets the chain as a `ServerCertificateChain` (DER

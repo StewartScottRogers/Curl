@@ -16,7 +16,7 @@ namespace Curl.Protocol.Rtsp;
 [TestClass]
 public sealed class RtspProtocolHandlerMaxFileSizeTests
 {
-    private const string Request = "OPTIONS * RTSP/1.0\r\nCSeq: 1\r\nUser-Agent: curl/8.21.0\r\n\r\n";
+    private const string Request = "OPTIONS * RTSP/1.0\r\nCSeq: 1\r\nUser-Agent: curl/8.22.0\r\n\r\n";
 
     private const string Head = "RTSP/1.0 200 OK\r\nCSeq: 1\r\nContent-Length: 5\r\n\r\n";
 

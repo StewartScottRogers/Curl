@@ -25,7 +25,7 @@ public sealed record HttpProxyTunnelOptions(string? UserAgent, Encoding Credenti
     /// Gets the options curl 8.21.0 uses when no option changes them: <c>User-Agent:
     /// curl/8.21.0</c> and UTF-8 credentials.
     /// </summary>
-    public static HttpProxyTunnelOptions Default { get; } = new("curl/8.21.0", Encoding.UTF8);
+    public static HttpProxyTunnelOptions Default { get; } = new("curl/8.22.0", Encoding.UTF8);
 
     /// <summary>
     /// Gets the <c>--proxy-header</c> values, verbatim and in command-line order: each one

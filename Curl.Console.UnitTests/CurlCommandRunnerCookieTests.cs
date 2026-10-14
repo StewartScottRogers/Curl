@@ -19,7 +19,7 @@ public sealed class CurlCommandRunnerCookieTests
 {
     private const string Url = "http://127.0.0.1:18231/";
 
-    private const string Head = "Host: 127.0.0.1:18231\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n";
+    private const string Head = "Host: 127.0.0.1:18231\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n";
 
     private const string SetsCookie = "HTTP/1.1 200 OK\r\nSet-Cookie: got=g1\r\nContent-Length: 0\r\n\r\n";
 
@@ -94,11 +94,11 @@ public sealed class CurlCommandRunnerCookieTests
             "request starts with the expected cookie header",
             true,
             Latin1(server.Written).StartsWith(
-                $"GET /x HTTP/1.1\r\nHost: 127.0.0.1:18316\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n{expectedCookieHeader}\r\n",
+                $"GET /x HTTP/1.1\r\nHost: 127.0.0.1:18316\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n{expectedCookieHeader}\r\n",
                 StringComparison.Ordinal));
         Assert.AreEqual(0, exitCode);
         Assert.StartsWith(
-            $"GET /x HTTP/1.1\r\nHost: 127.0.0.1:18316\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n{expectedCookieHeader}\r\n",
+            $"GET /x HTTP/1.1\r\nHost: 127.0.0.1:18316\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n{expectedCookieHeader}\r\n",
             Latin1(server.Written));
     }
 
@@ -121,11 +121,11 @@ public sealed class CurlCommandRunnerCookieTests
             "request starts with standard input then the HTTP request",
             true,
             Latin1(server.Written).StartsWith(
-                StandardInputCookies + "GET /x HTTP/1.1\r\nHost: 127.0.0.1:18316\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n",
+                StandardInputCookies + "GET /x HTTP/1.1\r\nHost: 127.0.0.1:18316\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n\r\n",
                 StringComparison.Ordinal));
         Assert.AreEqual(0, exitCode);
         Assert.StartsWith(
-            StandardInputCookies + "GET /x HTTP/1.1\r\nHost: 127.0.0.1:18316\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n",
+            StandardInputCookies + "GET /x HTTP/1.1\r\nHost: 127.0.0.1:18316\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n\r\n",
             Latin1(server.Written));
     }
 

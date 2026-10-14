@@ -6,11 +6,10 @@ using Curl.Testing;
 namespace Curl.Protocol.File;
 
 /// <summary>
-/// Pins a <c>file://</c> URL naming a directory (BL-1401). curl 8.21.0's Linux and macOS
-/// builds list it (<c>lib/file.c</c>, <c>file_do</c>, lines 414-471 and 568-586): the
-/// <c>-i</c> block holds only <c>Last-Modified</c>, <c>-I</c> stops after it, and each
-/// entry name not starting with <c>.</c> is written, then <c>\n</c>. The Windows build
-/// cannot open a directory and exits 37, measured on 2026-10-03.
+/// Pins a <c>file://</c> URL naming a directory (BL-1401). curl 8.22.0 lists it on every
+/// platform (<c>lib/file.c</c>, <c>file_do</c>; <c>win32_file_list</c> on Windows, BL-2166):
+/// the <c>-i</c> block holds only <c>Last-Modified</c>, <c>-I</c> stops after it, and each
+/// entry name not starting with <c>.</c> is written, then <c>\n</c>.
 /// </summary>
 [TestClass]
 public sealed class FileProtocolHandlerDirectoryListingTests
@@ -28,7 +27,7 @@ public sealed class FileProtocolHandlerDirectoryListingTests
     private static byte[] ExpectedListing => Encoding.ASCII.GetBytes("b.txt\na.txt\nsub\n");
 
     [TestMethod]
-    public async Task ExecuteAsync_DirectoryWhenListing_WritesTheNamesNotStartingWithDotEachFollowedByNewline()
+    public async Task ExecuteAsync_Directory_WritesTheNamesNotStartingWithDotEachFollowedByNewline()
     {
         var output = new MemoryStream();
 
@@ -68,46 +67,22 @@ public sealed class FileProtocolHandlerDirectoryListingTests
 
     [TestMethod]
     [OSCondition(OperatingSystems.Windows)]
-    public async Task ExecuteAsync_DirectoryOnWindows_ReportsExitThirtySevenByDefault()
+    public async Task ExecuteAsync_DirectoryOnWindows_ListsByDefault()
     {
         var fileSystem = Listing(EntryNames);
+        var output = new MemoryStream();
 
         Diagnostics.Arrange("url", "file:///dir/sub/");
         Diagnostics.Arrange("entries", string.Join(", ", EntryNames));
 
-        var result = await new FileProtocolHandler(fileSystem).ExecuteAsync(new TransferContext { Url = DirectoryUrl, Output = new MemoryStream() });
+        var result = await new FileProtocolHandler(fileSystem).ExecuteAsync(new TransferContext { Url = DirectoryUrl, Output = output });
 
         Diagnostics.Act("exit code", result.ExitCode);
-        Diagnostics.Act("listed path count", fileSystem.ListedPaths.Count);
-        Diagnostics.Assert("exit code", CurlExitCode.FileCouldntReadFile, result.ExitCode);
-        Assert.AreEqual(CurlExitCode.FileCouldntReadFile, result.ExitCode);
-        Assert.IsEmpty(fileSystem.ListedPaths);
-    }
-
-    [TestMethod]
-    public async Task ExecuteAsync_DirectoryWhenNotListing_ReportsCouldNotOpenFileAndExitThirtySeven()
-    {
-        var fileSystem = Listing(EntryNames);
-        var output = new MemoryStream();
-        var handler = new FileProtocolHandler(fileSystem) { ListsDirectories = false };
-
-        Diagnostics.Arrange("url", "file:///dir/sub/");
-        Diagnostics.Arrange("ListsDirectories", false);
-
-        var result = await handler.ExecuteAsync(new TransferContext { Url = DirectoryUrl, Output = output });
-
-        Diagnostics.Act("exit code", result.ExitCode);
-        Diagnostics.Act("error message", result.ErrorMessage);
-        Diagnostics.Assert("exit code", 37, (int)result.ExitCode);
-        Diagnostics.Assert(
-            "error message",
-            FileTransferMessages.CouldNotOpenForReading("/dir/sub/"),
-            result.ErrorMessage);
-        Assert.AreEqual(CurlExitCode.FileCouldntReadFile, result.ExitCode);
-        Assert.AreEqual(37, (int)result.ExitCode);
-        Assert.AreEqual(FileTransferMessages.CouldNotOpenForReading("/dir/sub/"), result.ErrorMessage);
-        Assert.AreEqual(0L, output.Length);
-        Assert.IsEmpty(fileSystem.ListedPaths);
+        Diagnostics.Diff("listing", ExpectedListing, output.ToArray());
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        CollectionAssert.AreEqual(ExpectedListing, output.ToArray());
+        CollectionAssert.AreEqual(new[] { OsPath }, fileSystem.ListedPaths.ToArray());
     }
 
     [TestMethod]
@@ -115,7 +90,7 @@ public sealed class FileProtocolHandlerDirectoryListingTests
     {
         var fileSystem = new FakeFileSystem();
         fileSystem.AddDirectory(OsPath);
-        var handler = new FileProtocolHandler(fileSystem) { ListsDirectories = true };
+        var handler = new FileProtocolHandler(fileSystem);
 
         Diagnostics.Arrange("url", "file:///dir/sub/");
         Diagnostics.Arrange("file system", "directory /dir/sub/, cannot list");
@@ -128,7 +103,7 @@ public sealed class FileProtocolHandlerDirectoryListingTests
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_MissingPathWhenListing_StillReportsExitThirtySeven()
+    public async Task ExecuteAsync_MissingPathOnAListingFileSystem_StillReportsExitThirtySeven()
     {
         Diagnostics.Arrange("url", "file:///dir/sub/");
         Diagnostics.Arrange("file system", "empty");
@@ -334,5 +309,5 @@ public sealed class FileProtocolHandlerDirectoryListingTests
     }
 
     private static ValueTask<TransferResult> ListAsync(IFileSystem fileSystem, TransferContext context) =>
-        new FileProtocolHandler(fileSystem) { ListsDirectories = true }.ExecuteAsync(context);
+        new FileProtocolHandler(fileSystem).ExecuteAsync(context);
 }

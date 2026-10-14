@@ -42,7 +42,7 @@ internal static class HttpRequestHeadFormatter
     /// <summary>
     /// The <c>User-Agent</c> curl 8.21.0 sends when <c>-A</c> is not given.
     /// </summary>
-    internal const string DefaultUserAgent = "curl/8.21.0";
+    internal const string DefaultUserAgent = "curl/8.22.0";
 
     /// <summary>
     /// The <c>Accept-Encoding</c> value <c>--compressed</c> sends: curl 8.21.0's, the same
@@ -126,7 +126,7 @@ internal static class HttpRequestHeadFormatter
         string? hostLine = FormatHostLine(url, options.FollowedToAnotherHost ? [] : customHeaders);
         AppendHostLine(head, hostLine);
         AppendAlways(head, "Proxy-Authorization", proxyAuthorization);
-        AppendAuthorization(head, customHeaders, authorization);
+        AppendAuthorization(head, customHeaders, authorization, options.HttpSignature is not null);
         AppendUnlessOverridden(head, customHeaders, "Range", range);
         AppendUnlessOverridden(head, customHeaders, "Content-Range", framing.ContentRange);
         AppendClientHeaders(head, customHeaders, options);
@@ -143,6 +143,27 @@ internal static class HttpRequestHeadFormatter
         AppendConnection(head, customHeaders, SendsTe(options, customHeaders), upgradesToH2c);
         head.Append("\r\n");
         return Encoding.Latin1.GetBytes(head.ToString());
+    }
+
+    /// <summary>
+    /// The length, in bytes, at which curl 8.22.0 refuses a request head: its request buffer
+    /// holds at most 1 MiB including a terminating byte, so a head of 1,048,575 bytes is sent
+    /// and one of 1,048,576 is not (measured, BL-2167; upstream test3229).
+    /// </summary>
+    internal const int MaximumRequestHeadLength = 1024 * 1024;
+
+    /// <summary>
+    /// Refuses a head of <see cref="MaximumRequestHeadLength" /> bytes or more with exit 100
+    /// and <c>HTTP request too large</c>, which the handler calls before anything is sent, as
+    /// curl does.
+    /// </summary>
+    /// <param name="head">The formatted head (<see cref="Format" />).</param>
+    internal static void ThrowIfTooLarge(byte[] head)
+    {
+        if (head.Length >= MaximumRequestHeadLength)
+        {
+            throw new HttpTransferException(CurlExitCode.TooLarge, HttpTransferMessages.RequestTooLarge) { InfoLines = [HttpTransferMessages.RequestTooLarge] };
+        }
     }
 
     /// <summary>
@@ -282,11 +303,17 @@ internal static class HttpRequestHeadFormatter
     /// or Negotiate value always, before any <c>-H</c> one, and any other (Basic, Bearer,
     /// <c>--aws-sigv4</c>) only when no <c>-H</c> value names <c>Authorization</c>, because
     /// libcurl's <c>output_auth_headers</c> checks the custom headers for Basic and Bearer alone
-    /// (measured, BL-986 Notes).
+    /// (measured, BL-986 Notes). An <c>--httpsig-*</c> request's value is whole header lines,
+    /// <c>Signature-Input</c> then <c>Signature</c>, written in the same slot whatever the
+    /// <c>-H</c> values are, as curl 8.22.0's <c>output_auth_headers</c> does (BL-2182).
     /// </summary>
-    private static void AppendAuthorization(StringBuilder head, HttpCustomHeader[] customHeaders, string? authorization)
+    private static void AppendAuthorization(StringBuilder head, HttpCustomHeader[] customHeaders, string? authorization, bool isHttpSignature)
     {
-        if (IsSentBesideAuthorizationHeader(authorization))
+        if (isHttpSignature)
+        {
+            AppendLines(head, authorization);
+        }
+        else if (IsSentBesideAuthorizationHeader(authorization))
         {
             AppendAlways(head, "Authorization", authorization);
         }
@@ -316,6 +343,14 @@ internal static class HttpRequestHeadFormatter
     /// engine's <c>Cookie</c> and its <c>Proxy-Authorization</c> beside custom ones (BL-182 and
     /// BL-183 Notes).
     /// </summary>
+    private static void AppendLines(StringBuilder head, string? lines)
+    {
+        if (!string.IsNullOrEmpty(lines))
+        {
+            head.Append(lines).Append("\r\n");
+        }
+    }
+
     private static void AppendAlways(StringBuilder head, string name, string? value)
     {
         if (!string.IsNullOrEmpty(value))

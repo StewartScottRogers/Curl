@@ -100,12 +100,15 @@ public sealed class CurlCommandRunnerRateTests
     }
 
     [TestMethod]
-    public async Task RunAsync_SilentVerbose_StillNotesEachWait()
+    public async Task RunAsync_SilentVerbose_WaitsWithoutANote()
     {
+        // BL-2173: curl 8.22.0's notef writes nothing under -s (measured 2026-10-13).
         await RunAsync(Taking(46), "-s", "-v", "--rate", "2/s", "dict://h/a", "dict://h/b");
 
-        Diagnostics.Assert("stderr contains the note line", true, StandardErrorText.Contains(Note + Environment.NewLine, StringComparison.Ordinal));
-        StringAssert.Contains(StandardErrorText, Note + Environment.NewLine);
+        Diagnostics.Assert("stderr contains Note: ", false, StandardErrorText.Contains("Note: ", StringComparison.Ordinal));
+        Diagnostics.Assert("wait count", 1, clock.Waits.Count);
+        Assert.DoesNotContain("Note: ", StandardErrorText);
+        Assert.HasCount(1, clock.Waits);
     }
 
     [TestMethod]

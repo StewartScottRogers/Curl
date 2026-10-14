@@ -21,10 +21,10 @@ public sealed class VerboseTransferEventWriterTests
     private static readonly IPEndPoint Loopback18229 = new(IPAddress.Loopback, 18229);
 
     private static readonly byte[] RequestHead18228 =
-        "GET /f.txt HTTP/1.1\r\nHost: 127.0.0.1:18228\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n"u8.ToArray();
+        "GET /f.txt HTTP/1.1\r\nHost: 127.0.0.1:18228\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n\r\n"u8.ToArray();
 
     private static readonly byte[] RequestHead18229 =
-        "GET /f.txt HTTP/1.1\r\nHost: 127.0.0.1:18229\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n"u8.ToArray();
+        "GET /f.txt HTTP/1.1\r\nHost: 127.0.0.1:18229\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n\r\n"u8.ToArray();
 
     private readonly MemoryStream output = new();
 
@@ -88,7 +88,7 @@ public sealed class VerboseTransferEventWriterTests
             "* using HTTP/1.x\r\n" +
             "> GET /f.txt HTTP/1.1\r\r\n" +
             "> Host: 127.0.0.1:18228\r\r\n" +
-            "> User-Agent: curl/8.21.0\r\r\n" +
+            "> User-Agent: curl/8.22.0\r\r\n" +
             "> Accept: */*\r\r\n" +
             "> \r\r\n" +
             "* Request completely sent off\r\n" +
@@ -185,7 +185,7 @@ public sealed class VerboseTransferEventWriterTests
         writer.ReportConnectionOpened(Opened(new IPEndPoint(IPAddress.Loopback, 18358), 62241));
         writer.ReportInfo("using HTTP/1.x");
         writer.ReportRequestHeader(
-            "POST /f.txt HTTP/1.1\r\nHost: 127.0.0.1:18358\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n"u8 +
+            "POST /f.txt HTTP/1.1\r\nHost: 127.0.0.1:18358\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n"u8 +
             "Content-Length: 3\r\nContent-Type: application/x-www-form-urlencoded\r\n\r\n"u8);
         writer.ReportDataSent("abc"u8);
         writer.ReportInfo("upload completely sent off: 3 bytes");
@@ -202,7 +202,7 @@ public sealed class VerboseTransferEventWriterTests
             "12:02:01.443000 * using HTTP/1.x\r\n" +
             "12:02:01.443000 > POST /f.txt HTTP/1.1\r\r\n" +
             "12:02:01.443000 > Host: 127.0.0.1:18358\r\r\n" +
-            "12:02:01.443000 > User-Agent: curl/8.21.0\r\r\n" +
+            "12:02:01.443000 > User-Agent: curl/8.22.0\r\r\n" +
             "12:02:01.443000 > Accept: */*\r\r\n" +
             "12:02:01.443000 > Content-Length: 3\r\r\n" +
             "12:02:01.443000 > Content-Type: application/x-www-form-urlencoded\r\r\n" +
@@ -316,7 +316,7 @@ public sealed class VerboseTransferEventWriterTests
             "* using HTTP/1.x\r\n" +
             "> GET /f.txt HTTP/1.1\r\r\n" +
             "> Host: 127.0.0.1:18229\r\r\n" +
-            "> User-Agent: curl/8.21.0\r\r\n" +
+            "> User-Agent: curl/8.22.0\r\r\n" +
             "> Accept: */*\r\r\n" +
             "> \r\r\n" +
             "* Request completely sent off\r\n" +

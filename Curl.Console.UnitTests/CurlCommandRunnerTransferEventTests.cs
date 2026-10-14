@@ -46,7 +46,7 @@ public sealed class CurlCommandRunnerTransferEventTests
             + "* using HTTP/1.x" + InfoEnd
             + "> GET /f.txt HTTP/1.1" + HeaderEnd
             + "> Host: 127.0.0.1:18441" + HeaderEnd
-            + "> User-Agent: curl/8.21.0" + HeaderEnd
+            + "> User-Agent: curl/8.22.0" + HeaderEnd
             + "> Accept: */*" + HeaderEnd
             + "> " + HeaderEnd
             + "* Request completely sent off" + InfoEnd
@@ -117,7 +117,7 @@ public sealed class CurlCommandRunnerTransferEventTests
             + "11:54:11.572000 * using HTTP/1.x" + InfoEnd
             + "11:54:11.572000 > GET /f.txt HTTP/1.1" + HeaderEnd
             + "11:54:11.572000 > Host: 127.0.0.1:18441" + HeaderEnd
-            + "11:54:11.572000 > User-Agent: curl/8.21.0" + HeaderEnd
+            + "11:54:11.572000 > User-Agent: curl/8.22.0" + HeaderEnd
             + "11:54:11.572000 > Accept: */*" + HeaderEnd
             + "11:54:11.572000 > " + HeaderEnd
             + "11:54:11.572000 * Request completely sent off" + InfoEnd
@@ -404,7 +404,7 @@ public sealed class CurlCommandRunnerTransferEventTests
             + "* [MULTI] [DO] xfer_setup: recv_idx=0, send_idx=0" + InfoEnd
             + "> GET /f.txt HTTP/1.1" + HeaderEnd
             + "> Host: 127.0.0.1:18441" + HeaderEnd
-            + "> User-Agent: curl/8.21.0" + HeaderEnd
+            + "> User-Agent: curl/8.22.0" + HeaderEnd
             + "> Accept: */*" + HeaderEnd
             + "> " + HeaderEnd
             + "* Request completely sent off" + InfoEnd
@@ -628,7 +628,7 @@ public sealed class CurlCommandRunnerTransferEventTests
         + ids + "* using HTTP/1.x" + InfoEnd
         + ids + "> GET /f.txt HTTP/1.1" + HeaderEnd
         + ids + "> Host: 127.0.0.1:18441" + HeaderEnd
-        + ids + "> User-Agent: curl/8.21.0" + HeaderEnd
+        + ids + "> User-Agent: curl/8.22.0" + HeaderEnd
         + ids + "> Accept: */*" + HeaderEnd
         + ids + "> " + HeaderEnd
         + ids + "* Request completely sent off" + InfoEnd
@@ -670,7 +670,7 @@ public sealed class CurlCommandRunnerTransferEventTests
             + "11:54:11.572000 => Send header, 84 bytes (0x54)" + InfoEnd
             + "0000: GET /f.txt HTTP/1.1" + InfoEnd
             + "0015: Host: 127.0.0.1:18442" + InfoEnd
-            + "002c: User-Agent: curl/8.21.0" + InfoEnd
+            + "002c: User-Agent: curl/8.22.0" + InfoEnd
             + "0045: Accept: */*" + InfoEnd
             + "0052: " + InfoEnd
             + "11:54:11.572000 * Request completely sent off" + InfoEnd
@@ -765,7 +765,7 @@ public sealed class CurlCommandRunnerTransferEventTests
         + "0010: 31 2e 31 0d 0a 48 6f 73 74 3a 20 31 32 37 2e 30 1.1..Host: 127.0" + InfoEnd
         + "0020: 2e 30 2e 31 3a 31 38 34 32 32 0d 0a 55 73 65 72 .0.1:18422..User" + InfoEnd
         + "0030: 2d 41 67 65 6e 74 3a 20 63 75 72 6c 2f 38 2e 32 -Agent: curl/8.2" + InfoEnd
-        + "0040: 31 2e 30 0d 0a 41 63 63 65 70 74 3a 20 2a 2f 2a 1.0..Accept: */*" + InfoEnd
+        + "0040: 32 2e 30 0d 0a 41 63 63 65 70 74 3a 20 2a 2f 2a 2.0..Accept: */*" + InfoEnd
         + "0050: 0d 0a 0d 0a                                     ...." + InfoEnd
         + "* Request completely sent off" + InfoEnd
         + "<= Recv header, 17 bytes (0x11)" + InfoEnd
@@ -804,7 +804,7 @@ public sealed class CurlCommandRunnerTransferEventTests
             });
             events.ReportInfo("using HTTP/1.x");
             events.ReportRequestHeader(Encoding.ASCII.GetBytes(
-                $"GET /f.txt HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n"));
+                $"GET /f.txt HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n\r\n"));
             events.ReportInfo("Request completely sent off");
             stampClock?.Set(574);
             events.ReportResponseHeader("HTTP/1.1 200 OK\r\n"u8);

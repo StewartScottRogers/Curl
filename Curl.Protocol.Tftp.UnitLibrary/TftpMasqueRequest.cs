@@ -23,7 +23,7 @@ namespace Curl.Protocol.Tftp;
 internal static class TftpMasqueRequest
 {
     /// <summary>The <c>User-Agent</c> curl 8.21.0 sends when <c>-A</c> is not given.</summary>
-    private const string DefaultUserAgent = "curl/8.21.0";
+    private const string DefaultUserAgent = "curl/8.22.0";
 
     /// <summary>
     /// Builds the request for <paramref name="host" /> and <paramref name="port" /> through

@@ -45,9 +45,9 @@ Every row was read from `FileProtocolHandler.cs` — `ExecuteAsync`, `DownloadFr
 and the `TimeProvider` and `DiagnosticLog` rows on 2026-09-29 (BL-927). When the handler
 starts or stops reading a member, change its row in the same commit.
 
-A directory takes the download path's listing branch (`ListDirectoryAsync`, BL-1401) when
-`FileProtocolHandler.ListsDirectories` is set - by default everywhere but Windows - and the
-`IFileSystem` is also an `IDirectoryLister`; it honours `TimeCondition`, `HeaderOutput`
+A directory takes the download path's listing branch (`ListDirectoryAsync`, BL-1401) on
+every platform, as curl 8.22.0 does (BL-2166), when the `IFileSystem` is also an
+`IDirectoryLister`; it honours `TimeCondition`, `HeaderOutput`
 (only `Last-Modified`), `NoBody` and `MaxFileSize` as a file does, and ignores `Range`,
 `RangeText` and `ResumeFrom` beyond skipping `-z`. Otherwise a directory is exit 37.
 

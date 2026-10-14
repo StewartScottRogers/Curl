@@ -1,3 +1,4 @@
+using System.Net;
 using System.Text;
 using Curl.Protocol.Abstractions;
 
@@ -195,8 +196,9 @@ public sealed class MqttServerConnectorTests
 
         ConnectResult result = await mqtt.ConnectAsync(new ConnectTarget("127.0.0.1", 8990, false), CancellationToken.None);
 
-        Assert.IsNotNull(result.Connection);
-        Assert.IsNotInstanceOfType<MqttServerConnection>(result.Connection);
+        SwsHttpServerConnection connection = Assert.IsInstanceOfType<SwsHttpServerConnection>(result.Connection);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(new IPEndPoint(IPAddress.Loopback, 8990), connection.RemoteEndPoint);
     }
 
     [TestMethod]

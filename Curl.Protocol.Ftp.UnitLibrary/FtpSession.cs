@@ -325,6 +325,12 @@ internal sealed class FtpSession(
     /// </summary>
     private async ValueTask<TransferResult?> ConnectAsync()
     {
+        if (HasControlByte(context.Credentials?.UserName) || HasControlByte(context.Credentials?.Password))
+        {
+            // curl 8.22.0 refuses such credentials before it connects, so no command is sent (upstream test2114).
+            return TransferResult.Failure(CurlExitCode.BadFunctionArgument, FtpTransferMessages.CredentialsHaveControlCode);
+        }
+
         try
         {
             TransferResult? failed = await GreetAndLogInAsync().ConfigureAwait(false)
@@ -659,6 +665,11 @@ internal sealed class FtpSession(
             return TransferResult.Failure(CurlExitCode.LoginDenied, FtpTransferMessages.AccountRequested);
         }
 
+        if (HasControlByte(account))
+        {
+            return TransferResult.Failure(CurlExitCode.BadFunctionArgument, FtpTransferMessages.AccountHasControlByte);
+        }
+
         FtpReply acct = await ExchangeAsync("ACCT " + account).ConfigureAwait(false);
         return acct.Code == 230
             ? LoggedIn()
@@ -676,10 +687,22 @@ internal sealed class FtpSession(
             return TransferResult.Failure(CurlExitCode.LoginDenied, FtpTransferMessages.AccessDenied(refusedCode));
         }
 
+        if (HasControlByte(command))
+        {
+            return TransferResult.Failure(CurlExitCode.BadFunctionArgument, FtpTransferMessages.AlternativeUserHasControlByte);
+        }
+
         alternativeUserSent = true;
         FtpReply user = await ExchangeAsync(command).ConfigureAwait(false);
         return await AnswerLoginReplyAsync(user, passwordSent: false).ConfigureAwait(false);
     }
+
+    /// <summary>
+    /// Whether <paramref name="value" /> holds a byte below 0x20, which curl 8.22.0 refuses in
+    /// anything it writes into a login command line: a CR or LF would end the line and let a
+    /// second command follow it (BL-2162).
+    /// </summary>
+    private static bool HasControlByte(string? value) => value is not null && value.Any(character => character < ' ');
 
     /// <summary>Logs the login complete and goes on.</summary>
     private TransferResult? LoggedIn()

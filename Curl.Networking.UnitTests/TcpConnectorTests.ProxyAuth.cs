@@ -27,16 +27,16 @@ public sealed partial class TcpConnectorTests
         "HTTP/1.1 407 Proxy Authentication Required\r\nProxy-Authenticate: Digest realm=\"r\", nonce=\"abc\", qop=\"auth\"\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
 
     private const string UnauthenticatedConnect =
-        "CONNECT example.test:80 HTTP/1.1\r\nHost: example.test:80\r\nUser-Agent: curl/8.21.0\r\nProxy-Connection: Keep-Alive\r\n\r\n";
+        "CONNECT example.test:80 HTTP/1.1\r\nHost: example.test:80\r\nUser-Agent: curl/8.22.0\r\nProxy-Connection: Keep-Alive\r\n\r\n";
 
     // curl's own Digest code's format (ADR-0025) with the measured cnonce and response.
     private const string DigestConnect =
         "CONNECT example.test:80 HTTP/1.1\r\nHost: example.test:80\r\n"
         + "Proxy-Authorization: Digest username=\"u\", realm=\"r\", nonce=\"abc\", uri=\"example.test:80\", cnonce=\"" + MeasuredClientNonce + "\", nc=00000001, qop=auth, response=\"53a4df5585ad72bb9377dd4c05f58fc1\"\r\n"
-        + "User-Agent: curl/8.21.0\r\nProxy-Connection: Keep-Alive\r\n\r\n";
+        + "User-Agent: curl/8.22.0\r\nProxy-Connection: Keep-Alive\r\n\r\n";
 
     private const string BasicConnect =
-        "CONNECT example.test:80 HTTP/1.1\r\nHost: example.test:80\r\nProxy-Authorization: Basic dTpw\r\nUser-Agent: curl/8.21.0\r\nProxy-Connection: Keep-Alive\r\n\r\n";
+        "CONNECT example.test:80 HTTP/1.1\r\nHost: example.test:80\r\nProxy-Authorization: Basic dTpw\r\nUser-Agent: curl/8.22.0\r\nProxy-Connection: Keep-Alive\r\n\r\n";
 
     private static readonly ProxyEndpoint AuthenticatingProxy = new(ProxyKind.Http, "127.0.0.1", 18602, new NetworkCredential("u", "p"));
 

@@ -60,6 +60,33 @@ public sealed class SmtpProtocolHandlerCommandTests
     }
 
     [TestMethod]
+    [DataRow("a@b\r\nDELE x", DisplayName = "CR LF")]
+    [DataRow("a@b\nDELE x", DisplayName = "LF alone")]
+    [DataRow("a@b\rDELE x", DisplayName = "CR alone")]
+    public async Task ExecuteAsync_VrfyRecipientWithLineBreak_QuitsWithExit43BeforeVrfy(string recipient)
+    {
+        // Measured on curl 8.22.0 (BL-2177): EHLO, QUIT, curl: (43) Refusing to send email address with a CR or LF.
+        CommandRun run = await RunAsync(EhloReply + Bye, new MailRequestOptions { Recipients = [recipient] });
+
+        Diagnostics.Diff("sent", Ehlo + Quit, run.Sent);
+        Assert.AreEqual(Ehlo + Quit, run.Sent);
+        Assert.AreEqual(CurlExitCode.BadFunctionArgument, run.Result.ExitCode);
+        Assert.AreEqual("Refusing to send email address with a CR or LF", run.Result.ErrorMessage);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ExpnRecipientWithCrLf_IsSentAsItIsAsCurlDoes()
+    {
+        // Measured on curl 8.22.0 (BL-2177): -X EXPN --mail-rcpt "a@b\r\nDELE x" sends the address raw, exit 0.
+        CommandRun run = await RunAsync(
+            EhloReply + Verified + Verified + Bye, new MailRequestOptions { Recipients = ["a@b\r\nDELE x"], CustomCommand = "EXPN" });
+
+        Diagnostics.Diff("sent", Ehlo + "EXPN a@b\r\nDELE x SMTPUTF8\r\n" + Quit, run.Sent);
+        Assert.AreEqual(Ehlo + "EXPN a@b\r\nDELE x SMTPUTF8\r\n" + Quit, run.Sent);
+        Assert.AreEqual(CurlExitCode.Ok, run.Result.ExitCode);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_TwoRecipients_SendsVrfyForEach()
     {
         CommandRun run = await RunAsync(EhloReply + Verified + Verified + Bye, new MailRequestOptions { Recipients = ["a@b", "c@d"] });

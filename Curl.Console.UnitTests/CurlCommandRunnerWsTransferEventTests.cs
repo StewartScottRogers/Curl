@@ -52,7 +52,7 @@ public sealed class CurlCommandRunnerWsTransferEventTests
             + "* using HTTP/1.x" + InfoEnd
             + "> GET /p HTTP/1.1" + HeaderEnd
             + "> Host: 127.0.0.1:47932" + HeaderEnd
-            + "> User-Agent: curl/8.21.0" + HeaderEnd
+            + "> User-Agent: curl/8.22.0" + HeaderEnd
             + "> Accept: */*" + HeaderEnd
             + "> Upgrade: websocket" + HeaderEnd
             + "> Sec-WebSocket-Version: 13" + HeaderEnd
@@ -177,7 +177,7 @@ public sealed class CurlCommandRunnerWsTransferEventTests
             + "=> Send header, 193 bytes (0xc1)\n"
             + "0000: GET /p HTTP/1.1\n"
             + "0011: Host: 127.0.0.1:47932\n"
-            + "0028: User-Agent: curl/8.21.0\n"
+            + "0028: User-Agent: curl/8.22.0\n"
             + "0041: Accept: */*\n"
             + "004e: Upgrade: websocket\n"
             + "0062: Sec-WebSocket-Version: 13\n"

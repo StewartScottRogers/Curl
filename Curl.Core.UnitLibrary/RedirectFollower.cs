@@ -592,6 +592,7 @@ public sealed class RedirectFollower(
             : hopHttp with
             {
                 BearerToken = null,
+                HttpSignature = null,
                 Headers = [.. hopHttp.Headers.Where(header => !IsCredentialHeader(header))],
                 SendsCookieStrings = false,
             };
@@ -611,9 +612,18 @@ public sealed class RedirectFollower(
     private static string HostAndPort(CurlUrl url) =>
         url.IsDefaultPort ? url.Host : string.Create(CultureInfo.InvariantCulture, $"{url.Host}:{url.Port}");
 
-    private static bool IsCredentialHeader(string header) =>
-        header.StartsWith("Authorization:", StringComparison.OrdinalIgnoreCase)
-        || header.StartsWith("Cookie:", StringComparison.OrdinalIgnoreCase);
+    /// <summary>
+    /// Tells whether an <c>-H</c> value names <c>Authorization</c> or <c>Cookie</c>, with any
+    /// blanks between the name and its colon ignored, as curl 8.22.0 drops
+    /// <c>Authorization : s3cr3t</c> from a redirect to another host (upstream test2113, BL-2163).
+    /// </summary>
+    private static bool IsCredentialHeader(string header)
+    {
+        int colon = header.IndexOf(':', StringComparison.Ordinal);
+        ReadOnlySpan<char> name = colon < 0 ? [] : header.AsSpan(0, colon).TrimEnd(" \t");
+        return name.Equals("Authorization", StringComparison.OrdinalIgnoreCase)
+            || name.Equals("Cookie", StringComparison.OrdinalIgnoreCase);
+    }
 
     /// <summary>
     /// The mail options a hop carries: the first hop's, with the <c>--oauth2-bearer</c> token
@@ -632,7 +642,7 @@ public sealed class RedirectFollower(
         if (mail is null)
         {
             // An HTTP first URL carries no mail options, but its --oauth2-bearer token is withheld all the same.
-            return first.Http?.BearerToken is null ? null : new MailRequestOptions { BearerTokenWithheld = true };
+            return first.Http!.BearerToken is null ? null : new MailRequestOptions { BearerTokenWithheld = true };
         }
 
         return mail.BearerToken is null ? mail : mail with { BearerToken = null, BearerTokenWithheld = true };

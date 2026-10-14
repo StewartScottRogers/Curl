@@ -31,6 +31,9 @@ namespace Curl.Protocol.Smb;
 /// </remarks>
 public sealed class SmbProtocolHandler : IProtocolHandler
 {
+    /// <summary>The user name or password held a byte below 0x20 (exit 43), curl 8.22.0's text (BL-2179).</summary>
+    private const string CredentialsHaveControlCode = "control code detected in credentials";
+
     private const int DefaultPort = 445;
 
     private const string SecureScheme = "smbs";
@@ -87,8 +90,22 @@ public sealed class SmbProtocolHandler : IProtocolHandler
         return result;
     }
 
+    /// <summary>
+    /// The exit 43 curl 8.22.0 refuses <paramref name="credentials" /> with before it connects when the
+    /// user name or password holds a byte below 0x20, or <see langword="null" /> when neither does (BL-2179).
+    /// </summary>
+    private static TransferResult? RefuseControlBytes(System.Net.NetworkCredential? credentials) =>
+        credentials is not null && (credentials.UserName.Any(character => character < ' ') || credentials.Password.Any(character => character < ' '))
+            ? TransferResult.Failure(CurlExitCode.BadFunctionArgument, CredentialsHaveControlCode)
+            : null;
+
     private async ValueTask<TransferResult> ConnectAndTransferAsync(ITransferContext context)
     {
+        if (RefuseControlBytes(context.Credentials) is { } credentialsRefused)
+        {
+            return credentialsRefused;
+        }
+
         CurlUrl url = context.Url;
         if (SmbUrlPath.TryParse(url.AbsolutePath, out SmbUrlPath? path) is { } pathError)
         {

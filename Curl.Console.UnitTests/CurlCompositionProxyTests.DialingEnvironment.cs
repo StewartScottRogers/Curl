@@ -10,7 +10,7 @@ namespace Curl.Console;
 /// </summary>
 public sealed partial class CurlCompositionProxyTests
 {
-    private const string DirectGet = "GET /a HTTP/1.1\r\nHost: example.com\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n";
+    private const string DirectGet = "GET /a HTTP/1.1\r\nHost: example.com\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n\r\n";
 
     [TestMethod]
     public async Task CreateRunner_DialingRunGivenHttpProxy_SendsTheRequestToTheProxy()

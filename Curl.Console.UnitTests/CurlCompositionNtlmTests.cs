@@ -22,7 +22,7 @@ public sealed class CurlCompositionNtlmTests
 
     private const string Url = "http://127.0.0.1:18526/x";
 
-    private const string Request = "GET /x HTTP/1.1\r\nHost: 127.0.0.1:18526\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n";
+    private const string Request = "GET /x HTTP/1.1\r\nHost: 127.0.0.1:18526\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n\r\n";
 
     private const string Type2 = "TlRMTVNTUAACAAAADAAMADgAAAAzgoriASNFZ4mrze8AAAAAAAAAACQAJABEAAAABgBwFwAAAA9TAGUAcgB2AGUAcgACAAwARABvAG0AYQBpAG4AAQAMAFMAZQByAHYAZQByAAAAAAAA";
 
@@ -56,7 +56,7 @@ public sealed class CurlCompositionNtlmTests
     public async Task RunAsync_ProxyNtlmThroughAForwardProxy_SendsType1ThenType3OnOneConnection()
     {
         // Measured (BL-604 Notes): curl -x http://127.0.0.1:18605 --proxy-ntlm -U u:p http://example.test/.
-        const string proxyRequest = "GET http://example.test/ HTTP/1.1\r\nHost: example.test\r\nProxy-Authorization: NTLM {0}\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\nProxy-Connection: Keep-Alive\r\n\r\n";
+        const string proxyRequest = "GET http://example.test/ HTTP/1.1\r\nHost: example.test\r\nProxy-Authorization: NTLM {0}\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\nProxy-Connection: Keep-Alive\r\n\r\n";
         TokenSource tokens = new();
         ScriptedConnector server = Server("HTTP/1.1 407 Proxy Authentication Required\r\nProxy-Authenticate: NTLM " + Type2 + "\r\nContent-Length: 0\r\n\r\n", Ok);
 

@@ -546,6 +546,34 @@ public sealed class CommandLineConfigFileTests
     }
 
     [TestMethod]
+    [DataRow("10000", "data = arg with space\n", "uses argument with unquoted whitespace. This may cause side-effects. Consider double quotes.")]
+    [DataRow("10000", "data = 'arg\n", "uses argument with leading single quote. It is probably a mistake. Consider double quotes.")]
+    public void Parse_ConfigFileWarningAtTheParsesColumnsVariable_KeepsItOnOneLine(string columns, string configText, string warningEnd)
+    {
+        // curl 8.22.0 at COLUMNS=10000 (upstream test459, test1712) keeps a config file's warning on
+        // one line, however long the file's path; a parse given an environment reader takes COLUMNS
+        // from it, not from this process (BL-2172).
+        const string LongPath = "C:/Temp/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/bbbbbbbbbbbbbbbbbbbbbbbb/log/test459/config";
+        RecordingDataFileReader reader = new();
+        reader.Files[LongPath] = Encoding.UTF8.GetBytes(configText);
+        string[] arguments = ["-K", LongPath, Url];
+        TestDiagnostics.For(TestContext).ArrangeArguments(arguments);
+
+        CommandLineParseResult result = CommandLineParser.Parse(
+            arguments,
+            _ => true,
+            new UnexpectedPasswordPrompt(),
+            reader,
+            new DefaultConfigFileSearch(_ => null, false, null, null),
+            false,
+            name => name == "COLUMNS" ? columns : null);
+
+        string expected = $"Warning: {LongPath}:1 Option 'data' {warningEnd}";
+        TestDiagnostics.For(TestContext).Assert("WarningLines", expected, string.Join("|", result.WarningLines));
+        CollectionAssert.AreEqual(new[] { expected }, result.WarningLines.ToArray());
+    }
+
+    [TestMethod]
     [DataRow("-K", "")]
     [DataRow("--config=", null)]
     public void Parse_EmptyConfigFileName_IsRefusedAsUnreadable(string option, string? value)

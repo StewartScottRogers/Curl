@@ -31,7 +31,7 @@ namespace Curl.Conformance;
 /// they name by its path, relative to the working directory when not absolute, as nothing when it
 /// is not there. <c>%HOSTIP</c> and <c>%CLIENTIP</c> are <c>127.0.0.1</c>, <c>%HTTPPORT</c> is
 /// <see cref="HttpPort"/>, <c>%HOST6IP</c> is <c>[::1]</c>, <c>%HTTP6PORT</c> is <see cref="Http6Port"/>, <c>%RESOLVE</c> is the name
-/// <see cref="UpstreamResolveCheck"/> emulates in a precheck, <c>%PROXYPORT</c> is <see cref="ProxyPort"/>, <c>%FTPPORT</c> is <see cref="FtpPort"/>, <c>%SMTPPORT</c> is <see cref="SmtpPort"/>, <c>%IMAPPORT</c> is <see cref="ImapPort"/>, <c>%POP3PORT</c> is <see cref="Pop3Port"/>, <c>%SOCKSPORT</c> is <see cref="SocksPort"/>, <c>%MQTTPORT</c> is <see cref="MqttPort"/>, <c>%TFTPPORT</c> is <see cref="TftpPort"/>,<c>%RTSPPORT</c> is <see cref="RtspPort"/>, <c>%HTTPSPORT</c>, <c>%SMTPSPORT</c>, <c>%IMAPSPORT</c>, <c>%POP3SPORT</c> and <c>%FTPSPORT</c> are <see cref="HttpsPort"/>, <see cref="SmtpsPort"/>, <see cref="ImapsPort"/>, <see cref="Pop3sPort"/> and <see cref="FtpsPort"/> when a certificate directory is named, <c>%NOLISTENPORT</c> is <see cref="NoListenPort"/>, a port that refuses every connection, <c>%FTPTIME2</c> is <c>8</c> (the seconds upstream gives FTP time-out cases on a host whose FTP server checks in under a second), and <c>%VERSION</c> is <see cref="CurlVersion"/>. Every other variable
+/// <see cref="UpstreamResolveCheck"/> emulates in a precheck, <c>%PROXYPORT</c> is <see cref="ProxyPort"/>, <c>%FTPPORT</c> is <see cref="FtpPort"/>, <c>%SMTPPORT</c> is <see cref="SmtpPort"/>, <c>%IMAPPORT</c> is <see cref="ImapPort"/>, <c>%POP3PORT</c> is <see cref="Pop3Port"/>, <c>%SOCKSPORT</c> is <see cref="SocksPort"/>, <c>%MQTTPORT</c> is <see cref="MqttPort"/>, <c>%TFTPPORT</c> is <see cref="TftpPort"/>,<c>%RTSPPORT</c> is <see cref="RtspPort"/>, <c>%HTTPSPORT</c>, <c>%SMTPSPORT</c>, <c>%IMAPSPORT</c>, <c>%POP3SPORT</c> and <c>%FTPSPORT</c> are <see cref="HttpsPort"/>, <see cref="SmtpsPort"/>, <see cref="ImapsPort"/>, <see cref="Pop3sPort"/> and <see cref="FtpsPort"/> when a certificate directory is named, <c>%GOPHERPORT</c> is <see cref="GopherPort"/>, <c>%HTTP2PORT</c> is <see cref="Http2Port"/>, <c>%NOLISTENPORT</c> is <see cref="NoListenPort"/>, a port that refuses every connection, <c>%FTPTIME2</c> is <c>8</c> (the seconds upstream gives FTP time-out cases on a host whose FTP server checks in under a second), and <c>%VERSION</c> is <see cref="CurlVersion"/>. Every other variable
 /// is unknown, so a case that uses one is skipped.
 /// </para>
 /// </remarks>
@@ -110,11 +110,20 @@ public sealed class UpstreamCaseRunner(
     /// <summary>The value of <c>%FTPSPORT</c> when the caller names a certificate directory: connections to this port reach the FTP control channel through implicit TLS, <see cref="FtpsServerConnector"/>, presenting <c>%CERTDIR/certs/test-localhost.pem</c>.</summary>
     public const string FtpsPort = "9007";
 
+    /// <summary>The value of <c>%GOPHERPORT</c>: connections to this port reach the Gopher emulation, <see cref="GopherServerConnector"/>, whose selector lines follow the tftpd emulation's dump for <c>&lt;verify&gt;&lt;protocol&gt;</c>.</summary>
+    public const string GopherPort = "9008";
+
+    /// <summary>
+    /// The value of <c>%HTTP2PORT</c>, upstream's nghttpx front of sws. No HTTP/2 stand-in stands behind it, so screening
+    /// skips a case naming the <c>http/2</c> server, and a connection to this port reaches the sws emulation like any other.
+    /// </summary>
+    public const string Http2Port = "9009";
+
     /// <summary>The value of <c>%NOLISTENPORT</c>: connections to this port are refused, <see cref="NoListenPortConnector"/>.</summary>
     public const string NoListenPort = "47";
 
     /// <summary>The value of <c>%VERSION</c>: the curl release Curl matches.</summary>
-    public const string CurlVersion = "8.21.0";
+    public const string CurlVersion = "8.22.0";
 
     private const string HostAddress = "127.0.0.1";
 
@@ -172,10 +181,23 @@ public sealed class UpstreamCaseRunner(
             return UpstreamCaseOutcome.Skipped(parsed.Failure.Message);
         }
 
-        return (UpstreamCaseScreening.FindSkipReason(expansion, parsed.TestCase, platform.Features)
-                ?? UpstreamCaseScreening.FindFileOutsideLogDirectory(parsed.TestCase, logDirectory)) is { } reason
+        return Screen(expansion, parsed.TestCase, logDirectory)
+            ?? await RunScreenedAsync(parsed.TestCase, testNumber, logDirectoryVariable, certificateDirectory).ConfigureAwait(false);
+    }
+
+    // The skip outcome of a case the harness cannot run here, or null when it can run: first a
+    // case only another platform's Curl has the features for (ADR-0488), then every other reason.
+    private UpstreamCaseOutcome? Screen(UpstreamTestFileExpansion expansion, UpstreamTestCase testCase, string logDirectory)
+    {
+        if (UpstreamCaseScreening.FindFeatureOfAnotherPlatform(testCase, platform.Features) is { } otherPlatformReason)
+        {
+            return UpstreamCaseOutcome.SkippedOnThisPlatform(otherPlatformReason);
+        }
+
+        return (UpstreamCaseScreening.FindSkipReason(expansion, testCase, platform.Features)
+                ?? UpstreamCaseScreening.FindFileOutsideLogDirectory(testCase, logDirectory)) is { } reason
             ? UpstreamCaseOutcome.Skipped(reason)
-            : await RunScreenedAsync(parsed.TestCase, testNumber, logDirectoryVariable, certificateDirectory).ConfigureAwait(false);
+            : null;
     }
 
     private static void RefuseABlank(string directory, string description, string parameterName)
@@ -266,6 +288,8 @@ public sealed class UpstreamCaseRunner(
             ["RESOLVE"] = UpstreamResolveCheck.Program,
             ["HOST6IP"] = Host6Address,
             ["HTTP6PORT"] = Http6Port,
+            ["GOPHERPORT"] = GopherPort,
+            ["HTTP2PORT"] = Http2Port,
         };
 
     private async Task<UpstreamCaseOutcome> RunScreenedAsync(UpstreamTestCase testCase, int testNumber, string logDirectory, string? certificateDirectory)
@@ -297,7 +321,8 @@ public sealed class UpstreamCaseRunner(
         ImapServerConnector imap = new(testCase, smtp);
         Pop3ServerConnector pop3 = new(testCase, imap);
         MqttServerConnector mqtt = new(testCase, new SocksServerConnector(testCase, MailTlsServer(testCase, FtpsServer(testCase, pop3, certificateDirectory), certificateDirectory)));
-        IConnector servers = sshServer?.InFrontOf(mqtt) ?? mqtt;
+        GopherServerConnector gopher = new(testCase, mqtt);
+        IConnector servers = sshServer?.InFrontOf(gopher) ?? gopher;
         // A CONNECT through the http-proxy to a mail port or the FTP control or passive port reaches that stand-in
         // (test1319 to 1321, BL-2011; test714 and test715, BL-2035).
         server.TunnelServerForPort = port => TunnelledPorts.Contains(port) ? pop3 : null;
@@ -322,6 +347,7 @@ public sealed class UpstreamCaseRunner(
             (pop3.ProtocolLog, pop3.ProtocolDump),
             (mqtt.ProtocolLog, mqtt.ProtocolDump),
             (tftp.ProtocolLog, tftp.ProtocolDump),
+            (gopher.ReceivedBytes, gopher.ReceivedDump),
         ]);
         byte[] outputFileBytes = ReadOutputFile(outputFile);
         return Judge(testCase, () => new UpstreamCaseRun(exitCode, standardOutput.ToArray(), standardError.ToArray(), receivedBytes, outputFileBytes)

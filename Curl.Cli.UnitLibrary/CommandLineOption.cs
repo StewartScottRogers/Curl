@@ -106,7 +106,7 @@ public sealed class CommandLineOption
     /// the parse reads as curl's Windows Schannel build (<see cref="CommandLineOptions.ActsAsWindowsSchannelBuild"/>),
     /// whose libcurl was built without the feature the option asks for, and otherwise applied as before. The
     /// refusal comes after a missing value is refused as <c>requires parameter</c> and before the value is
-    /// checked, so <c>--tlsauthtype ''</c> is refused as unsupported, not as blank (measured with curl 8.21.0
+    /// checked, so <c>--ssl-sessions ''</c> is refused as unsupported, not as blank (measured for <c>--tlsauthtype ''</c> with curl 8.21.0
     /// Schannel, 2026-10-02, BL-1278).
     /// </summary>
     /// <returns>The row, refused on the Windows Schannel build.</returns>
@@ -224,7 +224,9 @@ public sealed class CommandLineOption
 
     /// <summary>
     /// Creates a row for an option that takes a value and that curl 8.21.0 still accepts but that no
-    /// longer does anything (<c>--egd-file</c>, <c>--random-file</c>, <c>--krb4</c>): the value, empty
+    /// longer does anything (<c>--egd-file</c>, <c>--random-file</c>, <c>--krb4</c>, and since curl 8.22.0 the
+    /// six TLS-SRP options <c>--tlsuser</c>, <c>--tlspassword</c>, <c>--tlsauthtype</c> and their <c>--proxy-</c>
+    /// forms, ADR-0480): the value, empty
     /// included, is taken and ignored, and <see cref="CommandLineWarning.DeprecatedWithNoFunction(string)"/>
     /// is added unless <c>-s</c> / <c>--silent</c> has been read already. Its <c>--no-</c> spelling is
     /// refused as not reversible, and a missing value as for any value option.

@@ -40,7 +40,7 @@ public sealed partial class HttpProtocolHandlerTests
 
     private const string ProxyRequestStart = "GET http://example.invalid/ HTTP/1.1\r\nHost: example.invalid\r\n";
 
-    private const string ProxyRequestEnd = "User-Agent: curl/8.21.0\r\nAccept: */*\r\nProxy-Connection: Keep-Alive\r\n\r\n";
+    private const string ProxyRequestEnd = "User-Agent: curl/8.22.0\r\nAccept: */*\r\nProxy-Connection: Keep-Alive\r\n\r\n";
 
     private const string ProxyBasic = "Proxy-Authorization: Basic dTpw\r\n";
 
@@ -537,13 +537,15 @@ public sealed partial class HttpProtocolHandlerTests
 
     /// <summary>
     /// A 407 from an HTTP/1.0 proxy to a body chunked for its unknown length fails with exit 25,
-    /// as the answering request would go out as HTTP/1.0 (upstream test1072's proxy twin).
+    /// on the new connection the answering request goes out on as HTTP/1.0, before writing a
+    /// byte to it (BL-2130, upstream test1072's proxy twin).
     /// </summary>
     [TestMethod]
-    public async Task ExecuteAsync_Http10407ToABodyOfUnknownLength_ReturnsUploadFailed()
+    public async Task ExecuteAsync_Http10407ToABodyOfUnknownLength_ReconnectsThenReturnsUploadFailed()
     {
         string http10Challenge = ProxyBasicChallengeHead.Replace("HTTP/1.1", "HTTP/1.0", StringComparison.Ordinal);
         TurnTakingConnection connection = new(65536, http10Challenge + "PPP");
+        TurnTakingConnection second = new(65536, "HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok");
         MemoryStream output = new();
         TransferContext context = new()
         {
@@ -554,12 +556,14 @@ public sealed partial class HttpProtocolHandlerTests
         Diagnostics.Arrange("scripted response", OneLine(http10Challenge + "PPP"));
         Diagnostics.Arrange("request body", "unseekable stream of unknown length");
 
-        TransferResult result = await ProxyChallengeHandler(QueueConnector.For(connection), HttpAuthSchemes.Any).ExecuteAsync(context);
+        TransferResult result = await ProxyChallengeHandler(QueueConnector.For(connection, second), HttpAuthSchemes.Any).ExecuteAsync(context);
 
         WriteResult(result);
         Diagnostics.Assert("exit code", CurlExitCode.UploadFailed, result.ExitCode);
+        Diagnostics.Assert("bytes written to the second connection", 0, second.Written.Length);
         Assert.AreEqual(CurlExitCode.UploadFailed, result.ExitCode);
         Assert.AreEqual(string.Empty, Latin1(output.ToArray()));
+        Assert.AreEqual(string.Empty, second.Written);
     }
 
     /// <summary>

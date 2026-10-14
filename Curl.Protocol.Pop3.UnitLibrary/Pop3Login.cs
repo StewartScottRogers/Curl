@@ -146,6 +146,14 @@ internal sealed class Pop3Login(Pop3ControlChannel channel, ISaslAuthenticator? 
         message.Length == 0 ? EmptyMessage : Convert.ToBase64String(message);
 
     /// <summary>
+    /// Encodes an initial response sent on its own line after a <c>+</c>: empty when the
+    /// response is, as curl 8.22.0 sends <c>AUTH=EXTERNAL</c>'s empty user name (upstream
+    /// test884), otherwise base64. An empty answer to a challenge stays <c>=</c>.
+    /// </summary>
+    private static string EncodeDeferredInitialResponse(byte[] message) =>
+        message.Length == 0 ? string.Empty : Convert.ToBase64String(message);
+
+    /// <summary>
     /// The challenge a continuation carries: its text after the <c>+</c> and any spaces,
     /// decoded from base64. Text that is not base64 is an empty challenge when it starts with
     /// <c>=</c> or <paramref name="mechanism" /> ignores it, so LOGIN answers <c>+ !!!</c> as
@@ -352,7 +360,7 @@ internal sealed class Pop3Login(Pop3ControlChannel channel, ISaslAuthenticator? 
             : unsentInitialResponse;
         if (initialResponse is not null)
         {
-            return Encode(initialResponse);
+            return EncodeDeferredInitialResponse(initialResponse);
         }
 
         if (DecodeChallenge(response, exchange.Mechanism, challengesHanded++) is not { } challenge)

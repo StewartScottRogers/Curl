@@ -8,9 +8,9 @@ namespace Curl.Cli;
 /// Pins how the parser records the ten TLS options of ADR-0151: <c>--curves</c>, <c>--sigalgs</c>,
 /// <c>--tls-earlydata</c>, <c>--ech</c>, <c>--ssl-sessions</c>, <c>--engine</c>, <c>--dump-ca-embed</c>,
 /// <c>--tlsuser</c>, <c>--tlspassword</c> and <c>--tlsauthtype</c>, with curl 8.21.0's value checks
-/// (<c>src/tool_getparam.c</c>, tag <c>curl-8_21_0</c>): blank values refused where curl denies them,
-/// <c>--tlsauthtype</c> refused for anything but <c>SRP</c> as the OpenSSL build measured, and
-/// <c>--engine list</c> and <c>--dump-ca-embed</c> ending the command line as <c>-V</c> does.
+/// (<c>src/tool_getparam.c</c>, tag <c>curl-8_21_0</c>): blank values refused where curl denies them, and
+/// <c>--engine list</c> and <c>--dump-ca-embed</c> ending the command line as <c>-V</c> does. The last three
+/// only warn since curl 8.22.0 (ADR-0480); <see cref="CommandLineNoFunctionOptionTests"/> pins that.
 /// </summary>
 [TestClass]
 public sealed class CommandLineTlsHandshakeOptionTests
@@ -30,7 +30,6 @@ public sealed class CommandLineTlsHandshakeOptionTests
 
         Diagnostics.Assert("curves", null, options.Curves);
         Diagnostics.Assert("TLS early data", false, options.TlsEarlyData);
-        Diagnostics.Assert("TLS auth type", null, options.TlsAuthType);
         Assert.IsNull(options.Curves);
         Assert.IsNull(options.SignatureAlgorithms);
         Assert.IsFalse(options.TlsEarlyData);
@@ -41,9 +40,6 @@ public sealed class CommandLineTlsHandshakeOptionTests
         Assert.IsNull(options.Engine);
         Assert.IsFalse(options.EngineListRequested);
         Assert.IsFalse(options.CaEmbedDumpRequested);
-        Assert.IsNull(options.TlsUser);
-        Assert.IsNull(options.TlsPassword);
-        Assert.IsNull(options.TlsAuthType);
     }
 
     [TestMethod]
@@ -55,9 +51,6 @@ public sealed class CommandLineTlsHandshakeOptionTests
             "--sigalgs", "x", "--sigalgs", "rsa_pss_rsae_sha256:ECDSA+SHA256",
             "--ssl-sessions", "old.bin", "--ssl-sessions", "sess.bin",
             "--engine", "first", "--engine", "pkcs11",
-            "--tlsuser", "u1", "--tlsuser", "user",
-            "--tlspassword", "p1", "--tlspassword", "secret",
-            "--tlsauthtype", "SRP",
             Url,
         ]);
 
@@ -66,9 +59,6 @@ public sealed class CommandLineTlsHandshakeOptionTests
         Diagnostics.Assert("signature algorithms", "rsa_pss_rsae_sha256:ECDSA+SHA256", recorded?.SignatureAlgorithms);
         Diagnostics.Assert("SSL sessions file", "sess.bin", recorded?.SslSessionsFile);
         Diagnostics.Assert("engine", "pkcs11", recorded?.Engine);
-        Diagnostics.Assert("TLS user", "user", recorded?.TlsUser);
-        Diagnostics.Assert("TLS password", "secret", recorded?.TlsPassword);
-        Diagnostics.Assert("TLS auth type", "SRP", recorded?.TlsAuthType);
         Assert.IsTrue(result.IsAccepted);
         CommandLineOptions options = result.Options;
         Assert.AreEqual("X25519:P-384", options.Curves);
@@ -76,9 +66,6 @@ public sealed class CommandLineTlsHandshakeOptionTests
         Assert.AreEqual("sess.bin", options.SslSessionsFile);
         Assert.AreEqual("pkcs11", options.Engine);
         Assert.IsFalse(options.EngineListRequested);
-        Assert.AreEqual("user", options.TlsUser);
-        Assert.AreEqual("secret", options.TlsPassword);
-        Assert.AreEqual("SRP", options.TlsAuthType);
     }
 
     [TestMethod]
@@ -87,8 +74,6 @@ public sealed class CommandLineTlsHandshakeOptionTests
     [DataRow("--ech")]
     [DataRow("--ssl-sessions")]
     [DataRow("--engine")]
-    [DataRow("--tlsuser")]
-    [DataRow("--tlsauthtype")]
     public void Parse_EmptyValue_RefusesAsBlank(string spelledOption)
     {
         CommandLineParseResult result = Parse([spelledOption, string.Empty, Url]);
@@ -97,31 +82,6 @@ public sealed class CommandLineTlsHandshakeOptionTests
         Assert.AreEqual(CurlExitCode.FailedInit, result.Refusal!.ExitCode);
         CollectionAssert.AreEqual(
             new[] { $"curl: option {spelledOption}: blank argument where content is expected", TryHelp },
-            result.Refusal.StandardErrorLines.ToArray());
-    }
-
-    [TestMethod]
-    public void Parse_EmptyTlsPassword_IsAccepted()
-    {
-        CommandLineParseResult result = Parse(["--tlspassword", string.Empty, Url]);
-
-        Diagnostics.Assert("TLS password", "\"\"", "\"" + CommandLineParseDiagnostics.Peek(result.Options)?.TlsPassword + "\"");
-        Assert.IsTrue(result.IsAccepted);
-        Assert.AreEqual(string.Empty, result.Options.TlsPassword);
-    }
-
-    [TestMethod]
-    [DataRow("bogus")]
-    [DataRow("srp")]
-    [DataRow("SRP ")]
-    public void Parse_TlsAuthTypeOtherThanSrp_RefusesAsUnsupported(string value)
-    {
-        CommandLineParseResult result = Parse(["--tlsauthtype", value, Url]);
-
-        Diagnostics.AssertRefusal(result, CurlExitCode.FailedInit, ["curl: option --tlsauthtype: the installed libcurl version does not support this", TryHelp]);
-        Assert.AreEqual(CurlExitCode.FailedInit, result.Refusal!.ExitCode);
-        CollectionAssert.AreEqual(
-            new[] { "curl: option --tlsauthtype: the installed libcurl version does not support this", TryHelp },
             result.Refusal.StandardErrorLines.ToArray());
     }
 
@@ -422,9 +382,6 @@ public sealed class CommandLineTlsHandshakeOptionTests
             Diagnostics.Act("engine", options.Engine);
             Diagnostics.Act("engine list requested", options.EngineListRequested);
             Diagnostics.Act("CA embed dump requested", options.CaEmbedDumpRequested);
-            Diagnostics.Act("TLS user", options.TlsUser);
-            Diagnostics.Act("TLS password", options.TlsPassword);
-            Diagnostics.Act("TLS auth type", options.TlsAuthType);
         }
 
         return result;

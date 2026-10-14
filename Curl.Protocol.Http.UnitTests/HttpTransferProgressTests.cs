@@ -40,7 +40,7 @@ public sealed class HttpTransferProgressTests
         progress.ReportDownloaded(0, 2);
         progress.ReportTransferStarted();
 
-        string[] expected = ["started", "up 5/5", "down 4/4", "started", "up 0/5", "down 0/2"];
+        string[] expected = ["started", "up 5/5", "down 4/4", "retried", "up 0/5", "down 0/2"];
         Diagnostics.Act("reports", string.Join(" | ", sink.Reports));
         Diagnostics.Assert("reports", string.Join(" | ", expected), string.Join(" | ", sink.Reports));
         CollectionAssert.AreEqual(expected, sink.Reports.ToArray());

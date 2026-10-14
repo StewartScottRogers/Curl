@@ -27,7 +27,9 @@ internal static class MqttTopic
     /// <param name="url">The transfer's URL.</param>
     /// <returns>The topic's bytes, never empty.</returns>
     /// <exception cref="MqttTransferException">
-    /// The path names no topic, or the topic is over 65535 bytes; both are exit 3.
+    /// The path names no topic, the decoded topic holds a control byte (0x00 to 0x1F, as
+    /// curl's <c>Curl_urldecode</c> rejects with <c>REJECT_CTRL</c>; upstream test 2109), or
+    /// the topic is over 65535 bytes; all three are exit 3.
     /// </exception>
     internal static byte[] Decode(CurlUrl url)
     {
@@ -38,6 +40,11 @@ internal static class MqttTopic
         }
 
         byte[] topic = PercentDecode(Encoding.UTF8.GetBytes(path[1..]));
+        if (topic.AsSpan().IndexOfAnyInRange((byte)0x00, (byte)0x1F) >= 0)
+        {
+            throw new MqttTransferException(CurlExitCode.UrlMalformat, MqttTransferMessages.ControlByteInTopic);
+        }
+
         if (topic.Length > MaximumLength)
         {
             throw new MqttTransferException(CurlExitCode.UrlMalformat, MqttTransferMessages.TopicTooLong);

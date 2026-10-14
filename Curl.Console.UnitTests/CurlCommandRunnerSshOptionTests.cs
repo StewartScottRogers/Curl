@@ -246,9 +246,9 @@ public sealed class CurlCommandRunnerSshOptionTests
         Diagnostics.Assert(
             "stdout ends where curl fails",
             true,
-            StandardOutputText.EndsWith("  curl_easy_setopt(curl, CURLOPT_USERAGENT, \"curl/8.21.0\");\n  curl_easy_cleanup(curl);\n  curl = NULL;\n\n  return (int)result;\n}\n/**** End of sample code ****/\n", StringComparison.Ordinal));
+            StandardOutputText.EndsWith("  curl_easy_setopt(curl, CURLOPT_USERAGENT, \"curl/8.22.0\");\n  curl_easy_cleanup(curl);\n  curl = NULL;\n\n  return (int)result;\n}\n/**** End of sample code ****/\n", StringComparison.Ordinal));
         Assert.EndsWith(
-            "  curl_easy_setopt(curl, CURLOPT_USERAGENT, \"curl/8.21.0\");\n  curl_easy_cleanup(curl);\n  curl = NULL;\n\n  return (int)result;\n}\n/**** End of sample code ****/\n",
+            "  curl_easy_setopt(curl, CURLOPT_USERAGENT, \"curl/8.22.0\");\n  curl_easy_cleanup(curl);\n  curl = NULL;\n\n  return (int)result;\n}\n/**** End of sample code ****/\n",
             Encoding.UTF8.GetString(standardOutput.ToArray()));
     }
 

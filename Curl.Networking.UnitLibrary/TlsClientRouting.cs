@@ -26,7 +26,6 @@ public static class TlsClientRouting
         (NamesGroupsOrSignatureAlgorithms, "--curves or --sigalgs names the groups or signature algorithms"),
         (options => options.SslSessionsFile is not null, "--ssl-sessions imports and exports sessions"),
         (options => EchModes.Of(options) != EchMode.Off, "--ech offers Encrypted Client Hello"),
-        (UsesTlsSrp, "--tlsuser turns on TLS-SRP"),
         (options => options.NoSessionId, "--no-sessionid turns off the session cache"),
         (AllowsBeastOnTls10, "--ssl-allow-beast with a TLS 1.0 minimum turns off the CBC split"),
         (options => options.AllowEarlyData, "--tls-earlydata sends 0-RTT early data"),
@@ -61,10 +60,6 @@ public static class TlsClientRouting
     // ceiling is hand-built already; this adds a TLS 1.0 minimum under a higher one.
     private static bool AllowsBeastOnTls10(TlsClientOptions options) =>
         options.AllowBeast && options.MinimumVersion is TlsVersion.Tls10;
-
-    // The TLS-SRP row (ADR-0229, ADR-0328, BL-712): SslStream has no SRP, and --tlsuser alone
-    // turns it on, as libcurl defaults the TLS authentication type to SRP once a user is set.
-    private static bool UsesTlsSrp(TlsClientOptions options) => options.TlsUser is not null;
 
     // The --curves and --sigalgs row (ADR-0151, BL-709): SslStream offers the groups and
     // signature schemes the operating system chooses.

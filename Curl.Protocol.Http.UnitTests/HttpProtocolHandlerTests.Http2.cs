@@ -438,9 +438,9 @@ public sealed partial class HttpProtocolHandlerTests
         CollectionAssert.Contains(events.Info, "using HTTP/2");
         Diagnostics.Assert(
             "request head event",
-            OneLine("> GET / HTTP/2\r\nHost: example.com\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n"),
+            OneLine("> GET / HTTP/2\r\nHost: example.com\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n\r\n"),
             OneLine(events.Events.First(line => line.StartsWith("> ", StringComparison.Ordinal))));
-        Assert.AreEqual("> GET / HTTP/2\r\nHost: example.com\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n", events.Events.First(line => line.StartsWith("> ", StringComparison.Ordinal)));
+        Assert.AreEqual("> GET / HTTP/2\r\nHost: example.com\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n\r\n", events.Events.First(line => line.StartsWith("> ", StringComparison.Ordinal)));
     }
 
     [TestMethod]
@@ -472,9 +472,9 @@ public sealed partial class HttpProtocolHandlerTests
                 "* [HTTP/2] [1] [:scheme: https]",
                 "* [HTTP/2] [1] [:authority: example.com]",
                 "* [HTTP/2] [1] [:path: /?x]",
-                "* [HTTP/2] [1] [user-agent: curl/8.21.0]",
+                "* [HTTP/2] [1] [user-agent: curl/8.22.0]",
                 "* [HTTP/2] [1] [accept: */*]",
-                "> GET /?x HTTP/2\r\nHost: example.com\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n",
+                "> GET /?x HTTP/2\r\nHost: example.com\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n\r\n",
             ],
             events.Events.Skip(opened).Take(8));
         CollectionAssert.AreEqual(
@@ -485,9 +485,9 @@ public sealed partial class HttpProtocolHandlerTests
                 "* [HTTP/2] [1] [:scheme: https]",
                 "* [HTTP/2] [1] [:authority: example.com]",
                 "* [HTTP/2] [1] [:path: /?x]",
-                "* [HTTP/2] [1] [user-agent: curl/8.21.0]",
+                "* [HTTP/2] [1] [user-agent: curl/8.22.0]",
                 "* [HTTP/2] [1] [accept: */*]",
-                "> GET /?x HTTP/2\r\nHost: example.com\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n",
+                "> GET /?x HTTP/2\r\nHost: example.com\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n\r\n",
             },
             events.Events.Skip(opened).Take(8).ToArray());
     }

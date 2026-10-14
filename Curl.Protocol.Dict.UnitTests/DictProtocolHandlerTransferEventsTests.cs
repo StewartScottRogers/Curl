@@ -23,9 +23,9 @@ public sealed class DictProtocolHandlerTransferEventsTests
     private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
 
     [TestMethod]
-    [DataRow("dict://h/d:word", "CLIENT libcurl 8.21.0\r\nDEFINE ! word\r\nQUIT\r\n")]
-    [DataRow("dict://h/m:word:db:strategy", "CLIENT libcurl 8.21.0\r\nMATCH db strategy word\r\nQUIT\r\n")]
-    [DataRow("dict://h/", "CLIENT libcurl 8.21.0\r\n\r\nQUIT\r\n")]
+    [DataRow("dict://h/d:word", "CLIENT libcurl 8.22.0\r\nDEFINE ! word\r\nQUIT\r\n")]
+    [DataRow("dict://h/m:word:db:strategy", "CLIENT libcurl 8.22.0\r\nMATCH db strategy word\r\nQUIT\r\n")]
+    [DataRow("dict://h/", "CLIENT libcurl 8.22.0\r\n\r\nQUIT\r\n")]
     public async Task ExecuteAsync_ReplyThenClose_ReportsTheRequestTheReplyTheZeroByteCloseAndShuttingDown(string url, string request)
     {
         // Measured: "=> Send data, 44/53/31 bytes", "<= Recv data, 68 bytes", "<= Recv data, 0 bytes (0x0)",
@@ -60,10 +60,10 @@ public sealed class DictProtocolHandlerTransferEventsTests
         await new DictProtocolHandler(Connector(new ScriptedConnection(), 0)).ExecuteAsync(Context(url, events));
         Diagnostics.Act("transcript", DiagnosticText.Lines(events.Transcript));
 
-        string[] expected = ["* lookup word is missing", "=> CLIENT libcurl 8.21.0\r\n" + command + "\r\nQUIT\r\n", "<= ", "* shutting down connection #0"];
+        string[] expected = ["* lookup word is missing", "=> CLIENT libcurl 8.22.0\r\n" + command + "\r\nQUIT\r\n", "<= ", "* shutting down connection #0"];
         Diagnostics.Assert("transcript", DiagnosticText.Lines(expected), DiagnosticText.Lines(events.Transcript));
         CollectionAssert.AreEqual(
-            new[] { "* lookup word is missing", "=> CLIENT libcurl 8.21.0\r\n" + command + "\r\nQUIT\r\n", "<= ", "* shutting down connection #0" },
+            new[] { "* lookup word is missing", "=> CLIENT libcurl 8.22.0\r\n" + command + "\r\nQUIT\r\n", "<= ", "* shutting down connection #0" },
             events.Transcript);
     }
 
@@ -99,7 +99,7 @@ public sealed class DictProtocolHandlerTransferEventsTests
         CollectionAssert.AreEqual(
             new[]
             {
-                "=> CLIENT libcurl 8.21.0\r\nDEFINE ! w\r\nQUIT\r\n",
+                "=> CLIENT libcurl 8.22.0\r\nDEFINE ! w\r\nQUIT\r\n",
                 "<= 220 ok\r\n",
                 "<= 221 bye\r\n",
                 "<= ",

@@ -48,7 +48,6 @@ public sealed class CurlCommandRunnerCustomRequestNoteTests
     [DataRow(new[] { "-v", "-X", "POST", "-F", "a=b" }, "POST")]
     [DataRow(new[] { "-v", "-X", "HEAD", "-I" }, "HEAD")]
     [DataRow(new[] { "-v", "-X", "GET", "-d", "x", "-G" }, "GET")]
-    [DataRow(new[] { "-v", "-s", "-X", "GET" }, "GET")]
     public async Task RunAsync_VerboseMethodRepeatsTheInferredOne_WritesTheNoteFirst(string[] options, string method)
     {
         await RunAsync([.. options, "-o", "out", Url]);
@@ -129,10 +128,29 @@ public sealed class CurlCommandRunnerCustomRequestNoteTests
         Assert.AreEqual(0, standardError.Length);
     }
 
+    /// <summary>
+    /// Upstream test1740 (ADR-0482): curl 8.22.0's <c>notef</c> writes nothing under <c>-s</c>, so
+    /// <c>--silent -X POST -d foo</c> under the harness's <c>--trace-ascii</c>, or under <c>-v</c>,
+    /// with <c>-S</c> or not, writes no <c>Note:</c> line (measured 2026-10-13, BL-2173).
+    /// </summary>
+    /// <param name="options">The options before the output file and URL.</param>
+    [TestMethod]
+    [DataRow(new[] { "--silent", "-X", "POST", "-d", "foo", "--trace-ascii", "trace1740" })]
+    [DataRow(new[] { "-v", "-s", "-X", "POST", "-d", "foo" })]
+    [DataRow(new[] { "-v", "-s", "-S", "-X", "GET" })]
+    public async Task RunAsync_SilentTracedMethodRepeatsTheInferredOne_WritesNoNote(string[] options)
+    {
+        await RunAsync([.. options, "-o", "out", Url]);
+
+        string error = Encoding.UTF8.GetString(standardError.ToArray());
+        Diagnostics.Assert("stderr contains Note: ", false, error.Contains("Note: ", StringComparison.Ordinal));
+        Assert.DoesNotContain("Note: ", error);
+    }
+
     [TestMethod]
     public async Task RunAsync_VerboseGetForTwoUrls_WritesTheNoteAgainAfterTheFirstTransfersLeftIntactLine()
     {
-        await RunAsync(["-v", "-s", "-X", "GET", "-o", "one", Url, "-o", "two", "http://127.0.0.1:1/b"]);
+        await RunAsync(["-v", "--no-progress-meter", "-X", "GET", "-o", "one", Url, "-o", "two", "http://127.0.0.1:1/b"]);
 
         string[] lines = StandardErrorLines;
         int leftIntact = Array.IndexOf(lines, "* Connection #0 to host 127.0.0.1:1 left intact");

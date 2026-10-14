@@ -969,7 +969,7 @@ public sealed partial class SwsHttpServerConnectorTests
     }
 
     [TestMethod]
-    public async Task ConnectionMonitor_IsOneFlagForTheServer_SoOnlyTheFirstCloseAfterARequestIsRecorded()
+    public async Task ConnectionMonitor_IsPerConnection_SoEveryMonitoredConnectionsCloseIsRecorded()
     {
         Diagnostics.Arrange("servercmd", "connection-monitor, two connections");
         SwsHttpServerConnector server = new(Case(Reply("data", "first\n"), Reply("servercmd", "connection-monitor\n")));
@@ -981,7 +981,7 @@ public sealed partial class SwsHttpServerConnectorTests
         await first.DisposeAsync();
         await second.DisposeAsync();
 
-        Assert.AreEqual(Get + Get + "[DISCONNECT]\n", Observe("recorded", Get + Get + "[DISCONNECT]\n", Text(server.ReceivedBytes)));
+        Assert.AreEqual(Get + Get + "[DISCONNECT]\n[DISCONNECT]\n", Observe("recorded", Get + Get + "[DISCONNECT]\n[DISCONNECT]\n", Text(server.ReceivedBytes)));
     }
 
     [TestMethod]

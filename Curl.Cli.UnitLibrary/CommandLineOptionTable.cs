@@ -118,6 +118,10 @@ public static class CommandLineOptionTable
         CommandLineOption.Text("service-name", null, (options, service) => options.ServiceName = service),
         CommandLineOption.Text("oauth2-bearer", null, (options, token) => options.SetBearerToken(token)),
         CommandLineOption.Value("aws-sigv4", null, AcceptingEmpty((options, parameter) => options.AwsSigV4 = parameter)),
+        CommandLineOption.Text("httpsig-algo", null, (options, algorithm) => options.HttpSignatureAlgorithm = algorithm),
+        CommandLineOption.FileName("httpsig-key", null, (options, key) => options.HttpSignatureKey = key),
+        CommandLineOption.Text("httpsig-keyid", null, (options, keyId) => options.HttpSignatureKeyId = keyId),
+        CommandLineOption.Text("httpsig-headers", null, (options, components) => options.HttpSignatureHeaders = components),
         CommandLineOption.NegatableFlag("netrc", 'n', (options, on) => options.NetrcRequested = on),
         CommandLineOption.NegatableFlag("netrc-optional", null, (options, on) => options.NetrcOptionalRequested = on),
         CommandLineOption.Value("netrc-file", null, SettingExistingFile("--netrc-file", (options, file) => options.NetrcFile = file)),
@@ -230,11 +234,11 @@ public static class CommandLineOptionTable
         CommandLineOption.Value("proxy-crlfile", null, SettingExistingFile("--proxy-crlfile", (options, file) => options.ProxyCertificateRevocationListFile = file)),
         CommandLineOption.Text("proxy-pinnedpubkey", null, (options, pins) => options.ProxyPinnedPublicKey = pins),
         CommandLineOption.NegatableFlag("proxy-ca-native", null, (options, on) => options.ProxyUseNativeCaStore = on),
+        CommandLineOption.NoFunctionValue("proxy-tlsuser"),
+        CommandLineOption.NoFunctionValue("proxy-tlspassword"),
+        CommandLineOption.NoFunctionValue("proxy-tlsauthtype"),
         CommandLineOption.NegatableFlag("proxy-ssl-auto-client-cert", null, (options, on) => options.ProxyAutoClientCertificate = on),
         CommandLineOption.NegatableFlag("proxy-ssl-allow-beast", null, (options, on) => options.ProxyAllowBeast = on),
-        CommandLineOption.Value("proxy-tlsuser", null, AcceptingEmpty((options, user) => options.ProxyTlsUser = user)).RefusedBySchannelBuild(),
-        CommandLineOption.Text("proxy-tlspassword", null, (options, password) => options.ProxyTlsPassword = password).RefusedBySchannelBuild(),
-        CommandLineOption.Value("proxy-tlsauthtype", null, (options, value, spelledOption, _, _) => SetTlsAuthType(value, spelledOption, type => options.ProxyTlsAuthType = type)).RefusedBySchannelBuild(),
         CommandLineOption.FileName("cert", 'E', (options, certificate) => options.ClientCertificate = certificate),
         CommandLineOption.FileName("key", null, (options, key) => options.PrivateKey = key),
         CommandLineOption.Text("cert-type", null, (options, type) => options.ClientCertificateType = type),
@@ -264,9 +268,9 @@ public static class CommandLineOptionTable
         CommandLineOption.FileName("ssl-sessions", null, (options, file) => options.SslSessionsFile = file).RefusedBySchannelBuild(),
         CommandLineOption.Text("engine", null, SetEngine),
         CommandLineOption.Flag("dump-ca-embed", null, options => options.CaEmbedDumpRequested = true),
-        CommandLineOption.Text("tlsuser", null, (options, user) => options.TlsUser = user).RefusedBySchannelBuild(),
-        CommandLineOption.Value("tlspassword", null, AcceptingEmpty((options, password) => options.TlsPassword = password)).RefusedBySchannelBuild(),
-        CommandLineOption.Value("tlsauthtype", null, (options, value, spelledOption, _, _) => SetTlsAuthType(value, spelledOption, type => options.TlsAuthType = type)).RefusedBySchannelBuild(),
+        CommandLineOption.NoFunctionValue("tlsuser"),
+        CommandLineOption.NoFunctionValue("tlspassword"),
+        CommandLineOption.NoFunctionValue("tlsauthtype"),
         CommandLineOption.Value("range", 'r', SetRange),
         CommandLineOption.Value("continue-at", 'C', SetResumeFrom),
         CommandLineOption.Value("max-filesize", null, SetMaxFileSize),
@@ -712,28 +716,6 @@ public static class CommandLineOptionTable
     {
         options.Engine = name;
         options.EngineListRequested = name == "list";
-    }
-
-    /// <summary>
-    /// Sets <see cref="CommandLineOptions.TlsAuthType"/> or <see cref="CommandLineOptions.ProxyTlsAuthType"/>
-    /// through <paramref name="setAuthType"/> as curl does for <c>--tlsauthtype</c> and <c>--proxy-tlsauthtype</c>:
-    /// an empty value is refused as blank, and any value but <c>SRP</c> (compared case-sensitively) with
-    /// <see cref="CommandLineRefusal.InstalledLibcurlDoesNotSupport"/>, the only type it supports.
-    /// </summary>
-    private static CommandLineRefusal? SetTlsAuthType(string value, string spelledOption, Action<string> setAuthType)
-    {
-        if (value.Length == 0)
-        {
-            return CommandLineRefusal.BlankArgument(spelledOption);
-        }
-
-        if (value != "SRP")
-        {
-            return CommandLineRefusal.InstalledLibcurlDoesNotSupport(spelledOption);
-        }
-
-        setAuthType(value);
-        return null;
     }
 
     /// <summary>
@@ -1230,14 +1212,18 @@ public static class CommandLineOptionTable
 
     /// <summary>
     /// Records a <c>--proto</c> or <c>--proto-redir</c> value read by <see cref="CommandLineProtocolSet"/>,
-    /// warning (unless silent) about each name curl does not know, or refuses with
-    /// <see cref="CommandLineRefusal.BadlyUsedHere"/>, after those warnings, a value that allows no scheme.
+    /// or refuses with <see cref="CommandLineRefusal.UnrecognizedProtocol"/> a value naming a scheme curl does
+    /// not know and with <see cref="CommandLineRefusal.BadlyUsedHere"/> a value that allows no scheme, as curl
+    /// 8.22.0 does (BL-2143).
     /// </summary>
     private static CommandLineRefusal? SetAllowedProtocols(CommandLineOptions options, string value, string spelledOption, Action<IReadOnlySet<string>> set)
     {
-        List<string> warningLines = [];
-        IReadOnlySet<string>? allowed = CommandLineProtocolSet.Read(value, warningLines);
-        options.AddWarningLinesUnlessSilent(warningLines);
+        IReadOnlySet<string>? allowed = CommandLineProtocolSet.Read(value, out string? unrecognizedName);
+        if (unrecognizedName is not null)
+        {
+            return CommandLineRefusal.UnrecognizedProtocol(spelledOption, unrecognizedName, options.ErrorsHidden);
+        }
+
         if (allowed is null)
         {
             return CommandLineRefusal.BadlyUsedHere(spelledOption);

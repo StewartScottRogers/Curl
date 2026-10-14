@@ -31,7 +31,7 @@ public sealed class CurlCommandRunnerAltSvcTests
 
     private const string OwnOriginEntry = $"h1 localhost 18443 h1 localhost 18443 {Future} 0 0";
 
-    private const string RequestHead = "User-Agent: curl/8.21.0\r\nAccept: */*\r\n";
+    private const string RequestHead = "User-Agent: curl/8.22.0\r\nAccept: */*\r\n";
 
     private static readonly DateTimeOffset Now = new(2026, 9, 29, 11, 5, 35, TimeSpan.Zero);
 

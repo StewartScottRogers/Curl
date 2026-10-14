@@ -24,7 +24,7 @@ public sealed class CurlCompositionAwsSigV4Tests
 
     private const string EmptyPayloadHash = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
 
-    private const string Tail = "User-Agent: curl/8.21.0\r\nAccept: */*\r\n";
+    private const string Tail = "User-Agent: curl/8.22.0\r\nAccept: */*\r\n";
 
     private static readonly DateTimeOffset MeasuredForBl628 = new(2026, 9, 29, 6, 1, 11, TimeSpan.Zero);
 

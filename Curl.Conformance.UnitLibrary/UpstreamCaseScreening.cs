@@ -14,7 +14,7 @@ namespace Curl.Conformance;
 /// does not act on (a <c>&lt;tool&gt;</c> libtest,
 /// a <c>&lt;verify&gt;&lt;upload&gt;</c>, …); when a precheck or postcheck line is not a
 /// <c>%PERL -e</c> one-liner <see cref="UpstreamPerlOneLiner"/> interprets; when it needs a server other than <c>http</c> (the
-/// one emulated), <c>http-ipv6</c> (the same emulation on <c>%HOST6IP</c>:<c>%HTTP6PORT</c>), <c>http-proxy</c> (the same emulation on <c>%PROXYPORT</c>), <c>socks4</c> or <c>socks5</c> (<see cref="SocksServerConnector"/> on <c>%SOCKSPORT</c>), <c>mqtt</c> (<see cref="MqttServerConnector"/> on <c>%MQTTPORT</c>), <c>tftp</c> (<see cref="TftpServerConnector"/> on <c>%TFTPPORT</c>),<c>ftp</c> (<see cref="FtpServerConnector"/> on <c>%FTPPORT</c>, control channel only, so a case whose <c>&lt;verify&gt;&lt;protocol&gt;</c> shows a data connection opening is skipped), <c>ftps</c> (<see cref="FtpsServerConnector"/> on <c>%FTPSPORT</c>, the FTP stand-in behind implicit TLS), <c>file</c> or <c>none</c>; when it needs a feature Curl lacks, or needs absent
+/// one emulated), <c>http-ipv6</c> (the same emulation on <c>%HOST6IP</c>:<c>%HTTP6PORT</c>), <c>http-proxy</c> (the same emulation on <c>%PROXYPORT</c>), <c>socks4</c> or <c>socks5</c> (<see cref="SocksServerConnector"/> on <c>%SOCKSPORT</c>), <c>mqtt</c> (<see cref="MqttServerConnector"/> on <c>%MQTTPORT</c>), <c>tftp</c> (<see cref="TftpServerConnector"/> on <c>%TFTPPORT</c>), <c>gopher</c> (<see cref="GopherServerConnector"/> on <c>%GOPHERPORT</c>),<c>ftp</c> (<see cref="FtpServerConnector"/> on <c>%FTPPORT</c>, control channel only, so a case whose <c>&lt;verify&gt;&lt;protocol&gt;</c> shows a data connection opening is skipped), <c>ftps</c> (<see cref="FtpsServerConnector"/> on <c>%FTPSPORT</c>, the FTP stand-in behind implicit TLS), <c>file</c> or <c>none</c>; when it needs a feature Curl lacks, or needs absent
 /// one Curl has; when its <c>&lt;servercmd&gt;</c> holds a command the sws emulation (or, for an <c>ftp</c> or <c>ftps</c> case, the FTP stand-in) does not carry
 /// out; when it names no server and its command goes to a host name on the internet; when its
 /// command is not a plain curl command line; when a file part does not name an
@@ -35,7 +35,7 @@ internal static class UpstreamCaseScreening
     // Interpreted, not source-generated, so no generated code counts against the coverage gate.
     private static readonly Regex InternetUrlHost = new(@"\bhttps?://(?<host>[A-Za-z][A-Za-z0-9-]*(?:\.[A-Za-z0-9-]+)+)", RegexOptions.CultureInvariant);
 
-    private static readonly HashSet<string> Servers = ["http", "http-ipv6", "http-proxy", "socks4", "socks5", "mqtt", "tftp", "file", "none", .. LineProtocolServerConnector.EmulatedServers, .. MailTlsServerConnector.EmulatedServers, .. FtpsServerConnector.EmulatedServers, "sftp", "scp"];
+    private static readonly HashSet<string> Servers = ["http", "http-ipv6", "http-proxy", "socks4", "socks5", "mqtt", "tftp", "gopher", "file", "none", .. LineProtocolServerConnector.EmulatedServers, .. MailTlsServerConnector.EmulatedServers, .. FtpsServerConnector.EmulatedServers, "sftp", "scp"];
 
     // The servers that read <servercmd> as ftpserver.pl does: the FTP stand-in, plain or behind TLS.
     private static readonly string[] FtpServers = ["ftp", .. FtpsServerConnector.EmulatedServers];
@@ -172,6 +172,24 @@ internal static class UpstreamCaseScreening
         testCase.Find("verify", "upload") is not null && !UpstreamTestPartBodies.Lines(testCase.Find("client", "server")).Intersect(UploadingServers).Any()
             ? "the harness records <verify><upload> only for the smtp, imap, smtps, imaps, tftp, ftp, ftps, scp and sftp servers"
             : null;
+
+    /// <summary>
+    /// Finds the feature that keeps the case off this platform when Curl on another platform meets
+    /// every one of its <c>&lt;features&gt;</c>, such as <c>Schannel</c> off Windows, so the ratchet
+    /// can hold a listed case only where it can run (ADR-0488).
+    /// </summary>
+    /// <param name="testCase">The expanded file, parsed.</param>
+    /// <param name="features">The features Curl reports on this platform.</param>
+    /// <returns>A sentence naming the feature, or <see langword="null"/> when this platform meets the case's features or no platform does.</returns>
+    public static string? FindFeatureOfAnotherPlatform(UpstreamTestCase testCase, IReadOnlySet<string> features)
+    {
+        ArgumentNullException.ThrowIfNull(testCase);
+        ArgumentNullException.ThrowIfNull(features);
+        return UnsupportedFeature(testCase, features) is { } reason
+            && UpstreamCurlPlatform.All.Any(platform => UnsupportedFeature(testCase, platform.Features) is null)
+            ? reason
+            : null;
+    }
 
     private static string? UnsupportedFeature(UpstreamTestCase testCase, IReadOnlySet<string> features)
     {

@@ -201,6 +201,16 @@ public sealed class MaxTimeWatchdog : IDisposable
             inner.ReportTransferStarted();
         }
 
+        public void ReportRequestRetried()
+        {
+            lock (watchdog.gate)
+            {
+                watchdog.transferStarted = true;
+            }
+
+            inner.ReportRequestRetried();
+        }
+
         public void ReportDownloaded(long bytesSoFar, long? expectedTotal)
         {
             lock (watchdog.gate)

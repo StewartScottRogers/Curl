@@ -26,7 +26,7 @@ public sealed class UpstreamCaseVerificationTests
         string sections = "<verify>\n<protocol crlf=\"yes\">\nGET / HTTP/1.1\nDate: expected\nUser-Agent: curl/x\n</protocol>\n"
             + "<strip>\n^Date:\n</strip>\n<strippart>\ns/curl\\/[0-9.]+/curl\\/x/\n# comment\n</strippart>\n</verify>\n";
 
-        string? difference = Verify(sections, Run(received: "GET / HTTP/1.1\r\nDate: now\r\nUser-Agent: curl/8.21.0\r\n"));
+        string? difference = Verify(sections, Run(received: "GET / HTTP/1.1\r\nDate: now\r\nUser-Agent: curl/8.22.0\r\n"));
         ExpectDifference(null, difference);
         Assert.IsNull(difference);
     }
@@ -47,8 +47,8 @@ public sealed class UpstreamCaseVerificationTests
         string sections = "<verify>\n<protocol nonewline=\"yes\">\nGET / HTTP/1.1\n</protocol>\n</verify>\n";
 
         string? difference = Verify(sections, Run(received: "GET /x HTTP/1.1"));
-        ExpectDifference("<verify><protocol> differs at byte 5 (line 1): expected \"GET / HTTP/1.1\", got \"GET /x HTTP/1.1\"", difference);
-        Assert.AreEqual("<verify><protocol> differs at byte 5 (line 1): expected \"GET / HTTP/1.1\", got \"GET /x HTTP/1.1\"", difference);
+        ExpectDifference("<verify><protocol> differs at byte 5 (line 1): expected \"GET / HTTP/1.1\", got \"GET /x HTTP/1.1\"", FirstLine(difference));
+        Assert.AreEqual("<verify><protocol> differs at byte 5 (line 1): expected \"GET / HTTP/1.1\", got \"GET /x HTTP/1.1\"", FirstLine(difference));
     }
 
     [TestMethod]
@@ -60,7 +60,7 @@ public sealed class UpstreamCaseVerificationTests
         string? differing = Verify(sections, Run(received: "CONNECT a:1 HTTP/1.1"));
 
         Assert.IsNull(matching);
-        Assert.AreEqual("<verify><proxy> differs at byte 0 (line 1): expected \"CONNECT a:1 HTTP/1.1\", got the end", differing);
+        Assert.AreEqual("<verify><proxy> differs at byte 0 (line 1): expected \"CONNECT a:1 HTTP/1.1\", got the end", FirstLine(differing));
     }
 
     [TestMethod]
@@ -72,7 +72,7 @@ public sealed class UpstreamCaseVerificationTests
         string? differing = Verify(sections, Run(received: "body\r\n.\r\n"));
 
         Assert.IsNull(matching);
-        Assert.AreEqual("<verify><upload> differs at byte 0 (line 1): expected \"body\\r\\n\", got the end", differing);
+        Assert.AreEqual("<verify><upload> differs at byte 0 (line 1): expected \"body\\r\\n\", got the end", FirstLine(differing));
     }
 
     [TestMethod]
@@ -110,8 +110,8 @@ public sealed class UpstreamCaseVerificationTests
         ExpectDifference(null, difference);
         Assert.IsNull(difference);
         string? difference2 = Verify(sections, Run());
-        ExpectDifference("the --output file against <reply><data> differs at byte 0 (line 1): expected \"HTTP/1.1 200 OK\\r\\n\", got the end", difference2);
-        Assert.AreEqual("the --output file against <reply><data> differs at byte 0 (line 1): expected \"HTTP/1.1 200 OK\\r\\n\", got the end", difference2);
+        ExpectDifference("the --output file against <reply><data> differs at byte 0 (line 1): expected \"HTTP/1.1 200 OK\\r\\n\", got the end", FirstLine(difference2));
+        Assert.AreEqual("the --output file against <reply><data> differs at byte 0 (line 1): expected \"HTTP/1.1 200 OK\\r\\n\", got the end", FirstLine(difference2));
     }
 
     [TestMethod]
@@ -199,8 +199,8 @@ public sealed class UpstreamCaseVerificationTests
     public void FindFirstDifference_StdoutThatDiffers_NamesIt()
     {
         string? difference = Verify("<verify>\n<stdout>\na\n</stdout>\n</verify>\n", Run(standardOutput: "b\n"));
-        ExpectDifference("<verify><stdout> differs at byte 0 (line 1): expected \"a\\n\", got \"b\\n\"", difference);
-        Assert.AreEqual("<verify><stdout> differs at byte 0 (line 1): expected \"a\\n\", got \"b\\n\"", difference);
+        ExpectDifference("<verify><stdout> differs at byte 0 (line 1): expected \"a\\n\", got \"b\\n\"", FirstLine(difference));
+        Assert.AreEqual("<verify><stdout> differs at byte 0 (line 1): expected \"a\\n\", got \"b\\n\"", FirstLine(difference));
     }
 
     [TestMethod]
@@ -212,6 +212,20 @@ public sealed class UpstreamCaseVerificationTests
         ExpectDifference(null, difference);
         Assert.IsNull(difference);
         string? difference2 = Verify(sections, Run(standardError: "curl: (7) x\r\n"));
+        ExpectPresent(difference2);
+        Assert.IsNotNull(difference2);
+    }
+
+    [TestMethod]
+    public void FindFirstDifference_StderrInWarnMode_ComparesWrappedWarningsAsOneLine()
+    {
+        // curl 8.22.0's runtests.pl, mode="warn": each line loses "Warning: " and "\r", and its "\n" becomes a space.
+        string sections = "<verify>\n<stderr mode=\"warn\">\nWarning: a b c d\n</stderr>\n</verify>\n";
+
+        string? difference = Verify(sections, Run(standardError: "Warning: a b\r\nWarning: c d\r\n"));
+        ExpectDifference(null, difference);
+        Assert.IsNull(difference);
+        string? difference2 = Verify(sections, Run(standardError: "Warning: a b\r\nWarning: c e\r\n"));
         ExpectPresent(difference2);
         Assert.IsNotNull(difference2);
     }
@@ -235,7 +249,7 @@ public sealed class UpstreamCaseVerificationTests
         string sections = "<verify>\n<stderr>\nNote: skips transfer, \"there\" exists locally\n</stderr>\n</verify>\n";
 
         string? difference = Verify(sections, Run(standardError: "Note: skips transfer, \nNote: \"there\" exists locally\n", logDirectory: "/log"));
-        ExpectDifference("<verify><stderr> differs at byte 22 (line 1): expected \"Note: skips transfer, \\\"there\\\" exists locally\\n\", got \"Note: skips transfer, \\n\"", difference);
+        ExpectDifference("<verify><stderr> differs at byte 22 (line 1): expected \"Note: skips transfer, \\\"there\\\" exists locally\\n\", got \"Note: skips transfer, \\n\"", FirstLine(difference));
         Assert.IsNotNull(difference);
     }
 
@@ -256,8 +270,8 @@ public sealed class UpstreamCaseVerificationTests
         string path = Path.Combine(Path.GetTempPath(), $"missing-{Guid.NewGuid():N}").Replace('\\', '/');
 
         string? difference = Verify($"<verify>\n<file name=\"{path}\">\nx\n</file>\n</verify>\n", Run());
-        ExpectDifference($"<verify><file> ({path}) differs at byte 0 (line 1): expected \"x\\n\", got the end", difference);
-        Assert.AreEqual($"<verify><file> ({path}) differs at byte 0 (line 1): expected \"x\\n\", got the end", difference);
+        ExpectDifference($"<verify><file> ({path}) differs at byte 0 (line 1): expected \"x\\n\", got the end", FirstLine(difference));
+        Assert.AreEqual($"<verify><file> ({path}) differs at byte 0 (line 1): expected \"x\\n\", got the end", FirstLine(difference));
     }
 
     [TestMethod]
@@ -301,6 +315,9 @@ public sealed class UpstreamCaseVerificationTests
 
     private void ExpectPresent(string? actual) =>
         TestDiagnostics.For(TestContext).Assert("a difference is reported", true, actual is not null);
+
+    // The sentence naming the first difference; the line diff after it is pinned in UpstreamLineDifferenceTests.
+    private static string? FirstLine(string? difference) => difference?.Split('\n')[0];
 
     private static string Neutral(string? text) =>
         (text ?? "(none)").Replace(Path.GetTempPath().Replace('\\', '/'), "<temp>/");

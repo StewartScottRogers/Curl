@@ -62,13 +62,11 @@ public sealed class CurlCommandRunnerSkipExistingTests
     }
 
     [TestMethod]
-    [DataRow("-v")]
-    [DataRow("-sv")]
-    public async Task RunAsync_SkipExistingFilePresentVerbose_PrintsTheWrappedNote(string verbose)
+    public async Task RunAsync_SkipExistingFilePresentVerbose_PrintsTheWrappedNote()
     {
         outputFiles.ExistingPaths.Add(MeasuredPath);
 
-        int exitCode = await RunAsync([Ok], verbose, "-o", MeasuredPath, "--skip-existing", Url);
+        int exitCode = await RunAsync([Ok], "-v", "-o", MeasuredPath, "--skip-existing", Url);
 
         Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
@@ -85,12 +83,13 @@ public sealed class CurlCommandRunnerSkipExistingTests
 
     /// <summary>
     /// Pins the note under the trace options upstream's test harness adds to every curl it runs
-    /// (upstream tests 994, 996 and 1491, GF-0013): curl 8.21.0 with <c>-s --trace-ascii -
-    /// --trace-time</c> writes the note to standard error and nothing to standard output
-    /// (measured 2026-10-08, BL-1806 Notes).
+    /// (upstream tests 994, 996 and 1491, GF-0013): curl 8.22.0 with <c>-s --trace-ascii -
+    /// --trace-time</c> writes no note, as its <c>notef</c> writes nothing under <c>-s</c>, and nothing
+    /// to standard output (curl 8.21.0 wrote the note, measured 2026-10-08, BL-1806 Notes; 8.22.0
+    /// measured 2026-10-13, BL-2173).
     /// </summary>
     [TestMethod]
-    public async Task RunAsync_SkipExistingFilePresentSilentTraceAscii_PrintsTheNote()
+    public async Task RunAsync_SkipExistingFilePresentSilentTraceAscii_PrintsNoNote()
     {
         outputFiles.ExistingPaths.Add("there");
 
@@ -100,9 +99,8 @@ public sealed class CurlCommandRunnerSkipExistingTests
         Assert.AreEqual(0, exitCode);
         Diagnostics.Assert("connection count", 0, server.Targets.Count);
         Assert.IsEmpty(server.Targets);
-        string expectedNote = @"Note: skips transfer, ""there"" exists locally" + NewLine;
-        Diagnostics.Diff("stderr", Lf(expectedNote), Lf(StandardErrorText));
-        Assert.AreEqual(expectedNote, StandardErrorText);
+        Diagnostics.Diff("stderr", string.Empty, Lf(StandardErrorText));
+        Assert.AreEqual(string.Empty, StandardErrorText);
         Diagnostics.Diff("stdout", string.Empty, StandardOutputText);
         Assert.AreEqual(string.Empty, StandardOutputText);
     }

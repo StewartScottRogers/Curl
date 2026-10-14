@@ -53,6 +53,9 @@ namespace Curl.Protocol.Mqtt;
 /// </remarks>
 public sealed class MqttProtocolHandler : IProtocolHandler
 {
+    /// <summary>The user name or password held a byte below 0x20 (exit 43), curl 8.22.0's text (BL-2179).</summary>
+    private const string CredentialsHaveControlCode = "control code detected in credentials";
+
     private const int MqttDefaultPort = 1883;
 
     private const int MqttsDefaultPort = 8883;
@@ -138,6 +141,15 @@ public sealed class MqttProtocolHandler : IProtocolHandler
         };
     }
 
+    /// <summary>
+    /// The exit 43 curl 8.22.0 refuses <paramref name="credentials" /> with before it connects when the
+    /// user name or password holds a byte below 0x20, or <see langword="null" /> when neither does (BL-2179).
+    /// </summary>
+    private static TransferResult? RefuseControlBytes(System.Net.NetworkCredential? credentials) =>
+        credentials is not null && (credentials.UserName.Any(character => character < ' ') || credentials.Password.Any(character => character < ' '))
+            ? TransferResult.Failure(CurlExitCode.BadFunctionArgument, CredentialsHaveControlCode)
+            : null;
+
     private static string CreateRandomClientIdentifierSuffix() =>
         RandomNumberGenerator.GetString(ClientIdentifierAlphabet, ClientIdentifierSuffixLength);
 
@@ -146,6 +158,11 @@ public sealed class MqttProtocolHandler : IProtocolHandler
     /// </summary>
     private async ValueTask<TransferResult> TransferAsync(ITransferContext context, MqttDiagnosticLog log)
     {
+        if (RefuseControlBytes(context.Credentials) is { } credentialsRefused)
+        {
+            return credentialsRefused;
+        }
+
         ConnectResult connected = await connector
             .ConnectAsync(CreateTarget(context), context.CancellationToken)
             .ConfigureAwait(false);

@@ -273,8 +273,7 @@ public sealed class CommandLineOptions
     /// <summary>
     /// <see langword="true"/> when the command line is read as curl's Windows Schannel build reads it: that
     /// build's libcurl has no HTTP/2, HTTP/3, TLS-SRP or SSL session export, so <c>--http2</c>,
-    /// <c>--http2-prior-knowledge</c>, <c>--http3</c>, <c>--http3-only</c>, <c>--tlsuser</c>, <c>--tlspassword</c>,
-    /// <c>--tlsauthtype</c>, their three <c>--proxy-</c> forms and <c>--ssl-sessions</c> are refused with
+    /// <c>--http2-prior-knowledge</c>, <c>--http3</c>, <c>--http3-only</c> and <c>--ssl-sessions</c> are refused with
     /// <see cref="CommandLineRefusal.InstalledLibcurlDoesNotSupport"/> (<see cref="CommandLineOption.RefusedBySchannelBuild"/>,
     /// ADR-0397). Set by <see cref="CommandLineParser"/> for the platform it is asked to behave as.
     /// </summary>
@@ -819,6 +818,33 @@ public sealed class CommandLineOptions
     /// place of <see cref="AuthSchemes"/>.
     /// </summary>
     public string? AwsSigV4 { get; internal set; }
+
+    /// <summary>
+    /// The last <c>--httpsig-algo</c> value, verbatim and unchecked; <see langword="null"/> when not given.
+    /// An empty value is refused as blank. curl 8.22.0 checks it (<c>ed25519</c> or <c>hmac-sha256</c>)
+    /// only when it sets up an HTTP transfer (<c>src/config2setopts.c</c>, BL-2182).
+    /// </summary>
+    public string? HttpSignatureAlgorithm { get; internal set; }
+
+    /// <summary>
+    /// The last <c>--httpsig-key</c> value, verbatim: the hex key, or <c>@</c> and the name of a file
+    /// holding it, which curl 8.22.0 reads only when it sets up an HTTP transfer; <see langword="null"/>
+    /// when not given. An empty value is refused as blank.
+    /// </summary>
+    public string? HttpSignatureKey { get; internal set; }
+
+    /// <summary>
+    /// The last <c>--httpsig-keyid</c> value, verbatim; <see langword="null"/> when not given. An empty
+    /// value is refused as blank.
+    /// </summary>
+    public string? HttpSignatureKeyId { get; internal set; }
+
+    /// <summary>
+    /// The last <c>--httpsig-headers</c> value, verbatim and unparsed (the components to sign, such as
+    /// <c>method authority content-type:</c>); <see langword="null"/> when not given, meaning curl's
+    /// default set. An empty value is refused as blank.
+    /// </summary>
+    public string? HttpSignatureHeaders { get; internal set; }
 
     /// <summary>
     /// The last <c>-x</c> / <c>--proxy</c>, <c>--proxy1.0</c>, <c>--socks4</c>, <c>--socks4a</c>, <c>--socks5</c> or
@@ -1368,25 +1394,6 @@ public sealed class CommandLineOptions
     public bool ProxyAllowBeast { get; internal set; }
 
     /// <summary>
-    /// The <c>--proxy-tlsuser</c> TLS-SRP user name for the HTTPS proxy, verbatim, empty included, as curl 8.18.0
-    /// accepts it (measured, BL-1135), unlike <c>--tlsuser</c>; <see langword="null"/> when not given.
-    /// </summary>
-    public string? ProxyTlsUser { get; internal set; }
-
-    /// <summary>
-    /// The <c>--proxy-tlspassword</c> TLS-SRP password for the HTTPS proxy, verbatim; <see langword="null"/> when
-    /// not given. An empty value is refused as blank, as curl 8.18.0 refuses it (measured, BL-1135), unlike
-    /// <c>--tlspassword</c>.
-    /// </summary>
-    public string? ProxyTlsPassword { get; internal set; }
-
-    /// <summary>
-    /// The <c>--proxy-tlsauthtype</c> value: <c>SRP</c>, the only type curl accepts (case-sensitively), or
-    /// <see langword="null"/> when not given.
-    /// </summary>
-    public string? ProxyTlsAuthType { get; internal set; }
-
-    /// <summary>
     /// The <c>-E</c> / <c>--cert</c> value, verbatim, with <c>certificate[:password]</c> not yet split;
     /// <see langword="null"/> when not given. The last value wins.
     /// </summary>
@@ -1546,18 +1553,6 @@ public sealed class CommandLineOptions
     /// <see cref="EngineListRequested"/>. An empty value is refused as blank, as curl 8.21.0 refuses it.
     /// </summary>
     public string? Engine { get; internal set; }
-
-    /// <summary>The <c>--tlsuser</c> TLS-SRP user name, verbatim; <see langword="null"/> when not given. An empty value is refused as blank, as curl 8.21.0 refuses it.</summary>
-    public string? TlsUser { get; internal set; }
-
-    /// <summary>The <c>--tlspassword</c> TLS-SRP password, verbatim, empty included, as curl 8.21.0 accepts it; <see langword="null"/> when not given.</summary>
-    public string? TlsPassword { get; internal set; }
-
-    /// <summary>
-    /// The <c>--tlsauthtype</c> value: <c>SRP</c>, the only type curl 8.21.0 accepts (case-sensitively), or
-    /// <see langword="null"/> when not given.
-    /// </summary>
-    public string? TlsAuthType { get; internal set; }
 
     /// <summary>
     /// The <c>--ssl-sessions</c> file TLS session tickets are loaded from before the transfers and saved to

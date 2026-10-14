@@ -257,6 +257,13 @@ internal static class HttpTransferMessages
     internal const string LineTooLarge = "A value or data field grew larger than allowed";
 
     /// <summary>
+    /// The exit 100 message, also written as an info line, for a request head of
+    /// <see cref="HttpRequestHeadFormatter.MaximumRequestHeadLength" /> bytes or more, which
+    /// curl 8.22.0 refuses before sending a byte (measured, BL-2167).
+    /// </summary>
+    internal const string RequestTooLarge = "HTTP request too large";
+
+    /// <summary>
     /// The exit 100 message for a response header past
     /// <see cref="HttpResponseHeadReader.MaximumHeaderCount" />.
     /// </summary>
@@ -330,6 +337,13 @@ internal static class HttpTransferMessages
     /// gzip, zlib or Brotli stream (measured, BL-281 Notes).
     /// </summary>
     internal const string ReceivedDataWriteFailed = "Failed writing received data to disk/application";
+
+    /// <summary>
+    /// The exit 23 message for a <c>--compressed</c> gzip body whose first member is followed,
+    /// in the same read, by the two bytes that start another gzip member, <c>1F 8B</c>
+    /// (measured with curl 8.22.0, upstream test2305, BL-2169 Notes).
+    /// </summary>
+    internal const string MultiMemberGzipNotSupported = "Multi-member gzip response not supported";
 
     /// <summary>
     /// The exit 23 message for a decoded chunked body with bytes after the end of its gzip,

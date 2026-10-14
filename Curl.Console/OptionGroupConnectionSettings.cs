@@ -10,11 +10,12 @@ namespace Curl.Console;
 /// <see cref="ConnectTarget" /> names: a connection an earlier group left in the run's
 /// <see cref="ConnectionCache" /> is reused by a later group only when the two groups' settings are
 /// equal, as curl 8.21.0 reuses one only when <c>Curl_ssl_config_matches</c> and its other
-/// connection checks agree (ADR-0285, BL-754).
+/// connection checks agree (ADR-0285, BL-754). The <c>--connect-to</c> values are not compared
+/// here: the pool key holds the host and port a mapping dials (<c>ConnectionPoolKey.ConnectToAuthority</c>),
+/// so groups whose mappings reach the same place share a connection, as curl 8.22.0's do (test2051, BL-2164).
 /// </summary>
 /// <param name="Tls">The origin's TLS options (<see cref="TlsClientOptionsMapping.FromCommandLine" />).</param>
 /// <param name="ProxyTls">The HTTPS proxy's TLS options (<see cref="TlsClientOptionsMapping.ProxyFromCommandLine" />).</param>
-/// <param name="ConnectTo">The <c>--connect-to</c> values, verbatim, one per line.</param>
 /// <param name="UnixSocket">The <c>--unix-socket</c> or <c>--abstract-unix-socket</c>, or <see langword="null" />.</param>
 /// <param name="LocalBinding">The <c>--interface</c> and <c>--local-port</c> binding, or <see langword="null" />.</param>
 /// <param name="AddressFamily">The <c>-4</c>/<c>-6</c> choice.</param>
@@ -24,7 +25,6 @@ namespace Curl.Console;
 internal sealed record OptionGroupConnectionSettings(
     TlsClientOptions Tls,
     TlsClientOptions ProxyTls,
-    string ConnectTo,
     UnixSocketAddress? UnixSocket,
     LocalBinding? LocalBinding,
     AddressFamily AddressFamily,
@@ -39,7 +39,6 @@ internal sealed record OptionGroupConnectionSettings(
         new(
             TlsClientOptionsMapping.FromCommandLine(options),
             TlsClientOptionsMapping.ProxyFromCommandLine(options),
-            string.Join('\n', options.ConnectToEntries),
             CurlComposition.UnixSocketOf(options),
             CurlComposition.LocalBindingOf(options),
             CurlComposition.AddressFamilyOf(options),

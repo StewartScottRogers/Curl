@@ -36,9 +36,9 @@ public sealed partial class CurlCompositionProxyTests
 
     private const string ForwardedGet =
         "GET http://example.com/a HTTP/1.1\r\nHost: example.com\r\n"
-        + "User-Agent: curl/8.21.0\r\nAccept: */*\r\nProxy-Connection: Keep-Alive\r\n\r\n";
+        + "User-Agent: curl/8.22.0\r\nAccept: */*\r\nProxy-Connection: Keep-Alive\r\n\r\n";
 
-    private const string TunnelledGet = "GET /a HTTP/1.1\r\nHost: example.com\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n";
+    private const string TunnelledGet = "GET /a HTTP/1.1\r\nHost: example.com\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n\r\n";
 
     private static readonly ConnectTarget Proxy = new("127.0.0.1", 18238, false);
 
@@ -72,7 +72,7 @@ public sealed partial class CurlCompositionProxyTests
         Assert.AreEqual(0, run.ExitCode);
         Assert.AreEqual(
             "GET http://example.com/a HTTP/1.1\r\nHost: example.com\r\nProxy-Authorization: Basic dTpw\r\n"
-            + "User-Agent: curl/8.21.0\r\nAccept: */*\r\nProxy-Connection: Keep-Alive\r\n\r\n",
+            + "User-Agent: curl/8.22.0\r\nAccept: */*\r\nProxy-Connection: Keep-Alive\r\n\r\n",
             Latin1(server.Written));
     }
 
@@ -113,7 +113,7 @@ public sealed partial class CurlCompositionProxyTests
         Diagnostics.Assert("run.ExitCode", 0, run.ExitCode);
         Assert.AreEqual(0, run.ExitCode);
         Assert.AreEqual(
-            "GET /a HTTP/1.1\r\nHost: 127.0.0.1:18238\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n",
+            "GET /a HTTP/1.1\r\nHost: 127.0.0.1:18238\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n\r\n",
             Latin1(server.Written));
         Diagnostics.Assert("server.Targets.Single()", Proxy with { PoolScheme = "http" }, server.Targets.Single());
         Assert.AreEqual(Proxy with { PoolScheme = "http" }, server.Targets.Single());
@@ -131,8 +131,8 @@ public sealed partial class CurlCompositionProxyTests
         Diagnostics.Assert("run.ExitCode", 0, run.ExitCode);
         Assert.AreEqual(0, run.ExitCode);
         Assert.AreEqual(
-            "GET http://a.test/ HTTP/1.1\r\nHost: a.test\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\nProxy-Connection: Keep-Alive\r\n\r\n"
-            + "GET / HTTP/1.1\r\nHost: b.test:18329\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n",
+            "GET http://a.test/ HTTP/1.1\r\nHost: a.test\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\nProxy-Connection: Keep-Alive\r\n\r\n"
+            + "GET / HTTP/1.1\r\nHost: b.test:18329\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n\r\n",
             Latin1(server.Written));
         Diagnostics.Assert("server.Targets[0]", ForwardProxy, server.Targets[0]);
         Assert.AreEqual(ForwardProxy, server.Targets[0]);
@@ -156,7 +156,7 @@ public sealed partial class CurlCompositionProxyTests
         Assert.AreEqual(ForwardProxy, server.Targets[0]);
         Diagnostics.Assert("RouteOf(server.Targets[1])", ("b.test", 18329, true, (ProxyEndpoint?)null), RouteOf(server.Targets[1]));
         Assert.AreEqual(("b.test", 18329, true, (ProxyEndpoint?)null), RouteOf(server.Targets[1]));
-        StringAssert.EndsWith(Latin1(server.Written), "GET / HTTP/1.1\r\nHost: b.test:18329\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n");
+        StringAssert.EndsWith(Latin1(server.Written), "GET / HTTP/1.1\r\nHost: b.test:18329\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n\r\n");
     }
 
     [TestMethod]
@@ -170,7 +170,7 @@ public sealed partial class CurlCompositionProxyTests
         Assert.AreEqual(0, run.ExitCode);
         Assert.AreEqual(
             "CONNECT example.com:80 HTTP/1.1\r\nHost: example.com:80\r\nProxy-Authorization: Basic dTpw\r\n"
-            + "User-Agent: curl/8.21.0\r\nProxy-Connection: Keep-Alive\r\n\r\n"
+            + "User-Agent: curl/8.22.0\r\nProxy-Connection: Keep-Alive\r\n\r\n"
             + TunnelledGet,
             Latin1(server.Written));
         Diagnostics.Assert("server.Targets.Single()", Proxy, server.Targets.Single());
@@ -189,7 +189,7 @@ public sealed partial class CurlCompositionProxyTests
         Diagnostics.Assert("run.ExitCode", 7, run.ExitCode);
         Assert.AreEqual(7, run.ExitCode);
         Assert.AreEqual(
-            "CONNECT example.com:80 HTTP/1.1\r\nHost: example.com:80\r\nUser-Agent: curl/8.21.0\r\nProxy-Connection: Keep-Alive\r\n\r\n",
+            "CONNECT example.com:80 HTTP/1.1\r\nHost: example.com:80\r\nUser-Agent: curl/8.22.0\r\nProxy-Connection: Keep-Alive\r\n\r\n",
             Latin1(server.Written));
         Diagnostics.Assert("run.StandardError", ($"curl: (7) CONNECT tunnel failed, response 407{Environment.NewLine}").ReplaceLineEndings("\n"), run.StandardError.ReplaceLineEndings("\n"));
         Assert.AreEqual($"curl: (7) CONNECT tunnel failed, response 407{Environment.NewLine}", run.StandardError);
@@ -207,7 +207,7 @@ public sealed partial class CurlCompositionProxyTests
         Diagnostics.Assert("run.ExitCode", 0, run.ExitCode);
         Assert.AreEqual(0, run.ExitCode);
         Assert.AreEqual(
-            "CONNECT example.com:443 HTTP/1.1\r\nHost: example.com:443\r\nUser-Agent: curl/8.21.0\r\nProxy-Connection: Keep-Alive\r\n\r\n"
+            "CONNECT example.com:443 HTTP/1.1\r\nHost: example.com:443\r\nUser-Agent: curl/8.22.0\r\nProxy-Connection: Keep-Alive\r\n\r\n"
             + TunnelledGet,
             Latin1(server.Written));
         Diagnostics.Assert("run.StandardOutput", "hello", run.StandardOutput);
@@ -225,7 +225,7 @@ public sealed partial class CurlCompositionProxyTests
         Assert.AreEqual(7, run.ExitCode);
         Assert.AreEqual(
             "CONNECT example.com:443 HTTP/1.1\r\nHost: example.com:443\r\nProxy-Authorization: Basic dTpw\r\n"
-            + "User-Agent: curl/8.21.0\r\nProxy-Connection: Keep-Alive\r\n\r\n",
+            + "User-Agent: curl/8.22.0\r\nProxy-Connection: Keep-Alive\r\n\r\n",
             Latin1(server.Written));
         Diagnostics.Assert("run.StandardError", ($"curl: (7) CONNECT tunnel failed, response 407{Environment.NewLine}").ReplaceLineEndings("\n"), run.StandardError.ReplaceLineEndings("\n"));
         Assert.AreEqual($"curl: (7) CONNECT tunnel failed, response 407{Environment.NewLine}", run.StandardError);
@@ -278,7 +278,7 @@ public sealed partial class CurlCompositionProxyTests
         Diagnostics.Assert("run.ExitCode", 0, run.ExitCode);
         Assert.AreEqual(0, run.ExitCode);
         Assert.AreEqual(
-            $"CONNECT example.com:{port} HTTP/1.1\r\nHost: example.com:{port}\r\nUser-Agent: curl/8.21.0\r\nProxy-Connection: Keep-Alive\r\n\r\n"
+            $"CONNECT example.com:{port} HTTP/1.1\r\nHost: example.com:{port}\r\nUser-Agent: curl/8.22.0\r\nProxy-Connection: Keep-Alive\r\n\r\n"
             + TunnelledGet,
             Latin1(server.Written));
         Diagnostics.Assert("server.Targets.Single()", Proxy, server.Targets.Single());
@@ -358,7 +358,7 @@ public sealed partial class CurlCompositionProxyTests
         Diagnostics.Assert("run.ExitCode", 0, run.ExitCode);
         Assert.AreEqual(0, run.ExitCode);
         Assert.StartsWith(
-            "CONNECT example.com:80 HTTP/1.1\r\nHost: example.com:80\r\nUser-Agent: curl/8.21.0\r\nProxy-Connection: Keep-Alive\r\nX-P: 1\r\n\r\nGET /a HTTP/1.1\r\n",
+            "CONNECT example.com:80 HTTP/1.1\r\nHost: example.com:80\r\nUser-Agent: curl/8.22.0\r\nProxy-Connection: Keep-Alive\r\nX-P: 1\r\n\r\nGET /a HTTP/1.1\r\n",
             Latin1(server.Written));
     }
 
@@ -426,7 +426,7 @@ public sealed partial class CurlCompositionProxyTests
         Assert.AreEqual(
             ForwardedGet
             + "GET http://example.com/a HTTP/1.1\r\nHost: example.com\r\nProxy-Authorization: Basic dTpw\r\n"
-            + "User-Agent: curl/8.21.0\r\nAccept: */*\r\nProxy-Connection: Keep-Alive\r\n\r\n",
+            + "User-Agent: curl/8.22.0\r\nAccept: */*\r\nProxy-Connection: Keep-Alive\r\n\r\n",
             Latin1(server.Written));
         Diagnostics.Assert("run.StandardOutput", "hello", run.StandardOutput);
         Assert.AreEqual("hello", run.StandardOutput);
@@ -449,8 +449,8 @@ public sealed partial class CurlCompositionProxyTests
         Diagnostics.Assert("run.ExitCode", 0, run.ExitCode);
         Assert.AreEqual(0, run.ExitCode);
         Assert.StartsWith(
-            "CONNECT example.com:80 HTTP/1.1\r\nHost: example.com:80\r\nUser-Agent: curl/8.21.0\r\nProxy-Connection: Keep-Alive\r\n\r\n"
-            + "CONNECT example.com:80 HTTP/1.1\r\nHost: example.com:80\r\nProxy-Authorization: Basic dTpw\r\nUser-Agent: curl/8.21.0\r\nProxy-Connection: Keep-Alive\r\n\r\n"
+            "CONNECT example.com:80 HTTP/1.1\r\nHost: example.com:80\r\nUser-Agent: curl/8.22.0\r\nProxy-Connection: Keep-Alive\r\n\r\n"
+            + "CONNECT example.com:80 HTTP/1.1\r\nHost: example.com:80\r\nProxy-Authorization: Basic dTpw\r\nUser-Agent: curl/8.22.0\r\nProxy-Connection: Keep-Alive\r\n\r\n"
             + "GET /a HTTP/1.1\r\n",
             Latin1(server.Written));
     }
@@ -542,7 +542,7 @@ public sealed partial class CurlCompositionProxyTests
         Assert.AreEqual(0, run.ExitCode);
         Assert.AreEqual(
             "GET ftp://example.com/f.txt HTTP/1.1\r\nHost: example.com:21\r\n"
-            + "User-Agent: curl/8.21.0\r\nAccept: */*\r\nProxy-Connection: Keep-Alive\r\n\r\n",
+            + "User-Agent: curl/8.22.0\r\nAccept: */*\r\nProxy-Connection: Keep-Alive\r\n\r\n",
             Latin1(server.Written));
         Diagnostics.Assert("server.Targets.Single()", ForwardProxy, server.Targets.Single());
         Assert.AreEqual(ForwardProxy, server.Targets.Single());
@@ -562,7 +562,7 @@ public sealed partial class CurlCompositionProxyTests
         Assert.AreEqual(7, run.ExitCode);
         Assert.AreEqual(
             "GET http://127.0.0.1:18331/.well-known/masque/udp/example.com/69/ HTTP/1.1\r\n"
-            + "Host: 127.0.0.1:18331\r\nUser-Agent: curl/8.21.0\r\nProxy-Connection: Keep-Alive\r\n"
+            + "Host: 127.0.0.1:18331\r\nUser-Agent: curl/8.22.0\r\nProxy-Connection: Keep-Alive\r\n"
             + "Connection: Upgrade\r\nUpgrade: connect-udp\r\nCapsule-Protocol: ?1\r\n\r\n",
             Latin1(server.Written));
         Diagnostics.Assert("server.Targets.Single()", new ConnectTarget("127.0.0.1", 18331, false) { IsForwardProxy = true }, server.Targets.Single());

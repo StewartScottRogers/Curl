@@ -61,4 +61,11 @@ public sealed record HttpAuthRequest(
     /// the default, when it is not, and always for a proxy (BL-629).
     /// </summary>
     public AwsSigV4Inputs? AwsSigV4 { get; init; }
+
+    /// <summary>
+    /// Gets what signing the request with an HTTP message signature needs, which curl 8.22.0 does
+    /// in place of every other scheme when the <c>--httpsig-*</c> options are given;
+    /// <see langword="null" />, the default, when they are not, and always for a proxy (BL-2182).
+    /// </summary>
+    public HttpSignatureInputs? HttpSignature { get; init; }
 }

@@ -41,6 +41,9 @@ namespace Curl.Protocol.Dict;
 /// </remarks>
 public sealed class DictProtocolHandler(IConnector connector) : IProtocolHandler
 {
+    /// <summary>The user name or password held a byte below 0x20 (exit 43), curl 8.22.0's text (BL-2179).</summary>
+    private const string CredentialsHaveControlCode = "control code detected in credentials";
+
     /// <summary>The <c>-v</c> line curl 8.21.0 reports before sending a lookup whose word is empty or missing.</summary>
     private const string LookupWordMissingMessage = "lookup word is missing";
 
@@ -82,8 +85,22 @@ public sealed class DictProtocolHandler(IConnector connector) : IProtocolHandler
         return result;
     }
 
+    /// <summary>
+    /// The exit 43 curl 8.22.0 refuses <paramref name="credentials" /> with before it connects when the
+    /// user name or password holds a byte below 0x20, or <see langword="null" /> when neither does (BL-2179).
+    /// </summary>
+    private static TransferResult? RefuseControlBytes(System.Net.NetworkCredential? credentials) =>
+        credentials is not null && (credentials.UserName.Any(character => character < ' ') || credentials.Password.Any(character => character < ' '))
+            ? TransferResult.Failure(CurlExitCode.BadFunctionArgument, CredentialsHaveControlCode)
+            : null;
+
     private async Task<TransferResult> TransferAsync(ITransferContext context, DictDiagnosticLog log)
     {
+        if (RefuseControlBytes(context.Credentials) is { } credentialsRefused)
+        {
+            return credentialsRefused;
+        }
+
         CurlUrl url = context.Url;
         var target = new ConnectTarget(url.IdnHost, url.IsDefaultPort ? DefaultPort : url.Port, false)
         {

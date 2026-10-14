@@ -28,6 +28,13 @@ internal static class MqttTransferMessages
     internal const string TopicTooLong = "Too long MQTT topic";
 
     /// <summary>
+    /// The exit 3 message for a decoded topic holding a control byte:
+    /// <c>curl_easy_strerror(CURLE_URL_MALFORMAT)</c>, since <c>Curl_urldecode</c> fails
+    /// without calling <c>failf</c>.
+    /// </summary>
+    internal const string ControlByteInTopic = "URL rejected: Malformed input to a URL function";
+
+    /// <summary>
     /// The exit 56 message curl falls back to for a failed or closed receive.
     /// </summary>
     internal const string ReceiveFailed = "Failure when receiving data from the peer";
@@ -85,8 +92,13 @@ internal static class MqttTransferMessages
     /// </summary>
     /// <param name="message">A failure's message.</param>
     /// <returns><see langword="true" /> for a <c>curl_easy_strerror</c> text.</returns>
-    internal static bool IsStrerrorText(string message) =>
-        message is ReceiveFailed or SendFailed or PartialFile or WeirdServerReply or TooLarge;
+    internal static bool IsStrerrorText(string message) => StrerrorTexts.Contains(message);
+
+    /// <summary>The texts <see cref="IsStrerrorText" /> recognises, compared ordinally.</summary>
+    private static readonly HashSet<string> StrerrorTexts = new(StringComparer.Ordinal)
+    {
+        ReceiveFailed, SendFailed, PartialFile, WeirdServerReply, TooLarge, ControlByteInTopic,
+    };
 
     /// <summary>The <c>-v</c> line naming the client identifier, written before the CONNECT.</summary>
     /// <param name="clientIdentifier">The client identifier the CONNECT carries.</param>

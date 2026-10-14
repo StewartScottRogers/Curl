@@ -296,6 +296,56 @@ public sealed class PoolingConnectorSharedCacheTests
         Assert.AreEqual(2L, connected.ConnectionNumber);
     }
 
+    [TestMethod]
+    [DataRow("::origin.example:80", true, DisplayName = "a mapping to the origin's own host and port (test2051)")]
+    [DataRow("::ORIGIN.example:", true, DisplayName = "a mapping to the origin's host in another case, its port kept")]
+    [DataRow("other.example:80:elsewhere.example:80", true, DisplayName = "a mapping that does not match the origin")]
+    [DataRow("::elsewhere.example:80", false, DisplayName = "a mapping to another host")]
+    [DataRow("::origin.example:8080", false, DisplayName = "a mapping to another port")]
+    public async Task ConnectAsync_InALaterGroupWithoutConnectTo_ReusesOnlyWhenTheEarlierMappingDialledTheOrigin(string earlierMapping, bool expectedReuse)
+    {
+        var diagnostics = Diagnostics;
+        diagnostics.Arrange("earlier group's --connect-to", earlierMapping);
+        var cache = new ConnectionCache(_time);
+        var first = new PoolingConnector(new FakeConnector(), cache, "settings", new ConnectToMappings([earlierMapping]));
+        var later = new PoolingConnector(new FakeConnector(), cache, "settings", ConnectToMappings.None);
+        await ReturnToCacheAsync(first);
+
+        ConnectResult result;
+        using (diagnostics.Phase("later connect"))
+        {
+            result = await later.ConnectAsync(Target(), CancellationToken.None);
+        }
+
+        diagnostics.Act("reused", result.IsReused);
+        diagnostics.Assert("reused", expectedReuse, result.IsReused);
+        Assert.AreEqual(expectedReuse, result.IsReused);
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_ToAForwardProxyWithAConnectToMappingThatMovesIt_ReusesTheConnectionOpenedWithoutOne()
+    {
+        var diagnostics = Diagnostics;
+        diagnostics.Arrange("target", "a forward proxy, which --connect-to never moves");
+        var cache = new ConnectionCache(_time);
+        var first = new PoolingConnector(new FakeConnector(), cache, configuration: null);
+        var later = new PoolingConnector(new FakeConnector(), cache, configuration: null, new ConnectToMappings(["::elsewhere.example:81"]));
+        var proxy = new ConnectTarget("proxy.example", 3128, false) { PoolScheme = "http", IsForwardProxy = true };
+        var opened = await first.ConnectAsync(proxy, CancellationToken.None);
+        opened.Connection!.MarkReusable();
+        await opened.Connection.DisposeAsync();
+
+        ConnectResult result;
+        using (diagnostics.Phase("later connect"))
+        {
+            result = await later.ConnectAsync(proxy, CancellationToken.None);
+        }
+
+        diagnostics.Act("reused", result.IsReused);
+        diagnostics.Assert("reused", true, result.IsReused);
+        Assert.IsTrue(result.IsReused);
+    }
+
     private static async Task ReturnToCacheAsync(PoolingConnector connector)
     {
         var result = await connector.ConnectAsync(Target(), CancellationToken.None);

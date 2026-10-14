@@ -24,7 +24,7 @@ public sealed class LibcurlSourceCodeProxyTlsAndAuthenticationTests
         + "  curl_easy_setopt(curl, CURLOPT_URL, \"http://127.0.0.1:1/\");\n"
         + "  curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 1L);\n";
 
-    private const string Agent = "  curl_easy_setopt(curl, CURLOPT_USERAGENT, \"curl/8.21.0\");\n";
+    private const string Agent = "  curl_easy_setopt(curl, CURLOPT_USERAGENT, \"curl/8.22.0\");\n";
     private const string MaxRedirs = "  curl_easy_setopt(curl, CURLOPT_MAXREDIRS, 50L);\n";
     private const string Tls = "  curl_easy_setopt(curl, CURLOPT_SSLVERSION, (long)CURL_SSLVERSION_TLSv1_2);\n";
     private const string KeepAlive = "  curl_easy_setopt(curl, CURLOPT_TCP_KEEPALIVE, 1L);\n";

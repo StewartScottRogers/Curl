@@ -96,6 +96,9 @@ public sealed class TftpProtocolHandler(
     IConnector? proxyConnector = null,
     Encoding? proxyCredentialEncoding = null) : IProtocolHandler
 {
+    /// <summary>The user name or password held a byte below 0x20 (exit 43), curl 8.22.0's text (BL-2179).</summary>
+    private const string CredentialsHaveControlCode = "control code detected in credentials";
+
     /// <summary>The port a <c>tftp://</c> URL that names none is sent to.</summary>
     private const int DefaultPort = 69;
 
@@ -130,9 +133,23 @@ public sealed class TftpProtocolHandler(
         return result;
     }
 
+    /// <summary>
+    /// The exit 43 curl 8.22.0 refuses <paramref name="credentials" /> with before it sends a datagram when
+    /// the user name or password holds a byte below 0x20, or <see langword="null" /> when neither does (BL-2179).
+    /// </summary>
+    private static TransferResult? RefuseControlBytes(System.Net.NetworkCredential? credentials) =>
+        credentials is not null && (credentials.UserName.Any(character => character < ' ') || credentials.Password.Any(character => character < ' '))
+            ? TransferResult.Failure(CurlExitCode.BadFunctionArgument, CredentialsHaveControlCode)
+            : null;
+
     // Transfers directly, or fails through the proxy as curl 8.21.0 does.
     private async ValueTask<TransferResult> TransferThroughProxyOrDirectlyAsync(ITransferContext context, int port, long startTimestamp)
     {
+        if (RefuseControlBytes(context.Credentials) is { } credentialsRefused)
+        {
+            return credentialsRefused;
+        }
+
         return context.Proxy switch
         {
             null => await TransferFileAsync(context, port, startTimestamp).ConfigureAwait(false),

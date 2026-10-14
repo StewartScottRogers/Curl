@@ -13,7 +13,7 @@ public sealed partial class HttpRequestHeadFormatterTests
 {
     private const string TrUrl = "http://127.0.0.1:18180/a";
 
-    private const string TrHeaders = "Host: 127.0.0.1:18180\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n";
+    private const string TrHeaders = "Host: 127.0.0.1:18180\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n";
 
     [TestMethod]
     [DataRow(new string[0], TrHeaders + "TE: gzip\r\nConnection: TE\r\n", DisplayName = "--tr-encoding")]
@@ -33,7 +33,7 @@ public sealed partial class HttpRequestHeadFormatterTests
     [DataRow(new[] { "Connection :x" }, TrHeaders + "TE: gzip\r\nConnection :x\r\nConnection: TE\r\n", DisplayName = "Blank before colon is no Connection")]
     [DataRow(new[] { "Connectionx: a" }, TrHeaders + "TE: gzip\r\nConnectionx: a\r\nConnection: TE\r\n", DisplayName = "Longer name is no Connection")]
     [DataRow(new[] { "TEx: a" }, TrHeaders + "TE: gzip\r\nTEx: a\r\nConnection: TE\r\n", DisplayName = "Longer name is no TE")]
-    [DataRow(new[] { "Connection:x", "Host: h" }, "Host: h\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\nTE: gzip\r\nConnection: x, TE\r\n", DisplayName = "With a custom Host")]
+    [DataRow(new[] { "Connection:x", "Host: h" }, "Host: h\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\nTE: gzip\r\nConnection: x, TE\r\n", DisplayName = "With a custom Host")]
     public void Format_TransferEncoding_SendsMeasuredHead(string[] headers, string expectedHeaders)
     {
         HttpRequestOptions options = new() { TransferEncoding = true, Headers = headers };
@@ -68,7 +68,7 @@ public sealed partial class HttpRequestHeadFormatterTests
     public void Format_TransferEncodingWithEveryOtherHeader_SendsTeAfterAcceptAndConnectionLast()
     {
         const string expected = "POST /a HTTP/1.1\r\nHost: 127.0.0.1:18180\r\nAuthorization: Basic dTpw\r\n"
-            + "User-Agent: curl/8.21.0\r\nAccept: */*\r\nTE: gzip\r\nAccept-Encoding: deflate, gzip, br, zstd\r\n"
+            + "User-Agent: curl/8.22.0\r\nAccept: */*\r\nTE: gzip\r\nAccept-Encoding: deflate, gzip, br, zstd\r\n"
             + "Referer: http://r/\r\nCookie: c=1\r\nIf-Modified-Since: Sat, 01 Jan 2000 00:00:00 GMT\r\nX-A: 1\r\n"
             + "Content-Length: 4\r\nContent-Type: application/x-www-form-urlencoded\r\nConnection: x, TE\r\n\r\n";
         HttpRequestOptions options = new()
@@ -117,7 +117,7 @@ public sealed partial class HttpRequestHeadFormatterTests
     public void Format_TransferEncodingThroughProxy_SendsMeasuredHead(bool transferEncoding, string[] headers, string[] proxyHeaders, string expectedHeaders)
     {
         HttpRequestOptions options = new() { TransferEncoding = transferEncoding, Headers = headers, ProxyHeaders = proxyHeaders };
-        string expected = "GET http://example.com/a HTTP/1.1\r\nHost: example.com\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n"
+        string expected = "GET http://example.com/a HTTP/1.1\r\nHost: example.com\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n"
             + expectedHeaders + "\r\n";
 
         byte[] head = HttpRequestHeadFormatter.Format(ArrangedUrl("http://example.com/a"), Arranged(options), forwardProxy: true);

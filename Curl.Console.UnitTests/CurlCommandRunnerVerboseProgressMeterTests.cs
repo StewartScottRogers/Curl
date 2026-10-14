@@ -41,7 +41,7 @@ public sealed class CurlCommandRunnerVerboseProgressMeterTests
         "* using HTTP/1.x\n"
         + "> GET /f.txt HTTP/1.1\r\n"
         + "> Host: 127.0.0.1:18421\r\n"
-        + "> User-Agent: curl/8.21.0\r\n"
+        + "> User-Agent: curl/8.22.0\r\n"
         + "> Accept: */*\r\n"
         + "> \r\n"
         + "* Request completely sent off\n"
@@ -161,7 +161,7 @@ public sealed class CurlCommandRunnerVerboseProgressMeterTests
             events.ReportInfo("Established connection to 127.0.0.1 (127.0.0.1 port 18421) from 127.0.0.1 port 55348 ");
             context.Progress.ReportTransferStarted();
             events.ReportInfo("using HTTP/1.x");
-            events.ReportRequestHeader("GET /f.txt HTTP/1.1\r\nHost: 127.0.0.1:18421\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n"u8);
+            events.ReportRequestHeader("GET /f.txt HTTP/1.1\r\nHost: 127.0.0.1:18421\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n\r\n"u8);
             events.ReportInfo("Request completely sent off");
             events.ReportResponseHeader("HTTP/1.1 200 OK\r\n"u8);
             events.ReportResponseHeader("Content-Type: text/plain\r\n"u8);

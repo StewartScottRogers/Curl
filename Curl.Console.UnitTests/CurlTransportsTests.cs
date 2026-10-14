@@ -105,8 +105,8 @@ public sealed class CurlTransportsTests
         CurlTransports transports = CurlComposition.CreateTransports(NoOptions());
         Diagnostics.Act("tunnel user agent", transports.ProxyTunnelOptions.UserAgent);
 
-        Diagnostics.Assert("tunnel user agent", "curl/8.21.0", transports.ProxyTunnelOptions.UserAgent);
-        Assert.AreEqual("curl/8.21.0", transports.ProxyTunnelOptions.UserAgent);
+        Diagnostics.Assert("tunnel user agent", "curl/8.22.0", transports.ProxyTunnelOptions.UserAgent);
+        Assert.AreEqual("curl/8.22.0", transports.ProxyTunnelOptions.UserAgent);
     }
 
     [TestMethod]

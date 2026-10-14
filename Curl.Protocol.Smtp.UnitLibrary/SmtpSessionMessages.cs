@@ -8,6 +8,9 @@ namespace Curl.Protocol.Smtp;
 /// </summary>
 internal static class SmtpSessionMessages
 {
+    /// <summary>The user name or password held a byte below 0x20 (exit 43), curl 8.22.0's text (BL-2177).</summary>
+    internal const string CredentialsHaveControlCode = "control code detected in credentials";
+
     /// <summary>The server closed the connection before a reply was complete (exit 56).</summary>
     internal const string ResponseReadingFailed = "response reading failed (errno: 0)";
 
@@ -19,6 +22,12 @@ internal static class SmtpSessionMessages
 
     /// <summary>A reply line reached 65536 bytes (exit 100).</summary>
     internal const string ReplyLineTooLarge = "A value or data field grew larger than allowed";
+
+    /// <summary>
+    /// A <c>--mail-from</c>, <c>--mail-auth</c> or <c>--mail-rcpt</c> address held a CR or LF
+    /// (exit 43), curl 8.22.0's text (BL-2162); for a <c>VRFY</c> address too (BL-2177).
+    /// </summary>
+    internal const string AddressHasLineBreak = "Refusing to send email address with a CR or LF";
 
     /// <summary>A reply line held a NUL byte (exit 8, BL-1121).</summary>
     internal const string NulByteInResponseLine = "Nul byte in server response line";

@@ -22,7 +22,7 @@ public static class CurlAiHelpText
 
     /// <summary>
     /// The rows <c>--ai-help</c> documents that curl's <c>--help</c> does not: Curl's own options, which
-    /// <see cref="CurlHelpTable"/> must not gain so <c>--help</c> stays byte-identical to curl 8.21.0.
+    /// <see cref="CurlHelpTable"/> must not gain so <c>--help</c> stays byte-identical to curl 8.22.0.
     /// </summary>
     private static readonly CurlHelpEntry[] CurlOnlyEntries =
     [
@@ -115,7 +115,7 @@ public static class CurlAiHelpText
         [
             "# curl --ai-help",
             string.Empty,
-            "This `curl` is curl 8.21.0 reimplemented in C#, a drop-in replacement: the same options, exit codes and output bytes. Run it as `curl [options...] <url>`. This page is the Markdown option reference for AI agents; `curl --help` is the one for people.",
+            "This `curl` is curl 8.22.0 reimplemented in C#, a drop-in replacement: the same options, exit codes and output bytes. Run it as `curl [options...] <url>`. This page is the Markdown option reference for AI agents; `curl --help` is the one for people.",
             string.Empty,
             "## Categories",
             string.Empty,
