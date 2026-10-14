@@ -2,7 +2,7 @@
 
 RFC 9421 HTTP Message Signatures as curl 8.22.0's experimental `--httpsig-*` options sign a
 request (upstream `lib/http_httpsig.c` at `curl-8_22_0`), hand-built against the BCL and
-`Curl.Cryptography.UnitLibrary`'s Ed25519 (ADR-0484). Pure computation: no I/O and no clock;
+`Curl.Cryptography.UnitLibrary`'s Ed25519 (ADR-0485). Pure computation: no I/O and no clock;
 the caller passes `created`.
 
 Namespace `Curl.HttpMessageSignatures`. It holds:
