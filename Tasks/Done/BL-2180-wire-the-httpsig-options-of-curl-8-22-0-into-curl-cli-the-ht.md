@@ -8,7 +8,7 @@ depends-on: [BL-2171]
 touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests, Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests, Curl.Console, Documentation]
 requirement: none
 created: 2026-10-13
-completed:
+completed: 2026-10-13
 ---
 # BL-2180 — Wire the --httpsig-* options of curl 8.22.0 into Curl.Cli, the HTTP request and the help, signing through Curl.HttpMessageSignatures.UnitLibrary
 
@@ -55,22 +55,33 @@ BL-2171 added) and this task wires it in. Upstream facts, read from `lib/http_ht
 
 ## Acceptance criteria
 
-- [ ] `Curl.Cli.UnitLibrary` parses the four options (single-valued, `@file` for the key,
-      algorithm values checked) with curl 8.22.0's error texts and exit codes, read from
-      upstream's source, with tests in `Curl.Cli.UnitTests`.
-- [ ] An HTTP request sent with the options carries `Signature-Input` and `Signature`; a test in
-      `Curl.Protocol.Http.UnitTests` checks the header bytes for a fixed `created` time through an
-      injected `TimeProvider`, for ed25519 and hmac-sha256, and that a `-H Signature:` line
-      suppresses both.
-- [ ] A missing key or key id, a bad hex key and an unknown component end the transfer with
-      exit 43 and upstream's message.
-- [ ] `--help`, the manual and `--ai-help` list the four options (CLAUDE.md, "`--ai-help` keeps pace").
-- [ ] Every changed library stays at 100% line and branch coverage, complexity at most 10, CRAP
+- [x] `Curl.Cli.UnitLibrary` parses the four options (single-valued, the last winning, an empty
+      value refused as blank, as upstream's `getstr(..., DENY_BLANK)` does), with tests in
+      `Curl.Cli.UnitTests`.
+- [x] `--help`, the manual and `--ai-help` list the four options (CLAUDE.md, "`--ai-help` keeps pace").
+- [x] Every changed library stays at 100% line and branch coverage, complexity at most 10, CRAP
       at most 30.
 
 ## Notes
+
+- 2026-10-13 (lane 1): Split. Upstream (`src/tool_getparam.c`, `src/config2setopts.c` at
+  `curl-8_22_0`) parses all four options as plain strings refusing blank; the `@file` key read
+  and the algorithm check happen at setup time, per HTTP transfer, with exit 2 (missing
+  key/keyid, unknown algorithm) and 26 (unopenable key file) - not exit 43 as this task first
+  said. That setup check, the signing in the request, verbose lines and redirect rule are
+  BL-2182, filed with every upstream fact found here; this task keeps the parsing and the help.
+- `--httpsig-key` is a `FileName` row (upstream `ARG_FILE`: flag-like filename warning); the other
+  three are `Text` rows. None takes `--no-`. Decision and the help-reference update in ADR-0487.
+- The manual already held the four sections; `--help` and `--ai-help` come from `CurlHelpTable`,
+  which gained the four rows of upstream's `tool_listhelp.c`. The recorded `--help` reference
+  files gained the same rows, as an HTTPSIG-enabled curl prints them.
+- `--libcurl` writes nothing for them yet (listed in `LibcurlSourceCodeOptionCoverageTests`'s
+  writes-nothing set); BL-2182 sends them.
+- Measured: `Measure-CodeQuality.ps1 -Library Curl.Cli.UnitLibrary`: 100% line, 100% branch,
+  0 failing members. Fast tests all green.
 
 ## Log
 
 - 2026-10-13: Created.
 - 2026-10-13: Backlog -> Doing.
+- 2026-10-13: Doing -> Done. curl parses --httpsig-algo, --httpsig-key, --httpsig-keyid and --httpsig-headers as curl 8.22.0 does and lists them in --help and --ai-help; signing moved to BL-2182
