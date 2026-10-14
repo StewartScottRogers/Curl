@@ -797,6 +797,68 @@ public sealed class UpstreamCaseRunnerTests
     }
 
     [TestMethod]
+    [DataRow(1200)]
+    [DataRow(1609)]
+    public async Task RunAsync_GopherCase_RunsCurlAtGopherPort(int testNumber)
+    {
+        string? commandLine = null;
+        UpstreamCaseRunner runner = Runner(invocation =>
+        {
+            commandLine = string.Join(' ', invocation.Arguments);
+            return Task.FromResult(0);
+        });
+        string testFile = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "UpstreamTestData", $"test{testNumber}.curltest"));
+
+        UpstreamCaseOutcome outcome = await RunAsync(runner, testFile);
+
+        Assert.AreNotEqual(UpstreamCaseOutcomeKind.Skipped, outcome.Kind, outcome.Detail);
+        Assert.Contains(":" + UpstreamCaseRunner.GopherPort + "/", commandLine!);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_GopherCase_RecordsTheSelectorForVerifyProtocol()
+    {
+        UpstreamCaseRunner runner = Runner(async invocation =>
+        {
+            ConnectResult connected = await invocation.Connector.ConnectAsync(new ConnectTarget("127.0.0.1", GopherServerConnector.GopherPort, false), CancellationToken.None);
+            await connected.Connection!.WriteAsync("/5\r\n"u8.ToArray(), CancellationToken.None);
+            return 0;
+        });
+
+        UpstreamCaseOutcome outcome = await RunAsync(runner, "<testcase>\n<client>\n<server>\ngopher\n</server>\n<command>\ngopher://%HOSTIP:%GOPHERPORT/1/%TESTNUMBER\n</command>\n</client>\n<verify>\n<protocol crlf=\"yes\">\n/%TESTNUMBER\n</protocol>\n</verify>\n</testcase>\n");
+
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Passed, outcome.Kind, outcome.Detail);
+    }
+
+    [TestMethod]
+    [DataRow(5028)]
+    [DataRow(2407)]
+    public async Task RunAsync_CaseNamingGopherOrHttp2Port_IsNotSkippedForAMissingPort(int testNumber)
+    {
+        UpstreamCaseRunner runner = Runner(_ => Task.FromResult(0));
+        string testFile = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "UpstreamTestData", $"test{testNumber}.curltest"));
+
+        UpstreamCaseOutcome outcome = await RunAsync(runner, testFile);
+
+        Assert.DoesNotContain("has no value", outcome.Detail ?? string.Empty);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_Http2Port_HasItsValue()
+    {
+        string? commandLine = null;
+        UpstreamCaseRunner runner = Runner(invocation =>
+        {
+            commandLine = string.Join(' ', invocation.Arguments);
+            return Task.FromResult(0);
+        });
+
+        await RunAsync(runner, "<testcase>\n<client>\n<server>\nhttp\n</server>\n<command>\nhttp://%HOSTIP:%HTTP2PORT/%TESTNUMBER\n</command>\n</client>\n<verify>\n</verify>\n</testcase>\n");
+
+        Assert.Contains(":" + UpstreamCaseRunner.Http2Port + "/", commandLine!);
+    }
+
+    [TestMethod]
     [DataRow(240)]
     [DataRow(241)]
     [DataRow(242)]
