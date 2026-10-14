@@ -23,8 +23,10 @@ namespace Curl.Conformance;
 /// </remarks>
 internal static class UpstreamCaseScreening
 {
+    // runtests.pl at curl-8_22_0 reads stdout only from <verify>, so a <client><stdout> (test210 to
+    // test212, test407) is a comment it never checks; the harness accepts the case and ignores it too.
     private static readonly HashSet<string> ClientParts =
-        ["name", "command", "server", "features", "file", "file1", "file2", "file3", "file4", "stdin", "killserver", "disable", "precheck", "setenv"];
+        ["name", "command", "server", "features", "file", "file1", "file2", "file3", "file4", "stdin", "stdout", "killserver", "disable", "precheck", "setenv"];
 
     private static readonly HashSet<string> VerifyParts =
     [

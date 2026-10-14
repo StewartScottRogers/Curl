@@ -151,14 +151,15 @@ public sealed class UpstreamCaseScreeningTests
     }
 
     // The 8 cases naming %FTPSPORT at curl-8_21_0 run against the FTP stand-in behind implicit TLS
-    // (BL-1913); 404, 407 and 1112 still skip, each for another reason, never for the port.
+    // (BL-1913); 404 still skips, for another reason, never for the port. 407's <client><stdout>,
+    // which runtests.pl never reads, no longer skips it (BL-2221).
     [TestMethod]
     [DataRow(400, null)]
     [DataRow(401, null)]
     [DataRow(403, null)]
     [DataRow(404, "the expected exit code 77,60 is not a number")]
     [DataRow(406, null)]
-    [DataRow(407, "the harness does not act on <client><stdout>")]
+    [DataRow(407, null)]
     [DataRow(408, null)]
     [DataRow(1112, null)]
     public void FindSkipReason_FtpsCase_RunsWithAValueForTheFtpsPort(int testNumber, string? expected)
@@ -440,6 +441,7 @@ public sealed class UpstreamCaseScreeningTests
     [DataRow("<client>\n<server>\nsocks5\n</server>\n<command>\n--socks5 127.0.0.1:8994 http://127.0.0.1:8990/x\n</command>\n</client>\n")]
     [DataRow("<client>\n<server>\nmqtt\n</server>\n<command>\nmqtt://127.0.0.1:8998/1190\n</command>\n</client>\n")]
     [DataRow("<client>\n<setenv>\nhttp_proxy=http://127.0.0.1:8990/\n</setenv>\n<command>\nhttp://127.0.0.1:8990/x\n</command>\n</client>\n")]
+    [DataRow("<client>\n<command>\nhttp://127.0.0.1:8990/x\n</command>\n<stdout>\nignored\n</stdout>\n</client>\n")]
     public void FindSkipReason_NoInternetHostOrAServerNamed_ReturnsNull(string sections)
     {
         var diagnostics = TestDiagnostics.For(TestContext);

@@ -195,6 +195,20 @@ public sealed class UpstreamCaseVerificationTests
         Assert.IsNotNull(differing);
     }
 
+    // runtests.pl reads stdout only from <verify>: a <client><stdout> is never compared (BL-2221).
+    [TestMethod]
+    public void FindFirstDifference_ClientStdout_IsNotComparedWhetherOrNotTheOutputMatches()
+    {
+        string sections = "<client>\n<stdout>\ndata blobb\n</stdout>\n</client>\n";
+
+        string? matching = Verify(sections, Run(standardOutput: "data blobb\n"));
+        string? differing = Verify(sections, Run(standardOutput: "something else\n"));
+
+        ExpectDifference(null, differing);
+        Assert.IsNull(matching);
+        Assert.IsNull(differing);
+    }
+
     [TestMethod]
     public void FindFirstDifference_StdoutThatDiffers_NamesIt()
     {
