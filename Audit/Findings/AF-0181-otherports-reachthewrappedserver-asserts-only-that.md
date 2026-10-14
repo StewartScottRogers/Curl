@@ -7,8 +7,8 @@ status: closed
 reason: Re-audit 2026-10-13_1822.md: the reproduction no longer reproduces.
 key: quality:Curl.Conformance.UnitTests/MqttServerConnectorTests.cs:OtherPorts_ReachTheWrappedServer:weak-assertion
 reproduction: none
-task: none
-tasks:
+task: BL-2140
+tasks: BL-2140
 found: 2026-10-13
 found-at: c86d04eeb8477108eb6d9195bb036a4ddaecc5fc
 scorecard: 2026-10-13_0925.md
@@ -47,4 +47,5 @@ Select-String -Path Curl.Conformance.UnitTests/MqttServerConnectorTests.cs -Patt
 ## Log
 
 - 2026-10-13: filed proposed.
-- 2026-10-13: proposed -> closed. Re-audit 2026-10-13_1822.md: the reproduction no longer reproduces.
+- 2026-10-13: proposed -> accepted.
+- 2026-10-13: accepted -> closed. Re-audit 2026-10-13_1822.md: the reproduction no longer reproduces.

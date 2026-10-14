@@ -3,12 +3,12 @@ id: AF-0191
 title: BL-2130 cost $1.88, 3.7 times the median task cost, paging a 2,600-line handler in slices
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: process:logs:BL-2130:cost-outlier
 reproduction: none
-task: none
-tasks:
+task: BL-2150
+tasks: BL-2150
 found: 2026-10-13
 found-at: c86d04eeb8477108eb6d9195bb036a4ddaecc5fc
 scorecard: 2026-10-13_0925.md
@@ -47,3 +47,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Log
 
 - 2026-10-13: filed proposed.
+- 2026-10-13: proposed -> accepted.
