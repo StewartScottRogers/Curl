@@ -30,7 +30,10 @@
          The run then checks the manifest and warns, in its log and the scorecard commit's
          message, about any selected auditor left unseeded and any defect in an avoided file.
       5. Each selected auditor in the fixed order, one at a time, in the planted tree, with its
-         open findings from the audit branch to re-audit; its reply goes to
+         open findings from the audit branch to re-audit - less any accepted finding about one
+         past run's cost (key ...:cost-outlier) whose tasks are all in Tasks/Done at the audited
+         commit, which step 6 closes without a re-audit (ADR-0422, amended 2026-10-14) and which
+         step 4 does not avoid either; its reply goes to
          <stamp>\reports\<auditor>.md. A planted tree left changed afterwards marks that auditor
          as having written to the audited tree (unreliable), and is reset before the next.
       6. Write-AuditScorecard.ps1 -ReliabilityOnly, then Write-AuditFindings.ps1 -Tree <planted>
@@ -218,11 +221,15 @@ function Invoke-Agent([string]$Name, [string]$Model, [string]$Prompt, [string]$W
     return $p.ExitCode
 }
 
-function Get-OpenFindings([string]$Findings, [string]$Auditor) {
+function Get-OpenFindings([string]$Findings, [string]$Auditor, [string[]]$TaskPaths) {
+    # The auditor's open findings to re-audit, one prompt line each. A finding about one past run's
+    # cost whose tasks are all Done at the audited commit is left out: Write-AuditFindings.ps1 closes
+    # it without a re-audit (ADR-0422, amended 2026-10-14).
     $lines = @()
     foreach ($f in @(Get-ChildItem -LiteralPath $Findings -Filter 'AF-*.md' -ErrorAction SilentlyContinue | Sort-Object Name)) {
         $t = [IO.File]::ReadAllText($f.FullName)
         if ($t -notmatch "(?m)^auditor: $Auditor\s*$" -or $t -notmatch '(?m)^status: (proposed|accepted|deferred|blocked)\s*$') { continue }
+        if (Test-HistoricalClose $t $TaskPaths) { continue }
         $id = if ($t -match '(?m)^id: (\S+)') { $Matches[1] } else { continue }
         $title = if ($t -match '(?m)^title: (.+)$') { $Matches[1].Trim() } else { '' }
         $command = if ($t -match '(?s)```powershell\r?\n(.*?)```') { $Matches[1].Trim() } else { '' }
@@ -257,6 +264,29 @@ function Get-FindingField([string]$Text, [string]$Name) {
     return ''
 }
 
+function Test-AllTasksDone([string]$Text, [string[]]$TaskPaths) {
+    # True when the finding has at least one task and every one - its task, its tasks list, and any
+    # BL-###-fix-/re-fix- task file naming it, as Test-AuditDue.ps1 counts them - is in Tasks/Done
+    # (or an archive under it) in $TaskPaths, the audited commit's git paths.
+    $paths = @($TaskPaths | Where-Object { $_ } | ForEach-Object { "$_" -replace '\\', '/' })
+    $ids = @(@((Get-FindingField $Text 'task'), @((Get-FindingField $Text 'tasks') -split ',\s*')) | Where-Object { $_ -match '^BL-\d+$' })
+    $slug = (Get-FindingField $Text 'id').ToLowerInvariant()
+    $ids += @($paths | ForEach-Object { $_.Substring($_.LastIndexOf('/') + 1) } | Where-Object { $_ -match '^BL-\d+-(re-)?fix-' -and $_ -match "\b$slug\b" } | ForEach-Object { ($_ -split '-')[0..1] -join '-' })
+    $ids = @($ids | Sort-Object -Unique)
+    if (-not $ids.Count) { return $false }
+    foreach ($taskId in $ids) {
+        $path = @($paths | Where-Object { $_.Substring($_.LastIndexOf('/') + 1) -like "$taskId-*" } | Select-Object -First 1)
+        if (-not $path.Count -or $path[0] -notmatch '^Tasks/Done/') { return $false }
+    }
+    return $true
+}
+
+function Test-HistoricalClose([string]$Text, [string[]]$TaskPaths) {
+    # An accepted finding about one past run's cost (key ...:cost-outlier) whose tasks are all Done:
+    # Write-AuditFindings.ps1 closes it task-done-historical, so no auditor re-audits it.
+    return (Get-FindingField $Text 'status') -eq 'accepted' -and (Get-FindingField $Text 'key').EndsWith(':cost-outlier') -and (Test-AllTasksDone $Text $TaskPaths)
+}
+
 function Get-ReauditAwaitedFiles([string]$Findings, [string[]]$TaskPaths) {
     # The files the seeder must not plant in (BL-2108): those a finding awaiting a re-audit names
     # in its "Location:" line. A finding awaits a re-audit while it is accepted and every one of
@@ -264,25 +294,18 @@ function Get-ReauditAwaitedFiles([string]$Findings, [string[]]$TaskPaths) {
     # Test-AuditDue.ps1 counts them - is in Tasks/Done at the audited commit. Unlike
     # Test-AuditDue's reaudit-pending count, a finding that already has one verdict since its fix
     # still counts: it stays accepted until a second verdict or a clean rerun closes it, and a
-    # plant in its file would set that verdict aside too (ADR-0422's overlap rule).
+    # plant in its file would set that verdict aside too (ADR-0422's overlap rule). A finding about
+    # a past run's cost (key ...:cost-outlier) never awaits one: it closes without a re-audit
+    # (ADR-0422, amended 2026-10-14).
     # Returns one object per such finding: Id, Auditor, Files (paths with any :line removed).
     $awaited = @()
-    $paths = @($TaskPaths | Where-Object { $_ } | ForEach-Object { "$_" -replace '\\', '/' })
     foreach ($f in @(Get-ChildItem -LiteralPath $Findings -Filter 'AF-*.md' -ErrorAction SilentlyContinue | Sort-Object Name)) {
         $t = [IO.File]::ReadAllText($f.FullName)
         if ((Get-FindingField $t 'status') -ne 'accepted') { continue }
         $id = Get-FindingField $t 'id'
-        $ids = @(@((Get-FindingField $t 'task'), @((Get-FindingField $t 'tasks') -split ',\s*')) | Where-Object { $_ -match '^BL-\d+$' })
-        $slug = $id.ToLowerInvariant()
-        $ids += @($paths | ForEach-Object { $_.Substring($_.LastIndexOf('/') + 1) } | Where-Object { $_ -match '^BL-\d+-(re-)?fix-' -and $_ -match "\b$slug\b" } | ForEach-Object { ($_ -split '-')[0..1] -join '-' })
-        $ids = @($ids | Sort-Object -Unique)
-        if (-not $ids.Count) { continue }
-        $done = $true
-        foreach ($taskId in $ids) {
-            $path = @($paths | Where-Object { $_.Substring($_.LastIndexOf('/') + 1) -like "$taskId-*" } | Select-Object -First 1)
-            if (-not $path.Count -or $path[0] -notmatch '^Tasks/Done/') { $done = $false; break }
-        }
-        if (-not $done) { continue }
+        if (-not (Test-AllTasksDone $t $TaskPaths)) { continue }
+        # A past run's cost closes without a re-audit, so no plant can set one aside.
+        if ((Get-FindingField $t 'key').EndsWith(':cost-outlier')) { continue }
         $location = if ($t -match '(?m)^Location: `([^`]*)`') { $Matches[1] } else { '' }
         $files = @($location -split ',\s*' | ForEach-Object { ($_ -replace '\\', '/' -replace ':\d+(-\d+)?$', '').Trim() } | Where-Object { $_ -and $_ -notmatch '[{}]' } | Sort-Object -Unique)
         if ($files.Count) { $awaited += [pscustomobject]@{ Id = $id; Auditor = Get-FindingField $t 'auditor'; Files = $files } }
@@ -369,18 +392,24 @@ if ($SelfTest) {
         # BL-2108: files of findings awaiting a re-audit, and the manifest check.
         $awaitDir = Join-Path $scratch 'await'
         New-Item -ItemType Directory -Force $awaitDir | Out-Null
-        $finding = { param($Id, $Auditor, $Status, $Task, $Location) [IO.File]::WriteAllText((Join-Path $awaitDir "$Id-x.md"), "---`nid: $Id`nauditor: $Auditor`nstatus: $Status`ntask: $Task`ntasks: $Task`n---`n## Evidence`n`nLocation: ``$Location```n") }
+        $finding = { param($Id, $Auditor, $Status, $Task, $Location, $Key) [IO.File]::WriteAllText((Join-Path $awaitDir "$Id-x.md"), "---`nid: $Id`ntitle: Finding $Id`nauditor: $Auditor`nstatus: $Status`nkey: $Key`ntask: $Task`ntasks: $Task`n---`n## Evidence`n`nLocation: ``$Location```n") }
         & $finding 'AF-0010' 'conformance' 'accepted' 'BL-10' 'Curl.Console/CurlCommandRunner.cs:1310'
         & $finding 'AF-0011' 'quality' 'accepted' 'BL-11' 'Curl.Cli.UnitLibrary/A.cs:5'
         & $finding 'AF-0012' 'process' 'accepted' 'BL-12' 'logs/ci-runs.json'
         & $finding 'AF-0013' 'security' 'closed' 'BL-13' 'Curl.Tls.UnitLibrary/B.cs'
         & $finding 'AF-0014' 'truthfulness' 'accepted' 'BL-14' 'README.md:3, Documentation/C.md'
         & $finding 'AF-0015' 'quality' 'accepted' 'none' 'Curl.Core.UnitLibrary/D.cs'
+        # ADR-0422, amended 2026-10-14: a past run's cost, Done, closes without a re-audit; open, it is re-audited.
+        & $finding 'AF-0016' 'process' 'accepted' 'BL-16' 'logs/BL-800-x.jsonl' 'process:logs:BL-800:cost-outlier'
+        & $finding 'AF-0017' 'process' 'accepted' 'BL-17' 'logs/BL-801-x.jsonl' 'process:logs:BL-801:cost-outlier'
         $tasks = @('Tasks/Done/2026-10-10/BL-10-fix-af-0010-x.md', 'Tasks/Doing/BL-11-fix-af-0011-x.md', 'Tasks/Done/BL-12-fix-af-0012-x.md',
-            'Tasks/Done/BL-13-fix-af-0013-x.md', 'Tasks/Done/BL-14-fix-af-0014-x.md', 'Tasks/Backlog/BL-20-re-fix-af-0012-y.md')
+            'Tasks/Done/BL-13-fix-af-0013-x.md', 'Tasks/Done/BL-14-fix-af-0014-x.md', 'Tasks/Backlog/BL-20-re-fix-af-0012-y.md',
+            'Tasks/Done/BL-16-fix-af-0016-x.md', 'Tasks/Doing/BL-17-fix-af-0017-x.md')
         $awaited = @(Get-ReauditAwaitedFiles $awaitDir $tasks)
         $ids = ($awaited | ForEach-Object { $_.Id }) -join ','
-        Check 'an accepted finding whose tasks are all Done awaits a re-audit; an open task, an open Re-fix, closed or task-less does not' ($ids -eq 'AF-0010,AF-0014') $ids
+        Check 'an accepted finding whose tasks are all Done awaits a re-audit; an open task, an open Re-fix, closed, task-less or a past run''s cost does not' ($ids -eq 'AF-0010,AF-0014') $ids
+        $processOpen = (@(Get-OpenFindings $awaitDir 'process' $tasks) | ForEach-Object { ($_ -split ' ')[1] }) -join ','
+        Check 'a past run''s cost with every task Done is not re-audited; with a task open, and any other process finding, it is' ($processOpen -eq 'AF-0012,AF-0017') $processOpen
         $avoid = @($awaited | ForEach-Object { $_.Files } | Sort-Object -Unique)
         Check 'the files to avoid come from Location, without line numbers, every comma-separated path' (($avoid -join ',') -eq 'Curl.Console/CurlCommandRunner.cs,Documentation/C.md,README.md') ($avoid -join ',')
         $lines = @(Get-AvoidPromptLines $awaited)
@@ -535,7 +564,8 @@ try {
     # 4. seed
     Set-Caption 'seeding'
     $manifest = Join-Path $RunDir 'manifest.json'
-    $awaited = @(Get-ReauditAwaitedFiles (Join-Path $auditTree 'Audit\Findings') @(Invoke-Git @('-C', $repo, 'ls-tree', '-r', '--name-only', $auditedCommit, '--', 'Tasks')))
+    $auditedTaskPaths = @(Invoke-Git @('-C', $repo, 'ls-tree', '-r', '--name-only', $auditedCommit, '--', 'Tasks'))
+    $awaited = @(Get-ReauditAwaitedFiles (Join-Path $auditTree 'Audit\Findings') $auditedTaskPaths)
     $avoidFiles = @($awaited | ForEach-Object { $_.Files } | Sort-Object -Unique)
     $avoidLines = @(Get-AvoidPromptLines $awaited)
     [IO.File]::WriteAllText((Join-Path $RunDir 'avoid-files.txt'), (($avoidLines | ForEach-Object { "$_`r`n" }) -join ''), $Utf8)
@@ -555,7 +585,7 @@ try {
         Set-Caption $a
         $scratch = Join-Path $RunDir "scratch\$a"
         New-Item -ItemType Directory -Force $scratch | Out-Null
-        $open = @(Get-OpenFindings (Join-Path $auditTree 'Audit\Findings') $a)
+        $open = @(Get-OpenFindings (Join-Path $auditTree 'Audit\Findings') $a $auditedTaskPaths)
         $reaudit = if ($open.Count) { "Re-audit these open findings by running each reproduction:`n" + ($open -join "`n") } else { 'There are no findings to re-audit.' }
         $logsLine = if ($a -eq 'process') { " The factory's log folder is $logs; the previous scorecard's date is $($since.ToString('yyyy-MM-dd'))." } else { '' }
         $prompt = "Audit the tree at $plantedTree (commit $auditedCommit; auditor fingerprint $fingerprint).$logsLine Your temporary folder is $scratch. Do every step of your method in full and report its method counts; the re-audits below come on top of it, never instead. $reaudit Follow Audit/Instructions/Auditor-Rules.md and Audit/Instructions/$($Method[$a]).md in that tree, and end with exactly one json report block."

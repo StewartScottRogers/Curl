@@ -50,8 +50,8 @@ set it.
 | `scorecard` | The file name of the scorecard of the audit that found it, `yyyy-MM-dd_HHmm.md`. |
 | `duplicate-of` | The ID of the finding this one duplicates, set when it closes as a duplicate; empty otherwise. |
 | `closed` | The date it was closed, `yyyy-MM-dd`; empty while it is not closed. |
-| `closed-how` | How it closed ([Closing](#closing)): `mechanical`, `reliable-reaudit`, `consecutive`, `duplicate` or `stewart`; empty while it is not closed (and on findings closed before ADR-0422, all by a reliable re-audit). |
-| `closed-by` | What closed it: the re-audit's scorecard; both scorecards, comma-separated, for `consecutive`; the scorecard of the audit that found the duplicate, or `session` for one an interactive session marked; `stewart` for Stewart's close. Empty while it is not closed. |
+| `closed-how` | How it closed ([Closing](#closing)): `mechanical`, `reliable-reaudit`, `consecutive`, `duplicate`, `task-done-historical` or `stewart`; empty while it is not closed (and on findings closed before ADR-0422, all by a reliable re-audit). |
+| `closed-by` | What closed it: the re-audit's scorecard; both scorecards, comma-separated, for `consecutive`; the scorecard of the audit that closed it for `task-done-historical` (or `session` for one an interactive session closed under that rule); the scorecard of the audit that found the duplicate, or `session` for one an interactive session marked; `stewart` for Stewart's close. Empty while it is not closed. |
 
 ## Severities
 
@@ -74,7 +74,7 @@ given kind of finding gets; they apply these definitions and never replace them.
 | `deferred` | Stewart has not decided yet and parked it, for example to understand it first. | Stewart only. |
 | `blocked` | Stewart cannot decide until something else happens; `reason` names it. | Stewart only. |
 | `rejected` | Stewart does not agree it is a defect, or does not want it fixed. | Stewart only. |
-| `closed` | Evidence showed the reproduction no longer reproduces, it duplicates another finding, or Stewart closed it ([Closing](#closing)). | `Write-AuditFindings.ps1` under the closure rule, a session marking a duplicate, or Stewart. |
+| `closed` | Evidence showed the reproduction no longer reproduces, it duplicates another finding, it records a past run's cost and its tasks are Done, or Stewart closed it ([Closing](#closing)). | `Write-AuditFindings.ps1` under the closure rule, a session marking a duplicate, or Stewart. |
 
 A finding is **open** while it is `proposed`, `accepted`, `deferred` or `blocked`.
 
@@ -107,8 +107,9 @@ The date, the old and new status, and the reason.
 2. Only Stewart sets `accepted`, `deferred`, `blocked`, `rejected` or `proposed` again, by the moves above:
    in the audit pull request, on the board page's Audit tab (BL-1185), or by telling a session.
 3. A finding becomes `closed` only on evidence, by one of the paths in [Closing](#closing) -
-   never because its task reached Done. Nothing else closes a finding: not its task's
-   state, and not an audit in which it was not reported.
+   never because its task reached Done, except a finding about one past run's cost
+   (`task-done-historical`), whose task is the only evidence there can be. Nothing else
+   closes a finding: not its task's state, and not an audit in which it was not reported.
 4. A closed finding that reappears is a new finding naming the old one: a new ID whose
    Summary says "reappeared; previously AF-####". The closed file is not reopened.
 5. A report whose `key` equals the `key` of an open finding is the same finding: it adds a
@@ -136,10 +137,11 @@ reproduces and the first of these holds; `closed-how` records which:
 | `reliable-reaudit` | No mechanical answer (`reproduction: none`, or the rerun could not tell) and the auditor is reliable on that audit's scorecard ([Scorecards/README.md](../Scorecards/README.md#reliability)). |
 | `consecutive` | No mechanical answer, and the finding's previous `Re-audits` line is also its own auditor's `reproduces: no`, from a different audit. `closed-by` names both scorecards. |
 
-Two more closes are not re-audits:
+Three more closes are not re-audits:
 
 | `closed-how` | When |
 | --- | --- |
+| `task-done-historical` | Its key ends in `:cost-outlier`: it records one past run's cost, which no fix can change, so every re-audit would say it still reproduces. It is `accepted`, has at least one task, and every task - its `task`, its `tasks`, and every `BL-###-fix-`/`re-fix-` task file naming it - is in `Tasks/Done` at the audited commit: `Write-AuditFindings.ps1` closes it at the start of the audit, before any re-audit, and `RunAudit.ps1` does not ask its auditor to re-audit it. No `Re-fix` task is ever filed for it (Stewart, 2026-10-14; ADR-0422, amended 2026-10-14). |
 | `duplicate` | It has the same key as an open finding with a lower ID: `Write-AuditFindings.ps1` closes it at the start of an audit, or an interactive session marks it; `duplicate-of` names the original, whose `tasks` gains its tasks. |
 | `stewart` | Stewart closes an accepted finding himself ([Moves](#moves)), for example one the scorecard lists as stuck. |
 

@@ -18,7 +18,10 @@
 
     then fills the task's Goal, Context (the finding's ID, evidence and reproduction, and that
     the finding closes only when a re-audit confirms the fix) and Acceptance criteria (the
-    reproduction no longer reproduces; the build and the fast tests pass), and writes the new
+    reproduction no longer reproduces; the build and the fast tests pass) - for a finding whose
+    key ends in :cost-outlier, instead, a Goal and criteria to find what drove the past run's
+    cost and fix it or record that nothing can be, and a Context saying the first audit after the
+    task is Done closes the finding - and writes the new
     task's ID into the finding's `task` field and its `tasks` list. The tasks are lane-eligible:
     they change product code, not audit paths.
 
@@ -36,6 +39,11 @@
                 "Re-fix AF-NNNN: (title)" as above, with that line and the earlier tasks in its
                 Context. A latest line that is set aside ("not re-audited", a planted-defect
                 overlap) reopens nothing.
+      historical  A finding whose key ends in :cost-outlier (one past run's cost) never reopens: no
+                Re-fix task is filed for it, whatever its re-audits say. Once all its tasks are
+                Done, the next audit's Write-AuditFindings.ps1 closes it with closed-how
+                task-done-historical (ADR-0422, amended 2026-10-14). Its first Fix task is filed
+                as for any finding.
 
     Every other finding is left byte-identical.
 
@@ -70,7 +78,7 @@ function Read-Finding([string]$Path) {
     $section = { param([string]$Name) if ($text -match "(?s)## $Name\r?\n(.*?)(\r?\n## |\z)") { $Matches[1].Trim() } else { '' } }
     $location = if ($text -match '(?m)^Location: `([^`]*)`') { $Matches[1] } else { '' }
     $tasks = @("$($fields['tasks'])" -split ',\s*' | Where-Object { $_ -match '^BL-\d+$' })
-    return [pscustomobject]@{ Path = $Path; Text = $text; Id = $fields['id']; Title = $fields['title']; Auditor = $fields['auditor']; Severity = $fields['severity']; Status = $fields['status']; Task = $fields['task']; Tasks = $tasks; Location = $location; Evidence = (& $section 'Evidence'); Reproduction = (& $section 'Reproduction') }
+    return [pscustomobject]@{ Path = $Path; Text = $text; Id = $fields['id']; Title = $fields['title']; Auditor = $fields['auditor']; Severity = $fields['severity']; Status = $fields['status']; Key = "$($fields['key'])"; Task = $fields['task']; Tasks = $tasks; Location = $location; Evidence = (& $section 'Evidence'); Reproduction = (& $section 'Reproduction') }
 }
 
 # The front matter keys in template order; the same as Write-AuditFindings.ps1.
@@ -166,6 +174,10 @@ function Get-TaskTouches([string]$Location, [string]$Root) {
 
 function Set-TaskBody([string]$Path, $Finding, $Reopen, [string[]]$Earlier) {
     $goal = "The defect the audit office reported as $($Finding.Id) is fixed: its reproduction no longer reproduces, so a re-audit can close the finding."
+    # A finding about one past run's cost cannot stop reproducing: its task is the evidence, and the
+    # next audit closes it once the task is Done (ADR-0422, amended 2026-10-14).
+    $historical = "$($Finding.Key)".EndsWith(':cost-outlier')
+    $closing = if ($historical) { "The finding describes a past run's cost, which no fix can change, so no re-audit can close it: the first audit after this task reaches Done closes it (closed-how task-done-historical, ADR-0422 amended 2026-10-14). Look for avoidable waste in what drove the cost and fix its cause, or record that there is none." } else { "The finding closes only when a later re-audit by the $($Finding.Auditor) auditor confirms the fix, never because this task reaches Done." }
     $again = @()
     if ($Reopen) {
         $again = @(
@@ -186,9 +198,13 @@ function Set-TaskBody([string]$Path, $Finding, $Reopen, [string[]]$Earlier) {
         ''
         $Finding.Reproduction
         ''
-        "The finding closes only when a later re-audit by the $($Finding.Auditor) auditor confirms the fix, never because this task reaches Done."
+        $closing
     ) -join "`n"
     $criteria = "- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.`n- [ ] ``dotnet build`` and the fast tests (``dotnet test --filter `"TestCategory!=Integration`"``) pass."
+    if ($historical) {
+        $goal = "What drove the past run's cost that the audit office reported as $($Finding.Id) is found, and any avoidable waste in it is fixed, or the task records that there is none."
+        $criteria = "- [ ] The cause of the cost is named in this task, and either fixed or recorded as unavoidable.`n- [ ] ``dotnet build`` and the fast tests (``dotnet test --filter `"TestCategory!=Integration`"``) pass."
+    }
     $text = [IO.File]::ReadAllText($Path)
     $text = $text.Replace('<!-- One sentence: the observable outcome once this task is done. -->', $goal)
     $text = $text -replace '<!-- Why this matters.*?-->', $context.Replace('$', '$$')
@@ -212,6 +228,10 @@ function Invoke-Triage([string]$Findings, [string]$BoardScript, [string]$Root) {
             # still reproduces (ADR-0422).
             $tasks = @($board | Where-Object { $history -contains $_.Id })
             if ($tasks.Count -lt $history.Count -or @($tasks | Where-Object { -not $_.Done }).Count) { continue }
+            # A finding about one past run's cost never reopens: history cannot change, so a re-audit
+            # always says it reproduces. The next audit closes it, task-done-historical (ADR-0422,
+            # amended 2026-10-14).
+            if ($f.Key.EndsWith(':cost-outlier')) { continue }
             $reopen = Get-ReopenReaudit $f $tasks
             if (-not $reopen) { continue }
         }
@@ -275,9 +295,10 @@ if ($SelfTest) {
     New-Item -ItemType Directory -Force (Join-Path $work 'Curl.Cli.UnitTests'), (Join-Path $work 'findings') | Out-Null
     $failed = 0
     function Check([string]$Name, [bool]$Ok, [string]$Detail) { if (-not $Ok) { $script:failed++ }; Write-Host "$(if ($Ok) { 'PASS' } else { 'FAIL' }) ${Name}: $Detail" }
-    $finding = { param($Id, $Status, $Task, $Severity, $Auditor)
+    $finding = { param($Id, $Status, $Task, $Severity, $Auditor, $Key)
+        if (-not $Key) { $Key = "k:$Id" }
         $t = [IO.File]::ReadAllText((Join-Path $repo 'Audit\Findings\FINDING-TEMPLATE.md'))
-        $t = $t.Replace('{{ID}}', $Id).Replace('{{TITLE}}', "Finding $Id").Replace('{{AUDITOR}}', $Auditor).Replace('{{SEVERITY}}', $Severity).Replace('{{KEY}}', "k:$Id").Replace('{{FOUND}}', '2026-10-14').Replace('{{FOUND_AT}}', 'abc').Replace('{{SCORECARD}}', '2026-10-14_0930.md').Replace('{{SUMMARY}}', 's').Replace('{{LOCATION}}', 'Curl.Cli.UnitTests/ParserTests.cs:30').Replace('{{EVIDENCE}}', 'IsNotNull only').Replace('{{REPRODUCTION_COMMAND}}', 'Select-String x').Replace('{{REPRODUCTION_EXPECTED}}', 'e').Replace('{{REPRODUCTION_ACTUAL}}', 'a')
+        $t = $t.Replace('{{ID}}', $Id).Replace('{{TITLE}}', "Finding $Id").Replace('{{AUDITOR}}', $Auditor).Replace('{{SEVERITY}}', $Severity).Replace('{{KEY}}', $Key).Replace('{{FOUND}}', '2026-10-14').Replace('{{FOUND_AT}}', 'abc').Replace('{{SCORECARD}}', '2026-10-14_0930.md').Replace('{{SUMMARY}}', 's').Replace('{{LOCATION}}', 'Curl.Cli.UnitTests/ParserTests.cs:30').Replace('{{EVIDENCE}}', 'IsNotNull only').Replace('{{REPRODUCTION_COMMAND}}', 'Select-String x').Replace('{{REPRODUCTION_EXPECTED}}', 'e').Replace('{{REPRODUCTION_ACTUAL}}', 'a')
         $t = $t.Replace('status: proposed', "status: $Status").Replace('task: none', "task: $Task")
         [IO.File]::WriteAllText((Join-Path $work "findings\$Id-x.md"), $t, $Utf8)
     }
@@ -303,6 +324,7 @@ if ($SelfTest) {
     & $task 'BL-904' 'Done' 'Fix AF-0010: x' '2026-10-08'
     & $task 'BL-905' 'Done' 'Fix AF-0011: x' '2026-10-05'
     & $task 'BL-906' 'Done' 'Fix AF-0009: x' '2026-10-05'
+    & $task 'BL-907' 'Done' 'Fix AF-0012: x' '2026-10-05'
     & $finding 'AF-0007' 'accepted' 'BL-901' 'Medium' 'quality'
     & $reaudit 'AF-0007' @('- 2026-10-07 | 2026-10-07_0844.md | reproduces: yes | the mutant survived again')
     & $finding 'AF-0008' 'accepted' 'BL-902' 'Medium' 'quality'
@@ -311,6 +333,11 @@ if ($SelfTest) {
     & $finding 'AF-0010' 'accepted' 'BL-904' 'Medium' 'quality'
     & $reaudit 'AF-0010' @('- 2026-10-07 | 2026-10-07_0844.md | reproduces: yes | before the fix')
     & $finding 'AF-0011' 'accepted' 'BL-905' 'Medium' 'quality'
+    # A past run's cost (ADR-0422, amended 2026-10-14): Done, re-audited "yes" after, never reopens;
+    # a new one gets a Fix task that says the first audit after it is Done closes the finding.
+    & $finding 'AF-0012' 'accepted' 'BL-907' 'Low' 'process' 'process:logs:BL-800:cost-outlier'
+    & $reaudit 'AF-0012' @('- 2026-10-07 | 2026-10-07_0844.md | reproduces: yes | BL-800 still cost 4 times the median')
+    & $finding 'AF-0013' 'accepted' 'none' 'Low' 'process' 'process:logs:BL-801:cost-outlier'
     & $reaudit 'AF-0011' @('- 2026-10-06 | 2026-10-06_0900.md | reproduces: yes | still fails', '- 2026-10-07 | 2026-10-07_0844.md | not re-audited | overlaps planted defect PD-303 in Curl.Cli.UnitLibrary/CommandLineOptionTable.cs, so the auditor''s verdict (reproduces yes) is set aside: 282 options')
     $before = @{}; foreach ($f in Get-ChildItem (Join-Path $work 'findings')) { $before[$f.Name] = [IO.File]::ReadAllText($f.FullName) }
     $board = Join-Path $repo '.claude\skills\task-board\task-board.ps1'
@@ -345,6 +372,10 @@ if ($SelfTest) {
         Check 'one Re-fix task covering two findings is in both histories, the open one current' ($af9 -match '(?m)^tasks: BL-903, BL-906\r?$' -and $af9 -match '(?m)^task: BL-903\r?$') 'AF-0009'
         Check 'a re-audit before the task was completed reopens nothing' ([IO.File]::ReadAllText((Join-Path $work 'findings\AF-0010-x.md')) -ceq $before['AF-0010-x.md']) 'AF-0010'
         Check 'a set-aside latest re-audit reopens nothing' ([IO.File]::ReadAllText((Join-Path $work 'findings\AF-0011-x.md')) -ceq $before['AF-0011-x.md']) 'AF-0011'
+        Check 'a cost-outlier finding whose task is Done files no Re-fix task, whatever its re-audit says' ([IO.File]::ReadAllText((Join-Path $work 'findings\AF-0012-x.md')) -ceq $before['AF-0012-x.md'] -and -not @(Get-ChildItem (Join-Path $work 'Tasks\Backlog') -Filter 'BL-*.md' | Where-Object { [IO.File]::ReadAllText($_.FullName) -match 'AF-0012' }).Count) 'AF-0012'
+        $costTask = @(Get-ChildItem (Join-Path $work 'Tasks\Backlog') -Filter 'BL-*.md' | Where-Object { [IO.File]::ReadAllText($_.FullName) -match '(?m)^title: Fix AF-0013' })
+        $costText = if ($costTask.Count -eq 1) { [IO.File]::ReadAllText($costTask[0].FullName) } else { '' }
+        Check 'a new cost-outlier finding gets one Fix task saying the first audit after it is Done closes the finding' ($costTask.Count -eq 1 -and $costText -match 'task-done-historical' -and $costText -match 'recorded as unavoidable' -and $costText -notmatch 'confirms the fix' -and $costText -notmatch '<!--') "$($costTask.Count)"
         if ($tasks.Count -eq 1) {
             $t = [IO.File]::ReadAllText($tasks[0].FullName)
             $id = ($tasks[0].Name -split '-')[0..1] -join '-'
