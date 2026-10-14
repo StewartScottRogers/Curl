@@ -78,3 +78,4 @@ Ed25519 and HMAC primitives already exist in `Curl.Cryptography.UnitLibrary` (`E
 ## Log
 
 - 2026-10-13: Created by hand from GF-0040 after gap run 2026-10-13_1406 (BL-2128).
+- 2026-10-13: Backlog -> Doing.
