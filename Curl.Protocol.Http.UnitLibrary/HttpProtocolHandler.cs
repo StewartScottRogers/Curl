@@ -2796,7 +2796,8 @@ public sealed class HttpProtocolHandler(
         while (!bytes.IsEmpty)
         {
             int lineFeed = bytes.Span.IndexOf((byte)'\n');
-            int lineLength = lineFeed < 0 ? bytes.Length : lineFeed + 1;
+            // No line feed (-1 read as uint) is the whole remainder: the line ends at the last byte at the latest.
+            int lineLength = (int)Math.Min((uint)lineFeed, (uint)(bytes.Length - 1)) + 1;
             await WriteHeaderLineAsync(headerOutput, bytes[..lineLength], cancellationToken).ConfigureAwait(false);
             bytes = bytes[lineLength..];
         }

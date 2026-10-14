@@ -642,7 +642,7 @@ public sealed class RedirectFollower(
         if (mail is null)
         {
             // An HTTP first URL carries no mail options, but its --oauth2-bearer token is withheld all the same.
-            return first.Http?.BearerToken is null ? null : new MailRequestOptions { BearerTokenWithheld = true };
+            return first.Http!.BearerToken is null ? null : new MailRequestOptions { BearerTokenWithheld = true };
         }
 
         return mail.BearerToken is null ? mail : mail with { BearerToken = null, BearerTokenWithheld = true };
