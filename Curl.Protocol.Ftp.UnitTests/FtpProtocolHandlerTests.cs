@@ -446,27 +446,6 @@ public sealed class FtpProtocolHandlerTests
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_CredentialsWithCrLf_AreSentAsGivenAsCurlDoes()
-    {
-        var diagnostics = TestDiagnostics.For(TestContext);
-        string replies = Greeting + "331 Password required\r\n502 Command not implemented\r\n";
-        diagnostics.ArrangeFtp(Url, replies);
-        diagnostics.Arrange("credentials", FtpDiagnostics.Escape("a\r\nDELE x:pw"));
-
-        FtpRun run = await FtpRun.ExecuteAsync(
-            Url,
-            replies,
-            adjust: context => new TransferContext { Url = context.Url, Output = context.Output, Credentials = new NetworkCredential("a\r\nDELE x", "pw") });
-
-        diagnostics.ActRun(run);
-        diagnostics.DiffSent("USER a\r\nDELE x\r\nPASS pw\r\n", run.Sent);
-        Assert.AreEqual("USER a\r\nDELE x\r\nPASS pw\r\n", run.Sent);
-        var expectedResult = TransferResult.Failure(CurlExitCode.LoginDenied, "Access denied: 502");
-        diagnostics.Assert("result", expectedResult, run.Result);
-        Assert.AreEqual(expectedResult, run.Result);
-    }
-
-    [TestMethod]
     public async Task ExecuteAsync_LatinOneCredentials_AreSentOneBytePerCharacter()
     {
         var diagnostics = TestDiagnostics.For(TestContext);

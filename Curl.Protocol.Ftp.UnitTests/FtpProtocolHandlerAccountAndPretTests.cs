@@ -92,6 +92,53 @@ public sealed class FtpProtocolHandlerAccountAndPretTests
     }
 
     [TestMethod]
+    [DataRow("u\r\nSTOR: /2114", "p", DisplayName = "user name with CR LF, upstream test2114")]
+    [DataRow("u", "p\tq", DisplayName = "password with a tab")]
+    public async Task ExecuteAsync_CredentialsWithControlByte_FailsWithExit43SendingNothing(string user, string password)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("url", Url);
+
+        // curl 8.22.0 refuses them before it connects: curl: (43) control code detected in credentials.
+        FtpRun run = await RunAsync(Greeting, user: user, password: password);
+        diagnostics.ActRun(run);
+
+        Assert.AreEqual(string.Empty, run.Sent);
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.BadFunctionArgument, "control code detected in credentials"), run.Result);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_332WithFtpAccountHoldingCrLf_FailsWithExit43BeforeAcctAndNoQuit()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("url", Url);
+
+        // curl 8.22.0 (upstream test2115): USER and PASS go out, then exit 43 with no ACCT and no QUIT.
+        FtpRun run = await RunAsync(Greeting + Password + "332 Need account\r\n", account: "one\r\nDELE 2115");
+        diagnostics.ActRun(run);
+
+        diagnostics.DiffSent("USER u\r\nPASS p\r\n", run.Sent);
+        Assert.AreEqual("USER u\r\nPASS p\r\n", run.Sent);
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.BadFunctionArgument, "Control byte in FTP account"), run.Result);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_UserRefusedWithAlternativeHoldingCrLf_FailsWithExit43BeforeSendingIt()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("url", Url);
+
+        // curl 8.22.0 (upstream test2116): USER answered 530, then exit 43 with nothing more sent.
+        FtpRun run = await RunAsync(Greeting + "530 go away\r\n", alternative: "USER me\r\nDELE 2116");
+        diagnostics.ActRun(run);
+
+        diagnostics.DiffSent("USER u\r\n", run.Sent);
+        Assert.AreEqual("USER u\r\n", run.Sent);
+        Assert.AreEqual(
+            TransferResult.Failure(CurlExitCode.BadFunctionArgument, "Control byte in FTP alternative-to-user command"), run.Result);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_PassAnswered230WithFtpAccount_SendsNoAcct()
     {
         var diagnostics = TestDiagnostics.For(TestContext);
@@ -427,7 +474,8 @@ public sealed class FtpProtocolHandlerAccountAndPretTests
         Assert.AreEqual(CurlExitCode.FtpPortFailed, result.ExitCode);
     }
 
-    private static Task<FtpRun> RunAsync(string replies, string? account = null, string? alternative = null) =>
+    private static Task<FtpRun> RunAsync(
+        string replies, string? account = null, string? alternative = null, string user = "u", string password = "p") =>
         FtpRun.ExecuteAsync(
             Url,
             replies,
@@ -436,7 +484,7 @@ public sealed class FtpProtocolHandlerAccountAndPretTests
             {
                 Url = c.Url,
                 Output = c.Output,
-                Credentials = new System.Net.NetworkCredential("u", "p"),
+                Credentials = new System.Net.NetworkCredential(user, password),
                 FtpAccount = account,
                 FtpAlternativeToUser = alternative,
             });
