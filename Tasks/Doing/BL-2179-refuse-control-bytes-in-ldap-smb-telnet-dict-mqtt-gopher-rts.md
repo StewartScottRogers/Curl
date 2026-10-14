@@ -36,3 +36,4 @@ An LDAP, SMB, TELNET, DICT, MQTT, GOPHER, RTSP or TFTP user name or password hol
 ## Log
 
 - 2026-10-13: Created.
+- 2026-10-13: Backlog -> Doing.
