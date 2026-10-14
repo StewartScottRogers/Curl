@@ -42,7 +42,7 @@ In Curl.Protocol.Mqtt.UnitLibrary, make MqttTopic.Decode (or MqttSession before 
 ## Notes
 
 - Fix: `MqttTopic.Decode` rejects a decoded topic holding a byte 0x00 to 0x1F (curl's `Curl_urldecode` `REJECT_CTRL`) with exit 3 and `curl_easy_strerror` text `URL rejected: Malformed input to a URL function`, after CONNACK and before SUBSCRIBE or PUBLISH; no `-v` line for the message (`IsStrerrorText`).
-- Measured: the local reference curl.exe 8.22.0 (Schannel, Debug-enabled) still subscribes to `aa%00bb`, `aa%0Abb` and `aa%1Fbb`, so it fails its own release's test 2109. Followed the release's test: ADR-0483, decided by Claude under Stewart's delegation.
+- Measured: the local reference curl.exe 8.22.0 (Schannel, Debug-enabled) still subscribes to `aa%00bb`, `aa%0Abb` and `aa%1Fbb`, so it fails its own release's test 2109. Followed the release's test: ADR-0484, decided by Claude under Stewart's delegation.
 - Unit tests in Curl.Protocol.Mqtt.UnitTests: %00, %0A and %1F rejected before SUBSCRIBE, %00 before PUBLISH, %20 still subscribed, -v transcript shows only the shutting-down line; the old adversarial test that pinned subscribing with the NUL now pins exit 3.
 - Upstream test2109 passes through Curl; added 2109 to `Curl.Conformance.UnitTests/PassingUpstreamCases.txt` (added to touches: the ratchet asked for it, and no task in Doing on origin/work/dark-factory names that project).
 - No option changed, so `--ai-help` needs nothing.
