@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Tls.UnitLibrary]
 requirement: none
 created: 2026-10-14
-completed:
+completed: 2026-10-14
 ---
 # BL-2209 — Fix AF-0207: HandshakeMessageReader.Read has no body-length check: a split handshake message throws ArgumentOutOfRangeException and 6 tests fail
 
@@ -41,14 +41,17 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
 - 2026-10-14 (Claude): AF-0207 is most likely this audit's own planted defect: audit 20261014-045316's manifest plants a removed length check in Curl.Tls.UnitLibrary/HandshakeMessageReader.cs, which the 6 failing tests catch. CI was green on the audited commit. Check that the real tree's HandshakeMessageReader.Read checks the 24-bit length and the 6 tests pass; if both hold, there is nothing to fix: record that and finish.
 
+- 2026-10-14 (Claude, lane 1): Confirmed: AF-0207 was the audit's planted defect. The real HandshakeMessageReader.Read returns NeedMoreBytes when buffer.Length < 4 + length (line 32), so no code change. The reproduction gives Passed 9/9; dotnet build is clean and the fast tests are green (Curl.Tls.UnitTests 1271 passed, Curl.Networking.UnitTests 3149 passed, the four TcpConnectorQuicTests included). The finding closes on the quality auditor's re-audit.
+
 ## Log
 
 - 2026-10-14: Created.
 - 2026-10-14: Backlog -> Doing.
+- 2026-10-14: Doing -> Done. AF-0207 does not reproduce: HandshakeMessageReader.Read already checks the body length; the 9 reader tests and the 4 QUIC tests pass
