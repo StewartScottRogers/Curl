@@ -356,14 +356,46 @@ public sealed partial class UpstreamTestFileExpanderTests
     [TestMethod]
     public void Expand_ListsUnsupportedInstructionsOnceAndLeavesThemAsWritten()
     {
-        const string File = "%days[400]\n%DAYS[1]\n%include log/x%\n%includetext log/y%\n%sha256b64file[a]sha256b64file%\n%strippemfile[b]strippemfile%\n";
+        const string File = "%include log/x%\n%includetext log/y%\n%sha256b64file[a]sha256b64file%\n%strippemfile[b]strippemfile%\n";
 
         UpstreamTestFileExpansion expansion = Expand(File, NoVariables);
 
         Diagnostics.Diff("expanded text", File, Text(expansion));
 
         Assert.AreEqual(File, Text(expansion));
-        CollectionAssert.AreEqual(new[] { "%days", "%include", "%includetext", "%sha256b64file", "%strippemfile" }, expansion.UnsupportedInstructions.ToArray());
+        CollectionAssert.AreEqual(new[] { "%include", "%includetext", "%sha256b64file", "%strippemfile" }, expansion.UnsupportedInstructions.ToArray());
+    }
+
+    // testutil.pm: $d = int((N * 86400 + time() + 30) / 60) * 60, then %alternatives[$d,$d+60].
+    // 1700000000 + 30 rounds down to 1699999980; 400 days on, 1734559980.
+    [TestMethod]
+    [DataRow("%days[0]\n", "%alternatives[1699999980,1700000040]\n")]
+    [DataRow("%days[400]\n", "%alternatives[1734559980,1734560040]\n")]
+    [DataRow(".host.foo.com\tTRUE\t/we/want\tFALSE\t%DAYS[400]\ttest2\tyes\n", ".host.foo.com\tTRUE\t/we/want\tFALSE\t%alternatives[1734559980,1734560040]\ttest2\tyes\n")]
+    [DataRow("%days[-1] %days[x]\n", "%alternatives[1699913580,1699913640] %alternatives[1699999980,1700000040]\n")]
+    [DataRow("%days[400\n", "%days[400\n")]
+    public void Expand_DaysInstruction_BecomesTheTwoMinutesNDaysFromTheClocksNow(string written, string expected)
+    {
+        UpstreamTestFileExpansion expansion = UpstreamTestFileExpander.Expand(
+            Encoding.Latin1.GetBytes(written), NoVariables, NoFeatures, null, new FixedClock(DateTimeOffset.FromUnixTimeSeconds(1_700_000_000)));
+
+        Diagnostics.Diff("expanded text", expected, Text(expansion));
+
+        Assert.AreEqual(expected, Text(expansion));
+        Assert.IsEmpty(expansion.UnsupportedInstructions);
+    }
+
+    [TestMethod]
+    public void Expand_WithoutAClock_Throws()
+    {
+        ArgumentNullException thrown = Assert.ThrowsExactly<ArgumentNullException>(() => UpstreamTestFileExpander.Expand([], NoVariables, NoFeatures, null, null!));
+
+        Assert.AreEqual("clock", thrown.ParamName);
+    }
+
+    private sealed class FixedClock(DateTimeOffset now) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => now;
     }
 
     [TestMethod]

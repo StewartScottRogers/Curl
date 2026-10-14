@@ -22,12 +22,16 @@ parsing, the way `runtests.pl`'s `prepro` does: `UpstreamTestConditionalLines` r
 `UpstreamTestVariableSubstitution` replaces `%NAME` variables with the run's values, then
 `UpstreamTestFileInclusions` replaces `%includetext` (then the variables again),
 `UpstreamTestInstructions` replaces `%SP`-style character macros and `%b64[]b64%`,
-`%hex[]hex%` and `%repeat[]%`, `UpstreamTestFileInclusions` replaces `%include`, and
+`%hex[]hex%`, `%repeat[]%` and `%days[N]` (BL-2220: `%alternatives[D,D+60]`, D the epoch second
+N days and 30 seconds after the `TimeProvider`'s now rounded down to the minute, as `testutil.pm`
+writes it; `UpstreamCaseRunner` passes its own `TimeProvider`, and `UpstreamFirstDifference`
+resolves the alternatives with `UpstreamTestAlternatives` as `getpart.pm`'s `compareparts` does,
+so cookie-jar cases 31, 46, 61, 483 and 1415 pass), `UpstreamTestFileInclusions` replaces `%include`, and
 `UpstreamTestFileContentInstructions` replaces `%sha256b64file[]sha256b64file%` (the base64
 SHA-256 of a file) and `%strippemfile[]strippemfile%` (a file's PEM blocks); all four read files
 through the delegate the caller passes (`UpstreamCaseRunner` reads the disk). The resulting
 `UpstreamTestFileExpansion` lists upstream variables with no value and instructions it does not
-carry out (`%days`, a `%repeat` that would produce more than 16 MiB (ADR-0423), and the four
+carry out (a `%repeat` that would produce more than 16 MiB (ADR-0423), and the four
 file instructions when given no reader), left as written so the
 case can be skipped with a reason;
 `Parse()` hands it to the parser.

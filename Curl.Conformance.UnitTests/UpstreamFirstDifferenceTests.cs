@@ -23,6 +23,18 @@ public sealed class UpstreamFirstDifferenceTests
     }
 
     [TestMethod]
+    public void Describe_ProducedBytesMatchingAnAlternative_ReturnsNull()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("expected", "x %alternatives[1,2]\\n");
+
+        string? difference = UpstreamFirstDifference.Describe("x", Bytes("x %alternatives[1,2]\n"), Bytes("x 2\n"));
+
+        diagnostics.Act("difference", difference);
+        Assert.IsNull(difference);
+    }
+
+    [TestMethod]
     public void Describe_NamesTheOffsetLineAndBothLinesThenTheLineDiff()
     {
         var diagnostics = TestDiagnostics.For(TestContext);

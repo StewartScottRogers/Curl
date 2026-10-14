@@ -37,7 +37,7 @@ namespace Curl.Conformance;
 /// </remarks>
 /// <param name="runCurl">Runs curl for one invocation and returns its exit code.</param>
 /// <param name="platform">The features and null device of the platform Curl runs on.</param>
-/// <param name="timeProvider">Measures <paramref name="timeLimit"/>.</param>
+/// <param name="timeProvider">Measures <paramref name="timeLimit"/> and gives <c>%days[N]</c> its now.</param>
 /// <param name="timeLimit">How long a run may take before the case fails.</param>
 /// <param name="sshServer">
 /// The stand-in for upstream's test <c>sshd</c> (BL-1916), or <see langword="null"/> to leave
@@ -182,7 +182,7 @@ public sealed class UpstreamCaseRunner(
         AddTlsPorts(variables, certificateDirectory);
         AddSshVariables(variables);
 
-        UpstreamTestFileExpansion expansion = UpstreamTestFileExpander.Expand(UpstreamTestDirectoryComposition.Rewrite(testFile.Span), variables, platform.Features, ReadIncludedFile);
+        UpstreamTestFileExpansion expansion = UpstreamTestFileExpander.Expand(UpstreamTestDirectoryComposition.Rewrite(testFile.Span), variables, platform.Features, ReadIncludedFile, timeProvider);
         UpstreamTestCaseParseResult parsed = expansion.Parse();
         if (!parsed.IsParsed)
         {
