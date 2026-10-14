@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests]
 requirement: none
 created: 2026-10-13
-completed:
+completed: 2026-10-13
 ---
 # BL-2202 — Run upstream test5018: map a <client><file> named log/<name> to the case's log directory
 
@@ -27,8 +27,8 @@ in the tests directory, where `log/` is the log directory, so the harness can ma
 
 ## Acceptance criteria
 
-- [ ] An `UpstreamCaseRunnerTests` test pins that a `<client><file>` named `log/<name>`, and the command's `log/<name>`, are the case's log directory's `<name>`.
-- [ ] Test5018's ratchet row is no longer skipped; if it passes, `5018` is in `PassingUpstreamCases.txt`, otherwise its first difference is under Notes.
+- [x] An `UpstreamCaseRunnerTests` test pins that a `<client><file>` named `log/<name>`, and the command's `log/<name>`, are the case's log directory's `<name>`.
+- [x] Test5018's ratchet row is no longer skipped; if it passes, `5018` is in `PassingUpstreamCases.txt`, otherwise its first difference is under Notes.
 
 ## Notes
 
@@ -36,3 +36,4 @@ in the tests directory, where `log/` is the log directory, so the harness can ma
 
 - 2026-10-13: Created.
 - 2026-10-13: Backlog -> Doing.
+- 2026-10-13: Doing -> Done. UpstreamTestDirectoryComposition maps log/<name> in file parts and commands to %LOGDIR; test5018 passes and is listed
