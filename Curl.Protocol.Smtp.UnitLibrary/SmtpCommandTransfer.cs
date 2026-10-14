@@ -113,17 +113,23 @@ internal sealed class SmtpCommandTransfer(
                 ?? TransferResult.Success(0);
         }
 
-        foreach (string recipient in mail.Recipients)
+        return await SendRecipientCommandsAsync(custom, mail.Recipients).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Sends <c>VRFY</c>, or the <c>-X</c> command <paramref name="custom" />, for each recipient
+    /// in turn, stopping at the first one that fails.
+    /// </summary>
+    private async ValueTask<TransferResult> SendRecipientCommandsAsync(string? custom, IReadOnlyList<string> recipients)
+    {
+        foreach (string recipient in recipients)
         {
-            // Measured on curl 8.22.0 (BL-2177): a VRFY address holding CR or LF is exit 43 before
-            // VRFY is sent, and QUIT still follows; a -X command's address is sent as it is.
-            if (custom is null && recipient.AsSpan().IndexOfAny('\r', '\n') >= 0)
+            if (IsRefusedVerifyAddress(custom, recipient))
             {
                 return TransferResult.Failure(CurlExitCode.BadFunctionArgument, SmtpSessionMessages.AddressHasLineBreak);
             }
 
-            string command = custom is null ? VerifyCommand(recipient) : CustomRecipientCommand(custom, recipient);
-            if (await ExchangeAsync(command, recipientCommand: true).ConfigureAwait(false) is { } failure)
+            if (await ExchangeAsync(RecipientCommand(custom, recipient), recipientCommand: true).ConfigureAwait(false) is { } failure)
             {
                 return failure;
             }
@@ -131,6 +137,17 @@ internal sealed class SmtpCommandTransfer(
 
         return TransferResult.Success(0);
     }
+
+    /// <summary>
+    /// Whether <paramref name="recipient" /> is a <c>VRFY</c> address holding CR or LF. Measured on
+    /// curl 8.22.0 (BL-2177): such an address is exit 43 before <c>VRFY</c> is sent, and <c>QUIT</c>
+    /// still follows; a <c>-X</c> command's address is sent as it is.
+    /// </summary>
+    private static bool IsRefusedVerifyAddress(string? custom, string recipient) =>
+        custom is null && recipient.AsSpan().IndexOfAny('\r', '\n') >= 0;
+
+    private string RecipientCommand(string? custom, string recipient) =>
+        custom is null ? VerifyCommand(recipient) : CustomRecipientCommand(custom, recipient);
 
     private string VerifyCommand(string recipient)
     {

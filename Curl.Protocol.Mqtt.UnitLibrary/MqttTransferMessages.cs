@@ -92,8 +92,13 @@ internal static class MqttTransferMessages
     /// </summary>
     /// <param name="message">A failure's message.</param>
     /// <returns><see langword="true" /> for a <c>curl_easy_strerror</c> text.</returns>
-    internal static bool IsStrerrorText(string message) =>
-        message is ReceiveFailed or SendFailed or PartialFile or WeirdServerReply or TooLarge or ControlByteInTopic;
+    internal static bool IsStrerrorText(string message) => StrerrorTexts.Contains(message);
+
+    /// <summary>The texts <see cref="IsStrerrorText" /> recognises, compared ordinally.</summary>
+    private static readonly HashSet<string> StrerrorTexts = new(StringComparer.Ordinal)
+    {
+        ReceiveFailed, SendFailed, PartialFile, WeirdServerReply, TooLarge, ControlByteInTopic,
+    };
 
     /// <summary>The <c>-v</c> line naming the client identifier, written before the CONNECT.</summary>
     /// <param name="clientIdentifier">The client identifier the CONNECT carries.</param>

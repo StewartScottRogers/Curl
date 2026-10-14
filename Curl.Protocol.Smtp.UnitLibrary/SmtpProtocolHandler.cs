@@ -168,6 +168,15 @@ public sealed class SmtpProtocolHandler : IProtocolHandler
             return TransferResult.Failure(CurlExitCode.BadFunctionArgument, SmtpSessionMessages.CredentialsHaveControlCode);
         }
 
+        return await ConnectAndTransferAsync(context).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Connects, runs the session once the EHLO domain is read from the URL and writes the
+    /// lines <c>-v</c> ends the transfer with.
+    /// </summary>
+    private async ValueTask<TransferResult> ConnectAndTransferAsync(ITransferContext context)
+    {
         CurlUrl url = context.Url;
         bool implicitTls = url.Scheme == ImplicitTlsScheme;
         var trace = new SmtpStateTrace(context.Events, TracesStateMachine);

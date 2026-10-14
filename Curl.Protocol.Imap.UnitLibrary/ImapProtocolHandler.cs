@@ -109,6 +109,15 @@ public sealed class ImapProtocolHandler : IProtocolHandler
             return TransferResult.Failure(CurlExitCode.BadFunctionArgument, ImapSessionMessages.CredentialsHaveControlCode);
         }
 
+        return await ConnectAndTransferAsync(context).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Connects, or reuses a kept connection for the same login, runs the session on it and
+    /// writes the lines <c>-v</c> ends the transfer with.
+    /// </summary>
+    private async ValueTask<TransferResult> ConnectAndTransferAsync(ITransferContext context)
+    {
         CurlUrl url = context.Url;
         bool implicitTls = url.Scheme == ImplicitTlsScheme;
         var connectEvents = new ConnectionOpenedCapturingTransferEvents(context.Events);
