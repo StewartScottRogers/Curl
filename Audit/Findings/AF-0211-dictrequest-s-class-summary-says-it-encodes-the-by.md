@@ -3,8 +3,8 @@ id: AF-0211
 title: DictRequest's class summary says it encodes the bytes curl 8.21.0 sends; its CLIENT line is libcurl 8.22.0
 auditor: truthfulness
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: truthfulness:Curl.Protocol.Dict.UnitLibrary/DictRequest.cs:DictRequest:false-doc-comment
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Curl.Protocol.Dict.UnitLibrary/DictRequest.cs -Pattern 'as t
 ## Log
 
 - 2026-10-14: filed proposed.
+- 2026-10-14: proposed -> accepted.
