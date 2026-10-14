@@ -8,7 +8,7 @@ depends-on: []
 touches: [RunDarkFactory.ps1]
 requirement: none
 created: 2026-10-14
-completed:
+completed: 2026-10-14
 ---
 # BL-2207 — Re-fix AF-0204: BL-2142 cost $3.11, 4.25 times the median task cost, over 68 turns with 37 sliced Bash reads
 
@@ -45,11 +45,15 @@ The finding closes only when a later re-audit by the process auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Closed without a fix: AF-0204 describes a past run's cost, which BL-2218's rule now closes once its original task is Done.
 
 ## Log
 
 - 2026-10-14: Created.
+- 2026-10-14: Backlog -> Doing. interactive session; closing without a fix under BL-2218
+- 2026-10-14: Doing -> Done. Closed without a fix: AF-0204 describes a past run's cost, which BL-2218's rule now closes once its original task is Done
