@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Authentication.UnitLibrary, Curl.Authentication.UnitTests, Curl.Protocol.Imap.UnitLibrary, Curl.Protocol.Imap.UnitTests, Curl.Protocol.Pop3.UnitLibrary, Curl.Protocol.Pop3.UnitTests, Curl.Protocol.Smtp.UnitLibrary, Curl.Protocol.Smtp.UnitTests]
 requirement: none
 created: 2026-10-13
-completed:
+completed: 2026-10-13
 ---
 # BL-2161 — Re-close GF-0059: ;AUTH=EXTERNAL with no user name skips SASL; curl sends AUTH EXTERNAL with an empty (=) response
 
@@ -37,18 +37,37 @@ In Curl.Authentication.UnitLibrary's SaslAuthenticator/SaslMechanismRanking and 
 
 ## Acceptance criteria
 
-- [ ] `behaviour:test838`: Curl answers what curl 8.22.0 answers, `upstream test838 passes`, so the item measures `match`.
-- [ ] `behaviour:test840`: Curl answers what curl 8.22.0 answers, `upstream test840 passes`, so the item measures `match`.
-- [ ] `behaviour:test884`: Curl answers what curl 8.22.0 answers, `upstream test884 passes`, so the item measures `match`.
-- [ ] `behaviour:test886`: Curl answers what curl 8.22.0 answers, `upstream test886 passes`, so the item measures `match`.
-- [ ] `behaviour:test943`: Curl answers what curl 8.22.0 answers, `upstream test943 passes`, so the item measures `match`.
-- [ ] `behaviour:test945`: Curl answers what curl 8.22.0 answers, `upstream test945 passes`, so the item measures `match`.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
-- [ ] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
+- [x] `behaviour:test838`: Curl answers what curl 8.22.0 answers, `upstream test838 passes`, so the item measures `match`.
+- [x] `behaviour:test840`: Curl answers what curl 8.22.0 answers, `upstream test840 passes`, so the item measures `match`.
+- [x] `behaviour:test884`: Curl answers what curl 8.22.0 answers, `upstream test884 passes`, so the item measures `match`.
+- [x] `behaviour:test886`: Curl answers what curl 8.22.0 answers, `upstream test886 passes`, so the item measures `match`.
+- [x] `behaviour:test943`: Curl answers what curl 8.22.0 answers, `upstream test943 passes`, so the item measures `match`.
+- [x] `behaviour:test945`: Curl answers what curl 8.22.0 answers, `upstream test945 passes`, so the item measures `match`.
+- [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
+- [x] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
 
 ## Notes
+
+- Cause: BL-1989 already starts SASL EXTERNAL with no user (probed end to end: Curl sent
+  `A002 AUTHENTICATE EXTERNAL`). What still differed is the answer after the continuation:
+  Curl sent `=`, while curl 8.22.0's tests 838, 884 and 943 (read from the curl-8_22_0 tag on
+  GitHub, since the local upstream copy is behind the audit guard) expect an empty line.
+  Under SASL-IR (840, 886, 945) `=` on the command line was already right.
+- Fix: in the IMAP, POP3 and SMTP handlers an initial response sent on its own line after
+  `+` / `334` is an empty line when it is empty; an empty answer to a challenge stays `=`
+  (as `ExecuteAsync_EmptyMessages_AreSentAsEquals` pins). No ADR: it follows upstream's
+  tests and decides nothing new. Curl.Authentication was not changed.
+- Pinned by `ImapProtocolHandlerAuthenticationTests.ExecuteAsync_ExternalNamedWithoutUser_AuthenticatesAndIsAskedForFirst`
+  (838), `Pop3ProtocolHandlerLoginTests.ExecuteAsync_ExternalNamedAndOfferedWithoutUser_AuthenticatesWithAnEmptyUserName`
+  and `ExecuteAsync_EmptyInitialResponse_IsEqualsInlineAndAnEmptyLineAfterTheContinuation`
+  (884/886; the latter was an unmeasured `=` pin, renamed), and the new
+  `SmtpProtocolHandlerAuthenticationTests.ExecuteAsync_ExternalRequiredAndOfferedWithoutUserOrSaslIr_AnswersThe334WithAnEmptyLine` (943).
+- Both branches of each new encoder are reached by the fast tests (empty: the EXTERNAL
+  tests; non-empty: the non-IR LOGIN/PLAIN tests), so Measure-CodeQuality was not run.
+  No option changed, so `--ai-help` is unaffected. The items close only on a later gap run.
 
 ## Log
 
 - 2026-10-13: Created.
 - 2026-10-13: Backlog -> Doing.
+- 2026-10-13: Doing -> Done. An empty EXTERNAL initial response after + / 334 is now an empty line on IMAP, POP3 and SMTP, as curl 8.22.0 sends it
