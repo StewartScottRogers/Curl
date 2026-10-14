@@ -1,5 +1,5 @@
 ---
-id: BL-2179
+id: BL-2180
 title: Wire the --httpsig-* options of curl 8.22.0 into Curl.Cli, the HTTP request and the help, signing through Curl.HttpMessageSignatures.UnitLibrary
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-13
 completed:
 ---
-# BL-2179 — Wire the --httpsig-* options of curl 8.22.0 into Curl.Cli, the HTTP request and the help, signing through Curl.HttpMessageSignatures.UnitLibrary
+# BL-2180 — Wire the --httpsig-* options of curl 8.22.0 into Curl.Cli, the HTTP request and the help, signing through Curl.HttpMessageSignatures.UnitLibrary
 
 ## Goal
 

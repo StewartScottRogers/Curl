@@ -34,13 +34,13 @@ the Windows reference build.
   the URL has a query, header components taken only from `-H` lines, no signing when a `-H` line
   sets `Signature` or `Signature-Input`, and every refusal exit 43 with upstream's `httpsig: ...`
   message (or curl's generic text where upstream sets none).
-- BL-2179 wires the options into `Curl.Cli`, the HTTP request (with `created` from the injected
+- BL-2180 wires the options into `Curl.Cli`, the HTTP request (with `created` from the injected
   `TimeProvider`), `--help`, the manual and `--ai-help`.
 
 An interactive session is asked to add the eight `options:--httpsig-*` facets of
 `--httpsig-algo`, `--httpsig-headers`, `--httpsig-key` and `--httpsig-keyid` to
 `Gap/Baselines/option-exclusions.json` with a reason naming this ADR, since a lane may not write
-`Gap/` (ADR-0433): once BL-2179 lands, the reference's `is unknown` answer no longer matches
+`Gap/` (ADR-0433): once BL-2180 lands, the reference's `is unknown` answer no longer matches
 Curl's.
 
 ## Consequences

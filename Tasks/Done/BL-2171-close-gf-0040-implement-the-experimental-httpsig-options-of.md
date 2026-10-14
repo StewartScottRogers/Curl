@@ -17,7 +17,7 @@ completed: 2026-10-13
 
 A hand-built `Curl.HttpMessageSignatures.UnitLibrary` produces the RFC 9421 `Signature-Input`
 and `Signature` headers exactly as curl 8.22.0 built with `--enable-httpsig` does, ready for
-BL-2179 to wire `curl --httpsig-algo`, `--httpsig-key`, `--httpsig-keyid` and `--httpsig-headers`
+BL-2180 to wire `curl --httpsig-algo`, `--httpsig-key`, `--httpsig-keyid` and `--httpsig-headers`
 to it.
 
 ## Context
@@ -73,7 +73,7 @@ Ed25519 and HMAC primitives already exist in `Curl.Cryptography.UnitLibrary` (`E
 - Finding: GF-0040, `options:--httpsig-algo`, `options:--httpsig-headers`,
   `options:--httpsig-key`, `options:--httpsig-keyid`; targeted version curl 8.22.0 (ADR-0479).
 - 2026-10-13, split before any code: one run cannot build the library, the CLI options, the HTTP
-  wiring and the help. This task keeps the library and the ADR; BL-2179 (depends on this one)
+  wiring and the help. This task keeps the library and the ADR; BL-2180 (depends on this one)
   takes the CLI parsing, the HTTP request headers with a `TimeProvider`-fixed `created`, and
   `--help`/manual/`--ai-help`, with the upstream facts it needs in its Context. `touches` narrowed
   to match.
@@ -81,7 +81,7 @@ Ed25519 and HMAC primitives already exist in `Curl.Cryptography.UnitLibrary` (`E
 - Design: `CurlHttpSignature.CreateHeaders` is the whole of upstream's `Curl_output_httpsig` past
   the transfer state - option checks, the `Signature`/`Signature-Input` opt-out, key decoding,
   the ed25519 length check, component parsing, `sig1` parameters, base and signature - taking
-  `created` as an argument so BL-2179 supplies it from `TimeProvider`. Its parts
+  `created` as an argument so BL-2180 supplies it from `TimeProvider`. Its parts
   (`HttpSignatureBase`, `HttpMessageSigner`, `HttpSignatureHeaders.Create`) take any label and an
   optional `alg`, which is what lets the RFC vectors (label `sig-b25`/`sig-b26`, no `alg`) be
   pinned through the same code. HMAC-SHA256 is the BCL's `HMACSHA256`; Ed25519 is
@@ -96,11 +96,11 @@ Ed25519 and HMAC primitives already exist in `Curl.Cryptography.UnitLibrary` (`E
 - Measured: `Measure-CodeQuality.ps1 -Library Curl.HttpMessageSignatures.UnitLibrary`: 100% line,
   100% branch, 37 members, 0 failing, worst CRAP 8 (the first run found `Parse` at complexity 12;
   split into `DefaultComponents` and `ReadComponents`). 61 tests; full fast run green.
-- ADR-0484 records the decision and asks an interactive session to add the eight
+- ADR-0485 records the decision and asks an interactive session to add the eight
   `options:--httpsig-*` facets to `Gap/Baselines/option-exclusions.json`.
 
 ## Log
 
 - 2026-10-13: Created by hand from GF-0040 after gap run 2026-10-13_1406 (BL-2128).
 - 2026-10-13: Backlog -> Doing.
-- 2026-10-13: Doing -> Done. Curl.HttpMessageSignatures.UnitLibrary signs requests as curl 8.22.0's --httpsig-* do (RFC 9421 B.2.5/B.2.6 pinned byte for byte); wiring in BL-2179
+- 2026-10-13: Doing -> Done. Curl.HttpMessageSignatures.UnitLibrary signs requests as curl 8.22.0's --httpsig-* do (RFC 9421 B.2.5/B.2.6 pinned byte for byte); wiring in BL-2180
