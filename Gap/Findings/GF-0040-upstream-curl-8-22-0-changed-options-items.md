@@ -12,8 +12,8 @@ closed:
 regression: true
 items: [options:--httpsig-algo, options:--httpsig-headers, options:--httpsig-key, options:--httpsig-keyid, options:--httpsig-algo:argument, options:--httpsig-headers:argument, options:--httpsig-key:argument, options:--httpsig-keyid:argument]
 touches: []
-task: BL-2171
-tasks: [BL-2171]
+task: BL-2235
+tasks: [BL-2171, BL-2235]
 ---
 # GF-0040 - Upstream curl 8.22.0 changed options items
 
@@ -51,3 +51,4 @@ Bring these items to Curl when the target moves to 8.22.0.
 - 2026-10-13: Filed BL-2171 by hand: the Windows reference is built without the experimental --httpsig-* options, so this run measured them as match and closed the finding, but Curl implements them as an intended difference (CLAUDE.md "Decisions", ADR-0454 precedent; BL-2128).
 - 2026-10-14_0904: Added options:--httpsig-algo:argument, options:--httpsig-headers:argument, options:--httpsig-key:argument, options:--httpsig-keyid:argument from gap-options.
 - 2026-10-14_0904: Reopened as a regression: run 2026-10-14_0904 measured options:--httpsig-algo, options:--httpsig-headers, options:--httpsig-key, options:--httpsig-keyid, options:--httpsig-algo:argument, options:--httpsig-headers:argument, options:--httpsig-key:argument, options:--httpsig-keyid:argument as gap again.
+- 2026-10-14_0950: Filed BL-2235.
