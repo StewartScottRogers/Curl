@@ -31,3 +31,4 @@ Found by BL-2175 (GF-0038, curl 8.22.0 changed behaviour): with `%GOPHERPORT` ro
 ## Log
 
 - 2026-10-13: Created.
+- 2026-10-13: Backlog -> Doing.
