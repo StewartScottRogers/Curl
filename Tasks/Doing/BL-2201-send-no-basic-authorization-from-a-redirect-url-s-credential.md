@@ -36,3 +36,4 @@ how a redirect hop's URL credentials reach the authenticator it wraps.
 ## Log
 
 - 2026-10-13: Created.
+- 2026-10-13: Backlog -> Doing.
