@@ -80,8 +80,9 @@ internal static class ConfigFileSyntax
     /// <param name="file">The file name as curl shows it in warnings.</param>
     /// <param name="contents">The file's bytes.</param>
     /// <param name="encoding">The encoding the bytes are read in: UTF-8, or on Windows the ANSI code page for a file that is not valid UTF-8 (<see cref="ConfigFileApplier"/>).</param>
+    /// <param name="terminalColumns">The width the warnings wrap at: <see cref="WrappedMessage.TerminalColumns"/> of the parse's <c>COLUMNS</c> (BL-2172).</param>
     /// <returns>The option lines in file order.</returns>
-    internal static IReadOnlyList<ConfigFileLine> ReadLines(string file, byte[] contents, Encoding encoding)
+    internal static IReadOnlyList<ConfigFileLine> ReadLines(string file, byte[] contents, Encoding encoding, int terminalColumns)
     {
         string text = encoding.GetString(contents).Replace("\r\n", "\n", StringComparison.Ordinal);
         List<ConfigFileLine> lines = [];
@@ -89,7 +90,7 @@ internal static class ConfigFileSyntax
         {
             if (!IsBlankOrComment(line))
             {
-                lines.Add(ReadLine(file, lines.Count + 1, line));
+                lines.Add(ReadLine(file, lines.Count + 1, line, terminalColumns));
             }
         }
 
@@ -102,7 +103,7 @@ internal static class ConfigFileSyntax
         return fromFirstNonBlank.Length == 0 || fromFirstNonBlank[0] == '#';
     }
 
-    private static ConfigFileLine ReadLine(string file, int number, string line)
+    private static ConfigFileLine ReadLine(string file, int number, string line, int terminalColumns)
     {
         bool dashed = line.StartsWith('-');
         int optionEnd = 0;
@@ -119,7 +120,7 @@ internal static class ConfigFileSyntax
             parameterStart++;
         }
 
-        return ReadParameter(file, number, option, rest[parameterStart..]);
+        return ReadParameter(file, number, option, rest[parameterStart..], terminalColumns);
     }
 
     /// <summary>
@@ -133,7 +134,7 @@ internal static class ConfigFileSyntax
 
     private static bool IsSeparator(char character) => character is '=' or ':';
 
-    private static ConfigFileLine ReadParameter(string file, int number, string option, string text)
+    private static ConfigFileLine ReadParameter(string file, int number, string option, string text, int terminalColumns)
     {
         if (text.StartsWith('"'))
         {
@@ -145,7 +146,8 @@ internal static class ConfigFileSyntax
         {
             warningLines.AddRange(WrappedMessage.Lines(
                 "Warning: ",
-                $"{file}:{number} Option '{option}' uses argument with leading single quote. It is probably a mistake. Consider double quotes."));
+                $"{file}:{number} Option '{option}' uses argument with leading single quote. It is probably a mistake. Consider double quotes.",
+                terminalColumns));
         }
 
         int parameterEnd = text.AsSpan().IndexOfAny(WhiteSpace);
@@ -157,7 +159,8 @@ internal static class ConfigFileSyntax
         {
             warningLines.AddRange(WrappedMessage.Lines(
                 "Warning: ",
-                $"{file}:{number} Option '{option}' uses argument with unquoted whitespace. This may cause side-effects. Consider double quotes."));
+                $"{file}:{number} Option '{option}' uses argument with unquoted whitespace. This may cause side-effects. Consider double quotes.",
+                terminalColumns));
         }
 
         return new(number, option, parameterEnd == 0 ? null : text[..parameterEnd], warningLines);

@@ -29,8 +29,11 @@ public static class WrappedMessage
         Lines(prefix, message, TerminalColumns(Environment.GetEnvironmentVariable("COLUMNS")));
 
     /// <summary>
-    /// The width curl 8.21.0's <c>get_terminal_columns</c> takes from a <c>COLUMNS</c> value: the value
-    /// when it reads as a whole number from 21 to 9999, otherwise <see cref="DefaultTerminalColumns"/>.
+    /// The width curl 8.22.0's <c>get_terminal_columns</c> takes from a <c>COLUMNS</c> value: the value
+    /// when it reads as a whole number from 21 to 10000, otherwise <see cref="DefaultTerminalColumns"/>.
+    /// Measured with curl 8.22.0 (Windows, 2026-10-13): <c>COLUMNS=10000</c> keeps a config file's
+    /// unquoted-whitespace warning on one line and <c>COLUMNS=10001</c> wraps it at 79 (8.21.0 took
+    /// 9999 as its largest width; upstream test459, BL-2172).
     /// </summary>
     /// <param name="columnsVariable">The <c>COLUMNS</c> value, or <see langword="null"/> when it is not set.</param>
     /// <returns>The terminal width.</returns>
@@ -40,7 +43,7 @@ public static class WrappedMessage
             NumberStyles.AllowLeadingWhite | NumberStyles.AllowLeadingSign,
             CultureInfo.InvariantCulture,
             out int columns)
-        && columns is > 20 and < 10000
+        && columns is > 20 and <= 10000
             ? columns
             : DefaultTerminalColumns;
 

@@ -49,7 +49,7 @@ prints `Note: Read config file from '<path>'`, wrapped as a warning is and shown
 `DeferredOutputFileStream`, which is how curl's exit 23 message comes out right. The
 parser's warning lines are written to standard error before anything else.
 Every `Warning: ` line is wrapped by `WarningLineWrapper` as curl's `warnf` wraps it, at the
-width `TerminalColumns` resolves (`COLUMNS` from 21 to 9999, else the standard-error
+width `TerminalColumns` resolves (`COLUMNS` from 21 to 10000, else the standard-error
 console, else 79).
 On Windows each `-o` name is first rewritten by `Curl.Core`'s `WindowsOutputFileNameSanitizer`
 (`"*<>?|` and control characters become `_`, as curl 8.21.0 does; not under `-g`, see below),

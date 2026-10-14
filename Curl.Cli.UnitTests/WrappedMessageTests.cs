@@ -18,7 +18,8 @@ public sealed class WrappedMessageTests
     [DataRow(" +21", 21)]
     [DataRow("9999", 9999)]
     [DataRow("20", 79)]
-    [DataRow("10000", 79)]
+    [DataRow("10000", 10000)]
+    [DataRow("10001", 79)]
     [DataRow("80x", 79)]
     [DataRow("", 79)]
     public void TerminalColumns_ColumnsVariable_GivesCurlsWidth(string? columnsVariable, int expected)

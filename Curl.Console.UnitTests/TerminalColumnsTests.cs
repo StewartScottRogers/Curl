@@ -3,8 +3,8 @@ using Curl.Testing;
 namespace Curl.Console;
 
 /// <summary>
-/// Pins the terminal-width resolution against curl 8.21.0's <c>get_terminal_columns</c>:
-/// <c>COLUMNS</c> from 21 to 9999, then the standard-error console, then 79. Every test
+/// Pins the terminal-width resolution against curl 8.22.0's <c>get_terminal_columns</c>:
+/// <c>COLUMNS</c> from 21 to 10000, then the standard-error console, then 79. Every test
 /// injects the environment value and the console width.
 /// </summary>
 [TestClass]
@@ -25,6 +25,7 @@ public sealed class TerminalColumnsTests
     [TestMethod]
     [DataRow("21", 21)]
     [DataRow("9999", 9999)]
+    [DataRow("10000", 10000)]
     [DataRow(" +80", 80)]
     public void Resolve_ColumnsInRange_UsesIt(string columns, int expected)
     {
@@ -33,7 +34,7 @@ public sealed class TerminalColumnsTests
 
     [TestMethod]
     [DataRow("20")]
-    [DataRow("10000")]
+    [DataRow("10001")]
     [DataRow("wide")]
     [DataRow("80x")]
     [DataRow("")]

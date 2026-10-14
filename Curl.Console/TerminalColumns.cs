@@ -3,12 +3,12 @@ using System.Globalization;
 namespace Curl.Console;
 
 /// <summary>
-/// Resolves the terminal width curl 8.21.0's <c>get_terminal_columns</c> gives the warning
+/// Resolves the terminal width curl 8.22.0's <c>get_terminal_columns</c> gives the warning
 /// wrapper (see <see cref="WarningLineWrapper" />).
 /// </summary>
 /// <remarks>
 /// In curl's order: the <c>COLUMNS</c> environment variable when it reads as a whole number
-/// from 21 to 9999; otherwise the width of the console standard error is attached to, when it
+/// from 21 to 10000; otherwise the width of the console standard error is attached to, when it
 /// is one and that width is from 1 to 9999; otherwise <see cref="Default" />. On Windows curl
 /// takes the console width as the window's <c>Right - Left</c>, one less than
 /// <see cref="System.Console.WindowWidth" />, so an 80-column console gives 79.
@@ -47,7 +47,9 @@ internal static class TerminalColumns
 
     /// <summary>
     /// Reads a <c>COLUMNS</c> value as curl's <c>strtol</c> check does: optional leading
-    /// white space and sign, then only digits, from 21 to 9999.
+    /// white space and sign, then only digits, from 21 to 10000. Measured with curl 8.22.0
+    /// (Windows, 2026-10-13): <c>COLUMNS=10000</c> keeps a long warning on one line and
+    /// <c>COLUMNS=10001</c> wraps it at 79 (8.21.0 stopped at 9999; upstream test459, BL-2172).
     /// </summary>
     /// <param name="columnsVariable">The value, or <see langword="null" />.</param>
     /// <param name="columns">The width, when the value is used.</param>
@@ -58,7 +60,7 @@ internal static class TerminalColumns
             NumberStyles.AllowLeadingWhite | NumberStyles.AllowLeadingSign,
             CultureInfo.InvariantCulture,
             out columns)
-        && columns is > 20 and < 10000;
+        && columns is > 20 and <= 10000;
 
     /// <summary>
     /// Reads the width of the console standard error is attached to, in curl's terms.
