@@ -3,8 +3,8 @@ id: AF-0177
 title: ADR-0475 says only wrapped Note: and Warning: lines are joined; Unwrap also joins wrapped curl: error lines
 auditor: truthfulness
 severity: Low
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-13_1822.md: the reproduction no longer reproduces.
 key: truthfulness:Documentation/Planning/Decisions/ADR-0475-upstream-case-stderr-naming-logdir-is-compared-with-wrapped-notes-joined.md:UpstreamWrappedMessageLines.Unwrap:stale-adr
 reproduction: none
 task: BL-2123
@@ -13,9 +13,9 @@ found: 2026-10-12
 found-at: 4e6ddbc5b33356117bfec6778ba550ab61454a99
 scorecard: 2026-10-12_1653.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-13
+closed-how: reliable-reaudit
+closed-by: 2026-10-13_1822.md
 ---
 # AF-0177 - ADR-0475 says only wrapped Note: and Warning: lines are joined; Unwrap also joins wrapped curl: error lines
 
@@ -43,8 +43,10 @@ Run from the repository root:
 ## Re-audits
 
 - 2026-10-13 | 2026-10-13_0925.md | reproduces: no | Ran the reproduction: Prefixes with 'curl: ' in UpstreamWrappedMessageLines.cs = 1 (line 25: ["Warning: ", "Note: ", "curl: "]); 'curl: ' in ADR-0475 = 1. ADR-0475 line 34 now names the curl: prefix, citing test411's wrapped 'curl: cannot read config from' error. Residual imprecision: the ADR title and line 27 still mention only Note: and Warning: lines.
+- 2026-10-13 | 2026-10-13_1822.md | reproduces: no | Ran the reproduction: 1;1. UpstreamWrappedMessageLines.Prefixes still includes "curl: ", and ADR-0475 line 34 now names the 'curl: ' prefix too ('...the same Note: , Warning:  or curl:  prefix (the last for test411's wrapped curl: cannot read config from error)'). Only the ADR's title still mentions just Note: and Warning: lines.
 
 ## Log
 
 - 2026-10-12: filed proposed.
 - 2026-10-12: proposed -> accepted.
+- 2026-10-13: accepted -> closed. Re-audit 2026-10-13_1822.md: the reproduction no longer reproduces.

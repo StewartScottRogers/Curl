@@ -3,19 +3,19 @@ id: AF-0188
 title: Ws CLAUDE.md tells the reader to take IConnection; WsProtocolHandler takes IConnector
 auditor: truthfulness
 severity: Medium
-status: proposed
-reason:
+status: closed
+reason: Re-audit 2026-10-13_1822.md: the reproduction no longer reproduces.
 key: truthfulness:Curl.Protocol.Ws.UnitLibrary/CLAUDE.md:IConnection:false-statement
 reproduction: none
-task: none
-tasks:
+task: BL-2147
+tasks: BL-2147
 found: 2026-10-13
 found-at: c86d04eeb8477108eb6d9195bb036a4ddaecc5fc
 scorecard: 2026-10-13_0925.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-13
+closed-how: reliable-reaudit
+closed-by: 2026-10-13_1822.md
 ---
 # AF-0188 - Ws CLAUDE.md tells the reader to take IConnection; WsProtocolHandler takes IConnector
 
@@ -42,6 +42,10 @@ Run from the repository root:
 
 ## Re-audits
 
+- 2026-10-13 | 2026-10-13_1822.md | reproduces: no | Ran the reproduction: 0;1. Curl.Protocol.Ws.UnitLibrary/CLAUDE.md no longer says 'Take `IConnection`'; WsProtocolHandler still takes 'IConnector connector,'.
+
 ## Log
 
 - 2026-10-13: filed proposed.
+- 2026-10-13: proposed -> accepted.
+- 2026-10-13: accepted -> closed. Re-audit 2026-10-13_1822.md: the reproduction no longer reproduces.

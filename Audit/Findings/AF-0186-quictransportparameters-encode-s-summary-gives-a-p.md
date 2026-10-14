@@ -3,19 +3,19 @@ id: AF-0186
 title: QuicTransportParameters.Encode's summary gives a parameter order the code does not write
 auditor: truthfulness
 severity: Low
-status: proposed
-reason:
+status: closed
+reason: Re-audit 2026-10-13_1822.md: the reproduction no longer reproduces.
 key: truthfulness:Curl.Quic.UnitLibrary/QuicTransportParameters.cs:Encode:false-doc-comment
 reproduction: none
-task: none
-tasks:
+task: BL-2145
+tasks: BL-2145
 found: 2026-10-13
 found-at: c86d04eeb8477108eb6d9195bb036a4ddaecc5fc
 scorecard: 2026-10-13_0925.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-13
+closed-how: reliable-reaudit
+closed-by: 2026-10-13_1822.md
 ---
 # AF-0186 - QuicTransportParameters.Encode's summary gives a parameter order the code does not write
 
@@ -42,6 +42,10 @@ Run from the repository root:
 
 ## Re-audits
 
+- 2026-10-13 | 2026-10-13_1822.md | reproduces: no | Ran the reproduction: 0x00,0x0f,0x10,0x02,0x01,0x03,0x05,0x06,0x07,0x04,0x08,0x09,0x0a,0x0b,0x0c,0x0e,0x0d,0x11. The Encode summary (QuicTransportParameters.cs:102-109) gives the same order: connection IDs (original destination, initial source, retry source), stateless_reset_token, max_idle_timeout, max_udp_payload_size, bidi-local/bidi-remote/uni stream data, initial_max_data, stream counts, ack_delay_exponent, max_ack_delay, disable_active_migration, active_connection_id_limit, preferred_address, version_information last.
+
 ## Log
 
 - 2026-10-13: filed proposed.
+- 2026-10-13: proposed -> accepted.
+- 2026-10-13: accepted -> closed. Re-audit 2026-10-13_1822.md: the reproduction no longer reproduces.

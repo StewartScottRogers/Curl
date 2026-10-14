@@ -3,12 +3,12 @@ id: AF-0190
 title: BL-2131 cost $3.11, 6.1 times the median task cost, over 70 turns of sliced code reading
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: process:logs:BL-2131:cost-outlier
 reproduction: none
-task: none
-tasks:
+task: BL-2149
+tasks: BL-2149
 found: 2026-10-13
 found-at: c86d04eeb8477108eb6d9195bb036a4ddaecc5fc
 scorecard: 2026-10-13_0925.md
@@ -42,6 +42,9 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-10-13 | 2026-10-13_1822.md | reproduces: yes | The given reproduction still shows BL-2131 costUsd 3.1093 over the old window. Re-audited by mechanism over this window: BL-2142 cost $3.11, 4.25 times the $0.73 median, over 68 turns, with 37 sliced Bash reads ('sed -n 250,290p Curl.Cli.UnitLibrary/CommandLineOptionTable.cs' and others). Lane 2, claimed 13:34:45 and done 13:48. The same cause (sliced code reading driving turns and cost) crosses the cost-outlier rule again.
+
 ## Log
 
 - 2026-10-13: filed proposed.
+- 2026-10-13: proposed -> accepted.

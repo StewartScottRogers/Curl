@@ -3,12 +3,12 @@ id: AF-0179
 title: 3 Curl.Networking.UnitTests fail on the audited commit: TlsReader.Take has no bounds check, so a truncated ECHConfigList throws IndexOutOfRangeException
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Tls.UnitLibrary/TlsReader.cs:Take:failing-test
 reproduction: none
-task: none
-tasks:
+task: BL-2138
+tasks: BL-2138
 found: 2026-10-13
 found-at: c86d04eeb8477108eb6d9195bb036a4ddaecc5fc
 scorecard: 2026-10-13_0925.md
@@ -42,6 +42,9 @@ dotnet test Curl.Networking.UnitTests --filter "FullyQualifiedName~HandBuiltTlsP
 
 ## Re-audits
 
+- 2026-10-13 | 2026-10-13_1822.md | not re-audited | overlaps planted defect PD-103 in Curl.Tls.UnitLibrary/TlsReader.cs, so the auditor's verdict (reproduces yes) is set aside: Ran dotnet test Curl.Networking.UnitTests --filter "FullyQualifiedName~HandBuiltTlsProviderTests.AuthenticateAsClientAsync_WithEch": Failed 5, Passed 42, Total 47. The failures are 3 test methods (WithEch_WritesCurlsEchLinesBeforeTheHello x3 rows, WithEchHardAndNoUsableList_FailsWithExit35BeforeSendingAByte, WithEchTrueAndNoUsableList_SendsAPlainHello), each System.IndexOutOfRangeException at Curl.Tls.TlsReader.ReadUnsigned (TlsReader.cs:119) via EchConfigList.ReadConfigs. TlsReader.Take (line 126) still advances position without a bounds check.
+
 ## Log
 
 - 2026-10-13: filed proposed.
+- 2026-10-13: proposed -> accepted.

@@ -3,19 +3,19 @@ id: AF-0182
 title: SrpClient exponentiates with the password-derived x and private a through variable-time BigInteger.ModPow
 auditor: security
 severity: High
-status: proposed
-reason:
+status: closed
+reason: Re-audit 2026-10-13_1822.md: the reproduction no longer reproduces.
 key: security:Curl.Tls.UnitLibrary/SrpClient.cs:SrpClient.ComputePremasterSecret:secret-dependent-branch
 reproduction: none
-task: none
-tasks:
+task: BL-2141
+tasks: BL-2141
 found: 2026-10-13
 found-at: c86d04eeb8477108eb6d9195bb036a4ddaecc5fc
 scorecard: 2026-10-13_0925.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-13
+closed-how: reliable-reaudit
+closed-by: 2026-10-13_1822.md
 ---
 # AF-0182 - SrpClient exponentiates with the password-derived x and private a through variable-time BigInteger.ModPow
 
@@ -42,6 +42,10 @@ Select-String -Path Curl.Tls.UnitLibrary/SrpClient.cs -Pattern 'BigInteger\.ModP
 
 ## Re-audits
 
+- 2026-10-13 | 2026-10-13_1822.md | reproduces: no | Ran Select-String -Path Curl.Tls.UnitLibrary/SrpClient.cs -Pattern 'BigInteger\.ModPow' from the tree root: PathNotFound, no match. SrpClient.cs is gone from git ls-files, and no SRP client type remains. The only BigInteger.ModPow left in Curl.Tls.UnitLibrary is TlsCertificatePublicKey.cs:159, the RSA public-key operation on public values.
+
 ## Log
 
 - 2026-10-13: filed proposed.
+- 2026-10-13: proposed -> accepted.
+- 2026-10-13: accepted -> closed. Re-audit 2026-10-13_1822.md: the reproduction no longer reproduces.
