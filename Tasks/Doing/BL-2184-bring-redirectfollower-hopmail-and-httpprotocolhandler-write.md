@@ -32,3 +32,4 @@ Measured by BL-2182's run on 2026-10-13, none of them changed by it:
 ## Log
 
 - 2026-10-13: Created.
+- 2026-10-13: Backlog -> Doing.
