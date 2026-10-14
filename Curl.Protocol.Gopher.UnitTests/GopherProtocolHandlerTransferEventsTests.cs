@@ -78,6 +78,23 @@ public sealed class GopherProtocolHandlerTransferEventsTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_SelectorDecodesToCrLf_ReportsTheMessageThenShuttingDown()
+    {
+        // Measured: curl 8.22.0 -v gopher://127.0.0.1:47070/1a%0D%0Ab wrote "* Bad gopher selector,
+        // CR or LF not allowed", then "* shutting down connection #0", and exited 3 (BL-2185).
+        TranscriptTransferEvents events = new();
+        Diagnostics.Arrange("url", "gopher://h/1a%0D%0Ab");
+
+        TransferResult result = await new GopherProtocolHandler(Connector(new ScriptedConnection(), 0)).ExecuteAsync(Context("gopher://h/1a%0D%0Ab", events));
+        Report(result, events);
+
+        AssertTranscript(["* Bad gopher selector, CR or LF not allowed", "* shutting down connection #0"], events);
+        CollectionAssert.AreEqual(
+            new[] { "* Bad gopher selector, CR or LF not allowed", "* shutting down connection #0" },
+            events.Transcript);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_GophersEndsWithoutCloseNotify_ReportsTheMessageThenClosingAndFailsWithIt()
     {
         // Measured: gophers://127.0.0.1:47936/1/ -k wrote "<= Recv data, 25 bytes", then

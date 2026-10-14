@@ -26,8 +26,9 @@ namespace Curl.Protocol.Gopher;
 /// bytes, counted across reads, and a read that goes past it is cut there and ends the
 /// transfer with exit 63 (<see cref="CurlExitCode.FilesizeExceeded" />); a reply exactly at
 /// the limit is not a failure. A
-/// selector that decodes to a NUL byte is exit 3 (<see cref="CurlExitCode.UrlMalformat" />),
-/// found after connecting as in curl. A failed connect is returned unchanged; a failed
+/// selector that decodes to a NUL byte, or (as in curl 8.22.0) to a CR or LF byte, is exit 3
+/// (<see cref="CurlExitCode.UrlMalformat" />), found after connecting and before sending
+/// anything, as in curl. A failed connect is returned unchanged; a failed
 /// send is exit 55, a failed receive exit 56 and a failed output write exit 23, all
 /// returned rather than thrown. The exit 23 message names the size of the read that failed
 /// to write (at most 16384 bytes, as curl 8.21.0 reads gopher) and the bytes of it the
@@ -147,6 +148,12 @@ public sealed class GopherProtocolHandler : IProtocolHandler
             return TransferResult.Failure(CurlExitCode.UrlMalformat, GopherTransferMessages.SelectorMalformed);
         }
 
+        // curl 8.22.0 refuses a selector holding CR or LF before sending a byte (BL-2185).
+        if (selector.AsSpan().IndexOfAny((byte)'\r', (byte)'\n') >= 0)
+        {
+            return TransferResult.Failure(CurlExitCode.UrlMalformat, GopherTransferMessages.SelectorHasLineBreak);
+        }
+
         foreach (byte[] piece in (byte[][])[selector, LineEnd])
         {
             if (await TrySendAsync(connection, piece, context.CancellationToken).ConfigureAwait(false) is { } sendFailure)
@@ -174,8 +181,9 @@ public sealed class GopherProtocolHandler : IProtocolHandler
 
     /// <summary>
     /// Reports the line curl 8.21.0 ends a gopher connection with (measured, BL-934 Notes):
-    /// <c>shutting down connection #N</c> after a finished transfer or a malformed selector,
-    /// and otherwise <c>closing connection #N</c>, after the failure's own message when curl
+    /// <c>shutting down connection #N</c> after a finished transfer or a malformed selector -
+    /// after <c>Bad gopher selector, CR or LF not allowed</c> for one holding CR or LF
+    /// (curl 8.22.0, BL-2185) - and otherwise <c>closing connection #N</c>, after the failure's own message when curl
     /// reports it through <c>failf</c> - every failure but the fallback texts for a failed
     /// send or receive - and, for a failed send, after <c>Failed sending Gopher request</c>.
     /// </summary>
@@ -183,6 +191,11 @@ public sealed class GopherProtocolHandler : IProtocolHandler
     {
         if (result.ExitCode is CurlExitCode.Ok or CurlExitCode.UrlMalformat)
         {
+            if (result.ErrorMessage is GopherTransferMessages.SelectorHasLineBreak)
+            {
+                events.ReportInfo(result.ErrorMessage);
+            }
+
             events.ReportInfo(GopherTransferMessages.ShuttingDownConnection(connectionNumber));
             return;
         }

@@ -7,8 +7,9 @@ namespace Curl.Protocol.Gopher;
 /// 8.21.0 words it.
 /// </summary>
 /// <remarks>
-/// <c>lib/gopher.c</c> fails without calling <c>failf</c> for a bad selector, so curl
-/// prints the text <c>curl_easy_strerror</c> gives for the code, and that text is here.
+/// <c>lib/gopher.c</c> fails without calling <c>failf</c> for a selector that decodes to
+/// NUL, so curl prints the text <c>curl_easy_strerror</c> gives for the code, and that
+/// text is here; one that decodes to CR or LF gets its own <c>failf</c> text.
 /// </remarks>
 internal static class GopherTransferMessages
 {
@@ -16,6 +17,12 @@ internal static class GopherTransferMessages
     /// The exit 3 message for a selector that percent-decodes to a NUL byte.
     /// </summary>
     internal const string SelectorMalformed = "URL using bad/illegal format or missing URL";
+
+    /// <summary>
+    /// The exit 3 message curl 8.22.0's <c>lib/gopher.c</c> reports through <c>failf</c> for a
+    /// selector that percent-decodes to a CR or LF byte (measured, BL-2185).
+    /// </summary>
+    internal const string SelectorHasLineBreak = "Bad gopher selector, CR or LF not allowed";
 
     /// <summary>
     /// The exit 56 message curl falls back to for a failed receive.
