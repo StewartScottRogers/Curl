@@ -690,7 +690,11 @@ else {
 $referenceLine = if ($null -ne $reference -and $reference.Matches) { $reference.VersionLine } else { 'docs' }
 $referenceNames = @()
 if ($referenceLine -ne 'docs') {
-    $versionText = @(& $reference.Path -V 2>$null)
+    # Invoke-GapRun reads stdout alone. Under Windows PowerShell 5.1 with Stop, "& curl -V
+    # 2>$null" throws on any stderr line, and the debug-enabled 8.22.0 reference writes a
+    # warning there on -V, which ended the run with no log line (BL-2128).
+    $versionRun = Invoke-GapRun -Path $reference.Path -Arguments @('-V') -Environment @{} -TimeoutSeconds 20
+    $versionText = @([System.Text.Encoding]::UTF8.GetString($versionRun.Stdout) -split "`r?`n")
     foreach ($line in $versionText) { if ($line -match '^(Protocols|Features): (.*)$') { $referenceNames += @($Matches[2].Trim() -split '\s+') } }
 }
 $run = [ordered]@{

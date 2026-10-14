@@ -1,0 +1,21 @@
+{
+    "reference": {
+        "version": [
+            "WARNING: this libcurl is Debug-enabled, do not use in production",
+            "curl 9.9.9 (x86_64-w64-mingw32) libcurl/9.9.9 Schannel",
+            "Release-Date: 2099-01-01",
+            "Protocols: dict http https ipfs mqtt",
+            "Features: alt-svc Debug Largefile TrackMemory zstd"
+        ],
+        "exitCodes": { "dict": 7, "http": 7, "https": 7, "ipfs": 3, "mqtt": 7 }
+    },
+    "candidate": {
+        "version": [
+            "curl 9.9.9 (x86_64-w64-mingw32) libcurl/9.9.9 Schannel",
+            "Release-Date: 2099-01-01",
+            "Protocols: dict gopher http https mqtt",
+            "Features: alt-svc HTTP3 Largefile"
+        ],
+        "exitCodes": { "dict": 7, "gopher": 7, "http": 7, "https": 7, "mqtt": 1 }
+    }
+}

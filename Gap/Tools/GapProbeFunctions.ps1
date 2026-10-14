@@ -241,6 +241,26 @@ function Invoke-GapRun {
     }
 }
 
+$script:GapDebugBuildWarning = 'WARNING: this libcurl is Debug-enabled, do not use in production'
+
+function Remove-GapDebugBuildWarning {
+    <#
+    .SYNOPSIS
+        Returns -Text without the line a debug-enabled libcurl prints on curl -V
+        ("WARNING: this libcurl is Debug-enabled, do not use in production"), line ending
+        and all; every other line is kept byte for byte.
+
+    .DESCRIPTION
+        Git for Windows 2.56.0's ucrt64 curl 8.22.0, the Windows reference, is a debug build
+        (BL-2125). Curl matches the release build, which prints no such line, so the line is
+        a property of the reference build and never a gap (BL-2128).
+    #>
+    param([AllowNull()] [AllowEmptyString()] [string] $Text)
+    if ([string]::IsNullOrEmpty($Text)) { return $Text }
+    $kept = @($Text -split '(?<=\n)' | Where-Object { $_.TrimEnd("`r", "`n") -cne $script:GapDebugBuildWarning })
+    return ($kept -join '')
+}
+
 function Invoke-GapProbe {
     <#
     .SYNOPSIS
@@ -250,7 +270,8 @@ function Invoke-GapProbe {
         Runs the reference (only when its version line names -TargetVersion) and then the
         candidate, each in the controlled environment described in the script's help.
         Returns { Reference, Candidate }, each { ExitCode, Stdout (byte[]), Stderr
-        (string), TimedOut }; Reference is $null when no matching reference is found.
+        (string), TimedOut }; Reference is $null when no matching reference is found. The
+        reference's Stderr has lost the debug-build warning line (Remove-GapDebugBuildWarning).
 
     .PARAMETER Arguments
         The command line's arguments, without the program name.
@@ -293,6 +314,7 @@ function Invoke-GapProbe {
     $reference = Get-GapReferenceCurl -TargetVersion $TargetVersion -Path $ReferencePath
     if ($null -ne $reference -and $reference.Matches) {
         $referenceResult = Invoke-GapRun -Path $reference.Path @run
+        $referenceResult.Stderr = Remove-GapDebugBuildWarning $referenceResult.Stderr
     }
     $candidateResult = Invoke-GapRun -Path (Get-GapCandidateCurl -Path $CandidatePath) @run
     return [pscustomobject] @{ Reference = $referenceResult; Candidate = $candidateResult }
@@ -344,5 +366,10 @@ function Invoke-GapProbeSelfTest {
     $matched = Get-GapReferenceCurl -Path $echo -TargetVersion '0.0.1'
     $versionPassed = (-not $other.Matches) -and $matched.Matches -and $null -eq $slow.Reference -and $null -ne $probe.Reference -and $probe.Candidate.ExitCode -eq 7
     & $report 'a reference whose version line names another version is reported as not matching' $versionPassed ("line: $($other.VersionLine)")
+
+    $warned = "WARNING: this libcurl is Debug-enabled, do not use in production`r`ncurl: (7) x`nWARNING: this libcurl is Debug-enabled, do not use in production"
+    $stripped = Remove-GapDebugBuildWarning $warned
+    $kept = Remove-GapDebugBuildWarning "warning: this libcurl is Debug-enabled, do not use in production`nWARNING: this libcurl is Debug-enabled, do not use in production now`n"
+    & $report 'the debug-build warning line is removed from stderr, line ending and all, and nothing else is (BL-2128)' ($stripped -ceq "curl: (7) x`n" -and $kept -ceq "warning: this libcurl is Debug-enabled, do not use in production`nWARNING: this libcurl is Debug-enabled, do not use in production now`n" -and (Remove-GapDebugBuildWarning '') -ceq '') ("stripped: [$stripped] kept: [$kept]")
 
 }

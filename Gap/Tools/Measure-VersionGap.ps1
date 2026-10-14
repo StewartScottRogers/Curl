@@ -27,9 +27,14 @@
       through both binaries; otherwise gap. A scheme the reference lacks is excluded with
       reason reference-lacks:<scheme> when Curl lacks it too, and gap when Curl lists it:
       Curl matches the build it targets (ADR-0021, ADR-0397).
-    - A feature is match when both Features: lines agree on it, else gap. One both lack
-      is excluded: debug-build-only for Debug and TrackMemory, else
-      reference-lacks:<name>. Feature names compare case-insensitively.
+    - A feature is match when both Features: lines agree on it, else gap. Debug and
+      TrackMemory, when Curl does not list them, are excluded as debug-build-only whether
+      or not the reference lists them (the Windows reference, Git 2.56.0's ucrt64 curl
+      8.22.0, is a debug build; Curl matches the release build, BL-2128). Any other
+      feature both lack is excluded as reference-lacks:<name>. Feature names compare
+      case-insensitively.
+    - The line "WARNING: this libcurl is Debug-enabled, do not use in production" a debug
+      build prints with -V is dropped from either binary's -V lines before they are read.
     Without a matched reference, reference is null, referenceFallback is "docs" and every
     documented item is expected: match when Curl's curl -V lists it, else gap. No probe runs.
 
@@ -98,6 +103,7 @@ param(
 $ErrorActionPreference = 'Stop'
 
 $DebugBuildFeatures = @('Debug', 'TrackMemory')
+$DebugBuildWarning = 'WARNING: this libcurl is Debug-enabled, do not use in production'
 
 function Write-Utf8File([string] $Path, [string] $Text) {
     $folder = Split-Path $Path -Parent
@@ -141,11 +147,18 @@ function Read-VersionList([string[]] $Lines, [string] $Label) {
     return @()
 }
 
+# curl -V's lines without the line a debug-enabled libcurl prints first (BL-2128), so the
+# version line is the "curl <version> ..." line whichever stream the warning went to.
+function Remove-DebugBuildWarningLine([string[]] $Lines) {
+    # The comma keeps a one-line answer an array: PowerShell unrolls a returned array.
+    return , [string[]]@($Lines | Where-Object { $_ -cne $DebugBuildWarning })
+}
+
 function ConvertTo-BinaryAnswer($Canned) {
     if ($null -eq $Canned) { return $null }
     $codes = @{}
     if ($null -ne $Canned.exitCodes) { foreach ($p in $Canned.exitCodes.PSObject.Properties) { $codes[$p.Name] = [int]$p.Value } }
-    $lines = [string[]]@($Canned.version)
+    $lines = Remove-DebugBuildWarningLine ([string[]]@($Canned.version))
     return [pscustomobject]@{ VersionLine = $lines[0]; Protocols = (Read-VersionList $lines 'Protocols'); Features = (Read-VersionList $lines 'Features'); ExitCodes = $codes }
 }
 
@@ -161,7 +174,7 @@ function Get-LiveAnswers([string] $CandidatePath, [string] $ReferencePath, [stri
     $read = {
         param([string] $Path)
         $run = Invoke-GapRun -Path $Path -Arguments @('-V') -Environment @{} -TimeoutSeconds 20
-        $lines = [string[]]([System.Text.Encoding]::UTF8.GetString($run.Stdout) -split "`r?`n")
+        $lines = Remove-DebugBuildWarningLine ([string[]]([System.Text.Encoding]::UTF8.GetString($run.Stdout) -split "`r?`n"))
         return [pscustomobject]@{ VersionLine = $lines[0]; Protocols = (Read-VersionList $lines 'Protocols'); Features = (Read-VersionList $lines 'Features'); ExitCodes = @{} }
     }
     $referenceAnswer = $null
@@ -201,9 +214,10 @@ function Measure-Item([string] $Area, [string] $Key, [string] $Name, $Introduced
     }
     $referenceLists = Test-Listed $Answers.Reference.$label $Name
     $result.expected = if ($referenceLists) { 'listed' } else { 'not listed' }
-    if (-not $referenceLists -and -not $curlLists) {
+    $debugBuildOnly = $Area -eq 'features' -and (Test-Listed $DebugBuildFeatures $Name)
+    if (-not $curlLists -and ($debugBuildOnly -or -not $referenceLists)) {
         $result.state = 'excluded'
-        $result.reason = if ($Area -eq 'features' -and (Test-Listed $DebugBuildFeatures $Name)) { 'debug-build-only' } else { "reference-lacks:$Name" }
+        $result.reason = if ($debugBuildOnly) { 'debug-build-only' } else { "reference-lacks:$Name" }
         return $result
     }
     $result.state = if ($referenceLists -eq $curlLists) { 'match' } else { 'gap' }
@@ -316,6 +330,12 @@ function Invoke-SelfTest {
         # Live path with an explicit Curl.Console outside this script's repository: the stand-in must be the binary that runs (BL-1747).
         $live = Get-LiveAnswers (Join-Path $PSScriptRoot 'Fixtures/probe/Write-ProbeEcho.ps1') $null '9.9.9'
         Report ($live.Candidate.VersionLine -like '*Arguments*') 'an explicit -Candidate is the binary the live answers come from'
+
+        Invoke-VersionGap $upstream '9.9.9' $temp $out $false (Join-Path $fixtures 'probe-results-debug.json') $null $null $null | Out-Null
+        $debugMeasurement = [System.IO.File]::ReadAllText((Join-Path $out 'features.json')) | ConvertFrom-Json
+        $debugFeatures = & $read (Join-Path $out 'features.json')
+        Report ($debugMeasurement.reference -ceq 'curl 9.9.9 (x86_64-w64-mingw32) libcurl/9.9.9 Schannel') 'a debug build''s -V warning line is dropped, so the version line is the curl line (BL-2128)'
+        Report ($debugFeatures['features:Debug'].state -eq 'excluded' -and $debugFeatures['features:Debug'].reason -eq 'debug-build-only' -and $debugFeatures['features:TrackMemory'].state -eq 'excluded' -and $debugFeatures['features:TrackMemory'].reason -eq 'debug-build-only' -and $debugFeatures['features:alt-svc'].state -eq 'match') 'a debug-build feature only the reference lists is excluded with debug-build-only (BL-2128)'
 
         Invoke-VersionGap $upstream '9.9.9' $temp $out $false (Join-Path $fixtures 'probe-results-docs.json') $null $null $null | Out-Null
         $docs = [System.IO.File]::ReadAllText((Join-Path $out 'protocols.json')) | ConvertFrom-Json
