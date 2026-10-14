@@ -181,10 +181,23 @@ public sealed class UpstreamCaseRunner(
             return UpstreamCaseOutcome.Skipped(parsed.Failure.Message);
         }
 
-        return (UpstreamCaseScreening.FindSkipReason(expansion, parsed.TestCase, platform.Features)
-                ?? UpstreamCaseScreening.FindFileOutsideLogDirectory(parsed.TestCase, logDirectory)) is { } reason
+        return Screen(expansion, parsed.TestCase, logDirectory)
+            ?? await RunScreenedAsync(parsed.TestCase, testNumber, logDirectoryVariable, certificateDirectory).ConfigureAwait(false);
+    }
+
+    // The skip outcome of a case the harness cannot run here, or null when it can run: first a
+    // case only another platform's Curl has the features for (ADR-0488), then every other reason.
+    private UpstreamCaseOutcome? Screen(UpstreamTestFileExpansion expansion, UpstreamTestCase testCase, string logDirectory)
+    {
+        if (UpstreamCaseScreening.FindFeatureOfAnotherPlatform(testCase, platform.Features) is { } otherPlatformReason)
+        {
+            return UpstreamCaseOutcome.SkippedOnThisPlatform(otherPlatformReason);
+        }
+
+        return (UpstreamCaseScreening.FindSkipReason(expansion, testCase, platform.Features)
+                ?? UpstreamCaseScreening.FindFileOutsideLogDirectory(testCase, logDirectory)) is { } reason
             ? UpstreamCaseOutcome.Skipped(reason)
-            : await RunScreenedAsync(parsed.TestCase, testNumber, logDirectoryVariable, certificateDirectory).ConfigureAwait(false);
+            : null;
     }
 
     private static void RefuseABlank(string directory, string description, string parameterName)

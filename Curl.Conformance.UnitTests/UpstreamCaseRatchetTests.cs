@@ -122,6 +122,37 @@ public sealed class UpstreamCaseRatchetTests
         Assert.AreEqual("test7 is on PassingUpstreamCases.txt and is now skipped: why", verdict.Message);
     }
 
+    // ADR-0488: test2087 needs Schannel, so off Windows it is listed yet cannot run.
+    [TestMethod]
+    public void Judge_ListedSkipOnThisPlatformOnly_IsInconclusive()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("case, outcome, listed", "7, SkippedOnThisPlatform(why), true");
+
+        UpstreamCaseVerdict verdict = UpstreamCaseRatchet.Judge(7, UpstreamCaseOutcome.SkippedOnThisPlatform("why"), isListed: true);
+
+        diagnostics.Act("verdict", $"{verdict.Kind}: {verdict.Message}");
+        diagnostics.Assert("verdict kind", UpstreamCaseVerdictKind.Inconclusive, verdict.Kind);
+        diagnostics.Diff("verdict message", "test7 is on PassingUpstreamCases.txt and runs only on another platform: why", verdict.Message);
+        Assert.AreEqual(UpstreamCaseVerdictKind.Inconclusive, verdict.Kind);
+        Assert.AreEqual("test7 is on PassingUpstreamCases.txt and runs only on another platform: why", verdict.Message);
+    }
+
+    [TestMethod]
+    public void Judge_UnlistedSkipOnThisPlatformOnly_IsInconclusiveWithTheReason()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("case, outcome, listed", "7, SkippedOnThisPlatform(why), false");
+
+        UpstreamCaseVerdict verdict = UpstreamCaseRatchet.Judge(7, UpstreamCaseOutcome.SkippedOnThisPlatform("why"), isListed: false);
+
+        diagnostics.Act("verdict", $"{verdict.Kind}: {verdict.Message}");
+        diagnostics.Assert("verdict kind", UpstreamCaseVerdictKind.Inconclusive, verdict.Kind);
+        diagnostics.Diff("verdict message", "test7 is skipped: why", verdict.Message);
+        Assert.AreEqual(UpstreamCaseVerdictKind.Inconclusive, verdict.Kind);
+        Assert.AreEqual("test7 is skipped: why", verdict.Message);
+    }
+
     [TestMethod]
     public void Judge_UnlistedSkip_IsInconclusiveWithTheReason()
     {
@@ -168,5 +199,22 @@ public sealed class UpstreamCaseRatchetTests
         Assert.AreEqual(string.Empty, UpstreamCaseOutcome.Passed.Detail);
         Assert.AreEqual(UpstreamCaseOutcomeKind.Skipped, UpstreamCaseOutcome.Skipped("why").Kind);
         Assert.AreEqual("why", UpstreamCaseOutcome.Skipped("why").Detail);
+    }
+
+    [TestMethod]
+    public void Outcome_OnlySkippedOnThisPlatform_RunsOnlyOnAnotherPlatform()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("outcomes", "Passed, Failed(diff), Skipped(why), SkippedOnThisPlatform(why)");
+
+        UpstreamCaseOutcome[] others = [UpstreamCaseOutcome.Passed, UpstreamCaseOutcome.Failed("diff"), UpstreamCaseOutcome.Skipped("why")];
+        UpstreamCaseOutcome onThisPlatform = UpstreamCaseOutcome.SkippedOnThisPlatform("why");
+
+        diagnostics.Act("others run only on another platform", string.Join(",", others.Select(outcome => outcome.RunsOnlyOnAnotherPlatform)));
+        diagnostics.Act("skipped on this platform", $"{onThisPlatform.Kind} '{onThisPlatform.Detail}' {onThisPlatform.RunsOnlyOnAnotherPlatform}");
+        Assert.IsFalse(others.Any(outcome => outcome.RunsOnlyOnAnotherPlatform));
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Skipped, onThisPlatform.Kind);
+        Assert.AreEqual("why", onThisPlatform.Detail);
+        Assert.IsTrue(onThisPlatform.RunsOnlyOnAnotherPlatform);
     }
 }

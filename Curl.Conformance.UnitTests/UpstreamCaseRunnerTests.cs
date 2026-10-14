@@ -193,6 +193,24 @@ public sealed class UpstreamCaseRunnerTests
         Assert.AreEqual(UpstreamCaseOutcomeKind.Passed, outcome.Kind, outcome.Detail);
     }
 
+    // ADR-0488: off Windows a Schannel case is skipped as one only Windows' Curl runs; a case
+    // needing a feature no platform's Curl has is an ordinary skip.
+    [TestMethod]
+    [DataRow("SSL\nSchannel", true, "Curl lacks the feature Schannel")]
+    [DataRow("http\nDebug", false, "Curl lacks the feature Debug")]
+    public async Task RunAsync_CaseNeedingAFeatureThisPlatformLacks_SaysWhetherAnotherPlatformRunsIt(string caseFeatures, bool runsOnlyOnAnotherPlatform, string reason)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        UpstreamCaseRunner runner = Runner(_ => throw new AssertFailedException("curl must not run"));
+
+        UpstreamCaseOutcome outcome = await RunAsync(runner, $"<testcase>\n<client>\n<features>\n{caseFeatures}\n</features>\n<command>\na\n</command>\n</client>\n</testcase>\n");
+
+        diagnostics.Assert("runs only on another platform", runsOnlyOnAnotherPlatform, outcome.RunsOnlyOnAnotherPlatform);
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Skipped, outcome.Kind);
+        Assert.AreEqual(reason, outcome.Detail);
+        Assert.AreEqual(runsOnlyOnAnotherPlatform, outcome.RunsOnlyOnAnotherPlatform);
+    }
+
     [TestMethod]
     public async Task RunAsync_CurlThatNeverFinishes_FailsAfterTheTimeLimit()
     {

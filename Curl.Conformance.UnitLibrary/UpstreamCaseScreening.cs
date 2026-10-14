@@ -173,6 +173,24 @@ internal static class UpstreamCaseScreening
             ? "the harness records <verify><upload> only for the smtp, imap, smtps, imaps, tftp, ftp, ftps, scp and sftp servers"
             : null;
 
+    /// <summary>
+    /// Finds the feature that keeps the case off this platform when Curl on another platform meets
+    /// every one of its <c>&lt;features&gt;</c>, such as <c>Schannel</c> off Windows, so the ratchet
+    /// can hold a listed case only where it can run (ADR-0488).
+    /// </summary>
+    /// <param name="testCase">The expanded file, parsed.</param>
+    /// <param name="features">The features Curl reports on this platform.</param>
+    /// <returns>A sentence naming the feature, or <see langword="null"/> when this platform meets the case's features or no platform does.</returns>
+    public static string? FindFeatureOfAnotherPlatform(UpstreamTestCase testCase, IReadOnlySet<string> features)
+    {
+        ArgumentNullException.ThrowIfNull(testCase);
+        ArgumentNullException.ThrowIfNull(features);
+        return UnsupportedFeature(testCase, features) is { } reason
+            && UpstreamCurlPlatform.All.Any(platform => UnsupportedFeature(testCase, platform.Features) is null)
+            ? reason
+            : null;
+    }
+
     private static string? UnsupportedFeature(UpstreamTestCase testCase, IReadOnlySet<string> features)
     {
         foreach (string feature in UpstreamTestPartBodies.Lines(testCase.Find("client", "features")))

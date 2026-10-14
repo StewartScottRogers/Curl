@@ -1,5 +1,6 @@
 # Upstream test cases (Curl.Conformance.UnitTests/UpstreamTestData) that pass through Curl.
-# One case number per line. A listed case that fails or is skipped fails the build (ADR-0013, decision 5).
+# One case number per line. A listed case that fails or is skipped fails the build (ADR-0013, decision 5),
+# except where only another platform's Curl has the <features> it needs (ADR-0488).
 1
 2
 3
@@ -1171,6 +1172,7 @@
 2078
 2080
 2081
+2087
 2091
 2092
 2093
@@ -1211,6 +1213,7 @@
 3020
 3021
 3022
+3023
 3028
 3029
 3030

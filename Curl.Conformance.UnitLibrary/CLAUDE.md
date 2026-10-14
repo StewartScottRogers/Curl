@@ -268,7 +268,11 @@ or `UpstreamTest613Script`; test1013.pl and test1022.pl, which compare with `../
 not emulated. Any other check line skips the case, naming it. The result is an
 `UpstreamCaseOutcome` (passed, failed or skipped, with its detail), which
 `UpstreamCaseRatchet.Judge` turns into the `UpstreamCaseVerdict` a test row reports, given
-whether the case is on the passing list.
+whether the case is on the passing list. Before any other screening the runner asks
+`UpstreamCaseScreening.FindFeatureOfAnotherPlatform` whether the case's `<features>` are met by
+another platform's Curl (`UpstreamCurlPlatform.All`) and not this one's; such a case is
+`UpstreamCaseOutcome.SkippedOnThisPlatform`, which the ratchet reports `Inconclusive` even when
+it is listed (ADR-0488, BL-2176).
 
 The stand-in for upstream's test `sshd` is not here but in its own library,
 `Curl.Conformance.SshServer.UnitLibrary` (ADR-0456, BL-1934, BL-1935), because it reuses

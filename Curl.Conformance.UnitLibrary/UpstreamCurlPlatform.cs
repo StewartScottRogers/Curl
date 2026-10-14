@@ -59,6 +59,9 @@ public sealed class UpstreamCurlPlatform
     /// <summary>macOS, where Curl matches curl's OpenSSL build as on Linux; only Perl's name for it differs.</summary>
     public static UpstreamCurlPlatform MacOS { get; } = new(["OpenSSL", "xattr"], "/dev/null", "darwin");
 
+    /// <summary>Every platform Curl's conformance run stands for: Windows, Linux and macOS.</summary>
+    public static IReadOnlyList<UpstreamCurlPlatform> All { get; } = [Windows, Unix, MacOS];
+
     /// <summary>The features Curl reports on this platform, case-sensitive as upstream spells them.</summary>
     public IReadOnlySet<string> Features { get; }
 

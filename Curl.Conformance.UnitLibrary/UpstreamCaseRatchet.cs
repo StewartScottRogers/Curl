@@ -39,8 +39,17 @@ public static class UpstreamCaseRatchet
             (UpstreamCaseOutcomeKind.Passed, false) => new(UpstreamCaseVerdictKind.Inconclusive, $"test{testNumber} passes; add {testNumber} to {PassingListFileName}"),
             (UpstreamCaseOutcomeKind.Failed, true) => new(UpstreamCaseVerdictKind.Fail, $"test{testNumber} is on {PassingListFileName} and now fails: {outcome.Detail}"),
             (UpstreamCaseOutcomeKind.Failed, false) => new(UpstreamCaseVerdictKind.Inconclusive, $"test{testNumber} fails: {outcome.Detail}"),
-            (_, true) => new(UpstreamCaseVerdictKind.Fail, $"test{testNumber} is on {PassingListFileName} and is now skipped: {outcome.Detail}"),
-            _ => new(UpstreamCaseVerdictKind.Inconclusive, $"test{testNumber} is skipped: {outcome.Detail}"),
+            _ => JudgeSkip(testNumber, outcome, isListed),
         };
     }
+
+    // A listed case skipped only because another platform's Curl has the features it needs is held
+    // to the list there, not here (ADR-0488); any other skip of a listed case is a regression.
+    private static UpstreamCaseVerdict JudgeSkip(int testNumber, UpstreamCaseOutcome outcome, bool isListed) =>
+        (isListed, outcome.RunsOnlyOnAnotherPlatform) switch
+        {
+            (true, true) => new(UpstreamCaseVerdictKind.Inconclusive, $"test{testNumber} is on {PassingListFileName} and runs only on another platform: {outcome.Detail}"),
+            (true, false) => new(UpstreamCaseVerdictKind.Fail, $"test{testNumber} is on {PassingListFileName} and is now skipped: {outcome.Detail}"),
+            _ => new(UpstreamCaseVerdictKind.Inconclusive, $"test{testNumber} is skipped: {outcome.Detail}"),
+        };
 }

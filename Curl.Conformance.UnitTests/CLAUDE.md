@@ -28,7 +28,10 @@ every vendored case through curl in process (`CurlComposition.CreateRunner`, rea
 `InternalsVisibleTo` on `Curl.Console`), one row per case named by `UpstreamCaseDisplayName` (`test798 [http]: HTTP cookies in a folded header`) and carrying one test category per server it names, so `dotnet test --filter "TestCategory=ftp"` runs only the FTP cases. It is the ratchet
 of ADR-0013 decision 5: a case on `PassingUpstreamCases.txt` must pass, and fails with its
 first difference (or skip reason) if it stops; any other case is `Inconclusive` with its skip
-reason, its first difference, or a note that it passes and can be listed. A listed case that
+reason, its first difference, or a note that it passes and can be listed. A listed case whose
+`<features>` only another platform's Curl meets (test2087 and test3023 need `Schannel`, so they
+run on Windows only) is `Inconclusive` where it cannot run, not a failure; any other skip of a
+listed case fails it (ADR-0488). A listed case that
 fails is run once more before it is judged, since a stall of a busy CI runner can hold any case
 past a time limit - the harness's (curl past 20 seconds, or the whole case past 30; BL-1859) or
 the case's own, as test303's `-m 8` (BL-2093). When a change makes
