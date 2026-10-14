@@ -37,3 +37,4 @@ Curl's standard error for upstream test675 matches curl 8.22.0's, so a later gap
 ## Log
 
 - 2026-10-13: Created.
+- 2026-10-13: Backlog -> Doing.
