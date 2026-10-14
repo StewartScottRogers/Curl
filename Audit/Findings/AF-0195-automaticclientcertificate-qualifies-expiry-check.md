@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: quality:Curl.Networking.UnitLibrary/AutomaticClientCertificate.cs:Qualifies-le:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/AutomaticClientCertificate.cs:54:<=
-task: none
-tasks:
+task: BL-2188
+tasks: BL-2188
 found: 2026-10-13
 found-at: c192c3e80e58636be1d282d241a7781f7df86695
 scorecard: 2026-10-13_1822.md

@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: quality:Curl.Networking.UnitTests/TcpConnectorTests.Socks.cs:ConnectAsync_ThroughSocks5WithACredentialOf255Bytes_SendsIt:name-lies
 reproduction: none
-task: none
-tasks:
+task: BL-2187
+tasks: BL-2187
 found: 2026-10-13
 found-at: c192c3e80e58636be1d282d241a7781f7df86695
 scorecard: 2026-10-13_1822.md

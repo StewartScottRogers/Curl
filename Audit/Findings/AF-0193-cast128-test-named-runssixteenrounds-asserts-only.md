@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: quality:Curl.Cryptography.UnitTests/Cast128Tests.cs:EncryptBlock_EightyBitKeyZeroPaddedTo128Bits_RunsSixteenRoundsAndDiffers:weak-assertion
 reproduction: none
-task: none
-tasks:
+task: BL-2186
+tasks: BL-2186
 found: 2026-10-13
 found-at: c192c3e80e58636be1d282d241a7781f7df86695
 scorecard: 2026-10-13_1822.md
