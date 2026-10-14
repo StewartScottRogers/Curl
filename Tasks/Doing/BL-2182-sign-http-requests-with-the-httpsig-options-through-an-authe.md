@@ -78,3 +78,4 @@ implement them; upstream facts read at `curl-8_22_0`:
 ## Log
 
 - 2026-10-13: Created.
+- 2026-10-13: Backlog -> Doing.
