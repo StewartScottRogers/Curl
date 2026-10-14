@@ -35,7 +35,7 @@ In Curl.Console (ProgressMeterLines and the meter's line endings), match the ref
 
 ## Acceptance criteria
 
-- [x] `behaviour:test675`: split out to BL-2185 (see Notes); it needs the HTTP handler and Abstractions, outside this task's `touches`.
+- [x] `behaviour:test675`: split out to BL-2200 (see Notes); it needs the HTTP handler and Abstractions, outside this task's `touches`.
 - [x] `behaviour:test1498`: Curl answers what curl 8.22.0 answers, `reference curl exits 0; stdout 0 bytes: `, so the item measures `match`.
 - [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
 - [x] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md). No option changed.
@@ -43,11 +43,11 @@ In Curl.Console (ProgressMeterLines and the meter's line endings), match the ref
 ## Notes
 
 - test1498 (`-T .`): the recorded reference stderr ends on its last status line with no newline; Curl's ended with CR LF. Cause: curl's tool reads `-T .` standard input without blocking and installs its own progress callback (`tool_readbusy_cb`) for it, and `Curl_pgrsDone` writes its `\n` only when no progress callback is set. `-T -` has no callback and keeps the newline. Fix: `RunningTransferState.UploadsFromStandardInputWithoutBlocking` is set for `-T .`, and `CurlCommandRunner.WriteMeterEndAsync` writes that transfer's last status lines without the newline. Pinned by `CurlCommandRunnerStandardInputUploadProgressMeterTests` (`.` ends without, `-` with). The speed numbers in the two recordings differ only by timing.
-- test675: Curl's second transfer has no retry line at all, so either Curl's pool dropped the closed connection before reuse or its handler retried silently, and a retry would be drawn as an auth retry (two draws), not curl's `Curl_pgrsDone` single draw. Either way the change is in `Curl.Protocol.Http.UnitLibrary` (and likely `ITransferProgress` in Abstractions), and whether the reference's reuse is timing needs measuring. Split into BL-2185 rather than widened here; GF-0078 closes only when both items measure `match`.
+- test675: Curl's second transfer has no retry line at all, so either Curl's pool dropped the closed connection before reuse or its handler retried silently, and a retry would be drawn as an auth retry (two draws), not curl's `Curl_pgrsDone` single draw. Either way the change is in `Curl.Protocol.Http.UnitLibrary` (and likely `ITransferProgress` in Abstractions), and whether the reference's reuse is timing needs measuring. Split into BL-2200 rather than widened here; GF-0078 closes only when both items measure `match`.
 - 30 minutes of this run were lost to a filesystem-wide `find` for test1498 (the upstream tests/data path is under a `gap` folder the lane guard refuses); the recorded stderr in `C:/curl-crosscheck/recorded` was enough.
 
 ## Log
 
 - 2026-10-13: Created.
 - 2026-10-13: Backlog -> Doing.
-- 2026-10-13: Doing -> Done. A -T . upload's progress meter ends without a newline, as curl 8.22.0's does (test1498); test675 split to BL-2185
+- 2026-10-13: Doing -> Done. A -T . upload's progress meter ends without a newline, as curl 8.22.0's does (test1498); test675 split to BL-2200

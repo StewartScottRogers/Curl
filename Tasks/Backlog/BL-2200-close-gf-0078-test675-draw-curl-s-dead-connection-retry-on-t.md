@@ -1,5 +1,5 @@
 ---
-id: BL-2185
+id: BL-2200
 title: Close GF-0078 test675: draw curl's dead-connection retry on the progress meter (one draw, a newline, a new zero line)
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-13
 completed:
 ---
-# BL-2185 — Close GF-0078 test675: draw curl's dead-connection retry on the progress meter (one draw, a newline, a new zero line)
+# BL-2200 — Close GF-0078 test675: draw curl's dead-connection retry on the progress meter (one draw, a newline, a new zero line)
 
 ## Goal
 
