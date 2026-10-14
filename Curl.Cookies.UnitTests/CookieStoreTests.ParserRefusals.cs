@@ -26,7 +26,9 @@ public sealed partial class CookieStoreTests
     [DataRow("noequals", InvalidCookie)]
     [DataRow("=emptyname", InvalidCookie)]
     [DataRow(" =v", InvalidCookie, DisplayName = "A name that is only a blank")]
-    [DataRow("n\tb=v; Path=/", InvalidCookie, DisplayName = "A tab ends the name before its =")]
+    [DataRow("n\tb=v; Path=/", InvalidOctetsInName, DisplayName = "A tab inside the name (curl 8.22.0)")]
+    [DataRow("n=v; Pa\tth=/; X=\u0001", InvalidOctetsInName, DisplayName = "A tab inside a later name (curl 8.22.0)")]
+    [DataRow("n=v;\tPath=/x; Domain=other.test", BadTailmatch + "other.test\r\n", DisplayName = "A tab before a name is passed (curl 8.22.0)")]
     [DataRow("n\u0001a=v; Path=/", InvalidOctetsInName)]
     [DataRow("\u0001n=v", InvalidOctetsInName)]
     [DataRow("n\u0001", InvalidOctetsInName, DisplayName = "Before the missing = is noticed")]
@@ -107,16 +109,6 @@ public sealed partial class CookieStoreTests
     [TestMethod]
     public void StoreFromResponse_HeaderTooLong_ReportsNothing() =>
         AssertReportsNothing($"n={new string('b', SetCookieParser.LongestHeaderValue)}\u0001");
-
-    /// <summary>
-    /// Measured: a part that ends at a tab ends the reading, so what follows is never checked: a control
-    /// character there, or a <c>Domain</c> the host may not set, does not drop the cookie.
-    /// </summary>
-    [TestMethod]
-    [DataRow("n=v; Pa\tth=/; X=\u0001")]
-    [DataRow("n=v; Pa\tth=/x; Domain=other.test")]
-    public void StoreFromResponse_RefusalAfterATabEndedPart_IsNeverReached(string header) =>
-        AssertReportsOnly(CoUk, header, "Added cookie n=\"v\" for domain www.example.co.uk, path /, expire 0");
 
     private void AssertReportsOnly(CurlUrl url, string header, string expectedLine)
     {

@@ -42,7 +42,7 @@ public sealed class SetCookieParserTests
     [DataRow("http://localhost/", "s16=v; Path=\"", "localhost|FALSE|/|FALSE|0|s16|v")]
     [DataRow("http://localhost/", "s17=v; Path=/x\"", "localhost|FALSE|/x\"|FALSE|0|s17|v")]
     [DataRow("http://localhost/", "s18=v; Path=\"/x\"y\"", "localhost|FALSE|/x\"y|FALSE|0|s18|v")]
-    [DataRow("http://localhost/", "t4=v; Path\t=/x", "localhost|FALSE|/|FALSE|0|t4|v")]
+    [DataRow("http://localhost/", "t4=v; Path\t=/x", "localhost|FALSE|/x|FALSE|0|t4|v")]
     [DataRow("http://localhost/", "s6=v; Path=/a\u0001b", null)]
     [DataRow("http://localhost/a/b/", "s11=v; Path=/a\tb", null)]
     public void Parse_Path_MatchesCurl(string url, string header, string? expectedJarLine) =>
@@ -80,13 +80,14 @@ public sealed class SetCookieParserTests
     [DataRow("http://localhost/", "n9=v;Secure=", "localhost|FALSE|/|FALSE|0|n9|v")]
     [DataRow("http://localhost/", "t10=v; Secure=\t", "localhost|FALSE|/|FALSE|0|t10|v")]
     [DataRow("http://localhost/", "n10=v; Secure; Secure", "localhost|FALSE|/|TRUE|0|n10|v")]
-    [DataRow("http://localhost/", "t2=v; Secure\tx", "localhost|FALSE|/|TRUE|0|t2|v")]
+    [DataRow("http://localhost/", "t2=v; Secure\tx", null)]
     [DataRow("http://localhost/", "u3=v;Secure", "localhost|FALSE|/|TRUE|0|u3|v")]
     [DataRow("http://localhost/", "u4=v;  ;Secure", "localhost|FALSE|/|TRUE|0|u4|v")]
     [DataRow("http://localhost/", "u5=v; =x; Secure", "localhost|FALSE|/|TRUE|0|u5|v")]
-    [DataRow("http://localhost/", "u1=v;\tSecure", "localhost|FALSE|/|FALSE|0|u1|v")]
-    [DataRow("http://localhost/", "u2=v; \tSecure", "localhost|FALSE|/|FALSE|0|u2|v")]
-    [DataRow("http://localhost/", "u6=v; \t; Secure", "localhost|FALSE|/|FALSE|0|u6|v")]
+    [DataRow("http://localhost/", "u1=v;\tSecure", "localhost|FALSE|/|TRUE|0|u1|v")]
+    [DataRow("http://localhost/", "u2=v; \tSecure", "localhost|FALSE|/|TRUE|0|u2|v")]
+    [DataRow("http://localhost/", "u6=v; \t; Secure", "localhost|FALSE|/|TRUE|0|u6|v")]
+    [DataRow("http://localhost/", "u7=v;\tPath=/x", "localhost|FALSE|/x|FALSE|0|u7|v")]
     [DataRow("http://example.com/", "l=12; HttpOnly", "#HttpOnly_example.com|FALSE|/|FALSE|0|l|12")]
     [DataRow("http://localhost/", "k3=11; HTTPONLY=1", "localhost|FALSE|/|FALSE|0|k3|11")]
     [DataRow("http://localhost/", "w7=v; HttpOnly=", "localhost|FALSE|/|FALSE|0|w7|v")]
@@ -94,7 +95,7 @@ public sealed class SetCookieParserTests
     [DataRow("http://localhost/", "n11=v;;; HttpOnly", "#HttpOnly_localhost|FALSE|/|FALSE|0|n11|v")]
     [DataRow("http://localhost/", "t7=v; HttpOnly\t", "#HttpOnly_localhost|FALSE|/|FALSE|0|t7|v")]
     [DataRow("http://localhost/", "n26=v; Version=1; Comment=x; Foo", "localhost|FALSE|/|FALSE|0|n26|v")]
-    [DataRow("http://localhost/", "t1=v; Fo\to=x", "localhost|FALSE|/|FALSE|0|t1|v")]
+    [DataRow("http://localhost/", "t1=v; Fo\to=x", null)]
     public void Parse_SecureHttpOnlyAndOtherAttributes_MatchCurl(string url, string header, string? expectedJarLine) =>
         AssertParsesAsCurlDid(url, header, expectedJarLine);
 
@@ -141,8 +142,9 @@ public sealed class SetCookieParserTests
     [DataRow("m6=v\t", "localhost|FALSE|/|FALSE|0|m6|v")]
     [DataRow("n7=a\tb", null)]
     [DataRow("n\t8=v", null)]
-    [DataRow("t8\t=v", null)]
-    [DataRow("\tt9=v", null)]
+    [DataRow("t8\t=v", "localhost|FALSE|/|FALSE|0|t8|v")]
+    [DataRow("\tt9=v", "localhost|FALSE|/|FALSE|0|t9|v")]
+    [DataRow("t5=v; Max\t-Age=100", null)]
     [DataRow("s12=v; Foo=a\tb", null)]
     [DataRow("s3\u0001=v", null)]
     [DataRow("n30=v\u0001x", null)]
@@ -163,7 +165,7 @@ public sealed class SetCookieParserTests
     [DataRow("u=21; Expires=Wed, 09 Jun 2027 10:18:14 GMT; Max-Age=1000", Now + 1000)]
     [DataRow("n18=v; Max-Age=99999999999999999999999", CappedExpiry)]
     [DataRow("n19=v; Max-Age=", 0L)]
-    [DataRow("t5=v; Max\t-Age=100", 0L)]
+    [DataRow("t5=v;\tMax-Age\t=100", Now + 100)]
     public void Parse_MaxAge_CountsFromNow(string header, long expectedExpiry)
     {
         long actualExpiry = Parse("http://localhost/", header)!.ExpiresUnixSeconds;
@@ -414,27 +416,27 @@ public sealed class SetCookieParserTests
         Diagnostics.ActText(call + " threw " + exception.GetType().Name, exception.Message);
 
     /// <summary>
-    /// Measured 2026-09-27 (BL-443): <c>curl -v -b file -c - http://127.0.0.1:&lt;port&gt;/</c> with a file of
-    /// <c>Set-Cookie: f=v; Pa&lt;TAB&gt;th=/; X=&lt;0x01&gt;</c> and <c>Set-Cookie: g=v; X=&lt;0x01&gt;</c> sent
-    /// <c>Cookie: f=v</c>: a control character after a part that a tab ended is never checked.
+    /// curl 8.22.0 no longer ends a part's name at a tab (lib/cookie.c reads it up to <c>;</c> or <c>=</c> and
+    /// trims its blanks), so a cookie file line with a tab inside a later part's name is refused, and one
+    /// with a tab only around a name keeps the attribute (BL-2174).
     /// </summary>
     [TestMethod]
-    public void ParseFromCookieFile_ControlCharacterAfterATabEndedPart_IsNeverChecked()
+    public void ParseFromCookieFile_TabInsideOrAroundAPartName_RefusesOrTrimsAsCurl822()
     {
         DateTimeOffset now = DateTimeOffset.FromUnixTimeSeconds(Now);
-        Diagnostics.ArrangeText("cookie file line read", "f=v; Pa\tth=/; X=\u0001");
-        Diagnostics.ArrangeText("cookie file line refused", "g=v; X=\u0001");
+        Diagnostics.ArrangeText("cookie file line refused", "f=v; Pa\tth=/");
+        Diagnostics.ArrangeText("cookie file line read", "g=v;\tPath\t=/q");
         Diagnostics.Arrange("now (Unix seconds)", Now);
 
-        Cookie? read = SetCookieParser.ParseFromCookieFile("f=v; Pa\tth=/; X=\u0001", now);
-        Cookie? refused = SetCookieParser.ParseFromCookieFile("g=v; X=\u0001", now);
+        Cookie? refused = SetCookieParser.ParseFromCookieFile("f=v; Pa\tth=/", now);
+        Cookie? read = SetCookieParser.ParseFromCookieFile("g=v;\tPath\t=/q", now);
 
-        Diagnostics.ActText("read cookie name", read?.Name);
         Diagnostics.ActText("refused cookie name", refused?.Name);
-        Diagnostics.AssertText("read cookie name", "f", read?.Name);
+        Diagnostics.ActText("read cookie path", read?.Path);
         Diagnostics.AssertText("refused cookie name", null, refused?.Name);
-        Assert.AreEqual("f", read?.Name);
+        Diagnostics.AssertText("read cookie path", "/q", read?.Path);
         Assert.IsNull(refused);
+        Assert.AreEqual("/q", read?.Path);
     }
 
     /// <summary>

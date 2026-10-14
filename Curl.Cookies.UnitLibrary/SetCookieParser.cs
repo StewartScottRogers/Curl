@@ -27,8 +27,8 @@ public static class SetCookieParser
     /// <summary>An <c>Expires</c> value this long or longer is ignored, as if it were absent.</summary>
     private const int ShortestIgnoredExpires = 80;
 
-    /// <summary>The characters that end a part's name: <c>;</c>, tab and <c>=</c>.</summary>
-    private const string NameEnds = ";\t=";
+    /// <summary>The characters that end a part's name: <c>;</c> and <c>=</c>; curl 8.22.0 no longer ends one at a tab.</summary>
+    private const string NameEnds = ";=";
 
     /// <summary>curl caps a cookie's lifetime at 400 days from the time it is received.</summary>
     private const long LongestLifetimeSeconds = 400L * 24 * 60 * 60;
@@ -45,7 +45,7 @@ public static class SetCookieParser
     /// The value is split at <c>;</c>. The first part is the cookie: a name, <c>=</c>, and a value,
     /// both trimmed; a part without <c>=</c> or with an empty name is refused, and so is a name and
     /// value longer than <see cref="LongestNameAndValue"/> together. A value keeps its quotes. Each
-    /// later part is an attribute, its name read case-insensitively up to <c>=</c> or a tab:
+    /// later part is an attribute, its name read case-insensitively up to <c>=</c>:
     /// </para>
     /// <list type="bullet">
     /// <item><c>Secure</c> and <c>HttpOnly</c> count only without <c>=</c>; <c>Secure</c> from an
@@ -67,9 +67,10 @@ public static class SetCookieParser
     /// <item>Any other attribute is ignored.</item>
     /// </list>
     /// <para>
-    /// A part is checked before it is read: a control character other than tab in its name, or a tab or
-    /// other control character inside its trimmed value, refuses the cookie. A part that ends at a tab
-    /// ends the reading, the rest ignored and not checked. An expiry more
+    /// A part is checked before it is read: a tab or other control character inside its trimmed name or
+    /// value refuses the cookie. A name runs to a
+    /// <c>;</c> or <c>=</c> and loses its spaces and tabs at both ends, so <c>a=b;&#9;Secure</c> is secure
+    /// (curl 8.22.0, upstream test2885). An expiry more
     /// than 400 days after <paramref name="now"/> becomes 400 days and 30 seconds after it, rounded down
     /// to the minute. A name starting <c>__Secure-</c> (that case only) must be <c>Secure</c>, and one
     /// starting <c>__Host-</c> must be <c>Secure</c>, have the path <c>/</c> and no host-name
@@ -93,7 +94,7 @@ public static class SetCookieParser
     /// </summary>
     /// <remarks>
     /// <list type="bullet">
-    /// <item><c>invalid octets in name, cookie dropped</c>: a control character other than tab in a part's name.</item>
+    /// <item><c>invalid octets in name, cookie dropped</c>: a tab or other control character inside a part's trimmed name.</item>
     /// <item><c>invalid octets in value, cookie dropped</c>: a tab or other control character inside a part's trimmed value.</item>
     /// <item><c>invalid cookie, dropped</c>: the first part has no <c>=</c>, or an empty name.</item>
     /// <item><c>skipped cookie because not 'secure'</c>: <c>Secure</c> from an origin that is not secure.</item>
@@ -190,7 +191,7 @@ public static class SetCookieParser
 
     /// <summary>Reads every part in turn; <see langword="false"/> as soon as one refuses the cookie.</summary>
     /// <remarks>
-    /// A part that starts with no name at all - at a <c>;</c>, a tab, a <c>=</c> or the end - is skipped,
+    /// A part that starts with no name at all - at a <c>;</c>, a <c>=</c> or the end - is skipped,
     /// and the reading stops there unless a <c>;</c> follows at once: <c>a=b;=x; Path=/q</c> keeps the default
     /// path. A header's first part is the exception, refused as <c>invalid cookie, dropped</c>; a cookie
     /// file line skips it too, so <c>;a=b</c> there is the cookie <c>a=b</c> and <c>=v</c> is dropped
@@ -224,12 +225,12 @@ public static class SetCookieParser
 
     /// <summary>
     /// Tells whether the part at <paramref name="position"/> is skipped: it has no name - it starts at a <c>;</c>, a
-    /// tab, a <c>=</c> or the end - and is not a header's first part.
+    /// <c>=</c> or the end - and is not a header's first part.
     /// </summary>
     private static bool SkipsNamelessPart(string text, int position, bool isFirstPart, CookieUnderConstruction cookie) =>
         StartsNameless(text, position) && (!isFirstPart || cookie.IsFromCookieFile);
 
-    /// <summary>Tells whether the part at <paramref name="position"/> starts at a <c>;</c>, a tab, a <c>=</c> or the end.</summary>
+    /// <summary>Tells whether the part at <paramref name="position"/> starts at a <c>;</c>, a <c>=</c> or the end.</summary>
     private static bool StartsNameless(string text, int position) =>
         position >= text.Length || NameEnds.Contains(text[position], StringComparison.Ordinal);
 
@@ -243,9 +244,9 @@ public static class SetCookieParser
     /// </summary>
     private static HeaderPart ReadPart(string text, ref int position)
     {
-        int nameEnd = text.IndexOfAny([';', '\t', '='], position);
+        int nameEnd = text.IndexOfAny([';', '='], position);
         nameEnd = nameEnd < 0 ? text.Length : nameEnd;
-        string name = text[position..nameEnd].Trim(' ');
+        string name = text[position..nameEnd].Trim(' ', '\t');
         bool hasEquals = nameEnd < text.Length && text[nameEnd] == '=';
         position = nameEnd;
         if (!hasEquals)
@@ -321,7 +322,7 @@ public static class SetCookieParser
         /// <summary>Checks <paramref name="part"/>'s octets, then reads it as the cookie or as an attribute.</summary>
         public bool TryApplyPart(HeaderPart part, bool isFirstPart)
         {
-            if (CookieFieldRules.ContainsRefusedControlCharacter(part.Name))
+            if (part.Name.Contains('\t', StringComparison.Ordinal) || CookieFieldRules.ContainsRefusedControlCharacter(part.Name))
             {
                 return Refuse("invalid octets in name, cookie dropped");
             }
