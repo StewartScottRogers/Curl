@@ -3,8 +3,8 @@ id: AF-0199
 title: Requirement FR-053 says the default request head carries User-Agent: curl/8.21.0; Curl sends curl/8.22.0
 auditor: truthfulness
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: truthfulness:Documentation/Product/Requirements.md:FR-053:false-statement
 reproduction: none
 task: none
@@ -46,3 +46,4 @@ internal const string DefaultUserAgent = "curl/8.22.0";
 ## Log
 
 - 2026-10-13: filed proposed.
+- 2026-10-13: proposed -> accepted.
