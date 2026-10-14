@@ -51,8 +51,11 @@ public sealed class Cast128Tests
 
     // RFC 2144 Appendix B.1: the 80- and 40-bit keys are also given zero-padded to 128 bits,
     // but a key of more than 80 bits runs 16 rounds, so the padded forms are a different cipher.
+    // The expected ciphertext is OpenSSL 3.5.9's 16-round CAST5 (legacy provider):
+    // openssl enc -cast5-ecb -provider legacy -nopad -K 01234567123456782345000000000000,
+    // which differs from B.1's 12-round EB6A711A2C02271B.
     [TestMethod]
-    public void EncryptBlock_EightyBitKeyZeroPaddedTo128Bits_RunsSixteenRoundsAndDiffers()
+    public void EncryptBlock_EightyBitKeyZeroPaddedTo128Bits_GivesTheSixteenRoundOpenSslCiphertext()
     {
         var diagnostics = TestDiagnostics.For(TestContext);
         using Cast128 cast = new(Convert.FromHexString("01234567123456782345000000000000"));
@@ -64,8 +67,8 @@ public sealed class Cast128Tests
         cast.EncryptBlock(Convert.FromHexString(Plaintext), encrypted);
         diagnostics.Act("encrypted", Convert.ToHexString(encrypted));
 
-        diagnostics.Diff("encrypted against the 12-round 80-bit ciphertext", Convert.FromHexString("EB6A711A2C02271B"), encrypted);
-        Assert.AreNotEqual("EB6A711A2C02271B", Convert.ToHexString(encrypted));
+        diagnostics.Diff("encrypted", Convert.FromHexString("753DE29F5D167D03"), encrypted);
+        Assert.AreEqual("753DE29F5D167D03", Convert.ToHexString(encrypted));
     }
 
     // RFC 2144 Appendix B.2: a million iterations of four encryptions.
