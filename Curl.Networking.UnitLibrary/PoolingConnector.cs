@@ -41,6 +41,7 @@ public sealed class PoolingConnector : IConnector, IAsyncDisposable
     private readonly IConnector _innerConnector;
     private readonly ConnectionCache _cache;
     private readonly object? _configuration;
+    private readonly ConnectToMappings? _connectTo;
     private readonly bool _ownsCache;
 
     /// <summary>
@@ -64,13 +65,19 @@ public sealed class PoolingConnector : IConnector, IAsyncDisposable
     /// What else a connection must have been opened with to be handed to this connector's
     /// transfers, compared with <see cref="object.Equals(object?)" />; <see langword="null" /> for nothing.
     /// </param>
-    public PoolingConnector(IConnector innerConnector, ConnectionCache cache, object? configuration)
+    /// <param name="connectTo">
+    /// The <c>--connect-to</c> mappings this connector's targets are dialled through, or
+    /// <see langword="null" /> for none: a connection is shared only with a target sent to the same
+    /// host and port (<see cref="ConnectionPoolKey.ConnectToAuthority" />, BL-2164).
+    /// </param>
+    public PoolingConnector(IConnector innerConnector, ConnectionCache cache, object? configuration, ConnectToMappings? connectTo = null)
     {
         ArgumentNullException.ThrowIfNull(innerConnector);
         ArgumentNullException.ThrowIfNull(cache);
         _innerConnector = innerConnector;
         _cache = cache;
         _configuration = configuration;
+        _connectTo = connectTo;
     }
 
     /// <summary>
@@ -93,7 +100,7 @@ public sealed class PoolingConnector : IConnector, IAsyncDisposable
     /// <param name="innerConnector">Opens a connection when the cache has none for the key.</param>
     /// <returns>The connector.</returns>
     public PoolingConnector Over(IConnector innerConnector) =>
-        new(innerConnector, _cache, _configuration) { WaitsForMultiplexing = WaitsForMultiplexing };
+        new(innerConnector, _cache, _configuration, _connectTo) { WaitsForMultiplexing = WaitsForMultiplexing };
 
     /// <summary>
     /// Gives a datagram connector that opens channels through <paramref name="datagramConnector" />
@@ -155,7 +162,7 @@ public sealed class PoolingConnector : IConnector, IAsyncDisposable
 
         return await ConnectThroughPoolAsync(
             target,
-            ConnectionPoolKey.Of(target, _configuration),
+            ConnectionPoolKey.Of(target, _configuration, _connectTo),
             token => _innerConnector.ConnectAsync(target, token),
             isQuic: false,
             cancellationToken);
@@ -191,7 +198,7 @@ public sealed class PoolingConnector : IConnector, IAsyncDisposable
 
         return await ConnectThroughPoolAsync(
             target,
-            ConnectionPoolKey.Of(target, _configuration) is { } key ? key with { IsQuic = true } : null,
+            ConnectionPoolKey.Of(target, _configuration, _connectTo) is { } key ? key with { IsQuic = true } : null,
             token => _innerConnector.ConnectMultiplexedSessionAsync(target, openSession, token),
             isQuic: true,
             cancellationToken);

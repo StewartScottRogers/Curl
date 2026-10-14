@@ -30,6 +30,11 @@ namespace Curl.Networking;
 /// <see cref="object.Equals(object?)" />, or <see langword="null" /> for none.
 /// </param>
 /// <param name="IsQuic">Whether the connection runs over QUIC, which a transfer over TCP never shares (BL-735).</param>
+/// <param name="ConnectToAuthority">
+/// The upper-cased <c>host:port</c> a <c>--connect-to</c> mapping sends the target to, or
+/// <see langword="null" /> when no mapping moves it off its own host and port, so groups that
+/// dial the same place share a connection whatever their <c>--connect-to</c> values (test2051, BL-2164).
+/// </param>
 internal sealed record ConnectionPoolKey(
     string Scheme,
     string Host,
@@ -39,7 +44,8 @@ internal sealed record ConnectionPoolKey(
     ConnectionPoolProxyKey? Proxy,
     string? AltSvcAuthority,
     object? Configuration = null,
-    bool IsQuic = false)
+    bool IsQuic = false,
+    string? ConnectToAuthority = null)
 {
     /// <summary>
     /// Builds the key of <paramref name="target" />, or <see langword="null" /> when the
@@ -47,8 +53,9 @@ internal sealed record ConnectionPoolKey(
     /// </summary>
     /// <param name="target">The target a connection is asked for.</param>
     /// <param name="configuration">The asking connector's configuration, or <see langword="null" /> for none.</param>
+    /// <param name="connectTo">The asking connector's <c>--connect-to</c> mappings, or <see langword="null" /> for none.</param>
     /// <returns>The key, or <see langword="null" /> for a target that is never pooled.</returns>
-    public static ConnectionPoolKey? Of(ConnectTarget target, object? configuration = null) =>
+    public static ConnectionPoolKey? Of(ConnectTarget target, object? configuration = null, ConnectToMappings? connectTo = null) =>
         target.PoolScheme is null
             ? null
             : new ConnectionPoolKey(
@@ -59,7 +66,23 @@ internal sealed record ConnectionPoolKey(
                 target.IsForwardProxy,
                 ConnectionPoolProxyKey.Of(target.Proxy),
                 AltSvcAuthorityOf(target.AltSvcRoute),
-                configuration);
+                configuration,
+                ConnectToAuthority: ConnectToAuthorityOf(target, connectTo));
+
+    private static string? ConnectToAuthorityOf(ConnectTarget target, ConnectToMappings? connectTo)
+    {
+        if (connectTo is null || target.IsForwardProxy)
+        {
+            return null;
+        }
+
+        var destination = connectTo.Map(target.Host, target.Port);
+        bool movesTheTarget = destination.Port != target.Port
+            || !string.Equals(destination.Host, target.Host, StringComparison.OrdinalIgnoreCase);
+        return destination.IsMapped && movesTheTarget
+            ? $"{destination.Host.ToUpperInvariant()}:{destination.Port}"
+            : null;
+    }
 
     private static string? AltSvcAuthorityOf(AltSvcRoute? route) =>
         route is null ? null : $"{route.Alternative.Host.ToUpperInvariant()}:{route.Alternative.Port}";

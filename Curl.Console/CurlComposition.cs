@@ -814,7 +814,7 @@ internal static class CurlComposition
         bool waitsForMultiplexing = WaitsForMultiplexing(options);
         return runConnections is null
             ? new PoolingConnector(connector, timeProvider) { WaitsForMultiplexing = waitsForMultiplexing }
-            : new PoolingConnector(connector, runConnections, OptionGroupConnectionSettings.Of(options)) { WaitsForMultiplexing = waitsForMultiplexing };
+            : new PoolingConnector(connector, runConnections, OptionGroupConnectionSettings.Of(options), new ConnectToMappings(options.ConnectToEntries)) { WaitsForMultiplexing = waitsForMultiplexing };
     }
 
     /// <summary>
