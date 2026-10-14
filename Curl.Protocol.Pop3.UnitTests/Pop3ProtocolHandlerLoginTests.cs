@@ -216,7 +216,7 @@ public sealed class Pop3ProtocolHandlerLoginTests
 
     [TestMethod]
     [DataRow(true, "AUTH EXTERNAL =\r\n", DisplayName = "upstream test886: --sasl-ir, = on the line")]
-    [DataRow(false, "AUTH EXTERNAL\r\n=\r\n", DisplayName = "upstream test884: = after the continuation")]
+    [DataRow(false, "AUTH EXTERNAL\r\n\r\n", DisplayName = "upstream test884: an empty line after the continuation")]
     public async Task ExecuteAsync_ExternalNamedAndOfferedWithoutUser_AuthenticatesWithAnEmptyUserName(bool initialResponse, string sent)
     {
         // curl 8.21.0's tests 884 and 886: pop3://;AUTH=EXTERNAL@host/884, no -u (BL-1989).
@@ -269,10 +269,10 @@ public sealed class Pop3ProtocolHandlerLoginTests
 
     [TestMethod]
     [DataRow(true, "AUTH EXTERNAL =\r\n", DisplayName = "--sasl-ir: = on the line")]
-    [DataRow(false, "AUTH EXTERNAL\r\n=\r\n", DisplayName = "no --sasl-ir: = after the continuation")]
-    public async Task ExecuteAsync_EmptyInitialResponse_IsSentAsEquals(bool initialResponse, string sent)
+    [DataRow(false, "AUTH EXTERNAL\r\n\r\n", DisplayName = "no --sasl-ir: an empty line after the continuation")]
+    public async Task ExecuteAsync_EmptyInitialResponse_IsEqualsInlineAndAnEmptyLineAfterTheContinuation(bool initialResponse, string sent)
     {
-        // Not measured on POP3: RFC 5034 section 4 and curl's sasl.c send "=" for an empty message.
+        // curl 8.22.0's tests 884 and 886: "=" on the AUTH line, an empty line after the "+".
         var sasl = new ScriptedSaslAuthenticator(("EXTERNAL", [string.Empty]));
         string replies = initialResponse ? "+OK\r\n" : "+ \r\n+OK\r\n";
         Pop3Run run = await RunAsync(

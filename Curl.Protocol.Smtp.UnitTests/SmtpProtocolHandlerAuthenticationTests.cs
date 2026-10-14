@@ -226,6 +226,24 @@ public sealed class SmtpProtocolHandlerAuthenticationTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_ExternalRequiredAndOfferedWithoutUserOrSaslIr_AnswersThe334WithAnEmptyLine()
+    {
+        // upstream test943: smtp://;AUTH=EXTERNAL@host, no -u, no --sasl-ir
+        var sasl = new FakeSaslAuthenticator("EXTERNAL", []);
+        var context = new TransferContext
+        {
+            Url = CurlUrl.Parse(Url),
+            Output = Stream.Null,
+            Mail = new MailRequestOptions { LoginOptions = "AUTH=EXTERNAL" },
+        };
+
+        SmtpRun run = await RunAsync(context, Greeting + "250-localhost\r\n250-AUTH EXTERNAL\r\n250 OK\r\n334 \r\n" + Accepted + HelpReplyAndBye, sasl);
+
+        Diagnostics.Diff("sent", Ehlo + "AUTH EXTERNAL\r\n\r\n" + HelpAndQuit, run.Sent);
+        Assert.AreEqual(Ehlo + "AUTH EXTERNAL\r\n\r\n" + HelpAndQuit, run.Sent);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_ExternalRequiredAndOfferedWithoutUser_AuthenticatesWithAnEmptyResponse()
     {
         // curl --login-options AUTH=EXTERNAL --sasl-ir, no -u

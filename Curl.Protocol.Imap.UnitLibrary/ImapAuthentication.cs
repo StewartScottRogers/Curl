@@ -245,6 +245,13 @@ internal sealed class ImapAuthentication(ImapControlChannel channel, ISaslAuthen
     private static string Encode(byte[] message) => message.Length == 0 ? "=" : Convert.ToBase64String(message);
 
     /// <summary>
+    /// Encodes an initial response sent on its own line after a <c>+</c>: empty when the
+    /// response is, as curl 8.22.0 sends <c>AUTH=EXTERNAL</c>'s empty user name (upstream
+    /// test838), otherwise base64. An empty answer to a challenge stays <c>=</c>.
+    /// </summary>
+    private static string EncodeDeferredInitialResponse(byte[] message) => message.Length == 0 ? string.Empty : Convert.ToBase64String(message);
+
+    /// <summary>
     /// Decodes a <c>+</c> continuation's text, blanks and line end trimmed. One that is not
     /// base64 is empty when its text starts with <c>=</c> or <paramref name="mechanism" />
     /// ignores it (ADR-0133), and cancels the exchange otherwise (BL-1220).
@@ -388,17 +395,18 @@ internal sealed class ImapAuthentication(ImapControlChannel channel, ISaslAuthen
     /// <returns><see langword="null" /> once the answer is sent, or how the exchange ended.</returns>
     private async ValueTask<ExchangeOutcome?> AnswerAsync(ISaslExchange exchange, ImapResponse continuation, bool initialResponseDue)
     {
-        byte[]? answer = initialResponseDue ? await exchange.GetInitialResponseAsync(context.CancellationToken).ConfigureAwait(false) : null;
-        if (answer is null)
+        if (initialResponseDue && await exchange.GetInitialResponseAsync(context.CancellationToken).ConfigureAwait(false) is { } initialResponse)
         {
-            if (DecodeChallenge(continuation.Untagged[0], exchange.Mechanism, challengesHanded++) is not { } challenge)
-            {
-                return await CancelAsync().ConfigureAwait(false);
-            }
-
-            answer = await exchange.RespondAsync(challenge, context.CancellationToken).ConfigureAwait(false);
+            await channel.SendLineAsync(EncodeDeferredInitialResponse(initialResponse), ImapDiagnosticLogLines.SaslResponseNotLogged).ConfigureAwait(false);
+            return null;
         }
 
+        if (DecodeChallenge(continuation.Untagged[0], exchange.Mechanism, challengesHanded++) is not { } challenge)
+        {
+            return await CancelAsync().ConfigureAwait(false);
+        }
+
+        byte[]? answer = await exchange.RespondAsync(challenge, context.CancellationToken).ConfigureAwait(false);
         if (answer is null)
         {
             return await RefuseOrCancelAsync(exchange).ConfigureAwait(false);

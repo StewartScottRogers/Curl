@@ -189,10 +189,11 @@ public sealed class ImapProtocolHandlerAuthenticationTests
         ImapRun run = await RunAsync(
             Greeting + Caps("AUTH=PLAIN AUTH=EXTERNAL") + "+ \r\nA002 OK done\r\n" + ListReply("A003") + LogoutReply("A004"), sasl, user: null, mail: mail);
 
-        DiffSent(run, Capability + "A002 AUTHENTICATE EXTERNAL\r\n=\r\nA003 LIST \"\" *\r\nA004 LOGOUT\r\n");
+        // upstream test838: curl 8.22.0 answers the + with an empty line, not =
+        DiffSent(run, Capability + "A002 AUTHENTICATE EXTERNAL\r\n\r\nA003 LIST \"\" *\r\nA004 LOGOUT\r\n");
         Diagnostics.Assert("required mechanism", "EXTERNAL", sasl.Choices.Single().Request.RequiredMechanism);
         AssertOffered(sasl, "EXTERNAL");
-        Assert.AreEqual(Capability + "A002 AUTHENTICATE EXTERNAL\r\n=\r\nA003 LIST \"\" *\r\nA004 LOGOUT\r\n", run.Sent);
+        Assert.AreEqual(Capability + "A002 AUTHENTICATE EXTERNAL\r\n\r\nA003 LIST \"\" *\r\nA004 LOGOUT\r\n", run.Sent);
         Assert.AreEqual("EXTERNAL", sasl.Choices.Single().Request.RequiredMechanism);
         CollectionAssert.AreEqual(new[] { "EXTERNAL" }, sasl.Choices.Single().Offered);
         Assert.AreEqual("EXTERNAL", sasl.Begun.Single().RequiredMechanism);

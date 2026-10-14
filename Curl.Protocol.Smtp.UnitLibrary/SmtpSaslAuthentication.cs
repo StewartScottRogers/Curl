@@ -145,6 +145,12 @@ internal sealed class SmtpSaslAuthentication(SmtpControlChannel channel, ISaslAu
     private static string Encode(byte[] message) => message.Length == 0 ? "=" : Convert.ToBase64String(message);
 
     /// <summary>
+    /// Encodes an initial response sent on its own line after a <c>334</c>: empty when the
+    /// response is, as curl 8.22.0 sends it (upstream test943), otherwise base64.
+    /// </summary>
+    private static string EncodeDeferredInitialResponse(byte[] message) => message.Length == 0 ? string.Empty : Convert.ToBase64String(message);
+
+    /// <summary>
     /// Decodes a <c>334</c> challenge. One that is not base64 is empty when its text starts
     /// with <c>=</c> or <paramref name="mechanism" /> ignores it (ADR-0133), and cancels the
     /// exchange otherwise (BL-774).
@@ -366,22 +372,25 @@ internal sealed class SmtpSaslAuthentication(SmtpControlChannel channel, ISaslAu
 
     /// <summary>
     /// Answers a <c>334</c> with the pending initial response, or with the exchange's answer to
-    /// the decoded challenge.
+    /// the decoded challenge. An empty initial response is an empty line here, as curl 8.22.0
+    /// sends <c>AUTH=EXTERNAL</c>'s empty user name after the <c>334</c> (upstream test943),
+    /// while an empty answer to a challenge is <c>=</c>.
     /// </summary>
     /// <returns><see langword="null" /> once the answer is sent, or how the exchange ended.</returns>
     private async ValueTask<ExchangeOutcome?> AnswerAsync(ISaslExchange exchange, SmtpReply reply, byte[]? pending)
     {
-        byte[]? response = pending ?? await TakeInitialResponseAsync(exchange).ConfigureAwait(false);
-        if (response is null)
+        if ((pending ?? await TakeInitialResponseAsync(exchange).ConfigureAwait(false)) is { } initialResponse)
         {
-            if (DecodeChallenge(reply, exchange.Mechanism, challengesHanded++) is not { } challenge)
-            {
-                return await CancelAsync().ConfigureAwait(false);
-            }
-
-            response = await exchange.RespondAsync(challenge, context.CancellationToken).ConfigureAwait(false);
+            await channel.SendAsync(EncodeDeferredInitialResponse(initialResponse), SmtpDiagnosticLogLines.SaslResponseNotLogged).ConfigureAwait(false);
+            return null;
         }
 
+        if (DecodeChallenge(reply, exchange.Mechanism, challengesHanded++) is not { } challenge)
+        {
+            return await CancelAsync().ConfigureAwait(false);
+        }
+
+        byte[]? response = await exchange.RespondAsync(challenge, context.CancellationToken).ConfigureAwait(false);
         if (response is null)
         {
             return await CancelOrRefuseAsync(exchange).ConfigureAwait(false);
