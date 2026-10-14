@@ -5,10 +5,10 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Protocol.Mqtt.UnitLibrary, Curl.Protocol.Mqtt.UnitTests]
+touches: [Curl.Protocol.Mqtt.UnitLibrary, Curl.Protocol.Mqtt.UnitTests, Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
 requirement: none
 created: 2026-10-13
-completed:
+completed: 2026-10-13
 ---
 # BL-2168 — Close GF-0076: An MQTT topic with an encoded NUL (%00) is subscribed to, where curl fails with exit 3 before SUBSCRIBE
 
@@ -35,13 +35,20 @@ In Curl.Protocol.Mqtt.UnitLibrary, make MqttTopic.Decode (or MqttSession before 
 
 ## Acceptance criteria
 
-- [ ] `behaviour:test2109`: Curl answers what curl 8.22.0 answers, `upstream test2109 passes`, so the item measures `match`.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
-- [ ] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
+- [x] `behaviour:test2109`: Curl answers what curl 8.22.0 answers, `upstream test2109 passes`, so the item measures `match`.
+- [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
+- [x] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
 
 ## Notes
+
+- Fix: `MqttTopic.Decode` rejects a decoded topic holding a byte 0x00 to 0x1F (curl's `Curl_urldecode` `REJECT_CTRL`) with exit 3 and `curl_easy_strerror` text `URL rejected: Malformed input to a URL function`, after CONNACK and before SUBSCRIBE or PUBLISH; no `-v` line for the message (`IsStrerrorText`).
+- Measured: the local reference curl.exe 8.22.0 (Schannel, Debug-enabled) still subscribes to `aa%00bb`, `aa%0Abb` and `aa%1Fbb`, so it fails its own release's test 2109. Followed the release's test: ADR-0483, decided by Claude under Stewart's delegation.
+- Unit tests in Curl.Protocol.Mqtt.UnitTests: %00, %0A and %1F rejected before SUBSCRIBE, %00 before PUBLISH, %20 still subscribed, -v transcript shows only the shutting-down line; the old adversarial test that pinned subscribing with the NUL now pins exit 3.
+- Upstream test2109 passes through Curl; added 2109 to `Curl.Conformance.UnitTests/PassingUpstreamCases.txt` (added to touches: the ratchet asked for it, and no task in Doing on origin/work/dark-factory names that project).
+- No option changed, so `--ai-help` needs nothing.
 
 ## Log
 
 - 2026-10-13: Created.
 - 2026-10-13: Backlog -> Doing.
+- 2026-10-13: Doing -> Done. An MQTT topic decoded to a byte 0x00-0x1F is exit 3 after CONNACK, before SUBSCRIBE or PUBLISH; upstream test2109 passes
