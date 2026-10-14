@@ -40,3 +40,4 @@ Where to start: `Curl.Conformance.UnitLibrary` may not reference `Curl.Protocol.
 ## Log
 
 - 2026-10-14: Created.
+- 2026-10-14: Backlog -> Doing.
