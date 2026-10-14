@@ -811,6 +811,24 @@ public sealed class RedirectFollowerTests
     }
 
     [TestMethod]
+    public async Task FollowAsync_OtherHostWithBlanksBeforeColon_DropsAuthorizationAndCookie()
+    {
+        // Upstream test2113: curl 8.22.0 -L -H "Authorization : s3cr3t", 302 to another host,
+        // sends no Authorization there (BL-2163); a value with no colon is not a credential.
+        ScriptedHandler handler = new(Redirect(302, "http://localhost:18203/next"), Ok(200, 0));
+        HttpRequestOptions http = Location() with
+        {
+            Headers = ["Authorization : s3cr3t", "Cookie\t: a=b", "Authorization", "X-Authorization: v"],
+        };
+
+        await Follow(handler, Context(http, credentials: false));
+
+        string[] expected = ["Authorization", "X-Authorization: v"];
+        Diagnostics.Assert("Headers", string.Join(", ", expected), string.Join(", ", handler.Contexts[1].Http!.Headers.ToArray()));
+        CollectionAssert.AreEqual(expected, handler.Contexts[1].Http!.Headers.ToArray());
+    }
+
+    [TestMethod]
     [DataRow("http://localhost:18203/next", null, true, DisplayName = "other-host")]
     [DataRow("http://127.0.0.1:18203/next", "s3cr3t", false, DisplayName = "same-origin")]
     public async Task FollowAsync_MailBearerToken_IsWithheldFromAnotherHost(string target, string? bearer, bool withheld)
