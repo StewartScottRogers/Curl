@@ -44,3 +44,4 @@ In Curl.Protocol.Http.UnitLibrary, make HttpCustomHeader.Names compare the heade
 ## Log
 
 - 2026-10-13: Created.
+- 2026-10-13: Backlog -> Doing.
