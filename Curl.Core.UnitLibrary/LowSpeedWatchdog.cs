@@ -284,6 +284,8 @@ public sealed class LowSpeedWatchdog : IDisposable
 
         public void ReportRequestRetried() => inner.ReportRequestRetried();
 
+        public void ReportRequestResentOnFreshConnection() => inner.ReportRequestResentOnFreshConnection();
+
         public void ReportDownloaded(long bytesSoFar, long? expectedTotal) => inner.ReportDownloaded(bytesSoFar, expectedTotal);
 
         public void ReportTransferDone() => inner.ReportTransferDone();

@@ -650,7 +650,11 @@ public sealed class HttpProtocolHandler(
     /// The report of the exchange whose response asked for this retry, or
     /// <see langword="null" /> for the first.
     /// </param>
-    private async ValueTask<TransferResult> ConnectAndExchangeAsync(HttpRequestPlan plan, TransferReport? earlier)
+    /// <param name="resentAfterConnectionDied">
+    /// Whether this is the resend of a request whose pooled connection died before its response
+    /// began, which curl 8.22.0 draws apart from a retry a response asked for.
+    /// </param>
+    private async ValueTask<TransferResult> ConnectAndExchangeAsync(HttpRequestPlan plan, TransferReport? earlier, bool resentAfterConnectionDied = false)
     {
         if (FailureBeforeConnecting(plan, earlier) is { } failure)
         {
@@ -671,7 +675,7 @@ public sealed class HttpProtocolHandler(
 
         plan.OpenedConnection = true;
         plan.TakeServerCertificateFrom(connect);
-        ReportRequestStarted(plan, earlier);
+        ReportRequestStarted(plan, earlier, resentAfterConnectionDied);
 
         HttpAttemptOutcome outcome;
         await using (connection.ConfigureAwait(false))
@@ -686,20 +690,25 @@ public sealed class HttpProtocolHandler(
 
         ReportConnectionEnd(plan.Context, target, connect, outcome);
         return outcome.Retry is { } reconnect
-            ? await ConnectAndExchangeAsync(reconnect, outcome.Result.Report).ConfigureAwait(false)
+            ? await ConnectAndExchangeAsync(reconnect, outcome.Result.Report, outcome.DiedBeforeResponse).ConfigureAwait(false)
             : outcome.Result;
     }
 
     /// <summary>
-    /// Reports the progress of a request now connected: the transfer started for the first, and a
-    /// retried request starting for one a response asked for (<paramref name="earlier" /> set),
-    /// which curl 8.21.0 draws on a new progress-meter line (BL-2087).
+    /// Reports the progress of a request now connected: the transfer started for the first, a
+    /// resend on a fresh connection for one whose pooled connection died (BL-2200), and a retried
+    /// request starting for one a response asked for (<paramref name="earlier" /> set), which curl
+    /// 8.21.0 draws on a new progress-meter line (BL-2087).
     /// </summary>
-    private static void ReportRequestStarted(HttpRequestPlan plan, TransferReport? earlier)
+    private static void ReportRequestStarted(HttpRequestPlan plan, TransferReport? earlier, bool resentAfterConnectionDied)
     {
         if (earlier is null)
         {
             plan.Progress.ReportTransferStarted();
+        }
+        else if (resentAfterConnectionDied)
+        {
+            plan.Progress.ReportRequestResentOnFreshConnection();
         }
         else
         {

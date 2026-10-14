@@ -322,6 +322,29 @@ public sealed partial class HttpProtocolHandlerTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_ReusedConnectionResetBeforeTheResponse_ReportsTheResendOnAFreshConnection()
+    {
+        // Upstream test675: curl 8.22.0 draws a died connection's resend apart from an
+        // authentication retry (BL-2200 Notes).
+        ScriptedConnection dead = new([], 65536, failureAfterResponse: new IOException("Connection reset."));
+        RecordingTransferProgress progress = new();
+        QueueConnector connector = new(
+            ConnectResult.Connected(dead, null, isReused: true),
+            ConnectResult.Connected(Connection(KeepAliveResponse, 65536, ReuseRequest), null, connectionNumber: 1));
+        TransferContext context = new() { Url = CurlUrl.Parse(ReuseUrl), Output = new MemoryStream(), Events = new RecordingTransferEvents(), Progress = progress };
+        Diagnostics.Arrange("url, reused connection failure", $"{ReuseUrl}, Connection reset.");
+
+        TransferResult result = await Handler(connector).ExecuteAsync(context);
+
+        WriteResult(result);
+        string[] reports = [.. progress.Reports.Where(report => !report.StartsWith("down ", StringComparison.Ordinal))];
+        string[] expected = ["started", "resent", "done"];
+        WriteExpectedLines("progress reports", expected, reports);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        CollectionAssert.AreEqual(expected, reports);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_ReusedConnectionFailsTheSend_SendsTheRequestAgain()
     {
         FailingSendConnection dead = new(new IOException("Connection reset."), 0);

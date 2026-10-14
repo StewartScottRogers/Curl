@@ -53,4 +53,17 @@ public sealed class NoTransferProgressTests
         diagnostics.Act("thrown", thrown.GetType().Name);
         diagnostics.Assert("thrown", nameof(NotSupportedException), thrown.GetType().Name);
     }
+
+    [TestMethod]
+    public void ReportRequestResentOnFreshConnection_OnASinkThatDoesNotImplementIt_ReportsTheRequestRetried()
+    {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        ITransferProgress progress = new StubTransferProgress();
+        diagnostics.Arrange("sink", "default ReportRequestRetried reaches ReportTransferStarted, which throws NotSupportedException");
+
+        NotSupportedException thrown = Assert.ThrowsExactly<NotSupportedException>(progress.ReportRequestResentOnFreshConnection);
+
+        diagnostics.Act("thrown", thrown.GetType().Name);
+        diagnostics.Assert("thrown", nameof(NotSupportedException), thrown.GetType().Name);
+    }
 }

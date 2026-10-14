@@ -45,10 +45,27 @@ internal sealed class HttpTransferProgress(ITransferProgress sink)
     /// </summary>
     internal void ReportRequestRetried()
     {
+        CountFromZero();
+        sink.ReportRequestRetried();
+    }
+
+    /// <summary>
+    /// Reports that a request whose pooled connection died before its response began is sent
+    /// again on a fresh connection, as "request resent on a fresh connection", and counts its
+    /// bytes from zero: curl 8.22.0 ends the dead attempt's meter line with one draw and starts a
+    /// new one (measured, BL-2200 Notes).
+    /// </summary>
+    internal void ReportRequestResentOnFreshConnection()
+    {
+        CountFromZero();
+        sink.ReportRequestResentOnFreshConnection();
+    }
+
+    private void CountFromZero()
+    {
         started = true;
         downloaded = -1;
         uploaded = -1;
-        sink.ReportRequestRetried();
     }
 
     /// <summary>

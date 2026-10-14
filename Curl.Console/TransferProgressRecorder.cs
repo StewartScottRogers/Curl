@@ -58,6 +58,13 @@ internal sealed class TransferProgressRecorder : ITransferProgress
     /// </summary>
     private const int RedirectDoneDrawCount = 2;
 
+    /// <summary>
+    /// How many times curl 8.22.0 draws the status line of an attempt whose reused connection
+    /// died before its response began, before the resend on a fresh connection starts a new one:
+    /// one, <c>Curl_pgrsDone</c>'s forced update. Measured on upstream test675 (BL-2200 Notes).
+    /// </summary>
+    private const int DiedConnectionDoneDrawCount = 1;
+
     private readonly TimeProvider timeProvider;
 
     private readonly ProgressBarRecorder? progressBar;
@@ -151,7 +158,7 @@ internal sealed class TransferProgressRecorder : ITransferProgress
     /// redirect hop starting, which starts a new status line after the <c>-v</c> lines held
     /// since the hop before it reported done.
     /// </remarks>
-    public void ReportTransferStarted() => StartRequest(restartsClock: true);
+    public void ReportTransferStarted() => StartRequest(restartsClock: true, RedirectDoneDrawCount);
 
     /// <inheritdoc />
     /// <remarks>
@@ -159,14 +166,22 @@ internal sealed class TransferProgressRecorder : ITransferProgress
     /// line's Spent and average speeds count on from the first request, as curl 8.21.0 draws an
     /// authentication retry (measured, BL-2131 Notes).
     /// </remarks>
-    public void ReportRequestRetried() => StartRequest(restartsClock: false);
+    public void ReportRequestRetried() => StartRequest(restartsClock: false, RedirectDoneDrawCount);
 
-    private void StartRequest(bool restartsClock)
+    /// <inheritdoc />
+    /// <remarks>
+    /// Draws the dead attempt's line once (<c>Curl_pgrsDone</c>'s forced update) where a retry a
+    /// response asked for draws it twice, then starts a new line keeping the transfer's start
+    /// time, as curl 8.22.0 draws upstream test675 (measured, BL-2200 Notes).
+    /// </remarks>
+    public void ReportRequestResentOnFreshConnection() => StartRequest(restartsClock: false, DiedConnectionDoneDrawCount);
+
+    private void StartRequest(bool restartsClock, int doneDrawCount)
     {
         if (HasTransferStarted)
         {
             eventOutput?.Release();
-            FinishRedirectHop();
+            DrawDone(doneDrawCount);
             statusLines.Append(Environment.NewLine);
             StartHop(restartsClock);
         }
@@ -267,9 +282,13 @@ internal sealed class TransferProgressRecorder : ITransferProgress
     /// Makes the draws curl makes as a hop that answered with a redirect ends: the one before
     /// the next hop, or the one <c>--max-redirs</c> refuses to follow with exit 47.
     /// </summary>
-    internal void FinishRedirectHop()
+    internal void FinishRedirectHop() => DrawDone(RedirectDoneDrawCount);
+
+    /// <summary>Draws the status line <paramref name="count" /> times as a done transfer's.</summary>
+    /// <param name="count">How many draws.</param>
+    private void DrawDone(int count)
     {
-        for (int draw = 0; draw < RedirectDoneDrawCount; draw++)
+        for (int draw = 0; draw < count; draw++)
         {
             Draw(done: true);
         }

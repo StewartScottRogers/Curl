@@ -203,12 +203,22 @@ public sealed class MaxTimeWatchdog : IDisposable
 
         public void ReportRequestRetried()
         {
+            MarkTransferStarted();
+            inner.ReportRequestRetried();
+        }
+
+        public void ReportRequestResentOnFreshConnection()
+        {
+            MarkTransferStarted();
+            inner.ReportRequestResentOnFreshConnection();
+        }
+
+        private void MarkTransferStarted()
+        {
             lock (watchdog.gate)
             {
                 watchdog.transferStarted = true;
             }
-
-            inner.ReportRequestRetried();
         }
 
         public void ReportDownloaded(long bytesSoFar, long? expectedTotal)

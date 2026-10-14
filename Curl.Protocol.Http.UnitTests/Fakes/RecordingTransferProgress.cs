@@ -5,7 +5,7 @@ namespace Curl.Protocol.Http.Fakes;
 
 /// <summary>
 /// An <see cref="ITransferProgress" /> that records every report the handler makes, in order,
-/// as text a test can compare: <c>started</c>, <c>retried</c>, <c>down 3/10</c>, <c>up 5/?</c> or <c>done</c>,
+/// as text a test can compare: <c>started</c>, <c>retried</c>, <c>resent</c>, <c>down 3/10</c>, <c>up 5/?</c> or <c>done</c>,
 /// where <c>?</c> is an expected total that is not known. Given a shared log, it also appends
 /// each report to it as <c>progress </c> and the report, so a test can order progress reports
 /// against <see cref="RecordingTransferEvents.Events" />.
@@ -29,6 +29,9 @@ public sealed class RecordingTransferProgress(List<string>? sharedLog = null) : 
 
     /// <inheritdoc />
     public void ReportRequestRetried() => Record("retried");
+
+    /// <inheritdoc />
+    public void ReportRequestResentOnFreshConnection() => Record("resent");
 
     /// <inheritdoc />
     public void ReportDownloaded(long bytesSoFar, long? expectedTotal) => Record(Format("down", bytesSoFar, expectedTotal));
