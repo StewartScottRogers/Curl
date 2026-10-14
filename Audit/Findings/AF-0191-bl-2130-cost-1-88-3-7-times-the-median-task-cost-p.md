@@ -42,6 +42,8 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-10-13 | 2026-10-13_1822.md | reproduces: yes | The given reproduction still shows BL-2130 costUsd 1.8816 and 14 'sed -n' lines over the old window. Re-audited by mechanism over this window: BL-2152 (lane 2, claimed 13:58:41, after BL-2149's read-once prompt fix at 13:51:23) cost $2.46, 3.4 times the median. It paged HandBuiltTlsProvider.cs in slices ('sed -n 560,660p', 'sed -n 765,790p', 'sed -n 805,820p', and Read at offset 574), with 8 offset Reads and 12 sliced Bash calls.
+
 ## Log
 
 - 2026-10-13: filed proposed.

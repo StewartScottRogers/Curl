@@ -3,8 +3,8 @@ id: AF-0187
 title: Documentation/README.md says Product/ and Planning/ are unfilled scaffolds and ADR-0001 is the only decision; there are 474 ADRs and 107 requirements
 auditor: truthfulness
 severity: Medium
-status: proposed
-reason:
+status: closed
+reason: Re-audit 2026-10-13_1822.md: the reproduction no longer reproduces.
 key: truthfulness:Documentation/README.md:Status-of-these-documents:false-statement
 reproduction: none
 task: none
@@ -13,9 +13,9 @@ found: 2026-10-13
 found-at: c86d04eeb8477108eb6d9195bb036a4ddaecc5fc
 scorecard: 2026-10-13_0925.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-13
+closed-how: reliable-reaudit
+closed-by: 2026-10-13_1822.md
 ---
 # AF-0187 - Documentation/README.md says Product/ and Planning/ are unfilled scaffolds and ADR-0001 is the only decision; there are 474 ADRs and 107 requirements
 
@@ -42,6 +42,9 @@ Run from the repository root:
 
 ## Re-audits
 
+- 2026-10-13 | 2026-10-13_1822.md | reproduces: no | Ran the reproduction: 0;477;107. Documentation/README.md no longer says 'ADR-0001 is the exception'. There are 477 ADR files and 107 FR rows.
+
 ## Log
 
 - 2026-10-13: filed proposed.
+- 2026-10-13: proposed -> closed. Re-audit 2026-10-13_1822.md: the reproduction no longer reproduces.

@@ -42,6 +42,8 @@ $a=@('--proto-redir','x','http://127.0.0.1:50961/'); foreach($p in @(@('curl','C
 
 ## Re-audits
 
+- 2026-10-13 | 2026-10-13_1822.md | reproduces: no | Ran as written against curl 8.22.0 (ucrt64): 'curl exit 2', 'candidate exit 2' for --proto-redir x.
+
 ## Log
 
 - 2026-10-13: filed proposed.

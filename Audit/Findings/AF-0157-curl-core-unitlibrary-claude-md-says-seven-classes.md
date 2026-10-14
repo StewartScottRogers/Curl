@@ -3,8 +3,8 @@ id: AF-0157
 title: Curl.Core.UnitLibrary/CLAUDE.md says seven classes are not yet wired into Curl.Console and --ipfs-gateway is not yet parsed; all are wired and the option is parsed
 auditor: truthfulness
 severity: High
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-13_1822.md: the reproduction no longer reproduces.
 key: truthfulness:Curl.Core.UnitLibrary/CLAUDE.md:not-yet-wired-into-Curl.Console:false-statement
 reproduction: none
 task: BL-2050
@@ -13,9 +13,9 @@ found: 2026-10-11
 found-at: 22f394602532a6922adbc7fa91b3739b62d2112a
 scorecard: 2026-10-11_0051.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-13
+closed-how: reliable-reaudit
+closed-by: 2026-10-13_1822.md
 ---
 # AF-0157 - Curl.Core.UnitLibrary/CLAUDE.md says seven classes are not yet wired into Curl.Console and --ipfs-gateway is not yet parsed; all are wired and the option is parsed
 
@@ -45,8 +45,10 @@ Run from the repository root:
 - 2026-10-11 | 2026-10-11_1638.md | not re-audited | overlaps planted defect PD-201 in Curl.Console/CurlCommandRunner.cs, so the auditor's verdict (reproduces no) is set aside: Ran the reproduction: (Select-String Curl.Core.UnitLibrary/CLAUDE.md 'not yet wired').Count is 0. The wiring patterns are found in CurlCommandRunner.cs, CurlComposition.cs and TransferDispatch.cs, and the CLAUDE.md now says Curl.Console constructs or calls each class and that --ipfs-gateway is parsed by Curl.Cli.UnitLibrary's option table.
 - 2026-10-12 | 2026-10-12_1653.md | not re-audited | overlaps planted defect PD-201 in Curl.Console/CurlCommandRunner.cs, so the auditor's verdict (reproduces no) is set aside: Ran the reproduction. (Select-String -Path Curl.Core.UnitLibrary/CLAUDE.md -Pattern 'not yet wired').Count is 0, and the wiring patterns match in CurlCommandRunner.cs, CurlComposition.cs and TransferDispatch.cs. Curl.Core.UnitLibrary/CLAUDE.md:131-132 now says 'Curl.Console uses it for ipfs:// and ipns:// URLs, and --ipfs-gateway is parsed by Curl.Cli.UnitLibrary's option table'.
 - 2026-10-13 | 2026-10-13_0925.md | reproduces: no | Ran the reproduction: (Select-String Curl.Core.UnitLibrary/CLAUDE.md 'not yet wired').Count = 0, and the wiring files are CurlCommandRunner.cs,CurlComposition.cs,TransferDispatch.cs. Curl.Core.UnitLibrary/CLAUDE.md lines 131-132 now say Curl.Console uses IpfsGatewayRewriter and that --ipfs-gateway is parsed by Curl.Cli.UnitLibrary's option table.
+- 2026-10-13 | 2026-10-13_1822.md | reproduces: no | Ran the reproduction: the 'not yet wired' count in Curl.Core.UnitLibrary/CLAUDE.md is 0, and the wiring patterns are found in CurlCommandRunner.cs, CurlComposition.cs and TransferDispatch.cs. CLAUDE.md:131-132 now says Curl.Console uses IpfsGatewayRewriter and that --ipfs-gateway is parsed by Curl.Cli.UnitLibrary's option table.
 
 ## Log
 
 - 2026-10-11: filed proposed.
 - 2026-10-11: proposed -> accepted.
+- 2026-10-13: accepted -> closed. Re-audit 2026-10-13_1822.md: the reproduction no longer reproduces.

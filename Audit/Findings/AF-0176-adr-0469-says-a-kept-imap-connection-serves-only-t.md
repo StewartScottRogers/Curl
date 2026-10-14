@@ -3,8 +3,8 @@ id: AF-0176
 title: ADR-0469 says a kept IMAP connection serves only the same login options; the reuse key leaves login options out
 auditor: truthfulness
 severity: High
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-13_1822.md: the reproduction no longer reproduces.
 key: truthfulness:Documentation/Planning/Decisions/ADR-0469-imap-keeps-its-connection-for-the-next-url-and-tags-by-connection-number.md:ImapKeptConnection.LoginKeyOf:stale-adr
 reproduction: none
 task: BL-2122
@@ -13,9 +13,9 @@ found: 2026-10-12
 found-at: 4e6ddbc5b33356117bfec6778ba550ab61454a99
 scorecard: 2026-10-12_1653.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-13
+closed-how: reliable-reaudit
+closed-by: 2026-10-13_1822.md
 ---
 # AF-0176 - ADR-0469 says a kept IMAP connection serves only the same login options; the reuse key leaves login options out
 
@@ -43,8 +43,10 @@ Run from the repository root:
 ## Re-audits
 
 - 2026-10-13 | 2026-10-13_0925.md | reproduces: no | Ran the reproduction: 'same user, password, login options' count in ADR-0469 = 0; 'LoginOptions' count in ImapKeptConnection.cs = 0. ADR-0469 decision 2 (lines 25-27) now says 'A kept connection serves only the same user, password and --ssl level; the login options (;AUTH= or --login-options) are not part of that key'. That matches ImapKeptConnection.LoginKeyOf and Serves (line 63, key == loginKey).
+- 2026-10-13 | 2026-10-13_1822.md | reproduces: no | Ran the reproduction: 0;0. ADR-0469 no longer says 'same user, password, login options'. Its decision 2 (line 25) now says 'A kept connection serves only the same user, password and --ssl level; the login options (;AUTH= or --login-options) are not part of that key', which matches ImapKeptConnection.cs having no LoginOptions.
 
 ## Log
 
 - 2026-10-12: filed proposed.
 - 2026-10-12: proposed -> accepted.
+- 2026-10-13: accepted -> closed. Re-audit 2026-10-13_1822.md: the reproduction no longer reproduces.

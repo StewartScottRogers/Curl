@@ -3,8 +3,8 @@ id: AF-0170
 title: -T <file> with -O on a URL ending in / saves the response over the upload file instead of curl_response, without curl's No remote filename warning
 auditor: conformance
 severity: High
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-13_1822.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-10-13_0925.md, 2026-10-13_1822.md).
 key: conformance:--remote-name:upload-file-name:stdout
 reproduction: none
 task: BL-2105
@@ -13,9 +13,9 @@ found: 2026-10-11
 found-at: d8245edb7b661211c6628e9062e9939934939fb2
 scorecard: 2026-10-11_1638.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-13
+closed-how: consecutive
+closed-by: 2026-10-13_0925.md, 2026-10-13_1822.md
 ---
 # AF-0170 - -T <file> with -O on a URL ending in / saves the response over the upload file instead of curl_response, without curl's No remote filename warning
 
@@ -44,8 +44,10 @@ $r=(Get-Location).Path; $o="$env:TEMP\ac-tO"; foreach($s in 'curl','candidate'){
 
 - 2026-10-12 | 2026-10-12_1653.md | not re-audited | overlaps planted defect PD-201 in Curl.Console/CurlCommandRunner.cs, so the auditor's verdict (reproduces no) is set aside: As given, the reproduction cannot tell on this machine: Set-Content -NoNewline silently creates no file (Windows PowerShell 5.1.26100 and pwsh), so f.txt never exists and both binaries fail to open it. I reran it with the same setup written as [IO.File]::WriteAllText("$o\$s\f.txt",'file body'), everything else unchanged: 'curl: f.txt=9 curl_response=True warning=True exit=0' and 'candidate: f.txt=9 curl_response=True warning=True exit=0'. Both sent the same PUT /f.txt with a 9-byte body. Curl now saves to curl_response and prints curl's 'No remote filename' warning, and leaves the upload file untouched.
 - 2026-10-13 | 2026-10-13_0925.md | reproduces: no | Ran the reproduction with the reference path changed from mingw64 to ucrt64\bin\curl.exe (curl 8.22.0). On this machine 'Set-Content -NoNewline <path> <value>' silently created no file: the first run showed exit 26 'cannot open f.txt' for both binaries. The rerun created f.txt with [IO.File]::WriteAllText, everything else verbatim. Output: 'curl: f.txt=9 curl_response=True warning=True' and 'candidate: f.txt=9 curl_response=True warning=True'. Both exit 0 and both print 'Warning: No remote filename, uses "curl_response"'.
+- 2026-10-13 | 2026-10-13_1822.md | reproduces: no | As written, the curl half failed on the missing mingw64 curl. After changing it to ucrt64, both runs lost f.txt and exited 26 with the same 'No remote filename' warning, so the given command cannot tell. A corrected reproduction kept f.txt in a work folder separate from the recorder's -OutDirectory, and ran `-T f.txt -O http://127.0.0.1:50982/` against curl 8.22.0 (ucrt64) and Curl. Result: 'curl: exit=0 f.txt=9 curl_response=True warning=True' and 'candidate: exit=0 f.txt=9 curl_response=True warning=True'. Curl no longer overwrites the upload file.
 
 ## Log
 
 - 2026-10-11: filed proposed.
 - 2026-10-11: proposed -> accepted.
+- 2026-10-13: accepted -> closed. Re-audit 2026-10-13_1822.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-10-13_0925.md, 2026-10-13_1822.md).

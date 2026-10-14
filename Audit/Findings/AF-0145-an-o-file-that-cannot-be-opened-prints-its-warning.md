@@ -3,8 +3,8 @@ id: AF-0145
 title: An -o file that cannot be opened prints its Warning line inside the progress-meter row instead of after the meter's closing newline
 auditor: conformance
 severity: Low
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-13_1822.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-10-13_0925.md, 2026-10-13_1822.md).
 key: conformance:Curl.Console/CurlCommandRunner.cs:output-open-warning-after-meter:stderr
 reproduction: none
 task: BL-1964
@@ -13,9 +13,9 @@ found: 2026-10-10
 found-at: 1b27494521dec4bdaa3fe60c8dc7a3fc73874253
 scorecard: 2026-10-10_0123.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-13
+closed-how: consecutive
+closed-by: 2026-10-13_0925.md, 2026-10-13_1822.md
 ---
 # AF-0145 - An -o file that cannot be opened prints its Warning line inside the progress-meter row instead of after the meter's closing newline
 
@@ -46,8 +46,10 @@ $o="$env:TEMP\ac-odir"; $a=@('--output','missing.txt/f.txt','http://127.0.0.1:50
 - 2026-10-11 | 2026-10-11_1638.md | not re-audited | overlaps planted defect PD-201 in Curl.Console/CurlCommandRunner.cs, so the auditor's verdict (reproduces no) is set aside: Ran the reproduction: 'curl: 1 / Curl: 1'. In both, the Warning: Failed to open the file line starts its own line after the meter rows' closing newline. Both exit 23.
 - 2026-10-12 | 2026-10-12_1653.md | not re-audited | overlaps planted defect PD-201 in Curl.Console/CurlCommandRunner.cs, so the auditor's verdict (reproduces no) is set aside: Ran the reproduction as given against curl 8.21.0 (Schannel, Git for Windows): it printed 'curl: 1 / Curl: 1'. In both binaries the Warning line starts its own line after the meter row, both exit 23, and the two stderr.txt files are byte-for-byte identical (cmp).
 - 2026-10-13 | 2026-10-13_0925.md | reproduces: no | Ran the reproduction with the reference path changed from 'C:\Program Files\Git\mingw64\bin\curl.exe', which no longer exists, to ucrt64\bin\curl.exe (curl 8.22.0 Schannel, the differential tool's reference). Output: 'curl: 1 / Curl: 1'. Both exit 23, and stderr.txt is byte-identical (cmp reports no difference). Each is 4 meter rows, the closing '0\r\n', then 'Warning: Failed to open the file missing.txt/f.txt: No such file or directory\r\n' on its own line.
+- 2026-10-13 | 2026-10-13_1822.md | reproduces: no | As written, the curl half failed because C:\Program Files\Git\mingw64\bin\curl.exe no longer exists (only ucrt64). The Curl half ran and printed 'Curl: 1'. Rerun with the reference path changed to ucrt64\bin\curl.exe (curl 8.22.0 Schannel): 'curl: 1 / Curl: 1'. Both stderr files end with the meter row's CR LF, then 'Warning: Failed to open the file missing.txt/f.txt: No such file or directory' on its own line, and both exit 23.
 
 ## Log
 
 - 2026-10-10: filed proposed.
 - 2026-10-10: proposed -> accepted.
+- 2026-10-13: accepted -> closed. Re-audit 2026-10-13_1822.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-10-13_0925.md, 2026-10-13_1822.md).

@@ -42,6 +42,8 @@ dotnet test Curl.Networking.UnitTests --filter "FullyQualifiedName~HandBuiltTlsP
 
 ## Re-audits
 
+- 2026-10-13 | 2026-10-13_1822.md | not re-audited | overlaps planted defect PD-103 in Curl.Tls.UnitLibrary/TlsReader.cs, so the auditor's verdict (reproduces yes) is set aside: Ran dotnet test Curl.Networking.UnitTests --filter "FullyQualifiedName~HandBuiltTlsProviderTests.AuthenticateAsClientAsync_WithEch": Failed 5, Passed 42, Total 47. The failures are 3 test methods (WithEch_WritesCurlsEchLinesBeforeTheHello x3 rows, WithEchHardAndNoUsableList_FailsWithExit35BeforeSendingAByte, WithEchTrueAndNoUsableList_SendsAPlainHello), each System.IndexOutOfRangeException at Curl.Tls.TlsReader.ReadUnsigned (TlsReader.cs:119) via EchConfigList.ReadConfigs. TlsReader.Take (line 126) still advances position without a bounds check.
+
 ## Log
 
 - 2026-10-13: filed proposed.

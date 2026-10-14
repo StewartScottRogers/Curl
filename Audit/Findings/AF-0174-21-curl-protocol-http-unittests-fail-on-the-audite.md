@@ -3,8 +3,8 @@ id: AF-0174
 title: 21 Curl.Protocol.Http.UnitTests fail on the audited commit: HttpAuthUsingLines.AuthUsing writes the user's password into the verbose 'auth using' line
 auditor: quality
 severity: High
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-13_1822.md: the reproduction no longer reproduces.
 key: quality:Curl.Protocol.Http.UnitLibrary/HttpAuthUsingLines.cs:AuthUsing:failing-test
 reproduction: none
 task: BL-2120
@@ -13,9 +13,9 @@ found: 2026-10-12
 found-at: 4e6ddbc5b33356117bfec6778ba550ab61454a99
 scorecard: 2026-10-12_1653.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-13
+closed-how: reliable-reaudit
+closed-by: 2026-10-13_1822.md
 ---
 # AF-0174 - 21 Curl.Protocol.Http.UnitTests fail on the audited commit: HttpAuthUsingLines.AuthUsing writes the user's password into the verbose 'auth using' line
 
@@ -43,8 +43,10 @@ Select-String -Path Curl.Protocol.Http.UnitLibrary/HttpAuthUsingLines.cs -Patter
 ## Re-audits
 
 - 2026-10-13 | 2026-10-13_0925.md | reproduces: no | Ran the reproduction: Select-String -Path Curl.Protocol.Http.UnitLibrary/HttpAuthUsingLines.cs -Pattern "password '" gave no match. AuthUsing now formats only "... auth using {scheme} with user '{UserName}'". The unmutated Curl.Protocol.Http.UnitTests baseline in every mutation run passed with no tests excluded.
+- 2026-10-13 | 2026-10-13_1822.md | reproduces: no | Ran Select-String -Path Curl.Protocol.Http.UnitLibrary/HttpAuthUsingLines.cs -Pattern "password '": no match. Line 28 now writes only "... auth using {scheme} with user '{UserName}'". The Http mutation baseline ran with excludedTests empty: no Curl.Protocol.Http.UnitTests fail.
 
 ## Log
 
 - 2026-10-12: filed proposed.
 - 2026-10-12: proposed -> accepted.
+- 2026-10-13: accepted -> closed. Re-audit 2026-10-13_1822.md: the reproduction no longer reproduces.

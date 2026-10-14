@@ -42,6 +42,8 @@ $a=@('-s','http://127.0.0.1:50961/'); foreach($p in @(@('curl','C:\Program Files
 
 ## Re-audits
 
+- 2026-10-13 | 2026-10-13_1822.md | reproduces: no | Ran as written against curl 8.22.0 (ucrt64): 'curl: User-Agent: curl/8.22.0', 'candidate: User-Agent: curl/8.22.0'. The load tool's candidateVersion also reads 'curl 8.22.0 (x86_64-w64-mingw32) libcurl/8.22.0 Schannel'.
+
 ## Log
 
 - 2026-10-13: filed proposed.

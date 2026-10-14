@@ -3,8 +3,8 @@ id: AF-0189
 title: Lanes idle 82 of 272 lane minutes (30.1%) with nothing ready while the whole BL-2127/BL-2126/BL-2128 chain waited on interactive-only BL-2125
 auditor: process
 severity: Medium
-status: proposed
-reason:
+status: closed
+reason: Re-audit 2026-10-13_1822.md: the reproduction no longer reproduces.
 key: process:logs:BL-2125:empty-queue
 reproduction: none
 task: none
@@ -13,9 +13,9 @@ found: 2026-10-13
 found-at: c86d04eeb8477108eb6d9195bb036a4ddaecc5fc
 scorecard: 2026-10-13_0925.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-13
+closed-how: reliable-reaudit
+closed-by: 2026-10-13_1822.md
 ---
 # AF-0189 - Lanes idle 82 of 272 lane minutes (30.1%) with nothing ready while the whole BL-2127/BL-2126/BL-2128 chain waited on interactive-only BL-2125
 
@@ -42,6 +42,9 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-10-13 | 2026-10-13_1822.md | reproduces: no | The given reproduction over the old window still gives its historical numbers: laneMinutes 272.02, waitNothingReadyMinutes 82, 71 'No task is ready' lines, and BL-2127 'depends-on: [BL-2125]' at 7849345b1. Re-audited by mechanism over this window (Measure-FactoryProcess.ps1 -Since 2026-10-13), which holds shifts that finished tasks: waitNothingReadyMinutes 58 of laneMinutes 641.78 (9.0%), below the 20% bar. The empty-queue rule is not crossed. The related cause, an interactive-only task (BL-2128) holding the queue, came back this window as overlap waits instead (finding process:logs:BL-2160:overlap-wait).
+
 ## Log
 
 - 2026-10-13: filed proposed.
+- 2026-10-13: proposed -> closed. Re-audit 2026-10-13_1822.md: the reproduction no longer reproduces.

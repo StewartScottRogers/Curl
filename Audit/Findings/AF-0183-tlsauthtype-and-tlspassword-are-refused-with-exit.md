@@ -42,6 +42,8 @@ foreach($a in @(@('--tlsauthtype','1','http://127.0.0.1:50961/'),@('--tlspasswor
 
 ## Re-audits
 
+- 2026-10-13 | 2026-10-13_1822.md | reproduces: no | Ran as written against curl 8.22.0 (ucrt64): '--tlsauthtype curl exit 0', '--tlsauthtype candidate exit 0', '--tlspassword curl exit 0', '--tlspassword candidate exit 0'.
+
 ## Log
 
 - 2026-10-13: filed proposed.
