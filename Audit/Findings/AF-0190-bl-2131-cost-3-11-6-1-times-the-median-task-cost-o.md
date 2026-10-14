@@ -3,19 +3,19 @@ id: AF-0190
 title: BL-2131 cost $3.11, 6.1 times the median task cost, over 70 turns of sliced code reading
 auditor: process
 severity: Low
-status: accepted
-reason: 
+status: closed
+reason: Closed by an interactive session under ADR-0422's 2026-10-14 amendment (Stewart, BL-2218): a cost-outlier finding records a past run's cost, which no fix can change; its task BL-2149 is Done at work/dark-factory 6d3225a967b4, so it closes without a re-audit. Re-fix task BL-2205, filed before the rule, closes without a fix.
 key: process:logs:BL-2131:cost-outlier
 reproduction: none
-task: BL-2205
-tasks: BL-2149, BL-2205
+task: BL-2149
+tasks: BL-2149
 found: 2026-10-13
 found-at: c86d04eeb8477108eb6d9195bb036a4ddaecc5fc
 scorecard: 2026-10-13_0925.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-14
+closed-how: task-done-historical
+closed-by: session
 ---
 # AF-0190 - BL-2131 cost $3.11, 6.1 times the median task cost, over 70 turns of sliced code reading
 
@@ -49,3 +49,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 - 2026-10-13: filed proposed.
 - 2026-10-13: proposed -> accepted.
+- 2026-10-14: accepted -> closed. Closed by an interactive session under ADR-0422's 2026-10-14 amendment (Stewart, BL-2218): a cost-outlier finding records a past run's cost, which no fix can change; its task BL-2149 is Done at work/dark-factory 6d3225a967b4, so it closes without a re-audit. Re-fix task BL-2205, filed before the rule, closes without a fix.

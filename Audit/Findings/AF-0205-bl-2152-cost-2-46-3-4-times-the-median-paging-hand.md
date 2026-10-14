@@ -3,19 +3,19 @@ id: AF-0205
 title: BL-2152 cost $2.46, 3.4 times the median, paging HandBuiltTlsProvider.cs in slices after the read-once fix
 auditor: process
 severity: Low
-status: accepted
-reason: 
+status: closed
+reason: Closed by an interactive session under ADR-0422's 2026-10-14 amendment (Stewart, BL-2218): a cost-outlier finding records a past run's cost, which no fix can change; its task BL-2198 is Done at work/dark-factory 6d3225a967b4, so it closes without a re-audit. Re-fix task BL-2208, filed before the rule, closes without a fix.
 key: process:logs:BL-2152:cost-outlier
 reproduction: none
-task: BL-2208
-tasks: BL-2198, BL-2208
+task: BL-2198
+tasks: BL-2198
 found: 2026-10-13
 found-at: c192c3e80e58636be1d282d241a7781f7df86695
 scorecard: 2026-10-13_1822.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-14
+closed-how: task-done-historical
+closed-by: session
 ---
 # AF-0205 - BL-2152 cost $2.46, 3.4 times the median, paging HandBuiltTlsProvider.cs in slices after the read-once fix
 
@@ -48,3 +48,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 - 2026-10-13: filed proposed.
 - 2026-10-13: proposed -> accepted.
+- 2026-10-14: accepted -> closed. Closed by an interactive session under ADR-0422's 2026-10-14 amendment (Stewart, BL-2218): a cost-outlier finding records a past run's cost, which no fix can change; its task BL-2198 is Done at work/dark-factory 6d3225a967b4, so it closes without a re-audit. Re-fix task BL-2208, filed before the rule, closes without a fix.
