@@ -8,7 +8,7 @@ depends-on: []
 touches: [Documentation]
 requirement: none
 created: 2026-10-14
-completed:
+completed: 2026-10-13
 ---
 # BL-2192 — Fix AF-0199: Requirement FR-053 says the default request head carries User-Agent: curl/8.21.0; Curl sends curl/8.22.0
 
@@ -42,12 +42,15 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Replaced all 22 `User-Agent: curl/8.21.0` in Requirements.md (17 lines) with 8.22.0; each described current behaviour. Docs-only, no code reads the file, so no rebuild.
 
 ## Log
 
 - 2026-10-14: Created.
 - 2026-10-13: Backlog -> Doing.
+- 2026-10-13: Doing -> Done. FR-053 and 16 sibling lines now name curl/8.22.0
