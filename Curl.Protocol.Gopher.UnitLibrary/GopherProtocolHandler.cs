@@ -191,15 +191,33 @@ public sealed class GopherProtocolHandler : IProtocolHandler
     {
         if (result.ExitCode is CurlExitCode.Ok or CurlExitCode.UrlMalformat)
         {
-            if (result.ErrorMessage is GopherTransferMessages.SelectorHasLineBreak)
-            {
-                events.ReportInfo(result.ErrorMessage);
-            }
-
-            events.ReportInfo(GopherTransferMessages.ShuttingDownConnection(connectionNumber));
+            ReportShuttingDown(events, result.ErrorMessage, connectionNumber);
             return;
         }
 
+        ReportClosing(events, result, connectionNumber);
+    }
+
+    /// <summary>
+    /// Reports <c>shutting down connection #N</c>, after <c>Bad gopher selector, CR or LF not allowed</c>
+    /// when <paramref name="errorMessage" /> is that text (curl 8.22.0, BL-2185).
+    /// </summary>
+    private static void ReportShuttingDown(ITransferEvents events, string? errorMessage, long connectionNumber)
+    {
+        if (errorMessage is GopherTransferMessages.SelectorHasLineBreak)
+        {
+            events.ReportInfo(errorMessage);
+        }
+
+        events.ReportInfo(GopherTransferMessages.ShuttingDownConnection(connectionNumber));
+    }
+
+    /// <summary>
+    /// Reports a failed transfer's end: its message unless it is curl's fallback text,
+    /// <c>Failed sending Gopher request</c> for a failed send, then <c>closing connection #N</c>.
+    /// </summary>
+    private static void ReportClosing(ITransferEvents events, TransferResult result, long connectionNumber)
+    {
         if (!IsFallbackText(result.ErrorMessage!))
         {
             events.ReportInfo(result.ErrorMessage!);

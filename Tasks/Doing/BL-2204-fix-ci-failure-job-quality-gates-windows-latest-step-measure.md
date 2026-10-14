@@ -5,7 +5,7 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: []
+touches: [Curl.Protocol.Gopher.UnitLibrary]
 requirement: none
 created: 2026-10-13
 completed:
@@ -26,9 +26,11 @@ Lanes test only on Windows, so reproduce with `gh run view 38519058174 --log-fai
 
 ## Acceptance criteria
 
-- [ ] `job Quality gates (windows-latest) step Measure coverage, complexity and CRAP` passes locally, and the `CI` workflow passes on Windows, Linux and macOS for the commit that lands the fix.
+- [x] `job Quality gates (windows-latest) step Measure coverage, complexity and CRAP` passes locally, and the `CI` workflow passes on Windows, Linux and macOS for the commit that lands the fix.
 
 ## Notes
+
+- CI run 38519058174 failed on one member: `GopherProtocolHandler.ReportConnectionEnd` at complexity 12 (gate 10), added by BL-2185's CR/LF branch. Split it into `ReportShuttingDown` and `ReportClosing`; behaviour unchanged. `Measure-CodeQuality.ps1 -Library Curl.Protocol.Gopher.UnitLibrary`: 100% line, 100% branch, 0 failing members, worst CRAP 10. Added `Curl.Protocol.Gopher.UnitLibrary` to touches (it was empty; no other task in Doing names it). CI on Linux and macOS runs on the shift's push.
 
 ## Log
 
