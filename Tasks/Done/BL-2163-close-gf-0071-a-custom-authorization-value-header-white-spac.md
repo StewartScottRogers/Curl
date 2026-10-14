@@ -5,10 +5,10 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests]
+touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests, Curl.Core.UnitLibrary, Curl.Core.UnitTests]
 requirement: none
 created: 2026-10-13
-completed:
+completed: 2026-10-13
 ---
 # BL-2163 — Close GF-0071: A custom 'Authorization : value' header (white space before the colon) is still sent after -L redirects to another host
 
@@ -35,13 +35,18 @@ In Curl.Protocol.Http.UnitLibrary, make HttpCustomHeader.Names compare the heade
 
 ## Acceptance criteria
 
-- [ ] `behaviour:test2113`: Curl answers what curl 8.22.0 answers, `upstream test2113 passes`, so the item measures `match`.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
-- [ ] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
+- [x] `behaviour:test2113`: Curl answers what curl 8.22.0 answers, `upstream test2113 passes`, so the item measures `match`.
+- [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
+- [x] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
 
 ## Notes
+
+- The strip of `Authorization` and `Cookie` on a redirect to another host lives in `Curl.Core.UnitLibrary` (`RedirectFollower.IsCredentialHeader`), not in the HTTP library, so `Curl.Core.UnitLibrary` and `Curl.Core.UnitTests` were added to `touches`; no task in Doing on `origin/work/dark-factory` named them. It now compares the name before the colon with trailing blanks (space, tab) trimmed, so `Authorization : s3cr3t` is dropped as upstream test2113 expects; unit test `RedirectFollowerTests.FollowAsync_OtherHostWithBlanksBeforeColon_DropsAuthorizationAndCookie`.
+- Decision: `HttpCustomHeader.Names` is left as it is. It mirrors libcurl's `Curl_checkheaders`, which requires the colon or semicolon right after the name, so `Host : x` does not override curl's own `Host`; only the follow strip in `Curl_add_custom_headers` trims blanks before the colon. `RtspCustomHeader` and `WsCustomHeader` need no change for the same reason.
+- Not measured here: a lane may not run `Gap/Tools/Measure-UpstreamCases.cs` (the audit guard refuses `Gap/`); the next gap run re-measures `behaviour:test2113`.
 
 ## Log
 
 - 2026-10-13: Created.
 - 2026-10-13: Backlog -> Doing.
+- 2026-10-13: Doing -> Done. Authorization/Cookie with blanks before the colon dropped on a redirect to another host
