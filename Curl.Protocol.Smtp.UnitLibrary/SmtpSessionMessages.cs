@@ -20,6 +20,12 @@ internal static class SmtpSessionMessages
     /// <summary>A reply line reached 65536 bytes (exit 100).</summary>
     internal const string ReplyLineTooLarge = "A value or data field grew larger than allowed";
 
+    /// <summary>
+    /// A <c>--mail-from</c>, <c>--mail-auth</c> or <c>--mail-rcpt</c> address held a CR or LF
+    /// (exit 43), curl 8.22.0's text (BL-2162).
+    /// </summary>
+    internal const string AddressHasLineBreak = "Refusing to send email address with a CR or LF";
+
     /// <summary>A reply line held a NUL byte (exit 8, BL-1121).</summary>
     internal const string NulByteInResponseLine = "Nul byte in server response line";
 

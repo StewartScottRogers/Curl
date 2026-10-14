@@ -76,6 +76,47 @@ public sealed class SmtpProtocolHandlerMailExtensionTests
     }
 
     [TestMethod]
+    [DataRow("a@b\r\nDATA", DisplayName = "CR LF, upstream test2110")]
+    [DataRow("a@b\nDATA", DisplayName = "LF alone")]
+    [DataRow("a@b\rDATA", DisplayName = "CR alone")]
+    public async Task ExecuteAsync_MailFromWithLineBreak_QuitsWithExit43BeforeMailFrom(string from)
+    {
+        // curl 8.22.0 (test2110): EHLO, then QUIT, and the injected command never sent.
+        SmtpRun run = await RunAsync(Greeting + EhloReply + Bye, new MailRequestOptions { From = from, Recipients = ["c@d"] });
+
+        Diagnostics.Diff("sent", Ehlo + "QUIT\r\n", run.Sent);
+        Assert.AreEqual(Ehlo + "QUIT\r\n", run.Sent);
+        Assert.AreEqual(CurlExitCode.BadFunctionArgument, run.Result.ExitCode);
+        Assert.AreEqual("Refusing to send email address with a CR or LF", run.Result.ErrorMessage);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_MailAuthWithLineBreakOnceAuthenticated_QuitsWithExit43BeforeMailFrom()
+    {
+        SmtpRun run = await RunAsync(
+            Greeting + EhloReply + Authenticated + Bye,
+            new MailRequestOptions { From = "a@b", Recipients = ["c@d"], Auth = "x@y\r\nDATA" },
+            authenticate: true);
+
+        Diagnostics.Diff("sent", Ehlo + AuthPlain + "QUIT\r\n", run.Sent);
+        Assert.AreEqual(Ehlo + AuthPlain + "QUIT\r\n", run.Sent);
+        Assert.AreEqual(CurlExitCode.BadFunctionArgument, run.Result.ExitCode);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_RecipientWithLineBreak_QuitsWithExit43BeforeItsRcpt()
+    {
+        // curl 8.22.0 checks each recipient as its RCPT TO is built, so the ones before it go out.
+        SmtpRun run = await RunAsync(
+            Greeting + EhloReply + Ok + Ok + Bye,
+            new MailRequestOptions { From = "a@b", Recipients = ["c@d", "e@f\r\nDATA"] });
+
+        Diagnostics.Diff("sent", Ehlo + "MAIL FROM:<a@b> SIZE=21\r\nRCPT TO:<c@d>\r\nQUIT\r\n", run.Sent);
+        Assert.AreEqual(Ehlo + "MAIL FROM:<a@b> SIZE=21\r\nRCPT TO:<c@d>\r\nQUIT\r\n", run.Sent);
+        Assert.AreEqual(CurlExitCode.BadFunctionArgument, run.Result.ExitCode);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_MailAuthWithoutAuthenticating_SendsNoAuth()
     {
         // --mail-auth x@y without -u: MAIL FROM:<a@b> SIZE=21.
