@@ -4,11 +4,11 @@ title: -T - (stdin) is read whole and sent with Content-Length, not chunked; no 
 area: behaviour
 key: behaviour:stdin-upload-of-unknown-size
 severity: High
-status: open
+status: closed
 scope: target
 introduced-in:
 opened: 2026-10-08_1640
-closed:
+closed: 2026-10-13_1406
 regression: false
 items: [behaviour:test60, behaviour:test98, behaviour:test1068, behaviour:test1069, behaviour:test1072, behaviour:test1073]
 touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests, Curl.Console, Curl.Console.UnitTests]
@@ -38,6 +38,7 @@ In Curl.Protocol.Http.UnitLibrary (HttpRequestFraming, HttpRequestBodyWriter), t
 - 2026-10-11_1950: 1 of 6 items are gaps.
 - 2026-10-12_0951: 1 of 6 items are gaps.
 - 2026-10-12_2042: 1 of 6 items are gaps.
+- 2026-10-13_1406: 0 of 6 items are gaps.
 
 ## Log
 
@@ -45,3 +46,4 @@ In Curl.Protocol.Http.UnitLibrary (HttpRequestFraming, HttpRequestBodyWriter), t
 - 2026-10-08_1731: Filed BL-1800.
 - 2026-10-10_0756: Filed BL-2003.
 - 2026-10-11_1029: Filed BL-2075.
+- 2026-10-13_1406: Closed: run 2026-10-13_1406 measured every item as match or excluded.
