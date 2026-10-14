@@ -3,8 +3,8 @@ id: AF-0198
 title: -d '' --crlf (and --json '' --crlf) sends Transfer-Encoding: chunked with a 0 chunk where curl sends Content-Length: 0
 auditor: conformance
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: conformance:--crlf:HttpRequestFraming.OfBody:request
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ $a=@('-d','','--crlf','http://127.0.0.1:50972/'); foreach($p in @(@('curl','C:\P
 ## Log
 
 - 2026-10-13: filed proposed.
+- 2026-10-13: proposed -> accepted.
