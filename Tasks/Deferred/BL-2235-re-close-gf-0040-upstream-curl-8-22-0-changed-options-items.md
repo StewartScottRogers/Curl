@@ -60,3 +60,6 @@ Bring these items to Curl when the target moves to 8.22.0.
 ## Log
 
 - 2026-10-14: Created.
+
+- 2026-10-14 (Claude): nothing for a lane to do. The 8 --httpsig-* facets are now excluded as intended-difference:ADR-0485 on the gap branch (fd6b7eaf5, PR #142), so the next gap run re-measures them as excluded and closes GF-0040.
+- 2026-10-14: Backlog -> Deferred. closes at the next gap run: --httpsig-* excluded as intended difference (fd6b7eaf5)
