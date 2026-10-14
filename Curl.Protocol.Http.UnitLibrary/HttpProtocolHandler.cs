@@ -1165,6 +1165,7 @@ public sealed class HttpProtocolHandler(
         ReportAuthorizationLines(plan);
         try
         {
+            HttpRequestHeadFormatter.ThrowIfTooLarge(request);
             ThrowIfRefused(framing);
             ThrowIfChunkedResendToHttp10(plan);
             ThrowIfAuthorizationFailed(plan);

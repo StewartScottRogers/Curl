@@ -257,6 +257,13 @@ internal static class HttpTransferMessages
     internal const string LineTooLarge = "A value or data field grew larger than allowed";
 
     /// <summary>
+    /// The exit 100 message, also written as an info line, for a request head of
+    /// <see cref="HttpRequestHeadFormatter.MaximumRequestHeadLength" /> bytes or more, which
+    /// curl 8.22.0 refuses before sending a byte (measured, BL-2167).
+    /// </summary>
+    internal const string RequestTooLarge = "HTTP request too large";
+
+    /// <summary>
     /// The exit 100 message for a response header past
     /// <see cref="HttpResponseHeadReader.MaximumHeaderCount" />.
     /// </summary>

@@ -146,6 +146,27 @@ internal static class HttpRequestHeadFormatter
     }
 
     /// <summary>
+    /// The length, in bytes, at which curl 8.22.0 refuses a request head: its request buffer
+    /// holds at most 1 MiB including a terminating byte, so a head of 1,048,575 bytes is sent
+    /// and one of 1,048,576 is not (measured, BL-2167; upstream test3229).
+    /// </summary>
+    internal const int MaximumRequestHeadLength = 1024 * 1024;
+
+    /// <summary>
+    /// Refuses a head of <see cref="MaximumRequestHeadLength" /> bytes or more with exit 100
+    /// and <c>HTTP request too large</c>, which the handler calls before anything is sent, as
+    /// curl does.
+    /// </summary>
+    /// <param name="head">The formatted head (<see cref="Format" />).</param>
+    internal static void ThrowIfTooLarge(byte[] head)
+    {
+        if (head.Length >= MaximumRequestHeadLength)
+        {
+            throw new HttpTransferException(CurlExitCode.TooLarge, HttpTransferMessages.RequestTooLarge) { InfoLines = [HttpTransferMessages.RequestTooLarge] };
+        }
+    }
+
+    /// <summary>
     /// Reads the <c>-H</c> or <c>--proxy-header</c> <paramref name="entries" /> after turning
     /// each into its bytes in <see cref="HttpRequestOptions.CommandLineTextEncoding" />
     /// (<see cref="HeadText" />), as curl reads the bytes of its <c>argv</c> (ADR-0067).
