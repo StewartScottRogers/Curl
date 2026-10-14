@@ -50,3 +50,4 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 ## Log
 
 - 2026-10-14: Created.
+- 2026-10-13: Backlog -> Doing.
