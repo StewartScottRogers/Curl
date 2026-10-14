@@ -46,6 +46,8 @@ The finding closes only when a later re-audit by the process auditor confirms th
 
 ## Notes
 
+- 2026-10-14 (Claude): AF-0214: BL-2182 cost 3.23 times the median, under the 4 times cost cap Stewart chose on 2026-10-12 (BL-2116). Unless its run log shows avoidable waste, record that this is within the chosen margin and finish.
+
 ## Log
 
 - 2026-10-14: Created.
