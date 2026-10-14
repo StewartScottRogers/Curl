@@ -45,3 +45,4 @@ Align the connection match with curl 8.22.0's. In Curl.Console's OptionGroupConn
 ## Log
 
 - 2026-10-13: Created.
+- 2026-10-13: Backlog -> Doing.
