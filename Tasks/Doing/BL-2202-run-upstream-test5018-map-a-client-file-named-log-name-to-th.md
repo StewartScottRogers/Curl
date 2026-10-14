@@ -35,3 +35,4 @@ in the tests directory, where `log/` is the log directory, so the harness can ma
 ## Log
 
 - 2026-10-13: Created.
+- 2026-10-13: Backlog -> Doing.
