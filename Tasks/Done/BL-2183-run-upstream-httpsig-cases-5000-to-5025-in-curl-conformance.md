@@ -8,7 +8,7 @@ depends-on: [BL-2182]
 touches: [Curl.Conformance.UnitTests, Curl.Conformance.UnitLibrary, Curl.Console]
 requirement: none
 created: 2026-10-13
-completed:
+completed: 2026-10-13
 ---
 # BL-2183 — Run upstream httpsig cases 5000 to 5025 in Curl.Conformance.UnitTests with their key files and created=0
 
@@ -31,8 +31,8 @@ HMAC key there does not reproduce test 5002's, so use the tarball's file.
 
 ## Acceptance criteria
 
-- [ ] Both key files are in `Curl.Conformance.UnitTests/UpstreamTestData/data`.
-- [ ] The cases 5000 to 5025 Curl passes are listed in `PassingUpstreamCases.txt`; each one it
+- [x] Both key files are in `Curl.Conformance.UnitTests/UpstreamTestData/data`.
+- [x] The cases 5000 to 5025 Curl passes are listed in `PassingUpstreamCases.txt`; each one it
       fails is named under Notes with its first difference, or filed as a task.
 
 ## Notes
@@ -58,6 +58,18 @@ HMAC key there does not reproduce test 5002's, so use the tarball's file.
   first difference), add `--ai-help`-free note (no option changes), run `Measure-CodeQuality.ps1` once for
   `Curl.Conformance.UnitLibrary`, and document `sourceDirectory` in `Curl.Conformance.UnitLibrary/CLAUDE.md`.
 - Case 5000 uses `<tool>` (`lib5000`), so it stays skipped; 5026 to 5028 are outside this task's range.
+- 2026-10-13, lane 4: BL-2170 is Done, so `Curl.Console` was free. The dialing `CreateRunner` and
+  `CreateDialingTransferDispatch` take `TimeProvider? signingClock = null`, passed to
+  `CreateProtocolHandlers`; both `cref`s updated. Measured: 22 of 5001-5025 pass and are listed
+  (5001-5003, 5005-5017, 5019-5024). Not passing:
+  - 5004: skipped, `<client><tool>` (a libtest program), as 5000.
+  - 5018: skipped, its `<client><file name="log/upload5018">` is a literal relative `log/`, not
+    `%LOGDIR`; filed as BL-2202.
+  - 5025: fails at `<protocol>` byte 367 (line 10): expected `User-Agent: curl/8.22.0`, got
+    `Authorization: Basic Ym9iOmFsaWNl`, the redirect URL's `bob:alice` sent beside the signature;
+    filed as BL-2201.
+- `Measure-CodeQuality.ps1 -Library Curl.Conformance.UnitLibrary`: 0 failing members. No option
+  changed, so `--ai-help` is untouched.
 
 ## Log
 
@@ -65,3 +77,4 @@ HMAC key there does not reproduce test 5002's, so use the tarball's file.
 - 2026-10-13: Backlog -> Doing.
 - 2026-10-13: Doing -> Backlog. Needs Curl.Console (signingClock on the dialing CreateRunner), which BL-2170 in Doing touches; retry once BL-2170 is Done
 - 2026-10-13: Backlog -> Doing.
+- 2026-10-13: Doing -> Done. Upstream httpsig cases 5001-5025 run with the tarball's key files and created=0; 22 pass and are listed, 5018 and 5025 filed as BL-2202 and BL-2201
