@@ -44,3 +44,4 @@ In Curl.Cookies.UnitLibrary, apply the Public Suffix List to cookies loaded from
 ## Log
 
 - 2026-10-13: Created.
+- 2026-10-13: Backlog -> Doing.
