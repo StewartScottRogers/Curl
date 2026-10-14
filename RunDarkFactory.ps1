@@ -2516,9 +2516,11 @@ function Get-AuditCadence {
 
 function Get-ShiftStartDecision {
     # Whether a shift may start while an audit runs: start, refuse, or (with -Continuous) wait.
-    param([object[]]$Processes, [bool]$IsContinuous)
+    # A waiting "Fix CI failure" task starts the shift anyway: CI is red and the audit reads a
+    # fixed commit, so waiting for it only lengthens the red spell (AF-0203, BL-2196).
+    param([object[]]$Processes, [bool]$IsContinuous, [bool]$CiFixWaiting = $false)
     $audits = @($Processes | Where-Object { $_.CommandLine -match 'RunAudit\.ps1' -and $_.CommandLine -notmatch '\s-(NewTab|DryRun|SelfTest)\b' })
-    if (-not $audits.Count) { return 'start' }
+    if (-not $audits.Count -or $CiFixWaiting) { return 'start' }
     if ($IsContinuous) { return 'wait' }
     return 'refuse'
 }
@@ -2552,6 +2554,7 @@ if ($TestAuditCadence) {
     & $check 'a running audit refuses a shift start' ((Get-ShiftStartDecision @($audit) $false) -eq 'refuse') 'refuse'
     & $check 'with -Continuous it waits instead' ((Get-ShiftStartDecision @($audit) $true) -eq 'wait') 'wait'
     & $check 'a dry run or no audit lets the shift start' ((Get-ShiftStartDecision @($dry) $false) -eq 'start') 'start'
+    & $check 'a waiting CI fix task starts the shift despite a running audit' ((Get-ShiftStartDecision @($audit) $true $true) -eq 'start') 'start'
     exit $(if ($script:auditCadenceFailed) { 1 } else { 0 })
 }
 
@@ -4730,7 +4733,8 @@ New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
 # passed this, so only the coordinator or a single runner checks.
 if (-not $Lane) {
     while ($true) {
-        $decision = Get-ShiftStartDecision @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Select-Object CommandLine) $Continuous.IsPresent
+        $ciFixWaiting = [bool](Get-ChildItem (Join-Path $Root 'Tasks\Backlog') -Filter 'BL-*.md' -ErrorAction SilentlyContinue | Select-String -Pattern '^title: .*(Fix CI failure|Fix flaky CI test)' -List)
+        $decision = Get-ShiftStartDecision @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Select-Object CommandLine) $Continuous.IsPresent $ciFixWaiting
         if ($decision -eq 'start') { break }
         if ($decision -eq 'refuse') { Write-Trace '-' 'refuse' 'An audit is running; shifts start between audits.' 'Red'; exit 1 }
         Write-Trace '-' 'audit' 'An audit is running; shifts start between audits. Looking again in 5 minutes.' 'Yellow'
