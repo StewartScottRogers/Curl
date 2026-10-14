@@ -328,7 +328,8 @@ public sealed class UpstreamCaseRunner(
         SmtpServerConnector smtp = new(testCase, ftp);
         ImapServerConnector imap = new(testCase, smtp);
         Pop3ServerConnector pop3 = new(testCase, imap);
-        MqttServerConnector mqtt = new(testCase, new SocksServerConnector(testCase, MailTlsServer(testCase, FtpsServer(testCase, pop3, certificateDirectory), certificateDirectory)));
+        SocksServerConnector socks = new(testCase, MailTlsServer(testCase, FtpsServer(testCase, pop3, certificateDirectory), certificateDirectory));
+        MqttServerConnector mqtt = new(testCase, socks);
         GopherServerConnector gopher = new(testCase, mqtt);
         IConnector servers = sshServer?.InFrontOf(gopher) ?? gopher;
         // A CONNECT through the http-proxy to a mail port or the FTP control or passive port reaches that stand-in
@@ -362,6 +363,7 @@ public sealed class UpstreamCaseRunner(
         {
             ProxyReceivedBytes = server.ProxyReceivedBytes.ToArray(),
             LogDirectory = logDirectory,
+            SocksLog = System.Text.Encoding.Latin1.GetBytes(socks.ConnectLog),
             // A case reaches one uploading server, so at most one of these holds an upload.
             UploadedBytes = [.. smtp.UploadedMessage.Span, .. imap.UploadedMessage.Span, .. tftp.UploadedBytes.Span, .. ftp.UploadedBytes.Span, .. SshUpload(logDirectory, testNumber)],
         });

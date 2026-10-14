@@ -313,6 +313,42 @@ public sealed class UpstreamCaseVerificationTests
         Assert.AreEqual("<verify><errorcode>: expected exit code 0, got 6", difference2);
     }
 
+    // runtests.pl splits <errorcode> on commas and accepts any of the listed codes (test305, test405).
+    [TestMethod]
+    [DataRow(77, null)]
+    [DataRow(60, null)]
+    [DataRow(35, "<verify><errorcode>: expected exit code 77, 60, got 35")]
+    public void FindFirstDifference_ExitCodeList_PassesForAnyListedCode(int exitCode, string? expected)
+    {
+        string? difference = Verify("<verify>\n<errorcode>\n77, 60\n</errorcode>\n</verify>\n", Run(exitCode: exitCode));
+
+        ExpectDifference(expected, difference);
+        Assert.AreEqual(expected, difference);
+    }
+
+    // runtests.pl never reads a <verify><data>, so test301's placeholder is not compared with anything.
+    [TestMethod]
+    public void FindFirstDifference_VerifyDataPlaceholder_IsIgnored()
+    {
+        string? difference = Verify("<verify>\n<data>\n[insert full protocol verifiction dump here]\n</data>\n</verify>\n", Run(standardOutput: "body\n", outputFile: ""));
+
+        ExpectDifference(null, difference);
+        Assert.IsNull(difference);
+    }
+
+    [TestMethod]
+    public void FindFirstDifference_Socks_IsComparedWithWhatSocksdLogged()
+    {
+        const string sections = "<verify>\n<socks>\natyp 1 => 12.34.56.78\n</socks>\n</verify>\n";
+
+        string? matching = Verify(sections, new UpstreamCaseRun(0, [], [], [], []) { SocksLog = Bytes("atyp 1 => 12.34.56.78\n") });
+        string? differing = Verify(sections, new UpstreamCaseRun(0, [], [], [], []) { SocksLog = Bytes("atyp 3 => host\n") });
+
+        ExpectDifference(null, matching);
+        Assert.IsNull(matching);
+        Assert.StartsWith("<verify><socks>", differing!);
+    }
+
     private string? Verify(string sections, UpstreamCaseRun run) => Verify(sections, run, UpstreamRegex.MatchTimeout);
 
     private string? Verify(string sections, UpstreamCaseRun run, TimeSpan stripMatchTimeout)

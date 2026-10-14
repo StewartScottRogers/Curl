@@ -26,6 +26,9 @@ internal sealed class UpstreamCaseRun(int exitCode, byte[] standardOutput, byte[
     /// <summary>The last message the emulated SMTP server on <c>%SMTPPORT</c> received, for <c>&lt;verify&gt;&lt;upload&gt;</c>.</summary>
     public byte[] UploadedBytes { get; init; } = [];
 
+    /// <summary>What the emulated socksd on <c>%SOCKSPORT</c> wrote to its dump file, for <c>&lt;verify&gt;&lt;socks&gt;</c>.</summary>
+    public byte[] SocksLog { get; init; } = [];
+
     /// <summary>
     /// The case's <c>%LOGDIR</c>, or <see langword="null"/> when unknown: an expected <c>&lt;stderr&gt;</c>
     /// naming it is compared with curl's wrapped <c>Note:</c> and <c>Warning:</c> lines joined

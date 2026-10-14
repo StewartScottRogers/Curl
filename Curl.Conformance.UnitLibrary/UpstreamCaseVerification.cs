@@ -18,10 +18,11 @@ namespace Curl.Conformance;
 /// against the uploaded message with <c>&lt;strippart&gt;</c> run on it but no <c>&lt;strip&gt;</c>; the <c>--output</c> file against <c>&lt;datacheck&gt;</c> (and <c>&lt;datacheck1&gt;</c> to
 /// <c>&lt;datacheck9&gt;</c> after it), or <c>&lt;data&gt;</c> when there is none, unless
 /// <c>&lt;data&gt;</c> says <c>nocheck</c> or both are empty and it does not say <c>sendzero</c>;
+/// <c>&lt;socks&gt;</c> against what the socksd emulation logged, as written;
 /// <c>&lt;stdout&gt;</c> and <c>&lt;stderr&gt;</c> with <c>&lt;stripfile&gt;</c> run on the output;
 /// each <c>&lt;file&gt;</c> to <c>&lt;file4&gt;</c> against the named file with the matching
 /// <c>&lt;stripfileN&gt;</c>; <c>&lt;notexists&gt;</c>; and last the exit code against
-/// <c>&lt;errorcode&gt;</c>, 0 when absent.
+/// <c>&lt;errorcode&gt;</c>, any one of its comma-separated codes, 0 when absent.
 /// </para>
 /// <para>
 /// A verify part whose body is the line <c>%EMPTY</c> expects no bytes at all.
@@ -56,6 +57,7 @@ internal static class UpstreamCaseVerification
             () => CompareProtocol(testCase, "protocol", run.ReceivedBytes, stripMatchTimeout),
             () => CompareProtocol(testCase, "proxy", run.ProxyReceivedBytes, stripMatchTimeout),
             () => CompareUpload(testCase, run.UploadedBytes),
+            () => CompareSocks(testCase, run.SocksLog),
             () => CompareReplyData(testCase, run.OutputFileBytes),
             () => CompareOutput(testCase, "stdout", "stripfile", run.StandardOutput),
             () => CompareStandardError(testCase, run),
@@ -92,6 +94,12 @@ internal static class UpstreamCaseVerification
     private static string? CompareUpload(UpstreamTestCase testCase, byte[] uploaded) =>
         testCase.Find("verify", "upload") is { } part
             ? UpstreamFirstDifference.Describe("<verify><upload>", Expected(part), Strip(uploaded, [], Substitutions(testCase, "strippart")))
+            : null;
+
+    // runtests.pl compares socksd's dump file with <socks> as written, with no strip (test719 to test721).
+    private static string? CompareSocks(UpstreamTestCase testCase, byte[] socksLog) =>
+        testCase.Find("verify", "socks") is { } part
+            ? UpstreamFirstDifference.Describe("<verify><socks>", Expected(part), socksLog)
             : null;
 
     private static string? CompareReplyData(UpstreamTestCase testCase, byte[] outputFile)
@@ -159,11 +167,19 @@ internal static class UpstreamCaseVerification
             ? $"<verify><notexists>: {path} exists"
             : null;
 
+    // runtests.pl splits <errorcode> on commas and accepts any listed code (test305's "77,60"); screening
+    // has already skipped a case with an entry that is not a number.
     private static string? CompareExitCode(UpstreamTestCase testCase, int exitCode)
     {
-        int expected = int.TryParse(UpstreamTestPartBodies.Text(testCase.Find("verify", "errorcode")).Trim(), out int code) ? code : 0;
-        return exitCode == expected ? null : $"<verify><errorcode>: expected exit code {expected}, got {exitCode}";
+        string text = UpstreamTestPartBodies.Text(testCase.Find("verify", "errorcode")).Trim() is { Length: > 0 } listed ? listed : "0";
+        return ExpectedExitCodes(text).Contains(exitCode) ? null : $"<verify><errorcode>: expected exit code {text}, got {exitCode}";
     }
+
+    /// <summary>The exit codes an <c>&lt;errorcode&gt;</c> lists, split on commas as <c>runtests.pl</c> does.</summary>
+    /// <param name="text">The part's trimmed, non-empty text.</param>
+    /// <returns>Each listed code, with <see cref="int.MinValue"/> for an entry that is not a number.</returns>
+    internal static int[] ExpectedExitCodes(string text) =>
+        text.Split(',', StringSplitOptions.TrimEntries).Select(entry => int.TryParse(entry, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out int code) ? code : int.MinValue).ToArray();
 
     // nonewline before crlf, as runtests.pl chomps the last line before subnewlines: forcing CRLF
     // first would leave a carriage return the request never ends in.

@@ -18,8 +18,8 @@ namespace Curl.Conformance;
 /// one Curl has; when its <c>&lt;servercmd&gt;</c> holds a command the sws emulation (or, for an <c>ftp</c> or <c>ftps</c> case, the FTP stand-in) does not carry
 /// out; when it names no server and its command goes to a host name on the internet; when its
 /// command is not a plain curl command line; when a file part does not name an
-/// absolute path; when a strip line is not a substitution the harness can run; or when its expected
-/// exit code is not a number.
+/// absolute path; when a strip line is not a substitution the harness can run; or when an entry of
+/// its comma-separated list of expected exit codes is not a number.
 /// </remarks>
 internal static class UpstreamCaseScreening
 {
@@ -28,10 +28,12 @@ internal static class UpstreamCaseScreening
     private static readonly HashSet<string> ClientParts =
         ["name", "command", "server", "features", "file", "file1", "file2", "file3", "file4", "stdin", "stdout", "killserver", "disable", "precheck", "setenv"];
 
+    // runtests.pl at curl-8_22_0 never reads a <verify><data> (test301's placeholder "[insert full protocol
+    // verifiction dump here]", test302's empty one), so the harness accepts and ignores it too (BL-2222).
     private static readonly HashSet<string> VerifyParts =
     [
         "protocol", "proxy", "errorcode", "stdout", "stderr", "file", "file1", "file2", "file3", "file4", "notexists",
-        "upload", "strip", "strippart", "stripfile", "stripfile1", "stripfile2", "stripfile3", "stripfile4", "limits", "valgrind", "postcheck",
+        "upload", "socks", "data", "strip", "strippart", "stripfile", "stripfile1", "stripfile2", "stripfile3", "stripfile4", "limits", "valgrind", "postcheck",
     ];
 
     // Interpreted, not source-generated, so no generated code counts against the coverage gate.
@@ -268,8 +270,9 @@ internal static class UpstreamCaseScreening
             ? $"the harness does not run the Perl {code}"
             : null;
 
+    // A comma-separated list is accepted (test305's "77,60", BL-2222); any entry that is not a number is not.
     private static string? UnsupportedErrorCode(UpstreamTestCase testCase) =>
-        UpstreamTestPartBodies.Text(testCase.Find("verify", "errorcode")).Trim() is { Length: > 0 } code && !int.TryParse(code, out _)
+        UpstreamTestPartBodies.Text(testCase.Find("verify", "errorcode")).Trim() is { Length: > 0 } code && UpstreamCaseVerification.ExpectedExitCodes(code).Contains(int.MinValue)
             ? $"the expected exit code {code} is not a number"
             : null;
 }

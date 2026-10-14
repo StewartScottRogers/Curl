@@ -157,7 +157,7 @@ public sealed class UpstreamCaseScreeningTests
     [DataRow(400, null)]
     [DataRow(401, null)]
     [DataRow(403, null)]
-    [DataRow(404, "the expected exit code 77,60 is not a number")]
+    [DataRow(404, null)]
     [DataRow(406, null)]
     [DataRow(407, null)]
     [DataRow(408, null)]
@@ -363,6 +363,7 @@ public sealed class UpstreamCaseScreeningTests
     [DataRow("<verify>\n<strip>\n(\n</strip>\n</verify>\n", "the strip pattern ( is not a .NET regular expression")]
     [DataRow("<verify>\n<stripfile2>\n$_ = ''\n</stripfile2>\n</verify>\n", "the harness does not run the Perl $_ = ''")]
     [DataRow("<verify>\n<errorcode>\nlots\n</errorcode>\n</verify>\n", "the expected exit code lots is not a number")]
+    [DataRow("<verify>\n<errorcode>\n77,lots\n</errorcode>\n</verify>\n", "the expected exit code 77,lots is not a number")]
     [DataRow("<verify>\n<protocol>\nUSER anonymous\nLPRT 4,4,127,0,0,1,2,35,46\n</protocol>\n</verify>\n", "the FTP stand-in does not carry out the case's LPRT")]
     [DataRow("<verify>\n<protocol>\nCWD fully_simulated\n</protocol>\n</verify>\n", "the FTP stand-in does not carry out the case's CWD fully_simulated")]
     public void FindSkipReason_NamesWhatTheHarnessCannotDo(string sections, string expected)
