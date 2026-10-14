@@ -19,6 +19,11 @@
     { "number": 12, "kind": "Skipped", "detail": "the harness has no value for %HTTPSPORT", "milliseconds": 1 },
     { "number": 13, "kind": "Skipped", "detail": "the harness has no value for %PERL", "milliseconds": 1 },
     { "number": 14, "kind": "Skipped", "detail": "the harness has no value for %PERL, %NOLISTENPORT", "milliseconds": 1 },
-    { "number": 15, "kind": "Skipped", "detail": "disabled upstream", "milliseconds": 0 }
+    { "number": 15, "kind": "Skipped", "detail": "disabled upstream", "milliseconds": 0 },
+    { "number": 16, "kind": "Skipped", "detail": "the harness does not run a perl command", "milliseconds": 0 },
+    { "number": 17, "kind": "Skipped", "detail": "the harness does not run a perl command", "milliseconds": 0 },
+    { "number": 18, "kind": "Skipped", "detail": "the case needs Curl without the feature win32", "milliseconds": 0 },
+    { "number": 19, "kind": "Skipped", "detail": "the harness does not interpret the <client><precheck> line perl -e", "milliseconds": 0 },
+    { "number": 20, "kind": "Skipped", "detail": "Curl lacks the feature Unicode", "milliseconds": 0 }
   ]
 }

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="US-ASCII"?>
+<testcase>
+<info>
+<keywords>
+FILE
+</keywords>
+</info>
+
+<client>
+<server>
+file
+</server>
+<features>
+!win32
+</features>
+<name>
+fixture case 18
+</name>
+<command>
+file://localhost/%TESTNUMBER
+</command>
+
+</client>
+</testcase>
