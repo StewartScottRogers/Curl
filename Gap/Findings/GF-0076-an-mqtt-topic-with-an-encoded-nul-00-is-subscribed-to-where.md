@@ -4,11 +4,11 @@ title: An MQTT topic with an encoded NUL (%00) is subscribed to, where curl fail
 area: behaviour
 key: behaviour:mqtt-topic-control-byte-not-rejected
 severity: High
-status: open
+status: closed
 scope: target
 introduced-in:
 opened: 2026-10-13_1406
-closed:
+closed: 2026-10-14_0904
 regression: false
 items: [behaviour:test2109]
 touches: [Curl.Protocol.Mqtt.UnitLibrary, Curl.Protocol.Mqtt.UnitTests]
@@ -32,8 +32,10 @@ In Curl.Protocol.Mqtt.UnitLibrary, make MqttTopic.Decode (or MqttSession before 
 ## Measurements
 
 - 2026-10-13_1406: 1 of 1 items are gaps.
+- 2026-10-14_0904: 0 of 1 items are gaps.
 
 ## Log
 
 - 2026-10-13_1406: Opened by gap-behaviour.
 - 2026-10-13_1457: Filed BL-2168.
+- 2026-10-14_0904: Closed: run 2026-10-14_0904 measured every item as match or excluded.

@@ -4,11 +4,11 @@ title: ;AUTH=EXTERNAL with no user name skips SASL; curl sends AUTH EXTERNAL wit
 area: behaviour
 key: behaviour:sasl-external-without-user-skipped
 severity: High
-status: open
+status: closed
 scope: target
 introduced-in:
 opened: 2026-10-10_0657
-closed:
+closed: 2026-10-14_0904
 regression: true
 items: [behaviour:test838, behaviour:test840, behaviour:test884, behaviour:test886, behaviour:test943, behaviour:test945]
 touches: [Curl.Authentication.UnitLibrary, Curl.Authentication.UnitTests, Curl.Protocol.Imap.UnitLibrary, Curl.Protocol.Imap.UnitTests, Curl.Protocol.Pop3.UnitLibrary, Curl.Protocol.Pop3.UnitTests, Curl.Protocol.Smtp.UnitLibrary, Curl.Protocol.Smtp.UnitTests]
@@ -37,6 +37,7 @@ In Curl.Authentication.UnitLibrary's SaslAuthenticator/SaslMechanismRanking and 
 - 2026-10-12_0951: 0 of 6 items are gaps.
 - 2026-10-12_2042: 0 of 6 items are gaps.
 - 2026-10-13_1406: 3 of 6 items are gaps.
+- 2026-10-14_0904: 0 of 6 items are gaps.
 
 ## Log
 
@@ -45,3 +46,4 @@ In Curl.Authentication.UnitLibrary's SaslAuthenticator/SaslMechanismRanking and 
 - 2026-10-11_0936: Closed: run 2026-10-11_0936 measured every item as match or excluded.
 - 2026-10-13_1406: Reopened as a regression: run 2026-10-13_1406 measured behaviour:test838, behaviour:test884, behaviour:test943 as gap again.
 - 2026-10-13_1457: Filed BL-2161.
+- 2026-10-14_0904: Closed: run 2026-10-14_0904 measured every item as match or excluded.

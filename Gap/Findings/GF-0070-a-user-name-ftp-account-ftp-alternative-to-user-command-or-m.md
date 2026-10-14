@@ -4,11 +4,11 @@ title: A user name, FTP account, --ftp-alternative-to-user command or --mail-fro
 area: behaviour
 key: behaviour:crlf-in-protocol-command-argument-not-rejected
 severity: Critical
-status: open
+status: closed
 scope: target
 introduced-in:
 opened: 2026-10-13_1406
-closed:
+closed: 2026-10-14_0904
 regression: false
 items: [behaviour:test2110, behaviour:test2114, behaviour:test2115, behaviour:test2116]
 touches: [Curl.Protocol.Ftp.UnitLibrary, Curl.Protocol.Ftp.UnitTests, Curl.Protocol.Smtp.UnitLibrary, Curl.Protocol.Smtp.UnitTests]
@@ -32,8 +32,10 @@ Reject a CR or LF in any value Curl writes into a protocol command line with exi
 ## Measurements
 
 - 2026-10-13_1406: 4 of 4 items are gaps.
+- 2026-10-14_0904: 0 of 4 items are gaps.
 
 ## Log
 
 - 2026-10-13_1406: Opened by gap-behaviour.
 - 2026-10-13_1457: Filed BL-2162.
+- 2026-10-14_0904: Closed: run 2026-10-14_0904 measured every item as match or excluded.

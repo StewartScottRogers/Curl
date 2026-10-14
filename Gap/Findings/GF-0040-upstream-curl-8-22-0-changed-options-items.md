@@ -4,13 +4,13 @@ title: Upstream curl 8.22.0 changed options items
 area: options
 key: options:newest
 severity: High
-status: closed
+status: open
 scope: target
 introduced-in: 8.22.0
 opened: 2026-10-09_0050
-closed: 2026-10-13_1406
-regression: false
-items: [options:--httpsig-algo, options:--httpsig-headers, options:--httpsig-key, options:--httpsig-keyid]
+closed:
+regression: true
+items: [options:--httpsig-algo, options:--httpsig-headers, options:--httpsig-key, options:--httpsig-keyid, options:--httpsig-algo:argument, options:--httpsig-headers:argument, options:--httpsig-key:argument, options:--httpsig-keyid:argument]
 touches: []
 task: BL-2171
 tasks: [BL-2171]
@@ -41,6 +41,7 @@ Bring these items to Curl when the target moves to 8.22.0.
 - 2026-10-12_0951: 0 of 4 items are gaps. 4 not in this run's measurement.
 - 2026-10-12_2042: 0 of 4 items are gaps. 4 not in this run's measurement.
 - 2026-10-13_1406: 0 of 4 items are gaps.
+- 2026-10-14_0904: 8 of 8 items are gaps.
 
 ## Log
 
@@ -48,3 +49,5 @@ Bring these items to Curl when the target moves to 8.22.0.
 - 2026-10-13: Scope newest -> target: ADR-0479 moves the targeted version to 8.22.0 (BL-2128).
 - 2026-10-13_1406: Closed: run 2026-10-13_1406 measured every item as match or excluded.
 - 2026-10-13: Filed BL-2171 by hand: the Windows reference is built without the experimental --httpsig-* options, so this run measured them as match and closed the finding, but Curl implements them as an intended difference (CLAUDE.md "Decisions", ADR-0454 precedent; BL-2128).
+- 2026-10-14_0904: Added options:--httpsig-algo:argument, options:--httpsig-headers:argument, options:--httpsig-key:argument, options:--httpsig-keyid:argument from gap-options.
+- 2026-10-14_0904: Reopened as a regression: run 2026-10-14_0904 measured options:--httpsig-algo, options:--httpsig-headers, options:--httpsig-key, options:--httpsig-keyid, options:--httpsig-algo:argument, options:--httpsig-headers:argument, options:--httpsig-key:argument, options:--httpsig-keyid:argument as gap again.
