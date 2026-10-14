@@ -40,3 +40,4 @@ HMAC key there does not reproduce test 5002's, so use the tarball's file.
 ## Log
 
 - 2026-10-13: Created.
+- 2026-10-13: Backlog -> Doing.
