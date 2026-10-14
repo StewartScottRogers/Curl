@@ -684,6 +684,42 @@ public sealed class MqttProtocolHandlerTests
     }
 
     [TestMethod]
+    [DataRow("mqtt://h/aa%00bb", DisplayName = "encoded NUL, upstream test 2109")]
+    [DataRow("mqtt://h/aa%0Abb", DisplayName = "encoded line feed")]
+    [DataRow("mqtt://h/aa%1Fbb", DisplayName = "encoded 0x1F, the highest control byte")]
+    public async Task ExecuteAsync_TopicDecodedToAControlByte_IsUrlMalformatBeforeSubscribing(string url)
+    {
+        ScriptedConnection connection = new(Connack);
+
+        TransferResult result = await RunAsync(FakeConnector.For(connection), url, new RecordingStream());
+
+        Diagnostics.AssertResult(new TransferResult(CurlExitCode.UrlMalformat, 0, "URL rejected: Malformed input to a URL function"), result);
+        Assert.AreEqual(new TransferResult(CurlExitCode.UrlMalformat, 0, "URL rejected: Malformed input to a URL function"), result);
+        CollectionAssert.AreEqual(MeasuredConnect, connection.Written);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_PublishToTopicDecodedToNul_IsUrlMalformatBeforePublishing()
+    {
+        ScriptedConnection connection = new(Connack);
+
+        TransferResult result = await PublishAsync(connection, "mqtt://h/a%00", "x");
+
+        Assert.AreEqual(new TransferResult(CurlExitCode.UrlMalformat, 0, "URL rejected: Malformed input to a URL function"), result);
+        CollectionAssert.AreEqual(MeasuredConnect, connection.Written);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_TopicDecodedTo0x20_IsSubscribed()
+    {
+        ScriptedConnection connection = new(Connack);
+
+        await RunAsync(FakeConnector.For(connection), "mqtt://h/a%20b", new RecordingStream());
+
+        CollectionAssert.AreEqual(Concat(MeasuredConnect, Bytes("82 08 00 01 00 03", "a b", "00")), connection.Written);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_Topic65535BytesDecoded_IsSubscribed()
     {
         ScriptedConnection connection = new(Connack);
