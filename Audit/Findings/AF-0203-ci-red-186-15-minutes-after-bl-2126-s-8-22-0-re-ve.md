@@ -3,8 +3,8 @@ id: AF-0203
 title: CI red 186.15 minutes after BL-2126's 8.22.0 re-vendor broke test798, test1136 and test1462; fixes waited 2h15m for a running audit
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: process:logs:38431484503:ci-red
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Log
 
 - 2026-10-13: filed proposed.
+- 2026-10-13: proposed -> accepted.
