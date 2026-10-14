@@ -530,3 +530,4 @@ Bring these items to Curl when the target moves to 8.22.0.
 - 2026-10-13: Created.
 - 2026-10-13: Backlog -> Doing.
 - 2026-10-13: Doing -> Backlog. Split after measuring all 154 items: waits on BL-2161..BL-2169, BL-2171..BL-2176; interactive only for the gap-office exclusions of libtest, debug-build, unit-test and platform-only cases
+- 2026-10-14: Backlog -> Doing. interactive session: gap-office exclusions and re-measure

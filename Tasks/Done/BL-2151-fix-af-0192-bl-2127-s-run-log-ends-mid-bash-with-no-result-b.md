@@ -9,7 +9,7 @@ touches: [RunDarkFactory.ps1]
 lane: no
 requirement: none
 created: 2026-10-13
-completed:
+completed: 2026-10-14
 ---
 # BL-2151 — Fix AF-0192: BL-2127's run log ends mid-Bash with no result because the audit copied the logs 2.3 minutes into a live run
 
@@ -42,8 +42,8 @@ The finding closes only when a later re-audit by the process auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -54,3 +54,7 @@ Interactive only. The log copy and the unfinishedRuns count belong to the audit 
 - 2026-10-13: Created.
 - 2026-10-13: Backlog -> Doing.
 - 2026-10-13: Doing -> Backlog. Interactive only: the fix is in the audit office tooling, which lanes cannot touch; lane: no added
+
+Closed by evidence: audit 20261013-182203 closed AF-0192 on re-audit ("the reproduction no longer reproduces"); merged in PR #137.
+- 2026-10-14: Backlog -> Doing. AF-0192 closed on re-audit 2026-10-13_1822
+- 2026-10-14: Doing -> Done. AF-0192 closed on re-audit 2026-10-13_1822
