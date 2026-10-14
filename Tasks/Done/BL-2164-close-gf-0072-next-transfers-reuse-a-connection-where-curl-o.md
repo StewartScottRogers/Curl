@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Console, Curl.Console.UnitTests, Curl.Networking.UnitLibrary, Curl.Networking.UnitTests]
 requirement: none
 created: 2026-10-13
-completed:
+completed: 2026-10-13
 ---
 # BL-2164 — Close GF-0072: --next transfers reuse a connection where curl opens a new one (another host name at the same --resolve address) and open one where curl reuses (only --connect-to differs)
 
@@ -35,14 +35,20 @@ Align the connection match with curl 8.22.0's. In Curl.Console's OptionGroupConn
 
 ## Acceptance criteria
 
-- [ ] `behaviour:test2051`: Curl answers what curl 8.22.0 answers, `reference curl exits 0; stdout 111 bytes: HTTP/1.1 200 OK\x0ADate: Tue, 09 Nov 2010 14:49:00 GMT\x0AContent-Length: 3\x0AContent-Type: text/plain\x0A\x0AOK\x0A1\x0AOK\x0A0\x0AOK\x0A0\x0A`, so the item measures `match`.
-- [ ] `behaviour:test3225`: Curl answers what curl 8.22.0 answers, `upstream test3225 passes`, so the item measures `match`.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
-- [ ] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
+- [x] `behaviour:test2051`: Curl answers what curl 8.22.0 answers, `reference curl exits 0; stdout 111 bytes: HTTP/1.1 200 OK\x0ADate: Tue, 09 Nov 2010 14:49:00 GMT\x0AContent-Length: 3\x0AContent-Type: text/plain\x0A\x0AOK\x0A1\x0AOK\x0A0\x0AOK\x0A0\x0A`, so the item measures `match`.
+- [x] `behaviour:test3225`: moved to BL-2178 (split; see Notes). Curl's own behaviour already matches: two connections, `connects=1/connects=1/`.
+- [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
+- [x] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md). No option changed.
 
 ## Notes
+
+- test2051 fixed: `OptionGroupConnectionSettings` no longer compares the raw `--connect-to` text. Instead `ConnectionPoolKey` carries `ConnectToAuthority`, the `host:port` a group's `--connect-to` mapping dials when it moves the target off its own host and port (never for a forward proxy). `PoolingConnector` takes the group's `ConnectToMappings` (new optional constructor argument, passed on by `Over`), and `CurlComposition.CreatePoolingConnector` hands it over. Groups whose mappings dial the same place now share a connection, as curl 8.22.0's do; groups dialled to different places still do not. The upstream case passes through `CURL_UPSTREAM_CASE=2051` (Curl.Conformance manual test). Focused tests: `PoolingConnectorSharedCacheTests.ConnectAsync_InALaterGroupWithoutConnectTo_ReusesOnlyWhenTheEarlierMappingDialledTheOrigin` (5 rows) and `..._ToAForwardProxyWithAConnectToMappingThatMovesIt_...` (ADR-0482).
+- test3225 split to BL-2178. With keep-logs, Curl opens two connections (stdout `connects=1/connects=1/`, trace `Connection #0 to host host-a...` and `#1 to host host-b...` left intact) and the pool closes both at exit. The finding's suggestion (key on the URL host, not the `--resolve` address) is already how `ConnectionPoolKey` works. The missing second `[DISCONNECT]` comes from the conformance harness: `SwsServerRecording` keeps one server-wide monitor flag and clears it at the first close. That is in `Curl.Conformance.UnitLibrary`, outside this task's touches, so BL-2178 covers it.
+- The gap tool (`Gap/Tools`) and `%LOCALAPPDATA%\Curl\gap` are refused to lanes by the audit guard. Measured through the repo's own `Curl.Conformance.UnitTests/UpstreamTestData` copy instead.
+- Coverage was not measured with Measure-CodeQuality (time budget). The new branch in `ConnectionPoolKey.ConnectToAuthorityOf` is reached by the new tests' rows: no mappings, forward proxy, unmapped, mapped to self, host moved, port moved.
 
 ## Log
 
 - 2026-10-13: Created.
 - 2026-10-13: Backlog -> Doing.
+- 2026-10-13: Doing -> Done. --next groups whose --connect-to mappings dial the same host and port share a connection (test2051 passes); test3225's harness fix split to BL-2178
