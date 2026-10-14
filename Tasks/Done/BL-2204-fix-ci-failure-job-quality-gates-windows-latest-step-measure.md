@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Gopher.UnitLibrary]
 requirement: none
 created: 2026-10-13
-completed:
+completed: 2026-10-13
 ---
 # BL-2204 — Fix CI failure job Quality gates (windows-latest) step Measure coverage, complexity and CRAP on Windows
 
@@ -36,3 +36,4 @@ Lanes test only on Windows, so reproduce with `gh run view 38519058174 --log-fai
 
 - 2026-10-13: Created.
 - 2026-10-13: Backlog -> Doing.
+- 2026-10-13: Doing -> Done. ReportConnectionEnd split to complexity 6 or less; Gopher library passes all four quality gates
