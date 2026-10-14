@@ -44,3 +44,4 @@ In Curl.Protocol.Http.UnitLibrary, cap the request head as curl 8.22.0's request
 ## Log
 
 - 2026-10-13: Created.
+- 2026-10-13: Backlog -> Doing.
