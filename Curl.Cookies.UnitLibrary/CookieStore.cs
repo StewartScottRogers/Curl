@@ -1,4 +1,6 @@
 using System.Globalization;
+using System.Net;
+using System.Net.Sockets;
 using System.Text;
 using Curl.Protocol.Abstractions;
 
@@ -208,7 +210,8 @@ public sealed class CookieStore : ICookieStore
     /// Each cookie <see cref="NetscapeCookieFile.Read(TextReader, DateTimeOffset)"/> accepts is stored in file order, replacing a
     /// namesake in its place as a received cookie does, except that under <c>-j</c>
     /// (<paramref name="discardSessionCookies"/>) a session cookie is skipped. Cookies that have expired by
-    /// <paramref name="now"/> are then removed.
+    /// <paramref name="now"/> are then removed. A cookie whose domain is a public suffix is dropped first, reporting curl's
+    /// <c>cookie '&lt;name&gt;' dropped, domain '[file]' must not set cookies for '&lt;domain&gt;'</c> line (BL-2165).
     /// </remarks>
     /// <param name="reader">The file's text, one character per byte.</param>
     /// <param name="discardSessionCookies"><see langword="true"/> for <c>-j</c> (<c>--junk-session-cookies</c>).</param>
@@ -229,10 +232,22 @@ public sealed class CookieStore : ICookieStore
     /// <exception cref="ArgumentNullException"><paramref name="reader"/> or <paramref name="events"/> is <see langword="null"/>.</exception>
     public void LoadCookieFile(TextReader reader, bool discardSessionCookies, DateTimeOffset now, ITransferEvents events)
     {
-        IReadOnlyList<Cookie> loaded = NetscapeCookieFile.Read(reader, now, events);
+        List<Cookie> accepted = [];
+        foreach (Cookie cookie in NetscapeCookieFile.Read(reader, now, events).Where(cookie => !discardSessionCookies || !cookie.IsSessionCookie))
+        {
+            if (IsSetOnPublicSuffix(cookie))
+            {
+                events.ReportInfo($"cookie '{cookie.Name}' dropped, domain '[file]' must not set cookies for '{cookie.Domain}'");
+            }
+            else
+            {
+                accepted.Add(cookie);
+            }
+        }
+
         lock (storeLock)
         {
-            foreach (Cookie cookie in loaded.Where(cookie => !discardSessionCookies || !cookie.IsSessionCookie))
+            foreach (Cookie cookie in accepted)
             {
                 Store(cookie);
             }
@@ -516,6 +531,25 @@ public sealed class CookieStore : ICookieStore
             ? $"cookie '{cookie.Name}' for domain '{cookie.Domain}' dropped, would overlay an existing cookie"
             : null;
     }
+
+    /// <summary>
+    /// Whether curl 8.22.0 drops <paramref name="cookie"/>, read from a <c>-b</c> file, for its domain: one with a
+    /// domain that is not an IP address (<c>Curl_host_is_ipnum</c>, so a bracketed <c>[::1]</c> is not one) and that
+    /// <see cref="PublicSuffixList.IsCookieFileDomainAcceptable"/> refuses (upstream test409, BL-2165).
+    /// </summary>
+    private static bool IsSetOnPublicSuffix(Cookie cookie) =>
+        cookie.Domain is { } domain
+        && !IsIpAddressLiteral(domain)
+        && !PublicSuffixList.Embedded.IsCookieFileDomainAcceptable(domain);
+
+    /// <summary>
+    /// <c>Curl_host_is_ipnum</c>: a dotted-quad IPv4 address or an unbracketed IPv6 address, as <c>inet_pton</c>
+    /// reads them, so neither <c>1.2</c> nor <c>[::1]</c> is one.
+    /// </summary>
+    private static bool IsIpAddressLiteral(string domain) =>
+        !domain.Contains('[', StringComparison.Ordinal)
+        && IPAddress.TryParse(domain, out IPAddress? address)
+        && (address.AddressFamily == AddressFamily.InterNetworkV6 || domain.Count(character => character == '.') == 3);
 
     /// <summary>Stores <paramref name="cookie"/>, in its namesake's place when there is one.</summary>
     /// <returns><see langword="true"/> when it replaced a namesake; <see langword="false"/> when it was added as the newest.</returns>

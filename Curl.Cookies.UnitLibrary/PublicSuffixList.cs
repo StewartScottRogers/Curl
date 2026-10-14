@@ -65,6 +65,19 @@ internal sealed class PublicSuffixList
         return lowerHost == lowerDomain && IsPublicSuffix(lowerDomain);
     }
 
+    /// <summary>
+    /// curl 8.22.0's <c>is_public_suffix</c> for a cookie read from a <c>-b</c> file, which has no request host:
+    /// with one trailing dot left off, a domain of more than <see cref="LongestHost"/> characters is refused, and
+    /// otherwise the domain is accepted when it is <c>localhost</c> in any case or is not a public suffix, so
+    /// <c>.co.uk</c> and <c>uk</c> are refused and <c>foo.co.uk</c> is kept (upstream test409, BL-2165).
+    /// </summary>
+    /// <param name="cookieDomain">The cookie's domain, without the file's leading dot.</param>
+    public bool IsCookieFileDomainAcceptable(string cookieDomain)
+    {
+        string lowerDomain = WithoutTrailingDot(cookieDomain).ToLowerInvariant();
+        return lowerDomain.Length <= LongestHost && (lowerDomain == "localhost" || !IsPublicSuffix(lowerDomain));
+    }
+
     /// <summary><paramref name="name"/> without its one trailing dot, or unchanged when it has none.</summary>
     private static string WithoutTrailingDot(string name) => name.EndsWith('.') ? name[..^1] : name;
 

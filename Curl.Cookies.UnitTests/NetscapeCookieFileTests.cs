@@ -107,7 +107,8 @@ public sealed class NetscapeCookieFileTests
     /// <summary>
     /// Measured: <c>curl -b in2.txt -c out2.txt http://127.0.0.1:18221/p/x</c>. Domain dots and flags are
     /// normalised; a path field that starts <c>TRUE</c> is the secure field; expired, signed, too-large and
-    /// bad-prefix lines are dropped; an empty name or domain, and a domain with spaces, are kept.
+    /// bad-prefix lines are dropped; an empty name and a domain with spaces are kept. An empty domain was kept by
+    /// curl 8.21.0, but curl 8.22.0 drops it as a public suffix (BL-2165).
     /// </summary>
     [TestMethod]
     public void LoadCookieFile_FieldEdgeCases_NormalisesAsCurlDoes()
@@ -143,7 +144,6 @@ public sealed class NetscapeCookieFileTests
             + "  127.0.0.1\tFALSE\t/\tFALSE\t0\tA19\t19\r\n"
             + "127.0.0.1\tFALSE\t/\tFALSE\t0\tA18\t1 8 \r\n"
             + ".127.0.0.1\tTRUE\t/\tFALSE\t0\tA17\t17\r\n"
-            + "\tFALSE\t/\tFALSE\t0\tA15\t15\r\n"
             + "127.0.0.1\tFALSE\t/\tFALSE\t0\t\t14\r\n"
             + "127.0.0.1\tFALSE\t/\tTRUE\t0\t__Host-A9\t9\r\n"
             + "127.0.0.1\tFALSE\t/\tFALSE\t0\tA7\t7\r\n"
@@ -174,30 +174,30 @@ public sealed class NetscapeCookieFileTests
     public void LoadCookieFile_BooleanWords_ReadAsCurlReadsThem()
     {
         const string File =
-            "h\tFALSE\tT\t0\tD1\t1\n"
-            + "h\tFALSE\t\t0\tD2\t2\n"
-            + "h\tFALSE\tFALS\t0\tD3\t3\n"
-            + "h\tFALSE\ttrue\t0\tD4\t4\n"
-            + "h\tFALSE\tTRUEX\tTRUE\t0\tD5\t5\n"
-            + "h\tFALSE\tTRUE\t0\tD6\n"
-            + "h\tFALSE\t/\t\t0\tD7\t7\n"
-            + "h\t\t/\tFALSE\t0\tD8\t8\n"
-            + "h\tFALSE\t/\tFALSE\t0\tD9\t9\t\n"
-            + "h\tFALSE\t/\tFALSE\t0\tD10\n"
-            + "h\tFALSE\t/\tFALSE\t0\n";
+            "localhost\tFALSE\tT\t0\tD1\t1\n"
+            + "localhost\tFALSE\t\t0\tD2\t2\n"
+            + "localhost\tFALSE\tFALS\t0\tD3\t3\n"
+            + "localhost\tFALSE\ttrue\t0\tD4\t4\n"
+            + "localhost\tFALSE\tTRUEX\tTRUE\t0\tD5\t5\n"
+            + "localhost\tFALSE\tTRUE\t0\tD6\n"
+            + "localhost\tFALSE\t/\t\t0\tD7\t7\n"
+            + "localhost\t\t/\tFALSE\t0\tD8\t8\n"
+            + "localhost\tFALSE\t/\tFALSE\t0\tD9\t9\t\n"
+            + "localhost\tFALSE\t/\tFALSE\t0\tD10\n"
+            + "localhost\tFALSE\t/\tFALSE\t0\n";
 
         string actual = WriteJar(Load(File, discardSessionCookies: false), Now);
 
         string expected =
             Header
-            + "h\tFALSE\t/\tFALSE\t0\tD10\t\r\n"
-            + ".h\tTRUE\t/\tFALSE\t0\tD8\t8\r\n"
-            + "h\tFALSE\t/\tTRUE\t0\tD7\t7\r\n"
-            + "h\tFALSE\t/\tTRUE\t0\tD6\t\r\n"
-            + "h\tFALSE\t/\tTRUE\t0\tD5\t5\r\n"
-            + "h\tFALSE\t/\tFALSE\t0\tD3\t3\r\n"
-            + "h\tFALSE\t/\tTRUE\t0\tD2\t2\r\n"
-            + "h\tFALSE\t/\tTRUE\t0\tD1\t1\r\n";
+            + "localhost\tFALSE\t/\tFALSE\t0\tD10\t\r\n"
+            + ".localhost\tTRUE\t/\tFALSE\t0\tD8\t8\r\n"
+            + "localhost\tFALSE\t/\tTRUE\t0\tD7\t7\r\n"
+            + "localhost\tFALSE\t/\tTRUE\t0\tD6\t\r\n"
+            + "localhost\tFALSE\t/\tTRUE\t0\tD5\t5\r\n"
+            + "localhost\tFALSE\t/\tFALSE\t0\tD3\t3\r\n"
+            + "localhost\tFALSE\t/\tTRUE\t0\tD2\t2\r\n"
+            + "localhost\tFALSE\t/\tTRUE\t0\tD1\t1\r\n";
         Diagnostics.AssertText("cookie jar", expected, actual);
         Assert.AreEqual(expected, actual);
     }
@@ -205,7 +205,9 @@ public sealed class NetscapeCookieFileTests
     /// <summary>
     /// Measured: <c>curl -b in4.txt -c out4.txt</c> and <c>curl -b tcc.txt -c -</c>. Quotes stay on a value
     /// and come off a path; a carriage return ends the line; a control character refuses the name or value
-    /// but not the domain or path; <c>#httponly_</c> is a comment; bytes above 127 pass through.
+    /// but not the domain or path; <c>#httponly_</c> is a comment; bytes above 127 pass through. The single-label
+    /// domains <c>h</c> and <c>g</c> of those runs are <c>h.example</c> and <c>g.example</c> here, and the empty
+    /// <c>#HttpOnly_</c> domain is dropped, because curl 8.22.0 drops a public suffix read from a file (BL-2165).
     /// </summary>
     [TestMethod]
     public void LoadCookieFile_CharacterEdgeCases_ReadAsCurlReadsThem()
@@ -227,16 +229,15 @@ public sealed class NetscapeCookieFileTests
             + "127.0.0.1\tFALSE\t/\tFALSE\t0\tC6\ta\rb\n"
             + "127.0.0.1\tFALSE\t/\tFALSE\t0\tC8\taÃ©b\n"
             + "#HttpOnly_\tFALSE\t/\tFALSE\t0\tC9\t9\n"
-            + "..h\tTRUE\t/\tFALSE\t0\tE1\t1\n"
-            + "..g\tFALSE\t/\tFALSE\t0\tE2\t2\n";
+            + "..h.example\tTRUE\t/\tFALSE\t0\tE1\t1\n"
+            + "..g.example\tFALSE\t/\tFALSE\t0\tE2\t2\n";
 
         string actual = WriteJar(Load(File, discardSessionCookies: false), Now);
 
         string expected =
             Header
-            + ".g\tFALSE\t/\tFALSE\t0\tE2\t2\r\n"
-            + ".h\tTRUE\t/\tFALSE\t0\tE1\t1\r\n"
-            + "#HttpOnly_\tFALSE\t/\tFALSE\t0\tC9\t9\r\n"
+            + ".g.example\tFALSE\t/\tFALSE\t0\tE2\t2\r\n"
+            + ".h.example\tTRUE\t/\tFALSE\t0\tE1\t1\r\n"
             + "127.0.0.1\tFALSE\t/\tFALSE\t0\tC8\taÃ©b\r\n"
             + "127.0.0.1\tFALSE\t/\tFALSE\t0\tC6\ta\r\n"
             + "127.0.0.1\tFALSE\t/\u0001\tFALSE\t0\tC3\t3\r\n"
@@ -256,14 +257,14 @@ public sealed class NetscapeCookieFileTests
     public void LoadCookieFile_Namesakes_ReplaceInPlace()
     {
         const string File =
-            "h\tFALSE\t/\tFALSE\t0\tX\t1\n"
-            + "h\tFALSE\t/\tFALSE\t0\tY\t1\n"
-            + "H\tFALSE\t/\tFALSE\t0\tX\t2\n"
-            + "h\tTRUE\t/\tFALSE\t0\tX\t3\n";
+            "localhost\tFALSE\t/\tFALSE\t0\tX\t1\n"
+            + "localhost\tFALSE\t/\tFALSE\t0\tY\t1\n"
+            + "LOCALHOST\tFALSE\t/\tFALSE\t0\tX\t2\n"
+            + "localhost\tTRUE\t/\tFALSE\t0\tX\t3\n";
 
         string actual = WriteJar(Load(File, discardSessionCookies: false), Now);
 
-        string expected = Header + ".h\tTRUE\t/\tFALSE\t0\tX\t3\r\nh\tFALSE\t/\tFALSE\t0\tY\t1\r\nH\tFALSE\t/\tFALSE\t0\tX\t2\r\n";
+        string expected = Header + ".localhost\tTRUE\t/\tFALSE\t0\tX\t3\r\nlocalhost\tFALSE\t/\tFALSE\t0\tY\t1\r\nLOCALHOST\tFALSE\t/\tFALSE\t0\tX\t2\r\n";
         Diagnostics.AssertText("cookie jar", expected, actual);
         Assert.AreEqual(expected, actual);
     }
