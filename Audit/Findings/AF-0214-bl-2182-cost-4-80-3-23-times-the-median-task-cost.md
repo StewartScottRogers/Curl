@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: process:logs:BL-2182:cost-outlier
 reproduction: none
-task: none
-tasks:
+task: BL-2216
+tasks: BL-2216
 found: 2026-10-14
 found-at: c1dedd04f2a8e1534e64b664312c5dacc66bdf4a
 scorecard: 2026-10-14_0453.md

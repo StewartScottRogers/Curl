@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: quality:Curl.Protocol.Http.UnitLibrary/HttpRedirectLocation.cs:AppendUnescaped-gt:surviving-mutant
 reproduction: mutation Curl.Protocol.Http.UnitLibrary/HttpRedirectLocation.cs:245:>
-task: none
-tasks:
+task: BL-2211
+tasks: BL-2211
 found: 2026-10-14
 found-at: c1dedd04f2a8e1534e64b664312c5dacc66bdf4a
 scorecard: 2026-10-14_0453.md

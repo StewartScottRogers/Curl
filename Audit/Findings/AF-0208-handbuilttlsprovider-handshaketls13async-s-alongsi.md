@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: quality:Curl.Networking.UnitLibrary/HandBuiltTlsProvider.cs:HandshakeTls13Async-false:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/HandBuiltTlsProvider.cs:702:false
-task: none
-tasks:
+task: BL-2210
+tasks: BL-2210
 found: 2026-10-14
 found-at: c1dedd04f2a8e1534e64b664312c5dacc66bdf4a
 scorecard: 2026-10-14_0453.md

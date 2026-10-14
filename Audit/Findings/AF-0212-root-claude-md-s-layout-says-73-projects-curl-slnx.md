@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: truthfulness:CLAUDE.md:RepositoryLayoutProjectCount:false-statement
 reproduction: none
-task: none
-tasks:
+task: BL-2214
+tasks: BL-2214
 found: 2026-10-14
 found-at: c1dedd04f2a8e1534e64b664312c5dacc66bdf4a
 scorecard: 2026-10-14_0453.md
