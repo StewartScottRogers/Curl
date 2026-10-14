@@ -31,3 +31,4 @@ Split from BL-2160 (GF-0038, curl 8.22.0 changed behaviour). Measured 2026-10-13
 ## Log
 
 - 2026-10-13: Created.
+- 2026-10-13: Backlog -> Doing.
