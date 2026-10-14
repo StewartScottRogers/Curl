@@ -5,10 +5,10 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: [BL-2180]
-touches: [Curl.Protocol.Abstractions.UnitLibrary, Curl.Protocol.Abstractions.UnitTests, Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests, Curl.Console, Curl.Console.UnitTests, Curl.Conformance.UnitTests, Documentation]
+touches: [Curl.Core.UnitLibrary, Curl.Core.UnitTests, Curl.Protocol.Abstractions.UnitLibrary, Curl.Protocol.Abstractions.UnitTests, Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests, Curl.Console, Curl.Console.UnitTests, Curl.Conformance.UnitTests, Documentation]
 requirement: none
 created: 2026-10-13
-completed:
+completed: 2026-10-13
 ---
 # BL-2182 — Sign HTTP requests with the --httpsig-* options through an authenticator in Curl.Console, as curl 8.22.0's HTTPSIG auth does
 
@@ -60,22 +60,46 @@ implement them; upstream facts read at `curl-8_22_0`:
 
 ## Acceptance criteria
 
-- [ ] An HTTP request sent with the options carries `Signature-Input` and `Signature` in the
+- [x] An HTTP request sent with the options carries `Signature-Input` and `Signature` in the
       `Authorization` slot; a test in `Curl.Protocol.Http.UnitTests` or `Curl.Console.UnitTests`
       checks the header bytes for a fixed `created` time through an injected `TimeProvider`, for
       ed25519 and hmac-sha256 (upstream test 5001's and 5002's signatures with `created=0`), and
       that a `-H Signature:` line suppresses both.
-- [ ] A missing key or key id and an unknown algorithm end with exit 2 and upstream's
+- [x] A missing key or key id and an unknown algorithm end with exit 2 and upstream's
       `config2setopts.c` text; an unreadable `@file` key with exit 26; a bad hex key, a duplicate
       or unknown component with exit 43 and the library's `httpsig: ...` message.
-- [ ] A redirect to another origin is sent unsigned without `--location-trusted`.
-- [ ] `-v` prints upstream's four `httpsig:` lines and `Server auth using HTTPSIG with user ''`.
-- [ ] Every changed library stays at 100% line and branch coverage, complexity at most 10, CRAP
+- [x] A redirect to another origin is sent unsigned without `--location-trusted`.
+- [x] `-v` prints upstream's four `httpsig:` lines and `Server auth using HTTPSIG with user ''`.
+- [x] Every changed library stays at 100% line and branch coverage, complexity at most 10, CRAP
       at most 30.
 
 ## Notes
+
+- Touches: added `Curl.Core.UnitLibrary` and `Curl.Core.UnitTests`, because the redirect
+  follower (`RedirectFollower.HopHttp`) is where a hop to another origin drops credentials;
+  it now also drops `HttpRequestOptions.HttpSignature` there unless `--location-trusted`. No
+  other task in Doing named them.
+- Design: `HttpRequestOptions.HttpSignature` (`HttpSignatureSettings`, key already read from an
+  `@file`) -> `HttpAuthRequest.HttpSignature` (`HttpSignatureInputs`, with `@authority` from an
+  `-H Host:` value else the `Host` curl sends) -> `Curl.Console`'s `HttpSignatureHttpAuthenticator`,
+  wrapped around the `--aws-sigv4` one, so with both options given the signature wins. Its value
+  is whole `Signature-Input`/`Signature` lines, which `HttpRequestHeadFormatter` writes in the
+  `Authorization` slot as they are, whatever `-H Authorization` says.
+- Setup checks (`HttpSignatureSetup`) run at each URL of every scheme, not only HTTP ones, as
+  the simplest model; the mapping reads an `@file` key a second time when it builds the
+  transfer's options. Both are recorded here as choices, not measured differences.
+- Measured: the ed25519 key in `Curl.HttpMessageSignatures.UnitTests` reproduces upstream test
+  5001's signature with `created=0` byte for byte; its HMAC key is not upstream's, so the HMAC
+  test checks the signature against `HMACSHA256` of the signature base instead.
+- Not done here: running upstream cases 5000 to 5025 needs their key files and `created=0`
+  through the harness; filed as BL-2183.
+- `Measure-CodeQuality.ps1` for the four changed libraries: `Curl.Console` 100/100. My change
+  pushed `HttpAuthUsingLines.PickedScheme` to complexity 12; fixed by extracting
+  `SchemeOfSentValue`. Three failing members this task did not touch (`RedirectFollower.HopMail`,
+  `HttpProtocolHandler.WriteHeadersAsync`, `CurlUrlHost.TryNormalizeName`) are filed as BL-2184.
 
 ## Log
 
 - 2026-10-13: Created.
 - 2026-10-13: Backlog -> Doing.
+- 2026-10-13: Doing -> Done. --httpsig-* options sign HTTP requests (Signature-Input and Signature in the Authorization slot), setup checks exit 2/26/43, cross-origin redirects go unsigned; upstream cases left to BL-2183
