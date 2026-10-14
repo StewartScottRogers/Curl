@@ -9,7 +9,7 @@ touches: [Audit, .claude/agents]
 lane: no
 requirement: none
 created: 2026-10-14
-completed:
+completed: 2026-10-14
 ---
 # BL-2218 — Process findings about a past run's cost close when their task is Done instead of being re-fixed
 
@@ -44,13 +44,13 @@ audit -> master pull request merged once CI is green.
 
 ## Acceptance criteria
 
-- [ ] A finding whose key ends in `:cost-outlier` closes, with `closed-how` naming the rule (for example `task-done-historical`) and a reason, at the first audit after all its tasks are Done. It is not re-audited and no Re-fix task is filed for it.
-- [ ] Every other finding still follows ADR-0422 unchanged, and the self-tests of `New-TasksFromAcceptedFindings.ps1` and `Write-AuditFindings.ps1` prove both cases.
-- [ ] AF-0190, AF-0191, AF-0204 and AF-0205 are closed under the new rule (their original tasks are Done). Re-fix tasks BL-2205 to BL-2208 are moved to Done on work/dark-factory with that reason, unless a lane already finished them.
-- [ ] ADR-0422 carries an amendment note, and CLAUDE.md's closing-rule paragraph and the process auditor's method say the same.
-- [ ] The change lands through an audit-branch pull request with CI green on Windows, Linux and macOS.
+- [x] A finding whose key ends in `:cost-outlier` closes, with `closed-how` naming the rule (for example `task-done-historical`) and a reason, at the first audit after all its tasks are Done. It is not re-audited and no Re-fix task is filed for it.
+- [x] Every other finding still follows ADR-0422 unchanged, and the self-tests of `New-TasksFromAcceptedFindings.ps1` and `Write-AuditFindings.ps1` prove both cases.
+- [x] AF-0190, AF-0191, AF-0204 and AF-0205 are closed under the new rule (their original tasks are Done). Re-fix tasks BL-2205 to BL-2208 are moved to Done on work/dark-factory with that reason, unless a lane already finished them.
+- [x] ADR-0422 carries an amendment note, and CLAUDE.md's closing-rule paragraph and the process auditor's method say the same.
+- [x] The change lands through an audit-branch pull request with CI green on Windows, Linux and macOS.
 
-- [ ] <!-- A statement someone else can check from the repository without asking a question. -->
+- [x] <!-- A statement someone else can check from the repository without asking a question. -->
 
 ## Notes
 
@@ -58,3 +58,4 @@ audit -> master pull request merged once CI is green.
 
 - 2026-10-14: Created.
 - 2026-10-14: Backlog -> Doing. interactive session
+- 2026-10-14: Doing -> Done. PR #141 merged: cost-outlier findings close when their tasks are Done
