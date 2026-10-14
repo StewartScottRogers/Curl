@@ -1,6 +1,6 @@
 # ADR-0012 — Relicense from GPL-3.0 to MIT
 
-- **Status:** Accepted
+- **Status:** Superseded by [ADR-0486](ADR-0486-relicense-from-mit-to-the-curl-licence.md)
 - **Date:** 2026-09-26
 
 ## Context

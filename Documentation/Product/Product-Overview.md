@@ -312,11 +312,14 @@ Checkable by someone outside the project, in priority order:
   coverage, cyclomatic complexity of at most 10 per method and a CRAP score of at most
   30. Complexity breaks the build; coverage and CRAP are measured by
   `Measure-CodeQuality.ps1`.
-- **Licensing — MIT.** This repository is under the **MIT licence**
-  ([ADR-0012](../Planning/Decisions/ADR-0012-relicense-from-gpl-3-0-to-mit.md)),
-  relicensed from GPL-3.0. curl is under the **curl licence**, a permissive MIT-style
-  licence, and a permissive licence keeps the embed-in-anything use that makes a
-  drop-in replacement worth having.
+- **Licensing — the curl licence.** This repository is under the **curl licence**
+  (SPDX `curl`), the same permissive licence curl itself uses, word for word with this
+  project's copyright line
+  ([ADR-0486](../Planning/Decisions/ADR-0486-relicense-from-mit-to-the-curl-licence.md),
+  which supersedes the move from GPL-3.0 to MIT in
+  [ADR-0012](../Planning/Decisions/ADR-0012-relicense-from-gpl-3-0-to-mit.md)). Anyone who
+  can ship curl can ship Curl on the same terms, keeping the embed-in-anything use that
+  makes a drop-in replacement worth having.
   - **Clean-room is a choice worth making anyway.** Building from RFCs, the man page
     and observable behaviour — rather than translating C — avoids licence-provenance
     auditing and keeps the codebase unambiguously ours. Adopted as the working rule.
