@@ -286,11 +286,14 @@ internal sealed class HttpRequestFraming
     /// <param name="convertLineEndings">
     /// <see langword="true" /> for <c>--crlf</c>: <paramref name="body" /> is sent through
     /// <see cref="WithCrlfLineEndings" />, chunked, while curl decides <c>Expect</c> by its
-    /// length before conversion (measured, AF-0125: no <c>Expect</c> for a 10-byte file).
+    /// length before conversion (measured, AF-0125: no <c>Expect</c> for a 10-byte file). An empty
+    /// body has nothing to convert and keeps its <c>Content-Length: 0</c> (measured, AF-0198: curl
+    /// 8.22.0 sends it for <c>-d '' --crlf</c> and for an empty <c>-T</c> file with <c>--crlf</c>).
     /// </param>
     private static HttpRequestFraming OfBody(string method, HttpRequestBody body, HttpCustomHeader[] customHeaders, bool isHttp10, HttpUploadResume? upload = null, string? rangeText = null, bool convertLineEndings = false)
     {
         long? unconvertedLength = LengthOf(body);
+        convertLineEndings = convertLineEndings && unconvertedLength != 0;
         long? length = convertLineEndings ? null : unconvertedLength;
         body = convertLineEndings ? WithCrlfLineEndings(body) : body;
         bool wantsExpect = WantsExpect(unconvertedLength, isHttp10);
