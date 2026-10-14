@@ -134,14 +134,33 @@ public sealed class GopherProtocolHandlerAdversarialTests
     // Malformed input
 
     [TestMethod]
-    [DataRow("gopher://h/1a%0D%0Ab", new byte[] { 0x61, 0x0D, 0x0A, 0x62, 0x0D, 0x0A }, DisplayName = "CRLF in the middle")]
-    [DataRow("gopher://h/1a%0Ab%0D", new byte[] { 0x61, 0x0A, 0x62, 0x0D, 0x0D, 0x0A }, DisplayName = "bare LF, then a CR before the CRLF")]
-    [DataRow("gopher://h/1a?b%0d%0a#c%00", new byte[] { 0x61, 0x3F, 0x62, 0x0D, 0x0A, 0x0D, 0x0A }, DisplayName = "CRLF in the query, NUL in the fragment")]
-    public async Task ExecuteAsync_EncodedCrAndLfInTheSelector_AreSentDecodedAsCurlSendsThem(string url, byte[] expected)
+    [DataRow("gopher://h/1a%0D%0Ab", DisplayName = "CRLF in the middle")]
+    [DataRow("gopher://h/1a%0Ab", DisplayName = "bare LF")]
+    [DataRow("gopher://h/1a%0d", DisplayName = "bare CR at the end")]
+    [DataRow("gopher://h/1a?b%0d%0a", DisplayName = "CRLF in the query")]
+    [DataRow("gopher://h/1/sel%0d%0aINJECT/1609", DisplayName = "upstream test1609")]
+    public async Task ExecuteAsync_EncodedCrOrLfInTheSelector_ReturnsUrlMalformatAndSendsNothing(string url)
     {
-        // Measured: curl 8.21.0 refuses only NUL in a gopher selector; CR and LF go out
-        // decoded, and the fragment, NUL and all, is never sent.
-        await AssertSelectorSent(url, expected);
+        // Measured: curl 8.22.0 sent nothing for /1a%0D%0Ab, /1a%0Ab and /1a?b%0d%0a and
+        // exited 3 with "curl: (3) Bad gopher selector, CR or LF not allowed" (BL-2185).
+        ScriptedConnection connection = new("unread"u8.ToArray());
+        Diagnostics.Arrange("url", url);
+
+        TransferResult result = await Handler(connection).ExecuteAsync(Context(url));
+        Diagnostics.Act("result", DiagnosticText.Result(result));
+
+        Diagnostics.Assert("exit code", CurlExitCode.UrlMalformat, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.UrlMalformat, result.ExitCode);
+        Assert.AreEqual("Bad gopher selector, CR or LF not allowed", result.ErrorMessage);
+        Assert.IsEmpty(connection.Written);
+        Assert.AreEqual(0, connection.ReadCount);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_EncodedCrAndNulInTheFragment_AreNeverSentNorRefused()
+    {
+        // Measured: curl 8.22.0 sent "a\r\n" for /1a#c%0d and exited 0; the fragment is never sent.
+        await AssertSelectorSent("gopher://h/1a#c%0d%00", "a\r\n"u8.ToArray());
     }
 
     [TestMethod]

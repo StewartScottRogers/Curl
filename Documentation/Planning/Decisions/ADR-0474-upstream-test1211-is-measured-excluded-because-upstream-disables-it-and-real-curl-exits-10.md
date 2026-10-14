@@ -40,9 +40,12 @@ against curl.
    transfer time set.
 2. test1211 is not added to `PassingUpstreamCases.txt`; the in-process ratchet leaves it
    `Inconclusive` with its first difference (`QUIT`).
-3. The gap office measures `behaviour:test1211` as `excluded`, with the reason "disabled
-   upstream (tests/data/DISABLED); real curl 8.21.0 exits 10 after QUIT, which Curl matches
-   (ADR-0474)", so GF-0048's item can close.
+3. The gap office measures `behaviour:test1211` as `excluded`, because upstream lists it in
+   `tests/data/DISABLED`: the converter's general rule for every disabled case
+   (`Gap/Tools/ConvertTo-BehaviourMeasurement.ps1`) records the reason `disabled-upstream`
+   with the evidence "disabled upstream", and has no rule specific to test1211. Real curl
+   8.21.0 exits 10 after QUIT, which Curl matches; this ADR is the record of why that
+   exclusion is right, so GF-0048's item can close.
 4. Any other case upstream's `DISABLED` lists, whose expectation real curl contradicts, is
    handled the same way: measure real curl, match it, and exclude the case with that reason.
 

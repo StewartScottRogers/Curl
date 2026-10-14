@@ -8,7 +8,7 @@ depends-on: []
 touches: [Documentation]
 requirement: none
 created: 2026-10-14
-completed:
+completed: 2026-10-13
 ---
 # BL-2195 — Fix AF-0202: ADR-0474 says the gap office excludes test1211 with an ADR-specific reason; the converter records the generic disabled-upstream reason
 
@@ -42,11 +42,16 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Docs-only change (one ADR paragraph); no code touched, so build and tests are unaffected. Fixed the ADR because the converter lives on an audit path (interactive only).
+The reproduction count of 0 for test1211 stays by design: the ADR now says the converter has no test1211 rule.
 
 ## Log
 
 - 2026-10-14: Created.
+- 2026-10-13: Backlog -> Doing.
+- 2026-10-13: Doing -> Done. ADR-0474 decision 3 now states the converter's real generic rule instead of an invented test1211 reason.

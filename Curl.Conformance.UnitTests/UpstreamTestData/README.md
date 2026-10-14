@@ -27,6 +27,14 @@ them is BL-1923. `UpstreamConformanceTests` passes this folder as `%CERTDIR`, an
 copies `certs/` to the test output beside the cases. `.gitattributes` marks them `-text`.
 `Update-UpstreamTestData.ps1` refreshes this folder with the cases.
 
+## data
+
+`data/` holds the two files of `tests/data` that httpsig cases 5001 to 5025 name as
+`%SRCDIR/data/...` (BL-2183): `data-httpsig-ed25519.key` and `data-httpsig-hmac-sha256.key`, byte
+for byte. `UpstreamConformanceTests` passes this folder as `%SRCDIR`; any other `%SRCDIR/data/...` file is
+not vendored, so a case that names one fails with curl's read error. The csproj copies `data/` to
+the test output; `.gitattributes` marks the files `-text`.
+
 ## Refresh to another tag
 
 ```

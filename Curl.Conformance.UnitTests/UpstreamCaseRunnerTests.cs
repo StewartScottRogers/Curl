@@ -111,6 +111,27 @@ public sealed class UpstreamCaseRunnerTests
     }
 
     [TestMethod]
+    public async Task RunAsync_ClientFileAndCommandNamedLogSlashName_AreTheLogDirectorysName()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        string logDirectory = CreateLogDirectory();
+        IReadOnlyList<string>? arguments = null;
+        UpstreamCaseRunner runner = Runner(invocation =>
+        {
+            arguments = invocation.Arguments;
+            return Task.FromResult(0);
+        });
+        string testFile = "<testcase>\n<client>\n<command>\n-T log/upload%TESTNUMBER\n</command>\n<file name=\"log/upload%TESTNUMBER\">\nputdata\n</file>\n</client>\n</testcase>\n";
+
+        UpstreamCaseOutcome outcome = await RunWithLogDirectoryAsync(runner, testFile, logDirectory);
+
+        diagnostics.Assert("outcome kind", UpstreamCaseOutcomeKind.Passed, outcome.Kind);
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Passed, outcome.Kind, outcome.Detail);
+        Assert.AreEqual("putdata\n", File.ReadAllText($"{logDirectory}/upload5"));
+        Assert.IsTrue(arguments!.Contains($"{logDirectory.Replace('\\', '/')}/upload5"), string.Join(" ", arguments!));
+    }
+
+    [TestMethod]
     [DataRow("headers", "GET / HTTP/1.0\r\n\r\nbody\n")]
     [DataRow("yes", "GET / HTTP/1.0\r\n\r\nbody\r\n")]
     public async Task RunAsync_StdinAndFileWithCrlf_AreGivenWithCrlfLineEndings(string crlf, string expected)
@@ -384,6 +405,40 @@ public sealed class UpstreamCaseRunnerTests
         diagnostics.Assert("arguments", "--output-dir | Z:/curl/tests/not-there", string.Join(" | ", arguments ?? []));
         Assert.AreEqual(UpstreamCaseOutcomeKind.Passed, outcome.Kind, outcome.Detail);
         CollectionAssert.AreEqual(new[] { "--output-dir", "Z:/curl/tests/not-there" }, arguments!.ToArray());
+    }
+
+    [TestMethod]
+    public async Task RunAsync_SourceDirectoryWithABlank_Throws()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        UpstreamCaseRunner runner = Runner(_ => Task.FromResult(0));
+
+        diagnostics.Arrange("source directory", "/a b/tests");
+        ArgumentException exception = await Assert.ThrowsExactlyAsync<ArgumentException>(() => runner.RunAsync(1, ReadOnlyMemory<byte>.Empty, CreateLogDirectory(), null, null, "/a b/tests"));
+        diagnostics.Act("exception parameter", exception.ParamName);
+        diagnostics.Assert("exception parameter", "sourceDirectory", exception.ParamName);
+        Assert.AreEqual("sourceDirectory", exception.ParamName);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_SourceDirectory_IsSrcdirWithForwardSlashesAndKeepsTheEmulatedScripts()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        IReadOnlyList<string>? arguments = null;
+        UpstreamCaseRunner runner = Runner(invocation =>
+        {
+            arguments = CommandArguments(invocation);
+            return Task.FromResult(0);
+        });
+        string testFile = "<testcase>\n<client>\n<command option=\"no-output,no-include\">\n-K %SRCDIR/data/x --output-dir %SRCDIR/libtest/test610.pl\n</command>\n</client>\n</testcase>\n";
+
+        diagnostics.Arrange("source directory", "Z:\\curl\\tests");
+        UpstreamCaseOutcome outcome = await runner.RunAsync(5, Encoding.Latin1.GetBytes(testFile), CreateLogDirectory(), null, null, "Z:\\curl\\tests");
+        diagnostics.Act("arguments", string.Join(" | ", arguments ?? []));
+
+        diagnostics.Assert("arguments", "-K | Z:/curl/tests/data/x | --output-dir | ./libtest/test610.pl", string.Join(" | ", arguments ?? []));
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Passed, outcome.Kind, outcome.Detail);
+        CollectionAssert.AreEqual(new[] { "-K", "Z:/curl/tests/data/x", "--output-dir", "./libtest/test610.pl" }, arguments!.ToArray());
     }
 
     [TestMethod]

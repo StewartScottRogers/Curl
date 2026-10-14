@@ -165,8 +165,9 @@ Namespace `Curl.Cryptography`. It holds:
 - `DsaSignature` (public, `IDisposable`): FIPS 186-4 DSA - the constructor takes p, q, g
   and x, `SignHash` signs with RFC 6979's deterministic nonce over SHA1 to SHA512, and the
   static `VerifyHash` returns `false` for bad parameters, y not below p, r or s outside
-  [1, q - 1], or a mismatch. Signatures are r || s at q's length (ADR-0201). Constant-time
-  in x and k. The static `HashData` hashes a message for either, SHA-224 included, which
+  [1, q - 1], or a mismatch. Signatures are r || s at q's length (ADR-0201).
+  `ExportPublicKey` writes y = g^x mod p at p's length (`PublicKeyLength`), for a PKCS #8
+  key that leaves y out (AF-0197). Constant-time in x and k. The static `HashData` hashes a message for either, SHA-224 included, which
   the BCL lacks (ADR-0211: TLS's `dsa_sha224`).
 - `BrainpoolCurve` (public enum): `BrainpoolP256r1`, `BrainpoolP384r1`, `BrainpoolP512r1`
   (RFC 5639's r1 curves, TLS 1.3's `brainpoolP*r1tls13`).

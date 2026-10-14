@@ -205,9 +205,12 @@ than `http`, `file` or `none`, a missing feature, a variable with no value, an u
 `<servercmd>` or strip line each skip it with a reason, and so does a file part naming a file
 outside the case's log directory; before expansion `UpstreamTestDirectoryComposition` rewrites
 `%PWD/%LOGDIR` to `%LOGDIR` (the absolute log directory, so the composition names the file there on
-every platform) and `%SRCDIR/libtest/test610.pl` / `test613.pl` to `./libtest/...`, as
-`runtests.pl`'s default `$srcdir` names them; any other `%SRCDIR` has no value and skips the case
-(ADR-0458, BL-1944); curl's `--output` is `%LOGDIR/curl%TESTNUMBER.out`, as `runtests.pl` names it, and `--trace-ascii %LOGDIR/trace%TESTNUMBER --trace-config all --trace-time` follow `--include` as `runtests.pl` passes them, so the default config file's note prints as test433 expects (BL-2017);
+every platform; a file part named `log/<name>` and a `log/<name>` word in `<command>` become `%LOGDIR/<name>` too, as runtests.pl runs in the tests folder, BL-2202) and `%SRCDIR/libtest/test610.pl` / `test613.pl` to `./libtest/...`, as
+`runtests.pl`'s default `$srcdir` names them; any other `%SRCDIR` is the `sourceDirectory`
+`RunAsync` is given, with forward slashes (`UpstreamConformanceTests` passes `UpstreamTestData`,
+whose `data/` holds the httpsig key files, BL-2183), and with none it has no value and skips the case
+(ADR-0458, BL-1944); `UpstreamCurlPlatform.WithFeatures` adds a feature the harness stands in for
+(`Debug` for the httpsig cases, whose fixed `created=0` the tests supply as the signing clock); curl's `--output` is `%LOGDIR/curl%TESTNUMBER.out`, as `runtests.pl` names it, and `--trace-ascii %LOGDIR/trace%TESTNUMBER --trace-config all --trace-time` follow `--include` as `runtests.pl` passes them, so the default config file's note prints as test433 expects (BL-2017);
 `%PWD` elsewhere has a value only when the caller names a tests
 directory, and `%CERTDIR` only when it names a certificate directory: the folder holding
 upstream's `certs` folder, since cases name `%CERTDIR/certs/test-ca.crt` (BL-1922; the

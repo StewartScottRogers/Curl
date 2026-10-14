@@ -8,7 +8,7 @@ depends-on: []
 touches: [RunDarkFactory.ps1]
 requirement: none
 created: 2026-10-14
-completed:
+completed: 2026-10-13
 ---
 # BL-2197 — Fix AF-0204: BL-2142 cost $3.11, 4.25 times the median task cost, over 68 turns with 37 sliced Bash reads
 
@@ -41,11 +41,15 @@ The finding closes only when a later re-audit by the process auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Cause is the same as AF-0190: BL-2142 was claimed before BL-2149 put "Read once, do not slice" in the run prompt. The prompt already carries that rule; added AF-0204 as a further instance to both prompt copies in RunDarkFactory.ps1. Reproduction reads a past log, so it cannot be re-run here (Audit paths are off limits to lanes); re-audit confirms.
 
 ## Log
 
 - 2026-10-14: Created.
+- 2026-10-13: Backlog -> Doing.
+- 2026-10-13: Doing -> Done. Run prompts now name AF-0204 beside the Read-once rule

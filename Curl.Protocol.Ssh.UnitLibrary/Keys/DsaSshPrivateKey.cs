@@ -1,4 +1,3 @@
-using System.Numerics;
 using System.Security.Cryptography;
 using System.Text;
 using Curl.Cryptography;
@@ -58,7 +57,7 @@ internal sealed class DsaSshPrivateKey : SshPrivateKey
     internal static DsaSshPrivateKey Create(byte[] prime, byte[] subprime, byte[] generator, byte[]? publicKey, byte[] privateKey)
     {
         using DsaSignature check = new(prime, subprime, generator, privateKey);
-        byte[] y = publicKey ?? BigInteger.ModPow(Unsigned(generator), Unsigned(privateKey), Unsigned(prime)).ToByteArray(isUnsigned: true, isBigEndian: true);
+        byte[] y = publicKey ?? ComputePublicKey(check);
         return new DsaSshPrivateKey(prime, subprime, generator, y, privateKey);
     }
 
@@ -71,5 +70,11 @@ internal sealed class DsaSshPrivateKey : SshPrivateKey
         return signature;
     }
 
-    private static BigInteger Unsigned(byte[] magnitude) => new(magnitude, isUnsigned: true, isBigEndian: true);
+    /// <summary>y = g^x mod p by <see cref="DsaSignature" />'s constant-time exponentiation, never <c>BigInteger</c> on x (AF-0197).</summary>
+    private static byte[] ComputePublicKey(DsaSignature key)
+    {
+        byte[] y = new byte[key.PublicKeyLength];
+        key.ExportPublicKey(y);
+        return y;
+    }
 }

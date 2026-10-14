@@ -281,7 +281,7 @@ internal static class CurlComposition
             diagnosticLog);
 
     /// <summary>
-    /// Creates the contexts the dialing <see cref="CreateRunner(Stream, Stream, Stream, ITcpDialer, IDnsResolver, IDatagramConnector, bool, IWriteOutFileOpener?, bool, Func{string, string?}?, IConnectionListener?, DefaultConfigFileSearch?)" />
+    /// Creates the contexts the dialing <see cref="CreateRunner(Stream, Stream, Stream, ITcpDialer, IDnsResolver, IDatagramConnector, bool, IWriteOutFileOpener?, bool, Func{string, string?}?, IConnectionListener?, DefaultConfigFileSearch?, TimeProvider?)" />
     /// uses: <see cref="CreateSecurityContextFactory(IConnector, IDatagramConnector, IDiagnosticLog?)" />'s
     /// router, with NTLM sent to the hand-built context on every platform when
     /// <paramref name="usesHandBuiltNtlm" /> is set (<see cref="HandBuiltNtlmSecurityContextFactory" />, BL-1858).
@@ -1240,6 +1240,7 @@ internal static class CurlComposition
     /// </param>
     /// <param name="ftpListener">Listens for FTP's active-mode (<c>-P</c>) data connections; a <see cref="TcpConnectionListener" /> when <see langword="null" /> (BL-1907).</param>
     /// <param name="defaultConfigFileSearch">Where the run looks for the default config file (<c>.curlrc</c>); <see langword="null" /> for a run that reads none (BL-1977).</param>
+    /// <param name="signingClock">The clock <c>--aws-sigv4</c> and the <c>--httpsig-*</c> options sign with; <see cref="TimeProvider.System" /> when not given (BL-2183).</param>
     /// <returns>The runner.</returns>
     internal static CurlCommandRunner CreateRunner(
         Stream standardOutput,
@@ -1253,13 +1254,14 @@ internal static class CurlComposition
         bool usesHandBuiltNtlm = false,
         Func<string, string?>? readEnvironmentVariable = null,
         IConnectionListener? ftpListener = null,
-        DefaultConfigFileSearch? defaultConfigFileSearch = null)
+        DefaultConfigFileSearch? defaultConfigFileSearch = null,
+        TimeProvider? signingClock = null)
     {
         ConnectionCache runConnections = new(TimeProvider.System);
         LateBoundDiagnosticLog runLog = new();
         Func<string, string?> environment = readEnvironmentVariable ?? (_ => null);
         return new(
-            SharingRunCookies((options, cookies) => CreateDialingTransferDispatch(tcpDialer, dnsResolver, datagramConnector, cookies, options, runConnections, runLog, usesHandBuiltNtlm, environment, ftpListener)),
+            SharingRunCookies((options, cookies) => CreateDialingTransferDispatch(tcpDialer, dnsResolver, datagramConnector, cookies, options, runConnections, runLog, usesHandBuiltNtlm, environment, ftpListener, signingClock)),
             new PhysicalFileSystem(),
             new PhysicalFileSystem(),
             standardOutput,
@@ -1278,7 +1280,7 @@ internal static class CurlComposition
     }
 
     /// <summary>
-    /// Builds one option group's dispatch for the dialing <see cref="CreateRunner(Stream, Stream, Stream, ITcpDialer, IDnsResolver, IDatagramConnector, bool, IWriteOutFileOpener?, bool, Func{string, string?}?, IConnectionListener?, DefaultConfigFileSearch?)" />:
+    /// Builds one option group's dispatch for the dialing <see cref="CreateRunner(Stream, Stream, Stream, ITcpDialer, IDnsResolver, IDatagramConnector, bool, IWriteOutFileOpener?, bool, Func{string, string?}?, IConnectionListener?, DefaultConfigFileSearch?, TimeProvider?)" />:
     /// the group's <see cref="TcpConnector" /> over <paramref name="tcpDialer" /> and
     /// <paramref name="dnsResolver" />, pooled in <paramref name="runConnections" />, with a proxy
     /// selector that reads the environment through <paramref name="readEnvironmentVariable" />, and the connector's <c>--resolve</c> entries
@@ -1294,6 +1296,7 @@ internal static class CurlComposition
     /// <param name="usesHandBuiltNtlm">Whether NTLM is answered by the hand-built context on every platform (<see cref="CreateDialingSecurityContextFactory" />).</param>
     /// <param name="readEnvironmentVariable">Reads the proxy environment variables.</param>
     /// <param name="ftpListener">Listens for FTP's active-mode data connections, or <see langword="null" /> for a <see cref="TcpConnectionListener" />.</param>
+    /// <param name="signingClock">The clock <c>--aws-sigv4</c> and the <c>--httpsig-*</c> options sign with; <see cref="TimeProvider.System" /> when <see langword="null" />.</param>
     /// <returns>The dispatch.</returns>
     private static TransferDispatch CreateDialingTransferDispatch(
         ITcpDialer tcpDialer,
@@ -1305,7 +1308,8 @@ internal static class CurlComposition
         IDiagnosticLog diagnosticLog,
         bool usesHandBuiltNtlm,
         Func<string, string?> readEnvironmentVariable,
-        IConnectionListener? ftpListener)
+        IConnectionListener? ftpListener,
+        TimeProvider? signingClock)
     {
         ITlsProviderWithWarnings tlsProvider = CreateTlsProvider(TlsClientOptionsMapping.FromCommandLine(options), TimeProvider.System);
         ITlsProviderWithWarnings proxyTlsProvider = CreateTlsProvider(TlsClientOptionsMapping.ProxyFromCommandLine(options), TimeProvider.System);
@@ -1316,7 +1320,7 @@ internal static class CurlComposition
         ISecurityContextFactory securityContexts = CreateDialingSecurityContextFactory(poolingConnector, datagramConnector, diagnosticLog, usesHandBuiltNtlm);
         proxyContexts.Bind(securityContexts);
         return new(
-            new ProtocolDispatcher(CreateProtocolHandlers(poolingConnector, datagramConnector, tlsProvider, dnsResolver, cookies?.HandlerStore, securityContexts, proxyAuthSchemes: proxyTunnelOptions.ProxyAuthSchemes, negotiateOptions: NegotiateOptionsMapping.FromCommandLine(options), ftpDataConnector: poolingConnector.Over(tcpConnector.ForFtpDataConnections()), diagnosticLog: diagnosticLog, ftpListener: ftpListener)),
+            new ProtocolDispatcher(CreateProtocolHandlers(poolingConnector, datagramConnector, tlsProvider, dnsResolver, cookies?.HandlerStore, securityContexts, proxyAuthSchemes: proxyTunnelOptions.ProxyAuthSchemes, negotiateOptions: NegotiateOptionsMapping.FromCommandLine(options), signingClock: signingClock, ftpDataConnector: poolingConnector.Over(tcpConnector.ForFtpDataConnections()), diagnosticLog: diagnosticLog, ftpListener: ftpListener)),
             [],
             cookies,
             new ProxySelector(readEnvironmentVariable),

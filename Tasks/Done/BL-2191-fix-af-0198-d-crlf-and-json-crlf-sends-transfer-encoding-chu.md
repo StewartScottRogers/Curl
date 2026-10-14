@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Protocol.Http.UnitLibrary]
+touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests]
 requirement: none
 created: 2026-10-14
-completed:
+completed: 2026-10-13
 ---
 # BL-2191 — Fix AF-0198: -d '' --crlf (and --json '' --crlf) sends Transfer-Encoding: chunked with a 0 chunk where curl sends Content-Length: 0
 
@@ -41,11 +41,19 @@ The finding closes only when a later re-audit by the conformance auditor confirm
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Added `Curl.Protocol.Http.UnitTests` to `touches` for the focused unit tests (ADR-0482); no task in Doing on `origin/work/dark-factory` names it.
+- Measured curl 8.22.0 (Schannel): `-d '' --crlf` and an empty `-T` file with `--crlf` both send `Content-Length: 0`. Fix: `HttpRequestFraming.OfBody` skips line-ending conversion for a body of known length 0, so it keeps `Content-Length: 0` instead of going chunked. Non-empty `--crlf` bodies stay chunked (AF-0125).
+- Tests: `HttpCrlfUploadStreamTests.Of_CrlfEmptyBytesBody_KeepsContentLengthZero` and `Of_CrlfEmptyUpload_KeepsContentLengthZero` cover both sides of the new condition; Measure-CodeQuality was not run for this one-condition change.
+- Ran the full feature pipeline's work directly: a one-line fix needed no architect or reviewer subagent.
+- Reproduction rerun on a Release build: `curl: Content-Length: 0` / `candidate: Content-Length: 0`.
 
 ## Log
 
 - 2026-10-14: Created.
+- 2026-10-13: Backlog -> Doing.
+- 2026-10-13: Doing -> Done. -d '' --crlf, --json '' --crlf and an empty -T with --crlf send Content-Length: 0 like curl

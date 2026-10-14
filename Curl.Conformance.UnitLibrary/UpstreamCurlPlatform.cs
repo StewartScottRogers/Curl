@@ -14,7 +14,7 @@ namespace Curl.Conformance;
 /// <c>NTLM</c>, <c>Kerberos</c> and <c>SPNEGO</c>; the tool features a curl build has unless it
 /// disables them (<c>cookies</c>, <c>proxy</c>, <c>Mime</c>, <c>manual</c>, <c>DoH</c>,
 /// <c>digest</c>, <c>aws</c>, <c>netrc</c>, <c>verbose-strings</c>, <c>large-time</c>,
-/// <c>large-size</c>, <c>sha512-256</c> and <c>SSLpinning</c>); <c>large_file</c>;
+/// <c>large-size</c>, <c>sha512-256</c>, <c>SSLpinning</c> and <c>httpsig</c>); <c>large_file</c>;
 /// <c>local-http</c> (the harness's server is at <c>127.0.0.1</c>); <c>win32</c> on Windows, as
 /// <c>runtests.pl</c> sets it there; the TLS backend; and <c>xattr</c> off Windows, where curl
 /// cannot write extended attributes.
@@ -40,7 +40,7 @@ public sealed class UpstreamCurlPlatform
         "UnixSockets", "zstd",
         "crypto", "cookies", "proxy", "Mime", "manual", "DoH", "digest", "aws", "netrc", "verbose-strings",
         "large-time", "large-size", "sha512-256", "SSLpinning",
-        "large_file", "local-http",
+        "large_file", "local-http", "httpsig",
     ];
 
     private UpstreamCurlPlatform(IEnumerable<string> platformFeatures, string nullDevice, string operatingSystemName)
@@ -48,6 +48,13 @@ public sealed class UpstreamCurlPlatform
         Features = CommonFeatures.Concat(platformFeatures).ToHashSet(StringComparer.Ordinal);
         NullDevice = nullDevice;
         OperatingSystemName = operatingSystemName;
+    }
+
+    private UpstreamCurlPlatform(UpstreamCurlPlatform basis, IEnumerable<string> extraFeatures)
+    {
+        Features = basis.Features.Concat(extraFeatures).ToHashSet(StringComparer.Ordinal);
+        NullDevice = basis.NullDevice;
+        OperatingSystemName = basis.OperatingSystemName;
     }
 
     /// <summary>Windows, where Curl matches curl's Schannel build.</summary>
@@ -64,6 +71,18 @@ public sealed class UpstreamCurlPlatform
 
     /// <summary>The features Curl reports on this platform, case-sensitive as upstream spells them.</summary>
     public IReadOnlySet<string> Features { get; }
+
+    /// <summary>
+    /// Returns this platform with more features, for a harness that supplies one the platform lacks
+    /// (such as <c>Debug</c> for a case that needs the signing clock fixed); this platform is unchanged.
+    /// </summary>
+    /// <param name="extraFeatures">The features to add, spelled as upstream spells them.</param>
+    /// <returns>A platform with this one's features, null device and operating system name, and <paramref name="extraFeatures"/>.</returns>
+    public UpstreamCurlPlatform WithFeatures(IEnumerable<string> extraFeatures)
+    {
+        ArgumentNullException.ThrowIfNull(extraFeatures);
+        return new UpstreamCurlPlatform(this, extraFeatures);
+    }
 
     /// <summary>The value of <c>%DEV_NULL</c>.</summary>
     public string NullDevice { get; }

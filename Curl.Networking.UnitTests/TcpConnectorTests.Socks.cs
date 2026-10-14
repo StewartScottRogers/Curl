@@ -433,15 +433,25 @@ public sealed partial class TcpConnectorTests
     [TestMethod]
     public async Task ConnectAsync_ThroughSocks5WithACredentialOf255Bytes_SendsIt()
     {
-        var (result, _) = await ConnectThroughSocksAsync(
+        // RFC 1929: 01, the user's length and bytes, the password's length and bytes.
+        byte[] expected =
+        [
+            0x05, 0x03, 0x00, 0x01, 0x02,
+            0x01, 0xFF, .. Enumerable.Repeat((byte)'a', 255), 0xFF, .. Enumerable.Repeat((byte)'p', 255),
+            0x05, 0x01, 0x00, 0x01, 0x7F, 0x00, 0x00, 0x01, 0x1F, 0x90,
+        ];
+
+        var (result, proxyConnection) = await ConnectThroughSocksAsync(
             ProxyKind.Socks5,
             "127.0.0.1",
             [0x05, 0x02, 0x01, 0x00, .. Socks5Succeeded],
             new NetworkCredential(new string('a', 255), new string('p', 255)));
 
         Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Diff("bytes sent to proxy", expected, [.. proxyConnection.Written]);
 
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        CollectionAssert.AreEqual(expected, proxyConnection.Written);
     }
 
     [TestMethod]

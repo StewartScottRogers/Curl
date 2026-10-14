@@ -43,6 +43,25 @@ public static class UpstreamTestDirectoryComposition
             text = text.Replace(written, composed, StringComparison.Ordinal);
         }
 
-        return Encoding.Latin1.GetBytes(text);
+        text = text.Replace("name=\"log/", "name=\"%LOGDIR/", StringComparison.Ordinal);
+        return Encoding.Latin1.GetBytes(RewriteCommandLogPaths(text));
+    }
+
+    // Inside <command>, a word starting with log/ names runtests.pl's log folder (test5018's -T log/upload5018).
+    private static string RewriteCommandLogPaths(string text)
+    {
+        const string Open = "<command";
+        const string Close = "</command>";
+        StringBuilder rewritten = new();
+        int position = 0;
+        while (text.IndexOf(Open, position, StringComparison.Ordinal) is var start and >= 0
+            && text.IndexOf(Close, start, StringComparison.Ordinal) is var end and >= 0)
+        {
+            rewritten.Append(text, position, start - position);
+            rewritten.Append(text[start..end].Replace(" log/", " %LOGDIR/", StringComparison.Ordinal).Replace("\"log/", "\"%LOGDIR/", StringComparison.Ordinal));
+            position = end;
+        }
+
+        return rewritten.Append(text, position, text.Length - position).ToString();
     }
 }

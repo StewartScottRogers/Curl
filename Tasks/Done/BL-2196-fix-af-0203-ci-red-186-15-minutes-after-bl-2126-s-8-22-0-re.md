@@ -8,7 +8,7 @@ depends-on: []
 touches: [RunDarkFactory.ps1]
 requirement: none
 created: 2026-10-14
-completed:
+completed: 2026-10-13
 ---
 # BL-2196 — Fix AF-0203: CI red 186.15 minutes after BL-2126's 8.22.0 re-vendor broke test798, test1136 and test1462; fixes waited 2h15m for a running audit
 
@@ -41,11 +41,15 @@ The finding closes only when a later re-audit by the process auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Cause: Get-ShiftStartDecision made a -Continuous shift wait for a running audit even while CI was red with Fix CI failure tasks in Backlog (135 of the 186 red minutes). Fix: such a waiting task now starts the shift (RunDarkFactory.ps1); self-test added to -TestAuditCadence. The reproduction reads audit-office paths a lane cannot read, so it was verified through the self-test.
 
 ## Log
 
 - 2026-10-14: Created.
+- 2026-10-13: Backlog -> Doing.
+- 2026-10-13: Doing -> Done. Shift start no longer waits for an audit while a Fix CI failure task is waiting

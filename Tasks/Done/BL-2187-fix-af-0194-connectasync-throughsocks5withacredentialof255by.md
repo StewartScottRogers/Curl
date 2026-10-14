@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitTests]
 requirement: none
 created: 2026-10-14
-completed:
+completed: 2026-10-13
 ---
 # BL-2187 — Fix AF-0194: ConnectAsync_ThroughSocks5WithACredentialOf255Bytes_SendsIt never checks what was sent, only exit 0
 
@@ -41,11 +41,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Test-only fix, done directly rather than through the full feature pipeline: no production behaviour changes. `ConnectAsync_ThroughSocks5WithACredentialOf255Bytes_SendsIt` now keeps the proxy connection and asserts every byte sent: the greeting 05 03 00 01 02, the RFC 1929 sub-negotiation 01 ff + 255 x a + ff + 255 x p, then the connect request. The reproduction no longer matches this test (its one remaining match, line 31, is a different SOCKS test outside the finding). Curl.Networking.UnitTests: 3144 passed, 29 skipped; `dotnet build` clean.
 
 ## Log
 
 - 2026-10-14: Created.
+- 2026-10-13: Backlog -> Doing.
+- 2026-10-13: Doing -> Done. SOCKS5 255-byte credential test now asserts the RFC 1929 bytes sent, not just exit 0

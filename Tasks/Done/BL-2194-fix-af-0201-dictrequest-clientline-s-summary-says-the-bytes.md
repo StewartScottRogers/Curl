@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Dict.UnitLibrary]
 requirement: none
 created: 2026-10-14
-completed:
+completed: 2026-10-13
 ---
 # BL-2194 — Fix AF-0201: DictRequest.ClientLine's summary says the bytes sent match curl 8.21.0; the constant is CLIENT libcurl 8.22.0
 
@@ -42,11 +42,13 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
 ## Log
 
 - 2026-10-14: Created.
+- 2026-10-13: Backlog -> Doing.
+- 2026-10-13: Doing -> Done. Summary now names 8.22.0 (ADR-0479); repro gives 0

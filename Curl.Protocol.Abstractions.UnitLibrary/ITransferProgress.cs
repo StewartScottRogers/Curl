@@ -31,6 +31,15 @@ public interface ITransferProgress
     void ReportRequestRetried() => ReportTransferStarted();
 
     /// <summary>
+    /// Reports that a request whose reused connection died before its response began is sent
+    /// again on a fresh connection, with its byte counts from zero. curl 8.22.0 draws the dead
+    /// attempt's line once more (<c>Curl_pgrsDone</c>), ends it, and starts a new line (measured,
+    /// BL-2200 Notes). The default body reports it as <see cref="ReportRequestRetried" />, so a
+    /// sink that does not tell the two apart needs no change.
+    /// </summary>
+    void ReportRequestResentOnFreshConnection() => ReportRequestRetried();
+
+    /// <summary>
     /// Reports the body bytes received so far in this transfer.
     /// </summary>
     /// <param name="bytesSoFar">The running total of body bytes received, never a delta and never decreasing.</param>

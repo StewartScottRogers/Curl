@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Gopher.UnitLibrary, Curl.Protocol.Gopher.UnitTests, Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
 requirement: none
 created: 2026-10-13
-completed:
+completed: 2026-10-13
 ---
 # BL-2185 — Gopher rejects a CR or LF in the decoded selector with exit 3 (upstream test1609)
 
@@ -22,12 +22,22 @@ Found by BL-2175 (GF-0038, curl 8.22.0 changed behaviour): with `%GOPHERPORT` ro
 
 ## Acceptance criteria
 
-- [ ] A Gopher URL whose decoded selector holds `\r` or `\n` fails with exit 3 and writes no byte to the connection, pinned by a unit test in `Curl.Protocol.Gopher.UnitTests` (ADR-0482).
-- [ ] test1609 passes and is on `Curl.Conformance.UnitTests/PassingUpstreamCases.txt`.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] A Gopher URL whose decoded selector holds `\r` or `\n` fails with exit 3 and writes no byte to the connection, pinned by a unit test in `Curl.Protocol.Gopher.UnitTests` (ADR-0482).
+- [x] test1609 passes and is on `Curl.Conformance.UnitTests/PassingUpstreamCases.txt`.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Measured local curl 8.22.0 (Schannel) with `Record-CurlExchange.ps1`: `/1a%0D%0Ab`, `/1a%0Ab` and
+  `/1a?b%0d%0a` connect, send nothing and exit 3 with `curl: (3) Bad gopher selector, CR or LF not
+  allowed`; under `-v` that text is a `*` line before `* shutting down connection #0`. A CR in the
+  fragment (`/1a#c%0d`) is never sent and not refused (exit 0, `a\r\n`). NUL still gives the
+  `curl_easy_strerror` text with no `-v` line of its own.
+- The handler checks the decoded selector after the NUL check and before the first send; the old
+  adversarial rows that pinned 8.21.0 sending CR and LF were replaced by the 8.22.0 refusal.
 
 ## Log
 
 - 2026-10-13: Created.
+- 2026-10-13: Backlog -> Doing.
+- 2026-10-13: Doing -> Done. Gopher refuses a CR or LF in the decoded selector with exit 3; test1609 passes

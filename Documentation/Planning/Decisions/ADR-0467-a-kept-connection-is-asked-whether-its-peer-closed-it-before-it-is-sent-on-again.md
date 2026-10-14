@@ -40,3 +40,28 @@ A half-closed connection now gives curl's usual answer, and its request bytes on
 A connection whose FIN arrives after the check still takes the `Connection died` retry, as in
 curl. A TLS connection whose peer has sent `close_notify` but not yet a FIN is readable with
 bytes waiting, so it still counts as open, as in curl's peek.
+
+## Amendment (BL-2203, 2026-10-13): curl 8.22.0 asks only after a second idle
+
+Decided by Claude under Stewart's delegation. The gap office's reference, curl 8.22.0
+(`Git\ucrt64\bin\curl.exe`), no longer asks a connection used under a second ago. Measured with
+`Record-CurlExchange.ps1 -Connections 2`, the server closing after each `200` with
+`Content-Length: 26`, `-v --rate R URL URL`:
+
+- `--rate 66/m` (0.9 s apart), 2 of 2, and `120/m` (0.5 s): `Reusing existing http: connection`,
+  `Connection died, retrying a fresh connect (retry count: 1)`, `shutting down connection #0`,
+  then connection #1.
+- `--rate 54/m` (1.1 s apart), 2 of 2, and `30/m` (2 s): no `Reusing`, no `seems to be dead` and
+  no `shutting down` line; `Hostname ... was found in DNS cache` and connection #1.
+- `--digest` with `-HalfCloseAfterResponse` (this ADR's case), 2 of 2: `left intact`,
+  `Issue another request`, `Reusing existing http: connection`, `Connection died`, a fresh
+  connect. The retry goes through the pool, so the handler's rule (decision 2) already gives
+  these lines once the pool hands the connection out.
+
+So decision 3 becomes: `PoolingConnector` asks `HasPeerClosed` only of a connection idle for
+`PoolingConnector.LivenessCheckIdleTime` (one second) or longer, and closes one that answers `true`
+without a line, as curl 8.22.0's once-a-second prune does; one idle for less is handed out without
+asking, and the HTTP handler's `Connection died` resend (ADR-0489) takes over when it proves
+closed. A connection a read already found closed (ADR-0112) is still reported dead with both lines.
+The second is measured from when the connection was returned to the pool; curl times its prune
+from the last prune, which the measurements cannot tell apart. Upstream test675 depends on this.

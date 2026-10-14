@@ -14,7 +14,7 @@ public sealed class UpstreamCurlPlatformTests
         "UnixSockets", "zstd",
         "crypto", "cookies", "proxy", "Mime", "manual", "DoH", "digest", "aws", "netrc", "verbose-strings",
         "large-time", "large-size", "sha512-256", "SSLpinning",
-        "large_file", "local-http",
+        "large_file", "local-http", "httpsig",
     ];
 
     public TestContext TestContext { get; set; } = null!;
@@ -51,6 +51,36 @@ public sealed class UpstreamCurlPlatformTests
         diagnostics.Assert("null device", "/dev/null", platform.NullDevice);
         Assert.IsTrue(featuresMatch);
         Assert.AreEqual("/dev/null", platform.NullDevice);
+    }
+
+    [TestMethod]
+    public void WithFeatures_AddsFeaturesAndLeavesTheBasisAndTheRestAsTheyWere()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        UpstreamCurlPlatform basis = UpstreamCurlPlatform.Windows;
+        diagnostics.Arrange("extra features", "Debug");
+
+        UpstreamCurlPlatform extended = basis.WithFeatures(["Debug"]);
+
+        diagnostics.Act("extended has Debug", extended.Features.Contains("Debug"));
+        diagnostics.Assert("extended has Debug", true, extended.Features.Contains("Debug"));
+        diagnostics.Assert("basis has Debug", false, basis.Features.Contains("Debug"));
+        Assert.IsTrue(extended.Features.Contains("Debug"));
+        Assert.IsTrue(extended.Features.IsSupersetOf(basis.Features));
+        Assert.IsFalse(basis.Features.Contains("Debug"));
+        Assert.AreEqual(basis.NullDevice, extended.NullDevice);
+        Assert.AreEqual(basis.OperatingSystemName, extended.OperatingSystemName);
+    }
+
+    [TestMethod]
+    public void WithFeatures_NullFeatures_Throws()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+
+        ArgumentNullException exception = Assert.ThrowsExactly<ArgumentNullException>(() => UpstreamCurlPlatform.Unix.WithFeatures(null!));
+
+        diagnostics.Act("exception type", exception.GetType().Name);
+        diagnostics.Assert("exception type", nameof(ArgumentNullException), exception.GetType().Name);
     }
 
     [TestMethod]

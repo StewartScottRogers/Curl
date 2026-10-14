@@ -65,7 +65,15 @@ try {
         Copy-Item -LiteralPath $certFile.FullName -Destination (Join-Path $certsDestination $certFile.Name)
     }
 
-    Write-Output "Vendored $($upstreamTests.Count) test files, $($upstreamCerts.Count) certs files and COPYING from $Tag into $destination."
+    # The data files cases name as %SRCDIR/data/<file>: only those the harness can use, one by one (BL-2183).
+    $dataDestination = Join-Path $destination 'data'
+    New-Item -ItemType Directory -Path $dataDestination -Force | Out-Null
+    Get-ChildItem -LiteralPath $dataDestination -File | Remove-Item -Force
+    foreach ($dataFile in 'data-httpsig-ed25519.key', 'data-httpsig-hmac-sha256.key') {
+        Copy-Item -LiteralPath (Join-Path $upstreamData $dataFile) -Destination (Join-Path $dataDestination $dataFile)
+    }
+
+    Write-Output "Vendored $($upstreamTests.Count) test files, $($upstreamCerts.Count) certs files, the httpsig key files and COPYING from $Tag into $destination."
     Write-Output "If the count changed, update VendoredTestFileCount in UpstreamTestDataTests.cs and the tag in README.md."
 }
 finally {

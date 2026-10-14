@@ -31,8 +31,8 @@ internal static class DictRequest
 {
     /// <summary>
     /// The line that names the client to the server. It names upstream curl's own version
-    /// so the bytes sent match curl 8.21.0; it is one constant so it can follow the version
-    /// this project measures against.
+    /// so the bytes sent match curl 8.22.0 (ADR-0479); it is one constant so it can follow
+    /// the version this project measures against.
     /// </summary>
     public const string ClientLine = "CLIENT libcurl 8.22.0";
 

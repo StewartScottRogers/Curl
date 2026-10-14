@@ -59,6 +59,26 @@ public sealed class DsaSignature : IDisposable
     /// <summary>The length in bytes of a signature, r || s: twice the length of q.</summary>
     public int SignatureLength => 2 * domain.SubprimeLength;
 
+    /// <summary>The length in bytes of the public key y: the length of p, leading zeros removed.</summary>
+    public int PublicKeyLength => domain.PrimeLength;
+
+    /// <summary>
+    /// Writes this key's public key y = g^x mod p, big-endian with leading zeros kept, by the
+    /// same constant-time exponentiation signing uses: only the length of q shapes its
+    /// running time, never x (PKCS #8 leaves y out of a DSA key, so a loader computes it).
+    /// </summary>
+    /// <param name="destination">Receives y, exactly <see cref="PublicKeyLength" /> bytes.</param>
+    /// <exception cref="ArgumentException"><paramref name="destination" /> has the wrong length.</exception>
+    /// <exception cref="ObjectDisposedException">The key was disposed.</exception>
+    public void ExportPublicKey(Span<byte> destination)
+    {
+        ObjectDisposedException.ThrowIf(disposed, this);
+        RequireLength(destination, PublicKeyLength, nameof(destination));
+        uint[] power = new uint[domain.Prime.LimbCount];
+        domain.RaiseGenerator(privateKeyOctets, power);
+        MontgomeryModulus.FromLimbs(power, destination);
+    }
+
     /// <summary>
     /// Returns whether <paramref name="signature" /> is a valid DSA signature over
     /// <paramref name="hash" /> by the public key y under the domain parameters. Anything

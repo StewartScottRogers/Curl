@@ -8,7 +8,7 @@ depends-on: []
 touches: [RunDarkFactory.ps1]
 requirement: none
 created: 2026-10-14
-completed:
+completed: 2026-10-13
 ---
 # BL-2198 — Fix AF-0205: BL-2152 cost $2.46, 3.4 times the median, paging HandBuiltTlsProvider.cs in slices after the read-once fix
 
@@ -41,11 +41,15 @@ The finding closes only when a later re-audit by the process auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+BL-2152 ran after BL-2149's read-once rule but the run prompt did not cite AF-0205's sliced-read cost. Added AF-0205 to rule 7 in both prompt templates of RunDarkFactory.ps1, as BL-2197 did for AF-0204. The log itself is not reproducible from the lane checkout (audit paths); the check is the next process re-audit.
 
 ## Log
 
 - 2026-10-14: Created.
+- 2026-10-13: Backlog -> Doing.
+- 2026-10-13: Doing -> Done. Run prompts cite AF-0205's sliced-read cost

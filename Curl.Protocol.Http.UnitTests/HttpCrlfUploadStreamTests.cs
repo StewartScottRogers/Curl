@@ -127,6 +127,27 @@ public sealed class HttpCrlfUploadStreamTests
     }
 
     [TestMethod]
+    public void Of_CrlfEmptyBytesBody_KeepsContentLengthZero()
+    {
+        HttpRequestOptions options = new() { Body = new BytesBody(Array.Empty<byte>(), "application/x-www-form-urlencoded") };
+
+        HttpRequestFraming framing = HttpRequestFraming.Of(options, [], convertLineEndings: true);
+
+        Assert.IsFalse(framing.IsChunked);
+        Assert.AreEqual(0L, framing.KnownLength);
+        Assert.AreEqual("application/x-www-form-urlencoded", framing.Body!.ContentType);
+    }
+
+    [TestMethod]
+    public void Of_CrlfEmptyUpload_KeepsContentLengthZero()
+    {
+        HttpRequestFraming framing = HttpRequestFraming.Of(new HttpRequestOptions(), [], upload: Source(string.Empty), convertLineEndings: true);
+
+        Assert.IsFalse(framing.IsChunked);
+        Assert.AreEqual(0L, framing.KnownLength);
+    }
+
+    [TestMethod]
     public void Of_BodyWithoutCrlf_KeepsItsLength()
     {
         HttpRequestOptions options = new() { Body = new BytesBody(Encoding.ASCII.GetBytes("a\nb"), "text/plain") };

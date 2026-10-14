@@ -291,6 +291,40 @@ public sealed class TransferProgressRecorderTests
     }
 
     [TestMethod]
+    public void ReportRequestResentOnFreshConnection_AfterTheZeroLine_DrawsItOnceMoreThenANewLineAndANewZeroLine()
+    {
+        // Upstream test675: curl 8.22.0 reuses a connection the server closed, finds it dead and
+        // sends again on a fresh one; its meter is the zero line, one more draw (Curl_pgrsDone),
+        // a newline, and the resend's zero line (BL-2200 Notes).
+        TransferProgressRecorder recorder = new(clock);
+        recorder.ReportTransferStarted();
+        Diagnostics.Arrange("reports", "started; the reused connection died, resent on a fresh one");
+
+        recorder.ReportRequestResentOnFreshConnection();
+        Diagnostics.Act("status lines", VisibleAcrossPlatforms(recorder.StatusLines));
+
+        ExpectStatusLines(recorder, Zero + Zero + Environment.NewLine + Zero);
+        Assert.AreEqual(Zero + Zero + Environment.NewLine + Zero, recorder.StatusLines);
+    }
+
+    [TestMethod]
+    public void ReportRequestResentOnFreshConnection_TwoSecondsIn_StartsANewLineWhoseSpentCountsFromTheFirstRequest()
+    {
+        TransferProgressRecorder recorder = new(clock);
+        recorder.ReportTransferStarted();
+        clock.Advance(2000);
+        Diagnostics.Arrange("reports", "started; after 2 s the reused connection died, resent on a fresh one");
+
+        recorder.ReportRequestResentOnFreshConnection();
+        string lastLine = recorder.StatusLines[(recorder.StatusLines.LastIndexOf('\r') + 1)..];
+        Diagnostics.Act("resent request's zero line", Visible(lastLine));
+
+        const string expected = "  0      0   0      0   0      0      0      0           00:02              0";
+        Diagnostics.Assert("resent request's zero line", expected, lastLine);
+        Assert.AreEqual(expected, lastLine);
+    }
+
+    [TestMethod]
     public void ReportTransferStarted_Repeated_EndsTheHopAndStartsTheNextFromZero()
     {
         TransferProgressRecorder recorder = new(clock);

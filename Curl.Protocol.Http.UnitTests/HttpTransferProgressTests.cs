@@ -47,6 +47,25 @@ public sealed class HttpTransferProgressTests
     }
 
     [TestMethod]
+    public void ReportRequestResentOnFreshConnection_AfterCounts_PassesTheResendOnAndCountsFromZero()
+    {
+        RecordingTransferProgress sink = new();
+        HttpTransferProgress progress = new(sink);
+        Diagnostics.Arrange("calls", "started, down 4 of 4, resent, down 0 of 2, started");
+
+        progress.ReportTransferStarted();
+        progress.ReportDownloaded(4, 4);
+        progress.ReportRequestResentOnFreshConnection();
+        progress.ReportDownloaded(0, 2);
+        progress.ReportTransferStarted();
+
+        string[] expected = ["started", "down 4/4", "resent", "down 0/2"];
+        Diagnostics.Act("reports", string.Join(" | ", sink.Reports));
+        Diagnostics.Assert("reports", string.Join(" | ", expected), string.Join(" | ", sink.Reports));
+        CollectionAssert.AreEqual(expected, sink.Reports.ToArray());
+    }
+
+    [TestMethod]
     public void ReportTransferDone_PassesItOn()
     {
         RecordingTransferProgress sink = new();

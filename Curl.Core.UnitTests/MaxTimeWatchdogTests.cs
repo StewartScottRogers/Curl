@@ -263,6 +263,27 @@ public sealed class MaxTimeWatchdogTests
     }
 
     [TestMethod]
+    public void WatchProgress_RequestResentOnFreshConnection_PassesTheResendOnAndCountsTheTransferStarted()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("max time", OneSecond);
+        using MaxTimeWatchdog watchdog = new(OneSecond, clock);
+        RecordingProgress inner = new();
+        ITransferProgress progress = watchdog.WatchProgress(inner);
+        progress.ReportRequestResentOnFreshConnection();
+        clock.Advance(OneSecond);
+        clock.Fire();
+
+        string? message = watchdog.Failure.ErrorMessage;
+
+        diagnostics.Act("inner", inner.Last);
+        diagnostics.Act("error message", message);
+        diagnostics.Assert("inner", "resent", inner.Last);
+        Assert.AreEqual("resent", inner.Last);
+        Assert.AreEqual("Operation timed out after 1000 milliseconds with 0 bytes received", message);
+    }
+
+    [TestMethod]
     public void WatchProgress_PassesEveryReportOn()
     {
         var diagnostics = TestDiagnostics.For(TestContext);
@@ -298,6 +319,8 @@ public sealed class MaxTimeWatchdogTests
         public void ReportTransferStarted() => Last = "started";
 
         public void ReportRequestRetried() => Last = "retried";
+
+        public void ReportRequestResentOnFreshConnection() => Last = "resent";
 
         public void ReportDownloaded(long bytesSoFar, long? expectedTotal) => Last = $"downloaded {bytesSoFar} of {expectedTotal}";
 

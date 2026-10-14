@@ -138,6 +138,22 @@ public sealed class AutomaticClientCertificateTests
         Assert.IsFalse(qualifies);
     }
 
+    [TestMethod]
+    [DataRow(false, DisplayName = "First valid instant")]
+    [DataRow(true, DisplayName = "Last valid instant")]
+    public void Qualifies_AtTheEdgeOfItsValidity_ReturnsTrue(bool atNotAfter)
+    {
+        using var certificate = Certificate(null);
+        var edge = new DateTimeOffset(atNotAfter ? certificate.NotAfter : certificate.NotBefore);
+        Diagnostics.Arrange("edge", edge.ToString("O", System.Globalization.CultureInfo.InvariantCulture));
+
+        var qualifies = AutomaticClientCertificate.Qualifies(certificate, edge);
+        Diagnostics.Act("qualifies", qualifies);
+
+        Diagnostics.Assert("qualifies", true, qualifies);
+        Assert.IsTrue(qualifies);
+    }
+
     // Valid from a day ago to a day ahead, with the one extended key usage given, or none.
     private static X509Certificate2 Certificate(string? usage)
     {

@@ -128,6 +128,14 @@ public sealed class PoolingConnector : IConnector, IAsyncDisposable
     /// </summary>
     public static TimeSpan MaximumIdleTime { get; } = TimeSpan.FromSeconds(118);
 
+    /// <summary>
+    /// Gets how long a connection sits idle before the pool asks whether its peer closed it
+    /// (<see cref="IConnection.HasPeerClosed" />): one second, as curl 8.22.0 reuses a connection
+    /// used 0.9 seconds ago without asking and silently drops a closed one used 1.1 seconds ago
+    /// (measured, ADR-0467's BL-2203 amendment).
+    /// </summary>
+    public static TimeSpan LivenessCheckIdleTime { get; } = TimeSpan.FromSeconds(1);
+
     /// <inheritdoc />
     /// <remarks>
     /// When the pool holds an idle connection with the target's key it reports
@@ -144,7 +152,10 @@ public sealed class PoolingConnector : IConnector, IAsyncDisposable
     /// names the proxy's host, as curl 8.21.0 prints it (BL-360). An idle connection on which a
     /// read found the server's close is not handed out: it is reported with curl 8.21.0's
     /// <c>Connection N seems to be dead</c> and <c>shutting down connection #N</c>, closed,
-    /// and the next idle one with the key is tried (ADR-0112).
+    /// and the next idle one with the key is tried (ADR-0112). One idle for
+    /// <see cref="LivenessCheckIdleTime" /> or longer whose peer closed it
+    /// (<see cref="IConnection.HasPeerClosed" />) is closed without a word and the next tried;
+    /// one idle for less is handed out without asking, as curl 8.22.0 does (ADR-0467).
     /// <para>
     /// Before any of that, a connection in use with the key whose session carries several
     /// transfers at once (<see cref="IConnectionSession.ConcurrentTransferLimit" />) and has a
@@ -449,15 +460,26 @@ public sealed class PoolingConnector : IConnector, IAsyncDisposable
         }
 
         var match = await TakeMatchAsync(key);
-        while (match is not null && (match.HasReadPeerClose || match.Connection.HasPeerClosed))
+        while (match is not null && IsFoundDead(match, events))
         {
-            events.ReportInfo($"Connection {match.ConnectionNumber} seems to be dead");
-            events.ReportInfo($"shutting down connection #{match.ConnectionNumber}");
             await match.CloseAsync();
             match = await TakeMatchAsync(key);
         }
 
         return match;
+    }
+
+    private bool IsFoundDead(PoolEntry match, ITransferEvents events)
+    {
+        if (match.HasReadPeerClose)
+        {
+            events.ReportInfo($"Connection {match.ConnectionNumber} seems to be dead");
+            events.ReportInfo($"shutting down connection #{match.ConnectionNumber}");
+            return true;
+        }
+
+        return _cache.TimeProvider.GetElapsedTime(match.IdleSince) >= LivenessCheckIdleTime
+            && match.Connection.HasPeerClosed;
     }
 
     private async ValueTask<PoolEntry?> TakeMatchAsync(ConnectionPoolKey key)

@@ -1,3 +1,4 @@
 test*.curltest -text
 COPYING -text
 certs/* -text
+data/* -text

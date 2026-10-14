@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Networking.UnitLibrary]
+touches: [Curl.Networking.UnitLibrary, Curl.Networking.UnitTests]
 requirement: none
 created: 2026-10-14
-completed:
+completed: 2026-10-13
 ---
 # BL-2188 — Fix AF-0195: AutomaticClientCertificate.Qualifies' expiry check can become exclusive with no test failing
 
@@ -41,11 +41,30 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- 2026-10-13 (lane 6): the production code is already right (`<=` on line 54 is the
+  inclusive end the doc comment promises); the fix is a test only. Add to
+  `Curl.Networking.UnitTests/AutomaticClientCertificateTests.cs` a data-row test
+  `Qualifies_AtTheEdgeOfItsValidity_ReturnsTrue` calling `Qualifies(certificate,
+  new DateTimeOffset(certificate.NotAfter))` and likewise at `certificate.NotBefore`
+  (both are whole seconds, so the instant is exact), which kills the `<` mutant on line 54
+  and the matching one on line 53. Added `Curl.Networking.UnitTests` to `touches` for that
+  test; BL-2187 (in Doing) touches it too, so this task waits in Backlog until BL-2187 ends.
+
+- 2026-10-13 (lane 1): added `Qualifies_AtTheEdgeOfItsValidity_ReturnsTrue` (rows at
+  `NotBefore` and `NotAfter`). Lanes may not run `Audit/Tools/Invoke-MutationTest.ps1` (the
+  audit guard refuses it), so the mutant was applied by hand instead: with line 54's `<=` made
+  `<`, the "Last valid instant" row fails; restored, all 12 tests pass. The re-audit runs the
+  real reproduction.
 
 ## Log
 
 - 2026-10-14: Created.
+- 2026-10-13: Backlog -> Doing.
+- 2026-10-13: Doing -> Backlog. Needs a test in Curl.Networking.UnitTests, which BL-2187 (Doing) touches
+- 2026-10-13: Backlog -> Doing.
+- 2026-10-13: Doing -> Done. Edge-of-validity test kills the < mutant on line 54

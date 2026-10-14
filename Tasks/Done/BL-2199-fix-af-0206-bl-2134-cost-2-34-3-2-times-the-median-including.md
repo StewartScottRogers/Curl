@@ -8,7 +8,7 @@ depends-on: []
 touches: [RunDarkFactory.ps1]
 requirement: none
 created: 2026-10-14
-completed:
+completed: 2026-10-13
 ---
 # BL-2199 — Fix AF-0206: BL-2134 cost $2.34, 3.2 times the median, including a repair run after its own run left test1462 red
 
@@ -41,11 +41,15 @@ The finding closes only when a later re-audit by the process auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Fix: both run prompts in RunDarkFactory.ps1 now cite AF-0206 (BL-2134: 19 of 25 Bash calls were slice reads; a repair run took test1462 off the ratchet though BL-2136 already owned it), telling a run to leave a failing test another live task names to that task. Same pattern as BL-2198. Only a PowerShell prompt string changed (parses clean, no C# touched), so build and fast tests are unaffected.
 
 ## Log
 
 - 2026-10-14: Created.
+- 2026-10-13: Backlog -> Doing.
+- 2026-10-13: Doing -> Done. Run prompts cite AF-0206
