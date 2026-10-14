@@ -44,3 +44,4 @@ In Curl.Protocol.File.UnitLibrary, list directories on Windows as curl 8.22.0 do
 ## Log
 
 - 2026-10-13: Created.
+- 2026-10-13: Backlog -> Doing.
