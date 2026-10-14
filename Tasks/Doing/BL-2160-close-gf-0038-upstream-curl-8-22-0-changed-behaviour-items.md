@@ -501,3 +501,4 @@ Bring these items to Curl when the target moves to 8.22.0.
 ## Log
 
 - 2026-10-13: Created.
+- 2026-10-13: Backlog -> Doing.
