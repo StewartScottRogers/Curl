@@ -51,3 +51,4 @@ In Curl.Authentication.UnitLibrary's SaslAuthenticator/SaslMechanismRanking and 
 ## Log
 
 - 2026-10-13: Created.
+- 2026-10-13: Backlog -> Doing.
