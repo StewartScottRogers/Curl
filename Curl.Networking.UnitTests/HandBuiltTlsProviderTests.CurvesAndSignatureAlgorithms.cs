@@ -107,6 +107,30 @@ public sealed partial class HandBuiltTlsProviderTests
         }
     }
 
+    // With TLS 1.3 alone the hello drops every --curves group TLS 1.3 cannot key-share, such as
+    // brainpoolP256r1 (0x001a), which a hello beside TLS 1.2 keeps (BL-1086, AF-0208).
+    [TestMethod]
+    [DataRow(SchannelBuild)]
+    [DataRow(OpenSslBuild)]
+    public async Task AuthenticateAsClientAsync_WithCurvesAndATls13Minimum_OffersOnlyTheGroupsTls13CanShare(bool matchesSchannelBuild)
+    {
+        Diagnostics.Arrange("build", matchesSchannelBuild ? "Schannel" : "OpenSSL");
+        Diagnostics.Arrange("Curves", "brainpoolP256r1:X25519");
+        Diagnostics.Arrange("MinimumVersion", TlsVersion.Tls13);
+
+        byte[] record;
+        using (Diagnostics.Phase("TLS handshake"))
+        {
+            record = await CaptureClientHelloAsync(new TlsClientOptions(MinimumVersion: TlsVersion.Tls13, Curves: "brainpoolP256r1:X25519"), matchesSchannelBuild, ProfileHost, Http11);
+        }
+
+        var hello = DecodeClientHello(record);
+        Diagnostics.Bytes("captured ClientHello record", record);
+        Diagnostics.Assert("groups", "29", string.Join(",", SupportedGroupsExtension.Decode(ExtensionData(hello, TlsExtensionType.SupportedGroups)).Value.ToArray()));
+        CollectionAssert.AreEqual(new ushort[] { 0x001d }, SupportedGroupsExtension.Decode(ExtensionData(hello, TlsExtensionType.SupportedGroups)).Value.ToArray());
+        CollectionAssert.AreEqual(new ushort[] { 0x001d }, KeySharesOf(hello).Select(share => share.Group).ToArray());
+    }
+
     [TestMethod]
     [DataRow(OpenSslBuild, "ECDSA+SHA256", new ushort[] { 0x0403 })]
     [DataRow(OpenSslBuild, "rsa_pss_rsae_sha256:ECDSA+SHA256", new ushort[] { 0x0804, 0x0403 })]

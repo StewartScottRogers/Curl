@@ -857,7 +857,8 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
             OfferEncryptThenMac = ClientHelloProfileMapping.Sends(Profile, TlsExtensionType.EncryptThenMac),
             PadHello = Profile.PadsTcpHello,
             ExtensionOrder = ClientHelloProfileMapping.Tls12ExtensionOrder(Profile, RequestOcspStatus),
-            FixedExtensions = ClientHelloProfileMapping.Tls12FixedExtensions(Profile),            InsertEmptyFragment = InsertsEmptyFragment(options),
+            FixedExtensions = ClientHelloProfileMapping.Tls12FixedExtensions(Profile),
+            InsertEmptyFragment = InsertsEmptyFragment(options),
         };
 
         // Schannel's hello below a TLS 1.3 ceiling is in a record of that ceiling; a TLS 1.2

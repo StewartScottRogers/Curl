@@ -5,10 +5,10 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Networking.UnitLibrary]
+touches: [Curl.Networking.UnitLibrary, Curl.Networking.UnitTests]
 requirement: none
 created: 2026-10-14
-completed:
+completed: 2026-10-14
 ---
 # BL-2210 — Fix AF-0208: HandBuiltTlsProvider.HandshakeTls13Async's alongsideTls12: false can become true with no test failing
 
@@ -41,12 +41,26 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Fix: new test `AuthenticateAsClientAsync_WithCurvesAndATls13Minimum_OffersOnlyTheGroupsTls13CanShare`
+  (both builds) in `HandBuiltTlsProviderTests.CurvesAndSignatureAlgorithms.cs`: `--tlsv1.3` with
+  `--curves brainpoolP256r1:X25519` must offer supported_groups and key_share `[x25519]` only.
+  Expected bytes follow the documented OpenSSL rule in `ToTls13` (BL-1086); no product change.
+- Touches widened to `Curl.Networking.UnitTests` (the test lives there); no task in Doing on
+  `origin/work/dark-factory` names it.
+- Reproduction: a lane may not run `Audit/Tools/Invoke-MutationTest.ps1` (audit guard), so the
+  mutant was applied by hand (`alongsideTls12: false` -> `true` at line 702): both new rows
+  failed (`CollectionAssert.AreEqual failed. Element at index 0 do not match.`), then the line was
+  restored. The quality auditor's re-audit runs the tool itself.
+- The formatter hook also split a joined line in `ToTls12` (`FixedExtensions` / `InsertEmptyFragment`);
+  whitespace only.
 
 ## Log
 
 - 2026-10-14: Created.
 - 2026-10-14: Backlog -> Doing.
+- 2026-10-14: Doing -> Done. A test pins the TLS 1.3-only hello's supported_groups under --curves; AF-0208's mutant is killed
