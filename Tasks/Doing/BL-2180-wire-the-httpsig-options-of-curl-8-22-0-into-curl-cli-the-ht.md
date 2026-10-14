@@ -73,3 +73,4 @@ BL-2171 added) and this task wires it in. Upstream facts, read from `lib/http_ht
 ## Log
 
 - 2026-10-13: Created.
+- 2026-10-13: Backlog -> Doing.
