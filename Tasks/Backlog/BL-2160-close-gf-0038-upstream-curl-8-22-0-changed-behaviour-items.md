@@ -4,8 +4,9 @@ title: Close GF-0038: Upstream curl 8.22.0 changed behaviour items
 priority: High
 assignee: Claude
 pipeline: feature
-depends-on: []
+depends-on: [BL-2161, BL-2162, BL-2163, BL-2164, BL-2165, BL-2166, BL-2167, BL-2168, BL-2169, BL-2171, BL-2172, BL-2173, BL-2174, BL-2175, BL-2176]
 touches: []
+lane: no
 requirement: none
 created: 2026-10-13
 completed:
@@ -498,7 +499,34 @@ Bring these items to Curl when the target moves to 8.22.0.
 
 ## Notes
 
+- 2026-10-13, lane 1: split. Measured every item through the ratchet on Windows
+  (`dotnet test Curl.Conformance.UnitTests --filter TestCategory=Conformance`, trx):
+  - 48 of the 154 items already pass and are on `PassingUpstreamCases.txt`.
+  - Pass but not yet listed: 320, 1062, 1498, 2059, 2318 (BL-2172 lists them), and
+    2087, 3023, which need `Schannel` and so would skip, and fail the ratchet, on Linux
+    and macOS (BL-2176).
+  - Failing, cause already filed: 838, 884, 943 (BL-2161); 2110, 2114, 2115, 2116
+    (BL-2162); 2113 (BL-2163); 3225 (BL-2164); 409 (BL-2165); 3203 (BL-2166);
+    3229 (BL-2167); 2109 (BL-2168); 2305 (BL-2169); 5000-5025 httpsig (BL-2171).
+  - Failing, filed now: 459, 1712 config-file warning (BL-2172); 1740 `--silent` and
+    `Note:` (BL-2173); 2885 TAB before `secure` (BL-2174); 1609, 5028, 2407 harness
+    port variables (BL-2175).
+  - Not CLI behaviour the harness can run: libtests skipped for `<client><tool>`
+    (529, 546, 550, 565, 574, 1113, 1554, 1978, 1985, 2118, 2397, 2405, 5000, 5004);
+    debug-build-only cases skipped for feature `Debug` (644, 687, 688, 2057, 2094,
+    2100, 2117, 2349, 5008, 5010, 5026, 5027); `!win32` cases skipped on Windows (956,
+    958, 964); 2072 needs Unix; 321 needs a shell; and cases with no ratchet row at all
+    (unit tests or libtests the harness lists no row for: 322, 323, 324, 557, 1177,
+    1309, 1396, 1398, 1538, 1557, 1560, 1616, 1625, 1627, 1678, 1701, 1961, 2414,
+    2606, 3211, 3227, 3302, 3303, 3304, 3306).
+- Interactive only: the last group can only measure `match` or `excluded` through a
+  gap-office decision under `Gap/`, an audit path no lane may read or file a task for
+  (ADR-0433, BL-1209). Remove `lane: no` once an interactive session has recorded, in
+  the gap office, which of those cases are `excluded` (with a reason) and filed tasks
+  for any it decides Curl must run; the dependencies above cover everything else.
+
 ## Log
 
 - 2026-10-13: Created.
 - 2026-10-13: Backlog -> Doing.
+- 2026-10-13: Doing -> Backlog. Split after measuring all 154 items: waits on BL-2161..BL-2169, BL-2171..BL-2176; interactive only for the gap-office exclusions of libtest, debug-build, unit-test and platform-only cases
