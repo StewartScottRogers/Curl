@@ -3,8 +3,8 @@ id: AF-0193
 title: Cast128 test named RunsSixteenRounds asserts only that the output is not the 12-round ciphertext
 auditor: quality
 severity: Low
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-14_0453.md: the reproduction no longer reproduces.
 key: quality:Curl.Cryptography.UnitTests/Cast128Tests.cs:EncryptBlock_EightyBitKeyZeroPaddedTo128Bits_RunsSixteenRoundsAndDiffers:weak-assertion
 reproduction: none
 task: BL-2186
@@ -13,9 +13,9 @@ found: 2026-10-13
 found-at: c192c3e80e58636be1d282d241a7781f7df86695
 scorecard: 2026-10-13_1822.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-14
+closed-how: reliable-reaudit
+closed-by: 2026-10-14_0453.md
 ---
 # AF-0193 - Cast128 test named RunsSixteenRounds asserts only that the output is not the 12-round ciphertext
 
@@ -42,7 +42,10 @@ Select-String -Path Curl.Cryptography.UnitTests/Cast128Tests.cs -Pattern 'Assert
 
 ## Re-audits
 
+- 2026-10-14 | 2026-10-14_0453.md | reproduces: no | Ran Select-String -Path Curl.Cryptography.UnitTests/Cast128Tests.cs -Pattern 'Assert\.AreNotEqual\("EB6A711A2C02271B"': no match. The test is now EncryptBlock_EightyBitKeyZeroPaddedTo128Bits_GivesTheSixteenRoundOpenSslCiphertext (line 58) and asserts Assert.AreEqual("753DE29F5D167D03", Convert.ToHexString(encrypted)), the exact 16-round OpenSSL ciphertext.
+
 ## Log
 
 - 2026-10-13: filed proposed.
 - 2026-10-13: proposed -> accepted.
+- 2026-10-14: accepted -> closed. Re-audit 2026-10-14_0453.md: the reproduction no longer reproduces.

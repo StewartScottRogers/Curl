@@ -3,8 +3,8 @@ id: AF-0185
 title: Every HTTP request carries User-Agent: curl/8.21.0 (and --version says 8.21.0); the reference curl sends curl/8.22.0
 auditor: conformance
 severity: Medium
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-14_0453.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-10-13_1822.md, 2026-10-14_0453.md).
 key: conformance:User-Agent:curl-version:request
 reproduction: none
 task: BL-2144
@@ -13,9 +13,9 @@ found: 2026-10-13
 found-at: c86d04eeb8477108eb6d9195bb036a4ddaecc5fc
 scorecard: 2026-10-13_0925.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-14
+closed-how: consecutive
+closed-by: 2026-10-13_1822.md, 2026-10-14_0453.md
 ---
 # AF-0185 - Every HTTP request carries User-Agent: curl/8.21.0 (and --version says 8.21.0); the reference curl sends curl/8.22.0
 
@@ -43,8 +43,10 @@ $a=@('-s','http://127.0.0.1:50961/'); foreach($p in @(@('curl','C:\Program Files
 ## Re-audits
 
 - 2026-10-13 | 2026-10-13_1822.md | reproduces: no | Ran as written against curl 8.22.0 (ucrt64): 'curl: User-Agent: curl/8.22.0', 'candidate: User-Agent: curl/8.22.0'. The load tool's candidateVersion also reads 'curl 8.22.0 (x86_64-w64-mingw32) libcurl/8.22.0 Schannel'.
+- 2026-10-14 | 2026-10-14_0453.md | reproduces: no | Ran the reproduction: 'curl: User-Agent: curl/8.22.0' and 'candidate: User-Agent: curl/8.22.0'.
 
 ## Log
 
 - 2026-10-13: filed proposed.
 - 2026-10-13: proposed -> accepted.
+- 2026-10-14: accepted -> closed. Re-audit 2026-10-14_0453.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-10-13_1822.md, 2026-10-14_0453.md).

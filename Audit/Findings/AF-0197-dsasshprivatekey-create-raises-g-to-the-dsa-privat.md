@@ -3,8 +3,8 @@ id: AF-0197
 title: DsaSshPrivateKey.Create raises g to the DSA private key x through variable-time BigInteger.ModPow
 auditor: security
 severity: High
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-14_0453.md: the reproduction no longer reproduces.
 key: security:Curl.Protocol.Ssh.UnitLibrary/Keys/DsaSshPrivateKey.cs:DsaSshPrivateKey.Create:secret-dependent-branch
 reproduction: none
 task: BL-2190
@@ -13,9 +13,9 @@ found: 2026-10-13
 found-at: c192c3e80e58636be1d282d241a7781f7df86695
 scorecard: 2026-10-13_1822.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-14
+closed-how: reliable-reaudit
+closed-by: 2026-10-14_0453.md
 ---
 # AF-0197 - DsaSshPrivateKey.Create raises g to the DSA private key x through variable-time BigInteger.ModPow
 
@@ -42,7 +42,10 @@ Select-String -Path Curl.Protocol.Ssh.UnitLibrary/Keys/DsaSshPrivateKey.cs -Patt
 
 ## Re-audits
 
+- 2026-10-14 | 2026-10-14_0453.md | reproduces: no | Ran Select-String -Path Curl.Protocol.Ssh.UnitLibrary/Keys/DsaSshPrivateKey.cs -Pattern 'BigInteger\.ModPow': no match. DsaSshPrivateKey.Create now computes y through ComputePublicKey -> DsaSignature.ExportPublicKey (DsaSignature.cs:73-80), which calls domain.RaiseGenerator on the Montgomery limbs. The file has no BigInteger at all.
+
 ## Log
 
 - 2026-10-13: filed proposed.
 - 2026-10-13: proposed -> accepted.
+- 2026-10-14: accepted -> closed. Re-audit 2026-10-14_0453.md: the reproduction no longer reproduces.

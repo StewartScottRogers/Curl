@@ -43,6 +43,7 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Re-audits
 
 - 2026-10-13 | 2026-10-13_1822.md | reproduces: yes | The given reproduction still shows BL-2131 costUsd 3.1093 over the old window. Re-audited by mechanism over this window: BL-2142 cost $3.11, 4.25 times the $0.73 median, over 68 turns, with 37 sliced Bash reads ('sed -n 250,290p Curl.Cli.UnitLibrary/CommandLineOptionTable.cs' and others). Lane 2, claimed 13:34:45 and done 13:48. The same cause (sliced code reading driving turns and cost) crosses the cost-outlier rule again.
+- 2026-10-14 | 2026-10-14_0453.md | reproduces: yes | Original reproduction still prints BL-2131 claims 1, 13.05 min, costUsd 3.1093, done, and '06:50:38 L1 BL-2131 end 70 turns, 11.2 min'. By mechanism over this window (-Since 2026-10-13, 53 tasks done): the cost-outlier rule is crossed again by the same cause, sliced code reading. BL-2182 (lane 1, 2026-10-13 20:52 PDT) cost $4.80, 3.23x the $1.49 median, over 92 turns with 19 'sed -n' trace lines.
 
 ## Log
 

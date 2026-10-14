@@ -3,8 +3,8 @@ id: AF-0183
 title: --tlsauthtype and --tlspassword are refused with exit 2; the reference curl warns they are deprecated and exits 0
 auditor: conformance
 severity: High
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-14_0453.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-10-13_1822.md, 2026-10-14_0453.md).
 key: conformance:--tlsauthtype:refused-on-schannel:refused-option
 reproduction: none
 task: BL-2142
@@ -13,9 +13,9 @@ found: 2026-10-13
 found-at: c86d04eeb8477108eb6d9195bb036a4ddaecc5fc
 scorecard: 2026-10-13_0925.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-14
+closed-how: consecutive
+closed-by: 2026-10-13_1822.md, 2026-10-14_0453.md
 ---
 # AF-0183 - --tlsauthtype and --tlspassword are refused with exit 2; the reference curl warns they are deprecated and exits 0
 
@@ -43,8 +43,10 @@ foreach($a in @(@('--tlsauthtype','1','http://127.0.0.1:50961/'),@('--tlspasswor
 ## Re-audits
 
 - 2026-10-13 | 2026-10-13_1822.md | reproduces: no | Ran as written against curl 8.22.0 (ucrt64): '--tlsauthtype curl exit 0', '--tlsauthtype candidate exit 0', '--tlspassword curl exit 0', '--tlspassword candidate exit 0'.
+- 2026-10-14 | 2026-10-14_0453.md | reproduces: no | Ran the reproduction against curl 8.22.0 Schannel (Git ucrt64): --tlsauthtype curl exit 0, candidate exit 0; --tlspassword curl exit 0, candidate exit 0. Both print 'Warning: --tlsauthtype is deprecated and has no function anymore' (and the same for --tlspassword).
 
 ## Log
 
 - 2026-10-13: filed proposed.
 - 2026-10-13: proposed -> accepted.
+- 2026-10-14: accepted -> closed. Re-audit 2026-10-14_0453.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-10-13_1822.md, 2026-10-14_0453.md).

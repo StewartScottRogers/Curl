@@ -3,8 +3,8 @@ id: AF-0194
 title: ConnectAsync_ThroughSocks5WithACredentialOf255Bytes_SendsIt never checks what was sent, only exit 0
 auditor: quality
 severity: Medium
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-14_0453.md: the reproduction no longer reproduces.
 key: quality:Curl.Networking.UnitTests/TcpConnectorTests.Socks.cs:ConnectAsync_ThroughSocks5WithACredentialOf255Bytes_SendsIt:name-lies
 reproduction: none
 task: BL-2187
@@ -13,9 +13,9 @@ found: 2026-10-13
 found-at: c192c3e80e58636be1d282d241a7781f7df86695
 scorecard: 2026-10-13_1822.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-14
+closed-how: reliable-reaudit
+closed-by: 2026-10-14_0453.md
 ---
 # AF-0194 - ConnectAsync_ThroughSocks5WithACredentialOf255Bytes_SendsIt never checks what was sent, only exit 0
 
@@ -42,7 +42,10 @@ Select-String -Path Curl.Networking.UnitTests/TcpConnectorTests.Socks.cs -Patter
 
 ## Re-audits
 
+- 2026-10-14 | 2026-10-14_0453.md | reproduces: no | Ran the Select-String reproduction. It now matches only line 31, which is in a different test (ConnectAsync_ThroughSocks_ReportsNoMappedDestinationSoTheOriginIsNamedLeftIntact), not the finding's test. ConnectAsync_ThroughSocks5WithACredentialOf255Bytes_SendsIt (line 434) now builds the RFC 1929 expected bytes (01, 0xFF, 255 'a', 0xFF, 255 'p', then the CONNECT request) and asserts CollectionAssert.AreEqual(expected, proxyConnection.Written) besides exit 0.
+
 ## Log
 
 - 2026-10-13: filed proposed.
 - 2026-10-13: proposed -> accepted.
+- 2026-10-14: accepted -> closed. Re-audit 2026-10-14_0453.md: the reproduction no longer reproduces.

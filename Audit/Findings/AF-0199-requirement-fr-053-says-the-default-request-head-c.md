@@ -3,8 +3,8 @@ id: AF-0199
 title: Requirement FR-053 says the default request head carries User-Agent: curl/8.21.0; Curl sends curl/8.22.0
 auditor: truthfulness
 severity: High
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-14_0453.md: the reproduction no longer reproduces.
 key: truthfulness:Documentation/Product/Requirements.md:FR-053:false-statement
 reproduction: none
 task: BL-2192
@@ -13,9 +13,9 @@ found: 2026-10-13
 found-at: c192c3e80e58636be1d282d241a7781f7df86695
 scorecard: 2026-10-13_1822.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-14
+closed-how: reliable-reaudit
+closed-by: 2026-10-14_0453.md
 ---
 # AF-0199 - Requirement FR-053 says the default request head carries User-Agent: curl/8.21.0; Curl sends curl/8.22.0
 
@@ -43,7 +43,10 @@ internal const string DefaultUserAgent = "curl/8.22.0";
 
 ## Re-audits
 
+- 2026-10-14 | 2026-10-14_0453.md | reproduces: no | Ran the reproduction: 0 FR-053 rows match 'User-Agent: curl/8\.21\.0'. The row now reads 'User-Agent: curl/8.22.0', matching HttpRequestHeadFormatter's 'internal const string DefaultUserAgent = "curl/8.22.0";'.
+
 ## Log
 
 - 2026-10-13: filed proposed.
 - 2026-10-13: proposed -> accepted.
+- 2026-10-14: accepted -> closed. Re-audit 2026-10-14_0453.md: the reproduction no longer reproduces.

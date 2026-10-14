@@ -3,8 +3,8 @@ id: AF-0200
 title: Dict CLAUDE.md says DictRequest.ClientLine names libcurl 8.21.0; it is CLIENT libcurl 8.22.0
 auditor: truthfulness
 severity: High
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-14_0453.md: the reproduction no longer reproduces.
 key: truthfulness:Curl.Protocol.Dict.UnitLibrary/CLAUDE.md:ClientLine:false-statement
 reproduction: none
 task: BL-2193
@@ -13,9 +13,9 @@ found: 2026-10-13
 found-at: c192c3e80e58636be1d282d241a7781f7df86695
 scorecard: 2026-10-13_1822.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-14
+closed-how: reliable-reaudit
+closed-by: 2026-10-14_0453.md
 ---
 # AF-0200 - Dict CLAUDE.md says DictRequest.ClientLine names libcurl 8.21.0; it is CLIENT libcurl 8.22.0
 
@@ -43,7 +43,10 @@ public const string ClientLine = "CLIENT libcurl 8.22.0";
 
 ## Re-audits
 
+- 2026-10-14 | 2026-10-14_0453.md | reproduces: no | Ran the reproduction: 0 matches for 'names .libcurl 8\.21\.0' in Curl.Protocol.Dict.UnitLibrary/CLAUDE.md. Line 27 now says the ClientLine constant is 'CLIENT libcurl 8.22.0', matching 'public const string ClientLine = "CLIENT libcurl 8.22.0";'.
+
 ## Log
 
 - 2026-10-13: filed proposed.
 - 2026-10-13: proposed -> accepted.
+- 2026-10-14: accepted -> closed. Re-audit 2026-10-14_0453.md: the reproduction no longer reproduces.

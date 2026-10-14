@@ -3,8 +3,8 @@ id: AF-0206
 title: BL-2134 cost $2.34, 3.2 times the median, including a repair run after its own run left test1462 red
 auditor: process
 severity: Low
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-14_0453.md: the reproduction no longer reproduces.
 key: process:logs:BL-2134:cost-outlier
 reproduction: none
 task: BL-2199
@@ -13,9 +13,9 @@ found: 2026-10-13
 found-at: c192c3e80e58636be1d282d241a7781f7df86695
 scorecard: 2026-10-13_1822.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-14
+closed-how: reliable-reaudit
+closed-by: 2026-10-14_0453.md
 ---
 # AF-0206 - BL-2134 cost $2.34, 3.2 times the median, including a repair run after its own run left test1462 red
 
@@ -42,7 +42,10 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-10-14 | 2026-10-14_0453.md | reproduces: no | Original reproduction still prints BL-2134 $2.3368 with its 'flaky?' and 'repair' lines from 2026-10-13 12:14-12:19. Over this window (53 tasks done) the only cost outlier is BL-2182, a single run with no repair. grep for 'repair' and 'flaky?' across every DarkFactory-*.log in the window's log folder finds nothing.
+
 ## Log
 
 - 2026-10-13: filed proposed.
 - 2026-10-13: proposed -> accepted.
+- 2026-10-14: accepted -> closed. Re-audit 2026-10-14_0453.md: the reproduction no longer reproduces.

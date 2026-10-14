@@ -42,6 +42,8 @@ $a=@('-d','','--crlf','http://127.0.0.1:50972/'); foreach($p in @(@('curl','C:\P
 
 ## Re-audits
 
+- 2026-10-14 | 2026-10-14_0453.md | reproduces: no | Ran the reproduction: 'curl: Content-Length: 0' and 'candidate: Content-Length: 0', with no Transfer-Encoding. The --json '' --crlf variant also sends Content-Length: 0 from both.
+
 ## Log
 
 - 2026-10-13: filed proposed.
