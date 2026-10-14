@@ -1,7 +1,8 @@
 <#
 .SYNOPSIS
     Turns the auditors' reports from one audit into finding files: new ones filed, repeats noted,
-    re-audits recorded, and findings closed only by a confirming re-audit.
+    re-audits recorded, and findings closed only by a confirming re-audit - or, for a finding
+    about a past run's cost, once its tasks are Done.
 
 .DESCRIPTION
     Called by RunAudit.ps1 (BL-1020) after the auditors reply. Formats and rules:
@@ -34,7 +35,15 @@
       duplicate   Before anything else, open findings that share a key are one finding: all but
                   the lowest ID are closed with closed-how duplicate and duplicate-of, and their
                   tasks join the original's tasks list.
-      rerun       A finding with a mutation reproduction re-audited by its own auditor has the
+      historical  Next, before any report is read, an accepted finding whose key ends in
+                  :cost-outlier (one past run's cost, which no fix can change) closes with
+                  closed-how task-done-historical, closed-by this -Scorecard and a reason, once it
+                  has at least one task and every one - its task, its tasks list, and every
+                  BL-###-fix-/re-fix- task file naming it, as Test-AuditDue.ps1 counts them - is in
+                  Tasks/Done at the audited -Commit (read with git ls-tree). It is not re-audited:
+                  a re-audit of it in this audit's reports finds it closed and is skipped
+                  (ADR-0422, amended 2026-10-14).
+      rerun      A finding with a mutation reproduction re-audited by its own auditor has the
                   runner's targeted rerun on the clean audited -Commit (-RerunReproductions) first,
                   when the auditor says "no" or a planted defect overlaps it. No plant can touch
                   that rerun, so its answer stands: an own "no" with the mutant killed closes
@@ -63,7 +72,8 @@
                                       line is its own auditor's "no" from a different audit;
                                       closed-by names both scorecards.
                   A rerun in which the mutant survives closes nothing. Nothing else closes a
-                  finding - not its task's state, and not an audit that did not report it. Closed
+                  finding - not its task's state (outside the historical rule above), and not an
+                  audit that did not report it. Closed
                   findings are never changed. Re-audits lines go at the end of Re-audits, before
                   Log (BL-1183).
 
@@ -82,7 +92,7 @@
     This audit's scorecard file name, e.g. 2026-10-14_0930.md.
 
 .PARAMETER Commit
-    The audited commit.
+    The audited commit. Its Tasks folder, read with git, is the board the historical rule checks.
 
 .PARAMETER Date
     The audit's date, yyyy-MM-dd. Default today.
@@ -371,6 +381,61 @@ function Close-Duplicates([object[]]$Findings) {
     return $closed
 }
 
+# --- historical findings: a past run's cost (ADR-0422, amended 2026-10-14) --------------------
+
+# A key ending in this suffix names one past run's cost, which no later change can alter.
+$HistoricalKeySuffix = ':cost-outlier'
+# The board's task files at -Commit, as git paths; read once. Only the self-test sets it first.
+$BoardTaskPaths = $null
+
+function Get-BoardTaskPaths {
+    # Every BL-*.md task file under Tasks/ at the audited -Commit (archives included), from git, so
+    # the board is the audited commit's whatever the planted tree holds. Empty when git cannot tell.
+    if ($null -ne $script:BoardTaskPaths) { return $script:BoardTaskPaths }
+    $ErrorActionPreference = 'Continue'
+    $out = @(& git -C $repo ls-tree -r --name-only $Commit -- Tasks 2>$null)
+    if ($LASTEXITCODE -ne 0) { $out = @() }
+    $script:BoardTaskPaths = @($out | ForEach-Object { "$_" -replace '\\', '/' } | Where-Object { $_ -match '/BL-\d+-[^/]*\.md$' })
+    return $script:BoardTaskPaths
+}
+
+function Get-DoneHistoricalTasks($Finding, [string[]]$TaskPaths) {
+    # The tasks of an accepted finding whose key ends in :cost-outlier, when there is at least one
+    # and every one is in Tasks/Done (or an archive under it) at the audited commit; otherwise an
+    # empty list. Its tasks are counted as Test-AuditDue.ps1 counts them: its task, its tasks list,
+    # and every BL-###-fix-... or BL-###-re-fix-... task file naming it.
+    if ($Finding.Status -ne 'accepted' -or -not "$($Finding.Key)".EndsWith($HistoricalKeySuffix)) { return @() }
+    $names = @($TaskPaths | ForEach-Object { $_.Substring($_.LastIndexOf('/') + 1) })
+    $slug = "$($Finding.Id)".ToLowerInvariant()
+    $ids = @(Get-FindingTasks $Finding)
+    $ids += @($names | Where-Object { $_ -match '^BL-\d+-(re-)?fix-' -and $_ -match "\b$slug\b" } | ForEach-Object { ($_ -split '-')[0..1] -join '-' })
+    $ids = @($ids | Where-Object { $_ } | Sort-Object { [int]($_ -replace '\D', '') } -Unique)
+    if (-not $ids.Count) { return @() }
+    foreach ($id in $ids) {
+        $path = @($TaskPaths | Where-Object { $_.Substring($_.LastIndexOf('/') + 1) -like "$id-*" } | Select-Object -First 1)
+        if (-not $path.Count -or $path[0] -notmatch '^Tasks/Done/') { return @() }
+    }
+    return $ids
+}
+
+function Close-HistoricalFindings([object[]]$Findings) {
+    # A finding about one past run's cost (key ...:cost-outlier) describes history, so every re-audit
+    # would say it still reproduces and file a Re-fix task with nothing to fix. Its task is the only
+    # evidence there can be: once every task is Done at the audited commit, it closes here, before
+    # any re-audit, with closed-how task-done-historical (Stewart, 2026-10-14). Returns how many.
+    $closed = 0
+    $paths = @(Get-BoardTaskPaths)
+    foreach ($finding in @($Findings | Sort-Object Id)) {
+        $ids = @(Get-DoneHistoricalTasks $finding $paths)
+        if (-not $ids.Count) { continue }
+        Add-FindingTasks $finding $ids
+        $at = if ("$Commit".Length -gt 12) { "$Commit".Substring(0, 12) } else { "$Commit" }
+        Close-Finding $finding ([pscustomobject]@{ How = 'task-done-historical'; By = $Scorecard }) "Audit $Scorecard`: a cost-outlier finding records a past run's cost, which no fix can change; its tasks ($($ids -join ', ')) are Done at $at, so it closes without a re-audit (ADR-0422, amended 2026-10-14)."
+        $closed++
+    }
+    return $closed
+}
+
 function Get-FindingTasks($Finding) {
     # Every task filed for the finding: its tasks list, and its task when that is not in it.
     $text = [IO.File]::ReadAllText($Finding.Path)
@@ -489,6 +554,7 @@ function Invoke-WriteFindings {
     $counts = @{ new = 0; open = 0; closed = 0; catches = 0 }
     $catches = @()
     $counts.closed += Close-Duplicates $existing
+    $counts.closed += Close-HistoricalFindings $existing
 
     foreach ($auditor in $AuditorOrder) {
         $reportPath = Join-Path $ReportDirectory "$auditor.md"
@@ -580,6 +646,8 @@ if ($SelfTest) {
         $Manifest = Join-Path $work 'manifest.json'
         # One comma-joined string, as RunAudit.ps1 passes it through powershell -File (BL-1244).
         $Unreliable = ConvertTo-NameList @('process,truthfulness-not-run'); $Scorecard = '2026-10-14_0930.md'; $Commit = 'abc1234'; $Date = '2026-10-14'
+        # An empty board, not git: the fixtures' commit does not exist.
+        $script:BoardTaskPaths = @()
         $before = @{}
         foreach ($f in Get-ChildItem -LiteralPath $FindingsDirectory -Filter 'AF-*.md') { $before[$f.Name] = [IO.File]::ReadAllText($f.FullName) }
         $line = Invoke-WriteFindings
@@ -661,6 +729,41 @@ if ($SelfTest) {
         Check 'a set-aside line is neither yes nor no' (@(Get-ReauditLines $c22).Count -eq 1) "$(@(Get-ReauditLines $c22).Count) parsed"
         Check 'a re-audit with reproduces null is "not re-audited", not a no' ($c14 -match '\| 2026-10-14_0930\.md \| not re-audited \| site not sampled' -and $c14 -match '(?m)^status: accepted\r?$') 'AF-0014'
         Check 'closure summary line' ($line2 -eq 'findings: new 1, still open 1, closed 4, catches 0') $line2
+
+        # ADR-0422, amended 2026-10-14: a finding about a past run's cost closes once its tasks are Done.
+        $historical = Join-Path $work 'historical'
+        $FindingsDirectory = Join-Path $historical 'findings'; $ReportDirectory = Join-Path $historical 'reports'
+        New-Item -ItemType Directory -Force $FindingsDirectory, $ReportDirectory | Out-Null
+        Copy-Item -LiteralPath (Join-Path $repo 'Audit\Findings\FINDING-TEMPLATE.md') -Destination $FindingsDirectory
+        $Manifest = ''; $Tree = ''; $Unreliable = @(); $script:MechanicalOutcomes = @{}
+        $newHistorical = { param($Id, $Key, $Task, $Tasks, $Status)
+            $t = [IO.File]::ReadAllText((Join-Path $repo 'Audit\Findings\FINDING-TEMPLATE.md'))
+            $t = $t.Replace('{{ID}}', $Id).Replace('{{TITLE}}', "Finding $Id").Replace('{{AUDITOR}}', 'process').Replace('{{SEVERITY}}', 'Low').Replace('{{KEY}}', $Key).Replace('{{REPRODUCTION}}', 'none').Replace('{{FOUND}}', '2026-10-13').Replace('{{FOUND_AT}}', 'abc').Replace('{{SCORECARD}}', '2026-10-13_1822.md').Replace('{{SUMMARY}}', 's').Replace('{{LOCATION}}', 'logs/x.jsonl').Replace('{{EVIDENCE}}', 'e').Replace('{{REPRODUCTION_COMMAND}}', 'c').Replace('{{REPRODUCTION_EXPECTED}}', 'x').Replace('{{REPRODUCTION_ACTUAL}}', 'y')
+            $t = $t.Replace('status: proposed', "status: $Status").Replace('task: none', "task: $Task").Replace("tasks:`n", "tasks: $Tasks`n").Replace("tasks:`r`n", "tasks: $Tasks`r`n")
+            [IO.File]::WriteAllText((Join-Path $FindingsDirectory "$Id-x.md"), $t, $Utf8)
+        }
+        & $newHistorical 'AF-0030' 'process:logs:BL-10:cost-outlier' 'BL-10' 'BL-10' 'accepted'
+        & $newHistorical 'AF-0031' 'process:logs:BL-11:cost-outlier' 'BL-11' 'BL-11' 'accepted'
+        & $newHistorical 'AF-0032' 'process:logs:BL-13:redone-work' 'BL-13' 'BL-13' 'accepted'
+        & $newHistorical 'AF-0033' 'process:logs:BL-14:cost-outlier' 'none' '' 'accepted'
+        & $newHistorical 'AF-0034' 'process:logs:BL-15:cost-outlier' 'BL-15' 'BL-15' 'accepted'
+        & $newHistorical 'AF-0035' 'process:logs:BL-17:cost-outlier' 'BL-17' 'BL-17' 'accepted'
+        & $newHistorical 'AF-0036' 'process:logs:BL-19:cost-outlier' 'BL-19' 'BL-19' 'proposed'
+        # BL-12 is a Fix task for AF-0031 still in Backlog, found by its file name; BL-15 is not on
+        # the board; BL-18 is a Re-fix task for AF-0035 found by its file name, Done in an archive.
+        $script:BoardTaskPaths = @('Tasks/Done/BL-10-fix-af-0030-x.md', 'Tasks/Done/BL-11-fix-af-0031-x.md', 'Tasks/Backlog/BL-12-fix-af-0031-again.md', 'Tasks/Done/2026-10-10/BL-13-fix-af-0032-x.md', 'Tasks/Done/BL-17-fix-af-0035-x.md', 'Tasks/Done/2026-10-12/BL-18-re-fix-af-0035-x.md', 'Tasks/Done/BL-19-fix-af-0036-x.md')
+        [IO.File]::WriteAllText((Join-Path $ReportDirectory 'process.md'), "Fixture reply.`n`n``````json`n{ `"auditor`": `"process`", `"findings`": [], `"reaudits`": [ { `"finding`": `"AF-0030`", `"reproduces`": true, `"evidence`": `"BL-10 still cost 4 times the median`" }, { `"finding`": `"AF-0032`", `"reproduces`": true, `"evidence`": `"requeued again`" } ], `"metrics`": {} }`n```````n", $Utf8)
+        $beforeHistorical = @{}; foreach ($f in Get-ChildItem -LiteralPath $FindingsDirectory -Filter 'AF-*.md') { $beforeHistorical[$f.Name] = [IO.File]::ReadAllText($f.FullName) }
+        $Scorecard = '2026-10-15_0900.md'; $Commit = '0123456789abcdef0123'; $Date = '2026-10-15'
+        $line3 = Invoke-WriteFindings
+        $h30 = Lf 'AF-0030'; $h35 = Lf 'AF-0035'; $h32 = Lf 'AF-0032'
+        Check 'a cost-outlier finding whose tasks are all Done closes task-done-historical, with a reason and a Log line' ($h30 -match '(?m)^status: closed$' -and $h30 -match '(?m)^closed-how: task-done-historical$' -and $h30 -match '(?m)^closed-by: 2026-10-15_0900\.md$' -and $h30 -match '(?m)^closed: 2026-10-15$' -and $h30 -match '(?m)^reason: Audit 2026-10-15_0900\.md: a cost-outlier finding records a past run''s cost, which no fix can change; its tasks \(BL-10\) are Done at 0123456789ab, so it closes without a re-audit \(ADR-0422, amended 2026-10-14\)\.$' -and $h30 -match '(?m)^- 2026-10-15: accepted -> closed\. Audit 2026-10-15_0900\.md: a cost-outlier') 'AF-0030'
+        Check 'a closed cost-outlier finding is not re-audited: its re-audit in the reports adds no line' ($h30 -notmatch 'still cost 4 times') 'AF-0030'
+        Check 'a Re-fix task found by its file name, Done in an archive, joins the tasks and the close' ($h35 -match '(?m)^status: closed$' -and $h35 -match '(?m)^tasks: BL-17, BL-18$' -and $h35 -match 'its tasks \(BL-17, BL-18\) are Done') 'AF-0035'
+        $openHistorical = @('AF-0031-x.md', 'AF-0033-x.md', 'AF-0034-x.md', 'AF-0036-x.md' | Where-Object { [IO.File]::ReadAllText((Join-Path $FindingsDirectory $_)) -cne $beforeHistorical[$_] })
+        Check 'a cost-outlier finding with an open task, no task, a task not on the board, or not accepted is untouched' ($openHistorical.Count -eq 0) "changed: $($openHistorical -join ',')"
+        Check 'any other key whose task is Done follows ADR-0422 unchanged: re-audited, still open' ($h32 -match '(?m)^status: accepted$' -and $h32 -match '\| 2026-10-15_0900\.md \| reproduces: yes \| requeued again' -and $h32 -notmatch 'closed-how: task') 'AF-0032'
+        Check 'historical summary line' ($line3 -eq 'findings: new 0, still open 0, closed 2, catches 0') $line3
         $Tree = ''
         Check 'with no tree the member is the key''s <what> without its operator' ((Get-SiteMember ([pscustomobject]@{ File = 'X.UnitLibrary/Y.cs'; Line = 3; Operator = 'true' }) 'quality:X.UnitLibrary/Y.cs:Turn-true:surviving-mutant') -eq 'Turn') 'Turn'
         exit $(if ($failed) { 1 } else { 0 })

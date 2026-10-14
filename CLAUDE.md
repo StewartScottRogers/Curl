@@ -215,8 +215,8 @@ scorecard on the `audit` branch and opens its pull request, which it never merge
 
 Cadence: on demand, before each roadmap-milestone merge to `master`, and after changes to
 `RunDarkFactory.ps1`. `Audit\Tools\Test-AuditDue.ps1` says when one is due - also when
-accepted findings wait on a re-audit (`reaudit-pending:<n>`) or on a task no lane will take
-(`interactive-stuck:<n>`); a shift's end announces it, and holds a milestone's merge until the
+accepted findings wait on a re-audit (`reaudit-pending:<n>`), on a task no lane will take
+(`interactive-stuck:<n>`) or on the audit that closes them (`close-pending:<n>`); a shift's end announces it, and holds a milestone's merge until the
 audit has run (BL-1022).
 
 Findings are `Audit/Findings/AF-####-*.md`, arriving `proposed`. Only Stewart sets
@@ -226,7 +226,10 @@ one still reproducing after its tasks are Done. A finding closes only on evidenc
 because its task reached Done (ADR-0422): its own auditor's re-audit says it no longer
 reproduces and the audit run's own rerun of its mechanical reproduction on the clean commit
 agrees (whatever the auditor's reliability), or, with no mechanical answer, that auditor is
-reliable or says so on two audits running. Duplicates close as `duplicate`, and Stewart alone
+reliable or says so on two audits running. The one exception is a finding about one past
+run's cost (key ending `:cost-outlier`): history cannot change, so it is never re-audited and
+no `Re-fix` task is filed for it; the first audit after all its tasks are Done closes it as
+`task-done-historical` (Stewart, 2026-10-14). Duplicates close as `duplicate`, and Stewart alone
 may close an accepted finding himself (`closed-how: stewart`); the scorecard lists findings
 stuck open after more than 3 audits. Re-audit verdicts that overlap a planted defect are set
 aside.

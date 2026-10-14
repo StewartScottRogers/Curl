@@ -35,17 +35,22 @@ order:
    lanes may take them. The finding stays `accepted` while its task is worked and after it is
    Done; only evidence closes it - a later re-audit that finds the reproduction no longer
    reproduces, backed by the audit run's own mechanical rerun, a reliable auditor, or a second
-   consecutive "no" ([Closing](Findings/README.md#closing), ADR-0422).
+   consecutive "no" ([Closing](Findings/README.md#closing), ADR-0422). A finding about one past
+   run's cost (key ending `:cost-outlier`) is the exception: no fix can change history, so the
+   first audit after all its tasks are Done closes it, `closed-how: task-done-historical`,
+   without a re-audit (ADR-0422, amended 2026-10-14).
 5. **A fix that did not hold is re-fixed.** When every task of an accepted finding is Done and its
    latest re-audit - by its own auditor, dated after the last task was completed - says it still
    reproduces, the same script files `Re-fix AF-####: <title>` with that re-audit's evidence, and
    adds it to the finding's `tasks`. A finding with any task still open, a `Re-fix` one filed by
    hand included (found by its title naming the finding), gets nothing new. A set-aside or "not
-   re-audited" latest line (a planted-defect overlap) reopens nothing.
+   re-audited" latest line (a planted-defect overlap) reopens nothing, and a `cost-outlier`
+   finding never reopens.
 6. **Stuck findings go to Stewart.** The scorecard's Attention section lists every accepted finding
    still open after more than 3 audits that ran its auditor, and `Test-AuditDue.ps1` reports
-   `reaudit-pending:<n>` (tasks Done, no re-audit since) and `interactive-stuck:<n>` (held by a
-   task no lane will take). Stewart may close an accepted finding himself - `status: closed`,
+   `reaudit-pending:<n>` (tasks Done, no re-audit since), `interactive-stuck:<n>` (held by a
+   task no lane will take) and `close-pending:<n>` (`cost-outlier` findings with their tasks
+   Done, which the next audit closes). Stewart may close an accepted finding himself - `status: closed`,
    `closed-how: stewart`, `closed-by: stewart`, a `reason` and a `## Log` line - in the pull
    request, on the board page, or by telling a session; Claude never does it on its own judgement.
 

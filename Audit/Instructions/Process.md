@@ -99,6 +99,14 @@ came back "not re-audited" and could never close):
 - `"reproduces": null` only when the window holds no shift that finished a task, so it
   cannot tell.
 
+A `cost-outlier` finding is the exception: it records one past run's cost, which no fix can
+change, so it is never re-audited once its tasks are Done. Its task looks for avoidable waste in
+what drove the cost and fixes the cause, or records that there is none, and the first audit
+after every task is Done closes the finding with `closed-how: task-done-historical` (Stewart,
+2026-10-14; ADR-0422, amended 2026-10-14). The runner leaves such findings out of your
+re-audit list. A cost-outlier finding still open with a task not yet Done is re-audited by its
+mechanism like any other.
+
 ## Method counts
 
 Run every step above on every audit; re-audits come on top, never instead. Report `method.rulesChecked` in `metrics` ([Report-Format.md](Report-Format.md#method-counts)): a report without them marks you unreliable (BL-1364).

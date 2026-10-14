@@ -18,10 +18,14 @@
                       does at -Ref
       reaudit-pending:<N>    N accepted findings (at -ScorecardsRef) whose tasks (at -Ref) are all
                       Done, with no re-audit ("reproduces: yes" or "no") dated after the last one
-                      was completed: only an audit can close or reopen them (ADR-0422)
+                      was completed: only an audit can close or reopen them (ADR-0422); a finding
+                      about a past run's cost is counted under close-pending instead
       interactive-stuck:<N>  N accepted findings with an open task that is interactive only
                       (lane: no, or an audit path in touches), which no factory lane will take;
                       an interactive session must run it
+      close-pending:<N>      N accepted findings about one past run's cost (key ending
+                      :cost-outlier) whose tasks are all Done: the next audit closes them without a
+                      re-audit (task-done-historical, ADR-0422 amended 2026-10-14)
 
     A finding's tasks are its task, its tasks list, and every board task file named
     BL-###-fix-... or BL-###-re-fix-... that names it.
@@ -107,7 +111,9 @@ function Get-FindingWaits([string]$Repo, [string]$FindingsAt, [string]$TasksAt) 
     #                    the last one was completed;
     #   InteractiveStuck a task still open that is interactive only (lane: no, or an audit path
     #                    in touches), which no dark factory lane will ever take.
-    $waits = [ordered]@{ ReauditPending = 0; InteractiveStuck = 0 }
+    #   ClosePending     a finding about one past run's cost (key ...:cost-outlier) with every task
+    #                    Done, which the next audit closes without a re-audit.
+    $waits = [ordered]@{ ReauditPending = 0; InteractiveStuck = 0; ClosePending = 0 }
     $taskPaths = @(Invoke-Git $Repo @('ls-tree', '-r', '--name-only', $TasksAt, '--', 'Tasks') -AllowFailure | Where-Object { $_ -match '/BL-\d+-[^/]*\.md$' })
     $names = @(Invoke-Git $Repo @('ls-tree', '--name-only', "${FindingsAt}:Audit/Findings") -AllowFailure | Where-Object { $_ -match '^AF-\d+.*\.md$' })
     foreach ($name in $names) {
@@ -126,6 +132,8 @@ function Get-FindingWaits([string]$Repo, [string]$FindingsAt, [string]$TasksAt) 
             continue
         }
         if ($tasks.Count -lt $ids.Count) { continue }
+        # A past run's cost is never re-audited: the next audit closes it (ADR-0422, amended 2026-10-14).
+        if ((Get-FrontValue $text 'key').EndsWith(':cost-outlier')) { $waits.ClosePending++; continue }
         $completed = @($tasks | ForEach-Object { Get-FrontValue ((Invoke-Git $Repo @('show', "${TasksAt}:$_")) -join "`n") 'completed' } | Sort-Object)[-1]
         $reaudited = @([regex]::Matches($text, '(?m)^- (\d{4}-\d\d-\d\d) \| \S+ \| reproduces: (yes|no)(?: \([^)|]*\))? \|') | Where-Object { $_.Groups[1].Value -gt $completed })
         if (-not $reaudited.Count) { $waits.ReauditPending++ }
@@ -151,6 +159,7 @@ function Get-AuditDue([string]$Repo, [string]$At, [string]$ScorecardsAt) {
     $waits = Get-FindingWaits $Repo $ScorecardsAt $At
     if ($waits.ReauditPending) { $reasons += "reaudit-pending:$($waits.ReauditPending)" }
     if ($waits.InteractiveStuck) { $reasons += "interactive-stuck:$($waits.InteractiveStuck)" }
+    if ($waits.ClosePending) { $reasons += "close-pending:$($waits.ClosePending)" }
     return [ordered]@{ due = [bool]$reasons.Count; reasons = $reasons; lastScorecard = $last; lastCommit = $commit }
 }
 
@@ -203,17 +212,23 @@ if ($SelfTest) {
         & $newTask 'Tasks\Done\BL-004-fix-af-0004-x.md' "id: BL-004`ncompleted: 2026-10-05"
         & $newTask 'Tasks\Backlog\BL-005-re-fix-af-0004-and-af-0005-x.md' "id: BL-005`ntouches: [Audit/Tools]"
         & $newTask 'Tasks\Done\BL-006-fix-af-0005-x.md' "id: BL-006`ncompleted: 2026-10-05"
-        $newFinding = { param($Id, $Status, $Task, $Reaudits) [IO.File]::WriteAllText((Join-Path $repo "Audit\Findings\$Id-x.md"), "---`nid: $Id`nstatus: $Status`ntask: $Task`n---`n## Re-audits`n`n$Reaudits`n") }
+        $newFinding = { param($Id, $Status, $Task, $Reaudits, $Key) [IO.File]::WriteAllText((Join-Path $repo "Audit\Findings\$Id-x.md"), "---`nid: $Id`nstatus: $Status`nkey: $Key`ntask: $Task`n---`n## Re-audits`n`n$Reaudits`n") }
         & $newFinding 'AF-0001' 'accepted' 'BL-001' '- 2026-10-04 | a.md | reproduces: yes | before the fix'
         & $newFinding 'AF-0002' 'accepted' 'BL-002' ''
         & $newFinding 'AF-0003' 'accepted' 'BL-003' ''
         & $newFinding 'AF-0004' 'accepted' 'BL-004' '- 2026-10-07 | b.md | reproduces: yes | still'
         & $newFinding 'AF-0005' 'accepted' 'BL-006' '- 2026-10-07 | b.md | not re-audited | overlaps planted defect PD-1'
         & $newFinding 'AF-0006' 'proposed' 'none' ''
+        # A past run's cost (ADR-0422, amended 2026-10-14): Done, re-audited since or not, the next
+        # audit closes it; with no re-audit since it is not reaudit-pending either.
+        & $newTask 'Tasks\Done\BL-007-fix-af-0007-x.md' "id: BL-007`ncompleted: 2026-10-05"
+        & $newTask 'Tasks\Done\BL-008-fix-af-0008-x.md' "id: BL-008`ncompleted: 2026-10-05"
+        & $newFinding 'AF-0007' 'accepted' 'BL-007' '- 2026-10-07 | b.md | reproduces: yes | still costly' 'process:logs:BL-900:cost-outlier'
+        & $newFinding 'AF-0008' 'accepted' 'BL-008' '' 'process:logs:BL-901:cost-outlier'
         $waiting = Commit-All 'findings and tasks'
         $waits = Get-FindingWaits $repo $waiting $waiting
-        Check 'a Done task with no re-audit since is reaudit-pending; an interactive-only open task, own or a Re-fix found by its file name, is interactive-stuck' 'reaudit-pending 1, interactive-stuck 3' "reaudit-pending $($waits.ReauditPending), interactive-stuck $($waits.InteractiveStuck)"
-        Check 'both appear as reasons' 'Audit due: milestone:1, reaudit-pending:1, interactive-stuck:3' (Format-Due (Get-AuditDue $repo $waiting $waiting))
+        Check 'a Done task with no re-audit since is reaudit-pending; an interactive-only open task, own or a Re-fix found by its file name, is interactive-stuck; a past run''s cost with its tasks Done is close-pending' 'reaudit-pending 1, interactive-stuck 3, close-pending 2' "reaudit-pending $($waits.ReauditPending), interactive-stuck $($waits.InteractiveStuck), close-pending $($waits.ClosePending)"
+        Check 'all three appear as reasons' 'Audit due: milestone:1, reaudit-pending:1, interactive-stuck:3, close-pending:2' (Format-Due (Get-AuditDue $repo $waiting $waiting))
     }
     finally { Remove-Item -Recurse -Force -LiteralPath $repo -ErrorAction SilentlyContinue }
     exit $(if ($failed) { 1 } else { 0 })
