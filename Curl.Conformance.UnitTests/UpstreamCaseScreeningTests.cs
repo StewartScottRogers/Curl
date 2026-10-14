@@ -584,13 +584,13 @@ public sealed class UpstreamCaseScreeningTests
     }
 
     [TestMethod]
-    public void FindSkipReason_HttpsThroughTheHttpProxy_IsTheReason()
+    public void FindSkipReason_HttpsThroughTheHttpProxy_IsNotSkipped()
     {
         UpstreamTestCase testCase = ParsedTestCase.From("<client>\n<server>\nhttps\nhttp-proxy\n</server>\n<command>\nhttp://h/1\n</command>\n</client>\n");
 
         string? reason = UpstreamCaseScreening.FindSkipReason(CleanExpansion, testCase, Features);
 
-        Assert.AreEqual("the http-proxy stand-in tunnels no CONNECT to the https server (BL-1915)", reason);
+        Assert.IsNull(reason);
     }
 
     [TestMethod]

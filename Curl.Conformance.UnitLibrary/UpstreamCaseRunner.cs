@@ -332,7 +332,7 @@ public sealed class UpstreamCaseRunner(
         GopherServerConnector gopher = new(testCase, mqtt);
         IConnector servers = sshServer?.InFrontOf(gopher) ?? gopher;
         // A CONNECT through the http-proxy to a mail port or the FTP control or passive port reaches that stand-in
-        // (test1319 to 1321, BL-2011; test714 and test715, BL-2035).
+        // (test1319 to 1321, BL-2011; test714 and test715, BL-2035); one to %HTTPSPORT reaches the HTTPS stand-in, whose TLS handshake travels inside the tunnel (BL-2225).
         server.TunnelServerForPort = port => TunnelledPorts.Contains(port) ? pop3 : null;
         UpstreamCurlInvocation invocation = new(arguments, standardOutput, standardError, standardInput, servers, tftp, EnvironmentVariables(testCase)) { ConnectionListener = ftp.ActiveModeListener };
         (int exitCode, string? failure) = await RunCurlAsync(invocation, server).ConfigureAwait(false);
@@ -418,7 +418,7 @@ public sealed class UpstreamCaseRunner(
             ? new FtpsServerConnector(HttpsServerConnector.LoadCertificate(Path.Combine(certificateDirectory, "certs", HttpsServerConnector.DefaultCertificateFile)), ftp)
             : ftp;
 
-    private static readonly int[] TunnelledPorts = [Pop3ServerConnector.Pop3Port, ImapServerConnector.ImapPort, SmtpServerConnector.SmtpPort, FtpServerConnector.FtpPort, FtpServerConnector.PassivePort];
+    private static readonly int[] TunnelledPorts = [Pop3ServerConnector.Pop3Port, ImapServerConnector.ImapPort, SmtpServerConnector.SmtpPort, FtpServerConnector.FtpPort, FtpServerConnector.PassivePort, HttpsServerConnector.HttpsPort];
 
     private static TimeProvider ServerClock(List<string> arguments) =>
         CurlTimerOptions.AnyIn(arguments) ? TimeProvider.System : new WaitSkippingTimeProvider();

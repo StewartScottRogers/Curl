@@ -65,7 +65,6 @@ internal static class UpstreamCaseScreening
             () => UninterpretedCheck(testCase, "client", "precheck"),
             () => UninterpretedCheck(testCase, "verify", "postcheck"),
             () => UnsupportedServer(testCase),
-            () => HttpsThroughProxy(testCase),
             () => FtpDataConnection(testCase),
             () => UploadOffMailServer(testCase),
             () => UnsupportedFeature(testCase, features),
@@ -143,13 +142,6 @@ internal static class UpstreamCaseScreening
             ["https", var file] => file,
             _ => null,
         };
-
-    // The http-proxy stand-in relays no CONNECT tunnel to the HTTPS stand-in yet (BL-1915), so a
-    // case naming both would send its TLS handshake to the sws emulation as a request.
-    private static string? HttpsThroughProxy(UpstreamTestCase testCase) =>
-        HttpsCertificateFile(testCase) is not null && UpstreamTestPartBodies.Lines(testCase.Find("client", "server")).Contains("http-proxy")
-            ? "the http-proxy stand-in tunnels no CONNECT to the https server (BL-1915)"
-            : null;
 
     private static string? UnsupportedServer(UpstreamTestCase testCase) =>
         UpstreamTestPartBodies.Lines(testCase.Find("client", "server")).FirstOrDefault(server => !Servers.Contains(server) && HttpsCertificateFile(server) is null) is { } server

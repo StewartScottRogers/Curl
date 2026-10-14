@@ -74,7 +74,7 @@ Connections to `SwsHttpServerConnector.ProxyPort` (8992, the runner's `%PROXYPOR
 for upstream's `http-proxy` server (BL-1924): they are served the same way but recorded in
 `ProxyReceivedBytes`, compared with `<verify><proxy>` after `<strip>` / `<strippart>` as
 `<verify><protocol>` is; after a `CONNECT` such a connection records into `ReceivedBytes`, as
-upstream's HTTP server logs the tunnelled request. A `CONNECT` to `%POP3PORT`, `%IMAPPORT` or `%SMTPPORT` is relayed instead, once its `<connect>` reply keeps the connection open, to that mail stand-in (`SwsHttpServerConnector.TunnelServerForPort`, which the runner sets; BL-2011), as upstream's http-proxy connects to the named port, so the tunnelled commands land in its `ProtocolLog` (test1319, test1320, test1321 pass). A `CONNECT` to `%FTPPORT` or the FTP stand-in's passive port (`FtpServerConnector.FtpPort`, `PassivePort`) is relayed the same way, so FTP's control and data connections through the proxy reach the FTP stand-in (test714, test715 pass; BL-2035). Screening lets `http-proxy` cases run.
+upstream's HTTP server logs the tunnelled request. A `CONNECT` to `%POP3PORT`, `%IMAPPORT` or `%SMTPPORT` is relayed instead, once its `<connect>` reply keeps the connection open, to that mail stand-in (`SwsHttpServerConnector.TunnelServerForPort`, which the runner sets; BL-2011), as upstream's http-proxy connects to the named port, so the tunnelled commands land in its `ProtocolLog` (test1319, test1320, test1321 pass). A `CONNECT` to `%FTPPORT` or the FTP stand-in's passive port (`FtpServerConnector.FtpPort`, `PassivePort`) is relayed the same way, so FTP's control and data connections through the proxy reach the FTP stand-in (test714, test715 pass; BL-2035). A `CONNECT` to `%HTTPSPORT` is relayed the same way to the HTTPS stand-in (BL-2225). Screening lets `http-proxy` cases run.
 No case is skipped for `%PROXYPORT` any more (BL-1897): 17 proxy cases are measured (80, 83, 95,
 150, 184, 194, 275, 744, 1078, 1184, 1288, 1297, 1428, 1904, 2050, 2107, 3028), and the other
 `%PROXYPORT` cases skip for another reason (a `<tool>`, `<setenv>`, a feature or another server's port).
@@ -152,7 +152,10 @@ certificate, as stunnel does, and relays the decrypted requests to an `sws` emul
 turns (request bytes in, every reply byte out), so they land in its `ReceivedBytes` for
 `<verify><protocol>`; once sws closes the connection it sends close_notify, as stunnel does. It
 sits between `FtpServerConnector` and `NoListenPortConnector`. Screening lets `https` cases run,
-but skips one that also names `http-proxy` until the proxy stand-in tunnels to it (BL-1915). On
+those that also name `http-proxy` included: a `CONNECT` to `%HTTPSPORT` through the proxy stand-in
+is relayed to `HttpsServerConnector`, so the TLS handshake travels inside the tunnel, the `CONNECT`
+lands in `ProxyReceivedBytes` and the decrypted requests in `ReceivedBytes` (BL-2225; 1849 and 3106
+pass, and 446 and 780 to 783 skip for the Debug feature, BL-2234). On
 Windows 25 HTTPS cases pass (300, 303, 304, 306, 309, 311, 312, 325, 364, 410, 414, 417, 474,
 1561, 1562, 2009-2011, 2033, 2048, 2070, 2079, 2087, 3023, 3024, ...) and 2035, 2038, 2042,
 323 and 1244 fail on a difference the next gap run files; the `!Schannel` cases run on Linux and macOS.
