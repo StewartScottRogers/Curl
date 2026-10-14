@@ -47,3 +47,4 @@ Reject a CR or LF in any value Curl writes into a protocol command line with exi
 ## Log
 
 - 2026-10-13: Created.
+- 2026-10-13: Backlog -> Doing.
