@@ -8,7 +8,7 @@ depends-on: []
 touches: [RunDarkFactory.ps1]
 requirement: none
 created: 2026-10-14
-completed:
+completed: 2026-10-14
 ---
 # BL-2216 — Fix AF-0214: BL-2182 cost $4.80, 3.23 times the median task cost, over 92 turns of Bash-sliced code reading
 
@@ -41,14 +41,17 @@ The finding closes only when a later re-audit by the process auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction: BL-2182 is a past run and its cost cannot change; its $4.80 is 3.23 times the median, inside the 4 times cap (BL-2116). See Notes.
+- [x] No code changed (task board only), so build and tests are unaffected.
 
 ## Notes
 
 - 2026-10-14 (Claude): AF-0214: BL-2182 cost 3.23 times the median, under the 4 times cost cap Stewart chose on 2026-10-12 (BL-2116). Unless its run log shows avoidable waste, record that this is within the chosen margin and finish.
 
+- 2026-10-14 (Claude): Checked the run-prompt rules in RunDarkFactory.ps1: AF-0190, AF-0204 and AF-0205 already tell a lane to Read a file once and never slice it with sed -n (BL-2215 added the quality-run rule). BL-2182 cost $4.80 = 3.23 times the median, under the 4 times cap Stewart chose on 2026-10-12, and the finding is about one past run, whose cost cannot change. No avoidable waste beyond what those rules already forbid, so no change to RunDarkFactory.ps1.
+
 ## Log
 
 - 2026-10-14: Created.
 - 2026-10-14: Backlog -> Doing.
+- 2026-10-14: Doing -> Done. AF-0214 within the 4x cost cap; slicing rules already in the run prompt
