@@ -3,8 +3,8 @@ id: AF-0205
 title: BL-2152 cost $2.46, 3.4 times the median, paging HandBuiltTlsProvider.cs in slices after the read-once fix
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: process:logs:BL-2152:cost-outlier
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Log
 
 - 2026-10-13: filed proposed.
+- 2026-10-13: proposed -> accepted.
