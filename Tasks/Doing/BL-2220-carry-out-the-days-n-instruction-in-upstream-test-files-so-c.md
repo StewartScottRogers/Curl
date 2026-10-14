@@ -34,3 +34,4 @@ Source: Stewart's 2026-10-14 request to raise the gap office's behaviour score (
 ## Log
 
 - 2026-10-14: Created.
+- 2026-10-14: Backlog -> Doing.
