@@ -3,8 +3,8 @@ id: AF-0201
 title: DictRequest.ClientLine's summary says the bytes sent match curl 8.21.0; the constant is CLIENT libcurl 8.22.0
 auditor: truthfulness
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: truthfulness:Curl.Protocol.Dict.UnitLibrary/DictRequest.cs:ClientLine:false-doc-comment
 reproduction: none
 task: none
@@ -46,3 +46,4 @@ public const string ClientLine = "CLIENT libcurl 8.22.0";
 ## Log
 
 - 2026-10-13: filed proposed.
+- 2026-10-13: proposed -> accepted.
