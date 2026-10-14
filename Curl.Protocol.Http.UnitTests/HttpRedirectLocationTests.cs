@@ -81,10 +81,11 @@ public sealed class HttpRedirectLocationTests
 
     [TestMethod]
     [DataRow(200)]
+    [DataRow(201)]
     [DataRow(299)]
-    [DataRow(400)]
-    public void Find_Not3xx_IsNull(int status) =>
-        Assert.IsNull(Found(null, Head(status, ("Location", "/next"))));
+    [DataRow(404)]
+    public void Find_Not3xxWithLocation_Resolves(int status) =>
+        Assert.AreEqual("http://example.com:8080/next", Found("http://example.com:8080/next", Head(status, ("Location", "/next"))));
 
     [TestMethod]
     public void Find_NoLocation_IsNull() =>

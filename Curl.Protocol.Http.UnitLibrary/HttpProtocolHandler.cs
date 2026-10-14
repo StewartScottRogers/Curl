@@ -57,10 +57,10 @@ namespace Curl.Protocol.Http;
 /// 8.21.0 does (BL-176 Notes).
 /// </para>
 /// <para>
-/// A 3xx response's <c>Location</c> is resolved against the request URL into
+/// A response's <c>Location</c>, whatever its status, is resolved against the request URL into
 /// <see cref="TransferReport.RedirectUrl" /> (<see cref="HttpRedirectLocation" />), with or
 /// without <c>-L</c>. Under <see cref="HttpRequestOptions.FollowRedirects" /> the body of a
-/// response that has one is read and discarded, counted in the download size as curl counts
+/// 3xx response that has one is read and discarded, counted in the download size as curl counts
 /// it, while its head and trailers are still written to the header output (BL-179 Notes).
 /// </para>
 /// <para>
@@ -1212,7 +1212,7 @@ public sealed class HttpProtocolHandler(
             headReader.ReleaseDeferredHeaders();
             HttpFailMode fail = FailModeOf(plan, retry, actedOn);
             ThrowIfFailing(fail, HttpFailMode.Fail, actedOn);
-            bool discardsBody = DiscardsBody(options, retry, exchange.RedirectUrl);
+            bool discardsBody = DiscardsBody(options, retry, actedOn, exchange.RedirectUrl);
             ReportAuthRetryRewind(plan, actedOn, retry);
             ReportIgnoredBody(plan, actedOn, discardsBody && !upload.CutShort);
             ReportUploadStopped(context.Events, upload, retry, discardsBody);
@@ -1421,10 +1421,11 @@ public sealed class HttpProtocolHandler(
 
     /// <summary>
     /// Tells whether the response's body is read and discarded rather than delivered: when the
-    /// handler answers it with <paramref name="retry" />, or follows its redirect.
+    /// handler answers it with <paramref name="retry" />, or follows its redirect - a 3xx with a
+    /// target; a <c>Location</c> on any other status is reported but not followed (BL-2212).
     /// </summary>
-    private static bool DiscardsBody(HttpRequestOptions options, HttpRequestPlan? retry, string? redirectUrl) =>
-        retry is not null || (options.FollowRedirects && redirectUrl is not null);
+    private static bool DiscardsBody(HttpRequestOptions options, HttpRequestPlan? retry, HttpResponseHead head, string? redirectUrl) =>
+        retry is not null || (options.FollowRedirects && redirectUrl is not null && head.StatusLine.StatusCode is >= 300 and < 400);
 
     /// <summary>
     /// Marks an HTTP/3 request stream's transfer done with its session and writes its

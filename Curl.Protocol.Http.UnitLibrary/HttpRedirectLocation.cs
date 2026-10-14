@@ -6,7 +6,7 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Protocol.Http;
 
 /// <summary>
-/// Finds a 3xx response's redirect target, the source of <c>%{redirect_url}</c> and of the
+/// Finds a response's redirect target, the source of <c>%{redirect_url}</c> and of the
 /// next hop under <c>-L</c>: its first non-empty <c>Location</c> value, resolved against the
 /// request URL as curl 8.21.0 resolves it (measured, BL-179 Notes).
 /// </summary>
@@ -39,16 +39,12 @@ internal static class HttpRedirectLocation
     /// <param name="requestUrl">The URL the request was sent to.</param>
     /// <param name="head">The final response's head.</param>
     /// <returns>
-    /// The resolved target, or <see langword="null" /> when the status is not 3xx or no
-    /// <c>Location</c> header has a value.
+    /// The resolved target, or <see langword="null" /> when no <c>Location</c> header has a
+    /// value. Any status counts: curl 8.22.0 writes <c>%{redirect_url}</c> for a <c>Location</c>
+    /// on a 200, 201 or 404 too, with or without <c>-L</c>, and follows only a 3xx (BL-2212).
     /// </returns>
     internal static string? Find(CurlUrl requestUrl, HttpResponseHead head)
     {
-        if (head.StatusLine.StatusCode is < 300 or >= 400)
-        {
-            return null;
-        }
-
         HttpResponseHeader? location = head.Headers.FirstOrDefault(IsNonEmptyLocation);
         return location is null ? null : Resolve(requestUrl, location.Value);
     }
