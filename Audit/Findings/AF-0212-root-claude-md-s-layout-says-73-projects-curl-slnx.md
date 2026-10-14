@@ -3,8 +3,8 @@ id: AF-0212
 title: Root CLAUDE.md's layout says 73 projects; Curl.slnx lists 75 C# projects
 auditor: truthfulness
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: truthfulness:CLAUDE.md:RepositoryLayoutProjectCount:false-statement
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Run from the repository root:
 ## Log
 
 - 2026-10-14: filed proposed.
+- 2026-10-14: proposed -> accepted.
