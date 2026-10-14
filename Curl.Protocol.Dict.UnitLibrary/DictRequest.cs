@@ -5,7 +5,7 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Protocol.Dict;
 
 /// <summary>
-/// Encodes a <c>dict</c> URL's path as the bytes curl 8.21.0 sends: a <c>CLIENT</c> line,
+/// Encodes a <c>dict</c> URL's path as the bytes curl 8.22.0 sends: a <c>CLIENT</c> line,
 /// one command line, and <c>QUIT</c>, each ending in CRLF.
 /// </summary>
 /// <remarks>
