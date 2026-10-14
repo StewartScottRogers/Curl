@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Networking.UnitLibrary]
+touches: [Curl.Networking.UnitLibrary, Curl.Networking.UnitTests]
 requirement: none
 created: 2026-10-14
 completed:
@@ -46,7 +46,10 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Notes
 
+- 2026-10-13 (lane 6): Killing the `>=` -> `>` mutant needs a boundary test in `Curl.Networking.UnitTests` (`TcpConnectorQuicTests.UdpTunnel.cs`): a stalled proxy that advances the fake clock exactly 1000 ms against a 1000 ms connect timeout must give exit 28 "Connection timed out after 1000 milliseconds". The production line is already correct (curl expires once elapsed reaches the limit); only the test is missing. Added `Curl.Networking.UnitTests` to `touches`; BL-2187 (in Doing) touches it, so requeued behind it. No code was written.
+
 ## Log
 
 - 2026-10-14: Created.
 - 2026-10-13: Backlog -> Doing.
+- 2026-10-13: Doing -> Backlog. Needs Curl.Networking.UnitTests for the boundary test, which BL-2187 in Doing touches; requeued until it no longer overlaps
