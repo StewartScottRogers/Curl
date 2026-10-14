@@ -3,8 +3,8 @@ id: AF-0202
 title: ADR-0474 says the gap office excludes test1211 with an ADR-specific reason; the converter records the generic disabled-upstream reason
 auditor: truthfulness
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: truthfulness:Documentation/Planning/Decisions/ADR-0474-upstream-test1211-is-measured-excluded-because-upstream-disables-it-and-real-curl-exits-10.md:test1211:stale-adr
 reproduction: none
 task: none
@@ -46,3 +46,4 @@ if ($Detail -eq 'disabled upstream') { return @('excluded', 'disabled-upstream')
 ## Log
 
 - 2026-10-13: filed proposed.
+- 2026-10-13: proposed -> accepted.
