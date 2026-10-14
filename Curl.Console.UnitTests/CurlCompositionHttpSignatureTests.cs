@@ -127,6 +127,24 @@ public sealed class CurlCompositionHttpSignatureTests
         StringAssert.StartsWith(written, "GET /first HTTP/1.1\r\nHost: 127.0.0.1:18000\r\nSignature-Input: sig1=", StringComparison.Ordinal);
     }
 
+    [TestMethod]
+    public async Task RunAsync_RedirectToUrlWithCredentials_SendsTheHopWithNoAuthorization()
+    {
+        ScriptedConnector server = new(
+        [
+            Latin1("HTTP/1.1 301 OK\r\nLocation: http://bob:alice@127.0.0.1:18001/next\r\nContent-Length: 0\r\n\r\n"),
+            Latin1(Ok),
+        ]);
+
+        (int exitCode, string standardError) = await RunAsync(server, "http://127.0.0.1:18000/first", "-L", "--httpsig-key", Ed25519Key, "--httpsig-keyid", "k");
+
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Assert.AreEqual(0, exitCode, standardError);
+        string written = Latin1(server.Written);
+        string second = written[written.IndexOf("GET /next", StringComparison.Ordinal)..];
+        Assert.AreEqual("GET /next HTTP/1.1\r\nHost: 127.0.0.1:18001\r\n" + Tail + "\r\n", second);
+    }
+
     private async Task<(int ExitCode, string StandardError)> RunAsync(ScriptedConnector server, string url, params string[] options)
     {
         string[] arguments = [.. options, url];

@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Console, Curl.Console.UnitTests, Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
 requirement: none
 created: 2026-10-13
-completed:
+completed: 2026-10-13
 ---
 # BL-2201 — Send no Basic Authorization from a redirect URL's credentials when --httpsig-* signs the request (upstream test5025)
 
@@ -28,12 +28,15 @@ how a redirect hop's URL credentials reach the authenticator it wraps.
 
 ## Acceptance criteria
 
-- [ ] A redirect hop whose URL carries credentials, under `--httpsig-*`, sends no `Authorization` line; a focused test in `Curl.Console.UnitTests` pins it (ADR-0482).
-- [ ] `5025` is in `Curl.Conformance.UnitTests/PassingUpstreamCases.txt` and its ratchet row passes.
+- [x] A redirect hop whose URL carries credentials, under `--httpsig-*`, sends no `Authorization` line; a focused test in `Curl.Console.UnitTests` pins it (ADR-0482).
+- [x] `5025` is in `Curl.Conformance.UnitTests/PassingUpstreamCases.txt` and its ratchet row passes.
 
 ## Notes
+
+Fix: HttpRequestOptionsMapping leaves AuthSchemes as None when the --httpsig-* options are valid. The cross-origin hop drops HttpSignature (RedirectFollower), and the wrapped BasicAndBearerAuthenticator then answered with the URL's credentials as Basic; with no scheme allowed it answers nothing, as curl 8.22.0 sets HTTPSIG as the only origin auth. No change outside Curl.Console.
 
 ## Log
 
 - 2026-10-13: Created.
 - 2026-10-13: Backlog -> Doing.
+- 2026-10-13: Doing -> Done. Redirect hop under --httpsig-* sends no Basic; test5025 passes
