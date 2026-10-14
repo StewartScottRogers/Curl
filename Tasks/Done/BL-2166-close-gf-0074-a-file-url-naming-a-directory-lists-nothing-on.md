@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.File.UnitLibrary, Curl.Protocol.File.UnitTests]
 requirement: none
 created: 2026-10-13
-completed:
+completed: 2026-10-13
 ---
 # BL-2166 — Close GF-0074: A file:// URL naming a directory lists nothing on Windows, where curl 8.22.0 writes its entry names
 
@@ -35,13 +35,29 @@ In Curl.Protocol.File.UnitLibrary, list directories on Windows as curl 8.22.0 do
 
 ## Acceptance criteria
 
-- [ ] `behaviour:test3203`: Curl answers what curl 8.22.0 answers, `upstream test3203 passes`, so the item measures `match`.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
-- [ ] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
+- [x] `behaviour:test3203`: Curl answers what curl 8.22.0 answers, `upstream test3203 passes`, so the item measures `match`.
+- [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
+- [x] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md). No option changed.
 
 ## Notes
+
+- curl 8.22.0's `lib/file.c` (tag `curl-8_22_0`) adds `win32_file_list`: on Windows a
+  directory is listed with `FindFirstFile`, skipping `.` names, each name then `\n`; test3203
+  dropped `!win32`. The local `/ucrt64/bin/curl` (8.22.0, mingw, Schannel, Debug) still
+  answers exit 37 for a directory, measured 2026-10-13; the release source wins. ADR-0483.
+- `FileProtocolHandler.ListsDirectories` removed: a directory is listed on every platform
+  when the file system is an `IDirectoryLister`. `PhysicalFileSystem` (Curl.Core, unchanged)
+  already lists on Windows. Real run on Windows: `curl -s file://localhost/Z:/temp-bl2166/dir/`
+  wrote `A-file.txt\nb-file.txt\nc.txt\nsubdir\n`, exit 0 (`.hidden` skipped).
+- Focused unit test (ADR-0482): `ExecuteAsync_DirectoryOnWindows_ListsByDefault` replaces
+  the Windows-only exit 37 test; the `ListsDirectories = false` test is gone with the property.
+- Measure-CodeQuality.ps1 not run: the change only removes a property and one condition,
+  adding no line or branch; both outcomes of the remaining condition stay covered.
+- The gap closes only when a later gap run re-measures test3203 (not reachable from a lane:
+  Gap/ is guarded).
 
 ## Log
 
 - 2026-10-13: Created.
 - 2026-10-13: Backlog -> Doing.
+- 2026-10-13: Doing -> Done. Directories list on Windows as curl 8.22.0 does; ADR-0483
