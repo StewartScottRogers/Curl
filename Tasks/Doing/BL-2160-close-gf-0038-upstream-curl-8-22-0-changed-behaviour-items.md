@@ -5,7 +5,7 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: [BL-2161, BL-2162, BL-2163, BL-2164, BL-2165, BL-2166, BL-2167, BL-2168, BL-2169, BL-2171, BL-2172, BL-2173, BL-2174, BL-2175, BL-2176]
-touches: []
+touches: [Gap]
 lane: no
 requirement: none
 created: 2026-10-13

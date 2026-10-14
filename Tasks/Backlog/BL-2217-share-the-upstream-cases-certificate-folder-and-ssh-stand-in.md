@@ -1,7 +1,7 @@
 ---
 id: BL-2217
 title: Share the upstream cases' certificate folder and SSH stand-in construction so the gap tool can run HTTPS, FTPS, SFTP and SCP cases
-priority: Normal
+priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
