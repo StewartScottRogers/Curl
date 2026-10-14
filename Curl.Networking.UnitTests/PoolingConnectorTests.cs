@@ -535,26 +535,71 @@ public sealed class PoolingConnectorTests
     }
 
     [TestMethod]
-    public async Task ConnectAsync_WhenAnIdleConnectionReportsItsPeerClosed_ReportsItDeadAndOpensANewOne()
+    public async Task ConnectAsync_WhenAConnectionIdleUnderASecondReportsItsPeerClosed_ReusesItWithoutAsking()
     {
-        // curl 8.21.0 asks Curl_conn_is_alive before reusing a kept connection: a server that
-        // answered and then half-closed is found dead without a byte read (BL-2018 Notes).
+        // curl 8.22.0 --rate 66/m (0.9 s apart), the server closing after each response:
+        // Reusing existing http: connection, then Connection died (BL-2203 Notes, test675).
         await using var pool = CreatePool();
         var events = new RecordingTransferEvents();
         await ReturnToPoolAsync(pool, Target());
         _inner.Opened[0].HasPeerClosed = true;
+        _time.Advance(999);
+
+        var reused = await pool.ConnectAsync(Target() with { Events = events }, CancellationToken.None);
+
+        Diagnostics.Arrange("pooled", "peer closed, idle 999 ms");
+        Diagnostics.Act("info", string.Join(" | ", events.Info));
+        Diagnostics.Assert("reused", true, reused.IsReused);
+
+        Assert.IsEmpty(events.Info);
+        Assert.HasCount(1, events.Reused);
+        Assert.IsFalse(_inner.Opened[0].IsDisposed);
+        Assert.IsTrue(reused.IsReused);
+        Assert.AreEqual(0L, reused.ConnectionNumber);
+        await reused.Connection!.DisposeAsync();
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_WhenAConnectionIdleASecondReportsItsPeerClosed_ClosesItSilentlyAndOpensANewOne()
+    {
+        // curl 8.22.0 --rate 54/m (1.1 s apart), the server closing after each response: no
+        // Reusing, no seems to be dead and no shutting down line, a new connection #1 (BL-2203 Notes).
+        await using var pool = CreatePool();
+        var events = new RecordingTransferEvents();
+        await ReturnToPoolAsync(pool, Target());
+        _inner.Opened[0].HasPeerClosed = true;
+        _time.Advance(1000);
 
         var fresh = await pool.ConnectAsync(Target() with { Events = events }, CancellationToken.None);
 
-        Diagnostics.Arrange("pooled", "peer closed while idle");
+        Diagnostics.Arrange("pooled", "peer closed, idle 1000 ms");
         Diagnostics.Act("info", string.Join(" | ", events.Info));
         Diagnostics.Assert("fresh reused", false, fresh.IsReused);
 
-        CollectionAssert.AreEqual(new[] { "Connection 0 seems to be dead", "shutting down connection #0" }, events.Info);
+        Assert.IsEmpty(events.Info);
+        Assert.IsEmpty(events.Reused);
         Assert.IsTrue(_inner.Opened[0].IsDisposed);
         Assert.IsEmpty(_inner.Opened[0].Written);
         Assert.IsFalse(fresh.IsReused);
         Assert.AreEqual(1L, fresh.ConnectionNumber);
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_WhenAConnectionIdleASecondIsStillOpen_ReusesIt()
+    {
+        await using var pool = CreatePool();
+        await ReturnToPoolAsync(pool, Target());
+        _time.Advance(1000);
+
+        var reused = await pool.ConnectAsync(Target(), CancellationToken.None);
+
+        Diagnostics.Arrange("pooled", "open, idle 1000 ms");
+        Diagnostics.Act("reused", reused.IsReused);
+        Diagnostics.Assert("reused", true, reused.IsReused);
+
+        Assert.IsTrue(reused.IsReused);
+        Assert.AreEqual(0L, reused.ConnectionNumber);
+        await reused.Connection!.DisposeAsync();
     }
 
     [TestMethod]
