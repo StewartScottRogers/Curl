@@ -3,8 +3,8 @@ id: AF-0200
 title: Dict CLAUDE.md says DictRequest.ClientLine names libcurl 8.21.0; it is CLIENT libcurl 8.22.0
 auditor: truthfulness
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: truthfulness:Curl.Protocol.Dict.UnitLibrary/CLAUDE.md:ClientLine:false-statement
 reproduction: none
 task: none
@@ -46,3 +46,4 @@ public const string ClientLine = "CLIENT libcurl 8.22.0";
 ## Log
 
 - 2026-10-13: filed proposed.
+- 2026-10-13: proposed -> accepted.
