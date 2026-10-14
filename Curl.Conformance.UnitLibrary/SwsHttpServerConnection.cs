@@ -80,6 +80,8 @@ internal sealed class SwsHttpServerConnection : IConnection
 
     private bool disconnected;
 
+    private bool monitored;
+
     // The connection to the server a CONNECT tunnel is relayed to; null while there is none.
     private Task<IConnection?>? tunnelServer;
 
@@ -388,7 +390,7 @@ internal sealed class SwsHttpServerConnection : IConnection
 
         if (serverCommands.MonitorsConnections)
         {
-            recording.ArmDisconnectMonitor();
+            monitored = true;
         }
 
         idling = serverCommands.ReplyMode == SwsReplyMode.Idle;
@@ -437,7 +439,10 @@ internal sealed class SwsHttpServerConnection : IConnection
         if (!disconnected)
         {
             disconnected = true;
-            recording.RecordDisconnect();
+            if (monitored)
+            {
+                recording.RecordDisconnect();
+            }
         }
     }
 }

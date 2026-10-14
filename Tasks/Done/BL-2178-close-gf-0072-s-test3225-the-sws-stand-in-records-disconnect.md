@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests]
 requirement: none
 created: 2026-10-13
-completed:
+completed: 2026-10-13
 ---
 # BL-2178 — Close GF-0072's test3225: the sws stand-in records [DISCONNECT] for every monitored connection that closes
 
@@ -25,13 +25,16 @@ Upstream test3225 (curl 8.22.0) passes through Curl in the conformance harness, 
 
 ## Acceptance criteria
 
-- [ ] `CURL_UPSTREAM_CASE=3225 dotnet test Curl.Conformance.UnitTests --filter "TestCategory=Manual"` passes.
-- [ ] A focused `SwsHttpServerConnectorTests` test pins two monitored connections closing as two `[DISCONNECT]` lines.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests are green.
+- [x] `CURL_UPSTREAM_CASE=3225 dotnet test Curl.Conformance.UnitTests --filter "TestCategory=Manual"` passes.
+- [x] A focused `SwsHttpServerConnectorTests` test pins two monitored connections closing as two `[DISCONNECT]` lines.
+- [x] `dotnet build -warnaserror` is clean and the fast tests are green.
 
 ## Notes
+
+Monitor flag is now per connection (`SwsHttpServerConnection.monitored`); `SwsServerRecording` just records the line. test3225 added to PassingUpstreamCases.txt.
 
 ## Log
 
 - 2026-10-13: Created.
 - 2026-10-13: Backlog -> Doing.
+- 2026-10-13: Doing -> Done. test3225 passes; per-connection DISCONNECT recorded

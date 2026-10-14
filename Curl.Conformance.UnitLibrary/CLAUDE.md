@@ -56,8 +56,8 @@ second late, as after a stall on a busy runner, waits 250 ms more so curl's own 
 such as `-m`, fire first; BL-1321); `idle` answers nothing, and a read
 then waits until cancelled; `stream` answers with `a string to stream 01234567890\n` without end
 and reads nothing more; `connection-monitor` records `[DISCONNECT]\n` in `ReceivedBytes`
-(`SwsServerRecording`, one flag for the server as in sws) when a connection that carried a
-request closes; after an `upgrade` reply the connection records raw traffic until the client
+(`SwsServerRecording`) when a connection that served a request while the command was on closes,
+once per such connection (BL-2178); after an `upgrade` reply the connection records raw traffic until the client
 has been quiet for one second, then closes. `delay: N` alone is listed in
 `UnsupportedServerCommands`, so a case using it can be skipped with a reason: sws applies it
 only when it accepts a connection while another's request is part-read, which needs its
