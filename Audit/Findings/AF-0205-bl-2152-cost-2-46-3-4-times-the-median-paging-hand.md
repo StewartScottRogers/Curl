@@ -42,6 +42,8 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-10-14 | 2026-10-14_0453.md | reproduces: yes | Original reproduction still prints BL-2152 costUsd 2.4615 and 14 offset/'sed -n' matches. In this window paging files in slices still drives a cost outlier: BL-2182 (lane 1, 20:52 PDT 2026-10-13) $4.80, 3.23x median, 19 'sed -n' trace lines and 2 offset Reads over 92 turns.
+
 ## Log
 
 - 2026-10-13: filed proposed.

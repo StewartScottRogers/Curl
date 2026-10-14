@@ -43,6 +43,8 @@ if ($Detail -eq 'disabled upstream') { return @('excluded', 'disabled-upstream')
 
 ## Re-audits
 
+- 2026-10-14 | 2026-10-14_0453.md | not re-audited | Ran the reproduction: 0 matches for 'test1211|exits 10', and the generic rule line is "if ($Detail -eq 'disabled upstream') { return @('excluded', 'disabled-upstream') }". The converter is unchanged, so the reproduction cannot tell. ADR-0474's Decision 3 now says the converter's general rule records 'disabled-upstream' with evidence 'disabled upstream' and 'has no rule specific to test1211', which matches the code. Recorded as not re-audited.
+
 ## Log
 
 - 2026-10-13: filed proposed.

@@ -42,6 +42,8 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-10-14 | 2026-10-14_0453.md | reproduces: yes | Original reproduction still prints BL-2142 $3.1066 at the top of the previous window and 31 'sed -n' matches. In this window the same cause crosses the rule again: BL-2182, lane 1, 2026-10-13 20:52-21:10 PDT, $4.8021 (3.23x median $1.4886), 92 turns, 58 Bash calls, 19 'sed -n' lines.
+
 ## Log
 
 - 2026-10-13: filed proposed.

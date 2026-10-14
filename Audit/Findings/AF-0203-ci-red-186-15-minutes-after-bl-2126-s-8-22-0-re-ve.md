@@ -3,8 +3,8 @@ id: AF-0203
 title: CI red 186.15 minutes after BL-2126's 8.22.0 re-vendor broke test798, test1136 and test1462; fixes waited 2h15m for a running audit
 auditor: process
 severity: Low
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-14_0453.md: the reproduction no longer reproduces.
 key: process:logs:38431484503:ci-red
 reproduction: none
 task: BL-2196
@@ -13,9 +13,9 @@ found: 2026-10-13
 found-at: c192c3e80e58636be1d282d241a7781f7df86695
 scorecard: 2026-10-13_1822.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-14
+closed-how: reliable-reaudit
+closed-by: 2026-10-14_0453.md
 ---
 # AF-0203 - CI red 186.15 minutes after BL-2126's 8.22.0 re-vendor broke test798, test1136 and test1462; fixes waited 2h15m for a running audit
 
@@ -42,7 +42,10 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-10-14 | 2026-10-14_0453.md | reproduces: no | Original reproduction still prints the 186.15-minute spell (runId 38431484503) and 32 matches in the 2026-10-13 09:21/09:53 logs. Over this window the CI-red rule is crossed (441.93 min; spells 90, 186.15, 137.43, 28.35), but not by the cause the finding names. The 186.15 spell is AF-0203's own incident, ended 2026-10-13T19:57:59Z, before the previous audit, and is pulled in only by -Since 2026-10-13. No coordinator log in this window contains 'An audit is running'. The new 137.43-minute spell came from a missed quality step and cancelled CI runs, not from a re-vendor or an audit wait.
+
 ## Log
 
 - 2026-10-13: filed proposed.
 - 2026-10-13: proposed -> accepted.
+- 2026-10-14: accepted -> closed. Re-audit 2026-10-14_0453.md: the reproduction no longer reproduces.
