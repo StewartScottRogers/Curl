@@ -3,8 +3,8 @@ id: AF-0193
 title: Cast128 test named RunsSixteenRounds asserts only that the output is not the 12-round ciphertext
 auditor: quality
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Cryptography.UnitTests/Cast128Tests.cs:EncryptBlock_EightyBitKeyZeroPaddedTo128Bits_RunsSixteenRoundsAndDiffers:weak-assertion
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Curl.Cryptography.UnitTests/Cast128Tests.cs -Pattern 'Assert
 ## Log
 
 - 2026-10-13: filed proposed.
+- 2026-10-13: proposed -> accepted.
