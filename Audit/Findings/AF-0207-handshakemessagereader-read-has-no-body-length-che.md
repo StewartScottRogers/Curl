@@ -3,8 +3,8 @@ id: AF-0207
 title: HandshakeMessageReader.Read has no body-length check: a split handshake message throws ArgumentOutOfRangeException and 6 tests fail
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Tls.UnitLibrary/HandshakeMessageReader.cs:Read:failing-test
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ dotnet test Curl.Tls.UnitTests --filter "FullyQualifiedName~HandshakeMessageRead
 ## Log
 
 - 2026-10-14: filed proposed.
+- 2026-10-14: proposed -> accepted.
