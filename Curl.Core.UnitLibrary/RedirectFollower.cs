@@ -592,6 +592,7 @@ public sealed class RedirectFollower(
             : hopHttp with
             {
                 BearerToken = null,
+                HttpSignature = null,
                 Headers = [.. hopHttp.Headers.Where(header => !IsCredentialHeader(header))],
                 SendsCookieStrings = false,
             };

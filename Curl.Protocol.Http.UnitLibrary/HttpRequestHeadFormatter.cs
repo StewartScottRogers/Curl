@@ -126,7 +126,7 @@ internal static class HttpRequestHeadFormatter
         string? hostLine = FormatHostLine(url, options.FollowedToAnotherHost ? [] : customHeaders);
         AppendHostLine(head, hostLine);
         AppendAlways(head, "Proxy-Authorization", proxyAuthorization);
-        AppendAuthorization(head, customHeaders, authorization);
+        AppendAuthorization(head, customHeaders, authorization, options.HttpSignature is not null);
         AppendUnlessOverridden(head, customHeaders, "Range", range);
         AppendUnlessOverridden(head, customHeaders, "Content-Range", framing.ContentRange);
         AppendClientHeaders(head, customHeaders, options);
@@ -303,11 +303,17 @@ internal static class HttpRequestHeadFormatter
     /// or Negotiate value always, before any <c>-H</c> one, and any other (Basic, Bearer,
     /// <c>--aws-sigv4</c>) only when no <c>-H</c> value names <c>Authorization</c>, because
     /// libcurl's <c>output_auth_headers</c> checks the custom headers for Basic and Bearer alone
-    /// (measured, BL-986 Notes).
+    /// (measured, BL-986 Notes). An <c>--httpsig-*</c> request's value is whole header lines,
+    /// <c>Signature-Input</c> then <c>Signature</c>, written in the same slot whatever the
+    /// <c>-H</c> values are, as curl 8.22.0's <c>output_auth_headers</c> does (BL-2182).
     /// </summary>
-    private static void AppendAuthorization(StringBuilder head, HttpCustomHeader[] customHeaders, string? authorization)
+    private static void AppendAuthorization(StringBuilder head, HttpCustomHeader[] customHeaders, string? authorization, bool isHttpSignature)
     {
-        if (IsSentBesideAuthorizationHeader(authorization))
+        if (isHttpSignature)
+        {
+            AppendLines(head, authorization);
+        }
+        else if (IsSentBesideAuthorizationHeader(authorization))
         {
             AppendAlways(head, "Authorization", authorization);
         }
@@ -337,6 +343,14 @@ internal static class HttpRequestHeadFormatter
     /// engine's <c>Cookie</c> and its <c>Proxy-Authorization</c> beside custom ones (BL-182 and
     /// BL-183 Notes).
     /// </summary>
+    private static void AppendLines(StringBuilder head, string? lines)
+    {
+        if (!string.IsNullOrEmpty(lines))
+        {
+            head.Append(lines).Append("\r\n");
+        }
+    }
+
     private static void AppendAlways(StringBuilder head, string name, string? value)
     {
         if (!string.IsNullOrEmpty(value))

@@ -32,7 +32,7 @@ internal static class HttpAuthUsingLines
     /// Gives the scheme curl names for the request: Negotiate when
     /// <see cref="HttpNegotiateInfoLines.PicksNegotiate" /> says so; Digest for a first request
     /// with <c>--digest</c> alone and a user, which sends no value yet; none for an
-    /// <c>--aws-sigv4</c> request, whose authenticator writes its own <c>AWS_SIGV4</c> line
+    /// <c>--aws-sigv4</c> or <c>--httpsig-*</c> request, whose authenticator writes its own <c>AWS_SIGV4</c> or <c>HTTPSIG</c> line
     /// after its signing lines (BL-629); and otherwise the scheme the value starts with.
     /// </summary>
     private static string? PickedScheme(HttpAuthRequest request, string? authorization, bool answersChallenge, bool headerNamesAuthorization)
@@ -47,8 +47,15 @@ internal static class HttpAuthUsingLines
             return PicksDigestBeforeAnyValue(request, answersChallenge) ? "Digest" : null;
         }
 
-        return request.AwsSigV4 is null ? SchemeOfValue(authorization, headerNamesAuthorization && !request.IsProxy) : null;
+        return SchemeOfSentValue(request, authorization, headerNamesAuthorization);
     }
+
+    /// <summary>
+    /// Gives the scheme the sent value starts with, or none for an <c>--aws-sigv4</c> or
+    /// <c>--httpsig-*</c> request, whose authenticator writes its own line.
+    /// </summary>
+    private static string? SchemeOfSentValue(HttpAuthRequest request, string authorization, bool headerNamesAuthorization) =>
+        request.AwsSigV4 is null && request.HttpSignature is null ? SchemeOfValue(authorization, headerNamesAuthorization && !request.IsProxy) : null;
 
     /// <summary>
     /// Decides whether curl picks Digest for a request that sends no value: the transfer's

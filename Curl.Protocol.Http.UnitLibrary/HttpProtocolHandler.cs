@@ -320,6 +320,7 @@ public sealed class HttpProtocolHandler(
         {
             Events = context.Events,
             AwsSigV4 = AwsSigV4InputsOf(context, options, framing),
+            HttpSignature = HttpSignatureInputsOf(context, options),
         };
 
     /// <summary>
@@ -449,7 +450,7 @@ public sealed class HttpProtocolHandler(
     /// <c>--interface</c> bind never meets it (measured, BL-1684).
     /// </remarks>
     private static TransferResult WithFirstAuthorizationFailure(TransferResult result, HttpAuthRequest request, IReadOnlyList<string> authorizationLines) =>
-        result.ExitCode != CurlExitCode.Ok && request.AwsSigV4 is null && authorizationLines.Count > 0
+        result.ExitCode != CurlExitCode.Ok && request.AwsSigV4 is null && request.HttpSignature is null && authorizationLines.Count > 0
             ? result with { ErrorMessage = authorizationLines[0] }
             : result;
 
@@ -573,7 +574,7 @@ public sealed class HttpProtocolHandler(
     /// or Negotiate's first token when that is the one scheme allowed (ADR-0270).
     /// </summary>
     private HttpAuthRequest ProxyAuthRequestOf(HttpAuthRequest originRequest, ProxyEndpoint proxy) =>
-        originRequest with { Url = ProxyUrlOf(proxy), Credential = proxy.Credential, BearerToken = null, AllowedSchemes = ProxyAuthSchemes, IsProxy = true, AwsSigV4 = null };
+        originRequest with { Url = ProxyUrlOf(proxy), Credential = proxy.Credential, BearerToken = null, AllowedSchemes = ProxyAuthSchemes, IsProxy = true, AwsSigV4 = null, HttpSignature = null };
 
     /// <summary>
     /// Gives <paramref name="proxy" />'s own URL, <c>http://host:port/</c> (<c>https</c> for an
@@ -599,6 +600,17 @@ public sealed class HttpProtocolHandler(
                 IsGetOrHead = framing.Body is null && !framing.IsUpload,
                 PathAsIs = context.PathAsIs,
             }
+            : null;
+
+    /// <summary>
+    /// Gives what signing the request with the <c>--httpsig-*</c> options needs, or
+    /// <see langword="null" /> without them: the settings, the <c>@authority</c> value - an
+    /// <c>-H</c> <c>Host</c> value when one is sent, else the <c>Host</c> value curl's own head
+    /// carries - and the <c>-H</c> headers (BL-2182).
+    /// </summary>
+    private static HttpSignatureInputs? HttpSignatureInputsOf(ITransferContext context, HttpRequestOptions options) =>
+        options.HttpSignature is { } settings
+            ? new HttpSignatureInputs(settings, HttpRequestHeadFormatter.CustomHostOf(options) ?? HttpUrlText.HostHeaderAuthority(context.Url), options.Headers)
             : null;
 
     /// <summary>
