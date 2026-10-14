@@ -34,3 +34,4 @@ Upstream test3225 (curl 8.22.0) passes through Curl in the conformance harness, 
 ## Log
 
 - 2026-10-13: Created.
+- 2026-10-13: Backlog -> Doing.
