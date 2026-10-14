@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Http.UnitLibrary]
 requirement: none
 created: 2026-10-14
-completed:
+completed: 2026-10-14
 ---
 # BL-2212 — Fix AF-0210: %{redirect_url} is empty for a non-3xx response carrying Location; curl writes the resolved target
 
@@ -41,12 +41,17 @@ The finding closes only when a later re-audit by the conformance auditor confirm
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Measured curl 8.22.0 (Git ucrt64, Schannel) with `Record-CurlExchange.ps1`: a `Location` on a 200, 201 or 404 is written to `%{redirect_url}`, with or without `-L`; under `-L` the body is still written and nothing is followed. So `HttpRedirectLocation.Find` no longer checks the status, and `HttpProtocolHandler.DiscardsBody` discards a body under `-L` only for a 3xx with a target (`RedirectFollower` already follows only a 3xx). This is what ADR-0015's TransferReport table already says, so no new ADR.
+- Worked inline rather than through the full feature pipeline: a two-line fix plus its tests (`HttpRedirectLocationTests.Find_Not3xxWithLocation_Resolves`, `HttpProtocolHandlerTests.ExecuteAsync_LocationOnNon3xxWhileFollowing_WritesTheBodyAndReportsTheTarget` for 200 and 404).
+- The reproduction now gives curl and candidate both `[http://127.0.0.1:50976/z]`; the candidate under `-L` on a 200 writes `hello[http://127.0.0.1:50978/z]`, as curl does. Fast tests all green.
 
 ## Log
 
 - 2026-10-14: Created.
 - 2026-10-14: Backlog -> Doing.
+- 2026-10-14: Doing -> Done. %{redirect_url} reports the resolved Location of a non-3xx response as curl does (AF-0210)
