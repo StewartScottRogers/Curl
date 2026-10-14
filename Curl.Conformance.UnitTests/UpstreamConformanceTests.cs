@@ -374,8 +374,8 @@ public sealed class UpstreamConformanceTests
         DirectoryInfo logDirectory = Directory.CreateDirectory(Path.Combine(LogFolder, $"test{testNumber}-{Guid.NewGuid():N}"));
         try
         {
-            UpstreamCaseRunner runner = new(RunCurlAsync, Platform, TimeProvider.System, TimeLimit, SshServer);
-            return await Task.Run(() => runner.RunAsync(testNumber, testFile, logDirectory.FullName, certificateDirectory: CertificateFolder.Value)).WaitAsync(CaseHangLimit);
+            UpstreamCaseRunner runner = new(RunCurlAsync, PlatformFor(testFile), TimeProvider.System, TimeLimit, SshServer);
+            return await Task.Run(() => runner.RunAsync(testNumber, testFile, logDirectory.FullName, certificateDirectory: CertificateFolder.Value, sourceDirectory: UpstreamTestDataFolder)).WaitAsync(CaseHangLimit);
         }
         catch (TimeoutException)
         {
@@ -389,6 +389,13 @@ public sealed class UpstreamConformanceTests
             DeleteOrKeepLogDirectory(logDirectory);
         }
     }
+
+    // Upstream's httpsig cases rely on the Debug feature, which lets a test fix the signing time at
+    // created=0 (CURL_FORCETIME with CURL_HTTPSIG_CREATED). The harness stands in for it: it reports Debug to a
+    // case that also names httpsig, and RunCurlAsync signs those commands with a clock fixed at the epoch (BL-2183).
+    // Every other case sees no Debug, so the other Debug cases stay skipped.
+    private static UpstreamCurlPlatform PlatformFor(byte[] testFile) =>
+        Encoding.Latin1.GetString(testFile).Contains("\nhttpsig\n", StringComparison.Ordinal) ? Platform.WithFeatures(["Debug"]) : Platform;
 
     private static readonly string CaseHangLimitMessage =
         $"the case did not finish within {CaseHangLimit.TotalSeconds.ToString(CultureInfo.InvariantCulture)} seconds";
@@ -457,7 +464,14 @@ public sealed class UpstreamConformanceTests
             usesHandBuiltNtlm: true,
             readEnvironmentVariable: name => invocation.EnvironmentVariables.GetValueOrDefault(name),
             ftpListener: invocation.ConnectionListener,
-            defaultConfigFileSearch: new DefaultConfigFileSearch(name => invocation.EnvironmentVariables.GetValueOrDefault(name), OperatingSystem.IsWindows(), executableDirectory: null, accountHomeDirectory: null)).RunAsync(invocation.Arguments);
+            defaultConfigFileSearch: new DefaultConfigFileSearch(name => invocation.EnvironmentVariables.GetValueOrDefault(name), OperatingSystem.IsWindows(), executableDirectory: null, accountHomeDirectory: null),
+            signingClock: invocation.Arguments.Any(argument => argument.StartsWith("--httpsig", StringComparison.Ordinal)) ? new UnixEpochClock() : null).RunAsync(invocation.Arguments);
+
+    // The signing time of upstream's debug build under CURL_FORCETIME and CURL_HTTPSIG_CREATED=0.
+    private sealed class UnixEpochClock : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => DateTimeOffset.UnixEpoch;
+    }
 
     private static string GenerateCertificates()
     {

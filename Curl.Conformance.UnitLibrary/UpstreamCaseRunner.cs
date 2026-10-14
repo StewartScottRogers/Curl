@@ -25,7 +25,7 @@ namespace Curl.Conformance;
 /// parallel, <c>%PWD</c> is the tests directory the caller names, with forward slashes, and <c>%FILE_PWD</c> is empty, so <c>file://localhost%FILE_PWD/%LOGDIR/…</c> still
 /// names the file. <see cref="UpstreamTestDirectoryComposition"/> first rewrites <c>%PWD/%LOGDIR</c>
 /// to <c>%LOGDIR</c>, and <c>%SRCDIR</c> before the two emulated <c>libtest</c> scripts to <c>.</c>;
-/// any other <c>%SRCDIR</c> has no value. As upstream does, standard output and standard error are saved to
+/// any other <c>%SRCDIR</c> is the source directory the caller names, with forward slashes, and has no value when it names none. As upstream does, standard output and standard error are saved to
 /// <c>%LOGDIR/stdout%TESTNUMBER</c> and <c>%LOGDIR/stderr%TESTNUMBER</c> before the comparison,
 /// for the cases that verify them as files. <c>%include</c> and <c>%includetext</c> read the file
 /// they name by its path, relative to the working directory when not absolute, as nothing when it
@@ -152,24 +152,32 @@ public sealed class UpstreamCaseRunner(
     /// <c>%CERTDIR/certs/test-ca.crt</c>), by an absolute path with no blank in it;
     /// <see langword="null"/> leaves <c>%CERTDIR</c> without a value, so a case that uses it is skipped.
     /// </param>
+    /// <param name="sourceDirectory">
+    /// The folder holding the files cases name as <c>%SRCDIR/data/...</c> (the release's <c>tests</c>
+    /// folder), <c>%SRCDIR</c>, by an absolute path with no blank in it; <see langword="null"/> leaves
+    /// <c>%SRCDIR</c> without a value, so a case that uses it is skipped. The two emulated
+    /// <c>libtest</c> scripts keep their <c>./libtest/...</c> names either way.
+    /// </param>
     /// <returns>Whether the case passed, failed with its first difference, or was skipped with its reason.</returns>
     /// <exception cref="ArgumentException">
-    /// <paramref name="logDirectory"/>, <paramref name="testsDirectory"/> or
-    /// <paramref name="certificateDirectory"/> holds a blank, which would split every command that
-    /// names <c>%LOGDIR</c>, <c>%PWD</c> or <c>%CERTDIR</c> unquoted (test3009's
+    /// <paramref name="logDirectory"/>, <paramref name="testsDirectory"/>,
+    /// <paramref name="certificateDirectory"/> or <paramref name="sourceDirectory"/> holds a blank, which would split every command that
+    /// names <c>%LOGDIR</c>, <c>%PWD</c>, <c>%CERTDIR</c> or <c>%SRCDIR</c> unquoted (test3009's
     /// <c>--output-dir %PWD/not-there</c>, GF-0044), as upstream's relative <c>log/</c> never does.
     /// </exception>
     public async Task<UpstreamCaseOutcome> RunAsync(
-        int testNumber, ReadOnlyMemory<byte> testFile, string logDirectory, string? testsDirectory = null, string? certificateDirectory = null)
+        int testNumber, ReadOnlyMemory<byte> testFile, string logDirectory, string? testsDirectory = null, string? certificateDirectory = null, string? sourceDirectory = null)
     {
         ArgumentNullException.ThrowIfNull(logDirectory);
         RefuseABlank(logDirectory, "log directory", nameof(logDirectory));
         RefuseABlank(testsDirectory ?? string.Empty, "tests directory", nameof(testsDirectory));
         RefuseABlank(certificateDirectory ?? string.Empty, "certificate directory", nameof(certificateDirectory));
+        RefuseABlank(sourceDirectory ?? string.Empty, "source directory", nameof(sourceDirectory));
 
         string logDirectoryVariable = logDirectory.Replace('\\', '/');
         Dictionary<string, string> variables = Variables(testNumber, logDirectoryVariable);
         AddDirectoryVariable(variables, "PWD", testsDirectory);
+        AddDirectoryVariable(variables, "SRCDIR", sourceDirectory);
         AddDirectoryVariable(variables, "CERTDIR", certificateDirectory);
         AddTlsPorts(variables, certificateDirectory);
         AddSshVariables(variables);

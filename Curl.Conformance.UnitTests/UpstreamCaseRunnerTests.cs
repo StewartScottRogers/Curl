@@ -387,6 +387,40 @@ public sealed class UpstreamCaseRunnerTests
     }
 
     [TestMethod]
+    public async Task RunAsync_SourceDirectoryWithABlank_Throws()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        UpstreamCaseRunner runner = Runner(_ => Task.FromResult(0));
+
+        diagnostics.Arrange("source directory", "/a b/tests");
+        ArgumentException exception = await Assert.ThrowsExactlyAsync<ArgumentException>(() => runner.RunAsync(1, ReadOnlyMemory<byte>.Empty, CreateLogDirectory(), null, null, "/a b/tests"));
+        diagnostics.Act("exception parameter", exception.ParamName);
+        diagnostics.Assert("exception parameter", "sourceDirectory", exception.ParamName);
+        Assert.AreEqual("sourceDirectory", exception.ParamName);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_SourceDirectory_IsSrcdirWithForwardSlashesAndKeepsTheEmulatedScripts()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        IReadOnlyList<string>? arguments = null;
+        UpstreamCaseRunner runner = Runner(invocation =>
+        {
+            arguments = CommandArguments(invocation);
+            return Task.FromResult(0);
+        });
+        string testFile = "<testcase>\n<client>\n<command option=\"no-output,no-include\">\n-K %SRCDIR/data/x --output-dir %SRCDIR/libtest/test610.pl\n</command>\n</client>\n</testcase>\n";
+
+        diagnostics.Arrange("source directory", "Z:\\curl\\tests");
+        UpstreamCaseOutcome outcome = await runner.RunAsync(5, Encoding.Latin1.GetBytes(testFile), CreateLogDirectory(), null, null, "Z:\\curl\\tests");
+        diagnostics.Act("arguments", string.Join(" | ", arguments ?? []));
+
+        diagnostics.Assert("arguments", "-K | Z:/curl/tests/data/x | --output-dir | ./libtest/test610.pl", string.Join(" | ", arguments ?? []));
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Passed, outcome.Kind, outcome.Detail);
+        CollectionAssert.AreEqual(new[] { "-K", "Z:/curl/tests/data/x", "--output-dir", "./libtest/test610.pl" }, arguments!.ToArray());
+    }
+
+    [TestMethod]
     public async Task RunAsync_CertificateDirectoryWithABlank_Throws()
     {
         var diagnostics = TestDiagnostics.For(TestContext);
