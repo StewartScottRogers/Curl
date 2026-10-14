@@ -148,7 +148,10 @@ the `-G` / `--url-query` query with `QueryUrl` before the URL is parsed. `http` 
 platform's credential encoding, and Negotiate), which answers the scheme `-u`, `--basic`, `--digest`,
 `--negotiate`, `--anyauth` and `--oauth2-bearer` allow (`HttpRequestOptions.AuthSchemes` and `BearerToken`),
 wrapped for the HTTP handler alone in an `AwsSigV4HttpAuthenticator` that signs every request with
-`--aws-sigv4` in place of those schemes (`HttpRequestOptions.AwsSigV4`, ADR-0243).
+`--aws-sigv4` in place of those schemes (`HttpRequestOptions.AwsSigV4`, ADR-0243), itself wrapped in an
+`HttpSignatureHttpAuthenticator` that signs every request with the `--httpsig-*` options' `Signature-Input` and
+`Signature` lines in place of all of them (`HttpRequestOptions.HttpSignature`, BL-2182, ADR-0485); `HttpSignatureSetup`
+runs curl 8.22.0's setup checks for those options at each URL, refusing with exit 2, 26 or 43 and its `errorf` line.
 Negotiate's contexts come from `CurlComposition.CreateSecurityContextFactory`, ADR-0142's router:
 SSPI on Windows, elsewhere the system GSS-API with the hand-built SPNEGO and Kerberos behind it,
 reaching KDCs through `Curl.Networking`'s `KerberosKdcSocketTransport` over the run's connectors

@@ -96,7 +96,8 @@ internal static class CurlComposition
     /// <see cref="NegotiateOptions.Default" /> when not given.
     /// </param>
     /// <param name="signingClock">
-    /// The clock <c>--aws-sigv4</c> signs with (<see cref="AwsSigV4HttpAuthenticator" />, which
+    /// The clock <c>--aws-sigv4</c> and the <c>--httpsig-*</c> options sign with (<see cref="AwsSigV4HttpAuthenticator" />
+    /// and <see cref="HttpSignatureHttpAuthenticator" />, which
     /// the HTTP handler alone is given); <see cref="TimeProvider.System" /> when not given.
     /// </param>
     /// <param name="ftpDataConnector">
@@ -141,7 +142,7 @@ internal static class CurlComposition
         Lazy<ISecurityContextFactory> contexts = new(() => securityContexts ?? CreateSecurityContextFactory(connector, datagramConnector, diagnosticLog));
         Lazy<RankedHttpAuthenticator> httpAuthenticator = new(() => CreateHttpAuthenticator(contexts.Value, negotiateOptions, diagnosticLog));
         SecurityDelegation saslDelegation = (negotiateOptions ?? NegotiateOptions.Default).Delegation;
-        LazyProtocolHandler http = new(["http", "https"], () => new HttpProtocolHandler(recordingConnector, new AwsSigV4HttpAuthenticator(httpAuthenticator.Value, new AwsSigV4Signer(signingClock ?? TimeProvider.System, CredentialEncoding.ForPlatform(OperatingSystem.IsWindows()), diagnosticLog)), cookieStore, proxyAuthSchemes) { TracesHttp2Frames = tracesHttp2, TracesHttp3Streams = tracesHttp3, TracesClientReaders = tracesRead });
+        LazyProtocolHandler http = new(["http", "https"], () => new HttpProtocolHandler(recordingConnector, new HttpSignatureHttpAuthenticator(new AwsSigV4HttpAuthenticator(httpAuthenticator.Value, new AwsSigV4Signer(signingClock ?? TimeProvider.System, CredentialEncoding.ForPlatform(OperatingSystem.IsWindows()), diagnosticLog)), signingClock ?? TimeProvider.System), cookieStore, proxyAuthSchemes) { TracesHttp2Frames = tracesHttp2, TracesHttp3Streams = tracesHttp3, TracesClientReaders = tracesRead });
 
         IProtocolHandler[] handlers =
         [

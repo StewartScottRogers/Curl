@@ -1440,9 +1440,9 @@ internal sealed class CurlCommandRunner(
                 return (globFailure.ExitCode, true);
             }
 
-            if (await RefusedUploadRequestMethodAsync(options, index).ConfigureAwait(false))
+            if (await RefusedAtSetupAsync(options, index).ConfigureAwait(false) is { } refusedExitCode)
             {
-                return (CurlExitCode.FailedInit, true);
+                return (refusedExitCode, true);
             }
 
             await OpenTransferEventOutputOnceAsync(options).ConfigureAwait(false);
@@ -1474,6 +1474,49 @@ internal sealed class CurlCommandRunner(
         transferEventOutput = await TransferEventOutput
             .OpenAsync(options, fileSystem, GatedDeferringStandardOutput, eventStandardError, runsOnWindows, standardOutputIsTerminal, timeProvider, () => standardOutputSwitchedToBinary)
             .ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Refuses the URL at <paramref name="index" /> at its transfer's setup, as curl does: its
+    /// <c>-T</c> upload with another request method selected (<see cref="RefusedUploadRequestMethodAsync" />),
+    /// then the <c>--httpsig-*</c> checks (<see cref="RefusedHttpSignatureSetupAsync" />).
+    /// </summary>
+    /// <param name="options">The option group.</param>
+    /// <param name="index">The URL's index in the group.</param>
+    /// <returns>The exit code the run ends with, or <see langword="null" /> when the URL was not refused.</returns>
+    private async Task<CurlExitCode?> RefusedAtSetupAsync(CommandLineOptions options, int index)
+    {
+        if (await RefusedUploadRequestMethodAsync(options, index).ConfigureAwait(false))
+        {
+            return CurlExitCode.FailedInit;
+        }
+
+        return await RefusedHttpSignatureSetupAsync(options).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Refuses the URL when the <c>--httpsig-*</c> options fail curl 8.22.0's setup checks
+    /// (<see cref="HttpSignatureSetup.Of" />): the check's line, written as curl's <c>errorf</c>
+    /// writes it - not under <c>-s</c> without <c>-S</c>, and with no <c>curl: (N)</c> line -
+    /// nothing sent, and the run ends with the check's exit code (BL-2182).
+    /// </summary>
+    /// <param name="options">The option group.</param>
+    /// <returns>The exit code, or <see langword="null" /> when the checks pass.</returns>
+    private async Task<CurlExitCode?> RefusedHttpSignatureSetupAsync(CommandLineOptions options)
+    {
+        HttpSignatureSetup setup = HttpSignatureSetup.Of(options);
+        if (setup.ErrorLine is not { } line)
+        {
+            return null;
+        }
+
+        if (ShowsErrors(options))
+        {
+            await WriteErrorLinesAsync([line]).ConfigureAwait(false);
+        }
+
+        await RecordParallelRunEndAsync(TransferResult.Failure(setup.ExitCode, CurlEasyErrorText.Of(setup.ExitCode))).ConfigureAwait(false);
+        return setup.ExitCode;
     }
 
     /// <summary>

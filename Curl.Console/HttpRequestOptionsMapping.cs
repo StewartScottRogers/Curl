@@ -71,6 +71,7 @@ internal static class HttpRequestOptionsMapping
     /// <see cref="CommandLineOptions.FollowRedirects" /> as <see cref="HttpRequestOptions.FollowRedirects" />; and
     /// <see cref="CommandLineOptions.MaxRedirects" /> as <see cref="HttpRequestOptions.MaxRedirects" />; and
     /// <see cref="CommandLineOptions.AuthSchemes" />, <see cref="CommandLineOptions.BearerToken" /> and <see cref="CommandLineOptions.AwsSigV4" /> verbatim; and
+    /// the <c>--httpsig-*</c> options as <see cref="HttpRequestOptions.HttpSignature" /> (<see cref="HttpSignatureSetup.Of" />); and
     /// <see cref="CommandLineOptions.HttpVersion" /> as <see cref="HttpRequestOptions.Version" />, as
     /// <see cref="HttpVersionMapping.ToHttpVersionPreference" /> maps it; and <see cref="CommandLineOptions.Compressed" />,
     /// <see cref="CommandLineOptions.TransferEncoding" />, <see cref="CommandLineOptions.Raw" /> and
@@ -105,6 +106,7 @@ internal static class HttpRequestOptionsMapping
             AuthSchemes = options.AuthSchemes,
             BearerToken = options.BearerToken,
             AwsSigV4 = options.AwsSigV4,
+            HttpSignature = HttpSignatureSetup.Of(options).Settings,
             Version = HttpVersionMapping.ToHttpVersionPreference(options.HttpVersion),
             Compressed = options.Compressed,
             TransferEncoding = options.TransferEncoding,
