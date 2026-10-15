@@ -5,6 +5,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Curl.Quic.UnitLibrary\Curl.Quic.UnitLibrary.csproj" />
     <ProjectReference Include="..\Curl.Tls.UnitLibrary\Curl.Tls.UnitLibrary.csproj" />
   </ItemGroup>
 

@@ -88,6 +88,15 @@ public sealed class Http3ServerTlsHandshakeTests
         AssertServerAlert(Drive(CurlQuicTlsSettings, ServerSettings with { SignatureSchemes = [TlsSignatureScheme.Ed25519] }), TlsAlertDescription.HandshakeFailure);
 
     [TestMethod]
+    public void Receive_PreferredSchemeTheClientDoesNotOffer_SignsWithTheNextOne()
+    {
+        Exchange exchange = Drive(CurlQuicTlsSettings, ServerSettings with { SignatureSchemes = [0xfefe, TlsSignatureScheme.RsaPssRsaeSha256] });
+
+        Assert.IsTrue(exchange.Client.IsComplete);
+        Assert.AreEqual(TlsSignatureScheme.RsaPssRsaeSha256, exchange.Server.SignatureScheme);
+    }
+
+    [TestMethod]
     public void Receive_PreferredSchemeTheRsaKeyCannotSign_SignsWithTheNextOne()
     {
         Exchange exchange = Drive(CurlQuicTlsSettings, ServerSettings with { SignatureSchemes = [TlsSignatureScheme.EcdsaSecp256r1Sha256, TlsSignatureScheme.RsaPssRsaeSha384] });

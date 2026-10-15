@@ -1,13 +1,15 @@
 # Curl.Conformance.Http3Server.UnitLibrary
 
 The upstream case runner's stand-in for nghttpx serving HTTP/3 (`%HTTP3PORT`), built in
-pieces: BL-2246 put the TLS 1.3 server handshake here; BL-2247 adds QUIC packet protection
-and the HTTP/3 relay to `sws` on top of it.
+pieces: BL-2246 put the TLS 1.3 server handshake here, BL-2247 the QUIC server connection
+(`Http3ServerConnection`) on top of it; the HTTP/3 relay to `sws` comes next.
 
 ## Rules
 
 - It references `Curl.Tls.UnitLibrary` for the handshake codecs, key schedule, transcript
-  hash, key shares and signing keys; never copy that code here. It may also reference
+  hash, key shares and signing keys, and Curl.Quic.UnitLibrary for the QUIC codecs (packets,
+  frames, packet protection, Initial secrets, CRYPTO reassembly, transport parameters); never
+  copy that code here. It may also reference
   `Curl.Cryptography.*` and `Curl.Conformance.UnitLibrary`, and no `Curl.Protocol.*` library.
 - BCL only, no socket, no `SslStream`: bytes in, bytes out, per encryption level, as RFC 9001
   section 4 hands TLS to QUIC.
@@ -34,3 +36,20 @@ and the HTTP/3 relay to `sws` on top of it.
   `HttpsServerConnector.LoadCertificate` loads it.
 - `Http3ServerClientOffer` reads the ClientHello's extensions and refuses one QUIC cannot use.
 - `Http3ServerTlsOutput` collects one `Receive` call's bytes and secrets.
+- Http3ServerConnection is the I/O-free QUIC version 1 server (BL-2247). Receive(datagram)
+  returns the datagrams to send: it accepts the client's first Initial (DCID of 8 bytes or
+  more), derives the Initial keys from it, chooses an 8-byte connection ID, feeds CRYPTO frames
+  to Http3ServerTlsHandshake and installs its secrets, sends DefaultTransportParameters
+  (limits large enough that the client never waits for MAX_DATA, MAX_STREAM_DATA or
+  MAX_STREAMS) with original_destination_connection_id and initial_source_connection_id,
+  acknowledges every ack-eliciting packet, drops packets that fail protection, repeat or name
+  another connection, sends HANDSHAKE_DONE, and closes with CONNECTION_CLOSE 0x1c (a frame
+  error, or 0x100 plus the TLS alert) at every level it has keys for. An unknown version
+  in a datagram of 1200 bytes or more gets Version Negotiation. Until a client Handshake
+  packet arrives it sends at most 3x the bytes received and holds the rest. AcceptStream,
+  OpenUnidirectionalStream (3, 7, ...), Write and TakeDatagramsToSend carry stream
+  data; Close sends the application close; PeerClose keeps the client's. Nothing is
+  resent and no congestion control runs; it does not yet hold its sending to the client's
+  flow control limits (BL-2249 covers that).
+- Http3ServerStream is a client stream as the server reads it, reassembled with
+  QuicCryptoReassembler; Http3ServerPacketSpace (internal) is one packet number space.
