@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Networking.UnitLibrary]
+touches: [Curl.Networking.UnitLibrary, Curl.Networking.UnitTests]
 requirement: none
 created: 2026-10-15
-completed:
+completed: 2026-10-15
 ---
 # BL-2275 — Fix AF-0222: TcpDialer.Connected's NetworkStream ownsSocket: true can become false with no test failing, so a dialed socket is never closed on dispose
 
@@ -41,12 +41,28 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Fix: `TcpDialer.Connected` is now `internal` and no longer `[ExcludeFromCodeCoverage]`; it needs only a
+  socket with a local end point, which a unit test can make without sending a byte (ADR-0421). Two new tests
+  in `TcpDialerTests` (`Connected_WithAConnectedSocket_...` over a loopback listener, and
+  `Connected_WithASocketWhoseConnectIsDeferred_...` over a bound, unconnected socket) dispose the dialed
+  connection and assert the socket's handle is closed. The stream line stays at `TcpDialer.cs:228` and in
+  member `Connected`, so the finding's `-Site ...:228:true -Member Connected` still names it.
+- Reproduction: a lane may not run `Audit/Tools/Invoke-MutationTest.ps1` (audit guard), so the mutant was
+  applied by hand instead: with `ownsSocket: false` on line 228,
+  `Connected_WithAConnectedSocket_DisposingTheConnectionClosesTheSocket` fails ("Expected condition to be
+  true"); restored, both pass. The quality auditor's re-audit closes the finding.
+- Added `Curl.Networking.UnitTests` to `touches`: the mutation run measures that project's tests, so the
+  killing test must live there; no other task in Doing names it.
+- Fast tests: 37 projects green (Curl.Networking.UnitTests 3170 passed, 30 skipped). Measure-CodeQuality
+  for Curl.Networking.UnitLibrary: 0 failing members.
 
 ## Log
 
 - 2026-10-15: Created.
 - 2026-10-15: Backlog -> Doing.
+- 2026-10-15: Doing -> Done. Disposing a dialed TCP connection closes its socket, pinned by two TcpDialerTests that kill AF-0222's ownsSocket: false mutant
