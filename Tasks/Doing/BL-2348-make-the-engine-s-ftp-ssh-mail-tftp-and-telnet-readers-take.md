@@ -38,3 +38,4 @@ The known-hosts default search (`~/.ssh/known_hosts` when `--knownhosts` is not 
 ## Log
 
 - 2026-10-15: Created.
+- 2026-10-15: Backlog -> Doing.
