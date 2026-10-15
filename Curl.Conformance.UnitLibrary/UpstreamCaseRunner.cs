@@ -23,8 +23,9 @@ namespace Curl.Conformance;
 /// </para>
 /// <para>
 /// <c>%LOGDIR</c> is the absolute log directory with forward slashes, so cases can run in
-/// parallel, <c>%PWD</c> is the tests directory the caller names (else the source directory, the same release <c>tests</c> folder), with forward slashes, <c>%LIBTESTS</c> is <see cref="LibTestsProgram"/>, and <c>%FILE_PWD</c> is empty, so <c>file://localhost%FILE_PWD/%LOGDIR/…</c> still
-/// names the file. <see cref="UpstreamTestDirectoryComposition"/> first rewrites <c>%PWD/%LOGDIR</c>
+/// parallel, <c>%PWD</c> is the tests directory the caller names (else the source directory, the same release <c>tests</c> folder), with forward slashes, <c>%LIBTESTS</c> is <see cref="LibTestsProgram"/>, and <c>%FILE_PWD</c> is <c>/</c> before a drive-letter <c>%LOGDIR</c> and empty before one starting with <c>/</c>
+/// (<see cref="UpstreamTestDirectoryComposition.FilePwdBefore"/>), so <c>file:%FILE_PWD/%LOGDIR/…</c> and
+/// <c>file://localhost%FILE_PWD/%LOGDIR/…</c> name the file on every platform. <see cref="UpstreamTestDirectoryComposition"/> first rewrites <c>%PWD/%LOGDIR</c>
 /// to <c>%LOGDIR</c>, and <c>%SRCDIR</c> before the two emulated <c>libtest</c> scripts to <c>.</c>;
 /// any other <c>%SRCDIR</c> is the source directory the caller names, with forward slashes, and has no value when it names none. As upstream does, standard output and standard error are saved to
 /// <c>%LOGDIR/stdout%TESTNUMBER</c> and <c>%LOGDIR/stderr%TESTNUMBER</c> before the comparison,
@@ -45,7 +46,7 @@ namespace Curl.Conformance;
 /// <c>%SSHPORT</c>, <c>%USER</c>, <c>%SFTP_PWD</c>, <c>%SCP_PWD</c>, <c>%SSHSRVMD5</c> and
 /// <c>%SSHSRVSHA256</c> and <c>%SSHKEYALGO</c> without a value, so the SSH cases skip. Given one, <c>%SSHPORT</c> is
 /// <see cref="UpstreamSshServer.SshPort"/>, <c>%USER</c> its user, <c>%SFTP_PWD</c> and
-/// <c>%SCP_PWD</c> are empty (as <c>%FILE_PWD</c>, since <c>%LOGDIR</c> is already absolute), the
+/// <c>%SCP_PWD</c> are empty (since <c>%LOGDIR</c> is already absolute), the
 /// two fingerprints and <c>%SSHKEYALGO</c> are its host key's, and its client key files are written to
 /// <c>%LOGDIR/server/</c> before the run.
 /// </param>
@@ -345,7 +346,7 @@ public sealed class UpstreamCaseRunner(
             ["FTPTIME2"] = "8",
             ["TESTNUMBER"] = testNumber.ToString(CultureInfo.InvariantCulture),
             ["LOGDIR"] = logDirectory,
-            ["FILE_PWD"] = string.Empty,
+            ["FILE_PWD"] = UpstreamTestDirectoryComposition.FilePwdBefore(logDirectory),
             ["VERSION"] = CurlVersion,
             ["DEV_NULL"] = platform.NullDevice,
             ["PERL"] = UpstreamPerlOneLiner.Program,
