@@ -273,7 +273,7 @@ internal static class UpstreamCaseScreening
     private static string? UnsupportedStripCode(UpstreamTestCase testCase) =>
         SubstitutionParts
             .SelectMany(name => UpstreamTestPartBodies.Lines(testCase.Find("verify", name)))
-            .FirstOrDefault(line => !UpstreamPerlSubstitution.DoesNothing(line) && UpstreamPerlSubstitution.Parse(line) is null) is { } code
+            .FirstOrDefault(line => !UpstreamPerlSubstitution.DoesNothing(line) && IUpstreamPerlLineEdit.Parse(line) is null) is { } code
             ? $"the harness does not run the Perl {code}"
             : null;
 

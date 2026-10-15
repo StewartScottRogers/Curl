@@ -12,7 +12,7 @@ namespace Curl.Conformance;
 /// empties a line the pattern does not match, as Perl's <c>or</c> runs the assignment when
 /// <c>s///</c> replaced nothing.
 /// </summary>
-internal sealed class UpstreamPerlSubstitution
+internal sealed class UpstreamPerlSubstitution : IUpstreamPerlLineEdit
 {
     private const string SupportedFlags = "gimsx";
 
@@ -64,6 +64,11 @@ internal sealed class UpstreamPerlSubstitution
         EmptiesUnmatchedLine && !pattern.IsMatch(line)
             ? string.Empty
             : pattern.Replace(line, replacement, replacesEvery ? -1 : 1);
+
+    /// <summary>Matches the substitution's pattern against one line, as Perl's <c>s///</c> does before it replaces.</summary>
+    /// <param name="line">The line, with its line feed.</param>
+    /// <returns>The first match, whose groups are Perl's <c>$1</c>, <c>$2</c> and so on.</returns>
+    public Match Match(string line) => pattern.Match(line);
 
     private static bool StartsAsSubstitution(string code) =>
         code.Length >= 2 && code[0] == 's' && IsDelimiter(code[1]);

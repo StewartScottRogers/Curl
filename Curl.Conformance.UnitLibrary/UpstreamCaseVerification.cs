@@ -199,13 +199,13 @@ internal static class UpstreamCaseVerification
             _ => body,
         };
 
-    private static UpstreamPerlSubstitution[] Substitutions(UpstreamTestCase testCase, string name) =>
+    private static IUpstreamPerlLineEdit[] Substitutions(UpstreamTestCase testCase, string name) =>
         UpstreamTestPartBodies.Lines(testCase.Find("verify", name))
-            .Select(UpstreamPerlSubstitution.Parse).OfType<UpstreamPerlSubstitution>().ToArray();
+            .Select(IUpstreamPerlLineEdit.Parse).OfType<IUpstreamPerlLineEdit>().ToArray();
 
     // Removes the lines a strip pattern matches, runs each substitution on the rest, and drops
     // the lines that end up empty.
-    private static byte[] Strip(byte[] body, Regex[] strips, UpstreamPerlSubstitution[] substitutions)
+    private static byte[] Strip(byte[] body, Regex[] strips, IUpstreamPerlLineEdit[] substitutions)
     {
         StringBuilder result = new();
         foreach (string line in UpstreamTestLines.SplitAfterLineFeeds(Encoding.Latin1.GetString(body)))
