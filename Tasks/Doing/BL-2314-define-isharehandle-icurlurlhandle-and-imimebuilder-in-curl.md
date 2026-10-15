@@ -39,3 +39,4 @@ ADR-0506; plan sections "Share", "URL" and "MIME and formadd"; needs BL-2312. Up
 ## Log
 
 - 2026-10-15: Created.
+- 2026-10-15: Backlog -> Doing.
