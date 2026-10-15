@@ -6,16 +6,17 @@ using System.Text;
 using Curl.Authentication;
 using Curl.Cli;
 using Curl.Core;
-using Curl.Engine;
 using Curl.Core.FileSystem;
 using Curl.Core.Globbing;
 using Curl.Core.Hsts;
 using Curl.Core.Multipart;
+using Curl.Engine;
 using Curl.Networking;
 using Curl.Output;
 using Curl.Protocol.Abstractions;
 using EasyHttpOptions = Curl.Api.Options.Http.EasyHttpOptions;
 using EasyMimeBody = Curl.Api.Options.Http.EasyMimeBody;
+using EasyTransferOptions = Curl.Api.Options.Behaviour.EasyTransferOptions;
 
 namespace Curl.Console;
 
@@ -2812,9 +2813,30 @@ internal sealed class CurlCommandRunner(
         return EngineComposition.TracesWrite(options) ? new ClientWriterTraceEvents(readers) : readers;
     }
 
+    /// <summary>
+    /// Gets one transfer's transfer options: its group's, with the <c>-T</c> <paramref name="upload" /> when
+    /// there is one, and under <c>-C -</c> that upload resuming from offset -1, the end of the remote file, as
+    /// curl's tool sets <c>CURLOPT_RESUME_FROM_LARGE</c> for it (ADR-0534). The upload's size stays unknown
+    /// (-1): the engine sends the stream as it reads it.
+    /// </summary>
+    /// <param name="options">The accepted command line.</param>
+    /// <param name="upload">The <c>-T</c> source, or <see langword="null" /> without <c>-T</c>.</param>
+    /// <returns>The transfer options.</returns>
+    private static EasyTransferOptions TransferOptionsOf(CommandLineOptions options, Stream? upload)
+    {
+        EasyTransferOptions group = EasyOptionsFromCommandLine.TransferOf(options);
+        if (upload is null)
+        {
+            return group;
+        }
+
+        EasyTransferOptions uploading = EasyOptionsFromCommandLine.UploadTransferOf(group, uploadFileSize: null);
+        return options.ResumeFromOutputSize ? uploading with { ResumeFrom = -1 } : uploading;
+    }
+
     private ITransferEvents WithMultiOrTimerEvents(CommandLineOptions options, ITransferEvents inner, Func<long> takeConnectionId)
     {
-        TransferTimers timers = TransferTimers.Of(EasyOptionsFromCommandLine.NetworkOf(options), options.MaxTime);
+        TransferTimers timers = TransferTimers.Of(EasyOptionsFromCommandLine.NetworkOf(options), EasyOptionsFromCommandLine.TransferOf(options));
         bool tracesMulti = EngineComposition.TracesMulti(options);
         IReadOnlyList<string> waitLines = EngineComposition.TracesTimer(options) ? timers.WaitLines(tracesMulti) : [];
         if (tracesMulti)
@@ -3429,6 +3451,7 @@ internal sealed class CurlCommandRunner(
         Stream? upload)
     {
         Running.UploadResumesFromUnknownOffset = options.ResumeFromOutputSize && upload is not null;
+        EasyTransferOptions transferOptions = TransferOptionsOf(options, upload);
         string? outputFile = ResolveOutputFile(options, transfer, url);
         if (outputFile is not null
             && await CreateOutputDirectoriesOrSkipAsync(options, outputFile).ConfigureAwait(false) is { } unstarted)
@@ -3460,6 +3483,8 @@ internal sealed class CurlCommandRunner(
             Func<long?, TransferContext> createAttemptContext = _ => transferContextFactory.Create(
                 options,
                 EasyOptionsFromCommandLine.HttpOf(options),
+                EasyOptionsFromCommandLine.BehaviourOf(options),
+                transferOptions,
                 url,
                 RateLimited(options, toStandardOutput ? FlushedEachWriteUnderNoBuffer(options, InTextModeUnderUseAscii(options, Running.GatedStandardOutput)) : Stream.Null),
                 range,
@@ -3470,9 +3495,9 @@ internal sealed class CurlCommandRunner(
                 proxy,
                 progress: Running.Progress,
                 events: Running.Events,
-                lowSpeedWatchdog: transferPerformer.StartLowSpeedWatchdog(Running, options.SpeedLimit, options.SpeedTimeSeconds, diagnosticLog),
+                lowSpeedWatchdog: transferPerformer.StartLowSpeedWatchdog(Running, transferOptions, diagnosticLog),
                 abortToken: Running.AbortToken,
-                maxTimeWatchdog: transferPerformer.StartMaxTimeWatchdog(Running, options.MaxTime, diagnosticLog),
+                maxTimeWatchdog: transferPerformer.StartMaxTimeWatchdog(Running, transferOptions, diagnosticLog),
                 lookedUpCredentials: Running.LookedUpCredentials,
                 ifNoneMatchHeaders: Running.IfNoneMatchHeaders,
                 altSvc: Running.AltSvc,
@@ -4291,12 +4316,15 @@ internal sealed class CurlCommandRunner(
                 return await ReportCannotOpenForResumeAsync(options, output.Path).ConfigureAwait(false);
             }
 
+            EasyTransferOptions transferOptions = TransferOptionsOf(options, upload);
             TransferResult fileResult = await FollowRetryingAsync(
                     follower,
                     options,
                     attemptResumeFrom => transferContextFactory.Create(
                         options,
                         EasyOptionsFromCommandLine.HttpOf(options),
+                        EasyOptionsFromCommandLine.BehaviourOf(options),
+                        transferOptions,
                         url,
                         RateLimited(options, FlushedEachWriteUnderNoBuffer(options, output)),
                         range,
@@ -4308,9 +4336,9 @@ internal sealed class CurlCommandRunner(
                         watchHeaderOutput,
                         Running.Progress,
                         Running.Events,
-                        transferPerformer.StartLowSpeedWatchdog(Running, options.SpeedLimit, options.SpeedTimeSeconds, diagnosticLog),
+                        transferPerformer.StartLowSpeedWatchdog(Running, transferOptions, diagnosticLog),
                         Running.AbortToken,
-                        transferPerformer.StartMaxTimeWatchdog(Running, options.MaxTime, diagnosticLog),
+                        transferPerformer.StartMaxTimeWatchdog(Running, transferOptions, diagnosticLog),
                         Running.LookedUpCredentials,
                         Running.IfNoneMatchHeaders,
                         Running.AltSvc,

@@ -1,3 +1,4 @@
+using Curl.Api.Options.Behaviour;
 using Curl.Core;
 using Curl.Protocol.Abstractions;
 
@@ -128,16 +129,17 @@ internal sealed partial class TransferPerformer(TimeProvider timeProvider, Func<
     /// <summary>
     /// Starts the <c>-Y</c>/<c>-y</c> watchdog for the attempt whose context is being created, on
     /// the performer's clock, and keeps it on <paramref name="state" /> for
-    /// <see cref="FollowWatchingSpeedAsync" />: <c>-Y</c> alone watches for 30 seconds and <c>-y</c>
-    /// alone for 1 byte per second, as curl 8.21.0 does (measured 2026-09-27, BL-400 Notes).
+    /// <see cref="FollowWatchingSpeedAsync" />, watching for <see cref="EasyTransferOptions.LowSpeedTime" />
+    /// below <see cref="EasyTransferOptions.LowSpeedLimit" /> (<c>-Y</c> alone gives 30 seconds and <c>-y</c>
+    /// alone 1 byte per second, as curl 8.21.0 does, measured 2026-09-27, BL-400 Notes).
     /// </summary>
     /// <param name="state">The running transfer.</param>
-    /// <param name="speedLimit">The <c>-Y</c> value, or <see langword="null" /> when not given.</param>
-    /// <param name="speedTimeSeconds">The <c>-y</c> value in seconds, or <see langword="null" /> when not given.</param>
+    /// <param name="transfer">The transfer's options, whose low-speed limit and time are <c>-Y</c> and <c>-y</c>.</param>
     /// <param name="diagnosticLog">Where the watchdog writes.</param>
-    /// <returns>The started watchdog, or <see langword="null" /> when the speed is not watched.</returns>
-    internal LowSpeedWatchdog? StartLowSpeedWatchdog(EngineTransferState state, long? speedLimit, long? speedTimeSeconds, IDiagnosticLog diagnosticLog) =>
-        state.AttemptLowSpeedWatchdog = LowSpeedWatchdog.StartFromCommandLine(speedLimit, speedTimeSeconds, timeProvider, diagnosticLog);
+    /// <returns>The started watchdog, or <see langword="null" /> when the limit or the time is zero, so the speed is not watched.</returns>
+    internal LowSpeedWatchdog? StartLowSpeedWatchdog(EngineTransferState state, EasyTransferOptions transfer, IDiagnosticLog diagnosticLog) =>
+        state.AttemptLowSpeedWatchdog = LowSpeedWatchdog.StartFromCommandLine(
+            transfer.LowSpeedLimit, (long)transfer.LowSpeedTime.TotalSeconds, timeProvider, diagnosticLog);
 
     /// <summary>
     /// Starts the <c>-m</c> watchdog for the attempt whose context is being created, on the
@@ -146,11 +148,11 @@ internal sealed partial class TransferPerformer(TimeProvider timeProvider, Func<
     /// <c>-m</c>, as in curl 8.21.0.
     /// </summary>
     /// <param name="state">The running transfer.</param>
-    /// <param name="maxTime">The <c>-m</c> value, or <see langword="null" /> when not given.</param>
+    /// <param name="transfer">The transfer's options, whose <see cref="EasyTransferOptions.Timeout" /> is <c>-m</c>, zero when not given.</param>
     /// <param name="diagnosticLog">Where the watchdog writes.</param>
     /// <returns>The started watchdog, or <see langword="null" /> without a positive <c>-m</c>.</returns>
-    internal MaxTimeWatchdog? StartMaxTimeWatchdog(EngineTransferState state, TimeSpan? maxTime, IDiagnosticLog diagnosticLog) =>
-        state.AttemptMaxTimeWatchdog = MaxTimeWatchdog.StartFromCommandLine(maxTime, timeProvider, diagnosticLog);
+    internal MaxTimeWatchdog? StartMaxTimeWatchdog(EngineTransferState state, EasyTransferOptions transfer, IDiagnosticLog diagnosticLog) =>
+        state.AttemptMaxTimeWatchdog = MaxTimeWatchdog.StartFromCommandLine(transfer.Timeout, timeProvider, diagnosticLog);
 
     /// <summary>
     /// Performs one attempt through <paramref name="follower" /> under the <c>-Y</c>/<c>-y</c> and

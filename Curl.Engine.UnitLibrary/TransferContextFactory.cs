@@ -1,12 +1,15 @@
 using System.Net;
 using System.Text;
 
+using Curl.Api.Options.Behaviour;
 using Curl.Api.Options.Http;
 using Curl.Cli;
 using Curl.Core;
 using Curl.Output;
 using Curl.Protocol.Abstractions;
+using EasyTimeCondition = Curl.Api.Options.Behaviour.TimeCondition;
 using HttpRequestOptions = Curl.Protocol.Abstractions.HttpRequestOptions;
+using TimeCondition = Curl.Protocol.Abstractions.TimeCondition;
 
 namespace Curl.Engine;
 
@@ -54,6 +57,13 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
     /// </summary>
     /// <param name="options">The parsed command line.</param>
     /// <param name="http">The option group's HTTP options, which <see cref="HttpRequestOptionsMapping.Of" /> maps onto <see cref="TransferContext.Http" />.</param>
+    /// <param name="behaviour">The option group's behaviour options: <see cref="EasyBehaviourOptions.IncludeHeader" /> (<c>-i</c>).</param>
+    /// <param name="transfer">
+    /// The transfer's options: the <c>-r</c> text, <c>-I</c>'s no body, the file time, the time condition, text
+    /// mode, CRLF, the file size limit and the timeout; a <c>-T</c> upload under <c>-C -</c> has
+    /// <see cref="EasyTransferOptions.Upload" /> set and <see cref="EasyTransferOptions.ResumeFrom" /> -1, as
+    /// curl's tool asks libcurl to resume it from the end of the remote file.
+    /// </param>
     /// <param name="url">The URL to transfer.</param>
     /// <param name="output">Where the transfer's bytes go.</param>
     /// <param name="range">The parsed <c>-r</c> range, or <see langword="null" /> for the whole resource.</param>
@@ -130,6 +140,8 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
     internal TransferContext Create(
         CommandLineOptions options,
         EasyHttpOptions http,
+        EasyBehaviourOptions behaviour,
+        EasyTransferOptions transfer,
         CurlUrl url,
         Stream output,
         ByteRange? range,
@@ -151,20 +163,20 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
         SshOptions? ssh = null)
     {
         Stream? transferHeaderOutput = watchHeaderOutput is null
-            ? HeaderOutputOf(options, url, output, headerOutput, bodyHeaderStyles)
-            : watchHeaderOutput(HeaderOutputOf(options, url, output, headerOutput, bodyHeaderStyles));
+            ? HeaderOutputOf(behaviour, transfer, url, output, headerOutput, bodyHeaderStyles)
+            : watchHeaderOutput(HeaderOutputOf(behaviour, transfer, url, output, headerOutput, bodyHeaderStyles));
         return new()
         {
             Url = url,
             Output = WatchedOutput(output, lowSpeedWatchdog),
             HeaderOutput = transferHeaderOutput,
             DumpHeaderOutput = headerOutput,
-            NoBody = options.NoBody,
+            NoBody = transfer.NoBody,
             Range = range,
-            RangeText = options.Range,
+            RangeText = transfer.Range,
             ResumeFrom = resumeFrom,
-            ResumeUploadFromUnknownOffset = ResumesUploadFromUnknownOffset(options, upload),
-            MaxFileSize = options.MaxFileSize,
+            ResumeUploadFromUnknownOffset = ResumesUploadFromUnknownOffset(transfer, upload),
+            MaxFileSize = MaxFileSizeOf(transfer),
             Upload = UploadOf(url, upload),
             PostData = options.PostData,
             Credentials = lookedUpCredentials ?? options.Credentials,
@@ -184,27 +196,27 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
             FtpSslControlOnly = options.FtpSslControlOnly && !options.SslRequired,
             FtpCommandChannelClearing = CommandChannelClearingOf(options.FtpClearCommandChannel),
             ListOnly = options.ListOnly,
-            UseAscii = options.UseAscii,
+            UseAscii = transfer.TransferText,
             Append = options.Append,
-            ConvertLineEndings = options.ConvertLineEndings,
+            ConvertLineEndings = transfer.Crlf,
             QuoteCommands = options.QuoteCommands,
             CreateFileMode = options.CreateFileMode ?? TransferContext.DefaultCreateFileMode,
             PathAsIs = options.PathAsIs,
             ConnectTimeout = options.ConnectTimeout,
-            MaxTime = options.MaxTime,
+            MaxTime = MaxTimeOf(transfer),
             OperationStarted = OperationStartedOf(maxTimeWatchdog),
-            TimeCondition = options.TimeCondition,
-            RemoteTime = options.RemoteTime,
+            TimeCondition = TimeConditionOf(transfer),
+            RemoteTime = transfer.FileTime,
             Proxy = proxy,
             Http = HttpOptionsWithAltSvc(
                 url,
-                HttpRequestOptionsMapping.Of(options, http, formBody, proxy, commandLineTextEncoding, ifNoneMatchHeaders) with
+                HttpRequestOptionsMapping.Of(options, http, behaviour, transfer, formBody, proxy, commandLineTextEncoding, ifNoneMatchHeaders) with
                 {
                     HstsStore = HstsStore,
                     ProxyTunnel = options.ProxyTunnel || ConnectToTunnelsThroughProxy(options, url, proxy),
                 },
                 altSvc),
-            Mail = MailRequestOptionsMapping.FromCommandLine(options, url.Scheme),
+            Mail = MailRequestOptionsMapping.FromCommandLine(options, transfer, url.Scheme),
             Ssh = ssh,
             Progress = WatchedProgress(progress, lowSpeedWatchdog, maxTimeWatchdog),
             Events = EventsWritingConnectReplyHeads(options, proxy, EventsOrNone(events), transferHeaderOutput),
@@ -297,11 +309,38 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
     /// Tells whether <c>-C -</c> resumes the <c>-T</c> <paramref name="upload" /> from an offset
     /// only the server knows, as curl 8.21.0's offset -1 does.
     /// </summary>
-    /// <param name="options">The parsed command line.</param>
+    /// <param name="transfer">The transfer's options, an upload's <see cref="EasyTransferOptions.ResumeFrom" /> -1 for <c>-C -</c>.</param>
     /// <param name="upload">The <c>-T</c> source given to <see cref="Create" />, or <see langword="null" />.</param>
     /// <returns><see langword="true" /> for <c>-C -</c> with a <c>-T</c> source.</returns>
-    private static bool ResumesUploadFromUnknownOffset(CommandLineOptions options, Stream? upload) =>
-        options.ResumeFromOutputSize && upload is not null;
+    private static bool ResumesUploadFromUnknownOffset(EasyTransferOptions transfer, Stream? upload) =>
+        transfer is { Upload: true, ResumeFrom: -1 } && upload is not null;
+
+    /// <summary>
+    /// Gets the <c>--max-filesize</c> limit, or <see langword="null" /> for libcurl's 0, no limit.
+    /// </summary>
+    /// <param name="transfer">The transfer's options.</param>
+    /// <returns>The context's <see cref="TransferContext.MaxFileSize" />.</returns>
+    private static long? MaxFileSizeOf(EasyTransferOptions transfer) => transfer.MaxFileSize > 0 ? transfer.MaxFileSize : null;
+
+    /// <summary>
+    /// Gets the <c>-m</c> limit, or <see langword="null" /> for libcurl's zero, which never times out.
+    /// </summary>
+    /// <param name="transfer">The transfer's options.</param>
+    /// <returns>The context's <see cref="TransferContext.MaxTime" />.</returns>
+    private static TimeSpan? MaxTimeOf(EasyTransferOptions transfer) => transfer.Timeout > TimeSpan.Zero ? transfer.Timeout : null;
+
+    /// <summary>
+    /// Gets the <c>-z</c> condition the handlers read from <see cref="EasyTransferOptions.TimeCondition" /> and
+    /// the whole seconds of <see cref="EasyTransferOptions.TimeValue" />, or <see langword="null" /> for none.
+    /// </summary>
+    /// <param name="transfer">The transfer's options.</param>
+    /// <returns>The context's <see cref="TransferContext.TimeCondition" />.</returns>
+    private static TimeCondition? TimeConditionOf(EasyTransferOptions transfer) => transfer.TimeCondition switch
+    {
+        EasyTimeCondition.None => null,
+        EasyTimeCondition.IfUnmodifiedSince => TimeCondition.FromUnixSeconds(transfer.TimeValue, TimeConditionKind.IfUnmodifiedSince),
+        _ => TimeCondition.FromUnixSeconds(transfer.TimeValue, TimeConditionKind.IfModifiedSince),
+    };
 
     /// <summary>
     /// Gets the <c>CCC</c> behaviour the FTP handler reads for the command line's
@@ -380,7 +419,8 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
     /// <c>ws</c> or <c>wss</c> transfer, where curl writes the upgrade reply head only to
     /// <c>-D</c> (ADR-0128 row 5; <c>-I</c> measured the same, BL-583).
     /// </summary>
-    /// <param name="options">The parsed command line.</param>
+    /// <param name="behaviour">The option group's behaviour options, whose <see cref="EasyBehaviourOptions.IncludeHeader" /> is <c>-i</c>.</param>
+    /// <param name="transfer">The transfer's options, whose <see cref="EasyTransferOptions.NoBody" /> is <c>-I</c>.</param>
     /// <param name="url">The URL to transfer.</param>
     /// <param name="output">Where the transfer's body goes.</param>
     /// <param name="dumpHeaderOutput">Where the <c>-D</c> header lines go, or <see langword="null" /> without <c>-D</c>.</param>
@@ -394,9 +434,9 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
     /// <paramref name="bodyHeaderStyles" /> is given) when there is no <c>-D</c>, or a
     /// <see cref="HeaderLineTeeStream" /> writing each line to both.
     /// </returns>
-    private static Stream? HeaderOutputOf(CommandLineOptions options, CurlUrl url, Stream output, Stream? dumpHeaderOutput, StyledHeaderLines? bodyHeaderStyles)
+    private static Stream? HeaderOutputOf(EasyBehaviourOptions behaviour, EasyTransferOptions transfer, CurlUrl url, Stream output, Stream? dumpHeaderOutput, StyledHeaderLines? bodyHeaderStyles)
     {
-        if ((!options.ShowHeaders && !options.NoBody) || IsWebSocket(url))
+        if ((!behaviour.IncludeHeader && !transfer.NoBody) || IsWebSocket(url))
         {
             return dumpHeaderOutput;
         }

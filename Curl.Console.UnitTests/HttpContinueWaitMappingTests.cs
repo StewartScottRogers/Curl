@@ -1,3 +1,4 @@
+using Curl.Api.Options.Behaviour;
 using Curl.Cli;
 using Curl.Engine;
 using Curl.Protocol.Abstractions;
@@ -33,11 +34,11 @@ public sealed class HttpContinueWaitMappingTests
         Diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
 
-        TimeSpan continueWait = HttpRequestOptionsMapping.Of(result.Options, EasyOptionsFromCommandLine.HttpOf(result.Options)).ContinueWait;
+        TimeSpan continueWait = HttpRequestOptionsMapping.Of(result.Options, EasyOptionsFromCommandLine.HttpOf(result.Options), new EasyBehaviourOptions(), new EasyTransferOptions()).ContinueWait;
         Diagnostics.Act("continue wait", continueWait);
 
         Diagnostics.Assert("continue wait", TimeSpan.FromMilliseconds(expectedMilliseconds), continueWait);
-        Assert.AreEqual(TimeSpan.FromMilliseconds(expectedMilliseconds), HttpRequestOptionsMapping.Of(result.Options, EasyOptionsFromCommandLine.HttpOf(result.Options)).ContinueWait);
+        Assert.AreEqual(TimeSpan.FromMilliseconds(expectedMilliseconds), HttpRequestOptionsMapping.Of(result.Options, EasyOptionsFromCommandLine.HttpOf(result.Options), new EasyBehaviourOptions(), new EasyTransferOptions()).ContinueWait);
     }
 
     [TestMethod]
@@ -48,10 +49,10 @@ public sealed class HttpContinueWaitMappingTests
         Diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
 
-        TimeSpan continueWait = HttpRequestOptionsMapping.Of(result.Options, EasyOptionsFromCommandLine.HttpOf(result.Options)).ContinueWait;
+        TimeSpan continueWait = HttpRequestOptionsMapping.Of(result.Options, EasyOptionsFromCommandLine.HttpOf(result.Options), new EasyBehaviourOptions(), new EasyTransferOptions()).ContinueWait;
         Diagnostics.Act("continue wait", continueWait);
 
         Diagnostics.Assert("continue wait", HttpRequestOptions.DefaultContinueWait, continueWait);
-        Assert.AreEqual(HttpRequestOptions.DefaultContinueWait, HttpRequestOptionsMapping.Of(result.Options, EasyOptionsFromCommandLine.HttpOf(result.Options)).ContinueWait);
+        Assert.AreEqual(HttpRequestOptions.DefaultContinueWait, HttpRequestOptionsMapping.Of(result.Options, EasyOptionsFromCommandLine.HttpOf(result.Options), new EasyBehaviourOptions(), new EasyTransferOptions()).ContinueWait);
     }
 }

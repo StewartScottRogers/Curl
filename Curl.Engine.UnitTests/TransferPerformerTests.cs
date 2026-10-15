@@ -1,3 +1,4 @@
+using Curl.Api.Options.Behaviour;
 using Curl.Cli;
 using Curl.Console;
 using Curl.Core;
@@ -54,7 +55,7 @@ public sealed partial class TransferPerformerTests
     {
         TransferPerformer performer = new(clock, EasyErrorText);
         EngineTransferState state = NewState();
-        LowSpeedWatchdog? watchdog = performer.StartLowSpeedWatchdog(state, 100, 2, NoDiagnosticLog.Instance);
+        LowSpeedWatchdog? watchdog = performer.StartLowSpeedWatchdog(state, new EasyTransferOptions { LowSpeedLimit = 100, LowSpeedTime = TimeSpan.FromSeconds(2) }, NoDiagnosticLog.Instance);
         StallingHandler handler = new();
         TransferContext context = new() { Url = CurlUrl.Parse(First), Output = Stream.Null, CancellationToken = watchdog!.Token };
 
@@ -73,8 +74,8 @@ public sealed partial class TransferPerformerTests
     {
         TransferPerformer performer = new(clock, EasyErrorText);
         EngineTransferState state = NewState();
-        performer.StartLowSpeedWatchdog(state, 1, 100, NoDiagnosticLog.Instance);
-        MaxTimeWatchdog? watchdog = performer.StartMaxTimeWatchdog(state, TimeSpan.FromSeconds(1), NoDiagnosticLog.Instance);
+        performer.StartLowSpeedWatchdog(state, new EasyTransferOptions { LowSpeedLimit = 1, LowSpeedTime = TimeSpan.FromSeconds(100) }, NoDiagnosticLog.Instance);
+        MaxTimeWatchdog? watchdog = performer.StartMaxTimeWatchdog(state, new EasyTransferOptions { Timeout = TimeSpan.FromSeconds(1) }, NoDiagnosticLog.Instance);
         StallingHandler handler = new();
         TransferContext context = new() { Url = CurlUrl.Parse(First), Output = Stream.Null, CancellationToken = watchdog!.Token };
 
@@ -105,8 +106,8 @@ public sealed partial class TransferPerformerTests
         TransferPerformer performer = new(clock, EasyErrorText);
         EngineTransferState state = NewState();
 
-        Assert.IsNull(performer.StartLowSpeedWatchdog(state, null, null, NoDiagnosticLog.Instance));
-        Assert.IsNull(performer.StartMaxTimeWatchdog(state, null, NoDiagnosticLog.Instance));
+        Assert.IsNull(performer.StartLowSpeedWatchdog(state, new EasyTransferOptions(), NoDiagnosticLog.Instance));
+        Assert.IsNull(performer.StartMaxTimeWatchdog(state, new EasyTransferOptions(), NoDiagnosticLog.Instance));
         Assert.IsNull(state.AttemptLowSpeedWatchdog);
         Assert.IsNull(state.AttemptMaxTimeWatchdog);
     }

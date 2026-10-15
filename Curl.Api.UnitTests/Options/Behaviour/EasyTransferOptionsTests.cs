@@ -53,7 +53,7 @@ public sealed class EasyTransferOptionsTests
     public void New_EasyTransferOptions_SetsNoTimeConditionAtTheUnixEpoch()
     {
         Assert.AreEqual(TimeCondition.None, Defaults.TimeCondition);
-        Assert.AreEqual(DateTimeOffset.UnixEpoch, Defaults.TimeValue);
+        Assert.AreEqual(0L, Defaults.TimeValue);
     }
 
     [TestMethod]
@@ -80,7 +80,7 @@ public sealed class EasyTransferOptionsTests
         AssertChangesOnly(Defaults with { BufferSize = 1024 }, o => o with { BufferSize = 16384 });
         AssertChangesOnly(Defaults with { MaxFileSize = 1000 }, o => o with { MaxFileSize = 0 });
         AssertChangesOnly(Defaults with { TimeCondition = TimeCondition.IfModifiedSince }, o => o with { TimeCondition = TimeCondition.None });
-        AssertChangesOnly(Defaults with { TimeValue = DateTimeOffset.UnixEpoch.AddDays(1) }, o => o with { TimeValue = DateTimeOffset.UnixEpoch });
+        AssertChangesOnly(Defaults with { TimeValue = 86400 }, o => o with { TimeValue = 0 });
         AssertChangesOnly(Defaults with { TransferText = true }, o => o with { TransferText = false });
         AssertChangesOnly(Defaults with { Crlf = true }, o => o with { Crlf = false });
         AssertChangesOnly(Defaults with { ProxyTransferMode = true }, o => o with { ProxyTransferMode = false });

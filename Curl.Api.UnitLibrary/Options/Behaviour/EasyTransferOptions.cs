@@ -83,10 +83,10 @@ public sealed record EasyTransferOptions
 
     /// <summary>
     /// <c>CURLOPT_TIMEVALUE</c> (and <c>CURLOPT_TIMEVALUE_LARGE</c>): the time
-    /// <see cref="TimeCondition"/> compares with, in seconds since 1970-01-01 UTC. Default 0:
-    /// <see cref="DateTimeOffset.UnixEpoch"/>.
+    /// <see cref="TimeCondition"/> compares with, in seconds since 1970-01-01 UTC, as libcurl's
+    /// 64-bit <c>time_t</c> holds it, so a time past 9999-12-31 is kept. Default 0: 1970-01-01.
     /// </summary>
-    public DateTimeOffset TimeValue { get; init; } = DateTimeOffset.UnixEpoch;
+    public long TimeValue { get; init; }
 
     /// <summary>
     /// <c>CURLOPT_TRANSFERTEXT</c>: whether FTP transfers in ASCII mode and LDAP gives text. Default

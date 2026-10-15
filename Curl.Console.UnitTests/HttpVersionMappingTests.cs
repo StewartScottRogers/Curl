@@ -1,3 +1,4 @@
+using Curl.Api.Options.Behaviour;
 using Curl.Api.Options.Http;
 using Curl.Cli;
 using Curl.Engine;
@@ -128,7 +129,7 @@ public sealed class HttpVersionMappingTests
         CommandLineParseResult result = OpenSslBuildParser.Parse([option, Url]);
         Assert.IsTrue(result.IsAccepted);
 
-        HttpVersionPreference actual = HttpRequestOptionsMapping.Of(result.Options, EasyOptionsFromCommandLine.HttpOf(result.Options)).Version;
+        HttpVersionPreference actual = HttpRequestOptionsMapping.Of(result.Options, EasyOptionsFromCommandLine.HttpOf(result.Options), new EasyBehaviourOptions(), new EasyTransferOptions()).Version;
 
         Diagnostics.Act("version", actual);
 

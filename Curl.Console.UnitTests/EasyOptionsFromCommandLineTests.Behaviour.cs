@@ -65,7 +65,7 @@ public sealed partial class EasyOptionsFromCommandLineTests
         GivenTransfer("-l", o => o.DirListOnly, true, "-l"),
         GivenTransfer("--max-filesize", o => o.MaxFileSize, 2048L, "--max-filesize", "2k"),
         GivenTransfer("-z", o => o.TimeCondition, TimeCondition.IfModifiedSince, "-z", "Sun, 06 Nov 1994 08:49:37 GMT"),
-        GivenTransfer("-z time", o => o.TimeValue, ConditionDate, "-z", "Sun, 06 Nov 1994 08:49:37 GMT"),
+        GivenTransfer("-z time", o => o.TimeValue, ConditionDate.ToUnixTimeSeconds(), "-z", "Sun, 06 Nov 1994 08:49:37 GMT"),
         GivenTransfer("-z -", o => o.TimeCondition, TimeCondition.IfUnmodifiedSince, "-z", "-Sun, 06 Nov 1994 08:49:37 GMT"),
         GivenTransfer("-B", o => o.TransferText, true, "-B"),
         GivenTransfer("--crlf", o => o.Crlf, true, "--crlf"),

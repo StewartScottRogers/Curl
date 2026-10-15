@@ -1,4 +1,5 @@
 using System.Globalization;
+using Curl.Api.Options.Behaviour;
 using Curl.Api.Options.Network;
 
 namespace Curl.Engine;
@@ -13,12 +14,12 @@ namespace Curl.Engine;
 /// <param name="connectTimeout">The <c>--connect-timeout</c> given, or <see langword="null" /> when none, or 0, was.</param>
 internal sealed class TransferTimers(TimeSpan? transferTimeout, TimeSpan? connectTimeout)
 {
-    /// <summary>Gives the timers of <paramref name="maxTime" /> and the connect timeout in <paramref name="network" />.</summary>
+    /// <summary>Gives the timers of the transfer timeout in <paramref name="transfer" /> and the connect timeout in <paramref name="network" />.</summary>
     /// <param name="network">The transfer's network options, whose <see cref="EasyNetworkOptions.ConnectTimeout" /> of zero means not set.</param>
-    /// <param name="maxTime">The <c>-m</c> given, if any (the transfer group's timeout until its own retarget).</param>
+    /// <param name="transfer">The transfer's options, whose <see cref="EasyTransferOptions.Timeout" /> (<c>-m</c>) of zero means not set.</param>
     /// <returns>The transfer's timers.</returns>
-    public static TransferTimers Of(EasyNetworkOptions network, TimeSpan? maxTime) =>
-        new(Positive(maxTime), Positive(network.ConnectTimeout));
+    public static TransferTimers Of(EasyNetworkOptions network, EasyTransferOptions transfer) =>
+        new(Positive(transfer.Timeout), Positive(network.ConnectTimeout));
 
     /// <summary>Gets the number of timers, which curl's <c>pollset[...]</c> lines give as <c>timeouts=</c>.</summary>
     public int Count => Pending().Count;
@@ -72,5 +73,5 @@ internal sealed class TransferTimers(TimeSpan? transferTimeout, TimeSpan? connec
     private static string Milliseconds(TimeSpan remaining) =>
         ((long)Math.Ceiling(remaining.TotalMilliseconds)).ToString(CultureInfo.InvariantCulture);
 
-    private static TimeSpan? Positive(TimeSpan? timeout) => timeout > TimeSpan.Zero ? timeout : null;
+    private static TimeSpan? Positive(TimeSpan timeout) => timeout > TimeSpan.Zero ? timeout : null;
 }

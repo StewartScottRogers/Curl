@@ -1,5 +1,6 @@
 using System.Text;
 
+using Curl.Api.Options.Behaviour;
 using Curl.Api.Options.Http;
 using Curl.Cli;
 using Curl.Networking;
@@ -13,8 +14,9 @@ namespace Curl.Engine;
 /// reads. From <see cref="EasyHttpOptions" />: <c>--request-target</c>, <c>-H</c> with the headers <c>--json</c>
 /// adds, <c>-A</c>, <c>-e</c>, the <c>-d</c> family body, <c>-L</c>, <c>--max-redirs</c>, the HTTP version,
 /// <c>--compressed</c>, <c>--tr-encoding</c>, <c>--raw</c>, <c>--ignore-content-length</c>, <c>--http0.9</c> and
-/// <c>--expect100-timeout</c>. From the command line, until their groups' tasks retarget them: <c>-X</c>,
-/// <c>-f</c>, <c>--fail-with-body</c>, the authentication options, the proxy headers and tunnel,
+/// <c>--expect100-timeout</c>. From <see cref="EasyTransferOptions" />: <c>-X</c>; from
+/// <see cref="EasyBehaviourOptions" />: <c>-f</c>. From the command line: <c>--fail-with-body</c>, which curl's tool
+/// checks itself (ADR-0528), and, until their groups' tasks retarget them, the authentication options, the proxy headers and tunnel,
 /// <c>--unix-socket</c> and <c>--happy-eyeballs-timeout-ms</c>; with the <c>-F</c> body the caller built.
 /// </summary>
 /// <remarks>
@@ -37,6 +39,8 @@ internal static class HttpRequestOptionsMapping
     /// </summary>
     /// <param name="options">The parsed command line, for the options no <see cref="EasyHttpOptions" /> member carries.</param>
     /// <param name="http">The option group's HTTP options.</param>
+    /// <param name="behaviour">The option group's behaviour options, whose <see cref="EasyBehaviourOptions.FailOnError" /> is <c>-f</c>.</param>
+    /// <param name="transfer">The option group's transfer options, whose <see cref="EasyTransferOptions.CustomRequest" /> is <c>-X</c>.</param>
     /// <param name="formBody">
     /// The <c>-F</c> / <c>--form-string</c> body built for this transfer, or <see langword="null" />
     /// without <c>-F</c>; the parser refuses <c>-F</c> with a <c>-d</c> family body, so at most one is given.
@@ -66,9 +70,11 @@ internal static class HttpRequestOptionsMapping
     /// both decodings off (<c>--raw</c>) as <see cref="HttpRequestOptions.Raw" />;
     /// <see cref="EasyHttpOptions.TransferEncoding" />, <see cref="EasyHttpOptions.IgnoreContentLength" /> and
     /// <see cref="EasyHttpOptions.Http09Allowed" /> verbatim; and <see cref="EasyHttpOptions.Expect100Timeout" /> as
-    /// <see cref="HttpRequestOptions.ContinueWait" />. And from <paramref name="options" />:
-    /// <see cref="CommandLineOptions.RequestMethod" /> and <see cref="CommandLineOptions.ProxyHeaders" /> verbatim;
-    /// <see cref="CommandLineOptions.FailMode" /> as <see cref="HttpRequestOptions.Fail" />;
+    /// <see cref="HttpRequestOptions.ContinueWait" />. <see cref="EasyTransferOptions.CustomRequest" /> as
+    /// <see cref="HttpRequestOptions.CustomMethod" />, and <see cref="EasyBehaviourOptions.FailOnError" /> as
+    /// <see cref="HttpRequestOptions.Fail" /> <see cref="HttpFailMode.Fail" />, otherwise <c>--fail-with-body</c>'s
+    /// <see cref="CommandLineOptions.FailMode" />. And from <paramref name="options" />:
+    /// <see cref="CommandLineOptions.ProxyHeaders" /> verbatim;
     /// <see cref="CommandLineOptions.AuthSchemes" />, <see cref="CommandLineOptions.BearerToken" /> and
     /// <see cref="CommandLineOptions.AwsSigV4" /> verbatim; the <c>--httpsig-*</c> options as
     /// <see cref="HttpRequestOptions.HttpSignature" /> (<see cref="HttpSignatureSetup.Of" />), which leave
@@ -83,13 +89,15 @@ internal static class HttpRequestOptionsMapping
     internal static HttpRequestOptions Of(
         CommandLineOptions options,
         EasyHttpOptions http,
+        EasyBehaviourOptions behaviour,
+        EasyTransferOptions transfer,
         HttpRequestBody? formBody = null,
         ProxyEndpoint? proxy = null,
         Encoding? commandLineTextEncoding = null,
         IReadOnlyList<string>? ifNoneMatchHeaders = null) =>
         new()
         {
-            CustomMethod = options.RequestMethod,
+            CustomMethod = transfer.CustomRequest,
             RequestTarget = http.RequestTarget,
             Headers = [.. http.HttpHeaders, .. ifNoneMatchHeaders ?? []],
             ProxyHeaders = options.ProxyHeaders,
@@ -98,7 +106,7 @@ internal static class HttpRequestOptionsMapping
             Referer = http.Referer,
             AutoReferer = http.AutoReferer,
             Body = formBody ?? PostFieldsBodyOf(http),
-            Fail = options.FailMode,
+            Fail = behaviour.FailOnError ? HttpFailMode.Fail : options.FailMode,
             FollowRedirects = http.FollowLocation != FollowLocation.None,
             MaxRedirects = (int)http.MaxRedirects,
             AuthSchemes = HttpSignatureSetup.Of(options).Settings is null ? options.AuthSchemes : HttpAuthSchemes.None,

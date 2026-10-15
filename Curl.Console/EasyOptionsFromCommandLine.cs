@@ -6,12 +6,12 @@ using Curl.Api.Options.Authentication;
 using Curl.Api.Options.Behaviour;
 using Curl.Api.Options.Http;
 using Curl.Api.Options.Network;
+using Curl.Api.Options.Protocols;
 using Curl.Api.Options.Proxy;
 using Curl.Api.Options.Tls;
 using Curl.Cli;
 using Curl.Networking;
 using Curl.Protocol.Abstractions;
-using Curl.Api.Options.Protocols;
 using EasyFtpClearCommandChannel = Curl.Api.Options.Protocols.FtpClearCommandChannel;
 using EasyFtpFileMethod = Curl.Api.Options.Protocols.FtpFileMethod;
 using EasyGssApiDelegation = Curl.Api.Options.Authentication.GssApiDelegation;
@@ -613,7 +613,7 @@ internal static class EasyOptionsFromCommandLine
             TimeCondition = options.TimeCondition is not { } condition ? EasyTimeCondition.None
                 : condition.Kind == TimeConditionKind.IfModifiedSince ? EasyTimeCondition.IfModifiedSince
                 : EasyTimeCondition.IfUnmodifiedSince,
-            TimeValue = options.TimeCondition?.Value ?? transfer.TimeValue,
+            TimeValue = options.TimeCondition?.ValueUnixSeconds ?? transfer.TimeValue,
             TransferText = options.UseAscii,
             Crlf = options.ConvertLineEndings,
         };
