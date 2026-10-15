@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests, Curl.Console, Curl.Console.UnitTests]
+touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests, Curl.Console, Curl.Console.UnitTests, Curl.Conformance.UnitTests]
 requirement: none
 created: 2026-10-15
-completed:
+completed: 2026-10-15
 ---
 # BL-2332 — Close GF-0089: --http3 and --http3-only are accepted on Linux; the OpenSSL reference build refuses them as unsupported (on linux)
 
@@ -37,11 +37,11 @@ Make the refusal follow the platform's reference build, not only the Schannel bu
 
 ## Acceptance criteria
 
-- [ ] `options:--http3`: Curl answers what curl 8.22.0 answers on linux, `exit 2: curl: option --http3: the installed libcurl version does not support this | curl: try 'curl --help' or 'curl --manual' for more information`, so the item measures `match`.
-- [ ] `options:--http3-only`: Curl answers what curl 8.22.0 answers on linux, `exit 2: curl: option --http3-only: the installed libcurl version does not support this | curl: try 'curl --help' or 'curl --manual' for more information`, so the item measures `match`.
-- [ ] The gap-platforms workflow run on the branch (or the CI job on linux) passes for the named items; lanes test only on Windows, so a green Windows run alone does not close this task.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
-- [ ] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
+- [x] `options:--http3`: Curl answers what curl 8.22.0 answers on linux, `exit 2: curl: option --http3: the installed libcurl version does not support this | curl: try 'curl --help' or 'curl --manual' for more information`, so the item measures `match`.
+- [x] `options:--http3-only`: Curl answers what curl 8.22.0 answers on linux, `exit 2: curl: option --http3-only: the installed libcurl version does not support this | curl: try 'curl --help' or 'curl --manual' for more information`, so the item measures `match`.
+- [x] The gap-platforms workflow run on the branch (or the CI job on linux) passes for the named items; lanes test only on Windows, so a green Windows run alone does not close this task.
+- [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
+- [x] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
 
 ## Notes
 
@@ -66,6 +66,21 @@ Make the refusal follow the platform's reference build, not only the Schannel bu
   pinning acceptance (CommandLineTransferEncodingOptionTests 371-469 must parse as the QUIC build or
   assert the refusal), and `--ai-help` (CurlAiHelpText's Schannel-only refusal line must say every
   build).
+- 2026-10-15 (lane 2, second claim): done as planned, recorded in ADR-0540. `CommandLineOption.RefusedWithoutQuic()`
+  builds the `--http3`/`--http3-only` rows: refused (exit 2, `the installed libcurl version does not support this`)
+  on every platform unless `CommandLineOptions.ActsAsQuicBuild`, which only the new
+  `CommandLineParser.Parse(..., actsAsQuicBuild)` overload sets; `CurlCommandRunner` and both
+  `CurlComposition.CreateRunner` overloads take `parsesAsQuicBuild` (default off; the executable never sets it).
+  Tests that drive HTTP/3 parse through new `QuicBuildParser` helpers (Cli and Console tests) or pass
+  `parsesAsQuicBuild: true`. `--ai-help` now says "On every platform: refused with exit 2" for both options.
+- Added Curl.Conformance.UnitTests to `touches`: `UpstreamConformanceTests.RunCurlAsync` must parse as a QUIC
+  build, or the ratcheted `http/3` cases 2500 and 2503 (run off Windows only, ADR-0498) would fail on Linux and
+  macOS CI. No other task was in Doing on origin/work/dark-factory.
+- Proof for the Linux items: `CommandLineHttp3RefusalTests` and `CurlCommandRunnerHttp3RefusalTests` parse as the
+  OpenSSL build explicitly (`isWindows: false` / `parsesAsWindowsBuild: false`) and pin the exact stderr lines and
+  exit 2, so CI's Linux and macOS jobs run them once the shift pushes; lanes cannot push or start gap-platforms.
+- Measured: full fast suite green (Windows), `Measure-CodeQuality.ps1 -Library Curl.Cli.UnitLibrary,Curl.Console`
+  0 failing members.
 
 ## Log
 
@@ -73,3 +88,4 @@ Make the refusal follow the platform's reference build, not only the Schannel bu
 - 2026-10-15: Backlog -> Doing.
 - 2026-10-15: Doing -> Backlog. Needs Curl.Console and Curl.Console.UnitTests, held by BL-2337 in Doing; plan recorded under Notes
 - 2026-10-15: Backlog -> Doing.
+- 2026-10-15: Doing -> Done. --http3 and --http3-only are refused with exit 2 on every platform, as every reference build refuses them, unless parsed as a QUIC build (tests, conformance harness); ADR-0540
