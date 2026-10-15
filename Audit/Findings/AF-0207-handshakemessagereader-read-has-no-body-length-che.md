@@ -42,6 +42,8 @@ dotnet test Curl.Tls.UnitTests --filter "FullyQualifiedName~HandshakeMessageRead
 
 ## Re-audits
 
+- 2026-10-14 | 2026-10-14_1815.md | reproduces: no | Ran dotnet test Curl.Tls.UnitTests --filter "FullyQualifiedName~HandshakeMessageReaderTests": 'Passed! - Failed: 0, Passed: 9, Total: 9'. HandshakeMessageReader.Read now computes total = HeaderLength + length and returns NeedMoreBytes when buffer.Length < total (lines 31-34).
+
 ## Log
 
 - 2026-10-14: filed proposed.
