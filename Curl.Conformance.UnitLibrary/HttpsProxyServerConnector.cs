@@ -11,7 +11,9 @@ namespace Curl.Conformance;
 /// reach <see cref="SwsHttpServerConnector.ProxyPort"/> of the connector it wraps, where the sws
 /// emulation records them in its <see cref="SwsHttpServerConnector.ProxyReceivedBytes"/> for
 /// <c>&lt;verify&gt;&lt;proxy&gt;</c> and serves a proxied request or a <c>CONNECT</c> as the
-/// http-proxy does. Every other connection reaches the wrapped connector as it is. No socket is opened.
+/// http-proxy does. The proxy connection is kept alive between requests as sws keeps it
+/// (<see cref="SwsKeptAliveConnection"/>), so curl reuses it for its next URL (test1586).
+/// Every other connection reaches the wrapped connector as it is. No socket is opened.
 /// </summary>
 /// <remarks>
 /// Like stunnel as upstream's <c>servers.pm</c> starts it, the server offers no ALPN protocol and
@@ -42,6 +44,7 @@ public sealed class HttpsProxyServerConnector(X509Certificate2 certificate, ICon
         }
 
         ConnectResult connected = await backend.ConnectAsync(new ConnectTarget(target.Host, SwsHttpServerConnector.ProxyPort, target.UseTls), cancellationToken).ConfigureAwait(false);
-        return ConnectResult.Connected(new TlsRelayConnection(connected.Connection!, options, new IPEndPoint(IPAddress.Loopback, HttpsProxyPort)));
+        SwsKeptAliveConnection proxy = new((SwsHttpServerConnection)connected.Connection!);
+        return ConnectResult.Connected(new TlsRelayConnection(proxy, options, new IPEndPoint(IPAddress.Loopback, HttpsProxyPort)));
     }
 }

@@ -190,9 +190,12 @@ the caller names a certificate directory, as `%HTTPSPORT`), reaches the sws emul
 `%CERTDIR/certs/test-localhost.pem`, no ALPN and no client certificate request, so the decrypted
 proxied requests and `CONNECT`s land in `ProxyReceivedBytes` for `<verify><proxy>` and a
 `CONNECT` is tunnelled as through the http-proxy. The runner puts it in front of every other
-stand-in only for a case naming `https-proxy`; screening lets `https-proxy` cases run. 1630,
-1631, 1632 and 3401 pass; 1586 fails on a difference BL-2241 owns; 1647 is a libtest `<tool>`
-case and stays screened for that.
+stand-in only for a case naming `https-proxy`; screening lets `https-proxy` cases run. The relay
+reads the sws side eagerly, and sws returns 0 from a read with no reply waiting, so the proxy
+connection is wrapped in `SwsKeptAliveConnection`: while sws still reads requests on it, such a
+read waits for the client's next write, as sws blocks reading the next request, and the kept-alive
+TLS connection carries curl's next URL (BL-2241). 1586, 1630, 1631, 1632 and 3401 pass; 1647 is a
+libtest `<tool>` case and stays screened for that.
 
 `FtpsServerConnector` (BL-1913, ADR-0462) stands in for stunnel in front of the FTP stand-in,
 upstream's FTPS server: port 9007, the runner's `%FTPSPORT` (with a value only when the caller

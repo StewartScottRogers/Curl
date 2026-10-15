@@ -74,6 +74,28 @@ public sealed class HttpsProxyServerConnectorTests
         Assert.AreEqual(request, Encoding.Latin1.GetString(sws.ProxyReceivedBytes.ToArray()));
     }
 
+    [TestMethod]
+    [Timeout(60_000, CooperativeCancellation = true)]
+    public async Task ConnectAsync_SecondProxiedGetOnTheSameConnection_IsAnsweredToo()
+    {
+        using X509Certificate2 certificate = MailTlsServerConnectorTests.CreateCertificate();
+        SwsHttpServerConnector sws = new(ParsedTestCase.From(ReplyCase), TimeProvider.System);
+        HttpsProxyServerConnector connector = new(certificate, sws);
+        const string request = "GET http://example.com/1 HTTP/1.1\r\nHost: example.com\r\n\r\n";
+        int replyLength = "HTTP/1.1 200 OK\r\nContent-Length: 3\r\n\r\nhi\n".Length;
+        ConnectResult result = await connector.ConnectAsync(new ConnectTarget("127.0.0.1", HttpsProxyServerConnector.HttpsProxyPort, false), TestContext.CancellationToken);
+        await using SslStream client = await MailTlsServerConnectorTests.HandshakeAsync(result.Connection!);
+
+        await client.WriteAsync(Encoding.Latin1.GetBytes(request), TestContext.CancellationToken);
+        string first = await MailTlsServerConnectorTests.ReadAsync(client, replyLength);
+        await client.WriteAsync(Encoding.Latin1.GetBytes(request), TestContext.CancellationToken);
+        string second = await MailTlsServerConnectorTests.ReadAsync(client, replyLength);
+
+        Assert.AreEqual(first, second);
+        Assert.StartsWith("HTTP/1.1 200 OK", second);
+        Assert.AreEqual(request + request, Encoding.Latin1.GetString(sws.ProxyReceivedBytes.ToArray()));
+    }
+
     private async Task<string> ExchangeAsync(HttpsProxyServerConnector connector, string request, int replyLength)
     {
         ConnectResult result = await connector.ConnectAsync(new ConnectTarget("127.0.0.1", HttpsProxyServerConnector.HttpsProxyPort, false), TestContext.CancellationToken);
