@@ -8,7 +8,7 @@ depends-on: [BL-2292, BL-2293]
 touches: [Curl.Api.UnitLibrary/Callbacks, Curl.Api.UnitTests/Callbacks]
 requirement: none
 created: 2026-10-15
-completed:
+completed: 2026-10-15
 ---
 # BL-2301 — Define the libcurl callback delegates and EasyCallbackOptions in Curl.Api.UnitLibrary
 
@@ -27,17 +27,22 @@ ADR-0506 ("callbacks as delegates"); plan section "CURLOPT groups", row `EasyCal
 
 ## Acceptance criteria
 
-- [ ] Every callback in the plan's row has a delegate and an `EasyCallbackOptions` property documented with its `CURLOPT_*FUNCTION` name.
-- [ ] Every magic return value upstream defines for those callbacks is a named constant or enum member with upstream's number, pinned by a test.
-- [ ] Tests in `Curl.Api.UnitTests/Callbacks` show a new `EasyCallbackOptions` has every callback `null`.
-- [ ] `dotnet build` is clean (warnings are errors).
-- [ ] `dotnet test --filter "TestCategory!=Integration"` passes.
-- [ ] `powershell -NoProfile -File Measure-CodeQuality.ps1` passes (100% line and branch coverage, complexity <= 10, CRAP <= 30).
-- [ ] `Curl.Conformance.UnitTests/PassingUpstreamCases.txt` is unchanged.
+- [x] Every callback in the plan's row has a delegate and an `EasyCallbackOptions` property documented with its `CURLOPT_*FUNCTION` name.
+- [x] Every magic return value upstream defines for those callbacks is a named constant or enum member with upstream's number, pinned by a test.
+- [x] Tests in `Curl.Api.UnitTests/Callbacks` show a new `EasyCallbackOptions` has every callback `null`.
+- [x] `dotnet build` is clean (warnings are errors).
+- [x] `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] `powershell -NoProfile -File Measure-CodeQuality.ps1` passes (100% line and branch coverage, complexity <= 10, CRAP <= 30).
+- [x] `Curl.Conformance.UnitTests/PassingUpstreamCases.txt` is unchanged.
 
 ## Notes
+
+- Delivered directly (types only, no logic): 22 delegates, `EasyCallbackOptions`, the result enums and constant classes, and the value types `CurlSocket`, `CurlSocketAddress`, `HstsEntry`, `SshKey`, `CurlFileInfo` in `Curl.Api.UnitLibrary/Callbacks`. Shapes decided in ADR-0507 (Decided by Claude under Stewart's delegation): `long` byte counts with upstream's magic constants, enums for closed result sets, `nint` for opaque library pointers, `SeekOrigin` for the seek origin, `out HstsEntry?` for the HSTS read callback, no member for the `CURLINFO_END` sentinel.
+- Numbers from curl 8.22.0 `include/curl/curl.h`, pinned by `CallbackResultTests`. MSTEST0032 rejects asserting a const directly, so each constant goes through a `DataRow`.
+- Measured: `Measure-CodeQuality.ps1 -Library Curl.Api.UnitLibrary`: 100% line, 100% branch, worst CRAP 1, 0 failing members. Full build clean; fast tests all pass (Curl.Api.UnitTests 160). `PassingUpstreamCases.txt` untouched.
 
 ## Log
 
 - 2026-10-15: Created.
 - 2026-10-15: Backlog -> Doing.
+- 2026-10-15: Doing -> Done. Curl.Api.Callbacks defines all 22 libcurl callback delegates, their upstream-numbered result values and EasyCallbackOptions
