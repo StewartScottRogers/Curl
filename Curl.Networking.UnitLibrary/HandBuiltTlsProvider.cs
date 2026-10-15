@@ -859,6 +859,7 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
             ExtensionOrder = ClientHelloProfileMapping.Tls12ExtensionOrder(Profile, RequestOcspStatus),
             FixedExtensions = ClientHelloProfileMapping.Tls12FixedExtensions(Profile),
             InsertEmptyFragment = InsertsEmptyFragment(options),
+            KeyLog = options.KeyLogFile is { } keyLogFile ? new NssKeyLogFile(keyLogFile) : null,
         };
 
         // Schannel's hello below a TLS 1.3 ceiling is in a record of that ceiling; a TLS 1.2

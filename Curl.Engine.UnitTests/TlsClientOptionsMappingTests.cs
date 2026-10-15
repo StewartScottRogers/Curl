@@ -468,4 +468,24 @@ public sealed class TlsClientOptionsMappingTests
         Assert.IsTrue(parsed.IsAccepted);
         return parsed.Options;
     }
+
+    // BL-2327: the OpenSSL build logs to SSLKEYLOGFILE; the Schannel build ignores it (test2090 needs !Schannel).
+    [TestMethod]
+    [DataRow("/tmp/2090.log.ssl", false, "/tmp/2090.log.ssl")]
+    [DataRow("/tmp/2090.log.ssl", true, null)]
+    [DataRow("", false, null)]
+    [DataRow(null, false, null)]
+    public void KeyLogFileFromEnvironment_ReadsSslKeyLogFileOnlyOutsideTheSchannelBuild(string? value, bool matchesSchannelBuild, string? expected)
+    {
+        string? askedFor = null;
+        Diagnostics.Arrange("SSLKEYLOGFILE", value);
+        Diagnostics.Arrange("Schannel build", matchesSchannelBuild);
+
+        string? actual = TlsClientOptionsMapping.KeyLogFileFromEnvironment(name => { askedFor = name; return value; }, matchesSchannelBuild);
+        Diagnostics.Act("key log file", actual);
+
+        Diagnostics.Assert("key log file", expected, actual);
+        Assert.AreEqual(expected, actual);
+        Assert.AreEqual(matchesSchannelBuild ? null : "SSLKEYLOGFILE", askedFor);
+    }
 }

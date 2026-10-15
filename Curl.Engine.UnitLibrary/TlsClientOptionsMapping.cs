@@ -92,7 +92,8 @@ internal static class TlsClientOptionsMapping
             options.PinnedPublicKey,
             options.CertificateRevocationListFile,
             !options.ReuseSessionIds,
-            options.AllowBeast);
+            options.AllowBeast,
+            KeyLogFile());
 
     /// <summary>
     /// Maps the proxy TLS options of a parsed command line onto the <see cref="TlsClientOptions" />
@@ -150,7 +151,8 @@ internal static class TlsClientOptionsMapping
             CertificateRevocationListFile: options.ProxyCertificateRevocationListFile,
             UseAlpn: options.UseAlpn,
             NoSessionId: !options.ReuseSessionIds,
-            AllowBeast: options.ProxyAllowBeast);
+            AllowBeast: options.ProxyAllowBeast,
+            KeyLogFile: KeyLogFile());
 
     /// <summary>
     /// Maps the TLS options that reach the DNS-over-HTTPS server onto the <see cref="TlsClientOptions" />
@@ -179,7 +181,8 @@ internal static class TlsClientOptionsMapping
             Curves: options.Curves,
             RequireCertificateStatus: options.DohCertificateStatus,
             AutoClientCertificate: options.AutoClientCertificate,
-            CertificateRevocationListFile: options.CertificateRevocationListFile);
+            CertificateRevocationListFile: options.CertificateRevocationListFile,
+            KeyLogFile: KeyLogFile());
 
     /// <summary>
     /// Maps a TLS version from the command line, a minimum or a ceiling, onto the one the TLS
@@ -198,4 +201,17 @@ internal static class TlsClientOptionsMapping
     /// </returns>
     internal static TlsVersion ToTlsVersion(SslProtocols? tlsVersion) =>
         TlsVersionsByProtocol.GetValueOrDefault(tlsVersion ?? SslProtocols.None, TlsVersion.SystemDefault);
+
+    /// <summary>
+    /// Reads the file the OpenSSL build logs TLS secrets to from <c>SSLKEYLOGFILE</c>, for the target's,
+    /// an HTTPS proxy's and the DoH server's handshakes alike, as OpenSSL's key-log callback serves every
+    /// connection of the process (BL-2327, ADR-0518).
+    /// </summary>
+    /// <param name="readEnvironmentVariable">Reads an environment variable, <see langword="null" /> when unset.</param>
+    /// <param name="matchesSchannelBuild"><see langword="true" /> on Windows, whose Schannel build ignores the variable.</param>
+    /// <returns>The variable's value, or <see langword="null" /> when it is unset or empty or the build is Schannel's.</returns>
+    internal static string? KeyLogFileFromEnvironment(Func<string, string?> readEnvironmentVariable, bool matchesSchannelBuild) =>
+        !matchesSchannelBuild && readEnvironmentVariable("SSLKEYLOGFILE") is { Length: > 0 } path ? path : null;
+
+    private static string? KeyLogFile() => KeyLogFileFromEnvironment(Environment.GetEnvironmentVariable, OperatingSystem.IsWindows());
 }

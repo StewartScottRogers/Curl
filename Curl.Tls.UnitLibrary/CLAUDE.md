@@ -151,7 +151,9 @@ and Encrypted Client Hello (BL-706, ADR-0233).
   `session_ticket`, `extended_master_secret` and `encrypt_then_mac`, the session to
   resume, the client certificate, TLS 1.0 CBC's empty fragment
   (`InsertEmptyFragment`, off for `--ssl-allow-beast`), and `PadHello`
-  (a 256-to-511-byte hello padded to 512, `padding` last, ADR-0365). The
+  (a 256-to-511-byte hello padded to 512, `padding` last, ADR-0365), and `KeyLog`, an
+  `ITlsKeyLog` handed the `CLIENT_RANDOM` entry (client random, master secret) once the keys
+  are installed, for `SSLKEYLOGFILE` (ADR-0518, BL-2327; TLS 1.3 logs nothing yet, BL-2339). The
   ClientHello's extensions follow OpenSSL's order.
 - TLS 1.2 and below over a byte stream (ADR-0249): the internal `Tls12RecordLayer` reads
   whole records off the caller's `Stream`, removes their protection with the read state in

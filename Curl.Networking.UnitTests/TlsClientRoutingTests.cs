@@ -273,6 +273,7 @@ public sealed class TlsClientRoutingTests
         [new TlsClientOptions(AllowBeast: true, MinimumVersion: TlsVersion.Tls10), "--ssl-allow-beast with a TLS 1.0 minimum turns off the CBC split"],
         [new TlsClientOptions(AllowEarlyData: true), "--tls-earlydata sends 0-RTT early data"],
         [new TlsClientOptions(MinimumVersion: TlsVersion.Tls11), "--tlsv1.0 or --tlsv1.1 lets the versions reach below TLS 1.2"],
+        [new TlsClientOptions(KeyLogFile: "keys.log"), "SSLKEYLOGFILE logs the TLS secrets"],
     ];
 
     [TestMethod]

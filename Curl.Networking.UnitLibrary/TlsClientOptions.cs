@@ -173,6 +173,12 @@ namespace Curl.Networking;
 /// before it (ADR-0150). <see cref="TlsClientRouting" /> sends a connection with it whose range reaches
 /// TLS 1.0 to <see cref="HandBuiltTlsProvider" />, since <c>SslStream</c> has no control for the split.
 /// </param>
+/// <param name="KeyLogFile">
+/// The file the <c>SSLKEYLOGFILE</c> environment variable names, which the OpenSSL build appends the
+/// connection's secrets to (<see cref="NssKeyLogFile" />, BL-2327); <see langword="null" /> when it is
+/// not set, and always on Windows, where the Schannel build ignores it. <c>SslStream</c> cannot log its
+/// secrets, so <see cref="TlsClientRouting" /> sends such a connection to <see cref="HandBuiltTlsProvider" />.
+/// </param>
 public sealed record TlsClientOptions(
     bool Insecure = false,
     TlsVersion MinimumVersion = TlsVersion.SystemDefault,
@@ -202,4 +208,5 @@ public sealed record TlsClientOptions(
     string? PinnedPublicKey = null,
     string? CertificateRevocationListFile = null,
     bool NoSessionId = false,
-    bool AllowBeast = false);
+    bool AllowBeast = false,
+    string? KeyLogFile = null);
