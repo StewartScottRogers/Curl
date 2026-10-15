@@ -35,3 +35,4 @@ In curl 8.22.0, `CURL_DNS_SERVER` is read only by debug builds (`lib/hostip.c` /
 ## Log
 
 - 2026-10-14: Created.
+- 2026-10-14: Backlog -> Doing.
