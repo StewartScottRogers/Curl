@@ -13,4 +13,13 @@ internal sealed class UpstreamCommandLine(IReadOnlyList<string> arguments, char?
     /// <c>`</c>, or unescaped <c>$</c> or <c>`</c> inside double quotes, which a shell would act on and the harness does not; <see langword="null"/> when there is none.
     /// </summary>
     public char? UnsupportedShellSyntax { get; } = unsupportedShellSyntax;
+
+    /// <summary>
+    /// The file a <c>&gt; file</c> or <c>&gt;&gt; file</c> redirect sends the command's standard
+    /// output to, or <see langword="null"/> when the command has no redirect.
+    /// </summary>
+    public string? StandardOutputFile { get; init; }
+
+    /// <summary>Whether the redirect is <c>&gt;&gt;</c>, which appends to the file rather than truncating it.</summary>
+    public bool AppendsStandardOutput { get; init; }
 }

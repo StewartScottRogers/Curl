@@ -111,6 +111,30 @@ public sealed class UpstreamCaseRunnerTests
     }
 
     [TestMethod]
+    [DataRow(" option=\"no-stdout\"", ">>", "initial\nsaid\n", "")]
+    [DataRow(" option=\"no-stdout\"", ">", "said\n", "")]
+    [DataRow("", ">>", "initial\n", "said\n")]
+    public async Task RunAsync_CommandRedirectsStandardOutput_WritesTheFileAsTheShellDoes(string option, string redirect, string expectedFile, string expectedStdout)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        string logDirectory = CreateLogDirectory();
+        UpstreamCaseRunner runner = Runner(async invocation =>
+        {
+            await invocation.StandardOutput.WriteAsync("said\n"u8.ToArray());
+            return 0;
+        });
+        string testFile = $"<testcase>\n<client>\n<command{option}>\na {redirect} %LOGDIR/out%TESTNUMBER\n</command>\n"
+            + "<file name=\"%LOGDIR/out%TESTNUMBER\">\ninitial\n</file>\n</client>\n</testcase>\n";
+
+        UpstreamCaseOutcome outcome = await RunWithLogDirectoryAsync(runner, testFile, logDirectory);
+
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Passed, outcome.Kind, outcome.Detail);
+        diagnostics.Diff("redirect file", expectedFile, File.ReadAllText($"{logDirectory}/out5"));
+        Assert.AreEqual(expectedFile, File.ReadAllText($"{logDirectory}/out5"));
+        Assert.AreEqual(expectedStdout, File.ReadAllText($"{logDirectory}/stdout5"));
+    }
+
+    [TestMethod]
     public async Task RunAsync_ClientFileAndCommandNamedLogSlashName_AreTheLogDirectorysName()
     {
         var diagnostics = TestDiagnostics.For(TestContext);

@@ -9,8 +9,10 @@ namespace Curl.Conformance;
 /// <c>"</c>, <c>\</c>, <c>$</c> and <c>`</c>, and an unquoted backslash keeps the next character.
 /// </summary>
 /// <remarks>
-/// Shell syntax that would do more than quote - an unquoted <c>|</c>, <c>;</c>, <c>&amp;</c>,
-/// <c>&lt;</c>, <c>&gt;</c>, <c>$</c> or <c>`</c>, or an unescaped <c>$</c> or <c>`</c> inside
+/// A <c>&gt; file</c> or <c>&gt;&gt; file</c> that starts a word is read as the command's one
+/// redirect of standard output, into <see cref="UpstreamCommandLine.StandardOutputFile"/> (test321).
+/// Other shell syntax that would do more than quote - an unquoted <c>|</c>, <c>;</c>, <c>&amp;</c>,
+/// <c>&lt;</c>, a second or mid-word <c>&gt;</c>, <c>$</c> or <c>`</c>, or an unescaped <c>$</c> or <c>`</c> inside
 /// double quotes - is not carried out; it is reported in
 /// <see cref="UpstreamCommandLine.UnsupportedShellSyntax"/> so the case can be skipped with a
 /// reason. An unclosed quote runs to the end of the command. Each argument's bytes, carried as
@@ -40,6 +42,10 @@ internal static class UpstreamCommandLineSplitter
         private bool inWord;
         private char? unsupported;
         private int index;
+        private int redirects;
+        private bool readsRedirectTarget;
+        private string? standardOutputFile;
+        private bool appends;
 
         public UpstreamCommandLine Read()
         {
@@ -49,7 +55,9 @@ internal static class UpstreamCommandLineSplitter
             }
 
             EndWord();
-            return new UpstreamCommandLine(arguments, unsupported);
+            // A redirect with no file after it is a shell syntax error, not carried out.
+            unsupported ??= readsRedirectTarget ? '>' : null;
+            return new UpstreamCommandLine(arguments, unsupported) { StandardOutputFile = standardOutputFile, AppendsStandardOutput = appends };
         }
 
         private void ReadCharacter(char character)
@@ -57,6 +65,11 @@ internal static class UpstreamCommandLineSplitter
             if (char.IsWhiteSpace(character))
             {
                 EndWord();
+                return;
+            }
+
+            if (character == '>' && StartsRedirect())
+            {
                 return;
             }
 
@@ -124,11 +137,29 @@ internal static class UpstreamCommandLineSplitter
             }
         }
 
+        // A > or >> that starts a word, the first in the command, redirects standard output to the
+        // next word; one inside a word (2>, a file descriptor) or a second one is not carried out.
+        private bool StartsRedirect()
+        {
+            if (inWord || readsRedirectTarget || redirects++ > 0)
+            {
+                return false;
+            }
+
+            appends = index < command.Length && command[index] == '>';
+            index += appends ? 1 : 0;
+            readsRedirectTarget = true;
+            return true;
+        }
+
         private void EndWord()
         {
             if (inWord)
             {
-                arguments.Add(Encoding.UTF8.GetString(Encoding.Latin1.GetBytes(word.ToString())));
+                string value = Encoding.UTF8.GetString(Encoding.Latin1.GetBytes(word.ToString()));
+                standardOutputFile = readsRedirectTarget ? value : standardOutputFile;
+                arguments.AddRange(readsRedirectTarget ? [] : [value]);
+                readsRedirectTarget = false;
             }
 
             word.Clear();

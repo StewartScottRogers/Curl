@@ -342,7 +342,8 @@ public sealed class UpstreamCaseRunner(
             return UpstreamCaseOutcome.Failed(failure);
         }
 
-        File.WriteAllBytes($"{logDirectory}/stdout{testNumber}", standardOutput.ToArray());
+        byte[] standardOutputBytes = RedirectStandardOutput(testCase, standardOutput.ToArray());
+        File.WriteAllBytes($"{logDirectory}/stdout{testNumber}", standardOutputBytes);
         File.WriteAllBytes($"{logDirectory}/stderr{testNumber}", standardError.ToArray());
         // Read before the postcheck, as before: only the SSH upload is read after it.
         // Upstream's servers all append to one server.input, so a case that reaches several
@@ -359,7 +360,7 @@ public sealed class UpstreamCaseRunner(
             (gopher.ReceivedBytes, gopher.ReceivedDump),
         ]);
         byte[] outputFileBytes = ReadOutputFile(outputFile);
-        return Judge(testCase, () => new UpstreamCaseRun(exitCode, standardOutput.ToArray(), standardError.ToArray(), receivedBytes, outputFileBytes)
+        return Judge(testCase, () => new UpstreamCaseRun(exitCode, standardOutputBytes, standardError.ToArray(), receivedBytes, outputFileBytes)
         {
             ProxyReceivedBytes = server.ProxyReceivedBytes.ToArray(),
             LogDirectory = logDirectory,
@@ -475,6 +476,24 @@ public sealed class UpstreamCaseRunner(
         arguments.AddRange(TraceArguments(option, traceFile));
         arguments.AddRange(UpstreamCommandLineSplitter.Split(UpstreamTestPartBodies.Text(command)).Arguments);
         return arguments;
+    }
+
+    // Carries out the command's > or >> redirect (test321). runtests.pl puts its own
+    // >%LOGDIR/stdoutN after the command unless the option says no-stdout, and the shell's last
+    // redirect of a stream wins, so then the case's file is opened but gets nothing.
+    private static byte[] RedirectStandardOutput(UpstreamTestCase testCase, byte[] output)
+    {
+        UpstreamTestSection command = testCase.Find("client", "command")!;
+        UpstreamCommandLine commandLine = UpstreamCommandLineSplitter.Split(UpstreamTestPartBodies.Text(command));
+        if (commandLine.StandardOutputFile is not { } file)
+        {
+            return output;
+        }
+
+        bool runtestsCapturesOutput = !(command.GetAttribute("option") ?? string.Empty).Contains("no-stdout", StringComparison.Ordinal);
+        using FileStream stream = new(file, commandLine.AppendsStandardOutput ? FileMode.Append : FileMode.Create);
+        stream.Write(runtestsCapturesOutput ? [] : output);
+        return runtestsCapturesOutput ? output : [];
     }
 
     private static bool WritesOutputFile(UpstreamTestCase testCase, string option) =>

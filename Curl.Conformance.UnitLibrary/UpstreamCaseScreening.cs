@@ -99,8 +99,15 @@ internal static class UpstreamCaseScreening
             .SelectMany(section => FileParts.SelectMany(name => testCase.FindAll(section, name)))
             .FirstOrDefault(part => !Path.GetFullPath(part.GetAttribute("name")!).StartsWith(inside, StringComparison.OrdinalIgnoreCase)) is { } outside
             ? $"<{outside.Section}><{outside.Name}> names {outside.GetAttribute("name")}, outside the case's log directory"
-            : null;
+            : RedirectOutside(testCase, inside);
     }
+
+    // The command's > or >> redirect of standard output writes a file too (test321).
+    private static string? RedirectOutside(UpstreamTestCase testCase, string inside) =>
+        UpstreamCommandLineSplitter.Split(UpstreamTestPartBodies.Text(testCase.Find("client", "command"))).StandardOutputFile is { } file
+        && !Path.GetFullPath(file).StartsWith(inside, StringComparison.OrdinalIgnoreCase)
+            ? $"the command redirects its output to {file}, outside the case's log directory"
+            : null;
 
     private static string? UnresolvedVariable(UpstreamTestFileExpansion expansion) =>
         expansion.UnknownVariables.Count > 0

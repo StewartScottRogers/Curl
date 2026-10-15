@@ -42,6 +42,11 @@ public sealed class UpstreamPerlSubstitutionTests
     [DataRow("s/^EPRT \\|1\\|(\\S*)/EPRT \\|1\\|/", "EPRT |1|127.0.0.1|9006|\n", "EPRT |1|\n")]
     [DataRow("s/a/\\$1\\n/", "a", "$1\\n")]
     [DataRow("s/a/b\\\\/", "a", "b\\")]
+    [DataRow("s/^.*(?=\\* Ignoring (?:Content-Length|Transfer-Encoding) )// or $_ = ''", "12:00:00.000000 [0-0] * Ignoring Content-Length in CONNECT 200 response\n", "* Ignoring Content-Length in CONNECT 200 response\n")]
+    [DataRow("s/^.*(?=\\* Ignoring (?:Content-Length|Transfer-Encoding) )// or $_ = ''", "* Ignoring Transfer-Encoding in CONNECT 200 response\n", "* Ignoring Transfer-Encoding in CONNECT 200 response\n")]
+    [DataRow("s/^.*(?=\\* Ignoring (?:Content-Length|Transfer-Encoding) )// or $_ = ''", "* Connected to test.1287\n", "")]
+    [DataRow("s/x// or $_ = \"\";", "axb\n", "ab\n")]
+    [DataRow("s/x// or $_ = \"\";", "ab\n", "")]
     public void Parse_RunsTheSubstitutionAsPerlDoes(string code, string line, string expected)
     {
         var diagnostics = TestDiagnostics.For(TestContext);

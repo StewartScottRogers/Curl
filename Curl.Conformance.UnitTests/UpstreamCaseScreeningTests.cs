@@ -457,7 +457,7 @@ public sealed class UpstreamCaseScreeningTests
     public void FindFileOutsideLogDirectory_EveryFileInside_ReturnsNull()
     {
         string logDirectory = Rooted("log");
-        string sections = $"<client>\n<file name=\"{logDirectory}/in\">\n</file>\n</client>\n<verify>\n<file1 name=\"{logDirectory}/sub/out\">\n</file1>\n</verify>\n";
+        string sections = $"<client>\n<command>\nhttp://x/ > '{logDirectory}/out'\n</command>\n<file name=\"{logDirectory}/in\">\n</file>\n</client>\n<verify>\n<file1 name=\"{logDirectory}/sub/out\">\n</file1>\n</verify>\n";
 
         var diagnostics = TestDiagnostics.For(TestContext);
         diagnostics.Arrange("test sections", Neutral(sections));
@@ -472,6 +472,7 @@ public sealed class UpstreamCaseScreeningTests
     [DataRow("<client>\n<file name=\"{0}/in\">\n</file>\n</client>\n", "<client><file> names {0}/in, outside the case's log directory")]
     [DataRow("<verify>\n<file2 name=\"{0}/log/../out\">\n</file2>\n</verify>\n", "<verify><file2> names {0}/log/../out, outside the case's log directory")]
     [DataRow("<verify>\n<file name=\"{0}/logs/out\">\n</file>\n</verify>\n", "<verify><file> names {0}/logs/out, outside the case's log directory")]
+    [DataRow("<client>\n<command>\nhttp://x/ >> '{0}/out'\n</command>\n</client>\n", "the command redirects its output to {0}/out, outside the case's log directory")]
     public void FindFileOutsideLogDirectory_FileOutside_IsTheReason(string sections, string expected)
     {
         var diagnostics = TestDiagnostics.For(TestContext);
