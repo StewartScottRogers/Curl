@@ -2,6 +2,7 @@
 id: GF-0024
 title: --url-query passes a user's lower-case %3d through instead of normalising it to %3D
 area: behaviour
+platform: windows
 key: behaviour:url-query-escape-case
 severity: High
 status: closed
@@ -42,6 +43,7 @@ In Curl.Protocol.Abstractions.UnitLibrary's CurlUrl query building (used by --ur
 - 2026-10-14_0904: 0 of 1 items are gaps.
 - 2026-10-15_0304: 0 of 1 items are gaps.
 - 2026-10-15_0543: 0 of 1 items are gaps.
+- 2026-10-15_0751: 0 of 1 items are gaps.
 
 ## Log
 

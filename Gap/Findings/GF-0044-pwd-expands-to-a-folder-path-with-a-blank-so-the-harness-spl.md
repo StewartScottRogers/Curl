@@ -2,6 +2,7 @@
 id: GF-0044
 title: %PWD expands to a folder path with a blank, so the harness splits test3009's --output-dir argument and Curl fetches an extra URL
 area: behaviour
+platform: windows
 key: behaviour:harness-pwd-with-blank-splits-command
 severity: High
 status: closed
@@ -41,6 +42,7 @@ Curl's behaviour needs no change: it passes test3009 once %PWD holds no blank. M
 - 2026-10-14_0904: 0 of 1 items are gaps.
 - 2026-10-15_0304: 0 of 1 items are gaps.
 - 2026-10-15_0543: 0 of 1 items are gaps.
+- 2026-10-15_0751: 0 of 1 items are gaps.
 
 ## Log
 

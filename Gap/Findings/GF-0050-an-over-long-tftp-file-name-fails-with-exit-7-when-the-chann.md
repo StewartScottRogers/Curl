@@ -2,6 +2,7 @@
 id: GF-0050
 title: An over-long TFTP file name fails with exit 7 when the channel cannot open, where curl refuses it first with exit 71
 area: behaviour
+platform: windows
 key: behaviour:tftp-filename-too-long-checked-after-channel-opens
 severity: High
 status: closed
@@ -40,6 +41,7 @@ In Curl.Protocol.Tftp.UnitLibrary's TftpProtocolHandler, run TftpRequestFile's l
 - 2026-10-14_0904: 0 of 1 items are gaps.
 - 2026-10-15_0304: 0 of 1 items are gaps.
 - 2026-10-15_0543: 0 of 1 items are gaps.
+- 2026-10-15_0751: 0 of 1 items are gaps.
 
 ## Log
 

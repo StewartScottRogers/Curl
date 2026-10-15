@@ -2,6 +2,7 @@
 id: GF-0069
 title: A config-file line over 10 MB is accepted; upstream rejects the file with 'cannot read config'
 area: environment
+platform: windows
 key: environment:config-syntax-line-length-limit
 severity: Medium
 status: closed
@@ -37,6 +38,7 @@ Add the 10 MB (10485760-byte) per-line limit that docs/cmdline-opts/config.md st
 - 2026-10-14_0904: 0 of 1 items are gaps.
 - 2026-10-15_0304: 0 of 1 items are gaps.
 - 2026-10-15_0543: 0 of 1 items are gaps.
+- 2026-10-15_0751: 0 of 1 items are gaps.
 
 ## Log
 

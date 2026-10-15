@@ -2,6 +2,7 @@
 id: GF-0041
 title: On Windows a scheme-less drive-letter path (Z:/dir/file) is parsed as host and port instead of a path under --proto-default file
 area: behaviour
+platform: windows
 key: behaviour:drive-letter-path-taken-as-url-scheme
 severity: High
 status: closed
@@ -41,6 +42,7 @@ In Curl.Core.UnitLibrary's UrlSchemeGuesser.HasScheme, on Windows, take a single
 - 2026-10-14_0904: 0 of 1 items are gaps.
 - 2026-10-15_0304: 0 of 1 items are gaps.
 - 2026-10-15_0543: 0 of 1 items are gaps.
+- 2026-10-15_0751: 0 of 1 items are gaps.
 
 ## Log
 

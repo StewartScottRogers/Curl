@@ -2,6 +2,7 @@
 id: GF-0025
 title: With Expect: 100-continue, the POST body is not sent when the server answers early and closes
 area: behaviour
+platform: windows
 key: behaviour:expect-continue-body-after-early-response
 severity: Critical
 status: closed
@@ -42,6 +43,7 @@ In Curl.Protocol.Http.UnitLibrary's HttpContinueWaitConnection / HttpRequestBody
 - 2026-10-14_0904: 0 of 1 items are gaps.
 - 2026-10-15_0304: 0 of 1 items are gaps.
 - 2026-10-15_0543: 0 of 1 items are gaps.
+- 2026-10-15_0751: 0 of 1 items are gaps.
 
 ## Log
 

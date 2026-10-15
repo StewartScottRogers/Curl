@@ -2,6 +2,7 @@
 id: GF-0052
 title: --ignore-content-length does not stop FTP from sending SIZE before RETR
 area: behaviour
+platform: windows
 key: behaviour:ftp-ignore-content-length-still-sends-size
 severity: High
 status: closed
@@ -40,6 +41,7 @@ Carry --ignore-content-length to the FTP handler (Curl.Console's transfer-contex
 - 2026-10-14_0904: 0 of 2 items are gaps.
 - 2026-10-15_0304: 0 of 2 items are gaps.
 - 2026-10-15_0543: 0 of 2 items are gaps.
+- 2026-10-15_0751: 0 of 2 items are gaps.
 
 ## Log
 

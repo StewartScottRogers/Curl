@@ -2,6 +2,7 @@
 id: GF-0080
 title: --unix-socket cases throw in the gap harness: its dialer sends the Unix path to port 1, not to the sws emulation
 area: behaviour
+platform: windows
 key: behaviour:harness-unix-socket-dial-misses-sws-port
 severity: High
 status: closed
@@ -33,6 +34,7 @@ Give Curl.Conformance.UnitLibrary one public way to dial the http-unix server, f
 
 - 2026-10-15_0304: 2 of 2 items are gaps.
 - 2026-10-15_0543: 0 of 2 items are gaps.
+- 2026-10-15_0751: 0 of 2 items are gaps.
 
 ## Log
 

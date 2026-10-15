@@ -2,6 +2,7 @@
 id: GF-0060
 title: A SASL exchange given a bad challenge (CRAM-MD5 rubbish, a broken NTLM type-2) is not cancelled with * and retried with the next mechanism
 area: behaviour
+platform: windows
 key: behaviour:sasl-downgrade-after-bad-challenge
 severity: High
 status: closed
@@ -40,6 +41,7 @@ In Curl.Authentication.UnitLibrary (ChallengeSaslExchange, SecurityContextSaslEx
 - 2026-10-14_0904: 0 of 6 items are gaps.
 - 2026-10-15_0304: 0 of 6 items are gaps.
 - 2026-10-15_0543: 0 of 6 items are gaps.
+- 2026-10-15_0751: 0 of 6 items are gaps.
 
 ## Log
 

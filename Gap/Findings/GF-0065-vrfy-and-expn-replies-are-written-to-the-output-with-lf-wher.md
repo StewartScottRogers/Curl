@@ -2,6 +2,7 @@
 id: GF-0065
 title: VRFY and EXPN replies are written to the output with LF where curl writes the server's CR LF
 area: behaviour
+platform: windows
 key: behaviour:smtp-command-reply-written-without-cr
 severity: High
 status: closed
@@ -40,6 +41,7 @@ Find which side drops the CR. If Curl.Protocol.Smtp.UnitLibrary's SmtpCommandTra
 - 2026-10-14_0904: 0 of 4 items are gaps.
 - 2026-10-15_0304: 0 of 4 items are gaps.
 - 2026-10-15_0543: 0 of 4 items are gaps.
+- 2026-10-15_0751: 0 of 4 items are gaps.
 
 ## Log
 

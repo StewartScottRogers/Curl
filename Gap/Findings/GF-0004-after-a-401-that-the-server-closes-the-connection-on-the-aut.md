@@ -2,6 +2,7 @@
 id: GF-0004
 title: After a 401 that the server closes the connection on, the authenticated retry is written to the dead connection and never resent on a fresh one
 area: behaviour
+platform: windows
 key: behaviour:auth-retry-lost-when-server-closes-after-challenge
 severity: Critical
 status: closed
@@ -42,6 +43,7 @@ In Curl.Protocol.Http.UnitLibrary's HttpProtocolHandler, treat a connection that
 - 2026-10-14_0904: 0 of 15 items are gaps.
 - 2026-10-15_0304: 0 of 15 items are gaps.
 - 2026-10-15_0543: 0 of 15 items are gaps.
+- 2026-10-15_0751: 0 of 15 items are gaps.
 
 ## Log
 

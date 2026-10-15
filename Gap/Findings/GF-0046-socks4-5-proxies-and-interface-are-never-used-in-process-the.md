@@ -2,6 +2,7 @@
 id: GF-0046
 title: SOCKS4/5 proxies and --interface are never used in process: the request goes straight to the server and their exit codes (97, 7, 45) never arise
 area: behaviour
+platform: windows
 key: behaviour:in-process-runner-bypasses-socks-and-interface-binding
 severity: High
 status: closed
@@ -40,6 +41,7 @@ Re-measure after the InProcessCurl rewiring of behaviour:in-process-runner-bypas
 - 2026-10-14_0904: 0 of 12 items are gaps.
 - 2026-10-15_0304: 0 of 12 items are gaps.
 - 2026-10-15_0543: 0 of 12 items are gaps.
+- 2026-10-15_0751: 0 of 12 items are gaps.
 
 ## Log
 

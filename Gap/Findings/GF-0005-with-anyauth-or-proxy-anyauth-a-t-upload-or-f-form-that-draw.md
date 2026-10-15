@@ -2,6 +2,7 @@
 id: GF-0005
 title: With --anyauth or --proxy-anyauth, a -T upload or -F form that draws a 401/407 is never resent with credentials
 area: behaviour
+platform: windows
 key: behaviour:auth-retry-not-sent-for-upload-or-form-body
 severity: High
 status: closed
@@ -42,6 +43,7 @@ In Curl.Protocol.Http.UnitLibrary, make HttpProtocolHandler.MayRetry and the upl
 - 2026-10-14_0904: 0 of 7 items are gaps.
 - 2026-10-15_0304: 0 of 7 items are gaps.
 - 2026-10-15_0543: 0 of 7 items are gaps.
+- 2026-10-15_0751: 0 of 7 items are gaps.
 
 ## Log
 

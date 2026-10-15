@@ -2,6 +2,7 @@
 id: GF-0056
 title: --netrc-optional lets the netrc password override the URL's, and a .netrc holding a NUL byte stops the transfer
 area: behaviour
+platform: windows
 key: behaviour:netrc-url-credentials-and-nul-byte
 severity: High
 status: closed
@@ -40,6 +41,7 @@ In Curl.Console's TransferCredentialLookup, under --netrc-optional, keep a passw
 - 2026-10-14_0904: 0 of 2 items are gaps.
 - 2026-10-15_0304: 0 of 2 items are gaps.
 - 2026-10-15_0543: 0 of 2 items are gaps.
+- 2026-10-15_0751: 0 of 2 items are gaps.
 
 ## Log
 

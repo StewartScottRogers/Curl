@@ -2,6 +2,7 @@
 id: GF-0067
 title: A name under .localhost goes to the system resolver and fails with exit 6, where curl resolves it to 127.0.0.1 and ::1
 area: behaviour
+platform: windows
 key: behaviour:localhost-subdomain-not-resolved-to-loopback
 severity: Critical
 status: closed
@@ -37,6 +38,7 @@ In Curl.Networking.UnitLibrary, change SystemDnsResolver.ResolveAsync (the produ
 - 2026-10-14_0904: 0 of 1 items are gaps.
 - 2026-10-15_0304: 0 of 1 items are gaps.
 - 2026-10-15_0543: 0 of 1 items are gaps.
+- 2026-10-15_0751: 0 of 1 items are gaps.
 
 ## Log
 

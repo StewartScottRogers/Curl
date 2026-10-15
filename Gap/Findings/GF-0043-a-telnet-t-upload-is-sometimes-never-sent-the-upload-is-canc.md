@@ -2,6 +2,7 @@
 id: GF-0043
 title: A telnet -T upload is sometimes never sent: the upload is cancelled when the peer closes first
 area: behaviour
+platform: windows
 key: behaviour:telnet-upload-lost-when-peer-closes
 severity: High
 status: closed
@@ -41,6 +42,7 @@ In Curl.Protocol.Telnet.UnitLibrary's TelnetProtocolHandler, the -T upload runs 
 - 2026-10-14_0904: 0 of 1 items are gaps.
 - 2026-10-15_0304: 0 of 1 items are gaps.
 - 2026-10-15_0543: 0 of 1 items are gaps.
+- 2026-10-15_0751: 0 of 1 items are gaps.
 
 ## Log
 

@@ -2,6 +2,7 @@
 id: GF-0055
 title: A reply pipelined behind STARTTLS/AUTH TLS is not refused with exit 8, and a pre-authenticated FTP server skips AUTH under --ssl-reqd
 area: behaviour
+platform: windows
 key: behaviour:starttls-pipelined-reply-and-preauth
 severity: High
 status: closed
@@ -40,6 +41,7 @@ In Curl.Protocol.Smtp.UnitLibrary, Curl.Protocol.Pop3.UnitLibrary and Curl.Proto
 - 2026-10-14_0904: 0 of 4 items are gaps.
 - 2026-10-15_0304: 0 of 4 items are gaps.
 - 2026-10-15_0543: 0 of 4 items are gaps.
+- 2026-10-15_0751: 0 of 4 items are gaps.
 
 ## Log
 

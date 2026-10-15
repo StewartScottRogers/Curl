@@ -2,6 +2,7 @@
 id: GF-0064
 title: --crlf does not convert an SMTP upload's LF line ends to CR LF
 area: behaviour
+platform: windows
 key: behaviour:smtp-upload-ignores-crlf
 severity: High
 status: closed
@@ -40,6 +41,7 @@ Carry --crlf into MailRequestOptions (Curl.Console's MailRequestOptionsMapping, 
 - 2026-10-14_0904: 0 of 1 items are gaps.
 - 2026-10-15_0304: 0 of 1 items are gaps.
 - 2026-10-15_0543: 0 of 1 items are gaps.
+- 2026-10-15_0751: 0 of 1 items are gaps.
 
 ## Log
 

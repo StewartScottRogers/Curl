@@ -2,6 +2,7 @@
 id: GF-0079
 title: A wrong --pinnedpubkey with --cacert on the Schannel build gives exit 60 (revocation unknown) instead of 90
 area: behaviour
+platform: windows
 key: behaviour:schannel-cacert-revocation-judged-before-pinned-public-key
 severity: High
 status: closed
@@ -33,6 +34,7 @@ First measure the Schannel reference curl on a loopback TLS server with '--cacer
 
 - 2026-10-15_0304: 3 of 3 items are gaps.
 - 2026-10-15_0543: 0 of 3 items are gaps.
+- 2026-10-15_0751: 0 of 3 items are gaps.
 
 ## Log
 

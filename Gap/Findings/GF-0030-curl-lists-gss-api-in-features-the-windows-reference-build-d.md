@@ -2,6 +2,7 @@
 id: GF-0030
 title: Curl lists GSS-API in Features; the Windows reference build does not
 area: features
+platform: windows
 key: features:gss-api-not-in-reference
 severity: Medium
 status: closed
@@ -42,6 +43,7 @@ In Curl.Cli.UnitLibrary/CurlVersionText.cs, drop GSS-API from the Windows Featur
 - 2026-10-14_0904: 0 of 1 items are gaps.
 - 2026-10-15_0304: 0 of 1 items are gaps.
 - 2026-10-15_0543: 0 of 1 items are gaps.
+- 2026-10-15_0751: 0 of 1 items are gaps.
 
 ## Log
 

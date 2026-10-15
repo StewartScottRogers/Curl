@@ -108,5 +108,35 @@
     "areas": { "options": { "x": 568, "y": 568 }, "protocols": { "x": 27, "y": 27 }, "features": { "x": 18, "y": 18 }, "writeout": { "x": 138, "y": 138 }, "exitcodes": { "x": 259, "y": 259 }, "environment": { "x": 39, "y": 39 }, "behaviour": { "x": 1396, "y": 1427 } },
     "overall": { "x": 2445, "y": 2476 },
     "newest": { "x": 2445, "y": 2476 }
+  },
+  {
+    "stamp": "2026-10-15_0751",
+    "commit": "a62a7149d175dc43fac44407f9ba228fbef0947f",
+    "platform": "windows",
+    "targetVersion": "8.22.0",
+    "newestVersion": "8.22.0",
+    "areas": { "options": { "x": 568, "y": 568 }, "protocols": { "x": 27, "y": 27 }, "features": { "x": 18, "y": 18 }, "writeout": { "x": 138, "y": 138 }, "exitcodes": { "x": 259, "y": 259 }, "environment": { "x": 39, "y": 39 }, "behaviour": { "x": 1396, "y": 1427 } },
+    "overall": { "x": 2445, "y": 2476 },
+    "newest": { "x": 2445, "y": 2476 }
+  },
+  {
+    "stamp": "2026-10-15_0751",
+    "commit": "a62a7149d175dc43fac44407f9ba228fbef0947f",
+    "platform": "linux",
+    "targetVersion": "8.22.0",
+    "newestVersion": "8.22.0",
+    "areas": { "options": { "x": 565, "y": 568 }, "protocols": { "x": 27, "y": 29 }, "features": { "x": 19, "y": 22 }, "writeout": { "x": 138, "y": 138 }, "exitcodes": { "x": 259, "y": 259 }, "environment": { "x": 28, "y": 33 }, "behaviour": { "x": 1408, "y": 1445 } },
+    "overall": { "x": 2444, "y": 2494 },
+    "newest": { "x": 2444, "y": 2494 }
+  },
+  {
+    "stamp": "2026-10-15_0751",
+    "commit": "a62a7149d175dc43fac44407f9ba228fbef0947f",
+    "platform": "macos",
+    "targetVersion": "8.22.0",
+    "newestVersion": "8.22.0",
+    "areas": { "options": { "x": 565, "y": 568 }, "protocols": { "x": 25, "y": 29 }, "features": { "x": 19, "y": 22 }, "writeout": { "x": 138, "y": 138 }, "exitcodes": { "x": 259, "y": 259 }, "environment": { "x": 28, "y": 33 }, "behaviour": { "x": 1407, "y": 1445 } },
+    "overall": { "x": 2441, "y": 2494 },
+    "newest": { "x": 2441, "y": 2494 }
   }
 ]

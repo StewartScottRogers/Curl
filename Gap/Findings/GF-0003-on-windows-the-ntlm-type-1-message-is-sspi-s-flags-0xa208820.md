@@ -2,6 +2,7 @@
 id: GF-0003
 title: On Windows the NTLM type-1 message is SSPI's (flags 0xa2088207 plus VERSION), but curl -V does not list SSPI, so the !SSPI cases run and differ
 area: behaviour
+platform: windows
 key: behaviour:ntlm-type1-sspi-flavoured-without-sspi-feature
 severity: High
 status: closed
@@ -42,6 +43,7 @@ Make Curl's advertised features match its behaviour. On Windows, add SSPI to the
 - 2026-10-14_0904: 0 of 25 items are gaps.
 - 2026-10-15_0304: 0 of 25 items are gaps.
 - 2026-10-15_0543: 0 of 25 items are gaps.
+- 2026-10-15_0751: 0 of 25 items are gaps.
 
 ## Log
 

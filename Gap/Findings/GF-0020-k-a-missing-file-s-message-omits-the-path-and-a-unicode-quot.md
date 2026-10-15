@@ -2,6 +2,7 @@
 id: GF-0020
 title: -K: a missing file's message omits the path, and a Unicode quote in a config file is read differently
 area: behaviour
+platform: windows
 key: behaviour:config-file-reading
 severity: High
 status: closed
@@ -42,6 +43,7 @@ In Curl.Cli.UnitLibrary's config-file reader: put the quoted path in 'cannot rea
 - 2026-10-14_0904: 0 of 2 items are gaps.
 - 2026-10-15_0304: 0 of 2 items are gaps.
 - 2026-10-15_0543: 0 of 2 items are gaps.
+- 2026-10-15_0751: 0 of 2 items are gaps.
 
 ## Log
 

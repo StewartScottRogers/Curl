@@ -2,6 +2,7 @@
 id: GF-0048
 title: FTP active mode (-P) hangs in process: the FTP stand-in's PORT/EPRT cannot reach Curl's real TCP listener
 area: behaviour
+platform: windows
 key: behaviour:in-process-runner-lacks-ftp-active-listener
 severity: High
 status: closed
@@ -40,6 +41,7 @@ Pass the ftpListener through InProcessCurl's new overload (behaviour:in-process-
 - 2026-10-14_0904: 0 of 8 items are gaps.
 - 2026-10-15_0304: 0 of 8 items are gaps.
 - 2026-10-15_0543: 0 of 8 items are gaps.
+- 2026-10-15_0751: 0 of 8 items are gaps.
 
 ## Log
 

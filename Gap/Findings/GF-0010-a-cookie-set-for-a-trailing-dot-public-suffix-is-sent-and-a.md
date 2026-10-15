@@ -2,6 +2,7 @@
 id: GF-0010
 title: A cookie set for a trailing-dot public suffix is sent, and a -b name=value cookie follows a redirect to another host
 area: behaviour
+platform: windows
 key: behaviour:cookie-domain-matching
 severity: High
 status: closed
@@ -42,6 +43,7 @@ In Curl.Cookies.UnitLibrary: strip a trailing dot from both the Domain attribute
 - 2026-10-14_0904: 0 of 2 items are gaps.
 - 2026-10-15_0304: 0 of 2 items are gaps.
 - 2026-10-15_0543: 0 of 2 items are gaps.
+- 2026-10-15_0751: 0 of 2 items are gaps.
 
 ## Log
 

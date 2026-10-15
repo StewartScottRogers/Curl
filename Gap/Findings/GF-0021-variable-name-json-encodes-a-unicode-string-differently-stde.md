@@ -2,6 +2,7 @@
 id: GF-0021
 title: --variable ... {{name:json}} encodes a Unicode string differently (stderr)
 area: behaviour
+platform: windows
 key: behaviour:variable-json-function-unicode
 severity: Medium
 status: closed
@@ -42,6 +43,7 @@ In Curl.Cli.UnitLibrary's --variable / --expand-* expansion, make the ':json' fu
 - 2026-10-14_0904: 0 of 1 items are gaps.
 - 2026-10-15_0304: 0 of 1 items are gaps.
 - 2026-10-15_0543: 0 of 1 items are gaps.
+- 2026-10-15_0751: 0 of 1 items are gaps.
 
 ## Log
 
