@@ -8,7 +8,7 @@ depends-on: [BL-2285]
 touches: [Curl.Console, Curl.Console.UnitTests, Curl.Engine.UnitLibrary, Curl.Engine.UnitTests]
 requirement: none
 created: 2026-10-15
-completed:
+completed: 2026-10-15
 ---
 # BL-2286 — Move the authentication and security-context sources from Curl.Console to Curl.Engine.UnitLibrary
 
@@ -41,3 +41,4 @@ ADR-0506, plan phase 1 step 3; follows BL-2285, same rules (mechanical move, a f
 
 - 2026-10-15: Created.
 - 2026-10-15: Backlog -> Doing.
+- 2026-10-15: Doing -> Done. Authentication and security-context sources moved to Curl.Engine; build, fast tests and quality green
