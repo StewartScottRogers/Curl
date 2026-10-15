@@ -30,6 +30,40 @@ public sealed class UpstreamHttp2ServerTests
     }
 
     [TestMethod]
+    [DataRow(true, true, "tls over sws")]
+    [DataRow(true, false, "other")]
+    [DataRow(false, true, "other")]
+    public async Task InFrontOf_ConnectToTheTlsPort_ReachesTheTlsServerOnlyWithACertificateAndATlsServer(bool hasTlsServer, bool hasCertificate, string expected)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("has TLS server", hasTlsServer);
+        diagnostics.Arrange("has certificate", hasCertificate);
+        using var key = System.Security.Cryptography.ECDsa.Create();
+        using System.Security.Cryptography.X509Certificates.X509Certificate2 certificate = new System.Security.Cryptography.X509Certificates.CertificateRequest("CN=localhost", key, System.Security.Cryptography.HashAlgorithmName.SHA256)
+            .CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddDays(1));
+        UpstreamHttp2Server server = new(
+            backend => new NamedConnector("http2 over " + ((NamedConnector)backend).Name),
+            hasTlsServer ? (backend, _) => new NamedConnector("tls over " + ((NamedConnector)backend).Name) : null);
+        IConnector servers = server.InFrontOf(new NamedConnector("other"), new NamedConnector("sws"), hasCertificate ? certificate : null);
+
+        ConnectResult result = await servers.ConnectAsync(new ConnectTarget("127.0.0.1", UpstreamHttp2Server.Http2TlsPort, false), CancellationToken.None);
+
+        diagnostics.Assert("server reached", expected, result.ErrorMessage);
+        Assert.AreEqual(expected, result.ErrorMessage);
+    }
+
+    [TestMethod]
+    public void Http2TlsPort_IsTheRunnersHttp2TlsPort()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+
+        string port = UpstreamHttp2Server.Http2TlsPort.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+        diagnostics.Assert("port", UpstreamCaseRunner.Http2TlsPort, port);
+        Assert.AreEqual(UpstreamCaseRunner.Http2TlsPort, port);
+    }
+
+    [TestMethod]
     public void Http2Port_IsTheRunnersHttp2Port()
     {
         var diagnostics = TestDiagnostics.For(TestContext);

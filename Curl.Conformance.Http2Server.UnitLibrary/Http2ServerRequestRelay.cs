@@ -8,7 +8,7 @@ namespace Curl.Conformance.Http2Server;
 /// <summary>
 /// Relays one HTTP/2 request to the backend as HTTP/1.1, as nghttpx does in front of upstream's
 /// <c>sws</c> (ADR-0491): the request line and <c>Host</c> from the pseudo-headers, the other
-/// fields with capitalised names, then <c>X-Forwarded-Proto: http</c> and <c>Via: 2 nghttpx</c>;
+/// fields with capitalised names, then <c>X-Forwarded-Proto</c> (<c>http</c>, or <c>https</c> behind the TLS front) and <c>Via: 2 nghttpx</c>;
 /// and turns the backend's reply into HTTP/2 fields with <c>server: nghttpx</c> and
 /// <c>via: 1.1 nghttpx</c>.
 /// </summary>
@@ -26,7 +26,7 @@ internal static class Http2ServerRequestRelay
     /// <c>502</c> with no body when the backend cannot be reached.
     /// </summary>
     internal static async Task<Http2ServerReply> RelayAsync(
-        IConnector backend, ConnectTarget target, IReadOnlyList<HeaderField> request, byte[] body, CancellationToken cancellationToken)
+        IConnector backend, ConnectTarget target, IReadOnlyList<HeaderField> request, byte[] body, string forwardedProto, CancellationToken cancellationToken)
     {
         ConnectResult connected = await backend.ConnectAsync(target, cancellationToken).ConfigureAwait(false);
         if (connected.Connection is not { } connection)
@@ -36,7 +36,7 @@ internal static class Http2ServerRequestRelay
 
         await using (connection.ConfigureAwait(false))
         {
-            await connection.WriteAsync(FormatRequest(request, body), cancellationToken).ConfigureAwait(false);
+            await connection.WriteAsync(FormatRequest(request, body, forwardedProto), cancellationToken).ConfigureAwait(false);
             await connection.FlushAsync(cancellationToken).ConfigureAwait(false);
             return await ReadReplyAsync(new Http2ServerBackendReader(connection), Field(request, ":method") == "HEAD", cancellationToken).ConfigureAwait(false);
         }
@@ -46,7 +46,7 @@ internal static class Http2ServerRequestRelay
     /// Formats the HTTP/1.1 request nghttpx sends for an HTTP/2 request: a body with no
     /// <c>content-length</c> goes as one chunk.
     /// </summary>
-    internal static byte[] FormatRequest(IReadOnlyList<HeaderField> request, byte[] body)
+    internal static byte[] FormatRequest(IReadOnlyList<HeaderField> request, byte[] body, string forwardedProto = "http")
     {
         var text = new StringBuilder();
         text.Append(CultureInfo.InvariantCulture, $"{Field(request, ":method")} {Field(request, ":path")} HTTP/1.1\r\nHost: {Field(request, ":authority")}\r\n");
@@ -57,7 +57,7 @@ internal static class Http2ServerRequestRelay
 
         bool chunked = body.Length > 0 && Field(request, "content-length") is null;
         text.Append(chunked ? "Transfer-Encoding: chunked\r\n" : string.Empty);
-        text.Append(CultureInfo.InvariantCulture, $"X-Forwarded-Proto: http\r\nVia: {AppendVia(Field(request, "via"), "2 nghttpx")}\r\n\r\n");
+        text.Append(CultureInfo.InvariantCulture, $"X-Forwarded-Proto: {forwardedProto}\r\nVia: {AppendVia(Field(request, "via"), "2 nghttpx")}\r\n\r\n");
         byte[] head = Encoding.Latin1.GetBytes(text.ToString());
         return [.. head, .. (chunked ? ToOneChunk(body) : body)];
     }

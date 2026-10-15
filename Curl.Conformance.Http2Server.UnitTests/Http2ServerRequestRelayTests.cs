@@ -51,7 +51,7 @@ public sealed class Http2ServerRequestRelayTests
         var backend = new RecordingBackendConnector(
             "HTTP/1.1 100 Continue\r\n\r\nHTTP/1.1 200 OK\nDate: today\r\nServer: test-server/fake\r\nContent-Length: 6\r\nConnection: close\r\nVia: 1.1 sws\r\nno colon line\r\n\r\n-foo-\nextra");
 
-        Http2ServerReply reply = await Http2ServerRequestRelay.RelayAsync(backend, Target, Get1700, [], CancellationToken.None);
+        Http2ServerReply reply = await Http2ServerRequestRelay.RelayAsync(backend, Target, Get1700, [], "http", CancellationToken.None);
 
         Assert.AreEqual(":status: 200|date: today|content-length: 6|server: nghttpx|via: 1.1 sws, 1.1 nghttpx", Format(reply));
         Assert.AreEqual("-foo-\n", Encoding.Latin1.GetString(reply.Body));
@@ -64,7 +64,7 @@ public sealed class Http2ServerRequestRelayTests
         var backend = new RecordingBackendConnector(
             "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n3;ext=1\r\nabc\r\n2\r\nde\r\n0\r\nTrailer: x\r\n\r\n");
 
-        Http2ServerReply reply = await Http2ServerRequestRelay.RelayAsync(backend, Target, Get1700, [], CancellationToken.None);
+        Http2ServerReply reply = await Http2ServerRequestRelay.RelayAsync(backend, Target, Get1700, [], "http", CancellationToken.None);
 
         Assert.AreEqual(":status: 200|server: nghttpx|via: 1.1 nghttpx", Format(reply));
         Assert.AreEqual("abcde", Encoding.Latin1.GetString(reply.Body));
@@ -75,7 +75,7 @@ public sealed class Http2ServerRequestRelayTests
     {
         var backend = new RecordingBackendConnector("HTTP/1.1 200 OK\r\nTransfer-Encoding: gzip, chunked\r\n\r\n3\r\nabc\r\n");
 
-        Http2ServerReply reply = await Http2ServerRequestRelay.RelayAsync(backend, Target, Get1700, [], CancellationToken.None);
+        Http2ServerReply reply = await Http2ServerRequestRelay.RelayAsync(backend, Target, Get1700, [], "http", CancellationToken.None);
 
         Assert.AreEqual("abc", Encoding.Latin1.GetString(reply.Body));
     }
@@ -85,7 +85,7 @@ public sealed class Http2ServerRequestRelayTests
     {
         var backend = new RecordingBackendConnector("HTTP/1.1 200 OK\r\nTransfer-Encoding: identity\r\n\r\nall of it");
 
-        Http2ServerReply reply = await Http2ServerRequestRelay.RelayAsync(backend, Target, Get1700, [], CancellationToken.None);
+        Http2ServerReply reply = await Http2ServerRequestRelay.RelayAsync(backend, Target, Get1700, [], "http", CancellationToken.None);
 
         Assert.AreEqual("all of it", Encoding.Latin1.GetString(reply.Body));
     }
@@ -96,7 +96,7 @@ public sealed class Http2ServerRequestRelayTests
         var backend = new RecordingBackendConnector("HTTP/1.1 200 OK\r\nContent-Length: 6\r\n\r\n");
         HeaderField[] head = [new(":method", "HEAD"), new(":authority", "h"), new(":path", "/")];
 
-        Http2ServerReply reply = await Http2ServerRequestRelay.RelayAsync(backend, Target, head, [], CancellationToken.None);
+        Http2ServerReply reply = await Http2ServerRequestRelay.RelayAsync(backend, Target, head, [], "http", CancellationToken.None);
 
         Assert.AreEqual(0, reply.Body.Length);
         StringAssert.StartsWith(backend.Requests[0], "HEAD / HTTP/1.1\r\n");
@@ -109,7 +109,7 @@ public sealed class Http2ServerRequestRelayTests
     {
         var backend = new RecordingBackendConnector($"HTTP/1.1 {status} X\r\n\r\nnot a body");
 
-        Http2ServerReply reply = await Http2ServerRequestRelay.RelayAsync(backend, Target, Get1700, [], CancellationToken.None);
+        Http2ServerReply reply = await Http2ServerRequestRelay.RelayAsync(backend, Target, Get1700, [], "http", CancellationToken.None);
 
         Assert.AreEqual(0, reply.Body.Length);
         Assert.AreEqual(new HeaderField(":status", status), reply.Headers[0]);
@@ -123,7 +123,7 @@ public sealed class Http2ServerRequestRelayTests
     {
         var backend = new RecordingBackendConnector(backendReply);
 
-        Http2ServerReply reply = await Http2ServerRequestRelay.RelayAsync(backend, Target, Get1700, [], CancellationToken.None);
+        Http2ServerReply reply = await Http2ServerRequestRelay.RelayAsync(backend, Target, Get1700, [], "http", CancellationToken.None);
 
         Assert.AreEqual(new HeaderField(":status", "502"), reply.Headers[0]);
     }
@@ -133,7 +133,7 @@ public sealed class Http2ServerRequestRelayTests
     {
         var backend = new RecordingBackendConnector("HTTP/1.1 200 OK");
 
-        Http2ServerReply reply = await Http2ServerRequestRelay.RelayAsync(backend, Target, Get1700, [], CancellationToken.None);
+        Http2ServerReply reply = await Http2ServerRequestRelay.RelayAsync(backend, Target, Get1700, [], "http", CancellationToken.None);
 
         Assert.AreEqual(new HeaderField(":status", "200"), reply.Headers[0]);
     }
@@ -141,7 +141,7 @@ public sealed class Http2ServerRequestRelayTests
     [TestMethod]
     public async Task RelayAsync_BackendRefuses_Answers502FromNghttpxWithNoBody()
     {
-        Http2ServerReply reply = await Http2ServerRequestRelay.RelayAsync(new RecordingBackendConnector(null), Target, Get1700, [], CancellationToken.None);
+        Http2ServerReply reply = await Http2ServerRequestRelay.RelayAsync(new RecordingBackendConnector(null), Target, Get1700, [], "http", CancellationToken.None);
 
         Assert.AreEqual(":status: 502|server: nghttpx|via: 1.1 nghttpx", Format(reply));
         Assert.AreEqual(0, reply.Body.Length);

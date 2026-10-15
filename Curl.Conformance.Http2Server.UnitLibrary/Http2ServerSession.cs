@@ -15,7 +15,8 @@ namespace Curl.Conformance.Http2Server;
 /// <param name="stream">The server's half of the in-memory connection.</param>
 /// <param name="backend">The HTTP/1.1 server each stream is relayed to.</param>
 /// <param name="target">Where the client connected, passed on to <paramref name="backend"/>.</param>
-internal sealed class Http2ServerSession(Stream stream, IConnector backend, ConnectTarget target)
+/// <param name="forwardedProto">The <c>X-Forwarded-Proto</c> each relayed request carries: <c>http</c> for h2c, <c>https</c> behind the TLS front.</param>
+internal sealed class Http2ServerSession(Stream stream, IConnector backend, ConnectTarget target, string forwardedProto = "http")
 {
     private static readonly byte[] PrefaceHead = "PRI * HTTP/2.0\r\n\r\n"u8.ToArray();
 
@@ -155,7 +156,7 @@ internal sealed class Http2ServerSession(Stream stream, IConnector backend, Conn
 
     private async Task<bool> RespondAsync(int streamId, Http2ServerStream request, CancellationToken cancellationToken)
     {
-        Http2ServerReply reply = await Http2ServerRequestRelay.RelayAsync(backend, target, request.Request, request.Body.ToArray(), cancellationToken).ConfigureAwait(false);
+        Http2ServerReply reply = await Http2ServerRequestRelay.RelayAsync(backend, target, request.Request, request.Body.ToArray(), forwardedProto, cancellationToken).ConfigureAwait(false);
         byte[] body = reply.Body;
         await WriteAsync(Http2FrameFactory.CreateHeaders(streamId, encoder.Encode(reply.Headers), isEndStream: body.Length == 0, isEndHeaders: true), cancellationToken).ConfigureAwait(false);
         int sent = 0;

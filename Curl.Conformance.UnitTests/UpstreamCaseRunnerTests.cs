@@ -851,6 +851,55 @@ public sealed class UpstreamCaseRunnerTests
         Assert.IsInstanceOfType<SwsHttpServerConnector>(backend);
     }
 
+    // nghttpx's TLS front stands on %HTTP2TLSPORT with test-localhost.pem only for a case naming the http/2 server (BL-2245).
+    [TestMethod]
+    [DataRow("http/2", "http2 tls server", true)]
+    [DataRow("http", "connected", false)]
+    public async Task RunAsync_WithHttp2ServerAndACertificateDirectory_PutsTheTlsServerOnHttp2TlsPortForAnHttp2Case(string serverLine, string expectedReached, bool expectsCertificate)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        string certificateDirectory = CreateLogDirectory();
+        Directory.CreateDirectory(Path.Combine(certificateDirectory, "certs"));
+        using (System.Security.Cryptography.ECDsa key = System.Security.Cryptography.ECDsa.Create())
+        {
+            System.Security.Cryptography.X509Certificates.CertificateRequest request = new("CN=localhost", key, System.Security.Cryptography.HashAlgorithmName.SHA256);
+            using System.Security.Cryptography.X509Certificates.X509Certificate2 certificate = request.CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddDays(1));
+            await File.WriteAllTextAsync(Path.Combine(certificateDirectory, "certs", "test-localhost.pem"), certificate.ExportCertificatePem() + "\n" + key.ExportPkcs8PrivateKeyPem() + "\n");
+        }
+
+        System.Security.Cryptography.X509Certificates.X509Certificate2? presented = null;
+        string[]? arguments = null;
+        string? reached = null;
+        UpstreamHttp2Server http2Server = new(
+            _ => new RefusingConnector("http2 server"),
+            (_, certificate) =>
+            {
+                presented = certificate;
+                return new RefusingConnector("http2 tls server");
+            });
+        UpstreamCaseRunner runner = new(
+            async invocation =>
+            {
+                arguments = [.. CommandArguments(invocation)];
+                ConnectResult connected = await invocation.Connector.ConnectAsync(new ConnectTarget("127.0.0.1", UpstreamHttp2Server.Http2TlsPort, false), CancellationToken.None);
+                reached = connected.Connection is not null ? "connected" : connected.ErrorMessage;
+                return 0;
+            },
+            UpstreamCurlPlatform.Unix,
+            TimeProvider.System,
+            TimeSpan.FromSeconds(10),
+            http2Server: http2Server);
+        string testFile = $"<testcase>\n<client>\n<server>\n{serverLine}\n</server>\n<command option=\"no-output,no-include\">\nhttps://localhost:%HTTP2TLSPORT/\n</command>\n</client>\n</testcase>\n";
+
+        UpstreamCaseOutcome outcome = await runner.RunAsync(5, Encoding.Latin1.GetBytes(testFile), CreateLogDirectory(), null, certificateDirectory);
+        diagnostics.Act("connector reached on %HTTP2TLSPORT", reached);
+
+        Assert.AreNotEqual(UpstreamCaseOutcomeKind.Skipped, outcome.Kind, outcome.Detail);
+        CollectionAssert.AreEqual(new[] { "https://localhost:" + UpstreamCaseRunner.Http2TlsPort + "/" }, arguments);
+        Assert.AreEqual(expectedReached, reached);
+        Assert.AreEqual(expectsCertificate, presented is not null);
+    }
+
     [TestMethod]
     public async Task RunAsync_H2cVersion_IsH2c()
     {

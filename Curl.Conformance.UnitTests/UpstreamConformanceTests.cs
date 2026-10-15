@@ -354,8 +354,8 @@ public sealed class UpstreamConformanceTests
     // the RSA keys for curl's WinCNG build on Windows, the Ed25519 ones elsewhere (BL-1954, BL-2217).
     private static readonly UpstreamSshServer SshServer = UpstreamSshServerFactory.Create(OperatingSystem.IsWindows());
 
-    // The stand-in for upstream's http/2 server, nghttpx serving h2c in front of sws, on %HTTP2PORT (BL-2230).
-    private static readonly UpstreamHttp2Server Http2Server = new(UpstreamHttp2ServerFactory.Create);
+    // The stand-in for upstream's http/2 server, nghttpx serving h2c in front of sws, on %HTTP2PORT (BL-2230), and HTTP/2 over TLS on %HTTP2TLSPORT (BL-2245).
+    private static readonly UpstreamHttp2Server Http2Server = new(UpstreamHttp2ServerFactory.Create, UpstreamHttp2ServerFactory.CreateTls);
 
     private static async Task<UpstreamCaseOutcome> RunCaseOnceAsync(int testNumber, byte[] testFile)
     {

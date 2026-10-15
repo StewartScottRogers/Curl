@@ -33,7 +33,7 @@ namespace Curl.Conformance;
 /// they name by its path, relative to the working directory when not absolute, as nothing when it
 /// is not there. <c>%HOSTIP</c> and <c>%CLIENTIP</c> are <c>127.0.0.1</c>, <c>%HTTPPORT</c> is
 /// <see cref="HttpPort"/>, <c>%HOST6IP</c> and <c>%CLIENT6IP</c> are <c>[::1]</c>, <c>%CLIENT6IP-NB</c> is <c>::1</c>, <c>%HTTP6PORT</c> is <see cref="Http6Port"/>, <c>%FTP6PORT</c> is <see cref="Ftp6Port"/>, <c>%GOPHER6PORT</c> is <see cref="Gopher6Port"/>, <c>%RESOLVE</c> is the name
-/// <see cref="UpstreamResolveCheck"/> emulates in a precheck, <c>%PROXYPORT</c> is <see cref="ProxyPort"/>, <c>%FTPPORT</c> is <see cref="FtpPort"/>, <c>%SMTPPORT</c> is <see cref="SmtpPort"/>, <c>%IMAPPORT</c> is <see cref="ImapPort"/>, <c>%POP3PORT</c> is <see cref="Pop3Port"/>, <c>%SOCKSPORT</c> is <see cref="SocksPort"/>, <c>%MQTTPORT</c> is <see cref="MqttPort"/>, <c>%TFTPPORT</c> is <see cref="TftpPort"/>,<c>%RTSPPORT</c> is <see cref="RtspPort"/>, <c>%HTTPSPORT</c>, <c>%SMTPSPORT</c>, <c>%IMAPSPORT</c>, <c>%POP3SPORT</c>, <c>%FTPSPORT</c>, <c>%HTTPSPROXYPORT</c>, <c>%MQTTSPORT</c> and <c>%GOPHERSPORT</c> are <see cref="HttpsPort"/>, <see cref="SmtpsPort"/>, <see cref="ImapsPort"/>, <see cref="Pop3sPort"/>, <see cref="FtpsPort"/>, <see cref="HttpsProxyPort"/>, <see cref="MqttsPort"/> and <see cref="GophersPort"/> when a certificate directory is named, <c>%GOPHERPORT</c> is <see cref="GopherPort"/>, <c>%DICTPORT</c> is <see cref="DictPort"/>, <c>%TELNETPORT</c> is <see cref="TelnetPort"/>, <c>%DNSPORT</c> is <see cref="DnsPort"/>, <c>%HTTP2PORT</c> is <see cref="Http2Port"/>, <c>%H2CVER</c> is <see cref="H2cVersion"/>, <c>%NOLISTENPORT</c> is <see cref="NoListenPort"/>, a port that refuses every connection, <c>%HTTPUNIXPATH</c> is <see cref="HttpUnixPath"/>, <c>%FTPTIME2</c> is <c>8</c> (the seconds upstream gives FTP time-out cases on a host whose FTP server checks in under a second), and <c>%VERSION</c> is <see cref="CurlVersion"/>. Every other variable
+/// <see cref="UpstreamResolveCheck"/> emulates in a precheck, <c>%PROXYPORT</c> is <see cref="ProxyPort"/>, <c>%FTPPORT</c> is <see cref="FtpPort"/>, <c>%SMTPPORT</c> is <see cref="SmtpPort"/>, <c>%IMAPPORT</c> is <see cref="ImapPort"/>, <c>%POP3PORT</c> is <see cref="Pop3Port"/>, <c>%SOCKSPORT</c> is <see cref="SocksPort"/>, <c>%MQTTPORT</c> is <see cref="MqttPort"/>, <c>%TFTPPORT</c> is <see cref="TftpPort"/>,<c>%RTSPPORT</c> is <see cref="RtspPort"/>, <c>%HTTPSPORT</c>, <c>%SMTPSPORT</c>, <c>%IMAPSPORT</c>, <c>%POP3SPORT</c>, <c>%FTPSPORT</c>, <c>%HTTPSPROXYPORT</c>, <c>%MQTTSPORT</c>, <c>%GOPHERSPORT</c> and <c>%HTTP2TLSPORT</c> are <see cref="HttpsPort"/>, <see cref="SmtpsPort"/>, <see cref="ImapsPort"/>, <see cref="Pop3sPort"/>, <see cref="FtpsPort"/>, <see cref="HttpsProxyPort"/>, <see cref="MqttsPort"/>, <see cref="GophersPort"/> and <see cref="Http2TlsPort"/> when a certificate directory is named, <c>%GOPHERPORT</c> is <see cref="GopherPort"/>, <c>%DICTPORT</c> is <see cref="DictPort"/>, <c>%TELNETPORT</c> is <see cref="TelnetPort"/>, <c>%DNSPORT</c> is <see cref="DnsPort"/>, <c>%HTTP2PORT</c> is <see cref="Http2Port"/>, <c>%H2CVER</c> is <see cref="H2cVersion"/>, <c>%NOLISTENPORT</c> is <see cref="NoListenPort"/>, a port that refuses every connection, <c>%HTTPUNIXPATH</c> is <see cref="HttpUnixPath"/>, <c>%FTPTIME2</c> is <c>8</c> (the seconds upstream gives FTP time-out cases on a host whose FTP server checks in under a second), and <c>%VERSION</c> is <see cref="CurlVersion"/>. Every other variable
 /// is unknown, so a case that uses one is skipped.
 /// </para>
 /// </remarks>
@@ -54,7 +54,7 @@ namespace Curl.Conformance;
 /// The stand-in for upstream's <c>http/2</c> server, nghttpx serving h2c in front of sws (BL-2230), or
 /// <see langword="null"/> to leave it out, so screening skips a case naming the <c>http/2</c> server.
 /// Given one, a fresh server relaying to the case's sws emulation stands on <see cref="Http2Port"/> in
-/// front of the case's other stand-ins.
+/// front of the case's other stand-ins, and with a certificate directory its TLS server on <see cref="Http2TlsPort"/>.
 /// </param>
 public sealed class UpstreamCaseRunner(
     Func<UpstreamCurlInvocation, Task<int>> runCurl,
@@ -152,6 +152,13 @@ public sealed class UpstreamCaseRunner(
     /// and a connection to this port reaches the sws emulation like any other.
     /// </summary>
     public const string Http2Port = "9009";
+
+    /// <summary>
+    /// The value of <c>%HTTP2TLSPORT</c> when the caller names a certificate directory, upstream's nghttpx TLS front of sws,
+    /// <see cref="UpstreamHttp2Server.Http2TlsPort"/>: given an <see cref="UpstreamHttp2Server"/> with a TLS server, a connection to
+    /// this port speaks HTTP/2 over TLS, ALPN <c>h2</c>, presenting <c>%CERTDIR/certs/test-localhost.pem</c> (BL-2245).
+    /// </summary>
+    public const string Http2TlsPort = "9018";
 
     /// <summary>
     /// The value of <c>%H2CVER</c>, the protocol token curl's <c>Upgrade:</c> header names, as <c>runtests.pl</c>
@@ -307,6 +314,7 @@ public sealed class UpstreamCaseRunner(
             variables["HTTPSPROXYPORT"] = HttpsProxyPort;
             variables["MQTTSPORT"] = MqttsPort;
             variables["GOPHERSPORT"] = GophersPort;
+            variables["HTTP2TLSPORT"] = Http2TlsPort;
         }
     }
 
@@ -419,7 +427,7 @@ public sealed class UpstreamCaseRunner(
         GopherServerConnector gopher = new(testCase, mqtts);
         IConnector gophers = TlsFrontServer(testCase, GophersServerConnector.EmulatedServers, certificateDirectory, gopher, certificate => new GophersServerConnector(certificate, gopher));
         TelnetServerConnector telnet = new(new DictServerConnector(gophers));
-        IConnector servers = HttpsProxyServer(testCase, Http2Server(SshServer(telnet), server), certificateDirectory);
+        IConnector servers = HttpsProxyServer(testCase, Http2Server(testCase, SshServer(telnet), server, certificateDirectory), certificateDirectory);
         // A CONNECT through the http-proxy to a mail port or the FTP control or passive port reaches that stand-in
         // (test1319 to 1321, BL-2011; test714 and test715, BL-2035); one to %HTTPSPORT reaches the HTTPS stand-in, whose TLS handshake travels inside the tunnel (BL-2225).
         server.TunnelServerForPort = port => TunnelledPorts.Contains(port) ? pop3 : null;
@@ -525,7 +533,14 @@ public sealed class UpstreamCaseRunner(
     private IConnector SshServer(IConnector otherPorts) => sshServer?.InFrontOf(otherPorts) ?? otherPorts;
 
     // nghttpx relays each stream to sws as HTTP/1.1, so the relayed requests land in the sws emulation's ReceivedBytes.
-    private IConnector Http2Server(IConnector otherPorts, SwsHttpServerConnector sws) => http2Server?.InFrontOf(otherPorts, sws) ?? otherPorts;
+    // Its TLS front on %HTTP2TLSPORT presents test-localhost.pem, loaded only for a case naming the http/2 server when a certificate directory is named (BL-2245).
+    private IConnector Http2Server(UpstreamTestCase testCase, IConnector otherPorts, SwsHttpServerConnector sws, string? certificateDirectory) =>
+        http2Server?.InFrontOf(otherPorts, sws, Http2TlsCertificate(testCase, certificateDirectory)) ?? otherPorts;
+
+    private static X509Certificate2? Http2TlsCertificate(UpstreamTestCase testCase, string? certificateDirectory) =>
+        certificateDirectory is not null && UpstreamTestPartBodies.Lines(testCase.Find("client", "server")).Contains("http/2")
+            ? HttpsServerConnector.LoadCertificate(Path.Combine(certificateDirectory, "certs", HttpsServerConnector.DefaultCertificateFile))
+            : null;
 
     private static readonly int[] TunnelledPorts = [Pop3ServerConnector.Pop3Port, ImapServerConnector.ImapPort, SmtpServerConnector.SmtpPort, FtpServerConnector.FtpPort, FtpServerConnector.PassivePort, HttpsServerConnector.HttpsPort];
 
