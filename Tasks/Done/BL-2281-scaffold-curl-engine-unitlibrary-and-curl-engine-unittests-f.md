@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary, Curl.Engine.UnitTests, Curl.slnx]
 requirement: none
 created: 2026-10-15
-completed:
+completed: 2026-10-15
 ---
 # BL-2281 — Scaffold Curl.Engine.UnitLibrary and Curl.Engine.UnitTests for the transfer engine moving out of Curl.Console
 
@@ -27,12 +27,12 @@ ADR-0506 and `Documentation/Planning/Curl-Api-And-libcurl.md` (phase 1): the tra
 
 ## Acceptance criteria
 
-- [ ] `Curl.Engine.UnitLibrary/Curl.Engine.UnitLibrary.csproj` and `Curl.Engine.UnitTests/Curl.Engine.UnitTests.csproj` exist, are listed in `Curl.slnx` between `Curl.Cryptography.UnitTests` and `Curl.Http2.UnitLibrary`, and the library has the references and `InternalsVisibleTo` entries listed in Context.
-- [ ] The library's root namespace is `Curl.Engine` (by `Directory.Build.props`' rule) and it has a `CLAUDE.md` stating its purpose (the managed transfer engine, ADR-0506) and that it must never reference `Curl.Console`, `Libcurl` or `Curl.Api`.
-- [ ] `dotnet build` is clean (warnings are errors), including `VerifyAotCompatibility`.
-- [ ] `dotnet test --filter "TestCategory!=Integration"` passes.
-- [ ] `powershell -NoProfile -File Measure-CodeQuality.ps1` passes.
-- [ ] `Curl.Conformance.UnitTests/PassingUpstreamCases.txt` is unchanged.
+- [x] `Curl.Engine.UnitLibrary/Curl.Engine.UnitLibrary.csproj` and `Curl.Engine.UnitTests/Curl.Engine.UnitTests.csproj` exist, are listed in `Curl.slnx` between `Curl.Cryptography.UnitTests` and `Curl.Http2.UnitLibrary`, and the library has the references and `InternalsVisibleTo` entries listed in Context.
+- [x] The library's root namespace is `Curl.Engine` (by `Directory.Build.props`' rule) and it has a `CLAUDE.md` stating its purpose (the managed transfer engine, ADR-0506) and that it must never reference `Curl.Console`, `Libcurl` or `Curl.Api`.
+- [x] `dotnet build` is clean (warnings are errors), including `VerifyAotCompatibility`.
+- [x] `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] `powershell -NoProfile -File Measure-CodeQuality.ps1` passes.
+- [x] `Curl.Conformance.UnitTests/PassingUpstreamCases.txt` is unchanged.
 
 ## Notes
 
@@ -40,3 +40,4 @@ ADR-0506 and `Documentation/Planning/Curl-Api-And-libcurl.md` (phase 1): the tra
 
 - 2026-10-15: Created.
 - 2026-10-15: Backlog -> Doing.
+- 2026-10-15: Doing -> Done. Scaffolded Curl.Engine.UnitLibrary and Curl.Engine.UnitTests; build clean, quality gate passes
