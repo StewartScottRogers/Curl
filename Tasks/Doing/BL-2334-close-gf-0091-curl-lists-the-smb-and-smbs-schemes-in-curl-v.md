@@ -48,3 +48,4 @@ In Curl.Cli.UnitLibrary/CurlVersionText.cs, give Linux and macOS a third Protoco
 ## Log
 
 - 2026-10-15: Created.
+- 2026-10-15: Backlog -> Doing.
