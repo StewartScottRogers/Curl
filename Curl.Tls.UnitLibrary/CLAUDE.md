@@ -153,7 +153,10 @@ and Encrypted Client Hello (BL-706, ADR-0233).
   (`InsertEmptyFragment`, off for `--ssl-allow-beast`), and `PadHello`
   (a 256-to-511-byte hello padded to 512, `padding` last, ADR-0365), and `KeyLog`, an
   `ITlsKeyLog` handed the `CLIENT_RANDOM` entry (client random, master secret) once the keys
-  are installed, for `SSLKEYLOGFILE` (ADR-0518, BL-2327; TLS 1.3 logs nothing yet, BL-2339). The
+  are installed, for `SSLKEYLOGFILE` (ADR-0518, BL-2327); `Tls13ClientSettings.KeyLog` likewise gets
+  `CLIENT_EARLY_TRAFFIC_SECRET` (early data offered), the two handshake traffic secrets after the
+  ServerHello, and `CLIENT_TRAFFIC_SECRET_0`, `SERVER_TRAFFIC_SECRET_0` and `EXPORTER_SECRET` after the
+  server Finished, OpenSSL's order, with the transcript hello's random (BL-2339). The
   ClientHello's extensions follow OpenSSL's order.
 - TLS 1.2 and below over a byte stream (ADR-0249): the internal `Tls12RecordLayer` reads
   whole records off the caller's `Stream`, removes their protection with the read state in

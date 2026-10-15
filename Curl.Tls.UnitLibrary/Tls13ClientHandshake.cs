@@ -237,7 +237,9 @@ public sealed class Tls13ClientHandshake : IDisposable
         if (EarlyDataOffered)
         {
             byte[] clientHelloHash = CryptographicOperations.HashData(SessionSchedule.HashAlgorithm, clientHelloBytes);
-            output.Install(TlsEncryptionLevel.EarlyData, TlsTrafficDirection.Write, SessionSchedule.DeriveClientEarlyTrafficSecret(sessionEarlySecret, clientHelloHash));
+            byte[] clientEarlyTrafficSecret = SessionSchedule.DeriveClientEarlyTrafficSecret(sessionEarlySecret, clientHelloHash);
+            LogSecret("CLIENT_EARLY_TRAFFIC_SECRET", clientEarlyTrafficSecret);
+            output.Install(TlsEncryptionLevel.EarlyData, TlsTrafficDirection.Write, clientEarlyTrafficSecret);
         }
 
         state = State.WaitServerHello;
@@ -616,6 +618,8 @@ public sealed class Tls13ClientHandshake : IDisposable
         clientHandshakeTrafficSecret = Schedule.DeriveClientHandshakeTrafficSecret(handshakeSecret, serverHelloHash);
         serverHandshakeTrafficSecret = Schedule.DeriveServerHandshakeTrafficSecret(handshakeSecret, serverHelloHash);
         masterSecret = Schedule.ComputeMasterSecret(handshakeSecret);
+        LogSecret("CLIENT_HANDSHAKE_TRAFFIC_SECRET", clientHandshakeTrafficSecret);
+        LogSecret("SERVER_HANDSHAKE_TRAFFIC_SECRET", serverHandshakeTrafficSecret);
         output.Install(TlsEncryptionLevel.Handshake, TlsTrafficDirection.Read, serverHandshakeTrafficSecret);
         output.Install(TlsEncryptionLevel.Handshake, TlsTrafficDirection.Write, clientHandshakeTrafficSecret);
         state = State.WaitEncryptedExtensions;
@@ -952,9 +956,13 @@ public sealed class Tls13ClientHandshake : IDisposable
         }
 
         byte[] serverFinishedHash = Transcript.GetCurrentHash();
-        output.Install(TlsEncryptionLevel.Application, TlsTrafficDirection.Read, Schedule.DeriveServerApplicationTrafficSecret(masterSecret, serverFinishedHash));
+        byte[] serverApplicationTrafficSecret = Schedule.DeriveServerApplicationTrafficSecret(masterSecret, serverFinishedHash);
+        output.Install(TlsEncryptionLevel.Application, TlsTrafficDirection.Read, serverApplicationTrafficSecret);
         clientApplicationTrafficSecret = Schedule.DeriveClientApplicationTrafficSecret(masterSecret, serverFinishedHash);
         ExporterMasterSecret = Schedule.DeriveExporterMasterSecret(masterSecret, serverFinishedHash);
+        LogSecret("CLIENT_TRAFFIC_SECRET_0", clientApplicationTrafficSecret);
+        LogSecret("SERVER_TRAFFIC_SECRET_0", serverApplicationTrafficSecret);
+        LogSecret("EXPORTER_SECRET", ExporterMasterSecret);
         SendClientFinishedFlight(output);
         return null;
     }
@@ -1130,6 +1138,9 @@ public sealed class Tls13ClientHandshake : IDisposable
     }
 
     private ClientHello BindOfferedPsk(ClientHello hello) => pskOffer is null ? hello : BindPsk(hello);
+
+    /// <summary>Hands one secret to <see cref="Tls13ClientSettings.KeyLog" /> with the random of the hello the transcript holds.</summary>
+    private void LogSecret(string label, byte[] secret) => settings.KeyLog?.Append(label, transcriptHello!.Random, secret);
 
     private void UseTranscriptHello(ClientHello hello)
     {
