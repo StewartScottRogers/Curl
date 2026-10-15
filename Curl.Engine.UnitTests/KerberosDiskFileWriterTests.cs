@@ -1,6 +1,6 @@
 using Curl.Testing;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
 /// Pins <see cref="KerberosDiskFileWriter" /> against a temporary directory: bytes appended to

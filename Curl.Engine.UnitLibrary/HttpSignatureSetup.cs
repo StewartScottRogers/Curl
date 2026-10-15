@@ -2,7 +2,7 @@ using Curl.Cli;
 using Curl.HttpMessageSignatures;
 using Curl.Protocol.Abstractions;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
 /// The outcome of curl 8.22.0's setup checks for the <c>--httpsig-*</c> options

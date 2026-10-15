@@ -1,6 +1,6 @@
 using Curl.Kerberos;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
 /// Reads the hand-built Kerberos route's credential cache, keytab and <c>krb5.conf</c> files

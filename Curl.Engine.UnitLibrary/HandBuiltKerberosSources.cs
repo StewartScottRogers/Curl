@@ -1,7 +1,7 @@
 using Curl.Authentication;
 using Curl.Kerberos;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
 /// Where the hand-built Kerberos route of ADR-0142 finds its inputs: <c>krb5.conf</c> as MIT

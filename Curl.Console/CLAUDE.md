@@ -143,17 +143,13 @@ the `-G` / `--url-query` query with `QueryUrl` before the URL is parsed. `http` 
 `RankedHttpAuthenticator` (Basic and Bearer, and Digest with a random client nonce, all in the
 platform's credential encoding, and Negotiate), which answers the scheme `-u`, `--basic`, `--digest`,
 `--negotiate`, `--anyauth` and `--oauth2-bearer` allow (`HttpRequestOptions.AuthSchemes` and `BearerToken`),
-wrapped for the HTTP handler alone in an `AwsSigV4HttpAuthenticator` that signs every request with
-`--aws-sigv4` in place of those schemes (`HttpRequestOptions.AwsSigV4`, ADR-0243), itself wrapped in an
-`HttpSignatureHttpAuthenticator` that signs every request with the `--httpsig-*` options' `Signature-Input` and
-`Signature` lines in place of all of them (`HttpRequestOptions.HttpSignature`, BL-2182, ADR-0485); `HttpSignatureSetup`
-runs curl 8.22.0's setup checks for those options at each URL, refusing with exit 2, 26 or 43 and its `errorf` line.
+wrapped for the HTTP handler alone in `Curl.Engine`'s `AwsSigV4HttpAuthenticator` (`--aws-sigv4`) and that in its `HttpSignatureHttpAuthenticator` (the `--httpsig-*` options); `Curl.Engine`'s `HttpSignatureSetup` runs their setup checks at each URL. Both are described in `Curl.Engine.UnitLibrary/CLAUDE.md`.
 Negotiate's contexts come from `CurlComposition.CreateSecurityContextFactory`, ADR-0142's router:
 SSPI on Windows, elsewhere the system GSS-API with the hand-built SPNEGO and Kerberos behind it,
 reaching KDCs through `Curl.Networking`'s `KerberosKdcSocketTransport` over the run's connectors
-and finding them through `KerberosDnsSrvLookup`. `HandBuiltKerberosSources` reads `krb5.conf`
-and the credential cache from disk (`KerberosDiskFileReader`) only when a hand-built context first
-asks, with the `<uid>` of `/tmp/krb5cc_<uid>` from `ProcessUserId` (BL-527, ADR-0176). The same
+and finding them through `KerberosDnsSrvLookup`. `Curl.Engine`'s `HandBuiltKerberosSources` reads `krb5.conf`
+and the credential cache from disk only when a hand-built context first asks, with the `<uid>` of
+`/tmp/krb5cc_<uid>` from `ProcessUserId` (BL-527, ADR-0176). The same
 factory goes to `CreateSaslAuthenticator`, so SMTP, IMAP and POP3 answer SASL `GSSAPI` and `NTLM`
 on it (ADR-0184, BL-852). Tests pass their own `ISecurityContextFactory` to `CreateRunner`.
 `-0` / `--http1.0` and `--http1.1` set `HttpRequestOptions.Version` (the last one wins, HTTP/1.1
@@ -262,7 +258,7 @@ process's proxy environment variables in production and none in tests unless giv
 from `-x` or a `--socks` option, `--noproxy` and the variables; `-U` replaces its credential;
 it goes into `HttpRequestOptions.ForwardProxy` with `-p` as `ProxyTunnel`. A CONNECT tunnel
 authenticates with the scheme `--proxy-basic`, `--proxy-digest`, `--proxy-ntlm`, `--proxy-negotiate` and `--proxy-anyauth` pick,
-through the same `RankedHttpAuthenticator` the origin uses (`CreateProxyTunnelOptions`, ADR-0186), its contexts from ADR-0142's router through a `LateBoundSecurityContextFactory` bound once the connectors exist (ADR-0270),
+through the same `RankedHttpAuthenticator` the origin uses (`CreateProxyTunnelOptions`, ADR-0186), its contexts from ADR-0142's router through `Curl.Engine`'s `LateBoundSecurityContextFactory` bound once the connectors exist (ADR-0270),
 and a forward proxy's `407` is answered with the same pick, which `CreateProtocolHandlers` hands
 the HTTP handler (ADR-0239). Under
 `--unix-socket` or `--abstract-unix-socket` no proxy is chosen or even parsed, and the group's
@@ -271,35 +267,14 @@ With `--preproxy` (ADR-0273, BL-614) the environment is not read: `--noproxy` dr
 HTTP pre-proxy or a SOCKS `-x` beside one is exit 5, a lone pre-proxy is the transfer's SOCKS proxy,
 and an HTTP `-x` is reached through the pre-proxy the group's `TcpConnector` gets from
 `CurlComposition.PreProxyOf`. The `--socks5-*` options reach the same connector through
-`Socks5AuthenticationMapping`, with the tunnel's `LateBoundSecurityContextFactory` for GSS-API
+`Curl.Engine`'s `Socks5AuthenticationMapping`, with the tunnel's `LateBoundSecurityContextFactory` for GSS-API
 (ADR-0276, BL-615). Proxy text curl
 cannot use ends the transfer with the selector's exit 5 or 7, and a SOCKS proxy, or an HTTPS
 proxy for `https` or under `-p` or `-L`, ends an `http`/`https` transfer with exit 4 until the connector opens those tunnels
 (ADR-0053, BL-328). Other schemes do not read the proxy yet (BL-330), and redirect hops keep
 the first URL's proxy (BL-329). Measured on curl 8.21.0 (BL-238 Notes).
 
-`TransferCredentialLookup` then chooses the transfer's credentials, once per URL. When `-u` gives
-no user name, the URL's percent-decoded user name and password are sent (`http://zz@host/` sends
-`zz:`, `http://:x@host/` sends `:x`, `http://@host/` nothing), replacing a `-u :pw` whole (BL-791).
-Under `-n`, `--netrc-file` or `--netrc-optional` the netrc file has its say too, and the runner keeps them as the running transfer's
-`LookedUpCredentials`, which `TransferContextFactory` puts on every attempt's context in place of
-`-u`'s. A `-u` with a user name wins and no file is read. The file is the `--netrc-file` one, else the one a
-non-empty `NETRC` names (BL-2114), else `.netrc` in `HOME` (on Windows `_netrc` after it, and `USERPROFILE` when `HOME` is not set), read
-through the runner's `IDataFileReader` and environment. The URL's percent-decoded user name picks
-the entry (`Curl.Authentication`'s `NetrcFile`), whose password beats the URL's; an entry with no
-login takes the URL's user name, and one with no password sends an empty one, never the URL's
-(BL-1356); with no entry the URL's user and password are sent. Under `--netrc-optional` a URL
-with a password is not looked up at all, and its own credentials are sent (upstream test381,
-BL-1986). A NUL byte in the file ends its line (upstream test793). A required file that is missing or malformed fails each URL with
-`curl: (26) .netrc error: no such file` or `syntax error` before anything is sent, `-v` writing
-the same text as an info line first (BL-1447);
-`--netrc-optional` ignores both. When the file is in use, `TransferCredentialLookup.ForRedirectHops`
-gives `RedirectFollower` the same lookup for each redirect hop's URL, so every hop sends its own
-host's entry or none, `--location-trusted` or not (BL-790). Measured on curl 8.21.0 (BL-505 Notes).
-URL credentials that percent-decode to a byte below 0x20 (only `%00` for `http`, `https`, `ws` and
-`wss`) fail with `curl: (3) error extracting credentials from URL` before connecting, a redirect
-hop's too, and a matching netrc entry holding one with `curl: (26) control code detected in .netrc
-credentials` except over those four schemes; `-v` writes each as an info line first (BL-1411).
+The runner asks `Curl.Engine`'s `TransferCredentialLookup` for the transfer's credentials, once per URL, and keeps them as the running transfer's `LookedUpCredentials`, which `TransferContextFactory` puts on every attempt's context in place of `-u`'s; `RedirectFollower` gets `TransferCredentialLookup.ForRedirectHops` for each hop. The lookup's rules (URL credentials, netrc) are in `Curl.Engine.UnitLibrary/CLAUDE.md`.
 An `ftp` or `ftps` URL is claimed by `RoutingFtpProtocolHandler`, which hands an `ftp` one to
 the HTTP handler when its proxy is `Http` or `Http10` and `-p` is not given, so it is forwarded
 to the proxy as `GET ftp://host/path` with `Host: host:21` (ADR-0056, rule 3; BL-344); any

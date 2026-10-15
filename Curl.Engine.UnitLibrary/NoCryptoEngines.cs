@@ -1,6 +1,6 @@
 using Curl.Protocol.Abstractions;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
 /// What <c>--engine</c> does in a curl that has no crypto engines, as ADR-0151 decides: Curl has

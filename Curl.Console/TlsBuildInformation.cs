@@ -1,4 +1,5 @@
 using Curl.Cli;
+using Curl.Engine;
 
 namespace Curl.Console;
 

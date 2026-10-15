@@ -38,3 +38,44 @@ Four types the plan listed here stay in `Curl.Console` because each uses a tool-
 not moved yet: `ConnectionIdRecordingTransferEvents` and `TlsResultRecordingTransferEvents` (both use
 `RunningTransferState`), `MultiStateTraceEvents` (uses `TransferTimers`, BL-2288) and
 `GatedDiagnosticLog` (uses `WriteGate`).
+
+## Authentication and security-context sources (BL-2286)
+
+`TransferCredentialLookup` then chooses the transfer's credentials, once per URL. When `-u` gives
+no user name, the URL's percent-decoded user name and password are sent (`http://zz@host/` sends
+`zz:`, `http://:x@host/` sends `:x`, `http://@host/` nothing), replacing a `-u :pw` whole (BL-791).
+Under `-n`, `--netrc-file` or `--netrc-optional` the netrc file has its say too, and the runner keeps them as the running transfer's
+`LookedUpCredentials`, which `TransferContextFactory` puts on every attempt's context in place of
+`-u`'s. A `-u` with a user name wins and no file is read. The file is the `--netrc-file` one, else the one a
+non-empty `NETRC` names (BL-2114), else `.netrc` in `HOME` (on Windows `_netrc` after it, and `USERPROFILE` when `HOME` is not set), read
+through the runner's `IDataFileReader` and environment. The URL's percent-decoded user name picks
+the entry (`Curl.Authentication`'s `NetrcFile`), whose password beats the URL's; an entry with no
+login takes the URL's user name, and one with no password sends an empty one, never the URL's
+(BL-1356); with no entry the URL's user and password are sent. Under `--netrc-optional` a URL
+with a password is not looked up at all, and its own credentials are sent (upstream test381,
+BL-1986). A NUL byte in the file ends its line (upstream test793). A required file that is missing or malformed fails each URL with
+`curl: (26) .netrc error: no such file` or `syntax error` before anything is sent, `-v` writing
+the same text as an info line first (BL-1447);
+`--netrc-optional` ignores both. When the file is in use, `TransferCredentialLookup.ForRedirectHops`
+gives `RedirectFollower` the same lookup for each redirect hop's URL, so every hop sends its own
+host's entry or none, `--location-trusted` or not (BL-790). Measured on curl 8.21.0 (BL-505 Notes).
+URL credentials that percent-decode to a byte below 0x20 (only `%00` for `http`, `https`, `ws` and
+`wss`) fail with `curl: (3) error extracting credentials from URL` before connecting, a redirect
+hop's too, and a matching netrc entry holding one with `curl: (26) control code detected in .netrc
+credentials` except over those four schemes; `-v` writes each as an info line first (BL-1411).
+
+The other types moved with it, in `Curl.Engine`: `AwsSigV4HttpAuthenticator` signs every request
+with `--aws-sigv4` in place of the ranked schemes (`HttpRequestOptions.AwsSigV4`, ADR-0243) and
+`HttpSignatureHttpAuthenticator` signs with the `--httpsig-*` options' `Signature-Input` and
+`Signature` lines in place of all of them (`HttpRequestOptions.HttpSignature`, BL-2182, ADR-0485);
+`HttpSignatureSetup` runs curl 8.22.0's setup checks for those options at each URL, refusing with
+exit 2, 26 or 43 and its `errorf` line. `HandBuiltKerberosSources` reads `krb5.conf` and the
+credential cache from disk (`KerberosDiskFileReader`, `KerberosDiskFileWriter`) only when a
+hand-built context first asks (BL-527, ADR-0176); `HandBuiltNtlmSecurityContextFactory` answers NTLM with the
+hand-built factory on every platform, other schemes with the router (BL-1858); `LateBoundSecurityContextFactory` is an `ISecurityContextFactory` bound
+once the connectors exist (ADR-0270); `NegotiateOptionsMapping` and `Socks5AuthenticationMapping`
+map the `--negotiate` and `--socks5-*` options to their settings (ADR-0276, BL-615); `NoCryptoEngines`
+is what `--engine` does with no crypto engines (ADR-0151).
+
+`NoCryptoEnginesTests` and `Socks5AuthenticationMappingTests` stay in `Curl.Console.UnitTests`
+because each drives `CurlCommandRunner` or `CurlComposition`, which are tool-side.

@@ -1,6 +1,6 @@
 using Curl.Testing;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
 /// Pins <see cref="KerberosDiskFileReader" /> against a temporary directory: a file's bytes, a

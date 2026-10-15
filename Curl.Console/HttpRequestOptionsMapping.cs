@@ -3,6 +3,7 @@ using System.Text;
 using Curl.Cli;
 using Curl.Networking;
 using Curl.Protocol.Abstractions;
+using Curl.Engine;
 using HttpRequestOptions = Curl.Protocol.Abstractions.HttpRequestOptions;
 
 namespace Curl.Console;

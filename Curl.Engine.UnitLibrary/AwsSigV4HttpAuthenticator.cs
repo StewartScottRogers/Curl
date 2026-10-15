@@ -2,7 +2,7 @@ using System.Net;
 using Curl.Authentication;
 using Curl.Protocol.Abstractions;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
 /// Signs every request to the origin that carries <see cref="HttpAuthRequest.AwsSigV4" /> with

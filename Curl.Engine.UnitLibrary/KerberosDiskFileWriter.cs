@@ -1,6 +1,6 @@
 using Curl.Kerberos;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
 /// Appends a credential to the hand-built Kerberos route's <c>FILE:</c> or <c>DIR:</c>

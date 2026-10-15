@@ -2,7 +2,7 @@ using Curl.Cli;
 using Curl.Networking;
 using Curl.Protocol.Abstractions;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
 /// Maps the command line to the <see cref="Socks5AuthenticationOptions" /> the SOCKS5 greeting

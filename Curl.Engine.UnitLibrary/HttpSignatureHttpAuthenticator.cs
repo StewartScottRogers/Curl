@@ -1,7 +1,7 @@
 using Curl.HttpMessageSignatures;
 using Curl.Protocol.Abstractions;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
 /// Signs every request to the origin that carries <see cref="HttpAuthRequest.HttpSignature" />

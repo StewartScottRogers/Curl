@@ -2,7 +2,7 @@ using System.Text;
 using Curl.Kerberos;
 using Curl.Testing;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
 /// Pins <see cref="HandBuiltKerberosSources" />: <c>krb5.conf</c> and the default credential

@@ -1,6 +1,6 @@
 using Curl.Protocol.Abstractions;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
 /// Makes each context with the factory <see cref="Bind" /> was given, so the CONNECT tunnel's

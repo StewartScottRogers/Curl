@@ -1,5 +1,6 @@
 using Curl.Protocol.Abstractions;
 using Curl.Testing;
+using Curl.Engine;
 
 namespace Curl.Console;
 

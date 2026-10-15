@@ -2,7 +2,7 @@ using Curl.Authentication;
 using Curl.Cli;
 using Curl.Protocol.Abstractions;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>Maps the command line to the <see cref="NegotiateOptions" /> the Negotiate authenticator applies (ADR-0188).</summary>
 internal static class NegotiateOptionsMapping

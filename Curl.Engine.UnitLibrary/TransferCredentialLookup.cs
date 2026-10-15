@@ -7,7 +7,7 @@ using Curl.Cli;
 using Curl.Core;
 using Curl.Protocol.Abstractions;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
 /// Chooses a transfer's credentials from the URL's user information, and from the netrc file when
