@@ -4,11 +4,11 @@ title: Plain HTTP sent through -x to the HTTPS port ends in a clean close (exit 
 area: behaviour
 key: behaviour:harness-tls-server-closes-cleanly-on-plaintext
 severity: High
-status: open
+status: closed
 scope: target
 introduced-in:
 opened: 2026-10-15_0304
-closed:
+closed: 2026-10-15_0543
 regression: false
 items: [behaviour:test1244]
 touches: [Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests, Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests]
@@ -32,8 +32,10 @@ In Curl.Conformance.UnitLibrary TlsServerConnection.ServeAsync, end a connection
 ## Measurements
 
 - 2026-10-15_0304: 1 of 1 items are gaps.
+- 2026-10-15_0543: 0 of 1 items are gaps.
 
 ## Log
 
 - 2026-10-15_0304: Opened by gap-behaviour.
 - 2026-10-15_0349: Filed BL-2272.
+- 2026-10-15_0543: Closed: run 2026-10-15_0543 measured every item as match or excluded.

@@ -4,11 +4,11 @@ title: A wrong --pinnedpubkey with --cacert on the Schannel build gives exit 60 
 area: behaviour
 key: behaviour:schannel-cacert-revocation-judged-before-pinned-public-key
 severity: High
-status: open
+status: closed
 scope: target
 introduced-in:
 opened: 2026-10-15_0304
-closed:
+closed: 2026-10-15_0543
 regression: false
 items: [behaviour:test2035, behaviour:test2038, behaviour:test2042]
 touches: [Curl.Networking.UnitLibrary, Curl.Networking.UnitTests]
@@ -32,8 +32,10 @@ First measure the Schannel reference curl on a loopback TLS server with '--cacer
 ## Measurements
 
 - 2026-10-15_0304: 3 of 3 items are gaps.
+- 2026-10-15_0543: 0 of 3 items are gaps.
 
 ## Log
 
 - 2026-10-15_0304: Opened by gap-behaviour.
 - 2026-10-15_0349: Filed BL-2270.
+- 2026-10-15_0543: Closed: run 2026-10-15_0543 measured every item as match or excluded.
