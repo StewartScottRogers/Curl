@@ -1,6 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Text;
+using Curl.Api.Options.Authentication;
 using Curl.Api.Options.Http;
 using Curl.Api.Options.Protocols;
 using Curl.Api.Options.Proxy;
@@ -138,8 +139,9 @@ internal sealed partial class TransferPerformer
     /// handler serves fails first, with exit 1.
     /// </summary>
     /// <param name="dispatch">The run's dispatch: its dispatcher says whether the URL's scheme is served, its proxy selector chooses the proxy.</param>
-    /// <param name="options">The accepted command line, for <c>-U</c>, <c>--unix-socket</c> and the credential options.</param>
+    /// <param name="options">The accepted command line, for <c>-U</c> and <c>--unix-socket</c>.</param>
     /// <param name="proxyOptions">The option group's proxy options, which <see cref="TransferProxySelection" /> chooses from.</param>
+    /// <param name="authentication">The option group's authentication options: <c>-u</c> and the netrc options <see cref="TransferCredentialLookup" /> reads.</param>
     /// <param name="url">The transfer's URL.</param>
     /// <param name="state">The running transfer, which keeps the credentials.</param>
     /// <param name="events">
@@ -155,6 +157,7 @@ internal sealed partial class TransferPerformer
         TransferDispatch dispatch,
         CommandLineOptions options,
         EasyProxyOptions proxyOptions,
+        EasyAuthenticationOptions authentication,
         CurlUrl url,
         EngineTransferState state,
         ITransferEvents events,
@@ -176,7 +179,7 @@ internal sealed partial class TransferPerformer
             return false;
         }
 
-        bool looked = credentialLookup.TryLookUp(options, url, out NetworkCredential? lookedUpCredentials, out failure, events.ReportInfo);
+        bool looked = credentialLookup.TryLookUp(authentication, url, out NetworkCredential? lookedUpCredentials, out failure, events.ReportInfo);
         state.LookedUpCredentials = lookedUpCredentials;
         if (failure is not null)
         {

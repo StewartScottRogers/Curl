@@ -14,6 +14,7 @@ using Curl.Engine;
 using Curl.Networking;
 using Curl.Output;
 using Curl.Protocol.Abstractions;
+using EasyAuthenticationOptions = Curl.Api.Options.Authentication.EasyAuthenticationOptions;
 using EasyHttpOptions = Curl.Api.Options.Http.EasyHttpOptions;
 using EasyMimeBody = Curl.Api.Options.Http.EasyMimeBody;
 using EasyProxyOptions = Curl.Api.Options.Proxy.EasyProxyOptions;
@@ -3346,14 +3347,15 @@ internal sealed class CurlCommandRunner(
         Stream? headerOutput)
     {
         EasyProxyOptions proxyOptions = EasyOptionsFromCommandLine.ProxyOf(options);
+        EasyAuthenticationOptions authentication = EasyOptionsFromCommandLine.AuthenticationOf(options);
         RedirectFollower follower = new(
             dispatch.Dispatcher,
             (CurlUrl hopUrl, out ProxyEndpoint? hopProxy, [NotNullWhen(false)] out TransferResult? hopFailure) =>
                 TransferProxySelection.TrySelect(dispatch.ProxySelector, proxyOptions, options.UnixSocketPath is not null, options.ProxyCredentials, hopUrl, out hopProxy, out hopFailure, diagnosticLog)
-                && TransferCredentialLookup.TryCheckUrlCredentials(options, hopUrl, out hopFailure),
+                && TransferCredentialLookup.TryCheckUrlCredentials(authentication, hopUrl, out hopFailure),
             hsts: Hsts,
             selectHopAltSvc: (hopUrl, hopHttp) => Running.AltSvc is { } altSvc ? altSvc.ApplyTo(hopUrl, hopHttp) : hopHttp,
-            selectHopCredentials: CredentialLookup.ForRedirectHops(options));
+            selectHopCredentials: CredentialLookup.ForRedirectHops(authentication));
 
         if (!TransferPerformer.TryParseTransferUrl(QueryUrl.Append(url, options), options, out CurlUrl? transferUrl, out CurlUrlRejection rejection))
         {
@@ -3462,7 +3464,7 @@ internal sealed class CurlCommandRunner(
         }
 
         if (!TransferPerformer.TrySelectProxyAndCredentials(
-                dispatch, options, EasyOptionsFromCommandLine.ProxyOf(options), url, Running, EventsBeforeConnecting(transfer), diagnosticLog, CredentialLookup, out ProxyEndpoint? proxy, out TransferResult? proxyFailure))
+                dispatch, options, EasyOptionsFromCommandLine.ProxyOf(options), EasyOptionsFromCommandLine.AuthenticationOf(options), url, Running, EventsBeforeConnecting(transfer), diagnosticLog, CredentialLookup, out ProxyEndpoint? proxy, out TransferResult? proxyFailure))
         {
             return proxyFailure;
         }

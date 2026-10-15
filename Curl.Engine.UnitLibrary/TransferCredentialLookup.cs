@@ -2,6 +2,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Text;
 
+using Curl.Api.Options.Authentication;
 using Curl.Authentication;
 using Curl.Cli;
 using Curl.Core;
@@ -80,10 +81,10 @@ internal sealed class TransferCredentialLookup(
     /// <summary>
     /// Looks up the credentials the transfer of <paramref name="url" /> sends.
     /// </summary>
-    /// <param name="options">The option group of the transfer.</param>
+    /// <param name="authentication">The transfer's authentication options: <c>-u</c> and the netrc options.</param>
     /// <param name="url">The transfer's URL.</param>
     /// <param name="credentials">
-    /// The credentials to send in place of <see cref="CommandLineOptions.Credentials" />;
+    /// The credentials to send in place of <c>-u</c>'s (<see cref="EasyAuthenticationOptions.UserPassword" />);
     /// <see langword="null" /> when neither the URL nor the netrc file has anything to say, so the
     /// <c>-u</c> ones stand.
     /// </param>
@@ -97,51 +98,51 @@ internal sealed class TransferCredentialLookup(
     /// </param>
     /// <returns><see langword="false" /> when the transfer fails before it starts.</returns>
     internal bool TryLookUp(
-        CommandLineOptions options,
+        EasyAuthenticationOptions authentication,
         CurlUrl url,
         out NetworkCredential? credentials,
         [NotNullWhen(false)] out TransferResult? failure,
         Action<string>? reportInfo = null)
     {
         credentials = null;
-        if (!TryCheckUrlCredentials(options, url, out failure) || UserOptionWins(options))
+        if (!TryCheckUrlCredentials(authentication, url, out failure) || UserOptionWins(authentication))
         {
             return failure is null;
         }
 
-        if (options.NetrcUse == NetrcUse.Ignored || UrlPasswordWinsOverOptionalNetrc(options, url))
+        if (authentication.Netrc == NetrcUsage.Ignored || UrlPasswordWinsOverOptionalNetrc(authentication, url))
         {
             credentials = CredentialsWrittenInUrl(url);
             return true;
         }
 
-        return TryLookUpInNetrcFile(options, url, out credentials, out failure, reportInfo);
+        return TryLookUpInNetrcFile(authentication, url, out credentials, out failure, reportInfo);
     }
 
     /// <summary>
     /// Looks <paramref name="url" />'s host up in the netrc file, for <see cref="TryLookUp" />, once
     /// neither <c>-u</c> nor the absence of a netrc option has decided the credentials.
     /// </summary>
-    /// <param name="options">The option group of the transfer.</param>
+    /// <param name="authentication">The transfer's authentication options: <c>-u</c> and the netrc options.</param>
     /// <param name="url">The transfer's URL.</param>
     /// <param name="credentials">The credentials to send, as <see cref="TryLookUp" /> describes them.</param>
     /// <param name="failure">The exit-26 failure the netrc file ends the transfer with, when it does.</param>
     /// <param name="reportInfo">Gets <see cref="HostNotFoundLine" /> when the file gave the host nothing, or <see langword="null" />.</param>
     /// <returns><see langword="false" /> when the transfer fails before it starts.</returns>
     private bool TryLookUpInNetrcFile(
-        CommandLineOptions options,
+        EasyAuthenticationOptions authentication,
         CurlUrl url,
         out NetworkCredential? credentials,
         [NotNullWhen(false)] out TransferResult? failure,
         Action<string>? reportInfo)
     {
         string? urlUser = DecodedUserInformation(url.User);
-        string? text = ReadNetrcText(options);
+        string? text = ReadNetrcText(authentication);
         NetrcLookupResult result = text is null ? NetrcLookupResult.NotFound : NetrcFile.Find(text, url.Host, urlUser, diagnosticLog);
-        failure = FailureOf(options.NetrcUse, FailureMessageOf(text, result)) ?? NetrcControlCodeFailure(url, result);
+        failure = FailureOf(authentication.Netrc, FailureMessageOf(text, result)) ?? NetrcControlCodeFailure(url, result);
         if (failure is null && result.Outcome != NetrcLookupOutcome.Found)
         {
-            reportInfo?.Invoke(HostNotFoundLine(url.Host, options.NetrcFile));
+            reportInfo?.Invoke(HostNotFoundLine(url.Host, authentication.NetrcFile));
         }
 
         credentials = CredentialsOf(result, urlUser, DecodedUserInformation(url.Password));
@@ -156,16 +157,16 @@ internal sealed class TransferCredentialLookup(
     /// wins over the URL's credentials, so they are not checked under one. Each redirect hop's URL is
     /// checked the same way.
     /// </summary>
-    /// <param name="options">The option group of the transfer.</param>
+    /// <param name="authentication">The transfer's authentication options: <c>-u</c> and the netrc options.</param>
     /// <param name="url">The transfer's or the redirect hop's URL.</param>
     /// <param name="failure">The exit-3 failure, when the credentials are refused.</param>
     /// <returns><see langword="false" /> when the credentials are refused.</returns>
     internal static bool TryCheckUrlCredentials(
-        CommandLineOptions options,
+        EasyAuthenticationOptions authentication,
         CurlUrl url,
         [NotNullWhen(false)] out TransferResult? failure)
     {
-        failure = !UserOptionWins(options) && (HasRefusedControlCode(url, DecodedUserInformation(url.User)) || HasRefusedControlCode(url, DecodedUserInformation(url.Password)))
+        failure = !UserOptionWins(authentication) && (HasRefusedControlCode(url, DecodedUserInformation(url.User)) || HasRefusedControlCode(url, DecodedUserInformation(url.Password)))
             ? TransferResult.Failure(CurlExitCode.UrlMalformat, UrlCredentialsMessage)
             : null;
         return failure is null;
@@ -189,17 +190,21 @@ internal sealed class TransferCredentialLookup(
     /// <c>override_login</c> reads no netrc file at all (upstream test381, BL-1986). Under <c>-n</c>
     /// or <c>--netrc-file</c> curl drops the URL's password first, so the file is read.
     /// </summary>
-    /// <param name="options">The option group of the transfer.</param>
+    /// <param name="authentication">The transfer's authentication options: <c>-u</c> and the netrc options.</param>
     /// <param name="url">The transfer's URL.</param>
     /// <returns><see langword="true" /> under <c>--netrc-optional</c> with a URL password.</returns>
-    private static bool UrlPasswordWinsOverOptionalNetrc(CommandLineOptions options, CurlUrl url) =>
-        options.NetrcUse == NetrcUse.Optional && DecodedUserInformation(url.Password) is not null;
+    private static bool UrlPasswordWinsOverOptionalNetrc(EasyAuthenticationOptions authentication, CurlUrl url) =>
+        authentication.Netrc == NetrcUsage.Optional && DecodedUserInformation(url.Password) is not null;
 
-    /// <summary>Whether <c>-u</c> gives a user name, which wins over the URL's and the netrc file's credentials.</summary>
-    /// <param name="options">The option group of the transfer.</param>
+    /// <summary>
+    /// Whether <c>-u</c> gives a user name, which wins over the URL's and the netrc file's credentials:
+    /// <see cref="EasyAuthenticationOptions.UserName" />, else <see cref="EasyAuthenticationOptions.UserPassword" />
+    /// up to its first colon, as <c>CURLOPT_USERNAME</c> takes precedence over <c>CURLOPT_USERPWD</c> (ADR-0516).
+    /// </summary>
+    /// <param name="authentication">The transfer's authentication options: <c>-u</c> and the netrc options.</param>
     /// <returns><see langword="true" /> when <c>-u</c> gives a user name.</returns>
-    private static bool UserOptionWins(CommandLineOptions options) =>
-        !string.IsNullOrEmpty(options.Credentials?.UserName);
+    private static bool UserOptionWins(EasyAuthenticationOptions authentication) =>
+        !string.IsNullOrEmpty(authentication.UserName ?? authentication.UserPassword?.Split(':', 2)[0]);
 
     /// <summary>
     /// curl's exit-26 failure for a matching netrc entry whose login or password holds a byte below
@@ -249,17 +254,17 @@ internal sealed class TransferCredentialLookup(
     /// when <c>localhost</c> has no entry, <c>--location-trusted</c> or not (BL-790). A file problem
     /// on a hop sends the hop no netrc credentials rather than failing it.
     /// </summary>
-    /// <param name="options">The option group of the transfer.</param>
+    /// <param name="authentication">The transfer's authentication options: <c>-u</c> and the netrc options.</param>
     /// <returns>
     /// The lookup, or <see langword="null" /> when no netrc option is in effect or a <c>-u</c> with a
     /// user name wins, so the first hop's credentials follow <c>RedirectFollower</c>'s origin rules.
     /// </returns>
-    internal HopCredentialSelector? ForRedirectHops(CommandLineOptions options) =>
-        options.NetrcUse == NetrcUse.Ignored || !string.IsNullOrEmpty(options.Credentials?.UserName)
+    internal HopCredentialSelector? ForRedirectHops(EasyAuthenticationOptions authentication) =>
+        authentication.Netrc == NetrcUsage.Ignored || UserOptionWins(authentication)
             ? null
             : hopUrl =>
             {
-                _ = TryLookUp(options, hopUrl, out NetworkCredential? credentials, out _);
+                _ = TryLookUp(authentication, hopUrl, out NetworkCredential? credentials, out _);
                 return credentials;
             };
 
@@ -306,8 +311,8 @@ internal sealed class TransferCredentialLookup(
     /// <param name="use">Whether the file is required.</param>
     /// <param name="message">What is wrong with the file, or <see langword="null" />.</param>
     /// <returns>The failure, or <see langword="null" /> when the transfer goes ahead.</returns>
-    private static TransferResult? FailureOf(NetrcUse use, string? message) =>
-        message is not null && use == NetrcUse.Required ? TransferResult.Failure(CurlExitCode.ReadError, message) : null;
+    private static TransferResult? FailureOf(NetrcUsage use, string? message) =>
+        message is not null && use == NetrcUsage.Required ? TransferResult.Failure(CurlExitCode.ReadError, message) : null;
 
     /// <summary>
     /// Gets the credentials to send: a matching entry's, with the URL's user name when the entry has
@@ -346,11 +351,11 @@ internal sealed class TransferCredentialLookup(
     /// Reads the first netrc file there is, as UTF-8 with any byte order mark kept as text, as
     /// curl reads bytes.
     /// </summary>
-    /// <param name="options">The option group, which may name the file.</param>
+    /// <param name="authentication">The authentication options, whose <see cref="EasyAuthenticationOptions.NetrcFile" /> may name the file.</param>
     /// <returns>The file's text, or <see langword="null" /> when none could be read.</returns>
-    private string? ReadNetrcText(CommandLineOptions options)
+    private string? ReadNetrcText(EasyAuthenticationOptions authentication)
     {
-        foreach (string path in CandidatePaths(options))
+        foreach (string path in CandidatePaths(authentication))
         {
             if (fileReader.TryReadFile(path, out byte[] contents))
             {
@@ -364,15 +369,15 @@ internal sealed class TransferCredentialLookup(
     /// <summary>
     /// Lists where curl 8.21.0 looks for the netrc file, in order.
     /// </summary>
-    /// <param name="options">The option group, which may name the file.</param>
+    /// <param name="authentication">The authentication options, whose <see cref="EasyAuthenticationOptions.NetrcFile" /> may name the file.</param>
     /// <returns>
     /// The <c>--netrc-file</c> path alone; else the <c>NETRC</c> variable's path alone, when it is set
     /// and not empty (GF-0068, BL-2114); else <c>.netrc</c> in the home directory, then on Windows
     /// <c>_netrc</c> there; else nothing when there is no home directory.
     /// </returns>
-    private IEnumerable<string> CandidatePaths(CommandLineOptions options)
+    private IEnumerable<string> CandidatePaths(EasyAuthenticationOptions authentication)
     {
-        if ((options.NetrcFile ?? NonEmpty(readEnvironmentVariable("NETRC"))) is { } file)
+        if ((authentication.NetrcFile ?? NonEmpty(readEnvironmentVariable("NETRC"))) is { } file)
         {
             return [file];
         }
