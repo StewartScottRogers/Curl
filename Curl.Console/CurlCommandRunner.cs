@@ -1470,7 +1470,7 @@ internal sealed class CurlCommandRunner(
     /// <returns>The exit code, or <see langword="null" /> when the checks pass.</returns>
     private async Task<CurlExitCode?> RefusedHttpSignatureSetupAsync(CommandLineOptions options)
     {
-        HttpSignatureSetup setup = HttpSignatureSetup.Of(options);
+        HttpSignatureSetup setup = HttpSignatureSetup.Of(EasyOptionsFromCommandLine.AuthenticationOf(options));
         if (setup.ErrorLine is not { } line)
         {
             return null;
@@ -3492,6 +3492,7 @@ internal sealed class CurlCommandRunner(
                 transferOptions,
                 EasyOptionsFromCommandLine.ProtocolOf(options),
                 EasyOptionsFromCommandLine.ProxyOf(options),
+                EasyOptionsFromCommandLine.AuthenticationOf(options),
                 EasyOptionsFromCommandLine.NetworkOf(options),
                 url,
                 RateLimited(options, toStandardOutput ? FlushedEachWriteUnderNoBuffer(options, InTextModeUnderUseAscii(options, Running.GatedStandardOutput)) : Stream.Null),
@@ -4335,6 +4336,7 @@ internal sealed class CurlCommandRunner(
                         transferOptions,
                         EasyOptionsFromCommandLine.ProtocolOf(options),
                         EasyOptionsFromCommandLine.ProxyOf(options),
+                        EasyOptionsFromCommandLine.AuthenticationOf(options),
                         EasyOptionsFromCommandLine.NetworkOf(options),
                         url,
                         RateLimited(options, FlushedEachWriteUnderNoBuffer(options, output)),
@@ -4462,7 +4464,7 @@ internal sealed class CurlCommandRunner(
         long? resumeFrom,
         DeferredOutputFileStream? outputFile)
     {
-        RedirectPolicy redirectPolicy = RedirectPolicyMapping.Of(options, EasyOptionsFromCommandLine.HttpOf(options));
+        RedirectPolicy redirectPolicy = RedirectPolicyMapping.Of(options, EasyOptionsFromCommandLine.HttpOf(options), EasyOptionsFromCommandLine.AuthenticationOf(options));
         long? attemptResumeFrom = resumeFrom;
         TransferContext? firstContext = createAttemptContext(attemptResumeFrom);
         string scheme = firstContext.Url.Scheme;

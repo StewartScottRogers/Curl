@@ -1,3 +1,4 @@
+using Curl.Api.Options.Authentication;
 using Curl.Api.Options.Http;
 using Curl.Cli;
 using Curl.Console;
@@ -132,7 +133,7 @@ public sealed class RedirectPolicyMappingTests
         CommandLineOptions options = CommandLineParser.Parse([Url], _ => true).Options!;
         Diagnostics.Arrange("record", http);
 
-        RedirectPolicy policy = RedirectPolicyMapping.Of(options, http);
+        RedirectPolicy policy = RedirectPolicyMapping.Of(options, http, new EasyAuthenticationOptions());
 
         Diagnostics.Act("keep post on 301/302/303", KeepPost(policy));
         Diagnostics.Assert("keep post on 301/302/303", "True/False/True", KeepPost(policy));
@@ -188,6 +189,6 @@ public sealed class RedirectPolicyMappingTests
         CommandLineParseResult parsed = CommandLineParser.Parse(arguments, _ => true);
         Diagnostics.Assert("accepted", true, parsed.IsAccepted);
         Assert.IsTrue(parsed.IsAccepted);
-        return RedirectPolicyMapping.Of(parsed.Options, EasyOptionsFromCommandLine.HttpOf(parsed.Options));
+        return RedirectPolicyMapping.Of(parsed.Options, EasyOptionsFromCommandLine.HttpOf(parsed.Options), EasyOptionsFromCommandLine.AuthenticationOf(parsed.Options));
     }
 }

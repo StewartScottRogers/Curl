@@ -1,3 +1,4 @@
+using Curl.Api.Options.Authentication;
 using Curl.Api.Options.Behaviour;
 using Curl.Cli;
 using Curl.Engine;
@@ -31,11 +32,11 @@ public sealed class HttpUnixSocketMappingTests
         Diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
 
-        bool overUnixSocket = HttpRequestOptionsMapping.Of(result.Options, EasyOptionsFromCommandLine.HttpOf(result.Options), new EasyBehaviourOptions(), new EasyTransferOptions()).OverUnixSocket;
+        bool overUnixSocket = HttpRequestOptionsMapping.Of(result.Options, EasyOptionsFromCommandLine.HttpOf(result.Options), new EasyBehaviourOptions(), new EasyTransferOptions(), new EasyAuthenticationOptions()).OverUnixSocket;
         Diagnostics.Act("over unix socket", overUnixSocket);
 
         Diagnostics.Assert("over unix socket", true, overUnixSocket);
-        Assert.IsTrue(HttpRequestOptionsMapping.Of(result.Options, EasyOptionsFromCommandLine.HttpOf(result.Options), new EasyBehaviourOptions(), new EasyTransferOptions()).OverUnixSocket);
+        Assert.IsTrue(HttpRequestOptionsMapping.Of(result.Options, EasyOptionsFromCommandLine.HttpOf(result.Options), new EasyBehaviourOptions(), new EasyTransferOptions(), new EasyAuthenticationOptions()).OverUnixSocket);
     }
 
     [TestMethod]
@@ -46,10 +47,10 @@ public sealed class HttpUnixSocketMappingTests
         Diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
 
-        bool overUnixSocket = HttpRequestOptionsMapping.Of(result.Options, EasyOptionsFromCommandLine.HttpOf(result.Options), new EasyBehaviourOptions(), new EasyTransferOptions()).OverUnixSocket;
+        bool overUnixSocket = HttpRequestOptionsMapping.Of(result.Options, EasyOptionsFromCommandLine.HttpOf(result.Options), new EasyBehaviourOptions(), new EasyTransferOptions(), new EasyAuthenticationOptions()).OverUnixSocket;
         Diagnostics.Act("over unix socket", overUnixSocket);
 
         Diagnostics.Assert("over unix socket", false, overUnixSocket);
-        Assert.IsFalse(HttpRequestOptionsMapping.Of(result.Options, EasyOptionsFromCommandLine.HttpOf(result.Options), new EasyBehaviourOptions(), new EasyTransferOptions()).OverUnixSocket);
+        Assert.IsFalse(HttpRequestOptionsMapping.Of(result.Options, EasyOptionsFromCommandLine.HttpOf(result.Options), new EasyBehaviourOptions(), new EasyTransferOptions(), new EasyAuthenticationOptions()).OverUnixSocket);
     }
 }

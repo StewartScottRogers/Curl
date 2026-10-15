@@ -1,3 +1,4 @@
+using Curl.Api.Options.Authentication;
 using Curl.Api.Options.Behaviour;
 using Curl.Api.Options.Http;
 using Curl.Api.Options.Network;
@@ -40,7 +41,7 @@ public sealed class TransferContextFactoryTests
         ByteRange range = ByteRange.Bounded(2, 5);
 
         TransferContext context = new TransferContextFactory(standardInput)
-            .Create(Parse("file:///x.txt"), HttpOf("file:///x.txt"), BehaviourOf("file:///x.txt"), TransferOf("file:///x.txt"), ProtocolOf("file:///x.txt"), ProxyOf("file:///x.txt"), NetworkOf("file:///x.txt"), url, output, range, 7, headerOutput);
+            .Create(Parse("file:///x.txt"), HttpOf("file:///x.txt"), BehaviourOf("file:///x.txt"), TransferOf("file:///x.txt"), ProtocolOf("file:///x.txt"), ProxyOf("file:///x.txt"), AuthenticationOf("file:///x.txt"), NetworkOf("file:///x.txt"), url, output, range, 7, headerOutput);
         Diagnostics.Act("context URL", context.Url.OriginalString);
 
         Diagnostics.Assert("context.Url is url", true, ReferenceEquals(url, context.Url));
@@ -63,7 +64,7 @@ public sealed class TransferContextFactoryTests
         ITransferProgress progress = new SilentTransferProgress();
 
         TransferContext context = new TransferContextFactory(standardInput)
-            .Create(Parse("file:///x.txt"), HttpOf("file:///x.txt"), BehaviourOf("file:///x.txt"), TransferOf("file:///x.txt"), ProtocolOf("file:///x.txt"), ProxyOf("file:///x.txt"), NetworkOf("file:///x.txt"), CurlUrl.Parse("file:///x.txt"), output, null, null, null, progress: progress);
+            .Create(Parse("file:///x.txt"), HttpOf("file:///x.txt"), BehaviourOf("file:///x.txt"), TransferOf("file:///x.txt"), ProtocolOf("file:///x.txt"), ProxyOf("file:///x.txt"), AuthenticationOf("file:///x.txt"), NetworkOf("file:///x.txt"), CurlUrl.Parse("file:///x.txt"), output, null, null, null, progress: progress);
         Diagnostics.Act("context URL", context.Url.OriginalString);
 
         Diagnostics.Assert("context.Progress is progress", true, ReferenceEquals(progress, context.Progress));
@@ -78,7 +79,7 @@ public sealed class TransferContextFactoryTests
         ManualTimeProvider clock = new();
 
         TransferContext context = new TransferContextFactory(standardInput, clock)
-            .Create(Parse("file:///x.txt"), HttpOf("file:///x.txt"), BehaviourOf("file:///x.txt"), TransferOf("file:///x.txt"), ProtocolOf("file:///x.txt"), ProxyOf("file:///x.txt"), NetworkOf("file:///x.txt"), CurlUrl.Parse("file:///x.txt"), output, null, null, null);
+            .Create(Parse("file:///x.txt"), HttpOf("file:///x.txt"), BehaviourOf("file:///x.txt"), TransferOf("file:///x.txt"), ProtocolOf("file:///x.txt"), ProxyOf("file:///x.txt"), AuthenticationOf("file:///x.txt"), NetworkOf("file:///x.txt"), CurlUrl.Parse("file:///x.txt"), output, null, null, null);
         Diagnostics.Act("context URL", context.Url.OriginalString);
 
         Diagnostics.Assert("context.TimeProvider is clock", true, ReferenceEquals(clock, context.TimeProvider));
@@ -92,7 +93,7 @@ public sealed class TransferContextFactoryTests
         using MemoryStream output = new();
 
         TransferContext context = new TransferContextFactory(standardInput)
-            .Create(Parse("file:///x.txt"), HttpOf("file:///x.txt"), BehaviourOf("file:///x.txt"), TransferOf("file:///x.txt"), ProtocolOf("file:///x.txt"), ProxyOf("file:///x.txt"), NetworkOf("file:///x.txt"), CurlUrl.Parse("file:///x.txt"), output, null, null, null);
+            .Create(Parse("file:///x.txt"), HttpOf("file:///x.txt"), BehaviourOf("file:///x.txt"), TransferOf("file:///x.txt"), ProtocolOf("file:///x.txt"), ProxyOf("file:///x.txt"), AuthenticationOf("file:///x.txt"), NetworkOf("file:///x.txt"), CurlUrl.Parse("file:///x.txt"), output, null, null, null);
         Diagnostics.Act("context URL", context.Url.OriginalString);
 
         Diagnostics.Assert("context.TimeProvider is TimeProvider.System", true, ReferenceEquals(TimeProvider.System, context.TimeProvider));
@@ -106,7 +107,7 @@ public sealed class TransferContextFactoryTests
         using MemoryStream output = new();
 
         TransferContext context = new TransferContextFactory(standardInput)
-            .Create(Parse("file:///x.txt"), HttpOf("file:///x.txt"), BehaviourOf("file:///x.txt"), TransferOf("file:///x.txt"), ProtocolOf("file:///x.txt"), ProxyOf("file:///x.txt"), NetworkOf("file:///x.txt"), CurlUrl.Parse("file:///x.txt"), output, null, null, null);
+            .Create(Parse("file:///x.txt"), HttpOf("file:///x.txt"), BehaviourOf("file:///x.txt"), TransferOf("file:///x.txt"), ProtocolOf("file:///x.txt"), ProxyOf("file:///x.txt"), AuthenticationOf("file:///x.txt"), NetworkOf("file:///x.txt"), CurlUrl.Parse("file:///x.txt"), output, null, null, null);
         Diagnostics.Act("context URL", context.Url.OriginalString);
 
         Diagnostics.Assert("context.Progress is NoTransferProgress.Instance", true, ReferenceEquals(NoTransferProgress.Instance, context.Progress));
@@ -120,7 +121,7 @@ public sealed class TransferContextFactoryTests
         using MemoryStream output = new();
 
         TransferContext context = new TransferContextFactory(standardInput)
-            .Create(Parse("file:///x.txt"), HttpOf("file:///x.txt"), BehaviourOf("file:///x.txt"), TransferOf("file:///x.txt"), ProtocolOf("file:///x.txt"), ProxyOf("file:///x.txt"), NetworkOf("file:///x.txt"), CurlUrl.Parse("file:///x.txt"), output, null, null, null);
+            .Create(Parse("file:///x.txt"), HttpOf("file:///x.txt"), BehaviourOf("file:///x.txt"), TransferOf("file:///x.txt"), ProtocolOf("file:///x.txt"), ProxyOf("file:///x.txt"), AuthenticationOf("file:///x.txt"), NetworkOf("file:///x.txt"), CurlUrl.Parse("file:///x.txt"), output, null, null, null);
         Diagnostics.Act("context URL", context.Url.OriginalString);
 
         Diagnostics.Assert("context.HeaderOutput", "null", context.HeaderOutput is null ? "null" : "set");
@@ -215,7 +216,7 @@ public sealed class TransferContextFactoryTests
             "tftp://example.com/x");
 
         TransferContext context = new TransferContextFactory(standardInput)
-            .Create(options, EasyOptionsFromCommandLine.HttpOf(options), EasyOptionsFromCommandLine.BehaviourOf(options), EasyOptionsFromCommandLine.TransferOf(options), EasyOptionsFromCommandLine.ProtocolOf(options), EasyOptionsFromCommandLine.ProxyOf(options), EasyOptionsFromCommandLine.NetworkOf(options), CurlUrl.Parse("tftp://example.com/x"), output, null, null, null);
+            .Create(options, EasyOptionsFromCommandLine.HttpOf(options), EasyOptionsFromCommandLine.BehaviourOf(options), EasyOptionsFromCommandLine.TransferOf(options), EasyOptionsFromCommandLine.ProtocolOf(options), EasyOptionsFromCommandLine.ProxyOf(options), EasyOptionsFromCommandLine.AuthenticationOf(options), EasyOptionsFromCommandLine.NetworkOf(options), CurlUrl.Parse("tftp://example.com/x"), output, null, null, null);
         Diagnostics.Act("context URL", context.Url.OriginalString);
 
         Diagnostics.Assert("context.MaxFileSize", 100L, context.MaxFileSize);
@@ -284,7 +285,7 @@ public sealed class TransferContextFactoryTests
         Diagnostics.Arrange("transfer options", $"{condition} {pastYear9999}");
 
         TransferContext context = new TransferContextFactory(standardInput)
-            .Create(Parse("http://h/"), HttpOf("http://h/"), BehaviourOf("http://h/"), transfer, new EasyProtocolOptions(), new EasyProxyOptions(), new EasyNetworkOptions(), CurlUrl.Parse("http://h/"), output, null, null, null);
+            .Create(Parse("http://h/"), HttpOf("http://h/"), BehaviourOf("http://h/"), transfer, new EasyProtocolOptions(), new EasyProxyOptions(), new EasyAuthenticationOptions(), new EasyNetworkOptions(), CurlUrl.Parse("http://h/"), output, null, null, null);
         Diagnostics.Act("context.TimeCondition", context.TimeCondition);
 
         Diagnostics.Assert("seconds and kind", $"{pastYear9999} {expectedKind}", $"{context.TimeCondition?.ValueUnixSeconds} {context.TimeCondition?.Kind}");
@@ -300,7 +301,7 @@ public sealed class TransferContextFactoryTests
         string[] arguments = ["--max-filesize", "0", "-m", "0", "smtp://h/"];
 
         TransferContext context = new TransferContextFactory(standardInput)
-            .Create(Parse(arguments), HttpOf(arguments), BehaviourOf(arguments), TransferOf(arguments), ProtocolOf(arguments), ProxyOf(arguments), NetworkOf(arguments), CurlUrl.Parse("smtp://h/"), output, null, null, null);
+            .Create(Parse(arguments), HttpOf(arguments), BehaviourOf(arguments), TransferOf(arguments), ProtocolOf(arguments), ProxyOf(arguments), AuthenticationOf(arguments), NetworkOf(arguments), CurlUrl.Parse("smtp://h/"), output, null, null, null);
         Diagnostics.Act("MaxFileSize / MaxTime", $"{context.MaxFileSize?.ToString() ?? "null"} / {context.MaxTime?.ToString() ?? "null"}");
 
         Diagnostics.Assert("context.MaxFileSize", "null", context.MaxFileSize?.ToString() ?? "null");
@@ -316,7 +317,7 @@ public sealed class TransferContextFactoryTests
         using MemoryStream output = new();
 
         TransferContext context = new TransferContextFactory(standardInput)
-            .Create(Parse("ftp://example.com/f"), HttpOf("ftp://example.com/f"), BehaviourOf("ftp://example.com/f"), TransferOf("ftp://example.com/f"), ProtocolOf("ftp://example.com/f"), ProxyOf("ftp://example.com/f"), NetworkOf("ftp://example.com/f"), CurlUrl.Parse("ftp://example.com/f"), output, null, null, null);
+            .Create(Parse("ftp://example.com/f"), HttpOf("ftp://example.com/f"), BehaviourOf("ftp://example.com/f"), TransferOf("ftp://example.com/f"), ProtocolOf("ftp://example.com/f"), ProxyOf("ftp://example.com/f"), AuthenticationOf("ftp://example.com/f"), NetworkOf("ftp://example.com/f"), CurlUrl.Parse("ftp://example.com/f"), output, null, null, null);
         Diagnostics.Act("context URL", context.Url.OriginalString);
 
         Diagnostics.Assert("context.FtpPort", "null", context.FtpPort is null ? "null" : "set");
@@ -341,7 +342,7 @@ public sealed class TransferContextFactoryTests
         using MemoryStream output = new();
 
         TransferContext context = new TransferContextFactory(standardInput)
-            .Create(Parse([.. options, "ftp://example.com/f"]), HttpOf([.. options, "ftp://example.com/f"]), BehaviourOf([.. options, "ftp://example.com/f"]), TransferOf([.. options, "ftp://example.com/f"]), ProtocolOf([.. options, "ftp://example.com/f"]), ProxyOf([.. options, "ftp://example.com/f"]), NetworkOf([.. options, "ftp://example.com/f"]), CurlUrl.Parse("ftp://example.com/f"), output, null, null, null);
+            .Create(Parse([.. options, "ftp://example.com/f"]), HttpOf([.. options, "ftp://example.com/f"]), BehaviourOf([.. options, "ftp://example.com/f"]), TransferOf([.. options, "ftp://example.com/f"]), ProtocolOf([.. options, "ftp://example.com/f"]), ProxyOf([.. options, "ftp://example.com/f"]), AuthenticationOf([.. options, "ftp://example.com/f"]), NetworkOf([.. options, "ftp://example.com/f"]), CurlUrl.Parse("ftp://example.com/f"), output, null, null, null);
         Diagnostics.Act("context URL", context.Url.OriginalString);
 
         Diagnostics.Assert("context.FtpCommandChannelClearing", expected, context.FtpCommandChannelClearing);
@@ -355,7 +356,7 @@ public sealed class TransferContextFactoryTests
         using MemoryStream output = new();
 
         TransferContext context = new TransferContextFactory(standardInput)
-            .Create(Parse("-P", "-", "ftp://example.com/f"), HttpOf("-P", "-", "ftp://example.com/f"), BehaviourOf("-P", "-", "ftp://example.com/f"), TransferOf("-P", "-", "ftp://example.com/f"), ProtocolOf("-P", "-", "ftp://example.com/f"), ProxyOf("-P", "-", "ftp://example.com/f"), NetworkOf("-P", "-", "ftp://example.com/f"), CurlUrl.Parse("ftp://example.com/f"), output, null, null, null);
+            .Create(Parse("-P", "-", "ftp://example.com/f"), HttpOf("-P", "-", "ftp://example.com/f"), BehaviourOf("-P", "-", "ftp://example.com/f"), TransferOf("-P", "-", "ftp://example.com/f"), ProtocolOf("-P", "-", "ftp://example.com/f"), ProxyOf("-P", "-", "ftp://example.com/f"), AuthenticationOf("-P", "-", "ftp://example.com/f"), NetworkOf("-P", "-", "ftp://example.com/f"), CurlUrl.Parse("ftp://example.com/f"), output, null, null, null);
         Diagnostics.Act("context URL", context.Url.OriginalString);
 
         Diagnostics.Assert("context.FtpPort", "-", context.FtpPort);
@@ -465,7 +466,7 @@ public sealed class TransferContextFactoryTests
         using MemoryStream output = new();
 
         TransferContext context = new TransferContextFactory(standardInput)
-            .Create(Parse("--disable-eprt", "ftp://example.com/f"), HttpOf("--disable-eprt", "ftp://example.com/f"), BehaviourOf("--disable-eprt", "ftp://example.com/f"), TransferOf("--disable-eprt", "ftp://example.com/f"), ProtocolOf("--disable-eprt", "ftp://example.com/f"), ProxyOf("--disable-eprt", "ftp://example.com/f"), NetworkOf("--disable-eprt", "ftp://example.com/f"), CurlUrl.Parse("ftp://example.com/f"), output, null, null, null);
+            .Create(Parse("--disable-eprt", "ftp://example.com/f"), HttpOf("--disable-eprt", "ftp://example.com/f"), BehaviourOf("--disable-eprt", "ftp://example.com/f"), TransferOf("--disable-eprt", "ftp://example.com/f"), ProtocolOf("--disable-eprt", "ftp://example.com/f"), ProxyOf("--disable-eprt", "ftp://example.com/f"), AuthenticationOf("--disable-eprt", "ftp://example.com/f"), NetworkOf("--disable-eprt", "ftp://example.com/f"), CurlUrl.Parse("ftp://example.com/f"), output, null, null, null);
         Diagnostics.Act("context URL", context.Url.OriginalString);
 
         Diagnostics.Assert("context.FtpUseEprt", false, context.FtpUseEprt);
@@ -481,7 +482,7 @@ public sealed class TransferContextFactoryTests
         using MemoryStream output = new();
 
         TransferContext context = new TransferContextFactory(standardInput)
-            .Create(Parse(option, "ftp://example.com/f"), HttpOf(option, "ftp://example.com/f"), BehaviourOf(option, "ftp://example.com/f"), TransferOf(option, "ftp://example.com/f"), ProtocolOf(option, "ftp://example.com/f"), ProxyOf(option, "ftp://example.com/f"), NetworkOf(option, "ftp://example.com/f"), CurlUrl.Parse("ftp://example.com/f"), output, null, null, null);
+            .Create(Parse(option, "ftp://example.com/f"), HttpOf(option, "ftp://example.com/f"), BehaviourOf(option, "ftp://example.com/f"), TransferOf(option, "ftp://example.com/f"), ProtocolOf(option, "ftp://example.com/f"), ProxyOf(option, "ftp://example.com/f"), AuthenticationOf(option, "ftp://example.com/f"), NetworkOf(option, "ftp://example.com/f"), CurlUrl.Parse("ftp://example.com/f"), output, null, null, null);
         Diagnostics.Act("context URL", context.Url.OriginalString);
 
         Diagnostics.Assert("context.SslLevel", expected, context.SslLevel);
@@ -497,7 +498,7 @@ public sealed class TransferContextFactoryTests
         using MemoryStream output = new();
 
         TransferContext context = new TransferContextFactory(standardInput)
-            .Create(Parse("--ftp-ssl-control", "ftp://example.com/f"), HttpOf("--ftp-ssl-control", "ftp://example.com/f"), BehaviourOf("--ftp-ssl-control", "ftp://example.com/f"), TransferOf("--ftp-ssl-control", "ftp://example.com/f"), ProtocolOf("--ftp-ssl-control", "ftp://example.com/f"), ProxyOf("--ftp-ssl-control", "ftp://example.com/f"), NetworkOf("--ftp-ssl-control", "ftp://example.com/f"), CurlUrl.Parse("ftp://example.com/f"), output, null, null, null);
+            .Create(Parse("--ftp-ssl-control", "ftp://example.com/f"), HttpOf("--ftp-ssl-control", "ftp://example.com/f"), BehaviourOf("--ftp-ssl-control", "ftp://example.com/f"), TransferOf("--ftp-ssl-control", "ftp://example.com/f"), ProtocolOf("--ftp-ssl-control", "ftp://example.com/f"), ProxyOf("--ftp-ssl-control", "ftp://example.com/f"), AuthenticationOf("--ftp-ssl-control", "ftp://example.com/f"), NetworkOf("--ftp-ssl-control", "ftp://example.com/f"), CurlUrl.Parse("ftp://example.com/f"), output, null, null, null);
         Diagnostics.Act("context URL", context.Url.OriginalString);
 
         Diagnostics.Assert("context.FtpSslControlOnly", true, context.FtpSslControlOnly);
@@ -516,7 +517,7 @@ public sealed class TransferContextFactoryTests
 
         // --ssl-reqd outranks --ftp-ssl-control (ADR-0102), so FTP sends PROT P, not PROT C.
         TransferContext context = new TransferContextFactory(standardInput)
-            .Create(Parse(first, second, "ftp://example.com/f"), HttpOf(first, second, "ftp://example.com/f"), BehaviourOf(first, second, "ftp://example.com/f"), TransferOf(first, second, "ftp://example.com/f"), ProtocolOf(first, second, "ftp://example.com/f"), ProxyOf(first, second, "ftp://example.com/f"), NetworkOf(first, second, "ftp://example.com/f"), CurlUrl.Parse("ftp://example.com/f"), output, null, null, null);
+            .Create(Parse(first, second, "ftp://example.com/f"), HttpOf(first, second, "ftp://example.com/f"), BehaviourOf(first, second, "ftp://example.com/f"), TransferOf(first, second, "ftp://example.com/f"), ProtocolOf(first, second, "ftp://example.com/f"), ProxyOf(first, second, "ftp://example.com/f"), AuthenticationOf(first, second, "ftp://example.com/f"), NetworkOf(first, second, "ftp://example.com/f"), CurlUrl.Parse("ftp://example.com/f"), output, null, null, null);
         Diagnostics.Act("context URL", context.Url.OriginalString);
 
         Diagnostics.Assert("context.FtpSslControlOnly", false, context.FtpSslControlOnly);
@@ -534,7 +535,7 @@ public sealed class TransferContextFactoryTests
             "-X", "PATCH", "-H", "X: 1", "--proxy-header", "X-P: 1", "--proxy-header", "X-Q: 2", "-A", "a/1", "-e", "http://r/", "-d", "a=b", "http://example.com/");
 
         TransferContext context = new TransferContextFactory(standardInput)
-            .Create(options, EasyOptionsFromCommandLine.HttpOf(options), EasyOptionsFromCommandLine.BehaviourOf(options), EasyOptionsFromCommandLine.TransferOf(options), EasyOptionsFromCommandLine.ProtocolOf(options), EasyOptionsFromCommandLine.ProxyOf(options), EasyOptionsFromCommandLine.NetworkOf(options), CurlUrl.Parse("http://example.com/"), output, null, null, null);
+            .Create(options, EasyOptionsFromCommandLine.HttpOf(options), EasyOptionsFromCommandLine.BehaviourOf(options), EasyOptionsFromCommandLine.TransferOf(options), EasyOptionsFromCommandLine.ProtocolOf(options), EasyOptionsFromCommandLine.ProxyOf(options), EasyOptionsFromCommandLine.AuthenticationOf(options), EasyOptionsFromCommandLine.NetworkOf(options), CurlUrl.Parse("http://example.com/"), output, null, null, null);
         Diagnostics.Act("context URL", context.Url.OriginalString);
 
         Diagnostics.Assert("context.Http!.CustomMethod", "PATCH", context.Http!.CustomMethod);
@@ -565,7 +566,7 @@ public sealed class TransferContextFactoryTests
         CommandLineOptions options = Parse([.. arguments, "http://example.com/"]);
 
         TransferContext context = new TransferContextFactory(standardInput)
-            .Create(options, EasyOptionsFromCommandLine.HttpOf(options), EasyOptionsFromCommandLine.BehaviourOf(options), EasyOptionsFromCommandLine.TransferOf(options), EasyOptionsFromCommandLine.ProtocolOf(options), EasyOptionsFromCommandLine.ProxyOf(options), EasyOptionsFromCommandLine.NetworkOf(options), CurlUrl.Parse("http://example.com/"), output, null, null, null);
+            .Create(options, EasyOptionsFromCommandLine.HttpOf(options), EasyOptionsFromCommandLine.BehaviourOf(options), EasyOptionsFromCommandLine.TransferOf(options), EasyOptionsFromCommandLine.ProtocolOf(options), EasyOptionsFromCommandLine.ProxyOf(options), EasyOptionsFromCommandLine.AuthenticationOf(options), EasyOptionsFromCommandLine.NetworkOf(options), CurlUrl.Parse("http://example.com/"), output, null, null, null);
         Diagnostics.Act("context URL", context.Url.OriginalString);
 
         Diagnostics.Assert("context.Http!.MaxRedirects", expected, context.Http!.MaxRedirects);
@@ -589,7 +590,7 @@ public sealed class TransferContextFactoryTests
         Diagnostics.Arrange("transfer options", $"Upload={upload} ResumeFrom={resumeFrom} stream={withStream}");
 
         TransferContext context = new TransferContextFactory(standardInput)
-            .Create(options, EasyOptionsFromCommandLine.HttpOf(options), EasyOptionsFromCommandLine.BehaviourOf(options), transfer, new EasyProtocolOptions(), new EasyProxyOptions(), new EasyNetworkOptions(), CurlUrl.Parse("http://example.com/up"), output, null, null, null, upload: withStream ? uploadStream : null);
+            .Create(options, EasyOptionsFromCommandLine.HttpOf(options), EasyOptionsFromCommandLine.BehaviourOf(options), transfer, new EasyProtocolOptions(), new EasyProxyOptions(), new EasyAuthenticationOptions(), new EasyNetworkOptions(), CurlUrl.Parse("http://example.com/up"), output, null, null, null, upload: withStream ? uploadStream : null);
         Diagnostics.Act("context URL", context.Url.OriginalString);
 
         Diagnostics.Assert("context.ResumeUploadFromUnknownOffset", expected, context.ResumeUploadFromUnknownOffset);
@@ -603,7 +604,7 @@ public sealed class TransferContextFactoryTests
         using MemoryStream output = new();
 
         TransferContext context = new TransferContextFactory(standardInput)
-            .Create(Parse("telnet://example.com/"), HttpOf("telnet://example.com/"), BehaviourOf("telnet://example.com/"), TransferOf("telnet://example.com/"), ProtocolOf("telnet://example.com/"), ProxyOf("telnet://example.com/"), NetworkOf("telnet://example.com/"), CurlUrl.Parse("telnet://example.com/"), output, null, null, null);
+            .Create(Parse("telnet://example.com/"), HttpOf("telnet://example.com/"), BehaviourOf("telnet://example.com/"), TransferOf("telnet://example.com/"), ProtocolOf("telnet://example.com/"), ProxyOf("telnet://example.com/"), AuthenticationOf("telnet://example.com/"), NetworkOf("telnet://example.com/"), CurlUrl.Parse("telnet://example.com/"), output, null, null, null);
         Diagnostics.Act("context URL", context.Url.OriginalString);
 
         Diagnostics.Assert("context.Upload is standardInput", true, ReferenceEquals(standardInput, context.Upload));
@@ -619,7 +620,7 @@ public sealed class TransferContextFactoryTests
         using MemoryStream output = new();
 
         TransferContext context = new TransferContextFactory(standardInput)
-            .Create(Parse(url), HttpOf(url), BehaviourOf(url), TransferOf(url), ProtocolOf(url), ProxyOf(url), NetworkOf(url), CurlUrl.Parse(url), output, null, null, null);
+            .Create(Parse(url), HttpOf(url), BehaviourOf(url), TransferOf(url), ProtocolOf(url), ProxyOf(url), AuthenticationOf(url), NetworkOf(url), CurlUrl.Parse(url), output, null, null, null);
         Diagnostics.Act("context URL", context.Url.OriginalString);
 
         Diagnostics.Assert("context.Upload", "null", context.Upload is null ? "null" : "set");
@@ -637,7 +638,7 @@ public sealed class TransferContextFactoryTests
         using CancellationTokenSource abort = new();
 
         TransferContext context = new TransferContextFactory(standardInput)
-            .Create(Parse("file:///x.txt"), HttpOf("file:///x.txt"), BehaviourOf("file:///x.txt"), TransferOf("file:///x.txt"), ProtocolOf("file:///x.txt"), ProxyOf("file:///x.txt"), NetworkOf("file:///x.txt"), CurlUrl.Parse("file:///x.txt"), output, null, null, null, abortToken: abort.Token);
+            .Create(Parse("file:///x.txt"), HttpOf("file:///x.txt"), BehaviourOf("file:///x.txt"), TransferOf("file:///x.txt"), ProtocolOf("file:///x.txt"), ProxyOf("file:///x.txt"), AuthenticationOf("file:///x.txt"), NetworkOf("file:///x.txt"), CurlUrl.Parse("file:///x.txt"), output, null, null, null, abortToken: abort.Token);
         Diagnostics.Act("context URL", context.Url.OriginalString);
 
         Diagnostics.Assert("context.CancellationToken", abort.Token, context.CancellationToken);
@@ -652,7 +653,7 @@ public sealed class TransferContextFactoryTests
         using LowSpeedWatchdog watchdog = new(1, TimeSpan.FromHours(1), TimeProvider.System);
 
         TransferContext context = new TransferContextFactory(standardInput)
-            .Create(Parse("file:///x.txt"), HttpOf("file:///x.txt"), BehaviourOf("file:///x.txt"), TransferOf("file:///x.txt"), ProtocolOf("file:///x.txt"), ProxyOf("file:///x.txt"), NetworkOf("file:///x.txt"), CurlUrl.Parse("file:///x.txt"), output, null, null, null, lowSpeedWatchdog: watchdog);
+            .Create(Parse("file:///x.txt"), HttpOf("file:///x.txt"), BehaviourOf("file:///x.txt"), TransferOf("file:///x.txt"), ProtocolOf("file:///x.txt"), ProxyOf("file:///x.txt"), AuthenticationOf("file:///x.txt"), NetworkOf("file:///x.txt"), CurlUrl.Parse("file:///x.txt"), output, null, null, null, lowSpeedWatchdog: watchdog);
         Diagnostics.Act("context URL", context.Url.OriginalString);
 
         Diagnostics.Assert("context.CancellationToken", watchdog.Token, context.CancellationToken);
@@ -668,7 +669,7 @@ public sealed class TransferContextFactoryTests
         using CancellationTokenSource abort = new();
 
         TransferContext context = new TransferContextFactory(standardInput)
-            .Create(Parse("file:///x.txt"), HttpOf("file:///x.txt"), BehaviourOf("file:///x.txt"), TransferOf("file:///x.txt"), ProtocolOf("file:///x.txt"), ProxyOf("file:///x.txt"), NetworkOf("file:///x.txt"), CurlUrl.Parse("file:///x.txt"), output, null, null, null, lowSpeedWatchdog: watchdog, abortToken: abort.Token);
+            .Create(Parse("file:///x.txt"), HttpOf("file:///x.txt"), BehaviourOf("file:///x.txt"), TransferOf("file:///x.txt"), ProtocolOf("file:///x.txt"), ProxyOf("file:///x.txt"), AuthenticationOf("file:///x.txt"), NetworkOf("file:///x.txt"), CurlUrl.Parse("file:///x.txt"), output, null, null, null, lowSpeedWatchdog: watchdog, abortToken: abort.Token);
         Diagnostics.Act("context URL", context.Url.OriginalString);
         abort.Cancel();
 
@@ -688,7 +689,7 @@ public sealed class TransferContextFactoryTests
         using MaxTimeWatchdog watchdog = new(TimeSpan.FromHours(1), clock);
 
         TransferContext context = new TransferContextFactory(standardInput, clock)
-            .Create(Parse("dict://h/d:x"), HttpOf("dict://h/d:x"), BehaviourOf("dict://h/d:x"), TransferOf("dict://h/d:x"), ProtocolOf("dict://h/d:x"), ProxyOf("dict://h/d:x"), NetworkOf("dict://h/d:x"), CurlUrl.Parse("dict://h/d:x"), output, null, null, null, maxTimeWatchdog: watchdog);
+            .Create(Parse("dict://h/d:x"), HttpOf("dict://h/d:x"), BehaviourOf("dict://h/d:x"), TransferOf("dict://h/d:x"), ProtocolOf("dict://h/d:x"), ProxyOf("dict://h/d:x"), AuthenticationOf("dict://h/d:x"), NetworkOf("dict://h/d:x"), CurlUrl.Parse("dict://h/d:x"), output, null, null, null, maxTimeWatchdog: watchdog);
         Diagnostics.Act("context URL", context.Url.OriginalString);
 
         Diagnostics.Assert("context.CancellationToken", watchdog.Token, context.CancellationToken);
@@ -704,7 +705,7 @@ public sealed class TransferContextFactoryTests
         using MemoryStream output = new();
 
         TransferContext context = new TransferContextFactory(standardInput)
-            .Create(Parse("dict://h/d:x"), HttpOf("dict://h/d:x"), BehaviourOf("dict://h/d:x"), TransferOf("dict://h/d:x"), ProtocolOf("dict://h/d:x"), ProxyOf("dict://h/d:x"), NetworkOf("dict://h/d:x"), CurlUrl.Parse("dict://h/d:x"), output, null, null, null);
+            .Create(Parse("dict://h/d:x"), HttpOf("dict://h/d:x"), BehaviourOf("dict://h/d:x"), TransferOf("dict://h/d:x"), ProtocolOf("dict://h/d:x"), ProxyOf("dict://h/d:x"), AuthenticationOf("dict://h/d:x"), NetworkOf("dict://h/d:x"), CurlUrl.Parse("dict://h/d:x"), output, null, null, null);
         Diagnostics.Act("context URL", context.Url.OriginalString);
 
         Diagnostics.Assert("context.OperationStarted", "null", context.OperationStarted is null ? "null" : "set");
@@ -722,7 +723,7 @@ public sealed class TransferContextFactoryTests
         using CancellationTokenSource abort = new();
 
         TransferContext context = new TransferContextFactory(standardInput, clock)
-            .Create(Parse("dict://h/d:x"), HttpOf("dict://h/d:x"), BehaviourOf("dict://h/d:x"), TransferOf("dict://h/d:x"), ProtocolOf("dict://h/d:x"), ProxyOf("dict://h/d:x"), NetworkOf("dict://h/d:x"), CurlUrl.Parse("dict://h/d:x"), output, null, null, null, lowSpeedWatchdog: lowSpeed, abortToken: abort.Token, maxTimeWatchdog: maxTime);
+            .Create(Parse("dict://h/d:x"), HttpOf("dict://h/d:x"), BehaviourOf("dict://h/d:x"), TransferOf("dict://h/d:x"), ProtocolOf("dict://h/d:x"), ProxyOf("dict://h/d:x"), AuthenticationOf("dict://h/d:x"), NetworkOf("dict://h/d:x"), CurlUrl.Parse("dict://h/d:x"), output, null, null, null, lowSpeedWatchdog: lowSpeed, abortToken: abort.Token, maxTimeWatchdog: maxTime);
         Diagnostics.Act("context URL", context.Url.OriginalString);
         context.Progress.ReportTransferStarted();
         context.Progress.ReportDownloaded(7, null);
@@ -744,7 +745,7 @@ public sealed class TransferContextFactoryTests
         using MemoryStream dumpHeader = new();
 
         TransferContext context = new TransferContextFactory(standardInput)
-            .Create(Parse("-D", "h.txt", "gopher://h/1sel"), HttpOf("-D", "h.txt", "gopher://h/1sel"), BehaviourOf("-D", "h.txt", "gopher://h/1sel"), TransferOf("-D", "h.txt", "gopher://h/1sel"), ProtocolOf("-D", "h.txt", "gopher://h/1sel"), ProxyOf("-D", "h.txt", "gopher://h/1sel"), NetworkOf("-D", "h.txt", "gopher://h/1sel"), CurlUrl.Parse("gopher://h/1sel"), output, null, null, dumpHeader);
+            .Create(Parse("-D", "h.txt", "gopher://h/1sel"), HttpOf("-D", "h.txt", "gopher://h/1sel"), BehaviourOf("-D", "h.txt", "gopher://h/1sel"), TransferOf("-D", "h.txt", "gopher://h/1sel"), ProtocolOf("-D", "h.txt", "gopher://h/1sel"), ProxyOf("-D", "h.txt", "gopher://h/1sel"), AuthenticationOf("-D", "h.txt", "gopher://h/1sel"), NetworkOf("-D", "h.txt", "gopher://h/1sel"), CurlUrl.Parse("gopher://h/1sel"), output, null, null, dumpHeader);
         Diagnostics.Act("context URL", context.Url.OriginalString);
 
         Diagnostics.Assert("context.DumpHeaderOutput is dumpHeader", true, ReferenceEquals(dumpHeader, context.DumpHeaderOutput));
@@ -758,7 +759,7 @@ public sealed class TransferContextFactoryTests
         using MemoryStream output = new();
 
         TransferContext context = new TransferContextFactory(standardInput)
-            .Create(Parse("-i", "gopher://h/1sel"), HttpOf("-i", "gopher://h/1sel"), BehaviourOf("-i", "gopher://h/1sel"), TransferOf("-i", "gopher://h/1sel"), ProtocolOf("-i", "gopher://h/1sel"), ProxyOf("-i", "gopher://h/1sel"), NetworkOf("-i", "gopher://h/1sel"), CurlUrl.Parse("gopher://h/1sel"), output, null, null, null);
+            .Create(Parse("-i", "gopher://h/1sel"), HttpOf("-i", "gopher://h/1sel"), BehaviourOf("-i", "gopher://h/1sel"), TransferOf("-i", "gopher://h/1sel"), ProtocolOf("-i", "gopher://h/1sel"), ProxyOf("-i", "gopher://h/1sel"), AuthenticationOf("-i", "gopher://h/1sel"), NetworkOf("-i", "gopher://h/1sel"), CurlUrl.Parse("gopher://h/1sel"), output, null, null, null);
         Diagnostics.Act("context URL", context.Url.OriginalString);
 
         Diagnostics.Assert("context.HeaderOutput", "set", context.HeaderOutput is null ? "null" : "set");
@@ -774,7 +775,7 @@ public sealed class TransferContextFactoryTests
         using MemoryStream output = new();
 
         TransferContext context = new TransferContextFactory(standardInput)
-            .Create(Parse("gopher://h/1sel"), HttpOf("gopher://h/1sel"), BehaviourOf("gopher://h/1sel"), TransferOf("gopher://h/1sel"), ProtocolOf("gopher://h/1sel"), ProxyOf("gopher://h/1sel"), NetworkOf("gopher://h/1sel"), CurlUrl.Parse("gopher://h/1sel"), output, null, null, null);
+            .Create(Parse("gopher://h/1sel"), HttpOf("gopher://h/1sel"), BehaviourOf("gopher://h/1sel"), TransferOf("gopher://h/1sel"), ProtocolOf("gopher://h/1sel"), ProxyOf("gopher://h/1sel"), AuthenticationOf("gopher://h/1sel"), NetworkOf("gopher://h/1sel"), CurlUrl.Parse("gopher://h/1sel"), output, null, null, null);
         Diagnostics.Act("context URL", context.Url.OriginalString);
 
         Diagnostics.Assert("context.DumpHeaderOutput", "null", context.DumpHeaderOutput is null ? "null" : "set");
@@ -789,7 +790,7 @@ public sealed class TransferContextFactoryTests
         using MemoryStream dumpHeader = new();
 
         TransferContext context = new TransferContextFactory(standardInput)
-            .Create(Parse("-D", "h.txt", "-i", "ftp://h/"), HttpOf("-D", "h.txt", "-i", "ftp://h/"), BehaviourOf("-D", "h.txt", "-i", "ftp://h/"), TransferOf("-D", "h.txt", "-i", "ftp://h/"), ProtocolOf("-D", "h.txt", "-i", "ftp://h/"), ProxyOf("-D", "h.txt", "-i", "ftp://h/"), NetworkOf("-D", "h.txt", "-i", "ftp://h/"), CurlUrl.Parse("ftp://h/"), output, null, null, dumpHeader);
+            .Create(Parse("-D", "h.txt", "-i", "ftp://h/"), HttpOf("-D", "h.txt", "-i", "ftp://h/"), BehaviourOf("-D", "h.txt", "-i", "ftp://h/"), TransferOf("-D", "h.txt", "-i", "ftp://h/"), ProtocolOf("-D", "h.txt", "-i", "ftp://h/"), ProxyOf("-D", "h.txt", "-i", "ftp://h/"), AuthenticationOf("-D", "h.txt", "-i", "ftp://h/"), NetworkOf("-D", "h.txt", "-i", "ftp://h/"), CurlUrl.Parse("ftp://h/"), output, null, null, dumpHeader);
         Diagnostics.Act("context URL", context.Url.OriginalString);
         context.DumpHeaderOutput!.Write("220 hi\r\n"u8);
 
@@ -807,7 +808,7 @@ public sealed class TransferContextFactoryTests
         using MemoryStream dumpHeader = new();
 
         TransferContext context = new TransferContextFactory(standardInput)
-            .Create(Parse("-D", "h.txt", "ftp://h/"), HttpOf("-D", "h.txt", "ftp://h/"), BehaviourOf("-D", "h.txt", "ftp://h/"), TransferOf("-D", "h.txt", "ftp://h/"), ProtocolOf("-D", "h.txt", "ftp://h/"), ProxyOf("-D", "h.txt", "ftp://h/"), NetworkOf("-D", "h.txt", "ftp://h/"), CurlUrl.Parse("ftp://h/"), output, null, null, dumpHeader);
+            .Create(Parse("-D", "h.txt", "ftp://h/"), HttpOf("-D", "h.txt", "ftp://h/"), BehaviourOf("-D", "h.txt", "ftp://h/"), TransferOf("-D", "h.txt", "ftp://h/"), ProtocolOf("-D", "h.txt", "ftp://h/"), ProxyOf("-D", "h.txt", "ftp://h/"), AuthenticationOf("-D", "h.txt", "ftp://h/"), NetworkOf("-D", "h.txt", "ftp://h/"), CurlUrl.Parse("ftp://h/"), output, null, null, dumpHeader);
         Diagnostics.Act("context URL", context.Url.OriginalString);
         context.DumpHeaderOutput!.Write("220 hi\r\n"u8);
         context.HeaderOutput!.Write("Content-Length: 3\r\n"u8);
@@ -863,6 +864,7 @@ public sealed class TransferContextFactoryTests
             new EasyTransferOptions(),
             new EasyProtocolOptions(),
             new EasyProxyOptions(),
+            new EasyAuthenticationOptions(),
             NetworkOf("--connect-to", "::connect.example:8990", "http://www.example/"),
             CurlUrl.Parse("http://www.example/"),
             output,
@@ -887,7 +889,7 @@ public sealed class TransferContextFactoryTests
         Diagnostics.Arrange("network.ConnectTimeout", network.ConnectTimeout);
 
         TransferContext context = new TransferContextFactory(standardInput)
-            .Create(Parse("dict://h/d:x"), HttpOf("dict://h/d:x"), new EasyBehaviourOptions(), new EasyTransferOptions(), new EasyProtocolOptions(), new EasyProxyOptions(), network, CurlUrl.Parse("dict://h/d:x"), output, null, null, null);
+            .Create(Parse("dict://h/d:x"), HttpOf("dict://h/d:x"), new EasyBehaviourOptions(), new EasyTransferOptions(), new EasyProtocolOptions(), new EasyProxyOptions(), new EasyAuthenticationOptions(), network, CurlUrl.Parse("dict://h/d:x"), output, null, null, null);
         Diagnostics.Act("context.ConnectTimeout", context.ConnectTimeout);
 
         TimeSpan? expected = expectedMilliseconds is { } given ? TimeSpan.FromMilliseconds(given) : null;
@@ -930,10 +932,13 @@ public sealed class TransferContextFactoryTests
 
     private TransferContext CreateFtpContext(Stream standardInput, Stream output, EasyProtocolOptions protocol) =>
         new TransferContextFactory(standardInput)
-            .Create(Parse("ftp://example.com/f"), HttpOf("ftp://example.com/f"), new EasyBehaviourOptions(), new EasyTransferOptions(), protocol, new EasyProxyOptions(), new EasyNetworkOptions(), CurlUrl.Parse("ftp://example.com/f"), output, null, null, null);
+            .Create(Parse("ftp://example.com/f"), HttpOf("ftp://example.com/f"), new EasyBehaviourOptions(), new EasyTransferOptions(), protocol, new EasyProxyOptions(), new EasyAuthenticationOptions(), new EasyNetworkOptions(), CurlUrl.Parse("ftp://example.com/f"), output, null, null, null);
 
     private static EasyProtocolOptions ProtocolOf(params string[] arguments) =>
         EasyOptionsFromCommandLine.ProtocolOf(CommandLineParser.Parse(arguments, _ => true).Options!);
+
+    private static EasyAuthenticationOptions AuthenticationOf(params string[] arguments) =>
+        EasyOptionsFromCommandLine.AuthenticationOf(CommandLineParser.Parse(arguments, _ => true).Options!);
 
     private static EasyProxyOptions ProxyOf(params string[] arguments) =>
         EasyOptionsFromCommandLine.ProxyOf(CommandLineParser.Parse(arguments, _ => true).Options!);

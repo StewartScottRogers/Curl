@@ -1,4 +1,4 @@
-using Curl.Cli;
+using Curl.Api.Options.Authentication;
 using Curl.HttpMessageSignatures;
 using Curl.Protocol.Abstractions;
 
@@ -19,40 +19,40 @@ internal sealed record HttpSignatureSetup(HttpSignatureSettings? Settings, CurlE
     internal static readonly HttpSignatureSetup None = new(null, CurlExitCode.Ok, null);
 
     /// <summary>
-    /// Checks <paramref name="options" /> as curl does, in its order: a missing key, a missing key
+    /// Checks <paramref name="authentication" /> as curl does, in its order: a missing key, a missing key
     /// id, then an algorithm other than <c>ed25519</c> (the default) or <c>hmac-sha256</c> in any
     /// case, each exit 2; then reads a key given as <c>@file</c>, exit 26 when it cannot be read
     /// and 43 when it is empty.
     /// </summary>
-    /// <param name="options">The parsed command line.</param>
+    /// <param name="authentication">The option group's authentication options, whose <c>HttpSignature*</c> members are the <c>--httpsig-*</c> options.</param>
     /// <returns>The outcome.</returns>
-    internal static HttpSignatureSetup Of(CommandLineOptions options)
+    internal static HttpSignatureSetup Of(EasyAuthenticationOptions authentication)
     {
-        if (!IsRequested(options))
+        if (!IsRequested(authentication))
         {
             return None;
         }
 
-        if (options.HttpSignatureKey is not { } key)
+        if (authentication.HttpSignatureKey is not { } key)
         {
             return Refused(CurlExitCode.FailedInit, "curl: --httpsig-key is required");
         }
 
-        if (options.HttpSignatureKeyId is not { } keyId)
+        if (authentication.HttpSignatureKeyId is not { } keyId)
         {
             return Refused(CurlExitCode.FailedInit, "curl: --httpsig-keyid is required");
         }
 
-        return AlgorithmOf(options.HttpSignatureAlgorithm) is { } algorithm
-            ? WithKey(algorithm, key, keyId, options.HttpSignatureHeaders)
-            : Refused(CurlExitCode.FailedInit, $"curl: --httpsig-algo: unsupported algorithm '{options.HttpSignatureAlgorithm}'");
+        return AlgorithmOf(authentication.HttpSignatureAlgorithm) is { } algorithm
+            ? WithKey(algorithm, key, keyId, authentication.HttpSignatureHeaders)
+            : Refused(CurlExitCode.FailedInit, $"curl: --httpsig-algo: unsupported algorithm '{authentication.HttpSignatureAlgorithm}'");
     }
 
-    private static bool IsRequested(CommandLineOptions options) =>
-        options.HttpSignatureAlgorithm is not null
-        || options.HttpSignatureKey is not null
-        || options.HttpSignatureKeyId is not null
-        || options.HttpSignatureHeaders is not null;
+    private static bool IsRequested(EasyAuthenticationOptions authentication) =>
+        authentication.HttpSignatureAlgorithm is not null
+        || authentication.HttpSignatureKey is not null
+        || authentication.HttpSignatureKeyId is not null
+        || authentication.HttpSignatureHeaders is not null;
 
     /// <summary>
     /// Gives the algorithm's name in lower case, <c>ed25519</c> when none is given, or

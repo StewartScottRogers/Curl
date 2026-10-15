@@ -1,5 +1,6 @@
 using System.Text;
 
+using Curl.Api.Options.Authentication;
 using Curl.Api.Options.Behaviour;
 using Curl.Api.Options.Http;
 using Curl.Cli;
@@ -14,9 +15,10 @@ namespace Curl.Engine;
 /// reads. From <see cref="EasyHttpOptions" />: <c>--request-target</c>, <c>-H</c> with the headers <c>--json</c>
 /// adds, <c>-A</c>, <c>-e</c>, the <c>-d</c> family body, <c>-L</c>, <c>--max-redirs</c>, the HTTP version,
 /// <c>--compressed</c>, <c>--tr-encoding</c>, <c>--raw</c>, <c>--ignore-content-length</c>, <c>--http0.9</c> and
-/// <c>--expect100-timeout</c>. From <see cref="EasyTransferOptions" />: <c>-X</c>; from
+/// <c>--expect100-timeout</c>. From <see cref="EasyAuthenticationOptions" />: the HTTP authentication methods, the bearer
+/// token, <c>--aws-sigv4</c> and the <c>--httpsig-*</c> options. From <see cref="EasyTransferOptions" />: <c>-X</c>; from
 /// <see cref="EasyBehaviourOptions" />: <c>-f</c>. From the command line: <c>--fail-with-body</c>, which curl's tool
-/// checks itself (ADR-0528), and, until their groups' tasks retarget them, the authentication options, the proxy headers and tunnel,
+/// checks itself (ADR-0528), and, until their groups' tasks retarget them, the proxy headers and tunnel,
 /// <c>--unix-socket</c> and <c>--happy-eyeballs-timeout-ms</c>; with the <c>-F</c> body the caller built.
 /// </summary>
 /// <remarks>
@@ -41,6 +43,7 @@ internal static class HttpRequestOptionsMapping
     /// <param name="http">The option group's HTTP options.</param>
     /// <param name="behaviour">The option group's behaviour options, whose <see cref="EasyBehaviourOptions.FailOnError" /> is <c>-f</c>.</param>
     /// <param name="transfer">The option group's transfer options, whose <see cref="EasyTransferOptions.CustomRequest" /> is <c>-X</c>.</param>
+    /// <param name="authentication">The option group's authentication options: the HTTP methods, the bearer token, AWS SigV4 and the HTTP signature settings.</param>
     /// <param name="formBody">
     /// The <c>-F</c> / <c>--form-string</c> body built for this transfer, or <see langword="null" />
     /// without <c>-F</c>; the parser refuses <c>-F</c> with a <c>-d</c> family body, so at most one is given.
@@ -73,13 +76,15 @@ internal static class HttpRequestOptionsMapping
     /// <see cref="HttpRequestOptions.ContinueWait" />. <see cref="EasyTransferOptions.CustomRequest" /> as
     /// <see cref="HttpRequestOptions.CustomMethod" />, and <see cref="EasyBehaviourOptions.FailOnError" /> as
     /// <see cref="HttpRequestOptions.Fail" /> <see cref="HttpFailMode.Fail" />, otherwise <c>--fail-with-body</c>'s
-    /// <see cref="CommandLineOptions.FailMode" />. And from <paramref name="options" />:
-    /// <see cref="CommandLineOptions.ProxyHeaders" /> verbatim;
-    /// <see cref="CommandLineOptions.AuthSchemes" />, <see cref="CommandLineOptions.BearerToken" /> and
-    /// <see cref="CommandLineOptions.AwsSigV4" /> verbatim; the <c>--httpsig-*</c> options as
-    /// <see cref="HttpRequestOptions.HttpSignature" /> (<see cref="HttpSignatureSetup.Of" />), which leave
-    /// <see cref="HttpRequestOptions.AuthSchemes" /> empty so a redirect hop that drops the signature sends no
-    /// Basic from its URL's credentials (upstream test5025, BL-2201); <paramref name="proxy" /> as
+    /// <see cref="CommandLineOptions.FailMode" />. From <paramref name="authentication" />:
+    /// <see cref="EasyAuthenticationOptions.HttpAuthentication" /> as <see cref="HttpRequestOptions.AuthSchemes" />
+    /// (<see cref="AuthSchemesOf" />), <see cref="EasyAuthenticationOptions.XOAuth2Bearer" /> as
+    /// <see cref="HttpRequestOptions.BearerToken" /> and <see cref="EasyAuthenticationOptions.AwsSigV4" /> verbatim;
+    /// the <c>--httpsig-*</c> options as <see cref="HttpRequestOptions.HttpSignature" />
+    /// (<see cref="HttpSignatureSetup.Of" />), which leave <see cref="HttpRequestOptions.AuthSchemes" /> empty so a
+    /// redirect hop that drops the signature sends no Basic from its URL's credentials (upstream test5025,
+    /// BL-2201). And from <paramref name="options" />: <see cref="CommandLineOptions.ProxyHeaders" /> verbatim;
+    /// <paramref name="proxy" /> as
     /// <see cref="HttpRequestOptions.ForwardProxy" /> with <see cref="CommandLineOptions.ProxyTunnel" /> as
     /// <see cref="HttpRequestOptions.ProxyTunnel" />; whether <see cref="CommandLineOptions.UnixSocketPath" /> is
     /// set as <see cref="HttpRequestOptions.OverUnixSocket" />; <paramref name="commandLineTextEncoding" /> as
@@ -91,6 +96,7 @@ internal static class HttpRequestOptionsMapping
         EasyHttpOptions http,
         EasyBehaviourOptions behaviour,
         EasyTransferOptions transfer,
+        EasyAuthenticationOptions authentication,
         HttpRequestBody? formBody = null,
         ProxyEndpoint? proxy = null,
         Encoding? commandLineTextEncoding = null,
@@ -109,10 +115,10 @@ internal static class HttpRequestOptionsMapping
             Fail = behaviour.FailOnError ? HttpFailMode.Fail : options.FailMode,
             FollowRedirects = http.FollowLocation != FollowLocation.None,
             MaxRedirects = (int)http.MaxRedirects,
-            AuthSchemes = HttpSignatureSetup.Of(options).Settings is null ? options.AuthSchemes : HttpAuthSchemes.None,
-            BearerToken = options.BearerToken,
-            AwsSigV4 = options.AwsSigV4,
-            HttpSignature = HttpSignatureSetup.Of(options).Settings,
+            AuthSchemes = HttpSignatureSetup.Of(authentication).Settings is null ? AuthSchemesOf(authentication) : HttpAuthSchemes.None,
+            BearerToken = authentication.XOAuth2Bearer,
+            AwsSigV4 = authentication.AwsSigV4,
+            HttpSignature = HttpSignatureSetup.Of(authentication).Settings,
             Version = HttpVersionMapping.ToHttpVersionPreference(http.HttpVersion),
             Compressed = http.AcceptEncoding is not null,
             TransferEncoding = http.TransferEncoding,
@@ -138,6 +144,36 @@ internal static class HttpRequestOptionsMapping
         options.HappyEyeballsTimeout is { } given
             ? TimeSpan.FromMilliseconds(Math.Min(given.TotalMilliseconds, LongestTimerDelayMilliseconds))
             : TcpConnector.DefaultHappyEyeballsTimeout;
+
+    /// <summary>
+    /// The schemes the HTTP handler may answer a challenge with, as the curl tool's <c>CommandLineOptions.AuthSchemes</c>
+    /// gives them (ADR-0516): <see cref="HttpAuthenticationMethods.Any" /> is every scheme the engine knows, each
+    /// other <c>CURLAUTH_*</c> bit its scheme, and <see cref="HttpAuthSchemes.Bearer" /> only with
+    /// <see cref="EasyAuthenticationOptions.XOAuth2Bearer" /> set. The <c>CURLAUTH_AWS_SIGV4</c> bit is ignored, as
+    /// signing reads <see cref="EasyAuthenticationOptions.AwsSigV4" />; with no scheme left, Basic, libcurl's default.
+    /// </summary>
+    /// <param name="authentication">The option group's authentication options.</param>
+    /// <returns>The schemes.</returns>
+    internal static HttpAuthSchemes AuthSchemesOf(EasyAuthenticationOptions authentication)
+    {
+        HttpAuthenticationMethods methods = authentication.HttpAuthentication;
+        HttpAuthSchemes wanted = (methods & HttpAuthenticationMethods.Any) == HttpAuthenticationMethods.Any
+            ? HttpAuthSchemes.Any | HttpAuthSchemes.Bearer
+            : SchemesOf(methods);
+        HttpAuthSchemes allowed = authentication.XOAuth2Bearer is null ? wanted & ~HttpAuthSchemes.Bearer : wanted;
+        return allowed == HttpAuthSchemes.None ? HttpAuthSchemes.Basic : allowed;
+    }
+
+    /// <summary>Gives the scheme of each of Basic, Digest, NTLM, Negotiate and Bearer set in <paramref name="methods" />.</summary>
+    private static HttpAuthSchemes SchemesOf(HttpAuthenticationMethods methods) =>
+        SchemeOf(methods, HttpAuthenticationMethods.Basic, HttpAuthSchemes.Basic)
+        | SchemeOf(methods, HttpAuthenticationMethods.Digest, HttpAuthSchemes.Digest)
+        | SchemeOf(methods, HttpAuthenticationMethods.Ntlm, HttpAuthSchemes.Ntlm)
+        | SchemeOf(methods, HttpAuthenticationMethods.Negotiate, HttpAuthSchemes.Negotiate)
+        | SchemeOf(methods, HttpAuthenticationMethods.Bearer, HttpAuthSchemes.Bearer);
+
+    private static HttpAuthSchemes SchemeOf(HttpAuthenticationMethods methods, HttpAuthenticationMethods method, HttpAuthSchemes scheme) =>
+        (methods & method) != 0 ? scheme : HttpAuthSchemes.None;
 
     /// <summary>
     /// The <see cref="EasyHttpOptions.PostFields" /> body, or <see langword="null" /> when there is none, as

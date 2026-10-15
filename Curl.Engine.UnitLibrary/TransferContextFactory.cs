@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text;
 
+using Curl.Api.Options.Authentication;
 using Curl.Api.Options.Behaviour;
 using Curl.Api.Options.Http;
 using Curl.Api.Options.Network;
@@ -81,6 +82,11 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
     /// <param name="proxyOptions">
     /// The option group's proxy options: <c>-p</c> (<see cref="EasyProxyOptions.HttpProxyTunnel" />) and
     /// <c>--suppress-connect-headers</c>.
+    /// </param>
+    /// <param name="authentication">
+    /// The option group's authentication options: <c>-u</c> (<see cref="EasyAuthenticationOptions.UserPassword" />),
+    /// split at its first colon into <see cref="TransferContext.Credentials" />, and the settings
+    /// <see cref="HttpRequestOptionsMapping.Of" /> and <see cref="MailRequestOptionsMapping.FromCommandLine" /> read.
     /// </param>
     /// <param name="network">
     /// The option group's network options: <c>--connect-timeout</c> (zero is not set) and the <c>--connect-to</c>
@@ -166,6 +172,7 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
         EasyTransferOptions transfer,
         EasyProtocolOptions protocol,
         EasyProxyOptions proxyOptions,
+        EasyAuthenticationOptions authentication,
         EasyNetworkOptions network,
         CurlUrl url,
         Stream output,
@@ -204,7 +211,7 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
             MaxFileSize = MaxFileSizeOf(transfer),
             Upload = UploadOf(url, upload),
             PostData = options.PostData,
-            Credentials = lookedUpCredentials ?? options.Credentials,
+            Credentials = lookedUpCredentials ?? CredentialsOf(authentication.UserPassword),
             TelnetOptions = protocol.Telnet.TelnetOptions,
             TftpBlockSize = BlockSizeOf(protocol.Tftp),
             TftpNoOptions = protocol.Tftp.NoOptions,
@@ -235,13 +242,13 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
             Proxy = proxy,
             Http = HttpOptionsWithAltSvc(
                 url,
-                HttpRequestOptionsMapping.Of(options, http, behaviour, transfer, formBody, proxy, commandLineTextEncoding, ifNoneMatchHeaders) with
+                HttpRequestOptionsMapping.Of(options, http, behaviour, transfer, authentication, formBody, proxy, commandLineTextEncoding, ifNoneMatchHeaders) with
                 {
                     HstsStore = HstsStore,
                     ProxyTunnel = proxyOptions.HttpProxyTunnel || ConnectToTunnelsThroughProxy(network, url, proxy),
                 },
                 altSvc),
-            Mail = MailRequestOptionsMapping.FromCommandLine(options, transfer, protocol.Smtp, url.Scheme),
+            Mail = MailRequestOptionsMapping.FromCommandLine(options, transfer, protocol.Smtp, authentication, url.Scheme),
             Ssh = ssh,
             Progress = WatchedProgress(progress, lowSpeedWatchdog, maxTimeWatchdog),
             Events = EventsWritingConnectReplyHeads(proxyOptions, proxy, EventsOrNone(events), transferHeaderOutput),
@@ -249,6 +256,26 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
             DiagnosticLog = DiagnosticLog,
             CancellationToken = TokenOf(abortToken, lowSpeedWatchdog, maxTimeWatchdog),
         };
+    }
+
+    /// <summary>
+    /// Gets the <c>-u</c> credentials: <paramref name="userPassword" /> split at its first colon into the user name
+    /// and the password (empty when there is no colon), as the curl tool splits <c>-u</c>; <see langword="null" />
+    /// without it.
+    /// </summary>
+    /// <param name="userPassword">The option group's <see cref="EasyAuthenticationOptions.UserPassword" />.</param>
+    /// <returns>The credentials the context carries when no lookup chose others.</returns>
+    private static NetworkCredential? CredentialsOf(string? userPassword)
+    {
+        if (userPassword is null)
+        {
+            return null;
+        }
+
+        int colon = userPassword.IndexOf(':', StringComparison.Ordinal);
+        return colon < 0
+            ? new NetworkCredential(userPassword, string.Empty)
+            : new NetworkCredential(userPassword[..colon], userPassword[(colon + 1)..]);
     }
 
     /// <summary>

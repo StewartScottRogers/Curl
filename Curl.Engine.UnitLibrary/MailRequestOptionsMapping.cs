@@ -1,3 +1,4 @@
+using Curl.Api.Options.Authentication;
 using Curl.Api.Options.Behaviour;
 using Curl.Api.Options.Protocols;
 using Curl.Cli;
@@ -51,22 +52,29 @@ internal static class MailRequestOptionsMapping
     ];
 
     /// <summary>
-    /// Copies the mail options from <paramref name="options" /> for a transfer of
+    /// Copies the mail options from the option group's records and <paramref name="options" /> for a transfer of
     /// <paramref name="scheme" />.
     /// </summary>
-    /// <param name="options">The parsed command line.</param>
+    /// <param name="options">The parsed command line, for <c>--upload-flags</c>.</param>
     /// <param name="transfer">The option group's transfer options, whose <see cref="EasyTransferOptions.CustomRequest" /> is the <c>-X</c> command.</param>
     /// <param name="smtp">The option group's SMTP options: <c>--mail-from</c>, <c>--mail-rcpt</c>, <c>--mail-auth</c> and <c>--mail-rcpt-allowfails</c>.</param>
+    /// <param name="authentication">
+    /// The option group's authentication options: <c>--login-options</c>, <c>--sasl-authzid</c>, <c>--sasl-ir</c>,
+    /// <c>--oauth2-bearer</c> and <c>--service-name</c>.
+    /// </param>
     /// <param name="scheme">The transfer URL's scheme.</param>
     /// <returns>
     /// <see langword="null" /> for every scheme but <c>smtp</c>, <c>smtps</c>, <c>pop3</c>,
     /// <c>pop3s</c>, <c>imap</c> and <c>imaps</c>; for those, every mail option verbatim, the
     /// sender, recipients (in command-line order), <c>AUTH</c> and allow-fails from <paramref name="smtp" />, and <see cref="CommandLineOptions.UploadFlags" /> as
     /// the names of its set flags in curl's order. <see cref="MailRequestOptions.CustomCommand" /> is
-    /// <see cref="EasyTransferOptions.CustomRequest" />, and <see cref="MailRequestOptions.ServiceName" />
-    /// is <c>--service-name</c>, <see langword="null" /> for the scheme's default (ADR-0188).
+    /// <see cref="EasyTransferOptions.CustomRequest" />; <see cref="MailRequestOptions.LoginOptions" />,
+    /// <see cref="MailRequestOptions.SaslAuthorizationIdentity" /> and <see cref="MailRequestOptions.SaslInitialResponse" />
+    /// are their <paramref name="authentication" /> members, <see cref="MailRequestOptions.BearerToken" /> is
+    /// <see cref="EasyAuthenticationOptions.XOAuth2Bearer" />, and <see cref="MailRequestOptions.ServiceName" />
+    /// is <see cref="EasyAuthenticationOptions.ServiceName" />, <see langword="null" /> for the scheme's default (ADR-0188).
     /// </returns>
-    internal static MailRequestOptions? FromCommandLine(CommandLineOptions options, EasyTransferOptions transfer, EasySmtpOptions smtp, string scheme) =>
+    internal static MailRequestOptions? FromCommandLine(CommandLineOptions options, EasyTransferOptions transfer, EasySmtpOptions smtp, EasyAuthenticationOptions authentication, string scheme) =>
         !MailSchemes.Contains(scheme)
             ? null
             : new MailRequestOptions
@@ -77,11 +85,11 @@ internal static class MailRequestOptionsMapping
                 RecipientAllowFails = smtp.MailRecipientAllowFails,
                 UploadFlags = UploadFlagNamesOf(options.UploadFlags),
                 CustomCommand = transfer.CustomRequest,
-                LoginOptions = options.LoginOptions,
-                SaslAuthorizationIdentity = options.SaslAuthorizationIdentity,
-                SaslInitialResponse = options.SaslInitialResponse,
-                BearerToken = options.BearerToken,
-                ServiceName = options.ServiceName,
+                LoginOptions = authentication.LoginOptions,
+                SaslAuthorizationIdentity = authentication.SaslAuthorizationIdentity,
+                SaslInitialResponse = authentication.SaslInitialResponse,
+                BearerToken = authentication.XOAuth2Bearer,
+                ServiceName = authentication.ServiceName,
             };
 
     /// <summary>Gets the names of the flags set in <paramref name="flags" />, in curl's order.</summary>
