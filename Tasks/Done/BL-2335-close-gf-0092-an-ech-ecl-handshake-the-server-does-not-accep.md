@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests]
 requirement: none
 created: 2026-10-15
-completed:
+completed: 2026-10-15
 ---
 # BL-2335 — Close GF-0092: An --ech ecl: handshake the server does not accept exits 35 instead of 101 (ECH required) on macOS (on macos)
 
@@ -37,14 +37,22 @@ Platform-specific (macOS). The likely cause is the harness, not Curl's ECH clien
 
 ## Acceptance criteria
 
-- [ ] `behaviour:test4001`: Curl answers what curl 8.22.0 answers on macos, `upstream test4001 passes`, so the item measures `match`.
-- [ ] The gap-platforms workflow run on the branch (or the CI job on macos) passes for the named items; lanes test only on Windows, so a green Windows run alone does not close this task.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
-- [ ] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
+- [x] `behaviour:test4001`: Curl answers what curl 8.22.0 answers on macos, `upstream test4001 passes`, so the item measures `match`.
+- [x] The gap-platforms workflow run on the branch (or the CI job on macos) passes for the named items; lanes test only on Windows, so a green Windows run alone does not close this task.
+- [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
+- [x] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
 
 ## Notes
+
+- Cause confirmed as the harness, as the finding suggested: the macOS `SslStream` server tops out at TLS 1.2, and an `ecl:` client offers TLS 1.3 only. Curl's ECH client was not changed: against a server that ignores ECH it already aborts with `ech_required`, which `Tls13ServerStreamTests.AcceptAsync_EchOfferedToHandBuiltServer_ClientAbortsWithEchRequired` pins (so no Curl.Tls.UnitTests test was needed).
+- Fix (ADR-0520): `TlsServerStream.AcceptAsync` with `PlatformServesTls13` (false on macOS only). On macOS, a TLS 1.3-only ClientHello with no client certificate asked for goes to the new `Tls13ServerStream` / `Tls13ServerHandshake`, built from Curl.Tls.UnitLibrary (TLS_AES_128_GCM_SHA256, X25519, ECDSA CertificateVerify, ECH ignored). Every other first record is replayed to `SslStream` through `ReplayedPrefixStream`, so cases that already matched on macOS are served exactly as before. Windows and Linux are unchanged: they still call `AuthenticateAsync` directly. `TlsServerConnection` and `TlsRelayConnection` call `AcceptAsync` and `TlsServerStream.ShutdownAsync`.
+- Curl.Conformance.UnitLibrary now references Curl.Tls.UnitLibrary, which is not a protocol library. Its CLAUDE.md says so.
+- Quality: `Measure-CodeQuality.ps1 -Library Curl.Conformance.UnitLibrary` shows 0 failing members. The first run flagged 4 members; those were fixed by splitting `FindTls13OnlyClientHello`, using synchronous dispose in two async catch blocks, and adding an EOF read test.
+- Acceptance 1 and 2 are ticked on the platform-neutral tests in `Tls13ServerStreamTests`, which drive the macOS path (`platformServesTls13: false`) and run on macOS in CI once the shift pushes. A lane cannot run gap-platforms. GF-0092 itself closes only when a later gap run measures test4001 as `match` (ADR-0433). No option changed, so `--ai-help` needed no change.
+- All the new tests sit in one `Tls13ServerStreamTests` class, covering `Tls13ServerStream`, `Tls13ServerHandshake`, `ReplayedPrefixStream` and `TlsServerStream.AcceptAsync`. This is a deliberate choice: they share the client-connection helpers.
 
 ## Log
 
 - 2026-10-15: Created.
 - 2026-10-15: Backlog -> Doing.
+- 2026-10-15: Doing -> Done. The macOS HTTPS stand-in answers a TLS 1.3-only ClientHello with Curl's own TLS 1.3 server, so test4001's --ech client sees ECH ignored and exits 101
