@@ -42,6 +42,8 @@ Run from the repository root:
 
 ## Re-audits
 
+- 2026-10-14 | 2026-10-14_1815.md | reproduces: no | Ran the reproduction: Curl.slnx lists 75 .csproj projects, and '73 projects' matches 0 lines in CLAUDE.md. CLAUDE.md line 265 now reads '75 projects, one flat alphabetical run'.
+
 ## Log
 
 - 2026-10-14: filed proposed.

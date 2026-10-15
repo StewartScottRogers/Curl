@@ -3,8 +3,8 @@ id: AF-0209
 title: HttpRedirectLocation.AppendUnescaped's '> ~' bound can become '>= ~' with no test failing, so a redirect would escape '~'
 auditor: quality
 severity: High
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-14_1815.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
 key: quality:Curl.Protocol.Http.UnitLibrary/HttpRedirectLocation.cs:AppendUnescaped-gt:surviving-mutant
 reproduction: mutation Curl.Protocol.Http.UnitLibrary/HttpRedirectLocation.cs:245:>
 task: BL-2211
@@ -13,9 +13,9 @@ found: 2026-10-14
 found-at: c1dedd04f2a8e1534e64b664312c5dacc66bdf4a
 scorecard: 2026-10-14_0453.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-14
+closed-how: mechanical
+closed-by: 2026-10-14_1815.md
 ---
 # AF-0209 - HttpRedirectLocation.AppendUnescaped's '> ~' bound can become '>= ~' with no test failing, so a redirect would escape '~'
 
@@ -42,7 +42,10 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Proto
 
 ## Re-audits
 
+- 2026-10-14 | 2026-10-14_1815.md | reproduces: no | Ran the targeted -Site Curl.Protocol.Http.UnitLibrary/HttpRedirectLocation.cs:245:> -Member AppendUnescaped -ExcludeBaselineFailures -TimeoutSeconds 600. The site resolved inside AppendUnescaped to line 241, 'if (character is ' ' or > '~')' -> '>= '~'', outcome killed (4395 ms). The 21 HttpAuthUsing tests that fail unmutated were excluded. Runner's targeted mutation rerun on the clean audited commit: killed.
+
 ## Log
 
 - 2026-10-14: filed proposed.
 - 2026-10-14: proposed -> accepted.
+- 2026-10-14: accepted -> closed. Re-audit 2026-10-14_1815.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.

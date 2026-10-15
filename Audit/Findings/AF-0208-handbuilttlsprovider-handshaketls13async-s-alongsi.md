@@ -3,8 +3,8 @@ id: AF-0208
 title: HandBuiltTlsProvider.HandshakeTls13Async's alongsideTls12: false can become true with no test failing
 auditor: quality
 severity: High
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-14_1815.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
 key: quality:Curl.Networking.UnitLibrary/HandBuiltTlsProvider.cs:HandshakeTls13Async-false:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/HandBuiltTlsProvider.cs:702:false
 task: BL-2210
@@ -13,9 +13,9 @@ found: 2026-10-14
 found-at: c1dedd04f2a8e1534e64b664312c5dacc66bdf4a
 scorecard: 2026-10-14_0453.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-14
+closed-how: mechanical
+closed-by: 2026-10-14_1815.md
 ---
 # AF-0208 - HandBuiltTlsProvider.HandshakeTls13Async's alongsideTls12: false can become true with no test failing
 
@@ -42,7 +42,10 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Netwo
 
 ## Re-audits
 
+- 2026-10-14 | 2026-10-14_1815.md | reproduces: no | Ran the targeted -Site Curl.Networking.UnitLibrary/HandBuiltTlsProvider.cs:702:false -Member HandshakeTls13Async -ExcludeBaselineFailures -TimeoutSeconds 600. resolvedLine 702, mutated 'settings.ToTls13(alongsideTls12: true)', outcome killed (7600 ms). The 3 ECH tests that fail unmutated were excluded. Runner's targeted mutation rerun on the clean audited commit: killed.
+
 ## Log
 
 - 2026-10-14: filed proposed.
 - 2026-10-14: proposed -> accepted.
+- 2026-10-14: accepted -> closed. Re-audit 2026-10-14_1815.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.

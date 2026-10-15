@@ -42,6 +42,8 @@ Select-String -Path Curl.Protocol.Dict.UnitLibrary/DictRequest.cs -Pattern 'as t
 
 ## Re-audits
 
+- 2026-10-14 | 2026-10-14_1815.md | reproduces: no | Ran the reproduction: 'as the bytes curl 8\.21\.0 sends' no longer matches. The summary at DictRequest.cs:8 reads 'as the bytes curl 8.22.0 sends', and line 37 is ClientLine = "CLIENT libcurl 8.22.0"; the two agree.
+
 ## Log
 
 - 2026-10-14: filed proposed.

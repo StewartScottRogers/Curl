@@ -3,8 +3,8 @@ id: AF-0210
 title: %{redirect_url} is empty for a non-3xx response carrying Location; curl writes the resolved target
 auditor: conformance
 severity: Medium
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-14_1815.md: the reproduction no longer reproduces.
 key: conformance:Curl.Protocol.Http.UnitLibrary/HttpRedirectLocation.cs:redirect_url:stdout
 reproduction: none
 task: BL-2212
@@ -13,9 +13,9 @@ found: 2026-10-14
 found-at: c1dedd04f2a8e1534e64b664312c5dacc66bdf4a
 scorecard: 2026-10-14_0453.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-14
+closed-how: reliable-reaudit
+closed-by: 2026-10-14_1815.md
 ---
 # AF-0210 - %{redirect_url} is empty for a non-3xx response carrying Location; curl writes the resolved target
 
@@ -42,7 +42,10 @@ foreach($p in @(@('curl','C:\Program Files\Git\ucrt64\bin\curl.exe'),@('candidat
 
 ## Re-audits
 
+- 2026-10-14 | 2026-10-14_1815.md | reproduces: no | Ran the reproduction (201 Created with Location: /z, -s -w %{redirect_url}) against curl 8.22.0 Schannel and this tree's Release curl.exe: 'curl: [http://127.0.0.1:50976/z]' and 'candidate: [http://127.0.0.1:50976/z]'.
+
 ## Log
 
 - 2026-10-14: filed proposed.
 - 2026-10-14: proposed -> accepted.
+- 2026-10-14: accepted -> closed. Re-audit 2026-10-14_1815.md: the reproduction no longer reproduces.
