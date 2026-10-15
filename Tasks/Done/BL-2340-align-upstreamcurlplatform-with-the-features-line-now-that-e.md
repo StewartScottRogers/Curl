@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.UnitLibrary]
 requirement: none
 created: 2026-10-15
-completed:
+completed: 2026-10-15
 ---
 # BL-2340 — Align UpstreamCurlPlatform with the Features: line now that ECH and HTTP3 left it on Linux and macOS
 
@@ -24,12 +24,15 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] `UpstreamCurlPlatform`'s remarks state the actual source of `ECH` and `http/3`, true of the code.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests are green.
+- [x] `UpstreamCurlPlatform`'s remarks state the actual source of `ECH` and `http/3`, true of the code.
+- [x] `dotnet build -warnaserror` is clean and the fast tests are green.
 
 ## Notes
+
+- Decided by Claude under Stewart's delegation: keep reporting `ECH` and `http/3` (Curl still serves `--ech` and `--http3`, so the HTTP/3 cases such as test2500 stay measured on Linux and macOS). Behaviour is unchanged, so no ADR; only the remarks changed. The library CLAUDE.md already says only that `http/3` is Linux and macOS only, which stays true.
 
 ## Log
 
 - 2026-10-15: Created.
 - 2026-10-15: Backlog -> Doing.
+- 2026-10-15: Doing -> Done. UpstreamCurlPlatform remarks now state ECH and http/3 are listed though the Features: line omits them

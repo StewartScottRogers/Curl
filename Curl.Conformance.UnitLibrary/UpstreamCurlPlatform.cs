@@ -10,8 +10,10 @@ namespace Curl.Conformance;
 /// A feature is listed when Curl has it, by the name upstream's <c>runtests.pl</c> gives it: the
 /// protocols the harness can serve (<c>ws</c>, <c>wss</c> and <c>ipfs</c> among them, and <c>sftp</c>
 /// and <c>scp</c>, which Curl serves and <c>UpstreamSshServer</c> emulates); every
-/// feature on Curl's <c>curl -V</c> <c>Features:</c> line, with <c>HTTP2</c> as <c>http/2</c> and
-/// <c>h2c</c> and <c>HTTP3</c> as <c>http/3</c>; <c>crypto</c>, which upstream derives from
+/// feature on Curl's <c>curl -V</c> <c>Features:</c> line, except that <c>ECH</c> and <c>http/3</c>
+/// are listed because Curl still serves <c>--ech</c> and <c>--http3</c>, though the line names neither
+/// (ADR-0520, ADR-0521), which keeps the cases that need them measured; <c>HTTP2</c> is reported as
+/// <c>http/2</c> and <c>h2c</c>; <c>crypto</c>, which upstream derives from
 /// <c>NTLM</c>, <c>Kerberos</c> and <c>SPNEGO</c>; the tool features a curl build has unless it
 /// disables them (<c>cookies</c>, <c>proxy</c>, <c>Mime</c>, <c>manual</c>, <c>DoH</c>,
 /// <c>digest</c>, <c>aws</c>, <c>netrc</c>, <c>verbose-strings</c>, <c>large-time</c>,
