@@ -41,3 +41,4 @@ ADR-0506, "Layering" and "The engine's input is a CLI-neutral option model"; pla
 ## Log
 
 - 2026-10-15: Created.
+- 2026-10-15: Backlog -> Doing.
