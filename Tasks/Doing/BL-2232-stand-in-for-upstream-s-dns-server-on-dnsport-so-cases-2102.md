@@ -38,3 +38,4 @@ Upstream's `dnsd` (`tests/dnsd.py` at curl-8_22_0, read it) answers DNS queries 
 - 2026-10-14: Created.
 - 2026-10-14: Backlog -> Doing.
 - 2026-10-14: Doing -> Backlog. Waits on BL-2248: Curl never reads CURL_DNS_SERVER and its DNS-server resolver does not use the injected datagram connector
+- 2026-10-14: Backlog -> Doing.
