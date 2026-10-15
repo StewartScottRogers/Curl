@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Http.UnitLibrary]
 requirement: none
 created: 2026-10-14
-completed:
+completed: 2026-10-14
 ---
 # BL-2253 — Fix AF-0216: HttpAuthUsingLines.AuthUsing writes the password into the -v 'auth using' line; 21 Curl.Protocol.Http unit tests fail unmutated
 
@@ -41,14 +41,17 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
 - 2026-10-14 (Claude): AF-0216 is most likely audit 20261014-181528's own planted defect: its manifest plants a password appended to the verbose 'auth using' line in Curl.Protocol.Http.UnitLibrary/HttpAuthUsingLines.cs, which the 21 failing tests catch. CI was green on the audited commit. Check that the real tree's HttpAuthUsingLines never writes the password and the Curl.Protocol.Http tests pass; if both hold, there is nothing to fix: record that and finish.
 
+- 2026-10-14 (Claude, lane 1): Confirmed AF-0216 was the audit run's planted defect, not a real one. The real tree's `HttpAuthUsingLines.cs:28` writes only `... auth using {scheme} with user '{user}'`, no password. The reproduction (`dotnet test Curl.Protocol.Http.UnitTests --filter "FullyQualifiedName~HttpAuthUsingLinesTests"`) passes 17 of 17; Curl.Protocol.Http.UnitTests passes 2055 (18 skipped); `dotnet build` is clean and every fast test project (37) passes. No code change needed.
+
 ## Log
 
 - 2026-10-14: Created.
 - 2026-10-14: Backlog -> Doing.
+- 2026-10-14: Doing -> Done. AF-0216 does not reproduce: HttpAuthUsingLines never writes the password; reproduction passes 17/17
