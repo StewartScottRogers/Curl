@@ -35,3 +35,4 @@ Reuse, do not rewrite: `Curl.Http2.UnitLibrary` is a reference-free library alre
 ## Log
 
 - 2026-10-14: Created.
+- 2026-10-14: Backlog -> Doing.
