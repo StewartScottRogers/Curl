@@ -1,12 +1,15 @@
 using System.Globalization;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using Curl.Cli;
 using Curl.Conformance.Http2Server;
+using Curl.Conformance.Http3Server;
 using Curl.Conformance.SshServer;
 using Curl.Console;
 using Curl.Networking;
 using Curl.Protocol.Ssh;
 using Curl.Testing;
+using Curl.Tls;
 
 namespace Curl.Conformance;
 
@@ -357,12 +360,24 @@ public sealed class UpstreamConformanceTests
     // The stand-in for upstream's http/2 server, nghttpx serving h2c in front of sws, on %HTTP2PORT (BL-2230), and HTTP/2 over TLS on %HTTP2TLSPORT (BL-2245).
     private static readonly UpstreamHttp2Server Http2Server = new(UpstreamHttp2ServerFactory.Create, UpstreamHttp2ServerFactory.CreateTls);
 
+    // The stand-in for upstream's http/3 server, nghttpx-h3 in front of sws, on %HTTP3PORT (BL-2261). The generated
+    // test-localhost.pem holds a P-256 key, so the TLS settings sign with ECDSA; the server's own transport parameters
+    // replace the ones given here.
+    private static readonly UpstreamHttp3Server Http3Server = new((backend, certificate) => UpstreamHttp3ServerFactory.Create(
+        backend,
+        new Http3ServerTlsSettings
+        {
+            CertificateChain = [certificate.RawData],
+            SigningKey = new EcdsaTlsSigningKey(certificate.GetECDsaPrivateKey()!),
+            QuicTransportParameters = Http3ServerConnection.DefaultTransportParameters.Encode(),
+        }));
+
     private static async Task<UpstreamCaseOutcome> RunCaseOnceAsync(int testNumber, byte[] testFile)
     {
         DirectoryInfo logDirectory = Directory.CreateDirectory(Path.Combine(LogFolder, $"test{testNumber}-{Guid.NewGuid():N}"));
         try
         {
-            UpstreamCaseRunner runner = new(RunCurlAsync, PlatformFor(testFile), TimeProvider.System, TimeLimit, SshServer, Http2Server);
+            UpstreamCaseRunner runner = new(RunCurlAsync, PlatformFor(testFile), TimeProvider.System, TimeLimit, SshServer, Http2Server, Http3Server);
             return await Task.Run(() => runner.RunAsync(testNumber, testFile, logDirectory.FullName, certificateDirectory: CertificateFolder.Value, sourceDirectory: UpstreamTestDataFolder)).WaitAsync(CaseHangLimit);
         }
         catch (TimeoutException)

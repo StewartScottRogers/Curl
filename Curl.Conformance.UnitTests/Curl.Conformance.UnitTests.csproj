@@ -10,6 +10,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Curl.Conformance.Http2Server.UnitLibrary\Curl.Conformance.Http2Server.UnitLibrary.csproj" />
+    <ProjectReference Include="..\Curl.Conformance.Http3Server.UnitLibrary\Curl.Conformance.Http3Server.UnitLibrary.csproj" />
     <ProjectReference Include="..\Curl.Conformance.SshServer.UnitLibrary\Curl.Conformance.SshServer.UnitLibrary.csproj" />
     <ProjectReference Include="..\Curl.Conformance.UnitLibrary\Curl.Conformance.UnitLibrary.csproj" />
     <ProjectReference Include="..\Curl.Console\Curl.Console.csproj" />

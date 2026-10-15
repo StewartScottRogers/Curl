@@ -46,6 +46,9 @@ internal static class UpstreamCaseScreening
     // Upstream's nghttpx front of sws, emulated only when the runner is given an UpstreamHttp2Server.
     private const string Http2Server = "http/2";
 
+    // Upstream's nghttpx-h3 front of sws, emulated only when the runner is given an UpstreamHttp3Server.
+    private const string Http3Server = "http/3";
+
     // The servers that read <servercmd> as ftpserver.pl does: the FTP stand-in, plain or behind TLS.
     private static readonly string[] FtpServers = ["ftp", "ftp-ipv6", .. FtpsServerConnector.EmulatedServers];
 
@@ -64,9 +67,14 @@ internal static class UpstreamCaseScreening
     /// Whether the runner has the stand-in for upstream's <c>http/2</c> server (<see cref="UpstreamHttp2Server"/>), so a
     /// case naming that server can run (BL-2230).
     /// </param>
+    /// <param name="emulatesHttp3">
+    /// Whether the runner has the stand-in for upstream's <c>http/3</c> server (<see cref="UpstreamHttp3Server"/>), so a
+    /// case naming that server can run (BL-2261).
+    /// </param>
     /// <returns>A sentence saying why the case is skipped, or <see langword="null"/> when it can run.</returns>
-    public static string? FindSkipReason(UpstreamTestFileExpansion expansion, UpstreamTestCase testCase, IReadOnlySet<string> features, bool emulatesHttp2 = false)
+    public static string? FindSkipReason(UpstreamTestFileExpansion expansion, UpstreamTestCase testCase, IReadOnlySet<string> features, bool emulatesHttp2 = false, bool emulatesHttp3 = false)
     {
+        HashSet<string> standIns = [.. emulatesHttp2 ? [Http2Server] : Array.Empty<string>(), .. emulatesHttp3 ? [Http3Server] : Array.Empty<string>()];
         Func<string?>[] checks =
         [
             () => expansion.ConditionError,
@@ -77,7 +85,7 @@ internal static class UpstreamCaseScreening
             () => UnsupportedPart(testCase, "verify", VerifyParts),
             () => UninterpretedCheck(testCase, "client", "precheck"),
             () => UninterpretedCheck(testCase, "verify", "postcheck"),
-            () => UnsupportedServer(testCase, emulatesHttp2),
+            () => UnsupportedServer(testCase, standIns),
             () => FtpDataConnection(testCase),
             () => UploadOffMailServer(testCase),
             () => UnsupportedFeature(testCase, features),
@@ -163,8 +171,9 @@ internal static class UpstreamCaseScreening
             _ => null,
         };
 
-    private static string? UnsupportedServer(UpstreamTestCase testCase, bool emulatesHttp2) =>
-        UpstreamTestPartBodies.Lines(testCase.Find("client", "server")).FirstOrDefault(server => !Servers.Contains(server) && HttpsCertificateFile(server) is null && !(emulatesHttp2 && server == Http2Server)) is { } server
+    // standIns: the servers emulated only when the runner is given their stand-in (http/2, http/3).
+    private static string? UnsupportedServer(UpstreamTestCase testCase, HashSet<string> standIns) =>
+        UpstreamTestPartBodies.Lines(testCase.Find("client", "server")).FirstOrDefault(server => !Servers.Contains(server) && HttpsCertificateFile(server) is null && !standIns.Contains(server)) is { } server
             ? $"the harness does not emulate the {server} server"
             : null;
 

@@ -917,6 +917,116 @@ public sealed class UpstreamCaseRunnerTests
         CollectionAssert.AreEqual(new[] { "h2c" }, arguments);
     }
 
+    [TestMethod]
+    public async Task RunAsync_Http3CaseWithoutHttp3Server_IsSkippedForTheServer()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        UpstreamCaseRunner runner = Runner(_ => Task.FromResult(0));
+
+        UpstreamCaseOutcome outcome = await RunAsync(runner, "<testcase>\n<client>\n<server>\nhttp/3\n</server>\n<command>\nhttp://%HOSTIP:%HTTPPORT/%TESTNUMBER\n</command>\n</client>\n<verify>\n</verify>\n</testcase>\n");
+
+        diagnostics.Assert("skip reason", "the harness does not emulate the http/3 server", outcome.Detail);
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Skipped, outcome.Kind);
+        Assert.AreEqual("the harness does not emulate the http/3 server", outcome.Detail);
+    }
+
+    // runtests.pl reports nghttpx-h3 when its nghttpx serves HTTP/3; the harness reports it when it has the stand-in (BL-2261).
+    [TestMethod]
+    [DataRow(true, UpstreamCaseOutcomeKind.Passed)]
+    [DataRow(false, UpstreamCaseOutcomeKind.Skipped)]
+    public async Task RunAsync_NghttpxH3FeatureCase_RunsOnlyWithAnHttp3Server(bool givesHttp3Server, UpstreamCaseOutcomeKind expected)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("gives an http/3 server", givesHttp3Server);
+        UpstreamCaseRunner runner = new(
+            _ => Task.FromResult(0),
+            UpstreamCurlPlatform.Unix,
+            TimeProvider.System,
+            TimeSpan.FromSeconds(10),
+            http3Server: givesHttp3Server ? new UpstreamHttp3Server((_, _) => new RefusingDatagramConnector("http3 server")) : null);
+
+        UpstreamCaseOutcome outcome = await RunAsync(runner, "<testcase>\n<client>\n<features>\nnghttpx-h3\n</features>\n<server>\nnone\n</server>\n<command option=\"no-output,no-include\">\nx\n</command>\n</client>\n</testcase>\n");
+
+        diagnostics.Assert("outcome", expected, outcome.Kind);
+        Assert.AreEqual(expected, outcome.Kind, outcome.Detail);
+    }
+
+    // nghttpx-h3 stands on %HTTP3PORT with test-localhost.pem only for a case naming the http/3 server (BL-2261);
+    // every other datagram, and every one of another case, reaches the tftpd emulation, which refuses port 9019.
+    [TestMethod]
+    [DataRow("http/3", "http3 server", true)]
+    [DataRow("http", "tftpd", false)]
+    public async Task RunAsync_WithHttp3ServerAndACertificateDirectory_RoutesHttp3PortDatagramsToItForAnHttp3Case(string serverLine, string expectedReached, bool expectsServer)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        string certificateDirectory = CreateLogDirectory();
+        Directory.CreateDirectory(Path.Combine(certificateDirectory, "certs"));
+        using (System.Security.Cryptography.ECDsa key = System.Security.Cryptography.ECDsa.Create())
+        {
+            System.Security.Cryptography.X509Certificates.CertificateRequest request = new("CN=localhost", key, System.Security.Cryptography.HashAlgorithmName.SHA256);
+            using System.Security.Cryptography.X509Certificates.X509Certificate2 certificate = request.CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddDays(1));
+            await File.WriteAllTextAsync(Path.Combine(certificateDirectory, "certs", "test-localhost.pem"), certificate.ExportCertificatePem() + "\n" + key.ExportPkcs8PrivateKeyPem() + "\n");
+        }
+
+        System.Security.Cryptography.X509Certificates.X509Certificate2? presented = null;
+        IConnector? backend = null;
+        string[]? arguments = null;
+        string? reached = null;
+        UpstreamHttp3Server http3Server = new((sws, certificate) =>
+        {
+            backend = sws;
+            presented = certificate;
+            return new RefusingDatagramConnector("http3 server");
+        });
+        UpstreamCaseRunner runner = new(
+            async invocation =>
+            {
+                arguments = [.. CommandArguments(invocation)];
+                DatagramOpenResult opened = await invocation.DatagramConnector.OpenAsync("127.0.0.1", UpstreamHttp3Server.Http3Port, CancellationToken.None);
+                reached = opened.ErrorMessage!.Contains("http3 server", StringComparison.Ordinal) ? "http3 server" : "tftpd";
+                return 0;
+            },
+            UpstreamCurlPlatform.Unix,
+            TimeProvider.System,
+            TimeSpan.FromSeconds(10),
+            http3Server: http3Server);
+        string testFile = $"<testcase>\n<client>\n<server>\n{serverLine}\n</server>\n<command option=\"no-output,no-include\">\nhttps://localhost:%HTTP3PORT/\n</command>\n</client>\n</testcase>\n";
+
+        UpstreamCaseOutcome outcome = await runner.RunAsync(5, Encoding.Latin1.GetBytes(testFile), CreateLogDirectory(), null, certificateDirectory);
+        diagnostics.Act("datagram connector reached on %HTTP3PORT", reached);
+
+        Assert.AreNotEqual(UpstreamCaseOutcomeKind.Skipped, outcome.Kind, outcome.Detail);
+        CollectionAssert.AreEqual(new[] { "https://localhost:" + UpstreamCaseRunner.Http3Port + "/" }, arguments);
+        Assert.AreEqual(expectedReached, reached);
+        Assert.AreEqual(expectsServer, presented is not null);
+        Assert.AreEqual(expectsServer, backend is SwsHttpServerConnector);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_Http3PortWithoutACertificateDirectory_IsSkippedForTheVariable()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        UpstreamCaseRunner runner = new(
+            _ => Task.FromResult(0),
+            UpstreamCurlPlatform.Unix,
+            TimeProvider.System,
+            TimeSpan.FromSeconds(10),
+            http3Server: new UpstreamHttp3Server((_, _) => new RefusingDatagramConnector("http3 server")));
+
+        UpstreamCaseOutcome outcome = await RunAsync(runner, "<testcase>\n<client>\n<server>\nhttp/3\n</server>\n<command>\nhttps://localhost:%HTTP3PORT/\n</command>\n</client>\n</testcase>\n");
+
+        diagnostics.Assert("skip reason", "the harness has no value for HTTP3PORT", outcome.Detail);
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Skipped, outcome.Kind);
+        Assert.Contains("HTTP3PORT", outcome.Detail!);
+    }
+
+    // Refuses every datagram open with its own name, so a test can tell it was reached.
+    private sealed class RefusingDatagramConnector(string name) : IDatagramConnector
+    {
+        public ValueTask<DatagramOpenResult> OpenAsync(string host, int port, CancellationToken cancellationToken) =>
+            ValueTask.FromResult(DatagramOpenResult.Failed(CurlExitCode.CouldntConnect, name));
+    }
+
     // Refuses every connection with its own name, so a test can tell it was reached.
     private sealed class RefusingConnector(string name) : IConnector
     {

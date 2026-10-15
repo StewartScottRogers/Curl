@@ -33,7 +33,7 @@ namespace Curl.Conformance;
 /// they name by its path, relative to the working directory when not absolute, as nothing when it
 /// is not there. <c>%HOSTIP</c> and <c>%CLIENTIP</c> are <c>127.0.0.1</c>, <c>%HTTPPORT</c> is
 /// <see cref="HttpPort"/>, <c>%HOST6IP</c> and <c>%CLIENT6IP</c> are <c>[::1]</c>, <c>%CLIENT6IP-NB</c> is <c>::1</c>, <c>%HTTP6PORT</c> is <see cref="Http6Port"/>, <c>%FTP6PORT</c> is <see cref="Ftp6Port"/>, <c>%GOPHER6PORT</c> is <see cref="Gopher6Port"/>, <c>%RESOLVE</c> is the name
-/// <see cref="UpstreamResolveCheck"/> emulates in a precheck, <c>%PROXYPORT</c> is <see cref="ProxyPort"/>, <c>%FTPPORT</c> is <see cref="FtpPort"/>, <c>%SMTPPORT</c> is <see cref="SmtpPort"/>, <c>%IMAPPORT</c> is <see cref="ImapPort"/>, <c>%POP3PORT</c> is <see cref="Pop3Port"/>, <c>%SOCKSPORT</c> is <see cref="SocksPort"/>, <c>%MQTTPORT</c> is <see cref="MqttPort"/>, <c>%TFTPPORT</c> is <see cref="TftpPort"/>,<c>%RTSPPORT</c> is <see cref="RtspPort"/>, <c>%HTTPSPORT</c>, <c>%SMTPSPORT</c>, <c>%IMAPSPORT</c>, <c>%POP3SPORT</c>, <c>%FTPSPORT</c>, <c>%HTTPSPROXYPORT</c>, <c>%MQTTSPORT</c>, <c>%GOPHERSPORT</c> and <c>%HTTP2TLSPORT</c> are <see cref="HttpsPort"/>, <see cref="SmtpsPort"/>, <see cref="ImapsPort"/>, <see cref="Pop3sPort"/>, <see cref="FtpsPort"/>, <see cref="HttpsProxyPort"/>, <see cref="MqttsPort"/>, <see cref="GophersPort"/> and <see cref="Http2TlsPort"/> when a certificate directory is named, <c>%GOPHERPORT</c> is <see cref="GopherPort"/>, <c>%DICTPORT</c> is <see cref="DictPort"/>, <c>%TELNETPORT</c> is <see cref="TelnetPort"/>, <c>%DNSPORT</c> is <see cref="DnsPort"/>, <c>%HTTP2PORT</c> is <see cref="Http2Port"/>, <c>%H2CVER</c> is <see cref="H2cVersion"/>, <c>%NOLISTENPORT</c> is <see cref="NoListenPort"/>, a port that refuses every connection, <c>%HTTPUNIXPATH</c> is <see cref="HttpUnixPath"/>, <c>%FTPTIME2</c> is <c>8</c> (the seconds upstream gives FTP time-out cases on a host whose FTP server checks in under a second), and <c>%VERSION</c> is <see cref="CurlVersion"/>. Every other variable
+/// <see cref="UpstreamResolveCheck"/> emulates in a precheck, <c>%PROXYPORT</c> is <see cref="ProxyPort"/>, <c>%FTPPORT</c> is <see cref="FtpPort"/>, <c>%SMTPPORT</c> is <see cref="SmtpPort"/>, <c>%IMAPPORT</c> is <see cref="ImapPort"/>, <c>%POP3PORT</c> is <see cref="Pop3Port"/>, <c>%SOCKSPORT</c> is <see cref="SocksPort"/>, <c>%MQTTPORT</c> is <see cref="MqttPort"/>, <c>%TFTPPORT</c> is <see cref="TftpPort"/>,<c>%RTSPPORT</c> is <see cref="RtspPort"/>, <c>%HTTPSPORT</c>, <c>%SMTPSPORT</c>, <c>%IMAPSPORT</c>, <c>%POP3SPORT</c>, <c>%FTPSPORT</c>, <c>%HTTPSPROXYPORT</c>, <c>%MQTTSPORT</c>, <c>%GOPHERSPORT</c> and <c>%HTTP2TLSPORT</c> are <see cref="HttpsPort"/>, <see cref="SmtpsPort"/>, <see cref="ImapsPort"/>, <see cref="Pop3sPort"/>, <see cref="FtpsPort"/>, <see cref="HttpsProxyPort"/>, <see cref="MqttsPort"/>, <see cref="GophersPort"/> and <see cref="Http2TlsPort"/> when a certificate directory is named, <c>%GOPHERPORT</c> is <see cref="GopherPort"/>, <c>%DICTPORT</c> is <see cref="DictPort"/>, <c>%TELNETPORT</c> is <see cref="TelnetPort"/>, <c>%DNSPORT</c> is <see cref="DnsPort"/>, <c>%HTTP2PORT</c> is <see cref="Http2Port"/>, <c>%H2CVER</c> is <see cref="H2cVersion"/>, <c>%HTTP3PORT</c> is <see cref="Http3Port"/> when the caller names a certificate directory and gives an <see cref="UpstreamHttp3Server"/>, <c>%NOLISTENPORT</c> is <see cref="NoListenPort"/>, a port that refuses every connection, <c>%HTTPUNIXPATH</c> is <see cref="HttpUnixPath"/>, <c>%FTPTIME2</c> is <c>8</c> (the seconds upstream gives FTP time-out cases on a host whose FTP server checks in under a second), and <c>%VERSION</c> is <see cref="CurlVersion"/>. Every other variable
 /// is unknown, so a case that uses one is skipped.
 /// </para>
 /// </remarks>
@@ -56,14 +56,25 @@ namespace Curl.Conformance;
 /// Given one, a fresh server relaying to the case's sws emulation stands on <see cref="Http2Port"/> in
 /// front of the case's other stand-ins, and with a certificate directory its TLS server on <see cref="Http2TlsPort"/>.
 /// </param>
+/// <param name="http3Server">
+/// The stand-in for upstream's <c>http/3</c> server, nghttpx-h3 serving HTTP/3 over QUIC in front of sws (BL-2261), or
+/// <see langword="null"/> to leave it out, so screening skips a case naming the <c>http/3</c> server. Given one, the
+/// platform reports the <c>nghttpx-h3</c> feature, and with a certificate directory <c>%HTTP3PORT</c> is
+/// <see cref="Http3Port"/> and a fresh server relaying to the case's sws emulation, presenting
+/// <c>%CERTDIR/certs/test-localhost.pem</c>, takes the datagrams to it for a case naming the <c>http/3</c> server.
+/// </param>
 public sealed class UpstreamCaseRunner(
     Func<UpstreamCurlInvocation, Task<int>> runCurl,
     UpstreamCurlPlatform platform,
     TimeProvider timeProvider,
     TimeSpan timeLimit,
     UpstreamSshServer? sshServer = null,
-    UpstreamHttp2Server? http2Server = null)
+    UpstreamHttp2Server? http2Server = null,
+    UpstreamHttp3Server? http3Server = null)
 {
+    // runtests.pl reports nghttpx-h3 when it finds the nghttpx that serves HTTP/3, which the stand-in replaces.
+    private readonly UpstreamCurlPlatform platform = http3Server is null ? platform : platform.WithFeatures([Http3ServerFeature]);
+
     /// <summary>The value of <c>%HTTPPORT</c>; every connection reaches the emulation whatever its port.</summary>
     public const string HttpPort = "8990";
 
@@ -167,6 +178,16 @@ public sealed class UpstreamCaseRunner(
     public const string H2cVersion = "h2c";
 
     /// <summary>
+    /// The value of <c>%HTTP3PORT</c> when the caller names a certificate directory and gives an
+    /// <see cref="UpstreamHttp3Server"/>, <see cref="UpstreamHttp3Server.Http3Port"/>: datagrams to this port reach
+    /// upstream's nghttpx-h3 front of sws (BL-2261).
+    /// </summary>
+    public const string Http3Port = "9019";
+
+    /// <summary>The feature <c>runtests.pl</c> reports when its nghttpx serves HTTP/3, reported when an <see cref="UpstreamHttp3Server"/> is given.</summary>
+    public const string Http3ServerFeature = "nghttpx-h3";
+
+    /// <summary>
     /// The value of <c>%HTTPUNIXPATH</c>, upstream's <c>http-unix</c> server: the relative path <c>runtests.pl</c>'s
     /// <c>http.sock</c> has under its relative log directory, short enough for a <c>sockaddr_un</c> wherever the
     /// harness's log directory is. Nothing listens on it: a <c>--unix-socket</c> dial to it reaches the sws emulation
@@ -241,6 +262,7 @@ public sealed class UpstreamCaseRunner(
         Dictionary<string, string> variables = Variables(testNumber, logDirectoryVariable);
         AddDirectoryVariables(variables, testsDirectory, certificateDirectory, sourceDirectory);
         AddTlsPorts(variables, certificateDirectory);
+        AddHttp3Port(variables, certificateDirectory);
         AddSshVariables(variables);
 
         UpstreamTestFileExpansion expansion = UpstreamTestFileExpander.Expand(UpstreamTestDirectoryComposition.Rewrite(testFile.Span), variables, platform.Features, ReadIncludedFile, timeProvider);
@@ -263,7 +285,7 @@ public sealed class UpstreamCaseRunner(
             return UpstreamCaseOutcome.SkippedOnThisPlatform(otherPlatformReason);
         }
 
-        return (UpstreamCaseScreening.FindSkipReason(expansion, testCase, platform.Features, emulatesHttp2: http2Server is not null)
+        return (UpstreamCaseScreening.FindSkipReason(expansion, testCase, platform.Features, emulatesHttp2: http2Server is not null, emulatesHttp3: http3Server is not null)
                 ?? UpstreamCaseScreening.FindFileOutsideLogDirectory(testCase, logDirectory)) is { } reason
             ? UpstreamCaseOutcome.Skipped(reason)
             : null;
@@ -315,6 +337,15 @@ public sealed class UpstreamCaseRunner(
             variables["MQTTSPORT"] = MqttsPort;
             variables["GOPHERSPORT"] = GophersPort;
             variables["HTTP2TLSPORT"] = Http2TlsPort;
+        }
+    }
+
+    // nghttpx-h3 presents a certificate from %CERTDIR/certs/, so its port has a value only with it and the stand-in.
+    private void AddHttp3Port(Dictionary<string, string> variables, string? certificateDirectory)
+    {
+        if (http3Server is not null && certificateDirectory is not null)
+        {
+            variables["HTTP3PORT"] = Http3Port;
         }
     }
 
@@ -427,11 +458,11 @@ public sealed class UpstreamCaseRunner(
         GopherServerConnector gopher = new(testCase, mqtts);
         IConnector gophers = TlsFrontServer(testCase, GophersServerConnector.EmulatedServers, certificateDirectory, gopher, certificate => new GophersServerConnector(certificate, gopher));
         TelnetServerConnector telnet = new(new DictServerConnector(gophers));
-        IConnector servers = HttpsProxyServer(testCase, Http2Server(testCase, SshServer(telnet), server, certificateDirectory), certificateDirectory);
+        IConnector servers = HttpsProxyServer(testCase, Http2Server(testCase, NothingOnHttp3TcpPort(SshServer(telnet)), server, certificateDirectory), certificateDirectory);
         // A CONNECT through the http-proxy to a mail port or the FTP control or passive port reaches that stand-in
         // (test1319 to 1321, BL-2011; test714 and test715, BL-2035); one to %HTTPSPORT reaches the HTTPS stand-in, whose TLS handshake travels inside the tunnel (BL-2225).
         server.TunnelServerForPort = port => TunnelledPorts.Contains(port) ? pop3 : null;
-        UpstreamCurlInvocation invocation = new(arguments, standardOutput, standardError, standardInput, servers, dns, EnvironmentVariables(testCase)) { ConnectionListener = ftp.ActiveModeListener };
+        UpstreamCurlInvocation invocation = new(arguments, standardOutput, standardError, standardInput, servers, Http3Server(testCase, dns, server, certificateDirectory), EnvironmentVariables(testCase)) { ConnectionListener = ftp.ActiveModeListener };
         (int exitCode, string? failure) = await RunCurlAsync(invocation, server).ConfigureAwait(false);
         if (failure is not null)
         {
@@ -541,6 +572,16 @@ public sealed class UpstreamCaseRunner(
         certificateDirectory is not null && UpstreamTestPartBodies.Lines(testCase.Find("client", "server")).Contains("http/2")
             ? HttpsServerConnector.LoadCertificate(Path.Combine(certificateDirectory, "certs", HttpsServerConnector.DefaultCertificateFile))
             : null;
+
+    // nghttpx-h3 relays each request to sws as HTTP/1.1, so the relayed requests land in the sws emulation's ReceivedBytes.
+    // It presents test-localhost.pem, loaded only for a case naming the http/3 server when a certificate directory is named (BL-2261).
+    // nghttpx-h3 takes only datagrams on %HTTP3PORT, so --http3's TCP leg is refused there and the race settles on QUIC (ADR-0498).
+    private IConnector NothingOnHttp3TcpPort(IConnector otherPorts) => http3Server is null ? otherPorts : UpstreamHttp3Server.RefusingTcpOnHttp3Port(otherPorts);
+
+    private IDatagramConnector Http3Server(UpstreamTestCase testCase, IDatagramConnector otherPorts, SwsHttpServerConnector sws, string? certificateDirectory) =>
+        http3Server is not null && certificateDirectory is not null && UpstreamTestPartBodies.Lines(testCase.Find("client", "server")).Contains("http/3")
+            ? http3Server.InFrontOf(otherPorts, sws, HttpsServerConnector.LoadCertificate(Path.Combine(certificateDirectory, "certs", HttpsServerConnector.DefaultCertificateFile)))
+            : otherPorts;
 
     private static readonly int[] TunnelledPorts = [Pop3ServerConnector.Pop3Port, ImapServerConnector.ImapPort, SmtpServerConnector.SmtpPort, FtpServerConnector.FtpPort, FtpServerConnector.PassivePort, HttpsServerConnector.HttpsPort];
 

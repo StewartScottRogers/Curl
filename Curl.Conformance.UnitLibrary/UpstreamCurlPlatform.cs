@@ -18,8 +18,9 @@ namespace Curl.Conformance;
 /// <c>large-size</c>, <c>sha512-256</c>, <c>SSLpinning</c> and <c>httpsig</c>); <c>large_file</c>;
 /// <c>local-http</c> (the harness's server is at <c>127.0.0.1</c>); <c>win32</c> on Windows, as
 /// <c>runtests.pl</c> sets it there; the TLS backend; <c>xattr</c> off Windows, where curl
-/// cannot write extended attributes; and <c>http/2</c> and <c>h2c</c> off Windows only, since the
-/// Schannel build Curl matches there has no <c>HTTP2</c> and refuses <c>--http2</c> (BL-2230).
+/// cannot write extended attributes; <c>http/2</c> and <c>h2c</c> off Windows only, since the
+/// Schannel build Curl matches there has no <c>HTTP2</c> and refuses <c>--http2</c> (BL-2230); and
+/// <c>http/3</c> off Windows only, since that build refuses <c>--http3</c> too (BL-2261).
 /// </para>
 /// <para>
 /// These stay off, so the cases that need them are skipped rather than counted as failures:
@@ -37,7 +38,7 @@ public sealed class UpstreamCurlPlatform
     private static readonly string[] CommonFeatures =
     [
         "dict", "file", "gopher", "gophers", "http", "https", "ipfs", "mqtt", "mqtts", "scp", "sftp", "telnet", "tftp", "ws", "wss",
-        "alt-svc", "AsynchDNS", "brotli", "ECH", "GSS-API", "HSTS", "http/3", "HTTPS-proxy",
+        "alt-svc", "AsynchDNS", "brotli", "ECH", "GSS-API", "HSTS", "HTTPS-proxy",
         "HTTPSRR", "IDN", "IPv6", "Kerberos", "Largefile", "libz", "NTLM", "PSL", "SPNEGO", "SSL",
         "UnixSockets", "zstd",
         "crypto", "cookies", "proxy", "Mime", "manual", "DoH", "digest", "aws", "netrc", "verbose-strings",
@@ -63,10 +64,10 @@ public sealed class UpstreamCurlPlatform
     public static UpstreamCurlPlatform Windows { get; } = new(["win32", "Schannel"], "NUL", "MSWin32");
 
     /// <summary>Linux, where Curl matches curl's OpenSSL build.</summary>
-    public static UpstreamCurlPlatform Unix { get; } = new(["OpenSSL", "xattr", "http/2", "h2c"], "/dev/null", "linux");
+    public static UpstreamCurlPlatform Unix { get; } = new(["OpenSSL", "xattr", "http/2", "h2c", "http/3"], "/dev/null", "linux");
 
     /// <summary>macOS, where Curl matches curl's OpenSSL build as on Linux; only Perl's name for it differs.</summary>
-    public static UpstreamCurlPlatform MacOS { get; } = new(["OpenSSL", "xattr", "http/2", "h2c"], "/dev/null", "darwin");
+    public static UpstreamCurlPlatform MacOS { get; } = new(["OpenSSL", "xattr", "http/2", "h2c", "http/3"], "/dev/null", "darwin");
 
     /// <summary>Every platform Curl's conformance run stands for: Windows, Linux and macOS.</summary>
     public static IReadOnlyList<UpstreamCurlPlatform> All { get; } = [Windows, Unix, MacOS];
