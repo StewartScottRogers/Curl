@@ -63,7 +63,7 @@ internal sealed class TlsServerConnection : IConnection
         try
         {
             serverEnd.ResetsWhenDisposed = true;
-            await using SslStream tls = await TlsServerStream.AuthenticateAsync(serverEnd, options, cancellationToken).ConfigureAwait(false);
+            await using Stream tls = await TlsServerStream.AcceptAsync(serverEnd, options, TlsServerStream.PlatformServesTls13, cancellationToken).ConfigureAwait(false);
             serverEnd.ResetsWhenDisposed = false;
             await RelayAsync(server, tls, cancellationToken).ConfigureAwait(false);
         }
@@ -77,7 +77,7 @@ internal sealed class TlsServerConnection : IConnection
         await server.DisposeAsync().ConfigureAwait(false);
     }
 
-    private static async Task RelayAsync(SwsHttpServerConnection server, SslStream tls, CancellationToken cancellationToken)
+    private static async Task RelayAsync(SwsHttpServerConnection server, Stream tls, CancellationToken cancellationToken)
     {
         byte[] buffer = new byte[RelayBufferSize];
         int read;
@@ -92,7 +92,7 @@ internal sealed class TlsServerConnection : IConnection
             if (!server.ReadsRequests)
             {
                 // stunnel sends close_notify when sws closes, so curl sees a clean end of the stream.
-                await tls.ShutdownAsync().ConfigureAwait(false);
+                await TlsServerStream.ShutdownAsync(tls).ConfigureAwait(false);
                 return;
             }
         }

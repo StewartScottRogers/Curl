@@ -153,6 +153,14 @@ asynchronously only, what the other writes, and reads 0 once the other end is di
 drained, or gets a connection reset (`IOException` carrying `SocketError.ConnectionReset`) when
 the disposed end had `ResetsWhenDisposed` set. Tests reload a generated certificate through PKCS#12, since Windows Schannel and macOS
 reject an ephemeral server key.
+The stand-ins call `AcceptAsync` with `PlatformServesTls13`, false on macOS only, where .NET's
+`SslStream` server negotiates at most TLS 1.2 (BL-2335, ADR-0522). Elsewhere it is
+`AuthenticateAsync`. On macOS it reads the client's first record: a ClientHello offering only TLS
+1.3, with no client certificate asked for, is answered by `Tls13ServerStream`, Curl's own TLS 1.3
+server from `Curl.Tls.UnitLibrary` (`Tls13ServerHandshake`: TLS_AES_128_GCM_SHA256, the client's
+X25519 share, the certificate's ECDSA key, ECH ignored as stunnel without ECH keys does), so
+test4001's `--ech` client exits 101 there as on Windows and Linux; any other first record goes
+back to `SslStream` through `ReplayedPrefixStream`. `ShutdownAsync` sends close_notify on either.
 
 `HttpsServerConnector` (BL-1912) stands in for upstream's HTTPS server, `sws` behind stunnel, on
 port 8989, the runner's `%HTTPSPORT`, which has a value only when the caller names a certificate
@@ -399,8 +407,8 @@ What it is to hold in full, per ADR-0013 decision 2:
   from `Curl.Protocol.Abstractions.UnitLibrary`, which record the bytes they receive;
 - the comparison of a case's results against its `<verify>` section.
 
-This library references `Curl.Protocol.Abstractions.UnitLibrary` and no protocol
-library. It never opens a socket: every connection goes to an in-memory server. It is
+This library references `Curl.Protocol.Abstractions.UnitLibrary`, `Curl.Tls.UnitLibrary`
+(for the TLS 1.3 stand-in, ADR-0522) and no protocol library. It never opens a socket: every connection goes to an in-memory server. It is
 held to the same quality gates as every other `.UnitLibrary` (100% line and branch
 coverage, complexity at most 10, CRAP at most 30) and is AOT-compatible like every
 production project.
