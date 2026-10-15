@@ -5,12 +5,12 @@
 
 .DESCRIPTION
     Reads a gap run's area measurements (<run>/measurements/<platform>/<area>.json, or
-    <run>/measurements/<area>.json in a run from before ADR-0504), the optional
+    <run>/measurements/<area>.json in a run from before ADR-0505), the optional
     <run>/platforms.json that names a platform the run could not measure and why, the
     optional release diff (<run>/measurements/release-<newest>.json), the gap findings and
     the history of earlier runs, and writes the scorecard in the shape
     Gap/Instructions/Gap-Format.md section 8 defines (ADR-0433 decisions 2 and 3, BL-1732,
-    ADR-0504). Each measurement's platform field (windows when it has none) is its platform.
+    ADR-0505). Each measurement's platform field (windows when it has none) is its platform.
 
     The scorecard has exactly these sections, in this order, each saying "None." when it
     has nothing to list: Run, Scores, Platforms, Against the newest version, New gaps,
@@ -192,7 +192,7 @@ function Get-SortedPlatforms($Names) {
 function Read-Measurements([string]$Directory) {
     # platform -> (area -> measurement), from every measurement under <run>/measurements at
     # any depth: measurements/<platform>/<area>.json, or measurements/<area>.json in a run
-    # from before ADR-0504. A measurement without a platform field is a windows one.
+    # from before ADR-0505. A measurement without a platform field is a windows one.
     $folder = Join-Path $Directory 'measurements'
     if (-not (Test-Path -LiteralPath $folder -PathType Container)) { throw "No measurements folder in $Directory." }
     $platforms = @{}
@@ -254,7 +254,7 @@ function Read-GapFinding([System.IO.FileInfo]$File) {
     }
     $opened = ''; if ($front.ContainsKey('opened')) { $opened = $front['opened'] }
     $closed = ''; if ($front.ContainsKey('closed')) { $closed = $front['closed'] }
-    # A finding without a platform field is a windows finding (ADR-0504).
+    # A finding without a platform field is a windows finding (ADR-0505).
     $platform = 'windows'; if ($front.ContainsKey('platform') -and $front['platform']) { $platform = $front['platform'] }
     return [pscustomobject]@{
         Id         = $front['id']
@@ -628,7 +628,7 @@ function Invoke-SelfTest {
         $bytes = [System.IO.File]::ReadAllBytes($historyFile)
         Test-Check 'written files have no byte order mark and no carriage return' ($bytes[0] -eq 0x5B -and -not ($bytes -contains 13) -and -not ([System.IO.File]::ReadAllBytes((Join-Path $ScorecardsDirectory '2026-10-10_0900.md')) -contains 13))
 
-        # Platforms (ADR-0504): windows 3 of 5, linux 2 of 5, macos missing per platforms.json.
+        # Platforms (ADR-0505): windows 3 of 5, linux 2 of 5, macos missing per platforms.json.
         $script:RunDirectory = Join-Path $temp 'platforms'
         $script:ScorecardsDirectory = Join-Path $temp 'PlatformScorecards'
         $script:Stamp = '2026-10-15_1200'

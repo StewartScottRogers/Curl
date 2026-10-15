@@ -47,7 +47,7 @@
 .PARAMETER SaveArchiveTo
     Also copies the downloaded tarball, after its SHA-256 has matched the pinned hash, to
     this file, so a caller can build curl from the very source the office measures against
-    (gap-platforms.yml builds the Linux and macOS reference curl from it, ADR-0504). The
+    (gap-platforms.yml builds the Linux and macOS reference curl from it, ADR-0505). The
     tarball is downloaded even when the cache is complete.
 
 .PARAMETER BaselinesDirectory

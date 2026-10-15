@@ -1,5 +1,5 @@
 # Measures Curl against the targeted upstream curl release on Linux and macOS, area by area,
-# the way RunGapAnalysis.ps1 measures it on Windows (ADR-0504). No AI and no secret beyond
+# the way RunGapAnalysis.ps1 measures it on Windows (ADR-0505). No AI and no secret beyond
 # GITHUB_TOKEN: it only measures, and uploads the measurements for a gap run to analyse.
 #
 # Triggers:

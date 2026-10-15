@@ -1,7 +1,7 @@
 # Gap analyst method: exit codes
 
 The `gap-exitcodes` analyst follows `Gap/Instructions/Analyst-Rules.md` first and this
-method second. It reads `<run>/measurements/exitcodes.json`, written by
+method second. It reads `<run>/measurements/<platform>/exitcodes.json`, written by
 `Gap/Tools/Measure-ExitCodeGap.ps1`, whose header says how each code is compared.
 
 ## What the measurement holds

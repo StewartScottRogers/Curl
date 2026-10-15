@@ -3,7 +3,7 @@
     Measures Curl against an upstream curl release, area by area, on Windows here and on
     Linux and macOS through the gap-platforms workflow, then turns the measurements into
     findings, a scorecard, a pull request and Curl tasks (ADR-0433 decisions 3, 4, 5 and 7;
-    ADR-0504).
+    ADR-0505).
 .DESCRIPTION
     Steps, each traced to <repo>.gap\<stamp>\gap.log, where <repo>.gap sits beside the
     checkout and <stamp> is yyyy-MM-dd_HHmm:
@@ -17,11 +17,13 @@
        -f ref=<commit> -f request=<stamp>, then the run is found in gh run list by its title
        "Gap platforms <stamp> <commit>" (up to two minutes). A dispatch that fails leaves
        linux and macos missing, with the reason, and the run goes on.
-    4. When windows is selected: Gap/Tools/Measure-GapAreas.ps1 -Tree <tree> -OutDirectory
+    4. Gap/Tools/Get-UpstreamRelease.ps1 -Version <CurlVersion>; its last output line is
+       the release folder, named in every analyst's prompt. Then, when windows is selected:
+       Gap/Tools/Measure-GapAreas.ps1 -Tree <tree> -Release <folder> -OutDirectory
        <stamp>\measurements\windows -StatusFile <stamp>\status-windows.json, the same
        measurement phase gap-platforms.yml runs on Linux and macOS: it builds the candidate,
-       fetches the release, finds the reference curl (the Schannel curl of Git for Windows)
-       and runs each area's Measure-* tool (its help lists them). A measurement step that
+       finds the reference curl (the Schannel curl of Git for Windows) and runs each area's
+       Measure-* tool (its help lists them). A measurement step that
        changed the tree is logged with the files and the tree reset, so no analyst is
        blamed for it.
     5. gh run view <run> once a minute until it completes or -PlatformTimeoutMinutes pass
@@ -40,8 +42,8 @@
     7. The analysts, headless, the way the dark factory runs agents:
        claude -p --agent gap-<area> --model <model: of .claude/agents/gap-<area>.md>
        --dangerously-skip-permissions --output-format stream-json --verbose, with a prompt
-       on standard input naming the platform, run folder, measurement file, tree and run
-       stamp and the area's existing findings of that platform (id, key, status, items).
+       on standard input naming the platform, run folder, measurement file, tree, release
+       folder and run stamp and the area's existing findings of that platform (id, key, status, items).
        Every measured windows area gets its analyst; a linux or macos area gets one only
        when it has gaps of its own, and its prompt lists them. The result event's text is
        saved to <stamp>\reports\<platform>\gap-<area>.md and its total_cost_usd logged. An
@@ -852,9 +854,12 @@ else { Write-GapLog 'No remote platform selected; gap-platforms.yml not dispatch
 
 Write-Host '== Step 4: measure windows here'
 $states = [ordered]@{}
+# The release folder, for the windows measurement and for every analyst's prompt.
+if ((Invoke-GapTool 'release' 'Get-UpstreamRelease.ps1' @('-Version', $CurlVersion)) -ne 0) { Stop-GapRun "could not fetch curl $CurlVersion." }
+$release = if ($DryRun) { '<release folder>' } else { @($script:LastOutput | Where-Object { $_ })[-1].Trim() }
 if ($platformSelection -contains 'windows') {
     $statusFile = Join-Path $runDirectory 'status-windows.json'
-    $measure = @('-Tree', $tree, '-OutDirectory', (Join-Path $measurements 'windows'), '-WorkDirectory', (Join-Path $runDirectory 'work-windows'), '-StatusFile', $statusFile, '-Version', $CurlVersion, '-Areas', ($selection.Areas -join ','))
+    $measure = @('-Tree', $tree, '-OutDirectory', (Join-Path $measurements 'windows'), '-WorkDirectory', (Join-Path $runDirectory 'work-windows'), '-StatusFile', $statusFile, '-Version', $CurlVersion, '-Release', $release, '-Areas', ($selection.Areas -join ','))
     if ($DryRun) { $measure += '-DryRun' }
     $code = Invoke-GapTool 'measure-windows' 'Measure-GapAreas.ps1' $measure
     $measureScript = Join-Path $script:ToolsDirectory 'Measure-GapAreas.ps1'
@@ -931,6 +936,7 @@ foreach ($platform in $measuredPlatforms) {
             "Run folder: $runDirectory",
             "Measurement file: $file",
             "Measured tree: $tree",
+            "Release folder: $release",
             "Run stamp: $stamp"
         )
         if ($platform -ne 'windows') {

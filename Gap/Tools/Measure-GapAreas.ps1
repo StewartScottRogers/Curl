@@ -4,7 +4,7 @@
     upstream release, finds the reference curl, runs each selected area's Measure-* tool and
     writes <OutDirectory>/<area>.json and a status file. RunGapAnalysis.ps1 runs it on
     Windows and .github/workflows/gap-platforms.yml runs it on Linux and macOS, so every
-    platform is measured by the same code (ADR-0504).
+    platform is measured by the same code (ADR-0505).
 
 .DESCRIPTION
     Steps, each printed with its command and exit code:

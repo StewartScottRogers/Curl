@@ -10,7 +10,7 @@
 
     - open: every "status: open" finding, sorted by severity (Critical, High, Medium, Low),
       then scope (target before newest), then ID. Each carries its platform, windows when
-      the finding has no platform field (ADR-0504).
+      the finding has no platform field (ADR-0505).
     - closed: the findings whose "closed" run stamp is one of the last five distinct run
       stamps in history.json (a run has one entry per platform), in the same order.
     - regressions: the open findings with "regression: true", in the same order.
@@ -146,7 +146,7 @@ function Read-GapFinding([System.IO.FileInfo]$File) {
     if ($front.ContainsKey('closed')) { $closedStamp = $front['closed'] }
     $regression = $front.ContainsKey('regression') -and $front['regression'] -eq 'true'
 
-    # A finding without a platform field is a windows finding (ADR-0504).
+    # A finding without a platform field is a windows finding (ADR-0505).
     $platform = 'windows'
     if ($front.ContainsKey('platform') -and $front['platform'].Length -gt 0) { $platform = $front['platform'] }
     $entry = [ordered]@{
@@ -279,7 +279,7 @@ function New-GapDashboardData([string]$Generated) {
 
     # Each platform's newest history entry, in the order windows, linux, macos, and the one
     # of them with the lowest overall score: the headline, so no platform hides behind
-    # another (ADR-0504). A platform whose overall Y is 0 has no score and is passed over.
+    # another (ADR-0505). A platform whose overall Y is 0 has no score and is passed over.
     $platforms = [ordered]@{}
     $names = New-Object System.Collections.Generic.List[string]
     foreach ($entry in $history) { $name = [string]$entry.platform; if (-not $names.Contains($name)) { $names.Add($name) } }
@@ -386,7 +386,7 @@ function Invoke-SelfTest {
         [System.IO.File]::WriteAllText((Join-Path $platformScorecards 'history.json'), '[' + (@((& $entry '2026-10-15_1200' 'linux' 50 100), (& $entry '2026-10-15_1200' 'macos' 0 0), (& $entry '2026-10-15_1200' 'windows' 90 100), (& $entry '2026-10-16_1200' 'windows' 95 100)) -join ', ') + ']')
         $script:ScorecardsDirectory = $platformScorecards
         $platformData = ConvertFrom-Json -InputObject (New-GapDashboardData $fixedTime)
-        Test-Check 'platforms holds each platform''s newest entry, windows first (ADR-0504)' (
+        Test-Check 'platforms holds each platform''s newest entry, windows first (ADR-0505)' (
             [string]::Join(',', [string[]]@($platformData.platforms.PSObject.Properties | ForEach-Object { $_.Name })) -eq 'windows,linux,macos' -and $platformData.platforms.windows.overall.x -eq 95)
         Test-Check 'lowest is the platform with the lowest overall score, passing over one with Y = 0' (
             $platformData.lowest.platform -eq 'linux' -and $platformData.lowest.x -eq 50 -and $platformData.lowest.y -eq 100 -and $platformData.lowest.stamp -eq '2026-10-15_1200')

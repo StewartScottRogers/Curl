@@ -239,6 +239,9 @@ The gap analysis office measures Curl against upstream curl's release data - the
 version's tarball (`Gap/Baselines/target.json`) and the matched reference curl - in seven
 areas: options, protocols, features, write-out variables, exit codes, environment, and the
 behaviour of upstream's `tests/data` cases (ADR-0433; `Gap/README.md` maps the folder).
+Every run measures Windows locally and Linux and macOS in `gap-platforms.yml` (curl built
+from the tarball with OpenSSL); each platform scores and files findings on its own, a finding
+closes only on its own platform, and the headline is the lowest platform's score (ADR-0505).
 Seven read-only analysts group each area's gaps by cause: `gap-behaviour` (Opus),
 `gap-options` and `gap-environment` (Sonnet), `gap-protocols`, `gap-features`,
 `gap-writeout` and `gap-exitcodes` (Haiku).

@@ -1,7 +1,7 @@
 # Gap analyst method: behaviour
 
 The `gap-behaviour` analyst follows `Gap/Instructions/Analyst-Rules.md` first and this
-method second. It reads `<run>/measurements/behaviour.json`, written by
+method second. It reads `<run>/measurements/<platform>/behaviour.json`, written by
 `Gap/Tools/ConvertTo-BehaviourMeasurement.ps1` (BL-1729) and amended by
 `Gap/Tools/Measure-ReferenceCrossCheck.ps1` (BL-1730); each script's header says how it
 decides a case's state.

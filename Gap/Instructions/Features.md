@@ -1,7 +1,7 @@
 # Gap analyst method: features
 
 The `gap-features` analyst follows `Gap/Instructions/Analyst-Rules.md` first and this
-method second. It reads `<run>/measurements/features.json`, written by
+method second. It reads `<run>/measurements/<platform>/features.json`, written by
 `Gap/Tools/Measure-VersionGap.ps1`, whose header says how each feature is compared.
 
 ## What the measurement holds

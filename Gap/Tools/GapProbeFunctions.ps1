@@ -75,7 +75,7 @@ function Get-GapReferenceCurlPath {
     .SYNOPSIS
         Finds the reference curl: CURL_GAP_REFERENCE_CURL when it is set
         (gap-platforms.yml points it at the curl it built from the release tarball,
-        ADR-0504); else Git for Windows' ucrt64\bin\curl.exe (from Git 2.56.0) or
+        ADR-0505); else Git for Windows' ucrt64\bin\curl.exe (from Git 2.56.0) or
         mingw64\bin\curl.exe (before it) on Windows, the lookup Record-CurlExchange.ps1's
         Get-ReferenceCurlPath uses; curl on PATH elsewhere; $null when there is none.
     #>
@@ -380,6 +380,6 @@ function Invoke-GapProbeSelfTest {
         $env:CURL_GAP_REFERENCE_CURL = $echo
         $overridden = Get-GapReferenceCurlPath
     } finally { $env:CURL_GAP_REFERENCE_CURL = $savedReference }
-    & $report 'CURL_GAP_REFERENCE_CURL names the reference curl when it is set (ADR-0504)' ($overridden -eq $echo) ("found: $overridden")
+    & $report 'CURL_GAP_REFERENCE_CURL names the reference curl when it is set (ADR-0505)' ($overridden -eq $echo) ("found: $overridden")
 
 }

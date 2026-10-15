@@ -26,7 +26,7 @@
     | area protocols                                             | Pipeline protocol             |
     | any other area                                             | Pipeline feature              |
     | the finding's touches                                      | -Touches, dropping any Gap/, Audit/ or .claude/agents/ path; with none left the task has no touches, runs alone, and its Context says so |
-    | platform linux or macos                                    | " (on <platform>)" after the title, and the Context and acceptance criteria say lanes test only on Windows, so the proof is the gap-platforms workflow or CI on that platform (ADR-0504) |
+    | platform linux or macos                                    | " (on <platform>)" after the title, and the Context and acceptance criteria say lanes test only on Windows, so the proof is the gap-platforms workflow or CI on that platform (ADR-0505) |
 
     A finding's tasks are the IDs in its tasks list plus every board task whose title
     starts "Close GF-####" or "Re-close GF-####" for it, so a task filed by hand counts. A
@@ -53,7 +53,7 @@
 
 .PARAMETER MeasurementsDirectory
     Optional: a run's measurements folder (<platform>/<area>.json, Gap-Format.md section 4;
-    for windows also <area>.json, as runs before ADR-0504 wrote it). An item found in the
+    for windows also <area>.json, as runs before ADR-0505 wrote it). An item found in the
     finding's platform's measurement gives its acceptance box the item's expected answer.
 
 .PARAMETER WhatIf
@@ -108,7 +108,7 @@ function Read-Finding([string] $Path) {
         if ($lines[$index] -match '^([a-z-]+):\s?(.*)$') { $front[$Matches[1]] = $Matches[2].Trim() }
         $index++
     }
-    # A finding filed before findings carried a platform is a Windows finding (ADR-0504).
+    # A finding filed before findings carried a platform is a Windows finding (ADR-0505).
     if (-not $front.Contains('platform') -or -not $front['platform']) {
         $withPlatform = [ordered]@{}
         foreach ($name in @($front.Keys)) {
@@ -222,7 +222,7 @@ function Get-UpstreamSources([string] $Version, [string] $Area) {
 
 function Get-Expected([string] $Area, [string] $Platform, [string] $Key) {
     if (-not $MeasurementsDirectory) { return $null }
-    # <run>/measurements/<platform>/<area>.json; a run from before ADR-0504 kept
+    # <run>/measurements/<platform>/<area>.json; a run from before ADR-0505 kept
     # measurements/<area>.json, which is the windows one.
     $path = Join-Path (Join-Path $MeasurementsDirectory $Platform) "$Area.json"
     if (-not (Test-Path -LiteralPath $path) -and $Platform -eq 'windows') { $path = Join-Path $MeasurementsDirectory "$Area.json" }
@@ -248,7 +248,7 @@ function Format-TaskBody($Finding, [string] $Kind, [string[]] $Touches) {
     $platform = $front['platform']
     if ($platform -eq 'windows') { $lines.Add('- Platform: windows, measured against the Schannel curl of Git for Windows.') }
     else {
-        $lines.Add("- Platform: $platform, measured against curl $version built from the release tarball with OpenSSL by the gap-platforms workflow (.github/workflows/gap-platforms.yml, ADR-0504). This gap is $platform's own: Windows does not show it.")
+        $lines.Add("- Platform: $platform, measured against curl $version built from the release tarball with OpenSSL by the gap-platforms workflow (.github/workflows/gap-platforms.yml, ADR-0505). This gap is $platform's own: Windows does not show it.")
         $lines.Add("- Lanes test only on Windows, so a lane cannot see this gap pass locally. The proof is the gap-platforms workflow (run it on the branch: gh workflow run gap-platforms.yml -f ref=<branch>) or the CI job on $platform passing a test that pins each item; write those tests platform-neutral or mark them for $platform.")
     }
     $lines.Add("- Items: $itemText.")
@@ -399,7 +399,7 @@ function Invoke-SelfTest {
         $log01 = [IO.File]::ReadAllText((Get-ChildItem -Path (Join-Path $folder 'findings') -Filter 'GF-0001-*.md')[0].FullName)
         Assert-Check 'the finding gains task, tasks and a Log line' ($f01['task'] -eq $id01 -and $f01['tasks'] -eq "[$id01]" -and $log01 -match "(?m)^- [0-9]{4}-[0-9]{2}-[0-9]{2}_[0-9]{4}: Filed $id01\.$" -and $f03['task'] -eq $id03 -and $f03['tasks'] -eq "[BL-101, $id03]")
         Assert-Check 'the summary line counts the tasks filed' ($output -match 'New-TasksFromGaps: 5 task\(s\) filed\.')
-        Assert-Check 'a linux finding''s task names the platform in its title, Context and acceptance criteria (ADR-0504)' ($tasks['GF-0011'].Count -eq 1 -and $text['GF-0011'] -match '(?m)^title: Close GF-0011: The Unix socket path is read differently \(on linux\)$' -and $text['GF-0011'] -match 'Platform: linux' -and $text['GF-0011'] -match 'Lanes test only on Windows' -and $text['GF-0011'] -match 'gap-platforms workflow run on the branch' -and $text['GF-0011'] -match ('`options:--unix-socket`: Curl answers what curl ' + [regex]::Escape((Get-TargetVersion)) + ' answers on linux, `exit 7 on a missing socket`'))
+        Assert-Check 'a linux finding''s task names the platform in its title, Context and acceptance criteria (ADR-0505)' ($tasks['GF-0011'].Count -eq 1 -and $text['GF-0011'] -match '(?m)^title: Close GF-0011: The Unix socket path is read differently \(on linux\)$' -and $text['GF-0011'] -match 'Platform: linux' -and $text['GF-0011'] -match 'Lanes test only on Windows' -and $text['GF-0011'] -match 'gap-platforms workflow run on the branch' -and $text['GF-0011'] -match ('`options:--unix-socket`: Curl answers what curl ' + [regex]::Escape((Get-TargetVersion)) + ' answers on linux, `exit 7 on a missing socket`'))
         Assert-Check 'a windows finding''s task says nothing of the gap-platforms workflow' ($text['GF-0001'] -match 'Platform: windows' -and $text['GF-0001'] -notmatch 'gap-platforms' -and $text['GF-0001'] -notmatch '\(on windows\)')
         $saved = $env:CLAUDE_PROJECT_DIR
         try {

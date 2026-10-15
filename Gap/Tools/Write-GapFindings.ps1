@@ -5,14 +5,14 @@
     re-measurement on their own platform.
 
 .DESCRIPTION
-    ADR-0433 decisions 3 and 5, ADR-0504. Formats are in Gap/Instructions/Gap-Format.md
+    ADR-0433 decisions 3 and 5, ADR-0505. Formats are in Gap/Instructions/Gap-Format.md
     (sections 4 to 7); files follow Gap/Findings/FINDING-TEMPLATE.md's front matter and
     section order. Every rule is mechanical: read from the measurement files, never from an
     analyst's verdict.
 
     The areas measured are the <area>.json files under <RunDirectory>/measurements, at any
     depth: measurements/<platform>/<area>.json, or measurements/<area>.json in a run from
-    before ADR-0504 (release-*.json files are release diffs, not areas). Each measurement's
+    before ADR-0505 (release-*.json files are release diffs, not areas). Each measurement's
     platform field (windows, linux or macos) is its platform. Every finding has one
     platform; a finding without a platform field is a windows finding. Rules:
 
@@ -23,7 +23,7 @@
        a platform's own gaps are filed in its findings (rules 1 and 2), so one cause seen on
        every platform is one finding, not three.
     1. The last fenced json block of each <RunDirectory>/reports/<platform>/gap-<area>.md
-       (for windows also reports/gap-<area>.md, as runs before ADR-0504 wrote it) is the
+       (for windows also reports/gap-<area>.md, as runs before ADR-0505 wrote it) is the
        analyst's report block for that platform. A group's key is its "key" field when it
        has one, else "<area>:<slug of its title>". A group whose key and platform equal an
        existing finding's is that finding: items it names are added to the finding's items.
@@ -123,7 +123,7 @@ function Read-Finding([string] $Path) {
         if ($lines[$index] -match '^([a-z-]+):\s?(.*)$') { $front[$Matches[1]] = $Matches[2].Trim() }
         $index++
     }
-    # A finding filed before findings carried a platform is a Windows finding (ADR-0504).
+    # A finding filed before findings carried a platform is a Windows finding (ADR-0505).
     if (-not $front.Contains('platform') -or -not $front['platform']) {
         $withPlatform = [ordered]@{}
         foreach ($name in @($front.Keys)) {
@@ -199,7 +199,7 @@ function Get-PlatformRank([string] $Platform) {
     return $rank
 }
 
-# Rule 0 (ADR-0504): the gap items of each platform and area that are that platform's own.
+# Rule 0 (ADR-0505): the gap items of each platform and area that are that platform's own.
 # A gap on platform P is covered, and left to another platform's finding, when an earlier
 # platform Q in the order windows, linux, macos measured the area in this run and measured
 # the item as gap too, or did not measure the area and has an open finding listing it.
@@ -226,7 +226,7 @@ function Get-UncoveredGaps($Measured) {
 }
 
 # Every area measurement under <RunDirectory>/measurements, at any depth (one folder per
-# platform, or the files themselves in a run from before ADR-0504), except release diffs.
+# platform, or the files themselves in a run from before ADR-0505), except release diffs.
 function Get-RunMeasurements {
     $folder = Join-Path $RunDirectory 'measurements'
     if (-not (Test-Path $folder)) { return , @() }
@@ -241,7 +241,7 @@ function Get-RunMeasurements {
 }
 
 # The analyst report of one platform and area: reports/<platform>/gap-<area>.md, or for
-# windows reports/gap-<area>.md as a run from before ADR-0504 wrote it.
+# windows reports/gap-<area>.md as a run from before ADR-0505 wrote it.
 function Get-ReportPath([string] $Platform, [string] $Area) {
     $reports = Join-Path $RunDirectory 'reports'
     $path = Join-Path (Join-Path $reports $Platform) "gap-$Area.md"
@@ -411,7 +411,7 @@ function Invoke-WriteGapFindings {
     Write-Output "Gap findings ${Stamp}: $($s.New) new, $($s.StillOpen) still open, $($s.Closed) closed, $($s.Reopened) reopened as regressions, $($s.Ungrouped) ungrouped."
 }
 
-# The platform checks (ADR-0504), on a run built in a temporary folder: windows and linux
+# The platform checks (ADR-0505), on a run built in a temporary folder: windows and linux
 # measure options; macos measures nothing. Items: a (gap on both), b (gap on linux only),
 # c (match on windows, gap on linux), d (gap on windows only). Existing findings: GF-0001
 # windows lists a and d; GF-0002 linux lists c; GF-0003 macos lists a (not measured here);
