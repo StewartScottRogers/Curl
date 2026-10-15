@@ -487,6 +487,7 @@ public sealed class CurlCommandRunnerAltSvcVersionTests
                     new MemoryStream(),
                     runsOnWindows: true,
                     parsesAsWindowsBuild: false,
+                    parsesAsQuicBuild: true,
                     timeProvider: new FixedUtcClock(Now))
                 .RunAsync(arguments);
         }

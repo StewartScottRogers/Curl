@@ -113,7 +113,7 @@ public sealed class CommandLineSchannelBuildRefusalTests
 
     [TestMethod]
     [DataRow("--http2")]
-    [DataRow("--http3-only")]
+    [DataRow("--http2-prior-knowledge")]
     public void Parse_HttpVersionOnTheOpenSslBuild_IsAccepted(string spelling)
     {
         CommandLineParseResult result = ParseAsOpenSslBuild(["-s", spelling, Url]);
@@ -218,7 +218,7 @@ public sealed class CommandLineSchannelBuildRefusalTests
 
     [TestMethod]
     [DataRow("## --http2\n")]
-    [DataRow("## --http3-only\n")]
+    [DataRow("## --http2-prior-knowledge\n")]
     [DataRow("## --ssl-sessions\n")]
     [DataRow("## --proxy-http2\n")]
     public void AiHelp_SectionOfAnOptionTheSchannelBuildLacks_SaysWindowsRefusesIt(string heading)

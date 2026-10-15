@@ -131,7 +131,7 @@ public sealed partial class EasyOptionsFromCommandLineTests
 
     private static CommandLineOptions Parse(params string[] arguments)
     {
-        CommandLineParseResult result = OpenSslBuildParser.Parse([.. arguments, Url], _ => true);
+        CommandLineParseResult result = QuicBuildParser.Parse([.. arguments, Url], _ => true);
         Assert.IsTrue(result.IsAccepted, string.Join(' ', arguments));
         return result.Options;
     }

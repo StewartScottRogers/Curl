@@ -127,7 +127,7 @@ public sealed class HttpVersionMappingTests
     public void HttpRequestOptionsFromCommandLine_Http2OrHttp3Option_SetsTheVersion(string option, HttpVersionPreference expected)
     {
         Diagnostics.Arrange("option", option);
-        CommandLineParseResult result = OpenSslBuildParser.Parse([option, Url]);
+        CommandLineParseResult result = QuicBuildParser.Parse([option, Url]);
         Assert.IsTrue(result.IsAccepted);
 
         HttpVersionPreference actual = HttpRequestOptionsMapping.Of(EasyOptionsFromCommandLine.TransferSettingsOf(result.Options), EasyOptionsFromCommandLine.HttpOf(result.Options), new EasyBehaviourOptions(), new EasyTransferOptions(), new EasyAuthenticationOptions()).Version;
@@ -140,7 +140,7 @@ public sealed class HttpVersionMappingTests
 
     private static string OfferedBy(params string[] arguments)
     {
-        CommandLineParseResult result = OpenSslBuildParser.Parse(arguments);
+        CommandLineParseResult result = QuicBuildParser.Parse(arguments);
         Assert.IsTrue(result.IsAccepted);
 
         CurlTransports transports = EngineComposition.CreateTransports(EasyOptionsFromCommandLine.ToolOptionsOf(result.Options), EasyOptionsFromCommandLine.NetworkOf(result.Options), EasyOptionsFromCommandLine.TlsOf(result.Options), EasyOptionsFromCommandLine.HttpOf(result.Options), EasyOptionsFromCommandLine.ProxyOf(result.Options), EasyOptionsFromCommandLine.AuthenticationOf(result.Options), TimeProvider.System, traces: EasyOptionsFromCommandLine.TraceComponentsOf(result.Options));

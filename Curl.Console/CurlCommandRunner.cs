@@ -110,6 +110,11 @@ namespace Curl.Console;
 /// Performs each transfer attempt and numbers the run's transfers and connections (ADR-0506, BL-2282);
 /// <see langword="null" /> for one on the runner's clock.
 /// </param>
+/// <param name="parsesAsQuicBuild">
+/// Whether the command line is read as a curl built with a QUIC library reads it (<see cref="CommandLineOptions.ActsAsQuicBuild" />),
+/// accepting <c>--http3</c> and <c>--http3-only</c>; off by default, as every reference build refuses them (ADR-0540).
+/// Tests and the conformance harness turn it on to reach the hand-built HTTP/3.
+/// </param>
 /// <param name="writeOutTimeDialect">
 /// The C runtime whose <c>strftime</c> a <c>-w</c> <c>%time{format}</c> follows; the composition
 /// passes the platform's (<see cref="CurlComposition.WriteOutTimeDialectFor" />), and
@@ -266,7 +271,7 @@ namespace Curl.Console;
 /// </para>
 /// </remarks>
 /// <param name="lateBoundDiagnosticLog">The log the authenticators were composed with, bound to the run's diagnostic log once it is open (BL-923); <see langword="null" /> when none was composed.</param>
-/// <param name="parsesAsWindowsBuild">Whether the command line is read as curl's Windows Schannel build reads it (<see cref="CommandLineOptions.ActsAsWindowsSchannelBuild" />); <see langword="null" />, the default, reads it as this process's platform's build does. Tests pass <see langword="false" /> to reach the HTTP/2, HTTP/3 and TLS-SRP options on any platform.</param>
+/// <param name="parsesAsWindowsBuild">Whether the command line is read as curl's Windows Schannel build reads it (<see cref="CommandLineOptions.ActsAsWindowsSchannelBuild" />); <see langword="null" />, the default, reads it as this process's platform's build does. Tests pass <see langword="false" /> to reach the HTTP/2 options and <c>--ssl-sessions</c> on any platform.</param>
 internal sealed class CurlCommandRunner(
     Func<CommandLineOptions, TransferDispatch> createTransferDispatch,
     IFileSystem fileSystem,
@@ -296,7 +301,8 @@ internal sealed class CurlCommandRunner(
     TimeProvider? hstsClock = null,
     bool hstsLearnsOverHttp = false,
     bool altSvcUsesOverHttp = false,
-    TransferPerformer? transferPerformer = null)
+    TransferPerformer? transferPerformer = null,
+    bool parsesAsQuicBuild = false)
 {
     /// <summary>
     /// The line curl 8.21.0's own write callback prints, with no <c>(23)</c>, when standard
@@ -1334,7 +1340,8 @@ internal sealed class CurlCommandRunner(
             fileReader,
             defaultConfigFileSearch ?? NoDefaultConfigFile,
             parsesAsWindowsBuild ?? OperatingSystem.IsWindows(),
-            EnvironmentVariables);
+            EnvironmentVariables,
+            parsesAsQuicBuild);
 
     /// <summary>
     /// Transfers every URL of one option group in order, each command-line URL once for every URL

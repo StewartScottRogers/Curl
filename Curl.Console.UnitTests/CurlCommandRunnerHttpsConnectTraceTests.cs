@@ -129,7 +129,7 @@ public sealed class CurlCommandRunnerHttpsConnectTraceTests
     {
         // curl.se's curl 8.22.0 ngtcp2 build: --http3 names "2nd attempt uses h2", --http3-only none (BL-1284 Notes).
         Diagnostics.Arrange("option", option);
-        CommandLineParseResult parsed = OpenSslBuildParser.Parse(["-k", "-v", "--trace-config", "https-connect", option, "https://127.0.0.1:18713/"], _ => true);
+        CommandLineParseResult parsed = QuicBuildParser.Parse(["-k", "-v", "--trace-config", "https-connect", option, "https://127.0.0.1:18713/"], _ => true);
         Diagnostics.Assert("parse accepted", true, parsed.IsAccepted);
         Assert.IsTrue(parsed.IsAccepted);
 

@@ -9,7 +9,8 @@ namespace Curl.Cli;
 /// <c>--http0.9</c> (negatable), <c>--request-target</c>, <c>-0</c>/<c>--http1.0</c>, <c>--http1.1</c>, <c>--http2</c> and
 /// <c>--http2-prior-knowledge</c> (ADR-0141), and <c>--http3</c> and <c>--http3-only</c> (ADR-0144).
 /// Every refusal and warning line was measured with <c>/mingw64/bin/curl</c> 8.21.0 against
-/// <c>http://127.0.0.1:1/</c> on 2026-09-26, and the HTTP/3 ones with curl.se's 8.18.0 ngtcp2 build.
+/// <c>http://127.0.0.1:1/</c> on 2026-09-26, and the HTTP/3 ones with curl.se's 8.18.0 ngtcp2 build, so the
+/// tests parse as a QUIC build (ADR-0540); every reference build refuses the HTTP/3 options (CommandLineHttp3RefusalTests).
 /// </summary>
 [TestClass]
 public sealed class CommandLineTransferEncodingOptionTests
@@ -375,7 +376,7 @@ public sealed class CommandLineTransferEncodingOptionTests
     [DataRow("--http3", RequestedHttpVersion.Http3)]
     [DataRow("--http3=x", RequestedHttpVersion.Http3)]
     [DataRow("--http3-only", RequestedHttpVersion.Http3Only)]
-    public void Parse_Http3Option_IsAcceptedByTheOpenSslBuild(string spelling, RequestedHttpVersion expected)
+    public void Parse_Http3Option_IsAcceptedByTheQuicBuild(string spelling, RequestedHttpVersion expected)
     {
         CommandLineParseResult result = Parse([spelling, Url]);
 
@@ -459,7 +460,7 @@ public sealed class CommandLineTransferEncodingOptionTests
         Diagnostics.ArrangeArguments(arguments);
         Diagnostics.Bytes("k.txt", reader.Files["k.txt"]);
 
-        CommandLineParseResult result = OpenSslBuildParser.Parse(arguments, _ => true, ConsolePasswordPrompt.ForProcessConsole, reader);
+        CommandLineParseResult result = QuicBuildParser.Parse(arguments, _ => true, ConsolePasswordPrompt.ForProcessConsole, reader);
         WriteOutcome(result);
 
         Diagnostics.Assert("accepted", true, result.IsAccepted);
@@ -485,11 +486,11 @@ public sealed class CommandLineTransferEncodingOptionTests
     /// </summary>
     private static CommandLineOptions? Recorded(CommandLineParseResult result) => result.Options;
 
-    /// <summary>Parses <paramref name="arguments"/> as the OpenSSL build, writing them, the outcome and the option values as diagnostics.</summary>
+    /// <summary>Parses <paramref name="arguments"/> as the QUIC build (<see cref="QuicBuildParser"/>), which reads every option here as the OpenSSL build does but <c>--http3</c> and <c>--http3-only</c>, writing them, the outcome and the option values as diagnostics.</summary>
     private CommandLineParseResult Parse(IReadOnlyList<string> arguments)
     {
         Diagnostics.ArrangeArguments(arguments);
-        CommandLineParseResult result = OpenSslBuildParser.Parse(arguments);
+        CommandLineParseResult result = QuicBuildParser.Parse(arguments);
         WriteOutcome(result);
         return result;
     }

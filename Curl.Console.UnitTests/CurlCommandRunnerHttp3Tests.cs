@@ -319,7 +319,7 @@ public sealed class CurlCommandRunnerHttp3Tests
         using (Diagnostics.Phase("run"))
         {
             exitCode = await CurlComposition
-                .CreateRunner(standardOutput, standardError, standardInput, connector, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), parsesAsWindowsBuild: false)
+                .CreateRunner(standardOutput, standardError, standardInput, connector, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), parsesAsWindowsBuild: false, parsesAsQuicBuild: true)
                 .RunAsync(arguments);
         }
 

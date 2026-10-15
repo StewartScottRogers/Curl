@@ -26,7 +26,7 @@ public sealed class CurlCommandRunnerHttp3DatagramConnectorTests
                 new RefusingTcpDialer(),
                 new LoopbackDnsResolver(),
                 datagrams,
-                parsesAsWindowsBuild: false)
+                parsesAsWindowsBuild: false, parsesAsQuicBuild: true)
             .RunAsync(["-s", "--http3-only", "https://127.0.0.1:47260/"]);
 
         Assert.AreEqual((int)CurlExitCode.RecvError, exitCode);

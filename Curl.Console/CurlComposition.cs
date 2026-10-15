@@ -134,8 +134,8 @@ internal static class CurlComposition
     /// </param>
     /// <param name="parsesAsWindowsBuild">
     /// Whether the runner reads the command line as curl's Windows Schannel build does; <see langword="null" />
-    /// for this process's platform. Tests pass <see langword="false" /> to reach <c>--http2</c>, <c>--http3</c> and
-    /// the TLS-SRP options on every platform (ADR-0397).
+    /// for this process's platform. Tests pass <see langword="false" /> to reach <c>--http2</c> and <c>--ssl-sessions</c>
+    /// on every platform (ADR-0397).
     /// </param>
     /// <param name="writesProgressMeter">
     /// Whether the runner writes curl's progress meter and the <c>-#</c> bar, as the executable's runner
@@ -144,6 +144,11 @@ internal static class CurlComposition
     /// <param name="writeOutFileOpener">
     /// Opens the <c>-w</c> <c>%output{file}</c> targets, such as a <see cref="DiskWriteOutFileOpener" />; or
     /// <see langword="null" /> for the runner's <see cref="RefusingWriteOutFileOpener" />, which opens none (BL-1445).
+    /// </param>
+    /// <param name="parsesAsQuicBuild">
+    /// Whether the runner reads the command line as a curl built with a QUIC library does, accepting <c>--http3</c> and
+    /// <c>--http3-only</c>; off by default, as every reference build refuses them (ADR-0540). Tests and the conformance
+    /// harness turn it on to reach the hand-built HTTP/3 (BL-2260, BL-2332).
     /// </param>
     /// <returns>The runner.</returns>
     internal static CurlCommandRunner CreateRunner(
@@ -158,7 +163,8 @@ internal static class CurlComposition
         ConnectionCache? runConnections = null,
         bool? parsesAsWindowsBuild = null,
         bool writesProgressMeter = false,
-        IWriteOutFileOpener? writeOutFileOpener = null)
+        IWriteOutFileOpener? writeOutFileOpener = null,
+        bool parsesAsQuicBuild = false)
     {
         LateBoundDiagnosticLog runLog = new();
         return new(
@@ -176,6 +182,7 @@ internal static class CurlComposition
             runConnectionCache: runConnections,
             lateBoundDiagnosticLog: runLog,
             parsesAsWindowsBuild: parsesAsWindowsBuild,
+            parsesAsQuicBuild: parsesAsQuicBuild,
             transferPerformer: new TransferPerformer(TimeProvider.System, EasyErrorText));
     }
 
@@ -233,7 +240,12 @@ internal static class CurlComposition
     /// </param>
     /// <param name="parsesAsWindowsBuild">
     /// Whether the runner reads the command line as curl's Windows Schannel build does; <see langword="null" />
-    /// for this process's platform. Tests pass <see langword="false" /> to reach <c>--http3</c> on every platform (ADR-0397, BL-2260).
+    /// for this process's platform (ADR-0397).
+    /// </param>
+    /// <param name="parsesAsQuicBuild">
+    /// Whether the runner reads the command line as a curl built with a QUIC library does, accepting <c>--http3</c> and
+    /// <c>--http3-only</c>; off by default, as every reference build refuses them (ADR-0540). Tests and the conformance
+    /// harness turn it on to reach the hand-built HTTP/3 (BL-2260, BL-2332).
     /// </param>
     /// <returns>The runner.</returns>
     internal static CurlCommandRunner CreateRunner(
@@ -254,7 +266,8 @@ internal static class CurlComposition
         bool honoursHstsTimeVariable = false,
         bool honoursHstsHttpVariable = false,
         bool honoursAltSvcHttpVariable = false,
-        bool? parsesAsWindowsBuild = null)
+        bool? parsesAsWindowsBuild = null,
+        bool parsesAsQuicBuild = false)
     {
         ConnectionCache runConnections = new(TimeProvider.System);
         LateBoundDiagnosticLog runLog = new();
@@ -281,11 +294,12 @@ internal static class CurlComposition
             hstsLearnsOverHttp: LearnsHstsOverHttp(honoursHstsHttpVariable, environment),
             altSvcUsesOverHttp: UsesAltSvcOverHttp(honoursAltSvcHttpVariable, environment),
             parsesAsWindowsBuild: parsesAsWindowsBuild,
+            parsesAsQuicBuild: parsesAsQuicBuild,
             transferPerformer: new TransferPerformer(TimeProvider.System, EasyErrorText));
     }
 
     /// <summary>
-    /// Builds one option group's dispatch for the dialing <see cref="CreateRunner(Stream, Stream, Stream, ITcpDialer, IDnsResolver, IDatagramConnector, bool, IWriteOutFileOpener?, bool, Func{string, string?}?, IConnectionListener?, DefaultConfigFileSearch?, TimeProvider?, bool, bool, bool, bool, bool?)" />:
+    /// Builds one option group's dispatch for the dialing <see cref="CreateRunner(Stream, Stream, Stream, ITcpDialer, IDnsResolver, IDatagramConnector, bool, IWriteOutFileOpener?, bool, Func{string, string?}?, IConnectionListener?, DefaultConfigFileSearch?, TimeProvider?, bool, bool, bool, bool, bool?, bool)" />:
     /// the group's <see cref="TcpConnector" /> over <paramref name="tcpDialer" /> and
     /// <paramref name="dnsResolver" />, pooled in <paramref name="runConnections" />, with a proxy
     /// selector that reads the environment through <paramref name="readEnvironmentVariable" />, and the connector's <c>--resolve</c> entries

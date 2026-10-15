@@ -480,6 +480,7 @@ public sealed class UpstreamConformanceTests
     // Curl as the command composes it, every TCP dial reaching the case's in-memory servers through
     // InMemoryServerTcpDialer, so TcpConnector's proxy tunnel and PROXY-line code stays in the path (ADR-0460).
     // The default config file is looked for only where the case's <setenv> points CURL_HOME, XDG_CONFIG_HOME or HOME (BL-1977).
+    // It parses as a QUIC build, so upstream's http/3 cases reach the hand-built HTTP/3, which every reference build lacks (ADR-0540).
     internal static Task<int> RunCurlAsync(UpstreamCurlInvocation invocation) =>
         CurlComposition.CreateRunner(
             invocation.StandardOutput,
@@ -498,7 +499,8 @@ public sealed class UpstreamConformanceTests
             honoursHstsTimeVariable: true,
             honoursHstsHttpVariable: true,
             honoursAltSvcHttpVariable: true,
-            honoursDnsServerVariable: true).RunAsync(invocation.Arguments);
+            honoursDnsServerVariable: true,
+            parsesAsQuicBuild: true).RunAsync(invocation.Arguments);
 
     // The signing time of upstream's debug build under CURL_FORCETIME and CURL_HTTPSIG_CREATED=0.
     private sealed class UnixEpochClock : TimeProvider
