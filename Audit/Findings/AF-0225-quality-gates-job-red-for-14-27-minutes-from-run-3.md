@@ -3,8 +3,8 @@ id: AF-0225
 title: Quality gates job red for 14.27 minutes from run 38666857143 on aa14b025, and green again before its fix task ran
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: process:logs:CI-run-38666857143:ci-red
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Log
 
 - 2026-10-15: filed proposed.
+- 2026-10-15: proposed -> accepted.
