@@ -4,7 +4,7 @@ title: Remove Curl.Engine.UnitLibrary's reference to Curl.Cli.UnitLibrary so the
 priority: Normal
 assignee: Claude
 pipeline: direct
-depends-on: [BL-2309]
+depends-on: [BL-2309, BL-2323]
 touches: [Curl.Console, Curl.Console.UnitTests, Curl.Engine.UnitLibrary, Curl.Engine.UnitTests]
 requirement: none
 created: 2026-10-15
