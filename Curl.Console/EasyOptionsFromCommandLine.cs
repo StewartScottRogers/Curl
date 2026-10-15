@@ -10,6 +10,9 @@ using Curl.Api.Options.Tls;
 using Curl.Cli;
 using Curl.Networking;
 using Curl.Protocol.Abstractions;
+using Curl.Api.Options.Protocols;
+using EasyFtpClearCommandChannel = Curl.Api.Options.Protocols.FtpClearCommandChannel;
+using EasyFtpFileMethod = Curl.Api.Options.Protocols.FtpFileMethod;
 using EasyGssApiDelegation = Curl.Api.Options.Authentication.GssApiDelegation;
 using EasyTimeCondition = Curl.Api.Options.Behaviour.TimeCondition;
 using HttpVersion = Curl.Api.Options.Http.HttpVersion;
@@ -592,6 +595,87 @@ internal static class EasyOptionsFromCommandLine
             BufferSize = rate is > 0 and < ToolBufferSize ? rate : ToolBufferSize,
             Timeout = options.MaxTime is { } maxTime && maxTime > TimeSpan.Zero ? maxTime : transfer.Timeout,
         };
+    }
+
+    /// <summary>
+    /// Maps the protocol group: FTP's <c>-P</c>, <c>-Q</c>, <c>-a</c>, <c>--disable-eprt</c>,
+    /// <c>--disable-epsv</c>, <c>--ftp-pret</c>, <c>--ftp-create-dirs</c>, <c>--ftp-alternative-to-user</c>,
+    /// <c>--ftp-skip-pasv-ip</c>, <c>--ftp-ssl-ccc</c>, <c>--ftp-ssl-ccc-mode</c>, <c>--ftp-account</c> and
+    /// <c>--ftp-method</c>; SSH's <c>--key</c>, <c>--pubkey</c>, <c>--hostpubmd5</c>, <c>--hostpubsha256</c>,
+    /// <c>--knownhosts</c> and <c>--compressed-ssh</c>; <c>--mail-from</c>, <c>--mail-rcpt</c>,
+    /// <c>--mail-rcpt-allowfails</c> and <c>--mail-auth</c>; <c>--tftp-blksize</c> and
+    /// <c>--tftp-no-options</c>; and <c>-t</c>. curl's tool sets no RTSP or WebSocket option of its own
+    /// (an RTSP request is <c>-X</c>, the transfer group's), so those records keep libcurl's defaults;
+    /// <c>-l</c>, <c>-B</c> and <c>--crlf</c> are the transfer group's, and the known-hosts file the tool
+    /// finds without <c>--knownhosts</c> is per transfer (ADR-0529).
+    /// </summary>
+    /// <param name="options">The option group.</param>
+    /// <returns>The protocol options.</returns>
+    public static EasyProtocolOptions ProtocolOf(CommandLineOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        return new EasyProtocolOptions
+        {
+            Ftp = FtpOf(options),
+            Ssh = SshOf(options),
+            Smtp = SmtpOf(options),
+            Tftp = TftpOf(options),
+            Telnet = new EasyTelnetOptions { TelnetOptions = [.. options.TelnetOptions] },
+        };
+    }
+
+    // --ftp-create-dirs is CURLFTP_CREATE_DIR_RETRY, as --libcurl writes 2L; --ftp-method's choice is libcurl's value less one.
+    private static EasyFtpOptions FtpOf(CommandLineOptions options) =>
+        new()
+        {
+            ActiveAddress = options.FtpPort,
+            Quote = QuoteCommandsOf(options, prefix: null),
+            PreQuote = QuoteCommandsOf(options, prefix: '+'),
+            PostQuote = QuoteCommandsOf(options, prefix: '-'),
+            Append = options.Append,
+            UseEprt = options.FtpUseEprt,
+            UseEpsv = !options.FtpDisableEpsv,
+            UsePret = options.FtpSendPret,
+            CreateMissingDirectories = options.FtpCreateDirectories ? FtpCreateMissingDirectories.CreateAndRetry : FtpCreateMissingDirectories.None,
+            AlternativeToUser = options.FtpAlternativeToUser,
+            SkipPasvIp = options.FtpSkipPasvIp,
+            ClearCommandChannel = (EasyFtpClearCommandChannel)options.FtpClearCommandChannel,
+            Account = options.FtpAccount,
+            FileMethod = (EasyFtpFileMethod)((int)options.FtpFileMethod + 1),
+        };
+
+    // A -Q command starting with + runs just before the transfer and one with - after it, each without its prefix; any other before it starts.
+    private static string[] QuoteCommandsOf(CommandLineOptions options, char? prefix) =>
+        prefix is { } given
+            ? [.. options.QuoteCommands.Where(command => command.StartsWith(given)).Select(command => command[1..])]
+            : [.. options.QuoteCommands.Where(command => !command.StartsWith('+') && !command.StartsWith('-'))];
+
+    // --key is both the TLS key and the SSH private key, as curl's tool sets both from it.
+    private static EasySshOptions SshOf(CommandLineOptions options) =>
+        new()
+        {
+            PrivateKeyFile = options.PrivateKey,
+            PublicKeyFile = options.SshPublicKeyFile,
+            HostPublicKeyMd5 = options.SshHostPublicKeyMd5,
+            HostPublicKeySha256 = options.SshHostPublicKeySha256,
+            Compression = options.SshCompression,
+            KnownHostsFile = options.SshKnownHostsFile,
+        };
+
+    private static EasySmtpOptions SmtpOf(CommandLineOptions options) =>
+        new()
+        {
+            MailFrom = options.MailFrom,
+            MailRecipients = [.. options.MailRecipients],
+            MailAuth = options.MailAuth,
+            MailRecipientAllowFails = options.MailRecipientAllowFails,
+        };
+
+    // --tftp-blksize as given; the TFTP handler clamps it as libcurl does.
+    private static EasyTftpOptions TftpOf(CommandLineOptions options)
+    {
+        EasyTftpOptions tftp = new();
+        return tftp with { BlockSize = options.TftpBlockSize ?? tftp.BlockSize, NoOptions = options.TftpNoOptions };
     }
 
     // The schemes as CURLOPT_PROTOCOLS_STR takes them: lowercase, sorted, joined by commas.
