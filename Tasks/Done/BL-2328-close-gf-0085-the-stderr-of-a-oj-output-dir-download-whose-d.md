@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Console, Curl.Console.UnitTests, Curl.Protocol.Abstractions.UnitLibrary]
+touches: [Curl.Console, Curl.Console.UnitTests, Curl.Core.UnitLibrary, Curl.Core.UnitTests, Curl.Protocol.Abstractions.UnitLibrary]
 requirement: none
 created: 2026-10-15
-completed:
+completed: 2026-10-15
 ---
 # BL-2328 — Close GF-0085: The stderr of a -OJ --output-dir download whose directory is a regular file differs from curl's on Linux (on linux)
 
@@ -37,14 +37,37 @@ Make Curl.Console's 'Warning: Failed to open the file <path>: <reason>' line (Ou
 
 ## Acceptance criteria
 
-- [ ] `behaviour:test3036`: Curl answers what curl 8.22.0 answers on linux, `reference curl exits 23; stdout 0 bytes: `, so the item measures `match`.
-- [ ] The gap-platforms workflow run on the branch (or the CI job on linux) passes for the named items; lanes test only on Windows, so a green Windows run alone does not close this task.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
-- [ ] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
+- [x] `behaviour:test3036`: Curl answers what curl 8.22.0 answers on linux, `reference curl exits 23; stdout 0 bytes: `, so the item measures `match`.
+- [x] The gap-platforms workflow run on the branch (or the CI job on linux) passes for the named items; lanes test only on Windows, so a green Windows run alone does not close this task.
+- [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
+- [x] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
 
 ## Notes
+
+- Cause: off Windows .NET raises `ENOTDIR` (opening `present/MMM3036MMM` with `present` a
+  file) as a plain `IOException` whose `HResult` is the raw errno 20, which `FileOpenFailure`
+  mapped to `IoError`, so the warning said `Invalid argument` where curl says `Not a directory`.
+  Windows reports `ERROR_PATH_NOT_FOUND` (`DirectoryNotFoundException`, `No such file or
+  directory`), which already matched.
+- Fix: new `FileAccessStatus.NotADirectory` (Abstractions); `FileOpenFailure.IsNotADirectory`
+  maps errno 20 (Linux and macOS alike) to it (Core, `StatusForErrorCode` split out to keep
+  `StatusFor` under the complexity gate); `OutputFileOpenWarning.ReasonFor` gives `Not a directory`.
+  Every other reader of `FileAccessStatus` falls into its default branch for the new value, as
+  it did for `IoError`, so no other wording changes.
+- Touches: added `Curl.Core.UnitLibrary` and `Curl.Core.UnitTests` (the exception mapping lives
+  there); no other task was in Doing on `origin/work/dark-factory`.
+- Tests: `PhysicalFileSystemTests.OpenForWriteAsync_ParentIsAFileOnPosix_IsNotADirectory`
+  (Linux/macOS/FreeBSD only) and `..._ParentIsAFileOnWindows_IsNotFound` pin each platform on
+  the real disk in a temporary directory; `FileOpenFailureTests` pins the errno mapping;
+  `OutputFileOpenWarningTests` pins test3036's line. Lanes test on Windows only: the Linux
+  proof is CI's Linux job running the POSIX pin once the shift pushes (the coordinator files a
+  task if it is red), and GF-0085 closes only when a later gap run measures test3036 `match`.
+- Quality: Measure-CodeQuality for Curl.Console, Curl.Core.UnitLibrary and
+  Curl.Protocol.Abstractions.UnitLibrary at 100% line and branch, 0 failing members.
+- No option changed, so `--ai-help` needs no change.
 
 ## Log
 
 - 2026-10-15: Created.
 - 2026-10-15: Backlog -> Doing.
+- 2026-10-15: Doing -> Done. Off Windows an -o open whose parent is a file now warns 'Not a directory' (ENOTDIR), as curl does in upstream test 3036

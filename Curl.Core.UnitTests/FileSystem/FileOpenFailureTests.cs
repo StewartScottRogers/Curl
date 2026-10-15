@@ -116,6 +116,27 @@ public sealed class FileOpenFailureTests
     }
 
     [TestMethod]
+    public void StatusFor_NotADirectoryIOException_IsNotADirectory()
+    {
+        var status = RunStatusFor(new IOException("not a directory", 20), pathIsDirectory: false);
+
+        TestDiagnostics.For(TestContext).Assert("status", FileAccessStatus.NotADirectory, status);
+        Assert.AreEqual(FileAccessStatus.NotADirectory, status);
+    }
+
+    [TestMethod]
+    public void IsNotADirectory_OtherExceptionWithTheNotADirectoryCode_IsFalse()
+    {
+        var exception = new InvalidOperationException("not a directory") { HResult = 20 };
+        TestDiagnostics.For(TestContext).Arrange("exception", exception.GetType().Name);
+
+        var isNotADirectory = FileOpenFailure.IsNotADirectory(exception);
+
+        TestDiagnostics.For(TestContext).Assert("is not a directory", false, isNotADirectory);
+        Assert.IsFalse(isNotADirectory);
+    }
+
+    [TestMethod]
     [DataRow(unchecked((int)0x80070050))]
     [DataRow(unchecked((int)0x800700B7))]
     [DataRow(17)]

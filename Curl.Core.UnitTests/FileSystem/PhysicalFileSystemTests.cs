@@ -288,6 +288,38 @@ public sealed partial class PhysicalFileSystemTests
     }
 
     [TestMethod]
+    [OSCondition(OperatingSystems.Linux | OperatingSystems.OSX | OperatingSystems.FreeBSD)]
+    public async Task OpenForWriteAsync_ParentIsAFileOnPosix_IsNotADirectory()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        using var directory = new TemporaryDirectory();
+        File.WriteAllText(directory.Combine("present"), "file");
+        diagnostics.Arrange("path", "present/destination.txt, present being a file");
+
+        var result = await new PhysicalFileSystem()
+            .OpenForWriteAsync(directory.Combine("present/destination.txt"), FileWriteMode.CreateNew, DefaultCreateMode, CancellationToken.None);
+
+        ActResult(diagnostics, result);
+        AssertFailed(FileAccessStatus.NotADirectory, result);
+    }
+
+    [TestMethod]
+    [OSCondition(OperatingSystems.Windows)]
+    public async Task OpenForWriteAsync_ParentIsAFileOnWindows_IsNotFound()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        using var directory = new TemporaryDirectory();
+        File.WriteAllText(directory.Combine("present"), "file");
+        diagnostics.Arrange("path", "present/destination.txt, present being a file");
+
+        var result = await new PhysicalFileSystem()
+            .OpenForWriteAsync(directory.Combine("present/destination.txt"), FileWriteMode.CreateNew, DefaultCreateMode, CancellationToken.None);
+
+        ActResult(diagnostics, result);
+        AssertFailed(FileAccessStatus.NotFound, result);
+    }
+
+    [TestMethod]
     public async Task OpenForWriteAsync_Directory_IsIsDirectory()
     {
         var diagnostics = TestDiagnostics.For(TestContext);
