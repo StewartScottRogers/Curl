@@ -33,3 +33,4 @@ Upstream's `dnsd` (`tests/dnsd.py` at curl-8_22_0, read it) answers DNS queries 
 ## Log
 
 - 2026-10-14: Created.
+- 2026-10-14: Backlog -> Doing.
