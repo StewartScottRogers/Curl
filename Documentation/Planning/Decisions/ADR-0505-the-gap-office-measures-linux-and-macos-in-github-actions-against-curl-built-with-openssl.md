@@ -26,8 +26,13 @@ way for findings, tasks and scores to keep platforms apart.
    which checks it against the pinned SHA-256 in `Gap/Baselines/curl-<version>.json` first, so the
    reference is built from exactly the source the inventories come from. It is configured with
    OpenSSL, nghttp2, libssh2, zlib, brotli, zstd, libidn2, libpsl, GSS-API and LDAP from apt or
-   Homebrew, static libcurl, and no HTTP/3 (building ngtcp2 and nghttp3 as well is not cheap; the
-   converter's existing `reference-lacks:HTTP3` rule excludes those cases honestly). The built curl
+   Homebrew, static libcurl, NTLM (and with it SMB) and TLS session export switched on (configure
+   leaves both off unless asked, and Curl implements both; the first build without them showed
+   `--ntlm`, `--ssl-sessions`, `smb` and `smbs` as gaps that were only the reference's
+   configuration), and no HTTP/3 (building ngtcp2 and nghttp3 as well is not cheap on Ubuntu's
+   OpenSSL 3.0). The converter's existing `reference-lacks:HTTP3` rule excludes the HTTP/3
+   behaviour cases honestly; the `HTTP3` feature and the `--http3` options measure as gaps,
+   because Curl lists what this reference lacks. The built curl
    is cached per OS, version and workflow hash, and rebuilt when the cached one no longer runs.
    `CURL_GAP_REFERENCE_CURL` names it to every tool (`Get-GapReferenceCurlPath`).
 2. **Measure in GitHub Actions, through one code path.** `Gap/Tools/Measure-GapAreas.ps1` is the
