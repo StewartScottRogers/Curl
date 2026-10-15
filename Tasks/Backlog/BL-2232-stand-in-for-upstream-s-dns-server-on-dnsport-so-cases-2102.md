@@ -4,7 +4,7 @@ title: Stand in for upstream's DNS server on %DNSPORT so cases 2102, 2103 and 21
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: []
+depends-on: [BL-2248]
 touches: [Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests]
 requirement: none
 created: 2026-10-14
@@ -30,7 +30,11 @@ Upstream's `dnsd` (`tests/dnsd.py` at curl-8_22_0, read it) answers DNS queries 
 
 ## Notes
 
+- 2026-10-14 (lane 2, prerequisite pass before any code): Curl's DNS-server option never reaches an injected datagram connector. No `.cs` file reads `CURL_DNS_SERVER`; `CurlComposition.CreateDnsResolver` builds `DnsServerResolver` only for `--dns-servers` & co., and it opens sockets through `IDnsSocketOpener`, not `IDatagramConnector`; and the conformance tests pass `LoopbackOnlyDnsResolver` to `CreateRunner`, which overrides any resolver. Filed the Curl-side change as BL-2248 and requeued this task behind it, as the Context asks.
+- Also needed here once BL-2248 lands: the three cases need the `override-dns` feature, which `UpstreamCurlPlatform` keeps off (debug-only in curl). The harness should report it only to a case naming the `dns` server, as `PlatformFor` reports `Debug` only to httpsig cases (BL-2183), and turn on BL-2248's seam for those cases. This stays in this task's touches.
+
 ## Log
 
 - 2026-10-14: Created.
 - 2026-10-14: Backlog -> Doing.
+- 2026-10-14: Doing -> Backlog. Waits on BL-2248: Curl never reads CURL_DNS_SERVER and its DNS-server resolver does not use the injected datagram connector
