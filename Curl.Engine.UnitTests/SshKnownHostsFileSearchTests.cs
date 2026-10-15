@@ -70,7 +70,7 @@ public sealed class SshKnownHostsFileSearchTests
         reader.Files["account/.ssh/known_hosts"] = [];
         Diagnostics.Arrange("readable files", "h/.ssh/known_hosts, account/.ssh/known_hosts");
         SshKnownHostsFileSearch search = Search(runsOnWindows: false, "account");
-        string? found = search.Find(reader);
+        string? found = search.Find(path => reader.TryReadFile(path, out byte[] contents) ? contents : null);
         Diagnostics.Act("found", found ?? "null");
 
         Diagnostics.Assert("found", "h/.ssh/known_hosts", found ?? "null");

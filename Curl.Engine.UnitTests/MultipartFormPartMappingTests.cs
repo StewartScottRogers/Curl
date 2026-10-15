@@ -127,7 +127,7 @@ public sealed class MultipartFormPartMappingTests
         CommandLineParseResult parsed = CommandLineParser.Parse(arguments, _ => true);
         Assert.IsTrue(parsed.IsAccepted);
 
-        MultipartNameEscaping escaping = MultipartFormPartMapping.NameEscapingOf(parsed.Options, scheme);
+        MultipartNameEscaping escaping = MultipartFormPartMapping.NameEscapingOf(parsed.Options.FormEscape, scheme);
         Diagnostics.Act("escaping", escaping);
 
         Diagnostics.Assert("escaping", expected, escaping);

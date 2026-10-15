@@ -138,7 +138,10 @@ public sealed class EasyAuthenticationOptionsReadingTests
     }
 
     private static TransferCredentialLookup Lookup(InMemoryDataFileReader? reader = null) =>
-        new(reader ?? ReaderWithNetrc(), _ => null, runsOnWindows: false);
+        new(ReadFileOf(reader ?? ReaderWithNetrc()), _ => null, runsOnWindows: false);
+
+    private static Func<string, byte[]?> ReadFileOf(InMemoryDataFileReader reader) =>
+        path => reader.TryReadFile(path, out byte[] contents) ? contents : null;
 
     private static InMemoryDataFileReader ReaderWithNetrc()
     {

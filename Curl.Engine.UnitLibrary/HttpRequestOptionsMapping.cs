@@ -3,7 +3,6 @@ using System.Text;
 using Curl.Api.Options.Authentication;
 using Curl.Api.Options.Behaviour;
 using Curl.Api.Options.Http;
-using Curl.Cli;
 using Curl.Networking;
 using Curl.Protocol.Abstractions;
 using HttpRequestOptions = Curl.Protocol.Abstractions.HttpRequestOptions;
@@ -138,15 +137,15 @@ internal static class HttpRequestOptionsMapping
     /// (about 49.7 days) as <see cref="TcpConnector.HappyEyeballsTimeout" /> is, or curl's 200 ms
     /// (<see cref="TcpConnector.DefaultHappyEyeballsTimeout" />) when it was not given (BL-889).
     /// </summary>
-    /// <param name="options">The parsed command line.</param>
+    /// <param name="happyEyeballsTimeout">The <c>--happy-eyeballs-timeout-ms</c> value, or <see langword="null" /> when it was not given.</param>
     /// <returns>How long the QUIC handshake runs alone.</returns>
-    internal static TimeSpan HappyEyeballsTimeoutOf(CommandLineOptions options) =>
-        options.HappyEyeballsTimeout is { } given
+    internal static TimeSpan HappyEyeballsTimeoutOf(TimeSpan? happyEyeballsTimeout) =>
+        happyEyeballsTimeout is { } given
             ? TimeSpan.FromMilliseconds(Math.Min(given.TotalMilliseconds, LongestTimerDelayMilliseconds))
             : TcpConnector.DefaultHappyEyeballsTimeout;
 
     /// <summary>
-    /// The schemes the HTTP handler may answer a challenge with, as the curl tool's <c>CommandLineOptions.AuthSchemes</c>
+    /// The schemes the HTTP handler may answer a challenge with, as the curl tool's parsed command line
     /// gives them (ADR-0516): <see cref="HttpAuthenticationMethods.Any" /> is every scheme the engine knows, each
     /// other <c>CURLAUTH_*</c> bit its scheme, and <see cref="HttpAuthSchemes.Bearer" /> only with
     /// <see cref="EasyAuthenticationOptions.XOAuth2Bearer" /> set. The <c>CURLAUTH_AWS_SIGV4</c> bit is ignored, as
@@ -166,7 +165,7 @@ internal static class HttpRequestOptionsMapping
 
     /// <summary>
     /// The schemes the CONNECT tunnel and the HTTP handler may answer a proxy's challenge with, as the curl tool's
-    /// <c>CommandLineOptions.ProxyAuthSchemes</c> gives them (BL-2353): <see cref="HttpAuthenticationMethods.Any" /> is
+    /// the curl tool's parsed command line gives them (BL-2353): <see cref="HttpAuthenticationMethods.Any" /> is
     /// <see cref="HttpAuthSchemes.Any" />, each other <c>CURLAUTH_*</c> bit its scheme, and with no scheme left, Basic,
     /// libcurl's default.
     /// </summary>

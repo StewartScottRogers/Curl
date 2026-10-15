@@ -40,6 +40,20 @@ internal static class EasyOptionsFromCommandLine
     internal static EngineTraceComponents TraceComponentsOf(CommandLineOptions options) =>
         new(options.TraceComponents, options.VerbosityTraceComponents);
 
+    // Each --upload-flags flag and the name it is sent under, in the fixed order curl 8.21.0 sends them
+    // whatever order they were given in (BL-535 Notes).
+    private static readonly (ImapUploadFlags Flag, string Name)[] UploadFlagNames =
+    [
+        (ImapUploadFlags.Answered, "answered"),
+        (ImapUploadFlags.Deleted, "deleted"),
+        (ImapUploadFlags.Draft, "draft"),
+        (ImapUploadFlags.Flagged, "flagged"),
+        (ImapUploadFlags.Seen, "seen"),
+    ];
+
+    private static string[] UploadFlagNamesOf(ImapUploadFlags flags) =>
+        [.. UploadFlagNames.Where(pair => flags.HasFlag(pair.Flag)).Select(pair => pair.Name)];
+
     /// <summary>
     /// The curl tool's own settings the engine's transport factories read, which libcurl's easy options have no
     /// <c>CURLOPT_*</c> for: <c>-Z</c>, <c>--parallel-immediate</c>, <c>--ssl-sessions</c> and <c>-m</c> (BL-2356).
@@ -77,11 +91,11 @@ internal static class EasyOptionsFromCommandLine
             options.FtpSslControlOnly,
             options.SslRequired,
             options.ListOnly,
-            options.UploadFlags,
+            UploadFlagNamesOf(options.UploadFlags),
             options.ProxyHeaders,
             options.ProxyTunnel,
             options.UnixSocketPath is not null,
-            HttpRequestOptionsMapping.HappyEyeballsTimeoutOf(options),
+            HttpRequestOptionsMapping.HappyEyeballsTimeoutOf(options.HappyEyeballsTimeout),
             url => QueryUrl.Append(url, options));
 
     // The receive buffer curl's tool asks for, 100 KiB, as --libcurl writes CURLOPT_BUFFERSIZE.

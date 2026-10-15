@@ -4,7 +4,6 @@ using System.Text;
 
 using Curl.Api.Options.Authentication;
 using Curl.Authentication;
-using Curl.Cli;
 using Curl.Core;
 using Curl.Protocol.Abstractions;
 
@@ -50,7 +49,7 @@ namespace Curl.Engine;
 /// <see cref="NetrcControlCodeMessage" />, except over those four schemes.
 /// </para>
 /// </remarks>
-/// <param name="fileReader">Reads the netrc file.</param>
+/// <param name="readFile">Reads the netrc file: the path's bytes, or <see langword="null" /> when it cannot be read.</param>
 /// <param name="readEnvironmentVariable">
 /// Returns an environment variable's value, or <see langword="null" /> when it is not set; read
 /// for <c>NETRC</c>, <c>HOME</c> and, on Windows, <c>USERPROFILE</c>.
@@ -58,7 +57,7 @@ namespace Curl.Engine;
 /// <param name="runsOnWindows">Whether the default location is looked for as curl's Windows build does.</param>
 /// <param name="diagnosticLog">Where a matching netrc entry is logged, by host and login only (BL-1151); <see langword="null" /> logs nothing.</param>
 internal sealed class TransferCredentialLookup(
-    IDataFileReader fileReader,
+    Func<string, byte[]?> readFile,
     Func<string, string?> readEnvironmentVariable,
     bool runsOnWindows,
     IDiagnosticLog? diagnosticLog = null)
@@ -357,7 +356,7 @@ internal sealed class TransferCredentialLookup(
     {
         foreach (string path in CandidatePaths(authentication))
         {
-            if (fileReader.TryReadFile(path, out byte[] contents))
+            if (readFile(path) is { } contents)
             {
                 return Encoding.UTF8.GetString(contents);
             }

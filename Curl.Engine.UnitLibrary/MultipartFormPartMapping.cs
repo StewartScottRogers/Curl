@@ -1,6 +1,5 @@
 using System.Text;
 using Curl.Api.Options.Http;
-using Curl.Cli;
 using Curl.Core.Multipart;
 
 namespace Curl.Engine;
@@ -38,11 +37,11 @@ internal static class MultipartFormPartMapping
     /// strategy (upstream test1187, BL-2091), otherwise curl's default
     /// <see cref="MultipartNameEscaping.Percent" /> (BL-625).
     /// </summary>
-    /// <param name="options">The option group whose form is being built.</param>
+    /// <param name="formEscape">Whether <c>--form-escape</c> was given.</param>
     /// <param name="scheme">The transfer URL's scheme.</param>
-    /// <returns>The escaping <see cref="CommandLineOptions.FormEscape" /> and <paramref name="scheme" /> ask for.</returns>
-    internal static MultipartNameEscaping NameEscapingOf(CommandLineOptions options, string scheme) =>
-        options.FormEscape || MailRequestOptionsMapping.SendsFormAsMimeMessage(scheme)
+    /// <returns>The escaping <paramref name="formEscape" /> and <paramref name="scheme" /> ask for.</returns>
+    internal static MultipartNameEscaping NameEscapingOf(bool formEscape, string scheme) =>
+        formEscape ||MailRequestOptionsMapping.SendsFormAsMimeMessage(scheme)
             ? MultipartNameEscaping.Backslash
             : MultipartNameEscaping.Percent;
 
@@ -52,10 +51,10 @@ internal static class MultipartFormPartMapping
     /// <c>Content-Type</c> before a <c>:</c> or <c>;</c>, after that separator and its leading
     /// spaces, so <c>-H "Content-Type:"</c> gives an empty one (BL-1972).
     /// </summary>
-    /// <param name="options">The option group whose form is being built.</param>
+    /// <param name="headers">The <c>-H</c> values of the option group whose form is being built.</param>
     /// <returns>The value, or <see langword="null" /> when no <c>-H</c> value names <c>Content-Type</c>.</returns>
-    internal static string? RequestContentTypeOf(CommandLineOptions options) =>
-        options.Headers
+    internal static string? RequestContentTypeOf(IEnumerable<string> headers) =>
+        headers
             .Where(header => header.Length > ContentTypeName.Length
                 && header[ContentTypeName.Length] is ':' or ';'
                 && header.StartsWith(ContentTypeName, StringComparison.OrdinalIgnoreCase))

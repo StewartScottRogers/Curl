@@ -1,5 +1,3 @@
-using Curl.Cli;
-
 namespace Curl.Engine;
 
 /// <summary>
@@ -56,9 +54,9 @@ internal sealed class SshKnownHostsFileSearch(Func<string, string?> readEnvironm
         return string.IsNullOrEmpty(home) ? null : home + entry.Suffix;
     }
 
-    /// <summary>Finds the first candidate path <paramref name="reader" /> can read.</summary>
-    /// <param name="reader">Reads the candidate files.</param>
+    /// <summary>Finds the first candidate path <paramref name="readFile" /> can read.</summary>
+    /// <param name="readFile">Reads a candidate file: its bytes, or <see langword="null" /> when it cannot be read.</param>
     /// <returns>The known-hosts file, or <see langword="null" /> when none can be read.</returns>
-    internal string? Find(IDataFileReader reader) =>
-        CandidatePaths().FirstOrDefault(path => reader.TryReadFile(path, out _));
+    internal string? Find(Func<string, byte[]?> readFile) =>
+        CandidatePaths().FirstOrDefault(path => readFile(path) is not null);
 }

@@ -321,12 +321,17 @@ internal sealed class CurlCommandRunner(
     /// </summary>
     private IDataFileReader DataFileReader => configFileReader ?? DiskDataFileReader.ForProcess.WithStandardInput(() => standardInput);
 
+    /// <summary>Reads a file through <see cref="DataFileReader" /> for the engine's lookups.</summary>
+    /// <param name="path">The file's path.</param>
+    /// <returns>The file's bytes, or <see langword="null" /> when it cannot be read.</returns>
+    private byte[]? ReadDataFile(string path) => DataFileReader.TryReadFile(path, out byte[] contents) ? contents : null;
+
     /// <summary>
     /// Gets what chooses each transfer's credentials from the URL and the netrc file, reading it with
     /// <see cref="DataFileReader" /> and the home directory from the runner's environment (BL-505, BL-791).
     /// </summary>
     private TransferCredentialLookup CredentialLookup =>
-        new(DataFileReader, EnvironmentVariables, runsOnWindows, diagnosticLog);
+        new(ReadDataFile, EnvironmentVariables, runsOnWindows, diagnosticLog);
 
     /// <summary>
     /// Gets where an <c>scp</c> or <c>sftp</c> transfer looks for its known-hosts file, from the runner's
@@ -3410,13 +3415,13 @@ internal sealed class CurlCommandRunner(
         mimeMessage
             ? formBodyBuilder.BuildMailMessageAsync(
                 MultipartFormPartMapping.FromMimeBody(mimePost),
-                MultipartFormPartMapping.NameEscapingOf(options, scheme),
+                MultipartFormPartMapping.NameEscapingOf(options.FormEscape, scheme),
                 options.Headers,
                 CancellationToken.None)
             : formBodyBuilder.BuildAsync(
                 MultipartFormPartMapping.FromMimeBody(mimePost),
-                MultipartFormPartMapping.NameEscapingOf(options, scheme),
-                MultipartFormPartMapping.RequestContentTypeOf(options),
+                MultipartFormPartMapping.NameEscapingOf(options.FormEscape, scheme),
+                MultipartFormPartMapping.RequestContentTypeOf(options.Headers),
                 CancellationToken.None);
 
     /// <summary>
@@ -3474,7 +3479,7 @@ internal sealed class CurlCommandRunner(
                 EasyOptionsFromCommandLine.ProtocolOf(options).Ssh,
                 url,
                 Running,
-                () => KnownHostsSearch.Find(DataFileReader),
+                () => KnownHostsSearch.Find(ReadDataFile),
                 (knownHosts, missing) => UpdateLibcurlTransfer(entry => entry with { SshKnownHostsFile = knownHosts, SshKnownHostsFileMissing = missing }),
                 WriteErrorLineAsync).ConfigureAwait(false) is { } sshFailure)
         {

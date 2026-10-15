@@ -25,7 +25,7 @@ namespace Curl.Engine;
 /// <param name="FtpSslControlOnly"><c>--ftp-ssl-control</c>.</param>
 /// <param name="SslRequired"><c>--ssl-reqd</c>.</param>
 /// <param name="ListOnly"><c>-l</c> / <c>--list-only</c>.</param>
-/// <param name="UploadFlags"><c>--upload-flags</c>.</param>
+/// <param name="UploadFlags">The names of the <c>--upload-flags</c> flags set, in the fixed order curl sends them.</param>
 /// <param name="ProxyHeaders"><c>--proxy-header</c> lines.</param>
 /// <param name="ProxyTunnel"><c>-p</c>: tunnel through the HTTP proxy.</param>
 /// <param name="OverUnixSocket">Whether <c>--unix-socket</c> or <c>--abstract-unix-socket</c> was given.</param>
@@ -48,7 +48,7 @@ public sealed record EngineTransferSettings(
     bool FtpSslControlOnly,
     bool SslRequired,
     bool ListOnly,
-    ImapUploadFlags UploadFlags,
+    IReadOnlyList<string> UploadFlags,
     IReadOnlyList<string> ProxyHeaders,
     bool ProxyTunnel,
     bool OverUnixSocket,

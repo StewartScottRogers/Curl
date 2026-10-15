@@ -245,7 +245,7 @@ public sealed partial class TransferPerformerTests
 
     private static TransferDispatch HttpDispatch() => new(new ProtocolDispatcher([new ScriptedHandler()]));
 
-    private static TransferCredentialLookup CredentialLookup() => new(new InMemoryDataFileReader(), _ => null, runsOnWindows: false);
+    private static TransferCredentialLookup CredentialLookup() => new(_ => null, _ => null, runsOnWindows: false);
 
     private static Func<string, Task> Recorder(List<string> lines) => line =>
     {

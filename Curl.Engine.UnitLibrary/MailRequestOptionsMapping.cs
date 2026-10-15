@@ -1,7 +1,6 @@
 using Curl.Api.Options.Authentication;
 using Curl.Api.Options.Behaviour;
 using Curl.Api.Options.Protocols;
-using Curl.Cli;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Engine;
@@ -39,19 +38,6 @@ internal static class MailRequestOptionsMapping
     internal static bool SendsFormAsMimeMessage(string scheme) => MimeMessageSchemes.Contains(scheme);
 
     /// <summary>
-    /// Each <c>--upload-flags</c> flag and the name it is sent under, in the fixed order curl
-    /// 8.21.0 sends them whatever order they were given in (BL-535 Notes).
-    /// </summary>
-    private static readonly (ImapUploadFlags Flag, string Name)[] UploadFlagNames =
-    [
-        (ImapUploadFlags.Answered, "answered"),
-        (ImapUploadFlags.Deleted, "deleted"),
-        (ImapUploadFlags.Draft, "draft"),
-        (ImapUploadFlags.Flagged, "flagged"),
-        (ImapUploadFlags.Seen, "seen"),
-    ];
-
-    /// <summary>
     /// Copies the mail options from the option group's records and <paramref name="settings" /> for a transfer of
     /// <paramref name="scheme" />.
     /// </summary>
@@ -83,7 +69,7 @@ internal static class MailRequestOptionsMapping
                 Recipients = [.. smtp.MailRecipients],
                 Auth = smtp.MailAuth,
                 RecipientAllowFails = smtp.MailRecipientAllowFails,
-                UploadFlags = UploadFlagNamesOf(settings.UploadFlags),
+                UploadFlags = settings.UploadFlags,
                 CustomCommand = transfer.CustomRequest,
                 LoginOptions = authentication.LoginOptions,
                 SaslAuthorizationIdentity = authentication.SaslAuthorizationIdentity,
@@ -91,10 +77,4 @@ internal static class MailRequestOptionsMapping
                 BearerToken = authentication.XOAuth2Bearer,
                 ServiceName = authentication.ServiceName,
             };
-
-    /// <summary>Gets the names of the flags set in <paramref name="flags" />, in curl's order.</summary>
-    /// <param name="flags">The <c>--upload-flags</c> bit set.</param>
-    /// <returns>The names; empty when no flag is set.</returns>
-    private static string[] UploadFlagNamesOf(ImapUploadFlags flags) =>
-        [.. UploadFlagNames.Where(pair => flags.HasFlag(pair.Flag)).Select(pair => pair.Name)];
 }
