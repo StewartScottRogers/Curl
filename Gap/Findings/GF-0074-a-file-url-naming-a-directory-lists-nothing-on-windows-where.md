@@ -4,11 +4,11 @@ title: A file:// URL naming a directory lists nothing on Windows, where curl 8.2
 area: behaviour
 key: behaviour:file-url-directory-not-listed-on-windows
 severity: High
-status: open
+status: closed
 scope: target
 introduced-in:
 opened: 2026-10-13_1406
-closed:
+closed: 2026-10-14_0904
 regression: false
 items: [behaviour:test3203]
 touches: [Curl.Protocol.File.UnitLibrary, Curl.Protocol.File.UnitTests]
@@ -32,8 +32,10 @@ In Curl.Protocol.File.UnitLibrary, list directories on Windows as curl 8.22.0 do
 ## Measurements
 
 - 2026-10-13_1406: 1 of 1 items are gaps.
+- 2026-10-14_0904: 0 of 1 items are gaps.
 
 ## Log
 
 - 2026-10-13_1406: Opened by gap-behaviour.
 - 2026-10-13_1457: Filed BL-2166.
+- 2026-10-14_0904: Closed: run 2026-10-14_0904 measured every item as match or excluded.

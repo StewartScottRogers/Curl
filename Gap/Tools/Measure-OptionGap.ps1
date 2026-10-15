@@ -294,7 +294,7 @@ function Invoke-OptionGapSelfTest {
         $e.excluded -eq 1 -and $e.gap -eq 1 -and $e.match -eq 6 -and $e.x -eq 6 -and $e.y -eq 7 -and @($excludedRun.items).Count -eq 8
     & $report 'an excluded item keeps its answers, carries its reason and leaves X and Y' $excludedOk (($excludedItem, $e) | ConvertTo-Json -Compress -Depth 4)
     $real = Get-OptionExclusions (Join-Path $script:OptionRepositoryRoot 'Gap/Baselines/option-exclusions.json')
-    & $report 'the shipped exclusions name the five ADR-0454 options' ($real.Count -eq 5 -and @($real.Values | Where-Object { $_ -ceq 'intended-difference:ADR-0454' }).Count -eq 5 -and $real.ContainsKey('options:--ech') -and $real.ContainsKey('options:--dns-servers')) (($real.Keys | Sort-Object) -join ',')
+    & $report 'the shipped exclusions name the five ADR-0454 options and the eight ADR-0485 --httpsig-* facets' ($real.Count -eq 13 -and @($real.Values | Where-Object { $_ -ceq 'intended-difference:ADR-0454' }).Count -eq 5 -and @($real.Values | Where-Object { $_ -ceq 'intended-difference:ADR-0485' }).Count -eq 8 -and $real.ContainsKey('options:--ech') -and $real.ContainsKey('options:--dns-servers') -and $real.ContainsKey('options:--httpsig-keyid:argument')) (($real.Keys | Sort-Object) -join ',')
     & $report 'no exclusions file means no exclusions' ((Get-OptionExclusions (Join-Path $fixtures 'no-such-file.json')).Count -eq 0) ''
 
     $scratch = Join-Path ([System.IO.Path]::GetTempPath()) ('gap-options-test-' + [guid]::NewGuid().ToString('N'))

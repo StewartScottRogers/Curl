@@ -4,11 +4,11 @@ title: A custom 'Authorization : value' header (white space before the colon) is
 area: behaviour
 key: behaviour:custom-authorization-header-with-space-before-colon-kept-on-redirect
 severity: Critical
-status: open
+status: closed
 scope: target
 introduced-in:
 opened: 2026-10-13_1406
-closed:
+closed: 2026-10-14_0904
 regression: false
 items: [behaviour:test2113]
 touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests]
@@ -32,8 +32,10 @@ In Curl.Protocol.Http.UnitLibrary, make HttpCustomHeader.Names compare the heade
 ## Measurements
 
 - 2026-10-13_1406: 1 of 1 items are gaps.
+- 2026-10-14_0904: 0 of 1 items are gaps.
 
 ## Log
 
 - 2026-10-13_1406: Opened by gap-behaviour.
 - 2026-10-13_1457: Filed BL-2163.
+- 2026-10-14_0904: Closed: run 2026-10-14_0904 measured every item as match or excluded.
