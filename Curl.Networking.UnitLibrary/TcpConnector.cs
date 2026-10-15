@@ -1053,7 +1053,8 @@ public sealed partial class TcpConnector(
     /// does (BL-481): a <c>--resolve</c> entry for the host or for <c>*</c>, or a host and port
     /// this connector already resolved, answers without <see cref="IDnsResolver" /> and is
     /// reported on the target's events as <c>Hostname &lt;host&gt; was found in DNS
-    /// cache</c>. A host that did not resolve is not kept, so it is looked up again. Every
+    /// cache</c>. A host that did not resolve is kept as a negative entry only when
+    /// <see cref="CachesFailedLookUp" /> says so, and is otherwise looked up again. Every
     /// answer is then reported as curl's resolved lines (<see cref="ReportResolved" />), and
     /// written to the target's diagnostic log (<see cref="LogResolution" />, BL-920).
     /// </summary>
@@ -1139,17 +1140,39 @@ public sealed partial class TcpConnector(
 
         var (addresses, failure) = await LookUpAsync(host, target.Events, cancellationToken).ConfigureAwait(false);
         var answered = IsLocalhost(host) ? addresses : AddressFamilyFilter.Dialable(host, addresses, addressFamily);
-        if (answered.Count > 0)
-        {
-            var resolved = new DnsCacheEntry(host, port, answered);
-            _dnsCache.Store(cacheKey, resolved);
-            ReportResolved(resolved, target.Events);
-        }
-
+        CacheLookUp(new DnsCacheEntry(host, port, answered), cacheKey, failure, target.Events);
         var dialable = AddressFamilyFilter.Dialable(host, answered, addressFamily);
         LogResolution(log, host, port, dialable, fromCache: false, resolveStarted);
         return (new DnsResolution(dialable, failure), false);
     }
+
+    /// <summary>
+    /// Caches a look-up's answer under <paramref name="cacheKey" /> and reports it as curl's resolved
+    /// lines, or, when it answered no address, caches it as a negative entry if
+    /// <see cref="CachesFailedLookUp" /> says so.
+    /// </summary>
+    private void CacheLookUp(DnsCacheEntry answer, string cacheKey, DnsLookupFailure failure, ITransferEvents events)
+    {
+        if (answer.Addresses.Count > 0)
+        {
+            _dnsCache.Store(cacheKey, answer);
+            ReportResolved(answer, events);
+        }
+        else if (CachesFailedLookUp(failure))
+        {
+            _dnsCache.Store(cacheKey, answer);
+        }
+    }
+
+    /// <summary>
+    /// Tells whether a look-up that answered no address is kept as a negative DNS cache entry, as
+    /// curl 8.22.0's c-ares build keeps one (ADR-0499, BL-2262): only <see cref="DnsServerResolver" />'s,
+    /// the c-ares path, and not one that failed on its own configuration (exit 43), which asked nothing.
+    /// The system's threaded resolver build asks again for every transfer (measured), so other resolvers
+    /// keep nothing.
+    /// </summary>
+    private bool CachesFailedLookUp(DnsLookupFailure failure) =>
+        dnsResolver is DnsServerResolver && failure != DnsLookupFailure.BadConfiguration;
 
     /// <summary>
     /// Writes a resolve's answer to the diagnostic log: the addresses and elapsed milliseconds at

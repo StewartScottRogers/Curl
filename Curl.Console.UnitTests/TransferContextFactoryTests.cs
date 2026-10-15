@@ -361,6 +361,25 @@ public sealed class TransferContextFactoryTests
     }
 
     [TestMethod]
+    [DataRow("--ftp-ssl-control", "--ssl-reqd")]
+    [DataRow("--ssl-reqd", "--ftp-ssl-control")]
+    public void Create_SslReqdBesideFtpSslControl_IsRequiredForEveryConnection(string first, string second)
+    {
+        using MemoryStream standardInput = new();
+        using MemoryStream output = new();
+
+        // --ssl-reqd outranks --ftp-ssl-control (ADR-0102), so FTP sends PROT P, not PROT C.
+        TransferContext context = new TransferContextFactory(standardInput)
+            .Create(Parse(first, second, "ftp://example.com/f"), CurlUrl.Parse("ftp://example.com/f"), output, null, null, null);
+        Diagnostics.Act("context URL", context.Url.OriginalString);
+
+        Diagnostics.Assert("context.FtpSslControlOnly", false, context.FtpSslControlOnly);
+        Assert.IsFalse(context.FtpSslControlOnly);
+        Diagnostics.Assert("context.SslLevel", TransportSecurityLevel.Required, context.SslLevel);
+        Assert.AreEqual(TransportSecurityLevel.Required, context.SslLevel);
+    }
+
+    [TestMethod]
     public void Create_HttpRequestOptions_AreMappedOntoHttp()
     {
         using MemoryStream standardInput = new();

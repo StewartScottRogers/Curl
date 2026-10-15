@@ -56,6 +56,19 @@ public sealed class DnsServerResolver : IDnsResolverWithFailureReason
     {
     }
 
+    /// <summary>
+    /// Initializes a resolver that sends its UDP queries through <paramref name="datagramConnector" />
+    /// (<see cref="DatagramConnectorDnsSocketOpener" />), as <c>CURL_DNS_SERVER</c> asks for in the
+    /// conformance harness (ADR-0492, BL-2248).
+    /// </summary>
+    /// <param name="options">The c-ares options and the <c>-4</c> or <c>-6</c> choice.</param>
+    /// <param name="timeProvider">Times each attempt.</param>
+    /// <param name="datagramConnector">Opens each query's channel.</param>
+    public DnsServerResolver(DnsServerResolverOptions options, TimeProvider timeProvider, IDatagramConnector datagramConnector)
+        : this(options, timeProvider, new DatagramConnectorDnsSocketOpener(datagramConnector), SystemDnsServers.List, FindSystemInterfaceAddresses, RandomNumberGenerator.Fill)
+    {
+    }
+
     /// <summary>Initializes a resolver over the given pieces, so a test drives it without a network.</summary>
     /// <param name="options">The c-ares options and the <c>-4</c> or <c>-6</c> choice.</param>
     /// <param name="timeProvider">Times each attempt.</param>

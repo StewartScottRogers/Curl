@@ -21,7 +21,7 @@ internal static class UpstreamFirstDifference
 
     /// <summary>Describes the first difference between what was expected and what was produced.</summary>
     /// <param name="label">What is being compared, such as <c>&lt;verify&gt;&lt;stdout&gt;</c>.</param>
-    /// <param name="expected">The expected bytes.</param>
+    /// <param name="expected">The expected bytes, whose <c>%alternatives[A,B]</c> are first resolved by <see cref="UpstreamTestAlternatives"/>.</param>
     /// <param name="actual">The bytes produced.</param>
     /// <returns>
     /// A sentence naming the byte offset, the line and both lines, then on the lines after it the
@@ -29,6 +29,7 @@ internal static class UpstreamFirstDifference
     /// </returns>
     public static string? Describe(string label, byte[] expected, byte[] actual)
     {
+        expected = expected.AsSpan().IndexOf("%alternatives["u8) < 0 ? expected : Encoding.Latin1.GetBytes(UpstreamTestAlternatives.Choose(Encoding.Latin1.GetString(expected), Encoding.Latin1.GetString(actual)));
         if (expected.AsSpan().SequenceEqual(actual))
         {
             return null;

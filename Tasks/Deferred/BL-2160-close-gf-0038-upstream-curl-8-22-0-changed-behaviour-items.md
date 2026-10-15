@@ -5,7 +5,7 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: [BL-2161, BL-2162, BL-2163, BL-2164, BL-2165, BL-2166, BL-2167, BL-2168, BL-2169, BL-2171, BL-2172, BL-2173, BL-2174, BL-2175, BL-2176]
-touches: []
+touches: [Gap]
 lane: no
 requirement: none
 created: 2026-10-13
@@ -530,3 +530,7 @@ Bring these items to Curl when the target moves to 8.22.0.
 - 2026-10-13: Created.
 - 2026-10-13: Backlog -> Doing.
 - 2026-10-13: Doing -> Backlog. Split after measuring all 154 items: waits on BL-2161..BL-2169, BL-2171..BL-2176; interactive only for the gap-office exclusions of libtest, debug-build, unit-test and platform-only cases
+- 2026-10-14: Backlog -> Doing. interactive session: gap-office exclusions and re-measure
+
+- 2026-10-14 (Claude): gap run 2026-10-14_0904 (PR #142) measured 153 of GF-0038's 154 items as match or excluded. The last, test321, waits on BL-2223 (shell redirect in the harness); the gap run after BL-2223 closes GF-0038.
+- 2026-10-14: Doing -> Deferred. 153 of 154 items closed; test321 waits on BL-2223, then the next gap run

@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net.Sockets;
 using System.Text;
 using Curl.Authentication;
@@ -281,7 +282,7 @@ internal static class CurlComposition
             diagnosticLog);
 
     /// <summary>
-    /// Creates the contexts the dialing <see cref="CreateRunner(Stream, Stream, Stream, ITcpDialer, IDnsResolver, IDatagramConnector, bool, IWriteOutFileOpener?, bool, Func{string, string?}?, IConnectionListener?, DefaultConfigFileSearch?, TimeProvider?)" />
+    /// Creates the contexts the dialing <see cref="CreateRunner(Stream, Stream, Stream, ITcpDialer, IDnsResolver, IDatagramConnector, bool, IWriteOutFileOpener?, bool, Func{string, string?}?, IConnectionListener?, DefaultConfigFileSearch?, TimeProvider?, bool, bool, bool, bool, bool?)" />
     /// uses: <see cref="CreateSecurityContextFactory(IConnector, IDatagramConnector, IDiagnosticLog?)" />'s
     /// router, with NTLM sent to the hand-built context on every platform when
     /// <paramref name="usesHandBuiltNtlm" /> is set (<see cref="HandBuiltNtlmSecurityContextFactory" />, BL-1858).
@@ -1241,6 +1242,33 @@ internal static class CurlComposition
     /// <param name="ftpListener">Listens for FTP's active-mode (<c>-P</c>) data connections; a <see cref="TcpConnectionListener" /> when <see langword="null" /> (BL-1907).</param>
     /// <param name="defaultConfigFileSearch">Where the run looks for the default config file (<c>.curlrc</c>); <see langword="null" /> for a run that reads none (BL-1977).</param>
     /// <param name="signingClock">The clock <c>--aws-sigv4</c> and the <c>--httpsig-*</c> options sign with; <see cref="TimeProvider.System" /> when not given (BL-2183).</param>
+    /// <param name="honoursDnsServerVariable">
+    /// Whether a non-empty <c>CURL_DNS_SERVER</c> makes each option group resolve through
+    /// <see cref="DnsServerVariableResolverOf" />, as curl's debug build does; off by default, as in
+    /// curl's release build, and turned on by the conformance harness (ADR-0492, BL-2248).
+    /// </param>
+    /// <param name="honoursHstsTimeVariable">
+    /// Whether a <c>CURL_TIME</c> holding whole seconds since the epoch fixes the HSTS clock at that
+    /// instant (<see cref="HstsClockOf" />), as curl's debug build reads it in <c>lib/hsts.c</c>; off by
+    /// default, as in curl's release build, and turned on by the conformance harness (ADR-0493, BL-2234).
+    /// </param>
+    /// <param name="honoursHstsHttpVariable">
+    /// Whether a set <c>CURL_HSTS_HTTP</c> (any value, empty included) makes the run's HSTS cache learn
+    /// a <c>Strict-Transport-Security</c> header received over plain <c>http</c>, as curl's debug build
+    /// does in <c>lib/http.c</c>; off by default, as in curl's release build, and turned on by the
+    /// conformance harness (ADR-0494, BL-2250).
+    /// </param>
+    /// <param name="honoursAltSvcHttpVariable">
+    /// Whether a set <c>CURL_ALTSVC_HTTP</c> (any value, empty included) makes each <c>--alt-svc</c>
+    /// cache learn <c>Alt-Svc</c> headers received over plain <c>http</c> and look up a plain
+    /// <c>http</c> origin's alternatives, as curl's debug build does in <c>lib/http.c</c> and
+    /// <c>lib/url.c</c>; off by default, as in curl's release build, and turned on by the conformance
+    /// harness (ADR-0497, BL-2263).
+    /// </param>
+    /// <param name="parsesAsWindowsBuild">
+    /// Whether the runner reads the command line as curl's Windows Schannel build does; <see langword="null" />
+    /// for this process's platform. Tests pass <see langword="false" /> to reach <c>--http3</c> on every platform (ADR-0397, BL-2260).
+    /// </param>
     /// <returns>The runner.</returns>
     internal static CurlCommandRunner CreateRunner(
         Stream standardOutput,
@@ -1255,13 +1283,19 @@ internal static class CurlComposition
         Func<string, string?>? readEnvironmentVariable = null,
         IConnectionListener? ftpListener = null,
         DefaultConfigFileSearch? defaultConfigFileSearch = null,
-        TimeProvider? signingClock = null)
+        TimeProvider? signingClock = null,
+        bool honoursDnsServerVariable = false,
+        bool honoursHstsTimeVariable = false,
+        bool honoursHstsHttpVariable = false,
+        bool honoursAltSvcHttpVariable = false,
+        bool? parsesAsWindowsBuild = null)
     {
         ConnectionCache runConnections = new(TimeProvider.System);
         LateBoundDiagnosticLog runLog = new();
         Func<string, string?> environment = readEnvironmentVariable ?? (_ => null);
+        string? dnsServer = honoursDnsServerVariable ? environment(DnsServerVariableName) : null;
         return new(
-            SharingRunCookies((options, cookies) => CreateDialingTransferDispatch(tcpDialer, dnsResolver, datagramConnector, cookies, options, runConnections, runLog, usesHandBuiltNtlm, environment, ftpListener, signingClock)),
+            SharingRunCookies((options, cookies) => CreateDialingTransferDispatch(tcpDialer, DnsServerVariableResolverOf(options, dnsServer, dnsResolver, datagramConnector), datagramConnector, cookies, options, runConnections, runLog, usesHandBuiltNtlm, environment, ftpListener, signingClock)),
             new PhysicalFileSystem(),
             new PhysicalFileSystem(),
             standardOutput,
@@ -1276,11 +1310,81 @@ internal static class CurlComposition
             defaultConfigFileSearch: defaultConfigFileSearch,
             readEnvironmentVariable: readEnvironmentVariable,
             runConnectionCache: runConnections,
-            lateBoundDiagnosticLog: runLog);
+            lateBoundDiagnosticLog: runLog,
+            hstsClock: honoursHstsTimeVariable ? HstsClockOf(environment(HstsTimeVariableName)) : null,
+            hstsLearnsOverHttp: LearnsHstsOverHttp(honoursHstsHttpVariable, environment),
+            altSvcUsesOverHttp: UsesAltSvcOverHttp(honoursAltSvcHttpVariable, environment),
+            parsesAsWindowsBuild: parsesAsWindowsBuild);
     }
 
     /// <summary>
-    /// Builds one option group's dispatch for the dialing <see cref="CreateRunner(Stream, Stream, Stream, ITcpDialer, IDnsResolver, IDatagramConnector, bool, IWriteOutFileOpener?, bool, Func{string, string?}?, IConnectionListener?, DefaultConfigFileSearch?, TimeProvider?)" />:
+    /// Whether each <c>--alt-svc</c> cache learns and looks up over plain <c>http</c>: only behind the
+    /// harness seam, and then when <c>CURL_ALTSVC_HTTP</c> is set at all, as curl's debug build tests it
+    /// with <c>getenv</c> (ADR-0497, BL-2263).
+    /// </summary>
+    /// <param name="honoursAltSvcHttpVariable">Whether the seam is on.</param>
+    /// <param name="environment">Reads the run's environment.</param>
+    /// <returns>Whether the caches serve <c>http</c> origins.</returns>
+    internal static bool UsesAltSvcOverHttp(bool honoursAltSvcHttpVariable, Func<string, string?> environment) =>
+        honoursAltSvcHttpVariable && environment(AltSvcHttpVariableName) is not null;
+
+    /// <summary>The variable whose presence makes curl's debug build use Alt-Svc over plain <c>http</c>.</summary>
+    internal const string AltSvcHttpVariableName = "CURL_ALTSVC_HTTP";
+
+    /// <summary>
+    /// Whether the run's HSTS cache learns over plain <c>http</c>: only behind the harness seam, and
+    /// then when <c>CURL_HSTS_HTTP</c> is set at all, as curl's debug build tests it with <c>getenv</c>
+    /// (ADR-0494, BL-2250).
+    /// </summary>
+    /// <param name="honoursHstsHttpVariable">Whether the seam is on.</param>
+    /// <param name="environment">Reads the run's environment.</param>
+    /// <returns>Whether the cache learns over <c>http</c>.</returns>
+    internal static bool LearnsHstsOverHttp(bool honoursHstsHttpVariable, Func<string, string?> environment) =>
+        honoursHstsHttpVariable && environment(HstsHttpVariableName) is not null;
+
+    /// <summary>The variable curl's debug build reads its HSTS clock from, in whole seconds since the epoch.</summary>
+    internal const string HstsTimeVariableName = "CURL_TIME";
+
+    /// <summary>The variable whose presence makes curl's debug build learn HSTS over plain <c>http</c>.</summary>
+    internal const string HstsHttpVariableName = "CURL_HSTS_HTTP";
+
+    /// <summary>
+    /// The HSTS clock a <c>CURL_TIME</c> value fixes: a <see cref="FixedWallClock" /> at that many
+    /// seconds after the epoch, or <see langword="null" /> (the run's own clock) when the value is
+    /// not set or is not a whole number of seconds curl's dates can hold (ADR-0493, BL-2234).
+    /// </summary>
+    /// <param name="value">The variable's value, or <see langword="null" /> when not set.</param>
+    /// <returns>The clock, or <see langword="null" />.</returns>
+    internal static FixedWallClock? HstsClockOf(string? value) =>
+        long.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out long seconds) && seconds <= MaximumHstsTimeSeconds
+            ? new FixedWallClock(DateTimeOffset.FromUnixTimeSeconds(seconds))
+            : null;
+
+    /// <summary>The last second <see cref="DateTimeOffset" /> holds: 9999-12-31T23:59:59Z.</summary>
+    private const long MaximumHstsTimeSeconds = 253402300799;
+
+    /// <summary>The variable curl's debug build reads the DNS server to ask from (<c>override-dns</c>).</summary>
+    internal const string DnsServerVariableName = "CURL_DNS_SERVER";
+
+    /// <summary>
+    /// The resolver an option group of the dialing runner uses: with a non-empty
+    /// <paramref name="dnsServer" />, a <see cref="DnsServerResolver" /> asking that server
+    /// (<c>ip:port</c>, parsed as <c>--dns-servers</c> is) for the <c>-4</c> or <c>-6</c> family's
+    /// records through <paramref name="datagramConnector" />, as curl's debug build honours
+    /// <c>CURL_DNS_SERVER</c> (ADR-0492, BL-2248); otherwise <paramref name="dnsResolver" />.
+    /// </summary>
+    /// <param name="options">The option group.</param>
+    /// <param name="dnsServer">The <c>CURL_DNS_SERVER</c> value, or <see langword="null" /> when not honoured or not set.</param>
+    /// <param name="dnsResolver">The resolver the runner was given.</param>
+    /// <param name="datagramConnector">Carries the queries.</param>
+    /// <returns>The resolver.</returns>
+    internal static IDnsResolver DnsServerVariableResolverOf(CommandLineOptions options, string? dnsServer, IDnsResolver dnsResolver, IDatagramConnector datagramConnector) =>
+        string.IsNullOrEmpty(dnsServer)
+            ? dnsResolver
+            : new DnsServerResolver(new DnsServerResolverOptions(dnsServer, null, null, null, AddressFamilyOf(options)), TimeProvider.System, datagramConnector);
+
+    /// <summary>
+    /// Builds one option group's dispatch for the dialing <see cref="CreateRunner(Stream, Stream, Stream, ITcpDialer, IDnsResolver, IDatagramConnector, bool, IWriteOutFileOpener?, bool, Func{string, string?}?, IConnectionListener?, DefaultConfigFileSearch?, TimeProvider?, bool, bool, bool, bool, bool?)" />:
     /// the group's <see cref="TcpConnector" /> over <paramref name="tcpDialer" /> and
     /// <paramref name="dnsResolver" />, pooled in <paramref name="runConnections" />, with a proxy
     /// selector that reads the environment through <paramref name="readEnvironmentVariable" />, and the connector's <c>--resolve</c> entries
@@ -1311,11 +1415,13 @@ internal static class CurlComposition
         IConnectionListener? ftpListener,
         TimeProvider? signingClock)
     {
-        ITlsProviderWithWarnings tlsProvider = CreateTlsProvider(TlsClientOptionsMapping.FromCommandLine(options), TimeProvider.System);
+        TlsClientOptions tlsClientOptions = TlsClientOptionsMapping.FromCommandLine(options);
+        ITlsProviderWithWarnings tlsProvider = CreateTlsProvider(tlsClientOptions, TimeProvider.System);
         ITlsProviderWithWarnings proxyTlsProvider = CreateTlsProvider(TlsClientOptionsMapping.ProxyFromCommandLine(options), TimeProvider.System);
         LateBoundSecurityContextFactory proxyContexts = new() { UsesHandBuiltNtlm = usesHandBuiltNtlm };
         HttpProxyTunnelOptions proxyTunnelOptions = CreateProxyTunnelOptions(options, proxyContexts, diagnosticLog);
-        TcpConnector tcpConnector = CreateTcpConnector(options, dnsResolver, tcpDialer, tlsProvider, TimeProvider.System, proxyTunnelOptions, proxyTlsProvider, socks5SecurityContexts: proxyContexts);
+        QuicDialer quicDialer = CreateDatagramConnectorQuicDialer(options, tlsClientOptions, datagramConnector);
+        TcpConnector tcpConnector = CreateTcpConnector(options, dnsResolver, tcpDialer, tlsProvider, TimeProvider.System, proxyTunnelOptions, proxyTlsProvider, quicDialer, socks5SecurityContexts: proxyContexts);
         PoolingConnector poolingConnector = CreatePoolingConnector(options, tcpConnector, TimeProvider.System, runConnections);
         ISecurityContextFactory securityContexts = CreateDialingSecurityContextFactory(poolingConnector, datagramConnector, diagnosticLog, usesHandBuiltNtlm);
         proxyContexts.Bind(securityContexts);
@@ -1327,6 +1433,20 @@ internal static class CurlComposition
             poolingConnector,
             tcpConnector.LoadResolveEntries);
     }
+
+    /// <summary>
+    /// The QUIC dialer of an option group of the dialing runner: its <c>--http3</c> and
+    /// <c>--http3-only</c> datagrams go through <paramref name="datagramConnector" />
+    /// (<see cref="DatagramConnectorUdpChannelOpener" />), not a real UDP socket, so an in-process
+    /// HTTP/3 server answers them (BL-2260). The executable's <see cref="CreateTransports(CommandLineOptions, TimeProvider, ConnectionCache?, TlsSessionCache?, IDiagnosticLog?, DnsCache?)" />
+    /// keeps the socket-opening dialer.
+    /// </summary>
+    /// <param name="options">The option group.</param>
+    /// <param name="tlsClientOptions">The origin's TLS options.</param>
+    /// <param name="datagramConnector">Opens the QUIC channels.</param>
+    /// <returns>The dialer.</returns>
+    internal static QuicDialer CreateDatagramConnectorQuicDialer(CommandLineOptions options, TlsClientOptions tlsClientOptions, IDatagramConnector datagramConnector) =>
+        new(new DatagramConnectorUdpChannelOpener(datagramConnector), tlsClientOptions, TimeProvider.System) { WritesHttp3ConnectionLines = TracesHttp3(options) };
 
     /// <summary>
     /// The datagram connector TFTP opens its channel through: over a

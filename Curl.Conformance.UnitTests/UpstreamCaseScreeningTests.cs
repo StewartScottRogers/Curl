@@ -75,6 +75,24 @@ public sealed class UpstreamCaseScreeningTests
         Assert.IsNull(reason, reason);
     }
 
+    // runtests.pl at curl-8_22_0 never reads <client><connectport>: the http-proxy sws tunnels to the
+    // port the CONNECT names, so test1316's part is accepted and ignored (BL-2239).
+    [TestMethod]
+    public void FindSkipReason_ClientConnectPort_IsAcceptedAsRuntestsPlIgnoresIt()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        byte[] testFile = File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "UpstreamTestData", "test1316.curltest"));
+        Dictionary<string, string> variables = new(StringComparer.Ordinal) { ["HOSTIP"] = "127.0.0.1", ["FTPPORT"] = UpstreamCaseRunner.FtpPort, ["PROXYPORT"] = UpstreamCaseRunner.ProxyPort, ["TESTNUMBER"] = "1316" };
+        UpstreamTestFileExpansion expansion = UpstreamTestFileExpander.Expand(testFile, variables, Features);
+        UpstreamTestCase testCase = expansion.Parse().TestCase!;
+
+        string? reason = UpstreamCaseScreening.FindSkipReason(expansion, testCase, Features);
+
+        diagnostics.Act("skip reason", reason);
+        Assert.IsNotNull(testCase.Find("client", "connectport"));
+        Assert.IsNull(reason, reason);
+    }
+
     // The FTP active-mode and upload cases BL-1907 opened: none skips for %FTPPORT, the FTP stand-in
     // or <verify><upload>; the runner measures them (most pass, 149, 216, 1211 and 1217 differ).
     [TestMethod]
@@ -151,14 +169,15 @@ public sealed class UpstreamCaseScreeningTests
     }
 
     // The 8 cases naming %FTPSPORT at curl-8_21_0 run against the FTP stand-in behind implicit TLS
-    // (BL-1913); 404, 407 and 1112 still skip, each for another reason, never for the port.
+    // (BL-1913); 404 still skips, for another reason, never for the port. 407's <client><stdout>,
+    // which runtests.pl never reads, no longer skips it (BL-2221).
     [TestMethod]
     [DataRow(400, null)]
     [DataRow(401, null)]
     [DataRow(403, null)]
-    [DataRow(404, "the expected exit code 77,60 is not a number")]
+    [DataRow(404, null)]
     [DataRow(406, null)]
-    [DataRow(407, "the harness does not act on <client><stdout>")]
+    [DataRow(407, null)]
     [DataRow(408, null)]
     [DataRow(1112, null)]
     public void FindSkipReason_FtpsCase_RunsWithAValueForTheFtpsPort(int testNumber, string? expected)
@@ -362,6 +381,7 @@ public sealed class UpstreamCaseScreeningTests
     [DataRow("<verify>\n<strip>\n(\n</strip>\n</verify>\n", "the strip pattern ( is not a .NET regular expression")]
     [DataRow("<verify>\n<stripfile2>\n$_ = ''\n</stripfile2>\n</verify>\n", "the harness does not run the Perl $_ = ''")]
     [DataRow("<verify>\n<errorcode>\nlots\n</errorcode>\n</verify>\n", "the expected exit code lots is not a number")]
+    [DataRow("<verify>\n<errorcode>\n77,lots\n</errorcode>\n</verify>\n", "the expected exit code 77,lots is not a number")]
     [DataRow("<verify>\n<protocol>\nUSER anonymous\nLPRT 4,4,127,0,0,1,2,35,46\n</protocol>\n</verify>\n", "the FTP stand-in does not carry out the case's LPRT")]
     [DataRow("<verify>\n<protocol>\nCWD fully_simulated\n</protocol>\n</verify>\n", "the FTP stand-in does not carry out the case's CWD fully_simulated")]
     public void FindSkipReason_NamesWhatTheHarnessCannotDo(string sections, string expected)
@@ -440,6 +460,7 @@ public sealed class UpstreamCaseScreeningTests
     [DataRow("<client>\n<server>\nsocks5\n</server>\n<command>\n--socks5 127.0.0.1:8994 http://127.0.0.1:8990/x\n</command>\n</client>\n")]
     [DataRow("<client>\n<server>\nmqtt\n</server>\n<command>\nmqtt://127.0.0.1:8998/1190\n</command>\n</client>\n")]
     [DataRow("<client>\n<setenv>\nhttp_proxy=http://127.0.0.1:8990/\n</setenv>\n<command>\nhttp://127.0.0.1:8990/x\n</command>\n</client>\n")]
+    [DataRow("<client>\n<command>\nhttp://127.0.0.1:8990/x\n</command>\n<stdout>\nignored\n</stdout>\n</client>\n")]
     public void FindSkipReason_NoInternetHostOrAServerNamed_ReturnsNull(string sections)
     {
         var diagnostics = TestDiagnostics.For(TestContext);
@@ -454,7 +475,7 @@ public sealed class UpstreamCaseScreeningTests
     public void FindFileOutsideLogDirectory_EveryFileInside_ReturnsNull()
     {
         string logDirectory = Rooted("log");
-        string sections = $"<client>\n<file name=\"{logDirectory}/in\">\n</file>\n</client>\n<verify>\n<file1 name=\"{logDirectory}/sub/out\">\n</file1>\n</verify>\n";
+        string sections = $"<client>\n<command>\nhttp://x/ > '{logDirectory}/out'\n</command>\n<file name=\"{logDirectory}/in\">\n</file>\n</client>\n<verify>\n<file1 name=\"{logDirectory}/sub/out\">\n</file1>\n</verify>\n";
 
         var diagnostics = TestDiagnostics.For(TestContext);
         diagnostics.Arrange("test sections", Neutral(sections));
@@ -469,6 +490,7 @@ public sealed class UpstreamCaseScreeningTests
     [DataRow("<client>\n<file name=\"{0}/in\">\n</file>\n</client>\n", "<client><file> names {0}/in, outside the case's log directory")]
     [DataRow("<verify>\n<file2 name=\"{0}/log/../out\">\n</file2>\n</verify>\n", "<verify><file2> names {0}/log/../out, outside the case's log directory")]
     [DataRow("<verify>\n<file name=\"{0}/logs/out\">\n</file>\n</verify>\n", "<verify><file> names {0}/logs/out, outside the case's log directory")]
+    [DataRow("<client>\n<command>\nhttp://x/ >> '{0}/out'\n</command>\n</client>\n", "the command redirects its output to {0}/out, outside the case's log directory")]
     public void FindFileOutsideLogDirectory_FileOutside_IsTheReason(string sections, string expected)
     {
         var diagnostics = TestDiagnostics.For(TestContext);
@@ -554,7 +576,7 @@ public sealed class UpstreamCaseScreeningTests
     }
 
     [TestMethod]
-    [DataRow("client", "precheck", "perl -e \"if('[::1]' ne '[::1]') {print 'x';} else {exec 'resolve --ipv6 ip6-localhost'; print 'Cannot run precheck resolve';}\"")]
+    [DataRow("client", "precheck", "perl -e \"print 'x' unless 1;\"")]
     [DataRow("verify", "postcheck", "sh -c true")]
     public void FindSkipReason_CheckLineNotInterpreted_NamesTheLine(string section, string name, string line)
     {
@@ -584,13 +606,13 @@ public sealed class UpstreamCaseScreeningTests
     }
 
     [TestMethod]
-    public void FindSkipReason_HttpsThroughTheHttpProxy_IsTheReason()
+    public void FindSkipReason_HttpsThroughTheHttpProxy_IsNotSkipped()
     {
         UpstreamTestCase testCase = ParsedTestCase.From("<client>\n<server>\nhttps\nhttp-proxy\n</server>\n<command>\nhttp://h/1\n</command>\n</client>\n");
 
         string? reason = UpstreamCaseScreening.FindSkipReason(CleanExpansion, testCase, Features);
 
-        Assert.AreEqual("the http-proxy stand-in tunnels no CONNECT to the https server (BL-1915)", reason);
+        Assert.IsNull(reason);
     }
 
     [TestMethod]
@@ -620,6 +642,27 @@ public sealed class UpstreamCaseScreeningTests
         UpstreamTestCase testCase = ParsedTestCase.From($"<client>\n<features>\n{caseFeatures}\n</features>\n</client>\n");
         diagnostics.Arrange("case features", caseFeatures);
         diagnostics.Arrange("platform", operatingSystemName);
+
+        string? reason = UpstreamCaseScreening.FindFeatureOfAnotherPlatform(testCase, platform.Features);
+
+        diagnostics.Act("reason", reason);
+        diagnostics.Assert("reason", expected ?? "null", reason ?? "null");
+        Assert.AreEqual(expected, reason);
+    }
+
+    // ADR-0497: a feature the harness stands in for (Debug) is met on every platform, so a case needing it
+    // and another platform's feature is skipped here for that feature only.
+    [TestMethod]
+    [DataRow("Debug\nhttp/2\nSSL", "MSWin32", "Curl lacks the feature http/2")]
+    [DataRow("Schannel\nDebug", "linux", "Curl lacks the feature Schannel")]
+    [DataRow("Debug\nhttp/2\nSSL", "linux", null)]
+    public void FindFeatureOfAnotherPlatform_PlatformWithTheDebugStandIn_CountsDebugAsMetEverywhere(string caseFeatures, string operatingSystemName, string? expected)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        UpstreamCurlPlatform platform = UpstreamCurlPlatform.All.Single(candidate => candidate.OperatingSystemName == operatingSystemName).WithFeatures(["Debug"]);
+        UpstreamTestCase testCase = ParsedTestCase.From($"<client>\n<features>\n{caseFeatures}\n</features>\n</client>\n");
+        diagnostics.Arrange("case features", caseFeatures);
+        diagnostics.Arrange("platform", $"{operatingSystemName} with Debug");
 
         string? reason = UpstreamCaseScreening.FindFeatureOfAnotherPlatform(testCase, platform.Features);
 

@@ -8,21 +8,26 @@ namespace Curl.Conformance;
 /// <remarks>
 /// <para>
 /// A feature is listed when Curl has it, by the name upstream's <c>runtests.pl</c> gives it: the
-/// protocols the harness can serve (<c>ws</c>, <c>wss</c> and <c>ipfs</c> among them); every
+/// protocols the harness can serve (<c>ws</c>, <c>wss</c> and <c>ipfs</c> among them, and <c>sftp</c>
+/// and <c>scp</c>, which Curl serves and <c>UpstreamSshServer</c> emulates); every
 /// feature on Curl's <c>curl -V</c> <c>Features:</c> line, with <c>HTTP2</c> as <c>http/2</c> and
 /// <c>h2c</c> and <c>HTTP3</c> as <c>http/3</c>; <c>crypto</c>, which upstream derives from
 /// <c>NTLM</c>, <c>Kerberos</c> and <c>SPNEGO</c>; the tool features a curl build has unless it
 /// disables them (<c>cookies</c>, <c>proxy</c>, <c>Mime</c>, <c>manual</c>, <c>DoH</c>,
 /// <c>digest</c>, <c>aws</c>, <c>netrc</c>, <c>verbose-strings</c>, <c>large-time</c>,
-/// <c>large-size</c>, <c>sha512-256</c>, <c>SSLpinning</c> and <c>httpsig</c>); <c>large_file</c>;
+/// <c>large-size</c>, <c>sha512-256</c>, <c>SSLpinning</c> and <c>httpsig</c>); <c>headers-api</c>, since
+/// Curl writes <c>-w %header{name}</c> and <c>%{header_json}</c>, which curl writes only with libcurl's
+/// headers API (BL-2264); <c>large_file</c>;
 /// <c>local-http</c> (the harness's server is at <c>127.0.0.1</c>); <c>win32</c> on Windows, as
-/// <c>runtests.pl</c> sets it there; the TLS backend; and <c>xattr</c> off Windows, where curl
-/// cannot write extended attributes.
+/// <c>runtests.pl</c> sets it there; the TLS backend; <c>xattr</c> off Windows, where curl
+/// cannot write extended attributes; <c>http/2</c> and <c>h2c</c> off Windows only, since the
+/// Schannel build Curl matches there has no <c>HTTP2</c> and refuses <c>--http2</c> (BL-2230); and
+/// <c>http/3</c> off Windows only, since that build refuses <c>--http3</c> too (BL-2261).
 /// </para>
 /// <para>
 /// These stay off, so the cases that need them are skipped rather than counted as failures:
 /// libcurl's build and API features, which a command-line tool does not have (<c>Debug</c>,
-/// <c>TrackMemory</c>, <c>unittest</c>, <c>headers-api</c>, <c>form-api</c>, <c>wakeup</c>,
+/// <c>TrackMemory</c>, <c>unittest</c>, <c>form-api</c>, <c>wakeup</c>,
 /// <c>shuffle-dns</c>, <c>override-dns</c>, <c>threadsafe</c>, <c>getrlimit</c>,
 /// <c>--libcurl</c>); <c>ftp</c> and the other protocols the harness has no server for; features
 /// absent from Curl's <c>curl -V</c> (<c>SSPI</c>, <c>Unicode</c>, <c>MultiSSL</c>,
@@ -34,13 +39,13 @@ public sealed class UpstreamCurlPlatform
 {
     private static readonly string[] CommonFeatures =
     [
-        "dict", "file", "gopher", "gophers", "http", "https", "ipfs", "mqtt", "telnet", "tftp", "ws", "wss",
-        "alt-svc", "AsynchDNS", "brotli", "ECH", "GSS-API", "HSTS", "http/2", "h2c", "http/3", "HTTPS-proxy",
+        "dict", "file", "gopher", "gophers", "http", "https", "ipfs", "mqtt", "mqtts", "scp", "sftp", "telnet", "tftp", "ws", "wss",
+        "alt-svc", "AsynchDNS", "brotli", "ECH", "GSS-API", "HSTS", "HTTPS-proxy",
         "HTTPSRR", "IDN", "IPv6", "Kerberos", "Largefile", "libz", "NTLM", "PSL", "SPNEGO", "SSL",
         "UnixSockets", "zstd",
         "crypto", "cookies", "proxy", "Mime", "manual", "DoH", "digest", "aws", "netrc", "verbose-strings",
         "large-time", "large-size", "sha512-256", "SSLpinning",
-        "large_file", "local-http", "httpsig",
+        "large_file", "local-http", "httpsig", "headers-api",
     ];
 
     private UpstreamCurlPlatform(IEnumerable<string> platformFeatures, string nullDevice, string operatingSystemName)
@@ -61,10 +66,10 @@ public sealed class UpstreamCurlPlatform
     public static UpstreamCurlPlatform Windows { get; } = new(["win32", "Schannel"], "NUL", "MSWin32");
 
     /// <summary>Linux, where Curl matches curl's OpenSSL build.</summary>
-    public static UpstreamCurlPlatform Unix { get; } = new(["OpenSSL", "xattr"], "/dev/null", "linux");
+    public static UpstreamCurlPlatform Unix { get; } = new(["OpenSSL", "xattr", "http/2", "h2c", "http/3"], "/dev/null", "linux");
 
     /// <summary>macOS, where Curl matches curl's OpenSSL build as on Linux; only Perl's name for it differs.</summary>
-    public static UpstreamCurlPlatform MacOS { get; } = new(["OpenSSL", "xattr"], "/dev/null", "darwin");
+    public static UpstreamCurlPlatform MacOS { get; } = new(["OpenSSL", "xattr", "http/2", "h2c", "http/3"], "/dev/null", "darwin");
 
     /// <summary>Every platform Curl's conformance run stands for: Windows, Linux and macOS.</summary>
     public static IReadOnlyList<UpstreamCurlPlatform> All { get; } = [Windows, Unix, MacOS];

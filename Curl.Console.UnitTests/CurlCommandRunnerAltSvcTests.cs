@@ -245,6 +245,40 @@ public sealed class CurlCommandRunnerAltSvcTests
         Assert.IsNull(server.Targets.Single().AltSvcRoute);
     }
 
+    /// <summary>
+    /// Behind the harness seam curl's debug build under <c>CURL_ALTSVC_HTTP</c> learns a plain
+    /// <c>http</c> response's header, as upstream case 359 needs (ADR-0497, BL-2263).
+    /// </summary>
+    [TestMethod]
+    public async Task RunAsync_PlainHttpWithAnAltSvcHeaderOverHttpOn_LearnsIt()
+    {
+        ScriptedConnector server = Serve("Alt-Svc: h1=\":18443\"; ma=60");
+
+        int exitCode = await RunAsync(server, ["-v", "--alt-svc", CacheFile, "http://localhost:18499/"], altSvcUsesOverHttp: true);
+
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("stderr has Added alt-svc", true, StandardErrorText.Contains("Added alt-svc", StringComparison.Ordinal));
+        Assert.AreEqual(0, exitCode);
+        StringAssert.Contains(StandardErrorText, "* Added alt-svc: localhost:18443 over h1\r\n");
+        StringAssert.Contains(SavedCacheFile(), "h1 localhost 18499 h1 localhost 18443 ");
+    }
+
+    [TestMethod]
+    public async Task RunAsync_PlainHttpWithACachedEntryOverHttpOn_ConnectsToTheAlternative()
+    {
+        CacheFileHolds($"h1 localhost 18499 h1 localhost 18443 {Future} 0 0");
+        ScriptedConnector server = Serve();
+
+        int exitCode = await RunAsync(server, ["-s", "--alt-svc", CacheFile, "http://localhost:18499/"], altSvcUsesOverHttp: true);
+
+        AltSvcRoute? route = server.Targets.Single().AltSvcRoute;
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("alt-svc route", "localhost:18443", route is null ? "<null>" : $"{route.Alternative.Host}:{route.Alternative.Port}");
+        Assert.AreEqual(0, exitCode);
+        Assert.IsNotNull(route);
+        Assert.AreEqual(("localhost", 18443), (route.Alternative.Host, route.Alternative.Port));
+    }
+
     [TestMethod]
     public async Task RunAsync_EmptyAltSvc_LearnsWithoutReadingOrWritingAFile()
     {
@@ -359,9 +393,10 @@ public sealed class CurlCommandRunnerAltSvcTests
             Encoding.Latin1.GetBytes($"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n{(header.Length == 0 ? string.Empty : header + "\r\n")}\r\nhi")));
     }
 
-    private async Task<int> RunAsync(IConnector connector, string[] arguments)
+    private async Task<int> RunAsync(IConnector connector, string[] arguments, bool altSvcUsesOverHttp = false)
     {
         Diagnostics.Arrange("command line", string.Join(" ", arguments));
+        Diagnostics.Arrange("uses alt-svc over http", altSvcUsesOverHttp);
         Diagnostics.Arrange("connector", connector is ScriptedConnector ? "scripted" : "refuses every connect with exit 7");
         if (files.ExistingContent.TryGetValue(CacheFile, out byte[]? cacheBefore))
         {
@@ -379,7 +414,8 @@ public sealed class CurlCommandRunnerAltSvcTests
                     standardError,
                     new MemoryStream(),
                     runsOnWindows: true,
-                    timeProvider: new FixedUtcClock(Now))
+                    timeProvider: new FixedUtcClock(Now),
+                    altSvcUsesOverHttp: altSvcUsesOverHttp)
                 .RunAsync(arguments);
         }
 

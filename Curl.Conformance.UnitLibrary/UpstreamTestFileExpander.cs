@@ -9,7 +9,7 @@ namespace Curl.Conformance;
 /// its variables (<c>%HOSTIP</c>, <c>%TESTNUMBER</c>, …), its <c>%includetext</c> files (then its
 /// variables again, when it had one), its character macros (<c>%SP</c>, <c>%TAB</c>, <c>%CR</c>,
 /// <c>%LT</c>, <c>%GT</c>, <c>%AMP</c>), its <c>%b64[…]b64%</c>, <c>%hex[…]hex%</c> and
-/// <c>%repeat[…]%</c> instructions, its <c>%include</c> files, and its <c>%sha256b64file[…]sha256b64file%</c>
+/// <c>%repeat[…]%</c> and <c>%days[N]</c> instructions, its <c>%include</c> files, and its <c>%sha256b64file[…]sha256b64file%</c>
 /// and <c>%strippemfile[…]strippemfile%</c> instructions replaced, in that order.
 /// </summary>
 /// <remarks>
@@ -57,9 +57,24 @@ public static class UpstreamTestFileExpander
     /// leaves those instructions as written and lists them as unsupported.
     /// </param>
     /// <returns>The expanded file with the variables and instructions it could not resolve.</returns>
-    public static UpstreamTestFileExpansion Expand(ReadOnlySpan<byte> file, IReadOnlyDictionary<string, string> variables, IReadOnlySet<string> features, Func<string, byte[]?>? readFile)
+    public static UpstreamTestFileExpansion Expand(ReadOnlySpan<byte> file, IReadOnlyDictionary<string, string> variables, IReadOnlySet<string> features, Func<string, byte[]?>? readFile) =>
+        Expand(file, variables, features, readFile, TimeProvider.System);
+
+    /// <summary>
+    /// Expands the bytes of one test file as the overload without a clock does, with every
+    /// <c>%days[N]</c> counted from <paramref name="clock"/>'s now.
+    /// </summary>
+    /// <param name="file">The whole test file, as written.</param>
+    /// <param name="variables">The run's variable values, keyed by name without the <c>%</c>; inserted as UTF-8.</param>
+    /// <param name="features">The features the run reports; case-sensitive.</param>
+    /// <param name="readFile">Reads the file an instruction names, or <see langword="null"/> to leave those instructions unsupported.</param>
+    /// <param name="clock">Gives <c>%days[N]</c> its now.</param>
+    /// <returns>The expanded file with the variables and instructions it could not resolve.</returns>
+    public static UpstreamTestFileExpansion Expand(ReadOnlySpan<byte> file, IReadOnlyDictionary<string, string> variables, IReadOnlySet<string> features, Func<string, byte[]?>? readFile, TimeProvider clock)
     {
         ArgumentNullException.ThrowIfNull(variables);
+        ArgumentNullException.ThrowIfNull(features);
+        ArgumentNullException.ThrowIfNull(clock);
         ArgumentNullException.ThrowIfNull(features);
         UpstreamTestVariableSubstitution substitution = new(variables);
         UpstreamTestConditionalLines conditions = new(features);
@@ -77,7 +92,7 @@ public static class UpstreamTestFileExpander
 
             if (disposition == UpstreamTestLineDisposition.Kept)
             {
-                output.Append(ExpandLine(line, substitution, readFile, unsupportedInstructions));
+                output.Append(ExpandLine(line, substitution, readFile, unsupportedInstructions, clock));
             }
         }
 
@@ -89,8 +104,8 @@ public static class UpstreamTestFileExpander
     }
 
     // prepro's order: subvariables; subtextfile, then subvariables again when it included
-    // anything; subchars; subbase64, which ends with %include.
-    private static string ExpandLine(string line, UpstreamTestVariableSubstitution substitution, Func<string, byte[]?>? readFile, List<string> unsupportedInstructions)
+    // anything; subchars; subbase64 (%b64, %hex, %repeat, %days), which ends with %include.
+    private static string ExpandLine(string line, UpstreamTestVariableSubstitution substitution, Func<string, byte[]?>? readFile, List<string> unsupportedInstructions, TimeProvider clock)
     {
         string expanded = substitution.Substitute(line);
         if (readFile is not null)
@@ -99,7 +114,7 @@ public static class UpstreamTestFileExpander
             expanded = included ? substitution.Substitute(expanded) : expanded;
         }
 
-        expanded = UpstreamTestInstructions.Apply(UpstreamTestInstructions.ReplaceCharacterMacros(expanded), unsupportedInstructions);
+        expanded = UpstreamTestInstructions.Apply(UpstreamTestInstructions.ReplaceCharacterMacros(expanded), unsupportedInstructions, clock);
         if (readFile is null)
         {
             UpstreamTestFileInclusions.AddUnread(expanded, unsupportedInstructions);
@@ -110,7 +125,6 @@ public static class UpstreamTestFileExpander
             expanded = UpstreamTestFileContentInstructions.Replace(UpstreamTestFileInclusions.ReplaceRawIncludes(expanded, readFile), readFile);
         }
 
-        UpstreamTestInstructions.AddUnsupported(expanded, unsupportedInstructions);
         return expanded;
     }
 }

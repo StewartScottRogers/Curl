@@ -1,4 +1,5 @@
 using System.Buffers.Binary;
+using System.Globalization;
 using System.Net;
 using System.Text;
 using Curl.Protocol.Abstractions;
@@ -10,7 +11,7 @@ namespace Curl.Conformance;
 /// client's SOCKS handshake from what the client writes, then relays to a connection to the
 /// backend server.
 /// </summary>
-internal sealed class SocksServerConnection(SocksServerConfiguration configuration, IConnector backend) : IConnection
+internal sealed class SocksServerConnection(SocksServerConfiguration configuration, IConnector backend, Action<string> logConnect) : IConnection
 {
     private readonly List<byte> pendingRequest = [];
 
@@ -156,10 +157,18 @@ internal sealed class SocksServerConnection(SocksServerConfiguration configurati
         string host = request[3] == 3
             ? Encoding.Latin1.GetString(request, 5, request[4])
             : new IPAddress(request.AsSpan(4, addressLength)).ToString();
+        logConnect(Socks5LogLine(request, addressLength, host));
         bool connected = await ConnectBackendAsync(host, BinaryPrimitives.ReadUInt16BigEndian(request.AsSpan(end - 2)), cancellationToken).ConfigureAwait(false);
         pendingReply = [.. pendingReply, 5, (byte)(connected ? 0 : 5), .. request.AsSpan(2, end - 2)];
         return end;
     }
+
+    // The line socksd's socks5 connect appends to its dump file: "atyp 1 => 12.34.56.78", the host
+    // name as sent for type 3, and each IPv6 byte as " %02x" for type 4.
+    private static string Socks5LogLine(byte[] request, int addressLength, string host) =>
+        $"atyp {request[3].ToString(CultureInfo.InvariantCulture)} =>" + (request[3] == 4
+            ? string.Concat(request.AsSpan(4, addressLength).ToArray().Select(octet => " " + octet.ToString("x2", CultureInfo.InvariantCulture)))
+            : " " + host) + "\n";
 
     // Where the request ends: 0 while it is incomplete, -1 for a command or address type that is not supported.
     private static int Socks5RequestEnd(byte[] request)

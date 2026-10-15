@@ -29,6 +29,12 @@
     Curl.Protocol.Abstractions.UnitLibrary exercised from another protocol's tests is
     credited for it.
 
+    A whole-solution run that leaves any member short of line or branch coverage runs
+    the *.UnitTests projects that reach that member's library again, one at a time, into
+    a recheck folder under ResultsDirectory, and merges their reports in the same way
+    before scoring again. A whole-solution run can lose one project's coverage although
+    its tests passed (BL-2269); the recheck restores it, and a real gap still fails.
+
 .PARAMETER Library
     Assembly names to report on, wildcards allowed. Defaults to every production
     assembly - anything named *.UnitLibrary, plus Curl.Console. Curl.Console's
@@ -167,32 +173,19 @@ function Get-TestProjectsReaching {
     return $reaching
 }
 
-# --- 1. Collect coverage ----------------------------------------------------------
+function Invoke-CoverageTestRun {
+    # Runs dotnet test with Cobertura coverage for each target, writing into Directory,
+    # and throws if any test failed.
+    param([string[]] $Targets, [string] $Directory)
 
-if (-not $SkipTestRun) {
-    if (Test-Path $ResultsDirectory) { Remove-Item $ResultsDirectory -Recurse -Force }
-    New-Item -ItemType Directory -Path $ResultsDirectory -Force | Out-Null
-
-    # With -Library, run only the test projects whose project references reach a named
-    # library, directly or through other projects, rather than the whole solution. Those
-    # are the only tests that can execute its code, so its coverage, merged across them,
-    # is what a whole-solution run would report; on nine busy lanes that is minutes, not
-    # the 40-58 a whole-solution run took (BL-1318). Without -Library, or when no test
-    # project reaches the names given, the whole solution runs as before.
-    $testTargets = @(Join-Path $repositoryRoot 'Curl.slnx')
-    if ($Library) {
-        $covering = @(Get-TestProjectsReaching -Root $repositoryRoot -Library $Library -IncludeIntegration:$IncludeIntegration)
-        if ($covering.Count) { $testTargets = $covering }
-    }
-
-    Write-Host "Running tests with coverage into $ResultsDirectory ..." -ForegroundColor Cyan
+    Write-Host "Running tests with coverage into $Directory ..." -ForegroundColor Cyan
     $testOutput = New-Object System.Collections.Generic.List[string]
     $testExitCode = 0
-    foreach ($target in $testTargets) {
+    foreach ($target in $Targets) {
         $testArguments = @(
             'test', $target,
             '--collect:Code Coverage;Format=cobertura',
-            '--results-directory', $ResultsDirectory
+            '--results-directory', $Directory
         )
         if (-not $IncludeIntegration) { $testArguments += @('--filter', 'TestCategory!=Integration') }
         Write-Host "dotnet test $(Split-Path $target -Leaf)" -ForegroundColor DarkCyan
@@ -228,6 +221,27 @@ if (-not $SkipTestRun) {
     }
 }
 
+# --- 1. Collect coverage ----------------------------------------------------------
+
+if (-not $SkipTestRun) {
+    if (Test-Path $ResultsDirectory) { Remove-Item $ResultsDirectory -Recurse -Force }
+    New-Item -ItemType Directory -Path $ResultsDirectory -Force | Out-Null
+
+    # With -Library, run only the test projects whose project references reach a named
+    # library, directly or through other projects, rather than the whole solution. Those
+    # are the only tests that can execute its code, so its coverage, merged across them,
+    # is what a whole-solution run would report; on nine busy lanes that is minutes, not
+    # the 40-58 a whole-solution run took (BL-1318). Without -Library, or when no test
+    # project reaches the names given, the whole solution runs as before.
+    $testTargets = @(Join-Path $repositoryRoot 'Curl.slnx')
+    if ($Library) {
+        $covering = @(Get-TestProjectsReaching -Root $repositoryRoot -Library $Library -IncludeIntegration:$IncludeIntegration)
+        if ($covering.Count) { $testTargets = $covering }
+    }
+
+    Invoke-CoverageTestRun -Targets $testTargets -Directory $ResultsDirectory
+}
+
 $coverageFiles = @(Get-ChildItem -Path $ResultsDirectory -Filter '*.cobertura.xml' -Recurse -ErrorAction SilentlyContinue)
 if ($coverageFiles.Count -eq 0) {
     throw "No Cobertura report found under $ResultsDirectory."
@@ -256,63 +270,69 @@ function Get-ReportedAssemblyName {
 
 $methods = @{}
 
-foreach ($file in $coverageFiles) {
-    $document = New-Object System.Xml.XmlDocument
-    $document.Load($file.FullName)
+function Add-CoberturaReports {
+    # Merges each Cobertura file into $methods, keeping the best hit and condition counts
+    # seen for each line.
+    param([System.IO.FileInfo[]] $Files)
 
-    foreach ($package in $document.SelectNodes('/coverage/packages/package')) {
-        $assembly = Get-ReportedAssemblyName $package.GetAttribute('name')
-        if (-not (Test-IsProductionAssembly $assembly)) { continue }
+    foreach ($file in $Files) {
+        $document = New-Object System.Xml.XmlDocument
+        $document.Load($file.FullName)
 
-        foreach ($class in $package.SelectNodes('classes/class')) {
-            $className = $class.GetAttribute('name')
-            $sourceFile = $class.GetAttribute('filename')
+        foreach ($package in $document.SelectNodes('/coverage/packages/package')) {
+            $assembly = Get-ReportedAssemblyName $package.GetAttribute('name')
+            if (-not (Test-IsProductionAssembly $assembly)) { continue }
 
-            foreach ($method in $class.SelectNodes('methods/method')) {
-                $member = $method.GetAttribute('name') + $method.GetAttribute('signature')
-                $key = $assembly + '|' + $className + '|' + $member
+            foreach ($class in $package.SelectNodes('classes/class')) {
+                $className = $class.GetAttribute('name')
+                $sourceFile = $class.GetAttribute('filename')
 
-                if (-not $methods.ContainsKey($key)) {
-                    $methods[$key] = [pscustomobject]@{
-                        Assembly   = $assembly
-                        Class      = $className
-                        Member     = $member
-                        SourceFile = $sourceFile
-                        Complexity = 0
-                        Lines      = @{}
-                    }
-                }
-                $entry = $methods[$key]
+                foreach ($method in $class.SelectNodes('methods/method')) {
+                    $member = $method.GetAttribute('name') + $method.GetAttribute('signature')
+                    $key = $assembly + '|' + $className + '|' + $member
 
-                # Complexity is a property of the code, not of the run, so every report
-                # that saw this method agrees on it and the maximum is simply the value.
-                $complexity = [int] $method.GetAttribute('complexity')
-                if ($complexity -gt $entry.Complexity) { $entry.Complexity = $complexity }
-
-                foreach ($line in $method.SelectNodes('lines/line')) {
-                    $number = [int] $line.GetAttribute('number')
-                    $hits = [int] $line.GetAttribute('hits')
-
-                    $conditionsCovered = 0
-                    $conditionsTotal = 0
-                    $condition = $line.GetAttribute('condition-coverage')
-                    if ($condition -match '\((\d+)/(\d+)\)') {
-                        $conditionsCovered = [int] $Matches[1]
-                        $conditionsTotal = [int] $Matches[2]
-                    }
-
-                    if (-not $entry.Lines.ContainsKey($number)) {
-                        $entry.Lines[$number] = [pscustomobject]@{
-                            Hits              = $hits
-                            ConditionsCovered = $conditionsCovered
-                            ConditionsTotal   = $conditionsTotal
+                    if (-not $methods.ContainsKey($key)) {
+                        $methods[$key] = [pscustomobject]@{
+                            Assembly   = $assembly
+                            Class      = $className
+                            Member     = $member
+                            SourceFile = $sourceFile
+                            Complexity = 0
+                            Lines      = @{}
                         }
                     }
-                    else {
-                        $existing = $entry.Lines[$number]
-                        if ($hits -gt $existing.Hits) { $existing.Hits = $hits }
-                        if ($conditionsCovered -gt $existing.ConditionsCovered) { $existing.ConditionsCovered = $conditionsCovered }
-                        if ($conditionsTotal -gt $existing.ConditionsTotal) { $existing.ConditionsTotal = $conditionsTotal }
+                    $entry = $methods[$key]
+
+                    # Complexity is a property of the code, not of the run, so every report
+                    # that saw this method agrees on it and the maximum is simply the value.
+                    $complexity = [int] $method.GetAttribute('complexity')
+                    if ($complexity -gt $entry.Complexity) { $entry.Complexity = $complexity }
+
+                    foreach ($line in $method.SelectNodes('lines/line')) {
+                        $number = [int] $line.GetAttribute('number')
+                        $hits = [int] $line.GetAttribute('hits')
+
+                        $conditionsCovered = 0
+                        $conditionsTotal = 0
+                        $condition = $line.GetAttribute('condition-coverage')
+                        if ($condition -match '\((\d+)/(\d+)\)') {
+                            $conditionsCovered = [int] $Matches[1]
+                            $conditionsTotal = [int] $Matches[2]
+                        }
+
+                        if (-not $entry.Lines.ContainsKey($number)) {
+                            $entry.Lines[$number] = [pscustomobject]@{
+                                Hits              = $hits
+                                ConditionsCovered = $conditionsCovered
+                                ConditionsTotal   = $conditionsTotal
+                            }
+                        }
+                        else {
+                            $existing = $entry.Lines[$number]
+                            if ($hits -gt $existing.Hits) { $existing.Hits = $hits }
+                            if ($conditionsCovered -gt $existing.ConditionsCovered) { $existing.ConditionsCovered = $conditionsCovered }
+                            if ($conditionsTotal -gt $existing.ConditionsTotal) { $existing.ConditionsTotal = $conditionsTotal }
+                        }
                     }
                 }
             }
@@ -320,57 +340,89 @@ foreach ($file in $coverageFiles) {
     }
 }
 
+Add-CoberturaReports -Files $coverageFiles
+
 # --- 3. Score each method ---------------------------------------------------------
 
-$scored = New-Object System.Collections.Generic.List[object]
+function Get-ScoredMembers {
+    # Scores every merged method against the thresholds.
+    $scored = New-Object System.Collections.Generic.List[object]
 
-foreach ($entry in $methods.Values) {
-    $lineNumbers = @($entry.Lines.Keys)
-    $lineTotal = $lineNumbers.Count
-    if ($lineTotal -eq 0) { continue }
+    foreach ($entry in $methods.Values) {
+        $lineNumbers = @($entry.Lines.Keys)
+        $lineTotal = $lineNumbers.Count
+        if ($lineTotal -eq 0) { continue }
 
-    $missing = @($lineNumbers | Where-Object { $entry.Lines[$_].Hits -eq 0 } | Sort-Object)
-    $lineRate = ($lineTotal - $missing.Count) / $lineTotal
+        $missing = @($lineNumbers | Where-Object { $entry.Lines[$_].Hits -eq 0 } | Sort-Object)
+        $lineRate = ($lineTotal - $missing.Count) / $lineTotal
 
-    $branchTotal = 0
-    $branchCovered = 0
-    foreach ($number in $lineNumbers) {
-        $branchTotal += $entry.Lines[$number].ConditionsTotal
-        $branchCovered += $entry.Lines[$number].ConditionsCovered
+        $branchTotal = 0
+        $branchCovered = 0
+        foreach ($number in $lineNumbers) {
+            $branchTotal += $entry.Lines[$number].ConditionsTotal
+            $branchCovered += $entry.Lines[$number].ConditionsCovered
+        }
+        if ($branchTotal -eq 0) { $branchRate = 1.0 } else { $branchRate = $branchCovered / $branchTotal }
+
+        $complexity = $entry.Complexity
+        $crap = ($complexity * $complexity) * [math]::Pow(1 - $lineRate, 3) + $complexity
+
+        $failures = New-Object System.Collections.Generic.List[string]
+        if (($lineRate * 100) -lt $LineThreshold) { $failures.Add('line') }
+        if (($branchRate * 100) -lt $BranchThreshold) { $failures.Add('branch') }
+        if ($complexity -gt $ComplexityThreshold) { $failures.Add('complexity') }
+        if ($crap -gt $CrapThreshold) { $failures.Add('crap') }
+
+        $relativeFile = $entry.SourceFile
+        if ($relativeFile -and $relativeFile.StartsWith($repositoryRoot, [StringComparison]::OrdinalIgnoreCase)) {
+            $relativeFile = $relativeFile.Substring($repositoryRoot.Length).TrimStart('\', '/')
+        }
+
+        $scored.Add([pscustomobject]@{
+                Assembly      = $entry.Assembly
+                Class         = $entry.Class
+                Member        = $entry.Member
+                SourceFile    = $relativeFile
+                FirstLine     = ($lineNumbers | Measure-Object -Minimum).Minimum
+                LinesCovered  = $lineTotal - $missing.Count
+                LinesTotal    = $lineTotal
+                BranchCovered = $branchCovered
+                BranchTotal   = $branchTotal
+                LinePercent   = [math]::Round($lineRate * 100, 2)
+                BranchPercent = [math]::Round($branchRate * 100, 2)
+                Complexity    = $complexity
+                Crap          = [math]::Round($crap, 2)
+                MissingLines  = $missing
+                Failures      = $failures
+            })
     }
-    if ($branchTotal -eq 0) { $branchRate = 1.0 } else { $branchRate = $branchCovered / $branchTotal }
+    # The comma keeps PowerShell from unrolling the list on return.
+    return ,$scored
+}
 
-    $complexity = $entry.Complexity
-    $crap = ($complexity * $complexity) * [math]::Pow(1 - $lineRate, 3) + $complexity
+$scored = Get-ScoredMembers
 
-    $failures = New-Object System.Collections.Generic.List[string]
-    if (($lineRate * 100) -lt $LineThreshold) { $failures.Add('line') }
-    if (($branchRate * 100) -lt $BranchThreshold) { $failures.Add('branch') }
-    if ($complexity -gt $ComplexityThreshold) { $failures.Add('complexity') }
-    if ($crap -gt $CrapThreshold) { $failures.Add('crap') }
-
-    $relativeFile = $entry.SourceFile
-    if ($relativeFile -and $relativeFile.StartsWith($repositoryRoot, [StringComparison]::OrdinalIgnoreCase)) {
-        $relativeFile = $relativeFile.Substring($repositoryRoot.Length).TrimStart('\', '/')
+# A whole-solution run merges every test project's coverage into one report, and once
+# in a while one project's coverage never reaches it although its tests all passed: CI
+# run 38700283564 lost Curl.Cryptography.UnitTests' and reported 108 members uncovered
+# that the same commit's other run covered in full (BL-2269). So when a whole-solution
+# run leaves a member short of line or branch coverage, run the test projects that reach
+# its library again, one at a time, and merge their reports in. A real gap stays a gap,
+# since merging only ever adds lines some test executed.
+if (-not $SkipTestRun -and $testTargets.Count -eq 1 -and $testTargets[0] -like '*.slnx') {
+    $shortAssemblies = @($scored |
+        Where-Object { $_.Failures -contains 'line' -or $_.Failures -contains 'branch' } |
+        Select-Object -ExpandProperty Assembly -Unique)
+    if ($shortAssemblies.Count) {
+        $recheckTargets = @(Get-TestProjectsReaching -Root $repositoryRoot -Library $shortAssemblies -IncludeIntegration:$IncludeIntegration)
+        if ($recheckTargets.Count) {
+            Write-Host "Coverage short in $($shortAssemblies -join ', '); measuring the test projects that reach them again." -ForegroundColor Yellow
+            $recheckDirectory = Join-Path $ResultsDirectory 'recheck'
+            Invoke-CoverageTestRun -Targets $recheckTargets -Directory $recheckDirectory
+            Add-CoberturaReports -Files @(Get-ChildItem -Path $recheckDirectory -Filter '*.cobertura.xml' -Recurse -ErrorAction SilentlyContinue)
+            $scored = Get-ScoredMembers
+        }
     }
-
-    $scored.Add([pscustomobject]@{
-            Assembly      = $entry.Assembly
-            Class         = $entry.Class
-            Member        = $entry.Member
-            SourceFile    = $relativeFile
-            FirstLine     = ($lineNumbers | Measure-Object -Minimum).Minimum
-            LinesCovered  = $lineTotal - $missing.Count
-            LinesTotal    = $lineTotal
-            BranchCovered = $branchCovered
-            BranchTotal   = $branchTotal
-            LinePercent   = [math]::Round($lineRate * 100, 2)
-            BranchPercent = [math]::Round($branchRate * 100, 2)
-            Complexity    = $complexity
-            Crap          = [math]::Round($crap, 2)
-            MissingLines  = $missing
-            Failures      = $failures
-        })
 }
 
 # ToArray rather than @(...): Windows PowerShell 5.1 throws "Argument types do not

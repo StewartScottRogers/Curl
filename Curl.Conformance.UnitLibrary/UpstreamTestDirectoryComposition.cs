@@ -15,6 +15,12 @@ namespace Curl.Conformance;
 /// <c>%PWD</c> anywhere else is left as written.
 /// </para>
 /// <para>
+/// Upstream's <c>%FILE_PWD</c> is the tests folder as an absolute path starting with <c>/</c>
+/// (<c>/C:/…</c> on Windows), so <c>file:%FILE_PWD/%LOGDIR/x</c> has one slash before the path.
+/// <c>%FILE_PWD/%LOGDIR</c> is rewritten to <c>%FILE_PWD%LOGDIR</c>, and the runner gives
+/// <c>%FILE_PWD</c> the value <see cref="FilePwdBefore"/> returns for its log directory.
+/// </para>
+/// <para>
 /// <c>%SRCDIR/libtest/test610.pl</c> and <c>%SRCDIR/libtest/test613.pl</c> become
 /// <c>./libtest/…</c>, as <c>runtests.pl</c>'s default <c>$srcdir</c> of <c>.</c> names them: those
 /// are the two scripts the harness emulates (<see cref="UpstreamTest610Script"/>,
@@ -27,9 +33,22 @@ public static class UpstreamTestDirectoryComposition
     private static readonly (string Written, string Composed)[] Rewrites =
     [
         ("%PWD/%LOGDIR", "%LOGDIR"),
+        ("%FILE_PWD/%LOGDIR", "%FILE_PWD%LOGDIR"),
         ("%SRCDIR/libtest/test610.pl", "./libtest/test610.pl"),
         ("%SRCDIR/libtest/test613.pl", "./libtest/test613.pl"),
     ];
+
+    /// <summary>
+    /// Returns the value of <c>%FILE_PWD</c> for a log directory, so that the rewritten
+    /// <c>%FILE_PWD%LOGDIR</c> is an absolute path starting with one <c>/</c>, as upstream's
+    /// <c>%FILE_PWD/%LOGDIR</c> is: <c>/</c> before a drive-letter directory (<c>C:/…</c>), and
+    /// nothing before one that already starts with <c>/</c>, so <c>file:%FILE_PWD/%LOGDIR</c>
+    /// never becomes <c>file://tmp/…</c>, a URL naming the host <c>tmp</c> (test203, BL-2258).
+    /// </summary>
+    /// <param name="logDirectory">The case's absolute log directory, with forward slashes.</param>
+    /// <returns><c>/</c>, or the empty string when <paramref name="logDirectory"/> starts with <c>/</c>.</returns>
+    public static string FilePwdBefore(string logDirectory) =>
+        logDirectory.StartsWith('/') ? string.Empty : "/";
 
     /// <summary>Returns the test file with its directory compositions rewritten.</summary>
     /// <param name="testFile">The case's file, as vendored.</param>

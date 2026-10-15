@@ -19,7 +19,8 @@ namespace Curl.Conformance;
 /// is read for <c>method</c> (the method the SOCKS5 greeting is answered with, 0 when not given),
 /// <c>user</c> and <c>password</c> (the credentials accepted, <c>user</c> and <c>password</c> when
 /// not given) and <c>backendport</c>; wrong credentials are answered with status 1 and the
-/// connection closed.
+/// connection closed. <see cref="ConnectLog"/> holds the line socksd appends to its dump file for each
+/// SOCKS5 CONNECT, for <c>&lt;verify&gt;&lt;socks&gt;</c>.
 /// </remarks>
 /// <param name="testCase">The test case, parsed after <see cref="UpstreamTestFileExpander"/> has expanded it.</param>
 /// <param name="backend">The server CONNECT requests reach, and every connection not to <see cref="SocksPort"/>.</param>
@@ -30,17 +31,43 @@ public sealed class SocksServerConnector(UpstreamTestCase testCase, IConnector b
 
     private readonly SocksServerConfiguration configuration = SocksServerConfiguration.Read(testCase);
 
+    private readonly StringBuilder connectLog = new();
+
+    /// <summary>
+    /// What socksd writes to its dump file (<c>tests/server/socksd.c</c> at <c>curl-8_22_0</c>), one line per
+    /// SOCKS5 CONNECT: <c>atyp 1 =&gt; 12.34.56.78</c>, <c>atyp 3 =&gt; host.name</c>, or
+    /// <c>atyp 4 =&gt;</c> and each IPv6 address byte as two lowercase hex digits after a space.
+    /// </summary>
+    public string ConnectLog
+    {
+        get
+        {
+            lock (connectLog)
+            {
+                return connectLog.ToString();
+            }
+        }
+    }
+
     /// <summary>Opens an in-memory connection to the SOCKS emulation when <paramref name="target"/>'s port is <see cref="SocksPort"/>, otherwise a connection to the wrapped server.</summary>
     /// <param name="target">The host and port to connect to.</param>
     /// <param name="cancellationToken">Passed to the wrapped server.</param>
     /// <returns>The connection's result.</returns>
     public ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, CancellationToken cancellationToken) =>
         target.Port == SocksPort
-            ? ValueTask.FromResult(ConnectResult.Connected(new SocksServerConnection(configuration, backend)
+            ? ValueTask.FromResult(ConnectResult.Connected(new SocksServerConnection(configuration, backend, LogConnect)
             {
                 RemoteEndPoint = new IPEndPoint(IPAddress.Loopback, SocksPort),
             }))
             : backend.ConnectAsync(target, cancellationToken);
+
+    private void LogConnect(string line)
+    {
+        lock (connectLog)
+        {
+            connectLog.Append(line);
+        }
+    }
 }
 
 /// <summary>socksd's configuration, as a case's <c>&lt;servercmd&gt;</c> gives it.</summary>

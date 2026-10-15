@@ -310,6 +310,54 @@ public sealed class WriteOutTemplateRendererTests
     }
 
     [TestMethod]
+    public async Task RenderAsync_HeaderAllWithSeparator_JoinsEveryValue()
+    {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        // Upstream test764: curl 8.22.0 -L -w '%header{this:all:***}\n' over a 301 sending
+        // This: one, This: two and a 200 sending This: three, This: four wrote "one***two***three***four".
+        Harness harness = new(writesLineFeedAsCrLf: false);
+        harness.Variables.AllHeaders["this"] = ["one", "two", "three", "four"];
+        harness.Variables.AllHeaders["single"] = ["only"];
+
+        await harness.RenderAsync("%header{this:all:***}|%header{single:all:,}|%header{none:all:,}|%header{THIS:all:}", diagnostics);
+
+        diagnostics.Diff("harness.StandardOutputText", "one***two***three***four|only||onetwothreefour", harness.StandardOutputText);
+        Assert.AreEqual("one***two***three***four|only||onetwothreefour", harness.StandardOutputText);
+    }
+
+    [TestMethod]
+    public async Task RenderAsync_HeaderAllWithEscapedBraceInSeparator_WritesTheBrace()
+    {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        // Upstream test765: curl 8.22.0 -L -w '%header{this:all:-{\}-}\n' wrote "one-{}-two-{}-three-{}-four";
+        // a backslash before anything but } stays as it is.
+        Harness harness = new(writesLineFeedAsCrLf: false);
+        harness.Variables.AllHeaders["this"] = ["one", "two", "three", "four"];
+        harness.Variables.AllHeaders["x"] = ["a", "b"];
+
+        await harness.RenderAsync("%header{this:all:-{\\}-}|%header{x:all:\\q}|%header{x:all:\\}", diagnostics);
+
+        diagnostics.Diff("harness.StandardOutputText", "one-{}-two-{}-three-{}-four|a\\qb|%header{x:all:\\}", harness.StandardOutputText);
+        Assert.AreEqual("one-{}-two-{}-three-{}-four|a\\qb|%header{x:all:\\}", harness.StandardOutputText);
+    }
+
+    [TestMethod]
+    public async Task RenderAsync_HeaderAllFromASourceWithoutItsOwnLookup_WritesTheFirstValue()
+    {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("source", "first header only");
+        WriteOutTemplateRenderer renderer = new(new RecordingFileOpener(), false, WriteOutTimeDialect.Glibc, TimeProvider.System);
+        using MemoryStream standardOutput = new();
+        using MemoryStream standardError = new();
+
+        await renderer.RenderAsync("[%header{x:all:,}][%header{y:all:,}]", new FirstHeaderOnlySource("x", "1"), standardOutput, standardError);
+
+        string written = Encoding.UTF8.GetString(standardOutput.ToArray());
+        diagnostics.Diff("standard output", "[1][]", written);
+        Assert.AreEqual("[1][]", written);
+    }
+
+    [TestMethod]
     public async Task RenderAsync_HeaderNameOf256Bytes_IsNotLookedUp()
     {
         TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
@@ -626,6 +674,30 @@ public sealed class WriteOutTemplateRendererTests
         public string? FindFirstHeaderValue(string name)
         {
             return Headers.GetValueOrDefault(name);
+        }
+
+        public IReadOnlyList<string> FindAllHeaderValues(string name)
+        {
+            return AllHeaders.GetValueOrDefault(name) ?? [];
+        }
+
+        public Dictionary<string, string[]> AllHeaders { get; } = new(StringComparer.OrdinalIgnoreCase);
+    }
+
+    /// <summary>A source that keeps the interface's own <c>FindAllHeaderValues</c>.</summary>
+    private sealed class FirstHeaderOnlySource(string name, string value) : IWriteOutVariableSource
+    {
+        public bool TransferFailed => false;
+
+        public bool TryGetVariableText(string variableName, [NotNullWhen(true)] out string? text)
+        {
+            text = null;
+            return false;
+        }
+
+        public string? FindFirstHeaderValue(string headerName)
+        {
+            return string.Equals(headerName, name, StringComparison.OrdinalIgnoreCase) ? value : null;
         }
     }
 

@@ -57,10 +57,10 @@ namespace Curl.Protocol.Http;
 /// 8.21.0 does (BL-176 Notes).
 /// </para>
 /// <para>
-/// A 3xx response's <c>Location</c> is resolved against the request URL into
+/// A response's <c>Location</c>, whatever its status, is resolved against the request URL into
 /// <see cref="TransferReport.RedirectUrl" /> (<see cref="HttpRedirectLocation" />), with or
 /// without <c>-L</c>. Under <see cref="HttpRequestOptions.FollowRedirects" /> the body of a
-/// response that has one is read and discarded, counted in the download size as curl counts
+/// 3xx response that has one is read and discarded, counted in the download size as curl counts
 /// it, while its head and trailers are still written to the header output (BL-179 Notes).
 /// </para>
 /// <para>
@@ -131,8 +131,8 @@ namespace Curl.Protocol.Http;
 /// <para>
 /// With <see cref="HttpRequestOptions.AltSvcRoute" /> the connect target carries the alternative
 /// for the connector to dial and the request sends <c>Alt-Used</c> naming it; with
-/// <see cref="HttpRequestOptions.AltSvcStore" /> each <c>Alt-Svc</c> header of a response to an
-/// <c>https</c> URL is handed to the store as it arrives, and each alternative the store added is
+/// <see cref="HttpRequestOptions.AltSvcStore" /> each <c>Alt-Svc</c> header is handed to the store
+/// as it arrives (the store decides whether a plain <c>http</c> origin's is learned), and each alternative the store added is
 /// reported as <c>Added alt-svc: &lt;host&gt;:&lt;port&gt; over &lt;id&gt;</c> before the header
 /// line. Measured on curl 8.21.0 (BL-623 and BL-878 Notes).
 /// </para>
@@ -280,6 +280,7 @@ public sealed class HttpProtocolHandler(
         HttpInfoLineRecorder proxyAuthorizationLines = new();
         string? proxyAuthorization = await CreateFirstProxyAuthorizationAsync(proxyAuthRequest, proxyAuthorizationLines, context.CancellationToken).ConfigureAwait(false);
         (string? authorization, HttpTransferException? authorizationFailure) = await CreateFirstAuthorizationAsync(authRequest with { Events = authorizationLines }, context.CancellationToken).ConfigureAwait(false);
+        authorization ??= RepeatKeptDigestAuthorization(options, authRequest);
         bool probes = SendsFirstProbe(framing, authRequest, authorization, proxyAuthRequest, proxyAuthorization);
         HttpRequestPlan plan = new(context, options, probes ? framing.AsAuthProbe() : framing, authRequest, authorization)
         {
@@ -400,6 +401,28 @@ public sealed class HttpProtocolHandler(
         && (options.AuthSchemes & options.AuthSchemePicked) == options.AuthSchemePicked
             ? options.AuthSchemePicked
             : options.AuthSchemes;
+
+    /// <summary>
+    /// Makes the Digest value an earlier hop sent (<see cref="HttpRequestOptions.KeptDigestAuthorization" />)
+    /// again for this hop's request, its nonce counted on by
+    /// <see cref="IHttpAuthenticator.RepeatAuthorization" />, as curl 8.22.0 sends <c>nc=00000002</c>
+    /// to a same-host redirect after answering a Digest challenge (upstream test1286, BL-2252);
+    /// <see langword="null" /> when no value was kept, there is no credential or Digest is not allowed.
+    /// </summary>
+    private string? RepeatKeptDigestAuthorization(HttpRequestOptions options, HttpAuthRequest request) =>
+        options.KeptDigestAuthorization is { } kept
+        && request.Credential is not null
+        && (request.AllowedSchemes & HttpAuthSchemes.Digest) != 0
+            ? Authenticator.RepeatAuthorization(request, kept)
+            : null;
+
+    /// <summary>
+    /// Gives the <c>Authorization</c> value <paramref name="plan" /> sends when it is a Digest
+    /// one, the report's <see cref="TransferReport.DigestAuthorizationSent" /> (BL-2252);
+    /// <see langword="null" /> otherwise.
+    /// </summary>
+    private static string? DigestAuthorizationSentBy(HttpRequestPlan plan) =>
+        SchemeOfAuthorization(plan.Authorization) == HttpAuthSchemes.Digest ? plan.Authorization : null;
 
     /// <summary>
     /// Gives the scheme a server picked for the request <paramref name="plan" /> sends: the
@@ -1212,7 +1235,7 @@ public sealed class HttpProtocolHandler(
             headReader.ReleaseDeferredHeaders();
             HttpFailMode fail = FailModeOf(plan, retry, actedOn);
             ThrowIfFailing(fail, HttpFailMode.Fail, actedOn);
-            bool discardsBody = DiscardsBody(options, retry, exchange.RedirectUrl);
+            bool discardsBody = DiscardsBody(options, retry, actedOn, exchange.RedirectUrl);
             ReportAuthRetryRewind(plan, actedOn, retry);
             ReportIgnoredBody(plan, actedOn, discardsBody && !upload.CutShort);
             ReportUploadStopped(context.Events, upload, retry, discardsBody);
@@ -1331,6 +1354,7 @@ public sealed class HttpProtocolHandler(
             ResponseConnection = timedConnection,
             RedirectCount = plan.RedirectsFollowed - plan.Options.RedirectsFollowed,
             AuthSchemePicked = AuthSchemePickedBy(plan),
+            DigestAuthorizationSent = DigestAuthorizationSentBy(plan),
         };
 
     /// <summary>
@@ -1421,10 +1445,11 @@ public sealed class HttpProtocolHandler(
 
     /// <summary>
     /// Tells whether the response's body is read and discarded rather than delivered: when the
-    /// handler answers it with <paramref name="retry" />, or follows its redirect.
+    /// handler answers it with <paramref name="retry" />, or follows its redirect - a 3xx with a
+    /// target; a <c>Location</c> on any other status is reported but not followed (BL-2212).
     /// </summary>
-    private static bool DiscardsBody(HttpRequestOptions options, HttpRequestPlan? retry, string? redirectUrl) =>
-        retry is not null || (options.FollowRedirects && redirectUrl is not null);
+    private static bool DiscardsBody(HttpRequestOptions options, HttpRequestPlan? retry, HttpResponseHead head, string? redirectUrl) =>
+        retry is not null || (options.FollowRedirects && redirectUrl is not null && head.StatusLine.StatusCode is >= 300 and < 400);
 
     /// <summary>
     /// Marks an HTTP/3 request stream's transfer done with its session and writes its
@@ -2303,20 +2328,20 @@ public sealed class HttpProtocolHandler(
             : storedFromResponse;
 
     /// <summary>
-    /// Hands <paramref name="header" />, when it is an <c>Alt-Svc</c> header of a response to an
-    /// <c>https</c> URL and <paramref name="store" /> is set, to the store with the transfer's
+    /// Hands <paramref name="header" />, when it is an <c>Alt-Svc</c> header and
+    /// <paramref name="store" /> is set, to the store with the transfer's
     /// URL as the origin, and reports curl 8.21.0's <c>Added alt-svc: &lt;host&gt;:&lt;port&gt; over
     /// &lt;id&gt;</c> for each alternative it added, before the header line (measured, BL-623
     /// Notes), and for each it skipped the <c>lib/altsvc.c</c> line its reason names, in header
-    /// order (measured, ADR-0409). curl learns no
-    /// alternative over plain <c>http</c>. The store is told
+    /// order (measured, ADR-0409). The store decides whether a plain <c>http</c> origin's header is
+    /// learned: curl's release build learns none, its debug build does under <c>CURL_ALTSVC_HTTP</c>
+    /// (ADR-0497). The store is told
     /// <paramref name="responseVersion" />, the version the response came over, as curl 8.21.0
     /// passes <c>k->httpversion</c> to <c>Curl_altsvc_parse</c> (BL-947).
     /// </summary>
     private static void StoreAltSvc(ITransferContext context, IAltSvcStore? store, Version responseVersion, HttpResponseHeader header)
     {
         if (store is null
-            || context.Url.Scheme != "https"
             || !string.Equals(header.Name, "Alt-Svc", StringComparison.OrdinalIgnoreCase))
         {
             return;
@@ -2344,16 +2369,16 @@ public sealed class HttpProtocolHandler(
         };
 
     /// <summary>
-    /// Hands <paramref name="header" />, when it is a <c>Strict-Transport-Security</c> header of a
-    /// response to an <c>https</c> URL and <paramref name="store" /> is set, to the store with the
-    /// transfer's URL as the origin, and reports curl 8.21.0's <c>Illegal STS header skipped</c>
-    /// before the header line when the store refuses it (measured, ADR-0409). curl learns no HSTS
-    /// over plain <c>http</c>.
+    /// Hands <paramref name="header" />, when it is a <c>Strict-Transport-Security</c> header and
+    /// <paramref name="store" /> is set, to the store with the transfer's URL as the origin, and
+    /// reports curl 8.21.0's <c>Illegal STS header skipped</c> before the header line when the store
+    /// refuses it (measured, ADR-0409). The store decides whether an <c>http</c> origin's header is
+    /// learned: curl's release build learns none, its debug build does under <c>CURL_HSTS_HTTP</c>
+    /// (ADR-0494).
     /// </summary>
     private static void StoreHsts(ITransferContext context, IHstsStore? store, HttpResponseHeader header)
     {
         if (store is not null
-            && context.Url.Scheme == "https"
             && string.Equals(header.Name, "Strict-Transport-Security", StringComparison.OrdinalIgnoreCase)
             && !store.StoreFromResponse(context.Url, header.Value, context.TimeProvider.GetUtcNow()))
         {
@@ -2907,6 +2932,12 @@ public sealed class HttpProtocolHandler(
         internal HttpAuthSchemes AuthSchemePicked { get; init; }
 
         /// <summary>
+        /// Gets the Digest value the exchange's request was sent with, the report's
+        /// <see cref="TransferReport.DigestAuthorizationSent" /> (BL-2252).
+        /// </summary>
+        internal string? DigestAuthorizationSent { get; init; }
+
+        /// <summary>
         /// Gets or sets the moment the first request byte was about to be sent,
         /// <see langword="null" /> until then.
         /// </summary>
@@ -2943,6 +2974,7 @@ public sealed class HttpProtocolHandler(
                 RedirectCount = RedirectCount,
                 ResponseHeadersStored = body.HeadersStored,
                 AuthSchemePicked = AuthSchemePicked,
+                DigestAuthorizationSent = DigestAuthorizationSent,
                 ProxyConnectResponseCode = connect.ProxyConnectResponseCode,
                 UsedProxy = UsedProxy,
                 LocalEndPoint = connect.LocalEndPoint ?? connection.LocalEndPoint as IPEndPoint,

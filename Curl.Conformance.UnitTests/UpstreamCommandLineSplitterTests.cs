@@ -63,6 +63,44 @@ public sealed class UpstreamCommandLineSplitterTests
     }
 
     [TestMethod]
+    [DataRow("u --etag-save - >> log/out321", new[] { "u", "--etag-save", "-" }, "log/out321", true)]
+    [DataRow("u > 'log/a b'", new[] { "u" }, "log/a b", false)]
+    [DataRow("u >log/a -v", new[] { "u", "-v" }, "log/a", false)]
+    [DataRow("u '>' x", new[] { "u", ">", "x" }, null, false)]
+    public void Split_ReadsAStandardOutputRedirectAsTheShellDoes(string command, string[] arguments, string? file, bool appends)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("command", command);
+
+        UpstreamCommandLine line = UpstreamCommandLineSplitter.Split(command);
+
+        diagnostics.Act("arguments", string.Join(" | ", line.Arguments));
+        diagnostics.Act("file", line.StandardOutputFile);
+        diagnostics.Assert("file", file, line.StandardOutputFile);
+        CollectionAssert.AreEqual(arguments, line.Arguments.ToArray());
+        Assert.AreEqual(file, line.StandardOutputFile);
+        Assert.AreEqual(appends, line.AppendsStandardOutput);
+        Assert.IsNull(line.UnsupportedShellSyntax);
+    }
+
+    [TestMethod]
+    [DataRow("u 2>log/a")]
+    [DataRow("u >")]
+    [DataRow("u >>> log/a")]
+    [DataRow("u > > log/a")]
+    public void Split_ReportsARedirectItDoesNotCarryOut(string command)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("command", command);
+
+        UpstreamCommandLine line = UpstreamCommandLineSplitter.Split(command);
+
+        diagnostics.Act("unsupported shell syntax", line.UnsupportedShellSyntax);
+        diagnostics.Assert("unsupported shell syntax", '>', line.UnsupportedShellSyntax);
+        Assert.AreEqual('>', line.UnsupportedShellSyntax);
+    }
+
+    [TestMethod]
     public void Split_DecodesEachArgumentAsUtf8()
     {
         var diagnostics = TestDiagnostics.For(TestContext);

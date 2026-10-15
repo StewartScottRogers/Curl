@@ -49,6 +49,20 @@ internal sealed class FtpKeptConnection(IConnection connection, string loginKey,
     public bool QuitsOnShutDown { get; set; }
 
     /// <summary>
+    /// Gets or sets whether the server refused <c>EPSV</c> on this connection, so later transfers
+    /// on it send <c>PASV</c> straight away, as curl 8.22.0 clears the connection's
+    /// <c>ftp_use_epsv</c> (BL-2236).
+    /// </summary>
+    public bool EpsvRefused { get; set; }
+
+    /// <summary>
+    /// Gets or sets whether the server refused <c>EPRT</c> on this connection, so later transfers
+    /// on it send <c>PORT</c> straight away, as curl 8.22.0 clears the connection's
+    /// <c>ftp_use_eprt</c> (BL-2236).
+    /// </summary>
+    public bool EprtRefused { get; set; }
+
+    /// <summary>
     /// The login a transfer needs, which a kept connection must have been made for, as curl
     /// 8.21.0 reuses an FTP connection only for the same user, password, account,
     /// alternative-to-user command and TLS level.

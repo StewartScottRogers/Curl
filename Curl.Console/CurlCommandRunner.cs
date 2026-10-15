@@ -84,6 +84,22 @@ namespace Curl.Console;
 /// <c>time_*</c> variables are measured with, and the clock <c>%time{format}</c> reads;
 /// <see cref="TimeProvider.System" /> when not given.
 /// </param>
+/// <param name="hstsClock">
+/// The clock the run's HSTS cache counts expiries on and a <c>Strict-Transport-Security</c>
+/// header's <c>max-age</c> counts from, in place of <paramref name="timeProvider" />: the
+/// harness's stand-in for curl's debug build under <c>CURL_TIME</c> (ADR-0493, BL-2234);
+/// <see langword="null" />, the default, uses <paramref name="timeProvider" />.
+/// </param>
+/// <param name="hstsLearnsOverHttp">
+/// Whether the run's HSTS cache learns a <c>Strict-Transport-Security</c> header received over plain
+/// <c>http</c> too: the harness's stand-in for curl's debug build under <c>CURL_HSTS_HTTP</c>
+/// (ADR-0494, BL-2250); off by default, as in curl's release build.
+/// </param>
+/// <param name="altSvcUsesOverHttp">
+/// Whether each <c>--alt-svc</c> cache learns <c>Alt-Svc</c> headers received over plain <c>http</c>
+/// and looks up a plain <c>http</c> origin's alternatives too: the harness's stand-in for curl's debug
+/// build under <c>CURL_ALTSVC_HTTP</c> (ADR-0497, BL-2263); off by default, as in curl's release build.
+/// </param>
 /// <param name="writeOutTimeDialect">
 /// The C runtime whose <c>strftime</c> a <c>-w</c> <c>%time{format}</c> follows; the composition
 /// passes the platform's (<see cref="CurlComposition.WriteOutTimeDialectFor" />), and
@@ -266,7 +282,10 @@ internal sealed class CurlCommandRunner(
     TlsSessionCache? tlsSessions = null,
     IExtendedAttributeWriter? extendedAttributeWriter = null,
     LateBoundDiagnosticLog? lateBoundDiagnosticLog = null,
-    bool? parsesAsWindowsBuild = null)
+    bool? parsesAsWindowsBuild = null,
+    TimeProvider? hstsClock = null,
+    bool hstsLearnsOverHttp = false,
+    bool altSvcUsesOverHttp = false)
 {
     /// <summary>
     /// What curl 8.21.0 prints before its URL parser's reason when it rejects a transfer
@@ -637,9 +656,10 @@ internal sealed class CurlCommandRunner(
     /// <c>--hsts</c>, as curl 8.21.0's tool shares one through its share handle: an <c>https</c>
     /// response's <c>Strict-Transport-Security</c> switches a later <c>http</c> URL or redirect to the
     /// same host to <c>https</c> (measured 2026-09-29, BL-621 Notes; ADR-0218). Made on first use, on
-    /// the run's clock, writing to the run's diagnostic log (BL-921).
+    /// the run's clock, writing to the run's diagnostic log (BL-921); it learns over plain <c>http</c>
+    /// too only when the runner was made with <c>hstsLearnsOverHttp</c> (ADR-0494).
     /// </summary>
-    private HstsTransferPolicy Hsts => LazyInitializer.EnsureInitialized(ref hsts, () => new HstsTransferPolicy(timeProvider, diagnosticLog));
+    private HstsTransferPolicy Hsts => LazyInitializer.EnsureInitialized(ref hsts, () => new HstsTransferPolicy(hstsClock ?? timeProvider, diagnosticLog, hstsLearnsOverHttp));
 
     /// <summary>The run's HSTS cache once <see cref="Hsts" /> has made it.</summary>
     private HstsTransferPolicy? hsts;
@@ -812,7 +832,7 @@ internal sealed class CurlCommandRunner(
 
         diagnosticLog = runDiagnosticLog.Log;
         transferContextFactory.DiagnosticLog = diagnosticLog;
-        transferContextFactory.HstsStore = Hsts;
+        transferContextFactory.HstsStore = hstsClock is null ? Hsts : new ClockOverridingHstsStore(Hsts, hstsClock);
         lateBoundDiagnosticLog?.Bind(diagnosticLog);
         LogCommandLine(parsed, filesTriedWhileParsing);
     }
@@ -2862,7 +2882,7 @@ internal sealed class CurlCommandRunner(
         if (options.AltSvcFile is { } file && IsHttpUrl(QueryUrl.Append(transferUrl, options)))
         {
             Running.AltSvc = await AltSvcTransferCache
-                .OpenAsync(file, options.HttpVersion, options.ConnectToEntries, fileSystem, timeProvider, diagnosticLog)
+                .OpenAsync(file, options.HttpVersion, options.ConnectToEntries, fileSystem, timeProvider, diagnosticLog, altSvcUsesOverHttp)
                 .ConfigureAwait(false);
         }
     }

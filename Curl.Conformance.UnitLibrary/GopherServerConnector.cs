@@ -21,6 +21,12 @@ public sealed class GopherServerConnector(UpstreamTestCase testCase, IConnector 
     /// <summary>The port of upstream's Gopher server, <c>%GOPHERPORT</c>.</summary>
     public const int GopherPort = 9008;
 
+    /// <summary>
+    /// The port of upstream's <c>gopher-ipv6</c> server, <c>%GOPHER6PORT</c>: the same emulation as <see cref="GopherPort"/>,
+    /// reached on <c>[::1]</c> in memory. servers.pm picks a free port; this one no other stand-in uses.
+    /// </summary>
+    public const int Gopher6Port = 9012;
+
     private readonly SwsServerRecording recording = new();
 
     /// <summary>Every selector byte a client wrote, as sws's protocol dump holds them.</summary>
@@ -29,15 +35,19 @@ public sealed class GopherServerConnector(UpstreamTestCase testCase, IConnector 
     /// <summary>The writes of <see cref="ReceivedBytes"/>, each numbered in the order of all servers' writes.</summary>
     internal IReadOnlyList<UpstreamProtocolDumpEntry> ReceivedDump => recording.Dump;
 
-    /// <summary>Opens an in-memory connection to the Gopher emulation when <paramref name="target"/>'s port is <see cref="GopherPort"/>, otherwise a connection to the wrapped server.</summary>
+    /// <summary>
+    /// Opens an in-memory connection to the Gopher emulation when <paramref name="target"/>'s port is <see cref="GopherPort"/>
+    /// or <see cref="Gopher6Port"/>, its remote end point ::1 when the target is an IPv6 address and 127.0.0.1 otherwise;
+    /// otherwise a connection to the wrapped server.
+    /// </summary>
     /// <param name="target">The host and port to connect to.</param>
     /// <param name="cancellationToken">Passed to the wrapped server.</param>
     /// <returns>The connection's result.</returns>
     public ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, CancellationToken cancellationToken) =>
-        target.Port == GopherPort
+        target.Port is GopherPort or Gopher6Port
             ? ValueTask.FromResult(ConnectResult.Connected(new GopherServerConnection(testCase, recording)
             {
-                RemoteEndPoint = new IPEndPoint(IPAddress.Loopback, GopherPort),
+                RemoteEndPoint = new IPEndPoint(LoopbackAddress.For(target.Host), target.Port),
             }))
             : backend.ConnectAsync(target, cancellationToken);
 }

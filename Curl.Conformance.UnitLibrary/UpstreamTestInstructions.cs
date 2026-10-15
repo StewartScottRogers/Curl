@@ -20,11 +20,6 @@ internal static class UpstreamTestInstructions
         ("%SP", " "), ("%TAB", "\t"), ("%CR", "\r"), ("%LT", "<"), ("%GT", ">"), ("%AMP", "&"),
     ];
 
-    private static readonly (string Marker, string Name, StringComparison Comparison)[] UnsupportedMarkers =
-    [
-        ("%days[", "%days", StringComparison.OrdinalIgnoreCase),
-    ];
-
     /// <summary>Replaces <c>%SP</c>, <c>%TAB</c>, <c>%CR</c>, <c>%LT</c>, <c>%GT</c> and <c>%AMP</c>, in that order.</summary>
     /// <param name="line">The line.</param>
     /// <returns>The line with every macro replaced.</returns>
@@ -39,37 +34,37 @@ internal static class UpstreamTestInstructions
 
     /// <summary>
     /// Replaces every <c>%b64[…]b64%</c>, then every <c>%hex[…]hex%</c>, then every <c>%repeat[N x …]%</c>,
-    /// except that a repeat which would produce more than <see cref="MaximumRepeatLength"/> characters
-    /// is left as written and <c>%repeat</c> is added to <paramref name="unsupported"/>, once.
+    /// then every <c>%days[N]</c> (<see cref="ReplaceDays"/>), except that a repeat which would produce
+    /// more than <see cref="MaximumRepeatLength"/> characters is left as written and <c>%repeat</c> is
+    /// added to <paramref name="unsupported"/>, once.
     /// </summary>
     /// <param name="line">The line, one character per byte.</param>
     /// <param name="unsupported">The names of the instructions not carried out so far.</param>
+    /// <param name="clock">Gives <c>%days</c> its now.</param>
     /// <returns>The line with every instruction replaced.</returns>
-    public static string Apply(string line, List<string> unsupported)
+    public static string Apply(string line, List<string> unsupported, TimeProvider clock)
     {
         string text = ReplaceEach(line, "%b64[", "]b64%", content => Convert.ToBase64String(Encoding.Latin1.GetBytes(DecodePercentPairs(content))));
         text = ReplaceEach(text, "%hex[", "]hex%", DecodePercentPairs);
-        return ReplaceRepeats(text, unsupported);
+        return ReplaceDays(ReplaceRepeats(text, unsupported), clock.GetUtcNow());
     }
 
     /// <summary>
-    /// Adds the name of every instruction in the line that this harness does not carry out
-    /// (<c>%days</c>) to the list, once each, matching case-insensitively as upstream's expressions
-    /// do. <c>%include</c> and <c>%includetext</c> are <see cref="UpstreamTestFileInclusions"/>'s,
-    /// <c>%sha256b64file</c> and <c>%strippemfile</c> <see cref="UpstreamTestFileContentInstructions"/>'s.
+    /// Replaces every <c>%days[N]</c> as <c>testutil.pm</c>'s <c>subbase64</c> does at <c>curl-8_22_0</c>:
+    /// with <c>%alternatives[D,D2]</c>, where D is the epoch second N days and 30 seconds after
+    /// <paramref name="now"/>, rounded down to a whole minute, and D2 is D plus 60, the two values
+    /// curl's 400-day cookie cap can write in the minute around the run. N that is not an integer counts as 0.
     /// </summary>
-    /// <param name="line">The expanded line.</param>
-    /// <param name="unsupported">The names found so far.</param>
-    public static void AddUnsupported(string line, List<string> unsupported)
-    {
-        foreach ((string marker, string name, StringComparison comparison) in UnsupportedMarkers)
+    /// <param name="line">The line.</param>
+    /// <param name="now">The run's now.</param>
+    /// <returns>The line with every <c>%days[N]</c> replaced.</returns>
+    public static string ReplaceDays(string line, DateTimeOffset now) =>
+        ReplaceEach(line, "%days[", "]", content =>
         {
-            if (line.Contains(marker, comparison))
-            {
-                AddOnce(unsupported, name);
-            }
-        }
-    }
+            long days = long.TryParse(content, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out long parsed) ? parsed : 0;
+            long first = (days * 24 * 3600 + now.ToUnixTimeSeconds() + 30) / 60 * 60;
+            return string.Create(CultureInfo.InvariantCulture, $"%alternatives[{first},{first + 60}]");
+        });
 
     private static void AddOnce(List<string> names, string name)
     {

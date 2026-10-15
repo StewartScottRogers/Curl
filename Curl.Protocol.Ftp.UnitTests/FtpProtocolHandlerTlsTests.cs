@@ -281,12 +281,17 @@ public sealed class FtpProtocolHandlerTlsTests
     public async Task ExecuteAsync_FtpSslControl_SendsProtCAndLeavesTheDataInPlaintext()
     {
         var diagnostics = TestDiagnostics.For(TestContext);
-        // curl -k --ftp-ssl-control ftp://127.0.0.1:18437/a.txt
+        // curl -k --ftp-ssl-control ftp://127.0.0.1:18437/a.txt. The command line also makes
+        // SslLevel Required, which must not turn PROT C into PROT P (upstream test407, BL-2237).
         var securedControl = Scripted(LoggedIn + "200 PBSZ=0\r\n200 Protection level set to C\r\n" + Pwd + Retrieved);
         TlsRun run = await RunAsync(diagnostics,
             "ftp://127.0.0.1:18437/a.txt",
             Greeting + AuthAccepted,
-            context => context.FtpSslControlOnly = true,
+            context =>
+            {
+                context.SslLevel = TransportSecurityLevel.Required;
+                context.FtpSslControlOnly = true;
+            },
             [ConnectResult.Connected(securedControl)],
             "hello");
 
@@ -316,19 +321,16 @@ public sealed class FtpProtocolHandlerTlsTests
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_SslReqdAndFtpSslControl_SendsProtP()
+    public async Task ExecuteAsync_SslReqd_SendsProtP()
     {
         var diagnostics = TestDiagnostics.For(TestContext);
-        // curl -k --ssl-reqd --ftp-ssl-control ftp://127.0.0.1:18437/a.txt: --ssl-reqd outranks it.
+        // curl -k --ssl-reqd --ftp-ssl-control ftp://127.0.0.1:18437/a.txt: --ssl-reqd outranks
+        // it, so the context carries SslLevel Required without FtpSslControlOnly.
         var securedControl = Scripted(LoggedIn + Protected + Pwd + Retrieved);
         TlsRun run = await RunAsync(diagnostics,
             "ftp://127.0.0.1:18437/a.txt",
             Greeting + AuthAccepted,
-            context =>
-            {
-                context.SslLevel = TransportSecurityLevel.Required;
-                context.FtpSslControlOnly = true;
-            },
+            context => context.SslLevel = TransportSecurityLevel.Required,
             ConnectResult.Connected(securedControl),
             ConnectResult.Connected(Scripted("hello")));
 

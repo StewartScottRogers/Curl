@@ -18,6 +18,9 @@ public sealed class UpstreamTestDirectoryCompositionTests
     [DataRow("--output-dir %PWD/not-there", "--output-dir %PWD/not-there")]
     [DataRow("%SRCDIR/data/x %SRCDIR/libtest/test1013.pl", "%SRCDIR/data/x %SRCDIR/libtest/test1013.pl")]
     [DataRow("%PWD%LOGDIR", "%PWD%LOGDIR")]
+    [DataRow("file:%FILE_PWD/%LOGDIR/test%TESTNUMBER.txt", "file:%FILE_PWD%LOGDIR/test%TESTNUMBER.txt")]
+    [DataRow("file://localhost/%FILE_PWD/%LOGDIR/x", "file://localhost/%FILE_PWD%LOGDIR/x")]
+    [DataRow("file://%FILE_PWD/", "file://%FILE_PWD/")]
     public void Rewrite_Line_ComposesOnlyWhatRuntestsWorkingDirectoryNames(string written, string expected)
     {
         var diagnostics = TestDiagnostics.For(TestContext);
@@ -41,6 +44,22 @@ public sealed class UpstreamTestDirectoryCompositionTests
 
         diagnostics.Assert("rewritten", expected, rewritten);
         Assert.AreEqual(expected, rewritten);
+    }
+
+    [TestMethod]
+    [DataRow("/tmp/log/test203-1", "", "file:/tmp/log/test203-1/test203.txt")]
+    [DataRow("C:/work/log/test203-1", "/", "file:/C:/work/log/test203-1/test203.txt")]
+    public void FilePwdBefore_LogDirectory_MakesTheSingleSlashFileUrlOfTest203NameTheFile(string logDirectory, string expected, string expectedUrl)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("logDirectory", logDirectory);
+
+        string filePwd = UpstreamTestDirectoryComposition.FilePwdBefore(logDirectory);
+        string url = $"file:{filePwd}{logDirectory}/test203.txt";
+
+        diagnostics.Assert("filePwd", expected, filePwd);
+        Assert.AreEqual(expected, filePwd);
+        Assert.AreEqual(expectedUrl, url);
     }
 
     [TestMethod]

@@ -4,7 +4,8 @@ namespace Curl.Output;
 
 /// <summary>
 /// Renders a <c>-w</c> / <c>--write-out</c> template after a transfer, as curl 8.21.0's
-/// <c>tool_writeout.c</c> does: <c>%{name}</c> variables, <c>%header{name}</c>,
+/// <c>tool_writeout.c</c> does: <c>%{name}</c> variables, <c>%header{name}</c> and
+/// <c>%header{name:all:separator}</c> (every value joined, <c>\}</c> a literal brace),
 /// <c>%output{file}</c> and <c>%output{&gt;&gt;file}</c>, <c>%{stdout}</c> and
 /// <c>%{stderr}</c>, the <c>\n</c>, <c>\r</c> and <c>\t</c> escapes, and <c>%%</c>.
 /// </summary>
@@ -114,6 +115,7 @@ public sealed class WriteOutTemplateRenderer(
         private const string OutputOpening = "%output{";
         private const string TimeOpening = "%time{";
         private const string AppendMarker = ">>";
+        private const string AllHeaderValuesMarker = ":all:";
 
         private readonly StringBuilder pending = new();
         private Stream target = Stream.Null;
@@ -285,16 +287,48 @@ public sealed class WriteOutTemplateRenderer(
         private void RenderHeader()
         {
             position += HeaderOpening.Length;
-            if (!TryReadToClosingBrace(out string name))
+            if (!TryReadToUnescapedClosingBrace(out string content))
             {
                 pending.Append(HeaderOpening);
                 return;
             }
 
-            if (Encoding.UTF8.GetByteCount(name) < HeaderNameBufferBytes)
+            if (Encoding.UTF8.GetByteCount(content) >= HeaderNameBufferBytes)
             {
-                pending.Append(variables.FindFirstHeaderValue(name));
+                return;
             }
+
+            int allMarker = content.IndexOf(AllHeaderValuesMarker, StringComparison.Ordinal);
+            if (allMarker < 0)
+            {
+                pending.Append(variables.FindFirstHeaderValue(content));
+                return;
+            }
+
+            string separator = content[(allMarker + AllHeaderValuesMarker.Length)..].Replace("\\}", "}", StringComparison.Ordinal);
+            pending.AppendJoin(separator, variables.FindAllHeaderValues(content[..allMarker]));
+        }
+
+        /// <summary>
+        /// Reads to the first <c>}</c> not escaped as <c>\}</c>, as curl's <c>%header{</c> does.
+        /// </summary>
+        private bool TryReadToUnescapedClosingBrace(out string content)
+        {
+            int closingBrace = template.IndexOf('}', position);
+            while (closingBrace > position && template[closingBrace - 1] == '\\')
+            {
+                closingBrace = template.IndexOf('}', closingBrace + 1);
+            }
+
+            if (closingBrace < 0)
+            {
+                content = string.Empty;
+                return false;
+            }
+
+            content = template[position..closingBrace];
+            position = closingBrace + 1;
+            return true;
         }
 
         private async Task RenderOutputAsync()

@@ -46,15 +46,29 @@ public sealed partial class HttpProtocolHandlerTests
             events.Events[(header - 2)..header]);
     }
 
+    /// <summary>
+    /// The store, not the handler, decides whether an <c>http</c> origin's header is learned, as
+    /// curl's debug build learns it under <c>CURL_ALTSVC_HTTP</c> (ADR-0497).
+    /// </summary>
     [TestMethod]
-    public async Task ExecuteAsync_HttpAltSvc_WritesNoSkipLine()
+    public async Task ExecuteAsync_HttpAltSvcTheStoreLearnsNothingFrom_HandsItToTheStoreAndWritesNoLine()
+    {
+        ScriptedAltSvcStore store = new(Array.Empty<AltSvcHeaderOutcome>());
+
+        RecordingTransferEvents events = await SkipExchangeAsync(SkipHttpUrl, "Alt-Svc: h2=\":abc\"", new HttpRequestOptions { AltSvcStore = store });
+
+        Assert.HasCount(1, store.Responses);
+        Assert.IsFalse(events.Events.Any(line => line.Contains("alt-svc", StringComparison.Ordinal)));
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_HttpAltSvcTheStoreSkips_ReportsTheReasonJustBeforeTheHeaderLine()
     {
         ScriptedAltSvcStore store = new([AltSvcHeaderOutcome.Skipping(AltSvcSkipReason.UnknownPortNumber)]);
 
         RecordingTransferEvents events = await SkipExchangeAsync(SkipHttpUrl, "Alt-Svc: h2=\":abc\"", new HttpRequestOptions { AltSvcStore = store });
 
-        Assert.IsEmpty(store.Responses);
-        Assert.IsFalse(events.Events.Any(line => line.Contains("alt-svc", StringComparison.Ordinal)));
+        AssertJustBefore(events, "* Unknown alt-svc port number, ignoring.", "< Alt-Svc: h2=\":abc\"\r\n");
     }
 
     [TestMethod]
@@ -83,14 +97,29 @@ public sealed partial class HttpProtocolHandlerTests
         Assert.IsFalse(events.Events.Any(line => line.Contains("Illegal STS", StringComparison.Ordinal)));
     }
 
+    /// <summary>
+    /// The store, not the handler, decides whether an <c>http</c> origin's header is learned, as
+    /// curl's debug build learns it under <c>CURL_HSTS_HTTP</c> (ADR-0494).
+    /// </summary>
     [TestMethod]
-    public async Task ExecuteAsync_HttpSts_DoesNotCallTheStore()
+    public async Task ExecuteAsync_HttpStsTheStoreRefuses_HandsItToTheStoreAndReportsIllegalStsHeaderSkipped()
     {
         ScriptedHstsStore store = new(legal: false);
 
         RecordingTransferEvents events = await SkipExchangeAsync(SkipHttpUrl, "Strict-Transport-Security: max-age=abc", new HttpRequestOptions { HstsStore = store });
 
-        Assert.IsEmpty(store.Responses);
+        AssertJustBefore(events, "* Illegal STS header skipped", "< Strict-Transport-Security: max-age=abc\r\n");
+        Assert.AreEqual((CurlUrl.Parse(SkipHttpUrl), "max-age=abc", CookieTime), store.Responses.Single());
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_HttpStsTheStoreTakes_HandsItToTheStoreAndWritesNoLine()
+    {
+        ScriptedHstsStore store = new(legal: true);
+
+        RecordingTransferEvents events = await SkipExchangeAsync(SkipHttpUrl, "Strict-Transport-Security: max-age=60", new HttpRequestOptions { HstsStore = store });
+
+        Assert.AreEqual((CurlUrl.Parse(SkipHttpUrl), "max-age=60", CookieTime), store.Responses.Single());
         Assert.IsFalse(events.Events.Any(line => line.Contains("Illegal STS", StringComparison.Ordinal)));
     }
 

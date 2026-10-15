@@ -137,19 +137,12 @@ public sealed class SwsHttpServerConnector : IConnector
         abandonment.ThrowIfAbandoned();
         return ValueTask.FromResult(ConnectResult.Connected(new SwsHttpServerConnection(replySelector, serverCommands, waitAfterReply, target.Port == ProxyPort ? proxyRecording : recording, timeProvider, abandonment)
         {
-            LocalEndPoint = new IPEndPoint(LoopbackFor(target.Host), FirstLocalPort + (int)(((uint)Interlocked.Increment(ref connectionsOpened) - 1) & (LocalPortCount - 1))),
-            RemoteEndPoint = new IPEndPoint(LoopbackFor(target.Host), target.Port),
+            LocalEndPoint = new IPEndPoint(LoopbackAddress.For(target.Host), FirstLocalPort + (int)(((uint)Interlocked.Increment(ref connectionsOpened) - 1) & (LocalPortCount - 1))),
+            RemoteEndPoint = new IPEndPoint(LoopbackAddress.For(target.Host), target.Port),
             TunnelRecording = target.Port == ProxyPort ? recording : null,
             TunnelServerForPort = TunnelServerForPort,
         }));
     }
-
-    // A connection to ::1 has ::1 at both ends, as one to upstream's http-ipv6 server does, so a
-    // HAProxy PROXY line reads TCP6 (test1456).
-    private static IPAddress LoopbackFor(string host) =>
-        IPAddress.TryParse(host.Trim('[', ']'), out IPAddress? address) && address.AddressFamily == AddressFamily.InterNetworkV6
-            ? IPAddress.IPv6Loopback
-            : IPAddress.Loopback;
 
     private static ReadOnlySpan<byte> ReplyPart(UpstreamTestCase testCase, string name) =>
         (testCase.Find("reply", name)?.Content ?? ReadOnlyMemory<byte>.Empty).Span;

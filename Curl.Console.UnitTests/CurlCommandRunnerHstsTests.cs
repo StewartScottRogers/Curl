@@ -115,6 +115,21 @@ public sealed class CurlCommandRunnerHstsTests
     }
 
     [TestMethod]
+    public async Task RunAsync_HeaderOverPlainHttpWhenLearningOverHttp_SwitchesTheNextUrlAndSavesTheHost()
+    {
+        ScriptedConnector server = Serve(MaxAge60, string.Empty);
+
+        int exitCode = await RunAsync(server, ["-s", "--hsts", CacheFile, "http://localhost:18443/", "http://localhost:18443/"], hstsLearnsOverHttp: true);
+
+        Diagnostics.Assert("pool schemes", "http https", string.Join(" ", server.Targets.Select(target => target.PoolScheme)));
+        Diagnostics.Diff("saved cache file", Lf(CacheFileText("localhost \"20260929 14:23:10\"")), Lf(SavedCacheFile()));
+
+        Assert.AreEqual(0, exitCode);
+        CollectionAssert.AreEqual(new[] { "http", "https" }, server.Targets.Select(target => target.PoolScheme).ToArray());
+        Assert.AreEqual(CacheFileText("localhost \"20260929 14:23:10\""), SavedCacheFile());
+    }
+
+    [TestMethod]
     public async Task RunAsync_MissingFileAndAnHttpsHeader_CreatesTheFileWithTheLearnedHost()
     {
         files.UnreadablePaths.Add(CacheFile);
@@ -302,10 +317,11 @@ public sealed class CurlCommandRunnerHstsTests
         new((extraHeaders.Length == 0 ? [string.Empty] : extraHeaders).Select(header =>
             Encoding.Latin1.GetBytes($"HTTP/1.1 200 OK\r\nContent-Length: 0\r\n{(header.Length == 0 ? string.Empty : header + "\r\n")}\r\n")));
 
-    private async Task<int> RunAsync(IConnector connector, string[] arguments, bool runsOnWindows = true)
+    private async Task<int> RunAsync(IConnector connector, string[] arguments, bool runsOnWindows = true, bool hstsLearnsOverHttp = false)
     {
         Diagnostics.Arrange("command line", string.Join(" ", arguments));
         Diagnostics.Arrange("runs on Windows", runsOnWindows);
+        Diagnostics.Arrange("learns HSTS over http", hstsLearnsOverHttp);
         CurlCommandRunner runner = new(
             options => CreateTransferDispatch(connector),
             files,
@@ -314,7 +330,8 @@ public sealed class CurlCommandRunnerHstsTests
             standardError,
             new MemoryStream(),
             runsOnWindows: runsOnWindows,
-            timeProvider: new FixedUtcClock(Now));
+            timeProvider: new FixedUtcClock(Now),
+            hstsLearnsOverHttp: hstsLearnsOverHttp);
 
         int exitCode;
         using (Diagnostics.Phase("run"))

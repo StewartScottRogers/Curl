@@ -56,6 +56,26 @@ public sealed class SocksServerConnectorTests
         Assert.AreEqual("hello\n", await ExchangeAsync(connection, Get));
     }
 
+    // socksd.c's dump file: "atyp %u =>", then " a.b.c.d", " name" or " %02x" for each IPv6 byte (test719 to test721).
+    [TestMethod]
+    public async Task ConnectLog_Socks5Connects_HoldsSocksdsDumpLines()
+    {
+        (SocksServerConnector socks, _) = Server(string.Empty);
+        IConnection ipv4 = await ConnectAsync(socks);
+        IConnection ipv6 = await ConnectAsync(socks);
+        IConnection named = await ConnectAsync(socks);
+        IConnection socks4 = await ConnectAsync(socks);
+
+        await ipv4.WriteAsync((byte[])[.. Socks5NoAuthGreeting, 5, 1, 0, 1, 12, 34, 56, 78, 0x23, 0x1E], CancellationToken.None);
+        await ipv6.WriteAsync((byte[])[.. Socks5NoAuthGreeting, 5, 1, 0, 4, 0x22, .. new byte[14], 0x33, 0x23, 0x1E], CancellationToken.None);
+        await named.WriteAsync((byte[])[.. Socks5NoAuthGreeting, 5, 1, 0, 3, 2, (byte)'h', (byte)'n', 0x23, 0x1E], CancellationToken.None);
+        await socks4.WriteAsync(new byte[] { 4, 1, 0x23, 0x1E, 127, 0, 0, 1, 0 }, CancellationToken.None);
+
+        Assert.AreEqual(
+            "atyp 1 => 12.34.56.78\natyp 4 => 22 00 00 00 00 00 00 00 00 00 00 00 00 00 00 33\natyp 3 => hn\n",
+            socks.ConnectLog);
+    }
+
     [TestMethod]
     public async Task Socks5_ConnectsToAnIpv6AddressAndAHostName()
     {

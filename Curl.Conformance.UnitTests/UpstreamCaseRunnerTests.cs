@@ -111,6 +111,30 @@ public sealed class UpstreamCaseRunnerTests
     }
 
     [TestMethod]
+    [DataRow(" option=\"no-stdout\"", ">>", "initial\nsaid\n", "")]
+    [DataRow(" option=\"no-stdout\"", ">", "said\n", "")]
+    [DataRow("", ">>", "initial\n", "said\n")]
+    public async Task RunAsync_CommandRedirectsStandardOutput_WritesTheFileAsTheShellDoes(string option, string redirect, string expectedFile, string expectedStdout)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        string logDirectory = CreateLogDirectory();
+        UpstreamCaseRunner runner = Runner(async invocation =>
+        {
+            await invocation.StandardOutput.WriteAsync("said\n"u8.ToArray());
+            return 0;
+        });
+        string testFile = $"<testcase>\n<client>\n<command{option}>\na {redirect} %LOGDIR/out%TESTNUMBER\n</command>\n"
+            + "<file name=\"%LOGDIR/out%TESTNUMBER\">\ninitial\n</file>\n</client>\n</testcase>\n";
+
+        UpstreamCaseOutcome outcome = await RunWithLogDirectoryAsync(runner, testFile, logDirectory);
+
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Passed, outcome.Kind, outcome.Detail);
+        diagnostics.Diff("redirect file", expectedFile, File.ReadAllText($"{logDirectory}/out5"));
+        Assert.AreEqual(expectedFile, File.ReadAllText($"{logDirectory}/out5"));
+        Assert.AreEqual(expectedStdout, File.ReadAllText($"{logDirectory}/stdout5"));
+    }
+
+    [TestMethod]
     public async Task RunAsync_ClientFileAndCommandNamedLogSlashName_AreTheLogDirectorysName()
     {
         var diagnostics = TestDiagnostics.For(TestContext);
@@ -179,12 +203,12 @@ public sealed class UpstreamCaseRunnerTests
         var diagnostics = TestDiagnostics.For(TestContext);
         UpstreamCaseRunner runner = Runner(_ => throw new AssertFailedException("curl must not run"));
 
-        UpstreamCaseOutcome outcome = await RunAsync(runner, "<testcase>\n<client>\n<command>\nhttp://%CLIENT6IP/\n</command>\n</client>\n</testcase>\n");
+        UpstreamCaseOutcome outcome = await RunAsync(runner, "<testcase>\n<client>\n<command>\nhttp://%SOCKSUNIXPATH/\n</command>\n</client>\n</testcase>\n");
 
         diagnostics.Assert("outcome kind", UpstreamCaseOutcomeKind.Skipped, outcome.Kind);
         Assert.AreEqual(UpstreamCaseOutcomeKind.Skipped, outcome.Kind);
-        diagnostics.Assert("detail", "the harness has no value for %CLIENT6IP", outcome.Detail);
-        Assert.AreEqual("the harness has no value for %CLIENT6IP", outcome.Detail);
+        diagnostics.Assert("detail", "the harness has no value for %SOCKSUNIXPATH", outcome.Detail);
+        Assert.AreEqual("the harness has no value for %SOCKSUNIXPATH", outcome.Detail);
     }
 
     [TestMethod]
@@ -326,7 +350,7 @@ public sealed class UpstreamCaseRunnerTests
     }
 
     [TestMethod]
-    public async Task RunAsync_CurlReachingForUdp_GetsTheTftpEmulation()
+    public async Task RunAsync_CurlReachingForUdp_GetsTheDnsdEmulationInFrontOfTheTftpOne()
     {
         var diagnostics = TestDiagnostics.For(TestContext);
         IDatagramConnector? datagramConnector = null;
@@ -338,8 +362,26 @@ public sealed class UpstreamCaseRunnerTests
 
         await RunAsync(runner, "<testcase>\n<client>\n<command>\na\n</command>\n</client>\n</testcase>\n");
 
-        diagnostics.Assert("datagram connector type", nameof(TftpServerConnector), datagramConnector?.GetType().Name ?? "(none)");
-        Assert.IsInstanceOfType<TftpServerConnector>(datagramConnector);
+        diagnostics.Assert("datagram connector type", nameof(DnsServerConnector), datagramConnector?.GetType().Name ?? "(none)");
+        Assert.IsInstanceOfType<DnsServerConnector>(datagramConnector);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_QueryOnDnsPort_IsComparedWithVerifyDns()
+    {
+        const string testCase = "<testcase>\n<reply>\n<dns>\nA: %HOSTIP\n</dns>\n</reply>\n<client>\n<server>\ndns\n</server>\n<command>\na\n</command>\n</client>\n" +
+            "<verify>\n<dns>\nQNAME b QTYPE A\n</dns>\n</verify>\n</testcase>\n";
+        UpstreamCaseRunner runner = Runner(async invocation =>
+        {
+            await using IDatagramChannel channel = (await invocation.DatagramConnector.OpenAsync("127.0.0.1", int.Parse(UpstreamCaseRunner.DnsPort, System.Globalization.CultureInfo.InvariantCulture), CancellationToken.None)).Channel!;
+            await channel.SendAsync((byte[])[0, 1, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, (byte)'a', 0, 0, 1, 0, 1], channel.ServerEndPoint, CancellationToken.None);
+            return 0;
+        });
+
+        UpstreamCaseOutcome outcome = await RunAsync(runner, testCase);
+
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Failed, outcome.Kind);
+        Assert.Contains("QNAME a QTYPE A", outcome.Detail);
     }
 
     [TestMethod]
@@ -519,6 +561,45 @@ public sealed class UpstreamCaseRunnerTests
     }
 
     [TestMethod]
+    public async Task RunAsync_SourceDirectoryAndNoTestsDirectory_GivesPwdTheSourceDirectory()
+    {
+        // runtests.pl runs in the release's tests folder, which is also its %SRCDIR (test726's HOME=%PWD, BL-2224).
+        var diagnostics = TestDiagnostics.For(TestContext);
+        string logDirectory = CreateLogDirectory();
+        IReadOnlyList<string>? arguments = null;
+        UpstreamCaseRunner runner = Runner(invocation =>
+        {
+            arguments = CommandArguments(invocation);
+            return Task.FromResult(0);
+        });
+
+        UpstreamCaseOutcome outcome = await runner.RunAsync(5, Encoding.Latin1.GetBytes("<testcase>\n<client>\n<command option=\"no-output,no-include\">\n%PWD/not-there\n</command>\n</client>\n</testcase>\n"), logDirectory, sourceDirectory: logDirectory);
+
+        string expected = logDirectory.Replace('\\', '/') + "/not-there";
+        diagnostics.Assert("argument", expected, arguments?.SingleOrDefault());
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Passed, outcome.Kind, outcome.Detail);
+        Assert.AreEqual(expected, arguments!.Single());
+    }
+
+    [TestMethod]
+    public async Task RunAsync_LibTests_IsTheLibtestRunnerPath()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        IReadOnlyList<string>? arguments = null;
+        UpstreamCaseRunner runner = Runner(invocation =>
+        {
+            arguments = CommandArguments(invocation);
+            return Task.FromResult(0);
+        });
+
+        UpstreamCaseOutcome outcome = await RunAsync(runner, "<testcase>\n<client>\n<command option=\"no-output,no-include\">\n%LIBTESTS\n</command>\n</client>\n</testcase>\n");
+
+        diagnostics.Assert("argument", "./libtest/libtests", arguments?.SingleOrDefault());
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Passed, outcome.Kind, outcome.Detail);
+        Assert.AreEqual("./libtest/libtests", arguments!.Single());
+    }
+
+    [TestMethod]
     public async Task RunAsync_PwdBeforeLogDir_NamesTheFileInTheLogDirectoryWithNoTestsDirectory()
     {
         var diagnostics = TestDiagnostics.For(TestContext);
@@ -670,7 +751,10 @@ public sealed class UpstreamCaseRunnerTests
             Encoding.ASCII.GetBytes("private"),
             Encoding.ASCII.GetBytes("public"),
             "0011",
-            "abc/def");
+            "abc/def")
+        {
+            HostKeyAlgorithm = "ssh-rsa",
+        };
         UpstreamCaseRunner runner = new(
             async invocation =>
             {
@@ -684,10 +768,10 @@ public sealed class UpstreamCaseRunnerTests
             TimeSpan.FromSeconds(10),
             sshServer);
 
-        await RunWithLogDirectoryAsync(runner, "<testcase>\n<client>\n<server>\nnone\n</server>\n<command option=\"no-output,no-include\">\n%SSHPORT %USER [%SFTP_PWD] [%SCP_PWD] %SSHSRVMD5 %SSHSRVSHA256\n</command>\n</client>\n</testcase>\n", logDirectory);
+        await RunWithLogDirectoryAsync(runner, "<testcase>\n<client>\n<server>\nnone\n</server>\n<command option=\"no-output,no-include\">\n%SSHPORT %USER [%SFTP_PWD] [%SCP_PWD] %SSHSRVMD5 %SSHSRVSHA256 %SSHKEYALGO\n</command>\n</client>\n</testcase>\n", logDirectory);
 
-        diagnostics.Assert("arguments", "9003 curltest [] [] 0011 abc/def", string.Join(' ', arguments!));
-        CollectionAssert.AreEqual(new[] { "9003", "curltest", "[]", "[]", "0011", "abc/def" }, arguments);
+        diagnostics.Assert("arguments", "9003 curltest [] [] 0011 abc/def ssh-rsa", string.Join(' ', arguments!));
+        CollectionAssert.AreEqual(new[] { "9003", "curltest", "[]", "[]", "0011", "abc/def", "ssh-rsa" }, arguments);
         diagnostics.Assert("connector reached on %SSHPORT", "ssh server", sshServerReached);
         Assert.AreEqual("ssh server", sshServerReached);
         Assert.AreEqual("private", await File.ReadAllTextAsync(Path.Combine(logDirectory, "server", "curl_client_key")));
@@ -718,6 +802,229 @@ public sealed class UpstreamCaseRunnerTests
 
         diagnostics.Assert("outcome kind", UpstreamCaseOutcomeKind.Passed, outcome.Kind);
         Assert.AreEqual(UpstreamCaseOutcomeKind.Passed, outcome.Kind, outcome.Detail);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_Http2CaseWithoutHttp2Server_IsSkippedForTheServer()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        UpstreamCaseRunner runner = Runner(_ => Task.FromResult(0));
+
+        UpstreamCaseOutcome outcome = await RunAsync(runner, "<testcase>\n<client>\n<server>\nhttp/2\n</server>\n<command>\nhttp://%HOSTIP:%HTTP2PORT/%TESTNUMBER\n</command>\n</client>\n<verify>\n</verify>\n</testcase>\n");
+
+        diagnostics.Assert("skip reason", "the harness does not emulate the http/2 server", outcome.Detail);
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Skipped, outcome.Kind);
+        Assert.AreEqual("the harness does not emulate the http/2 server", outcome.Detail);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_WithHttp2Server_ReachesItOnHttp2PortInFrontOfTheSwsEmulation()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        string? http2ServerReached = null;
+        string? httpPortReached = null;
+        IConnector? backend = null;
+        UpstreamHttp2Server http2Server = new(sws =>
+        {
+            backend = sws;
+            return new RefusingConnector("http2 server");
+        });
+        UpstreamCaseRunner runner = new(
+            async invocation =>
+            {
+                http2ServerReached = (await invocation.Connector.ConnectAsync(new ConnectTarget("127.0.0.1", UpstreamHttp2Server.Http2Port, false), CancellationToken.None)).ErrorMessage;
+                ConnectResult http = await invocation.Connector.ConnectAsync(new ConnectTarget("127.0.0.1", 8990, false), CancellationToken.None);
+                httpPortReached = http.Connection is not null ? "connected" : http.ErrorMessage;
+                return 0;
+            },
+            UpstreamCurlPlatform.Unix,
+            TimeProvider.System,
+            TimeSpan.FromSeconds(10),
+            http2Server: http2Server);
+
+        UpstreamCaseOutcome outcome = await RunAsync(runner, "<testcase>\n<client>\n<server>\nhttp/2\n</server>\n<command>\nhttp://%HOSTIP:%HTTP2PORT/%TESTNUMBER\n</command>\n</client>\n<verify>\n</verify>\n</testcase>\n");
+
+        diagnostics.Assert("connector reached on %HTTP2PORT", "http2 server", http2ServerReached);
+        Assert.AreNotEqual(UpstreamCaseOutcomeKind.Skipped, outcome.Kind, outcome.Detail);
+        Assert.AreEqual("http2 server", http2ServerReached);
+        Assert.AreEqual("connected", httpPortReached);
+        Assert.IsInstanceOfType<SwsHttpServerConnector>(backend);
+    }
+
+    // nghttpx's TLS front stands on %HTTP2TLSPORT with test-localhost.pem only for a case naming the http/2 server (BL-2245).
+    [TestMethod]
+    [DataRow("http/2", "http2 tls server", true)]
+    [DataRow("http", "connected", false)]
+    public async Task RunAsync_WithHttp2ServerAndACertificateDirectory_PutsTheTlsServerOnHttp2TlsPortForAnHttp2Case(string serverLine, string expectedReached, bool expectsCertificate)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        string certificateDirectory = CreateLogDirectory();
+        Directory.CreateDirectory(Path.Combine(certificateDirectory, "certs"));
+        using (System.Security.Cryptography.ECDsa key = System.Security.Cryptography.ECDsa.Create())
+        {
+            System.Security.Cryptography.X509Certificates.CertificateRequest request = new("CN=localhost", key, System.Security.Cryptography.HashAlgorithmName.SHA256);
+            using System.Security.Cryptography.X509Certificates.X509Certificate2 certificate = request.CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddDays(1));
+            await File.WriteAllTextAsync(Path.Combine(certificateDirectory, "certs", "test-localhost.pem"), certificate.ExportCertificatePem() + "\n" + key.ExportPkcs8PrivateKeyPem() + "\n");
+        }
+
+        System.Security.Cryptography.X509Certificates.X509Certificate2? presented = null;
+        string[]? arguments = null;
+        string? reached = null;
+        UpstreamHttp2Server http2Server = new(
+            _ => new RefusingConnector("http2 server"),
+            (_, certificate) =>
+            {
+                presented = certificate;
+                return new RefusingConnector("http2 tls server");
+            });
+        UpstreamCaseRunner runner = new(
+            async invocation =>
+            {
+                arguments = [.. CommandArguments(invocation)];
+                ConnectResult connected = await invocation.Connector.ConnectAsync(new ConnectTarget("127.0.0.1", UpstreamHttp2Server.Http2TlsPort, false), CancellationToken.None);
+                reached = connected.Connection is not null ? "connected" : connected.ErrorMessage;
+                return 0;
+            },
+            UpstreamCurlPlatform.Unix,
+            TimeProvider.System,
+            TimeSpan.FromSeconds(10),
+            http2Server: http2Server);
+        string testFile = $"<testcase>\n<client>\n<server>\n{serverLine}\n</server>\n<command option=\"no-output,no-include\">\nhttps://localhost:%HTTP2TLSPORT/\n</command>\n</client>\n</testcase>\n";
+
+        UpstreamCaseOutcome outcome = await runner.RunAsync(5, Encoding.Latin1.GetBytes(testFile), CreateLogDirectory(), null, certificateDirectory);
+        diagnostics.Act("connector reached on %HTTP2TLSPORT", reached);
+
+        Assert.AreNotEqual(UpstreamCaseOutcomeKind.Skipped, outcome.Kind, outcome.Detail);
+        CollectionAssert.AreEqual(new[] { "https://localhost:" + UpstreamCaseRunner.Http2TlsPort + "/" }, arguments);
+        Assert.AreEqual(expectedReached, reached);
+        Assert.AreEqual(expectsCertificate, presented is not null);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_H2cVersion_IsH2c()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        string[]? arguments = null;
+        UpstreamCaseRunner runner = Runner(invocation =>
+        {
+            arguments = [.. CommandArguments(invocation)];
+            return Task.FromResult(0);
+        });
+
+        await RunAsync(runner, "<testcase>\n<client>\n<server>\nnone\n</server>\n<command option=\"no-output,no-include\">\n%H2CVER\n</command>\n</client>\n</testcase>\n");
+
+        diagnostics.Assert("arguments", "h2c", string.Join(' ', arguments!));
+        CollectionAssert.AreEqual(new[] { "h2c" }, arguments);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_Http3CaseWithoutHttp3Server_IsSkippedForTheServer()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        UpstreamCaseRunner runner = Runner(_ => Task.FromResult(0));
+
+        UpstreamCaseOutcome outcome = await RunAsync(runner, "<testcase>\n<client>\n<server>\nhttp/3\n</server>\n<command>\nhttp://%HOSTIP:%HTTPPORT/%TESTNUMBER\n</command>\n</client>\n<verify>\n</verify>\n</testcase>\n");
+
+        diagnostics.Assert("skip reason", "the harness does not emulate the http/3 server", outcome.Detail);
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Skipped, outcome.Kind);
+        Assert.AreEqual("the harness does not emulate the http/3 server", outcome.Detail);
+    }
+
+    // runtests.pl reports nghttpx-h3 when its nghttpx serves HTTP/3; the harness reports it when it has the stand-in (BL-2261).
+    [TestMethod]
+    [DataRow(true, UpstreamCaseOutcomeKind.Passed)]
+    [DataRow(false, UpstreamCaseOutcomeKind.Skipped)]
+    public async Task RunAsync_NghttpxH3FeatureCase_RunsOnlyWithAnHttp3Server(bool givesHttp3Server, UpstreamCaseOutcomeKind expected)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("gives an http/3 server", givesHttp3Server);
+        UpstreamCaseRunner runner = new(
+            _ => Task.FromResult(0),
+            UpstreamCurlPlatform.Unix,
+            TimeProvider.System,
+            TimeSpan.FromSeconds(10),
+            http3Server: givesHttp3Server ? new UpstreamHttp3Server((_, _) => new RefusingDatagramConnector("http3 server")) : null);
+
+        UpstreamCaseOutcome outcome = await RunAsync(runner, "<testcase>\n<client>\n<features>\nnghttpx-h3\n</features>\n<server>\nnone\n</server>\n<command option=\"no-output,no-include\">\nx\n</command>\n</client>\n</testcase>\n");
+
+        diagnostics.Assert("outcome", expected, outcome.Kind);
+        Assert.AreEqual(expected, outcome.Kind, outcome.Detail);
+    }
+
+    // nghttpx-h3 stands on %HTTP3PORT with test-localhost.pem only for a case naming the http/3 server (BL-2261);
+    // every other datagram, and every one of another case, reaches the tftpd emulation, which refuses port 9019.
+    [TestMethod]
+    [DataRow("http/3", "http3 server", true)]
+    [DataRow("http", "tftpd", false)]
+    public async Task RunAsync_WithHttp3ServerAndACertificateDirectory_RoutesHttp3PortDatagramsToItForAnHttp3Case(string serverLine, string expectedReached, bool expectsServer)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        string certificateDirectory = CreateLogDirectory();
+        Directory.CreateDirectory(Path.Combine(certificateDirectory, "certs"));
+        using (System.Security.Cryptography.ECDsa key = System.Security.Cryptography.ECDsa.Create())
+        {
+            System.Security.Cryptography.X509Certificates.CertificateRequest request = new("CN=localhost", key, System.Security.Cryptography.HashAlgorithmName.SHA256);
+            using System.Security.Cryptography.X509Certificates.X509Certificate2 certificate = request.CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddDays(1));
+            await File.WriteAllTextAsync(Path.Combine(certificateDirectory, "certs", "test-localhost.pem"), certificate.ExportCertificatePem() + "\n" + key.ExportPkcs8PrivateKeyPem() + "\n");
+        }
+
+        System.Security.Cryptography.X509Certificates.X509Certificate2? presented = null;
+        IConnector? backend = null;
+        string[]? arguments = null;
+        string? reached = null;
+        UpstreamHttp3Server http3Server = new((sws, certificate) =>
+        {
+            backend = sws;
+            presented = certificate;
+            return new RefusingDatagramConnector("http3 server");
+        });
+        UpstreamCaseRunner runner = new(
+            async invocation =>
+            {
+                arguments = [.. CommandArguments(invocation)];
+                DatagramOpenResult opened = await invocation.DatagramConnector.OpenAsync("127.0.0.1", UpstreamHttp3Server.Http3Port, CancellationToken.None);
+                reached = opened.ErrorMessage!.Contains("http3 server", StringComparison.Ordinal) ? "http3 server" : "tftpd";
+                return 0;
+            },
+            UpstreamCurlPlatform.Unix,
+            TimeProvider.System,
+            TimeSpan.FromSeconds(10),
+            http3Server: http3Server);
+        string testFile = $"<testcase>\n<client>\n<server>\n{serverLine}\n</server>\n<command option=\"no-output,no-include\">\nhttps://localhost:%HTTP3PORT/\n</command>\n</client>\n</testcase>\n";
+
+        UpstreamCaseOutcome outcome = await runner.RunAsync(5, Encoding.Latin1.GetBytes(testFile), CreateLogDirectory(), null, certificateDirectory);
+        diagnostics.Act("datagram connector reached on %HTTP3PORT", reached);
+
+        Assert.AreNotEqual(UpstreamCaseOutcomeKind.Skipped, outcome.Kind, outcome.Detail);
+        CollectionAssert.AreEqual(new[] { "https://localhost:" + UpstreamCaseRunner.Http3Port + "/" }, arguments);
+        Assert.AreEqual(expectedReached, reached);
+        Assert.AreEqual(expectsServer, presented is not null);
+        Assert.AreEqual(expectsServer, backend is SwsHttpServerConnector);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_Http3PortWithoutACertificateDirectory_IsSkippedForTheVariable()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        UpstreamCaseRunner runner = new(
+            _ => Task.FromResult(0),
+            UpstreamCurlPlatform.Unix,
+            TimeProvider.System,
+            TimeSpan.FromSeconds(10),
+            http3Server: new UpstreamHttp3Server((_, _) => new RefusingDatagramConnector("http3 server")));
+
+        UpstreamCaseOutcome outcome = await RunAsync(runner, "<testcase>\n<client>\n<server>\nhttp/3\n</server>\n<command>\nhttps://localhost:%HTTP3PORT/\n</command>\n</client>\n</testcase>\n");
+
+        diagnostics.Assert("skip reason", "the harness has no value for HTTP3PORT", outcome.Detail);
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Skipped, outcome.Kind);
+        Assert.Contains("HTTP3PORT", outcome.Detail!);
+    }
+
+    // Refuses every datagram open with its own name, so a test can tell it was reached.
+    private sealed class RefusingDatagramConnector(string name) : IDatagramConnector
+    {
+        public ValueTask<DatagramOpenResult> OpenAsync(string host, int port, CancellationToken cancellationToken) =>
+            ValueTask.FromResult(DatagramOpenResult.Failed(CurlExitCode.CouldntConnect, name));
     }
 
     // Refuses every connection with its own name, so a test can tell it was reached.
@@ -959,6 +1266,62 @@ public sealed class UpstreamCaseRunnerTests
     }
 
     [TestMethod]
+    [DataRow(1435)]
+    [DataRow(1436)]
+    public async Task RunAsync_HttpUnixCase_RunsCurlOnTheHttpUnixPath(int testNumber)
+    {
+        string? commandLine = null;
+        UpstreamCaseRunner runner = Runner(invocation =>
+        {
+            commandLine = string.Join(' ', invocation.Arguments);
+            return Task.FromResult(0);
+        });
+        string testFile = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "UpstreamTestData", $"test{testNumber}.curltest"));
+
+        UpstreamCaseOutcome outcome = await RunAsync(runner, testFile);
+
+        Assert.AreNotEqual(UpstreamCaseOutcomeKind.Skipped, outcome.Kind, outcome.Detail);
+        Assert.Contains("--unix-socket " + UpstreamCaseRunner.HttpUnixPath + " ", commandLine!);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_Ipv6Variables_HaveTheValuesOfTheInMemoryIpv6Servers()
+    {
+        string? commandLine = null;
+        UpstreamCaseRunner runner = Runner(invocation =>
+        {
+            commandLine = string.Join(' ', invocation.Arguments);
+            return Task.FromResult(0);
+        });
+
+        await RunAsync(runner, "<testcase>\n<client>\n<server>\nnone\n</server>\n<command>\n%CLIENT6IP %CLIENT6IP-NB %FTP6PORT %GOPHER6PORT\n</command>\n</client>\n</testcase>\n");
+
+        Assert.Contains("[::1] ::1 9011 9012", commandLine!);
+    }
+
+    [TestMethod]
+    [DataRow(252, UpstreamCaseRunner.Ftp6Port)]
+    [DataRow(253, UpstreamCaseRunner.Ftp6Port)]
+    [DataRow(254, UpstreamCaseRunner.Ftp6Port)]
+    [DataRow(255, UpstreamCaseRunner.Ftp6Port)]
+    [DataRow(1203, UpstreamCaseRunner.Gopher6Port)]
+    public async Task RunAsync_FtpOrGopherIpv6Case_RunsCurlAtItsIpv6Port(int testNumber, string port)
+    {
+        string? commandLine = null;
+        UpstreamCaseRunner runner = Runner(invocation =>
+        {
+            commandLine = string.Join(' ', invocation.Arguments);
+            return Task.FromResult(0);
+        });
+        string testFile = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "UpstreamTestData", $"test{testNumber}.curltest"));
+
+        UpstreamCaseOutcome outcome = await RunAsync(runner, testFile);
+
+        Assert.AreNotEqual(UpstreamCaseOutcomeKind.Skipped, outcome.Kind, outcome.Detail);
+        Assert.Contains("[::1]:" + port, commandLine!);
+    }
+
+    [TestMethod]
     [DataRow(567)]
     [DataRow(568)]
     [DataRow(569)]
@@ -1116,6 +1479,49 @@ public sealed class UpstreamCaseRunnerTests
         UpstreamCaseOutcome outcome = await RunAsync(runner, "<testcase>\n<client>\n<server>\nftps\n</server>\n<command>\nftps://localhost:%FTPSPORT/\n</command>\n</client>\n</testcase>\n");
 
         Assert.AreEqual("the harness has no value for %FTPSPORT", outcome.Detail);
+    }
+
+    [TestMethod]
+    [Timeout(60_000, CooperativeCancellation = true)]
+    public async Task RunAsync_HttpsProxyCaseWithACertificateDirectory_ServesTlsOnTheHttpsProxyPort()
+    {
+        string certificateDirectory = CreateLogDirectory();
+        Directory.CreateDirectory(Path.Combine(certificateDirectory, "certs"));
+        using (System.Security.Cryptography.ECDsa key = System.Security.Cryptography.ECDsa.Create())
+        {
+            System.Security.Cryptography.X509Certificates.CertificateRequest request = new("CN=localhost", key, System.Security.Cryptography.HashAlgorithmName.SHA256);
+            using System.Security.Cryptography.X509Certificates.X509Certificate2 certificate = request.CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddDays(1));
+            await File.WriteAllTextAsync(Path.Combine(certificateDirectory, "certs", "test-localhost.pem"), certificate.ExportCertificatePem() + "\n" + key.ExportPkcs8PrivateKeyPem() + "\n");
+        }
+
+        string[]? arguments = null;
+        int read = -1;
+        UpstreamCaseRunner runner = Runner(async invocation =>
+        {
+            arguments = [.. CommandArguments(invocation)];
+            ConnectResult connected = await invocation.Connector.ConnectAsync(new ConnectTarget("127.0.0.1", HttpsProxyServerConnector.HttpsProxyPort, false), CancellationToken.None);
+            await using IConnection connection = connected.Connection!;
+            await connection.WriteAsync("GET http://x/ HTTP/1.1\r\n\r\n"u8.ToArray(), CancellationToken.None);
+            read = await connection.ReadAsync(new byte[16], CancellationToken.None);
+            return 0;
+        });
+        string testFile = "<testcase>\n<client>\n<server>\nhttp\nhttps-proxy\n</server>\n<command option=\"no-output,no-include\">\n-x https://localhost:%HTTPSPROXYPORT\n</command>\n</client>\n</testcase>\n";
+
+        UpstreamCaseOutcome outcome = await runner.RunAsync(5, Encoding.Latin1.GetBytes(testFile), CreateLogDirectory(), null, certificateDirectory);
+
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Passed, outcome.Kind, outcome.Detail);
+        CollectionAssert.AreEqual(new[] { "-x", "https://localhost:" + UpstreamCaseRunner.HttpsProxyPort }, arguments);
+        Assert.AreEqual(0, read, "a plain-text request to the TLS proxy ends the connection");
+    }
+
+    [TestMethod]
+    public async Task RunAsync_HttpsProxyCaseWithoutACertificateDirectory_SkipsForTheHttpsProxyPort()
+    {
+        UpstreamCaseRunner runner = Runner(_ => Task.FromResult(0));
+
+        UpstreamCaseOutcome outcome = await RunAsync(runner, "<testcase>\n<client>\n<server>\nhttps-proxy\n</server>\n<command>\n-x https://localhost:%HTTPSPROXYPORT http://x/\n</command>\n</client>\n</testcase>\n");
+
+        Assert.AreEqual("the harness has no value for %HTTPSPROXYPORT", outcome.Detail);
     }
 
     [TestMethod]

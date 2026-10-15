@@ -39,7 +39,9 @@ namespace Curl.Console;
 /// <c>--http3</c> does, falling back to TCP when QUIC fails (measured), and one naming <c>h2</c> or <c>h1</c>
 /// makes TCP the first attempt of <c>--http3</c>'s race (<see cref="HttpRequestOptions.TriesTcpBeforeQuic" />,
 /// BL-948). None is used for plain <c>http</c> or
-/// for an origin a <c>--connect-to</c> mapping matches.
+/// for an origin a <c>--connect-to</c> mapping matches, and no header received over plain <c>http</c>
+/// is learned, unless the cache is opened with <c>usesOverHttp</c>, the harness's stand-in for curl's
+/// debug build under <c>CURL_ALTSVC_HTTP</c> (ADR-0497).
 /// </para>
 /// <para>
 /// Every header is learned under the version its response came over - <c>h3</c> for HTTP/3, <c>h2</c> for
@@ -62,8 +64,11 @@ internal sealed class AltSvcTransferCache : IAltSvcStore
 
     private readonly IReadOnlyList<string> connectToEntries;
 
-    private AltSvcTransferCache(AltSvcCache cache, string file, RequestedHttpVersion? requestedVersion, IReadOnlyList<string> connectToEntries)
+    private readonly bool usesOverHttp;
+
+    private AltSvcTransferCache(AltSvcCache cache, string file, RequestedHttpVersion? requestedVersion, IReadOnlyList<string> connectToEntries, bool usesOverHttp)
     {
+        this.usesOverHttp = usesOverHttp;
         this.cache = cache;
         this.file = file;
         this.requestedVersion = requestedVersion;
@@ -82,6 +87,11 @@ internal sealed class AltSvcTransferCache : IAltSvcStore
     /// The run's diagnostic log, where the cache writes alternatives stored and used under component
     /// <c>altsvc</c> (BL-1072); <see langword="null" /> writes nothing.
     /// </param>
+    /// <param name="usesOverHttp">
+    /// Whether a plain <c>http</c> origin learns <c>Alt-Svc</c> headers and has its alternatives looked
+    /// up as an <c>https</c> one does: the harness's stand-in for curl's debug build under
+    /// <c>CURL_ALTSVC_HTTP</c> (ADR-0497, BL-2263); off by default, as in curl's release build.
+    /// </param>
     /// <returns>The cache.</returns>
     internal static async Task<AltSvcTransferCache> OpenAsync(
         string file,
@@ -89,7 +99,8 @@ internal sealed class AltSvcTransferCache : IAltSvcStore
         IReadOnlyList<string> connectToEntries,
         IFileSystem fileSystem,
         TimeProvider clock,
-        IDiagnosticLog? diagnosticLog = null)
+        IDiagnosticLog? diagnosticLog = null,
+        bool usesOverHttp = false)
     {
         AltSvcCache cache = new(clock, diagnosticLog);
         if (file.Length > 0)
@@ -97,7 +108,7 @@ internal sealed class AltSvcTransferCache : IAltSvcStore
             cache.ReadFile(await ReadTextAsync(file, fileSystem).ConfigureAwait(false));
         }
 
-        return new AltSvcTransferCache(cache, file, requestedVersion, connectToEntries);
+        return new AltSvcTransferCache(cache, file, requestedVersion, connectToEntries, usesOverHttp);
     }
 
     /// <summary>
@@ -126,8 +137,21 @@ internal sealed class AltSvcTransferCache : IAltSvcStore
     }
 
     /// <inheritdoc />
+    /// <remarks>
+    /// A plain <c>http</c> origin's header is learned only when the cache was opened with
+    /// <c>usesOverHttp</c>; otherwise it is ignored and nothing is reported, as curl's release build
+    /// does (ADR-0497).
+    /// </remarks>
     public IReadOnlyList<AltSvcHeaderOutcome> StoreFromResponse(CurlUrl origin, string altSvcHeader, Version responseVersion, DateTimeOffset now) =>
-        cache.ApplyHeader(altSvcHeader, SourceAlpnOf(responseVersion), origin.IdnHost, origin.Port);
+        IsUsedFor(origin)
+            ? cache.ApplyHeader(altSvcHeader, SourceAlpnOf(responseVersion), origin.IdnHost, origin.Port)
+            : [];
+
+    /// <summary>
+    /// Tells whether the cache serves <paramref name="url" />: an <c>https</c> one always, a plain
+    /// <c>http</c> one only when it was opened with <c>usesOverHttp</c> (ADR-0497).
+    /// </summary>
+    private bool IsUsedFor(CurlUrl url) => usesOverHttp || url.Scheme == "https";
 
     /// <summary>
     /// The source ALPN a header is learned under, from the version its response came over, as curl 8.21.0's
@@ -195,7 +219,7 @@ internal sealed class AltSvcTransferCache : IAltSvcStore
 
     private AltSvcMatch? MatchFor(CurlUrl url)
     {
-        if (url.Scheme != "https" || ConnectToDecides(url, connectToEntries))
+        if (!IsUsedFor(url) || ConnectToDecides(url, connectToEntries))
         {
             return null;
         }

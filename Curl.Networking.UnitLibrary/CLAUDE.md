@@ -182,6 +182,9 @@ then reported as `Host H:P was resolved.`, `IPv6: ...` and `IPv4: ...`, naming t
 cached (none for an IP address), and `LoadResolveEntries` loads the `--resolve` entries
 (`ResolveOverrides.Entries`, as `ResolveEntry`) into the cache with curl's `Added H:P:A to DNS
 cache` lines at a transfer's start; until a transfer calls it, the first connect loads them.
+Per ADR-0499 (BL-2262) a look-up through `DnsServerResolver` that answered no address (exit 43 aside) is
+cached as a negative entry, as curl 8.22.0's c-ares build caches it, so later connects to that host and
+port fail with `Negative DNS entry` and exit 6 without asking again; other resolvers' failures are not kept.
 Per ADR-0117 (BL-510) each `ConnectAsync` runs its resolve, dials, tunnel and TLS handshakes under
 one limit, the constructor's `connectTimeout` (`CurlComposition.ConnectTimeoutOf`: `--connect-timeout`,
 or a smaller `-m`), else `DefaultConnectTimeout` (300 s), on its `TimeProvider`; when it passes the
@@ -470,7 +473,7 @@ round on its `TimeProvider`; a truncated reply is asked again over TCP. Replies 
 (`DnsReplyMatch`) and read through `DnsAnswerDecoder` into a `DnsQueryOutcome`. It implements
 `IDnsResolverWithFailureReason`, so `TcpConnector` (the SOCKS4 and SOCKS5 local resolve included, BL-829) and `UdpDatagramConnector` add c-ares' reason
 (`DnsLookupFailureText`) in brackets, or make it exit 43, through `NameResolutionFailure`.
-`ResolveServiceAsync` looks up SRV records for Kerberos KDC location (BL-689). Sockets come from
+`ResolveServiceAsync` looks up SRV records for Kerberos KDC location (BL-689). Its public constructor taking an `IDatagramConnector` sends the UDP queries through `DatagramConnectorDnsSocketOpener` (no TCP retry), for `CURL_DNS_SERVER` behind the harness seam (ADR-0492, BL-2248). Sockets come from
 `IDnsSocketOpener`; tests use `Fakes/ScriptedDnsSocketOpener` and `ManualTimeProvider`.
 
 Per ADR-0180 (BL-728) `TcpConnector` takes an optional `QuicDialer`, and its
@@ -490,6 +493,12 @@ recvfrom() ...`. This project therefore references `Curl.Quic.UnitLibrary`, whic
 `Curl.Networking.UnitTests` see its internals: `Fakes/QuicTestServer` and `QuicTestTlsServer` are
 copies of `Curl.Quic.UnitTests`' in-memory server, reached through `Fakes/QuicServerChannelOpener`.
 `PoolingConnector.ConnectMultiplexedAsync` passes straight through to its inner connector.
+Per BL-2260 `DatagramConnectorUdpChannelOpener` is the `IUdpChannelOpener` over an `IDatagramConnector`,
+which `QuicDialer`'s public `(IUdpChannelOpener, TlsClientOptions, TimeProvider)` constructor takes: each
+channel opens to the endpoint's address and port through the connector on its first send or receive,
+binds no local end (`--interface`, `--local-port` are the connector's), and a refused open is
+`SocketError.ConnectionRefused`. `Curl.Console`'s dialing runner (`InProcessCurl`) uses it, so an
+in-process HTTP/3 server answers QUIC; the executable keeps `UdpChannelOpener`.
 Per ADR-0250 (BL-942) a target whose `Proxy` is an HTTP, HTTP/1.0 or HTTPS proxy is not
 resolved: `TcpConnector.UdpTunnel.cs` dials the proxy, sends curl 8.22.0's CONNECT-UDP request
 (`HttpProxyTunnel.BuildConnectUdpRequest`), takes a `101` or `2xx` (`OpensUdpTunnel`), and hands

@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <PackageReference Include="MSTest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Microsoft.VisualStudio.TestTools.UnitTesting" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Curl.Conformance.Http3Server.UnitLibrary\Curl.Conformance.Http3Server.UnitLibrary.csproj" />
+    <ProjectReference Include="..\Curl.Http3.UnitLibrary\Curl.Http3.UnitLibrary.csproj" />
+    <ProjectReference Include="..\Curl.Quic.UnitLibrary\Curl.Quic.UnitLibrary.csproj" />
+  </ItemGroup>
+
+</Project>

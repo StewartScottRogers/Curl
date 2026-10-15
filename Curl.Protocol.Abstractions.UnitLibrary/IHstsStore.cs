@@ -1,13 +1,15 @@
 namespace Curl.Protocol.Abstractions;
 
 /// <summary>
-/// Learns the HTTP Strict Transport Security policy an HTTPS origin sends in each
+/// Learns the HTTP Strict Transport Security policy an origin sends in each
 /// <c>Strict-Transport-Security</c> response header (<c>--hsts</c>), one header at a time as it is
 /// read (ADR-0409).
 /// </summary>
 /// <remarks>
-/// Set on <see cref="HttpRequestOptions.HstsStore" />. The store never reads a clock: the caller
-/// passes the time from <see cref="ITransferContext.TimeProvider" />.
+/// Set on <see cref="HttpRequestOptions.HstsStore" />. The HTTP handler hands it every such header,
+/// whatever the origin's scheme, and the store decides whether a plain <c>http</c> origin's is
+/// learned (ADR-0494). The store never reads a clock: the caller passes the time from
+/// <see cref="ITransferContext.TimeProvider" />.
 /// </remarks>
 public interface IHstsStore
 {
@@ -21,7 +23,8 @@ public interface IHstsStore
     /// <returns>
     /// <see langword="false" /> only when the header is illegal and curl 8.21.0 writes
     /// <c>Illegal STS header skipped</c> (<c>lib/http.c</c>); <see langword="true" /> otherwise,
-    /// including for an IP-address host, which stores nothing and for which curl writes no line.
+    /// including for an IP-address host, which stores nothing and for which curl writes no line, and
+    /// for an <c>http</c> origin the store does not learn from.
     /// </returns>
     bool StoreFromResponse(CurlUrl origin, string headerValue, DateTimeOffset now);
 }

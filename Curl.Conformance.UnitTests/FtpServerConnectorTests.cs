@@ -28,6 +28,40 @@ public sealed class FtpServerConnectorTests
     }
 
     [TestMethod]
+    public async Task ConnectAsync_Ftp6PortOnIpv6Loopback_ReachesTheControlChannelWithIpv6EndPoints()
+    {
+        FtpServerConnector connector = new(
+            ParsedTestCase.From("<reply>\n<servercmd>\nREPLY welcome 220 six\n</servercmd>\n</reply>\n"),
+            new SwsHttpServerConnector(ParsedTestCase.From(string.Empty), TimeProvider.System));
+
+        ConnectResult result = await connector.ConnectAsync(new ConnectTarget("[::1]", FtpServerConnector.Ftp6Port, false), TestContext.CancellationToken);
+        await using IConnection connection = result.Connection!;
+        string greeting = await ReadTextAsync(connection);
+
+        Assert.AreEqual("220 six\r\n", greeting);
+        Assert.AreEqual($"[::1]:{FtpServerConnector.Ftp6Port}", connection.RemoteEndPoint!.ToString());
+        Assert.StartsWith("[::1]:", connection.LocalEndPoint!.ToString()!);
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_EpsvOnFtp6Port_OffersThePassivePortAndItsDataConnection()
+    {
+        FtpServerConnector connector = new(
+            ParsedTestCase.From(string.Empty),
+            new SwsHttpServerConnector(ParsedTestCase.From(string.Empty), TimeProvider.System));
+        ConnectResult result = await connector.ConnectAsync(new ConnectTarget("::1", FtpServerConnector.Ftp6Port, false), TestContext.CancellationToken);
+        await using IConnection connection = result.Connection!;
+        await ReadTextAsync(connection);
+
+        await connection.WriteAsync(Encoding.Latin1.GetBytes("EPSV\r\n"), TestContext.CancellationToken);
+        string reply = await ReadTextAsync(connection);
+        ConnectResult data = await connector.ConnectAsync(new ConnectTarget("::1", FtpServerConnector.PassivePort, false), TestContext.CancellationToken);
+
+        Assert.AreEqual($"229 Entering Passive Mode (|||{FtpServerConnector.PassivePort}|)\r\n", reply);
+        Assert.IsNotNull(data.Connection);
+    }
+
+    [TestMethod]
     public async Task ConnectAsync_OtherPort_ReachesTheWrappedServer()
     {
         FtpServerConnector connector = new(

@@ -22,8 +22,11 @@ namespace Curl.Conformance;
 /// to PREFIX.1 to PREFIX.N, exiting 2 (Perl's <c>die $!</c> on ENOENT) when the folder is missing.</item>
 /// <item><c>for my $i ((1..N)) { ... open(FH, "&lt;", ...); (&lt;FH&gt; eq "TEXT" and &lt;FH&gt; eq "") or die ... }</c>:
 /// exits 2 when a file is missing and 255 (Perl's <c>die</c>) when one holds anything but TEXT.</item>
+/// <item><c>if('A' ne 'B') {print 'TEXT';} else {exec 'resolve ...'; print '...';}</c> (test1083): prints TEXT when A
+/// and B differ, otherwise returns what <see cref="UpstreamResolveCheck"/> answers for the exec'd line (<c>exec</c>
+/// replaces the process, so the trailing print never runs).</item>
 /// </list>
-/// Any other line, such as test1083's <c>if ... else {exec '%RESOLVE ...'}</c>, is not interpreted.
+/// Any other line is not interpreted.
 /// </remarks>
 internal static class UpstreamPerlOneLiner
 {
@@ -42,6 +45,7 @@ internal static class UpstreamPerlOneLiner
     [
         (Form(@"-e 'exit\(\(stat\(""(?<file>[^""]+)""\)\)\[9\] != (?<epoch>-?\d+)\)'"), (match, _) => ModificationTimeIs(match)),
         (Form(@"-e ""print '(?<text>[^']*)' if\('(?<left>[^']*)' ne '(?<right>[^']*)'\);"""), (match, _) => PrintIfDifferent(match)),
+        (Form(@"-e ""if\('(?<left>[^']*)' ne '(?<right>[^']*)'\) \{print '(?<text>[^']*)';\} else \{exec '(?<resolve>" + UpstreamResolveCheck.Program + @"(?: --ipv[46])? \S+)'; print '[^']*';\}"""), (match, _) => PrintIfDifferentElseResolve(match)),
         (Form(@"-e ""print '(?<text>[^']*)' if\((?<names>\$\^O eq '[^']+'(?: \|\| \$\^O eq '[^']+')*)\);"""), PrintIfOperatingSystem),
         (Form(@"-e 'if\(""(?<host>[^""]*)"" !~ /(?<pattern>[^/]*)/\) \{print ""(?<text>[^""]*)""; exit\(1\)\}'"), (match, _) => PrintIfNoMatch(match)),
         (Form(@"-e 'open\(IN,\$ARGV\[0\]\); my \$lines=grep\(/(?<pattern>[^/]*)/, <IN>\); exit \(\$lines != (?<count>\d+)\);[^']*' (?<file>\S+)"), (match, _) => MatchingLineCountIs(match)),
@@ -96,6 +100,12 @@ internal static class UpstreamPerlOneLiner
 
     private static UpstreamPerlOneLinerResult PrintIfDifferent(Match match) =>
         match.Groups["left"].Value == match.Groups["right"].Value ? Passed : new(0, match.Groups["text"].Value);
+
+    // exec replaces the process, so the trailing print never runs and the resolve tool's result is the one-liner's.
+    private static UpstreamPerlOneLinerResult PrintIfDifferentElseResolve(Match match) =>
+        match.Groups["left"].Value == match.Groups["right"].Value
+            ? UpstreamResolveCheck.RunLine(match.Groups["resolve"].Value)!
+            : new(0, match.Groups["text"].Value);
 
     private static UpstreamPerlOneLinerResult PrintIfOperatingSystem(Match match, string operatingSystemName) =>
         match.Groups["names"].Value.Contains($"'{operatingSystemName}'", StringComparison.Ordinal) ? new(0, match.Groups["text"].Value) : Passed;

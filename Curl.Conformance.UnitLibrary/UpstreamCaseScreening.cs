@@ -14,31 +14,43 @@ namespace Curl.Conformance;
 /// does not act on (a <c>&lt;tool&gt;</c> libtest,
 /// a <c>&lt;verify&gt;&lt;upload&gt;</c>, …); when a precheck or postcheck line is not a
 /// <c>%PERL -e</c> one-liner <see cref="UpstreamPerlOneLiner"/> interprets; when it needs a server other than <c>http</c> (the
-/// one emulated), <c>http-ipv6</c> (the same emulation on <c>%HOST6IP</c>:<c>%HTTP6PORT</c>), <c>http-proxy</c> (the same emulation on <c>%PROXYPORT</c>), <c>socks4</c> or <c>socks5</c> (<see cref="SocksServerConnector"/> on <c>%SOCKSPORT</c>), <c>mqtt</c> (<see cref="MqttServerConnector"/> on <c>%MQTTPORT</c>), <c>tftp</c> (<see cref="TftpServerConnector"/> on <c>%TFTPPORT</c>), <c>gopher</c> (<see cref="GopherServerConnector"/> on <c>%GOPHERPORT</c>),<c>ftp</c> (<see cref="FtpServerConnector"/> on <c>%FTPPORT</c>, control channel only, so a case whose <c>&lt;verify&gt;&lt;protocol&gt;</c> shows a data connection opening is skipped), <c>ftps</c> (<see cref="FtpsServerConnector"/> on <c>%FTPSPORT</c>, the FTP stand-in behind implicit TLS), <c>file</c> or <c>none</c>; when it needs a feature Curl lacks, or needs absent
+/// one emulated), <c>http-ipv6</c> (the same emulation on <c>%HOST6IP</c>:<c>%HTTP6PORT</c>), <c>http-unix</c> (the same emulation on the Unix socket <c>%HTTPUNIXPATH</c>),<c>http-proxy</c> (the same emulation on <c>%PROXYPORT</c>), <c>socks4</c> or <c>socks5</c> (<see cref="SocksServerConnector"/> on <c>%SOCKSPORT</c>), <c>mqtt</c> (<see cref="MqttServerConnector"/> on <c>%MQTTPORT</c>), <c>tftp</c> (<see cref="TftpServerConnector"/> on <c>%TFTPPORT</c>), <c>gopher</c> (<see cref="GopherServerConnector"/> on <c>%GOPHERPORT</c>),<c>ftp</c> (<see cref="FtpServerConnector"/> on <c>%FTPPORT</c>, control channel only, so a case whose <c>&lt;verify&gt;&lt;protocol&gt;</c> shows a data connection opening is skipped), <c>ftps</c> (<see cref="FtpsServerConnector"/> on <c>%FTPSPORT</c>, the FTP stand-in behind implicit TLS), <c>mqtts</c> and <c>gophers</c> (<see cref="MqttsServerConnector"/> and <see cref="GophersServerConnector"/>, the MQTT and Gopher stand-ins behind TLS), <c>file</c> or <c>none</c>; when it needs a feature Curl lacks, or needs absent
 /// one Curl has; when its <c>&lt;servercmd&gt;</c> holds a command the sws emulation (or, for an <c>ftp</c> or <c>ftps</c> case, the FTP stand-in) does not carry
 /// out; when it names no server and its command goes to a host name on the internet; when its
 /// command is not a plain curl command line; when a file part does not name an
-/// absolute path; when a strip line is not a substitution the harness can run; or when its expected
-/// exit code is not a number.
+/// absolute path; when a strip line is not a substitution the harness can run; or when an entry of
+/// its comma-separated list of expected exit codes is not a number.
 /// </remarks>
 internal static class UpstreamCaseScreening
 {
+    // runtests.pl at curl-8_22_0 reads stdout only from <verify>, so a <client><stdout> (test210 to
+    // test212, test407) is a comment it never checks; the harness accepts the case and ignores it too.
+    // Nor do runtests.pl, runner.pm or servers.pm read a <client><connectport> (test1316): the
+    // http-proxy sws tunnels to the port the CONNECT request names, as the proxy stand-in does (BL-2239).
     private static readonly HashSet<string> ClientParts =
-        ["name", "command", "server", "features", "file", "file1", "file2", "file3", "file4", "stdin", "killserver", "disable", "precheck", "setenv"];
+        ["name", "command", "server", "features", "file", "file1", "file2", "file3", "file4", "stdin", "stdout", "connectport", "killserver", "disable", "precheck", "setenv"];
 
+    // runtests.pl at curl-8_22_0 never reads a <verify><data> (test301's placeholder "[insert full protocol
+    // verifiction dump here]", test302's empty one), so the harness accepts and ignores it too (BL-2222).
     private static readonly HashSet<string> VerifyParts =
     [
         "protocol", "proxy", "errorcode", "stdout", "stderr", "file", "file1", "file2", "file3", "file4", "notexists",
-        "upload", "strip", "strippart", "stripfile", "stripfile1", "stripfile2", "stripfile3", "stripfile4", "limits", "valgrind", "postcheck",
+        "upload", "socks", "dns", "data", "strip", "strippart", "stripfile", "stripfile1", "stripfile2", "stripfile3", "stripfile4", "limits", "valgrind", "postcheck",
     ];
 
     // Interpreted, not source-generated, so no generated code counts against the coverage gate.
     private static readonly Regex InternetUrlHost = new(@"\bhttps?://(?<host>[A-Za-z][A-Za-z0-9-]*(?:\.[A-Za-z0-9-]+)+)", RegexOptions.CultureInvariant);
 
-    private static readonly HashSet<string> Servers = ["http", "http-ipv6", "http-proxy", "socks4", "socks5", "mqtt", "tftp", "gopher", "file", "none", .. LineProtocolServerConnector.EmulatedServers, .. MailTlsServerConnector.EmulatedServers, .. FtpsServerConnector.EmulatedServers, "sftp", "scp"];
+    private static readonly HashSet<string> Servers = ["http", "http-ipv6", "http-unix", "http-proxy", HttpsProxyServerConnector.EmulatedServer, "socks4", "socks5", "mqtt", "tftp", .. DnsServerConnector.EmulatedServers, "gopher", "gopher-ipv6", "ftp-ipv6", "file", "none", .. LineProtocolServerConnector.EmulatedServers, .. MailTlsServerConnector.EmulatedServers, .. FtpsServerConnector.EmulatedServers, .. MqttsServerConnector.EmulatedServers, .. GophersServerConnector.EmulatedServers, .. DictServerConnector.EmulatedServers, .. TelnetServerConnector.EmulatedServers, "sftp", "scp"];
+
+    // Upstream's nghttpx front of sws, emulated only when the runner is given an UpstreamHttp2Server.
+    private const string Http2Server = "http/2";
+
+    // Upstream's nghttpx-h3 front of sws, emulated only when the runner is given an UpstreamHttp3Server.
+    private const string Http3Server = "http/3";
 
     // The servers that read <servercmd> as ftpserver.pl does: the FTP stand-in, plain or behind TLS.
-    private static readonly string[] FtpServers = ["ftp", .. FtpsServerConnector.EmulatedServers];
+    private static readonly string[] FtpServers = ["ftp", "ftp-ipv6", .. FtpsServerConnector.EmulatedServers];
 
     private static readonly Regex FtpDataConnectionCommand = new(@"^LPRT\b|^CWD fully_simulated", RegexOptions.CultureInvariant | RegexOptions.Multiline);
     private static readonly Regex CurlConfigScript = new(@"\btest(?:1013|1022)\.pl\b", RegexOptions.CultureInvariant);
@@ -51,9 +63,18 @@ internal static class UpstreamCaseScreening
     /// <param name="expansion">The case's expanded file.</param>
     /// <param name="testCase">The expanded file, parsed.</param>
     /// <param name="features">The features Curl reports.</param>
+    /// <param name="emulatesHttp2">
+    /// Whether the runner has the stand-in for upstream's <c>http/2</c> server (<see cref="UpstreamHttp2Server"/>), so a
+    /// case naming that server can run (BL-2230).
+    /// </param>
+    /// <param name="emulatesHttp3">
+    /// Whether the runner has the stand-in for upstream's <c>http/3</c> server (<see cref="UpstreamHttp3Server"/>), so a
+    /// case naming that server can run (BL-2261).
+    /// </param>
     /// <returns>A sentence saying why the case is skipped, or <see langword="null"/> when it can run.</returns>
-    public static string? FindSkipReason(UpstreamTestFileExpansion expansion, UpstreamTestCase testCase, IReadOnlySet<string> features)
+    public static string? FindSkipReason(UpstreamTestFileExpansion expansion, UpstreamTestCase testCase, IReadOnlySet<string> features, bool emulatesHttp2 = false, bool emulatesHttp3 = false)
     {
+        HashSet<string> standIns = [.. emulatesHttp2 ? [Http2Server] : Array.Empty<string>(), .. emulatesHttp3 ? [Http3Server] : Array.Empty<string>()];
         Func<string?>[] checks =
         [
             () => expansion.ConditionError,
@@ -64,8 +85,7 @@ internal static class UpstreamCaseScreening
             () => UnsupportedPart(testCase, "verify", VerifyParts),
             () => UninterpretedCheck(testCase, "client", "precheck"),
             () => UninterpretedCheck(testCase, "verify", "postcheck"),
-            () => UnsupportedServer(testCase),
-            () => HttpsThroughProxy(testCase),
+            () => UnsupportedServer(testCase, standIns),
             () => FtpDataConnection(testCase),
             () => UploadOffMailServer(testCase),
             () => UnsupportedFeature(testCase, features),
@@ -96,8 +116,15 @@ internal static class UpstreamCaseScreening
             .SelectMany(section => FileParts.SelectMany(name => testCase.FindAll(section, name)))
             .FirstOrDefault(part => !Path.GetFullPath(part.GetAttribute("name")!).StartsWith(inside, StringComparison.OrdinalIgnoreCase)) is { } outside
             ? $"<{outside.Section}><{outside.Name}> names {outside.GetAttribute("name")}, outside the case's log directory"
-            : null;
+            : RedirectOutside(testCase, inside);
     }
+
+    // The command's > or >> redirect of standard output writes a file too (test321).
+    private static string? RedirectOutside(UpstreamTestCase testCase, string inside) =>
+        UpstreamCommandLineSplitter.Split(UpstreamTestPartBodies.Text(testCase.Find("client", "command"))).StandardOutputFile is { } file
+        && !Path.GetFullPath(file).StartsWith(inside, StringComparison.OrdinalIgnoreCase)
+            ? $"the command redirects its output to {file}, outside the case's log directory"
+            : null;
 
     private static string? UnresolvedVariable(UpstreamTestFileExpansion expansion) =>
         expansion.UnknownVariables.Count > 0
@@ -144,15 +171,9 @@ internal static class UpstreamCaseScreening
             _ => null,
         };
 
-    // The http-proxy stand-in relays no CONNECT tunnel to the HTTPS stand-in yet (BL-1915), so a
-    // case naming both would send its TLS handshake to the sws emulation as a request.
-    private static string? HttpsThroughProxy(UpstreamTestCase testCase) =>
-        HttpsCertificateFile(testCase) is not null && UpstreamTestPartBodies.Lines(testCase.Find("client", "server")).Contains("http-proxy")
-            ? "the http-proxy stand-in tunnels no CONNECT to the https server (BL-1915)"
-            : null;
-
-    private static string? UnsupportedServer(UpstreamTestCase testCase) =>
-        UpstreamTestPartBodies.Lines(testCase.Find("client", "server")).FirstOrDefault(server => !Servers.Contains(server) && HttpsCertificateFile(server) is null) is { } server
+    // standIns: the servers emulated only when the runner is given their stand-in (http/2, http/3).
+    private static string? UnsupportedServer(UpstreamTestCase testCase, HashSet<string> standIns) =>
+        UpstreamTestPartBodies.Lines(testCase.Find("client", "server")).FirstOrDefault(server => !Servers.Contains(server) && HttpsCertificateFile(server) is null && !standIns.Contains(server)) is { } server
             ? $"the harness does not emulate the {server} server"
             : null;
 
@@ -166,7 +187,7 @@ internal static class UpstreamCaseScreening
 
     // Only the SMTP, IMAP and FTP stand-ins, plain or behind TLS, the tftpd stand-in and the SSH stand-in's scp and SFTP record an upload (BL-1909, BL-1910, BL-1914, BL-1952, BL-1907, BL-1913, BL-1917, BL-1918); any other server's case
     // verifying <upload> keeps a reason.
-    private static readonly string[] UploadingServers = ["smtp", "imap", "smtps", "imaps", "tftp", "ftp", "ftps", "scp", "sftp"];
+    private static readonly string[] UploadingServers = ["smtp", "imap", "smtps", "imaps", "tftp", "ftp", "ftp-ipv6", "ftps", "scp", "sftp"];
 
     private static string? UploadOffMailServer(UpstreamTestCase testCase) =>
         testCase.Find("verify", "upload") is not null && !UpstreamTestPartBodies.Lines(testCase.Find("client", "server")).Intersect(UploadingServers).Any()
@@ -176,17 +197,20 @@ internal static class UpstreamCaseScreening
     /// <summary>
     /// Finds the feature that keeps the case off this platform when Curl on another platform meets
     /// every one of its <c>&lt;features&gt;</c>, such as <c>Schannel</c> off Windows, so the ratchet
-    /// can hold a listed case only where it can run (ADR-0488).
+    /// can hold a listed case only where it can run (ADR-0488). A feature in <paramref name="features"/>
+    /// that no platform reports, such as the harness's <c>Debug</c> stand-in, counts as met on every
+    /// platform, since the harness stands in for it there too (ADR-0497).
     /// </summary>
     /// <param name="testCase">The expanded file, parsed.</param>
-    /// <param name="features">The features Curl reports on this platform.</param>
+    /// <param name="features">The features Curl reports on this platform, with any the harness stands in for.</param>
     /// <returns>A sentence naming the feature, or <see langword="null"/> when this platform meets the case's features or no platform does.</returns>
     public static string? FindFeatureOfAnotherPlatform(UpstreamTestCase testCase, IReadOnlySet<string> features)
     {
         ArgumentNullException.ThrowIfNull(testCase);
         ArgumentNullException.ThrowIfNull(features);
+        string[] standIns = [.. features.Where(feature => !UpstreamCurlPlatform.All.Any(platform => platform.Features.Contains(feature)))];
         return UnsupportedFeature(testCase, features) is { } reason
-            && UpstreamCurlPlatform.All.Any(platform => UnsupportedFeature(testCase, platform.Features) is null)
+            && UpstreamCurlPlatform.All.Any(platform => UnsupportedFeature(testCase, platform.Features.Concat(standIns).ToHashSet(StringComparer.Ordinal)) is null)
             ? reason
             : null;
     }
@@ -270,12 +294,13 @@ internal static class UpstreamCaseScreening
     private static string? UnsupportedStripCode(UpstreamTestCase testCase) =>
         SubstitutionParts
             .SelectMany(name => UpstreamTestPartBodies.Lines(testCase.Find("verify", name)))
-            .FirstOrDefault(line => !UpstreamPerlSubstitution.DoesNothing(line) && UpstreamPerlSubstitution.Parse(line) is null) is { } code
+            .FirstOrDefault(line => !UpstreamPerlSubstitution.DoesNothing(line) && IUpstreamPerlLineEdit.Parse(line) is null) is { } code
             ? $"the harness does not run the Perl {code}"
             : null;
 
+    // A comma-separated list is accepted (test305's "77,60", BL-2222); any entry that is not a number is not.
     private static string? UnsupportedErrorCode(UpstreamTestCase testCase) =>
-        UpstreamTestPartBodies.Text(testCase.Find("verify", "errorcode")).Trim() is { Length: > 0 } code && !int.TryParse(code, out _)
+        UpstreamTestPartBodies.Text(testCase.Find("verify", "errorcode")).Trim() is { Length: > 0 } code && UpstreamCaseVerification.ExpectedExitCodes(code).Contains(int.MinValue)
             ? $"the expected exit code {code} is not a number"
             : null;
 }

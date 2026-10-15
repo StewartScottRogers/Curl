@@ -18,10 +18,12 @@ namespace Curl.Conformance;
 /// against the uploaded message with <c>&lt;strippart&gt;</c> run on it but no <c>&lt;strip&gt;</c>; the <c>--output</c> file against <c>&lt;datacheck&gt;</c> (and <c>&lt;datacheck1&gt;</c> to
 /// <c>&lt;datacheck9&gt;</c> after it), or <c>&lt;data&gt;</c> when there is none, unless
 /// <c>&lt;data&gt;</c> says <c>nocheck</c> or both are empty and it does not say <c>sendzero</c>;
+/// <c>&lt;socks&gt;</c> against what the socksd emulation logged, as written; <c>&lt;dns&gt;</c>
+/// against the dnsd emulation's query lines, both sorted, the logged ones kept only where its <c>host</c> pattern matches;
 /// <c>&lt;stdout&gt;</c> and <c>&lt;stderr&gt;</c> with <c>&lt;stripfile&gt;</c> run on the output;
 /// each <c>&lt;file&gt;</c> to <c>&lt;file4&gt;</c> against the named file with the matching
 /// <c>&lt;stripfileN&gt;</c>; <c>&lt;notexists&gt;</c>; and last the exit code against
-/// <c>&lt;errorcode&gt;</c>, 0 when absent.
+/// <c>&lt;errorcode&gt;</c>, any one of its comma-separated codes, 0 when absent.
 /// </para>
 /// <para>
 /// A verify part whose body is the line <c>%EMPTY</c> expects no bytes at all.
@@ -56,6 +58,8 @@ internal static class UpstreamCaseVerification
             () => CompareProtocol(testCase, "protocol", run.ReceivedBytes, stripMatchTimeout),
             () => CompareProtocol(testCase, "proxy", run.ProxyReceivedBytes, stripMatchTimeout),
             () => CompareUpload(testCase, run.UploadedBytes),
+            () => CompareSocks(testCase, run.SocksLog),
+            () => CompareDns(testCase, run.DnsLog),
             () => CompareReplyData(testCase, run.OutputFileBytes),
             () => CompareOutput(testCase, "stdout", "stripfile", run.StandardOutput),
             () => CompareStandardError(testCase, run),
@@ -93,6 +97,29 @@ internal static class UpstreamCaseVerification
         testCase.Find("verify", "upload") is { } part
             ? UpstreamFirstDifference.Describe("<verify><upload>", Expected(part), Strip(uploaded, [], Substitutions(testCase, "strippart")))
             : null;
+
+    // runtests.pl compares socksd's dump file with <socks> as written, with no strip (test719 to test721).
+    private static string? CompareSocks(UpstreamTestCase testCase, byte[] socksLog) =>
+        testCase.Find("verify", "socks") is { } part
+            ? UpstreamFirstDifference.Describe("<verify><socks>", Expected(part), socksLog)
+            : null;
+
+    // runtests.pl sorts dnsd.input's lines and <dns>'s, keeps only the logged lines its host attribute
+    // matches as a Perl pattern when it has one (test2104 leaves out curl's HTTPS queries), and compares them.
+    private static string? CompareDns(UpstreamTestCase testCase, string dnsLog)
+    {
+        if (testCase.Find("verify", "dns") is not { } part)
+        {
+            return null;
+        }
+
+        Regex? host = part.GetAttribute("host") is { } pattern ? UpstreamRegex.TryCreate(pattern, RegexOptions.None) : null;
+        IEnumerable<string> logged = dnsLog.Split('\n', StringSplitOptions.RemoveEmptyEntries).Where(line => host?.IsMatch(line) ?? true);
+        return UpstreamFirstDifference.Describe("<verify><dns>", SortedLines(UpstreamTestPartBodies.Lines(part)), SortedLines(logged));
+    }
+
+    private static byte[] SortedLines(IEnumerable<string> lines) =>
+        Encoding.Latin1.GetBytes(string.Concat(lines.Order(StringComparer.Ordinal).Select(line => line + "\n")));
 
     private static string? CompareReplyData(UpstreamTestCase testCase, byte[] outputFile)
     {
@@ -159,11 +186,19 @@ internal static class UpstreamCaseVerification
             ? $"<verify><notexists>: {path} exists"
             : null;
 
+    // runtests.pl splits <errorcode> on commas and accepts any listed code (test305's "77,60"); screening
+    // has already skipped a case with an entry that is not a number.
     private static string? CompareExitCode(UpstreamTestCase testCase, int exitCode)
     {
-        int expected = int.TryParse(UpstreamTestPartBodies.Text(testCase.Find("verify", "errorcode")).Trim(), out int code) ? code : 0;
-        return exitCode == expected ? null : $"<verify><errorcode>: expected exit code {expected}, got {exitCode}";
+        string text = UpstreamTestPartBodies.Text(testCase.Find("verify", "errorcode")).Trim() is { Length: > 0 } listed ? listed : "0";
+        return ExpectedExitCodes(text).Contains(exitCode) ? null : $"<verify><errorcode>: expected exit code {text}, got {exitCode}";
     }
+
+    /// <summary>The exit codes an <c>&lt;errorcode&gt;</c> lists, split on commas as <c>runtests.pl</c> does.</summary>
+    /// <param name="text">The part's trimmed, non-empty text.</param>
+    /// <returns>Each listed code, with <see cref="int.MinValue"/> for an entry that is not a number.</returns>
+    internal static int[] ExpectedExitCodes(string text) =>
+        text.Split(',', StringSplitOptions.TrimEntries).Select(entry => int.TryParse(entry, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out int code) ? code : int.MinValue).ToArray();
 
     // nonewline before crlf, as runtests.pl chomps the last line before subnewlines: forcing CRLF
     // first would leave a carriage return the request never ends in.
@@ -183,13 +218,13 @@ internal static class UpstreamCaseVerification
             _ => body,
         };
 
-    private static UpstreamPerlSubstitution[] Substitutions(UpstreamTestCase testCase, string name) =>
+    private static IUpstreamPerlLineEdit[] Substitutions(UpstreamTestCase testCase, string name) =>
         UpstreamTestPartBodies.Lines(testCase.Find("verify", name))
-            .Select(UpstreamPerlSubstitution.Parse).OfType<UpstreamPerlSubstitution>().ToArray();
+            .Select(IUpstreamPerlLineEdit.Parse).OfType<IUpstreamPerlLineEdit>().ToArray();
 
     // Removes the lines a strip pattern matches, runs each substitution on the rest, and drops
     // the lines that end up empty.
-    private static byte[] Strip(byte[] body, Regex[] strips, UpstreamPerlSubstitution[] substitutions)
+    private static byte[] Strip(byte[] body, Regex[] strips, IUpstreamPerlLineEdit[] substitutions)
     {
         StringBuilder result = new();
         foreach (string line in UpstreamTestLines.SplitAfterLineFeeds(Encoding.Latin1.GetString(body)))

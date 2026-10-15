@@ -1,11 +1,15 @@
 using System.Globalization;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using Curl.Cli;
+using Curl.Conformance.Http2Server;
+using Curl.Conformance.Http3Server;
 using Curl.Conformance.SshServer;
 using Curl.Console;
 using Curl.Networking;
 using Curl.Protocol.Ssh;
 using Curl.Testing;
+using Curl.Tls;
 
 namespace Curl.Conformance;
 
@@ -349,32 +353,31 @@ public sealed class UpstreamConformanceTests
         Assert.IsEmpty(skippedForAVariable, string.Join("; ", skippedForAVariable));
     }
 
-    // The stand-in for upstream's test sshd, on %SSHPORT, with its account and fixed keys (BL-1916).
-    // On Windows Curl matches curl's WinCNG build, which reads no Ed25519 key and offers no
-    // ssh-ed25519 host key, so the client key files are the RSA pair and the fingerprints the
-    // RSA host key's; elsewhere the Ed25519 ones (BL-1954).
-    private static readonly UpstreamSshServer SshServer = OperatingSystem.IsWindows()
-        ? new(
-            () => new SshServerConnector(new SystemSshRandomSource()),
-            SshServerClientAccount.User,
-            Encoding.ASCII.GetBytes(SshServerRsaClientKey.PrivateKeyPem),
-            Encoding.ASCII.GetBytes(SshServerRsaClientKey.PublicKeyLine + "\n"),
-            SshServerRsaHostKey.Md5Fingerprint,
-            SshServerRsaHostKey.Sha256Fingerprint)
-        : new(
-            () => new SshServerConnector(new SystemSshRandomSource()),
-            SshServerClientAccount.User,
-            SshServerClientAccount.CreatePrivateKeyFile(),
-            SshServerClientAccount.CreatePublicKeyFile(),
-            SshServerHostKey.Md5Fingerprint,
-            SshServerHostKey.Sha256Fingerprint);
+    // The stand-in for upstream's test sshd, on %SSHPORT, for the platform's curl build:
+    // the RSA keys for curl's WinCNG build on Windows, the Ed25519 ones elsewhere (BL-1954, BL-2217).
+    private static readonly UpstreamSshServer SshServer = UpstreamSshServerFactory.Create(OperatingSystem.IsWindows());
+
+    // The stand-in for upstream's http/2 server, nghttpx serving h2c in front of sws, on %HTTP2PORT (BL-2230), and HTTP/2 over TLS on %HTTP2TLSPORT (BL-2245).
+    private static readonly UpstreamHttp2Server Http2Server = new(UpstreamHttp2ServerFactory.Create, UpstreamHttp2ServerFactory.CreateTls);
+
+    // The stand-in for upstream's http/3 server, nghttpx-h3 in front of sws, on %HTTP3PORT (BL-2261). The generated
+    // test-localhost.pem holds a P-256 key, so the TLS settings sign with ECDSA; the server's own transport parameters
+    // replace the ones given here.
+    private static readonly UpstreamHttp3Server Http3Server = new((backend, certificate) => UpstreamHttp3ServerFactory.Create(
+        backend,
+        new Http3ServerTlsSettings
+        {
+            CertificateChain = [certificate.RawData],
+            SigningKey = new EcdsaTlsSigningKey(certificate.GetECDsaPrivateKey()!),
+            QuicTransportParameters = Http3ServerConnection.DefaultTransportParameters.Encode(),
+        }));
 
     private static async Task<UpstreamCaseOutcome> RunCaseOnceAsync(int testNumber, byte[] testFile)
     {
         DirectoryInfo logDirectory = Directory.CreateDirectory(Path.Combine(LogFolder, $"test{testNumber}-{Guid.NewGuid():N}"));
         try
         {
-            UpstreamCaseRunner runner = new(RunCurlAsync, PlatformFor(testFile), TimeProvider.System, TimeLimit, SshServer);
+            UpstreamCaseRunner runner = new(RunCurlAsync, PlatformFor(testFile), TimeProvider.System, TimeLimit, SshServer, Http2Server, Http3Server);
             return await Task.Run(() => runner.RunAsync(testNumber, testFile, logDirectory.FullName, certificateDirectory: CertificateFolder.Value, sourceDirectory: UpstreamTestDataFolder)).WaitAsync(CaseHangLimit);
         }
         catch (TimeoutException)
@@ -393,9 +396,28 @@ public sealed class UpstreamConformanceTests
     // Upstream's httpsig cases rely on the Debug feature, which lets a test fix the signing time at
     // created=0 (CURL_FORCETIME with CURL_HTTPSIG_CREATED). The harness stands in for it: it reports Debug to a
     // case that also names httpsig, and RunCurlAsync signs those commands with a clock fixed at the epoch (BL-2183).
-    // Every other case sees no Debug, so the other Debug cases stay skipped.
-    private static UpstreamCurlPlatform PlatformFor(byte[] testFile) =>
-        Encoding.Latin1.GetString(testFile).Contains("\nhttpsig\n", StringComparison.Ordinal) ? Platform.WithFeatures(["Debug"]) : Platform;
+    // The HSTS cases that fix the clock with CURL_TIME (446, 780-783) rely on it too: the harness reports Debug to a
+    // case naming the HSTS feature and setting CURL_TIME, and RunCurlAsync has Curl honour CURL_TIME as the HSTS clock
+    // (ADR-0493, BL-2234), and CURL_HSTS_HTTP, when set, as learning HSTS over plain http (ADR-0494, BL-2250).
+    // The Alt-Svc cases that set CURL_ALTSVC_HTTP (358, 359) rely on it to learn and look up Alt-Svc over plain http:
+    // the harness reports Debug to a case naming the alt-svc feature and setting CURL_ALTSVC_HTTP, and RunCurlAsync has
+    // Curl honour it (ADR-0497, BL-2263). The cases against nghttpx's TLS front on %HTTP2TLSPORT (2400, 2401, 2406) name
+    // Debug only because upstream runs its http/2 cases on debug builds; they use nothing debug-only, so the harness
+    // reports Debug to a case whose command names %HTTP2TLSPORT. Every other case sees no Debug, so the other Debug cases stay skipped.
+    // A case naming the dns server (2102 to 2104) relies on override-dns, the debug build's CURL_DNS_SERVER: the harness
+    // reports it to that case alone, and RunCurlAsync has Curl ask the dnsd stand-in on %DNSPORT through the datagram connector (ADR-0492, BL-2232).
+    private static UpstreamCurlPlatform PlatformFor(byte[] testFile)
+    {
+        string text = Encoding.Latin1.GetString(testFile);
+        bool standsInForDebug = text.Contains("\nhttpsig\n", StringComparison.Ordinal)
+            || (text.Contains("\nHSTS\n", StringComparison.Ordinal) && text.Contains("\nCURL_TIME=", StringComparison.Ordinal))
+            || (text.Contains("\nalt-svc\n", StringComparison.Ordinal) && text.Contains("\nCURL_ALTSVC_HTTP=", StringComparison.Ordinal))
+            || text.Contains(":%HTTP2TLSPORT/", StringComparison.Ordinal);
+        UpstreamCurlPlatform platform = standsInForDebug ? Platform.WithFeatures(["Debug"]) : Platform;
+        return text.Contains("\n<server>\n", StringComparison.Ordinal) && text.Contains("\ndns\n", StringComparison.Ordinal)
+            ? platform.WithFeatures(["override-dns"])
+            : platform;
+    }
 
     private static readonly string CaseHangLimitMessage =
         $"the case did not finish within {CaseHangLimit.TotalSeconds.ToString(CultureInfo.InvariantCulture)} seconds";
@@ -437,8 +459,15 @@ public sealed class UpstreamConformanceTests
                 Platform,
                 TimeProvider.System,
                 TimeLimit,
-                SshServer);
+                SshServer,
+                Http2Server);
             UpstreamCaseOutcome outcome = await runner.RunAsync(testNumber, testFile, logDirectory.FullName, certificateDirectory: CertificateFolder.Value);
+
+            // test471 needs http/2, which the Schannel build Curl matches on Windows lacks (ADR-0488, BL-2230).
+            if (outcome.RunsOnlyOnAnotherPlatform)
+            {
+                Assert.Inconclusive(outcome.Detail);
+            }
 
             Assert.AreEqual(UpstreamCaseOutcomeKind.Passed, outcome.Kind, outcome.Detail);
         }
@@ -465,7 +494,11 @@ public sealed class UpstreamConformanceTests
             readEnvironmentVariable: name => invocation.EnvironmentVariables.GetValueOrDefault(name),
             ftpListener: invocation.ConnectionListener,
             defaultConfigFileSearch: new DefaultConfigFileSearch(name => invocation.EnvironmentVariables.GetValueOrDefault(name), OperatingSystem.IsWindows(), executableDirectory: null, accountHomeDirectory: null),
-            signingClock: invocation.Arguments.Any(argument => argument.StartsWith("--httpsig", StringComparison.Ordinal)) ? new UnixEpochClock() : null).RunAsync(invocation.Arguments);
+            signingClock: invocation.Arguments.Any(argument => argument.StartsWith("--httpsig", StringComparison.Ordinal)) ? new UnixEpochClock() : null,
+            honoursHstsTimeVariable: true,
+            honoursHstsHttpVariable: true,
+            honoursAltSvcHttpVariable: true,
+            honoursDnsServerVariable: true).RunAsync(invocation.Arguments);
 
     // The signing time of upstream's debug build under CURL_FORCETIME and CURL_HTTPSIG_CREATED=0.
     private sealed class UnixEpochClock : TimeProvider
@@ -473,13 +506,8 @@ public sealed class UpstreamConformanceTests
         public override DateTimeOffset GetUtcNow() => DateTimeOffset.UnixEpoch;
     }
 
-    private static string GenerateCertificates()
-    {
-        string certificateDirectory = Path.Combine(AppContext.BaseDirectory, "UpstreamCertificates");
-        new UpstreamTestCertificateGenerator(TimeProvider.System)
-            .Generate(Path.Combine(UpstreamTestDataFolder, "certs"), Path.Combine(certificateDirectory, "certs"));
-        return certificateDirectory;
-    }
+    private static string GenerateCertificates() => UpstreamCertificateFolder.Prepare(
+        Path.Combine(UpstreamTestDataFolder, "certs"), Path.Combine(AppContext.BaseDirectory, "UpstreamCertificates"), TimeProvider.System);
 
     // A run that timed out may still hold a file open; the temporary folder is left to the system then.
     // With CURL_UPSTREAM_KEEP_LOGS=1 the folder is kept and its path printed to the test's output (BL-2155).

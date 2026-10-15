@@ -1064,18 +1064,20 @@ public sealed partial class HttpProtocolHandlerTests
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_LocationOn200WhileFollowing_WritesTheBodyAndReportsNoTarget()
+    [DataRow("200 OK")]
+    [DataRow("404 Not Found")]
+    public async Task ExecuteAsync_LocationOnNon3xxWhileFollowing_WritesTheBodyAndReportsTheTarget(string status)
     {
         MemoryStream output = new();
-        Diagnostics.Arrange("follow, scripted response", "True, 200 OK with Location: /x, body hello");
+        Diagnostics.Arrange("follow, scripted response", $"True, {status} with Location: /x, body hello");
 
-        TransferResult result = await Handler(QueueConnector.For(Connection("HTTP/1.1 200 OK\r\nLocation: /x\r\nContent-Length: 5\r\n\r\nhello", 65536)))
+        TransferResult result = await Handler(QueueConnector.For(Connection($"HTTP/1.1 {status}\r\nLocation: /x\r\nContent-Length: 5\r\n\r\nhello", 65536)))
             .ExecuteAsync(FollowContext("http://example.com/", output));
 
         WriteResult(result);
-        Diagnostics.Assert("redirect url", "(null)", result.Report!.RedirectUrl ?? "(null)");
+        Diagnostics.Assert("redirect url", "http://example.com/x", result.Report!.RedirectUrl ?? "(null)");
         Diagnostics.Assert("body", "hello", Latin1(output.ToArray()));
-        Assert.IsNull(result.Report!.RedirectUrl);
+        Assert.AreEqual("http://example.com/x", result.Report!.RedirectUrl);
         Assert.AreEqual("hello", Latin1(output.ToArray()));
     }
 

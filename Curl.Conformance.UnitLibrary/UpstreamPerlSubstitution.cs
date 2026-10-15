@@ -8,11 +8,15 @@ namespace Curl.Conformance;
 /// <c>runtests.pl</c> runs with <c>eval</c> on each line of an output. Only the form nearly every
 /// case uses is carried out, a substitution <c>s/pattern/replacement/flags</c> with any
 /// punctuation or symbol as the delimiter and flags from <c>gimsx</c>; the pattern is run as a
-/// .NET regular expression.
+/// .NET regular expression. A substitution may be followed by <c>or $_ = ''</c> (test1287), which
+/// empties a line the pattern does not match, as Perl's <c>or</c> runs the assignment when
+/// <c>s///</c> replaced nothing.
 /// </summary>
-internal sealed class UpstreamPerlSubstitution
+internal sealed class UpstreamPerlSubstitution : IUpstreamPerlLineEdit
 {
     private const string SupportedFlags = "gimsx";
+
+    private static readonly string[] EmptyingSuffixes = [" or $_ = ''", " or $_ = \"\""];
 
     private readonly Regex pattern;
     private readonly string replacement;
@@ -24,6 +28,8 @@ internal sealed class UpstreamPerlSubstitution
         this.replacement = replacement;
         this.replacesEvery = replacesEvery;
     }
+
+    private bool EmptiesUnmatchedLine { get; init; }
 
     /// <summary>Whether a line of a strip part is Perl that does nothing: blank, or a comment.</summary>
     /// <param name="line">The line, without its line feed.</param>
@@ -37,6 +43,8 @@ internal sealed class UpstreamPerlSubstitution
     public static UpstreamPerlSubstitution? Parse(string line)
     {
         string code = line.Trim().TrimEnd(';');
+        string? suffix = EmptyingSuffixes.FirstOrDefault(ending => code.EndsWith(ending, StringComparison.Ordinal));
+        code = code[..(code.Length - (suffix?.Length ?? 0))];
         if (!StartsAsSubstitution(code))
         {
             return null;
@@ -45,15 +53,22 @@ internal sealed class UpstreamPerlSubstitution
         char delimiter = code[1];
         List<string> pieces = SplitOnDelimiter(code[2..], delimiter);
         return pieces.Count == 3 && HasOnlySupportedFlags(pieces[2])
-            ? Create(pieces[0], UnescapePerlReplacement(pieces[1]), pieces[2])
+            ? Create(pieces[0], UnescapePerlReplacement(pieces[1]), pieces[2], suffix is not null)
             : null;
     }
 
     /// <summary>Runs the substitution on one line.</summary>
     /// <param name="line">The line, with its line feed.</param>
-    /// <returns>The line after the substitution.</returns>
+    /// <returns>The line after the substitution, or an empty line when the code empties a line the pattern does not match.</returns>
     public string Apply(string line) =>
-        pattern.Replace(line, replacement, replacesEvery ? -1 : 1);
+        EmptiesUnmatchedLine && !pattern.IsMatch(line)
+            ? string.Empty
+            : pattern.Replace(line, replacement, replacesEvery ? -1 : 1);
+
+    /// <summary>Matches the substitution's pattern against one line, as Perl's <c>s///</c> does before it replaces.</summary>
+    /// <param name="line">The line, with its line feed.</param>
+    /// <returns>The first match, whose groups are Perl's <c>$1</c>, <c>$2</c> and so on.</returns>
+    public Match Match(string line) => pattern.Match(line);
 
     private static bool StartsAsSubstitution(string code) =>
         code.Length >= 2 && code[0] == 's' && IsDelimiter(code[1]);
@@ -81,7 +96,7 @@ internal sealed class UpstreamPerlSubstitution
     private static bool IsDelimiter(char character) =>
         char.IsPunctuation(character) || char.IsSymbol(character);
 
-    private static UpstreamPerlSubstitution? Create(string patternText, string replacement, string flags)
+    private static UpstreamPerlSubstitution? Create(string patternText, string replacement, string flags, bool emptiesUnmatchedLine)
     {
         RegexOptions options = RegexOptions.CultureInvariant
             | (flags.Contains('i', StringComparison.Ordinal) ? RegexOptions.IgnoreCase : RegexOptions.None)
@@ -89,7 +104,7 @@ internal sealed class UpstreamPerlSubstitution
             | (flags.Contains('s', StringComparison.Ordinal) ? RegexOptions.Singleline : RegexOptions.None)
             | (flags.Contains('x', StringComparison.Ordinal) ? RegexOptions.IgnorePatternWhitespace : RegexOptions.None);
         return UpstreamRegex.TryCreate(patternText, options) is { } regex
-            ? new UpstreamPerlSubstitution(regex, replacement, flags.Contains('g', StringComparison.Ordinal))
+            ? new UpstreamPerlSubstitution(regex, replacement, flags.Contains('g', StringComparison.Ordinal)) { EmptiesUnmatchedLine = emptiesUnmatchedLine }
             : null;
     }
 

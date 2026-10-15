@@ -325,6 +325,21 @@ public sealed class TransferWriteOutVariables(
         return null;
     }
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// The earlier responses of a <c>-L</c> chain come first, then the last response; each
+    /// value is trimmed of spaces and tabs at both ends.
+    /// </remarks>
+    public IReadOnlyList<string> FindAllHeaderValues(string name)
+    {
+        ArgumentNullException.ThrowIfNull(name);
+        return report.EarlierResponseHeaders
+            .Concat(report.ResponseHeaders)
+            .Where(header => string.Equals(header.Key, name, StringComparison.OrdinalIgnoreCase))
+            .Select(header => header.Value.Trim(HeaderValueWhitespace))
+            .ToArray();
+    }
+
     /// <summary>
     /// The object <c>%{json}</c> prints on one line: every variable in
     /// <see cref="JsonMemberNames"/>, then <c>curl_version</c>.

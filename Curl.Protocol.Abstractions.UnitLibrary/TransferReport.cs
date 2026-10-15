@@ -61,6 +61,13 @@ public sealed record TransferReport
     public IReadOnlyList<KeyValuePair<string, string>> PseudoHeaders { get; init; } = [];
 
     /// <summary>
+    /// Gets every header of every response before the last one in a <c>-L</c> chain, hop by
+    /// hop and in the order received, duplicates kept; empty when no redirect was followed.
+    /// <c>%header{name:all:separator}</c> writes these values before the last response's.
+    /// </summary>
+    public IReadOnlyList<KeyValuePair<string, string>> EarlierResponseHeaders { get; init; } = [];
+
+    /// <summary>
     /// Gets the last response's <c>Content-Type</c> value, the source of
     /// <c>%{content_type}</c>; <see langword="null" /> when absent.
     /// </summary>
@@ -193,4 +200,13 @@ public sealed record TransferReport
     /// when no server picked one, or for a transfer that is not HTTP.
     /// </summary>
     public HttpAuthSchemes AuthSchemePicked { get; init; }
+
+    /// <summary>
+    /// Gets the Digest <c>Authorization</c> value the transfer's last request to the origin was
+    /// sent with, which a followed redirect to a hop that may be sent credentials carries as
+    /// <see cref="HttpRequestOptions.KeptDigestAuthorization" /> (upstream test1286, BL-2252);
+    /// <see langword="null" /> when that request sent no Digest value, or for a transfer that is
+    /// not HTTP.
+    /// </summary>
+    public string? DigestAuthorizationSent { get; init; }
 }

@@ -390,6 +390,31 @@ public sealed class TransferWriteOutVariablesTests
     }
 
     [TestMethod]
+    public void FindAllHeaderValues_RedirectChain_EarlierResponsesFirstTrimmedCaseInsensitively()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        // Upstream test764: a 301 sending This: one, This: two, then a 200 sending This: three,
+        // This: four; curl 8.22.0 -L -w '%header{this:all:***}' wrote one***two***three***four.
+        TransferReport report = new()
+        {
+            EarlierResponseHeaders = [new("This", "one"), new("Location", "/2"), new("this", " two\t")],
+            ResponseHeaders = [new("THIS", "three"), new("Other", "x"), new("This", "four")],
+        };
+        diagnostics.Arrange("earlier response header count", report.EarlierResponseHeaders.Count);
+        diagnostics.Arrange("response header count", report.ResponseHeaders.Count);
+        TransferWriteOutVariables variables = WithReport(report);
+
+        string all = string.Join("|", variables.FindAllHeaderValues("this"));
+        diagnostics.Act("all 'this'", all);
+
+        diagnostics.Assert("all 'this'", "one|two|three|four", all);
+        Assert.AreEqual("one|two|three|four", all);
+        Assert.IsEmpty(variables.FindAllHeaderValues("missing"));
+        Assert.AreEqual("three", variables.FindFirstHeaderValue("this"));
+        Assert.ThrowsExactly<ArgumentNullException>(() => variables.FindAllHeaderValues(null!));
+    }
+
+    [TestMethod]
     public void TryGetVariableText_PseudoHeaders_CountTowardsNumHeadersButAreNeverFound()
     {
         var diagnostics = TestDiagnostics.For(TestContext);

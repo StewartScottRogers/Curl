@@ -101,6 +101,10 @@ as curl.se's build looks them up; an entry for another host or port is dialled (
 `h3` one over HTTP/3 alone, an `h1` or `h2` one over TCP with ALPN choosing; an `h3` entry naming the
 origin itself makes a transfer without a version option race HTTP/3 against TCP. `RedirectFollower`
 calls `ApplyTo` again for each hop. Measured (ADR-0214, BL-623 Notes; ADR-0226, BL-733 Notes).
+The HTTP handler hands the cache every `Alt-Svc` header, `http` or `https`, and the cache decides: behind
+`CreateRunner(honoursAltSvcHttpVariable: true)` a set `CURL_ALTSVC_HTTP` makes it learn and look up a plain
+`http` origin as an `https` one (`AltSvcTransferCache.OpenAsync`'s `usesOverHttp`), as curl's debug build
+does; the shipped `curl` never turns it on (ADR-0497, BL-2263).
 
 The run holds one HSTS cache, `Curl.Core`'s `HstsTransferPolicy`, shared by every transfer of every
 group with or without `--hsts`. Under `--hsts <file>` each transfer reads the file (`HstsCacheFile`)
@@ -109,7 +113,7 @@ file, whatever the outcome; one that cannot be written is left alone, and `--hst
 An `http` URL whose host the cache knows is switched to `https` (the scheme only; an explicit port
 stays), `-v` printing `* Switched from HTTP to HTTPS due to HSTS => <url>`; `RedirectFollower` learns
 every hop's `https` `Strict-Transport-Security` and switches a known `http` redirect target the same
-way before `--proto-redir` checks it. Measured on curl 8.21.0 (ADR-0218, BL-621 Notes).
+way before `--proto-redir` checks it. Measured on curl 8.21.0 (ADR-0218, BL-621 Notes). Behind the harness seam `CreateRunner(honoursHstsTimeVariable: true)`, a `CURL_TIME` of whole seconds fixes that cache's clock (`FixedWallClock`, `ClockOverridingHstsStore`), as curl's debug build does; the shipped `curl` never turns it on (ADR-0493, BL-2234). Behind `CreateRunner(honoursHstsHttpVariable: true)` a set `CURL_HSTS_HTTP` makes the cache learn `Strict-Transport-Security` over plain `http` too (`HstsTransferPolicy`'s `learnsOverHttp`), as curl's debug build does; the HTTP handler hands the store every such header and the store decides (ADR-0494, BL-2250).
 
 Each URL's output comes from `CommandLineOptions.UrlOutputs`: an `-o` name, or for `-O` /
 `--remote-name-all` the name `RemoteFileName` takes from the URL path (last non-empty

@@ -195,6 +195,20 @@ public sealed class UpstreamCaseVerificationTests
         Assert.IsNotNull(differing);
     }
 
+    // runtests.pl reads stdout only from <verify>: a <client><stdout> is never compared (BL-2221).
+    [TestMethod]
+    public void FindFirstDifference_ClientStdout_IsNotComparedWhetherOrNotTheOutputMatches()
+    {
+        string sections = "<client>\n<stdout>\ndata blobb\n</stdout>\n</client>\n";
+
+        string? matching = Verify(sections, Run(standardOutput: "data blobb\n"));
+        string? differing = Verify(sections, Run(standardOutput: "something else\n"));
+
+        ExpectDifference(null, differing);
+        Assert.IsNull(matching);
+        Assert.IsNull(differing);
+    }
+
     [TestMethod]
     public void FindFirstDifference_StdoutThatDiffers_NamesIt()
     {
@@ -297,6 +311,57 @@ public sealed class UpstreamCaseVerificationTests
         string? difference2 = Verify("", Run(exitCode: 6));
         ExpectDifference("<verify><errorcode>: expected exit code 0, got 6", difference2);
         Assert.AreEqual("<verify><errorcode>: expected exit code 0, got 6", difference2);
+    }
+
+    // runtests.pl splits <errorcode> on commas and accepts any of the listed codes (test305, test405).
+    [TestMethod]
+    [DataRow(77, null)]
+    [DataRow(60, null)]
+    [DataRow(35, "<verify><errorcode>: expected exit code 77, 60, got 35")]
+    public void FindFirstDifference_ExitCodeList_PassesForAnyListedCode(int exitCode, string? expected)
+    {
+        string? difference = Verify("<verify>\n<errorcode>\n77, 60\n</errorcode>\n</verify>\n", Run(exitCode: exitCode));
+
+        ExpectDifference(expected, difference);
+        Assert.AreEqual(expected, difference);
+    }
+
+    // runtests.pl never reads a <verify><data>, so test301's placeholder is not compared with anything.
+    [TestMethod]
+    public void FindFirstDifference_VerifyDataPlaceholder_IsIgnored()
+    {
+        string? difference = Verify("<verify>\n<data>\n[insert full protocol verifiction dump here]\n</data>\n</verify>\n", Run(standardOutput: "body\n", outputFile: ""));
+
+        ExpectDifference(null, difference);
+        Assert.IsNull(difference);
+    }
+
+    [TestMethod]
+    public void FindFirstDifference_Socks_IsComparedWithWhatSocksdLogged()
+    {
+        const string sections = "<verify>\n<socks>\natyp 1 => 12.34.56.78\n</socks>\n</verify>\n";
+
+        string? matching = Verify(sections, new UpstreamCaseRun(0, [], [], [], []) { SocksLog = Bytes("atyp 1 => 12.34.56.78\n") });
+        string? differing = Verify(sections, new UpstreamCaseRun(0, [], [], [], []) { SocksLog = Bytes("atyp 3 => host\n") });
+
+        ExpectDifference(null, matching);
+        Assert.IsNull(matching);
+        Assert.StartsWith("<verify><socks>", differing!);
+    }
+
+    [TestMethod]
+    public void FindFirstDifference_Dns_ComparesSortedLinesAndKeepsOnlyThoseItsHostPatternMatches()
+    {
+        const string sections = "<verify>\n<dns host=\"examplehost.invalid QTYPE A\">\nQNAME examplehost.invalid QTYPE A\nQNAME examplehost.invalid QTYPE AAAA\n</dns>\n</verify>\n";
+        const string unfiltered = "<verify>\n<dns>\nQNAME a QTYPE A\n</dns>\n</verify>\n";
+
+        string? matching = Verify(sections, new UpstreamCaseRun(0, [], [], [], []) { DnsLog = "QNAME examplehost.invalid QTYPE HTTPS\nQNAME examplehost.invalid QTYPE AAAA\nQNAME examplehost.invalid QTYPE A\n" });
+        string? differing = Verify(sections, new UpstreamCaseRun(0, [], [], [], []) { DnsLog = "QNAME examplehost.invalid QTYPE A\n" });
+        string? unfilteredExtraLine = Verify(unfiltered, new UpstreamCaseRun(0, [], [], [], []) { DnsLog = "QNAME a QTYPE A\nQNAME a QTYPE HTTPS\n" });
+
+        Assert.IsNull(matching);
+        Assert.StartsWith("<verify><dns>", differing!);
+        Assert.StartsWith("<verify><dns>", unfilteredExtraLine!);
     }
 
     private string? Verify(string sections, UpstreamCaseRun run) => Verify(sections, run, UpstreamRegex.MatchTimeout);
