@@ -35,13 +35,13 @@ public static class CurlVersionText
     /// <summary>
     /// The fourth line: the curl features the code gives evidence for, in curl's order (alphabetical,
     /// ignoring case): the line for Linux and macOS, the OpenSSL reference build. <see cref="WindowsFeaturesLine"/>
-    /// is the Windows line, which drops <c>GSS-API</c>, <c>HTTP2</c> and <c>HTTP3</c>
+    /// is the Windows line, which drops <c>GSS-API</c> and <c>HTTP2</c>
     /// and adds <c>SSPI</c>. ADR-0021's four, plus <c>brotli</c> and <c>libz</c> now that the registered
     /// HTTP handler decodes <c>br</c>, <c>gzip</c> and <c>deflate</c> bodies, and <c>HTTP2</c> off Windows
     /// now that <c>--http2</c> is accepted (ADR-0141, Decision 5), and <c>GSS-API</c> off Windows, and
     /// <c>Kerberos</c> and <c>SPNEGO</c> on every platform, now that <c>--negotiate</c> is answered
-    /// (ADR-0142, ADR-0176), <c>NTLM</c> on every platform now that <c>--ntlm</c> is (ADR-0181), and
-    /// <c>HTTP3</c> off Windows now that <c>--http3</c> and <c>--http3-only</c> work (ADR-0144).
+    /// (ADR-0142, ADR-0176), <c>NTLM</c> on every platform now that <c>--ntlm</c> is (ADR-0181).
+    /// No <c>HTTP3</c>: the OpenSSL reference build has no QUIC library, so it lists no <c>HTTP3</c>, though <c>--http3</c> and <c>--http3-only</c> still work over the hand-built QUIC stack (ADR-0144, ADR-0451, ADR-0521, BL-2330).
     /// No <c>TLS-SRP</c>: curl 8.22.0 dropped TLS-SRP, so its <c>lib/version.c</c> lists it no more (ADR-0480, BL-2152).
     /// BL-1417's audit added <c>alt-svc</c>, <c>HSTS</c>, <c>HTTPS-proxy</c>, <c>HTTPSRR</c>, <c>IDN</c>,
     /// <c>PSL</c>, <c>UnixSockets</c> and <c>zstd</c>, each with evidence in the code (ADR-0021 amendment).
@@ -52,7 +52,7 @@ public static class CurlVersionText
     /// <c>--ssl-sessions</c> loads and saves TLS session tickets there (ADR-0319, ADR-0519, BL-2331); the
     /// Schannel build refuses <c>--ssl-sessions</c> (ADR-0397), so <see cref="WindowsFeaturesLine"/> leaves it out.
     /// </summary>
-    public const string FeaturesLine = "Features: alt-svc AsynchDNS brotli GSS-API HSTS HTTP2 HTTP3 HTTPS-proxy HTTPSRR IDN IPv6 Kerberos Largefile libz NTLM PSL SPNEGO SSL SSLS-EXPORT threadsafe UnixSockets zstd";
+    public const string FeaturesLine = "Features: alt-svc AsynchDNS brotli GSS-API HSTS HTTP2 HTTPS-proxy HTTPSRR IDN IPv6 Kerberos Largefile libz NTLM PSL SPNEGO SSL SSLS-EXPORT threadsafe UnixSockets zstd";
 
     /// <summary>
     /// The fourth line on Windows: <see cref="FeaturesLine"/> with <c>SSPI</c> after <c>SSL</c>, as the

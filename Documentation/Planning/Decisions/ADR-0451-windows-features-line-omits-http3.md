@@ -1,6 +1,6 @@
 # ADR-0451 — `curl -V` on Windows does not list `HTTP3`
 
-- **Status:** Accepted
+- **Status:** Accepted (its premise that Linux and macOS list `HTTP3` is superseded by ADR-0521)
 - **Date:** 2026-10-08
 
 Decided by Claude under Stewart's delegation (task BL-1825, GF-0032).

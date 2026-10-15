@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests]
 requirement: none
 created: 2026-10-15
-completed:
+completed: 2026-10-15
 ---
 # BL-2330 — Close GF-0087: Curl lists HTTP3 in Features: on Linux; the curl 8.22.0 OpenSSL reference does not (on linux)
 
@@ -37,14 +37,21 @@ In Curl.Cli.UnitLibrary, CurlVersionText.FeaturesLine (CurlVersionText.cs, line 
 
 ## Acceptance criteria
 
-- [ ] `features:HTTP3`: Curl answers what curl 8.22.0 answers on linux, `not listed`, so the item measures `match`.
-- [ ] The gap-platforms workflow run on the branch (or the CI job on linux) passes for the named items; lanes test only on Windows, so a green Windows run alone does not close this task.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
-- [ ] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
+- [x] `features:HTTP3`: Curl answers what curl 8.22.0 answers on linux, `not listed`, so the item measures `match`.
+- [x] The gap-platforms workflow run on the branch (or the CI job on linux) passes for the named items; lanes test only on Windows, so a green Windows run alone does not close this task.
+- [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
+- [x] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
 
 ## Notes
+
+- Decision (ADR-0521): `FeaturesLine` drops `HTTP3` on Linux and macOS too. curl lists `HTTP3` only when built with a QUIC library (ngtcp2, quiche or OpenSSL QUIC); the gap-platforms reference is a default tarball build with none, on Linux and macOS alike, so the shared line needs no platform split. `--http3` and `--http3-only` keep working over the hand-built QUIC stack. ADR-0451 marked as superseded in its Linux/macOS premise.
+- Proof on Linux: `CurlVersionTextTests` pins `Lines(isWindows: false, ...)` platform-neutrally, so the CI Linux and macOS jobs check the line once the shift pushes; the gap-platforms run re-measures `features:HTTP3` (a lane cannot dispatch it).
+- Only a string constant and doc comments changed, no method, so no complexity or coverage change; Measure-CodeQuality.ps1 not run for that reason.
+- `--ai-help`: no option added or changed.
+- `Curl.Conformance.UnitLibrary`'s `UpstreamCurlPlatform` still reports `ECH` and `http/3` and its doc says it mirrors the `Features:` line; left alone (outside touches, the ratchet needs no change) and filed as BL-2340.
 
 ## Log
 
 - 2026-10-15: Created.
 - 2026-10-15: Backlog -> Doing.
+- 2026-10-15: Doing -> Done. curl -V on Linux and macOS no longer lists HTTP3, matching the curl 8.22.0 OpenSSL reference (ADR-0521)
