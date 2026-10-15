@@ -35,3 +35,4 @@ ADR-0506, plan phase 2 step 4; needs BL-2316. `Curl.Output.UnitLibrary/TransferW
 ## Log
 
 - 2026-10-15: Created.
+- 2026-10-15: Backlog -> Doing.
