@@ -8,7 +8,7 @@ public sealed class UpstreamCurlPlatformTests
 {
     private static readonly string[] CommonFeatures =
     [
-        "dict", "file", "gopher", "gophers", "http", "https", "ipfs", "mqtt", "mqtts", "telnet", "tftp", "ws", "wss",
+        "dict", "file", "gopher", "gophers", "http", "https", "ipfs", "mqtt", "mqtts", "scp", "sftp", "telnet", "tftp", "ws", "wss",
         "alt-svc", "AsynchDNS", "brotli", "ECH", "GSS-API", "HSTS", "http/2", "h2c", "http/3", "HTTPS-proxy",
         "HTTPSRR", "IDN", "IPv6", "Kerberos", "Largefile", "libz", "NTLM", "PSL", "SPNEGO", "SSL",
         "UnixSockets", "zstd",
@@ -105,6 +105,21 @@ public sealed class UpstreamCurlPlatformTests
         diagnostics.Assert("listed on Unix", false, onUnix);
         Assert.IsFalse(UpstreamCurlPlatform.Windows.Features.Contains(feature));
         Assert.IsFalse(UpstreamCurlPlatform.Unix.Features.Contains(feature));
+    }
+
+    [TestMethod]
+    [DataRow("sftp")]
+    [DataRow("scp")]
+    public void AllPlatforms_ListTheSshProtocolsTheHarnessEmulates(string feature)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("feature", feature);
+
+        bool onEvery = UpstreamCurlPlatform.All.All(platform => platform.Features.Contains(feature));
+
+        diagnostics.Act("listed on every platform", onEvery);
+        diagnostics.Assert("listed on every platform", true, onEvery);
+        Assert.IsTrue(onEvery);
     }
 
     [TestMethod]

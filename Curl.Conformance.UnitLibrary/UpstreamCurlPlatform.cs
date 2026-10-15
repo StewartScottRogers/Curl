@@ -8,7 +8,8 @@ namespace Curl.Conformance;
 /// <remarks>
 /// <para>
 /// A feature is listed when Curl has it, by the name upstream's <c>runtests.pl</c> gives it: the
-/// protocols the harness can serve (<c>ws</c>, <c>wss</c> and <c>ipfs</c> among them); every
+/// protocols the harness can serve (<c>ws</c>, <c>wss</c> and <c>ipfs</c> among them, and <c>sftp</c>
+/// and <c>scp</c>, which Curl serves and <c>UpstreamSshServer</c> emulates); every
 /// feature on Curl's <c>curl -V</c> <c>Features:</c> line, with <c>HTTP2</c> as <c>http/2</c> and
 /// <c>h2c</c> and <c>HTTP3</c> as <c>http/3</c>; <c>crypto</c>, which upstream derives from
 /// <c>NTLM</c>, <c>Kerberos</c> and <c>SPNEGO</c>; the tool features a curl build has unless it
@@ -34,7 +35,7 @@ public sealed class UpstreamCurlPlatform
 {
     private static readonly string[] CommonFeatures =
     [
-        "dict", "file", "gopher", "gophers", "http", "https", "ipfs", "mqtt", "mqtts", "telnet", "tftp", "ws", "wss",
+        "dict", "file", "gopher", "gophers", "http", "https", "ipfs", "mqtt", "mqtts", "scp", "sftp", "telnet", "tftp", "ws", "wss",
         "alt-svc", "AsynchDNS", "brotli", "ECH", "GSS-API", "HSTS", "http/2", "h2c", "http/3", "HTTPS-proxy",
         "HTTPSRR", "IDN", "IPv6", "Kerberos", "Largefile", "libz", "NTLM", "PSL", "SPNEGO", "SSL",
         "UnixSockets", "zstd",
