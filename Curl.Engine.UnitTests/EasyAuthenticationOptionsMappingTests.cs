@@ -1,3 +1,4 @@
+using Curl.Console;
 using System.Net;
 
 using Curl.Api.Options.Authentication;
@@ -60,7 +61,7 @@ public sealed class EasyAuthenticationOptionsMappingTests
         };
         Diagnostics.Arrange("record", authentication);
 
-        HttpRequestOptions mapped = HttpRequestOptionsMapping.Of(NoOptions, new EasyHttpOptions(), new EasyBehaviourOptions(), new EasyTransferOptions(), authentication);
+        HttpRequestOptions mapped = HttpRequestOptionsMapping.Of(EasyOptionsFromCommandLine.TransferSettingsOf(NoOptions), new EasyHttpOptions(), new EasyBehaviourOptions(), new EasyTransferOptions(), authentication);
         Diagnostics.Act("auth schemes / aws", $"{mapped.AuthSchemes} / {mapped.AwsSigV4}");
 
         Assert.AreEqual(HttpAuthSchemes.Digest, mapped.AuthSchemes);
@@ -81,7 +82,7 @@ public sealed class EasyAuthenticationOptionsMappingTests
         };
         Diagnostics.Arrange("record", authentication);
 
-        HttpRequestOptions mapped = HttpRequestOptionsMapping.Of(NoOptions, new EasyHttpOptions(), new EasyBehaviourOptions(), new EasyTransferOptions(), authentication);
+        HttpRequestOptions mapped = HttpRequestOptionsMapping.Of(EasyOptionsFromCommandLine.TransferSettingsOf(NoOptions), new EasyHttpOptions(), new EasyBehaviourOptions(), new EasyTransferOptions(), authentication);
         Diagnostics.Act("auth schemes / signature", $"{mapped.AuthSchemes} / {mapped.HttpSignature}");
 
         Assert.AreEqual(HttpAuthSchemes.None, mapped.AuthSchemes);
@@ -117,7 +118,7 @@ public sealed class EasyAuthenticationOptionsMappingTests
         };
         Diagnostics.Arrange("record", authentication);
 
-        MailRequestOptions mail = MailRequestOptionsMapping.FromCommandLine(NoOptions, new EasyTransferOptions(), new EasySmtpOptions(), authentication, "imap")!;
+        MailRequestOptions mail = MailRequestOptionsMapping.FromCommandLine(EasyOptionsFromCommandLine.TransferSettingsOf(NoOptions), new EasyTransferOptions(), new EasySmtpOptions(), authentication, "imap")!;
         Diagnostics.Act("login / authzid / ir / service", $"{mail.LoginOptions} / {mail.SaslAuthorizationIdentity} / {mail.SaslInitialResponse} / {mail.ServiceName}");
 
         Assert.AreEqual("AUTH=PLAIN", mail.LoginOptions);
@@ -136,7 +137,7 @@ public sealed class EasyAuthenticationOptionsMappingTests
         EasyAuthenticationOptions authentication = new() { UnrestrictedAuthentication = unrestricted, DisallowUserNameInUrl = disallowUserName };
         Diagnostics.Arrange("record", authentication);
 
-        RedirectPolicy policy = RedirectPolicyMapping.Of(NoOptions, new EasyHttpOptions(), authentication);
+        RedirectPolicy policy = RedirectPolicyMapping.Of(EasyOptionsFromCommandLine.TransferSettingsOf(NoOptions), new EasyHttpOptions(), authentication);
         Diagnostics.Act("trusted / disallows user", $"{policy.LocationTrusted} / {policy.DisallowsUserInUrl}");
 
         Assert.AreEqual(unrestricted, policy.LocationTrusted);
@@ -186,7 +187,7 @@ public sealed class EasyAuthenticationOptionsMappingTests
         using MemoryStream standardInput = new();
         using MemoryStream output = new();
         return new TransferContextFactory(standardInput).Create(
-            NoOptions,
+            EasyOptionsFromCommandLine.TransferSettingsOf(NoOptions),
             new EasyHttpOptions(),
             new EasyBehaviourOptions(),
             new EasyTransferOptions(),

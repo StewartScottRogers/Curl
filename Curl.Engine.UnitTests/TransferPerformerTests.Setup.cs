@@ -1,5 +1,6 @@
 using System.Text;
 using Curl.Api.Options.Http;
+using Curl.Api.Options.Network;
 using Curl.Api.Options.Protocols;
 using Curl.Cli;
 using Curl.Core;
@@ -33,7 +34,7 @@ public sealed partial class TransferPerformerTests
         CommandLineOptions options = Parse("http://exa mple.com/");
         InfoRecordingEvents events = new();
 
-        bool parsed = TransferPerformer.TryParseTransferUrl("http://exa mple.com/", options, out _, out CurlUrlRejection rejection);
+        bool parsed = TransferPerformer.TryParseTransferUrl("http://exa mple.com/", options.DisallowUsernameInUrl, options.PathAsIs, out _, out CurlUrlRejection rejection);
         TransferResult result = TransferPerformer.ReportUrlRejected(rejection, events);
 
         Assert.IsFalse(parsed);
@@ -47,7 +48,7 @@ public sealed partial class TransferPerformerTests
     {
         CommandLineOptions options = Parse("--disallow-username-in-url", "http://user@example.com/");
 
-        bool parsed = TransferPerformer.TryParseTransferUrl("http://user@example.com/", options, out _, out CurlUrlRejection rejection);
+        bool parsed = TransferPerformer.TryParseTransferUrl("http://user@example.com/", options.DisallowUsernameInUrl, options.PathAsIs, out _, out CurlUrlRejection rejection);
         TransferResult result = TransferPerformer.ReportUrlRejected(rejection, new InfoRecordingEvents());
 
         Assert.IsFalse(parsed);
@@ -73,7 +74,7 @@ public sealed partial class TransferPerformerTests
         EngineTransferState state = NewState();
 
         bool selected = TransferPerformer.TrySelectProxyAndCredentials(
-            HttpDispatch(), options, EasyOptionsFromCommandLine.ProxyOf(options), EasyOptionsFromCommandLine.AuthenticationOf(options), CurlUrl.Parse(First), state, new InfoRecordingEvents(), NoDiagnosticLog.Instance, CredentialLookup(),
+            HttpDispatch(), EasyOptionsFromCommandLine.TransferSettingsOf(options), EasyOptionsFromCommandLine.ProxyOf(options), EasyOptionsFromCommandLine.AuthenticationOf(options), CurlUrl.Parse(First), state, new InfoRecordingEvents(), NoDiagnosticLog.Instance, CredentialLookup(),
             out ProxyEndpoint? proxy, out TransferResult? failure);
 
         Assert.IsTrue(selected);
@@ -89,7 +90,7 @@ public sealed partial class TransferPerformerTests
         InfoRecordingEvents events = new();
 
         bool selected = TransferPerformer.TrySelectProxyAndCredentials(
-            HttpDispatch(), options, EasyOptionsFromCommandLine.ProxyOf(options), EasyOptionsFromCommandLine.AuthenticationOf(options), CurlUrl.Parse("gopher://example.com/"), NewState(), events, NoDiagnosticLog.Instance, CredentialLookup(),
+            HttpDispatch(), EasyOptionsFromCommandLine.TransferSettingsOf(options), EasyOptionsFromCommandLine.ProxyOf(options), EasyOptionsFromCommandLine.AuthenticationOf(options), CurlUrl.Parse("gopher://example.com/"), NewState(), events, NoDiagnosticLog.Instance, CredentialLookup(),
             out _, out TransferResult? failure);
 
         Assert.IsFalse(selected);
@@ -138,7 +139,7 @@ public sealed partial class TransferPerformerTests
         EngineTransferState state = NewState();
 
         TransferResult? failure = await sshPerformer.ResolveSshOptionsAsync(
-            Parse(SftpUrl), new EasySshOptions { HostPublicKeyMd5 = Md5Fingerprint }, CurlUrl.Parse(SftpUrl), state, () => null, (_, _) => { }, Recorder(lines));
+            EasyOptionsFromCommandLine.TransferSettingsOf(Parse(SftpUrl)), new EasySshOptions { HostPublicKeyMd5 = Md5Fingerprint }, CurlUrl.Parse(SftpUrl), state, () => null, (_, _) => { }, Recorder(lines));
 
         Assert.IsNull(failure);
         CollectionAssert.AreEqual(new[] { TransferPerformer.KnownHostsFileMissingWarning }, lines);
@@ -162,7 +163,7 @@ public sealed partial class TransferPerformerTests
         EngineTransferState state = NewState();
 
         TransferResult? failure = await sshPerformer.ResolveSshOptionsAsync(
-            Parse(First), new EasySshOptions(), CurlUrl.Parse(First), state, () => throw new AssertFailedException("searched"), (_, _) => { }, Recorder([]));
+            EasyOptionsFromCommandLine.TransferSettingsOf(Parse(First)), new EasySshOptions(), CurlUrl.Parse(First), state, () => throw new AssertFailedException("searched"), (_, _) => { }, Recorder([]));
 
         Assert.IsNull(failure);
         Assert.IsNull(state.Ssh);
@@ -175,7 +176,7 @@ public sealed partial class TransferPerformerTests
         hsts.StoreFromResponse(CurlUrl.Parse("https://example.com/"), "max-age=31536000", clock.GetUtcNow());
         InfoRecordingEvents events = new();
 
-        string url = await TransferPerformer.SwitchToHttpsForHstsAsync(hsts, Parse("http://example.com/a"), new EasyHttpOptions(), "http://example.com/a", new ReadRecordingFileSystem(), events);
+        string url = await TransferPerformer.SwitchToHttpsForHstsAsync(hsts, SettingsOf("http://example.com/a"), NetworkOf("http://example.com/a"), new EasyHttpOptions(), "http://example.com/a", new ReadRecordingFileSystem(), events);
 
         Assert.AreEqual("https://example.com/a", url);
         CollectionAssert.AreEqual(new[] { HstsTransferPolicy.SwitchedMessagePrefix + "https://example.com/a" }, events.Info);
@@ -186,7 +187,7 @@ public sealed partial class TransferPerformerTests
     {
         InfoRecordingEvents events = new();
 
-        string url = await TransferPerformer.SwitchToHttpsForHstsAsync(new HstsTransferPolicy(clock), Parse(First), new EasyHttpOptions(), First, new ReadRecordingFileSystem(), events);
+        string url = await TransferPerformer.SwitchToHttpsForHstsAsync(new HstsTransferPolicy(clock), SettingsOf(First), NetworkOf(First), new EasyHttpOptions(), First, new ReadRecordingFileSystem(), events);
 
         Assert.AreEqual(First, url);
         Assert.IsEmpty(events.Info);
@@ -200,7 +201,7 @@ public sealed partial class TransferPerformerTests
         InfoRecordingEvents events = new();
 
         string url = await TransferPerformer.SwitchToHttpsForHstsAsync(
-            new HstsTransferPolicy(clock), Parse("http://example.com/a"), new EasyHttpOptions { Hsts = "hsts.txt" }, "http://example.com/a", fileSystem, events);
+            new HstsTransferPolicy(clock), SettingsOf("http://example.com/a"), NetworkOf("http://example.com/a"), new EasyHttpOptions { Hsts = "hsts.txt" }, "http://example.com/a", fileSystem, events);
 
         CollectionAssert.AreEqual(new[] { "hsts.txt" }, fileSystem.ReadPaths);
         Assert.AreEqual("https://example.com/a", url);
@@ -215,7 +216,7 @@ public sealed partial class TransferPerformerTests
         fileSystem.ExistingContent["cookies.txt"] = Encoding.ASCII.GetBytes("example.com\tFALSE\t/\tFALSE\t0\tname\tvalue\n");
         InfoRecordingEvents events = new();
 
-        await new TransferPerformer(clock, EasyErrorText).LoadCookieFilesAsync(cookies, options, "http://example.com/", fileSystem, Stream.Null, events);
+        await new TransferPerformer(clock, EasyErrorText).LoadCookieFilesAsync(cookies, EasyOptionsFromCommandLine.TransferSettingsOf(options), "http://example.com/", fileSystem, Stream.Null, events);
 
         Assert.AreEqual("name=value", cookies.HandlerStore.GetCookieHeader(CurlUrl.Parse("http://example.com/"), false, clock.GetUtcNow(), events));
     }
@@ -227,7 +228,7 @@ public sealed partial class TransferPerformerTests
         ReadRecordingFileSystem fileSystem = new();
 
         await new TransferPerformer(clock, EasyErrorText).LoadCookieFilesAsync(
-            CookieEngine.FromHttpOptions(EasyOptionsFromCommandLine.HttpOf(options)), options, "file:///dir/x", fileSystem, Stream.Null, new InfoRecordingEvents());
+            CookieEngine.FromHttpOptions(EasyOptionsFromCommandLine.HttpOf(options)), EasyOptionsFromCommandLine.TransferSettingsOf(options), "file:///dir/x", fileSystem, Stream.Null, new InfoRecordingEvents());
 
         Assert.IsEmpty(fileSystem.ReadPaths);
     }
@@ -237,6 +238,10 @@ public sealed partial class TransferPerformerTests
     private const string Md5Fingerprint = "00112233445566778899aabbccddeeff";
 
     private static CommandLineOptions Parse(params string[] arguments) => CommandLineParser.Parse(arguments, _ => true).Options!;
+
+    private static EngineTransferSettings SettingsOf(string url) => EasyOptionsFromCommandLine.TransferSettingsOf(Parse(url));
+
+    private static EasyNetworkOptions NetworkOf(string url) => EasyOptionsFromCommandLine.NetworkOf(Parse(url));
 
     private static TransferDispatch HttpDispatch() => new(new ProtocolDispatcher([new ScriptedHandler()]));
 
@@ -250,7 +255,7 @@ public sealed partial class TransferPerformerTests
 
     private Task<TransferResult?> ResolveSshAsync(CommandLineOptions options, List<string> lines, List<(string? File, bool Missing)> recorded) =>
         sshPerformer.ResolveSshOptionsAsync(
-            options, EasyOptionsFromCommandLine.ProtocolOf(options).Ssh, CurlUrl.Parse(SftpUrl), NewState(), () => null, (file, missing) => recorded.Add((file, missing)), Recorder(lines));
+            EasyOptionsFromCommandLine.TransferSettingsOf(options), EasyOptionsFromCommandLine.ProtocolOf(options).Ssh, CurlUrl.Parse(SftpUrl), NewState(), () => null, (file, missing) => recorded.Add((file, missing)), Recorder(lines));
 
     /// <summary>Records the info lines; drops the rest.</summary>
     private sealed class InfoRecordingEvents : ITransferEvents

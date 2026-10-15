@@ -29,7 +29,7 @@ public sealed class HappyEyeballsTimeoutMappingTests
     {
         Diagnostics.Arrange("arguments", "--http3 --happy-eyeballs-timeout-ms 1000");
 
-        HttpRequestOptions http = HttpRequestOptionsMapping.Of(Parse("--http3", "--happy-eyeballs-timeout-ms", "1000"), EasyOptionsFromCommandLine.HttpOf(Parse("--http3", "--happy-eyeballs-timeout-ms", "1000")), new EasyBehaviourOptions(), new EasyTransferOptions(), new EasyAuthenticationOptions());
+        HttpRequestOptions http = HttpRequestOptionsMapping.Of(EasyOptionsFromCommandLine.TransferSettingsOf(Parse("--http3", "--happy-eyeballs-timeout-ms", "1000")), EasyOptionsFromCommandLine.HttpOf(Parse("--http3", "--happy-eyeballs-timeout-ms", "1000")), new EasyBehaviourOptions(), new EasyTransferOptions(), new EasyAuthenticationOptions());
 
         Diagnostics.Act("HappyEyeballsTimeout", http.HappyEyeballsTimeout);
 
@@ -42,7 +42,7 @@ public sealed class HappyEyeballsTimeoutMappingTests
     {
         Diagnostics.Arrange("arguments", "--http3");
 
-        HttpRequestOptions http = HttpRequestOptionsMapping.Of(Parse("--http3"), EasyOptionsFromCommandLine.HttpOf(Parse("--http3")), new EasyBehaviourOptions(), new EasyTransferOptions(), new EasyAuthenticationOptions());
+        HttpRequestOptions http = HttpRequestOptionsMapping.Of(EasyOptionsFromCommandLine.TransferSettingsOf(Parse("--http3")), EasyOptionsFromCommandLine.HttpOf(Parse("--http3")), new EasyBehaviourOptions(), new EasyTransferOptions(), new EasyAuthenticationOptions());
 
         Diagnostics.Act("HappyEyeballsTimeout", http.HappyEyeballsTimeout);
 
@@ -57,7 +57,7 @@ public sealed class HappyEyeballsTimeoutMappingTests
     {
         Diagnostics.Arrange("arguments", "--happy-eyeballs-timeout-ms 9000000000000");
 
-        HttpRequestOptions http = HttpRequestOptionsMapping.Of(Parse("--happy-eyeballs-timeout-ms", "9000000000000"), EasyOptionsFromCommandLine.HttpOf(Parse("--happy-eyeballs-timeout-ms", "9000000000000")), new EasyBehaviourOptions(), new EasyTransferOptions(), new EasyAuthenticationOptions());
+        HttpRequestOptions http = HttpRequestOptionsMapping.Of(EasyOptionsFromCommandLine.TransferSettingsOf(Parse("--happy-eyeballs-timeout-ms", "9000000000000")), EasyOptionsFromCommandLine.HttpOf(Parse("--happy-eyeballs-timeout-ms", "9000000000000")), new EasyBehaviourOptions(), new EasyTransferOptions(), new EasyAuthenticationOptions());
 
         Diagnostics.Act("HappyEyeballsTimeout", http.HappyEyeballsTimeout);
 

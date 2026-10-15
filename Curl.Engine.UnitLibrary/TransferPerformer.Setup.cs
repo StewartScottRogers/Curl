@@ -3,9 +3,9 @@ using System.Net;
 using System.Text;
 using Curl.Api.Options.Authentication;
 using Curl.Api.Options.Http;
+using Curl.Api.Options.Network;
 using Curl.Api.Options.Protocols;
 using Curl.Api.Options.Proxy;
-using Curl.Cli;
 using Curl.Core;
 using Curl.Core.Hsts;
 using Curl.Protocol.Abstractions;
@@ -80,18 +80,20 @@ internal sealed partial class TransferPerformer
     /// 8.21.0, measured, BL-626 and BL-910 Notes).
     /// </summary>
     /// <param name="text">The URL, with any <c>-G</c> / <c>--url-query</c> query.</param>
-    /// <param name="options">The transfer's option group.</param>
+    /// <param name="disallowUsernameInUrl"><c>--disallow-username-in-url</c>.</param>
+    /// <param name="pathAsIs"><c>--path-as-is</c>.</param>
     /// <param name="url">The parsed URL.</param>
     /// <param name="rejection">Why the URL was rejected.</param>
     /// <returns><see langword="true" /> when the URL parsed.</returns>
     internal static bool TryParseTransferUrl(
         string text,
-        CommandLineOptions options,
+        bool disallowUsernameInUrl,
+        bool pathAsIs,
         [NotNullWhen(true)] out CurlUrl? url,
         out CurlUrlRejection rejection) =>
-        options.DisallowUsernameInUrl
-            ? CurlUrl.TryParseDisallowingUser(text, options.PathAsIs, out url, out rejection)
-            : CurlUrl.TryParse(text, options.PathAsIs, out url, out rejection);
+        disallowUsernameInUrl
+            ? CurlUrl.TryParseDisallowingUser(text, pathAsIs, out url, out rejection)
+            : CurlUrl.TryParse(text, pathAsIs, out url, out rejection);
 
     /// <summary>
     /// Reports a transfer URL curl's parser rejects as the <c>-v</c> info line
@@ -126,11 +128,12 @@ internal sealed partial class TransferPerformer
     /// <summary>
     /// Refuses an <c>--interface</c> and then an <c>--ech</c> value curl's setopt refuses, before the transfer connects.
     /// </summary>
-    /// <param name="options">The accepted command line.</param>
+    /// <param name="network">The option group's network options, for <c>--interface</c>.</param>
+    /// <param name="settings">The tool settings, for <c>--ech</c>.</param>
     /// <param name="events">The transfer's events before connecting.</param>
     /// <returns>The first refusal, or <see langword="null" /> when both are accepted.</returns>
-    internal static TransferResult? RefuseMalformedSetopt(CommandLineOptions options, ITransferEvents events) =>
-        RefuseMalformedInterface(options, events) ?? RefuseMalformedEchMode(options, events);
+    internal static TransferResult? RefuseMalformedSetopt(EasyNetworkOptions network, EngineTransferSettings settings, ITransferEvents events) =>
+        RefuseMalformedInterface(network, events) ?? RefuseMalformedEchMode(settings, events);
 
     /// <summary>
     /// Chooses the transfer's proxy with <see cref="TransferProxySelection" />, then its credentials
@@ -139,7 +142,7 @@ internal sealed partial class TransferPerformer
     /// handler serves fails first, with exit 1.
     /// </summary>
     /// <param name="dispatch">The run's dispatch: its dispatcher says whether the URL's scheme is served, its proxy selector chooses the proxy.</param>
-    /// <param name="options">The accepted command line, for <c>-U</c> and <c>--unix-socket</c>.</param>
+    /// <param name="settings">The tool settings, for <c>-U</c> and <c>--unix-socket</c>.</param>
     /// <param name="proxyOptions">The option group's proxy options, which <see cref="TransferProxySelection" /> chooses from.</param>
     /// <param name="authentication">The option group's authentication options: <c>-u</c> and the netrc options <see cref="TransferCredentialLookup" /> reads.</param>
     /// <param name="url">The transfer's URL.</param>
@@ -155,7 +158,7 @@ internal sealed partial class TransferPerformer
     /// <returns><see langword="false" /> when the transfer ends before it starts.</returns>
     internal static bool TrySelectProxyAndCredentials(
         TransferDispatch dispatch,
-        CommandLineOptions options,
+        EngineTransferSettings settings,
         EasyProxyOptions proxyOptions,
         EasyAuthenticationOptions authentication,
         CurlUrl url,
@@ -174,7 +177,7 @@ internal sealed partial class TransferPerformer
             return false;
         }
 
-        if (!TransferProxySelection.TrySelect(dispatch.ProxySelector, proxyOptions, options.UnixSocketPath is not null, options.ProxyCredentials, url, out proxy, out failure, diagnosticLog))
+        if (!TransferProxySelection.TrySelect(dispatch.ProxySelector, proxyOptions, settings.OverUnixSocket, settings.ProxyCredentials, url, out proxy, out failure, diagnosticLog))
         {
             return false;
         }
@@ -199,7 +202,7 @@ internal sealed partial class TransferPerformer
     /// <see cref="KnownHostsFileMissingFailure" /> end the run before any connection (measured 2026-09-29,
     /// BL-576 Notes). Any other scheme is left without SSH options.
     /// </summary>
-    /// <param name="options">The transfer's option group, for <c>-k</c>, <c>-s</c>, <c>-S</c> and <c>--pass</c>.</param>
+    /// <param name="settings">The tool settings, for <c>-k</c>, <c>-s</c>, <c>-S</c> and <c>--pass</c>.</param>
     /// <param name="ssh">The option group's SSH options: the keys, the host key fingerprints, compression and <c>--knownhosts</c>.</param>
     /// <param name="url">The URL to transfer.</param>
     /// <param name="state">The running transfer, which keeps the SSH options.</param>
@@ -208,7 +211,7 @@ internal sealed partial class TransferPerformer
     /// <param name="writeErrorLine">Writes a line to standard error.</param>
     /// <returns><see cref="KnownHostsFileMissingFailure" />, or <see langword="null" /> to go on.</returns>
     internal async Task<TransferResult?> ResolveSshOptionsAsync(
-        CommandLineOptions options,
+        EngineTransferSettings settings,
         EasySshOptions ssh,
         CurlUrl url,
         EngineTransferState state,
@@ -221,15 +224,15 @@ internal sealed partial class TransferPerformer
             return null;
         }
 
-        string? knownHosts = options.Insecure ? null : ssh.KnownHostsFile ?? findKnownHostsFile();
-        bool missing = knownHosts is null && !options.Insecure;
+        string? knownHosts = settings.Insecure ? null : ssh.KnownHostsFile ?? findKnownHostsFile();
+        bool missing = knownHosts is null && !settings.Insecure;
         recordKnownHostsFile(knownHosts, missing);
-        if (missing && await ReportKnownHostsFileMissingAsync(options, ssh, writeErrorLine).ConfigureAwait(false) is { } failure)
+        if (missing && await ReportKnownHostsFileMissingAsync(settings, ssh, writeErrorLine).ConfigureAwait(false) is { } failure)
         {
             return failure;
         }
 
-        state.Ssh = SshOptionsMapping.Of(ssh, options.Passphrase, knownHosts);
+        state.Ssh = SshOptionsMapping.Of(ssh, settings.Passphrase, knownHosts);
         return null;
     }
 
@@ -241,7 +244,7 @@ internal sealed partial class TransferPerformer
     /// empty (measured 2026-09-27, BL-316 Notes).
     /// </summary>
     /// <param name="cookies">The option group's cookies, or <see langword="null" /> without <c>-b</c> or <c>-c</c>.</param>
-    /// <param name="options">The accepted command line.</param>
+    /// <param name="settings">The tool settings, for the <c>-G</c> / <c>--url-query</c> query.</param>
     /// <param name="transferUrl">The URL about to be transferred.</param>
     /// <param name="fileSystem">Opens the files.</param>
     /// <param name="standardInput">What <c>-b -</c> reads.</param>
@@ -249,13 +252,13 @@ internal sealed partial class TransferPerformer
     /// <returns>A task that completes when the files are loaded.</returns>
     internal async Task LoadCookieFilesAsync(
         CookieEngine? cookies,
-        CommandLineOptions options,
+        EngineTransferSettings settings,
         string transferUrl,
         IFileSystem fileSystem,
         Stream standardInput,
         ITransferEvents events)
     {
-        if (cookies is not null && IsHttpUrl(QueryUrl.Append(transferUrl, options)))
+        if (cookies is not null && IsHttpUrl(settings.AppendUrlQuery(transferUrl)))
         {
             await cookies.LoadCookieFilesAsync(fileSystem, standardInput, timeProvider.GetUtcNow(), events).ConfigureAwait(false);
         }
@@ -267,7 +270,8 @@ internal sealed partial class TransferPerformer
     /// <c>%{url_effective}</c> then shows, as curl does just before it connects (BL-621 Notes).
     /// </summary>
     /// <param name="hsts">The run's HSTS cache.</param>
-    /// <param name="options">The transfer's option group, for the <c>-G</c> / <c>--url-query</c> query and <c>--path-as-is</c>.</param>
+    /// <param name="settings">The tool settings, for the <c>-G</c> / <c>--url-query</c> query.</param>
+    /// <param name="network">The option group's network options, for <c>--path-as-is</c>.</param>
     /// <param name="http">The option group's HTTP options, whose <see cref="EasyHttpOptions.Hsts" /> is the <c>--hsts</c> file.</param>
     /// <param name="transferUrl">The URL about to be transferred.</param>
     /// <param name="fileSystem">Opens the <c>--hsts</c> file.</param>
@@ -275,7 +279,8 @@ internal sealed partial class TransferPerformer
     /// <returns>The URL to transfer: switched, or as it was.</returns>
     internal static async Task<string> SwitchToHttpsForHstsAsync(
         HstsTransferPolicy hsts,
-        CommandLineOptions options,
+        EngineTransferSettings settings,
+        EasyNetworkOptions network,
         EasyHttpOptions http,
         string transferUrl,
         IFileSystem fileSystem,
@@ -283,13 +288,13 @@ internal sealed partial class TransferPerformer
     {
         await HstsCacheFile.ReadAsync(http, hsts, fileSystem).ConfigureAwait(false);
 
-        if (!CurlUrl.TryParse(QueryUrl.Append(transferUrl, options), options.PathAsIs, out CurlUrl? url)
+        if (!CurlUrl.TryParse(settings.AppendUrlQuery(transferUrl), network.PathAsIs, out CurlUrl? url)
             || !hsts.TrySwitchToHttps(transferUrl, url, out string? httpsUrl))
         {
             return transferUrl;
         }
 
-        events.ReportInfo(HstsTransferPolicy.SwitchedMessagePrefix + UrlEffective.Normalize(QueryUrl.Append(httpsUrl, options), options.PathAsIs));
+        events.ReportInfo(HstsTransferPolicy.SwitchedMessagePrefix + UrlEffective.Normalize(settings.AppendUrlQuery(httpsUrl), network.PathAsIs));
         return httpsUrl;
     }
 
@@ -299,7 +304,8 @@ internal sealed partial class TransferPerformer
     /// its file is neither read nor written (measured 2026-09-29, BL-623 Notes).
     /// </summary>
     /// <param name="state">The running transfer, which keeps the cache.</param>
-    /// <param name="options">The transfer's option group, for the <c>-G</c> / <c>--url-query</c> query and <c>--connect-to</c>.</param>
+    /// <param name="settings">The tool settings, for the <c>-G</c> / <c>--url-query</c> query.</param>
+    /// <param name="network">The option group's network options, for <c>--connect-to</c>.</param>
     /// <param name="http">The option group's HTTP options: the <see cref="EasyHttpOptions.AltSvc" /> file and the HTTP version.</param>
     /// <param name="transferUrl">The URL transferred.</param>
     /// <param name="fileSystem">Opens the file.</param>
@@ -308,17 +314,18 @@ internal sealed partial class TransferPerformer
     /// <returns>A task that completes when the file is read.</returns>
     internal async Task OpenAltSvcCacheAsync(
         EngineTransferState state,
-        CommandLineOptions options,
+        EngineTransferSettings settings,
+        EasyNetworkOptions network,
         EasyHttpOptions http,
         string transferUrl,
         IFileSystem fileSystem,
         IDiagnosticLog diagnosticLog,
         bool usesOverHttp)
     {
-        if (http.AltSvc is not null && IsHttpUrl(QueryUrl.Append(transferUrl, options)))
+        if (http.AltSvc is not null && IsHttpUrl(settings.AppendUrlQuery(transferUrl)))
         {
             state.AltSvc = await AltSvcTransferCache
-                .OpenAsync(http, options.ConnectToEntries, fileSystem, timeProvider, diagnosticLog, usesOverHttp)
+                .OpenAsync(http, network.ConnectTo, fileSystem, timeProvider, diagnosticLog, usesOverHttp)
                 .ConfigureAwait(false);
         }
     }
@@ -331,22 +338,22 @@ internal sealed partial class TransferPerformer
     /// <c>cookie_setopts</c> does (measured 2026-10-03, BL-1391); else <see cref="NoCryptoEngines.LoadFailure" />'s.
     /// </summary>
     /// <param name="cookies">The option group's cookies, or <see langword="null" />.</param>
-    /// <param name="options">The accepted command line.</param>
+    /// <param name="settings">The tool settings, for <c>--engine</c> and <c>-s</c>.</param>
     /// <param name="runsOnWindows">Whether the run is the Windows build's.</param>
     /// <param name="writeWarning">Writes a warning's text to standard error, wrapped as every warning is.</param>
     /// <returns>The failure, or <see langword="null" /> when the transfer goes ahead.</returns>
     internal async Task<TransferResult?> SetupFailureAsync(
         CookieEngine? cookies,
-        CommandLineOptions options,
+        EngineTransferSettings settings,
         bool runsOnWindows,
         Func<string, Task> writeWarning)
     {
         if (cookies is not { CookieLineTooLong: true })
         {
-            return NoCryptoEngines.LoadFailure(options.Engine, runsOnWindows);
+            return NoCryptoEngines.LoadFailure(settings.Engine, runsOnWindows);
         }
 
-        if (!options.Silent)
+        if (!settings.Silent)
         {
             await writeWarning(CookieEngine.CookieLineTooLongWarning).ConfigureAwait(false);
         }
@@ -365,7 +372,7 @@ internal sealed partial class TransferPerformer
     /// <paramref name="jarPrintTarget" />.
     /// </summary>
     /// <param name="cookies">The option group's cookies, or <see langword="null" />.</param>
-    /// <param name="options">The transfer's option group, for the <c>-G</c> / <c>--url-query</c> query.</param>
+    /// <param name="settings">The tool settings, for the <c>-G</c> / <c>--url-query</c> query.</param>
     /// <param name="http">The option group's HTTP options, whose <see cref="EasyHttpOptions.Hsts" /> is the <c>--hsts</c> file.</param>
     /// <param name="transferUrl">The URL transferred, as typed or as a <c>-T</c> upload resolved it.</param>
     /// <param name="jarPrintTarget">Gives the stream the runner chose for <c>-c -</c> to print the jar to; the performer never picks it.</param>
@@ -376,7 +383,7 @@ internal sealed partial class TransferPerformer
     /// <returns>A task that completes when all are written.</returns>
     internal async Task WriteCookieJarAltSvcAndHstsFilesAsync(
         CookieEngine? cookies,
-        CommandLineOptions options,
+        EngineTransferSettings settings,
         EasyHttpOptions http,
         string transferUrl,
         Func<Stream> jarPrintTarget,
@@ -385,7 +392,7 @@ internal sealed partial class TransferPerformer
         IFileSystem fileSystem,
         bool runsOnWindows)
     {
-        if (cookies is not null && IsHttpUrl(QueryUrl.Append(transferUrl, options)))
+        if (cookies is not null && IsHttpUrl(settings.AppendUrlQuery(transferUrl)))
         {
             await cookies.WriteCookieJarAsync(fileSystem, jarPrintTarget(), timeProvider.GetUtcNow()).ConfigureAwait(false);
         }
@@ -404,19 +411,19 @@ internal sealed partial class TransferPerformer
     /// when a host key fingerprint was given, and otherwise <see cref="KnownHostsFileMissingLine" />, unless
     /// <c>-s</c> without <c>-S</c>, and <see cref="KnownHostsFileMissingFailure" />.
     /// </summary>
-    /// <param name="options">The transfer's option group, for <c>-s</c> and <c>-S</c>.</param>
+    /// <param name="settings">The tool settings, for <c>-s</c> and <c>-S</c>.</param>
     /// <param name="ssh">The option group's SSH options, for the host key fingerprints.</param>
     /// <param name="writeErrorLine">Writes a line to standard error.</param>
     /// <returns><see cref="KnownHostsFileMissingFailure" />, or <see langword="null" /> when the transfer goes on.</returns>
-    private async Task<TransferResult?> ReportKnownHostsFileMissingAsync(CommandLineOptions options, EasySshOptions ssh, Func<string, Task> writeErrorLine)
+    private async Task<TransferResult?> ReportKnownHostsFileMissingAsync(EngineTransferSettings settings, EasySshOptions ssh, Func<string, Task> writeErrorLine)
     {
         if (ssh.HostPublicKeyMd5 is not null || ssh.HostPublicKeySha256 is not null)
         {
-            await WriteUnlessHiddenAsync(options.Silent, KnownHostsFileMissingWarning, writeErrorLine).ConfigureAwait(false);
+            await WriteUnlessHiddenAsync(settings.Silent, KnownHostsFileMissingWarning, writeErrorLine).ConfigureAwait(false);
             return null;
         }
 
-        await WriteUnlessHiddenAsync(options.Silent && !options.ShowError, KnownHostsFileMissingLine, writeErrorLine).ConfigureAwait(false);
+        await WriteUnlessHiddenAsync(settings.Silent && !settings.ShowError, KnownHostsFileMissingLine, writeErrorLine).ConfigureAwait(false);
         return KnownHostsFileMissingFailure;
     }
 
@@ -434,12 +441,12 @@ internal sealed partial class TransferPerformer
     /// argument</c> as a <c>-v</c> line, fails the transfer with exit 43 and that message, still writes
     /// its <c>-w</c> output, and transfers nothing after it (measured 2026-09-29, BL-600 Notes).
     /// </summary>
-    /// <param name="options">The transfer's option group.</param>
+    /// <param name="network">The option group's network options, for <c>--interface</c>.</param>
     /// <param name="events">Where the <c>-v</c> line goes.</param>
     /// <returns><see cref="InterfaceSetoptFailure" />, or <see langword="null" /> when the value was accepted.</returns>
-    private static TransferResult? RefuseMalformedInterface(CommandLineOptions options, ITransferEvents events)
+    private static TransferResult? RefuseMalformedInterface(EasyNetworkOptions network, ITransferEvents events)
     {
-        if (options.Interface is not { Value: { } interfaceValue } || !EngineInterfaceBinding.Parse(interfaceValue).IsMalformed)
+        if (network.Interface is not { } interfaceValue || !EngineInterfaceBinding.Parse(interfaceValue).IsMalformed)
         {
             return null;
         }
@@ -450,17 +457,17 @@ internal sealed partial class TransferPerformer
 
     /// <summary>
     /// Refuses an <c>--ech</c> mode libcurl refuses when curl sets it
-    /// (<see cref="CommandLineOptions.EchModeIsMalformed" />): curl 8.21.0's ECH build reports
+    /// (<see cref="EngineTransferSettings.EchModeIsMalformed" />): curl 8.21.0's ECH build reports
     /// <c>setopt 0x2855 got bad argument</c> and fails the transfer with exit 43 (BL-1107), as it
     /// fails a malformed <c>--interface</c>, so the <c>-v</c> line and the <c>-w</c> output follow that
     /// measurement (ADR-0378).
     /// </summary>
-    /// <param name="options">The transfer's option group.</param>
+    /// <param name="settings">The tool settings, for <c>--ech</c>.</param>
     /// <param name="events">Where the <c>-v</c> line goes.</param>
     /// <returns><see cref="EchSetoptFailure" />, or <see langword="null" /> when the mode was accepted.</returns>
-    private static TransferResult? RefuseMalformedEchMode(CommandLineOptions options, ITransferEvents events)
+    private static TransferResult? RefuseMalformedEchMode(EngineTransferSettings settings, ITransferEvents events)
     {
-        if (!options.EchModeIsMalformed)
+        if (!settings.EchModeIsMalformed)
         {
             return null;
         }

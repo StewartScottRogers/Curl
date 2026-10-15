@@ -37,9 +37,9 @@ internal static class HttpRequestOptionsMapping
     private const double LongestTimerDelayMilliseconds = uint.MaxValue - 1;
 
     /// <summary>
-    /// Copies the HTTP request options from <paramref name="http" /> and <paramref name="options" />.
+    /// Copies the HTTP request options from <paramref name="http" /> and <paramref name="settings" />.
     /// </summary>
-    /// <param name="options">The parsed command line, for the options no <see cref="EasyHttpOptions" /> member carries.</param>
+    /// <param name="settings">The tool settings, for the options no <see cref="EasyHttpOptions" /> member carries.</param>
     /// <param name="http">The option group's HTTP options.</param>
     /// <param name="behaviour">The option group's behaviour options, whose <see cref="EasyBehaviourOptions.FailOnError" /> is <c>-f</c>.</param>
     /// <param name="transfer">The option group's transfer options, whose <see cref="EasyTransferOptions.CustomRequest" /> is <c>-X</c>.</param>
@@ -76,23 +76,23 @@ internal static class HttpRequestOptionsMapping
     /// <see cref="HttpRequestOptions.ContinueWait" />. <see cref="EasyTransferOptions.CustomRequest" /> as
     /// <see cref="HttpRequestOptions.CustomMethod" />, and <see cref="EasyBehaviourOptions.FailOnError" /> as
     /// <see cref="HttpRequestOptions.Fail" /> <see cref="HttpFailMode.Fail" />, otherwise <c>--fail-with-body</c>'s
-    /// <see cref="CommandLineOptions.FailMode" />. From <paramref name="authentication" />:
+    /// <see cref="EngineTransferSettings.FailMode" />. From <paramref name="authentication" />:
     /// <see cref="EasyAuthenticationOptions.HttpAuthentication" /> as <see cref="HttpRequestOptions.AuthSchemes" />
     /// (<see cref="AuthSchemesOf" />), <see cref="EasyAuthenticationOptions.XOAuth2Bearer" /> as
     /// <see cref="HttpRequestOptions.BearerToken" /> and <see cref="EasyAuthenticationOptions.AwsSigV4" /> verbatim;
     /// the <c>--httpsig-*</c> options as <see cref="HttpRequestOptions.HttpSignature" />
     /// (<see cref="HttpSignatureSetup.Of" />), which leave <see cref="HttpRequestOptions.AuthSchemes" /> empty so a
     /// redirect hop that drops the signature sends no Basic from its URL's credentials (upstream test5025,
-    /// BL-2201). And from <paramref name="options" />: <see cref="CommandLineOptions.ProxyHeaders" /> verbatim;
+    /// BL-2201). And from <paramref name="settings" />: <see cref="EngineTransferSettings.ProxyHeaders" /> verbatim;
     /// <paramref name="proxy" /> as
-    /// <see cref="HttpRequestOptions.ForwardProxy" /> with <see cref="CommandLineOptions.ProxyTunnel" /> as
-    /// <see cref="HttpRequestOptions.ProxyTunnel" />; whether <see cref="CommandLineOptions.UnixSocketPath" /> is
+    /// <see cref="HttpRequestOptions.ForwardProxy" /> with <see cref="EngineTransferSettings.ProxyTunnel" /> as
+    /// <see cref="HttpRequestOptions.ProxyTunnel" />; whether <see cref="EngineTransferSettings.OverUnixSocket" /> is
     /// set as <see cref="HttpRequestOptions.OverUnixSocket" />; <paramref name="commandLineTextEncoding" /> as
     /// <see cref="HttpRequestOptions.CommandLineTextEncoding" />; and
-    /// <see cref="CommandLineOptions.HappyEyeballsTimeout" /> as <see cref="HttpRequestOptions.HappyEyeballsTimeout" /> (<see cref="HappyEyeballsTimeoutOf" />).
+    /// <see cref="EngineTransferSettings.HappyEyeballsTimeout" /> as <see cref="HttpRequestOptions.HappyEyeballsTimeout" /> (<see cref="HappyEyeballsTimeoutOf" />).
     /// </returns>
     internal static HttpRequestOptions Of(
-        CommandLineOptions options,
+        EngineTransferSettings settings,
         EasyHttpOptions http,
         EasyBehaviourOptions behaviour,
         EasyTransferOptions transfer,
@@ -106,13 +106,13 @@ internal static class HttpRequestOptionsMapping
             CustomMethod = transfer.CustomRequest,
             RequestTarget = http.RequestTarget,
             Headers = [.. http.HttpHeaders, .. ifNoneMatchHeaders ?? []],
-            ProxyHeaders = options.ProxyHeaders,
+            ProxyHeaders = settings.ProxyHeaders,
             CommandLineTextEncoding = commandLineTextEncoding ?? Encoding.Latin1,
             UserAgent = http.UserAgent,
             Referer = http.Referer,
             AutoReferer = http.AutoReferer,
             Body = formBody ?? PostFieldsBodyOf(http),
-            Fail = behaviour.FailOnError ? HttpFailMode.Fail : options.FailMode,
+            Fail = behaviour.FailOnError ? HttpFailMode.Fail : settings.FailMode,
             FollowRedirects = http.FollowLocation != FollowLocation.None,
             MaxRedirects = (int)http.MaxRedirects,
             AuthSchemes = HttpSignatureSetup.Of(authentication).Settings is null ? AuthSchemesOf(authentication) : HttpAuthSchemes.None,
@@ -126,10 +126,10 @@ internal static class HttpRequestOptionsMapping
             IgnoreContentLength = http.IgnoreContentLength,
             AllowHttp09Reply = http.Http09Allowed,
             ForwardProxy = proxy,
-            ProxyTunnel = options.ProxyTunnel,
-            OverUnixSocket = options.UnixSocketPath is not null,
+            ProxyTunnel = settings.ProxyTunnel,
+            OverUnixSocket = settings.OverUnixSocket,
             ContinueWait = http.Expect100Timeout,
-            HappyEyeballsTimeout = HappyEyeballsTimeoutOf(options),
+            HappyEyeballsTimeout = settings.HappyEyeballsTimeout,
         };
 
     /// <summary>

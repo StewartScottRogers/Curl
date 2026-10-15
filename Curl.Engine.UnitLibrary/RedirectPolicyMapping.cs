@@ -1,6 +1,6 @@
 using Curl.Api.Options.Authentication;
 using Curl.Api.Options.Http;
-using Curl.Cli;
+
 using Curl.Core;
 
 namespace Curl.Engine;
@@ -17,9 +17,9 @@ internal static class RedirectPolicyMapping
 {
     /// <summary>
     /// Copies the redirect options from <paramref name="http" />, <paramref name="authentication" /> and
-    /// <paramref name="options" />.
+    /// <paramref name="settings" />.
     /// </summary>
-    /// <param name="options">The parsed command line, for <c>--proto</c> and <c>--proto-redir</c>.</param>
+    /// <param name="settings">The tool settings, for <c>--proto</c> and <c>--proto-redir</c>.</param>
     /// <param name="http">The option group's HTTP options.</param>
     /// <param name="authentication">The option group's authentication options.</param>
     /// <returns>
@@ -28,12 +28,12 @@ internal static class RedirectPolicyMapping
     /// <see cref="EasyHttpOptions.FollowLocation" /> <see cref="FollowLocation.ObeyCode" /> (<c>--follow</c>) as
     /// <see cref="RedirectPolicy.DropsCustomMethodOnSwitchToGet" />,
     /// <see cref="EasyAuthenticationOptions.UnrestrictedAuthentication" /> as <see cref="RedirectPolicy.LocationTrusted" />,
-    /// <see cref="CommandLineOptions.AllowedRedirectProtocols" /> as
+    /// <see cref="EngineTransferSettings.AllowedRedirectProtocols" /> as
     /// <see cref="RedirectPolicy.AllowedSchemes" /> (curl's default when not given),
-    /// <see cref="CommandLineOptions.AllowedProtocols" /> as <see cref="RedirectPolicy.AllowedTransferSchemes" />,
+    /// <see cref="EngineTransferSettings.AllowedProtocols" /> as <see cref="RedirectPolicy.AllowedTransferSchemes" />,
     /// and <see cref="EasyAuthenticationOptions.DisallowUserNameInUrl" /> as <see cref="RedirectPolicy.DisallowsUserInUrl" />.
     /// </returns>
-    internal static RedirectPolicy Of(CommandLineOptions options, EasyHttpOptions http, EasyAuthenticationOptions authentication)
+    internal static RedirectPolicy Of(EngineTransferSettings settings, EasyHttpOptions http, EasyAuthenticationOptions authentication)
     {
         RedirectPolicy policy = new()
         {
@@ -43,10 +43,10 @@ internal static class RedirectPolicyMapping
             KeepPostOn303 = http.PostRedirect.HasFlag(PostRedirect.Post303),
             LocationTrusted = authentication.UnrestrictedAuthentication,
             DropsCustomMethodOnSwitchToGet = http.FollowLocation == FollowLocation.ObeyCode,
-            AllowedTransferSchemes = options.AllowedProtocols,
+            AllowedTransferSchemes = settings.AllowedProtocols,
             DisallowsUserInUrl = authentication.DisallowUserNameInUrl,
         };
-        return options.AllowedRedirectProtocols is { } redirectSchemes
+        return settings.AllowedRedirectProtocols is { } redirectSchemes
             ? policy with { AllowedSchemes = redirectSchemes }
             : policy;
     }

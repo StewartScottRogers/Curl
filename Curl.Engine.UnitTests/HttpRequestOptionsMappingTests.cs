@@ -1,3 +1,4 @@
+using Curl.Console;
 using Curl.Api.Options.Authentication;
 using Curl.Api.Options.Behaviour;
 using Curl.Api.Options.Http;
@@ -43,7 +44,7 @@ public sealed class HttpRequestOptionsMappingTests
         };
         Diagnostics.Arrange("record", http);
 
-        HttpRequestOptions mapped = HttpRequestOptionsMapping.Of(NoOptions, http, new EasyBehaviourOptions(), new EasyTransferOptions(), new EasyAuthenticationOptions(), ifNoneMatchHeaders: ["If-None-Match: \"e\""]);
+        HttpRequestOptions mapped = HttpRequestOptionsMapping.Of(EasyOptionsFromCommandLine.TransferSettingsOf(NoOptions), http, new EasyBehaviourOptions(), new EasyTransferOptions(), new EasyAuthenticationOptions(), ifNoneMatchHeaders: ["If-None-Match: \"e\""]);
 
         Diagnostics.Act("headers", string.Join(" | ", mapped.Headers));
         Diagnostics.Assert("headers", "X: 1 | If-None-Match: \"e\"", string.Join(" | ", mapped.Headers));
@@ -69,7 +70,7 @@ public sealed class HttpRequestOptionsMappingTests
     [TestMethod]
     public void Of_DefaultRecord_SendsNoBodyAndFollowsNothing()
     {
-        HttpRequestOptions mapped = HttpRequestOptionsMapping.Of(NoOptions, new EasyHttpOptions(), new EasyBehaviourOptions(), new EasyTransferOptions(), new EasyAuthenticationOptions());
+        HttpRequestOptions mapped = HttpRequestOptionsMapping.Of(EasyOptionsFromCommandLine.TransferSettingsOf(NoOptions), new EasyHttpOptions(), new EasyBehaviourOptions(), new EasyTransferOptions(), new EasyAuthenticationOptions());
 
         Diagnostics.Act("follow / body / compressed", $"{mapped.FollowRedirects}/{mapped.Body is null}/{mapped.Compressed}");
 
@@ -91,7 +92,7 @@ public sealed class HttpRequestOptionsMappingTests
         Diagnostics.Arrange("content / transfer decoding", $"{contentDecoding}/{transferDecoding}");
 
         bool raw = HttpRequestOptionsMapping.Of(
-            NoOptions,
+            EasyOptionsFromCommandLine.TransferSettingsOf(NoOptions),
             new EasyHttpOptions { HttpContentDecoding = contentDecoding, HttpTransferDecoding = transferDecoding }, new EasyBehaviourOptions(), new EasyTransferOptions(), new EasyAuthenticationOptions()).Raw;
 
         Diagnostics.Act("raw", raw);

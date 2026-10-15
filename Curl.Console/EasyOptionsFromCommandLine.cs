@@ -49,6 +49,41 @@ internal static class EasyOptionsFromCommandLine
     internal static EngineToolOptions ToolOptionsOf(CommandLineOptions options) =>
         new(options.Parallel, options.ParallelImmediate, options.SslSessionsFile, options.MaxTime);
 
+    /// <summary>
+    /// The curl tool's own settings one transfer's setup and context read, which libcurl's easy options have no
+    /// <c>CURLOPT_*</c> for or which the engine reads as the tool resolved them: <c>-s</c>, <c>-S</c>, <c>--fail</c>,
+    /// <c>--create-file-mode</c>, <c>-k</c>, <c>--pass</c>, <c>--engine</c>, <c>--ech</c>, <c>-d</c>, <c>-U</c>,
+    /// <c>--proto</c>, <c>--proto-redir</c>, the <c>--ssl*</c> level, <c>-l</c>, <c>--upload-flags</c>,
+    /// <c>--proxy-header</c>, <c>-p</c>, <c>--unix-socket</c>, <c>--happy-eyeballs-timeout-ms</c> and the
+    /// <c>-G</c> / <c>--url-query</c> query (BL-2357).
+    /// </summary>
+    /// <param name="options">The parsed command line.</param>
+    /// <returns>The transfer settings.</returns>
+    internal static EngineTransferSettings TransferSettingsOf(CommandLineOptions options) =>
+        new(
+            options.Silent,
+            options.ShowError,
+            options.FailMode,
+            options.CreateFileMode,
+            options.Insecure,
+            options.Passphrase,
+            options.Engine,
+            options.EchModeIsMalformed,
+            options.PostData,
+            options.ProxyCredentials,
+            options.AllowedProtocols,
+            options.AllowedRedirectProtocols,
+            options.SslLevel,
+            options.FtpSslControlOnly,
+            options.SslRequired,
+            options.ListOnly,
+            options.UploadFlags,
+            options.ProxyHeaders,
+            options.ProxyTunnel,
+            options.UnixSocketPath is not null,
+            HttpRequestOptionsMapping.HappyEyeballsTimeoutOf(options),
+            url => QueryUrl.Append(url, options));
+
     // The receive buffer curl's tool asks for, 100 KiB, as --libcurl writes CURLOPT_BUFFERSIZE.
     private const long ToolBufferSize = 102400;
 

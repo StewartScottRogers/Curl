@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary, Curl.Engine.UnitTests, Curl.Console, Curl.Console.UnitTests, Curl.Api.UnitLibrary, Curl.Api.UnitTests]
 requirement: none
 created: 2026-10-15
-completed:
+completed: 2026-10-15
 ---
 # BL-2357 — Make TransferPerformer.Setup, TransferContextFactory and RedirectPolicyMapping stop taking CommandLineOptions
 
@@ -22,14 +22,18 @@ ADR-0506; one of the four pieces BL-2310 needs before the engine can drop its `C
 
 ## Acceptance criteria
 
-- [ ] `TransferPerformer.Setup.cs`, `TransferContextFactory.cs` and `RedirectPolicyMapping.cs` do not name `CommandLineOptions`.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes with no test deleted, skipped or weakened.
-- [ ] `Measure-CodeQuality.ps1` passes all four gates for every library changed, measured in one call.
-- [ ] `Curl.Conformance.UnitTests/PassingUpstreamCases.txt` is unchanged.
+- [x] `TransferPerformer.Setup.cs`, `TransferContextFactory.cs` and `RedirectPolicyMapping.cs` do not name `CommandLineOptions`.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes with no test deleted, skipped or weakened.
+- [x] `Measure-CodeQuality.ps1` passes all four gates for every library changed, measured in one call.
+- [x] `Curl.Conformance.UnitTests/PassingUpstreamCases.txt` is unchanged.
 
 ## Notes
+
+- Decided (ADR-0539): tool-only settings are an engine-owned `EngineTransferSettings`; `--path-as-is`, `--interface`, `--connect-to` come from `EasyNetworkOptions`. `HttpRequestOptionsMapping.Of` and `MailRequestOptionsMapping.FromCommandLine` also changed to take the record, as `TransferContextFactory.Create` calls them.
+- Quality gates passed for Curl.Engine.UnitLibrary and Curl.Console in one run; PassingUpstreamCases.txt untouched.
 
 ## Log
 
 - 2026-10-15: Created.
 - 2026-10-15: Backlog -> Doing.
+- 2026-10-15: Doing -> Done. Setup, context factory and redirect mapping read EngineTransferSettings; build clean, fast tests green, quality gates pass

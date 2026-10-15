@@ -130,7 +130,7 @@ public sealed class HttpVersionMappingTests
         CommandLineParseResult result = OpenSslBuildParser.Parse([option, Url]);
         Assert.IsTrue(result.IsAccepted);
 
-        HttpVersionPreference actual = HttpRequestOptionsMapping.Of(result.Options, EasyOptionsFromCommandLine.HttpOf(result.Options), new EasyBehaviourOptions(), new EasyTransferOptions(), new EasyAuthenticationOptions()).Version;
+        HttpVersionPreference actual = HttpRequestOptionsMapping.Of(EasyOptionsFromCommandLine.TransferSettingsOf(result.Options), EasyOptionsFromCommandLine.HttpOf(result.Options), new EasyBehaviourOptions(), new EasyTransferOptions(), new EasyAuthenticationOptions()).Version;
 
         Diagnostics.Act("version", actual);
 

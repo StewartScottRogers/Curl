@@ -7,7 +7,6 @@ using Curl.Api.Options.Http;
 using Curl.Api.Options.Network;
 using Curl.Api.Options.Protocols;
 using Curl.Api.Options.Proxy;
-using Curl.Cli;
 using Curl.Core;
 using Curl.Output;
 using Curl.Protocol.Abstractions;
@@ -65,7 +64,7 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
     /// <summary>
     /// Creates the context for one transfer, carrying every option a handler reads.
     /// </summary>
-    /// <param name="options">The parsed command line.</param>
+    /// <param name="settings">The tool settings: the post data, TLS level, FTP and mail flags and the creation mode no option group carries.</param>
     /// <param name="http">The option group's HTTP options, which <see cref="HttpRequestOptionsMapping.Of" /> maps onto <see cref="TransferContext.Http" />.</param>
     /// <param name="behaviour">The option group's behaviour options: <see cref="EasyBehaviourOptions.IncludeHeader" /> (<c>-i</c>).</param>
     /// <param name="transfer">
@@ -166,7 +165,7 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
     /// <paramref name="headerOutput" />, the <c>-D</c> stream alone, whatever <c>-i</c> says.
     /// </returns>
     internal TransferContext Create(
-        CommandLineOptions options,
+        EngineTransferSettings settings,
         EasyHttpOptions http,
         EasyBehaviourOptions behaviour,
         EasyTransferOptions transfer,
@@ -210,7 +209,7 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
             ResumeUploadFromUnknownOffset = ResumesUploadFromUnknownOffset(transfer, upload),
             MaxFileSize = MaxFileSizeOf(transfer),
             Upload = UploadOf(url, upload),
-            PostData = options.PostData,
+            PostData = settings.PostData,
             Credentials = lookedUpCredentials ?? CredentialsOf(authentication.UserPassword),
             TelnetOptions = protocol.Telnet.TelnetOptions,
             TftpBlockSize = BlockSizeOf(protocol.Tftp),
@@ -224,16 +223,16 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
             FtpSendPret = protocol.Ftp.UsePret,
             FtpPort = protocol.Ftp.ActiveAddress,
             FtpUseEprt = protocol.Ftp.UseEprt,
-            SslLevel = options.SslLevel,
-            FtpSslControlOnly = options.FtpSslControlOnly && !options.SslRequired,
+            SslLevel = settings.SslLevel,
+            FtpSslControlOnly = settings.FtpSslControlOnly && !settings.SslRequired,
             FtpCommandChannelClearing = CommandChannelClearingOf(protocol.Ftp.ClearCommandChannel),
-            ListOnly = options.ListOnly,
+            ListOnly = settings.ListOnly,
             UseAscii = transfer.TransferText,
             Append = protocol.Ftp.Append,
             ConvertLineEndings = transfer.Crlf,
             QuoteCommands = QuoteCommandsOf(protocol.Ftp),
-            CreateFileMode = options.CreateFileMode ?? TransferContext.DefaultCreateFileMode,
-            PathAsIs = options.PathAsIs,
+            CreateFileMode = settings.CreateFileMode ?? TransferContext.DefaultCreateFileMode,
+            PathAsIs = network.PathAsIs,
             ConnectTimeout = ConnectTimeoutOf(network),
             MaxTime = MaxTimeOf(transfer),
             OperationStarted = OperationStartedOf(maxTimeWatchdog),
@@ -242,13 +241,13 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
             Proxy = proxy,
             Http = HttpOptionsWithAltSvc(
                 url,
-                HttpRequestOptionsMapping.Of(options, http, behaviour, transfer, authentication, formBody, proxy, commandLineTextEncoding, ifNoneMatchHeaders) with
+                HttpRequestOptionsMapping.Of(settings, http, behaviour, transfer, authentication, formBody, proxy, commandLineTextEncoding, ifNoneMatchHeaders) with
                 {
                     HstsStore = HstsStore,
                     ProxyTunnel = proxyOptions.HttpProxyTunnel || ConnectToTunnelsThroughProxy(network, url, proxy),
                 },
                 altSvc),
-            Mail = MailRequestOptionsMapping.FromCommandLine(options, transfer, protocol.Smtp, authentication, url.Scheme),
+            Mail = MailRequestOptionsMapping.FromCommandLine(settings, transfer, protocol.Smtp, authentication, url.Scheme),
             Ssh = ssh,
             Progress = WatchedProgress(progress, lowSpeedWatchdog, maxTimeWatchdog),
             Events = EventsWritingConnectReplyHeads(proxyOptions, proxy, EventsOrNone(events), transferHeaderOutput),

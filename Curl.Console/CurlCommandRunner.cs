@@ -2022,7 +2022,7 @@ internal sealed class CurlCommandRunner(
             options, transfer.UrlIndex, standardOutputSwitchedToBinary, endsTheRun);
         await WriteOutAsync(options, transfer, givenUrl, transferUrl, result, standardOutputIsBinary).ConfigureAwait(false);
         await transferPerformer.WriteCookieJarAltSvcAndHstsFilesAsync(
-                dispatch.Cookies, options, EasyOptionsFromCommandLine.HttpOf(options), transferUrl, () => CookieJarStandardOutput(standardOutputIsBinary), state, Hsts, fileSystem, runsOnWindows)
+                dispatch.Cookies, EasyOptionsFromCommandLine.TransferSettingsOf(options), EasyOptionsFromCommandLine.HttpOf(options), transferUrl, () => CookieJarStandardOutput(standardOutputIsBinary), state, Hsts, fileSystem, runsOnWindows)
             .ConfigureAwait(false);
 
         previousTransferResult = result;
@@ -2173,17 +2173,17 @@ internal sealed class CurlCommandRunner(
         }
 
         ITransferEvents eventsBeforeConnecting = SetUpTransferEvents(options, transfer);
-        if (TransferPerformer.RefuseMalformedSetopt(options, eventsBeforeConnecting) is { } setoptFailure)
+        if (TransferPerformer.RefuseMalformedSetopt(EasyOptionsFromCommandLine.NetworkOf(options), EasyOptionsFromCommandLine.TransferSettingsOf(options), eventsBeforeConnecting) is { } setoptFailure)
         {
             return (setoptFailure, givenUrl, transferUrl);
         }
 
         dispatch.LoadResolveEntries(eventsBeforeConnecting);
         TraceTransferStart(options, eventsBeforeConnecting);
-        await transferPerformer.LoadCookieFilesAsync(dispatch.Cookies, options, transferUrl, fileSystem, standardInput, eventsBeforeConnecting).ConfigureAwait(false);
+        await transferPerformer.LoadCookieFilesAsync(dispatch.Cookies, EasyOptionsFromCommandLine.TransferSettingsOf(options), transferUrl, fileSystem, standardInput, eventsBeforeConnecting).ConfigureAwait(false);
         EasyHttpOptions http = EasyOptionsFromCommandLine.HttpOf(options);
-        await transferPerformer.OpenAltSvcCacheAsync(Running, options, http, transferUrl, fileSystem, diagnosticLog, altSvcUsesOverHttp).ConfigureAwait(false);
-        transferUrl = await TransferPerformer.SwitchToHttpsForHstsAsync(Hsts, options, http, transferUrl, fileSystem, eventsBeforeConnecting).ConfigureAwait(false);
+        await transferPerformer.OpenAltSvcCacheAsync(Running, EasyOptionsFromCommandLine.TransferSettingsOf(options), EasyOptionsFromCommandLine.NetworkOf(options), http, transferUrl, fileSystem, diagnosticLog, altSvcUsesOverHttp).ConfigureAwait(false);
+        transferUrl = await TransferPerformer.SwitchToHttpsForHstsAsync(Hsts, EasyOptionsFromCommandLine.TransferSettingsOf(options), EasyOptionsFromCommandLine.NetworkOf(options), http, transferUrl, fileSystem, eventsBeforeConnecting).ConfigureAwait(false);
         TransferResult result = await TransferWithHeaderOutputAsync(dispatch, options, transfer, transferUrl, uploadFile)
             .ConfigureAwait(false);
         return (result, givenUrl, transferUrl);
@@ -3214,7 +3214,7 @@ internal sealed class CurlCommandRunner(
 
         await WriteCustomRequestLinesAsync(options, uploadFile).ConfigureAwait(false);
         Stream? etagWatchedHeaderOutput = Running.SaveEtag is { } saveEtag ? new EtagSaveStream(saveEtag, headerOutput) : headerOutput;
-        return await transferPerformer.SetupFailureAsync(dispatch.Cookies, options, runsOnWindows, WriteWrappedWarningAsync).ConfigureAwait(false)
+        return await transferPerformer.SetupFailureAsync(dispatch.Cookies, EasyOptionsFromCommandLine.TransferSettingsOf(options), runsOnWindows, WriteWrappedWarningAsync).ConfigureAwait(false)
             ?? await TransferOpeningUploadFileAsync(dispatch, options, url, uploadFile, transfer, etagWatchedHeaderOutput).ConfigureAwait(false);
     }
 
@@ -3357,7 +3357,7 @@ internal sealed class CurlCommandRunner(
             selectHopAltSvc: (hopUrl, hopHttp) => Running.AltSvc is { } altSvc ? altSvc.ApplyTo(hopUrl, hopHttp) : hopHttp,
             selectHopCredentials: CredentialLookup.ForRedirectHops(authentication));
 
-        if (!TransferPerformer.TryParseTransferUrl(QueryUrl.Append(url, options), options, out CurlUrl? transferUrl, out CurlUrlRejection rejection))
+        if (!TransferPerformer.TryParseTransferUrl(QueryUrl.Append(url, options), options.DisallowUsernameInUrl, options.PathAsIs, out CurlUrl? transferUrl, out CurlUrlRejection rejection))
         {
             return TransferPerformer.ReportUrlRejected(rejection, EventsBeforeConnecting(transfer));
         }
@@ -3464,13 +3464,13 @@ internal sealed class CurlCommandRunner(
         }
 
         if (!TransferPerformer.TrySelectProxyAndCredentials(
-                dispatch, options, EasyOptionsFromCommandLine.ProxyOf(options), EasyOptionsFromCommandLine.AuthenticationOf(options), url, Running, EventsBeforeConnecting(transfer), diagnosticLog, CredentialLookup, out ProxyEndpoint? proxy, out TransferResult? proxyFailure))
+                dispatch, EasyOptionsFromCommandLine.TransferSettingsOf(options), EasyOptionsFromCommandLine.ProxyOf(options), EasyOptionsFromCommandLine.AuthenticationOf(options), url, Running, EventsBeforeConnecting(transfer), diagnosticLog, CredentialLookup, out ProxyEndpoint? proxy, out TransferResult? proxyFailure))
         {
             return proxyFailure;
         }
 
         if (await transferPerformer.ResolveSshOptionsAsync(
-                options,
+                EasyOptionsFromCommandLine.TransferSettingsOf(options),
                 EasyOptionsFromCommandLine.ProtocolOf(options).Ssh,
                 url,
                 Running,
@@ -3486,7 +3486,7 @@ internal sealed class CurlCommandRunner(
             bool toStandardOutput = !transfer.DiscardsBody;
             StartTransferProgress(options, options.ResumeFrom, toStandardOutput);
             Func<long?, TransferContext> createAttemptContext = _ => transferContextFactory.Create(
-                options,
+                EasyOptionsFromCommandLine.TransferSettingsOf(options),
                 EasyOptionsFromCommandLine.HttpOf(options),
                 EasyOptionsFromCommandLine.BehaviourOf(options),
                 transferOptions,
@@ -3681,7 +3681,7 @@ internal sealed class CurlCommandRunner(
     private static bool FallsBackToDefaultRemoteName(CommandLineOptions options, string url, UrlTransfer transfer) =>
         transfer.OutputFileName is null
         && transfer.UsesRemoteName
-        && TransferPerformer.TryParseTransferUrl(QueryUrl.Append(url, options), options, out CurlUrl? parsed, out _)
+        && TransferPerformer.TryParseTransferUrl(QueryUrl.Append(url, options), options.DisallowUsernameInUrl, options.PathAsIs, out CurlUrl? parsed, out _)
         && RemoteFileName.FromUrlPath(RemoteNameUrlPath(transfer, parsed)) is null;
 
     /// <summary>
@@ -4330,7 +4330,7 @@ internal sealed class CurlCommandRunner(
                     follower,
                     options,
                     attemptResumeFrom => transferContextFactory.Create(
-                        options,
+                        EasyOptionsFromCommandLine.TransferSettingsOf(options),
                         EasyOptionsFromCommandLine.HttpOf(options),
                         EasyOptionsFromCommandLine.BehaviourOf(options),
                         transferOptions,
@@ -4464,7 +4464,7 @@ internal sealed class CurlCommandRunner(
         long? resumeFrom,
         DeferredOutputFileStream? outputFile)
     {
-        RedirectPolicy redirectPolicy = RedirectPolicyMapping.Of(options, EasyOptionsFromCommandLine.HttpOf(options), EasyOptionsFromCommandLine.AuthenticationOf(options));
+        RedirectPolicy redirectPolicy = RedirectPolicyMapping.Of(EasyOptionsFromCommandLine.TransferSettingsOf(options), EasyOptionsFromCommandLine.HttpOf(options), EasyOptionsFromCommandLine.AuthenticationOf(options));
         long? attemptResumeFrom = resumeFrom;
         TransferContext? firstContext = createAttemptContext(attemptResumeFrom);
         string scheme = firstContext.Url.Scheme;
