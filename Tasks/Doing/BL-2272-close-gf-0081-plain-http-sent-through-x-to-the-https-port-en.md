@@ -44,3 +44,4 @@ In Curl.Conformance.UnitLibrary TlsServerConnection.ServeAsync, end a connection
 ## Log
 
 - 2026-10-15: Created.
+- 2026-10-15: Backlog -> Doing.
