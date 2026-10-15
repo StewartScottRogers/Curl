@@ -13,4 +13,8 @@ public interface ICurlEngine : IAsyncDisposable
     /// <summary><c>curl_easy_init</c>: a new easy handle with every option at its default.</summary>
     /// <returns>The new easy handle; the caller disposes it (<c>curl_easy_cleanup</c>).</returns>
     IEasyTransfer CreateEasy();
+
+    /// <summary><c>curl_multi_init</c>: a new multi handle with every option at its default.</summary>
+    /// <returns>The new multi handle; the caller disposes it (<c>curl_multi_cleanup</c>).</returns>
+    Multi.IMultiTransfer CreateMulti();
 }
