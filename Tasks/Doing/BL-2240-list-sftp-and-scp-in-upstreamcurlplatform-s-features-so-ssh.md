@@ -31,3 +31,4 @@ Found by BL-2224 (2026-10-14): once `%SSHKEYALGO` has a value, test1459 (SFTP wi
 ## Log
 
 - 2026-10-14: Created.
+- 2026-10-14: Backlog -> Doing.
