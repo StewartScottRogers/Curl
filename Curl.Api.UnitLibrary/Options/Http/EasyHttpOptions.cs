@@ -227,4 +227,10 @@ public sealed record EasyHttpOptions
     /// <c>CURLOPT_STREAM_WEIGHT</c>: the HTTP/2 stream's weight, 1 to 256. Default 16.
     /// </summary>
     public int StreamWeight { get; init; } = 16;
+
+    /// <summary>
+    /// <c>CURLOPT_SSL_ENABLE_ALPN</c>: whether the TLS handshake offers the HTTP versions through
+    /// ALPN. Default <see langword="true"/> (1).
+    /// </summary>
+    public bool SslEnableAlpn { get; init; } = true;
 }

@@ -44,8 +44,12 @@ DoH's TLS options, splitting `-E` with `Curl.Networking`'s `ClientCertificateArg
 SOCKS5 and HAProxy options; the proxy environment variables stay the engine's (ADR-0515).
 `AuthenticationOf` builds `EasyAuthenticationOptions` from the credential, netrc, method, SASL,
 GSS-API, AWS SigV4, redirect-trust and `--httpsig-*` options (ADR-0516).
-Nothing reads these yet: BL-2323, BL-2324, BL-2325 and BL-2338 hand their records to the engine's
-classes, and BL-2307 to BL-2309 add the other groups.
+`HttpOf` builds `EasyHttpOptions` from the header, `--json`, user-agent, referer, encoding, redirect,
+`-d` body, HTTP version, cookie, alt-svc, HSTS and `--no-alpn` options; `-X`, `-I` and the `-F` body
+are left to other groups and tasks (ADR-0527).
+`NetworkOf` is read by the engine's connection factories (BL-2323); the others are not read yet:
+BL-2324, BL-2325, BL-2338 and BL-2344 to BL-2346 hand their records to the engine's classes, and
+BL-2308 and BL-2309 add the other groups.
 
 `Program.Main` only opens the standard streams, builds the composition and hands the
 arguments to `CurlCommandRunner`, which parses them, runs each URL and prints curl's

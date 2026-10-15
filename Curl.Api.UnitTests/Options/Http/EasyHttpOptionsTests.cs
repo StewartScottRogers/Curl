@@ -48,6 +48,12 @@ public sealed class EasyHttpOptionsTests
     }
 
     [TestMethod]
+    public void New_EasyHttpOptions_OffersAlpn()
+    {
+        Assert.IsTrue(Defaults.SslEnableAlpn);
+    }
+
+    [TestMethod]
     public void New_EasyHttpOptions_FollowsNoRedirectButAllowsThirty()
     {
         Assert.AreEqual(FollowLocation.None, Defaults.FollowLocation);
@@ -182,6 +188,7 @@ public sealed class EasyHttpOptionsTests
         AssertChangesOnly(Defaults with { PipeWait = true }, o => o with { PipeWait = false });
         AssertChangesOnly(Defaults with { StreamDependency = new EasyStreamDependency(new object(), true) }, o => o with { StreamDependency = null });
         AssertChangesOnly(Defaults with { StreamWeight = 256 }, o => o with { StreamWeight = 16 });
+        AssertChangesOnly(Defaults with { SslEnableAlpn = false }, o => o with { SslEnableAlpn = true });
     }
 
     private static void AssertChangesOnly(EasyHttpOptions changed, Func<EasyHttpOptions, EasyHttpOptions> restore)

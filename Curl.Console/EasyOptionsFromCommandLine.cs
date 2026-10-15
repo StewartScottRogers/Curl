@@ -2,6 +2,7 @@ using System.Collections.Frozen;
 using System.Net;
 using System.Security.Authentication;
 using Curl.Api.Options.Authentication;
+using Curl.Api.Options.Http;
 using Curl.Api.Options.Network;
 using Curl.Api.Options.Proxy;
 using Curl.Api.Options.Tls;
@@ -9,6 +10,7 @@ using Curl.Cli;
 using Curl.Networking;
 using Curl.Protocol.Abstractions;
 using EasyGssApiDelegation = Curl.Api.Options.Authentication.GssApiDelegation;
+using HttpVersion = Curl.Api.Options.Http.HttpVersion;
 
 namespace Curl.Console;
 
@@ -61,6 +63,17 @@ internal static class EasyOptionsFromCommandLine
         [HttpAuthSchemes.Ntlm] = HttpAuthenticationMethods.Ntlm,
         [HttpAuthSchemes.Negotiate] = HttpAuthenticationMethods.Negotiate,
         [HttpAuthSchemes.Bearer] = HttpAuthenticationMethods.Bearer,
+    }.ToFrozenDictionary();
+
+    // The versions the command line asks for, as the CURL_HTTP_VERSION_* curl's tool sets for each.
+    private static readonly FrozenDictionary<RequestedHttpVersion, HttpVersion> HttpVersionsByRequested = new Dictionary<RequestedHttpVersion, HttpVersion>
+    {
+        [RequestedHttpVersion.Http10] = HttpVersion.Http10,
+        [RequestedHttpVersion.Http11] = HttpVersion.Http11,
+        [RequestedHttpVersion.Http2] = HttpVersion.Http2,
+        [RequestedHttpVersion.Http2PriorKnowledge] = HttpVersion.Http2PriorKnowledge,
+        [RequestedHttpVersion.Http3] = HttpVersion.Http3,
+        [RequestedHttpVersion.Http3Only] = HttpVersion.Http3Only,
     }.ToFrozenDictionary();
 
     /// <summary>
@@ -359,6 +372,124 @@ internal static class EasyOptionsFromCommandLine
     private static HttpAuthenticationMethods MethodsOf(HttpAuthSchemes schemes) =>
         (schemes & HttpAuthSchemes.Any) == HttpAuthSchemes.Any ? HttpAuthenticationMethods.Any
         : AuthenticationMethodsByScheme.Where(pair => (schemes & pair.Key) != 0).Aggregate(HttpAuthenticationMethods.None, (all, pair) => all | pair.Value);
+
+    /// <summary>
+    /// Maps the HTTP group: <c>-H</c> with the headers <c>--json</c> adds, <c>-A</c>, <c>-e</c> (and its
+    /// <c>;auto</c>), <c>--compressed</c>, <c>--tr-encoding</c>, <c>--raw</c>, <c>-L</c>, <c>--follow</c>,
+    /// <c>--max-redirs</c>, <c>--post301</c>, <c>--post302</c>, <c>--post303</c>, the <c>-d</c> family and
+    /// <c>--json</c> body (none under <c>-G</c>, which moves it into the URL), <c>--form-escape</c>,
+    /// <c>--http1.0</c> to <c>--http3-only</c>, <c>--http0.9</c>, <c>--ignore-content-length</c>,
+    /// <c>--expect100-timeout</c>, <c>--request-target</c>, <c>-b</c>, <c>-c</c>, <c>-j</c>, <c>--alt-svc</c>,
+    /// <c>--hsts</c> and <c>--no-alpn</c>. <c>-X</c> and <c>-I</c> are the transfer group's, <c>--path-as-is</c>
+    /// the network group's, the <c>-F</c> body is mapped by BL-2344 and the <c>--etag-compare</c> header is
+    /// added per transfer, so none of them is set here (ADR-0527).
+    /// </summary>
+    /// <param name="options">The option group.</param>
+    /// <returns>The HTTP options.</returns>
+    public static EasyHttpOptions HttpOf(CommandLineOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        EasyHttpOptions http = WithRequest(options, WithEncodings(options, WithRedirects(options, new EasyHttpOptions())));
+        return WithAltSvcAndHsts(options, WithCookies(options, WithBody(options, http)));
+    }
+
+    // The request line and headers.
+    private static EasyHttpOptions WithRequest(CommandLineOptions options, EasyHttpOptions http) =>
+        http with
+        {
+            HttpHeaders = HttpHeadersOf(options),
+            UserAgent = options.UserAgent,
+            Referer = options.Referer,
+            AutoReferer = options.AutoReferer,
+            HttpVersion = options.HttpVersion is { } version ? HttpVersionsByRequested[version] : HttpVersion.None,
+            Http09Allowed = options.AllowHttp09Reply,
+            RequestTarget = options.RequestTarget,
+            Expect100Timeout = options.Expect100Timeout is { } wait && wait > TimeSpan.Zero ? wait : http.Expect100Timeout,
+            SslEnableAlpn = options.UseAlpn,
+        };
+
+    // The encodings asked for and decoded; --raw turns both decodings off, as curl's tool does.
+    private static EasyHttpOptions WithEncodings(CommandLineOptions options, EasyHttpOptions http) =>
+        http with
+        {
+            AcceptEncoding = options.Compressed ? string.Empty : null,
+            TransferEncoding = options.TransferEncoding,
+            HttpContentDecoding = !options.Raw,
+            HttpTransferDecoding = !options.Raw,
+            IgnoreContentLength = options.IgnoreContentLength,
+        };
+
+    // -L is CURLFOLLOW_ALL and --follow CURLFOLLOW_OBEYCODE, as --libcurl writes 1L and 2L.
+    private static EasyHttpOptions WithRedirects(CommandLineOptions options, EasyHttpOptions http) =>
+        http with
+        {
+            FollowLocation = !options.FollowRedirects ? FollowLocation.None
+                : options.FollowRedirectsPerSpec ? FollowLocation.ObeyCode
+                : FollowLocation.All,
+            MaxRedirects = options.MaxRedirects,
+            PostRedirect = PostRedirectOf(options.KeepPostAfter301, PostRedirect.Post301)
+                | PostRedirectOf(options.KeepPostAfter302, PostRedirect.Post302)
+                | PostRedirectOf(options.KeepPostAfter303, PostRedirect.Post303),
+        };
+
+    // The -d family's bytes and their size as --libcurl writes them; -G leaves no body.
+    private static EasyHttpOptions WithBody(CommandLineOptions options, EasyHttpOptions http) =>
+        options.PostData is { } data && !options.DataInQuery
+            ? http with { PostFields = data, PostFieldSize = data.Length, MimeOptions = MimeOptionsOf(options) }
+            : http with { MimeOptions = MimeOptionsOf(options) };
+
+    private static MimeOptions MimeOptionsOf(CommandLineOptions options) =>
+        options.FormEscape ? MimeOptions.FormEscape : MimeOptions.None;
+
+    // The -b strings joined as --libcurl writes CURLOPT_COOKIE, the -b files, -c and -j.
+    private static EasyHttpOptions WithCookies(CommandLineOptions options, EasyHttpOptions http)
+    {
+        string[] cookieStrings = CookieValuesOf(options, cookieStrings: true);
+        return http with
+        {
+            Cookie = cookieStrings.Length > 0 ? string.Join("; ", cookieStrings) : null,
+            CookieFiles = CookieValuesOf(options, cookieStrings: false),
+            CookieJar = options.CookieJar,
+            CookieSession = options.JunkSessionCookies,
+        };
+    }
+
+    private static string[] CookieValuesOf(CommandLineOptions options, bool cookieStrings) =>
+        [.. options.Cookies.Where(cookie => cookie.IsCookieString == cookieStrings).Select(cookie => cookie.Value)];
+
+    // Setting CURLOPT_ALTSVC or CURLOPT_HSTS turns the cache on with libcurl's own control bits.
+    private static EasyHttpOptions WithAltSvcAndHsts(CommandLineOptions options, EasyHttpOptions http) =>
+        http with
+        {
+            AltSvc = options.AltSvcFile,
+            AltSvcControl = options.AltSvcFile is null ? AltSvcControl.None : AltSvcControl.H1 | AltSvcControl.H2 | AltSvcControl.H3,
+            Hsts = options.HstsFile,
+            HstsControl = options.HstsFile is null ? HstsControl.None : HstsControl.Enable,
+        };
+
+    // The -H headers in order, then the --json ones no -H header already names, as curl's tool adds them.
+    private static List<string> HttpHeadersOf(CommandLineOptions options)
+    {
+        List<string> headers = [.. options.Headers];
+        if (options.SendsJson)
+        {
+            AddHeaderUnlessNamed(headers, "Content-Type: application/json");
+            AddHeaderUnlessNamed(headers, "Accept: application/json");
+        }
+
+        return headers;
+    }
+
+    private static void AddHeaderUnlessNamed(List<string> headers, string header)
+    {
+        string nameAndColon = header[..(header.IndexOf(':', StringComparison.Ordinal) + 1)];
+        if (!headers.Exists(existing => existing.StartsWith(nameAndColon, StringComparison.OrdinalIgnoreCase)))
+        {
+            headers.Add(header);
+        }
+    }
+
+    private static PostRedirect PostRedirectOf(bool on, PostRedirect bit) => on ? bit : PostRedirect.None;
 
     // The schemes as CURLOPT_PROTOCOLS_STR takes them: lowercase, sorted, joined by commas.
     private static string? ProtocolListOf(IReadOnlySet<string>? schemes) =>
