@@ -48,3 +48,4 @@ In Curl.Protocol.Ssh.UnitLibrary, make a refused or unreachable connection on sc
 ## Log
 
 - 2026-10-15: Created.
+- 2026-10-15: Backlog -> Doing.
