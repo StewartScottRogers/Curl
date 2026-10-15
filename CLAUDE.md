@@ -39,7 +39,7 @@ unit test. A slow test that is pure computation is not an Integration test: it s
 Always build and run the fast tests before declaring a task finished.
 
 ## Quality gates
-Every `*.UnitLibrary` (and `Curl.Console`) is held to 100% line coverage, 100% branch
+Every `*.UnitLibrary` (and `Curl.Console`, `Curl.Api` and `Libcurl`) is held to 100% line coverage, 100% branch
 coverage, cyclomatic complexity of at most 10 per method, and a CRAP score of at most 30.
 All four are measured with tooling the solution already has - the coverage collector the
 MSTest meta-package brings, and the SDK's own `CA1502` analyzer - so no package is needed
@@ -262,7 +262,7 @@ Curl/
 ├── Curl.Networking.IntegrationTests/ ← its Integration tests, just before the library
 ├── Curl.Networking.UnitLibrary/
 ├── Curl.Networking.UnitTests/
-├── ...                           ← 79 projects, one flat alphabetical run
+├── ...                           ← 84 projects, one flat alphabetical run
 ├── Documentation/                ← shared project (docs and planning)
 ├── Tasks/                        ← shared project (task board)
 ├── Audit/                        ← shared project (the audit office; never written by the factory)
@@ -275,11 +275,17 @@ Curl/
 - Tests: the same name with `.UnitTests` instead of `.UnitLibrary`.
 - Integration tests, once an area has any: the same name with `.IntegrationTests`
   instead of `.UnitLibrary` (ADR-0421).
-- The executable is `Curl.Console` — no `.UnitLibrary` suffix, because it is not a
-  library. It is the only exception.
+- Three projects are exceptions to the `Curl.<Area>.UnitLibrary` rule: the executable
+  `Curl.Console` (no `.UnitLibrary` suffix, because it is not a library) and the two
+  programming interfaces `Curl.Api` and `Libcurl` (ADR-0506). `Libcurl` also has no `Curl.`
+  prefix, matching upstream's library name. `Curl.Api` and `Libcurl` are held to the four
+  quality gates like a `*.UnitLibrary`. `Curl.Api.UnitTests` tests both `Curl.Api` and
+  `Curl.Api.UnitLibrary`; `Libcurl.UnitTests` tests `Libcurl`.
 - Names sort so each `.UnitTests` lands directly after the library it tests, and each
   `.IntegrationTests` directly before it (for `Curl.Console`, directly before
-  `Curl.Console.UnitTests`). Keep it that way.
+  `Curl.Console.UnitTests`). Keep it that way. `Libcurl` and `Libcurl.UnitTests` sort after
+  every `Curl.*` project; in `Curl.slnx`, `Curl.Api`, `Curl.Api.UnitLibrary` and
+  `Curl.Api.UnitTests` come first, before `Curl.Authentication.UnitLibrary`.
 
 In `Curl.slnx`, projects are listed as one flat run with no solution folders around
 them. The `Solution Items` and `Scripts` solution folders hold loose files only.

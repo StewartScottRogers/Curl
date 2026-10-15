@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Api, Curl.Api.UnitLibrary, Curl.Api.UnitTests, Libcurl, Libcurl.UnitTests, Curl.slnx, CLAUDE.md, Measure-CodeQuality.ps1]
 requirement: none
 created: 2026-10-15
-completed:
+completed: 2026-10-15
 ---
 # BL-2292 — Scaffold Curl.Api, Curl.Api.UnitLibrary, Curl.Api.UnitTests, Libcurl and Libcurl.UnitTests and record their naming exceptions
 
@@ -30,17 +30,24 @@ ADR-0506 and `Documentation/Planning/Curl-Api-And-libcurl.md` (phase 2 step 1). 
 
 ## Acceptance criteria
 
-- [ ] The five project folders and `.csproj` files exist with the references in Context and are listed in `Curl.slnx` at the positions in Context.
-- [ ] `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Api,Libcurl` reports both as production assemblies (an assembly with no members passes).
-- [ ] Root `CLAUDE.md`'s "Project naming" and "Quality gates" sections name `Curl.Api` and `Libcurl` as stated in Context, and the layout block's project count matches `Curl.slnx`.
-- [ ] `dotnet build` is clean (warnings are errors), including `VerifyAotCompatibility` for the three production projects.
-- [ ] `dotnet test --filter "TestCategory!=Integration"` passes.
-- [ ] `powershell -NoProfile -File Measure-CodeQuality.ps1` passes.
-- [ ] `Curl.Conformance.UnitTests/PassingUpstreamCases.txt` is unchanged.
+- [x] The five project folders and `.csproj` files exist with the references in Context and are listed in `Curl.slnx` at the positions in Context.
+- [x] `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Api,Libcurl` reports both as production assemblies (an assembly with no members passes).
+- [x] Root `CLAUDE.md`'s "Project naming" and "Quality gates" sections name `Curl.Api` and `Libcurl` as stated in Context, and the layout block's project count matches `Curl.slnx`.
+- [x] `dotnet build` is clean (warnings are errors), including `VerifyAotCompatibility` for the three production projects.
+- [x] `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] `powershell -NoProfile -File Measure-CodeQuality.ps1` passes.
+- [x] `Curl.Conformance.UnitTests/PassingUpstreamCases.txt` is unchanged.
 
 ## Notes
+
+- Scaffolded with empty projects. `Curl.Api.UnitLibrary` and `Curl.Api` give `InternalsVisibleTo` to `Curl.Api.UnitTests`; `Libcurl` to `Libcurl.UnitTests`. Root namespaces come from `Directory.Build.props` (`Curl.Api`, and the project name `Libcurl`).
+- `Curl.slnx` count is 84 projects (was 79); `CLAUDE.md` layout block updated.
+- `Measure-CodeQuality.ps1`: predicate and help now accept `Curl.Api` and `Libcurl`. With no members yet, a run prints no table row for either (no coverage package is emitted for an empty assembly) and reports 0 failing members; they appear once code lands.
+- Full `Measure-CodeQuality.ps1` passed: 0 failing members across 37 production assemblies.
+- Scripts searched for `Curl.*` project globs: none outside guarded paths. One guarded script selects projects by `*.UnitLibrary` or `Curl.Console` (the audit tool `Find-BooleanNameMismatches.ps1`, line 82); a lane may not file or edit it, so an interactive session on the `audit` branch must add `Curl.Api` and `Libcurl` to it.
 
 ## Log
 
 - 2026-10-15: Created.
 - 2026-10-15: Backlog -> Doing.
+- 2026-10-15: Doing -> Done. Curl.Api, Curl.Api.UnitLibrary, Curl.Api.UnitTests, Libcurl and Libcurl.UnitTests exist in the solution, empty, and CLAUDE.md and Measure-CodeQuality.ps1 know them

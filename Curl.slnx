@@ -47,6 +47,9 @@
     <File Path="install.ps1" />
     <File Path="install.sh" />
   </Folder>
+  <Project Path="Curl.Api/Curl.Api.csproj" />
+  <Project Path="Curl.Api.UnitLibrary/Curl.Api.UnitLibrary.csproj" />
+  <Project Path="Curl.Api.UnitTests/Curl.Api.UnitTests.csproj" />
   <Project Path="Curl.Authentication.UnitLibrary/Curl.Authentication.UnitLibrary.csproj" />
   <Project Path="Curl.Authentication.UnitTests/Curl.Authentication.UnitTests.csproj" />
   <Project Path="Curl.Cli.IntegrationTests/Curl.Cli.IntegrationTests.csproj" />
@@ -129,6 +132,8 @@
 
   <Project Path="Documentation/Documentation.shproj" />
   <Project Path=".claude/Claude.shproj" />
+  <Project Path="Libcurl/Libcurl.csproj" />
+  <Project Path="Libcurl.UnitTests/Libcurl.UnitTests.csproj" />
   <Project Path="Tasks/Tasks.shproj" />
   <Project Path="Audit/Audit.shproj" />
   <Project Path="Gap/Gap.shproj" />
