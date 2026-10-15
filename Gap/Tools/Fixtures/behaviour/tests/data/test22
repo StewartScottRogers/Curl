@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="US-ASCII"?>
+<testcase>
+<info>
+<keywords>
+SFTP
+</keywords>
+</info>
+
+<client>
+<server>
+sftp
+</server>
+<name>
+fixture case 22
+</name>
+<command>
+--key %LOGDIR/server/curl_client_key sftp://%HOSTIP:%SSHPORT%SFTP_PWD/%LOGDIR/test%TESTNUMBER.txt
+</command>
+<stdout>
+</stdout>
+
+</client>
+</testcase>
