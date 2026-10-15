@@ -1,6 +1,9 @@
 using Curl.Api.Callbacks;
 using Curl.Api.Codes;
 using Curl.Api.EngineContracts;
+using Curl.Api.EngineContracts.ConnectOnly;
+using Curl.Api.EngineContracts.Headers;
+using Curl.Api.EngineContracts.WebSocket;
 using Curl.Api.EngineContracts.Multi;
 using Curl.Api.Info;
 using Curl.Api.Options;
@@ -49,6 +52,12 @@ public sealed class MultiValueTypeTests
         public TransferInfo Info => throw new NotSupportedException();
 
         public string ErrorText => "";
+
+        public ITransferHeaders Headers => throw new NotSupportedException();
+
+        public IEasyWebSocket WebSocket => throw new NotSupportedException();
+
+        public IConnectOnlyConnection Connection => throw new NotSupportedException();
 
         public ValueTask<CurlCode> PerformAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
 
