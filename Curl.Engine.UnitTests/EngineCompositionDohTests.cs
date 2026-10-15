@@ -2,6 +2,7 @@ using Curl.Console;
 using System.Net.Sockets;
 using System.Text;
 
+using Curl.Api.Options.Tls;
 using Curl.Cli;
 using Curl.Networking;
 using Curl.Protocol.Abstractions;
@@ -66,7 +67,7 @@ public sealed class EngineCompositionDohTests
     [TestMethod]
     public void CreateTransports_WithDohUrl_SharesTheDohResolverBetweenBothConnectors()
     {
-        CurlTransports transports = EngineComposition.CreateTransports(Parse("--doh-url", DohUrl), EasyOptionsFromCommandLine.NetworkOf(Parse("--doh-url", DohUrl)));
+        CurlTransports transports = EngineComposition.CreateTransports(Parse("--doh-url", DohUrl), EasyOptionsFromCommandLine.NetworkOf(Parse("--doh-url", DohUrl)), EasyOptionsFromCommandLine.TlsOf(Parse("--doh-url", DohUrl)));
         Diagnostics.Act("resolver type", transports.DnsResolver.GetType().Name);
 
         Diagnostics.Assert("resolver type", nameof(DohDnsResolver), transports.DnsResolver.GetType().Name);
@@ -297,8 +298,8 @@ public sealed class EngineCompositionDohTests
     [TestMethod]
     public void DohFromCommandLine_TakesTheDohFlagsAndNotTheTransfersInsecureOrCertStatus()
     {
-        TlsClientOptions dohOnly = TlsClientOptionsMapping.DohFromCommandLine(Parse("--doh-insecure", "--doh-cert-status"));
-        TlsClientOptions transferOnly = TlsClientOptionsMapping.DohFromCommandLine(Parse("-k", "--cert-status"));
+        TlsClientOptions dohOnly = TlsClientOptionsMapping.DohOf(TlsOf("--doh-insecure", "--doh-cert-status"));
+        TlsClientOptions transferOnly = TlsClientOptionsMapping.DohOf(TlsOf("-k", "--cert-status"));
         Diagnostics.Act("DoH-only options", dohOnly);
         Diagnostics.Act("transfer-only options", transferOnly);
 
@@ -315,7 +316,7 @@ public sealed class EngineCompositionDohTests
     {
         // curl --ssl-no-revoke --cacert root.pem --doh-url ... (no --doh-insecure) verified the DoH server's
         // certificate against root.pem and resolved; -k alone did not reach it (measured).
-        TlsClientOptions options = TlsClientOptionsMapping.DohFromCommandLine(Parse(
+        TlsClientOptions options = TlsClientOptionsMapping.DohOf(TlsOf(
             "--cacert", "root.pem",
             "--capath", "certs",
             "--crlfile", "list.crl",
@@ -344,7 +345,7 @@ public sealed class EngineCompositionDohTests
     public void CreateDohConnector_OffersOnlyHttp11AndTakesNoResolveEntries()
     {
         TcpConnector connector = EngineComposition.CreateDohConnector(
-            Parse("--http2", "--resolve", "x:1:192.0.2.1", "--doh-url", DohUrl), new TcpDialer(), TimeProvider.System);
+            Parse("--http2", "--resolve", "x:1:192.0.2.1", "--doh-url", DohUrl), new EasyTlsOptions(), new TcpDialer(), TimeProvider.System);
         Diagnostics.Act("ALPN offer", string.Join(", ", connector.HttpOverTlsApplicationProtocols.ToArray()));
         Diagnostics.Act("Unix socket", connector.UnixSocket?.ToString() ?? "(none)");
 
@@ -365,7 +366,7 @@ public sealed class EngineCompositionDohTests
 
     private IDnsResolver CreateDnsResolver(params string[] arguments)
     {
-        IDnsResolver resolver = EngineComposition.CreateDnsResolver(Parse(arguments), EasyOptionsFromCommandLine.NetworkOf(Parse(arguments)), TimeProvider.System, new TcpDialer());
+        IDnsResolver resolver = EngineComposition.CreateDnsResolver(Parse(arguments), EasyOptionsFromCommandLine.NetworkOf(Parse(arguments)), EasyOptionsFromCommandLine.TlsOf(Parse(arguments)), TimeProvider.System, new TcpDialer());
         Diagnostics.Act("resolver type", resolver.GetType().Name);
         return resolver;
     }
@@ -407,6 +408,9 @@ public sealed class EngineCompositionDohTests
         Diagnostics.Act("web targets", string.Join(", ", webServer.Targets.Select(target => $"{target.Host}:{target.Port}")));
         return result;
     }
+
+    // The TLS record the command line maps to, as Curl.Console hands it to the engine.
+    private EasyTlsOptions TlsOf(params string[] arguments) => EasyOptionsFromCommandLine.TlsOf(Parse(arguments));
 
     private CommandLineOptions Parse(params string[] arguments)
     {

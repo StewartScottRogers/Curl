@@ -1,5 +1,6 @@
-using System.Security.Authentication;
+using Curl.Api.Options.Tls;
 using Curl.Cli;
+using Curl.Console;
 using Curl.Networking;
 using Curl.Testing;
 
@@ -47,9 +48,9 @@ public sealed class TlsClientOptionsMappingTests
     }
 
     [TestMethod]
-    public void FromCommandLine_ClientCertificate_CopiesTheValueWithItsPassphraseVerbatim()
+    public void FromCommandLine_ClientCertificate_CopiesThePathAndItsPassphraseAsSplit()
     {
-        Assert.AreEqual(Expect(new TlsClientOptions(ClientCertificate: "client.p12:secret")), Map("--cert", "client.p12:secret", Url));
+        Assert.AreEqual(Expect(new TlsClientOptions(ClientCertificate: "client.p12", Passphrase: "secret")), Map("--cert", "client.p12:secret", Url));
     }
 
     [TestMethod]
@@ -196,16 +197,29 @@ public sealed class TlsClientOptionsMappingTests
     }
 
     [TestMethod]
-    public void ToTlsVersion_OtherNonNullVersion_MapsToSystemDefault()
+    [DataRow(SslVersionMaximum.None)]
+    [DataRow(SslVersionMaximum.Default)]
+    public void ToTlsVersion_CeilingNamingNoVersion_MapsToSystemDefault(SslVersionMaximum ceiling)
     {
-        Diagnostics.Arrange("protocols", SslProtocols.None);
-        TlsVersion version = TlsClientOptionsMapping.ToTlsVersion(SslProtocols.None);
+        Diagnostics.Arrange("ceiling", ceiling);
+        TlsVersion version = TlsClientOptionsMapping.ToTlsVersion(ceiling);
+        Diagnostics.Act("TLS version", version);
+
+        Diagnostics.Assert("TLS version", TlsVersion.SystemDefault, version);
+        Assert.AreEqual(TlsVersion.SystemDefault, version);
+    }
+
+    [TestMethod]
+    public void ToTlsVersion_SslVersionWithNoTlsVersion_MapsToSystemDefault()
+    {
+        Diagnostics.Arrange("SSL version", SslVersion.Ssl3);
+        TlsVersion version = TlsClientOptionsMapping.ToTlsVersion(SslVersion.Ssl3);
         Diagnostics.Act("TLS version", version);
 
         Diagnostics.Assert("TLS version", TlsVersion.SystemDefault, version);
         Assert.AreEqual(
             TlsVersion.SystemDefault,
-            TlsClientOptionsMapping.ToTlsVersion(SslProtocols.None));
+            TlsClientOptionsMapping.ToTlsVersion(SslVersion.Ssl3));
     }
 
     /// <summary>
@@ -357,11 +371,11 @@ public sealed class TlsClientOptionsMappingTests
     }
 
     [TestMethod]
-    public void ProxyFromCommandLine_ProxyClientCertificateOptions_ReachTheProxyVerbatim()
+    public void ProxyFromCommandLine_ProxyClientCertificateOptions_ReachTheProxyWithTheCertificateSplitFromItsPassphrase()
     {
         Assert.AreEqual(
             Expect(new TlsClientOptions(
-                ClientCertificate: @"proxy\:name.pem:se\:cret",
+                ClientCertificate: "proxy:name.pem",
                 PrivateKey: "proxy-key.pem",
                 CertificateType: "P12",
                 PrivateKeyType: "DER",
@@ -436,10 +450,18 @@ public sealed class TlsClientOptionsMappingTests
     }
 
     private TlsClientOptions Map(params string[] arguments) =>
-        Mapped("target", arguments, TlsClientOptionsMapping.FromCommandLine(Parse(arguments)));
+        Mapped("target", arguments, MapTarget(Parse(arguments)));
 
     private TlsClientOptions MapProxy(params string[] arguments) =>
-        Mapped("proxy", arguments, TlsClientOptionsMapping.ProxyFromCommandLine(Parse(arguments)));
+        Mapped("proxy", arguments, MapProxyOf(Parse(arguments)));
+
+    // The target's options through the whole command line, as the engine maps them from the TLS record.
+    private static TlsClientOptions MapTarget(CommandLineOptions options) =>
+        TlsClientOptionsMapping.Of(EasyOptionsFromCommandLine.TlsOf(options), options.UseAlpn, options.SslSessionsFile);
+
+    // The HTTPS proxy's options through the whole command line, as the engine maps them from the TLS record.
+    private static TlsClientOptions MapProxyOf(CommandLineOptions options) =>
+        TlsClientOptionsMapping.ProxyOf(EasyOptionsFromCommandLine.TlsOf(options), options.UseAlpn);
 
     /// <summary>Notes the options the next <see cref="Mapped" /> is expected to give, and returns them.</summary>
     private TlsClientOptions Expect(TlsClientOptions expected)

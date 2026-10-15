@@ -1,5 +1,6 @@
 using System.Net.Sockets;
 using Curl.Api.Options.Network;
+using Curl.Api.Options.Tls;
 using Curl.Cli;
 using Curl.Networking;
 using Curl.Protocol.Abstractions;
@@ -15,8 +16,8 @@ namespace Curl.Engine;
 /// here: the pool key holds the host and port a mapping dials (<c>ConnectionPoolKey.ConnectToAuthority</c>),
 /// so groups whose mappings reach the same place share a connection, as curl 8.22.0's do (test2051, BL-2164).
 /// </summary>
-/// <param name="Tls">The origin's TLS options (<see cref="TlsClientOptionsMapping.FromCommandLine" />).</param>
-/// <param name="ProxyTls">The HTTPS proxy's TLS options (<see cref="TlsClientOptionsMapping.ProxyFromCommandLine" />).</param>
+/// <param name="Tls">The origin's TLS options (<see cref="TlsClientOptionsMapping.Of" />).</param>
+/// <param name="ProxyTls">The HTTPS proxy's TLS options (<see cref="TlsClientOptionsMapping.ProxyOf" />).</param>
 /// <param name="UnixSocket">The <c>--unix-socket</c> or <c>--abstract-unix-socket</c>, or <see langword="null" />.</param>
 /// <param name="LocalBinding">The <c>--interface</c> and <c>--local-port</c> binding, or <see langword="null" />.</param>
 /// <param name="AddressFamily">The <c>-4</c>/<c>-6</c> choice.</param>
@@ -34,13 +35,14 @@ internal sealed record OptionGroupConnectionSettings(
     string ApplicationProtocols)
 {
     /// <summary>Reads the settings of one option group.</summary>
-    /// <param name="options">The option group, for its TLS, proxy and HTTP version options.</param>
+    /// <param name="options">The option group, for its proxy, ALPN, <c>--ssl-sessions</c> and HTTP version options.</param>
     /// <param name="network">The option group's network options, for its socket, binding and IP version.</param>
+    /// <param name="tls">The option group's TLS options, for the target's and the HTTPS proxy's handshakes.</param>
     /// <returns>The settings.</returns>
-    internal static OptionGroupConnectionSettings Of(CommandLineOptions options, EasyNetworkOptions network) =>
+    internal static OptionGroupConnectionSettings Of(CommandLineOptions options, EasyNetworkOptions network, EasyTlsOptions tls) =>
         new(
-            TlsClientOptionsMapping.FromCommandLine(options),
-            TlsClientOptionsMapping.ProxyFromCommandLine(options),
+            TlsClientOptionsMapping.Of(tls, options.UseAlpn, options.SslSessionsFile),
+            TlsClientOptionsMapping.ProxyOf(tls, options.UseAlpn),
             EngineComposition.UnixSocketOf(network),
             EngineComposition.LocalBindingOf(network),
             EngineComposition.AddressFamilyOf(network),

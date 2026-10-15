@@ -52,7 +52,7 @@ public sealed class EngineCompositionHttp3TraceTests
     [TestMethod]
     public void CreateTransports_UnderTraceConfigHttp3_TracesHttp3()
     {
-        CurlTransports transports = EngineComposition.CreateTransports(Parse("-v", "--trace-config", "http/3"), EasyOptionsFromCommandLine.NetworkOf(Parse("-v", "--trace-config", "http/3")), TimeProvider.System);
+        CurlTransports transports = EngineComposition.CreateTransports(Parse("-v", "--trace-config", "http/3"), EasyOptionsFromCommandLine.NetworkOf(Parse("-v", "--trace-config", "http/3")), EasyOptionsFromCommandLine.TlsOf(Parse("-v", "--trace-config", "http/3")), TimeProvider.System);
         Diagnostics.Act("transports trace HTTP/3", transports.TracesHttp3);
 
         Diagnostics.Assert("transports trace HTTP/3", true, transports.TracesHttp3);
@@ -62,7 +62,7 @@ public sealed class EngineCompositionHttp3TraceTests
     [TestMethod]
     public void CreateTransports_WithoutTheHttp3Component_DoesNotTraceHttp3()
     {
-        CurlTransports transports = EngineComposition.CreateTransports(Parse("-v"), EasyOptionsFromCommandLine.NetworkOf(Parse("-v")), TimeProvider.System);
+        CurlTransports transports = EngineComposition.CreateTransports(Parse("-v"), EasyOptionsFromCommandLine.NetworkOf(Parse("-v")), EasyOptionsFromCommandLine.TlsOf(Parse("-v")), TimeProvider.System);
         Diagnostics.Act("transports trace HTTP/3", transports.TracesHttp3);
 
         Diagnostics.Assert("transports trace HTTP/3", false, transports.TracesHttp3);

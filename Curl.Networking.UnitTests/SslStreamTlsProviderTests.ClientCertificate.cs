@@ -355,7 +355,12 @@ public sealed partial class SslStreamTlsProviderTests
         return request.CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddDays(1));
     }
 
-    private static TlsClientOptions ClientCertificate(string value) => new(Insecure: true, ClientCertificate: value);
+    // The -E value split into the certificate and its pass phrase as curl's tool splits it before the loader sees it (ADR-0514).
+    private static TlsClientOptions ClientCertificate(string value)
+    {
+        var (path, passphrase) = ClientCertificateArgument.Split(value, OperatingSystem.IsWindows());
+        return new(Insecure: true, ClientCertificate: path, Passphrase: passphrase);
+    }
 
     // The OpenSSL build splits at a drive letter's colon, so on Windows a temporary path is
     // given to it with the colon escaped, as a user of that build would write it.

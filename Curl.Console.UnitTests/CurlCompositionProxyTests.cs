@@ -399,7 +399,7 @@ public sealed partial class CurlCompositionProxyTests
         string[] arguments = ["--proxy-ntlm", "-U", "u:p", "-p", "-x", "127.0.0.1:18604", "http://example.test/"];
         Diagnostics.ArrangeCommandLine(arguments);
         CurlTransports transports = EngineComposition.CreateTransports(
-            CommandLineParser.Parse(arguments, _ => true).Options!, EasyOptionsFromCommandLine.NetworkOf(CommandLineParser.Parse(arguments, _ => true).Options!));
+            CommandLineParser.Parse(arguments, _ => true).Options!, EasyOptionsFromCommandLine.NetworkOf(CommandLineParser.Parse(arguments, _ => true).Options!), EasyOptionsFromCommandLine.TlsOf(CommandLineParser.Parse(arguments, _ => true).Options!));
         HttpAuthRequest request = new("CONNECT", CurlUrl.Parse("http://127.0.0.1:18604/"), "example.test:80", new System.Net.NetworkCredential("u", "p"), null, HttpAuthSchemes.Ntlm, IsProxy: true);
 
         string? value = await transports.ProxyTunnelOptions.ProxyAuthenticator!.CreateAuthorizationAsync(request, [], CancellationToken.None);

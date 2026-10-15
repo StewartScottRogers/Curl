@@ -1,11 +1,11 @@
-using Curl.Cli;
+using Curl.Api.Options.Tls;
 using Curl.Testing;
 
 namespace Curl.Engine;
 
 /// <summary>
 /// Pins <see cref="TlsBuildInformation.Lines" />: no build-time engines for <c>--engine list</c>, nothing for
-/// <c>--dump-ca-embed</c>, and no answer for a command line that asks neither (ADR-0151).
+/// <c>--dump-ca-embed</c>, and no answer for an option group that asks neither (ADR-0151).
 /// </summary>
 [TestClass]
 public sealed class TlsBuildInformationTests
@@ -17,7 +17,7 @@ public sealed class TlsBuildInformationTests
     [TestMethod]
     public void Lines_EngineList_ListsNoEngines()
     {
-        string[] lines = LinesFor("--engine", "list")!.ToArray();
+        string[] lines = LinesFor(new EasyTlsOptions { Engine = "list" }, caEmbedDumpRequested: false)!.ToArray();
 
         Diagnostics.Assert("lines", "Build-time engines: |   <none>", string.Join(" | ", lines));
         CollectionAssert.AreEqual(
@@ -28,7 +28,7 @@ public sealed class TlsBuildInformationTests
     [TestMethod]
     public void Lines_DumpCaEmbed_IsNoLines()
     {
-        IReadOnlyList<string> lines = LinesFor("--dump-ca-embed")!;
+        IReadOnlyList<string> lines = LinesFor(new EasyTlsOptions(), caEmbedDumpRequested: true)!;
 
         Diagnostics.Assert("line count", 0, lines.Count);
         Assert.IsEmpty(lines);
@@ -37,24 +37,18 @@ public sealed class TlsBuildInformationTests
     [TestMethod]
     public void Lines_NeitherOption_IsNull()
     {
-        IReadOnlyList<string>? lines = LinesFor("--engine", "pkcs11", "https://example.com/");
+        IReadOnlyList<string>? lines = LinesFor(new EasyTlsOptions { Engine = "pkcs11" }, caEmbedDumpRequested: false);
 
         Diagnostics.Assert("lines", "null", lines is null ? "null" : string.Join(" | ", lines));
         Assert.IsNull(lines);
     }
 
-    private IReadOnlyList<string>? LinesFor(params string[] arguments)
+    private IReadOnlyList<string>? LinesFor(EasyTlsOptions tls, bool caEmbedDumpRequested)
     {
-        Diagnostics.Arrange("command line", string.Join(' ', arguments));
-        IReadOnlyList<string>? lines = TlsBuildInformation.Lines(Parse(arguments));
+        Diagnostics.Arrange("engine", tls.Engine ?? "(none)");
+        Diagnostics.Arrange("--dump-ca-embed", caEmbedDumpRequested);
+        IReadOnlyList<string>? lines = TlsBuildInformation.Lines(tls, caEmbedDumpRequested);
         Diagnostics.Act("lines", lines is null ? "null" : string.Join(" | ", lines));
         return lines;
-    }
-
-    private static CommandLineOptions Parse(params string[] arguments)
-    {
-        CommandLineParseResult parsed = CommandLineParser.Parse(arguments, _ => true);
-        Assert.IsTrue(parsed.IsAccepted);
-        return parsed.Options;
     }
 }

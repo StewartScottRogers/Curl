@@ -1,158 +1,135 @@
 using System.Collections.Frozen;
-using System.Security.Authentication;
-using Curl.Cli;
+using Curl.Api.Options.Tls;
 using Curl.Networking;
 
 namespace Curl.Engine;
 
 /// <summary>
-/// Maps the TLS options of a parsed command line onto the <see cref="TlsClientOptions" />
-/// an <see cref="SslStreamTlsProvider" /> applies: the target's, and an HTTPS proxy's.
+/// Maps an option group's <see cref="EasyTlsOptions" /> onto the <see cref="TlsClientOptions" />
+/// an <see cref="SslStreamTlsProvider" /> applies: the target's, an HTTPS proxy's and the
+/// DNS-over-HTTPS server's (ADR-0514, BL-2324).
 /// </summary>
 internal static class TlsClientOptionsMapping
 {
-    // The versions the parser records, as SslProtocols, and the TlsVersion each is to the provider.
-    private static readonly FrozenDictionary<SslProtocols, TlsVersion> TlsVersionsByProtocol =
-        new Dictionary<SslProtocols, TlsVersion>
+    // The lowest versions the record names, and the TlsVersion each is to the provider; CURL_SSLVERSION_TLSv1 is TLS 1.0 or later.
+    private static readonly FrozenDictionary<SslVersion, TlsVersion> TlsVersionsBySslVersion =
+        new Dictionary<SslVersion, TlsVersion>
         {
-            [ObsoleteTlsProtocols.Tls10] = TlsVersion.Tls10,
-            [ObsoleteTlsProtocols.Tls11] = TlsVersion.Tls11,
-            [SslProtocols.Tls12] = TlsVersion.Tls12,
-            [SslProtocols.Tls13] = TlsVersion.Tls13,
+            [SslVersion.Tls1] = TlsVersion.Tls10,
+            [SslVersion.Tls10] = TlsVersion.Tls10,
+            [SslVersion.Tls11] = TlsVersion.Tls11,
+            [SslVersion.Tls12] = TlsVersion.Tls12,
+            [SslVersion.Tls13] = TlsVersion.Tls13,
+        }.ToFrozenDictionary();
+
+    // The ceilings the record names, and the TlsVersion each is to the provider.
+    private static readonly FrozenDictionary<SslVersionMaximum, TlsVersion> TlsVersionsBySslVersionMaximum =
+        new Dictionary<SslVersionMaximum, TlsVersion>
+        {
+            [SslVersionMaximum.Tls10] = TlsVersion.Tls10,
+            [SslVersionMaximum.Tls11] = TlsVersion.Tls11,
+            [SslVersionMaximum.Tls12] = TlsVersion.Tls12,
+            [SslVersionMaximum.Tls13] = TlsVersion.Tls13,
         }.ToFrozenDictionary();
 
     /// <summary>
-    /// Copies <c>-k</c>, <c>--cacert</c>, <c>--capath</c>, <c>--cert</c>, <c>--key</c>,
-    /// <c>--ciphers</c>, <c>--tls13-ciphers</c>, <c>--cert-type</c>, <c>--key-type</c>,
-    /// <c>--pass</c>, <c>--ssl-no-revoke</c>, <c>--ssl-revoke-best-effort</c>, <c>--no-alpn</c> and the
-    /// minimum TLS version from <paramref name="options" />. <c>--ca-native</c>
-    /// (<see cref="CommandLineOptions.UseNativeCaStore" />) maps to nothing: without
-    /// <c>--cacert</c> the provider already verifies against the operating system's store, and
-    /// with it curl 8.21.0 still verifies against the file on both builds (measured, ADR-0124).
+    /// Maps the target's TLS options: <see cref="EasyTlsOptions.Origin" />'s verification (<c>-k</c>
+    /// turns <see cref="TlsPeerOptions.VerifyPeer" /> off, as <see cref="TlsClientOptions.Insecure" />),
+    /// CA file and directory, client certificate, key, their types and pass phrase, cipher lists,
+    /// pinned public key, revocation list, versions (<see cref="ToTlsVersion(SslVersion)" /> and
+    /// <see cref="ToTlsVersion(SslVersionMaximum)" />) and <c>CURLSSLOPT_*</c> bits
+    /// (<see cref="SslOptions.NoRevoke" />, <see cref="SslOptions.RevokeBestEffort" />,
+    /// <see cref="SslOptions.EarlyData" />, <see cref="SslOptions.AutoClientCert" /> and
+    /// <see cref="SslOptions.AllowBeast" />); and the record's <see cref="EasyTlsOptions.EllipticCurves" />,
+    /// <see cref="EasyTlsOptions.SignatureAlgorithms" />, the three Encrypted Client Hello members,
+    /// <see cref="EasyTlsOptions.Engine" />, <see cref="EasyTlsOptions.VerifyStatus" /> and
+    /// <see cref="EasyTlsOptions.SessionIdCache" /> negated as <see cref="TlsClientOptions.NoSessionId" />.
+    /// <see cref="SslOptions.NativeCa" /> (<c>--ca-native</c>) maps to nothing: without <c>--cacert</c>
+    /// the provider already verifies against the operating system's store, and with it curl 8.21.0
+    /// still verifies against the file on both builds (measured, ADR-0124). The record's
+    /// <see cref="TlsPeerOptions.Certificate" /> and <see cref="TlsPeerOptions.KeyPassword" /> arrive
+    /// already split from <c>-E</c> (ADR-0514), so they are copied as they are.
     /// </summary>
-    /// <param name="options">The parsed command line.</param>
-    /// <returns>
-    /// The TLS settings: <see cref="CommandLineOptions.Insecure" /> and
-    /// <see cref="CommandLineOptions.CaCertificateFile" />,
-    /// <see cref="CommandLineOptions.CaCertificateDirectory" />,
-    /// <see cref="CommandLineOptions.ClientCertificate" />,
-    /// <see cref="CommandLineOptions.PrivateKey" />, <see cref="CommandLineOptions.Ciphers" />
-    /// <see cref="CommandLineOptions.Tls13Ciphers" />,
-    /// <see cref="CommandLineOptions.ClientCertificateType" /> (as
-    /// <see cref="TlsClientOptions.CertificateType" />),
-    /// <see cref="CommandLineOptions.PrivateKeyType" />,
-    /// <see cref="CommandLineOptions.Passphrase" />,
-    /// <see cref="CommandLineOptions.SkipRevocationCheck" />,
-    /// <see cref="CommandLineOptions.RevocationCheckBestEffort" /> and
-    /// <see cref="CommandLineOptions.UseAlpn" /> verbatim, and
-    /// <see cref="CommandLineOptions.MinimumTlsVersion" /> and
-    /// <see cref="CommandLineOptions.MaximumTlsVersion" /> (<c>--tls-max</c>) as the
-    /// <see cref="TlsVersion" /> <see cref="ToTlsVersion" /> maps them to; and the ten options of
-    /// ADR-0151 verbatim: <see cref="CommandLineOptions.Curves" />,
-    /// <see cref="CommandLineOptions.SignatureAlgorithms" />,
-    /// <see cref="CommandLineOptions.TlsEarlyData" /> (as <see cref="TlsClientOptions.AllowEarlyData" />),
-    /// <see cref="CommandLineOptions.Ech" />, <see cref="CommandLineOptions.EchPublicName" />,
-    /// <see cref="CommandLineOptions.EchConfigList" />, <see cref="CommandLineOptions.SslSessionsFile" />,
-    /// and <see cref="CommandLineOptions.Engine" /> (the three TLS-SRP options have no function since
-    /// curl 8.22.0, ADR-0480); and
-    /// ADR-0191's <see cref="CommandLineOptions.RequireCertificateStatus" /> (<c>--cert-status</c>) and
-    /// <see cref="CommandLineOptions.AutoClientCertificate" /> (<c>--ssl-auto-client-cert</c>); and
-    /// ADR-0193's <see cref="CommandLineOptions.PinnedPublicKey" /> (<c>--pinnedpubkey</c>); and ADR-0197's
-    /// <see cref="CommandLineOptions.CertificateRevocationListFile" /> (<c>--crlfile</c>); and, by ADR-0151 (BL-713),
-    /// <see cref="CommandLineOptions.ReuseSessionIds" /> negated as <see cref="TlsClientOptions.NoSessionId" />
-    /// (<c>--no-sessionid</c>) and <see cref="CommandLineOptions.AllowBeast" /> (<c>--ssl-allow-beast</c>).
-    /// </returns>
-    internal static TlsClientOptions FromCommandLine(CommandLineOptions options) =>
-        new(
-            options.Insecure,
-            ToTlsVersion(options.MinimumTlsVersion),
-            options.CaCertificateFile,
-            options.CaCertificateDirectory,
-            options.ClientCertificate,
-            options.PrivateKey,
-            options.Ciphers,
-            options.Tls13Ciphers,
-            options.ClientCertificateType,
-            options.PrivateKeyType,
-            options.Passphrase,
-            options.SkipRevocationCheck,
-            options.RevocationCheckBestEffort,
-            options.UseAlpn,
-            ToTlsVersion(options.MaximumTlsVersion),
-            options.Curves,
-            options.SignatureAlgorithms,
-            options.TlsEarlyData,
-            options.Ech,
-            options.EchPublicName,
-            options.EchConfigList,
-            options.SslSessionsFile,
-            options.Engine,
-            options.RequireCertificateStatus,
-            options.AutoClientCertificate,
-            options.PinnedPublicKey,
-            options.CertificateRevocationListFile,
-            !options.ReuseSessionIds,
-            options.AllowBeast,
+    /// <param name="tls">The option group's TLS options.</param>
+    /// <param name="useAlpn">Whether ALPN is offered: <see langword="false" /> under <c>--no-alpn</c>, which is not on the TLS record (ADR-0514).</param>
+    /// <param name="sslSessionsFile">The <c>--ssl-sessions</c> file, the tool's own and not on the TLS record (ADR-0514), or <see langword="null" />.</param>
+    /// <returns>The target's TLS settings.</returns>
+    internal static TlsClientOptions Of(EasyTlsOptions tls, bool useAlpn, string? sslSessionsFile)
+    {
+        TlsPeerOptions origin = tls.Origin;
+        return new(
+            !origin.VerifyPeer,
+            ToTlsVersion(origin.SslVersion),
+            origin.CertificateAuthorityFile,
+            origin.CertificateAuthorityPath,
+            origin.Certificate,
+            origin.Key,
+            origin.CipherList,
+            origin.Tls13Ciphers,
+            origin.CertificateType,
+            origin.KeyType,
+            origin.KeyPassword,
+            origin.SslOptions.HasFlag(SslOptions.NoRevoke),
+            origin.SslOptions.HasFlag(SslOptions.RevokeBestEffort),
+            useAlpn,
+            ToTlsVersion(origin.SslVersionMaximum),
+            tls.EllipticCurves,
+            tls.SignatureAlgorithms,
+            origin.SslOptions.HasFlag(SslOptions.EarlyData),
+            tls.EncryptedClientHello,
+            tls.EncryptedClientHelloPublicName,
+            tls.EncryptedClientHelloConfigList,
+            sslSessionsFile,
+            tls.Engine,
+            tls.VerifyStatus,
+            origin.SslOptions.HasFlag(SslOptions.AutoClientCert),
+            origin.PinnedPublicKey,
+            origin.RevocationListFile,
+            !tls.SessionIdCache,
+            origin.SslOptions.HasFlag(SslOptions.AllowBeast),
             KeyLogFile());
+    }
 
     /// <summary>
-    /// Maps the proxy TLS options of a parsed command line onto the <see cref="TlsClientOptions" />
-    /// the handshake to an HTTPS proxy applies, as curl 8.21.0 keeps them apart from the target's
-    /// (measured, ADR-0061): <c>-k</c> and <c>--cacert</c> never reach the proxy.
+    /// Maps the TLS options of the handshake to an HTTPS proxy, which curl 8.21.0 keeps apart from the
+    /// target's (measured, ADR-0061): <see cref="EasyTlsOptions.Proxy" />'s verification, CA file and
+    /// directory (which already falls back to <c>--capath</c>, ADR-0514), client certificate, key, their
+    /// types and pass phrase, cipher lists, pinned public key, revocation list, minimum version
+    /// (<c>--proxy-tlsv1</c>) and its <see cref="SslOptions.AutoClientCert" /> and
+    /// <see cref="SslOptions.AllowBeast" /> bits; <see cref="EasyTlsOptions.SessionIdCache" /> negated as
+    /// <see cref="TlsClientOptions.NoSessionId" />, as for the target (BL-713); and
+    /// <paramref name="useAlpn" />, since curl 8.21.0 offers no ALPN to the proxy under <c>--no-alpn</c>
+    /// (measured, ADR-0190, BL-871). <c>--proxy-ca-native</c> maps to nothing, as <c>--ca-native</c> does
+    /// (ADR-0124); every other setting is its default. Neither the target's minimum nor <c>--tls-max</c>
+    /// reaches the proxy: curl 8.21.0 completes the handshake with a TLS 1.2-only HTTPS proxy under
+    /// <c>--tlsv1.3</c> and under <c>--tls-max 1.1</c> (measured, BL-502).
     /// </summary>
-    /// <param name="options">The parsed command line.</param>
-    /// <returns>
-    /// <see cref="CommandLineOptions.ProxyInsecure" /> as <see cref="TlsClientOptions.Insecure" />,
-    /// <see cref="CommandLineOptions.ProxyCaCertificateFile" /> as
-    /// <see cref="TlsClientOptions.CaCertificateFile" />, and
-    /// <see cref="CommandLineOptions.ProxyCaCertificateDirectory" />, or
-    /// <see cref="CommandLineOptions.CaCertificateDirectory" /> without it, as
-    /// <see cref="TlsClientOptions.CaCertificateDirectory" />, since curl falls back to
-    /// <c>--capath</c> for the proxy, and <see cref="CommandLineOptions.ProxyMinimumTlsVersion" />
-    /// (<c>--proxy-tlsv1</c>) as <see cref="TlsClientOptions.MinimumVersion" />, and
-    /// <see cref="CommandLineOptions.ProxyAutoClientCertificate" /> (<c>--proxy-ssl-auto-client-cert</c>) as
-    /// <see cref="TlsClientOptions.AutoClientCertificate" /> (ADR-0191), and the proxy's client certificate
-    /// and cipher lists as the target's counterparts map (BL-606):
-    /// <see cref="CommandLineOptions.ProxyClientCertificate" /> (<c>--proxy-cert</c>),
-    /// <see cref="CommandLineOptions.ProxyPrivateKey" /> (<c>--proxy-key</c>),
-    /// <see cref="CommandLineOptions.ProxyClientCertificateType" /> (<c>--proxy-cert-type</c>, as
-    /// <see cref="TlsClientOptions.CertificateType" />),
-    /// <see cref="CommandLineOptions.ProxyPrivateKeyType" /> (<c>--proxy-key-type</c>),
-    /// <see cref="CommandLineOptions.ProxyPassphrase" /> (<c>--proxy-pass</c>),
-    /// <see cref="CommandLineOptions.ProxyCiphers" /> (<c>--proxy-ciphers</c>) and
-    /// <see cref="CommandLineOptions.ProxyTls13Ciphers" /> (<c>--proxy-tls13-ciphers</c>), each verbatim;
-    /// and, as the target's counterparts map (BL-611), <see cref="CommandLineOptions.ProxyPinnedPublicKey" />
-    /// (<c>--proxy-pinnedpubkey</c>) as <see cref="TlsClientOptions.PinnedPublicKey" /> and
-    /// <see cref="CommandLineOptions.ProxyCertificateRevocationListFile" /> (<c>--proxy-crlfile</c>) as
-    /// <see cref="TlsClientOptions.CertificateRevocationListFile" />, verbatim. <c>--proxy-ca-native</c> maps to nothing,
-    /// as <c>--ca-native</c> does (ADR-0124); <see cref="CommandLineOptions.ProxyAllowBeast" /> (<c>--proxy-ssl-allow-beast</c>)
-    /// as <see cref="TlsClientOptions.AllowBeast" /> and <c>--no-sessionid</c> as <see cref="TlsClientOptions.NoSessionId" />, as for the target (BL-713);
-    /// <see cref="CommandLineOptions.UseAlpn" /> (<c>--no-alpn</c>) as <see cref="TlsClientOptions.UseAlpn" />,
-    /// since curl 8.21.0 offers no ALPN to the proxy under <c>--no-alpn</c> (measured, ADR-0190, BL-871);
-    /// the <c>--proxy-tlsuser</c> family has no function since curl 8.22.0 (ADR-0480); every other setting is its default. Neither the target's minimum nor <c>--tls-max</c> reaches the proxy: curl 8.21.0
-    /// completes the handshake with a TLS 1.2-only HTTPS proxy under <c>--tlsv1.3</c> and under
-    /// <c>--tls-max 1.1</c> (measured, BL-502).
-    /// </returns>
-    internal static TlsClientOptions ProxyFromCommandLine(CommandLineOptions options) =>
-        new(
-            Insecure: options.ProxyInsecure,
-            MinimumVersion: ToTlsVersion(options.ProxyMinimumTlsVersion),
-            CaCertificateFile: options.ProxyCaCertificateFile,
-            CaCertificateDirectory: options.ProxyCaCertificateDirectory ?? options.CaCertificateDirectory,
-            ClientCertificate: options.ProxyClientCertificate,
-            PrivateKey: options.ProxyPrivateKey,
-            Ciphers: options.ProxyCiphers,
-            Tls13Ciphers: options.ProxyTls13Ciphers,
-            CertificateType: options.ProxyClientCertificateType,
-            PrivateKeyType: options.ProxyPrivateKeyType,
-            Passphrase: options.ProxyPassphrase,
-            AutoClientCertificate: options.ProxyAutoClientCertificate,
-            PinnedPublicKey: options.ProxyPinnedPublicKey,
-            CertificateRevocationListFile: options.ProxyCertificateRevocationListFile,
-            UseAlpn: options.UseAlpn,
-            NoSessionId: !options.ReuseSessionIds,
-            AllowBeast: options.ProxyAllowBeast,
+    /// <param name="tls">The option group's TLS options.</param>
+    /// <param name="useAlpn">Whether ALPN is offered: <see langword="false" /> under <c>--no-alpn</c>.</param>
+    /// <returns>The HTTPS proxy's TLS settings.</returns>
+    internal static TlsClientOptions ProxyOf(EasyTlsOptions tls, bool useAlpn)
+    {
+        TlsPeerOptions proxy = tls.Proxy;
+        return new(
+            Insecure: !proxy.VerifyPeer,
+            MinimumVersion: ToTlsVersion(proxy.SslVersion),
+            CaCertificateFile: proxy.CertificateAuthorityFile,
+            CaCertificateDirectory: proxy.CertificateAuthorityPath,
+            ClientCertificate: proxy.Certificate,
+            PrivateKey: proxy.Key,
+            Ciphers: proxy.CipherList,
+            Tls13Ciphers: proxy.Tls13Ciphers,
+            CertificateType: proxy.CertificateType,
+            PrivateKeyType: proxy.KeyType,
+            Passphrase: proxy.KeyPassword,
+            AutoClientCertificate: proxy.SslOptions.HasFlag(SslOptions.AutoClientCert),
+            PinnedPublicKey: proxy.PinnedPublicKey,
+            CertificateRevocationListFile: proxy.RevocationListFile,
+            UseAlpn: useAlpn,
+            NoSessionId: !tls.SessionIdCache,
+            AllowBeast: proxy.SslOptions.HasFlag(SslOptions.AllowBeast),
             KeyLogFile: KeyLogFile());
+    }
 
     /// <summary>
     /// Maps the TLS options that reach the DNS-over-HTTPS server onto the <see cref="TlsClientOptions" />
@@ -160,47 +137,51 @@ internal static class TlsClientOptionsMapping
     /// DoH transfer, of which <c>--cacert</c> and <c>--ssl-no-revoke</c> were measured to reach it, and
     /// the two DoH options themselves. <c>-k</c> and <c>--cert-status</c> never reach it (measured).
     /// </summary>
-    /// <param name="options">The parsed command line.</param>
+    /// <param name="tls">The option group's TLS options.</param>
     /// <returns>
-    /// <see cref="CommandLineOptions.DohInsecure" /> as <see cref="TlsClientOptions.Insecure" />,
-    /// <see cref="CommandLineOptions.DohCertificateStatus" /> as
-    /// <see cref="TlsClientOptions.RequireCertificateStatus" />, and
-    /// <see cref="CommandLineOptions.CaCertificateFile" />, <see cref="CommandLineOptions.CaCertificateDirectory" />,
-    /// <see cref="CommandLineOptions.CertificateRevocationListFile" />, <see cref="CommandLineOptions.Curves" />,
-    /// <see cref="CommandLineOptions.SkipRevocationCheck" />, <see cref="CommandLineOptions.RevocationCheckBestEffort" />
-    /// and <see cref="CommandLineOptions.AutoClientCertificate" /> verbatim; every other setting is its
-    /// default, so ALPN offers <c>http/1.1</c> only.
+    /// <see cref="EasyTlsOptions.DohVerifyPeer" /> negated as <see cref="TlsClientOptions.Insecure" />,
+    /// <see cref="EasyTlsOptions.DohVerifyStatus" /> as <see cref="TlsClientOptions.RequireCertificateStatus" />,
+    /// and the origin's CA file and directory, revocation list, <see cref="SslOptions.NoRevoke" />,
+    /// <see cref="SslOptions.RevokeBestEffort" /> and <see cref="SslOptions.AutoClientCert" />, and
+    /// <see cref="EasyTlsOptions.EllipticCurves" />, verbatim; every other setting is its default, so ALPN
+    /// offers <c>http/1.1</c> only.
     /// </returns>
-    internal static TlsClientOptions DohFromCommandLine(CommandLineOptions options) =>
-        new(
-            Insecure: options.DohInsecure,
-            CaCertificateFile: options.CaCertificateFile,
-            CaCertificateDirectory: options.CaCertificateDirectory,
-            SkipRevocationCheck: options.SkipRevocationCheck,
-            RevocationCheckBestEffort: options.RevocationCheckBestEffort,
-            Curves: options.Curves,
-            RequireCertificateStatus: options.DohCertificateStatus,
-            AutoClientCertificate: options.AutoClientCertificate,
-            CertificateRevocationListFile: options.CertificateRevocationListFile,
+    internal static TlsClientOptions DohOf(EasyTlsOptions tls)
+    {
+        TlsPeerOptions origin = tls.Origin;
+        return new(
+            Insecure: !tls.DohVerifyPeer,
+            CaCertificateFile: origin.CertificateAuthorityFile,
+            CaCertificateDirectory: origin.CertificateAuthorityPath,
+            SkipRevocationCheck: origin.SslOptions.HasFlag(SslOptions.NoRevoke),
+            RevocationCheckBestEffort: origin.SslOptions.HasFlag(SslOptions.RevokeBestEffort),
+            Curves: tls.EllipticCurves,
+            RequireCertificateStatus: tls.DohVerifyStatus,
+            AutoClientCertificate: origin.SslOptions.HasFlag(SslOptions.AutoClientCert),
+            CertificateRevocationListFile: origin.RevocationListFile,
             KeyLogFile: KeyLogFile());
+    }
 
-    /// <summary>
-    /// Maps a TLS version from the command line, a minimum or a ceiling, onto the one the TLS
-    /// provider applies.
-    /// </summary>
-    /// <param name="tlsVersion">
-    /// <see cref="CommandLineOptions.MinimumTlsVersion" />, <see cref="CommandLineOptions.MaximumTlsVersion" />
-    /// or <see cref="CommandLineOptions.ProxyMinimumTlsVersion" />, or <see langword="null" /> when not given.
-    /// </param>
+    /// <summary>Maps a lowest TLS version from the record onto the one the TLS provider applies.</summary>
+    /// <param name="sslVersion">The origin's or the proxy's <see cref="TlsPeerOptions.SslVersion" />.</param>
     /// <returns>
-    /// <see cref="TlsVersion.Tls10" /> for <see cref="ObsoleteTlsProtocols.Tls10" />,
-    /// <see cref="TlsVersion.Tls11" /> for <see cref="ObsoleteTlsProtocols.Tls11" />,
-    /// <see cref="TlsVersion.Tls12" /> for <see cref="SslProtocols.Tls12" />,
-    /// <see cref="TlsVersion.Tls13" /> for <see cref="SslProtocols.Tls13" />, and
-    /// <see cref="TlsVersion.SystemDefault" /> for <see langword="null" /> or any other value.
+    /// <see cref="TlsVersion.Tls10" /> for <see cref="SslVersion.Tls1" /> and <see cref="SslVersion.Tls10" />,
+    /// <see cref="TlsVersion.Tls11" />, <see cref="TlsVersion.Tls12" /> and <see cref="TlsVersion.Tls13" /> for
+    /// their own, and <see cref="TlsVersion.SystemDefault" /> for <see cref="SslVersion.Default" /> or any other
+    /// value (ADR-0514).
     /// </returns>
-    internal static TlsVersion ToTlsVersion(SslProtocols? tlsVersion) =>
-        TlsVersionsByProtocol.GetValueOrDefault(tlsVersion ?? SslProtocols.None, TlsVersion.SystemDefault);
+    internal static TlsVersion ToTlsVersion(SslVersion sslVersion) =>
+        TlsVersionsBySslVersion.GetValueOrDefault(sslVersion, TlsVersion.SystemDefault);
+
+    /// <summary>Maps a TLS version ceiling from the record onto the one the TLS provider applies.</summary>
+    /// <param name="sslVersionMaximum">The origin's <see cref="TlsPeerOptions.SslVersionMaximum" />.</param>
+    /// <returns>
+    /// <see cref="TlsVersion.Tls10" /> to <see cref="TlsVersion.Tls13" /> for their own, and
+    /// <see cref="TlsVersion.SystemDefault" /> for <see cref="SslVersionMaximum.None" />,
+    /// <see cref="SslVersionMaximum.Default" /> or any other value.
+    /// </returns>
+    internal static TlsVersion ToTlsVersion(SslVersionMaximum sslVersionMaximum) =>
+        TlsVersionsBySslVersionMaximum.GetValueOrDefault(sslVersionMaximum, TlsVersion.SystemDefault);
 
     /// <summary>
     /// Reads the file the OpenSSL build logs TLS secrets to from <c>SSLKEYLOGFILE</c>, for the target's,

@@ -80,7 +80,7 @@ public sealed class EngineCompositionLocalBindingTests
     [TestMethod]
     public void CreateTransports_WithAnInterface_GivesTheTcpConnectorItsBinding()
     {
-        CurlTransports transports = EngineComposition.CreateTransports(Parse("--interface", "host!127.0.0.1", "http://h/"), EasyOptionsFromCommandLine.NetworkOf(Parse("--interface", "host!127.0.0.1", "http://h/")));
+        CurlTransports transports = EngineComposition.CreateTransports(Parse("--interface", "host!127.0.0.1", "http://h/"), EasyOptionsFromCommandLine.NetworkOf(Parse("--interface", "host!127.0.0.1", "http://h/")), EasyOptionsFromCommandLine.TlsOf(Parse("--interface", "host!127.0.0.1", "http://h/")));
         Diagnostics.Act("TCP connector binding", transports.TcpConnector.LocalBinding);
 
         LocalBinding expected = new(null, "127.0.0.1", null, 0, 1);

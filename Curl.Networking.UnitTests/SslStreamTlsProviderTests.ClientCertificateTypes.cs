@@ -141,11 +141,8 @@ public sealed partial class SslStreamTlsProviderTests
     public async Task AuthenticateAsClientAsync_WithCertTypeP12AndAPassphraseThatDoesNotOpenItInTheOpenSslBuild_FailsWithSslCertProblem(string? passphrase)
     {
         var file = WriteCertificateFile("client.p12", s_clientCertificate.Export(X509ContentType.Pkcs12, Passphrase));
-        var options = ClientCertificate($"{Escaped(file)}:{Passphrase}") with { CertificateType = "P12", Passphrase = passphrase };
-        if (passphrase is null)
-        {
-            options = options with { ClientCertificate = Escaped(file) };
-        }
+        var value = passphrase is null ? Escaped(file) : $"{Escaped(file)}:{Passphrase}";
+        var options = ClientCertificate(value) with { CertificateType = "P12", Passphrase = passphrase };
 
         var handshake = await HandshakeWithClientCertificateRequestAsync(options, OpenSslBuild);
 

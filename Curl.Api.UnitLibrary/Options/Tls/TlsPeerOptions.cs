@@ -24,9 +24,11 @@ public sealed record TlsPeerOptions
 
     /// <summary>
     /// <c>CURLOPT_SSLCERTTYPE</c> / <c>CURLOPT_PROXY_SSLCERTTYPE</c>: the client
-    /// certificate's format (<c>PEM</c>, <c>DER</c>, <c>P12</c>). Default <c>"PEM"</c>.
+    /// certificate's format (<c>PEM</c>, <c>DER</c>, <c>P12</c>). Default <see langword="null"/>: not
+    /// set, as libcurl stores it, which the OpenSSL build reads as <c>PEM</c> and the Schannel build as
+    /// <c>P12</c> (ADR-0530).
     /// </summary>
-    public string CertificateType { get; init; } = "PEM";
+    public string? CertificateType { get; init; }
 
     /// <summary>
     /// <c>CURLOPT_SSLKEY</c> / <c>CURLOPT_PROXY_SSLKEY</c>: the private key's file name.
@@ -42,9 +44,10 @@ public sealed record TlsPeerOptions
 
     /// <summary>
     /// <c>CURLOPT_SSLKEYTYPE</c> / <c>CURLOPT_PROXY_SSLKEYTYPE</c>: the private key's format
-    /// (<c>PEM</c>, <c>DER</c>, <c>ENG</c>, <c>PROV</c>). Default <c>"PEM"</c>.
+    /// (<c>PEM</c>, <c>DER</c>, <c>ENG</c>, <c>PROV</c>). Default <see langword="null"/>: not set, as
+    /// libcurl stores it, which the TLS library reads as <c>PEM</c> (ADR-0530).
     /// </summary>
-    public string KeyType { get; init; } = "PEM";
+    public string? KeyType { get; init; }
 
     /// <summary>
     /// <c>CURLOPT_KEYPASSWD</c> / <c>CURLOPT_PROXY_KEYPASSWD</c>: the pass phrase that

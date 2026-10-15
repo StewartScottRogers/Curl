@@ -180,8 +180,8 @@ public sealed class EngineCompositionDnsTraceTests
     {
         Diagnostics.Arrange("traced arguments", "-v --trace-config dns");
         Diagnostics.Arrange("plain arguments", "-v");
-        CurlTransports traced = EngineComposition.CreateTransports(Parse("-v", "--trace-config", "dns"), EasyOptionsFromCommandLine.NetworkOf(Parse("-v", "--trace-config", "dns")));
-        CurlTransports plain = EngineComposition.CreateTransports(Parse("-v"), EasyOptionsFromCommandLine.NetworkOf(Parse("-v")));
+        CurlTransports traced = EngineComposition.CreateTransports(Parse("-v", "--trace-config", "dns"), EasyOptionsFromCommandLine.NetworkOf(Parse("-v", "--trace-config", "dns")), EasyOptionsFromCommandLine.TlsOf(Parse("-v", "--trace-config", "dns")));
+        CurlTransports plain = EngineComposition.CreateTransports(Parse("-v"), EasyOptionsFromCommandLine.NetworkOf(Parse("-v")), EasyOptionsFromCommandLine.TlsOf(Parse("-v")));
 
         Diagnostics.Act("traced: traces DNS filter", traced.TcpConnector.TracesDnsFilter);
         Diagnostics.Act("plain: traces DNS filter", plain.TcpConnector.TracesDnsFilter);

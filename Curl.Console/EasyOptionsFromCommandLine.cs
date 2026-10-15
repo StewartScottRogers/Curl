@@ -28,8 +28,6 @@ namespace Curl.Console;
 /// </summary>
 internal static class EasyOptionsFromCommandLine
 {
-    private const string Pkcs11UriScheme = "pkcs11:";
-
     // The receive buffer curl's tool asks for, 100 KiB, as --libcurl writes CURLOPT_BUFFERSIZE.
     private const long ToolBufferSize = 102400;
 
@@ -180,7 +178,7 @@ internal static class EasyOptionsFromCommandLine
 
     /// <summary>
     /// Maps the TLS group: the origin's <c>-k</c>, <c>--cacert</c>, <c>--capath</c>, <c>-E</c>
-    /// (split into the certificate and its pass phrase as curl's tool splits it), <c>--cert-type</c>,
+    /// (split into the certificate and its pass phrase as curl's tool splits it), <c>--cert-type</c> (unset when not given, ADR-0530),
     /// <c>--key</c>, <c>--key-type</c>, <c>--pass</c>, <c>--ciphers</c>, <c>--tls13-ciphers</c>,
     /// <c>--tlsv1*</c>, <c>--tls-max</c>, <c>--crlfile</c>, <c>--pinnedpubkey</c>, <c>--ssl-no-revoke</c>,
     /// <c>--ssl-revoke-best-effort</c>, <c>--ssl-allow-beast</c>, <c>--ssl-auto-client-cert</c>,
@@ -222,9 +220,9 @@ internal static class EasyOptionsFromCommandLine
         return new TlsPeerOptions
         {
             Certificate = certificate,
-            CertificateType = FileTypeOf(options.ClientCertificateType, certificate),
+            CertificateType = options.ClientCertificateType,
             Key = options.PrivateKey,
-            KeyType = FileTypeOf(options.PrivateKeyType, options.PrivateKey),
+            KeyType = options.PrivateKeyType,
             KeyPassword = options.Passphrase ?? passphrase,
             SslVersion = SslVersionOf(options.MinimumTlsVersion),
             SslVersionMaximum = SslVersionMaximumOf(options.MaximumTlsVersion),
@@ -249,9 +247,9 @@ internal static class EasyOptionsFromCommandLine
         return new TlsPeerOptions
         {
             Certificate = certificate,
-            CertificateType = FileTypeOf(options.ProxyClientCertificateType, certificate),
+            CertificateType = options.ProxyClientCertificateType,
             Key = options.ProxyPrivateKey,
-            KeyType = FileTypeOf(options.ProxyPrivateKeyType, options.ProxyPrivateKey),
+            KeyType = options.ProxyPrivateKeyType,
             KeyPassword = options.ProxyPassphrase ?? passphrase,
             SslVersion = options.ProxyMinimumTlsVersion is null ? SslVersion.Default : SslVersion.Tls1,
             VerifyPeer = !options.ProxyInsecure,
@@ -270,10 +268,6 @@ internal static class EasyOptionsFromCommandLine
     // -E's certificate[:passphrase], split as curl's tool splits it; only its Windows build keeps a drive letter's colon.
     private static (string? Certificate, string? Passphrase) CertificateOf(string? value) =>
         value is null ? (null, null) : ClientCertificateArgument.Split(value, OperatingSystem.IsWindows());
-
-    // The type given, else ENG for a pkcs11: certificate or key as curl's tool sets it, else libcurl's PEM.
-    private static string FileTypeOf(string? type, string? file) =>
-        type ?? (file is not null && file.StartsWith(Pkcs11UriScheme, StringComparison.OrdinalIgnoreCase) ? "ENG" : "PEM");
 
     // The minimum the command line names; none leaves the TLS library's own (the engine's behaviour, ADR-0514).
     private static SslVersion SslVersionOf(SslProtocols? minimum) =>

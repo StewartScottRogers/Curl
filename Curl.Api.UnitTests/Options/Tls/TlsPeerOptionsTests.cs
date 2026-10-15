@@ -16,10 +16,10 @@ public sealed class TlsPeerOptionsTests
     }
 
     [TestMethod]
-    public void New_TlsPeerOptions_DefaultsCertificateAndKeyTypeToPem()
+    public void New_TlsPeerOptions_LeavesCertificateAndKeyTypeUnset()
     {
-        Assert.AreEqual("PEM", Defaults.CertificateType);
-        Assert.AreEqual("PEM", Defaults.KeyType);
+        Assert.IsNull(Defaults.CertificateType);
+        Assert.IsNull(Defaults.KeyType);
     }
 
     [TestMethod]
@@ -64,10 +64,10 @@ public sealed class TlsPeerOptionsTests
 
         AssertChangesOnly(Defaults with { Certificate = "c.pem" }, o => o with { Certificate = null });
         AssertChangesOnly(Defaults with { CertificateBlob = blob }, o => o with { CertificateBlob = null });
-        AssertChangesOnly(Defaults with { CertificateType = "DER" }, o => o with { CertificateType = "PEM" });
+        AssertChangesOnly(Defaults with { CertificateType = "DER" }, o => o with { CertificateType = null });
         AssertChangesOnly(Defaults with { Key = "k.pem" }, o => o with { Key = null });
         AssertChangesOnly(Defaults with { KeyBlob = blob }, o => o with { KeyBlob = null });
-        AssertChangesOnly(Defaults with { KeyType = "DER" }, o => o with { KeyType = "PEM" });
+        AssertChangesOnly(Defaults with { KeyType = "DER" }, o => o with { KeyType = null });
         AssertChangesOnly(Defaults with { KeyPassword = "secret" }, o => o with { KeyPassword = null });
         AssertChangesOnly(Defaults with { SslVersion = SslVersion.Tls12 }, o => o with { SslVersion = SslVersion.Default });
         AssertChangesOnly(Defaults with { SslVersionMaximum = SslVersionMaximum.Tls13 }, o => o with { SslVersionMaximum = SslVersionMaximum.None });

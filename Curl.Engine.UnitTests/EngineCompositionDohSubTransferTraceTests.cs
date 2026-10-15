@@ -149,7 +149,7 @@ public sealed class EngineCompositionDohSubTransferTraceTests
         Assert.IsTrue(parsed.IsAccepted);
         CommandLineOptions options = parsed.Options;
         FlowScopedTransferEvents? resolverEvents = EngineComposition.TracesDns(options) ? new() : null;
-        TcpConnector dohConnector = EngineComposition.CreateDohConnector(options, new ScriptedTcpDialer(new ScriptedConnector(dohAnswers)), TimeProvider.System);
+        TcpConnector dohConnector = EngineComposition.CreateDohConnector(options, EasyOptionsFromCommandLine.TlsOf(options), new ScriptedTcpDialer(new ScriptedConnector(dohAnswers)), TimeProvider.System);
         TcpConnector connector = EngineComposition.CreateTcpConnector(
             options, EasyOptionsFromCommandLine.NetworkOf(options),
             EngineComposition.CreateDohResolver(DohUrl, dohConnector, AddressFamily.Unspecified, resolverEvents),

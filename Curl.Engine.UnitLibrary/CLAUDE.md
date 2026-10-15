@@ -169,3 +169,7 @@ are in `Curl.Engine.UnitTests`; the setup tests use their own `ReadRecordingFile
 ## The network option group (BL-2323)
 
 `Curl.Engine.UnitLibrary` references `Curl.Api.UnitLibrary` for its option records. `EngineComposition`'s transport, TCP connector, pooling connector and DNS resolver factories take `EasyNetworkOptions` beside `CommandLineOptions` (still read for TLS, proxy, trace, HTTP version and `-m`), and `CreateUdpDatagramConnector`, `LocalBindingOf`, `UnixSocketOf`, `AddressFamilyOf`, `ConnectTimeoutOf`, `DnsServerVariableResolverOf`, `TcpSocketOptionsOf`, `TransferTimers.Of` and `OptionGroupConnectionSettings.Of` read their network settings from it alone (ADR-0526). `Curl.Console` builds the record with `EasyOptionsFromCommandLine.NetworkOf`, which `Curl.Engine.UnitTests` and `Curl.Engine.IntegrationTests` link. `TransferContextFactory` still reads the connect timeout and `--connect-to` from `CommandLineOptions` until BL-2343.
+
+## The TLS option group (BL-2324)
+
+`TlsClientOptionsMapping` (`Of`, `ProxyOf`, `DohOf`), `TlsBuildInformation`, `CreateTransports`, `CreateDnsResolver`, `CreateDohConnector`, `CreatePoolingConnector` and `OptionGroupConnectionSettings.Of` read TLS settings from `EasyTlsOptions`, which `Curl.Console` builds with `EasyOptionsFromCommandLine.TlsOf`; `--no-alpn` and `--ssl-sessions` still come from `CommandLineOptions` (ADR-0530).

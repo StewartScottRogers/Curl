@@ -4717,7 +4717,7 @@ internal sealed class CurlCommandRunner(
         { ManualRequested: true } => CurlManual.Lines(),
         { HelpRequested: true, HelpSubject: var subject } when !CurlHelpText.IsOptionSubject(subject) =>
             CurlHelpText.Lines(subject, terminalColumns),
-        _ => TlsBuildInformation.Lines(options),
+        _ => TlsBuildInformation.Lines(EasyOptionsFromCommandLine.TlsOf(options), options.CaEmbedDumpRequested),
     };
 
     /// <summary>

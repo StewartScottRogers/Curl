@@ -248,7 +248,7 @@ public sealed class QuicDialer
             return (null, null, MultiplexedConnectResult.Failed(CurlExitCode.SslCipher, cipherFailure));
         }
 
-        var (certificate, certificateFailure) = ClientCertificateLoader.LoadAsOpenSslBuild(_options, recognisesDriveLetters: _matchesSchannelBuild);
+        var (certificate, certificateFailure) = ClientCertificateLoader.LoadAsOpenSslBuild(_options);
         if (certificateFailure is not null)
         {
             return (null, null, MultiplexedConnectResult.Failed(certificateFailure.ExitCode, certificateFailure.ErrorMessage!));

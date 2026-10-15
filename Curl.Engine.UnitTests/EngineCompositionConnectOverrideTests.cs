@@ -171,7 +171,7 @@ public sealed class EngineCompositionConnectOverrideTests
         CommandLineParseResult parsed = CommandLineParser.Parse([.. arguments, "tftp://tftp.test/"], _ => true);
         Assert.IsTrue(parsed.IsAccepted);
 
-        CurlTransports transports = EngineComposition.CreateTransports(parsed.Options, EasyOptionsFromCommandLine.NetworkOf(parsed.Options));
+        CurlTransports transports = EngineComposition.CreateTransports(parsed.Options, EasyOptionsFromCommandLine.NetworkOf(parsed.Options), EasyOptionsFromCommandLine.TlsOf(parsed.Options));
 
         DatagramOpenResult result;
         using (Diagnostics.Phase("open"))

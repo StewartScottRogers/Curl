@@ -29,9 +29,9 @@ internal static class ClientCertificateLoader
     /// <summary>
     /// Loads the <see cref="TlsClientOptions.ClientCertificate" /> the options name, as the
     /// build's curl does. The Schannel build reads the certificate and its key from a Windows
-    /// certificate store or a PKCS#12 file and ignores <c>--key</c> and <c>--key-type</c>; only
-    /// the Windows build of curl keeps a drive letter's colon in the <c>--cert</c> value.
-    /// <c>--pass</c>, when given, is the passphrase in place of the one in <c>--cert</c>.
+    /// certificate store or a PKCS#12 file and ignores <c>--key</c> and <c>--key-type</c>. The
+    /// path and its pass phrase arrive already split from <c>--cert</c>, <c>--pass</c> outranking
+    /// the value's own, only the Windows build keeping a drive letter's colon (ADR-0514).
     /// Without <c>--cert</c>, <c>--ssl-auto-client-cert</c> chooses one from the user's
     /// personal store through <see cref="AutomaticClientCertificate" /> (ADR-0191).
     /// </summary>
@@ -67,38 +67,25 @@ internal static class ClientCertificateLoader
     public static (X509Certificate2? Certificate, ConnectResult? Failure) Load(
         TlsClientOptions options,
         bool matchesSchannelBuild,
-        IClientCertificateStore certificateStore)
-    {
-        if (options.ClientCertificate is null || !matchesSchannelBuild)
-        {
-            return LoadAsOpenSslBuild(options, recognisesDriveLetters: false);
-        }
-
-        var (path, splitPassphrase) = ClientCertificateArgument.Split(options.ClientCertificate, recognisesDriveLetters: true);
-        return LoadAsSchannelBuild(path, options.Passphrase ?? splitPassphrase, options.CertificateType, certificateStore);
-    }
+        IClientCertificateStore certificateStore) =>
+        options.ClientCertificate is not { } path || !matchesSchannelBuild
+            ? LoadAsOpenSslBuild(options)
+            : LoadAsSchannelBuild(path, options.Passphrase, options.CertificateType, certificateStore);
 
     /// <summary>
     /// Loads the <see cref="TlsClientOptions.ClientCertificate" /> as a build on the OpenSSL
     /// API does: the OpenSSL build, and curl.se's LibreSSL build, which dials QUIC on Windows
-    /// (ADR-0290). <c>--pass</c>, when given, is the passphrase in place of the one in <c>--cert</c>.
+    /// (ADR-0290). The path and its pass phrase arrive already split from <c>--cert</c> (ADR-0514).
     /// </summary>
     /// <param name="options">The handshake's settings.</param>
-    /// <param name="recognisesDriveLetters"><see langword="true" /> for a Windows build of curl, which keeps a drive letter's colon in the <c>--cert</c> value.</param>
     /// <returns>
     /// No certificate and no failure without <c>--cert</c>; otherwise the certificate with its
     /// key, or the exit 58 or exit 43 failure <see cref="LoadAsOpenSslBuild(string, string?, string?, string?, string?)" /> reports.
     /// </returns>
-    public static (X509Certificate2? Certificate, ConnectResult? Failure) LoadAsOpenSslBuild(TlsClientOptions options, bool recognisesDriveLetters)
-    {
-        if (options.ClientCertificate is null)
-        {
-            return (null, null);
-        }
-
-        var (path, splitPassphrase) = ClientCertificateArgument.Split(options.ClientCertificate, recognisesDriveLetters);
-        return LoadAsOpenSslBuild(path, options.Passphrase ?? splitPassphrase, options.PrivateKey, options.CertificateType, options.PrivateKeyType);
-    }
+    public static (X509Certificate2? Certificate, ConnectResult? Failure) LoadAsOpenSslBuild(TlsClientOptions options) =>
+        options.ClientCertificate is { } path
+            ? LoadAsOpenSslBuild(path, options.Passphrase, options.PrivateKey, options.CertificateType, options.PrivateKeyType)
+            : (null, null);
 
     /// <summary>
     /// Loads the certificate as curl's Schannel build does: from a Windows certificate store
