@@ -11,7 +11,7 @@ namespace Curl.Console;
 /// <summary>
 /// Pins how <see cref="TransferContextFactory" /> carries the mail options into
 /// <see cref="TransferContext.Mail" /> (<see cref="MailRequestOptionsMapping" />), and that
-/// <see cref="CurlComposition.CreateSaslAuthenticator" /> composes the authenticator from
+/// <see cref="EngineComposition.CreateSaslAuthenticator" /> composes the authenticator from
 /// <c>Curl.Authentication.UnitLibrary</c>.
 /// </summary>
 [TestClass]
@@ -120,7 +120,7 @@ public sealed class TransferContextFactoryMailTests
     [TestMethod]
     public async Task CreateSaslAuthenticator_IsTheAuthenticationLibrarysInThePlatformsEncoding()
     {
-        ISaslAuthenticator authenticator = CurlComposition.CreateSaslAuthenticator(new SystemSecurityContextFactory());
+        ISaslAuthenticator authenticator = EngineComposition.CreateSaslAuthenticator(new SystemSecurityContextFactory());
         SaslRequest request = new(new NetworkCredential("\u00e9", "p"), null, null, null, "smtp", "example.com");
         Diagnostics.Arrange("mechanism / user / password", "PLAIN / U+00E9 / p");
 

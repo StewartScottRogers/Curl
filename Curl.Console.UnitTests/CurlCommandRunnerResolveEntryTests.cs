@@ -1,3 +1,4 @@
+using Curl.Engine;
 using System.Text;
 using Curl.Cli;
 using Curl.Core;
@@ -101,7 +102,7 @@ public sealed class CurlCommandRunnerResolveEntryTests
         CommandLineParseResult parsed = CommandLineParser.Parse(arguments, _ => true);
         Diagnostics.Assert("command line accepted", true, parsed.IsAccepted);
         Assert.IsTrue(parsed.IsAccepted);
-        TcpConnector connector = CurlComposition.CreateTcpConnector(
+        TcpConnector connector = EngineComposition.CreateTcpConnector(
             parsed.Options,
             new LoopbackDnsResolver(),
             new ScriptedTcpDialer(new ScriptedConnector(responses)),
@@ -117,7 +118,7 @@ public sealed class CurlCommandRunnerResolveEntryTests
         {
             exitCode = await new CurlCommandRunner(
                     _ => new TransferDispatch(
-                        new ProtocolDispatcher(CurlComposition.CreateProtocolHandlers(connector, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new PassThroughTlsProvider(), new LoopbackDnsResolver())),
+                        new ProtocolDispatcher(EngineComposition.CreateProtocolHandlers(connector, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new PassThroughTlsProvider(), new LoopbackDnsResolver())),
                         [],
                         loadResolveEntries: connector.LoadResolveEntries),
                     files,

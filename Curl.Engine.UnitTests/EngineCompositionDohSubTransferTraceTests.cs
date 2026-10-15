@@ -6,7 +6,7 @@ using Curl.Output;
 using Curl.Protocol.Abstractions;
 using Curl.Testing;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
 /// Pins the <c>-v</c> lines of each DoH sub-transfer under <c>--trace-config dns</c> against curl
@@ -19,7 +19,7 @@ namespace Curl.Console;
 /// <see cref="VerboseTransferEventWriter" /> as standard error gets them.
 /// </summary>
 [TestClass]
-public sealed class CurlCompositionDohSubTransferTraceTests
+public sealed class EngineCompositionDohSubTransferTraceTests
 {
     public TestContext TestContext { get; set; } = null!;
 
@@ -136,7 +136,7 @@ public sealed class CurlCompositionDohSubTransferTraceTests
 
     /// <summary>
     /// Connects to <c>example.test:47113</c> through the composition's TCP connector over the
-    /// composition's DoH resolver, whose own connector is <see cref="CurlComposition.CreateDohConnector" />
+    /// composition's DoH resolver, whose own connector is <see cref="EngineComposition.CreateDohConnector" />
     /// over a dialer that answers each DoH connection with the next of <paramref name="dohAnswers" />.
     /// </summary>
     private async Task<ConnectResult> ConnectAsync(byte[][] dohAnswers, params string[] arguments)
@@ -147,11 +147,11 @@ public sealed class CurlCompositionDohSubTransferTraceTests
         CommandLineParseResult parsed = CommandLineParser.Parse([.. given, "--doh-url", DohUrl, "http://example.test:47113/"], _ => true);
         Assert.IsTrue(parsed.IsAccepted);
         CommandLineOptions options = parsed.Options;
-        FlowScopedTransferEvents? resolverEvents = CurlComposition.TracesDns(options) ? new() : null;
-        TcpConnector dohConnector = CurlComposition.CreateDohConnector(options, new ScriptedTcpDialer(new ScriptedConnector(dohAnswers)), TimeProvider.System);
-        TcpConnector connector = CurlComposition.CreateTcpConnector(
+        FlowScopedTransferEvents? resolverEvents = EngineComposition.TracesDns(options) ? new() : null;
+        TcpConnector dohConnector = EngineComposition.CreateDohConnector(options, new ScriptedTcpDialer(new ScriptedConnector(dohAnswers)), TimeProvider.System);
+        TcpConnector connector = EngineComposition.CreateTcpConnector(
             options,
-            CurlComposition.CreateDohResolver(DohUrl, dohConnector, AddressFamily.Unspecified, resolverEvents),
+            EngineComposition.CreateDohResolver(DohUrl, dohConnector, AddressFamily.Unspecified, resolverEvents),
             new ScriptedTcpDialer(new ScriptedConnector([])),
             new PassThroughTlsProvider(),
             TimeProvider.System,

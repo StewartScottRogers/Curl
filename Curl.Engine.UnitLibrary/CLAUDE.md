@@ -12,7 +12,7 @@ Held to the four quality gates in the root `CLAUDE.md`. Its tests live in `Curl.
 
 ## What has moved here so far (BL-2285)
 
-`CurlComposition.CreateProtocolHandlers` (in `Curl.Console`) gives every handler an
+`EngineComposition.CreateProtocolHandlers` gives every handler an
 `EndPointRecordingConnector` and an `EndPointRecordingDatagramConnector` sharing one
 `ConnectionEndPointRecorder`, and wraps each handler in an `EndPointReportingProtocolHandler`, which
 puts the end points of the transfer's first connection (FTP's control connection) on its report when
@@ -102,7 +102,30 @@ to the seam's option groups): the mappings from command-line options to protocol
 `TransferTimers`, `TlsBuildInformation` and `UnusableDohUrlResolver`. `RetryPolicyMapping` stays in
 `Curl.Console`: `--retry` is the curl tool's.
 
-`OptionGroupConnectionSettings` stays in `Curl.Console` because it calls `CurlComposition`. Tests
-that drive `CurlComposition` stay in `Curl.Console.UnitTests` too: `CurlTransportsTests`,
-`HttpVersionMappingTests` and `TransferProxySelectionPreProxyTests`. `TlsClientOptionsMappingTests`
-links `OpenSslBuildParser` from `Curl.Cli.UnitTests`.
+`CurlTransportsTests`, `HttpVersionMappingTests` and `TransferProxySelectionPreProxyTests` stay in
+`Curl.Console.UnitTests`. `TlsClientOptionsMappingTests` links `OpenSslBuildParser` from
+`Curl.Cli.UnitTests`.
+
+## The engine's composition (BL-2289)
+
+`EngineComposition` builds the engine's services with plain constructor calls - no container, no
+reflection, so native AOT sees every type: the protocol handlers (`CreateProtocolHandlers`), the
+transports (`CreateTransports`, `CreateTcpConnector`, `CreatePoolingConnector`,
+`CreateUdpDatagramConnector`, `CreateDatagramConnectorQuicDialer`), the DNS resolvers
+(`CreateDnsResolver`, `CreateDohResolver`, `DnsServerVariableResolverOf`), the TLS providers
+(`CreateTlsProvider`), the security-context factories and authenticators
+(`CreateSecurityContextFactory`, `CreateDialingSecurityContextFactory`, `CreateHttpAuthenticator`,
+`CreateSaslAuthenticator`), the `--trace-config` predicates (`Traces*`) and the option readers
+(`AddressFamilyOf`, `ConnectTimeoutOf`, `LocalBindingOf`, `PreProxyOf`, `UnixSocketOf` and the
+like). `Curl.Console`'s `CurlComposition` keeps `CreateRunner` and calls these. curl's easy error
+text stays in `Curl.Console` (`CurlEasyErrorText`, which `Gap/` tooling reads by path), so the DoH
+resolver's text comes in through the `easyErrorText` parameter of `CreateTransports`,
+`CreateDnsResolver` and `CreateDohResolver`; without one it is empty. `OptionGroupConnectionSettings`
+and `ProcessUserId` moved here with it.
+
+Their tests are `EngineComposition*Tests` in `Curl.Engine.UnitTests` (with their own copies of the
+`LoopbackDnsResolver` and `ScriptedTcpDialer` fakes, and a reference to `Curl.Protocol.Ssh.UnitTests`
+for its in-memory SSH server) and `EngineCompositionDnsServersIntegrationTests` in
+`Curl.Engine.IntegrationTests`. Tests that run a transfer through `CurlComposition.CreateRunner`,
+`CreateTransferDispatch` or `CreateDispatcher` stay in `Curl.Console.UnitTests` as
+`CurlComposition*Tests`.

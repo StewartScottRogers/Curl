@@ -2,7 +2,7 @@ using Curl.Cli;
 using Curl.Networking;
 using Curl.Testing;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
 /// Pins which trace components turn on curl 8.21.0's <c>[SOCKS]</c> lines, measured with
@@ -11,7 +11,7 @@ namespace Curl.Console;
 /// plain <c>-v</c> do not.
 /// </summary>
 [TestClass]
-public sealed class CurlCompositionSocksTraceTests
+public sealed class EngineCompositionSocksTraceTests
 {
     public TestContext TestContext { get; set; } = null!;
 
@@ -26,7 +26,7 @@ public sealed class CurlCompositionSocksTraceTests
     public void TracesSocks_UnderSocksProxyOrANamedAll_IsTrue(string[] arguments)
     {
         Diagnostics.Arrange("command line arguments", string.Join(" ", arguments));
-        bool tracesSocks = CurlComposition.TracesSocks(Parse(arguments));
+        bool tracesSocks = EngineComposition.TracesSocks(Parse(arguments));
         Diagnostics.Act("traces socks", tracesSocks);
 
         Diagnostics.Assert("traces socks", true, tracesSocks);
@@ -44,7 +44,7 @@ public sealed class CurlCompositionSocksTraceTests
         // curl -s -vvvv -x socks5://127.0.0.1:18601 http://127.0.0.1:80/x writes [SETUP] added SOCKS
         // filter but no [SOCKS] line (BL-1191 Notes).
         Diagnostics.Arrange("command line arguments", string.Join(" ", arguments));
-        bool tracesSocks = CurlComposition.TracesSocks(Parse(arguments));
+        bool tracesSocks = EngineComposition.TracesSocks(Parse(arguments));
         Diagnostics.Act("traces socks", tracesSocks);
 
         Diagnostics.Assert("traces socks", false, tracesSocks);
@@ -74,7 +74,7 @@ public sealed class CurlCompositionSocksTraceTests
     }
 
     private static TcpConnector CreateConnector(params string[] arguments) =>
-        CurlComposition.CreateTcpConnector(
+        EngineComposition.CreateTcpConnector(
             Parse(arguments),
             new SystemDnsResolver(),
             new ScriptedTcpDialer(new ScriptedConnector([])),

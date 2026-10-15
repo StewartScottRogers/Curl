@@ -524,7 +524,7 @@ public sealed class CurlCommandRunnerCookieTests
     private static TransferDispatch CreateTransferDispatch(IConnector connector, Cli.CommandLineOptions options)
     {
         CookieEngine? cookies = CookieEngine.FromCommandLine(options);
-        IReadOnlyList<IProtocolHandler> handlers = CurlComposition.CreateProtocolHandlers(
+        IReadOnlyList<IProtocolHandler> handlers = EngineComposition.CreateProtocolHandlers(
             connector,
             new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"),
             new PassThroughTlsProvider(),

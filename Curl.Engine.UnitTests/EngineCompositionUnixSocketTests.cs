@@ -1,11 +1,10 @@
-using Curl.Engine;
 using Curl.Cli;
 using Curl.Core;
 using Curl.Networking;
 using Curl.Protocol.Abstractions;
 using Curl.Testing;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
 /// Pins that the composition hands <c>--unix-socket</c> and <c>--abstract-unix-socket</c> to the TCP
@@ -14,7 +13,7 @@ namespace Curl.Console;
 /// <see cref="ScriptedTcpDialer" />, which records a Unix socket as a <c>unix:</c> target.
 /// </summary>
 [TestClass]
-public sealed class CurlCompositionUnixSocketTests
+public sealed class EngineCompositionUnixSocketTests
 {
     public TestContext TestContext { get; set; } = null!;
 
@@ -44,20 +43,20 @@ public sealed class CurlCompositionUnixSocketTests
     public void UnixSocketOf_TakesTheLastSocketOptionOrNone()
     {
         Diagnostics.Arrange("command lines", "http://h/ | --unix-socket a --abstract-unix-socket b http://h/ | --unix-socket a http://h/");
-        string sockets = string.Join(" | ", new[] { Parse("http://h/"), Parse("--unix-socket", "a", "--abstract-unix-socket", "b", "http://h/"), Parse("--unix-socket", "a", "http://h/") }.Select(options => CurlComposition.UnixSocketOf(options)?.ToString() ?? "none"));
+        string sockets = string.Join(" | ", new[] { Parse("http://h/"), Parse("--unix-socket", "a", "--abstract-unix-socket", "b", "http://h/"), Parse("--unix-socket", "a", "http://h/") }.Select(options => EngineComposition.UnixSocketOf(options)?.ToString() ?? "none"));
         Diagnostics.Act("unix sockets", sockets);
         Diagnostics.Assert("unix sockets", $"none | {new UnixSocketAddress("b", IsAbstract: true)} | {new UnixSocketAddress("a", IsAbstract: false)}", sockets);
 
-        Assert.IsNull(CurlComposition.UnixSocketOf(Parse("http://h/")));
-        Assert.AreEqual(new UnixSocketAddress("b", IsAbstract: true), CurlComposition.UnixSocketOf(Parse("--unix-socket", "a", "--abstract-unix-socket", "b", "http://h/")));
-        Assert.AreEqual(new UnixSocketAddress("a", IsAbstract: false), CurlComposition.UnixSocketOf(Parse("--unix-socket", "a", "http://h/")));
+        Assert.IsNull(EngineComposition.UnixSocketOf(Parse("http://h/")));
+        Assert.AreEqual(new UnixSocketAddress("b", IsAbstract: true), EngineComposition.UnixSocketOf(Parse("--unix-socket", "a", "--abstract-unix-socket", "b", "http://h/")));
+        Assert.AreEqual(new UnixSocketAddress("a", IsAbstract: false), EngineComposition.UnixSocketOf(Parse("--unix-socket", "a", "http://h/")));
     }
 
     [TestMethod]
     public void CreateTransports_WithAUnixSocket_GivesTheTcpConnectorThatSocket()
     {
         Diagnostics.Arrange("command line arguments", "--unix-socket /run/app.sock http://h/");
-        CurlTransports transports = CurlComposition.CreateTransports(Parse("--unix-socket", "/run/app.sock", "http://h/"));
+        CurlTransports transports = EngineComposition.CreateTransports(Parse("--unix-socket", "/run/app.sock", "http://h/"));
         Diagnostics.Act("tcp connector unix socket", transports.TcpConnector.UnixSocket);
 
         Diagnostics.Assert("tcp connector unix socket", new UnixSocketAddress("/run/app.sock", IsAbstract: false), transports.TcpConnector.UnixSocket);
@@ -89,7 +88,7 @@ public sealed class CurlCompositionUnixSocketTests
         Diagnostics.Assert("dialed hosts", "unix:/run/a.sock, unix:/run/b.sock", string.Join(", ", server.Targets.Select(dialed => dialed.Host)));
         Assert.IsFalse(second.IsReused);
         CollectionAssert.AreEqual(new[] { "unix:/run/a.sock", "unix:/run/b.sock" }, server.Targets.Select(dialed => dialed.Host).ToArray());
-        Assert.AreNotSame(CurlComposition.CreateTransports(parsed.Groups[0]).PoolingConnector, CurlComposition.CreateTransports(parsed.Groups[1]).PoolingConnector);
+        Assert.AreNotSame(EngineComposition.CreateTransports(parsed.Groups[0]).PoolingConnector, EngineComposition.CreateTransports(parsed.Groups[1]).PoolingConnector);
     }
 
     [TestMethod]
@@ -119,7 +118,7 @@ public sealed class CurlCompositionUnixSocketTests
     }
 
     private static TcpConnector CreateConnector(CommandLineOptions options, ScriptedConnector server) =>
-        CurlComposition.CreateTcpConnector(
+        EngineComposition.CreateTcpConnector(
             options,
             new LoopbackDnsResolver(),
             new ScriptedTcpDialer(server),

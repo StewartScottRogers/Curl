@@ -1,10 +1,9 @@
-using Curl.Engine;
 using Curl.Cli;
 using Curl.Networking;
 using Curl.Protocol.Abstractions;
 using Curl.Testing;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
 /// Pins that <c>--dns-servers</c>, <c>--dns-interface</c>, <c>--dns-ipv4-addr</c> and
@@ -12,7 +11,7 @@ namespace Curl.Console;
 /// for every transfer of the run, as curl's c-ares build resolves then (ADR-0170, BL-694).
 /// </summary>
 [TestClass]
-public sealed class CurlCompositionDnsServersTests
+public sealed class EngineCompositionDnsServersTests
 {
     public TestContext TestContext { get; set; } = null!;
 
@@ -21,7 +20,7 @@ public sealed class CurlCompositionDnsServersTests
     [TestMethod]
     public void CreateDnsResolver_WithoutACaresOption_IsTheSystemResolver()
     {
-        IDnsResolver resolver = CurlComposition.CreateDnsResolver(Parse(), TimeProvider.System, new TcpDialer());
+        IDnsResolver resolver = EngineComposition.CreateDnsResolver(Parse(), TimeProvider.System, new TcpDialer());
         Diagnostics.Act("resolver type", resolver.GetType().Name);
 
         Diagnostics.Assert("resolver type", nameof(SystemDnsResolver), resolver.GetType().Name);
@@ -35,7 +34,7 @@ public sealed class CurlCompositionDnsServersTests
     [DataRow("--dns-ipv6-addr", "::1")]
     public void CreateDnsResolver_WithACaresOption_IsTheHandBuiltResolver(string option, string value)
     {
-        IDnsResolver resolver = CurlComposition.CreateDnsResolver(Parse(option, value), TimeProvider.System, new TcpDialer());
+        IDnsResolver resolver = EngineComposition.CreateDnsResolver(Parse(option, value), TimeProvider.System, new TcpDialer());
         Diagnostics.Act("resolver type", resolver.GetType().Name);
 
         Diagnostics.Assert("resolver type", nameof(DnsServerResolver), resolver.GetType().Name);
@@ -47,7 +46,7 @@ public sealed class CurlCompositionDnsServersTests
     {
         // curl --dns-servers bogus http://bl694.example/ -> curl: (43) Error 43 resolving bl694.example:80 (c-ares build);
         // the system resolver has no such failure, so the exit shows which resolver ran. Nothing is sent.
-        CurlTransports transports = CurlComposition.CreateTransports(Parse("--dns-servers", "bogus"));
+        CurlTransports transports = EngineComposition.CreateTransports(Parse("--dns-servers", "bogus"));
 
         ConnectResult tcp;
         DatagramOpenResult udp;

@@ -398,7 +398,7 @@ public sealed partial class CurlCompositionProxyTests
         // (BL-604): SSPI's Type 1 on Windows, curl's own NTLM's elsewhere.
         string[] arguments = ["--proxy-ntlm", "-U", "u:p", "-p", "-x", "127.0.0.1:18604", "http://example.test/"];
         Diagnostics.ArrangeCommandLine(arguments);
-        CurlTransports transports = CurlComposition.CreateTransports(
+        CurlTransports transports = EngineComposition.CreateTransports(
             CommandLineParser.Parse(arguments, _ => true).Options!);
         HttpAuthRequest request = new("CONNECT", CurlUrl.Parse("http://127.0.0.1:18604/"), "example.test:80", new System.Net.NetworkCredential("u", "p"), null, HttpAuthSchemes.Ntlm, IsProxy: true);
 
@@ -623,7 +623,7 @@ public sealed partial class CurlCompositionProxyTests
     {
         Diagnostics.ArrangeCommandLine(arguments);
         HttpProxyTunnelOptions options =
-            CurlComposition.CreateProxyTunnelOptions(CommandLineParser.Parse(arguments, _ => true).Options!, new SystemSecurityContextFactory());
+            EngineComposition.CreateProxyTunnelOptions(CommandLineParser.Parse(arguments, _ => true).Options!, new SystemSecurityContextFactory());
         Diagnostics.Act("proxy auth schemes, HTTP/2 tunnel", $"{options.ProxyAuthSchemes}, {options.ProxyHttp2}");
         return options;
     }

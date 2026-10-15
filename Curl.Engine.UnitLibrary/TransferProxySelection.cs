@@ -83,7 +83,7 @@ internal static class TransferProxySelection
     /// '&lt;text&gt;'</c>; with no <c>-x</c> (the environment is not read) the pre-proxy is the SOCKS
     /// proxy itself; a SOCKS <c>-x</c> is exit 5 <c>Having a SOCKS pre-proxy and proxy is not supported
     /// with '&lt;-x&gt;'</c>; an HTTP or HTTPS <c>-x</c> is the proxy, which the connector reaches
-    /// through the pre-proxy (<c>CurlComposition.PreProxyOf</c>).
+    /// through the pre-proxy (<c>EngineComposition.PreProxyOf</c>).
     /// </summary>
     private static bool TrySelectBehindPreProxy(
         ProxySelector selector,

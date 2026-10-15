@@ -1,10 +1,9 @@
-using Curl.Engine;
 using System.Net.Sockets;
 using Curl.Cli;
 using Curl.Networking;
 using Curl.Protocol.Abstractions;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
 /// What one <c>-:</c>/<c>--next</c> option group opens its connections with, beyond what the
@@ -40,10 +39,10 @@ internal sealed record OptionGroupConnectionSettings(
         new(
             TlsClientOptionsMapping.FromCommandLine(options),
             TlsClientOptionsMapping.ProxyFromCommandLine(options),
-            CurlComposition.UnixSocketOf(options),
-            CurlComposition.LocalBindingOf(options),
-            CurlComposition.AddressFamilyOf(options),
-            CurlComposition.HaproxyProtocolOf(options),
-            CurlComposition.PreProxyOf(options),
+            EngineComposition.UnixSocketOf(options),
+            EngineComposition.LocalBindingOf(options),
+            EngineComposition.AddressFamilyOf(options),
+            EngineComposition.HaproxyProtocolOf(options),
+            EngineComposition.PreProxyOf(options),
             string.Join('\n', HttpVersionMapping.HttpOverTlsApplicationProtocolsOf(options.HttpVersion)));
 }

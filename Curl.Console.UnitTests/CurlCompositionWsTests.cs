@@ -1,3 +1,4 @@
+using Curl.Engine;
 using System.Text;
 using System.Text.RegularExpressions;
 using Curl.Cli;
@@ -8,7 +9,7 @@ namespace Curl.Console;
 
 /// <summary>
 /// Pins <c>ws://</c> and <c>wss://</c> end to end through the production composition over fake
-/// connectors: the handler <see cref="CurlComposition.CreateProtocolHandlers" /> registers, the
+/// connectors: the handler <see cref="EngineComposition.CreateProtocolHandlers" /> registers, the
 /// HTTP authenticator it composes, the runner's <c>-T</c>, <c>-D</c> and <c>-i</c> handling and the
 /// <c>-V</c> protocol list. Every exchange was recorded from curl 8.21.0 (mingw, Schannel) with
 /// <c>Record-CurlExchange.ps1</c> (ADR-0128's table, BL-582 and BL-583 Notes). The random

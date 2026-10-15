@@ -161,7 +161,7 @@ public sealed class TransferProxySelectionPreProxyTests
     [TestMethod]
     public void PreProxyOf_WithASocksPreProxy_GivesTheConnectorIt()
     {
-        CurlTransports transports = CurlComposition.CreateTransports(Parse("--preproxy", "socks5://127.0.0.1:41080", "-x", "http://10.0.0.1:3128", "http://h/"));
+        CurlTransports transports = EngineComposition.CreateTransports(Parse("--preproxy", "socks5://127.0.0.1:41080", "-x", "http://10.0.0.1:3128", "http://h/"));
         Diagnostics.Act("connector pre-proxy", Show(transports.TcpConnector.PreProxy));
 
         Diagnostics.Assert("connector pre-proxy", Show(new ProxyEndpoint(ProxyKind.Socks5, "127.0.0.1", 41080, null)), Show(transports.TcpConnector.PreProxy));
@@ -176,10 +176,10 @@ public sealed class TransferProxySelectionPreProxyTests
     public void PreProxyOf_WithNoUsableSocksPreProxy_GivesNone(string[] arguments)
     {
         CommandLineOptions options = Parse(arguments);
-        Diagnostics.Act("pre-proxy", Show(CurlComposition.PreProxyOf(options)));
+        Diagnostics.Act("pre-proxy", Show(EngineComposition.PreProxyOf(options)));
 
-        Diagnostics.Assert("pre-proxy", "(none)", Show(CurlComposition.PreProxyOf(options)));
-        Assert.IsNull(CurlComposition.PreProxyOf(Parse(arguments)));
+        Diagnostics.Assert("pre-proxy", "(none)", Show(EngineComposition.PreProxyOf(options)));
+        Assert.IsNull(EngineComposition.PreProxyOf(Parse(arguments)));
     }
 
     private ProxyEndpoint? Select(out TransferResult? failure, params string[] arguments)

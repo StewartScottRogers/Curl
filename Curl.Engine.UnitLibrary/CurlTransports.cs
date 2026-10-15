@@ -41,13 +41,13 @@ namespace Curl.Engine;
 /// run's shared <see cref="ConnectionCache" /> to the runner (ADR-0050, ADR-0285).
 /// </param>
 /// <param name="DiagnosticLog">The run's diagnostic log the authenticators were composed with (BL-923); <see langword="null" /> for none.</param>
-/// <param name="TracesFtp">Whether the FTP handler writes the <c>--trace-config ftp</c> lines (<c>CurlComposition.TracesFtp</c>, BL-1162).</param>
-/// <param name="TracesSmtp">Whether the SMTP handler writes the <c>--trace-config smtp</c> lines (<c>CurlComposition.TracesSmtp</c>, BL-1163).</param>
-/// <param name="TracesWs">Whether the WebSocket handler writes the <c>--trace-config ws</c> lines (<c>CurlComposition.TracesWs</c>, BL-1164).</param>
-/// <param name="TracesSsh">Whether the SSH handler writes the <c>--trace-config ssh</c> lines (<c>CurlComposition.TracesSsh</c>, BL-1166).</param>
-/// <param name="TracesHttp2">Whether the HTTP handler writes the <c>--trace-config http/2</c> lines (<c>CurlComposition.TracesHttp2</c>, BL-1167).</param>
-/// <param name="TracesHttp3">Whether the HTTP handler writes the <c>--trace-config http/3</c> lines (<c>CurlComposition.TracesHttp3</c>, BL-1168).</param>
-/// <param name="TracesRead">Whether the HTTP handler writes an HTTP/1.x request body's <c>--trace-config read</c> lines (<c>CurlComposition.TracesRead</c>, BL-1189).</param>
+/// <param name="TracesFtp">Whether the FTP handler writes the <c>--trace-config ftp</c> lines (<c>EngineComposition.TracesFtp</c>, BL-1162).</param>
+/// <param name="TracesSmtp">Whether the SMTP handler writes the <c>--trace-config smtp</c> lines (<c>EngineComposition.TracesSmtp</c>, BL-1163).</param>
+/// <param name="TracesWs">Whether the WebSocket handler writes the <c>--trace-config ws</c> lines (<c>EngineComposition.TracesWs</c>, BL-1164).</param>
+/// <param name="TracesSsh">Whether the SSH handler writes the <c>--trace-config ssh</c> lines (<c>EngineComposition.TracesSsh</c>, BL-1166).</param>
+/// <param name="TracesHttp2">Whether the HTTP handler writes the <c>--trace-config http/2</c> lines (<c>EngineComposition.TracesHttp2</c>, BL-1167).</param>
+/// <param name="TracesHttp3">Whether the HTTP handler writes the <c>--trace-config http/3</c> lines (<c>EngineComposition.TracesHttp3</c>, BL-1168).</param>
+/// <param name="TracesRead">Whether the HTTP handler writes an HTTP/1.x request body's <c>--trace-config read</c> lines (<c>EngineComposition.TracesRead</c>, BL-1189).</param>
 internal sealed record CurlTransports(
     IDnsResolver DnsResolver,
     TimeProvider TimeProvider,

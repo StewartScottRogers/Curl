@@ -1,4 +1,3 @@
-using Curl.Engine;
 using System.Net;
 using Curl.Cli;
 using Curl.Networking;
@@ -6,7 +5,7 @@ using Curl.Protocol.Abstractions;
 
 using Curl.Testing;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
 /// Pins that the composition hands <c>--interface</c> and <c>--local-port</c> to the TCP connector as a
@@ -14,7 +13,7 @@ namespace Curl.Console;
 /// and that each connect is dialed bound, through a <see cref="ScriptedTcpDialer" />.
 /// </summary>
 [TestClass]
-public sealed class CurlCompositionLocalBindingTests
+public sealed class EngineCompositionLocalBindingTests
 {
     public TestContext TestContext { get; set; } = null!;
 
@@ -59,7 +58,7 @@ public sealed class CurlCompositionLocalBindingTests
         // curl --interface 127.0.0.1 --local-port 40000-40010 -w '%{local_port}' -> 40000, exit 0.
         ScriptedConnector server = new([]);
         ScriptedTcpDialer dialer = new(server);
-        TcpConnector connector = CurlComposition.CreateTcpConnector(
+        TcpConnector connector = EngineComposition.CreateTcpConnector(
             Parse("--interface", "127.0.0.1", "--local-port", "40000-40010", "http://127.0.0.1:47599/"),
             new LoopbackDnsResolver(),
             dialer,
@@ -79,7 +78,7 @@ public sealed class CurlCompositionLocalBindingTests
     [TestMethod]
     public void CreateTransports_WithAnInterface_GivesTheTcpConnectorItsBinding()
     {
-        CurlTransports transports = CurlComposition.CreateTransports(Parse("--interface", "host!127.0.0.1", "http://h/"));
+        CurlTransports transports = EngineComposition.CreateTransports(Parse("--interface", "host!127.0.0.1", "http://h/"));
         Diagnostics.Act("TCP connector binding", transports.TcpConnector.LocalBinding);
 
         LocalBinding expected = new(null, "127.0.0.1", null, 0, 1);
@@ -89,7 +88,7 @@ public sealed class CurlCompositionLocalBindingTests
 
     private LocalBinding? LocalBindingOf(params string[] arguments)
     {
-        LocalBinding? binding = CurlComposition.LocalBindingOf(Parse(arguments));
+        LocalBinding? binding = EngineComposition.LocalBindingOf(Parse(arguments));
         Diagnostics.Act("binding", binding);
         return binding;
     }

@@ -1,3 +1,4 @@
+using Curl.Engine;
 using System.Globalization;
 using System.Net;
 using System.Text;
@@ -509,7 +510,7 @@ public sealed class CurlCommandRunnerAltSvcVersionTests
     private static string RouteText(AltSvcRoute? route) => route?.ToString() ?? "<null>";
 
     private static TransferDispatch CreateTransferDispatch(IConnector connector) =>
-        new(new ProtocolDispatcher(CurlComposition.CreateProtocolHandlers(
+        new(new ProtocolDispatcher(EngineComposition.CreateProtocolHandlers(
             connector,
             new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"),
             new PassThroughTlsProvider(),

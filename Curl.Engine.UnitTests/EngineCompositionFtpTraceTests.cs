@@ -1,10 +1,9 @@
-using Curl.Engine;
 using System.Text;
 using Curl.Cli;
 using Curl.Protocol.Abstractions;
 using Curl.Testing;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
 /// Pins which <c>--trace-config</c> components turn on curl 8.21.0's <c>[FTP]</c> lines - <c>ftp</c>,
@@ -13,7 +12,7 @@ namespace Curl.Console;
 /// The lines themselves are pinned in <c>Curl.Protocol.Ftp.UnitTests</c>.
 /// </summary>
 [TestClass]
-public sealed class CurlCompositionFtpTraceTests
+public sealed class EngineCompositionFtpTraceTests
 {
     public TestContext TestContext { get; set; } = null!;
 
@@ -54,7 +53,7 @@ public sealed class CurlCompositionFtpTraceTests
     [TestMethod]
     public void CreateTransports_UnderTraceConfigFtp_TracesFtp()
     {
-        CurlTransports transports = CurlComposition.CreateTransports(Parse("-v", "--trace-config", "ftp"), TimeProvider.System);
+        CurlTransports transports = EngineComposition.CreateTransports(Parse("-v", "--trace-config", "ftp"), TimeProvider.System);
         Diagnostics.Act("transports trace FTP", transports.TracesFtp);
 
         Diagnostics.Assert("transports trace FTP", true, transports.TracesFtp);
@@ -64,7 +63,7 @@ public sealed class CurlCompositionFtpTraceTests
     [TestMethod]
     public void CreateTransports_WithoutTheFtpComponent_DoesNotTraceFtp()
     {
-        CurlTransports transports = CurlComposition.CreateTransports(Parse("-v"), TimeProvider.System);
+        CurlTransports transports = EngineComposition.CreateTransports(Parse("-v"), TimeProvider.System);
         Diagnostics.Act("transports trace FTP", transports.TracesFtp);
 
         Diagnostics.Assert("transports trace FTP", false, transports.TracesFtp);
@@ -80,7 +79,7 @@ public sealed class CurlCompositionFtpTraceTests
         Diagnostics.Arrange("URL", "ftp://127.0.0.1/file.txt");
         Diagnostics.Bytes("scripted control replies", Encoding.Latin1.GetBytes(ControlReplies));
         ScriptedConnector server = new([Encoding.Latin1.GetBytes(ControlReplies), "hello"u8.ToArray()]);
-        IProtocolHandler ftp = CurlComposition
+        IProtocolHandler ftp = EngineComposition
             .CreateProtocolHandlers(server, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new PassThroughTlsProvider(), new LoopbackDnsResolver(), tracesFtp: tracesFtp)
             .Single(handler => handler.SupportedSchemes.Contains("ftp"));
         InfoRecordingEvents events = new();
@@ -112,7 +111,7 @@ public sealed class CurlCompositionFtpTraceTests
 
     private bool TracesFtp(string[] arguments)
     {
-        bool traces = CurlComposition.TracesFtp(Parse(arguments));
+        bool traces = EngineComposition.TracesFtp(Parse(arguments));
         Diagnostics.Act("traces FTP", traces);
         return traces;
     }

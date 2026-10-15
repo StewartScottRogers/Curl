@@ -412,7 +412,7 @@ public sealed class CurlCommandRunnerNextGroupTests
     /// <summary>The production handler set over <paramref name="connector" />, with the group's cookies.</summary>
     private static TransferDispatch CreateTransferDispatch(IConnector connector, CookieEngine? cookies)
     {
-        IReadOnlyList<IProtocolHandler> handlers = CurlComposition.CreateProtocolHandlers(
+        IReadOnlyList<IProtocolHandler> handlers = EngineComposition.CreateProtocolHandlers(
             connector,
             new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"),
             new PassThroughTlsProvider(),

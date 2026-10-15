@@ -3,7 +3,7 @@ using Curl.Networking;
 
 using Curl.Testing;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
 /// Pins which trace components turn on curl 8.21.0's <c>[HTTP-PROXY]</c> and <c>[H1-PROXY]</c> lines,
@@ -12,7 +12,7 @@ namespace Curl.Console;
 /// <c>--trace-config all</c> both; <c>network</c>, <c>-vvvv</c> and plain <c>-v</c> neither.
 /// </summary>
 [TestClass]
-public sealed class CurlCompositionHttpProxyTraceTests
+public sealed class EngineCompositionHttpProxyTraceTests
 {
     public TestContext TestContext { get; set; } = null!;
 
@@ -25,7 +25,7 @@ public sealed class CurlCompositionHttpProxyTraceTests
     [DataRow(new[] { "-vvvv", "--trace-config", "all" })]
     public void TracesHttpProxy_UnderHttpProxyProxyOrANamedAll_IsTrue(string[] arguments)
     {
-        bool traces = Traces("traces HTTP-PROXY", CurlComposition.TracesHttpProxy, arguments);
+        bool traces = Traces("traces HTTP-PROXY", EngineComposition.TracesHttpProxy, arguments);
 
         Diagnostics.Assert("traces HTTP-PROXY", true, traces);
         Assert.IsTrue(traces);
@@ -40,7 +40,7 @@ public sealed class CurlCompositionHttpProxyTraceTests
     {
         // curl -s -vvvv -p -x http://127.0.0.1:18941 http://example.test/x writes [SETUP] added HTTP
         // proxy tunnel filter but no [HTTP-PROXY] line (BL-1193 Notes).
-        bool traces = Traces("traces HTTP-PROXY", CurlComposition.TracesHttpProxy, arguments);
+        bool traces = Traces("traces HTTP-PROXY", EngineComposition.TracesHttpProxy, arguments);
 
         Diagnostics.Assert("traces HTTP-PROXY", false, traces);
         Assert.IsFalse(traces);
@@ -52,7 +52,7 @@ public sealed class CurlCompositionHttpProxyTraceTests
     [DataRow(new[] { "-v", "--trace-config", "all" })]
     public void TracesH1Proxy_UnderH1ProxyProxyOrANamedAll_IsTrue(string[] arguments)
     {
-        bool traces = Traces("traces H1-PROXY", CurlComposition.TracesH1Proxy, arguments);
+        bool traces = Traces("traces H1-PROXY", EngineComposition.TracesH1Proxy, arguments);
 
         Diagnostics.Assert("traces H1-PROXY", true, traces);
         Assert.IsTrue(traces);
@@ -65,7 +65,7 @@ public sealed class CurlCompositionHttpProxyTraceTests
     [DataRow(new[] { "-vvvv" })]
     public void TracesH1Proxy_UnderNetworkHttpProxyOrTheAllOfVvvv_IsFalse(string[] arguments)
     {
-        bool traces = Traces("traces H1-PROXY", CurlComposition.TracesH1Proxy, arguments);
+        bool traces = Traces("traces H1-PROXY", EngineComposition.TracesH1Proxy, arguments);
 
         Diagnostics.Assert("traces H1-PROXY", false, traces);
         Assert.IsFalse(traces);
@@ -102,7 +102,7 @@ public sealed class CurlCompositionHttpProxyTraceTests
 
     private TcpConnector CreateConnector(params string[] arguments)
     {
-        TcpConnector connector = CurlComposition.CreateTcpConnector(
+        TcpConnector connector = EngineComposition.CreateTcpConnector(
             Parse(arguments),
             new SystemDnsResolver(),
             new ScriptedTcpDialer(new ScriptedConnector([])),

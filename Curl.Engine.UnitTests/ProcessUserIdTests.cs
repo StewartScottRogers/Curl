@@ -1,7 +1,7 @@
 using System.Text;
 using Curl.Testing;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>Pins <see cref="ProcessUserId" />: the real user id from a <c>/proc/self/status</c> file, and 0 without one.</summary>
 [TestClass]

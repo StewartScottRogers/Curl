@@ -11,7 +11,7 @@ namespace Curl.Console;
 /// Pins how <c>--happy-eyeballs-timeout-ms</c> reaches <see cref="HttpRequestOptions.HappyEyeballsTimeout" />
 /// through <see cref="HttpRequestOptionsMapping.FromCommandLine" />, the QUIC-against-TCP race of a
 /// <c>--http3</c> transfer (ADR-0144), and <see cref="TcpConnector.HappyEyeballsTimeout" /> through
-/// <see cref="CurlComposition.CreateTcpConnector" />, the IPv4-against-IPv6 race (ADR-0254, BL-889).
+/// <see cref="EngineComposition.CreateTcpConnector" />, the IPv4-against-IPv6 race (ADR-0254, BL-889).
 /// </summary>
 [TestClass]
 public sealed class HappyEyeballsTimeoutMappingTests
@@ -97,7 +97,7 @@ public sealed class HappyEyeballsTimeoutMappingTests
     }
 
     private static TcpConnector CreateTcpConnector(CommandLineOptions options) =>
-        CurlComposition.CreateTcpConnector(
+        EngineComposition.CreateTcpConnector(
             options,
             new LoopbackDnsResolver(),
             new ScriptedTcpDialer(new ScriptedConnector([])),

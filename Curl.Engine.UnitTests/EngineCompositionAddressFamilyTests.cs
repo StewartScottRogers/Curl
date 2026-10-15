@@ -1,4 +1,3 @@
-using Curl.Engine;
 using System.Net.Sockets;
 
 using Curl.Cli;
@@ -6,14 +5,14 @@ using Curl.Networking;
 using Curl.Protocol.Abstractions;
 using Curl.Testing;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
 /// Pins that <c>-4</c> and <c>-6</c> on the command line reach the TCP and UDP connectors the
 /// composition builds, so a name is dialled at the chosen family's addresses only (BL-500).
 /// </summary>
 [TestClass]
-public sealed class CurlCompositionAddressFamilyTests
+public sealed class EngineCompositionAddressFamilyTests
 {
     public TestContext TestContext { get; set; } = null!;
 
@@ -27,10 +26,10 @@ public sealed class CurlCompositionAddressFamilyTests
     {
         Diagnostics.Arrange("arguments", option + " http://example.com/");
         CommandLineParseResult parsed = CommandLineParser.Parse([option, "http://example.com/"], _ => true);
-        Diagnostics.Act("address family", CurlComposition.AddressFamilyOf(parsed.Options!));
+        Diagnostics.Act("address family", EngineComposition.AddressFamilyOf(parsed.Options!));
 
-        Diagnostics.Assert("address family", expected, CurlComposition.AddressFamilyOf(parsed.Options!));
-        Assert.AreEqual(expected, CurlComposition.AddressFamilyOf(parsed.Options!));
+        Diagnostics.Assert("address family", expected, EngineComposition.AddressFamilyOf(parsed.Options!));
+        Assert.AreEqual(expected, EngineComposition.AddressFamilyOf(parsed.Options!));
     }
 
     [TestMethod]
@@ -70,7 +69,7 @@ public sealed class CurlCompositionAddressFamilyTests
     {
         Diagnostics.Arrange("arguments", "-6 --resolve tftp.test:69:127.0.0.1 tftp://tftp.test/");
         CommandLineParseResult parsed = CommandLineParser.Parse(["-6", "--resolve", "tftp.test:69:127.0.0.1", "tftp://tftp.test/"], _ => true);
-        CurlTransports transports = CurlComposition.CreateTransports(parsed.Options!);
+        CurlTransports transports = EngineComposition.CreateTransports(parsed.Options!);
 
         DatagramOpenResult result;
         using (Diagnostics.Phase("open"))
@@ -93,7 +92,7 @@ public sealed class CurlCompositionAddressFamilyTests
         CommandLineParseResult parsed = CommandLineParser.Parse([.. arguments, "http://example.com/"], _ => true);
         Assert.IsTrue(parsed.IsAccepted);
 
-        TcpConnector connector = CurlComposition.CreateTcpConnector(
+        TcpConnector connector = EngineComposition.CreateTcpConnector(
             parsed.Options,
             new LoopbackDnsResolver(),
             new ScriptedTcpDialer(server),

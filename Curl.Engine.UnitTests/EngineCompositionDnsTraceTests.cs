@@ -1,10 +1,9 @@
-using Curl.Engine;
 using Curl.Cli;
 using Curl.Networking;
 using Curl.Protocol.Abstractions;
 using Curl.Testing;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
 /// Pins curl 8.21.0's <c>[DNS]</c> lines under <c>-v --trace-config dns</c>, <c>doh</c> or <c>all</c>
@@ -14,7 +13,7 @@ namespace Curl.Console;
 /// <see cref="ScriptedConnector" />, so no socket is opened.
 /// </summary>
 [TestClass]
-public sealed class CurlCompositionDnsTraceTests
+public sealed class EngineCompositionDnsTraceTests
 {
     public TestContext TestContext { get; set; } = null!;
 
@@ -180,8 +179,8 @@ public sealed class CurlCompositionDnsTraceTests
     {
         Diagnostics.Arrange("traced arguments", "-v --trace-config dns");
         Diagnostics.Arrange("plain arguments", "-v");
-        CurlTransports traced = CurlComposition.CreateTransports(Parse("-v", "--trace-config", "dns"));
-        CurlTransports plain = CurlComposition.CreateTransports(Parse("-v"));
+        CurlTransports traced = EngineComposition.CreateTransports(Parse("-v", "--trace-config", "dns"));
+        CurlTransports plain = EngineComposition.CreateTransports(Parse("-v"));
 
         Diagnostics.Act("traced: traces DNS filter", traced.TcpConnector.TracesDnsFilter);
         Diagnostics.Act("plain: traces DNS filter", plain.TcpConnector.TracesDnsFilter);
@@ -371,7 +370,7 @@ public sealed class CurlCompositionDnsTraceTests
     {
         Diagnostics.Arrange("arguments", string.Join(' ', arguments.Append("http://127.0.0.1:47110/")));
         CommandLineOptions options = Parse(arguments);
-        TcpConnector connector = CurlComposition.CreateTcpConnector(
+        TcpConnector connector = EngineComposition.CreateTcpConnector(
             options,
             new SystemDnsResolver(),
             new ScriptedTcpDialer(new ScriptedConnector([])),

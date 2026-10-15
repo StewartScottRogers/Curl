@@ -1,10 +1,9 @@
-using Curl.Engine;
 using Curl.Cli;
 using Curl.Networking;
 
 using Curl.Testing;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
 /// Pins that the composition hands <c>--haproxy-protocol</c> and <c>--haproxy-clientip</c> to the TCP
@@ -13,7 +12,7 @@ namespace Curl.Console;
 /// <c>--haproxy-clientip 1.2.3.4 --no-haproxy-protocol</c> still sent <c>PROXY TCP4 1.2.3.4 ...</c>).
 /// </summary>
 [TestClass]
-public sealed class CurlCompositionHaproxyProtocolTests
+public sealed class EngineCompositionHaproxyProtocolTests
 {
     public TestContext TestContext { get; set; } = null!;
 
@@ -61,7 +60,7 @@ public sealed class CurlCompositionHaproxyProtocolTests
     [TestMethod]
     public void CreateTransports_WithHaproxyProtocol_GivesTheTcpConnectorTheHeader()
     {
-        CurlTransports transports = CurlComposition.CreateTransports(Parse("--haproxy-protocol", "http://h/"));
+        CurlTransports transports = EngineComposition.CreateTransports(Parse("--haproxy-protocol", "http://h/"));
         Diagnostics.Act("TCP connector header", transports.TcpConnector.HaproxyProtocol);
 
         Diagnostics.Assert("TCP connector header", new HaproxyProtocolHeader(null), transports.TcpConnector.HaproxyProtocol);
@@ -70,7 +69,7 @@ public sealed class CurlCompositionHaproxyProtocolTests
 
     private HaproxyProtocolHeader? HaproxyProtocolOf(params string[] arguments)
     {
-        HaproxyProtocolHeader? header = CurlComposition.HaproxyProtocolOf(Parse(arguments));
+        HaproxyProtocolHeader? header = EngineComposition.HaproxyProtocolOf(Parse(arguments));
         Diagnostics.Act("header", header?.ToString() ?? "(null)");
         return header;
     }

@@ -1,4 +1,3 @@
-using Curl.Engine;
 using System.Net;
 
 using Curl.Cli;
@@ -6,7 +5,7 @@ using Curl.Networking;
 using Curl.Protocol.Abstractions;
 using Curl.Testing;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
 /// Pins that the TCP and UDP connectors the composition builds apply <c>--resolve</c> and
@@ -14,7 +13,7 @@ namespace Curl.Console;
 /// whose <see cref="ScriptedConnector" /> records the address and port actually dialed.
 /// </summary>
 [TestClass]
-public sealed class CurlCompositionConnectOverrideTests
+public sealed class EngineCompositionConnectOverrideTests
 {
     public TestContext TestContext { get; set; } = null!;
 
@@ -171,7 +170,7 @@ public sealed class CurlCompositionConnectOverrideTests
         CommandLineParseResult parsed = CommandLineParser.Parse([.. arguments, "tftp://tftp.test/"], _ => true);
         Assert.IsTrue(parsed.IsAccepted);
 
-        CurlTransports transports = CurlComposition.CreateTransports(parsed.Options);
+        CurlTransports transports = EngineComposition.CreateTransports(parsed.Options);
 
         DatagramOpenResult result;
         using (Diagnostics.Phase("open"))
@@ -196,7 +195,7 @@ public sealed class CurlCompositionConnectOverrideTests
         CommandLineParseResult parsed = CommandLineParser.Parse([.. arguments, $"http://{host}:{port}/"], _ => true);
         Assert.IsTrue(parsed.IsAccepted);
 
-        TcpConnector connector = CurlComposition.CreateTcpConnector(
+        TcpConnector connector = EngineComposition.CreateTcpConnector(
             parsed.Options,
             new LoopbackDnsResolver(),
             new ScriptedTcpDialer(server),

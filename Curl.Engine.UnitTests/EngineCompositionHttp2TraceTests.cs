@@ -3,9 +3,8 @@ using Curl.Protocol.Abstractions;
 using Curl.Protocol.Http;
 
 using Curl.Testing;
-using Curl.Engine;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
 /// Pins which <c>--trace-config</c> components turn on curl 8.21.0's <c>[HTTP/2]</c> frame lines -
@@ -15,7 +14,7 @@ namespace Curl.Console;
 /// every info line.
 /// </summary>
 [TestClass]
-public sealed class CurlCompositionHttp2TraceTests
+public sealed class EngineCompositionHttp2TraceTests
 {
     public TestContext TestContext { get; set; } = null!;
 
@@ -51,7 +50,7 @@ public sealed class CurlCompositionHttp2TraceTests
     [TestMethod]
     public void CreateTransports_UnderTraceConfigHttp2_TracesHttp2()
     {
-        CurlTransports transports = CurlComposition.CreateTransports(Parse("-v", "--trace-config", "http/2"), TimeProvider.System);
+        CurlTransports transports = EngineComposition.CreateTransports(Parse("-v", "--trace-config", "http/2"), TimeProvider.System);
         Diagnostics.Act("transports trace HTTP/2", transports.TracesHttp2);
 
         Diagnostics.Assert("transports trace HTTP/2", true, transports.TracesHttp2);
@@ -61,7 +60,7 @@ public sealed class CurlCompositionHttp2TraceTests
     [TestMethod]
     public void CreateTransports_WithoutTheHttp2Component_DoesNotTraceHttp2()
     {
-        CurlTransports transports = CurlComposition.CreateTransports(Parse("-v"), TimeProvider.System);
+        CurlTransports transports = EngineComposition.CreateTransports(Parse("-v"), TimeProvider.System);
         Diagnostics.Act("transports trace HTTP/2", transports.TracesHttp2);
 
         Diagnostics.Assert("transports trace HTTP/2", false, transports.TracesHttp2);
@@ -74,7 +73,7 @@ public sealed class CurlCompositionHttp2TraceTests
     public void CreateProtocolHandlers_HandsTheChoiceToTheHttpHandler(bool tracesHttp2)
     {
         Diagnostics.Arrange("tracesHttp2", tracesHttp2);
-        HttpProtocolHandler http = CurlComposition
+        HttpProtocolHandler http = EngineComposition
             .CreateProtocolHandlers(new ScriptedConnector([]), new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new PassThroughTlsProvider(), new LoopbackDnsResolver(), tracesHttp2: tracesHttp2)
             .OfType<EndPointReportingProtocolHandler>()
             .Select(handler => handler.Handler)
@@ -88,7 +87,7 @@ public sealed class CurlCompositionHttp2TraceTests
 
     private bool TracesHttp2(string[] arguments)
     {
-        bool traces = CurlComposition.TracesHttp2(Parse(arguments));
+        bool traces = EngineComposition.TracesHttp2(Parse(arguments));
         Diagnostics.Act("traces HTTP/2", traces);
         return traces;
     }

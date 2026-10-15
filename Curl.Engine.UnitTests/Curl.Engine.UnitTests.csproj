@@ -10,6 +10,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Curl.Engine.UnitLibrary\Curl.Engine.UnitLibrary.csproj" />
+    <ProjectReference Include="..\Curl.Protocol.Ssh.UnitTests\Curl.Protocol.Ssh.UnitTests.csproj" />
   </ItemGroup>
 
   <ItemGroup>

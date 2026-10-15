@@ -142,7 +142,7 @@ public sealed partial class CurlCompositionTests
     public async Task CreateTransports_ProxyCertAndProxyCiphers_LeaveTheOriginsHandshakeAlone()
     {
         Diagnostics.Arrange("arguments", $"-x {HttpsProxyUrl} --proxy-cert missing.pem --proxy-ciphers BOGUS {ProxiedUrl}");
-        CurlTransports transports = CurlComposition.CreateTransports(
+        CurlTransports transports = EngineComposition.CreateTransports(
             Parse("-x", HttpsProxyUrl, "--proxy-cert", "missing.pem", "--proxy-ciphers", "BOGUS", ProxiedUrl));
         UnusedConnection connection = new();
 
@@ -163,7 +163,7 @@ public sealed partial class CurlCompositionTests
     private static async Task<(ConnectResult Proxy, ConnectResult Origin)> ProxyAndOriginHandshakesAsync(string[] proxyArguments, string[] originArguments)
     {
         ConnectResult proxy = await ProxyHandshakeAsync(proxyArguments);
-        CurlTransports originTransports = CurlComposition.CreateTransports(Parse([.. originArguments, "https://127.0.0.1:47606/"]));
+        CurlTransports originTransports = EngineComposition.CreateTransports(Parse([.. originArguments, "https://127.0.0.1:47606/"]));
         ConnectResult origin = await originTransports.TlsProvider.AuthenticateAsClientAsync(new UnusedConnection(), "127.0.0.1", CancellationToken.None);
         return (proxy, origin);
     }
@@ -189,7 +189,7 @@ public sealed partial class CurlCompositionTests
 
     private static async Task<ConnectResult> ProxyHandshakeAsync(params string[] proxyTlsArguments)
     {
-        CurlTransports transports = CurlComposition.CreateTransports(Parse(["-x", HttpsProxyUrl, "--proxy-insecure", .. proxyTlsArguments, ProxiedUrl]));
+        CurlTransports transports = EngineComposition.CreateTransports(Parse(["-x", HttpsProxyUrl, "--proxy-insecure", .. proxyTlsArguments, ProxiedUrl]));
         return await transports.ProxyTlsProvider.AuthenticateAsClientAsync(new UnusedConnection(), "127.0.0.1", CancellationToken.None);
     }
 

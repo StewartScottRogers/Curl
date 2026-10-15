@@ -3,9 +3,8 @@ using Curl.Protocol.Abstractions;
 using Curl.Protocol.Http;
 
 using Curl.Testing;
-using Curl.Engine;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
 /// Pins which <c>--trace-config</c> components turn on curl 8.21.0's <c>[HTTP/3]</c> stream lines -
@@ -15,7 +14,7 @@ namespace Curl.Console;
 /// every info line.
 /// </summary>
 [TestClass]
-public sealed class CurlCompositionHttp3TraceTests
+public sealed class EngineCompositionHttp3TraceTests
 {
     public TestContext TestContext { get; set; } = null!;
 
@@ -52,7 +51,7 @@ public sealed class CurlCompositionHttp3TraceTests
     [TestMethod]
     public void CreateTransports_UnderTraceConfigHttp3_TracesHttp3()
     {
-        CurlTransports transports = CurlComposition.CreateTransports(Parse("-v", "--trace-config", "http/3"), TimeProvider.System);
+        CurlTransports transports = EngineComposition.CreateTransports(Parse("-v", "--trace-config", "http/3"), TimeProvider.System);
         Diagnostics.Act("transports trace HTTP/3", transports.TracesHttp3);
 
         Diagnostics.Assert("transports trace HTTP/3", true, transports.TracesHttp3);
@@ -62,7 +61,7 @@ public sealed class CurlCompositionHttp3TraceTests
     [TestMethod]
     public void CreateTransports_WithoutTheHttp3Component_DoesNotTraceHttp3()
     {
-        CurlTransports transports = CurlComposition.CreateTransports(Parse("-v"), TimeProvider.System);
+        CurlTransports transports = EngineComposition.CreateTransports(Parse("-v"), TimeProvider.System);
         Diagnostics.Act("transports trace HTTP/3", transports.TracesHttp3);
 
         Diagnostics.Assert("transports trace HTTP/3", false, transports.TracesHttp3);
@@ -75,7 +74,7 @@ public sealed class CurlCompositionHttp3TraceTests
     public void CreateProtocolHandlers_HandsTheChoiceToTheHttpHandler(bool tracesHttp3)
     {
         Diagnostics.Arrange("tracesHttp3", tracesHttp3);
-        HttpProtocolHandler http = CurlComposition
+        HttpProtocolHandler http = EngineComposition
             .CreateProtocolHandlers(new ScriptedConnector([]), new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new PassThroughTlsProvider(), new LoopbackDnsResolver(), tracesHttp3: tracesHttp3)
             .OfType<EndPointReportingProtocolHandler>()
             .Select(handler => handler.Handler)
@@ -89,7 +88,7 @@ public sealed class CurlCompositionHttp3TraceTests
 
     private bool TracesHttp3(string[] arguments)
     {
-        bool traces = CurlComposition.TracesHttp3(Parse(arguments));
+        bool traces = EngineComposition.TracesHttp3(Parse(arguments));
         Diagnostics.Act("traces HTTP/3", traces);
         return traces;
     }

@@ -1,10 +1,9 @@
-using Curl.Engine;
 using System.Text;
 using Curl.Cli;
 using Curl.Protocol.Abstractions;
 using Curl.Testing;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
 /// Pins which <c>--trace-config</c> components turn on curl 8.21.0's <c>[SMTP]</c> lines - <c>smtp</c>,
@@ -13,7 +12,7 @@ namespace Curl.Console;
 /// The lines themselves are pinned in <c>Curl.Protocol.Smtp.UnitTests</c>.
 /// </summary>
 [TestClass]
-public sealed class CurlCompositionSmtpTraceTests
+public sealed class EngineCompositionSmtpTraceTests
 {
     public TestContext TestContext { get; set; } = null!;
 
@@ -31,7 +30,7 @@ public sealed class CurlCompositionSmtpTraceTests
     public void TracesSmtp_WithTheSmtpComponent_IsTrue(params string[] arguments)
     {
         Diagnostics.Arrange("command line arguments", string.Join(" ", arguments));
-        bool tracesSmtp = CurlComposition.TracesSmtp(Parse(arguments));
+        bool tracesSmtp = EngineComposition.TracesSmtp(Parse(arguments));
         Diagnostics.Act("traces smtp", tracesSmtp);
 
         Diagnostics.Assert("traces smtp", true, tracesSmtp);
@@ -46,7 +45,7 @@ public sealed class CurlCompositionSmtpTraceTests
     public void TracesSmtp_WithoutTheSmtpComponent_IsFalse(params string[] arguments)
     {
         Diagnostics.Arrange("command line arguments", string.Join(" ", arguments));
-        bool tracesSmtp = CurlComposition.TracesSmtp(Parse(arguments));
+        bool tracesSmtp = EngineComposition.TracesSmtp(Parse(arguments));
         Diagnostics.Act("traces smtp", tracesSmtp);
 
         Diagnostics.Assert("traces smtp", false, tracesSmtp);
@@ -57,7 +56,7 @@ public sealed class CurlCompositionSmtpTraceTests
     public void CreateTransports_UnderTraceConfigSmtp_TracesSmtp()
     {
         Diagnostics.Arrange("command line arguments", "-v --trace-config smtp");
-        CurlTransports transports = CurlComposition.CreateTransports(Parse("-v", "--trace-config", "smtp"), TimeProvider.System);
+        CurlTransports transports = EngineComposition.CreateTransports(Parse("-v", "--trace-config", "smtp"), TimeProvider.System);
         Diagnostics.Act("transports trace smtp", transports.TracesSmtp);
 
         Diagnostics.Assert("transports trace smtp", true, transports.TracesSmtp);
@@ -68,7 +67,7 @@ public sealed class CurlCompositionSmtpTraceTests
     public void CreateTransports_WithoutTheSmtpComponent_DoesNotTraceSmtp()
     {
         Diagnostics.Arrange("command line arguments", "-v");
-        CurlTransports transports = CurlComposition.CreateTransports(Parse("-v"), TimeProvider.System);
+        CurlTransports transports = EngineComposition.CreateTransports(Parse("-v"), TimeProvider.System);
         Diagnostics.Act("transports trace smtp", transports.TracesSmtp);
 
         Diagnostics.Assert("transports trace smtp", false, transports.TracesSmtp);
@@ -83,7 +82,7 @@ public sealed class CurlCompositionSmtpTraceTests
         Diagnostics.Arrange("traces smtp requested", tracesSmtp);
         Diagnostics.Arrange("scripted server replies", ControlReplies);
         ScriptedConnector server = new([Encoding.Latin1.GetBytes(ControlReplies)]);
-        IProtocolHandler smtp = CurlComposition
+        IProtocolHandler smtp = EngineComposition
             .CreateProtocolHandlers(server, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new PassThroughTlsProvider(), new LoopbackDnsResolver(), tracesSmtp: tracesSmtp)
             .Single(handler => handler.SupportedSchemes.Contains("smtp"));
         InfoRecordingEvents events = new();

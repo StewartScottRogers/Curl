@@ -1,3 +1,4 @@
+using Curl.Engine;
 using System.Text;
 
 using Curl.Authentication;
@@ -75,7 +76,7 @@ public sealed partial class CurlCompositionProxyTests
     {
         Diagnostics.ArrangeCommandLine(arguments);
         HttpProxyTunnelOptions options =
-            CurlComposition.CreateProxyTunnelOptions(
+            EngineComposition.CreateProxyTunnelOptions(
                 CommandLineParser.Parse(arguments, _ => true, ConsolePasswordPrompt.ForProcessConsole, DiskDataFileReader.ForProcess, isWindows: false).Options!,
                 new SystemSecurityContextFactory());
         Diagnostics.Act("proxy auth schemes, HTTP/2 tunnel", $"{options.ProxyAuthSchemes}, {options.ProxyHttp2}");

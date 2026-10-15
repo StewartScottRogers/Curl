@@ -1,10 +1,9 @@
-using Curl.Engine;
 using System.Text;
 using Curl.Cli;
 using Curl.Protocol.Abstractions;
 using Curl.Testing;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
 /// Pins which <c>--trace-config</c> components turn on curl 8.21.0's <c>[WS]</c> lines - <c>ws</c>,
@@ -13,7 +12,7 @@ namespace Curl.Console;
 /// <c>Curl.Protocol.Ws.UnitTests</c>.
 /// </summary>
 [TestClass]
-public sealed class CurlCompositionWsTraceTests
+public sealed class EngineCompositionWsTraceTests
 {
     private const string Head101AndText =
         "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: x\r\n\r\n\x81\x02hi";
@@ -32,11 +31,11 @@ public sealed class CurlCompositionWsTraceTests
     {
         Diagnostics.Arrange("command line arguments", string.Join(" ", arguments));
 
-        bool tracesWs = CurlComposition.TracesWs(Parse(arguments));
+        bool tracesWs = EngineComposition.TracesWs(Parse(arguments));
         Diagnostics.Act("traces ws", tracesWs);
 
         Diagnostics.Assert("traces ws", true, tracesWs);
-        Assert.IsTrue(CurlComposition.TracesWs(Parse(arguments)));
+        Assert.IsTrue(EngineComposition.TracesWs(Parse(arguments)));
     }
 
     [TestMethod]
@@ -48,18 +47,18 @@ public sealed class CurlCompositionWsTraceTests
     {
         Diagnostics.Arrange("command line arguments", string.Join(" ", arguments));
 
-        bool tracesWs = CurlComposition.TracesWs(Parse(arguments));
+        bool tracesWs = EngineComposition.TracesWs(Parse(arguments));
         Diagnostics.Act("traces ws", tracesWs);
 
         Diagnostics.Assert("traces ws", false, tracesWs);
-        Assert.IsFalse(CurlComposition.TracesWs(Parse(arguments)));
+        Assert.IsFalse(EngineComposition.TracesWs(Parse(arguments)));
     }
 
     [TestMethod]
     public void CreateTransports_UnderTraceConfigWs_TracesWs()
     {
         Diagnostics.Arrange("command line arguments", "-v --trace-config ws");
-        CurlTransports transports = CurlComposition.CreateTransports(Parse("-v", "--trace-config", "ws"), TimeProvider.System);
+        CurlTransports transports = EngineComposition.CreateTransports(Parse("-v", "--trace-config", "ws"), TimeProvider.System);
         Diagnostics.Act("traces ws", transports.TracesWs);
 
         Diagnostics.Assert("traces ws", true, transports.TracesWs);
@@ -70,7 +69,7 @@ public sealed class CurlCompositionWsTraceTests
     public void CreateTransports_WithoutTheWsComponent_DoesNotTraceWs()
     {
         Diagnostics.Arrange("command line arguments", "-v");
-        CurlTransports transports = CurlComposition.CreateTransports(Parse("-v"), TimeProvider.System);
+        CurlTransports transports = EngineComposition.CreateTransports(Parse("-v"), TimeProvider.System);
         Diagnostics.Act("traces ws", transports.TracesWs);
 
         Diagnostics.Assert("traces ws", false, transports.TracesWs);
@@ -85,7 +84,7 @@ public sealed class CurlCompositionWsTraceTests
         ScriptedConnector server = new([Encoding.Latin1.GetBytes(Head101AndText)]);
         Diagnostics.Arrange("traces ws", tracesWs);
         Diagnostics.Bytes("scripted response", Encoding.Latin1.GetBytes(Head101AndText));
-        IProtocolHandler ws = CurlComposition
+        IProtocolHandler ws = EngineComposition
             .CreateProtocolHandlers(server, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new PassThroughTlsProvider(), new LoopbackDnsResolver(), tracesWs: tracesWs)
             .Single(handler => handler.SupportedSchemes.Contains("ws"));
         InfoRecordingEvents events = new();

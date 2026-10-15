@@ -9,10 +9,15 @@ executable rather than a library.
 It is also the only project that references every library: composing the services
 is its job. `CurlComposition` is the composition root, written as plain constructor
 calls - no container, no reflection, no assembly scanning, so native AOT sees every
-type. `Curl.Core.UnitLibrary` dispatches through the `IProtocolHandler` instances it is
+type. It keeps `CreateRunner` and the runner wiring; the factories that build the protocol
+handlers, transports, DNS resolvers, TLS providers, security-context factories and
+authenticators are `Curl.Engine.UnitLibrary`'s `EngineComposition`, which it calls (BL-2289),
+handing it `CurlEasyErrorText.Of` for the DoH resolver's error text. Where this file names an
+`EngineComposition` member, that member is engine code described here for the runner's sake;
+`Curl.Engine.UnitLibrary/CLAUDE.md` owns it. `Curl.Core.UnitLibrary` dispatches through the `IProtocolHandler` instances it is
 given and must never reference a protocol library directly.
 
-`CurlComposition.CreateTransports` wraps an option group's `TcpConnector` in one `PoolingConnector`,
+`EngineComposition.CreateTransports` wraps an option group's `TcpConnector` in one `PoolingConnector`,
 which every TCP handler connects through, so a later URL to the same pool key reuses an
 earlier URL's connection; `TransferDispatch` holds it as its `ConnectionPool`. In production the
 connector shares the run's `ConnectionCache`, which the runner closes without writing anything once
@@ -21,12 +26,12 @@ without one owns its pool, which disposing the dispatch closes. It also holds th
 `LoadResolveEntries`, which the runner calls at the start of every URL's transfer, just before
 the `-b` files load, so `-v` prints the `--resolve` entries' `Added ... to DNS cache` lines for
 each URL; a `--retry` attempt and a followed redirect reload nothing, as in curl 8.21.0 (BL-486).
-The origin's and the HTTPS proxy's TLS providers come from `CurlComposition.CreateTlsProvider`,
+The origin's and the HTTPS proxy's TLS providers come from `EngineComposition.CreateTlsProvider`,
 which builds `HandBuiltTlsProvider` when `TlsClientRouting.Choose` routes the options to the
 hand-built client (a `--tls-max` of 1.0 or 1.1 today) and `SslStreamTlsProvider` otherwise
 (ADR-0140, ADR-0162, BL-708).
 
-`CurlComposition.CreateProtocolHandlers` builds the handlers behind the engine's end-point recorders and `LazyProtocolHandler` (see `Curl.Engine.UnitLibrary/CLAUDE.md`, ADR-0119, BL-515, BL-1715, AF-0063).
+`EngineComposition.CreateProtocolHandlers` builds the handlers behind the engine's end-point recorders and `LazyProtocolHandler` (see `Curl.Engine.UnitLibrary/CLAUDE.md`, ADR-0119, BL-515, BL-1715, AF-0063).
 
 `Program.Main` only opens the standard streams, builds the composition and hands the
 arguments to `CurlCommandRunner`, which parses them, runs each URL and prints curl's
@@ -144,7 +149,7 @@ the `-G` / `--url-query` query with `QueryUrl` before the URL is parsed. `http` 
 platform's credential encoding, and Negotiate), which answers the scheme `-u`, `--basic`, `--digest`,
 `--negotiate`, `--anyauth` and `--oauth2-bearer` allow (`HttpRequestOptions.AuthSchemes` and `BearerToken`),
 wrapped for the HTTP handler alone in `Curl.Engine`'s `AwsSigV4HttpAuthenticator` (`--aws-sigv4`) and that in its `HttpSignatureHttpAuthenticator` (the `--httpsig-*` options); `Curl.Engine`'s `HttpSignatureSetup` runs their setup checks at each URL. Both are described in `Curl.Engine.UnitLibrary/CLAUDE.md`.
-Negotiate's contexts come from `CurlComposition.CreateSecurityContextFactory`, ADR-0142's router:
+Negotiate's contexts come from `EngineComposition.CreateSecurityContextFactory`, ADR-0142's router:
 SSPI on Windows, elsewhere the system GSS-API with the hand-built SPNEGO and Kerberos behind it,
 reaching KDCs through `Curl.Networking`'s `KerberosKdcSocketTransport` over the run's connectors
 and finding them through `KerberosDnsSrvLookup`. `Curl.Engine`'s `HandBuiltKerberosSources` reads `krb5.conf`
@@ -200,7 +205,7 @@ The `-:`/`--next` option groups (`CommandLineParseResult.Groups`) run in order, 
 including the first with an output option left over (ADR-0126, BL-509). Each group's URLs use
 that group's options through a `TransferDispatch` the factory builds for the group and the runner
 disposes when the group ends. Every group's `PoolingConnector` shares the run's one
-`ConnectionCache` (`CurlComposition.CreatePoolingConnector`), keyed on the group's
+`ConnectionCache` (`EngineComposition.CreatePoolingConnector`), keyed on the group's
 `OptionGroupConnectionSettings`, so a later group reuses an earlier group's connection when their
 TLS, proxy TLS and other connection settings are equal, and the runner closes the cache when the
 run ends (ADR-0285, BL-754).
@@ -262,11 +267,11 @@ through the same `RankedHttpAuthenticator` the origin uses (`CreateProxyTunnelOp
 and a forward proxy's `407` is answered with the same pick, which `CreateProtocolHandlers` hands
 the HTTP handler (ADR-0239). Under
 `--unix-socket` or `--abstract-unix-socket` no proxy is chosen or even parsed, and the group's
-`TcpConnector` dials that socket (`CurlComposition.UnixSocketOf`), as curl 8.21.0 does (ADR-0149, BL-507).
+`TcpConnector` dials that socket (`EngineComposition.UnixSocketOf`), as curl 8.21.0 does (ADR-0149, BL-507).
 With `--preproxy` (ADR-0273, BL-614) the environment is not read: `--noproxy` drops both proxies, an
 HTTP pre-proxy or a SOCKS `-x` beside one is exit 5, a lone pre-proxy is the transfer's SOCKS proxy,
 and an HTTP `-x` is reached through the pre-proxy the group's `TcpConnector` gets from
-`CurlComposition.PreProxyOf`. The `--socks5-*` options reach the same connector through
+`EngineComposition.PreProxyOf`. The `--socks5-*` options reach the same connector through
 `Curl.Engine`'s `Socks5AuthenticationMapping`, with the tunnel's `LateBoundSecurityContextFactory` for GSS-API
 (ADR-0276, BL-615). Proxy text curl
 cannot use ends the transfer with the selector's exit 5 or 7, and a SOCKS proxy, or an HTTPS
@@ -280,9 +285,9 @@ the HTTP handler when its proxy is `Http` or `Http10` and `-p` is not given, so 
 to the proxy as `GET ftp://host/path` with `Host: host:21` (ADR-0056, rule 3; BL-344); any
 other transfer, `ftps` through an HTTP proxy included (curl 8.21.0 tunnels it with
 `CONNECT host:990`, BL-458), goes to `FtpProtocolHandler` over the pooling connector
-(ADR-0323, BL-434), its passive data connections over `CurlComposition.FtpDataConnectorOf`'s
+(ADR-0323, BL-434), its passive data connections over `EngineComposition.FtpDataConnectorOf`'s
 `PoolingConnector.Over(TcpConnector.ForFtpDataConnections())`, which `--connect-timeout` does not
-limit (ADR-0286, BL-797) and `--connect-to` maps to its host only, keeping the reply's port (BL-1976, BL-2042). `CurlComposition.CreateFtpProtocolHandler` builds it with a
+limit (ADR-0286, BL-797) and `--connect-to` maps to its host only, keeping the reply's port (BL-1976, BL-2042). `EngineComposition.CreateFtpProtocolHandler` builds it with a
 `TcpConnectionListener` for `-P`, the run's TLS provider and DNS resolver, and a
 `SystemNetworkInterfaceLookup` (ADR-0102, ADR-0108, ADR-0110), and `TransferContextFactory`
 copies `-P`, `--disable-eprt`, `--ssl`/`--ssl-reqd` and `--ftp-ssl-control` into the context.

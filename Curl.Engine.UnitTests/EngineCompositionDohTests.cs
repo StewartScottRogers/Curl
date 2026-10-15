@@ -1,4 +1,3 @@
-using Curl.Engine;
 using System.Net.Sockets;
 using System.Text;
 
@@ -7,7 +6,7 @@ using Curl.Networking;
 using Curl.Protocol.Abstractions;
 using Curl.Testing;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
 /// Pins how the composition resolves through <c>--doh-url</c> (BL-642, ADR-0152), each case as curl
@@ -18,7 +17,7 @@ namespace Curl.Console;
 /// server are both <see cref="ScriptedConnector" />s, so no socket is opened.
 /// </summary>
 [TestClass]
-public sealed class CurlCompositionDohTests
+public sealed class EngineCompositionDohTests
 {
     public TestContext TestContext { get; set; } = null!;
 
@@ -66,7 +65,7 @@ public sealed class CurlCompositionDohTests
     [TestMethod]
     public void CreateTransports_WithDohUrl_SharesTheDohResolverBetweenBothConnectors()
     {
-        CurlTransports transports = CurlComposition.CreateTransports(Parse("--doh-url", DohUrl));
+        CurlTransports transports = EngineComposition.CreateTransports(Parse("--doh-url", DohUrl));
         Diagnostics.Act("resolver type", transports.DnsResolver.GetType().Name);
 
         Diagnostics.Assert("resolver type", nameof(DohDnsResolver), transports.DnsResolver.GetType().Name);
@@ -245,7 +244,7 @@ public sealed class CurlCompositionDohTests
     public void CreateDohResolver_WithAUrlThatDoesNotParse_ResolvesNothing()
     {
         Diagnostics.Arrange("DoH URL", "http://[bad/");
-        IDnsResolver resolver = CurlComposition.CreateDohResolver("http://[bad/", new ScriptedConnector([]), AddressFamily.Unspecified);
+        IDnsResolver resolver = EngineComposition.CreateDohResolver("http://[bad/", new ScriptedConnector([]), AddressFamily.Unspecified);
         Diagnostics.Act("resolver type", resolver.GetType().Name);
 
         Diagnostics.Assert("resolver type", nameof(UnusableDohUrlResolver), resolver.GetType().Name);
@@ -273,11 +272,11 @@ public sealed class CurlCompositionDohTests
     public void DohUrlOf_MakesTheUrlCurlAsks(string value, string expected)
     {
         Diagnostics.Arrange("value", value);
-        Uri? url = CurlComposition.DohUrlOf(value);
+        Uri? url = EngineComposition.DohUrlOf(value);
         Diagnostics.Act("DoH URL", url);
 
         Diagnostics.Assert("DoH URL", new Uri(expected), url);
-        Assert.AreEqual(new Uri(expected), CurlComposition.DohUrlOf(value));
+        Assert.AreEqual(new Uri(expected), EngineComposition.DohUrlOf(value));
     }
 
     [TestMethod]
@@ -287,11 +286,11 @@ public sealed class CurlCompositionDohTests
     public void DohUrlOf_ANonHttpOrUnparsableValue_IsNone(string value)
     {
         Diagnostics.Arrange("value", value);
-        Uri? url = CurlComposition.DohUrlOf(value);
+        Uri? url = EngineComposition.DohUrlOf(value);
         Diagnostics.Act("DoH URL", url?.ToString() ?? "(none)");
 
         Diagnostics.Assert("DoH URL is none", true, url is null);
-        Assert.IsNull(CurlComposition.DohUrlOf(value));
+        Assert.IsNull(EngineComposition.DohUrlOf(value));
     }
 
     [TestMethod]
@@ -343,7 +342,7 @@ public sealed class CurlCompositionDohTests
     [TestMethod]
     public void CreateDohConnector_OffersOnlyHttp11AndTakesNoResolveEntries()
     {
-        TcpConnector connector = CurlComposition.CreateDohConnector(
+        TcpConnector connector = EngineComposition.CreateDohConnector(
             Parse("--http2", "--resolve", "x:1:192.0.2.1", "--doh-url", DohUrl), new TcpDialer(), TimeProvider.System);
         Diagnostics.Act("ALPN offer", string.Join(", ", connector.HttpOverTlsApplicationProtocols.ToArray()));
         Diagnostics.Act("Unix socket", connector.UnixSocket?.ToString() ?? "(none)");
@@ -365,7 +364,7 @@ public sealed class CurlCompositionDohTests
 
     private IDnsResolver CreateDnsResolver(params string[] arguments)
     {
-        IDnsResolver resolver = CurlComposition.CreateDnsResolver(Parse(arguments), TimeProvider.System, new TcpDialer());
+        IDnsResolver resolver = EngineComposition.CreateDnsResolver(Parse(arguments), TimeProvider.System, new TcpDialer());
         Diagnostics.Act("resolver type", resolver.GetType().Name);
         return resolver;
     }
@@ -384,10 +383,10 @@ public sealed class CurlCompositionDohTests
         params string[] arguments)
     {
         CommandLineOptions options = Parse([.. arguments, "--doh-url", dohUrl]);
-        FlowScopedTransferEvents? resolverEvents = CurlComposition.TracesDns(options) ? new() : null;
-        TcpConnector connector = CurlComposition.CreateTcpConnector(
+        FlowScopedTransferEvents? resolverEvents = EngineComposition.TracesDns(options) ? new() : null;
+        TcpConnector connector = EngineComposition.CreateTcpConnector(
             options,
-            CurlComposition.CreateDohResolver(dohUrl, dohServer, CurlComposition.AddressFamilyOf(options), resolverEvents),
+            EngineComposition.CreateDohResolver(dohUrl, dohServer, EngineComposition.AddressFamilyOf(options), resolverEvents),
             new ScriptedTcpDialer(webServer),
             new PassThroughTlsProvider(),
             TimeProvider.System,

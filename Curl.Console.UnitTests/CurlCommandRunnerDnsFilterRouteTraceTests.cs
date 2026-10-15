@@ -1,3 +1,4 @@
+using Curl.Engine;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -16,7 +17,7 @@ namespace Curl.Console;
 /// (mingw, Schannel) measured on 2026-10-02 (BL-1157 and BL-1181 Notes), leaving out the repeated
 /// <c>done=0</c> lines that follow curl's poll timing and the system resolver's own lines
 /// (ADR-0366). Elapsed milliseconds are written as <c>N</c>. The transfer runs through the
-/// production handler set over the connector <see cref="CurlComposition.CreateTcpConnector" />
+/// production handler set over the connector <see cref="EngineComposition.CreateTcpConnector" />
 /// builds from the command line, whose resolver answers <c>127.0.0.1</c> and whose dials are refused.
 /// </summary>
 [TestClass]
@@ -278,7 +279,7 @@ public sealed class CurlCommandRunnerDnsFilterRouteTraceTests
         Diagnostics.Arrange("command line", string.Join(" ", arguments));
         CommandLineParseResult parsed = CommandLineParser.Parse(arguments, _ => true);
         Assert.IsTrue(parsed.IsAccepted);
-        TcpConnector connector = CurlComposition.CreateTcpConnector(
+        TcpConnector connector = EngineComposition.CreateTcpConnector(
             parsed.Options,
             new LoopbackDnsResolver(),
             new RefusingTcpDialer(),
@@ -292,7 +293,7 @@ public sealed class CurlCommandRunnerDnsFilterRouteTraceTests
         {
             exitCode = await new CurlCommandRunner(
                     _ => new TransferDispatch(
-                        new ProtocolDispatcher(CurlComposition.CreateProtocolHandlers(connector, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new PassThroughTlsProvider(), new LoopbackDnsResolver())),
+                        new ProtocolDispatcher(EngineComposition.CreateProtocolHandlers(connector, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new PassThroughTlsProvider(), new LoopbackDnsResolver())),
                         [],
                         loadResolveEntries: connector.LoadResolveEntries),
                     files,

@@ -1,3 +1,4 @@
+using Curl.Engine;
 using System.Text;
 using Curl.Cli;
 using Curl.Core;
@@ -111,7 +112,7 @@ public sealed class CurlCommandRunnerHttpsConnectTraceTests
         string actual;
         using (Diagnostics.Phase("run"))
         {
-            actual = CurlComposition.HttpsConnectFirstAttemptVersionOf(version);
+            actual = EngineComposition.HttpsConnectFirstAttemptVersionOf(version);
         }
 
         Diagnostics.Act("first attempt version", actual);
@@ -134,7 +135,7 @@ public sealed class CurlCommandRunnerHttpsConnectTraceTests
         TcpConnector connector;
         using (Diagnostics.Phase("run"))
         {
-            connector = CurlComposition.CreateTcpConnector(
+            connector = EngineComposition.CreateTcpConnector(
                 parsed.Options!,
                 new LoopbackDnsResolver(),
                 new ScriptedTcpDialer(new ScriptedConnector([Response])),
@@ -350,7 +351,7 @@ public sealed class CurlCommandRunnerHttpsConnectTraceTests
         Diagnostics.Arrange("scripted reads", string.Join(" | ", reads.Select(read => Encoding.Latin1.GetString(read).Replace("\r\n", "\\r\\n", StringComparison.Ordinal))));
         CommandLineParseResult parsed = CommandLineParser.Parse(["-s", .. arguments], _ => true);
         Assert.IsTrue(parsed.IsAccepted);
-        TcpConnector connector = CurlComposition.CreateTcpConnector(
+        TcpConnector connector = EngineComposition.CreateTcpConnector(
             parsed.Options,
             new LoopbackDnsResolver(),
             new ScriptedTcpDialer(new ScriptedConnector(reads)),
@@ -364,7 +365,7 @@ public sealed class CurlCommandRunnerHttpsConnectTraceTests
         {
             exitCode = await new CurlCommandRunner(
                     _ => new TransferDispatch(
-                        new ProtocolDispatcher(CurlComposition.CreateProtocolHandlers(connector, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new PassThroughTlsProvider(), new LoopbackDnsResolver())),
+                        new ProtocolDispatcher(EngineComposition.CreateProtocolHandlers(connector, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new PassThroughTlsProvider(), new LoopbackDnsResolver())),
                         [],
                         loadResolveEntries: connector.LoadResolveEntries),
                     files,

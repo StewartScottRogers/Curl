@@ -2,18 +2,17 @@ using Curl.Cli;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Http;
 using Curl.Testing;
-using Curl.Engine;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
-/// Pins that the composition hands <c>--trace-config read</c> (<see cref="CurlComposition.TracesRead" />:
+/// Pins that the composition hands <c>--trace-config read</c> (<see cref="EngineComposition.TracesRead" />:
 /// <c>read</c> or <c>all</c>, so <c>-vvv</c> too) to the HTTP handler, which then writes an HTTP/1.x
 /// request body's upload reader lines (BL-1189). The lines themselves are pinned in
 /// <c>Curl.Protocol.Http.UnitTests</c>.
 /// </summary>
 [TestClass]
-public sealed class CurlCompositionReadTraceTests
+public sealed class EngineCompositionReadTraceTests
 {
     public TestContext TestContext { get; set; } = null!;
 
@@ -26,7 +25,7 @@ public sealed class CurlCompositionReadTraceTests
     public void CreateTransports_UnderTraceConfigRead_TracesRead(params string[] arguments)
     {
         Diagnostics.Arrange("command line arguments", string.Join(" ", arguments));
-        CurlTransports transports = CurlComposition.CreateTransports(Parse(arguments), TimeProvider.System);
+        CurlTransports transports = EngineComposition.CreateTransports(Parse(arguments), TimeProvider.System);
         bool tracesRead = transports.TracesRead;
         Diagnostics.Act("traces read", tracesRead);
 
@@ -41,7 +40,7 @@ public sealed class CurlCompositionReadTraceTests
     public void CreateTransports_WithoutTheReadComponent_DoesNotTraceRead(params string[] arguments)
     {
         Diagnostics.Arrange("command line arguments", string.Join(" ", arguments));
-        CurlTransports transports = CurlComposition.CreateTransports(Parse(arguments), TimeProvider.System);
+        CurlTransports transports = EngineComposition.CreateTransports(Parse(arguments), TimeProvider.System);
         bool tracesRead = transports.TracesRead;
         Diagnostics.Act("traces read", tracesRead);
 
@@ -55,7 +54,7 @@ public sealed class CurlCompositionReadTraceTests
     public void CreateProtocolHandlers_HandsTheChoiceToTheHttpHandler(bool tracesRead)
     {
         Diagnostics.Arrange("traces read requested", tracesRead);
-        HttpProtocolHandler http = CurlComposition
+        HttpProtocolHandler http = EngineComposition
             .CreateProtocolHandlers(new ScriptedConnector([]), new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new PassThroughTlsProvider(), new LoopbackDnsResolver(), tracesRead: tracesRead)
             .OfType<EndPointReportingProtocolHandler>()
             .Select(handler => handler.Handler)

@@ -1,3 +1,4 @@
+using Curl.Engine;
 using System.Net;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -236,8 +237,8 @@ public sealed class CurlCommandRunnerWsTransferEventTests
     {
         return new CurlCommandRunner(
                 parsed => new TransferDispatch(
-                    new ProtocolDispatcher(CurlComposition.CreateProtocolHandlers(
-                        connector, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new PassThroughTlsProvider(), new LoopbackDnsResolver(), tracesWs: CurlComposition.TracesWs(parsed)))),
+                    new ProtocolDispatcher(EngineComposition.CreateProtocolHandlers(
+                        connector, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new PassThroughTlsProvider(), new LoopbackDnsResolver(), tracesWs: EngineComposition.TracesWs(parsed)))),
                 files,
                 files,
                 standardOutput,

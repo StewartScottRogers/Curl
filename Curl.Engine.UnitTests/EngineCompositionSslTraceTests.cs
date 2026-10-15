@@ -2,7 +2,7 @@ using Curl.Cli;
 using Curl.Networking;
 using Curl.Testing;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
 /// Pins which trace components turn on curl 8.21.0's <c>[SSL]</c> and <c>[SSL-PROXY]</c> lines,
@@ -12,7 +12,7 @@ namespace Curl.Console;
 /// on <c>[SSL-PROXY]</c>.
 /// </summary>
 [TestClass]
-public sealed class CurlCompositionSslTraceTests
+public sealed class EngineCompositionSslTraceTests
 {
     public TestContext TestContext { get; set; } = null!;
 
@@ -27,7 +27,7 @@ public sealed class CurlCompositionSslTraceTests
     {
         Diagnostics.Arrange("arguments", string.Join(" ", arguments));
 
-        bool parsedResult = CurlComposition.TracesSsl(Parse(arguments));
+        bool parsedResult = EngineComposition.TracesSsl(Parse(arguments));
         bool connectorResult = Connector(arguments).TracesSslFilter;
 
         Diagnostics.Act("TracesSsl result", parsedResult);
@@ -46,7 +46,7 @@ public sealed class CurlCompositionSslTraceTests
     {
         Diagnostics.Arrange("arguments", string.Join(" ", arguments));
 
-        bool parsedResult = CurlComposition.TracesSsl(Parse(arguments));
+        bool parsedResult = EngineComposition.TracesSsl(Parse(arguments));
         bool connectorResult = Connector(arguments).TracesSslFilter;
 
         Diagnostics.Act("TracesSsl result", parsedResult);
@@ -64,7 +64,7 @@ public sealed class CurlCompositionSslTraceTests
     {
         Diagnostics.Arrange("arguments", string.Join(" ", arguments));
 
-        bool parsedResult = CurlComposition.TracesSslProxy(Parse(arguments));
+        bool parsedResult = EngineComposition.TracesSslProxy(Parse(arguments));
         bool connectorResult = Connector(arguments).TracesSslProxyFilter;
 
         Diagnostics.Act("TracesSslProxy result", parsedResult);
@@ -84,7 +84,7 @@ public sealed class CurlCompositionSslTraceTests
     {
         Diagnostics.Arrange("arguments", string.Join(" ", arguments));
 
-        bool parsedResult = CurlComposition.TracesSslProxy(Parse(arguments));
+        bool parsedResult = EngineComposition.TracesSslProxy(Parse(arguments));
         bool connectorResult = Connector(arguments).TracesSslProxyFilter;
 
         Diagnostics.Act("TracesSslProxy result", parsedResult);
@@ -96,7 +96,7 @@ public sealed class CurlCompositionSslTraceTests
     }
 
     private static TcpConnector Connector(string[] arguments) =>
-        CurlComposition.CreateTcpConnector(
+        EngineComposition.CreateTcpConnector(
             Parse(arguments),
             new SystemDnsResolver(),
             new ScriptedTcpDialer(new ScriptedConnector([])),

@@ -1,8 +1,7 @@
-using Curl.Engine;
 using System.Globalization;
 using System.Text;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
 /// Gives this process's real user id, the <c>&lt;uid&gt;</c> of MIT's default credential cache

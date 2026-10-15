@@ -1,15 +1,14 @@
 using Curl.Protocol.Abstractions;
 using Curl.Testing;
-using Curl.Engine;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
-/// Pins <see cref="CurlComposition.CreateDialingSecurityContextFactory" />: the hand-built NTLM
+/// Pins <see cref="EngineComposition.CreateDialingSecurityContextFactory" />: the hand-built NTLM
 /// wrapper is put around the router only when asked for (BL-1858, BL-1946).
 /// </summary>
 [TestClass]
-public sealed class CurlCompositionDialingSecurityContextFactoryTests
+public sealed class EngineCompositionDialingSecurityContextFactoryTests
 {
     public TestContext TestContext { get; set; } = null!;
 
@@ -22,7 +21,7 @@ public sealed class CurlCompositionDialingSecurityContextFactoryTests
     {
         Diagnostics.Arrange("usesHandBuiltNtlm", usesHandBuiltNtlm);
 
-        ISecurityContextFactory factory = CurlComposition.CreateDialingSecurityContextFactory(
+        ISecurityContextFactory factory = EngineComposition.CreateDialingSecurityContextFactory(
             new ScriptedConnector([]),
             new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"),
             null,

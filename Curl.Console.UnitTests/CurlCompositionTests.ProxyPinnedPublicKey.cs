@@ -127,7 +127,7 @@ public sealed partial class CurlCompositionTests
     public void CreateTransports_ProxyPinnedpubkeyAndProxyCrlfile_ReachTheProxysOptionsOnly()
     {
         Diagnostics.Arrange("arguments", $"-x {HttpsProxyUrl} --proxy-pinnedpubkey {WrongProxyPin} --proxy-crlfile proxy.crl {ProxiedUrl}");
-        CurlTransports transports = CurlComposition.CreateTransports(
+        CurlTransports transports = EngineComposition.CreateTransports(
             Parse("-x", HttpsProxyUrl, "--proxy-pinnedpubkey", WrongProxyPin, "--proxy-crlfile", "proxy.crl", ProxiedUrl));
 
         Diagnostics.Act("proxy pinned public key", transports.ProxyTlsClientOptions.PinnedPublicKey);
@@ -144,8 +144,8 @@ public sealed partial class CurlCompositionTests
     {
         // curl ... --proxy-ca-native (without --proxy-insecure) against a self-signed proxy is exit 60, as
         // without it; --proxy-ssl-allow-beast is exit 0 (curl 8.21.0, 2026-09-30).
-        CurlTransports without = CurlComposition.CreateTransports(Parse("-x", HttpsProxyUrl, ProxiedUrl));
-        CurlTransports with = CurlComposition.CreateTransports(
+        CurlTransports without = EngineComposition.CreateTransports(Parse("-x", HttpsProxyUrl, ProxiedUrl));
+        CurlTransports with = EngineComposition.CreateTransports(
             Parse("-x", HttpsProxyUrl, "--proxy-ca-native", "--proxy-ssl-allow-beast", ProxiedUrl));
 
         Diagnostics.Arrange("arguments", $"-x {HttpsProxyUrl} --proxy-ca-native --proxy-ssl-allow-beast {ProxiedUrl}");
@@ -169,7 +169,7 @@ public sealed partial class CurlCompositionTests
         listener.Start();
         Task serverTask = ServeOneHandshakeAsync(listener, certificate);
 
-        CurlTransports transports = CurlComposition.CreateTransports(
+        CurlTransports transports = EngineComposition.CreateTransports(
             Parse(["-x", HttpsProxyUrl, "--proxy-insecure", .. proxyTlsArguments(key.ExportSubjectPublicKeyInfo()), ProxiedUrl]));
         TcpClient client = new();
         await client.ConnectAsync((IPEndPoint)listener.LocalEndpoint);

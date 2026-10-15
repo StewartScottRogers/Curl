@@ -5,6 +5,7 @@
     <InternalsVisibleTo Include="Curl.Console.UnitTests" />
     <InternalsVisibleTo Include="Curl.Console.IntegrationTests" />
     <InternalsVisibleTo Include="Curl.Conformance.UnitTests" />
+    <InternalsVisibleTo Include="Curl.Engine.IntegrationTests" />
     <InternalsVisibleTo Include="Curl.Engine.UnitTests" />
   </ItemGroup>
 

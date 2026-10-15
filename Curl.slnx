@@ -73,6 +73,7 @@
   <Project Path="Curl.Core.UnitTests/Curl.Core.UnitTests.csproj" />
   <Project Path="Curl.Cryptography.UnitLibrary/Curl.Cryptography.UnitLibrary.csproj" />
   <Project Path="Curl.Cryptography.UnitTests/Curl.Cryptography.UnitTests.csproj" />
+  <Project Path="Curl.Engine.IntegrationTests/Curl.Engine.IntegrationTests.csproj" />
   <Project Path="Curl.Engine.UnitLibrary/Curl.Engine.UnitLibrary.csproj" />
   <Project Path="Curl.Engine.UnitTests/Curl.Engine.UnitTests.csproj" />
   <Project Path="Curl.Http2.UnitLibrary/Curl.Http2.UnitLibrary.csproj" />

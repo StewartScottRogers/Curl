@@ -1,3 +1,4 @@
+using Curl.Engine;
 using System.Net;
 using System.Text;
 using Curl.Core;
@@ -278,8 +279,8 @@ public sealed class CurlCommandRunnerSmtpTransferEventTests
         {
             exitCode = await new CurlCommandRunner(
                     options => new TransferDispatch(
-                        new ProtocolDispatcher(CurlComposition.CreateProtocolHandlers(
-                            connector, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new TrustReportingTlsProvider(), new LoopbackDnsResolver(), tracesSmtp: CurlComposition.TracesSmtp(options)))),
+                        new ProtocolDispatcher(EngineComposition.CreateProtocolHandlers(
+                            connector, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new TrustReportingTlsProvider(), new LoopbackDnsResolver(), tracesSmtp: EngineComposition.TracesSmtp(options)))),
                     files,
                     files,
                     standardOutput,

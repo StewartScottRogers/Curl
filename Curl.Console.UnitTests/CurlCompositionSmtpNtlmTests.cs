@@ -1,3 +1,4 @@
+using Curl.Engine;
 using System.Text;
 
 using Curl.Protocol.Abstractions;
@@ -11,7 +12,7 @@ namespace Curl.Console;
 /// 2026-09-29 against <c>Record-CurlExchange.ps1 -Smtp</c> (BL-538 Notes): <c>AUTH NTLM</c>, a bare
 /// <c>334 </c>, the Type 1 message, <c>334</c> with the recorder's fixed Type 2, the Type 3 message,
 /// <c>235</c>, then the mail transaction. The scripted token source proves
-/// <see cref="CurlComposition.CreateProtocolHandlers" /> hands the run's security context factory to
+/// <see cref="EngineComposition.CreateProtocolHandlers" /> hands the run's security context factory to
 /// the SASL authenticator (BL-852); the production router is run too, each platform pinned to its own
 /// NTLM.
 /// </summary>

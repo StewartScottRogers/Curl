@@ -1,11 +1,11 @@
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
-/// Pins <see cref="CurlComposition.UsesAltSvcOverHttp" />, the use of Alt-Svc over plain <c>http</c>
+/// Pins <see cref="EngineComposition.UsesAltSvcOverHttp" />, the use of Alt-Svc over plain <c>http</c>
 /// <c>CURL_ALTSVC_HTTP</c> turns on behind the harness seam (ADR-0497, BL-2263).
 /// </summary>
 [TestClass]
-public sealed class CurlCompositionAltSvcHttpTests
+public sealed class EngineCompositionAltSvcHttpTests
 {
     [TestMethod]
     [DataRow(true, "yeah", true)]
@@ -14,7 +14,7 @@ public sealed class CurlCompositionAltSvcHttpTests
     [DataRow(false, "yeah", false)]
     public void UsesAltSvcOverHttp_SeamAndVariable_UsesItOnlyWithTheSeamOnAndTheVariableSet(bool seamOn, string? value, bool expected)
     {
-        bool uses = CurlComposition.UsesAltSvcOverHttp(seamOn, name => name == "CURL_ALTSVC_HTTP" ? value : null);
+        bool uses = EngineComposition.UsesAltSvcOverHttp(seamOn, name => name == "CURL_ALTSVC_HTTP" ? value : null);
 
         Assert.AreEqual(expected, uses);
     }

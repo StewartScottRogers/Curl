@@ -35,8 +35,8 @@ public sealed class CurlCommandRunnerSharedDnsCacheTests
 
         Diagnostics.Arrange("first option group", "http://h/a");
         Diagnostics.Arrange("second option group", "-k https://h/b");
-        CurlTransports first = CurlComposition.CreateTransports(Parse("http://h/a"), TimeProvider.System, runDnsCache: runDnsCache);
-        CurlTransports second = CurlComposition.CreateTransports(Parse("-k", "https://h/b"), TimeProvider.System, runDnsCache: runDnsCache);
+        CurlTransports first = EngineComposition.CreateTransports(Parse("http://h/a"), TimeProvider.System, runDnsCache: runDnsCache);
+        CurlTransports second = EngineComposition.CreateTransports(Parse("-k", "https://h/b"), TimeProvider.System, runDnsCache: runDnsCache);
 
         Diagnostics.Act("first connector uses the run cache", ReferenceEquals(runDnsCache, first.TcpConnector.DnsCache));
         Diagnostics.Act("second connector uses the run cache", ReferenceEquals(runDnsCache, second.TcpConnector.DnsCache));
@@ -50,8 +50,8 @@ public sealed class CurlCommandRunnerSharedDnsCacheTests
     public void CreateTransports_WithoutARunDnsCache_GivesEachTcpConnectorACacheOfItsOwn()
     {
         Diagnostics.Arrange("option groups", "http://h/a and http://h/b, each without a run cache");
-        CurlTransports first = CurlComposition.CreateTransports(Parse("http://h/a"));
-        CurlTransports second = CurlComposition.CreateTransports(Parse("http://h/b"));
+        CurlTransports first = EngineComposition.CreateTransports(Parse("http://h/a"));
+        CurlTransports second = EngineComposition.CreateTransports(Parse("http://h/b"));
 
         Diagnostics.Act("connectors share a cache", ReferenceEquals(first.TcpConnector.DnsCache, second.TcpConnector.DnsCache));
         Diagnostics.Assert("connectors share a cache", false, ReferenceEquals(first.TcpConnector.DnsCache, second.TcpConnector.DnsCache));
@@ -176,7 +176,7 @@ public sealed class CurlCommandRunnerSharedDnsCacheTests
         return await new CurlCommandRunner(
                 options =>
                 {
-                    TcpConnector connector = CurlComposition.CreateTcpConnector(
+                    TcpConnector connector = EngineComposition.CreateTcpConnector(
                         options,
                         new LoopbackDnsResolver(),
                         dialer,
@@ -185,7 +185,7 @@ public sealed class CurlCommandRunnerSharedDnsCacheTests
                         HttpProxyTunnelOptions.Default,
                         runDnsCache: runDnsCache);
                     return new TransferDispatch(
-                        new ProtocolDispatcher(CurlComposition.CreateProtocolHandlers(connector, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new PassThroughTlsProvider(), new LoopbackDnsResolver())),
+                        new ProtocolDispatcher(EngineComposition.CreateProtocolHandlers(connector, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new PassThroughTlsProvider(), new LoopbackDnsResolver())),
                         [],
                         loadResolveEntries: connector.LoadResolveEntries);
                 },

@@ -1,4 +1,3 @@
-using Curl.Engine;
 using System.Net;
 using System.Net.Sockets;
 
@@ -6,15 +5,15 @@ using Curl.Cli;
 using Curl.Protocol.Abstractions;
 using Curl.Testing;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
 /// Pins, over a real loopback DNS server and TCP listener, that <c>--dns-servers</c> makes
 /// every transfer connect to the address that server answered (ADR-0170, BL-694). The
-/// socket-free cases stay in <c>CurlCompositionDnsServersTests</c>.
+/// socket-free cases stay in <c>EngineCompositionDnsServersTests</c>.
 /// </summary>
 [TestClass]
-public sealed class CurlCompositionDnsServersIntegrationTests
+public sealed class EngineCompositionDnsServersIntegrationTests
 {
     public TestContext TestContext { get; set; } = null!;
 
@@ -30,7 +29,7 @@ public sealed class CurlCompositionDnsServersIntegrationTests
         int dnsPort = ((IPEndPoint)dnsServer.Client.LocalEndPoint!).Port;
         int webPort = ((IPEndPoint)webServer.LocalEndpoint).Port;
         Task answering = AnswerOneQueryAsync(dnsServer);
-        CurlTransports transports = CurlComposition.CreateTransports(Parse("-4", "--dns-servers", $"127.0.0.1:{dnsPort}"));
+        CurlTransports transports = EngineComposition.CreateTransports(Parse("-4", "--dns-servers", $"127.0.0.1:{dnsPort}"));
 
         ConnectResult result;
         using (Diagnostics.Phase("connect"))

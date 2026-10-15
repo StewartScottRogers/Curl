@@ -1,3 +1,4 @@
+using Curl.Engine;
 using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -260,7 +261,7 @@ public sealed class CurlCommandRunnerTcpIoTraceTests
         Diagnostics.Arrange("tls provider", tlsProvider.GetType().Name);
         Diagnostics.Assert("command line accepted", true, parsed.IsAccepted);
         Assert.IsTrue(parsed.IsAccepted);
-        TcpConnector connector = CurlComposition.CreateTcpConnector(
+        TcpConnector connector = EngineComposition.CreateTcpConnector(
             parsed.Options,
             new LoopbackDnsResolver(),
             new ScriptedTcpDialer(new ScriptedConnector(serverReads)),
@@ -274,7 +275,7 @@ public sealed class CurlCommandRunnerTcpIoTraceTests
         {
             exitCode = await new CurlCommandRunner(
                     _ => new TransferDispatch(
-                        new ProtocolDispatcher(CurlComposition.CreateProtocolHandlers(connector, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new PassThroughTlsProvider(), new LoopbackDnsResolver())),
+                        new ProtocolDispatcher(EngineComposition.CreateProtocolHandlers(connector, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new PassThroughTlsProvider(), new LoopbackDnsResolver())),
                         [],
                         loadResolveEntries: connector.LoadResolveEntries),
                     files,

@@ -2788,12 +2788,12 @@ internal sealed class CurlCommandRunner(
     /// <summary>
     /// Wraps <paramref name="output" /> in the events that add the trace lines the transfer writes
     /// after its connect has returned: <see cref="AsyncResolveTeardownTraceEvents" /> under
-    /// <see cref="CurlComposition.TracesDns" />, <see cref="MultiStateTraceEvents" /> under
-    /// <see cref="CurlComposition.TracesMulti" />, <see cref="ClientReaderResetTraceEvents" /> under
-    /// <see cref="CurlComposition.TracesRead" /> and, outermost so its <c>[WRITE] [OUT] done</c> comes before
-    /// the <c>[READ]</c> line, <see cref="ClientWriterTraceEvents" /> under <see cref="CurlComposition.TracesWrite" />.
+    /// <see cref="EngineComposition.TracesDns" />, <see cref="MultiStateTraceEvents" /> under
+    /// <see cref="EngineComposition.TracesMulti" />, <see cref="ClientReaderResetTraceEvents" /> under
+    /// <see cref="EngineComposition.TracesRead" /> and, outermost so its <c>[WRITE] [OUT] done</c> comes before
+    /// the <c>[READ]</c> line, <see cref="ClientWriterTraceEvents" /> under <see cref="EngineComposition.TracesWrite" />.
     /// The <c>[MULTI]</c> lines sit inside the other two, which is what lets them find their place among those lines.
-    /// Under <see cref="CurlComposition.TracesTimer" /> the response wait's <c>[TIMER]</c> lines
+    /// Under <see cref="EngineComposition.TracesTimer" /> the response wait's <c>[TIMER]</c> lines
     /// (<see cref="TransferTimers.WaitLines" />) go among the <c>[MULTI]</c> lines, or, with the multi not
     /// traced, through <see cref="ResponseWaitTimerTraceEvents" /> in their place (BL-1258).
     /// </summary>
@@ -2803,17 +2803,17 @@ internal sealed class CurlCommandRunner(
     /// <returns>The events the transfer reports to.</returns>
     private ITransferEvents WithTraceLineEvents(CommandLineOptions options, ITransferEvents output, Func<long> takeConnectionId)
     {
-        ITransferEvents teardown = CurlComposition.TracesDns(options) ? new AsyncResolveTeardownTraceEvents(output) : output;
+        ITransferEvents teardown = EngineComposition.TracesDns(options) ? new AsyncResolveTeardownTraceEvents(output) : output;
         ITransferEvents multi = WithMultiOrTimerEvents(options, teardown, takeConnectionId);
-        ITransferEvents readers = CurlComposition.TracesRead(options) ? new ClientReaderResetTraceEvents(multi) : multi;
-        return CurlComposition.TracesWrite(options) ? new ClientWriterTraceEvents(readers) : readers;
+        ITransferEvents readers = EngineComposition.TracesRead(options) ? new ClientReaderResetTraceEvents(multi) : multi;
+        return EngineComposition.TracesWrite(options) ? new ClientWriterTraceEvents(readers) : readers;
     }
 
     private ITransferEvents WithMultiOrTimerEvents(CommandLineOptions options, ITransferEvents inner, Func<long> takeConnectionId)
     {
         TransferTimers timers = TransferTimers.Of(options);
-        bool tracesMulti = CurlComposition.TracesMulti(options);
-        IReadOnlyList<string> waitLines = CurlComposition.TracesTimer(options) ? timers.WaitLines(tracesMulti) : [];
+        bool tracesMulti = EngineComposition.TracesMulti(options);
+        IReadOnlyList<string> waitLines = EngineComposition.TracesTimer(options) ? timers.WaitLines(tracesMulti) : [];
         if (tracesMulti)
         {
             return new MultiStateTraceEvents(inner, timeProvider, takeConnectionId, timers, waitLines);
@@ -2833,7 +2833,7 @@ internal sealed class CurlCommandRunner(
     /// <param name="eventsBeforeConnecting">The transfer's events before it has a connection.</param>
     private static void TraceTransferStart(CommandLineOptions options, ITransferEvents eventsBeforeConnecting)
     {
-        if (CurlComposition.TracesMulti(options))
+        if (EngineComposition.TracesMulti(options))
         {
             foreach (string line in MultiStateTraceEvents.StartLines)
             {
@@ -2841,7 +2841,7 @@ internal sealed class CurlCommandRunner(
             }
         }
 
-        if (CurlComposition.TracesRead(options))
+        if (EngineComposition.TracesRead(options))
         {
             eventsBeforeConnecting.ReportInfo(ClientReaderResetTraceEvents.ResetLine);
         }

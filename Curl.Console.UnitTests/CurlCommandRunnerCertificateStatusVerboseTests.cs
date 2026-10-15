@@ -1,3 +1,4 @@
+using Curl.Engine;
 using System.Text;
 
 using Curl.Core;
@@ -76,7 +77,7 @@ public sealed class CurlCommandRunnerCertificateStatusVerboseTests
         {
             exitCode = await new CurlCommandRunner(
                     _ => new TransferDispatch(
-                        new ProtocolDispatcher(CurlComposition.CreateProtocolHandlers(connector, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new PassThroughTlsProvider(), new LoopbackDnsResolver())),
+                        new ProtocolDispatcher(EngineComposition.CreateProtocolHandlers(connector, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new PassThroughTlsProvider(), new LoopbackDnsResolver())),
                         []),
                     fileSystem,
                     fileSystem,

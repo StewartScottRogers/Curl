@@ -1,3 +1,4 @@
+using Curl.Engine;
 using System.Text;
 
 using Curl.Cli;
@@ -114,7 +115,7 @@ public sealed class TlsSessionFileLinesTests
         Diagnostics.Arrange("connector script", "connect fails: CouldntConnect");
 
         int exitCode = await new CurlCommandRunner(
-                _ => new TransferDispatch(new ProtocolDispatcher(CurlComposition.CreateProtocolHandlers(new RecordingConnector(CurlExitCode.CouldntConnect, "Failed to connect"), new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new PassThroughTlsProvider(), new LoopbackDnsResolver())), []),
+                _ => new TransferDispatch(new ProtocolDispatcher(EngineComposition.CreateProtocolHandlers(new RecordingConnector(CurlExitCode.CouldntConnect, "Failed to connect"), new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new PassThroughTlsProvider(), new LoopbackDnsResolver())), []),
                 fileSystem,
                 fileSystem,
                 new MemoryStream(),
@@ -143,11 +144,11 @@ public sealed class TlsSessionFileLinesTests
         var sessions = new TlsSessionCache(TimeProvider.System);
         Diagnostics.Arrange("cases", "sessions file, curves, sessions file without a cache, no options, no session id");
 
-        var withFile = CurlComposition.CreateTlsProvider(new TlsClientOptions(SslSessionsFile: "s"), TimeProvider.System, sessions);
-        var withCurves = CurlComposition.CreateTlsProvider(new TlsClientOptions(Curves: "X25519"), TimeProvider.System, sessions);
-        var withFileNoCache = CurlComposition.CreateTlsProvider(new TlsClientOptions(SslSessionsFile: "s"), TimeProvider.System);
-        var plain = CurlComposition.CreateTlsProvider(new TlsClientOptions(), TimeProvider.System, sessions);
-        var noSessionId = CurlComposition.CreateTlsProvider(new TlsClientOptions(NoSessionId: true), TimeProvider.System, sessions);
+        var withFile = EngineComposition.CreateTlsProvider(new TlsClientOptions(SslSessionsFile: "s"), TimeProvider.System, sessions);
+        var withCurves = EngineComposition.CreateTlsProvider(new TlsClientOptions(Curves: "X25519"), TimeProvider.System, sessions);
+        var withFileNoCache = EngineComposition.CreateTlsProvider(new TlsClientOptions(SslSessionsFile: "s"), TimeProvider.System);
+        var plain = EngineComposition.CreateTlsProvider(new TlsClientOptions(), TimeProvider.System, sessions);
+        var noSessionId = EngineComposition.CreateTlsProvider(new TlsClientOptions(NoSessionId: true), TimeProvider.System, sessions);
         string providers = string.Join(", ", new object[] { withFile, withCurves, withFileNoCache, plain, noSessionId }.Select(provider => provider.GetType().Name));
         Diagnostics.Act("providers", providers);
 

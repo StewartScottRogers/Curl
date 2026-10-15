@@ -3,15 +3,15 @@ using Curl.Protocol.Ssh.Negotiation;
 
 using Curl.Testing;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
-/// Pins the libraries <see cref="CurlComposition.CreateProtocolHandlers" /> gives the LDAP and SSH
+/// Pins the libraries <see cref="EngineComposition.CreateProtocolHandlers" /> gives the LDAP and SSH
 /// handlers by platform, as the platform's curl is built: WinLDAP and the Schannel build's SSH
 /// algorithms on Windows, OpenLDAP and the OpenSSL build's elsewhere (BL-1356).
 /// </summary>
 [TestClass]
-public sealed class CurlCompositionPlatformLibraryTests
+public sealed class EngineCompositionPlatformLibraryTests
 {
     public TestContext TestContext { get; set; } = null!;
 
@@ -23,7 +23,7 @@ public sealed class CurlCompositionPlatformLibraryTests
     public void LdapDialectFor_EachPlatform_IsItsCurlsLdapLibrary(bool runsOnWindows, LdapDialect expected)
     {
         Diagnostics.Arrange("runsOnWindows", runsOnWindows);
-        LdapDialect dialect = CurlComposition.LdapDialectFor(runsOnWindows);
+        LdapDialect dialect = EngineComposition.LdapDialectFor(runsOnWindows);
         Diagnostics.Act("LDAP dialect", dialect);
 
         Diagnostics.Assert("LDAP dialect", expected, dialect);
@@ -34,7 +34,7 @@ public sealed class CurlCompositionPlatformLibraryTests
     public void SshAlgorithmPreferencesFor_Windows_IsTheSchannelBuilds()
     {
         Diagnostics.Arrange("runsOnWindows", true);
-        SshAlgorithmPreferences preferences = CurlComposition.SshAlgorithmPreferencesFor(runsOnWindows: true);
+        SshAlgorithmPreferences preferences = EngineComposition.SshAlgorithmPreferencesFor(runsOnWindows: true);
         bool isReference = ReferenceEquals(SshAlgorithmPreferences.WindowsReference, preferences);
         Diagnostics.Act("is the Windows reference", isReference);
 
@@ -46,7 +46,7 @@ public sealed class CurlCompositionPlatformLibraryTests
     public void SshAlgorithmPreferencesFor_OffWindows_IsTheOpenSslBuilds()
     {
         Diagnostics.Arrange("runsOnWindows", false);
-        SshAlgorithmPreferences preferences = CurlComposition.SshAlgorithmPreferencesFor(runsOnWindows: false);
+        SshAlgorithmPreferences preferences = EngineComposition.SshAlgorithmPreferencesFor(runsOnWindows: false);
         bool isReference = ReferenceEquals(SshAlgorithmPreferences.OpenSslReference, preferences);
         Diagnostics.Act("is the OpenSSL reference", isReference);
 
