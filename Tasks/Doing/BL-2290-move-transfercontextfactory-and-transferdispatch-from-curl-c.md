@@ -36,3 +36,4 @@ ADR-0506, plan phase 1 step 3; follows BL-2289, same rules (mechanical move, `CL
 ## Log
 
 - 2026-10-15: Created.
+- 2026-10-15: Backlog -> Doing.
