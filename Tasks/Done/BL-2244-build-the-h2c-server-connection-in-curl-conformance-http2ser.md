@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.Http2Server.UnitLibrary, Curl.Conformance.Http2Server.UnitTests, Curl.slnx]
 requirement: none
 created: 2026-10-14
-completed:
+completed: 2026-10-14
 ---
 # BL-2244 — Build the h2c server connection in Curl.Conformance.Http2Server.UnitLibrary that relays each HTTP/2 stream to an HTTP/1.1 connector, as nghttpx does
 
@@ -24,15 +24,20 @@ Reuse, do not rewrite: `Curl.Http2.UnitLibrary` is a reference-free library alre
 
 ## Acceptance criteria
 
-- [ ] The library and its `.UnitTests` exist, listed in `Curl.slnx` beside each other in sort order; AOT-compatible; `dotnet build` clean; no `Curl.Protocol.*` reference beyond `Curl.Protocol.Abstractions.UnitLibrary`.
-- [ ] Unit tests pin: the client preface and server SETTINGS exchange, a GET relayed to the inner connector with the HTTP/1.1 request bytes nghttpx sends (including `Via` / `X-Forwarded-*` as the cases expect), a POST with a DATA body, `Upgrade: h2c` answered with `101 Switching Protocols` then the reply on stream 1, `SETTINGS_ENABLE_PUSH` honoured (no PUSH_PROMISE sent), and GOAWAY when the client closes.
-- [ ] Flow control: the server sends WINDOW_UPDATE so a body larger than 65535 bytes is received, and never sends DATA past the client's window.
-- [ ] A factory the runner can call in one line (like `UpstreamSshServerFactory`) builds the server over a given inner connector.
-- [ ] `Measure-CodeQuality.ps1 -Library Curl.Conformance.Http2Server.UnitLibrary` shows 100% line and branch coverage, complexity at most 10 and CRAP at most 30; the fast tests are green; the library has a `CLAUDE.md`.
+- [x] The library and its `.UnitTests` exist, listed in `Curl.slnx` beside each other in sort order; AOT-compatible; `dotnet build` clean; no `Curl.Protocol.*` reference beyond `Curl.Protocol.Abstractions.UnitLibrary`.
+- [x] Unit tests pin: the client preface and server SETTINGS exchange, a GET relayed to the inner connector with the HTTP/1.1 request bytes nghttpx sends (including `Via` / `X-Forwarded-*` as the cases expect), a POST with a DATA body, `Upgrade: h2c` answered with `101 Switching Protocols` then the reply on stream 1, `SETTINGS_ENABLE_PUSH` honoured (no PUSH_PROMISE sent), and GOAWAY when the client closes.
+- [x] Flow control: the server sends WINDOW_UPDATE so a body larger than 65535 bytes is received, and never sends DATA past the client's window.
+- [x] A factory the runner can call in one line (like `UpstreamSshServerFactory`) builds the server over a given inner connector.
+- [x] `Measure-CodeQuality.ps1 -Library Curl.Conformance.Http2Server.UnitLibrary` shows 100% line and branch coverage, complexity at most 10 and CRAP at most 30; the fast tests are green; the library has a `CLAUDE.md`.
 
 ## Notes
+
+- Decided (ADR-0491): in-memory relay over `InMemoryDuplexStream`; backend request gets `X-Forwarded-Proto: http` and `Via: 2 nghttpx` (no `X-Forwarded-For`, which servers.pm does not enable and no case strips); reply gets `server: nghttpx` and `via: 1.1 nghttpx`, pinned from upstream test1700's `<protocol>` and `<stdout>`.
+- Streams are relayed one after another on one task; out of scope for now: an HTTP/1.1 request without `Upgrade: h2c`, an upgrade request with a body, and a reply header block larger than one frame (ADR-0491).
+- Measure-CodeQuality.ps1 -Library Curl.Conformance.Http2Server.UnitLibrary: line 100%, branch 100%, 0 failing members, worst CRAP 10.
 
 ## Log
 
 - 2026-10-14: Created.
 - 2026-10-14: Backlog -> Doing.
+- 2026-10-14: Doing -> Done. h2c server library with relay, flow control and factory; quality gates met
