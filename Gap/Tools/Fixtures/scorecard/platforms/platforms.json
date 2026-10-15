@@ -1,0 +1,5 @@
+{
+  "windows": { "state": "measured", "reason": null },
+  "linux": { "state": "measured", "reason": null },
+  "macos": { "state": "missing", "reason": "gap-platforms run 42 timed out after 180 minutes" }
+}

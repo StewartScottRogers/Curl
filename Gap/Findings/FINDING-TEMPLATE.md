@@ -2,6 +2,7 @@
 id: GF-0000
 title: One line naming the cause
 area: options
+platform: windows
 key: options:cause-slug
 severity: Medium
 status: open

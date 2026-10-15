@@ -1,0 +1,17 @@
+{
+  "area": "options",
+  "targetVersion": "8.21.0",
+  "candidateCommit": "d15d115db0a1b2c3d4e5f60718293a4b5c6d7e03",
+  "platform": "linux",
+  "reference": "curl 8.21.0 (x86_64-pc-linux-gnu) libcurl/8.21.0 OpenSSL/3.0.13",
+  "measuredAt": "2026-10-09T14:30:00Z",
+  "items": [
+    { "key": "options:--a", "state": "match", "reason": null, "expected": null, "actual": null, "evidence": null, "introducedIn": null },
+    { "key": "options:--b", "state": "match", "reason": null, "expected": null, "actual": null, "evidence": null, "introducedIn": null },
+    { "key": "options:--c", "state": "gap", "reason": null, "expected": null, "actual": null, "evidence": null, "introducedIn": null },
+    { "key": "options:--d", "state": "gap", "reason": null, "expected": null, "actual": null, "evidence": null, "introducedIn": null },
+    { "key": "options:--e", "state": "unmeasured", "reason": "needs-server:smtp", "expected": null, "actual": null, "evidence": null, "introducedIn": null },
+    { "key": "options:--f", "state": "excluded", "reason": "platform:linux", "expected": null, "actual": null, "evidence": null, "introducedIn": null }
+  ],
+  "counts": { "match": 2, "gap": 2, "unmeasured": 1, "excluded": 1, "x": 2, "y": 5 }
+}
