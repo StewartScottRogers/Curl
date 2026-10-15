@@ -76,6 +76,41 @@ public sealed class HttpRequestBodyWriterTests
     }
 
     [TestMethod]
+    public async Task WriteAsync_ChunkedStdinWithHeldHead_SendsHeadDataAndLastChunkInOneWrite()
+    {
+        // upstream test60 (-T - -H 'Content-Length: 1'): curl 8.21.0 sends the head, the data
+        // chunk and 0\r\n\r\n from one upload buffer, so a server that answers on the data and
+        // closes still receives the closing chunk (BL-2341).
+        ScriptedConnection connection = new([], 1);
+        HttpRequestBodyWriter writer = new(connection) { HeldHead = "HEAD\r\n\r\n"u8.ToArray() };
+        Diagnostics.Arrange("writer", Describe(writer));
+
+        await writer.WriteAsync(new StreamBody(new MemoryStream("more than one byte\n"u8.ToArray()), null, "a/b"), true, CancellationToken.None);
+        WriteWriter(writer);
+
+        string expected = "HEAD\r\n\r\n13\r\nmore than one byte\n\r\n0\r\n\r\n";
+        Diagnostics.Assert("Encoding.Latin1.GetString(connection.Written)", expected, Encoding.Latin1.GetString(connection.Written));
+        Assert.AreEqual(expected, Encoding.Latin1.GetString(connection.Written));
+        Diagnostics.Assert("connection.WriteLengths", expected.Length.ToString(System.Globalization.CultureInfo.InvariantCulture), string.Join(", ", connection.WriteLengths));
+        CollectionAssert.AreEqual(new[] { expected.Length }, connection.WriteLengths.ToArray());
+    }
+
+    [TestMethod]
+    public async Task WriteAsync_ChunkedStreamReadsInPieces_SendsEachChunkWhenTheNextReadGivesMore()
+    {
+        FailingReadStream stream = new("abcde"u8.ToArray(), 2, new IOException("Lock violation."));
+        ScriptedConnection connection = new([], 1);
+        HttpRequestBodyWriter writer = new(connection);
+        Diagnostics.Arrange("writer", Describe(writer));
+
+        await writer.WriteAsync(new StreamBody(stream, null, "a/b"), true, CancellationToken.None);
+        WriteWriter(writer);
+
+        Diagnostics.Assert("connection.WriteLengths", "7, 7, 11", string.Join(", ", connection.WriteLengths));
+        CollectionAssert.AreEqual(new[] { 7, 7, 11 }, connection.WriteLengths.ToArray());
+    }
+
+    [TestMethod]
     public async Task WriteAsync_StreamOfKnownLength_ReadsNoFurtherThanItsLength()
     {
         FailingReadStream stream = new(new byte[HttpRequestBodyWriter.UploadBufferSize + 10], int.MaxValue, new IOException("Not reached."));

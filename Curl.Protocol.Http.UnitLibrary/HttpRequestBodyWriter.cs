@@ -108,6 +108,15 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
     private ReadOnlyMemory<byte> unsent;
 
     /// <summary>
+    /// The bytes of a chunked stream body of unknown length (<c>-T -</c>) held back until the next
+    /// read tells whether the stream has ended, so the last chunk of data and the closing chunk go
+    /// out in one write, as curl 8.21.0 fills its upload buffer before it sends: a server that
+    /// answers on the data and closes would otherwise reset the connection before the closing
+    /// chunk reaches it (BL-2341, ADR-0525); <see langword="null" /> for any other body.
+    /// </summary>
+    private List<byte>? heldBack;
+
+    /// <summary>
     /// Gets the connection that waited for <c>100 Continue</c> and so watches for a
     /// status of 300 or above while the body is sent, or <see langword="null" /> when the
     /// request waited for nothing and the body is sent whole.
@@ -150,6 +159,7 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
     internal async ValueTask WriteAsync(HttpRequestBody body, bool isChunked, CancellationToken cancellationToken)
     {
         expectedLength = body is BytesBody known ? known.Content.Length : ((StreamBody)body).Length;
+        heldBack = null;
         if (EarlyResponseWatch is null)
         {
             Progress.ReportUploaded(BytesSent, expectedLength);
@@ -167,11 +177,13 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
         await WriteHeldHeadAsync(cancellationToken).ConfigureAwait(false);
         if (isChunked && !CutShort)
         {
-            await HttpConnectionSend.WriteAsync(connection, LastChunk, cancellationToken).ConfigureAwait(false);
+            await SendAsync(LastChunk, cancellationToken).ConfigureAwait(false);
             ReportSent(LastChunk);
             Progress.ReportUploaded(BytesSent, expectedLength);
         }
 
+        await ReleaseHeldBackAsync(cancellationToken).ConfigureAwait(false);
+        heldBack = null;
         await HttpConnectionSend.FlushAsync(connection, cancellationToken).ConfigureAwait(false);
         await HttpConnectionSend.EndStreamRequestAsync(connection, cancellationToken).ConfigureAwait(false);
     }
@@ -244,7 +256,7 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
 
     private async ValueTask WriteStreamAsync(StreamBody body, bool isChunked, CancellationToken cancellationToken)
     {
-        startPosition = body.Content.CanSeek ? body.Content.Position : null;
+        StartReading(body, isChunked);
         byte[] buffer = new byte[UploadBufferSize];
         while (!CutShort)
         {
@@ -265,8 +277,28 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
                 return;
             }
 
-            await WritePieceAsync(buffer.AsMemory(0, read), isChunked, cancellationToken).ConfigureAwait(false);
+            await WriteReadPieceAsync(buffer.AsMemory(0, read), isChunked, cancellationToken).ConfigureAwait(false);
         }
+    }
+
+    /// <summary>
+    /// Notes where a seekable stream body begins, for a resend, and starts <see cref="heldBack" />
+    /// for a chunked body of unknown length sent without waiting for <c>100 Continue</c>.
+    /// </summary>
+    private void StartReading(StreamBody body, bool isChunked)
+    {
+        startPosition = body.Content.CanSeek ? body.Content.Position : null;
+        heldBack = isChunked && body.Length is null && EarlyResponseWatch is null ? [] : null;
+    }
+
+    /// <summary>
+    /// Writes what <see cref="heldBack" /> holds, now that a read has given more, then the piece
+    /// that read gave.
+    /// </summary>
+    private async ValueTask WriteReadPieceAsync(ReadOnlyMemory<byte> piece, bool isChunked, CancellationToken cancellationToken)
+    {
+        await ReleaseHeldBackAsync(cancellationToken).ConfigureAwait(false);
+        await WritePieceAsync(piece, isChunked, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -412,10 +444,11 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
     /// Reads from the body stream, taking a failed read as the end of the stream, as curl
     /// does, except a <see cref="RequestBodyReadFailedException" />, which fails the transfer
     /// with exit 26 and its message, as curl fails a multipart part its encoder refuses
-    /// (measured, BL-385 Notes).
+    /// (measured, BL-385 Notes); before failing, it writes what <see cref="heldBack" /> holds, so
+    /// the chunks read before the failure still reach the server.
     /// </summary>
     /// <exception cref="HttpTransferException">The read threw a <see cref="RequestBodyReadFailedException" />.</exception>
-    private static async ValueTask<int> ReadAsync(Stream stream, Memory<byte> buffer, CancellationToken cancellationToken)
+    private async ValueTask<int> ReadAsync(Stream stream, Memory<byte> buffer, CancellationToken cancellationToken)
     {
         try
         {
@@ -423,6 +456,7 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
         }
         catch (RequestBodyReadFailedException failed)
         {
+            await ReleaseHeldBackAsync(cancellationToken).ConfigureAwait(false);
             throw new HttpTransferException(CurlExitCode.ReadError, failed.Message);
         }
         catch (IOException)
@@ -486,12 +520,43 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
         ReadOnlyMemory<byte> head = heldHead;
         heldHead = ReadOnlyMemory<byte>.Empty;
         int shared = Math.Min(framed.Length, Math.Max(UploadBufferSize - head.Length, 0));
-        await HttpConnectionSend.WriteAsync(connection, (byte[])[.. head.Span, .. framed.Span[..shared]], cancellationToken).ConfigureAwait(false);
+        await SendAsync((byte[])[.. head.Span, .. framed.Span[..shared]], cancellationToken).ConfigureAwait(false);
         Events.ReportRequestHeader(head.Span);
         if (shared < framed.Length)
         {
-            await HttpConnectionSend.WriteAsync(connection, framed[shared..], cancellationToken).ConfigureAwait(false);
+            await SendAsync(framed[shared..], cancellationToken).ConfigureAwait(false);
         }
+    }
+
+    /// <summary>
+    /// Writes <paramref name="bytes" /> to the connection, or adds them to <see cref="heldBack" />
+    /// while a chunked body of unknown length is being held back.
+    /// </summary>
+    private async ValueTask SendAsync(ReadOnlyMemory<byte> bytes, CancellationToken cancellationToken)
+    {
+        if (heldBack is not null)
+        {
+            heldBack.AddRange(bytes.Span);
+            return;
+        }
+
+        await HttpConnectionSend.WriteAsync(connection, bytes, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Writes the bytes <see cref="heldBack" /> holds, if any, in one write, and goes on holding
+    /// back from empty.
+    /// </summary>
+    private async ValueTask ReleaseHeldBackAsync(CancellationToken cancellationToken)
+    {
+        if (heldBack is not { Count: > 0 } held)
+        {
+            return;
+        }
+
+        byte[] bytes = [.. held];
+        held.Clear();
+        await HttpConnectionSend.WriteAsync(connection, bytes, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -502,13 +567,13 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
     {
         if (isChunked)
         {
-            await HttpConnectionSend.WriteAsync(connection, ChunkSizeLine(piece.Length), cancellationToken).ConfigureAwait(false);
+            await SendAsync(ChunkSizeLine(piece.Length), cancellationToken).ConfigureAwait(false);
         }
 
-        await HttpConnectionSend.WriteAsync(connection, piece, cancellationToken).ConfigureAwait(false);
+        await SendAsync(piece, cancellationToken).ConfigureAwait(false);
         if (isChunked)
         {
-            await HttpConnectionSend.WriteAsync(connection, "\r\n"u8.ToArray(), cancellationToken).ConfigureAwait(false);
+            await SendAsync("\r\n"u8.ToArray(), cancellationToken).ConfigureAwait(false);
         }
     }
 
