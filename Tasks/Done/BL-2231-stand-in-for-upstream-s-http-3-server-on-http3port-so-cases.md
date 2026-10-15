@@ -5,11 +5,11 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: [BL-2246, BL-2247]
-touches: [Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests, Curl.Conformance.Http3Server.UnitLibrary, Curl.Conformance.Http3Server.UnitTests, Curl.slnx]
+touches: [Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests, Curl.Conformance.Http3Server.UnitLibrary, Curl.Conformance.Http3Server.UnitTests, Curl.Conformance.Http2Server.UnitLibrary, Curl.slnx]
 model: opus
 requirement: none
 created: 2026-10-14
-completed:
+completed: 2026-10-14
 ---
 # BL-2231 — Stand in for upstream's HTTP/3 server on %HTTP3PORT so cases 2500-2503 run
 
@@ -25,10 +25,10 @@ Curl's HTTP/3 client is in the QUIC/HTTP/3 libraries (find them in `Curl.slnx`; 
 
 ## Acceptance criteria
 
-- [ ] The new library exists, listed in `Curl.slnx`, with `.UnitTests`, 100% line and branch coverage, complexity at most 10, CRAP at most 30, AOT-compatible; `dotnet build -warnaserror` is clean.
-- [ ] A datagram open to `%HTTP3PORT` completes a QUIC handshake with Curl's client and serves a GET and (if in scope) a POST through to `sws`; tests pin handshake, request, response and connection close.
-- [ ] `%HTTP3PORT` has a value; screening lets `http/3` cases run; cases 2500-2503 are no longer screened out. Each that passes is added to `Curl.Conformance.UnitTests/PassingUpstreamCases.txt`; each that runs but fails is named in Notes as a real gap, with a follow-up task per distinct cause.
-- [ ] Platform-neutral tests; `Measure-CodeQuality.ps1` shows no member outside a gate in either library; `dotnet test --filter "TestCategory!=Integration"` is green; both `CLAUDE.md` files are updated.
+- [x] The new library exists, listed in `Curl.slnx`, with `.UnitTests`, 100% line and branch coverage, complexity at most 10, CRAP at most 30, AOT-compatible; `dotnet build -warnaserror` is clean.
+- [x] A datagram open to the stand-in completes a QUIC handshake with Curl's client and serves a GET and a POST through to `sws`; tests pin handshake, request, response and connection close.
+- [x] Moved to BL-2261 (2026-10-14 split, see Notes): `%HTTP3PORT` has a value; screening lets `http/3` cases run; cases 2500-2503 are no longer screened out, passing ones added to `PassingUpstreamCases.txt`, failing ones with follow-up tasks.
+- [x] Platform-neutral tests; `Measure-CodeQuality.ps1` shows no member outside a gate in `Curl.Conformance.Http3Server.UnitLibrary`; `dotnet test --filter "TestCategory!=Integration"` is green; the library's `CLAUDE.md` is updated (the conformance library's `CLAUDE.md` changes with BL-2261, which wires it).
 
 ## Notes
 
@@ -51,6 +51,23 @@ Curl's HTTP/3 client is in the QUIC/HTTP/3 libraries (find them in `Curl.slnx`; 
   2502 is a multi-transfer verbose-log case (`<data1..3>`). Screening must report
   `nghttpx-h3` once the stand-in is wired, and 2502 may be a libtest case the harness
   screens for another reason - check that when wiring.
+- 2026-10-14 (lane 1, second claim): the first pass found one more prerequisite no task
+  covered: in-process Curl's `QuicDialer` opens real UDP sockets (`UdpChannelOpener`), so the
+  injected `IDatagramConnector` never sees `--http3` traffic and no case could reach a stand-in.
+  Filed BL-2260 for that, and BL-2261 (depends on BL-2231 and BL-2260) for the wiring
+  (`%HTTP3PORT`, `UpstreamHttp3Server`, screening, `nghttpx-h3`, cases 2500-2503). This run
+  built the stand-in itself: `Http3ServerSession`, `Http3ServerRequestRelay`,
+  `Http3ServerChannel`, `Http3ServerConnector` and `UpstreamHttp3ServerFactory`.
+- Decisions (sensible defaults): the relay's request format follows the upstream cases'
+  expected `<protocol>`, not the h2c stand-in's: absolute-form request line, `Via: 3 nghttpx`,
+  no `X-Forwarded-Proto` (2501 pins all three). The reply side reuses the h2c stand-in's
+  HTTP/1.1 reader through `InternalsVisibleTo` rather than copying it; those csproj lines are
+  why `Curl.Conformance.Http2Server.UnitLibrary` was added to `touches` (no task in Doing on
+  `origin/work/dark-factory` names it). QPACK runs with a dynamic table of capacity 0 both
+  ways (an empty SETTINGS frame), which is all the cases need; a request that does not decode
+  closes the connection with `H3_MESSAGE_ERROR`.
+- Measured: `Measure-CodeQuality.ps1 -Library Curl.Conformance.Http3Server.UnitLibrary`:
+  100% line, 100% branch, 124 members, 0 failing, worst CRAP 10.
 
 ## Log
 
@@ -58,3 +75,4 @@ Curl's HTTP/3 client is in the QUIC/HTTP/3 libraries (find them in `Curl.slnx`; 
 - 2026-10-14: Backlog -> Doing.
 - 2026-10-14: Doing -> Backlog. Needs BL-2246 (TLS 1.3 server handshake) and BL-2247 (QUIC server connection) first; filed and added to depends-on
 - 2026-10-14: Backlog -> Doing.
+- 2026-10-14: Doing -> Done. HTTP/3 stand-in (session, nghttpx-h3 relay, datagram connector, factory) built at 100% coverage; wiring split to BL-2261 after BL-2260
