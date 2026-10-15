@@ -12,8 +12,8 @@ closed:
 regression: false
 items: [behaviour:test1435, behaviour:test1436]
 touches: [Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests]
-task:
-tasks: []
+task: BL-2271
+tasks: [BL-2271]
 ---
 # GF-0080 - --unix-socket cases throw in the gap harness: its dialer sends the Unix path to port 1, not to the sws emulation
 
@@ -36,3 +36,4 @@ Give Curl.Conformance.UnitLibrary one public way to dial the http-unix server, f
 ## Log
 
 - 2026-10-15_0304: Opened by gap-behaviour.
+- 2026-10-15_0349: Filed BL-2271.

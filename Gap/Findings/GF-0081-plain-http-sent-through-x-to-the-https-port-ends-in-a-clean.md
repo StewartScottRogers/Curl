@@ -12,8 +12,8 @@ closed:
 regression: false
 items: [behaviour:test1244]
 touches: [Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests, Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests]
-task:
-tasks: []
+task: BL-2272
+tasks: [BL-2272]
 ---
 # GF-0081 - Plain HTTP sent through -x to the HTTPS port ends in a clean close (exit 52) instead of stunnel's reset (exit 56)
 
@@ -36,3 +36,4 @@ In Curl.Conformance.UnitLibrary TlsServerConnection.ServeAsync, end a connection
 ## Log
 
 - 2026-10-15_0304: Opened by gap-behaviour.
+- 2026-10-15_0349: Filed BL-2272.

@@ -12,8 +12,8 @@ closed:
 regression: false
 items: [behaviour:test2035, behaviour:test2038, behaviour:test2042]
 touches: [Curl.Networking.UnitLibrary, Curl.Networking.UnitTests]
-task:
-tasks: []
+task: BL-2270
+tasks: [BL-2270]
 ---
 # GF-0079 - A wrong --pinnedpubkey with --cacert on the Schannel build gives exit 60 (revocation unknown) instead of 90
 
@@ -36,3 +36,4 @@ First measure the Schannel reference curl on a loopback TLS server with '--cacer
 ## Log
 
 - 2026-10-15_0304: Opened by gap-behaviour.
+- 2026-10-15_0349: Filed BL-2270.
