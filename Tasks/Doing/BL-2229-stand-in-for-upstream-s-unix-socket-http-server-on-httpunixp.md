@@ -33,3 +33,4 @@ Platform: nothing here opens a real Unix socket (the harness dials through `InMe
 ## Log
 
 - 2026-10-14: Created.
+- 2026-10-14: Backlog -> Doing.
