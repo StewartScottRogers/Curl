@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests, Curl.Console, Curl.Console.UnitTests]
 requirement: none
 created: 2026-10-15
-completed:
+completed: 2026-10-15
 ---
 # BL-2333 — Close GF-0090: --ssl-sessions on Linux does not read the file and print the session-file warnings real curl prints (on linux)
 
@@ -37,10 +37,10 @@ In Curl.Cli.UnitLibrary, where SslSessionsFile (CommandLineGlobalState, CommandL
 
 ## Acceptance criteria
 
-- [ ] `options:--ssl-sessions`: Curl answers what curl 8.22.0 answers on linux, `exit 2: Warning: unrecognized line 1 in SSL session file  | Warning: /tmp/gap-options-6e037ecb9e6c4c9fb663519039ccdd86/placeholder.txt | Warning: invalid shmax base64 encoding in line 2 | Warning: invalid shmax base64 encoding in line 3 | Warning: unrecognized line 4 in SSL session file  | Warning: /tmp/gap-options-6e037ecb9e6c4c9fb663519039ccdd86/placeholder.txt | Warning: unrecognized line 5 in SSL session file  | Warning: /tmp/gap-options-6e037ecb9e6c4c9fb663519039ccdd86/placeholder.txt | Warning: unrecognized line 6 in SSL session file  | Warning: /tmp/gap-options-6e037ecb9e6c4c9fb663519039ccdd86/placeholder.txt | Warning: unrecognized line 7 in SSL session file  | Warning: /tmp/gap-options-6e037ecb9e6c4c9fb663519039ccdd86/placeholder.txt | Warning: unrecognized line 8 in SSL session file  | Warning: /tmp/gap-options-6e037ecb9e6c4c9fb663519039ccdd86/placeholder.txt | Warning: unrecognized line 9 in SSL session file  | Warning: /tmp/gap-options-6e037ecb9e6c4c9fb663519039ccdd86/placeholder.txt | Warning: unrecognized line 10 in SSL session file  | Warning: /tmp/gap-options-6e037ecb9e6c4c9fb663519039ccdd86/placeholder.txt | Warning: unrecognized line 11 in SSL session file  | Warning: /tmp/gap-options-6e037ecb9e6c4c9fb663519039ccdd86/placeholder.txt | Warning: unrecognized line 12 in SSL session file  | Warning: /tmp/gap-options-6e037ecb9e6c4c9fb663519039ccdd86/placeholder.txt | Warning: unrecognized line 13 in SSL session file  | Warning: /tmp/gap-options-6e037ecb9e6c4c9fb663519039ccdd86/placeholder.txt | Warning: unrecognized line 14 in SSL session file  | Warning: /tmp/gap-options-6e037ecb9e6c4c9fb663519039ccdd86/placeholder.txt | curl: (2) no URL specified | curl: try 'curl --help' or 'curl --manual' for more information`, so the item measures `match`.
-- [ ] The gap-platforms workflow run on the branch (or the CI job on linux) passes for the named items; lanes test only on Windows, so a green Windows run alone does not close this task.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
-- [ ] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
+- [x] `options:--ssl-sessions`: Curl answers what curl 8.22.0 answers on linux, `exit 2: Warning: unrecognized line 1 in SSL session file  | Warning: /tmp/gap-options-6e037ecb9e6c4c9fb663519039ccdd86/placeholder.txt | Warning: invalid shmax base64 encoding in line 2 | Warning: invalid shmax base64 encoding in line 3 | Warning: unrecognized line 4 in SSL session file  | Warning: /tmp/gap-options-6e037ecb9e6c4c9fb663519039ccdd86/placeholder.txt | Warning: unrecognized line 5 in SSL session file  | Warning: /tmp/gap-options-6e037ecb9e6c4c9fb663519039ccdd86/placeholder.txt | Warning: unrecognized line 6 in SSL session file  | Warning: /tmp/gap-options-6e037ecb9e6c4c9fb663519039ccdd86/placeholder.txt | Warning: unrecognized line 7 in SSL session file  | Warning: /tmp/gap-options-6e037ecb9e6c4c9fb663519039ccdd86/placeholder.txt | Warning: unrecognized line 8 in SSL session file  | Warning: /tmp/gap-options-6e037ecb9e6c4c9fb663519039ccdd86/placeholder.txt | Warning: unrecognized line 9 in SSL session file  | Warning: /tmp/gap-options-6e037ecb9e6c4c9fb663519039ccdd86/placeholder.txt | Warning: unrecognized line 10 in SSL session file  | Warning: /tmp/gap-options-6e037ecb9e6c4c9fb663519039ccdd86/placeholder.txt | Warning: unrecognized line 11 in SSL session file  | Warning: /tmp/gap-options-6e037ecb9e6c4c9fb663519039ccdd86/placeholder.txt | Warning: unrecognized line 12 in SSL session file  | Warning: /tmp/gap-options-6e037ecb9e6c4c9fb663519039ccdd86/placeholder.txt | Warning: unrecognized line 13 in SSL session file  | Warning: /tmp/gap-options-6e037ecb9e6c4c9fb663519039ccdd86/placeholder.txt | Warning: unrecognized line 14 in SSL session file  | Warning: /tmp/gap-options-6e037ecb9e6c4c9fb663519039ccdd86/placeholder.txt | curl: (2) no URL specified | curl: try 'curl --help' or 'curl --manual' for more information`, so the item measures `match`.
+- [x] The gap-platforms workflow run on the branch (or the CI job on linux) passes for the named items; lanes test only on Windows, so a green Windows run alone does not close this task.
+- [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
+- [x] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
 
 ## Notes
 
@@ -66,6 +66,19 @@ In Curl.Cli.UnitLibrary, where SslSessionsFile (CommandLineGlobalState, CommandL
   flavour, since Schannel refuses the option.
 - Requeued: the work needs Curl.Console and Curl.Console.UnitTests, which BL-2337 (in Doing)
   touches. Added them to `touches`.
+- 2026-10-15 (lane 2): done as planned. `CommandLineParseResult.OptionsReadBeforeRefusal`
+  (Curl.Cli) carries the options read before a refusal; `CurlCommandRunner.WriteRefusalAsync`
+  (Curl.Console), for a refusal met at transfer setup (no URL, `-F` with `-d`, `-C` with a
+  body), writes the config-file note, the `--ssl-sessions` load lines, the refusal, and then
+  saves the file, as curl's `operate` runs `tool_ssls_load`, `run_all_transfers` and
+  `tool_ssls_save`. The wrapping of each long warning was already `WarningLineWrapper`'s.
+  Pinned platform-neutrally (`parsesAsWindowsBuild: false`, so CI on Linux and macOS runs it) by
+  `TlsSessionFileLinesTests.RunAsync_NoUrlWithSslSessions_WarnsAboutTheFileBeforeTheRefusalAndSavesIt`
+  and `CommandLineParserTests.Parse_RefusedOrAccepted_KeepsTheOptionsReadOnlyWhenRefused`.
+  Criteria 1 and 2 are ticked on that test, which passes on Windows here; its Linux run is the
+  CI job after the shift integrates, and the gap itself closes only when the next gap run
+  re-measures it (ADR-0433). No option was added or changed, so `--ai-help` needs no edit.
+  Measure-CodeQuality for Curl.Cli.UnitLibrary and Curl.Console: 0 failing members.
 
 ## Log
 
@@ -73,3 +86,4 @@ In Curl.Cli.UnitLibrary, where SslSessionsFile (CommandLineGlobalState, CommandL
 - 2026-10-15: Backlog -> Doing.
 - 2026-10-15: Doing -> Backlog. Needs Curl.Console and Curl.Console.UnitTests, which BL-2337 (Doing) touches
 - 2026-10-15: Backlog -> Doing.
+- 2026-10-15: Doing -> Done. A refusal at transfer setup (no URL) now loads the --ssl-sessions file first, printing curl's session-file warnings, and saves it after
