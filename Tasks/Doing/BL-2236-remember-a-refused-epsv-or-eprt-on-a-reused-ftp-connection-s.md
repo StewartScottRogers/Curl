@@ -34,3 +34,4 @@ curl 8.22.0 (`lib/ftp.c`) clears `conn->bits.ftp_use_epsv` / `ftp_use_eprt` once
 ## Log
 
 - 2026-10-14: Created.
+- 2026-10-14: Backlog -> Doing.
