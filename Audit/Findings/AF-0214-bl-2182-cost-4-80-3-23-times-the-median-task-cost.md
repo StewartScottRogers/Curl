@@ -3,8 +3,8 @@ id: AF-0214
 title: BL-2182 cost $4.80, 3.23 times the median task cost, over 92 turns of Bash-sliced code reading
 auditor: process
 severity: Low
-status: accepted
-reason: 
+status: closed
+reason: Audit 2026-10-14_1815.md: a cost-outlier finding records a past run's cost, which no fix can change; its tasks (BL-2216) are Done at d86a80f0091f, so it closes without a re-audit (ADR-0422, amended 2026-10-14).
 key: process:logs:BL-2182:cost-outlier
 reproduction: none
 task: BL-2216
@@ -13,9 +13,9 @@ found: 2026-10-14
 found-at: c1dedd04f2a8e1534e64b664312c5dacc66bdf4a
 scorecard: 2026-10-14_0453.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-14
+closed-how: task-done-historical
+closed-by: 2026-10-14_1815.md
 ---
 # AF-0214 - BL-2182 cost $4.80, 3.23 times the median task cost, over 92 turns of Bash-sliced code reading
 
@@ -46,3 +46,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 - 2026-10-14: filed proposed.
 - 2026-10-14: proposed -> accepted.
+- 2026-10-14: accepted -> closed. Audit 2026-10-14_1815.md: a cost-outlier finding records a past run's cost, which no fix can change; its tasks (BL-2216) are Done at d86a80f0091f, so it closes without a re-audit (ADR-0422, amended 2026-10-14).

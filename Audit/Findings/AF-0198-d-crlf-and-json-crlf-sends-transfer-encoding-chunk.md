@@ -3,8 +3,8 @@ id: AF-0198
 title: -d '' --crlf (and --json '' --crlf) sends Transfer-Encoding: chunked with a 0 chunk where curl sends Content-Length: 0
 auditor: conformance
 severity: Medium
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-14_1815.md: the reproduction no longer reproduces.
 key: conformance:--crlf:HttpRequestFraming.OfBody:request
 reproduction: none
 task: BL-2191
@@ -13,9 +13,9 @@ found: 2026-10-13
 found-at: c192c3e80e58636be1d282d241a7781f7df86695
 scorecard: 2026-10-13_1822.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-14
+closed-how: reliable-reaudit
+closed-by: 2026-10-14_1815.md
 ---
 # AF-0198 - -d '' --crlf (and --json '' --crlf) sends Transfer-Encoding: chunked with a 0 chunk where curl sends Content-Length: 0
 
@@ -43,8 +43,10 @@ $a=@('-d','','--crlf','http://127.0.0.1:50972/'); foreach($p in @(@('curl','C:\P
 ## Re-audits
 
 - 2026-10-14 | 2026-10-14_0453.md | reproduces: no | Ran the reproduction: 'curl: Content-Length: 0' and 'candidate: Content-Length: 0', with no Transfer-Encoding. The --json '' --crlf variant also sends Content-Length: 0 from both.
+- 2026-10-14 | 2026-10-14_1815.md | reproduces: no | Ran the reproduction against curl 8.22.0 (x86_64-w64-mingw32) libcurl/8.22.0 Schannel and Curl.Console/bin/Release/net10.0/curl.exe built from this tree: 'curl: Content-Length: 0' and 'candidate: Content-Length: 0'. No Transfer-Encoding: chunked in the candidate's request.
 
 ## Log
 
 - 2026-10-13: filed proposed.
 - 2026-10-13: proposed -> accepted.
+- 2026-10-14: accepted -> closed. Re-audit 2026-10-14_1815.md: the reproduction no longer reproduces.
