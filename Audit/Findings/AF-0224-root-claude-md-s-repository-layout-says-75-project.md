@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: truthfulness:CLAUDE.md:repository-layout-project-count:false-statement
 reproduction: none
-task: none
-tasks:
+task: BL-2277
+tasks: BL-2277
 found: 2026-10-15
 found-at: 3e1062e68644127a82ba2f5ef33ceb1044cc6f67
 scorecard: 2026-10-15_0156.md

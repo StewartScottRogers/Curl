@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: quality:Curl.Networking.UnitLibrary/TcpDialer.cs:Connected-true:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/TcpDialer.cs:228:true
-task: none
-tasks:
+task: BL-2275
+tasks: BL-2275
 found: 2026-10-15
 found-at: 3e1062e68644127a82ba2f5ef33ceb1044cc6f67
 scorecard: 2026-10-15_0156.md

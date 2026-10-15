@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: process:logs:CI-run-38666857143:ci-red
 reproduction: none
-task: none
-tasks:
+task: BL-2278
+tasks: BL-2278
 found: 2026-10-15
 found-at: 3e1062e68644127a82ba2f5ef33ceb1044cc6f67
 scorecard: 2026-10-15_0156.md

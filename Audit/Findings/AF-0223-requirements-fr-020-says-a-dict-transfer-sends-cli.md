@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: truthfulness:Documentation/Product/Requirements.md:FR-020:false-statement
 reproduction: none
-task: none
-tasks:
+task: BL-2276
+tasks: BL-2276
 found: 2026-10-15
 found-at: 3e1062e68644127a82ba2f5ef33ceb1044cc6f67
 scorecard: 2026-10-15_0156.md
