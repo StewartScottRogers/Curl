@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests]
+touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests, Curl.Console, Curl.Console.UnitTests]
 requirement: none
 created: 2026-10-15
 completed:
@@ -44,7 +44,31 @@ In Curl.Cli.UnitLibrary, where SslSessionsFile (CommandLineGlobalState, CommandL
 
 ## Notes
 
+- 2026-10-15 (lane 1, first claim, no code written): the file loading and its warnings already
+  exist. `Curl.Console/TlsSessionFileLines.cs` loads the file through
+  `TlsSessionCache.Import` (Curl.Networking.UnitLibrary), which already returns curl's exact
+  lines (`Warning: unrecognized line N in SSL session file F`, `Warning: invalid shmax base64
+  encoding in line N`, ...), and `WarningLineWrapper` already wraps them as curl does
+  (`... in SSL session file ` / `Warning: F`). The gap is ordering: `CurlCommandRunner`
+  loads the file only in `TransferAllGroupsAsync`, which never runs when the parser refuses
+  the command line with `CommandLineRefusal.NoUrlSpecified` (`FoundAtTransferSetup`). Real
+  curl's `operate()` calls `tool_ssls_load` before `get_args`/`run_all_transfers`, where
+  "no URL specified" is met, and calls `tool_ssls_save` after, so it also rewrites the file.
+- Plan: in `CurlCommandRunner.WriteRefusalAsync` (Curl.Console), for a refusal with
+  `FoundAtTransferSetup` and an `SslSessionsFile` on a build that accepts the option (not
+  Schannel; the parser already refuses it there), write the `TlsSessionFileLines.Load` lines
+  before the refusal's lines, then save the file after, as `CloseRunAsync` does. The refused
+  parse result must carry the options (or the session file path and `-s`/`-v` state) to the
+  runner; check what `CommandLineParseResult` keeps for a refusal, and add it in Curl.Cli if
+  missing. Unit test in Curl.Console.UnitTests with a temp file holding a line with no `:`
+  and a line `!!:x`, asserting the warnings come before `curl: (2) no URL specified`; mark it
+  `[OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]` or inject the build
+  flavour, since Schannel refuses the option.
+- Requeued: the work needs Curl.Console and Curl.Console.UnitTests, which BL-2337 (in Doing)
+  touches. Added them to `touches`.
+
 ## Log
 
 - 2026-10-15: Created.
 - 2026-10-15: Backlog -> Doing.
+- 2026-10-15: Doing -> Backlog. Needs Curl.Console and Curl.Console.UnitTests, which BL-2337 (Doing) touches
