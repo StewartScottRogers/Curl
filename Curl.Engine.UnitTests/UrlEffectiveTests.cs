@@ -1,6 +1,6 @@
 using Curl.Testing;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
 /// Pins the URL <see cref="UrlEffective" /> gives <c>%{url_effective}</c>, as curl 8.21.0

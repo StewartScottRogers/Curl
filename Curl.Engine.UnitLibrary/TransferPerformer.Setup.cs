@@ -4,13 +4,12 @@ using System.Text;
 using Curl.Cli;
 using Curl.Core;
 using Curl.Core.Hsts;
-using Curl.Engine;
 using Curl.Protocol.Abstractions;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
-/// The per-transfer setup libcurl does before it connects, split out of <see cref="CurlCommandRunner" />
+/// The per-transfer setup libcurl does before it connects, split out of <c>CurlCommandRunner</c>
 /// (ADR-0506, BL-2283): the URL parse and its refusals, the setopt refusals, the proxy and credential
 /// choice, the SSH options, the <c>-b</c> files, the HSTS upgrade, the alt-svc cache and the setup
 /// failures, and the <c>-c</c> jar, alt-svc and HSTS write-back libcurl does at cleanup. What a step
@@ -45,8 +44,8 @@ internal sealed partial class TransferPerformer
     /// any connection, measured on curl 8.21.0 (BL-576 Notes). It is compared by reference, so that
     /// the runner stops before the remaining URLs, as curl does.
     /// </summary>
-    internal static readonly TransferResult KnownHostsFileMissingFailure =
-        TransferResult.Failure(CurlExitCode.FailedInit, CurlEasyErrorText.Of(CurlExitCode.FailedInit));
+    internal TransferResult KnownHostsFileMissingFailure { get; } =
+        TransferResult.Failure(CurlExitCode.FailedInit, easyErrorText(CurlExitCode.FailedInit));
 
     /// <summary>
     /// The result of a transfer whose <c>--interface</c> value libcurl refuses when curl sets it
@@ -132,7 +131,7 @@ internal sealed partial class TransferPerformer
     /// <summary>
     /// Chooses the transfer's proxy with <see cref="TransferProxySelection" />, then its credentials
     /// with <see cref="TransferCredentialLookup" />, which it keeps as the running transfer's
-    /// <see cref="RunningTransferState.LookedUpCredentials" /> for every attempt's context. A scheme no
+    /// <see cref="EngineTransferState.LookedUpCredentials" /> for every attempt's context. A scheme no
     /// handler serves fails first, with exit 1.
     /// </summary>
     /// <param name="dispatch">The run's dispatch: its dispatcher says whether the URL's scheme is served, its proxy selector chooses the proxy.</param>
@@ -152,7 +151,7 @@ internal sealed partial class TransferPerformer
         TransferDispatch dispatch,
         CommandLineOptions options,
         CurlUrl url,
-        RunningTransferState state,
+        EngineTransferState state,
         ITransferEvents events,
         IDiagnosticLog diagnosticLog,
         TransferCredentialLookup credentialLookup,
@@ -183,7 +182,7 @@ internal sealed partial class TransferPerformer
     }
 
     /// <summary>
-    /// Sets <see cref="RunningTransferState.Ssh" /> for an <c>scp</c> or <c>sftp</c> transfer, resolving its
+    /// Sets <see cref="EngineTransferState.Ssh" /> for an <c>scp</c> or <c>sftp</c> transfer, resolving its
     /// known-hosts file as curl 8.21.0's tool does (ADR-0122): none under <c>-k</c>, whatever
     /// <c>--knownhosts</c> says; else the <c>--knownhosts</c> file; else <paramref name="findKnownHostsFile" />'s.
     /// When none is found, a <c>--hostpubmd5</c> or <c>--hostpubsha256</c> fingerprint lets the transfer
@@ -199,10 +198,10 @@ internal sealed partial class TransferPerformer
     /// <param name="recordKnownHostsFile">Records the file chosen, and whether it is missing, for <c>--libcurl</c>.</param>
     /// <param name="writeErrorLine">Writes a line to standard error.</param>
     /// <returns><see cref="KnownHostsFileMissingFailure" />, or <see langword="null" /> to go on.</returns>
-    internal static async Task<TransferResult?> ResolveSshOptionsAsync(
+    internal async Task<TransferResult?> ResolveSshOptionsAsync(
         CommandLineOptions options,
         CurlUrl url,
-        RunningTransferState state,
+        EngineTransferState state,
         Func<string?> findKnownHostsFile,
         Action<string?, bool> recordKnownHostsFile,
         Func<string, Task> writeErrorLine)
@@ -298,7 +297,7 @@ internal sealed partial class TransferPerformer
     /// <param name="usesOverHttp">Whether the cache also serves plain <c>http</c> origins (<c>CURL_ALTSVC_HTTP</c>).</param>
     /// <returns>A task that completes when the file is read.</returns>
     internal async Task OpenAltSvcCacheAsync(
-        RunningTransferState state,
+        EngineTransferState state,
         CommandLineOptions options,
         string transferUrl,
         IFileSystem fileSystem,
@@ -325,7 +324,7 @@ internal sealed partial class TransferPerformer
     /// <param name="runsOnWindows">Whether the run is the Windows build's.</param>
     /// <param name="writeWarning">Writes a warning's text to standard error, wrapped as every warning is.</param>
     /// <returns>The failure, or <see langword="null" /> when the transfer goes ahead.</returns>
-    internal static async Task<TransferResult?> SetupFailureAsync(
+    internal async Task<TransferResult?> SetupFailureAsync(
         CookieEngine? cookies,
         CommandLineOptions options,
         bool runsOnWindows,
@@ -341,12 +340,12 @@ internal sealed partial class TransferPerformer
             await writeWarning(CookieEngine.CookieLineTooLongWarning).ConfigureAwait(false);
         }
 
-        return TransferResult.Failure(CurlExitCode.TooLarge, CurlEasyErrorText.Of(CurlExitCode.TooLarge));
+        return TransferResult.Failure(CurlExitCode.TooLarge, easyErrorText(CurlExitCode.TooLarge));
     }
 
     /// <summary>
     /// Writes the run's <c>-c</c> jar after the transfer of <paramref name="transferUrl" />, then the
-    /// transfer's <c>--alt-svc</c> file, when it has one (<see cref="RunningTransferState.AltSvc" />), then
+    /// transfer's <c>--alt-svc</c> file, when it has one (<see cref="EngineTransferState.AltSvc" />), then
     /// the group's <c>--hsts</c> file, when it has one (<see cref="HstsCacheFile.WriteAsync" />), as libcurl
     /// writes them at cleanup. The jar is written when there is one and the URL is <c>http</c> or
     /// <c>https</c>, whatever the transfer's outcome: curl 8.21.0 writes it after every HTTP transfer,
@@ -368,7 +367,7 @@ internal sealed partial class TransferPerformer
         CommandLineOptions options,
         string transferUrl,
         Func<Stream> jarPrintTarget,
-        RunningTransferState state,
+        EngineTransferState state,
         HstsTransferPolicy hsts,
         IFileSystem fileSystem,
         bool runsOnWindows)
@@ -398,7 +397,7 @@ internal sealed partial class TransferPerformer
     /// <param name="options">The transfer's option group.</param>
     /// <param name="writeErrorLine">Writes a line to standard error.</param>
     /// <returns><see cref="KnownHostsFileMissingFailure" />, or <see langword="null" /> when the transfer goes on.</returns>
-    private static async Task<TransferResult?> ReportKnownHostsFileMissingAsync(CommandLineOptions options, Func<string, Task> writeErrorLine)
+    private async Task<TransferResult?> ReportKnownHostsFileMissingAsync(CommandLineOptions options, Func<string, Task> writeErrorLine)
     {
         if (options.SshHostPublicKeyMd5 is not null || options.SshHostPublicKeySha256 is not null)
         {

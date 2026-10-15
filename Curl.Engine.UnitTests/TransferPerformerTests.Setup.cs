@@ -2,10 +2,10 @@ using System.Text;
 using Curl.Cli;
 using Curl.Core;
 using Curl.Core.Hsts;
-using Curl.Engine;
+using Curl.Console;
 using Curl.Protocol.Abstractions;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
 /// Pins the per-transfer setup split into <see cref="TransferPerformer" /> (ADR-0506, BL-2283): a
@@ -14,6 +14,17 @@ namespace Curl.Console;
 /// </summary>
 public sealed partial class TransferPerformerTests
 {
+    private readonly TransferPerformer sshPerformer = new(TimeProvider.System, EasyErrorText);
+
+    [TestMethod]
+    public void KnownHostsFileMissingFailure_GivenEasyErrorText_Exits2WithItsTextForExit2()
+    {
+        TransferResult failure = sshPerformer.KnownHostsFileMissingFailure;
+
+        Assert.AreEqual(CurlExitCode.FailedInit, failure.ExitCode);
+        Assert.AreEqual(EasyErrorText(CurlExitCode.FailedInit), failure.ErrorMessage);
+    }
+
     [TestMethod]
     public void ReportUrlRejected_UnparsableHost_Exits3AndReportsTheRejection()
     {
@@ -57,7 +68,7 @@ public sealed partial class TransferPerformerTests
     public void TrySelectProxyAndCredentials_ProxyOption_ChoosesThatProxy()
     {
         CommandLineOptions options = Parse("-x", "http://proxy.example:3128", First);
-        RunningTransferState state = NewState();
+        EngineTransferState state = NewState();
 
         bool selected = TransferPerformer.TrySelectProxyAndCredentials(
             HttpDispatch(), options, CurlUrl.Parse(First), state, new InfoRecordingEvents(), NoDiagnosticLog.Instance, CredentialLookup(),
@@ -92,7 +103,7 @@ public sealed partial class TransferPerformerTests
 
         TransferResult? failure = await ResolveSshAsync(Parse(SftpUrl), lines, recorded);
 
-        Assert.AreSame(TransferPerformer.KnownHostsFileMissingFailure, failure);
+        Assert.AreSame(sshPerformer.KnownHostsFileMissingFailure, failure);
         CollectionAssert.AreEqual(new[] { TransferPerformer.KnownHostsFileMissingLine }, lines);
         CollectionAssert.AreEqual(new (string?, bool)[] { (null, true) }, recorded);
     }
@@ -104,7 +115,7 @@ public sealed partial class TransferPerformerTests
 
         TransferResult? failure = await ResolveSshAsync(Parse("-s", SftpUrl), lines, []);
 
-        Assert.AreSame(TransferPerformer.KnownHostsFileMissingFailure, failure);
+        Assert.AreSame(sshPerformer.KnownHostsFileMissingFailure, failure);
         Assert.IsEmpty(lines);
     }
 
@@ -122,9 +133,9 @@ public sealed partial class TransferPerformerTests
     public async Task ResolveSshOptionsAsync_NoKnownHostsFileWithFingerprint_WarnsAndGoesOn()
     {
         List<string> lines = [];
-        RunningTransferState state = NewState();
+        EngineTransferState state = NewState();
 
-        TransferResult? failure = await TransferPerformer.ResolveSshOptionsAsync(
+        TransferResult? failure = await sshPerformer.ResolveSshOptionsAsync(
             Parse("--hostpubmd5", Md5Fingerprint, SftpUrl), CurlUrl.Parse(SftpUrl), state, () => null, (_, _) => { }, Recorder(lines));
 
         Assert.IsNull(failure);
@@ -146,9 +157,9 @@ public sealed partial class TransferPerformerTests
     [TestMethod]
     public async Task ResolveSshOptionsAsync_HttpUrl_LeavesTheTransferWithoutSshOptions()
     {
-        RunningTransferState state = NewState();
+        EngineTransferState state = NewState();
 
-        TransferResult? failure = await TransferPerformer.ResolveSshOptionsAsync(
+        TransferResult? failure = await sshPerformer.ResolveSshOptionsAsync(
             Parse(First), CurlUrl.Parse(First), state, () => throw new AssertFailedException("searched"), (_, _) => { }, Recorder([]));
 
         Assert.IsNull(failure);
@@ -162,7 +173,7 @@ public sealed partial class TransferPerformerTests
         hsts.StoreFromResponse(CurlUrl.Parse("https://example.com/"), "max-age=31536000", clock.GetUtcNow());
         InfoRecordingEvents events = new();
 
-        string url = await TransferPerformer.SwitchToHttpsForHstsAsync(hsts, Parse("http://example.com/a"), "http://example.com/a", new InMemoryFileSystem(), events);
+        string url = await TransferPerformer.SwitchToHttpsForHstsAsync(hsts, Parse("http://example.com/a"), "http://example.com/a", new ReadRecordingFileSystem(), events);
 
         Assert.AreEqual("https://example.com/a", url);
         CollectionAssert.AreEqual(new[] { HstsTransferPolicy.SwitchedMessagePrefix + "https://example.com/a" }, events.Info);
@@ -173,7 +184,7 @@ public sealed partial class TransferPerformerTests
     {
         InfoRecordingEvents events = new();
 
-        string url = await TransferPerformer.SwitchToHttpsForHstsAsync(new HstsTransferPolicy(clock), Parse(First), First, new InMemoryFileSystem(), events);
+        string url = await TransferPerformer.SwitchToHttpsForHstsAsync(new HstsTransferPolicy(clock), Parse(First), First, new ReadRecordingFileSystem(), events);
 
         Assert.AreEqual(First, url);
         Assert.IsEmpty(events.Info);
@@ -184,11 +195,11 @@ public sealed partial class TransferPerformerTests
     {
         CommandLineOptions options = Parse("-b", "cookies.txt", "http://example.com/");
         CookieEngine cookies = CookieEngine.FromCommandLine(options)!;
-        InMemoryFileSystem fileSystem = new();
+        ReadRecordingFileSystem fileSystem = new();
         fileSystem.ExistingContent["cookies.txt"] = Encoding.ASCII.GetBytes("example.com\tFALSE\t/\tFALSE\t0\tname\tvalue\n");
         InfoRecordingEvents events = new();
 
-        await new TransferPerformer(clock).LoadCookieFilesAsync(cookies, options, "http://example.com/", fileSystem, Stream.Null, events);
+        await new TransferPerformer(clock, EasyErrorText).LoadCookieFilesAsync(cookies, options, "http://example.com/", fileSystem, Stream.Null, events);
 
         Assert.AreEqual("name=value", cookies.HandlerStore.GetCookieHeader(CurlUrl.Parse("http://example.com/"), false, clock.GetUtcNow(), events));
     }
@@ -197,9 +208,9 @@ public sealed partial class TransferPerformerTests
     public async Task LoadCookieFilesAsync_FileUrl_ReadsNoCookieFile()
     {
         CommandLineOptions options = Parse("-b", "cookies.txt", "file:///dir/x");
-        InMemoryFileSystem fileSystem = new();
+        ReadRecordingFileSystem fileSystem = new();
 
-        await new TransferPerformer(clock).LoadCookieFilesAsync(
+        await new TransferPerformer(clock, EasyErrorText).LoadCookieFilesAsync(
             CookieEngine.FromCommandLine(options), options, "file:///dir/x", fileSystem, Stream.Null, new InfoRecordingEvents());
 
         Assert.IsEmpty(fileSystem.ReadPaths);
@@ -221,8 +232,8 @@ public sealed partial class TransferPerformerTests
         return Task.CompletedTask;
     };
 
-    private static Task<TransferResult?> ResolveSshAsync(CommandLineOptions options, List<string> lines, List<(string? File, bool Missing)> recorded) =>
-        TransferPerformer.ResolveSshOptionsAsync(
+    private Task<TransferResult?> ResolveSshAsync(CommandLineOptions options, List<string> lines, List<(string? File, bool Missing)> recorded) =>
+        sshPerformer.ResolveSshOptionsAsync(
             options, CurlUrl.Parse(SftpUrl), NewState(), () => null, (file, missing) => recorded.Add((file, missing)), Recorder(lines));
 
     /// <summary>Records the info lines; drops the rest.</summary>
@@ -271,5 +282,24 @@ public sealed partial class TransferPerformerTests
         public void ReportDataReceived(ReadOnlySpan<byte> bytes)
         {
         }
+    }
+
+    /// <summary>Opens the files it was given for reading, records every path it was asked to read, and writes nothing.</summary>
+    private sealed class ReadRecordingFileSystem : IFileSystem
+    {
+        public Dictionary<string, byte[]> ExistingContent { get; } = [];
+
+        public List<string> ReadPaths { get; } = [];
+
+        public ValueTask<FileOpenResult> OpenForReadAsync(string path, CancellationToken cancellationToken)
+        {
+            ReadPaths.Add(path);
+            return ValueTask.FromResult(ExistingContent.TryGetValue(path, out byte[]? content)
+                ? FileOpenResult.Opened(new MemoryStream(content, writable: false), content.Length, null)
+                : FileOpenResult.Failed(FileAccessStatus.NotFound));
+        }
+
+        public ValueTask<FileOpenResult> OpenForWriteAsync(string path, FileWriteMode mode, UnixFileMode createMode, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
     }
 }

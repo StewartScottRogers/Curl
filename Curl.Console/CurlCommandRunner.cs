@@ -602,7 +602,7 @@ internal sealed class CurlCommandRunner(
     /// run's transfers and connections and keeps when its last serial attempt started, which
     /// <see cref="WaitForTransferStartRateAsync" /> measures <c>--rate</c> from (ADR-0506, BL-2282).
     /// </summary>
-    private readonly TransferPerformer transferPerformer = TransferPerformer.GivenOrOnClock(transferPerformer, timeProvider);
+    private readonly TransferPerformer transferPerformer = TransferPerformer.GivenOrOnClock(transferPerformer, timeProvider, EasyErrorText);
     /// <summary>
     /// The run's HSTS cache, shared by every transfer of every option group and on with or without
     /// <c>--hsts</c>, as curl 8.21.0's tool shares one through its share handle: an <c>https</c>
@@ -2873,6 +2873,7 @@ internal sealed class CurlCommandRunner(
     /// <returns><see langword="true" /> when no further URL is transferred.</returns>
     private bool EndsTheRun(CommandLineOptions options, TransferResult result) =>
         RunEndingFailures.Contains(result)
+        || ReferenceEquals(result, transferPerformer.KnownHostsFileMissingFailure)
         || ReferenceEquals(result, cannotOpenUploadFileAfterFailure)
         || (options.FailEarly && !result.IsSuccess);
 
@@ -2900,11 +2901,18 @@ internal sealed class CurlCommandRunner(
     }
 
     /// <summary>
+    /// <see cref="CurlEasyErrorText.Of" /> as one delegate made once, so no call site re-checks a
+    /// compiler-cached method-group delegate (BL-2291).
+    /// </summary>
+    private static readonly Func<CurlExitCode, string> EasyErrorText = new(CurlEasyErrorText.Of);
+
+    /// <summary>
     /// The results, compared by reference, after which no further URL is transferred whatever
     /// the options: a resumed <c>-o</c> file, a <c>-T</c> or <c>-D</c> file that cannot be opened,
     /// a <c>--create-dirs</c> directory that cannot be created, an IPFS URL that cannot be
-    /// rewritten or asked for its remote name, an SSH transfer with no known-hosts file, and an
-    /// <c>--interface</c> value or <c>--ech</c> mode libcurl refuses when curl sets it.
+    /// rewritten or asked for its remote name, and an <c>--interface</c> value or <c>--ech</c> mode
+    /// libcurl refuses when curl sets it. An SSH transfer with no known-hosts file ends the run too,
+    /// through the performer's own <see cref="TransferPerformer.KnownHostsFileMissingFailure" />.
     /// </summary>
     private static readonly HashSet<TransferResult> RunEndingFailures = new(ReferenceEqualityComparer.Instance)
     {
@@ -2916,7 +2924,6 @@ internal sealed class CurlCommandRunner(
         IpfsMalformedGatewayOptionFailure,
         IpfsMalformedTargetUrlFailure,
         IpfsRemoteNameFailure,
-        TransferPerformer.KnownHostsFileMissingFailure,
         TransferPerformer.InterfaceSetoptFailure,
         TransferPerformer.EchSetoptFailure,
     };
@@ -3180,7 +3187,7 @@ internal sealed class CurlCommandRunner(
 
         await WriteCustomRequestLinesAsync(options, uploadFile).ConfigureAwait(false);
         Stream? etagWatchedHeaderOutput = Running.SaveEtag is { } saveEtag ? new EtagSaveStream(saveEtag, headerOutput) : headerOutput;
-        return await TransferPerformer.SetupFailureAsync(dispatch.Cookies, options, runsOnWindows, WriteWrappedWarningAsync).ConfigureAwait(false)
+        return await transferPerformer.SetupFailureAsync(dispatch.Cookies, options, runsOnWindows, WriteWrappedWarningAsync).ConfigureAwait(false)
             ?? await TransferOpeningUploadFileAsync(dispatch, options, url, uploadFile, transfer, etagWatchedHeaderOutput).ConfigureAwait(false);
     }
 
@@ -3430,7 +3437,7 @@ internal sealed class CurlCommandRunner(
             return proxyFailure;
         }
 
-        if (await TransferPerformer.ResolveSshOptionsAsync(
+        if (await transferPerformer.ResolveSshOptionsAsync(
                 options,
                 url,
                 Running,

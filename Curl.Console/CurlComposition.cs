@@ -41,6 +41,12 @@ namespace Curl.Console;
 internal static class CurlComposition
 {
     /// <summary>
+    /// <see cref="CurlEasyErrorText.Of" /> as one delegate made once, so no call site re-checks a
+    /// compiler-cached method-group delegate (BL-2291).
+    /// </summary>
+    private static readonly Func<CurlExitCode, string> EasyErrorText = new(CurlEasyErrorText.Of);
+
+    /// <summary>
     /// Creates the runner that parses a command line and performs its transfers against
     /// the real disk, the real network and the given standard streams, wrapping warnings at
     /// the width <see cref="TerminalColumns.Resolve()" /> gives. The network
@@ -74,7 +80,7 @@ internal static class CurlComposition
         DnsCache runDnsCache = new();
         LateBoundDiagnosticLog runLog = new();
         return new(
-            SharingRunCookies((options, cookies) => CreateTransferDispatch(CreateTransports(options, TimeProvider.System, runConnections, tlsSessions, runLog, runDnsCache, CurlEasyErrorText.Of), cookies, NegotiateOptionsMapping.FromCommandLine(options))),
+            SharingRunCookies((options, cookies) => CreateTransferDispatch(CreateTransports(options, TimeProvider.System, runConnections, tlsSessions, runLog, runDnsCache, EasyErrorText), cookies, NegotiateOptionsMapping.FromCommandLine(options))),
             new PhysicalFileSystem(),
             new PhysicalFileSystem(),
             standardOutput,
@@ -95,7 +101,7 @@ internal static class CurlComposition
             tlsSessions: tlsSessions,
             extendedAttributeWriter: NativeExtendedAttributeWriter.ForCurrentPlatform(),
             lateBoundDiagnosticLog: runLog,
-            transferPerformer: new TransferPerformer(TimeProvider.System));
+            transferPerformer: new TransferPerformer(TimeProvider.System, EasyErrorText));
     }
 
     /// <summary>
@@ -165,7 +171,7 @@ internal static class CurlComposition
             runConnectionCache: runConnections,
             lateBoundDiagnosticLog: runLog,
             parsesAsWindowsBuild: parsesAsWindowsBuild,
-            transferPerformer: new TransferPerformer(TimeProvider.System));
+            transferPerformer: new TransferPerformer(TimeProvider.System, EasyErrorText));
     }
 
     /// <summary>
@@ -270,7 +276,7 @@ internal static class CurlComposition
             hstsLearnsOverHttp: LearnsHstsOverHttp(honoursHstsHttpVariable, environment),
             altSvcUsesOverHttp: UsesAltSvcOverHttp(honoursAltSvcHttpVariable, environment),
             parsesAsWindowsBuild: parsesAsWindowsBuild,
-            transferPerformer: new TransferPerformer(TimeProvider.System));
+            transferPerformer: new TransferPerformer(TimeProvider.System, EasyErrorText));
     }
 
     /// <summary>

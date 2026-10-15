@@ -87,9 +87,9 @@ is `FixedWallClock` and `ClockOverridingHstsStore` (a `CURL_TIME` of whole secon
 `CRuntimeErrorNumbers` words a C runtime errno as `strerror` does; and `CurlErrorBuffer` cuts a
 message to curl's 255-byte error buffer (ADR-0072; `Curl.Networking` has its own internal copy).
 
-`HstsCacheFile` and `TlsSessionFileLines`, with their tests, stay in
-`Curl.Console` because they use tool-side types (`DeferredOutputFileStream`,
-`HttpVersionMapping`, `ToolNotes`). `CookieEngineTests` uses its own read-only file system fake,
+`TlsSessionFileLines`, with its tests, stays in `Curl.Console` because it uses tool-side types
+(`ToolNotes`). `HstsCacheFile` stayed too until BL-2291 gave it its own `0666` create mode in
+place of `DeferredOutputFileStream.CreateMode` and moved it here. `CookieEngineTests` uses its own read-only file system fake,
 and `SshKnownHostsFileSearchTests` links `InMemoryDataFileReader` from `Curl.Console.UnitTests`.
 
 ## Option mappings and transfer plumbing (BL-2288)
@@ -150,3 +150,18 @@ longer reaches a tool-side type.
 Their tests moved too: `TransferContextFactoryTests`, `TransferContextFactoryMailTests`,
 `AltSvcTransferCacheTests` and `HeaderLineTeeStreamTests` are in `Curl.Engine.UnitTests`, linking
 `ManualTimeProvider` and `SteppingTimeProvider` from `Curl.Console.UnitTests`.
+
+## The transfer performer (BL-2291)
+
+`TransferPerformer` (`TransferPerformer.cs` and `TransferPerformer.Setup.cs`, built in `Curl.Console`
+by BL-2282 to BL-2284) is here: one attempt under its watchdogs, the run's `%{xfer_id}` and
+`%{conn_id}` numbering, and the per-transfer setup and cleanup libcurl does. What it keeps about a
+running transfer is `EngineTransferState` (the attempt's watchdogs, the retry and connection IDs, the
+looked-up credentials, the SSH options and the alt-svc cache); `Curl.Console`'s `RunningTransferState`
+derives from it and adds the tool's part. curl's easy error text comes in through the constructor's
+`easyErrorText` (`CurlEasyErrorText.Of` in production, which stays in `Curl.Console`), so
+`KnownHostsFileMissingFailure` is one per performer and `ResolveSshOptionsAsync` and
+`SetupFailureAsync` are instance methods. `HstsCacheFile` and `UrlEffective` (`%{url_effective}`,
+which the HSTS switch line prints) moved with it. `TransferPerformerTests` and `UrlEffectiveTests`
+are in `Curl.Engine.UnitTests`; the setup tests use their own `ReadRecordingFileSystem` fake, as
+`Curl.Console.UnitTests`' `InMemoryFileSystem` uses tool-side types.

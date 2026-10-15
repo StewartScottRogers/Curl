@@ -1,9 +1,10 @@
 using Curl.Cli;
+using Curl.Console;
 using Curl.Core;
 using Curl.Protocol.Abstractions;
 using HttpRequestOptions = Curl.Protocol.Abstractions.HttpRequestOptions;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
 /// Pins <see cref="TransferPerformer" />, the redirect-following attempt split out of
@@ -24,7 +25,7 @@ public sealed partial class TransferPerformerTests
     public async Task FollowWatchingSpeedAsync_RedirectUnderFollow_FollowsToTheNextUrl()
     {
         ScriptedHandler handler = new(Redirect(302, Next), TransferResult.Success(6));
-        RunningTransferState state = NewState();
+        EngineTransferState state = NewState();
         TransferContext context = new() { Url = CurlUrl.Parse(First), Output = Stream.Null, Http = new HttpRequestOptions { FollowRedirects = true } };
 
         TransferResult result = await TransferPerformer.FollowWatchingSpeedAsync(state, Follower(handler), context, new RedirectPolicy());
@@ -51,8 +52,8 @@ public sealed partial class TransferPerformerTests
     [TestMethod]
     public async Task FollowWatchingSpeedAsync_StalledBelowSpeedLimit_Exits28TooSlow()
     {
-        TransferPerformer performer = new(clock);
-        RunningTransferState state = NewState();
+        TransferPerformer performer = new(clock, EasyErrorText);
+        EngineTransferState state = NewState();
         LowSpeedWatchdog? watchdog = performer.StartLowSpeedWatchdog(state, 100, 2, NoDiagnosticLog.Instance);
         StallingHandler handler = new();
         TransferContext context = new() { Url = CurlUrl.Parse(First), Output = Stream.Null, CancellationToken = watchdog!.Token };
@@ -70,8 +71,8 @@ public sealed partial class TransferPerformerTests
     [TestMethod]
     public async Task FollowWatchingSpeedAsync_PastMaxTime_Exits28TimedOut()
     {
-        TransferPerformer performer = new(clock);
-        RunningTransferState state = NewState();
+        TransferPerformer performer = new(clock, EasyErrorText);
+        EngineTransferState state = NewState();
         performer.StartLowSpeedWatchdog(state, 1, 100, NoDiagnosticLog.Instance);
         MaxTimeWatchdog? watchdog = performer.StartMaxTimeWatchdog(state, TimeSpan.FromSeconds(1), NoDiagnosticLog.Instance);
         StallingHandler handler = new();
@@ -101,8 +102,8 @@ public sealed partial class TransferPerformerTests
     [TestMethod]
     public void StartWatchdogs_NothingToWatch_KeepNone()
     {
-        TransferPerformer performer = new(clock);
-        RunningTransferState state = NewState();
+        TransferPerformer performer = new(clock, EasyErrorText);
+        EngineTransferState state = NewState();
 
         Assert.IsNull(performer.StartLowSpeedWatchdog(state, null, null, NoDiagnosticLog.Instance));
         Assert.IsNull(performer.StartMaxTimeWatchdog(state, null, NoDiagnosticLog.Instance));
@@ -113,7 +114,7 @@ public sealed partial class TransferPerformerTests
     [TestMethod]
     public void RecordSerialAttemptStart_SerialRun_RecordsNowAndParallelRunLeavesIt()
     {
-        TransferPerformer performer = new(clock);
+        TransferPerformer performer = new(clock, EasyErrorText);
         Assert.IsNull(performer.SerialTransferStart);
 
         performer.RecordSerialAttemptStart(runsInParallel: true);
@@ -127,21 +128,21 @@ public sealed partial class TransferPerformerTests
     [TestMethod]
     public void GivenOrOnClock_GivenOrNot_UsesTheGivenOneElseAClockOfItsOwn()
     {
-        TransferPerformer given = new(clock);
+        TransferPerformer given = new(clock, EasyErrorText);
 
-        TransferPerformer onClock = TransferPerformer.GivenOrOnClock(null, clock);
+        TransferPerformer onClock = TransferPerformer.GivenOrOnClock(null, clock, EasyErrorText);
         clock.Advance(TimeSpan.FromSeconds(4));
         onClock.RecordSerialAttemptStart(runsInParallel: false);
 
-        Assert.AreSame(given, TransferPerformer.GivenOrOnClock(given, null));
+        Assert.AreSame(given, TransferPerformer.GivenOrOnClock(given, null, EasyErrorText));
         Assert.AreEqual(clock.GetTimestamp(), onClock.SerialTransferStart);
-        Assert.IsNotNull(TransferPerformer.GivenOrOnClock(null, null));
+        Assert.IsNotNull(TransferPerformer.GivenOrOnClock(null, null, EasyErrorText));
     }
 
     [TestMethod]
     public void TakeIds_CountFromZero()
     {
-        TransferPerformer performer = new(clock);
+        TransferPerformer performer = new(clock, EasyErrorText);
 
         Assert.AreEqual(0, performer.NextTransferId);
         Assert.AreEqual(0, performer.TakeTransferId());
@@ -153,9 +154,9 @@ public sealed partial class TransferPerformerTests
     [TestMethod]
     public void TakeNextAttemptIds_AttemptWithoutConnection_TakesNewIds()
     {
-        TransferPerformer performer = new(clock);
+        TransferPerformer performer = new(clock, EasyErrorText);
         performer.TakeTransferId();
-        RunningTransferState state = NewState();
+        EngineTransferState state = NewState();
 
         performer.TakeNextAttemptIds(state);
 
@@ -168,8 +169,8 @@ public sealed partial class TransferPerformerTests
     [TestMethod]
     public void TakeNextAttemptIds_AttemptWithConnection_KeepsItsConnectionId()
     {
-        TransferPerformer performer = new(clock);
-        RunningTransferState state = NewState();
+        TransferPerformer performer = new(clock, EasyErrorText);
+        EngineTransferState state = NewState();
         state.ConnectionId = 5;
 
         performer.TakeNextAttemptIds(state);
@@ -187,7 +188,7 @@ public sealed partial class TransferPerformerTests
     [DataRow("ftp://h/", 0, false, DisplayName = "another scheme is taken to have opened one")]
     public void KeepRetriedConnectionIdWhenReused_Attempt_KeepsIdOnlyWhenReused(string url, int connections, bool keeps)
     {
-        RunningTransferState state = NewState();
+        EngineTransferState state = NewState();
         state.RetriedConnectionId = 3;
         TransferResult attempt = TransferResult.Success(0) with { Report = new TransferReport { ConnectionCount = connections } };
 
@@ -199,7 +200,7 @@ public sealed partial class TransferPerformerTests
     [TestMethod]
     public void KeepRetriedConnectionIdWhenReused_NoRetriedAttemptOrNoReport_LeavesConnectionId()
     {
-        RunningTransferState state = NewState();
+        EngineTransferState state = NewState();
         TransferContext context = new() { Url = CurlUrl.Parse("http://h/"), Output = Stream.Null };
 
         TransferPerformer.KeepRetriedConnectionIdWhenReused(state, context, TransferResult.Success(0) with { Report = new TransferReport { ConnectionCount = 0 } });
@@ -234,11 +235,10 @@ public sealed partial class TransferPerformerTests
     private static TransferResult Redirect(int status, string location) =>
         TransferResult.Success(0) with { Report = new TransferReport { ResponseCode = status, RedirectUrl = location } };
 
-    private static RunningTransferState NewState()
-    {
-        StandardOutputFailureDeferringStream standardOutput = new(new MemoryStream());
-        return new RunningTransferState(0, Array.Empty<CommandLineOptions>(), CancellationToken.None, standardOutput, standardOutput);
-    }
+    private static EngineTransferState NewState() => new();
+
+    /// <summary>Stands in for curl's easy error text, naming the code it was asked for.</summary>
+    private static string EasyErrorText(CurlExitCode code) => $"easy error text {(int)code}";
 
     /// <summary>Answers each transfer with the next scripted result and records the URLs asked for.</summary>
     private sealed class ScriptedHandler(params TransferResult[] results) : IProtocolHandler

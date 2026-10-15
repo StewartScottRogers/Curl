@@ -2,7 +2,7 @@ using System.Text;
 using Curl.Core.Hsts;
 using Curl.Protocol.Abstractions;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
 /// The <c>--hsts</c> file of a transfer, read into the run's <see cref="HstsTransferPolicy" /> before
@@ -17,6 +17,15 @@ namespace Curl.Console;
 /// </remarks>
 internal static class HstsCacheFile
 {
+    /// <summary>
+    /// The mode a newly created <c>--hsts</c> file receives on a POSIX system, before the umask:
+    /// <c>0666</c>, what curl's <c>fopen</c> uses, as for an <c>-o</c> file.
+    /// </summary>
+    private const UnixFileMode HstsFileCreateMode =
+        UnixFileMode.UserRead | UnixFileMode.UserWrite
+        | UnixFileMode.GroupRead | UnixFileMode.GroupWrite
+        | UnixFileMode.OtherRead | UnixFileMode.OtherWrite;
+
     /// <summary>Reads <paramref name="file" /> into the cache, unless it is empty.</summary>
     /// <param name="file">The <c>--hsts</c> value.</param>
     /// <param name="hsts">The run's HSTS cache.</param>
@@ -64,7 +73,7 @@ internal static class HstsCacheFile
         }
 
         FileOpenResult opened = await fileSystem
-            .OpenForWriteAsync(file, FileWriteMode.Truncate, DeferredOutputFileStream.CreateMode, CancellationToken.None)
+            .OpenForWriteAsync(file, FileWriteMode.Truncate, HstsFileCreateMode, CancellationToken.None)
             .ConfigureAwait(false);
         if (opened.Content is not { } content)
         {

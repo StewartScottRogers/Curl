@@ -72,7 +72,7 @@ gateway or not: `curl: Failed to extract a filename from the URL to use for stor
 `-1`, exit 1, and the run ends (BL-372 Notes). A URL still without a
 scheme gets the one `UrlSchemeGuesser` guesses (`http`, or `ftp` for `ftp.` and so on), which
 `%{url_effective}` shows while `%{url}` keeps the URL as typed. Measured on curl 8.21.0
-(BL-240 Notes). `%{url_effective}` prints the URL `UrlEffective` rebuilds: the scheme in
+(BL-240 Notes). `%{url_effective}` prints the URL `Curl.Engine`'s `UrlEffective` rebuilds: the scheme in
 lower case, the authority as typed, and the path as curl sends it - `/` when empty, dot
 segments removed unless `--path-as-is` - before the query and fragment; a URL curl rejects
 prints as typed, as curl 8.21.0 does (BL-371 and BL-444 Notes).
@@ -104,7 +104,7 @@ The HTTP handler hands the cache every `Alt-Svc` header, `http` or `https`, and 
 does; the shipped `curl` never turns it on (ADR-0497, BL-2263).
 
 The run holds one HSTS cache, `Curl.Core`'s `HstsTransferPolicy`, shared by every transfer of every
-group with or without `--hsts`. Under `--hsts <file>` each transfer reads the file (`HstsCacheFile`)
+group with or without `--hsts`. Under `--hsts <file>` each transfer reads the file (`Curl.Engine`'s `HstsCacheFile`)
 just before it connects, a missing one as empty, and writes the cache back after the `--alt-svc`
 file, whatever the outcome; one that cannot be written is left alone, and `--hsts ""` does neither.
 An `http` URL whose host the cache knows is switched to `https` (the scheme only; an explicit port
@@ -312,14 +312,14 @@ the retry warning. A `-J` name lasts for the whole transfer (`NamedByContentDisp
 `honor_cd_filename`), so a later attempt opens that file at its first body write. Each attempt's
 progress meter starts once the retry wait is over (upstream test 3036, BL-1849).
 
-`TransferPerformer` is libcurl's half of an attempt, split out of the runner (ADR-0506, BL-2282):
+`Curl.Engine`'s `TransferPerformer` is libcurl's half of an attempt, split out of the runner (ADR-0506, BL-2282) and moved to the engine (BL-2291):
 it performs one attempt through `RedirectFollower` under the attempt's `-Y`/`-y` and `-m` watchdogs
-(started by it on its clock and kept on the `RunningTransferState`), turns a watchdog's cancel into
+(started by it on its clock and kept on the transfer's `EngineTransferState`, the engine part `RunningTransferState` derives from), turns a watchdog's cancel into
 its exit 28 failure, numbers the run's `%{xfer_id}` and `%{conn_id}` (`TakeNextAttemptIds`,
 `KeepRetriedConnectionIdWhenReused`) and keeps the serial attempt start `--rate` measures from.
 The `--retry` loop around it (`FollowRetryingAsync`, the retry lines, the `-o` attempt bytes) stays
 in the runner, as retrying is the curl tool's work. `CurlComposition.CreateRunner` builds it; a
-runner given none makes one on its own clock.
+runner given none makes one on its own clock. Both hand it `CurlEasyErrorText.Of`, which stays here, for the text its known-hosts and cookie-line failures carry.
 It also owns the per-transfer setup libcurl does before it connects (`TransferPerformer.Setup.cs`,
 BL-2283): the URL parse and its refusals (`TryParseTransferUrl`, `ReportUrlRejected`,
 `ParsedUrlRefusal`), the `--interface` and `--ech` setopt refusals (`RefuseMalformedSetopt`), the
@@ -328,7 +328,7 @@ known-hosts check (`ResolveSshOptionsAsync`), the `-b` files (`LoadCookieFilesAs
 upgrade (`SwitchToHttpsForHstsAsync`), the alt-svc cache (`OpenAltSvcCacheAsync`), the setup
 failures (`SetupFailureAsync`: the too-long `-b` string, `--engine`), and the `-c` jar, alt-svc and
 HSTS write-back libcurl does at cleanup (`WriteCookieJarAltSvcAndHstsFilesAsync`). Its run-ending
-failures (`KnownHostsFileMissingFailure`, `InterfaceSetoptFailure`, `EchSetoptFailure`) are
+failures (`KnownHostsFileMissingFailure`, one per performer, and the static `InterfaceSetoptFailure` and `EchSetoptFailure`) are
 compared by reference in the runner. A step that writes to standard error does it through a
 delegate the runner passes (`WriteErrorLineAsync`, its wrapped warning writer), `-c -` prints the
 jar to the stream the runner's `jarPrintTarget` gives, and an attempt's body and header bytes go to

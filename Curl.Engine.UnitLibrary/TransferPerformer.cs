@@ -1,17 +1,22 @@
 using Curl.Core;
 using Curl.Protocol.Abstractions;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
 /// Performs one attempt of a transfer, following its redirects under the <c>-Y</c>/<c>-y</c> and
 /// <c>-m</c> watchdogs - what libcurl does inside one <c>curl_easy_perform</c> - and numbers the
 /// run's transfers and connections, as libcurl gives each its <c>%{xfer_id}</c> and
-/// <c>%{conn_id}</c>. The <c>--retry</c> loop around it stays in <see cref="CurlCommandRunner" />,
+/// <c>%{conn_id}</c>. The <c>--retry</c> loop around it stays in <c>CurlCommandRunner</c>,
 /// as retrying is the curl tool's work (<c>tool_operate.c</c>), not libcurl's (ADR-0506, BL-2282).
 /// </summary>
 /// <param name="timeProvider">The clock the watchdogs and the serial attempt start are read on.</param>
-internal sealed partial class TransferPerformer(TimeProvider timeProvider)
+/// <param name="easyErrorText">
+/// Curl's easy error text for each exit code, which the known-hosts and cookie-line failures carry:
+/// <c>Curl.Console</c>'s <c>CurlEasyErrorText.Of</c> in production, as that table stays in
+/// <c>Curl.Console</c>, where <c>Gap/</c> tooling reads it by path (BL-2291).
+/// </param>
+internal sealed partial class TransferPerformer(TimeProvider timeProvider, Func<CurlExitCode, string> easyErrorText)
 {
     /// <summary>The <c>%{conn_id}</c> the next transfer that connects takes, counted per run from zero.</summary>
     private long nextConnectionId;
@@ -38,9 +43,10 @@ internal sealed partial class TransferPerformer(TimeProvider timeProvider)
     /// </summary>
     /// <param name="performer">The performer the runner was given, or <see langword="null" />.</param>
     /// <param name="timeProvider">The clock the runner was given, or <see langword="null" />.</param>
+    /// <param name="easyErrorText">Curl's easy error text for each exit code, for a new performer.</param>
     /// <returns>The performer the runner uses.</returns>
-    internal static TransferPerformer GivenOrOnClock(TransferPerformer? performer, TimeProvider? timeProvider) =>
-        performer ?? new TransferPerformer(timeProvider ?? TimeProvider.System);
+    internal static TransferPerformer GivenOrOnClock(TransferPerformer? performer, TimeProvider? timeProvider, Func<CurlExitCode, string> easyErrorText) =>
+        performer ?? new TransferPerformer(timeProvider ?? TimeProvider.System, easyErrorText);
 
     /// <summary>Takes the next <c>%{xfer_id}</c>.</summary>
     /// <returns>The transfer's number.</returns>
@@ -74,7 +80,7 @@ internal sealed partial class TransferPerformer(TimeProvider timeProvider)
     /// server closed, curl printed <c>xfer_id</c> 2 and <c>conn_id</c> 2 (measured 2026-09-29, BL-799 Notes).
     /// </summary>
     /// <param name="state">The running transfer.</param>
-    internal void TakeNextAttemptIds(RunningTransferState state)
+    internal void TakeNextAttemptIds(EngineTransferState state)
     {
         state.RetriedConnectionId = state.ConnectionId ?? nextConnectionId++;
         state.ConnectionId = null;
@@ -91,7 +97,7 @@ internal sealed partial class TransferPerformer(TimeProvider timeProvider)
     /// <param name="state">The running transfer.</param>
     /// <param name="context">The attempt's context.</param>
     /// <param name="attempt">The attempt's result.</param>
-    internal static void KeepRetriedConnectionIdWhenReused(RunningTransferState state, TransferContext context, TransferResult attempt)
+    internal static void KeepRetriedConnectionIdWhenReused(EngineTransferState state, TransferContext context, TransferResult attempt)
     {
         if (state.RetriedConnectionId is { } retriedConnectionId && ReportsNoConnectionOpened(context, attempt))
         {
@@ -130,7 +136,7 @@ internal sealed partial class TransferPerformer(TimeProvider timeProvider)
     /// <param name="speedTimeSeconds">The <c>-y</c> value in seconds, or <see langword="null" /> when not given.</param>
     /// <param name="diagnosticLog">Where the watchdog writes.</param>
     /// <returns>The started watchdog, or <see langword="null" /> when the speed is not watched.</returns>
-    internal LowSpeedWatchdog? StartLowSpeedWatchdog(RunningTransferState state, long? speedLimit, long? speedTimeSeconds, IDiagnosticLog diagnosticLog) =>
+    internal LowSpeedWatchdog? StartLowSpeedWatchdog(EngineTransferState state, long? speedLimit, long? speedTimeSeconds, IDiagnosticLog diagnosticLog) =>
         state.AttemptLowSpeedWatchdog = LowSpeedWatchdog.StartFromCommandLine(speedLimit, speedTimeSeconds, timeProvider, diagnosticLog);
 
     /// <summary>
@@ -143,7 +149,7 @@ internal sealed partial class TransferPerformer(TimeProvider timeProvider)
     /// <param name="maxTime">The <c>-m</c> value, or <see langword="null" /> when not given.</param>
     /// <param name="diagnosticLog">Where the watchdog writes.</param>
     /// <returns>The started watchdog, or <see langword="null" /> without a positive <c>-m</c>.</returns>
-    internal MaxTimeWatchdog? StartMaxTimeWatchdog(RunningTransferState state, TimeSpan? maxTime, IDiagnosticLog diagnosticLog) =>
+    internal MaxTimeWatchdog? StartMaxTimeWatchdog(EngineTransferState state, TimeSpan? maxTime, IDiagnosticLog diagnosticLog) =>
         state.AttemptMaxTimeWatchdog = MaxTimeWatchdog.StartFromCommandLine(maxTime, timeProvider, diagnosticLog);
 
     /// <summary>
@@ -158,7 +164,7 @@ internal sealed partial class TransferPerformer(TimeProvider timeProvider)
     /// <param name="redirectPolicy">The <c>-L</c> policy.</param>
     /// <returns>The attempt's result, or a watchdog's failure.</returns>
     internal static async Task<TransferResult> FollowWatchingSpeedAsync(
-        RunningTransferState state,
+        EngineTransferState state,
         RedirectFollower follower,
         TransferContext context,
         RedirectPolicy redirectPolicy)

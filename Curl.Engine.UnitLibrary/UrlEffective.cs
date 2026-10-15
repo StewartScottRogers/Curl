@@ -1,6 +1,6 @@
 using Curl.Protocol.Abstractions;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
 /// Normalises a transfer's URL into the one curl 8.21.0 prints for <c>%{url_effective}</c>:
