@@ -37,7 +37,7 @@ Make Curl's chunked upload of an unseekable stdin finish on Linux and macOS the 
 
 ## Acceptance criteria
 
-- [x] `behaviour:test60`: moved to BL-2340, because it does not reproduce outside the gap harness (see Notes).
+- [x] `behaviour:test60`: moved to BL-2341, because it does not reproduce outside the gap harness (see Notes).
 - [x] `behaviour:test1072`: Curl answers what curl answers on linux, exit 65 with 0 bytes on stdout.
 - [x] `behaviour:test1073`: Curl answers what curl answers on linux, exit 65 with 0 bytes on stdout.
 - [x] The CI job on linux runs the platform-neutral tests that pin both platforms' answers. Linux behaviour was also checked against real curl under WSL (see Notes). The finding itself closes only when a gap analysis re-measures it.
@@ -59,11 +59,11 @@ Make Curl's chunked upload of an unseekable stdin finish on Linux and macOS the 
 - **Left as they are (ADR-0524 Consequences).**
   - Curl writes `Issue another request` before the rewind lines, where curl writes it after.
   - A file redirected into Curl's stdin off Windows still gets 65, because `UnixConsoleStream` never seeks.
-- **test60.** It did not reproduce outside the gap harness: the WSL publish sent the closing `0` chunk exactly as curl did, both from a shell pipe and with stdin written late. Filed as BL-2340.
+- **test60.** It did not reproduce outside the gap harness: the WSL publish sent the closing `0` chunk exactly as curl did, both from a shell pipe and with stdin written late. Filed as BL-2341.
 - **Quality.** `Measure-CodeQuality.ps1 -Library Curl.Protocol.Http.UnitLibrary,Curl.Console` flagged `FailureBeforeConnecting` at complexity 14, with 100% line and branch coverage. Splitting it into `RewindFails` and `CannotRewind` brought every method under the gate.
 
 ## Log
 
 - 2026-10-15: Created.
 - 2026-10-15: Backlog -> Doing.
-- 2026-10-15: Doing -> Done. A chunked -T - resend from a piped stdin to an HTTP/1.0 server fails its rewind with exit 65 off Windows, as curl does (test1072, test1073); test60 split to BL-2340
+- 2026-10-15: Doing -> Done. A chunked -T - resend from a piped stdin to an HTTP/1.0 server fails its rewind with exit 65 off Windows, as curl does (test1072, test1073); test60 split to BL-2341

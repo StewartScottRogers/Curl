@@ -1,5 +1,5 @@
 ---
-id: BL-2340
+id: BL-2341
 title: Close GF-0082 test60: send the last 0-chunk of a -T - upload before the gap harness's server answers on Linux and macOS
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-15
 completed:
 ---
-# BL-2340 — Close GF-0082 test60: send the last 0-chunk of a -T - upload before the gap harness's server answers on Linux and macOS
+# BL-2341 — Close GF-0082 test60: send the last 0-chunk of a -T - upload before the gap harness's server answers on Linux and macOS
 
 ## Goal
 
