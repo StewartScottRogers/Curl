@@ -3,8 +3,8 @@ id: AF-0223
 title: Requirements FR-020 says a dict:// transfer sends CLIENT libcurl 8.21.0; the code sends CLIENT libcurl 8.22.0
 auditor: truthfulness
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: truthfulness:Documentation/Product/Requirements.md:FR-020:false-statement
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Documentation/Product/Requirements.md -Pattern 'CLIENT libcu
 ## Log
 
 - 2026-10-15: filed proposed.
+- 2026-10-15: proposed -> accepted.
