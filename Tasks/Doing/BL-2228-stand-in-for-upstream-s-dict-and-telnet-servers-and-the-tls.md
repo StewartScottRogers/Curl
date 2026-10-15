@@ -33,3 +33,4 @@ Follow the existing stand-ins: `ILineProtocolResponder` + `LineProtocolServerCon
 ## Log
 
 - 2026-10-14: Created.
+- 2026-10-14: Backlog -> Doing.
