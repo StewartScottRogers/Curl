@@ -42,3 +42,4 @@ ADR-0506, plan phase 1 step 3 (first move). A mechanical move: no behaviour chan
 ## Log
 
 - 2026-10-15: Created.
+- 2026-10-15: Backlog -> Doing.
