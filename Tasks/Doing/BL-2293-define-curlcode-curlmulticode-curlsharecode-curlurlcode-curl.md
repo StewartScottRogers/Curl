@@ -35,3 +35,4 @@ ADR-0506, "Names": `CurlCode` is a libcurl function's result (`CURLcode`), `Curl
 ## Log
 
 - 2026-10-15: Created.
+- 2026-10-15: Backlog -> Doing.
