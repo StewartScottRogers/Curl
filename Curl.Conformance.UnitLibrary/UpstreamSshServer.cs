@@ -26,6 +26,12 @@ public sealed record UpstreamSshServer(
     public const int SshPort = 9003;
 
     /// <summary>
+    /// The host key's algorithm name as a <c>known_hosts</c> line writes it, <c>%SSHKEYALGO</c>:
+    /// <c>ssh-ed25519</c> unless set (<c>ssh-rsa</c> for the RSA host key the Windows build of curl reads).
+    /// </summary>
+    public string HostKeyAlgorithm { get; init; } = "ssh-ed25519";
+
+    /// <summary>
     /// Puts the server on <see cref="SshPort"/> in front of the case's other servers.
     /// </summary>
     /// <param name="otherPorts">Where every connection to another port goes.</param>

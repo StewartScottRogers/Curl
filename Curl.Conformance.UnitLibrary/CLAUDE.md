@@ -229,8 +229,7 @@ every platform; a file part named `log/<name>` and a `log/<name>` word in `<comm
 whose `data/` holds the httpsig key files, BL-2183), and with none it has no value and skips the case
 (ADR-0458, BL-1944); `UpstreamCurlPlatform.WithFeatures` adds a feature the harness stands in for
 (`Debug` for the httpsig cases, whose fixed `created=0` the tests supply as the signing clock); curl's `--output` is `%LOGDIR/curl%TESTNUMBER.out`, as `runtests.pl` names it, and `--trace-ascii %LOGDIR/trace%TESTNUMBER --trace-config all --trace-time` follow `--include` as `runtests.pl` passes them, so the default config file's note prints as test433 expects (BL-2017);
-`%PWD` elsewhere has a value only when the caller names a tests
-directory, and `%CERTDIR` only when it names a certificate directory: the folder holding
+`%PWD` elsewhere is the tests directory the caller names, else its source directory (the same release `tests` folder, as `runtests.pl`'s working directory; so 726, 1145 and 3009 pass, BL-2224), and has no value when it names neither; `%LIBTESTS` is `./libtest/libtests` (`UpstreamCaseRunner.LibTestsProgram`), a path with no runner behind it, since every case naming it (518, 537, 678, 1960) skips for its `<tool>`; and `%CERTDIR` only when it names a certificate directory: the folder holding
 upstream's `certs` folder, since cases name `%CERTDIR/certs/test-ca.crt` (BL-1922; the
 conformance tests pass the parent of the `certs` folder `UpstreamTestCertificateGenerator` writes, BL-1923); a log, tests or certificate directory
 holding a blank is refused, since commands name them unquoted, GF-0044), writes `<client><file>` parts into
@@ -311,7 +310,7 @@ variables have no value and the SSH cases skip. Given one, `%SSHPORT` is 9003
 (`UpstreamSshServer.SshPort`; TCP, so it does not clash with the TFTP stand-in's UDP 9003) and
 `InFrontOf` puts a fresh server from `CreateServer` on that port in front of the case's other
 stand-ins; `%USER` is its `User`; `%SFTP_PWD` and `%SCP_PWD` are empty, as `%LOGDIR` is already
-absolute; `%SSHSRVMD5` and `%SSHSRVSHA256` are its host key's fingerprints; and before curl runs
+absolute; `%SSHSRVMD5` and `%SSHSRVSHA256` are its host key's fingerprints, and `%SSHKEYALGO` its `HostKeyAlgorithm` as a `known_hosts` line names it (`ssh-rsa` from the factory on Windows, `ssh-ed25519` elsewhere and by default; BL-2224); and before curl runs
 its client key files are written as `%LOGDIR/server/curl_client_key` and `curl_client_key.pub`,
 as `sshserver.pl` writes them. That library's `UpstreamSshServerFactory.Create(windowsBuildOfCurl)`
 builds the record (BL-2217), for the conformance tests and the gap office's tool alike: the RSA

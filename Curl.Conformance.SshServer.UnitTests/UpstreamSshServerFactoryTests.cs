@@ -15,6 +15,7 @@ public sealed class UpstreamSshServerFactoryTests
         Assert.AreEqual(SshServerRsaClientKey.PublicKeyLine + "\n", Encoding.ASCII.GetString(server.ClientPublicKeyFile.Span));
         Assert.AreEqual(SshServerRsaHostKey.Md5Fingerprint, server.HostKeyMd5);
         Assert.AreEqual(SshServerRsaHostKey.Sha256Fingerprint, server.HostKeySha256);
+        Assert.AreEqual("ssh-rsa", server.HostKeyAlgorithm);
     }
 
     [TestMethod]
@@ -27,6 +28,7 @@ public sealed class UpstreamSshServerFactoryTests
         CollectionAssert.AreEqual(SshServerClientAccount.CreatePublicKeyFile(), server.ClientPublicKeyFile.ToArray());
         Assert.AreEqual(SshServerHostKey.Md5Fingerprint, server.HostKeyMd5);
         Assert.AreEqual(SshServerHostKey.Sha256Fingerprint, server.HostKeySha256);
+        Assert.AreEqual("ssh-ed25519", server.HostKeyAlgorithm);
     }
 
     [TestMethod]

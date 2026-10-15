@@ -95,8 +95,8 @@ values (BL-1954): the RSA key's on Windows, the Ed25519 key's elsewhere.
 `UpstreamSshServer` record of `Curl.Conformance.UnitLibrary` (which this library references)
 that the case runner puts on `%SSHPORT`: a fresh `SshServerConnector` per case, user
 `curltest`, and for `true` (curl's WinCNG build) the `SshServerRsaClientKey` files and
-`SshServerRsaHostKey` fingerprints, for `false` the Ed25519 account files and
-`SshServerHostKey` fingerprints. It exists so `UpstreamConformanceTests` and the gap office's
+`SshServerRsaHostKey` fingerprints and `HostKeyAlgorithm` `ssh-rsa`, for `false` the Ed25519
+account files, `SshServerHostKey` fingerprints and `ssh-ed25519` (the runner's `%SSHKEYALGO`, BL-2224). It exists so `UpstreamConformanceTests` and the gap office's
 `Gap/Tools/Measure-UpstreamCases.cs` build the same server with one public call
 (`UpstreamSshServerFactory.Create(OperatingSystem.IsWindows())`), without reaching these
 internal keys.

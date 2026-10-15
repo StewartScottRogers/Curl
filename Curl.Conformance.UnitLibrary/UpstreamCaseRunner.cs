@@ -22,7 +22,7 @@ namespace Curl.Conformance;
 /// </para>
 /// <para>
 /// <c>%LOGDIR</c> is the absolute log directory with forward slashes, so cases can run in
-/// parallel, <c>%PWD</c> is the tests directory the caller names, with forward slashes, and <c>%FILE_PWD</c> is empty, so <c>file://localhost%FILE_PWD/%LOGDIR/…</c> still
+/// parallel, <c>%PWD</c> is the tests directory the caller names (else the source directory, the same release <c>tests</c> folder), with forward slashes, <c>%LIBTESTS</c> is <see cref="LibTestsProgram"/>, and <c>%FILE_PWD</c> is empty, so <c>file://localhost%FILE_PWD/%LOGDIR/…</c> still
 /// names the file. <see cref="UpstreamTestDirectoryComposition"/> first rewrites <c>%PWD/%LOGDIR</c>
 /// to <c>%LOGDIR</c>, and <c>%SRCDIR</c> before the two emulated <c>libtest</c> scripts to <c>.</c>;
 /// any other <c>%SRCDIR</c> is the source directory the caller names, with forward slashes, and has no value when it names none. As upstream does, standard output and standard error are saved to
@@ -42,10 +42,10 @@ namespace Curl.Conformance;
 /// <param name="sshServer">
 /// The stand-in for upstream's test <c>sshd</c> (BL-1916), or <see langword="null"/> to leave
 /// <c>%SSHPORT</c>, <c>%USER</c>, <c>%SFTP_PWD</c>, <c>%SCP_PWD</c>, <c>%SSHSRVMD5</c> and
-/// <c>%SSHSRVSHA256</c> without a value, so the SSH cases skip. Given one, <c>%SSHPORT</c> is
+/// <c>%SSHSRVSHA256</c> and <c>%SSHKEYALGO</c> without a value, so the SSH cases skip. Given one, <c>%SSHPORT</c> is
 /// <see cref="UpstreamSshServer.SshPort"/>, <c>%USER</c> its user, <c>%SFTP_PWD</c> and
 /// <c>%SCP_PWD</c> are empty (as <c>%FILE_PWD</c>, since <c>%LOGDIR</c> is already absolute), the
-/// two fingerprints are its host key's, and its client key files are written to
+/// two fingerprints and <c>%SSHKEYALGO</c> are its host key's, and its client key files are written to
 /// <c>%LOGDIR/server/</c> before the run.
 /// </param>
 public sealed class UpstreamCaseRunner(
@@ -125,6 +125,13 @@ public sealed class UpstreamCaseRunner(
     /// <summary>The value of <c>%VERSION</c>: the curl release Curl matches.</summary>
     public const string CurlVersion = "8.22.0";
 
+    /// <summary>
+    /// The value of <c>%LIBTESTS</c>, <c>runtests.pl</c>'s path to the libtest runner. Every case naming it at
+    /// <c>curl-8_22_0</c> (518, 537, 678, 1960) runs a <c>&lt;tool&gt;</c>, which screening skips for that reason,
+    /// so no runner stands behind the path.
+    /// </summary>
+    public const string LibTestsProgram = "./libtest/libtests";
+
     private const string HostAddress = "127.0.0.1";
 
     // runtests.pl's $HOST6IP: the IPv6 loopback, bracketed for a URL.
@@ -144,8 +151,9 @@ public sealed class UpstreamCaseRunner(
     /// </param>
     /// <param name="testsDirectory">
     /// The release's <c>tests</c> folder, <c>%PWD</c>, by an absolute path with no blank in it, as
-    /// <c>runtests.pl</c>'s working directory; <see langword="null"/> leaves <c>%PWD</c> without a
-    /// value, so a case that uses it is skipped.
+    /// <c>runtests.pl</c>'s working directory; <see langword="null"/> gives <c>%PWD</c> the
+    /// <paramref name="sourceDirectory"/>, the same folder, and leaves it without a value when that is
+    /// <see langword="null"/> too, so a case that uses it is skipped.
     /// </param>
     /// <param name="certificateDirectory">
     /// The folder holding upstream's <c>certs</c> folder, <c>%CERTDIR</c> (cases name
@@ -169,16 +177,11 @@ public sealed class UpstreamCaseRunner(
         int testNumber, ReadOnlyMemory<byte> testFile, string logDirectory, string? testsDirectory = null, string? certificateDirectory = null, string? sourceDirectory = null)
     {
         ArgumentNullException.ThrowIfNull(logDirectory);
-        RefuseABlank(logDirectory, "log directory", nameof(logDirectory));
-        RefuseABlank(testsDirectory ?? string.Empty, "tests directory", nameof(testsDirectory));
-        RefuseABlank(certificateDirectory ?? string.Empty, "certificate directory", nameof(certificateDirectory));
-        RefuseABlank(sourceDirectory ?? string.Empty, "source directory", nameof(sourceDirectory));
+        RefuseBlanks(logDirectory, testsDirectory, certificateDirectory, sourceDirectory);
 
         string logDirectoryVariable = logDirectory.Replace('\\', '/');
         Dictionary<string, string> variables = Variables(testNumber, logDirectoryVariable);
-        AddDirectoryVariable(variables, "PWD", testsDirectory);
-        AddDirectoryVariable(variables, "SRCDIR", sourceDirectory);
-        AddDirectoryVariable(variables, "CERTDIR", certificateDirectory);
+        AddDirectoryVariables(variables, testsDirectory, certificateDirectory, sourceDirectory);
         AddTlsPorts(variables, certificateDirectory);
         AddSshVariables(variables);
 
@@ -206,6 +209,22 @@ public sealed class UpstreamCaseRunner(
                 ?? UpstreamCaseScreening.FindFileOutsideLogDirectory(testCase, logDirectory)) is { } reason
             ? UpstreamCaseOutcome.Skipped(reason)
             : null;
+    }
+
+    private static void RefuseBlanks(string logDirectory, string? testsDirectory, string? certificateDirectory, string? sourceDirectory)
+    {
+        RefuseABlank(logDirectory, "log directory", nameof(logDirectory));
+        RefuseABlank(testsDirectory ?? string.Empty, "tests directory", nameof(testsDirectory));
+        RefuseABlank(certificateDirectory ?? string.Empty, "certificate directory", nameof(certificateDirectory));
+        RefuseABlank(sourceDirectory ?? string.Empty, "source directory", nameof(sourceDirectory));
+    }
+
+    // runtests.pl's working directory, %PWD, is the release's tests folder, which is also its %SRCDIR.
+    private static void AddDirectoryVariables(Dictionary<string, string> variables, string? testsDirectory, string? certificateDirectory, string? sourceDirectory)
+    {
+        AddDirectoryVariable(variables, "PWD", testsDirectory ?? sourceDirectory);
+        AddDirectoryVariable(variables, "SRCDIR", sourceDirectory);
+        AddDirectoryVariable(variables, "CERTDIR", certificateDirectory);
     }
 
     private static void RefuseABlank(string directory, string description, string parameterName)
@@ -247,6 +266,7 @@ public sealed class UpstreamCaseRunner(
             variables["SCP_PWD"] = string.Empty;
             variables["SSHSRVMD5"] = sshServer.HostKeyMd5;
             variables["SSHSRVSHA256"] = sshServer.HostKeySha256;
+            variables["SSHKEYALGO"] = sshServer.HostKeyAlgorithm;
         }
     }
 
@@ -294,6 +314,7 @@ public sealed class UpstreamCaseRunner(
             ["DEV_NULL"] = platform.NullDevice,
             ["PERL"] = UpstreamPerlOneLiner.Program,
             ["RESOLVE"] = UpstreamResolveCheck.Program,
+            ["LIBTESTS"] = LibTestsProgram,
             ["HOST6IP"] = Host6Address,
             ["HTTP6PORT"] = Http6Port,
             ["GOPHERPORT"] = GopherPort,

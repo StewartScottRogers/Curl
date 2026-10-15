@@ -543,6 +543,45 @@ public sealed class UpstreamCaseRunnerTests
     }
 
     [TestMethod]
+    public async Task RunAsync_SourceDirectoryAndNoTestsDirectory_GivesPwdTheSourceDirectory()
+    {
+        // runtests.pl runs in the release's tests folder, which is also its %SRCDIR (test726's HOME=%PWD, BL-2224).
+        var diagnostics = TestDiagnostics.For(TestContext);
+        string logDirectory = CreateLogDirectory();
+        IReadOnlyList<string>? arguments = null;
+        UpstreamCaseRunner runner = Runner(invocation =>
+        {
+            arguments = CommandArguments(invocation);
+            return Task.FromResult(0);
+        });
+
+        UpstreamCaseOutcome outcome = await runner.RunAsync(5, Encoding.Latin1.GetBytes("<testcase>\n<client>\n<command option=\"no-output,no-include\">\n%PWD/not-there\n</command>\n</client>\n</testcase>\n"), logDirectory, sourceDirectory: logDirectory);
+
+        string expected = logDirectory.Replace('\\', '/') + "/not-there";
+        diagnostics.Assert("argument", expected, arguments?.SingleOrDefault());
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Passed, outcome.Kind, outcome.Detail);
+        Assert.AreEqual(expected, arguments!.Single());
+    }
+
+    [TestMethod]
+    public async Task RunAsync_LibTests_IsTheLibtestRunnerPath()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        IReadOnlyList<string>? arguments = null;
+        UpstreamCaseRunner runner = Runner(invocation =>
+        {
+            arguments = CommandArguments(invocation);
+            return Task.FromResult(0);
+        });
+
+        UpstreamCaseOutcome outcome = await RunAsync(runner, "<testcase>\n<client>\n<command option=\"no-output,no-include\">\n%LIBTESTS\n</command>\n</client>\n</testcase>\n");
+
+        diagnostics.Assert("argument", "./libtest/libtests", arguments?.SingleOrDefault());
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Passed, outcome.Kind, outcome.Detail);
+        Assert.AreEqual("./libtest/libtests", arguments!.Single());
+    }
+
+    [TestMethod]
     public async Task RunAsync_PwdBeforeLogDir_NamesTheFileInTheLogDirectoryWithNoTestsDirectory()
     {
         var diagnostics = TestDiagnostics.For(TestContext);
@@ -694,7 +733,10 @@ public sealed class UpstreamCaseRunnerTests
             Encoding.ASCII.GetBytes("private"),
             Encoding.ASCII.GetBytes("public"),
             "0011",
-            "abc/def");
+            "abc/def")
+        {
+            HostKeyAlgorithm = "ssh-rsa",
+        };
         UpstreamCaseRunner runner = new(
             async invocation =>
             {
@@ -708,10 +750,10 @@ public sealed class UpstreamCaseRunnerTests
             TimeSpan.FromSeconds(10),
             sshServer);
 
-        await RunWithLogDirectoryAsync(runner, "<testcase>\n<client>\n<server>\nnone\n</server>\n<command option=\"no-output,no-include\">\n%SSHPORT %USER [%SFTP_PWD] [%SCP_PWD] %SSHSRVMD5 %SSHSRVSHA256\n</command>\n</client>\n</testcase>\n", logDirectory);
+        await RunWithLogDirectoryAsync(runner, "<testcase>\n<client>\n<server>\nnone\n</server>\n<command option=\"no-output,no-include\">\n%SSHPORT %USER [%SFTP_PWD] [%SCP_PWD] %SSHSRVMD5 %SSHSRVSHA256 %SSHKEYALGO\n</command>\n</client>\n</testcase>\n", logDirectory);
 
-        diagnostics.Assert("arguments", "9003 curltest [] [] 0011 abc/def", string.Join(' ', arguments!));
-        CollectionAssert.AreEqual(new[] { "9003", "curltest", "[]", "[]", "0011", "abc/def" }, arguments);
+        diagnostics.Assert("arguments", "9003 curltest [] [] 0011 abc/def ssh-rsa", string.Join(' ', arguments!));
+        CollectionAssert.AreEqual(new[] { "9003", "curltest", "[]", "[]", "0011", "abc/def", "ssh-rsa" }, arguments);
         diagnostics.Assert("connector reached on %SSHPORT", "ssh server", sshServerReached);
         Assert.AreEqual("ssh server", sshServerReached);
         Assert.AreEqual("private", await File.ReadAllTextAsync(Path.Combine(logDirectory, "server", "curl_client_key")));

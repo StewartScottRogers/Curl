@@ -28,13 +28,19 @@ public static class UpstreamSshServerFactory
             Encoding.ASCII.GetBytes(SshServerRsaClientKey.PublicKeyLine + "\n"),
             SshServerRsaHostKey.Md5Fingerprint,
             SshServerRsaHostKey.Sha256Fingerprint)
+        {
+            HostKeyAlgorithm = "ssh-rsa",
+        }
         : new(
             ServerPerCase,
             SshServerClientAccount.User,
             SshServerClientAccount.CreatePrivateKeyFile(),
             SshServerClientAccount.CreatePublicKeyFile(),
             SshServerHostKey.Md5Fingerprint,
-            SshServerHostKey.Sha256Fingerprint);
+            SshServerHostKey.Sha256Fingerprint)
+        {
+            HostKeyAlgorithm = "ssh-ed25519",
+        };
 
     // Held in a field, so Create has no delegate-cache branch for a test to miss.
     private static readonly Func<IConnector> ServerPerCase = () => new SshServerConnector(new SystemSshRandomSource());

@@ -13,6 +13,17 @@ public sealed class UpstreamSshServerTests
     public TestContext TestContext { get; set; } = null!;
 
     [TestMethod]
+    public void HostKeyAlgorithm_NotSet_IsSshEd25519()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+
+        UpstreamSshServer server = new(() => new NamedConnector("ssh"), "user", ReadOnlyMemory<byte>.Empty, ReadOnlyMemory<byte>.Empty, "md5", "sha256");
+
+        diagnostics.Assert("host key algorithm", "ssh-ed25519", server.HostKeyAlgorithm);
+        Assert.AreEqual("ssh-ed25519", server.HostKeyAlgorithm);
+    }
+
+    [TestMethod]
     [DataRow(UpstreamSshServer.SshPort, "ssh")]
     [DataRow(8990, "other")]
     public async Task InFrontOf_ConnectToPort_ReachesTheServerForThatPort(int port, string expected)
