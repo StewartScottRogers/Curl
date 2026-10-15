@@ -4,11 +4,11 @@ title: Upstream curl 8.22.0 changed options items
 area: options
 key: options:newest
 severity: High
-status: open
+status: closed
 scope: target
 introduced-in: 8.22.0
 opened: 2026-10-09_0050
-closed:
+closed: 2026-10-15_0304
 regression: true
 items: [options:--httpsig-algo, options:--httpsig-headers, options:--httpsig-key, options:--httpsig-keyid, options:--httpsig-algo:argument, options:--httpsig-headers:argument, options:--httpsig-key:argument, options:--httpsig-keyid:argument]
 touches: []
@@ -42,6 +42,7 @@ Bring these items to Curl when the target moves to 8.22.0.
 - 2026-10-12_2042: 0 of 4 items are gaps. 4 not in this run's measurement.
 - 2026-10-13_1406: 0 of 4 items are gaps.
 - 2026-10-14_0904: 8 of 8 items are gaps.
+- 2026-10-15_0304: 0 of 8 items are gaps.
 
 ## Log
 
@@ -52,3 +53,4 @@ Bring these items to Curl when the target moves to 8.22.0.
 - 2026-10-14_0904: Added options:--httpsig-algo:argument, options:--httpsig-headers:argument, options:--httpsig-key:argument, options:--httpsig-keyid:argument from gap-options.
 - 2026-10-14_0904: Reopened as a regression: run 2026-10-14_0904 measured options:--httpsig-algo, options:--httpsig-headers, options:--httpsig-key, options:--httpsig-keyid, options:--httpsig-algo:argument, options:--httpsig-headers:argument, options:--httpsig-key:argument, options:--httpsig-keyid:argument as gap again.
 - 2026-10-14_0950: Filed BL-2235.
+- 2026-10-15_0304: Closed: run 2026-10-15_0304 measured every item as match or excluded.
