@@ -1,5 +1,5 @@
 ---
-id: BL-2351
+id: BL-2353
 title: Thread EasyAuthenticationOptions through EngineComposition's transport factories for Negotiate and proxy authentication
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-15
 completed:
 ---
-# BL-2351 — Thread EasyAuthenticationOptions through EngineComposition's transport factories for Negotiate and proxy authentication
+# BL-2353 — Thread EasyAuthenticationOptions through EngineComposition's transport factories for Negotiate and proxy authentication
 
 ## Goal
 
