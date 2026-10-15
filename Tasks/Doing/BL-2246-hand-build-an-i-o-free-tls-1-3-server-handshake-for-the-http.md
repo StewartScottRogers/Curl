@@ -34,3 +34,4 @@ Scope: parse ClientHello; pick TLS_AES_128_GCM_SHA256 (also accept the client's 
 ## Log
 
 - 2026-10-14: Created.
+- 2026-10-14: Backlog -> Doing.
