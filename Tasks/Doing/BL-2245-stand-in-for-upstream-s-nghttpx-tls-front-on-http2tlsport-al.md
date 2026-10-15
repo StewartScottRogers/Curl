@@ -31,3 +31,4 @@ Split out of BL-2230 (2026-10-14): BL-2230 puts the h2c server (BL-2244) on `%HT
 ## Log
 
 - 2026-10-14: Created.
+- 2026-10-14: Backlog -> Doing.
