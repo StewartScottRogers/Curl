@@ -131,8 +131,8 @@ namespace Curl.Protocol.Http;
 /// <para>
 /// With <see cref="HttpRequestOptions.AltSvcRoute" /> the connect target carries the alternative
 /// for the connector to dial and the request sends <c>Alt-Used</c> naming it; with
-/// <see cref="HttpRequestOptions.AltSvcStore" /> each <c>Alt-Svc</c> header of a response to an
-/// <c>https</c> URL is handed to the store as it arrives, and each alternative the store added is
+/// <see cref="HttpRequestOptions.AltSvcStore" /> each <c>Alt-Svc</c> header is handed to the store
+/// as it arrives (the store decides whether a plain <c>http</c> origin's is learned), and each alternative the store added is
 /// reported as <c>Added alt-svc: &lt;host&gt;:&lt;port&gt; over &lt;id&gt;</c> before the header
 /// line. Measured on curl 8.21.0 (BL-623 and BL-878 Notes).
 /// </para>
@@ -2328,20 +2328,20 @@ public sealed class HttpProtocolHandler(
             : storedFromResponse;
 
     /// <summary>
-    /// Hands <paramref name="header" />, when it is an <c>Alt-Svc</c> header of a response to an
-    /// <c>https</c> URL and <paramref name="store" /> is set, to the store with the transfer's
+    /// Hands <paramref name="header" />, when it is an <c>Alt-Svc</c> header and
+    /// <paramref name="store" /> is set, to the store with the transfer's
     /// URL as the origin, and reports curl 8.21.0's <c>Added alt-svc: &lt;host&gt;:&lt;port&gt; over
     /// &lt;id&gt;</c> for each alternative it added, before the header line (measured, BL-623
     /// Notes), and for each it skipped the <c>lib/altsvc.c</c> line its reason names, in header
-    /// order (measured, ADR-0409). curl learns no
-    /// alternative over plain <c>http</c>. The store is told
+    /// order (measured, ADR-0409). The store decides whether a plain <c>http</c> origin's header is
+    /// learned: curl's release build learns none, its debug build does under <c>CURL_ALTSVC_HTTP</c>
+    /// (ADR-0497). The store is told
     /// <paramref name="responseVersion" />, the version the response came over, as curl 8.21.0
     /// passes <c>k->httpversion</c> to <c>Curl_altsvc_parse</c> (BL-947).
     /// </summary>
     private static void StoreAltSvc(ITransferContext context, IAltSvcStore? store, Version responseVersion, HttpResponseHeader header)
     {
         if (store is null
-            || context.Url.Scheme != "https"
             || !string.Equals(header.Name, "Alt-Svc", StringComparison.OrdinalIgnoreCase))
         {
             return;

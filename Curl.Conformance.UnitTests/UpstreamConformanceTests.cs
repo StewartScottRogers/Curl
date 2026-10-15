@@ -383,14 +383,21 @@ public sealed class UpstreamConformanceTests
     // case that also names httpsig, and RunCurlAsync signs those commands with a clock fixed at the epoch (BL-2183).
     // The HSTS cases that fix the clock with CURL_TIME (446, 780-783) rely on it too: the harness reports Debug to a
     // case naming the HSTS feature and setting CURL_TIME, and RunCurlAsync has Curl honour CURL_TIME as the HSTS clock
-    // (ADR-0493, BL-2234), and CURL_HSTS_HTTP, when set, as learning HSTS over plain http (ADR-0494, BL-2250). Every other case sees no Debug, so the other Debug cases stay skipped.
+    // (ADR-0493, BL-2234), and CURL_HSTS_HTTP, when set, as learning HSTS over plain http (ADR-0494, BL-2250).
+    // The Alt-Svc cases that set CURL_ALTSVC_HTTP (358, 359) rely on it to learn and look up Alt-Svc over plain http:
+    // the harness reports Debug to a case naming the alt-svc feature and setting CURL_ALTSVC_HTTP, and RunCurlAsync has
+    // Curl honour it (ADR-0497, BL-2263). The cases against nghttpx's TLS front on %HTTP2TLSPORT (2400, 2401, 2406) name
+    // Debug only because upstream runs its http/2 cases on debug builds; they use nothing debug-only, so the harness
+    // reports Debug to a case whose command names %HTTP2TLSPORT. Every other case sees no Debug, so the other Debug cases stay skipped.
     // A case naming the dns server (2102 to 2104) relies on override-dns, the debug build's CURL_DNS_SERVER: the harness
     // reports it to that case alone, and RunCurlAsync has Curl ask the dnsd stand-in on %DNSPORT through the datagram connector (ADR-0492, BL-2232).
     private static UpstreamCurlPlatform PlatformFor(byte[] testFile)
     {
         string text = Encoding.Latin1.GetString(testFile);
         bool standsInForDebug = text.Contains("\nhttpsig\n", StringComparison.Ordinal)
-            || (text.Contains("\nHSTS\n", StringComparison.Ordinal) && text.Contains("\nCURL_TIME=", StringComparison.Ordinal));
+            || (text.Contains("\nHSTS\n", StringComparison.Ordinal) && text.Contains("\nCURL_TIME=", StringComparison.Ordinal))
+            || (text.Contains("\nalt-svc\n", StringComparison.Ordinal) && text.Contains("\nCURL_ALTSVC_HTTP=", StringComparison.Ordinal))
+            || text.Contains(":%HTTP2TLSPORT/", StringComparison.Ordinal);
         UpstreamCurlPlatform platform = standsInForDebug ? Platform.WithFeatures(["Debug"]) : Platform;
         return text.Contains("\n<server>\n", StringComparison.Ordinal) && text.Contains("\ndns\n", StringComparison.Ordinal)
             ? platform.WithFeatures(["override-dns"])
@@ -475,6 +482,7 @@ public sealed class UpstreamConformanceTests
             signingClock: invocation.Arguments.Any(argument => argument.StartsWith("--httpsig", StringComparison.Ordinal)) ? new UnixEpochClock() : null,
             honoursHstsTimeVariable: true,
             honoursHstsHttpVariable: true,
+            honoursAltSvcHttpVariable: true,
             honoursDnsServerVariable: true).RunAsync(invocation.Arguments);
 
     // The signing time of upstream's debug build under CURL_FORCETIME and CURL_HTTPSIG_CREATED=0.

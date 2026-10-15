@@ -101,6 +101,10 @@ as curl.se's build looks them up; an entry for another host or port is dialled (
 `h3` one over HTTP/3 alone, an `h1` or `h2` one over TCP with ALPN choosing; an `h3` entry naming the
 origin itself makes a transfer without a version option race HTTP/3 against TCP. `RedirectFollower`
 calls `ApplyTo` again for each hop. Measured (ADR-0214, BL-623 Notes; ADR-0226, BL-733 Notes).
+The HTTP handler hands the cache every `Alt-Svc` header, `http` or `https`, and the cache decides: behind
+`CreateRunner(honoursAltSvcHttpVariable: true)` a set `CURL_ALTSVC_HTTP` makes it learn and look up a plain
+`http` origin as an `https` one (`AltSvcTransferCache.OpenAsync`'s `usesOverHttp`), as curl's debug build
+does; the shipped `curl` never turns it on (ADR-0497, BL-2263).
 
 The run holds one HSTS cache, `Curl.Core`'s `HstsTransferPolicy`, shared by every transfer of every
 group with or without `--hsts`. Under `--hsts <file>` each transfer reads the file (`HstsCacheFile`)

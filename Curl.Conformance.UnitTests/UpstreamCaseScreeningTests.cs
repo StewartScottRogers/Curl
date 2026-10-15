@@ -650,6 +650,27 @@ public sealed class UpstreamCaseScreeningTests
         Assert.AreEqual(expected, reason);
     }
 
+    // ADR-0497: a feature the harness stands in for (Debug) is met on every platform, so a case needing it
+    // and another platform's feature is skipped here for that feature only.
+    [TestMethod]
+    [DataRow("Debug\nhttp/2\nSSL", "MSWin32", "Curl lacks the feature http/2")]
+    [DataRow("Schannel\nDebug", "linux", "Curl lacks the feature Schannel")]
+    [DataRow("Debug\nhttp/2\nSSL", "linux", null)]
+    public void FindFeatureOfAnotherPlatform_PlatformWithTheDebugStandIn_CountsDebugAsMetEverywhere(string caseFeatures, string operatingSystemName, string? expected)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        UpstreamCurlPlatform platform = UpstreamCurlPlatform.All.Single(candidate => candidate.OperatingSystemName == operatingSystemName).WithFeatures(["Debug"]);
+        UpstreamTestCase testCase = ParsedTestCase.From($"<client>\n<features>\n{caseFeatures}\n</features>\n</client>\n");
+        diagnostics.Arrange("case features", caseFeatures);
+        diagnostics.Arrange("platform", $"{operatingSystemName} with Debug");
+
+        string? reason = UpstreamCaseScreening.FindFeatureOfAnotherPlatform(testCase, platform.Features);
+
+        diagnostics.Act("reason", reason);
+        diagnostics.Assert("reason", expected ?? "null", reason ?? "null");
+        Assert.AreEqual(expected, reason);
+    }
+
     [TestMethod]
     public void FindFeatureOfAnotherPlatform_NullArgument_Throws()
     {

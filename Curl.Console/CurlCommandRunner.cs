@@ -95,6 +95,11 @@ namespace Curl.Console;
 /// <c>http</c> too: the harness's stand-in for curl's debug build under <c>CURL_HSTS_HTTP</c>
 /// (ADR-0494, BL-2250); off by default, as in curl's release build.
 /// </param>
+/// <param name="altSvcUsesOverHttp">
+/// Whether each <c>--alt-svc</c> cache learns <c>Alt-Svc</c> headers received over plain <c>http</c>
+/// and looks up a plain <c>http</c> origin's alternatives too: the harness's stand-in for curl's debug
+/// build under <c>CURL_ALTSVC_HTTP</c> (ADR-0497, BL-2263); off by default, as in curl's release build.
+/// </param>
 /// <param name="writeOutTimeDialect">
 /// The C runtime whose <c>strftime</c> a <c>-w</c> <c>%time{format}</c> follows; the composition
 /// passes the platform's (<see cref="CurlComposition.WriteOutTimeDialectFor" />), and
@@ -279,7 +284,8 @@ internal sealed class CurlCommandRunner(
     LateBoundDiagnosticLog? lateBoundDiagnosticLog = null,
     bool? parsesAsWindowsBuild = null,
     TimeProvider? hstsClock = null,
-    bool hstsLearnsOverHttp = false)
+    bool hstsLearnsOverHttp = false,
+    bool altSvcUsesOverHttp = false)
 {
     /// <summary>
     /// What curl 8.21.0 prints before its URL parser's reason when it rejects a transfer
@@ -2876,7 +2882,7 @@ internal sealed class CurlCommandRunner(
         if (options.AltSvcFile is { } file && IsHttpUrl(QueryUrl.Append(transferUrl, options)))
         {
             Running.AltSvc = await AltSvcTransferCache
-                .OpenAsync(file, options.HttpVersion, options.ConnectToEntries, fileSystem, timeProvider, diagnosticLog)
+                .OpenAsync(file, options.HttpVersion, options.ConnectToEntries, fileSystem, timeProvider, diagnosticLog, altSvcUsesOverHttp)
                 .ConfigureAwait(false);
         }
     }

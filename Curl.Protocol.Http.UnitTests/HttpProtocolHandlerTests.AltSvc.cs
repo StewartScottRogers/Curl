@@ -220,8 +220,12 @@ public sealed partial class HttpProtocolHandlerTests
         Assert.AreEqual(("h3=\":443\"; ma=60", HttpVersion.Version30), (store.Responses.Single().AltSvcHeader, store.Responses.Single().ResponseVersion));
     }
 
+    /// <summary>
+    /// The store, not the handler, decides whether a plain <c>http</c> origin's header is learned
+    /// (ADR-0497), so the handler hands it over with the origin and reports what the store added.
+    /// </summary>
     [TestMethod]
-    public async Task ExecuteAsync_HttpResponseWithAltSvc_DoesNotCallTheStore()
+    public async Task ExecuteAsync_HttpResponseWithAltSvc_HandsItToTheStore()
     {
         const string head = "HTTP/1.1 200 OK\r\nAlt-Svc: h1=\":18443\"; ma=60\r\nContent-Length: 0\r\n\r\n";
         ScriptedAltSvcStore store = new(AltSvcAlternative18443);
@@ -232,9 +236,9 @@ public sealed partial class HttpProtocolHandlerTests
 
         WriteResult(result);
         Diagnostics.Act("stored alt-svc headers", store.Responses.Count);
-        Diagnostics.Assert("stored alt-svc headers", 0, store.Responses.Count);
+        Diagnostics.Assert("stored alt-svc headers", 1, store.Responses.Count);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
-        Assert.IsEmpty(store.Responses);
+        Assert.AreEqual("h1=\":18443\"; ma=60", store.Responses.Single().AltSvcHeader);
     }
 
     [TestMethod]

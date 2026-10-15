@@ -282,7 +282,7 @@ internal static class CurlComposition
             diagnosticLog);
 
     /// <summary>
-    /// Creates the contexts the dialing <see cref="CreateRunner(Stream, Stream, Stream, ITcpDialer, IDnsResolver, IDatagramConnector, bool, IWriteOutFileOpener?, bool, Func{string, string?}?, IConnectionListener?, DefaultConfigFileSearch?, TimeProvider?, bool, bool, bool, bool?)" />
+    /// Creates the contexts the dialing <see cref="CreateRunner(Stream, Stream, Stream, ITcpDialer, IDnsResolver, IDatagramConnector, bool, IWriteOutFileOpener?, bool, Func{string, string?}?, IConnectionListener?, DefaultConfigFileSearch?, TimeProvider?, bool, bool, bool, bool, bool?)" />
     /// uses: <see cref="CreateSecurityContextFactory(IConnector, IDatagramConnector, IDiagnosticLog?)" />'s
     /// router, with NTLM sent to the hand-built context on every platform when
     /// <paramref name="usesHandBuiltNtlm" /> is set (<see cref="HandBuiltNtlmSecurityContextFactory" />, BL-1858).
@@ -1258,6 +1258,13 @@ internal static class CurlComposition
     /// does in <c>lib/http.c</c>; off by default, as in curl's release build, and turned on by the
     /// conformance harness (ADR-0494, BL-2250).
     /// </param>
+    /// <param name="honoursAltSvcHttpVariable">
+    /// Whether a set <c>CURL_ALTSVC_HTTP</c> (any value, empty included) makes each <c>--alt-svc</c>
+    /// cache learn <c>Alt-Svc</c> headers received over plain <c>http</c> and look up a plain
+    /// <c>http</c> origin's alternatives, as curl's debug build does in <c>lib/http.c</c> and
+    /// <c>lib/url.c</c>; off by default, as in curl's release build, and turned on by the conformance
+    /// harness (ADR-0497, BL-2263).
+    /// </param>
     /// <param name="parsesAsWindowsBuild">
     /// Whether the runner reads the command line as curl's Windows Schannel build does; <see langword="null" />
     /// for this process's platform. Tests pass <see langword="false" /> to reach <c>--http3</c> on every platform (ADR-0397, BL-2260).
@@ -1280,6 +1287,7 @@ internal static class CurlComposition
         bool honoursDnsServerVariable = false,
         bool honoursHstsTimeVariable = false,
         bool honoursHstsHttpVariable = false,
+        bool honoursAltSvcHttpVariable = false,
         bool? parsesAsWindowsBuild = null)
     {
         ConnectionCache runConnections = new(TimeProvider.System);
@@ -1305,8 +1313,23 @@ internal static class CurlComposition
             lateBoundDiagnosticLog: runLog,
             hstsClock: honoursHstsTimeVariable ? HstsClockOf(environment(HstsTimeVariableName)) : null,
             hstsLearnsOverHttp: LearnsHstsOverHttp(honoursHstsHttpVariable, environment),
+            altSvcUsesOverHttp: UsesAltSvcOverHttp(honoursAltSvcHttpVariable, environment),
             parsesAsWindowsBuild: parsesAsWindowsBuild);
     }
+
+    /// <summary>
+    /// Whether each <c>--alt-svc</c> cache learns and looks up over plain <c>http</c>: only behind the
+    /// harness seam, and then when <c>CURL_ALTSVC_HTTP</c> is set at all, as curl's debug build tests it
+    /// with <c>getenv</c> (ADR-0497, BL-2263).
+    /// </summary>
+    /// <param name="honoursAltSvcHttpVariable">Whether the seam is on.</param>
+    /// <param name="environment">Reads the run's environment.</param>
+    /// <returns>Whether the caches serve <c>http</c> origins.</returns>
+    internal static bool UsesAltSvcOverHttp(bool honoursAltSvcHttpVariable, Func<string, string?> environment) =>
+        honoursAltSvcHttpVariable && environment(AltSvcHttpVariableName) is not null;
+
+    /// <summary>The variable whose presence makes curl's debug build use Alt-Svc over plain <c>http</c>.</summary>
+    internal const string AltSvcHttpVariableName = "CURL_ALTSVC_HTTP";
 
     /// <summary>
     /// Whether the run's HSTS cache learns over plain <c>http</c>: only behind the harness seam, and
@@ -1361,7 +1384,7 @@ internal static class CurlComposition
             : new DnsServerResolver(new DnsServerResolverOptions(dnsServer, null, null, null, AddressFamilyOf(options)), TimeProvider.System, datagramConnector);
 
     /// <summary>
-    /// Builds one option group's dispatch for the dialing <see cref="CreateRunner(Stream, Stream, Stream, ITcpDialer, IDnsResolver, IDatagramConnector, bool, IWriteOutFileOpener?, bool, Func{string, string?}?, IConnectionListener?, DefaultConfigFileSearch?, TimeProvider?, bool, bool, bool, bool?)" />:
+    /// Builds one option group's dispatch for the dialing <see cref="CreateRunner(Stream, Stream, Stream, ITcpDialer, IDnsResolver, IDatagramConnector, bool, IWriteOutFileOpener?, bool, Func{string, string?}?, IConnectionListener?, DefaultConfigFileSearch?, TimeProvider?, bool, bool, bool, bool, bool?)" />:
     /// the group's <see cref="TcpConnector" /> over <paramref name="tcpDialer" /> and
     /// <paramref name="dnsResolver" />, pooled in <paramref name="runConnections" />, with a proxy
     /// selector that reads the environment through <paramref name="readEnvironmentVariable" />, and the connector's <c>--resolve</c> entries
