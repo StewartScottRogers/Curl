@@ -11,7 +11,7 @@ namespace Curl.Console;
 /// as retrying is the curl tool's work (<c>tool_operate.c</c>), not libcurl's (ADR-0506, BL-2282).
 /// </summary>
 /// <param name="timeProvider">The clock the watchdogs and the serial attempt start are read on.</param>
-internal sealed class TransferPerformer(TimeProvider timeProvider)
+internal sealed partial class TransferPerformer(TimeProvider timeProvider)
 {
     /// <summary>The <c>%{conn_id}</c> the next transfer that connects takes, counted per run from zero.</summary>
     private long nextConnectionId;

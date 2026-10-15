@@ -13,7 +13,7 @@ namespace Curl.Console;
 /// second is real.
 /// </summary>
 [TestClass]
-public sealed class TransferPerformerTests
+public sealed partial class TransferPerformerTests
 {
     private const string First = "http://127.0.0.1:18282/a";
     private const string Next = "http://127.0.0.1:18282/next";

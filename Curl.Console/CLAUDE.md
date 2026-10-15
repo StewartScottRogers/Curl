@@ -315,6 +315,19 @@ its exit 28 failure, numbers the run's `%{xfer_id}` and `%{conn_id}` (`TakeNextA
 The `--retry` loop around it (`FollowRetryingAsync`, the retry lines, the `-o` attempt bytes) stays
 in the runner, as retrying is the curl tool's work. `CurlComposition.CreateRunner` builds it; a
 runner given none makes one on its own clock.
+It also owns the per-transfer setup libcurl does before it connects (`TransferPerformer.Setup.cs`,
+BL-2283): the URL parse and its refusals (`TryParseTransferUrl`, `ReportUrlRejected`,
+`ParsedUrlRefusal`), the `--interface` and `--ech` setopt refusals (`RefuseMalformedSetopt`), the
+scheme, proxy and credential choice (`TrySelectProxyAndCredentials`), the SSH options and the
+known-hosts check (`ResolveSshOptionsAsync`), the `-b` files (`LoadCookieFilesAsync`), the HSTS
+upgrade (`SwitchToHttpsForHstsAsync`), the alt-svc cache (`OpenAltSvcCacheAsync`), the setup
+failures (`SetupFailureAsync`: the too-long `-b` string, `--engine`), and the `-c` jar, alt-svc and
+HSTS write-back libcurl does at cleanup (`WriteCookieJarAltSvcAndHstsFilesAsync`). Its run-ending
+failures (`KnownHostsFileMissingFailure`, `InterfaceSetoptFailure`, `EchSetoptFailure`) are
+compared by reference in the runner. A step that writes to standard error does it through a
+delegate the runner passes (`WriteErrorLineAsync`, its wrapped warning writer); the runner still
+does the curl tool's part: globbing, IPFS, `--etag-*`, output files, upload files, the progress
+meter, `-w` and the `curl: (N)` lines.
 
 Under `-Y`/`--speed-limit` or `-y`/`--speed-time` each attempt gets a `Curl.Core`
 `LowSpeedWatchdog` on the runner's clock: `TransferContextFactory` wraps the output and the
