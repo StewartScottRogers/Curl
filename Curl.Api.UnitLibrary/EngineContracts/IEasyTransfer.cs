@@ -1,4 +1,7 @@
 using Curl.Api.Codes;
+using Curl.Api.EngineContracts.ConnectOnly;
+using Curl.Api.EngineContracts.Headers;
+using Curl.Api.EngineContracts.WebSocket;
 using Curl.Api.Info;
 using Curl.Api.Options;
 
@@ -24,6 +27,18 @@ public interface IEasyTransfer : IAsyncDisposable
     /// succeeded or gave no detail.
     /// </summary>
     string ErrorText { get; }
+
+    /// <summary>The header API (<c>curl_easy_header</c>, <c>curl_easy_nextheader</c>) over the headers this handle received.</summary>
+    ITransferHeaders Headers { get; }
+
+    /// <summary>The WebSocket API (<c>curl_ws_recv</c>, <c>curl_ws_send</c>, <c>curl_ws_start_frame</c>, <c>curl_ws_meta</c>) on this handle.</summary>
+    IEasyWebSocket WebSocket { get; }
+
+    /// <summary>
+    /// <c>curl_easy_recv</c> and <c>curl_easy_send</c>: the raw connection left open by a perform with
+    /// <c>CURLOPT_CONNECT_ONLY</c>.
+    /// </summary>
+    IConnectOnlyConnection Connection { get; }
 
     /// <summary><c>curl_easy_perform</c>: run the transfer the options describe.</summary>
     /// <param name="cancellationToken">Stops the transfer; it then ends with an error code.</param>
