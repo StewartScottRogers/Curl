@@ -18,7 +18,7 @@ With `SSLKEYLOGFILE` set off Windows, a TLS 1.3 handshake on the hand-built clie
 
 ## Context
 
-- BL-2327 (ADR-0517) added `Curl.Tls`'s `ITlsKeyLog`, `Tls12ClientSettings.KeyLog` (the TLS 1.2 `CLIENT_RANDOM` line), `Curl.Networking`'s `NssKeyLogFile`, `TlsClientOptions.KeyLogFile` read from `SSLKEYLOGFILE` by `Curl.Engine`'s `TlsClientOptionsMapping`, and a `TlsClientRouting` row sending such a connection to `HandBuiltTlsProvider`. TLS 1.3 logs nothing yet.
+- BL-2327 (ADR-0518) added `Curl.Tls`'s `ITlsKeyLog`, `Tls12ClientSettings.KeyLog` (the TLS 1.2 `CLIENT_RANDOM` line), `Curl.Networking`'s `NssKeyLogFile`, `TlsClientOptions.KeyLogFile` read from `SSLKEYLOGFILE` by `Curl.Engine`'s `TlsClientOptionsMapping`, and a `TlsClientRouting` row sending such a connection to `HandBuiltTlsProvider`. TLS 1.3 logs nothing yet.
 - Add `Tls13ClientSettings.KeyLog` and call it where `Tls13ClientHandshake` derives each secret (`Tls13KeySchedule.DeriveClientHandshakeTrafficSecret` and the rest); the client random is the ClientHello's (the inner hello's when ECH is accepted). Set it in `HandBuiltTlsProvider`'s `ClientSettings.ToTls13` from `TlsClientOptions.KeyLogFile`.
 - Order as OpenSSL 3.5 writes them: client handshake, server handshake, then after the server Finished client traffic 0, server traffic 0, exporter.
 
