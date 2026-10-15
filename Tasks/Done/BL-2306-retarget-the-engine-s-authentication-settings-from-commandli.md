@@ -22,7 +22,7 @@ ADR-0506; plan phase 1 step 4; follows BL-2305 and uses the rules for every reta
 
 ## Acceptance criteria
 
-- [x] The engine classes named in Context take `EasyAuthenticationOptions`, not `CommandLineOptions`, for their authentication settings. (Split to BL-2326; see Notes.)
+- [x] The engine classes named in Context take `EasyAuthenticationOptions`, not `CommandLineOptions`, for their authentication settings. (Split to BL-2338; see Notes.)
 - [x] `EasyOptionsFromCommandLine` maps every authentication command-line option named in Context, each with a test; Curl's HTTP message signature options, which have no `CURLOPT_*`, are carried by a Curl-specific property documented as such.
 - [x] `dotnet build` is clean (warnings are errors).
 - [x] `dotnet test --filter "TestCategory!=Integration"` passes and no existing test was deleted, skipped or weakened.
@@ -32,7 +32,7 @@ ADR-0506; plan phase 1 step 4; follows BL-2305 and uses the rules for every reta
 
 ## Notes
 
-- 2026-10-15, split (rule 4, before any code): `Curl.Engine.UnitLibrary` has no reference to `Curl.Api.UnitLibrary` until BL-2323 (still in Backlog), so the engine classes cannot take `EasyAuthenticationOptions` in this run, as BL-2303 to BL-2305 found for their groups. This task delivers the mapper (`EasyOptionsFromCommandLine.AuthenticationOf`) and ADR-0516; BL-2326 (depends on this and BL-2323) retargets the engine's authentication classes.
+- 2026-10-15, split (rule 4, before any code): `Curl.Engine.UnitLibrary` has no reference to `Curl.Api.UnitLibrary` until BL-2323 (still in Backlog), so the engine classes cannot take `EasyAuthenticationOptions` in this run, as BL-2303 to BL-2305 found for their groups. This task delivers the mapper (`EasyOptionsFromCommandLine.AuthenticationOf`) and ADR-0516; BL-2338 (depends on this and BL-2323) retargets the engine's authentication classes.
 - Decided (ADR-0516, by Claude under Stewart's delegation): the methods are the engine's `AuthSchemes`/`ProxyAuthSchemes` as `CURLAUTH_*` bits, every known scheme being `CURLAUTH_ANY`, plus `CURLAUTH_AWS_SIGV4` with `--aws-sigv4` (differs from `--libcurl` only in bits the engine never uses); `-u`/`-U` are `CURLOPT_USERPWD`/`PROXYUSERPWD` as `user:password`; `--ntlm-wb`, `--krb` and the TLS-SRP options have no function in the reference build and keep libcurl's defaults.
 - `EasyAuthenticationOptions` gained four Curl-specific members, `HttpSignatureAlgorithm`, `HttpSignatureKey` (a secret, redacted by `ToString`), `HttpSignatureKeyId` and `HttpSignatureHeaders`, each documented as having no `CURLOPT_*`, with default, `with` and redaction tests.
 - No command-line option changed, so `--ai-help` needs nothing.
@@ -42,4 +42,4 @@ ADR-0506; plan phase 1 step 4; follows BL-2305 and uses the rules for every reta
 
 - 2026-10-15: Created.
 - 2026-10-15: Backlog -> Doing.
-- 2026-10-15: Doing -> Done. EasyOptionsFromCommandLine.AuthenticationOf maps every authentication option onto EasyAuthenticationOptions (ADR-0516); engine retarget split to BL-2326
+- 2026-10-15: Doing -> Done. EasyOptionsFromCommandLine.AuthenticationOf maps every authentication option onto EasyAuthenticationOptions (ADR-0516); engine retarget split to BL-2338

@@ -44,7 +44,7 @@ DoH's TLS options, splitting `-E` with `Curl.Networking`'s `ClientCertificateArg
 SOCKS5 and HAProxy options; the proxy environment variables stay the engine's (ADR-0515).
 `AuthenticationOf` builds `EasyAuthenticationOptions` from the credential, netrc, method, SASL,
 GSS-API, AWS SigV4, redirect-trust and `--httpsig-*` options (ADR-0516).
-Nothing reads these yet: BL-2323, BL-2324, BL-2325 and BL-2326 hand their records to the engine's
+Nothing reads these yet: BL-2323, BL-2324, BL-2325 and BL-2338 hand their records to the engine's
 classes, and BL-2307 to BL-2309 add the other groups.
 
 `Program.Main` only opens the standard streams, builds the composition and hands the

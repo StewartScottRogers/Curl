@@ -1,5 +1,5 @@
 ---
-id: BL-2326
+id: BL-2338
 title: Make the engine's authentication classes read EasyAuthenticationOptions instead of CommandLineOptions
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-15
 completed:
 ---
-# BL-2326 — Make the engine's authentication classes read EasyAuthenticationOptions instead of CommandLineOptions
+# BL-2338 — Make the engine's authentication classes read EasyAuthenticationOptions instead of CommandLineOptions
 
 ## Goal
 
