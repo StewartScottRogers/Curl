@@ -3,12 +3,12 @@ id: AF-0219
 title: Curl.Cli README says CurlHelpTable holds curl 8.21.0's 274 help rows; it holds 278, four of them httpsig rows 8.21.0 lacks
 auditor: truthfulness
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: Stewart accepted it on 2026-10-14.
 key: truthfulness:Curl.Cli.UnitLibrary/README.md:CurlHelpTable:false-statement
 reproduction: none
-task: none
-tasks:
+task: BL-2256
+tasks: BL-2256
 found: 2026-10-14
 found-at: d86a80f0091fbf88c08d7b9b2fa37a9197854bd8
 scorecard: 2026-10-14_1815.md
@@ -45,3 +45,4 @@ Run from the repository root:
 ## Log
 
 - 2026-10-14: filed proposed.
+- 2026-10-14: proposed -> accepted.

@@ -3,12 +3,12 @@ id: AF-0218
 title: HttpLineReader.ReadLineAsync's 'lineFeed >= 0' can become 'lineFeed > 0' with no test failing
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Stewart accepted it on 2026-10-14.
 key: quality:Curl.Protocol.Http.UnitLibrary/HttpLineReader.cs:ReadLineAsync-ge:surviving-mutant
 reproduction: mutation Curl.Protocol.Http.UnitLibrary/HttpLineReader.cs:70:>=
-task: none
-tasks:
+task: BL-2255
+tasks: BL-2255
 found: 2026-10-14
 found-at: d86a80f0091fbf88c08d7b9b2fa37a9197854bd8
 scorecard: 2026-10-14_1815.md
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Proto
 ## Log
 
 - 2026-10-14: filed proposed.
+- 2026-10-14: proposed -> accepted.

@@ -3,12 +3,12 @@ id: AF-0220
 title: Lanes idled 652 of 971.62 lane minutes (67%) behind BL-2235, a High gap task filed with touches: [] (read as *) that overlapped BL-2160 left in Doing by an interactive session
 auditor: process
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Stewart accepted it on 2026-10-14.
 key: process:logs:BL-2235:overlap-wait
 reproduction: none
-task: none
-tasks:
+task: BL-2257
+tasks: BL-2257
 found: 2026-10-14
 found-at: d86a80f0091fbf88c08d7b9b2fa37a9197854bd8
 scorecard: 2026-10-14_1815.md
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Log
 
 - 2026-10-14: filed proposed.
+- 2026-10-14: proposed -> accepted.

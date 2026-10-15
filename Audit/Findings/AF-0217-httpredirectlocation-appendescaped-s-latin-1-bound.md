@@ -3,12 +3,12 @@ id: AF-0217
 title: HttpRedirectLocation.AppendEscaped's Latin-1 bound '<= 0xFF' can become '< 0xFF' with no test failing, so a redirect would send U+00FF as %C3%BF
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Stewart accepted it on 2026-10-14.
 key: quality:Curl.Protocol.Http.UnitLibrary/HttpRedirectLocation.cs:AppendEscaped-le:surviving-mutant
 reproduction: mutation Curl.Protocol.Http.UnitLibrary/HttpRedirectLocation.cs:260:<=
-task: none
-tasks:
+task: BL-2254
+tasks: BL-2254
 found: 2026-10-14
 found-at: d86a80f0091fbf88c08d7b9b2fa37a9197854bd8
 scorecard: 2026-10-14_1815.md
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Proto
 ## Log
 
 - 2026-10-14: filed proposed.
+- 2026-10-14: proposed -> accepted.

@@ -3,8 +3,8 @@ id: AF-0215
 title: TlsReader.Take has no bounds check: 70 Curl.Tls unit tests and 3 Curl.Networking ECH tests fail unmutated with IndexOutOfRangeException
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: rejected
+reason: Stewart rejected it on 2026-10-14: it is audit 20261014-181528's planted TlsReader.Take defect, not a defect in the real tree.
 key: quality:Curl.Tls.UnitLibrary/TlsReader.cs:Take:failing-test
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ dotnet test Curl.Tls.UnitTests --filter "TestCategory!=Integration"
 ## Log
 
 - 2026-10-14: filed proposed.
+- 2026-10-14: proposed -> rejected.
