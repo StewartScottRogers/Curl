@@ -358,6 +358,45 @@ public sealed partial class SslStreamTlsProviderTests
         AssertFailed(handshake, expectedExitCode, expectedMessage);
     }
 
+    // curl 8.18.0 with OpenSSL 3.5.5, measured 2026-10-15 (BL-2349): a pkcs11: URI of type ENG
+    // or PROV makes OpenSSL try the pkcs11 provider, which the system does not have.
+    [TestMethod]
+    [DataRow("ENG")]
+    [DataRow("PROV")]
+    public async Task AuthenticateAsClientAsync_WithAPkcs11CertOfTypeEngOrProvInTheOpenSslBuild_FailsLoadingThePkcs11Provider(string certificateType)
+    {
+        var options = ClientCertificate("pkcs11:token=a;object=b") with { CertificateType = certificateType };
+
+        var handshake = await HandshakeWithClientCertificateRequestAsync(options, OpenSslBuild);
+
+        AssertFailed(handshake, CurlExitCode.SslCertProblem, TlsFailureMessages.OpenSslPkcs11ProviderNotLoaded);
+    }
+
+    [TestMethod]
+    [DataRow("ENG")]
+    [DataRow("PROV")]
+    public async Task AuthenticateAsClientAsync_WithAPkcs11KeyOfTypeEngOrProvInTheOpenSslBuild_FailsLoadingThePkcs11Provider(string privateKeyType)
+    {
+        var certificateFile = WriteCertificateFile("client.pem", s_clientCertificate.ExportCertificatePem());
+        var options = ClientCertificate(Escaped(certificateFile)) with { PrivateKey = "pkcs11:object=k", PrivateKeyType = privateKeyType };
+
+        var handshake = await HandshakeWithClientCertificateRequestAsync(options, OpenSslBuild);
+
+        AssertFailed(handshake, CurlExitCode.SslCertProblem, TlsFailureMessages.OpenSslPkcs11ProviderNotLoaded);
+    }
+
+    // curl 8.21.0's Schannel build, measured 2026-10-15 (BL-2349): the ENG its tool gives a
+    // pkcs11: URI is never reached, as no such file opens.
+    [TestMethod]
+    public async Task AuthenticateAsClientAsync_WithAPkcs11CertOfTypeEngInTheSchannelBuild_ReportsTheMissingFile()
+    {
+        var options = ClientCertificate("pkcs11:token=a;object=b") with { CertificateType = "ENG" };
+
+        var handshake = await HandshakeWithClientCertificateRequestAsync(options, SchannelBuild);
+
+        AssertFailed(handshake, CurlExitCode.SslCertProblem, "schannel: Failed to get certificate location or file for pkcs11:token=a;object=b");
+    }
+
     [TestMethod]
     public async Task AuthenticateAsClientAsync_WithPassOpeningAnEncryptedPemKeyInTheOpenSslBuild_PresentsTheCertificate()
     {

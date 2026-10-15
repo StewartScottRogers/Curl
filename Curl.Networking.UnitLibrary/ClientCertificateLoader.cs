@@ -209,7 +209,7 @@ internal static class ClientCertificateLoader
         {
             ClientCertificateFileType.Pem => ReadPemCertificate(path),
             ClientCertificateFileType.Der => ReadDerCertificate(path),
-            _ => (null, OpenSslCertificateTypeRefused(certificateFileType, certificateType!)),
+            _ => (null, OpenSslCertificateTypeRefused(certificateFileType, certificateType!, path)),
         };
 
         return certificatePem is null
@@ -234,22 +234,32 @@ internal static class ClientCertificateLoader
     }
 
     // ENG and PROV name keys held outside a file, which this build has no engine or
-    // provider for; any other unknown type is a bad argument.
-    private static ConnectResult OpenSslCertificateTypeRefused(ClientCertificateFileType type, string certificateType) => type switch
-    {
-        ClientCertificateFileType.Engine => SslCertProblem(TlsFailureMessages.OpenSslClientCertificateEngineNotSet),
-        ClientCertificateFileType.Provider => SslCertProblem(TlsFailureMessages.OpenSslClientCertificateProviderNotSet),
-        _ => ConnectResult.Failed(CurlExitCode.BadFunctionArgument, TlsFailureMessages.OpenSslClientCertificateTypeUnsupported(certificateType)),
-    };
+    // provider for; any other unknown type is a bad argument. A pkcs11: URI of either type
+    // makes OpenSSL 3 try the pkcs11 provider, which no system here has (BL-2349).
+    private static ConnectResult OpenSslCertificateTypeRefused(ClientCertificateFileType type, string certificateType, string path) =>
+        LoadsThroughPkcs11Provider(type, path)
+            ? SslCertProblem(TlsFailureMessages.OpenSslPkcs11ProviderNotLoaded)
+            : type switch
+            {
+                ClientCertificateFileType.Engine => SslCertProblem(TlsFailureMessages.OpenSslClientCertificateEngineNotSet),
+                ClientCertificateFileType.Provider => SslCertProblem(TlsFailureMessages.OpenSslClientCertificateProviderNotSet),
+                _ => ConnectResult.Failed(CurlExitCode.BadFunctionArgument, TlsFailureMessages.OpenSslClientCertificateTypeUnsupported(certificateType)),
+            };
 
-    private static ConnectResult? OpenSslPrivateKeyTypeRefused(ClientCertificateFileType type) => type switch
-    {
-        ClientCertificateFileType.Pem or ClientCertificateFileType.Der => null,
-        ClientCertificateFileType.Engine => SslCertProblem(TlsFailureMessages.OpenSslPrivateKeyEngineNotSet),
-        ClientCertificateFileType.Provider => SslCertProblem(TlsFailureMessages.OpenSslPrivateKeyProviderNotSet),
-        ClientCertificateFileType.Pkcs12 => SslCertProblem(TlsFailureMessages.OpenSslPrivateKeyTypePkcs12Refused),
-        _ => ConnectResult.Failed(CurlExitCode.BadFunctionArgument, TlsFailureMessages.OpenSslPrivateKeyTypeUnsupported),
-    };
+    private static ConnectResult? OpenSslPrivateKeyTypeRefused(ClientCertificateFileType type, string keyPath) =>
+        LoadsThroughPkcs11Provider(type, keyPath)
+            ? SslCertProblem(TlsFailureMessages.OpenSslPkcs11ProviderNotLoaded)
+            : type switch
+            {
+                ClientCertificateFileType.Pem or ClientCertificateFileType.Der => null,
+                ClientCertificateFileType.Engine => SslCertProblem(TlsFailureMessages.OpenSslPrivateKeyEngineNotSet),
+                ClientCertificateFileType.Provider => SslCertProblem(TlsFailureMessages.OpenSslPrivateKeyProviderNotSet),
+                ClientCertificateFileType.Pkcs12 => SslCertProblem(TlsFailureMessages.OpenSslPrivateKeyTypePkcs12Refused),
+                _ => ConnectResult.Failed(CurlExitCode.BadFunctionArgument, TlsFailureMessages.OpenSslPrivateKeyTypeUnsupported),
+            };
+
+    private static bool LoadsThroughPkcs11Provider(ClientCertificateFileType type, string path) =>
+        type is ClientCertificateFileType.Engine or ClientCertificateFileType.Provider && ClientCertificateArgument.IsPkcs11Uri(path);
 
     private static (X509Certificate2? Certificate, ConnectResult? Failure) CombineWithPrivateKeyFile(
         string certificatePem,
@@ -258,7 +268,7 @@ internal static class ClientCertificateLoader
         string? passphrase)
     {
         var keyFileType = ClientCertificateFileTypeName.Parse(privateKeyType);
-        var refusal = OpenSslPrivateKeyTypeRefused(keyFileType);
+        var refusal = OpenSslPrivateKeyTypeRefused(keyFileType, keyPath);
         if (refusal is not null)
         {
             return (null, refusal);
