@@ -38,3 +38,4 @@ Stays in the runner (the curl tool's work): globbing, IPFS rewriting, `--etag-*`
 ## Log
 
 - 2026-10-15: Created.
+- 2026-10-15: Backlog -> Doing.
