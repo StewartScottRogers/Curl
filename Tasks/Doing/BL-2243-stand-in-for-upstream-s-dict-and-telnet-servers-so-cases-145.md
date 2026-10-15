@@ -31,3 +31,4 @@ Split from BL-2228, which delivered the TLS fronts of MQTT and gopher (`MqttsSer
 ## Log
 
 - 2026-10-14: Created.
+- 2026-10-14: Backlog -> Doing.
