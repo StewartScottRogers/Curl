@@ -31,3 +31,4 @@ BL-2264 (2026-10-15) made the conformance harness report `headers-api`, so 2503 
 ## Log
 
 - 2026-10-15: Created.
+- 2026-10-15: Backlog -> Doing.
