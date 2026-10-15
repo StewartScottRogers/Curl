@@ -72,8 +72,9 @@ public sealed class HttpsServerConnectorTests
 
     [TestMethod]
     [Timeout(60_000, CooperativeCancellation = true)]
-    public async Task ConnectAsync_ClientSpeakingPlainHttp_IsDisconnected()
+    public async Task ConnectAsync_ClientSpeakingPlainHttp_IsResetAsStunnelResetsIt()
     {
+        // test1244: curl: (56) Recv failure: Connection was reset (GF-0081).
         using X509Certificate2 certificate = CreateCertificate();
         SwsHttpServerConnector sws = new(ParsedTestCase.From(KeptOpenReply));
         HttpsServerConnector connector = new(sws, certificate, sws);
@@ -82,9 +83,9 @@ public sealed class HttpsServerConnectorTests
 
         await connection.WriteAsync(Encoding.Latin1.GetBytes(Request), CancellationToken.None);
         await connection.FlushAsync(CancellationToken.None);
-        int read = await connection.ReadAsync(new byte[64], CancellationToken.None);
+        IOException failure = await Assert.ThrowsExactlyAsync<IOException>(() => connection.ReadAsync(new byte[64], CancellationToken.None).AsTask());
 
-        Assert.AreEqual(0, read);
+        Assert.AreEqual(System.Net.Sockets.SocketError.ConnectionReset, ((System.Net.Sockets.SocketException)failure.InnerException!).SocketErrorCode);
         Assert.IsEmpty(sws.ReceivedBytes.ToArray());
     }
 

@@ -150,7 +150,8 @@ none, as stunnel by default) and client-certificate request, accepting any clien
 as stunnel at `verify = 0` does, and disposes the stream if the handshake fails.
 `InMemoryDuplexStream.CreatePair` makes the two connected ends it runs over: each end reads,
 asynchronously only, what the other writes, and reads 0 once the other end is disposed and
-drained. Tests reload a generated certificate through PKCS#12, since Windows Schannel and macOS
+drained, or gets a connection reset (`IOException` carrying `SocketError.ConnectionReset`) when
+the disposed end had `ResetsWhenDisposed` set. Tests reload a generated certificate through PKCS#12, since Windows Schannel and macOS
 reject an ephemeral server key.
 
 `HttpsServerConnector` (BL-1912) stands in for upstream's HTTPS server, `sws` behind stunnel, on
@@ -160,15 +161,17 @@ the certificate the case's `<server>` line `https [file]` names from `%CERTDIR/c
 (`test-localhost.pem` when none, loaded by `LoadCertificate`), offers no ALPN and asks for no client
 certificate, as stunnel does, and relays the decrypted requests to an `sws` emulation connection in
 turns (request bytes in, every reply byte out), so they land in its `ReceivedBytes` for
-`<verify><protocol>`; once sws closes the connection it sends close_notify, as stunnel does. It
+`<verify><protocol>`; once sws closes the connection it sends close_notify, as stunnel does, and a
+failed handshake (plain HTTP sent to the port, test1244) resets the connection, as stunnel does, so
+curl reports exit 56 (BL-2272). It
 sits between `FtpServerConnector` and `NoListenPortConnector`. Screening lets `https` cases run,
 those that also name `http-proxy` included: a `CONNECT` to `%HTTPSPORT` through the proxy stand-in
 is relayed to `HttpsServerConnector`, so the TLS handshake travels inside the tunnel, the `CONNECT`
 lands in `ProxyReceivedBytes` and the decrypted requests in `ReceivedBytes` (BL-2225; 1849 and 3106
 pass; 780 to 783 pass with the Debug stand-in below, and 446 fails until Curl honours `CURL_HSTS_HTTP`, BL-2250). On
-Windows 25 HTTPS cases pass (300, 303, 304, 306, 309, 311, 312, 325, 364, 410, 414, 417, 474,
-1561, 1562, 2009-2011, 2033, 2048, 2070, 2079, 2087, 3023, 3024, ...) and 2035, 2038, 2042,
-323 and 1244 fail on a difference the next gap run files; the `!Schannel` cases run on Linux and macOS.
+Windows 26 HTTPS cases pass (300, 303, 304, 306, 309, 311, 312, 325, 364, 410, 414, 417, 474,
+1244, 1561, 1562, 2009-2011, 2033, 2048, 2070, 2079, 2087, 3023, 3024, ...) and 2035, 2038, 2042
+and 323 fail on a difference the next gap run files; the `!Schannel` cases run on Linux and macOS.
 
 `MailTlsServerConnector` (BL-1914, ADR-0459) stands in for stunnel in front of the mail
 stand-ins: ports 9000, 9001 and 9002, the runner's `%SMTPSPORT`, `%IMAPSPORT` and `%POP3SPORT`

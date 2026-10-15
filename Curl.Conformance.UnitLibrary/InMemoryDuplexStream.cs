@@ -7,7 +7,8 @@ namespace Curl.Conformance;
 /// <see cref="CreatePair"/> writes, the other end reads, in order. It is how a TLS stand-in
 /// server and a client meet without a socket. It is asynchronous only: the synchronous
 /// <see cref="Read(byte[], int, int)"/> and <see cref="Write(byte[], int, int)"/> throw.
-/// Disposing an end ends the other end's reads at 0 once it has read everything written.
+/// Disposing an end ends the other end's reads at 0 once it has read everything written;
+/// with <see cref="ResetsWhenDisposed"/> set, with a connection-reset failure instead.
 /// </summary>
 public sealed class InMemoryDuplexStream : Stream
 {
@@ -108,9 +109,13 @@ public sealed class InMemoryDuplexStream : Stream
             {
                 pending = await incoming.ReadAsync(cancellationToken).ConfigureAwait(false);
             }
-            catch (ChannelClosedException)
+            catch (ChannelClosedException closed) when (closed.InnerException is null)
             {
                 return 0;
+            }
+            catch (ChannelClosedException closed)
+            {
+                throw closed.InnerException!;
             }
         }
 
@@ -147,11 +152,26 @@ public sealed class InMemoryDuplexStream : Stream
         return ValueTask.CompletedTask;
     }
 
-    /// <summary>Ends the other end's reads once it has read everything already written.</summary>
+    /// <summary>
+    /// Whether disposing this end resets the connection, as a socket closed with unread data
+    /// does: the other end, once it has read everything already written, gets an
+    /// <see cref="IOException"/> carrying a <see cref="System.Net.Sockets.SocketException"/> for
+    /// <see cref="System.Net.Sockets.SocketError.ConnectionReset"/> from its next read instead of
+    /// 0. <see langword="false"/> until set.
+    /// </summary>
+    public bool ResetsWhenDisposed { get; set; }
+
+    /// <summary>
+    /// Ends the other end's reads once it has read everything already written: at 0, or with a
+    /// connection reset when <see cref="ResetsWhenDisposed"/> is set.
+    /// </summary>
     /// <param name="disposing">Passed to the base stream.</param>
     protected override void Dispose(bool disposing)
     {
-        outgoing.TryComplete();
+        outgoing.TryComplete(ResetsWhenDisposed ? CreateResetFailure() : null);
         base.Dispose(disposing);
     }
+
+    private static IOException CreateResetFailure() =>
+        new("The peer reset the connection.", new System.Net.Sockets.SocketException((int)System.Net.Sockets.SocketError.ConnectionReset));
 }

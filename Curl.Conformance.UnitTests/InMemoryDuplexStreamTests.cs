@@ -72,6 +72,30 @@ public sealed class InMemoryDuplexStreamTests
     }
 
     [TestMethod]
+    public async Task ReadAsync_AfterOtherEndDisposedWithReset_ReadsWhatWasWrittenThenThrowsConnectionReset()
+    {
+        (InMemoryDuplexStream first, InMemoryDuplexStream second) = InMemoryDuplexStream.CreatePair();
+        await first.WriteAsync("last"u8.ToArray());
+        first.ResetsWhenDisposed = true;
+        await first.DisposeAsync();
+
+        byte[] buffer = new byte[16];
+        int count = await second.ReadAsync(buffer.AsMemory());
+        IOException failure = await Assert.ThrowsExactlyAsync<IOException>(() => second.ReadAsync(buffer.AsMemory()).AsTask());
+
+        Assert.AreEqual(4, count);
+        Assert.AreEqual(System.Net.Sockets.SocketError.ConnectionReset, ((System.Net.Sockets.SocketException)failure.InnerException!).SocketErrorCode);
+    }
+
+    [TestMethod]
+    public void ResetsWhenDisposed_NewEnd_IsFalse()
+    {
+        (InMemoryDuplexStream first, _) = InMemoryDuplexStream.CreatePair();
+
+        Assert.IsFalse(first.ResetsWhenDisposed);
+    }
+
+    [TestMethod]
     public async Task WriteAsync_EmptyBuffer_WritesNothingSoTheOtherEndKeepsWaiting()
     {
         (InMemoryDuplexStream first, InMemoryDuplexStream second) = InMemoryDuplexStream.CreatePair();
