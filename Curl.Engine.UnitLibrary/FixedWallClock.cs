@@ -1,4 +1,4 @@
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
 /// A <see cref="TimeProvider" /> whose wall clock stands at one instant while its timestamps and

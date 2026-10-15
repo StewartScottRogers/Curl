@@ -1,4 +1,4 @@
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
 /// The C runtime's <c>errno</c> values curl 8.21.0's <c>--create-dirs</c> and <c>-R</c> messages

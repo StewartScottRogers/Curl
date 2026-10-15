@@ -1,6 +1,6 @@
 using Curl.Cli;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
 /// Finds the known-hosts file an <c>scp</c> or <c>sftp</c> transfer checks the server's host key

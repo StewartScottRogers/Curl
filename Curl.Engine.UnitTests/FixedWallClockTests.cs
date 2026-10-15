@@ -1,4 +1,4 @@
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>Pins <see cref="FixedWallClock" />: a wall clock that stands still (ADR-0493, BL-2234).</summary>
 [TestClass]

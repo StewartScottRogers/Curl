@@ -4,7 +4,7 @@ using Curl.Cli;
 using Curl.Protocol.Abstractions;
 using Curl.Testing;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
 /// Pins which <c>-b</c> cookies <see cref="CookieEngine" /> puts in its store: curl 8.21.0 leaves
@@ -56,7 +56,7 @@ public sealed class CookieEngineTests
     [TestMethod]
     public async Task HandlerStore_CookieFileAndStringWithHeaderNamingCookie_SendsOnlyTheFilesCookies()
     {
-        InMemoryFileSystem fileSystem = new();
+        ReadOnlyFileSystem fileSystem = new();
         fileSystem.ExistingContent["jar.txt"] =
             Encoding.Latin1.GetBytes("# Netscape HTTP Cookie File\n127.0.0.1\tFALSE\t/\tFALSE\t0\tsess\ts1\n");
         Diagnostics.Arrange("command line", $"-b jar.txt -b a=b -H \"Cookie: c=d\" {Url}");
@@ -89,7 +89,7 @@ public sealed class CookieEngineTests
     [TestMethod]
     public async Task GetStoredCookieHeader_CookieFileAndString_SendsOnlyTheFilesCookies()
     {
-        InMemoryFileSystem fileSystem = new();
+        ReadOnlyFileSystem fileSystem = new();
         fileSystem.ExistingContent["jar.txt"] =
             Encoding.Latin1.GetBytes("# Netscape HTTP Cookie File\n127.0.0.1\tFALSE\t/\tFALSE\t0\tsess\ts1\n");
         Diagnostics.Arrange("command line", $"-b jar.txt -b test=yes {Url}");
@@ -103,6 +103,17 @@ public sealed class CookieEngineTests
         Diagnostics.Assert("stored, full", "sess=s1, sess=s1; test=yes", $"{stored}, {full}");
         Assert.AreEqual("sess=s1", stored);
         Assert.AreEqual("sess=s1; test=yes", full);
+    }
+
+    private sealed class ReadOnlyFileSystem : IFileSystem
+    {
+        public Dictionary<string, byte[]> ExistingContent { get; } = [];
+
+        public ValueTask<FileOpenResult> OpenForReadAsync(string path, CancellationToken cancellationToken) =>
+            ValueTask.FromResult(FileOpenResult.Opened(new MemoryStream(ExistingContent[path], writable: false), ExistingContent[path].Length, null));
+
+        public ValueTask<FileOpenResult> OpenForWriteAsync(string path, FileWriteMode mode, UnixFileMode createMode, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
     }
 
     private static CommandLineOptions Parse(params string[] arguments)

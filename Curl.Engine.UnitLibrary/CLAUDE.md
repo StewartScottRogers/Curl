@@ -79,3 +79,15 @@ is what `--engine` does with no crypto engines (ADR-0151).
 
 `NoCryptoEnginesTests` and `Socks5AuthenticationMappingTests` stay in `Curl.Console.UnitTests`
 because each drives `CurlCommandRunner` or `CurlComposition`, which are tool-side.
+
+The per-transfer stores moved too (BL-2287), in `Curl.Engine`: `CookieEngine` is the cookies of
+one run, as curl's tool sets them up from `-b`, `-c` and `-j`; `HstsTransferPolicy`'s test clock
+is `FixedWallClock` and `ClockOverridingHstsStore` (a `CURL_TIME` of whole seconds, ADR-0493);
+`SshKnownHostsFileSearch` finds the known-hosts file a scp or sftp transfer checks (ADR-0122);
+`CRuntimeErrorNumbers` words a C runtime errno as `strerror` does; and `CurlErrorBuffer` cuts a
+message to curl's 255-byte error buffer (ADR-0072; `Curl.Networking` has its own internal copy).
+
+`AltSvcTransferCache`, `HstsCacheFile` and `TlsSessionFileLines`, with their tests, stay in
+`Curl.Console` because they use tool-side types (`DeferredOutputFileStream`,
+`HttpVersionMapping`, `ToolNotes`). `CookieEngineTests` uses its own read-only file system fake,
+and `SshKnownHostsFileSearchTests` links `InMemoryDataFileReader` from `Curl.Console.UnitTests`.

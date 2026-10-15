@@ -1,3 +1,4 @@
+using Curl.Engine;
 using Curl.Testing;
 
 namespace Curl.Console;

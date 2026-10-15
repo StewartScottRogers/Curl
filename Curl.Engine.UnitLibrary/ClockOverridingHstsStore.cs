@@ -1,6 +1,6 @@
 using Curl.Protocol.Abstractions;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
 /// An <see cref="IHstsStore" /> that hands every header to <paramref name="inner" /> with the time

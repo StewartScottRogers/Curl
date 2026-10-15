@@ -3168,13 +3168,13 @@ internal sealed class CurlCommandRunner(
 
     /// <summary>
     /// Formats the line printed for a failed transfer that carries a message, with the message
-    /// cut to curl's error buffer (<see cref="CurlErrorBuffer" />). A bad glob's lines are not
+    /// cut to curl's error buffer (<see cref="Curl.Engine.CurlErrorBuffer" />). A bad glob's lines are not
     /// cut: curl's tool formats them itself (measured 2026-09-27, BL-380 Notes).
     /// </summary>
     /// <param name="result">The failed transfer's result.</param>
     /// <returns>The line <see cref="FormatErrorLine" /> gives for the cut message.</returns>
     private static string FormatTransferErrorLine(TransferResult result) =>
-        FormatErrorLine(result, CurlErrorBuffer.Truncate(result.ErrorMessage));
+        FormatErrorLine(result, Curl.Engine.CurlErrorBuffer.Truncate(result.ErrorMessage));
 
     /// <summary>
     /// Formats the line printed for a failure that carries a message.

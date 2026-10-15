@@ -1,7 +1,7 @@
 using System.Text;
 using Curl.Testing;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
 /// Pins <see cref="CurlErrorBuffer" />: a message of up to 255 UTF-8 bytes is kept whole, a

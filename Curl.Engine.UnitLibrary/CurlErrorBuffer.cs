@@ -1,6 +1,6 @@
 using System.Text;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
 /// curl's error buffer: libcurl formats a transfer's failure message into 256 bytes

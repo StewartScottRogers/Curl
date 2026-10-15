@@ -1,6 +1,7 @@
+using Curl.Console;
 using Curl.Testing;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
 /// Pins the order <see cref="SshKnownHostsFileSearch" /> lists its candidates in, as curl 8.21.0's

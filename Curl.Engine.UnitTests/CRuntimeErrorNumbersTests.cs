@@ -1,6 +1,6 @@
 using Curl.Testing;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
 /// Pins the C runtime numbers and <c>strerror</c> texts of glibc, macOS and the Windows C

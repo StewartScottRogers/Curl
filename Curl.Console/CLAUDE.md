@@ -31,7 +31,7 @@ hand-built client (a `--tls-max` of 1.0 or 1.1 today) and `SslStreamTlsProvider`
 `Program.Main` only opens the standard streams, builds the composition and hands the
 arguments to `CurlCommandRunner`, which parses them, runs each URL and prints curl's
 `curl: (N) <message>` lines, each transfer's message cut to curl's 255-byte error buffer by
-`CurlErrorBuffer` (a bad glob's lines are not cut; ADR-0072, BL-380). The parse reads the default config file first, where
+`Curl.Engine`'s `CurlErrorBuffer` (a bad glob's lines are not cut; ADR-0072, BL-380). The parse reads the default config file first, where
 `DefaultConfigFileSearch.ForProcess` finds it (the composition passes it; a runner given none
 reads no `.curlrc`, which keeps tests off the real home directory), unless the first argument
 starts with `-q` or is `--disable`; `-K` files apply where they stand. Both are read through
@@ -105,7 +105,7 @@ file, whatever the outcome; one that cannot be written is left alone, and `--hst
 An `http` URL whose host the cache knows is switched to `https` (the scheme only; an explicit port
 stays), `-v` printing `* Switched from HTTP to HTTPS due to HSTS => <url>`; `RedirectFollower` learns
 every hop's `https` `Strict-Transport-Security` and switches a known `http` redirect target the same
-way before `--proto-redir` checks it. Measured on curl 8.21.0 (ADR-0218, BL-621 Notes). Behind the harness seam `CreateRunner(honoursHstsTimeVariable: true)`, a `CURL_TIME` of whole seconds fixes that cache's clock (`FixedWallClock`, `ClockOverridingHstsStore`), as curl's debug build does; the shipped `curl` never turns it on (ADR-0493, BL-2234). Behind `CreateRunner(honoursHstsHttpVariable: true)` a set `CURL_HSTS_HTTP` makes the cache learn `Strict-Transport-Security` over plain `http` too (`HstsTransferPolicy`'s `learnsOverHttp`), as curl's debug build does; the HTTP handler hands the store every such header and the store decides (ADR-0494, BL-2250).
+way before `--proto-redir` checks it. Measured on curl 8.21.0 (ADR-0218, BL-621 Notes). Behind the harness seam `CreateRunner(honoursHstsTimeVariable: true)`, a `CURL_TIME` of whole seconds fixes that cache's clock (`Curl.Engine`'s `FixedWallClock` and `ClockOverridingHstsStore`), as curl's debug build does; the shipped `curl` never turns it on (ADR-0493, BL-2234). Behind `CreateRunner(honoursHstsHttpVariable: true)` a set `CURL_HSTS_HTTP` makes the cache learn `Strict-Transport-Security` over plain `http` too (`HstsTransferPolicy`'s `learnsOverHttp`), as curl's debug build does; the HTTP handler hands the store every such header and the store decides (ADR-0494, BL-2250).
 
 Each URL's output comes from `CommandLineOptions.UrlOutputs`: an `-o` name, or for `-O` /
 `--remote-name-all` the name `RemoteFileName` takes from the URL path (last non-empty
@@ -157,7 +157,7 @@ when neither is given), as do `--http3` and `--http3-only`, for which the TCP co
 QUIC connects to the group's `QuicDialer` (ADR-0182, BL-732), and `--compressed`, `--tr-encoding`, `--raw` and `--ignore-content-length`
 are copied as they are (BL-236); `CurlCommandRunnerTransferEncodingTests` pins each one's request
 bytes and output as BL-177, BL-180 and BL-315 measured them.
-With `-b` or `-c` the handler also gets the option group's `CookieEngine`: one `CookieStore`
+With `-b` or `-c` the handler also gets the option group's `CookieEngine` (in `Curl.Engine`): one `CookieStore`
 shared by every URL of every group (`CurlComposition.SharingRunCookies`), the `-b` files loaded before the first transfer (session cookies dropped under
 `-j`, a missing file ignored), the `-b name=value` strings sent after the stored cookies (left out when an `-H` value names
 `Cookie`, BL-291) as one string joined as curl's `cookie_setopts` joins them (`;` and a space,
@@ -337,7 +337,7 @@ Under `-R`/`--remote-time` a successful transfer to an `-o` file whose result ca
 (`PhysicalFileSystem` in production), even when no body was written, as curl does. A
 failed stamp prints curl's `Failed to set filetime` warning lines unless `-s`: the Windows
 build's `CreateFile failed: GetLastError` form on Windows when the file does not open and its `SetFileTime failed` form when the time is refused once it has (BL-1453), and elsewhere the POSIX build's
-`on '<file>': <strerror>`, worded from `utimes`'s errno by `CRuntimeErrorNumbers` (BL-1433). On Windows a
+`on '<file>': <strerror>`, worded from `utimes`'s errno by `Curl.Engine`'s `CRuntimeErrorNumbers` (BL-1433). On Windows a
 time before 1752-09-14T00:00:00Z is first capped to it with `Warning: Capping set filetime to
 minimum to avoid overflow` (unless `-s`), as curl 8.21.0 does; off Windows it is set as given
 (BL-1392).
