@@ -43,3 +43,4 @@ ADR-0506 and `Documentation/Planning/Curl-Api-And-libcurl.md` (phase 2 step 1). 
 ## Log
 
 - 2026-10-15: Created.
+- 2026-10-15: Backlog -> Doing.
