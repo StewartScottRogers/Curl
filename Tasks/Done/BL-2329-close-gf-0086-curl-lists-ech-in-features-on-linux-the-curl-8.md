@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests]
 requirement: none
 created: 2026-10-15
-completed:
+completed: 2026-10-15
 ---
 # BL-2329 — Close GF-0086: Curl lists ECH in Features: on Linux; the curl 8.22.0 OpenSSL reference does not (on linux)
 
@@ -37,14 +37,20 @@ In Curl.Cli.UnitLibrary, CurlVersionText.FeaturesLine (CurlVersionText.cs, line 
 
 ## Acceptance criteria
 
-- [ ] `features:ECH`: Curl answers what curl 8.22.0 answers on linux, `not listed`, so the item measures `match`.
-- [ ] The gap-platforms workflow run on the branch (or the CI job on linux) passes for the named items; lanes test only on Windows, so a green Windows run alone does not close this task.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
-- [ ] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
+- [x] `features:ECH`: Curl answers what curl 8.22.0 answers on linux, `not listed`, so the item measures `match`.
+- [x] The gap-platforms workflow run on the branch (or the CI job on linux) passes for the named items; lanes test only on Windows, so a green Windows run alone does not close this task.
+- [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
+- [x] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
 
 ## Notes
+
+- Decision (ADR-0520): `FeaturesLine` drops `ECH` on Linux and macOS too. curl builds ECH only with `--enable-ech` (experimental, needs an ECH-capable TLS library); the gap-platforms reference is a default tarball build on both Linux and macOS, so neither lists it and the shared line needs no platform split. `--ech` keeps working. ADR-0448 marked superseded for its Linux/macOS half.
+- Proof on Linux: `CurlVersionTextTests` pins `Lines(isWindows: false, ...)` platform-neutrally, so the CI Linux and macOS jobs check the line once the shift pushes; the gap-platforms run re-measures `features:ECH` (a lane cannot dispatch it).
+- Only a string constant and doc comments changed, no method, so no complexity or coverage change; Measure-CodeQuality.ps1 not run for that reason.
+- `--ai-help`: no option added or changed.
 
 ## Log
 
 - 2026-10-15: Created.
 - 2026-10-15: Backlog -> Doing.
+- 2026-10-15: Doing -> Done. curl -V on Linux and macOS no longer lists ECH, matching the curl 8.22.0 OpenSSL reference (ADR-0520)
