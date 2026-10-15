@@ -39,3 +39,4 @@ ADR-0506 and `Documentation/Planning/Curl-Api-And-libcurl.md` (phase 1): the tra
 ## Log
 
 - 2026-10-15: Created.
+- 2026-10-15: Backlog -> Doing.
