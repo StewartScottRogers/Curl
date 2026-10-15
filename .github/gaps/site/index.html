@@ -7,12 +7,15 @@
   written by Gap/Tools/Export-GapDashboardData.ps1.
 
   It shows the release banner (when a newer curl than the target is out), the headline
-  equivalence against the targeted and the newest curl, one row per area with its change
-  since the previous run, an inline SVG trend of the overall and per-area scores over the
-  run history (drawn at the page's own width on a time axis, with a range picker, a legend
-  that shows and hides each line, and a guide listing every score of the run nearest the
-  pointer, so it stays readable at hundreds of runs), the open gaps with area, severity, scope and introduced-in filters, the
-  regressions and the recently closed gaps. With "latest": null it says "No gap analysis
+  equivalence against the targeted and the newest curl on the lowest-scoring platform (data
+  "lowest", ADR-0505), one row per area with one column per platform and each platform's
+  change since its previous run, an inline SVG trend of the overall and per-area scores over
+  one platform's run history, with a platform picker (drawn at the page's own width on a
+  time axis, with a range picker, a legend that shows and hides each line, and a guide
+  listing every score of the run nearest the pointer, so it stays readable at hundreds of
+  runs), the open gaps with area, platform, severity, scope and introduced-in filters, the
+  regressions and the recently closed gaps. Data written before platforms existed (no
+  "platforms") shows its latest entry as the one platform. With "latest": null it says "No gap analysis
   has run yet".
 
   Query overrides (all optional):
@@ -183,39 +186,57 @@ function scoreCard(label, version, score) {
     element('div', { text: score ? `${score.x} of ${score.y}` : 'not measured' }));
 }
 
+// Each platform's newest history entry (data.platforms, ADR-0505), or the latest entry alone
+// for data written before platforms existed.
+function platformEntries(data) {
+  const platforms = data.platforms && Object.keys(data.platforms).length ? data.platforms : { [data.latest.platform]: data.latest };
+  return Object.entries(platforms);
+}
+
+// The entry before this one on the same platform, for the change column.
+function previousOnPlatform(data, entry) {
+  const same = data.history.filter(run => run.platform === entry.platform && run.stamp < entry.stamp);
+  return same.length ? same[same.length - 1] : null;
+}
+
+// The headline is the lowest platform's score, so no platform hides behind another; each
+// platform's own score follows.
 function renderHeadline(data) {
-  const latest = data.latest;
+  const entries = platformEntries(data);
+  const lowestName = data.lowest ? data.lowest.platform : entries[0][0];
+  const lowest = (entries.find(([name]) => name === lowestName) || entries[0])[1];
   const run = element('p', { class: 'run muted' },
-    `Run ${latest.stamp} · commit `,
-    element('a', { href: `https://github.com/StewartScottRogers/Curl/commit/${latest.commit}`, text: latest.commit.slice(0, 9) }),
-    ` · ${latest.platform}` + (latest.reference ? ` · ${latest.reference}` : ''));
+    `Lowest platform: ${lowestName} · run ${lowest.stamp} · commit `,
+    element('a', { href: `https://github.com/StewartScottRogers/Curl/commit/${lowest.commit}`, text: lowest.commit.slice(0, 9) }),
+    ` · platforms ${entries.map(([name, entry]) => `${name} ${percentText(entry.overall)} (${entry.stamp})`).join(', ')}`);
   return element('section', {},
     element('div', { class: 'headline' },
-      scoreCard('Targeted', latest.targetVersion || data.target, latest.overall),
-      scoreCard('Newest', latest.newestVersion || data.newest, latest.newest)),
+      scoreCard(`Targeted, lowest (${lowestName})`, lowest.targetVersion || data.target, lowest.overall),
+      scoreCard(`Newest, ${lowestName}`, lowest.newestVersion || data.newest, lowest.newest)),
     run);
 }
 
+// One row per area, one column per platform: its score, the change since that platform's
+// previous run, and a bar.
 function renderAreas(data) {
-  const latest = data.latest;
-  const previous = data.history.length > 1 ? data.history[data.history.length - 2] : null;
-  // Soft hyphens let the long headings break at phone width.
-  const head = element('tr', {}, ...['Area', 'X', 'Y', '%', 'Unmea­sured', 'Ex­cluded', 'Change']
-    .map((name, i) => element('th', { class: i === 0 ? null : 'num', text: name })));
-  const rows = Object.keys(latest.areas).sort().map(area => {
-    const score = latest.areas[area];
+  const entries = platformEntries(data);
+  const areas = [...new Set(entries.flatMap(([, entry]) => Object.keys(entry.areas || {})))].sort();
+  const head = element('tr', {}, element('th', { text: 'Area' }),
+    ...entries.map(([name]) => element('th', { class: 'num', text: name })));
+  const cell = (score, before) => {
+    if (!score) return element('td', { class: 'num muted', text: '—' });
     const value = percent(score) || 0;
     const bar = element('div', { class: 'bar', role: 'img', 'aria-label': percentText(score) },
       element('span', { style: `width: ${value.toFixed(1)}%` }));
-    return element('tr', {},
-      element('td', { text: area }),
-      element('td', { class: 'num', text: String(score.x) }),
-      element('td', { class: 'num', text: String(score.y) }),
-      element('td', { class: 'num' }, percentText(score), bar),
-      element('td', { class: 'num', text: score.unmeasured === undefined ? '—' : String(score.unmeasured) }),
-      element('td', { class: 'num', text: score.excluded === undefined ? '—' : String(score.excluded) }),
-      element('td', { class: 'num' }, changeText(score, previous && previous.areas[area])));
-  });
+    return element('td', { class: 'num' }, `${score.x} of ${score.y} · ${percentText(score)} `, changeText(score, before), bar);
+  };
+  const row = (label, pick) => element('tr', {}, element('td', {}, label),
+    ...entries.map(([, entry]) => {
+      const previous = previousOnPlatform(data, entry);
+      return cell(pick(entry), previous && pick(previous));
+    }));
+  const rows = areas.map(area => row(area, entry => entry.areas && entry.areas[area]));
+  rows.push(row(element('b', { text: 'overall' }), entry => entry.overall));
   return element('section', {}, element('h2', { text: 'Areas' }),
     element('div', { class: 'table-wrap' }, element('table', {}, element('thead', {}, head), element('tbody', {}, ...rows))));
 }
@@ -433,8 +454,27 @@ function renderTrend(data) {
   return element('section', { id: 'trend' }, element('h2', { text: 'Trend' }), card);
 }
 
+// The trend of one platform at a time, the lowest platform first, with a picker when the
+// history holds more than one platform (ADR-0505).
+function renderPlatformTrend(data) {
+  const names = [...new Set(data.history.map(run => run.platform))];
+  if (names.length <= 1) return renderTrend(data);
+  const chosen = data.lowest && names.includes(data.lowest.platform) ? data.lowest.platform : names[0];
+  const select = element('select', { name: 'platform' },
+    ...names.map(name => element('option', { value: name, text: name, selected: name === chosen ? 'selected' : null })));
+  const holder = element('div', {});
+  const draw = () => holder.replaceChildren(renderTrend({ ...data, history: data.history.filter(run => run.platform === select.value) }));
+  select.addEventListener('change', draw);
+  draw();
+  return element('section', {}, element('label', { class: 'filters' }, 'Trend on ', select), holder);
+}
+
+function platformOf(gap) {
+  return gap.platform || 'windows';
+}
+
 function gapEntry(gap) {
-  const facts = [gap.area, gap.severity, `scope ${gap.scope}`,
+  const facts = [gap.area, gap.severity, platformOf(gap), `scope ${gap.scope}`,
     gap.introducedIn ? `since ${gap.introducedIn}` : 'introduced in unknown',
     `${gap.items} item${gap.items === 1 ? '' : 's'}`,
     gap.tasks.length ? gap.tasks.join(', ') : 'no task'];
@@ -460,6 +500,7 @@ function renderOpen(data) {
   const introduced = gap => gap.introducedIn || 'unknown';
   const filters = element('form', { class: 'filters' },
     selectFilter('area', 'Area', distinct(g => g.area)),
+    selectFilter('platform', 'Platform', distinct(platformOf)),
     selectFilter('severity', 'Severity', ['Critical', 'High', 'Medium', 'Low'].filter(s => open.some(g => g.severity === s))),
     selectFilter('scope', 'Scope', distinct(g => g.scope)),
     selectFilter('introducedIn', 'Introduced in', distinct(introduced)));
@@ -468,6 +509,7 @@ function renderOpen(data) {
   const draw = () => {
     const chosen = Object.fromEntries(new FormData(filters));
     const shown = open.filter(g => (!chosen.area || g.area === chosen.area)
+      && (!chosen.platform || platformOf(g) === chosen.platform)
       && (!chosen.severity || g.severity === chosen.severity)
       && (!chosen.scope || g.scope === chosen.scope)
       && (!chosen.introducedIn || introduced(g) === chosen.introducedIn));
@@ -480,7 +522,7 @@ function renderOpen(data) {
 }
 
 function shortList(title, gaps, empty) {
-  const items = gaps.map(g => element('li', {}, element('a', { href: g.url, text: g.id }), ` ${g.title} (${g.area}, ${g.severity})`));
+  const items = gaps.map(g => element('li', {}, element('a', { href: g.url, text: g.id }), ` ${g.title} (${g.area}, ${platformOf(g)}, ${g.severity})`));
   return element('section', {}, element('h2', { text: title }),
     items.length ? element('ul', {}, ...items) : element('p', { class: 'muted', text: empty }));
 }
@@ -496,7 +538,7 @@ function render(data) {
     renderBanner(data),
     renderHeadline(data),
     renderAreas(data),
-    renderTrend(data),
+    renderPlatformTrend(data),
     renderOpen(data),
     element('div', { class: 'lists' },
       shortList('Regressions', data.regressions || [], 'No regressions.'),

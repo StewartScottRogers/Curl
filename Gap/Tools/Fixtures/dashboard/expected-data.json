@@ -27,6 +27,39 @@
       "y": 326
     }
   },
+  "platforms": {
+    "windows": {
+      "stamp": "2026-10-06_0900",
+      "commit": "d15d115db0a1b2c3d4e5f60718293a4b5c6d7e86",
+      "platform": "windows",
+      "targetVersion": "8.21.0",
+      "newestVersion": "8.22.0",
+      "areas": {
+        "options": {
+          "x": 246,
+          "y": 260
+        },
+        "writeout": {
+          "x": 60,
+          "y": 62
+        }
+      },
+      "overall": {
+        "x": 306,
+        "y": 322
+      },
+      "newest": {
+        "x": 304,
+        "y": 326
+      }
+    }
+  },
+  "lowest": {
+    "platform": "windows",
+    "stamp": "2026-10-06_0900",
+    "x": 306,
+    "y": 322
+  },
   "history": [
     {
       "stamp": "2026-10-01_0900",
@@ -184,6 +217,7 @@
       "id": "GF-0002",
       "title": "POST body is sent twice after a redirect",
       "area": "behaviour",
+      "platform": "windows",
       "severity": "Critical",
       "scope": "target",
       "introducedIn": "7.10",
@@ -199,6 +233,7 @@
       "id": "GF-0001",
       "title": "Encrypted Client Hello options are missing",
       "area": "options",
+      "platform": "windows",
       "severity": "High",
       "scope": "target",
       "introducedIn": "8.8.0",
@@ -213,6 +248,7 @@
       "id": "GF-0005",
       "title": "The mqtts scheme is missing",
       "area": "protocols",
+      "platform": "windows",
       "severity": "High",
       "scope": "target",
       "introducedIn": "8.21.0",
@@ -227,6 +263,7 @@
       "id": "GF-0003",
       "title": "The time_example write-out variable is missing",
       "area": "writeout",
+      "platform": "windows",
       "severity": "High",
       "scope": "newest",
       "introducedIn": "8.22.0",
@@ -239,6 +276,7 @@
       "id": "GF-0004",
       "title": "The new --retry argument form differs",
       "area": "options",
+      "platform": "windows",
       "severity": "Medium",
       "scope": "newest",
       "introducedIn": "8.22.0",
@@ -251,6 +289,7 @@
       "id": "GF-0006",
       "title": "A help line is worded differently",
       "area": "options",
+      "platform": "windows",
       "severity": "Low",
       "scope": "target",
       "introducedIn": null,
@@ -265,6 +304,7 @@
       "id": "GF-0007",
       "title": "The strerror text for exit 101 differs",
       "area": "exitcodes",
+      "platform": "windows",
       "severity": "Medium",
       "scope": "target",
       "introducedIn": "8.12.0",
@@ -281,6 +321,7 @@
       "id": "GF-0002",
       "title": "POST body is sent twice after a redirect",
       "area": "behaviour",
+      "platform": "windows",
       "severity": "Critical",
       "scope": "target",
       "introducedIn": "7.10",

@@ -5,8 +5,10 @@ method in `Gap/Instructions/<Area>.md`, and follows both. The design is ADR-0433
 (`Documentation/Planning/Decisions/ADR-0433-a-gap-analysis-office-measures-curl-against-upstream-curl-releases.md`).
 Every file format named here is defined in `Gap/Instructions/Gap-Format.md`.
 
-An analyst reads one area's measurement, `<run>/measurements/<area>.json`, groups its `gap`
-items by cause, says how to close each cause, and ends with one report block. The run turns
+An analyst reads one area's measurement on one platform,
+`<run>/measurements/<platform>/<area>.json` (the prompt names the file and the platform),
+groups its `gap` items by cause, says how to close each cause, and ends with one report
+block. The run turns
 each group into a gap finding and Claude files its tasks. The analyst decides nothing else.
 
 ## The rules
@@ -53,6 +55,17 @@ each group into a gap finding and Claude files its tasks. The analyst decides no
    it. The run reads only that block.
 8. **No Python and no network beyond loopback.** Checks and scratch scripts are PowerShell.
    Any probe you rerun talks only to `127.0.0.1` or `localhost`.
+9. **One platform at a time** (ADR-0505). The prompt names the platform: `windows`,
+   measured on this machine against the Schannel curl of Git for Windows, or `linux` or
+   `macos`, measured by the gap-platforms workflow against curl built from the release
+   tarball with OpenSSL. On windows, rule 3 covers every `gap` item. On linux and macos
+   the prompt lists the gap items that are that platform's own; every other gap is
+   already covered by a finding of another platform. Group exactly the listed items, so
+   rule 3 reads "every listed item in exactly one group". The findings the prompt lists
+   for rule 4 are that platform's. A linux or macos measurement's evidence ran on a
+   GitHub runner, so give its reproduction as the command the item's `evidence` names,
+   to run on that platform; where the cause is platform-specific (a path, a socket, a
+   TLS library's text), say so in the `suggestion`.
 
 ## The report block
 
@@ -83,11 +96,13 @@ A measurement with no `gap` items gives `"groups": []`.
 
 ## Checking the block before sending it
 
-Save the block to the temporary folder and run, from the repository root:
+Save the block to the temporary folder and run, from the repository root, with the
+measurement file the prompt names (on linux and macos, set `$gaps` to the listed items
+instead):
 
 ```powershell
 $report = Get-Content <temp>\report.json -Raw | ConvertFrom-Json
-$measurement = Get-Content <run>\measurements\<area>.json -Raw | ConvertFrom-Json
+$measurement = Get-Content <run>\measurements\<platform>\<area>.json -Raw | ConvertFrom-Json
 $gaps = @($measurement.items | Where-Object state -eq 'gap' | ForEach-Object key)
 $grouped = @($report.groups | ForEach-Object { $_.items })
 Compare-Object $gaps $grouped                                  # prints nothing

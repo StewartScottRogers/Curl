@@ -1,7 +1,7 @@
 # Gap analyst method: write-out
 
 The `gap-writeout` analyst follows `Gap/Instructions/Analyst-Rules.md` first and this
-method second. It reads `<run>/measurements/writeout.json`, written by
+method second. It reads `<run>/measurements/<platform>/writeout.json`, written by
 `Gap/Tools/Measure-WriteOutGap.ps1`, whose header says how each variable is probed.
 
 ## What the measurement holds

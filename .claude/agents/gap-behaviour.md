@@ -10,7 +10,7 @@ tracked file.
 1. Read `Gap/Instructions/Analyst-Rules.md` first. Its rules bind you.
 2. Read `Gap/Instructions/Behaviour.md`, your method.
 3. Follow both for the run folder, commit, release folder and findings the prompt names:
-   read `<run>/measurements/behaviour.json`, pre-group its `gap` items with the method's
+   read `<run>/measurements/<platform>/behaviour.json` (the measurement file the prompt names), pre-group the `gap` items the prompt leaves to you (Analyst-Rules.md rule 9) with the method's
    signature one-liner, find each bucket's cause in the upstream case files and Curl's
    code, and write each cause's group with its evidence, suggestion and touches.
 4. End your reply with exactly one fenced `json` report block in the analyst report format

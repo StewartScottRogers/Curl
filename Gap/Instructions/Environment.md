@@ -1,7 +1,7 @@
 # Gap analyst method: environment
 
 The `gap-environment` analyst follows `Gap/Instructions/Analyst-Rules.md` first and this
-method second. It reads `<run>/measurements/environment.json`, written by
+method second. It reads `<run>/measurements/<platform>/environment.json`, written by
 `Gap/Tools/Measure-EnvironmentGap.ps1`, whose header lists every recipe.
 
 ## What the measurement holds

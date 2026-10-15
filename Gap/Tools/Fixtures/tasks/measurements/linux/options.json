@@ -1,0 +1,12 @@
+{
+  "area": "options",
+  "targetVersion": "8.21.0",
+  "candidateCommit": "0000000000000000000000000000000000000000",
+  "platform": "linux",
+  "reference": "curl 8.21.0 (x86_64-pc-linux-gnu) libcurl/8.21.0 OpenSSL/3.0.13",
+  "measuredAt": "2026-10-15T12:00:00Z",
+  "items": [
+    { "key": "options:--unix-socket", "state": "gap", "reason": null, "expected": "exit 7 on a missing socket", "actual": "exit 2", "evidence": "curl --unix-socket /tmp/s http://localhost/", "introducedIn": "7.40.0" }
+  ],
+  "counts": { "match": 0, "gap": 1, "unmeasured": 0, "excluded": 0, "x": 0, "y": 1 }
+}

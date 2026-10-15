@@ -5,6 +5,11 @@ gap run (ADR-0433). Copy `FINDING-TEMPLATE.md` for the front matter and sections
 field is defined in [`../Instructions/Gap-Format.md`](../Instructions/Gap-Format.md),
 section 7.
 
+Every finding has a `platform`: `windows`, `linux` or `macos` (ADR-0505). A finding without
+the field is a `windows` one, as every finding filed before ADR-0505 is. A finding holds only
+gaps that are its platform's own: a linux or macos gap that Windows (or, for macOS, Linux)
+also shows stays with that platform's finding.
+
 ## Statuses
 
 - `open`: filed and accepted. Claude files the tasks for a `scope: target` finding; a
@@ -17,7 +22,8 @@ There is no won't-fix status.
 ## Closing and reopening (ADR-0433 decision 5)
 
 - A finding closes only when a run measures every one of its items as `match`, or as
-  `excluded` with a reason the run states. That run's stamp goes in `closed`.
+  `excluded` with a reason the run states, on the finding's platform. That run's stamp goes
+  in `closed`. Another platform's measurement neither closes nor reopens it.
 - A finding never closes because its task reached Done. When every task is Done and the
   latest run still measures a gap, a `Re-close GF-####` task is filed.
 - A `closed` finding whose item measures `gap` again reopens: `status: open`,

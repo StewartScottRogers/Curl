@@ -209,7 +209,11 @@ not an item key: it names a cause, never one item.
 
 ## 4. Area measurement
 
-`<run>/measurements/<area>.json`, written by the area's `Measure-*` tool. It gives every
+`<run>/measurements/<platform>/<area>.json`, written by the area's `Measure-*` tool, which
+`Measure-GapAreas.ps1` runs: on Windows from `RunGapAnalysis.ps1`, on Linux and macOS from
+`.github/workflows/gap-platforms.yml`, whose artifact `gap-measurements-<platform>` the run
+downloads into that folder (ADR-0505). A run from before ADR-0505 kept
+`<run>/measurements/<area>.json`, all Windows; every reader takes both. It gives every
 inventory item of the targeted version exactly one state on one platform.
 
 | Field | Type | Meaning |
@@ -233,6 +237,29 @@ inventory item of the targeted version exactly one state on one platform.
 | `reasons` | object | `behaviour` only: the number of items per reason, keyed by reason in ordinal order. Its values add up to `unmeasured + excluded`. |
 
 `x` is `match`. `y` is `match + gap + unmeasured`. An `excluded` item counts in neither.
+
+### Measurement status, the `-StatusFile` of `Measure-GapAreas.ps1`
+
+`<run>/status-windows.json` on Windows, `status.json` in the `gap-measurements-<platform>`
+artifact on Linux and macOS. Written by `Measure-GapAreas.ps1` with `ConvertTo-Json`.
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `platform` | string | `windows`, `linux` or `macos`. |
+| `commit` | string | The commit measured. |
+| `target` | string | The version measured against. |
+| `reference` | string | The reference curl's version line, or `docs` when none names the target. |
+| `areas` | object | One property per selected area: `"X of Y"`, or `"not measured: <why>"`. |
+| `failure` | string or `null` | Why the measurement stopped before any area (the build or the release download failed), or `null`. |
+
+### Platforms, `<run>/platforms.json`
+
+Written by `RunGapAnalysis.ps1` after every platform has reported. One property per
+selected platform, each `{ "state", "reason", "reference", "areas" }`: `state` is
+`measured` when any area's measurement arrived and `missing` otherwise; `reason` says why a
+platform is missing (the dispatch failed, the run did not finish within
+`-PlatformTimeoutMinutes`, the job left no measurement), or that a measured one's job did
+not succeed, else `null`; `reference` and `areas` come from its status file, or `null`.
 
 ### Reasons
 
@@ -439,7 +466,8 @@ Front matter, in this order:
 | `id` | string | `GF-####`, four digits, never reused. |
 | `title` | string | The cause in one line. |
 | `area` | string | The area name. |
-| `key` | string | The group key `<area>:<cause-slug>`, stable across runs, used to match a later run's group to this finding. |
+| `platform` | string | `windows`, `linux` or `macos`: the platform whose measurement filed it and whose re-measurement alone closes it (ADR-0505). A finding without the field is `windows`, as every finding filed before ADR-0505 is; a `scope: newest` finding is `windows`. |
+| `key` | string | The group key `<area>:<cause-slug>`, stable across runs, used with `platform` to match a later run's group to this finding. |
 | `severity` | string | `Critical`, `High`, `Medium` or `Low`. |
 | `status` | string | `open`, `closed` or `rejected`. |
 | `scope` | string | `target` or `newest`. |
@@ -463,10 +491,15 @@ run: the stamp and how many of the items are still gaps), `Log`.
 Statuses and closing (ADR-0433 decisions 4 and 5):
 
 - A finding is filed `open`, which means accepted. Claude files its tasks.
+- A finding holds only its platform's own gaps (ADR-0505): a gap on linux or macos that an
+  earlier platform in the order windows, linux, macos measures as `gap` in the same run
+  (or, when that platform was not measured, lists in an open finding) is left to that
+  platform's finding, so one cause seen everywhere is one finding.
 - It closes only when a run measures every one of its items as `match`, or as `excluded`
-  with a reason the run states. It never closes because its task reached Done.
-- A `closed` finding whose item measures `gap` again reopens: `status: open`,
-  `regression: true`, `closed` emptied, and the run that saw it in the Log.
+  with a reason the run states, on the finding's platform. Another platform's measurement
+  never closes it, and it never closes because its task reached Done.
+- A `closed` finding whose item measures `gap` again on its platform reopens:
+  `status: open`, `regression: true`, `closed` emptied, and the run that saw it in the Log.
 - Only Stewart sets `rejected`. A rejected finding gets no new tasks.
 - There is no won't-fix status.
 
@@ -475,6 +508,7 @@ Statuses and closing (ADR-0433 decisions 4 and 5):
 id: GF-0001
 title: Encrypted Client Hello options are missing
 area: options
+platform: windows
 key: options:encrypted-client-hello
 severity: High
 status: open
@@ -516,51 +550,75 @@ Parse `--ech` and its four argument forms in Curl.Console and pass them to the T
 
 ### Scorecard, `Gap/Scorecards/<yyyy-MM-dd_HHmm>.md`
 
-One per run, named by its run stamp. `Gap/Scorecards/README.md` describes the folder. Its
-fixed sections, in this order:
+One per run, named by its run stamp, covering every platform the run measured
+(ADR-0505). `Gap/Scorecards/README.md` describes the folder. Its fixed sections, in this
+order:
 
 | Section | Holds |
 | --- | --- |
-| `Run` | The candidate commit, the platform, the targeted version, the newest version, and the reference (its `--version` first line, or "documents" for a fallback). |
-| `Scores` | A table, one row per area and an overall row: X, Y, the percentage, unmeasured, excluded, and the change in percentage points since the last run on the same platform. |
-| `Against the newest version` | The same table computed as in section 10, and the release diff's version. |
-| `New gaps` | The findings this run opened, with id, title and severity. |
+| `Run` | The candidate commit, the platforms measured, each missing platform with the reason from `platforms.json`, the targeted version, the newest version, and each platform's reference (its `--version` first line, or "documents" for a fallback). |
+| `Scores` | The headline, the lowest platform's overall score ("Overall: X of Y, P%, on `<platform>`, the lowest of ..."), with any missing platform named after it, so no platform hides behind another. Then a table, one row per area and an overall row, one column per platform: "X of Y, P% (change)", the change in percentage points since the last run on the same platform; "not measured" for an area a platform has neither measured nor carried; "missing" in a missing platform's column. |
+| `Platforms` | One `### <platform>` table per measured platform, one row per area and an overall row: X, Y, the percentage, unmeasured, excluded, and the change. |
+| `Against the newest version` | The release diff's version, the lowest platform's newest score, and the same per-platform table computed as in section 10, "X of Y, P%". |
+| `New gaps` | The findings this run opened, with id, title, severity and platform. |
 | `Closed` | The findings this run closed. |
 | `Regressions` | The findings this run reopened. |
-| `Unmeasured by reason` | A table of area, reason and count, for `unmeasured` and `excluded` items. |
+| `Unmeasured by reason` | A table of area, platform, reason and count, for `unmeasured` and `excluded` items. |
 
 A section with nothing to list says `None.`
 
 ```markdown
-# Gap scorecard 2026-10-09_1430
+# Gap scorecard 2026-10-15_1200
 
 ## Run
 
 - Commit: d15d115db0a1b2c3d4e5f60718293a4b5c6d7e8f
-- Platform: windows
-- Target: 8.21.0
+- Platforms: windows, linux
+- Missing: macos (gap-platforms run 42 did not finish within 180 minutes)
+- Target: 8.22.0
 - Newest: 8.22.0
-- Reference: curl 8.21.0 (x86_64-w64-mingw32) libcurl/8.21.0 Schannel
+- Reference on windows: curl 8.22.0 (x86_64-w64-mingw32) libcurl/8.22.0 Schannel
+- Reference on linux: curl 8.22.0 (x86_64-pc-linux-gnu) libcurl/8.22.0 OpenSSL/3.0.13
 
 ## Scores
+
+Overall: 240 of 260, 92.3%, on linux, the lowest of windows, linux. Missing: macos (gap-platforms run 42 did not finish within 180 minutes).
+
+| Area | windows | linux | macos |
+| --- | --- | --- | --- |
+| options | 250 of 260, 96.2% (+1.5) | 240 of 260, 92.3% (first run) | missing |
+| overall | 250 of 260, 96.2% (+1.5) | 240 of 260, 92.3% (first run) | missing |
+
+## Platforms
+
+### windows
 
 | Area | X | Y | % | Unmeasured | Excluded | Change |
 | --- | --- | --- | --- | --- | --- | --- |
 | options | 250 | 260 | 96.2 | 4 | 2 | +1.5 |
 | overall | 250 | 260 | 96.2 | 4 | 2 | +1.5 |
 
+### linux
+
+| Area | X | Y | % | Unmeasured | Excluded | Change |
+| --- | --- | --- | --- | --- | --- | --- |
+| options | 240 | 260 | 92.3 | 4 | 2 | first run |
+| overall | 240 | 260 | 92.3 | 4 | 2 | first run |
+
 ## Against the newest version
 
-Release 8.22.0.
+Newest version 8.22.0 is the target; the target figures are repeated.
 
-| Area | X | Y | % |
+Overall: 240 of 260, 92.3%, on linux, the lowest of windows, linux.
+
+| Area | windows | linux | macos |
 | --- | --- | --- | --- |
-| options | 249 | 263 | 94.7 |
-| overall | 249 | 263 | 94.7 |
+| options | 250 of 260, 96.2% | 240 of 260, 92.3% | missing |
+| overall | 250 of 260, 96.2% | 240 of 260, 92.3% | missing |
 
 ## New gaps
 
-- GF-0001 Encrypted Client Hello options are missing (High)
+- GF-0101 The Unix socket path is read differently (Medium, linux)
 
 ## Closed
 
@@ -572,15 +630,19 @@ None.
 
 ## Unmeasured by reason
 
-| Area | Reason | Count |
-| --- | --- | --- |
-| options | needs-server:smtp | 4 |
-| options | platform:linux | 2 |
+| Area | Platform | Reason | Count |
+| --- | --- | --- | --- |
+| options | windows | needs-server:smtp | 4 |
+| options | windows | platform:unix | 2 |
+| options | linux | needs-server:smtp | 4 |
+| options | linux | platform:windows | 2 |
 ```
 
 ### History, `Gap/Scorecards/history.json`
 
-An array with one entry per run, oldest first. Each run appends one.
+An array with one entry per run and measured platform, oldest first. Each run appends one
+entry per platform it measured, in the order windows, linux, macos; a missing platform
+gets none.
 
 | Field | Type | Meaning |
 | --- | --- | --- |
@@ -589,9 +651,9 @@ An array with one entry per run, oldest first. Each run appends one.
 | `platform` | string | `windows`, `linux` or `macos`. |
 | `targetVersion` | string | The targeted version. |
 | `newestVersion` | string | The newest version. |
-| `areas` | object | One property per measured area: `{ "x": int, "y": int }`. |
-| `overall` | object | `{ "x": int, "y": int }`, the sums across the areas. |
-| `newest` | object | `{ "x": int, "y": int }`, the overall score against the newest version. |
+| `areas` | object | One property per area measured on the platform: `{ "x": int, "y": int }`. |
+| `overall` | object | `{ "x": int, "y": int }`, the sums across the platform's areas. |
+| `newest` | object | `{ "x": int, "y": int }`, the platform's overall score against the newest version. |
 
 ```json
 [
@@ -618,12 +680,15 @@ dashboard page.
 | `generated` | string | When the file was written, UTC time. |
 | `target` | string | The targeted version. |
 | `newest` | string | The newest version. |
-| `latest` | object | The last `history.json` entry. |
+| `latest` | object or `null` | The last `history.json` entry. |
+| `platforms` | object | One property per platform in `history.json`, in the order windows, linux, macos: that platform's newest entry (ADR-0505). |
+| `lowest` | object or `null` | `{ "platform": string, "stamp": string, "x": int, "y": int }`: the `platforms` entry with the lowest overall score, the dashboard's headline; a platform whose overall `y` is 0 is passed over. |
 | `history` | object[] | The whole of `history.json`. |
 | `open` | object[] | Every `open` finding. |
 | `open[].id` | string | `GF-####`. |
 | `open[].title` | string | The finding's title. |
 | `open[].area` | string | Its area. |
+| `open[].platform` | string | Its platform, `windows` when the finding has none. |
 | `open[].severity` | string | Its severity. |
 | `open[].scope` | string | `target` or `newest`. |
 | `open[].introducedIn` | string or `null` | Its `introduced-in`, or `null` when empty. |
@@ -631,7 +696,7 @@ dashboard page.
 | `open[].items` | integer | How many item keys it lists. |
 | `open[].tasks` | string[] | Its `tasks`. |
 | `open[].url` | string | The finding's page on GitHub. |
-| `closed` | object[] | Findings closed in the last 5 runs, with the same fields as `open`. |
+| `closed` | object[] | Findings closed in the last 5 runs (distinct stamps in `history.json`), with the same fields as `open`. |
 | `regressions` | object[] | Open findings with `regression: true`, with the same fields as `open`. |
 | `release` | object or `null` | `{ "version": string, "newGaps": int }` for the newest release when it is newer than the target, or `null`. |
 
@@ -650,6 +715,19 @@ dashboard page.
     "overall": { "x": 250, "y": 260 },
     "newest": { "x": 249, "y": 263 }
   },
+  "platforms": {
+    "windows": {
+      "stamp": "2026-10-09_1430",
+      "commit": "d15d115db0a1b2c3d4e5f60718293a4b5c6d7e8f",
+      "platform": "windows",
+      "targetVersion": "8.21.0",
+      "newestVersion": "8.22.0",
+      "areas": { "options": { "x": 250, "y": 260 } },
+      "overall": { "x": 250, "y": 260 },
+      "newest": { "x": 249, "y": 263 }
+    }
+  },
+  "lowest": { "platform": "windows", "stamp": "2026-10-09_1430", "x": 250, "y": 260 },
   "history": [
     {
       "stamp": "2026-10-09_1430",
@@ -667,6 +745,7 @@ dashboard page.
       "id": "GF-0001",
       "title": "Encrypted Client Hello options are missing",
       "area": "options",
+      "platform": "windows",
       "severity": "High",
       "scope": "target",
       "introducedIn": "8.8.0",
@@ -700,4 +779,4 @@ not in X) until a run targets that version. Removed cases leave both X and Y. Th
 their target measurement.
 
 The overall score against the newest version is the sum of X over the sum of Y across the
-areas, and is recorded as `newest` in `history.json`.
+areas, computed per platform and recorded as `newest` in that platform's `history.json` entry.
