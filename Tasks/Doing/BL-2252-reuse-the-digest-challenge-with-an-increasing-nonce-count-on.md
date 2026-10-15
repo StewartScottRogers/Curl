@@ -31,3 +31,4 @@ Found by BL-2238 (2026-10-14), which made the harness run test1286's Digest-fiel
 ## Log
 
 - 2026-10-14: Created.
+- 2026-10-14: Backlog -> Doing.
