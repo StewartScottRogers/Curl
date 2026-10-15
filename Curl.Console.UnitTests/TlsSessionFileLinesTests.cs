@@ -138,6 +138,44 @@ public sealed class TlsSessionFileLinesTests
         Assert.AreEqual(string.Empty, fileText);
     }
 
+    // curl 8.22.0 loads the file before it sets up the transfers, where it meets "no URL
+    // specified", and saves it after (gap finding GF-0090, BL-2333).
+    [TestMethod]
+    public async Task RunAsync_NoUrlWithSslSessions_WarnsAboutTheFileBeforeTheRefusalAndSavesIt()
+    {
+        File.WriteAllText(_file, "no colon\n!!:x\n");
+        var standardError = new MemoryStream();
+        var fileSystem = new InMemoryFileSystem();
+        Diagnostics.Arrange("command line", "--ssl-sessions <file>");
+        Diagnostics.Arrange("session file", "no colon\\n!!:x\\n");
+
+        int exitCode = await new CurlCommandRunner(
+                _ => throw new InvalidOperationException("no transfer is set up"),
+                fileSystem,
+                fileSystem,
+                new MemoryStream(),
+                standardError,
+                new MemoryStream(),
+                runsOnWindows: false,
+                parsesAsWindowsBuild: false,
+                tlsSessions: new TlsSessionCache(TimeProvider.System))
+            .RunAsync(["--ssl-sessions", _file]);
+        string error = Encoding.UTF8.GetString(standardError.ToArray());
+        string fileText = File.ReadAllText(_file);
+        int unrecognized = error.IndexOf("Warning: unrecognized line 1 in SSL session file", StringComparison.Ordinal);
+        int invalidBase64 = error.IndexOf("Warning: invalid shmax base64 encoding in line 2", StringComparison.Ordinal);
+        int noUrl = error.IndexOf("curl: (2) no URL specified", StringComparison.Ordinal);
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Act("stderr", Shown(error));
+
+        Diagnostics.Assert("exit code", 2, exitCode);
+        Diagnostics.Assert("warnings in order, before the refusal", true, unrecognized >= 0 && unrecognized < invalidBase64 && invalidBase64 < noUrl);
+        Diagnostics.Assert("session file length after the save", 0, fileText.Length);
+        Assert.AreEqual(2, exitCode);
+        Assert.IsTrue(unrecognized >= 0 && unrecognized < invalidBase64 && invalidBase64 < noUrl, Shown(error));
+        Assert.AreEqual(string.Empty, fileText);
+    }
+
     [TestMethod]
     public void CreateTlsProvider_WithSessionsAndTheOption_IsTheHandBuiltProvider()
     {

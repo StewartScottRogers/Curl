@@ -868,7 +868,7 @@ internal sealed class CurlCommandRunner(
     {
         if (!parsed.IsAccepted)
         {
-            await WriteRefusalAsync(parsed.Refusal, parsed.NotedDefaultConfigFile).ConfigureAwait(false);
+            await WriteRefusalAsync(parsed.Refusal, parsed.NotedDefaultConfigFile, parsed.OptionsReadBeforeRefusal).ConfigureAwait(false);
 
             return (int)parsed.Refusal.ExitCode;
         }
@@ -4842,17 +4842,23 @@ internal sealed class CurlCommandRunner(
     /// Writes a refused command line's lines and, where curl 8.21.0 prints it, the default config
     /// file's note: before the lines for a refusal curl meets at transfer setup
     /// (<see cref="CommandLineRefusal.FoundAtTransferSetup" />), after them for one it meets while
-    /// reading the command line (measured 2026-09-27, BL-352).
+    /// reading the command line (measured 2026-09-27, BL-352). A refusal met at transfer setup
+    /// also loads the <c>--ssl-sessions</c> file before its lines and saves it after them, as
+    /// curl 8.22.0's <c>operate</c> loads it before <c>run_all_transfers</c> and saves it after
+    /// (gap finding GF-0090, BL-2333).
     /// </summary>
     /// <param name="refusal">The refusal.</param>
     /// <param name="notedDefaultConfigFile">The default config file to announce, or <see langword="null" /> for none.</param>
+    /// <param name="optionsRead">The options read before the refusal, which name the <c>--ssl-sessions</c> file.</param>
     /// <returns>A task that completes when everything is flushed.</returns>
-    private async Task WriteRefusalAsync(CommandLineRefusal refusal, string? notedDefaultConfigFile)
+    private async Task WriteRefusalAsync(CommandLineRefusal refusal, string? notedDefaultConfigFile, CommandLineOptions optionsRead)
     {
         if (refusal.FoundAtTransferSetup)
         {
             await WriteDefaultConfigFileNoteAsync(notedDefaultConfigFile).ConfigureAwait(false);
+            await WriteTlsSessionLinesAsync(optionsRead, TlsSessionFileLines.Load).ConfigureAwait(false);
             await WriteErrorLinesAsync(refusal.StandardErrorLines).ConfigureAwait(false);
+            await WriteTlsSessionLinesAsync(optionsRead, (sessions, options) => TlsSessionFileLines.Save(sessions, options, runsOnWindows)).ConfigureAwait(false);
         }
         else
         {
