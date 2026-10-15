@@ -32,3 +32,4 @@ ADR-0506; one of the four pieces BL-2310 needs before the engine can drop its `C
 ## Log
 
 - 2026-10-15: Created.
+- 2026-10-15: Backlog -> Doing.
