@@ -346,12 +346,18 @@ function Get-Collision($Task, [object[]] $Tasks) {
 # even when it overlaps nothing in Doing. Without that, smaller tasks on the same projects
 # keep starting as each Doing task ends, and a large task is never free to start (BL-717,
 # BL-1041). A task that touches * reserves everything, so it runs once Doing empties.
+# Only a wait on a lane-eligible Doing task reserves: lanes finish those, so holding
+# work back lets them drain. An interactive-only task in Doing ends only when a session
+# finishes it, which may be days away, so a task waiting on one reserves nothing and the
+# lanes keep working beside it (AF-0220: a * task behind an interactive claim idled every
+# lane for five hours).
 function Get-StartOrder([object[]] $Ready, [object[]] $Tasks) {
     $reserved = @()
     foreach ($task in $Ready) {
         $busy = Get-Collision $task $Tasks
         if ($busy) {
-            $reserved += $task
+            $laneBusy = @($Tasks | Where-Object { $_.State -eq 'Doing' -and $_.LaneAllowed -and (Test-Overlap $task.Touches $_.Touches) })
+            if ($laneBusy.Count -gt 0) { $reserved += $task }
             [pscustomobject]@{ Task = $task; Start = $false; Behind = $busy; HeldBy = $null }
             continue
         }
