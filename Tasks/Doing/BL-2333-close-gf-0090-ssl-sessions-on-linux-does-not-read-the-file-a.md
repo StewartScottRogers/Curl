@@ -47,3 +47,4 @@ In Curl.Cli.UnitLibrary, where SslSessionsFile (CommandLineGlobalState, CommandL
 ## Log
 
 - 2026-10-15: Created.
+- 2026-10-15: Backlog -> Doing.
