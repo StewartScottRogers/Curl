@@ -44,9 +44,9 @@ internal sealed class InMemoryServerTcpDialer(IConnector server) : ITcpDialer
     public async ValueTask<IConnection> DialUnixSocketAsync(UnixSocketAddress address, CancellationToken cancellationToken)
     {
         // A Unix socket has no port: the dial goes to %HTTPPORT, so a dial to %HTTPUNIXPATH reaches
-        // the sws emulation, as upstream's http-unix server is sws (BL-2229).
+        // the sws emulation, as upstream's http-unix server is sws (BL-2229, BL-2271).
         ConnectResult connected = await server
-            .ConnectAsync(new ConnectTarget(address.Path, int.Parse(UpstreamCaseRunner.HttpPort, System.Globalization.CultureInfo.InvariantCulture), false), cancellationToken);
+            .ConnectAsync(UpstreamCaseRunner.HttpUnixSocketTarget(address.Path), cancellationToken);
 
         return connected.Connection
             ?? throw new IOException($"The in-memory server refused the connection: {connected.ErrorMessage}");

@@ -195,6 +195,17 @@ public sealed class UpstreamCaseRunner(
     /// </summary>
     public const string HttpUnixPath = "log/server/http.sock";
 
+    /// <summary>
+    /// The in-memory dial a <c>--unix-socket</c> connection to <paramref name="unixSocketPath"/> makes: the path as
+    /// the host and <see cref="HttpPort"/> as the port, since a Unix socket has none, so a dial to
+    /// <see cref="HttpUnixPath"/> reaches the sws emulation, as upstream's <c>http-unix</c> server is sws. The
+    /// conformance tests' dialer and the gap office's tool both dial with it (BL-2271).
+    /// </summary>
+    /// <param name="unixSocketPath">The Unix socket path curl dials.</param>
+    /// <returns>The target to pass to the case's connector chain.</returns>
+    public static ConnectTarget HttpUnixSocketTarget(string unixSocketPath) =>
+        new(unixSocketPath, int.Parse(HttpPort, CultureInfo.InvariantCulture), false);
+
     /// <summary>The value of <c>%NOLISTENPORT</c>: connections to this port are refused, <see cref="NoListenPortConnector"/>.</summary>
     public const string NoListenPort = "47";
 

@@ -1285,6 +1285,20 @@ public sealed class UpstreamCaseRunnerTests
     }
 
     [TestMethod]
+    public async Task HttpUnixSocketTarget_TheHttpUnixPath_ReachesTheSwsEmulationOnTheHttpPort()
+    {
+        SwsHttpServerConnector server = new(ParsedTestCase.From("<reply>\n<data>\nHTTP/1.1 200 OK\n\n</data>\n</reply>\n"));
+
+        ConnectTarget target = UpstreamCaseRunner.HttpUnixSocketTarget(UpstreamCaseRunner.HttpUnixPath);
+        ConnectResult connected = await server.ConnectAsync(target, CancellationToken.None);
+
+        Assert.AreEqual(UpstreamCaseRunner.HttpUnixPath, target.Host);
+        Assert.AreEqual(UpstreamCaseRunner.HttpPort, target.Port.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        Assert.IsFalse(target.UseTls);
+        Assert.IsNotNull(connected.Connection, connected.ErrorMessage);
+    }
+
+    [TestMethod]
     public async Task RunAsync_Ipv6Variables_HaveTheValuesOfTheInMemoryIpv6Servers()
     {
         string? commandLine = null;

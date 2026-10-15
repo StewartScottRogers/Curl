@@ -253,7 +253,8 @@ failed to resolve, where curl caches the failure).
 path `runtests.pl`'s `http.sock` has under its relative log directory, so it fits a `sockaddr_un`
 wherever the harness's log directory is. Nothing listens on it: upstream's `http-unix` server is the
 `sws` emulation, and the conformance tests' `InMemoryServerTcpDialer` sends a `--unix-socket` dial to
-the connector chain at `%HTTPPORT`, so it reaches `SwsHttpServerConnector` through `TcpConnector`'s own
+the connector chain at `%HTTPPORT` through `UpstreamCaseRunner.HttpUnixSocketTarget` (BL-2271, the one
+public way to dial it, for the gap office's tool too), so it reaches `SwsHttpServerConnector` through `TcpConnector`'s own
 Unix-socket code. Screening lets `http-unix` cases run: 1435 and 1436 pass.
 A `<client><stdout>` part is accepted and never compared, since `runtests.pl` at `curl-8_22_0` reads
 stdout only from `<verify>` (BL-2221): 210 passes, and 211 and 212 differ (Curl retries a refused
