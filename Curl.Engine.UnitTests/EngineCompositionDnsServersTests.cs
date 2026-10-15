@@ -47,7 +47,7 @@ public sealed class EngineCompositionDnsServersTests
     {
         // curl --dns-servers bogus http://bl694.example/ -> curl: (43) Error 43 resolving bl694.example:80 (c-ares build);
         // the system resolver has no such failure, so the exit shows which resolver ran. Nothing is sent.
-        CurlTransports transports = EngineComposition.CreateTransports(Parse("--dns-servers", "bogus"), EasyOptionsFromCommandLine.NetworkOf(Parse("--dns-servers", "bogus")), EasyOptionsFromCommandLine.TlsOf(Parse("--dns-servers", "bogus")), EasyOptionsFromCommandLine.HttpOf(Parse("--dns-servers", "bogus")), EasyOptionsFromCommandLine.ProxyOf(Parse("--dns-servers", "bogus")));
+        CurlTransports transports = EngineComposition.CreateTransports(Parse("--dns-servers", "bogus"), EasyOptionsFromCommandLine.NetworkOf(Parse("--dns-servers", "bogus")), EasyOptionsFromCommandLine.TlsOf(Parse("--dns-servers", "bogus")), EasyOptionsFromCommandLine.HttpOf(Parse("--dns-servers", "bogus")), EasyOptionsFromCommandLine.ProxyOf(Parse("--dns-servers", "bogus")), EasyOptionsFromCommandLine.AuthenticationOf(Parse("--dns-servers", "bogus")));
 
         ConnectResult tcp;
         DatagramOpenResult udp;

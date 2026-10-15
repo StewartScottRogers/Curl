@@ -81,7 +81,7 @@ public sealed class Socks5AuthenticationMappingTests
     [TestMethod]
     public void CreateTransports_WithSocks5Basic_GivesTheTcpConnectorTheOptionsAndTheRunsContexts()
     {
-        CurlTransports transports = EngineComposition.CreateTransports(Parse("--socks5-basic", Url), EasyOptionsFromCommandLine.NetworkOf(Parse("--socks5-basic", Url)), EasyOptionsFromCommandLine.TlsOf(Parse("--socks5-basic", Url)), EasyOptionsFromCommandLine.HttpOf(Parse("--socks5-basic", Url)), EasyOptionsFromCommandLine.ProxyOf(Parse("--socks5-basic", Url)));
+        CurlTransports transports = EngineComposition.CreateTransports(Parse("--socks5-basic", Url), EasyOptionsFromCommandLine.NetworkOf(Parse("--socks5-basic", Url)), EasyOptionsFromCommandLine.TlsOf(Parse("--socks5-basic", Url)), EasyOptionsFromCommandLine.HttpOf(Parse("--socks5-basic", Url)), EasyOptionsFromCommandLine.ProxyOf(Parse("--socks5-basic", Url)), EasyOptionsFromCommandLine.AuthenticationOf(Parse("--socks5-basic", Url)));
 
         Socks5AuthenticationOptions options = transports.TcpConnector.Socks5Authentication;
         Diagnostics.Act("allow basic / gssapi / has contexts", $"{options.AllowUserNameAndPassword} / {options.AllowGssapi} / {options.SecurityContexts is not null}");
@@ -94,7 +94,7 @@ public sealed class Socks5AuthenticationMappingTests
         Map(Parse(arguments), null, OperatingSystem.IsWindows());
 
     private static Socks5AuthenticationOptions Map(CommandLineOptions options, ISecurityContextFactory? contexts, bool usesSspi) =>
-        Socks5AuthenticationMapping.Of(EasyOptionsFromCommandLine.ProxyOf(options), NegotiateOptionsMapping.FromCommandLine(options), contexts, usesSspi);
+        Socks5AuthenticationMapping.Of(EasyOptionsFromCommandLine.ProxyOf(options), NegotiateOptionsMapping.Of(EasyOptionsFromCommandLine.AuthenticationOf(options)), contexts, usesSspi);
 
     private CommandLineOptions Parse(params string[] arguments)
     {

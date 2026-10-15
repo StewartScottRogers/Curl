@@ -78,7 +78,7 @@ public sealed partial class CurlCompositionProxyTests
         HttpProxyTunnelOptions options =
             EngineComposition.CreateProxyTunnelOptions(
                 CommandLineParser.Parse(arguments, _ => true, ConsolePasswordPrompt.ForProcessConsole, DiskDataFileReader.ForProcess, isWindows: false).Options!,
-                EasyOptionsFromCommandLine.ProxyOf(CommandLineParser.Parse(arguments, _ => true, ConsolePasswordPrompt.ForProcessConsole, DiskDataFileReader.ForProcess, isWindows: false).Options!),
+                EasyOptionsFromCommandLine.ProxyOf(CommandLineParser.Parse(arguments, _ => true, ConsolePasswordPrompt.ForProcessConsole, DiskDataFileReader.ForProcess, isWindows: false).Options!), EasyOptionsFromCommandLine.AuthenticationOf(CommandLineParser.Parse(arguments, _ => true, ConsolePasswordPrompt.ForProcessConsole, DiskDataFileReader.ForProcess, isWindows: false).Options!),
                 new SystemSecurityContextFactory());
         Diagnostics.Act("proxy auth schemes, HTTP/2 tunnel", $"{options.ProxyAuthSchemes}, {options.ProxyHttp2}");
         return options;

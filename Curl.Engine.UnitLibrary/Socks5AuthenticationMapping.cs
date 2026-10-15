@@ -20,7 +20,7 @@ internal static class Socks5AuthenticationMapping
     /// </summary>
     /// <param name="proxy">The option group's proxy options.</param>
     /// <param name="negotiate">
-    /// The <c>--proxy-service-name</c> and <c>--delegation</c> of <see cref="NegotiateOptionsMapping.FromCommandLine" />,
+    /// The <c>--proxy-service-name</c> and <c>--delegation</c> of <see cref="NegotiateOptionsMapping.Of" />,
     /// which belong to the authentication options.
     /// </param>
     /// <param name="securityContexts">Makes the Kerberos contexts GSS-API runs on; <see langword="null" /> for none.</param>

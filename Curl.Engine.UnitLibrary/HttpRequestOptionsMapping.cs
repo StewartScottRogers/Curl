@@ -164,6 +164,23 @@ internal static class HttpRequestOptionsMapping
         return allowed == HttpAuthSchemes.None ? HttpAuthSchemes.Basic : allowed;
     }
 
+    /// <summary>
+    /// The schemes the CONNECT tunnel and the HTTP handler may answer a proxy's challenge with, as the curl tool's
+    /// <c>CommandLineOptions.ProxyAuthSchemes</c> gives them (BL-2353): <see cref="HttpAuthenticationMethods.Any" /> is
+    /// <see cref="HttpAuthSchemes.Any" />, each other <c>CURLAUTH_*</c> bit its scheme, and with no scheme left, Basic,
+    /// libcurl's default.
+    /// </summary>
+    /// <param name="authentication">The option group's authentication options.</param>
+    /// <returns>The schemes.</returns>
+    internal static HttpAuthSchemes ProxyAuthSchemesOf(EasyAuthenticationOptions authentication)
+    {
+        HttpAuthenticationMethods methods = authentication.ProxyAuthentication;
+        HttpAuthSchemes allowed = (methods & HttpAuthenticationMethods.Any) == HttpAuthenticationMethods.Any
+            ? HttpAuthSchemes.Any
+            : SchemesOf(methods);
+        return allowed == HttpAuthSchemes.None ? HttpAuthSchemes.Basic : allowed;
+    }
+
     /// <summary>Gives the scheme of each of Basic, Digest, NTLM, Negotiate and Bearer set in <paramref name="methods" />.</summary>
     private static HttpAuthSchemes SchemesOf(HttpAuthenticationMethods methods) =>
         SchemeOf(methods, HttpAuthenticationMethods.Basic, HttpAuthSchemes.Basic)

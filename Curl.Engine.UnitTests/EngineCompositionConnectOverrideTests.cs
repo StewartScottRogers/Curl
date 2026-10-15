@@ -171,7 +171,7 @@ public sealed class EngineCompositionConnectOverrideTests
         CommandLineParseResult parsed = CommandLineParser.Parse([.. arguments, "tftp://tftp.test/"], _ => true);
         Assert.IsTrue(parsed.IsAccepted);
 
-        CurlTransports transports = EngineComposition.CreateTransports(parsed.Options, EasyOptionsFromCommandLine.NetworkOf(parsed.Options), EasyOptionsFromCommandLine.TlsOf(parsed.Options), EasyOptionsFromCommandLine.HttpOf(parsed.Options), EasyOptionsFromCommandLine.ProxyOf(parsed.Options));
+        CurlTransports transports = EngineComposition.CreateTransports(parsed.Options, EasyOptionsFromCommandLine.NetworkOf(parsed.Options), EasyOptionsFromCommandLine.TlsOf(parsed.Options), EasyOptionsFromCommandLine.HttpOf(parsed.Options), EasyOptionsFromCommandLine.ProxyOf(parsed.Options), EasyOptionsFromCommandLine.AuthenticationOf(parsed.Options));
 
         DatagramOpenResult result;
         using (Diagnostics.Phase("open"))
@@ -197,7 +197,7 @@ public sealed class EngineCompositionConnectOverrideTests
         Assert.IsTrue(parsed.IsAccepted);
 
         TcpConnector connector = EngineComposition.CreateTcpConnector(
-            parsed.Options, EasyOptionsFromCommandLine.NetworkOf(parsed.Options), EasyOptionsFromCommandLine.HttpOf(parsed.Options), EasyOptionsFromCommandLine.ProxyOf(parsed.Options),
+            parsed.Options, EasyOptionsFromCommandLine.NetworkOf(parsed.Options), EasyOptionsFromCommandLine.HttpOf(parsed.Options), EasyOptionsFromCommandLine.ProxyOf(parsed.Options), EasyOptionsFromCommandLine.AuthenticationOf(parsed.Options),
             new LoopbackDnsResolver(),
             new ScriptedTcpDialer(server),
             new PassThroughTlsProvider(),

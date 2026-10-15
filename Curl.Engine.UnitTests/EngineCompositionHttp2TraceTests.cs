@@ -51,7 +51,7 @@ public sealed class EngineCompositionHttp2TraceTests
     [TestMethod]
     public void CreateTransports_UnderTraceConfigHttp2_TracesHttp2()
     {
-        CurlTransports transports = EngineComposition.CreateTransports(Parse("-v", "--trace-config", "http/2"), EasyOptionsFromCommandLine.NetworkOf(Parse("-v", "--trace-config", "http/2")), EasyOptionsFromCommandLine.TlsOf(Parse("-v", "--trace-config", "http/2")), EasyOptionsFromCommandLine.HttpOf(Parse("-v", "--trace-config", "http/2")), EasyOptionsFromCommandLine.ProxyOf(Parse("-v", "--trace-config", "http/2")), TimeProvider.System);
+        CurlTransports transports = EngineComposition.CreateTransports(Parse("-v", "--trace-config", "http/2"), EasyOptionsFromCommandLine.NetworkOf(Parse("-v", "--trace-config", "http/2")), EasyOptionsFromCommandLine.TlsOf(Parse("-v", "--trace-config", "http/2")), EasyOptionsFromCommandLine.HttpOf(Parse("-v", "--trace-config", "http/2")), EasyOptionsFromCommandLine.ProxyOf(Parse("-v", "--trace-config", "http/2")), EasyOptionsFromCommandLine.AuthenticationOf(Parse("-v", "--trace-config", "http/2")), TimeProvider.System);
         Diagnostics.Act("transports trace HTTP/2", transports.TracesHttp2);
 
         Diagnostics.Assert("transports trace HTTP/2", true, transports.TracesHttp2);
@@ -61,7 +61,7 @@ public sealed class EngineCompositionHttp2TraceTests
     [TestMethod]
     public void CreateTransports_WithoutTheHttp2Component_DoesNotTraceHttp2()
     {
-        CurlTransports transports = EngineComposition.CreateTransports(Parse("-v"), EasyOptionsFromCommandLine.NetworkOf(Parse("-v")), EasyOptionsFromCommandLine.TlsOf(Parse("-v")), EasyOptionsFromCommandLine.HttpOf(Parse("-v")), EasyOptionsFromCommandLine.ProxyOf(Parse("-v")), TimeProvider.System);
+        CurlTransports transports = EngineComposition.CreateTransports(Parse("-v"), EasyOptionsFromCommandLine.NetworkOf(Parse("-v")), EasyOptionsFromCommandLine.TlsOf(Parse("-v")), EasyOptionsFromCommandLine.HttpOf(Parse("-v")), EasyOptionsFromCommandLine.ProxyOf(Parse("-v")), EasyOptionsFromCommandLine.AuthenticationOf(Parse("-v")), TimeProvider.System);
         Diagnostics.Act("transports trace HTTP/2", transports.TracesHttp2);
 
         Diagnostics.Assert("transports trace HTTP/2", false, transports.TracesHttp2);

@@ -1,25 +1,26 @@
+using Curl.Api.Options.Authentication;
 using Curl.Authentication;
-using Curl.Cli;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Engine;
 
-/// <summary>Maps the command line to the <see cref="NegotiateOptions" /> the Negotiate authenticator applies (ADR-0188).</summary>
+/// <summary>Maps the option group's authentication options to the <see cref="NegotiateOptions" /> the Negotiate authenticator applies (ADR-0188).</summary>
 internal static class NegotiateOptionsMapping
 {
     /// <summary>
-    /// Copies <c>--service-name</c>, <c>--proxy-service-name</c> and <c>--delegation</c> from
-    /// <paramref name="options" />.
+    /// Copies <see cref="EasyAuthenticationOptions.ServiceName" /> (<c>--service-name</c>),
+    /// <see cref="EasyAuthenticationOptions.ProxyServiceName" /> (<c>--proxy-service-name</c>) and
+    /// <see cref="EasyAuthenticationOptions.GssApiDelegation" /> (<c>--delegation</c>) from <paramref name="authentication" />.
     /// </summary>
-    /// <param name="options">The parsed command line.</param>
+    /// <param name="authentication">The option group's authentication options.</param>
     /// <returns>The two service names verbatim, <see langword="null" /> when not given, and the delegation level.</returns>
-    internal static NegotiateOptions FromCommandLine(CommandLineOptions options) =>
-        new(options.ServiceName, options.ProxyServiceName, DelegationOf(options.GssApiDelegation));
+    internal static NegotiateOptions Of(EasyAuthenticationOptions authentication) =>
+        new(authentication.ServiceName, authentication.ProxyServiceName, DelegationOf(authentication.GssApiDelegation));
 
     private static SecurityDelegation DelegationOf(GssApiDelegation delegation) => delegation switch
     {
-        GssApiDelegation.Policy => SecurityDelegation.Policy,
-        GssApiDelegation.Always => SecurityDelegation.Always,
+        GssApiDelegation.PolicyFlag => SecurityDelegation.Policy,
+        GssApiDelegation.Flag => SecurityDelegation.Always,
         _ => SecurityDelegation.None,
     };
 }
