@@ -29,3 +29,4 @@ Found by BL-2259 (2026-10-14): test358 (HTTP GET translated by alt-svc lookup to
 ## Log
 
 - 2026-10-14: Created.
+- 2026-10-15: Backlog -> Doing.
