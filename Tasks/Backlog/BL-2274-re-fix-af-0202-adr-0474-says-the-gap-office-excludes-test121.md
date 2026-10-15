@@ -6,6 +6,7 @@ assignee: Claude
 pipeline: docs
 depends-on: []
 touches: [Documentation]
+lane: no
 requirement: none
 created: 2026-10-15
 completed:
@@ -51,7 +52,10 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 
 ## Notes
 
+Interactive only: the reproduction counts lines in the gap office converter script, a gap office path no lane may read or change, and the ADR (a Documentation file) cannot change that count. Remove `lane: no` once an interactive session has either added a test1211 rule recording the ADR-0474 reason to that script or corrected ADR-0474 decision 3 (line 43) to say the generic disabled-upstream reason applies.
+
 ## Log
 
 - 2026-10-15: Created.
 - 2026-10-15: Backlog -> Doing.
+- 2026-10-15: Doing -> Backlog. Interactive only: the fix lives in a gap office path
