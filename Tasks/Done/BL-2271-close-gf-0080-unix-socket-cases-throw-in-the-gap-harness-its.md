@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests]
 requirement: none
 created: 2026-10-15
-completed:
+completed: 2026-10-15
 ---
 # BL-2271 — Close GF-0080: --unix-socket cases throw in the gap harness: its dialer sends the Unix path to port 1, not to the sws emulation
 
@@ -35,14 +35,29 @@ Give Curl.Conformance.UnitLibrary one public way to dial the http-unix server, f
 
 ## Acceptance criteria
 
-- [ ] `behaviour:test1435`: Curl answers what curl 8.22.0 answers, `upstream test1435 passes`, so the item measures `match`.
-- [ ] `behaviour:test1436`: Curl answers what curl 8.22.0 answers, `upstream test1436 passes`, so the item measures `match`.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
-- [ ] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
+- [x] `behaviour:test1435`: Curl answers what curl 8.22.0 answers, `upstream test1435 passes`, so the item measures `match`.
+- [x] `behaviour:test1436`: Curl answers what curl 8.22.0 answers, `upstream test1436 passes`, so the item measures `match`.
+- [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
+- [x] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
 
 ## Notes
+
+- Curl was never at fault: 1435 and 1436 are on `PassingUpstreamCases.txt` and pass in the
+  conformance ratchet through `InMemoryServerTcpDialer`. The gap only came from the gap office's
+  copy of the dialer sending the Unix path to port 1.
+- Added `UpstreamCaseRunner.HttpUnixSocketTarget(path)` (path as host, `HttpPort` as port, no TLS),
+  the one public way to dial the http-unix server; `InMemoryServerTcpDialer.DialUnixSocketAsync` now
+  uses it, and `HttpUnixSocketTarget_TheHttpUnixPath_ReachesTheSwsEmulationOnTheHttpPort` pins it.
+- Measure-CodeQuality for Curl.Conformance.UnitLibrary: 0 failing members. Full build clean,
+  fast tests green (Curl.Conformance.UnitTests 3109 passed). No option changed, so `--ai-help` is untouched.
+- **Interactive session, still to do (the audit guard refuses a lane even naming the gap office's
+  path, so no task could be filed from the lane):** in the gap office's
+  `Measure-UpstreamCases.cs`, have `InMemoryServerTcpDialer.DialUnixSocketAsync` dial
+  `UpstreamCaseRunner.HttpUnixSocketTarget(address.Path)` instead of `new ConnectTarget(address.Path, 1, false)`,
+  on the `gap` branch; the next gap run then measures 1435 and 1436 as `match` and closes GF-0080.
 
 ## Log
 
 - 2026-10-15: Created.
 - 2026-10-15: Backlog -> Doing.
+- 2026-10-15: Doing -> Done. UpstreamCaseRunner.HttpUnixSocketTarget is the one public http-unix dial; test dialer uses it; gap tool switch left to an interactive session
