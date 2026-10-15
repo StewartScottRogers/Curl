@@ -4,11 +4,11 @@ title: A cookie loaded with -b from a file for a public suffix domain (.co.uk) i
 area: behaviour
 key: behaviour:cookie-file-public-suffix-domain-not-dropped
 severity: High
-status: open
+status: closed
 scope: target
 introduced-in:
 opened: 2026-10-13_1406
-closed:
+closed: 2026-10-14_0904
 regression: false
 items: [behaviour:test409]
 touches: [Curl.Cookies.UnitLibrary, Curl.Cookies.UnitTests]
@@ -32,8 +32,10 @@ In Curl.Cookies.UnitLibrary, apply the Public Suffix List to cookies loaded from
 ## Measurements
 
 - 2026-10-13_1406: 1 of 1 items are gaps.
+- 2026-10-14_0904: 0 of 1 items are gaps.
 
 ## Log
 
 - 2026-10-13_1406: Opened by gap-behaviour.
 - 2026-10-13_1457: Filed BL-2165.
+- 2026-10-14_0904: Closed: run 2026-10-14_0904 measured every item as match or excluded.

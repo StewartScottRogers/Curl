@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="US-ASCII"?>
+<testcase>
+<info>
+<keywords>
+FILE
+</keywords>
+</info>
+
+<client>
+<server>
+file
+</server>
+<features>
+
+</features>
+<name>
+fixture case 19
+</name>
+<command>
+file:////%FILE_PWD/%LOGDIR/test%TESTNUMBER.txt
+</command>
+<precheck>
+%PERL -e "print 'Test requires a Unix system' if($^O eq 'MSWin32' || $^O eq 'msys');"
+</precheck>
+</client>
+</testcase>

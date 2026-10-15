@@ -272,8 +272,9 @@ The rest, by area:
 | | `timeout` | `unmeasured` | The case did not finish within the harness's time limit. |
 | | `libcurl-api` | `excluded` | A libcurl API case (`<tool>lib...`). |
 | | `libcurl-unit-test` | `excluded` | A libcurl unit test (`<tool>unit...`). |
+| | `upstream-source-check` | `excluded` | The case runs a perl script over upstream's own source, documents or test scripts and never runs curl (`<command type="perl">` without `%CURL`; ADR-0490). |
 | | `debug-build-only` | `excluded` | The case needs a debug build (`Debug`, `TrackMemory`, `unittest`). |
-| | `platform:<os>` | `excluded` | The case runs only on another platform. |
+| | `platform:<os>` | `excluded` | The case runs only on another platform: on Windows `platform:unix` for a `!win32` feature or a `<precheck>` that refuses `MSWin32`, elsewhere `platform:windows` for a `win32` feature (ADR-0490). |
 | | `disabled-upstream` | `excluded` | The release's `tests/data/DISABLED` lists the case, so upstream's own test suite does not run it. |
 
 ```json

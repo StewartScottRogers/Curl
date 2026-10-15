@@ -13,7 +13,8 @@
     case's <keywords> so the analyst can group gaps by cause.
 
     A Skipped case is classified from the case file's <client><tool>, <client><server>,
-    <client><features> and <info><keywords> parts (upstream's docs/tests/FILEFORMAT.md;
+    <client><features>, <client><command type="perl">, <client><precheck> and
+    <info><keywords> parts (upstream's docs/tests/FILEFORMAT.md;
     Curl.Conformance.UnitLibrary/UpstreamTestCaseParser.cs reads them the same way). The
     first rule that fits wins, in this order:
       0. the harness's reason is "disabled
@@ -22,8 +23,17 @@
          BL-2027)                             -> excluded, disabled-upstream
       1. <tool> names a lib... program        -> excluded, libcurl-api
       2. <tool> names a unit... program       -> excluded, libcurl-unit-test
+     2a. <command type="perl"> never names
+         %CURL: a script over upstream's own
+         source, documents or test scripts
+         (BL-2160, ADR-0490)                  -> excluded, upstream-source-check
       3. <features> needs Debug, TrackMemory
          or unittest                          -> excluded, debug-build-only
+     3a. measured on Windows, <features>
+         lists !win32 or the <precheck>
+         refuses MSWin32                      -> excluded, platform:unix
+         measured elsewhere, <features>
+         lists win32                          -> excluded, platform:windows
       4. <features> needs a name absent from
          -ReferenceFeatures (when given)      -> excluded, reference-lacks:<name>
       5. <server> names a server other than
@@ -34,7 +44,9 @@
          for any other variable (or %PERL
          with others)                         -> unmeasured, unknown-variable
       7. anything else                        -> unmeasured, harness-unsupported
-    A feature written !<name> asks for its absence and never fits rules 3 or 4. Feature
+    A feature written !<name> asks for its absence and never fits rules 3 or 4 (rule 3a reads
+    !win32 as "not on Windows"). A perl command that names %CURL runs curl and is not rule
+    2a's: it falls through to the later rules. Feature
     names compare case-insensitively. A <server> line's first word is the server; any
     words after it (a certificate file) are ignored. Every skipped item's evidence is the harness's reason.
 
@@ -112,7 +124,7 @@ function Get-PartLines([string] $Text, [string] $Name) {
 
 function Read-CaseTags([string] $Folder, [int] $Number) {
     $path = Join-Path $Folder "test$Number"
-    $tags = [pscustomobject]@{ Tool = $null; Servers = @(); Features = @(); Keywords = @() }
+    $tags = [pscustomobject]@{ Tool = $null; Servers = @(); Features = @(); Keywords = @(); PerlCommand = $null; Precheck = '' }
     if (-not (Test-Path -LiteralPath $path)) { return $tags }
     # Latin-1 keeps every byte as one character, so binary test data cannot break the read.
     $text = [System.IO.File]::ReadAllText($path, [System.Text.Encoding]::GetEncoding(28591))
@@ -124,17 +136,26 @@ function Read-CaseTags([string] $Folder, [int] $Number) {
     $tags.Servers = @(Get-PartLines $clientText 'server' | ForEach-Object { ($_ -split '\s+')[0] })
     $tags.Features = @(Get-PartLines $clientText 'features')
     $tags.Keywords = @(Get-PartLines $text 'keywords')
+    $perl = [regex]::Match($clientText, '<command\s[^>]*type="perl"[^>]*>(.*?)</command>', [System.Text.RegularExpressions.RegexOptions]::Singleline)
+    if ($perl.Success) { $tags.PerlCommand = $perl.Groups[1].Value.Trim() }
+    $tags.Precheck = (@(Get-PartLines $clientText 'precheck') -join "`n")
     return $tags
 }
 
 # The state and reason of a skipped case, by rules 0 to 7 in order.
-function Get-SkippedVerdict($Tags, [string] $Detail, [string[]] $Available) {
+function Get-SkippedVerdict($Tags, [string] $Detail, [string[]] $Available, [bool] $OnWindows) {
     if ($Detail -eq 'disabled upstream') { return @('excluded', 'disabled-upstream') }
     if ($Tags.Tool -like 'lib*') { return @('excluded', 'libcurl-api') }
     if ($Tags.Tool -like 'unit*') { return @('excluded', 'libcurl-unit-test') }
+    if ($null -ne $Tags.PerlCommand -and $Tags.PerlCommand -notmatch '%CURL\b') { return @('excluded', 'upstream-source-check') }
     $needed = @($Tags.Features | Where-Object { -not $_.StartsWith('!') })
     foreach ($feature in $needed) {
         if ($DebugFeatures -contains $feature) { return @('excluded', 'debug-build-only') }
+    }
+    if ($OnWindows) {
+        if ($Tags.Features -contains '!win32' -or $Tags.Precheck -match "\`$\^O eq 'MSWin32'") { return @('excluded', 'platform:unix') }
+    } elseif ($needed -contains 'win32') {
+        return @('excluded', 'platform:windows')
     }
     if ($Available.Count -gt 0) {
         foreach ($feature in $needed) {
@@ -149,7 +170,7 @@ function Get-SkippedVerdict($Tags, [string] $Detail, [string[]] $Available) {
     return @('unmeasured', 'harness-unsupported')
 }
 
-function Convert-Case($Case, [string] $Folder, [string[]] $Available) {
+function Convert-Case($Case, [string] $Folder, [string[]] $Available, [bool] $OnWindows) {
     $number = [int]$Case.number
     $tags = Read-CaseTags $Folder $number
     $item = [ordered]@{
@@ -160,7 +181,7 @@ function Convert-Case($Case, [string] $Folder, [string[]] $Available) {
         'Passed' { $item.state = 'match'; $item.expected = "upstream test$number passes"; $item.actual = 'passes' }
         'Failed' { $item.state = 'gap'; $item.expected = "upstream test$number passes"; $item.actual = [string]$Case.detail }
         'Skipped' {
-            $verdict = Get-SkippedVerdict $tags ([string]$Case.detail) $Available
+            $verdict = Get-SkippedVerdict $tags ([string]$Case.detail) $Available $OnWindows
             $item.state = $verdict[0]; $item.reason = $verdict[1]; $item.evidence = [string]$Case.detail
         }
         default { throw "Case $number has the unknown kind '$($Case.kind)'." }
@@ -170,13 +191,14 @@ function Convert-Case($Case, [string] $Folder, [string[]] $Available) {
 
 function Get-Platform([string] $RawPlatform) {
     if ($RawPlatform -eq 'Windows') { return 'windows' }
-    if ((& uname) -eq 'Darwin') { return 'macos' }
+    if ((Get-Command uname -ErrorAction SilentlyContinue) -and (& uname) -eq 'Darwin') { return 'macos' }
     return 'linux'
 }
 
 function ConvertTo-BehaviourMeasurement($Raw, [string] $Folder, [string[]] $Available, [string] $ReferenceLine, [string] $ReleaseVersion) {
     $available = @($Available | Where-Object { $_ })
-    $items = @($Raw.cases | ForEach-Object { Convert-Case $_ $Folder $available })
+    $onWindows = [string]$Raw.platform -eq 'Windows'
+    $items = @($Raw.cases | ForEach-Object { Convert-Case $_ $Folder $available $onWindows })
     $sortedKeys = [string[]]($items | ForEach-Object { $_.key })
     [Array]::Sort($sortedKeys, [StringComparer]::Ordinal)
     $byKey = @{}; foreach ($i in $items) { $byKey[$i.key] = $i }
@@ -247,10 +269,15 @@ function Invoke-SelfTest {
         Report (Is 'behaviour:test10' 'excluded' 'libcurl-api') 'the rules apply in order: a lib tool on an ftp server is libcurl-api'
         Report (Is 'behaviour:test11' 'unmeasured' 'unknown-variable') 'a !Debug feature asks for its absence and is not debug-build-only'
         Report (Is 'behaviour:test4' 'unmeasured' 'unknown-variable') 'with no reference, rule 4 is skipped'
+        Report (Is 'behaviour:test16' 'excluded' 'upstream-source-check') 'rule 2a: a perl command that never names %CURL gives excluded upstream-source-check'
+        Report (Is 'behaviour:test17' 'unmeasured' 'harness-unsupported') 'rule 2a: a perl command that runs %CURL is not a source check'
+        Report (Is 'behaviour:test18' 'excluded' 'platform:unix') 'rule 3a: on Windows, a !win32 feature gives excluded platform:unix'
+        Report (Is 'behaviour:test19' 'excluded' 'platform:unix') 'rule 3a: on Windows, a precheck refusing MSWin32 gives excluded platform:unix'
+        Report (Is 'behaviour:test20' 'unmeasured' 'needs-server:file') 'rule 3a: on Windows, a win32 feature is not platform-excluded'
         Report ($null -eq $m.reference -and $m.referenceFallback -eq 'docs' -and $m.targetVersion -eq '9.9.9') 'with no reference, reference is null with the docs fallback'
         $c = $m.counts
         $reasonTotal = 0; foreach ($p in $m.reasons.PSObject.Properties) { $reasonTotal += [int]$p.Value }
-        Report ($c.x -eq $c.match -and $c.y -eq ($c.match + $c.gap + $c.unmeasured) -and ($c.match + $c.gap + $c.unmeasured + $c.excluded) -eq @($m.items).Count -and @($m.items).Count -eq 15) 'counts add up to the case count'
+        Report ($c.x -eq $c.match -and $c.y -eq ($c.match + $c.gap + $c.unmeasured) -and ($c.match + $c.gap + $c.unmeasured + $c.excluded) -eq @($m.items).Count -and @($m.items).Count -eq 20) 'counts add up to the case count'
         Report ($reasonTotal -eq ($c.unmeasured + $c.excluded) -and $m.reasons.'libcurl-api' -eq 2 -and $m.reasons.'unknown-variable' -eq 4 -and $m.reasons.'no-perl' -eq 1) 'the per-reason summary adds up to unmeasured plus excluded'
 
         Invoke-Conversion $raw $data @('http', 'IPv6') 'curl 9.9.9 (fake) libcurl/9.9.9' '9.9.9' $out | Out-Null
@@ -258,6 +285,12 @@ function Invoke-SelfTest {
         $t = @{}; foreach ($i in $r.items) { $t[$i.key] = $i }
         Report ($t['behaviour:test4'].state -eq 'excluded' -and $t['behaviour:test4'].reason -eq 'reference-lacks:HTTP3') 'rule 4: a feature the reference lacks gives excluded reference-lacks:<name>'
         Report ($r.reference -eq 'curl 9.9.9 (fake) libcurl/9.9.9' -and $null -eq $r.PSObject.Properties['referenceFallback']) 'with a reference, reference is its version line'
+
+        $unixRaw = [System.IO.File]::ReadAllText($raw) | ConvertFrom-Json
+        $unixRaw.platform = 'Unix'
+        $u = @{}; foreach ($i in (ConvertTo-BehaviourMeasurement $unixRaw $data @() $null '9.9.9').items) { $u[$i.key] = $i }
+        Report ($u['behaviour:test20'].state -eq 'excluded' -and $u['behaviour:test20'].reason -eq 'platform:windows') 'rule 3a: off Windows, a win32 feature gives excluded platform:windows'
+        Report ($u['behaviour:test18'].reason -eq 'needs-server:file' -and $u['behaviour:test19'].reason -eq 'needs-server:file') 'rule 3a: off Windows, !win32 and a precheck refusing MSWin32 are not platform-excluded'
     } finally {
         if (Test-Path -LiteralPath $temp) { Remove-Item -LiteralPath $temp -Recurse -Force }
     }

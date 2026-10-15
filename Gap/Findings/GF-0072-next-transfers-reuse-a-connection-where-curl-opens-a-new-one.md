@@ -4,11 +4,11 @@ title: --next transfers reuse a connection where curl opens a new one (another h
 area: behaviour
 key: behaviour:connection-reuse-match-differs
 severity: High
-status: open
+status: closed
 scope: target
 introduced-in:
 opened: 2026-10-13_1406
-closed:
+closed: 2026-10-14_0904
 regression: false
 items: [behaviour:test2051, behaviour:test3225]
 touches: [Curl.Console, Curl.Console.UnitTests, Curl.Networking.UnitLibrary, Curl.Networking.UnitTests]
@@ -32,8 +32,10 @@ Align the connection match with curl 8.22.0's. In Curl.Console's OptionGroupConn
 ## Measurements
 
 - 2026-10-13_1406: 2 of 2 items are gaps.
+- 2026-10-14_0904: 0 of 2 items are gaps.
 
 ## Log
 
 - 2026-10-13_1406: Opened by gap-behaviour.
 - 2026-10-13_1457: Filed BL-2164.
+- 2026-10-14_0904: Closed: run 2026-10-14_0904 measured every item as match or excluded.
