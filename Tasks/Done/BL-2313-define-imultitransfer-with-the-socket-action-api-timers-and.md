@@ -8,7 +8,7 @@ depends-on: [BL-2312]
 touches: [Curl.Api.UnitLibrary/EngineContracts/ICurlEngine.cs, Curl.Api.UnitLibrary/EngineContracts/Multi, Curl.Api.UnitTests/EngineContracts/Multi]
 requirement: none
 created: 2026-10-15
-completed:
+completed: 2026-10-15
 ---
 # BL-2313 — Define IMultiTransfer with the socket-action API, timers and CURLMOPT options in Curl.Api.UnitLibrary
 
@@ -26,17 +26,28 @@ ADR-0506; plan section "Multi"; needs BL-2312. Upstream: curl 8.22.0's `include/
 
 ## Acceptance criteria
 
-- [ ] `IMultiTransfer`, `EasyMultiOptions`, the multi message record and the `CURL_POLL_*`, `CURL_CSELECT_*`, `CURLPIPE_*`, `CURL_PUSH_*`, `CURLMINFO_*` values exist in `Curl.Api.UnitLibrary/EngineContracts/Multi`, each member documented with the libcurl name it stands for.
-- [ ] `ICurlEngine` has `CreateMulti()`.
-- [ ] Tests in `Curl.Api.UnitTests/EngineContracts/Multi` pin every upstream constant and `EasyMultiOptions`' defaults (libcurl 8.22.0's).
-- [ ] `dotnet build` is clean (warnings are errors).
-- [ ] `dotnet test --filter "TestCategory!=Integration"` passes.
-- [ ] `powershell -NoProfile -File Measure-CodeQuality.ps1` passes (100% line and branch coverage, complexity <= 10, CRAP <= 30).
-- [ ] `Curl.Conformance.UnitTests/PassingUpstreamCases.txt` is unchanged.
+- [x] `IMultiTransfer`, `EasyMultiOptions` (named `MultiOptions`, see Notes), the multi message record and the `CURL_POLL_*`, `CURL_CSELECT_*`, `CURLPIPE_*`, `CURL_PUSH_*`, `CURLMINFO_*` values exist in `Curl.Api.UnitLibrary/EngineContracts/Multi`, each member documented with the libcurl name it stands for.
+- [x] `ICurlEngine` has `CreateMulti()`.
+- [x] Tests in `Curl.Api.UnitTests/EngineContracts/Multi` pin every upstream constant and `EasyMultiOptions`' defaults (libcurl 8.22.0's).
+- [x] `dotnet build` is clean (warnings are errors).
+- [x] `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] `powershell -NoProfile -File Measure-CodeQuality.ps1` passes (100% line and branch coverage, complexity <= 10, CRAP <= 30).
+- [x] `Curl.Conformance.UnitTests/PassingUpstreamCases.txt` is unchanged.
 
 ## Notes
+
+- Decisions recorded in ADR-0510. The options record is `MultiOptions`, not `EasyMultiOptions`:
+  the `Easy*Options` records are `curl_easy_setopt` groups, so the prefix would be false.
+- `curl_multi_get_offt` is `GetInfo(CurlMultiInfo)` and `curl_multi_waitfds` is
+  `GetWaitSockets`, not `GetOffset`/`WaitFds`, so the names say what is read.
+- Also pinned beyond the list: `CURLMSG_*`, `CURL_WAIT_POLL*`, `CURLMNOTIFY_*`, `CURLMNWC_*`
+  (needed by `MultiOptions.NetworkChanged`, the notify API and `struct curl_waitfd`), and
+  `CURL_SOCKET_TIMEOUT` as `CurlMultiSockets.Timeout`.
+- Measured: `Measure-CodeQuality.ps1 -Library Curl.Api.UnitLibrary`: 100% line, 100% branch,
+  0 failing members.
 
 ## Log
 
 - 2026-10-15: Created.
 - 2026-10-15: Backlog -> Doing.
+- 2026-10-15: Doing -> Done. IMultiTransfer, MultiOptions and the multi.h constants are defined and pinned; ICurlEngine has CreateMulti()
