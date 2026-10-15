@@ -33,3 +33,4 @@ Split out of BL-2307 (ADR-0506 plan phase 1 step 4, ADR-0527), which built `Easy
 ## Log
 
 - 2026-10-15: Created.
+- 2026-10-15: Backlog -> Doing.
