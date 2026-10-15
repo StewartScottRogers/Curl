@@ -29,3 +29,4 @@ Found by BL-2259 (2026-10-14), run through Curl on Linux: test1801 fails with "<
 ## Log
 
 - 2026-10-14: Created.
+- 2026-10-15: Backlog -> Doing.
