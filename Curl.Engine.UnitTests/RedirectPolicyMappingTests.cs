@@ -2,7 +2,7 @@ using Curl.Cli;
 using Curl.Core;
 using Curl.Testing;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
 /// Pins how <c>--max-redirs</c>, <c>--post301</c>, <c>--post302</c>, <c>--post303</c>, <c>--follow</c> and

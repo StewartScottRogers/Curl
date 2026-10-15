@@ -6,7 +6,7 @@ using Curl.Protocol.Abstractions;
 using Curl.Engine;
 using HttpRequestOptions = Curl.Protocol.Abstractions.HttpRequestOptions;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
 /// Maps the HTTP request options of a parsed command line onto the

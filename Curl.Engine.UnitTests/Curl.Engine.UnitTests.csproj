@@ -13,6 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Include="..\Curl.Cli.UnitTests\OpenSslBuildParser.cs" Link="CliFakes\OpenSslBuildParser.cs" />
     <Compile Include="..\Curl.Console.UnitTests\InMemoryDataFileReader.cs" Link="ConsoleFakes\InMemoryDataFileReader.cs" />
   </ItemGroup>
 

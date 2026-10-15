@@ -133,7 +133,7 @@ curl 8.21.0 hands it on: FTP and file parse it themselves, SFTP after `STAT`, HT
 WebSocket send it, the rest, SCP among them, ignore it, BL-386, BL-1322, BL-1396), the `-C` offset and the
 `--max-filesize` limit. `-C -` resumes from the size of the URL's `-o` file, and a transfer
 that resumes past byte zero opens that file for appending before it starts, as curl does.
-Every context also carries `Http`, which `HttpRequestOptionsMapping` fills from `-X`,
+Every context also carries `Http`, which `Curl.Engine`'s `HttpRequestOptionsMapping` fills from `-X`,
 `--request-target` (sent verbatim as the request-line target), `-H`, `-A`, `-e`, the `-d` family and `--json`: `--json` appends `Content-Type: application/json` and
 `Accept: application/json` after the `-H` headers unless a `-H` header already starts with
 that name (case-insensitive), and a body is a `BytesBody` sent as
@@ -252,7 +252,7 @@ failed, it reports that transfer's code instead, with the text `CurlEasyErrorTex
 unless `-s`, as curl 8.21.0 does (upstream test1072, BL-2088). `%{url_effective}` prints the
 resolved URL.
 
-Each transfer's proxy is chosen by `TransferProxySelection`, after the URL, range and `-F`
+Each transfer's proxy is chosen by `Curl.Engine`'s `TransferProxySelection`, after the URL, range and `-F`
 body are checked: `Curl.Core`'s `ProxySelector` (held by `TransferDispatch`, reading the
 process's proxy environment variables in production and none in tests unless given) picks it
 from `-x` or a `--socks` option, `--noproxy` and the variables; `-U` replaces its credential;
@@ -288,7 +288,7 @@ limit (ADR-0286, BL-797) and `--connect-to` maps to its host only, keeping the r
 copies `-P`, `--disable-eprt`, `--ssl`/`--ssl-reqd` and `--ftp-ssl-control` into the context.
 
 Every transfer goes through `Curl.Core`'s `RedirectFollower`. `-L` becomes
-`HttpRequestOptions.FollowRedirects`, and `RedirectPolicyMapping` turns `--max-redirs`,
+`HttpRequestOptions.FollowRedirects`, and `Curl.Engine`'s `RedirectPolicyMapping` turns `--max-redirs`,
 `--post301`/`--post302`/`--post303` and `--location-trusted` into its `RedirectPolicy`; `--follow`
 follows as `-L` does but drops a `-X` method whenever a redirect switches the request to GET
 (`RedirectPolicy.DropsCustomMethodOnSwitchToGet`, BL-627). Every
@@ -366,12 +366,12 @@ Under `--trace-config read` (or `all`, `-vvv`, `-vvvv`) the runner writes curl's
 `[READ] client_reset, clear readers` as each transfer starts, after the `--resolve` lines, and
 `ClientReaderResetTraceEvents` writes it again before a finished transfer's `left intact` or
 `shutting down connection` line (ADR-0357's BL-1159 amendment) and after each followed redirect's
-`Issue another request to this URL` line; `CurlTransports.TracesRead` has the HTTP handler write an
+`Issue another request to this URL` line; `Curl.Engine`'s `CurlTransports.TracesRead` has the HTTP handler write an
 HTTP/1.x `-d` or `-T` body's upload reader lines (ADR-0383, BL-1189).
 Under `--trace-config multi` (or `network`, `all`, `-vvvv`) the runner writes curl's `[MULTI] [INIT]`
 lines up to `[SETUP] -> [CONNECT]` before that, and `MultiStateTraceEvents`, inside the `[READ]` and
 `[WRITE]` events, writes each later group of `[MULTI]` lines beside the transfer line curl writes it
-next to (ADR-0382, BL-1188). Its poll lines give `timeouts=` and `tinternal=` from `TransferTimers`
+next to (ADR-0382, BL-1188). Its poll lines give `timeouts=` and `tinternal=` from `Curl.Engine`'s `TransferTimers`
 (a positive `-m` and `--connect-timeout`), and under `--trace-config timer` the response wait's
 `[TIMER]` lines (`TransferTimers.WaitLines`) go between its `PERFORMING` poll lines; with the multi
 not traced, `ResponseWaitTimerTraceEvents` writes them after `Request completely sent off` (ADR-0401, BL-1258).

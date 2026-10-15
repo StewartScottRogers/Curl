@@ -36,7 +36,7 @@ once the runner has opened the run's log.
 
 Four types the plan listed here stay in `Curl.Console` because each uses a tool-side type that has
 not moved yet: `ConnectionIdRecordingTransferEvents` and `TlsResultRecordingTransferEvents` (both use
-`RunningTransferState`), `MultiStateTraceEvents` (uses `TransferTimers`, BL-2288) and
+`RunningTransferState`), `MultiStateTraceEvents` (uses `TransferTimers` from `Curl.Engine` and other tool-side types) and
 `GatedDiagnosticLog` (uses `WriteGate`).
 
 ## Authentication and security-context sources (BL-2286)
@@ -91,3 +91,18 @@ message to curl's 255-byte error buffer (ADR-0072; `Curl.Networking` has its own
 `Curl.Console` because they use tool-side types (`DeferredOutputFileStream`,
 `HttpVersionMapping`, `ToolNotes`). `CookieEngineTests` uses its own read-only file system fake,
 and `SshKnownHostsFileSearchTests` links `InMemoryDataFileReader` from `Curl.Console.UnitTests`.
+
+## Option mappings and transfer plumbing (BL-2288)
+
+Moved here, in `Curl.Engine`, still reading `CommandLineOptions` (BL-2303 to BL-2309 retarget them
+to the seam's option groups): the mappings from command-line options to protocol option records
+(`HttpRequestOptionsMapping`, `HttpVersionMapping`, `MailRequestOptionsMapping`,
+`MultipartFormPartMapping`, `RedirectPolicyMapping`, `SshOptionsMapping`, `TlsClientOptionsMapping`),
+`CurlTransports` (the run's shared connectors and resolvers), `TransferProxySelection`,
+`TransferTimers`, `TlsBuildInformation` and `UnusableDohUrlResolver`. `RetryPolicyMapping` stays in
+`Curl.Console`: `--retry` is the curl tool's.
+
+`OptionGroupConnectionSettings` stays in `Curl.Console` because it calls `CurlComposition`. Tests
+that drive `CurlComposition` stay in `Curl.Console.UnitTests` too: `CurlTransportsTests`,
+`HttpVersionMappingTests` and `TransferProxySelectionPreProxyTests`. `TlsClientOptionsMappingTests`
+links `OpenSslBuildParser` from `Curl.Cli.UnitTests`.

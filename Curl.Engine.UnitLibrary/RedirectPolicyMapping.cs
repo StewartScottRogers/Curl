@@ -1,7 +1,7 @@
 using Curl.Cli;
 using Curl.Core;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
 /// Maps the redirect options of a parsed command line onto the <see cref="RedirectPolicy" />

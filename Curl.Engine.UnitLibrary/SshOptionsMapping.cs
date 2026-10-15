@@ -1,7 +1,7 @@
 using Curl.Cli;
 using Curl.Protocol.Abstractions;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
 /// Maps the parsed command line's SSH options onto the <see cref="SshOptions" /> an <c>scp</c> or

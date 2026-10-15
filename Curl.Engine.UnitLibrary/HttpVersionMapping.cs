@@ -2,7 +2,7 @@ using Curl.Cli;
 using Curl.Networking;
 using Curl.Protocol.Abstractions;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
 /// Maps the HTTP version option of a parsed command line onto what the HTTP handler asks for

@@ -1,3 +1,4 @@
+using Curl.Engine;
 using Curl.Cli;
 using Curl.Testing;
 using HttpRequestOptions = Curl.Protocol.Abstractions.HttpRequestOptions;

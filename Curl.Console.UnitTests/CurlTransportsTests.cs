@@ -1,3 +1,4 @@
+using Curl.Engine;
 using Curl.Authentication;
 using Curl.Cli;
 using Curl.Networking;

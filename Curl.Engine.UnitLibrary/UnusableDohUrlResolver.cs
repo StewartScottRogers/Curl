@@ -2,7 +2,7 @@ using System.Net;
 
 using Curl.Protocol.Abstractions;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
 /// The resolver a <c>--doh-url</c> that is not an <c>http</c> or <c>https</c> URL leaves the run with:

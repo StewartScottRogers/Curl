@@ -2,7 +2,7 @@ using Curl.Cli;
 using Curl.Core.Multipart;
 using Curl.Testing;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 [TestClass]
 public sealed class MultipartFormPartMappingTests

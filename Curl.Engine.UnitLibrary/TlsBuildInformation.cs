@@ -1,7 +1,7 @@
 using Curl.Cli;
 using Curl.Engine;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
 /// What the two options asking about Curl's TLS build print on standard output, as ADR-0151 decides:

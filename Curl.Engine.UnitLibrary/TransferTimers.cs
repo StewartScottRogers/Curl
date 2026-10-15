@@ -1,7 +1,7 @@
 using System.Globalization;
 using Curl.Cli;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
 /// The timers of a transfer's <c>-m</c> (<c>[TIMEOUT]</c>) and <c>--connect-timeout</c>

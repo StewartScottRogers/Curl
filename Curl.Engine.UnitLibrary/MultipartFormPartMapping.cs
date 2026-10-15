@@ -1,7 +1,7 @@
 using Curl.Cli;
 using Curl.Core.Multipart;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
 /// Maps the <c>-F</c> / <c>--form</c> and <c>--form-string</c> parts of a parsed command line,

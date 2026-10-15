@@ -3,7 +3,7 @@ using System.Security.Authentication;
 using Curl.Cli;
 using Curl.Networking;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
 /// Maps the TLS options of a parsed command line onto the <see cref="TlsClientOptions" />

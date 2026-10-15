@@ -1,6 +1,6 @@
 using Curl.Testing;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
 /// Pins <see cref="TransferTimers" />: the <c>-m</c> and <c>--connect-timeout</c> timers curl 8.21.0's multi

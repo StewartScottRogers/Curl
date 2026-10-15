@@ -1,3 +1,4 @@
+using Curl.Engine;
 using Curl.Cli;
 using Curl.Core;
 using Curl.Protocol.Abstractions;

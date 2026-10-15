@@ -1,7 +1,7 @@
 using Curl.Cli;
 using Curl.Testing;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
 /// Pins <see cref="TlsBuildInformation.Lines" />: no build-time engines for <c>--engine list</c>, nothing for

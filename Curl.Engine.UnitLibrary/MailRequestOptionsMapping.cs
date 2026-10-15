@@ -1,7 +1,7 @@
 using Curl.Cli;
 using Curl.Protocol.Abstractions;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
 /// Maps the mail options of a parsed command line onto the <see cref="MailRequestOptions" />

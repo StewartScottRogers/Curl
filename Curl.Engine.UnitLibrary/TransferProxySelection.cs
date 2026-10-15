@@ -4,7 +4,7 @@ using Curl.Cli;
 using Curl.Core;
 using Curl.Protocol.Abstractions;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
 /// Chooses the proxy one transfer goes through from <c>-x</c> or a <c>--socks</c> option,
@@ -83,7 +83,7 @@ internal static class TransferProxySelection
     /// '&lt;text&gt;'</c>; with no <c>-x</c> (the environment is not read) the pre-proxy is the SOCKS
     /// proxy itself; a SOCKS <c>-x</c> is exit 5 <c>Having a SOCKS pre-proxy and proxy is not supported
     /// with '&lt;-x&gt;'</c>; an HTTP or HTTPS <c>-x</c> is the proxy, which the connector reaches
-    /// through the pre-proxy (<see cref="CurlComposition.PreProxyOf" />).
+    /// through the pre-proxy (<c>CurlComposition.PreProxyOf</c>).
     /// </summary>
     private static bool TrySelectBehindPreProxy(
         ProxySelector selector,
