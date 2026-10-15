@@ -203,12 +203,12 @@ public sealed class UpstreamCaseRunnerTests
         var diagnostics = TestDiagnostics.For(TestContext);
         UpstreamCaseRunner runner = Runner(_ => throw new AssertFailedException("curl must not run"));
 
-        UpstreamCaseOutcome outcome = await RunAsync(runner, "<testcase>\n<client>\n<command>\nhttp://%CLIENT6IP/\n</command>\n</client>\n</testcase>\n");
+        UpstreamCaseOutcome outcome = await RunAsync(runner, "<testcase>\n<client>\n<command>\nhttp://%HTTPUNIXPATH/\n</command>\n</client>\n</testcase>\n");
 
         diagnostics.Assert("outcome kind", UpstreamCaseOutcomeKind.Skipped, outcome.Kind);
         Assert.AreEqual(UpstreamCaseOutcomeKind.Skipped, outcome.Kind);
-        diagnostics.Assert("detail", "the harness has no value for %CLIENT6IP", outcome.Detail);
-        Assert.AreEqual("the harness has no value for %CLIENT6IP", outcome.Detail);
+        diagnostics.Assert("detail", "the harness has no value for %HTTPUNIXPATH", outcome.Detail);
+        Assert.AreEqual("the harness has no value for %HTTPUNIXPATH", outcome.Detail);
     }
 
     [TestMethod]
@@ -1022,6 +1022,43 @@ public sealed class UpstreamCaseRunnerTests
         diagnostics.Assert("outcome", "not skipped", $"{outcome.Kind}: {outcome.Detail}");
         Assert.AreNotEqual(UpstreamCaseOutcomeKind.Skipped, outcome.Kind, outcome.Detail);
         Assert.Contains(":" + UpstreamCaseRunner.Http6Port, commandLine!);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_Ipv6Variables_HaveTheValuesOfTheInMemoryIpv6Servers()
+    {
+        string? commandLine = null;
+        UpstreamCaseRunner runner = Runner(invocation =>
+        {
+            commandLine = string.Join(' ', invocation.Arguments);
+            return Task.FromResult(0);
+        });
+
+        await RunAsync(runner, "<testcase>\n<client>\n<server>\nnone\n</server>\n<command>\n%CLIENT6IP %CLIENT6IP-NB %FTP6PORT %GOPHER6PORT\n</command>\n</client>\n</testcase>\n");
+
+        Assert.Contains("[::1] ::1 9011 9012", commandLine!);
+    }
+
+    [TestMethod]
+    [DataRow(252, UpstreamCaseRunner.Ftp6Port)]
+    [DataRow(253, UpstreamCaseRunner.Ftp6Port)]
+    [DataRow(254, UpstreamCaseRunner.Ftp6Port)]
+    [DataRow(255, UpstreamCaseRunner.Ftp6Port)]
+    [DataRow(1203, UpstreamCaseRunner.Gopher6Port)]
+    public async Task RunAsync_FtpOrGopherIpv6Case_RunsCurlAtItsIpv6Port(int testNumber, string port)
+    {
+        string? commandLine = null;
+        UpstreamCaseRunner runner = Runner(invocation =>
+        {
+            commandLine = string.Join(' ', invocation.Arguments);
+            return Task.FromResult(0);
+        });
+        string testFile = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "UpstreamTestData", $"test{testNumber}.curltest"));
+
+        UpstreamCaseOutcome outcome = await RunAsync(runner, testFile);
+
+        Assert.AreNotEqual(UpstreamCaseOutcomeKind.Skipped, outcome.Kind, outcome.Detail);
+        Assert.Contains("[::1]:" + port, commandLine!);
     }
 
     [TestMethod]

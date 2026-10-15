@@ -17,6 +17,13 @@ public sealed class FtpServerConnector : IConnector
     /// <summary>The port of the FTP control channel, <c>%FTPPORT</c>.</summary>
     public const int FtpPort = 8993;
 
+    /// <summary>
+    /// The port of upstream's <c>ftp-ipv6</c> server, <c>%FTP6PORT</c>: the same control channel as <see cref="FtpPort"/>,
+    /// reached on <c>[::1]</c> in memory, so no case needs IPv6 from the machine. servers.pm picks a free port; this one no
+    /// other stand-in uses.
+    /// </summary>
+    public const int Ftp6Port = 9011;
+
     /// <summary>The port each passive-mode data connection is offered on: ftpserver.pl picks a free port, and this fixed port, which no other stand-in uses (8995 is %SMTPPORT), stands for it.</summary>
     public const int PassivePort = 9005;
 
@@ -60,7 +67,7 @@ public sealed class FtpServerConnector : IConnector
     public ReadOnlyMemory<byte> UploadedBytes => upload?.ReceivedBytes ?? [];
 
     /// <summary>
-    /// Opens a control-channel connection when <paramref name="target"/>'s port is <see cref="FtpPort"/>,
+    /// Opens a control-channel connection when <paramref name="target"/>'s port is <see cref="FtpPort"/> or <see cref="Ftp6Port"/>,
     /// the data connection the last <c>PASV</c> or <c>EPSV</c> opened (once) when it is
     /// <see cref="PassivePort"/> (refused when none is offered), otherwise a connection to the wrapped server.
     /// </summary>
@@ -69,7 +76,7 @@ public sealed class FtpServerConnector : IConnector
     /// <returns>The connected result.</returns>
     public ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, CancellationToken cancellationToken)
     {
-        if (target.Port == FtpPort)
+        if (target.Port is FtpPort or Ftp6Port)
         {
             return controlChannel.ConnectAsync(target, cancellationToken);
         }

@@ -30,7 +30,7 @@ namespace Curl.Conformance;
 /// for the cases that verify them as files. <c>%include</c> and <c>%includetext</c> read the file
 /// they name by its path, relative to the working directory when not absolute, as nothing when it
 /// is not there. <c>%HOSTIP</c> and <c>%CLIENTIP</c> are <c>127.0.0.1</c>, <c>%HTTPPORT</c> is
-/// <see cref="HttpPort"/>, <c>%HOST6IP</c> is <c>[::1]</c>, <c>%HTTP6PORT</c> is <see cref="Http6Port"/>, <c>%RESOLVE</c> is the name
+/// <see cref="HttpPort"/>, <c>%HOST6IP</c> and <c>%CLIENT6IP</c> are <c>[::1]</c>, <c>%CLIENT6IP-NB</c> is <c>::1</c>, <c>%HTTP6PORT</c> is <see cref="Http6Port"/>, <c>%FTP6PORT</c> is <see cref="Ftp6Port"/>, <c>%GOPHER6PORT</c> is <see cref="Gopher6Port"/>, <c>%RESOLVE</c> is the name
 /// <see cref="UpstreamResolveCheck"/> emulates in a precheck, <c>%PROXYPORT</c> is <see cref="ProxyPort"/>, <c>%FTPPORT</c> is <see cref="FtpPort"/>, <c>%SMTPPORT</c> is <see cref="SmtpPort"/>, <c>%IMAPPORT</c> is <see cref="ImapPort"/>, <c>%POP3PORT</c> is <see cref="Pop3Port"/>, <c>%SOCKSPORT</c> is <see cref="SocksPort"/>, <c>%MQTTPORT</c> is <see cref="MqttPort"/>, <c>%TFTPPORT</c> is <see cref="TftpPort"/>,<c>%RTSPPORT</c> is <see cref="RtspPort"/>, <c>%HTTPSPORT</c>, <c>%SMTPSPORT</c>, <c>%IMAPSPORT</c>, <c>%POP3SPORT</c>, <c>%FTPSPORT</c> and <c>%HTTPSPROXYPORT</c> are <see cref="HttpsPort"/>, <see cref="SmtpsPort"/>, <see cref="ImapsPort"/>, <see cref="Pop3sPort"/>, <see cref="FtpsPort"/> and <see cref="HttpsProxyPort"/> when a certificate directory is named, <c>%GOPHERPORT</c> is <see cref="GopherPort"/>, <c>%HTTP2PORT</c> is <see cref="Http2Port"/>, <c>%NOLISTENPORT</c> is <see cref="NoListenPort"/>, a port that refuses every connection, <c>%FTPTIME2</c> is <c>8</c> (the seconds upstream gives FTP time-out cases on a host whose FTP server checks in under a second), and <c>%VERSION</c> is <see cref="CurlVersion"/>. Every other variable
 /// is unknown, so a case that uses one is skipped.
 /// </para>
@@ -116,6 +116,12 @@ public sealed class UpstreamCaseRunner(
     /// <summary>The value of <c>%GOPHERPORT</c>: connections to this port reach the Gopher emulation, <see cref="GopherServerConnector"/>, whose selector lines follow the tftpd emulation's dump for <c>&lt;verify&gt;&lt;protocol&gt;</c>.</summary>
     public const string GopherPort = "9008";
 
+    /// <summary>The value of <c>%FTP6PORT</c>, upstream's <c>ftp-ipv6</c> server on <c>%HOST6IP</c>: connections to <c>[::1]</c> at this port reach the same FTP control channel as <see cref="FtpPort"/>, in memory.</summary>
+    public const string Ftp6Port = "9011";
+
+    /// <summary>The value of <c>%GOPHER6PORT</c>, upstream's <c>gopher-ipv6</c> server on <c>%HOST6IP</c>: connections to <c>[::1]</c> at this port reach the same Gopher emulation as <see cref="GopherPort"/>, in memory.</summary>
+    public const string Gopher6Port = "9012";
+
     /// <summary>
     /// The value of <c>%HTTP2PORT</c>, upstream's nghttpx front of sws. No HTTP/2 stand-in stands behind it, so screening
     /// skips a case naming the <c>http/2</c> server, and a connection to this port reaches the sws emulation like any other.
@@ -139,6 +145,9 @@ public sealed class UpstreamCaseRunner(
 
     // runtests.pl's $HOST6IP: the IPv6 loopback, bracketed for a URL.
     private const string Host6Address = "[::1]";
+
+    // runtests.pl's %CLIENT6IP-NB: the client's IPv6 address unbracketed, as --interface takes it.
+    private const string Host6AddressNoBrackets = "::1";
 
     private static readonly string[] ClientFileParts = ["file", "file1", "file2", "file3", "file4"];
 
@@ -321,7 +330,11 @@ public sealed class UpstreamCaseRunner(
             ["LIBTESTS"] = LibTestsProgram,
             ["HOST6IP"] = Host6Address,
             ["HTTP6PORT"] = Http6Port,
+            ["FTP6PORT"] = Ftp6Port,
+            ["CLIENT6IP"] = Host6Address,
+            ["CLIENT6IP-NB"] = Host6AddressNoBrackets,
             ["GOPHERPORT"] = GopherPort,
+            ["GOPHER6PORT"] = Gopher6Port,
             ["HTTP2PORT"] = Http2Port,
         };
 

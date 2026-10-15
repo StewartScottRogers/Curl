@@ -89,6 +89,21 @@ public sealed class GopherServerConnectorTests
     }
 
     [TestMethod]
+    public async Task Selector_OnGopher6Port_IsAnsweredOverIpv6Loopback()
+    {
+        UpstreamTestCase testCase = ParsedTestCase.From(Parts);
+        GopherServerConnector gopher = new(testCase, new SwsHttpServerConnector(testCase, TimeProvider.System));
+        ConnectResult result = await gopher.ConnectAsync(new ConnectTarget("[::1]", GopherServerConnector.Gopher6Port, false), CancellationToken.None);
+        IConnection connection = result.Connection!;
+
+        await connection.WriteAsync("/moo/1203\r\n"u8.ToArray(), CancellationToken.None);
+
+        Assert.AreEqual("iMenu\n", await ReadToEndAsync(connection));
+        Assert.AreEqual("/moo/1203\r\n", Encoding.Latin1.GetString(gopher.ReceivedBytes.Span));
+        Assert.AreEqual($"[::1]:{GopherServerConnector.Gopher6Port}", connection.RemoteEndPoint!.ToString());
+    }
+
+    [TestMethod]
     public async Task OtherPort_ReachesTheWrappedServer()
     {
         UpstreamTestCase testCase = ParsedTestCase.From(Parts);

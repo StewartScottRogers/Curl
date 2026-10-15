@@ -48,14 +48,18 @@ internal sealed class LineProtocolServerConnector : IConnector
     /// <summary>The writes <see cref="ReceivedBytes"/> came from, each numbered in the order of all servers' writes.</summary>
     public IReadOnlyList<UpstreamProtocolDumpEntry> ReceivedDump => recording.Dump;
 
-    /// <summary>Opens a new in-memory connection, its remote end point 127.0.0.1 at the target's port.</summary>
-    /// <param name="target">Gives only the remote end point's port: every host and port reaches the same server.</param>
+    /// <summary>
+    /// Opens a new in-memory connection, its remote end point the loopback address at the target's port, both
+    /// ends ::1 when the target is an IPv6 address (upstream's <c>ftp-ipv6</c> server, so curl's <c>EPRT</c>
+    /// names <c>|2|::1|</c>) and 127.0.0.1 otherwise.
+    /// </summary>
+    /// <param name="target">Gives the remote end point's port and address family: every host and port reaches the same server.</param>
     /// <param name="cancellationToken">Not observed; the connection opens at once.</param>
     /// <returns>A connected result.</returns>
     public ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, CancellationToken cancellationToken) =>
         ValueTask.FromResult(ConnectResult.Connected(new LineProtocolServerConnection(createResponder(), recording, clock)
         {
-            LocalEndPoint = new IPEndPoint(IPAddress.Loopback, FirstLocalPort + Interlocked.Increment(ref connectionsOpened) - 1),
-            RemoteEndPoint = new IPEndPoint(IPAddress.Loopback, target.Port),
+            LocalEndPoint = new IPEndPoint(LoopbackAddress.For(target.Host), FirstLocalPort + Interlocked.Increment(ref connectionsOpened) - 1),
+            RemoteEndPoint = new IPEndPoint(LoopbackAddress.For(target.Host), target.Port),
         }));
 }
