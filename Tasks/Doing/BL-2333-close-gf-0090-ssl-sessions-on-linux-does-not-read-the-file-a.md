@@ -72,3 +72,4 @@ In Curl.Cli.UnitLibrary, where SslSessionsFile (CommandLineGlobalState, CommandL
 - 2026-10-15: Created.
 - 2026-10-15: Backlog -> Doing.
 - 2026-10-15: Doing -> Backlog. Needs Curl.Console and Curl.Console.UnitTests, which BL-2337 (Doing) touches
+- 2026-10-15: Backlog -> Doing.
