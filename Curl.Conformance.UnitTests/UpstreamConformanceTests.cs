@@ -379,7 +379,7 @@ public sealed class UpstreamConformanceTests
     // case that also names httpsig, and RunCurlAsync signs those commands with a clock fixed at the epoch (BL-2183).
     // The HSTS cases that fix the clock with CURL_TIME (446, 780-783) rely on it too: the harness reports Debug to a
     // case naming the HSTS feature and setting CURL_TIME, and RunCurlAsync has Curl honour CURL_TIME as the HSTS clock
-    // (ADR-0493, BL-2234). Every other case sees no Debug, so the other Debug cases stay skipped.
+    // (ADR-0493, BL-2234), and CURL_HSTS_HTTP, when set, as learning HSTS over plain http (ADR-0494, BL-2250). Every other case sees no Debug, so the other Debug cases stay skipped.
     private static UpstreamCurlPlatform PlatformFor(byte[] testFile)
     {
         string text = Encoding.Latin1.GetString(testFile);
@@ -457,7 +457,8 @@ public sealed class UpstreamConformanceTests
             ftpListener: invocation.ConnectionListener,
             defaultConfigFileSearch: new DefaultConfigFileSearch(name => invocation.EnvironmentVariables.GetValueOrDefault(name), OperatingSystem.IsWindows(), executableDirectory: null, accountHomeDirectory: null),
             signingClock: invocation.Arguments.Any(argument => argument.StartsWith("--httpsig", StringComparison.Ordinal)) ? new UnixEpochClock() : null,
-            honoursHstsTimeVariable: true).RunAsync(invocation.Arguments);
+            honoursHstsTimeVariable: true,
+            honoursHstsHttpVariable: true).RunAsync(invocation.Arguments);
 
     // The signing time of upstream's debug build under CURL_FORCETIME and CURL_HTTPSIG_CREATED=0.
     private sealed class UnixEpochClock : TimeProvider

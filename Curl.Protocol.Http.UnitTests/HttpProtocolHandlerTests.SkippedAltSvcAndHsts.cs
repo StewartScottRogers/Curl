@@ -83,14 +83,29 @@ public sealed partial class HttpProtocolHandlerTests
         Assert.IsFalse(events.Events.Any(line => line.Contains("Illegal STS", StringComparison.Ordinal)));
     }
 
+    /// <summary>
+    /// The store, not the handler, decides whether an <c>http</c> origin's header is learned, as
+    /// curl's debug build learns it under <c>CURL_HSTS_HTTP</c> (ADR-0494).
+    /// </summary>
     [TestMethod]
-    public async Task ExecuteAsync_HttpSts_DoesNotCallTheStore()
+    public async Task ExecuteAsync_HttpStsTheStoreRefuses_HandsItToTheStoreAndReportsIllegalStsHeaderSkipped()
     {
         ScriptedHstsStore store = new(legal: false);
 
         RecordingTransferEvents events = await SkipExchangeAsync(SkipHttpUrl, "Strict-Transport-Security: max-age=abc", new HttpRequestOptions { HstsStore = store });
 
-        Assert.IsEmpty(store.Responses);
+        AssertJustBefore(events, "* Illegal STS header skipped", "< Strict-Transport-Security: max-age=abc\r\n");
+        Assert.AreEqual((CurlUrl.Parse(SkipHttpUrl), "max-age=abc", CookieTime), store.Responses.Single());
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_HttpStsTheStoreTakes_HandsItToTheStoreAndWritesNoLine()
+    {
+        ScriptedHstsStore store = new(legal: true);
+
+        RecordingTransferEvents events = await SkipExchangeAsync(SkipHttpUrl, "Strict-Transport-Security: max-age=60", new HttpRequestOptions { HstsStore = store });
+
+        Assert.AreEqual((CurlUrl.Parse(SkipHttpUrl), "max-age=60", CookieTime), store.Responses.Single());
         Assert.IsFalse(events.Events.Any(line => line.Contains("Illegal STS", StringComparison.Ordinal)));
     }
 

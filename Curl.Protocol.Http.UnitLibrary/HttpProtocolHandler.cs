@@ -2345,16 +2345,16 @@ public sealed class HttpProtocolHandler(
         };
 
     /// <summary>
-    /// Hands <paramref name="header" />, when it is a <c>Strict-Transport-Security</c> header of a
-    /// response to an <c>https</c> URL and <paramref name="store" /> is set, to the store with the
-    /// transfer's URL as the origin, and reports curl 8.21.0's <c>Illegal STS header skipped</c>
-    /// before the header line when the store refuses it (measured, ADR-0409). curl learns no HSTS
-    /// over plain <c>http</c>.
+    /// Hands <paramref name="header" />, when it is a <c>Strict-Transport-Security</c> header and
+    /// <paramref name="store" /> is set, to the store with the transfer's URL as the origin, and
+    /// reports curl 8.21.0's <c>Illegal STS header skipped</c> before the header line when the store
+    /// refuses it (measured, ADR-0409). The store decides whether an <c>http</c> origin's header is
+    /// learned: curl's release build learns none, its debug build does under <c>CURL_HSTS_HTTP</c>
+    /// (ADR-0494).
     /// </summary>
     private static void StoreHsts(ITransferContext context, IHstsStore? store, HttpResponseHeader header)
     {
         if (store is not null
-            && context.Url.Scheme == "https"
             && string.Equals(header.Name, "Strict-Transport-Security", StringComparison.OrdinalIgnoreCase)
             && !store.StoreFromResponse(context.Url, header.Value, context.TimeProvider.GetUtcNow()))
         {

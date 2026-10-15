@@ -90,6 +90,11 @@ namespace Curl.Console;
 /// harness's stand-in for curl's debug build under <c>CURL_TIME</c> (ADR-0493, BL-2234);
 /// <see langword="null" />, the default, uses <paramref name="timeProvider" />.
 /// </param>
+/// <param name="hstsLearnsOverHttp">
+/// Whether the run's HSTS cache learns a <c>Strict-Transport-Security</c> header received over plain
+/// <c>http</c> too: the harness's stand-in for curl's debug build under <c>CURL_HSTS_HTTP</c>
+/// (ADR-0494, BL-2250); off by default, as in curl's release build.
+/// </param>
 /// <param name="writeOutTimeDialect">
 /// The C runtime whose <c>strftime</c> a <c>-w</c> <c>%time{format}</c> follows; the composition
 /// passes the platform's (<see cref="CurlComposition.WriteOutTimeDialectFor" />), and
@@ -273,7 +278,8 @@ internal sealed class CurlCommandRunner(
     IExtendedAttributeWriter? extendedAttributeWriter = null,
     LateBoundDiagnosticLog? lateBoundDiagnosticLog = null,
     bool? parsesAsWindowsBuild = null,
-    TimeProvider? hstsClock = null)
+    TimeProvider? hstsClock = null,
+    bool hstsLearnsOverHttp = false)
 {
     /// <summary>
     /// What curl 8.21.0 prints before its URL parser's reason when it rejects a transfer
@@ -644,9 +650,10 @@ internal sealed class CurlCommandRunner(
     /// <c>--hsts</c>, as curl 8.21.0's tool shares one through its share handle: an <c>https</c>
     /// response's <c>Strict-Transport-Security</c> switches a later <c>http</c> URL or redirect to the
     /// same host to <c>https</c> (measured 2026-09-29, BL-621 Notes; ADR-0218). Made on first use, on
-    /// the run's clock, writing to the run's diagnostic log (BL-921).
+    /// the run's clock, writing to the run's diagnostic log (BL-921); it learns over plain <c>http</c>
+    /// too only when the runner was made with <c>hstsLearnsOverHttp</c> (ADR-0494).
     /// </summary>
-    private HstsTransferPolicy Hsts => LazyInitializer.EnsureInitialized(ref hsts, () => new HstsTransferPolicy(hstsClock ?? timeProvider, diagnosticLog));
+    private HstsTransferPolicy Hsts => LazyInitializer.EnsureInitialized(ref hsts, () => new HstsTransferPolicy(hstsClock ?? timeProvider, diagnosticLog, hstsLearnsOverHttp));
 
     /// <summary>The run's HSTS cache once <see cref="Hsts" /> has made it.</summary>
     private HstsTransferPolicy? hsts;

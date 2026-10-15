@@ -117,6 +117,24 @@ public sealed class HstsTransferPolicyTests
     }
 
     [TestMethod]
+    public void StoreFromResponse_HttpOriginWhenLearningOverHttp_StoresTheHostWithoutItsTrailingDot()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        HstsTransferPolicy learningOverHttp = new(new FakeTimeProvider(Now), learnsOverHttp: true);
+        diagnostics.Arrange("header", "max-age=60 from http://localhost./ with learnsOverHttp");
+
+        bool stored = learningOverHttp.StoreFromResponse(CurlUrl.Parse("http://localhost./"), "max-age=60", Now);
+
+        diagnostics.Act("stored", stored);
+        Assert.IsTrue(stored);
+
+        string? file = learningOverHttp.FormatFile("\n", HstsCache.LatestWritableExpiryOnWindows);
+        diagnostics.Act("file", file);
+        diagnostics.Assert("file", EmptyFile + "localhost \"20260929 14:23:10\"\n", file);
+        Assert.AreEqual(EmptyFile + "localhost \"20260929 14:23:10\"\n", file);
+    }
+
+    [TestMethod]
     public void StoreFromResponse_LegalHeader_ReturnsTrueAndStoresTheHostFromTheGivenTime()
     {
         var diagnostics = TestDiagnostics.For(TestContext);

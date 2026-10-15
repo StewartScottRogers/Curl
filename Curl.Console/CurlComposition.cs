@@ -282,7 +282,7 @@ internal static class CurlComposition
             diagnosticLog);
 
     /// <summary>
-    /// Creates the contexts the dialing <see cref="CreateRunner(Stream, Stream, Stream, ITcpDialer, IDnsResolver, IDatagramConnector, bool, IWriteOutFileOpener?, bool, Func{string, string?}?, IConnectionListener?, DefaultConfigFileSearch?, TimeProvider?, bool, bool)" />
+    /// Creates the contexts the dialing <see cref="CreateRunner(Stream, Stream, Stream, ITcpDialer, IDnsResolver, IDatagramConnector, bool, IWriteOutFileOpener?, bool, Func{string, string?}?, IConnectionListener?, DefaultConfigFileSearch?, TimeProvider?, bool, bool, bool)" />
     /// uses: <see cref="CreateSecurityContextFactory(IConnector, IDatagramConnector, IDiagnosticLog?)" />'s
     /// router, with NTLM sent to the hand-built context on every platform when
     /// <paramref name="usesHandBuiltNtlm" /> is set (<see cref="HandBuiltNtlmSecurityContextFactory" />, BL-1858).
@@ -1252,6 +1252,12 @@ internal static class CurlComposition
     /// instant (<see cref="HstsClockOf" />), as curl's debug build reads it in <c>lib/hsts.c</c>; off by
     /// default, as in curl's release build, and turned on by the conformance harness (ADR-0493, BL-2234).
     /// </param>
+    /// <param name="honoursHstsHttpVariable">
+    /// Whether a set <c>CURL_HSTS_HTTP</c> (any value, empty included) makes the run's HSTS cache learn
+    /// a <c>Strict-Transport-Security</c> header received over plain <c>http</c>, as curl's debug build
+    /// does in <c>lib/http.c</c>; off by default, as in curl's release build, and turned on by the
+    /// conformance harness (ADR-0494, BL-2250).
+    /// </param>
     /// <returns>The runner.</returns>
     internal static CurlCommandRunner CreateRunner(
         Stream standardOutput,
@@ -1268,7 +1274,8 @@ internal static class CurlComposition
         DefaultConfigFileSearch? defaultConfigFileSearch = null,
         TimeProvider? signingClock = null,
         bool honoursDnsServerVariable = false,
-        bool honoursHstsTimeVariable = false)
+        bool honoursHstsTimeVariable = false,
+        bool honoursHstsHttpVariable = false)
     {
         ConnectionCache runConnections = new(TimeProvider.System);
         LateBoundDiagnosticLog runLog = new();
@@ -1291,11 +1298,26 @@ internal static class CurlComposition
             readEnvironmentVariable: readEnvironmentVariable,
             runConnectionCache: runConnections,
             lateBoundDiagnosticLog: runLog,
-            hstsClock: honoursHstsTimeVariable ? HstsClockOf(environment(HstsTimeVariableName)) : null);
+            hstsClock: honoursHstsTimeVariable ? HstsClockOf(environment(HstsTimeVariableName)) : null,
+            hstsLearnsOverHttp: LearnsHstsOverHttp(honoursHstsHttpVariable, environment));
     }
+
+    /// <summary>
+    /// Whether the run's HSTS cache learns over plain <c>http</c>: only behind the harness seam, and
+    /// then when <c>CURL_HSTS_HTTP</c> is set at all, as curl's debug build tests it with <c>getenv</c>
+    /// (ADR-0494, BL-2250).
+    /// </summary>
+    /// <param name="honoursHstsHttpVariable">Whether the seam is on.</param>
+    /// <param name="environment">Reads the run's environment.</param>
+    /// <returns>Whether the cache learns over <c>http</c>.</returns>
+    internal static bool LearnsHstsOverHttp(bool honoursHstsHttpVariable, Func<string, string?> environment) =>
+        honoursHstsHttpVariable && environment(HstsHttpVariableName) is not null;
 
     /// <summary>The variable curl's debug build reads its HSTS clock from, in whole seconds since the epoch.</summary>
     internal const string HstsTimeVariableName = "CURL_TIME";
+
+    /// <summary>The variable whose presence makes curl's debug build learn HSTS over plain <c>http</c>.</summary>
+    internal const string HstsHttpVariableName = "CURL_HSTS_HTTP";
 
     /// <summary>
     /// The HSTS clock a <c>CURL_TIME</c> value fixes: a <see cref="FixedWallClock" /> at that many
@@ -1333,7 +1355,7 @@ internal static class CurlComposition
             : new DnsServerResolver(new DnsServerResolverOptions(dnsServer, null, null, null, AddressFamilyOf(options)), TimeProvider.System, datagramConnector);
 
     /// <summary>
-    /// Builds one option group's dispatch for the dialing <see cref="CreateRunner(Stream, Stream, Stream, ITcpDialer, IDnsResolver, IDatagramConnector, bool, IWriteOutFileOpener?, bool, Func{string, string?}?, IConnectionListener?, DefaultConfigFileSearch?, TimeProvider?, bool, bool)" />:
+    /// Builds one option group's dispatch for the dialing <see cref="CreateRunner(Stream, Stream, Stream, ITcpDialer, IDnsResolver, IDatagramConnector, bool, IWriteOutFileOpener?, bool, Func{string, string?}?, IConnectionListener?, DefaultConfigFileSearch?, TimeProvider?, bool, bool, bool)" />:
     /// the group's <see cref="TcpConnector" /> over <paramref name="tcpDialer" /> and
     /// <paramref name="dnsResolver" />, pooled in <paramref name="runConnections" />, with a proxy
     /// selector that reads the environment through <paramref name="readEnvironmentVariable" />, and the connector's <c>--resolve</c> entries

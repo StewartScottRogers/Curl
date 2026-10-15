@@ -13,7 +13,7 @@ namespace Curl.Core.Hsts;
 /// The switch changes the scheme only: the rest of the URL is kept as typed, so an explicit
 /// <c>:80</c> stays (<c>http://localhost:80/</c> becomes <c>https://localhost:80/</c>), while a URL
 /// without a port moves to 443 with the scheme's default. A header received over plain <c>http</c>
-/// is ignored. Every member takes one lock, so <c>-Z</c> transfers may share the cache.
+/// is ignored, unless <paramref name="learnsOverHttp" /> is set. Every member takes one lock, so <c>-Z</c> transfers may share the cache.
 /// </remarks>
 /// <param name="timeProvider">The clock expiries are counted on.</param>
 /// <param name="diagnosticLog">
@@ -23,7 +23,12 @@ namespace Curl.Core.Hsts;
 /// expired lines (<see cref="HstsCache" />, BL-1072); <see langword="null" /> for none. Only
 /// the host is written, never the URL, so no credential can be.
 /// </param>
-public sealed class HstsTransferPolicy(TimeProvider timeProvider, IDiagnosticLog? diagnosticLog = null) : IHstsStore
+/// <param name="learnsOverHttp">
+/// Whether a header received over plain <c>http</c> is learned too, as curl's debug build learns it
+/// under <c>CURL_HSTS_HTTP</c> (<c>lib/http.c</c>); off by default, as in curl's release build, and
+/// turned on only by the conformance harness (ADR-0494, BL-2250).
+/// </param>
+public sealed class HstsTransferPolicy(TimeProvider timeProvider, IDiagnosticLog? diagnosticLog = null, bool learnsOverHttp = false) : IHstsStore
 {
     /// <summary>
     /// What curl's <c>-v</c> line says before the switched URL: <c>Switched from HTTP to HTTPS due to
@@ -96,7 +101,8 @@ public sealed class HstsTransferPolicy(TimeProvider timeProvider, IDiagnosticLog
     /// <summary>
     /// Learns one <c>Strict-Transport-Security</c> header of a response from <paramref name="origin" />,
     /// as <see cref="HstsCache.ApplyHeader(string, string, DateTimeOffset)" /> does, when the origin is
-    /// <c>https</c>; a header received over plain <c>http</c> is ignored (ADR-0409).
+    /// <c>https</c>; a header received over plain <c>http</c> is ignored (ADR-0409) unless the policy
+    /// learns over <c>http</c> (ADR-0494).
     /// </summary>
     /// <param name="origin">The URL of the request the response answered.</param>
     /// <param name="headerValue">The header's value, verbatim.</param>
@@ -111,7 +117,7 @@ public sealed class HstsTransferPolicy(TimeProvider timeProvider, IDiagnosticLog
         ArgumentNullException.ThrowIfNull(origin);
         ArgumentNullException.ThrowIfNull(headerValue);
 
-        if (origin.Scheme != "https")
+        if (origin.Scheme != "https" && !learnsOverHttp)
         {
             return true;
         }

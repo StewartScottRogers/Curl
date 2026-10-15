@@ -294,12 +294,9 @@ public sealed record HttpRequestOptions
     public IAltSvcStore? AltSvcStore { get; init; }
 
     /// <summary>
-    /// Gets the store each <c>Strict-Transport-Security</c> header of an HTTPS response is handed to
-    /// as it is read (<c>--hsts</c>, ADR-0409), or <see langword="null" />, the default, to learn none.
+    /// Gets the store each <c>Strict-Transport-Security</c> response header is handed to as it is
+    /// read (<c>--hsts</c>, ADR-0409), or <see langword="null" />, the default, to learn none. The
+    /// store decides whether a plain <c>http</c> origin's header is learned (ADR-0494).
     /// </summary>
-    /// <remarks>
-    /// The seam only so far: no handler reads it until BL-1420 wires the HTTP handler and
-    /// <c>Curl.Console</c> to it.
-    /// </remarks>
     public IHstsStore? HstsStore { get; init; }
 }
