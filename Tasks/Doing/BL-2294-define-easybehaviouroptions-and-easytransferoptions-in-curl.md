@@ -41,3 +41,4 @@ Rules for every option-group task (this one, BL-2295 to BL-2300):
 ## Log
 
 - 2026-10-15: Created.
+- 2026-10-15: Backlog -> Doing.
