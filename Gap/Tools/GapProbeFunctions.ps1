@@ -188,7 +188,9 @@ function Invoke-GapRun {
         $startInfo.WorkingDirectory = $WorkingDirectory
 
         $kept = @{}
-        foreach ($name in 'PATH', 'SystemRoot', 'TEMP', 'TMP') {
+        # DOTNET_ROOT* tell Curl.Console's app host where .NET is when it is not in a
+        # default location (setup-dotnet on a macOS runner); curl never reads them (ADR-0505).
+        foreach ($name in 'PATH', 'SystemRoot', 'TEMP', 'TMP', 'DOTNET_ROOT', 'DOTNET_ROOT_X64', 'DOTNET_ROOT_ARM64') {
             $value = [Environment]::GetEnvironmentVariable($name)
             if ($null -ne $value) { $kept[$name] = $value }
         }
