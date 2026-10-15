@@ -33,3 +33,4 @@ Run `dotnet test Curl.Conformance.UnitTests --filter "TestCategory!=Integration&
 ## Log
 
 - 2026-10-14: Created.
+- 2026-10-14: Backlog -> Doing.
