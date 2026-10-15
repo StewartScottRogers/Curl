@@ -29,6 +29,9 @@ internal sealed class UpstreamCaseRun(int exitCode, byte[] standardOutput, byte[
     /// <summary>What the emulated socksd on <c>%SOCKSPORT</c> wrote to its dump file, for <c>&lt;verify&gt;&lt;socks&gt;</c>.</summary>
     public byte[] SocksLog { get; init; } = [];
 
+    /// <summary>What the emulated dnsd on <c>%DNSPORT</c> wrote to <c>dnsd.input</c>, one <c>QNAME … QTYPE …</c> line per query, for <c>&lt;verify&gt;&lt;dns&gt;</c>.</summary>
+    public string DnsLog { get; init; } = string.Empty;
+
     /// <summary>
     /// The case's <c>%LOGDIR</c>, or <see langword="null"/> when unknown: an expected <c>&lt;stderr&gt;</c>
     /// naming it is compared with curl's wrapped <c>Note:</c> and <c>Warning:</c> lines joined

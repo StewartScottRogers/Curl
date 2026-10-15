@@ -230,6 +230,23 @@ sends negtelnetserver.py's `IAC WILL NEW_ENVIRON`, `IAC WONT NAWS`, `IAC DO NEW_
 option byte, or `IAC` and one other byte) until a write leaves data, echoes that data with
 surrounding whitespace stripped, and closes. Neither server writes `server.input`, so neither joins
 `UpstreamProtocolDump`. Screening lets `dict` and `telnet` cases run: 1450 and 1452 pass.
+`DnsServerConnector` (BL-2232) emulates upstream's `dnsd` (`tests/server/dnsd.c` at `curl-8_22_0`)
+over datagrams on port 9017, the runner's `%DNSPORT` (servers.pm picks a free port, and no other
+stand-in uses this one); it wraps `TftpServerConnector` as the runner's `IDatagramConnector`, so any
+other UDP port reaches the tftpd stand-in. A `DnsServerChannel` answers every query, for any name, as
+dnsd does: the query's ID, flags `0x8180`, the question copied, and for an A or AAAA query one record
+(`0xc00c`, class IN, TTL 2580) with the last `A:` or `AAAA:` address (brackets allowed) of
+`<reply><dns>`, or no record when that line's address does not parse (`A: none`) or is missing; a
+datagram under 16 bytes or whose name runs past its end gets no answer. `HTTPS:`, `Delay-*` and
+`Rcode-*` lines are not emulated, as no case at `curl-8_22_0` uses them. `QueryLog` holds dnsd's
+`dnsd.input` lines (`QNAME <name> QTYPE <A|AAAA|HTTPS|<unknown>>`), which the runner passes as
+`UpstreamCaseRun.DnsLog` and `UpstreamCaseVerification` compares with `<verify><dns>` as
+`runtests.pl` does: both sorted, the logged lines kept only where the part's `host` attribute matches
+as a pattern. The conformance tests compose curl with `CreateRunner(honoursDnsServerVariable: true)`
+(ADR-0492), so `CURL_DNS_SERVER` reaches the stand-in through the datagram connector, and report the
+`override-dns` feature only to a case naming the `dns` server. Screening lets `dns` cases run: 2102
+and 2103 pass, and 2104 fails on a Curl difference BL-2262 owns (Curl asks again for a name that
+failed to resolve, where curl caches the failure).
 `%HTTPUNIXPATH` is `log/server/http.sock` (`UpstreamCaseRunner.HttpUnixPath`, BL-2229), the relative
 path `runtests.pl`'s `http.sock` has under its relative log directory, so it fits a `sockaddr_un`
 wherever the harness's log directory is. Nothing listens on it: upstream's `http-unix` server is the
@@ -275,7 +292,7 @@ conformance tests pass the parent of the `certs` folder `UpstreamTestCertificate
 holding a blank is refused, since commands name them unquoted, GF-0044), writes `<client><file>` parts into
 the case's log directory, splits `<client><command>` with `UpstreamCommandLineSplitter` as
 the shell `runtests.pl` uses would, and runs curl through an `UpstreamCurlInvocation` against
-the `sws` emulation and `TftpServerConnector`. The invocation's
+the `sws` emulation and `DnsServerConnector` in front of `TftpServerConnector`. The invocation's
 `EnvironmentVariables` is the whole environment the run reads (BL-1892): each `NAME=value` line
 of every `<client><setenv>` part (`getpart` joins them; BL-2017), after expansion (so `%HOSTIP` and the rest are already replaced), with an
 empty value kept as an empty variable and a line with no `=` (or a `#` comment) left out, as

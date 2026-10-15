@@ -384,12 +384,17 @@ public sealed class UpstreamConformanceTests
     // The HSTS cases that fix the clock with CURL_TIME (446, 780-783) rely on it too: the harness reports Debug to a
     // case naming the HSTS feature and setting CURL_TIME, and RunCurlAsync has Curl honour CURL_TIME as the HSTS clock
     // (ADR-0493, BL-2234), and CURL_HSTS_HTTP, when set, as learning HSTS over plain http (ADR-0494, BL-2250). Every other case sees no Debug, so the other Debug cases stay skipped.
+    // A case naming the dns server (2102 to 2104) relies on override-dns, the debug build's CURL_DNS_SERVER: the harness
+    // reports it to that case alone, and RunCurlAsync has Curl ask the dnsd stand-in on %DNSPORT through the datagram connector (ADR-0492, BL-2232).
     private static UpstreamCurlPlatform PlatformFor(byte[] testFile)
     {
         string text = Encoding.Latin1.GetString(testFile);
         bool standsInForDebug = text.Contains("\nhttpsig\n", StringComparison.Ordinal)
             || (text.Contains("\nHSTS\n", StringComparison.Ordinal) && text.Contains("\nCURL_TIME=", StringComparison.Ordinal));
-        return standsInForDebug ? Platform.WithFeatures(["Debug"]) : Platform;
+        UpstreamCurlPlatform platform = standsInForDebug ? Platform.WithFeatures(["Debug"]) : Platform;
+        return text.Contains("\n<server>\n", StringComparison.Ordinal) && text.Contains("\ndns\n", StringComparison.Ordinal)
+            ? platform.WithFeatures(["override-dns"])
+            : platform;
     }
 
     private static readonly string CaseHangLimitMessage =
@@ -469,7 +474,8 @@ public sealed class UpstreamConformanceTests
             defaultConfigFileSearch: new DefaultConfigFileSearch(name => invocation.EnvironmentVariables.GetValueOrDefault(name), OperatingSystem.IsWindows(), executableDirectory: null, accountHomeDirectory: null),
             signingClock: invocation.Arguments.Any(argument => argument.StartsWith("--httpsig", StringComparison.Ordinal)) ? new UnixEpochClock() : null,
             honoursHstsTimeVariable: true,
-            honoursHstsHttpVariable: true).RunAsync(invocation.Arguments);
+            honoursHstsHttpVariable: true,
+            honoursDnsServerVariable: true).RunAsync(invocation.Arguments);
 
     // The signing time of upstream's debug build under CURL_FORCETIME and CURL_HTTPSIG_CREATED=0.
     private sealed class UnixEpochClock : TimeProvider

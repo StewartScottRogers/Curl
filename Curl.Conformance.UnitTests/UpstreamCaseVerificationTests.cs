@@ -349,6 +349,21 @@ public sealed class UpstreamCaseVerificationTests
         Assert.StartsWith("<verify><socks>", differing!);
     }
 
+    [TestMethod]
+    public void FindFirstDifference_Dns_ComparesSortedLinesAndKeepsOnlyThoseItsHostPatternMatches()
+    {
+        const string sections = "<verify>\n<dns host=\"examplehost.invalid QTYPE A\">\nQNAME examplehost.invalid QTYPE A\nQNAME examplehost.invalid QTYPE AAAA\n</dns>\n</verify>\n";
+        const string unfiltered = "<verify>\n<dns>\nQNAME a QTYPE A\n</dns>\n</verify>\n";
+
+        string? matching = Verify(sections, new UpstreamCaseRun(0, [], [], [], []) { DnsLog = "QNAME examplehost.invalid QTYPE HTTPS\nQNAME examplehost.invalid QTYPE AAAA\nQNAME examplehost.invalid QTYPE A\n" });
+        string? differing = Verify(sections, new UpstreamCaseRun(0, [], [], [], []) { DnsLog = "QNAME examplehost.invalid QTYPE A\n" });
+        string? unfilteredExtraLine = Verify(unfiltered, new UpstreamCaseRun(0, [], [], [], []) { DnsLog = "QNAME a QTYPE A\nQNAME a QTYPE HTTPS\n" });
+
+        Assert.IsNull(matching);
+        Assert.StartsWith("<verify><dns>", differing!);
+        Assert.StartsWith("<verify><dns>", unfilteredExtraLine!);
+    }
+
     private string? Verify(string sections, UpstreamCaseRun run) => Verify(sections, run, UpstreamRegex.MatchTimeout);
 
     private string? Verify(string sections, UpstreamCaseRun run, TimeSpan stripMatchTimeout)

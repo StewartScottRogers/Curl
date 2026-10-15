@@ -18,7 +18,8 @@ namespace Curl.Conformance;
 /// against the uploaded message with <c>&lt;strippart&gt;</c> run on it but no <c>&lt;strip&gt;</c>; the <c>--output</c> file against <c>&lt;datacheck&gt;</c> (and <c>&lt;datacheck1&gt;</c> to
 /// <c>&lt;datacheck9&gt;</c> after it), or <c>&lt;data&gt;</c> when there is none, unless
 /// <c>&lt;data&gt;</c> says <c>nocheck</c> or both are empty and it does not say <c>sendzero</c>;
-/// <c>&lt;socks&gt;</c> against what the socksd emulation logged, as written;
+/// <c>&lt;socks&gt;</c> against what the socksd emulation logged, as written; <c>&lt;dns&gt;</c>
+/// against the dnsd emulation's query lines, both sorted, the logged ones kept only where its <c>host</c> pattern matches;
 /// <c>&lt;stdout&gt;</c> and <c>&lt;stderr&gt;</c> with <c>&lt;stripfile&gt;</c> run on the output;
 /// each <c>&lt;file&gt;</c> to <c>&lt;file4&gt;</c> against the named file with the matching
 /// <c>&lt;stripfileN&gt;</c>; <c>&lt;notexists&gt;</c>; and last the exit code against
@@ -58,6 +59,7 @@ internal static class UpstreamCaseVerification
             () => CompareProtocol(testCase, "proxy", run.ProxyReceivedBytes, stripMatchTimeout),
             () => CompareUpload(testCase, run.UploadedBytes),
             () => CompareSocks(testCase, run.SocksLog),
+            () => CompareDns(testCase, run.DnsLog),
             () => CompareReplyData(testCase, run.OutputFileBytes),
             () => CompareOutput(testCase, "stdout", "stripfile", run.StandardOutput),
             () => CompareStandardError(testCase, run),
@@ -101,6 +103,23 @@ internal static class UpstreamCaseVerification
         testCase.Find("verify", "socks") is { } part
             ? UpstreamFirstDifference.Describe("<verify><socks>", Expected(part), socksLog)
             : null;
+
+    // runtests.pl sorts dnsd.input's lines and <dns>'s, keeps only the logged lines its host attribute
+    // matches as a Perl pattern when it has one (test2104 leaves out curl's HTTPS queries), and compares them.
+    private static string? CompareDns(UpstreamTestCase testCase, string dnsLog)
+    {
+        if (testCase.Find("verify", "dns") is not { } part)
+        {
+            return null;
+        }
+
+        Regex? host = part.GetAttribute("host") is { } pattern ? UpstreamRegex.TryCreate(pattern, RegexOptions.None) : null;
+        IEnumerable<string> logged = dnsLog.Split('\n', StringSplitOptions.RemoveEmptyEntries).Where(line => host?.IsMatch(line) ?? true);
+        return UpstreamFirstDifference.Describe("<verify><dns>", SortedLines(UpstreamTestPartBodies.Lines(part)), SortedLines(logged));
+    }
+
+    private static byte[] SortedLines(IEnumerable<string> lines) =>
+        Encoding.Latin1.GetBytes(string.Concat(lines.Order(StringComparer.Ordinal).Select(line => line + "\n")));
 
     private static string? CompareReplyData(UpstreamTestCase testCase, byte[] outputFile)
     {

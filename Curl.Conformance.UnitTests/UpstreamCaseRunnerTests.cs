@@ -350,7 +350,7 @@ public sealed class UpstreamCaseRunnerTests
     }
 
     [TestMethod]
-    public async Task RunAsync_CurlReachingForUdp_GetsTheTftpEmulation()
+    public async Task RunAsync_CurlReachingForUdp_GetsTheDnsdEmulationInFrontOfTheTftpOne()
     {
         var diagnostics = TestDiagnostics.For(TestContext);
         IDatagramConnector? datagramConnector = null;
@@ -362,8 +362,26 @@ public sealed class UpstreamCaseRunnerTests
 
         await RunAsync(runner, "<testcase>\n<client>\n<command>\na\n</command>\n</client>\n</testcase>\n");
 
-        diagnostics.Assert("datagram connector type", nameof(TftpServerConnector), datagramConnector?.GetType().Name ?? "(none)");
-        Assert.IsInstanceOfType<TftpServerConnector>(datagramConnector);
+        diagnostics.Assert("datagram connector type", nameof(DnsServerConnector), datagramConnector?.GetType().Name ?? "(none)");
+        Assert.IsInstanceOfType<DnsServerConnector>(datagramConnector);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_QueryOnDnsPort_IsComparedWithVerifyDns()
+    {
+        const string testCase = "<testcase>\n<reply>\n<dns>\nA: %HOSTIP\n</dns>\n</reply>\n<client>\n<server>\ndns\n</server>\n<command>\na\n</command>\n</client>\n" +
+            "<verify>\n<dns>\nQNAME b QTYPE A\n</dns>\n</verify>\n</testcase>\n";
+        UpstreamCaseRunner runner = Runner(async invocation =>
+        {
+            await using IDatagramChannel channel = (await invocation.DatagramConnector.OpenAsync("127.0.0.1", int.Parse(UpstreamCaseRunner.DnsPort, System.Globalization.CultureInfo.InvariantCulture), CancellationToken.None)).Channel!;
+            await channel.SendAsync((byte[])[0, 1, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, (byte)'a', 0, 0, 1, 0, 1], channel.ServerEndPoint, CancellationToken.None);
+            return 0;
+        });
+
+        UpstreamCaseOutcome outcome = await RunAsync(runner, testCase);
+
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Failed, outcome.Kind);
+        Assert.Contains("QNAME a QTYPE A", outcome.Detail);
     }
 
     [TestMethod]
