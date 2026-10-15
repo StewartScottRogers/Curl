@@ -150,11 +150,59 @@ public sealed class FtpProtocolHandlerKeptConnectionTests
         Assert.AreEqual(sentBeforeClose, script.Sent);
     }
 
+    [TestMethod]
+    public async Task ExecuteAsync_SecondUrlAfterEpsvRefused_SendsPasvWithoutEpsv()
+    {
+        // upstream test 211: EPSV answered 500 on the first URL; curl 8.22.0 never retries it on the connection
+        const string Pasv = "227 Entering Passive Mode (127,0,0,1,241,48)\r\n";
+        string replies = LoggedIn + "500 no\r\n" + Pasv + "200 Type set\r\n213 1\r\n150 Opening\r\n226 Transfer complete\r\n"
+            + Pasv + "213 1\r\n150 Opening\r\n226 Transfer complete\r\n";
+        var control = new KeepingConnection(new ScriptedConnection(Encoding.Latin1.GetBytes(replies)));
+        var script = new Script(control);
+
+        TransferResult first = await script.RunAsync(Host + "/211", reused: false);
+        TransferResult second = await script.RunAsync(Host + "/211", reused: true);
+
+        Assert.IsTrue(first.IsSuccess);
+        Assert.IsTrue(second.IsSuccess);
+        Assert.AreEqual(LoginSent + "EPSV\r\nPASV\r\nTYPE I\r\nSIZE 211\r\nRETR 211\r\nPASV\r\nSIZE 211\r\nRETR 211\r\n", script.Sent);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_SecondUrlAfterEprtRefused_SendsPortWithoutEprt()
+    {
+        // upstream test 212: EPRT answered 500 on the first URL under -P -; curl 8.22.0 never retries it on the connection
+        string replies = LoggedIn + "500 no\r\n200 PORT ok\r\n200 Type set\r\n213 1\r\n150 Opening\r\n226 Transfer complete\r\n"
+            + "200 PORT ok\r\n213 1\r\n150 Opening\r\n226 Transfer complete\r\n";
+        var control = new KeepingConnection(new ScriptedConnection(Encoding.Latin1.GetBytes(replies)) { LocalEndPoint = new IPEndPoint(IPAddress.Loopback, 55129) });
+        var listener = new QueuedListener(Listening(56717), Listening(56718), Listening(56719));
+        var script = new Script(control) { FtpPort = "-", Listener = listener };
+
+        TransferResult first = await script.RunAsync(Host + "/212", reused: false);
+        TransferResult second = await script.RunAsync(Host + "/212", reused: true);
+
+        Assert.IsTrue(first.IsSuccess);
+        Assert.IsTrue(second.IsSuccess);
+        Assert.AreEqual(
+            LoginSent + "EPRT |1|127.0.0.1|56717|\r\nPORT 127,0,0,1,221,142\r\nTYPE I\r\nSIZE 212\r\nRETR 212\r\nPORT 127,0,0,1,221,143\r\nSIZE 212\r\nRETR 212\r\n",
+            script.Sent);
+        Assert.HasCount(3, listener.Targets);
+    }
+
+    private static ListenResult Listening(int port) =>
+        ListenResult.Listening(new ScriptedPendingConnection(new IPEndPoint(IPAddress.Loopback, port), ConnectResult.Connected(new ScriptedConnection(Encoding.Latin1.GetBytes("x")))));
+
     /// <summary>Runs transfers over one kept control connection, each with a fresh data connection.</summary>
     private sealed class Script(KeepingConnection control)
     {
 
         public FtpFileMethod FileMethod { get; init; }
+
+        /// <summary>Gets the <c>-P</c> value, or <see langword="null" /> for passive mode.</summary>
+        public string? FtpPort { get; init; }
+
+        /// <summary>Gets the listener active mode binds on, or <see langword="null" /> for passive mode.</summary>
+        public QueuedListener? Listener { get; init; }
 
         public string Sent => Encoding.Latin1.GetString(control.Script.Sent);
 
@@ -163,8 +211,9 @@ public sealed class FtpProtocolHandlerKeptConnectionTests
             var connector = new QueuedConnector(
                 ConnectResult.Connected(control, null, isReused: reused),
                 ConnectResult.Connected(new ScriptedConnection(Encoding.Latin1.GetBytes("x"))));
-            var context = new TransferContext { Url = CurlUrl.Parse(url), Output = new MemoryStream(), FtpFileMethod = FileMethod };
-            return await new FtpProtocolHandler(connector).ExecuteAsync(context);
+            var context = new TransferContext { Url = CurlUrl.Parse(url), Output = new MemoryStream(), FtpFileMethod = FileMethod, FtpPort = FtpPort };
+            var handler = Listener is null ? new FtpProtocolHandler(connector) : new FtpProtocolHandler(connector, Listener, new QueuedTlsProvider());
+            return await handler.ExecuteAsync(context);
         }
     }
 }

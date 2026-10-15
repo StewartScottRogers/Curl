@@ -263,6 +263,12 @@ internal sealed class FtpSession(
     /// <summary>The last <c>TYPE</c> the server accepted on the control connection, <c>A</c> or <c>I</c>.</summary>
     private char? transferType = TransferTypeOf(reused);
 
+    /// <summary>Whether the server refused <c>EPSV</c> on the control connection, in this transfer or an earlier one (BL-2236).</summary>
+    private bool epsvRefused = reused?.EpsvRefused == true;
+
+    /// <summary>Whether the server refused <c>EPRT</c> on the control connection, in this transfer or an earlier one (BL-2236).</summary>
+    private bool eprtRefused = reused?.EprtRefused == true;
+
     /// <summary>What curl's <c>prevpath</c> becomes once the transfer reports the directory it remembers.</summary>
     private string? directoryToRemember;
 
@@ -1197,7 +1203,7 @@ internal sealed class FtpSession(
     private async ValueTask<TransferResult?> AnnounceActivePortAsync(IPAddress address, FtpPortArgument argument)
     {
         bool ipv6 = address.AddressFamily == AddressFamily.InterNetworkV6;
-        if (context.FtpUseEprt || ipv6)
+        if ((context.FtpUseEprt && !eprtRefused) || ipv6)
         {
             if (await ListenAsync(address, argument).ConfigureAwait(false) is { } failed)
             {
@@ -1248,6 +1254,7 @@ internal sealed class FtpSession(
     {
         if (!ipv6)
         {
+            eprtRefused = true;
             context.Events.ReportInfo(FtpTransferMessages.DisablingEprt);
             log.EprtRefused();
         }
@@ -1512,7 +1519,7 @@ internal sealed class FtpSession(
     /// </remarks>
     private async ValueTask<TransferResult?> OpenPassiveDataConnectionAsync()
     {
-        if (context.FtpDisableEpsv && !controlPeerIsIPv6)
+        if (SkipsEpsv)
         {
             return await EnterPassiveModeAsync(FtpTransferMessages.ConnectDataStreamPassively).ConfigureAwait(false);
         }
@@ -1535,6 +1542,12 @@ internal sealed class FtpSession(
     }
 
     /// <summary>
+    /// Gets whether <c>PASV</c> goes first: under <c>--disable-epsv</c>, or once the server
+    /// refused <c>EPSV</c> on the connection (BL-2236), but never over IPv6, which has no <c>PASV</c>.
+    /// </summary>
+    private bool SkipsEpsv => (context.FtpDisableEpsv || epsvRefused) && !controlPeerIsIPv6;
+
+    /// <summary>
     /// Answers a data connection to the <c>229</c>'s port that could not be made: over IPv6
     /// the transfer ends with exit 8 and the dial's message, no <c>QUIT</c>; otherwise curl
     /// 8.21.0's <c>-v</c> line and <c>PASV</c>, whose port carries the transfer (measured, BL-1250).
@@ -1547,6 +1560,7 @@ internal sealed class FtpSession(
             return TransferResult.Failure(CurlExitCode.WeirdServerReply, dialFailure.ErrorMessage!, bytesTransferred);
         }
 
+        epsvRefused = true;
         context.Events.ReportInfo(FtpTransferMessages.EpsvFailed);
         log.EpsvDataConnectFailed();
         return await EnterPassiveModeAsync(afterSent: null).ConfigureAwait(false);
@@ -1563,6 +1577,7 @@ internal sealed class FtpSession(
             return TransferResult.Failure(CurlExitCode.WeirdServerReply, FtpTransferMessages.EpsvFailedOverIPv6, bytesTransferred);
         }
 
+        epsvRefused = true;
         context.Events.ReportInfo(FtpTransferMessages.EpsvFailed);
         trace.EpsvRefused();
         log.EpsvRefused(code);
@@ -2178,6 +2193,8 @@ internal sealed class FtpSession(
         }
 
         kept.Remember(entryPath, protectData, transferType, rememberedPath, control.UnreadBytes);
+        kept.EpsvRefused = epsvRefused;
+        kept.EprtRefused = eprtRefused;
         originalControl.MarkReusable();
         return true;
     }
