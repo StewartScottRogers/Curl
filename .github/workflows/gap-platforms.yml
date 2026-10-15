@@ -1,0 +1,205 @@
+# Measures Curl against the targeted upstream curl release on Linux and macOS, area by area,
+# the way RunGapAnalysis.ps1 measures it on Windows (ADR-0504). No AI and no secret beyond
+# GITHUB_TOKEN: it only measures, and uploads the measurements for a gap run to analyse.
+#
+# Triggers:
+#   * workflow_dispatch - by hand, or by RunGapAnalysis.ps1 at the start of every gap run
+#                         (gh workflow run gap-platforms.yml -f ref=<commit> -f request=<stamp>).
+#                         `ref` is the commit or branch measured (default work/dark-factory);
+#                         `request` names the run, so the gap run can find it by its title.
+#   * schedule          - weekly, Monday 07:17 UTC, measuring work/dark-factory. A scheduled
+#                         run uses the copy of this file on master.
+#   * pull_request      - when a pull request changes Gap/ or this file: measures the pull
+#                         request's own commit, so the change proves itself before it reaches
+#                         master (workflow_dispatch only works once the file is on master).
+#
+# Each matrix job (ubuntu-latest, macos-latest):
+#   1. Checks out this workflow's own commit into office/ (the gap office's tools) and the
+#      commit measured into tree/.
+#   2. Installs .NET from tree/global.json.
+#   3. The reference curl: curl <target> (office/Gap/Baselines/target.json) built from the
+#      release tarball Get-UpstreamRelease.ps1 -SaveArchiveTo downloads and checks against the
+#      pinned SHA-256 in Gap/Baselines/curl-<version>.json, with OpenSSL (CLAUDE.md: Linux and
+#      macOS match the OpenSSL build) and nghttp2, libssh2, zlib, brotli, zstd, libidn2,
+#      libpsl, GSS-API and LDAP from apt or Homebrew; no HTTP/3, so the converter excludes the
+#      HTTP/3 cases as reference-lacks:HTTP3. It is cached per OS, version and this file's
+#      hash; a cached curl that no longer runs (a Homebrew library moved on) is rebuilt.
+#   4. Gap/Tools/Measure-GapAreas.ps1 builds Curl.Console Release in tree/ and measures all
+#      seven areas against that curl, writing out/measurements/<area>.json and out/status.json.
+#   5. Uploads out/ as the artifact gap-measurements-<linux|macos> (also when a step failed,
+#      so a partial measurement still reaches the gap run) and writes the scores to the job
+#      summary. The job fails when any area was not measured.
+name: Gap platforms
+
+run-name: >-
+  ${{ github.event_name == 'workflow_dispatch' && format('Gap platforms {0} {1}', inputs.request, inputs.ref) || format('Gap platforms ({0})', github.event_name) }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Commit or branch to measure'
+        required: false
+        default: 'work/dark-factory'
+      request:
+        description: 'Name of the gap run that asked for this measurement (its stamp)'
+        required: false
+        default: 'by-hand'
+  schedule:
+    - cron: '17 7 * * 1'
+  pull_request:
+    paths:
+      - 'Gap/**'
+      - '.github/workflows/gap-platforms.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gap-platforms-${{ github.event_name }}-${{ inputs.request || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  measure:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux
+          - os: macos-latest
+            platform: macos
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 150
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      MEASURED_REF: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || (github.event_name == 'schedule' && 'work/dark-factory' || github.sha) }}
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+      DOTNET_NOLOGO: '1'
+    steps:
+      - name: Check out the gap office's tools
+        uses: actions/checkout@v4
+        with:
+          path: office
+
+      - name: Check out the commit measured
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.MEASURED_REF }}
+          path: tree
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: tree/global.json
+
+      - name: Read the targeted version
+        id: target
+        run: |
+          $version = (Get-Content -LiteralPath office/Gap/Baselines/target.json -Raw | ConvertFrom-Json).version
+          "version=$version" >> $env:GITHUB_OUTPUT
+          Write-Host "Target curl $version; measuring $env:MEASURED_REF"
+
+      - name: Restore the reference curl
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/refcurl
+          key: refcurl-${{ matrix.os }}-${{ steps.target.outputs.version }}-${{ hashFiles('office/.github/workflows/gap-platforms.yml') }}
+
+      - name: Install the reference curl's libraries (Linux)
+        if: matrix.platform == 'linux'
+        shell: bash
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q libssl-dev libnghttp2-dev libssh2-1-dev zlib1g-dev libbrotli-dev libzstd-dev libidn2-dev libpsl-dev libkrb5-dev libldap-dev pkg-config
+
+      - name: Install the reference curl's libraries (macOS)
+        if: matrix.platform == 'macos'
+        shell: bash
+        run: |
+          brew install openssl@3 libnghttp2 libssh2 brotli zstd libidn2 libpsl pkgconf || true
+
+      - name: Check the cached reference curl still runs
+        id: cached
+        shell: bash
+        run: |
+          if [ -x "$RUNNER_TEMP/refcurl/bin/curl" ] && "$RUNNER_TEMP/refcurl/bin/curl" -V; then
+            echo "usable=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "usable=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build the reference curl from the pinned release tarball
+        if: steps.cached.outputs.usable != 'true'
+        run: |
+          $version = '${{ steps.target.outputs.version }}'
+          $archive = Join-Path $env:RUNNER_TEMP "curl-$version.tar.gz"
+          & office/Gap/Tools/Get-UpstreamRelease.ps1 -Version $version -SaveArchiveTo $archive
+          if (-not (Test-Path -LiteralPath $archive)) { throw "Get-UpstreamRelease.ps1 saved no tarball." }
+          $source = Join-Path $env:RUNNER_TEMP 'refcurl-src'
+          New-Item -ItemType Directory -Force -Path $source | Out-Null
+          tar -xzf $archive -C $source --strip-components 1
+          if ($LASTEXITCODE -ne 0) { throw 'tar failed.' }
+          $prefix = Join-Path $env:RUNNER_TEMP 'refcurl'
+          $configure = @("--prefix=$prefix", '--disable-shared', '--enable-static', '--with-nghttp2', '--with-libssh2', '--with-zlib', '--with-brotli', '--with-zstd', '--with-libidn2', '--with-libpsl', '--with-gssapi', '--enable-ldap', '--without-ngtcp2', '--without-nghttp3', '--without-quiche', '--without-openssl-quic')
+          if ('${{ matrix.platform }}' -eq 'macos') {
+            $brew = { param([string] $Formula) (& brew --prefix $Formula).Trim() }
+            $openssl = & $brew 'openssl@3'
+            $configure += @("--with-openssl=$openssl", "--with-libssh2=$(& $brew 'libssh2')")
+            $env:PKG_CONFIG_PATH = (@('openssl@3', 'libnghttp2', 'libssh2', 'brotli', 'zstd', 'libidn2', 'libpsl') | ForEach-Object { Join-Path (& $brew $_) 'lib/pkgconfig' }) -join ':'
+          } else {
+            $configure += '--with-openssl'
+          }
+          Push-Location $source
+          try {
+            & ./configure @configure
+            if ($LASTEXITCODE -ne 0) { throw 'configure failed.' }
+            $jobs = [Environment]::ProcessorCount
+            & make "-j$jobs"
+            if ($LASTEXITCODE -ne 0) { throw 'make failed.' }
+            & make install
+            if ($LASTEXITCODE -ne 0) { throw 'make install failed.' }
+          } finally { Pop-Location }
+          & (Join-Path $prefix 'bin/curl') -V
+
+      - name: Measure the seven areas
+        id: measure
+        continue-on-error: true
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP 'out'
+          $work = Join-Path $env:RUNNER_TEMP 'gap-work'
+          & office/Gap/Tools/Measure-GapAreas.ps1 -Tree (Resolve-Path tree).Path -OutDirectory (Join-Path $out 'measurements') -WorkDirectory $work -StatusFile (Join-Path $out 'status.json') -ReferencePath (Join-Path $env:RUNNER_TEMP 'refcurl/bin/curl')
+          exit $LASTEXITCODE
+
+      - name: Upload the measurements
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gap-measurements-${{ matrix.platform }}
+          path: ${{ runner.temp }}/out
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Summarise
+        if: always()
+        run: |
+          $statusFile = Join-Path $env:RUNNER_TEMP 'out/status.json'
+          $lines = @("## Gap measurement on ${{ matrix.platform }}", '')
+          if (Test-Path -LiteralPath $statusFile) {
+            $status = Get-Content -LiteralPath $statusFile -Raw | ConvertFrom-Json
+            $lines += @("- Commit: $($status.commit)", "- Target: $($status.target)", "- Reference: $($status.reference)", '')
+            if ($status.failure) { $lines += @("Stopped early: $($status.failure)", '') }
+            $lines += @('| Area | Score | Match | Gap | Unmeasured | Excluded |', '| --- | --- | --- | --- | --- | --- |')
+            foreach ($area in $status.areas.PSObject.Properties) {
+              $file = Join-Path $env:RUNNER_TEMP "out/measurements/$($area.Name).json"
+              if (Test-Path -LiteralPath $file) {
+                $c = (Get-Content -LiteralPath $file -Raw | ConvertFrom-Json).counts
+                $lines += "| $($area.Name) | $($area.Value) | $($c.match) | $($c.gap) | $($c.unmeasured) | $($c.excluded) |"
+              } else { $lines += "| $($area.Name) | $($area.Value) | - | - | - | - |" }
+            }
+          } else { $lines += 'No status file: the measurement did not start.' }
+          $lines -join "`n" | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY
+          $lines | ForEach-Object { Write-Host $_ }
+          if ('${{ steps.measure.outcome }}' -ne 'success') { Write-Host "::error::Measurement on ${{ matrix.platform }} did not measure every area."; exit 1 }

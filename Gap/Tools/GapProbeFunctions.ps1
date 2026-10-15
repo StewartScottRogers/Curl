@@ -73,10 +73,13 @@ function Get-GapLaunch {
 function Get-GapReferenceCurlPath {
     <#
     .SYNOPSIS
-        Finds the reference curl: Git for Windows' ucrt64\bin\curl.exe (from Git 2.56.0)
-        or mingw64\bin\curl.exe (before it) on Windows, the lookup Record-CurlExchange.ps1's
+        Finds the reference curl: CURL_GAP_REFERENCE_CURL when it is set
+        (gap-platforms.yml points it at the curl it built from the release tarball,
+        ADR-0504); else Git for Windows' ucrt64\bin\curl.exe (from Git 2.56.0) or
+        mingw64\bin\curl.exe (before it) on Windows, the lookup Record-CurlExchange.ps1's
         Get-ReferenceCurlPath uses; curl on PATH elsewhere; $null when there is none.
     #>
+    if ($env:CURL_GAP_REFERENCE_CURL) { return $env:CURL_GAP_REFERENCE_CURL }
     if (-not $script:GapIsWindows) {
         $curl = Get-Command curl -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
         if ($null -ne $curl) { return $curl.Source }
@@ -371,5 +374,12 @@ function Invoke-GapProbeSelfTest {
     $stripped = Remove-GapDebugBuildWarning $warned
     $kept = Remove-GapDebugBuildWarning "warning: this libcurl is Debug-enabled, do not use in production`nWARNING: this libcurl is Debug-enabled, do not use in production now`n"
     & $report 'the debug-build warning line is removed from stderr, line ending and all, and nothing else is (BL-2128)' ($stripped -ceq "curl: (7) x`n" -and $kept -ceq "warning: this libcurl is Debug-enabled, do not use in production`nWARNING: this libcurl is Debug-enabled, do not use in production now`n" -and (Remove-GapDebugBuildWarning '') -ceq '') ("stripped: [$stripped] kept: [$kept]")
+
+    $savedReference = $env:CURL_GAP_REFERENCE_CURL
+    try {
+        $env:CURL_GAP_REFERENCE_CURL = $echo
+        $overridden = Get-GapReferenceCurlPath
+    } finally { $env:CURL_GAP_REFERENCE_CURL = $savedReference }
+    & $report 'CURL_GAP_REFERENCE_CURL names the reference curl when it is set (ADR-0504)' ($overridden -eq $echo) ("found: $overridden")
 
 }
