@@ -6,6 +6,7 @@ assignee: Claude
 pipeline: direct
 depends-on: []
 touches: [RunDarkFactory.ps1]
+lane: no
 requirement: none
 created: 2026-10-15
 completed:
@@ -46,7 +47,10 @@ The finding closes only when a later re-audit by the process auditor confirms th
 
 ## Notes
 
+- Interactive only: the finding and its reproduction tool sit in the audit folder, which the lane guard forbids reading, so a lane cannot see the finding or run the reproduction. The red spell itself (run 38700283564, a lost coverage report in the Measure step) was already fixed by BL-2269 (commit 6110cd360, Done); the recorded ciRedMinutes is history from logs and cannot change. Remove `lane: no` once an interactive session has read AF-0227, decided what in RunDarkFactory.ps1 (if anything) must change, and written that into this task, or closed it as the history-only case.
+
 ## Log
 
 - 2026-10-15: Created.
 - 2026-10-15: Backlog -> Doing.
+- 2026-10-15: Doing -> Backlog. Interactive only: the finding and its reproduction are in the audit folder, which lanes may not read; the red run's cause was fixed by BL-2269
