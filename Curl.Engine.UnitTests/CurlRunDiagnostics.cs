@@ -5,11 +5,15 @@ using Curl.Testing;
 namespace Curl.Engine;
 
 /// <summary>
-/// Writes the diagnostic lines about the bytes a scripted connector was sent, as the engine's
-/// tests that run a handler over one share them.
+/// Writes the diagnostic lines about the command line a test parses and the bytes a scripted connector
+/// was sent, as the engine's tests share them.
 /// </summary>
 internal static class CurlRunDiagnostics
 {
+    /// <summary>Writes the command line, its arguments joined by spaces.</summary>
+    public static void ArrangeCommandLine(this TestDiagnostics diagnostics, IEnumerable<string> arguments) =>
+        diagnostics.Arrange("command line", string.Join(' ', arguments));
+
     /// <summary>Writes the bytes a scripted connector was sent, as <c>BYTES</c>.</summary>
     public static void ActWritten(this TestDiagnostics diagnostics, ScriptedConnector connector) =>
         diagnostics.Bytes("request bytes", connector.Written);

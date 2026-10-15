@@ -1,3 +1,4 @@
+using Curl.Console;
 using Curl.Engine;
 using System.Net;
 using System.Security.Cryptography;
@@ -6,13 +7,13 @@ using Curl.Cli;
 using Curl.Protocol.Abstractions;
 using Curl.Testing;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 // Pins that --proxy-cert, --proxy-pass and --proxy-ciphers fail the handshake to an HTTPS proxy as
 // --cert, --pass and --ciphers fail the origin's, with the same exit code and message (BL-606). Each
 // failure comes before a byte is read or written, so the connection handed to the proxy's TLS
 // provider is never used.
-public sealed partial class CurlCompositionTests
+public sealed partial class EngineCompositionTests
 {
     private const string HttpsProxyUrl = "https://127.0.0.1:47606";
 

@@ -1,3 +1,4 @@
+using Curl.Console;
 using Curl.Engine;
 using System.Net;
 using System.Net.Security;
@@ -10,14 +11,14 @@ using Curl.Networking;
 using Curl.Protocol.Abstractions;
 using Curl.Testing;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 // Pins that --proxy-pinnedpubkey, --proxy-crlfile, --proxy-ca-native, --proxy-ssl-auto-client-cert and
 // --proxy-ssl-allow-beast reach the handshake to an HTTPS proxy only, as their origin counterparts reach
 // the origin's (BL-611). Measured with curl 8.21.0 (Schannel) against Record-CurlExchange.ps1 -Tls as the
 // proxy, 2026-09-30: a wrong --proxy-pinnedpubkey is exit 90, the right one and a wrong --pinnedpubkey
 // (the origin's, over plain HTTP) are exit 0.
-public sealed partial class CurlCompositionTests
+public sealed partial class EngineCompositionTests
 {
     private const string WrongProxyPin = "sha256//AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
 
@@ -72,54 +73,6 @@ public sealed partial class CurlCompositionTests
         Diagnostics.Act("exit code", result.ExitCode);
         Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
-        await result.Connection!.DisposeAsync();
-    }
-
-    [TestMethod]
-    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
-    public async Task CreateTransports_SelfSignedProxyUnderProxyInsecure_RecordsProxySslVerifyResult18OffWindows()
-    {
-        // curl -s -o /dev/null --proxy-insecure -x https://localhost:18443 -w '%{ssl_verify_result} %{proxy_ssl_verify_result}'
-        // http://example.invalid/ -> "0 18" (curl 8.18.0, OpenSSL 3.5.5, 2026-09-30, BL-661 Notes).
-        Diagnostics.Arrange("proxy tls arguments", "--proxy-insecure only");
-        RunningTransferState state = NewRunningTransferState();
-
-        ConnectResult result;
-        using (Diagnostics.Phase("handshake"))
-        {
-            result = await LoopbackProxyHandshakeAsync(_ => [], new TlsResultRecordingTransferEvents(NoTransferEvents.Instance, state));
-        }
-
-        Diagnostics.Act("exit code", result.ExitCode);
-        Diagnostics.Act("proxy ssl verify result", state.ProxySslVerifyResult);
-        Diagnostics.Act("ssl verify result", state.SslVerifyResult);
-        Diagnostics.Assert("proxy ssl verify result", 18L, state.ProxySslVerifyResult);
-        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, result.ErrorMessage);
-        Assert.AreEqual(18L, state.ProxySslVerifyResult);
-        Assert.AreEqual(0L, state.SslVerifyResult);
-        await result.Connection!.DisposeAsync();
-    }
-
-    [TestMethod]
-    [OSCondition(OperatingSystems.Windows)]
-    public async Task CreateTransports_SelfSignedProxyUnderProxyInsecure_RecordsProxySslVerifyResult0OnWindows()
-    {
-        // curl 8.21.0 (Schannel) prints 0 for both, whatever it found (ADR-0043).
-        Diagnostics.Arrange("proxy tls arguments", "--proxy-insecure only");
-        RunningTransferState state = NewRunningTransferState();
-
-        ConnectResult result;
-        using (Diagnostics.Phase("handshake"))
-        {
-            result = await LoopbackProxyHandshakeAsync(_ => [], new TlsResultRecordingTransferEvents(NoTransferEvents.Instance, state));
-        }
-
-        Diagnostics.Act("exit code", result.ExitCode);
-        Diagnostics.Act("ssl verify result", state.SslVerifyResult);
-        Diagnostics.Assert("proxy ssl verify result", 0L, state.ProxySslVerifyResult);
-        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, result.ErrorMessage);
-        Assert.AreEqual(0L, state.ProxySslVerifyResult);
-        Assert.AreEqual(0L, state.SslVerifyResult);
         await result.Connection!.DisposeAsync();
     }
 
@@ -191,12 +144,6 @@ public sealed partial class CurlCompositionTests
         }
 
         return result;
-    }
-
-    private static RunningTransferState NewRunningTransferState()
-    {
-        StandardOutputFailureDeferringStream standardOutput = new(new MemoryStream());
-        return new RunningTransferState(0, Array.Empty<CommandLineOptions>(), CancellationToken.None, standardOutput, standardOutput);
     }
 
     private static async Task ServeOneHandshakeAsync(TcpListener listener, X509Certificate2 certificate)

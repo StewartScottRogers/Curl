@@ -20,26 +20,6 @@ namespace Curl.Console;
 public sealed partial class CurlCompositionProxyTests
 {
     [TestMethod]
-    public void CreateProxyTunnelOptions_ProxyHttp2_AsksTheConnectorForAnHttp2Tunnel()
-    {
-        HttpProxyTunnelOptions options = OpenSslBuildTunnelOptionsFor(["--proxy-http2", "-p", "-x", "https://127.0.0.1:18443", "http://example.com/a"]);
-
-        Diagnostics.Assert("options.ProxyHttp2", true, options.ProxyHttp2);
-        Assert.IsTrue(options.ProxyHttp2);
-    }
-
-    [TestMethod]
-    [DataRow(new[] { "-p", "-x", "https://127.0.0.1:18443", "http://example.com/a" }, DisplayName = "left out")]
-    [DataRow(new[] { "--proxy-http2", "--no-proxy-http2", "-p", "-x", "https://127.0.0.1:18443", "http://example.com/a" }, DisplayName = "--no-proxy-http2")]
-    public void CreateProxyTunnelOptions_WithoutProxyHttp2_LeavesTheHttp2TunnelOff(string[] arguments)
-    {
-        HttpProxyTunnelOptions options = OpenSslBuildTunnelOptionsFor(arguments);
-
-        Diagnostics.Assert("options.ProxyHttp2", false, options.ProxyHttp2);
-        Assert.IsFalse(options.ProxyHttp2);
-    }
-
-    [TestMethod]
     public async Task RunAsync_ProxyHttp2ThroughAnH2HttpsProxy_RunsTheTransferInsideAnHttp2ConnectStream()
     {
         HttpProxyTunnelOptions tunnelOptions = OpenSslBuildTunnelOptionsFor(["--proxy-http2", "-p", "-x", "https://127.0.0.1:18443", "http://example.com/a"]);

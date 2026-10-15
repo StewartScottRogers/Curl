@@ -17,21 +17,7 @@ handing it `CurlEasyErrorText.Of` for the DoH resolver's error text. Where this 
 `Curl.Engine.UnitLibrary/CLAUDE.md` owns it. `Curl.Core.UnitLibrary` dispatches through the `IProtocolHandler` instances it is
 given and must never reference a protocol library directly.
 
-`EngineComposition.CreateTransports` wraps an option group's `TcpConnector` in one `PoolingConnector`,
-which every TCP handler connects through, so a later URL to the same pool key reuses an
-earlier URL's connection; `Curl.Engine`'s `TransferDispatch` holds it as its `ConnectionPool`. In production the
-connector shares the run's `ConnectionCache`, which the runner closes without writing anything once
-the run's transfers end, whatever their outcome (ADR-0050, BL-334, ADR-0285); a connector made
-without one owns its pool, which disposing the dispatch closes. It also holds the `TcpConnector`'s
-`LoadResolveEntries`, which the runner calls at the start of every URL's transfer, just before
-the `-b` files load, so `-v` prints the `--resolve` entries' `Added ... to DNS cache` lines for
-each URL; a `--retry` attempt and a followed redirect reload nothing, as in curl 8.21.0 (BL-486).
-The origin's and the HTTPS proxy's TLS providers come from `EngineComposition.CreateTlsProvider`,
-which builds `HandBuiltTlsProvider` when `TlsClientRouting.Choose` routes the options to the
-hand-built client (a `--tls-max` of 1.0 or 1.1 today) and `SslStreamTlsProvider` otherwise
-(ADR-0140, ADR-0162, BL-708).
-
-`EngineComposition.CreateProtocolHandlers` builds the handlers behind the engine's end-point recorders and `LazyProtocolHandler` (see `Curl.Engine.UnitLibrary/CLAUDE.md`, ADR-0119, BL-515, BL-1715, AF-0063).
+`CurlComposition` calls `EngineComposition`'s factories for the transports, TLS providers and protocol handlers; what they build and how they wire it is described in `Curl.Engine.UnitLibrary/CLAUDE.md`.
 
 `EasyOptionsFromCommandLine` is the curl tool's `config2setopts.c`: it maps one option group's
 `CommandLineOptions` onto `Curl.Api.UnitLibrary`'s easy option groups, one method per group, as

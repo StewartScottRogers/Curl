@@ -123,6 +123,24 @@ resolver's text comes in through the `easyErrorText` parameter of `CreateTranspo
 `CreateDnsResolver` and `CreateDohResolver`; without one it is empty. `OptionGroupConnectionSettings`
 and `ProcessUserId` moved here with it.
 
+What the factories do, moved from `Curl.Console/CLAUDE.md` (BL-2322):
+
+`CreateTransports` wraps an option group's `TcpConnector` in one `PoolingConnector`,
+which every TCP handler connects through, so a later URL to the same pool key reuses an
+earlier URL's connection; `Curl.Engine`'s `TransferDispatch` holds it as its `ConnectionPool`. In production the
+connector shares the run's `ConnectionCache`, which the runner closes without writing anything once
+the run's transfers end, whatever their outcome (ADR-0050, BL-334, ADR-0285); a connector made
+without one owns its pool, which disposing the dispatch closes. It also holds the `TcpConnector`'s
+`LoadResolveEntries`, which the runner calls at the start of every URL's transfer, just before
+the `-b` files load, so `-v` prints the `--resolve` entries' `Added ... to DNS cache` lines for
+each URL; a `--retry` attempt and a followed redirect reload nothing, as in curl 8.21.0 (BL-486).
+The origin's and the HTTPS proxy's TLS providers come from `CreateTlsProvider`,
+which builds `HandBuiltTlsProvider` when `TlsClientRouting.Choose` routes the options to the
+hand-built client (a `--tls-max` of 1.0 or 1.1 today) and `SslStreamTlsProvider` otherwise
+(ADR-0140, ADR-0162, BL-708).
+
+`CreateProtocolHandlers` builds the handlers behind the engine's end-point recorders and `LazyProtocolHandler` (ADR-0119, BL-515, BL-1715, AF-0063).
+
 Their tests are `EngineComposition*Tests` in `Curl.Engine.UnitTests` (with their own copies of the
 `LoopbackDnsResolver` and `ScriptedTcpDialer` fakes, and a reference to `Curl.Protocol.Ssh.UnitTests`
 for its in-memory SSH server) and `EngineCompositionDnsServersIntegrationTests` in

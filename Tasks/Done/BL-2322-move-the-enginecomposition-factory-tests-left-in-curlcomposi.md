@@ -8,7 +8,7 @@ depends-on: [BL-2289]
 touches: [Curl.Console.UnitTests, Curl.Engine.UnitTests, Curl.Console/CLAUDE.md, Curl.Engine.UnitLibrary/CLAUDE.md]
 requirement: none
 created: 2026-10-15
-completed:
+completed: 2026-10-15
 ---
 # BL-2322 — Move the EngineComposition factory tests left in CurlCompositionTests and CurlCompositionProxyTests to Curl.Engine.UnitTests
 
@@ -22,14 +22,19 @@ BL-2289 moved the factories to `Curl.Engine.UnitLibrary/EngineComposition.cs` an
 
 ## Acceptance criteria
 
-- [ ] No test in `Curl.Console.UnitTests/CurlCompositionTests*.cs` or `CurlCompositionProxyTests*.cs` calls only `EngineComposition` members.
-- [ ] The moved tests keep their names and assertions; the fast test counts of the two projects sum to the same total as before.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
-- [ ] `Curl.Console/CLAUDE.md` describes only `Curl.Console` code.
+- [x] No test in `Curl.Console.UnitTests/CurlCompositionTests*.cs` or `CurlCompositionProxyTests*.cs` calls only `EngineComposition` members.
+- [x] The moved tests keep their names and assertions; the fast test counts of the two projects sum to the same total as before.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] `Curl.Console/CLAUDE.md` describes only `Curl.Console` code.
 
 ## Notes
+
+- Moved 93 → 93 `[TestMethod]`s: `EngineCompositionTests` (+ `.ProxyPinnedPublicKey`, `.ProxyTlsHandshake` partials) and `EngineCompositionProxyTests` in `Curl.Engine.UnitTests`; `ArrangeCommandLine` added to its `CurlRunDiagnostics`.
+- Left in Console on purpose: the two `...RecordsProxySslVerifyResult...` tests (they record into Console's own `RunningTransferState`/`TlsResultRecordingTransferEvents`, so they also call Console code) as `CurlCompositionTests.ProxySslVerifyResult.cs`, with their own copy of the loopback handshake helper.
+- `Curl.Console/CLAUDE.md` paragraphs on `CreateTransports`, `CreateTlsProvider` and `CreateProtocolHandlers` moved to `Curl.Engine.UnitLibrary/CLAUDE.md`; mentions of `EngineComposition` members inside the runner's own paragraphs stay, since they say how the runner uses them.
 
 ## Log
 
 - 2026-10-15: Created.
 - 2026-10-15: Backlog -> Doing.
+- 2026-10-15: Doing -> Done. EngineComposition factory tests moved to Curl.Engine.UnitTests; build clean, fast tests green
