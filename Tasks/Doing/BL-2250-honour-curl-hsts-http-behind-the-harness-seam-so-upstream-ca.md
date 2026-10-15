@@ -31,3 +31,4 @@ Found by BL-2234, which stands in for the Debug feature of the HSTS cases that s
 ## Log
 
 - 2026-10-14: Created.
+- 2026-10-14: Backlog -> Doing.
