@@ -152,7 +152,27 @@ public sealed class UpstreamPerlOneLinerTests
     }
 
     [TestMethod]
-    [DataRow("-e \"if('[::1]' ne '[::1]') {print 'Test requires default test client host address';} else {exec 'resolve --ipv6 ip6-localhost'; print 'Cannot run precheck resolve';}\"")]
+    [DataRow("[::1]", "[::2]", 0, "Test requires default test client host address")]
+    [DataRow("[::1]", "[::1]", 0, "")]
+    public void Run_PrintIfDifferentElseResolve_PrintsOrResolvesIp6Localhost(string left, string right, int expectedExitCode, string expectedOutput)
+    {
+        var result = UpstreamPerlOneLiner.Run(Test1083Line(left, right, "resolve --ipv6 ip6-localhost"), "linux");
+
+        Assert.AreEqual(new UpstreamPerlOneLinerResult(expectedExitCode, expectedOutput), result);
+    }
+
+    [TestMethod]
+    public void Run_PrintIfDifferentElseResolve_ReturnsTheResolveFailureWhenTheNameDoesNotResolve()
+    {
+        var result = UpstreamPerlOneLiner.Run(Test1083Line("a", "a", "resolve --ipv6 no-such-name"), "linux");
+
+        Assert.AreEqual(new UpstreamPerlOneLinerResult(1, "Resolving IPv6 'no-such-name' didn't work\n"), result);
+    }
+
+    private static string Test1083Line(string left, string right, string resolveLine) =>
+        $"-e \"if('{left}' ne '{right}') {{print 'Test requires default test client host address';}} else {{exec '{resolveLine}'; print 'Cannot run precheck resolve';}}\"";
+
+    [TestMethod]
     [DataRow("/tests/libtest/test610.pl gone /log/file")]
     [DataRow("-e 'print \"hello\"'")]
     public void Run_AnyOtherLine_IsNotInterpreted(string arguments)

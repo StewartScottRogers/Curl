@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests]
 requirement: none
 created: 2026-10-14
-completed:
+completed: 2026-10-14
 ---
 # BL-2242 — Interpret test1083's if-ne-print-else-exec RESOLVE precheck one-liner so the case runs
 
@@ -22,13 +22,16 @@ Found by BL-2227, which gave `%CLIENT6IP` the value `[::1]`: test1083 (`HTTP-IPv
 
 ## Acceptance criteria
 
-- [ ] `UpstreamPerlOneLinerTests` (or `UpstreamPerlCheckLineTests`) pin both branches of the new form.
-- [ ] test1083 runs; if it passes it is on `PassingUpstreamCases.txt`, otherwise its first difference is named under Notes with a follow-up task.
-- [ ] `Measure-CodeQuality.ps1 -Library Curl.Conformance.UnitLibrary` shows no member outside a gate; fast tests green; library `CLAUDE.md` updated.
+- [x] `UpstreamPerlOneLinerTests` (or `UpstreamPerlCheckLineTests`) pin both branches of the new form.
+- [x] test1083 runs; if it passes it is on `PassingUpstreamCases.txt`, otherwise its first difference is named under Notes with a follow-up task.
+- [x] `Measure-CodeQuality.ps1 -Library Curl.Conformance.UnitLibrary` shows no member outside a gate; fast tests green; library `CLAUDE.md` updated.
 
 ## Notes
+
+Added form to UpstreamPerlOneLiner; exec'd line restricted to resolve lines and answered by UpstreamResolveCheck. test1083 passes and is on PassingUpstreamCases.txt. Quality run: 0 failing members.
 
 ## Log
 
 - 2026-10-14: Created.
 - 2026-10-14: Backlog -> Doing.
+- 2026-10-14: Doing -> Done. UpstreamPerlOneLiner interprets test1083's if-ne-print-else-exec-resolve precheck; test1083 passes

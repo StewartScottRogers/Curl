@@ -576,7 +576,7 @@ public sealed class UpstreamCaseScreeningTests
     }
 
     [TestMethod]
-    [DataRow("client", "precheck", "perl -e \"if('[::1]' ne '[::1]') {print 'x';} else {exec 'resolve --ipv6 ip6-localhost'; print 'Cannot run precheck resolve';}\"")]
+    [DataRow("client", "precheck", "perl -e \"print 'x' unless 1;\"")]
     [DataRow("verify", "postcheck", "sh -c true")]
     public void FindSkipReason_CheckLineNotInterpreted_NamesTheLine(string section, string name, string line)
     {
