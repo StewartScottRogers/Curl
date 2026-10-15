@@ -4,7 +4,7 @@ title: Stand in for upstream's nghttpx HTTP/2 front on %HTTP2PORT and %HTTP2TLSP
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: []
+depends-on: [BL-2244]
 touches: [Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests, Curl.Conformance.Http2Server.UnitLibrary, Curl.Conformance.Http2Server.UnitTests, Curl.slnx]
 model: opus
 requirement: none
@@ -33,7 +33,13 @@ Source: Stewart's 2026-10-14 request to raise the gap office's behaviour score (
 
 ## Notes
 
+- 2026-10-14 (lane 1, first pass before any code): split. The whole stand-in - an HTTP/2 server connection, the relay to sws, the runner wiring, the TLS front and triage of 13 cases, each under the quality gates - does not fit one run's cost cap. Split into:
+  - BL-2244: the h2c server library itself (`Curl.Conformance.Http2Server.UnitLibrary` + `.UnitTests`, `Curl.slnx`). It reuses the HPACK and frame codec already in `Curl.Http2.UnitLibrary`, which references nothing, so it is not a `Curl.Protocol.*` dependency. This task now depends on it.
+  - BL-2245: the TLS front on `%HTTP2TLSPORT` (cases 359, 2403, 2404, 2406). It depends on this task.
+  - What is left here: put BL-2244's server on `%HTTP2PORT` through a record the caller passes (as `UpstreamSshServer` is), give `%H2CVER` the value `runtests.pl` sets at curl-8_22_0 (read it there; `h2c` is expected), let screening run `http/2` cases on the h2c port, and triage 358, 1700, 1702, 1800, 1801 and 2400-2402. The TLS criteria above belong to BL-2245.
+
 ## Log
 
 - 2026-10-14: Created.
 - 2026-10-14: Backlog -> Doing.
+- 2026-10-14: Doing -> Backlog. Split: waits on BL-2244 (the h2c server library); the TLS port is BL-2245
