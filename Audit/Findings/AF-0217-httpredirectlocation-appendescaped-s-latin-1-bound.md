@@ -3,8 +3,8 @@ id: AF-0217
 title: HttpRedirectLocation.AppendEscaped's Latin-1 bound '<= 0xFF' can become '< 0xFF' with no test failing, so a redirect would send U+00FF as %C3%BF
 auditor: quality
 severity: High
-status: accepted
-reason: Stewart accepted it on 2026-10-14.
+status: closed
+reason: Re-audit 2026-10-15_0156.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
 key: quality:Curl.Protocol.Http.UnitLibrary/HttpRedirectLocation.cs:AppendEscaped-le:surviving-mutant
 reproduction: mutation Curl.Protocol.Http.UnitLibrary/HttpRedirectLocation.cs:260:<=
 task: BL-2254
@@ -13,9 +13,9 @@ found: 2026-10-14
 found-at: d86a80f0091fbf88c08d7b9b2fa37a9197854bd8
 scorecard: 2026-10-14_1815.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-15
+closed-how: mechanical
+closed-by: 2026-10-15_0156.md
 ---
 # AF-0217 - HttpRedirectLocation.AppendEscaped's Latin-1 bound '<= 0xFF' can become '< 0xFF' with no test failing, so a redirect would send U+00FF as %C3%BF
 
@@ -42,7 +42,10 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Proto
 
 ## Re-audits
 
+- 2026-10-15 | 2026-10-15_0156.md | reproduces: no | Ran the targeted -Site command (HttpRedirectLocation.cs:260:<=, -Member AppendEscaped): resolvedLine 260, 'if (value[index] <= 'ÿ')' -> 'if (value[index] < 'ÿ')', outcome killed (score 1). Baseline passed with no excluded tests. Runner's targeted mutation rerun on the clean audited commit: killed.
+
 ## Log
 
 - 2026-10-14: filed proposed.
 - 2026-10-14: proposed -> accepted.
+- 2026-10-15: accepted -> closed. Re-audit 2026-10-15_0156.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.

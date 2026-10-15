@@ -3,8 +3,8 @@ id: AF-0207
 title: HandshakeMessageReader.Read has no body-length check: a split handshake message throws ArgumentOutOfRangeException and 6 tests fail
 auditor: quality
 severity: High
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-15_0156.md: the reproduction no longer reproduces.
 key: quality:Curl.Tls.UnitLibrary/HandshakeMessageReader.cs:Read:failing-test
 reproduction: none
 task: BL-2209
@@ -13,9 +13,9 @@ found: 2026-10-14
 found-at: c1dedd04f2a8e1534e64b664312c5dacc66bdf4a
 scorecard: 2026-10-14_0453.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-15
+closed-how: reliable-reaudit
+closed-by: 2026-10-15_0156.md
 ---
 # AF-0207 - HandshakeMessageReader.Read has no body-length check: a split handshake message throws ArgumentOutOfRangeException and 6 tests fail
 
@@ -43,8 +43,10 @@ dotnet test Curl.Tls.UnitTests --filter "FullyQualifiedName~HandshakeMessageRead
 ## Re-audits
 
 - 2026-10-14 | 2026-10-14_1815.md | reproduces: no | Ran dotnet test Curl.Tls.UnitTests --filter "FullyQualifiedName~HandshakeMessageReaderTests": 'Passed! - Failed: 0, Passed: 9, Total: 9'. HandshakeMessageReader.Read now computes total = HeaderLength + length and returns NeedMoreBytes when buffer.Length < total (lines 31-34).
+- 2026-10-15 | 2026-10-15_0156.md | reproduces: no | Ran dotnet test Curl.Tls.UnitTests --filter "FullyQualifiedName~HandshakeMessageReaderTests": Passed! - Failed: 0, Passed: 9, Skipped: 0, Total: 9. No ArgumentOutOfRangeException and no failing test.
 
 ## Log
 
 - 2026-10-14: filed proposed.
 - 2026-10-14: proposed -> accepted.
+- 2026-10-15: accepted -> closed. Re-audit 2026-10-15_0156.md: the reproduction no longer reproduces.
