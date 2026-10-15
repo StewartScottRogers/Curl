@@ -470,7 +470,7 @@ round on its `TimeProvider`; a truncated reply is asked again over TCP. Replies 
 (`DnsReplyMatch`) and read through `DnsAnswerDecoder` into a `DnsQueryOutcome`. It implements
 `IDnsResolverWithFailureReason`, so `TcpConnector` (the SOCKS4 and SOCKS5 local resolve included, BL-829) and `UdpDatagramConnector` add c-ares' reason
 (`DnsLookupFailureText`) in brackets, or make it exit 43, through `NameResolutionFailure`.
-`ResolveServiceAsync` looks up SRV records for Kerberos KDC location (BL-689). Sockets come from
+`ResolveServiceAsync` looks up SRV records for Kerberos KDC location (BL-689). Its public constructor taking an `IDatagramConnector` sends the UDP queries through `DatagramConnectorDnsSocketOpener` (no TCP retry), for `CURL_DNS_SERVER` behind the harness seam (ADR-0492, BL-2248). Sockets come from
 `IDnsSocketOpener`; tests use `Fakes/ScriptedDnsSocketOpener` and `ManualTimeProvider`.
 
 Per ADR-0180 (BL-728) `TcpConnector` takes an optional `QuicDialer`, and its

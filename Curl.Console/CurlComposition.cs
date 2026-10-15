@@ -281,7 +281,7 @@ internal static class CurlComposition
             diagnosticLog);
 
     /// <summary>
-    /// Creates the contexts the dialing <see cref="CreateRunner(Stream, Stream, Stream, ITcpDialer, IDnsResolver, IDatagramConnector, bool, IWriteOutFileOpener?, bool, Func{string, string?}?, IConnectionListener?, DefaultConfigFileSearch?, TimeProvider?)" />
+    /// Creates the contexts the dialing <see cref="CreateRunner(Stream, Stream, Stream, ITcpDialer, IDnsResolver, IDatagramConnector, bool, IWriteOutFileOpener?, bool, Func{string, string?}?, IConnectionListener?, DefaultConfigFileSearch?, TimeProvider?, bool)" />
     /// uses: <see cref="CreateSecurityContextFactory(IConnector, IDatagramConnector, IDiagnosticLog?)" />'s
     /// router, with NTLM sent to the hand-built context on every platform when
     /// <paramref name="usesHandBuiltNtlm" /> is set (<see cref="HandBuiltNtlmSecurityContextFactory" />, BL-1858).
@@ -1241,6 +1241,11 @@ internal static class CurlComposition
     /// <param name="ftpListener">Listens for FTP's active-mode (<c>-P</c>) data connections; a <see cref="TcpConnectionListener" /> when <see langword="null" /> (BL-1907).</param>
     /// <param name="defaultConfigFileSearch">Where the run looks for the default config file (<c>.curlrc</c>); <see langword="null" /> for a run that reads none (BL-1977).</param>
     /// <param name="signingClock">The clock <c>--aws-sigv4</c> and the <c>--httpsig-*</c> options sign with; <see cref="TimeProvider.System" /> when not given (BL-2183).</param>
+    /// <param name="honoursDnsServerVariable">
+    /// Whether a non-empty <c>CURL_DNS_SERVER</c> makes each option group resolve through
+    /// <see cref="DnsServerVariableResolverOf" />, as curl's debug build does; off by default, as in
+    /// curl's release build, and turned on by the conformance harness (ADR-0492, BL-2248).
+    /// </param>
     /// <returns>The runner.</returns>
     internal static CurlCommandRunner CreateRunner(
         Stream standardOutput,
@@ -1255,13 +1260,15 @@ internal static class CurlComposition
         Func<string, string?>? readEnvironmentVariable = null,
         IConnectionListener? ftpListener = null,
         DefaultConfigFileSearch? defaultConfigFileSearch = null,
-        TimeProvider? signingClock = null)
+        TimeProvider? signingClock = null,
+        bool honoursDnsServerVariable = false)
     {
         ConnectionCache runConnections = new(TimeProvider.System);
         LateBoundDiagnosticLog runLog = new();
         Func<string, string?> environment = readEnvironmentVariable ?? (_ => null);
+        string? dnsServer = honoursDnsServerVariable ? environment(DnsServerVariableName) : null;
         return new(
-            SharingRunCookies((options, cookies) => CreateDialingTransferDispatch(tcpDialer, dnsResolver, datagramConnector, cookies, options, runConnections, runLog, usesHandBuiltNtlm, environment, ftpListener, signingClock)),
+            SharingRunCookies((options, cookies) => CreateDialingTransferDispatch(tcpDialer, DnsServerVariableResolverOf(options, dnsServer, dnsResolver, datagramConnector), datagramConnector, cookies, options, runConnections, runLog, usesHandBuiltNtlm, environment, ftpListener, signingClock)),
             new PhysicalFileSystem(),
             new PhysicalFileSystem(),
             standardOutput,
@@ -1279,8 +1286,28 @@ internal static class CurlComposition
             lateBoundDiagnosticLog: runLog);
     }
 
+    /// <summary>The variable curl's debug build reads the DNS server to ask from (<c>override-dns</c>).</summary>
+    internal const string DnsServerVariableName = "CURL_DNS_SERVER";
+
     /// <summary>
-    /// Builds one option group's dispatch for the dialing <see cref="CreateRunner(Stream, Stream, Stream, ITcpDialer, IDnsResolver, IDatagramConnector, bool, IWriteOutFileOpener?, bool, Func{string, string?}?, IConnectionListener?, DefaultConfigFileSearch?, TimeProvider?)" />:
+    /// The resolver an option group of the dialing runner uses: with a non-empty
+    /// <paramref name="dnsServer" />, a <see cref="DnsServerResolver" /> asking that server
+    /// (<c>ip:port</c>, parsed as <c>--dns-servers</c> is) for the <c>-4</c> or <c>-6</c> family's
+    /// records through <paramref name="datagramConnector" />, as curl's debug build honours
+    /// <c>CURL_DNS_SERVER</c> (ADR-0492, BL-2248); otherwise <paramref name="dnsResolver" />.
+    /// </summary>
+    /// <param name="options">The option group.</param>
+    /// <param name="dnsServer">The <c>CURL_DNS_SERVER</c> value, or <see langword="null" /> when not honoured or not set.</param>
+    /// <param name="dnsResolver">The resolver the runner was given.</param>
+    /// <param name="datagramConnector">Carries the queries.</param>
+    /// <returns>The resolver.</returns>
+    internal static IDnsResolver DnsServerVariableResolverOf(CommandLineOptions options, string? dnsServer, IDnsResolver dnsResolver, IDatagramConnector datagramConnector) =>
+        string.IsNullOrEmpty(dnsServer)
+            ? dnsResolver
+            : new DnsServerResolver(new DnsServerResolverOptions(dnsServer, null, null, null, AddressFamilyOf(options)), TimeProvider.System, datagramConnector);
+
+    /// <summary>
+    /// Builds one option group's dispatch for the dialing <see cref="CreateRunner(Stream, Stream, Stream, ITcpDialer, IDnsResolver, IDatagramConnector, bool, IWriteOutFileOpener?, bool, Func{string, string?}?, IConnectionListener?, DefaultConfigFileSearch?, TimeProvider?, bool)" />:
     /// the group's <see cref="TcpConnector" /> over <paramref name="tcpDialer" /> and
     /// <paramref name="dnsResolver" />, pooled in <paramref name="runConnections" />, with a proxy
     /// selector that reads the environment through <paramref name="readEnvironmentVariable" />, and the connector's <c>--resolve</c> entries
