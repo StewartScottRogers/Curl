@@ -3,8 +3,8 @@ id: AF-0224
 title: Root CLAUDE.md's repository layout says 75 projects; Curl.slnx lists 79
 auditor: truthfulness
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: truthfulness:CLAUDE.md:repository-layout-project-count:false-statement
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Run from the repository root:
 ## Log
 
 - 2026-10-15: filed proposed.
+- 2026-10-15: proposed -> accepted.
