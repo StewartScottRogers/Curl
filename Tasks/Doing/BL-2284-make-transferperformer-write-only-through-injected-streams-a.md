@@ -37,3 +37,4 @@ Introduce a small parameter object (for example `TransferOutputs`: body stream, 
 ## Log
 
 - 2026-10-15: Created.
+- 2026-10-15: Backlog -> Doing.
