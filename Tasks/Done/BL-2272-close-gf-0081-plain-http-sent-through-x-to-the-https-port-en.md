@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests, Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests]
 requirement: none
 created: 2026-10-15
-completed:
+completed: 2026-10-15
 ---
 # BL-2272 — Close GF-0081: Plain HTTP sent through -x to the HTTPS port ends in a clean close (exit 52) instead of stunnel's reset (exit 56)
 
@@ -35,13 +35,19 @@ In Curl.Conformance.UnitLibrary TlsServerConnection.ServeAsync, end a connection
 
 ## Acceptance criteria
 
-- [ ] `behaviour:test1244`: Curl answers what curl 8.22.0 answers, `upstream test1244 passes`, so the item measures `match`.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
-- [ ] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
+- [x] `behaviour:test1244`: Curl answers what curl 8.22.0 answers, `upstream test1244 passes`, so the item measures `match`.
+- [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
+- [x] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
 
 ## Notes
+
+- Cause: `TlsServerConnection.ServeAsync` disposed the in-memory server end after a failed handshake, which the client read as a clean end of stream (exit 52). Fix: `InMemoryDuplexStream.ResetsWhenDisposed`; the HTTPS stand-in sets it for the handshake only, so a failed handshake faults the client's next read with `IOException(SocketException(ConnectionReset))`, as stunnel's reset does, and Curl reports exit 56. A flag rather than a `Reset()` call because `TlsServerStream.AuthenticateAsync` disposes the stream itself on failure, before the caller could reset it.
+- Curl.Protocol.Http already maps a reset on the first response read to exit 56 "Recv failure: Connection was reset" (existing tests in `HttpProtocolHandlerTests.Timeouts.cs` and `.RemainingInfoLines.cs`), so no HTTP change was needed.
+- Tests: `InMemoryDuplexStreamTests` (reset after disposal, default false), `HttpsServerConnectorTests.ConnectAsync_ClientSpeakingPlainHttp_IsResetAsStunnelResetsIt`, `UpstreamCaseRunnerTests.RunAsync_HttpsCaseWithACertificateDirectory_ServesTlsOnTheHttpsPort` now expects the reset; test1244 added to `PassingUpstreamCases.txt` and passes on Windows. No option changed, so `--ai-help` is unaffected.
+- Measure-CodeQuality for Curl.Conformance.UnitLibrary: 0 failing members.
 
 ## Log
 
 - 2026-10-15: Created.
 - 2026-10-15: Backlog -> Doing.
+- 2026-10-15: Doing -> Done. Plain HTTP to the HTTPS stand-in is reset as stunnel resets it, so test1244 exits 56 and passes
