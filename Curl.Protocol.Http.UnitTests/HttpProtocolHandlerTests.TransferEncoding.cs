@@ -129,13 +129,39 @@ public sealed partial class HttpProtocolHandlerTests
         MemoryStream output = new();
         Diagnostics.Arrange("request", "redirect hop after an HTTP/1.0 response, PUT of a 3-byte stream of unknown length");
 
-        TransferResult result = await Handler(QueueConnector.For(connection)).ExecuteAsync(EncodingContext(output, options));
+        TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), new SilentAuthenticator())
+            .ExecuteAsync(EncodingContext(output, options));
 
         WriteResult(result);
         Diagnostics.Assert("exit code", CurlExitCode.UploadFailed, result.ExitCode);
         Assert.AreEqual(CurlExitCode.UploadFailed, result.ExitCode);
         Assert.AreEqual("Chunky upload is not supported by HTTP 1.0", result.ErrorMessage);
         Assert.IsEmpty(connection.Written);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_RedirectHopAfterAnHttp10ResponseWithBodyOfUnknownLengthThatCannotRewind_FailsWithExit65BeforeConnecting()
+    {
+        // Off Windows curl 8.22.0 cannot lseek stdin read through a pipe, so the -L hop fails its rewind first (upstream test1073, BL-2337).
+        HttpRequestOptions options = new()
+        {
+            EarlierResponseWasHttp10 = true,
+            Body = new StreamBody(new UnrewindableStream([1, 2, 3]), null, "application/octet-stream"),
+            CustomMethod = "PUT",
+        };
+        QueueConnector connector = QueueConnector.For(Connection("HTTP/1.0 200 OK\r\nContent-Length: 5\r\n\r\nhello", 65536));
+        MemoryStream output = new();
+        Diagnostics.Arrange("request", "redirect hop after an HTTP/1.0 response, PUT of a 3-byte unseekable stream of unknown length");
+
+        TransferResult result = await new HttpProtocolHandler(connector, new SilentAuthenticator())
+            .ExecuteAsync(EncodingContext(output, options));
+
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.SendFailRewind, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.SendFailRewind, result.ExitCode);
+        Assert.AreEqual("seek callback returned error 2", result.ErrorMessage);
+        Assert.IsEmpty(connector.Targets);
+        Assert.AreEqual(0L, output.Length);
     }
 
     [TestMethod]
