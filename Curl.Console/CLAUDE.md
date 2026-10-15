@@ -38,8 +38,10 @@ hand-built client (a `--tls-max` of 1.0 or 1.1 today) and `SslStreamTlsProvider`
 curl hands its options to libcurl (ADR-0506). `NetworkOf` builds `EasyNetworkOptions` from the
 connection, DNS, socket, timeout, protocol and `--ssl` options; an option left out keeps libcurl's
 default, and where its mapping differs from the `CURLOPT_*` lines `--libcurl` writes, the command
-line's behaviour wins (ADR-0513). Nothing reads it yet: BL-2323 hands its record to the engine's
-factories, and BL-2304 to BL-2309 add the other groups.
+line's behaviour wins (ADR-0513). `TlsOf` builds `EasyTlsOptions` from the origin's, the HTTPS proxy's and
+DoH's TLS options, splitting `-E` with `Curl.Networking`'s `ClientCertificateArgument` (ADR-0514).
+Nothing reads either yet: BL-2323 and BL-2324 hand their records to the engine's
+factories, and BL-2305 to BL-2309 add the other groups.
 
 `Program.Main` only opens the standard streams, builds the composition and hands the
 arguments to `CurlCommandRunner`, which parses them, runs each URL and prints curl's

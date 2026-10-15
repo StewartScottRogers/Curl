@@ -13,7 +13,7 @@ namespace Curl.Networking;
 /// <c>pkcs11:</c>, in any case, is not split. Only the Windows build of curl reads a letter,
 /// <c>:</c> and <c>\</c> or <c>/</c> at the start as a drive letter rather than a separator.
 /// </remarks>
-internal static class ClientCertificateArgument
+public static class ClientCertificateArgument
 {
     private const string Pkcs11UriScheme = "pkcs11:";
 

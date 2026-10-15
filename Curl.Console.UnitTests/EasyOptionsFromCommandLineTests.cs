@@ -9,7 +9,7 @@ namespace Curl.Console;
 /// libcurl's default (ADR-0513).
 /// </summary>
 [TestClass]
-public sealed class EasyOptionsFromCommandLineTests
+public sealed partial class EasyOptionsFromCommandLineTests
 {
     private const string Url = "https://example.com/";
 

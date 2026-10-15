@@ -20,6 +20,8 @@ public sealed class EasyTlsOptionsTests
         Assert.IsNull(Defaults.EllipticCurves);
         Assert.IsNull(Defaults.SignatureAlgorithms);
         Assert.IsNull(Defaults.EncryptedClientHello);
+        Assert.IsNull(Defaults.EncryptedClientHelloPublicName);
+        Assert.IsNull(Defaults.EncryptedClientHelloConfigList);
     }
 
     [TestMethod]
@@ -62,6 +64,8 @@ public sealed class EasyTlsOptionsTests
         AssertChangesOnly(Defaults with { SessionIdCache = false }, o => o with { SessionIdCache = true });
         AssertChangesOnly(Defaults with { FalseStart = true }, o => o with { FalseStart = false });
         AssertChangesOnly(Defaults with { EncryptedClientHello = "grease" }, o => o with { EncryptedClientHello = null });
+        AssertChangesOnly(Defaults with { EncryptedClientHelloPublicName = "public.example" }, o => o with { EncryptedClientHelloPublicName = null });
+        AssertChangesOnly(Defaults with { EncryptedClientHelloConfigList = "AEX+DQBB" }, o => o with { EncryptedClientHelloConfigList = null });
         AssertChangesOnly(Defaults with { DohVerifyPeer = false }, o => o with { DohVerifyPeer = true });
         AssertChangesOnly(Defaults with { DohVerifyHost = false }, o => o with { DohVerifyHost = true });
         AssertChangesOnly(Defaults with { DohVerifyStatus = true }, o => o with { DohVerifyStatus = false });

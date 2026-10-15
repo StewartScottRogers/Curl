@@ -89,6 +89,21 @@ public sealed record EasyTlsOptions
     public string? EncryptedClientHello { get; init; }
 
     /// <summary>
+    /// <c>CURLOPT_ECH</c> given as <c>pn:</c>&lt;name&gt;: the public name the Encrypted Client Hello
+    /// outer handshake carries, without its <c>pn:</c> prefix. libcurl keeps it beside the mode
+    /// <see cref="EncryptedClientHello"/> sets (ADR-0514). Default <see langword="null"/>. The
+    /// Schannel build does not support it.
+    /// </summary>
+    public string? EncryptedClientHelloPublicName { get; init; }
+
+    /// <summary>
+    /// <c>CURLOPT_ECH</c> given as <c>ecl:</c>&lt;list&gt;: the base64 ECHConfigList, without its
+    /// <c>ecl:</c> prefix. libcurl keeps it beside the mode <see cref="EncryptedClientHello"/> sets
+    /// (ADR-0514). Default <see langword="null"/>. The Schannel build does not support it.
+    /// </summary>
+    public string? EncryptedClientHelloConfigList { get; init; }
+
+    /// <summary>
     /// <c>CURLOPT_DOH_SSL_VERIFYPEER</c>: whether a DNS-over-HTTPS server's certificate
     /// chain must verify. Default <see langword="true"/> (1).
     /// </summary>
