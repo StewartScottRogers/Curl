@@ -16,6 +16,8 @@
   <ItemGroup>
     <Compile Include="..\Curl.Cli.UnitTests\OpenSslBuildParser.cs" Link="CliFakes\OpenSslBuildParser.cs" />
     <Compile Include="..\Curl.Console.UnitTests\InMemoryDataFileReader.cs" Link="ConsoleFakes\InMemoryDataFileReader.cs" />
+    <Compile Include="..\Curl.Console.UnitTests\ManualTimeProvider.cs" Link="ConsoleFakes\ManualTimeProvider.cs" />
+    <Compile Include="..\Curl.Console.UnitTests\SteppingTimeProvider.cs" Link="ConsoleFakes\SteppingTimeProvider.cs" />
   </ItemGroup>
 
 </Project>

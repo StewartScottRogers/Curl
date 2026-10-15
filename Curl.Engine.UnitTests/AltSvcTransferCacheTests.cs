@@ -1,8 +1,9 @@
+using Curl.Core.FileSystem;
 using Curl.Core.AltSvc;
 using Curl.Protocol.Abstractions;
 using Curl.Testing;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
 /// Pins <see cref="AltSvcTransferCache" />: <see cref="AltSvcTransferCache.SourceAlpnOf" />, the source ALPN an <c>Alt-Svc</c> header is learned
@@ -36,7 +37,7 @@ public sealed class AltSvcTransferCacheTests
     [TestMethod]
     public async Task StoreFromResponse_AddedThenBadPort_GivesTheAddedAlternativeThenTheSkipReason()
     {
-        AltSvcTransferCache cache = await AltSvcTransferCache.OpenAsync(string.Empty, null, [], new InMemoryFileSystem(), TimeProvider.System);
+        AltSvcTransferCache cache = await AltSvcTransferCache.OpenAsync(string.Empty, null, [], new UnusedFileSystem(), TimeProvider.System);
 
         IReadOnlyList<AltSvcHeaderOutcome> outcomes = cache.StoreFromResponse(
             CurlUrl.Parse("https://h.test/"),
@@ -51,5 +52,15 @@ public sealed class AltSvcTransferCacheTests
         Assert.HasCount(2, outcomes);
         Assert.AreEqual(new Curl.Protocol.Abstractions.AltSvcAlternative("h2", "h.test", 8443), outcomes[0].Added);
         Assert.AreEqual(AltSvcSkipReason.UnknownPortNumber, outcomes[1].SkipReason);
+    }
+
+    /// <summary>A file system the cache must never touch: an empty <c>--alt-svc</c> name reads and writes nothing.</summary>
+    private sealed class UnusedFileSystem : IFileSystem
+    {
+        public ValueTask<FileOpenResult> OpenForReadAsync(string path, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
+
+        public ValueTask<FileOpenResult> OpenForWriteAsync(string path, FileWriteMode mode, UnixFileMode createMode, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
     }
 }

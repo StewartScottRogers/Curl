@@ -1,7 +1,7 @@
 using System.Text;
 using Curl.Testing;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
 /// Pins the header output that feeds both <c>-D</c> and <c>-i</c>: each line goes to the

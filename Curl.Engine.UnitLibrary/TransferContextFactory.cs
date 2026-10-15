@@ -6,9 +6,8 @@ using Curl.Core;
 using Curl.Output;
 using Curl.Protocol.Abstractions;
 using HttpRequestOptions = Curl.Protocol.Abstractions.HttpRequestOptions;
-using Curl.Engine;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
 /// Builds the <see cref="TransferContext" /> for one URL of an accepted command line,
@@ -70,7 +69,7 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
     /// </param>
     /// <param name="watchHeaderOutput">
     /// Wraps the header output <see cref="HeaderOutputOf" /> chose, for <c>-J</c>, whose
-    /// <see cref="RemoteHeaderNameStream" /> must read each header line before it goes anywhere;
+    /// <c>RemoteHeaderNameStream</c> must read each header line before it goes anywhere;
     /// <see langword="null" /> to use that output as it is.
     /// </param>
     /// <param name="progress">

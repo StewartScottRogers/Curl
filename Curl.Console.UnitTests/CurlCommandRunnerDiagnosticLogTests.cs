@@ -1,3 +1,4 @@
+using Curl.Engine;
 using System.Text;
 using System.Text.RegularExpressions;
 using Curl.Cli;

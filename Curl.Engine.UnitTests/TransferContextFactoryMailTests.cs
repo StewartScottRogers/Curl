@@ -1,4 +1,3 @@
-using Curl.Engine;
 using System.Net;
 
 using Curl.Authentication;
@@ -6,7 +5,7 @@ using Curl.Cli;
 using Curl.Protocol.Abstractions;
 using Curl.Testing;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
 /// Pins how <see cref="TransferContextFactory" /> carries the mail options into

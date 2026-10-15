@@ -19,7 +19,7 @@ given and must never reference a protocol library directly.
 
 `EngineComposition.CreateTransports` wraps an option group's `TcpConnector` in one `PoolingConnector`,
 which every TCP handler connects through, so a later URL to the same pool key reuses an
-earlier URL's connection; `TransferDispatch` holds it as its `ConnectionPool`. In production the
+earlier URL's connection; `Curl.Engine`'s `TransferDispatch` holds it as its `ConnectionPool`. In production the
 connector shares the run's `ConnectionCache`, which the runner closes without writing anything once
 the run's transfers end, whatever their outcome (ADR-0050, BL-334, ADR-0285); a connector made
 without one owns its pool, which disposing the dispatch closes. It also holds the `TcpConnector`'s
@@ -86,11 +86,11 @@ header lines and replaces the file with the value of each `ETag` of a 200-399 re
 that cannot be created skips the transfer - no report, no `-w` - and a run whose every transfer was
 skipped ends with `curl: no transfer performed` and exit 26 (BL-619 Notes).
 
-Under `--alt-svc <file>` each `http` or `https` transfer gets its own `AltSvcTransferCache` (an
+Under `--alt-svc <file>` each `http` or `https` transfer gets its own `Curl.Engine` `AltSvcTransferCache` (an
 `AltSvcCache` from `Curl.Core`, ADR-0175), as curl gives each transfer's handle one: the file is read
 just after the `-b` files, a missing one as empty, and written back after the `-c` jar, created if
 missing and silently left alone if it cannot be written; no other scheme reads or writes it, and
-`--alt-svc ""` does neither. `TransferContextFactory` puts it on `HttpRequestOptions.AltSvcStore`, so
+`--alt-svc ""` does neither. `Curl.Engine`'s `TransferContextFactory` puts it on `HttpRequestOptions.AltSvcStore`, so
 the HTTP handler learns each `Alt-Svc` header of an `https` response and prints `* Added alt-svc`,
 and `AltSvcTransferCache.ApplyTo` sets `AltSvcRoute` and `Version` for an `https` origin, unless a
 `--connect-to` mapping matches it: the version option decides which `h1`, `h2` and `h3` entries apply,
@@ -131,7 +131,7 @@ name already taken is refused with `File exists` and exit 23. Measured on curl 8
 at (`RedirectLocationFileName`), so `-J -L -O` with no `Content-Disposition` names the file
 after the last URL followed, as upstream tests 1642 and 1643 expect (BL-1809).
 
-`TransferContextFactory` builds each transfer's context from the parsed options; the
+`Curl.Engine`'s `TransferContextFactory` builds each transfer's context from the parsed options; the
 context carries the `-r` text as given (`RangeText`, which the HTTP handler sends verbatim)
 and its parsed range (`ByteRangeParser`; text that names no range goes to every handler with a `null` range, as
 curl 8.21.0 hands it on: FTP and file parse it themselves, SFTP after `STAT`, HTTP, RTSP and
@@ -180,7 +180,7 @@ for `--stderr -`, as curl 8.21.0's `freopen`ed C `stderr` does (BL-1815); any ot
 its leading directories first made under `--create-dirs` as for `-o` (upstream test 3031, BL-1852),
 and one that cannot be opened prints `curl: Failed to open <file>` and stops the run with
 exit 23. `-i` and `-I` send the header lines to the body output too (standard output or the
-`-o` file); with `-D` as well, `HeaderLineTeeStream` writes each line to the `-D` output and
+`-o` file); with `-D` as well, `Curl.Engine`'s `HeaderLineTeeStream` writes each line to the `-D` output and
 then the body output before the next, so `-i -D -` prints every header line twice in a row,
 as curl 8.21.0 does. When standard output is a terminal that renders bold (`terminalRendersStyles`:
 true off Windows, and on Windows once `StandardOutputVirtualTerminal` has turned on
@@ -203,7 +203,7 @@ in a later option group, once the groups before it have run (BL-509). A URL with
 
 The `-:`/`--next` option groups (`CommandLineParseResult.Groups`) run in order, up to and
 including the first with an output option left over (ADR-0126, BL-509). Each group's URLs use
-that group's options through a `TransferDispatch` the factory builds for the group and the runner
+that group's options through a `Curl.Engine` `TransferDispatch` the factory builds for the group and the runner
 disposes when the group ends. Every group's `PoolingConnector` shares the run's one
 `ConnectionCache` (`EngineComposition.CreatePoolingConnector`), keyed on the group's
 `OptionGroupConnectionSettings`, so a later group reuses an earlier group's connection when their
@@ -258,7 +258,7 @@ unless `-s`, as curl 8.21.0 does (upstream test1072, BL-2088). `%{url_effective}
 resolved URL.
 
 Each transfer's proxy is chosen by `Curl.Engine`'s `TransferProxySelection`, after the URL, range and `-F`
-body are checked: `Curl.Core`'s `ProxySelector` (held by `TransferDispatch`, reading the
+body are checked: `Curl.Core`'s `ProxySelector` (held by `Curl.Engine`'s `TransferDispatch`, reading the
 process's proxy environment variables in production and none in tests unless given) picks it
 from `-x` or a `--socks` option, `--noproxy` and the variables; `-U` replaces its credential;
 it goes into `HttpRequestOptions.ForwardProxy` with `-p` as `ProxyTunnel`. A CONNECT tunnel
@@ -289,7 +289,7 @@ other transfer, `ftps` through an HTTP proxy included (curl 8.21.0 tunnels it wi
 `PoolingConnector.Over(TcpConnector.ForFtpDataConnections())`, which `--connect-timeout` does not
 limit (ADR-0286, BL-797) and `--connect-to` maps to its host only, keeping the reply's port (BL-1976, BL-2042). `EngineComposition.CreateFtpProtocolHandler` builds it with a
 `TcpConnectionListener` for `-P`, the run's TLS provider and DNS resolver, and a
-`SystemNetworkInterfaceLookup` (ADR-0102, ADR-0108, ADR-0110), and `TransferContextFactory`
+`SystemNetworkInterfaceLookup` (ADR-0102, ADR-0108, ADR-0110), and `Curl.Engine`'s `TransferContextFactory`
 copies `-P`, `--disable-eprt`, `--ssl`/`--ssl-reqd` and `--ftp-ssl-control` into the context.
 
 Every transfer goes through `Curl.Core`'s `RedirectFollower`. `-L` becomes
@@ -339,7 +339,7 @@ does the curl tool's part: globbing, IPFS, `--etag-*`, output files, upload file
 meter, `-w` and the `curl: (N)` lines.
 
 Under `-Y`/`--speed-limit` or `-y`/`--speed-time` each attempt gets a `Curl.Core`
-`LowSpeedWatchdog` on the runner's clock: `TransferContextFactory` wraps the output and the
+`LowSpeedWatchdog` on the runner's clock: `Curl.Engine`'s `TransferContextFactory` wraps the output and the
 progress sink so it counts the bytes moved, and gives the context its token. An attempt it
 cancels after `-y` seconds below `-Y` (30 seconds, or 1 byte per second, when only one is
 given) ends with `curl: (28) Operation too slow. Less than N bytes/sec transferred the last T
@@ -347,7 +347,7 @@ seconds`, as measured on curl 8.21.0 (ADR-0106, BL-400).
 
 Under a positive `-m`/`--max-time` each attempt also gets a `Curl.Core` `MaxTimeWatchdog` on the
 runner's clock (ADR-0117 and its BL-511 amendment): its start becomes the context's
-`OperationStarted`, `TransferContextFactory` wraps the progress sink so it learns whether the
+`OperationStarted`, `Curl.Engine`'s `TransferContextFactory` wraps the progress sink so it learns whether the
 handler reported the transfer started and how many body bytes it received, and its token also
 cancels the context's. An attempt it cancels ends with exit 28 and `Operation timed out after N
 milliseconds with M bytes received` (`with M out of T` when the size is known), or `Connection
@@ -516,7 +516,7 @@ it follows `--stderr`) or over the `--log-file`, truncated, UTF-8 without a byte
 closed when the run ends. Every line goes through `GatedDiagnosticLog`, which takes the run's
 `WriteGate` before the writer's lock. A `--log-file` that cannot be opened prints
 `Warning: Failed to open the --log-file <path>`, even under `-s`, and the run carries on without a
-log. `TransferContextFactory.DiagnosticLog` puts the log on every transfer's context. The runner
+log. `Curl.Engine`'s `TransferContextFactory.DiagnosticLog` puts the log on every transfer's context. The runner
 logs under `cli` the files the parse tried to read (`RecordingDataFileReader`), the parser's
 `Warning: ` lines and the accepted command line, and under `runner` every `Warning: ` line it
 prints, each transfer's start and end (`TransferDiagnosticLines`: never a credential, only

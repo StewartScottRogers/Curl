@@ -1,10 +1,10 @@
-using Curl.Engine;
+using Curl.Console;
 using Curl.Cli;
 using Curl.Core;
 using Curl.Protocol.Abstractions;
 using Curl.Testing;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
 /// Pins how <see cref="TransferContextFactory" /> copies the parsed command line, the URL and
@@ -48,7 +48,7 @@ public sealed class TransferContextFactoryTests
     {
         using MemoryStream standardInput = new();
         using MemoryStream output = new();
-        TransferProgressRecorder progress = new(new ManualTimeProvider());
+        ITransferProgress progress = new SilentTransferProgress();
 
         TransferContext context = new TransferContextFactory(standardInput)
             .Create(Parse("file:///x.txt"), CurlUrl.Parse("file:///x.txt"), output, null, null, null, progress: progress);
@@ -727,5 +727,21 @@ public sealed class TransferContextFactoryTests
         CommandLineParseResult parsed = CommandLineParser.Parse(arguments, _ => true);
         Assert.IsTrue(parsed.IsAccepted);
         return parsed.Options;
+    }
+
+    /// <summary>A progress sink that records nothing, to tell the context's sink from the one given.</summary>
+    private sealed class SilentTransferProgress : ITransferProgress
+    {
+        public void ReportTransferStarted()
+        {
+        }
+
+        public void ReportDownloaded(long bytesSoFar, long? expectedTotal)
+        {
+        }
+
+        public void ReportUploaded(long bytesSoFar, long? expectedTotal)
+        {
+        }
     }
 }

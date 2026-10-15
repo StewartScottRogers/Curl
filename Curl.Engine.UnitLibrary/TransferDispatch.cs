@@ -1,11 +1,10 @@
-using Curl.Engine;
 using Curl.Core;
 using Curl.Protocol.Abstractions;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
-/// What <see cref="CurlCommandRunner" /> transfers through for one run: the dispatcher, the
+/// What the curl tool's command runner transfers through for one run: the dispatcher, the
 /// warning lines curl prints before each transfer for options the build ignores, and the run's
 /// cookies.
 /// </summary>

@@ -1,4 +1,4 @@
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
 /// The header output of a transfer whose header lines go both to the <c>-D</c> output and,

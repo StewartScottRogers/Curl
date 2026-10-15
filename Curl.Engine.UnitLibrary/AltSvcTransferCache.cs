@@ -1,4 +1,3 @@
-using Curl.Engine;
 using System.Text;
 using Curl.Cli;
 using Curl.Core.AltSvc;
@@ -7,7 +6,7 @@ using Curl.Protocol.Abstractions;
 using AltSvcAlternative = Curl.Protocol.Abstractions.AltSvcAlternative;
 using HttpRequestOptions = Curl.Protocol.Abstractions.HttpRequestOptions;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
 /// One <c>http</c> or <c>https</c> transfer's alt-svc cache (<c>--alt-svc</c>), as curl 8.21.0 gives each
@@ -53,6 +52,15 @@ namespace Curl.Console;
 /// </remarks>
 internal sealed class AltSvcTransferCache : IAltSvcStore
 {
+    /// <summary>
+    /// The mode a newly created <c>--alt-svc</c> file receives on a POSIX system, before the umask:
+    /// <c>0666</c>, what curl's <c>fopen</c> uses, as for an <c>-o</c> file.
+    /// </summary>
+    private const UnixFileMode AltSvcFileCreateMode =
+        UnixFileMode.UserRead | UnixFileMode.UserWrite
+        | UnixFileMode.GroupRead | UnixFileMode.GroupWrite
+        | UnixFileMode.OtherRead | UnixFileMode.OtherWrite;
+
     private static readonly AltSvcAlpn[] NoAlpns = [];
 
     private static readonly IReadOnlySet<AltSvcAlpn> NoAllowedAlpns = new HashSet<AltSvcAlpn>();
@@ -183,7 +191,7 @@ internal sealed class AltSvcTransferCache : IAltSvcStore
         }
 
         FileOpenResult opened = await fileSystem
-            .OpenForWriteAsync(file, FileWriteMode.Truncate, DeferredOutputFileStream.CreateMode, CancellationToken.None)
+            .OpenForWriteAsync(file, FileWriteMode.Truncate, AltSvcFileCreateMode, CancellationToken.None)
             .ConfigureAwait(false);
         if (opened.Content is not { } content)
         {

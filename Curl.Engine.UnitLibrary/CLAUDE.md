@@ -87,7 +87,7 @@ is `FixedWallClock` and `ClockOverridingHstsStore` (a `CURL_TIME` of whole secon
 `CRuntimeErrorNumbers` words a C runtime errno as `strerror` does; and `CurlErrorBuffer` cuts a
 message to curl's 255-byte error buffer (ADR-0072; `Curl.Networking` has its own internal copy).
 
-`AltSvcTransferCache`, `HstsCacheFile` and `TlsSessionFileLines`, with their tests, stay in
+`HstsCacheFile` and `TlsSessionFileLines`, with their tests, stay in
 `Curl.Console` because they use tool-side types (`DeferredOutputFileStream`,
 `HttpVersionMapping`, `ToolNotes`). `CookieEngineTests` uses its own read-only file system fake,
 and `SshKnownHostsFileSearchTests` links `InMemoryDataFileReader` from `Curl.Console.UnitTests`.
@@ -129,3 +129,24 @@ for its in-memory SSH server) and `EngineCompositionDnsServersIntegrationTests` 
 `Curl.Engine.IntegrationTests`. Tests that run a transfer through `CurlComposition.CreateRunner`,
 `CreateTransferDispatch` or `CreateDispatcher` stay in `Curl.Console.UnitTests` as
 `CurlComposition*Tests`.
+
+## The transfer context and dispatch (BL-2290)
+
+`TransferContextFactory` builds the `TransferContext` of each URL of an accepted command line,
+carrying every option a handler reads: the clock, the run's diagnostic log and HSTS store (both set
+by the runner once it has opened them), the `-Y`/`-y` and `-m` watchdogs' wrapped output, progress
+sink and cancellation token, the `-D`/`-i`/`-I` header output (`HeaderLineTeeStream` writes each line
+to the `-D` output and then the body output) and the `CONNECT` reply heads. Standard input comes in
+through its constructor, for a `telnet` transfer's upload. `TransferDispatch` holds one option
+group's dispatcher, cookies, proxy selector, connection pool and `--resolve` loader, which the
+runner disposes when the group ends; `CurlCommandRunner` receives a
+`Func<CommandLineOptions, TransferDispatch>` that returns it.
+
+`AltSvcTransferCache` moved with the factory (the factory stores it on `HttpRequestOptions.AltSvcStore`
+and asks it for the route), so the earlier note that it stays in `Curl.Console` no longer holds; it
+carries its own copy of the `0666` create mode `DeferredOutputFileStream.CreateMode` holds, so it no
+longer reaches a tool-side type.
+
+Their tests moved too: `TransferContextFactoryTests`, `TransferContextFactoryMailTests`,
+`AltSvcTransferCacheTests` and `HeaderLineTeeStreamTests` are in `Curl.Engine.UnitTests`, linking
+`ManualTimeProvider` and `SteppingTimeProvider` from `Curl.Console.UnitTests`.
