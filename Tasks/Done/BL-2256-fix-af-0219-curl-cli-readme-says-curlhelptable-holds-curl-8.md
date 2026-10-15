@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Cli.UnitLibrary]
 requirement: none
 created: 2026-10-14
-completed:
+completed: 2026-10-14
 ---
 # BL-2256 — Fix AF-0219: Curl.Cli README says CurlHelpTable holds curl 8.21.0's 274 help rows; it holds 278, four of them httpsig rows 8.21.0 lacks
 
@@ -41,8 +41,8 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -50,3 +50,4 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 
 - 2026-10-14: Created.
 - 2026-10-14: Backlog -> Doing.
+- 2026-10-14: Doing -> Done. README states 278 rows: 274 from curl 8.21.0 plus four httpsig rows (ADR-0487); AF-0219 reproduction gives 278 / 0
