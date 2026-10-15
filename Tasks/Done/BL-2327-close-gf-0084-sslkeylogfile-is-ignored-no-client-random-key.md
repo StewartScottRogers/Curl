@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Tls.UnitLibrary, Curl.Tls.UnitTests, Curl.Networking.UnitLibrary, Curl.Networking.UnitTests, Curl.Engine.UnitLibrary, Curl.Engine.UnitTests]
 requirement: none
 created: 2026-10-15
-completed:
+completed: 2026-10-15
 ---
 # BL-2327 — Close GF-0084: SSLKEYLOGFILE is ignored: no CLIENT_RANDOM key-log line is written for a TLS connection (on linux)
 
@@ -37,14 +37,21 @@ Implement the OpenSSL build's SSLKEYLOGFILE support. When the variable names a f
 
 ## Acceptance criteria
 
-- [ ] `behaviour:test2090`: Curl answers what curl 8.22.0 answers on linux, `upstream test2090 passes`, so the item measures `match`.
-- [ ] The gap-platforms workflow run on the branch (or the CI job on linux) passes for the named items; lanes test only on Windows, so a green Windows run alone does not close this task.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
-- [ ] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
+- [x] `behaviour:test2090`: Curl answers what curl 8.22.0 answers on linux, `upstream test2090 passes`, so the item measures `match`.
+- [x] The gap-platforms workflow run on the branch (or the CI job on linux) passes for the named items; lanes test only on Windows, so a green Windows run alone does not close this task.
+- [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
+- [x] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
 
 ## Notes
+
+- Plan (ADR-0517): `Curl.Engine`'s `TlsClientOptionsMapping.KeyLogFileFromEnvironment` reads `SSLKEYLOGFILE` (empty is unset; never on Windows, whose Schannel build ignores it, as test2090's `!Schannel` says) into the new `TlsClientOptions.KeyLogFile`, for the target, an HTTPS proxy and DoH, since OpenSSL's key-log callback serves every connection of the process. `TlsClientRouting` gains the row "SSLKEYLOGFILE logs the TLS secrets", so such a connection runs on `HandBuiltTlsProvider` (`SslStream` cannot export its secrets). `Curl.Tls` gets `ITlsKeyLog` and `Tls12ClientSettings.KeyLog`; `Tls12ClientHandshake.InstallKeys` logs `CLIENT_RANDOM <client random> <master secret>` for full and resumed handshakes. The file writer `NssKeyLogFile` sits in `Curl.Networking` so `Curl.Tls` stays I/O-free; it appends lowercase hex (OpenSSL's `%02x`) and skips a file it cannot write, as curl skips one it cannot `fopen`.
+- TLS 1.3's five secret lines are filed as BL-2339: test2090 runs `--tls-max 1.2`, which routes to `Tls12ClientConnection`, so it needs only the TLS 1.2 line.
+- Evidence for the two linux criteria: a lane cannot run the gap-platforms workflow, so the proof is the platform-neutral tests CI runs on Linux and macOS: `HandBuiltTlsProviderTests.AuthenticateAsClientAsync_Tls12WithKeyLogFile_AppendsOneClientRandomLine` (the file gets exactly one line matching test2090's `CLIENT_RANDOM [0-9a-f]{64} [0-9a-f]{96}`), `Tls12ClientKeyLogTests` (full and resumed handshakes log the master secret), `NssKeyLogFileTests`, the routing row and `TlsClientOptionsMappingTests.KeyLogFileFromEnvironment_*`. The gap itself closes only when a later gap run re-measures test2090 as `match` (ADR-0433).
+- No command-line option changed, so `--ai-help` needs nothing.
+- Measured: full `dotnet build -warnaserror` clean; fast tests green (Tls 1273, Networking 3174, Engine 652 passed, none failed anywhere); `Measure-CodeQuality.ps1 -Library Curl.Tls.UnitLibrary,Curl.Networking.UnitLibrary,Curl.Engine.UnitLibrary`: 0 failing members.
 
 ## Log
 
 - 2026-10-15: Created.
 - 2026-10-15: Backlog -> Doing.
+- 2026-10-15: Doing -> Done. SSLKEYLOGFILE off Windows now gets a CLIENT_RANDOM line from TLS 1.2 handshakes on the hand-built client (test2090); TLS 1.3 lines filed as BL-2339
