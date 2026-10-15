@@ -115,7 +115,7 @@ read with no reply waiting returns 0, because in memory nothing else can arrive.
 
 `%HTTP6PORT` is 8991 (`UpstreamCaseRunner.Http6Port`, BL-1903) and `%HOST6IP` is `[::1]`: upstream's `http-ipv6` server is the same `sws` emulation, all in memory, so no case needs IPv6 from the machine, and screening lets `http-ipv6` cases run. A connection whose target is an IPv6 address has `::1` at both ends (`SwsHttpServerConnector`), so a `--haproxy-protocol` line reads `PROXY TCP6 ::1 ::1` (test1456), and the conformance tests' resolver answers `ip6-localhost` with `::1`, as the `%RESOLVE` precheck says it does (test241). The 8 cases this opened (240, 241, 242, 263, 1324, 1408, 1456, 3202) pass; the other `http-ipv6` cases skip for another reason (a `<tool>`, a feature, a precheck). `%CLIENT6IP` is `[::1]` and `%CLIENT6IP-NB` `::1`, and upstream's `ftp-ipv6` and `gopher-ipv6` servers are the FTP and Gopher stand-ins on `%FTP6PORT` 9011 (`FtpServerConnector.Ftp6Port`) and `%GOPHER6PORT` 9012 (`GopherServerConnector.Gopher6Port`), in memory too (BL-2227; servers.pm picks free ports, and these two no other stand-in uses). `LoopbackAddress` gives every in-memory connection to an IPv6 address `::1` at both ends, the line-protocol stand-ins included, so curl's `-P -` sends `EPRT |2|::1|...`; ftpserver.pl answers `EPSV` the same on IPv6. Screening lets `ftp-ipv6` (with ftpserver.pl's `<servercmd>` set and `<verify><upload>`) and `gopher-ipv6` cases run: 252, 253, 254, 255, 1046, 1048, 1050 and 1203 pass (1046 and 1048 with `--interface ::1`, which the in-memory dial accepts), test1083's `if(...) {print ...} else {exec '%RESOLVE ...'}` precheck runs (`UpstreamPerlOneLiner`, BL-2242), and test2086 skips for its `<tool>`.
 
-`GopherServerConnector` (BL-2175) emulates upstream's Gopher server, `sws --gopher`, on port 9008, the runner's `%GOPHERPORT`, outermost of the runner's connectors (the SSH stand-in excepted), and passes every other connection on. A `GopherServerConnection` reads one selector line up to its CRLF (however the writes split it), records those bytes for `<verify><protocol>` (after the tftpd dump; bytes past the CRLF are dropped), answers with `<data>`, or `<dataN>` when the number after the selector's last slash (past any non-digits, as sws's `strtol` reads it) is over 10000, sent as written with no headers, and closes. Screening lets `gopher` cases run: 1200, 1201 and 1202 pass, 1609 fails on a Curl difference (BL-2185: Curl sends `/sel\r\n` where curl rejects the CR LF with exit 3), and 5028 skips for the Debug feature.
+`GopherServerConnector` (BL-2175) emulates upstream's Gopher server, `sws --gopher`, on port 9008, the runner's `%GOPHERPORT`, outside every other stand-in but the Gophers, dict, telnet, SSH and https-proxy ones, and passes every other connection on. A `GopherServerConnection` reads one selector line up to its CRLF (however the writes split it), records those bytes for `<verify><protocol>` (after the tftpd dump; bytes past the CRLF are dropped), answers with `<data>`, or `<dataN>` when the number after the selector's last slash (past any non-digits, as sws's `strtol` reads it) is over 10000, sent as written with no headers, and closes. Screening lets `gopher` cases run: 1200, 1201 and 1202 pass, 1609 fails on a Curl difference (BL-2185: Curl sends `/sel\r\n` where curl rejects the CR LF with exit 3), and 5028 skips for the Debug feature.
 
 `%HTTP2PORT` is 9009 (`UpstreamCaseRunner.Http2Port`, BL-2175), so no case skips for it, but no stand-in for upstream's `nghttpx` HTTP/2 front stands behind it: screening still skips a case naming the `http/2` server (1700, 1702, 358, 359), and test2407 skips first for its `<tool>`. A connection to 9009 reaches the `sws` emulation like any other port.
 
@@ -218,7 +218,18 @@ through a `TlsRelayConnection` with `test-localhost.pem`, so the decrypted packe
 dump and the selector in the Gopher stand-in's `ReceivedBytes`. The runner puts each just outside
 its plain stand-in only for a case naming `mqtts` or `gophers`; screening lets those servers run,
 and `UpstreamCurlPlatform` reports the `mqtts` protocol feature, as Curl's `curl -V` does. 1640 and
-1272 pass. Upstream's `dict` and `telnet` servers are not emulated yet (BL-2243).
+1272 pass.
+`DictServerConnector` and `TelnetServerConnector` (BL-2243) stand in for upstream's `dict` and
+`telnet` servers (`tests/dictserver.py` and `tests/negtelnetserver.py` at `curl-8_22_0`) on ports
+9015 and 9016, the runner's `%DICTPORT` and `%TELNETPORT`, just inside the Gopher stand-ins. The
+dict stand-in is a `LineProtocolServerConnector` whose responder sends
+`220 dictserver <xnooptions> <msgid@msgid>\n` on connect and answers the first command line with
+`552 No matches\n` and a close, as dictserver.py answers its one read. A `TelnetServerConnection`
+sends negtelnetserver.py's `IAC WILL NEW_ENVIRON`, `IAC WONT NAWS`, `IAC DO NEW_ENVIRON`,
+`IAC DONT NAWS`, skips the client's TELNET commands (`IAC` with `WILL`/`WONT`/`DO`/`DONT` and an
+option byte, or `IAC` and one other byte) until a write leaves data, echoes that data with
+surrounding whitespace stripped, and closes. Neither server writes `server.input`, so neither joins
+`UpstreamProtocolDump`. Screening lets `dict` and `telnet` cases run: 1450 and 1452 pass.
 `%HTTPUNIXPATH` is `log/server/http.sock` (`UpstreamCaseRunner.HttpUnixPath`, BL-2229), the relative
 path `runtests.pl`'s `http.sock` has under its relative log directory, so it fits a `sockaddr_un`
 wherever the harness's log directory is. Nothing listens on it: upstream's `http-unix` server is the

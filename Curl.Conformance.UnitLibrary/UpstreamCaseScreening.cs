@@ -41,7 +41,7 @@ internal static class UpstreamCaseScreening
     // Interpreted, not source-generated, so no generated code counts against the coverage gate.
     private static readonly Regex InternetUrlHost = new(@"\bhttps?://(?<host>[A-Za-z][A-Za-z0-9-]*(?:\.[A-Za-z0-9-]+)+)", RegexOptions.CultureInvariant);
 
-    private static readonly HashSet<string> Servers = ["http", "http-ipv6", "http-unix", "http-proxy", HttpsProxyServerConnector.EmulatedServer, "socks4", "socks5", "mqtt", "tftp", "gopher", "gopher-ipv6", "ftp-ipv6", "file", "none", .. LineProtocolServerConnector.EmulatedServers, .. MailTlsServerConnector.EmulatedServers, .. FtpsServerConnector.EmulatedServers, .. MqttsServerConnector.EmulatedServers, .. GophersServerConnector.EmulatedServers, "sftp", "scp"];
+    private static readonly HashSet<string> Servers = ["http", "http-ipv6", "http-unix", "http-proxy", HttpsProxyServerConnector.EmulatedServer, "socks4", "socks5", "mqtt", "tftp", "gopher", "gopher-ipv6", "ftp-ipv6", "file", "none", .. LineProtocolServerConnector.EmulatedServers, .. MailTlsServerConnector.EmulatedServers, .. FtpsServerConnector.EmulatedServers, .. MqttsServerConnector.EmulatedServers, .. GophersServerConnector.EmulatedServers, .. DictServerConnector.EmulatedServers, .. TelnetServerConnector.EmulatedServers, "sftp", "scp"];
 
     // The servers that read <servercmd> as ftpserver.pl does: the FTP stand-in, plain or behind TLS.
     private static readonly string[] FtpServers = ["ftp", "ftp-ipv6", .. FtpsServerConnector.EmulatedServers];
