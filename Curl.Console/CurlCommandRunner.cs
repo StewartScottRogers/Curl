@@ -3467,6 +3467,7 @@ internal sealed class CurlCommandRunner(
 
         if (await transferPerformer.ResolveSshOptionsAsync(
                 options,
+                EasyOptionsFromCommandLine.ProtocolOf(options).Ssh,
                 url,
                 Running,
                 () => KnownHostsSearch.Find(DataFileReader),
@@ -3485,6 +3486,7 @@ internal sealed class CurlCommandRunner(
                 EasyOptionsFromCommandLine.HttpOf(options),
                 EasyOptionsFromCommandLine.BehaviourOf(options),
                 transferOptions,
+                EasyOptionsFromCommandLine.ProtocolOf(options),
                 url,
                 RateLimited(options, toStandardOutput ? FlushedEachWriteUnderNoBuffer(options, InTextModeUnderUseAscii(options, Running.GatedStandardOutput)) : Stream.Null),
                 range,
@@ -4325,6 +4327,7 @@ internal sealed class CurlCommandRunner(
                         EasyOptionsFromCommandLine.HttpOf(options),
                         EasyOptionsFromCommandLine.BehaviourOf(options),
                         transferOptions,
+                        EasyOptionsFromCommandLine.ProtocolOf(options),
                         url,
                         RateLimited(options, FlushedEachWriteUnderNoBuffer(options, output)),
                         range,

@@ -1,4 +1,5 @@
 using Curl.Api.Options.Behaviour;
+using Curl.Api.Options.Protocols;
 using Curl.Cli;
 using Curl.Protocol.Abstractions;
 
@@ -55,24 +56,25 @@ internal static class MailRequestOptionsMapping
     /// </summary>
     /// <param name="options">The parsed command line.</param>
     /// <param name="transfer">The option group's transfer options, whose <see cref="EasyTransferOptions.CustomRequest" /> is the <c>-X</c> command.</param>
+    /// <param name="smtp">The option group's SMTP options: <c>--mail-from</c>, <c>--mail-rcpt</c>, <c>--mail-auth</c> and <c>--mail-rcpt-allowfails</c>.</param>
     /// <param name="scheme">The transfer URL's scheme.</param>
     /// <returns>
     /// <see langword="null" /> for every scheme but <c>smtp</c>, <c>smtps</c>, <c>pop3</c>,
     /// <c>pop3s</c>, <c>imap</c> and <c>imaps</c>; for those, every mail option verbatim, the
-    /// recipients in command-line order, and <see cref="CommandLineOptions.UploadFlags" /> as
+    /// sender, recipients (in command-line order), <c>AUTH</c> and allow-fails from <paramref name="smtp" />, and <see cref="CommandLineOptions.UploadFlags" /> as
     /// the names of its set flags in curl's order. <see cref="MailRequestOptions.CustomCommand" /> is
     /// <see cref="EasyTransferOptions.CustomRequest" />, and <see cref="MailRequestOptions.ServiceName" />
     /// is <c>--service-name</c>, <see langword="null" /> for the scheme's default (ADR-0188).
     /// </returns>
-    internal static MailRequestOptions? FromCommandLine(CommandLineOptions options, EasyTransferOptions transfer, string scheme) =>
+    internal static MailRequestOptions? FromCommandLine(CommandLineOptions options, EasyTransferOptions transfer, EasySmtpOptions smtp, string scheme) =>
         !MailSchemes.Contains(scheme)
             ? null
             : new MailRequestOptions
             {
-                From = options.MailFrom,
-                Recipients = [.. options.MailRecipients],
-                Auth = options.MailAuth,
-                RecipientAllowFails = options.MailRecipientAllowFails,
+                From = smtp.MailFrom,
+                Recipients = [.. smtp.MailRecipients],
+                Auth = smtp.MailAuth,
+                RecipientAllowFails = smtp.MailRecipientAllowFails,
                 UploadFlags = UploadFlagNamesOf(options.UploadFlags),
                 CustomCommand = transfer.CustomRequest,
                 LoginOptions = options.LoginOptions,

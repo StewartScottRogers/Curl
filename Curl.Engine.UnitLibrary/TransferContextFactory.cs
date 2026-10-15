@@ -3,11 +3,15 @@ using System.Text;
 
 using Curl.Api.Options.Behaviour;
 using Curl.Api.Options.Http;
+using Curl.Api.Options.Protocols;
 using Curl.Cli;
 using Curl.Core;
 using Curl.Output;
 using Curl.Protocol.Abstractions;
+using EasyFtpClearCommandChannel = Curl.Api.Options.Protocols.FtpClearCommandChannel;
+using EasyFtpFileMethod = Curl.Api.Options.Protocols.FtpFileMethod;
 using EasyTimeCondition = Curl.Api.Options.Behaviour.TimeCondition;
+using FtpFileMethod = Curl.Protocol.Abstractions.FtpFileMethod;
 using HttpRequestOptions = Curl.Protocol.Abstractions.HttpRequestOptions;
 using TimeCondition = Curl.Protocol.Abstractions.TimeCondition;
 
@@ -36,6 +40,9 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
     /// <summary>The one scheme whose transfer uploads standard input.</summary>
     private const string TelnetScheme = "telnet";
 
+    /// <summary>The TFTP options at libcurl's defaults, whose block size <see cref="BlockSizeOf" /> compares with.</summary>
+    private static readonly EasyTftpOptions DefaultTftpOptions = new();
+
     /// <summary>Every context's clock: the one given, or <see cref="TimeProvider.System" />.</summary>
     private readonly TimeProvider clock = timeProvider ?? TimeProvider.System;
 
@@ -63,6 +70,11 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
     /// mode, CRLF, the file size limit and the timeout; a <c>-T</c> upload under <c>-C -</c> has
     /// <see cref="EasyTransferOptions.Upload" /> set and <see cref="EasyTransferOptions.ResumeFrom" /> -1, as
     /// curl's tool asks libcurl to resume it from the end of the remote file.
+    /// </param>
+    /// <param name="protocol">
+    /// The option group's protocol options: FTP's <c>-P</c>, <c>-Q</c>, <c>-a</c> and <c>--ftp-*</c> settings and
+    /// <c>--disable-epsv</c>/<c>--disable-eprt</c>, the <c>--mail-*</c> sender and recipients,
+    /// <c>--tftp-blksize</c>, <c>--tftp-no-options</c> and <c>-t</c>.
     /// </param>
     /// <param name="url">The URL to transfer.</param>
     /// <param name="output">Where the transfer's bytes go.</param>
@@ -142,6 +154,7 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
         EasyHttpOptions http,
         EasyBehaviourOptions behaviour,
         EasyTransferOptions transfer,
+        EasyProtocolOptions protocol,
         CurlUrl url,
         Stream output,
         ByteRange? range,
@@ -180,26 +193,26 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
             Upload = UploadOf(url, upload),
             PostData = options.PostData,
             Credentials = lookedUpCredentials ?? options.Credentials,
-            TelnetOptions = options.TelnetOptions,
-            TftpBlockSize = options.TftpBlockSize,
-            TftpNoOptions = options.TftpNoOptions,
-            FtpDisableEpsv = options.FtpDisableEpsv,
-            FtpSkipPasvIp = options.FtpSkipPasvIp,
-            FtpFileMethod = options.FtpFileMethod,
-            FtpCreateDirectories = options.FtpCreateDirectories,
-            FtpAccount = options.FtpAccount,
-            FtpAlternativeToUser = options.FtpAlternativeToUser,
-            FtpSendPret = options.FtpSendPret,
-            FtpPort = options.FtpPort,
-            FtpUseEprt = options.FtpUseEprt,
+            TelnetOptions = protocol.Telnet.TelnetOptions,
+            TftpBlockSize = BlockSizeOf(protocol.Tftp),
+            TftpNoOptions = protocol.Tftp.NoOptions,
+            FtpDisableEpsv = !protocol.Ftp.UseEpsv,
+            FtpSkipPasvIp = protocol.Ftp.SkipPasvIp,
+            FtpFileMethod = FileMethodOf(protocol.Ftp.FileMethod),
+            FtpCreateDirectories = protocol.Ftp.CreateMissingDirectories != FtpCreateMissingDirectories.None,
+            FtpAccount = protocol.Ftp.Account,
+            FtpAlternativeToUser = protocol.Ftp.AlternativeToUser,
+            FtpSendPret = protocol.Ftp.UsePret,
+            FtpPort = protocol.Ftp.ActiveAddress,
+            FtpUseEprt = protocol.Ftp.UseEprt,
             SslLevel = options.SslLevel,
             FtpSslControlOnly = options.FtpSslControlOnly && !options.SslRequired,
-            FtpCommandChannelClearing = CommandChannelClearingOf(options.FtpClearCommandChannel),
+            FtpCommandChannelClearing = CommandChannelClearingOf(protocol.Ftp.ClearCommandChannel),
             ListOnly = options.ListOnly,
             UseAscii = transfer.TransferText,
-            Append = options.Append,
+            Append = protocol.Ftp.Append,
             ConvertLineEndings = transfer.Crlf,
-            QuoteCommands = options.QuoteCommands,
+            QuoteCommands = QuoteCommandsOf(protocol.Ftp),
             CreateFileMode = options.CreateFileMode ?? TransferContext.DefaultCreateFileMode,
             PathAsIs = options.PathAsIs,
             ConnectTimeout = options.ConnectTimeout,
@@ -216,7 +229,7 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
                     ProxyTunnel = options.ProxyTunnel || ConnectToTunnelsThroughProxy(options, url, proxy),
                 },
                 altSvc),
-            Mail = MailRequestOptionsMapping.FromCommandLine(options, transfer, url.Scheme),
+            Mail = MailRequestOptionsMapping.FromCommandLine(options, transfer, protocol.Smtp, url.Scheme),
             Ssh = ssh,
             Progress = WatchedProgress(progress, lowSpeedWatchdog, maxTimeWatchdog),
             Events = EventsWritingConnectReplyHeads(options, proxy, EventsOrNone(events), transferHeaderOutput),
@@ -343,17 +356,51 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
     };
 
     /// <summary>
-    /// Gets the <c>CCC</c> behaviour the FTP handler reads for the command line's
-    /// <c>--ftp-ssl-ccc</c> and <c>--ftp-ssl-ccc-mode</c> (BL-636).
+    /// Gets the <c>CCC</c> behaviour the FTP handler reads for <c>--ftp-ssl-ccc</c> and
+    /// <c>--ftp-ssl-ccc-mode</c> (BL-636).
     /// </summary>
-    /// <param name="clearing">What the parsed command line chose.</param>
+    /// <param name="clearing">The option group's <see cref="EasyFtpOptions.ClearCommandChannel" />.</param>
     /// <returns>The same choice in the handler's terms.</returns>
-    private static FtpCommandChannelClearing CommandChannelClearingOf(FtpClearCommandChannel clearing) => clearing switch
+    private static FtpCommandChannelClearing CommandChannelClearingOf(EasyFtpClearCommandChannel clearing) => clearing switch
     {
-        FtpClearCommandChannel.Active => FtpCommandChannelClearing.Active,
-        FtpClearCommandChannel.Passive => FtpCommandChannelClearing.Passive,
+        EasyFtpClearCommandChannel.Active => FtpCommandChannelClearing.Active,
+        EasyFtpClearCommandChannel.Passive => FtpCommandChannelClearing.Passive,
         _ => FtpCommandChannelClearing.Off,
     };
+
+    /// <summary>
+    /// Gets the <c>--tftp-blksize</c> the TFTP handler reads: <see langword="null" /> for libcurl's default of 512,
+    /// which the handler asks for when none is given, else the size as given, which the handler clamps.
+    /// </summary>
+    /// <param name="tftp">The option group's TFTP options.</param>
+    /// <returns>The context's <see cref="TransferContext.TftpBlockSize" />.</returns>
+    private static int? BlockSizeOf(EasyTftpOptions tftp) =>
+        tftp.BlockSize == DefaultTftpOptions.BlockSize ? null : tftp.BlockSize;
+
+    /// <summary>
+    /// Gets the path walk the FTP handler reads for <c>--ftp-method</c>: libcurl's default and
+    /// <c>multicwd</c> are both one <c>CWD</c> per directory.
+    /// </summary>
+    /// <param name="method">The option group's <see cref="EasyFtpOptions.FileMethod" />.</param>
+    /// <returns>The same choice in the handler's terms.</returns>
+    private static FtpFileMethod FileMethodOf(EasyFtpFileMethod method) => method switch
+    {
+        EasyFtpFileMethod.NoCwd => FtpFileMethod.NoCwd,
+        EasyFtpFileMethod.SingleCwd => FtpFileMethod.SingleCwd,
+        _ => FtpFileMethod.MultiCwd,
+    };
+
+    /// <summary>
+    /// Gets the <c>-Q</c> commands as the FTP and SFTP handlers read them, one list whose <c>+</c> prefix marks a
+    /// command sent just before the transfer and <c>-</c> one sent after it: <see cref="EasyFtpOptions.Quote" />
+    /// as they are, then <see cref="EasyFtpOptions.PreQuote" /> each behind <c>+</c> and
+    /// <see cref="EasyFtpOptions.PostQuote" /> each behind <c>-</c>. Each handler sorts the list by prefix, so
+    /// each stage keeps its command-line order.
+    /// </summary>
+    /// <param name="ftp">The option group's FTP options.</param>
+    /// <returns>The context's <see cref="TransferContext.QuoteCommands" />.</returns>
+    private static string[] QuoteCommandsOf(EasyFtpOptions ftp) =>
+        [.. ftp.Quote, .. ftp.PreQuote.Select(command => "+" + command), .. ftp.PostQuote.Select(command => "-" + command)];
 
     /// <summary>
     /// Gets <paramref name="events" />, or <see cref="NoTransferEvents.Instance" /> when it is <see langword="null" />.

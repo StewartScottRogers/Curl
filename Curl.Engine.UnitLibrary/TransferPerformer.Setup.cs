@@ -2,6 +2,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Text;
 using Curl.Api.Options.Http;
+using Curl.Api.Options.Protocols;
 using Curl.Cli;
 using Curl.Core;
 using Curl.Core.Hsts;
@@ -192,7 +193,8 @@ internal sealed partial class TransferPerformer
     /// <see cref="KnownHostsFileMissingFailure" /> end the run before any connection (measured 2026-09-29,
     /// BL-576 Notes). Any other scheme is left without SSH options.
     /// </summary>
-    /// <param name="options">The transfer's option group.</param>
+    /// <param name="options">The transfer's option group, for <c>-k</c>, <c>-s</c>, <c>-S</c> and <c>--pass</c>.</param>
+    /// <param name="ssh">The option group's SSH options: the keys, the host key fingerprints, compression and <c>--knownhosts</c>.</param>
     /// <param name="url">The URL to transfer.</param>
     /// <param name="state">The running transfer, which keeps the SSH options.</param>
     /// <param name="findKnownHostsFile">Finds the default known-hosts file, or gives <see langword="null" />.</param>
@@ -201,6 +203,7 @@ internal sealed partial class TransferPerformer
     /// <returns><see cref="KnownHostsFileMissingFailure" />, or <see langword="null" /> to go on.</returns>
     internal async Task<TransferResult?> ResolveSshOptionsAsync(
         CommandLineOptions options,
+        EasySshOptions ssh,
         CurlUrl url,
         EngineTransferState state,
         Func<string?> findKnownHostsFile,
@@ -212,15 +215,15 @@ internal sealed partial class TransferPerformer
             return null;
         }
 
-        string? knownHosts = options.Insecure ? null : options.SshKnownHostsFile ?? findKnownHostsFile();
+        string? knownHosts = options.Insecure ? null : ssh.KnownHostsFile ?? findKnownHostsFile();
         bool missing = knownHosts is null && !options.Insecure;
         recordKnownHostsFile(knownHosts, missing);
-        if (missing && await ReportKnownHostsFileMissingAsync(options, writeErrorLine).ConfigureAwait(false) is { } failure)
+        if (missing && await ReportKnownHostsFileMissingAsync(options, ssh, writeErrorLine).ConfigureAwait(false) is { } failure)
         {
             return failure;
         }
 
-        state.Ssh = SshOptionsMapping.FromCommandLine(options, knownHosts);
+        state.Ssh = SshOptionsMapping.Of(ssh, options.Passphrase, knownHosts);
         return null;
     }
 
@@ -395,12 +398,13 @@ internal sealed partial class TransferPerformer
     /// when a host key fingerprint was given, and otherwise <see cref="KnownHostsFileMissingLine" />, unless
     /// <c>-s</c> without <c>-S</c>, and <see cref="KnownHostsFileMissingFailure" />.
     /// </summary>
-    /// <param name="options">The transfer's option group.</param>
+    /// <param name="options">The transfer's option group, for <c>-s</c> and <c>-S</c>.</param>
+    /// <param name="ssh">The option group's SSH options, for the host key fingerprints.</param>
     /// <param name="writeErrorLine">Writes a line to standard error.</param>
     /// <returns><see cref="KnownHostsFileMissingFailure" />, or <see langword="null" /> when the transfer goes on.</returns>
-    private async Task<TransferResult?> ReportKnownHostsFileMissingAsync(CommandLineOptions options, Func<string, Task> writeErrorLine)
+    private async Task<TransferResult?> ReportKnownHostsFileMissingAsync(CommandLineOptions options, EasySshOptions ssh, Func<string, Task> writeErrorLine)
     {
-        if (options.SshHostPublicKeyMd5 is not null || options.SshHostPublicKeySha256 is not null)
+        if (ssh.HostPublicKeyMd5 is not null || ssh.HostPublicKeySha256 is not null)
         {
             await WriteUnlessHiddenAsync(options.Silent, KnownHostsFileMissingWarning, writeErrorLine).ConfigureAwait(false);
             return null;

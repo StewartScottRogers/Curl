@@ -1,5 +1,6 @@
 using System.Text;
 using Curl.Api.Options.Http;
+using Curl.Api.Options.Protocols;
 using Curl.Cli;
 using Curl.Core;
 using Curl.Core.Hsts;
@@ -137,7 +138,7 @@ public sealed partial class TransferPerformerTests
         EngineTransferState state = NewState();
 
         TransferResult? failure = await sshPerformer.ResolveSshOptionsAsync(
-            Parse("--hostpubmd5", Md5Fingerprint, SftpUrl), CurlUrl.Parse(SftpUrl), state, () => null, (_, _) => { }, Recorder(lines));
+            Parse(SftpUrl), new EasySshOptions { HostPublicKeyMd5 = Md5Fingerprint }, CurlUrl.Parse(SftpUrl), state, () => null, (_, _) => { }, Recorder(lines));
 
         Assert.IsNull(failure);
         CollectionAssert.AreEqual(new[] { TransferPerformer.KnownHostsFileMissingWarning }, lines);
@@ -161,7 +162,7 @@ public sealed partial class TransferPerformerTests
         EngineTransferState state = NewState();
 
         TransferResult? failure = await sshPerformer.ResolveSshOptionsAsync(
-            Parse(First), CurlUrl.Parse(First), state, () => throw new AssertFailedException("searched"), (_, _) => { }, Recorder([]));
+            Parse(First), new EasySshOptions(), CurlUrl.Parse(First), state, () => throw new AssertFailedException("searched"), (_, _) => { }, Recorder([]));
 
         Assert.IsNull(failure);
         Assert.IsNull(state.Ssh);
@@ -249,7 +250,7 @@ public sealed partial class TransferPerformerTests
 
     private Task<TransferResult?> ResolveSshAsync(CommandLineOptions options, List<string> lines, List<(string? File, bool Missing)> recorded) =>
         sshPerformer.ResolveSshOptionsAsync(
-            options, CurlUrl.Parse(SftpUrl), NewState(), () => null, (file, missing) => recorded.Add((file, missing)), Recorder(lines));
+            options, EasyOptionsFromCommandLine.ProtocolOf(options).Ssh, CurlUrl.Parse(SftpUrl), NewState(), () => null, (file, missing) => recorded.Add((file, missing)), Recorder(lines));
 
     /// <summary>Records the info lines; drops the rest.</summary>
     private sealed class InfoRecordingEvents : ITransferEvents
