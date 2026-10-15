@@ -2,6 +2,7 @@
 id: GF-0072
 title: --next transfers reuse a connection where curl opens a new one (another host name at the same --resolve address) and open one where curl reuses (only --connect-to differs)
 area: behaviour
+platform: windows
 key: behaviour:connection-reuse-match-differs
 severity: High
 status: closed
@@ -35,6 +36,7 @@ Align the connection match with curl 8.22.0's. In Curl.Console's OptionGroupConn
 - 2026-10-14_0904: 0 of 2 items are gaps.
 - 2026-10-15_0304: 0 of 2 items are gaps.
 - 2026-10-15_0543: 0 of 2 items are gaps.
+- 2026-10-15_0751: 0 of 2 items are gaps.
 
 ## Log
 

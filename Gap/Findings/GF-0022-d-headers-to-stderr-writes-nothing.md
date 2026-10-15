@@ -2,6 +2,7 @@
 id: GF-0022
 title: -D % (headers to stderr) writes nothing
 area: behaviour
+platform: windows
 key: behaviour:dump-header-to-stderr
 severity: High
 status: closed
@@ -42,6 +43,7 @@ In Curl.Cli.UnitLibrary and Curl.Console's -D target opening, accept '%' as stde
 - 2026-10-14_0904: 0 of 1 items are gaps.
 - 2026-10-15_0304: 0 of 1 items are gaps.
 - 2026-10-15_0543: 0 of 1 items are gaps.
+- 2026-10-15_0751: 0 of 1 items are gaps.
 
 ## Log
 

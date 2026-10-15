@@ -2,6 +2,7 @@
 id: GF-0071
 title: A custom 'Authorization : value' header (white space before the colon) is still sent after -L redirects to another host
 area: behaviour
+platform: windows
 key: behaviour:custom-authorization-header-with-space-before-colon-kept-on-redirect
 severity: Critical
 status: closed
@@ -35,6 +36,7 @@ In Curl.Protocol.Http.UnitLibrary, make HttpCustomHeader.Names compare the heade
 - 2026-10-14_0904: 0 of 1 items are gaps.
 - 2026-10-15_0304: 0 of 1 items are gaps.
 - 2026-10-15_0543: 0 of 1 items are gaps.
+- 2026-10-15_0751: 0 of 1 items are gaps.
 
 ## Log
 

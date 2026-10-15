@@ -2,6 +2,7 @@
 id: GF-0073
 title: A cookie loaded with -b from a file for a public suffix domain (.co.uk) is sent, where curl drops it
 area: behaviour
+platform: windows
 key: behaviour:cookie-file-public-suffix-domain-not-dropped
 severity: High
 status: closed
@@ -35,6 +36,7 @@ In Curl.Cookies.UnitLibrary, apply the Public Suffix List to cookies loaded from
 - 2026-10-14_0904: 0 of 1 items are gaps.
 - 2026-10-15_0304: 0 of 1 items are gaps.
 - 2026-10-15_0543: 0 of 1 items are gaps.
+- 2026-10-15_0751: 0 of 1 items are gaps.
 
 ## Log
 

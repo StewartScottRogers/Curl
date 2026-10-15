@@ -2,6 +2,7 @@
 id: GF-0018
 title: -F multipart bodies differ: custom Content-Type, several files in one -F, quoted file names with , ; "
 area: behaviour
+platform: windows
 key: behaviour:multipart-form-encoding
 severity: High
 status: closed
@@ -42,6 +43,7 @@ In Curl.Cli.UnitLibrary's -F parser and the multipart writer it feeds: merge a u
 - 2026-10-14_0904: 0 of 4 items are gaps.
 - 2026-10-15_0304: 0 of 4 items are gaps.
 - 2026-10-15_0543: 0 of 4 items are gaps.
+- 2026-10-15_0751: 0 of 4 items are gaps.
 
 ## Log
 

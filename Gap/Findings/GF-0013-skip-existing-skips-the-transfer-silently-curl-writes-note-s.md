@@ -2,6 +2,7 @@
 id: GF-0013
 title: --skip-existing skips the transfer silently; curl writes 'Note: skips transfer, "<file>" exists locally'
 area: behaviour
+platform: windows
 key: behaviour:skip-existing-note-missing
 severity: Medium
 status: closed
@@ -42,6 +43,7 @@ In Curl.Console, where --skip-existing decides to skip a transfer, write curl 8.
 - 2026-10-14_0904: 0 of 3 items are gaps.
 - 2026-10-15_0304: 0 of 3 items are gaps.
 - 2026-10-15_0543: 0 of 3 items are gaps.
+- 2026-10-15_0751: 0 of 3 items are gaps.
 
 ## Log
 

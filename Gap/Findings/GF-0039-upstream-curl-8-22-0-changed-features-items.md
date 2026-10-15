@@ -2,6 +2,7 @@
 id: GF-0039
 title: Upstream curl 8.22.0 changed features items
 area: features
+platform: windows
 key: features:newest
 severity: Low
 status: closed
@@ -41,6 +42,7 @@ Bring these items to Curl when the target moves to 8.22.0.
 - 2026-10-14_0904: 0 of 1 items are gaps. 1 not in this run's measurement.
 - 2026-10-15_0304: 0 of 1 items are gaps. 1 not in this run's measurement.
 - 2026-10-15_0543: 0 of 1 items are gaps. 1 not in this run's measurement.
+- 2026-10-15_0751: 0 of 1 items are gaps. 1 not in this run's measurement.
 
 ## Log
 

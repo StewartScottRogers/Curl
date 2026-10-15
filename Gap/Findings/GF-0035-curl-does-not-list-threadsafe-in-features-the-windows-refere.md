@@ -2,6 +2,7 @@
 id: GF-0035
 title: Curl does not list threadsafe in Features; the Windows reference build does
 area: features
+platform: windows
 key: features:threadsafe-missing
 severity: High
 status: closed
@@ -42,6 +43,7 @@ Record in an ADR whether Curl's transfers are thread-safe in the sense curl mean
 - 2026-10-14_0904: 0 of 1 items are gaps.
 - 2026-10-15_0304: 0 of 1 items are gaps.
 - 2026-10-15_0543: 0 of 1 items are gaps.
+- 2026-10-15_0751: 0 of 1 items are gaps.
 
 ## Log
 

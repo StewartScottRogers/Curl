@@ -2,6 +2,7 @@
 id: GF-0017
 title: --compressed mishandles 'Content-Encoding: none' and a broken deflate header
 area: behaviour
+platform: windows
 key: behaviour:content-encoding-edge-cases
 severity: High
 status: closed
@@ -42,6 +43,7 @@ In Curl.Protocol.Http.UnitLibrary's HttpContentCoding / HttpContentDecoder: trea
 - 2026-10-14_0904: 0 of 2 items are gaps.
 - 2026-10-15_0304: 0 of 2 items are gaps.
 - 2026-10-15_0543: 0 of 2 items are gaps.
+- 2026-10-15_0751: 0 of 2 items are gaps.
 
 ## Log
 

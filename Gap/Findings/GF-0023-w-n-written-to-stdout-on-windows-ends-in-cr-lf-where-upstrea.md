@@ -2,6 +2,7 @@
 id: GF-0023
 title: -w '\n' written to stdout on Windows ends in CR LF where upstream expects LF
 area: behaviour
+platform: windows
 key: behaviour:writeout-stdout-line-feed
 severity: High
 status: closed
@@ -42,6 +43,7 @@ In Curl.Output.UnitLibrary / Curl.Console's -w writer, write a -w line feed to s
 - 2026-10-14_0904: 0 of 1 items are gaps.
 - 2026-10-15_0304: 0 of 1 items are gaps.
 - 2026-10-15_0543: 0 of 1 items are gaps.
+- 2026-10-15_0751: 0 of 1 items are gaps.
 
 ## Log
 

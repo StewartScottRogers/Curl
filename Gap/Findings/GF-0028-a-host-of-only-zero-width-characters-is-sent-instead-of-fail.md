@@ -2,6 +2,7 @@
 id: GF-0028
 title: A host of only zero-width characters is sent instead of failing with exit 3
 area: behaviour
+platform: windows
 key: behaviour:idn-host-mapping-to-empty
 severity: High
 status: closed
@@ -42,6 +43,7 @@ In Curl.Protocol.Abstractions.UnitLibrary's CurlUrlHost, reject a host whose IDN
 - 2026-10-14_0904: 0 of 1 items are gaps.
 - 2026-10-15_0304: 0 of 1 items are gaps.
 - 2026-10-15_0543: 0 of 1 items are gaps.
+- 2026-10-15_0751: 0 of 1 items are gaps.
 
 ## Log
 

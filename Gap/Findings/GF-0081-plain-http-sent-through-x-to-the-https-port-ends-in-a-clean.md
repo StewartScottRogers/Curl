@@ -2,6 +2,7 @@
 id: GF-0081
 title: Plain HTTP sent through -x to the HTTPS port ends in a clean close (exit 52) instead of stunnel's reset (exit 56)
 area: behaviour
+platform: windows
 key: behaviour:harness-tls-server-closes-cleanly-on-plaintext
 severity: High
 status: closed
@@ -33,6 +34,7 @@ In Curl.Conformance.UnitLibrary TlsServerConnection.ServeAsync, end a connection
 
 - 2026-10-15_0304: 1 of 1 items are gaps.
 - 2026-10-15_0543: 0 of 1 items are gaps.
+- 2026-10-15_0751: 0 of 1 items are gaps.
 
 ## Log
 

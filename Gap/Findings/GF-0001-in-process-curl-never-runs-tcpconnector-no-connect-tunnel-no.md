@@ -2,6 +2,7 @@
 id: GF-0001
 title: In process, Curl never runs TcpConnector: no CONNECT tunnel, no HAProxy header, no .onion refusal, no name-resolution or --resolve/--connect-to failures
 area: behaviour
+platform: windows
 key: behaviour:in-process-runner-bypasses-tcp-connector
 severity: Critical
 status: closed
@@ -42,6 +43,7 @@ In Curl.Console, give InProcessCurl (and the CurlComposition.CreateRunner overlo
 - 2026-10-14_0904: 0 of 36 items are gaps.
 - 2026-10-15_0304: 0 of 36 items are gaps.
 - 2026-10-15_0543: 0 of 36 items are gaps.
+- 2026-10-15_0751: 0 of 36 items are gaps.
 
 ## Log
 

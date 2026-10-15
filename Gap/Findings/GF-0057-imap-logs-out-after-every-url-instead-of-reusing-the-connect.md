@@ -2,6 +2,7 @@
 id: GF-0057
 title: IMAP logs out after every URL instead of reusing the connection, and every connection's tags start with A where curl uses one letter per connection
 area: behaviour
+platform: windows
 key: behaviour:imap-connection-not-reused-and-tag-letter-fixed
 severity: High
 status: closed
@@ -40,6 +41,7 @@ In Curl.Protocol.Imap.UnitLibrary, keep an IMAP connection open after a transfer
 - 2026-10-14_0904: 0 of 6 items are gaps.
 - 2026-10-15_0304: 0 of 6 items are gaps.
 - 2026-10-15_0543: 0 of 6 items are gaps.
+- 2026-10-15_0751: 0 of 6 items are gaps.
 
 ## Log
 

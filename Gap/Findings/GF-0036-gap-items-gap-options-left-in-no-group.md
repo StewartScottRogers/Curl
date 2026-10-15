@@ -2,6 +2,7 @@
 id: GF-0036
 title: Gap items gap-options left in no group
 area: options
+platform: windows
 key: options:ungrouped
 severity: Low
 status: closed
@@ -47,6 +48,7 @@ Group these items under their causes in the next gap-options report.
 - 2026-10-14_0904: 0 of 6 items are gaps.
 - 2026-10-15_0304: 0 of 6 items are gaps.
 - 2026-10-15_0543: 0 of 6 items are gaps.
+- 2026-10-15_0751: 0 of 6 items are gaps.
 
 ## Log
 

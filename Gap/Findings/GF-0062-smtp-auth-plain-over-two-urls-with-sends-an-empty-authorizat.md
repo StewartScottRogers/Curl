@@ -2,6 +2,7 @@
 id: GF-0062
 title: SMTP AUTH PLAIN over two URLs with -: sends an empty authorization identity; upstream expects user, user, password
 area: behaviour
+platform: windows
 key: behaviour:smtp-plain-message-on-connection-reuse
 severity: High
 status: closed
@@ -41,6 +42,7 @@ Measure test938's command line against the reference with Record-CurlExchange.ps
 - 2026-10-14_0904: 0 of 1 items are gaps.
 - 2026-10-15_0304: 0 of 1 items are gaps.
 - 2026-10-15_0543: 0 of 1 items are gaps.
+- 2026-10-15_0751: 0 of 1 items are gaps.
 
 ## Log
 
