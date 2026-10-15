@@ -38,3 +38,4 @@ Byte-for-byte points ADR-0513 settles: `ConnectTimeout` zero means "not set" (li
 ## Log
 
 - 2026-10-15: Created.
+- 2026-10-15: Backlog -> Doing.
