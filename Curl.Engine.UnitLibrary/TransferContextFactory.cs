@@ -3,6 +3,7 @@ using System.Text;
 
 using Curl.Api.Options.Behaviour;
 using Curl.Api.Options.Http;
+using Curl.Api.Options.Network;
 using Curl.Api.Options.Protocols;
 using Curl.Api.Options.Proxy;
 using Curl.Cli;
@@ -80,6 +81,10 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
     /// <param name="proxyOptions">
     /// The option group's proxy options: <c>-p</c> (<see cref="EasyProxyOptions.HttpProxyTunnel" />) and
     /// <c>--suppress-connect-headers</c>.
+    /// </param>
+    /// <param name="network">
+    /// The option group's network options: <c>--connect-timeout</c> (zero is not set) and the <c>--connect-to</c>
+    /// mappings, which <see cref="ConnectToTunnelsThroughProxy" /> reads.
     /// </param>
     /// <param name="url">The URL to transfer.</param>
     /// <param name="output">Where the transfer's bytes go.</param>
@@ -161,6 +166,7 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
         EasyTransferOptions transfer,
         EasyProtocolOptions protocol,
         EasyProxyOptions proxyOptions,
+        EasyNetworkOptions network,
         CurlUrl url,
         Stream output,
         ByteRange? range,
@@ -221,7 +227,7 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
             QuoteCommands = QuoteCommandsOf(protocol.Ftp),
             CreateFileMode = options.CreateFileMode ?? TransferContext.DefaultCreateFileMode,
             PathAsIs = options.PathAsIs,
-            ConnectTimeout = options.ConnectTimeout,
+            ConnectTimeout = ConnectTimeoutOf(network),
             MaxTime = MaxTimeOf(transfer),
             OperationStarted = OperationStartedOf(maxTimeWatchdog),
             TimeCondition = TimeConditionOf(transfer),
@@ -232,7 +238,7 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
                 HttpRequestOptionsMapping.Of(options, http, behaviour, transfer, formBody, proxy, commandLineTextEncoding, ifNoneMatchHeaders) with
                 {
                     HstsStore = HstsStore,
-                    ProxyTunnel = proxyOptions.HttpProxyTunnel || ConnectToTunnelsThroughProxy(options, url, proxy),
+                    ProxyTunnel = proxyOptions.HttpProxyTunnel || ConnectToTunnelsThroughProxy(network, url, proxy),
                 },
                 altSvc),
             Mail = MailRequestOptionsMapping.FromCommandLine(options, transfer, protocol.Smtp, url.Scheme),
@@ -384,6 +390,15 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
         tftp.BlockSize == DefaultTftpOptions.BlockSize ? null : tftp.BlockSize;
 
     /// <summary>
+    /// Gets the <c>--connect-timeout</c> a handler reads: <see langword="null" /> when the record's
+    /// <see cref="EasyNetworkOptions.ConnectTimeout" /> is zero, which means not set (ADR-0513).
+    /// </summary>
+    /// <param name="network">The option group's network options.</param>
+    /// <returns>The context's <see cref="TransferContext.ConnectTimeout" />.</returns>
+    private static TimeSpan? ConnectTimeoutOf(EasyNetworkOptions network) =>
+        network.ConnectTimeout == TimeSpan.Zero ? null : network.ConnectTimeout;
+
+    /// <summary>
     /// Gets the path walk the FTP handler reads for <c>--ftp-method</c>: libcurl's default and
     /// <c>multicwd</c> are both one <c>CWD</c> per directory.
     /// </summary>
@@ -421,18 +436,18 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
     /// <c>-p</c> would (<c>lib/url.c</c>'s <c>parse_connect_to_slist</c>; upstream tests 2050 and
     /// 2055). A mapping that names the URL's own host and port, or does not parse, does not.
     /// </summary>
-    /// <param name="options">The parsed command line.</param>
+    /// <param name="network">The option group's network options, whose <see cref="EasyNetworkOptions.ConnectTo" /> is <c>--connect-to</c>.</param>
     /// <param name="url">The URL to transfer.</param>
     /// <param name="proxy">The transfer's proxy, or <see langword="null" /> for none.</param>
     /// <returns><see langword="true" /> when the transfer tunnels because of <c>--connect-to</c>.</returns>
-    internal static bool ConnectToTunnelsThroughProxy(CommandLineOptions options, CurlUrl url, ProxyEndpoint? proxy)
+    internal static bool ConnectToTunnelsThroughProxy(EasyNetworkOptions network, CurlUrl url, ProxyEndpoint? proxy)
     {
-        if (!IsHttpOrHttpsProxy(proxy) || options.ConnectToEntries.Count == 0)
+        if (!IsHttpOrHttpsProxy(proxy) || network.ConnectTo.Count == 0)
         {
             return false;
         }
 
-        Networking.ConnectDestination destination = new Networking.ConnectToMappings(options.ConnectToEntries).Map(url.Host, url.Port);
+        Networking.ConnectDestination destination = new Networking.ConnectToMappings(network.ConnectTo).Map(url.Host, url.Port);
         return destination is { IsMapped: true, ParseError: null } && IsAnotherHostOrPort(destination, url);
     }
 

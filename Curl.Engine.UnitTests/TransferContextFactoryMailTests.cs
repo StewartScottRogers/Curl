@@ -1,6 +1,7 @@
 using System.Net;
 using Curl.Api.Options.Behaviour;
 using Curl.Api.Options.Http;
+using Curl.Api.Options.Network;
 using Curl.Api.Options.Proxy;
 using Curl.Authentication;
 using Curl.Cli;
@@ -113,7 +114,7 @@ public sealed class TransferContextFactoryMailTests
         Diagnostics.Arrange("command line", url + " --mail-from from@example.com");
 
         TransferContext context = new TransferContextFactory(standardInput)
-            .Create(Parse(url, "--mail-from", "from@example.com"), HttpOf(url, "--mail-from", "from@example.com"), BehaviourOf(url, "--mail-from", "from@example.com"), TransferOf(url, "--mail-from", "from@example.com"), ProtocolOf(url, "--mail-from", "from@example.com"), ProxyOf(url, "--mail-from", "from@example.com"), CurlUrl.Parse(url), output, null, null, null);
+            .Create(Parse(url, "--mail-from", "from@example.com"), HttpOf(url, "--mail-from", "from@example.com"), BehaviourOf(url, "--mail-from", "from@example.com"), TransferOf(url, "--mail-from", "from@example.com"), ProtocolOf(url, "--mail-from", "from@example.com"), ProxyOf(url, "--mail-from", "from@example.com"), new EasyNetworkOptions(), CurlUrl.Parse(url), output, null, null, null);
         Diagnostics.Act("mail options", context.Mail?.ToString() ?? "null");
 
         Diagnostics.Assert("mail options", "null", context.Mail?.ToString() ?? "null");
@@ -151,7 +152,7 @@ public sealed class TransferContextFactoryMailTests
         using MemoryStream output = new();
 
         TransferContext context = new TransferContextFactory(standardInput)
-            .Create(Parse([url, .. arguments]), HttpOf([url, .. arguments]), BehaviourOf([url, .. arguments]), TransferOf([url, .. arguments]), ProtocolOf([url, .. arguments]), ProxyOf([url, .. arguments]), CurlUrl.Parse(url), output, null, null, null);
+            .Create(Parse([url, .. arguments]), HttpOf([url, .. arguments]), BehaviourOf([url, .. arguments]), TransferOf([url, .. arguments]), ProtocolOf([url, .. arguments]), ProxyOf([url, .. arguments]), new EasyNetworkOptions(), CurlUrl.Parse(url), output, null, null, null);
 
         Diagnostics.Act("mail options", context.Mail?.ToString() ?? "null");
         Assert.IsNotNull(context.Mail);
