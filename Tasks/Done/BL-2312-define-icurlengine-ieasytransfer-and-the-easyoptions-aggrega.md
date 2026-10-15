@@ -8,7 +8,7 @@ depends-on: [BL-2293, BL-2294, BL-2295, BL-2296, BL-2297, BL-2298, BL-2299, BL-2
 touches: [Curl.Api.UnitLibrary/EngineContracts, Curl.Api.UnitTests/EngineContracts, Curl.Api.UnitLibrary/Options/EasyOptions.cs, Curl.Api.UnitTests/Options/EasyOptionsTests.cs]
 requirement: none
 created: 2026-10-15
-completed:
+completed: 2026-10-15
 ---
 # BL-2312 — Define ICurlEngine, IEasyTransfer and the EasyOptions aggregate in Curl.Api.UnitLibrary
 
@@ -27,18 +27,23 @@ ADR-0506, "Layering" and "The engine's input is a CLI-neutral option model"; pla
 
 ## Acceptance criteria
 
-- [ ] `ICurlEngine`, `IEasyTransfer`, the pause flags and the version-information record exist in `Curl.Api.UnitLibrary/EngineContracts` with XML docs naming the libcurl function each member stands for.
-- [ ] `EasyOptions` exists in `Curl.Api.UnitLibrary/Options/EasyOptions.cs`; a test in `Curl.Api.UnitTests/Options/EasyOptionsTests.cs` shows a new instance equals one built from every group's default record.
-- [ ] Tests in `Curl.Api.UnitTests/EngineContracts` pin the `CURLPAUSE_*` values and the version record's defaults.
-- [ ] `Curl.Api.UnitLibrary` still references no protocol library and no engine.
-- [ ] `dotnet build` is clean (warnings are errors).
-- [ ] `dotnet test --filter "TestCategory!=Integration"` passes.
-- [ ] `powershell -NoProfile -File Measure-CodeQuality.ps1` passes (100% line and branch coverage, complexity <= 10, CRAP <= 30).
-- [ ] `Curl.Conformance.UnitTests/PassingUpstreamCases.txt` is unchanged.
+- [x] `ICurlEngine`, `IEasyTransfer`, the pause flags and the version-information record exist in `Curl.Api.UnitLibrary/EngineContracts` with XML docs naming the libcurl function each member stands for.
+- [x] `EasyOptions` exists in `Curl.Api.UnitLibrary/Options/EasyOptions.cs`; a test in `Curl.Api.UnitTests/Options/EasyOptionsTests.cs` shows a new instance equals one built from every group's default record.
+- [x] Tests in `Curl.Api.UnitTests/EngineContracts` pin the `CURLPAUSE_*` values and the version record's defaults.
+- [x] `Curl.Api.UnitLibrary` still references no protocol library and no engine.
+- [x] `dotnet build` is clean (warnings are errors).
+- [x] `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] `powershell -NoProfile -File Measure-CodeQuality.ps1` passes (100% line and branch coverage, complexity <= 10, CRAP <= 30).
+- [x] `Curl.Conformance.UnitTests/PassingUpstreamCases.txt` is unchanged.
 
 ## Notes
+
+- Contract shapes decided in ADR-0509: settable `Options` changed with `with`; `CurlPause` members Continue 0, Receive 1, Send 4, All 5 (the `*_CONT` aliases share 0); `CurlVersionInfo` holds feature names, not the bitmask, and defaults to 8.22.0 / 0x081600 with nothing built in.
+- `Curl.Api.UnitLibrary` still references only `Curl.Protocol.Abstractions.UnitLibrary`.
+- Measure-CodeQuality.ps1 -Library Curl.Api.UnitLibrary: 100% line, 100% branch, 0 failing members. Fast tests green; `PassingUpstreamCases.txt` untouched.
 
 ## Log
 
 - 2026-10-15: Created.
 - 2026-10-15: Backlog -> Doing.
+- 2026-10-15: Doing -> Done. Engine contracts and EasyOptions defined; build clean, fast tests green, Curl.Api.UnitLibrary at 100% line and branch
