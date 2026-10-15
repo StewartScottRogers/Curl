@@ -31,3 +31,4 @@ BL-2226 gave the harness an `https-proxy` stand-in (`HttpsProxyServerConnector`,
 ## Log
 
 - 2026-10-14: Created.
+- 2026-10-14: Backlog -> Doing.
