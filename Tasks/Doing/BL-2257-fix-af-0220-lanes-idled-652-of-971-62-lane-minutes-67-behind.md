@@ -51,3 +51,4 @@ The finding closes only when a later re-audit by the process auditor confirms th
 ## Log
 
 - 2026-10-14: Created.
+- 2026-10-15: Backlog -> Doing. Interactive: task-board.ps1 is a guard file.
