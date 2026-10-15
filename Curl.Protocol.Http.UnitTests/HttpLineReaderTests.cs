@@ -42,6 +42,27 @@ public sealed class HttpLineReaderTests
     }
 
     [TestMethod]
+    [DataRow(false, 1, DisplayName = "Any line, 1-byte reads")]
+    [DataRow(false, 65536, DisplayName = "Any line, one read")]
+    [DataRow(true, 65536, DisplayName = "Status line, one read")]
+    public async Task ReadLineAsync_BareLineFeedAtTheFrontOfTheBuffer_ReturnsItAsALineOfItsOwn(bool isStatusLine, int chunkSize)
+    {
+        HttpLineReader reader = new(new ScriptedConnection(Encoding.ASCII.GetBytes("\nab\n"), chunkSize));
+        Diagnostics.Arrange("status line, chunk size", $"{isStatusLine}, {chunkSize}");
+        Diagnostics.Bytes("scripted", Encoding.ASCII.GetBytes("\nab\n"));
+
+        byte[]? first = await reader.ReadLineAsync(isStatusLine, CancellationToken.None);
+        byte[]? second = await reader.ReadLineAsync(false, CancellationToken.None);
+
+        Diagnostics.Bytes("first line", first);
+        Diagnostics.Bytes("second line", second);
+        Diagnostics.Diff("first line", "\n", first is null ? "(none)" : Encoding.ASCII.GetString(first));
+        Diagnostics.Diff("second line", "ab\n", second is null ? "(none)" : Encoding.ASCII.GetString(second));
+        Assert.AreEqual("\n", first is null ? "(none)" : Encoding.ASCII.GetString(first));
+        Assert.AreEqual("ab\n", second is null ? "(none)" : Encoding.ASCII.GetString(second));
+    }
+
+    [TestMethod]
     public async Task ReadLineAsync_PeerClosesInsideALine_ReturnsNull()
     {
         HttpLineReader reader = new(new ScriptedConnection(Encoding.ASCII.GetBytes("partial"), 2));

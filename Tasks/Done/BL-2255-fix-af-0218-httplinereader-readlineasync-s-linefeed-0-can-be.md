@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Protocol.Http.UnitLibrary]
+touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests]
 requirement: none
 created: 2026-10-14
-completed:
+completed: 2026-10-14
 ---
 # BL-2255 — Fix AF-0218: HttpLineReader.ReadLineAsync's 'lineFeed >= 0' can become 'lineFeed > 0' with no test failing
 
@@ -41,12 +41,17 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Added `Curl.Protocol.Http.UnitTests` to `touches`: the fix is a test, and no other task in Doing on `origin/work/dark-factory` names that project.
+- Fix: `HttpLineReaderTests.ReadLineAsync_BareLineFeedAtTheFrontOfTheBuffer_ReturnsItAsALineOfItsOwn` scripts `\nab\n` (a bare LF at buffer index 0) and asserts the lines `\n` then `ab\n`, for an ordinary line with 1-byte and single reads and for a status line. No production change: the code was right, only the test was missing.
+- A lane may not run `Audit/Tools/Invoke-MutationTest.ps1` (audit path), so the mutant was applied by hand instead: with `if (lineFeed > 0)` all 3 new rows fail (Failed 3, Passed 6 of `HttpLineReaderTests`); with the original `>= 0` all pass. The quality auditor's re-audit confirms it with the tool.
 
 ## Log
 
 - 2026-10-14: Created.
 - 2026-10-14: Backlog -> Doing.
+- 2026-10-14: Doing -> Done. A test now puts a bare LF at buffer index 0, so the lineFeed > 0 mutant in HttpLineReader.ReadLineAsync fails 3 tests
