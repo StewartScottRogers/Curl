@@ -39,3 +39,4 @@ Points ADR-0516 settles that this retarget must honour:
 ## Log
 
 - 2026-10-15: Created.
+- 2026-10-15: Backlog -> Doing.
