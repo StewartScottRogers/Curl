@@ -75,6 +75,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Curl.Api.UnitLibrary\Curl.Api.UnitLibrary.csproj" />
     <ProjectReference Include="..\Curl.Authentication.UnitLibrary\Curl.Authentication.UnitLibrary.csproj" />
     <ProjectReference Include="..\Curl.Cli.UnitLibrary\Curl.Cli.UnitLibrary.csproj" />
     <ProjectReference Include="..\Curl.Engine.UnitLibrary\Curl.Engine.UnitLibrary.csproj" />

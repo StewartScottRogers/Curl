@@ -42,6 +42,7 @@ public sealed class EasyNetworkOptionsTests
         Assert.IsFalse(Defaults.TcpKeepAlive);
         Assert.IsFalse(Defaults.FreshConnect);
         Assert.IsFalse(Defaults.ForbidReuse);
+        Assert.IsFalse(Defaults.MultipathTcp);
     }
 
     [TestMethod]
@@ -53,6 +54,8 @@ public sealed class EasyNetworkOptionsTests
         Assert.AreEqual(9, Defaults.TcpKeepCount);
         Assert.AreEqual(0L, Defaults.AddressScope);
         Assert.AreEqual(5, Defaults.MaxConnects);
+        Assert.AreEqual(0, Defaults.IpTypeOfService);
+        Assert.AreEqual(0, Defaults.VlanPriority);
     }
 
     [TestMethod]
@@ -61,7 +64,7 @@ public sealed class EasyNetworkOptionsTests
         Assert.AreEqual(TimeSpan.FromSeconds(60), Defaults.DnsCacheTimeout);
         Assert.AreEqual(TimeSpan.FromSeconds(60), Defaults.TcpKeepIdle);
         Assert.AreEqual(TimeSpan.FromSeconds(60), Defaults.TcpKeepInterval);
-        Assert.AreEqual(TimeSpan.FromSeconds(300), Defaults.ConnectTimeout);
+        Assert.AreEqual(TimeSpan.Zero, Defaults.ConnectTimeout);
         Assert.AreEqual(TimeSpan.FromMilliseconds(200), Defaults.HappyEyeballsTimeout);
         Assert.AreEqual(TimeSpan.FromSeconds(118), Defaults.MaxIdleConnectionAge);
         Assert.AreEqual(TimeSpan.FromHours(24), Defaults.MaxConnectionLifetime);
@@ -121,6 +124,9 @@ public sealed class EasyNetworkOptionsTests
         Change("TcpKeepIdle", o => o with { TcpKeepIdle = TimeSpan.FromSeconds(5) }, o => o with { TcpKeepIdle = Defaults.TcpKeepIdle }),
         Change("TcpKeepInterval", o => o with { TcpKeepInterval = TimeSpan.FromSeconds(5) }, o => o with { TcpKeepInterval = Defaults.TcpKeepInterval }),
         Change("TcpKeepCount", o => o with { TcpKeepCount = 3 }, o => o with { TcpKeepCount = Defaults.TcpKeepCount }),
+        Change("IpTypeOfService", o => o with { IpTypeOfService = 16 }, o => o with { IpTypeOfService = Defaults.IpTypeOfService }),
+        Change("VlanPriority", o => o with { VlanPriority = 3 }, o => o with { VlanPriority = Defaults.VlanPriority }),
+        Change("MultipathTcp", o => o with { MultipathTcp = true }, o => o with { MultipathTcp = Defaults.MultipathTcp }),
         Change("AddressScope", o => o with { AddressScope = 2 }, o => o with { AddressScope = Defaults.AddressScope }),
         Change("UnixSocketPath", o => o with { UnixSocketPath = "/tmp/s" }, o => o with { UnixSocketPath = Defaults.UnixSocketPath }),
         Change("AbstractUnixSocket", o => o with { AbstractUnixSocket = "s" }, o => o with { AbstractUnixSocket = Defaults.AbstractUnixSocket }),

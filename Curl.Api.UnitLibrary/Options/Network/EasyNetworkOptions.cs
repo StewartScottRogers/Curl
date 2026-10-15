@@ -115,6 +115,25 @@ public sealed record EasyNetworkOptions
     /// <summary><c>CURLOPT_TCP_KEEPCNT</c>: unanswered keepalive probes before the connection is dropped. Default 9.</summary>
     public int TcpKeepCount { get; init; } = 9;
 
+    /// <summary>
+    /// The IP Type of Service byte each socket is given (the curl tool's <c>--ip-tos</c>, which it sets
+    /// through <c>CURLOPT_SOCKOPTFUNCTION</c> rather than an option of its own; ADR-0513). Default 0,
+    /// meaning the socket's own.
+    /// </summary>
+    public int IpTypeOfService { get; init; }
+
+    /// <summary>
+    /// The VLAN priority each socket is given (the curl tool's <c>--vlan-priority</c>, set through
+    /// <c>CURLOPT_SOCKOPTFUNCTION</c>; ADR-0513). Default 0, meaning the socket's own.
+    /// </summary>
+    public int VlanPriority { get; init; }
+
+    /// <summary>
+    /// Open TCP sockets as Multipath TCP (the curl tool's <c>--mptcp</c>, set through
+    /// <c>CURLOPT_OPENSOCKETFUNCTION</c>; ADR-0513). Default <see langword="false"/>.
+    /// </summary>
+    public bool MultipathTcp { get; init; }
+
     /// <summary><c>CURLOPT_ADDRESS_SCOPE</c>: the IPv6 scope id for link-local addresses. Default 0.</summary>
     public long AddressScope { get; init; }
 
@@ -129,9 +148,10 @@ public sealed record EasyNetworkOptions
 
     /// <summary>
     /// <c>CURLOPT_CONNECTTIMEOUT</c> (and <c>CURLOPT_CONNECTTIMEOUT_MS</c>): the longest the connect
-    /// phase may take. Default 300 seconds, which libcurl also uses when set to zero.
+    /// phase may take. Default zero, libcurl's stored default, which it takes as 300 seconds and for
+    /// which it sets no <c>CONNECTTIMEOUT</c> timer (ADR-0513).
     /// </summary>
-    public TimeSpan ConnectTimeout { get; init; } = TimeSpan.FromSeconds(300);
+    public TimeSpan ConnectTimeout { get; init; } = TimeSpan.Zero;
 
     /// <summary>
     /// <c>CURLOPT_HAPPY_EYEBALLS_TIMEOUT_MS</c>: the head start the first IP family gets before the

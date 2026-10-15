@@ -33,6 +33,14 @@ hand-built client (a `--tls-max` of 1.0 or 1.1 today) and `SslStreamTlsProvider`
 
 `EngineComposition.CreateProtocolHandlers` builds the handlers behind the engine's end-point recorders and `LazyProtocolHandler` (see `Curl.Engine.UnitLibrary/CLAUDE.md`, ADR-0119, BL-515, BL-1715, AF-0063).
 
+`EasyOptionsFromCommandLine` is the curl tool's `config2setopts.c`: it maps one option group's
+`CommandLineOptions` onto `Curl.Api.UnitLibrary`'s easy option groups, one method per group, as
+curl hands its options to libcurl (ADR-0506). `NetworkOf` builds `EasyNetworkOptions` from the
+connection, DNS, socket, timeout, protocol and `--ssl` options; an option left out keeps libcurl's
+default, and where its mapping differs from the `CURLOPT_*` lines `--libcurl` writes, the command
+line's behaviour wins (ADR-0513). Nothing reads it yet: BL-2323 hands its record to the engine's
+factories, and BL-2304 to BL-2309 add the other groups.
+
 `Program.Main` only opens the standard streams, builds the composition and hands the
 arguments to `CurlCommandRunner`, which parses them, runs each URL and prints curl's
 `curl: (N) <message>` lines, each transfer's message cut to curl's 255-byte error buffer by
