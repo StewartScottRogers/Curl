@@ -177,3 +177,7 @@ are in `Curl.Engine.UnitTests`; the setup tests use their own `ReadRecordingFile
 ## The form body (BL-2344)
 
 `MultipartFormPartMapping.FromMimeBody` builds the builder's parts from `EasyHttpOptions.MimePost`, which `Curl.Console` builds with `EasyOptionsFromCommandLine.HttpOf`: an `EasyMimeFile` or `EasyMimeStandardInput` part with a file name is an upload, one without is file content, `EasyMimeBytes` is UTF-8 text, and `SubParts` is a multipart. `NameEscapingOf` and `RequestContentTypeOf` still read `CommandLineOptions` (ADR-0531).
+
+## The HTTP request, version and redirect mappings (BL-2345)
+
+`HttpRequestOptionsMapping.Of`, `RedirectPolicyMapping.Of` and `TransferContextFactory.Create` take `EasyHttpOptions` for the headers (with `--json`'s), `-A`, `-e`, `--request-target`, the `-d` body (`PostFields`, `null` under `-G`), the encodings (`Compressed` is a set `AcceptEncoding`, `Raw` both decodings off), `-L`/`--follow`, `--max-redirs`, `--post30x`, the HTTP version, `--http0.9`, `--ignore-content-length` and `--expect100-timeout`; `-X`, `-f`, authentication, proxy, `--unix-socket`, `--happy-eyeballs-timeout-ms`, `--location-trusted` and the `--proto` options still come from `CommandLineOptions`. `HttpVersionMapping` maps `Curl.Api`'s `HttpVersion`; its `FromRequested` bridges `CommandLineOptions.HttpVersion` for `EngineComposition`, `OptionGroupConnectionSettings` and `AltSvcTransferCache` until BL-2350 and BL-2346 (ADR-0532).

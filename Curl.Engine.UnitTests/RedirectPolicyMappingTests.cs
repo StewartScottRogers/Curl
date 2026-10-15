@@ -1,4 +1,6 @@
+using Curl.Api.Options.Http;
 using Curl.Cli;
+using Curl.Console;
 using Curl.Core;
 using Curl.Testing;
 
@@ -119,6 +121,27 @@ public sealed class RedirectPolicyMappingTests
     }
 
     [TestMethod]
+    public void Of_RecordBuiltDirectly_ReadsTheRedirectSettingsFromIt()
+    {
+        EasyHttpOptions http = new()
+        {
+            FollowLocation = FollowLocation.ObeyCode,
+            MaxRedirects = 7,
+            PostRedirect = PostRedirect.Post301 | PostRedirect.Post303,
+        };
+        CommandLineOptions options = CommandLineParser.Parse([Url], _ => true).Options!;
+        Diagnostics.Arrange("record", http);
+
+        RedirectPolicy policy = RedirectPolicyMapping.Of(options, http);
+
+        Diagnostics.Act("keep post on 301/302/303", KeepPost(policy));
+        Diagnostics.Assert("keep post on 301/302/303", "True/False/True", KeepPost(policy));
+        Assert.AreEqual("True/False/True", KeepPost(policy));
+        Assert.AreEqual(7, policy.MaxRedirects);
+        Assert.IsTrue(policy.DropsCustomMethodOnSwitchToGet);
+    }
+
+    [TestMethod]
     [DataRow(false, "-L")]
     [DataRow(true, "--follow")]
     [DataRow(false, "--follow", "-L")]
@@ -165,6 +188,6 @@ public sealed class RedirectPolicyMappingTests
         CommandLineParseResult parsed = CommandLineParser.Parse(arguments, _ => true);
         Diagnostics.Assert("accepted", true, parsed.IsAccepted);
         Assert.IsTrue(parsed.IsAccepted);
-        return RedirectPolicyMapping.FromCommandLine(parsed.Options);
+        return RedirectPolicyMapping.Of(parsed.Options, EasyOptionsFromCommandLine.HttpOf(parsed.Options));
     }
 }

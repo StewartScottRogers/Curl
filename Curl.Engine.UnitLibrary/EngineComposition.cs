@@ -861,7 +861,7 @@ internal static class EngineComposition
     /// <c>--unix-socket</c> or <c>--abstract-unix-socket</c> it dials that socket for every
     /// transfer of the option group instead (<see cref="UnixSocketOf" />, BL-507). HTTP over TLS
     /// offers the ALPN list the version option and the platform choose
-    /// (<see cref="HttpVersionMapping.HttpOverTlsApplicationProtocolsOf(RequestedHttpVersion?)" />, ADR-0141).
+    /// (<see cref="HttpVersionMapping.HttpOverTlsApplicationProtocolsOf(Curl.Api.Options.Http.HttpVersion)" />, ADR-0141).
     /// <c>--happy-eyeballs-timeout-ms</c> is how long it dials the first address family alone before
     /// the other, curl's 200 ms when not given (ADR-0254, BL-889).
     /// </summary>
@@ -919,7 +919,7 @@ internal static class EngineComposition
             ConnectTimeoutOf(network, options.MaxTime),
             AddressFamilyOf(network),
             UnixSocketOf(network),
-            HttpVersionMapping.HttpOverTlsApplicationProtocolsOf(options.HttpVersion),
+            HttpVersionMapping.HttpOverTlsApplicationProtocolsOf(HttpVersionMapping.FromRequested(options.HttpVersion)),
             quicDialer,
             network.HappyEyeballsTimeout,
             localBinding: LocalBindingOf(network),

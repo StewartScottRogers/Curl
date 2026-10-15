@@ -1,7 +1,9 @@
 using System.Net;
 
+using Curl.Api.Options.Http;
 using Curl.Authentication;
 using Curl.Cli;
+using Curl.Console;
 using Curl.Protocol.Abstractions;
 using Curl.Testing;
 
@@ -109,7 +111,7 @@ public sealed class TransferContextFactoryMailTests
         Diagnostics.Arrange("command line", url + " --mail-from from@example.com");
 
         TransferContext context = new TransferContextFactory(standardInput)
-            .Create(Parse(url, "--mail-from", "from@example.com"), CurlUrl.Parse(url), output, null, null, null);
+            .Create(Parse(url, "--mail-from", "from@example.com"), HttpOf(url, "--mail-from", "from@example.com"), CurlUrl.Parse(url), output, null, null, null);
         Diagnostics.Act("mail options", context.Mail?.ToString() ?? "null");
 
         Diagnostics.Assert("mail options", "null", context.Mail?.ToString() ?? "null");
@@ -147,7 +149,7 @@ public sealed class TransferContextFactoryMailTests
         using MemoryStream output = new();
 
         TransferContext context = new TransferContextFactory(standardInput)
-            .Create(Parse([url, .. arguments]), CurlUrl.Parse(url), output, null, null, null);
+            .Create(Parse([url, .. arguments]), HttpOf([url, .. arguments]), CurlUrl.Parse(url), output, null, null, null);
 
         Diagnostics.Act("mail options", context.Mail?.ToString() ?? "null");
         Assert.IsNotNull(context.Mail);
@@ -163,4 +165,7 @@ public sealed class TransferContextFactoryMailTests
         Assert.IsTrue(parsed.IsAccepted);
         return parsed.Options;
     }
+
+    private static EasyHttpOptions HttpOf(params string[] arguments) =>
+        EasyOptionsFromCommandLine.HttpOf(CommandLineParser.Parse(arguments, _ => true).Options!);
 }

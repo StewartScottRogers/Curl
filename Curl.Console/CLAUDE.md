@@ -57,7 +57,7 @@ for each transfer's form body (BL-2344).
 `--compressed-ssh`), mail, TFTP and `-t` options; RTSP and WebSocket keep libcurl's defaults, and the
 known-hosts file found without `--knownhosts` stays per transfer (ADR-0529).
 `NetworkOf` is read by the engine's connection factories (BL-2323); the others are not read yet:
-BL-2324, BL-2325, BL-2338, BL-2345, BL-2346, BL-2347 and BL-2348 hand their records to the engine's classes.
+BL-2324, BL-2325, BL-2338, BL-2346, BL-2347 and BL-2348 hand their records to the engine's classes. `HttpOf` is also read by `HttpRequestOptionsMapping`, `RedirectPolicyMapping` and `TransferContextFactory` (BL-2345, ADR-0532).
 
 `Program.Main` only opens the standard streams, builds the composition and hands the
 arguments to `CurlCommandRunner`, which parses them, runs each URL and prints curl's

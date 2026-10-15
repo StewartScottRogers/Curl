@@ -131,7 +131,7 @@ internal sealed class AltSvcTransferCache : IAltSvcStore
     /// <returns>The options with the route and version set.</returns>
     internal HttpRequestOptions ApplyTo(CurlUrl url, HttpRequestOptions http)
     {
-        HttpVersionPreference version = HttpVersionMapping.ToHttpVersionPreference(requestedVersion);
+        HttpVersionPreference version = HttpVersionMapping.ToHttpVersionPreference(HttpVersionMapping.FromRequested(requestedVersion));
         return MatchFor(url) switch
         {
             null => http with { AltSvcRoute = null, Version = version, TcpFirstAttemptVersion = null },

@@ -1,47 +1,42 @@
 using System.Text;
 
+using Curl.Api.Options.Http;
 using Curl.Cli;
 using Curl.Networking;
 using Curl.Protocol.Abstractions;
-using Curl.Engine;
 using HttpRequestOptions = Curl.Protocol.Abstractions.HttpRequestOptions;
 
 namespace Curl.Engine;
 
 /// <summary>
-/// Maps the HTTP request options of a parsed command line onto the
-/// <see cref="HttpRequestOptions" /> an HTTP handler reads: <c>-X</c>, <c>--request-target</c>, <c>-H</c>, <c>-A</c>,
-/// <c>-e</c>, the <c>-d</c> family, <c>--json</c>, <c>-G</c>, <c>-f</c>, <c>--fail-with-body</c>
-/// <c>-L</c>, the authentication options <c>--basic</c>, <c>--digest</c>, <c>--anyauth</c> and
-/// <c>--oauth2-bearer</c>, and the transfer-encoding options <c>-0</c> / <c>--http1.0</c>,
-/// <c>--http1.1</c>, <c>--compressed</c>, <c>--tr-encoding</c>, <c>--raw</c> and
-/// <c>--ignore-content-length</c>, with the <c>-F</c> body the caller built.
+/// Maps the HTTP request options of an option group onto the <see cref="HttpRequestOptions" /> an HTTP handler
+/// reads. From <see cref="EasyHttpOptions" />: <c>--request-target</c>, <c>-H</c> with the headers <c>--json</c>
+/// adds, <c>-A</c>, <c>-e</c>, the <c>-d</c> family body, <c>-L</c>, <c>--max-redirs</c>, the HTTP version,
+/// <c>--compressed</c>, <c>--tr-encoding</c>, <c>--raw</c>, <c>--ignore-content-length</c>, <c>--http0.9</c> and
+/// <c>--expect100-timeout</c>. From the command line, until their groups' tasks retarget them: <c>-X</c>,
+/// <c>-f</c>, <c>--fail-with-body</c>, the authentication options, the proxy headers and tunnel,
+/// <c>--unix-socket</c> and <c>--happy-eyeballs-timeout-ms</c>; with the <c>-F</c> body the caller built.
 /// </summary>
 /// <remarks>
 /// Measured with curl 8.21.0 (mingw, Schannel) against a loopback recorder on 2026-09-26
-/// (BL-231 Notes). <c>--json</c> adds <c>Content-Type: application/json</c> and
-/// <c>Accept: application/json</c> after every <c>-H</c> header, each only when no <c>-H</c>
-/// header already starts with that name and a colon, compared without case, and adds them
-/// under <c>-G</c> too. A <c>-d</c> family body is sent as
-/// <c>application/x-www-form-urlencoded</c>, and not at all under <c>-G</c>, which moves it
-/// into the URL query (<see cref="QueryUrl" />).
+/// (BL-231 Notes). <c>--json</c>'s <c>Content-Type</c> and <c>Accept</c> lines and the <c>-G</c> rule that
+/// sends no <c>-d</c> body are applied where <see cref="EasyHttpOptions" /> is built
+/// (<c>EasyOptionsFromCommandLine.HttpOf</c>); a <see cref="EasyHttpOptions.PostFields" /> body is sent as
+/// <c>application/x-www-form-urlencoded</c>.
 /// </remarks>
 internal static class HttpRequestOptionsMapping
 {
     /// <summary>The <c>Content-Type</c> curl sends a <c>-d</c> family body with.</summary>
     internal const string FormUrlEncoded = "application/x-www-form-urlencoded";
 
-    private const string JsonContentType = "Content-Type: application/json";
-
-    private const string JsonAccept = "Accept: application/json";
-
     // The longest delay a .NET timer takes, about 49.7 days; a longer --happy-eyeballs-timeout-ms is held to it.
     private const double LongestTimerDelayMilliseconds = uint.MaxValue - 1;
 
     /// <summary>
-    /// Copies the HTTP request options from <paramref name="options" />.
+    /// Copies the HTTP request options from <paramref name="http" /> and <paramref name="options" />.
     /// </summary>
-    /// <param name="options">The parsed command line.</param>
+    /// <param name="options">The parsed command line, for the options no <see cref="EasyHttpOptions" /> member carries.</param>
+    /// <param name="http">The option group's HTTP options.</param>
     /// <param name="formBody">
     /// The <c>-F</c> / <c>--form-string</c> body built for this transfer, or <see langword="null" />
     /// without <c>-F</c>; the parser refuses <c>-F</c> with a <c>-d</c> family body, so at most one is given.
@@ -59,33 +54,35 @@ internal static class HttpRequestOptionsMapping
     /// transfer, as curl 8.21.0 adds them to its header list (BL-619 Notes); <see langword="null" /> for none.
     /// </param>
     /// <returns>
-    /// The options: <see cref="CommandLineOptions.RequestMethod" />,
-    /// <see cref="CommandLineOptions.RequestTarget" />,
-    /// <see cref="CommandLineOptions.UserAgent" />, <see cref="CommandLineOptions.Referer" /> and
-    /// <see cref="CommandLineOptions.AutoReferer" /> verbatim; the <c>-H</c> headers followed by the ones <c>--json</c> adds
-    /// and then <paramref name="ifNoneMatchHeaders" />; and
-    /// <see cref="CommandLineOptions.ProxyHeaders" /> verbatim; and
-    /// <paramref name="formBody" /> when given, otherwise
-    /// <see cref="CommandLineOptions.PostData" /> as a <see cref="BytesBody" />, unless
-    /// <see cref="CommandLineOptions.DataInQuery" /> moved it into the query; and
-    /// <see cref="CommandLineOptions.FailMode" /> as <see cref="HttpRequestOptions.Fail" />; and
-    /// <see cref="CommandLineOptions.FollowRedirects" /> as <see cref="HttpRequestOptions.FollowRedirects" />; and
-    /// <see cref="CommandLineOptions.MaxRedirects" /> as <see cref="HttpRequestOptions.MaxRedirects" />; and
-    /// <see cref="CommandLineOptions.AuthSchemes" />, <see cref="CommandLineOptions.BearerToken" /> and <see cref="CommandLineOptions.AwsSigV4" /> verbatim; and
-    /// the <c>--httpsig-*</c> options as <see cref="HttpRequestOptions.HttpSignature" /> (<see cref="HttpSignatureSetup.Of" />), which leave <see cref="HttpRequestOptions.AuthSchemes" /> empty so a redirect hop that drops the signature sends no Basic from its URL's credentials (upstream test5025, BL-2201); and
-    /// <see cref="CommandLineOptions.HttpVersion" /> as <see cref="HttpRequestOptions.Version" />, as
-    /// <see cref="HttpVersionMapping.ToHttpVersionPreference" /> maps it; and <see cref="CommandLineOptions.Compressed" />,
-    /// <see cref="CommandLineOptions.TransferEncoding" />, <see cref="CommandLineOptions.Raw" /> and
-    /// <see cref="CommandLineOptions.IgnoreContentLength" /> and <see cref="CommandLineOptions.AllowHttp09Reply" /> verbatim; and
-    /// <paramref name="proxy" /> as <see cref="HttpRequestOptions.ForwardProxy" /> with
-    /// <see cref="CommandLineOptions.ProxyTunnel" /> as <see cref="HttpRequestOptions.ProxyTunnel" />; and
-    /// whether <see cref="CommandLineOptions.UnixSocketPath" /> is set as <see cref="HttpRequestOptions.OverUnixSocket" />; and
-    /// <paramref name="commandLineTextEncoding" /> as <see cref="HttpRequestOptions.CommandLineTextEncoding" />; and
-    /// <see cref="CommandLineOptions.Expect100Timeout" /> as <see cref="HttpRequestOptions.ContinueWait" /> (<see cref="ContinueWaitOf" />); and
+    /// The options: <see cref="EasyHttpOptions.RequestTarget" />, <see cref="EasyHttpOptions.UserAgent" />,
+    /// <see cref="EasyHttpOptions.Referer" /> and <see cref="EasyHttpOptions.AutoReferer" /> verbatim;
+    /// <see cref="EasyHttpOptions.HttpHeaders" /> followed by <paramref name="ifNoneMatchHeaders" />;
+    /// <paramref name="formBody" /> when given, otherwise <see cref="EasyHttpOptions.PostFields" /> as a
+    /// <see cref="BytesBody" />; <see cref="EasyHttpOptions.FollowLocation" /> other than
+    /// <see cref="FollowLocation.None" /> as <see cref="HttpRequestOptions.FollowRedirects" />;
+    /// <see cref="EasyHttpOptions.MaxRedirects" /> verbatim; <see cref="EasyHttpOptions.HttpVersion" /> as
+    /// <see cref="HttpRequestOptions.Version" />, as <see cref="HttpVersionMapping.ToHttpVersionPreference" />
+    /// maps it; a set <see cref="EasyHttpOptions.AcceptEncoding" /> as <see cref="HttpRequestOptions.Compressed" />;
+    /// both decodings off (<c>--raw</c>) as <see cref="HttpRequestOptions.Raw" />;
+    /// <see cref="EasyHttpOptions.TransferEncoding" />, <see cref="EasyHttpOptions.IgnoreContentLength" /> and
+    /// <see cref="EasyHttpOptions.Http09Allowed" /> verbatim; and <see cref="EasyHttpOptions.Expect100Timeout" /> as
+    /// <see cref="HttpRequestOptions.ContinueWait" />. And from <paramref name="options" />:
+    /// <see cref="CommandLineOptions.RequestMethod" /> and <see cref="CommandLineOptions.ProxyHeaders" /> verbatim;
+    /// <see cref="CommandLineOptions.FailMode" /> as <see cref="HttpRequestOptions.Fail" />;
+    /// <see cref="CommandLineOptions.AuthSchemes" />, <see cref="CommandLineOptions.BearerToken" /> and
+    /// <see cref="CommandLineOptions.AwsSigV4" /> verbatim; the <c>--httpsig-*</c> options as
+    /// <see cref="HttpRequestOptions.HttpSignature" /> (<see cref="HttpSignatureSetup.Of" />), which leave
+    /// <see cref="HttpRequestOptions.AuthSchemes" /> empty so a redirect hop that drops the signature sends no
+    /// Basic from its URL's credentials (upstream test5025, BL-2201); <paramref name="proxy" /> as
+    /// <see cref="HttpRequestOptions.ForwardProxy" /> with <see cref="CommandLineOptions.ProxyTunnel" /> as
+    /// <see cref="HttpRequestOptions.ProxyTunnel" />; whether <see cref="CommandLineOptions.UnixSocketPath" /> is
+    /// set as <see cref="HttpRequestOptions.OverUnixSocket" />; <paramref name="commandLineTextEncoding" /> as
+    /// <see cref="HttpRequestOptions.CommandLineTextEncoding" />; and
     /// <see cref="CommandLineOptions.HappyEyeballsTimeout" /> as <see cref="HttpRequestOptions.HappyEyeballsTimeout" /> (<see cref="HappyEyeballsTimeoutOf" />).
     /// </returns>
-    internal static HttpRequestOptions FromCommandLine(
+    internal static HttpRequestOptions Of(
         CommandLineOptions options,
+        EasyHttpOptions http,
         HttpRequestBody? formBody = null,
         ProxyEndpoint? proxy = null,
         Encoding? commandLineTextEncoding = null,
@@ -93,44 +90,33 @@ internal static class HttpRequestOptionsMapping
         new()
         {
             CustomMethod = options.RequestMethod,
-            RequestTarget = options.RequestTarget,
-            Headers = [.. HeadersOf(options), .. ifNoneMatchHeaders ?? []],
+            RequestTarget = http.RequestTarget,
+            Headers = [.. http.HttpHeaders, .. ifNoneMatchHeaders ?? []],
             ProxyHeaders = options.ProxyHeaders,
             CommandLineTextEncoding = commandLineTextEncoding ?? Encoding.Latin1,
-            UserAgent = options.UserAgent,
-            Referer = options.Referer,
-            AutoReferer = options.AutoReferer,
-            Body = formBody ?? PostDataBodyOf(options),
+            UserAgent = http.UserAgent,
+            Referer = http.Referer,
+            AutoReferer = http.AutoReferer,
+            Body = formBody ?? PostFieldsBodyOf(http),
             Fail = options.FailMode,
-            FollowRedirects = options.FollowRedirects,
-            MaxRedirects = options.MaxRedirects,
+            FollowRedirects = http.FollowLocation != FollowLocation.None,
+            MaxRedirects = (int)http.MaxRedirects,
             AuthSchemes = HttpSignatureSetup.Of(options).Settings is null ? options.AuthSchemes : HttpAuthSchemes.None,
             BearerToken = options.BearerToken,
             AwsSigV4 = options.AwsSigV4,
             HttpSignature = HttpSignatureSetup.Of(options).Settings,
-            Version = HttpVersionMapping.ToHttpVersionPreference(options.HttpVersion),
-            Compressed = options.Compressed,
-            TransferEncoding = options.TransferEncoding,
-            Raw = options.Raw,
-            IgnoreContentLength = options.IgnoreContentLength,
-            AllowHttp09Reply = options.AllowHttp09Reply,
+            Version = HttpVersionMapping.ToHttpVersionPreference(http.HttpVersion),
+            Compressed = http.AcceptEncoding is not null,
+            TransferEncoding = http.TransferEncoding,
+            Raw = !http.HttpContentDecoding && !http.HttpTransferDecoding,
+            IgnoreContentLength = http.IgnoreContentLength,
+            AllowHttp09Reply = http.Http09Allowed,
             ForwardProxy = proxy,
             ProxyTunnel = options.ProxyTunnel,
             OverUnixSocket = options.UnixSocketPath is not null,
-            ContinueWait = ContinueWaitOf(options),
+            ContinueWait = http.Expect100Timeout,
             HappyEyeballsTimeout = HappyEyeballsTimeoutOf(options),
         };
-
-    /// <summary>
-    /// The wait for <c>100 Continue</c>: the <c>--expect100-timeout</c> value, or curl's one
-    /// second (<see cref="HttpRequestOptions.DefaultContinueWait" />) when none or 0 was given,
-    /// as curl 8.21.0 waits one second for <c>--expect100-timeout 0</c> and <c>0.0001</c>
-    /// (measured, BL-624 Notes).
-    /// </summary>
-    /// <param name="options">The parsed command line.</param>
-    /// <returns>How long to wait before the body is sent anyway.</returns>
-    internal static TimeSpan ContinueWaitOf(CommandLineOptions options) =>
-        options.Expect100Timeout is { } given && given > TimeSpan.Zero ? given : HttpRequestOptions.DefaultContinueWait;
 
     /// <summary>
     /// How long a <c>--http3</c> transfer waits for the QUIC handshake before it also connects over
@@ -146,36 +132,9 @@ internal static class HttpRequestOptionsMapping
             : TcpConnector.DefaultHappyEyeballsTimeout;
 
     /// <summary>
-    /// The <c>-d</c> family body, or <see langword="null" /> when there is none or <c>-G</c> moved it into the query.
+    /// The <see cref="EasyHttpOptions.PostFields" /> body, or <see langword="null" /> when there is none, as
+    /// under <c>-G</c>, which moved it into the query.
     /// </summary>
-    private static BytesBody? PostDataBodyOf(CommandLineOptions options) =>
-        options.PostData is { } data && !options.DataInQuery ? new BytesBody(data, FormUrlEncoded) : null;
-
-    /// <summary>
-    /// The <c>-H</c> headers, then the <c>--json</c> ones no <c>-H</c> header already names.
-    /// </summary>
-    private static List<string> HeadersOf(CommandLineOptions options)
-    {
-        List<string> headers = [.. options.Headers];
-        if (options.SendsJson)
-        {
-            AddUnlessNamed(headers, JsonContentType);
-            AddUnlessNamed(headers, JsonAccept);
-        }
-
-        return headers;
-    }
-
-    /// <summary>
-    /// Appends <paramref name="header" /> unless a header in <paramref name="headers" /> starts
-    /// with its name and colon, compared without case, as curl's tool checks.
-    /// </summary>
-    private static void AddUnlessNamed(List<string> headers, string header)
-    {
-        string nameAndColon = header[..(header.IndexOf(':', StringComparison.Ordinal) + 1)];
-        if (!headers.Exists(existing => existing.StartsWith(nameAndColon, StringComparison.OrdinalIgnoreCase)))
-        {
-            headers.Add(header);
-        }
-    }
+    private static BytesBody? PostFieldsBodyOf(EasyHttpOptions http) =>
+        http.PostFields is { } data ? new BytesBody(data, FormUrlEncoded) : null;
 }

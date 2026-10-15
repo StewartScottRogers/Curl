@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text;
 
+using Curl.Api.Options.Http;
 using Curl.Cli;
 using Curl.Core;
 using Curl.Output;
@@ -52,6 +53,7 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
     /// Creates the context for one transfer, carrying every option a handler reads.
     /// </summary>
     /// <param name="options">The parsed command line.</param>
+    /// <param name="http">The option group's HTTP options, which <see cref="HttpRequestOptionsMapping.Of" /> maps onto <see cref="TransferContext.Http" />.</param>
     /// <param name="url">The URL to transfer.</param>
     /// <param name="output">Where the transfer's bytes go.</param>
     /// <param name="range">The parsed <c>-r</c> range, or <see langword="null" /> for the whole resource.</param>
@@ -127,6 +129,7 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
     /// </returns>
     internal TransferContext Create(
         CommandLineOptions options,
+        EasyHttpOptions http,
         CurlUrl url,
         Stream output,
         ByteRange? range,
@@ -195,7 +198,7 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
             Proxy = proxy,
             Http = HttpOptionsWithAltSvc(
                 url,
-                HttpRequestOptionsMapping.FromCommandLine(options, formBody, proxy, commandLineTextEncoding, ifNoneMatchHeaders) with
+                HttpRequestOptionsMapping.Of(options, http, formBody, proxy, commandLineTextEncoding, ifNoneMatchHeaders) with
                 {
                     HstsStore = HstsStore,
                     ProxyTunnel = options.ProxyTunnel || ConnectToTunnelsThroughProxy(options, url, proxy),

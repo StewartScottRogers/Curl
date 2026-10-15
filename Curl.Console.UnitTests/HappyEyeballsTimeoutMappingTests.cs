@@ -1,5 +1,5 @@
-using Curl.Engine;
 using Curl.Cli;
+using Curl.Engine;
 using Curl.Networking;
 using Curl.Protocol.Abstractions;
 using Curl.Testing;
@@ -9,7 +9,7 @@ namespace Curl.Console;
 
 /// <summary>
 /// Pins how <c>--happy-eyeballs-timeout-ms</c> reaches <see cref="HttpRequestOptions.HappyEyeballsTimeout" />
-/// through <see cref="HttpRequestOptionsMapping.FromCommandLine" />, the QUIC-against-TCP race of a
+/// through <see cref="HttpRequestOptionsMapping.Of" />, the QUIC-against-TCP race of a
 /// <c>--http3</c> transfer (ADR-0144), and <see cref="TcpConnector.HappyEyeballsTimeout" /> through
 /// <see cref="EngineComposition.CreateTcpConnector" />, the IPv4-against-IPv6 race (ADR-0254, BL-889).
 /// </summary>
@@ -27,7 +27,7 @@ public sealed class HappyEyeballsTimeoutMappingTests
     {
         Diagnostics.Arrange("arguments", "--http3 --happy-eyeballs-timeout-ms 1000");
 
-        HttpRequestOptions http = HttpRequestOptionsMapping.FromCommandLine(Parse("--http3", "--happy-eyeballs-timeout-ms", "1000"));
+        HttpRequestOptions http = HttpRequestOptionsMapping.Of(Parse("--http3", "--happy-eyeballs-timeout-ms", "1000"), EasyOptionsFromCommandLine.HttpOf(Parse("--http3", "--happy-eyeballs-timeout-ms", "1000")));
 
         Diagnostics.Act("HappyEyeballsTimeout", http.HappyEyeballsTimeout);
 
@@ -40,7 +40,7 @@ public sealed class HappyEyeballsTimeoutMappingTests
     {
         Diagnostics.Arrange("arguments", "--http3");
 
-        HttpRequestOptions http = HttpRequestOptionsMapping.FromCommandLine(Parse("--http3"));
+        HttpRequestOptions http = HttpRequestOptionsMapping.Of(Parse("--http3"), EasyOptionsFromCommandLine.HttpOf(Parse("--http3")));
 
         Diagnostics.Act("HappyEyeballsTimeout", http.HappyEyeballsTimeout);
 
@@ -55,7 +55,7 @@ public sealed class HappyEyeballsTimeoutMappingTests
     {
         Diagnostics.Arrange("arguments", "--happy-eyeballs-timeout-ms 9000000000000");
 
-        HttpRequestOptions http = HttpRequestOptionsMapping.FromCommandLine(Parse("--happy-eyeballs-timeout-ms", "9000000000000"));
+        HttpRequestOptions http = HttpRequestOptionsMapping.Of(Parse("--happy-eyeballs-timeout-ms", "9000000000000"), EasyOptionsFromCommandLine.HttpOf(Parse("--happy-eyeballs-timeout-ms", "9000000000000")));
 
         Diagnostics.Act("HappyEyeballsTimeout", http.HappyEyeballsTimeout);
 

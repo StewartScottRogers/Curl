@@ -48,5 +48,5 @@ internal sealed record OptionGroupConnectionSettings(
             EngineComposition.AddressFamilyOf(network),
             EngineComposition.HaproxyProtocolOf(options),
             EngineComposition.PreProxyOf(options),
-            string.Join('\n', HttpVersionMapping.HttpOverTlsApplicationProtocolsOf(options.HttpVersion)));
+            string.Join('\n', HttpVersionMapping.HttpOverTlsApplicationProtocolsOf(HttpVersionMapping.FromRequested(options.HttpVersion))));
 }

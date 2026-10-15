@@ -224,8 +224,8 @@ namespace Curl.Console;
 /// </para>
 /// <para>
 /// Every transfer goes through <see cref="RedirectFollower" /> with the
-/// <see cref="RedirectPolicy" /> <see cref="RedirectPolicyMapping" /> maps from the command
-/// line, so under <c>-L</c> each redirect is followed into the same body and header outputs:
+/// <see cref="RedirectPolicy" /> <see cref="RedirectPolicyMapping" /> maps from the option
+/// group, so under <c>-L</c> each redirect is followed into the same body and header outputs:
 /// <c>-L -i</c> writes every response's head and the last response's body, and following one
 /// redirect more than <c>--max-redirs</c> allows fails with exit 47,
 /// <c>Maximum (N) redirects followed</c>, as curl 8.21.0 does. Without <c>-L</c> the
@@ -3457,6 +3457,7 @@ internal sealed class CurlCommandRunner(
             StartTransferProgress(options, options.ResumeFrom, toStandardOutput);
             Func<long?, TransferContext> createAttemptContext = _ => transferContextFactory.Create(
                 options,
+                EasyOptionsFromCommandLine.HttpOf(options),
                 url,
                 RateLimited(options, toStandardOutput ? FlushedEachWriteUnderNoBuffer(options, InTextModeUnderUseAscii(options, Running.GatedStandardOutput)) : Stream.Null),
                 range,
@@ -4293,6 +4294,7 @@ internal sealed class CurlCommandRunner(
                     options,
                     attemptResumeFrom => transferContextFactory.Create(
                         options,
+                        EasyOptionsFromCommandLine.HttpOf(options),
                         url,
                         RateLimited(options, FlushedEachWriteUnderNoBuffer(options, output)),
                         range,
@@ -4419,7 +4421,7 @@ internal sealed class CurlCommandRunner(
         long? resumeFrom,
         DeferredOutputFileStream? outputFile)
     {
-        RedirectPolicy redirectPolicy = RedirectPolicyMapping.FromCommandLine(options);
+        RedirectPolicy redirectPolicy = RedirectPolicyMapping.Of(options, EasyOptionsFromCommandLine.HttpOf(options));
         long? attemptResumeFrom = resumeFrom;
         TransferContext? firstContext = createAttemptContext(attemptResumeFrom);
         string scheme = firstContext.Url.Scheme;
