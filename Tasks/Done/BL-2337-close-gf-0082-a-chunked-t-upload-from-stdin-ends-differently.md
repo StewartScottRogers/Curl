@@ -50,13 +50,13 @@ Make Curl's chunked upload of an unseekable stdin finish on Linux and macOS the 
   - stdin as a pipe exits 65: `seek callback returned error 2`, then `rewind of client reader 'cr-in' failed: 65`, with no new connection.
   - stdin as a redirected file exits 25.
   - curl rewinds stdin with `lseek` before it builds the resend. That fails on a pipe off Windows but not on Windows, which is why the Windows reference answers 25.
-- **Decision (ADR-0520).**
+- **Decision (ADR-0524).**
   - New `IRewindableUpload` in `Curl.Protocol.Http`.
   - `HttpProtocolHandler.FailureBeforeConnecting` now fails a chunked resend to HTTP/1.0 with `UploadRewindFailed` (exit 65) when the body cannot be rewound.
   - `Curl.Console`'s `StandardInputUploadStream.CanRewind` is true when the wrapped stream seeks, or on Windows.
   - So the in-process upstream cases (seekable `MemoryStream` stdin) and Windows keep 25, and the conformance ratchet still holds 1072 and 1073 on every platform.
 - **Verified on Linux.** A self-contained `linux-x64` publish run in WSL with stdin piped now prints the same `-v` rewind lines and `curl: (65) seek callback returned error 2` as real curl, for both the 401 and the 301.
-- **Left as they are (ADR-0520 Consequences).**
+- **Left as they are (ADR-0524 Consequences).**
   - Curl writes `Issue another request` before the rewind lines, where curl writes it after.
   - A file redirected into Curl's stdin off Windows still gets 65, because `UnixConsoleStream` never seeks.
 - **test60.** It did not reproduce outside the gap harness: the WSL publish sent the closing `0` chunk exactly as curl did, both from a shell pipe and with stdin written late. Filed as BL-2340.

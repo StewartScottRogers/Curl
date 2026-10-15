@@ -18,7 +18,7 @@ A later gap analysis measures `behaviour:test60` (`-T - -H 'Content-Length: 1'`,
 
 ## Context
 
-- Gap finding GF-0082, split out of BL-2337. BL-2337 closed the finding's other two items, test1072 and test1073 (ADR-0520).
+- Gap finding GF-0082, split out of BL-2337. BL-2337 closed the finding's other two items, test1072 and test1073 (ADR-0524).
 - The finding: on Linux, the request Record-CurlExchange records from Curl stops at byte 179, where the closing `0\r\n\r\n` chunk should start. On macOS, Curl exits 56 because it writes that chunk after the server has closed. The reference sends the closing chunk and exits 0.
 - BL-2337 could not reproduce this outside the gap harness. A self-contained `linux-x64` publish of Curl, run in WSL Ubuntu against `nc`, sent the closing chunk and exited 0, byte for byte like `/usr/bin/curl`. That held with stdin from a shell pipe, and also with stdin written 300 ms after start, stdout and stderr redirected.
 - So the difference needs the harness: stdin written by pwsh's `Process.StandardInput` and then closed (Record-CurlExchange.ps1, around line 3150), the cross-check's 3-second idle server, or the native AOT build.
