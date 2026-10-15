@@ -280,6 +280,7 @@ public sealed class HttpProtocolHandler(
         HttpInfoLineRecorder proxyAuthorizationLines = new();
         string? proxyAuthorization = await CreateFirstProxyAuthorizationAsync(proxyAuthRequest, proxyAuthorizationLines, context.CancellationToken).ConfigureAwait(false);
         (string? authorization, HttpTransferException? authorizationFailure) = await CreateFirstAuthorizationAsync(authRequest with { Events = authorizationLines }, context.CancellationToken).ConfigureAwait(false);
+        authorization ??= RepeatKeptDigestAuthorization(options, authRequest);
         bool probes = SendsFirstProbe(framing, authRequest, authorization, proxyAuthRequest, proxyAuthorization);
         HttpRequestPlan plan = new(context, options, probes ? framing.AsAuthProbe() : framing, authRequest, authorization)
         {
@@ -400,6 +401,28 @@ public sealed class HttpProtocolHandler(
         && (options.AuthSchemes & options.AuthSchemePicked) == options.AuthSchemePicked
             ? options.AuthSchemePicked
             : options.AuthSchemes;
+
+    /// <summary>
+    /// Makes the Digest value an earlier hop sent (<see cref="HttpRequestOptions.KeptDigestAuthorization" />)
+    /// again for this hop's request, its nonce counted on by
+    /// <see cref="IHttpAuthenticator.RepeatAuthorization" />, as curl 8.22.0 sends <c>nc=00000002</c>
+    /// to a same-host redirect after answering a Digest challenge (upstream test1286, BL-2252);
+    /// <see langword="null" /> when no value was kept, there is no credential or Digest is not allowed.
+    /// </summary>
+    private string? RepeatKeptDigestAuthorization(HttpRequestOptions options, HttpAuthRequest request) =>
+        options.KeptDigestAuthorization is { } kept
+        && request.Credential is not null
+        && (request.AllowedSchemes & HttpAuthSchemes.Digest) != 0
+            ? Authenticator.RepeatAuthorization(request, kept)
+            : null;
+
+    /// <summary>
+    /// Gives the <c>Authorization</c> value <paramref name="plan" /> sends when it is a Digest
+    /// one, the report's <see cref="TransferReport.DigestAuthorizationSent" /> (BL-2252);
+    /// <see langword="null" /> otherwise.
+    /// </summary>
+    private static string? DigestAuthorizationSentBy(HttpRequestPlan plan) =>
+        SchemeOfAuthorization(plan.Authorization) == HttpAuthSchemes.Digest ? plan.Authorization : null;
 
     /// <summary>
     /// Gives the scheme a server picked for the request <paramref name="plan" /> sends: the
@@ -1331,6 +1354,7 @@ public sealed class HttpProtocolHandler(
             ResponseConnection = timedConnection,
             RedirectCount = plan.RedirectsFollowed - plan.Options.RedirectsFollowed,
             AuthSchemePicked = AuthSchemePickedBy(plan),
+            DigestAuthorizationSent = DigestAuthorizationSentBy(plan),
         };
 
     /// <summary>
@@ -2908,6 +2932,12 @@ public sealed class HttpProtocolHandler(
         internal HttpAuthSchemes AuthSchemePicked { get; init; }
 
         /// <summary>
+        /// Gets the Digest value the exchange's request was sent with, the report's
+        /// <see cref="TransferReport.DigestAuthorizationSent" /> (BL-2252).
+        /// </summary>
+        internal string? DigestAuthorizationSent { get; init; }
+
+        /// <summary>
         /// Gets or sets the moment the first request byte was about to be sent,
         /// <see langword="null" /> until then.
         /// </summary>
@@ -2944,6 +2974,7 @@ public sealed class HttpProtocolHandler(
                 RedirectCount = RedirectCount,
                 ResponseHeadersStored = body.HeadersStored,
                 AuthSchemePicked = AuthSchemePicked,
+                DigestAuthorizationSent = DigestAuthorizationSent,
                 ProxyConnectResponseCode = connect.ProxyConnectResponseCode,
                 UsedProxy = UsedProxy,
                 LocalEndPoint = connect.LocalEndPoint ?? connection.LocalEndPoint as IPEndPoint,

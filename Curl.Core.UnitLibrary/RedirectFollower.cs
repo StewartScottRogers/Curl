@@ -86,6 +86,13 @@ namespace Curl.Core;
 /// is sent to the next hop before any challenge, as libcurl 8.21.0 does (upstream test1088, BL-1819).
 /// </para>
 /// <para>
+/// Every hop that may be sent credentials is sent the previous hop's
+/// <see cref="TransferReport.DigestAuthorizationSent" /> as
+/// <see cref="HttpRequestOptions.KeptDigestAuthorization" />, so a Digest answer goes to the next
+/// hop again with its nonce counted on, as curl 8.22.0 sends <c>nc=00000002</c> after a same-host
+/// redirect (upstream test1286, BL-2252); a hop that may not is sent none.
+/// </para>
+/// <para>
 /// Every hop after one whose response was HTTP/1.0 is sent
 /// <see cref="HttpRequestOptions.EarlierResponseWasHttp10" />, so it goes out as HTTP/1.0, as
 /// curl 8.21.0 sends every later request of a transfer once a response in it was HTTP/1.0: a
@@ -232,7 +239,7 @@ public sealed class RedirectFollower(
             log.Followed(responseCode, target, bodyDropped, methodDropped);
             chain.Followed(target);
             // No stop means the target parsed, so next is set.
-            hop = NextHop(context, hop.Url, next!, HopMethod(http, methodDropped) with { RedirectsFollowed = chain.RedirectCount, ResponseHeadersStored = result.Report.ResponseHeadersStored, AuthSchemePicked = result.Report.AuthSchemePicked, EarlierResponseWasHttp10 = receivedHttp10 }, hopProxy, bodyDropped, policy.LocationTrusted || IsSameOrigin(context.Url, next!), operationStarted, selectHopAltSvc, selectHopCredentials);
+            hop = NextHop(context, hop.Url, next!, HopMethod(http, methodDropped) with { RedirectsFollowed = chain.RedirectCount, ResponseHeadersStored = result.Report.ResponseHeadersStored, AuthSchemePicked = result.Report.AuthSchemePicked, KeptDigestAuthorization = result.Report.DigestAuthorizationSent, EarlierResponseWasHttp10 = receivedHttp10 }, hopProxy, bodyDropped, policy.LocationTrusted || IsSameOrigin(context.Url, next!), operationStarted, selectHopAltSvc, selectHopCredentials);
         }
     }
 
@@ -593,6 +600,7 @@ public sealed class RedirectFollower(
             {
                 BearerToken = null,
                 HttpSignature = null,
+                KeptDigestAuthorization = null,
                 Headers = [.. hopHttp.Headers.Where(header => !IsCredentialHeader(header))],
                 SendsCookieStrings = false,
             };

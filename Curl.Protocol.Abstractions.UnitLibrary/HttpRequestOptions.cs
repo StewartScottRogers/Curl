@@ -126,6 +126,17 @@ public sealed record HttpRequestOptions
     public HttpAuthSchemes AuthSchemePicked { get; init; }
 
     /// <summary>
+    /// Gets the Digest <c>Authorization</c> value an earlier hop of the transfer last sent, the
+    /// earlier hop's <see cref="TransferReport.DigestAuthorizationSent" />, or
+    /// <see langword="null" /> for none. With credentials and Digest allowed, the hop sends it
+    /// again before any challenge, counted on by
+    /// <see cref="IHttpAuthenticator.RepeatAuthorization" /> for this hop's request: the same
+    /// nonce and <c>cnonce</c> with the next <c>nc</c>, as curl 8.22.0 keeps its Digest state
+    /// across the redirects it follows (upstream test1286, BL-2252).
+    /// </summary>
+    public string? KeptDigestAuthorization { get; init; }
+
+    /// <summary>
     /// Gets a value indicating whether a response of an earlier hop of the transfer was
     /// HTTP/1.0, which sends this request as HTTP/1.0, as for <c>-0</c>, since curl 8.21.0 sends
     /// every later request of a transfer as HTTP/1.0 once a response in it was: a <c>-T -</c>

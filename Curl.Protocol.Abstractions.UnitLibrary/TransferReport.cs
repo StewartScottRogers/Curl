@@ -193,4 +193,13 @@ public sealed record TransferReport
     /// when no server picked one, or for a transfer that is not HTTP.
     /// </summary>
     public HttpAuthSchemes AuthSchemePicked { get; init; }
+
+    /// <summary>
+    /// Gets the Digest <c>Authorization</c> value the transfer's last request to the origin was
+    /// sent with, which a followed redirect to a hop that may be sent credentials carries as
+    /// <see cref="HttpRequestOptions.KeptDigestAuthorization" /> (upstream test1286, BL-2252);
+    /// <see langword="null" /> when that request sent no Digest value, or for a transfer that is
+    /// not HTTP.
+    /// </summary>
+    public string? DigestAuthorizationSent { get; init; }
 }

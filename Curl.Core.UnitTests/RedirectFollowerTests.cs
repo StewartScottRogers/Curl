@@ -283,6 +283,23 @@ public sealed class RedirectFollowerTests
     }
 
     [TestMethod]
+    [DataRow(Next, "Digest nc=00000001", DisplayName = "same-origin")]
+    [DataRow("http://localhost:18203/next", null, DisplayName = "other-host")]
+    public async Task FollowAsync_HopsDigestAuthorizationSent_IsKeptOnlyForAHopThatMayBeSentCredentials(string target, string? expected)
+    {
+        // curl keeps its Digest nonce across a same-host redirect and counts it on (upstream test1286, BL-2252).
+        TransferResult first = Redirect(302, target) with { Report = Redirect(302, target).Report! with { DigestAuthorizationSent = "Digest nc=00000001" } };
+        ScriptedHandler handler = new(first, Ok(200, 0));
+
+        await Follow(handler, Context(Location(), credentials: true));
+
+        Diagnostics.Assert("handler.Contexts[0].Http!.KeptDigestAuthorization", null, handler.Contexts[0].Http!.KeptDigestAuthorization);
+        Assert.IsNull(handler.Contexts[0].Http!.KeptDigestAuthorization);
+        Diagnostics.Assert("handler.Contexts[1].Http!.KeptDigestAuthorization", expected, handler.Contexts[1].Http!.KeptDigestAuthorization);
+        Assert.AreEqual(expected, handler.Contexts[1].Http!.KeptDigestAuthorization);
+    }
+
+    [TestMethod]
     public async Task FollowAsync_AfterAnHttp10Response_SendsEveryLaterHopAsHttp10()
     {
         // curl sends every later request of a transfer as HTTP/1.0 once a response in it was,
