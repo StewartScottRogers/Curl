@@ -37,7 +37,7 @@ ADR-0506; plan sections "WebSocket", "Header API" and the easy `_recv`/`_send`; 
 
 ## Notes
 
-- Shapes decided in ADR-0511: `IEasyTransfer` gains `WebSocket`, `Headers` and `Connection` (not
+- Shapes decided in ADR-0512: `IEasyTransfer` gains `WebSocket`, `Headers` and `Connection` (not
   `ConnectOnly`, which already names the option enum); async calls return code-and-count record
   structs; `curl_ws_meta` is the nullable `IEasyWebSocket.CurrentFrame`; both `[Flags]` enums add
   `None = 0`; `ITransferHeaders.LastRequest` is the `request` argument -1.
