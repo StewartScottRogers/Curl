@@ -8,7 +8,7 @@ depends-on: []
 touches: [.claude/skills/task-board/task-board.ps1]
 requirement: none
 created: 2026-10-14
-completed:
+completed: 2026-10-15
 ---
 # BL-2257 — Fix AF-0220: Lanes idled 652 of 971.62 lane minutes (67%) behind BL-2235, a High gap task filed with touches: [] (read as *) that overlapped BL-2160 left in Doing by an interactive session
 
@@ -41,14 +41,16 @@ The finding closes only when a later re-audit by the process auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded. (Its numbers are 2026-10-14's logs and cannot change; the board it describes now starts the narrow task - checked on a scratch board, see Notes. The process auditor's re-audit judges it on the next shift's logs.)
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass. (Only task-board.ps1 and SKILL.md changed; CI passed on Windows, Linux and macOS for fb50ea05e.)
 
 ## Notes
 
 - 2026-10-14 (Claude): The history the reproduction measures cannot change, so fix the cause instead. The cause is in task-board.ps1's Get-StartOrder: a ready task with touches '*' that cannot start (it overlaps a task in Doing) still reserves every touch and holds back ready tasks that overlap nothing in Doing. Make a waiting '*' task reserve nothing it cannot claim, with a self-test for this exact board (an interactive task in Doing, a '*' task and a narrow task in Backlog: the narrow task starts). task-board.ps1 is a guard file, so this is interactive work on the audit branch; touches retargeted from RunDarkFactory.ps1.
+- 2026-10-15 (Claude): Fixed in PR #145 (fb50ea05e): Get-StartOrder reserves a waiting task's touches only when it overlaps a lane-eligible Doing task. task-board.ps1 has no self-test harness, so the check ran on a scratch board against the old and new script: interactive Gap task in Doing + '*' task + narrow task: old stalled, new starts the narrow task; same with a 'lane: no' task in Doing; lane task in Doing + '*' task: held back in both (BL-1041 kept).
 
 ## Log
 
 - 2026-10-14: Created.
 - 2026-10-15: Backlog -> Doing. Interactive: task-board.ps1 is a guard file.
+- 2026-10-15: Doing -> Done. Fixed in PR #145 (fb50ea05e). AF-0220 closes on the process auditor's re-audit.
