@@ -33,3 +33,4 @@ Split out of BL-2338 (ADR-0506 plan phase 1 step 4; mapping settled in ADR-0516)
 ## Log
 
 - 2026-10-15: Created.
+- 2026-10-15: Backlog -> Doing.
