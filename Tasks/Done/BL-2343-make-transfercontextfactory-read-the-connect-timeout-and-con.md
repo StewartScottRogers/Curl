@@ -8,7 +8,7 @@ depends-on: [BL-2323]
 touches: [Curl.Engine.UnitLibrary, Curl.Engine.UnitTests, Curl.Console, Curl.Console.UnitTests]
 requirement: none
 created: 2026-10-15
-completed:
+completed: 2026-10-15
 ---
 # BL-2343 — Make TransferContextFactory read the connect timeout and --connect-to entries from EasyNetworkOptions
 
@@ -22,14 +22,19 @@ Split out of BL-2323 (ADR-0506 plan phase 1 step 4), which retargeted `EngineCom
 
 ## Acceptance criteria
 
-- [ ] `TransferContextFactory` reads the connect timeout and `--connect-to` entries from `EasyNetworkOptions`, not `CommandLineOptions`.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes, no existing test deleted, skipped or weakened.
-- [ ] `Measure-CodeQuality.ps1 -Library Curl.Engine.UnitLibrary,Curl.Console` passes.
-- [ ] `Curl.Conformance.UnitTests/PassingUpstreamCases.txt` is unchanged and every case still passes.
+- [x] `TransferContextFactory` reads the connect timeout and `--connect-to` entries from `EasyNetworkOptions`, not `CommandLineOptions`.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes, no existing test deleted, skipped or weakened.
+- [x] `Measure-CodeQuality.ps1 -Library Curl.Engine.UnitLibrary,Curl.Console` passes.
+- [x] `Curl.Conformance.UnitTests/PassingUpstreamCases.txt` is unchanged and every case still passes.
 
 ## Notes
+
+- `TransferContextFactory.Create` takes `EasyNetworkOptions network` after `proxyOptions`; `CurlCommandRunner`'s two call sites pass `EasyOptionsFromCommandLine.NetworkOf(options)`. `ConnectToTunnelsThroughProxy` now takes the record and reads `ConnectTo`.
+- Connect timeout: the record's zero (not set, ADR-0513) maps to a `null` `TransferContext.ConnectTimeout` (`ConnectTimeoutOf`). `NetworkOf` drops a non-positive `--connect-timeout`, so `--connect-timeout 0` now gives `null` where it gave zero; every reader (HTTP, FTP, TFTP deadlines) already treats a non-positive value as not given, so behaviour is unchanged. No ADR: it follows ADR-0513.
+- Tests: every `Create` call passes a network record; the `ConnectToTunnelsThroughProxy` tests build the record directly; new `Create_NetworkOptionsConnectTimeout_IsTheContextsConnectTimeoutWithZeroAsNull`. Engine tests 718 passed, Console 2826, Conformance 3129. Quality: 0 failing members across both libraries.
 
 ## Log
 
 - 2026-10-15: Created.
 - 2026-10-15: Backlog -> Doing.
+- 2026-10-15: Doing -> Done. TransferContextFactory reads the connect timeout and --connect-to entries from EasyNetworkOptions
