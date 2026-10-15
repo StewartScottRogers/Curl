@@ -38,3 +38,4 @@ Move into `TransferPerformer` (names as of 2026-10-15): `FollowWatchingSpeedAsyn
 ## Log
 
 - 2026-10-15: Created.
+- 2026-10-15: Backlog -> Doing.
