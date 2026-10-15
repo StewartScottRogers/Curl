@@ -49,3 +49,4 @@ Make Curl's chunked upload of an unseekable stdin finish on Linux and macOS the 
 ## Log
 
 - 2026-10-15: Created.
+- 2026-10-15: Backlog -> Doing.
