@@ -178,7 +178,7 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
             FtpPort = options.FtpPort,
             FtpUseEprt = options.FtpUseEprt,
             SslLevel = options.SslLevel,
-            FtpSslControlOnly = options.FtpSslControlOnly,
+            FtpSslControlOnly = options.FtpSslControlOnly && !options.SslRequired,
             FtpCommandChannelClearing = CommandChannelClearingOf(options.FtpClearCommandChannel),
             ListOnly = options.ListOnly,
             UseAscii = options.UseAscii,

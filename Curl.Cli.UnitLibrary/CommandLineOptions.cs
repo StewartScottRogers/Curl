@@ -1147,7 +1147,7 @@ public sealed class CommandLineOptions
     internal bool SslTry { get; private set; }
 
     /// <summary><see langword="true"/> when <c>--ssl-reqd</c> or <c>--ftp-ssl-reqd</c> was given and no <c>--no-</c> spelling of either came after it.</summary>
-    internal bool SslRequired { get; set; }
+    public bool SslRequired { get; internal set; }
 
     /// <summary><see langword="true"/> when <c>-l</c> / <c>--list-only</c> was given and no <c>--no-list-only</c> came after it.</summary>
     public bool ListOnly { get; internal set; }

@@ -335,8 +335,8 @@ public interface ITransferContext
     /// <summary>
     /// Gets whether a plaintext scheme upgrades to TLS, per <c>--ssl</c>/<c>--ftp-ssl</c>
     /// (<see cref="TransportSecurityLevel.Try" />) and <c>--ssl-reqd</c>/<c>--ftp-ssl-reqd</c>
-    /// (<see cref="TransportSecurityLevel.Required" />); <see cref="TransportSecurityLevel.None" />
-    /// when neither was given.
+    /// (<see cref="TransportSecurityLevel.Required" />, also under <c>--ftp-ssl-control</c>);
+    /// <see cref="TransportSecurityLevel.None" /> when none was given.
     /// </summary>
     /// <remarks>
     /// <c>ftp://</c> is to read it (ADR-0102).
@@ -344,9 +344,10 @@ public interface ITransferContext
     TransportSecurityLevel SslLevel { get; }
 
     /// <summary>
-    /// Gets a value indicating whether <c>--ftp-ssl-control</c> was given, which secures an
-    /// FTP transfer's control connection only and leaves its data connections in plaintext;
-    /// <see langword="false" /> when not given.
+    /// Gets a value indicating whether <c>--ftp-ssl-control</c> was given without
+    /// <c>--ssl-reqd</c>, which outranks it: it secures an FTP transfer's control connection
+    /// only and leaves its data connections in plaintext (<c>PROT C</c>);
+    /// <see langword="false" /> otherwise.
     /// </summary>
     /// <remarks>
     /// <c>ftp://</c> is to read it (ADR-0102).

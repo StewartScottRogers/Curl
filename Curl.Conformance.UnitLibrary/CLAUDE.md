@@ -204,9 +204,9 @@ port only, ftpserver.pl answers `PBSZ` and `PROT` with 500, and no `AUTH TLS` up
 FTPS) is emulated, since ftpserver.pl offers none. The runner puts it between the SOCKS stand-in
 and `MailTlsServerConnector`'s backend only for a case naming `ftps`; screening lets `ftps` cases
 run, reads their `<servercmd>` with ftpserver.pl's command set and records their
-`<verify><upload>`. No case skips for `%FTPSPORT`: 400, 401, 403, 406 and 408 are measured and
-differ on a Curl difference the next gap run files (Curl sends `PROT P` where curl at
-`--ftp-ssl-control` sends `PROT C`; BL-2237); 1112 (`SLOWDOWNDATA`) and 407 are measured and differ the same way; 404 (exit code `77,60`) passes (BL-2222).
+`<verify><upload>`. No case skips for `%FTPSPORT`: 400, 401, 403, 406, 407, 408 and 1112
+(`SLOWDOWNDATA`) pass, Curl sending `PROT C` under `--ftp-ssl-control` as curl does (BL-2237),
+and 404 (exit code `77,60`) passes (BL-2222).
 `MqttsServerConnector` and `GophersServerConnector` (BL-2228) stand in for stunnel in front of the
 MQTT and Gopher stand-ins: ports 9013 and 9014, the runner's `%MQTTSPORT` and `%GOPHERSPORT` (with a
 value only when the caller names a certificate directory; servers.pm picks free ports, and these two
