@@ -1,6 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Text;
+using Curl.Api.Options.Http;
 using Curl.Cli;
 using Curl.Core;
 using Curl.Core.Hsts;
@@ -257,7 +258,8 @@ internal sealed partial class TransferPerformer
     /// <c>%{url_effective}</c> then shows, as curl does just before it connects (BL-621 Notes).
     /// </summary>
     /// <param name="hsts">The run's HSTS cache.</param>
-    /// <param name="options">The transfer's option group.</param>
+    /// <param name="options">The transfer's option group, for the <c>-G</c> / <c>--url-query</c> query and <c>--path-as-is</c>.</param>
+    /// <param name="http">The option group's HTTP options, whose <see cref="EasyHttpOptions.Hsts" /> is the <c>--hsts</c> file.</param>
     /// <param name="transferUrl">The URL about to be transferred.</param>
     /// <param name="fileSystem">Opens the <c>--hsts</c> file.</param>
     /// <param name="events">Where the <c>-v</c> line goes.</param>
@@ -265,14 +267,12 @@ internal sealed partial class TransferPerformer
     internal static async Task<string> SwitchToHttpsForHstsAsync(
         HstsTransferPolicy hsts,
         CommandLineOptions options,
+        EasyHttpOptions http,
         string transferUrl,
         IFileSystem fileSystem,
         ITransferEvents events)
     {
-        if (options.HstsFile is { } file)
-        {
-            await HstsCacheFile.ReadAsync(file, hsts, fileSystem).ConfigureAwait(false);
-        }
+        await HstsCacheFile.ReadAsync(http, hsts, fileSystem).ConfigureAwait(false);
 
         if (!CurlUrl.TryParse(QueryUrl.Append(transferUrl, options), options.PathAsIs, out CurlUrl? url)
             || !hsts.TrySwitchToHttps(transferUrl, url, out string? httpsUrl))
@@ -290,7 +290,8 @@ internal sealed partial class TransferPerformer
     /// its file is neither read nor written (measured 2026-09-29, BL-623 Notes).
     /// </summary>
     /// <param name="state">The running transfer, which keeps the cache.</param>
-    /// <param name="options">The transfer's option group.</param>
+    /// <param name="options">The transfer's option group, for the <c>-G</c> / <c>--url-query</c> query and <c>--connect-to</c>.</param>
+    /// <param name="http">The option group's HTTP options: the <see cref="EasyHttpOptions.AltSvc" /> file and the HTTP version.</param>
     /// <param name="transferUrl">The URL transferred.</param>
     /// <param name="fileSystem">Opens the file.</param>
     /// <param name="diagnosticLog">Where the cache logs.</param>
@@ -299,15 +300,16 @@ internal sealed partial class TransferPerformer
     internal async Task OpenAltSvcCacheAsync(
         EngineTransferState state,
         CommandLineOptions options,
+        EasyHttpOptions http,
         string transferUrl,
         IFileSystem fileSystem,
         IDiagnosticLog diagnosticLog,
         bool usesOverHttp)
     {
-        if (options.AltSvcFile is { } file && IsHttpUrl(QueryUrl.Append(transferUrl, options)))
+        if (http.AltSvc is not null && IsHttpUrl(QueryUrl.Append(transferUrl, options)))
         {
             state.AltSvc = await AltSvcTransferCache
-                .OpenAsync(file, options.HttpVersion, options.ConnectToEntries, fileSystem, timeProvider, diagnosticLog, usesOverHttp)
+                .OpenAsync(http, options.ConnectToEntries, fileSystem, timeProvider, diagnosticLog, usesOverHttp)
                 .ConfigureAwait(false);
         }
     }
@@ -354,7 +356,8 @@ internal sealed partial class TransferPerformer
     /// <paramref name="jarPrintTarget" />.
     /// </summary>
     /// <param name="cookies">The option group's cookies, or <see langword="null" />.</param>
-    /// <param name="options">The transfer's option group.</param>
+    /// <param name="options">The transfer's option group, for the <c>-G</c> / <c>--url-query</c> query.</param>
+    /// <param name="http">The option group's HTTP options, whose <see cref="EasyHttpOptions.Hsts" /> is the <c>--hsts</c> file.</param>
     /// <param name="transferUrl">The URL transferred, as typed or as a <c>-T</c> upload resolved it.</param>
     /// <param name="jarPrintTarget">Gives the stream the runner chose for <c>-c -</c> to print the jar to; the performer never picks it.</param>
     /// <param name="state">The transfer's state, with its alt-svc cache.</param>
@@ -365,6 +368,7 @@ internal sealed partial class TransferPerformer
     internal async Task WriteCookieJarAltSvcAndHstsFilesAsync(
         CookieEngine? cookies,
         CommandLineOptions options,
+        EasyHttpOptions http,
         string transferUrl,
         Func<Stream> jarPrintTarget,
         EngineTransferState state,
@@ -382,10 +386,7 @@ internal sealed partial class TransferPerformer
             await altSvc.WriteAsync(fileSystem).ConfigureAwait(false);
         }
 
-        if (options.HstsFile is { } hstsFile)
-        {
-            await HstsCacheFile.WriteAsync(hstsFile, hsts, fileSystem, runsOnWindows).ConfigureAwait(false);
-        }
+        await HstsCacheFile.WriteAsync(http, hsts, fileSystem, runsOnWindows).ConfigureAwait(false);
     }
 
     /// <summary>

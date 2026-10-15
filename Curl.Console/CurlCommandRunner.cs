@@ -14,6 +14,7 @@ using Curl.Core.Multipart;
 using Curl.Networking;
 using Curl.Output;
 using Curl.Protocol.Abstractions;
+using EasyHttpOptions = Curl.Api.Options.Http.EasyHttpOptions;
 using EasyMimeBody = Curl.Api.Options.Http.EasyMimeBody;
 
 namespace Curl.Console;
@@ -2018,7 +2019,7 @@ internal sealed class CurlCommandRunner(
             options, transfer.UrlIndex, standardOutputSwitchedToBinary, endsTheRun);
         await WriteOutAsync(options, transfer, givenUrl, transferUrl, result, standardOutputIsBinary).ConfigureAwait(false);
         await transferPerformer.WriteCookieJarAltSvcAndHstsFilesAsync(
-                dispatch.Cookies, options, transferUrl, () => CookieJarStandardOutput(standardOutputIsBinary), state, Hsts, fileSystem, runsOnWindows)
+                dispatch.Cookies, options, EasyOptionsFromCommandLine.HttpOf(options), transferUrl, () => CookieJarStandardOutput(standardOutputIsBinary), state, Hsts, fileSystem, runsOnWindows)
             .ConfigureAwait(false);
 
         previousTransferResult = result;
@@ -2177,8 +2178,9 @@ internal sealed class CurlCommandRunner(
         dispatch.LoadResolveEntries(eventsBeforeConnecting);
         TraceTransferStart(options, eventsBeforeConnecting);
         await transferPerformer.LoadCookieFilesAsync(dispatch.Cookies, options, transferUrl, fileSystem, standardInput, eventsBeforeConnecting).ConfigureAwait(false);
-        await transferPerformer.OpenAltSvcCacheAsync(Running, options, transferUrl, fileSystem, diagnosticLog, altSvcUsesOverHttp).ConfigureAwait(false);
-        transferUrl = await TransferPerformer.SwitchToHttpsForHstsAsync(Hsts, options, transferUrl, fileSystem, eventsBeforeConnecting).ConfigureAwait(false);
+        EasyHttpOptions http = EasyOptionsFromCommandLine.HttpOf(options);
+        await transferPerformer.OpenAltSvcCacheAsync(Running, options, http, transferUrl, fileSystem, diagnosticLog, altSvcUsesOverHttp).ConfigureAwait(false);
+        transferUrl = await TransferPerformer.SwitchToHttpsForHstsAsync(Hsts, options, http, transferUrl, fileSystem, eventsBeforeConnecting).ConfigureAwait(false);
         TransferResult result = await TransferWithHeaderOutputAsync(dispatch, options, transfer, transferUrl, uploadFile)
             .ConfigureAwait(false);
         return (result, givenUrl, transferUrl);

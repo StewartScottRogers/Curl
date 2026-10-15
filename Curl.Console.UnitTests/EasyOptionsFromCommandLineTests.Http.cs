@@ -64,6 +64,8 @@ public sealed partial class EasyOptionsFromCommandLineTests
         GivenHttp("--request-target", o => o.RequestTarget, "*", "--request-target", "*"),
         GivenHttp("-b string", o => o.Cookie, "a=1", "-b", "a=1"),
         GivenHttp("-b strings", o => o.Cookie, "a=1; b=2", "-b", "a=1", "-b", "b=2"),
+        GivenHttp("-b string starting with a space", o => o.Cookie, "a=1; b=2", "-b", "a=1", "-b", " b=2"),
+        GivenHttp("-b string starting with a tab", o => o.Cookie, "a=1;\tb=2", "-b", "a=1", "-b", "\tb=2"),
         GivenHttp("-b string is no file", o => o.CookieFiles.Count, 0, "-b", "a=1"),
         GivenHttp("-b file", o => string.Join('|', o.CookieFiles), "jar.txt|other.txt", "-b", "jar.txt", "-b", "a=1", "-b", "other.txt"),
         GivenHttp("-b file is no string", o => o.Cookie, null, "-b", "jar.txt"),

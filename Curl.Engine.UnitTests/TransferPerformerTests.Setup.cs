@@ -1,4 +1,5 @@
 using System.Text;
+using Curl.Api.Options.Http;
 using Curl.Cli;
 using Curl.Core;
 using Curl.Core.Hsts;
@@ -173,7 +174,7 @@ public sealed partial class TransferPerformerTests
         hsts.StoreFromResponse(CurlUrl.Parse("https://example.com/"), "max-age=31536000", clock.GetUtcNow());
         InfoRecordingEvents events = new();
 
-        string url = await TransferPerformer.SwitchToHttpsForHstsAsync(hsts, Parse("http://example.com/a"), "http://example.com/a", new ReadRecordingFileSystem(), events);
+        string url = await TransferPerformer.SwitchToHttpsForHstsAsync(hsts, Parse("http://example.com/a"), new EasyHttpOptions(), "http://example.com/a", new ReadRecordingFileSystem(), events);
 
         Assert.AreEqual("https://example.com/a", url);
         CollectionAssert.AreEqual(new[] { HstsTransferPolicy.SwitchedMessagePrefix + "https://example.com/a" }, events.Info);
@@ -184,17 +185,31 @@ public sealed partial class TransferPerformerTests
     {
         InfoRecordingEvents events = new();
 
-        string url = await TransferPerformer.SwitchToHttpsForHstsAsync(new HstsTransferPolicy(clock), Parse(First), First, new ReadRecordingFileSystem(), events);
+        string url = await TransferPerformer.SwitchToHttpsForHstsAsync(new HstsTransferPolicy(clock), Parse(First), new EasyHttpOptions(), First, new ReadRecordingFileSystem(), events);
 
         Assert.AreEqual(First, url);
         Assert.IsEmpty(events.Info);
     }
 
     [TestMethod]
+    public async Task SwitchToHttpsForHstsAsync_HstsFileNamingTheHost_ReadsItAndSwitches()
+    {
+        ReadRecordingFileSystem fileSystem = new();
+        fileSystem.ExistingContent["hsts.txt"] = Encoding.ASCII.GetBytes("example.com \"20991231 00:00:00\"\n");
+        InfoRecordingEvents events = new();
+
+        string url = await TransferPerformer.SwitchToHttpsForHstsAsync(
+            new HstsTransferPolicy(clock), Parse("http://example.com/a"), new EasyHttpOptions { Hsts = "hsts.txt" }, "http://example.com/a", fileSystem, events);
+
+        CollectionAssert.AreEqual(new[] { "hsts.txt" }, fileSystem.ReadPaths);
+        Assert.AreEqual("https://example.com/a", url);
+    }
+
+    [TestMethod]
     public async Task LoadCookieFilesAsync_CookieFileBeforeAnHttpRequest_LoadsItsCookies()
     {
         CommandLineOptions options = Parse("-b", "cookies.txt", "http://example.com/");
-        CookieEngine cookies = CookieEngine.FromCommandLine(options)!;
+        CookieEngine cookies = CookieEngine.FromHttpOptions(EasyOptionsFromCommandLine.HttpOf(options))!;
         ReadRecordingFileSystem fileSystem = new();
         fileSystem.ExistingContent["cookies.txt"] = Encoding.ASCII.GetBytes("example.com\tFALSE\t/\tFALSE\t0\tname\tvalue\n");
         InfoRecordingEvents events = new();
@@ -211,7 +226,7 @@ public sealed partial class TransferPerformerTests
         ReadRecordingFileSystem fileSystem = new();
 
         await new TransferPerformer(clock, EasyErrorText).LoadCookieFilesAsync(
-            CookieEngine.FromCommandLine(options), options, "file:///dir/x", fileSystem, Stream.Null, new InfoRecordingEvents());
+            CookieEngine.FromHttpOptions(EasyOptionsFromCommandLine.HttpOf(options)), options, "file:///dir/x", fileSystem, Stream.Null, new InfoRecordingEvents());
 
         Assert.IsEmpty(fileSystem.ReadPaths);
     }

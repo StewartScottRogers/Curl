@@ -1,4 +1,5 @@
 using System.Text;
+using Curl.Api.Options.Http;
 using Curl.Core.Hsts;
 using Curl.Protocol.Abstractions;
 
@@ -26,14 +27,17 @@ internal static class HstsCacheFile
         | UnixFileMode.GroupRead | UnixFileMode.GroupWrite
         | UnixFileMode.OtherRead | UnixFileMode.OtherWrite;
 
-    /// <summary>Reads <paramref name="file" /> into the cache, unless it is empty.</summary>
-    /// <param name="file">The <c>--hsts</c> value.</param>
+    /// <summary>
+    /// Reads the <see cref="EasyHttpOptions.Hsts" /> file into the cache, unless there is none or its
+    /// name is empty.
+    /// </summary>
+    /// <param name="http">The transfer's HTTP options, whose <see cref="EasyHttpOptions.Hsts" /> is the <c>--hsts</c> value.</param>
     /// <param name="hsts">The run's HSTS cache.</param>
     /// <param name="fileSystem">Opens the file.</param>
     /// <returns>A task that completes when the file is read.</returns>
-    internal static async Task ReadAsync(string file, HstsTransferPolicy hsts, IFileSystem fileSystem)
+    internal static async Task ReadAsync(EasyHttpOptions http, HstsTransferPolicy hsts, IFileSystem fileSystem)
     {
-        if (file.Length == 0)
+        if (http.Hsts is not { Length: > 0 } file)
         {
             return;
         }
@@ -52,16 +56,17 @@ internal static class HstsCacheFile
     }
 
     /// <summary>
-    /// Replaces <paramref name="file" /> with the cache in curl's format, unless it is empty or curl
-    /// would fail to write an expiry (<see cref="HstsTransferPolicy.FormatFile" />).
+    /// Replaces the <see cref="EasyHttpOptions.Hsts" /> file with the cache in curl's format, unless there
+    /// is none, its name is empty or curl would fail to write an expiry (<see cref="HstsTransferPolicy.FormatFile" />).
     /// </summary>
-    /// <param name="file">The <c>--hsts</c> value.</param>
+    /// <param name="http">The transfer's HTTP options, whose <see cref="EasyHttpOptions.Hsts" /> is the <c>--hsts</c> value.</param>
     /// <param name="hsts">The run's HSTS cache.</param>
     /// <param name="fileSystem">Opens the file.</param>
     /// <param name="runsOnWindows">Whether to write as curl's Windows build does, in CR LF and with its <c>gmtime</c> limit.</param>
     /// <returns>A task that completes when the file is written.</returns>
-    internal static async Task WriteAsync(string file, HstsTransferPolicy hsts, IFileSystem fileSystem, bool runsOnWindows)
+    internal static async Task WriteAsync(EasyHttpOptions http, HstsTransferPolicy hsts, IFileSystem fileSystem, bool runsOnWindows)
     {
+        string file = http.Hsts ?? string.Empty;
         string? text = file.Length == 0
             ? null
             : runsOnWindows

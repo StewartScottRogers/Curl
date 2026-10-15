@@ -478,13 +478,13 @@ internal static class EasyOptionsFromCommandLine
     private static MimeOptions MimeOptionsOf(CommandLineOptions options) =>
         options.FormEscape ? MimeOptions.FormEscape : MimeOptions.None;
 
-    // The -b strings joined as --libcurl writes CURLOPT_COOKIE, the -b files, -c and -j.
+    // The -b strings joined as curl's cookie_setopts joins them for CURLOPT_COOKIE, the -b files, -c and -j.
     private static EasyHttpOptions WithCookies(CommandLineOptions options, EasyHttpOptions http)
     {
         string[] cookieStrings = CookieValuesOf(options, cookieStrings: true);
         return http with
         {
-            Cookie = cookieStrings.Length > 0 ? string.Join("; ", cookieStrings) : null,
+            Cookie = cookieStrings.Length > 0 ? JoinCookieStrings(cookieStrings) : null,
             CookieFiles = CookieValuesOf(options, cookieStrings: false),
             CookieJar = options.CookieJar,
             CookieSession = options.JunkSessionCookies,
@@ -493,6 +493,19 @@ internal static class EasyOptionsFromCommandLine
 
     private static string[] CookieValuesOf(CommandLineOptions options, bool cookieStrings) =>
         [.. options.Cookies.Where(cookie => cookie.IsCookieString == cookieStrings).Select(cookie => cookie.Value)];
+
+    // The first string as it is, each later one after ';' and a space, the space left out when the
+    // string already starts with a space or a tab, as curl 8.21.0's cookie_setopts joins them (ADR-0533).
+    private static string JoinCookieStrings(string[] cookieStrings)
+    {
+        StringBuilder joined = new(cookieStrings[0]);
+        foreach (string cookieString in cookieStrings.Skip(1))
+        {
+            joined.Append(cookieString.StartsWith(' ') || cookieString.StartsWith('\t') ? ";" : "; ").Append(cookieString);
+        }
+
+        return joined.ToString();
+    }
 
     // Setting CURLOPT_ALTSVC or CURLOPT_HSTS turns the cache on with libcurl's own control bits.
     private static EasyHttpOptions WithAltSvcAndHsts(CommandLineOptions options, EasyHttpOptions http) =>

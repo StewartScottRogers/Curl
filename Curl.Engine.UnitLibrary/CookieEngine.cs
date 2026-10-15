@@ -1,6 +1,6 @@
 using System.Globalization;
 using System.Text;
-using Curl.Cli;
+using Curl.Api.Options.Http;
 using Curl.Cookies;
 using Curl.Protocol.Abstractions;
 
@@ -43,11 +43,9 @@ internal sealed class CookieEngine
     /// </summary>
     internal const string CookieLineTooLongWarning = "skipped provided cookie, the cookie header would go over 8200 bytes";
 
-    private readonly StringBuilder joinedCookieStrings = new();
+    private readonly string joinedCookieString;
 
-    private readonly List<string> sentCookieStrings = [];
-
-    private readonly List<string> cookieFiles = [];
+    private readonly IReadOnlyList<string> cookieFiles;
 
     private readonly string? cookieJar;
 
@@ -55,25 +53,24 @@ internal sealed class CookieEngine
 
     private bool cookieFilesLoaded;
 
-    private CookieEngine(CommandLineOptions options, CookieStore store)
+    private CookieEngine(EasyHttpOptions http, CookieStore store)
     {
         this.store = store;
-        AddCookies(options.Cookies, sendCookieStrings: !options.Headers.Any(NamesCookie));
-        cookieJar = options.CookieJar;
-        discardSessionCookies = options.JunkSessionCookies;
-        HandlerStore = cookieFiles.Count > 0 || cookieJar is not null
-            ? new GroupCookies(store, sentCookieStrings)
-            : new CookieStringSender(sentCookieStrings);
+        joinedCookieString = http.Cookie ?? string.Empty;
+        cookieFiles = http.CookieFiles;
+        cookieJar = http.CookieJar;
+        discardSessionCookies = http.CookieSession;
+        HandlerStore = HandlerStoreOf(http, store, SentCookieStringsOf(joinedCookieString, http.HttpHeaders));
     }
 
     /// <summary>
-    /// Gets a value indicating whether the group's <c>-b name=value</c> strings, joined as
-    /// <see cref="JoinCookieString" /> joins them, reach <see cref="LongestCookieLine" /> bytes in
+    /// Gets a value indicating whether the group's joined <c>-b name=value</c> strings
+    /// (<see cref="EasyHttpOptions.Cookie" />) reach <see cref="LongestCookieLine" /> bytes in
     /// UTF-8, so every transfer of the group fails with exit 100 before it connects, as curl
     /// 8.21.0's <c>cookie_setopts</c> fails it - whether or not an <c>-H</c> value names
     /// <c>Cookie</c> (measured 2026-10-03, BL-1391).
     /// </summary>
-    internal bool CookieLineTooLong => Encoding.UTF8.GetByteCount(joinedCookieStrings.ToString()) >= LongestCookieLine;
+    internal bool CookieLineTooLong => Encoding.UTF8.GetByteCount(joinedCookieString) >= LongestCookieLine;
 
     /// <summary>
     /// Gets the store the HTTP handler reads and writes: the run's <see cref="CookieStore" />, with
@@ -83,13 +80,17 @@ internal sealed class CookieEngine
     internal ICookieStore HandlerStore { get; }
 
     /// <summary>
-    /// Creates the cookies of a run of one option group from the parsed command line, with a store
-    /// of their own.
+    /// Creates the cookies of a run of one option group from its HTTP options, with a store of
+    /// their own.
     /// </summary>
-    /// <param name="options">The parsed command line.</param>
+    /// <param name="http">
+    /// The group's HTTP options: <see cref="EasyHttpOptions.Cookie" /> (the <c>-b name=value</c>
+    /// strings, joined), <see cref="EasyHttpOptions.CookieFiles" />, <see cref="EasyHttpOptions.CookieJar" />,
+    /// <see cref="EasyHttpOptions.CookieSession" /> and <see cref="EasyHttpOptions.HttpHeaders" />.
+    /// </param>
     /// <returns>The run's cookies, or <see langword="null" /> when neither <c>-b</c> nor <c>-c</c> was given.</returns>
-    internal static CookieEngine? FromCommandLine(CommandLineOptions options) =>
-        FromCommandLine(options, new CookieStore());
+    internal static CookieEngine? FromHttpOptions(EasyHttpOptions http) =>
+        FromHttpOptions(http, new CookieStore());
 
     /// <summary>
     /// Creates one <c>-:</c> / <c>--next</c> option group's cookies over the run's
@@ -99,11 +100,11 @@ internal sealed class CookieEngine
     /// <c>-c j A --next B</c> sent B none and <c>A --next -c j B</c> kept only B's (measured
     /// 2026-09-28, BL-509 Notes).
     /// </summary>
-    /// <param name="options">The option group.</param>
+    /// <param name="http">The option group's HTTP options.</param>
     /// <param name="runCookies">The cookies stored and loaded by the run so far.</param>
     /// <returns>The group's cookies, or <see langword="null" /> when the group gives neither <c>-b</c> nor <c>-c</c>.</returns>
-    internal static CookieEngine? FromCommandLine(CommandLineOptions options, CookieStore runCookies) =>
-        options.Cookies.Count > 0 || options.CookieJar is not null ? new CookieEngine(options, runCookies) : null;
+    internal static CookieEngine? FromHttpOptions(EasyHttpOptions http, CookieStore runCookies) =>
+        http.Cookie is not null || http.CookieFiles.Count > 0 || http.CookieJar is not null ? new CookieEngine(http, runCookies) : null;
 
     /// <summary>
     /// Loads every <c>-b</c> file, in command-line order, dropping session cookies under <c>-j</c>,
@@ -169,46 +170,27 @@ internal sealed class CookieEngine
     }
 
     /// <summary>
-    /// Keeps each <c>-b</c> file to load and joins the <c>-b name=value</c> strings into one, which
-    /// is sent unless <paramref name="sendCookieStrings" /> is <see langword="false" />.
+    /// The <c>-b name=value</c> strings sent: the joined string, unless it is empty or an <c>-H</c>
+    /// value names <c>Cookie</c>.
     /// </summary>
-    /// <param name="cookies">The <c>-b</c> values, in command-line order.</param>
-    /// <param name="sendCookieStrings">Whether the joined <c>name=value</c> string is sent.</param>
-    private void AddCookies(IEnumerable<CommandLineCookie> cookies, bool sendCookieStrings)
-    {
-        foreach (CommandLineCookie cookie in cookies)
-        {
-            if (cookie.IsCookieString)
-            {
-                JoinCookieString(cookie.Value);
-            }
-            else
-            {
-                cookieFiles.Add(cookie.Value);
-            }
-        }
-
-        if (sendCookieStrings && joinedCookieStrings.Length > 0)
-        {
-            sentCookieStrings.Add(joinedCookieStrings.ToString());
-        }
-    }
+    /// <param name="joinedCookieString">The joined <c>-b name=value</c> strings.</param>
+    /// <param name="headers">The <c>-H</c> values.</param>
+    /// <returns>The strings sent, none or one.</returns>
+    private static string[] SentCookieStringsOf(string joinedCookieString, IReadOnlyList<string> headers) =>
+        joinedCookieString.Length > 0 && !headers.Any(NamesCookie) ? [joinedCookieString] : [];
 
     /// <summary>
-    /// Appends one <c>-b name=value</c> string as curl 8.21.0's <c>cookie_setopts</c> does: the
-    /// first as it is, each later one after <c>;</c> and a space, the space left out when the
-    /// string already starts with a space or a tab.
+    /// The store the HTTP handler reads and writes: the run's, while a <c>-b</c> file or <c>-c</c>
+    /// turns the cookie engine on, or else one that only sends <paramref name="sentCookieStrings" />.
     /// </summary>
-    /// <param name="cookieString">The <c>-b</c> value.</param>
-    private void JoinCookieString(string cookieString)
-    {
-        if (joinedCookieStrings.Length > 0)
-        {
-            joinedCookieStrings.Append(cookieString.StartsWith(' ') || cookieString.StartsWith('\t') ? ";" : "; ");
-        }
-
-        joinedCookieStrings.Append(cookieString);
-    }
+    /// <param name="http">The option group's HTTP options.</param>
+    /// <param name="store">The run's store.</param>
+    /// <param name="sentCookieStrings">The <c>-b name=value</c> strings sent.</param>
+    /// <returns>The handler's store.</returns>
+    private static ICookieStore HandlerStoreOf(EasyHttpOptions http, CookieStore store, string[] sentCookieStrings) =>
+        http.CookieFiles.Count > 0 || http.CookieJar is not null
+            ? new GroupCookies(store, sentCookieStrings)
+            : new CookieStringSender(sentCookieStrings);
 
     /// <summary>
     /// Tells whether an <c>-H</c> value names <c>Cookie</c> as curl's <c>Curl_checkheaders</c>

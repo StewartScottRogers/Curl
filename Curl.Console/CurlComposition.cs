@@ -367,7 +367,7 @@ internal static class CurlComposition
         Func<CommandLineOptions, CookieEngine?, TransferDispatch> createTransferDispatch)
     {
         CookieStore runCookies = new();
-        return options => createTransferDispatch(options, CookieEngine.FromCommandLine(options, runCookies));
+        return options => createTransferDispatch(options, CookieEngine.FromHttpOptions(EasyOptionsFromCommandLine.HttpOf(options), runCookies));
     }
 
     /// <summary>

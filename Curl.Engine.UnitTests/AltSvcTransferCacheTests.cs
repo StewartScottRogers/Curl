@@ -1,7 +1,10 @@
+using Curl.Api.Options.Http;
 using Curl.Core.FileSystem;
 using Curl.Core.AltSvc;
 using Curl.Protocol.Abstractions;
 using Curl.Testing;
+using HttpRequestOptions = Curl.Protocol.Abstractions.HttpRequestOptions;
+using HttpVersion = Curl.Api.Options.Http.HttpVersion;
 
 namespace Curl.Engine;
 
@@ -37,7 +40,7 @@ public sealed class AltSvcTransferCacheTests
     [TestMethod]
     public async Task StoreFromResponse_AddedThenBadPort_GivesTheAddedAlternativeThenTheSkipReason()
     {
-        AltSvcTransferCache cache = await AltSvcTransferCache.OpenAsync(string.Empty, null, [], new UnusedFileSystem(), TimeProvider.System);
+        AltSvcTransferCache cache = await AltSvcTransferCache.OpenAsync(new EasyHttpOptions { AltSvc = string.Empty }, [], new UnusedFileSystem(), TimeProvider.System);
 
         IReadOnlyList<AltSvcHeaderOutcome> outcomes = cache.StoreFromResponse(
             CurlUrl.Parse("https://h.test/"),
@@ -52,6 +55,27 @@ public sealed class AltSvcTransferCacheTests
         Assert.HasCount(2, outcomes);
         Assert.AreEqual(new Curl.Protocol.Abstractions.AltSvcAlternative("h2", "h.test", 8443), outcomes[0].Added);
         Assert.AreEqual(AltSvcSkipReason.UnknownPortNumber, outcomes[1].SkipReason);
+    }
+
+    /// <summary>
+    /// With no entry for the origin, a connection keeps the version the option group's
+    /// <see cref="EasyHttpOptions.HttpVersion" /> asks for, and a <see langword="null" /> file reads nothing.
+    /// </summary>
+    [TestMethod]
+    [DataRow(HttpVersion.None, HttpVersionPreference.Http11, DisplayName = "no version option")]
+    [DataRow(HttpVersion.Http11, HttpVersionPreference.Http11, DisplayName = "--http1.1")]
+    [DataRow(HttpVersion.Http3, HttpVersionPreference.Http3, DisplayName = "--http3")]
+    [DataRow(HttpVersion.Http3Only, HttpVersionPreference.Http3Only, DisplayName = "--http3-only")]
+    public async Task ApplyTo_NoEntryForTheOrigin_KeepsTheRequestedVersion(HttpVersion requested, HttpVersionPreference expected)
+    {
+        Diagnostics.Arrange("http version", requested);
+        AltSvcTransferCache cache = await AltSvcTransferCache.OpenAsync(new EasyHttpOptions { HttpVersion = requested }, [], new UnusedFileSystem(), TimeProvider.System);
+
+        HttpVersionPreference actual = cache.ApplyTo(CurlUrl.Parse("https://h.test/"), new HttpRequestOptions()).Version;
+        Diagnostics.Act("version", actual);
+
+        Diagnostics.Assert("version", expected, actual);
+        Assert.AreEqual(expected, actual);
     }
 
     /// <summary>A file system the cache must never touch: an empty <c>--alt-svc</c> name reads and writes nothing.</summary>

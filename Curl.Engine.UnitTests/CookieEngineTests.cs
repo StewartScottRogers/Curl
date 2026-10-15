@@ -1,6 +1,6 @@
 using System.Text;
 
-using Curl.Cli;
+using Curl.Api.Options.Http;
 using Curl.Protocol.Abstractions;
 using Curl.Testing;
 
@@ -30,7 +30,7 @@ public sealed class CookieEngineTests
     public void HandlerStore_CookieStringWithHeaderNamingCookie_SendsNoCookieHeader(string header)
     {
         Diagnostics.Arrange("command line", $"-b a=b -H \"{header}\" {Url}");
-        CookieEngine cookies = CookieEngine.FromCommandLine(Parse("-b", "a=b", "-H", header, Url))!;
+        CookieEngine cookies = CookieEngine.FromHttpOptions(new EasyHttpOptions { Cookie = "a=b", HttpHeaders = [header] })!;
         string? cookieHeader = cookies.HandlerStore.GetCookieHeader(CurlUrl.Parse(Url), false, Now, NoTransferEvents.Instance);
         Diagnostics.Act("cookie header", cookieHeader ?? "<null>");
 
@@ -40,12 +40,12 @@ public sealed class CookieEngineTests
 
     [TestMethod]
     [DataRow(new string[0], DisplayName = "no -H")]
-    [DataRow(new[] { "-H", "Cookies: c=d" }, DisplayName = "-H Cookies:")]
-    [DataRow(new[] { "-H", "X-Cookie: c=d" }, DisplayName = "-H X-Cookie:")]
-    public void HandlerStore_CookieStringWithoutHeaderNamingCookie_SendsTheString(string[] headerArguments)
+    [DataRow(new[] { "Cookies: c=d" }, DisplayName = "-H Cookies:")]
+    [DataRow(new[] { "X-Cookie: c=d" }, DisplayName = "-H X-Cookie:")]
+    public void HandlerStore_CookieStringWithoutHeaderNamingCookie_SendsTheString(string[] headers)
     {
-        Diagnostics.Arrange("command line", $"-b a=b {string.Join(" ", headerArguments)} {Url}");
-        CookieEngine cookies = CookieEngine.FromCommandLine(Parse(["-b", "a=b", .. headerArguments, Url]))!;
+        Diagnostics.Arrange("command line", $"-b a=b {string.Join(" ", headers.Select(header => $"-H \"{header}\""))} {Url}");
+        CookieEngine cookies = CookieEngine.FromHttpOptions(new EasyHttpOptions { Cookie = "a=b", HttpHeaders = headers })!;
         string? cookieHeader = cookies.HandlerStore.GetCookieHeader(CurlUrl.Parse(Url), false, Now, NoTransferEvents.Instance);
         Diagnostics.Act("cookie header", cookieHeader ?? "<null>");
 
@@ -61,8 +61,7 @@ public sealed class CookieEngineTests
             Encoding.Latin1.GetBytes("# Netscape HTTP Cookie File\n127.0.0.1\tFALSE\t/\tFALSE\t0\tsess\ts1\n");
         Diagnostics.Arrange("command line", $"-b jar.txt -b a=b -H \"Cookie: c=d\" {Url}");
         Diagnostics.Bytes("jar.txt", fileSystem.ExistingContent["jar.txt"]);
-        CookieEngine cookies = CookieEngine.FromCommandLine(
-            Parse("-b", "jar.txt", "-b", "a=b", "-H", "Cookie: c=d", Url))!;
+        CookieEngine cookies = CookieEngine.FromHttpOptions(new EasyHttpOptions { Cookie = "a=b", CookieFiles = ["jar.txt"], HttpHeaders = ["Cookie: c=d"] })!;
 
         await cookies.LoadCookieFilesAsync(fileSystem, Stream.Null, Now, NoTransferEvents.Instance);
         string? cookieHeader = cookies.HandlerStore.GetCookieHeader(CurlUrl.Parse(Url), false, Now, NoTransferEvents.Instance);
@@ -77,7 +76,7 @@ public sealed class CookieEngineTests
     {
         // curl -b test=yes -L to another host sends no Cookie (upstream test2015, BL-1846).
         Diagnostics.Arrange("command line", $"-b test=yes {Url}");
-        CookieEngine cookies = CookieEngine.FromCommandLine(Parse("-b", "test=yes", Url))!;
+        CookieEngine cookies = CookieEngine.FromHttpOptions(new EasyHttpOptions { Cookie = "test=yes" })!;
 
         string? cookieHeader = cookies.HandlerStore.GetStoredCookieHeader(CurlUrl.Parse(Url), false, Now, NoTransferEvents.Instance);
         Diagnostics.Act("cookie header", cookieHeader ?? "<null>");
@@ -93,7 +92,7 @@ public sealed class CookieEngineTests
         fileSystem.ExistingContent["jar.txt"] =
             Encoding.Latin1.GetBytes("# Netscape HTTP Cookie File\n127.0.0.1\tFALSE\t/\tFALSE\t0\tsess\ts1\n");
         Diagnostics.Arrange("command line", $"-b jar.txt -b test=yes {Url}");
-        CookieEngine cookies = CookieEngine.FromCommandLine(Parse("-b", "jar.txt", "-b", "test=yes", Url))!;
+        CookieEngine cookies = CookieEngine.FromHttpOptions(new EasyHttpOptions { Cookie = "test=yes", CookieFiles = ["jar.txt"] })!;
 
         await cookies.LoadCookieFilesAsync(fileSystem, Stream.Null, Now, NoTransferEvents.Instance);
         string? stored = cookies.HandlerStore.GetStoredCookieHeader(CurlUrl.Parse(Url), false, Now, NoTransferEvents.Instance);
@@ -105,6 +104,47 @@ public sealed class CookieEngineTests
         Assert.AreEqual("sess=s1; test=yes", full);
     }
 
+    [TestMethod]
+    public void FromHttpOptions_NoCookieOptions_GivesNoCookies()
+    {
+        Diagnostics.Arrange("http options", "no Cookie, CookieFiles or CookieJar");
+
+        CookieEngine? cookies = CookieEngine.FromHttpOptions(new EasyHttpOptions { CookieSession = true });
+        Diagnostics.Act("cookies", cookies is null ? "<null>" : "created");
+
+        Diagnostics.Assert("cookies", "<null>", cookies is null ? "<null>" : "created");
+        Assert.IsNull(cookies);
+    }
+
+    [TestMethod]
+    public void FromHttpOptions_CookieJarOnly_TurnsTheCookieEngineOn()
+    {
+        Diagnostics.Arrange("http options", "CookieJar = jar.txt");
+        CookieEngine cookies = CookieEngine.FromHttpOptions(new EasyHttpOptions { CookieJar = "jar.txt" })!;
+
+        cookies.HandlerStore.StoreFromResponse(CurlUrl.Parse(Url), "a=b", 0, Now, NoTransferEvents.Instance);
+        string? stored = cookies.HandlerStore.GetStoredCookieHeader(CurlUrl.Parse(Url), false, Now, NoTransferEvents.Instance);
+        Diagnostics.Act("stored cookie header", stored ?? "<null>");
+
+        Diagnostics.Assert("stored cookie header", "a=b", stored ?? "<null>");
+        Assert.AreEqual("a=b", stored);
+    }
+
+    [TestMethod]
+    [DataRow(CookieEngine.LongestCookieLine - 1, false, DisplayName = "one byte short")]
+    [DataRow(CookieEngine.LongestCookieLine, true, DisplayName = "at the limit")]
+    public void CookieLineTooLong_JoinedCookieLength_ComparesWithTheLongestCookieLine(int length, bool expected)
+    {
+        string cookie = "a=" + new string('x', length - 2);
+        Diagnostics.Arrange("Cookie length", length);
+
+        bool tooLong = CookieEngine.FromHttpOptions(new EasyHttpOptions { Cookie = cookie })!.CookieLineTooLong;
+        Diagnostics.Act("too long", tooLong);
+
+        Diagnostics.Assert("too long", expected, tooLong);
+        Assert.AreEqual(expected, tooLong);
+    }
+
     private sealed class ReadOnlyFileSystem : IFileSystem
     {
         public Dictionary<string, byte[]> ExistingContent { get; } = [];
@@ -114,12 +154,5 @@ public sealed class CookieEngineTests
 
         public ValueTask<FileOpenResult> OpenForWriteAsync(string path, FileWriteMode mode, UnixFileMode createMode, CancellationToken cancellationToken) =>
             throw new NotSupportedException();
-    }
-
-    private static CommandLineOptions Parse(params string[] arguments)
-    {
-        CommandLineParseResult parsed = CommandLineParser.Parse(arguments, _ => true);
-        Assert.IsTrue(parsed.IsAccepted);
-        return parsed.Options;
     }
 }

@@ -1,10 +1,11 @@
 using System.Text;
-using Curl.Cli;
+using Curl.Api.Options.Http;
 using Curl.Core.AltSvc;
 using Curl.Networking;
 using Curl.Protocol.Abstractions;
 using AltSvcAlternative = Curl.Protocol.Abstractions.AltSvcAlternative;
 using HttpRequestOptions = Curl.Protocol.Abstractions.HttpRequestOptions;
+using HttpVersion = Curl.Api.Options.Http.HttpVersion;
 
 namespace Curl.Engine;
 
@@ -69,13 +70,13 @@ internal sealed class AltSvcTransferCache : IAltSvcStore
 
     private readonly string file;
 
-    private readonly RequestedHttpVersion? requestedVersion;
+    private readonly HttpVersion requestedVersion;
 
     private readonly IReadOnlyList<string> connectToEntries;
 
     private readonly bool usesOverHttp;
 
-    private AltSvcTransferCache(AltSvcCache cache, string file, RequestedHttpVersion? requestedVersion, IReadOnlyList<string> connectToEntries, bool usesOverHttp)
+    private AltSvcTransferCache(AltSvcCache cache, string file, HttpVersion requestedVersion, IReadOnlyList<string> connectToEntries, bool usesOverHttp)
     {
         this.usesOverHttp = usesOverHttp;
         this.cache = cache;
@@ -85,10 +86,14 @@ internal sealed class AltSvcTransferCache : IAltSvcStore
     }
 
     /// <summary>
-    /// Creates the cache of one transfer, reading <paramref name="file" /> into it unless it is empty.
+    /// Creates the cache of one transfer, reading its <see cref="EasyHttpOptions.AltSvc" /> file into it
+    /// unless the name is empty.
     /// </summary>
-    /// <param name="file">The <c>--alt-svc</c> value; empty for no file.</param>
-    /// <param name="requestedVersion">The transfer's HTTP version option, which decides the entries it may use.</param>
+    /// <param name="http">
+    /// The transfer's HTTP options: <see cref="EasyHttpOptions.AltSvc" />, the file (empty or
+    /// <see langword="null" /> for none), and <see cref="EasyHttpOptions.HttpVersion" />, which decides the
+    /// entries it may use.
+    /// </param>
     /// <param name="connectToEntries">The transfer's <c>--connect-to</c> values, which win over an alternative.</param>
     /// <param name="fileSystem">Opens the file.</param>
     /// <param name="clock">The clock expiries are counted on.</param>
@@ -103,14 +108,15 @@ internal sealed class AltSvcTransferCache : IAltSvcStore
     /// </param>
     /// <returns>The cache.</returns>
     internal static async Task<AltSvcTransferCache> OpenAsync(
-        string file,
-        RequestedHttpVersion? requestedVersion,
+        EasyHttpOptions http,
         IReadOnlyList<string> connectToEntries,
         IFileSystem fileSystem,
         TimeProvider clock,
         IDiagnosticLog? diagnosticLog = null,
         bool usesOverHttp = false)
     {
+        string file = http.AltSvc ?? string.Empty;
+        HttpVersion requestedVersion = http.HttpVersion;
         AltSvcCache cache = new(clock, diagnosticLog);
         if (file.Length > 0)
         {
@@ -131,7 +137,7 @@ internal sealed class AltSvcTransferCache : IAltSvcStore
     /// <returns>The options with the route and version set.</returns>
     internal HttpRequestOptions ApplyTo(CurlUrl url, HttpRequestOptions http)
     {
-        HttpVersionPreference version = HttpVersionMapping.ToHttpVersionPreference(HttpVersionMapping.FromRequested(requestedVersion));
+        HttpVersionPreference version = HttpVersionMapping.ToHttpVersionPreference(requestedVersion);
         return MatchFor(url) switch
         {
             null => http with { AltSvcRoute = null, Version = version, TcpFirstAttemptVersion = null },
@@ -242,14 +248,14 @@ internal sealed class AltSvcTransferCache : IAltSvcStore
     /// transfer may switch to, for a version option (curl 8.21.0's <c>Curl_http_neg_init</c> and
     /// <c>url_set_conn_peer</c>): <c>-0</c> and <c>--http2-prior-knowledge</c> look nothing up.
     /// </summary>
-    private static (IReadOnlyList<AltSvcAlpn> LookedUpUnder, IReadOnlySet<AltSvcAlpn> Allowed) LookupOf(RequestedHttpVersion? version) =>
+    private static (IReadOnlyList<AltSvcAlpn> LookedUpUnder, IReadOnlySet<AltSvcAlpn> Allowed) LookupOf(HttpVersion version) =>
         version switch
         {
-            null => ([AltSvcAlpn.H2, AltSvcAlpn.H1], new HashSet<AltSvcAlpn> { AltSvcAlpn.H1, AltSvcAlpn.H2, AltSvcAlpn.H3 }),
-            RequestedHttpVersion.Http11 => ([AltSvcAlpn.H1], new HashSet<AltSvcAlpn> { AltSvcAlpn.H1 }),
-            RequestedHttpVersion.Http2 => ([AltSvcAlpn.H2, AltSvcAlpn.H1], new HashSet<AltSvcAlpn> { AltSvcAlpn.H1, AltSvcAlpn.H2 }),
-            RequestedHttpVersion.Http3 => ([AltSvcAlpn.H3, AltSvcAlpn.H2, AltSvcAlpn.H1], new HashSet<AltSvcAlpn> { AltSvcAlpn.H1, AltSvcAlpn.H2, AltSvcAlpn.H3 }),
-            RequestedHttpVersion.Http3Only => ([AltSvcAlpn.H3], new HashSet<AltSvcAlpn> { AltSvcAlpn.H3 }),
+            HttpVersion.None => ([AltSvcAlpn.H2, AltSvcAlpn.H1], new HashSet<AltSvcAlpn> { AltSvcAlpn.H1, AltSvcAlpn.H2, AltSvcAlpn.H3 }),
+            HttpVersion.Http11 => ([AltSvcAlpn.H1], new HashSet<AltSvcAlpn> { AltSvcAlpn.H1 }),
+            HttpVersion.Http2 => ([AltSvcAlpn.H2, AltSvcAlpn.H1], new HashSet<AltSvcAlpn> { AltSvcAlpn.H1, AltSvcAlpn.H2 }),
+            HttpVersion.Http3 => ([AltSvcAlpn.H3, AltSvcAlpn.H2, AltSvcAlpn.H1], new HashSet<AltSvcAlpn> { AltSvcAlpn.H1, AltSvcAlpn.H2, AltSvcAlpn.H3 }),
+            HttpVersion.Http3Only => ([AltSvcAlpn.H3], new HashSet<AltSvcAlpn> { AltSvcAlpn.H3 }),
             _ => (NoAlpns, NoAllowedAlpns),
         };
 
@@ -259,7 +265,7 @@ internal sealed class AltSvcTransferCache : IAltSvcStore
     /// <c>--http3</c> does (measured); any other preference leaves the version as it is.
     /// </summary>
     private HttpVersionPreference SameDestinationVersion(AltSvcAlpn destination, HttpVersionPreference version) =>
-        destination == AltSvcAlpn.H3 && requestedVersion is null ? HttpVersionPreference.Http3 : version;
+        destination == AltSvcAlpn.H3 && requestedVersion == HttpVersion.None ? HttpVersionPreference.Http3 : version;
 
     /// <summary>
     /// The version a TCP attempt that goes before QUIC names for an entry naming the origin itself:

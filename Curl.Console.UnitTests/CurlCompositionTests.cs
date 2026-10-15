@@ -583,7 +583,7 @@ public sealed partial class CurlCompositionTests
     public void CreateTransferDispatch_Cookies_GivesTheRunnerTheRunsCookies()
     {
         Diagnostics.Arrange("arguments", "-c jar.txt http://example.com/");
-        CookieEngine cookies = CookieEngine.FromCommandLine(Parse("-c", "jar.txt", "http://example.com/"))!;
+        CookieEngine cookies = CookieEngine.FromHttpOptions(EasyOptionsFromCommandLine.HttpOf(Parse("-c", "jar.txt", "http://example.com/")))!;
 
         TransferDispatch dispatch = CurlComposition.CreateTransferDispatch(EngineComposition.CreateTransports(NoOptions(), EasyOptionsFromCommandLine.NetworkOf(NoOptions()), EasyOptionsFromCommandLine.TlsOf(NoOptions())), cookies);
 

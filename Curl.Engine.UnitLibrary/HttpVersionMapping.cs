@@ -64,8 +64,8 @@ internal static class HttpVersionMapping
     /// The option group's HTTP version for a command line's <see cref="CommandLineOptions.HttpVersion" />, as
     /// <c>EasyOptionsFromCommandLine.HttpOf</c> maps it: <see cref="HttpVersion.None" /> when no version option
     /// was given. A bridge for the readers not yet handed <see cref="Curl.Api.Options.Http.EasyHttpOptions" />
-    /// (<c>EngineComposition</c>, <see cref="OptionGroupConnectionSettings" /> and <see cref="AltSvcTransferCache" />),
-    /// which BL-2346 and BL-2350 remove.
+    /// (<c>EngineComposition</c> and <see cref="OptionGroupConnectionSettings" />),
+    /// which BL-2350 removes.
     /// </summary>
     /// <param name="version">The command line's version option, or <see langword="null" /> for none.</param>
     /// <returns>The same version in the option group's terms.</returns>
