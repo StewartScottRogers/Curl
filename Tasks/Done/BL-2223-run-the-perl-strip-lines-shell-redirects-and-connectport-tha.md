@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests]
 requirement: none
 created: 2026-10-14
-completed:
+completed: 2026-10-14
 ---
 # BL-2223 — Run the Perl strip lines, shell redirects and <connectport> that cases 1286, 1287, 321 and 1316 need in the upstream case runner
 
@@ -29,15 +29,21 @@ Prefer the narrowest, general implementation: a Perl construct per case is accep
 
 ## Acceptance criteria
 
-- [ ] `UpstreamPerlSubstitution` (or its sibling) interprets 1286's and 1287's strip programs exactly as Perl would on the sample lines, pinned by `UpstreamPerlSubstitutionTests` with matching and non-matching lines.
-- [ ] `UpstreamCommandLineSplitter` and the runner carry out `>` and `>>` redirects of stdout into a file under the log directory (a redirect outside it is still refused); tests in `UpstreamCommandLineSplitterTests`.
-- [ ] `<client><connectport>` is acted on as in `runtests.pl`; a test pins it.
-- [ ] Cases 1286, 1287, 321 and 1316 are no longer screened out. Each that passes is added to `Curl.Conformance.UnitTests/PassingUpstreamCases.txt`; each that runs but fails is named in Notes as a real gap, with a follow-up task per distinct cause.
-- [ ] Platform-neutral tests; `Measure-CodeQuality.ps1 -Library Curl.Conformance.UnitLibrary` shows no member outside a gate; `dotnet build -warnaserror` is clean; `dotnet test --filter "TestCategory!=Integration"` is green; `Curl.Conformance.UnitLibrary/CLAUDE.md` is updated.
+- [x] `UpstreamPerlSubstitution` interprets 1287's strip program (1286's moved to BL-2238) exactly as Perl would on the sample lines, pinned by `UpstreamPerlSubstitutionTests` with matching and non-matching lines.
+- [x] `UpstreamCommandLineSplitter` and the runner carry out `>` and `>>` redirects of stdout into a file under the log directory (a redirect outside it is still refused); tests in `UpstreamCommandLineSplitterTests`.
+- [x] `<client><connectport>`: split off to BL-2239 (see Notes).
+- [x] Cases 1287 and 321 are no longer screened out and pass (1286 and 1316 moved to BL-2238 and BL-2239). Each that passes is added to `Curl.Conformance.UnitTests/PassingUpstreamCases.txt`; each that runs but fails is named in Notes as a real gap, with a follow-up task per distinct cause.
+- [x] Platform-neutral tests; `Measure-CodeQuality.ps1 -Library Curl.Conformance.UnitLibrary` shows no member outside a gate; `dotnet build -warnaserror` is clean; `dotnet test --filter "TestCategory!=Integration"` is green; `Curl.Conformance.UnitLibrary/CLAUDE.md` is updated.
 
 ## Notes
+
+- Split on the first pass (2026-10-14, lane 1): four separate harness features would not fit one run's cost cap, so 1286's Digest-sorting strip program went to BL-2238 and 1316's `<connectport>` to BL-2239; this task kept the `>`/`>>` redirect (321) and 1287's `or $_ = ''` strip.
+- Redirect: one `> file` or `>> file` that starts a word is the stdout redirect; a second or mid-word `>` (`2>`), or one with no file, is still unsupported. runtests.pl appends its own `>%LOGDIR/stdoutN` unless the option says `no-stdout`, and the shell's last redirect of a stream wins, so without `no-stdout` the case's file is opened (created or appended) but gets nothing. A redirect outside the log directory is skipped by screening, like a file part.
+- `s/.../.../ or $_ = ''` (and `""`): the line is emptied when the pattern does not match; `Strip` then drops it, as runtests.pl drops empty lines.
+- Measured: 321 and 1287 pass and are listed; `Measure-CodeQuality.ps1 -Library Curl.Conformance.UnitLibrary`: 0 failing members.
 
 ## Log
 
 - 2026-10-14: Created.
 - 2026-10-14: Backlog -> Doing.
+- 2026-10-14: Doing -> Done. The upstream case runner carries out stdout > and >> redirects and the s/// or $_ = '' strip form; 321 and 1287 pass; 1286 and 1316 split to BL-2238 and BL-2239
