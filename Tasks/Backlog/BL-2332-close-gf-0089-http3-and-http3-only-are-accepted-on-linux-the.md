@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests]
+touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests, Curl.Console, Curl.Console.UnitTests]
 requirement: none
 created: 2026-10-15
 completed:
@@ -45,7 +45,30 @@ Make the refusal follow the platform's reference build, not only the Schannel bu
 
 ## Notes
 
+- 2026-10-15 (lane 1, first claim, no code written): the change cannot stay inside the Cli
+  projects. Off Windows the rows of `--http3`/`--http3-only` (CommandLineOptionTable.cs:340-341)
+  apply through the same parse that `Curl.Console.UnitTests` uses with
+  `parsesAsWindowsBuild: false` (CurlCommandRunnerHttp3Tests, CurlCommandRunnerAltSvcVersionTests,
+  CurlCommandRunnerHttpsConnectTraceTests, CurlCommandRunnerHttp3DatagramConnectorTests,
+  HttpVersionMappingTests, HappyEyeballsTimeoutMappingTests - about 34 uses of `--http3`), so refusing
+  them off Windows turns those red and leaves Curl.Console's HTTP/3 composition uncovered. Added
+  Curl.Console and Curl.Console.UnitTests to `touches`; BL-2337 holds both, so requeued behind it.
+- Plan for the next claim: the reference builds on all three platforms (Schannel on Windows,
+  tarball+OpenSSL with no QUIC library on Linux and macOS, ADR-0505/ADR-0521) refuse both options with
+  `option --http3: the installed libcurl version does not support this`, exit 2. Give the parser a
+  third build reading beside Windows Schannel and the OpenSSL reference: "a QUIC build" (curl.se's
+  ngtcp2 build, ADR-0144) that accepts them. Production never selects it, so the rows refuse on every
+  platform; Console's `CreateRunner` gains a way for the HTTP/3 tests to parse as the QUIC build so the
+  hand-built stack stays covered (and reachable through Libcurl's CURLOPT_HTTP_VERSION). Supersede
+  ADR-0521 decision 2 in a new ADR "Decided by Claude under Stewart's delegation". Update
+  CommandLineOptionTable rows, CommandLineOption (a refusal that does not depend on Schannel),
+  CommandLineOptions.ActsAsWindowsSchannelBuild docs, CurlVersionText.cs:44 comment, the Cli tests
+  pinning acceptance (CommandLineTransferEncodingOptionTests 371-469 must parse as the QUIC build or
+  assert the refusal), and `--ai-help` (CurlAiHelpText's Schannel-only refusal line must say every
+  build).
+
 ## Log
 
 - 2026-10-15: Created.
 - 2026-10-15: Backlog -> Doing.
+- 2026-10-15: Doing -> Backlog. Needs Curl.Console and Curl.Console.UnitTests, held by BL-2337 in Doing; plan recorded under Notes
