@@ -31,3 +31,4 @@ Measure real curl (Schannel and OpenSSL builds) with `-E pkcs11:...` and `--key 
 ## Log
 
 - 2026-10-15: Created.
+- 2026-10-15: Backlog -> Doing.
