@@ -786,6 +786,70 @@ public sealed class UpstreamCaseRunnerTests
         Assert.AreEqual(UpstreamCaseOutcomeKind.Passed, outcome.Kind, outcome.Detail);
     }
 
+    [TestMethod]
+    public async Task RunAsync_Http2CaseWithoutHttp2Server_IsSkippedForTheServer()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        UpstreamCaseRunner runner = Runner(_ => Task.FromResult(0));
+
+        UpstreamCaseOutcome outcome = await RunAsync(runner, "<testcase>\n<client>\n<server>\nhttp/2\n</server>\n<command>\nhttp://%HOSTIP:%HTTP2PORT/%TESTNUMBER\n</command>\n</client>\n<verify>\n</verify>\n</testcase>\n");
+
+        diagnostics.Assert("skip reason", "the harness does not emulate the http/2 server", outcome.Detail);
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Skipped, outcome.Kind);
+        Assert.AreEqual("the harness does not emulate the http/2 server", outcome.Detail);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_WithHttp2Server_ReachesItOnHttp2PortInFrontOfTheSwsEmulation()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        string? http2ServerReached = null;
+        string? httpPortReached = null;
+        IConnector? backend = null;
+        UpstreamHttp2Server http2Server = new(sws =>
+        {
+            backend = sws;
+            return new RefusingConnector("http2 server");
+        });
+        UpstreamCaseRunner runner = new(
+            async invocation =>
+            {
+                http2ServerReached = (await invocation.Connector.ConnectAsync(new ConnectTarget("127.0.0.1", UpstreamHttp2Server.Http2Port, false), CancellationToken.None)).ErrorMessage;
+                ConnectResult http = await invocation.Connector.ConnectAsync(new ConnectTarget("127.0.0.1", 8990, false), CancellationToken.None);
+                httpPortReached = http.Connection is not null ? "connected" : http.ErrorMessage;
+                return 0;
+            },
+            UpstreamCurlPlatform.Unix,
+            TimeProvider.System,
+            TimeSpan.FromSeconds(10),
+            http2Server: http2Server);
+
+        UpstreamCaseOutcome outcome = await RunAsync(runner, "<testcase>\n<client>\n<server>\nhttp/2\n</server>\n<command>\nhttp://%HOSTIP:%HTTP2PORT/%TESTNUMBER\n</command>\n</client>\n<verify>\n</verify>\n</testcase>\n");
+
+        diagnostics.Assert("connector reached on %HTTP2PORT", "http2 server", http2ServerReached);
+        Assert.AreNotEqual(UpstreamCaseOutcomeKind.Skipped, outcome.Kind, outcome.Detail);
+        Assert.AreEqual("http2 server", http2ServerReached);
+        Assert.AreEqual("connected", httpPortReached);
+        Assert.IsInstanceOfType<SwsHttpServerConnector>(backend);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_H2cVersion_IsH2c()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        string[]? arguments = null;
+        UpstreamCaseRunner runner = Runner(invocation =>
+        {
+            arguments = [.. CommandArguments(invocation)];
+            return Task.FromResult(0);
+        });
+
+        await RunAsync(runner, "<testcase>\n<client>\n<server>\nnone\n</server>\n<command option=\"no-output,no-include\">\n%H2CVER\n</command>\n</client>\n</testcase>\n");
+
+        diagnostics.Assert("arguments", "h2c", string.Join(' ', arguments!));
+        CollectionAssert.AreEqual(new[] { "h2c" }, arguments);
+    }
+
     // Refuses every connection with its own name, so a test can tell it was reached.
     private sealed class RefusingConnector(string name) : IConnector
     {

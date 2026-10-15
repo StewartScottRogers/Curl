@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text;
 using Curl.Cli;
+using Curl.Conformance.Http2Server;
 using Curl.Conformance.SshServer;
 using Curl.Console;
 using Curl.Networking;
@@ -353,12 +354,15 @@ public sealed class UpstreamConformanceTests
     // the RSA keys for curl's WinCNG build on Windows, the Ed25519 ones elsewhere (BL-1954, BL-2217).
     private static readonly UpstreamSshServer SshServer = UpstreamSshServerFactory.Create(OperatingSystem.IsWindows());
 
+    // The stand-in for upstream's http/2 server, nghttpx serving h2c in front of sws, on %HTTP2PORT (BL-2230).
+    private static readonly UpstreamHttp2Server Http2Server = new(UpstreamHttp2ServerFactory.Create);
+
     private static async Task<UpstreamCaseOutcome> RunCaseOnceAsync(int testNumber, byte[] testFile)
     {
         DirectoryInfo logDirectory = Directory.CreateDirectory(Path.Combine(LogFolder, $"test{testNumber}-{Guid.NewGuid():N}"));
         try
         {
-            UpstreamCaseRunner runner = new(RunCurlAsync, PlatformFor(testFile), TimeProvider.System, TimeLimit, SshServer);
+            UpstreamCaseRunner runner = new(RunCurlAsync, PlatformFor(testFile), TimeProvider.System, TimeLimit, SshServer, Http2Server);
             return await Task.Run(() => runner.RunAsync(testNumber, testFile, logDirectory.FullName, certificateDirectory: CertificateFolder.Value, sourceDirectory: UpstreamTestDataFolder)).WaitAsync(CaseHangLimit);
         }
         catch (TimeoutException)
@@ -428,8 +432,15 @@ public sealed class UpstreamConformanceTests
                 Platform,
                 TimeProvider.System,
                 TimeLimit,
-                SshServer);
+                SshServer,
+                Http2Server);
             UpstreamCaseOutcome outcome = await runner.RunAsync(testNumber, testFile, logDirectory.FullName, certificateDirectory: CertificateFolder.Value);
+
+            // test471 needs http/2, which the Schannel build Curl matches on Windows lacks (ADR-0488, BL-2230).
+            if (outcome.RunsOnlyOnAnotherPlatform)
+            {
+                Assert.Inconclusive(outcome.Detail);
+            }
 
             Assert.AreEqual(UpstreamCaseOutcomeKind.Passed, outcome.Kind, outcome.Detail);
         }

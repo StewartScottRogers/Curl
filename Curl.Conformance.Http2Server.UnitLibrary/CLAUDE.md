@@ -15,7 +15,9 @@ Read ADR-0491 before changing it.
 ## Shape
 
 - `UpstreamHttp2ServerFactory.Create(backend)` is the one public entry: an `IConnector`
-  (`Http2ServerConnector`) over the backend, the case's sws emulation.
+  (`Http2ServerConnector`) over the backend, the case's sws emulation. The conformance tests
+  hand it to the runner as `new UpstreamHttp2Server(UpstreamHttp2ServerFactory.Create)`, which
+  puts it on `%HTTP2PORT` (BL-2230).
 - `Http2ServerSession` serves one connection: preface or `Upgrade: h2c`, SETTINGS, PING,
   WINDOW_UPDATE, header blocks with CONTINUATION, DATA, and GOAWAY at the end.
 - `Http2ServerRequestRelay` turns a stream's request into nghttpx's HTTP/1.1 request and the

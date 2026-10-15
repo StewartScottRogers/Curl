@@ -9,7 +9,7 @@ public sealed class UpstreamCurlPlatformTests
     private static readonly string[] CommonFeatures =
     [
         "dict", "file", "gopher", "gophers", "http", "https", "ipfs", "mqtt", "mqtts", "scp", "sftp", "telnet", "tftp", "ws", "wss",
-        "alt-svc", "AsynchDNS", "brotli", "ECH", "GSS-API", "HSTS", "http/2", "h2c", "http/3", "HTTPS-proxy",
+        "alt-svc", "AsynchDNS", "brotli", "ECH", "GSS-API", "HSTS", "http/3", "HTTPS-proxy",
         "HTTPSRR", "IDN", "IPv6", "Kerberos", "Largefile", "libz", "NTLM", "PSL", "SPNEGO", "SSL",
         "UnixSockets", "zstd",
         "crypto", "cookies", "proxy", "Mime", "manual", "DoH", "digest", "aws", "netrc", "verbose-strings",
@@ -44,7 +44,7 @@ public sealed class UpstreamCurlPlatformTests
 
         UpstreamCurlPlatform platform = UpstreamCurlPlatform.Unix;
 
-        bool featuresMatch = platform.Features.SetEquals([.. CommonFeatures, "OpenSSL", "xattr"]);
+        bool featuresMatch = platform.Features.SetEquals([.. CommonFeatures, "OpenSSL", "xattr", "http/2", "h2c"]);
         diagnostics.Act("feature count", platform.Features.Count);
         diagnostics.Act("null device", platform.NullDevice);
         diagnostics.Assert("features equal common + OpenSSL + xattr", true, featuresMatch);
