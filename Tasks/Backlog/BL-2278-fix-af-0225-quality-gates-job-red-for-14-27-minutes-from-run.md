@@ -6,6 +6,7 @@ assignee: Claude
 pipeline: direct
 depends-on: []
 touches: [RunDarkFactory.ps1]
+lane: no
 requirement: none
 created: 2026-10-15
 completed:
@@ -46,7 +47,10 @@ The finding closes only when a later re-audit by the process auditor confirms th
 
 ## Notes
 
+Interactive only (lane: no). Read from the code and the task text, the 14.27-minute spell looks like a one-off: run 38666857143 failed on aa14b025 (a lane pushed past the Quality gates), the coordinator filed BL-2251 after its 5-minute confirm wait (`$CiConfirmMinutes`), and an unrelated later commit passed first, ending the spell. `RunDarkFactory.ps1` already files a High "Fix CI failure" task, which `next` offers first and which runs on opus; AF-0213 already requires a quality run before a push. I found no defect in `RunDarkFactory.ps1` to change. The reproduction runs the process auditor's measuring tool over the audit worktree's logs, which the audit guard stops a lane from reading, so a lane cannot check the acceptance criterion. Remove `lane: no` once an interactive session has run the reproduction and either decided the spell needs no factory change (then close the task) or named the change to make.
+
 ## Log
 
 - 2026-10-15: Created.
 - 2026-10-15: Backlog -> Doing.
+- 2026-10-15: Doing -> Backlog. Interactive only: the reproduction reads audit paths a lane cannot read; no defect found in RunDarkFactory.ps1
