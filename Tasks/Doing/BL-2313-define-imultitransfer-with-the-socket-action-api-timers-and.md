@@ -39,3 +39,4 @@ ADR-0506; plan section "Multi"; needs BL-2312. Upstream: curl 8.22.0's `include/
 ## Log
 
 - 2026-10-15: Created.
+- 2026-10-15: Backlog -> Doing.
