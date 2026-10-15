@@ -47,8 +47,11 @@ public static class CurlVersionText
     /// <c>PSL</c>, <c>UnixSockets</c> and <c>zstd</c>, each with evidence in the code (ADR-0021 amendment).
     /// <c>threadsafe</c> on every platform, after <c>SSL</c> (and <c>SSPI</c>) as both reference builds list it,
     /// because Curl's process-wide set-up is thread-safe (ADR-0444, BL-1828).
+    /// <c>SSLS-EXPORT</c> off Windows, after <c>SSL</c>, as the OpenSSL reference build lists it, because
+    /// <c>--ssl-sessions</c> loads and saves TLS session tickets there (ADR-0319, ADR-0519, BL-2331); the
+    /// Schannel build refuses <c>--ssl-sessions</c> (ADR-0397), so <see cref="WindowsFeaturesLine"/> leaves it out.
     /// </summary>
-    public const string FeaturesLine = "Features: alt-svc AsynchDNS brotli ECH GSS-API HSTS HTTP2 HTTP3 HTTPS-proxy HTTPSRR IDN IPv6 Kerberos Largefile libz NTLM PSL SPNEGO SSL threadsafe UnixSockets zstd";
+    public const string FeaturesLine = "Features: alt-svc AsynchDNS brotli ECH GSS-API HSTS HTTP2 HTTP3 HTTPS-proxy HTTPSRR IDN IPv6 Kerberos Largefile libz NTLM PSL SPNEGO SSL SSLS-EXPORT threadsafe UnixSockets zstd";
 
     /// <summary>
     /// The fourth line on Windows: <see cref="FeaturesLine"/> with <c>SSPI</c> after <c>SSL</c>, as the
