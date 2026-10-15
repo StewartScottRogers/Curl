@@ -207,6 +207,15 @@ run, reads their `<servercmd>` with ftpserver.pl's command set and records their
 `<verify><upload>`. No case skips for `%FTPSPORT`: 400, 401, 403, 406 and 408 are measured and
 differ on a Curl difference the next gap run files (Curl sends `PROT P` where curl at
 `--ftp-ssl-control` sends `PROT C`; BL-2237); 1112 (`SLOWDOWNDATA`) and 407 are measured and differ the same way; 404 (exit code `77,60`) passes (BL-2222).
+`MqttsServerConnector` and `GophersServerConnector` (BL-2228) stand in for stunnel in front of the
+MQTT and Gopher stand-ins: ports 9013 and 9014, the runner's `%MQTTSPORT` and `%GOPHERSPORT` (with a
+value only when the caller names a certificate directory; servers.pm picks free ports, and these two
+no other stand-in uses), reach `MqttServerConnector.MqttPort` and `GopherServerConnector.GopherPort`
+through a `TlsRelayConnection` with `test-localhost.pem`, so the decrypted packets land in the mqttd
+dump and the selector in the Gopher stand-in's `ReceivedBytes`. The runner puts each just outside
+its plain stand-in only for a case naming `mqtts` or `gophers`; screening lets those servers run,
+and `UpstreamCurlPlatform` reports the `mqtts` protocol feature, as Curl's `curl -V` does. 1640 and
+1272 pass. Upstream's `dict` and `telnet` servers are not emulated yet (BL-2243).
 A `<client><stdout>` part is accepted and never compared, since `runtests.pl` at `curl-8_22_0` reads
 stdout only from `<verify>` (BL-2221): 210 passes, and 211 and 212 differ (Curl retries a refused
 `EPSV` or `EPRT` on the reused connection; BL-2236).
