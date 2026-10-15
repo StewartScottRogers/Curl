@@ -61,7 +61,7 @@ public sealed class EngineCompositionUnixSocketTests
     public void CreateTransports_WithAUnixSocket_GivesTheTcpConnectorThatSocket()
     {
         Diagnostics.Arrange("command line arguments", "--unix-socket /run/app.sock http://h/");
-        CurlTransports transports = EngineComposition.CreateTransports(Parse("--unix-socket", "/run/app.sock", "http://h/"), EasyOptionsFromCommandLine.NetworkOf(Parse("--unix-socket", "/run/app.sock", "http://h/")), EasyOptionsFromCommandLine.TlsOf(Parse("--unix-socket", "/run/app.sock", "http://h/")));
+        CurlTransports transports = EngineComposition.CreateTransports(Parse("--unix-socket", "/run/app.sock", "http://h/"), EasyOptionsFromCommandLine.NetworkOf(Parse("--unix-socket", "/run/app.sock", "http://h/")), EasyOptionsFromCommandLine.TlsOf(Parse("--unix-socket", "/run/app.sock", "http://h/")), EasyOptionsFromCommandLine.ProxyOf(Parse("--unix-socket", "/run/app.sock", "http://h/")));
         Diagnostics.Act("tcp connector unix socket", transports.TcpConnector.UnixSocket);
 
         Diagnostics.Assert("tcp connector unix socket", new UnixSocketAddress("/run/app.sock", IsAbstract: false), transports.TcpConnector.UnixSocket);
@@ -93,7 +93,7 @@ public sealed class EngineCompositionUnixSocketTests
         Diagnostics.Assert("dialed hosts", "unix:/run/a.sock, unix:/run/b.sock", string.Join(", ", server.Targets.Select(dialed => dialed.Host)));
         Assert.IsFalse(second.IsReused);
         CollectionAssert.AreEqual(new[] { "unix:/run/a.sock", "unix:/run/b.sock" }, server.Targets.Select(dialed => dialed.Host).ToArray());
-        Assert.AreNotSame(EngineComposition.CreateTransports(parsed.Groups[0], EasyOptionsFromCommandLine.NetworkOf(parsed.Groups[0]), EasyOptionsFromCommandLine.TlsOf(parsed.Groups[0])).PoolingConnector, EngineComposition.CreateTransports(parsed.Groups[1], EasyOptionsFromCommandLine.NetworkOf(parsed.Groups[1]), EasyOptionsFromCommandLine.TlsOf(parsed.Groups[1])).PoolingConnector);
+        Assert.AreNotSame(EngineComposition.CreateTransports(parsed.Groups[0], EasyOptionsFromCommandLine.NetworkOf(parsed.Groups[0]), EasyOptionsFromCommandLine.TlsOf(parsed.Groups[0]), EasyOptionsFromCommandLine.ProxyOf(parsed.Groups[0])).PoolingConnector, EngineComposition.CreateTransports(parsed.Groups[1], EasyOptionsFromCommandLine.NetworkOf(parsed.Groups[1]), EasyOptionsFromCommandLine.TlsOf(parsed.Groups[1]), EasyOptionsFromCommandLine.ProxyOf(parsed.Groups[1])).PoolingConnector);
     }
 
     [TestMethod]
@@ -104,7 +104,7 @@ public sealed class EngineCompositionUnixSocketTests
         CommandLineOptions options = Parse("--unix-socket", "nosuch.sock", "-x", "http://[bad", "http://localhost/");
         Diagnostics.Arrange("command line arguments", "--unix-socket nosuch.sock -x http://[bad http://localhost/");
 
-        bool selected = TransferProxySelection.TrySelect(new ProxySelector(_ => null), options, CurlUrl.Parse("http://localhost/"), out ProxyEndpoint? proxy, out TransferResult? failure);
+        bool selected = TransferProxySelection.TrySelect(new ProxySelector(_ => null), EasyOptionsFromCommandLine.ProxyOf(options), options.UnixSocketPath is not null, options.ProxyCredentials, CurlUrl.Parse("http://localhost/"), out ProxyEndpoint? proxy, out TransferResult? failure);
         Diagnostics.Act("selected", selected);
         Diagnostics.Act("proxy", proxy?.ToString() ?? "none");
         Diagnostics.Act("failure", failure?.ExitCode.ToString() ?? "none");
@@ -124,7 +124,7 @@ public sealed class EngineCompositionUnixSocketTests
 
     private static TcpConnector CreateConnector(CommandLineOptions options, ScriptedConnector server) =>
         EngineComposition.CreateTcpConnector(
-            options, EasyOptionsFromCommandLine.NetworkOf(options),
+            options, EasyOptionsFromCommandLine.NetworkOf(options), EasyOptionsFromCommandLine.ProxyOf(options),
             new LoopbackDnsResolver(),
             new ScriptedTcpDialer(server),
             new PassThroughTlsProvider(),

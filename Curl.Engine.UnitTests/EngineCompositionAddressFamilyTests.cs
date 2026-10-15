@@ -71,7 +71,7 @@ public sealed class EngineCompositionAddressFamilyTests
     {
         Diagnostics.Arrange("arguments", "-6 --resolve tftp.test:69:127.0.0.1 tftp://tftp.test/");
         CommandLineParseResult parsed = CommandLineParser.Parse(["-6", "--resolve", "tftp.test:69:127.0.0.1", "tftp://tftp.test/"], _ => true);
-        CurlTransports transports = EngineComposition.CreateTransports(parsed.Options!, EasyOptionsFromCommandLine.NetworkOf(parsed.Options!), EasyOptionsFromCommandLine.TlsOf(parsed.Options!));
+        CurlTransports transports = EngineComposition.CreateTransports(parsed.Options!, EasyOptionsFromCommandLine.NetworkOf(parsed.Options!), EasyOptionsFromCommandLine.TlsOf(parsed.Options!), EasyOptionsFromCommandLine.ProxyOf(parsed.Options!));
 
         DatagramOpenResult result;
         using (Diagnostics.Phase("open"))
@@ -95,7 +95,7 @@ public sealed class EngineCompositionAddressFamilyTests
         Assert.IsTrue(parsed.IsAccepted);
 
         TcpConnector connector = EngineComposition.CreateTcpConnector(
-            parsed.Options, EasyOptionsFromCommandLine.NetworkOf(parsed.Options),
+            parsed.Options, EasyOptionsFromCommandLine.NetworkOf(parsed.Options), EasyOptionsFromCommandLine.ProxyOf(parsed.Options),
             new LoopbackDnsResolver(),
             new ScriptedTcpDialer(server),
             new PassThroughTlsProvider(),

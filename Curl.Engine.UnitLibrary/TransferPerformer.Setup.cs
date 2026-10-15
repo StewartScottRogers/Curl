@@ -3,6 +3,7 @@ using System.Net;
 using System.Text;
 using Curl.Api.Options.Http;
 using Curl.Api.Options.Protocols;
+using Curl.Api.Options.Proxy;
 using Curl.Cli;
 using Curl.Core;
 using Curl.Core.Hsts;
@@ -137,7 +138,8 @@ internal sealed partial class TransferPerformer
     /// handler serves fails first, with exit 1.
     /// </summary>
     /// <param name="dispatch">The run's dispatch: its dispatcher says whether the URL's scheme is served, its proxy selector chooses the proxy.</param>
-    /// <param name="options">The accepted command line.</param>
+    /// <param name="options">The accepted command line, for <c>-U</c>, <c>--unix-socket</c> and the credential options.</param>
+    /// <param name="proxyOptions">The option group's proxy options, which <see cref="TransferProxySelection" /> chooses from.</param>
     /// <param name="url">The transfer's URL.</param>
     /// <param name="state">The running transfer, which keeps the credentials.</param>
     /// <param name="events">
@@ -152,6 +154,7 @@ internal sealed partial class TransferPerformer
     internal static bool TrySelectProxyAndCredentials(
         TransferDispatch dispatch,
         CommandLineOptions options,
+        EasyProxyOptions proxyOptions,
         CurlUrl url,
         EngineTransferState state,
         ITransferEvents events,
@@ -168,7 +171,7 @@ internal sealed partial class TransferPerformer
             return false;
         }
 
-        if (!TransferProxySelection.TrySelect(dispatch.ProxySelector, options, url, out proxy, out failure, diagnosticLog))
+        if (!TransferProxySelection.TrySelect(dispatch.ProxySelector, proxyOptions, options.UnixSocketPath is not null, options.ProxyCredentials, url, out proxy, out failure, diagnosticLog))
         {
             return false;
         }

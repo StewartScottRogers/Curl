@@ -16,6 +16,7 @@ using Curl.Output;
 using Curl.Protocol.Abstractions;
 using EasyHttpOptions = Curl.Api.Options.Http.EasyHttpOptions;
 using EasyMimeBody = Curl.Api.Options.Http.EasyMimeBody;
+using EasyProxyOptions = Curl.Api.Options.Proxy.EasyProxyOptions;
 using EasyTransferOptions = Curl.Api.Options.Behaviour.EasyTransferOptions;
 
 namespace Curl.Console;
@@ -3344,10 +3345,11 @@ internal sealed class CurlCommandRunner(
         UrlTransfer transfer,
         Stream? headerOutput)
     {
+        EasyProxyOptions proxyOptions = EasyOptionsFromCommandLine.ProxyOf(options);
         RedirectFollower follower = new(
             dispatch.Dispatcher,
             (CurlUrl hopUrl, out ProxyEndpoint? hopProxy, [NotNullWhen(false)] out TransferResult? hopFailure) =>
-                TransferProxySelection.TrySelect(dispatch.ProxySelector, options, hopUrl, out hopProxy, out hopFailure, diagnosticLog)
+                TransferProxySelection.TrySelect(dispatch.ProxySelector, proxyOptions, options.UnixSocketPath is not null, options.ProxyCredentials, hopUrl, out hopProxy, out hopFailure, diagnosticLog)
                 && TransferCredentialLookup.TryCheckUrlCredentials(options, hopUrl, out hopFailure),
             hsts: Hsts,
             selectHopAltSvc: (hopUrl, hopHttp) => Running.AltSvc is { } altSvc ? altSvc.ApplyTo(hopUrl, hopHttp) : hopHttp,
@@ -3460,7 +3462,7 @@ internal sealed class CurlCommandRunner(
         }
 
         if (!TransferPerformer.TrySelectProxyAndCredentials(
-                dispatch, options, url, Running, EventsBeforeConnecting(transfer), diagnosticLog, CredentialLookup, out ProxyEndpoint? proxy, out TransferResult? proxyFailure))
+                dispatch, options, EasyOptionsFromCommandLine.ProxyOf(options), url, Running, EventsBeforeConnecting(transfer), diagnosticLog, CredentialLookup, out ProxyEndpoint? proxy, out TransferResult? proxyFailure))
         {
             return proxyFailure;
         }
@@ -3487,6 +3489,7 @@ internal sealed class CurlCommandRunner(
                 EasyOptionsFromCommandLine.BehaviourOf(options),
                 transferOptions,
                 EasyOptionsFromCommandLine.ProtocolOf(options),
+                EasyOptionsFromCommandLine.ProxyOf(options),
                 url,
                 RateLimited(options, toStandardOutput ? FlushedEachWriteUnderNoBuffer(options, InTextModeUnderUseAscii(options, Running.GatedStandardOutput)) : Stream.Null),
                 range,
@@ -4328,6 +4331,7 @@ internal sealed class CurlCommandRunner(
                         EasyOptionsFromCommandLine.BehaviourOf(options),
                         transferOptions,
                         EasyOptionsFromCommandLine.ProtocolOf(options),
+                        EasyOptionsFromCommandLine.ProxyOf(options),
                         url,
                         RateLimited(options, FlushedEachWriteUnderNoBuffer(options, output)),
                         range,

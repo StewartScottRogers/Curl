@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Net.Sockets;
 using System.Text;
 using Curl.Api.Options.Network;
+using Curl.Api.Options.Proxy;
 using Curl.Api.Options.Tls;
 using Curl.Authentication;
 using Curl.Cli;
@@ -53,7 +54,7 @@ internal static class CurlComposition
     /// the real disk, the real network and the given standard streams, wrapping warnings at
     /// the width <see cref="TerminalColumns.Resolve()" /> gives. The network
     /// transports are built for each option group by
-    /// <see cref="CreateTransports(CommandLineOptions, EasyNetworkOptions, EasyTlsOptions, TimeProvider, ConnectionCache?, TlsSessionCache?, IDiagnosticLog?, DnsCache?, Func{CurlExitCode, string}?)" /> once the
+    /// <see cref="CreateTransports(CommandLineOptions, EasyNetworkOptions, EasyTlsOptions, EasyProxyOptions, TimeProvider, ConnectionCache?, TlsSessionCache?, IDiagnosticLog?, DnsCache?, Func{CurlExitCode, string}?)" /> once the
     /// command line is parsed, because their TLS settings come from it, over one
     /// <see cref="ConnectionCache" /> the runner closes when the run ends, so a later group reuses
     /// an earlier group's connection when their settings match (ADR-0285, BL-754).
@@ -82,7 +83,7 @@ internal static class CurlComposition
         DnsCache runDnsCache = new();
         LateBoundDiagnosticLog runLog = new();
         return new(
-            SharingRunCookies((options, cookies) => CreateTransferDispatch(CreateTransports(options, EasyOptionsFromCommandLine.NetworkOf(options), EasyOptionsFromCommandLine.TlsOf(options), TimeProvider.System, runConnections, tlsSessions, runLog, runDnsCache, EasyErrorText), cookies, NegotiateOptionsMapping.FromCommandLine(options))),
+            SharingRunCookies((options, cookies) => CreateTransferDispatch(CreateTransports(options, EasyOptionsFromCommandLine.NetworkOf(options), EasyOptionsFromCommandLine.TlsOf(options), EasyOptionsFromCommandLine.ProxyOf(options), TimeProvider.System, runConnections, tlsSessions, runLog, runDnsCache, EasyErrorText), cookies, NegotiateOptionsMapping.FromCommandLine(options))),
             new PhysicalFileSystem(),
             new PhysicalFileSystem(),
             standardOutput,
@@ -315,14 +316,15 @@ internal static class CurlComposition
     {
         EasyNetworkOptions network = EasyOptionsFromCommandLine.NetworkOf(options);
         EasyTlsOptions tls = EasyOptionsFromCommandLine.TlsOf(options);
+        EasyProxyOptions proxy = EasyOptionsFromCommandLine.ProxyOf(options);
         TlsClientOptions tlsClientOptions = TlsClientOptionsMapping.Of(tls, options.UseAlpn, options.SslSessionsFile);
         ITlsProviderWithWarnings tlsProvider = CreateTlsProvider(tlsClientOptions, TimeProvider.System);
         ITlsProviderWithWarnings proxyTlsProvider = CreateTlsProvider(TlsClientOptionsMapping.ProxyOf(tls, options.UseAlpn), TimeProvider.System);
         LateBoundSecurityContextFactory proxyContexts = new() { UsesHandBuiltNtlm = usesHandBuiltNtlm };
-        HttpProxyTunnelOptions proxyTunnelOptions = CreateProxyTunnelOptions(options, proxyContexts, diagnosticLog);
+        HttpProxyTunnelOptions proxyTunnelOptions = CreateProxyTunnelOptions(options, proxy, proxyContexts, diagnosticLog);
         QuicDialer quicDialer = CreateDatagramConnectorQuicDialer(options, tlsClientOptions, datagramConnector);
-        TcpConnector tcpConnector = CreateTcpConnector(options, network, dnsResolver, tcpDialer, tlsProvider, TimeProvider.System, proxyTunnelOptions, proxyTlsProvider, quicDialer, socks5SecurityContexts: proxyContexts);
-        PoolingConnector poolingConnector = CreatePoolingConnector(options, network, tls, tcpConnector, TimeProvider.System, runConnections);
+        TcpConnector tcpConnector = CreateTcpConnector(options, network, proxy, dnsResolver, tcpDialer, tlsProvider, TimeProvider.System, proxyTunnelOptions, proxyTlsProvider, quicDialer, socks5SecurityContexts: proxyContexts);
+        PoolingConnector poolingConnector = CreatePoolingConnector(options, network, tls, proxy, tcpConnector, TimeProvider.System, runConnections);
         ISecurityContextFactory securityContexts = CreateDialingSecurityContextFactory(poolingConnector, datagramConnector, diagnosticLog, usesHandBuiltNtlm);
         proxyContexts.Bind(securityContexts);
         return new(
@@ -344,7 +346,7 @@ internal static class CurlComposition
     /// <param name="runConnections">The run's connection cache, or <see langword="null" />.</param>
     /// <returns>The group's connector.</returns>
     private static IConnector GroupConnectorOf(CommandLineOptions options, IConnector connector, ConnectionCache? runConnections) =>
-        runConnections is null ? connector : CreatePoolingConnector(options, EasyOptionsFromCommandLine.NetworkOf(options), EasyOptionsFromCommandLine.TlsOf(options), connector, TimeProvider.System, runConnections);
+        runConnections is null ? connector : CreatePoolingConnector(options, EasyOptionsFromCommandLine.NetworkOf(options), EasyOptionsFromCommandLine.TlsOf(options), EasyOptionsFromCommandLine.ProxyOf(options), connector, TimeProvider.System, runConnections);
 
     /// <summary>
     /// The C runtime whose <c>strftime</c> a <c>-w</c> <c>%time{format}</c> follows on the

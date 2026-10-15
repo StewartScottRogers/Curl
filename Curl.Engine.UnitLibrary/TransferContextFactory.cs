@@ -4,6 +4,7 @@ using System.Text;
 using Curl.Api.Options.Behaviour;
 using Curl.Api.Options.Http;
 using Curl.Api.Options.Protocols;
+using Curl.Api.Options.Proxy;
 using Curl.Cli;
 using Curl.Core;
 using Curl.Output;
@@ -75,6 +76,10 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
     /// The option group's protocol options: FTP's <c>-P</c>, <c>-Q</c>, <c>-a</c> and <c>--ftp-*</c> settings and
     /// <c>--disable-epsv</c>/<c>--disable-eprt</c>, the <c>--mail-*</c> sender and recipients,
     /// <c>--tftp-blksize</c>, <c>--tftp-no-options</c> and <c>-t</c>.
+    /// </param>
+    /// <param name="proxyOptions">
+    /// The option group's proxy options: <c>-p</c> (<see cref="EasyProxyOptions.HttpProxyTunnel" />) and
+    /// <c>--suppress-connect-headers</c>.
     /// </param>
     /// <param name="url">The URL to transfer.</param>
     /// <param name="output">Where the transfer's bytes go.</param>
@@ -155,6 +160,7 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
         EasyBehaviourOptions behaviour,
         EasyTransferOptions transfer,
         EasyProtocolOptions protocol,
+        EasyProxyOptions proxyOptions,
         CurlUrl url,
         Stream output,
         ByteRange? range,
@@ -226,13 +232,13 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
                 HttpRequestOptionsMapping.Of(options, http, behaviour, transfer, formBody, proxy, commandLineTextEncoding, ifNoneMatchHeaders) with
                 {
                     HstsStore = HstsStore,
-                    ProxyTunnel = options.ProxyTunnel || ConnectToTunnelsThroughProxy(options, url, proxy),
+                    ProxyTunnel = proxyOptions.HttpProxyTunnel || ConnectToTunnelsThroughProxy(options, url, proxy),
                 },
                 altSvc),
             Mail = MailRequestOptionsMapping.FromCommandLine(options, transfer, protocol.Smtp, url.Scheme),
             Ssh = ssh,
             Progress = WatchedProgress(progress, lowSpeedWatchdog, maxTimeWatchdog),
-            Events = EventsWritingConnectReplyHeads(options, proxy, EventsOrNone(events), transferHeaderOutput),
+            Events = EventsWritingConnectReplyHeads(proxyOptions, proxy, EventsOrNone(events), transferHeaderOutput),
             TimeProvider = clock,
             DiagnosticLog = DiagnosticLog,
             CancellationToken = TokenOf(abortToken, lowSpeedWatchdog, maxTimeWatchdog),
@@ -450,13 +456,13 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
     /// send CONNECT to, no header output, or <c>--suppress-connect-headers</c> leaves the heads
     /// out (measured 2026-09-30, BL-613 Notes).
     /// </summary>
-    /// <param name="options">The parsed command line.</param>
+    /// <param name="proxyOptions">The option group's proxy options, whose <see cref="EasyProxyOptions.SuppressConnectHeaders" /> is <c>--suppress-connect-headers</c>.</param>
     /// <param name="proxy">The transfer's proxy, or <see langword="null" /> for none.</param>
     /// <param name="events">The transfer's events.</param>
     /// <param name="headerOutput">The transfer's header output, or <see langword="null" /> for none.</param>
     /// <returns>The events the context carries.</returns>
-    private static ITransferEvents EventsWritingConnectReplyHeads(CommandLineOptions options, ProxyEndpoint? proxy, ITransferEvents events, Stream? headerOutput) =>
-        IsHttpOrHttpsProxy(proxy) && headerOutput is not null && !options.SuppressConnectHeaders
+    private static ITransferEvents EventsWritingConnectReplyHeads(EasyProxyOptions proxyOptions, ProxyEndpoint? proxy, ITransferEvents events, Stream? headerOutput) =>
+        IsHttpOrHttpsProxy(proxy) && headerOutput is not null && !proxyOptions.SuppressConnectHeaders
             ? new ConnectReplyHeadWritingEvents(events, headerOutput)
             : events;
 

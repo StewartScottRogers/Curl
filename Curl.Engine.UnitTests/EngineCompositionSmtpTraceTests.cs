@@ -57,7 +57,7 @@ public sealed class EngineCompositionSmtpTraceTests
     public void CreateTransports_UnderTraceConfigSmtp_TracesSmtp()
     {
         Diagnostics.Arrange("command line arguments", "-v --trace-config smtp");
-        CurlTransports transports = EngineComposition.CreateTransports(Parse("-v", "--trace-config", "smtp"), EasyOptionsFromCommandLine.NetworkOf(Parse("-v", "--trace-config", "smtp")), EasyOptionsFromCommandLine.TlsOf(Parse("-v", "--trace-config", "smtp")), TimeProvider.System);
+        CurlTransports transports = EngineComposition.CreateTransports(Parse("-v", "--trace-config", "smtp"), EasyOptionsFromCommandLine.NetworkOf(Parse("-v", "--trace-config", "smtp")), EasyOptionsFromCommandLine.TlsOf(Parse("-v", "--trace-config", "smtp")), EasyOptionsFromCommandLine.ProxyOf(Parse("-v", "--trace-config", "smtp")), TimeProvider.System);
         Diagnostics.Act("transports trace smtp", transports.TracesSmtp);
 
         Diagnostics.Assert("transports trace smtp", true, transports.TracesSmtp);
@@ -68,7 +68,7 @@ public sealed class EngineCompositionSmtpTraceTests
     public void CreateTransports_WithoutTheSmtpComponent_DoesNotTraceSmtp()
     {
         Diagnostics.Arrange("command line arguments", "-v");
-        CurlTransports transports = EngineComposition.CreateTransports(Parse("-v"), EasyOptionsFromCommandLine.NetworkOf(Parse("-v")), EasyOptionsFromCommandLine.TlsOf(Parse("-v")), TimeProvider.System);
+        CurlTransports transports = EngineComposition.CreateTransports(Parse("-v"), EasyOptionsFromCommandLine.NetworkOf(Parse("-v")), EasyOptionsFromCommandLine.TlsOf(Parse("-v")), EasyOptionsFromCommandLine.ProxyOf(Parse("-v")), TimeProvider.System);
         Diagnostics.Act("transports trace smtp", transports.TracesSmtp);
 
         Diagnostics.Assert("transports trace smtp", false, transports.TracesSmtp);

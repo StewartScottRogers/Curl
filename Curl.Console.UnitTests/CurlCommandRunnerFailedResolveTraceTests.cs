@@ -105,7 +105,7 @@ public sealed class CurlCommandRunnerFailedResolveTraceTests
         CommandLineParseResult parsed = CommandLineParser.Parse(arguments, _ => true);
         Assert.IsTrue(parsed.IsAccepted);
         TcpConnector connector = EngineComposition.CreateTcpConnector(
-            parsed.Options, EasyOptionsFromCommandLine.NetworkOf(parsed.Options),
+            parsed.Options, EasyOptionsFromCommandLine.NetworkOf(parsed.Options), EasyOptionsFromCommandLine.ProxyOf(parsed.Options),
             new UnresolvingDnsResolver(),
             new UnusedTcpDialer(),
             new PassThroughTlsProvider(),

@@ -1,14 +1,16 @@
+using System.Collections.Frozen;
 using System.Diagnostics.CodeAnalysis;
 using System.Net;
-using Curl.Cli;
+using Curl.Api.Options.Proxy;
 using Curl.Core;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Engine;
 
 /// <summary>
-/// Chooses the proxy one transfer goes through from <c>-x</c> or a <c>--socks</c> option,
-/// <c>--noproxy</c>, <c>-U</c> and the proxy environment variables.
+/// Chooses the proxy one transfer goes through from the option group's <see cref="EasyProxyOptions" />
+/// (<c>-x</c> or a <c>--socks</c> option, <c>--preproxy</c> and <c>--noproxy</c>), <c>-U</c> and the
+/// proxy environment variables.
 /// </summary>
 /// <remarks>
 /// <see cref="ProxySelector" /> picks the proxy (ADR-0024); <c>-U</c>/<c>--proxy-user</c> then
@@ -28,10 +30,29 @@ internal static class TransferProxySelection
     private const string FileScheme = "file";
 
     /// <summary>
+    /// The kind proxy text with no scheme names for each <see cref="ProxyType" />. <see cref="ProxyType.Https2" />
+    /// is <c>-x</c>'s HTTP under <c>--proxy-http2</c> (ADR-0515), so it stays HTTP here and only asks the
+    /// tunnel for HTTP/2 (<see cref="EngineComposition.CreateProxyTunnelOptions" />).
+    /// </summary>
+    private static readonly FrozenDictionary<ProxyType, ProxyKind> KindsWithoutScheme = new Dictionary<ProxyType, ProxyKind>
+    {
+        [ProxyType.Http] = ProxyKind.Http,
+        [ProxyType.Http10] = ProxyKind.Http10,
+        [ProxyType.Https] = ProxyKind.Https,
+        [ProxyType.Https2] = ProxyKind.Http,
+        [ProxyType.Socks4] = ProxyKind.Socks4,
+        [ProxyType.Socks5] = ProxyKind.Socks5,
+        [ProxyType.Socks4A] = ProxyKind.Socks4a,
+        [ProxyType.Socks5Hostname] = ProxyKind.Socks5Hostname,
+    }.ToFrozenDictionary();
+
+    /// <summary>
     /// Chooses the proxy for <paramref name="url" />.
     /// </summary>
     /// <param name="selector">Reads <c>-x</c>, <c>--noproxy</c> and the proxy environment variables.</param>
-    /// <param name="options">The accepted command line.</param>
+    /// <param name="proxyOptions">The option group's proxy, pre-proxy, proxy type and no-proxy list.</param>
+    /// <param name="throughUnixSocket">Whether <c>--unix-socket</c> or <c>--abstract-unix-socket</c> was given.</param>
+    /// <param name="proxyUser">The <c>-U</c> credential, or <see langword="null" />.</param>
     /// <param name="url">The URL being transferred.</param>
     /// <param name="proxy">
     /// The proxy, with the <c>-U</c> credential when one was given; <see langword="null" /> for a
@@ -47,7 +68,9 @@ internal static class TransferProxySelection
     /// <returns><see langword="true" /> unless the transfer must end with <paramref name="failure" />.</returns>
     internal static bool TrySelect(
         ProxySelector selector,
-        CommandLineOptions options,
+        EasyProxyOptions proxyOptions,
+        bool throughUnixSocket,
+        NetworkCredential? proxyUser,
         CurlUrl url,
         out ProxyEndpoint? proxy,
         [NotNullWhen(false)] out TransferResult? failure,
@@ -57,22 +80,22 @@ internal static class TransferProxySelection
         failure = null;
         // curl 8.21.0 drops the proxy, unread, when --unix-socket or --abstract-unix-socket is given
         // ("do not mix proxy and Unix domain sockets"; measured, BL-507).
-        if (url.Scheme == FileScheme || options.UnixSocketPath is not null)
+        if (url.Scheme == FileScheme || throughUnixSocket)
         {
             return true;
         }
 
-        if (!string.IsNullOrEmpty(options.PreProxy))
+        if (!string.IsNullOrEmpty(proxyOptions.PreProxy))
         {
-            return TrySelectBehindPreProxy(selector, options, options.PreProxy, url, diagnosticLog, out proxy, out failure);
+            return TrySelectBehindPreProxy(selector, proxyOptions, proxyOptions.PreProxy, proxyUser, url, diagnosticLog, out proxy, out failure);
         }
 
-        if (!selector.TrySelect(url, options.Proxy?.Address, KindWithoutSchemeOf(options.Proxy), options.NoProxy, out ProxyEndpoint? selected, out failure, diagnosticLog))
+        if (!selector.TrySelect(url, proxyOptions.Proxy, KindWithoutSchemeOf(proxyOptions), proxyOptions.NoProxy, out ProxyEndpoint? selected, out failure, diagnosticLog))
         {
             return false;
         }
 
-        proxy = WithProxyUser(WithHttp10Kind(selected, options.Proxy), options.ProxyCredentials);
+        proxy = WithProxyUser(WithHttp10Kind(selected, proxyOptions), proxyUser);
         return true;
     }
 
@@ -87,8 +110,9 @@ internal static class TransferProxySelection
     /// </summary>
     private static bool TrySelectBehindPreProxy(
         ProxySelector selector,
-        CommandLineOptions options,
+        EasyProxyOptions options,
         string preProxyText,
+        NetworkCredential? proxyUser,
         CurlUrl url,
         IDiagnosticLog? log,
         out ProxyEndpoint? proxy,
@@ -102,7 +126,7 @@ internal static class TransferProxySelection
             return failure is null;
         }
 
-        proxy = WithProxyUser(WithHttp10Kind(selected, options.Proxy) ?? preProxy, options.ProxyCredentials);
+        proxy = WithProxyUser(WithHttp10Kind(selected, options) ?? preProxy, proxyUser);
         return true;
     }
 
@@ -112,7 +136,7 @@ internal static class TransferProxySelection
     /// </summary>
     private static bool TrySelectPreProxy(
         ProxySelector selector,
-        CommandLineOptions options,
+        EasyProxyOptions options,
         string preProxyText,
         CurlUrl url,
         IDiagnosticLog? log,
@@ -139,7 +163,7 @@ internal static class TransferProxySelection
     /// </summary>
     private static bool TrySelectProxyBehindPreProxy(
         ProxySelector selector,
-        CommandLineOptions options,
+        EasyProxyOptions options,
         CurlUrl url,
         IDiagnosticLog? log,
         out ProxyEndpoint? selected,
@@ -147,12 +171,12 @@ internal static class TransferProxySelection
     {
         selected = null;
         failure = null;
-        if (options.Proxy is not { } proxyOption)
+        if (options.Proxy is not { } proxyText)
         {
             return true;
         }
 
-        if (!selector.TrySelect(url, proxyOption.Address, KindWithoutSchemeOf(proxyOption), options.NoProxy, out selected, out failure, log))
+        if (!selector.TrySelect(url, proxyText, KindWithoutSchemeOf(options), options.NoProxy, out selected, out failure, log))
         {
             return false;
         }
@@ -161,7 +185,7 @@ internal static class TransferProxySelection
         {
             failure = TransferResult.Failure(
                 CurlExitCode.CouldntResolveProxy,
-                $"Having a SOCKS pre-proxy and proxy is not supported with '{proxyOption.Address}'");
+                $"Having a SOCKS pre-proxy and proxy is not supported with '{proxyText}'");
             return false;
         }
 
@@ -171,17 +195,16 @@ internal static class TransferProxySelection
     /// <summary>Whether <paramref name="kind" /> is an HTTP or HTTPS proxy, which a pre-proxy can lead to.</summary>
     private static bool IsHttpKind(ProxyKind kind) => kind is ProxyKind.Http or ProxyKind.Http10 or ProxyKind.Https;
 
-    /// <summary>The kind proxy option text with no scheme names: the option's own, or HTTP when none was given.</summary>
-    private static ProxyKind KindWithoutSchemeOf(CommandLineProxy? proxyOption) =>
-        proxyOption?.KindWithoutScheme ?? ProxyKind.Http;
+    /// <summary>The kind proxy text with no scheme names: the option group's <see cref="EasyProxyOptions.ProxyType" />.</summary>
+    private static ProxyKind KindWithoutSchemeOf(EasyProxyOptions options) => KindsWithoutScheme[options.ProxyType];
 
     /// <summary>
     /// Keeps <c>--proxy1.0</c>'s HTTP/1.0 for a proxy whose text names <c>http://</c>, as curl's
     /// <c>parse_proxy</c> leaves the proxy type as HTTP or HTTP/1.0 for that scheme (upstream test
     /// 213 sends <c>CONNECT … HTTP/1.0</c> for <c>--proxy1.0 http://A</c>, BL-1855).
     /// </summary>
-    private static ProxyEndpoint? WithHttp10Kind(ProxyEndpoint? proxy, CommandLineProxy? proxyOption) =>
-        proxy is { Kind: ProxyKind.Http } && proxyOption?.KindWithoutScheme == ProxyKind.Http10 ? proxy with { Kind = ProxyKind.Http10 } : proxy;
+    private static ProxyEndpoint? WithHttp10Kind(ProxyEndpoint? proxy, EasyProxyOptions options) =>
+        proxy is { Kind: ProxyKind.Http } && options.ProxyType == ProxyType.Http10 ? proxy with { Kind = ProxyKind.Http10 } : proxy;
 
     /// <summary>Replaces the proxy's credential with the <c>-U</c> one, when both are present.</summary>
     private static ProxyEndpoint? WithProxyUser(ProxyEndpoint? proxy, NetworkCredential? proxyUser) =>

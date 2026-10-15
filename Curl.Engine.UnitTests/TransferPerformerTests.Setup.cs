@@ -73,7 +73,7 @@ public sealed partial class TransferPerformerTests
         EngineTransferState state = NewState();
 
         bool selected = TransferPerformer.TrySelectProxyAndCredentials(
-            HttpDispatch(), options, CurlUrl.Parse(First), state, new InfoRecordingEvents(), NoDiagnosticLog.Instance, CredentialLookup(),
+            HttpDispatch(), options, EasyOptionsFromCommandLine.ProxyOf(options), CurlUrl.Parse(First), state, new InfoRecordingEvents(), NoDiagnosticLog.Instance, CredentialLookup(),
             out ProxyEndpoint? proxy, out TransferResult? failure);
 
         Assert.IsTrue(selected);
@@ -89,7 +89,7 @@ public sealed partial class TransferPerformerTests
         InfoRecordingEvents events = new();
 
         bool selected = TransferPerformer.TrySelectProxyAndCredentials(
-            HttpDispatch(), options, CurlUrl.Parse("gopher://example.com/"), NewState(), events, NoDiagnosticLog.Instance, CredentialLookup(),
+            HttpDispatch(), options, EasyOptionsFromCommandLine.ProxyOf(options), CurlUrl.Parse("gopher://example.com/"), NewState(), events, NoDiagnosticLog.Instance, CredentialLookup(),
             out _, out TransferResult? failure);
 
         Assert.IsFalse(selected);

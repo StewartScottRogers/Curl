@@ -1,5 +1,6 @@
 using System.Net.Sockets;
 using Curl.Api.Options.Network;
+using Curl.Api.Options.Proxy;
 using Curl.Api.Options.Tls;
 using Curl.Cli;
 using Curl.Networking;
@@ -35,18 +36,19 @@ internal sealed record OptionGroupConnectionSettings(
     string ApplicationProtocols)
 {
     /// <summary>Reads the settings of one option group.</summary>
-    /// <param name="options">The option group, for its proxy, ALPN, <c>--ssl-sessions</c> and HTTP version options.</param>
+    /// <param name="options">The option group, for its ALPN, <c>--ssl-sessions</c> and HTTP version options.</param>
     /// <param name="network">The option group's network options, for its socket, binding and IP version.</param>
     /// <param name="tls">The option group's TLS options, for the target's and the HTTPS proxy's handshakes.</param>
+    /// <param name="proxy">The option group's proxy options, for its pre-proxy and HAProxy line.</param>
     /// <returns>The settings.</returns>
-    internal static OptionGroupConnectionSettings Of(CommandLineOptions options, EasyNetworkOptions network, EasyTlsOptions tls) =>
+    internal static OptionGroupConnectionSettings Of(CommandLineOptions options, EasyNetworkOptions network, EasyTlsOptions tls, EasyProxyOptions proxy) =>
         new(
             TlsClientOptionsMapping.Of(tls, options.UseAlpn, options.SslSessionsFile),
             TlsClientOptionsMapping.ProxyOf(tls, options.UseAlpn),
             EngineComposition.UnixSocketOf(network),
             EngineComposition.LocalBindingOf(network),
             EngineComposition.AddressFamilyOf(network),
-            EngineComposition.HaproxyProtocolOf(options),
-            EngineComposition.PreProxyOf(options),
+            EngineComposition.HaproxyProtocolOf(proxy),
+            EngineComposition.PreProxyOf(proxy),
             string.Join('\n', HttpVersionMapping.HttpOverTlsApplicationProtocolsOf(HttpVersionMapping.FromRequested(options.HttpVersion))));
 }

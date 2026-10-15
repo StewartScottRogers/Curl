@@ -67,7 +67,7 @@ public sealed class EngineCompositionDohTests
     [TestMethod]
     public void CreateTransports_WithDohUrl_SharesTheDohResolverBetweenBothConnectors()
     {
-        CurlTransports transports = EngineComposition.CreateTransports(Parse("--doh-url", DohUrl), EasyOptionsFromCommandLine.NetworkOf(Parse("--doh-url", DohUrl)), EasyOptionsFromCommandLine.TlsOf(Parse("--doh-url", DohUrl)));
+        CurlTransports transports = EngineComposition.CreateTransports(Parse("--doh-url", DohUrl), EasyOptionsFromCommandLine.NetworkOf(Parse("--doh-url", DohUrl)), EasyOptionsFromCommandLine.TlsOf(Parse("--doh-url", DohUrl)), EasyOptionsFromCommandLine.ProxyOf(Parse("--doh-url", DohUrl)));
         Diagnostics.Act("resolver type", transports.DnsResolver.GetType().Name);
 
         Diagnostics.Assert("resolver type", nameof(DohDnsResolver), transports.DnsResolver.GetType().Name);
@@ -387,7 +387,7 @@ public sealed class EngineCompositionDohTests
         CommandLineOptions options = Parse([.. arguments, "--doh-url", dohUrl]);
         FlowScopedTransferEvents? resolverEvents = EngineComposition.TracesDns(options) ? new() : null;
         TcpConnector connector = EngineComposition.CreateTcpConnector(
-            options, EasyOptionsFromCommandLine.NetworkOf(options),
+            options, EasyOptionsFromCommandLine.NetworkOf(options), EasyOptionsFromCommandLine.ProxyOf(options),
             EngineComposition.CreateDohResolver(dohUrl, dohServer, EngineComposition.AddressFamilyOf(EasyOptionsFromCommandLine.NetworkOf(options)), resolverEvents),
             new ScriptedTcpDialer(webServer),
             new PassThroughTlsProvider(),
