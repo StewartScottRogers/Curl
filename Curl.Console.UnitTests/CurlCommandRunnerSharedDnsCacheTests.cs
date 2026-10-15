@@ -177,7 +177,7 @@ public sealed class CurlCommandRunnerSharedDnsCacheTests
                 options =>
                 {
                     TcpConnector connector = EngineComposition.CreateTcpConnector(
-                        options, EasyOptionsFromCommandLine.NetworkOf(options), EasyOptionsFromCommandLine.HttpOf(options), EasyOptionsFromCommandLine.ProxyOf(options), EasyOptionsFromCommandLine.AuthenticationOf(options),
+                        options, EasyOptionsFromCommandLine.TraceComponentsOf(options), EasyOptionsFromCommandLine.NetworkOf(options), EasyOptionsFromCommandLine.HttpOf(options), EasyOptionsFromCommandLine.ProxyOf(options), EasyOptionsFromCommandLine.AuthenticationOf(options),
                         new LoopbackDnsResolver(),
                         dialer,
                         new PassThroughTlsProvider(),

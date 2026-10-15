@@ -280,7 +280,7 @@ public sealed class CurlCommandRunnerSmtpTransferEventTests
             exitCode = await new CurlCommandRunner(
                     options => new TransferDispatch(
                         new ProtocolDispatcher(EngineComposition.CreateProtocolHandlers(
-                            connector, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new TrustReportingTlsProvider(), new LoopbackDnsResolver(), tracesSmtp: EngineComposition.TracesSmtp(options)))),
+                            connector, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new TrustReportingTlsProvider(), new LoopbackDnsResolver(), tracesSmtp: EngineComposition.TracesSmtp(EasyOptionsFromCommandLine.TraceComponentsOf(options))))),
                     files,
                     files,
                     standardOutput,

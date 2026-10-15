@@ -28,7 +28,7 @@ public sealed class EngineCompositionSslTraceTests
     {
         Diagnostics.Arrange("arguments", string.Join(" ", arguments));
 
-        bool parsedResult = EngineComposition.TracesSsl(Parse(arguments));
+        bool parsedResult = EngineComposition.TracesSsl(EasyOptionsFromCommandLine.TraceComponentsOf(Parse(arguments)));
         bool connectorResult = Connector(arguments).TracesSslFilter;
 
         Diagnostics.Act("TracesSsl result", parsedResult);
@@ -47,7 +47,7 @@ public sealed class EngineCompositionSslTraceTests
     {
         Diagnostics.Arrange("arguments", string.Join(" ", arguments));
 
-        bool parsedResult = EngineComposition.TracesSsl(Parse(arguments));
+        bool parsedResult = EngineComposition.TracesSsl(EasyOptionsFromCommandLine.TraceComponentsOf(Parse(arguments)));
         bool connectorResult = Connector(arguments).TracesSslFilter;
 
         Diagnostics.Act("TracesSsl result", parsedResult);
@@ -65,7 +65,7 @@ public sealed class EngineCompositionSslTraceTests
     {
         Diagnostics.Arrange("arguments", string.Join(" ", arguments));
 
-        bool parsedResult = EngineComposition.TracesSslProxy(Parse(arguments));
+        bool parsedResult = EngineComposition.TracesSslProxy(EasyOptionsFromCommandLine.TraceComponentsOf(Parse(arguments)));
         bool connectorResult = Connector(arguments).TracesSslProxyFilter;
 
         Diagnostics.Act("TracesSslProxy result", parsedResult);
@@ -85,7 +85,7 @@ public sealed class EngineCompositionSslTraceTests
     {
         Diagnostics.Arrange("arguments", string.Join(" ", arguments));
 
-        bool parsedResult = EngineComposition.TracesSslProxy(Parse(arguments));
+        bool parsedResult = EngineComposition.TracesSslProxy(EasyOptionsFromCommandLine.TraceComponentsOf(Parse(arguments)));
         bool connectorResult = Connector(arguments).TracesSslProxyFilter;
 
         Diagnostics.Act("TracesSslProxy result", parsedResult);
@@ -98,7 +98,7 @@ public sealed class EngineCompositionSslTraceTests
 
     private static TcpConnector Connector(string[] arguments) =>
         EngineComposition.CreateTcpConnector(
-            Parse(arguments), EasyOptionsFromCommandLine.NetworkOf(Parse(arguments)), EasyOptionsFromCommandLine.HttpOf(Parse(arguments)), EasyOptionsFromCommandLine.ProxyOf(Parse(arguments)), EasyOptionsFromCommandLine.AuthenticationOf(Parse(arguments)),
+            Parse(arguments), EasyOptionsFromCommandLine.TraceComponentsOf(Parse(arguments)), EasyOptionsFromCommandLine.NetworkOf(Parse(arguments)), EasyOptionsFromCommandLine.HttpOf(Parse(arguments)), EasyOptionsFromCommandLine.ProxyOf(Parse(arguments)), EasyOptionsFromCommandLine.AuthenticationOf(Parse(arguments)),
             new SystemDnsResolver(),
             new ScriptedTcpDialer(new ScriptedConnector([])),
             new PassThroughTlsProvider(),

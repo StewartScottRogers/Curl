@@ -96,7 +96,7 @@ public sealed class CurlCommandRunnerSocksQueryAlpnTraceTests
         Diagnostics.Assert("command line accepted", true, parsed.IsAccepted);
         Assert.IsTrue(parsed.IsAccepted);
         TcpConnector connector = EngineComposition.CreateTcpConnector(
-            parsed.Options, EasyOptionsFromCommandLine.NetworkOf(parsed.Options), EasyOptionsFromCommandLine.HttpOf(parsed.Options), EasyOptionsFromCommandLine.ProxyOf(parsed.Options), EasyOptionsFromCommandLine.AuthenticationOf(parsed.Options),
+            parsed.Options, EasyOptionsFromCommandLine.TraceComponentsOf(parsed.Options), EasyOptionsFromCommandLine.NetworkOf(parsed.Options), EasyOptionsFromCommandLine.HttpOf(parsed.Options), EasyOptionsFromCommandLine.ProxyOf(parsed.Options), EasyOptionsFromCommandLine.AuthenticationOf(parsed.Options),
             new LoopbackDnsResolver(),
             new ScriptedTcpDialer(new ScriptedConnector([Socks5NoAuthentication, Socks5Granted, Response])),
             new PassThroughTlsProvider(),

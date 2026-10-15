@@ -238,7 +238,7 @@ public sealed class CurlCommandRunnerWsTransferEventTests
         return new CurlCommandRunner(
                 parsed => new TransferDispatch(
                     new ProtocolDispatcher(EngineComposition.CreateProtocolHandlers(
-                        connector, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new PassThroughTlsProvider(), new LoopbackDnsResolver(), tracesWs: EngineComposition.TracesWs(parsed)))),
+                        connector, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new PassThroughTlsProvider(), new LoopbackDnsResolver(), tracesWs: EngineComposition.TracesWs(EasyOptionsFromCommandLine.TraceComponentsOf(parsed))))),
                 files,
                 files,
                 standardOutput,

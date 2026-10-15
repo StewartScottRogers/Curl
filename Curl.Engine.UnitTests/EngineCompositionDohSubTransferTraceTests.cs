@@ -148,10 +148,10 @@ public sealed class EngineCompositionDohSubTransferTraceTests
         CommandLineParseResult parsed = CommandLineParser.Parse([.. given, "--doh-url", DohUrl, "http://example.test:47113/"], _ => true);
         Assert.IsTrue(parsed.IsAccepted);
         CommandLineOptions options = parsed.Options;
-        FlowScopedTransferEvents? resolverEvents = EngineComposition.TracesDns(options) ? new() : null;
-        TcpConnector dohConnector = EngineComposition.CreateDohConnector(options, EasyOptionsFromCommandLine.TlsOf(options), new ScriptedTcpDialer(new ScriptedConnector(dohAnswers)), TimeProvider.System);
+        FlowScopedTransferEvents? resolverEvents = EngineComposition.TracesDns(EasyOptionsFromCommandLine.TraceComponentsOf(options)) ? new() : null;
+        TcpConnector dohConnector = EngineComposition.CreateDohConnector(options, EasyOptionsFromCommandLine.TraceComponentsOf(options), EasyOptionsFromCommandLine.TlsOf(options), new ScriptedTcpDialer(new ScriptedConnector(dohAnswers)), TimeProvider.System);
         TcpConnector connector = EngineComposition.CreateTcpConnector(
-            options, EasyOptionsFromCommandLine.NetworkOf(options), EasyOptionsFromCommandLine.HttpOf(options), EasyOptionsFromCommandLine.ProxyOf(options), EasyOptionsFromCommandLine.AuthenticationOf(options),
+            options, EasyOptionsFromCommandLine.TraceComponentsOf(options), EasyOptionsFromCommandLine.NetworkOf(options), EasyOptionsFromCommandLine.HttpOf(options), EasyOptionsFromCommandLine.ProxyOf(options), EasyOptionsFromCommandLine.AuthenticationOf(options),
             EngineComposition.CreateDohResolver(DohUrl, dohConnector, AddressFamily.Unspecified, resolverEvents),
             new ScriptedTcpDialer(new ScriptedConnector([])),
             new PassThroughTlsProvider(),

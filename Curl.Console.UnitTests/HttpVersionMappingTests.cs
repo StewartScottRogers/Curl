@@ -143,7 +143,7 @@ public sealed class HttpVersionMappingTests
         CommandLineParseResult result = OpenSslBuildParser.Parse(arguments);
         Assert.IsTrue(result.IsAccepted);
 
-        CurlTransports transports = EngineComposition.CreateTransports(result.Options, EasyOptionsFromCommandLine.NetworkOf(result.Options), EasyOptionsFromCommandLine.TlsOf(result.Options), EasyOptionsFromCommandLine.HttpOf(result.Options), EasyOptionsFromCommandLine.ProxyOf(result.Options), EasyOptionsFromCommandLine.AuthenticationOf(result.Options), TimeProvider.System);
+        CurlTransports transports = EngineComposition.CreateTransports(result.Options, EasyOptionsFromCommandLine.NetworkOf(result.Options), EasyOptionsFromCommandLine.TlsOf(result.Options), EasyOptionsFromCommandLine.HttpOf(result.Options), EasyOptionsFromCommandLine.ProxyOf(result.Options), EasyOptionsFromCommandLine.AuthenticationOf(result.Options), TimeProvider.System, traces: EasyOptionsFromCommandLine.TraceComponentsOf(result.Options));
 
         return string.Join(',', transports.TcpConnector.HttpOverTlsApplicationProtocols);
     }

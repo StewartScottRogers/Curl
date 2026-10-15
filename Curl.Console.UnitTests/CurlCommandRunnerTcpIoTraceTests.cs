@@ -262,7 +262,7 @@ public sealed class CurlCommandRunnerTcpIoTraceTests
         Diagnostics.Assert("command line accepted", true, parsed.IsAccepted);
         Assert.IsTrue(parsed.IsAccepted);
         TcpConnector connector = EngineComposition.CreateTcpConnector(
-            parsed.Options, EasyOptionsFromCommandLine.NetworkOf(parsed.Options), EasyOptionsFromCommandLine.HttpOf(parsed.Options), EasyOptionsFromCommandLine.ProxyOf(parsed.Options), EasyOptionsFromCommandLine.AuthenticationOf(parsed.Options),
+            parsed.Options, EasyOptionsFromCommandLine.TraceComponentsOf(parsed.Options), EasyOptionsFromCommandLine.NetworkOf(parsed.Options), EasyOptionsFromCommandLine.HttpOf(parsed.Options), EasyOptionsFromCommandLine.ProxyOf(parsed.Options), EasyOptionsFromCommandLine.AuthenticationOf(parsed.Options),
             new LoopbackDnsResolver(),
             new ScriptedTcpDialer(new ScriptedConnector(serverReads)),
             tlsProvider,

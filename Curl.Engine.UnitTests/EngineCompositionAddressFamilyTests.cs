@@ -95,7 +95,7 @@ public sealed class EngineCompositionAddressFamilyTests
         Assert.IsTrue(parsed.IsAccepted);
 
         TcpConnector connector = EngineComposition.CreateTcpConnector(
-            parsed.Options, EasyOptionsFromCommandLine.NetworkOf(parsed.Options), EasyOptionsFromCommandLine.HttpOf(parsed.Options), EasyOptionsFromCommandLine.ProxyOf(parsed.Options), EasyOptionsFromCommandLine.AuthenticationOf(parsed.Options),
+            parsed.Options, EasyOptionsFromCommandLine.TraceComponentsOf(parsed.Options), EasyOptionsFromCommandLine.NetworkOf(parsed.Options), EasyOptionsFromCommandLine.HttpOf(parsed.Options), EasyOptionsFromCommandLine.ProxyOf(parsed.Options), EasyOptionsFromCommandLine.AuthenticationOf(parsed.Options),
             new LoopbackDnsResolver(),
             new ScriptedTcpDialer(server),
             new PassThroughTlsProvider(),

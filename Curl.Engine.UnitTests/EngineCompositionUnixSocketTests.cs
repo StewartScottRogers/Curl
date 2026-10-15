@@ -124,7 +124,7 @@ public sealed class EngineCompositionUnixSocketTests
 
     private static TcpConnector CreateConnector(CommandLineOptions options, ScriptedConnector server) =>
         EngineComposition.CreateTcpConnector(
-            options, EasyOptionsFromCommandLine.NetworkOf(options), EasyOptionsFromCommandLine.HttpOf(options), EasyOptionsFromCommandLine.ProxyOf(options), EasyOptionsFromCommandLine.AuthenticationOf(options),
+            options, EasyOptionsFromCommandLine.TraceComponentsOf(options), EasyOptionsFromCommandLine.NetworkOf(options), EasyOptionsFromCommandLine.HttpOf(options), EasyOptionsFromCommandLine.ProxyOf(options), EasyOptionsFromCommandLine.AuthenticationOf(options),
             new LoopbackDnsResolver(),
             new ScriptedTcpDialer(server),
             new PassThroughTlsProvider(),

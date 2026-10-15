@@ -10,6 +10,7 @@ using Curl.Api.Options.Protocols;
 using Curl.Api.Options.Proxy;
 using Curl.Api.Options.Tls;
 using Curl.Cli;
+using Curl.Engine;
 using Curl.Networking;
 using Curl.Protocol.Abstractions;
 using EasyFtpClearCommandChannel = Curl.Api.Options.Protocols.FtpClearCommandChannel;
@@ -29,6 +30,15 @@ namespace Curl.Console;
 /// </summary>
 internal static class EasyOptionsFromCommandLine
 {
+    /// <summary>
+    /// The run's <c>--trace-config</c> components as the engine takes them: curl's <c>curl_global_trace</c> is a
+    /// global, so no option group holds it, and the command line's <c>--trace-config</c>, <c>-v</c> and <c>--no-verbose</c>
+    /// are all that set it (BL-2355).
+    /// </summary>
+    /// <param name="options">The parsed command line.</param>
+    /// <returns>The trace components that are on, and the ones only <c>-vv</c> and up put there.</returns>
+    internal static EngineTraceComponents TraceComponentsOf(CommandLineOptions options) =>
+        new(options.TraceComponents, options.VerbosityTraceComponents);
     // The receive buffer curl's tool asks for, 100 KiB, as --libcurl writes CURLOPT_BUFFERSIZE.
     private const long ToolBufferSize = 102400;
 

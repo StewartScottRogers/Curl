@@ -345,7 +345,7 @@ public sealed class EngineCompositionDohTests
     public void CreateDohConnector_OffersOnlyHttp11AndTakesNoResolveEntries()
     {
         TcpConnector connector = EngineComposition.CreateDohConnector(
-            Parse("--http2", "--resolve", "x:1:192.0.2.1", "--doh-url", DohUrl), new EasyTlsOptions(), new TcpDialer(), TimeProvider.System);
+            Parse("--http2", "--resolve", "x:1:192.0.2.1", "--doh-url", DohUrl), EasyOptionsFromCommandLine.TraceComponentsOf(Parse("--http2", "--resolve", "x:1:192.0.2.1", "--doh-url", DohUrl)), new EasyTlsOptions(), new TcpDialer(), TimeProvider.System);
         Diagnostics.Act("ALPN offer", string.Join(", ", connector.HttpOverTlsApplicationProtocols.ToArray()));
         Diagnostics.Act("Unix socket", connector.UnixSocket?.ToString() ?? "(none)");
 
@@ -385,9 +385,9 @@ public sealed class EngineCompositionDohTests
         params string[] arguments)
     {
         CommandLineOptions options = Parse([.. arguments, "--doh-url", dohUrl]);
-        FlowScopedTransferEvents? resolverEvents = EngineComposition.TracesDns(options) ? new() : null;
+        FlowScopedTransferEvents? resolverEvents = EngineComposition.TracesDns(EasyOptionsFromCommandLine.TraceComponentsOf(options)) ? new() : null;
         TcpConnector connector = EngineComposition.CreateTcpConnector(
-            options, EasyOptionsFromCommandLine.NetworkOf(options), EasyOptionsFromCommandLine.HttpOf(options), EasyOptionsFromCommandLine.ProxyOf(options), EasyOptionsFromCommandLine.AuthenticationOf(options),
+            options, EasyOptionsFromCommandLine.TraceComponentsOf(options), EasyOptionsFromCommandLine.NetworkOf(options), EasyOptionsFromCommandLine.HttpOf(options), EasyOptionsFromCommandLine.ProxyOf(options), EasyOptionsFromCommandLine.AuthenticationOf(options),
             EngineComposition.CreateDohResolver(dohUrl, dohServer, EngineComposition.AddressFamilyOf(EasyOptionsFromCommandLine.NetworkOf(options)), resolverEvents),
             new ScriptedTcpDialer(webServer),
             new PassThroughTlsProvider(),

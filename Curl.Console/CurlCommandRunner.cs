@@ -2809,10 +2809,10 @@ internal sealed class CurlCommandRunner(
     /// <returns>The events the transfer reports to.</returns>
     private ITransferEvents WithTraceLineEvents(CommandLineOptions options, ITransferEvents output, Func<long> takeConnectionId)
     {
-        ITransferEvents teardown = EngineComposition.TracesDns(options) ? new AsyncResolveTeardownTraceEvents(output) : output;
+        ITransferEvents teardown = EngineComposition.TracesDns(EasyOptionsFromCommandLine.TraceComponentsOf(options)) ? new AsyncResolveTeardownTraceEvents(output) : output;
         ITransferEvents multi = WithMultiOrTimerEvents(options, teardown, takeConnectionId);
-        ITransferEvents readers = EngineComposition.TracesRead(options) ? new ClientReaderResetTraceEvents(multi) : multi;
-        return EngineComposition.TracesWrite(options) ? new ClientWriterTraceEvents(readers) : readers;
+        ITransferEvents readers = EngineComposition.TracesRead(EasyOptionsFromCommandLine.TraceComponentsOf(options)) ? new ClientReaderResetTraceEvents(multi) : multi;
+        return EngineComposition.TracesWrite(EasyOptionsFromCommandLine.TraceComponentsOf(options)) ? new ClientWriterTraceEvents(readers) : readers;
     }
 
     /// <summary>
@@ -2839,8 +2839,8 @@ internal sealed class CurlCommandRunner(
     private ITransferEvents WithMultiOrTimerEvents(CommandLineOptions options, ITransferEvents inner, Func<long> takeConnectionId)
     {
         TransferTimers timers = TransferTimers.Of(EasyOptionsFromCommandLine.NetworkOf(options), EasyOptionsFromCommandLine.TransferOf(options));
-        bool tracesMulti = EngineComposition.TracesMulti(options);
-        IReadOnlyList<string> waitLines = EngineComposition.TracesTimer(options) ? timers.WaitLines(tracesMulti) : [];
+        bool tracesMulti = EngineComposition.TracesMulti(EasyOptionsFromCommandLine.TraceComponentsOf(options));
+        IReadOnlyList<string> waitLines = EngineComposition.TracesTimer(EasyOptionsFromCommandLine.TraceComponentsOf(options)) ? timers.WaitLines(tracesMulti) : [];
         if (tracesMulti)
         {
             return new MultiStateTraceEvents(inner, timeProvider, takeConnectionId, timers, waitLines);
@@ -2860,7 +2860,7 @@ internal sealed class CurlCommandRunner(
     /// <param name="eventsBeforeConnecting">The transfer's events before it has a connection.</param>
     private static void TraceTransferStart(CommandLineOptions options, ITransferEvents eventsBeforeConnecting)
     {
-        if (EngineComposition.TracesMulti(options))
+        if (EngineComposition.TracesMulti(EasyOptionsFromCommandLine.TraceComponentsOf(options)))
         {
             foreach (string line in MultiStateTraceEvents.StartLines)
             {
@@ -2868,7 +2868,7 @@ internal sealed class CurlCommandRunner(
             }
         }
 
-        if (EngineComposition.TracesRead(options))
+        if (EngineComposition.TracesRead(EasyOptionsFromCommandLine.TraceComponentsOf(options)))
         {
             eventsBeforeConnecting.ReportInfo(ClientReaderResetTraceEvents.ResetLine);
         }

@@ -27,7 +27,7 @@ public sealed class EngineCompositionSocksTraceTests
     public void TracesSocks_UnderSocksProxyOrANamedAll_IsTrue(string[] arguments)
     {
         Diagnostics.Arrange("command line arguments", string.Join(" ", arguments));
-        bool tracesSocks = EngineComposition.TracesSocks(Parse(arguments));
+        bool tracesSocks = EngineComposition.TracesSocks(EasyOptionsFromCommandLine.TraceComponentsOf(Parse(arguments)));
         Diagnostics.Act("traces socks", tracesSocks);
 
         Diagnostics.Assert("traces socks", true, tracesSocks);
@@ -45,7 +45,7 @@ public sealed class EngineCompositionSocksTraceTests
         // curl -s -vvvv -x socks5://127.0.0.1:18601 http://127.0.0.1:80/x writes [SETUP] added SOCKS
         // filter but no [SOCKS] line (BL-1191 Notes).
         Diagnostics.Arrange("command line arguments", string.Join(" ", arguments));
-        bool tracesSocks = EngineComposition.TracesSocks(Parse(arguments));
+        bool tracesSocks = EngineComposition.TracesSocks(EasyOptionsFromCommandLine.TraceComponentsOf(Parse(arguments)));
         Diagnostics.Act("traces socks", tracesSocks);
 
         Diagnostics.Assert("traces socks", false, tracesSocks);
@@ -76,7 +76,7 @@ public sealed class EngineCompositionSocksTraceTests
 
     private static TcpConnector CreateConnector(params string[] arguments) =>
         EngineComposition.CreateTcpConnector(
-            Parse(arguments), EasyOptionsFromCommandLine.NetworkOf(Parse(arguments)), EasyOptionsFromCommandLine.HttpOf(Parse(arguments)), EasyOptionsFromCommandLine.ProxyOf(Parse(arguments)), EasyOptionsFromCommandLine.AuthenticationOf(Parse(arguments)),
+            Parse(arguments), EasyOptionsFromCommandLine.TraceComponentsOf(Parse(arguments)), EasyOptionsFromCommandLine.NetworkOf(Parse(arguments)), EasyOptionsFromCommandLine.HttpOf(Parse(arguments)), EasyOptionsFromCommandLine.ProxyOf(Parse(arguments)), EasyOptionsFromCommandLine.AuthenticationOf(Parse(arguments)),
             new SystemDnsResolver(),
             new ScriptedTcpDialer(new ScriptedConnector([])),
             new PassThroughTlsProvider(),

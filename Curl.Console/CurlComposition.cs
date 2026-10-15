@@ -11,6 +11,7 @@ using Curl.Cli;
 using Curl.Cookies;
 using Curl.Core;
 using Curl.Core.FileSystem;
+using Curl.Engine;
 using Curl.Kerberos;
 using Curl.Networking;
 using Curl.Ntlm;
@@ -33,7 +34,6 @@ using Curl.Protocol.Ssh.Negotiation;
 using Curl.Protocol.Telnet;
 using Curl.Protocol.Tftp;
 using Curl.Protocol.Ws;
-using Curl.Engine;
 using static Curl.Engine.EngineComposition;
 
 namespace Curl.Console;
@@ -56,7 +56,7 @@ internal static class CurlComposition
     /// the real disk, the real network and the given standard streams, wrapping warnings at
     /// the width <see cref="TerminalColumns.Resolve()" /> gives. The network
     /// transports are built for each option group by
-    /// <see cref="CreateTransports(CommandLineOptions, EasyNetworkOptions, EasyTlsOptions, EasyHttpOptions, EasyProxyOptions, EasyAuthenticationOptions, TimeProvider, ConnectionCache?, TlsSessionCache?, IDiagnosticLog?, DnsCache?, Func{CurlExitCode, string}?)" /> once the
+    /// <see cref="CreateTransports(CommandLineOptions, EasyNetworkOptions, EasyTlsOptions, EasyHttpOptions, EasyProxyOptions, EasyAuthenticationOptions, TimeProvider, ConnectionCache?, TlsSessionCache?, IDiagnosticLog?, DnsCache?, Func{CurlExitCode, string}?, EngineTraceComponents?)" /> once the
     /// command line is parsed, because their TLS settings come from it, over one
     /// <see cref="ConnectionCache" /> the runner closes when the run ends, so a later group reuses
     /// an earlier group's connection when their settings match (ADR-0285, BL-754).
@@ -85,7 +85,7 @@ internal static class CurlComposition
         DnsCache runDnsCache = new();
         LateBoundDiagnosticLog runLog = new();
         return new(
-            SharingRunCookies((options, cookies) => CreateTransferDispatch(CreateTransports(options, EasyOptionsFromCommandLine.NetworkOf(options), EasyOptionsFromCommandLine.TlsOf(options), EasyOptionsFromCommandLine.HttpOf(options), EasyOptionsFromCommandLine.ProxyOf(options), EasyOptionsFromCommandLine.AuthenticationOf(options), TimeProvider.System, runConnections, tlsSessions, runLog, runDnsCache, EasyErrorText), cookies, NegotiateOptionsMapping.Of(EasyOptionsFromCommandLine.AuthenticationOf(options)))),
+            SharingRunCookies((options, cookies) => CreateTransferDispatch(CreateTransports(options, EasyOptionsFromCommandLine.NetworkOf(options), EasyOptionsFromCommandLine.TlsOf(options), EasyOptionsFromCommandLine.HttpOf(options), EasyOptionsFromCommandLine.ProxyOf(options), EasyOptionsFromCommandLine.AuthenticationOf(options), TimeProvider.System, runConnections, tlsSessions, runLog, runDnsCache, EasyErrorText, EasyOptionsFromCommandLine.TraceComponentsOf(options)), cookies, NegotiateOptionsMapping.Of(EasyOptionsFromCommandLine.AuthenticationOf(options)))),
             new PhysicalFileSystem(),
             new PhysicalFileSystem(),
             standardOutput,
@@ -326,8 +326,9 @@ internal static class CurlComposition
         ITlsProviderWithWarnings proxyTlsProvider = CreateTlsProvider(TlsClientOptionsMapping.ProxyOf(tls, options.UseAlpn), TimeProvider.System);
         LateBoundSecurityContextFactory proxyContexts = new() { UsesHandBuiltNtlm = usesHandBuiltNtlm };
         HttpProxyTunnelOptions proxyTunnelOptions = CreateProxyTunnelOptions(options, proxy, authentication, proxyContexts, diagnosticLog);
-        QuicDialer quicDialer = CreateDatagramConnectorQuicDialer(options, tlsClientOptions, datagramConnector);
-        TcpConnector tcpConnector = CreateTcpConnector(options, network, http, proxy, authentication, dnsResolver, tcpDialer, tlsProvider, TimeProvider.System, proxyTunnelOptions, proxyTlsProvider, quicDialer, socks5SecurityContexts: proxyContexts);
+        EngineTraceComponents traces = EasyOptionsFromCommandLine.TraceComponentsOf(options);
+        QuicDialer quicDialer = CreateDatagramConnectorQuicDialer(options, traces, tlsClientOptions, datagramConnector);
+        TcpConnector tcpConnector = CreateTcpConnector(options, traces, network, http, proxy, authentication, dnsResolver, tcpDialer, tlsProvider, TimeProvider.System, proxyTunnelOptions, proxyTlsProvider, quicDialer, socks5SecurityContexts: proxyContexts);
         PoolingConnector poolingConnector = CreatePoolingConnector(options, network, tls, http, proxy, tcpConnector, TimeProvider.System, runConnections);
         ISecurityContextFactory securityContexts = CreateDialingSecurityContextFactory(poolingConnector, datagramConnector, diagnosticLog, usesHandBuiltNtlm);
         proxyContexts.Bind(securityContexts);

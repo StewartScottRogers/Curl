@@ -94,9 +94,9 @@ public sealed class EngineCompositionHttpProxyTraceTests
         Assert.IsFalse(connector.TracesH1ProxyFilter);
     }
 
-    private bool Traces(string label, Func<CommandLineOptions, bool> traces, string[] arguments)
+    private bool Traces(string label, Func<EngineTraceComponents, bool> traces, string[] arguments)
     {
-        bool result = traces(Parse(arguments));
+        bool result = traces(EasyOptionsFromCommandLine.TraceComponentsOf(Parse(arguments)));
         Diagnostics.Act(label, result);
         return result;
     }
@@ -104,7 +104,7 @@ public sealed class EngineCompositionHttpProxyTraceTests
     private TcpConnector CreateConnector(params string[] arguments)
     {
         TcpConnector connector = EngineComposition.CreateTcpConnector(
-            Parse(arguments), EasyOptionsFromCommandLine.NetworkOf(Parse(arguments)), EasyOptionsFromCommandLine.HttpOf(Parse(arguments)), EasyOptionsFromCommandLine.ProxyOf(Parse(arguments)), EasyOptionsFromCommandLine.AuthenticationOf(Parse(arguments)),
+            Parse(arguments), EasyOptionsFromCommandLine.TraceComponentsOf(Parse(arguments)), EasyOptionsFromCommandLine.NetworkOf(Parse(arguments)), EasyOptionsFromCommandLine.HttpOf(Parse(arguments)), EasyOptionsFromCommandLine.ProxyOf(Parse(arguments)), EasyOptionsFromCommandLine.AuthenticationOf(Parse(arguments)),
             new SystemDnsResolver(),
             new ScriptedTcpDialer(new ScriptedConnector([])),
             new PassThroughTlsProvider(),
