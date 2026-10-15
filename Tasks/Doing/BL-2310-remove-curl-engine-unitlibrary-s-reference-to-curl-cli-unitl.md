@@ -36,3 +36,4 @@ ADR-0506; plan phase 1 step 4 (closing step); follows BL-2309, after which no en
 ## Log
 
 - 2026-10-15: Created.
+- 2026-10-15: Backlog -> Doing.
