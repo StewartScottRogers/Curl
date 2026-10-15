@@ -32,3 +32,4 @@ Split out of BL-2323 (ADR-0506 plan phase 1 step 4), which retargeted `EngineCom
 ## Log
 
 - 2026-10-15: Created.
+- 2026-10-15: Backlog -> Doing.
