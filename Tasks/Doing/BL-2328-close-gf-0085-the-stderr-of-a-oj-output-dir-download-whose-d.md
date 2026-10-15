@@ -47,3 +47,4 @@ Make Curl.Console's 'Warning: Failed to open the file <path>: <reason>' line (Ou
 ## Log
 
 - 2026-10-15: Created.
+- 2026-10-15: Backlog -> Doing.
