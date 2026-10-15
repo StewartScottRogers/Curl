@@ -48,3 +48,4 @@ Make the refusal follow the platform's reference build, not only the Schannel bu
 ## Log
 
 - 2026-10-15: Created.
+- 2026-10-15: Backlog -> Doing.
