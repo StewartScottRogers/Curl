@@ -31,3 +31,4 @@ Split from BL-2223 (2026-10-14). Strip code: `if(s/^(Authorization: Digest )([^\
 ## Log
 
 - 2026-10-14: Created (split from BL-2223).
+- 2026-10-14: Backlog -> Doing.
