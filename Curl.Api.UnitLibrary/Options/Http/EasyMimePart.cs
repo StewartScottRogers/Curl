@@ -14,8 +14,9 @@ public sealed record EasyMimePart
 
     /// <summary>
     /// <c>curl_mime_filename</c>: the remote file name sent in <c>Content-Disposition</c>.
-    /// Default <see langword="null"/>: none (<c>curl_mime_filedata</c> sets it to the file's
-    /// base name).
+    /// Default <see langword="null"/>: none. <c>curl_mime_filedata</c> sets it to the file's
+    /// base name, so a file part with no file name is one whose name was cleared afterwards
+    /// with <c>curl_mime_filename(part, NULL)</c>, as curl's tool does for <c>-F name=&lt;file</c>.
     /// </summary>
     public string? FileName { get; init; }
 

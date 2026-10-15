@@ -14,6 +14,7 @@ using Curl.Core.Multipart;
 using Curl.Networking;
 using Curl.Output;
 using Curl.Protocol.Abstractions;
+using EasyMimeBody = Curl.Api.Options.Http.EasyMimeBody;
 
 namespace Curl.Console;
 
@@ -3340,7 +3341,8 @@ internal sealed class CurlCommandRunner(
 
         ByteRange? range = ParseRange(options.Range);
 
-        if (options.FormParts.Count == 0)
+        EasyMimeBody? mimePost = EasyOptionsFromCommandLine.HttpOf(options).MimePost;
+        if (mimePost is null)
         {
             return await TransferWithBodyAsync(
                     follower, dispatch, options, transferUrl, transfer, range, headerOutput, null, upload)
@@ -3348,7 +3350,7 @@ internal sealed class CurlCommandRunner(
         }
 
         bool mimeMessage = MailRequestOptionsMapping.SendsFormAsMimeMessage(transferUrl.Scheme);
-        MultipartFormBuildResult form = await BuildFormAsync(options, transferUrl.Scheme, mimeMessage).ConfigureAwait(false);
+        MultipartFormBuildResult form = await BuildFormAsync(options, mimePost, transferUrl.Scheme, mimeMessage).ConfigureAwait(false);
         if (!form.IsBuilt)
         {
             return form.Failure;
@@ -3372,18 +3374,19 @@ internal sealed class CurlCommandRunner(
     /// <paramref name="mimeMessage" /> is set, otherwise as the HTTP form body (BL-1988).
     /// </summary>
     /// <param name="options">The parsed command line.</param>
+    /// <param name="mimePost">The <c>-F</c> parts, as <see cref="EasyOptionsFromCommandLine.HttpOf" /> maps them.</param>
     /// <param name="scheme">The transfer URL's scheme, which picks the names' escaping.</param>
     /// <param name="mimeMessage">Whether the parts are a mail message rather than a form.</param>
     /// <returns>The body, or the failure that stops the transfer before it connects.</returns>
-    private ValueTask<MultipartFormBuildResult> BuildFormAsync(CommandLineOptions options, string scheme, bool mimeMessage) =>
+    private ValueTask<MultipartFormBuildResult> BuildFormAsync(CommandLineOptions options, EasyMimeBody mimePost, string scheme, bool mimeMessage) =>
         mimeMessage
             ? formBodyBuilder.BuildMailMessageAsync(
-                MultipartFormPartMapping.FromCommandLine(options.FormParts),
+                MultipartFormPartMapping.FromMimeBody(mimePost),
                 MultipartFormPartMapping.NameEscapingOf(options, scheme),
                 options.Headers,
                 CancellationToken.None)
             : formBodyBuilder.BuildAsync(
-                MultipartFormPartMapping.FromCommandLine(options.FormParts),
+                MultipartFormPartMapping.FromMimeBody(mimePost),
                 MultipartFormPartMapping.NameEscapingOf(options, scheme),
                 MultipartFormPartMapping.RequestContentTypeOf(options),
                 CancellationToken.None);

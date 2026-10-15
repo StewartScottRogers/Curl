@@ -1,4 +1,6 @@
+using Curl.Api.Options.Http;
 using Curl.Cli;
+using Curl.Console;
 using Curl.Core.Multipart;
 using Curl.Testing;
 
@@ -12,7 +14,7 @@ public sealed class MultipartFormPartMappingTests
     private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
 
     [TestMethod]
-    public void FromCommandLine_EachPartKind_CopiesEveryFieldAndTheKind()
+    public void FromMimeBody_EachPartKind_CopiesEveryFieldAndTheKind()
     {
         Diagnostics.Arrange("form arguments", "a=b;type=x/y;headers=X-A: 1 | f=@f.txt;filename=q | c=<c.txt | =anonymous");
 
@@ -32,7 +34,7 @@ public sealed class MultipartFormPartMappingTests
     }
 
     [TestMethod]
-    public void FromCommandLine_NestedMultipart_MapsItsPartsInOrder()
+    public void FromMimeBody_NestedMultipart_MapsItsPartsInOrder()
     {
         Diagnostics.Arrange("form arguments", "m=(;type=multipart/alternative | x=1 | y=@t.txt | =)");
 
@@ -49,11 +51,11 @@ public sealed class MultipartFormPartMappingTests
         Diagnostics.Assert("nested part count", 2, multipart.Parts.Count);
         Assert.HasCount(2, multipart.Parts);
         AssertPart(multipart.Parts[0], "x", MultipartFormPartKind.Text, "1", null, null, []);
-        AssertPart(multipart.Parts[1], "y", MultipartFormPartKind.FileUpload, "t.txt", null, null, []);
+        AssertPart(multipart.Parts[1], "y", MultipartFormPartKind.FileUpload, "t.txt", null, "t.txt", []);
     }
 
     [TestMethod]
-    public void FromCommandLine_PartWithEncoder_CopiesTheEncoder()
+    public void FromMimeBody_PartWithEncoder_CopiesTheEncoder()
     {
         Diagnostics.Arrange("form arguments", "t=hi;encoder=base64 | u=hi");
 
@@ -65,6 +67,46 @@ public sealed class MultipartFormPartMappingTests
         Assert.AreEqual("base64", parts[0].Encoder);
         Diagnostics.Assert("second encoder", null, parts[1].Encoder);
         Assert.IsNull(parts[1].Encoder);
+    }
+
+    [TestMethod]
+    public void FromMimeBody_StandardInputParts_MapToTheStandardInputPath()
+    {
+        Diagnostics.Arrange("form arguments", "u=@- | c=<- | n=@-;filename=up.bin");
+
+        IReadOnlyList<MultipartFormPart> parts = Map("-F", "u=@-", "-F", "c=<-", "-F", "n=@-;filename=up.bin");
+        Diagnostics.Act("part count", parts.Count);
+
+        Assert.HasCount(3, parts);
+        AssertPart(parts[0], "u", MultipartFormPartKind.FileUpload, "-", null, "-", []);
+        AssertPart(parts[1], "c", MultipartFormPartKind.FileContent, "-", null, null, []);
+        AssertPart(parts[2], "n", MultipartFormPartKind.FileUpload, "-", null, "up.bin", []);
+        Assert.IsTrue(parts[0].ReadsStandardInput);
+        Assert.IsTrue(parts[1].ReadsStandardInput);
+    }
+
+    [TestMethod]
+    public void FromMimeBody_PartWithNoData_IsAnEmptyTextPart()
+    {
+        Diagnostics.Arrange("part", "a part fresh from curl_mime_addpart, named e");
+
+        IReadOnlyList<MultipartFormPart> parts = MultipartFormPartMapping.FromMimeBody(new EasyMimeBody { Parts = [new EasyMimePart { Name = "e" }] });
+        Diagnostics.Act("part count", parts.Count);
+
+        Assert.HasCount(1, parts);
+        AssertPart(parts[0], "e", MultipartFormPartKind.Text, string.Empty, null, null, []);
+    }
+
+    [TestMethod]
+    public void FromMimeBody_CallbackData_IsRefused()
+    {
+        Diagnostics.Arrange("part", "a curl_mime_data_cb part");
+        EasyMimeBody body = new() { Parts = [new EasyMimePart { Data = new EasyMimeCallback(-1, _ => 0, null) }] };
+
+        NotSupportedException refusal = Assert.ThrowsExactly<NotSupportedException>(() => MultipartFormPartMapping.FromMimeBody(body));
+        Diagnostics.Act("message", refusal.Message);
+
+        Assert.Contains("callback", refusal.Message);
     }
 
     [TestMethod]
@@ -98,7 +140,7 @@ public sealed class MultipartFormPartMappingTests
         Diagnostics.Assert("parsed.IsAccepted", true, parsed.IsAccepted);
         Assert.IsTrue(parsed.IsAccepted);
 
-        return MultipartFormPartMapping.FromCommandLine(parsed.Options.FormParts);
+        return MultipartFormPartMapping.FromMimeBody(EasyOptionsFromCommandLine.HttpOf(parsed.Options).MimePost!);
     }
 
     private void AssertPart(

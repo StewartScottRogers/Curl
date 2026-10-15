@@ -45,8 +45,9 @@ SOCKS5 and HAProxy options; the proxy environment variables stay the engine's (A
 `AuthenticationOf` builds `EasyAuthenticationOptions` from the credential, netrc, method, SASL,
 GSS-API, AWS SigV4, redirect-trust and `--httpsig-*` options (ADR-0516).
 `HttpOf` builds `EasyHttpOptions` from the header, `--json`, user-agent, referer, encoding, redirect,
-`-d` body, HTTP version, cookie, alt-svc, HSTS and `--no-alpn` options; `-X`, `-I` and the `-F` body
-are left to other groups and tasks (ADR-0527).
+`-d` body, `-F`/`--form-string` parts (`MimePost`, ADR-0531), HTTP version, cookie, alt-svc, HSTS and
+`--no-alpn` options; `-X` and `-I` are left to other groups (ADR-0527). The runner reads `MimePost`
+for each transfer's form body (BL-2344).
 `BehaviourOf` builds `EasyBehaviourOptions` from `-v`/`--trace*`, `-i`/`-I`, `-s`/`--no-progress-meter`,
 `-f` and `--create-file-mode`; `TransferOf` builds `EasyTransferOptions` from `-r`, `-C`, `-X`, `-R`,
 `-l`, `-I`, `--max-filesize`, `-z`, `-B`, `--crlf`, `-Y`/`-y`, `--limit-rate` and `-m`, and
@@ -56,7 +57,7 @@ are left to other groups and tasks (ADR-0527).
 `--compressed-ssh`), mail, TFTP and `-t` options; RTSP and WebSocket keep libcurl's defaults, and the
 known-hosts file found without `--knownhosts` stays per transfer (ADR-0529).
 `NetworkOf` is read by the engine's connection factories (BL-2323); the others are not read yet:
-BL-2324, BL-2325, BL-2338, BL-2344 to BL-2346, BL-2347 and BL-2348 hand their records to the engine's classes.
+BL-2324, BL-2325, BL-2338, BL-2345, BL-2346, BL-2347 and BL-2348 hand their records to the engine's classes.
 
 `Program.Main` only opens the standard streams, builds the composition and hands the
 arguments to `CurlCommandRunner`, which parses them, runs each URL and prints curl's

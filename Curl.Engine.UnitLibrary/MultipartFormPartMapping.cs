@@ -1,27 +1,35 @@
+using System.Text;
+using Curl.Api.Options.Http;
 using Curl.Cli;
 using Curl.Core.Multipart;
 
 namespace Curl.Engine;
 
 /// <summary>
-/// Maps the <c>-F</c> / <c>--form</c> and <c>--form-string</c> parts of a parsed command line,
-/// <see cref="FormPartSpecification" />, onto the <see cref="MultipartFormPart" />
-/// <see cref="MultipartFormBodyBuilder" /> takes. The two models are separate because
-/// <c>Curl.Cli</c> references <c>Curl.Core</c> (ADR-0027).
+/// Maps the multipart body of <see cref="EasyHttpOptions.MimePost" />, which <c>Curl.Console</c>'s
+/// <c>EasyOptionsFromCommandLine.HttpOf</c> builds from the <c>-F</c> / <c>--form</c> and
+/// <c>--form-string</c> parts as curl's tool builds its <c>curl_mime</c> tree, onto the
+/// <see cref="MultipartFormPart" /> <see cref="MultipartFormBodyBuilder" /> takes (ADR-0531).
 /// </summary>
 /// <remarks>
-/// Every field is copied as parsed, <see cref="FormPartSpecification.Encoder" /> included: the
+/// A part with <see cref="EasyMimePart.SubParts" /> is a multipart; <see cref="EasyMimeBytes" /> is
+/// text, read as UTF-8; an <see cref="EasyMimeFile" /> or <see cref="EasyMimeStandardInput" /> with a
+/// file name is a file upload, and one whose name was cleared, as for <c>name=&lt;file</c>, is file
+/// content. Every other field is copied as it is, <see cref="EasyMimePart.Encoder" /> included: the
 /// builder applies <c>;encoder=</c> and rejects an unknown name (ADR-0041).
 /// </remarks>
 internal static class MultipartFormPartMapping
 {
     private const string ContentTypeName = "Content-Type";
 
-    /// <summary>Maps <paramref name="parts" />, and the parts nested inside them, in order.</summary>
-    /// <param name="parts">The parsed parts, from <see cref="CommandLineOptions.FormParts" />.</param>
-    /// <returns>The builder's parts, one for each of <paramref name="parts" />.</returns>
-    internal static IReadOnlyList<MultipartFormPart> FromCommandLine(IReadOnlyList<FormPartSpecification> parts) =>
-        [.. parts.Select(FromSpecification)];
+    /// <summary>Maps the parts of <paramref name="body" />, and the parts nested inside them, in order.</summary>
+    /// <param name="body">The multipart body, from <see cref="EasyHttpOptions.MimePost" />.</param>
+    /// <returns>The builder's parts, one for each of the body's parts.</returns>
+    /// <exception cref="NotSupportedException">
+    /// A part's data is an <see cref="EasyMimeCallback" />, which no command line produces and the builder cannot read.
+    /// </exception>
+    internal static IReadOnlyList<MultipartFormPart> FromMimeBody(EasyMimeBody body) =>
+        [.. body.Parts.Select(FromMimePart)];
 
     /// <summary>
     /// The escaping the builder gives names and file names: <see cref="MultipartNameEscaping.Backslash" />
@@ -54,25 +62,35 @@ internal static class MultipartFormPartMapping
             .Select(header => header[(ContentTypeName.Length + 1)..].TrimStart(' '))
             .FirstOrDefault();
 
-    private static MultipartFormPart FromSpecification(FormPartSpecification part) =>
+    private static MultipartFormPart FromMimePart(EasyMimePart part) =>
         new(
             part.Name,
-            KindOf(part.Kind),
-            part.Content,
-            part.ContentType,
+            KindOf(part),
+            ContentOf(part.Data),
+            part.Type,
             part.FileName,
             part.Headers,
-            FromCommandLine(part.Parts))
+            part.SubParts is { } subParts ? FromMimeBody(subParts) : [])
         {
             Encoder = part.Encoder,
         };
 
-    private static MultipartFormPartKind KindOf(FormPartKind kind) =>
-        kind switch
+    private static MultipartFormPartKind KindOf(EasyMimePart part) =>
+        part switch
         {
-            FormPartKind.FileUpload => MultipartFormPartKind.FileUpload,
-            FormPartKind.FileContent => MultipartFormPartKind.FileContent,
-            FormPartKind.Multipart => MultipartFormPartKind.Multipart,
+            { SubParts: not null } => MultipartFormPartKind.Multipart,
+            { Data: EasyMimeFile or EasyMimeStandardInput, FileName: null } => MultipartFormPartKind.FileContent,
+            { Data: EasyMimeFile or EasyMimeStandardInput } => MultipartFormPartKind.FileUpload,
             _ => MultipartFormPartKind.Text,
+        };
+
+    private static string ContentOf(EasyMimeData? data) =>
+        data switch
+        {
+            EasyMimeBytes bytes => Encoding.UTF8.GetString(bytes.Bytes.Span),
+            EasyMimeFile file => file.Path,
+            EasyMimeStandardInput => MultipartFormPart.StandardInputPath,
+            null => string.Empty,
+            _ => throw new NotSupportedException("A multipart form part read through a callback cannot be built into a command-line form body."),
         };
 }

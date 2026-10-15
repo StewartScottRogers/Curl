@@ -68,6 +68,15 @@ public sealed class EasyMimeBodyTests
     }
 
     [TestMethod]
+    public void EasyMimeStandardInput_IsDataOfItsOwnKind()
+    {
+        EasyMimeData data = new EasyMimeStandardInput();
+
+        Assert.AreEqual(new EasyMimeStandardInput(), data);
+        Assert.AreNotEqual<EasyMimeData>(new EasyMimeFile("-"), data);
+    }
+
+    [TestMethod]
     public void EasyMimeCallback_HoldsTheSizeAndBothCallbacks()
     {
         ReadCallback read = _ => 0;

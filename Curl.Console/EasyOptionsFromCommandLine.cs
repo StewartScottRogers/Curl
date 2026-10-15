@@ -1,6 +1,7 @@
 using System.Collections.Frozen;
 using System.Net;
 using System.Security.Authentication;
+using System.Text;
 using Curl.Api.Options.Authentication;
 using Curl.Api.Options.Behaviour;
 using Curl.Api.Options.Http;
@@ -379,11 +380,12 @@ internal static class EasyOptionsFromCommandLine
     /// Maps the HTTP group: <c>-H</c> with the headers <c>--json</c> adds, <c>-A</c>, <c>-e</c> (and its
     /// <c>;auto</c>), <c>--compressed</c>, <c>--tr-encoding</c>, <c>--raw</c>, <c>-L</c>, <c>--follow</c>,
     /// <c>--max-redirs</c>, <c>--post301</c>, <c>--post302</c>, <c>--post303</c>, the <c>-d</c> family and
-    /// <c>--json</c> body (none under <c>-G</c>, which moves it into the URL), <c>--form-escape</c>,
+    /// <c>--json</c> body (none under <c>-G</c>, which moves it into the URL), the <c>-F</c> and <c>--form-string</c>
+    /// parts as <see cref="EasyHttpOptions.MimePost" /> (ADR-0531), <c>--form-escape</c>,
     /// <c>--http1.0</c> to <c>--http3-only</c>, <c>--http0.9</c>, <c>--ignore-content-length</c>,
     /// <c>--expect100-timeout</c>, <c>--request-target</c>, <c>-b</c>, <c>-c</c>, <c>-j</c>, <c>--alt-svc</c>,
     /// <c>--hsts</c> and <c>--no-alpn</c>. <c>-X</c> and <c>-I</c> are the transfer group's, <c>--path-as-is</c>
-    /// the network group's, the <c>-F</c> body is mapped by BL-2344 and the <c>--etag-compare</c> header is
+    /// the network group's and the <c>--etag-compare</c> header is
     /// added per transfer, so none of them is set here (ADR-0527).
     /// </summary>
     /// <param name="options">The option group.</param>
@@ -438,7 +440,40 @@ internal static class EasyOptionsFromCommandLine
     private static EasyHttpOptions WithBody(CommandLineOptions options, EasyHttpOptions http) =>
         options.PostData is { } data && !options.DataInQuery
             ? http with { PostFields = data, PostFieldSize = data.Length, MimeOptions = MimeOptionsOf(options) }
-            : http with { MimeOptions = MimeOptionsOf(options) };
+            : http with { MimeOptions = MimeOptionsOf(options), MimePost = MimeBodyOf(options.FormParts) };
+
+    // The -F and --form-string parts as curl's tool builds its curl_mime tree, or none without them (ADR-0531).
+    private static EasyMimeBody? MimeBodyOf(IReadOnlyList<FormPartSpecification> parts) =>
+        parts.Count == 0 ? null : new EasyMimeBody { Parts = [.. parts.Select(MimePartOf)] };
+
+    private static EasyMimePart MimePartOf(FormPartSpecification part) =>
+        new()
+        {
+            Name = part.Name,
+            FileName = MimeFileNameOf(part),
+            Type = part.ContentType,
+            Encoder = part.Encoder,
+            Headers = part.Headers,
+            SubParts = part.Kind == FormPartKind.Multipart ? MimeBodyOf(part.Parts) ?? new EasyMimeBody() : null,
+            Data = MimeDataOf(part),
+        };
+
+    // curl_mime_filedata names an @file part after its path's base name unless ;filename= names it; <file clears the name.
+    private static string? MimeFileNameOf(FormPartSpecification part) => part.Kind switch
+    {
+        FormPartKind.FileUpload => part.FileName ?? part.Content[(part.Content.LastIndexOfAny(['/', '\\']) + 1)..],
+        FormPartKind.FileContent => null,
+        _ => part.FileName,
+    };
+
+    // Text goes as UTF-8 bytes, a file by its path, and @- and <- as the tool's standard input callback.
+    private static EasyMimeData? MimeDataOf(FormPartSpecification part) => part.Kind switch
+    {
+        FormPartKind.Text => new EasyMimeBytes(Encoding.UTF8.GetBytes(part.Content)),
+        FormPartKind.Multipart => null,
+        _ when part.Content == "-" => new EasyMimeStandardInput(),
+        _ => new EasyMimeFile(part.Content),
+    };
 
     private static MimeOptions MimeOptionsOf(CommandLineOptions options) =>
         options.FormEscape ? MimeOptions.FormEscape : MimeOptions.None;

@@ -173,3 +173,7 @@ are in `Curl.Engine.UnitTests`; the setup tests use their own `ReadRecordingFile
 ## The TLS option group (BL-2324)
 
 `TlsClientOptionsMapping` (`Of`, `ProxyOf`, `DohOf`), `TlsBuildInformation`, `CreateTransports`, `CreateDnsResolver`, `CreateDohConnector`, `CreatePoolingConnector` and `OptionGroupConnectionSettings.Of` read TLS settings from `EasyTlsOptions`, which `Curl.Console` builds with `EasyOptionsFromCommandLine.TlsOf`; `--no-alpn` and `--ssl-sessions` still come from `CommandLineOptions` (ADR-0530).
+
+## The form body (BL-2344)
+
+`MultipartFormPartMapping.FromMimeBody` builds the builder's parts from `EasyHttpOptions.MimePost`, which `Curl.Console` builds with `EasyOptionsFromCommandLine.HttpOf`: an `EasyMimeFile` or `EasyMimeStandardInput` part with a file name is an upload, one without is file content, `EasyMimeBytes` is UTF-8 text, and `SubParts` is a multipart. `NameEscapingOf` and `RequestContentTypeOf` still read `CommandLineOptions` (ADR-0531).

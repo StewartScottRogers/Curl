@@ -78,6 +78,24 @@ public sealed partial class EasyOptionsFromCommandLineTests
         GivenHttp("--hsts control", o => o.HstsControl, HstsControl.Enable, "--hsts", "hsts.txt"),
         GivenHttp("--no-alpn", o => o.SslEnableAlpn, false, "--no-alpn"),
         GivenHttp("--alpn", o => o.SslEnableAlpn, true, "--no-alpn", "--alpn"),
+        GivenHttp("-F text", MimeText, "[a|||||bytes:b]", "-F", "a=b"),
+        GivenHttp("-F no name", MimeText, "[|||||bytes:v]", "-F", "=v"),
+        GivenHttp("-F parts in order", MimeText, "[a|||||bytes:1] [b|||||bytes:2]", "-F", "a=1", "-F", "b=2"),
+        GivenHttp("--form-string", MimeText, "[a|||||bytes:@x;type=y]", "--form-string", "a=@x;type=y"),
+        GivenHttp("-F @file", MimeText, "[f|up.txt||||file:dir/up.txt]", "-F", "f=@dir/up.txt"),
+        GivenHttp("-F @file backslash", MimeText, "[f|up.txt||||file:dir\\up.txt]", "-F", "f=@dir\\up.txt"),
+        GivenHttp("-F <file", MimeText, "[c|||||file:dir/in.txt]", "-F", "c=<dir/in.txt"),
+        GivenHttp("-F @-", MimeText, "[u|-||||stdin]", "-F", "u=@-"),
+        GivenHttp("-F <-", MimeText, "[c|||||stdin]", "-F", "c=<-"),
+        GivenHttp("-F ;type=", MimeText, "[a||text/x|||bytes:b]", "-F", "a=b;type=text/x"),
+        GivenHttp("-F ;filename=", MimeText, "[f|other.txt||||file:up.txt]", "-F", "f=@up.txt;filename=other.txt"),
+        GivenHttp("-F text ;filename=", MimeText, "[a|n.txt||||bytes:b]", "-F", "a=b;filename=n.txt"),
+        GivenHttp("-F ;headers=", MimeText, "[a||||X-A: 1,X-B: 2|bytes:b]", "-F", "a=b;headers=X-A: 1;headers=X-B: 2"),
+        GivenHttp("-F ;encoder=", MimeText, "[a|||base64||bytes:b]", "-F", "a=b;encoder=base64"),
+        GivenHttp("-F multipart", MimeText, "[m||multipart/mixed|||none|([x|||||bytes:1] [y|t.txt||||file:t.txt])]", "-F", "m=(;type=multipart/mixed", "-F", "x=1", "-F", "y=@t.txt", "-F", "=)"),
+        GivenHttp("-F empty multipart", MimeText, "[m|||||none|()]", "-F", "m=(", "-F", "=)"),
+        GivenHttp("-F @file list", MimeText, "[g|||||none|([|a.txt||||file:a.txt] [|b.txt||||file:b.txt])]", "-F", "g=@a.txt,b.txt"),
+        GivenHttp("-F with --form-escape", o => o.MimePost?.Parts.Count, 1, "--form-escape", "-F", "a=b"),
     ];
 
     public static IEnumerable<object?[]> AbsentHttpOptions =>
@@ -159,4 +177,22 @@ public sealed partial class EasyOptionsFromCommandLineTests
         [option, read, expected, arguments];
 
     private static object?[] AbsentHttp(string member, Func<EasyHttpOptions, object?> read) => [member, read];
+
+    // Each part as [name|file name|type|encoder|headers|data], then |(its subparts) for a multipart.
+    private static string? MimeText(EasyHttpOptions http) =>
+        http.MimePost is { } body ? MimeBodyText(body) : null;
+
+    private static string MimeBodyText(EasyMimeBody body) =>
+        string.Join(' ', body.Parts.Select(part =>
+            $"[{part.Name}|{part.FileName}|{part.Type}|{part.Encoder}|{string.Join(',', part.Headers)}|{MimeDataText(part.Data)}"
+            + (part.SubParts is { } subParts ? $"|({MimeBodyText(subParts)})]" : "]")));
+
+    private static string MimeDataText(EasyMimeData? data) => data switch
+    {
+        EasyMimeBytes bytes => "bytes:" + Encoding.UTF8.GetString(bytes.Bytes.Span),
+        EasyMimeFile file => "file:" + file.Path,
+        EasyMimeStandardInput => "stdin",
+        null => "none",
+        _ => "other",
+    };
 }
