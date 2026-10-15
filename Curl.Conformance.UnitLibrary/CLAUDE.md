@@ -183,6 +183,17 @@ the `--ssl` / `--ssl-reqd` cases on a plain mail server (980, 981, 982, 984, 985
 against a server that does not offer it. 981, 984, 985, 987, 988 and 989 pass; 980 and 982 fail
 on a Curl difference the next gap run files.
 
+`HttpsProxyServerConnector` (BL-2226) stands in for upstream's `https-proxy` server, stunnel in
+front of the proxy-mode `sws`: port 9010, the runner's `%HTTPSPROXYPORT` (with a value only when
+the caller names a certificate directory, as `%HTTPSPORT`), reaches the sws emulation's proxy port
+(`SwsHttpServerConnector.ProxyPort`) through a `TlsRelayConnection` presenting
+`%CERTDIR/certs/test-localhost.pem`, no ALPN and no client certificate request, so the decrypted
+proxied requests and `CONNECT`s land in `ProxyReceivedBytes` for `<verify><proxy>` and a
+`CONNECT` is tunnelled as through the http-proxy. The runner puts it in front of every other
+stand-in only for a case naming `https-proxy`; screening lets `https-proxy` cases run. 1630,
+1631, 1632 and 3401 pass; 1586 fails on a difference BL-2241 owns; 1647 is a libtest `<tool>`
+case and stays screened for that.
+
 `FtpsServerConnector` (BL-1913, ADR-0462) stands in for stunnel in front of the FTP stand-in,
 upstream's FTPS server: port 9007, the runner's `%FTPSPORT` (with a value only when the caller
 names a certificate directory), speaks TLS from the first byte (implicit FTPS) and reaches

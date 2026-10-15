@@ -31,7 +31,7 @@ namespace Curl.Conformance;
 /// they name by its path, relative to the working directory when not absolute, as nothing when it
 /// is not there. <c>%HOSTIP</c> and <c>%CLIENTIP</c> are <c>127.0.0.1</c>, <c>%HTTPPORT</c> is
 /// <see cref="HttpPort"/>, <c>%HOST6IP</c> is <c>[::1]</c>, <c>%HTTP6PORT</c> is <see cref="Http6Port"/>, <c>%RESOLVE</c> is the name
-/// <see cref="UpstreamResolveCheck"/> emulates in a precheck, <c>%PROXYPORT</c> is <see cref="ProxyPort"/>, <c>%FTPPORT</c> is <see cref="FtpPort"/>, <c>%SMTPPORT</c> is <see cref="SmtpPort"/>, <c>%IMAPPORT</c> is <see cref="ImapPort"/>, <c>%POP3PORT</c> is <see cref="Pop3Port"/>, <c>%SOCKSPORT</c> is <see cref="SocksPort"/>, <c>%MQTTPORT</c> is <see cref="MqttPort"/>, <c>%TFTPPORT</c> is <see cref="TftpPort"/>,<c>%RTSPPORT</c> is <see cref="RtspPort"/>, <c>%HTTPSPORT</c>, <c>%SMTPSPORT</c>, <c>%IMAPSPORT</c>, <c>%POP3SPORT</c> and <c>%FTPSPORT</c> are <see cref="HttpsPort"/>, <see cref="SmtpsPort"/>, <see cref="ImapsPort"/>, <see cref="Pop3sPort"/> and <see cref="FtpsPort"/> when a certificate directory is named, <c>%GOPHERPORT</c> is <see cref="GopherPort"/>, <c>%HTTP2PORT</c> is <see cref="Http2Port"/>, <c>%NOLISTENPORT</c> is <see cref="NoListenPort"/>, a port that refuses every connection, <c>%FTPTIME2</c> is <c>8</c> (the seconds upstream gives FTP time-out cases on a host whose FTP server checks in under a second), and <c>%VERSION</c> is <see cref="CurlVersion"/>. Every other variable
+/// <see cref="UpstreamResolveCheck"/> emulates in a precheck, <c>%PROXYPORT</c> is <see cref="ProxyPort"/>, <c>%FTPPORT</c> is <see cref="FtpPort"/>, <c>%SMTPPORT</c> is <see cref="SmtpPort"/>, <c>%IMAPPORT</c> is <see cref="ImapPort"/>, <c>%POP3PORT</c> is <see cref="Pop3Port"/>, <c>%SOCKSPORT</c> is <see cref="SocksPort"/>, <c>%MQTTPORT</c> is <see cref="MqttPort"/>, <c>%TFTPPORT</c> is <see cref="TftpPort"/>,<c>%RTSPPORT</c> is <see cref="RtspPort"/>, <c>%HTTPSPORT</c>, <c>%SMTPSPORT</c>, <c>%IMAPSPORT</c>, <c>%POP3SPORT</c>, <c>%FTPSPORT</c> and <c>%HTTPSPROXYPORT</c> are <see cref="HttpsPort"/>, <see cref="SmtpsPort"/>, <see cref="ImapsPort"/>, <see cref="Pop3sPort"/>, <see cref="FtpsPort"/> and <see cref="HttpsProxyPort"/> when a certificate directory is named, <c>%GOPHERPORT</c> is <see cref="GopherPort"/>, <c>%HTTP2PORT</c> is <see cref="Http2Port"/>, <c>%NOLISTENPORT</c> is <see cref="NoListenPort"/>, a port that refuses every connection, <c>%FTPTIME2</c> is <c>8</c> (the seconds upstream gives FTP time-out cases on a host whose FTP server checks in under a second), and <c>%VERSION</c> is <see cref="CurlVersion"/>. Every other variable
 /// is unknown, so a case that uses one is skipped.
 /// </para>
 /// </remarks>
@@ -109,6 +109,9 @@ public sealed class UpstreamCaseRunner(
 
     /// <summary>The value of <c>%FTPSPORT</c> when the caller names a certificate directory: connections to this port reach the FTP control channel through implicit TLS, <see cref="FtpsServerConnector"/>, presenting <c>%CERTDIR/certs/test-localhost.pem</c>.</summary>
     public const string FtpsPort = "9007";
+
+    /// <summary>The value of <c>%HTTPSPROXYPORT</c> when the caller names a certificate directory: connections to this port reach the http-proxy port through TLS, <see cref="HttpsProxyServerConnector"/>, presenting <c>%CERTDIR/certs/test-localhost.pem</c>.</summary>
+    public const string HttpsProxyPort = "9010";
 
     /// <summary>The value of <c>%GOPHERPORT</c>: connections to this port reach the Gopher emulation, <see cref="GopherServerConnector"/>, whose selector lines follow the tftpd emulation's dump for <c>&lt;verify&gt;&lt;protocol&gt;</c>.</summary>
     public const string GopherPort = "9008";
@@ -253,6 +256,7 @@ public sealed class UpstreamCaseRunner(
             variables["IMAPSPORT"] = ImapsPort;
             variables["POP3SPORT"] = Pop3sPort;
             variables["FTPSPORT"] = FtpsPort;
+            variables["HTTPSPROXYPORT"] = HttpsProxyPort;
         }
     }
 
@@ -352,7 +356,7 @@ public sealed class UpstreamCaseRunner(
         SocksServerConnector socks = new(testCase, MailTlsServer(testCase, FtpsServer(testCase, pop3, certificateDirectory), certificateDirectory));
         MqttServerConnector mqtt = new(testCase, socks);
         GopherServerConnector gopher = new(testCase, mqtt);
-        IConnector servers = sshServer?.InFrontOf(gopher) ?? gopher;
+        IConnector servers = HttpsProxyServer(testCase, sshServer?.InFrontOf(gopher) ?? gopher, certificateDirectory);
         // A CONNECT through the http-proxy to a mail port or the FTP control or passive port reaches that stand-in
         // (test1319 to 1321, BL-2011; test714 and test715, BL-2035); one to %HTTPSPORT reaches the HTTPS stand-in, whose TLS handshake travels inside the tunnel (BL-2225).
         server.TunnelServerForPort = port => TunnelledPorts.Contains(port) ? pop3 : null;
@@ -441,6 +445,12 @@ public sealed class UpstreamCaseRunner(
         certificateDirectory is not null && UpstreamTestPartBodies.Lines(testCase.Find("client", "server")).Intersect(FtpsServerConnector.EmulatedServers).Any()
             ? new FtpsServerConnector(HttpsServerConnector.LoadCertificate(Path.Combine(certificateDirectory, "certs", HttpsServerConnector.DefaultCertificateFile)), ftp)
             : ftp;
+
+    // A case naming the https-proxy server reaches it on %HTTPSPROXYPORT, which has a value only with a certificate directory; stunnel presents test-localhost.pem.
+    private static IConnector HttpsProxyServer(UpstreamTestCase testCase, IConnector servers, string? certificateDirectory) =>
+        certificateDirectory is not null && UpstreamTestPartBodies.Lines(testCase.Find("client", "server")).Contains(HttpsProxyServerConnector.EmulatedServer)
+            ? new HttpsProxyServerConnector(HttpsServerConnector.LoadCertificate(Path.Combine(certificateDirectory, "certs", HttpsServerConnector.DefaultCertificateFile)), servers)
+            : servers;
 
     private static readonly int[] TunnelledPorts = [Pop3ServerConnector.Pop3Port, ImapServerConnector.ImapPort, SmtpServerConnector.SmtpPort, FtpServerConnector.FtpPort, FtpServerConnector.PassivePort, HttpsServerConnector.HttpsPort];
 

@@ -39,7 +39,7 @@ internal static class UpstreamCaseScreening
     // Interpreted, not source-generated, so no generated code counts against the coverage gate.
     private static readonly Regex InternetUrlHost = new(@"\bhttps?://(?<host>[A-Za-z][A-Za-z0-9-]*(?:\.[A-Za-z0-9-]+)+)", RegexOptions.CultureInvariant);
 
-    private static readonly HashSet<string> Servers = ["http", "http-ipv6", "http-proxy", "socks4", "socks5", "mqtt", "tftp", "gopher", "file", "none", .. LineProtocolServerConnector.EmulatedServers, .. MailTlsServerConnector.EmulatedServers, .. FtpsServerConnector.EmulatedServers, "sftp", "scp"];
+    private static readonly HashSet<string> Servers = ["http", "http-ipv6", "http-proxy", HttpsProxyServerConnector.EmulatedServer, "socks4", "socks5", "mqtt", "tftp", "gopher", "file", "none", .. LineProtocolServerConnector.EmulatedServers, .. MailTlsServerConnector.EmulatedServers, .. FtpsServerConnector.EmulatedServers, "sftp", "scp"];
 
     // The servers that read <servercmd> as ftpserver.pl does: the FTP stand-in, plain or behind TLS.
     private static readonly string[] FtpServers = ["ftp", .. FtpsServerConnector.EmulatedServers];
