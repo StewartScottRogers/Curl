@@ -35,3 +35,4 @@ ADR-0506, plan phase 2 step 5 - the console's re-base onto the seam, the step be
 ## Log
 
 - 2026-10-15: Created.
+- 2026-10-15: Backlog -> Doing.
