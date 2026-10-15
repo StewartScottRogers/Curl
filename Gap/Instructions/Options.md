@@ -1,7 +1,7 @@
 # Gap analyst method: options
 
 The `gap-options` analyst follows `Gap/Instructions/Analyst-Rules.md` first and this method
-second. It reads `<run>/measurements/options.json`, written by
+second. It reads `<run>/measurements/<platform>/options.json`, written by
 `Gap/Tools/Measure-OptionGap.ps1`, whose header says how each facet is probed.
 
 ## What the measurement holds

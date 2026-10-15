@@ -44,6 +44,12 @@
     A local curl-<version>.tar.gz to use instead of downloading; for self-tests. It is
     always hashed and checked, even when the cache is already complete.
 
+.PARAMETER SaveArchiveTo
+    Also copies the downloaded tarball, after its SHA-256 has matched the pinned hash, to
+    this file, so a caller can build curl from the very source the office measures against
+    (gap-platforms.yml builds the Linux and macOS reference curl from it, ADR-0505). The
+    tarball is downloaded even when the cache is complete.
+
 .PARAMETER BaselinesDirectory
     The folder holding target.json and the curl-<version>.json manifests. Default:
     Gap/Baselines.
@@ -62,6 +68,7 @@ param(
     [string] $CacheRoot,
     [string] $ArchivePath,
     [string] $BaselinesDirectory,
+    [string] $SaveArchiveTo,
     [switch] $SelfTest
 )
 
@@ -133,6 +140,10 @@ function Invoke-SelfTest {
         $printedAgain = @(& $PSCommandPath -Version 9.9.9 -ArchivePath $archive -CacheRoot $cache -BaselinesDirectory $baselines)
         Report ((Test-Path -LiteralPath $sentinel) -and $printedAgain.Count -eq 1 -and $printedAgain[0] -eq $printed[0]) 'a second run with the same archive returns without re-extracting'
 
+        $saved = Join-Path $work (Join-Path 'saved' 'curl.tar.gz')
+        & $PSCommandPath -Version 9.9.9 -ArchivePath $archive -CacheRoot $cache -BaselinesDirectory $baselines -SaveArchiveTo $saved | Out-Null
+        Report ((Test-Path -LiteralPath $saved) -and (Get-FileHash -LiteralPath $saved -Algorithm SHA256).Hash.ToLowerInvariant() -eq $hash) '-SaveArchiveTo copies the checked tarball'
+
         Remove-Item -LiteralPath (Join-Path $versionFolder (Join-Path 'tests' 'certs')) -Recurse -Force
         & $PSCommandPath -Version 9.9.9 -CacheRoot $cache -BaselinesDirectory $baselines -ArchivePath $archive | Out-Null
         Report ((Test-Path -LiteralPath (Join-Path $versionFolder 'tests/certs/test-ca.prm')) -and -not (Test-Path -LiteralPath $sentinel)) 'a cache without tests/certs is extracted again'
@@ -180,7 +191,7 @@ if (Test-Path -LiteralPath $manifestPath) {
     $pinned = (Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json).sha256
 }
 
-if ($pinned -and -not $ArchivePath -and (Test-Path -LiteralPath $completePath) -and (Test-Path -LiteralPath $certsFolder) -and
+if ($pinned -and -not $ArchivePath -and -not $SaveArchiveTo -and (Test-Path -LiteralPath $completePath) -and (Test-Path -LiteralPath $certsFolder) -and
     (Get-Content -LiteralPath $completePath -Raw).Trim() -eq $pinned) {
     Write-Output (Resolve-Path -LiteralPath $versionFolder).Path
     return
@@ -217,6 +228,12 @@ try {
     $hash = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant()
     if ($pinned -and $pinned -ne $hash) {
         throw "SHA-256 mismatch for ${sourceRoot}: $manifestPath pins $pinned but $url hashes to $hash. The cache is untouched."
+    }
+    if ($SaveArchiveTo) {
+        $savePath = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($SaveArchiveTo)
+        $saveFolder = Split-Path -Parent $savePath
+        if (-not (Test-Path -LiteralPath $saveFolder)) { New-Item -ItemType Directory -Path $saveFolder -Force | Out-Null }
+        Copy-Item -LiteralPath $archive -Destination $savePath -Force
     }
 
     if ($pinned -and (Test-Path -LiteralPath $completePath) -and (Test-Path -LiteralPath $certsFolder) -and

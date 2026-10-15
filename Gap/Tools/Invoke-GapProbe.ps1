@@ -16,7 +16,8 @@
     Invoke-GapProbe; run it directly to probe one command line, or with -SelfTest.
 
     Each run starts from an environment holding only PATH, SystemRoot, TEMP, TMP,
-    USERPROFILE, HOME and APPDATA, with HOME, USERPROFILE, APPDATA, CURL_HOME and
+    DOTNET_ROOT, DOTNET_ROOT_X64, DOTNET_ROOT_ARM64 (so Curl.Console's app host finds .NET
+    where setup-dotnet put it), USERPROFILE, HOME and APPDATA, with HOME, USERPROFILE, APPDATA, CURL_HOME and
     XDG_CONFIG_HOME pointed at a fresh empty temporary folder, so no real .curlrc or
     _curlrc leaks in. The folder is deleted after the run.
 

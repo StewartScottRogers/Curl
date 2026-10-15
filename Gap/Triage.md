@@ -18,10 +18,15 @@ the tasks itself; Stewart's approval is not needed. The finding format is in
    lanes cannot read `Gap/`. A `Close` or `Re-close` task filed by hand, its title naming
    the finding, counts as open, so nothing more is filed for that finding. The script
    refuses to run inside a dark factory lane.
+   A `linux` or `macos` finding's task ends its title with ` (on <platform>)`, and its
+   Context and acceptance criteria say that lanes test only on Windows, so the proof is
+   the gap-platforms workflow (`gh workflow run gap-platforms.yml -f ref=<branch>`) or the
+   CI job on that platform passing the named items (ADR-0505).
 3. **Stewart may reject any finding.** He alone sets `status: rejected`; a rejected finding
    gets no new task.
 4. **A finding closes only on re-measurement.** A later gap run must measure every item as
-   `match`, or `excluded` with a reason. A task reaching Done never closes a finding.
+   `match`, or `excluded` with a reason, on the finding's platform. A task reaching Done
+   never closes a finding, and neither does another platform's measurement.
 5. **When the fix does not hold, a `Re-close` task is filed.** When every task of an open
    finding is Done (in `Tasks/Done` or its archive) and the latest `Measurements` line,
    dated after the last completion, still shows gaps, the script files

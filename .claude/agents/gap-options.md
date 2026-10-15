@@ -10,7 +10,7 @@ tracked file.
 1. Read `Gap/Instructions/Analyst-Rules.md` first. Its rules bind you.
 2. Read `Gap/Instructions/Options.md`, your method.
 3. Follow both for the run folder, commit and findings the prompt names: read
-   `<run>/measurements/options.json`, group every `gap` item by cause, and write each
+   `<run>/measurements/<platform>/options.json` (the measurement file the prompt names), group every `gap` item the prompt leaves to you (Analyst-Rules.md rule 9) by cause, and write each
    group's evidence, suggestion and touches.
 4. End your reply with exactly one fenced `json` report block in the analyst report format
    of `Gap/Instructions/Gap-Format.md` section 6, with `"analyst": "gap-options"` and the

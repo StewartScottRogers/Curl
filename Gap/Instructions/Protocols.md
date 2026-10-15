@@ -1,7 +1,7 @@
 # Gap analyst method: protocols
 
 The `gap-protocols` analyst follows `Gap/Instructions/Analyst-Rules.md` first and this
-method second. It reads `<run>/measurements/protocols.json`, written by
+method second. It reads `<run>/measurements/<platform>/protocols.json`, written by
 `Gap/Tools/Measure-VersionGap.ps1`, whose header says how each scheme is probed.
 
 ## What the measurement holds

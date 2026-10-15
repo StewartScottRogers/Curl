@@ -26,6 +26,7 @@
     | area protocols                                             | Pipeline protocol             |
     | any other area                                             | Pipeline feature              |
     | the finding's touches                                      | -Touches, dropping any Gap/, Audit/ or .claude/agents/ path; with none left the task has no touches, runs alone, and its Context says so |
+    | platform linux or macos                                    | " (on <platform>)" after the title, and the Context and acceptance criteria say lanes test only on Windows, so the proof is the gap-platforms workflow or CI on that platform (ADR-0505) |
 
     A finding's tasks are the IDs in its tasks list plus every board task whose title
     starts "Close GF-####" or "Re-close GF-####" for it, so a task filed by hand counts. A
@@ -34,8 +35,8 @@
     of the finding's tasks, strictly: a run on the completion day may predate the fix.
 
     The task body stands alone, since lanes cannot read Gap/: its Goal says what Curl must
-    do; its Context carries the finding's ID, area, severity, introduced-in, item keys,
-    Evidence and Suggestion in full, the targeted curl version (Gap/Baselines/target.json)
+    do; its Context carries the finding's ID, area, severity, introduced-in, platform and
+    the reference curl it was measured against, item keys, Evidence and Suggestion in full, the targeted curl version (Gap/Baselines/target.json)
     and the upstream documents the yardstick came from (the sources of
     Gap/Upstream/<version>/<area>.json), and says the gap closes only on re-measurement
     (ADR-0433 decision 5); its Acceptance criteria hold one box per item key, with the
@@ -51,8 +52,9 @@
     The checkout whose Tasks/ receives the tasks. Default the repository root.
 
 .PARAMETER MeasurementsDirectory
-    Optional: a run's measurements folder (<area>.json, Gap-Format.md section 4). An item
-    found there gives its acceptance box the item's expected answer.
+    Optional: a run's measurements folder (<platform>/<area>.json, Gap-Format.md section 4;
+    for windows also <area>.json, as runs before ADR-0505 wrote it). An item found in the
+    finding's platform's measurement gives its acceptance box the item's expected answer.
 
 .PARAMETER WhatIf
     Prints each task it would file and changes nothing.
@@ -85,7 +87,7 @@ if (-not $BoardRoot) { $BoardRoot = $script:RepoRoot }
 $script:TaskBoard = Join-Path $script:RepoRoot '.claude\skills\task-board\task-board.ps1'
 $script:Utf8NoBom = New-Object Text.UTF8Encoding($false)
 
-$script:FrontOrder = @('id', 'title', 'area', 'key', 'severity', 'status', 'scope', 'introduced-in',
+$script:FrontOrder = @('id', 'title', 'area', 'platform', 'key', 'severity', 'status', 'scope', 'introduced-in',
     'opened', 'closed', 'regression', 'items', 'touches', 'task', 'tasks')
 $script:SectionOrder = @('Summary', 'Evidence', 'Suggestion', 'Measurements', 'Log')
 $script:PriorityBySeverity = @{ 'Critical' = 'High'; 'High' = 'High'; 'Medium' = 'Normal'; 'Low' = 'Low' }
@@ -105,6 +107,16 @@ function Read-Finding([string] $Path) {
     while ($index -lt $lines.Count -and $lines[$index] -ne '---') {
         if ($lines[$index] -match '^([a-z-]+):\s?(.*)$') { $front[$Matches[1]] = $Matches[2].Trim() }
         $index++
+    }
+    # A finding filed before findings carried a platform is a Windows finding (ADR-0505).
+    if (-not $front.Contains('platform') -or -not $front['platform']) {
+        $withPlatform = [ordered]@{}
+        foreach ($name in @($front.Keys)) {
+            if ($name -ne 'platform') { $withPlatform[$name] = $front[$name] }
+            if ($name -eq 'area') { $withPlatform['platform'] = 'windows' }
+        }
+        if (-not $withPlatform.Contains('platform')) { $withPlatform['platform'] = 'windows' }
+        $front = $withPlatform
     }
     $current = $null
     for ($index++; $index -lt $lines.Count; $index++) {
@@ -208,9 +220,12 @@ function Get-UpstreamSources([string] $Version, [string] $Area) {
     return "the curl $Version release tarball (no $Area inventory names its documents yet)"
 }
 
-function Get-Expected([string] $Area, [string] $Key) {
+function Get-Expected([string] $Area, [string] $Platform, [string] $Key) {
     if (-not $MeasurementsDirectory) { return $null }
-    $path = Join-Path $MeasurementsDirectory "$Area.json"
+    # <run>/measurements/<platform>/<area>.json; a run from before ADR-0505 kept
+    # measurements/<area>.json, which is the windows one.
+    $path = Join-Path (Join-Path $MeasurementsDirectory $Platform) "$Area.json"
+    if (-not (Test-Path -LiteralPath $path) -and $Platform -eq 'windows') { $path = Join-Path $MeasurementsDirectory "$Area.json" }
     if (-not (Test-Path -LiteralPath $path)) { return $null }
     $item = @(([IO.File]::ReadAllText($path) | ConvertFrom-Json).items | Where-Object { $_.key -eq $Key }) | Select-Object -First 1
     if ($null -eq $item -or $null -eq $item.expected) { return $null }
@@ -230,6 +245,12 @@ function Format-TaskBody($Finding, [string] $Kind, [string[]] $Touches) {
     if ($Kind -eq 'Re-close') { $lines.Add("This is a Re-close task: every earlier task for $($front['id']) ($($front['tasks'])) is Done, but the latest gap analysis still measures a gap, so the fix did not hold.") ; $lines.Add('') }
     $lines.Add("- Finding: $($front['id']), filed by the gap analysis office (ADR-0433).")
     $lines.Add("- Area: $($front['area']). Severity: $($front['severity']). Introduced in: $introduced.")
+    $platform = $front['platform']
+    if ($platform -eq 'windows') { $lines.Add('- Platform: windows, measured against the Schannel curl of Git for Windows.') }
+    else {
+        $lines.Add("- Platform: $platform, measured against curl $version built from the release tarball with OpenSSL by the gap-platforms workflow (.github/workflows/gap-platforms.yml, ADR-0505). This gap is $platform's own: Windows does not show it.")
+        $lines.Add("- Lanes test only on Windows, so a lane cannot see this gap pass locally. The proof is the gap-platforms workflow (run it on the branch: gh workflow run gap-platforms.yml -f ref=<branch>) or the CI job on $platform passing a test that pins each item; write those tests platform-neutral or mark them for $platform.")
+    }
     $lines.Add("- Items: $itemText.")
     $lines.Add("- Targeted curl version: $version (Gap/Baselines/target.json).")
     $lines.Add("- Yardstick: $(Get-UpstreamSources $version $front['area']).")
@@ -240,11 +261,13 @@ function Format-TaskBody($Finding, [string] $Kind, [string[]] $Touches) {
     $lines.Add(''); $lines.Add('Suggestion, copied from the finding:'); $lines.Add('')
     $lines.Add((Get-SectionText $Finding 'Suggestion'))
     $lines.Add(''); $lines.Add('## Acceptance criteria'); $lines.Add('')
+    $on = if ($platform -eq 'windows') { '' } else { " on $platform" }
     foreach ($item in $items) {
-        $expected = Get-Expected $front['area'] $item
-        if ($null -ne $expected) { $lines.Add("- [ ] ``$item``: Curl answers what curl $version answers, ``$expected``, so the item measures ``match``.") }
-        else { $lines.Add("- [ ] ``$item``: Curl answers what curl $version answers, as the Evidence above shows, so the item measures ``match``.") }
+        $expected = Get-Expected $front['area'] $platform $item
+        if ($null -ne $expected) { $lines.Add("- [ ] ``$item``: Curl answers what curl $version answers$on, ``$expected``, so the item measures ``match``.") }
+        else { $lines.Add("- [ ] ``$item``: Curl answers what curl $version answers$on, as the Evidence above shows, so the item measures ``match``.") }
     }
+    if ($platform -ne 'windows') { $lines.Add("- [ ] The gap-platforms workflow run on the branch (or the CI job on $platform) passes for the named items; lanes test only on Windows, so a green Windows run alone does not close this task.") }
     $lines.Add('- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.')
     $lines.Add('- [ ] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).')
     $lines.Add('')
@@ -294,6 +317,7 @@ function Invoke-NewTasksFromGaps {
         if ($null -eq $kind) { continue }
         $front = $finding.Front
         $title = "${kind} $($front['id']): $($front['title'])"
+        if ($front['platform'] -ne 'windows') { $title += " (on $($front['platform']))" }
         $priority = $script:PriorityBySeverity[$front['severity']]
         if (-not $priority) { throw "$($front['id']) has severity '$($front['severity'])'; expected Critical, High, Medium or Low." }
         $pipeline = if ($front['area'] -eq 'protocols') { 'protocol' } else { 'feature' }
@@ -349,7 +373,7 @@ function Invoke-SelfTest {
 
         $output = Invoke-Run $folder
         $tasks = @{}
-        foreach ($id in @('GF-0001', 'GF-0002', 'GF-0003', 'GF-0004', 'GF-0005', 'GF-0006', 'GF-0007', 'GF-0008', 'GF-0009', 'GF-0010')) { $tasks[$id] = @(Get-Filed $folder $id) }
+        foreach ($id in @('GF-0001', 'GF-0002', 'GF-0003', 'GF-0004', 'GF-0005', 'GF-0006', 'GF-0007', 'GF-0008', 'GF-0009', 'GF-0010', 'GF-0011')) { $tasks[$id] = @(Get-Filed $folder $id) }
         $text = @{}
         foreach ($id in @($tasks.Keys)) { if ($tasks[$id].Count -eq 1) { $text[$id] = [IO.File]::ReadAllText($tasks[$id][0].FullName) } }
         Assert-Check 'an open target finding with no task gets "Close GF-####: <title>"' ($tasks['GF-0001'].Count -eq 1 -and $text['GF-0001'] -match '(?m)^title: Close GF-0001: Encrypted Client Hello options are missing$')
@@ -366,7 +390,7 @@ function Invoke-SelfTest {
         $allText = @($text.Values)
         Assert-Check 'a filed task contains the finding''s Evidence and Suggestion text' ($text['GF-0001'] -match 'Evidence text of GF-0001' -and $text['GF-0001'] -match 'Suggestion text of GF-0001' -and $text['GF-0003'] -match 'Evidence text of GF-0003')
         Assert-Check 'no filed task keeps an HTML comment from the template' (@($allText | Where-Object { $_ -match '<!--' }).Count -eq 0)
-        Assert-Check 'the Context names the ID, area, severity, introduced-in, items, target version, yardstick and re-measurement rule' ($text['GF-0001'] -match 'Finding: GF-0001' -and $text['GF-0001'] -match 'Area: options\. Severity: Critical\. Introduced in: 8\.8\.0' -and $text['GF-0001'] -match 'Targeted curl version: 8\.21\.0' -and $text['GF-0001'] -match 'docs/cmdline-opts/\*\.md' -and $text['GF-0001'] -match 'ADR-0433 decision 5')
+        Assert-Check 'the Context names the ID, area, severity, introduced-in, items, target version, yardstick and re-measurement rule' ($text['GF-0001'] -match 'Finding: GF-0001' -and $text['GF-0001'] -match 'Area: options\. Severity: Critical\. Introduced in: 8\.8\.0' -and $text['GF-0001'] -match ('Targeted curl version: ' + [regex]::Escape((Get-TargetVersion))) -and $text['GF-0001'] -match 'docs/cmdline-opts/\*\.md' -and $text['GF-0001'] -match 'ADR-0433 decision 5')
         Assert-Check 'acceptance criteria hold one box per item key, with the measured expected answer, and the standard gates' ($text['GF-0001'] -match '- \[ \] `options:--ech`: .*`known option`' -and $text['GF-0001'] -match '- \[ \] `options:--ech:argument`: .*`accepts false, true, hard and pn:<name>`' -and $text['GF-0001'] -match 'dotnet build -warnaserror' -and $text['GF-0001'] -match '--ai-help')
         $f01 = Get-FindingFront $folder 'GF-0001'
         $f03 = Get-FindingFront $folder 'GF-0003'
@@ -374,7 +398,9 @@ function Invoke-SelfTest {
         $id03 = $tasks['GF-0003'][0].BaseName -replace '^(BL-\d+).*$', '$1'
         $log01 = [IO.File]::ReadAllText((Get-ChildItem -Path (Join-Path $folder 'findings') -Filter 'GF-0001-*.md')[0].FullName)
         Assert-Check 'the finding gains task, tasks and a Log line' ($f01['task'] -eq $id01 -and $f01['tasks'] -eq "[$id01]" -and $log01 -match "(?m)^- [0-9]{4}-[0-9]{2}-[0-9]{2}_[0-9]{4}: Filed $id01\.$" -and $f03['task'] -eq $id03 -and $f03['tasks'] -eq "[BL-101, $id03]")
-        Assert-Check 'the summary line counts the tasks filed' ($output -match 'New-TasksFromGaps: 4 task\(s\) filed\.')
+        Assert-Check 'the summary line counts the tasks filed' ($output -match 'New-TasksFromGaps: 5 task\(s\) filed\.')
+        Assert-Check 'a linux finding''s task names the platform in its title, Context and acceptance criteria (ADR-0505)' ($tasks['GF-0011'].Count -eq 1 -and $text['GF-0011'] -match '(?m)^title: Close GF-0011: The Unix socket path is read differently \(on linux\)$' -and $text['GF-0011'] -match 'Platform: linux' -and $text['GF-0011'] -match 'Lanes test only on Windows' -and $text['GF-0011'] -match 'gap-platforms workflow run on the branch' -and $text['GF-0011'] -match ('`options:--unix-socket`: Curl answers what curl ' + [regex]::Escape((Get-TargetVersion)) + ' answers on linux, `exit 7 on a missing socket`'))
+        Assert-Check 'a windows finding''s task says nothing of the gap-platforms workflow' ($text['GF-0001'] -match 'Platform: windows' -and $text['GF-0001'] -notmatch 'gap-platforms' -and $text['GF-0001'] -notmatch '\(on windows\)')
         $saved = $env:CLAUDE_PROJECT_DIR
         try {
             $env:CLAUDE_PROJECT_DIR = Join-Path $folder 'board'
