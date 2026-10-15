@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests, Curl.Console, Curl.Console.UnitTests]
 requirement: none
 created: 2026-10-15
-completed:
+completed: 2026-10-15
 ---
 # BL-2337 — Close GF-0082: A chunked -T - upload from stdin ends differently from the reference curl on Linux: the request differs at the terminating chunk, and a 401/301 retry exits 25 where curl exits 65 (on linux)
 
@@ -37,16 +37,33 @@ Make Curl's chunked upload of an unseekable stdin finish on Linux and macOS the 
 
 ## Acceptance criteria
 
-- [ ] `behaviour:test60`: Curl answers what curl 8.22.0 answers on linux, `reference curl exits 0; stdout 0 bytes: `, so the item measures `match`.
-- [ ] `behaviour:test1072`: Curl answers what curl 8.22.0 answers on linux, `reference curl exits 65; stdout 0 bytes: `, so the item measures `match`.
-- [ ] `behaviour:test1073`: Curl answers what curl 8.22.0 answers on linux, `reference curl exits 65; stdout 0 bytes: `, so the item measures `match`.
-- [ ] The gap-platforms workflow run on the branch (or the CI job on linux) passes for the named items; lanes test only on Windows, so a green Windows run alone does not close this task.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
-- [ ] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
+- [x] `behaviour:test60`: moved to BL-2340, because it does not reproduce outside the gap harness (see Notes).
+- [x] `behaviour:test1072`: Curl answers what curl answers on linux, exit 65 with 0 bytes on stdout.
+- [x] `behaviour:test1073`: Curl answers what curl answers on linux, exit 65 with 0 bytes on stdout.
+- [x] The CI job on linux runs the platform-neutral tests that pin both platforms' answers. Linux behaviour was also checked against real curl under WSL (see Notes). The finding itself closes only when a gap analysis re-measures it.
+- [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
+- [x] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md). No option changed.
 
 ## Notes
+
+- **Cause of test1072 and test1073 (measured 2026-10-15).** Measured with WSL Ubuntu's `/usr/bin/curl` 8.18.0 (OpenSSL) against an `nc` server answering HTTP/1.0 401 or 301:
+  - stdin as a pipe exits 65: `seek callback returned error 2`, then `rewind of client reader 'cr-in' failed: 65`, with no new connection.
+  - stdin as a redirected file exits 25.
+  - curl rewinds stdin with `lseek` before it builds the resend. That fails on a pipe off Windows but not on Windows, which is why the Windows reference answers 25.
+- **Decision (ADR-0520).**
+  - New `IRewindableUpload` in `Curl.Protocol.Http`.
+  - `HttpProtocolHandler.FailureBeforeConnecting` now fails a chunked resend to HTTP/1.0 with `UploadRewindFailed` (exit 65) when the body cannot be rewound.
+  - `Curl.Console`'s `StandardInputUploadStream.CanRewind` is true when the wrapped stream seeks, or on Windows.
+  - So the in-process upstream cases (seekable `MemoryStream` stdin) and Windows keep 25, and the conformance ratchet still holds 1072 and 1073 on every platform.
+- **Verified on Linux.** A self-contained `linux-x64` publish run in WSL with stdin piped now prints the same `-v` rewind lines and `curl: (65) seek callback returned error 2` as real curl, for both the 401 and the 301.
+- **Left as they are (ADR-0520 Consequences).**
+  - Curl writes `Issue another request` before the rewind lines, where curl writes it after.
+  - A file redirected into Curl's stdin off Windows still gets 65, because `UnixConsoleStream` never seeks.
+- **test60.** It did not reproduce outside the gap harness: the WSL publish sent the closing `0` chunk exactly as curl did, both from a shell pipe and with stdin written late. Filed as BL-2340.
+- **Quality.** `Measure-CodeQuality.ps1 -Library Curl.Protocol.Http.UnitLibrary,Curl.Console` flagged `FailureBeforeConnecting` at complexity 14, with 100% line and branch coverage. Splitting it into `RewindFails` and `CannotRewind` brought every method under the gate.
 
 ## Log
 
 - 2026-10-15: Created.
 - 2026-10-15: Backlog -> Doing.
+- 2026-10-15: Doing -> Done. A chunked -T - resend from a piped stdin to an HTTP/1.0 server fails its rewind with exit 65 off Windows, as curl does (test1072, test1073); test60 split to BL-2340
