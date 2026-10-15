@@ -35,3 +35,4 @@ ADR-0506; plan section "CURLINFO". `curl_easy_getinfo` returns these; `Libcurl`'
 ## Log
 
 - 2026-10-15: Created.
+- 2026-10-15: Backlog -> Doing.
