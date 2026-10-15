@@ -38,6 +38,7 @@ In Curl.Protocol.Imap.UnitLibrary, keep an IMAP connection open after a transfer
 - 2026-10-12_2042: 0 of 6 items are gaps.
 - 2026-10-13_1406: 0 of 6 items are gaps.
 - 2026-10-14_0904: 0 of 6 items are gaps.
+- 2026-10-15_0304: 0 of 6 items are gaps.
 
 ## Log
 

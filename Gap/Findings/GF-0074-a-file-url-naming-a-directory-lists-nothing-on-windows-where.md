@@ -33,6 +33,7 @@ In Curl.Protocol.File.UnitLibrary, list directories on Windows as curl 8.22.0 do
 
 - 2026-10-13_1406: 1 of 1 items are gaps.
 - 2026-10-14_0904: 0 of 1 items are gaps.
+- 2026-10-15_0304: 0 of 1 items are gaps.
 
 ## Log
 
