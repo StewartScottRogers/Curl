@@ -87,12 +87,12 @@ public sealed class CurlCommandRunnerConnectTimeoutTests
         TimeSpan actual;
         using (Diagnostics.Phase("connect timeout of"))
         {
-            actual = EngineComposition.ConnectTimeoutOf(parsed.Options!);
+            actual = EngineComposition.ConnectTimeoutOf(EasyOptionsFromCommandLine.NetworkOf(parsed.Options!), parsed.Options!.MaxTime);
         }
 
         Diagnostics.Act("connect timeout", actual);
         Diagnostics.Assert("connect timeout", TimeSpan.FromMilliseconds(expectedMilliseconds), actual);
-        Assert.AreEqual(TimeSpan.FromMilliseconds(expectedMilliseconds), EngineComposition.ConnectTimeoutOf(parsed.Options!));
+        Assert.AreEqual(TimeSpan.FromMilliseconds(expectedMilliseconds), EngineComposition.ConnectTimeoutOf(EasyOptionsFromCommandLine.NetworkOf(parsed.Options!), parsed.Options!.MaxTime));
     }
 
     /// <summary>
@@ -106,7 +106,7 @@ public sealed class CurlCommandRunnerConnectTimeoutTests
         CommandLineParseResult parsed = CommandLineParser.Parse(arguments, _ => true);
         Assert.IsTrue(parsed.IsAccepted);
         TcpConnector connector = EngineComposition.CreateTcpConnector(
-            parsed.Options,
+            parsed.Options, EasyOptionsFromCommandLine.NetworkOf(parsed.Options),
             new LoopbackDnsResolver(),
             new StallingTcpDialer(),
             new PassThroughTlsProvider(),

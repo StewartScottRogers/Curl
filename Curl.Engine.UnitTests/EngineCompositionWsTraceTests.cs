@@ -1,3 +1,4 @@
+using Curl.Console;
 using System.Text;
 using Curl.Cli;
 using Curl.Protocol.Abstractions;
@@ -58,7 +59,7 @@ public sealed class EngineCompositionWsTraceTests
     public void CreateTransports_UnderTraceConfigWs_TracesWs()
     {
         Diagnostics.Arrange("command line arguments", "-v --trace-config ws");
-        CurlTransports transports = EngineComposition.CreateTransports(Parse("-v", "--trace-config", "ws"), TimeProvider.System);
+        CurlTransports transports = EngineComposition.CreateTransports(Parse("-v", "--trace-config", "ws"), EasyOptionsFromCommandLine.NetworkOf(Parse("-v", "--trace-config", "ws")), TimeProvider.System);
         Diagnostics.Act("traces ws", transports.TracesWs);
 
         Diagnostics.Assert("traces ws", true, transports.TracesWs);
@@ -69,7 +70,7 @@ public sealed class EngineCompositionWsTraceTests
     public void CreateTransports_WithoutTheWsComponent_DoesNotTraceWs()
     {
         Diagnostics.Arrange("command line arguments", "-v");
-        CurlTransports transports = EngineComposition.CreateTransports(Parse("-v"), TimeProvider.System);
+        CurlTransports transports = EngineComposition.CreateTransports(Parse("-v"), EasyOptionsFromCommandLine.NetworkOf(Parse("-v")), TimeProvider.System);
         Diagnostics.Act("traces ws", transports.TracesWs);
 
         Diagnostics.Assert("traces ws", false, transports.TracesWs);

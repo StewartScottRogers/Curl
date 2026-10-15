@@ -1,5 +1,5 @@
 using System.Globalization;
-using Curl.Cli;
+using Curl.Api.Options.Network;
 
 namespace Curl.Engine;
 
@@ -13,11 +13,12 @@ namespace Curl.Engine;
 /// <param name="connectTimeout">The <c>--connect-timeout</c> given, or <see langword="null" /> when none, or 0, was.</param>
 internal sealed class TransferTimers(TimeSpan? transferTimeout, TimeSpan? connectTimeout)
 {
-    /// <summary>Gives the timers of the <c>-m</c> and <c>--connect-timeout</c> in <paramref name="options" />.</summary>
-    /// <param name="options">The transfer's option group.</param>
+    /// <summary>Gives the timers of <paramref name="maxTime" /> and the connect timeout in <paramref name="network" />.</summary>
+    /// <param name="network">The transfer's network options, whose <see cref="EasyNetworkOptions.ConnectTimeout" /> of zero means not set.</param>
+    /// <param name="maxTime">The <c>-m</c> given, if any (the transfer group's timeout until its own retarget).</param>
     /// <returns>The transfer's timers.</returns>
-    public static TransferTimers Of(CommandLineOptions options) =>
-        new(Positive(options.MaxTime), Positive(options.ConnectTimeout));
+    public static TransferTimers Of(EasyNetworkOptions network, TimeSpan? maxTime) =>
+        new(Positive(maxTime), Positive(network.ConnectTimeout));
 
     /// <summary>Gets the number of timers, which curl's <c>pollset[...]</c> lines give as <c>timeouts=</c>.</summary>
     public int Count => Pending().Count;

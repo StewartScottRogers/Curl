@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Net.Sockets;
 using System.Text;
+using Curl.Api.Options.Network;
 using Curl.Authentication;
 using Curl.Cli;
 using Curl.Cookies;
@@ -369,10 +370,11 @@ internal static class EngineComposition
     /// <see cref="PoolingConnector" /> over the TCP connector, on the same clock, is the option group's
     /// connection pool (ADR-0050).
     /// </summary>
-    /// <param name="options">The parsed command line.</param>
+    /// <param name="options">The parsed command line, for everything but the network group.</param>
+    /// <param name="network">The option group's network options: its connections, name resolution and connect timeout.</param>
     /// <returns>The connectors and the pieces they were built from.</returns>
-    internal static CurlTransports CreateTransports(CommandLineOptions options) =>
-        CreateTransports(options, TimeProvider.System);
+    internal static CurlTransports CreateTransports(CommandLineOptions options, EasyNetworkOptions network) =>
+        CreateTransports(options, network, TimeProvider.System);
 
     /// <summary>
     /// Creates the run's resolver: the <see cref="CreateDohResolver" /> one when <c>--doh-url</c> is
@@ -382,7 +384,8 @@ internal static class EngineComposition
     /// is given, as curl's c-ares build resolves then (ADR-0170, BL-694), asking only the
     /// <c>-4</c> or <c>-6</c> family's records; otherwise the <see cref="SystemDnsResolver" />.
     /// </summary>
-    /// <param name="options">The parsed command line.</param>
+    /// <param name="options">The parsed command line, whose TLS and trace options the DoH connector reads.</param>
+    /// <param name="network">The option group's network options, whose DNS settings and IP version pick the resolver.</param>
     /// <param name="timeProvider">The clock the hand-built resolver and the DoH connections time on.</param>
     /// <param name="tcpDialer">Opens the plaintext TCP connections to the DoH server.</param>
     /// <param name="dohTrace">
@@ -391,19 +394,19 @@ internal static class EngineComposition
     /// </param>
     /// <param name="easyErrorText">Curl's easy error text for each exit code, which the DoH resolver's <c>--trace-config doh</c> lines carry (BL-1102): <c>Curl.Console</c>'s <c>CurlEasyErrorText.Of</c> in production; <see langword="null" /> for an empty text.</param>
     /// <returns>The resolver.</returns>
-    internal static IDnsResolver CreateDnsResolver(CommandLineOptions options, TimeProvider timeProvider, ITcpDialer tcpDialer, ITransferEvents? dohTrace = null, Func<CurlExitCode, string>? easyErrorText = null)
+    internal static IDnsResolver CreateDnsResolver(CommandLineOptions options, EasyNetworkOptions network, TimeProvider timeProvider, ITcpDialer tcpDialer, ITransferEvents? dohTrace = null, Func<CurlExitCode, string>? easyErrorText = null)
     {
-        if (options.DohUrl is { } dohUrl)
+        if (network.DohUrl is { } dohUrl)
         {
-            return CreateDohResolver(dohUrl, CreateDohConnector(options, tcpDialer, timeProvider), AddressFamilyOf(options), dohTrace, easyErrorText);
+            return CreateDohResolver(dohUrl, CreateDohConnector(options, tcpDialer, timeProvider), AddressFamilyOf(network), dohTrace, easyErrorText);
         }
 
         DnsServerResolverOptions resolverOptions = new(
-            options.DnsServers,
-            options.DnsInterface,
-            options.DnsIPv4Address,
-            options.DnsIPv6Address,
-            AddressFamilyOf(options));
+            network.DnsServers,
+            network.DnsInterface,
+            network.DnsLocalIPv4,
+            network.DnsLocalIPv6,
+            AddressFamilyOf(network));
         return resolverOptions.IsAnyGiven
             ? new DnsServerResolver(resolverOptions, timeProvider)
             : new SystemDnsResolver();
@@ -729,13 +732,14 @@ internal static class EngineComposition
             : new HandBuiltTlsProvider(options, timeProvider, sessions, echConfigs);
 
     /// <summary>
-    /// Creates the network transports as <see cref="CreateTransports(CommandLineOptions)" /> does,
+    /// Creates the network transports as <see cref="CreateTransports(CommandLineOptions, EasyNetworkOptions)" /> does,
     /// on <paramref name="timeProvider" /> instead of <see cref="TimeProvider.System" />: the
     /// <see cref="TcpConnector" />, the TLS providers and the
     /// <see cref="UdpDatagramConnector" /> all time on it, so the handshake timestamps the TLS
     /// provider reports are on the connector's clock (ADR-0030).
     /// </summary>
-    /// <param name="options">The parsed command line.</param>
+    /// <param name="options">The parsed command line, for everything but the network group.</param>
+    /// <param name="network">The option group's network options: its connections, name resolution and connect timeout.</param>
     /// <param name="timeProvider">The clock every transport times on.</param>
     /// <returns>The connectors and the pieces they were built from.</returns>
     /// <param name="runConnections">
@@ -746,18 +750,11 @@ internal static class EngineComposition
     /// <param name="diagnosticLog">The run's diagnostic log, which the authenticators and security contexts write their choices to (BL-923); <see langword="null" /> for none.</param>
     /// <param name="runDnsCache">The run's DNS cache, which every option group's TCP connector answers from and adds to as curl 8.21.0 shares its cache (BL-1053); <see langword="null" /> for a cache of the group's own.</param>
     /// <param name="easyErrorText">Curl's easy error text for each exit code, which the DoH resolver's <c>--trace-config doh</c> lines carry (BL-1102): <c>Curl.Console</c>'s <c>CurlEasyErrorText.Of</c> in production; <see langword="null" /> for an empty text.</param>
-    internal static CurlTransports CreateTransports(CommandLineOptions options, TimeProvider timeProvider, ConnectionCache? runConnections = null, TlsSessionCache? tlsSessions = null, IDiagnosticLog? diagnosticLog = null, DnsCache? runDnsCache = null, Func<CurlExitCode, string>? easyErrorText = null)
+    internal static CurlTransports CreateTransports(CommandLineOptions options, EasyNetworkOptions network, TimeProvider timeProvider, ConnectionCache? runConnections = null, TlsSessionCache? tlsSessions = null, IDiagnosticLog? diagnosticLog = null, DnsCache? runDnsCache = null, Func<CurlExitCode, string>? easyErrorText = null)
     {
-        TcpDialer tcpDialer = new(TcpSocketOptions.FromCommandLine(options.TcpNoDelay, options.TcpKeepAlive, options.TcpKeepAliveSeconds, options.TcpKeepAliveProbeCount)
-            with
-        {
-            TypeOfService = options.IpTypeOfService,
-            VlanPriority = options.VlanPriority,
-            FastOpen = options.TcpFastOpen,
-            MultipathTcp = options.MultipathTcp,
-        });
+        TcpDialer tcpDialer = new(TcpSocketOptionsOf(network));
         FlowScopedTransferEvents? resolverEvents = TracesDns(options) ? new() : null;
-        IDnsResolver dnsResolver = CreateDnsResolver(options, timeProvider, tcpDialer, resolverEvents, easyErrorText);
+        IDnsResolver dnsResolver = CreateDnsResolver(options, network, timeProvider, tcpDialer, resolverEvents, easyErrorText);
         TlsClientOptions tlsClientOptions = TlsClientOptionsMapping.FromCommandLine(options);
         ITlsProviderWithWarnings tlsProvider = CreateTlsProvider(tlsClientOptions, timeProvider, tlsSessions, dnsResolver as IEchConfigListLookup);
         TlsClientOptions proxyTlsClientOptions = TlsClientOptionsMapping.ProxyFromCommandLine(options);
@@ -765,9 +762,9 @@ internal static class EngineComposition
         LateBoundSecurityContextFactory proxyContexts = new();
         HttpProxyTunnelOptions proxyTunnelOptions = CreateProxyTunnelOptions(options, proxyContexts, diagnosticLog);
         QuicDialer quicDialer = new(tlsClientOptions, timeProvider) { WritesHttp3ConnectionLines = TracesHttp3(options) };
-        TcpConnector tcpConnector = CreateTcpConnector(options, dnsResolver, tcpDialer, tlsProvider, timeProvider, proxyTunnelOptions, proxyTlsProvider, quicDialer, proxyContexts, runDnsCache, resolverEvents);
-        UdpDatagramConnector udpDatagramConnector = CreateUdpDatagramConnector(options, dnsResolver, timeProvider, diagnosticLog);
-        PoolingConnector poolingConnector = CreatePoolingConnector(options, tcpConnector, timeProvider, runConnections);
+        TcpConnector tcpConnector = CreateTcpConnector(options, network, dnsResolver, tcpDialer, tlsProvider, timeProvider, proxyTunnelOptions, proxyTlsProvider, quicDialer, proxyContexts, runDnsCache, resolverEvents);
+        UdpDatagramConnector udpDatagramConnector = CreateUdpDatagramConnector(network, dnsResolver, timeProvider, diagnosticLog);
+        PoolingConnector poolingConnector = CreatePoolingConnector(options, network, tcpConnector, timeProvider, runConnections);
 
         // The tunnel answers --proxy-ntlm and --proxy-negotiate on the same router the origin's
         // contexts come from, which can only be made once the connectors exist (BL-604).
@@ -796,6 +793,24 @@ internal static class EngineComposition
     }
 
     /// <summary>
+    /// The socket options each TCP connection is given: <c>TCP_NODELAY</c>, keepalive with its idle time and
+    /// probe count, the IP Type of Service byte, the VLAN priority, TCP Fast Open and Multipath TCP. libcurl's
+    /// own keepalive defaults on the record (60 seconds, 9 probes) are <see cref="TcpSocketOptions" />'s
+    /// defaults too, so a record that leaves them gives the sockets curl's tool gives them (ADR-0513).
+    /// </summary>
+    /// <param name="network">The option group's network options.</param>
+    /// <returns>The socket options.</returns>
+    internal static TcpSocketOptions TcpSocketOptionsOf(EasyNetworkOptions network) =>
+        TcpSocketOptions.FromCommandLine(network.TcpNoDelay, network.TcpKeepAlive, (long)network.TcpKeepIdle.TotalSeconds, network.TcpKeepCount)
+        with
+        {
+            TypeOfService = network.IpTypeOfService,
+            VlanPriority = network.VlanPriority,
+            FastOpen = network.TcpFastOpen,
+            MultipathTcp = network.MultipathTcp,
+        };
+
+    /// <summary>
     /// Tells whether a transfer waits for a connection to its origin that may yet multiplex rather
     /// than open one of its own: curl sets <c>CURLOPT_PIPEWAIT</c> on every <c>-Z</c> transfer unless
     /// <c>--parallel-immediate</c> is given (measured, BL-717 Notes).
@@ -811,13 +826,15 @@ internal static class EngineComposition
     /// so a later group reuses an earlier group's connection when their settings are equal, as curl
     /// 8.21.0 does (ADR-0285, BL-754); or, without one, over a pool of its own.
     /// </summary>
-    /// <param name="options">The option group.</param>
+    /// <param name="options">The option group, whose TLS, proxy and HTTP version options the pool's settings hold.</param>
+    /// <param name="network">The option group's network options, whose <c>--connect-to</c> entries, binding, socket and IP version the pool's settings hold.</param>
     /// <param name="connector">Opens a connection when the pool has none to reuse.</param>
     /// <param name="timeProvider">The clock a pool of its own measures idle time on.</param>
     /// <param name="runConnections">The run's connection cache, or <see langword="null" />.</param>
     /// <returns>The pooling connector.</returns>
     internal static PoolingConnector CreatePoolingConnector(
         CommandLineOptions options,
+        EasyNetworkOptions network,
         IConnector connector,
         TimeProvider timeProvider,
         ConnectionCache? runConnections)
@@ -825,7 +842,7 @@ internal static class EngineComposition
         bool waitsForMultiplexing = WaitsForMultiplexing(options);
         return runConnections is null
             ? new PoolingConnector(connector, timeProvider) { WaitsForMultiplexing = waitsForMultiplexing }
-            : new PoolingConnector(connector, runConnections, OptionGroupConnectionSettings.Of(options), new ConnectToMappings(options.ConnectToEntries)) { WaitsForMultiplexing = waitsForMultiplexing };
+            : new PoolingConnector(connector, runConnections, OptionGroupConnectionSettings.Of(options, network), new ConnectToMappings(network.ConnectTo)) { WaitsForMultiplexing = waitsForMultiplexing };
     }
 
     /// <summary>
@@ -841,7 +858,8 @@ internal static class EngineComposition
     /// <c>--happy-eyeballs-timeout-ms</c> is how long it dials the first address family alone before
     /// the other, curl's 200 ms when not given (ADR-0254, BL-889).
     /// </summary>
-    /// <param name="options">The parsed command line.</param>
+    /// <param name="options">The parsed command line, for its proxy, TLS, HTTP version, <c>-m</c> and trace options.</param>
+    /// <param name="network">The option group's network options: <c>--resolve</c>, <c>--connect-to</c>, the binding, the socket, the IP version and the connect timeouts.</param>
     /// <param name="dnsResolver">Resolves a host no <c>--resolve</c> entry answers for.</param>
     /// <param name="tcpDialer">Opens each plaintext connection.</param>
     /// <param name="tlsProvider">Upgrades a connection whose target asks for TLS.</param>
@@ -871,6 +889,7 @@ internal static class EngineComposition
     /// </returns>
     internal static TcpConnector CreateTcpConnector(
         CommandLineOptions options,
+        EasyNetworkOptions network,
         IDnsResolver dnsResolver,
         ITcpDialer tcpDialer,
         ITlsProvider tlsProvider,
@@ -887,16 +906,16 @@ internal static class EngineComposition
             tlsProvider,
             timeProvider,
             proxyTunnelOptions,
-            ResolveOverrides.Parse(options.ResolveEntries),
-            new ConnectToMappings(options.ConnectToEntries),
+            ResolveOverrides.Parse(network.Resolve),
+            new ConnectToMappings(network.ConnectTo),
             proxyTlsProvider,
-            ConnectTimeoutOf(options),
-            AddressFamilyOf(options),
-            UnixSocketOf(options),
+            ConnectTimeoutOf(network, options.MaxTime),
+            AddressFamilyOf(network),
+            UnixSocketOf(network),
             HttpVersionMapping.HttpOverTlsApplicationProtocolsOf(options.HttpVersion),
             quicDialer,
-            options.HappyEyeballsTimeout,
-            localBinding: LocalBindingOf(options),
+            network.HappyEyeballsTimeout,
+            localBinding: LocalBindingOf(network),
             preProxy: PreProxyOf(options),
             socks5Authentication: Socks5AuthenticationMapping.FromCommandLine(options, socks5SecurityContexts, OperatingSystem.IsWindows()),
             haproxyProtocol: HaproxyProtocolOf(options),
@@ -914,7 +933,7 @@ internal static class EngineComposition
             TracesTcpFilter = TracesTcp(options),
             TracesTimers = TracesTimer(options),
             TracesTimerExpiry = TracesMulti(options),
-            TracedConnectTimeout = options.ConnectTimeout > TimeSpan.Zero ? options.ConnectTimeout : null,
+            TracedConnectTimeout = network.ConnectTimeout > TimeSpan.Zero ? network.ConnectTimeout : null,
             TracedTransferTimeout = options.MaxTime > TimeSpan.Zero ? options.MaxTime : null,
             TracesHttpsConnectFilter = TracesHttpsConnect(options),
             HttpsConnectFirstAttemptVersion = HttpsConnectFirstAttemptVersionOf(options.HttpVersion),
@@ -960,18 +979,17 @@ internal static class EngineComposition
     /// binding is part of each option group's <see cref="OptionGroupConnectionSettings" />, so a bound
     /// connection is never reused unbound.
     /// </summary>
-    /// <param name="options">The parsed command line.</param>
+    /// <param name="network">The option group's network options: <see cref="EasyNetworkOptions.Interface" />, <see cref="EasyNetworkOptions.LocalPort" /> and <see cref="EasyNetworkOptions.LocalPortRange" />, a port of 0 meaning any.</param>
     /// <returns>The binding, or <see langword="null" />.</returns>
-    internal static LocalBinding? LocalBindingOf(CommandLineOptions options)
+    internal static LocalBinding? LocalBindingOf(EasyNetworkOptions network)
     {
-        if (options.Interface is null && options.LocalPorts is null)
+        if (network.Interface is null && network.LocalPort == 0)
         {
             return null;
         }
 
-        LocalPortRange ports = options.LocalPorts ?? new LocalPortRange(0, 0);
-        (string? interfaceName, string? hostName, string? deviceName) = LocalBindingNamesOf(options.Interface);
-        return new LocalBinding(interfaceName, hostName, deviceName, ports.First, ports.Count);
+        (string? interfaceName, string? hostName, string? deviceName) = LocalBindingNamesOf(network.Interface is { } named ? InterfaceBinding.Parse(named) : null);
+        return new LocalBinding(interfaceName, hostName, deviceName, network.LocalPort, network.LocalPortRange);
     }
 
     /// <summary>
@@ -1001,22 +1019,24 @@ internal static class EngineComposition
     /// neither (BL-507). Each option group builds its own transports, so each group's pool
     /// holds only connections to its own socket.
     /// </summary>
-    /// <param name="options">The parsed command line.</param>
+    /// <param name="network">The option group's network options.</param>
     /// <returns>The socket, or <see langword="null" /> to dial TCP.</returns>
-    internal static UnixSocketAddress? UnixSocketOf(CommandLineOptions options) =>
-        options.UnixSocketPath is { } path ? new UnixSocketAddress(path, options.UnixSocketIsAbstract) : null;
+    internal static UnixSocketAddress? UnixSocketOf(EasyNetworkOptions network) =>
+        network.UnixSocketPath is { } path ? new UnixSocketAddress(path, false)
+        : network.AbstractUnixSocket is { } name ? new UnixSocketAddress(name, true)
+        : null;
 
     /// <summary>
     /// The address family both connectors dial:<see cref="AddressFamily.InterNetwork" /> under
     /// <c>-4</c>, <see cref="AddressFamily.InterNetworkV6" /> under <c>-6</c>, and
     /// <see cref="AddressFamily.Unspecified" /> (either) when neither was given (BL-500).
     /// </summary>
-    /// <param name="options">The parsed command line.</param>
+    /// <param name="network">The option group's network options.</param>
     /// <returns>The family.</returns>
-    internal static AddressFamily AddressFamilyOf(CommandLineOptions options) => options.IpAddressFamily switch
+    internal static AddressFamily AddressFamilyOf(EasyNetworkOptions network) => network.IpResolve switch
     {
-        IpAddressFamilyChoice.IPv4Only => AddressFamily.InterNetwork,
-        IpAddressFamilyChoice.IPv6Only => AddressFamily.InterNetworkV6,
+        IpResolve.V4 => AddressFamily.InterNetwork,
+        IpResolve.V6 => AddressFamily.InterNetworkV6,
         _ => AddressFamily.Unspecified,
     };
 
@@ -1026,12 +1046,13 @@ internal static class EngineComposition
     /// <c>-m</c> when it runs out sooner, as curl 8.21.0 ends a connect with its connect message
     /// at whichever runs out first (measured, BL-510).
     /// </summary>
-    /// <param name="options">The parsed command line.</param>
+    /// <param name="network">The option group's network options, whose <see cref="EasyNetworkOptions.ConnectTimeout" /> of zero means not set.</param>
+    /// <param name="maxTime">The <c>-m</c> value, if any (the transfer group's timeout until its own retarget).</param>
     /// <returns>The limit on each connect.</returns>
-    internal static TimeSpan ConnectTimeoutOf(CommandLineOptions options)
+    internal static TimeSpan ConnectTimeoutOf(EasyNetworkOptions network, TimeSpan? maxTime)
     {
-        TimeSpan connectTimeout = options.ConnectTimeout is { } given && given > TimeSpan.Zero ? given : TcpConnector.DefaultConnectTimeout;
-        return options.MaxTime is { } maxTime && maxTime > TimeSpan.Zero && maxTime < connectTimeout ? maxTime : connectTimeout;
+        TimeSpan connectTimeout = network.ConnectTimeout > TimeSpan.Zero ? network.ConnectTimeout : TcpConnector.DefaultConnectTimeout;
+        return maxTime is { } given && given > TimeSpan.Zero && given < connectTimeout ? given : connectTimeout;
     }
 
     /// <summary>
@@ -1041,22 +1062,22 @@ internal static class EngineComposition
     /// <c>tftp://</c> transfer and fails it with exit 49 for an entry that does not parse
     /// (measured).
     /// </summary>
-    /// <param name="options">The parsed command line.</param>
+    /// <param name="network">The option group's network options.</param>
     /// <param name="dnsResolver">Resolves a host no <c>--resolve</c> entry answers for.</param>
     /// <param name="timeProvider">The clock the connector times on.</param>
     /// <param name="diagnosticLog">Where the resolve and the channel are logged (<c>--log-level</c>, BL-968); <see langword="null" /> logs nothing.</param>
     /// <returns>The connector.</returns>
     internal static UdpDatagramConnector CreateUdpDatagramConnector(
-        CommandLineOptions options,
+        EasyNetworkOptions network,
         IDnsResolver dnsResolver,
         TimeProvider timeProvider,
         IDiagnosticLog? diagnosticLog = null) =>
         new(
             dnsResolver,
             timeProvider,
-            ResolveOverrides.Parse(options.ResolveEntries),
-            new ConnectToMappings(options.ConnectToEntries),
-            AddressFamilyOf(options),
+            ResolveOverrides.Parse(network.Resolve),
+            new ConnectToMappings(network.ConnectTo),
+            AddressFamilyOf(network),
             diagnosticLog);
 
     /// <summary>
@@ -1152,21 +1173,21 @@ internal static class EngineComposition
     /// records through <paramref name="datagramConnector" />, as curl's debug build honours
     /// <c>CURL_DNS_SERVER</c> (ADR-0492, BL-2248); otherwise <paramref name="dnsResolver" />.
     /// </summary>
-    /// <param name="options">The option group.</param>
+    /// <param name="network">The option group's network options, whose IP version the queries ask for.</param>
     /// <param name="dnsServer">The <c>CURL_DNS_SERVER</c> value, or <see langword="null" /> when not honoured or not set.</param>
     /// <param name="dnsResolver">The resolver the runner was given.</param>
     /// <param name="datagramConnector">Carries the queries.</param>
     /// <returns>The resolver.</returns>
-    internal static IDnsResolver DnsServerVariableResolverOf(CommandLineOptions options, string? dnsServer, IDnsResolver dnsResolver, IDatagramConnector datagramConnector) =>
+    internal static IDnsResolver DnsServerVariableResolverOf(EasyNetworkOptions network, string? dnsServer, IDnsResolver dnsResolver, IDatagramConnector datagramConnector) =>
         string.IsNullOrEmpty(dnsServer)
             ? dnsResolver
-            : new DnsServerResolver(new DnsServerResolverOptions(dnsServer, null, null, null, AddressFamilyOf(options)), TimeProvider.System, datagramConnector);
+            : new DnsServerResolver(new DnsServerResolverOptions(dnsServer, null, null, null, AddressFamilyOf(network)), TimeProvider.System, datagramConnector);
 
     /// <summary>
     /// The QUIC dialer of an option group of the dialing runner: its <c>--http3</c> and
     /// <c>--http3-only</c> datagrams go through <paramref name="datagramConnector" />
     /// (<see cref="DatagramConnectorUdpChannelOpener" />), not a real UDP socket, so an in-process
-    /// HTTP/3 server answers them (BL-2260). The executable's <see cref="CreateTransports(CommandLineOptions, TimeProvider, ConnectionCache?, TlsSessionCache?, IDiagnosticLog?, DnsCache?, Func{CurlExitCode, string}?)" />
+    /// HTTP/3 server answers them (BL-2260). The executable's <see cref="CreateTransports(CommandLineOptions, EasyNetworkOptions, TimeProvider, ConnectionCache?, TlsSessionCache?, IDiagnosticLog?, DnsCache?, Func{CurlExitCode, string}?)" />
     /// keeps the socket-opening dialer.
     /// </summary>
     /// <param name="options">The option group.</param>

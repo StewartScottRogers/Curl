@@ -1,3 +1,4 @@
+using Curl.Console;
 using Curl.Cli;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Http;
@@ -25,7 +26,7 @@ public sealed class EngineCompositionReadTraceTests
     public void CreateTransports_UnderTraceConfigRead_TracesRead(params string[] arguments)
     {
         Diagnostics.Arrange("command line arguments", string.Join(" ", arguments));
-        CurlTransports transports = EngineComposition.CreateTransports(Parse(arguments), TimeProvider.System);
+        CurlTransports transports = EngineComposition.CreateTransports(Parse(arguments), EasyOptionsFromCommandLine.NetworkOf(Parse(arguments)), TimeProvider.System);
         bool tracesRead = transports.TracesRead;
         Diagnostics.Act("traces read", tracesRead);
 
@@ -40,7 +41,7 @@ public sealed class EngineCompositionReadTraceTests
     public void CreateTransports_WithoutTheReadComponent_DoesNotTraceRead(params string[] arguments)
     {
         Diagnostics.Arrange("command line arguments", string.Join(" ", arguments));
-        CurlTransports transports = EngineComposition.CreateTransports(Parse(arguments), TimeProvider.System);
+        CurlTransports transports = EngineComposition.CreateTransports(Parse(arguments), EasyOptionsFromCommandLine.NetworkOf(Parse(arguments)), TimeProvider.System);
         bool tracesRead = transports.TracesRead;
         Diagnostics.Act("traces read", tracesRead);
 

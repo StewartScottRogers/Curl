@@ -2811,7 +2811,7 @@ internal sealed class CurlCommandRunner(
 
     private ITransferEvents WithMultiOrTimerEvents(CommandLineOptions options, ITransferEvents inner, Func<long> takeConnectionId)
     {
-        TransferTimers timers = TransferTimers.Of(options);
+        TransferTimers timers = TransferTimers.Of(EasyOptionsFromCommandLine.NetworkOf(options), options.MaxTime);
         bool tracesMulti = EngineComposition.TracesMulti(options);
         IReadOnlyList<string> waitLines = EngineComposition.TracesTimer(options) ? timers.WaitLines(tracesMulti) : [];
         if (tracesMulti)

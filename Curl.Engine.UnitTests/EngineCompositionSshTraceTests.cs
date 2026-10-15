@@ -1,3 +1,4 @@
+using Curl.Console;
 using Curl.Cli;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Ssh;
@@ -57,7 +58,7 @@ public sealed class EngineCompositionSshTraceTests
     {
         Diagnostics.Arrange("arguments", "-v --trace-config ssh");
 
-        CurlTransports transports = EngineComposition.CreateTransports(Parse("-v", "--trace-config", "ssh"), TimeProvider.System);
+        CurlTransports transports = EngineComposition.CreateTransports(Parse("-v", "--trace-config", "ssh"), EasyOptionsFromCommandLine.NetworkOf(Parse("-v", "--trace-config", "ssh")), TimeProvider.System);
 
         Diagnostics.Act("transports traces ssh", transports.TracesSsh);
         Diagnostics.Assert("transports traces ssh", true, transports.TracesSsh);
@@ -69,7 +70,7 @@ public sealed class EngineCompositionSshTraceTests
     {
         Diagnostics.Arrange("arguments", "-v");
 
-        CurlTransports transports = EngineComposition.CreateTransports(Parse("-v"), TimeProvider.System);
+        CurlTransports transports = EngineComposition.CreateTransports(Parse("-v"), EasyOptionsFromCommandLine.NetworkOf(Parse("-v")), TimeProvider.System);
 
         Diagnostics.Act("transports traces ssh", transports.TracesSsh);
         Diagnostics.Assert("transports traces ssh", false, transports.TracesSsh);

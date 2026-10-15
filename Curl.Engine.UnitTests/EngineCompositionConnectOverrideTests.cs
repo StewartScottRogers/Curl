@@ -1,3 +1,4 @@
+using Curl.Console;
 using System.Net;
 
 using Curl.Cli;
@@ -170,7 +171,7 @@ public sealed class EngineCompositionConnectOverrideTests
         CommandLineParseResult parsed = CommandLineParser.Parse([.. arguments, "tftp://tftp.test/"], _ => true);
         Assert.IsTrue(parsed.IsAccepted);
 
-        CurlTransports transports = EngineComposition.CreateTransports(parsed.Options);
+        CurlTransports transports = EngineComposition.CreateTransports(parsed.Options, EasyOptionsFromCommandLine.NetworkOf(parsed.Options));
 
         DatagramOpenResult result;
         using (Diagnostics.Phase("open"))
@@ -196,7 +197,7 @@ public sealed class EngineCompositionConnectOverrideTests
         Assert.IsTrue(parsed.IsAccepted);
 
         TcpConnector connector = EngineComposition.CreateTcpConnector(
-            parsed.Options,
+            parsed.Options, EasyOptionsFromCommandLine.NetworkOf(parsed.Options),
             new LoopbackDnsResolver(),
             new ScriptedTcpDialer(server),
             new PassThroughTlsProvider(),

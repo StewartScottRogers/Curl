@@ -98,7 +98,7 @@ public sealed class HappyEyeballsTimeoutMappingTests
 
     private static TcpConnector CreateTcpConnector(CommandLineOptions options) =>
         EngineComposition.CreateTcpConnector(
-            options,
+            options, EasyOptionsFromCommandLine.NetworkOf(options),
             new LoopbackDnsResolver(),
             new ScriptedTcpDialer(new ScriptedConnector([])),
             new PassThroughTlsProvider(),

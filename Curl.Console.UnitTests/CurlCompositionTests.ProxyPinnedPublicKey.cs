@@ -128,7 +128,7 @@ public sealed partial class CurlCompositionTests
     {
         Diagnostics.Arrange("arguments", $"-x {HttpsProxyUrl} --proxy-pinnedpubkey {WrongProxyPin} --proxy-crlfile proxy.crl {ProxiedUrl}");
         CurlTransports transports = EngineComposition.CreateTransports(
-            Parse("-x", HttpsProxyUrl, "--proxy-pinnedpubkey", WrongProxyPin, "--proxy-crlfile", "proxy.crl", ProxiedUrl));
+            Parse("-x", HttpsProxyUrl, "--proxy-pinnedpubkey", WrongProxyPin, "--proxy-crlfile", "proxy.crl", ProxiedUrl), EasyOptionsFromCommandLine.NetworkOf(Parse("-x", HttpsProxyUrl, "--proxy-pinnedpubkey", WrongProxyPin, "--proxy-crlfile", "proxy.crl", ProxiedUrl)));
 
         Diagnostics.Act("proxy pinned public key", transports.ProxyTlsClientOptions.PinnedPublicKey);
         Diagnostics.Act("target pinned public key", transports.TlsClientOptions.PinnedPublicKey);
@@ -144,9 +144,9 @@ public sealed partial class CurlCompositionTests
     {
         // curl ... --proxy-ca-native (without --proxy-insecure) against a self-signed proxy is exit 60, as
         // without it; --proxy-ssl-allow-beast is exit 0 (curl 8.21.0, 2026-09-30).
-        CurlTransports without = EngineComposition.CreateTransports(Parse("-x", HttpsProxyUrl, ProxiedUrl));
+        CurlTransports without = EngineComposition.CreateTransports(Parse("-x", HttpsProxyUrl, ProxiedUrl), EasyOptionsFromCommandLine.NetworkOf(Parse("-x", HttpsProxyUrl, ProxiedUrl)));
         CurlTransports with = EngineComposition.CreateTransports(
-            Parse("-x", HttpsProxyUrl, "--proxy-ca-native", "--proxy-ssl-allow-beast", ProxiedUrl));
+            Parse("-x", HttpsProxyUrl, "--proxy-ca-native", "--proxy-ssl-allow-beast", ProxiedUrl), EasyOptionsFromCommandLine.NetworkOf(Parse("-x", HttpsProxyUrl, "--proxy-ca-native", "--proxy-ssl-allow-beast", ProxiedUrl)));
 
         Diagnostics.Arrange("arguments", $"-x {HttpsProxyUrl} --proxy-ca-native --proxy-ssl-allow-beast {ProxiedUrl}");
         Diagnostics.Act("proxy tls client options without", without.ProxyTlsClientOptions);
@@ -170,7 +170,7 @@ public sealed partial class CurlCompositionTests
         Task serverTask = ServeOneHandshakeAsync(listener, certificate);
 
         CurlTransports transports = EngineComposition.CreateTransports(
-            Parse(["-x", HttpsProxyUrl, "--proxy-insecure", .. proxyTlsArguments(key.ExportSubjectPublicKeyInfo()), ProxiedUrl]));
+            Parse(["-x", HttpsProxyUrl, "--proxy-insecure", .. proxyTlsArguments(key.ExportSubjectPublicKeyInfo()), ProxiedUrl]), EasyOptionsFromCommandLine.NetworkOf(Parse(["-x", HttpsProxyUrl, "--proxy-insecure", .. proxyTlsArguments(key.ExportSubjectPublicKeyInfo()), ProxiedUrl])));
         TcpClient client = new();
         await client.ConnectAsync((IPEndPoint)listener.LocalEndpoint);
         ConnectResult result = await ((SslStreamTlsProvider)transports.ProxyTlsProvider).AuthenticateAsClientAsync(

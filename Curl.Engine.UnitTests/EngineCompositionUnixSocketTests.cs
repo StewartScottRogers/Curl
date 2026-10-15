@@ -1,3 +1,5 @@
+using Curl.Api.Options.Network;
+using Curl.Console;
 using Curl.Cli;
 using Curl.Core;
 using Curl.Networking;
@@ -42,21 +44,24 @@ public sealed class EngineCompositionUnixSocketTests
     [TestMethod]
     public void UnixSocketOf_TakesTheLastSocketOptionOrNone()
     {
-        Diagnostics.Arrange("command lines", "http://h/ | --unix-socket a --abstract-unix-socket b http://h/ | --unix-socket a http://h/");
-        string sockets = string.Join(" | ", new[] { Parse("http://h/"), Parse("--unix-socket", "a", "--abstract-unix-socket", "b", "http://h/"), Parse("--unix-socket", "a", "http://h/") }.Select(options => EngineComposition.UnixSocketOf(options)?.ToString() ?? "none"));
+        EasyNetworkOptions none = new();
+        EasyNetworkOptions abstractSocket = new() { AbstractUnixSocket = "b" };
+        EasyNetworkOptions pathSocket = new() { UnixSocketPath = "a" };
+        Diagnostics.Arrange("network options", "none | AbstractUnixSocket b | UnixSocketPath a");
+        string sockets = string.Join(" | ", new[] { none, abstractSocket, pathSocket }.Select(network => EngineComposition.UnixSocketOf(network)?.ToString() ?? "none"));
         Diagnostics.Act("unix sockets", sockets);
         Diagnostics.Assert("unix sockets", $"none | {new UnixSocketAddress("b", IsAbstract: true)} | {new UnixSocketAddress("a", IsAbstract: false)}", sockets);
 
-        Assert.IsNull(EngineComposition.UnixSocketOf(Parse("http://h/")));
-        Assert.AreEqual(new UnixSocketAddress("b", IsAbstract: true), EngineComposition.UnixSocketOf(Parse("--unix-socket", "a", "--abstract-unix-socket", "b", "http://h/")));
-        Assert.AreEqual(new UnixSocketAddress("a", IsAbstract: false), EngineComposition.UnixSocketOf(Parse("--unix-socket", "a", "http://h/")));
+        Assert.IsNull(EngineComposition.UnixSocketOf(none));
+        Assert.AreEqual(new UnixSocketAddress("b", IsAbstract: true), EngineComposition.UnixSocketOf(abstractSocket));
+        Assert.AreEqual(new UnixSocketAddress("a", IsAbstract: false), EngineComposition.UnixSocketOf(pathSocket));
     }
 
     [TestMethod]
     public void CreateTransports_WithAUnixSocket_GivesTheTcpConnectorThatSocket()
     {
         Diagnostics.Arrange("command line arguments", "--unix-socket /run/app.sock http://h/");
-        CurlTransports transports = EngineComposition.CreateTransports(Parse("--unix-socket", "/run/app.sock", "http://h/"));
+        CurlTransports transports = EngineComposition.CreateTransports(Parse("--unix-socket", "/run/app.sock", "http://h/"), EasyOptionsFromCommandLine.NetworkOf(Parse("--unix-socket", "/run/app.sock", "http://h/")));
         Diagnostics.Act("tcp connector unix socket", transports.TcpConnector.UnixSocket);
 
         Diagnostics.Assert("tcp connector unix socket", new UnixSocketAddress("/run/app.sock", IsAbstract: false), transports.TcpConnector.UnixSocket);
@@ -88,7 +93,7 @@ public sealed class EngineCompositionUnixSocketTests
         Diagnostics.Assert("dialed hosts", "unix:/run/a.sock, unix:/run/b.sock", string.Join(", ", server.Targets.Select(dialed => dialed.Host)));
         Assert.IsFalse(second.IsReused);
         CollectionAssert.AreEqual(new[] { "unix:/run/a.sock", "unix:/run/b.sock" }, server.Targets.Select(dialed => dialed.Host).ToArray());
-        Assert.AreNotSame(EngineComposition.CreateTransports(parsed.Groups[0]).PoolingConnector, EngineComposition.CreateTransports(parsed.Groups[1]).PoolingConnector);
+        Assert.AreNotSame(EngineComposition.CreateTransports(parsed.Groups[0], EasyOptionsFromCommandLine.NetworkOf(parsed.Groups[0])).PoolingConnector, EngineComposition.CreateTransports(parsed.Groups[1], EasyOptionsFromCommandLine.NetworkOf(parsed.Groups[1])).PoolingConnector);
     }
 
     [TestMethod]
@@ -119,7 +124,7 @@ public sealed class EngineCompositionUnixSocketTests
 
     private static TcpConnector CreateConnector(CommandLineOptions options, ScriptedConnector server) =>
         EngineComposition.CreateTcpConnector(
-            options,
+            options, EasyOptionsFromCommandLine.NetworkOf(options),
             new LoopbackDnsResolver(),
             new ScriptedTcpDialer(server),
             new PassThroughTlsProvider(),

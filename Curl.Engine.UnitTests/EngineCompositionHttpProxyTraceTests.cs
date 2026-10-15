@@ -1,3 +1,4 @@
+using Curl.Console;
 using Curl.Cli;
 using Curl.Networking;
 
@@ -103,7 +104,7 @@ public sealed class EngineCompositionHttpProxyTraceTests
     private TcpConnector CreateConnector(params string[] arguments)
     {
         TcpConnector connector = EngineComposition.CreateTcpConnector(
-            Parse(arguments),
+            Parse(arguments), EasyOptionsFromCommandLine.NetworkOf(Parse(arguments)),
             new SystemDnsResolver(),
             new ScriptedTcpDialer(new ScriptedConnector([])),
             new PassThroughTlsProvider(),

@@ -14,6 +14,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Include="..\Curl.Console\EasyOptionsFromCommandLine.cs" Link="ConsoleMappings\EasyOptionsFromCommandLine.cs" />
     <Compile Include="..\Curl.Cli.UnitTests\OpenSslBuildParser.cs" Link="CliFakes\OpenSslBuildParser.cs" />
     <Compile Include="..\Curl.Console.UnitTests\InMemoryDataFileReader.cs" Link="ConsoleFakes\InMemoryDataFileReader.cs" />
     <Compile Include="..\Curl.Console.UnitTests\ManualTimeProvider.cs" Link="ConsoleFakes\ManualTimeProvider.cs" />

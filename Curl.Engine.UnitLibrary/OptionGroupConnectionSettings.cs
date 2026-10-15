@@ -1,4 +1,5 @@
 using System.Net.Sockets;
+using Curl.Api.Options.Network;
 using Curl.Cli;
 using Curl.Networking;
 using Curl.Protocol.Abstractions;
@@ -33,15 +34,16 @@ internal sealed record OptionGroupConnectionSettings(
     string ApplicationProtocols)
 {
     /// <summary>Reads the settings of one option group.</summary>
-    /// <param name="options">The option group.</param>
+    /// <param name="options">The option group, for its TLS, proxy and HTTP version options.</param>
+    /// <param name="network">The option group's network options, for its socket, binding and IP version.</param>
     /// <returns>The settings.</returns>
-    internal static OptionGroupConnectionSettings Of(CommandLineOptions options) =>
+    internal static OptionGroupConnectionSettings Of(CommandLineOptions options, EasyNetworkOptions network) =>
         new(
             TlsClientOptionsMapping.FromCommandLine(options),
             TlsClientOptionsMapping.ProxyFromCommandLine(options),
-            EngineComposition.UnixSocketOf(options),
-            EngineComposition.LocalBindingOf(options),
-            EngineComposition.AddressFamilyOf(options),
+            EngineComposition.UnixSocketOf(network),
+            EngineComposition.LocalBindingOf(network),
+            EngineComposition.AddressFamilyOf(network),
             EngineComposition.HaproxyProtocolOf(options),
             EngineComposition.PreProxyOf(options),
             string.Join('\n', HttpVersionMapping.HttpOverTlsApplicationProtocolsOf(options.HttpVersion)));

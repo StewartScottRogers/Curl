@@ -1,3 +1,4 @@
+using Curl.Console;
 using Curl.Cli;
 using Curl.Networking;
 using Curl.Protocol.Abstractions;
@@ -179,8 +180,8 @@ public sealed class EngineCompositionDnsTraceTests
     {
         Diagnostics.Arrange("traced arguments", "-v --trace-config dns");
         Diagnostics.Arrange("plain arguments", "-v");
-        CurlTransports traced = EngineComposition.CreateTransports(Parse("-v", "--trace-config", "dns"));
-        CurlTransports plain = EngineComposition.CreateTransports(Parse("-v"));
+        CurlTransports traced = EngineComposition.CreateTransports(Parse("-v", "--trace-config", "dns"), EasyOptionsFromCommandLine.NetworkOf(Parse("-v", "--trace-config", "dns")));
+        CurlTransports plain = EngineComposition.CreateTransports(Parse("-v"), EasyOptionsFromCommandLine.NetworkOf(Parse("-v")));
 
         Diagnostics.Act("traced: traces DNS filter", traced.TcpConnector.TracesDnsFilter);
         Diagnostics.Act("plain: traces DNS filter", plain.TcpConnector.TracesDnsFilter);
@@ -371,7 +372,7 @@ public sealed class EngineCompositionDnsTraceTests
         Diagnostics.Arrange("arguments", string.Join(' ', arguments.Append("http://127.0.0.1:47110/")));
         CommandLineOptions options = Parse(arguments);
         TcpConnector connector = EngineComposition.CreateTcpConnector(
-            options,
+            options, EasyOptionsFromCommandLine.NetworkOf(options),
             new SystemDnsResolver(),
             new ScriptedTcpDialer(new ScriptedConnector([])),
             new PassThroughTlsProvider(),

@@ -1,3 +1,4 @@
+using Curl.Console;
 using System.Net.Sockets;
 using System.Text;
 
@@ -65,7 +66,7 @@ public sealed class EngineCompositionDohTests
     [TestMethod]
     public void CreateTransports_WithDohUrl_SharesTheDohResolverBetweenBothConnectors()
     {
-        CurlTransports transports = EngineComposition.CreateTransports(Parse("--doh-url", DohUrl));
+        CurlTransports transports = EngineComposition.CreateTransports(Parse("--doh-url", DohUrl), EasyOptionsFromCommandLine.NetworkOf(Parse("--doh-url", DohUrl)));
         Diagnostics.Act("resolver type", transports.DnsResolver.GetType().Name);
 
         Diagnostics.Assert("resolver type", nameof(DohDnsResolver), transports.DnsResolver.GetType().Name);
@@ -364,7 +365,7 @@ public sealed class EngineCompositionDohTests
 
     private IDnsResolver CreateDnsResolver(params string[] arguments)
     {
-        IDnsResolver resolver = EngineComposition.CreateDnsResolver(Parse(arguments), TimeProvider.System, new TcpDialer());
+        IDnsResolver resolver = EngineComposition.CreateDnsResolver(Parse(arguments), EasyOptionsFromCommandLine.NetworkOf(Parse(arguments)), TimeProvider.System, new TcpDialer());
         Diagnostics.Act("resolver type", resolver.GetType().Name);
         return resolver;
     }
@@ -385,8 +386,8 @@ public sealed class EngineCompositionDohTests
         CommandLineOptions options = Parse([.. arguments, "--doh-url", dohUrl]);
         FlowScopedTransferEvents? resolverEvents = EngineComposition.TracesDns(options) ? new() : null;
         TcpConnector connector = EngineComposition.CreateTcpConnector(
-            options,
-            EngineComposition.CreateDohResolver(dohUrl, dohServer, EngineComposition.AddressFamilyOf(options), resolverEvents),
+            options, EasyOptionsFromCommandLine.NetworkOf(options),
+            EngineComposition.CreateDohResolver(dohUrl, dohServer, EngineComposition.AddressFamilyOf(EasyOptionsFromCommandLine.NetworkOf(options)), resolverEvents),
             new ScriptedTcpDialer(webServer),
             new PassThroughTlsProvider(),
             TimeProvider.System,

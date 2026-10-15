@@ -1,3 +1,4 @@
+using Curl.Console;
 using System.Net.Sockets;
 using System.Text;
 using Curl.Cli;
@@ -150,7 +151,7 @@ public sealed class EngineCompositionDohSubTransferTraceTests
         FlowScopedTransferEvents? resolverEvents = EngineComposition.TracesDns(options) ? new() : null;
         TcpConnector dohConnector = EngineComposition.CreateDohConnector(options, new ScriptedTcpDialer(new ScriptedConnector(dohAnswers)), TimeProvider.System);
         TcpConnector connector = EngineComposition.CreateTcpConnector(
-            options,
+            options, EasyOptionsFromCommandLine.NetworkOf(options),
             EngineComposition.CreateDohResolver(DohUrl, dohConnector, AddressFamily.Unspecified, resolverEvents),
             new ScriptedTcpDialer(new ScriptedConnector([])),
             new PassThroughTlsProvider(),

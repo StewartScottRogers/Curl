@@ -12,4 +12,8 @@
     <ProjectReference Include="..\Curl.Engine.UnitLibrary\Curl.Engine.UnitLibrary.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Compile Include="..\Curl.Console\EasyOptionsFromCommandLine.cs" Link="ConsoleMappings\EasyOptionsFromCommandLine.cs" />
+  </ItemGroup>
+
 </Project>

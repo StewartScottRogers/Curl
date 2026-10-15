@@ -74,7 +74,7 @@ public sealed class CurlCommandRunnerDnsServerVariableTests
     {
         FixedDnsResolver given = new(IPAddress.Loopback);
 
-        IDnsResolver chosen = EngineComposition.DnsServerVariableResolverOf(Curl.Cli.CommandLineParser.Parse(["http://dns.example/"], _ => true).Options!, string.Empty, given, new DnsStandIn(null));
+        IDnsResolver chosen = EngineComposition.DnsServerVariableResolverOf(EasyOptionsFromCommandLine.NetworkOf(Curl.Cli.CommandLineParser.Parse(["http://dns.example/"], _ => true).Options!), string.Empty, given, new DnsStandIn(null));
 
         Assert.AreSame(given, chosen);
     }

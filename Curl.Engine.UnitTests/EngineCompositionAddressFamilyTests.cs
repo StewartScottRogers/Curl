@@ -1,4 +1,6 @@
+using Curl.Console;
 using System.Net.Sockets;
+using Curl.Api.Options.Network;
 
 using Curl.Cli;
 using Curl.Networking;
@@ -19,17 +21,17 @@ public sealed class EngineCompositionAddressFamilyTests
     private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
 
     [TestMethod]
-    [DataRow("-4", AddressFamily.InterNetwork)]
-    [DataRow("--ipv6", AddressFamily.InterNetworkV6)]
-    [DataRow("-v", AddressFamily.Unspecified)]
-    public void AddressFamilyOf_MapsTheChosenFamily(string option, AddressFamily expected)
+    [DataRow(IpResolve.V4, AddressFamily.InterNetwork)]
+    [DataRow(IpResolve.V6, AddressFamily.InterNetworkV6)]
+    [DataRow(IpResolve.Whatever, AddressFamily.Unspecified)]
+    public void AddressFamilyOf_MapsTheChosenFamily(IpResolve ipResolve, AddressFamily expected)
     {
-        Diagnostics.Arrange("arguments", option + " http://example.com/");
-        CommandLineParseResult parsed = CommandLineParser.Parse([option, "http://example.com/"], _ => true);
-        Diagnostics.Act("address family", EngineComposition.AddressFamilyOf(parsed.Options!));
+        Diagnostics.Arrange("IP resolve", ipResolve);
+        EasyNetworkOptions network = new() { IpResolve = ipResolve };
+        Diagnostics.Act("address family", EngineComposition.AddressFamilyOf(network));
 
-        Diagnostics.Assert("address family", expected, EngineComposition.AddressFamilyOf(parsed.Options!));
-        Assert.AreEqual(expected, EngineComposition.AddressFamilyOf(parsed.Options!));
+        Diagnostics.Assert("address family", expected, EngineComposition.AddressFamilyOf(network));
+        Assert.AreEqual(expected, EngineComposition.AddressFamilyOf(network));
     }
 
     [TestMethod]
@@ -69,7 +71,7 @@ public sealed class EngineCompositionAddressFamilyTests
     {
         Diagnostics.Arrange("arguments", "-6 --resolve tftp.test:69:127.0.0.1 tftp://tftp.test/");
         CommandLineParseResult parsed = CommandLineParser.Parse(["-6", "--resolve", "tftp.test:69:127.0.0.1", "tftp://tftp.test/"], _ => true);
-        CurlTransports transports = EngineComposition.CreateTransports(parsed.Options!);
+        CurlTransports transports = EngineComposition.CreateTransports(parsed.Options!, EasyOptionsFromCommandLine.NetworkOf(parsed.Options!));
 
         DatagramOpenResult result;
         using (Diagnostics.Phase("open"))
@@ -93,7 +95,7 @@ public sealed class EngineCompositionAddressFamilyTests
         Assert.IsTrue(parsed.IsAccepted);
 
         TcpConnector connector = EngineComposition.CreateTcpConnector(
-            parsed.Options,
+            parsed.Options, EasyOptionsFromCommandLine.NetworkOf(parsed.Options),
             new LoopbackDnsResolver(),
             new ScriptedTcpDialer(server),
             new PassThroughTlsProvider(),

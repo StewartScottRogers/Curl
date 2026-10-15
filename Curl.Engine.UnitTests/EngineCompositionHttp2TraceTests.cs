@@ -1,3 +1,4 @@
+using Curl.Console;
 using Curl.Cli;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Http;
@@ -50,7 +51,7 @@ public sealed class EngineCompositionHttp2TraceTests
     [TestMethod]
     public void CreateTransports_UnderTraceConfigHttp2_TracesHttp2()
     {
-        CurlTransports transports = EngineComposition.CreateTransports(Parse("-v", "--trace-config", "http/2"), TimeProvider.System);
+        CurlTransports transports = EngineComposition.CreateTransports(Parse("-v", "--trace-config", "http/2"), EasyOptionsFromCommandLine.NetworkOf(Parse("-v", "--trace-config", "http/2")), TimeProvider.System);
         Diagnostics.Act("transports trace HTTP/2", transports.TracesHttp2);
 
         Diagnostics.Assert("transports trace HTTP/2", true, transports.TracesHttp2);
@@ -60,7 +61,7 @@ public sealed class EngineCompositionHttp2TraceTests
     [TestMethod]
     public void CreateTransports_WithoutTheHttp2Component_DoesNotTraceHttp2()
     {
-        CurlTransports transports = EngineComposition.CreateTransports(Parse("-v"), TimeProvider.System);
+        CurlTransports transports = EngineComposition.CreateTransports(Parse("-v"), EasyOptionsFromCommandLine.NetworkOf(Parse("-v")), TimeProvider.System);
         Diagnostics.Act("transports trace HTTP/2", transports.TracesHttp2);
 
         Diagnostics.Assert("transports trace HTTP/2", false, transports.TracesHttp2);

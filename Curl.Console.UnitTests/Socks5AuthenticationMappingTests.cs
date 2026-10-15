@@ -81,7 +81,7 @@ public sealed class Socks5AuthenticationMappingTests
     [TestMethod]
     public void CreateTransports_WithSocks5Basic_GivesTheTcpConnectorTheOptionsAndTheRunsContexts()
     {
-        CurlTransports transports = EngineComposition.CreateTransports(Parse("--socks5-basic", Url));
+        CurlTransports transports = EngineComposition.CreateTransports(Parse("--socks5-basic", Url), EasyOptionsFromCommandLine.NetworkOf(Parse("--socks5-basic", Url)));
 
         Socks5AuthenticationOptions options = transports.TcpConnector.Socks5Authentication;
         Diagnostics.Act("allow basic / gssapi / has contexts", $"{options.AllowUserNameAndPassword} / {options.AllowGssapi} / {options.SecurityContexts is not null}");

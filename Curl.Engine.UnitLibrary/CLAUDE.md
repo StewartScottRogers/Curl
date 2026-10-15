@@ -165,3 +165,7 @@ derives from it and adds the tool's part. curl's easy error text comes in throug
 which the HSTS switch line prints) moved with it. `TransferPerformerTests` and `UrlEffectiveTests`
 are in `Curl.Engine.UnitTests`; the setup tests use their own `ReadRecordingFileSystem` fake, as
 `Curl.Console.UnitTests`' `InMemoryFileSystem` uses tool-side types.
+
+## The network option group (BL-2323)
+
+`Curl.Engine.UnitLibrary` references `Curl.Api.UnitLibrary` for its option records. `EngineComposition`'s transport, TCP connector, pooling connector and DNS resolver factories take `EasyNetworkOptions` beside `CommandLineOptions` (still read for TLS, proxy, trace, HTTP version and `-m`), and `CreateUdpDatagramConnector`, `LocalBindingOf`, `UnixSocketOf`, `AddressFamilyOf`, `ConnectTimeoutOf`, `DnsServerVariableResolverOf`, `TcpSocketOptionsOf`, `TransferTimers.Of` and `OptionGroupConnectionSettings.Of` read their network settings from it alone (ADR-0526). `Curl.Console` builds the record with `EasyOptionsFromCommandLine.NetworkOf`, which `Curl.Engine.UnitTests` and `Curl.Engine.IntegrationTests` link. `TransferContextFactory` still reads the connect timeout and `--connect-to` from `CommandLineOptions` until BL-2343.

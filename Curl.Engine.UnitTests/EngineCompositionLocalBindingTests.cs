@@ -1,3 +1,5 @@
+using Curl.Api.Options.Network;
+using Curl.Console;
 using System.Net;
 using Curl.Cli;
 using Curl.Networking;
@@ -22,7 +24,7 @@ public sealed class EngineCompositionLocalBindingTests
     [TestMethod]
     public void LocalBindingOf_WithNeitherOption_IsNull()
     {
-        LocalBinding? binding = LocalBindingOf("http://h/");
+        LocalBinding? binding = LocalBindingOf(new EasyNetworkOptions());
 
         Diagnostics.Assert("binding", null, binding);
         Assert.IsNull(binding);
@@ -35,7 +37,7 @@ public sealed class EngineCompositionLocalBindingTests
     [DataRow("ifhost!eth0!127.0.0.1", null, "127.0.0.1", "eth0")]
     public void LocalBindingOf_WithAnInterface_SplitsItByItsPrefix(string value, string? interfaceName, string? hostName, string? deviceName)
     {
-        LocalBinding? binding = LocalBindingOf("--interface", value, "http://h/");
+        LocalBinding? binding = LocalBindingOf(new EasyNetworkOptions { Interface = value });
 
         LocalBinding expected = new(interfaceName, hostName, deviceName, 0, 1);
         Diagnostics.Assert("binding", expected, binding);
@@ -45,7 +47,7 @@ public sealed class EngineCompositionLocalBindingTests
     [TestMethod]
     public void LocalBindingOf_WithLocalPortsOnly_BindsThePortsAlone()
     {
-        LocalBinding? binding = LocalBindingOf("--local-port", "40000-40010", "http://h/");
+        LocalBinding? binding = LocalBindingOf(new EasyNetworkOptions { LocalPort = 40000, LocalPortRange = 11 });
 
         LocalBinding expected = new(null, null, null, 40000, 11);
         Diagnostics.Assert("binding", expected, binding);
@@ -59,7 +61,7 @@ public sealed class EngineCompositionLocalBindingTests
         ScriptedConnector server = new([]);
         ScriptedTcpDialer dialer = new(server);
         TcpConnector connector = EngineComposition.CreateTcpConnector(
-            Parse("--interface", "127.0.0.1", "--local-port", "40000-40010", "http://127.0.0.1:47599/"),
+            Parse("--interface", "127.0.0.1", "--local-port", "40000-40010", "http://127.0.0.1:47599/"), EasyOptionsFromCommandLine.NetworkOf(Parse("--interface", "127.0.0.1", "--local-port", "40000-40010", "http://127.0.0.1:47599/")),
             new LoopbackDnsResolver(),
             dialer,
             new PassThroughTlsProvider(),
@@ -78,7 +80,7 @@ public sealed class EngineCompositionLocalBindingTests
     [TestMethod]
     public void CreateTransports_WithAnInterface_GivesTheTcpConnectorItsBinding()
     {
-        CurlTransports transports = EngineComposition.CreateTransports(Parse("--interface", "host!127.0.0.1", "http://h/"));
+        CurlTransports transports = EngineComposition.CreateTransports(Parse("--interface", "host!127.0.0.1", "http://h/"), EasyOptionsFromCommandLine.NetworkOf(Parse("--interface", "host!127.0.0.1", "http://h/")));
         Diagnostics.Act("TCP connector binding", transports.TcpConnector.LocalBinding);
 
         LocalBinding expected = new(null, "127.0.0.1", null, 0, 1);
@@ -86,9 +88,10 @@ public sealed class EngineCompositionLocalBindingTests
         Assert.AreEqual(expected, transports.TcpConnector.LocalBinding);
     }
 
-    private LocalBinding? LocalBindingOf(params string[] arguments)
+    private LocalBinding? LocalBindingOf(EasyNetworkOptions network)
     {
-        LocalBinding? binding = EngineComposition.LocalBindingOf(Parse(arguments));
+        Diagnostics.Arrange("network options", network);
+        LocalBinding? binding = EngineComposition.LocalBindingOf(network);
         Diagnostics.Act("binding", binding);
         return binding;
     }
