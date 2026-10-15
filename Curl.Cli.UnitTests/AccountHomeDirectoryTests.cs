@@ -48,20 +48,6 @@ public sealed class AccountHomeDirectoryTests
     }
 
     [TestMethod]
-    public void ReadFromUserDatabase_OnAnyPlatform_IsTheUserProfileFolder()
-    {
-        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
-        string expected = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-        diagnostics.Arrange("user profile folder found", expected.Length > 0);
-
-        string directory = AccountHomeDirectory.ReadFromUserDatabase();
-        diagnostics.Act("directory found", directory.Length > 0);
-
-        diagnostics.Assert("directory is the user profile folder", true, directory == expected);
-        Assert.AreEqual(expected, directory);
-    }
-
-    [TestMethod]
     [OSCondition(OperatingSystems.Windows)]
     public void ForProcess_OnWindows_IsNull()
     {
@@ -76,17 +62,16 @@ public sealed class AccountHomeDirectoryTests
     }
 
     [TestMethod]
-    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
-    public void ForProcess_OffWindows_IsTheUserProfileFolder()
+    public void ReadOffWindows_OffWindowsWithNoUserDatabaseEntry_IsNull()
     {
         TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
-        string expected = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-        diagnostics.Arrange("platform", "not Windows");
+        diagnostics.Arrange("is windows", false);
+        diagnostics.Arrange("user database gives", null);
 
-        string? directory = AccountHomeDirectory.ForProcess;
-        diagnostics.Act("directory found", directory is not null);
+        string? directory = AccountHomeDirectory.ReadOffWindows(isWindows: false, () => null);
+        diagnostics.Act("directory", directory);
 
-        diagnostics.Assert("directory is the user profile folder", true, directory == expected);
-        Assert.AreEqual(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), AccountHomeDirectory.ForProcess);
+        diagnostics.Assert("directory", null, directory);
+        Assert.IsNull(directory);
     }
 }

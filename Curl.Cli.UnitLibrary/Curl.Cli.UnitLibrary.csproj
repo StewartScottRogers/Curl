@@ -1,5 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+  <PropertyGroup>
+    <!-- The source-generated LibraryImport marshalling of UserDatabaseHomeDirectory (BL-2336). -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\Curl.Core.UnitLibrary\Curl.Core.UnitLibrary.csproj" />
     <ProjectReference Include="..\Curl.Output.UnitLibrary\Curl.Output.UnitLibrary.csproj" />
