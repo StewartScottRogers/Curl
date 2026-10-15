@@ -35,3 +35,4 @@ Curl's HTTP/3 client is in the QUIC/HTTP/3 libraries (find them in `Curl.slnx`; 
 ## Log
 
 - 2026-10-14: Created.
+- 2026-10-14: Backlog -> Doing.
