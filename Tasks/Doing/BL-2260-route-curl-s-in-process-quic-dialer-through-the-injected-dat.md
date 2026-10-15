@@ -32,3 +32,4 @@ Found by BL-2231's first pass (2026-10-14): `CurlComposition` builds `new QuicDi
 ## Log
 
 - 2026-10-14: Created.
+- 2026-10-14: Backlog -> Doing.
