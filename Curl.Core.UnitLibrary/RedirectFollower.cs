@@ -763,11 +763,13 @@ public sealed class RedirectFollower(
         private long requestSize;
         private int connectionCount;
         private bool redirectUrlCleared;
+        private readonly List<KeyValuePair<string, string>> earlierResponseHeaders = [];
 
         public int RedirectCount { get; private set; }
 
         public void Add(TransferReport? report, string? referer)
         {
+            earlierResponseHeaders.AddRange(lastReport?.ResponseHeaders ?? []);
             lastReport = report;
             lastReferer = referer;
             if (report is null)
@@ -819,6 +821,7 @@ public sealed class RedirectFollower(
                     HeaderSize = headerSize,
                     RequestSize = requestSize,
                     ConnectionCount = connectionCount,
+                    EarlierResponseHeaders = [.. earlierResponseHeaders],
                     Timings = MergeTimings(report.Timings),
                 },
             };

@@ -61,6 +61,13 @@ public sealed record TransferReport
     public IReadOnlyList<KeyValuePair<string, string>> PseudoHeaders { get; init; } = [];
 
     /// <summary>
+    /// Gets every header of every response before the last one in a <c>-L</c> chain, hop by
+    /// hop and in the order received, duplicates kept; empty when no redirect was followed.
+    /// <c>%header{name:all:separator}</c> writes these values before the last response's.
+    /// </summary>
+    public IReadOnlyList<KeyValuePair<string, string>> EarlierResponseHeaders { get; init; } = [];
+
+    /// <summary>
     /// Gets the last response's <c>Content-Type</c> value, the source of
     /// <c>%{content_type}</c>; <see langword="null" /> when absent.
     /// </summary>

@@ -32,4 +32,17 @@ public interface IWriteOutVariableSource
     /// <param name="name">The header name exactly as written between the braces; header names match case-insensitively.</param>
     /// <returns>The first value, or <see langword="null"/> when the response has no such header.</returns>
     string? FindFirstHeaderValue(string name);
+
+    /// <summary>
+    /// Finds every value of the response header with the given name, as
+    /// <c>%header{name:all:separator}</c> joins them: from every response of the transfer,
+    /// a redirect's included, in the order received.
+    /// </summary>
+    /// <remarks>Unless overridden, this is the first value alone, or none.</remarks>
+    /// <param name="name">The header name; header names match case-insensitively.</param>
+    /// <returns>Every value, or an empty list when no response had such a header.</returns>
+    IReadOnlyList<string> FindAllHeaderValues(string name)
+    {
+        return FindFirstHeaderValue(name) is { } value ? [value] : [];
+    }
 }

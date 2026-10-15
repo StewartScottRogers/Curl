@@ -1459,6 +1459,26 @@ public sealed class RedirectFollowerTests
     }
 
     [TestMethod]
+    public async Task FollowAsync_ThreeHops_KeepsEarlierHopsHeadersInOrderAndTheLastAsResponseHeaders()
+    {
+        // Upstream test764's -w %header{this:all:***} reads every hop's headers (BL-2267).
+        TransferResult first = Redirect(301, "http://127.0.0.1:18203/b");
+        TransferResult second = Redirect(302, Next);
+        ScriptedHandler handler = new(
+            first with { Report = first.Report! with { ResponseHeaders = [new("This", "one"), new("This", "two")] } },
+            second with { Report = second.Report! with { ResponseHeaders = [new("Location", Next)] } },
+            Ok(200, 5) with { Report = new TransferReport { ResponseCode = 200, ResponseHeaders = [new("This", "three")] } });
+
+        TransferResult result = await Follow(handler, Context(Location()));
+
+        string earlier = string.Join("|", result.Report!.EarlierResponseHeaders.Select(header => header.Key + ": " + header.Value));
+        Diagnostics.Assert("result.Report.EarlierResponseHeaders", "This: one|This: two|Location: " + Next, earlier);
+        Assert.AreEqual("This: one|This: two|Location: " + Next, earlier);
+        Diagnostics.Assert("result.Report.ResponseHeaders.Count", 1, result.Report.ResponseHeaders.Count);
+        Assert.AreEqual("three", result.Report.ResponseHeaders.Single().Value);
+    }
+
+    [TestMethod]
     public async Task FollowAsync_TimedHops_MeasuresFromFirstStartAndReportsRedirectDuration()
     {
         MillisecondTimeProvider clock = new();
