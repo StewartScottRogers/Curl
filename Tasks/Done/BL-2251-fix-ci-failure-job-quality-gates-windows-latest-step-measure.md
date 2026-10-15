@@ -30,7 +30,7 @@ Lanes test only on Windows, so reproduce with `gh run view 38666857143 --log-fai
 
 ## Notes
 
-- The failing member was the `ChooseSignatureScheme` filter lambda in `Curl.Conformance.Http3Server.UnitLibraryHttp3ServerTlsHandshake.cs:161` at 50% branch coverage: no test had the client not offer a server-preferred scheme. Run 38666857143 measured aa14b025, which predates 0ed9339d5 (BL-2247); that commit added `Receive_PreferredSchemeTheClientDoesNotOffer_SignsWithTheNextOne`, which covers the missing branch. No code change was needed here.
+- The failing member was the `ChooseSignatureScheme` filter lambda in `Curl.Conformance.Http3Server.UnitLibrary/Http3ServerTlsHandshake.cs:161` at 50% branch coverage: no test had the client not offer a server-preferred scheme. Run 38666857143 measured aa14b025, which predates 0ed9339d5 (BL-2247); that commit added `Receive_PreferredSchemeTheClientDoesNotOffer_SignsWithTheNextOne`, which covers the missing branch. No code change was needed here.
 - Evidence: CI run 38667881010 at 4c541e2e8 passed Quality gates (windows-latest) and Build and test on Windows, Linux and macOS. Locally, `Measure-CodeQuality.ps1 -Library Curl.Conformance.Http3Server.UnitLibrary` at e0563d248 reports 0 failing members.
 
 ## Log
