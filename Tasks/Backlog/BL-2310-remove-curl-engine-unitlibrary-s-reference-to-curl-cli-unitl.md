@@ -4,7 +4,7 @@ title: Remove Curl.Engine.UnitLibrary's reference to Curl.Cli.UnitLibrary so the
 priority: Normal
 assignee: Claude
 pipeline: direct
-depends-on: [BL-2309, BL-2323, BL-2324, BL-2344, BL-2345, BL-2346, BL-2347, BL-2348]
+depends-on: [BL-2309, BL-2323, BL-2324, BL-2344, BL-2345, BL-2346, BL-2347, BL-2348, BL-2325, BL-2338, BL-2343, BL-2350]
 touches: [Curl.Console, Curl.Console.UnitTests, Curl.Engine.UnitLibrary, Curl.Engine.UnitTests]
 requirement: none
 created: 2026-10-15
@@ -33,7 +33,11 @@ ADR-0506; plan phase 1 step 4 (closing step); follows BL-2309, after which no en
 
 ## Notes
 
+- 2026-10-15 (lane 3): Measured by removing the `ProjectReference` and every `using Curl.Cli;` from the engine: 83 build errors remain, 92 uses of `CommandLineOptions` across 14 engine files (EngineComposition 37, TransferPerformer.Setup 13, HttpRequestOptionsMapping 9, TransferCredentialLookup 9, RedirectPolicyMapping 5, TransferProxySelection 4, and others), plus the types `CommandLineProxy`, `GssApiDelegation`, `IDataFileReader`, `ImapUploadFlags`, `InterfaceBinding`, `NetrcUse` and `RequestedHttpVersion`. BL-2309 left these. Backlog tasks BL-2325 (proxy), BL-2338 (authentication), BL-2343 (connect timeout/TransferContextFactory) and BL-2350 (HTTP version/ALPN) cover most of them, so they are now in `depends-on`.
+- When this task is claimed again: repeat the removal (delete the csproj reference and the `using Curl.Cli;` lines), build `Curl.Engine.UnitLibrary`, and for any `CommandLineOptions` or type still named, retarget it here or file a task and requeue once. Then also fix `Curl.Engine.UnitTests` and `Curl.Console` call sites, update `Curl.Engine.UnitLibrary/CLAUDE.md` line 7 to say the engine must never reference `Curl.Cli`.
+
 ## Log
 
 - 2026-10-15: Created.
 - 2026-10-15: Backlog -> Doing.
+- 2026-10-15: Doing -> Backlog. Engine still uses CommandLineOptions in 14 files; waits on BL-2325, BL-2338, BL-2343, BL-2350
