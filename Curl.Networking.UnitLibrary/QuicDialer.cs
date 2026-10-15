@@ -58,6 +58,19 @@ public sealed class QuicDialer
     }
 
     /// <summary>
+    /// Creates the dialer for the curl build this platform usually runs over
+    /// <paramref name="channelOpener" />, such as a <see cref="DatagramConnectorUdpChannelOpener" />
+    /// for a run whose datagrams go through an injected connector (BL-2260).
+    /// </summary>
+    /// <param name="channelOpener">Opens the channel to each address.</param>
+    /// <param name="options">The TLS settings: the ones that judge the server's certificate, <c>--cert</c> and the cipher options.</param>
+    /// <param name="timeProvider">The clock the handshake, its timeouts and the timings run on.</param>
+    public QuicDialer(IUdpChannelOpener channelOpener, TlsClientOptions options, TimeProvider timeProvider)
+        : this(channelOpener, options, OperatingSystem.IsWindows(), timeProvider, SystemTlsRandomSource.Instance)
+    {
+    }
+
+    /// <summary>
     /// Creates the dialer for a named curl build over any channel opener, so a test runs the
     /// handshake against an in-memory server.
     /// </summary>

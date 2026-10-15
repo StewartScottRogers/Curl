@@ -490,6 +490,12 @@ recvfrom() ...`. This project therefore references `Curl.Quic.UnitLibrary`, whic
 `Curl.Networking.UnitTests` see its internals: `Fakes/QuicTestServer` and `QuicTestTlsServer` are
 copies of `Curl.Quic.UnitTests`' in-memory server, reached through `Fakes/QuicServerChannelOpener`.
 `PoolingConnector.ConnectMultiplexedAsync` passes straight through to its inner connector.
+Per BL-2260 `DatagramConnectorUdpChannelOpener` is the `IUdpChannelOpener` over an `IDatagramConnector`,
+which `QuicDialer`'s public `(IUdpChannelOpener, TlsClientOptions, TimeProvider)` constructor takes: each
+channel opens to the endpoint's address and port through the connector on its first send or receive,
+binds no local end (`--interface`, `--local-port` are the connector's), and a refused open is
+`SocketError.ConnectionRefused`. `Curl.Console`'s dialing runner (`InProcessCurl`) uses it, so an
+in-process HTTP/3 server answers QUIC; the executable keeps `UdpChannelOpener`.
 Per ADR-0250 (BL-942) a target whose `Proxy` is an HTTP, HTTP/1.0 or HTTPS proxy is not
 resolved: `TcpConnector.UdpTunnel.cs` dials the proxy, sends curl 8.22.0's CONNECT-UDP request
 (`HttpProxyTunnel.BuildConnectUdpRequest`), takes a `101` or `2xx` (`OpensUdpTunnel`), and hands

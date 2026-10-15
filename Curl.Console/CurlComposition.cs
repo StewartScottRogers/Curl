@@ -282,7 +282,7 @@ internal static class CurlComposition
             diagnosticLog);
 
     /// <summary>
-    /// Creates the contexts the dialing <see cref="CreateRunner(Stream, Stream, Stream, ITcpDialer, IDnsResolver, IDatagramConnector, bool, IWriteOutFileOpener?, bool, Func{string, string?}?, IConnectionListener?, DefaultConfigFileSearch?, TimeProvider?, bool, bool, bool)" />
+    /// Creates the contexts the dialing <see cref="CreateRunner(Stream, Stream, Stream, ITcpDialer, IDnsResolver, IDatagramConnector, bool, IWriteOutFileOpener?, bool, Func{string, string?}?, IConnectionListener?, DefaultConfigFileSearch?, TimeProvider?, bool, bool, bool, bool?)" />
     /// uses: <see cref="CreateSecurityContextFactory(IConnector, IDatagramConnector, IDiagnosticLog?)" />'s
     /// router, with NTLM sent to the hand-built context on every platform when
     /// <paramref name="usesHandBuiltNtlm" /> is set (<see cref="HandBuiltNtlmSecurityContextFactory" />, BL-1858).
@@ -1258,6 +1258,10 @@ internal static class CurlComposition
     /// does in <c>lib/http.c</c>; off by default, as in curl's release build, and turned on by the
     /// conformance harness (ADR-0494, BL-2250).
     /// </param>
+    /// <param name="parsesAsWindowsBuild">
+    /// Whether the runner reads the command line as curl's Windows Schannel build does; <see langword="null" />
+    /// for this process's platform. Tests pass <see langword="false" /> to reach <c>--http3</c> on every platform (ADR-0397, BL-2260).
+    /// </param>
     /// <returns>The runner.</returns>
     internal static CurlCommandRunner CreateRunner(
         Stream standardOutput,
@@ -1275,7 +1279,8 @@ internal static class CurlComposition
         TimeProvider? signingClock = null,
         bool honoursDnsServerVariable = false,
         bool honoursHstsTimeVariable = false,
-        bool honoursHstsHttpVariable = false)
+        bool honoursHstsHttpVariable = false,
+        bool? parsesAsWindowsBuild = null)
     {
         ConnectionCache runConnections = new(TimeProvider.System);
         LateBoundDiagnosticLog runLog = new();
@@ -1299,7 +1304,8 @@ internal static class CurlComposition
             runConnectionCache: runConnections,
             lateBoundDiagnosticLog: runLog,
             hstsClock: honoursHstsTimeVariable ? HstsClockOf(environment(HstsTimeVariableName)) : null,
-            hstsLearnsOverHttp: LearnsHstsOverHttp(honoursHstsHttpVariable, environment));
+            hstsLearnsOverHttp: LearnsHstsOverHttp(honoursHstsHttpVariable, environment),
+            parsesAsWindowsBuild: parsesAsWindowsBuild);
     }
 
     /// <summary>
@@ -1355,7 +1361,7 @@ internal static class CurlComposition
             : new DnsServerResolver(new DnsServerResolverOptions(dnsServer, null, null, null, AddressFamilyOf(options)), TimeProvider.System, datagramConnector);
 
     /// <summary>
-    /// Builds one option group's dispatch for the dialing <see cref="CreateRunner(Stream, Stream, Stream, ITcpDialer, IDnsResolver, IDatagramConnector, bool, IWriteOutFileOpener?, bool, Func{string, string?}?, IConnectionListener?, DefaultConfigFileSearch?, TimeProvider?, bool, bool, bool)" />:
+    /// Builds one option group's dispatch for the dialing <see cref="CreateRunner(Stream, Stream, Stream, ITcpDialer, IDnsResolver, IDatagramConnector, bool, IWriteOutFileOpener?, bool, Func{string, string?}?, IConnectionListener?, DefaultConfigFileSearch?, TimeProvider?, bool, bool, bool, bool?)" />:
     /// the group's <see cref="TcpConnector" /> over <paramref name="tcpDialer" /> and
     /// <paramref name="dnsResolver" />, pooled in <paramref name="runConnections" />, with a proxy
     /// selector that reads the environment through <paramref name="readEnvironmentVariable" />, and the connector's <c>--resolve</c> entries
@@ -1386,11 +1392,13 @@ internal static class CurlComposition
         IConnectionListener? ftpListener,
         TimeProvider? signingClock)
     {
-        ITlsProviderWithWarnings tlsProvider = CreateTlsProvider(TlsClientOptionsMapping.FromCommandLine(options), TimeProvider.System);
+        TlsClientOptions tlsClientOptions = TlsClientOptionsMapping.FromCommandLine(options);
+        ITlsProviderWithWarnings tlsProvider = CreateTlsProvider(tlsClientOptions, TimeProvider.System);
         ITlsProviderWithWarnings proxyTlsProvider = CreateTlsProvider(TlsClientOptionsMapping.ProxyFromCommandLine(options), TimeProvider.System);
         LateBoundSecurityContextFactory proxyContexts = new() { UsesHandBuiltNtlm = usesHandBuiltNtlm };
         HttpProxyTunnelOptions proxyTunnelOptions = CreateProxyTunnelOptions(options, proxyContexts, diagnosticLog);
-        TcpConnector tcpConnector = CreateTcpConnector(options, dnsResolver, tcpDialer, tlsProvider, TimeProvider.System, proxyTunnelOptions, proxyTlsProvider, socks5SecurityContexts: proxyContexts);
+        QuicDialer quicDialer = CreateDatagramConnectorQuicDialer(options, tlsClientOptions, datagramConnector);
+        TcpConnector tcpConnector = CreateTcpConnector(options, dnsResolver, tcpDialer, tlsProvider, TimeProvider.System, proxyTunnelOptions, proxyTlsProvider, quicDialer, socks5SecurityContexts: proxyContexts);
         PoolingConnector poolingConnector = CreatePoolingConnector(options, tcpConnector, TimeProvider.System, runConnections);
         ISecurityContextFactory securityContexts = CreateDialingSecurityContextFactory(poolingConnector, datagramConnector, diagnosticLog, usesHandBuiltNtlm);
         proxyContexts.Bind(securityContexts);
@@ -1402,6 +1410,20 @@ internal static class CurlComposition
             poolingConnector,
             tcpConnector.LoadResolveEntries);
     }
+
+    /// <summary>
+    /// The QUIC dialer of an option group of the dialing runner: its <c>--http3</c> and
+    /// <c>--http3-only</c> datagrams go through <paramref name="datagramConnector" />
+    /// (<see cref="DatagramConnectorUdpChannelOpener" />), not a real UDP socket, so an in-process
+    /// HTTP/3 server answers them (BL-2260). The executable's <see cref="CreateTransports(CommandLineOptions, TimeProvider, ConnectionCache?, TlsSessionCache?, IDiagnosticLog?, DnsCache?)" />
+    /// keeps the socket-opening dialer.
+    /// </summary>
+    /// <param name="options">The option group.</param>
+    /// <param name="tlsClientOptions">The origin's TLS options.</param>
+    /// <param name="datagramConnector">Opens the QUIC channels.</param>
+    /// <returns>The dialer.</returns>
+    internal static QuicDialer CreateDatagramConnectorQuicDialer(CommandLineOptions options, TlsClientOptions tlsClientOptions, IDatagramConnector datagramConnector) =>
+        new(new DatagramConnectorUdpChannelOpener(datagramConnector), tlsClientOptions, TimeProvider.System) { WritesHttp3ConnectionLines = TracesHttp3(options) };
 
     /// <summary>
     /// The datagram connector TFTP opens its channel through: over a
