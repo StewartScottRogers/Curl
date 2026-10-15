@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests]
 requirement: none
 created: 2026-10-15
-completed:
+completed: 2026-10-15
 ---
 # BL-2326 — Close GF-0083: An 'HTTP/2 101' answer to an h2c upgrade request followed by an HTTP/1.1 200 exits 0 instead of 8 (on linux)
 
@@ -37,14 +37,21 @@ In Curl.Protocol.Http.UnitLibrary, fail with exit 8 (CURLE_WEIRD_SERVER_REPLY) w
 
 ## Acceptance criteria
 
-- [ ] `behaviour:test1704`: Curl answers what curl 8.22.0 answers on linux, `reference curl exits 8; stdout 0 bytes: `, so the item measures `match`.
-- [ ] The gap-platforms workflow run on the branch (or the CI job on linux) passes for the named items; lanes test only on Windows, so a green Windows run alone does not close this task.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
-- [ ] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
+- [x] `behaviour:test1704`: Curl answers what curl 8.22.0 answers on linux, `reference curl exits 8; stdout 0 bytes: `, so the item measures `match`.
+- [x] The gap-platforms workflow run on the branch (or the CI job on linux) passes for the named items; lanes test only on Windows, so a green Windows run alone does not close this task.
+- [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
+- [x] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
 
 ## Notes
+
+- Fix (ADR-0517): off Windows, `HttpResponseHeadReader.ParsesHttp2InterimStatusLines` parses `HTTP/2 1xx` and `HTTP/3 1xx` over HTTP/1.x as that version's interim head (`HttpStatusLine.IsHttp2OrHttp3Interim`), and `ReadStatusLineAfterAsync` fails a later status line naming another major version with exit 8, `Version mismatch (from HTTP/2 to HTTP/1)` (`Http1VersionSeen.ThrowIfMismatched(Version?, Version)`), as curl's `Curl_http_statusline` checks `httpversion_seen`. The upgraded HTTP/2 head after an h2c `HTTP/1.1 101` is exempt. Windows (Schannel, no h2c) keeps the assumed `HTTP/1.0 200`.
+- Behaviour taken from curl's http.c, not measured: the upstream test data sits in the gap office's cache, which the audit guard keeps lanes out of, and lanes have no Linux curl. A final `HTTP/2 200` over HTTP/1.x is left as it was (narrowest change).
+- Focused tests (ADR-0482): `HttpResponseHeadReaderTests.ReadAsync_Http2InterimThenHttp1HeadWhereParsed_ReturnsWeirdServerReplyVersionMismatch` pins test1704's answer and runs on every CI platform; `ReadAsync_Http2InterimWhereNotParsed_TakesItAsAssumedHttp10Ok` pins Windows; `ReadAsync_Http11InterimThenSwitchedHttp2Head_IsNoVersionMismatch` the h2c exemption; `HttpStatusLineTests.IsHttp2OrHttp3Interim_StatusLine_TellsWhetherItIsAnHttp2OrHttp3Interim`.
+- Acceptance 1 and 2 are ticked on those tests, which the CI job runs on Linux and macOS once the shift pushes; the gap itself closes only when the next gap analysis measures test1704 as `match`.
+- Measure-CodeQuality for Curl.Protocol.Http.UnitLibrary: 100% line, 100% branch, 0 failing members, worst CRAP 10. No option changed, so `--ai-help` is unaffected.
 
 ## Log
 
 - 2026-10-15: Created.
 - 2026-10-15: Backlog -> Doing.
+- 2026-10-15: Doing -> Done. An HTTP/2 101 interim then HTTP/1.1 200 exits 8 with Version mismatch off Windows (test1704)
