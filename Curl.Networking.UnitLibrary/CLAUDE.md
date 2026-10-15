@@ -51,7 +51,8 @@ captures the first record and rebuilds it from the profile. Both providers judge
 exit 60 and 77); the hand-built path reaches it through `HandBuiltCertificateVerifier`, which
 builds the chain and the `SslPolicyErrors` `SslStream` would. Both load `--cert` through
 `ClientCertificateLoader.Load`. Per ADR-0193 `ServerCertificateVerification.Judge` also checks
-`--pinnedpubkey` (`TlsClientOptions.PinnedPublicKey`) once the certificate is accepted, `-k` included:
+`--pinnedpubkey` (`TlsClientOptions.PinnedPublicKey`) once the certificate is accepted, `-k` included,
+except in the Schannel build with `--cacert`, which judges the pin first (ADR-0504, BL-2270):
 `PinnedPublicKey` matches `sha256//` hashes or a PEM or DER key file as curl's `Curl_pin_peer_pubkey`
 does, and a mismatch is exit 90 in both providers. Per ADR-0336 (BL-877) `Judge` also records on
 `PeerVerification` the server key's `sha256//` hash for a hash pin, which a completed handshake
