@@ -36,8 +36,13 @@
          lists win32                          -> excluded, platform:windows
       4. <features> needs a name absent from
          -ReferenceFeatures (when given)      -> excluded, reference-lacks:<name>
-      5. <server> names a server other than
-         http (or none)                       -> unmeasured, needs-server:<server>
+      5. the harness's reason says it does
+         not emulate the <name> server        -> unmeasured, needs-server:<name>
+         or has no value for a %<NAME>PORT
+         variable (the first one it names,
+         %NOLISTENPORT aside): no server
+         listens there (BL-2233)              -> unmeasured, needs-server:<name>,
+                                                 lower case
       6. the harness's reason says it has no
          value for %PERL alone (no perl was
          found, BL-1839)                      -> unmeasured, no-perl
@@ -47,8 +52,10 @@
     A feature written !<name> asks for its absence and never fits rules 3 or 4 (rule 3a reads
     !win32 as "not on Windows"). A perl command that names %CURL runs curl and is not rule
     2a's: it falls through to the later rules. Feature
-    names compare case-insensitively. A <server> line's first word is the server; any
-    words after it (a certificate file) are ignored. Every skipped item's evidence is the harness's reason.
+    names compare case-insensitively. Rules 5 to 7 read only the harness's own reason, never
+    the case's <server> tag: the harness runs most of upstream's servers, so a case that names
+    one and is skipped is skipped for something else, which its reason says (BL-2233). Every
+    skipped item's evidence is the harness's reason.
 
     The measurement adds "reasons": the count of items per reason, sorted by reason, for the
     scorecard's "Unmeasured by reason" table. Its values add up to unmeasured + excluded.
@@ -107,7 +114,6 @@ param(
 $ErrorActionPreference = 'Stop'
 
 $DebugFeatures = @('Debug', 'TrackMemory', 'unittest')
-$HarnessServers = @('http', 'none')
 
 function Write-Utf8File([string] $Path, [string] $Text) {
     $folder = Split-Path $Path -Parent
@@ -124,7 +130,7 @@ function Get-PartLines([string] $Text, [string] $Name) {
 
 function Read-CaseTags([string] $Folder, [int] $Number) {
     $path = Join-Path $Folder "test$Number"
-    $tags = [pscustomobject]@{ Tool = $null; Servers = @(); Features = @(); Keywords = @(); PerlCommand = $null; Precheck = '' }
+    $tags = [pscustomobject]@{ Tool = $null; Features = @(); Keywords = @(); PerlCommand = $null; Precheck = '' }
     if (-not (Test-Path -LiteralPath $path)) { return $tags }
     # Latin-1 keeps every byte as one character, so binary test data cannot break the read.
     $text = [System.IO.File]::ReadAllText($path, [System.Text.Encoding]::GetEncoding(28591))
@@ -132,14 +138,25 @@ function Read-CaseTags([string] $Folder, [int] $Number) {
     $clientText = if ($client.Success) { $client.Groups[1].Value } else { '' }
     $tool = @(Get-PartLines $clientText 'tool')
     $tags.Tool = if ($tool.Count -gt 0) { $tool[0] } else { $null }
-    # A server line may name a certificate after the server ("https test-localhost.pem").
-    $tags.Servers = @(Get-PartLines $clientText 'server' | ForEach-Object { ($_ -split '\s+')[0] })
     $tags.Features = @(Get-PartLines $clientText 'features')
     $tags.Keywords = @(Get-PartLines $text 'keywords')
     $perl = [regex]::Match($clientText, '<command\s[^>]*type="perl"[^>]*>(.*?)</command>', [System.Text.RegularExpressions.RegexOptions]::Singleline)
     if ($perl.Success) { $tags.PerlCommand = $perl.Groups[1].Value.Trim() }
     $tags.Precheck = (@(Get-PartLines $clientText 'precheck') -join "`n")
     return $tags
+}
+
+# The server rule 5 reads from the harness's reason, or $null: the <name> of "the harness does
+# not emulate the <name> server", else the first %<NAME>PORT of "the harness has no value for
+# ..." in lower case, %NOLISTENPORT aside (a port nothing listens on by design).
+function Get-MissingServer([string] $Detail) {
+    $emulate = [regex]::Match($Detail, '^the harness does not emulate the (\S+) server')
+    if ($emulate.Success) { return $emulate.Groups[1].Value }
+    if ($Detail -notlike 'the harness has no value for *') { return $null }
+    foreach ($m in [regex]::Matches($Detail, '%([A-Z0-9_]+)PORT\b')) {
+        if ($m.Groups[1].Value -ne 'NOLISTEN') { return $m.Groups[1].Value.ToLowerInvariant() }
+    }
+    return $null
 }
 
 # The state and reason of a skipped case, by rules 0 to 7 in order.
@@ -162,9 +179,8 @@ function Get-SkippedVerdict($Tags, [string] $Detail, [string[]] $Available, [boo
             if (-not ($Available -contains $feature)) { return @('excluded', "reference-lacks:$feature") }
         }
     }
-    foreach ($server in $Tags.Servers) {
-        if (-not ($HarnessServers -contains $server)) { return @('unmeasured', "needs-server:$server") }
-    }
+    $server = Get-MissingServer $Detail
+    if ($server) { return @('unmeasured', "needs-server:$server") }
     if ($Detail -eq 'the harness has no value for %PERL') { return @('unmeasured', 'no-perl') }
     if ($Detail -like 'the harness has no value for *') { return @('unmeasured', 'unknown-variable') }
     return @('unmeasured', 'harness-unsupported')
@@ -258,8 +274,10 @@ function Invoke-SelfTest {
         Report (Is 'behaviour:test1' 'excluded' 'libcurl-api') 'rule 1: a lib... tool gives excluded libcurl-api'
         Report (Is 'behaviour:test2' 'excluded' 'libcurl-unit-test') 'rule 2: a unit... tool gives excluded libcurl-unit-test'
         Report (Is 'behaviour:test3' 'excluded' 'debug-build-only') 'rule 3: a Debug, TrackMemory or unittest feature gives excluded debug-build-only'
-        Report (Is 'behaviour:test5' 'unmeasured' 'needs-server:ftp') 'rule 5: a server other than http gives unmeasured needs-server:<server>'
-        Report (Is 'behaviour:test12' 'unmeasured' 'needs-server:https') 'rule 5: a certificate after the server name is not part of the reason'
+        Report (Is 'behaviour:test5' 'unmeasured' 'needs-server:ftp') 'rule 5: no value for %<NAME>PORT gives unmeasured needs-server:<name>'
+        Report (Is 'behaviour:test12' 'unmeasured' 'needs-server:https') 'rule 5: the port variable''s name, lower case, is the server'
+        Report (Is 'behaviour:test21' 'unmeasured' 'needs-server:http/2') 'rule 5: the harness not emulating the <name> server gives needs-server:<name>'
+        Report ((Is 'behaviour:test22' 'unmeasured' 'harness-unsupported') -and $s['behaviour:test22'].evidence -eq 'the harness does not act on <client><stdout>') 'rule 5: a case naming a server but skipped for something else carries the harness''s reason, not needs-server'
         Report (Is 'behaviour:test6' 'unmeasured' 'unknown-variable') 'rule 6: a harness reason naming a variable gives unmeasured unknown-variable'
         Report (Is 'behaviour:test13' 'unmeasured' 'no-perl') 'rule 6: no value for %PERL alone gives unmeasured no-perl'
         Report (Is 'behaviour:test14' 'unmeasured' 'unknown-variable') 'rule 6: no value for %PERL with another variable stays unknown-variable'
@@ -268,17 +286,17 @@ function Invoke-SelfTest {
         Report ((Is 'behaviour:test9' 'gap' $null) -and $s['behaviour:test9'].actual -eq 'stdout differs at byte 4' -and (@($s['behaviour:test9'].attributes.keywords) -join ',') -eq 'HTTP,HTTP GET') 'a failed case gives gap with its first difference and keywords'
         Report (Is 'behaviour:test10' 'excluded' 'libcurl-api') 'the rules apply in order: a lib tool on an ftp server is libcurl-api'
         Report (Is 'behaviour:test11' 'unmeasured' 'unknown-variable') 'a !Debug feature asks for its absence and is not debug-build-only'
-        Report (Is 'behaviour:test4' 'unmeasured' 'unknown-variable') 'with no reference, rule 4 is skipped'
+        Report (Is 'behaviour:test4' 'unmeasured' 'needs-server:http3') 'with no reference, rule 4 is skipped'
         Report (Is 'behaviour:test16' 'excluded' 'upstream-source-check') 'rule 2a: a perl command that never names %CURL gives excluded upstream-source-check'
         Report (Is 'behaviour:test17' 'unmeasured' 'harness-unsupported') 'rule 2a: a perl command that runs %CURL is not a source check'
         Report (Is 'behaviour:test18' 'excluded' 'platform:unix') 'rule 3a: on Windows, a !win32 feature gives excluded platform:unix'
         Report (Is 'behaviour:test19' 'excluded' 'platform:unix') 'rule 3a: on Windows, a precheck refusing MSWin32 gives excluded platform:unix'
-        Report (Is 'behaviour:test20' 'unmeasured' 'needs-server:file') 'rule 3a: on Windows, a win32 feature is not platform-excluded'
+        Report (Is 'behaviour:test20' 'unmeasured' 'harness-unsupported') 'rule 3a: on Windows, a win32 feature is not platform-excluded'
         Report ($null -eq $m.reference -and $m.referenceFallback -eq 'docs' -and $m.targetVersion -eq '9.9.9') 'with no reference, reference is null with the docs fallback'
         $c = $m.counts
         $reasonTotal = 0; foreach ($p in $m.reasons.PSObject.Properties) { $reasonTotal += [int]$p.Value }
-        Report ($c.x -eq $c.match -and $c.y -eq ($c.match + $c.gap + $c.unmeasured) -and ($c.match + $c.gap + $c.unmeasured + $c.excluded) -eq @($m.items).Count -and @($m.items).Count -eq 20) 'counts add up to the case count'
-        Report ($reasonTotal -eq ($c.unmeasured + $c.excluded) -and $m.reasons.'libcurl-api' -eq 2 -and $m.reasons.'unknown-variable' -eq 4 -and $m.reasons.'no-perl' -eq 1) 'the per-reason summary adds up to unmeasured plus excluded'
+        Report ($c.x -eq $c.match -and $c.y -eq ($c.match + $c.gap + $c.unmeasured) -and ($c.match + $c.gap + $c.unmeasured + $c.excluded) -eq @($m.items).Count -and @($m.items).Count -eq 22) 'counts add up to the case count'
+        Report ($reasonTotal -eq ($c.unmeasured + $c.excluded) -and $m.reasons.'libcurl-api' -eq 2 -and $m.reasons.'unknown-variable' -eq 3 -and $m.reasons.'no-perl' -eq 1) 'the per-reason summary adds up to unmeasured plus excluded'
 
         Invoke-Conversion $raw $data @('http', 'IPv6') 'curl 9.9.9 (fake) libcurl/9.9.9' '9.9.9' $out | Out-Null
         $r = [System.IO.File]::ReadAllText($out) | ConvertFrom-Json
@@ -290,7 +308,7 @@ function Invoke-SelfTest {
         $unixRaw.platform = 'Unix'
         $u = @{}; foreach ($i in (ConvertTo-BehaviourMeasurement $unixRaw $data @() $null '9.9.9').items) { $u[$i.key] = $i }
         Report ($u['behaviour:test20'].state -eq 'excluded' -and $u['behaviour:test20'].reason -eq 'platform:windows') 'rule 3a: off Windows, a win32 feature gives excluded platform:windows'
-        Report ($u['behaviour:test18'].reason -eq 'needs-server:file' -and $u['behaviour:test19'].reason -eq 'needs-server:file') 'rule 3a: off Windows, !win32 and a precheck refusing MSWin32 are not platform-excluded'
+        Report ($u['behaviour:test18'].reason -eq 'harness-unsupported' -and $u['behaviour:test19'].reason -eq 'harness-unsupported') 'rule 3a: off Windows, !win32 and a precheck refusing MSWin32 are not platform-excluded'
     } finally {
         if (Test-Path -LiteralPath $temp) { Remove-Item -LiteralPath $temp -Recurse -Force }
     }

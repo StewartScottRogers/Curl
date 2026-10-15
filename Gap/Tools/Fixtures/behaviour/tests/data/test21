@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="US-ASCII"?>
+<testcase>
+<info>
+<keywords>
+HTTP
+HTTP/2
+</keywords>
+</info>
+
+<client>
+<server>
+http/2
+</server>
+<name>
+fixture case 21
+</name>
+<command>
+--http2 http://%HOSTIP:%HTTP2PORT/%TESTNUMBER
+</command>
+
+</client>
+</testcase>

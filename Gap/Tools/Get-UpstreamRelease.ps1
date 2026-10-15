@@ -6,8 +6,10 @@
 .DESCRIPTION
     The gap analysis office measures Curl against upstream curl's release tarball
     (ADR-0433 decision 1). This script fetches that tarball and extracts only
-    curl-<version>/docs, curl-<version>/tests/data, curl-<version>/lib/strerror.c and
-    curl-<version>/COPYING into <CacheRoot>/<version>/, a cache outside the repository.
+    curl-<version>/docs, curl-<version>/tests/data, curl-<version>/tests/certs (the test
+    certificates' .prm files, from which Measure-UpstreamCases.cs generates %CERTDIR, BL-2233),
+    curl-<version>/lib/strerror.c and curl-<version>/COPYING into <CacheRoot>/<version>/, a
+    cache outside the repository.
     It prints that folder's full path as the only line on standard output.
 
     Download: first
@@ -22,8 +24,8 @@
 
     Cache: <CacheRoot>/<version>/.complete is written last and holds the hash, so an
     interrupted extraction is redone from scratch. When .complete already holds the
-    pinned hash and no -ArchivePath is given, the script returns at once without
-    downloading.
+    pinned hash, tests/certs is there and no -ArchivePath is given, the script returns at
+    once without downloading; a cache from before tests/certs was extracted is redone.
 
     Extraction uses Windows' own System32\tar.exe (a Git Bash GNU tar earlier on PATH
     reads "C:\..." as a remote host), and plain tar off Windows. Runs under Windows
@@ -119,10 +121,10 @@ function Invoke-SelfTest {
         $manifest = if (Test-Path -LiteralPath $manifestPath) { Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json } else { $null }
         Report ($null -ne $manifest -and $manifest.sha256 -eq $hash -and $manifest.version -eq '9.9.9' -and $manifest.tag -eq 'curl-9_9_9') 'first run writes the manifest with the archive''s hash'
 
-        $wanted = @('docs/x.md', 'tests/data/test1', 'lib/strerror.c', 'COPYING')
+        $wanted = @('docs/x.md', 'tests/data/test1', 'tests/certs/test-ca.prm', 'lib/strerror.c', 'COPYING')
         $allWanted = @($wanted | Where-Object { -not (Test-Path -LiteralPath (Join-Path $versionFolder $_)) }).Count -eq 0
         $otherAbsent = -not (Test-Path -LiteralPath (Join-Path $versionFolder (Join-Path 'lib' 'other.c')))
-        Report ($allWanted -and $otherAbsent) 'only docs/, tests/data/, lib/strerror.c and COPYING are extracted'
+        Report ($allWanted -and $otherAbsent) 'only docs/, tests/data/, tests/certs/, lib/strerror.c and COPYING are extracted'
 
         Report ($printed.Count -eq 1 -and $printed[0] -eq (Resolve-Path -LiteralPath $versionFolder).Path) 'the printed path is the version''s cache folder'
 
@@ -130,6 +132,11 @@ function Invoke-SelfTest {
         Write-Utf8File $sentinel 'left by the self-test'
         $printedAgain = @(& $PSCommandPath -Version 9.9.9 -ArchivePath $archive -CacheRoot $cache -BaselinesDirectory $baselines)
         Report ((Test-Path -LiteralPath $sentinel) -and $printedAgain.Count -eq 1 -and $printedAgain[0] -eq $printed[0]) 'a second run with the same archive returns without re-extracting'
+
+        Remove-Item -LiteralPath (Join-Path $versionFolder (Join-Path 'tests' 'certs')) -Recurse -Force
+        & $PSCommandPath -Version 9.9.9 -CacheRoot $cache -BaselinesDirectory $baselines -ArchivePath $archive | Out-Null
+        Report ((Test-Path -LiteralPath (Join-Path $versionFolder 'tests/certs/test-ca.prm')) -and -not (Test-Path -LiteralPath $sentinel)) 'a cache without tests/certs is extracted again'
+        Write-Utf8File $sentinel 'left by the self-test'
 
         $otherArchive = Join-Path $work (Join-Path 'other' 'curl-9.9.9.tar.gz')
         New-Item -ItemType Directory -Path (Split-Path $otherArchive -Parent) | Out-Null
@@ -166,13 +173,14 @@ $sourceRoot = "curl-$Version"
 $manifestPath = Join-Path $BaselinesDirectory "$sourceRoot.json"
 $versionFolder = Join-Path $CacheRoot $Version
 $completePath = Join-Path $versionFolder '.complete'
+$certsFolder = Join-Path $versionFolder (Join-Path 'tests' 'certs')
 
 $pinned = $null
 if (Test-Path -LiteralPath $manifestPath) {
     $pinned = (Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json).sha256
 }
 
-if ($pinned -and -not $ArchivePath -and (Test-Path -LiteralPath $completePath) -and
+if ($pinned -and -not $ArchivePath -and (Test-Path -LiteralPath $completePath) -and (Test-Path -LiteralPath $certsFolder) -and
     (Get-Content -LiteralPath $completePath -Raw).Trim() -eq $pinned) {
     Write-Output (Resolve-Path -LiteralPath $versionFolder).Path
     return
@@ -211,7 +219,7 @@ try {
         throw "SHA-256 mismatch for ${sourceRoot}: $manifestPath pins $pinned but $url hashes to $hash. The cache is untouched."
     }
 
-    if ($pinned -and (Test-Path -LiteralPath $completePath) -and
+    if ($pinned -and (Test-Path -LiteralPath $completePath) -and (Test-Path -LiteralPath $certsFolder) -and
         (Get-Content -LiteralPath $completePath -Raw).Trim() -eq $pinned) {
         Write-Output (Resolve-Path -LiteralPath $versionFolder).Path
         return
@@ -232,7 +240,7 @@ try {
     if (Test-Path -LiteralPath $versionFolder) { Remove-Item -LiteralPath $versionFolder -Recurse -Force }
     New-Item -ItemType Directory -Path $versionFolder -Force | Out-Null
     $tar = Get-TarPath
-    & $tar -xzf $archive -C $versionFolder --strip-components 1 "$sourceRoot/docs" "$sourceRoot/tests/data" "$sourceRoot/lib/strerror.c" "$sourceRoot/COPYING" | Out-Null
+    & $tar -xzf $archive -C $versionFolder --strip-components 1 "$sourceRoot/docs" "$sourceRoot/tests/data" "$sourceRoot/tests/certs" "$sourceRoot/lib/strerror.c" "$sourceRoot/COPYING" | Out-Null
     if ($LASTEXITCODE -ne 0) { throw "tar could not extract $sourceRoot from $archive." }
     Write-Utf8File $completePath $hash
     Write-Output (Resolve-Path -LiteralPath $versionFolder).Path

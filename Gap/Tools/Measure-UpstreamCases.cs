@@ -55,20 +55,34 @@
 // against the harness platform's features) is not run; it is written Skipped with the detail
 // "disabled upstream", which ConvertTo-BehaviourMeasurement.ps1 measures excluded, disabled-upstream.
 // "--self-test" instead checks these substitutions and prints a PASS or FAIL line per check.
+// Servers and certificates (BL-2233), as UpstreamConformanceTests.RunCaseOnceAsync gives them: the
+// runner gets the SSH stand-in for the platform's curl build (UpstreamSshServerFactory, %SSHPORT),
+// the HTTP/2 stand-ins (%HTTP2PORT, %HTTP2TLSPORT) and the HTTP/3 one (%HTTP3PORT), and %CERTDIR is a
+// folder generated once per run from the release's tests/certs into <out.json's folder>/
+// upstream-certificates (UpstreamCertificateFolder.Prepare), so the SFTP, SCP and TLS cases run
+// instead of skipping for a missing variable. That folder is deleted with the logs.
 //
 // Known limit: UpstreamCaseRunner.CurlVersion is a constant ("8.22.0" since BL-2127), so %VERSION in
 // a newer release's cases is substituted with it until the next retarget ADR moves it (ADR-0479).
 #:project ../../Curl.Conformance.UnitLibrary/Curl.Conformance.UnitLibrary.csproj
+#:project ../../Curl.Conformance.SshServer.UnitLibrary/Curl.Conformance.SshServer.UnitLibrary.csproj
+#:project ../../Curl.Conformance.Http2Server.UnitLibrary/Curl.Conformance.Http2Server.UnitLibrary.csproj
+#:project ../../Curl.Conformance.Http3Server.UnitLibrary/Curl.Conformance.Http3Server.UnitLibrary.csproj
 #:project ../../Curl.Console/Curl.Console.csproj
 using System.Diagnostics;
 using System.Globalization;
 using System.Net;
 using System.Net.Sockets;
+using System.Security.Cryptography.X509Certificates;
 using System.Text.Json;
 using Curl.Conformance;
+using Curl.Conformance.Http2Server;
+using Curl.Conformance.Http3Server;
+using Curl.Conformance.SshServer;
 using Curl.Console;
 using Curl.Networking;
 using Curl.Protocol.Abstractions;
+using Curl.Tls;
 
 const string KeepLogsOption = "--keep-logs";
 
@@ -127,6 +141,21 @@ string disabledFile = Path.Combine(testDataFolder, "DISABLED");
 IReadOnlySet<int> disabledCases = File.Exists(disabledFile)
     ? DisabledCases.Read(File.ReadAllLines(disabledFile), platform.Features)
     : new HashSet<int>();
+string certificateFolder = Path.Combine(Path.GetDirectoryName(outputPath)!, "upstream-certificates");
+string certificateDirectory = UpstreamCertificateFolder.Prepare(
+    Path.Combine(Path.GetDirectoryName(testDataFolder.TrimEnd('\\', '/'))!, "certs"), certificateFolder, TimeProvider.System);
+UpstreamServers servers = new(
+    UpstreamSshServerFactory.Create(OperatingSystem.IsWindows()),
+    new UpstreamHttp2Server(UpstreamHttp2ServerFactory.Create, UpstreamHttp2ServerFactory.CreateTls),
+    new UpstreamHttp3Server((backend, certificate) => UpstreamHttp3ServerFactory.Create(
+        backend,
+        new Http3ServerTlsSettings
+        {
+            CertificateChain = [certificate.RawData],
+            SigningKey = new EcdsaTlsSigningKey(certificate.GetECDsaPrivateKey()!),
+            QuicTransportParameters = Http3ServerConnection.DefaultTransportParameters.Encode(),
+        })),
+    certificateDirectory);
 
 // Some cases name a file relative to curl's working folder (upstream runs them from tests/,
 // e.g. "-o %"); run them all from the log folder so such files go where the run deletes them,
@@ -147,7 +176,7 @@ await Parallel.ForEachAsync(
         Stopwatch stopwatch = Stopwatch.StartNew();
         UpstreamCaseOutcome outcome = disabledCases.Contains(number)
             ? UpstreamCaseOutcome.Skipped(DisabledCases.Reason)
-            : await RunCaseAsync(number, testFile, Directory.CreateDirectory(Path.Combine(logFolder, $"test{number}-{Guid.NewGuid():N}")), platform, timeLimit, caseHangLimit, keepLogs);
+            : await RunCaseAsync(number, testFile, Directory.CreateDirectory(Path.Combine(logFolder, $"test{number}-{Guid.NewGuid():N}")), platform, servers, timeLimit, caseHangLimit, keepLogs);
         results[index] = (number, outcome, stopwatch.ElapsedMilliseconds);
         int done = Interlocked.Increment(ref finished);
         if (done % 100 == 0 || done == ordered.Length)
@@ -167,6 +196,7 @@ else
 }
 
 DeleteLogDirectory(new DirectoryInfo(releaseCopy));
+DeleteLogDirectory(new DirectoryInfo(certificateFolder));
 DateTimeOffset finishedAt = DateTimeOffset.Now;
 
 await using (FileStream output = File.Create(outputPath))
@@ -211,12 +241,12 @@ static Task<int> RunCurlAsync(UpstreamCurlInvocation invocation)
 }
 
 // Runs one case in its own log folder, which is deleted afterwards unless keepLogs, and judges a hang or a throw failed.
-static async Task<UpstreamCaseOutcome> RunCaseAsync(int number, byte[] testFile, DirectoryInfo logDirectory, UpstreamCurlPlatform platform, TimeSpan timeLimit, TimeSpan caseHangLimit, bool keepLogs)
+static async Task<UpstreamCaseOutcome> RunCaseAsync(int number, byte[] testFile, DirectoryInfo logDirectory, UpstreamCurlPlatform platform, UpstreamServers servers, TimeSpan timeLimit, TimeSpan caseHangLimit, bool keepLogs)
 {
     try
     {
-        UpstreamCaseRunner runner = new(RunCurlAsync, platform, TimeProvider.System, timeLimit);
-        return await Task.Run(() => runner.RunAsync(number, testFile, logDirectory.FullName)).WaitAsync(caseHangLimit);
+        UpstreamCaseRunner runner = new(RunCurlAsync, platform, TimeProvider.System, timeLimit, servers.Ssh, servers.Http2, servers.Http3);
+        return await Task.Run(() => runner.RunAsync(number, testFile, logDirectory.FullName, certificateDirectory: servers.CertificateDirectory)).WaitAsync(caseHangLimit);
     }
     catch (TimeoutException)
     {
@@ -572,3 +602,6 @@ internal static class ReplyEscapes
         return (line[digitsStart..digitsEnd], digitsEnd);
     }
 }
+
+// The servers and certificate folder every case's runner gets (BL-2233), built once per run.
+sealed record UpstreamServers(UpstreamSshServer Ssh, UpstreamHttp2Server Http2, UpstreamHttp3Server Http3, string CertificateDirectory);

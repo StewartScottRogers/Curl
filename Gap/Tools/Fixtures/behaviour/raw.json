@@ -24,6 +24,8 @@
     { "number": 17, "kind": "Skipped", "detail": "the harness does not run a perl command", "milliseconds": 0 },
     { "number": 18, "kind": "Skipped", "detail": "the case needs Curl without the feature win32", "milliseconds": 0 },
     { "number": 19, "kind": "Skipped", "detail": "the harness does not interpret the <client><precheck> line perl -e", "milliseconds": 0 },
-    { "number": 20, "kind": "Skipped", "detail": "Curl lacks the feature Unicode", "milliseconds": 0 }
+    { "number": 20, "kind": "Skipped", "detail": "Curl lacks the feature Unicode", "milliseconds": 0 },
+    { "number": 21, "kind": "Skipped", "detail": "the harness does not emulate the http/2 server", "milliseconds": 0 },
+    { "number": 22, "kind": "Skipped", "detail": "the harness does not act on <client><stdout>", "milliseconds": 0 }
   ]
 }
