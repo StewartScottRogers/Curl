@@ -233,3 +233,31 @@ are in `Curl.Engine.UnitTests`; the setup tests use their own `ReadRecordingFile
 ## The last Curl.Cli types in the mappings and lookups (BL-2358)
 
 `MultipartFormPartMapping.NameEscapingOf` takes whether `--form-escape` was given and `RequestContentTypeOf` the `-H` values; `HttpRequestOptionsMapping.HappyEyeballsTimeoutOf` takes the `--happy-eyeballs-timeout-ms` value; `EngineTransferSettings.UploadFlags` is the names of the `--upload-flags` flags set, in curl's order, which `Curl.Console` works out (`EasyOptionsFromCommandLine.TransferSettingsOf`) so `MailRequestOptionsMapping` no longer names `ImapUploadFlags`. `TransferCredentialLookup` and `SshKnownHostsFileSearch.Find` read files through a `Func<string, byte[]?>` (`null` when unreadable) that `CurlCommandRunner.ReadDataFile` supplies from its `IDataFileReader`, so neither names `Curl.Cli`.
+
+## The managed engine and its easy handle (BL-2316)
+
+`ManagedCurlEngine` is the `ICurlEngine` behind `Curl.Api` and `Libcurl` (ADR-0506, ADR-0541). Its
+public constructor runs on the system clock and the real network; the internal one takes a
+`TimeProvider` and a `Func<EasyOptions, ProtocolDispatcher>`, which tests use to put a fake
+connector under the handlers. Its connection, TLS session and DNS caches are fields of the engine
+object, never static, so two engines in one process share nothing; `DisposeAsync` closes its pooled
+connections. `CreateDispatcher` builds a transfer's dispatcher as `Curl.Console`'s composition
+builds an option group's: `EngineComposition.CreateTransports` over the handle's easy groups and the
+engine's caches, then `CreateProtocolHandlers` over its pooling connector. `CreateMulti`,
+`CreateShare`, `CreateUrl`, `CreateMime` and `CreateForm` throw `NotSupportedException`: they are
+phase 3 work.
+
+`ManagedEasyTransfer` is its `IEasyTransfer`. `PerformAsync` reads `EasyNetworkOptions.Url` (none is
+`CurlCode.UrlMalformat` with `No URL set`, one that does not parse the same code with libcurl's
+malformed-URL text), builds the context with `TransferContextFactory.Create` from the easy groups and
+`TransferSettingsOf`'s `EngineTransferSettings` (what the easy groups say for verify-peer, the key
+password, the crypto engine, the proxy tunnel and the Unix socket, libcurl's defaults for the rest),
+and performs the attempt with `TransferPerformer.FollowWatchingSpeedAsync` through a
+`RedirectFollower`. Body bytes go to `EasyCallbackOptions.Write` and header lines to
+`EasyCallbackOptions.Header` through `CallbackWriteStream`, each discarded when unset; a callback that
+takes fewer bytes than it was given fails the transfer with `CurlCode.WriteError`. The result's exit
+code becomes the `CurlCode`, its message `ErrorText`, and `Info` carries the effective URL and the
+response code. `Duplicate` copies the options and none of the results, `Reset` restores
+`new EasyOptions()`, `Pause` records the directions and returns `Ok`, and `UpkeepAsync` returns
+`Ok`. `Headers`, `WebSocket` and `Connection` throw `NotSupportedException` (phase 3). Their tests are
+`ManagedCurlEngineTests`, `ManagedEasyTransferTests` and `CallbackWriteStreamTests`.
