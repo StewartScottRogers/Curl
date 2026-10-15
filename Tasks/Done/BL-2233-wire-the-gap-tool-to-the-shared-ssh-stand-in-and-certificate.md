@@ -9,7 +9,7 @@ touches: [Gap]
 lane: no
 requirement: none
 created: 2026-10-14
-completed:
+completed: 2026-10-15
 ---
 # BL-2233 — Wire the gap tool to the shared SSH stand-in and certificate folder, and label unmeasured cases by their real skip reason
 
@@ -23,12 +23,16 @@ Found 2026-10-14 while filing the harness tasks: Gap/Tools/Measure-UpstreamCases
 
 ## Acceptance criteria
 
-- [ ] Measure-UpstreamCases.cs passes the shared SSH stand-in and certificate folder, and a gap run measures the SSH and TLS cases instead of skipping them.
-- [ ] Unmeasured behaviour cases carry the harness's real skip reason, and the converter's self-test proves it.
-- [ ] The change lands on the gap branch and its PR merges once CI is green.
+- [x] Measure-UpstreamCases.cs passes the shared SSH stand-in and certificate folder, and a gap run measures the SSH and TLS cases instead of skipping them.
+- [x] Unmeasured behaviour cases carry the harness's real skip reason, and the converter's self-test proves it.
+- [x] The change lands on the gap branch and its PR merges once CI is green.
 
 ## Notes
+
+- 2026-10-15 (Claude): PR #146 (9b68f0a1a). The tool also wires the HTTP/2 and HTTP/3 stand-ins; Get-UpstreamRelease.ps1 now extracts tests/certs. Of the 116 cases the 2026-10-14_0904 run skipped for SSH/TLS/HTTP2-3 variables, 72 pass and 4 fail. Rule 5 reads the harness's reason; converter self-test cases 21 and 22.
 
 ## Log
 
 - 2026-10-14: Created.
+- 2026-10-15: Backlog -> Doing.
+- 2026-10-15: Doing -> Done. Merged in PR #146.
