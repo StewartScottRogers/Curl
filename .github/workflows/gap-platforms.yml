@@ -21,8 +21,11 @@
 #      release tarball Get-UpstreamRelease.ps1 -SaveArchiveTo downloads and checks against the
 #      pinned SHA-256 in Gap/Baselines/curl-<version>.json, with OpenSSL (CLAUDE.md: Linux and
 #      macOS match the OpenSSL build) and nghttp2, libssh2, zlib, brotli, zstd, libidn2,
-#      libpsl, GSS-API and LDAP from apt or Homebrew; no HTTP/3, so the converter excludes the
-#      HTTP/3 cases as reference-lacks:HTTP3. It is cached per OS, version and this file's
+#      libpsl, GSS-API and LDAP from apt or Homebrew, and NTLM (with it SMB) and TLS session
+#      export switched on, which configure leaves off unless asked and Curl implements. No
+#      HTTP/3: the converter excludes the HTTP/3 behaviour cases as reference-lacks:HTTP3,
+#      while the HTTP3 feature and --http3 options measure as gaps (Curl lists what this
+#      reference lacks). It is cached per OS, version and this file's
 #      hash; a cached curl that no longer runs (a Homebrew library moved on) is rebuilt.
 #   4. Gap/Tools/Measure-GapAreas.ps1 builds Curl.Console Release in tree/ and measures all
 #      seven areas against that curl, writing out/measurements/<area>.json and out/status.json.
@@ -143,7 +146,7 @@ jobs:
           tar -xzf $archive -C $source --strip-components 1
           if ($LASTEXITCODE -ne 0) { throw 'tar failed.' }
           $prefix = Join-Path $env:RUNNER_TEMP 'refcurl'
-          $configure = @("--prefix=$prefix", '--disable-shared', '--enable-static', '--with-nghttp2', '--with-libssh2', '--with-zlib', '--with-brotli', '--with-zstd', '--with-libidn2', '--with-libpsl', '--with-gssapi', '--enable-ldap', '--without-ngtcp2', '--without-nghttp3', '--without-quiche', '--without-openssl-quic')
+          $configure = @("--prefix=$prefix", '--disable-shared', '--enable-static', '--with-nghttp2', '--with-libssh2', '--with-zlib', '--with-brotli', '--with-zstd', '--with-libidn2', '--with-libpsl', '--with-gssapi', '--enable-ldap', '--enable-ntlm', '--enable-ssls-export', '--without-ngtcp2', '--without-nghttp3', '--without-quiche', '--without-openssl-quic')
           if ('${{ matrix.platform }}' -eq 'macos') {
             $brew = { param([string] $Formula) (& brew --prefix $Formula).Trim() }
             $openssl = & $brew 'openssl@3'
