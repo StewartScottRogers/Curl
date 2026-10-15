@@ -1,7 +1,7 @@
 using System.Globalization;
 using Curl.Protocol.Abstractions;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
 /// Passes every event on to <paramref name="inner" /> and writes the <c>[WRITE]</c> lines curl 8.21.0

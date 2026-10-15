@@ -1,7 +1,7 @@
 using Curl.Protocol.Abstractions;
 using Curl.Testing;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
 /// Pins <see cref="ClientWriterTraceEvents" />: curl 8.21.0's <c>[WRITE]</c> lines after each response header

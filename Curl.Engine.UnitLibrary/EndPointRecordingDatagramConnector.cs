@@ -1,7 +1,7 @@
 using System.Net;
 using Curl.Protocol.Abstractions;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
 /// Opens channels through <paramref name="connector" /> and records each one it opens with

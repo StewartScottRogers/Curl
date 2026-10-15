@@ -3,7 +3,7 @@ using System.Net.Sockets;
 using Curl.Networking;
 using Curl.Protocol.Abstractions;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
 /// Remembers the end points of the first connection a transfer opens, as the recording

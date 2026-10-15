@@ -6,6 +6,7 @@ using System.Text;
 using Curl.Authentication;
 using Curl.Cli;
 using Curl.Core;
+using Curl.Engine;
 using Curl.Core.FileSystem;
 using Curl.Core.Globbing;
 using Curl.Core.Hsts;

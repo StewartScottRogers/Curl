@@ -6,6 +6,7 @@ using Curl.Core;
 using Curl.Output;
 using Curl.Protocol.Abstractions;
 using HttpRequestOptions = Curl.Protocol.Abstractions.HttpRequestOptions;
+using Curl.Engine;
 
 namespace Curl.Console;
 

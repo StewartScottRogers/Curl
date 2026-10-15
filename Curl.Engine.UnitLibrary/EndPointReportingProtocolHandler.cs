@@ -1,6 +1,6 @@
 using Curl.Protocol.Abstractions;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
 /// Performs each transfer with <paramref name="handler" /> and puts on its report the end

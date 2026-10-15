@@ -2,6 +2,7 @@ using Curl.Cli;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Ssh;
 using Curl.Testing;
+using Curl.Engine;
 
 namespace Curl.Console;
 

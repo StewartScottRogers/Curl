@@ -1,6 +1,6 @@
 using Curl.Protocol.Abstractions;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
 /// Serves the FTP handler's schemes, <c>ftp</c> and <c>ftps</c>, by routing each transfer to

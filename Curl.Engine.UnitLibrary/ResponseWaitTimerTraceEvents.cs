@@ -1,24 +1,33 @@
-using Curl.Networking;
 using Curl.Protocol.Abstractions;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
-/// Passes every event on to <paramref name="inner" /> unchanged and writes each CONNECT reply
-/// head a tunnelling proxy sends to <paramref name="headerOutput" />, the transfer's
-/// <c>-i</c>, <c>-I</c> or <c>-D</c> output, as curl 8.21.0 does without
-/// <c>--suppress-connect-headers</c> (measured 2026-09-30, BL-613 Notes).
+/// Passes every event on to <paramref name="inner" /> and writes <paramref name="waitLines" />, the
+/// <c>[TIMER]</c> lines curl 8.21.0 writes under <c>-v --trace-config timer</c> as it waits for the
+/// response, after each <c>Request completely sent off</c> line (measured, BL-1258 Notes, ADR-0401).
+/// Used only when the multi is not traced: then <c>MultiStateTraceEvents</c> writes them among its
+/// poll lines.
 /// </summary>
 /// <param name="inner">The transfer's own events.</param>
-/// <param name="headerOutput">The transfer's header output; it belongs to the caller and is neither flushed nor closed here.</param>
-internal sealed class ConnectReplyHeadWritingEvents(ITransferEvents inner, Stream headerOutput) : IConnectReplyHeadWritingEvents
+/// <param name="waitLines">The lines, from <c>TransferTimers.WaitLines</c>.</param>
+internal sealed class ResponseWaitTimerTraceEvents(ITransferEvents inner, IReadOnlyList<string> waitLines) : ITransferEvents
 {
-    /// <inheritdoc />
-    public ValueTask WriteConnectReplyHeadAsync(ReadOnlyMemory<byte> head, CancellationToken cancellationToken) =>
-        headerOutput.WriteAsync(head, cancellationToken);
+    /// <summary>The line after which curl waits for the response.</summary>
+    public const string RequestSentLine = "Request completely sent off";
 
     /// <inheritdoc />
-    public void ReportInfo(string text) => inner.ReportInfo(text);
+    public void ReportInfo(string text)
+    {
+        inner.ReportInfo(text);
+        if (text == RequestSentLine)
+        {
+            foreach (var line in waitLines)
+            {
+                inner.ReportInfo(line);
+            }
+        }
+    }
 
     /// <inheritdoc />
     public void ReportConnectionOpened(ConnectionOpenedEvent opened) => inner.ReportConnectionOpened(opened);

@@ -26,15 +26,7 @@ which builds `HandBuiltTlsProvider` when `TlsClientRouting.Choose` routes the op
 hand-built client (a `--tls-max` of 1.0 or 1.1 today) and `SslStreamTlsProvider` otherwise
 (ADR-0140, ADR-0162, BL-708).
 
-`CurlComposition.CreateProtocolHandlers` gives every handler an `EndPointRecordingConnector` and
-an `EndPointRecordingDatagramConnector` sharing one `ConnectionEndPointRecorder`, and wraps
-each handler in an `EndPointReportingProtocolHandler`, which puts the end points of the
-transfer's first connection (FTP's control connection) on its report when the handler reported
-neither, so `%{local_ip}`, `%{local_port}`, `%{remote_ip}` and `%{remote_port}` work for every
-scheme without handler code; HTTP keeps its own (ADR-0119, BL-515). Each handler sits behind a
-`LazyProtocolHandler` that names its schemes and builds the handler on its first transfer, as do the
-security context factory and the HTTP authenticator, so a run builds only what its URLs' schemes use
-(BL-1715, AF-0063); `EndPointReportingProtocolHandler.Handler` gives the built handler.
+`CurlComposition.CreateProtocolHandlers` builds the handlers behind the engine's end-point recorders and `LazyProtocolHandler` (see `Curl.Engine.UnitLibrary/CLAUDE.md`, ADR-0119, BL-515, BL-1715, AF-0063).
 
 `Program.Main` only opens the standard streams, builds the composition and hands the
 arguments to `CurlCommandRunner`, which parses them, runs each URL and prints curl's

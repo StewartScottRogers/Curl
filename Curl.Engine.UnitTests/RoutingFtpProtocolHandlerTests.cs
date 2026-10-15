@@ -4,8 +4,9 @@ using Curl.Protocol.Abstractions;
 using Curl.Protocol.Ftp;
 using Curl.Testing;
 using HttpRequestOptions = Curl.Protocol.Abstractions.HttpRequestOptions;
+using Curl.Engine;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
 /// Pins which <c>ftp</c> transfers <see cref="RoutingFtpProtocolHandler" /> hands to the HTTP

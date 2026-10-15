@@ -1,8 +1,9 @@
 using System.Net;
 using Curl.Protocol.Abstractions;
 using Curl.Testing;
+using Curl.Engine;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 [TestClass]
 public sealed class EndPointRecordingConnectorTests

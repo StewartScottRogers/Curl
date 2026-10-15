@@ -3,6 +3,7 @@ using Curl.Protocol.Abstractions;
 using Curl.Protocol.Http;
 
 using Curl.Testing;
+using Curl.Engine;
 
 namespace Curl.Console;
 

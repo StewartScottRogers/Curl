@@ -1,6 +1,6 @@
 using Curl.Protocol.Abstractions;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
 /// Serves <paramref name="schemes" /> without building the handler that performs their

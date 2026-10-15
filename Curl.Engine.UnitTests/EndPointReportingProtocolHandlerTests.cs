@@ -2,7 +2,7 @@ using System.Net;
 using Curl.Protocol.Abstractions;
 using Curl.Testing;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 [TestClass]
 public sealed class EndPointReportingProtocolHandlerTests
@@ -67,5 +67,20 @@ public sealed class EndPointReportingProtocolHandlerTests
 
         Diagnostics.Assert("report", "null", result.Report?.ToString() ?? "null");
         Assert.IsNull(result.Report);
+    }
+
+    [TestMethod]
+    public void Handler_GivenALazyHandler_IsTheBuiltHandler()
+    {
+        RecordingProtocolHandler built = RecordingProtocolHandler.Failing("dict", CurlExitCode.CouldntConnect, "x");
+        LazyProtocolHandler lazy = new(built.SupportedSchemes, () => built);
+        Diagnostics.Arrange("wrapped handler", "a lazy handler that builds the recording handler");
+
+        EndPointReportingProtocolHandler handler = new(lazy, new ConnectionEndPointRecorder());
+        Diagnostics.Act("handler is the built one", ReferenceEquals(built, handler.Handler));
+
+        Diagnostics.Assert("handler is the built one", true, ReferenceEquals(built, handler.Handler));
+        Assert.AreSame(built, handler.Handler);
+        Assert.AreSame(lazy, handler.GivenHandler);
     }
 }

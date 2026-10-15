@@ -1,6 +1,6 @@
 using Curl.Protocol.Abstractions;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
 /// The run's diagnostic log for services composed before the command line is read, such as the

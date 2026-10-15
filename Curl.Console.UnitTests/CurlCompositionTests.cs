@@ -23,6 +23,7 @@ using Curl.Protocol.Telnet;
 using Curl.Protocol.Tftp;
 using Curl.Protocol.Ws;
 using Curl.Testing;
+using Curl.Engine;
 
 namespace Curl.Console;
 

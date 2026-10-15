@@ -1,7 +1,7 @@
 using Curl.Protocol.Abstractions;
 using Curl.Testing;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
 /// Pins <see cref="ResponseWaitTimerTraceEvents" />: the response wait's <c>[TIMER]</c> lines follow each
