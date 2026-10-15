@@ -33,3 +33,4 @@ Upstream's `servers.pm` (curl-8_22_0) starts `https-proxy` as stunnel on `%HTTPS
 ## Log
 
 - 2026-10-14: Created.
+- 2026-10-14: Backlog -> Doing.
