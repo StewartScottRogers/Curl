@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary, Curl.Networking.UnitTests]
 requirement: none
 created: 2026-10-15
-completed:
+completed: 2026-10-15
 ---
 # BL-2270 — Close GF-0079: A wrong --pinnedpubkey with --cacert on the Schannel build gives exit 60 (revocation unknown) instead of 90
 
@@ -35,15 +35,22 @@ First measure the Schannel reference curl on a loopback TLS server with '--cacer
 
 ## Acceptance criteria
 
-- [ ] `behaviour:test2035`: Curl answers what curl 8.22.0 answers, `upstream test2035 passes`, so the item measures `match`.
-- [ ] `behaviour:test2038`: Curl answers what curl 8.22.0 answers, `upstream test2038 passes`, so the item measures `match`.
-- [ ] `behaviour:test2042`: Curl answers what curl 8.22.0 answers, `upstream test2042 passes`, so the item measures `match`.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
-- [ ] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
+- [x] `behaviour:test2035`: Curl answers what curl 8.22.0 answers, `upstream test2035 passes`, so the item measures `match`.
+- [x] `behaviour:test2038`: Curl answers what curl 8.22.0 answers, `upstream test2038 passes`, so the item measures `match`.
+- [x] `behaviour:test2042`: Curl answers what curl 8.22.0 answers, `upstream test2042 passes`, so the item measures `match`.
+- [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
+- [x] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md). No option was added or changed, so `--ai-help` is unchanged.
 
 ## Notes
+
+- Measured curl 8.21.0 Schannel with `Record-CurlExchange.ps1 -Tls -TlsRootCertificateFile`, `-sS --cacert root.pem`: a wrong `sha256//` pin is exit 90, the right pin exit 60 (`schannel: the revocation status is unknown`), no pin exit 60. So with `--cacert` the pin is judged before the manual chain check.
+- `ServerCertificateVerification.Judge` now judges the pin first when `matchesSchannelBuild` and `--cacert` are both set (`JudgesPinnedPublicKeyBeforeVerification`); the OpenSSL build and system-store validation keep the old order. ADR-0504 records it.
+- Focused tests in `SslStreamTlsProviderTests.ChainErrors.cs`: a wrong pin with an unknown-revocation `--cacert` chain is exit 90 on both builds; the right pin on Schannel is still exit 60.
+- `CURL_UPSTREAM_CASE=2035`, `2038`, `2042` through `NamedUpstreamCase_RunThroughCurl_PassesAsAListedCaseMust`: all three pass. Adding them to `Curl.Conformance.UnitTests/PassingUpstreamCases.txt` is outside this task's touches; the ratchet picks them up.
+- Measure-CodeQuality.ps1 -Library Curl.Networking.UnitLibrary: 0 failing members. Full build clean; fast tests green in all 37 test projects.
 
 ## Log
 
 - 2026-10-15: Created.
 - 2026-10-15: Backlog -> Doing.
+- 2026-10-15: Doing -> Done. A wrong --pinnedpubkey with --cacert on the Schannel build is exit 90 (pin judged before the manual chain check); upstream test2035, test2038, test2042 pass
