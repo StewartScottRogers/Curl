@@ -11,8 +11,9 @@ namespace Curl.Conformance.Http3Server;
 /// of <c>sws</c> (cases 2500 and 2501 at <c>curl-8_22_0</c>): the request line in absolute form
 /// (<c>GET https://localhost:port/path HTTP/1.1</c>), <c>Host</c> from <c>:authority</c>, the other
 /// fields with capitalised names, then <c>Via: 3 nghttpx</c> and no <c>X-Forwarded-Proto</c>. The
-/// reply is read as the h2c stand-in reads it, into fields with <c>server: nghttpx</c> and
-/// <c>via: 1.1 nghttpx</c>.
+/// reply is read as the h2c stand-in reads it, into fields ending in <c>via: 1.1 nghttpx</c>, but
+/// with no <c>server</c> field: upstream's HTTP/3 cases (2501, 2503) expect none, where its h2
+/// cases expect <c>server: nghttpx</c> (ADR-0502).
 /// </summary>
 internal static class Http3ServerRequestRelay
 {
@@ -30,14 +31,15 @@ internal static class Http3ServerRequestRelay
         ConnectResult connected = await backend.ConnectAsync(target, cancellationToken).ConfigureAwait(false);
         if (connected.Connection is not { } connection)
         {
-            return new Http2ServerReply([new(":status", "502"), new("server", "nghttpx"), new("via", "1.1 nghttpx")], []);
+            return new Http2ServerReply([new(":status", "502"), new("via", "1.1 nghttpx")], []);
         }
 
         await using (connection.ConfigureAwait(false))
         {
             await connection.WriteAsync(FormatRequest(request, body), cancellationToken).ConfigureAwait(false);
             await connection.FlushAsync(cancellationToken).ConfigureAwait(false);
-            return await Http2ServerRequestRelay.ReadReplyAsync(new Http2ServerBackendReader(connection), Field(request, ":method") == "HEAD", cancellationToken).ConfigureAwait(false);
+            Http2ServerReply reply = await Http2ServerRequestRelay.ReadReplyAsync(new Http2ServerBackendReader(connection), Field(request, ":method") == "HEAD", cancellationToken).ConfigureAwait(false);
+            return reply with { Headers = [.. reply.Headers.Where(f => f.Name != "server")] };
         }
     }
 

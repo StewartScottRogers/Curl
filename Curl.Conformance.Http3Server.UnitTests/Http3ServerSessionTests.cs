@@ -33,7 +33,7 @@ public sealed class Http3ServerSessionTests
         Assert.AreEqual(0, beforeFin);
         Assert.AreEqual("GET https://localhost:9010/2500 HTTP/1.1\r\nHost: localhost:9010\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\nVia: 3 nghttpx\r\n\r\n", backend.Requests.Single());
         Assert.IsTrue(stream.IsReadComplete);
-        Assert.AreEqual(":status: 200|date: Tue, 09 Nov 2010 14:49:00 GMT|content-length: 6|content-type: text/html|funny-head: yesyes|server: nghttpx|via: 1.1 nghttpx", string.Join("|", fields.Select(f => $"{f.Name}: {f.Value}")));
+        Assert.AreEqual(":status: 200|date: Tue, 09 Nov 2010 14:49:00 GMT|content-length: 6|content-type: text/html|funny-head: yesyes|via: 1.1 nghttpx", string.Join("|", fields.Select(f => $"{f.Name}: {f.Value}")));
         Assert.AreEqual("-foo-\n", Encoding.ASCII.GetString(body));
         var control = client.Streams.AcceptUnidirectional()!;
         Assert.AreEqual(3UL, control.Id);

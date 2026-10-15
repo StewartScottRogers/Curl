@@ -43,4 +43,28 @@ public sealed class Http3ServerRequestRelayTests
         Assert.AreEqual("200", reply.Headers[0].Value);
         Assert.IsEmpty(reply.Body);
     }
+
+    [TestMethod]
+    public async Task RelayAsync_BackendReply_HasNoServerFieldAsNghttpxH3Writes()
+    {
+        var backend = new RecordingBackendConnector("HTTP/1.1 200 OK\r\nServer: sws\r\nContent-Length: 6\r\nFunny-head: yesyes\r\n\r\n-foo-\n");
+        HeaderField[] request = [new(":method", "GET"), new(":scheme", "https"), new(":authority", "h"), new(":path", "/2503")];
+
+        var reply = await Http3ServerRequestRelay.RelayAsync(backend, new("h", 1, UseTls: false), request, [], CancellationToken.None);
+
+        Assert.AreEqual(":status: 200|content-length: 6|funny-head: yesyes|via: 1.1 nghttpx", string.Join("|", reply.Headers.Select(f => $"{f.Name}: {f.Value}")));
+        Assert.AreEqual("-foo-\n", Encoding.ASCII.GetString(reply.Body));
+    }
+
+    [TestMethod]
+    public async Task RelayAsync_BackendRefuses_Answers502WithNoServerField()
+    {
+        var backend = new RecordingBackendConnector(null);
+        HeaderField[] request = [new(":method", "GET"), new(":scheme", "https"), new(":authority", "h"), new(":path", "/")];
+
+        var reply = await Http3ServerRequestRelay.RelayAsync(backend, new("h", 1, UseTls: false), request, [], CancellationToken.None);
+
+        Assert.AreEqual(":status: 502|via: 1.1 nghttpx", string.Join("|", reply.Headers.Select(f => $"{f.Name}: {f.Value}")));
+        Assert.IsEmpty(reply.Body);
+    }
 }

@@ -76,7 +76,8 @@ in-process Curl's QUIC through the injected `IDatagramConnector`.
   (`GET https://localhost:port/path HTTP/1.1`), `Host` from `:authority`, the other fields
   capitalised, `Transfer-Encoding: chunked` for a body without `content-length`, and
   `Via: 3 nghttpx` (after any incoming `via`); no `X-Forwarded-Proto`. The reply comes back
-  with `server: nghttpx` and `via: 1.1 nghttpx`; an unreachable backend reads as `502`.
+  with `via: 1.1 nghttpx` and no `server` field, as upstream's HTTP/3 cases 2501 and 2503
+  expect (ADR-0502, BL-2268); an unreachable backend reads as `502`.
 - `Http3ServerChannel` (internal) is one client's `IDatagramChannel`: sends go to its session,
   answers wait for receives and come from `ServerEndPoint`. `Http3ServerConnector` (internal)
   opens a fresh connection and session per open, whatever the port; `UpstreamHttp3ServerFactory.Create(backend, tlsSettings)`
