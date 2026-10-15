@@ -72,3 +72,4 @@ Make the refusal follow the platform's reference build, not only the Schannel bu
 - 2026-10-15: Created.
 - 2026-10-15: Backlog -> Doing.
 - 2026-10-15: Doing -> Backlog. Needs Curl.Console and Curl.Console.UnitTests, held by BL-2337 in Doing; plan recorded under Notes
+- 2026-10-15: Backlog -> Doing.
