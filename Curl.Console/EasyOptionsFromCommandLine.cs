@@ -1,6 +1,7 @@
 using System.Collections.Frozen;
 using System.Security.Authentication;
 using Curl.Api.Options.Network;
+using Curl.Api.Options.Proxy;
 using Curl.Api.Options.Tls;
 using Curl.Cli;
 using Curl.Networking;
@@ -12,7 +13,7 @@ namespace Curl.Console;
 /// The curl tool's <c>config2setopts.c</c>: maps one option group of a parsed command line onto the
 /// easy option groups of <c>Curl.Api</c> (ADR-0506), one method per group, as curl hands its
 /// options to libcurl with <c>curl_easy_setopt</c>. Each mapping agrees with the <c>CURLOPT_*</c>
-/// lines <c>--libcurl</c> writes for the same command line, except where ADR-0513 and ADR-0514 record that the
+/// lines <c>--libcurl</c> writes for the same command line, except where ADR-0513, ADR-0514 and ADR-0515 record that the
 /// command line's behaviour wins; an option the command line leaves out keeps libcurl's default.
 /// </summary>
 internal static class EasyOptionsFromCommandLine
@@ -35,6 +36,18 @@ internal static class EasyOptionsFromCommandLine
         [ObsoleteTlsProtocols.Tls11] = SslVersionMaximum.Tls11,
         [SslProtocols.Tls12] = SslVersionMaximum.Tls12,
         [SslProtocols.Tls13] = SslVersionMaximum.Tls13,
+    }.ToFrozenDictionary();
+
+    // The kind a proxy option names, as the CURLPROXY_* --libcurl writes for it.
+    private static readonly FrozenDictionary<ProxyKind, ProxyType> ProxyTypesByKind = new Dictionary<ProxyKind, ProxyType>
+    {
+        [ProxyKind.Http] = ProxyType.Http,
+        [ProxyKind.Http10] = ProxyType.Http10,
+        [ProxyKind.Https] = ProxyType.Https,
+        [ProxyKind.Socks4] = ProxyType.Socks4,
+        [ProxyKind.Socks4a] = ProxyType.Socks4A,
+        [ProxyKind.Socks5] = ProxyType.Socks5,
+        [ProxyKind.Socks5Hostname] = ProxyType.Socks5Hostname,
     }.ToFrozenDictionary();
 
     /// <summary>
@@ -237,6 +250,51 @@ internal static class EasyOptionsFromCommandLine
         SslVersionMaximumsByProtocol.GetValueOrDefault(maximum ?? SslProtocols.None, SslVersionMaximum.None);
 
     private static SslOptions SslOptionOf(bool on, SslOptions bit) => on ? bit : SslOptions.None;
+
+    /// <summary>
+    /// Maps the proxy group: <c>-x</c>, <c>--proxy1.0</c>, <c>--socks4</c>, <c>--socks4a</c>,
+    /// <c>--socks5</c>, <c>--socks5-hostname</c> and <c>--proxy-http2</c> (the proxy and its type),
+    /// <c>--preproxy</c>, <c>--noproxy</c>, <c>-p</c>, <c>--suppress-connect-headers</c>,
+    /// <c>--proxy-header</c>, <c>--socks5-basic</c>, <c>--socks5-gssapi</c>, <c>--socks5-gssapi-nec</c>,
+    /// <c>--socks5-gssapi-service</c>, <c>--haproxy-protocol</c> and <c>--haproxy-clientip</c>. The proxy
+    /// environment variables are libcurl's to read, so they are not part of the record; proxy credentials
+    /// and proxy TLS belong to the authentication and TLS groups (ADR-0515).
+    /// </summary>
+    /// <param name="options">The option group.</param>
+    /// <returns>The proxy options.</returns>
+    public static EasyProxyOptions ProxyOf(CommandLineOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        return new EasyProxyOptions
+        {
+            Proxy = options.Proxy?.Address,
+            ProxyType = ProxyTypeOf(options),
+            PreProxy = options.PreProxy,
+            NoProxy = options.NoProxy,
+            HttpProxyTunnel = options.ProxyTunnel,
+            SuppressConnectHeaders = options.SuppressConnectHeaders,
+            ProxyHeaders = [.. options.ProxyHeaders],
+            Socks5Authentication = Socks5AuthenticationOf(options),
+            Socks5GssApiNec = options.Socks5GssapiNec,
+            Socks5GssApiService = options.Socks5GssapiServiceName,
+            HaProxyProtocol = options.HaproxyProtocol,
+            HaProxyClientIp = options.HaproxyClientIp,
+        };
+    }
+
+    // The option's kind, as --libcurl writes CURLOPT_PROXYTYPE; --proxy-http2 turns -x's HTTP into CURLPROXY_HTTPS2 (ADR-0515).
+    private static ProxyType ProxyTypeOf(CommandLineOptions options) =>
+        options.Proxy is not { } proxy ? ProxyType.Http
+        : proxy.KindWithoutScheme == ProxyKind.Http && options.ProxyHttp2 ? ProxyType.Https2
+        : ProxyTypesByKind[proxy.KindWithoutScheme];
+
+    // curl's tool sets CURLOPT_SOCKS5_AUTH only when a --socks5-basic or --socks5-gssapi bit is on; none keeps libcurl's both.
+    private static Socks5Authentication Socks5AuthenticationOf(CommandLineOptions options)
+    {
+        Socks5Authentication methods = (options.Socks5BasicAuth ? Socks5Authentication.Basic : Socks5Authentication.None)
+            | (options.Socks5GssapiAuth ? Socks5Authentication.GssApi : Socks5Authentication.None);
+        return methods == Socks5Authentication.None ? new EasyProxyOptions().Socks5Authentication : methods;
+    }
 
     // The schemes as CURLOPT_PROTOCOLS_STR takes them: lowercase, sorted, joined by commas.
     private static string? ProtocolListOf(IReadOnlySet<string>? schemes) =>

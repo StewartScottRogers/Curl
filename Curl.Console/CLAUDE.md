@@ -40,8 +40,10 @@ connection, DNS, socket, timeout, protocol and `--ssl` options; an option left o
 default, and where its mapping differs from the `CURLOPT_*` lines `--libcurl` writes, the command
 line's behaviour wins (ADR-0513). `TlsOf` builds `EasyTlsOptions` from the origin's, the HTTPS proxy's and
 DoH's TLS options, splitting `-E` with `Curl.Networking`'s `ClientCertificateArgument` (ADR-0514).
-Nothing reads either yet: BL-2323 and BL-2324 hand their records to the engine's
-factories, and BL-2305 to BL-2309 add the other groups.
+`ProxyOf` builds `EasyProxyOptions` from the proxy, pre-proxy, `--noproxy`, tunnel, proxy-header,
+SOCKS5 and HAProxy options; the proxy environment variables stay the engine's (ADR-0515).
+Nothing reads these yet: BL-2323, BL-2324 and BL-2325 hand their records to the engine's
+classes, and BL-2306 to BL-2309 add the other groups.
 
 `Program.Main` only opens the standard streams, builds the composition and hands the
 arguments to `CurlCommandRunner`, which parses them, runs each URL and prints curl's
