@@ -8,7 +8,7 @@ depends-on: [BL-2303]
 touches: [Curl.Console, Curl.Console.UnitTests, Curl.Engine.UnitLibrary, Curl.Engine.UnitTests, Curl.Engine.IntegrationTests, Curl.Api.UnitLibrary/Options/Network, Curl.Api.UnitTests/Options/Network]
 requirement: none
 created: 2026-10-15
-completed:
+completed: 2026-10-15
 ---
 # BL-2323 — Make the engine's connection, DNS and timeout factories read EasyNetworkOptions instead of CommandLineOptions
 
@@ -26,16 +26,23 @@ Byte-for-byte points ADR-0513 settles: `ConnectTimeout` zero means "not set" (li
 
 ## Acceptance criteria
 
-- [ ] The engine members named in Context take `EasyNetworkOptions`, not `CommandLineOptions`, for their network, DNS and timeout settings, and `Curl.Engine.UnitLibrary` references `Curl.Api.UnitLibrary`.
-- [ ] Tests that built `CommandLineOptions` only to drive one of those members now build the record; tests through the whole command line stay as they are.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes, no existing test deleted, skipped or weakened.
-- [ ] `Measure-CodeQuality.ps1 -Library Curl.Engine.UnitLibrary,Curl.Console` passes.
-- [ ] `Curl.Conformance.UnitTests/PassingUpstreamCases.txt` is unchanged and every case still passes.
-- [ ] `Curl.Console/CurlEasyErrorText.cs` stays at that path and `InProcessCurl.RunAsync`'s public signatures are unchanged.
+- [x] The engine members named in Context take `EasyNetworkOptions`, not `CommandLineOptions`, for their network, DNS and timeout settings, and `Curl.Engine.UnitLibrary` references `Curl.Api.UnitLibrary`.
+- [x] Tests that built `CommandLineOptions` only to drive one of those members now build the record; tests through the whole command line stay as they are.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes, no existing test deleted, skipped or weakened.
+- [x] `Measure-CodeQuality.ps1 -Library Curl.Engine.UnitLibrary,Curl.Console` passes.
+- [x] `Curl.Conformance.UnitTests/PassingUpstreamCases.txt` is unchanged and every case still passes.
+- [x] `Curl.Console/CurlEasyErrorText.cs` stays at that path and `InProcessCurl.RunAsync`'s public signatures are unchanged.
 
 ## Notes
+
+- Decisions in ADR-0526. `CreateTransports`, `CreateDnsResolver`, `CreateTcpConnector`, `CreatePoolingConnector` and `OptionGroupConnectionSettings.Of` take the record beside `CommandLineOptions` (still read for TLS, proxy, trace, HTTP version, `-m`); `CreateUdpDatagramConnector`, `LocalBindingOf`, `UnixSocketOf`, `AddressFamilyOf`, `DnsServerVariableResolverOf` and the new `TcpSocketOptionsOf` take the record alone; `ConnectTimeoutOf` and `TransferTimers.Of` take it with `-m` as a `TimeSpan?`. `CreateDohConnector` reads no network option, so it stays as it was.
+- `TransferContextFactory`'s connect timeout and `--connect-to` fields are split out to BL-2343: its per-URL `Create` has many callers, and threading the record through it is a change of its own.
+- Test approach: call sites were rewritten mechanically to pass `EasyOptionsFromCommandLine.NetworkOf(<options>)`; `Curl.Engine.UnitTests` and `Curl.Engine.IntegrationTests` link `Curl.Console/EasyOptionsFromCommandLine.cs` for it. `AddressFamilyOf`, `LocalBindingOf` and `UnixSocketOf` tests build the record directly.
+- Measured: curl 8.22.0 (Schannel) `--libcurl` writes no `CURLOPT_HAPPY_EYEBALLS_TIMEOUT_MS` for `--happy-eyeballs-timeout-ms 0` and `50L` for 50, so the record's 200 ms for 0 is curl's; the engine had used 0 ms. Keepalive: the record's 60 s / 9 probes equal `TcpSocketOptions`' defaults, so sockets are unchanged.
+- Results: full fast suite 0 failures (Console 2547, Engine 652, Conformance 3129 passed); Measure-CodeQuality for both libraries: 0 failing members.
 
 ## Log
 
 - 2026-10-15: Created.
 - 2026-10-15: Backlog -> Doing.
+- 2026-10-15: Doing -> Done. The engine's connection, DNS and timeout factories read EasyNetworkOptions; Curl.Console hands them EasyOptionsFromCommandLine.NetworkOf
