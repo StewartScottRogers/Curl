@@ -41,6 +41,7 @@ In Curl.Cli.UnitLibrary/CurlVersionText.cs, drop GSS-API from the Windows Featur
 - 2026-10-13_1406: 0 of 1 items are gaps.
 - 2026-10-14_0904: 0 of 1 items are gaps.
 - 2026-10-15_0304: 0 of 1 items are gaps.
+- 2026-10-15_0543: 0 of 1 items are gaps.
 
 ## Log
 

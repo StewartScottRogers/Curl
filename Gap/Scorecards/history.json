@@ -98,5 +98,15 @@
     "areas": { "options": { "x": 568, "y": 568 }, "protocols": { "x": 27, "y": 27 }, "features": { "x": 18, "y": 18 }, "writeout": { "x": 138, "y": 138 }, "exitcodes": { "x": 259, "y": 259 }, "environment": { "x": 39, "y": 39 }, "behaviour": { "x": 1390, "y": 1427 } },
     "overall": { "x": 2439, "y": 2476 },
     "newest": { "x": 2439, "y": 2476 }
+  },
+  {
+    "stamp": "2026-10-15_0543",
+    "commit": "433a1953297ac88e63b8a711cf293bfb54f6e77a",
+    "platform": "windows",
+    "targetVersion": "8.22.0",
+    "newestVersion": "8.22.0",
+    "areas": { "options": { "x": 568, "y": 568 }, "protocols": { "x": 27, "y": 27 }, "features": { "x": 18, "y": 18 }, "writeout": { "x": 138, "y": 138 }, "exitcodes": { "x": 259, "y": 259 }, "environment": { "x": 39, "y": 39 }, "behaviour": { "x": 1396, "y": 1427 } },
+    "overall": { "x": 2445, "y": 2476 },
+    "newest": { "x": 2445, "y": 2476 }
   }
 ]

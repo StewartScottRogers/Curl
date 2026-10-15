@@ -4,11 +4,11 @@ title: --unix-socket cases throw in the gap harness: its dialer sends the Unix p
 area: behaviour
 key: behaviour:harness-unix-socket-dial-misses-sws-port
 severity: High
-status: open
+status: closed
 scope: target
 introduced-in:
 opened: 2026-10-15_0304
-closed:
+closed: 2026-10-15_0543
 regression: false
 items: [behaviour:test1435, behaviour:test1436]
 touches: [Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests]
@@ -32,8 +32,10 @@ Give Curl.Conformance.UnitLibrary one public way to dial the http-unix server, f
 ## Measurements
 
 - 2026-10-15_0304: 2 of 2 items are gaps.
+- 2026-10-15_0543: 0 of 2 items are gaps.
 
 ## Log
 
 - 2026-10-15_0304: Opened by gap-behaviour.
 - 2026-10-15_0349: Filed BL-2271.
+- 2026-10-15_0543: Closed: run 2026-10-15_0543 measured every item as match or excluded.

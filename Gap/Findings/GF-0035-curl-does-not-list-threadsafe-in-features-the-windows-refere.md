@@ -41,6 +41,7 @@ Record in an ADR whether Curl's transfers are thread-safe in the sense curl mean
 - 2026-10-13_1406: 0 of 1 items are gaps.
 - 2026-10-14_0904: 0 of 1 items are gaps.
 - 2026-10-15_0304: 0 of 1 items are gaps.
+- 2026-10-15_0543: 0 of 1 items are gaps.
 
 ## Log
 
