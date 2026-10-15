@@ -26,7 +26,7 @@ internal sealed class StandardInputUploadStream(Stream inner) : Stream, IRewinda
     /// wrapped stream can seek, as a file redirected into it can, or when
     /// <see cref="SeekOfUnseekableInputSucceeds" />. Off Windows, stdin read through a pipe cannot
     /// be rewound, so curl 8.22.0 fails a chunked resend of it to an HTTP/1.0 server with exit 65
-    /// rather than 25 (upstream test1072 and test1073 as GF-0082 runs them, ADR-0520, BL-2337).
+    /// rather than 25 (upstream test1072 and test1073 as GF-0082 runs them, ADR-0524, BL-2337).
     /// </summary>
     public bool CanRewind => inner.CanSeek || SeekOfUnseekableInputSucceeds;
 

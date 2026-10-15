@@ -748,7 +748,7 @@ public sealed class HttpProtocolHandler(
     /// <see cref="IRewindableUpload.CanRewind" /> says no, as stdin read through a pipe off Windows
     /// is, which curl 8.22.0 fails rewinding before it reaches the exit 25 of
     /// <see cref="ThrowIfChunkedResendToHttp10" /> (upstream test1072 and test1073 as GF-0082 runs
-    /// them, ADR-0520, BL-2337); <see langword="null" /> for none.
+    /// them, ADR-0524, BL-2337); <see langword="null" /> for none.
     /// </summary>
     private static TransferResult? FailureBeforeConnecting(HttpRequestPlan plan, TransferReport? earlier)
     {
