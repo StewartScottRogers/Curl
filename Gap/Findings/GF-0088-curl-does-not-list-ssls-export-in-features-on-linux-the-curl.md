@@ -13,8 +13,8 @@ closed:
 regression: false
 items: [features:SSLS-EXPORT]
 touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests]
-task:
-tasks: []
+task: BL-2331
+tasks: [BL-2331]
 ---
 # GF-0088 - Curl does not list SSLS-EXPORT in Features: on Linux; the curl 8.22.0 OpenSSL reference does
 
@@ -37,3 +37,4 @@ In Curl.Cli.UnitLibrary, CurlVersionText.FeaturesLine (CurlVersionText.cs, line 
 ## Log
 
 - 2026-10-15_0751: Opened by gap-features.
+- 2026-10-15_0900: Filed BL-2331.

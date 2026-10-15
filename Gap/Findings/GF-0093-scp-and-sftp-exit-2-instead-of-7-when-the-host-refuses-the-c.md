@@ -13,8 +13,8 @@ closed:
 regression: false
 items: [protocols:scp, protocols:sftp]
 touches: [Curl.Protocol.Ssh.UnitLibrary, Curl.Protocol.Ssh.UnitTests]
-task:
-tasks: []
+task: BL-2336
+tasks: [BL-2336]
 ---
 # GF-0093 - scp and sftp exit 2 instead of 7 when the host refuses the connection
 
@@ -37,3 +37,4 @@ In Curl.Protocol.Ssh.UnitLibrary, make a refused or unreachable connection on sc
 ## Log
 
 - 2026-10-15_0751: Opened by gap-protocols.
+- 2026-10-15_0900: Filed BL-2336.

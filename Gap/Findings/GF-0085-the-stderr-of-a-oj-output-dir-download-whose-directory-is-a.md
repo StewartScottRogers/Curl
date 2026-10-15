@@ -13,8 +13,8 @@ closed:
 regression: false
 items: [behaviour:test3036]
 touches: [Curl.Console, Curl.Console.UnitTests, Curl.Protocol.Abstractions.UnitLibrary]
-task:
-tasks: []
+task: BL-2328
+tasks: [BL-2328]
 ---
 # GF-0085 - The stderr of a -OJ --output-dir download whose directory is a regular file differs from curl's on Linux
 
@@ -37,3 +37,4 @@ Make Curl.Console's 'Warning: Failed to open the file <path>: <reason>' line (Ou
 ## Log
 
 - 2026-10-15_0751: Opened by gap-behaviour.
+- 2026-10-15_0900: Filed BL-2328.

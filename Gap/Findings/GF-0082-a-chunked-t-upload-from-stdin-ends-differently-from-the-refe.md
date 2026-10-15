@@ -13,8 +13,8 @@ closed:
 regression: false
 items: [behaviour:test60, behaviour:test1072, behaviour:test1073]
 touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests, Curl.Console, Curl.Console.UnitTests]
-task:
-tasks: []
+task: BL-2337
+tasks: [BL-2337]
 ---
 # GF-0082 - A chunked -T - upload from stdin ends differently from the reference curl on Linux: the request differs at the terminating chunk, and a 401/301 retry exits 25 where curl exits 65
 
@@ -37,3 +37,4 @@ Make Curl's chunked upload of an unseekable stdin finish on Linux and macOS the 
 ## Log
 
 - 2026-10-15_0751: Opened by gap-behaviour.
+- 2026-10-15_0900: Filed BL-2337.

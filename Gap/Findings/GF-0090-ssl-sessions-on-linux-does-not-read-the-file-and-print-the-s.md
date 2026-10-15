@@ -13,8 +13,8 @@ closed:
 regression: false
 items: [options:--ssl-sessions]
 touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests]
-task:
-tasks: []
+task: BL-2333
+tasks: [BL-2333]
 ---
 # GF-0090 - --ssl-sessions on Linux does not read the file and print the session-file warnings real curl prints
 
@@ -37,3 +37,4 @@ In Curl.Cli.UnitLibrary, where SslSessionsFile (CommandLineGlobalState, CommandL
 ## Log
 
 - 2026-10-15_0751: Opened by gap-options.
+- 2026-10-15_0900: Filed BL-2333.

@@ -13,8 +13,8 @@ closed:
 regression: false
 items: [features:ECH]
 touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests]
-task:
-tasks: []
+task: BL-2329
+tasks: [BL-2329]
 ---
 # GF-0086 - Curl lists ECH in Features: on Linux; the curl 8.22.0 OpenSSL reference does not
 
@@ -37,3 +37,4 @@ In Curl.Cli.UnitLibrary, CurlVersionText.FeaturesLine (CurlVersionText.cs, line 
 ## Log
 
 - 2026-10-15_0751: Opened by gap-features.
+- 2026-10-15_0900: Filed BL-2329.

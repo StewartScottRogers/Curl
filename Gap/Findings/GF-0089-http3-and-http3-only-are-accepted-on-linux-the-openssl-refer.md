@@ -13,8 +13,8 @@ closed:
 regression: false
 items: [options:--http3, options:--http3-only]
 touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests]
-task:
-tasks: []
+task: BL-2332
+tasks: [BL-2332]
 ---
 # GF-0089 - --http3 and --http3-only are accepted on Linux; the OpenSSL reference build refuses them as unsupported
 
@@ -37,3 +37,4 @@ Make the refusal follow the platform's reference build, not only the Schannel bu
 ## Log
 
 - 2026-10-15_0751: Opened by gap-options.
+- 2026-10-15_0900: Filed BL-2332.

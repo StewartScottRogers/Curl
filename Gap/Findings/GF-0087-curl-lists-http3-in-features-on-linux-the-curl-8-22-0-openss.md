@@ -13,8 +13,8 @@ closed:
 regression: false
 items: [features:HTTP3]
 touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests]
-task:
-tasks: []
+task: BL-2330
+tasks: [BL-2330]
 ---
 # GF-0087 - Curl lists HTTP3 in Features: on Linux; the curl 8.22.0 OpenSSL reference does not
 
@@ -37,3 +37,4 @@ In Curl.Cli.UnitLibrary, CurlVersionText.FeaturesLine (CurlVersionText.cs, line 
 ## Log
 
 - 2026-10-15_0751: Opened by gap-features.
+- 2026-10-15_0900: Filed BL-2330.

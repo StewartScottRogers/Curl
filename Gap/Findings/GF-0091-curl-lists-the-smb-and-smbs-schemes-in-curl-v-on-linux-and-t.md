@@ -13,8 +13,8 @@ closed:
 regression: false
 items: [protocols:smb, protocols:smbs]
 touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests]
-task:
-tasks: []
+task: BL-2334
+tasks: [BL-2334]
 ---
 # GF-0091 - Curl lists the smb and smbs schemes in curl -V on Linux, and the Linux reference curl 8.22.0 with OpenSSL does not
 
@@ -37,3 +37,4 @@ In Curl.Cli.UnitLibrary/CurlVersionText.cs, give Linux and macOS a third Protoco
 ## Log
 
 - 2026-10-15_0751: Opened by gap-protocols.
+- 2026-10-15_0900: Filed BL-2334.
