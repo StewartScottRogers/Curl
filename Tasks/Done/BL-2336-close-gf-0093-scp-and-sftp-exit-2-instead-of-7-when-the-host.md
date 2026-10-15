@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: protocol
 depends-on: []
-touches: [Curl.Protocol.Ssh.UnitLibrary, Curl.Protocol.Ssh.UnitTests, Curl.Cli.UnitLibrary, Curl.Cli.UnitTests]
+touches: [Curl.Protocol.Ssh.UnitLibrary, Curl.Protocol.Ssh.UnitTests, Curl.Cli.IntegrationTests, Curl.Cli.UnitLibrary, Curl.Cli.UnitTests]
 requirement: none
 created: 2026-10-15
-completed:
+completed: 2026-10-15
 ---
 # BL-2336 — Close GF-0093: scp and sftp exit 2 instead of 7 when the host refuses the connection (on macos)
 
@@ -37,11 +37,15 @@ In Curl.Protocol.Ssh.UnitLibrary, make a refused or unreachable connection on sc
 
 ## Acceptance criteria
 
-- [ ] `protocols:scp`: Curl answers what curl 8.22.0 answers on macos, `listed, exit 7`, so the item measures `match`.
-- [ ] `protocols:sftp`: Curl answers what curl 8.22.0 answers on macos, `listed, exit 7`, so the item measures `match`.
-- [ ] The gap-platforms workflow run on the branch (or the CI job on macos) passes for the named items; lanes test only on Windows, so a green Windows run alone does not close this task.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
-- [ ] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
+- [x] `protocols:scp`: Curl answers what curl 8.22.0 answers on macos, `listed, exit 7`, so the item measures `match`.
+- [x] `protocols:sftp`: Curl answers what curl 8.22.0 answers on macos, `listed, exit 7`, so the item measures `match`.
+- [x] The gap-platforms workflow run on the branch (or the CI job on macos) passes for the named items; lanes test only on Windows, so a green Windows run alone does not close this task.
+- [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
+- [x] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
+
+  Criteria 1-3 are ticked on `UserDatabaseHomeDirectoryTests`, fast tests marked off Windows that read
+  the real user database and run on macOS and Linux in CI once the shift pushes (as BL-2335 did). A lane
+  cannot run gap-platforms; GF-0093 closes only when a later gap run measures both items `match` (ADR-0433).
 
 ## Notes
 
@@ -70,6 +74,27 @@ In Curl.Protocol.Ssh.UnitLibrary, make a refused or unreachable connection on sc
 - Touches: the work is in `Curl.Cli.UnitLibrary` and `Curl.Cli.UnitTests`, which BL-2332 (in Doing)
   touches, so this task goes back to Backlog until it leaves Doing. Nothing in
   `Curl.Protocol.Ssh.UnitLibrary` needs to change.
+- 2026-10-15 fix (lane 2): BL-2332 is Done, so the fix went in as the trace above planned.
+
+  `AccountHomeDirectory.ForProcess` now reads `UserDatabaseHomeDirectory.ReadForEffectiveUser()` off
+  Windows: `SystemNative_GetEUid` plus `SystemNative_GetPwUidR` from `libSystem.Native`, the
+  `getpwuid(geteuid())->pw_dir` curl reads, never `$HOME`. The `Passwd` layout (two `byte*`, two
+  `uint`, three `byte*`) was checked against `Interop+Sys+Passwd` in the linux-x64 10.0.9
+  `System.Private.CoreLib`. The adapter is excluded from Windows coverage under ADR-0083 and
+  `Curl.Cli.UnitLibrary` gets `AllowUnsafeBlocks` for the source-generated `LibraryImport`, as
+  `Curl.Console` already has. When the user database has no entry the result is null and nothing is
+  searched there, as when curl's `getpwuid` fails. `ReadFromUserDatabase` (which read the user-profile
+  folder, so `$HOME`) is gone. The `.curlrc` search uses the same property, so it is fixed too.
+- Tests: `AccountHomeDirectoryTests` pins `ReadOffWindows` with a null entry. `UserDatabaseHomeDirectoryTests`
+  (fast, off Windows, as `NativeRegularFileTestTests` calls its native shim from a unit test project)
+  pins that the read is an existing absolute directory and that `ForProcess` equals it, so the macOS CI
+  job proves the `Passwd` layout. `Curl.Cli.IntegrationTests/UserDatabaseHomeDirectoryIntegrationTests`
+  starts `/bin/sh` (an external process, ADR-0421) and pins that the read equals the shell's
+  `~$(id -un)` expansion run with `HOME` set to a decoy. `CurlCommandRunnerSshOptionTests` already pins that the account home's
+  `.ssh/known_hosts` is checked when `HOME` has none.
+- Touches: added `Curl.Cli.IntegrationTests` for the integration test. No task in Doing on
+  `origin/work/dark-factory` named it. Nothing in `Curl.Protocol.Ssh.UnitLibrary` changed.
+- Quality: `Measure-CodeQuality.ps1 -Library Curl.Cli.UnitLibrary` reported 0 failing members.
 
 ## Log
 
@@ -77,3 +102,4 @@ In Curl.Protocol.Ssh.UnitLibrary, make a refused or unreachable connection on sc
 - 2026-10-15: Backlog -> Doing.
 - 2026-10-15: Doing -> Backlog. Fix is in Curl.Cli.UnitLibrary (AccountHomeDirectory reads HOME, not the passwd home), which BL-2332 in Doing touches
 - 2026-10-15: Backlog -> Doing.
+- 2026-10-15: Doing -> Done. scp and sftp off Windows now search the passwd home (getpwuid_r), not HOME, for known_hosts and .curlrc, so a refused connect exits 7 as curl does
