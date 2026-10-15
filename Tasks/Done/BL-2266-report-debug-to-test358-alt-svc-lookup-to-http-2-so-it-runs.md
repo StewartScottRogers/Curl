@@ -8,7 +8,7 @@ depends-on: [BL-2263]
 touches: [Curl.Conformance.UnitTests]
 requirement: none
 created: 2026-10-14
-completed:
+completed: 2026-10-15
 ---
 # BL-2266 — Report Debug to test358 (alt-svc lookup to HTTP/2) so it runs on Linux and macOS
 
@@ -22,11 +22,15 @@ Found by BL-2259 (2026-10-14): test358 (HTTP GET translated by alt-svc lookup to
 
 ## Acceptance criteria
 
-- [ ] PlatformFor reports Debug to 358, with a comment saying why.
-- [ ] 358 is in PassingUpstreamCases.txt if it passes on Linux and macOS CI; otherwise its first difference is in Notes with a follow-up task.
+- [x] PlatformFor reports Debug to 358, with a comment saying why.
+- [x] 358 is in PassingUpstreamCases.txt if it passes on Linux and macOS CI; otherwise its first difference is in Notes with a follow-up task.
 ## Notes
+
+- PlatformFor already reported Debug to 358: BL-2263 keyed it on the alt-svc feature plus CURL_ALTSVC_HTTP, and its comment names 358 and 359. Nothing was left to change there.
+- 358 was still skipped on Linux and macOS CI only because it is not listed. Run under the Unix platform with Curl reading the command line as the non-Windows build (temporary local edit, reverted), it passes; on Windows it skips for h2c, which only the other platforms meet (ADR-0488), so it is listed.
 
 ## Log
 
 - 2026-10-14: Created.
 - 2026-10-15: Backlog -> Doing.
+- 2026-10-15: Doing -> Done. Case 358 passes under the Unix platform and is listed; Debug was already reported by BL-2263.
