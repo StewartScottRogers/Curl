@@ -6,10 +6,11 @@ namespace Curl.Api.Options.Authentication;
 /// An easy handle's authentication options (ADR-0506, plan row
 /// <c>EasyAuthenticationOptions</c>): <c>.netrc</c>, the origin's and the proxy's credentials
 /// and methods, SASL, the OAuth 2.0 bearer token, GSS-API service names and delegation, the
-/// Kerberos level for FTP, AWS SigV4 and TLS-SRP for the origin and the proxy. Every default
-/// is libcurl 8.22.0's. <see cref="ToString"/> never prints a password, a combined
-/// user-and-password string or a bearer token: it prints <c>&lt;redacted&gt;</c> for one
-/// that is set.
+/// Kerberos level for FTP, AWS SigV4, TLS-SRP for the origin and the proxy, and Curl's HTTP
+/// message signature settings, which have no <c>CURLOPT_*</c>. Every libcurl default is libcurl
+/// 8.22.0's. <see cref="ToString"/> never prints a password, a combined user-and-password
+/// string, a bearer token or a signature key: it prints <c>&lt;redacted&gt;</c> for one that
+/// is set.
 /// </summary>
 public sealed record EasyAuthenticationOptions
 {
@@ -180,6 +181,33 @@ public sealed record EasyAuthenticationOptions
     /// </summary>
     public string? ProxyTlsAuthPassword { get; init; }
 
+    /// <summary>
+    /// Curl-specific, with no <c>CURLOPT_*</c>: the HTTP message signature algorithm the curl
+    /// tool's <c>--httpsig-algo</c> names (<c>ed25519</c> or <c>hmac-sha256</c>), verbatim and
+    /// unchecked. Default <see langword="null"/>: requests are not signed.
+    /// </summary>
+    public string? HttpSignatureAlgorithm { get; init; }
+
+    /// <summary>
+    /// Curl-specific, with no <c>CURLOPT_*</c>: the HTTP message signature key the curl tool's
+    /// <c>--httpsig-key</c> names, a secret: the hex key, or <c>@</c> and the name of a file
+    /// holding it. Default <see langword="null"/>.
+    /// </summary>
+    public string? HttpSignatureKey { get; init; }
+
+    /// <summary>
+    /// Curl-specific, with no <c>CURLOPT_*</c>: the key identifier the curl tool's
+    /// <c>--httpsig-keyid</c> names. Default <see langword="null"/>.
+    /// </summary>
+    public string? HttpSignatureKeyId { get; init; }
+
+    /// <summary>
+    /// Curl-specific, with no <c>CURLOPT_*</c>: the components to sign the curl tool's
+    /// <c>--httpsig-headers</c> names, verbatim and unparsed. Default <see langword="null"/>:
+    /// curl's default set.
+    /// </summary>
+    public string? HttpSignatureHeaders { get; init; }
+
     private bool PrintMembers(StringBuilder builder)
     {
         builder.Append($"Netrc = {Netrc}, NetrcFile = {NetrcFile}, ");
@@ -196,7 +224,9 @@ public sealed record EasyAuthenticationOptions
         builder.Append($"TlsAuthType = {TlsAuthType}, TlsAuthUserName = {TlsAuthUserName}, ");
         builder.Append($"TlsAuthPassword = {Redact(TlsAuthPassword)}, ");
         builder.Append($"ProxyTlsAuthType = {ProxyTlsAuthType}, ProxyTlsAuthUserName = {ProxyTlsAuthUserName}, ");
-        builder.Append($"ProxyTlsAuthPassword = {Redact(ProxyTlsAuthPassword)}");
+        builder.Append($"ProxyTlsAuthPassword = {Redact(ProxyTlsAuthPassword)}, ");
+        builder.Append($"HttpSignatureAlgorithm = {HttpSignatureAlgorithm}, HttpSignatureKey = {Redact(HttpSignatureKey)}, ");
+        builder.Append($"HttpSignatureKeyId = {HttpSignatureKeyId}, HttpSignatureHeaders = {HttpSignatureHeaders}");
         return true;
     }
 

@@ -1,11 +1,14 @@
 using System.Collections.Frozen;
+using System.Net;
 using System.Security.Authentication;
+using Curl.Api.Options.Authentication;
 using Curl.Api.Options.Network;
 using Curl.Api.Options.Proxy;
 using Curl.Api.Options.Tls;
 using Curl.Cli;
 using Curl.Networking;
 using Curl.Protocol.Abstractions;
+using EasyGssApiDelegation = Curl.Api.Options.Authentication.GssApiDelegation;
 
 namespace Curl.Console;
 
@@ -13,7 +16,7 @@ namespace Curl.Console;
 /// The curl tool's <c>config2setopts.c</c>: maps one option group of a parsed command line onto the
 /// easy option groups of <c>Curl.Api</c> (ADR-0506), one method per group, as curl hands its
 /// options to libcurl with <c>curl_easy_setopt</c>. Each mapping agrees with the <c>CURLOPT_*</c>
-/// lines <c>--libcurl</c> writes for the same command line, except where ADR-0513, ADR-0514 and ADR-0515 record that the
+/// lines <c>--libcurl</c> writes for the same command line, except where ADR-0513 to ADR-0516 record that the
 /// command line's behaviour wins; an option the command line leaves out keeps libcurl's default.
 /// </summary>
 internal static class EasyOptionsFromCommandLine
@@ -48,6 +51,16 @@ internal static class EasyOptionsFromCommandLine
         [ProxyKind.Socks4a] = ProxyType.Socks4A,
         [ProxyKind.Socks5] = ProxyType.Socks5,
         [ProxyKind.Socks5Hostname] = ProxyType.Socks5Hostname,
+    }.ToFrozenDictionary();
+
+    // The schemes the engine knows, as their CURLAUTH_* bits.
+    private static readonly FrozenDictionary<HttpAuthSchemes, HttpAuthenticationMethods> AuthenticationMethodsByScheme = new Dictionary<HttpAuthSchemes, HttpAuthenticationMethods>
+    {
+        [HttpAuthSchemes.Basic] = HttpAuthenticationMethods.Basic,
+        [HttpAuthSchemes.Digest] = HttpAuthenticationMethods.Digest,
+        [HttpAuthSchemes.Ntlm] = HttpAuthenticationMethods.Ntlm,
+        [HttpAuthSchemes.Negotiate] = HttpAuthenticationMethods.Negotiate,
+        [HttpAuthSchemes.Bearer] = HttpAuthenticationMethods.Bearer,
     }.ToFrozenDictionary();
 
     /// <summary>
@@ -295,6 +308,57 @@ internal static class EasyOptionsFromCommandLine
             | (options.Socks5GssapiAuth ? Socks5Authentication.GssApi : Socks5Authentication.None);
         return methods == Socks5Authentication.None ? new EasyProxyOptions().Socks5Authentication : methods;
     }
+
+    /// <summary>
+    /// Maps the authentication group: <c>-u</c>, <c>-n</c>, <c>--netrc-file</c>, <c>--netrc-optional</c>,
+    /// <c>--basic</c>, <c>--digest</c>, <c>--ntlm</c>, <c>--negotiate</c>, <c>--anyauth</c>, <c>--oauth2-bearer</c>,
+    /// <c>--aws-sigv4</c>, <c>-U</c> and the <c>--proxy-*</c> method twins, <c>--login-options</c>,
+    /// <c>--sasl-authzid</c>, <c>--sasl-ir</c>, <c>--service-name</c>, <c>--proxy-service-name</c>,
+    /// <c>--delegation</c>, <c>--location-trusted</c>, <c>--disallow-username-in-url</c> and Curl's
+    /// <c>--httpsig-*</c> options. <c>--ntlm-wb</c>, <c>--krb</c>, <c>--tlsauthtype</c>, <c>--tlsuser</c>,
+    /// <c>--tlspassword</c> and their proxy twins have no function in the reference build, so the
+    /// command line keeps no value for them and their members keep libcurl's default (ADR-0516).
+    /// </summary>
+    /// <param name="options">The option group.</param>
+    /// <returns>The authentication options.</returns>
+    public static EasyAuthenticationOptions AuthenticationOf(CommandLineOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+
+        // NetrcUse and Curl.Cli's GssApiDelegation hold libcurl's CURL_NETRC_* and CURLGSSAPI_DELEGATION_* values in the same order.
+        return new EasyAuthenticationOptions
+        {
+            Netrc = (NetrcUsage)options.NetrcUse,
+            NetrcFile = options.NetrcFile,
+            UserPassword = UserPasswordOf(options.Credentials),
+            LoginOptions = options.LoginOptions,
+            HttpAuthentication = MethodsOf(options.AuthSchemes) | (options.AwsSigV4 is null ? HttpAuthenticationMethods.None : HttpAuthenticationMethods.AwsSigV4),
+            ProxyAuthentication = MethodsOf(options.ProxyAuthSchemes),
+            ProxyUserPassword = UserPasswordOf(options.ProxyCredentials),
+            SaslAuthorizationIdentity = options.SaslAuthorizationIdentity,
+            SaslInitialResponse = options.SaslInitialResponse,
+            XOAuth2Bearer = options.BearerToken,
+            DisallowUserNameInUrl = options.DisallowUsernameInUrl,
+            UnrestrictedAuthentication = options.SendCredentialsToRedirectHosts,
+            ServiceName = options.ServiceName,
+            ProxyServiceName = options.ProxyServiceName,
+            GssApiDelegation = (EasyGssApiDelegation)options.GssApiDelegation,
+            AwsSigV4 = options.AwsSigV4,
+            HttpSignatureAlgorithm = options.HttpSignatureAlgorithm,
+            HttpSignatureKey = options.HttpSignatureKey,
+            HttpSignatureKeyId = options.HttpSignatureKeyId,
+            HttpSignatureHeaders = options.HttpSignatureHeaders,
+        };
+    }
+
+    // user:password as --libcurl writes CURLOPT_USERPWD and CURLOPT_PROXYUSERPWD; the parser has already asked for a missing password.
+    private static string? UserPasswordOf(NetworkCredential? credentials) =>
+        credentials is null ? null : $"{credentials.UserName}:{credentials.Password}";
+
+    // Every scheme the engine knows is CURLAUTH_ANY, as --anyauth asks libcurl; otherwise each scheme its CURLAUTH_* bit (ADR-0516).
+    private static HttpAuthenticationMethods MethodsOf(HttpAuthSchemes schemes) =>
+        (schemes & HttpAuthSchemes.Any) == HttpAuthSchemes.Any ? HttpAuthenticationMethods.Any
+        : AuthenticationMethodsByScheme.Where(pair => (schemes & pair.Key) != 0).Aggregate(HttpAuthenticationMethods.None, (all, pair) => all | pair.Value);
 
     // The schemes as CURLOPT_PROTOCOLS_STR takes them: lowercase, sorted, joined by commas.
     private static string? ProtocolListOf(IReadOnlySet<string>? schemes) =>

@@ -63,6 +63,15 @@ public sealed class EasyAuthenticationOptionsTests
     }
 
     [TestMethod]
+    public void New_EasyAuthenticationOptions_LeavesCurlsHttpMessageSignatureUnset()
+    {
+        Assert.IsNull(Defaults.HttpSignatureAlgorithm);
+        Assert.IsNull(Defaults.HttpSignatureKey);
+        Assert.IsNull(Defaults.HttpSignatureKeyId);
+        Assert.IsNull(Defaults.HttpSignatureHeaders);
+    }
+
+    [TestMethod]
     public void HttpAuthenticationMethods_Members_HoldLibcurlsCurlauthBits()
     {
         Assert.AreEqual(0u, (uint)HttpAuthenticationMethods.None);
@@ -125,6 +134,10 @@ public sealed class EasyAuthenticationOptionsTests
         AssertChangesOnly(Defaults with { ProxyTlsAuthType = "SRP" }, o => o with { ProxyTlsAuthType = null });
         AssertChangesOnly(Defaults with { ProxyTlsAuthUserName = "psrpuser" }, o => o with { ProxyTlsAuthUserName = null });
         AssertChangesOnly(Defaults with { ProxyTlsAuthPassword = "psrppass" }, o => o with { ProxyTlsAuthPassword = null });
+        AssertChangesOnly(Defaults with { HttpSignatureAlgorithm = "ed25519" }, o => o with { HttpSignatureAlgorithm = null });
+        AssertChangesOnly(Defaults with { HttpSignatureKey = "00ff" }, o => o with { HttpSignatureKey = null });
+        AssertChangesOnly(Defaults with { HttpSignatureKeyId = "key-1" }, o => o with { HttpSignatureKeyId = null });
+        AssertChangesOnly(Defaults with { HttpSignatureHeaders = "method authority" }, o => o with { HttpSignatureHeaders = null });
     }
 
     [TestMethod]
@@ -139,6 +152,7 @@ public sealed class EasyAuthenticationOptionsTests
             XOAuth2Bearer = "SecretBearerToken",
             TlsAuthPassword = "SecretTlsSrpPassword",
             ProxyTlsAuthPassword = "SecretProxyTlsSrpPassword",
+            HttpSignatureKey = "SecretSignatureKey",
         };
 
         var text = options.ToString();
@@ -146,7 +160,8 @@ public sealed class EasyAuthenticationOptionsTests
         Assert.DoesNotContain("Secret", text);
         Assert.Contains("Password = <redacted>,", text);
         Assert.Contains("XOAuth2Bearer = <redacted>,", text);
-        Assert.Contains("ProxyTlsAuthPassword = <redacted>", text);
+        Assert.Contains("ProxyTlsAuthPassword = <redacted>,", text);
+        Assert.Contains("HttpSignatureKey = <redacted>,", text);
     }
 
     [TestMethod]
