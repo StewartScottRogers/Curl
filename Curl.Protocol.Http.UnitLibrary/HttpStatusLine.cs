@@ -85,6 +85,19 @@ internal sealed class HttpStatusLine(Version version, int statusCode, string rea
             string.Empty);
 
     /// <summary>
+    /// Tells whether a status line received over HTTP/1.x is an HTTP/2 or HTTP/3 interim one,
+    /// <c>HTTP/2 1xx</c> or <c>HTTP/3 1xx</c> with a three-digit code, which curl's OpenSSL
+    /// build parses as that version's 1xx (upstream test1704, BL-2326).
+    /// </summary>
+    /// <param name="line">The line, without its terminator.</param>
+    /// <returns><see langword="true" /> when it is.</returns>
+    internal static bool IsHttp2OrHttp3Interim(string line) =>
+        line.Length >= 10
+        && (line.StartsWith("HTTP/2 ", StringComparison.Ordinal) || line.StartsWith("HTTP/3 ", StringComparison.Ordinal))
+        && line[7] == '1'
+        && IsThreeDigits(line.AsSpan(7, 3));
+
+    /// <summary>
     /// Tells whether bytes received so far could still begin a status line: they must match
     /// <c>HTTP/</c>, in any letter case, as far as they go.
     /// </summary>
