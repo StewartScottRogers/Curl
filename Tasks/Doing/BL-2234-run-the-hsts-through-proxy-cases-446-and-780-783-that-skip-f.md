@@ -30,3 +30,4 @@ Found by BL-2225, which made the http-proxy stand-in tunnel a `CONNECT` to `%HTT
 ## Log
 
 - 2026-10-14: Created.
+- 2026-10-14: Backlog -> Doing.
