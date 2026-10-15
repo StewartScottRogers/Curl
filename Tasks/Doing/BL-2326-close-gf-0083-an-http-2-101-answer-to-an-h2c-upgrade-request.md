@@ -47,3 +47,4 @@ In Curl.Protocol.Http.UnitLibrary, fail with exit 8 (CURLE_WEIRD_SERVER_REPLY) w
 ## Log
 
 - 2026-10-15: Created.
+- 2026-10-15: Backlog -> Doing.
