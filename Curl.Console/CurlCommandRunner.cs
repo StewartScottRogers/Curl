@@ -84,6 +84,12 @@ namespace Curl.Console;
 /// <c>time_*</c> variables are measured with, and the clock <c>%time{format}</c> reads;
 /// <see cref="TimeProvider.System" /> when not given.
 /// </param>
+/// <param name="hstsClock">
+/// The clock the run's HSTS cache counts expiries on and a <c>Strict-Transport-Security</c>
+/// header's <c>max-age</c> counts from, in place of <paramref name="timeProvider" />: the
+/// harness's stand-in for curl's debug build under <c>CURL_TIME</c> (ADR-0493, BL-2234);
+/// <see langword="null" />, the default, uses <paramref name="timeProvider" />.
+/// </param>
 /// <param name="writeOutTimeDialect">
 /// The C runtime whose <c>strftime</c> a <c>-w</c> <c>%time{format}</c> follows; the composition
 /// passes the platform's (<see cref="CurlComposition.WriteOutTimeDialectFor" />), and
@@ -266,7 +272,8 @@ internal sealed class CurlCommandRunner(
     TlsSessionCache? tlsSessions = null,
     IExtendedAttributeWriter? extendedAttributeWriter = null,
     LateBoundDiagnosticLog? lateBoundDiagnosticLog = null,
-    bool? parsesAsWindowsBuild = null)
+    bool? parsesAsWindowsBuild = null,
+    TimeProvider? hstsClock = null)
 {
     /// <summary>
     /// What curl 8.21.0 prints before its URL parser's reason when it rejects a transfer
@@ -639,7 +646,7 @@ internal sealed class CurlCommandRunner(
     /// same host to <c>https</c> (measured 2026-09-29, BL-621 Notes; ADR-0218). Made on first use, on
     /// the run's clock, writing to the run's diagnostic log (BL-921).
     /// </summary>
-    private HstsTransferPolicy Hsts => LazyInitializer.EnsureInitialized(ref hsts, () => new HstsTransferPolicy(timeProvider, diagnosticLog));
+    private HstsTransferPolicy Hsts => LazyInitializer.EnsureInitialized(ref hsts, () => new HstsTransferPolicy(hstsClock ?? timeProvider, diagnosticLog));
 
     /// <summary>The run's HSTS cache once <see cref="Hsts" /> has made it.</summary>
     private HstsTransferPolicy? hsts;
@@ -812,7 +819,7 @@ internal sealed class CurlCommandRunner(
 
         diagnosticLog = runDiagnosticLog.Log;
         transferContextFactory.DiagnosticLog = diagnosticLog;
-        transferContextFactory.HstsStore = Hsts;
+        transferContextFactory.HstsStore = hstsClock is null ? Hsts : new ClockOverridingHstsStore(Hsts, hstsClock);
         lateBoundDiagnosticLog?.Bind(diagnosticLog);
         LogCommandLine(parsed, filesTriedWhileParsing);
     }

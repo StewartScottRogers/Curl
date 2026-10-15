@@ -163,7 +163,7 @@ sits between `FtpServerConnector` and `NoListenPortConnector`. Screening lets `h
 those that also name `http-proxy` included: a `CONNECT` to `%HTTPSPORT` through the proxy stand-in
 is relayed to `HttpsServerConnector`, so the TLS handshake travels inside the tunnel, the `CONNECT`
 lands in `ProxyReceivedBytes` and the decrypted requests in `ReceivedBytes` (BL-2225; 1849 and 3106
-pass, and 446 and 780 to 783 skip for the Debug feature, BL-2234). On
+pass; 780 to 783 pass with the Debug stand-in below, and 446 fails until Curl honours `CURL_HSTS_HTTP`, BL-2249). On
 Windows 25 HTTPS cases pass (300, 303, 304, 306, 309, 311, 312, 325, 364, 410, 414, 417, 474,
 1561, 1562, 2009-2011, 2033, 2048, 2070, 2079, 2087, 3023, 3024, ...) and 2035, 2038, 2042,
 323 and 1244 fail on a difference the next gap run files; the `!Schannel` cases run on Linux and macOS.
@@ -254,7 +254,7 @@ every platform; a file part named `log/<name>` and a `log/<name>` word in `<comm
 `RunAsync` is given, with forward slashes (`UpstreamConformanceTests` passes `UpstreamTestData`,
 whose `data/` holds the httpsig key files, BL-2183), and with none it has no value and skips the case
 (ADR-0458, BL-1944); `UpstreamCurlPlatform.WithFeatures` adds a feature the harness stands in for
-(`Debug` for the httpsig cases, whose fixed `created=0` the tests supply as the signing clock); curl's `--output` is `%LOGDIR/curl%TESTNUMBER.out`, as `runtests.pl` names it, and `--trace-ascii %LOGDIR/trace%TESTNUMBER --trace-config all --trace-time` follow `--include` as `runtests.pl` passes them, so the default config file's note prints as test433 expects (BL-2017);
+(`Debug` for the httpsig cases, whose fixed `created=0` the tests supply as the signing clock, and for a case naming the `HSTS` feature and setting `CURL_TIME` - 446 and 780 to 783 - whose fixed HSTS clock Curl reads from `CURL_TIME` because the tests pass `CreateRunner(honoursHstsTimeVariable: true)`, ADR-0493, BL-2234); curl's `--output` is `%LOGDIR/curl%TESTNUMBER.out`, as `runtests.pl` names it, and `--trace-ascii %LOGDIR/trace%TESTNUMBER --trace-config all --trace-time` follow `--include` as `runtests.pl` passes them, so the default config file's note prints as test433 expects (BL-2017);
 `%PWD` elsewhere is the tests directory the caller names, else its source directory (the same release `tests` folder, as `runtests.pl`'s working directory; so 726, 1145 and 3009 pass, BL-2224), and has no value when it names neither; `%LIBTESTS` is `./libtest/libtests` (`UpstreamCaseRunner.LibTestsProgram`), a path with no runner behind it, since every case naming it (518, 537, 678, 1960) skips for its `<tool>`; and `%CERTDIR` only when it names a certificate directory: the folder holding
 upstream's `certs` folder, since cases name `%CERTDIR/certs/test-ca.crt` (BL-1922; the
 conformance tests pass the parent of the `certs` folder `UpstreamTestCertificateGenerator` writes, BL-1923); a log, tests or certificate directory

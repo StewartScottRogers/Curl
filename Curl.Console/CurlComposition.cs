@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net.Sockets;
 using System.Text;
 using Curl.Authentication;
@@ -281,7 +282,7 @@ internal static class CurlComposition
             diagnosticLog);
 
     /// <summary>
-    /// Creates the contexts the dialing <see cref="CreateRunner(Stream, Stream, Stream, ITcpDialer, IDnsResolver, IDatagramConnector, bool, IWriteOutFileOpener?, bool, Func{string, string?}?, IConnectionListener?, DefaultConfigFileSearch?, TimeProvider?, bool)" />
+    /// Creates the contexts the dialing <see cref="CreateRunner(Stream, Stream, Stream, ITcpDialer, IDnsResolver, IDatagramConnector, bool, IWriteOutFileOpener?, bool, Func{string, string?}?, IConnectionListener?, DefaultConfigFileSearch?, TimeProvider?, bool, bool)" />
     /// uses: <see cref="CreateSecurityContextFactory(IConnector, IDatagramConnector, IDiagnosticLog?)" />'s
     /// router, with NTLM sent to the hand-built context on every platform when
     /// <paramref name="usesHandBuiltNtlm" /> is set (<see cref="HandBuiltNtlmSecurityContextFactory" />, BL-1858).
@@ -1246,6 +1247,11 @@ internal static class CurlComposition
     /// <see cref="DnsServerVariableResolverOf" />, as curl's debug build does; off by default, as in
     /// curl's release build, and turned on by the conformance harness (ADR-0492, BL-2248).
     /// </param>
+    /// <param name="honoursHstsTimeVariable">
+    /// Whether a <c>CURL_TIME</c> holding whole seconds since the epoch fixes the HSTS clock at that
+    /// instant (<see cref="HstsClockOf" />), as curl's debug build reads it in <c>lib/hsts.c</c>; off by
+    /// default, as in curl's release build, and turned on by the conformance harness (ADR-0493, BL-2234).
+    /// </param>
     /// <returns>The runner.</returns>
     internal static CurlCommandRunner CreateRunner(
         Stream standardOutput,
@@ -1261,7 +1267,8 @@ internal static class CurlComposition
         IConnectionListener? ftpListener = null,
         DefaultConfigFileSearch? defaultConfigFileSearch = null,
         TimeProvider? signingClock = null,
-        bool honoursDnsServerVariable = false)
+        bool honoursDnsServerVariable = false,
+        bool honoursHstsTimeVariable = false)
     {
         ConnectionCache runConnections = new(TimeProvider.System);
         LateBoundDiagnosticLog runLog = new();
@@ -1283,8 +1290,27 @@ internal static class CurlComposition
             defaultConfigFileSearch: defaultConfigFileSearch,
             readEnvironmentVariable: readEnvironmentVariable,
             runConnectionCache: runConnections,
-            lateBoundDiagnosticLog: runLog);
+            lateBoundDiagnosticLog: runLog,
+            hstsClock: honoursHstsTimeVariable ? HstsClockOf(environment(HstsTimeVariableName)) : null);
     }
+
+    /// <summary>The variable curl's debug build reads its HSTS clock from, in whole seconds since the epoch.</summary>
+    internal const string HstsTimeVariableName = "CURL_TIME";
+
+    /// <summary>
+    /// The HSTS clock a <c>CURL_TIME</c> value fixes: a <see cref="FixedWallClock" /> at that many
+    /// seconds after the epoch, or <see langword="null" /> (the run's own clock) when the value is
+    /// not set or is not a whole number of seconds curl's dates can hold (ADR-0493, BL-2234).
+    /// </summary>
+    /// <param name="value">The variable's value, or <see langword="null" /> when not set.</param>
+    /// <returns>The clock, or <see langword="null" />.</returns>
+    internal static FixedWallClock? HstsClockOf(string? value) =>
+        long.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out long seconds) && seconds <= MaximumHstsTimeSeconds
+            ? new FixedWallClock(DateTimeOffset.FromUnixTimeSeconds(seconds))
+            : null;
+
+    /// <summary>The last second <see cref="DateTimeOffset" /> holds: 9999-12-31T23:59:59Z.</summary>
+    private const long MaximumHstsTimeSeconds = 253402300799;
 
     /// <summary>The variable curl's debug build reads the DNS server to ask from (<c>override-dns</c>).</summary>
     internal const string DnsServerVariableName = "CURL_DNS_SERVER";
@@ -1307,7 +1333,7 @@ internal static class CurlComposition
             : new DnsServerResolver(new DnsServerResolverOptions(dnsServer, null, null, null, AddressFamilyOf(options)), TimeProvider.System, datagramConnector);
 
     /// <summary>
-    /// Builds one option group's dispatch for the dialing <see cref="CreateRunner(Stream, Stream, Stream, ITcpDialer, IDnsResolver, IDatagramConnector, bool, IWriteOutFileOpener?, bool, Func{string, string?}?, IConnectionListener?, DefaultConfigFileSearch?, TimeProvider?, bool)" />:
+    /// Builds one option group's dispatch for the dialing <see cref="CreateRunner(Stream, Stream, Stream, ITcpDialer, IDnsResolver, IDatagramConnector, bool, IWriteOutFileOpener?, bool, Func{string, string?}?, IConnectionListener?, DefaultConfigFileSearch?, TimeProvider?, bool, bool)" />:
     /// the group's <see cref="TcpConnector" /> over <paramref name="tcpDialer" /> and
     /// <paramref name="dnsResolver" />, pooled in <paramref name="runConnections" />, with a proxy
     /// selector that reads the environment through <paramref name="readEnvironmentVariable" />, and the connector's <c>--resolve</c> entries

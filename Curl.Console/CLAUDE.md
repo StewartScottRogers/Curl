@@ -109,7 +109,7 @@ file, whatever the outcome; one that cannot be written is left alone, and `--hst
 An `http` URL whose host the cache knows is switched to `https` (the scheme only; an explicit port
 stays), `-v` printing `* Switched from HTTP to HTTPS due to HSTS => <url>`; `RedirectFollower` learns
 every hop's `https` `Strict-Transport-Security` and switches a known `http` redirect target the same
-way before `--proto-redir` checks it. Measured on curl 8.21.0 (ADR-0218, BL-621 Notes).
+way before `--proto-redir` checks it. Measured on curl 8.21.0 (ADR-0218, BL-621 Notes). Behind the harness seam `CreateRunner(honoursHstsTimeVariable: true)`, a `CURL_TIME` of whole seconds fixes that cache's clock (`FixedWallClock`, `ClockOverridingHstsStore`), as curl's debug build does; the shipped `curl` never turns it on (ADR-0493, BL-2234).
 
 Each URL's output comes from `CommandLineOptions.UrlOutputs`: an `-o` name, or for `-O` /
 `--remote-name-all` the name `RemoteFileName` takes from the URL path (last non-empty
