@@ -36,3 +36,4 @@ ADR-0506; plan section "CURLOPT groups". Follow the rules for option-group tasks
 ## Log
 
 - 2026-10-15: Created.
+- 2026-10-15: Backlog -> Doing.
