@@ -34,3 +34,4 @@ The harness is in memory, so no case needs IPv6 from the machine: `%HOST6IP` is 
 ## Log
 
 - 2026-10-14: Created.
+- 2026-10-14: Backlog -> Doing.
