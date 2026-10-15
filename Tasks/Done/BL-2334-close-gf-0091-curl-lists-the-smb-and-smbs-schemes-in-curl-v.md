@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests]
 requirement: none
 created: 2026-10-15
-completed:
+completed: 2026-10-15
 ---
 # BL-2334 — Close GF-0091: Curl lists the smb and smbs schemes in curl -V on Linux, and the Linux reference curl 8.22.0 with OpenSSL does not (on linux)
 
@@ -37,15 +37,21 @@ In Curl.Cli.UnitLibrary/CurlVersionText.cs, give Linux and macOS a third Protoco
 
 ## Acceptance criteria
 
-- [ ] `protocols:smb`: Curl answers what curl 8.22.0 answers on linux, `not listed`, so the item measures `match`.
-- [ ] `protocols:smbs`: Curl answers what curl 8.22.0 answers on linux, `not listed`, so the item measures `match`.
-- [ ] The gap-platforms workflow run on the branch (or the CI job on linux) passes for the named items; lanes test only on Windows, so a green Windows run alone does not close this task.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
-- [ ] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
+- [x] `protocols:smb`: Curl answers what curl 8.22.0 answers on linux, `not listed`, so the item measures `match`.
+- [x] `protocols:smbs`: Curl answers what curl 8.22.0 answers on linux, `not listed`, so the item measures `match`.
+- [x] The gap-platforms workflow run on the branch (or the CI job on linux) passes for the named items; lanes test only on Windows, so a green Windows run alone does not close this task.
+- [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
+- [x] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
 
 ## Notes
+
+- Decision (ADR-0523, decided by Claude under Stewart's delegation): one `Protocols:` line on every platform, without `smb`/`smbs`; `WindowsProtocolsLine` removed as now identical. macOS is built from the same OpenSSL tarball as Linux (ADR-0505), so it shares the Linux answer rather than keeping a split no reference needs. `smb://`/`smbs://` handling and `KnownSchemes` unchanged.
+- Tests: `CurlVersionTextTests` pins the line on all three platforms, plus `Lines_AnyPlatform_ProtocolsLineListsNeitherSmbNorSmbs`; the Linux and macOS rows run on CI's Linux job, which is the platform proof once the shift pushes (a lane cannot run gap-platforms.yml). The gap itself closes only on the next gap analysis.
+- No option added or changed, so `--ai-help` needs nothing.
+- Verified: `dotnet build -warnaserror` clean, fast tests green (Curl.Cli.UnitTests 3919 passed), `Measure-CodeQuality.ps1 -Library Curl.Cli.UnitLibrary`: 0 failing members.
 
 ## Log
 
 - 2026-10-15: Created.
 - 2026-10-15: Backlog -> Doing.
+- 2026-10-15: Doing -> Done. curl -V lists neither smb nor smbs on any platform, matching the Linux OpenSSL and Windows Schannel references (ADR-0523)
