@@ -35,3 +35,4 @@ ADR-0506; plan phase 1 step 4; follows BL-2304 and uses the rules for every reta
 ## Log
 
 - 2026-10-15: Created.
+- 2026-10-15: Backlog -> Doing.
