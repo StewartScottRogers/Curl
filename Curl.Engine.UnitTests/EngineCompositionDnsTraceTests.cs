@@ -180,8 +180,8 @@ public sealed class EngineCompositionDnsTraceTests
     {
         Diagnostics.Arrange("traced arguments", "-v --trace-config dns");
         Diagnostics.Arrange("plain arguments", "-v");
-        CurlTransports traced = EngineComposition.CreateTransports(Parse("-v", "--trace-config", "dns"), EasyOptionsFromCommandLine.NetworkOf(Parse("-v", "--trace-config", "dns")), EasyOptionsFromCommandLine.TlsOf(Parse("-v", "--trace-config", "dns")), EasyOptionsFromCommandLine.HttpOf(Parse("-v", "--trace-config", "dns")), EasyOptionsFromCommandLine.ProxyOf(Parse("-v", "--trace-config", "dns")), EasyOptionsFromCommandLine.AuthenticationOf(Parse("-v", "--trace-config", "dns")), EasyOptionsFromCommandLine.TraceComponentsOf(Parse("-v", "--trace-config", "dns")));
-        CurlTransports plain = EngineComposition.CreateTransports(Parse("-v"), EasyOptionsFromCommandLine.NetworkOf(Parse("-v")), EasyOptionsFromCommandLine.TlsOf(Parse("-v")), EasyOptionsFromCommandLine.HttpOf(Parse("-v")), EasyOptionsFromCommandLine.ProxyOf(Parse("-v")), EasyOptionsFromCommandLine.AuthenticationOf(Parse("-v")));
+        CurlTransports traced = EngineComposition.CreateTransports(EasyOptionsFromCommandLine.ToolOptionsOf(Parse("-v", "--trace-config", "dns")), EasyOptionsFromCommandLine.NetworkOf(Parse("-v", "--trace-config", "dns")), EasyOptionsFromCommandLine.TlsOf(Parse("-v", "--trace-config", "dns")), EasyOptionsFromCommandLine.HttpOf(Parse("-v", "--trace-config", "dns")), EasyOptionsFromCommandLine.ProxyOf(Parse("-v", "--trace-config", "dns")), EasyOptionsFromCommandLine.AuthenticationOf(Parse("-v", "--trace-config", "dns")), EasyOptionsFromCommandLine.TraceComponentsOf(Parse("-v", "--trace-config", "dns")));
+        CurlTransports plain = EngineComposition.CreateTransports(EasyOptionsFromCommandLine.ToolOptionsOf(Parse("-v")), EasyOptionsFromCommandLine.NetworkOf(Parse("-v")), EasyOptionsFromCommandLine.TlsOf(Parse("-v")), EasyOptionsFromCommandLine.HttpOf(Parse("-v")), EasyOptionsFromCommandLine.ProxyOf(Parse("-v")), EasyOptionsFromCommandLine.AuthenticationOf(Parse("-v")));
 
         Diagnostics.Act("traced: traces DNS filter", traced.TcpConnector.TracesDnsFilter);
         Diagnostics.Act("plain: traces DNS filter", plain.TcpConnector.TracesDnsFilter);
@@ -372,7 +372,7 @@ public sealed class EngineCompositionDnsTraceTests
         Diagnostics.Arrange("arguments", string.Join(' ', arguments.Append("http://127.0.0.1:47110/")));
         CommandLineOptions options = Parse(arguments);
         TcpConnector connector = EngineComposition.CreateTcpConnector(
-            options, EasyOptionsFromCommandLine.TraceComponentsOf(options), EasyOptionsFromCommandLine.NetworkOf(options), EasyOptionsFromCommandLine.HttpOf(options), EasyOptionsFromCommandLine.ProxyOf(options), EasyOptionsFromCommandLine.AuthenticationOf(options),
+            EasyOptionsFromCommandLine.ToolOptionsOf(options), EasyOptionsFromCommandLine.TraceComponentsOf(options), EasyOptionsFromCommandLine.NetworkOf(options), EasyOptionsFromCommandLine.HttpOf(options), EasyOptionsFromCommandLine.ProxyOf(options), EasyOptionsFromCommandLine.AuthenticationOf(options),
             new SystemDnsResolver(),
             new ScriptedTcpDialer(new ScriptedConnector([])),
             new PassThroughTlsProvider(),

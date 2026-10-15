@@ -39,6 +39,16 @@ internal static class EasyOptionsFromCommandLine
     /// <returns>The trace components that are on, and the ones only <c>-vv</c> and up put there.</returns>
     internal static EngineTraceComponents TraceComponentsOf(CommandLineOptions options) =>
         new(options.TraceComponents, options.VerbosityTraceComponents);
+
+    /// <summary>
+    /// The curl tool's own settings the engine's transport factories read, which libcurl's easy options have no
+    /// <c>CURLOPT_*</c> for: <c>-Z</c>, <c>--parallel-immediate</c>, <c>--ssl-sessions</c> and <c>-m</c> (BL-2356).
+    /// </summary>
+    /// <param name="options">The parsed command line.</param>
+    /// <returns>The tool options.</returns>
+    internal static EngineToolOptions ToolOptionsOf(CommandLineOptions options) =>
+        new(options.Parallel, options.ParallelImmediate, options.SslSessionsFile, options.MaxTime);
+
     // The receive buffer curl's tool asks for, 100 KiB, as --libcurl writes CURLOPT_BUFFERSIZE.
     private const long ToolBufferSize = 102400;
 

@@ -74,10 +74,9 @@ public sealed class EasyAuthenticationOptionsTransportTests
     public void CreateProxyTunnelOptions_Record_AuthenticatesTheProxyWithTheRecordsMethods()
     {
         EasyAuthenticationOptions authentication = new() { ProxyAuthentication = HttpAuthenticationMethods.Ntlm };
-        CommandLineOptions options = CommandLineParser.Parse(["http://h/"], _ => true).Options!;
         Diagnostics.Arrange("proxy methods", authentication.ProxyAuthentication);
 
-        HttpProxyTunnelOptions tunnel = EngineComposition.CreateProxyTunnelOptions(options, new EasyProxyOptions(), authentication, new LateBoundSecurityContextFactory());
+        HttpProxyTunnelOptions tunnel = EngineComposition.CreateProxyTunnelOptions(new Curl.Api.Options.Http.EasyHttpOptions(), new EasyProxyOptions(), authentication, new LateBoundSecurityContextFactory());
         Diagnostics.Act("tunnel schemes", tunnel.ProxyAuthSchemes);
 
         Diagnostics.Assert("tunnel schemes", HttpAuthSchemes.Ntlm, tunnel.ProxyAuthSchemes);

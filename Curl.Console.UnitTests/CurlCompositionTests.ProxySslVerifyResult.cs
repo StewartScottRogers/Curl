@@ -80,7 +80,7 @@ public sealed partial class CurlCompositionTests
         Task serverTask = ServeOneHandshakeAsync(listener, certificate);
 
         CommandLineOptions options = Parse(["-x", VerifyResultProxyUrl, "--proxy-insecure", .. proxyTlsArguments(key.ExportSubjectPublicKeyInfo()), VerifyResultProxiedUrl]);
-        CurlTransports transports = EngineComposition.CreateTransports(options, EasyOptionsFromCommandLine.NetworkOf(options), EasyOptionsFromCommandLine.TlsOf(options), EasyOptionsFromCommandLine.HttpOf(options), EasyOptionsFromCommandLine.ProxyOf(options), EasyOptionsFromCommandLine.AuthenticationOf(options));
+        CurlTransports transports = EngineComposition.CreateTransports(EasyOptionsFromCommandLine.ToolOptionsOf(options), EasyOptionsFromCommandLine.NetworkOf(options), EasyOptionsFromCommandLine.TlsOf(options), EasyOptionsFromCommandLine.HttpOf(options), EasyOptionsFromCommandLine.ProxyOf(options), EasyOptionsFromCommandLine.AuthenticationOf(options));
         TcpClient client = new();
         await client.ConnectAsync((IPEndPoint)listener.LocalEndpoint);
         ConnectResult result = await ((SslStreamTlsProvider)transports.ProxyTlsProvider).AuthenticateAsClientAsync(

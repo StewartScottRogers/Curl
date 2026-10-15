@@ -26,7 +26,7 @@ public sealed class EngineCompositionReadTraceTests
     public void CreateTransports_UnderTraceConfigRead_TracesRead(params string[] arguments)
     {
         Diagnostics.Arrange("command line arguments", string.Join(" ", arguments));
-        CurlTransports transports = EngineComposition.CreateTransports(Parse(arguments), EasyOptionsFromCommandLine.NetworkOf(Parse(arguments)), EasyOptionsFromCommandLine.TlsOf(Parse(arguments)), EasyOptionsFromCommandLine.HttpOf(Parse(arguments)), EasyOptionsFromCommandLine.ProxyOf(Parse(arguments)), EasyOptionsFromCommandLine.AuthenticationOf(Parse(arguments)), TimeProvider.System, traces: EasyOptionsFromCommandLine.TraceComponentsOf(Parse(arguments)));
+        CurlTransports transports = EngineComposition.CreateTransports(EasyOptionsFromCommandLine.ToolOptionsOf(Parse(arguments)), EasyOptionsFromCommandLine.NetworkOf(Parse(arguments)), EasyOptionsFromCommandLine.TlsOf(Parse(arguments)), EasyOptionsFromCommandLine.HttpOf(Parse(arguments)), EasyOptionsFromCommandLine.ProxyOf(Parse(arguments)), EasyOptionsFromCommandLine.AuthenticationOf(Parse(arguments)), TimeProvider.System, traces: EasyOptionsFromCommandLine.TraceComponentsOf(Parse(arguments)));
         bool tracesRead = transports.TracesRead;
         Diagnostics.Act("traces read", tracesRead);
 
@@ -41,7 +41,7 @@ public sealed class EngineCompositionReadTraceTests
     public void CreateTransports_WithoutTheReadComponent_DoesNotTraceRead(params string[] arguments)
     {
         Diagnostics.Arrange("command line arguments", string.Join(" ", arguments));
-        CurlTransports transports = EngineComposition.CreateTransports(Parse(arguments), EasyOptionsFromCommandLine.NetworkOf(Parse(arguments)), EasyOptionsFromCommandLine.TlsOf(Parse(arguments)), EasyOptionsFromCommandLine.HttpOf(Parse(arguments)), EasyOptionsFromCommandLine.ProxyOf(Parse(arguments)), EasyOptionsFromCommandLine.AuthenticationOf(Parse(arguments)), TimeProvider.System, traces: EasyOptionsFromCommandLine.TraceComponentsOf(Parse(arguments)));
+        CurlTransports transports = EngineComposition.CreateTransports(EasyOptionsFromCommandLine.ToolOptionsOf(Parse(arguments)), EasyOptionsFromCommandLine.NetworkOf(Parse(arguments)), EasyOptionsFromCommandLine.TlsOf(Parse(arguments)), EasyOptionsFromCommandLine.HttpOf(Parse(arguments)), EasyOptionsFromCommandLine.ProxyOf(Parse(arguments)), EasyOptionsFromCommandLine.AuthenticationOf(Parse(arguments)), TimeProvider.System, traces: EasyOptionsFromCommandLine.TraceComponentsOf(Parse(arguments)));
         bool tracesRead = transports.TracesRead;
         Diagnostics.Act("traces read", tracesRead);
 

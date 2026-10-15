@@ -276,7 +276,7 @@ public sealed partial class CurlCompositionTests
     public void CreateDispatcher_ProductionTransports_BuildsWithoutADuplicateScheme()
     {
         Diagnostics.Arrange("arguments", "gophers://example.com/");
-        ProtocolDispatcher dispatcher = CurlComposition.CreateDispatcher(EngineComposition.CreateTransports(NoOptions(), EasyOptionsFromCommandLine.NetworkOf(NoOptions()), EasyOptionsFromCommandLine.TlsOf(NoOptions()), EasyOptionsFromCommandLine.HttpOf(NoOptions()), EasyOptionsFromCommandLine.ProxyOf(NoOptions()), EasyOptionsFromCommandLine.AuthenticationOf(NoOptions())));
+        ProtocolDispatcher dispatcher = CurlComposition.CreateDispatcher(EngineComposition.CreateTransports(EasyOptionsFromCommandLine.ToolOptionsOf(NoOptions()), EasyOptionsFromCommandLine.NetworkOf(NoOptions()), EasyOptionsFromCommandLine.TlsOf(NoOptions()), EasyOptionsFromCommandLine.HttpOf(NoOptions()), EasyOptionsFromCommandLine.ProxyOf(NoOptions()), EasyOptionsFromCommandLine.AuthenticationOf(NoOptions())));
 
         Diagnostics.Act("dispatcher built", dispatcher is not null);
         Diagnostics.Assert("dispatcher built", true, dispatcher is not null);
@@ -287,7 +287,7 @@ public sealed partial class CurlCompositionTests
     public void CreateTransferDispatch_ProductionTransports_WarnsWithTheProxyTlsProvidersWarnings()
     {
         Diagnostics.Arrange("arguments", "gophers://example.com/");
-        CurlTransports transports = EngineComposition.CreateTransports(NoOptions(), EasyOptionsFromCommandLine.NetworkOf(NoOptions()), EasyOptionsFromCommandLine.TlsOf(NoOptions()), EasyOptionsFromCommandLine.HttpOf(NoOptions()), EasyOptionsFromCommandLine.ProxyOf(NoOptions()), EasyOptionsFromCommandLine.AuthenticationOf(NoOptions()));
+        CurlTransports transports = EngineComposition.CreateTransports(EasyOptionsFromCommandLine.ToolOptionsOf(NoOptions()), EasyOptionsFromCommandLine.NetworkOf(NoOptions()), EasyOptionsFromCommandLine.TlsOf(NoOptions()), EasyOptionsFromCommandLine.HttpOf(NoOptions()), EasyOptionsFromCommandLine.ProxyOf(NoOptions()), EasyOptionsFromCommandLine.AuthenticationOf(NoOptions()));
 
         TransferDispatch dispatch = CurlComposition.CreateTransferDispatch(transports);
 
@@ -303,7 +303,7 @@ public sealed partial class CurlCompositionTests
         Diagnostics.Arrange("arguments", "-c jar.txt http://example.com/");
         CookieEngine cookies = CookieEngine.FromHttpOptions(EasyOptionsFromCommandLine.HttpOf(Parse("-c", "jar.txt", "http://example.com/")))!;
 
-        TransferDispatch dispatch = CurlComposition.CreateTransferDispatch(EngineComposition.CreateTransports(NoOptions(), EasyOptionsFromCommandLine.NetworkOf(NoOptions()), EasyOptionsFromCommandLine.TlsOf(NoOptions()), EasyOptionsFromCommandLine.HttpOf(NoOptions()), EasyOptionsFromCommandLine.ProxyOf(NoOptions()), EasyOptionsFromCommandLine.AuthenticationOf(NoOptions())), cookies);
+        TransferDispatch dispatch = CurlComposition.CreateTransferDispatch(EngineComposition.CreateTransports(EasyOptionsFromCommandLine.ToolOptionsOf(NoOptions()), EasyOptionsFromCommandLine.NetworkOf(NoOptions()), EasyOptionsFromCommandLine.TlsOf(NoOptions()), EasyOptionsFromCommandLine.HttpOf(NoOptions()), EasyOptionsFromCommandLine.ProxyOf(NoOptions()), EasyOptionsFromCommandLine.AuthenticationOf(NoOptions())), cookies);
 
         Diagnostics.Act("dispatch cookies are the run's cookies", ReferenceEquals(cookies, dispatch.Cookies));
         Diagnostics.Assert("dispatch cookies are the run's cookies", true, ReferenceEquals(cookies, dispatch.Cookies));
@@ -314,7 +314,7 @@ public sealed partial class CurlCompositionTests
     public void CreateTransferDispatch_ProductionTransports_EveryTcpHandlerReceivesTheOnePoolingConnector()
     {
         Diagnostics.Arrange("arguments", "gophers://example.com/");
-        CurlTransports transports = EngineComposition.CreateTransports(NoOptions(), EasyOptionsFromCommandLine.NetworkOf(NoOptions()), EasyOptionsFromCommandLine.TlsOf(NoOptions()), EasyOptionsFromCommandLine.HttpOf(NoOptions()), EasyOptionsFromCommandLine.ProxyOf(NoOptions()), EasyOptionsFromCommandLine.AuthenticationOf(NoOptions()));
+        CurlTransports transports = EngineComposition.CreateTransports(EasyOptionsFromCommandLine.ToolOptionsOf(NoOptions()), EasyOptionsFromCommandLine.NetworkOf(NoOptions()), EasyOptionsFromCommandLine.TlsOf(NoOptions()), EasyOptionsFromCommandLine.HttpOf(NoOptions()), EasyOptionsFromCommandLine.ProxyOf(NoOptions()), EasyOptionsFromCommandLine.AuthenticationOf(NoOptions()));
 
         TransferDispatch dispatch = CurlComposition.CreateTransferDispatch(transports);
 
@@ -336,7 +336,7 @@ public sealed partial class CurlCompositionTests
     public void CreateDispatcher_ProductionTransports_HttpHandlerReceivesThePoolingConnector()
     {
         Diagnostics.Arrange("arguments", "gophers://example.com/");
-        CurlTransports transports = EngineComposition.CreateTransports(NoOptions(), EasyOptionsFromCommandLine.NetworkOf(NoOptions()), EasyOptionsFromCommandLine.TlsOf(NoOptions()), EasyOptionsFromCommandLine.HttpOf(NoOptions()), EasyOptionsFromCommandLine.ProxyOf(NoOptions()), EasyOptionsFromCommandLine.AuthenticationOf(NoOptions()));
+        CurlTransports transports = EngineComposition.CreateTransports(EasyOptionsFromCommandLine.ToolOptionsOf(NoOptions()), EasyOptionsFromCommandLine.NetworkOf(NoOptions()), EasyOptionsFromCommandLine.TlsOf(NoOptions()), EasyOptionsFromCommandLine.HttpOf(NoOptions()), EasyOptionsFromCommandLine.ProxyOf(NoOptions()), EasyOptionsFromCommandLine.AuthenticationOf(NoOptions()));
 
         ProtocolDispatcher dispatcher = CurlComposition.CreateDispatcher(transports);
 
@@ -350,7 +350,7 @@ public sealed partial class CurlCompositionTests
     public void CreateTransferDispatch_ProductionTransports_FtpHandlerGetsTheListenerTlsProviderAndResolver()
     {
         Diagnostics.Arrange("arguments", "gophers://example.com/");
-        CurlTransports transports = EngineComposition.CreateTransports(NoOptions(), EasyOptionsFromCommandLine.NetworkOf(NoOptions()), EasyOptionsFromCommandLine.TlsOf(NoOptions()), EasyOptionsFromCommandLine.HttpOf(NoOptions()), EasyOptionsFromCommandLine.ProxyOf(NoOptions()), EasyOptionsFromCommandLine.AuthenticationOf(NoOptions()));
+        CurlTransports transports = EngineComposition.CreateTransports(EasyOptionsFromCommandLine.ToolOptionsOf(NoOptions()), EasyOptionsFromCommandLine.NetworkOf(NoOptions()), EasyOptionsFromCommandLine.TlsOf(NoOptions()), EasyOptionsFromCommandLine.HttpOf(NoOptions()), EasyOptionsFromCommandLine.ProxyOf(NoOptions()), EasyOptionsFromCommandLine.AuthenticationOf(NoOptions()));
 
         TransferDispatch dispatch = CurlComposition.CreateTransferDispatch(transports);
 
@@ -370,7 +370,7 @@ public sealed partial class CurlCompositionTests
     public void CreateTransferDispatch_ProductionTransports_FtpDataConnectionsGoThroughThePoolOverAConnectorWithoutTheConnectTimeout()
     {
         Diagnostics.Arrange("arguments", "gophers://example.com/");
-        CurlTransports transports = EngineComposition.CreateTransports(NoOptions(), EasyOptionsFromCommandLine.NetworkOf(NoOptions()), EasyOptionsFromCommandLine.TlsOf(NoOptions()), EasyOptionsFromCommandLine.HttpOf(NoOptions()), EasyOptionsFromCommandLine.ProxyOf(NoOptions()), EasyOptionsFromCommandLine.AuthenticationOf(NoOptions()));
+        CurlTransports transports = EngineComposition.CreateTransports(EasyOptionsFromCommandLine.ToolOptionsOf(NoOptions()), EasyOptionsFromCommandLine.NetworkOf(NoOptions()), EasyOptionsFromCommandLine.TlsOf(NoOptions()), EasyOptionsFromCommandLine.HttpOf(NoOptions()), EasyOptionsFromCommandLine.ProxyOf(NoOptions()), EasyOptionsFromCommandLine.AuthenticationOf(NoOptions()));
 
         TransferDispatch dispatch = CurlComposition.CreateTransferDispatch(transports);
 
@@ -389,7 +389,7 @@ public sealed partial class CurlCompositionTests
     public void CreateDispatcher_ProductionTransports_FtpDataConnectionsGoThroughThePoolOverAConnectorWithoutTheConnectTimeout()
     {
         Diagnostics.Arrange("arguments", "gophers://example.com/");
-        CurlTransports transports = EngineComposition.CreateTransports(NoOptions(), EasyOptionsFromCommandLine.NetworkOf(NoOptions()), EasyOptionsFromCommandLine.TlsOf(NoOptions()), EasyOptionsFromCommandLine.HttpOf(NoOptions()), EasyOptionsFromCommandLine.ProxyOf(NoOptions()), EasyOptionsFromCommandLine.AuthenticationOf(NoOptions()));
+        CurlTransports transports = EngineComposition.CreateTransports(EasyOptionsFromCommandLine.ToolOptionsOf(NoOptions()), EasyOptionsFromCommandLine.NetworkOf(NoOptions()), EasyOptionsFromCommandLine.TlsOf(NoOptions()), EasyOptionsFromCommandLine.HttpOf(NoOptions()), EasyOptionsFromCommandLine.ProxyOf(NoOptions()), EasyOptionsFromCommandLine.AuthenticationOf(NoOptions()));
 
         ProtocolDispatcher dispatcher = CurlComposition.CreateDispatcher(transports);
 
@@ -437,7 +437,7 @@ public sealed partial class CurlCompositionTests
 
         int exitCode = await new CurlCommandRunner(
                 options => CurlComposition.CreateTransferDispatch(
-                    EngineComposition.CreateTransports(options, EasyOptionsFromCommandLine.NetworkOf(options), EasyOptionsFromCommandLine.TlsOf(options), EasyOptionsFromCommandLine.HttpOf(options), EasyOptionsFromCommandLine.ProxyOf(options), EasyOptionsFromCommandLine.AuthenticationOf(options)) with { PoolingConnector = new PoolingConnector(server, TimeProvider.System) }),
+                    EngineComposition.CreateTransports(EasyOptionsFromCommandLine.ToolOptionsOf(options), EasyOptionsFromCommandLine.NetworkOf(options), EasyOptionsFromCommandLine.TlsOf(options), EasyOptionsFromCommandLine.HttpOf(options), EasyOptionsFromCommandLine.ProxyOf(options), EasyOptionsFromCommandLine.AuthenticationOf(options)) with { PoolingConnector = new PoolingConnector(server, TimeProvider.System) }),
                 new InMemoryFileSystem(),
                 new InMemoryFileSystem(),
                 standardOutput,
@@ -460,7 +460,7 @@ public sealed partial class CurlCompositionTests
     public void CreateTransferDispatch_CaPath_WarnsAsThePlatformsCurlBuildDoes()
     {
         Diagnostics.Arrange("arguments", "--capath . https://example.com/");
-        CurlTransports transports = EngineComposition.CreateTransports(Parse("--capath", ".", "https://example.com/"), EasyOptionsFromCommandLine.NetworkOf(Parse("--capath", ".", "https://example.com/")), EasyOptionsFromCommandLine.TlsOf(Parse("--capath", ".", "https://example.com/")), EasyOptionsFromCommandLine.HttpOf(Parse("--capath", ".", "https://example.com/")), EasyOptionsFromCommandLine.ProxyOf(Parse("--capath", ".", "https://example.com/")), EasyOptionsFromCommandLine.AuthenticationOf(Parse("--capath", ".", "https://example.com/")));
+        CurlTransports transports = EngineComposition.CreateTransports(EasyOptionsFromCommandLine.ToolOptionsOf(Parse("--capath", ".", "https://example.com/")), EasyOptionsFromCommandLine.NetworkOf(Parse("--capath", ".", "https://example.com/")), EasyOptionsFromCommandLine.TlsOf(Parse("--capath", ".", "https://example.com/")), EasyOptionsFromCommandLine.HttpOf(Parse("--capath", ".", "https://example.com/")), EasyOptionsFromCommandLine.ProxyOf(Parse("--capath", ".", "https://example.com/")), EasyOptionsFromCommandLine.AuthenticationOf(Parse("--capath", ".", "https://example.com/")));
 
         TransferDispatch dispatch = CurlComposition.CreateTransferDispatch(transports);
 
@@ -480,7 +480,7 @@ public sealed partial class CurlCompositionTests
     {
         Diagnostics.Arrange("arguments", "--tls13-ciphers BOGUS --proxy-tls13-ciphers BOGUS https://example.com/");
         CurlTransports transports = EngineComposition.CreateTransports(
-            Parse("--tls13-ciphers", "BOGUS", "--proxy-tls13-ciphers", "BOGUS", "https://example.com/"), EasyOptionsFromCommandLine.NetworkOf(Parse("--tls13-ciphers", "BOGUS", "--proxy-tls13-ciphers", "BOGUS", "https://example.com/")), EasyOptionsFromCommandLine.TlsOf(Parse("--tls13-ciphers", "BOGUS", "--proxy-tls13-ciphers", "BOGUS", "https://example.com/")), EasyOptionsFromCommandLine.HttpOf(Parse("--tls13-ciphers", "BOGUS", "--proxy-tls13-ciphers", "BOGUS", "https://example.com/")), EasyOptionsFromCommandLine.ProxyOf(Parse("--tls13-ciphers", "BOGUS", "--proxy-tls13-ciphers", "BOGUS", "https://example.com/")), EasyOptionsFromCommandLine.AuthenticationOf(Parse("--tls13-ciphers", "BOGUS", "--proxy-tls13-ciphers", "BOGUS", "https://example.com/")));
+            EasyOptionsFromCommandLine.ToolOptionsOf(Parse("--tls13-ciphers", "BOGUS", "--proxy-tls13-ciphers", "BOGUS", "https://example.com/")), EasyOptionsFromCommandLine.NetworkOf(Parse("--tls13-ciphers", "BOGUS", "--proxy-tls13-ciphers", "BOGUS", "https://example.com/")), EasyOptionsFromCommandLine.TlsOf(Parse("--tls13-ciphers", "BOGUS", "--proxy-tls13-ciphers", "BOGUS", "https://example.com/")), EasyOptionsFromCommandLine.HttpOf(Parse("--tls13-ciphers", "BOGUS", "--proxy-tls13-ciphers", "BOGUS", "https://example.com/")), EasyOptionsFromCommandLine.ProxyOf(Parse("--tls13-ciphers", "BOGUS", "--proxy-tls13-ciphers", "BOGUS", "https://example.com/")), EasyOptionsFromCommandLine.AuthenticationOf(Parse("--tls13-ciphers", "BOGUS", "--proxy-tls13-ciphers", "BOGUS", "https://example.com/")));
 
         TransferDispatch dispatch = CurlComposition.CreateTransferDispatch(transports);
 
@@ -501,7 +501,7 @@ public sealed partial class CurlCompositionTests
     {
         Diagnostics.Arrange("arguments", "--tls13-ciphers TLS_AES_128_GCM_SHA256 --proxy-tls13-ciphers TLS_AES_128_GCM_SHA256 https://example.com/");
         CurlTransports transports = EngineComposition.CreateTransports(
-            Parse("--tls13-ciphers", "TLS_AES_128_GCM_SHA256", "--proxy-tls13-ciphers", "TLS_AES_128_GCM_SHA256", "https://example.com/"), EasyOptionsFromCommandLine.NetworkOf(Parse("--tls13-ciphers", "TLS_AES_128_GCM_SHA256", "--proxy-tls13-ciphers", "TLS_AES_128_GCM_SHA256", "https://example.com/")), EasyOptionsFromCommandLine.TlsOf(Parse("--tls13-ciphers", "TLS_AES_128_GCM_SHA256", "--proxy-tls13-ciphers", "TLS_AES_128_GCM_SHA256", "https://example.com/")), EasyOptionsFromCommandLine.HttpOf(Parse("--tls13-ciphers", "TLS_AES_128_GCM_SHA256", "--proxy-tls13-ciphers", "TLS_AES_128_GCM_SHA256", "https://example.com/")), EasyOptionsFromCommandLine.ProxyOf(Parse("--tls13-ciphers", "TLS_AES_128_GCM_SHA256", "--proxy-tls13-ciphers", "TLS_AES_128_GCM_SHA256", "https://example.com/")), EasyOptionsFromCommandLine.AuthenticationOf(Parse("--tls13-ciphers", "TLS_AES_128_GCM_SHA256", "--proxy-tls13-ciphers", "TLS_AES_128_GCM_SHA256", "https://example.com/")));
+            EasyOptionsFromCommandLine.ToolOptionsOf(Parse("--tls13-ciphers", "TLS_AES_128_GCM_SHA256", "--proxy-tls13-ciphers", "TLS_AES_128_GCM_SHA256", "https://example.com/")), EasyOptionsFromCommandLine.NetworkOf(Parse("--tls13-ciphers", "TLS_AES_128_GCM_SHA256", "--proxy-tls13-ciphers", "TLS_AES_128_GCM_SHA256", "https://example.com/")), EasyOptionsFromCommandLine.TlsOf(Parse("--tls13-ciphers", "TLS_AES_128_GCM_SHA256", "--proxy-tls13-ciphers", "TLS_AES_128_GCM_SHA256", "https://example.com/")), EasyOptionsFromCommandLine.HttpOf(Parse("--tls13-ciphers", "TLS_AES_128_GCM_SHA256", "--proxy-tls13-ciphers", "TLS_AES_128_GCM_SHA256", "https://example.com/")), EasyOptionsFromCommandLine.ProxyOf(Parse("--tls13-ciphers", "TLS_AES_128_GCM_SHA256", "--proxy-tls13-ciphers", "TLS_AES_128_GCM_SHA256", "https://example.com/")), EasyOptionsFromCommandLine.AuthenticationOf(Parse("--tls13-ciphers", "TLS_AES_128_GCM_SHA256", "--proxy-tls13-ciphers", "TLS_AES_128_GCM_SHA256", "https://example.com/")));
 
         TransferDispatch dispatch = CurlComposition.CreateTransferDispatch(transports);
 
@@ -515,7 +515,7 @@ public sealed partial class CurlCompositionTests
     {
         Diagnostics.Arrange("arguments", "--capath . --proxy-tls13-ciphers B --tls13-ciphers BOGUS https://example.com/");
         CurlTransports transports = EngineComposition.CreateTransports(
-            Parse("--capath", ".", "--proxy-tls13-ciphers", "B", "--tls13-ciphers", "BOGUS", "https://example.com/"), EasyOptionsFromCommandLine.NetworkOf(Parse("--capath", ".", "--proxy-tls13-ciphers", "B", "--tls13-ciphers", "BOGUS", "https://example.com/")), EasyOptionsFromCommandLine.TlsOf(Parse("--capath", ".", "--proxy-tls13-ciphers", "B", "--tls13-ciphers", "BOGUS", "https://example.com/")), EasyOptionsFromCommandLine.HttpOf(Parse("--capath", ".", "--proxy-tls13-ciphers", "B", "--tls13-ciphers", "BOGUS", "https://example.com/")), EasyOptionsFromCommandLine.ProxyOf(Parse("--capath", ".", "--proxy-tls13-ciphers", "B", "--tls13-ciphers", "BOGUS", "https://example.com/")), EasyOptionsFromCommandLine.AuthenticationOf(Parse("--capath", ".", "--proxy-tls13-ciphers", "B", "--tls13-ciphers", "BOGUS", "https://example.com/")));
+            EasyOptionsFromCommandLine.ToolOptionsOf(Parse("--capath", ".", "--proxy-tls13-ciphers", "B", "--tls13-ciphers", "BOGUS", "https://example.com/")), EasyOptionsFromCommandLine.NetworkOf(Parse("--capath", ".", "--proxy-tls13-ciphers", "B", "--tls13-ciphers", "BOGUS", "https://example.com/")), EasyOptionsFromCommandLine.TlsOf(Parse("--capath", ".", "--proxy-tls13-ciphers", "B", "--tls13-ciphers", "BOGUS", "https://example.com/")), EasyOptionsFromCommandLine.HttpOf(Parse("--capath", ".", "--proxy-tls13-ciphers", "B", "--tls13-ciphers", "BOGUS", "https://example.com/")), EasyOptionsFromCommandLine.ProxyOf(Parse("--capath", ".", "--proxy-tls13-ciphers", "B", "--tls13-ciphers", "BOGUS", "https://example.com/")), EasyOptionsFromCommandLine.AuthenticationOf(Parse("--capath", ".", "--proxy-tls13-ciphers", "B", "--tls13-ciphers", "BOGUS", "https://example.com/")));
 
         IReadOnlyList<string> lines = CurlComposition.WarningLinesBeforeEachTransfer(
             transports with { ProxyTlsProvider = new WarningTlsProvider("Warning: ignoring setting the CA path for the proxy, not supported by libcurl with Schannel") },
@@ -539,7 +539,7 @@ public sealed partial class CurlCompositionTests
     public void WarningLinesBeforeEachTransfer_SchannelBuildWithOneTls13CipherList_ListsOnlyItsWarning(string option, string expected)
     {
         Diagnostics.Arrange("arguments", $"{option} BOGUS http://example.com/");
-        CurlTransports transports = EngineComposition.CreateTransports(Parse(option, "BOGUS", "http://example.com/"), EasyOptionsFromCommandLine.NetworkOf(Parse(option, "BOGUS", "http://example.com/")), EasyOptionsFromCommandLine.TlsOf(Parse(option, "BOGUS", "http://example.com/")), EasyOptionsFromCommandLine.HttpOf(Parse(option, "BOGUS", "http://example.com/")), EasyOptionsFromCommandLine.ProxyOf(Parse(option, "BOGUS", "http://example.com/")), EasyOptionsFromCommandLine.AuthenticationOf(Parse(option, "BOGUS", "http://example.com/")));
+        CurlTransports transports = EngineComposition.CreateTransports(EasyOptionsFromCommandLine.ToolOptionsOf(Parse(option, "BOGUS", "http://example.com/")), EasyOptionsFromCommandLine.NetworkOf(Parse(option, "BOGUS", "http://example.com/")), EasyOptionsFromCommandLine.TlsOf(Parse(option, "BOGUS", "http://example.com/")), EasyOptionsFromCommandLine.HttpOf(Parse(option, "BOGUS", "http://example.com/")), EasyOptionsFromCommandLine.ProxyOf(Parse(option, "BOGUS", "http://example.com/")), EasyOptionsFromCommandLine.AuthenticationOf(Parse(option, "BOGUS", "http://example.com/")));
 
         IReadOnlyList<string> lines = CurlComposition.WarningLinesBeforeEachTransfer(transports, matchesSchannelBuild: true);
 
@@ -552,7 +552,7 @@ public sealed partial class CurlCompositionTests
     public void WarningLinesBeforeEachTransfer_SchannelBuildWithNoIgnoredOption_ListsNothing()
     {
         Diagnostics.Arrange("arguments", "https://example.com/");
-        CurlTransports transports = EngineComposition.CreateTransports(Parse("https://example.com/"), EasyOptionsFromCommandLine.NetworkOf(Parse("https://example.com/")), EasyOptionsFromCommandLine.TlsOf(Parse("https://example.com/")), EasyOptionsFromCommandLine.HttpOf(Parse("https://example.com/")), EasyOptionsFromCommandLine.ProxyOf(Parse("https://example.com/")), EasyOptionsFromCommandLine.AuthenticationOf(Parse("https://example.com/")));
+        CurlTransports transports = EngineComposition.CreateTransports(EasyOptionsFromCommandLine.ToolOptionsOf(Parse("https://example.com/")), EasyOptionsFromCommandLine.NetworkOf(Parse("https://example.com/")), EasyOptionsFromCommandLine.TlsOf(Parse("https://example.com/")), EasyOptionsFromCommandLine.HttpOf(Parse("https://example.com/")), EasyOptionsFromCommandLine.ProxyOf(Parse("https://example.com/")), EasyOptionsFromCommandLine.AuthenticationOf(Parse("https://example.com/")));
 
         IReadOnlyList<string> lines = CurlComposition.WarningLinesBeforeEachTransfer(transports, matchesSchannelBuild: true);
 
@@ -566,7 +566,7 @@ public sealed partial class CurlCompositionTests
     {
         Diagnostics.Arrange("arguments", "--tls13-ciphers TLS_AES_128_GCM_SHA256 --proxy-tls13-ciphers TLS_AES_128_GCM_SHA256 https://example.com/");
         CurlTransports transports = EngineComposition.CreateTransports(
-            Parse("--tls13-ciphers", "TLS_AES_128_GCM_SHA256", "--proxy-tls13-ciphers", "TLS_AES_128_GCM_SHA256", "https://example.com/"), EasyOptionsFromCommandLine.NetworkOf(Parse("--tls13-ciphers", "TLS_AES_128_GCM_SHA256", "--proxy-tls13-ciphers", "TLS_AES_128_GCM_SHA256", "https://example.com/")), EasyOptionsFromCommandLine.TlsOf(Parse("--tls13-ciphers", "TLS_AES_128_GCM_SHA256", "--proxy-tls13-ciphers", "TLS_AES_128_GCM_SHA256", "https://example.com/")), EasyOptionsFromCommandLine.HttpOf(Parse("--tls13-ciphers", "TLS_AES_128_GCM_SHA256", "--proxy-tls13-ciphers", "TLS_AES_128_GCM_SHA256", "https://example.com/")), EasyOptionsFromCommandLine.ProxyOf(Parse("--tls13-ciphers", "TLS_AES_128_GCM_SHA256", "--proxy-tls13-ciphers", "TLS_AES_128_GCM_SHA256", "https://example.com/")), EasyOptionsFromCommandLine.AuthenticationOf(Parse("--tls13-ciphers", "TLS_AES_128_GCM_SHA256", "--proxy-tls13-ciphers", "TLS_AES_128_GCM_SHA256", "https://example.com/")));
+            EasyOptionsFromCommandLine.ToolOptionsOf(Parse("--tls13-ciphers", "TLS_AES_128_GCM_SHA256", "--proxy-tls13-ciphers", "TLS_AES_128_GCM_SHA256", "https://example.com/")), EasyOptionsFromCommandLine.NetworkOf(Parse("--tls13-ciphers", "TLS_AES_128_GCM_SHA256", "--proxy-tls13-ciphers", "TLS_AES_128_GCM_SHA256", "https://example.com/")), EasyOptionsFromCommandLine.TlsOf(Parse("--tls13-ciphers", "TLS_AES_128_GCM_SHA256", "--proxy-tls13-ciphers", "TLS_AES_128_GCM_SHA256", "https://example.com/")), EasyOptionsFromCommandLine.HttpOf(Parse("--tls13-ciphers", "TLS_AES_128_GCM_SHA256", "--proxy-tls13-ciphers", "TLS_AES_128_GCM_SHA256", "https://example.com/")), EasyOptionsFromCommandLine.ProxyOf(Parse("--tls13-ciphers", "TLS_AES_128_GCM_SHA256", "--proxy-tls13-ciphers", "TLS_AES_128_GCM_SHA256", "https://example.com/")), EasyOptionsFromCommandLine.AuthenticationOf(Parse("--tls13-ciphers", "TLS_AES_128_GCM_SHA256", "--proxy-tls13-ciphers", "TLS_AES_128_GCM_SHA256", "https://example.com/")));
 
         IReadOnlyList<string> lines = CurlComposition.WarningLinesBeforeEachTransfer(
             transports with { ProxyTlsProvider = new WarningTlsProvider() },

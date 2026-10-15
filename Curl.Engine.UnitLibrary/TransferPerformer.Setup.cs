@@ -430,7 +430,7 @@ internal sealed partial class TransferPerformer
 
     /// <summary>
     /// Refuses a <c>--interface</c> value libcurl refuses when curl sets it
-    /// (<see cref="InterfaceBinding.IsMalformed" />): curl 8.21.0 reports <c>setopt 0x274e got bad
+    /// (<see cref="EngineInterfaceBinding.IsMalformed" />): curl 8.21.0 reports <c>setopt 0x274e got bad
     /// argument</c> as a <c>-v</c> line, fails the transfer with exit 43 and that message, still writes
     /// its <c>-w</c> output, and transfers nothing after it (measured 2026-09-29, BL-600 Notes).
     /// </summary>
@@ -439,7 +439,7 @@ internal sealed partial class TransferPerformer
     /// <returns><see cref="InterfaceSetoptFailure" />, or <see langword="null" /> when the value was accepted.</returns>
     private static TransferResult? RefuseMalformedInterface(CommandLineOptions options, ITransferEvents events)
     {
-        if (options.Interface is not { IsMalformed: true })
+        if (options.Interface is not { Value: { } interfaceValue } || !EngineInterfaceBinding.Parse(interfaceValue).IsMalformed)
         {
             return null;
         }

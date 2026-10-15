@@ -61,7 +61,7 @@ public sealed class EngineCompositionHaproxyProtocolTests
     [TestMethod]
     public void CreateTransports_WithHaproxyProtocol_GivesTheTcpConnectorTheHeader()
     {
-        CurlTransports transports = EngineComposition.CreateTransports(Parse("--haproxy-protocol", "http://h/"), EasyOptionsFromCommandLine.NetworkOf(Parse("--haproxy-protocol", "http://h/")), EasyOptionsFromCommandLine.TlsOf(Parse("--haproxy-protocol", "http://h/")), EasyOptionsFromCommandLine.HttpOf(Parse("--haproxy-protocol", "http://h/")), EasyOptionsFromCommandLine.ProxyOf(Parse("--haproxy-protocol", "http://h/")), EasyOptionsFromCommandLine.AuthenticationOf(Parse("--haproxy-protocol", "http://h/")));
+        CurlTransports transports = EngineComposition.CreateTransports(EasyOptionsFromCommandLine.ToolOptionsOf(Parse("--haproxy-protocol", "http://h/")), EasyOptionsFromCommandLine.NetworkOf(Parse("--haproxy-protocol", "http://h/")), EasyOptionsFromCommandLine.TlsOf(Parse("--haproxy-protocol", "http://h/")), EasyOptionsFromCommandLine.HttpOf(Parse("--haproxy-protocol", "http://h/")), EasyOptionsFromCommandLine.ProxyOf(Parse("--haproxy-protocol", "http://h/")), EasyOptionsFromCommandLine.AuthenticationOf(Parse("--haproxy-protocol", "http://h/")));
         Diagnostics.Act("TCP connector header", transports.TcpConnector.HaproxyProtocol);
 
         Diagnostics.Assert("TCP connector header", new HaproxyProtocolHeader(null), transports.TcpConnector.HaproxyProtocol);

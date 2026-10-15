@@ -127,7 +127,7 @@ public sealed partial class EngineCompositionTests
     public void CreateTransports_BothConnectors_ShareOneSystemDnsResolverAndTimeProviderSystem()
     {
         Diagnostics.Arrange("arguments", "gophers://example.com/");
-        CurlTransports transports = EngineComposition.CreateTransports(NoOptions(), EasyOptionsFromCommandLine.NetworkOf(NoOptions()), EasyOptionsFromCommandLine.TlsOf(NoOptions()), EasyOptionsFromCommandLine.HttpOf(NoOptions()), EasyOptionsFromCommandLine.ProxyOf(NoOptions()), EasyOptionsFromCommandLine.AuthenticationOf(NoOptions()));
+        CurlTransports transports = EngineComposition.CreateTransports(EasyOptionsFromCommandLine.ToolOptionsOf(NoOptions()), EasyOptionsFromCommandLine.NetworkOf(NoOptions()), EasyOptionsFromCommandLine.TlsOf(NoOptions()), EasyOptionsFromCommandLine.HttpOf(NoOptions()), EasyOptionsFromCommandLine.ProxyOf(NoOptions()), EasyOptionsFromCommandLine.AuthenticationOf(NoOptions()));
 
         Diagnostics.Act("dns resolver type", transports.DnsResolver.GetType().Name);
         Diagnostics.Act("time provider is TimeProvider.System", ReferenceEquals(TimeProvider.System, transports.TimeProvider));
@@ -144,7 +144,7 @@ public sealed partial class EngineCompositionTests
     public void CreateTransports_NoTimeProviderGiven_SslStreamTlsProviderTimesOnTimeProviderSystem()
     {
         Diagnostics.Arrange("arguments", "gophers://example.com/");
-        CurlTransports transports = EngineComposition.CreateTransports(NoOptions(), EasyOptionsFromCommandLine.NetworkOf(NoOptions()), EasyOptionsFromCommandLine.TlsOf(NoOptions()), EasyOptionsFromCommandLine.HttpOf(NoOptions()), EasyOptionsFromCommandLine.ProxyOf(NoOptions()), EasyOptionsFromCommandLine.AuthenticationOf(NoOptions()));
+        CurlTransports transports = EngineComposition.CreateTransports(EasyOptionsFromCommandLine.ToolOptionsOf(NoOptions()), EasyOptionsFromCommandLine.NetworkOf(NoOptions()), EasyOptionsFromCommandLine.TlsOf(NoOptions()), EasyOptionsFromCommandLine.HttpOf(NoOptions()), EasyOptionsFromCommandLine.ProxyOf(NoOptions()), EasyOptionsFromCommandLine.AuthenticationOf(NoOptions()));
 
         TimeProvider captured = CapturedDependency<TimeProvider>(transports.TlsProvider);
         Diagnostics.Act("tls provider time provider is TimeProvider.System", ReferenceEquals(TimeProvider.System, captured));
@@ -158,7 +158,7 @@ public sealed partial class EngineCompositionTests
         TimeProvider timeProvider = new ReplacementTimeProvider();
         Diagnostics.Arrange("time provider", timeProvider.GetType().Name);
 
-        CurlTransports transports = EngineComposition.CreateTransports(NoOptions(), EasyOptionsFromCommandLine.NetworkOf(NoOptions()), EasyOptionsFromCommandLine.TlsOf(NoOptions()), EasyOptionsFromCommandLine.HttpOf(NoOptions()), EasyOptionsFromCommandLine.ProxyOf(NoOptions()), EasyOptionsFromCommandLine.AuthenticationOf(NoOptions()), timeProvider);
+        CurlTransports transports = EngineComposition.CreateTransports(EasyOptionsFromCommandLine.ToolOptionsOf(NoOptions()), EasyOptionsFromCommandLine.NetworkOf(NoOptions()), EasyOptionsFromCommandLine.TlsOf(NoOptions()), EasyOptionsFromCommandLine.HttpOf(NoOptions()), EasyOptionsFromCommandLine.ProxyOf(NoOptions()), EasyOptionsFromCommandLine.AuthenticationOf(NoOptions()), timeProvider);
 
         Diagnostics.Act("transports time provider is the given one", ReferenceEquals(timeProvider, transports.TimeProvider));
         Diagnostics.Assert("transports time provider is the given one", true, ReferenceEquals(timeProvider, transports.TimeProvider));
@@ -193,7 +193,7 @@ public sealed partial class EngineCompositionTests
     public void CreateTransports_WithTlsMax10_UpgradesTheOriginWithTheHandBuiltClientAndTheProxyWithSslStream()
     {
         Diagnostics.Arrange("arguments", "--tls-max 1.0 https://example.com/");
-        CurlTransports transports = EngineComposition.CreateTransports(Parse("--tls-max", "1.0", "https://example.com/"), EasyOptionsFromCommandLine.NetworkOf(Parse("--tls-max", "1.0", "https://example.com/")), EasyOptionsFromCommandLine.TlsOf(Parse("--tls-max", "1.0", "https://example.com/")), EasyOptionsFromCommandLine.HttpOf(Parse("--tls-max", "1.0", "https://example.com/")), EasyOptionsFromCommandLine.ProxyOf(Parse("--tls-max", "1.0", "https://example.com/")), EasyOptionsFromCommandLine.AuthenticationOf(Parse("--tls-max", "1.0", "https://example.com/")));
+        CurlTransports transports = EngineComposition.CreateTransports(EasyOptionsFromCommandLine.ToolOptionsOf(Parse("--tls-max", "1.0", "https://example.com/")), EasyOptionsFromCommandLine.NetworkOf(Parse("--tls-max", "1.0", "https://example.com/")), EasyOptionsFromCommandLine.TlsOf(Parse("--tls-max", "1.0", "https://example.com/")), EasyOptionsFromCommandLine.HttpOf(Parse("--tls-max", "1.0", "https://example.com/")), EasyOptionsFromCommandLine.ProxyOf(Parse("--tls-max", "1.0", "https://example.com/")), EasyOptionsFromCommandLine.AuthenticationOf(Parse("--tls-max", "1.0", "https://example.com/")));
 
         Diagnostics.Act("origin tls provider type", transports.TlsProvider.GetType().Name);
         Diagnostics.Act("proxy tls provider type", transports.ProxyTlsProvider.GetType().Name);
@@ -211,7 +211,7 @@ public sealed partial class EngineCompositionTests
     public void CreateTransports_WithCurvesOrSigalgs_UpgradesTheOriginWithTheHandBuiltClient(string option, string value)
     {
         Diagnostics.Arrange("arguments", $"{option} {value} https://example.com/");
-        CurlTransports transports = EngineComposition.CreateTransports(Parse(option, value, "https://example.com/"), EasyOptionsFromCommandLine.NetworkOf(Parse(option, value, "https://example.com/")), EasyOptionsFromCommandLine.TlsOf(Parse(option, value, "https://example.com/")), EasyOptionsFromCommandLine.HttpOf(Parse(option, value, "https://example.com/")), EasyOptionsFromCommandLine.ProxyOf(Parse(option, value, "https://example.com/")), EasyOptionsFromCommandLine.AuthenticationOf(Parse(option, value, "https://example.com/")));
+        CurlTransports transports = EngineComposition.CreateTransports(EasyOptionsFromCommandLine.ToolOptionsOf(Parse(option, value, "https://example.com/")), EasyOptionsFromCommandLine.NetworkOf(Parse(option, value, "https://example.com/")), EasyOptionsFromCommandLine.TlsOf(Parse(option, value, "https://example.com/")), EasyOptionsFromCommandLine.HttpOf(Parse(option, value, "https://example.com/")), EasyOptionsFromCommandLine.ProxyOf(Parse(option, value, "https://example.com/")), EasyOptionsFromCommandLine.AuthenticationOf(Parse(option, value, "https://example.com/")));
 
         Diagnostics.Act("origin tls provider type", transports.TlsProvider.GetType().Name);
         Diagnostics.Act("proxy tls provider type", transports.ProxyTlsProvider.GetType().Name);
@@ -224,7 +224,7 @@ public sealed partial class EngineCompositionTests
     public void CreateTransports_TcpConnector_ReceivesTcpDialerAndSecureSslStreamTlsProvider()
     {
         Diagnostics.Arrange("arguments", "gophers://example.com/");
-        CurlTransports transports = EngineComposition.CreateTransports(NoOptions(), EasyOptionsFromCommandLine.NetworkOf(NoOptions()), EasyOptionsFromCommandLine.TlsOf(NoOptions()), EasyOptionsFromCommandLine.HttpOf(NoOptions()), EasyOptionsFromCommandLine.ProxyOf(NoOptions()), EasyOptionsFromCommandLine.AuthenticationOf(NoOptions()));
+        CurlTransports transports = EngineComposition.CreateTransports(EasyOptionsFromCommandLine.ToolOptionsOf(NoOptions()), EasyOptionsFromCommandLine.NetworkOf(NoOptions()), EasyOptionsFromCommandLine.TlsOf(NoOptions()), EasyOptionsFromCommandLine.HttpOf(NoOptions()), EasyOptionsFromCommandLine.ProxyOf(NoOptions()), EasyOptionsFromCommandLine.AuthenticationOf(NoOptions()));
 
         Diagnostics.Act("insecure", transports.TlsClientOptions.Insecure);
         Diagnostics.Assert("insecure", false, transports.TlsClientOptions.Insecure);
@@ -242,7 +242,7 @@ public sealed partial class EngineCompositionTests
         Diagnostics.Arrange("arguments", "-k --cacert x.pem https://example.com/");
         CommandLineOptions options = Parse("-k", "--cacert", "x.pem", "https://example.com/");
 
-        CurlTransports transports = EngineComposition.CreateTransports(options, EasyOptionsFromCommandLine.NetworkOf(options), EasyOptionsFromCommandLine.TlsOf(options), EasyOptionsFromCommandLine.HttpOf(options), EasyOptionsFromCommandLine.ProxyOf(options), EasyOptionsFromCommandLine.AuthenticationOf(options));
+        CurlTransports transports = EngineComposition.CreateTransports(EasyOptionsFromCommandLine.ToolOptionsOf(options), EasyOptionsFromCommandLine.NetworkOf(options), EasyOptionsFromCommandLine.TlsOf(options), EasyOptionsFromCommandLine.HttpOf(options), EasyOptionsFromCommandLine.ProxyOf(options), EasyOptionsFromCommandLine.AuthenticationOf(options));
 
         Diagnostics.Act("proxy tls client options", transports.ProxyTlsClientOptions);
         Diagnostics.Assert("proxy tls client options", new TlsClientOptions(), transports.ProxyTlsClientOptions);
@@ -260,7 +260,7 @@ public sealed partial class EngineCompositionTests
             "--cacert", "x.pem", "--proxy-insecure", "--proxy-cacert", "proxy.pem", "--proxy-capath", "proxy-certs", "https://example.com/");
 
         Diagnostics.Arrange("arguments", "--cacert x.pem --proxy-insecure --proxy-cacert proxy.pem --proxy-capath proxy-certs https://example.com/");
-        CurlTransports transports = EngineComposition.CreateTransports(options, EasyOptionsFromCommandLine.NetworkOf(options), EasyOptionsFromCommandLine.TlsOf(options), EasyOptionsFromCommandLine.HttpOf(options), EasyOptionsFromCommandLine.ProxyOf(options), EasyOptionsFromCommandLine.AuthenticationOf(options));
+        CurlTransports transports = EngineComposition.CreateTransports(EasyOptionsFromCommandLine.ToolOptionsOf(options), EasyOptionsFromCommandLine.NetworkOf(options), EasyOptionsFromCommandLine.TlsOf(options), EasyOptionsFromCommandLine.HttpOf(options), EasyOptionsFromCommandLine.ProxyOf(options), EasyOptionsFromCommandLine.AuthenticationOf(options));
 
         Diagnostics.Act("proxy tls client options", transports.ProxyTlsClientOptions);
         Diagnostics.Act("target tls client options", transports.TlsClientOptions);
@@ -284,7 +284,7 @@ public sealed partial class EngineCompositionTests
         TimeProvider timeProvider = new ReplacementTimeProvider();
         Diagnostics.Arrange("time provider", timeProvider.GetType().Name);
 
-        CurlTransports transports = EngineComposition.CreateTransports(NoOptions(), EasyOptionsFromCommandLine.NetworkOf(NoOptions()), EasyOptionsFromCommandLine.TlsOf(NoOptions()), EasyOptionsFromCommandLine.HttpOf(NoOptions()), EasyOptionsFromCommandLine.ProxyOf(NoOptions()), EasyOptionsFromCommandLine.AuthenticationOf(NoOptions()), timeProvider);
+        CurlTransports transports = EngineComposition.CreateTransports(EasyOptionsFromCommandLine.ToolOptionsOf(NoOptions()), EasyOptionsFromCommandLine.NetworkOf(NoOptions()), EasyOptionsFromCommandLine.TlsOf(NoOptions()), EasyOptionsFromCommandLine.HttpOf(NoOptions()), EasyOptionsFromCommandLine.ProxyOf(NoOptions()), EasyOptionsFromCommandLine.AuthenticationOf(NoOptions()), timeProvider);
 
         bool sameClock = ReferenceEquals(timeProvider, CapturedDependency<TimeProvider>(transports.ProxyTlsProvider));
         Diagnostics.Act("proxy tls provider uses the given time provider", sameClock);
@@ -298,7 +298,7 @@ public sealed partial class EngineCompositionTests
         Diagnostics.Arrange("arguments", "-k --cacert x.pem --tlsv1.3 gophers://example.com/");
         CommandLineOptions options = Parse("-k", "--cacert", "x.pem", "--tlsv1.3", "gophers://example.com/");
 
-        CurlTransports transports = EngineComposition.CreateTransports(options, EasyOptionsFromCommandLine.NetworkOf(options), EasyOptionsFromCommandLine.TlsOf(options), EasyOptionsFromCommandLine.HttpOf(options), EasyOptionsFromCommandLine.ProxyOf(options), EasyOptionsFromCommandLine.AuthenticationOf(options));
+        CurlTransports transports = EngineComposition.CreateTransports(EasyOptionsFromCommandLine.ToolOptionsOf(options), EasyOptionsFromCommandLine.NetworkOf(options), EasyOptionsFromCommandLine.TlsOf(options), EasyOptionsFromCommandLine.HttpOf(options), EasyOptionsFromCommandLine.ProxyOf(options), EasyOptionsFromCommandLine.AuthenticationOf(options));
 
         TlsClientOptions expected = new(Insecure: true, MinimumVersion: TlsVersion.Tls13, CaCertificateFile: "x.pem");
         Diagnostics.Act("tls client options", transports.TlsClientOptions);
@@ -311,8 +311,8 @@ public sealed partial class EngineCompositionTests
     public void CreateTransports_EachCall_BuildsItsOwnResolver()
     {
         Diagnostics.Arrange("arguments", "gophers://example.com/");
-        IDnsResolver first = EngineComposition.CreateTransports(NoOptions(), EasyOptionsFromCommandLine.NetworkOf(NoOptions()), EasyOptionsFromCommandLine.TlsOf(NoOptions()), EasyOptionsFromCommandLine.HttpOf(NoOptions()), EasyOptionsFromCommandLine.ProxyOf(NoOptions()), EasyOptionsFromCommandLine.AuthenticationOf(NoOptions())).DnsResolver;
-        IDnsResolver second = EngineComposition.CreateTransports(NoOptions(), EasyOptionsFromCommandLine.NetworkOf(NoOptions()), EasyOptionsFromCommandLine.TlsOf(NoOptions()), EasyOptionsFromCommandLine.HttpOf(NoOptions()), EasyOptionsFromCommandLine.ProxyOf(NoOptions()), EasyOptionsFromCommandLine.AuthenticationOf(NoOptions())).DnsResolver;
+        IDnsResolver first = EngineComposition.CreateTransports(EasyOptionsFromCommandLine.ToolOptionsOf(NoOptions()), EasyOptionsFromCommandLine.NetworkOf(NoOptions()), EasyOptionsFromCommandLine.TlsOf(NoOptions()), EasyOptionsFromCommandLine.HttpOf(NoOptions()), EasyOptionsFromCommandLine.ProxyOf(NoOptions()), EasyOptionsFromCommandLine.AuthenticationOf(NoOptions())).DnsResolver;
+        IDnsResolver second = EngineComposition.CreateTransports(EasyOptionsFromCommandLine.ToolOptionsOf(NoOptions()), EasyOptionsFromCommandLine.NetworkOf(NoOptions()), EasyOptionsFromCommandLine.TlsOf(NoOptions()), EasyOptionsFromCommandLine.HttpOf(NoOptions()), EasyOptionsFromCommandLine.ProxyOf(NoOptions()), EasyOptionsFromCommandLine.AuthenticationOf(NoOptions())).DnsResolver;
 
         Diagnostics.Act("resolvers are the same instance", ReferenceEquals(first, second));
         Diagnostics.Assert("resolvers are the same instance", false, ReferenceEquals(first, second));
@@ -326,7 +326,7 @@ public sealed partial class EngineCompositionTests
     public void CreateTransports_PoolingConnector_WaitsForMultiplexingUnderParallelWithoutParallelImmediate(string[] arguments, bool waits)
     {
         Diagnostics.Arrange("arguments", string.Join(" ", arguments));
-        CurlTransports transports = EngineComposition.CreateTransports(Parse(arguments), EasyOptionsFromCommandLine.NetworkOf(Parse(arguments)), EasyOptionsFromCommandLine.TlsOf(Parse(arguments)), EasyOptionsFromCommandLine.HttpOf(Parse(arguments)), EasyOptionsFromCommandLine.ProxyOf(Parse(arguments)), EasyOptionsFromCommandLine.AuthenticationOf(Parse(arguments)));
+        CurlTransports transports = EngineComposition.CreateTransports(EasyOptionsFromCommandLine.ToolOptionsOf(Parse(arguments)), EasyOptionsFromCommandLine.NetworkOf(Parse(arguments)), EasyOptionsFromCommandLine.TlsOf(Parse(arguments)), EasyOptionsFromCommandLine.HttpOf(Parse(arguments)), EasyOptionsFromCommandLine.ProxyOf(Parse(arguments)), EasyOptionsFromCommandLine.AuthenticationOf(Parse(arguments)));
 
         Diagnostics.Act("pooling connector waits for multiplexing", transports.PoolingConnector.WaitsForMultiplexing);
         Diagnostics.Assert("pooling connector waits for multiplexing", waits, transports.PoolingConnector.WaitsForMultiplexing);
@@ -339,7 +339,7 @@ public sealed partial class EngineCompositionTests
         TimeProvider timeProvider = new ReplacementTimeProvider();
         Diagnostics.Arrange("time provider", timeProvider.GetType().Name);
 
-        CurlTransports transports = EngineComposition.CreateTransports(NoOptions(), EasyOptionsFromCommandLine.NetworkOf(NoOptions()), EasyOptionsFromCommandLine.TlsOf(NoOptions()), EasyOptionsFromCommandLine.HttpOf(NoOptions()), EasyOptionsFromCommandLine.ProxyOf(NoOptions()), EasyOptionsFromCommandLine.AuthenticationOf(NoOptions()), timeProvider);
+        CurlTransports transports = EngineComposition.CreateTransports(EasyOptionsFromCommandLine.ToolOptionsOf(NoOptions()), EasyOptionsFromCommandLine.NetworkOf(NoOptions()), EasyOptionsFromCommandLine.TlsOf(NoOptions()), EasyOptionsFromCommandLine.HttpOf(NoOptions()), EasyOptionsFromCommandLine.ProxyOf(NoOptions()), EasyOptionsFromCommandLine.AuthenticationOf(NoOptions()), timeProvider);
 
         bool wrapsTcpConnector = ReferenceEquals(transports.TcpConnector, CapturedDependency<IConnector>(transports.PoolingConnector));
         Diagnostics.Act("pooling connector wraps the tcp connector", wrapsTcpConnector);
@@ -356,7 +356,7 @@ public sealed partial class EngineCompositionTests
             "--capath", "certs", "--cert", "c.p12:pw", "--key", "k.pem",
             "--ciphers", "AES128-SHA", "--tls13-ciphers", "TLS_AES_128_GCM_SHA256", "https://example.com/");
 
-        CurlTransports transports = EngineComposition.CreateTransports(options, EasyOptionsFromCommandLine.NetworkOf(options), EasyOptionsFromCommandLine.TlsOf(options), EasyOptionsFromCommandLine.HttpOf(options), EasyOptionsFromCommandLine.ProxyOf(options), EasyOptionsFromCommandLine.AuthenticationOf(options));
+        CurlTransports transports = EngineComposition.CreateTransports(EasyOptionsFromCommandLine.ToolOptionsOf(options), EasyOptionsFromCommandLine.NetworkOf(options), EasyOptionsFromCommandLine.TlsOf(options), EasyOptionsFromCommandLine.HttpOf(options), EasyOptionsFromCommandLine.ProxyOf(options), EasyOptionsFromCommandLine.AuthenticationOf(options));
 
         TlsClientOptions expected = new(
             CaCertificateDirectory: "certs",

@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary, Curl.Engine.UnitTests, Curl.Console, Curl.Console.UnitTests, Curl.Api.UnitLibrary, Curl.Api.UnitTests]
 requirement: none
 created: 2026-10-15
-completed:
+completed: 2026-10-15
 ---
 # BL-2356 — Make EngineComposition's factory methods and OptionGroupConnectionSettings stop taking CommandLineOptions
 
@@ -22,14 +22,17 @@ ADR-0506; one of the four pieces BL-2310 needs before the engine can drop its `C
 
 ## Acceptance criteria
 
-- [ ] None of the methods named in Goal, and no part of `OptionGroupConnectionSettings.cs`, names `CommandLineOptions` or `InterfaceBinding`.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes with no test deleted, skipped or weakened.
-- [ ] `Measure-CodeQuality.ps1` passes all four gates for every library changed, measured in one call.
-- [ ] `Curl.Conformance.UnitTests/PassingUpstreamCases.txt` is unchanged.
+- [x] None of the methods named in Goal, and no part of `OptionGroupConnectionSettings.cs`, names `CommandLineOptions` or `InterfaceBinding`.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes with no test deleted, skipped or weakened.
+- [x] `Measure-CodeQuality.ps1` passes all four gates for every library changed, measured in one call.
+- [x] `Curl.Conformance.UnitTests/PassingUpstreamCases.txt` is unchanged.
 
 ## Notes
+
+- Decision (ADR-0538): ALPN and `-A` come from `EasyHttpOptions`; `-Z`, `--parallel-immediate`, `--ssl-sessions` and the `-m` trace limit are an engine-owned `EngineToolOptions`; `--interface` is parsed by `EngineInterfaceBinding`. `TransferPerformer.RefuseMalformedInterface` now reparses `options.Interface.Value` with it; `CommandLineOptions` itself is BL-2310's.
 
 ## Log
 
 - 2026-10-15: Created.
 - 2026-10-15: Backlog -> Doing.
+- 2026-10-15: Doing -> Done. Transport factories read EngineToolOptions and easy groups; build clean, fast tests green, quality gates pass

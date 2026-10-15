@@ -58,7 +58,7 @@ public sealed class EngineCompositionSshTraceTests
     {
         Diagnostics.Arrange("arguments", "-v --trace-config ssh");
 
-        CurlTransports transports = EngineComposition.CreateTransports(Parse("-v", "--trace-config", "ssh"), EasyOptionsFromCommandLine.NetworkOf(Parse("-v", "--trace-config", "ssh")), EasyOptionsFromCommandLine.TlsOf(Parse("-v", "--trace-config", "ssh")), EasyOptionsFromCommandLine.HttpOf(Parse("-v", "--trace-config", "ssh")), EasyOptionsFromCommandLine.ProxyOf(Parse("-v", "--trace-config", "ssh")), EasyOptionsFromCommandLine.AuthenticationOf(Parse("-v", "--trace-config", "ssh")), TimeProvider.System, traces: EasyOptionsFromCommandLine.TraceComponentsOf(Parse("-v", "--trace-config", "ssh")));
+        CurlTransports transports = EngineComposition.CreateTransports(EasyOptionsFromCommandLine.ToolOptionsOf(Parse("-v", "--trace-config", "ssh")), EasyOptionsFromCommandLine.NetworkOf(Parse("-v", "--trace-config", "ssh")), EasyOptionsFromCommandLine.TlsOf(Parse("-v", "--trace-config", "ssh")), EasyOptionsFromCommandLine.HttpOf(Parse("-v", "--trace-config", "ssh")), EasyOptionsFromCommandLine.ProxyOf(Parse("-v", "--trace-config", "ssh")), EasyOptionsFromCommandLine.AuthenticationOf(Parse("-v", "--trace-config", "ssh")), TimeProvider.System, traces: EasyOptionsFromCommandLine.TraceComponentsOf(Parse("-v", "--trace-config", "ssh")));
 
         Diagnostics.Act("transports traces ssh", transports.TracesSsh);
         Diagnostics.Assert("transports traces ssh", true, transports.TracesSsh);
@@ -70,7 +70,7 @@ public sealed class EngineCompositionSshTraceTests
     {
         Diagnostics.Arrange("arguments", "-v");
 
-        CurlTransports transports = EngineComposition.CreateTransports(Parse("-v"), EasyOptionsFromCommandLine.NetworkOf(Parse("-v")), EasyOptionsFromCommandLine.TlsOf(Parse("-v")), EasyOptionsFromCommandLine.HttpOf(Parse("-v")), EasyOptionsFromCommandLine.ProxyOf(Parse("-v")), EasyOptionsFromCommandLine.AuthenticationOf(Parse("-v")), TimeProvider.System, traces: EasyOptionsFromCommandLine.TraceComponentsOf(Parse("-v")));
+        CurlTransports transports = EngineComposition.CreateTransports(EasyOptionsFromCommandLine.ToolOptionsOf(Parse("-v")), EasyOptionsFromCommandLine.NetworkOf(Parse("-v")), EasyOptionsFromCommandLine.TlsOf(Parse("-v")), EasyOptionsFromCommandLine.HttpOf(Parse("-v")), EasyOptionsFromCommandLine.ProxyOf(Parse("-v")), EasyOptionsFromCommandLine.AuthenticationOf(Parse("-v")), TimeProvider.System, traces: EasyOptionsFromCommandLine.TraceComponentsOf(Parse("-v")));
 
         Diagnostics.Act("transports traces ssh", transports.TracesSsh);
         Diagnostics.Assert("transports traces ssh", false, transports.TracesSsh);

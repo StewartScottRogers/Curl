@@ -362,20 +362,20 @@ internal static class EngineComposition
     /// <c>SO_KEEPALIVE</c> unless <c>--no-tcp-nodelay</c> or <c>--no-keepalive</c> says not to, and the
     /// TLS provider <see cref="CreateTlsProvider" /> routes to, and a <see cref="UdpDatagramConnector" />. Both
     /// connectors and the TLS provider share the one resolver and <see cref="TimeProvider.System" />. TLS uses
-    /// the <see cref="TlsClientOptions" /> mapped from <paramref name="options" /> by
+    /// the <see cref="TlsClientOptions" /> mapped from <paramref name="tls" /> by
     /// <see cref="TlsClientOptionsMapping.Of" /> from <paramref name="tls" />, one set shared by every URL on
     /// the command line. The handshake to an HTTPS proxy runs through a second provider, routed
     /// the same way, on the same clock, with the <see cref="TlsClientOptions" />
     /// <see cref="TlsClientOptionsMapping.ProxyOf" /> maps from the proxy's
     /// TLS options, so <c>-k</c> and <c>--cacert</c> never reach the proxy. The CONNECT request that tunnels through an HTTP proxy carries the
     /// <see cref="HttpProxyTunnelOptions" /> <see cref="CreateProxyTunnelOptions" /> maps from
-    /// <paramref name="options" />, and the TCP connector applies the <c>--resolve</c> and
+    /// <paramref name="http" /> and <paramref name="proxy" />, and the TCP connector applies the <c>--resolve</c> and
     /// <c>--connect-to</c> values (<see cref="CreateTcpConnector" />), as the UDP connector does
     /// (<see cref="CreateUdpDatagramConnector" />). One
     /// <see cref="PoolingConnector" /> over the TCP connector, on the same clock, is the option group's
     /// connection pool (ADR-0050).
     /// </summary>
-    /// <param name="options">The parsed command line, for everything but the network group.</param>
+    /// <param name="tool">The curl tool's own settings: <c>-Z</c>, <c>--parallel-immediate</c>, <c>--ssl-sessions</c> and <c>-m</c>.</param>
     /// <param name="network">The option group's network options: its connections, name resolution and connect timeout.</param>
     /// <param name="tls">The option group's TLS options, for the target's, the HTTPS proxy's and the DoH server's handshakes.</param>
     /// <param name="http">The option group's HTTP options, for the HTTP version the ALPN list and the HTTPS-CONNECT attempts follow.</param>
@@ -383,8 +383,8 @@ internal static class EngineComposition
     /// <param name="authentication">The option group's authentication options, for the proxy's auth methods, the Negotiate service names and <c>--delegation</c>.</param>
     /// <param name="traces">The run's <c>--trace-config</c> components; <see langword="null" /> for none.</param>
     /// <returns>The connectors and the pieces they were built from.</returns>
-    internal static CurlTransports CreateTransports(CommandLineOptions options, EasyNetworkOptions network, EasyTlsOptions tls, EasyHttpOptions http, EasyProxyOptions proxy, EasyAuthenticationOptions authentication, EngineTraceComponents? traces = null) =>
-        CreateTransports(options, network, tls, http, proxy, authentication, TimeProvider.System, traces: traces);
+    internal static CurlTransports CreateTransports(EngineToolOptions tool, EasyNetworkOptions network, EasyTlsOptions tls, EasyHttpOptions http, EasyProxyOptions proxy, EasyAuthenticationOptions authentication, EngineTraceComponents? traces = null) =>
+        CreateTransports(tool, network, tls, http, proxy, authentication, TimeProvider.System, traces: traces);
 
     /// <summary>
     /// Creates the run's resolver: the <see cref="CreateDohResolver" /> one when <c>--doh-url</c> is
@@ -394,7 +394,6 @@ internal static class EngineComposition
     /// is given, as curl's c-ares build resolves then (ADR-0170, BL-694), asking only the
     /// <c>-4</c> or <c>-6</c> family's records; otherwise the <see cref="SystemDnsResolver" />.
     /// </summary>
-    /// <param name="options">The parsed command line, whose trace options the DoH connector reads.</param>
     /// <param name="network">The option group's network options, whose DNS settings and IP version pick the resolver.</param>
     /// <param name="tls">The option group's TLS options, whose DoH settings the DoH connector's handshakes apply.</param>
     /// <param name="timeProvider">The clock the hand-built resolver and the DoH connections time on.</param>
@@ -406,11 +405,11 @@ internal static class EngineComposition
     /// <param name="easyErrorText">Curl's easy error text for each exit code, which the DoH resolver's <c>--trace-config doh</c> lines carry (BL-1102): <c>Curl.Console</c>'s <c>CurlEasyErrorText.Of</c> in production; <see langword="null" /> for an empty text.</param>
     /// <param name="traces">The run's <c>--trace-config</c> components, for the DoH connector's DNS filter lines; <see langword="null" /> for none.</param>
     /// <returns>The resolver.</returns>
-    internal static IDnsResolver CreateDnsResolver(CommandLineOptions options, EasyNetworkOptions network, EasyTlsOptions tls, TimeProvider timeProvider, ITcpDialer tcpDialer, ITransferEvents? dohTrace = null, Func<CurlExitCode, string>? easyErrorText = null, EngineTraceComponents? traces = null)
+    internal static IDnsResolver CreateDnsResolver(EasyNetworkOptions network, EasyTlsOptions tls, TimeProvider timeProvider, ITcpDialer tcpDialer, ITransferEvents? dohTrace = null, Func<CurlExitCode, string>? easyErrorText = null, EngineTraceComponents? traces = null)
     {
         if (network.DohUrl is { } dohUrl)
         {
-            return CreateDohResolver(dohUrl, CreateDohConnector(options, traces ?? EngineTraceComponents.None, tls, tcpDialer, timeProvider), AddressFamilyOf(network), dohTrace, easyErrorText);
+            return CreateDohResolver(dohUrl, CreateDohConnector(traces ?? EngineTraceComponents.None, tls, tcpDialer, timeProvider), AddressFamilyOf(network), dohTrace, easyErrorText);
         }
 
         DnsServerResolverOptions resolverOptions = new(
@@ -707,13 +706,12 @@ internal static class EngineComposition
     /// Under <see cref="TracesDns" /> it writes the DNS filter's lines for each DoH sub-transfer too,
     /// as curl 8.21.0 does (BL-1180).
     /// </summary>
-    /// <param name="options">The parsed command line, for its trace options.</param>
     /// <param name="traces">The run's <c>--trace-config</c> components, for the DNS filter lines.</param>
     /// <param name="tls">The option group's TLS options.</param>
     /// <param name="tcpDialer">Opens each plaintext connection.</param>
     /// <param name="timeProvider">The clock the connector and its TLS provider time on.</param>
     /// <returns>The connector.</returns>
-    internal static TcpConnector CreateDohConnector(CommandLineOptions options, EngineTraceComponents traces, EasyTlsOptions tls, ITcpDialer tcpDialer, TimeProvider timeProvider) =>
+    internal static TcpConnector CreateDohConnector(EngineTraceComponents traces, EasyTlsOptions tls, ITcpDialer tcpDialer, TimeProvider timeProvider) =>
         new(
             new SystemDnsResolver(),
             tcpDialer,
@@ -746,13 +744,13 @@ internal static class EngineComposition
             : new HandBuiltTlsProvider(options, timeProvider, sessions, echConfigs);
 
     /// <summary>
-    /// Creates the network transports as <see cref="CreateTransports(CommandLineOptions, EasyNetworkOptions, EasyTlsOptions, EasyHttpOptions, EasyProxyOptions, EasyAuthenticationOptions, EngineTraceComponents?)" /> does,
+    /// Creates the network transports as <see cref="CreateTransports(EngineToolOptions, EasyNetworkOptions, EasyTlsOptions, EasyHttpOptions, EasyProxyOptions, EasyAuthenticationOptions, EngineTraceComponents?)" /> does,
     /// on <paramref name="timeProvider" /> instead of <see cref="TimeProvider.System" />: the
     /// <see cref="TcpConnector" />, the TLS providers and the
     /// <see cref="UdpDatagramConnector" /> all time on it, so the handshake timestamps the TLS
     /// provider reports are on the connector's clock (ADR-0030).
     /// </summary>
-    /// <param name="options">The parsed command line, for everything but the network group.</param>
+    /// <param name="tool">The curl tool's own settings: <c>-Z</c>, <c>--parallel-immediate</c>, <c>--ssl-sessions</c> and <c>-m</c>.</param>
     /// <param name="network">The option group's network options: its connections, name resolution and connect timeout.</param>
     /// <param name="tls">The option group's TLS options, for the target's, the HTTPS proxy's and the DoH server's handshakes.</param>
     /// <param name="http">The option group's HTTP options, for the HTTP version the ALPN list and the HTTPS-CONNECT attempts follow.</param>
@@ -769,22 +767,22 @@ internal static class EngineComposition
     /// <param name="runDnsCache">The run's DNS cache, which every option group's TCP connector answers from and adds to as curl 8.21.0 shares its cache (BL-1053); <see langword="null" /> for a cache of the group's own.</param>
     /// <param name="easyErrorText">Curl's easy error text for each exit code, which the DoH resolver's <c>--trace-config doh</c> lines carry (BL-1102): <c>Curl.Console</c>'s <c>CurlEasyErrorText.Of</c> in production; <see langword="null" /> for an empty text.</param>
     /// <param name="traces">The run's <c>--trace-config</c> components; <see langword="null" /> for none.</param>
-    internal static CurlTransports CreateTransports(CommandLineOptions options, EasyNetworkOptions network, EasyTlsOptions tls, EasyHttpOptions http, EasyProxyOptions proxy, EasyAuthenticationOptions authentication, TimeProvider timeProvider, ConnectionCache? runConnections = null, TlsSessionCache? tlsSessions = null, IDiagnosticLog? diagnosticLog = null, DnsCache? runDnsCache = null, Func<CurlExitCode, string>? easyErrorText = null, EngineTraceComponents? traces = null)
+    internal static CurlTransports CreateTransports(EngineToolOptions tool, EasyNetworkOptions network, EasyTlsOptions tls, EasyHttpOptions http, EasyProxyOptions proxy, EasyAuthenticationOptions authentication, TimeProvider timeProvider, ConnectionCache? runConnections = null, TlsSessionCache? tlsSessions = null, IDiagnosticLog? diagnosticLog = null, DnsCache? runDnsCache = null, Func<CurlExitCode, string>? easyErrorText = null, EngineTraceComponents? traces = null)
     {
         traces ??= EngineTraceComponents.None;
         TcpDialer tcpDialer = new(TcpSocketOptionsOf(network));
         FlowScopedTransferEvents? resolverEvents = TracesDns(traces) ? new() : null;
-        IDnsResolver dnsResolver = CreateDnsResolver(options, network, tls, timeProvider, tcpDialer, resolverEvents, easyErrorText, traces);
-        TlsClientOptions tlsClientOptions = TlsClientOptionsMapping.Of(tls, options.UseAlpn, options.SslSessionsFile);
+        IDnsResolver dnsResolver = CreateDnsResolver(network, tls, timeProvider, tcpDialer, resolverEvents, easyErrorText, traces);
+        TlsClientOptions tlsClientOptions = TlsClientOptionsMapping.Of(tls, http.SslEnableAlpn, tool.SslSessionsFile);
         ITlsProviderWithWarnings tlsProvider = CreateTlsProvider(tlsClientOptions, timeProvider, tlsSessions, dnsResolver as IEchConfigListLookup);
-        TlsClientOptions proxyTlsClientOptions = TlsClientOptionsMapping.ProxyOf(tls, options.UseAlpn);
+        TlsClientOptions proxyTlsClientOptions = TlsClientOptionsMapping.ProxyOf(tls, http.SslEnableAlpn);
         ITlsProviderWithWarnings proxyTlsProvider = CreateTlsProvider(proxyTlsClientOptions, timeProvider);
         LateBoundSecurityContextFactory proxyContexts = new();
-        HttpProxyTunnelOptions proxyTunnelOptions = CreateProxyTunnelOptions(options, proxy, authentication, proxyContexts, diagnosticLog);
+        HttpProxyTunnelOptions proxyTunnelOptions = CreateProxyTunnelOptions(http, proxy, authentication, proxyContexts, diagnosticLog);
         QuicDialer quicDialer = new(tlsClientOptions, timeProvider) { WritesHttp3ConnectionLines = TracesHttp3(traces) };
-        TcpConnector tcpConnector = CreateTcpConnector(options, traces, network, http, proxy, authentication, dnsResolver, tcpDialer, tlsProvider, timeProvider, proxyTunnelOptions, proxyTlsProvider, quicDialer, proxyContexts, runDnsCache, resolverEvents);
+        TcpConnector tcpConnector = CreateTcpConnector(tool, traces, network, http, proxy, authentication, dnsResolver, tcpDialer, tlsProvider, timeProvider, proxyTunnelOptions, proxyTlsProvider, quicDialer, proxyContexts, runDnsCache, resolverEvents);
         UdpDatagramConnector udpDatagramConnector = CreateUdpDatagramConnector(network, dnsResolver, timeProvider, diagnosticLog);
-        PoolingConnector poolingConnector = CreatePoolingConnector(options, network, tls, http, proxy, tcpConnector, timeProvider, runConnections);
+        PoolingConnector poolingConnector = CreatePoolingConnector(tool, network, tls, http, proxy, tcpConnector, timeProvider, runConnections);
 
         // The tunnel answers --proxy-ntlm and --proxy-negotiate on the same router the origin's
         // contexts come from, which can only be made once the connectors exist (BL-604).
@@ -835,9 +833,9 @@ internal static class EngineComposition
     /// than open one of its own: curl sets <c>CURLOPT_PIPEWAIT</c> on every <c>-Z</c> transfer unless
     /// <c>--parallel-immediate</c> is given (measured, BL-717 Notes).
     /// </summary>
-    /// <param name="options">The parsed command line.</param>
+    /// <param name="tool">The curl tool's own settings.</param>
     /// <returns><see langword="true" /> for <c>-Z</c> without <c>--parallel-immediate</c>.</returns>
-    internal static bool WaitsForMultiplexing(CommandLineOptions options) => options.Parallel && !options.ParallelImmediate;
+    internal static bool WaitsForMultiplexing(EngineToolOptions tool) => tool.Parallel && !tool.ParallelImmediate;
 
     /// <summary>
     /// Creates an option group's pooling connector over <paramref name="connector" />, waiting for
@@ -846,7 +844,7 @@ internal static class EngineComposition
     /// so a later group reuses an earlier group's connection when their settings are equal, as curl
     /// 8.21.0 does (ADR-0285, BL-754); or, without one, over a pool of its own.
     /// </summary>
-    /// <param name="options">The option group, whose <c>-Z</c>, ALPN and <c>--ssl-sessions</c> options the pool's settings hold.</param>
+    /// <param name="tool">The curl tool's own settings, whose <c>-Z</c> and <c>--ssl-sessions</c> the pool's settings hold.</param>
     /// <param name="network">The option group's network options, whose <c>--connect-to</c> entries, binding, socket and IP version the pool's settings hold.</param>
     /// <param name="tls">The option group's TLS options, which the pool's settings hold.</param>
     /// <param name="http">The option group's HTTP options, whose HTTP version the pool's settings hold.</param>
@@ -856,7 +854,7 @@ internal static class EngineComposition
     /// <param name="runConnections">The run's connection cache, or <see langword="null" />.</param>
     /// <returns>The pooling connector.</returns>
     internal static PoolingConnector CreatePoolingConnector(
-        CommandLineOptions options,
+        EngineToolOptions tool,
         EasyNetworkOptions network,
         EasyTlsOptions tls,
         EasyHttpOptions http,
@@ -865,16 +863,16 @@ internal static class EngineComposition
         TimeProvider timeProvider,
         ConnectionCache? runConnections)
     {
-        bool waitsForMultiplexing = WaitsForMultiplexing(options);
+        bool waitsForMultiplexing = WaitsForMultiplexing(tool);
         return runConnections is null
             ? new PoolingConnector(connector, timeProvider) { WaitsForMultiplexing = waitsForMultiplexing }
-            : new PoolingConnector(connector, runConnections, OptionGroupConnectionSettings.Of(options, network, tls, http, proxy), new ConnectToMappings(network.ConnectTo)) { WaitsForMultiplexing = waitsForMultiplexing };
+            : new PoolingConnector(connector, runConnections, OptionGroupConnectionSettings.Of(tool, network, tls, http, proxy), new ConnectToMappings(network.ConnectTo)) { WaitsForMultiplexing = waitsForMultiplexing };
     }
 
     /// <summary>
     /// Creates the run's <see cref="TcpConnector" /> over the given pieces, with the
     /// <c>--resolve</c> entries parsed by <see cref="ResolveOverrides.Parse" /> and the
-    /// <c>--connect-to</c> mappings of <paramref name="options" />, so a transfer dials the
+    /// <c>--connect-to</c> mappings of <paramref name="network" />, so a transfer dials the
     /// mapped host and port at the overridden addresses. An entry that does not parse fails
     /// each transfer with exit 49 when it connects, as curl 8.21.0 fails it. Under
     /// <c>--unix-socket</c> or <c>--abstract-unix-socket</c> it dials that socket for every
@@ -884,7 +882,7 @@ internal static class EngineComposition
     /// <c>--happy-eyeballs-timeout-ms</c> is how long it dials the first address family alone before
     /// the other, curl's 200 ms when not given (ADR-0254, BL-889).
     /// </summary>
-    /// <param name="options">The parsed command line, for its <c>-m</c> and trace options.</param>
+    /// <param name="tool">The curl tool's own settings, for its <c>-m</c>.</param>
     /// <param name="network">The option group's network options: <c>--resolve</c>, <c>--connect-to</c>, the binding, the socket, the IP version and the connect timeouts.</param>
     /// <param name="http">The option group's HTTP options: the HTTP version the ALPN list and the HTTPS-CONNECT attempts follow.</param>
     /// <param name="proxy">The option group's proxy options: the pre-proxy, SOCKS5 authentication and the HAProxy line.</param>
@@ -918,7 +916,7 @@ internal static class EngineComposition
     /// The connector, writing curl's <c>[DNS]</c> filter lines when <see cref="TracesDns" /> says so.
     /// </returns>
     internal static TcpConnector CreateTcpConnector(
-        CommandLineOptions options,
+        EngineToolOptions tool,
         EngineTraceComponents traces,
         EasyNetworkOptions network,
         EasyHttpOptions http,
@@ -943,7 +941,7 @@ internal static class EngineComposition
             ResolveOverrides.Parse(network.Resolve),
             new ConnectToMappings(network.ConnectTo),
             proxyTlsProvider,
-            ConnectTimeoutOf(network, options.MaxTime),
+            ConnectTimeoutOf(network, tool.MaxTime),
             AddressFamilyOf(network),
             UnixSocketOf(network),
             HttpVersionMapping.HttpOverTlsApplicationProtocolsOf(http.HttpVersion),
@@ -968,7 +966,7 @@ internal static class EngineComposition
             TracesTimers = TracesTimer(traces),
             TracesTimerExpiry = TracesMulti(traces),
             TracedConnectTimeout = network.ConnectTimeout > TimeSpan.Zero ? network.ConnectTimeout : null,
-            TracedTransferTimeout = options.MaxTime > TimeSpan.Zero ? options.MaxTime : null,
+            TracedTransferTimeout = tool.MaxTime > TimeSpan.Zero ? tool.MaxTime : null,
             TracesHttpsConnectFilter = TracesHttpsConnect(traces),
             HttpsConnectFirstAttemptVersion = HttpsConnectFirstAttemptVersionOf(http.HttpVersion),
             HttpsConnectSecondAttemptVersion = http.HttpVersion == HttpVersion.Http3 ? "h2" : null,
@@ -1022,7 +1020,7 @@ internal static class EngineComposition
             return null;
         }
 
-        (string? interfaceName, string? hostName, string? deviceName) = LocalBindingNamesOf(network.Interface is { } named ? InterfaceBinding.Parse(named) : null);
+        (string? interfaceName, string? hostName, string? deviceName) = LocalBindingNamesOf(network.Interface is { } named ? EngineInterfaceBinding.Parse(named) : null);
         return new LocalBinding(interfaceName, hostName, deviceName, network.LocalPort, network.LocalPortRange);
     }
 
@@ -1030,7 +1028,7 @@ internal static class EngineComposition
     /// The names <see cref="LocalBindingOf" /> binds for a <c>--interface</c> value: a plain name as both
     /// interface and host, <c>ifhost!</c>'s parts as device and host, <c>if!</c> and <c>host!</c> as given.
     /// </summary>
-    private static (string? InterfaceName, string? HostName, string? DeviceName) LocalBindingNamesOf(InterfaceBinding? named)
+    private static (string? InterfaceName, string? HostName, string? DeviceName) LocalBindingNamesOf(EngineInterfaceBinding? named)
     {
         if (named is null)
         {
@@ -1131,15 +1129,15 @@ internal static class EngineComposition
     /// tunnel through an <c>https://</c> proxy when <c>--proxy-http2</c> asked for one (ADR-0408), which
     /// <paramref name="proxy" /> holds as <see cref="ProxyType.Https2" /> (ADR-0515).
     /// </summary>
-    /// <param name="options">The parsed command line, for <c>-A</c>.</param>
+    /// <param name="http">The option group's HTTP options, for <c>-A</c>.</param>
     /// <param name="proxy">The option group's proxy options, for <c>--proxy-header</c> and <c>--proxy-http2</c>.</param>
     /// <param name="authentication">The option group's authentication options, for the proxy's auth methods, <c>--proxy-service-name</c> and <c>--delegation</c>.</param>
     /// <param name="securityContexts">Makes the proxy's NTLM and Negotiate contexts: <see cref="CreateSecurityContextFactory" />'s router in production.</param>
     /// <returns>The tunnel's options.</returns>
     /// <param name="diagnosticLog">The run's diagnostic log, which the authenticators and security contexts write their choices to (BL-923); <see langword="null" /> for none.</param>
-    internal static HttpProxyTunnelOptions CreateProxyTunnelOptions(CommandLineOptions options, EasyProxyOptions proxy, EasyAuthenticationOptions authentication, ISecurityContextFactory securityContexts, IDiagnosticLog? diagnosticLog = null) =>
+    internal static HttpProxyTunnelOptions CreateProxyTunnelOptions(EasyHttpOptions http, EasyProxyOptions proxy, EasyAuthenticationOptions authentication, ISecurityContextFactory securityContexts, IDiagnosticLog? diagnosticLog = null) =>
         new(
-            options.UserAgent switch
+            http.UserAgent switch
             {
                 null => HttpProxyTunnelOptions.Default.UserAgent,
                 "" => null,
@@ -1224,15 +1222,14 @@ internal static class EngineComposition
     /// The QUIC dialer of an option group of the dialing runner: its <c>--http3</c> and
     /// <c>--http3-only</c> datagrams go through <paramref name="datagramConnector" />
     /// (<see cref="DatagramConnectorUdpChannelOpener" />), not a real UDP socket, so an in-process
-    /// HTTP/3 server answers them (BL-2260). The executable's <see cref="CreateTransports(CommandLineOptions, EasyNetworkOptions, EasyTlsOptions, EasyHttpOptions, EasyProxyOptions, EasyAuthenticationOptions, TimeProvider, ConnectionCache?, TlsSessionCache?, IDiagnosticLog?, DnsCache?, Func{CurlExitCode, string}?, EngineTraceComponents?)" />
+    /// HTTP/3 server answers them (BL-2260). The executable's <see cref="CreateTransports(EngineToolOptions, EasyNetworkOptions, EasyTlsOptions, EasyHttpOptions, EasyProxyOptions, EasyAuthenticationOptions, TimeProvider, ConnectionCache?, TlsSessionCache?, IDiagnosticLog?, DnsCache?, Func{CurlExitCode, string}?, EngineTraceComponents?)" />
     /// keeps the socket-opening dialer.
     /// </summary>
-    /// <param name="options">The option group.</param>
     /// <param name="traces">The run's <c>--trace-config</c> components, for the HTTP/3 connection lines.</param>
     /// <param name="tlsClientOptions">The origin's TLS options.</param>
     /// <param name="datagramConnector">Opens the QUIC channels.</param>
     /// <returns>The dialer.</returns>
-    internal static QuicDialer CreateDatagramConnectorQuicDialer(CommandLineOptions options, EngineTraceComponents traces, TlsClientOptions tlsClientOptions, IDatagramConnector datagramConnector) =>
+    internal static QuicDialer CreateDatagramConnectorQuicDialer(EngineTraceComponents traces, TlsClientOptions tlsClientOptions, IDatagramConnector datagramConnector) =>
         new(new DatagramConnectorUdpChannelOpener(datagramConnector), tlsClientOptions, TimeProvider.System) { WritesHttp3ConnectionLines = TracesHttp3(traces) };
 
     /// <summary>

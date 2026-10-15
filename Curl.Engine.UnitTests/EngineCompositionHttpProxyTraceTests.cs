@@ -104,7 +104,7 @@ public sealed class EngineCompositionHttpProxyTraceTests
     private TcpConnector CreateConnector(params string[] arguments)
     {
         TcpConnector connector = EngineComposition.CreateTcpConnector(
-            Parse(arguments), EasyOptionsFromCommandLine.TraceComponentsOf(Parse(arguments)), EasyOptionsFromCommandLine.NetworkOf(Parse(arguments)), EasyOptionsFromCommandLine.HttpOf(Parse(arguments)), EasyOptionsFromCommandLine.ProxyOf(Parse(arguments)), EasyOptionsFromCommandLine.AuthenticationOf(Parse(arguments)),
+            EasyOptionsFromCommandLine.ToolOptionsOf(Parse(arguments)), EasyOptionsFromCommandLine.TraceComponentsOf(Parse(arguments)), EasyOptionsFromCommandLine.NetworkOf(Parse(arguments)), EasyOptionsFromCommandLine.HttpOf(Parse(arguments)), EasyOptionsFromCommandLine.ProxyOf(Parse(arguments)), EasyOptionsFromCommandLine.AuthenticationOf(Parse(arguments)),
             new SystemDnsResolver(),
             new ScriptedTcpDialer(new ScriptedConnector([])),
             new PassThroughTlsProvider(),

@@ -280,7 +280,7 @@ public sealed class CurlCommandRunnerDnsFilterRouteTraceTests
         CommandLineParseResult parsed = CommandLineParser.Parse(arguments, _ => true);
         Assert.IsTrue(parsed.IsAccepted);
         TcpConnector connector = EngineComposition.CreateTcpConnector(
-            parsed.Options, EasyOptionsFromCommandLine.TraceComponentsOf(parsed.Options), EasyOptionsFromCommandLine.NetworkOf(parsed.Options), EasyOptionsFromCommandLine.HttpOf(parsed.Options), EasyOptionsFromCommandLine.ProxyOf(parsed.Options), EasyOptionsFromCommandLine.AuthenticationOf(parsed.Options),
+            EasyOptionsFromCommandLine.ToolOptionsOf(parsed.Options), EasyOptionsFromCommandLine.TraceComponentsOf(parsed.Options), EasyOptionsFromCommandLine.NetworkOf(parsed.Options), EasyOptionsFromCommandLine.HttpOf(parsed.Options), EasyOptionsFromCommandLine.ProxyOf(parsed.Options), EasyOptionsFromCommandLine.AuthenticationOf(parsed.Options),
             new LoopbackDnsResolver(),
             new RefusingTcpDialer(),
             new PassThroughTlsProvider(),

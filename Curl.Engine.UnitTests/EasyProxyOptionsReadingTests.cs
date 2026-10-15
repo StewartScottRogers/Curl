@@ -165,9 +165,8 @@ public sealed class EasyProxyOptionsReadingTests
     public void CreateProxyTunnelOptions_ProxyType_AsksForAnHttp2TunnelOnlyForHttps2(ProxyType type, bool http2)
     {
         EasyProxyOptions proxy = new() { ProxyType = type, ProxyHeaders = ["X-Proxy: 1"] };
-        Curl.Cli.CommandLineOptions options = Curl.Cli.CommandLineParser.Parse(["http://h/"], _ => true).Options!;
 
-        HttpProxyTunnelOptions tunnel = EngineComposition.CreateProxyTunnelOptions(options, proxy, new EasyAuthenticationOptions(), new LateBoundSecurityContextFactory());
+        HttpProxyTunnelOptions tunnel = EngineComposition.CreateProxyTunnelOptions(new Curl.Api.Options.Http.EasyHttpOptions(), proxy, new EasyAuthenticationOptions(), new LateBoundSecurityContextFactory());
         Diagnostics.Act("HTTP/2 / headers", $"{tunnel.ProxyHttp2} / {string.Join('|', tunnel.ProxyHeaders)}");
 
         Diagnostics.Assert("HTTP/2 / headers", $"{http2} / X-Proxy: 1", $"{tunnel.ProxyHttp2} / {string.Join('|', tunnel.ProxyHeaders)}");

@@ -35,8 +35,8 @@ public sealed class CurlCommandRunnerSharedDnsCacheTests
 
         Diagnostics.Arrange("first option group", "http://h/a");
         Diagnostics.Arrange("second option group", "-k https://h/b");
-        CurlTransports first = EngineComposition.CreateTransports(Parse("http://h/a"), EasyOptionsFromCommandLine.NetworkOf(Parse("http://h/a")), EasyOptionsFromCommandLine.TlsOf(Parse("http://h/a")), EasyOptionsFromCommandLine.HttpOf(Parse("http://h/a")), EasyOptionsFromCommandLine.ProxyOf(Parse("http://h/a")), EasyOptionsFromCommandLine.AuthenticationOf(Parse("http://h/a")), TimeProvider.System, runDnsCache: runDnsCache);
-        CurlTransports second = EngineComposition.CreateTransports(Parse("-k", "https://h/b"), EasyOptionsFromCommandLine.NetworkOf(Parse("-k", "https://h/b")), EasyOptionsFromCommandLine.TlsOf(Parse("-k", "https://h/b")), EasyOptionsFromCommandLine.HttpOf(Parse("-k", "https://h/b")), EasyOptionsFromCommandLine.ProxyOf(Parse("-k", "https://h/b")), EasyOptionsFromCommandLine.AuthenticationOf(Parse("-k", "https://h/b")), TimeProvider.System, runDnsCache: runDnsCache);
+        CurlTransports first = EngineComposition.CreateTransports(EasyOptionsFromCommandLine.ToolOptionsOf(Parse("http://h/a")), EasyOptionsFromCommandLine.NetworkOf(Parse("http://h/a")), EasyOptionsFromCommandLine.TlsOf(Parse("http://h/a")), EasyOptionsFromCommandLine.HttpOf(Parse("http://h/a")), EasyOptionsFromCommandLine.ProxyOf(Parse("http://h/a")), EasyOptionsFromCommandLine.AuthenticationOf(Parse("http://h/a")), TimeProvider.System, runDnsCache: runDnsCache);
+        CurlTransports second = EngineComposition.CreateTransports(EasyOptionsFromCommandLine.ToolOptionsOf(Parse("-k", "https://h/b")), EasyOptionsFromCommandLine.NetworkOf(Parse("-k", "https://h/b")), EasyOptionsFromCommandLine.TlsOf(Parse("-k", "https://h/b")), EasyOptionsFromCommandLine.HttpOf(Parse("-k", "https://h/b")), EasyOptionsFromCommandLine.ProxyOf(Parse("-k", "https://h/b")), EasyOptionsFromCommandLine.AuthenticationOf(Parse("-k", "https://h/b")), TimeProvider.System, runDnsCache: runDnsCache);
 
         Diagnostics.Act("first connector uses the run cache", ReferenceEquals(runDnsCache, first.TcpConnector.DnsCache));
         Diagnostics.Act("second connector uses the run cache", ReferenceEquals(runDnsCache, second.TcpConnector.DnsCache));
@@ -50,8 +50,8 @@ public sealed class CurlCommandRunnerSharedDnsCacheTests
     public void CreateTransports_WithoutARunDnsCache_GivesEachTcpConnectorACacheOfItsOwn()
     {
         Diagnostics.Arrange("option groups", "http://h/a and http://h/b, each without a run cache");
-        CurlTransports first = EngineComposition.CreateTransports(Parse("http://h/a"), EasyOptionsFromCommandLine.NetworkOf(Parse("http://h/a")), EasyOptionsFromCommandLine.TlsOf(Parse("http://h/a")), EasyOptionsFromCommandLine.HttpOf(Parse("http://h/a")), EasyOptionsFromCommandLine.ProxyOf(Parse("http://h/a")), EasyOptionsFromCommandLine.AuthenticationOf(Parse("http://h/a")));
-        CurlTransports second = EngineComposition.CreateTransports(Parse("http://h/b"), EasyOptionsFromCommandLine.NetworkOf(Parse("http://h/b")), EasyOptionsFromCommandLine.TlsOf(Parse("http://h/b")), EasyOptionsFromCommandLine.HttpOf(Parse("http://h/b")), EasyOptionsFromCommandLine.ProxyOf(Parse("http://h/b")), EasyOptionsFromCommandLine.AuthenticationOf(Parse("http://h/b")));
+        CurlTransports first = EngineComposition.CreateTransports(EasyOptionsFromCommandLine.ToolOptionsOf(Parse("http://h/a")), EasyOptionsFromCommandLine.NetworkOf(Parse("http://h/a")), EasyOptionsFromCommandLine.TlsOf(Parse("http://h/a")), EasyOptionsFromCommandLine.HttpOf(Parse("http://h/a")), EasyOptionsFromCommandLine.ProxyOf(Parse("http://h/a")), EasyOptionsFromCommandLine.AuthenticationOf(Parse("http://h/a")));
+        CurlTransports second = EngineComposition.CreateTransports(EasyOptionsFromCommandLine.ToolOptionsOf(Parse("http://h/b")), EasyOptionsFromCommandLine.NetworkOf(Parse("http://h/b")), EasyOptionsFromCommandLine.TlsOf(Parse("http://h/b")), EasyOptionsFromCommandLine.HttpOf(Parse("http://h/b")), EasyOptionsFromCommandLine.ProxyOf(Parse("http://h/b")), EasyOptionsFromCommandLine.AuthenticationOf(Parse("http://h/b")));
 
         Diagnostics.Act("connectors share a cache", ReferenceEquals(first.TcpConnector.DnsCache, second.TcpConnector.DnsCache));
         Diagnostics.Assert("connectors share a cache", false, ReferenceEquals(first.TcpConnector.DnsCache, second.TcpConnector.DnsCache));
@@ -177,7 +177,7 @@ public sealed class CurlCommandRunnerSharedDnsCacheTests
                 options =>
                 {
                     TcpConnector connector = EngineComposition.CreateTcpConnector(
-                        options, EasyOptionsFromCommandLine.TraceComponentsOf(options), EasyOptionsFromCommandLine.NetworkOf(options), EasyOptionsFromCommandLine.HttpOf(options), EasyOptionsFromCommandLine.ProxyOf(options), EasyOptionsFromCommandLine.AuthenticationOf(options),
+                        EasyOptionsFromCommandLine.ToolOptionsOf(options), EasyOptionsFromCommandLine.TraceComponentsOf(options), EasyOptionsFromCommandLine.NetworkOf(options), EasyOptionsFromCommandLine.HttpOf(options), EasyOptionsFromCommandLine.ProxyOf(options), EasyOptionsFromCommandLine.AuthenticationOf(options),
                         new LoopbackDnsResolver(),
                         dialer,
                         new PassThroughTlsProvider(),

@@ -576,7 +576,7 @@ public sealed partial class CurlCompositionProxyTests
     {
         Diagnostics.ArrangeCommandLine(arguments);
         HttpProxyTunnelOptions options =
-            EngineComposition.CreateProxyTunnelOptions(CommandLineParser.Parse(arguments, _ => true).Options!, EasyOptionsFromCommandLine.ProxyOf(CommandLineParser.Parse(arguments, _ => true).Options!), EasyOptionsFromCommandLine.AuthenticationOf(CommandLineParser.Parse(arguments, _ => true).Options!), new SystemSecurityContextFactory());
+            EngineComposition.CreateProxyTunnelOptions(EasyOptionsFromCommandLine.HttpOf(CommandLineParser.Parse(arguments, _ => true).Options!), EasyOptionsFromCommandLine.ProxyOf(CommandLineParser.Parse(arguments, _ => true).Options!), EasyOptionsFromCommandLine.AuthenticationOf(CommandLineParser.Parse(arguments, _ => true).Options!), new SystemSecurityContextFactory());
         Diagnostics.Act("proxy auth schemes, HTTP/2 tunnel", $"{options.ProxyAuthSchemes}, {options.ProxyHttp2}");
         return options;
     }

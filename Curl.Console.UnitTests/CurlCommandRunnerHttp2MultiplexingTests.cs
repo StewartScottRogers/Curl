@@ -156,7 +156,7 @@ public sealed class CurlCommandRunnerHttp2MultiplexingTests
         CurlCommandRunner runner = new(
             options =>
             {
-                PoolingConnector pool = new(server, TimeProvider.System) { WaitsForMultiplexing = EngineComposition.WaitsForMultiplexing(options) };
+                PoolingConnector pool = new(server, TimeProvider.System) { WaitsForMultiplexing = EngineComposition.WaitsForMultiplexing(EasyOptionsFromCommandLine.ToolOptionsOf(options)) };
                 HttpProtocolHandler http = new(pool, new BasicAndBearerAuthenticator(CredentialEncoding.ForPlatform(isWindows: false)));
                 return new TransferDispatch(new ProtocolDispatcher([http]), [], connectionPool: pool);
             },
