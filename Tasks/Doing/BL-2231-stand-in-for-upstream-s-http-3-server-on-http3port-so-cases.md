@@ -57,3 +57,4 @@ Curl's HTTP/3 client is in the QUIC/HTTP/3 libraries (find them in `Curl.slnx`; 
 - 2026-10-14: Created.
 - 2026-10-14: Backlog -> Doing.
 - 2026-10-14: Doing -> Backlog. Needs BL-2246 (TLS 1.3 server handshake) and BL-2247 (QUIC server connection) first; filed and added to depends-on
+- 2026-10-14: Backlog -> Doing.
