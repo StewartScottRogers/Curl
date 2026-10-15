@@ -75,6 +75,24 @@ public sealed class UpstreamCaseScreeningTests
         Assert.IsNull(reason, reason);
     }
 
+    // runtests.pl at curl-8_22_0 never reads <client><connectport>: the http-proxy sws tunnels to the
+    // port the CONNECT names, so test1316's part is accepted and ignored (BL-2239).
+    [TestMethod]
+    public void FindSkipReason_ClientConnectPort_IsAcceptedAsRuntestsPlIgnoresIt()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        byte[] testFile = File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "UpstreamTestData", "test1316.curltest"));
+        Dictionary<string, string> variables = new(StringComparer.Ordinal) { ["HOSTIP"] = "127.0.0.1", ["FTPPORT"] = UpstreamCaseRunner.FtpPort, ["PROXYPORT"] = UpstreamCaseRunner.ProxyPort, ["TESTNUMBER"] = "1316" };
+        UpstreamTestFileExpansion expansion = UpstreamTestFileExpander.Expand(testFile, variables, Features);
+        UpstreamTestCase testCase = expansion.Parse().TestCase!;
+
+        string? reason = UpstreamCaseScreening.FindSkipReason(expansion, testCase, Features);
+
+        diagnostics.Act("skip reason", reason);
+        Assert.IsNotNull(testCase.Find("client", "connectport"));
+        Assert.IsNull(reason, reason);
+    }
+
     // The FTP active-mode and upload cases BL-1907 opened: none skips for %FTPPORT, the FTP stand-in
     // or <verify><upload>; the runner measures them (most pass, 149, 216, 1211 and 1217 differ).
     [TestMethod]

@@ -25,8 +25,10 @@ internal static class UpstreamCaseScreening
 {
     // runtests.pl at curl-8_22_0 reads stdout only from <verify>, so a <client><stdout> (test210 to
     // test212, test407) is a comment it never checks; the harness accepts the case and ignores it too.
+    // Nor do runtests.pl, runner.pm or servers.pm read a <client><connectport> (test1316): the
+    // http-proxy sws tunnels to the port the CONNECT request names, as the proxy stand-in does (BL-2239).
     private static readonly HashSet<string> ClientParts =
-        ["name", "command", "server", "features", "file", "file1", "file2", "file3", "file4", "stdin", "stdout", "killserver", "disable", "precheck", "setenv"];
+        ["name", "command", "server", "features", "file", "file1", "file2", "file3", "file4", "stdin", "stdout", "connectport", "killserver", "disable", "precheck", "setenv"];
 
     // runtests.pl at curl-8_22_0 never reads a <verify><data> (test301's placeholder "[insert full protocol
     // verifiction dump here]", test302's empty one), so the harness accepts and ignores it too (BL-2222).
