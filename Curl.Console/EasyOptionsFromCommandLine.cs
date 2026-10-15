@@ -2,6 +2,7 @@ using System.Collections.Frozen;
 using System.Net;
 using System.Security.Authentication;
 using Curl.Api.Options.Authentication;
+using Curl.Api.Options.Behaviour;
 using Curl.Api.Options.Http;
 using Curl.Api.Options.Network;
 using Curl.Api.Options.Proxy;
@@ -10,6 +11,7 @@ using Curl.Cli;
 using Curl.Networking;
 using Curl.Protocol.Abstractions;
 using EasyGssApiDelegation = Curl.Api.Options.Authentication.GssApiDelegation;
+using EasyTimeCondition = Curl.Api.Options.Behaviour.TimeCondition;
 using HttpVersion = Curl.Api.Options.Http.HttpVersion;
 
 namespace Curl.Console;
@@ -24,6 +26,9 @@ namespace Curl.Console;
 internal static class EasyOptionsFromCommandLine
 {
     private const string Pkcs11UriScheme = "pkcs11:";
+
+    // The receive buffer curl's tool asks for, 100 KiB, as --libcurl writes CURLOPT_BUFFERSIZE.
+    private const long ToolBufferSize = 102400;
 
     // The versions the parser records, as SslProtocols, and the CURL_SSLVERSION_* each is as a minimum.
     private static readonly FrozenDictionary<SslProtocols, SslVersion> SslVersionsByProtocol = new Dictionary<SslProtocols, SslVersion>
@@ -490,6 +495,104 @@ internal static class EasyOptionsFromCommandLine
     }
 
     private static PostRedirect PostRedirectOf(bool on, PostRedirect bit) => on ? bit : PostRedirect.None;
+
+    /// <summary>
+    /// Maps the behaviour group: <c>-v</c> and the <c>--trace</c> options (<c>CURLOPT_VERBOSE</c>;
+    /// their output stays the tool's), <c>-i</c> and <c>-I</c> (headers in the body), <c>-s</c> and
+    /// <c>--no-progress-meter</c> (<c>CURLOPT_NOPROGRESS</c>), <c>-f</c> (<c>--fail-with-body</c> is
+    /// checked by the tool, not libcurl) and <c>--create-file-mode</c>. <c>-S</c>, <c>-#</c>,
+    /// <c>-N</c>, <c>--retry*</c> and the output files never reach libcurl (ADR-0528).
+    /// </summary>
+    /// <param name="options">The option group.</param>
+    /// <returns>The behaviour options.</returns>
+    public static EasyBehaviourOptions BehaviourOf(CommandLineOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        EasyBehaviourOptions behaviour = new();
+        return behaviour with
+        {
+            Verbose = options.Trace != TraceKind.None,
+            IncludeHeader = options.ShowHeaders,
+            NoProgress = options.Silent || options.ProgressMeterOff,
+            FailOnError = options.FailMode == HttpFailMode.Fail,
+            NewFilePermissions = options.CreateFileMode is { } mode && mode != 0 ? mode : behaviour.NewFilePermissions,
+        };
+    }
+
+    /// <summary>
+    /// Maps the transfer group: <c>-r</c>, <c>-C</c> with an offset, <c>-X</c>, <c>-R</c> and <c>-I</c>
+    /// (the file time), <c>-l</c>, <c>-I</c> (no body), <c>--max-filesize</c>, <c>-z</c>, <c>-B</c>,
+    /// <c>--crlf</c>, <c>-Y</c>, <c>-y</c>, <c>--limit-rate</c> (both speeds and the receive buffer) and
+    /// <c>-m</c>. <c>-C -</c> and <c>-T</c> are per transfer: the offset comes from the output file and
+    /// the upload from the URL's <c>-T</c> file, which <see cref="UploadTransferOf" /> adds (ADR-0528).
+    /// </summary>
+    /// <param name="options">The option group.</param>
+    /// <returns>The transfer options.</returns>
+    public static EasyTransferOptions TransferOf(CommandLineOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        EasyTransferOptions transfer = WithConditions(options, WithRequestShape(options, new EasyTransferOptions()));
+        return WithRateAndTimeout(options, WithLowSpeed(options, transfer));
+    }
+
+    /// <summary>
+    /// Adds a transfer's <c>-T</c> upload to its group's transfer options, as curl's tool sets
+    /// <c>CURLOPT_UPLOAD</c> and <c>CURLOPT_INFILESIZE_LARGE</c> for the URL a <c>-T</c> file pairs with.
+    /// </summary>
+    /// <param name="transfer">The group's transfer options.</param>
+    /// <param name="uploadFileSize">The upload's size in bytes; <see langword="null"/> when it is not known, as for standard input.</param>
+    /// <returns>The transfer options with the upload.</returns>
+    public static EasyTransferOptions UploadTransferOf(EasyTransferOptions transfer, long? uploadFileSize)
+    {
+        ArgumentNullException.ThrowIfNull(transfer);
+        return transfer with { Upload = true, InFileSize = uploadFileSize ?? transfer.InFileSize };
+    }
+
+    // What is asked for: the range, the -C offset, the method, the file time, names only and no body.
+    private static EasyTransferOptions WithRequestShape(CommandLineOptions options, EasyTransferOptions transfer) =>
+        transfer with
+        {
+            Range = options.Range,
+            ResumeFrom = options.ResumeFrom ?? transfer.ResumeFrom,
+            CustomRequest = options.RequestMethod,
+            FileTime = options.NoBody || options.RemoteTime,
+            DirListOnly = options.ListOnly,
+            NoBody = options.NoBody,
+            MaxFileSize = options.MaxFileSize ?? transfer.MaxFileSize,
+        };
+
+    // The -z condition, text mode and line-ending conversion.
+    private static EasyTransferOptions WithConditions(CommandLineOptions options, EasyTransferOptions transfer) =>
+        transfer with
+        {
+            TimeCondition = options.TimeCondition is not { } condition ? EasyTimeCondition.None
+                : condition.Kind == TimeConditionKind.IfModifiedSince ? EasyTimeCondition.IfModifiedSince
+                : EasyTimeCondition.IfUnmodifiedSince,
+            TimeValue = options.TimeCondition?.Value ?? transfer.TimeValue,
+            TransferText = options.UseAscii,
+            Crlf = options.ConvertLineEndings,
+        };
+
+    // -Y alone also sets 30 seconds and -y alone a limit of 1, as --libcurl writes them.
+    private static EasyTransferOptions WithLowSpeed(CommandLineOptions options, EasyTransferOptions transfer) =>
+        transfer with
+        {
+            LowSpeedLimit = options.SpeedLimit ?? (options.SpeedTimeSeconds is null ? 0 : 1),
+            LowSpeedTime = TimeSpan.FromSeconds(options.SpeedTimeSeconds ?? (options.SpeedLimit is null ? 0 : 30)),
+        };
+
+    // --limit-rate both ways; the tool's receive buffer is 100 KiB, or a smaller --limit-rate; -m is set only when positive.
+    private static EasyTransferOptions WithRateAndTimeout(CommandLineOptions options, EasyTransferOptions transfer)
+    {
+        long rate = options.LimitRate ?? 0;
+        return transfer with
+        {
+            MaxSendSpeed = rate,
+            MaxReceiveSpeed = rate,
+            BufferSize = rate is > 0 and < ToolBufferSize ? rate : ToolBufferSize,
+            Timeout = options.MaxTime is { } maxTime && maxTime > TimeSpan.Zero ? maxTime : transfer.Timeout,
+        };
+    }
 
     // The schemes as CURLOPT_PROTOCOLS_STR takes them: lowercase, sorted, joined by commas.
     private static string? ProtocolListOf(IReadOnlySet<string>? schemes) =>
