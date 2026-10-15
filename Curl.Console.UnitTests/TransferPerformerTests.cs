@@ -34,6 +34,21 @@ public sealed partial class TransferPerformerTests
     }
 
     [TestMethod]
+    public async Task FollowWatchingSpeedAsync_InjectedBodyAndHeaderStreams_EachReceivesOnlyItsBytes()
+    {
+        using MemoryStream body = new();
+        using MemoryStream header = new();
+        WritingHandler handler = new("HTTP/1.1 200 OK\r\n\r\n"u8.ToArray(), "hello\n"u8.ToArray());
+        TransferContext context = new() { Url = CurlUrl.Parse(First), Output = body, HeaderOutput = header };
+
+        TransferResult result = await TransferPerformer.FollowWatchingSpeedAsync(NewState(), Follower(handler), context, new RedirectPolicy());
+
+        Assert.IsTrue(result.IsSuccess);
+        CollectionAssert.AreEqual("hello\n"u8.ToArray(), body.ToArray());
+        CollectionAssert.AreEqual("HTTP/1.1 200 OK\r\n\r\n"u8.ToArray(), header.ToArray());
+    }
+
+    [TestMethod]
     public async Task FollowWatchingSpeedAsync_StalledBelowSpeedLimit_Exits28TooSlow()
     {
         TransferPerformer performer = new(clock);
@@ -238,6 +253,19 @@ public sealed partial class TransferPerformerTests
         {
             Urls.Add(context.Url.OriginalString);
             return ValueTask.FromResult(results[next++]);
+        }
+    }
+
+    /// <summary>Writes its head to the context's header stream and its body to the context's body stream.</summary>
+    private sealed class WritingHandler(byte[] head, byte[] bodyBytes) : IProtocolHandler
+    {
+        public IReadOnlyCollection<string> SupportedSchemes { get; } = ["http"];
+
+        public async ValueTask<TransferResult> ExecuteAsync(ITransferContext context)
+        {
+            await context.HeaderOutput!.WriteAsync(head, context.CancellationToken);
+            await context.Output.WriteAsync(bodyBytes, context.CancellationToken);
+            return TransferResult.Success(bodyBytes.Length);
         }
     }
 

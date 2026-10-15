@@ -330,7 +330,11 @@ failures (`SetupFailureAsync`: the too-long `-b` string, `--engine`), and the `-
 HSTS write-back libcurl does at cleanup (`WriteCookieJarAltSvcAndHstsFilesAsync`). Its run-ending
 failures (`KnownHostsFileMissingFailure`, `InterfaceSetoptFailure`, `EchSetoptFailure`) are
 compared by reference in the runner. A step that writes to standard error does it through a
-delegate the runner passes (`WriteErrorLineAsync`, its wrapped warning writer); the runner still
+delegate the runner passes (`WriteErrorLineAsync`, its wrapped warning writer), `-c -` prints the
+jar to the stream the runner's `jarPrintTarget` gives, and an attempt's body and header bytes go to
+the context's `Output` and `HeaderOutput` streams: the performer names none of the runner's standard
+streams, `WriteGate`, `WarningLineWrapper` or progress meters, as libcurl writes only through its
+write, header and debug callbacks (BL-2284); the runner still
 does the curl tool's part: globbing, IPFS, `--etag-*`, output files, upload files, the progress
 meter, `-w` and the `curl: (N)` lines.
 

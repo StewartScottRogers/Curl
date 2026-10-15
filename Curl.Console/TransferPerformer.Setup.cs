@@ -352,12 +352,12 @@ internal sealed partial class TransferPerformer
     /// <c>https</c>, whatever the transfer's outcome: curl 8.21.0 writes it after every HTTP transfer,
     /// after its <c>-w</c> output, and not after a <c>file</c> or <c>dict</c> one (measured 2026-09-26,
     /// BL-237 Notes); the jar file is replaced each time, and <c>-c -</c> prints it to
-    /// <paramref name="jarStandardOutput" />.
+    /// <paramref name="jarPrintTarget" />.
     /// </summary>
     /// <param name="cookies">The option group's cookies, or <see langword="null" />.</param>
     /// <param name="options">The transfer's option group.</param>
     /// <param name="transferUrl">The URL transferred, as typed or as a <c>-T</c> upload resolved it.</param>
-    /// <param name="jarStandardOutput">Gives where <c>-c -</c> prints the jar.</param>
+    /// <param name="jarPrintTarget">Gives the stream the runner chose for <c>-c -</c> to print the jar to; the performer never picks it.</param>
     /// <param name="state">The transfer's state, with its alt-svc cache.</param>
     /// <param name="hsts">The run's HSTS cache.</param>
     /// <param name="fileSystem">Writes the files.</param>
@@ -367,7 +367,7 @@ internal sealed partial class TransferPerformer
         CookieEngine? cookies,
         CommandLineOptions options,
         string transferUrl,
-        Func<Stream> jarStandardOutput,
+        Func<Stream> jarPrintTarget,
         RunningTransferState state,
         HstsTransferPolicy hsts,
         IFileSystem fileSystem,
@@ -375,7 +375,7 @@ internal sealed partial class TransferPerformer
     {
         if (cookies is not null && IsHttpUrl(QueryUrl.Append(transferUrl, options)))
         {
-            await cookies.WriteCookieJarAsync(fileSystem, jarStandardOutput(), timeProvider.GetUtcNow()).ConfigureAwait(false);
+            await cookies.WriteCookieJarAsync(fileSystem, jarPrintTarget(), timeProvider.GetUtcNow()).ConfigureAwait(false);
         }
 
         if (state.AltSvc is { } altSvc)
