@@ -40,6 +40,7 @@ Bring these items to Curl when the target moves to 8.22.0.
 - 2026-10-13_1406: 0 of 1 items are gaps. 1 not in this run's measurement.
 - 2026-10-14_0904: 0 of 1 items are gaps. 1 not in this run's measurement.
 - 2026-10-15_0304: 0 of 1 items are gaps. 1 not in this run's measurement.
+- 2026-10-15_0543: 0 of 1 items are gaps. 1 not in this run's measurement.
 
 ## Log
 
