@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: protocol
 depends-on: []
-touches: [Curl.Protocol.Ssh.UnitLibrary, Curl.Protocol.Ssh.UnitTests]
+touches: [Curl.Protocol.Ssh.UnitLibrary, Curl.Protocol.Ssh.UnitTests, Curl.Cli.UnitLibrary, Curl.Cli.UnitTests]
 requirement: none
 created: 2026-10-15
 completed:
@@ -45,7 +45,34 @@ In Curl.Protocol.Ssh.UnitLibrary, make a refused or unreachable connection on sc
 
 ## Notes
 
+- 2026-10-15 trace (lane 4): the 2 is not the connector's. `SshProtocolHandler` passes a refused
+  connect through as 7 (the Windows build measures 7). The 2 is `TransferPerformer.KnownHostsFileMissingFailure`
+  ("curl: Could not find a known_hosts file", exit 2), returned before any connection when
+  `SshKnownHostsFileSearch` finds no `.ssh/known_hosts`. The local curl 8.22.0 (mingw) still exits 2
+  with no known_hosts file (measured 2026-10-15 with `HOME`/`CURL_HOME` pointed at an empty
+  directory), so the tool code is unchanged and the macOS reference exiting 7 means it found a
+  known_hosts file that Curl's search did not.
+- Cause: the search's last directory, the account home "from the user database" (curl's
+  `getpwuid(geteuid())->pw_dir`), comes from `Curl.Cli.UnitLibrary/AccountHomeDirectory.cs`, which
+  reads `Environment.GetFolderPath(SpecialFolder.UserProfile)`. Off Windows .NET returns `$HOME` there
+  when it is set, so whenever `HOME` names another directory (as a measurement harness does) Curl
+  never looks in the passwd home, while curl does - and the macOS runner's `/Users/runner/.ssh/known_hosts`
+  exists. The same defect hits the `.curlrc` search (`DefaultConfigFileSearch`).
+- Fix to make: read the passwd entry itself off Windows, ignoring `HOME`, through the .NET runtime's
+  `SystemNative_GetPwUidR` shim in `libSystem.Native` (normalised `Passwd` record, same layout on
+  Linux and macOS - the pattern `Curl.Console/NativeRegularFileTest.cs` uses for `SystemNative_Stat`),
+  with `SystemNative_GetEUid` for the uid; exclude the thin adapter from Windows coverage under
+  ADR-0083 and test it off Windows (a test that sets nothing and compares with `getent`-free
+  expectations: the result is non-empty and does not change when `HOME` is overridden in a child
+  process is an Integration test; a unit test pins `ReadOffWindows` wiring). Then pin in
+  `Curl.Engine`/`Curl.Cli` tests that a `HOME` differing from the account home still finds the
+  account home's `.ssh/known_hosts`.
+- Touches: the work is in `Curl.Cli.UnitLibrary` and `Curl.Cli.UnitTests`, which BL-2332 (in Doing)
+  touches, so this task goes back to Backlog until it leaves Doing. Nothing in
+  `Curl.Protocol.Ssh.UnitLibrary` needs to change.
+
 ## Log
 
 - 2026-10-15: Created.
 - 2026-10-15: Backlog -> Doing.
+- 2026-10-15: Doing -> Backlog. Fix is in Curl.Cli.UnitLibrary (AccountHomeDirectory reads HOME, not the passwd home), which BL-2332 in Doing touches
