@@ -8,7 +8,7 @@ depends-on: []
 touches: [RunDarkFactory.ps1]
 requirement: none
 created: 2026-10-15
-completed:
+completed: 2026-10-15
 ---
 # BL-2279 — Fix AF-0226: CI red for 31.42 minutes from run 38682338635: test203 failed on Linux and macOS after BL-2219's ratchet commit 8d337539
 
@@ -41,12 +41,16 @@ The finding closes only when a later re-audit by the process auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- The CI red spell is past and cannot be rerun. Cause: lanes test only on Windows, so a ratchet case whose output depends on the platform went green locally and red on Linux and macOS. Decision (Claude, under delegation): add a rule to both lane prompts in RunDarkFactory.ps1 telling a lane to check ratchet cases for platform dependence before holding them. No new ADR: a prompt rule, not a design change.
+- Only RunDarkFactory.ps1 changed (parses clean, dotnet build clean); fast tests not rerun as no C# changed.
 
 ## Log
 
 - 2026-10-15: Created.
 - 2026-10-15: Backlog -> Doing.
+- 2026-10-15: Doing -> Done. Added a ratchet platform-dependence rule to the lane prompts

@@ -3477,6 +3477,12 @@ Rules for this unattended run, in addition to CLAUDE.md:
    drive, such as `find /` or `Get-ChildItem C:\ -Recurse`, and never leave a command
    running when you finish: the lane stays held until it ends (AF-0213: a `find / -maxdepth 6`
    kept BL-2180's lane busy for 22 minutes after its run was done).
+   Lanes test only on Windows, so before a task adds or holds an upstream case on the
+   conformance ratchet, check that the case's output does not depend on the platform (path
+   separators, drive letters, OS error text, certificates); where it does, pin each
+   platform's answer in its own test or leave the case off the ratchet, so CI on Linux and
+   macOS does not go red (AF-0226: BL-2219 held 108 cases on the ratchet after a Windows-only
+   run and test203 failed on Linux and macOS, leaving CI red for 31 minutes).
 
 End your reply with exactly one line, either
 FACTORY: DONE {ID} <what now works>
@@ -3603,6 +3609,12 @@ Rules for this unattended run, in addition to CLAUDE.md:
    drive, such as `find /` or `Get-ChildItem C:\ -Recurse`, and never leave a command
    running when you finish: the lane stays held until it ends (AF-0213: a `find / -maxdepth 6`
    kept BL-2180's lane busy for 22 minutes after its run was done).
+   Lanes test only on Windows, so before a task adds or holds an upstream case on the
+   conformance ratchet, check that the case's output does not depend on the platform (path
+   separators, drive letters, OS error text, certificates); where it does, pin each
+   platform's answer in its own test or leave the case off the ratchet, so CI on Linux and
+   macOS does not go red (AF-0226: BL-2219 held 108 cases on the ratchet after a Windows-only
+   run and test203 failed on Linux and macOS, leaving CI red for 31 minutes).
 
 End your reply with exactly one line, either
 FACTORY: DONE {ID} <what now works>
