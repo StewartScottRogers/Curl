@@ -31,3 +31,4 @@ Found by BL-2227, which gave `%CLIENT6IP` the value `[::1]`: test1083 (`HTTP-IPv
 ## Log
 
 - 2026-10-14: Created.
+- 2026-10-14: Backlog -> Doing.
