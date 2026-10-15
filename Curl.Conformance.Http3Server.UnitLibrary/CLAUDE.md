@@ -49,7 +49,12 @@ pieces: BL-2246 put the TLS 1.3 server handshake here, BL-2247 the QUIC server c
   packet arrives it sends at most 3x the bytes received and holds the rest. AcceptStream,
   OpenUnidirectionalStream (3, 7, ...), Write and TakeDatagramsToSend carry stream
   data; Close sends the application close; PeerClose keeps the client's. Nothing is
-  resent and no congestion control runs; it does not yet hold its sending to the client's
-  flow control limits (BL-2249 covers that).
+  resent and no congestion control runs. Sending holds to the client's flow control
+  (BL-2249): the limits come from its quic_transport_parameters (initial_max_data, and
+  initial_max_stream_data_bidi_local for its bidirectional streams or _uni for the server's
+  unidirectional ones), MAX_DATA and MAX_STREAM_DATA raise them, and bytes past them wait,
+  the FIN after them.
 - Http3ServerStream is a client stream as the server reads it, reassembled with
-  QuicCryptoReassembler; Http3ServerPacketSpace (internal) is one packet number space.
+  QuicCryptoReassembler; Http3ServerSendStream (internal) is a stream as the server sends
+  on it, its unsent bytes and its limit; Http3ServerPacketSpace (internal) is one packet
+  number space.

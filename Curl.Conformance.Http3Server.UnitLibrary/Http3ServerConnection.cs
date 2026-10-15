@@ -16,9 +16,10 @@ namespace Curl.Conformance.Http3Server;
 /// Finished checks out, carries stream data both ways, and closes in either direction. An
 /// Initial of another version in a datagram of 1200 bytes or more gets Version Negotiation.
 /// Until a Handshake packet from the client validates its address it sends at most three times
-/// the bytes received (RFC 9000 section 8.1) and holds the rest. Nothing is resent and no
-/// congestion control runs: in memory nothing is lost. It does not hold its sending to the
-/// client's flow control limits.
+/// the bytes received (RFC 9000 section 8.1) and holds the rest. No STREAM frame passes the
+/// client's MAX_DATA or MAX_STREAM_DATA limit: the rest waits until the client raises it
+/// (RFC 9000 section 4.1). Nothing is resent and no congestion control runs: in memory nothing
+/// is lost.
 /// </summary>
 /// <param name="tlsSettings">The certificate, key and preferences of the TLS handshake.</param>
 /// <param name="random">The source of the connection ID, the server random and its key share.</param>
@@ -46,7 +47,7 @@ public sealed class Http3ServerConnection(Http3ServerTlsSettings tlsSettings, IT
 
     private readonly Queue<Http3ServerStream> accepted = [];
 
-    private readonly Dictionary<ulong, ulong> sentOffsets = [];
+    private readonly Dictionary<ulong, Http3ServerSendStream> sendStreams = [];
 
     private readonly Queue<byte[]> outbox = [];
 
@@ -63,6 +64,12 @@ public sealed class Http3ServerConnection(Http3ServerTlsSettings tlsSettings, IT
     private long bytesSent;
 
     private bool addressValidated;
+
+    private QuicTransportParameters clientParameters = new();
+
+    private ulong connectionSendLimit;
+
+    private ulong connectionBytesSent;
 
     /// <summary>
     /// Gets the transport parameters the server declares, before the connection IDs: limits so
@@ -136,7 +143,11 @@ public sealed class Http3ServerConnection(Http3ServerTlsSettings tlsSettings, IT
         return id;
     }
 
-    /// <summary>Queues bytes on a stream, after those written before, in STREAM frames of at most 1000 bytes; <see cref="TakeDatagramsToSend" /> sends them.</summary>
+    /// <summary>
+    /// Queues bytes on a stream, after those written before, in STREAM frames of at most 1000
+    /// bytes; <see cref="TakeDatagramsToSend" /> sends them. Bytes past the client's MAX_DATA or
+    /// MAX_STREAM_DATA limit wait, with the FIN after them, until the client raises it.
+    /// </summary>
     /// <param name="streamId">A client bidirectional stream, or one from <see cref="OpenUnidirectionalStream" />.</param>
     /// <param name="bytes">The bytes.</param>
     /// <param name="endStream">Whether the last frame carries the FIN.</param>
@@ -144,18 +155,8 @@ public sealed class Http3ServerConnection(Http3ServerTlsSettings tlsSettings, IT
     public void Write(ulong streamId, ReadOnlySpan<byte> bytes, bool endStream)
     {
         RequireOpen();
-        var offset = sentOffsets.GetValueOrDefault(streamId);
-        var position = 0;
-        do
-        {
-            var length = Math.Min(Http3ServerPacketSpace.MaximumChunkLength, bytes.Length - position);
-            var last = position + length == bytes.Length;
-            application.QueueFrame(new QuicStreamFrame(streamId, offset, bytes.Slice(position, length).ToArray(), endStream && last));
-            offset += (ulong)length;
-            position += length;
-        }
-        while (position < bytes.Length);
-        sentOffsets[streamId] = offset;
+        SendStream(streamId).Append(bytes, endStream);
+        QueueStreamFrames();
     }
 
     /// <summary>Returns the datagrams carrying what waits to be sent, such as the stream data <see cref="Write" /> queued.</summary>
@@ -338,13 +339,21 @@ public sealed class Http3ServerConnection(Http3ServerTlsSettings tlsSettings, IT
             case QuicStreamFrame stream:
                 ReceiveStream(stream);
                 break;
+            case QuicMaxDataFrame maxData:
+                connectionSendLimit = Math.Max(connectionSendLimit, maxData.MaximumData);
+                QueueStreamFrames();
+                break;
+            case QuicMaxStreamDataFrame maxStreamData:
+                SendStream(maxStreamData.StreamId).Raise(maxStreamData.MaximumStreamData);
+                QueueStreamFrames();
+                break;
             case QuicConnectionCloseFrame close:
                 // The client closed: the server drains and sends nothing more (RFC 9000 section 10.2.2).
                 PeerClose = close;
                 IsClosed = true;
                 break;
             default:
-                // ACK (nothing is resent), PING, PADDING, flow control and connection ID frames ask nothing of the stand-in.
+                // ACK (nothing is resent), PING, PADDING, the client's BLOCKED and MAX_STREAMS frames and connection ID frames ask nothing of the stand-in.
                 break;
         }
     }
@@ -378,6 +387,36 @@ public sealed class Http3ServerConnection(Http3ServerTlsSettings tlsSettings, IT
         {
             IsHandshakeComplete = true;
             application.QueueFrame(new QuicHandshakeDoneFrame());
+
+            // The handshake refuses a ClientHello without quic_transport_parameters, so they are there.
+            clientParameters = QuicTransportParameters.Decode(tls!.ClientQuicTransportParameters!);
+            connectionSendLimit = clientParameters.InitialMaxData;
+        }
+    }
+
+    // A server unidirectional stream has the client's initial_max_stream_data_uni, a client
+    // bidirectional one its initial_max_stream_data_bidi_local (RFC 9000 section 18.2).
+    private Http3ServerSendStream SendStream(ulong streamId)
+    {
+        if (!sendStreams.TryGetValue(streamId, out var stream))
+        {
+            var limit = (streamId & 2) != 0 ? clientParameters.InitialMaxStreamDataUni : clientParameters.InitialMaxStreamDataBidiLocal;
+            stream = new Http3ServerSendStream(streamId, limit);
+            sendStreams.Add(streamId, stream);
+        }
+
+        return stream;
+    }
+
+    private void QueueStreamFrames()
+    {
+        foreach (var stream in sendStreams.Values)
+        {
+            while (stream.TakeFrame(connectionSendLimit - connectionBytesSent) is { } frame)
+            {
+                connectionBytesSent += (ulong)frame.Data.Length;
+                application.QueueFrame(frame);
+            }
         }
     }
 

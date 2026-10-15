@@ -61,6 +61,46 @@ public sealed class Http3ServerConnectionTests
     }
 
     [TestMethod]
+    public void Write_BodyPastTheClientsStreamLimit_ArrivesWholeAsTheClientRaisesIt()
+    {
+        using var server = new Http3ServerConnection(ServerSettings, SystemTlsRandomSource.Instance);
+        using var client = Connect(server);
+        var stream = client.Streams.OpenBidirectional()!;
+        stream.Write("GET"u8, endStream: true);
+        Pump(client, server, client.TakeDatagramsToSend(), []);
+        var body = new byte[100000];
+        RandomNumberGenerator.Fill(body);
+
+        server.Write(stream.Id, body, endStream: true);
+        var received = ReceiveAll(client, server, stream);
+
+        Assert.IsNull(client.Failure);
+        Assert.IsTrue(stream.IsReadComplete);
+        CollectionAssert.AreEqual(body, received);
+    }
+
+    [TestMethod]
+    public void Write_BodyPastTheClientsConnectionLimit_HoldsTheRestUntilMaxData()
+    {
+        using var server = new Http3ServerConnection(ServerSettings, SystemTlsRandomSource.Instance);
+        using var client = Connect(server, QuicTransportParameters.CurlClientDefaults with { InitialMaxData = 10000 });
+        var stream = client.Streams.OpenBidirectional()!;
+        stream.Write("GET"u8, endStream: true);
+        Pump(client, server, client.TakeDatagramsToSend(), []);
+        var body = new byte[100000];
+        RandomNumberGenerator.Fill(body);
+
+        server.Write(stream.Id, body.AsSpan(0, 50000), endStream: false);
+        server.Write(stream.Id, body.AsSpan(50000), endStream: true);
+        var firstFlight = server.TakeDatagramsToSend();
+        var received = ReceiveAll(client, server, stream, firstFlight);
+
+        Assert.IsTrue(firstFlight.Sum(datagram => datagram.Length) < 20000);
+        Assert.IsNull(client.Failure);
+        CollectionAssert.AreEqual(body, received);
+    }
+
+    [TestMethod]
     public void Write_UnidirectionalStreams_ArriveEachWay()
     {
         using var server = new Http3ServerConnection(ServerSettings, SystemTlsRandomSource.Instance);
@@ -245,12 +285,16 @@ public sealed class Http3ServerConnectionTests
         Assert.ThrowsExactly<ArgumentNullException>(() => new Http3ServerConnection(ServerSettings, null!));
     }
 
-    private static QuicClientConnectionState CreateClient(Tls13ClientSettings? tls = null) =>
-        new(new QuicClientSettings { Tls = tls ?? QuicClientSettings.CreateOpenSslTlsSettings("localhost") }, SystemTlsRandomSource.Instance, AcceptingVerifier.Instance, TimeProvider.System);
+    private static QuicClientConnectionState CreateClient(Tls13ClientSettings? tls = null, QuicTransportParameters? parameters = null) =>
+        new(
+            new QuicClientSettings { Tls = tls ?? QuicClientSettings.CreateOpenSslTlsSettings("localhost"), TransportParameters = parameters ?? QuicTransportParameters.CurlClientDefaults },
+            SystemTlsRandomSource.Instance,
+            AcceptingVerifier.Instance,
+            TimeProvider.System);
 
-    private static QuicClientConnectionState Connect(Http3ServerConnection server)
+    private static QuicClientConnectionState Connect(Http3ServerConnection server, QuicTransportParameters? parameters = null)
     {
-        var client = CreateClient();
+        var client = CreateClient(parameters: parameters);
         Pump(client, server, client.Start(), []);
         Assert.IsTrue(client.IsConfirmed);
         return client;
@@ -265,6 +309,22 @@ public sealed class Http3ServerConnectionTests
             toServer = nextToServer;
             toClient = [];
         }
+    }
+
+    // Reads the stream as the client receives it, so the client raises its limits, until the FIN.
+    private static byte[] ReceiveAll(QuicClientConnectionState client, Http3ServerConnection server, QuicStream stream, IReadOnlyList<byte[]>? firstFlight = null)
+    {
+        List<byte> received = [];
+        var buffer = new byte[65536];
+        var toClient = firstFlight ?? server.TakeDatagramsToSend();
+        for (var round = 0; round < 1000 && !stream.IsReadComplete; round++)
+        {
+            var toServer = toClient.SelectMany(datagram => client.Receive(datagram)).ToList();
+            received.AddRange(buffer.AsSpan(0, stream.Read(buffer)));
+            toClient = [.. toServer.Concat(client.TakeDatagramsToSend()).SelectMany(datagram => server.Receive(datagram))];
+        }
+
+        return [.. received];
     }
 
     private static string ReadAll(QuicStream stream)
