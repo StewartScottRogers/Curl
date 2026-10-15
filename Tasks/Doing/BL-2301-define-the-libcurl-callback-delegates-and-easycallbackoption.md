@@ -40,3 +40,4 @@ ADR-0506 ("callbacks as delegates"); plan section "CURLOPT groups", row `EasyCal
 ## Log
 
 - 2026-10-15: Created.
+- 2026-10-15: Backlog -> Doing.
