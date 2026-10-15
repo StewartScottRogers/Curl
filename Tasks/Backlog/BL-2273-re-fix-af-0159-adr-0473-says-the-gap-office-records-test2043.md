@@ -5,7 +5,8 @@ priority: Low
 assignee: Claude
 pipeline: docs
 depends-on: []
-touches: [Documentation]
+touches: [Documentation, Gap/Tools/ConvertTo-BehaviourMeasurement.ps1]
+lane: no
 requirement: none
 created: 2026-10-15
 completed:
@@ -50,7 +51,11 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 
 ## Notes
 
+- Interactive only. ADR-0473 already states the exclusion as intent (Decision 2 says "This is intent: today ... has no internet-host rule"; Consequences say it is left to an interactive session), so the document is truthful. The reproduction counts matches in `Gap/Tools/ConvertTo-BehaviourMeasurement.ps1`, an audit path a lane may not read or change, so only the converter can satisfy it: add an `excluded` rule there for a skipped case that "reaches <host> on the internet" (test2043 included), with reason "reaches revoked.badssl.com on the internet; `--ssl-no-revoke` is pinned by unit tests (ADR-0473)".
+- Remove `lane: no` once the converter has that internet-host rule (or, alternatively, once Stewart decides the finding is closed by the ADR wording alone).
+
 ## Log
 
 - 2026-10-15: Created.
 - 2026-10-15: Backlog -> Doing.
+- 2026-10-15: Doing -> Backlog. Interactive only: the reproduction needs a rule in the gap office converter script, an audit path; ADR-0473 already states the exclusion as intent
