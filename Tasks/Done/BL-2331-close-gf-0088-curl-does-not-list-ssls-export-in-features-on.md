@@ -45,7 +45,7 @@ In Curl.Cli.UnitLibrary, CurlVersionText.FeaturesLine (CurlVersionText.cs, line 
 ## Notes
 
 - Evidence for the feature: `--ssl-sessions` already loads and saves TLS session tickets off Windows (ADR-0319, `TlsSessionFileLines` and its tests in Curl.Console.UnitTests), so no transport work was needed.
-- `CurlVersionText.FeaturesLine` (Linux and macOS) now lists `SSLS-EXPORT` between `SSL` and `threadsafe`; `WindowsFeaturesLine` is unchanged because the Schannel build refuses `--ssl-sessions` (ADR-0397). ADR-0518 records this and amends ADR-0021's row. ADR-0021 itself is outside this task's touches, so its row was left as is; ADR-0518 says it now holds only for Windows.
+- `CurlVersionText.FeaturesLine` (Linux and macOS) now lists `SSLS-EXPORT` between `SSL` and `threadsafe`; `WindowsFeaturesLine` is unchanged because the Schannel build refuses `--ssl-sessions` (ADR-0397). ADR-0519 records this and amends ADR-0021's row. ADR-0021 itself is outside this task's touches, so its row was left as is; ADR-0519 says it now holds only for Windows.
 - macOS shares the line: the gap-platforms macOS reference is also curl built with OpenSSL (ADR-0505).
 - Linux proof: `CurlVersionTextTests.Lines_Linux_NamesTheGnuTripleAndOpenSsl` pins the line platform-neutrally (isWindows is injected), so CI's Linux job checks it once the shift pushes; the gap item closes on the next gap-platforms run.
 - No option added or changed, so `--ai-help` needs nothing. Only a string constant changed (no new branch or method), so Measure-CodeQuality was not run.
