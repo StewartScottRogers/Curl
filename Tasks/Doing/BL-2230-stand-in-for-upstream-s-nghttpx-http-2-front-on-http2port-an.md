@@ -43,3 +43,4 @@ Source: Stewart's 2026-10-14 request to raise the gap office's behaviour score (
 - 2026-10-14: Created.
 - 2026-10-14: Backlog -> Doing.
 - 2026-10-14: Doing -> Backlog. Split: waits on BL-2244 (the h2c server library); the TLS port is BL-2245
+- 2026-10-14: Backlog -> Doing.
