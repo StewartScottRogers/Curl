@@ -76,3 +76,4 @@ In Curl.Protocol.Ssh.UnitLibrary, make a refused or unreachable connection on sc
 - 2026-10-15: Created.
 - 2026-10-15: Backlog -> Doing.
 - 2026-10-15: Doing -> Backlog. Fix is in Curl.Cli.UnitLibrary (AccountHomeDirectory reads HOME, not the passwd home), which BL-2332 in Doing touches
+- 2026-10-15: Backlog -> Doing.
