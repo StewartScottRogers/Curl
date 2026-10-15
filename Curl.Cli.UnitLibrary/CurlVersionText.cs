@@ -7,7 +7,7 @@ namespace Curl.Cli;
 /// terminator; the console layer chooses the newline (CRLF on Windows, as the mingw reference writes).
 /// </summary>
 /// <remarks>
-/// Keep <see cref="ProtocolsLine"/>, <see cref="WindowsProtocolsLine"/> and <see cref="FeaturesLine"/> current (ADR-0021, Decision 6): the task
+/// Keep <see cref="ProtocolsLine"/> and <see cref="FeaturesLine"/> current (ADR-0021, Decision 6): the task
 /// that registers a handler in <c>CurlComposition.CreateProtocolHandlers</c>, or lands a feature curl
 /// lists, adds it here and to <c>CurlVersionTextTests</c> in the same change.
 /// </remarks>
@@ -19,18 +19,13 @@ public static class CurlVersionText
     /// <summary>
     /// The third line: the schemes the registered handlers serve, in curl's alphabetical order —
     /// <c>file</c>, <c>dict</c>, <c>ftp</c>/<c>ftps</c>, <c>gopher</c>/<c>gophers</c>, <c>telnet</c>, <c>tftp</c>,
-    /// <c>imap</c>/<c>imaps</c>, <c>mqtt</c>/<c>mqtts</c>, <c>pop3</c>/<c>pop3s</c>, <c>rtsp</c>, <c>scp</c>/<c>sftp</c>, <c>smb</c>/<c>smbs</c>, <c>smtp</c>/<c>smtps</c>, <c>ws</c>/<c>wss</c> and <c>http</c>/<c>https</c> —
+    /// <c>imap</c>/<c>imaps</c>, <c>mqtt</c>/<c>mqtts</c>, <c>pop3</c>/<c>pop3s</c>, <c>rtsp</c>, <c>scp</c>/<c>sftp</c>, <c>smtp</c>/<c>smtps</c>, <c>ws</c>/<c>wss</c> and <c>http</c>/<c>https</c> —
     /// and <c>ipfs</c>/<c>ipns</c>, which the tool serves by rewriting to a gateway as curl does and which
-    /// every curl 8.21.0 build lists (ADR-0021 amendment, BL-1417).
+    /// every curl 8.21.0 build lists (ADR-0021 amendment, BL-1417). The same line on every platform.
+    /// No <c>smb</c> or <c>smbs</c>: neither the Schannel reference build nor the OpenSSL reference build of
+    /// curl 8.22.0 lists them, though <c>smb://</c> and <c>smbs://</c> URLs still work (ADR-0453, ADR-0523, BL-2334).
     /// </summary>
-    public const string ProtocolsLine = "Protocols: dict file ftp ftps gopher gophers http https imap imaps ipfs ipns ldap ldaps mqtt mqtts pop3 pop3s rtsp scp sftp smb smbs smtp smtps telnet tftp ws wss";
-
-    /// <summary>
-    /// The third line on Windows: <see cref="ProtocolsLine"/> without <c>smb</c> and <c>smbs</c>, which the
-    /// Schannel reference build of curl 8.21.0 does not list, though <c>smb://</c> and <c>smbs://</c> URLs
-    /// still work (ADR-0453, BL-1830).
-    /// </summary>
-    public const string WindowsProtocolsLine = "Protocols: dict file ftp ftps gopher gophers http https imap imaps ipfs ipns ldap ldaps mqtt mqtts pop3 pop3s rtsp scp sftp smtp smtps telnet tftp ws wss";
+    public const string ProtocolsLine = "Protocols: dict file ftp ftps gopher gophers http https imap imaps ipfs ipns ldap ldaps mqtt mqtts pop3 pop3s rtsp scp sftp smtp smtps telnet tftp ws wss";
 
     /// <summary>
     /// The fourth line: the curl features the code gives evidence for, in curl's order (alphabetical,
@@ -71,15 +66,14 @@ public static class CurlVersionText
     /// <param name="isWindows">Whether the running system is Windows (<see cref="OperatingSystem.IsWindows"/>).</param>
     /// <param name="isMacOS">Whether the running system is macOS (<see cref="OperatingSystem.IsMacOS"/>); read only when <paramref name="isWindows"/> is <see langword="false"/>.</param>
     /// <returns>
-    /// The version line, <see cref="ReleaseDateLine"/>, <see cref="WindowsProtocolsLine"/> and
-    /// <see cref="WindowsFeaturesLine"/> on Windows or <see cref="ProtocolsLine"/> and
-    /// <see cref="FeaturesLine"/> anywhere else.
+    /// The version line, <see cref="ReleaseDateLine"/>, <see cref="ProtocolsLine"/>, and
+    /// <see cref="WindowsFeaturesLine"/> on Windows or <see cref="FeaturesLine"/> anywhere else.
     /// The version line names the mingw triple and <c>Schannel</c> on Windows, the Apple triple and
     /// <c>SecureTransport</c> on macOS, and the GNU/Linux triple and <c>OpenSSL</c> anywhere else.
     /// </returns>
     public static IReadOnlyList<string> Lines(bool isWindows, bool isMacOS) =>
         isWindows
-            ? [VersionLine(isWindows, isMacOS), ReleaseDateLine, WindowsProtocolsLine, WindowsFeaturesLine]
+            ? [VersionLine(isWindows, isMacOS), ReleaseDateLine, ProtocolsLine, WindowsFeaturesLine]
             : [VersionLine(isWindows, isMacOS), ReleaseDateLine, ProtocolsLine, FeaturesLine];
 
     private static string VersionLine(bool isWindows, bool isMacOS) =>
