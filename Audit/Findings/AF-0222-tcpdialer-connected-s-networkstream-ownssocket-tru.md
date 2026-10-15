@@ -3,8 +3,8 @@ id: AF-0222
 title: TcpDialer.Connected's NetworkStream ownsSocket: true can become false with no test failing, so a dialed socket is never closed on dispose
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Networking.UnitLibrary/TcpDialer.cs:Connected-true:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/TcpDialer.cs:228:true
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Netwo
 ## Log
 
 - 2026-10-15: filed proposed.
+- 2026-10-15: proposed -> accepted.
