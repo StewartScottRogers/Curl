@@ -8,7 +8,7 @@ depends-on: [BL-2304, BL-2323]
 touches: [Curl.Console, Curl.Console.UnitTests, Curl.Engine.UnitLibrary, Curl.Engine.UnitTests, Curl.Engine.IntegrationTests, Curl.Networking.UnitLibrary, Curl.Networking.UnitTests, Curl.Api.UnitLibrary/Options/Tls, Curl.Api.UnitTests/Options/Tls]
 requirement: none
 created: 2026-10-15
-completed:
+completed: 2026-10-15
 ---
 # BL-2324 — Make the engine's TLS classes read EasyTlsOptions instead of CommandLineOptions
 
@@ -28,16 +28,23 @@ Points ADR-0514 settles that this retarget must honour:
 
 ## Acceptance criteria
 
-- [ ] `TlsClientOptionsMapping`, `TlsBuildInformation`, `EngineComposition.CreateTlsProvider` and `TransferContextFactory`'s TLS fields take `EasyTlsOptions`, not `CommandLineOptions`, for their TLS settings.
-- [ ] Tests that built `CommandLineOptions` only to drive one of those members now build the record; tests through the whole command line stay as they are.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes, no existing test deleted, skipped or weakened.
-- [ ] `Measure-CodeQuality.ps1 -Library Curl.Engine.UnitLibrary,Curl.Console,Curl.Networking.UnitLibrary` passes.
-- [ ] `Curl.Conformance.UnitTests/PassingUpstreamCases.txt` is unchanged and every case still passes.
-- [ ] `Curl.Console/CurlEasyErrorText.cs` stays at that path and `InProcessCurl.RunAsync`'s public signatures are unchanged.
+- [x] `TlsClientOptionsMapping`, `TlsBuildInformation`, `EngineComposition.CreateTlsProvider` and `TransferContextFactory`'s TLS fields take `EasyTlsOptions`, not `CommandLineOptions`, for their TLS settings.
+- [x] Tests that built `CommandLineOptions` only to drive one of those members now build the record; tests through the whole command line stay as they are.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes, no existing test deleted, skipped or weakened.
+- [x] `Measure-CodeQuality.ps1 -Library Curl.Engine.UnitLibrary,Curl.Console,Curl.Networking.UnitLibrary` passes.
+- [x] `Curl.Conformance.UnitTests/PassingUpstreamCases.txt` is unchanged and every case still passes.
+- [x] `Curl.Console/CurlEasyErrorText.cs` stays at that path and `InProcessCurl.RunAsync`'s public signatures are unchanged.
 
 ## Notes
+
+- Plan: `TlsClientOptionsMapping.Of/ProxyOf/DohOf` map `EasyTlsOptions` (with `UseAlpn` and `SslSessionsFile` beside it); `CreateTransports`, `CreateDnsResolver`, `CreateDohConnector`, `CreatePoolingConnector` and `OptionGroupConnectionSettings.Of` take the record; `TlsBuildInformation.Lines(EasyTlsOptions, bool caEmbedDumpRequested)`. ADR-0530.
+- `TransferContextFactory` had no TLS fields; nothing to move there.
+- `ClientCertificateLoader` no longer splits `-E`; Networking tests now split their `file:pass` values (test helper) before the loader.
+- `TlsPeerOptions.CertificateType`/`KeyType` are nullable (Schannel reads no type as P12 but refuses `PEM`); the `pkcs11:` `ENG` guess was dropped to keep behaviour unchanged, filed as BL-2349.
+- Measured: fast tests green in every project (Engine 654, Console 2798, Networking 3175, Api 423, Conformance 3129 passed); Measure-CodeQuality for Engine, Console, Networking and Api: 0 failing members. PassingUpstreamCases.txt unchanged; CurlEasyErrorText.cs and InProcessCurl untouched.
 
 ## Log
 
 - 2026-10-15: Created.
 - 2026-10-15: Backlog -> Doing.
+- 2026-10-15: Doing -> Done. The engine's TLS classes read EasyTlsOptions built by EasyOptionsFromCommandLine.TlsOf; -E is split once; behaviour unchanged (ADR-0530)
