@@ -47,3 +47,4 @@ Implement the OpenSSL build's SSLKEYLOGFILE support. When the variable names a f
 ## Log
 
 - 2026-10-15: Created.
+- 2026-10-15: Backlog -> Doing.
