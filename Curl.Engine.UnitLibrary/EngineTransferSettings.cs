@@ -1,5 +1,4 @@
 using System.Net;
-using Curl.Cli;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Engine;

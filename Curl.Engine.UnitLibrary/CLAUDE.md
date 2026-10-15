@@ -4,7 +4,9 @@ The managed transfer engine (ADR-0506): the code that runs a transfer, moving ou
 `Curl.Console` so that `Curl.Console`, `Curl.Api` and `Libcurl` can all drive it. Namespace
 `Curl.Engine`. Transfer code is moving in task by task (BL-2285 onwards).
 
-It references `Curl.Cli.UnitLibrary` only temporarily; BL-2310 drops that reference.
+It must never reference `Curl.Cli.UnitLibrary` (BL-2310 dropped the last reference): the engine
+reads only the easy option groups (`Curl.Api`'s `Easy*Options` records and the engine's own
+`EngineToolOptions` and `EngineTransferSettings`), which `Curl.Console` builds from the command line.
 
 Never reference `Curl.Console`, `Libcurl` or `Curl.Api`: the engine sits beneath all three.
 
@@ -94,7 +96,7 @@ and `SshKnownHostsFileSearchTests` links `InMemoryDataFileReader` from `Curl.Con
 
 ## Option mappings and transfer plumbing (BL-2288)
 
-Moved here, in `Curl.Engine`, still reading `CommandLineOptions` (BL-2303 to BL-2309 retarget them
+Moved here, in `Curl.Engine`, then reading `CommandLineOptions` (BL-2303 to BL-2358 retargeted them
 to the seam's option groups): the mappings from command-line options to protocol option records
 (`HttpRequestOptionsMapping`, `HttpVersionMapping`, `MailRequestOptionsMapping`,
 `MultipartFormPartMapping`, `RedirectPolicyMapping`, `SshOptionsMapping`, `TlsClientOptionsMapping`),

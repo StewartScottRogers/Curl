@@ -1,4 +1,3 @@
-using Curl.Cli;
 using Curl.Networking;
 using Curl.Protocol.Abstractions;
 using HttpVersion = Curl.Api.Options.Http.HttpVersion;

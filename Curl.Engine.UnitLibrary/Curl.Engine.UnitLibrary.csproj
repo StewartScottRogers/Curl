@@ -12,7 +12,6 @@
   <ItemGroup>
     <ProjectReference Include="..\Curl.Api.UnitLibrary\Curl.Api.UnitLibrary.csproj" />
     <ProjectReference Include="..\Curl.Authentication.UnitLibrary\Curl.Authentication.UnitLibrary.csproj" />
-    <ProjectReference Include="..\Curl.Cli.UnitLibrary\Curl.Cli.UnitLibrary.csproj" />
     <ProjectReference Include="..\Curl.Cookies.UnitLibrary\Curl.Cookies.UnitLibrary.csproj" />
     <ProjectReference Include="..\Curl.Core.UnitLibrary\Curl.Core.UnitLibrary.csproj" />
     <ProjectReference Include="..\Curl.HttpMessageSignatures.UnitLibrary\Curl.HttpMessageSignatures.UnitLibrary.csproj" />

@@ -7,7 +7,6 @@ using Curl.Api.Options.Network;
 using Curl.Api.Options.Proxy;
 using Curl.Api.Options.Tls;
 using Curl.Authentication;
-using Curl.Cli;
 using Curl.Cookies;
 using Curl.Core;
 using Curl.Core.FileSystem;
@@ -1006,7 +1005,7 @@ internal static class EngineComposition
     /// <c>--local-port</c>, or <see langword="null" /> for neither (BL-600): a plain name is tried as an
     /// interface and then as a host, <c>if!</c> as an interface only, <c>host!</c> as a host only, and
     /// <c>ifhost!</c> binds its host with its interface part kept as the device name; the port range is
-    /// <see cref="LocalPortRange.First" /> and <see cref="LocalPortRange.Count" />, or any port. A value
+    /// <see cref="EasyNetworkOptions.LocalPort" /> and <see cref="EasyNetworkOptions.LocalPortRange" />, or any port. A value
     /// libcurl refuses at setopt never reaches a connect, so its empty parts are not looked at. The
     /// binding is part of each option group's <see cref="OptionGroupConnectionSettings" />, so a bound
     /// connection is never reused unbound.
