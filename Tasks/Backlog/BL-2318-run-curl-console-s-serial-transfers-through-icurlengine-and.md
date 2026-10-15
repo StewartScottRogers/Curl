@@ -4,7 +4,7 @@ title: Run Curl.Console's serial transfers through ICurlEngine and IEasyTransfer
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-2316]
+depends-on: [BL-2316, BL-2317, BL-2359, BL-2360]
 touches: [Curl.Console, Curl.Console.UnitTests, Curl.Engine.UnitLibrary, Curl.Engine.UnitTests]
 requirement: none
 created: 2026-10-15
@@ -32,7 +32,14 @@ ADR-0506, plan phase 2 step 5 - the console's re-base onto the seam, the step be
 
 ## Notes
 
+- 2026-10-15 (lane 1, prerequisite pass before any code): the serial attempt in `CurlCommandRunner.FollowRetryingAsync` runs on a context the runner builds (diagnostic log, `ITransferEvents` for `-v`/`--trace`, progress sink, `-D` tee, watchdogs on the shared `RunningTransferState`, the option group's `TransferDispatch` with its cookies and connection pool across URLs) and reads the whole `TransferReport` for `-w`. `ManagedEasyTransfer.PerformAsync` builds its own context with libcurl defaults (`TransferSettingsOf`: silent, no fail mode, no `--proto`), `Stream.Null` standard input, no events or progress, a fresh `EngineTransferState` per perform, and fills `Info` with only the URL and response code. Routing the runner through it byte for byte needs, all outside this task's `touches`:
+  - BL-2317 (Backlog): `Info` filled from the report, so `-w` and the runner's report-driven output still have their values.
+  - BL-2359 (filed): the tool's settings, the upload read callback, `-C`, curl's easy error text and engine-wide shared state (cookies, HSTS, alt-svc, ID numbering, connection pool) carried to `ManagedEasyTransfer` (touches `Curl.Api.UnitLibrary`).
+  - BL-2360 (filed): trace events through the debug callback and progress through xferinfo, for `-v`, `--trace` and the meter.
+  Requeued with those in `depends-on`; no code was changed. A console-side `IEasyTransfer` that only wrapped `TransferPerformer` was rejected: it would satisfy the recording-fake test while changing nothing, and the task says `CreateRunner` gets the managed engine.
+
 ## Log
 
 - 2026-10-15: Created.
 - 2026-10-15: Backlog -> Doing.
+- 2026-10-15: Doing -> Backlog. Needs BL-2317, BL-2359 and BL-2360: ManagedEasyTransfer cannot yet run the tool's attempt byte for byte (tool settings, shared state, trace and progress callbacks, full TransferInfo)
