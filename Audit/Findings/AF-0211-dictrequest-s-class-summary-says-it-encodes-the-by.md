@@ -3,8 +3,8 @@ id: AF-0211
 title: DictRequest's class summary says it encodes the bytes curl 8.21.0 sends; its CLIENT line is libcurl 8.22.0
 auditor: truthfulness
 severity: Low
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-15_0156.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-10-14_1815.md, 2026-10-15_0156.md).
 key: truthfulness:Curl.Protocol.Dict.UnitLibrary/DictRequest.cs:DictRequest:false-doc-comment
 reproduction: none
 task: BL-2213
@@ -13,9 +13,9 @@ found: 2026-10-14
 found-at: c1dedd04f2a8e1534e64b664312c5dacc66bdf4a
 scorecard: 2026-10-14_0453.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-15
+closed-how: consecutive
+closed-by: 2026-10-14_1815.md, 2026-10-15_0156.md
 ---
 # AF-0211 - DictRequest's class summary says it encodes the bytes curl 8.21.0 sends; its CLIENT line is libcurl 8.22.0
 
@@ -43,8 +43,10 @@ Select-String -Path Curl.Protocol.Dict.UnitLibrary/DictRequest.cs -Pattern 'as t
 ## Re-audits
 
 - 2026-10-14 | 2026-10-14_1815.md | reproduces: no | Ran the reproduction: 'as the bytes curl 8\.21\.0 sends' no longer matches. The summary at DictRequest.cs:8 reads 'as the bytes curl 8.22.0 sends', and line 37 is ClientLine = "CLIENT libcurl 8.22.0"; the two agree.
+- 2026-10-15 | 2026-10-15_0156.md | reproduces: no | Ran the reproduction: 'as the bytes curl 8.21.0 sends' no longer matches. DictRequest's summary now reads 'Encodes a dict URL's path as the bytes curl 8.22.0 sends', which agrees with ClientLine = "CLIENT libcurl 8.22.0" (line 37).
 
 ## Log
 
 - 2026-10-14: filed proposed.
 - 2026-10-14: proposed -> accepted.
+- 2026-10-15: accepted -> closed. Re-audit 2026-10-15_0156.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-10-14_1815.md, 2026-10-15_0156.md).

@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: truthfulness:Documentation/Planning/Decisions/ADR-0473-upstream-test2043-is-measured-excluded-because-it-checks-a-live-internet-host.md:ADR-0473:stale-adr
 reproduction: none
-task: BL-2052
-tasks: BL-2052
+task: BL-2273
+tasks: BL-2052, BL-2273
 found: 2026-10-11
 found-at: 22f394602532a6922adbc7fa91b3739b62d2112a
 scorecard: 2026-10-11_0051.md
@@ -48,6 +48,7 @@ Run from the repository root:
 - 2026-10-13 | 2026-10-13_1822.md | not re-audited | Ran the reproduction: 0 (no 'internet|test2043' rule in Gap/Tools/ConvertTo-BehaviourMeasurement.ps1) and 5 'excluded' returns, so the converter is unchanged. But the finding's defect was the ADR's claim, and ADR-0473 decision 2 (lines 40-43) now says the excluded measurement is intent: 'This is intent: today Gap/Tools/ConvertTo-BehaviourMeasurement.ps1 has no internet-host rule, so it records the skipped case as unmeasured (harness-unsupported).' The reproduction only checks the converter, not the ADR text, so it cannot tell whether the false statement remains; read by hand, the ADR is now true of the code.
 - 2026-10-14 | 2026-10-14_0453.md | not re-audited | Ran the reproduction: 0 matches for 'internet|test2043' and 5 for "return @\('excluded'" in Gap/Tools/ConvertTo-BehaviourMeasurement.ps1. The converter is unchanged (still no internet-host rule), so the reproduction measures only the code side and cannot tell. ADR-0473's Decision 2 now says 'This is intent: today ... has no internet-host rule, so it records the skipped case as unmeasured', so the ADR now matches the code. Recorded as not re-audited.
 - 2026-10-14 | 2026-10-14_1815.md | not re-audited | Ran the reproduction: 'internet|test2043' matches 0 lines in Gap/Tools/ConvertTo-BehaviourMeasurement.ps1, and "return @('excluded'" matches 8. The converter output is unchanged. The fix went on the ADR side instead: ADR-0473 decision 2 now reads 'The gap office is to measure behaviour:test2043 as excluded ... This is intent: today Gap/Tools/ConvertTo-BehaviourMeasurement.ps1 has no internet-host rule, so it records the skipped case as unmeasured (harness-unsupported)'. That matches the code. The reproduction only searches the converter, so it cannot tell whether the mismatch remains; read by hand, it is gone except for the title's present-tense 'is measured excluded'.
+- 2026-10-15 | 2026-10-15_0156.md | reproduces: yes | Ran the reproduction: (Select-String ... -Pattern 'internet|test2043').Count = 0, and (Select-String ... -Pattern "return @\('excluded'").Count = 8. The converter still has no internet-host or test2043 rule, so test2043 is not excluded as ADR-0473 says.
 
 ## Log
 

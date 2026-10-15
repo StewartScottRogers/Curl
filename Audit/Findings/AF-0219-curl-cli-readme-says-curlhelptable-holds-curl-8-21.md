@@ -42,6 +42,8 @@ Run from the repository root:
 
 ## Re-audits
 
+- 2026-10-15 | 2026-10-15_0156.md | reproduces: no | Ran the reproduction: CurlHelpTable.cs has 278 rows, and the README no longer says '274 help rows' (count 0). Curl.Cli.UnitLibrary/README.md:23 now says '278 help rows ... the 274 in curl 8.21.0's generated src/tool_listhelp.c, plus the four --httpsig-* rows of a curl 8.22.0 built with --enable-httpsig (ADR-0487)', which matches the table.
+
 ## Log
 
 - 2026-10-14: filed proposed.

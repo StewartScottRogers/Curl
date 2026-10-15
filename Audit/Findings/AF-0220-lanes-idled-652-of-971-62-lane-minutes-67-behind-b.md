@@ -3,8 +3,8 @@ id: AF-0220
 title: Lanes idled 652 of 971.62 lane minutes (67%) behind BL-2235, a High gap task filed with touches: [] (read as *) that overlapped BL-2160 left in Doing by an interactive session
 auditor: process
 severity: Medium
-status: accepted
-reason: Stewart accepted it on 2026-10-14.
+status: closed
+reason: Re-audit 2026-10-15_0156.md: the reproduction no longer reproduces.
 key: process:logs:BL-2235:overlap-wait
 reproduction: none
 task: BL-2257
@@ -13,9 +13,9 @@ found: 2026-10-14
 found-at: d86a80f0091fbf88c08d7b9b2fa37a9197854bd8
 scorecard: 2026-10-14_1815.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-15
+closed-how: reliable-reaudit
+closed-by: 2026-10-15_0156.md
 ---
 # AF-0220 - Lanes idled 652 of 971.62 lane minutes (67%) behind BL-2235, a High gap task filed with touches: [] (read as *) that overlapped BL-2160 left in Doing by an interactive session
 
@@ -42,7 +42,10 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-10-15 | 2026-10-15_0156.md | reproduces: no | Ran the given reproduction: '652 of 971.62 lane minutes', 'priority: High', 'touches: []', fe98450af '2026-10-14 15:38:36 -0700 chore(tasks): defer BL-2160 and BL-2235 to the next gap run'. That window is the original incident. Re-audited by mechanism over this audit's window (Measure-FactoryProcess.ps1 -Since 2026-10-14 on the 20261015-015611 logs): three shifts finished 43 tasks, and waitOverlapMinutes is 13 of 623.53 laneMinutes (2.1%), under 20%. The only overlap waits are 6 one-minute waits at 19:03-19:09 and 5 at 20:50-20:55 in DarkFactory-20261014-172412-L1.log, each just before the lane retired; none lies behind an interactive-only Doing task. BL-2257's fix (825ff80e0, 'a task waiting on an interactive-only Doing task reserves nothing') is in the audited history.
+
 ## Log
 
 - 2026-10-14: filed proposed.
 - 2026-10-14: proposed -> accepted.
+- 2026-10-15: accepted -> closed. Re-audit 2026-10-15_0156.md: the reproduction no longer reproduces.
