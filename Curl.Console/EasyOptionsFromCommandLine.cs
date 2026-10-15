@@ -32,6 +32,9 @@ internal static class EasyOptionsFromCommandLine
     // The receive buffer curl's tool asks for, 100 KiB, as --libcurl writes CURLOPT_BUFFERSIZE.
     private const long ToolBufferSize = 102400;
 
+    // The type curl's tool gives a pkcs11: certificate or key without --cert-type or --key-type.
+    private const string EnginePkcs11Type = "ENG";
+
     // The versions the parser records, as SslProtocols, and the CURL_SSLVERSION_* each is as a minimum.
     private static readonly FrozenDictionary<SslProtocols, SslVersion> SslVersionsByProtocol = new Dictionary<SslProtocols, SslVersion>
     {
@@ -179,7 +182,7 @@ internal static class EasyOptionsFromCommandLine
 
     /// <summary>
     /// Maps the TLS group: the origin's <c>-k</c>, <c>--cacert</c>, <c>--capath</c>, <c>-E</c>
-    /// (split into the certificate and its pass phrase as curl's tool splits it), <c>--cert-type</c> (unset when not given, ADR-0530),
+    /// (split into the certificate and its pass phrase as curl's tool splits it), <c>--cert-type</c> (unset when not given, ADR-0530, but <c>ENG</c> for a <c>pkcs11:</c> certificate or key, ADR-0537),
     /// <c>--key</c>, <c>--key-type</c>, <c>--pass</c>, <c>--ciphers</c>, <c>--tls13-ciphers</c>,
     /// <c>--tlsv1*</c>, <c>--tls-max</c>, <c>--crlfile</c>, <c>--pinnedpubkey</c>, <c>--ssl-no-revoke</c>,
     /// <c>--ssl-revoke-best-effort</c>, <c>--ssl-allow-beast</c>, <c>--ssl-auto-client-cert</c>,
@@ -221,9 +224,9 @@ internal static class EasyOptionsFromCommandLine
         return new TlsPeerOptions
         {
             Certificate = certificate,
-            CertificateType = options.ClientCertificateType,
+            CertificateType = TypeOf(options.ClientCertificateType, certificate),
             Key = options.PrivateKey,
-            KeyType = options.PrivateKeyType,
+            KeyType = TypeOf(options.PrivateKeyType, options.PrivateKey),
             KeyPassword = options.Passphrase ?? passphrase,
             SslVersion = SslVersionOf(options.MinimumTlsVersion),
             SslVersionMaximum = SslVersionMaximumOf(options.MaximumTlsVersion),
@@ -248,9 +251,9 @@ internal static class EasyOptionsFromCommandLine
         return new TlsPeerOptions
         {
             Certificate = certificate,
-            CertificateType = options.ProxyClientCertificateType,
+            CertificateType = TypeOf(options.ProxyClientCertificateType, certificate),
             Key = options.ProxyPrivateKey,
-            KeyType = options.ProxyPrivateKeyType,
+            KeyType = TypeOf(options.ProxyPrivateKeyType, options.ProxyPrivateKey),
             KeyPassword = options.ProxyPassphrase ?? passphrase,
             SslVersion = options.ProxyMinimumTlsVersion is null ? SslVersion.Default : SslVersion.Tls1,
             VerifyPeer = !options.ProxyInsecure,
@@ -269,6 +272,10 @@ internal static class EasyOptionsFromCommandLine
     // -E's certificate[:passphrase], split as curl's tool splits it; only its Windows build keeps a drive letter's colon.
     private static (string? Certificate, string? Passphrase) CertificateOf(string? value) =>
         value is null ? (null, null) : ClientCertificateArgument.Split(value, OperatingSystem.IsWindows());
+
+    // The --cert-type or --key-type given; without one, ENG for a pkcs11: certificate or key, as curl's tool sets it (BL-2349).
+    private static string? TypeOf(string? type, string? certificateOrKey) =>
+        type ?? (ClientCertificateArgument.IsPkcs11Uri(certificateOrKey) ? EnginePkcs11Type : null);
 
     // The minimum the command line names; none leaves the TLS library's own (the engine's behaviour, ADR-0514).
     private static SslVersion SslVersionOf(SslProtocols? minimum) =>
