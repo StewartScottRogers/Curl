@@ -60,26 +60,6 @@ internal static class HttpVersionMapping
     internal static IReadOnlyList<string> HttpOverTlsApplicationProtocolsOf(HttpVersion version, bool isWindows) =>
         version == HttpVersion.None ? DefaultOffer(isWindows) : OfferedFor(version);
 
-    /// <summary>
-    /// The option group's HTTP version for a command line's <see cref="CommandLineOptions.HttpVersion" />, as
-    /// <c>EasyOptionsFromCommandLine.HttpOf</c> maps it: <see cref="HttpVersion.None" /> when no version option
-    /// was given. A bridge for the readers not yet handed <see cref="Curl.Api.Options.Http.EasyHttpOptions" />
-    /// (<c>EngineComposition</c> and <see cref="OptionGroupConnectionSettings" />),
-    /// which BL-2350 removes.
-    /// </summary>
-    /// <param name="version">The command line's version option, or <see langword="null" /> for none.</param>
-    /// <returns>The same version in the option group's terms.</returns>
-    internal static HttpVersion FromRequested(RequestedHttpVersion? version) => version switch
-    {
-        RequestedHttpVersion.Http10 => HttpVersion.Http10,
-        RequestedHttpVersion.Http11 => HttpVersion.Http11,
-        RequestedHttpVersion.Http2 => HttpVersion.Http2,
-        RequestedHttpVersion.Http2PriorKnowledge => HttpVersion.Http2PriorKnowledge,
-        RequestedHttpVersion.Http3 => HttpVersion.Http3,
-        RequestedHttpVersion.Http3Only => HttpVersion.Http3Only,
-        _ => HttpVersion.None,
-    };
-
     private static IReadOnlyList<string> OfferedFor(HttpVersion version) => version switch
     {
         HttpVersion.Http2 or HttpVersion.Http2Tls or HttpVersion.Http3 or HttpVersion.Http3Only => HttpApplicationProtocols.H2ThenHttp11,

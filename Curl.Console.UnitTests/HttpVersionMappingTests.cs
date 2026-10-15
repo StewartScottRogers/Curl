@@ -137,47 +137,12 @@ public sealed class HttpVersionMappingTests
         Assert.AreEqual(expected, actual);
     }
 
-    [TestMethod]
-    [DataRow(null, HttpVersion.None)]
-    [DataRow(RequestedHttpVersion.Http10, HttpVersion.Http10)]
-    [DataRow(RequestedHttpVersion.Http11, HttpVersion.Http11)]
-    [DataRow(RequestedHttpVersion.Http2, HttpVersion.Http2)]
-    [DataRow(RequestedHttpVersion.Http2PriorKnowledge, HttpVersion.Http2PriorKnowledge)]
-    [DataRow(RequestedHttpVersion.Http3, HttpVersion.Http3)]
-    [DataRow(RequestedHttpVersion.Http3Only, HttpVersion.Http3Only)]
-    [DataRow((RequestedHttpVersion)99, HttpVersion.None)]
-    public void FromRequested_MapsEachVersionOptionAsHttpOfDoes(RequestedHttpVersion? requested, HttpVersion expected)
-    {
-        Diagnostics.Arrange("requested", requested);
-
-        HttpVersion actual = HttpVersionMapping.FromRequested(requested);
-        string[] arguments = requested is { } version && OptionOf(version) is { } option ? [option, Url] : [Url];
-        HttpVersion fromHttpOf = EasyOptionsFromCommandLine.HttpOf(OpenSslBuildParser.Parse(arguments).Options!).HttpVersion;
-
-        Diagnostics.Act("version", actual);
-
-        Diagnostics.Assert("version", expected, actual);
-        Assert.AreEqual(expected, actual);
-        Assert.AreEqual(fromHttpOf, actual);
-    }
-
-    private static string? OptionOf(RequestedHttpVersion version) => version switch
-    {
-        RequestedHttpVersion.Http10 => "--http1.0",
-        RequestedHttpVersion.Http11 => "--http1.1",
-        RequestedHttpVersion.Http2 => "--http2",
-        RequestedHttpVersion.Http2PriorKnowledge => "--http2-prior-knowledge",
-        RequestedHttpVersion.Http3 => "--http3",
-        RequestedHttpVersion.Http3Only => "--http3-only",
-        _ => null,
-    };
-
     private static string OfferedBy(params string[] arguments)
     {
         CommandLineParseResult result = OpenSslBuildParser.Parse(arguments);
         Assert.IsTrue(result.IsAccepted);
 
-        CurlTransports transports = EngineComposition.CreateTransports(result.Options, EasyOptionsFromCommandLine.NetworkOf(result.Options), EasyOptionsFromCommandLine.TlsOf(result.Options), EasyOptionsFromCommandLine.ProxyOf(result.Options), TimeProvider.System);
+        CurlTransports transports = EngineComposition.CreateTransports(result.Options, EasyOptionsFromCommandLine.NetworkOf(result.Options), EasyOptionsFromCommandLine.TlsOf(result.Options), EasyOptionsFromCommandLine.HttpOf(result.Options), EasyOptionsFromCommandLine.ProxyOf(result.Options), TimeProvider.System);
 
         return string.Join(',', transports.TcpConnector.HttpOverTlsApplicationProtocols);
     }

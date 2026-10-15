@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Net.Sockets;
 using System.Text;
+using Curl.Api.Options.Http;
 using Curl.Api.Options.Network;
 using Curl.Api.Options.Proxy;
 using Curl.Api.Options.Tls;
@@ -31,6 +32,7 @@ using Curl.Protocol.Ssh.Negotiation;
 using Curl.Protocol.Telnet;
 using Curl.Protocol.Tftp;
 using Curl.Protocol.Ws;
+using HttpVersion = Curl.Api.Options.Http.HttpVersion;
 
 namespace Curl.Engine;
 
@@ -375,10 +377,11 @@ internal static class EngineComposition
     /// <param name="options">The parsed command line, for everything but the network group.</param>
     /// <param name="network">The option group's network options: its connections, name resolution and connect timeout.</param>
     /// <param name="tls">The option group's TLS options, for the target's, the HTTPS proxy's and the DoH server's handshakes.</param>
+    /// <param name="http">The option group's HTTP options, for the HTTP version the ALPN list and the HTTPS-CONNECT attempts follow.</param>
     /// <param name="proxy">The option group's proxy options, for the tunnel, the pre-proxy, SOCKS5 authentication and the HAProxy line.</param>
     /// <returns>The connectors and the pieces they were built from.</returns>
-    internal static CurlTransports CreateTransports(CommandLineOptions options, EasyNetworkOptions network, EasyTlsOptions tls, EasyProxyOptions proxy) =>
-        CreateTransports(options, network, tls, proxy, TimeProvider.System);
+    internal static CurlTransports CreateTransports(CommandLineOptions options, EasyNetworkOptions network, EasyTlsOptions tls, EasyHttpOptions http, EasyProxyOptions proxy) =>
+        CreateTransports(options, network, tls, http, proxy, TimeProvider.System);
 
     /// <summary>
     /// Creates the run's resolver: the <see cref="CreateDohResolver" /> one when <c>--doh-url</c> is
@@ -577,13 +580,13 @@ internal static class EngineComposition
     /// <c>h1</c> under <c>--http1.0</c> and <c>--http1.1</c>, <c>h3</c> under <c>--http3</c> and
     /// <c>--http3-only</c>, else <c>h2</c> (measured for none and <c>--http1.1</c>, BL-1192 Notes).
     /// </summary>
-    /// <param name="version">The HTTP version option given, if any.</param>
+    /// <param name="version">The option group's HTTP version, <see cref="HttpVersion.None" /> when no version option was given.</param>
     /// <returns>The version's name.</returns>
-    internal static string HttpsConnectFirstAttemptVersionOf(RequestedHttpVersion? version) =>
+    internal static string HttpsConnectFirstAttemptVersionOf(HttpVersion version) =>
         version switch
         {
-            RequestedHttpVersion.Http10 or RequestedHttpVersion.Http11 => "h1",
-            RequestedHttpVersion.Http3 or RequestedHttpVersion.Http3Only => "h3",
+            HttpVersion.Http10 or HttpVersion.Http11 => "h1",
+            HttpVersion.Http3 or HttpVersion.Http3Only => "h3",
             _ => "h2",
         };
 
@@ -738,7 +741,7 @@ internal static class EngineComposition
             : new HandBuiltTlsProvider(options, timeProvider, sessions, echConfigs);
 
     /// <summary>
-    /// Creates the network transports as <see cref="CreateTransports(CommandLineOptions, EasyNetworkOptions, EasyTlsOptions, EasyProxyOptions)" /> does,
+    /// Creates the network transports as <see cref="CreateTransports(CommandLineOptions, EasyNetworkOptions, EasyTlsOptions, EasyHttpOptions, EasyProxyOptions)" /> does,
     /// on <paramref name="timeProvider" /> instead of <see cref="TimeProvider.System" />: the
     /// <see cref="TcpConnector" />, the TLS providers and the
     /// <see cref="UdpDatagramConnector" /> all time on it, so the handshake timestamps the TLS
@@ -747,6 +750,7 @@ internal static class EngineComposition
     /// <param name="options">The parsed command line, for everything but the network group.</param>
     /// <param name="network">The option group's network options: its connections, name resolution and connect timeout.</param>
     /// <param name="tls">The option group's TLS options, for the target's, the HTTPS proxy's and the DoH server's handshakes.</param>
+    /// <param name="http">The option group's HTTP options, for the HTTP version the ALPN list and the HTTPS-CONNECT attempts follow.</param>
     /// <param name="proxy">The option group's proxy options, for the tunnel, the pre-proxy, SOCKS5 authentication and the HAProxy line.</param>
     /// <param name="timeProvider">The clock every transport times on.</param>
     /// <returns>The connectors and the pieces they were built from.</returns>
@@ -758,7 +762,7 @@ internal static class EngineComposition
     /// <param name="diagnosticLog">The run's diagnostic log, which the authenticators and security contexts write their choices to (BL-923); <see langword="null" /> for none.</param>
     /// <param name="runDnsCache">The run's DNS cache, which every option group's TCP connector answers from and adds to as curl 8.21.0 shares its cache (BL-1053); <see langword="null" /> for a cache of the group's own.</param>
     /// <param name="easyErrorText">Curl's easy error text for each exit code, which the DoH resolver's <c>--trace-config doh</c> lines carry (BL-1102): <c>Curl.Console</c>'s <c>CurlEasyErrorText.Of</c> in production; <see langword="null" /> for an empty text.</param>
-    internal static CurlTransports CreateTransports(CommandLineOptions options, EasyNetworkOptions network, EasyTlsOptions tls, EasyProxyOptions proxy, TimeProvider timeProvider, ConnectionCache? runConnections = null, TlsSessionCache? tlsSessions = null, IDiagnosticLog? diagnosticLog = null, DnsCache? runDnsCache = null, Func<CurlExitCode, string>? easyErrorText = null)
+    internal static CurlTransports CreateTransports(CommandLineOptions options, EasyNetworkOptions network, EasyTlsOptions tls, EasyHttpOptions http, EasyProxyOptions proxy, TimeProvider timeProvider, ConnectionCache? runConnections = null, TlsSessionCache? tlsSessions = null, IDiagnosticLog? diagnosticLog = null, DnsCache? runDnsCache = null, Func<CurlExitCode, string>? easyErrorText = null)
     {
         TcpDialer tcpDialer = new(TcpSocketOptionsOf(network));
         FlowScopedTransferEvents? resolverEvents = TracesDns(options) ? new() : null;
@@ -770,9 +774,9 @@ internal static class EngineComposition
         LateBoundSecurityContextFactory proxyContexts = new();
         HttpProxyTunnelOptions proxyTunnelOptions = CreateProxyTunnelOptions(options, proxy, proxyContexts, diagnosticLog);
         QuicDialer quicDialer = new(tlsClientOptions, timeProvider) { WritesHttp3ConnectionLines = TracesHttp3(options) };
-        TcpConnector tcpConnector = CreateTcpConnector(options, network, proxy, dnsResolver, tcpDialer, tlsProvider, timeProvider, proxyTunnelOptions, proxyTlsProvider, quicDialer, proxyContexts, runDnsCache, resolverEvents);
+        TcpConnector tcpConnector = CreateTcpConnector(options, network, http, proxy, dnsResolver, tcpDialer, tlsProvider, timeProvider, proxyTunnelOptions, proxyTlsProvider, quicDialer, proxyContexts, runDnsCache, resolverEvents);
         UdpDatagramConnector udpDatagramConnector = CreateUdpDatagramConnector(network, dnsResolver, timeProvider, diagnosticLog);
-        PoolingConnector poolingConnector = CreatePoolingConnector(options, network, tls, proxy, tcpConnector, timeProvider, runConnections);
+        PoolingConnector poolingConnector = CreatePoolingConnector(options, network, tls, http, proxy, tcpConnector, timeProvider, runConnections);
 
         // The tunnel answers --proxy-ntlm and --proxy-negotiate on the same router the origin's
         // contexts come from, which can only be made once the connectors exist (BL-604).
@@ -834,9 +838,10 @@ internal static class EngineComposition
     /// so a later group reuses an earlier group's connection when their settings are equal, as curl
     /// 8.21.0 does (ADR-0285, BL-754); or, without one, over a pool of its own.
     /// </summary>
-    /// <param name="options">The option group, whose proxy and HTTP version options the pool's settings hold.</param>
+    /// <param name="options">The option group, whose <c>-Z</c>, ALPN and <c>--ssl-sessions</c> options the pool's settings hold.</param>
     /// <param name="network">The option group's network options, whose <c>--connect-to</c> entries, binding, socket and IP version the pool's settings hold.</param>
     /// <param name="tls">The option group's TLS options, which the pool's settings hold.</param>
+    /// <param name="http">The option group's HTTP options, whose HTTP version the pool's settings hold.</param>
     /// <param name="proxy">The option group's proxy options, whose pre-proxy and HAProxy line the pool's settings hold.</param>
     /// <param name="connector">Opens a connection when the pool has none to reuse.</param>
     /// <param name="timeProvider">The clock a pool of its own measures idle time on.</param>
@@ -846,6 +851,7 @@ internal static class EngineComposition
         CommandLineOptions options,
         EasyNetworkOptions network,
         EasyTlsOptions tls,
+        EasyHttpOptions http,
         EasyProxyOptions proxy,
         IConnector connector,
         TimeProvider timeProvider,
@@ -854,7 +860,7 @@ internal static class EngineComposition
         bool waitsForMultiplexing = WaitsForMultiplexing(options);
         return runConnections is null
             ? new PoolingConnector(connector, timeProvider) { WaitsForMultiplexing = waitsForMultiplexing }
-            : new PoolingConnector(connector, runConnections, OptionGroupConnectionSettings.Of(options, network, tls, proxy), new ConnectToMappings(network.ConnectTo)) { WaitsForMultiplexing = waitsForMultiplexing };
+            : new PoolingConnector(connector, runConnections, OptionGroupConnectionSettings.Of(options, network, tls, http, proxy), new ConnectToMappings(network.ConnectTo)) { WaitsForMultiplexing = waitsForMultiplexing };
     }
 
     /// <summary>
@@ -870,8 +876,9 @@ internal static class EngineComposition
     /// <c>--happy-eyeballs-timeout-ms</c> is how long it dials the first address family alone before
     /// the other, curl's 200 ms when not given (ADR-0254, BL-889).
     /// </summary>
-    /// <param name="options">The parsed command line, for its proxy, TLS, HTTP version, <c>-m</c> and trace options.</param>
+    /// <param name="options">The parsed command line, for its <c>-m</c>, Negotiate and trace options.</param>
     /// <param name="network">The option group's network options: <c>--resolve</c>, <c>--connect-to</c>, the binding, the socket, the IP version and the connect timeouts.</param>
+    /// <param name="http">The option group's HTTP options: the HTTP version the ALPN list and the HTTPS-CONNECT attempts follow.</param>
     /// <param name="proxy">The option group's proxy options: the pre-proxy, SOCKS5 authentication and the HAProxy line.</param>
     /// <param name="dnsResolver">Resolves a host no <c>--resolve</c> entry answers for.</param>
     /// <param name="tcpDialer">Opens each plaintext connection.</param>
@@ -903,6 +910,7 @@ internal static class EngineComposition
     internal static TcpConnector CreateTcpConnector(
         CommandLineOptions options,
         EasyNetworkOptions network,
+        EasyHttpOptions http,
         EasyProxyOptions proxy,
         IDnsResolver dnsResolver,
         ITcpDialer tcpDialer,
@@ -926,7 +934,7 @@ internal static class EngineComposition
             ConnectTimeoutOf(network, options.MaxTime),
             AddressFamilyOf(network),
             UnixSocketOf(network),
-            HttpVersionMapping.HttpOverTlsApplicationProtocolsOf(HttpVersionMapping.FromRequested(options.HttpVersion)),
+            HttpVersionMapping.HttpOverTlsApplicationProtocolsOf(http.HttpVersion),
             quicDialer,
             network.HappyEyeballsTimeout,
             localBinding: LocalBindingOf(network),
@@ -950,8 +958,8 @@ internal static class EngineComposition
             TracedConnectTimeout = network.ConnectTimeout > TimeSpan.Zero ? network.ConnectTimeout : null,
             TracedTransferTimeout = options.MaxTime > TimeSpan.Zero ? options.MaxTime : null,
             TracesHttpsConnectFilter = TracesHttpsConnect(options),
-            HttpsConnectFirstAttemptVersion = HttpsConnectFirstAttemptVersionOf(options.HttpVersion),
-            HttpsConnectSecondAttemptVersion = options.HttpVersion == RequestedHttpVersion.Http3 ? "h2" : null,
+            HttpsConnectFirstAttemptVersion = HttpsConnectFirstAttemptVersionOf(http.HttpVersion),
+            HttpsConnectSecondAttemptVersion = http.HttpVersion == HttpVersion.Http3 ? "h2" : null,
             ResolverEvents = resolverEvents,
         };
 
@@ -1203,7 +1211,7 @@ internal static class EngineComposition
     /// The QUIC dialer of an option group of the dialing runner: its <c>--http3</c> and
     /// <c>--http3-only</c> datagrams go through <paramref name="datagramConnector" />
     /// (<see cref="DatagramConnectorUdpChannelOpener" />), not a real UDP socket, so an in-process
-    /// HTTP/3 server answers them (BL-2260). The executable's <see cref="CreateTransports(CommandLineOptions, EasyNetworkOptions, EasyTlsOptions, EasyProxyOptions, TimeProvider, ConnectionCache?, TlsSessionCache?, IDiagnosticLog?, DnsCache?, Func{CurlExitCode, string}?)" />
+    /// HTTP/3 server answers them (BL-2260). The executable's <see cref="CreateTransports(CommandLineOptions, EasyNetworkOptions, EasyTlsOptions, EasyHttpOptions, EasyProxyOptions, TimeProvider, ConnectionCache?, TlsSessionCache?, IDiagnosticLog?, DnsCache?, Func{CurlExitCode, string}?)" />
     /// keeps the socket-opening dialer.
     /// </summary>
     /// <param name="options">The option group.</param>

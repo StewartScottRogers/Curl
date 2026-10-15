@@ -54,7 +54,7 @@ public sealed class EngineCompositionFtpTraceTests
     [TestMethod]
     public void CreateTransports_UnderTraceConfigFtp_TracesFtp()
     {
-        CurlTransports transports = EngineComposition.CreateTransports(Parse("-v", "--trace-config", "ftp"), EasyOptionsFromCommandLine.NetworkOf(Parse("-v", "--trace-config", "ftp")), EasyOptionsFromCommandLine.TlsOf(Parse("-v", "--trace-config", "ftp")), EasyOptionsFromCommandLine.ProxyOf(Parse("-v", "--trace-config", "ftp")), TimeProvider.System);
+        CurlTransports transports = EngineComposition.CreateTransports(Parse("-v", "--trace-config", "ftp"), EasyOptionsFromCommandLine.NetworkOf(Parse("-v", "--trace-config", "ftp")), EasyOptionsFromCommandLine.TlsOf(Parse("-v", "--trace-config", "ftp")), EasyOptionsFromCommandLine.HttpOf(Parse("-v", "--trace-config", "ftp")), EasyOptionsFromCommandLine.ProxyOf(Parse("-v", "--trace-config", "ftp")), TimeProvider.System);
         Diagnostics.Act("transports trace FTP", transports.TracesFtp);
 
         Diagnostics.Assert("transports trace FTP", true, transports.TracesFtp);
@@ -64,7 +64,7 @@ public sealed class EngineCompositionFtpTraceTests
     [TestMethod]
     public void CreateTransports_WithoutTheFtpComponent_DoesNotTraceFtp()
     {
-        CurlTransports transports = EngineComposition.CreateTransports(Parse("-v"), EasyOptionsFromCommandLine.NetworkOf(Parse("-v")), EasyOptionsFromCommandLine.TlsOf(Parse("-v")), EasyOptionsFromCommandLine.ProxyOf(Parse("-v")), TimeProvider.System);
+        CurlTransports transports = EngineComposition.CreateTransports(Parse("-v"), EasyOptionsFromCommandLine.NetworkOf(Parse("-v")), EasyOptionsFromCommandLine.TlsOf(Parse("-v")), EasyOptionsFromCommandLine.HttpOf(Parse("-v")), EasyOptionsFromCommandLine.ProxyOf(Parse("-v")), TimeProvider.System);
         Diagnostics.Act("transports trace FTP", transports.TracesFtp);
 
         Diagnostics.Assert("transports trace FTP", false, transports.TracesFtp);

@@ -103,7 +103,7 @@ public sealed class CurlCommandRunnerResolveEntryTests
         Diagnostics.Assert("command line accepted", true, parsed.IsAccepted);
         Assert.IsTrue(parsed.IsAccepted);
         TcpConnector connector = EngineComposition.CreateTcpConnector(
-            parsed.Options, EasyOptionsFromCommandLine.NetworkOf(parsed.Options), EasyOptionsFromCommandLine.ProxyOf(parsed.Options),
+            parsed.Options, EasyOptionsFromCommandLine.NetworkOf(parsed.Options), EasyOptionsFromCommandLine.HttpOf(parsed.Options), EasyOptionsFromCommandLine.ProxyOf(parsed.Options),
             new LoopbackDnsResolver(),
             new ScriptedTcpDialer(new ScriptedConnector(responses)),
             new PassThroughTlsProvider(),

@@ -61,7 +61,7 @@ public sealed class EngineCompositionLocalBindingTests
         ScriptedConnector server = new([]);
         ScriptedTcpDialer dialer = new(server);
         TcpConnector connector = EngineComposition.CreateTcpConnector(
-            Parse("--interface", "127.0.0.1", "--local-port", "40000-40010", "http://127.0.0.1:47599/"), EasyOptionsFromCommandLine.NetworkOf(Parse("--interface", "127.0.0.1", "--local-port", "40000-40010", "http://127.0.0.1:47599/")), EasyOptionsFromCommandLine.ProxyOf(Parse("--interface", "127.0.0.1", "--local-port", "40000-40010", "http://127.0.0.1:47599/")),
+            Parse("--interface", "127.0.0.1", "--local-port", "40000-40010", "http://127.0.0.1:47599/"), EasyOptionsFromCommandLine.NetworkOf(Parse("--interface", "127.0.0.1", "--local-port", "40000-40010", "http://127.0.0.1:47599/")), EasyOptionsFromCommandLine.HttpOf(Parse("--interface", "127.0.0.1", "--local-port", "40000-40010", "http://127.0.0.1:47599/")), EasyOptionsFromCommandLine.ProxyOf(Parse("--interface", "127.0.0.1", "--local-port", "40000-40010", "http://127.0.0.1:47599/")),
             new LoopbackDnsResolver(),
             dialer,
             new PassThroughTlsProvider(),
@@ -80,7 +80,7 @@ public sealed class EngineCompositionLocalBindingTests
     [TestMethod]
     public void CreateTransports_WithAnInterface_GivesTheTcpConnectorItsBinding()
     {
-        CurlTransports transports = EngineComposition.CreateTransports(Parse("--interface", "host!127.0.0.1", "http://h/"), EasyOptionsFromCommandLine.NetworkOf(Parse("--interface", "host!127.0.0.1", "http://h/")), EasyOptionsFromCommandLine.TlsOf(Parse("--interface", "host!127.0.0.1", "http://h/")), EasyOptionsFromCommandLine.ProxyOf(Parse("--interface", "host!127.0.0.1", "http://h/")));
+        CurlTransports transports = EngineComposition.CreateTransports(Parse("--interface", "host!127.0.0.1", "http://h/"), EasyOptionsFromCommandLine.NetworkOf(Parse("--interface", "host!127.0.0.1", "http://h/")), EasyOptionsFromCommandLine.TlsOf(Parse("--interface", "host!127.0.0.1", "http://h/")), EasyOptionsFromCommandLine.HttpOf(Parse("--interface", "host!127.0.0.1", "http://h/")), EasyOptionsFromCommandLine.ProxyOf(Parse("--interface", "host!127.0.0.1", "http://h/")));
         Diagnostics.Act("TCP connector binding", transports.TcpConnector.LocalBinding);
 
         LocalBinding expected = new(null, "127.0.0.1", null, 0, 1);

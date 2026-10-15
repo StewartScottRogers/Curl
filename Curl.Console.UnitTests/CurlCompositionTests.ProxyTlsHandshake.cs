@@ -143,7 +143,7 @@ public sealed partial class CurlCompositionTests
     {
         Diagnostics.Arrange("arguments", $"-x {HttpsProxyUrl} --proxy-cert missing.pem --proxy-ciphers BOGUS {ProxiedUrl}");
         CurlTransports transports = EngineComposition.CreateTransports(
-            Parse("-x", HttpsProxyUrl, "--proxy-cert", "missing.pem", "--proxy-ciphers", "BOGUS", ProxiedUrl), EasyOptionsFromCommandLine.NetworkOf(Parse("-x", HttpsProxyUrl, "--proxy-cert", "missing.pem", "--proxy-ciphers", "BOGUS", ProxiedUrl)), EasyOptionsFromCommandLine.TlsOf(Parse("-x", HttpsProxyUrl, "--proxy-cert", "missing.pem", "--proxy-ciphers", "BOGUS", ProxiedUrl)), EasyOptionsFromCommandLine.ProxyOf(Parse("-x", HttpsProxyUrl, "--proxy-cert", "missing.pem", "--proxy-ciphers", "BOGUS", ProxiedUrl)));
+            Parse("-x", HttpsProxyUrl, "--proxy-cert", "missing.pem", "--proxy-ciphers", "BOGUS", ProxiedUrl), EasyOptionsFromCommandLine.NetworkOf(Parse("-x", HttpsProxyUrl, "--proxy-cert", "missing.pem", "--proxy-ciphers", "BOGUS", ProxiedUrl)), EasyOptionsFromCommandLine.TlsOf(Parse("-x", HttpsProxyUrl, "--proxy-cert", "missing.pem", "--proxy-ciphers", "BOGUS", ProxiedUrl)), EasyOptionsFromCommandLine.HttpOf(Parse("-x", HttpsProxyUrl, "--proxy-cert", "missing.pem", "--proxy-ciphers", "BOGUS", ProxiedUrl)), EasyOptionsFromCommandLine.ProxyOf(Parse("-x", HttpsProxyUrl, "--proxy-cert", "missing.pem", "--proxy-ciphers", "BOGUS", ProxiedUrl)));
         UnusedConnection connection = new();
 
         ConnectResult result;
@@ -163,7 +163,7 @@ public sealed partial class CurlCompositionTests
     private static async Task<(ConnectResult Proxy, ConnectResult Origin)> ProxyAndOriginHandshakesAsync(string[] proxyArguments, string[] originArguments)
     {
         ConnectResult proxy = await ProxyHandshakeAsync(proxyArguments);
-        CurlTransports originTransports = EngineComposition.CreateTransports(Parse([.. originArguments, "https://127.0.0.1:47606/"]), EasyOptionsFromCommandLine.NetworkOf(Parse([.. originArguments, "https://127.0.0.1:47606/"])), EasyOptionsFromCommandLine.TlsOf(Parse([.. originArguments, "https://127.0.0.1:47606/"])), EasyOptionsFromCommandLine.ProxyOf(Parse([.. originArguments, "https://127.0.0.1:47606/"])));
+        CurlTransports originTransports = EngineComposition.CreateTransports(Parse([.. originArguments, "https://127.0.0.1:47606/"]), EasyOptionsFromCommandLine.NetworkOf(Parse([.. originArguments, "https://127.0.0.1:47606/"])), EasyOptionsFromCommandLine.TlsOf(Parse([.. originArguments, "https://127.0.0.1:47606/"])), EasyOptionsFromCommandLine.HttpOf(Parse([.. originArguments, "https://127.0.0.1:47606/"])), EasyOptionsFromCommandLine.ProxyOf(Parse([.. originArguments, "https://127.0.0.1:47606/"])));
         ConnectResult origin = await originTransports.TlsProvider.AuthenticateAsClientAsync(new UnusedConnection(), "127.0.0.1", CancellationToken.None);
         return (proxy, origin);
     }
@@ -189,7 +189,7 @@ public sealed partial class CurlCompositionTests
 
     private static async Task<ConnectResult> ProxyHandshakeAsync(params string[] proxyTlsArguments)
     {
-        CurlTransports transports = EngineComposition.CreateTransports(Parse(["-x", HttpsProxyUrl, "--proxy-insecure", .. proxyTlsArguments, ProxiedUrl]), EasyOptionsFromCommandLine.NetworkOf(Parse(["-x", HttpsProxyUrl, "--proxy-insecure", .. proxyTlsArguments, ProxiedUrl])), EasyOptionsFromCommandLine.TlsOf(Parse(["-x", HttpsProxyUrl, "--proxy-insecure", .. proxyTlsArguments, ProxiedUrl])), EasyOptionsFromCommandLine.ProxyOf(Parse(["-x", HttpsProxyUrl, "--proxy-insecure", .. proxyTlsArguments, ProxiedUrl])));
+        CurlTransports transports = EngineComposition.CreateTransports(Parse(["-x", HttpsProxyUrl, "--proxy-insecure", .. proxyTlsArguments, ProxiedUrl]), EasyOptionsFromCommandLine.NetworkOf(Parse(["-x", HttpsProxyUrl, "--proxy-insecure", .. proxyTlsArguments, ProxiedUrl])), EasyOptionsFromCommandLine.TlsOf(Parse(["-x", HttpsProxyUrl, "--proxy-insecure", .. proxyTlsArguments, ProxiedUrl])), EasyOptionsFromCommandLine.HttpOf(Parse(["-x", HttpsProxyUrl, "--proxy-insecure", .. proxyTlsArguments, ProxiedUrl])), EasyOptionsFromCommandLine.ProxyOf(Parse(["-x", HttpsProxyUrl, "--proxy-insecure", .. proxyTlsArguments, ProxiedUrl])));
         return await transports.ProxyTlsProvider.AuthenticateAsClientAsync(new UnusedConnection(), "127.0.0.1", CancellationToken.None);
     }
 

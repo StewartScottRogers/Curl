@@ -1,4 +1,5 @@
 using System.Net.Sockets;
+using Curl.Api.Options.Http;
 using Curl.Api.Options.Network;
 using Curl.Api.Options.Proxy;
 using Curl.Api.Options.Tls;
@@ -36,12 +37,13 @@ internal sealed record OptionGroupConnectionSettings(
     string ApplicationProtocols)
 {
     /// <summary>Reads the settings of one option group.</summary>
-    /// <param name="options">The option group, for its ALPN, <c>--ssl-sessions</c> and HTTP version options.</param>
+    /// <param name="options">The option group, for its ALPN and <c>--ssl-sessions</c> options.</param>
     /// <param name="network">The option group's network options, for its socket, binding and IP version.</param>
     /// <param name="tls">The option group's TLS options, for the target's and the HTTPS proxy's handshakes.</param>
+    /// <param name="http">The option group's HTTP options, for the HTTP version the ALPN list follows.</param>
     /// <param name="proxy">The option group's proxy options, for its pre-proxy and HAProxy line.</param>
     /// <returns>The settings.</returns>
-    internal static OptionGroupConnectionSettings Of(CommandLineOptions options, EasyNetworkOptions network, EasyTlsOptions tls, EasyProxyOptions proxy) =>
+    internal static OptionGroupConnectionSettings Of(CommandLineOptions options, EasyNetworkOptions network, EasyTlsOptions tls, EasyHttpOptions http, EasyProxyOptions proxy) =>
         new(
             TlsClientOptionsMapping.Of(tls, options.UseAlpn, options.SslSessionsFile),
             TlsClientOptionsMapping.ProxyOf(tls, options.UseAlpn),
@@ -50,5 +52,5 @@ internal sealed record OptionGroupConnectionSettings(
             EngineComposition.AddressFamilyOf(network),
             EngineComposition.HaproxyProtocolOf(proxy),
             EngineComposition.PreProxyOf(proxy),
-            string.Join('\n', HttpVersionMapping.HttpOverTlsApplicationProtocolsOf(HttpVersionMapping.FromRequested(options.HttpVersion))));
+            string.Join('\n', HttpVersionMapping.HttpOverTlsApplicationProtocolsOf(http.HttpVersion)));
 }

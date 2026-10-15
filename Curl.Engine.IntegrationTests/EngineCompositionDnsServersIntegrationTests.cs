@@ -30,7 +30,7 @@ public sealed class EngineCompositionDnsServersIntegrationTests
         int dnsPort = ((IPEndPoint)dnsServer.Client.LocalEndPoint!).Port;
         int webPort = ((IPEndPoint)webServer.LocalEndpoint).Port;
         Task answering = AnswerOneQueryAsync(dnsServer);
-        CurlTransports transports = EngineComposition.CreateTransports(Parse("-4", "--dns-servers", $"127.0.0.1:{dnsPort}"), EasyOptionsFromCommandLine.NetworkOf(Parse("-4", "--dns-servers", $"127.0.0.1:{dnsPort}")), EasyOptionsFromCommandLine.TlsOf(Parse("-4", "--dns-servers", $"127.0.0.1:{dnsPort}")), EasyOptionsFromCommandLine.ProxyOf(Parse("-4", "--dns-servers", $"127.0.0.1:{dnsPort}")));
+        CurlTransports transports = EngineComposition.CreateTransports(Parse("-4", "--dns-servers", $"127.0.0.1:{dnsPort}"), EasyOptionsFromCommandLine.NetworkOf(Parse("-4", "--dns-servers", $"127.0.0.1:{dnsPort}")), EasyOptionsFromCommandLine.TlsOf(Parse("-4", "--dns-servers", $"127.0.0.1:{dnsPort}")), EasyOptionsFromCommandLine.HttpOf(Parse("-4", "--dns-servers", $"127.0.0.1:{dnsPort}")), EasyOptionsFromCommandLine.ProxyOf(Parse("-4", "--dns-servers", $"127.0.0.1:{dnsPort}")));
 
         ConnectResult result;
         using (Diagnostics.Phase("connect"))
