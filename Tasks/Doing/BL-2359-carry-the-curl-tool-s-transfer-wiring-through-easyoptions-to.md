@@ -34,3 +34,4 @@ ADR-0506 phase 2; found by BL-2318, which cannot route `Curl.Console`'s serial t
 ## Log
 
 - 2026-10-15: Created.
+- 2026-10-15: Backlog -> Doing.
