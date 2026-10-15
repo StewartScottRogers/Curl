@@ -163,7 +163,7 @@ sits between `FtpServerConnector` and `NoListenPortConnector`. Screening lets `h
 those that also name `http-proxy` included: a `CONNECT` to `%HTTPSPORT` through the proxy stand-in
 is relayed to `HttpsServerConnector`, so the TLS handshake travels inside the tunnel, the `CONNECT`
 lands in `ProxyReceivedBytes` and the decrypted requests in `ReceivedBytes` (BL-2225; 1849 and 3106
-pass; 780 to 783 pass with the Debug stand-in below, and 446 fails until Curl honours `CURL_HSTS_HTTP`, BL-2249). On
+pass; 780 to 783 pass with the Debug stand-in below, and 446 fails until Curl honours `CURL_HSTS_HTTP`, BL-2250). On
 Windows 25 HTTPS cases pass (300, 303, 304, 306, 309, 311, 312, 325, 364, 410, 414, 417, 474,
 1561, 1562, 2009-2011, 2033, 2048, 2070, 2079, 2087, 3023, 3024, ...) and 2035, 2038, 2042,
 323 and 1244 fail on a difference the next gap run files; the `!Schannel` cases run on Linux and macOS.

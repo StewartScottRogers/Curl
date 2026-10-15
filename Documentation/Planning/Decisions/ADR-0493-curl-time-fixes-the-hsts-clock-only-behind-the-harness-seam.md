@@ -32,5 +32,5 @@ does.
 
 - 780, 781, 782 and 783 pass and join the ratchet.
 - 446 runs and fails: it also needs `CURL_HSTS_HTTP`, the debug build's switch that learns HSTS over
-  plain `http` (BL-2249).
+  plain `http` (BL-2250).
 - Other `CURL_TIME` cases (970, 972, 1981) still skip for `Debug`; they fix other clocks.

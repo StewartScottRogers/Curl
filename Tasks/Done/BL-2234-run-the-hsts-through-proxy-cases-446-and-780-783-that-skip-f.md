@@ -29,11 +29,11 @@ Found by BL-2225, which made the http-proxy stand-in tunnel a `CONNECT` to `%HTT
 
 - Debug stands for `CURL_TIME` (the debug build's HSTS clock, `lib/hsts.c`) and `CURL_HSTS_HTTP` (learn HSTS over plain `http`). Decision (ADR-0493): `CreateRunner(honoursHstsTimeVariable: true)` fixes the HSTS clock at `CURL_TIME` through `FixedWallClock` and `ClockOverridingHstsStore`; the shipped `curl` never turns it on. The conformance tests report `Debug` to a case naming `HSTS` and setting `CURL_TIME`.
 - Touches widened to `Curl.Console` and `Curl.Console.UnitTests` (the clock seam lives in the runner); no task in Doing on `origin/work/dark-factory` named them.
-- 780, 781, 782, 783 pass and are listed. 446 runs and fails (`hsts446` differs at line 3: nothing stored from the plain-http responses) because it also needs `CURL_HSTS_HTTP`: filed BL-2249.
+- 780, 781, 782, 783 pass and are listed. 446 runs and fails (`hsts446` differs at line 3: nothing stored from the plain-http responses) because it also needs `CURL_HSTS_HTTP`: filed BL-2250.
 - Fast tests green (Curl.Console.UnitTests 2860 passed, Curl.Conformance.UnitTests 2896 passed); `Measure-CodeQuality.ps1 -Library Curl.Console,Curl.Conformance.UnitLibrary`: 0 failing members.
 
 ## Log
 
 - 2026-10-14: Created.
 - 2026-10-14: Backlog -> Doing.
-- 2026-10-14: Doing -> Done. Upstream HSTS cases 780-783 run with a CURL_TIME HSTS clock behind the harness seam and pass; 446 runs and waits on BL-2249
+- 2026-10-14: Doing -> Done. Upstream HSTS cases 780-783 run with a CURL_TIME HSTS clock behind the harness seam and pass; 446 runs and waits on BL-2250

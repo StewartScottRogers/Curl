@@ -1,5 +1,5 @@
 ---
-id: BL-2249
+id: BL-2250
 title: Honour CURL_HSTS_HTTP behind the harness seam so upstream case 446 passes
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-14
 completed:
 ---
-# BL-2249 — Honour CURL_HSTS_HTTP behind the harness seam so upstream case 446 passes
+# BL-2250 — Honour CURL_HSTS_HTTP behind the harness seam so upstream case 446 passes
 
 ## Goal
 
