@@ -31,3 +31,4 @@ BL-2245 (2026-10-14) put nghttpx’s TLS front (ALPN h2, X-Forwarded-Proto: http
 ## Log
 
 - 2026-10-14: Created.
+- 2026-10-14: Backlog -> Doing.
