@@ -182,6 +182,9 @@ then reported as `Host H:P was resolved.`, `IPv6: ...` and `IPv4: ...`, naming t
 cached (none for an IP address), and `LoadResolveEntries` loads the `--resolve` entries
 (`ResolveOverrides.Entries`, as `ResolveEntry`) into the cache with curl's `Added H:P:A to DNS
 cache` lines at a transfer's start; until a transfer calls it, the first connect loads them.
+Per ADR-0499 (BL-2262) a look-up through `DnsServerResolver` that answered no address (exit 43 aside) is
+cached as a negative entry, as curl 8.22.0's c-ares build caches it, so later connects to that host and
+port fail with `Negative DNS entry` and exit 6 without asking again; other resolvers' failures are not kept.
 Per ADR-0117 (BL-510) each `ConnectAsync` runs its resolve, dials, tunnel and TLS handshakes under
 one limit, the constructor's `connectTimeout` (`CurlComposition.ConnectTimeoutOf`: `--connect-timeout`,
 or a smaller `-m`), else `DefaultConnectTimeout` (300 s), on its `TimeProvider`; when it passes the

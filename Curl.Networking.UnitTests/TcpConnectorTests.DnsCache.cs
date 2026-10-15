@@ -118,6 +118,52 @@ public sealed partial class TcpConnectorTests
     }
 
     [TestMethod]
+    public async Task ConnectAsync_AfterADnsServerFoundNoSuchName_FailsFromANegativeDnsEntryWithoutAskingTheServerAgain()
+    {
+        // curl 8.22.0's c-ares build caches a failed resolve (lib/hostip.c, Curl_dnscache_add_negative):
+        // upstream test2104 asks for examplehost.invalid three times and its dnsd sees one A and one AAAA
+        // query; the later transfers write Negative DNS entry and fail with exit 6 (BL-2262, ADR-0499).
+        var dnsServer = new IPEndPoint(IPAddress.Parse("192.0.2.1"), 53);
+        var opener = new ScriptedDnsSocketOpener(new ManualTimeProvider(), (dnsServer, ScriptedDnsServer.AnsweringCode(3)));
+        byte nextQueryId = 0;
+        var resolver = new DnsServerResolver(
+            new DnsServerResolverOptions("192.0.2.1", null, null, null), new ManualTimeProvider(), opener, () => [], _ => null,
+            destination => destination.Fill(++nextQueryId));
+        var connector = new TcpConnector(resolver, new FakeTcpDialer(), new FakeTlsProvider(), new ManualTimeProvider());
+        var second = new RecordingTransferEvents();
+
+        var first = await ConnectLoggedAsync(connector, new ConnectTarget("examplehost.invalid", 80, UseTls: false));
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("examplehost.invalid", 80, UseTls: false) { Events = second });
+
+        Diagnostics.Assert("queries sent", 2, opener.Sent.Count);
+        Assert.AreEqual(CurlExitCode.CouldntResolveHost, first.ExitCode);
+        Assert.AreEqual(CurlExitCode.CouldntResolveHost, result.ExitCode);
+        Assert.AreEqual("Could not resolve host: examplehost.invalid", result.ErrorMessage);
+        CollectionAssert.AreEqual(
+            new[] { "Negative DNS entry", "Could not resolve host: examplehost.invalid", "Could not resolve: examplehost.invalid:80", "Could not resolve: examplehost.invalid" },
+            second.Info.ToArray());
+        Assert.HasCount(2, opener.Sent);
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_AfterADnsServerConfigurationThatDidNotParse_AsksAgainWithoutANegativeDnsEntry()
+    {
+        // An unparsable --dns-servers is exit 43 before any query: no name was answered, so nothing is cached.
+        var opener = new ScriptedDnsSocketOpener(new ManualTimeProvider());
+        var resolver = new DnsServerResolver(
+            new DnsServerResolverOptions("not-an-address", null, null, null), new ManualTimeProvider(), opener, () => [], _ => null, _ => { });
+        var connector = new TcpConnector(resolver, new FakeTcpDialer(), new FakeTlsProvider(), new ManualTimeProvider());
+        var second = new RecordingTransferEvents();
+
+        await ConnectLoggedAsync(connector, new ConnectTarget("examplehost.invalid", 80, UseTls: false));
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("examplehost.invalid", 80, UseTls: false) { Events = second });
+
+        Diagnostics.Assert("result.ExitCode", CurlExitCode.BadFunctionArgument, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.BadFunctionArgument, result.ExitCode);
+        Assert.DoesNotContain("Negative DNS entry", second.Info);
+    }
+
+    [TestMethod]
     public async Task ConnectAsync_WithAResolveEntry_ReportsItAddedAndFoundInDnsCacheOnEveryTransferIncludingTheFirst()
     {
         // curl -s -v --resolve foo.example:47181:127.0.0.1 http://foo.example:47181/a http://foo.example:47181/b
