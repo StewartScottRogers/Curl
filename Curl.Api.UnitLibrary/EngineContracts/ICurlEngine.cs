@@ -17,4 +17,20 @@ public interface ICurlEngine : IAsyncDisposable
     /// <summary><c>curl_multi_init</c>: a new multi handle with every option at its default.</summary>
     /// <returns>The new multi handle; the caller disposes it (<c>curl_multi_cleanup</c>).</returns>
     Multi.IMultiTransfer CreateMulti();
+
+    /// <summary><c>curl_share_init</c>: a new share handle that shares nothing yet.</summary>
+    /// <returns>The new share handle; the caller frees it with <see cref="Share.IShareHandle.Cleanup"/>.</returns>
+    Share.IShareHandle CreateShare();
+
+    /// <summary><c>curl_url</c>: a new URL handle with every part unset.</summary>
+    /// <returns>The new URL handle; the caller disposes it (<c>curl_url_cleanup</c>).</returns>
+    Url.ICurlUrlHandle CreateUrl();
+
+    /// <summary><c>curl_mime_init</c>: a new MIME handle with no parts.</summary>
+    /// <returns>The new MIME handle.</returns>
+    Mime.IMimeBuilder CreateMime();
+
+    /// <summary>A new, empty form for <c>curl_formadd</c>, whose first call starts from a null <c>httppost</c>.</summary>
+    /// <returns>The new form builder.</returns>
+    Mime.ICurlFormBuilder CreateForm();
 }

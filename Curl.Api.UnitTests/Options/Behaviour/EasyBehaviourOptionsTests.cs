@@ -1,4 +1,5 @@
 using System.Text;
+using Curl.Api.UnitTests.EngineContracts.Share;
 
 namespace Curl.Api.Options.Behaviour;
 
@@ -57,7 +58,7 @@ public sealed class EasyBehaviourOptionsTests
         AssertChangesOnly(Defaults with { FailOnError = true }, o => o with { FailOnError = false });
         AssertChangesOnly(Defaults with { KeepSendingOnError = true }, o => o with { KeepSendingOnError = false });
         AssertChangesOnly(Defaults with { Private = "mine" }, o => o with { Private = null });
-        AssertChangesOnly(Defaults with { Share = new object() }, o => o with { Share = null });
+        AssertChangesOnly(Defaults with { Share = new UnusedShareHandle() }, o => o with { Share = null });
         AssertChangesOnly(Defaults with { QuickExit = true }, o => o with { QuickExit = false });
         AssertChangesOnly(Defaults with { NewFilePermissions = UnixFileMode.UserRead }, o => o with { NewFilePermissions = Octal644 });
         AssertChangesOnly(Defaults with { NewDirectoryPermissions = UnixFileMode.UserExecute }, o => o with { NewDirectoryPermissions = Octal755 });

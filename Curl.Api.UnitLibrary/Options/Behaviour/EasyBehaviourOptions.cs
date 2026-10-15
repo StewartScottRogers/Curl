@@ -1,4 +1,5 @@
 using System.Text;
+using Curl.Api.EngineContracts.Share;
 
 namespace Curl.Api.Options.Behaviour;
 
@@ -78,7 +79,7 @@ public sealed record EasyBehaviourOptions
     /// public suffix list or HSTS cache the transfer shares. Default <see langword="null"/>:
     /// nothing is shared.
     /// </summary>
-    public object? Share { get; init; }
+    public IShareHandle? Share { get; init; }
 
     /// <summary>
     /// <c>CURLOPT_QUICK_EXIT</c>: whether the handle may leak resources rather than wait for a
