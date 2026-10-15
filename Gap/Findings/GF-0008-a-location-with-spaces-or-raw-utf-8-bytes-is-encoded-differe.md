@@ -2,6 +2,7 @@
 id: GF-0008
 title: A Location with spaces or raw UTF-8 bytes is encoded differently from curl, or rejected
 area: behaviour
+platform: windows
 key: behaviour:redirect-location-url-encoding
 severity: Critical
 status: closed
@@ -42,6 +43,7 @@ In Curl.Protocol.Http.UnitLibrary's HttpRedirectLocation (with CurlUrl in Curl.P
 - 2026-10-14_0904: 0 of 4 items are gaps.
 - 2026-10-15_0304: 0 of 4 items are gaps.
 - 2026-10-15_0543: 0 of 4 items are gaps.
+- 2026-10-15_0751: 0 of 4 items are gaps.
 
 ## Log
 

@@ -2,6 +2,7 @@
 id: GF-0070
 title: A user name, FTP account, --ftp-alternative-to-user command or --mail-from address holding CR LF is sent to the server instead of failing with exit 43
 area: behaviour
+platform: windows
 key: behaviour:crlf-in-protocol-command-argument-not-rejected
 severity: Critical
 status: closed
@@ -35,6 +36,7 @@ Reject a CR or LF in any value Curl writes into a protocol command line with exi
 - 2026-10-14_0904: 0 of 4 items are gaps.
 - 2026-10-15_0304: 0 of 4 items are gaps.
 - 2026-10-15_0543: 0 of 4 items are gaps.
+- 2026-10-15_0751: 0 of 4 items are gaps.
 
 ## Log
 

@@ -2,6 +2,7 @@
 id: GF-0034
 title: Curl does not list SSPI in Features; the Windows reference build does
 area: features
+platform: windows
 key: features:sspi-missing
 severity: High
 status: closed
@@ -42,6 +43,7 @@ In Curl.Cli.UnitLibrary/CurlVersionText.cs, add SSPI to the Windows FeaturesLine
 - 2026-10-14_0904: 0 of 1 items are gaps.
 - 2026-10-15_0304: 0 of 1 items are gaps.
 - 2026-10-15_0543: 0 of 1 items are gaps.
+- 2026-10-15_0751: 0 of 1 items are gaps.
 
 ## Log
 

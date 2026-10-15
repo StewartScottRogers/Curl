@@ -2,6 +2,7 @@
 id: GF-0075
 title: A 1 MB custom request header is sent and the transfer ends with exit 52, where curl refuses it with exit 100
 area: behaviour
+platform: windows
 key: behaviour:oversized-custom-request-header-not-rejected
 severity: High
 status: closed
@@ -35,6 +36,7 @@ In Curl.Protocol.Http.UnitLibrary, cap the request head as curl 8.22.0's request
 - 2026-10-14_0904: 0 of 1 items are gaps.
 - 2026-10-15_0304: 0 of 1 items are gaps.
 - 2026-10-15_0543: 0 of 1 items are gaps.
+- 2026-10-15_0751: 0 of 1 items are gaps.
 
 ## Log
 

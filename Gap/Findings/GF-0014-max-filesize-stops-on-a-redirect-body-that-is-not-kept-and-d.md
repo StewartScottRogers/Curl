@@ -2,6 +2,7 @@
 id: GF-0014
 title: --max-filesize stops on a redirect body that is not kept, and does not stop a decompressed body that grows past the limit
 area: behaviour
+platform: windows
 key: behaviour:max-filesize-on-redirect-and-decoded-body
 severity: High
 status: closed
@@ -42,6 +43,7 @@ In Curl.Protocol.Http.UnitLibrary's HttpDownloadConditions / HttpContentLength: 
 - 2026-10-14_0904: 0 of 2 items are gaps.
 - 2026-10-15_0304: 0 of 2 items are gaps.
 - 2026-10-15_0543: 0 of 2 items are gaps.
+- 2026-10-15_0751: 0 of 2 items are gaps.
 
 ## Log
 

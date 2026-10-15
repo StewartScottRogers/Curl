@@ -2,6 +2,7 @@
 id: GF-0002
 title: In process, Curl opens a new connection for every request, so connection-reuse cases see [DISCONNECT], local port -1 and the wrong verdict for the second response
 area: behaviour
+platform: windows
 key: behaviour:in-process-runner-has-no-connection-pool
 severity: Critical
 status: closed
@@ -42,6 +43,7 @@ In Curl.Console, make InProcessCurl.RunAsync create a run ConnectionCache and pa
 - 2026-10-14_0904: 0 of 10 items are gaps.
 - 2026-10-15_0304: 0 of 10 items are gaps.
 - 2026-10-15_0543: 0 of 10 items are gaps.
+- 2026-10-15_0751: 0 of 10 items are gaps.
 
 ## Log
 

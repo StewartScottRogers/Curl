@@ -2,6 +2,7 @@
 id: GF-0076
 title: An MQTT topic with an encoded NUL (%00) is subscribed to, where curl fails with exit 3 before SUBSCRIBE
 area: behaviour
+platform: windows
 key: behaviour:mqtt-topic-control-byte-not-rejected
 severity: High
 status: closed
@@ -35,6 +36,7 @@ In Curl.Protocol.Mqtt.UnitLibrary, make MqttTopic.Decode (or MqttSession before 
 - 2026-10-14_0904: 0 of 1 items are gaps.
 - 2026-10-15_0304: 0 of 1 items are gaps.
 - 2026-10-15_0543: 0 of 1 items are gaps.
+- 2026-10-15_0751: 0 of 1 items are gaps.
 
 ## Log
 

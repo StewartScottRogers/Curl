@@ -2,6 +2,7 @@
 id: GF-0026
 title: --location-trusted --anyauth through a proxy does not send Basic credentials to the redirect's new host
 area: behaviour
+platform: windows
 key: behaviour:location-trusted-anyauth-through-proxy
 severity: Critical
 status: closed
@@ -42,6 +43,7 @@ In Curl.Protocol.Http.UnitLibrary's redirect handling (HttpProtocolHandler with 
 - 2026-10-14_0904: 0 of 1 items are gaps.
 - 2026-10-15_0304: 0 of 1 items are gaps.
 - 2026-10-15_0543: 0 of 1 items are gaps.
+- 2026-10-15_0751: 0 of 1 items are gaps.
 
 ## Log
 

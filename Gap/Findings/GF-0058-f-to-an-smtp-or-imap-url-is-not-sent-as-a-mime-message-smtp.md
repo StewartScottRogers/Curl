@@ -2,6 +2,7 @@
 id: GF-0058
 title: -F to an smtp:// or imap:// URL is not sent as a MIME message: SMTP sends VRFY and IMAP sends LIST
 area: behaviour
+platform: windows
 key: behaviour:mail-multipart-form-not-sent
 severity: High
 status: closed
@@ -40,6 +41,7 @@ In Curl.Console's mail mapping (MailRequestOptionsMapping), treat -F parts on an
 - 2026-10-14_0904: 0 of 5 items are gaps.
 - 2026-10-15_0304: 0 of 5 items are gaps.
 - 2026-10-15_0543: 0 of 5 items are gaps.
+- 2026-10-15_0751: 0 of 5 items are gaps.
 
 ## Log
 

@@ -2,6 +2,7 @@
 id: GF-0051
 title: FTP sends QUIT and closes after every URL; curl keeps the control connection for the next URL and sends QUIT only at exit
 area: behaviour
+platform: windows
 key: behaviour:ftp-control-connection-not-reused
 severity: High
 status: closed
@@ -40,6 +41,7 @@ In Curl.Protocol.Ftp.UnitLibrary, keep an FTP control connection open after a tr
 - 2026-10-14_0904: 0 of 12 items are gaps.
 - 2026-10-15_0304: 0 of 12 items are gaps.
 - 2026-10-15_0543: 0 of 12 items are gaps.
+- 2026-10-15_0751: 0 of 12 items are gaps.
 
 ## Log
 

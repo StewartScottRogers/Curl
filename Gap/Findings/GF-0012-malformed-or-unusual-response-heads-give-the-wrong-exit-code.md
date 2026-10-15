@@ -2,6 +2,7 @@
 id: GF-0012
 title: Malformed or unusual response heads give the wrong exit code (HTTP/0.9 under -I, header starting with whitespace, 100 without a final response, NUL in a trailer)
 area: behaviour
+platform: windows
 key: behaviour:http-response-parsing-exit-codes
 severity: High
 status: closed
@@ -42,6 +43,7 @@ In Curl.Protocol.Http.UnitLibrary's HttpResponseHeadReader and HttpChunkedDecode
 - 2026-10-14_0904: 0 of 4 items are gaps.
 - 2026-10-15_0304: 0 of 4 items are gaps.
 - 2026-10-15_0543: 0 of 4 items are gaps.
+- 2026-10-15_0751: 0 of 4 items are gaps.
 
 ## Log
 

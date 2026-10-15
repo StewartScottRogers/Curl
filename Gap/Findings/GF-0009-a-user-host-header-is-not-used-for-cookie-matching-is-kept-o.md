@@ -2,6 +2,7 @@
 id: GF-0009
 title: A user Host: header is not used for cookie matching, is kept on a redirect to another host, and a lower-case 'host:' does not remove it
 area: behaviour
+platform: windows
 key: behaviour:custom-host-header-handling
 severity: High
 status: closed
@@ -42,6 +43,7 @@ In Curl.Protocol.Http.UnitLibrary (HttpCustomHeader, HttpRequestHeadFormatter) a
 - 2026-10-14_0904: 0 of 4 items are gaps.
 - 2026-10-15_0304: 0 of 4 items are gaps.
 - 2026-10-15_0543: 0 of 4 items are gaps.
+- 2026-10-15_0751: 0 of 4 items are gaps.
 
 ## Log
 

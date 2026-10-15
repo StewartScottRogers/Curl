@@ -2,6 +2,7 @@
 id: GF-0074
 title: A file:// URL naming a directory lists nothing on Windows, where curl 8.22.0 writes its entry names
 area: behaviour
+platform: windows
 key: behaviour:file-url-directory-not-listed-on-windows
 severity: High
 status: closed
@@ -35,6 +36,7 @@ In Curl.Protocol.File.UnitLibrary, list directories on Windows as curl 8.22.0 do
 - 2026-10-14_0904: 0 of 1 items are gaps.
 - 2026-10-15_0304: 0 of 1 items are gaps.
 - 2026-10-15_0543: 0 of 1 items are gaps.
+- 2026-10-15_0751: 0 of 1 items are gaps.
 
 ## Log
 

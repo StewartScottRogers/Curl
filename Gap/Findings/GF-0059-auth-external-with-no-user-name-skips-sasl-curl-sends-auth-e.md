@@ -2,6 +2,7 @@
 id: GF-0059
 title: ;AUTH=EXTERNAL with no user name skips SASL; curl sends AUTH EXTERNAL with an empty (=) response
 area: behaviour
+platform: windows
 key: behaviour:sasl-external-without-user-skipped
 severity: High
 status: closed
@@ -40,6 +41,7 @@ In Curl.Authentication.UnitLibrary's SaslAuthenticator/SaslMechanismRanking and 
 - 2026-10-14_0904: 0 of 6 items are gaps.
 - 2026-10-15_0304: 0 of 6 items are gaps.
 - 2026-10-15_0543: 0 of 6 items are gaps.
+- 2026-10-15_0751: 0 of 6 items are gaps.
 
 ## Log
 

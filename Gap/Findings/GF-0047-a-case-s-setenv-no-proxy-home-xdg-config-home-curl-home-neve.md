@@ -2,6 +2,7 @@
 id: GF-0047
 title: A case's <setenv> (NO_PROXY, HOME, XDG_CONFIG_HOME, CURL_HOME) never reaches Curl in process, so curlrc, .ipfs/gateway and NO_PROXY lookups differ
 area: behaviour
+platform: windows
 key: behaviour:in-process-runner-ignores-case-environment
 severity: High
 status: closed
@@ -40,6 +41,7 @@ Pass readEnvironmentVariable through InProcessCurl's new overload (behaviour:in-
 - 2026-10-14_0904: 0 of 8 items are gaps.
 - 2026-10-15_0304: 0 of 8 items are gaps.
 - 2026-10-15_0543: 0 of 8 items are gaps.
+- 2026-10-15_0751: 0 of 8 items are gaps.
 
 ## Log
 

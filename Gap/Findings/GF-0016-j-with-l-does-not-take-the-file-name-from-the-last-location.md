@@ -2,6 +2,7 @@
 id: GF-0016
 title: -J with -L does not take the file name from the last Location, and -OJ --no-clobber --retry differs
 area: behaviour
+platform: windows
 key: behaviour:remote-header-name-with-redirect-and-retry
 severity: High
 status: closed
@@ -42,6 +43,7 @@ In Curl.Console's -O/-J output naming: with -J and -L and no Content-Disposition
 - 2026-10-14_0904: 0 of 3 items are gaps.
 - 2026-10-15_0304: 0 of 3 items are gaps.
 - 2026-10-15_0543: 0 of 3 items are gaps.
+- 2026-10-15_0751: 0 of 3 items are gaps.
 
 ## Log
 

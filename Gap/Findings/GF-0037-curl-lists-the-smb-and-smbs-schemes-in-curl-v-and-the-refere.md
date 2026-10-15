@@ -2,6 +2,7 @@
 id: GF-0037
 title: Curl lists the smb and smbs schemes in curl -V, and the reference 8.21.0 Windows build does not
 area: protocols
+platform: windows
 key: protocols:smb-not-in-reference
 severity: Medium
 status: closed
@@ -42,6 +43,7 @@ Remove smb and smbs from the Protocols: line in CurlVersionText.ProtocolsLine (C
 - 2026-10-14_0904: 0 of 2 items are gaps.
 - 2026-10-15_0304: 0 of 2 items are gaps.
 - 2026-10-15_0543: 0 of 2 items are gaps.
+- 2026-10-15_0751: 0 of 2 items are gaps.
 
 ## Log
 

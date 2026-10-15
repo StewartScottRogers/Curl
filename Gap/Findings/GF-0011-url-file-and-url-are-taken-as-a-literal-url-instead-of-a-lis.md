@@ -2,6 +2,7 @@
 id: GF-0011
 title: --url @file and --url @- are taken as a literal URL instead of a list of URLs to read
 area: behaviour
+platform: windows
 key: behaviour:url-option-reads-at-file
 severity: High
 status: closed
@@ -42,6 +43,7 @@ In Curl.Cli.UnitLibrary's --url option (CommandLineOptionTable / its applier), s
 - 2026-10-14_0904: 0 of 3 items are gaps.
 - 2026-10-15_0304: 0 of 3 items are gaps.
 - 2026-10-15_0543: 0 of 3 items are gaps.
+- 2026-10-15_0751: 0 of 3 items are gaps.
 
 ## Log
 

@@ -2,6 +2,7 @@
 id: GF-0063
 title: --mail-from '<addr> RET=HDRS' gains a trailing '>' after the parameters; curl sends an address that starts with '<' as given
 area: behaviour
+platform: windows
 key: behaviour:smtp-mail-from-with-parameters-rewrapped
 severity: High
 status: closed
@@ -40,6 +41,7 @@ In Curl.Protocol.Smtp.UnitLibrary's SmtpMailTransaction, send a --mail-from (and
 - 2026-10-14_0904: 0 of 1 items are gaps.
 - 2026-10-15_0304: 0 of 1 items are gaps.
 - 2026-10-15_0543: 0 of 1 items are gaps.
+- 2026-10-15_0751: 0 of 1 items are gaps.
 
 ## Log
 

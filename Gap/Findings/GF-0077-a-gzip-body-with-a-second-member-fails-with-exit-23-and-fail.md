@@ -2,6 +2,7 @@
 id: GF-0077
 title: A gzip body with a second member fails with exit 23 and 'Failed writing received data to disk/application' where curl says 'Multi-member gzip response not supported'
 area: behaviour
+platform: windows
 key: behaviour:multi-member-gzip-error-message
 severity: Medium
 status: closed
@@ -35,6 +36,7 @@ In Curl.Protocol.Http.UnitLibrary, when HttpContentCodingDecoder finds a second 
 - 2026-10-14_0904: 0 of 1 items are gaps.
 - 2026-10-15_0304: 0 of 1 items are gaps.
 - 2026-10-15_0543: 0 of 1 items are gaps.
+- 2026-10-15_0751: 0 of 1 items are gaps.
 
 ## Log
 

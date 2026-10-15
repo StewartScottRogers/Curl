@@ -2,6 +2,7 @@
 id: GF-0049
 title: TFTP requests drop every leading slash of the URL path; curl drops only the first, so tftp://host//N asks for /N
 area: behaviour
+platform: windows
 key: behaviour:tftp-path-loses-every-leading-slash
 severity: High
 status: closed
@@ -40,6 +41,7 @@ In Curl.Protocol.Tftp.UnitLibrary's TftpRequestFile.FromUrlPath, remove exactly 
 - 2026-10-14_0904: 0 of 15 items are gaps.
 - 2026-10-15_0304: 0 of 15 items are gaps.
 - 2026-10-15_0543: 0 of 15 items are gaps.
+- 2026-10-15_0751: 0 of 15 items are gaps.
 
 ## Log
 

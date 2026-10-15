@@ -2,6 +2,7 @@
 id: GF-0027
 title: -C N --fail against a 416 whose Content-Range says the file is complete exits 22 instead of 0
 area: behaviour
+platform: windows
 key: behaviour:resume-complete-file-with-fail
 severity: High
 status: closed
@@ -42,6 +43,7 @@ In Curl.Protocol.Http.UnitLibrary's HttpDownloadConditions / HttpContentRange: t
 - 2026-10-14_0904: 0 of 1 items are gaps.
 - 2026-10-15_0304: 0 of 1 items are gaps.
 - 2026-10-15_0543: 0 of 1 items are gaps.
+- 2026-10-15_0751: 0 of 1 items are gaps.
 
 ## Log
 

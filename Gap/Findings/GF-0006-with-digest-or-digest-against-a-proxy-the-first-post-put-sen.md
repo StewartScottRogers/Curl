@@ -2,6 +2,7 @@
 id: GF-0006
 title: With --digest (or Digest against a proxy), the first POST/PUT sends its body instead of Content-Length: 0
 area: behaviour
+platform: windows
 key: behaviour:auth-probe-request-sends-body
 severity: High
 status: closed
@@ -42,6 +43,7 @@ In Curl.Protocol.Http.UnitLibrary, when --digest is chosen for the origin or the
 - 2026-10-14_0904: 0 of 15 items are gaps.
 - 2026-10-15_0304: 0 of 15 items are gaps.
 - 2026-10-15_0543: 0 of 15 items are gaps.
+- 2026-10-15_0751: 0 of 15 items are gaps.
 
 ## Log
 
