@@ -33,3 +33,4 @@ With `SSLKEYLOGFILE` set off Windows, a TLS 1.3 handshake on the hand-built clie
 ## Log
 
 - 2026-10-15: Created.
+- 2026-10-15: Backlog -> Doing.
