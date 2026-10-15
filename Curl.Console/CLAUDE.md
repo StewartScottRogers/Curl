@@ -340,6 +340,15 @@ the retry warning. A `-J` name lasts for the whole transfer (`NamedByContentDisp
 `honor_cd_filename`), so a later attempt opens that file at its first body write. Each attempt's
 progress meter starts once the retry wait is over (upstream test 3036, BL-1849).
 
+`TransferPerformer` is libcurl's half of an attempt, split out of the runner (ADR-0506, BL-2282):
+it performs one attempt through `RedirectFollower` under the attempt's `-Y`/`-y` and `-m` watchdogs
+(started by it on its clock and kept on the `RunningTransferState`), turns a watchdog's cancel into
+its exit 28 failure, numbers the run's `%{xfer_id}` and `%{conn_id}` (`TakeNextAttemptIds`,
+`KeepRetriedConnectionIdWhenReused`) and keeps the serial attempt start `--rate` measures from.
+The `--retry` loop around it (`FollowRetryingAsync`, the retry lines, the `-o` attempt bytes) stays
+in the runner, as retrying is the curl tool's work. `CurlComposition.CreateRunner` builds it; a
+runner given none makes one on its own clock.
+
 Under `-Y`/`--speed-limit` or `-y`/`--speed-time` each attempt gets a `Curl.Core`
 `LowSpeedWatchdog` on the runner's clock: `TransferContextFactory` wraps the output and the
 progress sink so it counts the bytes moved, and gives the context its token. An attempt it

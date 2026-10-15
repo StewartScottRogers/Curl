@@ -1141,7 +1141,8 @@ internal static class CurlComposition
             runConnectionCache: runConnections,
             tlsSessions: tlsSessions,
             extendedAttributeWriter: NativeExtendedAttributeWriter.ForCurrentPlatform(),
-            lateBoundDiagnosticLog: runLog);
+            lateBoundDiagnosticLog: runLog,
+            transferPerformer: new TransferPerformer(TimeProvider.System));
     }
 
     /// <summary>
@@ -1210,7 +1211,8 @@ internal static class CurlComposition
             outputPaths: new PhysicalOutputPaths(),
             runConnectionCache: runConnections,
             lateBoundDiagnosticLog: runLog,
-            parsesAsWindowsBuild: parsesAsWindowsBuild);
+            parsesAsWindowsBuild: parsesAsWindowsBuild,
+            transferPerformer: new TransferPerformer(TimeProvider.System));
     }
 
     /// <summary>
@@ -1314,7 +1316,8 @@ internal static class CurlComposition
             hstsClock: honoursHstsTimeVariable ? HstsClockOf(environment(HstsTimeVariableName)) : null,
             hstsLearnsOverHttp: LearnsHstsOverHttp(honoursHstsHttpVariable, environment),
             altSvcUsesOverHttp: UsesAltSvcOverHttp(honoursAltSvcHttpVariable, environment),
-            parsesAsWindowsBuild: parsesAsWindowsBuild);
+            parsesAsWindowsBuild: parsesAsWindowsBuild,
+            transferPerformer: new TransferPerformer(TimeProvider.System));
     }
 
     /// <summary>

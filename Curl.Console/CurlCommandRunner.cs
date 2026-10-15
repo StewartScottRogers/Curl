@@ -100,6 +100,10 @@ namespace Curl.Console;
 /// and looks up a plain <c>http</c> origin's alternatives too: the harness's stand-in for curl's debug
 /// build under <c>CURL_ALTSVC_HTTP</c> (ADR-0497, BL-2263); off by default, as in curl's release build.
 /// </param>
+/// <param name="transferPerformer">
+/// Performs each transfer attempt and numbers the run's transfers and connections (ADR-0506, BL-2282);
+/// <see langword="null" /> for one on the runner's clock.
+/// </param>
 /// <param name="writeOutTimeDialect">
 /// The C runtime whose <c>strftime</c> a <c>-w</c> <c>%time{format}</c> follows; the composition
 /// passes the platform's (<see cref="CurlComposition.WriteOutTimeDialectFor" />), and
@@ -285,7 +289,8 @@ internal sealed class CurlCommandRunner(
     bool? parsesAsWindowsBuild = null,
     TimeProvider? hstsClock = null,
     bool hstsLearnsOverHttp = false,
-    bool altSvcUsesOverHttp = false)
+    bool altSvcUsesOverHttp = false,
+    TransferPerformer? transferPerformer = null)
 {
     /// <summary>
     /// What curl 8.21.0 prints before its URL parser's reason when it rejects a transfer
@@ -644,13 +649,11 @@ internal sealed class CurlCommandRunner(
     private TransferResult? previousTransferResult;
 
     /// <summary>
-    /// When the run's last serial transfer started - its last <c>--retry</c> attempt's start, set by
-    /// <see cref="RecordSerialAttemptStart" /> - as a <see cref="TimeProvider.GetTimestamp" />, which
-    /// <see cref="WaitForTransferStartRateAsync" /> measures <c>--rate</c> from; <see langword="null" />
-    /// before the first.
+    /// Performs each attempt of a transfer under its watchdogs, following its redirects, and numbers the
+    /// run's transfers and connections and keeps when its last serial attempt started, which
+    /// <see cref="WaitForTransferStartRateAsync" /> measures <c>--rate</c> from (ADR-0506, BL-2282).
     /// </summary>
-    private long? previousSerialTransferStart;
-
+    private readonly TransferPerformer transferPerformer = TransferPerformer.GivenOrOnClock(transferPerformer, timeProvider);
     /// <summary>
     /// The run's HSTS cache, shared by every transfer of every option group and on with or without
     /// <c>--hsts</c>, as curl 8.21.0's tool shares one through its share handle: an <c>https</c>
@@ -691,21 +694,10 @@ internal sealed class CurlCommandRunner(
     private TransferResult? cannotOpenUploadFileAfterFailure;
 
     /// <summary>
-    /// The <c>%{conn_id}</c> the next transfer that connects takes, counted per run from zero.
-    /// </summary>
-    private long nextConnectionId;
-
-    /// <summary>
     /// The <c>%{conn_id}</c> of each connection a transfer of the run opened, by the pool's number
     /// for it, which a later transfer that reuses the connection takes (<see cref="ConnectionIdRecordingTransferEvents" />, BL-1052).
     /// </summary>
     private readonly ConcurrentDictionary<long, long> connectionIdsByPoolNumber = new();
-
-    /// <summary>
-    /// The <c>%{xfer_id}</c> the next transfer takes, counted per run from zero, one for every URL
-    /// a glob expands to.
-    /// </summary>
-    private long nextTransferId;
 
     /// <summary>
     /// The <c>%{xfer_id}</c> of the running <c>-:</c> / <c>--next</c> option group's first transfer,
@@ -1399,7 +1391,7 @@ internal sealed class CurlCommandRunner(
     /// </returns>
     private async Task<(CurlExitCode ExitCode, bool RunEnded)> TransferAllAsync(CommandLineOptions options, CurlExitCode exitCode)
     {
-        firstTransferIdOfGroup = nextTransferId;
+        firstTransferIdOfGroup = transferPerformer.NextTransferId;
         TransferDispatch dispatch = createTransferDispatch(options);
 
         return await ThenCleanUpAsync(TransferEachUrlAsync(dispatch, options, exitCode), () => EndGroupAsync(dispatch, options)).ConfigureAwait(false);
@@ -1593,7 +1585,7 @@ internal sealed class CurlCommandRunner(
         {
             foreach (UrlGlobMatch match in glob.Expand())
             {
-                if (!UrlTransfer.TryCreate(options, index, firstUrlNumberOfGroup + index, nextTransferId++, match, uploadMatch, runsOnWindows, out UrlTransfer? transfer, out TransferResult? nameFailure))
+                if (!UrlTransfer.TryCreate(options, index, firstUrlNumberOfGroup + index, transferPerformer.TakeTransferId(), match, uploadMatch, runsOnWindows, out UrlTransfer? transfer, out TransferResult? nameFailure))
                 {
                     await WriteGlobFailureLinesAsync(options, nameFailure).ConfigureAwait(false);
                     await RecordParallelRunEndAsync(nameFailure).ConfigureAwait(false);
@@ -1709,7 +1701,7 @@ internal sealed class CurlCommandRunner(
         }
 
         await WaitForTransferStartRateAsync(options).ConfigureAwait(false);
-        previousSerialTransferStart = timeProvider.GetTimestamp();
+        transferPerformer.RecordSerialAttemptStart(runsInParallel: false);
         TransferResult result = await TransferAndReportAsync(dispatch, options, transfer).ConfigureAwait(false);
 
         return ReferenceEquals(result, EtagSaveFileSkippedTransfer)
@@ -1753,7 +1745,7 @@ internal sealed class CurlCommandRunner(
     private long MillisecondsUntilTransferMayStart(long? interval, out long took)
     {
         took = 0;
-        if (interval is not { } least || previousSerialTransferStart is not { } previousStart)
+        if (interval is not { } least || transferPerformer.SerialTransferStart is not { } previousStart)
         {
             return 0;
         }
@@ -2924,7 +2916,7 @@ internal sealed class CurlCommandRunner(
     /// <param name="result">The transfer's result.</param>
     /// <returns>The number <c>%{conn_id}</c> prints.</returns>
     private long TakeConnectionId(TransferResult result) =>
-        UsedAConnection(result) ? Running.ConnectionId ?? nextConnectionId++ : NoConnectionId;
+        UsedAConnection(result) ? Running.ConnectionId ?? transferPerformer.TakeConnectionId() : NoConnectionId;
 
     /// <summary>
     /// Sets the running transfer's <see cref="RunningTransferState.Events" />, whose lines under
@@ -2948,7 +2940,7 @@ internal sealed class CurlCommandRunner(
     private ITransferEvents SetUpTransferEvents(CommandLineOptions options, UrlTransfer transfer)
     {
         RunningTransferState state = Running;
-        Func<long> takeConnectionId = () => state.ConnectionId ??= nextConnectionId++;
+        Func<long> takeConnectionId = () => state.ConnectionId ??= transferPerformer.TakeConnectionId();
         ITransferEvents output = transferEventOutput.EventsFor(transfer.TransferId, () => takeConnectionId());
         ITransferEvents events = WithTraceLineEvents(options, output, takeConnectionId);
         ITransferEvents recorded = options.WriteOut is null ? events : new TlsResultRecordingTransferEvents(events, state);
@@ -3849,9 +3841,9 @@ internal sealed class CurlCommandRunner(
                 proxy,
                 progress: Running.Progress,
                 events: Running.Events,
-                lowSpeedWatchdog: StartLowSpeedWatchdog(options),
+                lowSpeedWatchdog: transferPerformer.StartLowSpeedWatchdog(Running, options.SpeedLimit, options.SpeedTimeSeconds, diagnosticLog),
                 abortToken: Running.AbortToken,
-                maxTimeWatchdog: StartMaxTimeWatchdog(options),
+                maxTimeWatchdog: transferPerformer.StartMaxTimeWatchdog(Running, options.MaxTime, diagnosticLog),
                 lookedUpCredentials: Running.LookedUpCredentials,
                 ifNoneMatchHeaders: Running.IfNoneMatchHeaders,
                 altSvc: Running.AltSvc,
@@ -4686,9 +4678,9 @@ internal sealed class CurlCommandRunner(
                         watchHeaderOutput,
                         Running.Progress,
                         Running.Events,
-                        StartLowSpeedWatchdog(options),
+                        transferPerformer.StartLowSpeedWatchdog(Running, options.SpeedLimit, options.SpeedTimeSeconds, diagnosticLog),
                         Running.AbortToken,
-                        StartMaxTimeWatchdog(options),
+                        transferPerformer.StartMaxTimeWatchdog(Running, options.MaxTime, diagnosticLog),
                         Running.LookedUpCredentials,
                         Running.IfNoneMatchHeaders,
                         Running.AltSvc,
@@ -4809,11 +4801,15 @@ internal sealed class CurlCommandRunner(
         TransferRetrier retrier = new(async _ =>
         {
             await retryLinesWritten.ConfigureAwait(false);
-            RecordSerialAttemptStart();
-            TransferContext context = firstContext ?? CreateRetryAttemptContext(options, createAttemptContext, attemptResumeFrom, outputFile);
+            transferPerformer.RecordSerialAttemptStart(runsInParallel: parallelRun is not null);
+            TransferContext context = firstContext ?? TransferPerformer.CreateRetryAttemptContext(
+                () => StartTransferProgress(options, attemptResumeFrom, toStandardOutput: outputFile is null),
+                createAttemptContext,
+                attemptResumeFrom);
             firstContext = null;
-            TransferResult attemptResult = await FollowWatchingSpeedAsync(follower, context, redirectPolicy).ConfigureAwait(false);
-            KeepRetriedConnectionIdWhenReused(context, attemptResult);
+            RunningTransferState state = Running;
+            TransferResult attemptResult = await TransferPerformer.FollowWatchingSpeedAsync(state, follower, context, redirectPolicy).ConfigureAwait(false);
+            TransferPerformer.KeepRetriedConnectionIdWhenReused(state, context, attemptResult);
             return attemptResult;
         });
 
@@ -4824,7 +4820,7 @@ internal sealed class CurlCommandRunner(
                 (attempt, warning) =>
                 {
                     Running.RetryCount++;
-                    TakeNextAttemptIds();
+                    transferPerformer.TakeNextAttemptIds(Running);
                     long? retriedResumeFrom = attemptResumeFrom;
                     long keptBytes = AttemptBytesKeptForResume(options, attempt, scheme, retriedResumeFrom, outputFile);
                     attemptResumeFrom = keptBytes > 0 ? retriedResumeFrom.GetValueOrDefault() + keptBytes : retriedResumeFrom;
@@ -4837,142 +4833,10 @@ internal sealed class CurlCommandRunner(
         return result;
     }
 
-    /// <summary>
-    /// Creates the context of an attempt <c>--retry</c> runs again, on fresh progress started now,
-    /// once the retry wait is over, so its meter counts from the attempt's start as curl 8.21.0's
-    /// does: after a one-second wait curl drew no <c>00:01</c> status line for a 6-byte body,
-    /// which progress started before the wait did (measured 2026-10-09, BL-1849 Notes).
-    /// </summary>
-    /// <param name="options">The accepted command line.</param>
-    /// <param name="createAttemptContext">Creates an attempt's context on the transfer's current progress.</param>
-    /// <param name="resumeFrom">The <c>-C</c> offset the attempt resumes from, or <see langword="null" />.</param>
-    /// <param name="outputFile">The <c>-o</c> file, or <see langword="null" /> for standard output.</param>
-    /// <returns>The attempt's context.</returns>
-    private TransferContext CreateRetryAttemptContext(
-        CommandLineOptions options,
-        Func<long?, TransferContext> createAttemptContext,
-        long? resumeFrom,
-        DeferredOutputFileStream? outputFile)
-    {
-        StartTransferProgress(options, resumeFrom, toStandardOutput: outputFile is null);
-
-        return createAttemptContext(resumeFrom);
-    }
-
-    /// <summary>
-    /// Moves <see cref="previousSerialTransferStart" /> to now as a serial transfer's attempt starts, after any
-    /// <c>--retry</c> wait, so <c>--rate</c> measures from the last attempt's start, as curl 8.21.0's
-    /// <c>serial_transfers</c> resets its start on every retry: 503 then 200 with <c>--retry-delay 1</c> and
-    /// 300 ms answers printed <c>Note: Transfer took 315 ms</c> (measured 2026-10-02, BL-971 Notes). Under
-    /// <c>-Z</c>, where <c>--rate</c> waits for nothing, it is left alone.
-    /// </summary>
-    private void RecordSerialAttemptStart()
-    {
-        if (parallelRun is null)
-        {
-            previousSerialTransferStart = timeProvider.GetTimestamp();
-        }
-    }
-
-    /// <summary>
-    /// Numbers the attempt <c>--retry</c> is about to run as a transfer of its own, as curl 8.21.0
-    /// does: it takes the next <c>%{xfer_id}</c>, and the retried attempt keeps the <c>%{conn_id}</c>
-    /// it connected with, so the next attempt takes a new one unless it reuses that connection
-    /// (<see cref="KeepRetriedConnectionIdWhenReused" />). Against 503, 503, 200 on connections the
-    /// server closed, curl printed <c>xfer_id</c> 2 and <c>conn_id</c> 2 (measured 2026-09-29, BL-799 Notes).
-    /// </summary>
-    private void TakeNextAttemptIds()
-    {
-        RunningTransferState state = Running;
-        state.RetriedConnectionId = state.ConnectionId ?? nextConnectionId++;
-        state.ConnectionId = null;
-        state.RetryTransferId = nextTransferId++;
-    }
-
-    /// <summary>
-    /// Gives a <c>--retry</c> attempt that reused the retried attempt's connection that attempt's
-    /// <c>%{conn_id}</c>, as curl 8.21.0 printed <c>conn_id</c> 0 after three attempts over one
-    /// kept-alive connection (measured 2026-09-29, BL-799 Notes). Only an <c>http</c> or
-    /// <c>https</c> attempt says whether it opened a connection (<see cref="TransferReport.ConnectionCount" />);
-    /// any other is taken to have opened one.
-    /// </summary>
-    /// <param name="context">The attempt's context.</param>
-    /// <param name="attempt">The attempt's result.</param>
-    private void KeepRetriedConnectionIdWhenReused(TransferContext context, TransferResult attempt)
-    {
-        RunningTransferState state = Running;
-        if (state.RetriedConnectionId is { } retriedConnectionId && ReportsNoConnectionOpened(context, attempt))
-        {
-            state.ConnectionId = retriedConnectionId;
-        }
-    }
-
-    /// <summary>
-    /// Tells whether an attempt said it opened no connection: an <c>http</c> or <c>https</c> one
-    /// whose report counts none.
-    /// </summary>
-    /// <param name="context">The attempt's context.</param>
-    /// <param name="attempt">The attempt's result.</param>
-    /// <returns><see langword="true" /> when the attempt reused a connection.</returns>
-    private static bool ReportsNoConnectionOpened(TransferContext context, TransferResult attempt) =>
-        IsHttpScheme(context.Url.Scheme) && attempt.Report is { ConnectionCount: 0 };
-
     /// <summary>Tells whether <paramref name="scheme" /> is <c>http</c> or <c>https</c>.</summary>
     /// <param name="scheme">The scheme, in lower case.</param>
     /// <returns><see langword="true" /> for <c>http</c> and <c>https</c>.</returns>
     private static bool IsHttpScheme(string scheme) => scheme is "http" or "https";
-
-    /// <summary>
-    /// Starts the <c>-Y</c>/<c>-y</c> watchdog for the attempt whose context is being created, on
-    /// the runner's clock, and keeps it for <see cref="FollowWatchingSpeedAsync" />: <c>-Y</c>
-    /// alone watches for 30 seconds and <c>-y</c> alone for 1 byte per second, as curl 8.21.0
-    /// does (measured 2026-09-27, BL-400 Notes).
-    /// </summary>
-    /// <param name="options">The accepted command line.</param>
-    /// <returns>The started watchdog, or <see langword="null" /> when the speed is not watched.</returns>
-    private LowSpeedWatchdog? StartLowSpeedWatchdog(CommandLineOptions options) =>
-        Running.AttemptLowSpeedWatchdog = LowSpeedWatchdog.StartFromCommandLine(options.SpeedLimit, options.SpeedTimeSeconds, timeProvider, diagnosticLog);
-
-    /// <summary>
-    /// Starts the <c>-m</c> watchdog for the attempt whose context is being created, on the
-    /// runner's clock, and keeps it for <see cref="FollowWatchingSpeedAsync" /> (ADR-0117): each
-    /// <c>--retry</c> attempt gets a fresh <c>-m</c>, as in curl 8.21.0.
-    /// </summary>
-    /// <param name="options">The accepted command line.</param>
-    /// <returns>The started watchdog, or <see langword="null" /> without a positive <c>-m</c>.</returns>
-    private MaxTimeWatchdog? StartMaxTimeWatchdog(CommandLineOptions options) =>
-        Running.AttemptMaxTimeWatchdog = MaxTimeWatchdog.StartFromCommandLine(options.MaxTime, timeProvider, diagnosticLog);
-
-    /// <summary>
-    /// Performs one attempt through <paramref name="follower" /> under the <c>-Y</c>/<c>-y</c> and
-    /// <c>-m</c> watchdogs its context was created with, stopping both when the attempt ends. An
-    /// attempt either watchdog cancelled ends with that watchdog's exit 28 failure, which
-    /// <c>--retry</c> counts as transient.
-    /// </summary>
-    /// <param name="follower">Performs the attempt, following redirects under <c>-L</c>.</param>
-    /// <param name="context">The attempt's context.</param>
-    /// <param name="redirectPolicy">The <c>-L</c> policy.</param>
-    /// <returns>The attempt's result, or a watchdog's failure.</returns>
-    private async Task<TransferResult> FollowWatchingSpeedAsync(RedirectFollower follower, TransferContext context, RedirectPolicy redirectPolicy)
-    {
-        RunningTransferState state = Running;
-        using LowSpeedWatchdog? watchdog = state.AttemptLowSpeedWatchdog;
-        using MaxTimeWatchdog? maxTimeWatchdog = state.AttemptMaxTimeWatchdog;
-        state.AttemptLowSpeedWatchdog = null;
-        state.AttemptMaxTimeWatchdog = null;
-        try
-        {
-            return await follower.FollowAsync(context, redirectPolicy).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException) when (watchdog is { IsTooSlow: true })
-        {
-            return watchdog.Failure;
-        }
-        catch (OperationCanceledException) when (maxTimeWatchdog is { HasTimedOut: true })
-        {
-            return maxTimeWatchdog.Failure;
-        }
-    }
 
     /// <summary>
     /// Writes what curl 8.21.0 prints for an attempt <c>--retry</c> runs again, and readies the
@@ -4980,7 +4844,7 @@ internal sealed class CurlCommandRunner(
     /// without <c>-S</c>, then the retry warning unless <c>-s</c> was given, whether or not with
     /// <c>-S</c> (measured 2026-09-27, BL-241 Notes). The attempt's <c>-o</c> bytes are then kept
     /// or cut back (<see cref="KeepOrThrowAwayAttemptBytesAsync" />); the next attempt gets fresh
-    /// progress once the retry wait is over (<see cref="CreateRetryAttemptContext" />).
+    /// progress once the retry wait is over (<see cref="TransferPerformer.CreateRetryAttemptContext" />).
     /// </summary>
     /// <param name="options">The accepted command line.</param>
     /// <param name="attempt">The attempt's result.</param>
