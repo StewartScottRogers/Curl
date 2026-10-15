@@ -74,7 +74,10 @@ internal sealed class ManagedEasyTransfer(Func<EasyOptions, ProtocolDispatcher> 
             follower,
             CreateContext(options, settings, url, cancellationToken),
             RedirectPolicyMapping.Of(settings, options.Http, options.Authentication)).ConfigureAwait(false);
-        return Finish(result, urlText);
+        return Finish(
+            result.ExitCode.ToCurlCode(),
+            result.ErrorMessage ?? string.Empty,
+            TransferInfoFromReport.Of(result, urlText, options.Transfer.FileTime, timeProvider));
     }
 
     /// <inheritdoc />
@@ -155,13 +158,6 @@ internal sealed class ManagedEasyTransfer(Func<EasyOptions, ProtocolDispatcher> 
             OverUnixSocket: options.Network.UnixSocketPath is not null,
             HappyEyeballsTimeout: HttpRequestOptionsMapping.HappyEyeballsTimeoutOf(null),
             AppendUrlQuery: url => url);
-
-    private CurlCode Finish(TransferResult result, string urlText) =>
-        Finish(result.ExitCode.ToCurlCode(), result.ErrorMessage ?? string.Empty, new TransferInfo
-        {
-            EffectiveUrl = urlText,
-            ResponseCode = result.Report?.ResponseCode ?? 0,
-        });
 
     private CurlCode Finish(CurlCode code, string errorText, TransferInfo info)
     {

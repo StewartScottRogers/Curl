@@ -54,6 +54,18 @@ public sealed class ManagedEasyTransferTests
     }
 
     [TestMethod]
+    public async Task PerformAsync_HttpGetOnFakeConnector_FillsInfoFromTheTransferReport()
+    {
+        ScriptedConnector connector = new([Encoding.ASCII.GetBytes(Response)]);
+        await using IEasyTransfer easy = CreateEngine(connector).CreateEasy();
+        easy.Options = new EasyOptions { Network = new EasyNetworkOptions { Url = "http://h/x" } };
+
+        await easy.PerformAsync(CancellationToken.None);
+
+        Assert.AreEqual("text/plain", easy.Info.ContentType);
+    }
+
+    [TestMethod]
     public async Task PerformAsync_NoCallbacksSet_DiscardsTheBodyAndHeadersAndSucceeds()
     {
         ScriptedConnector connector = new([Encoding.ASCII.GetBytes(Response)]);

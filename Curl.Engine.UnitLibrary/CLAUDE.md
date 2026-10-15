@@ -256,8 +256,13 @@ and performs the attempt with `TransferPerformer.FollowWatchingSpeedAsync` throu
 `RedirectFollower`. Body bytes go to `EasyCallbackOptions.Write` and header lines to
 `EasyCallbackOptions.Header` through `CallbackWriteStream`, each discarded when unset; a callback that
 takes fewer bytes than it was given fails the transfer with `CurlCode.WriteError`. The result's exit
-code becomes the `CurlCode`, its message `ErrorText`, and `Info` carries the effective URL and the
-response code. `Duplicate` copies the options and none of the results, `Reset` restores
+code becomes the `CurlCode`, its message `ErrorText`, and `Info` is what `TransferInfoFromReport.Of`
+fills from the result's `TransferReport` (BL-2317): every `CURLINFO_*` the report holds, each worked
+out as `Curl.Output`'s `TransferWriteOutVariables` works out its `-w` variable (times in whole
+microseconds from the handler's start, at least one; speeds over the total time), plus the
+`CURLAUTH_*` bits a 401's `WWW-Authenticate` or a 407's `Proxy-Authenticate` lines offer, the last
+`Content-Length`, the effective URL's scheme and `CURLPROTO_*` bit, and `CURLINFO_FILETIME` only
+under `EasyTransferOptions.FileTime`. The rest keep their fresh-handle defaults (BL-2361). `Duplicate` copies the options and none of the results, `Reset` restores
 `new EasyOptions()`, `Pause` records the directions and returns `Ok`, and `UpkeepAsync` returns
 `Ok`. `Headers`, `WebSocket` and `Connection` throw `NotSupportedException` (phase 3). Their tests are
 `ManagedCurlEngineTests`, `ManagedEasyTransferTests` and `CallbackWriteStreamTests`.
