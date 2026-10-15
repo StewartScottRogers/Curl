@@ -35,3 +35,4 @@ ADR-0506; plan phase 1 step 4 (last retarget); follows BL-2308 and uses the rule
 ## Log
 
 - 2026-10-15: Created.
+- 2026-10-15: Backlog -> Doing.
