@@ -14,7 +14,7 @@ public sealed class UpstreamCurlPlatformTests
         "UnixSockets", "zstd",
         "crypto", "cookies", "proxy", "Mime", "manual", "DoH", "digest", "aws", "netrc", "verbose-strings",
         "large-time", "large-size", "sha512-256", "SSLpinning",
-        "large_file", "local-http", "httpsig",
+        "large_file", "local-http", "httpsig", "headers-api",
     ];
 
     public TestContext TestContext { get; set; } = null!;
@@ -87,7 +87,6 @@ public sealed class UpstreamCurlPlatformTests
     [DataRow("Debug")]
     [DataRow("TrackMemory")]
     [DataRow("unittest")]
-    [DataRow("headers-api")]
     [DataRow("ftp")]
     [DataRow("SSPI")]
     [DataRow("codeset-utf8")]
@@ -105,6 +104,19 @@ public sealed class UpstreamCurlPlatformTests
         diagnostics.Assert("listed on Unix", false, onUnix);
         Assert.IsFalse(UpstreamCurlPlatform.Windows.Features.Contains(feature));
         Assert.IsFalse(UpstreamCurlPlatform.Unix.Features.Contains(feature));
+    }
+
+    // Curl writes -w %header{name} and %{header_json}, which curl writes only with libcurl's headers API (BL-2264).
+    [TestMethod]
+    public void AllPlatforms_ListTheHeadersApi()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+
+        bool onEvery = UpstreamCurlPlatform.All.All(platform => platform.Features.Contains("headers-api"));
+
+        diagnostics.Act("listed on every platform", onEvery);
+        diagnostics.Assert("listed on every platform", true, onEvery);
+        Assert.IsTrue(onEvery);
     }
 
     [TestMethod]
