@@ -2,6 +2,8 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Curl.Conformance.Http2Server.UnitTests" />
+    <InternalsVisibleTo Include="Curl.Conformance.Http3Server.UnitLibrary" />
+    <InternalsVisibleTo Include="Curl.Conformance.Http3Server.UnitTests" />
   </ItemGroup>
 
   <ItemGroup>

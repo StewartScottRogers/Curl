@@ -10,6 +10,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Curl.Conformance.Http3Server.UnitLibrary\Curl.Conformance.Http3Server.UnitLibrary.csproj" />
+    <ProjectReference Include="..\Curl.Http3.UnitLibrary\Curl.Http3.UnitLibrary.csproj" />
     <ProjectReference Include="..\Curl.Quic.UnitLibrary\Curl.Quic.UnitLibrary.csproj" />
   </ItemGroup>
 
