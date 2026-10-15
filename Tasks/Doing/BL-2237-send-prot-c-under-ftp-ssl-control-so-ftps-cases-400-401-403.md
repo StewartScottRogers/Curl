@@ -31,3 +31,4 @@ Found by BL-2221: test407 now runs and fails `<verify><protocol> differs at byte
 ## Log
 
 - 2026-10-14: Created.
+- 2026-10-14: Backlog -> Doing.
