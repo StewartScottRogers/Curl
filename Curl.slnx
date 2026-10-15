@@ -54,6 +54,8 @@
   <Project Path="Curl.Cli.UnitTests/Curl.Cli.UnitTests.csproj" />
   <Project Path="Curl.Conformance.Http2Server.UnitLibrary/Curl.Conformance.Http2Server.UnitLibrary.csproj" />
   <Project Path="Curl.Conformance.Http2Server.UnitTests/Curl.Conformance.Http2Server.UnitTests.csproj" />
+  <Project Path="Curl.Conformance.Http3Server.UnitLibrary/Curl.Conformance.Http3Server.UnitLibrary.csproj" />
+  <Project Path="Curl.Conformance.Http3Server.UnitTests/Curl.Conformance.Http3Server.UnitTests.csproj" />
   <Project Path="Curl.Conformance.SshServer.UnitLibrary/Curl.Conformance.SshServer.UnitLibrary.csproj" />
   <Project Path="Curl.Conformance.SshServer.UnitTests/Curl.Conformance.SshServer.UnitTests.csproj" />
   <Project Path="Curl.Conformance.UnitLibrary/Curl.Conformance.UnitLibrary.csproj" />
