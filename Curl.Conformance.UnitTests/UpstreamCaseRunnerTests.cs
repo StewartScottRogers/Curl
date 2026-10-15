@@ -203,12 +203,12 @@ public sealed class UpstreamCaseRunnerTests
         var diagnostics = TestDiagnostics.For(TestContext);
         UpstreamCaseRunner runner = Runner(_ => throw new AssertFailedException("curl must not run"));
 
-        UpstreamCaseOutcome outcome = await RunAsync(runner, "<testcase>\n<client>\n<command>\nhttp://%HTTPUNIXPATH/\n</command>\n</client>\n</testcase>\n");
+        UpstreamCaseOutcome outcome = await RunAsync(runner, "<testcase>\n<client>\n<command>\nhttp://%SOCKSUNIXPATH/\n</command>\n</client>\n</testcase>\n");
 
         diagnostics.Assert("outcome kind", UpstreamCaseOutcomeKind.Skipped, outcome.Kind);
         Assert.AreEqual(UpstreamCaseOutcomeKind.Skipped, outcome.Kind);
-        diagnostics.Assert("detail", "the harness has no value for %HTTPUNIXPATH", outcome.Detail);
-        Assert.AreEqual("the harness has no value for %HTTPUNIXPATH", outcome.Detail);
+        diagnostics.Assert("detail", "the harness has no value for %SOCKSUNIXPATH", outcome.Detail);
+        Assert.AreEqual("the harness has no value for %SOCKSUNIXPATH", outcome.Detail);
     }
 
     [TestMethod]
@@ -1022,6 +1022,25 @@ public sealed class UpstreamCaseRunnerTests
         diagnostics.Assert("outcome", "not skipped", $"{outcome.Kind}: {outcome.Detail}");
         Assert.AreNotEqual(UpstreamCaseOutcomeKind.Skipped, outcome.Kind, outcome.Detail);
         Assert.Contains(":" + UpstreamCaseRunner.Http6Port, commandLine!);
+    }
+
+    [TestMethod]
+    [DataRow(1435)]
+    [DataRow(1436)]
+    public async Task RunAsync_HttpUnixCase_RunsCurlOnTheHttpUnixPath(int testNumber)
+    {
+        string? commandLine = null;
+        UpstreamCaseRunner runner = Runner(invocation =>
+        {
+            commandLine = string.Join(' ', invocation.Arguments);
+            return Task.FromResult(0);
+        });
+        string testFile = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "UpstreamTestData", $"test{testNumber}.curltest"));
+
+        UpstreamCaseOutcome outcome = await RunAsync(runner, testFile);
+
+        Assert.AreNotEqual(UpstreamCaseOutcomeKind.Skipped, outcome.Kind, outcome.Detail);
+        Assert.Contains("--unix-socket " + UpstreamCaseRunner.HttpUnixPath + " ", commandLine!);
     }
 
     [TestMethod]

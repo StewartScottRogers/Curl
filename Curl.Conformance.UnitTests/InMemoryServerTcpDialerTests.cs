@@ -35,6 +35,18 @@ public sealed class InMemoryServerTcpDialerTests
     }
 
     [TestMethod]
+    public async Task UnixSocket_ToTheHttpUnixPath_ReachesTheSwsStandIn()
+    {
+        SwsHttpServerConnector server = new(ParsedTestCase.From(Reply));
+
+        int exitCode = await RunCurlAsync(server, "--unix-socket", UpstreamCaseRunner.HttpUnixPath, "http://unix.example/1");
+
+        Assert.AreEqual(0, exitCode);
+        string received = Observe("received bytes", "GET /1 HTTP/1.1\r\nHost: unix.example\r\n...", Text(server.ReceivedBytes));
+        Assert.IsTrue(received.StartsWith("GET /1 HTTP/1.1\r\nHost: unix.example\r\n", StringComparison.Ordinal), received);
+    }
+
+    [TestMethod]
     public async Task HaproxyProtocol_WritesTheProxyLineFirstOnTheConnection()
     {
         SwsHttpServerConnector server = new(ParsedTestCase.From(Reply));

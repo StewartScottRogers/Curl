@@ -35,6 +35,19 @@ public sealed partial class SwsHttpServerConnectorTests
     }
 
     [TestMethod]
+    public async Task ConnectAsync_ToTheHttpUnixPath_ServesAndRecordsTheRequest()
+    {
+        SwsHttpServerConnector server = new(Case(Reply("data", "first\n")));
+        IConnection connection = (await server.ConnectAsync(new ConnectTarget(UpstreamCaseRunner.HttpUnixPath, 1, false), CancellationToken.None)).Connection!;
+
+        string reply = await ExchangeAsync(connection, Get);
+
+        Assert.AreEqual("first\n", reply);
+        Assert.AreEqual(Get, Text(server.ReceivedBytes));
+        Assert.AreEqual("127.0.0.1:49152", $"{connection.LocalEndPoint}");
+    }
+
+    [TestMethod]
     public async Task ConnectAsync_ToTheProxyPort_RecordsInProxyReceivedBytesApart()
     {
         SwsHttpServerConnector server = new(Case(Reply("data", "first\n")));

@@ -216,6 +216,12 @@ dump and the selector in the Gopher stand-in's `ReceivedBytes`. The runner puts 
 its plain stand-in only for a case naming `mqtts` or `gophers`; screening lets those servers run,
 and `UpstreamCurlPlatform` reports the `mqtts` protocol feature, as Curl's `curl -V` does. 1640 and
 1272 pass. Upstream's `dict` and `telnet` servers are not emulated yet (BL-2243).
+`%HTTPUNIXPATH` is `log/server/http.sock` (`UpstreamCaseRunner.HttpUnixPath`, BL-2229), the relative
+path `runtests.pl`'s `http.sock` has under its relative log directory, so it fits a `sockaddr_un`
+wherever the harness's log directory is. Nothing listens on it: upstream's `http-unix` server is the
+`sws` emulation, and the conformance tests' `InMemoryServerTcpDialer` sends a `--unix-socket` dial to
+the connector chain at `%HTTPPORT`, so it reaches `SwsHttpServerConnector` through `TcpConnector`'s own
+Unix-socket code. Screening lets `http-unix` cases run: 1435 and 1436 pass.
 A `<client><stdout>` part is accepted and never compared, since `runtests.pl` at `curl-8_22_0` reads
 stdout only from `<verify>` (BL-2221): 210 passes, and 211 and 212 differ (Curl retries a refused
 `EPSV` or `EPRT` on the reused connection; BL-2236).
