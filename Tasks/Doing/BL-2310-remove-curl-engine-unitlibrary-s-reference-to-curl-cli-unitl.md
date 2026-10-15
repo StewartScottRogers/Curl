@@ -44,3 +44,4 @@ ADR-0506; plan phase 1 step 4 (closing step); follows BL-2309, after which no en
 - 2026-10-15: Doing -> Backlog. Engine still uses CommandLineOptions in 14 files; waits on BL-2325, BL-2338, BL-2343, BL-2350
 - 2026-10-15: Backlog -> Doing.
 - 2026-10-15: Doing -> Backlog. Engine still uses CommandLineOptions in 10 files; waits on BL-2355, BL-2356, BL-2357, BL-2358
+- 2026-10-15: Backlog -> Doing.
