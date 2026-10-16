@@ -2,8 +2,12 @@
 
 The .NET-idiomatic programming interface to Curl (ADR-0506), not a `Curl.<Area>.UnitLibrary`:
 `Curl.Api` is a naming exception, with `Curl.Console` and `Libcurl`. Namespace `Curl.Api`
-for every area folder (`Client/` holds `CurlClient` and `CurlClientOptions`; `Composition/`
-holds the engine-building half of the partial `CurlClient`).
+for `Client/` (`CurlClient` and `CurlClientOptions`) and `Composition/` (the engine-building
+half of the partial `CurlClient`); `Curl.Api.Errors` for `Errors/`.
+
+- `Errors/`: `CurlException`, the one exception every failure in `Curl.Api` throws, carrying the
+  `CurlCode`; `CurlException.ThrowIfFailed` maps a call's result to it, and `CurlCodeText` is its own
+  copy of curl 8.22.0's `curl_easy_strerror` text (ADR-0630).
 
 `CurlClient` (BL-2496) is constructed over an `ICurlEngine`, owns it unless told not to,
 creates easy handles with `CurlClientOptions` applied (internal `CreateEasy`), and throws
