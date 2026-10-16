@@ -1,5 +1,5 @@
 ---
-id: BL-2491
+id: BL-2494
 title: Engine: CURLWS_RAW_MODE on a write-callback WebSocket transfer
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-16
 completed:
 ---
-# BL-2491 — Engine: CURLWS_RAW_MODE on a write-callback WebSocket transfer
+# BL-2494 — Engine: CURLWS_RAW_MODE on a write-callback WebSocket transfer
 
 ## Goal
 

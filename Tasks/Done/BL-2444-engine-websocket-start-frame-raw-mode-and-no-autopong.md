@@ -32,10 +32,10 @@ ADR-0506; phase 3 of `Documentation/Planning/Curl-Api-And-libcurl.md`. Read the 
 
 - Scope (2026-10-16, lane 1): `CURLWS_NOAUTOPONG` already came with BL-2443 and is pinned by its tests. `CURLWS_OFFSET` and `StartFrameAsync` are left to BL-2481 (Backlog), which BL-2443 filed for exactly that work and which also touches `Curl.Protocol.Ws` for a partial-frame encoder this task's `touches` do not name; doing it here would leave BL-2481 nothing to do (AF-0148). So this task built `CURLWS_RAW_MODE` on the connect-only API.
 - Behaviour, from curl 8.16 `lib/ws.c` (the raw-mode code is unchanged in later releases, 8.22.0 included): under `data->set.ws_raw_mode`, `curl_ws_send` refuses a non-zero `fragsize` or `flags` with `CURLE_BAD_FUNCTION_ARGUMENT` ("fragsize and flags must be zero in raw mode") and writes the buffer directly; `curl_ws_recv` still decodes frames, and it skips flushing the pending pong, so no automatic pong goes out. `ManagedEasyWebSocket` now takes the handle's `WebSocketOptionBits` in place of an answers-pings flag and does the same. This only follows upstream, so no ADR.
-- Raw mode in the write-callback path (a `ws` transfer that is not connect-only, `ws_cw_write`) needs a `WsProtocolHandler` option in `Curl.Protocol.Ws`, outside `touches`: filed as BL-2491.
+- Raw mode in the write-callback path (a `ws` transfer that is not connect-only, `ws_cw_write`) needs a `WsProtocolHandler` option in `Curl.Protocol.Ws`, outside `touches`: filed as BL-2494.
 - Measured: `Measure-CodeQuality.ps1 -Library Curl.Engine.UnitLibrary` gave 0 failing members after `SendAsync` was split (it measured complexity 12 before).
 ## Log
 
 - 2026-10-15: Created.
 - 2026-10-16: Backlog -> Doing.
-- 2026-10-16: Doing -> Done. CURLWS_RAW_MODE on the connect-only WebSocket API; no-autopong pinned; OFFSET and start_frame left to BL-2481, write-callback raw mode filed as BL-2491
+- 2026-10-16: Doing -> Done. CURLWS_RAW_MODE on the connect-only WebSocket API; no-autopong pinned; OFFSET and start_frame left to BL-2481, write-callback raw mode filed as BL-2494
