@@ -30,7 +30,7 @@ ADR-0506; phase 3 of `Documentation/Planning/Curl-Api-And-libcurl.md`. Read the 
 
 ## Notes
 
-- Decided in ADR-0582: the waits are async only (`WaitAsync`, `PollAsync`) beside `PerformAsync`,
+- Decided in ADR-0584: the waits are async only (`WaitAsync`, `PollAsync`) beside `PerformAsync`,
   since `CurlEasy.Perform` is Libcurl's one sync bridge; a negative `timeout_ms` answers
   `BadFunctionArgument` without the engine, as `multi_wait` does; `FdSet` fills `ISet<CurlSocket>`
   read, write and exception sets from the engine's `GetWaitSockets`, the seam having no fdset.
