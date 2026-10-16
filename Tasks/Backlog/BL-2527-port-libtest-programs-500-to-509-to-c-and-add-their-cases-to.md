@@ -4,7 +4,7 @@ title: Port libtest programs 500 to 509 to C# and add their cases to the ratchet
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-2526]
+depends-on: [BL-2556]
 touches: [Curl.Conformance.LibTest.UnitLibrary, Curl.Conformance.LibTest.UnitTests, Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
 requirement: none
 created: 2026-10-16

@@ -28,7 +28,7 @@ Phase 5 section of the plan; ADR-0506. Read `Libcurl` as it is, the upstream cas
 
 ## Notes
 
-- Filed BL-2523 to BL-2552 (4 harness tasks, 26 port batches, a depends-on chain). Decision: ports live in a new `Curl.Conformance.LibTest` pair, not the case runner project; the plan's 362 programs are 259 distinct programs behind 364 cases, so 26 batches not 36.
+- Filed BL-2553 to BL-2552 (4 harness tasks, 26 port batches, a depends-on chain). Decision: ports live in a new `Curl.Conformance.LibTest` pair, not the case runner project; the plan's 362 programs are 259 distinct programs behind 364 cases, so 26 batches not 36.
 - The two gap office tasks are not filed: the lane guard refuses any command naming the gap office folder (ADR-0433). An interactive session files both with `-NoLane`, the first depending on BL-2552; the plan's Phase 5 filed-tasks text says so.
 - `status` reports pre-existing duplicate IDs (BL-2496, BL-2482, BL-1068, BL-1559), none mine, no cycle.
 
@@ -36,4 +36,4 @@ Phase 5 section of the plan; ADR-0506. Read `Libcurl` as it is, the upstream cas
 
 - 2026-10-16: Created.
 - 2026-10-16: Backlog -> Doing. Criteria at claim: 1f588d3c 4272a6b9 8738c7f6.
-- 2026-10-16: Doing -> Done. Filed BL-2523 to BL-2552 and corrected the plan; gap office tasks left to an interactive session.
+- 2026-10-16: Doing -> Done. Filed BL-2553 to BL-2552 and corrected the plan; gap office tasks left to an interactive session.

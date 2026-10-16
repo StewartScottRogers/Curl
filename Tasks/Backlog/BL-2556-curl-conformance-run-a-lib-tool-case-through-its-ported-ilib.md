@@ -1,16 +1,16 @@
 ---
-id: BL-2526
+id: BL-2556
 title: Curl.Conformance: run a lib tool case through its ported ILibTest program
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-2525]
+depends-on: [BL-2555]
 touches: [Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests, Curl.Conformance.LibTest.UnitLibrary, Curl.Conformance.LibTest.UnitTests]
 requirement: none
 created: 2026-10-16
 completed:
 ---
-# BL-2526 — Curl.Conformance: run a lib tool case through its ported ILibTest program
+# BL-2556 — Curl.Conformance: run a lib tool case through its ported ILibTest program
 
 ## Goal
 

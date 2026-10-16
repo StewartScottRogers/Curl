@@ -1,5 +1,5 @@
 ---
-id: BL-2523
+id: BL-2553
 title: Scaffold Curl.Conformance.LibTest: the ILibTest program shape and result codes
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-16
 completed:
 ---
-# BL-2523 — Scaffold Curl.Conformance.LibTest: the ILibTest program shape and result codes
+# BL-2553 — Scaffold Curl.Conformance.LibTest: the ILibTest program shape and result codes
 
 ## Goal
 

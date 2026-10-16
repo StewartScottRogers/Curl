@@ -1,16 +1,16 @@
 ---
-id: BL-2525
+id: BL-2555
 title: Curl.Conformance.LibTest: multi, share and timing helpers (testutil, testtrace, wait helpers)
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-2524]
+depends-on: [BL-2554]
 touches: [Curl.Conformance.LibTest.UnitLibrary, Curl.Conformance.LibTest.UnitTests]
 requirement: none
 created: 2026-10-16
 completed:
 ---
-# BL-2525 — Curl.Conformance.LibTest: multi, share and timing helpers (testutil, testtrace, wait helpers)
+# BL-2555 — Curl.Conformance.LibTest: multi, share and timing helpers (testutil, testtrace, wait helpers)
 
 ## Goal
 

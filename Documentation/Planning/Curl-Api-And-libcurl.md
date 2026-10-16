@@ -449,10 +449,10 @@ time as a `depends-on` chain in test-number order.
 
 | Task | Title |
 | --- | --- |
-| BL-2523 | Scaffold Curl.Conformance.LibTest: the ILibTest program shape and result codes |
-| BL-2524 | Curl.Conformance.LibTest: first.c helpers over Libcurl (setopt, init and the TEST_ERR codes) |
-| BL-2525 | Curl.Conformance.LibTest: multi, share and timing helpers (testutil, testtrace, wait helpers) |
-| BL-2526 | Curl.Conformance: run a lib tool case through its ported ILibTest program |
+| BL-2553 | Scaffold Curl.Conformance.LibTest: the ILibTest program shape and result codes |
+| BL-2554 | Curl.Conformance.LibTest: first.c helpers over Libcurl (setopt, init and the TEST_ERR codes) |
+| BL-2555 | Curl.Conformance.LibTest: multi, share and timing helpers (testutil, testtrace, wait helpers) |
+| BL-2556 | Curl.Conformance: run a lib tool case through its ported ILibTest program |
 | BL-2527 to BL-2552 | Port libtest programs in 26 batches of up to ten (lib500 to lib5004), each adding its passing cases to the ratchet |
 
 Not filed from a lane: the gap office's two tasks (stop excluding `libcurl-api` cases and measure

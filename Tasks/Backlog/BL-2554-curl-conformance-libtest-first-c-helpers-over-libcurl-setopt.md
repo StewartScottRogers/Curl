@@ -1,16 +1,16 @@
 ---
-id: BL-2524
+id: BL-2554
 title: Curl.Conformance.LibTest: first.c helpers over Libcurl (setopt, init and the TEST_ERR codes)
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-2523]
+depends-on: [BL-2553]
 touches: [Curl.Conformance.LibTest.UnitLibrary, Curl.Conformance.LibTest.UnitTests]
 requirement: none
 created: 2026-10-16
 completed:
 ---
-# BL-2524 — Curl.Conformance.LibTest: first.c helpers over Libcurl (setopt, init and the TEST_ERR codes)
+# BL-2554 — Curl.Conformance.LibTest: first.c helpers over Libcurl (setopt, init and the TEST_ERR codes)
 
 ## Goal
 
