@@ -31,7 +31,7 @@ ADR-0506; phase 3 of `Documentation/Planning/Curl-Api-And-libcurl.md`. Read the 
 
 ## Notes
 
-- Plan: generate `CurlOption` and the 327-row table (312 options, 15 aliases) from curl 8.22.0's `lib/easyoptions.c` and `include/curl/curl.h`, fetched from GitHub at tag `curl-8_22_0` (the gap office's tarball cache is an audit path a lane may not read). `CurlOptions.All/ByName/ById/Next` are public; `EasyOptionDispatch.SetOption` is internal, for `CurlEasy` (BL-2408) to call through `EasyOptionDispatch.Default`. Decisions in ADR-0558.
+- Plan: generate `CurlOption` and the 327-row table (312 options, 15 aliases) from curl 8.22.0's `lib/easyoptions.c` and `include/curl/curl.h`, fetched from GitHub at tag `curl-8_22_0` (the gap office's tarball cache is an audit path a lane may not read). `CurlOptions.All/ByName/ById/Next` are public; `EasyOptionDispatch.SetOption` is internal, for `CurlEasy` (BL-2408) to call through `EasyOptionDispatch.Default`. Decisions in ADR-0560.
 - `CurlOption` member names follow `CurlCode`'s rule (one capital per underscore-separated word: `AccepttimeoutMs`); hand-picked word breaks would be 327 choices nobody can check.
 - Value types: `LONG`/`OFF_T` take `long` or `int`, `VALUES` also any `Enum`, `OBJECT`/`CBPTR` anything but a `Delegate` (so each `CURLOT_*` type has a wrong-type test), pointer types take `null`; `bool` is not accepted (libcurl takes `0L`/`1L`).
 - Group tasks (BL-2400 to BL-2407, and the callback tasks) implement `Add<Group>Setters` in an `EasyOptionSetters` part in their own `Libcurl/Options/<Group>` folder, keeping namespace `Libcurl.Options`; the declarations already sit in `Libcurl/Options/EasyOptionSetters.cs`.
