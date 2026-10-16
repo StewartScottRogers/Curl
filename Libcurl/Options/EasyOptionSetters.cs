@@ -25,8 +25,18 @@ internal static partial class EasyOptionSetters
         AddHttpSetters(setters);
         AddProtocolSetters(setters);
         AddCallbackSetters(setters);
+        AddMimePostSetters(setters);
+        AddFormPostSetters(setters);
         return setters;
     }
+
+    /// <summary>Adds the <c>CURLOPT_MIMEPOST</c> row (<c>Libcurl/Mime/Mime</c>).</summary>
+    /// <param name="setters">The rows to add to.</param>
+    static partial void AddMimePostSetters(Dictionary<CurlOption, EasyOptionSetter> setters);
+
+    /// <summary>Adds the <c>CURLOPT_HTTPPOST</c> row (<c>Libcurl/Mime/Form</c>).</summary>
+    /// <param name="setters">The rows to add to.</param>
+    static partial void AddFormPostSetters(Dictionary<CurlOption, EasyOptionSetter> setters);
 
     /// <summary>Adds the <c>EasyBehaviourOptions</c> rows (<c>Libcurl/Options/Behaviour</c>).</summary>
     /// <param name="setters">The rows to add to.</param>

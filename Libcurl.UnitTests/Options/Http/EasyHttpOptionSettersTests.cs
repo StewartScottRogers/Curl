@@ -352,11 +352,10 @@ public sealed class EasyHttpOptionSettersTests
     }
 
     [TestMethod]
-    public void SetOption_MimepostAndHttppost_AreLeftToTheMimeTasks()
+    public void SetOption_Httppost_IsLeftToTheFormTask()
     {
         var options = new EasyOptions();
 
-        Assert.AreEqual(CurlCode.NotBuiltIn, EasyOptionDispatch.Default.SetOption(ref options, CurlOption.Mimepost, null));
         Assert.AreEqual(CurlCode.NotBuiltIn, EasyOptionDispatch.Default.SetOption(ref options, CurlOption.Httppost, null));
     }
 

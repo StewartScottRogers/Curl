@@ -81,12 +81,19 @@ writing `MultiOptions` back only on `Ok`), `GetHandles` (the engine's transfers 
 or notification `multi.h` lacks answers `UnknownOption` without calling the engine (ADR-0582).
 
 `Share` holds `CurlShare`, the share handle `CurlLibrary.ShareInit` (`curl_share_init`) returns over
-the engine's `IShareHandle`, and `CurlShareOption` (ADR-0581). `SetOption` is `curl_share_setopt`:
+the engine's `IShareHandle`, and `CurlShareOption` (ADR-0583). `SetOption` is `curl_share_setopt`:
 `SHARE`/`UNSHARE` of `COOKIE` to `HSTS` and the seam's lock delegates go to the engine, `NONE`, `SHARE`,
 an unknown kind or option, or a value of the wrong type answer `BadOption` without it, and `USERDATA` is
 kept as `UserData`. `Cleanup` is `curl_share_cleanup`; after the engine's `Ok` every call answers
 `Invalid`. `CURLOPT_SHARE` (`Options/Behaviour`) stores a `CurlShare`'s engine handle, and a cleaned-up
 `CurlShare` or `null` detaches.
+
+`Mime/Mime` holds `CurlMime` (`curl_mime`, from `CurlLibrary.MimeInit`) and `CurlMimePart` (from
+`AddPart`), namespace `Libcurl.Mime` (ADR-0583): each `curl_mime_*` part setter is one call to the
+engine's `IMimePartBuilder`, whose answer it returns; `Dispose` is `curl_mime_free`, after which the
+handle and its parts throw `ObjectDisposedException`. It implements `EasyOptionSetters`'
+`AddMimePostSetters`: `CURLOPT_MIMEPOST` takes a `CurlMime` (else `BadFunctionArgument`) and stores its
+body as it is when set. `AddFormPostSetters` is declared for `Mime/Form`'s `CURLOPT_HTTPPOST`.
 
 `Info` holds `CurlInfo` (every `CURLINFO_*` of curl 8.22.0's `curl.h` by name and number) and the
 internal `EasyInfoDispatch` `CurlEasy.GetInfo` goes through (ADR-0566): an id `curl.h` lacks answers
