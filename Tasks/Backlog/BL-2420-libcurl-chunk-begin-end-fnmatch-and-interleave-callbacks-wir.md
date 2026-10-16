@@ -4,7 +4,7 @@ title: Libcurl: chunk begin/end, fnmatch and interleave callbacks wired through 
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-2419]
+depends-on: [BL-2419, BL-2477, BL-2478]
 touches: [Libcurl/Callbacks/Wildcard, Libcurl.UnitTests/Callbacks/Wildcard, Curl.Engine.UnitLibrary, Curl.Engine.UnitTests]
 requirement: none
 created: 2026-10-15
@@ -30,7 +30,20 @@ ADR-0506; phase 3 of `Documentation/Planning/Curl-Api-And-libcurl.md`. Read the 
 
 ## Notes
 
+- 2026-10-16 (lane 1, prerequisite pass before any code): the engine has nothing to wire these
+  callbacks to. No FTP code parses a `LIST` reply, matches a wildcard or loops over matched files,
+  and nothing in `Curl.Protocol.Rtsp.UnitLibrary` hands interleaved `$` RTP frames anywhere
+  (`RtspReplyReader` only skips them, BL-1663). The seam (`ChunkBeginCallback`, `ChunkEndCallback`,
+  `FileNameMatchCallback`, `InterleaveCallback`, `CurlFileInfo`, `EasyBehaviourOptions.WildcardMatch`)
+  already exists in `Curl.Api.UnitLibrary`. Filed BL-2476 (LIST parser and `curl_fnmatch`),
+  BL-2478 (FTP wildcard download loop with begin, end and match hooks; depends on BL-2476) and
+  BL-2477 (RTSP interleave sink), and requeued on BL-2477 and BL-2478. Once they are Done, this
+  task adapts the four delegates to those hooks in `EngineComposition` (mapping the FTP library's
+  file entries to `CurlFileInfo`, gated on `WildcardMatch`) and adds the `Libcurl/Callbacks/Wildcard`
+  setters with their `*DATA` options taking any value, as the other callback areas do.
+
 ## Log
 
 - 2026-10-15: Created.
 - 2026-10-16: Backlog -> Doing.
+- 2026-10-16: Doing -> Backlog. Waits on BL-2477 (RTSP interleave sink) and BL-2478 (FTP wildcard loop, after BL-2476): the engine has nothing to wire the callbacks to yet
