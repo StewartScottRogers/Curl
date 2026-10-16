@@ -46,7 +46,7 @@ BL-2476 ported curl 8.22.0's own `Curl_fnmatch` (`lib/curl_fnmatch.c`) and pinne
 - Locale: UTF-8, since the curl tool calls `setlocale(LC_ALL, "")` and unit1307's Linux `[\xFF]` FAIL rows only
   hold in a multibyte locale.
 - Quality: 100% line, 100% branch, 0 failing members, worst CRAP 10 (524 members).
-- Follow-up: BL-2481 (glibc `[=a=]` and `[.a.]` in brackets).
+- Follow-up: BL-2482 (glibc `[=a=]` and `[.a.]` in brackets).
 
 ## Log
 

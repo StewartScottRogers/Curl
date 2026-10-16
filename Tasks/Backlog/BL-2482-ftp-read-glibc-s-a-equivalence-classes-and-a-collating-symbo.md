@@ -1,5 +1,5 @@
 ---
-id: BL-2481
+id: BL-2482
 title: FTP: read glibc's [=a=] equivalence classes and [.a.] collating symbols in the Linux wildcard matcher
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-16
 completed:
 ---
-# BL-2481 — FTP: read glibc's [=a=] equivalence classes and [.a.] collating symbols in the Linux wildcard matcher
+# BL-2482 — FTP: read glibc's [=a=] equivalence classes and [.a.] collating symbols in the Linux wildcard matcher
 
 ## Goal
 

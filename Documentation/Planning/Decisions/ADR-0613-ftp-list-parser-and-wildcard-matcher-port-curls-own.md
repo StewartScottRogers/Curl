@@ -71,5 +71,5 @@ The `macOS` model is inferred from FreeBSD's source and the `MAC_*` rows of `uni
 available to measure on. glibc 2.43 (WSL Ubuntu, `C.UTF-8`) was measured through `find -name`, which calls
 `fnmatch`: `[` matches `[`, `[]` matches `[]`, `\` does not match `\` and `[[:foo:]]` does not match `f]`, as
 modelled. The curl tool has no option for `CURLOPT_WILDCARDMATCH`, so curl itself cannot be measured from the
-command line. glibc's `[=a=]` equivalence classes and `[.a.]` collating symbols are not read yet; BL-2481 adds them.
+command line. glibc's `[=a=]` equivalence classes and `[.a.]` collating symbols are not read yet; BL-2482 adds them.
 `FtpWildcardMatcher.Curl`'s answers are unchanged.
