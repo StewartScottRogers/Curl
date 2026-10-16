@@ -60,7 +60,7 @@ internal sealed class ToolCurlEngine : ICurlEngine
     /// <returns>The multi handle; disposing it is <c>curl_multi_cleanup</c>.</returns>
     internal CurlMulti MultiInit() => library.MultiInit();
 
-    /// <summary><c>curl_mime_init</c> on the library, for a transfer's <c>-F</c> form (BL-2493, ADR-0650).</summary>
+    /// <summary><c>curl_mime_init</c> on the library, for a transfer's <c>-F</c> form (BL-2493, ADR-0652).</summary>
     /// <returns>The empty form; disposing it is <c>curl_mime_free</c>.</returns>
     internal CurlMime MimeInit() => library.MimeInit();
 

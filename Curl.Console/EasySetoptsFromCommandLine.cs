@@ -8,7 +8,7 @@ namespace Curl.Console;
 /// <summary>
 /// The <c>curl_easy_setopt</c> calls the curl tool's <c>config2setopts.c</c> makes for a serial transfer's
 /// behaviour, transfer, network (BL-2491, ADR-0631), TLS, authentication and proxy options (BL-2492, ADR-0642), and
-/// its HTTP and protocol options (BL-2493, ADR-0650): one <see cref="EasySetopt" /> per
+/// its HTTP and protocol options (BL-2493, ADR-0652): one <see cref="EasySetopt" /> per
 /// <c>CURLOPT_*</c> whose value the command line moved off libcurl's default. What libcurl has no
 /// <c>CURLOPT_*</c> for, or what its setter would clamp to another value than the command line's, stays on
 /// the engine transfer's hooks (<see cref="KeptOnHooks" />).
@@ -117,7 +117,7 @@ internal static partial class EasySetoptsFromCommandLine
     /// <c>--tftp-blksize</c> or <c>--hostpubmd5</c> its setter would hold to another value or refuse,
     /// <c>--engine</c>, an <c>--ech</c> value <c>CURLOPT_ECH</c> would ignore, the TLS-SRP fields, Curl's
     /// <c>--httpsig-*</c> options (ADR-0642), and the <c>-F</c> form, which the runner moves to <c>CURLOPT_MIMEPOST</c>
-    /// itself when it can build it (ADR-0650).
+    /// itself when it can build it (ADR-0652).
     /// </summary>
     /// <param name="options">The transfer's easy options.</param>
     /// <returns>The options for the hooks.</returns>

@@ -347,7 +347,7 @@ TLS (origin, `PROXY_*` twins, then the handle's own), authentication and proxy f
 (`EasySetoptsFromCommandLine.TlsAuthenticationProxy.cs`; `CURLOPT_AWS_SIGV4` before `CURLOPT_HTTPAUTH`,
 `CURLOPT_HAPROXY_CLIENT_IP` before `CURLOPT_HAPROXYPROTOCOL`, `--ech` as its mode, `pn:` and `ecl:` calls; BL-2492,
 ADR-0642), and so does every HTTP and protocol field (`EasySetoptsFromCommandLine.HttpProtocols.cs`; one
-`CURLOPT_COOKIEFILE` per `-b` file, `CURLOPT_POSTFIELDS` before `CURLOPT_POSTFIELDSIZE_LARGE`; BL-2493, ADR-0650). The
+`CURLOPT_COOKIEFILE` per `-b` file, `CURLOPT_POSTFIELDS` before `CURLOPT_POSTFIELDSIZE_LARGE`; BL-2493, ADR-0652). The
 `-F` form is built by `CurlMimeFromFormBody` as a `curl_mime` tree on the runner's library (`ToolCurlEngine.MimeInit`)
 and set last as `CURLOPT_MIMEPOST`; a form with a `@-` or `<-` part or an encoder `curl_mime_encoder` refuses stays
 on the hooks whole, as `MimePost`. The hooks keep the callbacks group whole, of the HTTP and protocol groups only

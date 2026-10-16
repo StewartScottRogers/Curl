@@ -6,7 +6,7 @@ using Libcurl.Options;
 namespace Curl.Console;
 
 /// <summary>
-/// The HTTP and protocol half of <see cref="EasySetoptsFromCommandLine" /> (BL-2493, ADR-0650): the
+/// The HTTP and protocol half of <see cref="EasySetoptsFromCommandLine" /> (BL-2493, ADR-0652): the
 /// <c>curl_easy_setopt</c> calls <c>config2setopts.c</c> makes for those groups, and what of them stays on the hooks.
 /// The <c>-F</c> form is not among the calls: the runner builds it as a <c>curl_mime</c> tree on the library and sets it
 /// as <c>CURLOPT_MIMEPOST</c> itself (<see cref="CurlMimeFromFormBody" />).

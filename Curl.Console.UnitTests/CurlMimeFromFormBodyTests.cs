@@ -10,7 +10,7 @@ using Libcurl.Options;
 namespace Curl.Console;
 
 /// <summary>
-/// Pins <see cref="CurlMimeFromFormBody" /> (ADR-0650): the <c>-F</c> form becomes a <c>curl_mime</c> tree that, set as
+/// Pins <see cref="CurlMimeFromFormBody" /> (ADR-0652): the <c>-F</c> form becomes a <c>curl_mime</c> tree that, set as
 /// <c>CURLOPT_MIMEPOST</c>, gives the handle the form as the tool mapped it, and a form with a part no
 /// <c>curl_mime_*</c> call can build is not built at all.
 /// </summary>

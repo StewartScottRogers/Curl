@@ -7,7 +7,7 @@ namespace Curl.Console;
 /// <summary>
 /// Builds the <c>-F</c> and <c>--form-string</c> form, as <see cref="EasyOptionsFromCommandLine.HttpOf" /> maps it, into a
 /// <c>curl_mime</c> tree with the <c>curl_mime_*</c> calls curl's tool's <c>tool2curlmime</c> makes, for the runner to
-/// set as <c>CURLOPT_MIMEPOST</c> (BL-2493, ADR-0650).
+/// set as <c>CURLOPT_MIMEPOST</c> (BL-2493, ADR-0652).
 /// </summary>
 internal static class CurlMimeFromFormBody
 {

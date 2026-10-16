@@ -32,7 +32,7 @@ ADR-0506, ADR-0624; BL-2451 routed serial transfers through CurlEasy (ToolCurlEn
 - Plan: HTTP and protocol rows in `EasySetoptsFromCommandLine.HttpProtocols.cs`, the same `SetoptRow` model as
   BL-2491/BL-2492, after the proxy rows; one `CURLOPT_COOKIEFILE` per `-b` file (the setter appends one file per call).
   The `-F` form is built by the new `CurlMimeFromFormBody` with `ToolCurlEngine.MimeInit` (`curl_mime_init` on the
-  runner's library) and set by `SetUpToolEasy` as `CURLOPT_MIMEPOST` after the groups' calls. Decisions in ADR-0650
+  runner's library) and set by `SetUpToolEasy` as `CURLOPT_MIMEPOST` after the groups' calls. Decisions in ADR-0652
   (ADR-0649 was already taken on the shared branch).
 - Kept on the hooks: a form with a `@-`/`<-` part (the tool's standard input reader has no `curl_mime_*` call that
   builds the same part) or an encoder `curl_mime_encoder` refuses; `HttpPost`, `StreamDependency`, `CookieList` (the
