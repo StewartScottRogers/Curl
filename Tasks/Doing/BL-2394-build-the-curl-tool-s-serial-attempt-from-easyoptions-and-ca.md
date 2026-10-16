@@ -39,3 +39,4 @@ ADR-0506 phase 2, ADR-0552. BL-2318 routed every serial attempt through `IEasyTr
 - 2026-10-15: Doing -> Backlog. Split: too big for one run; waits on BL-2395, BL-2396, BL-2397 and BL-2398, which move the runner's attempt wiring into ManagedEasyTransfer step by step
 - 2026-10-16: Backlog -> Doing.
 - 2026-10-16: Doing -> Backlog. Waits on BL-2479: the engine has no hook to perform from the options through the runner's follower and context factory
+- 2026-10-16: Backlog -> Doing.
