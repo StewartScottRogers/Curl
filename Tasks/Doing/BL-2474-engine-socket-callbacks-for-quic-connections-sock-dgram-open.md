@@ -30,3 +30,4 @@ ADR-0610 (BL-2418): `Curl.Engine`'s `SocketCallbackConnector` calls the socket c
 ## Log
 
 - 2026-10-16: Created.
+- 2026-10-16: Backlog -> Doing. Criteria at claim: cb168e42 c4aff572.
