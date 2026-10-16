@@ -272,13 +272,11 @@ public sealed partial class ManagedMultiTransferTests
     }
 
     [TestMethod]
-    public async Task SocketActionAndCountMembers_NotYetBuilt_ThrowNotSupported()
+    public async Task CountAndNotificationMembers_NotYetBuilt_ThrowNotSupported()
     {
         await using ManagedCurlEngine engine = new();
         await using IMultiTransfer multi = engine.CreateMulti();
 
-        Assert.ThrowsExactly<NotSupportedException>(() => multi.SocketActionAsync(CurlMultiSockets.Timeout, CurlSocketSelect.None, CancellationToken.None));
-        Assert.ThrowsExactly<NotSupportedException>(() => multi.Assign(CurlSocket.Bad, null));
         Assert.ThrowsExactly<NotSupportedException>(() => multi.GetHandles());
         Assert.ThrowsExactly<NotSupportedException>(() => multi.GetWaitSockets(Span<CurlWaitSocket>.Empty, out _));
         Assert.ThrowsExactly<NotSupportedException>(() => multi.GetInfo(CurlMultiInfo.TransfersRunning));
