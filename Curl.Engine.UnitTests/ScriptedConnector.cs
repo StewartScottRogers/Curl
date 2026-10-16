@@ -45,9 +45,29 @@ internal sealed class ScriptedConnector(IEnumerable<byte[]> reads) : IConnector
     /// </summary>
     public bool ObservesCancellation { get; init; }
 
+    /// <summary>
+    /// Gets a value indicating whether each connect first reports to the target's events that it opened
+    /// connection number 1, after its <c>Trying</c> info line, as <see cref="Curl.Networking.TcpConnector" /> does;
+    /// <see langword="false" />, the default, for neither.
+    /// </summary>
+    public bool ReportsTheConnectionOpened { get; init; }
+
     public ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, CancellationToken cancellationToken)
     {
         Targets.Add(target);
+        if (ReportsTheConnectionOpened)
+        {
+            target.Events.ReportInfo($"  Trying 127.0.0.1:{target.Port}...");
+            target.Events.ReportConnectionOpened(new ConnectionOpenedEvent
+            {
+                HostName = target.Host,
+                RemoteEndPoint = new IPEndPoint(IPAddress.Loopback, target.Port),
+                LocalEndPoint = new IPEndPoint(IPAddress.Loopback, 50000),
+                IsSecondConnection = false,
+                ConnectionNumber = 1,
+            });
+        }
+
         if (ReportsTheAlpnOffer)
         {
             target.Events.ReportTlsHandshake(new TlsHandshakeEvent

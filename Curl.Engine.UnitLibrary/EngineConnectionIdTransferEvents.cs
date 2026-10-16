@@ -10,24 +10,31 @@ namespace Curl.Engine;
 /// runner (BL-1052, BL-2362): a connection the transfer opens takes its <c>%{conn_id}</c> and is
 /// remembered in <paramref name="connectionIds" /> under the pool's number for it, and a transfer that
 /// reuses that connection takes the same <c>%{conn_id}</c>. A reused connection no transfer of the engine
-/// saw open takes the pool's number for it (ADR-0109).
+/// saw open takes the pool's number for it (ADR-0109). Each <c>%{conn_id}</c> it takes goes to
+/// <paramref name="connectionIdTaken" /> before the event goes on, so the handle's live
+/// <see cref="Api.Info.TransferInfo.ConnectionId" /> is the connection's while the debug callback sees the
+/// event (BL-2364, ADR-0547).
 /// </summary>
 /// <param name="inner">The transfer's own events.</param>
 /// <param name="state">The running transfer whose <see cref="EngineTransferState.ConnectionId" /> is kept.</param>
 /// <param name="connectionIds">The engine's <c>%{conn_id}</c> of each connection, by the pool's number for it.</param>
 /// <param name="takeConnectionId">Gives the transfer its <c>%{conn_id}</c>, taking the next one when it has none.</param>
+/// <param name="connectionIdTaken">Told the transfer's <c>%{conn_id}</c> each time it opens or reuses a connection.</param>
 internal sealed class EngineConnectionIdTransferEvents(
     ITransferEvents inner,
     EngineTransferState state,
     ConcurrentDictionary<long, long> connectionIds,
-    Func<long> takeConnectionId) : ITransferEvents
+    Func<long> takeConnectionId,
+    Action<long> connectionIdTaken) : ITransferEvents
 {
     /// <inheritdoc />
     public void ReportConnectionOpened(ConnectionOpenedEvent opened)
     {
         if (!opened.IsSecondConnection)
         {
-            connectionIds[opened.ConnectionNumber] = takeConnectionId();
+            long connectionId = takeConnectionId();
+            connectionIds[opened.ConnectionNumber] = connectionId;
+            connectionIdTaken(connectionId);
         }
 
         inner.ReportConnectionOpened(opened);
@@ -36,7 +43,9 @@ internal sealed class EngineConnectionIdTransferEvents(
     /// <inheritdoc />
     public void ReportConnectionReused(ConnectionReusedEvent reused)
     {
-        state.ConnectionId = connectionIds.GetValueOrDefault(reused.ConnectionNumber, reused.ConnectionNumber);
+        long connectionId = connectionIds.GetValueOrDefault(reused.ConnectionNumber, reused.ConnectionNumber);
+        state.ConnectionId = connectionId;
+        connectionIdTaken(connectionId);
         inner.ReportConnectionReused(reused);
     }
 

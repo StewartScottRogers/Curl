@@ -14,16 +14,18 @@ namespace Curl.Engine;
 public sealed class EngineConnectionIdTransferEventsTests
 {
     [TestMethod]
-    public void ReportConnectionOpened_NewConnection_RemembersTheTakenIdUnderThePoolNumber()
+    public void ReportConnectionOpened_NewConnection_RemembersTheTakenIdUnderThePoolNumberAndTellsIt()
     {
         EngineTransferState state = new();
         ConcurrentDictionary<long, long> connectionIds = new();
-        EngineConnectionIdTransferEvents events = new(NoTransferEvents.Instance, state, connectionIds, () => state.ConnectionId ??= 4);
+        List<long> told = [];
+        EngineConnectionIdTransferEvents events = new(NoTransferEvents.Instance, state, connectionIds, () => state.ConnectionId ??= 4, told.Add);
 
         events.ReportConnectionOpened(Opened(7, isSecond: false));
 
         Assert.AreEqual(4, connectionIds[7]);
         Assert.AreEqual(4, state.ConnectionId);
+        CollectionAssert.AreEqual(new long[] { 4 }, told);
     }
 
     [TestMethod]
@@ -31,7 +33,7 @@ public sealed class EngineConnectionIdTransferEventsTests
     {
         EngineTransferState state = new();
         ConcurrentDictionary<long, long> connectionIds = new();
-        EngineConnectionIdTransferEvents events = new(NoTransferEvents.Instance, state, connectionIds, () => throw new AssertFailedException("taken"));
+        EngineConnectionIdTransferEvents events = new(NoTransferEvents.Instance, state, connectionIds, () => throw new AssertFailedException("taken"), _ => throw new AssertFailedException("told"));
 
         events.ReportConnectionOpened(Opened(7, isSecond: true));
 
@@ -42,22 +44,24 @@ public sealed class EngineConnectionIdTransferEventsTests
     [TestMethod]
     [DataRow(7L, 4L)]
     [DataRow(9L, 9L)]
-    public void ReportConnectionReused_PoolNumber_TakesTheOpenersIdOrThePoolNumber(long connectionNumber, long expected)
+    public void ReportConnectionReused_PoolNumber_TakesAndTellsTheOpenersIdOrThePoolNumber(long connectionNumber, long expected)
     {
         EngineTransferState state = new();
         ConcurrentDictionary<long, long> connectionIds = new() { [7] = 4 };
-        EngineConnectionIdTransferEvents events = new(NoTransferEvents.Instance, state, connectionIds, () => 0);
+        List<long> told = [];
+        EngineConnectionIdTransferEvents events = new(NoTransferEvents.Instance, state, connectionIds, () => 0, told.Add);
 
         events.ReportConnectionReused(new ConnectionReusedEvent { Scheme = "http", IsProxy = false, HostName = "h", Port = 80, ConnectionNumber = connectionNumber });
 
         Assert.AreEqual(expected, state.ConnectionId);
+        CollectionAssert.AreEqual(new[] { expected }, told);
     }
 
     [TestMethod]
     public void EveryEvent_GoesOnToTheInnerEvents()
     {
         CountingEvents inner = new();
-        EngineConnectionIdTransferEvents events = new(inner, new EngineTransferState(), new ConcurrentDictionary<long, long>(), () => 0);
+        EngineConnectionIdTransferEvents events = new(inner, new EngineTransferState(), new ConcurrentDictionary<long, long>(), () => 0, _ => { });
 
         events.ReportConnectionOpened(Opened(1, isSecond: false));
         events.ReportConnectionReused(new ConnectionReusedEvent { Scheme = "http", IsProxy = false, HostName = "h", Port = 80, ConnectionNumber = 1 });

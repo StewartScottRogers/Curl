@@ -23,7 +23,9 @@ namespace Curl.Engine;
 /// (<see cref="CallbackTransferProgress" />), whose abort ends the transfer with
 /// <see cref="CurlCode.AbortedByCallback" /> (ADR-0543). Cookies, the HSTS cache, pooled
 /// connections and the <c>%{xfer_id}</c> and <c>%{conn_id}</c> numbering are the engine's (<see cref="ManagedEngineSharedState" />),
-/// shared with its other handles (ADR-0542). Around the attempt it does the runner's setup and cleanup:
+/// shared with its other handles (ADR-0542); while a transfer performs, <see cref="Info" /> holds its
+/// <c>%{xfer_id}</c> from the start and its <c>%{conn_id}</c> once it connects (-1 before), for the debug
+/// callback's <c>--trace-ids</c> prefix (ADR-0547). Around the attempt it does the runner's setup and cleanup:
 /// the <c>-b</c> files, <c>--alt-svc</c> and <c>--hsts</c> files read before it and the <c>-c</c> jar,
 /// alt-svc and HSTS files written after it, through <see cref="Host" /> (ADR-0544). The header, WebSocket and connect-only
 /// APIs are phase 3 work and throw <see cref="NotSupportedException" />.
@@ -110,6 +112,7 @@ internal sealed class ManagedEasyTransfer(
 
         EngineTransferSettings settings = ToolSettings ?? TransferSettingsOf(options);
         long transferId = shared.Performer.TakeTransferId();
+        Info = new TransferInfo { EffectiveUrl = urlText, TransferId = transferId, ConnectionId = NoConnectionId };
         CookieEngine? cookies = CookieEngine.FromHttpOptions(options.Http, shared.Cookies);
         EngineTransferState state = new();
         ITransferEvents events = EventsOf(options, state);
@@ -159,7 +162,9 @@ internal sealed class ManagedEasyTransfer(
     /// The transfer's events: the debug callback's under <c>CURLOPT_VERBOSE</c>, else none, with the
     /// <see cref="TraceComponents" />' lines added (<see cref="WithTraceComponentEvents" />), kept by
     /// <see cref="EngineConnectionIdTransferEvents" />, which gives the transfer its <c>%{conn_id}</c>
-    /// when it opens a connection and the opener's when it reuses one.
+    /// when it opens a connection and the opener's when it reuses one, and puts it on <see cref="Info" />
+    /// at once, so the debug callback can read it as curl's tool reads <c>CURLINFO_CONN_ID</c> for
+    /// <c>--trace-ids</c> (BL-2364, ADR-0547).
     /// </summary>
     /// <param name="options">The handle's options.</param>
     /// <param name="state">The running transfer, which keeps the <c>%{conn_id}</c>.</param>
@@ -172,7 +177,8 @@ internal sealed class ManagedEasyTransfer(
                 TraceComponents),
             state,
             shared.ConnectionIdsByPoolNumber,
-            () => state.ConnectionId ??= shared.Performer.TakeConnectionId());
+            () => state.ConnectionId ??= shared.Performer.TakeConnectionId(),
+            connectionId => Info = Info with { ConnectionId = connectionId });
 
     /// <summary>
     /// Wraps <paramref name="events" /> in the decorators the curl tool's runner adds under the same

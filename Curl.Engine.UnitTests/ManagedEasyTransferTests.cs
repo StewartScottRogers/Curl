@@ -512,6 +512,36 @@ public sealed partial class ManagedEasyTransferTests
     }
 
     [TestMethod]
+    public async Task PerformAsync_DebugCallbackReadsTheHandlesIds_GetsNoConnectionBeforeItOpensAndItsNumberAfter()
+    {
+        List<(string Data, long TransferId, long ConnectionId)> calls = [];
+        ScriptedConnector connector = new([Encoding.ASCII.GetBytes(Response)]) { ReportsTheConnectionOpened = true };
+        await using ManagedEasyTransfer easy = (ManagedEasyTransfer)CreateEngine(connector).CreateEasy();
+        easy.Options = new EasyOptions
+        {
+            Network = new EasyNetworkOptions { Url = "http://h/x" },
+            Behaviour = new EasyBehaviourOptions { Verbose = true },
+            Callbacks = new()
+            {
+                Debug = (_, data) =>
+                {
+                    calls.Add((Encoding.Latin1.GetString(data), easy.Info.TransferId, easy.Info.ConnectionId));
+                    return 0;
+                },
+            },
+        };
+
+        CurlCode code = await easy.PerformAsync(CancellationToken.None);
+
+        Assert.AreEqual(CurlCode.Ok, code);
+        int connected = calls.FindIndex(call => call.ConnectionId != ManagedEasyTransfer.NoConnectionId);
+        Assert.IsGreaterThan(0, connected);
+        Assert.IsTrue(calls.Take(connected).All(call => call.ConnectionId == ManagedEasyTransfer.NoConnectionId));
+        Assert.IsTrue(calls.Skip(connected).All(call => call.ConnectionId == 0));
+        Assert.IsTrue(calls.All(call => call.TransferId == 0));
+    }
+
+    [TestMethod]
     public async Task PerformAsync_DebugCallbackWithoutVerbose_IsNotCalled()
     {
         List<(CurlInfoType Type, string Data)> calls = [];
