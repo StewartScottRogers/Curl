@@ -32,7 +32,7 @@ ADR-0506; phase 3 of `Documentation/Planning/Curl-Api-And-libcurl.md`. Read the 
 
 - Plan correction: the date parser is `CurlDateParser` in `Curl.Protocol.Abstractions.UnitLibrary`, not `Curl.Core`; Libcurl reaches it through `Curl.Api.UnitLibrary`'s reference, so no csproj change.
 - `CurlDate.Parse` answers -1 (`CurlDate.Invalid`) for refused text; the parser already moves a real -1 to 0 as upstream's `curl_getdate` does. `null` throws.
-- `CurlSlist` is an `IReadOnlyList<string>`; `Append(null, s)` starts a list, `FreeAll` empties it. The option setters already copy any `IEnumerable<string>` on set, so the copy semantics hold with no setter change (ADR-0576, decided by Claude under Stewart's delegation).
+- `CurlSlist` is an `IReadOnlyList<string>`; `Append(null, s)` starts a list, `FreeAll` empties it. The option setters already copy any `IEnumerable<string>` on set, so the copy semantics hold with no setter change (ADR-0578, decided by Claude under Stewart's delegation).
 - Added `Libcurl/CLAUDE.md` to `touches` for the CLAUDE.md criterion; no task in Doing names it.
 - Measured: `Measure-CodeQuality.ps1 -Library Libcurl` 0 failing members; Libcurl.UnitTests 458 passed; 41 fast test projects passed.
 
