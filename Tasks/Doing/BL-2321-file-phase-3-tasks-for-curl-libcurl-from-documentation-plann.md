@@ -36,3 +36,4 @@ ADR-0506; the plan's "Phase 3" table (about 55-60 tasks). Phases 1 and 2 decided
 ## Log
 
 - 2026-10-15: Created.
+- 2026-10-15: Backlog -> Doing.
