@@ -10,7 +10,9 @@ namespace Libcurl.UnitTests.Easy;
 
 /// <summary>
 /// An <see cref="IEasyTransfer"/> whose perform answers <see cref="Result"/> and records the options and
-/// token it ran with, and which counts its disposals. Its other members are not called by these tests.
+/// token it ran with, and which counts its disposals. <see cref="Reset"/> and <see cref="Duplicate"/> follow
+/// <see cref="IEasyTransfer"/>'s contract: a reset restores the default options and keeps the open connection,
+/// a duplicate carries the options and nothing else. Its other members are not called by these tests.
 /// </summary>
 internal sealed class FakeEasyTransfer : IEasyTransfer
 {
@@ -41,9 +43,18 @@ internal sealed class FakeEasyTransfer : IEasyTransfer
         return ValueTask.FromResult(Result);
     }
 
-    public IEasyTransfer Duplicate() => throw new NotSupportedException();
+    /// <summary>Stands for the connection a perform leaves open: a duplicate never carries it, a reset keeps it.</summary>
+    public string? OpenConnection { get; set; }
 
-    public void Reset() => throw new NotSupportedException();
+    public int ResetCount { get; private set; }
+
+    public IEasyTransfer Duplicate() => new FakeEasyTransfer { Result = Result, Options = Options };
+
+    public void Reset()
+    {
+        ResetCount++;
+        Options = new();
+    }
 
     public CurlCode Pause(CurlPause directions) => throw new NotSupportedException();
 

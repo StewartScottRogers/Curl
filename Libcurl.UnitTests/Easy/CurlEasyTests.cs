@@ -102,6 +102,76 @@ public sealed class CurlEasyTests
     }
 
     [TestMethod]
+    public void Reset_AfterSetOption_RestoresTheDefaultOptionsAndKeepsTheConnection()
+    {
+        var transfer = new FakeEasyTransfer { OpenConnection = "connection #0" };
+        using var easy = new CurlEasy(transfer, VerboseOnly);
+        Assert.AreEqual(CurlCode.Ok, easy.SetOption(CurlOption.Verbose, 1L));
+
+        easy.Reset();
+
+        Assert.AreEqual(1, transfer.ResetCount);
+        Assert.AreEqual(new EasyOptions(), easy.Options);
+        Assert.IsFalse(easy.Options.Behaviour.Verbose);
+        Assert.AreEqual("connection #0", transfer.OpenConnection);
+    }
+
+    [TestMethod]
+    public void DupHandle_CarriesTheOptionsButNotTheConnection()
+    {
+        var transfer = new FakeEasyTransfer { OpenConnection = "connection #0" };
+        using var easy = new CurlEasy(transfer, VerboseOnly);
+        Assert.AreEqual(CurlCode.Ok, easy.SetOption(CurlOption.Verbose, 1L));
+
+        using var duplicate = easy.DupHandle();
+
+        Assert.AreNotSame(easy, duplicate);
+        Assert.IsTrue(duplicate.Options.Behaviour.Verbose);
+        Assert.AreEqual(easy.Options, duplicate.Options);
+        Assert.AreNotSame(transfer, duplicate.Transfer);
+        Assert.IsNull(((FakeEasyTransfer)duplicate.Transfer).OpenConnection);
+        Assert.IsFalse(duplicate.IsCleanedUp);
+    }
+
+    [TestMethod]
+    public void DupHandle_ThenSetOptionOnTheDuplicate_LeavesTheOriginalUnchanged()
+    {
+        using var easy = new CurlEasy(new FakeEasyTransfer(), VerboseOnly);
+        using var duplicate = easy.DupHandle();
+
+        Assert.AreEqual(CurlCode.Ok, duplicate.SetOption(CurlOption.Verbose, 1L));
+
+        Assert.IsTrue(duplicate.Options.Behaviour.Verbose);
+        Assert.IsFalse(easy.Options.Behaviour.Verbose);
+    }
+
+    [TestMethod]
+    public void DupHandle_CleanupOfTheDuplicate_LeavesTheOriginalLive()
+    {
+        var transfer = new FakeEasyTransfer();
+        using var easy = new CurlEasy(transfer, VerboseOnly);
+        var duplicate = easy.DupHandle();
+
+        duplicate.Dispose();
+
+        Assert.IsTrue(duplicate.IsCleanedUp);
+        Assert.IsFalse(easy.IsCleanedUp);
+        Assert.AreEqual(0, transfer.DisposeCount);
+    }
+
+    [TestMethod]
+    public void ResetAndDupHandle_AfterCleanup_ThrowObjectDisposed()
+    {
+        var transfer = new FakeEasyTransfer();
+        var easy = new CurlEasy(transfer, VerboseOnly);
+        easy.Dispose();
+
+        Assert.ThrowsExactly<ObjectDisposedException>(easy.Reset);
+        Assert.ThrowsExactly<ObjectDisposedException>(() => easy.DupHandle());
+        Assert.AreEqual(0, transfer.ResetCount);
+    }
+
+    [TestMethod]
     public async Task EasyInit_WrapsTheEnginesNewTransfer()
     {
         var engine = new FakeCurlEngine();

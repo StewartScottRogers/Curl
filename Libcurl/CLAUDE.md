@@ -62,6 +62,9 @@ changed `EasyOptions` back to the transfer only on `Ok`; `PerformAsync` is the n
 `Perform` blocks on it, the one sanctioned sync-over-async bridge in Libcurl. `Dispose` and
 `DisposeAsync` are `curl_easy_cleanup` and dispose the transfer once; a member used afterwards throws
 `ObjectDisposedException`. `GetInfo` is `curl_easy_getinfo` and goes through `Info`'s dispatch.
+`Reset` is `curl_easy_reset` and `DupHandle` is `curl_easy_duphandle`, each a call to the transfer's
+`Reset` or `Duplicate`: what survives each (connections kept by a reset, only the options carried by a
+duplicate) is the engine's contract on `IEasyTransfer`, not Libcurl's.
 
 `Multi` holds `CurlMulti`, the multi handle `CurlLibrary.MultiInit` (`curl_multi_init`) returns over
 the engine's `IMultiTransfer` (ADR-0570). It is `partial`: each multi area adds its members in its own

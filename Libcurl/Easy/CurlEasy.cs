@@ -10,7 +10,8 @@ namespace Libcurl.Easy;
 /// An easy handle (ADR-0506): <c>curl_easy_init</c>'s result, created by
 /// <see cref="Global.CurlLibrary.EasyInit"/> over the engine's <see cref="IEasyTransfer"/>.
 /// <see cref="SetOption"/> is <c>curl_easy_setopt</c>, <see cref="GetInfo"/> is <c>curl_easy_getinfo</c>, <see cref="Perform"/> and
-/// <see cref="PerformAsync"/> are <c>curl_easy_perform</c>, and <see cref="Dispose"/> (or
+/// <see cref="PerformAsync"/> are <c>curl_easy_perform</c>, <see cref="Reset"/> is <c>curl_easy_reset</c>,
+/// <see cref="DupHandle"/> is <c>curl_easy_duphandle</c>, and <see cref="Dispose"/> (or
 /// <see cref="DisposeAsync"/>) is <c>curl_easy_cleanup</c>.
 /// </summary>
 public sealed class CurlEasy : IDisposable, IAsyncDisposable
@@ -93,6 +94,22 @@ public sealed class CurlEasy : IDisposable, IAsyncDisposable
     /// <exception cref="ObjectDisposedException">The handle has been cleaned up.</exception>
     public ValueTask<CurlCode> PerformAsync(CancellationToken cancellationToken = default) =>
         LiveTransfer().PerformAsync(cancellationToken);
+
+    /// <summary>
+    /// <c>curl_easy_reset</c>: every option back to its default, as a new handle has them. The engine
+    /// keeps the handle's live connections, DNS cache and session cache, as libcurl does.
+    /// </summary>
+    /// <exception cref="ObjectDisposedException">The handle has been cleaned up.</exception>
+    public void Reset() => LiveTransfer().Reset();
+
+    /// <summary>
+    /// <c>curl_easy_duphandle</c>: a new handle with this one's options and none of its state - no
+    /// connection, no last transfer's info, no received headers - over the engine's duplicate transfer.
+    /// The two handles are independent: setting an option on one leaves the other's unchanged.
+    /// </summary>
+    /// <returns>The new handle; the caller disposes it (<c>curl_easy_cleanup</c>).</returns>
+    /// <exception cref="ObjectDisposedException">The handle has been cleaned up.</exception>
+    public CurlEasy DupHandle() => new(LiveTransfer().Duplicate(), dispatch);
 
     /// <summary>
     /// <c>curl_easy_cleanup</c>, synchronously: blocks on <see cref="DisposeAsync"/>. A second cleanup
