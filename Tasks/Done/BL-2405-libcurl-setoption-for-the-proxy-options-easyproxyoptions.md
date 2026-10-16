@@ -30,7 +30,7 @@ ADR-0506; phase 3 of `Documentation/Planning/Curl-Api-And-libcurl.md`. Read the 
 
 ## Notes
 
-- Plan: one setter row per `EasyProxyOptions` field in `Libcurl/Options/Proxy/EasyProxyOptionSetters.cs`, wired by the `AddProxySetters` part, following ADR-0572's shape. Decisions in ADR-0573 (setopt.c's checks: PROXYPORT 0..65535 and PROXYTYPE HTTP..SOCKS5_HOSTNAME else BadFunctionArgument, unknown SOCKS5_AUTH bit NotBuiltIn, HEADEROPT keeps the separate bit, HAPROXY_CLIENT_IP turns HAPROXYPROTOCOL on, PROXYHEADER copied at set time).
+- Plan: one setter row per `EasyProxyOptions` field in `Libcurl/Options/Proxy/EasyProxyOptionSetters.cs`, wired by the `AddProxySetters` part, following ADR-0572's shape. Decisions in ADR-0576 (setopt.c's checks: PROXYPORT 0..65535 and PROXYTYPE HTTP..SOCKS5_HOSTNAME else BadFunctionArgument, unknown SOCKS5_AUTH bit NotBuiltIn, HEADEROPT keeps the separate bit, HAPROXY_CLIENT_IP turns HAPROXYPROTOCOL on, PROXYHEADER copied at set time).
 - `PROXY_SERVICE_NAME` is not set here: `EasyProxyOptions` has no field for it (it is the authentication group's).
 - Added `Libcurl/CLAUDE.md` to `touches`: the acceptance criteria ask for it to be kept true, and no task in Doing on origin/work/dark-factory names it.
 - Measured: `Measure-CodeQuality.ps1 -Library Libcurl` 0 failing members; Libcurl.UnitTests 390 passed (15 new); full fast run green; PassingUpstreamCases.txt unchanged.
