@@ -2,10 +2,13 @@ using System.Text;
 using Curl.Api.Codes;
 using Curl.Api.EngineContracts;
 using Curl.Api.Options;
+using Curl.Api.Options.Behaviour;
+using Curl.Api.Options.Http;
 using Curl.Api.Options.Network;
 using Curl.Api.Options.Proxy;
 using Curl.Api.Options.Tls;
 using Curl.Core;
+using Curl.Networking;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Engine;
@@ -14,6 +17,8 @@ namespace Curl.Engine;
 public sealed class ManagedEasyTransferTests
 {
     private const string Response = "HTTP/1.1 200 OK\r\nContent-Length: 5\r\nContent-Type: text/plain\r\n\r\nhello";
+
+    private const string Continue = "HTTP/1.1 100 Continue\r\n\r\n";
 
     private const string ConnectFailure = "Failed to connect to h port 80 after 0 ms: Could not connect to server";
 
@@ -232,10 +237,244 @@ public sealed class ManagedEasyTransferTests
         Assert.IsTrue(settings.Silent);
     }
 
-    private static ManagedCurlEngine CreateEngine(IConnector connector) =>
-        new(TimeProvider.System, _ => new ProtocolDispatcher(EngineComposition.CreateProtocolHandlers(
+    [TestMethod]
+    public void TransferSettingsOf_ProtocolsListOnlyAndProxyHeadersSet_CarriesThem()
+    {
+        EasyOptions options = new()
+        {
+            Network = new EasyNetworkOptions { Protocols = " HTTPS ,ftp", RedirectProtocols = "https" },
+            Transfer = new EasyTransferOptions { DirListOnly = true },
+            Proxy = new EasyProxyOptions { ProxyHeaders = ["X: y"] },
+        };
+
+        EngineTransferSettings settings = ManagedEasyTransfer.TransferSettingsOf(options);
+
+        CollectionAssert.AreEquivalent(new[] { "https", "ftp" }, settings.AllowedProtocols!.ToArray());
+        CollectionAssert.AreEquivalent(new[] { "https" }, settings.AllowedRedirectProtocols!.ToArray());
+        Assert.IsTrue(settings.ListOnly);
+        CollectionAssert.AreEqual(new[] { "X: y" }, settings.ProxyHeaders.ToArray());
+    }
+
+    [TestMethod]
+    public void ProtocolSetOf_NotSet_GivesLibcurlsDefault()
+    {
+        Assert.IsNull(ManagedEasyTransfer.ProtocolSetOf(null));
+    }
+
+    [TestMethod]
+    public async Task PerformAsync_FailOnErrorAgainst404_MatchesTheToolsFailTransfer()
+    {
+        const string NotFound = "HTTP/1.1 404 Not Found\r\nContent-Length: 4\r\n\r\ngone";
+        EasyOptions options = new()
+        {
+            Network = new EasyNetworkOptions { Url = "http://h/x" },
+            Behaviour = new EasyBehaviourOptions { FailOnError = true },
+        };
+        EngineTransferSettings toolSettings = ManagedEasyTransfer.TransferSettingsOf(new EasyOptions()) with { FailMode = HttpFailMode.Fail };
+
+        (byte[] easyBytes, CurlCode easyCode) = await PerformThroughEasyAsync(options, null, NotFound);
+        (byte[] toolBytes, CurlCode toolCode) = await PerformThroughToolAsync(options with { Behaviour = new() }, toolSettings, "http://h/x", NotFound);
+
+        Assert.AreEqual(CurlCode.HttpReturnedError, easyCode);
+        Assert.AreEqual(toolCode, easyCode);
+        CollectionAssert.AreEqual(toolBytes, easyBytes);
+    }
+
+    [TestMethod]
+    public async Task PerformAsync_ToolSettingsFailWithBody_UsesThemInPlaceOfTheOptions()
+    {
+        const string NotFound = "HTTP/1.1 404 Not Found\r\nContent-Length: 4\r\n\r\ngone";
+        ScriptedConnector connector = new([Encoding.ASCII.GetBytes(NotFound)]);
+        await using ManagedEasyTransfer easy = (ManagedEasyTransfer)CreateEngine(connector).CreateEasy();
+        MemoryStream body = new();
+        easy.Options = new EasyOptions
+        {
+            Network = new EasyNetworkOptions { Url = "http://h/x" },
+            Callbacks = new() { Write = data => WriteTo(body, data) },
+        };
+        easy.ToolSettings = ManagedEasyTransfer.TransferSettingsOf(new EasyOptions()) with { FailMode = HttpFailMode.FailWithBody };
+
+        CurlCode code = await easy.PerformAsync(CancellationToken.None);
+
+        Assert.AreEqual(CurlCode.HttpReturnedError, code);
+        Assert.AreEqual("gone", Encoding.ASCII.GetString(body.ToArray()));
+    }
+
+    [TestMethod]
+    public async Task PerformAsync_ProtocolsExcludeTheUrlsScheme_MatchesTheToolsProtoRefusal()
+    {
+        EasyOptions options = new() { Network = new EasyNetworkOptions { Url = "http://h/x", Protocols = "https" } };
+        EngineTransferSettings toolSettings = ManagedEasyTransfer.TransferSettingsOf(new EasyOptions()) with { AllowedProtocols = new HashSet<string> { "https" } };
+
+        (byte[] easyBytes, CurlCode easyCode) = await PerformThroughEasyAsync(options, null, Response);
+        (byte[] toolBytes, CurlCode toolCode) = await PerformThroughToolAsync(options with { Network = new EasyNetworkOptions() }, toolSettings, "http://h/x", Response);
+
+        Assert.AreEqual(CurlCode.UnsupportedProtocol, easyCode);
+        Assert.AreEqual(toolCode, easyCode);
+        Assert.IsEmpty(easyBytes);
+        Assert.IsEmpty(toolBytes);
+    }
+
+    [TestMethod]
+    public async Task PerformAsync_UrlWithTheGetQuery_MatchesTheToolsGetTransfer()
+    {
+        EasyOptions options = new() { Network = new EasyNetworkOptions { Url = "http://h/x?a=b" } };
+        EngineTransferSettings toolSettings = ManagedEasyTransfer.TransferSettingsOf(new EasyOptions()) with { AppendUrlQuery = url => url + "?a=b" };
+
+        (byte[] easyBytes, CurlCode easyCode) = await PerformThroughEasyAsync(options, null, Response);
+        (byte[] toolBytes, CurlCode toolCode) = await PerformThroughToolAsync(new EasyOptions(), toolSettings, "http://h/x", Response);
+
+        Assert.AreEqual(CurlCode.Ok, easyCode);
+        Assert.AreEqual(toolCode, easyCode);
+        StringAssert.StartsWith(Encoding.ASCII.GetString(easyBytes), "GET /x?a=b HTTP/1.1\r\n");
+        CollectionAssert.AreEqual(toolBytes, easyBytes);
+    }
+
+    [TestMethod]
+    public async Task PerformAsync_UploadThroughTheReadCallback_MatchesTheToolsStandardInputUpload()
+    {
+        EasyOptions options = new()
+        {
+            Network = new EasyNetworkOptions { Url = "http://h/up" },
+            Transfer = new EasyTransferOptions { Upload = true },
+        };
+
+        (byte[] easyBytes, CurlCode easyCode) = await PerformThroughEasyAsync(options with { Callbacks = new() { Read = ReadOf("abc") } }, null, Continue + Response);
+        (byte[] toolBytes, CurlCode toolCode) = await PerformThroughToolAsync(
+            options, ManagedEasyTransfer.TransferSettingsOf(options), "http://h/up", Continue + Response, new CallbackReadStream(ReadOf("abc")));
+
+        Assert.AreEqual(CurlCode.Ok, easyCode);
+        Assert.AreEqual(toolCode, easyCode);
+        StringAssert.StartsWith(Encoding.ASCII.GetString(easyBytes), "PUT /up HTTP/1.1\r\n");
+        StringAssert.EndsWith(Encoding.ASCII.GetString(easyBytes), "\r\n\r\n3\r\nabc\r\n0\r\n\r\n");
+        CollectionAssert.AreEqual(toolBytes, easyBytes);
+    }
+
+    [TestMethod]
+    public async Task PerformAsync_UploadWithNoReadCallback_SendsAnEmptyBody()
+    {
+        EasyOptions options = new()
+        {
+            Network = new EasyNetworkOptions { Url = "http://h/up" },
+            Transfer = new EasyTransferOptions { Upload = true },
+        };
+
+        (byte[] easyBytes, CurlCode easyCode) = await PerformThroughEasyAsync(options, null, Response);
+
+        Assert.AreEqual(CurlCode.Ok, easyCode);
+        StringAssert.StartsWith(Encoding.ASCII.GetString(easyBytes), "PUT /up HTTP/1.1\r\n");
+    }
+
+    [TestMethod]
+    public async Task PerformAsync_TwoHandlesOfOneEngine_ShareTheCookiesAndThePooledConnection()
+    {
+        const string SetsCookie = "HTTP/1.1 200 OK\r\nSet-Cookie: a=1\r\nContent-Length: 0\r\n\r\n";
+        ScriptedConnector connector = new([Encoding.ASCII.GetBytes(SetsCookie), Encoding.ASCII.GetBytes(Response)]);
+        await using ManagedCurlEngine engine = new(TimeProvider.System, (_, shared, cookies) => new ProtocolDispatcher(EngineComposition.CreateProtocolHandlers(
+            new PoolingConnector(connector, shared.Connections, configuration: null),
+            new RecordingDatagramConnector(CurlExitCode.CouldntConnect, ConnectFailure),
+            new PassThroughTlsProvider(),
+            new LoopbackDnsResolver(),
+            cookies)));
+        EasyOptions options = new()
+        {
+            Network = new EasyNetworkOptions { Url = "http://h/x" },
+            Http = new EasyHttpOptions { CookieFiles = [string.Empty] },
+        };
+        await using IEasyTransfer first = engine.CreateEasy();
+        await using IEasyTransfer second = engine.CreateEasy();
+        first.Options = options;
+        second.Options = options;
+
+        await first.PerformAsync(CancellationToken.None);
+        int written = connector.Written.Length;
+        CurlCode code = await second.PerformAsync(CancellationToken.None);
+
+        Assert.AreEqual(CurlCode.Ok, code);
+        Assert.HasCount(1, connector.Targets);
+        StringAssert.Contains(Encoding.ASCII.GetString(connector.Written[written..]), "Cookie: a=1\r\n");
+        Assert.AreEqual(0, first.Info.TransferId);
+        Assert.AreEqual(1, second.Info.TransferId);
+    }
+
+    [TestMethod]
+    public async Task ResetAndDuplicate_ToolSettingsSet_DuplicateKeepsThemAndResetDropsThem()
+    {
+        await using ManagedEasyTransfer easy = (ManagedEasyTransfer)CreateEngine(new RecordingConnector(CurlExitCode.CouldntConnect, ConnectFailure)).CreateEasy();
+        EngineTransferSettings settings = ManagedEasyTransfer.TransferSettingsOf(new EasyOptions());
+        easy.ToolSettings = settings;
+
+        await using ManagedEasyTransfer copy = (ManagedEasyTransfer)easy.Duplicate();
+        easy.Reset();
+
+        Assert.AreSame(settings, copy.ToolSettings);
+        Assert.IsNull(easy.ToolSettings);
+    }
+
+    private static long WriteTo(MemoryStream stream, ReadOnlySpan<byte> data)
+    {
+        stream.Write(data);
+        return data.Length;
+    }
+
+    private static Api.Callbacks.ReadCallback ReadOf(string text)
+    {
+        MemoryStream source = new(Encoding.ASCII.GetBytes(text));
+        return buffer => source.Read(buffer);
+    }
+
+    private static async Task<(byte[] Written, CurlCode Code)> PerformThroughEasyAsync(EasyOptions options, EngineTransferSettings? toolSettings, string response)
+    {
+        ScriptedConnector connector = new([Encoding.ASCII.GetBytes(response)]);
+        await using ManagedEasyTransfer easy = (ManagedEasyTransfer)CreateEngine(connector).CreateEasy();
+        easy.Options = options;
+        easy.ToolSettings = toolSettings;
+
+        CurlCode code = await easy.PerformAsync(CancellationToken.None);
+
+        return (connector.Written, code);
+    }
+
+    // The tool's serial attempt today: the runner's context from TransferContextFactory and the
+    // attempt TransferPerformer.FollowWatchingSpeedAsync performs (CurlCommandRunner.TransferWithBodyAsync).
+    private static async Task<(byte[] Written, CurlCode Code)> PerformThroughToolAsync(
+        EasyOptions options, EngineTransferSettings settings, string urlText, string response, Stream? upload = null)
+    {
+        ScriptedConnector connector = new([Encoding.ASCII.GetBytes(response)]);
+        Assert.IsTrue(CurlUrl.TryParse(settings.AppendUrlQuery(urlText), pathAsIs: false, out CurlUrl? url));
+        TransferContext context = new TransferContextFactory(Stream.Null, TimeProvider.System).Create(
+            settings,
+            options.Http,
+            options.Behaviour,
+            options.Transfer,
+            options.Protocols,
+            options.Proxy,
+            options.Authentication,
+            options.Network,
+            url,
+            Stream.Null,
+            range: null,
+            resumeFrom: null,
+            headerOutput: null,
+            upload: upload);
+
+        TransferResult result = await TransferPerformer.FollowWatchingSpeedAsync(
+            new EngineTransferState(),
+            new RedirectFollower(CreateDispatcher(connector, cookies: null)),
+            context,
+            RedirectPolicyMapping.Of(settings, options.Http, options.Authentication));
+
+        return (connector.Written, result.ExitCode.ToCurlCode());
+    }
+
+    private static ProtocolDispatcher CreateDispatcher(IConnector connector, ICookieStore? cookies) =>
+        new(EngineComposition.CreateProtocolHandlers(
             connector,
             new RecordingDatagramConnector(CurlExitCode.CouldntConnect, ConnectFailure),
             new PassThroughTlsProvider(),
-            new LoopbackDnsResolver())));
+            new LoopbackDnsResolver(),
+            cookies));
+
+    private static ManagedCurlEngine CreateEngine(IConnector connector) =>
+        new(TimeProvider.System, (_, _, cookies) => CreateDispatcher(connector, cookies));
 }

@@ -16,12 +16,17 @@ namespace Curl.Engine;
 /// <see cref="TransferContextFactory" /> builds, and the attempt <see cref="TransferPerformer.FollowWatchingSpeedAsync" />
 /// performs through a <see cref="RedirectFollower" />. Body bytes go to the write callback and header
 /// lines to the header callback, each discarded when unset; writing to standard output when no write
-/// callback is set is <c>Libcurl</c>'s job, not the engine's. The header, WebSocket and connect-only
+/// callback is set is <c>Libcurl</c>'s job, not the engine's. An upload (<see cref="Api.Options.Behaviour.EasyTransferOptions.Upload" />)
+/// reads the read callback through <see cref="CallbackReadStream" />. Cookies, the HSTS cache, pooled
+/// connections and the <c>%{xfer_id}</c> numbering are the engine's (<see cref="ManagedEngineSharedState" />),
+/// shared with its other handles (ADR-0542). The header, WebSocket and connect-only
 /// APIs are phase 3 work and throw <see cref="NotSupportedException" />.
 /// </summary>
-/// <param name="createDispatcher">Builds a transfer's dispatcher from its options.</param>
-/// <param name="timeProvider">The clock each transfer runs on.</param>
-internal sealed class ManagedEasyTransfer(Func<EasyOptions, ProtocolDispatcher> createDispatcher, TimeProvider timeProvider) : IEasyTransfer
+/// <param name="createDispatcher">Builds a transfer's dispatcher from its options, the engine's shared state and the cookie store its HTTP handler keeps.</param>
+/// <param name="shared">What the engine's handles share.</param>
+internal sealed class ManagedEasyTransfer(
+    Func<EasyOptions, ManagedEngineSharedState, ICookieStore?, ProtocolDispatcher> createDispatcher,
+    ManagedEngineSharedState shared) : IEasyTransfer
 {
     /// <summary>libcurl's <c>CURLE_URL_MALFORMAT</c> text for a perform with no URL set.</summary>
     internal const string NoUrlSetText = "No URL set";
@@ -40,6 +45,14 @@ internal sealed class ManagedEasyTransfer(Func<EasyOptions, ProtocolDispatcher> 
 
     /// <summary>The directions <see cref="Pause" /> last left paused.</summary>
     internal CurlPause PausedDirections { get; private set; }
+
+    /// <summary>
+    /// Gets or sets the curl tool's own settings for the handle's transfers - <c>-s</c>, <c>-S</c>,
+    /// <c>--fail-with-body</c> and the rest that <see cref="TransferSettingsOf" /> can only default - for
+    /// <c>Curl.Console</c> to set from its command line once its runner performs through the engine (BL-2318, ADR-0542); <see langword="null" />, as for every
+    /// <c>Curl.Api</c> and <c>Libcurl</c> handle, to take them from <see cref="Options" />.
+    /// </summary>
+    internal EngineTransferSettings? ToolSettings { get; set; }
 
     /// <summary>Not supported yet: the header API is phase 3's headers work (ADR-0506).</summary>
     /// <exception cref="NotSupportedException">Always.</exception>
@@ -67,8 +80,10 @@ internal sealed class ManagedEasyTransfer(Func<EasyOptions, ProtocolDispatcher> 
             return Finish(CurlCode.UrlMalformat, MalformedUrlText, new TransferInfo { EffectiveUrl = urlText });
         }
 
-        EngineTransferSettings settings = TransferSettingsOf(options);
-        RedirectFollower follower = new(createDispatcher(options));
+        EngineTransferSettings settings = ToolSettings ?? TransferSettingsOf(options);
+        long transferId = shared.Performer.TakeTransferId();
+        CookieEngine? cookies = CookieEngine.FromHttpOptions(options.Http, shared.Cookies);
+        RedirectFollower follower = new(createDispatcher(options, shared, cookies?.HandlerStore));
         TransferResult result = await TransferPerformer.FollowWatchingSpeedAsync(
             new EngineTransferState(),
             follower,
@@ -77,14 +92,18 @@ internal sealed class ManagedEasyTransfer(Func<EasyOptions, ProtocolDispatcher> 
         return Finish(
             result.ExitCode.ToCurlCode(),
             result.ErrorMessage ?? string.Empty,
-            TransferInfoFromReport.Of(result, urlText, options.Transfer.FileTime, timeProvider));
+            TransferInfoFromReport.Of(result, urlText, options.Transfer.FileTime, shared.TimeProvider) with { TransferId = transferId });
     }
 
     /// <inheritdoc />
-    public IEasyTransfer Duplicate() => new ManagedEasyTransfer(createDispatcher, timeProvider) { Options = Options };
+    public IEasyTransfer Duplicate() => new ManagedEasyTransfer(createDispatcher, shared) { Options = Options, ToolSettings = ToolSettings };
 
     /// <inheritdoc />
-    public void Reset() => Options = new EasyOptions();
+    public void Reset()
+    {
+        Options = new EasyOptions();
+        ToolSettings = null;
+    }
 
     /// <summary>
     /// <c>curl_easy_pause</c>: records the directions to leave paused. A handle outside a transfer has
@@ -110,7 +129,7 @@ internal sealed class ManagedEasyTransfer(Func<EasyOptions, ProtocolDispatcher> 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     private TransferContext CreateContext(EasyOptions options, EngineTransferSettings settings, CurlUrl url, CancellationToken cancellationToken) =>
-        new TransferContextFactory(Stream.Null, timeProvider).Create(
+        new TransferContextFactory(Stream.Null, shared.TimeProvider) { HstsStore = shared.Hsts }.Create(
             settings,
             options.Http,
             options.Behaviour,
@@ -124,13 +143,29 @@ internal sealed class ManagedEasyTransfer(Func<EasyOptions, ProtocolDispatcher> 
             range: null,
             resumeFrom: options.Transfer.ResumeFrom > 0 ? options.Transfer.ResumeFrom : null,
             headerOutput: options.Callbacks.Header is { } header ? CallbackWriteStream.Of(header) : null,
+            upload: UploadOf(options),
             abortToken: cancellationToken);
 
     /// <summary>
-    /// The curl tool's own settings for a transfer driven through the easy interface: what the
-    /// easy groups say (<c>CURLOPT_SSL_VERIFYPEER</c>, <c>CURLOPT_KEYPASSWD</c>, <c>CURLOPT_SSLENGINE</c>,
-    /// <c>CURLOPT_HTTPPROXYTUNNEL</c>, <c>CURLOPT_UNIX_SOCKET_PATH</c>), and libcurl's defaults for the rest,
-    /// which have no easy option yet (ADR-0541).
+    /// The upload source of a <see cref="Api.Options.Behaviour.EasyTransferOptions.Upload" /> transfer: the read callback, or
+    /// nothing to read when none is set, as the engine has no standard input of its own; the host hands
+    /// standard input or a <c>-T</c> file over as a read callback (ADR-0542).
+    /// </summary>
+    /// <param name="options">The handle's options.</param>
+    /// <returns>The upload stream, or <see langword="null" /> when the transfer uploads nothing.</returns>
+    private static Stream? UploadOf(EasyOptions options) =>
+        options.Transfer.Upload
+            ? options.Callbacks.Read is { } read ? new CallbackReadStream(read) : Stream.Null
+            : null;
+
+    /// <summary>
+    /// The curl tool's own settings for a transfer driven through the easy interface with no
+    /// <see cref="ToolSettings" />: what the easy groups say (<c>CURLOPT_SSL_VERIFYPEER</c>,
+    /// <c>CURLOPT_KEYPASSWD</c>, <c>CURLOPT_SSLENGINE</c>, <c>CURLOPT_PROTOCOLS_STR</c>,
+    /// <c>CURLOPT_REDIR_PROTOCOLS_STR</c>, <c>CURLOPT_DIRLISTONLY</c>, <c>CURLOPT_PROXYHEADER</c>,
+    /// <c>CURLOPT_HTTPPROXYTUNNEL</c>, <c>CURLOPT_UNIX_SOCKET_PATH</c>), and libcurl's defaults for the
+    /// rest, which are the tool's alone (ADR-0541, ADR-0542). <c>CURLOPT_FAILONERROR</c> needs nothing here:
+    /// <see cref="HttpRequestOptionsMapping" /> reads it from the behaviour group.
     /// </summary>
     /// <param name="options">The handle's options.</param>
     /// <returns>The settings.</returns>
@@ -146,18 +181,29 @@ internal sealed class ManagedEasyTransfer(Func<EasyOptions, ProtocolDispatcher> 
             EchModeIsMalformed: false,
             PostData: null,
             ProxyCredentials: null,
-            AllowedProtocols: null,
-            AllowedRedirectProtocols: null,
+            AllowedProtocols: ProtocolSetOf(options.Network.Protocols),
+            AllowedRedirectProtocols: ProtocolSetOf(options.Network.RedirectProtocols),
             SslLevel: TransportSecurityLevel.None,
             FtpSslControlOnly: false,
             SslRequired: false,
-            ListOnly: false,
+            ListOnly: options.Transfer.DirListOnly,
             UploadFlags: [],
-            ProxyHeaders: [],
+            ProxyHeaders: options.Proxy.ProxyHeaders,
             ProxyTunnel: options.Proxy.HttpProxyTunnel,
             OverUnixSocket: options.Network.UnixSocketPath is not null,
             HappyEyeballsTimeout: HttpRequestOptionsMapping.HappyEyeballsTimeoutOf(null),
             AppendUrlQuery: url => url);
+
+    /// <summary>
+    /// The schemes a <c>CURLOPT_PROTOCOLS_STR</c> or <c>CURLOPT_REDIR_PROTOCOLS_STR</c> list names, lower
+    /// cased with blanks around each name dropped.
+    /// </summary>
+    /// <param name="protocols">The comma-separated list, or <see langword="null" /> when not set.</param>
+    /// <returns>The schemes, or <see langword="null" /> for libcurl's default.</returns>
+    internal static IReadOnlySet<string>? ProtocolSetOf(string? protocols) =>
+        protocols?.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(protocol => protocol.ToLowerInvariant())
+            .ToHashSet(StringComparer.Ordinal);
 
     private CurlCode Finish(CurlCode code, string errorText, TransferInfo info)
     {

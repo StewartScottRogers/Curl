@@ -40,9 +40,25 @@ public sealed class ManagedCurlEngineTests
     {
         await using ManagedCurlEngine engine = new();
 
-        Core.ProtocolDispatcher dispatcher = engine.CreateDispatcher(new EasyOptions());
+        Core.ProtocolDispatcher dispatcher = ManagedCurlEngine.CreateDispatcher(new EasyOptions(), engine.Shared, cookieStore: null);
 
         Assert.IsNotNull(dispatcher);
+    }
+
+    [TestMethod]
+    public async Task Shared_ProductionEngine_HasNoEasyErrorText()
+    {
+        await using ManagedCurlEngine engine = new();
+
+        Assert.AreEqual(string.Empty, engine.Shared.Performer.KnownHostsFileMissingFailure.ErrorMessage);
+    }
+
+    [TestMethod]
+    public async Task Shared_EasyErrorTextGiven_ReachesThePerformer()
+    {
+        await using ManagedCurlEngine engine = new(TimeProvider.System, null, code => $"text {(int)code}");
+
+        Assert.AreEqual("text 2", engine.Shared.Performer.KnownHostsFileMissingFailure.ErrorMessage);
     }
 
     [TestMethod]
@@ -62,6 +78,8 @@ public sealed class ManagedCurlEngineTests
 
         Assert.AreNotSame(first.VersionInfo, second.VersionInfo);
         Assert.AreNotSame(first.CreateEasy(), second.CreateEasy());
+        Assert.AreNotSame(first.Shared.Cookies, second.Shared.Cookies);
+        Assert.AreNotSame(first.Shared.Connections, second.Shared.Connections);
     }
 
     [TestMethod]
