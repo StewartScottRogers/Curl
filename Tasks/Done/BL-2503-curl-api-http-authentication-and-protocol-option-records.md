@@ -34,7 +34,7 @@ Phase 4 of `Documentation/Planning/Curl-Api-And-libcurl.md`; ADR-0506. `Curl.Api
   (one line each, calling `CurlProtocolOptions.Apply` beside `CurlTransportOptions.Apply`) and
   `Curl.Api/CLAUDE.md` (the criterion keeps it true). No task in Doing on `origin/work/dark-factory`
   names them (BL-2504 touches `Curl.Api/Cancellation`, BL-2506 `Curl.Api/Mime`).
-- Decisions in ADR-0637: records follow ADR-0636; `CurlHttpOptions` leaves headers, method, body,
+- Decisions in ADR-0640: records follow ADR-0636; `CurlHttpOptions` leaves headers, method, body,
   MIME and `StreamDependency` to the request; `UserAgent` `null` keeps the client's; flag enums are
   not bit-checked (libcurl takes any bits); `EasyWebSocketOptions` stays `CurlWebSocketOptions`'.
 - Measured: `Measure-CodeQuality.ps1 -Library Curl.Api` 0 failing members, 100% line and branch,
