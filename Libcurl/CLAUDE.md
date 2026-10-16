@@ -34,7 +34,10 @@ an `EasyOptionSetters` part in `Libcurl/Callbacks/<Area>`, keeping the namespace
 `CURLOPT_WRITEFUNCTION`, `READFUNCTION` and `HEADERFUNCTION` (their own delegate type or `null`, any other
 delegate `BadFunctionArgument`) and the `*DATA` pointers: the delegate's closure is its user data, so a
 `Stream` is the `FILE *` of libcurl's default function (`StreamDataCallbacks`, unless the caller's own
-function is set) and any other value is taken and changes nothing.
+function is set) and any other value is taken and changes nothing. `Callbacks/Progress` sets
+`CURLOPT_PROGRESSFUNCTION`, `XFERINFOFUNCTION` and `DEBUGFUNCTION` the same way, which the engine already
+calls (ADR-0543); `XFERINFODATA` (`PROGRESSDATA` is the same option) and `DEBUGDATA` take any value and
+change nothing (ADR-0574).
 
 `Misc/ErrorText` holds `CurlErrorText`: `Multi`, `Share` and `Url` are `curl_multi_strerror`,
 `curl_share_strerror` and `curl_url_strerror` with upstream's test1538 strings and fallbacks, and
