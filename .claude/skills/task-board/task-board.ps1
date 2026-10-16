@@ -413,6 +413,55 @@ function Add-LogLine([string] $Text, [string] $Line) {
     return "$body$newline$Line$newline"
 }
 
+# The acceptance criteria as they read with every box unticked, one string per criterion
+# (a "- [ ]" or "- [x]" line with its indented continuation lines), whitespace collapsed,
+# so ticking a box or rewrapping a line changes nothing and rewording one does (BL-2488).
+function Get-AcceptanceCriteria([string] $Text) {
+    $section = [regex]::Match($Text, '(?ms)^## Acceptance criteria[ \t]*\r?$(.*?)(?=^## |\z)')
+    if (-not $section.Success) { return @() }
+    $criteria = New-Object System.Collections.Generic.List[string]
+    foreach ($line in ($section.Groups[1].Value -split '\r?\n')) {
+        if ($line -match '^\s*[-*] \[[ xX]\]\s*(.*)$') { $criteria.Add($Matches[1]); continue }
+        if ($criteria.Count -gt 0 -and $line -match '^\s+\S') { $criteria[$criteria.Count - 1] += ' ' + $line.Trim() }
+    }
+    return @($criteria | ForEach-Object { ($_ -replace '\s+', ' ').Trim() })
+}
+
+# The first 8 hex digits of a criterion's SHA-256: short enough for a Log line, long
+# enough that a reworded criterion never matches by chance.
+function Get-CriterionFingerprint([string] $Criterion) {
+    $sha = [Security.Cryptography.SHA256]::Create()
+    try { $hash = $sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($Criterion)) } finally { $sha.Dispose() }
+    return (-join ($hash[0..3] | ForEach-Object { $_.ToString('x2') }))
+}
+
+# The " Criteria at claim: <fingerprints>." text a claim adds to its Log line, or '' when
+# the task has no acceptance criteria.
+function Get-ClaimSnapshot([string] $Text) {
+    $prints = @(Get-AcceptanceCriteria $Text | ForEach-Object { Get-CriterionFingerprint $_ })
+    if ($prints.Count -eq 0) { return '' }
+    return " Criteria at claim: $($prints -join ' ')."
+}
+
+# Throws, naming each criterion added or reworded and counting those removed, when the
+# criteria differ from the latest claim's snapshot. A task claimed before snapshots
+# existed has none and is not checked.
+function Assert-CriteriaUnchangedSinceClaim($Task, [string] $Text) {
+    $claims = [regex]::Matches($Text, '(?m)^\s*-\s.*-> Doing\..*Criteria at claim: ([0-9a-f ]+)\.')
+    if ($claims.Count -eq 0) { return }
+    $atClaim = @($claims[$claims.Count - 1].Groups[1].Value -split ' ' | Where-Object { $_ })
+    $now = @(Get-AcceptanceCriteria $Text)
+    $nowPrints = @($now | ForEach-Object { Get-CriterionFingerprint $_ })
+    $changed = @(for ($i = 0; $i -lt $now.Count; $i++) { if ($atClaim -notcontains $nowPrints[$i]) { $now[$i] } })
+    $removed = @($atClaim | Where-Object { $nowPrints -notcontains $_ }).Count
+    if ($changed.Count -eq 0 -and $removed -eq 0) { return }
+    $lines = @($changed | ForEach-Object { "  changed or added: $_" })
+    if ($removed -gt 0) { $lines += "  removed: $removed criteria" }
+    throw ("$($Task.Id)'s acceptance criteria differ from when it was claimed:`n" + ($lines -join "`n") +
+        "`nA run meets its criteria as written. If one cannot be met, move the task to Blocked and say why; " +
+        "to change criteria, move it to Backlog, edit them there, and claim it again.")
+}
+
 switch ($Command) {
 
     'status' {
@@ -571,11 +620,13 @@ switch ($Command) {
             if ([regex]::IsMatch($text, '(?m)^\s*[-*] \[ \]')) {
                 throw "$($task.Id) still has unticked acceptance criteria. Tick them, or move it to Blocked and say why."
             }
+            Assert-CriteriaUnchangedSinceClaim $task $text
             $text = Set-FrontMatterField $text 'completed' $Today
         }
 
         $line = "- ${Today}: $from -> $To."
         if ($Reason) { $line += ' ' + $Reason.Trim() }
+        if ($To -eq 'Doing') { $line += Get-ClaimSnapshot $text }
         $text = Add-LogLine $text $line
 
         $fileName = Split-Path $task.Path -Leaf
