@@ -78,7 +78,9 @@ complexity). `Info/Strings` reads the strings, lists, `PRIVATE` and `TLS_SSL_PTR
 `CurlTlsSessionInfo` with the build's backend and no native pointer. `Info/Times` reads the times,
 sizes, speeds, content lengths, `RETRY_AFTER` and `EARLYDATA_SENT_T`: a time's `_T` form is its
 `TimeSpan` in whole (truncated) microseconds and its double form that count over 1,000,000, as
-`getinfo.c` derives both; a size or speed is the same `long` in both forms.
+`getinfo.c` derives both; a size or speed is the same `long` in both forms. `Info/Longs` reads every `_LONG` info, the
+`_SOCKET` `ACTIVESOCKET` and the `_OFF_T` `FILETIME_T`, `XFER_ID` and `CONN_ID`, each the
+`TransferInfo` `long` as it is (`FILETIME` and `FILETIME_T` the same seconds); the two sockets stay -1.
 
 Reference `Curl.Api.UnitLibrary` and `Curl.Engine.UnitLibrary` only (project references). The engine
 reference is for `CurlGlobal.Init(flags)`, the parameterless `curl_global_init`, which builds a
