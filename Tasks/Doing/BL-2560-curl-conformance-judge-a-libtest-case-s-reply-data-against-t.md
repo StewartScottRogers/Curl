@@ -32,3 +32,4 @@ Found by BL-2558: a libtest case run through the ratchet's engine (`UpstreamConf
 ## Log
 
 - 2026-10-16: Created.
+- 2026-10-16: Backlog -> Doing. Criteria at claim: 147177d6 f9449db5 2fa0c431 4272a6b9.
