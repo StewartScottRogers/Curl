@@ -1,3 +1,5 @@
+using Curl.Api.EngineContracts;
+
 namespace Curl.Conformance.LibTest;
 
 /// <summary>
@@ -34,6 +36,19 @@ public sealed class LibTestContext
         TestNumber = testNumber;
         Arguments = copy;
     }
+
+    /// <summary>
+    /// The engine the program's <c>curl_global_init</c> takes, reaching the case's servers, or
+    /// <see langword="null"/> when none was given, so the program's init fails. The program owns it:
+    /// its <c>curl_global_cleanup</c> disposes it.
+    /// </summary>
+    public ICurlEngine? Engine { get; init; }
+
+    /// <summary>The program's <c>stdout</c>, which the case runner compares with <c>&lt;verify&gt;&lt;stdout&gt;</c>; nothing by default.</summary>
+    public Stream StandardOutput { get; init; } = Stream.Null;
+
+    /// <summary>The program's <c>stderr</c>, where a failing step writes its line; nothing by default.</summary>
+    public TextWriter StandardError { get; init; } = TextWriter.Null;
 
     /// <summary>The upstream case's number, libtest's <c>testnum</c>.</summary>
     public int TestNumber { get; }

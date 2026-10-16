@@ -356,6 +356,45 @@ public sealed class UpstreamCaseScreeningTests
     }
 
     [TestMethod]
+    [DataRow("lib1", null)]
+    [DataRow("lib2", "libtest program not ported")]
+    public void FindSkipReason_LibTool_RunsOnlyAPortedProgram(string tool, string? expected)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        string sections = RunnableClient + $"<client>\n<tool>\n{tool}\n</tool>\n</client>\n";
+        diagnostics.Arrange("test sections", sections);
+
+        string? reason = UpstreamCaseScreening.FindSkipReason(CleanExpansion, ParsedTestCase.From(sections), Features, isPortedLibTest: program => program == "lib1");
+        diagnostics.Act("skip reason", reason);
+
+        diagnostics.Assert("skip reason", expected, reason);
+        Assert.AreEqual(expected, reason);
+    }
+
+    [TestMethod]
+    [DataRow("<client>\n<tool>\nlib%TESTNUMBER\n</tool>\n</client>\n", null)]
+    [DataRow("<client>\n<tool>\n lib500 \n</tool>\n</client>\n", "lib500")]
+    [DataRow("<client>\n<tool>\ntool1394\n</tool>\n</client>\n", null)]
+    [DataRow("<client>\n<name>\nno tool\n</name>\n</client>\n", null)]
+    public void LibTestProgramName_IsTheLibProgramTheToolLineNames(string sections, string? expected)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("test sections", sections);
+
+        string? program = UpstreamCaseScreening.LibTestProgramName(ParsedTestCase.From(sections));
+        diagnostics.Act("program", program);
+
+        diagnostics.Assert("program", expected, program);
+        Assert.AreEqual(expected, program);
+    }
+
+    [TestMethod]
+    public void LibTestProgramName_NullCase_Throws()
+    {
+        Assert.ThrowsExactly<ArgumentNullException>(() => UpstreamCaseScreening.LibTestProgramName(null!));
+    }
+
+    [TestMethod]
     [DataRow("<verify>\n<protocol>\nUSER anonymous\nEPSV\nTYPE I\nSIZE 1\nRETR 1\n</protocol>\n</verify>\n")]
     [DataRow("<verify>\n<protocol>\nPASV\nLIST\nNLST\nMDTM 1\nREST 3\n</protocol>\n</verify>\n")]
     public void FindSkipReason_PassiveFtpTransfer_RunsTheCase(string sections)
@@ -371,7 +410,10 @@ public sealed class UpstreamCaseScreeningTests
     }
 
     [TestMethod]
-    [DataRow("<client>\n<tool>\nlib1\n</tool>\n</client>\n", "the harness does not act on <client><tool>")]
+    [DataRow("<client>\n<tool>\nlib1\n</tool>\n</client>\n", "libtest program not ported")]
+    [DataRow("<client>\n<tool>\nunit1300\n</tool>\n</client>\n", "the harness does not act on <client><tool>")]
+    [DataRow("<client>\n<tool>\nlib\n</tool>\n</client>\n", "the harness does not act on <client><tool>")]
+    [DataRow("<client>\n<tool>\nlibx1\n</tool>\n</client>\n", "the harness does not act on <client><tool>")]
     [DataRow("<verify>\n<upload>\nx\n</upload>\n</verify>\n", "the harness records <verify><upload> only for the smtp, imap, smtps, imaps, tftp, ftp, ftps, scp and sftp servers")]
     [DataRow("<client>\n<features>\nhttp\nDebug\n</features>\n</client>\n", "Curl lacks the feature Debug")]
     [DataRow("<client>\n<features>\n!SSL\n</features>\n</client>\n", "the case needs Curl without the feature SSL")]

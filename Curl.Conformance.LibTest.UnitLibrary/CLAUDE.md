@@ -11,7 +11,12 @@ upstream case runner runs for a case whose `<client><tool>` line names `lib%TEST
   libtest's `test()`.
 - `LibTestContext` is what `first.c` hands `test()`: `TestNumber` (`testnum`), `Arguments` (after
   the program name, copied), `Url` (`argv[1]`) and `Argument2` to `Argument4`
-  (`libtest_arg2` to `_arg4`, `null` when not given).
+  (`libtest_arg2` to `_arg4`, `null` when not given), and, set by the case runner, the `Engine`
+  the program's `curl_global_init` takes (reaching the case's in-memory servers; the program's
+  cleanup disposes it), its `StandardOutput` and its `StandardError`.
+- `LibTestPrograms` is the table of ported programs by `ProgramName` the case runner looks a
+  case's `<tool>` up in (BL-2556): an explicit list, never a reflection scan (AOT).
+  `LibTestPrograms.Ported` is the table each port task appends its program to.
 - `LibTestResult` is the exit code `main()` returns: `Success` (0), or `FromCurlCode` by number.
 - `LibTestErrorCodes` is `first.h`'s `TEST_ERR_*` codes, 8.22.0's `CURLE_OBSOLETE*` values (ADR-0653).
 - `LibTestSteps` is `first.h`'s step macros carrying `result` as `Result`: `GlobalInit`,

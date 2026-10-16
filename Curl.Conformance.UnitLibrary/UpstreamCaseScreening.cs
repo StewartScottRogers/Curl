@@ -28,7 +28,13 @@ internal static class UpstreamCaseScreening
     // Nor do runtests.pl, runner.pm or servers.pm read a <client><connectport> (test1316): the
     // http-proxy sws tunnels to the port the CONNECT request names, as the proxy stand-in does (BL-2239).
     private static readonly HashSet<string> ClientParts =
-        ["name", "command", "server", "features", "file", "file1", "file2", "file3", "file4", "stdin", "stdout", "connectport", "killserver", "disable", "precheck", "setenv"];
+        ["name", "command", "server", "features", "file", "file1", "file2", "file3", "file4", "stdin", "stdout", "connectport", "killserver", "disable", "precheck", "setenv", "tool"];
+
+    /// <summary>The reason a case is skipped whose <c>&lt;tool&gt;</c> names a libtest program with no port yet.</summary>
+    public const string LibTestNotPorted = "libtest program not ported";
+
+    /// <summary>The reason a case is skipped whose <c>&lt;tool&gt;</c> names a program other than a libtest one (a <c>unitNNNN</c> or <c>toolNNNN</c>).</summary>
+    public const string ToolNotRun = "the harness does not act on <client><tool>";
 
     // runtests.pl at curl-8_22_0 never reads a <verify><data> (test301's placeholder "[insert full protocol
     // verifiction dump here]", test302's empty one), so the harness accepts and ignores it too (BL-2222).
@@ -71,8 +77,12 @@ internal static class UpstreamCaseScreening
     /// Whether the runner has the stand-in for upstream's <c>http/3</c> server (<see cref="UpstreamHttp3Server"/>), so a
     /// case naming that server can run (BL-2261).
     /// </param>
+    /// <param name="isPortedLibTest">
+    /// Whether a libtest program, by name, has a port the runner can run (BL-2556); <see langword="null"/>
+    /// for none, so every case with a <c>&lt;tool&gt;</c> is skipped.
+    /// </param>
     /// <returns>A sentence saying why the case is skipped, or <see langword="null"/> when it can run.</returns>
-    public static string? FindSkipReason(UpstreamTestFileExpansion expansion, UpstreamTestCase testCase, IReadOnlySet<string> features, bool emulatesHttp2 = false, bool emulatesHttp3 = false)
+    public static string? FindSkipReason(UpstreamTestFileExpansion expansion, UpstreamTestCase testCase, IReadOnlySet<string> features, bool emulatesHttp2 = false, bool emulatesHttp3 = false, Func<string, bool>? isPortedLibTest = null)
     {
         HashSet<string> standIns = [.. emulatesHttp2 ? [Http2Server] : Array.Empty<string>(), .. emulatesHttp3 ? [Http3Server] : Array.Empty<string>()];
         Func<string?>[] checks =
@@ -82,6 +92,7 @@ internal static class UpstreamCaseScreening
             () => UnsupportedInstruction(expansion),
             () => CurlConfigComparison(testCase),
             () => UnsupportedPart(testCase, "client", ClientParts),
+            () => UnrunTool(testCase, isPortedLibTest ?? (_ => false)),
             () => UnsupportedPart(testCase, "verify", VerifyParts),
             () => UninterpretedCheck(testCase, "client", "precheck"),
             () => UninterpretedCheck(testCase, "verify", "postcheck"),
@@ -140,6 +151,28 @@ internal static class UpstreamCaseScreening
         testCase.Sections.FirstOrDefault(part => part.Section == section && !supported.Contains(part.Name)) is { } part
             ? $"the harness does not act on <{section}><{part.Name}>"
             : null;
+
+    /// <summary>
+    /// The libtest program a case's <c>&lt;client&gt;&lt;tool&gt;</c> line names, such as <c>lib500</c>
+    /// (<c>lib%TESTNUMBER</c> once expanded, or <c>libNNN</c>); <see langword="null"/> when it has no
+    /// <c>&lt;tool&gt;</c> or names another kind of program.
+    /// </summary>
+    /// <param name="testCase">The parsed, expanded case.</param>
+    /// <returns>The program's name, or <see langword="null"/>.</returns>
+    public static string? LibTestProgramName(UpstreamTestCase testCase)
+    {
+        ArgumentNullException.ThrowIfNull(testCase);
+        string tool = UpstreamTestPartBodies.Text(testCase.Find("client", "tool")).Trim();
+        return tool.Length > 3 && tool.StartsWith("lib", StringComparison.Ordinal) && tool[3..].All(char.IsAsciiDigit) ? tool : null;
+    }
+
+    // runtests.pl runs a <tool> in place of curl; the harness runs a ported libtest program (BL-2556) and no other.
+    private static string? UnrunTool(UpstreamTestCase testCase, Func<string, bool> isPortedLibTest) =>
+        testCase.Find("client", "tool") is null
+            ? null
+            : LibTestProgramName(testCase) is not { } program
+                ? ToolNotRun
+                : isPortedLibTest(program) ? null : LibTestNotPorted;
 
     // A precheck or postcheck runs only when every line is a %PERL -e one-liner that
     // UpstreamPerlOneLiner interprets (BL-1933), a test610.pl or test613.pl line (BL-1894) or a %RESOLVE line UpstreamResolveCheck emulates (BL-1929).

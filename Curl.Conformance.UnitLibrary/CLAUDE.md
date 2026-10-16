@@ -399,6 +399,17 @@ are measured and differ. The runner reads the upload after the case's `<postchec
 `runtests.pl` does, because 624 and 625 upload into a folder and the postcheck moves the file to
 `%LOGDIR/upload.%TESTNUMBER` (BL-1955).
 
+A case whose `<client><tool>` names a libtest program (`lib%TESTNUMBER` or `libNNN`,
+`UpstreamCaseScreening.LibTestProgramName`) runs its ported `ILibTest` in place of curl (BL-2556,
+ADR-0656): `UpstreamCaseRunner`'s optional `UpstreamLibTests(Programs, CreateEngine)` names the
+ported programs (`LibTestPrograms`, from `Curl.Conformance.LibTest.UnitLibrary`, which this library
+references) and makes the `Libcurl` engine each run gets from its `UpstreamCurlInvocation`. The
+program gets the command's words alone as its arguments (no `--output`, `--include` or trace), the
+invocation's stdout and a line-feed-only stderr writer, runs under the same time limit, and is judged
+as a curl run is. A lib case whose program is not ported skips with `libtest program not ported`; any
+other tool (`unitNNNN`, `toolNNNN`) with `the harness does not act on <client><tool>`. Until BL-2558
+gives the ratchet a real engine, it passes no `UpstreamLibTests`, so every lib case skips as not ported.
+
 What it is to hold in full, per ADR-0013 decision 2:
 
 - the test-file parser, variable substitution (`%HOSTIP`, `%TESTNUMBER`, `%LOGDIR`, ...)

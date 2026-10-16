@@ -84,4 +84,28 @@ public sealed class LibTestContextTests
     {
         Assert.ThrowsExactly<ArgumentNullException>(() => new LibTestContext(1, ["url", null!]));
     }
+
+    [TestMethod]
+    public void EngineAndStreams_WhenNotSet_AreNoEngineAndNullStreams()
+    {
+        var context = new LibTestContext(1, ["url"]);
+
+        Assert.IsNull(context.Engine);
+        Assert.AreSame(Stream.Null, context.StandardOutput);
+        Assert.AreSame(TextWriter.Null, context.StandardError);
+    }
+
+    [TestMethod]
+    public void EngineAndStreams_WhenSet_AreThoseGiven()
+    {
+        FakeCurlEngine engine = new();
+        using MemoryStream output = new();
+        using StringWriter error = new();
+
+        var context = new LibTestContext(1, ["url"]) { Engine = engine, StandardOutput = output, StandardError = error };
+
+        Assert.AreSame(engine, context.Engine);
+        Assert.AreSame(output, context.StandardOutput);
+        Assert.AreSame(error, context.StandardError);
+    }
 }
