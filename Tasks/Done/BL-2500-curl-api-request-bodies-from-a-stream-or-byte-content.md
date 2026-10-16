@@ -30,7 +30,7 @@ Phase 4 of `Documentation/Planning/Curl-Api-And-libcurl.md`; ADR-0506. `Curl.Api
 
 ## Notes
 
-- Design (ADR-0633): `CurlRequest.Body` is now `CurlContent?` (`Curl.Api/RequestBodies`). Bytes stay
+- Design (ADR-0634): `CurlRequest.Body` is now `CurlContent?` (`Curl.Api/RequestBodies`). Bytes stay
   `CURLOPT_POSTFIELDS`; `CurlContent.FromStream(stream, length?)` posts with no post fields, so the
   engine reads through `StreamUpload.Read`, and rewinds through `StreamUpload.Seek` to the stream's
   position at send time. Size: the given length, else a seekable stream's remaining length, else -1
@@ -44,7 +44,7 @@ Phase 4 of `Documentation/Planning/Curl-Api-And-libcurl.md`; ADR-0506. `Curl.Api
 - Measured: `Measure-CodeQuality.ps1 -Library Curl.Api` 100% line, 100% branch, 0 failing members;
   fast tests all green (Curl.Api.UnitTests 509 passed, 2 skipped by platform).
 - Default taken: the original exception of a failed read is not carried on `CurlException` (it has
-  no inner-exception constructor, and `Errors/` is outside touches); recorded in ADR-0633.
+  no inner-exception constructor, and `Errors/` is outside touches); recorded in ADR-0634.
 
 ## Log
 
