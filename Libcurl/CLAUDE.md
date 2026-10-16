@@ -53,7 +53,10 @@ each request is given its connection and before each look-up its DNS cache misse
 (BL-2419, ADR-0611). `Callbacks/Wildcard` sets `CURLOPT_CHUNK_BGN_FUNCTION`, `CHUNK_END_FUNCTION`, `FNMATCH_FUNCTION`
 and `INTERLEAVEFUNCTION` the same way, which the engine calls around each file of an FTP wildcard download under
 `CURLOPT_WILDCARDMATCH` and for each interleaved RTP frame of an RTSP transfer; `CHUNK_DATA`, `FNMATCH_DATA` and
-`INTERLEAVEDATA` take any value and change nothing (BL-2420, ADR-0619).
+`INTERLEAVEDATA` take any value and change nothing (BL-2420, ADR-0619). `Callbacks/Hsts` sets `CURLOPT_HSTSREADFUNCTION`
+and `HSTSWRITEFUNCTION` the same way, which the engine calls, while `CURLOPT_HSTS_CTRL` enables HSTS or `CURLOPT_HSTS`
+is set, for entries before each perform and with every entry at `curl_easy_cleanup`; `HSTSREADDATA` and
+`HSTSWRITEDATA` take any value and change nothing (BL-2421, ADR-0620).
 
 `Misc/ErrorText` holds `CurlErrorText`: `Multi`, `Share` and `Url` are `curl_multi_strerror`,
 `curl_share_strerror` and `curl_url_strerror` with upstream's test1538 strings and fallbacks, and
