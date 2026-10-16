@@ -137,7 +137,7 @@ internal static class SshHostKeyChecker
     {
         if (options.HostPublicKeySha256 is null && options.HostPublicKeyMd5 is null)
         {
-            CheckKnownHosts(hostKey, host, port, knownHosts, events);
+            CheckWithoutFingerprints(hostKey, host, port, options, knownHosts, events);
             return;
         }
 
@@ -145,7 +145,32 @@ internal static class SshHostKeyChecker
         CheckMd5(hostKey, options.HostPublicKeyMd5, events);
     }
 
-    private static void CheckKnownHosts(byte[] hostKey, string host, int port, KnownHostsFile? knownHosts, ITransferEvents events)
+    /// <summary>
+    /// The check with no fingerprint given: libcurl's <c>CURLOPT_SSH_HOSTKEYFUNCTION</c>
+    /// (<see cref="SshOptions.HostKeyAcceptance" />) when set, in place of the known-hosts file, as
+    /// <c>ssh_check_fingerprint</c> does; else the known-hosts check (ADR-0623).
+    /// </summary>
+    private static void CheckWithoutFingerprints(byte[] hostKey, string host, int port, SshOptions options, KnownHostsFile? knownHosts, ITransferEvents events)
+    {
+        if (options.HostKeyAcceptance is not { } accepts)
+        {
+            CheckKnownHosts(hostKey, host, port, knownHosts, options.KnownHostDecision, events);
+            return;
+        }
+
+        if (!accepts(SshKeyBlobReader.ReadKeyTypeName(hostKey), hostKey))
+        {
+            throw SshTransferException.KnownHostRefused();
+        }
+    }
+
+    private static void CheckKnownHosts(
+        byte[] hostKey,
+        string host,
+        int port,
+        KnownHostsFile? knownHosts,
+        Func<SshKnownHostQuery, SshKnownHostVerdict>? decision,
+        ITransferEvents events)
     {
         if (knownHosts is null)
         {
@@ -162,14 +187,35 @@ internal static class SshHostKeyChecker
 
         KnownHostsLookup lookup = knownHosts.Lookup(host, port, hostKey);
         events.ReportInfo(SshInfoLines.HostCheck((int)lookup.Check, lookup.Key));
-        if (lookup.Check != KnownHostsCheck.Match)
+        if (!IsAccepted(Decide(hostKey, lookup, decision)))
         {
             events.ReportInfo(SshInfoLines.KnownHostCheckFailed);
             throw SshTransferException.KnownHostRefused();
         }
 
-        events.ReportInfo(SshInfoLines.KnownHostMatches);
+        if (lookup.Check == KnownHostsCheck.Match)
+        {
+            events.ReportInfo(SshInfoLines.KnownHostMatches);
+        }
     }
+
+    /// <summary>
+    /// libcurl's <c>CURLOPT_SSH_KEYFUNCTION</c> answer, or without one its default <c>sshkeycallback</c>'s:
+    /// <see cref="SshKnownHostVerdict.Accept" /> for a match, else <see cref="SshKnownHostVerdict.Reject" />.
+    /// </summary>
+    private static SshKnownHostVerdict Decide(byte[] hostKey, KnownHostsLookup lookup, Func<SshKnownHostQuery, SshKnownHostVerdict>? decision)
+    {
+        if (decision is null)
+        {
+            return lookup.Check == KnownHostsCheck.Match ? SshKnownHostVerdict.Accept : SshKnownHostVerdict.Reject;
+        }
+
+        return decision(new SshKnownHostQuery(SshKeyBlobReader.ReadKeyTypeName(hostKey), hostKey, lookup.Key, (SshKnownHostMatch)lookup.Check));
+    }
+
+    /// <summary>Whether a verdict accepts the key: the three <c>CURLKHSTAT_FINE*</c> values, and no other.</summary>
+    private static bool IsAccepted(SshKnownHostVerdict verdict) =>
+        verdict is SshKnownHostVerdict.Accept or SshKnownHostVerdict.AcceptAndAddToFile or SshKnownHostVerdict.AcceptAndReplaceInFile;
 
     private static void CheckSha256(byte[] hostKey, string? expected, ITransferEvents events)
     {
