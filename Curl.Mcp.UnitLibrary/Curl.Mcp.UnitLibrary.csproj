@@ -6,6 +6,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Curl.Api.UnitLibrary\Curl.Api.UnitLibrary.csproj" />
+    <ProjectReference Include="..\Curl.Cli.UnitLibrary\Curl.Cli.UnitLibrary.csproj" />
   </ItemGroup>
 
 </Project>
