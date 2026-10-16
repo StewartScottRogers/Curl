@@ -31,3 +31,4 @@ Found by BL-2360. ADR-0543 keeps `DebugCallback`'s libcurl signature: curl's too
 ## Log
 
 - 2026-10-15: Created.
+- 2026-10-15: Backlog -> Doing.
