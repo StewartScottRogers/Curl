@@ -1,3 +1,4 @@
+using System.Text;
 using Curl.Api.Callbacks;
 using Curl.Api.Codes;
 using Curl.Api.EngineContracts;
@@ -7,6 +8,7 @@ using Curl.Api.EngineContracts.WebSocket;
 using Curl.Api.Info;
 using Curl.Api.Options;
 using Curl.Core;
+using Curl.Core.Multipart;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Engine;
@@ -96,6 +98,13 @@ internal sealed class ManagedEasyTransfer(
     /// <see cref="Reset" /> leaves it, as it is a global setting, not an option.
     /// </summary>
     internal EngineTraceComponents TraceComponents { get; set; } = EngineTraceComponents.None;
+
+    /// <summary>
+    /// Gets or sets what gives each <c>CURLOPT_MIMEPOST</c> body its boundary: <see cref="MultipartBoundary.CreateRandom" />,
+    /// curl's random one, by default; tests set a fixed one to compare bodies. <see cref="Duplicate" /> copies it and
+    /// <see cref="Reset" /> leaves it, as it is not an option.
+    /// </summary>
+    internal Func<string> CreateFormBoundary { get; set; } = MultipartBoundary.CreateRandom;
 
     /// <summary>
     /// Gets or sets the pieces of each transfer the curl tool's runner has already chosen before connecting -
@@ -248,12 +257,87 @@ internal sealed class ManagedEasyTransfer(
         EngineTransferSettings settings = ToolSettings ?? TransferSettingsOf(options);
         long transferId = shared.Performer.TakeTransferId();
         Info = new TransferInfo { EffectiveUrl = urlText, TransferId = transferId, ConnectionId = NoConnectionId };
+        return await PerformBuildingMimePostAsync(options, settings, url, urlText, transferId, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Builds the <c>CURLOPT_MIMEPOST</c> body (<see cref="MimePostFormUnlessToolGaveAsync" />) and runs the transfer
+    /// with it, or ends the perform with the build's failure before anything is set up or sent.
+    /// </summary>
+    /// <param name="options">The handle's options.</param>
+    /// <param name="settings">The tool settings.</param>
+    /// <param name="url">The URL set, parsed.</param>
+    /// <param name="urlText">The URL set.</param>
+    /// <param name="transferId">The transfer's <c>%{xfer_id}</c>.</param>
+    /// <param name="cancellationToken">Stops the transfer.</param>
+    /// <returns>The transfer's code.</returns>
+    private async Task<CurlCode> PerformBuildingMimePostAsync(
+        EasyOptions options,
+        EngineTransferSettings settings,
+        CurlUrl url,
+        string urlText,
+        long transferId,
+        CancellationToken cancellationToken)
+    {
+        EngineToolTransferInputs? toolInputs = ToolInputs;
+        MultipartFormBuildResult? form = await MimePostFormUnlessToolGaveAsync(toolInputs, options, url, cancellationToken).ConfigureAwait(false);
+        return form is { IsBuilt: false }
+            ? Finish(form.Failure.ExitCode.ToCurlCode(), form.Failure.ErrorMessage!, Info)
+            : await PerformDisposingFormAsync(options, settings, url, urlText, transferId, toolInputs, form?.Body, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary><see cref="PerformParsedAsync" />, then disposes <paramref name="formBody" />'s content.</summary>
+    /// <param name="options">The handle's options.</param>
+    /// <param name="settings">The tool settings.</param>
+    /// <param name="url">The URL set, parsed.</param>
+    /// <param name="urlText">The URL set.</param>
+    /// <param name="transferId">The transfer's <c>%{xfer_id}</c>.</param>
+    /// <param name="toolInputs">The runner's chosen pieces, or <see langword="null" /> for a handle's own.</param>
+    /// <param name="formBody">The <c>CURLOPT_MIMEPOST</c> body, or <see langword="null" /> for none.</param>
+    /// <param name="cancellationToken">Stops the transfer.</param>
+    /// <returns>The transfer's code.</returns>
+    private async Task<CurlCode> PerformDisposingFormAsync(
+        EasyOptions options,
+        EngineTransferSettings settings,
+        CurlUrl url,
+        string urlText,
+        long transferId,
+        EngineToolTransferInputs? toolInputs,
+        StreamBody? formBody,
+        CancellationToken cancellationToken)
+    {
+        await using Stream? formContent = formBody?.Content;
+        return await PerformParsedAsync(options, settings, url, urlText, transferId, toolInputs, formBody, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Runs the transfer of a URL that parsed, its <c>CURLOPT_MIMEPOST</c> body built: the setup, the attempt and the
+    /// cleanup <see cref="PerformAsync" /> describes.
+    /// </summary>
+    /// <param name="options">The handle's options.</param>
+    /// <param name="settings">The tool settings.</param>
+    /// <param name="url">The URL set, parsed.</param>
+    /// <param name="urlText">The URL set.</param>
+    /// <param name="transferId">The transfer's <c>%{xfer_id}</c>.</param>
+    /// <param name="toolInputs">The runner's chosen pieces, or <see langword="null" /> for a handle's own.</param>
+    /// <param name="formBody">The <c>CURLOPT_MIMEPOST</c> body, or <see langword="null" /> for none.</param>
+    /// <param name="cancellationToken">Stops the transfer.</param>
+    /// <returns>The transfer's code.</returns>
+    private async Task<CurlCode> PerformParsedAsync(
+        EasyOptions options,
+        EngineTransferSettings settings,
+        CurlUrl url,
+        string urlText,
+        long transferId,
+        EngineToolTransferInputs? toolInputs,
+        StreamBody? formBody,
+        CancellationToken cancellationToken)
+    {
         CookieEngine? cookies = CookieEngine.FromHttpOptions(options.Http, PerformShared.Cookies);
         (EngineTransferState state, TlsVerifyResultRecordingTransferEvents events) = StateAndEventsOf(ToolEvents, options);
-        EngineToolTransferInputs? toolInputs = ToolInputs;
         string transferUrl = await SetUpUnlessToolDidAsync(toolInputs, options, settings, cookies, state, urlText, events).ConfigureAwait(false);
         RedirectFollower follower = new(createDispatcher(options, PerformShared, HandlerCookieStoreOf(cookies)));
-        EngineToolTransferInputs inputs = InputsOf(toolInputs, options, state, PauseGateFor(url));
+        EngineToolTransferInputs inputs = MimePostForm.WithBody(InputsOf(toolInputs, options, state, PauseGateFor(url)), formBody, url.Scheme);
         CallbackReadStream? callbackUpload = inputs.Upload as CallbackReadStream;
         EngineToolTransferProgress? toolProgress = ToolProgress;
         using CancellationTokenSource abort = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, AbortTokenOf(toolProgress));
@@ -277,6 +361,25 @@ internal sealed class ManagedEasyTransfer(
         LastResult = events.ReportOn(result);
         return FinishPerformed(LastResult, options, transferId, cookies, ConnectionIdOf(result, state), AbortedTextOf(callbackUpload));
     }
+
+    /// <summary>
+    /// The <c>CURLOPT_MIMEPOST</c> body (<see cref="MimePostForm.BuildAsync" />), built in UTF-8 through
+    /// <see cref="Host" />'s file system with <see cref="CreateFormBoundary" />'s boundary, unless the curl tool's runner
+    /// gave <paramref name="toolInputs" />, whose <see cref="EngineToolTransferInputs.FormBody" /> it built itself.
+    /// </summary>
+    /// <param name="toolInputs">The runner's chosen pieces, or <see langword="null" /> for a handle's own.</param>
+    /// <param name="options">The handle's options.</param>
+    /// <param name="url">The URL set, whose scheme picks a form or a mail message.</param>
+    /// <param name="cancellationToken">Cancels the file opens.</param>
+    /// <returns>The body or its failure, or <see langword="null" /> for none.</returns>
+    private async Task<MultipartFormBuildResult?> MimePostFormUnlessToolGaveAsync(
+        EngineToolTransferInputs? toolInputs,
+        EasyOptions options,
+        CurlUrl url,
+        CancellationToken cancellationToken) =>
+        toolInputs is null
+            ? await MimePostForm.BuildAsync(new MultipartFormBodyBuilder(Host.FileSystem, Encoding.UTF8, CreateFormBoundary), options.Http, url.Scheme, cancellationToken).ConfigureAwait(false)
+            : null;
 
     /// <summary>The token the curl tool's runner aborts the transfer through, or none without <paramref name="toolProgress" />.</summary>
     /// <param name="toolProgress">The runner's progress and abort token, or <see langword="null" />.</param>
@@ -644,7 +747,7 @@ internal sealed class ManagedEasyTransfer(
     }
 
     /// <inheritdoc />
-    public IEasyTransfer Duplicate() => new ManagedEasyTransfer(createDispatcher, shared) { Options = Options, ToolSettings = ToolSettings, Host = Host, TraceComponents = TraceComponents };
+    public IEasyTransfer Duplicate() => new ManagedEasyTransfer(createDispatcher, shared) { Options = Options, ToolSettings = ToolSettings, Host = Host, TraceComponents = TraceComponents, CreateFormBoundary = CreateFormBoundary };
 
     /// <inheritdoc />
     public void Reset()

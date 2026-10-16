@@ -1,5 +1,6 @@
 using Curl.Api.Codes;
 using Curl.Api.EngineContracts;
+using Curl.Api.EngineContracts.Mime;
 using Curl.Api.EngineContracts.Multi;
 using Curl.Api.EngineContracts.Url;
 using Curl.Api.Options;
@@ -116,11 +117,21 @@ public sealed class ManagedCurlEngineTests
     }
 
     [TestMethod]
-    public async Task MimeAndForm_NotYetBuilt_ThrowNotSupported()
+    public async Task CreateMime_Called_GivesAManagedMimeBuilderWithNoParts()
     {
         await using ManagedCurlEngine engine = new();
 
-        Assert.ThrowsExactly<NotSupportedException>(() => engine.CreateMime());
+        IMimeBuilder mime = engine.CreateMime();
+
+        Assert.IsInstanceOfType<ManagedMimeBuilder>(mime);
+        Assert.IsEmpty(mime.Build().Parts);
+    }
+
+    [TestMethod]
+    public async Task CreateForm_NotYetBuilt_ThrowsNotSupported()
+    {
+        await using ManagedCurlEngine engine = new();
+
         Assert.ThrowsExactly<NotSupportedException>(() => engine.CreateForm());
     }
 }

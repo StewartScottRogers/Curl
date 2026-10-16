@@ -86,10 +86,9 @@ public sealed class ManagedCurlEngine : ICurlEngine
     /// <returns>A <see cref="ManagedCurlUrlHandle" />; the caller disposes it.</returns>
     public ICurlUrlHandle CreateUrl() => new ManagedCurlUrlHandle();
 
-    /// <summary>Not supported yet: the MIME handle is phase 3's MIME API work (ADR-0506).</summary>
-    /// <returns>Never returns.</returns>
-    /// <exception cref="NotSupportedException">Always.</exception>
-    public IMimeBuilder CreateMime() => throw new NotSupportedException("The MIME API is phase 3 work (ADR-0506).");
+    /// <summary><c>curl_mime_init</c>: a new MIME handle holding no part (BL-2439).</summary>
+    /// <returns>A <see cref="ManagedMimeBuilder" />, whose body <c>CURLOPT_MIMEPOST</c> sends.</returns>
+    public IMimeBuilder CreateMime() => new ManagedMimeBuilder();
 
     /// <summary>Not supported yet: the form API is phase 3's MIME API work (ADR-0506).</summary>
     /// <returns>Never returns.</returns>
