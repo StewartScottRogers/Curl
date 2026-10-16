@@ -30,7 +30,7 @@ ADR-0506; phase 3 of `Documentation/Planning/Curl-Api-And-libcurl.md`. Read the 
 
 ## Notes
 
-- Decisions in ADR-0561: `CurlLibrary.EasyInit()` is `curl_easy_init`; the handle keeps no options of its own and writes the dispatched copy back to `IEasyTransfer.Options` only on `Ok`; `CurlEasy` is `IDisposable` and `IAsyncDisposable`, cleanup disposes the transfer once, and members used afterwards throw `ObjectDisposedException`.
+- Decisions in ADR-0563: `CurlLibrary.EasyInit()` is `curl_easy_init`; the handle keeps no options of its own and writes the dispatched copy back to `IEasyTransfer.Options` only on `Ok`; `CurlEasy` is `IDisposable` and `IAsyncDisposable`, cleanup disposes the transfer once, and members used afterwards throw `ObjectDisposedException`.
 - Added `Libcurl/CLAUDE.md` to `touches` to keep its area map true (an acceptance criterion); no task in Doing on `origin/work/dark-factory` names it.
 - Measured: `Measure-CodeQuality.ps1 -Library Libcurl` reports 100% line and branch coverage and 0 failing members; `PassingUpstreamCases.txt` untouched.
 
@@ -38,4 +38,4 @@ ADR-0506; phase 3 of `Documentation/Planning/Curl-Api-And-libcurl.md`. Read the 
 
 - 2026-10-15: Created.
 - 2026-10-15: Backlog -> Doing.
-- 2026-10-15: Doing -> Done. CurlEasy with SetOption, Perform, PerformAsync and Dispose over IEasyTransfer; ADR-0561
+- 2026-10-15: Doing -> Done. CurlEasy with SetOption, Perform, PerformAsync and Dispose over IEasyTransfer; ADR-0563
