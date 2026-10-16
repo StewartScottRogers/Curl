@@ -278,12 +278,14 @@ Curl/
 - Tests: the same name with `.UnitTests` instead of `.UnitLibrary`.
 - Integration tests, once an area has any: the same name with `.IntegrationTests`
   instead of `.UnitLibrary` (ADR-0421).
-- Three projects are exceptions to the `Curl.<Area>.UnitLibrary` rule: the executable
-  `Curl.Console` (no `.UnitLibrary` suffix, because it is not a library) and the two
-  programming interfaces `Curl.Api` and `Libcurl` (ADR-0506). `Libcurl` also has no `Curl.`
-  prefix, matching upstream's library name. `Curl.Api` and `Libcurl` are held to the four
-  quality gates like a `*.UnitLibrary`. `Curl.Api.UnitTests` tests both `Curl.Api` and
-  `Curl.Api.UnitLibrary`; `Libcurl.UnitTests` tests `Libcurl`.
+- Four projects are exceptions to the `Curl.<Area>.UnitLibrary` rule: the executable
+  `Curl.Console` (no `.UnitLibrary` suffix, because it is not a library), the two
+  programming interfaces `Curl.Api` and `Libcurl` (ADR-0506), and the MCP server host
+  `Curl.Mcp` (ADR-0548). `Libcurl` also has no `Curl.` prefix, matching upstream's library
+  name. `Curl.Api`, `Libcurl` and `Curl.Mcp` are held to the four quality gates like a
+  `*.UnitLibrary`. `Curl.Api.UnitTests` tests both `Curl.Api` and `Curl.Api.UnitLibrary`,
+  `Curl.Mcp.UnitTests` tests both `Curl.Mcp` and `Curl.Mcp.UnitLibrary`, and
+  `Libcurl.UnitTests` tests `Libcurl`.
 - Names sort so each `.UnitTests` lands directly after the library it tests, and each
   `.IntegrationTests` directly before it (for `Curl.Console`, directly before
   `Curl.Console.UnitTests`). Keep it that way. `Libcurl` and `Libcurl.UnitTests` sort after
@@ -312,10 +314,11 @@ Each project folder may contain its own `CLAUDE.md` with project-specific rules;
 - **Base class library only.** Write against `System.*`. Sockets, TLS, HTTP, DNS,
   compression, JSON and argument handling are all in the BCL already, and
   `Curl.Console` publishes native AOT, where every dependency is a trim risk. The
-  one package in `Directory.Packages.props` — Microsoft's `MSTest` meta-package —
-  is the test harness and is the only approved dependency in the solution. Adding a
-  second needs Stewart's explicit approval, asked for *before* the reference is
-  added — hand-roll the small piece needed, or stop and ask. Test projects use
+  approved packages are Microsoft's `MSTest` meta-package, the test harness, and, for
+  `Curl.Mcp` alone, `ModelContextProtocol` and `Microsoft.Extensions.Hosting` (Stewart,
+  2026-10-15, ADR-0548); no other project, and no `*.UnitLibrary`, may reference those two.
+  Adding any other package needs Stewart's explicit approval, asked for *before* the
+  reference is added — hand-roll the small piece needed, or stop and ask. Test projects use
   MSTest, the framework in the .NET SDK; no third-party test, mocking or assertion
   library is permitted.
 - **Tests pass on Windows, Linux and macOS.** CI runs the fast tests on all three, and
