@@ -3,7 +3,13 @@
 The .NET-idiomatic programming interface to Curl (ADR-0506), not a `Curl.<Area>.UnitLibrary`:
 `Curl.Api` is a naming exception, with `Curl.Console` and `Libcurl`. Namespace `Curl.Api`
 for `Client/` (`CurlClient` and `CurlClientOptions`) and `Composition/` (the engine-building
-half of the partial `CurlClient`); `Curl.Api.Errors` for `Errors/`.
+half of the partial `CurlClient`) and `Messages/`; `Curl.Api.Errors` for `Errors/`.
+
+- `Messages/`: `CurlRequest` and `CurlResponse` records and the `SendAsync` half of the partial
+  `CurlClient` (BL-2499, ADR-0632). `CurlRequestOptions` maps a request onto `EasyOptions`;
+  `ResponseHeaderCollector` is the header callback that splits header lines into reason, headers and
+  trailers. The response body is `Stream.Null` until BL-2501. Its tests use the scripted fakes in
+  `Curl.Api.UnitTests/Messages`.
 
 - `Errors/`: `CurlException`, the one exception every failure in `Curl.Api` throws, carrying the
   `CurlCode`; `CurlException.ThrowIfFailed` maps a call's result to it, and `CurlCodeText` is its own
