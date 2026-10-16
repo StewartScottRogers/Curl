@@ -180,14 +180,15 @@ public sealed class ManagedFormBuilderTests
     }
 
     [TestMethod]
-    public void Add_Stream_AddsAPartWithNoDataUnderItsFileName()
+    public void Add_Stream_AddsAStreamPartOfTheContentsLengthUnderItsFileName()
     {
         ManagedFormBuilder form = NewForm();
+        object stream = new();
 
-        form.Add([Arg(CurlFormOption.CopyName, "a"), Arg(CurlFormOption.Stream, new object()), Arg(CurlFormOption.FileName, "s"), Arg(CurlFormOption.ContentsLength, 4L)]);
+        form.Add([Arg(CurlFormOption.CopyName, "a"), Arg(CurlFormOption.Stream, stream), Arg(CurlFormOption.FileName, "s"), Arg(CurlFormOption.ContentsLength, 4L)]);
 
         EasyMimePart part = OnlyPart(form);
-        Assert.IsNull(part.Data);
+        Assert.AreEqual(new FormStreamData(4, stream), part.Data);
         Assert.AreEqual("s", part.FileName);
         Assert.IsNull(part.Type);
     }

@@ -590,7 +590,7 @@ internal sealed class ManagedEasyTransfer(
     }
 
     /// <summary>
-    /// The <c>CURLOPT_MIMEPOST</c> body (<see cref="MimePostForm.BuildAsync" />), built in UTF-8 through
+    /// The <c>CURLOPT_MIMEPOST</c> or <c>CURLOPT_HTTPPOST</c> body (<see cref="MimePostForm.BuildAsync" />), built in UTF-8 through
     /// <see cref="Host" />'s file system with <see cref="CreateFormBoundary" />'s boundary, unless the curl tool's runner
     /// gave <paramref name="toolInputs" />, whose <see cref="EngineToolTransferInputs.FormBody" /> it built itself.
     /// </summary>
@@ -607,7 +607,7 @@ internal sealed class ManagedEasyTransfer(
         ICollection<CallbackReadStream> mimeReads,
         CancellationToken cancellationToken) =>
         toolInputs is null
-            ? await MimePostForm.BuildAsync(new MultipartFormBodyBuilder(Host.FileSystem, Encoding.UTF8, CreateFormBoundary), options.Http, url.Scheme, mimeReads, cancellationToken).ConfigureAwait(false)
+            ? await MimePostForm.BuildAsync(new MultipartFormBodyBuilder(Host.FileSystem, Encoding.UTF8, CreateFormBoundary), options.Http, url.Scheme, options.Callbacks.Read, mimeReads, cancellationToken).ConfigureAwait(false)
             : null;
 
     /// <summary>The token the curl tool's runner aborts the transfer through, or none without <paramref name="toolProgress" />.</summary>

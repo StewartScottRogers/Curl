@@ -159,8 +159,8 @@ internal sealed class FormPost
 
     /// <summary>
     /// The part's content as <c>Curl_getformdata</c> sets it from the field's flags: a file (standard input for
-    /// <c>-</c>), the buffer, nothing for a stream (the easy handle's read callback is not known here, as
-    /// <c>curl_formget</c> has none either), else the value.
+    /// <c>-</c>), the buffer, a <see cref="FormStreamData" /> for a stream (the easy handle's read callback is not
+    /// known until it is sent, and <c>curl_formget</c> has none, so sends it empty), else the value.
     /// </summary>
     private EasyMimeData? DataOf(FormFieldInfo file)
     {
@@ -174,7 +174,7 @@ internal sealed class FormPost
             return BytesOf(Field.Buffer!, Field.BufferLength);
         }
 
-        return Field.HasAny(FormFieldFlags.Callback) ? null : BytesOf(ValueBytesOf(file.Value!), Field.ContentsLength);
+        return Field.HasAny(FormFieldFlags.Callback) ? new FormStreamData(Field.ContentsLength, Field.StreamObject) : BytesOf(ValueBytesOf(file.Value!), Field.ContentsLength);
     }
 
     private static EasyMimeData? FileDataOf(object? path) =>
