@@ -37,7 +37,7 @@ Upstream's `curl_version_info(stamp)` ignores `stamp` and always answers its one
    what libcurl answers for a library it was built without.
 4. Agreement with `curl -V` over the real `ManagedCurlEngine` - host, TLS backend, the protocol list
    without the tool's own `ipfs` and `ipns`, and the feature names - is the engine's to report.
-   `Curl.Engine.UnitLibrary` was held by another lane, so that is BL-2464.
+   `Curl.Engine.UnitLibrary` was held by another lane, so that is BL-2465.
 
 ## Consequences
 

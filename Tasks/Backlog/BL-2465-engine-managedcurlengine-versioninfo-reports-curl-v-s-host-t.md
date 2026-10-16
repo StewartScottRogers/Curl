@@ -1,5 +1,5 @@
 ---
-id: BL-2464
+id: BL-2465
 title: Engine: ManagedCurlEngine.VersionInfo reports curl -V's host, TLS backend, protocols and features
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-16
 completed:
 ---
-# BL-2464 — Engine: ManagedCurlEngine.VersionInfo reports curl -V's host, TLS backend, protocols and features
+# BL-2465 — Engine: ManagedCurlEngine.VersionInfo reports curl -V's host, TLS backend, protocols and features
 
 ## Goal
 
