@@ -46,3 +46,4 @@ Guard file: `task-board.ps1` changes only through the `audit` branch (CLAUDE.md,
 ## Log
 
 - 2026-10-16: Created.
+- 2026-10-16: Backlog -> Doing. Criteria at claim: b94827b4 7bc07c93 49428525 0d10730e 8f977375 67fc12e5 fbb6e071.
