@@ -43,3 +43,4 @@ ADR-0506, plan phase 2 step 5 - the console's re-base onto the seam, the step be
 - 2026-10-15: Created.
 - 2026-10-15: Backlog -> Doing.
 - 2026-10-15: Doing -> Backlog. Needs BL-2317, BL-2359 and BL-2360: ManagedEasyTransfer cannot yet run the tool's attempt byte for byte (tool settings, shared state, trace and progress callbacks, full TransferInfo)
+- 2026-10-15: Backlog -> Doing.
