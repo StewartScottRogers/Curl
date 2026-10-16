@@ -32,3 +32,4 @@ ADR-0506, ADR-0624; BL-2451 routed serial transfers through CurlEasy (ToolCurlEn
 ## Log
 
 - 2026-10-16: Created.
+- 2026-10-16: Backlog -> Doing. Criteria at claim: 4d57dfb4 84393800 e3fd321b 908e5cf5.
