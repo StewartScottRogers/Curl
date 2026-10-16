@@ -82,7 +82,7 @@ sizes, speeds, content lengths, `RETRY_AFTER` and `EARLYDATA_SENT_T`: a time's `
 
 Reference `Curl.Api.UnitLibrary` and `Curl.Engine.UnitLibrary` only (project references). The engine
 reference is for `CurlGlobal.Init(flags)`, the parameterless `curl_global_init`, which builds a
-`ManagedCurlEngine` (ADR-0577); every other member takes its `ICurlEngine` from the library, so tests
+`ManagedCurlEngine` (ADR-0579); every other member takes its `ICurlEngine` from the library, so tests
 inject fakes. Never reference `Curl.Api` or a protocol library.
 
 Held to the four quality gates in the root `CLAUDE.md`. Its tests live in `Libcurl.UnitTests`,

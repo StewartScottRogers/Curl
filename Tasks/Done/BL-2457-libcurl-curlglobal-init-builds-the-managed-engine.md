@@ -31,7 +31,7 @@ ADR-0506; phase 3 of `Documentation/Planning/Curl-Api-And-libcurl.md`. Read the 
 
 ## Notes
 
-- Added `CurlGlobal.Init(CurlGlobalFlags flags = Default)`, which builds `new ManagedCurlEngine()` (system clock, real network, empty easy error text until BL-2450), and an internal `CurlLibrary.Engine` so the test can show the engine type without a transfer. Decision recorded in ADR-0577.
+- Added `CurlGlobal.Init(CurlGlobalFlags flags = Default)`, which builds `new ManagedCurlEngine()` (system clock, real network, empty easy error text until BL-2450), and an internal `CurlLibrary.Engine` so the test can show the engine type without a transfer. Decision recorded in ADR-0579.
 - Added `Libcurl/CLAUDE.md` to `touches`: the first acceptance criterion edits it, and no task in Doing on `origin/work/dark-factory` names it. `Curl.Engine.UnitLibrary`'s CLAUDE.md already says it sits behind `Libcurl` and is BL-2416's area, so it is left alone.
 - Overloading `Init` made the bare `cref="Init"` ambiguous (CS0419); the crefs now name `Init(CurlGlobalFlags)`.
 - Measured: `Measure-CodeQuality.ps1 -Library Libcurl` reports Libcurl at 100% line, 100% branch, 0 failing members. Fast tests: 0 failed; Libcurl.UnitTests 438 passed.
