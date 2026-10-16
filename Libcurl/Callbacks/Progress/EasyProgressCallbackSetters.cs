@@ -7,7 +7,7 @@ namespace Libcurl.Callbacks.Progress;
 
 /// <summary>
 /// The setter rows of <c>CURLOPT_PROGRESSFUNCTION</c>, <c>CURLOPT_XFERINFOFUNCTION</c> and
-/// <c>CURLOPT_DEBUGFUNCTION</c> and their <c>*DATA</c> pointers (ADR-0574). A function row takes its own delegate
+/// <c>CURLOPT_DEBUGFUNCTION</c> and their <c>*DATA</c> pointers (ADR-0577). A function row takes its own delegate
 /// type or <see langword="null"/> (libcurl's default) and answers <see cref="CurlCode.BadFunctionArgument"/> for any
 /// other delegate. The engine calls them as libcurl does: the xferinfo function, else the progress function, on
 /// every progress report unless <c>CURLOPT_NOPROGRESS</c> is set, a non-zero return aborting the transfer with
