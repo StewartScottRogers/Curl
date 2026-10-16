@@ -111,8 +111,7 @@ public sealed class ManagedCurlEngine : ICurlEngine
     /// <returns>The dispatcher.</returns>
     internal static ProtocolDispatcher CreateDispatcher(EasyOptions options, ManagedEngineSharedState shared, ICookieStore? cookieStore)
     {
-        EngineToolOptions tool = new(Parallel: false, ParallelImmediate: false, SslSessionsFile: null, MaxTime: options.Transfer.Timeout > TimeSpan.Zero ? options.Transfer.Timeout : null);
-        CurlTransports transports = EngineComposition.CreateTransports(tool, options.Network, options.Tls, options.Http, options.Proxy, options.Authentication, shared.TimeProvider, shared.Connections, shared.TlsSessions, runDnsCache: shared.DnsCache);
+        CurlTransports transports = CreateTransports(options, shared);
         return new ProtocolDispatcher(EngineComposition.CreateProtocolHandlers(
             transports.PoolingConnector,
             transports.UdpDatagramConnector,
@@ -122,5 +121,21 @@ public sealed class ManagedCurlEngine : ICurlEngine
             proxyAuthSchemes: transports.ProxyTunnelOptions.ProxyAuthSchemes,
             negotiateOptions: NegotiateOptionsMapping.Of(options.Authentication),
             ftpDataConnector: EngineComposition.FtpDataConnectorOf(transports)));
+    }
+
+    /// <summary>
+    /// Builds the connector a <c>CURLOPT_CONNECT_ONLY</c> 1 perform dials through: the <c>TcpConnector</c> of
+    /// <see cref="CreateDispatcher" />'s transports, not its pool, so the connection is the handle's own (ADR-0608).
+    /// </summary>
+    /// <param name="options">The transfer's options.</param>
+    /// <param name="shared">The engine's shared caches.</param>
+    /// <returns>The connector.</returns>
+    internal static IConnector CreateConnectOnlyConnector(EasyOptions options, ManagedEngineSharedState shared) =>
+        CreateTransports(options, shared).TcpConnector;
+
+    private static CurlTransports CreateTransports(EasyOptions options, ManagedEngineSharedState shared)
+    {
+        EngineToolOptions tool = new(Parallel: false, ParallelImmediate: false, SslSessionsFile: null, MaxTime: options.Transfer.Timeout > TimeSpan.Zero ? options.Transfer.Timeout : null);
+        return EngineComposition.CreateTransports(tool, options.Network, options.Tls, options.Http, options.Proxy, options.Authentication, shared.TimeProvider, shared.Connections, shared.TlsSessions, runDnsCache: shared.DnsCache);
     }
 }

@@ -1,5 +1,6 @@
 using Curl.Api.Codes;
 using Curl.Api.EngineContracts;
+using Curl.Api.EngineContracts.ConnectOnly;
 using Curl.Api.Options;
 using Libcurl.Info;
 using Libcurl.Options;
@@ -12,7 +13,9 @@ namespace Libcurl.Easy;
 /// <see cref="SetOption"/> is <c>curl_easy_setopt</c>, <see cref="GetInfo"/> is <c>curl_easy_getinfo</c>, <see cref="Perform"/> and
 /// <see cref="PerformAsync"/> are <c>curl_easy_perform</c>, <see cref="Reset"/> is <c>curl_easy_reset</c>,
 /// <see cref="DupHandle"/> is <c>curl_easy_duphandle</c>, <see cref="Pause"/> is <c>curl_easy_pause</c>,
-/// <see cref="Upkeep"/> and <see cref="UpkeepAsync"/> are <c>curl_easy_upkeep</c>, and <see cref="Dispose"/> (or
+/// <see cref="Upkeep"/> and <see cref="UpkeepAsync"/> are <c>curl_easy_upkeep</c>, <see cref="Recv"/> and
+/// <see cref="RecvAsync"/> are <c>curl_easy_recv</c>, <see cref="Send"/> and <see cref="SendAsync"/> are
+/// <c>curl_easy_send</c>, and <see cref="Dispose"/> (or
 /// <see cref="DisposeAsync"/>) is <c>curl_easy_cleanup</c>.
 /// </summary>
 public sealed class CurlEasy : IDisposable, IAsyncDisposable
@@ -143,6 +146,58 @@ public sealed class CurlEasy : IDisposable, IAsyncDisposable
     /// <exception cref="ObjectDisposedException">The handle has been cleaned up.</exception>
     public ValueTask<CurlCode> UpkeepAsync(CancellationToken cancellationToken = default) =>
         LiveTransfer().UpkeepAsync(cancellationToken);
+
+    /// <summary>
+    /// <c>curl_easy_recv</c>: receives the bytes the connection a <c>CURLOPT_CONNECT_ONLY</c> perform left open has
+    /// ready, blocking on <see cref="RecvAsync"/>, which itself never waits for the peer.
+    /// </summary>
+    /// <param name="buffer">Where the received bytes are written.</param>
+    /// <param name="received"><c>*n</c>: how many bytes were written; 0 unless the answer is <see cref="CurlCode.Ok"/>, and 0 with it once the peer has closed.</param>
+    /// <returns>
+    /// The engine's answer: <see cref="CurlCode.Ok"/>, <see cref="CurlCode.Again"/> when nothing is ready yet, or
+    /// <see cref="CurlCode.UnsupportedProtocol"/> when no connect-only perform left a connection open.
+    /// </returns>
+    /// <exception cref="ObjectDisposedException">The handle has been cleaned up.</exception>
+    public CurlCode Recv(Memory<byte> buffer, out int received)
+    {
+        var result = RecvAsync(buffer).AsTask().GetAwaiter().GetResult();
+        received = result.Result == CurlCode.Ok ? result.ByteCount : 0;
+        return result.Result;
+    }
+
+    /// <summary><c>curl_easy_recv</c>: receives the bytes the connect-only connection has ready, without waiting for more.</summary>
+    /// <param name="buffer">Where the received bytes are written.</param>
+    /// <param name="cancellationToken">Stops the call.</param>
+    /// <returns>The engine's result and byte count, as <see cref="Recv"/> describes.</returns>
+    /// <exception cref="ObjectDisposedException">The handle has been cleaned up.</exception>
+    public ValueTask<CurlConnectOnlyResult> RecvAsync(Memory<byte> buffer, CancellationToken cancellationToken = default) =>
+        LiveTransfer().Connection.ReceiveAsync(buffer, cancellationToken);
+
+    /// <summary>
+    /// <c>curl_easy_send</c>: sends <paramref name="buffer"/> on the connection a <c>CURLOPT_CONNECT_ONLY</c> perform
+    /// left open, blocking on <see cref="SendAsync"/>, which itself never waits for the peer.
+    /// </summary>
+    /// <param name="buffer">The bytes to send.</param>
+    /// <param name="sent"><c>*n</c>: how many bytes of <paramref name="buffer"/> were sent; 0 unless the answer is <see cref="CurlCode.Ok"/>.</param>
+    /// <returns>
+    /// The engine's answer: <see cref="CurlCode.Ok"/>, <see cref="CurlCode.Again"/> when nothing could be sent yet, or
+    /// <see cref="CurlCode.UnsupportedProtocol"/> when no connect-only perform left a connection open.
+    /// </returns>
+    /// <exception cref="ObjectDisposedException">The handle has been cleaned up.</exception>
+    public CurlCode Send(ReadOnlyMemory<byte> buffer, out int sent)
+    {
+        var result = SendAsync(buffer).AsTask().GetAwaiter().GetResult();
+        sent = result.Result == CurlCode.Ok ? result.ByteCount : 0;
+        return result.Result;
+    }
+
+    /// <summary><c>curl_easy_send</c>: sends as many bytes of <paramref name="buffer"/> as the connect-only connection takes now.</summary>
+    /// <param name="buffer">The bytes to send.</param>
+    /// <param name="cancellationToken">Stops the call.</param>
+    /// <returns>The engine's result and byte count, as <see cref="Send"/> describes.</returns>
+    /// <exception cref="ObjectDisposedException">The handle has been cleaned up.</exception>
+    public ValueTask<CurlConnectOnlyResult> SendAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default) =>
+        LiveTransfer().Connection.SendAsync(buffer, cancellationToken);
 
     /// <summary>
     /// <c>curl_easy_cleanup</c>, synchronously: blocks on <see cref="DisposeAsync"/>. A second cleanup

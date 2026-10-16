@@ -36,7 +36,8 @@ internal sealed class FakeEasyTransfer : IEasyTransfer
 
     public IEasyWebSocket WebSocket => throw new NotSupportedException();
 
-    public IConnectOnlyConnection Connection => throw new NotSupportedException();
+    /// <summary>The connect-only connection: one with nothing open unless a test gives its own.</summary>
+    public IConnectOnlyConnection Connection { get; init; } = new FakeConnectOnlyConnection();
 
     public ValueTask<CurlCode> PerformAsync(CancellationToken cancellationToken)
     {

@@ -33,8 +33,9 @@ namespace Curl.Engine;
 /// reach <see cref="Info" /> through <see cref="TlsVerifyResultRecordingTransferEvents" /> (BL-2366). Around the attempt it does the runner's setup and cleanup:
 /// the <c>-b</c> files, <c>--alt-svc</c> and <c>--hsts</c> files read before it and the <c>-c</c> jar,
 /// alt-svc and HSTS files written after it, through <see cref="Host" /> (ADR-0544). <see cref="Headers" /> keeps the
-/// headers of the last perform's HTTP responses (ADR-0603); the WebSocket and connect-only APIs are phase 3 work and
-/// throw <see cref="NotSupportedException" />.
+/// headers of the last perform's HTTP responses (ADR-0603), and <see cref="Connection" /> the connection a
+/// <c>CURLOPT_CONNECT_ONLY</c> 1 perform left open (ADR-0608); the WebSocket API is phase 3 work and throws
+/// <see cref="NotSupportedException" />.
 /// </summary>
 /// <param name="createDispatcher">Builds a transfer's dispatcher from its options, the engine's shared state and the cookie store its HTTP handler keeps.</param>
 /// <param name="shared">What the engine's handles share.</param>
@@ -187,14 +188,30 @@ internal sealed class ManagedEasyTransfer(
     /// <exception cref="NotSupportedException">Always.</exception>
     public IEasyWebSocket WebSocket => throw new NotSupportedException("The WebSocket API is phase 3 work (ADR-0506).");
 
-    /// <summary>Not supported yet: <c>curl_easy_recv</c> and <c>curl_easy_send</c> are phase 3's connect-only work (ADR-0506).</summary>
-    /// <exception cref="NotSupportedException">Always.</exception>
-    public IConnectOnlyConnection Connection => throw new NotSupportedException("The connect-only API is phase 3 work (ADR-0506).");
+    /// <summary>The connection a connect-only perform left open, for <see cref="Connection" />.</summary>
+    private ConnectOnlyConnection? connectOnly;
+
+    /// <summary>
+    /// Gets or sets what builds the connector a <c>CURLOPT_CONNECT_ONLY</c> 1 perform dials through:
+    /// <see cref="ManagedCurlEngine.CreateConnectOnlyConnector" /> by default; tests put a fake connector there.
+    /// <see cref="Duplicate" /> copies it and <see cref="Reset" /> leaves it, as it is not an option.
+    /// </summary>
+    internal Func<EasyOptions, ManagedEngineSharedState, IConnector> CreateConnectOnlyConnector { get; set; } = ManagedCurlEngine.CreateConnectOnlyConnector;
+
+    /// <summary>
+    /// <c>curl_easy_recv</c> and <c>curl_easy_send</c> on the connection the last perform with
+    /// <c>CURLOPT_CONNECT_ONLY</c> 1 left open (<see cref="ConnectOnlyConnection" />, ADR-0608); every later perform,
+    /// and cleanup, closes it.
+    /// </summary>
+    public IConnectOnlyConnection Connection => ConnectOnly;
+
+    private ConnectOnlyConnection ConnectOnly => connectOnly ??= new ConnectOnlyConnection(() => Options.Network.ConnectOnly != Api.Options.Network.ConnectOnly.Disabled);
 
     /// <inheritdoc />
     public async ValueTask<CurlCode> PerformAsync(CancellationToken cancellationToken)
     {
         headers.Clear();
+        await ConnectOnly.CloseAsync().ConfigureAwait(false);
         return ToolAttempt is { } attempt
             ? await PerformToolAttemptAsync(attempt).ConfigureAwait(false)
             : await PerformFromOptionsAsync(cancellationToken).ConfigureAwait(false);
@@ -257,7 +274,35 @@ internal sealed class ManagedEasyTransfer(
         EngineTransferSettings settings = ToolSettings ?? TransferSettingsOf(options);
         long transferId = shared.Performer.TakeTransferId();
         Info = new TransferInfo { EffectiveUrl = urlText, TransferId = transferId, ConnectionId = NoConnectionId };
+        if (options.Network.ConnectOnly == Api.Options.Network.ConnectOnly.Connect)
+        {
+            return await PerformConnectOnlyAsync(options, url, cancellationToken).ConfigureAwait(false);
+        }
+
         return await PerformBuildingMimePostAsync(options, settings, url, urlText, transferId, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// <c>CURLOPT_CONNECT_ONLY</c> 1: connects to the URL's host and port through <see cref="CreateConnectOnlyConnector" />'s
+    /// connector, with TLS for a TLS scheme, sends nothing, and keeps the connection for <see cref="Connection" />; a
+    /// failed connect ends the perform with the connector's code and text (ADR-0608).
+    /// </summary>
+    /// <param name="options">The handle's options.</param>
+    /// <param name="url">The URL set, parsed.</param>
+    /// <param name="cancellationToken">Stops the connect.</param>
+    /// <returns>The perform's code.</returns>
+    private async Task<CurlCode> PerformConnectOnlyAsync(EasyOptions options, CurlUrl url, CancellationToken cancellationToken)
+    {
+        IConnector connector = CreateConnectOnlyConnector(options, PerformShared);
+        ConnectResult connect = await connector.ConnectAsync(new ConnectTarget(url.IdnHost, url.Port, ConnectOnlyConnection.UsesTls(url.Scheme)), cancellationToken).ConfigureAwait(false);
+        if (connect.Connection is not { } opened)
+        {
+            // ConnectResult.Failed takes a non-null message, so a result with no connection always has one.
+            return Finish(connect.ExitCode.ToCurlCode(), connect.ErrorMessage!, Info);
+        }
+
+        await ConnectOnly.OpenAsync(opened).ConfigureAwait(false);
+        return Finish(CurlCode.Ok, string.Empty, Info);
     }
 
     /// <summary>
@@ -747,7 +792,7 @@ internal sealed class ManagedEasyTransfer(
     }
 
     /// <inheritdoc />
-    public IEasyTransfer Duplicate() => new ManagedEasyTransfer(createDispatcher, shared) { Options = Options, ToolSettings = ToolSettings, Host = Host, TraceComponents = TraceComponents, CreateFormBoundary = CreateFormBoundary };
+    public IEasyTransfer Duplicate() => new ManagedEasyTransfer(createDispatcher, shared) { Options = Options, ToolSettings = ToolSettings, Host = Host, TraceComponents = TraceComponents, CreateFormBoundary = CreateFormBoundary, CreateConnectOnlyConnector = CreateConnectOnlyConnector };
 
     /// <inheritdoc />
     public void Reset()
@@ -781,8 +826,9 @@ internal sealed class ManagedEasyTransfer(
     /// <returns><see cref="CurlCode.Ok" />.</returns>
     public ValueTask<CurlCode> UpkeepAsync(CancellationToken cancellationToken) => ValueTask.FromResult(CurlCode.Ok);
 
-    /// <inheritdoc />
-    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    /// <summary><c>curl_easy_cleanup</c>: closes the connection a connect-only perform left open, if any.</summary>
+    /// <returns>A task that completes once it is closed.</returns>
+    public ValueTask DisposeAsync() => connectOnly?.CloseAsync() ?? ValueTask.CompletedTask;
 
     private TransferContext CreateContext(
         EasyOptions options,

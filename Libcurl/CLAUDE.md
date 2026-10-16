@@ -72,8 +72,11 @@ length or one past the end answers `null`. `GetEnv` is `curl_getenv` (`null` for
 `Easy` holds `CurlEasy`, the easy handle `CurlLibrary.EasyInit` (`curl_easy_init`) returns over the
 engine's `IEasyTransfer` (ADR-0563): `SetOption` goes through `EasyOptionDispatch` and writes the
 changed `EasyOptions` back to the transfer only on `Ok`; `PerformAsync` is the native shape, and
-`Perform` blocks on it; `Upkeep` (`curl_easy_upkeep`) blocks on `UpkeepAsync` the same way, and these
-two and `WebSocket`'s blocking calls are Libcurl's only sanctioned sync-over-async bridges. `Pause` is `curl_easy_pause` and passes the
+`Perform` blocks on it; `Upkeep` (`curl_easy_upkeep`) blocks on `UpkeepAsync` the same way, as `Recv`
+(`curl_easy_recv`) and `Send` (`curl_easy_send`) block on `RecvAsync` and `SendAsync`, which pass straight to
+the transfer's `IConnectOnlyConnection` and never wait for the peer (ADR-0608); `Recv` and `Send` keep libcurl's
+`*n` out parameter, 0 unless `Ok`, and every other answer (`Again`, `UnsupportedProtocol` with no connect-only
+connection) is the engine's. These and `WebSocket`'s blocking calls are Libcurl's only sanctioned sync-over-async bridges. `Pause` is `curl_easy_pause` and passes the
 engine only the `Receive` and `Send` bits, dropping the rest as libcurl does. A perform clears the
 `CURLOPT_ERRORBUFFER` buffer, if one is set, and on failure writes the engine's `ErrorText` into it
 cut to 255 UTF-8 bytes (`EasyErrorBuffer`, libcurl's 256-byte `CURL_ERROR_SIZE` less the NUL);

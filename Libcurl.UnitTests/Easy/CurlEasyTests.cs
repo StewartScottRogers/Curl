@@ -1,6 +1,7 @@
 using System.Text;
 using Curl.Api.Codes;
 using Curl.Api.EngineContracts;
+using Curl.Api.EngineContracts.ConnectOnly;
 using Curl.Api.Options;
 using Libcurl.Easy;
 using Libcurl.Global;
@@ -301,6 +302,95 @@ public sealed class CurlEasyTests
 
         Assert.AreEqual(CurlCode.Ok, code);
         Assert.AreEqual(source.Token, transfer.UpkeptWith[0]);
+    }
+
+    [TestMethod]
+    public void Recv_DataReady_WritesItAndAnswersOkWithTheCount()
+    {
+        var connection = new FakeConnectOnlyConnection { Incoming = "hi"u8.ToArray(), ReceiveResult = new(CurlCode.Ok, 2) };
+        using var easy = new CurlEasy(new FakeEasyTransfer { Connection = connection }, VerboseOnly);
+        var buffer = new byte[8];
+
+        var code = easy.Recv(buffer, out var received);
+
+        Assert.AreEqual(CurlCode.Ok, code);
+        Assert.AreEqual(2, received);
+        Assert.AreEqual("hi", Encoding.ASCII.GetString(buffer, 0, received));
+        Assert.AreEqual(CancellationToken.None, connection.LastToken);
+    }
+
+    [TestMethod]
+    public void Recv_NothingReady_AnswersAgainWithNoBytes()
+    {
+        var connection = new FakeConnectOnlyConnection { ReceiveResult = new(CurlCode.Again, 5) };
+        using var easy = new CurlEasy(new FakeEasyTransfer { Connection = connection }, VerboseOnly);
+
+        var code = easy.Recv(new byte[8], out var received);
+
+        Assert.AreEqual(CurlCode.Again, code);
+        Assert.AreEqual(0, received);
+    }
+
+    [TestMethod]
+    public void RecvAndSend_NoConnectOnlyConnection_AnswerTheEnginesUnsupportedProtocol()
+    {
+        using var easy = new CurlEasy(new FakeEasyTransfer(), VerboseOnly);
+
+        Assert.AreEqual(CurlCode.UnsupportedProtocol, easy.Recv(new byte[8], out var received));
+        Assert.AreEqual(CurlCode.UnsupportedProtocol, easy.Send("x"u8.ToArray(), out var sent));
+        Assert.AreEqual(0, received);
+        Assert.AreEqual(0, sent);
+    }
+
+    [TestMethod]
+    public void Send_ConnectionTakesTheBytes_AnswersOkWithTheCount()
+    {
+        var connection = new FakeConnectOnlyConnection { SendResult = new(CurlCode.Ok, 3) };
+        using var easy = new CurlEasy(new FakeEasyTransfer { Connection = connection }, VerboseOnly);
+
+        var code = easy.Send("abc"u8.ToArray(), out var sent);
+
+        Assert.AreEqual(CurlCode.Ok, code);
+        Assert.AreEqual(3, sent);
+        Assert.AreEqual("abc", Encoding.ASCII.GetString(connection.Sent.Single()));
+    }
+
+    [TestMethod]
+    public void Send_NothingCouldBeSent_AnswersAgainWithNoBytes()
+    {
+        var connection = new FakeConnectOnlyConnection { SendResult = new(CurlCode.Again, 3) };
+        using var easy = new CurlEasy(new FakeEasyTransfer { Connection = connection }, VerboseOnly);
+
+        var code = easy.Send("abc"u8.ToArray(), out var sent);
+
+        Assert.AreEqual(CurlCode.Again, code);
+        Assert.AreEqual(0, sent);
+    }
+
+    [TestMethod]
+    public async Task RecvAsyncAndSendAsync_PassTheTokenAndAnswerTheEnginesResult()
+    {
+        var connection = new FakeConnectOnlyConnection { ReceiveResult = new(CurlCode.Again, 0), SendResult = new(CurlCode.SendError, 0) };
+        await using var easy = new CurlEasy(new FakeEasyTransfer { Connection = connection }, VerboseOnly);
+        using var source = new CancellationTokenSource();
+
+        var receive = await easy.RecvAsync(new byte[4], source.Token);
+        Assert.AreEqual(source.Token, connection.LastToken);
+        var send = await easy.SendAsync("x"u8.ToArray(), source.Token);
+
+        Assert.AreEqual(new CurlConnectOnlyResult(CurlCode.Again, 0), receive);
+        Assert.AreEqual(CurlCode.SendError, send.Result);
+        Assert.AreEqual(source.Token, connection.LastToken);
+    }
+
+    [TestMethod]
+    public async Task RecvAndSend_AfterCleanup_ThrowObjectDisposed()
+    {
+        var easy = new CurlEasy(new FakeEasyTransfer(), VerboseOnly);
+        await easy.DisposeAsync();
+
+        Assert.ThrowsExactly<ObjectDisposedException>(() => easy.Recv(new byte[1], out _));
+        Assert.ThrowsExactly<ObjectDisposedException>(() => easy.Send(new byte[1], out _));
     }
 
     [TestMethod]
