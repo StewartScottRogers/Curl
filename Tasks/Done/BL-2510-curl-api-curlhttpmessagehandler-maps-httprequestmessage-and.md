@@ -32,7 +32,7 @@ Phase 4 of `Documentation/Planning/Curl-Api-And-libcurl.md`; ADR-0506. `Curl.Api
 
 - Added `Curl.Api/CLAUDE.md` to `touches`: the last criterion keeps it true, and no task in Doing on
   `origin/work/dark-factory` names it.
-- Design in ADR-0646 (decided by Claude under Stewart's delegation): the handler does not own the
+- Design in ADR-0647 (decided by Claude under Stewart's delegation): the handler does not own the
   client (its `Dispose` is synchronous and blocking on `DisposeAsync` is forbidden); every `HttpContent`
   goes as a stream body with its `ContentLength` (so multipart is .NET's own bytes under its
   `Content-Type`), `Content-Length` is left to the engine; `Version`/`VersionPolicy` become
