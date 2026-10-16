@@ -57,6 +57,13 @@ for text that is not a date. `CurlSlist` is `struct curl_slist` as an `IReadOnly
 emptying it). Every list-valued option setter copies the list when it is set, so a list changed or
 freed afterwards leaves the option as set; a new list setter must copy too.
 
+`Misc/Version` holds `CurlVersion` (ADR-0591): `Text(library)` is `curl_version`, `libcurl/<version>`
+and the engine's TLS backend, the tail of `curl -V`'s first line; `Info(library, age)` is
+`curl_version_info`, which ignores the age as libcurl does and answers a `CurlVersionInfoData` of
+`CurlVersionAge.Now` from `ICurlEngine.VersionInfo`, its `CurlVersionFeatures` bits the OR of
+`FeatureBit` over the feature names (`lib/version.c`'s table) and every library version the seam lacks
+`null` or 0. Both answer after `curl_global_cleanup`.
+
 `Easy` holds `CurlEasy`, the easy handle `CurlLibrary.EasyInit` (`curl_easy_init`) returns over the
 engine's `IEasyTransfer` (ADR-0563): `SetOption` goes through `EasyOptionDispatch` and writes the
 changed `EasyOptions` back to the transfer only on `Ok`; `PerformAsync` is the native shape, and
