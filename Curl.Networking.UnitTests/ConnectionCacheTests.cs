@@ -46,5 +46,29 @@ public sealed class ConnectionCacheTests
         Assert.IsTrue(inner.Opened[1].IsDisposed);
     }
 
+    [TestMethod]
+    public async Task CloseIdleAsync_WithAnIdleAndALeasedConnection_ClosesTheIdleOneAndKeepsTheLeasedOneForReuse()
+    {
+        var cache = new ConnectionCache(new ManualTimeProvider());
+        var inner = new FakeConnector();
+        var connector = new PoolingConnector(inner, cache, configuration: null);
+        var idle = await connector.ConnectAsync(Target("idle.example"), CancellationToken.None);
+        idle.Connection!.MarkReusable();
+        await idle.Connection.DisposeAsync();
+        var inUse = await connector.ConnectAsync(Target("in-use.example"), CancellationToken.None);
+
+        await cache.CloseIdleAsync();
+        inUse.Connection!.MarkReusable();
+        await inUse.Connection.DisposeAsync();
+        var again = await connector.ConnectAsync(Target("in-use.example"), CancellationToken.None);
+        var idleAgain = await connector.ConnectAsync(Target("idle.example"), CancellationToken.None);
+
+        Assert.IsTrue(inner.Opened[0].IsDisposed);
+        Assert.IsFalse(inner.Opened[1].IsDisposed);
+        Assert.IsTrue(again.IsReused);
+        Assert.IsFalse(idleAgain.IsReused);
+        Assert.HasCount(3, inner.Opened);
+    }
+
     private static ConnectTarget Target(string host) => new(host, 80, false) { PoolScheme = "http" };
 }

@@ -314,6 +314,9 @@ of one run - reuse each other's connections only when their configurations are e
 The cache is also the run's `IConnectionNumbers`, which `PoolingConnector.ConnectionNumbers`
 hands to `FileProtocolHandler`, so a `file://` transfer takes the next number in the same count
 (ADR-0347, BL-977), as `NumberingDatagrams` does for a TFTP channel (ADR-0346).
+Per ADR-0604 (BL-2427) `ConnectionCache.CloseIdleAsync` closes the idle connections and leaves the
+cache open, and `DnsCache.Clear` drops every entry, `--resolve` ones included: libcurl's
+`CURLMNWC_CLEAR_CONNS` and `CURLMNWC_CLEAR_DNS`, which the engine's multi handle runs.
 
 Per BL-717 a pooled connection whose `IConnectionSession` multiplexes (HTTP/2) is shared, not
 checked out: while its session's `ConcurrentTransferLimit` has streams to spare, a transfer with the

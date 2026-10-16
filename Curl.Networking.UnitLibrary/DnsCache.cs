@@ -25,4 +25,10 @@ public sealed class DnsCache
 
     /// <summary>Drops the entry cached for <paramref name="key" />, if there is one.</summary>
     internal void Remove(string key) => _entries.TryRemove(key, out _);
+
+    /// <summary>
+    /// Drops every entry, <c>--resolve</c> ones included, as libcurl's <c>CURLMNWC_CLEAR_DNS</c> empties
+    /// its DNS cache when the network changed; the next lookup of every name resolves it again.
+    /// </summary>
+    public void Clear() => _entries.Clear();
 }
