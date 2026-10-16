@@ -32,3 +32,4 @@ ADR-0616 (BL-2443) built `curl_ws_recv`, `curl_ws_send` and `curl_ws_meta` over 
 ## Log
 
 - 2026-10-16: Created.
+- 2026-10-16: Backlog -> Doing. Criteria at claim: 38ec9a67 b8258fe2 0cf7a8c9 0f90c956.
