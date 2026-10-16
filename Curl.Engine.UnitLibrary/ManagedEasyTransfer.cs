@@ -256,7 +256,7 @@ internal sealed class ManagedEasyTransfer(
         return Finish(
             result.ExitCode.ToCurlCode(),
             result.ErrorMessage ?? string.Empty,
-            TransferInfoFromReport.Of(result, urlText, options.Transfer.FileTime, shared.TimeProvider) with
+            TransferInfoFromReport.Of(result, urlText, options.Transfer.FileTime, shared.TimeProvider, options.Tls.GatherCertificateInfo) with
             {
                 TransferId = transferId,
                 ConnectionId = connectionId,

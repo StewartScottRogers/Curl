@@ -1,6 +1,7 @@
 using System.Net;
 using Curl.Api.Info;
 using Curl.Core;
+using Curl.Output;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Engine;
@@ -15,6 +16,9 @@ namespace Curl.Engine;
 internal static class TransferInfoFromReport
 {
     private const long MicrosecondsPerSecond = 1_000_000;
+
+    /// <summary>The line a certificate's PEM block starts with.</summary>
+    private const string PemBeginLine = "-----BEGIN CERTIFICATE-----";
 
     /// <summary>The <c>CURLAUTH_*</c> bit of each scheme name a challenge starts with.</summary>
     private static readonly Dictionary<string, long> CurlAuthBitsByChallengeScheme = new(StringComparer.OrdinalIgnoreCase)
@@ -64,8 +68,9 @@ internal static class TransferInfoFromReport
     /// <param name="requestUrl">The URL the transfer was given, the effective URL when the report names no other.</param>
     /// <param name="fileTimeRequested">Whether <c>CURLOPT_FILETIME</c> asked for the remote file's time, without which libcurl answers -1.</param>
     /// <param name="timeProvider">The provider that took the report's <see cref="TransferTimings" />.</param>
+    /// <param name="certificateInfoRequested">Whether <c>CURLOPT_CERTINFO</c> asked for the peer certificates' records, without which libcurl's <c>CURLINFO_CERTINFO</c> is empty.</param>
     /// <returns>The info.</returns>
-    internal static TransferInfo Of(TransferResult result, string requestUrl, bool fileTimeRequested, TimeProvider timeProvider)
+    internal static TransferInfo Of(TransferResult result, string requestUrl, bool fileTimeRequested, TimeProvider timeProvider, bool certificateInfoRequested = false)
     {
         TransferReport report = result.Report ?? new TransferReport();
         string effectiveUrl = report.EffectiveUrl ?? requestUrl;
@@ -76,7 +81,31 @@ internal static class TransferInfoFromReport
             Protocol = ProtocolOf(effectiveUrl),
             FileTime = fileTimeRequested ? result.SourceLastWriteUnixSeconds ?? -1 : -1,
             RetryAfter = RetryAfterOf(report, timeProvider),
+            CertInfo = CertInfoOf(report, certificateInfoRequested),
         };
+    }
+
+    /// <summary>
+    /// The <c>CURLINFO_CERTINFO</c> lists of the report's peer certificates, the server's own first; none unless
+    /// <c>CURLOPT_CERTINFO</c> <paramref name="requested" /> them.
+    /// </summary>
+    private static IReadOnlyList<IReadOnlyList<string>> CertInfoOf(TransferReport report, bool requested) =>
+        requested ? [.. report.PeerCertificates.Select(certificate => CertInfoRecordsOf(PeerCertificateText.Format(certificate)))] : [];
+
+    /// <summary>
+    /// One certificate's <c>CURLINFO_CERTINFO</c> list, from its <c>%{certs}</c> text (<see cref="PeerCertificateText" />):
+    /// each <c>label:value</c> line is one string, and the PEM block, which <c>%{certs}</c> prints without the label,
+    /// is libcurl's last string, <c>Cert:</c> and the block with its line feeds. Empty when the text is (a certificate
+    /// curl could not read).
+    /// </summary>
+    /// <param name="certificateText">The certificate's <c>%{certs}</c> text.</param>
+    /// <returns>The certificate's strings, in libcurl's order.</returns>
+    internal static IReadOnlyList<string> CertInfoRecordsOf(string certificateText)
+    {
+        int pemStart = certificateText.IndexOf(PemBeginLine, StringComparison.Ordinal);
+        return pemStart < 0
+            ? []
+            : [.. certificateText[..pemStart].Split('\n', StringSplitOptions.RemoveEmptyEntries), "Cert:" + certificateText[pemStart..]];
     }
 
     private static TransferInfo WithTexts(TransferInfo info, TransferReport report, string effectiveUrl) => info with

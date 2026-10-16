@@ -1,6 +1,9 @@
 using System.Net;
+using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
 using Curl.Api.Info;
 using Curl.Console;
+using Curl.Output;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Engine;
@@ -337,4 +340,50 @@ public sealed class TransferInfoFromReportTests
     [TestMethod]
     public void Of_FileTimeNotRequested_AnswersMinusOne() =>
         Assert.AreEqual(-1, TransferInfoFromReport.Of(new TransferResult(CurlExitCode.Ok, 0, null, DateTimeOffset.UnixEpoch.AddSeconds(5)) { Report = new TransferReport() }, RequestUrl, false, new ManualTimeProvider()).FileTime);
+
+    [TestMethod]
+    public void Of_CertificateInfoRequested_GivesOneListPerPeerCertificate()
+    {
+        ReadOnlyMemory<byte>[] chain = [SelfSignedCertificate("CN=leaf"), SelfSignedCertificate("CN=root")];
+
+        TransferInfo info = TransferInfoFromReport.Of(
+            new TransferResult(CurlExitCode.Ok, 0) { Report = new TransferReport { PeerCertificates = chain } }, RequestUrl, false, new ManualTimeProvider(), certificateInfoRequested: true);
+
+        Assert.HasCount(2, info.CertInfo);
+        Assert.AreEqual("Subject:CN=leaf", info.CertInfo[0][0]);
+        Assert.AreEqual("Subject:CN=root", info.CertInfo[1][0]);
+    }
+
+    [TestMethod]
+    public void Of_CertificateInfoNotRequested_LeavesTheListsEmpty()
+    {
+        TransferInfo info = TransferInfoFromReport.Of(
+            new TransferResult(CurlExitCode.Ok, 0) { Report = new TransferReport { PeerCertificates = [SelfSignedCertificate("CN=leaf")] } }, RequestUrl, false, new ManualTimeProvider());
+
+        Assert.IsEmpty(info.CertInfo);
+    }
+
+    [TestMethod]
+    public void CertInfoRecordsOf_CertificateText_GivesEachLineAndThePemAsCert()
+    {
+        string text = PeerCertificateText.Format(SelfSignedCertificate("CN=leaf"));
+        int pemStart = text.IndexOf("-----BEGIN CERTIFICATE-----", StringComparison.Ordinal);
+
+        IReadOnlyList<string> records = TransferInfoFromReport.CertInfoRecordsOf(text);
+
+        Assert.AreEqual("Cert:" + text[pemStart..], records[^1]);
+        Assert.AreEqual(text[..pemStart], string.Concat(records.Take(records.Count - 1).Select(record => record + "\n")));
+    }
+
+    [TestMethod]
+    public void CertInfoRecordsOf_UnreadableCertificate_GivesNoStrings() =>
+        Assert.IsEmpty(TransferInfoFromReport.CertInfoRecordsOf(PeerCertificateText.Format(new byte[] { 1, 2, 3 })));
+
+    private static ReadOnlyMemory<byte> SelfSignedCertificate(string subject)
+    {
+        using ECDsa key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        CertificateRequest request = new(subject, key, HashAlgorithmName.SHA256);
+        using X509Certificate2 certificate = request.CreateSelfSigned(DateTimeOffset.UnixEpoch, DateTimeOffset.UnixEpoch.AddYears(1));
+        return certificate.RawData;
+    }
 }
