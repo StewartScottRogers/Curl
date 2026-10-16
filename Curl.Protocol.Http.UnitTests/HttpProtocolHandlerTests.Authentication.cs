@@ -485,6 +485,103 @@ public sealed partial class HttpProtocolHandlerTests
             events.Events);
     }
 
+    /// <summary>
+    /// A 401 answered for a body that cannot seek but rewinds through <see cref="IUploadRewinder" />,
+    /// as libcurl's read callback does through <c>CURLOPT_SEEKFUNCTION</c>: the body is rewound once
+    /// and the retry sends it again whole (BL-2463).
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_ChallengeToABodyThatRewindsThroughItsRewinder_RewindsAndResendsItWhole()
+    {
+        TurnTakingConnection first = new(65536, ChallengeHead + "nope", OkHead + "ok");
+        RewinderStream body = new("hello"u8.ToArray());
+        MemoryStream output = new();
+        TransferContext context = new()
+        {
+            Url = CurlUrl.Parse(AuthUrl),
+            Output = output,
+            Http = new HttpRequestOptions { Body = new StreamBody(body, 5, "application/octet-stream") },
+        };
+        Diagnostics.Arrange("url, body, response", $"{AuthUrl}, a 5-byte rewinder stream body, {OneLine(ChallengeHead)}");
+
+        TransferResult result = await new HttpProtocolHandler(QueueConnector.For(first), new ScriptedAuthenticator(null, DigestValue)).ExecuteAsync(context);
+
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Assert("rewinds", 1, body.Rewinds);
+        Assert.AreEqual(1, body.Rewinds);
+        string[] requests = first.Written.Split("POST ", StringSplitOptions.RemoveEmptyEntries);
+        Assert.HasCount(2, requests, first.Written);
+        Assert.EndsWith("\r\n\r\nhello", requests[0]);
+        Assert.Contains("Authorization: " + DigestValue, requests[1]);
+        Assert.EndsWith("\r\n\r\nhello", requests[1]);
+        Assert.AreEqual("ok", Latin1(output.ToArray()));
+    }
+
+    /// <summary>
+    /// A 401 that arrives while a rewinder body of unknown length still waits for
+    /// <c>100 Continue</c>: none of it was read, so it is not rewound, as curl 8.22.0's
+    /// <c>cr_in_rewind</c> rewinds nothing its read callback never gave (BL-2463).
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_ChallengeBeforeARewinderBodyIsRead_AsksForNoRewind()
+    {
+        TurnTakingConnection first = new(65536, ChallengeHead + "nope", OkHead + "ok");
+        RewinderStream body = new("hello"u8.ToArray(), "seek callback returned error 1");
+        TransferContext context = new()
+        {
+            Url = CurlUrl.Parse(AuthUrl),
+            Output = new MemoryStream(),
+            Http = new HttpRequestOptions { Body = new StreamBody(body, null, "application/octet-stream") },
+        };
+        Diagnostics.Arrange("url, body, response", $"{AuthUrl}, a rewinder stream body of unknown length, {OneLine(ChallengeHead)}");
+
+        TransferResult result = await new HttpProtocolHandler(QueueConnector.For(first), new ScriptedAuthenticator(null, DigestValue)).ExecuteAsync(context);
+
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Assert("rewinds", 0, body.Rewinds);
+        Assert.AreEqual(0, body.Rewinds);
+    }
+
+    /// <summary>
+    /// The same 401 where the rewinder fails: the retry fails before it is sent with exit 65 and
+    /// the rewinder's own message, after it and <c>rewind of client reader 'cr-in' failed: 65</c>
+    /// under <c>-v</c>, as curl 8.22.0's <c>cr_in_rewind</c> fails a seek callback that returns
+    /// an error (BL-2463).
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_ChallengeToABodyWhoseRewinderFails_ReturnsSendFailRewindWithTheRewindersMessage()
+    {
+        TurnTakingConnection first = new(65536, ChallengeHead + "nope", OkHead + "ok");
+        RewinderStream body = new("hello"u8.ToArray(), "seek callback returned error 1");
+        RecordingTransferEvents events = new();
+        TransferContext context = new()
+        {
+            Url = CurlUrl.Parse(AuthUrl),
+            Output = new MemoryStream(),
+            Http = new HttpRequestOptions { Body = new StreamBody(body, 5, "application/octet-stream") },
+            Events = events,
+        };
+        Diagnostics.Arrange("url, body, response", $"{AuthUrl}, a rewinder stream body whose rewind fails, {OneLine(ChallengeHead)}");
+
+        TransferResult result = await new HttpProtocolHandler(QueueConnector.For(first), new ScriptedAuthenticator(null, DigestValue)).ExecuteAsync(context);
+
+        WriteResult(result);
+        WriteEvents("events", events.Events);
+        Diagnostics.Assert("exit code", CurlExitCode.SendFailRewind, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.SendFailRewind, result.ExitCode);
+        Assert.AreEqual("seek callback returned error 1", result.ErrorMessage);
+        Assert.AreEqual(1, body.Rewinds);
+        Assert.HasCount(1, first.Written.Split("POST ", StringSplitOptions.RemoveEmptyEntries), first.Written);
+        Assert.AreEqual(401, result.Report!.ResponseCode);
+        CollectionAssert.IsSubsetOf(
+            new[] { "* seek callback returned error 1", "* rewind of client reader 'cr-in' failed: 65" },
+            events.Events);
+    }
+
     [TestMethod]
     public async Task ExecuteAsync_ReconnectFails_ReturnsTheConnectFailure()
     {

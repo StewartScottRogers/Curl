@@ -194,7 +194,7 @@ internal static class HttpTransferMessages
     /// The <c>-v</c> line curl 8.21.0's <c>Curl_client_start</c> (<c>lib/sendf.c</c>) writes after
     /// <see cref="UploadSeekFailed" />, naming its file reader and exit 65 (ADR-0279).
     /// </summary>
-    internal const string UploadReaderRewindFailed = "rewind of client reader 'cr-in' failed: 65";
+    internal const string UploadReaderRewindFailed = IUploadRewinder.ReaderRewindFailedLine;
 
     /// <summary>
     /// Gives an HTTP/3 error code's name as <c>vquic_h3_err_str</c> gives it at

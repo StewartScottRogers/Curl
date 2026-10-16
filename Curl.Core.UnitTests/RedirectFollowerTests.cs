@@ -790,6 +790,65 @@ public sealed class RedirectFollowerTests
     }
 
     [TestMethod]
+    public async Task FollowAsync_RewinderUploadAnswered307_RewindsItOnceAndResendsItWhole()
+    {
+        // An upload that cannot seek but rewinds through IUploadRewinder, as libcurl's read
+        // callback does through CURLOPT_SEEKFUNCTION: both PUTs carry it whole (BL-2463).
+        ScriptedHandler handler = new(Redirect(307, Next), Ok(200, 0));
+        RewinderStream upload = new([1, 2, 3]);
+
+        TransferResult result = await Follow(handler, Context(Location(), uploadStream: upload));
+
+        Diagnostics.Assert("result.ExitCode", CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Assert("upload.Rewinds", 1, upload.Rewinds);
+        Assert.AreEqual(1, upload.Rewinds);
+        Diagnostics.Assert("handler.Uploads count", 2, handler.Uploads.Count());
+        Assert.HasCount(2, handler.Uploads);
+        Diagnostics.Assert("handler.Uploads[1]", string.Join(", ", new byte[] { 1, 2, 3 }), string.Join(", ", handler.Uploads[1]));
+        CollectionAssert.AreEqual(new byte[] { 1, 2, 3 }, handler.Uploads[1]);
+    }
+
+    [TestMethod]
+    public async Task FollowAsync_RewinderUploadWhoseRewindFails_EndsWithSendFailRewindAndTheRewindersMessage()
+    {
+        // curl 8.22.0's cr_in_rewind: a seek callback that fails ends the next hop with exit 65
+        // and the callback's message, before it is sent (BL-2463).
+        ScriptedHandler handler = new(Redirect(307, Next), Ok(200, 0));
+        RewinderStream upload = new([1, 2, 3], "seek callback returned error 1");
+
+        TransferResult result = await Follow(handler, Context(Location(), uploadStream: upload));
+
+        Diagnostics.Assert("result.ExitCode", CurlExitCode.SendFailRewind, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.SendFailRewind, result.ExitCode);
+        Diagnostics.Assert("result.ErrorMessage", "seek callback returned error 1", result.ErrorMessage);
+        Assert.AreEqual("seek callback returned error 1", result.ErrorMessage);
+        Diagnostics.Assert("handler.Contexts count", 1, handler.Contexts.Count());
+        Assert.HasCount(1, handler.Contexts);
+        Diagnostics.Assert("result.Report!.ResponseCode", 307, result.Report!.ResponseCode);
+        Assert.AreEqual(307, result.Report!.ResponseCode);
+        Diagnostics.Assert("result.Report.RedirectCount", 1, result.Report.RedirectCount);
+        Assert.AreEqual(1, result.Report.RedirectCount);
+    }
+
+    [TestMethod]
+    public async Task FollowAsync_RewinderUploadNeverRead_AsksForNoRewind()
+    {
+        // curl rewinds nothing when the read callback was never called (cr_in_rewind's read_len).
+        ScriptedHandler handler = new(Redirect(307, Next), Ok(200, 0)) { ReadsUploads = false };
+        RewinderStream upload = new([1, 2, 3], "seek callback returned error 1");
+
+        TransferResult result = await Follow(handler, Context(Location(), uploadStream: upload));
+
+        Diagnostics.Assert("result.ExitCode", CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Assert("upload.Rewinds", 0, upload.Rewinds);
+        Assert.AreEqual(0, upload.Rewinds);
+        Diagnostics.Assert("handler.Contexts count", 2, handler.Contexts.Count());
+        Assert.HasCount(2, handler.Contexts);
+    }
+
+    [TestMethod]
     public async Task FollowAsync_HeadAnswered303_StaysNoBody()
     {
         // curl -L -I --max-redirs 1, 303: HEAD /a then HEAD /next.
@@ -1964,6 +2023,8 @@ public sealed class RedirectFollowerTests
 
         public List<byte[]> StreamBodies { get; } = [];
 
+        public bool ReadsUploads { get; init; } = true;
+
         public string DescribeScript() =>
             string.Join(
                 ", ",
@@ -1974,7 +2035,7 @@ public sealed class RedirectFollowerTests
         public ValueTask<TransferResult> ExecuteAsync(ITransferContext context)
         {
             Contexts.Add(context);
-            if (context.Upload is { } upload)
+            if (ReadsUploads && context.Upload is { } upload)
             {
                 using MemoryStream sent = new();
                 upload.CopyTo(sent);
@@ -2029,6 +2090,31 @@ public sealed class RedirectFollowerTests
     private sealed class NonSeekableStream(byte[] content) : MemoryStream(content)
     {
         public override bool CanSeek => false;
+    }
+
+    /// <summary>
+    /// A readable stream that cannot seek but rewinds to its start through
+    /// <see cref="IUploadRewinder" />, as libcurl's read callback does through its seek callback,
+    /// counting each rewind and failing each with <c>failure</c> when one is given.
+    /// </summary>
+    private sealed class RewinderStream(byte[] content, string? failure = null) : MemoryStream(content), IUploadRewinder
+    {
+        public int Rewinds { get; private set; }
+
+        public override bool CanSeek => false;
+
+        public bool HasBeenRead => Position > 0;
+
+        public string? RewindToStart()
+        {
+            Rewinds++;
+            if (failure is null)
+            {
+                Position = 0;
+            }
+
+            return failure;
+        }
     }
 
     /// <summary>

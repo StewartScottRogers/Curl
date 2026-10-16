@@ -143,6 +143,13 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
     internal bool CutShort { get; private set; }
 
     /// <summary>
+    /// Gets the message an <see cref="IUploadRewinder" /> gave when <see cref="Rewound" /> failed
+    /// to take the body back to its start, which fails the resend with exit 65 before it connects;
+    /// <see langword="null" /> when no such rewind failed.
+    /// </summary>
+    internal string? RewindFailure { get; private set; }
+
+    /// <summary>
     /// Gets a value indicating whether the body's reads are reported as curl 8.21.0's
     /// <c>--trace-config read</c> lines (<see cref="HttpClientReaderTraceLines" />, BL-1189, BL-1214):
     /// bodies of bytes, <c>-T</c> uploads and multipart bodies, chunked or not, sent at once or after
@@ -222,7 +229,9 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
 
     /// <summary>
     /// Gives the body a resend of this request sends: the same bytes, or the same stream
-    /// rewound to where this writer began reading it; a stream that cannot seek goes on from
+    /// rewound to where this writer began reading it; a stream that cannot seek but implements
+    /// <see cref="IUploadRewinder" /> is rewound through it once some of it was read, and a failed
+    /// rewind is kept in <see cref="RewindFailure" />; any other stream that cannot seek goes on from
     /// where it is, after the bytes of a piece a <c>417</c> cut short, as curl 8.21.0 goes on
     /// reading stdin rather than failing (measured, BL-319 Notes).
     /// </summary>
@@ -238,6 +247,12 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
         if (startPosition is { } start)
         {
             stream.Content.Position = start;
+            return body;
+        }
+
+        if (stream.Content is IUploadRewinder { HasBeenRead: true } rewinder)
+        {
+            RewindFailure = rewinder.RewindToStart();
             return body;
         }
 
