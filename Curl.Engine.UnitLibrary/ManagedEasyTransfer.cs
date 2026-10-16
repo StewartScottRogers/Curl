@@ -17,7 +17,11 @@ namespace Curl.Engine;
 /// performs through a <see cref="RedirectFollower" />. Body bytes go to the write callback and header
 /// lines to the header callback, each discarded when unset; writing to standard output when no write
 /// callback is set is <c>Libcurl</c>'s job, not the engine's. An upload (<see cref="Api.Options.Behaviour.EasyTransferOptions.Upload" />)
-/// reads the read callback through <see cref="CallbackReadStream" />. Cookies, the HSTS cache, pooled
+/// reads the read callback through <see cref="CallbackReadStream" />. Under <c>CURLOPT_VERBOSE</c> every
+/// transfer event goes to the debug callback (<see cref="DebugCallbackTransferEvents" />), and without
+/// <c>CURLOPT_NOPROGRESS</c> the progress goes to the xferinfo or progress callback
+/// (<see cref="CallbackTransferProgress" />), whose abort ends the transfer with
+/// <see cref="CurlCode.AbortedByCallback" /> (ADR-0543). Cookies, the HSTS cache, pooled
 /// connections and the <c>%{xfer_id}</c> numbering are the engine's (<see cref="ManagedEngineSharedState" />),
 /// shared with its other handles (ADR-0542). The header, WebSocket and connect-only
 /// APIs are phase 3 work and throw <see cref="NotSupportedException" />.
@@ -84,15 +88,69 @@ internal sealed class ManagedEasyTransfer(
         long transferId = shared.Performer.TakeTransferId();
         CookieEngine? cookies = CookieEngine.FromHttpOptions(options.Http, shared.Cookies);
         RedirectFollower follower = new(createDispatcher(options, shared, cookies?.HandlerStore));
-        TransferResult result = await TransferPerformer.FollowWatchingSpeedAsync(
-            new EngineTransferState(),
+        using CancellationTokenSource abort = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        CallbackTransferProgress? progress = CallbackTransferProgress.Of(options.Behaviour.NoProgress, options.Callbacks, abort);
+        TransferResult? result = await FollowUnlessAbortedAsync(
             follower,
-            CreateContext(options, settings, url, cancellationToken),
-            RedirectPolicyMapping.Of(settings, options.Http, options.Authentication)).ConfigureAwait(false);
+            CreateContext(options, settings, url, progress, abort.Token),
+            RedirectPolicyMapping.Of(settings, options.Http, options.Authentication),
+            progress).ConfigureAwait(false);
+        return FinishPerformed(result, urlText, options.Transfer.FileTime, transferId);
+    }
+
+    /// <summary>
+    /// Records a performed transfer's outcome: the result's code, message and <see cref="Info" />, or
+    /// <see cref="CurlCode.AbortedByCallback" /> with libcurl's <c>Callback aborted</c> when the progress
+    /// callback aborted it.
+    /// </summary>
+    /// <param name="result">The attempt's result, or <see langword="null" /> when the progress callback aborted it.</param>
+    /// <param name="urlText">The transfer's URL as set.</param>
+    /// <param name="fileTime">Whether <c>CURLOPT_FILETIME</c> is set.</param>
+    /// <param name="transferId">The transfer's <c>%{xfer_id}</c>.</param>
+    /// <returns>The transfer's code.</returns>
+    private CurlCode FinishPerformed(TransferResult? result, string urlText, bool fileTime, long transferId)
+    {
+        if (result is null)
+        {
+            return Finish(
+                CurlCode.AbortedByCallback,
+                CallbackTransferProgress.CallbackAbortedText,
+                new TransferInfo { EffectiveUrl = urlText, TransferId = transferId });
+        }
+
         return Finish(
             result.ExitCode.ToCurlCode(),
             result.ErrorMessage ?? string.Empty,
-            TransferInfoFromReport.Of(result, urlText, options.Transfer.FileTime, shared.TimeProvider) with { TransferId = transferId });
+            TransferInfoFromReport.Of(result, urlText, fileTime, shared.TimeProvider) with { TransferId = transferId });
+    }
+
+    /// <summary>
+    /// Performs the attempt with <see cref="TransferPerformer.FollowWatchingSpeedAsync" />, unless the
+    /// progress callback aborts it: then, whether the cancel stopped the attempt or it finished first, the
+    /// transfer is libcurl's <c>CURLE_ABORTED_BY_CALLBACK</c> (ADR-0543).
+    /// </summary>
+    /// <param name="follower">Performs the attempt, following redirects.</param>
+    /// <param name="context">The attempt's context.</param>
+    /// <param name="redirectPolicy">The redirect policy.</param>
+    /// <param name="progress">The progress callback's sink, or <see langword="null" /> for none.</param>
+    /// <returns>The attempt's result, or <see langword="null" /> when the progress callback aborted it.</returns>
+    private static async Task<TransferResult?> FollowUnlessAbortedAsync(
+        RedirectFollower follower,
+        TransferContext context,
+        RedirectPolicy redirectPolicy,
+        CallbackTransferProgress? progress)
+    {
+        TransferResult result;
+        try
+        {
+            result = await TransferPerformer.FollowWatchingSpeedAsync(new EngineTransferState(), follower, context, redirectPolicy).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (progress is { Aborted: true })
+        {
+            return null;
+        }
+
+        return progress is { Aborted: true } ? null : result;
     }
 
     /// <inheritdoc />
@@ -128,7 +186,12 @@ internal sealed class ManagedEasyTransfer(
     /// <inheritdoc />
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
-    private TransferContext CreateContext(EasyOptions options, EngineTransferSettings settings, CurlUrl url, CancellationToken cancellationToken) =>
+    private TransferContext CreateContext(
+        EasyOptions options,
+        EngineTransferSettings settings,
+        CurlUrl url,
+        CallbackTransferProgress? progress,
+        CancellationToken cancellationToken) =>
         new TransferContextFactory(Stream.Null, shared.TimeProvider) { HstsStore = shared.Hsts }.Create(
             settings,
             options.Http,
@@ -144,6 +207,8 @@ internal sealed class ManagedEasyTransfer(
             resumeFrom: options.Transfer.ResumeFrom > 0 ? options.Transfer.ResumeFrom : null,
             headerOutput: options.Callbacks.Header is { } header ? CallbackWriteStream.Of(header) : null,
             upload: UploadOf(options),
+            progress: progress,
+            events: DebugCallbackTransferEvents.Of(options.Behaviour.Verbose, options.Callbacks.Debug),
             abortToken: cancellationToken);
 
     /// <summary>

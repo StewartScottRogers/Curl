@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Curl.Output.UnitTests" />
+    <InternalsVisibleTo Include="Curl.Engine.UnitLibrary" />
   </ItemGroup>
 
   <ItemGroup>

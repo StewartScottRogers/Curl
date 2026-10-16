@@ -39,6 +39,12 @@ internal sealed class ScriptedConnector(IEnumerable<byte[]> reads) : IConnector
     /// </summary>
     public bool ReportsTheAlpnOffer { get; init; }
 
+    /// <summary>
+    /// Gets a value indicating whether each read throws <see cref="OperationCanceledException" /> once its token is
+    /// cancelled, as a socket read does; <see langword="false" />, the default, to read on regardless.
+    /// </summary>
+    public bool ObservesCancellation { get; init; }
+
     public ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, CancellationToken cancellationToken)
     {
         Targets.Add(target);
@@ -56,10 +62,10 @@ internal sealed class ScriptedConnector(IEnumerable<byte[]> reads) : IConnector
         }
 
         bool isReused = ReusesTheFirstConnection && Targets.Count > 1;
-        return ValueTask.FromResult(ConnectResult.Connected(new ScriptedConnection(pendingReads, written), null, isReused: isReused, applicationProtocol: ApplicationProtocol));
+        return ValueTask.FromResult(ConnectResult.Connected(new ScriptedConnection(pendingReads, written, ObservesCancellation), null, isReused: isReused, applicationProtocol: ApplicationProtocol));
     }
 
-    private sealed class ScriptedConnection(Queue<byte[]> pendingReads, MemoryStream written) : IConnection
+    private sealed class ScriptedConnection(Queue<byte[]> pendingReads, MemoryStream written, bool observesCancellation) : IConnection
     {
         private byte[] remainder = [];
 
@@ -69,6 +75,11 @@ internal sealed class ScriptedConnector(IEnumerable<byte[]> reads) : IConnector
 
         public ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken)
         {
+            if (observesCancellation)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+            }
+
             if (remainder.Length == 0 && !pendingReads.TryDequeue(out remainder!))
             {
                 remainder = [];

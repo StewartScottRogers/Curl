@@ -1,4 +1,5 @@
 using System.Text;
+using Curl.Api.Callbacks;
 using Curl.Api.Codes;
 using Curl.Api.EngineContracts;
 using Curl.Api.Options;
@@ -9,6 +10,7 @@ using Curl.Api.Options.Proxy;
 using Curl.Api.Options.Tls;
 using Curl.Core;
 using Curl.Networking;
+using Curl.Output;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Engine;
@@ -411,6 +413,151 @@ public sealed class ManagedEasyTransferTests
         Assert.IsNull(easy.ToolSettings);
     }
 
+    [TestMethod]
+    public async Task PerformAsync_VerboseWithADebugCallback_GivesItTheEventsTheToolsEventsReceiveInTheirOrder()
+    {
+        List<(CurlInfoType Type, string Data)> easyCalls = [];
+        List<(CurlInfoType Type, string Data)> toolCalls = [];
+        EasyOptions options = new()
+        {
+            Network = new EasyNetworkOptions { Url = "http://h/x" },
+            Behaviour = new EasyBehaviourOptions { Verbose = true },
+        };
+
+        (_, CurlCode easyCode) = await PerformThroughEasyAsync(options with { Callbacks = new() { Debug = RecordingDebug(easyCalls) } }, null, Response);
+        await PerformThroughToolAsync(
+            options,
+            ManagedEasyTransfer.TransferSettingsOf(options),
+            "http://h/x",
+            Response,
+            events: new DebugCallbackTransferEvents(RecordingDebug(toolCalls), PlatformTlsBackend.ForProcess));
+
+        Assert.AreEqual(CurlCode.Ok, easyCode);
+        CollectionAssert.AreEqual(toolCalls, easyCalls);
+        List<CurlInfoType> types = [.. easyCalls.Select(call => call.Type).Distinct()];
+        CollectionAssert.IsSubsetOf(new[] { CurlInfoType.Text, CurlInfoType.HeaderOut, CurlInfoType.HeaderIn, CurlInfoType.DataIn }, types);
+        Assert.IsTrue(types.IndexOf(CurlInfoType.HeaderOut) < types.IndexOf(CurlInfoType.HeaderIn));
+        StringAssert.StartsWith(easyCalls.First(call => call.Type == CurlInfoType.HeaderOut).Data, "GET /x HTTP/1.1\r\n");
+        Assert.AreEqual("HTTP/1.1 200 OK\r\n", easyCalls.First(call => call.Type == CurlInfoType.HeaderIn).Data);
+        Assert.AreEqual("hello", easyCalls.Single(call => call.Type == CurlInfoType.DataIn).Data);
+        Assert.IsTrue(easyCalls.Where(call => call.Type == CurlInfoType.Text).All(call => call.Data.EndsWith('\n')));
+    }
+
+    [TestMethod]
+    public async Task PerformAsync_DebugCallbackWithoutVerbose_IsNotCalled()
+    {
+        List<(CurlInfoType Type, string Data)> calls = [];
+        EasyOptions options = new()
+        {
+            Network = new EasyNetworkOptions { Url = "http://h/x" },
+            Callbacks = new() { Debug = RecordingDebug(calls) },
+        };
+
+        (_, CurlCode code) = await PerformThroughEasyAsync(options, null, Response);
+
+        Assert.AreEqual(CurlCode.Ok, code);
+        Assert.IsEmpty(calls);
+    }
+
+    [TestMethod]
+    public async Task PerformAsync_TransferInfoCallback_GetsTheCountsTheToolsProgressSinkReceives()
+    {
+        List<string> easyCalls = [];
+        List<string> toolCalls = [];
+        using CancellationTokenSource unused = new();
+        EasyOptions options = new()
+        {
+            Network = new EasyNetworkOptions { Url = "http://h/x" },
+            Behaviour = new EasyBehaviourOptions { NoProgress = false },
+        };
+
+        (_, CurlCode easyCode) = await PerformThroughEasyAsync(options with { Callbacks = new() { TransferInfo = RecordingTransferInfo(easyCalls, abort: false) } }, null, Response);
+        await PerformThroughToolAsync(
+            options,
+            ManagedEasyTransfer.TransferSettingsOf(options),
+            "http://h/x",
+            Response,
+            progress: new CallbackTransferProgress((dlTotal, dlNow, ulTotal, ulNow) => RecordingTransferInfo(toolCalls, abort: false)(dlTotal, dlNow, ulTotal, ulNow), unused));
+
+        Assert.AreEqual(CurlCode.Ok, easyCode);
+        CollectionAssert.AreEqual(toolCalls, easyCalls);
+        Assert.AreEqual("0 0 0 0", easyCalls[0]);
+        CollectionAssert.Contains(easyCalls, "5 5 0 0");
+    }
+
+    [TestMethod]
+    public async Task PerformAsync_TransferInfoCallbackUnderNoProgress_IsNotCalled()
+    {
+        List<string> calls = [];
+        EasyOptions options = new()
+        {
+            Network = new EasyNetworkOptions { Url = "http://h/x" },
+            Callbacks = new() { TransferInfo = RecordingTransferInfo(calls, abort: false) },
+        };
+
+        (_, CurlCode code) = await PerformThroughEasyAsync(options, null, Response);
+
+        Assert.AreEqual(CurlCode.Ok, code);
+        Assert.IsEmpty(calls);
+    }
+
+    [TestMethod]
+    [DataRow(true)]
+    [DataRow(false)]
+    public async Task PerformAsync_TransferInfoCallbackReturnsNonZero_AbortsWithAbortedByCallback(bool readsObserveCancellation)
+    {
+        List<string> calls = [];
+        ScriptedConnector connector = new([Encoding.ASCII.GetBytes(Response[..^3]), Encoding.ASCII.GetBytes(Response[^3..])]) { ObservesCancellation = readsObserveCancellation };
+        await using IEasyTransfer easy = CreateEngine(connector).CreateEasy();
+        MemoryStream body = new();
+        easy.Options = new EasyOptions
+        {
+            Network = new EasyNetworkOptions { Url = "http://h/x" },
+            Behaviour = new EasyBehaviourOptions { NoProgress = false },
+            Callbacks = new() { TransferInfo = RecordingTransferInfo(calls, abort: true), Write = data => WriteTo(body, data) },
+        };
+
+        CurlCode code = await easy.PerformAsync(CancellationToken.None);
+
+        Assert.AreEqual(CurlCode.AbortedByCallback, code);
+        Assert.AreEqual(CallbackTransferProgress.CallbackAbortedText, easy.ErrorText);
+        Assert.AreEqual("http://h/x", easy.Info.EffectiveUrl);
+        Assert.AreEqual(1, calls.Count(call => call.Split(' ')[1] != "0"));
+        Assert.AreNotEqual("0", calls[^1].Split(' ')[1]);
+        Assert.AreEqual(readsObserveCancellation, body.Length < "hello".Length);
+    }
+
+    [TestMethod]
+    [DataRow(true)]
+    [DataRow(false)]
+    public async Task PerformAsync_CallerCancels_ThrowsOperationCanceled(bool withTransferInfo)
+    {
+        List<string> calls = [];
+        await using IEasyTransfer easy = CreateEngine(new ScriptedConnector([Encoding.ASCII.GetBytes(Response)])).CreateEasy();
+        easy.Options = new EasyOptions
+        {
+            Network = new EasyNetworkOptions { Url = "http://h/x" },
+            Behaviour = new EasyBehaviourOptions { NoProgress = false },
+            Callbacks = new() { TransferInfo = withTransferInfo ? RecordingTransferInfo(calls, abort: false) : null },
+        };
+
+        await Assert.ThrowsAsync<OperationCanceledException>(async () => await easy.PerformAsync(new CancellationToken(canceled: true)));
+    }
+
+    private static Api.Callbacks.DebugCallback RecordingDebug(List<(CurlInfoType Type, string Data)> calls) =>
+        (type, data) =>
+        {
+            calls.Add((type, Encoding.Latin1.GetString(data)));
+            return 0;
+        };
+
+    private static Api.Callbacks.TransferInfoCallback RecordingTransferInfo(List<string> calls, bool abort) =>
+        (dlTotal, dlNow, ulTotal, ulNow) =>
+        {
+            calls.Add($"{dlTotal} {dlNow} {ulTotal} {ulNow}");
+            return abort && dlNow > 0 ? 1 : 0;
+        };
+
     private static long WriteTo(MemoryStream stream, ReadOnlySpan<byte> data)
     {
         stream.Write(data);
@@ -438,7 +585,13 @@ public sealed class ManagedEasyTransferTests
     // The tool's serial attempt today: the runner's context from TransferContextFactory and the
     // attempt TransferPerformer.FollowWatchingSpeedAsync performs (CurlCommandRunner.TransferWithBodyAsync).
     private static async Task<(byte[] Written, CurlCode Code)> PerformThroughToolAsync(
-        EasyOptions options, EngineTransferSettings settings, string urlText, string response, Stream? upload = null)
+        EasyOptions options,
+        EngineTransferSettings settings,
+        string urlText,
+        string response,
+        Stream? upload = null,
+        ITransferEvents? events = null,
+        ITransferProgress? progress = null)
     {
         ScriptedConnector connector = new([Encoding.ASCII.GetBytes(response)]);
         Assert.IsTrue(CurlUrl.TryParse(settings.AppendUrlQuery(urlText), pathAsIs: false, out CurlUrl? url));
@@ -456,7 +609,9 @@ public sealed class ManagedEasyTransferTests
             range: null,
             resumeFrom: null,
             headerOutput: null,
-            upload: upload);
+            upload: upload,
+            progress: progress,
+            events: events);
 
         TransferResult result = await TransferPerformer.FollowWatchingSpeedAsync(
             new EngineTransferState(),
