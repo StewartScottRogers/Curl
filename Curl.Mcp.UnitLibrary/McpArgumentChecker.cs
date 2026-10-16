@@ -13,7 +13,9 @@ namespace Curl.Mcp;
 /// from <see cref="McpOptionPathTable" />; paths inside values (<c>-d @file</c>, <c>-F name=@file</c>,
 /// <c>-w %output{file}</c>, <c>file://</c> URLs) are found as curl reads them. A <c>-K</c> config file
 /// inside the root is read and its lines checked the same way, at most
-/// <see cref="MaximumConfigDepth" /> files deep. It never writes, and reads no file but a <c>-K</c> one.
+/// <see cref="MaximumConfigDepth" /> files deep, and a <c>-w @file</c> template inside the root is read
+/// and its <c>%output{file}</c> directives checked (ADR-0600). It never writes, and reads no file but
+/// a <c>-K</c> config or a <c>-w @file</c> template.
 /// </summary>
 public sealed class McpArgumentChecker
 {
@@ -218,9 +220,46 @@ public sealed class McpArgumentChecker
             return McpArgumentCheck.Refused(written, value, $"{written} takes a value with {{{{variables}}}}, whose expanded path cannot be checked before curl runs.");
         }
 
-        return longName == "config"
-            ? CheckConfig(written, value, configDepth)
-            : CheckPaths(written, McpOptionValuePaths.PathsIn(longName, use, value));
+        return CheckPathValue(written, longName, use, value, configDepth);
+    }
+
+    /// <summary>A <c>-K</c> file and a <c>-w @file</c> template are read and checked; any other value's paths are checked as named.</summary>
+    private McpArgumentCheck CheckPathValue(string written, string longName, McpOptionPathUse use, string value, int configDepth)
+    {
+        return longName switch
+        {
+            "config" => CheckConfig(written, value, configDepth),
+            "write-out" when value.StartsWith('@') => CheckWriteOutTemplate(written, value[1..]),
+            _ => CheckPaths(written, McpOptionValuePaths.PathsIn(longName, use, value)),
+        };
+    }
+
+    /// <summary>
+    /// A <c>-w @file</c> template must lie inside the root and be readable; it is then read and its
+    /// <c>%output{file}</c> directives checked as an inline template's are (ADR-0600), a refusal naming the template.
+    /// <c>-w @-</c> reads the template from standard input, which the <c>curl</c> tool's caller supplies unchecked.
+    /// </summary>
+    private McpArgumentCheck CheckWriteOutTemplate(string written, string file)
+    {
+        if (file == "-")
+        {
+            return McpArgumentCheck.Refused(written, "@-", $"{written} @- reads its template from standard input, which cannot be checked before curl runs.");
+        }
+
+        McpPathCheck check = root.Check(file);
+        if (!check.IsAllowed)
+        {
+            return McpArgumentCheck.Refused(written, file, $"{written} {check.Reason}");
+        }
+
+        string? template = ReadCheckedFile(check.ResolvedPath!, out string failure);
+        if (template is null)
+        {
+            return McpArgumentCheck.Refused(written, file, $"{written} '{file}' cannot be read: {failure}");
+        }
+
+        McpArgumentCheck paths = CheckPaths(written, McpOptionValuePaths.TemplatePaths(template));
+        return paths.IsAllowed ? paths : paths with { Reason = $"In write-out template '{file}': {paths.Reason}" };
     }
 
     /// <summary>
@@ -277,13 +316,13 @@ public sealed class McpArgumentChecker
             return McpArgumentCheck.Refused(written, value, $"{written} '{value}' nests config files more than {MaximumConfigDepth} deep, as a config that includes itself does.");
         }
 
-        string? text = ReadConfig(check.ResolvedPath!, out string failure);
+        string? text = ReadCheckedFile(check.ResolvedPath!, out string failure);
         return text is null
             ? McpArgumentCheck.Refused(written, value, $"{written} '{value}' cannot be read: {failure}")
             : CheckConfigLines(value, McpConfigFileSyntax.ReadLines(text), configDepth + 1);
     }
 
-    private static string? ReadConfig(string resolvedPath, out string failure)
+    private static string? ReadCheckedFile(string resolvedPath, out string failure)
     {
         failure = string.Empty;
         try

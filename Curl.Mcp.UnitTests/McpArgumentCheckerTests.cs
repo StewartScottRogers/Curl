@@ -147,8 +147,8 @@ public sealed class McpArgumentCheckerTests
     [DataRow("-H|X: @{out}|http://h/", "")]
     [DataRow("--proxy-header|@{out}/h|http://h/", "--proxy-header")]
     [DataRow("-w|@{out}/t|http://h/", "-w")]
-    [DataRow("-w|@{in}/t|http://h/", "")]
-    [DataRow("-w|@-|http://h/", "")]
+    [DataRow("-w|@{in}/missing|http://h/", "-w")]
+    [DataRow("-w|@-|http://h/", "-w")]
     [DataRow("-w|%output{{out}/w}%{http_code}|http://h/", "-w")]
     [DataRow("-w|%output{>>{out}/w}|http://h/", "-w")]
     [DataRow("-w|%output{{in}/w}x|http://h/", "")]
@@ -303,6 +303,45 @@ public sealed class McpArgumentCheckerTests
         StringAssert.Contains(missing.Reason, "cannot be read");
         StringAssert.Contains(folder.Reason, "cannot be read");
         StringAssert.Contains(standardInput.Reason, "standard input");
+    }
+
+    [TestMethod]
+    [DataRow("%output{{out}/x}%{http_code}", "-w")]
+    [DataRow("%{http_code}\n%output{>>{out}/x}", "-w")]
+    [DataRow("%output{{in}/x}%{http_code}", "")]
+    [DataRow("%{http_code}\n", "")]
+    [DataRow("", "")]
+    public void Check_WriteOutTemplateFileInsideTheRoot_ChecksItsOutputDirectives(string content, string refusedOption)
+    {
+        string template = Path.Combine(root, "template.txt");
+        File.WriteAllText(template, Expand(content));
+
+        McpArgumentCheck check = checker.Check(["-w", "@" + template, "http://h/"]);
+
+        Assert.AreEqual(refusedOption, check.Option ?? string.Empty, check.Reason);
+        if (!check.IsAllowed)
+        {
+            Assert.AreEqual(Expand("{out}/x"), check.Path);
+            StringAssert.StartsWith(check.Reason, $"In write-out template '{template}': -w '");
+            StringAssert.Contains(check.Reason, "outside CURL_MCP_ROOT");
+        }
+    }
+
+    [TestMethod]
+    public void Check_WriteOutTemplateFileOutsideOrUnreadable_IsRefused()
+    {
+        string outsideTemplate = Path.Combine(outside, "t.txt");
+        File.WriteAllText(outsideTemplate, "%{http_code}");
+
+        McpArgumentCheck outsideCheck = checker.Check(["--write-out", "@" + outsideTemplate, "http://h/"]);
+        McpArgumentCheck missing = checker.Check(["-w", "@" + Path.Combine(root, "missing.txt"), "http://h/"]);
+        McpArgumentCheck folder = checker.Check(["-w", "@" + root, "http://h/"]);
+
+        Assert.AreEqual("--write-out", outsideCheck.Option);
+        StringAssert.Contains(outsideCheck.Reason, "outside CURL_MCP_ROOT");
+        Assert.AreEqual("-w", missing.Option);
+        StringAssert.Contains(missing.Reason, "cannot be read");
+        StringAssert.Contains(folder.Reason, "cannot be read");
     }
 
     [TestMethod]

@@ -90,7 +90,8 @@ internal static class McpOptionValuePaths
             ["url-query"] = value => UrlEncodedPaths(value.StartsWith('+') ? value[1..] : value),
             ["variable"] = value => UrlEncodedPaths(value.StartsWith('%') ? value[1..] : value),
             ["form"] = FormPaths,
-            ["write-out"] = WriteOutPaths,
+            // A -w @file template is read and checked by McpArgumentChecker itself (ADR-0600).
+            ["write-out"] = TemplatePaths,
             ["url"] = UrlPaths,
         }.ToFrozenDictionary(StringComparer.Ordinal);
 
@@ -172,11 +173,10 @@ internal static class McpOptionValuePaths
         return word.ToString();
     }
 
-    /// <summary><c>-w @file</c> reads its template from the file; any other template may write files with <c>%output{file}</c>.</summary>
-    private static IReadOnlyList<McpValuePath> WriteOutPaths(string value) =>
-        value.StartsWith('@') ? FilePath(value[1..]) : TemplatePaths(value);
-
-    private static List<McpValuePath> TemplatePaths(string template)
+    /// <summary>The files a <c>-w</c> template's <c>%output{file}</c> and <c>%output{&gt;&gt;file}</c> directives name.</summary>
+    /// <param name="template">The template text, given inline or read from a <c>-w @file</c> file.</param>
+    /// <returns>The paths to check, in the order the template names them.</returns>
+    internal static List<McpValuePath> TemplatePaths(string template)
     {
         List<McpValuePath> paths = [];
         int index = 0;
