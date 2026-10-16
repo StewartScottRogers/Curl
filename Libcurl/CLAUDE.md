@@ -25,7 +25,7 @@ options with `setopt.c`'s range checks, and turns the `PROTOCOLS` bitmasks into 
 `EasyTransferOptions` options with `setopt.c`'s checks, each `_LARGE` or `_MS` alias setting the same
 field as the option it extends, and clamps the two buffer sizes rather than refusing them (ADR-0572). `Options/Proxy` sets the
 `EasyProxyOptions` options with `setopt.c`'s checks, keeps a copy of the `PROXYHEADER` list, and
-turns `HAPROXYPROTOCOL` on whenever `HAPROXY_CLIENT_IP` is set (ADR-0573).
+turns `HAPROXYPROTOCOL` on whenever `HAPROXY_CLIENT_IP` is set (ADR-0576).
 
 `Options/Callbacks` implements `AddCallbackSetters` once, calling one partial method per callback area
 (`AddReadWriteCallbackSetters`, `AddProgressCallbackSetters` and the rest), which each area implements in

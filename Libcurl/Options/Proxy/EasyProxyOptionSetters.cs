@@ -7,7 +7,7 @@ namespace Libcurl.Options;
 
 /// <summary>
 /// The setter rows of every <c>CURLOPT_*</c> <see cref="EasyProxyOptions"/> holds, each checking its
-/// value as curl 8.22.0's <c>lib/setopt.c</c> does (ADR-0573).
+/// value as curl 8.22.0's <c>lib/setopt.c</c> does (ADR-0576).
 /// </summary>
 internal static class EasyProxyOptionSetters
 {
