@@ -32,3 +32,4 @@ Prerequisite of BL-2420, which adapts libcurl's CURLOPT_CHUNK_BGN_FUNCTION, CHUN
 ## Log
 
 - 2026-10-16: Created.
+- 2026-10-16: Backlog -> Doing.
