@@ -33,3 +33,4 @@ Phase 4 of `Documentation/Planning/Curl-Api-And-libcurl.md`; ADR-0506. `Curl.Api
 ## Log
 
 - 2026-10-16: Created.
+- 2026-10-16: Backlog -> Doing. Criteria at claim: f0579c35 4272a6b9 5393a01b 8738c7f6 ae118507.
