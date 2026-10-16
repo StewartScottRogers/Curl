@@ -32,7 +32,7 @@ ADR-0506; phase 3 of `Documentation/Planning/Curl-Api-And-libcurl.md`. Read the 
 
 - Built in `Libcurl/Multi/Settings` as a `CurlMulti` part: `SetOption(CurlMultiOption, object?)` over the
   internal `MultiOptionSetters` table, `GetHandles`, `WaitFds`, `GetInfo(CurlMultiInfo, out long)`,
-  `NotifyEnable` and `NotifyDisable`. Decisions in ADR-0581 (ADR-0580 was already taken on the shared
+  `NotifyEnable` and `NotifyDisable`. Decisions in ADR-0582 (ADR-0580 and ADR-0581 were already taken on the shared
   branch). The plan matched the seam; nothing to correct.
 - `multi.c`'s range checks are taken from curl 8.22.0's source as read: no libcurl is installed on the
   lane machine to call `curl_multi_setopt` against.
