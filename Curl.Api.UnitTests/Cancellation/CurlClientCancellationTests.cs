@@ -92,8 +92,10 @@ public sealed class CurlClientCancellationTests
         await source.CancelAsync();
         await response.Body.DisposeAsync();
 
+        // The client's multi handle driver also removes the cancelled transfer (ADR-0644), and may do so
+        // before the unpaused transfer asks its transfer-info callback, so ask the callback directly.
         Assert.AreEqual(1, engine.Transfer.ResumeCalls);
-        Assert.IsGreaterThan(0, engine.Transfer.ProgressCalls);
+        Assert.AreEqual(TransferCancellation.Abort, engine.Transfer.Options.Callbacks.TransferInfo!(0, 0, 0, 0));
         Assert.IsTrue(engine.Transfer.Disposed);
     }
 
