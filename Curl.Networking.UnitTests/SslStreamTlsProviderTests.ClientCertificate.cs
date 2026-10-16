@@ -39,7 +39,11 @@ public sealed partial class SslStreamTlsProviderTests
     // BL-254: on Windows SslStream caches the credential handle of a handshake that
     // presented a certificate under the key of one that presents none, so every later
     // handshake without --cert in the process presented it too. Real curl presents none.
+    // BL-2373: that cache is process-wide, so a handshake of a test running beside this one
+    // could land between its two handshakes and make the second present a certificate;
+    // the test runs alone.
     [TestMethod]
+    [DoNotParallelize]
     [DataRow(SchannelBuild)]
     [DataRow(OpenSslBuild)]
     public async Task AuthenticateAsClientAsync_WithoutClientCertificateAfterAHandshakeThatPresentedOne_PresentsNone(bool matchesSchannelBuild)
