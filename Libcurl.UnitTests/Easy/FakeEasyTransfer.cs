@@ -24,7 +24,7 @@ internal sealed class FakeEasyTransfer : IEasyTransfer
 
     public EasyOptions Options { get; set; } = new();
 
-    public TransferInfo Info => throw new NotSupportedException();
+    public TransferInfo Info { get; init; } = new();
 
     public string ErrorText => throw new NotSupportedException();
 

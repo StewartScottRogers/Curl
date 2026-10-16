@@ -32,7 +32,16 @@ engine's `IEasyTransfer` (ADR-0563): `SetOption` goes through `EasyOptionDispatc
 changed `EasyOptions` back to the transfer only on `Ok`; `PerformAsync` is the native shape, and
 `Perform` blocks on it, the one sanctioned sync-over-async bridge in Libcurl. `Dispose` and
 `DisposeAsync` are `curl_easy_cleanup` and dispose the transfer once; a member used afterwards throws
-`ObjectDisposedException`.
+`ObjectDisposedException`. `GetInfo` is `curl_easy_getinfo` and goes through `Info`'s dispatch.
+
+`Info` holds `CurlInfo` (every `CURLINFO_*` of curl 8.22.0's `curl.h` by name and number) and the
+internal `EasyInfoDispatch` `CurlEasy.GetInfo` goes through (ADR-0564): an id `curl.h` lacks answers
+`UnknownOption`, a known info no group reads yet `NotBuiltIn`. Each info group adds its reader rows by
+implementing its `Add<Group>Readers` partial method in an `EasyInfoReaders` part in `Info/<Group>`,
+keeping the namespace `Libcurl.Info`, with each reader a named method in an explicit
+`new EasyInfoReader(...)` (a lambda or cached method group counts against the adding method's
+complexity). `Info/Strings` reads the strings, lists, `PRIVATE` and `TLS_SSL_PTR`, which answers a
+`CurlTlsSessionInfo` with the build's backend and no native pointer.
 
 Reference `Curl.Api.UnitLibrary` only. Never reference `Curl.Api`, a protocol library, or
 `Curl.Engine.UnitLibrary` before the task that adds the engine-building overloads.

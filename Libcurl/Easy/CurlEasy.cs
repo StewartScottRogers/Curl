@@ -1,6 +1,7 @@
 using Curl.Api.Codes;
 using Curl.Api.EngineContracts;
 using Curl.Api.Options;
+using Libcurl.Info;
 using Libcurl.Options;
 
 namespace Libcurl.Easy;
@@ -8,7 +9,7 @@ namespace Libcurl.Easy;
 /// <summary>
 /// An easy handle (ADR-0506): <c>curl_easy_init</c>'s result, created by
 /// <see cref="Global.CurlLibrary.EasyInit"/> over the engine's <see cref="IEasyTransfer"/>.
-/// <see cref="SetOption"/> is <c>curl_easy_setopt</c>, <see cref="Perform"/> and
+/// <see cref="SetOption"/> is <c>curl_easy_setopt</c>, <see cref="GetInfo"/> is <c>curl_easy_getinfo</c>, <see cref="Perform"/> and
 /// <see cref="PerformAsync"/> are <c>curl_easy_perform</c>, and <see cref="Dispose"/> (or
 /// <see cref="DisposeAsync"/>) is <c>curl_easy_cleanup</c>.
 /// </summary>
@@ -54,6 +55,23 @@ public sealed class CurlEasy : IDisposable, IAsyncDisposable
         }
 
         return code;
+    }
+
+    /// <summary><c>curl_easy_getinfo</c>: reads <paramref name="info"/> about the handle's last transfer.</summary>
+    /// <param name="info">The info to read.</param>
+    /// <param name="value">
+    /// The value, of the .NET type <see cref="CurlInfo"/>'s remarks give for the info's base; <see langword="null"/>
+    /// when the answer is not <see cref="CurlCode.Ok"/>.
+    /// </param>
+    /// <returns>
+    /// <see cref="CurlCode.Ok"/>, <see cref="CurlCode.UnknownOption"/> for an info <c>curl.h</c> lacks, or
+    /// <see cref="CurlCode.NotBuiltIn"/> for one Libcurl does not read yet.
+    /// </returns>
+    /// <exception cref="ObjectDisposedException">The handle has been cleaned up.</exception>
+    public CurlCode GetInfo(CurlInfo info, out object? value)
+    {
+        var live = LiveTransfer();
+        return EasyInfoDispatch.Default.GetInfo(info, live.Info, live.Options, out value);
     }
 
     /// <summary>
