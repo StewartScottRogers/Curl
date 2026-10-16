@@ -5,11 +5,11 @@ area: features
 platform: linux
 key: features:http3-not-in-reference
 severity: Medium
-status: open
+status: closed
 scope: target
 introduced-in:
 opened: 2026-10-15_0751
-closed:
+closed: 2026-10-15_1657
 regression: false
 items: [features:HTTP3]
 touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests]
@@ -33,8 +33,10 @@ In Curl.Cli.UnitLibrary, CurlVersionText.FeaturesLine (CurlVersionText.cs, line 
 ## Measurements
 
 - 2026-10-15_0751: 1 of 1 items are gaps.
+- 2026-10-15_1657: 0 of 1 items are gaps.
 
 ## Log
 
 - 2026-10-15_0751: Opened by gap-features.
 - 2026-10-15_0900: Filed BL-2330.
+- 2026-10-15_1657: Closed: run 2026-10-15_1657 measured every item as match or excluded on linux.

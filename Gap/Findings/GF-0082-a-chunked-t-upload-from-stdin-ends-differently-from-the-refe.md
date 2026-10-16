@@ -5,11 +5,11 @@ area: behaviour
 platform: linux
 key: behaviour:stdin-chunked-upload-unix-diverges
 severity: Critical
-status: open
+status: closed
 scope: target
 introduced-in:
 opened: 2026-10-15_0751
-closed:
+closed: 2026-10-15_1657
 regression: false
 items: [behaviour:test60, behaviour:test1072, behaviour:test1073]
 touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests, Curl.Console, Curl.Console.UnitTests]
@@ -33,8 +33,10 @@ Make Curl's chunked upload of an unseekable stdin finish on Linux and macOS the 
 ## Measurements
 
 - 2026-10-15_0751: 3 of 3 items are gaps.
+- 2026-10-15_1657: 0 of 3 items are gaps.
 
 ## Log
 
 - 2026-10-15_0751: Opened by gap-behaviour.
 - 2026-10-15_0900: Filed BL-2337.
+- 2026-10-15_1657: Closed: run 2026-10-15_1657 measured every item as match or excluded on linux.
