@@ -12,6 +12,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- For CurlHelpText.Categories, from which the ai-help MCP resources are listed (BL-2387, ADR-0576). -->
+    <InternalsVisibleTo Include="Curl.Mcp.UnitLibrary" />
+    <InternalsVisibleTo Include="Curl.Mcp.UnitTests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <EmbeddedResource Include="CurlManual.txt" LogicalName="Curl.Cli.CurlManual.txt" />
   </ItemGroup>
 

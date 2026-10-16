@@ -6,7 +6,8 @@ over standard input and output. It is a naming exception, with `Curl.Console`, `
 
 It contains only attribute wiring and forwarding calls: the generic host, the stdio transport,
 `[McpServerToolType]` classes whose methods each forward to one `Curl.Mcp.UnitLibrary` call
-(`CurlCommandTool`, the `curl` tool), the runner adapters over `Curl.Console` and the engine
+(`CurlCommandTool`, the `curl` tool), the `--ai-help` resource handlers over
+`McpAiHelpResourceCatalogue` (`CurlAiHelpResourceHandlers`, ADR-0589), the runner adapters over `Curl.Console` and the engine
 (`InProcessCurlCommandRunner`), and the source-generated JSON context. Tool logic - checking,
 capping, turning a result into an error - lives in `Curl.Mcp.UnitLibrary`, never here; a branch
 added here is a sign it belongs there. The host makes `CURL_MCP_ROOT` the process's current

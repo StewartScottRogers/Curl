@@ -23,7 +23,8 @@ internal static class CurlMcpHost
     /// <c>CURL_MCP_ROOT</c> and <c>CURL_MCP_MAX_RESPONSE_BYTES</c> once, so a bad value stops the
     /// server before it starts, and makes the root the process's current directory, so curl's
     /// relative paths resolve inside it (ADR-0575). Tools are registered one by one, never by
-    /// scanning an assembly: the <c>curl</c> tool over <see cref="InProcessCurlCommandRunner" />.
+    /// scanning an assembly: the <c>curl</c> tool over <see cref="InProcessCurlCommandRunner" />, and the <c>--ai-help</c>
+    /// resources through <see cref="CurlAiHelpResourceHandlers" /> (ADR-0589).
     /// </summary>
     /// <param name="args">The arguments as received from the shell.</param>
     /// <param name="readEnvironmentVariable">Reads an environment variable, <see langword="null" /> when it is unset.</param>
@@ -42,7 +43,9 @@ internal static class CurlMcpHost
         builder.Services
             .AddMcpServer()
             .WithStdioServerTransport()
-            .WithTools<CurlCommandTool>(CurlMcpJsonContext.ToolOptions);
+            .WithTools<CurlCommandTool>(CurlMcpJsonContext.ToolOptions)
+            .WithListResourcesHandler(CurlAiHelpResourceHandlers.ListAsync)
+            .WithReadResourceHandler(CurlAiHelpResourceHandlers.ReadAsync);
         return builder.Build();
     }
 }

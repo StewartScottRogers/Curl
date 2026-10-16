@@ -12,7 +12,8 @@ checks a whole curl argument array, paths embedded in values, `file:` URLs and `
 answering with an `McpArgumentCheck`. `McpCurlTool` (ADR-0569) is the `curl` tool: it checks the
 arguments, runs them through the injected `ICurlCommandRunner` with the root as working directory,
 captures standard output and error in `McpCappedCaptureStream`, and answers with an
-`McpCurlToolResult`. The later tasks of `Documentation/Planning/Curl-Mcp.md` add the rest.
+`McpCurlToolResult`. `McpAiHelpResourceCatalogue` (ADR-0589) lists the `--ai-help` resources, one
+`McpAiHelpResource` per subject, from `CurlHelpText.Categories`. The later tasks of `Documentation/Planning/Curl-Mcp.md` add the rest.
 
 Base class library only. Only `Curl.Mcp` may take the MCP SDK packages (`ModelContextProtocol`
 and `Microsoft.Extensions.Hosting`); this library references no package. Reference
