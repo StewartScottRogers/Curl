@@ -54,3 +54,4 @@ ADR-0506; phase 3 of `Documentation/Planning/Curl-Api-And-libcurl.md`. Read the 
 - 2026-10-15: Created.
 - 2026-10-15: Backlog -> Doing.
 - 2026-10-15: Doing -> Backlog. Waits on BL-2463: the engine needs a rewind seam in Curl.Protocol.Abstractions, Curl.Core and the HTTP handler before a read callback can be rewound
+- 2026-10-16: Backlog -> Doing.
