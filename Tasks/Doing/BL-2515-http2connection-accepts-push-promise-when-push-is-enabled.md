@@ -36,3 +36,4 @@ Suggested shape (decide and record in an ADR if it differs): a constructor overl
 ## Log
 
 - 2026-10-16: Created.
+- 2026-10-16: Backlog -> Doing. Criteria at claim: 32289025 4d9e7b43 65020420 9e5bf8e0 4272a6b9 5f66a896.
