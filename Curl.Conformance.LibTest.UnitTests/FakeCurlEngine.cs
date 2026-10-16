@@ -12,7 +12,7 @@ using Curl.Api.Options;
 
 namespace Curl.Conformance.LibTest.UnitTests;
 
-/// <summary>An <see cref="ICurlEngine"/> whose easy transfers perform with <see cref="PerformResult"/> and report <see cref="Info"/>; it makes no other handle.</summary>
+/// <summary>An <see cref="ICurlEngine"/> whose easy transfers perform with <see cref="PerformResult"/> and report <see cref="Info"/>, whose multi handle is <see cref="Multi"/>, and whose share and URL handles are fakes; it makes no MIME or form builder.</summary>
 internal sealed class FakeCurlEngine : ICurlEngine
 {
     public CurlCode PerformResult { get; init; } = CurlCode.Ok;
@@ -23,11 +23,13 @@ internal sealed class FakeCurlEngine : ICurlEngine
 
     public IEasyTransfer CreateEasy() => new FakeEasyTransfer(PerformResult, Info);
 
-    public IMultiTransfer CreateMulti() => throw new NotSupportedException();
+    public FakeMultiTransfer Multi { get; } = new();
 
-    public IShareHandle CreateShare() => throw new NotSupportedException();
+    public IMultiTransfer CreateMulti() => Multi;
 
-    public ICurlUrlHandle CreateUrl() => throw new NotSupportedException();
+    public IShareHandle CreateShare() => new FakeShareHandle();
+
+    public ICurlUrlHandle CreateUrl() => new FakeUrlHandle();
 
     public IMimeBuilder CreateMime() => throw new NotSupportedException();
 

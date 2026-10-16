@@ -22,7 +22,7 @@ namespace Curl.Conformance.LibTest;
 /// <see cref="EasyGetInfo"/>).
 /// </summary>
 /// <param name="error">Where a failing step writes the line upstream's macro writes to <c>stderr</c>.</param>
-public sealed class LibTestSteps(TextWriter error)
+public sealed partial class LibTestSteps(TextWriter error)
 {
     private readonly TextWriter error = error ?? throw new ArgumentNullException(nameof(error));
 

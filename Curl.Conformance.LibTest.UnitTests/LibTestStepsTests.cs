@@ -9,7 +9,7 @@ using Libcurl.Options;
 namespace Curl.Conformance.LibTest.UnitTests;
 
 [TestClass]
-public sealed class LibTestStepsTests
+public sealed partial class LibTestStepsTests
 {
     private const CurlOption UnknownOption = (CurlOption)99999;
 
