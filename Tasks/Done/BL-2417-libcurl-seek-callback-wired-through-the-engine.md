@@ -8,7 +8,7 @@ depends-on: [BL-2416, BL-2463]
 touches: [Libcurl/Callbacks/Seek, Libcurl.UnitTests/Callbacks/Seek, Curl.Engine.UnitLibrary, Curl.Engine.UnitTests]
 requirement: none
 created: 2026-10-15
-completed:
+completed: 2026-10-16
 ---
 # BL-2417 — Libcurl: seek callback wired through the engine
 
@@ -22,11 +22,11 @@ ADR-0506; phase 3 of `Documentation/Planning/Curl-Api-And-libcurl.md`. Read the 
 
 ## Acceptance criteria
 
-- [ ] Engine tests cover rewind, cannot-seek and fail-seek.
-- [ ] `dotnet build` is clean and the fast tests pass with no test deleted, skipped or weakened.
-- [ ] `Curl.Conformance.UnitTests/PassingUpstreamCases.txt` is unchanged or grown, and every case it lists still passes.
-- [ ] `Measure-CodeQuality.ps1 -Library Libcurl,Curl.Engine.UnitLibrary` reports 0 failing members (100% line and branch coverage, complexity at most 10, CRAP at most 30).
-- [ ] Every new public member has an XML doc comment, and `Libcurl/CLAUDE.md` or `Curl.Engine.UnitLibrary`'s CLAUDE.md is kept true.
+- [x] Engine tests cover rewind, cannot-seek and fail-seek.
+- [x] `dotnet build` is clean and the fast tests pass with no test deleted, skipped or weakened.
+- [x] `Curl.Conformance.UnitTests/PassingUpstreamCases.txt` is unchanged or grown, and every case it lists still passes.
+- [x] `Measure-CodeQuality.ps1 -Library Libcurl,Curl.Engine.UnitLibrary` reports 0 failing members (100% line and branch coverage, complexity at most 10, CRAP at most 30).
+- [x] Every new public member has an XML doc comment, and `Libcurl/CLAUDE.md` or `Curl.Engine.UnitLibrary`'s CLAUDE.md is kept true.
 
 ## Notes
 
@@ -49,9 +49,17 @@ ADR-0506; phase 3 of `Documentation/Planning/Curl-Api-And-libcurl.md`. Read the 
   `EasyOptionSetters.Seek.cs` and `EasySeekCallbackSetters` like `Callbacks/Progress` (`SEEKFUNCTION` takes a
   `SeekCallback` or null, else `BadFunctionArgument`; `SEEKDATA` takes any value and changes nothing).
 
+- 2026-10-16 (lane 1): done as planned above, with one choice: only a handle with a seek callback gets the
+  rewinding `SeekingCallbackReadStream` (a `CallbackReadStream` subclass implementing `IUploadRewinder`); with
+  none the upload stays a plain `CallbackReadStream`, so the curl tool's uploads and a resend without a seek
+  callback behave as before (ADR-0609). `CURLOPT_RESUME_FROM`'s forward seek through the callback is filed as
+  BL-2473. `Measure-CodeQuality.ps1 -Library Libcurl,Curl.Engine.UnitLibrary`: 0 failing members. The
+  conformance ratchet file is unchanged.
+
 ## Log
 
 - 2026-10-15: Created.
 - 2026-10-15: Backlog -> Doing.
 - 2026-10-15: Doing -> Backlog. Waits on BL-2463: the engine needs a rewind seam in Curl.Protocol.Abstractions, Curl.Core and the HTTP handler before a read callback can be rewound
 - 2026-10-16: Backlog -> Doing.
+- 2026-10-16: Doing -> Done. CURLOPT_SEEKFUNCTION rewinds a read-callback upload on redirect or auth retry; Ok, CantSeek and Fail covered
