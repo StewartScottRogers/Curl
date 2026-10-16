@@ -30,3 +30,4 @@ Found by BL-2364 on 2026-10-15 (dark factory lane 1, Windows): it failed once in
 ## Log
 
 - 2026-10-15: Created.
+- 2026-10-15: Backlog -> Doing.
