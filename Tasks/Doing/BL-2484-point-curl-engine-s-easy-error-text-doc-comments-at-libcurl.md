@@ -30,3 +30,4 @@ BL-2450 moved `CurlEasyErrorText` from `Curl.Console` to `Libcurl/Misc/ErrorText
 ## Log
 
 - 2026-10-16: Created.
+- 2026-10-16: Backlog -> Doing. Criteria at claim: d46ce23c 3d836d5e.
