@@ -30,7 +30,7 @@ ADR-0506; phase 3 of `Documentation/Planning/Curl-Api-And-libcurl.md`. Read the 
 
 ## Notes
 
-- Decisions in ADR-0579. `CurlShare` (`Libcurl/Share`) wraps the engine's `IShareHandle`; `SetOption`
+- Decisions in ADR-0581. `CurlShare` (`Libcurl/Share`) wraps the engine's `IShareHandle`; `SetOption`
   checks kinds, options and value types itself (`BadOption`), passes the seam's lock delegates
   through as given, and keeps `USERDATA` as `UserData`; `Cleanup` marks the handle cleaned up only on
   the engine's `Ok`, after which every call answers `Invalid`.
