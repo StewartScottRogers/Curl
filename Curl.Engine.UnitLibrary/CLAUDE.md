@@ -122,7 +122,7 @@ transports (`CreateTransports`, `CreateTcpConnector`, `CreatePoolingConnector`,
 `CreateSaslAuthenticator`), the `--trace-config` predicates (`Traces*`) and the option readers
 (`AddressFamilyOf`, `ConnectTimeoutOf`, `LocalBindingOf`, `PreProxyOf`, `UnixSocketOf` and the
 like). `Curl.Console`'s `CurlComposition` keeps `CreateRunner` and calls these. curl's easy error
-text stays in `Curl.Console` (`CurlEasyErrorText`, which `Gap/` tooling reads by path), so the DoH
+text lives in `Libcurl/Misc/ErrorText` (`CurlEasyErrorText`, which `Curl.Console` passes in; the engine never references `Libcurl`), so the DoH
 resolver's text comes in through the `easyErrorText` parameter of `CreateTransports`,
 `CreateDnsResolver` and `CreateDohResolver`; without one it is empty. `OptionGroupConnectionSettings`
 and `ProcessUserId` moved here with it.
@@ -181,7 +181,7 @@ by BL-2282 to BL-2284) is here: one attempt under its watchdogs, the run's `%{xf
 running transfer is `EngineTransferState` (the attempt's watchdogs, the retry and connection IDs, the
 looked-up credentials, the SSH options and the alt-svc cache); `Curl.Console`'s `RunningTransferState`
 derives from it and adds the tool's part. curl's easy error text comes in through the constructor's
-`easyErrorText` (`CurlEasyErrorText.Of` in production, which stays in `Curl.Console`), so
+`easyErrorText` (`CurlEasyErrorText.Of` in production, which lives in `Libcurl/Misc/ErrorText` and which `Curl.Console` passes in), so
 `KnownHostsFileMissingFailure` is one per performer and `ResolveSshOptionsAsync` and
 `SetupFailureAsync` are instance methods. `HstsCacheFile` and `UrlEffective` (`%{url_effective}`,
 which the HSTS switch line prints) moved with it. `TransferPerformerTests` and `UrlEffectiveTests`

@@ -78,7 +78,7 @@ does what only a command line has.
 | `ProgressBarRecorder`, `ProgressMeterFields`, `ProgressMeterLines`, `TransferProgressRecorder`, `TerminalColumns`, `WarningLineWrapper`, `ToolNotes` | `HttpRequestOptionsMapping`, `HttpVersionMapping`, `MailRequestOptionsMapping`, `MultipartFormPartMapping`, `RedirectPolicyMapping`, `SshOptionsMapping`, `TlsClientOptionsMapping`, `OptionGroupConnectionSettings`, `TlsBuildInformation`, `TransferProxySelection`, `TransferTimers`, `UnusableDohUrlResolver`, `CurlTransports` |
 | `StandardOutput*`, `StandardError*`, `StandardInput*`, `ClosedStandardOutputStream`, `WriteGate`, `WriteGateStream`, `DumpHeaderOutputStream`, `EtagSaveStream`, and the runner's stream wrappers `LineFeedToCrLfStream`, `TextModeUntilBinaryStream`, `FlushEachWriteStream`, `HoldableStream` | `AwsSigV4HttpAuthenticator`, `HttpSignatureHttpAuthenticator`, `HttpSignatureSetup`, `HandBuiltKerberosSources`, `HandBuiltNtlmSecurityContextFactory`, `KerberosDisk*`, `LateBoundSecurityContextFactory`, `NegotiateOptionsMapping`, `Socks5AuthenticationMapping`, `TransferCredentialLookup`, `NoCryptoEngines` |
 | `InProcessCurl` (public; `Gap/Tools/Measure-UpstreamCases.cs` calls it), `RunDiagnosticLog`, `RecordingDataFileReader`, `TransferDiagnosticLines`, `TransferEventOutput`, `DiskWriteOutFileOpener`, `RefusingWriteOutFileOpener`, and until `RunningTransferState`, `TransferTimers` and `WriteGate` move: `ConnectionIdRecordingTransferEvents`, `TlsResultRecordingTransferEvents`, `MultiStateTraceEvents`, `GatedDiagnosticLog` (BL-2285) | the trace-event decorators (`ClientReaderResetTraceEvents`, `ClientWriterTraceEvents`, `ConnectReplyHeadWritingEvents`, `ResponseWaitTimerTraceEvents`), `ConnectionEndPointRecorder`, `EndPointRecording*Connector`, `EndPointReportingProtocolHandler`, `LazyProtocolHandler`, `RoutingFtpProtocolHandler`, `LateBoundDiagnosticLog` |
-| `CurlEasyErrorText` for now: `Gap/Tools/Measure-ExitCodeGap.ps1` reads it by path (ADR-0506); it moves in phase 3 with an interactive `Gap/` change | `CurlErrorBuffer` (it is `CURLOPT_ERRORBUFFER`'s 256-byte cut) |
+| `CurlEasyErrorText` (moved to `Libcurl/Misc/ErrorText` by BL-2450; `Curl.Console` passes it in) | `CurlErrorBuffer` (it is `CURLOPT_ERRORBUFFER`'s 256-byte cut) |
 
 A move task that finds a file in its list referencing a tool-side type leaves it, says why in its
 Notes, and the classification here is corrected. `LineFeedToCrLfStream`, `TextModeUntilBinaryStream`,
@@ -204,7 +204,7 @@ retargets) waits on phase 2's option groups, so the two phases interleave.
 5. Align the documents with the split.
 
 Every phase 1 task keeps every test, the ratchet (`PassingUpstreamCases.txt`) and the gap office's
-scores unchanged, leaves `Curl.Console/CurlEasyErrorText.cs` where it is and keeps
+scores unchanged, leaves `CurlEasyErrorText` where it is (it has since moved to `Libcurl/Misc/ErrorText`, BL-2450) and keeps
 `InProcessCurl.RunAsync`'s public signature (ADR-0506, "What must not change").
 
 ### Phase 2 - scaffold the API projects and define the seam (21 tasks, filed)

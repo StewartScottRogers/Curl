@@ -408,7 +408,7 @@ internal static class EngineComposition
     /// Receives the DoH resolver's <c>--trace-config doh</c> lines (BL-1102); <see langword="null" />
     /// for none.
     /// </param>
-    /// <param name="easyErrorText">Curl's easy error text for each exit code, which the DoH resolver's <c>--trace-config doh</c> lines carry (BL-1102): <c>Curl.Console</c>'s <c>CurlEasyErrorText.Of</c> in production; <see langword="null" /> for an empty text.</param>
+    /// <param name="easyErrorText">Curl's easy error text for each exit code, which the DoH resolver's <c>--trace-config doh</c> lines carry (BL-1102): <c>CurlEasyErrorText.Of</c> (in <c>Libcurl/Misc/ErrorText</c>) passed in by <c>Curl.Console</c> in production; <see langword="null" /> for an empty text.</param>
     /// <param name="traces">The run's <c>--trace-config</c> components, for the DoH connector's DNS filter lines; <see langword="null" /> for none.</param>
     /// <returns>The resolver.</returns>
     internal static IDnsResolver CreateDnsResolver(EasyNetworkOptions network, EasyTlsOptions tls, TimeProvider timeProvider, ITcpDialer tcpDialer, ITransferEvents? dohTrace = null, Func<CurlExitCode, string>? easyErrorText = null, EngineTraceComponents? traces = null)
@@ -445,7 +445,7 @@ internal static class EngineComposition
     /// (BL-1102), and each DoH sub-transfer's own lines through a <see cref="DohSubTransferEvents" />
     /// (BL-1180); <see langword="null" /> for none.
     /// </param>
-    /// <param name="easyErrorText">Curl's easy error text for each exit code, which the DoH resolver's <c>--trace-config doh</c> lines carry (BL-1102): <c>Curl.Console</c>'s <c>CurlEasyErrorText.Of</c> in production; <see langword="null" /> for an empty text.</param>
+    /// <param name="easyErrorText">Curl's easy error text for each exit code, which the DoH resolver's <c>--trace-config doh</c> lines carry (BL-1102): <c>CurlEasyErrorText.Of</c> (in <c>Libcurl/Misc/ErrorText</c>) passed in by <c>Curl.Console</c> in production; <see langword="null" /> for an empty text.</param>
     /// <returns>The resolver.</returns>
     internal static IDnsResolver CreateDohResolver(string dohUrl, IConnector connector, AddressFamily addressFamily, ITransferEvents? dohTrace = null, Func<CurlExitCode, string>? easyErrorText = null) =>
         DohUrlOf(dohUrl) is { } url
@@ -771,7 +771,7 @@ internal static class EngineComposition
     /// <param name="tlsSessions">The run's <c>--ssl-sessions</c> cache, which the origin's TLS provider uses (ADR-0319); <see langword="null" /> for none.</param>
     /// <param name="diagnosticLog">The run's diagnostic log, which the authenticators and security contexts write their choices to (BL-923); <see langword="null" /> for none.</param>
     /// <param name="runDnsCache">The run's DNS cache, which every option group's TCP connector answers from and adds to as curl 8.21.0 shares its cache (BL-1053); <see langword="null" /> for a cache of the group's own.</param>
-    /// <param name="easyErrorText">Curl's easy error text for each exit code, which the DoH resolver's <c>--trace-config doh</c> lines carry (BL-1102): <c>Curl.Console</c>'s <c>CurlEasyErrorText.Of</c> in production; <see langword="null" /> for an empty text.</param>
+    /// <param name="easyErrorText">Curl's easy error text for each exit code, which the DoH resolver's <c>--trace-config doh</c> lines carry (BL-1102): <c>CurlEasyErrorText.Of</c> (in <c>Libcurl/Misc/ErrorText</c>) passed in by <c>Curl.Console</c> in production; <see langword="null" /> for an empty text.</param>
     /// <param name="traces">The run's <c>--trace-config</c> components; <see langword="null" /> for none.</param>
     internal static CurlTransports CreateTransports(EngineToolOptions tool, EasyNetworkOptions network, EasyTlsOptions tls, EasyHttpOptions http, EasyProxyOptions proxy, EasyAuthenticationOptions authentication, TimeProvider timeProvider, ConnectionCache? runConnections = null, TlsSessionCache? tlsSessions = null, IDiagnosticLog? diagnosticLog = null, DnsCache? runDnsCache = null, Func<CurlExitCode, string>? easyErrorText = null, EngineTraceComponents? traces = null) =>
         CreateTransports(tool, network, tls, http, proxy, authentication, timeProvider, runConnections, tlsSessions, diagnosticLog, runDnsCache, easyErrorText, traces, static resolver => resolver);

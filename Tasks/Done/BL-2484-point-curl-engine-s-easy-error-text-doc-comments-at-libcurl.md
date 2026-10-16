@@ -8,7 +8,7 @@ depends-on: [BL-2450]
 touches: [Curl.Engine.UnitLibrary, Documentation/Planning/Curl-Api-And-libcurl.md]
 requirement: none
 created: 2026-10-16
-completed:
+completed: 2026-10-16
 ---
 # BL-2484 — Point Curl.Engine's easy error text doc comments at Libcurl's CurlEasyErrorText
 
@@ -22,8 +22,8 @@ BL-2450 moved `CurlEasyErrorText` from `Curl.Console` to `Libcurl/Misc/ErrorText
 
 ## Acceptance criteria
 
-- [ ] `grep -rn "CurlEasyErrorText" Curl.Engine.UnitLibrary Documentation/Planning/Curl-Api-And-libcurl.md` shows no line saying it is in or stays in `Curl.Console`.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] `grep -rn "CurlEasyErrorText" Curl.Engine.UnitLibrary Documentation/Planning/Curl-Api-And-libcurl.md` shows no line saying it is in or stays in `Curl.Console`.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
 
@@ -31,3 +31,4 @@ BL-2450 moved `CurlEasyErrorText` from `Curl.Console` to `Libcurl/Misc/ErrorText
 
 - 2026-10-16: Created.
 - 2026-10-16: Backlog -> Doing. Criteria at claim: d46ce23c 3d836d5e.
+- 2026-10-16: Doing -> Done. Doc comments, CLAUDE.md and plan now point at Libcurl/Misc/ErrorText; build clean, Engine tests green

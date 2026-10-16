@@ -18,7 +18,7 @@ internal sealed class ManagedEngineSharedState
 {
     /// <summary>Creates an engine's state, every cache its own.</summary>
     /// <param name="timeProvider">The clock the caches, the HSTS cache and the transfers run on.</param>
-    /// <param name="easyErrorText">Curl's easy error text for each exit code (<c>Curl.Console</c>'s <c>CurlEasyErrorText.Of</c> in production).</param>
+    /// <param name="easyErrorText">Curl's easy error text for each exit code (<c>CurlEasyErrorText.Of</c> from <c>Libcurl/Misc/ErrorText</c>, passed in by <c>Curl.Console</c>, in production).</param>
     /// <param name="readEnvironmentVariable">
     /// Reads the proxy environment variables every handle's own perform consults (<see cref="ProxySelector" />):
     /// <see cref="Environment.GetEnvironmentVariable(string)" />, the default, in production; a dictionary in tests.

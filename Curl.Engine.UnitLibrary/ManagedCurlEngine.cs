@@ -46,8 +46,8 @@ public sealed class ManagedCurlEngine : ICurlEngine
     /// for the production one.
     /// </param>
     /// <param name="easyErrorText">
-    /// Curl's easy error text for each exit code: <c>Curl.Console</c>'s <c>CurlEasyErrorText.Of</c>, which
-    /// stays there (BL-2291); <see langword="null" /> for an empty text.
+    /// Curl's easy error text for each exit code: <c>CurlEasyErrorText.Of</c> (in <c>Libcurl/Misc/ErrorText</c>), which
+    /// <c>Curl.Console</c> passes in (BL-2291, BL-2450); <see langword="null" /> for an empty text.
     /// </param>
     /// <param name="readEnvironmentVariable">
     /// Reads the proxy environment variables each handle's own perform consults, as libcurl reads them for every
