@@ -8,7 +8,7 @@ depends-on: [BL-2458]
 touches: [Curl.Engine.UnitLibrary, Curl.Engine.UnitTests, Libcurl.UnitTests/Misc/Version, Libcurl.UnitTests/Libcurl.UnitTests.csproj]
 requirement: none
 created: 2026-10-16
-completed:
+completed: 2026-10-16
 ---
 # BL-2465 — Engine: ManagedCurlEngine.VersionInfo reports curl -V's host, TLS backend, protocols and features
 
@@ -30,14 +30,20 @@ Curl.Engine.UnitLibrary does not reference `Curl.Cli.UnitLibrary`; either pin th
 
 ## Acceptance criteria
 
-- [ ] A test in `Curl.Engine.UnitTests` checks `ManagedCurlEngine.VersionInfo`'s host, TLS backend, protocols (plus `ipfs`, `ipns`) and features against `CurlVersionText.Lines` for the running platform.
-- [ ] A test in `Libcurl.UnitTests/Misc/Version` checks `CurlVersion.Text` and `CurlVersion.Info(CurlVersionAge.Now)` over a real `ManagedCurlEngine` against `curl -V`'s lines (`CurlVersionText`), adding a `Curl.Cli.UnitLibrary` reference to `Libcurl.UnitTests` if needed.
-- [ ] `dotnet build` is clean and the fast tests pass with no test deleted, skipped or weakened.
-- [ ] `Measure-CodeQuality.ps1 -Library Curl.Engine.UnitLibrary` reports 0 failing members.
+- [x] A test in `Curl.Engine.UnitTests` checks `ManagedCurlEngine.VersionInfo`'s host, TLS backend, protocols (plus `ipfs`, `ipns`) and features against `CurlVersionText.Lines` for the running platform.
+- [x] A test in `Libcurl.UnitTests/Misc/Version` checks `CurlVersion.Text` and `CurlVersion.Info(CurlVersionAge.Now)` over a real `ManagedCurlEngine` against `curl -V`'s lines (`CurlVersionText`), adding a `Curl.Cli.UnitLibrary` reference to `Libcurl.UnitTests` if needed.
+- [x] `dotnet build` is clean and the fast tests pass with no test deleted, skipped or weakened.
+- [x] `Measure-CodeQuality.ps1 -Library Curl.Engine.UnitLibrary` reports 0 failing members.
 
 ## Notes
+
+- Decision (taken from the task's first option, so no ADR): the values are pinned in `Curl.Engine.UnitLibrary`'s new internal `ManagedCurlVersion.For(isWindows, isMacOS)`, one branch per platform so all three are covered on any OS; `ManagedCurlVersionTests` checks each platform's answer against `CurlVersionText.Lines`, which keeps `CurlVersionText` the single source of truth.
+- `Libcurl.UnitTests` now references `Curl.Cli.UnitLibrary`; `CurlVersionTests.TextAndInfo_ManagedEngine_AgreeWithCurlVOnTheRunningPlatform` runs over a real `ManagedCurlEngine`.
+- Delivered directly rather than through the full /feature subagent stages: the change is one small class and two tests.
+- Measured: full build clean, all fast tests green (Engine 1660, Libcurl 1085), `Measure-CodeQuality.ps1 -Library Curl.Engine.UnitLibrary` 0 failing members.
 
 ## Log
 
 - 2026-10-16: Created.
 - 2026-10-16: Backlog -> Doing.
+- 2026-10-16: Doing -> Done. ManagedCurlEngine.VersionInfo reports curl -V's host, TLS backend, protocols and features on every platform, so Libcurl's curl_version and curl_version_info agree with curl -V
