@@ -9,7 +9,7 @@ namespace Curl.Api;
 /// it disposes the engine when the client owns it; after <see cref="DisposeAsync"/> every member
 /// that uses the engine throws <see cref="ObjectDisposedException"/>.
 /// </summary>
-public sealed class CurlClient : IAsyncDisposable
+public sealed partial class CurlClient : IAsyncDisposable
 {
     private readonly ICurlEngine _engine;
     private readonly bool _ownsEngine;
