@@ -352,11 +352,11 @@ public sealed class EasyHttpOptionSettersTests
     }
 
     [TestMethod]
-    public void SetOption_Httppost_IsLeftToTheFormTask()
+    public void SetOption_Httppost_IsSetByTheFormArea()
     {
         var options = new EasyOptions();
 
-        Assert.AreEqual(CurlCode.NotBuiltIn, EasyOptionDispatch.Default.SetOption(ref options, CurlOption.Httppost, null));
+        Assert.AreEqual(CurlCode.Ok, EasyOptionDispatch.Default.SetOption(ref options, CurlOption.Httppost, null));
     }
 
     private static EasyOptions SetOk(EasyOptions options, CurlOption option, object? value)
