@@ -1,5 +1,5 @@
 ---
-id: BL-2523
+id: BL-2526
 title: Ws: measure and match CURLWS_RAW_MODE on a -T upload of a write-callback WebSocket transfer
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-16
 completed:
 ---
-# BL-2523 — Ws: measure and match CURLWS_RAW_MODE on a -T upload of a write-callback WebSocket transfer
+# BL-2526 — Ws: measure and match CURLWS_RAW_MODE on a -T upload of a write-callback WebSocket transfer
 
 ## Goal
 

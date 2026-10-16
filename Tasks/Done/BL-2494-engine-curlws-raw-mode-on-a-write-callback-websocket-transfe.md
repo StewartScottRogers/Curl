@@ -30,7 +30,7 @@ BL-2444 gave `ManagedEasyWebSocket` (the `CURLOPT_CONNECT_ONLY` 2 API) `CURLWS_R
 
 - Plan (done by the lane directly, no sub-agents): `WsFrameReceiver` takes `rawMode` and, when set, hands each read's bytes on undecoded (`Decode`), so no `[WS]` decode lines, no pong and no violation; `--max-filesize`, `%{size_download}` and `%{size_delivered}` count the raw bytes, as curl's download writer runs before `ws_cw_write`. `WsProtocolHandler.RawMode` (init) passes it; `EngineComposition.CreateProtocolHandlers` takes `webSocketRawMode`, which `ManagedCurlEngine.CreateDispatcher` sets from `IsWebSocketRawMode(options)`.
 - Followed curl 8.22.0's `ws_cw_write`: `if(!(type & CLIENTWRITE_BODY) || data->set.ws_raw_mode) return Curl_cwriter_write(data, writer->next, ...)`; that early return skips the decode, the auto-pong and the close handling. No new design choice, so no ADR.
-- Left out, filed as BL-2523: what the `-T` upload sends under raw mode (still one frame).
+- Left out, filed as BL-2526: what the `-T` upload sends under raw mode (still one frame).
 - Tests: `WsFrameReceiverTests.ReceiveAsync_RawMode_*`, `WsProtocolHandlerTests.ExecuteAsync_RawMode_*`, and `ManagedEasyTransferTests.PerformAsync_WebSocketTransferToTheWriteCallback_HandsOverRawFramesOnlyUnderRawMode` (both bit settings; existing tests unchanged).
 - Measured: `Measure-CodeQuality.ps1 -Library Curl.Engine.UnitLibrary,Curl.Protocol.Ws.UnitLibrary` reported 0 failing members. Its first run stopped on a failing `dotnet test` it did not name; the second run and the full fast run were green.
 
