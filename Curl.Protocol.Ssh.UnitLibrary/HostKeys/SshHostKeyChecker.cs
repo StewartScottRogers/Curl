@@ -116,7 +116,8 @@ internal static class SshHostKeyChecker
     /// hex), or with <c>SSL peer certificate or SSH remote key was not OK</c> when the
     /// known-hosts file has no entry for the host or a different key for it.
     /// </exception>
-    internal static void Check(byte[] hostKey, string host, int port, SshOptions options, KnownHostsFile? knownHosts) =>
+    /// <returns>The known-hosts file to write back, or <see langword="null" /> when none is to be written.</returns>
+    internal static KnownHostsFile? Check(byte[] hostKey, string host, int port, SshOptions options, KnownHostsFile? knownHosts) =>
         Check(hostKey, host, port, options, knownHosts, NoTransferEvents.Instance);
 
     /// <summary>
@@ -133,16 +134,22 @@ internal static class SshHostKeyChecker
     /// <param name="knownHosts">The known-hosts file, or <see langword="null" /> under <c>-k</c>.</param>
     /// <param name="events">Where the lines go.</param>
     /// <exception cref="SshTransferException">As the overload without events throws.</exception>
-    internal static void Check(byte[] hostKey, string host, int port, SshOptions options, KnownHostsFile? knownHosts, ITransferEvents events)
+    /// <returns>
+    /// The known-hosts file to write back, with the host key added, when
+    /// <see cref="SshOptions.KnownHostDecision" /> answered <see cref="SshKnownHostVerdict.AcceptAndAddToFile" />
+    /// or <see cref="SshKnownHostVerdict.AcceptAndReplaceInFile" /> for a key that did not match, as
+    /// libssh2.c's <c>ssh_knownhost</c> writes it (ADR-0626); else <see langword="null" />.
+    /// </returns>
+    internal static KnownHostsFile? Check(byte[] hostKey, string host, int port, SshOptions options, KnownHostsFile? knownHosts, ITransferEvents events)
     {
         if (options.HostPublicKeySha256 is null && options.HostPublicKeyMd5 is null)
         {
-            CheckWithoutFingerprints(hostKey, host, port, options, knownHosts, events);
-            return;
+            return CheckWithoutFingerprints(hostKey, host, port, options, knownHosts, events);
         }
 
         CheckSha256(hostKey, options.HostPublicKeySha256, events);
         CheckMd5(hostKey, options.HostPublicKeyMd5, events);
+        return null;
     }
 
     /// <summary>
@@ -150,21 +157,17 @@ internal static class SshHostKeyChecker
     /// (<see cref="SshOptions.HostKeyAcceptance" />) when set, in place of the known-hosts file, as
     /// <c>ssh_check_fingerprint</c> does; else the known-hosts check (ADR-0623).
     /// </summary>
-    private static void CheckWithoutFingerprints(byte[] hostKey, string host, int port, SshOptions options, KnownHostsFile? knownHosts, ITransferEvents events)
+    private static KnownHostsFile? CheckWithoutFingerprints(byte[] hostKey, string host, int port, SshOptions options, KnownHostsFile? knownHosts, ITransferEvents events)
     {
         if (options.HostKeyAcceptance is not { } accepts)
         {
-            CheckKnownHosts(hostKey, host, port, knownHosts, options.KnownHostDecision, events);
-            return;
+            return CheckKnownHosts(hostKey, host, port, knownHosts, options.KnownHostDecision, events);
         }
 
-        if (!accepts(SshKeyBlobReader.ReadKeyTypeName(hostKey), hostKey))
-        {
-            throw SshTransferException.KnownHostRefused();
-        }
+        return accepts(SshKeyBlobReader.ReadKeyTypeName(hostKey), hostKey) ? null : throw SshTransferException.KnownHostRefused();
     }
 
-    private static void CheckKnownHosts(
+    private static KnownHostsFile? CheckKnownHosts(
         byte[] hostKey,
         string host,
         int port,
@@ -175,7 +178,7 @@ internal static class SshHostKeyChecker
         if (knownHosts is null)
         {
             events.ReportInfo(SshInfoLines.NoKnownHostsFile);
-            return;
+            return null;
         }
 
         if (KnownHostKeyTypeNames.FromName(SshKeyBlobReader.ReadKeyTypeName(hostKey)) == KnownHostKeyType.Unknown)
@@ -187,7 +190,8 @@ internal static class SshHostKeyChecker
 
         KnownHostsLookup lookup = knownHosts.Lookup(host, port, hostKey);
         events.ReportInfo(SshInfoLines.HostCheck((int)lookup.Check, lookup.Key));
-        if (!IsAccepted(Decide(hostKey, lookup, decision)))
+        SshKnownHostVerdict verdict = Decide(hostKey, lookup, decision);
+        if (!IsAccepted(verdict))
         {
             events.ReportInfo(SshInfoLines.KnownHostCheckFailed);
             throw SshTransferException.KnownHostRefused();
@@ -196,8 +200,25 @@ internal static class SshHostKeyChecker
         if (lookup.Check == KnownHostsCheck.Match)
         {
             events.ReportInfo(SshInfoLines.KnownHostMatches);
+            return null;
         }
+
+        return FileToWrite(verdict, lookup, knownHosts, host, hostKey);
     }
+
+    /// <summary>
+    /// What libssh2.c's <c>ssh_knownhost</c> writes for an accepted key that did not match: for
+    /// <see cref="SshKnownHostVerdict.AcceptAndAddToFile" /> the file with the key added, for
+    /// <see cref="SshKnownHostVerdict.AcceptAndReplaceInFile" /> with the mismatching entry deleted
+    /// first, and for <see cref="SshKnownHostVerdict.Accept" /> nothing, as its in-memory add
+    /// outlives no transfer.
+    /// </summary>
+    private static KnownHostsFile? FileToWrite(SshKnownHostVerdict verdict, KnownHostsLookup lookup, KnownHostsFile knownHosts, string host, byte[] hostKey) => verdict switch
+    {
+        SshKnownHostVerdict.AcceptAndAddToFile => knownHosts.WithHostKey(host, hostKey, replaced: null),
+        SshKnownHostVerdict.AcceptAndReplaceInFile => knownHosts.WithHostKey(host, hostKey, lookup.Entry),
+        _ => null,
+    };
 
     /// <summary>
     /// libcurl's <c>CURLOPT_SSH_KEYFUNCTION</c> answer, or without one its default <c>sshkeycallback</c>'s:

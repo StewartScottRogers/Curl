@@ -295,7 +295,7 @@ public sealed class SshProtocolHandler : IProtocolHandler
         SshUserAuthentication authentication = new(transport, credentialEncoding, userKeys, events, agentConnector) { Trace = trace };
         await authentication.RequestServiceAsync(context.CancellationToken).ConfigureAwait(false);
         transport.DiagnosticLog.HostKeyPresented(hostKey);
-        CheckHostKey(hostKey, target, events, trace);
+        await CheckHostKeyAsync(hostKey, target, events, trace, context.CancellationToken).ConfigureAwait(false);
         transport.DiagnosticLog.HostKeyAccepted(target.Options, target.KnownHosts);
         await authentication.AuthenticateAsync(context.Credentials, context.CancellationToken).ConfigureAwait(false);
         trace.Enter(SshUserAuthentication.AuthDoneState);
@@ -311,8 +311,9 @@ public sealed class SshProtocolHandler : IProtocolHandler
     }
 
     // curl's SSH_HOSTKEY state, which with neither --hostpubsha256 nor --hostpubmd5 says it
-    // checks the known-hosts file (measured, BL-1166).
-    private static void CheckHostKey(byte[] hostKey, SshSessionTarget target, ITransferEvents events, SshStateTrace trace)
+    // checks the known-hosts file (measured, BL-1166), and writes it back there when
+    // CURLOPT_SSH_KEYFUNCTION asked for it (ADR-0626).
+    private async ValueTask CheckHostKeyAsync(byte[] hostKey, SshSessionTarget target, ITransferEvents events, SshStateTrace trace, CancellationToken cancellationToken)
     {
         trace.Enter("SSH_HOSTKEY");
         if (target.Options.HostPublicKeySha256 is null && target.Options.HostPublicKeyMd5 is null)
@@ -320,7 +321,11 @@ public sealed class SshProtocolHandler : IProtocolHandler
             trace.Write("no host key checksum given, checking knownhosts");
         }
 
-        SshHostKeyChecker.Check(hostKey, target.Host, target.Port, target.Options, target.KnownHosts, events);
+        if (SshHostKeyChecker.Check(hostKey, target.Host, target.Port, target.Options, target.KnownHosts, events) is { } rewritten)
+        {
+            await rewritten.WriteAsync(fileSystem, target.Options.KnownHostsPath!, events, cancellationToken).ConfigureAwait(false);
+        }
+
         trace.Enter("SSH_AUTHLIST");
     }
 
