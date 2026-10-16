@@ -31,3 +31,4 @@ Measured 2026-10-16 during BL-2491 on Windows' curl 8.21.0 (Schannel): `-s -S --
 ## Log
 
 - 2026-10-16: Created.
+- 2026-10-16: Backlog -> Doing. Criteria at claim: 9cafc694 46d4e715 a0b0533f.
