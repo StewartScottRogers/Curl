@@ -29,10 +29,10 @@ ADR-0564 decision 7: `McpArgumentChecker` (`Curl.Mcp.UnitLibrary/McpArgumentChec
 
 Filed by BL-2379.
 
-Chose to read the template (as `-K` is read) and run the inline-template `%output{}` scan over it, rather than refuse every `%output{`: it matches how inline templates and `-K` files are treated and keeps in-root `%output{}` working (ADR-0599). Also refused `-w @-`: `McpCurlTool` passes the caller's `standardInput` to curl, so a template read from it was an unchecked escape. Measured: 448 Curl.Mcp tests green; Measure-CodeQuality for Curl.Mcp.UnitLibrary 0 failing members after splitting `CheckPathValue` out of `CheckValue` (complexity 12 -> under 10).
+Chose to read the template (as `-K` is read) and run the inline-template `%output{}` scan over it, rather than refuse every `%output{`: it matches how inline templates and `-K` files are treated and keeps in-root `%output{}` working (ADR-0600). Also refused `-w @-`: `McpCurlTool` passes the caller's `standardInput` to curl, so a template read from it was an unchecked escape. Measured: 448 Curl.Mcp tests green; Measure-CodeQuality for Curl.Mcp.UnitLibrary 0 failing members after splitting `CheckPathValue` out of `CheckValue` (complexity 12 -> under 10).
 
 ## Log
 
 - 2026-10-15: Created.
 - 2026-10-16: Backlog -> Doing.
-- 2026-10-16: Doing -> Done. -w @file templates are read and their %output{} files checked; -w @- refused (ADR-0599)
+- 2026-10-16: Doing -> Done. -w @file templates are read and their %output{} files checked; -w @- refused (ADR-0600)
