@@ -41,6 +41,7 @@ public sealed partial class CurlClient
         IEasyTransfer easy = CreateEasy();
         ResponseHeaderCollector collector = new();
         ResponseBodyStream body = new(easy, bodyCapacity, cancellationToken);
+        easy.Options = CurlTransportOptions.Apply(easy.Options, request.Network, request.Tls, request.Proxy);
         easy.Options = CurlRequestOptions.Apply(easy.Options, request, collector.Take, body.TakeBody);
         await body.StartAsync().ConfigureAwait(false);
         TransferInfo info = easy.Info;

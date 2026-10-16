@@ -58,6 +58,7 @@ public sealed partial class CurlClient : IAsyncDisposable
             Transfer = defaults.Transfer with { Timeout = Options.Timeout },
             Network = defaults.Network with { ConnectTimeout = Options.ConnectTimeout },
         };
+        easy.Options = CurlTransportOptions.Apply(easy.Options, Options.Network, Options.Tls, Options.Proxy);
         return easy;
     }
 

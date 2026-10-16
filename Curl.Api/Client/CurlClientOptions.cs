@@ -5,7 +5,7 @@ namespace Curl.Api;
 /// starts at libcurl's own default, so a client made with <c>new CurlClientOptions()</c> sets
 /// nothing a fresh <c>curl_easy_init</c> handle does not already have.
 /// </summary>
-public sealed record CurlClientOptions
+public sealed partial record CurlClientOptions
 {
     /// <summary><c>CURLOPT_USERAGENT</c> for every handle; <see langword="null"/> (the default) sends no <c>User-Agent</c> header.</summary>
     public string? UserAgent { get; init; }

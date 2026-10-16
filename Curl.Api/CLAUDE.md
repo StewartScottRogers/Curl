@@ -46,6 +46,14 @@ frame text, binary, ping, pong, close and raw bytes, and `ReceiveFrameAsync`, `S
 `CurrentFrame` are the frame API. A call the engine answers `Again` waits 1 ms and asks again. Tests
 use the fakes in `Curl.Api.UnitTests/WebSockets` (`FakeEasyWebSocket` and friends).
 
+`Options/Transport/` (BL-2502, ADR-0636, namespace `Curl.Api`): `CurlNetworkOptions`, `CurlTlsOptions`
+(with `CurlTlsPeerOptions`) and `CurlProxyOptions` map one to one onto `EasyNetworkOptions`,
+`EasyTlsOptions` and `EasyProxyOptions`, validating each value as it is set (`TransportOptionGuard`).
+They hang off `CurlClientOptions` and `CurlRequest` as `Network`, `Tls` and `Proxy` (the partial halves
+live in this folder); `CurlTransportOptions.Apply` puts the client's on in `CreateEasy` and the
+request's in `SendAsync`, a set record replacing its whole group. Tests in
+`Curl.Api.UnitTests/Options/Transport`.
+
 Reference `Curl.Api.UnitLibrary` (the seam) and `Curl.Engine.UnitLibrary` (only for
 `ManagedCurlEngine` in `Composition/`), nothing else. Never reference `Libcurl` or a protocol
 library.

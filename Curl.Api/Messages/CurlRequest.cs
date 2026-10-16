@@ -5,7 +5,7 @@ namespace Curl.Api;
 /// order and casing given, and an optional in-memory body. Immutable; change one part with a
 /// <see langword="with"/> expression.
 /// </summary>
-public sealed record CurlRequest
+public sealed partial record CurlRequest
 {
     /// <summary>A request with no headers and no body.</summary>
     /// <param name="method">The request method.</param>
