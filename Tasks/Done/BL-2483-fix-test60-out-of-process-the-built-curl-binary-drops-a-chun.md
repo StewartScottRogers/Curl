@@ -34,17 +34,17 @@ Run as a real process with standard input on a pipe, `curl http://127.0.0.1:<por
 
 ## Notes
 
-- Outcome: no product defect found, so no production change. Decision recorded in ADR-0647 (decided by Claude under Stewart's delegation): Curl keeps sending the last data chunk and `0\r\n\r\n` in one write once stdin's end is read.
+- Outcome: no product defect found, so no production change. Decision recorded in ADR-0648 (decided by Claude under Stewart's delegation): Curl keeps sending the last data chunk and `0\r\n\r\n` in one write once stdin's end is read.
 - Recordings (2026-10-16, scratch directories in the lane worktree, not committed), all with `-RequestReadMilliseconds 3000 -HoldOpenMilliseconds 1500 -AnswerHeldRequests 20 -StandardInput 'more than one byte\n'` and `<url>/bzz/60 -T - -H "Content-Length: 1"`:
   - Windows `.rec60\v1` (Git for Windows' ucrt64 curl 8.22.0, the recorder's default) and `.rec60\v2` (built `Curl.Console\bin\Debug\net10.0\curl.exe`): both `request.bin` 184 bytes, identical (head 154 + `13\r\nmore than one byte\n\r\n` + `0\r\n\r\n`), exit 0 both. Six more reference runs (`.rec60\r1`-`r6`, upstream's header-only reply): 184 bytes every time.
   - Linux via WSL Ubuntu (`-Curl wsl.exe -ListenAddress 172.26.96.1`; curl 8.18.0 OpenSSL and Curl.Console published `-r linux-x64 --self-contained -p:PublishAot=false`): `.rec60\w1`/`w2` (stdin through wsl.exe) and `.rec60\p1`/`p2` (stdin from a real Linux pipe, `printf ... | curl`): both binaries 186 bytes (longer host), closing chunk included, exit 0.
-- What differs: curl 8.22.0's debug trace shows it sends the data chunk and the closing chunk in two writes (`Curl_xfer_send(len=25)`, then `sending last upload chunk of 5 bytes`); Curl sends 30 bytes in one. The recorder answers as soon as the one body byte `Content-Length: 1` promises arrives, i.e. between curl's two writes, then answers the lone `0\r\n\r\n` again as a held request (curl's stdout carries the second answer; Curl's does not). In CI the reference reported stdout 0 bytes, which fits the reference, not Curl, being the side whose closing chunk the recorder missed; the lane cannot read the gap office's recordings to confirm, so BL-2521 does.
+- What differs: curl 8.22.0's debug trace shows it sends the data chunk and the closing chunk in two writes (`Curl_xfer_send(len=25)`, then `sending last upload chunk of 5 bytes`); Curl sends 30 bytes in one. The recorder answers as soon as the one body byte `Content-Length: 1` promises arrives, i.e. between curl's two writes, then answers the lone `0\r\n\r\n` again as a held request (curl's stdout carries the second answer; Curl's does not). In CI the reference reported stdout 0 bytes, which fits the reference, not Curl, being the side whose closing chunk the recorder missed; the lane cannot read the gap office's recordings to confirm, so BL-2522 does.
 - Unit test: `HttpRequestBodyWriterTests.WriteAsync_ChunkedStdinOnAPipeAfterTheContinueWait_SendsDataAndLastChunkInOneWriteOnceThePipeCloses`, with the new fake `Fakes/PipeLikeStream` (bytes on the first read, the second read waits for the writing end to close, then 0). It checks nothing is written while the end is unknown, then one 30-byte write, then the answer is read. It passed against the current code.
 - Fast tests: whole solution green (exit 0); `PassingUpstreamCases.txt` untouched. Quality: `Measure-CodeQuality.ps1 -Library Curl.Console,Curl.Protocol.Http.UnitLibrary` reported 0 failing members.
-- Follow-up: BL-2521 (interactive only) runs `gh workflow run gap-platforms.yml -f ref=<full commit>` and records `behaviour:test60`'s outcome in ADR-0647.
+- Follow-up: BL-2522 (interactive only) runs `gh workflow run gap-platforms.yml -f ref=<full commit>` and records `behaviour:test60`'s outcome in ADR-0648.
 
 ## Log
 
 - 2026-10-16: Created.
 - 2026-10-16: Backlog -> Doing. Criteria at claim: fbf9dd85 6a8f6aec 4272a6b9 8738c7f6 b51e6f31 81fa3112.
-- 2026-10-16: Doing -> Done. A pipe-fed chunked -T - upload is pinned to send its data chunk and closing chunk in one write; Windows and Linux recordings match curl; ADR-0647 and BL-2521 follow up the CI cross-check
+- 2026-10-16: Doing -> Done. A pipe-fed chunked -T - upload is pinned to send its data chunk and closing chunk in one write; Windows and Linux recordings match curl; ADR-0648 and BL-2522 follow up the CI cross-check
