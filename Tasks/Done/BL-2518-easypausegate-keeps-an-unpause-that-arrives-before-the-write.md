@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary, Curl.Engine.UnitTests]
 requirement: none
 created: 2026-10-16
-completed:
+completed: 2026-10-16
 ---
 # BL-2518 — EasyPauseGate keeps an unpause that arrives before the write callback's pause is recorded
 
@@ -22,10 +22,10 @@ Found by BL-2501 (ADR-0635). `Curl.Api`'s streamed response body (`Curl.Api/Resp
 
 ## Acceptance criteria
 
-- [ ] A test in `Curl.Engine.UnitTests` unpauses from inside the window (for example from a write callback that calls `Pause(CurlPause.Continue)` on the handle before returning `WriteCallbackResult.Pause`) and the transfer completes with every byte delivered once.
-- [ ] The same holds for a read callback returning `ReadCallbackResult.Pause`.
-- [ ] `dotnet build` is clean and the fast tests pass.
-- [ ] `Measure-CodeQuality.ps1 -Library Curl.Engine.UnitLibrary` reports 0 failing members.
+- [x] A test in `Curl.Engine.UnitTests` unpauses from inside the window (for example from a write callback that calls `Pause(CurlPause.Continue)` on the handle before returning `WriteCallbackResult.Pause`) and the transfer completes with every byte delivered once.
+- [x] The same holds for a read callback returning `ReadCallbackResult.Pause`.
+- [x] `dotnet build` is clean and the fast tests pass.
+- [x] `Measure-CodeQuality.ps1 -Library Curl.Engine.UnitLibrary` reports 0 failing members.
 
 ## Notes
 
@@ -33,3 +33,4 @@ Found by BL-2501 (ADR-0635). `Curl.Api`'s streamed response body (`Curl.Api/Resp
 
 - 2026-10-16: Created.
 - 2026-10-16: Backlog -> Doing. Criteria at claim: badf3bb8 f82ef2b0 3d836d5e c4aff572.
+- 2026-10-16: Doing -> Done. EasyPauseGate counts Set calls; the write and read streams pass the count read before the callback to Pause, which ignores a pause an unpause has overtaken.
