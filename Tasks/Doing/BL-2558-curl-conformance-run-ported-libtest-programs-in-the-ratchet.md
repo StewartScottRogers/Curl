@@ -32,3 +32,4 @@ BL-2556 (ADR-0656) made the runner run a `<tool>` case's ported `ILibTest` in pl
 ## Log
 
 - 2026-10-16: Created.
+- 2026-10-16: Backlog -> Doing. Criteria at claim: 4e19d2f4 9b707145 3160c91e 4272a6b9.
