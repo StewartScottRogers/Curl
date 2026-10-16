@@ -1,8 +1,8 @@
 # Libcurl and Curl.Api: two public .NET APIs over one engine
 
 **Status: approved by Stewart 2026-10-15; phases 1 and 2 filed as tasks, phase 3 filed by the
-last phase 2 task, phase 4 by the last phase 3 task, phase 5 described here and filed by the last
-phase 4 task (BL-2514).** Nothing below exists in the code yet except where it
+last phase 2 task, phase 4 by the last phase 3 task, phase 5 filed by the last
+phase 4 task (BL-2514), except its gap office part.** Nothing below exists in the code yet except where it
 says "today". The decision record is ADR-0506; where this plan and the ADR disagree, the ADR wins
 and this plan is corrected.
 
@@ -251,7 +251,7 @@ transfers over the multi contract; `CurlHttpMessageHandler` (request/response ma
 HTTP/2 and HTTP/3 version policy, decompression, redirects and auth, cancellation, proxy); a
 usage README; `--ai-help` is untouched (no option changes).
 
-### Phase 5 - port `tests/libtest` and measure `libcurl-api` (estimate 40-45 tasks)
+### Phase 5 - port `tests/libtest` and measure `libcurl-api` (30 tasks filed, 2 interactive ones still to file; the estimate was 40-45)
 
 1. A libtest harness in the conformance projects: a C# `ILibTest` program shape, the `<tool>lib…`
    case runner beside the existing upstream-case runner, `libtest`'s `first.c` helpers
@@ -278,8 +278,8 @@ usage README; `--ai-help` is untouched (no option changes).
 | 2 - scaffolding and seam | 21 (filed) |
 | 3 - `Libcurl` | 61 (filed) |
 | 4 - `Curl.Api` | 19 (filed) |
-| 5 - libtest ports and gap measurement | 40-45 |
-| **All** | **150-162** |
+| 5 - libtest ports and gap measurement | 30 (filed) + 2 interactive |
+| **All** | **153** |
 
 ## Filed tasks
 
@@ -437,3 +437,25 @@ HTTP/3 policy, decompression, redirects, auth and proxy bullets are BL-2511 and 
 | BL-2512 | `Curl.Api`: CurlHttpMessageHandler decompression, redirects and authentication |
 | BL-2513 | `Curl.Api`: usage README |
 | BL-2514 | File phase 5 tasks: port tests/libtest and measure libcurl-api |
+
+Phase 5 - libtest ports (30 tasks filed 2026-10-16 by BL-2514; the estimate was 40-45, corrected). Measured
+against the vendored case files: 364 upstream cases run 259 distinct `lib` programs (112 name `libNNN`,
+252 name `lib%TESTNUMBER`), not 362 programs; the 362 counted source files in `tests/libtest`, and a
+source file no case runs needs no port. So ten programs per batch gives 26 batches, not about 36. The
+harness is a new pair, `Curl.Conformance.LibTest.UnitLibrary` and `.UnitTests` (ports are C# `ILibTest`
+classes over `Libcurl`, held to the quality gates), kept apart from the case runner in
+`Curl.Conformance.UnitLibrary`. The batches share `PassingUpstreamCases.txt`, so they run one at a
+time as a `depends-on` chain in test-number order.
+
+| Task | Title |
+| --- | --- |
+| BL-2523 | Scaffold Curl.Conformance.LibTest: the ILibTest program shape and result codes |
+| BL-2524 | Curl.Conformance.LibTest: first.c helpers over Libcurl (setopt, init and the TEST_ERR codes) |
+| BL-2525 | Curl.Conformance.LibTest: multi, share and timing helpers (testutil, testtrace, wait helpers) |
+| BL-2526 | Curl.Conformance: run a lib tool case through its ported ILibTest program |
+| BL-2527 to BL-2552 | Port libtest programs in 26 batches of up to ten (lib500 to lib5004), each adding its passing cases to the ratchet |
+
+Not filed from a lane: the gap office's two tasks (stop excluding `libcurl-api` cases and measure
+them through the harness; have `gap-behaviour` group their failures). A lane's shell may not name
+the gap office's folder (ADR-0433), so an interactive session files both with `-NoLane` and
+`depends-on: [BL-2552]` (the second also on the first), and runs them after the last batch.
