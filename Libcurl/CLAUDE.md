@@ -28,7 +28,7 @@ field as the option it extends, and clamps the two buffer sizes rather than refu
 `Options/Callbacks` implements `AddCallbackSetters` once, calling one partial method per callback area
 (`AddReadWriteCallbackSetters`, `AddProgressCallbackSetters` and the rest), which each area implements in
 an `EasyOptionSetters` part in `Libcurl/Callbacks/<Area>`, keeping the namespace `Libcurl.Options`
-(ADR-0569). `Callbacks/ReadWrite` (not `Data`: the `data/` path rule refuses that folder name) sets
+(ADR-0573). `Callbacks/ReadWrite` (not `Data`: the `data/` path rule refuses that folder name) sets
 `CURLOPT_WRITEFUNCTION`, `READFUNCTION` and `HEADERFUNCTION` (their own delegate type or `null`, any other
 delegate `BadFunctionArgument`) and the `*DATA` pointers: the delegate's closure is its user data, so a
 `Stream` is the `FILE *` of libcurl's default function (`StreamDataCallbacks`, unless the caller's own

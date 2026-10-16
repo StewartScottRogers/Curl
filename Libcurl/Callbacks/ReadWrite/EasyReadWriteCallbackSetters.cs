@@ -7,7 +7,7 @@ namespace Libcurl.Callbacks.ReadWrite;
 
 /// <summary>
 /// The setter rows of <c>CURLOPT_WRITEFUNCTION</c>, <c>CURLOPT_READFUNCTION</c> and <c>CURLOPT_HEADERFUNCTION</c>
-/// and their <c>*DATA</c> pointers (ADR-0569). A function row takes its own delegate type or <see langword="null"/>
+/// and their <c>*DATA</c> pointers (ADR-0573). A function row takes its own delegate type or <see langword="null"/>
 /// (libcurl's default) and answers <see cref="CurlCode.BadFunctionArgument"/> for any other delegate. The managed
 /// callback carries its user data in its closure, so a <c>*DATA</c> row matters only as the <c>FILE *</c> of
 /// libcurl's default function: a <see cref="Stream"/> installs <see cref="StreamDataCallbacks"/> over it unless a

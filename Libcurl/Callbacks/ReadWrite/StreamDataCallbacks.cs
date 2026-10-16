@@ -3,7 +3,7 @@ namespace Libcurl.Callbacks.ReadWrite;
 /// <summary>
 /// libcurl's default write and read functions over the <see cref="Stream"/> a <c>CURLOPT_WRITEDATA</c>,
 /// <c>CURLOPT_HEADERDATA</c> or <c>CURLOPT_READDATA</c> names, the managed <c>FILE *</c>: <see cref="Write"/> is
-/// <c>fwrite</c> and <see cref="Read"/> is <c>fread</c> (ADR-0569).
+/// <c>fwrite</c> and <see cref="Read"/> is <c>fread</c> (ADR-0573).
 /// </summary>
 /// <param name="stream">The stream the data goes to or comes from.</param>
 internal sealed class StreamDataCallbacks(Stream stream)

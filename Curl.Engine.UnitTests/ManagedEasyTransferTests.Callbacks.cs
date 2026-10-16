@@ -8,7 +8,7 @@ using Curl.Api.Options.Network;
 
 namespace Curl.Engine;
 
-// The write, read and header callbacks' magic return values through a whole transfer (BL-2415, ADR-0569).
+// The write, read and header callbacks' magic return values through a whole transfer (BL-2415, ADR-0573).
 public sealed partial class ManagedEasyTransferTests
 {
     [TestMethod]

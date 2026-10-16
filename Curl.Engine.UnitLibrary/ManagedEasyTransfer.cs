@@ -53,7 +53,7 @@ internal sealed class ManagedEasyTransfer(
     /// <inheritdoc />
     public string ErrorText { get; private set; } = string.Empty;
 
-    /// <summary>The handle's pause state, which <see cref="Pause" /> sets and a pausing callback waits on (ADR-0569).</summary>
+    /// <summary>The handle's pause state, which <see cref="Pause" /> sets and a pausing callback waits on (ADR-0573).</summary>
     private readonly EasyPauseGate pauseGate = new();
 
     /// <summary>The directions left paused, by <see cref="Pause" /> or by a callback that returned a pause.</summary>
@@ -342,7 +342,7 @@ internal sealed class ManagedEasyTransfer(
 
     /// <summary>
     /// The pause state a callback's pause waits on: the handle's, but none for a <c>file</c> URL, which libcurl cannot
-    /// pause (<c>PROTOPT_NONETWORK</c>), so a pause there fails as libcurl's does (ADR-0569).
+    /// pause (<c>PROTOPT_NONETWORK</c>), so a pause there fails as libcurl's does (ADR-0573).
     /// </summary>
     /// <param name="url">The URL set.</param>
     /// <returns>The pause state, or <see langword="null" />.</returns>
@@ -556,7 +556,7 @@ internal sealed class ManagedEasyTransfer(
     /// Performs the attempt with <see cref="TransferPerformer.FollowWatchingSpeedAsync" />, unless the
     /// progress callback aborts it: then, whether the cancel stopped the attempt or it finished first, the
     /// transfer is libcurl's <c>CURLE_ABORTED_BY_CALLBACK</c> (ADR-0543), as it is when the read callback
-    /// returned <c>CURL_READFUNC_ABORT</c> (ADR-0569).
+    /// returned <c>CURL_READFUNC_ABORT</c> (ADR-0573).
     /// </summary>
     /// <param name="follower">Performs the attempt, following redirects.</param>
     /// <param name="state">The running transfer, which keeps the attempt's watchdogs.</param>
@@ -602,7 +602,7 @@ internal sealed class ManagedEasyTransfer(
 
     /// <summary>
     /// <c>curl_easy_pause</c>: records the directions to leave paused, and a transfer waiting on a callback's
-    /// pause in a direction now clear hands the callback its data again (ADR-0569). The call always succeeds.
+    /// pause in a direction now clear hands the callback its data again (ADR-0573). The call always succeeds.
     /// </summary>
     /// <param name="directions">The directions to leave paused.</param>
     /// <returns><see cref="CurlCode.Ok" />.</returns>

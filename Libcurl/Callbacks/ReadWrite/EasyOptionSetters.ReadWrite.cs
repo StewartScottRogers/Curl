@@ -2,7 +2,7 @@ using Libcurl.Callbacks.ReadWrite;
 
 namespace Libcurl.Options;
 
-/// <summary>The write, read and header part of <see cref="EasyOptionSetters"/> (ADR-0569).</summary>
+/// <summary>The write, read and header part of <see cref="EasyOptionSetters"/> (ADR-0573).</summary>
 internal static partial class EasyOptionSetters
 {
     /// <summary>Adds the write, read and header rows, from <see cref="EasyReadWriteCallbackSetters"/>.</summary>

@@ -3,7 +3,7 @@ namespace Libcurl.Options;
 /// <summary>
 /// The <c>EasyCallbackOptions</c> part of <see cref="EasyOptionSetters"/> (ADR-0560): each callback area adds its
 /// rows from its own folder (<c>Libcurl/Callbacks/&lt;Area&gt;</c>) by implementing its partial method below in a
-/// part of this class there, in this namespace, so the callback tasks never edit one shared file (ADR-0569).
+/// part of this class there, in this namespace, so the callback tasks never edit one shared file (ADR-0573).
 /// Until an area's part exists its method adds nothing, and its options answer
 /// <see cref="Curl.Api.Codes.CurlCode.NotBuiltIn"/>.
 /// </summary>

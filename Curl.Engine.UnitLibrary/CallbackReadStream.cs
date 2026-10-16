@@ -12,7 +12,7 @@ namespace Curl.Engine;
 /// <c>CURLE_ABORTED_BY_CALLBACK</c>; <see cref="ReadCallbackResult.Pause" /> pauses sending on
 /// <paramref name="pauseGate" /> and the read waits until the handle is unpaused and asks the callback
 /// again, or, with no gate or on the synchronous path, fails with libcurl's
-/// <c>Read callback asked for PAUSE when not supported</c> (ADR-0569). Any other return below zero or
+/// <c>Read callback asked for PAUSE when not supported</c> (ADR-0573). Any other return below zero or
 /// past the buffer's length fails the read with libcurl's <c>CURLE_READ_ERROR</c> text.
 /// </summary>
 /// <param name="callback">The read callback.</param>

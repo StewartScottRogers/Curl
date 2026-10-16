@@ -7,7 +7,7 @@ namespace Curl.Engine;
 /// callback that returns <c>CURL_WRITEFUNC_PAUSE</c> pauses receiving, a read callback that returns
 /// <c>CURL_READFUNC_PAUSE</c> pauses sending, and the transfer waits in <see cref="WhenResumedAsync" /> until
 /// <see cref="Set" /> clears that direction's bit, as libcurl holds a paused transfer until the application
-/// unpauses it (ADR-0569).
+/// unpauses it (ADR-0573).
 /// </summary>
 internal sealed class EasyPauseGate
 {

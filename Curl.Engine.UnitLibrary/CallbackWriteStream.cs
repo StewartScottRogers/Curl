@@ -16,7 +16,7 @@ namespace Curl.Engine;
 /// returns <see cref="WriteCallbackResult.Pause" /> pauses receiving on <paramref name="pauseGate" />, and
 /// the write waits until the handle is unpaused and hands the same chunk to the callback again, as
 /// libcurl keeps the paused data for later; with no gate, or on the synchronous path, which cannot wait,
-/// it fails with libcurl's <c>Write callback asked for PAUSE when not supported</c> (ADR-0569).
+/// it fails with libcurl's <c>Write callback asked for PAUSE when not supported</c> (ADR-0573).
 /// </summary>
 /// <param name="callback">Receives each chunk and returns how many bytes it took.</param>
 /// <param name="pauseGate">The handle's pause state, or <see langword="null" /> when the transfer cannot pause.</param>
