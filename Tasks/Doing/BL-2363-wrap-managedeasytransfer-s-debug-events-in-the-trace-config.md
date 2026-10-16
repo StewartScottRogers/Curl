@@ -32,3 +32,4 @@ Found by BL-2360 (ADR-0543): `DebugCallbackTransferEvents` passes on every event
 ## Log
 
 - 2026-10-15: Created.
+- 2026-10-15: Backlog -> Doing.
