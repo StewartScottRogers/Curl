@@ -1,5 +1,5 @@
 ---
-id: BL-2496
+id: BL-2523
 title: Accept --proto lists naming an unknown scheme beside a known one, as curl 8.21.0 does
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-16
 completed:
 ---
-# BL-2496 — Accept --proto lists naming an unknown scheme beside a known one, as curl 8.21.0 does
+# BL-2523 — Accept --proto lists naming an unknown scheme beside a known one, as curl 8.21.0 does
 
 ## Goal
 

@@ -1,5 +1,5 @@
 ---
-id: BL-2482
+id: BL-2524
 title: Engine: send CURLOPT_HTTPPOST bodies and CURLFORM_STREAM parts through the read callback
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-16
 completed: 2026-10-16
 ---
-# BL-2482 — Engine: send CURLOPT_HTTPPOST bodies and CURLFORM_STREAM parts through the read callback
+# BL-2524 — Engine: send CURLOPT_HTTPPOST bodies and CURLFORM_STREAM parts through the read callback
 
 ## Goal
 
