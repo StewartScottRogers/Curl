@@ -43,8 +43,11 @@ the failure that ends a session as `error` with its `CurlExitCode`, the EPSV-to-
 EPRT-to-PORT fallbacks, a skipped `227` address, a refused `AUTH` or `PROT P` and an
 ignored `*` quote as `warning`, login, TLS, directory reached, data connection and
 transfer start and end as `info`, and each command and reply as `verbose`, the argument
-of `PASS` and `ACCT` never; both connect targets carry the log on. Still to
-come: the other FTP-only options.
+of `PASS` and `ACCT` never; both connect targets carry the log on. For wildcard downloads
+(BL-2476, ADR-0613), `FtpFileListParser` turns a `LIST` reply into `FtpFileListEntry` values
+as curl 8.22.0's `lib/ftplistparser.c` does (Unix `ls -l` and DOS formats; malformed is exit
+87), and `FtpWildcardPattern` matches names as curl's own `Curl_fnmatch` does; the engine
+does not drive them yet (BL-2478, BL-2420). Still to come: the other FTP-only options.
 
 **URL schemes:** `ftp`, and `ftps` for a handler built with a listener and a TLS provider.
 
