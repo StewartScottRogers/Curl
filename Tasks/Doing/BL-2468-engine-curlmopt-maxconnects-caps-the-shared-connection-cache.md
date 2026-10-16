@@ -33,3 +33,4 @@ BL-2428 (ADR-0605) applied `PIPELINING`, `MAX_HOST_CONNECTIONS`, `MAX_TOTAL_CONN
 ## Log
 
 - 2026-10-16: Created.
+- 2026-10-16: Backlog -> Doing.
