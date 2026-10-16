@@ -8,7 +8,7 @@ depends-on: [BL-2318, BL-2313, BL-2314, BL-2315]
 touches: [Documentation/Wiki/Glossary.md, Documentation/Product/Product-Overview.md, Documentation/Product/Requirements.md]
 requirement: none
 created: 2026-10-15
-completed:
+completed: 2026-10-15
 ---
 # BL-2320 — Add the engine, seam and public API terms to the glossary and the product overview
 
@@ -22,10 +22,10 @@ ADR-0506, plan phase 2 step 6; `align-and-document` work. Terms: transfer engine
 
 ## Acceptance criteria
 
-- [ ] `Documentation/Wiki/Glossary.md` has an entry for each term in Context, each naming the type or project it is.
-- [ ] `Documentation/Product/Product-Overview.md` describes the layering (tool, `Libcurl`, `Curl.Api`, seam, engine) with a link to the plan.
-- [ ] `Documentation/Product/Requirements.md` has requirement IDs for `Libcurl` and `Curl.Api` marked planned.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] `Documentation/Wiki/Glossary.md` has an entry for each term in Context, each naming the type or project it is.
+- [x] `Documentation/Product/Product-Overview.md` describes the layering (tool, `Libcurl`, `Curl.Api`, seam, engine) with a link to the plan.
+- [x] `Documentation/Product/Requirements.md` has requirement IDs for `Libcurl` and `Curl.Api` marked planned.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
@@ -33,3 +33,4 @@ ADR-0506, plan phase 2 step 6; `align-and-document` work. Terms: transfer engine
 
 - 2026-10-15: Created.
 - 2026-10-15: Backlog -> Doing.
+- 2026-10-15: Doing -> Done. Glossary, product overview and requirements (FR-108, FR-109 planned) name the engine, seam and public APIs
