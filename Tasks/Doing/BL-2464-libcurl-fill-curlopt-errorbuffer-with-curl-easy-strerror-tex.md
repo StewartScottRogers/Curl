@@ -31,3 +31,4 @@ BL-2411 made a perform clear the buffer and write the engine's text cut to 255 b
 ## Log
 
 - 2026-10-15: Created.
+- 2026-10-16: Backlog -> Doing.
