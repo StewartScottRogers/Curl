@@ -84,6 +84,7 @@
   <Project Path="Curl.HttpMessageSignatures.UnitTests/Curl.HttpMessageSignatures.UnitTests.csproj" />
   <Project Path="Curl.Kerberos.UnitLibrary/Curl.Kerberos.UnitLibrary.csproj" />
   <Project Path="Curl.Kerberos.UnitTests/Curl.Kerberos.UnitTests.csproj" />
+  <Project Path="Curl.Mcp.IntegrationTests/Curl.Mcp.IntegrationTests.csproj" />
   <Project Path="Curl.Mcp/Curl.Mcp.csproj" />
   <Project Path="Curl.Mcp.UnitLibrary/Curl.Mcp.UnitLibrary.csproj" />
   <Project Path="Curl.Mcp.UnitTests/Curl.Mcp.UnitTests.csproj" />
