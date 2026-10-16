@@ -38,6 +38,12 @@ at its new path. It is the specification: its `Goal`, `Context` and
 As you go, record the plan's summary and anything learned under the task's `Notes`,
 and tick each acceptance box as you verify it.
 
+Tick a box only after running its check. A criterion about the build or the tests is
+checked by running them, even when only text files changed. Never reword, delete or split
+an acceptance criterion during a run: one you cannot meet as written sends the task to
+`Blocked` (step 4), and `task-board.ps1` refuses the move to `Done` of a task whose
+criteria differ from when it was claimed (BL-2488).
+
 A fix found through an upstream case also gets a focused unit test: any product fix found
 through an upstream case (the ratchet, a gap finding or an audit conformance finding) also
 adds a focused unit test in the fixed library's own `.UnitTests` project, so each library's

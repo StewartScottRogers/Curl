@@ -100,6 +100,14 @@ The script refuses:
 - moves the table above does not allow
 - claiming a task assigned to Stewart, or one whose dependencies are not done
 - moving to `Done` while any `- [ ]` box is unticked
+- moving to `Done` a task whose acceptance criteria were reworded, added or removed since
+  it was claimed (BL-2488): `move -To Doing` writes one 8-digit SHA-256 fingerprint per
+  criterion on its Log line (`Criteria at claim: ...`), with ticks ignored and whitespace
+  collapsed, and the move to `Done` names each criterion that no longer matches. To change
+  criteria, move the task to `Backlog`, edit them there and claim it again; a criterion that
+  cannot be met sends the task to `Blocked`. A task claimed before BL-2488 has no snapshot
+  and is not checked. `Test-TaskBoardCriteria.ps1` beside the script tests this on a
+  scratch board.
 - touching an archived task
 - acting on an ID that names more than one live task (run `dedupe` first)
 - inside a dark factory shift only (`CURL_DARK_FACTORY_LANE` set, BL-995): filing with
@@ -136,9 +144,11 @@ the log and dates honest.
 2. One task in `Doing` per session. A dark factory lane is a session: with `-Lanes 4`
    up to four tasks are in `Doing` at once, never two whose `touches` overlap, and the
    shift claims each one before its run starts.
-3. Tick each acceptance box in the file as you verify it. Move to `Done` only when
-   every box is ticked and every pipeline gate is green, with a one-line `-Reason`
-   saying what now works.
+3. Tick each acceptance box in the file as you verify it, and only after running its
+   check: a box about the build or the tests means running them, even when only text
+   files changed. Never reword, delete or split a criterion during a run; the script
+   refuses the move to `Done` if you do. Move to `Done` only when every box is ticked and
+   every pipeline gate is green, with a one-line `-Reason` saying what now works.
 4. If you cannot finish, move to `Blocked` with the blocker and who can clear it. If
    the blocker is itself work, have `task-planner` file it and add it to this task's
    `depends-on`.
