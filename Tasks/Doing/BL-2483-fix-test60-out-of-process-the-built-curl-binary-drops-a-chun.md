@@ -37,3 +37,4 @@ Run as a real process with standard input on a pipe, `curl http://127.0.0.1:<por
 ## Log
 
 - 2026-10-16: Created.
+- 2026-10-16: Backlog -> Doing. Criteria at claim: fbf9dd85 6a8f6aec 4272a6b9 8738c7f6 b51e6f31 81fa3112.
