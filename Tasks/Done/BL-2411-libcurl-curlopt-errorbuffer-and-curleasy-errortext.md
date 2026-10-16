@@ -8,7 +8,7 @@ depends-on: [BL-2400, BL-2408]
 touches: [Libcurl/Easy, Libcurl.UnitTests/Easy]
 requirement: none
 created: 2026-10-15
-completed:
+completed: 2026-10-15
 ---
 # BL-2411 — Libcurl: CURLOPT_ERRORBUFFER and CurlEasy.ErrorText
 
@@ -39,3 +39,4 @@ ADR-0506; phase 3 of `Documentation/Planning/Curl-Api-And-libcurl.md`. Read the 
 
 - 2026-10-15: Created.
 - 2026-10-15: Backlog -> Doing.
+- 2026-10-15: Doing -> Done. Perform fills and clears CURLOPT_ERRORBUFFER with a 255-byte cut; CurlEasy.ErrorText added; 0 failing members
