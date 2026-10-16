@@ -48,6 +48,26 @@ is reimplemented against its RFCs in its own class library, behind interfaces th
 driven from a unit test without touching a network. The only dependency is the .NET base
 class library.
 
+## Use it from .NET: `Libcurl` and `Curl.Api`
+
+Curl is also becoming a library. Two public programming interfaces sit over one transfer
+engine, the same engine the `curl` executable runs, so a program gets the same behaviour
+as the command line ([ADR-0506](Documentation/Planning/Decisions/ADR-0506-libcurl-and-curl-api-over-one-transfer-engine.md),
+[plan](Documentation/Planning/Curl-Api-And-libcurl.md)):
+
+| Project | What it is for |
+| --- | --- |
+| [`Libcurl`](Libcurl) | libcurl's API in C#, call for call: `CurlGlobal.Init()`, `CurlEasy` with `SetOption`, `Perform` and `GetInfo`, and the multi, share, URL, MIME, header and WebSocket interfaces. For code ported from C, and the future home of a native C ABI built with native AOT. Tested by `Libcurl.UnitTests`. |
+| [`Curl.Api`](Curl.Api) | The same engine written the way a .NET developer expects: `CurlClient`, `async` with `CancellationToken`, `Stream` bodies, exceptions, `IAsyncEnumerable` for WebSocket messages, and a `CurlHttpMessageHandler` for `HttpClient`. Tested by `Curl.Api.UnitTests`. |
+| [`Curl.Api.UnitLibrary`](Curl.Api.UnitLibrary) | The seam both stand on: the engine contracts (`ICurlEngine`, `IEasyTransfer`), result codes (`CurlCode` and the rest), the option groups (`EasyHttpOptions`, `EasyTlsOptions` and the rest), `TransferInfo` and the callback delegates. Either API can be rewritten another way without touching the engine. |
+| [`Curl.Engine.UnitLibrary`](Curl.Engine.UnitLibrary) | The transfer engine, moved out of `Curl.Console` so the executable and both APIs share it. |
+
+Where it stands: the engine is extracted and `Curl.Api.UnitLibrary`'s seam is defined;
+the console is being re-based onto the engine through it. `Libcurl` and `Curl.Api` are
+created and empty until their own phases: `Libcurl` is filled area by area next, then
+`Curl.Api` over it, then upstream's `tests/libtest` cases are ported to measure it. Both
+are held to the same quality gates as every library here.
+
 ## Built by a dark factory
 
 The port is being written by a *dark factory* - an unattended production line of Claude
@@ -108,6 +128,7 @@ RunDarkFactory.cmd -Hours 4 -MaxTasks 3
 
 - [Download and install](DOWNLOAD.md) - every supported platform, installers and checksums
 - [Product overview](Documentation/Product/Product-Overview.md) - scope, architecture and roadmap
+- [Libcurl and Curl.Api plan](Documentation/Planning/Curl-Api-And-libcurl.md) - the two .NET APIs, their phases and their libcurl inventory
 - [Task board](Tasks/README.md) - what is being worked on, one Markdown file per task
 
 ## Licence
