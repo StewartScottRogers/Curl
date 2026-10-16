@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.Unicode;
 using Curl.Api.Options.Http;
 using Curl.Core.Multipart;
 
@@ -11,11 +12,16 @@ namespace Curl.Engine;
 /// <see cref="MultipartFormPart" /> <see cref="MultipartFormBodyBuilder" /> takes (ADR-0531).
 /// </summary>
 /// <remarks>
-/// A part with <see cref="EasyMimePart.SubParts" /> is a multipart; <see cref="EasyMimeBytes" /> is
-/// text, read as UTF-8; an <see cref="EasyMimeFile" /> or <see cref="EasyMimeStandardInput" /> with a
-/// file name is a file upload, and one whose name was cleared, as for <c>name=&lt;file</c>, is file
-/// content. Every other field is copied as it is, <see cref="EasyMimePart.Encoder" /> included: the
-/// builder applies <c>;encoder=</c> and rejects an unknown name (ADR-0041).
+/// A part with <see cref="EasyMimePart.SubParts" /> is a multipart; <see cref="EasyMimeBytes" /> holding valid
+/// UTF-8 is text, read as UTF-8, so the builder sends it in its text encoding - the same bytes for the engine's
+/// UTF-8 builder, the platform's for the curl tool's <c>-F</c> text, which is command-line text - and any other
+/// bytes are a <see cref="MultipartFormPartKind.Bytes" /> part, sent byte for byte (BL-2470); an <see cref="EasyMimeCallback" />
+/// is a <see cref="MultipartFormPartKind.Reader" /> part over a <see cref="MimeCallbackReadStream" />, of
+/// unknown length when its size is -1; an <see cref="EasyMimeFile" /> or <see cref="EasyMimeStandardInput" />
+/// with a file name is a file upload, and one whose name was cleared, as for <c>name=&lt;file</c>, is file
+/// content; a part with no data is empty text. Every other field is copied as it is,
+/// <see cref="EasyMimePart.Encoder" /> included: the builder applies <c>;encoder=</c> and rejects an unknown
+/// name (ADR-0041).
 /// </remarks>
 internal static class MultipartFormPartMapping
 {
@@ -23,12 +29,13 @@ internal static class MultipartFormPartMapping
 
     /// <summary>Maps the parts of <paramref name="body" />, and the parts nested inside them, in order.</summary>
     /// <param name="body">The multipart body, from <see cref="EasyHttpOptions.MimePost" />.</param>
+    /// <param name="callbackReads">
+    /// Receives each <see cref="MimeCallbackReadStream" /> a callback part opens as the body is built, so the perform
+    /// can tell that a read callback aborted it; <see langword="null" /> keeps none.
+    /// </param>
     /// <returns>The builder's parts, one for each of the body's parts.</returns>
-    /// <exception cref="NotSupportedException">
-    /// A part's data is an <see cref="EasyMimeCallback" />, which no command line produces and the builder cannot read.
-    /// </exception>
-    internal static IReadOnlyList<MultipartFormPart> FromMimeBody(EasyMimeBody body) =>
-        [.. body.Parts.Select(FromMimePart)];
+    internal static IReadOnlyList<MultipartFormPart> FromMimeBody(EasyMimeBody body, ICollection<CallbackReadStream>? callbackReads = null) =>
+        [.. body.Parts.Select(part => FromMimePart(part, callbackReads))];
 
     /// <summary>
     /// The escaping the builder gives names and file names: <see cref="MultipartNameEscaping.Backslash" />
@@ -41,7 +48,7 @@ internal static class MultipartFormPartMapping
     /// <param name="scheme">The transfer URL's scheme.</param>
     /// <returns>The escaping <paramref name="formEscape" /> and <paramref name="scheme" /> ask for.</returns>
     internal static MultipartNameEscaping NameEscapingOf(bool formEscape, string scheme) =>
-        formEscape ||MailRequestOptionsMapping.SendsFormAsMimeMessage(scheme)
+        formEscape || MailRequestOptionsMapping.SendsFormAsMimeMessage(scheme)
             ? MultipartNameEscaping.Backslash
             : MultipartNameEscaping.Percent;
 
@@ -61,7 +68,7 @@ internal static class MultipartFormPartMapping
             .Select(header => header[(ContentTypeName.Length + 1)..].TrimStart(' '))
             .FirstOrDefault();
 
-    private static MultipartFormPart FromMimePart(EasyMimePart part) =>
+    private static MultipartFormPart FromMimePart(EasyMimePart part, ICollection<CallbackReadStream>? callbackReads) =>
         new(
             part.Name,
             KindOf(part),
@@ -69,27 +76,57 @@ internal static class MultipartFormPartMapping
             part.Type,
             part.FileName,
             part.Headers,
-            part.SubParts is { } subParts ? FromMimeBody(subParts) : [])
+            part.SubParts is { } subParts ? FromMimeBody(subParts, callbackReads) : [])
         {
             Encoder = part.Encoder,
+            Bytes = RawBytesOf(part.Data),
+            OpenContent = OpenerOf(part.Data, callbackReads),
+            ContentLength = ContentLengthOf(part.Data),
         };
 
     private static MultipartFormPartKind KindOf(EasyMimePart part) =>
         part switch
         {
             { SubParts: not null } => MultipartFormPartKind.Multipart,
-            { Data: EasyMimeFile or EasyMimeStandardInput, FileName: null } => MultipartFormPartKind.FileContent,
-            { Data: EasyMimeFile or EasyMimeStandardInput } => MultipartFormPartKind.FileUpload,
+            { Data: EasyMimeFile or EasyMimeStandardInput } => part.FileName is null ? MultipartFormPartKind.FileContent : MultipartFormPartKind.FileUpload,
+            _ => KindOfData(part.Data),
+        };
+
+    /// <summary>The kind of a part with no sub-parts and no file: bytes that are not UTF-8, a callback, else text.</summary>
+    private static MultipartFormPartKind KindOfData(EasyMimeData? data) =>
+        data switch
+        {
+            EasyMimeBytes bytes when !Utf8.IsValid(bytes.Bytes.Span) => MultipartFormPartKind.Bytes,
+            EasyMimeCallback => MultipartFormPartKind.Reader,
             _ => MultipartFormPartKind.Text,
         };
+
+    /// <summary>The bytes of a <see cref="MultipartFormPartKind.Bytes" /> part: bytes that are not UTF-8, else none.</summary>
+    private static ReadOnlyMemory<byte> RawBytesOf(EasyMimeData? data) =>
+        data is EasyMimeBytes bytes && !Utf8.IsValid(bytes.Bytes.Span) ? bytes.Bytes : ReadOnlyMemory<byte>.Empty;
+
+    /// <summary>What opens a callback part's stream, or <see langword="null" /> for any other data.</summary>
+    private static Func<Stream>? OpenerOf(EasyMimeData? data, ICollection<CallbackReadStream>? callbackReads) =>
+        data is EasyMimeCallback callback ? () => OpenCallback(callback, callbackReads) : null;
+
+    /// <summary>A callback part's size, or <see langword="null" /> when it is -1 (unknown) or the data is not a callback.</summary>
+    private static long? ContentLengthOf(EasyMimeData? data) =>
+        data is EasyMimeCallback { Size: >= 0 } sized ? sized.Size : null;
 
     private static string ContentOf(EasyMimeData? data) =>
         data switch
         {
-            EasyMimeBytes bytes => Encoding.UTF8.GetString(bytes.Bytes.Span),
+            EasyMimeBytes bytes when Utf8.IsValid(bytes.Bytes.Span) => Encoding.UTF8.GetString(bytes.Bytes.Span),
             EasyMimeFile file => file.Path,
             EasyMimeStandardInput => MultipartFormPart.StandardInputPath,
-            null => string.Empty,
-            _ => throw new NotSupportedException("A multipart form part read through a callback cannot be built into a command-line form body."),
+            _ => string.Empty,
         };
+
+    /// <summary>Opens <paramref name="callback" />'s stream, keeping it in <paramref name="callbackReads" /> when given.</summary>
+    private static MimeCallbackReadStream OpenCallback(EasyMimeCallback callback, ICollection<CallbackReadStream>? callbackReads)
+    {
+        MimeCallbackReadStream stream = new(callback);
+        callbackReads?.Add(stream);
+        return stream;
+    }
 }

@@ -106,7 +106,7 @@ one it opens the path `-` as before (BL-275). A file that cannot seek declares t
 `UnseekableFileLength` gives it (ADR-0097); one that can declares its length, except a device
 under `/dev/` off Windows, which `SeekableFileLength` sends chunked as libcurl does
 (ADR-0104). Names and file names are escaped as `MultipartNameEscaping` says: `%22`, `%0D`, `%0A` by default, `\\` and `\"` under `--form-escape` (BL-625). `Curl.Console` builds every `-F` body with it. Two kinds no command line gives serve
-libcurl's MIME API (BL-2470, ADR-0626): a `Bytes` part sends `MultipartFormPart.Bytes` verbatim, and a `Reader`
+libcurl's MIME API (BL-2470, ADR-0627): a `Bytes` part sends `MultipartFormPart.Bytes` verbatim, and a `Reader`
 part streams what `OpenContent` opens, never read ahead, with `ContentLength` `null` leaving the body's length
 unknown (sent chunked); both take a text part's headers.
 

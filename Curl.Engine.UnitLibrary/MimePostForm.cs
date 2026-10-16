@@ -17,13 +17,17 @@ internal static class MimePostForm
     /// <param name="builder">Builds the body.</param>
     /// <param name="http">The handle's HTTP options.</param>
     /// <param name="scheme">The transfer URL's scheme.</param>
+    /// <param name="callbackReads">
+    /// Receives the stream of each <c>curl_mime_data_cb</c> part as the body is built
+    /// (<see cref="MultipartFormPartMapping.FromMimeBody" />); <see langword="null" /> keeps none.
+    /// </param>
     /// <param name="cancellationToken">Cancels the file opens.</param>
     /// <returns>The body or its failure, or <see langword="null" /> when no <c>CURLOPT_MIMEPOST</c> is set.</returns>
-    /// <exception cref="NotSupportedException">A part's data is an <see cref="EasyMimeCallback" /> (<see cref="MultipartFormPartMapping.FromMimeBody" />).</exception>
     internal static async ValueTask<MultipartFormBuildResult?> BuildAsync(
         MultipartFormBodyBuilder builder,
         EasyHttpOptions http,
         string scheme,
+        ICollection<CallbackReadStream>? callbackReads,
         CancellationToken cancellationToken)
     {
         if (http.MimePost is not { } body)
@@ -31,7 +35,7 @@ internal static class MimePostForm
             return null;
         }
 
-        IReadOnlyList<MultipartFormPart> parts = MultipartFormPartMapping.FromMimeBody(body);
+        IReadOnlyList<MultipartFormPart> parts = MultipartFormPartMapping.FromMimeBody(body, callbackReads);
         MultipartNameEscaping escaping = MultipartFormPartMapping.NameEscapingOf(http.MimeOptions.HasFlag(MimeOptions.FormEscape), scheme);
         return MailRequestOptionsMapping.SendsFormAsMimeMessage(scheme)
             ? await builder.BuildMailMessageAsync(parts, escaping, http.HttpHeaders, cancellationToken).ConfigureAwait(false)

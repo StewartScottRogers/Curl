@@ -19,7 +19,7 @@ public sealed class MimePostFormTests
     [TestMethod]
     public async Task BuildAsync_NoMimePost_GivesNull()
     {
-        MultipartFormBuildResult? form = await MimePostForm.BuildAsync(Builder, new EasyHttpOptions(), "http", CancellationToken.None);
+        MultipartFormBuildResult? form = await MimePostForm.BuildAsync(Builder, new EasyHttpOptions(), "http", null, CancellationToken.None);
 
         Assert.IsNull(form);
     }
@@ -27,7 +27,7 @@ public sealed class MimePostFormTests
     [TestMethod]
     public async Task BuildAsync_HttpUrl_BuildsAFormDataBodyWithPercentEscapedNames()
     {
-        MultipartFormBuildResult? form = await MimePostForm.BuildAsync(Builder, new EasyHttpOptions { MimePost = OnePart }, "http", CancellationToken.None);
+        MultipartFormBuildResult? form = await MimePostForm.BuildAsync(Builder, new EasyHttpOptions { MimePost = OnePart }, "http", null, CancellationToken.None);
 
         string body = await ContentOfAsync(form!);
         Assert.AreEqual("multipart/form-data; boundary=b0", form!.Body!.ContentType);
@@ -39,7 +39,7 @@ public sealed class MimePostFormTests
     {
         EasyHttpOptions http = new() { MimePost = OnePart, MimeOptions = MimeOptions.FormEscape };
 
-        MultipartFormBuildResult? form = await MimePostForm.BuildAsync(Builder, http, "http", CancellationToken.None);
+        MultipartFormBuildResult? form = await MimePostForm.BuildAsync(Builder, http, "http", null, CancellationToken.None);
 
         StringAssert.Contains(await ContentOfAsync(form!), "name=\"a\\\"b\"");
     }
@@ -49,7 +49,7 @@ public sealed class MimePostFormTests
     {
         EasyHttpOptions http = new() { MimePost = OnePart, HttpHeaders = ["Subject: hi"] };
 
-        MultipartFormBuildResult? form = await MimePostForm.BuildAsync(Builder, http, "smtp", CancellationToken.None);
+        MultipartFormBuildResult? form = await MimePostForm.BuildAsync(Builder, http, "smtp", null, CancellationToken.None);
 
         string message = await ContentOfAsync(form!);
         StringAssert.StartsWith(message, "Content-Type: multipart/mixed; boundary=b0\r\nMime-Version: 1.0\r\nSubject: hi\r\n");

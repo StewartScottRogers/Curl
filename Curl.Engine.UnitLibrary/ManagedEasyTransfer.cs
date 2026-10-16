@@ -429,10 +429,11 @@ internal sealed class ManagedEasyTransfer(
         CancellationToken cancellationToken)
     {
         EngineToolTransferInputs? toolInputs = ToolInputs;
-        MultipartFormBuildResult? form = await MimePostFormUnlessToolGaveAsync(toolInputs, options, url, cancellationToken).ConfigureAwait(false);
+        List<CallbackReadStream> mimeReads = [];
+        MultipartFormBuildResult? form = await MimePostFormUnlessToolGaveAsync(toolInputs, options, url, mimeReads, cancellationToken).ConfigureAwait(false);
         return form is { IsBuilt: false }
             ? Finish(form.Failure.ExitCode.ToCurlCode(), form.Failure.ErrorMessage!, Info)
-            : await PerformDisposingFormAsync(options, settings, url, urlText, transferId, toolInputs, form?.Body, cancellationToken).ConfigureAwait(false);
+            : await PerformDisposingFormAsync(options, settings, url, urlText, transferId, toolInputs, form?.Body, mimeReads, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary><see cref="PerformParsedAsync" />, then disposes <paramref name="formBody" />'s content.</summary>
@@ -443,6 +444,7 @@ internal sealed class ManagedEasyTransfer(
     /// <param name="transferId">The transfer's <c>%{xfer_id}</c>.</param>
     /// <param name="toolInputs">The runner's chosen pieces, or <see langword="null" /> for a handle's own.</param>
     /// <param name="formBody">The <c>CURLOPT_MIMEPOST</c> body, or <see langword="null" /> for none.</param>
+    /// <param name="mimeReads">The streams of the body's <c>curl_mime_data_cb</c> parts.</param>
     /// <param name="cancellationToken">Stops the transfer.</param>
     /// <returns>The transfer's code.</returns>
     private async Task<CurlCode> PerformDisposingFormAsync(
@@ -453,10 +455,11 @@ internal sealed class ManagedEasyTransfer(
         long transferId,
         EngineToolTransferInputs? toolInputs,
         StreamBody? formBody,
+        IReadOnlyList<CallbackReadStream> mimeReads,
         CancellationToken cancellationToken)
     {
         await using Stream? formContent = formBody?.Content;
-        return await PerformParsedAsync(options, settings, url, urlText, transferId, toolInputs, formBody, cancellationToken).ConfigureAwait(false);
+        return await PerformParsedAsync(options, settings, url, urlText, transferId, toolInputs, formBody, mimeReads, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -470,6 +473,7 @@ internal sealed class ManagedEasyTransfer(
     /// <param name="transferId">The transfer's <c>%{xfer_id}</c>.</param>
     /// <param name="toolInputs">The runner's chosen pieces, or <see langword="null" /> for a handle's own.</param>
     /// <param name="formBody">The <c>CURLOPT_MIMEPOST</c> body, or <see langword="null" /> for none.</param>
+    /// <param name="mimeReads">The streams of the body's <c>curl_mime_data_cb</c> parts, whose abort ends the perform.</param>
     /// <param name="cancellationToken">Stops the transfer.</param>
     /// <returns>The transfer's code.</returns>
     private async Task<CurlCode> PerformParsedAsync(
@@ -480,6 +484,7 @@ internal sealed class ManagedEasyTransfer(
         long transferId,
         EngineToolTransferInputs? toolInputs,
         StreamBody? formBody,
+        IReadOnlyList<CallbackReadStream> mimeReads,
         CancellationToken cancellationToken)
     {
         CookieEngine? cookies = CookieEngine.FromHttpOptions(options.Http, PerformShared.Cookies);
@@ -488,7 +493,7 @@ internal sealed class ManagedEasyTransfer(
         EngineToolTransferDispatch? toolDispatch = ToolDispatch;
         RedirectFollower follower = FollowerOf(toolDispatch, options, cookies);
         EngineToolTransferInputs inputs = MimePostForm.WithBody(InputsOf(toolInputs, options, settings, url, state, PauseGateFor(url)), formBody, url.Scheme);
-        CallbackReadStream? callbackUpload = inputs.Upload as CallbackReadStream;
+        IReadOnlyList<CallbackReadStream> callbackReads = inputs.Upload is CallbackReadStream upload ? [.. mimeReads, upload] : mimeReads;
         EngineToolTransferProgress? toolProgress = ToolProgress;
         using CancellationTokenSource abort = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, AbortTokenOf(toolProgress));
         CallbackTransferProgress? callbackProgress = CallbackProgressUnlessToolGave(toolProgress, options, abort);
@@ -507,10 +512,10 @@ internal sealed class ManagedEasyTransfer(
                 ContextTokenOf(toolProgress, cancellationToken, abort)),
             RedirectPolicyMapping.Of(settings, options.Http, options.Authentication),
             callbackProgress,
-            callbackUpload).ConfigureAwait(false);
+            callbackReads).ConfigureAwait(false);
         await CleanUpUnlessToolDoesAsync(toolInputs, options, settings, cookies, state, transferUrl).ConfigureAwait(false);
         LastResult = recorder is null ? result : recorder.ReportOn(result);
-        return FinishPerformed(LastResult, options, transferId, cookies, ConnectionIdOf(result, state), AbortedTextOf(callbackUpload));
+        return FinishPerformed(LastResult, options, transferId, cookies, ConnectionIdOf(result, state), AbortedTextOf(callbackReads));
     }
 
     /// <summary>
@@ -554,15 +559,17 @@ internal sealed class ManagedEasyTransfer(
     /// <param name="toolInputs">The runner's chosen pieces, or <see langword="null" /> for a handle's own.</param>
     /// <param name="options">The handle's options.</param>
     /// <param name="url">The URL set, whose scheme picks a form or a mail message.</param>
+    /// <param name="mimeReads">Receives the stream of each <c>curl_mime_data_cb</c> part.</param>
     /// <param name="cancellationToken">Cancels the file opens.</param>
     /// <returns>The body or its failure, or <see langword="null" /> for none.</returns>
     private async Task<MultipartFormBuildResult?> MimePostFormUnlessToolGaveAsync(
         EngineToolTransferInputs? toolInputs,
         EasyOptions options,
         CurlUrl url,
+        ICollection<CallbackReadStream> mimeReads,
         CancellationToken cancellationToken) =>
         toolInputs is null
-            ? await MimePostForm.BuildAsync(new MultipartFormBodyBuilder(Host.FileSystem, Encoding.UTF8, CreateFormBoundary), options.Http, url.Scheme, cancellationToken).ConfigureAwait(false)
+            ? await MimePostForm.BuildAsync(new MultipartFormBodyBuilder(Host.FileSystem, Encoding.UTF8, CreateFormBoundary), options.Http, url.Scheme, mimeReads, cancellationToken).ConfigureAwait(false)
             : null;
 
     /// <summary>The token the curl tool's runner aborts the transfer through, or none without <paramref name="toolProgress" />.</summary>
@@ -702,13 +709,14 @@ internal sealed class ManagedEasyTransfer(
         string.Equals(url.Scheme, "file", StringComparison.OrdinalIgnoreCase) ? null : pauseGate;
 
     /// <summary>
-    /// The text of a perform a callback aborted: libcurl's <c>operation aborted by callback</c> when the read callback
-    /// returned <c>CURL_READFUNC_ABORT</c>, else the progress callback's <c>Callback aborted</c>.
+    /// The text of a perform a callback aborted: libcurl's <c>operation aborted by callback</c> when a read callback (the
+    /// upload's or a <c>curl_mime_data_cb</c> part's) returned <c>CURL_READFUNC_ABORT</c>, else the progress callback's
+    /// <c>Callback aborted</c>.
     /// </summary>
-    /// <param name="upload">The read callback's stream, or <see langword="null" /> when the transfer reads none.</param>
+    /// <param name="reads">The read callbacks' streams the transfer reads.</param>
     /// <returns>The text.</returns>
-    private static string AbortedTextOf(CallbackReadStream? upload) =>
-        upload is { Aborted: true } ? CallbackReadStream.AbortedText : CallbackTransferProgress.CallbackAbortedText;
+    private static string AbortedTextOf(IReadOnlyList<CallbackReadStream> reads) =>
+        reads.Any(read => read.Aborted) ? CallbackReadStream.AbortedText : CallbackTransferProgress.CallbackAbortedText;
 
     /// <summary>
     /// The pieces a handle with no <see cref="ToolInputs" /> chooses from its options: no proxy, credentials,
@@ -909,7 +917,7 @@ internal sealed class ManagedEasyTransfer(
     /// <param name="context">The attempt's context.</param>
     /// <param name="redirectPolicy">The redirect policy.</param>
     /// <param name="progress">The progress callback's sink, or <see langword="null" /> for none.</param>
-    /// <param name="upload">The read callback's stream, or <see langword="null" /> when the transfer reads none.</param>
+    /// <param name="reads">The read callbacks' streams the transfer reads: the upload's and the <c>curl_mime_data_cb</c> parts'.</param>
     /// <returns>The attempt's result, or <see langword="null" /> when a callback aborted it.</returns>
     private static async Task<TransferResult?> FollowUnlessAbortedAsync(
         RedirectFollower follower,
@@ -917,7 +925,7 @@ internal sealed class ManagedEasyTransfer(
         TransferContext context,
         RedirectPolicy redirectPolicy,
         CallbackTransferProgress? progress,
-        CallbackReadStream? upload)
+        IReadOnlyList<CallbackReadStream> reads)
     {
         TransferResult result;
         try
@@ -929,7 +937,7 @@ internal sealed class ManagedEasyTransfer(
             return null;
         }
 
-        return progress is { Aborted: true } || upload is { Aborted: true } ? null : result;
+        return progress is { Aborted: true } || reads.Any(read => read.Aborted) ? null : result;
     }
 
     /// <inheritdoc />
