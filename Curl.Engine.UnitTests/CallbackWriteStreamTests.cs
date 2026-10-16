@@ -1,4 +1,5 @@
 using Curl.Api.Callbacks;
+using Curl.Protocol.Abstractions;
 
 namespace Curl.Engine;
 
@@ -26,12 +27,26 @@ public sealed class CallbackWriteStreamTests
     }
 
     [TestMethod]
-    public void Write_HeaderCallbackTakesFewerBytes_ThrowsIOException()
+    public void Write_HeaderCallbackTakesFewerBytes_ThrowsOutputWriteFailedWithWhatItTook()
     {
         HeaderCallback callback = header => header.Length - 1;
         using CallbackWriteStream stream = CallbackWriteStream.Of(callback);
 
-        Assert.ThrowsExactly<IOException>(() => stream.Write([1, 2]));
+        OutputWriteFailedException failure = Assert.ThrowsExactly<OutputWriteFailedException>(() => stream.Write([1, 2]));
+
+        Assert.AreEqual(1, failure.BytesAccepted);
+        Assert.AreEqual("Failure writing output to destination, passed 2 returned 1", failure.Message);
+    }
+
+    [TestMethod]
+    public void Write_WriteCallbackReturnsANegativeCount_AcceptsNothingAndSaysWhatItReturned()
+    {
+        using CallbackWriteStream stream = new(_ => -1);
+
+        OutputWriteFailedException failure = Assert.ThrowsExactly<OutputWriteFailedException>(() => stream.Write([1, 2, 3]));
+
+        Assert.AreEqual(0, failure.BytesAccepted);
+        Assert.AreEqual("Failure writing output to destination, passed 3 returned -1", failure.Message);
     }
 
     [TestMethod]

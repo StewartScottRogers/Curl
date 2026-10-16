@@ -1,3 +1,4 @@
+using Curl.Api.Callbacks;
 using Curl.Api.Codes;
 using Curl.Api.EngineContracts;
 using Curl.Api.EngineContracts.ConnectOnly;
@@ -93,6 +94,18 @@ internal sealed class ManagedEasyTransfer(
     /// <see cref="Duplicate" /> does not copy it and <see cref="Reset" /> clears it, as it belongs to one transfer.
     /// </summary>
     internal EngineToolTransferInputs? ToolInputs { get; set; }
+
+    /// <summary>
+    /// Gets or sets where each transfer writes its body and header bytes as the curl tool's runner built them -
+    /// its <c>--limit-rate</c>, <c>-N</c>, <c>--use-ascii</c> and standard-output or file chain, the <c>-D</c>
+    /// stream, the <c>-J</c> header watcher and the <c>--styled-output</c> styles - for <c>Curl.Console</c> to set
+    /// per transfer once its runner performs from the options (BL-2394, ADR-0558). While set, a perform from the
+    /// options writes there in place of <see cref="EasyCallbackOptions.Write" /> and
+    /// <see cref="EasyCallbackOptions.Header" />; <see langword="null" />, as for every <c>Curl.Api</c> and
+    /// <c>Libcurl</c> handle, to write to those callbacks. <see cref="Duplicate" /> does not copy it and
+    /// <see cref="Reset" /> clears it, as it belongs to one transfer.
+    /// </summary>
+    internal EngineToolTransferOutputs? ToolOutputs { get; set; }
 
     /// <summary>
     /// Gets the whole result of the last perform, for the curl tool's <c>--retry</c>, failure lines and <c>-w</c>,
@@ -454,6 +467,7 @@ internal sealed class ManagedEasyTransfer(
         Options = new EasyOptions();
         ToolSettings = null;
         ToolInputs = null;
+        ToolOutputs = null;
     }
 
     /// <summary>
@@ -486,8 +500,10 @@ internal sealed class ManagedEasyTransfer(
         CallbackTransferProgress? progress,
         ITransferEvents events,
         EngineToolTransferInputs inputs,
-        CancellationToken cancellationToken) =>
-        new TransferContextFactory(Stream.Null, shared.TimeProvider) { HstsStore = shared.Hsts, DiagnosticLog = Host.DiagnosticLog }.Create(
+        CancellationToken cancellationToken)
+    {
+        EngineToolTransferOutputs outputs = ToolOutputs ?? OwnOutputsOf(options.Callbacks);
+        return new TransferContextFactory(Stream.Null, shared.TimeProvider) { HstsStore = shared.Hsts, DiagnosticLog = Host.DiagnosticLog }.Create(
             settings,
             options.Http,
             options.Behaviour,
@@ -497,20 +513,35 @@ internal sealed class ManagedEasyTransfer(
             options.Authentication,
             options.Network,
             url,
-            options.Callbacks.Write is { } write ? CallbackWriteStream.Of(write) : Stream.Null,
+            outputs.Output,
             range: inputs.Range,
             resumeFrom: inputs.ResumeFrom,
-            headerOutput: options.Callbacks.Header is { } header ? CallbackWriteStream.Of(header) : null,
+            headerOutput: outputs.HeaderOutput,
             formBody: inputs.FormBody,
             upload: inputs.Upload,
             proxy: inputs.Proxy,
+            watchHeaderOutput: outputs.WatchHeaderOutput,
             progress: progress,
             events: events,
             lookedUpCredentials: inputs.LookedUpCredentials,
             ifNoneMatchHeaders: inputs.IfNoneMatchHeaders,
             altSvc: inputs.AltSvc,
+            bodyHeaderStyles: outputs.BodyHeaderStyles,
             abortToken: cancellationToken,
             ssh: inputs.Ssh);
+    }
+
+    /// <summary>
+    /// The outputs a handle with no <see cref="ToolOutputs" /> writes to: the body to the write callback and the
+    /// header lines to the header callback through <see cref="CallbackWriteStream" />, the body discarded and the
+    /// header lines dropped when the callback is unset.
+    /// </summary>
+    /// <param name="callbacks">The handle's callbacks.</param>
+    /// <returns>The outputs.</returns>
+    private static EngineToolTransferOutputs OwnOutputsOf(EasyCallbackOptions callbacks) =>
+        new(
+            callbacks.Write is { } write ? CallbackWriteStream.Of(write) : Stream.Null,
+            HeaderOutput: callbacks.Header is { } header ? CallbackWriteStream.Of(header) : null);
 
     /// <summary>
     /// The upload source of a <see cref="Api.Options.Behaviour.EasyTransferOptions.Upload" /> transfer: the read callback, or

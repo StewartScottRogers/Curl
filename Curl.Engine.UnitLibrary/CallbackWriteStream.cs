@@ -1,4 +1,7 @@
+using System.Globalization;
+
 using Curl.Api.Callbacks;
+using Curl.Protocol.Abstractions;
 
 namespace Curl.Engine;
 
@@ -6,7 +9,9 @@ namespace Curl.Engine;
 /// A write-only stream that hands every write to a libcurl write or header callback, as libcurl
 /// hands each chunk it receives to <c>CURLOPT_WRITEFUNCTION</c> or <c>CURLOPT_HEADERFUNCTION</c>.
 /// A callback that returns anything but the chunk's length fails the write with an
-/// <see cref="IOException" />, which ends the transfer with <c>CURLE_WRITE_ERROR</c> as libcurl does.
+/// <see cref="OutputWriteFailedException" /> carrying what it returned, which ends the transfer with
+/// <c>CURLE_WRITE_ERROR</c> and the runner's exit 23 text,
+/// <c>Failure writing output to destination, passed N returned M</c>, as libcurl does.
 /// </summary>
 /// <param name="callback">Receives each chunk and returns how many bytes it took.</param>
 internal sealed class CallbackWriteStream(Func<ReadOnlySpan<byte>, long> callback) : Stream
@@ -60,9 +65,12 @@ internal sealed class CallbackWriteStream(Func<ReadOnlySpan<byte>, long> callbac
     /// <inheritdoc />
     public override void Write(ReadOnlySpan<byte> buffer)
     {
-        if (callback(buffer) != buffer.Length)
+        long returned = callback(buffer);
+        if (returned != buffer.Length)
         {
-            throw new IOException($"Failure writing output to destination, passed {buffer.Length} returned a different count");
+            throw new OutputWriteFailedException(
+                (int)Math.Clamp(returned, 0, int.MaxValue),
+                string.Create(CultureInfo.InvariantCulture, $"Failure writing output to destination, passed {buffer.Length} returned {returned}"));
         }
     }
 
