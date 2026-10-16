@@ -15,8 +15,11 @@ namespace Curl.Engine;
 /// engine attached to one share handle send each other's cookies and reuse each other's connections. The lock
 /// callbacks are called around each access: <see cref="CurlLockData.Share" /> for the handle's own state as a
 /// transfer attaches and detaches and as it is cleaned up, every shared cache kind as a transfer takes it, and
-/// <see cref="CurlLockData.Cookie" /> around each read and write of the shared cookies. <see cref="CurlLockData.Psl" />
-/// is accepted and shares nothing: the engine keeps no public suffix list.
+/// <see cref="CurlLockData.Cookie" /> around each read and write of the shared cookies. Every transfer of every engine
+/// checks cookie domains against the one embedded public suffix list snapshot, which never changes, so it is shared
+/// whatever the handle says; while <see cref="CurlLockData.Psl" /> is shared, a transfer takes it under its lock as it
+/// takes the shared caches (ADR-0617). An HSTS entry one attached transfer learns switches another's <c>http</c>
+/// URL to <c>https</c> while <see cref="CurlLockData.Hsts" /> is shared.
 /// </summary>
 /// <param name="timeProvider">The clock the share handle's caches run on.</param>
 internal sealed class ManagedShareHandle(TimeProvider timeProvider) : IShareHandle
@@ -99,7 +102,8 @@ internal sealed class ManagedShareHandle(TimeProvider timeProvider) : IShareHand
     /// Attaches <paramref name="transfer" /> for one perform: counts it under the <see cref="CurlLockData.Share" /> lock,
     /// so option changes and <see cref="Cleanup" /> answer <see cref="CurlShareCode.InUse" /> until <see cref="Detach" />,
     /// and gives <paramref name="engine" />'s state with each cache this handle shares in place of the engine's, taking
-    /// each one under its kind's lock. A handle already cleaned up shares nothing.
+    /// each one under its kind's lock, the public suffix list first when it is shared. A handle already cleaned up
+    /// shares nothing.
     /// </summary>
     /// <param name="transfer">The transfer about to perform.</param>
     /// <param name="engine">The transfer's engine's state.</param>
@@ -114,6 +118,7 @@ internal sealed class ManagedShareHandle(TimeProvider timeProvider) : IShareHand
             }
 
             UnderShareLock(transfer, () => ++attachedTransfers);
+            _ = TakeShared(transfer, CurlLockData.Psl, own: true, engine: false);
             return new ManagedEngineSharedState(
                 engine,
                 TakeShared(transfer, CurlLockData.Connect, Connections, engine.Connections),

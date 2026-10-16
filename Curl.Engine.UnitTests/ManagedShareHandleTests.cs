@@ -25,6 +25,8 @@ public sealed class ManagedShareHandleTests
 
     private const string KeepsAlive = "HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n";
 
+    private const string LearnsHsts = "HTTP/1.1 200 OK\r\nStrict-Transport-Security: max-age=86400\r\nContent-Length: 0\r\n\r\n";
+
     private const string ConnectFailure = "Failed to connect to h port 80 after 0 ms: Could not connect to server";
 
     [TestMethod]
@@ -90,6 +92,54 @@ public sealed class ManagedShareHandleTests
         await PerformAsync(second, "http://h/b", share);
 
         Assert.AreEqual(2, connector.Opened);
+    }
+
+    [TestMethod]
+    public async Task PerformAsync_HstsShared_SwitchesAnotherEnginesHandleToHttpsForAHostOneHandleLearned()
+    {
+        ScriptedConnector connector = new([Encoding.ASCII.GetBytes(LearnsHsts), Encoding.ASCII.GetBytes(KeepsAlive)]);
+        await using ManagedCurlEngine first = CreateEngine(connector);
+        await using ManagedCurlEngine second = CreateEngine(connector);
+        IShareHandle share = first.CreateShare();
+        share.Share(CurlLockData.Hsts);
+
+        CurlCode learning = await PerformAsync(first, "https://example.com/a", share);
+        CurlCode switching = await PerformAsync(second, "http://example.com/b", share);
+
+        Assert.AreEqual(CurlCode.Ok, learning);
+        Assert.AreEqual(CurlCode.Ok, switching);
+        Assert.AreEqual(443, connector.Targets[1].Port);
+    }
+
+    [TestMethod]
+    public async Task PerformAsync_HstsNotShared_LeavesAnotherEnginesHandleOnHttp()
+    {
+        ScriptedConnector connector = new([Encoding.ASCII.GetBytes(LearnsHsts), Encoding.ASCII.GetBytes(KeepsAlive)]);
+        await using ManagedCurlEngine first = CreateEngine(connector);
+        await using ManagedCurlEngine second = CreateEngine(connector);
+        IShareHandle share = first.CreateShare();
+
+        await PerformAsync(first, "https://example.com/a", share);
+        await PerformAsync(second, "http://example.com/b", share);
+
+        Assert.AreEqual(80, connector.Targets[1].Port);
+    }
+
+    [TestMethod]
+    public async Task PerformAsync_PslShared_TakesThePublicSuffixListUnderItsLock()
+    {
+        ScriptedConnector connector = new([Encoding.ASCII.GetBytes(KeepsAlive)]);
+        await using ManagedCurlEngine engine = CreateEngine(connector);
+        IShareHandle share = engine.CreateShare();
+        share.Share(CurlLockData.Psl);
+        List<string> calls = [];
+        share.SetLockCallback((_, data, _) => calls.Add($"lock {data}"));
+        share.SetUnlockCallback((_, data) => calls.Add($"unlock {data}"));
+
+        CurlCode code = await PerformAsync(engine, "http://example.com/a", share);
+
+        Assert.AreEqual(CurlCode.Ok, code);
+        CollectionAssert.AreEqual(new[] { "lock Share", "unlock Share", "lock Psl", "unlock Psl", "lock Share", "unlock Share" }, calls);
     }
 
     [TestMethod]
