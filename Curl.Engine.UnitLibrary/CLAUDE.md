@@ -264,7 +264,13 @@ out as `Curl.Output`'s `TransferWriteOutVariables` works out its `-w` variable (
 microseconds from the handler's start, at least one; speeds over the total time), plus the
 `CURLAUTH_*` bits a 401's `WWW-Authenticate` or a 407's `Proxy-Authenticate` lines offer, the last
 `Content-Length`, the effective URL's scheme and `CURLPROTO_*` bit, and `CURLINFO_FILETIME` only
-under `EasyTransferOptions.FileTime`. The rest keep their fresh-handle defaults (BL-2361). `Duplicate` copies the options and none of the results, `Reset` restores
+under `EasyTransferOptions.FileTime`. BL-2361 added `CURLINFO_RETRY_AFTER` (the last response's
+`Retry-After`, read by `Curl.Core`'s `RetryAfterHeader`), `CURLINFO_CONTENT_LENGTH_UPLOAD`
+(`ManagedEasyTransfer.ContentLengthUploadOf`: `CURLOPT_INFILESIZE` under `CURLOPT_UPLOAD`, else a
+post's `CURLOPT_POSTFIELDSIZE` or body length, else -1) and `CURLINFO_COOKIELIST`
+(`CookieEngine.ListLines`, the shared store's cookies as Netscape lines while a `-b` file or `-c`
+turns the cookie engine on). `%{conn_id}` is BL-2362's; the rest keep their fresh-handle defaults
+until BL-2366 to BL-2369. `Duplicate` copies the options and none of the results, `Reset` restores
 `new EasyOptions()`, `Pause` records the directions and returns `Ok`, and `UpkeepAsync` returns
 `Ok`. `Headers`, `WebSocket` and `Connection` throw `NotSupportedException` (phase 3). Their tests are
 `ManagedCurlEngineTests`, `ManagedEasyTransferTests` and `CallbackWriteStreamTests`.

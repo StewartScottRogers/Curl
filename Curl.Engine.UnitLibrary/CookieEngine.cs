@@ -80,6 +80,15 @@ internal sealed class CookieEngine
     internal ICookieStore HandlerStore { get; }
 
     /// <summary>
+    /// Gets <c>CURLINFO_COOKIELIST</c>: every cookie in the run's store as one Netscape cookie-file line
+    /// (<see cref="NetscapeCookieFile.FormatLine" />), in the order stored, while a <c>-b</c> file or
+    /// <c>-c</c> turns the cookie engine on; none while only <c>-b name=value</c> strings are given, as
+    /// libcurl keeps no cookie list for <c>CURLOPT_COOKIE</c> alone.
+    /// </summary>
+    internal IReadOnlyList<string> ListLines =>
+        HandlerStore is GroupCookies ? [.. store.Cookies.Select(NetscapeCookieFile.FormatLine)] : [];
+
+    /// <summary>
     /// Creates the cookies of a run of one option group from its HTTP options, with a store of
     /// their own.
     /// </summary>

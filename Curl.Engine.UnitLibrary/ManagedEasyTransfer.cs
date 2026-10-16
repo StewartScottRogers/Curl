@@ -95,33 +95,54 @@ internal sealed class ManagedEasyTransfer(
             CreateContext(options, settings, url, progress, abort.Token),
             RedirectPolicyMapping.Of(settings, options.Http, options.Authentication),
             progress).ConfigureAwait(false);
-        return FinishPerformed(result, urlText, options.Transfer.FileTime, transferId);
+        return FinishPerformed(result, options, transferId, cookies);
     }
+
+    /// <summary>
+    /// <c>CURLINFO_CONTENT_LENGTH_UPLOAD</c> of a performed transfer: the upload's declared size -
+    /// <c>CURLOPT_INFILESIZE</c> under <c>CURLOPT_UPLOAD</c>,
+    /// <c>CURLOPT_POSTFIELDSIZE</c> or else the length of <c>CURLOPT_POSTFIELDS</c> for a post, and -1,
+    /// unknown, for anything else.
+    /// </summary>
+    /// <param name="options">The handle's options.</param>
+    /// <returns>The declared size, or -1.</returns>
+    internal static long ContentLengthUploadOf(EasyOptions options) =>
+        options.Transfer.Upload ? options.Transfer.InFileSize
+        : options.Http.PostFields is { } fields && options.Http.PostFieldSize < 0 ? fields.Length
+        : options.Http.PostFields is not null || options.Http.Post ? options.Http.PostFieldSize
+        : -1;
 
     /// <summary>
     /// Records a performed transfer's outcome: the result's code, message and <see cref="Info" />, or
     /// <see cref="CurlCode.AbortedByCallback" /> with libcurl's <c>Callback aborted</c> when the progress
-    /// callback aborted it.
+    /// callback aborted it. <see cref="TransferInfo.CookieList" /> is the cookie engine's list either way.
     /// </summary>
     /// <param name="result">The attempt's result, or <see langword="null" /> when the progress callback aborted it.</param>
-    /// <param name="urlText">The transfer's URL as set.</param>
-    /// <param name="fileTime">Whether <c>CURLOPT_FILETIME</c> is set.</param>
+    /// <param name="options">The handle's options.</param>
     /// <param name="transferId">The transfer's <c>%{xfer_id}</c>.</param>
+    /// <param name="cookies">The transfer's cookies, or <see langword="null" /> when no cookie option is set.</param>
     /// <returns>The transfer's code.</returns>
-    private CurlCode FinishPerformed(TransferResult? result, string urlText, bool fileTime, long transferId)
+    private CurlCode FinishPerformed(TransferResult? result, EasyOptions options, long transferId, CookieEngine? cookies)
     {
+        string urlText = options.Network.Url!;
+        IReadOnlyList<string> cookieList = cookies?.ListLines ?? [];
         if (result is null)
         {
             return Finish(
                 CurlCode.AbortedByCallback,
                 CallbackTransferProgress.CallbackAbortedText,
-                new TransferInfo { EffectiveUrl = urlText, TransferId = transferId });
+                new TransferInfo { EffectiveUrl = urlText, TransferId = transferId, CookieList = cookieList });
         }
 
         return Finish(
             result.ExitCode.ToCurlCode(),
             result.ErrorMessage ?? string.Empty,
-            TransferInfoFromReport.Of(result, urlText, fileTime, shared.TimeProvider) with { TransferId = transferId });
+            TransferInfoFromReport.Of(result, urlText, options.Transfer.FileTime, shared.TimeProvider) with
+            {
+                TransferId = transferId,
+                CookieList = cookieList,
+                ContentLengthUpload = ContentLengthUploadOf(options),
+            });
     }
 
     /// <summary>

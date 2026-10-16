@@ -75,6 +75,7 @@ internal static class TransferInfoFromReport
             Scheme = SchemeOf(effectiveUrl),
             Protocol = ProtocolOf(effectiveUrl),
             FileTime = fileTimeRequested ? result.SourceLastWriteUnixSeconds ?? -1 : -1,
+            RetryAfter = RetryAfterOf(report, timeProvider),
         };
     }
 
@@ -104,6 +105,16 @@ internal static class TransferInfoFromReport
         ProxyAuthAvailable = report.ResponseCode == 407 ? ChallengedCurlAuthBits(report, "Proxy-Authenticate") : 0,
         ContentLengthDownload = ContentLengthOf(report),
     };
+
+    /// <summary>
+    /// The last response's <c>Retry-After</c>, read as libcurl's <c>http_header_r</c> reads it whatever the
+    /// response code (<see cref="RetryAfterHeader" />); zero when it has none.
+    /// </summary>
+    private static TimeSpan RetryAfterOf(TransferReport report, TimeProvider timeProvider) =>
+        TimeSpan.FromSeconds(report.ResponseHeaders
+            .Where(header => string.Equals(header.Key, "Retry-After", StringComparison.OrdinalIgnoreCase))
+            .Select(header => RetryAfterHeader.ParseSeconds(header.Value, timeProvider.GetUtcNow()))
+            .LastOrDefault());
 
     private static TransferInfo WithEndPoints(TransferInfo info, TransferReport report) => info with
     {

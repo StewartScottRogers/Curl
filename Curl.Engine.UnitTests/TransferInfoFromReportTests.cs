@@ -80,6 +80,15 @@ public sealed class TransferInfoFromReportTests
     public void Of_Report_TakesTheContentType() => Assert.AreEqual("text/plain", Full.ContentType);
 
     [TestMethod]
+    public void Of_ResponseWithRetryAfterSeconds_TakesTheLastOne() =>
+        Assert.AreEqual(
+            TimeSpan.FromSeconds(120),
+            Of(new TransferReport { ResponseCode = 200, ResponseHeaders = [new("Retry-After", "5"), new("retry-after", " 120")] }).RetryAfter);
+
+    [TestMethod]
+    public void Of_ResponseWithoutRetryAfter_AnswersZero() => Assert.AreEqual(TimeSpan.Zero, Full.RetryAfter);
+
+    [TestMethod]
     public void Of_Report_TakesTheFtpEntryPath() => Assert.AreEqual("/home", Full.FtpEntryPath);
 
     [TestMethod]

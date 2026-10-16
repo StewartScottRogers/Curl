@@ -368,6 +368,74 @@ public sealed class ManagedEasyTransferTests
     }
 
     [TestMethod]
+    public async Task PerformAsync_CookieEngineOn_ListsTheStoredCookiesAsNetscapeLines()
+    {
+        const string SetsCookie = "HTTP/1.1 200 OK\r\nSet-Cookie: a=1\r\nContent-Length: 0\r\n\r\n";
+        await using IEasyTransfer easy = CreateEngine(new ScriptedConnector([Encoding.ASCII.GetBytes(SetsCookie)])).CreateEasy();
+        easy.Options = new EasyOptions
+        {
+            Network = new EasyNetworkOptions { Url = "http://h/x" },
+            Http = new EasyHttpOptions { CookieFiles = [string.Empty] },
+        };
+
+        await easy.PerformAsync(CancellationToken.None);
+
+        Assert.AreEqual("h\tFALSE\t/\tFALSE\t0\ta\t1", easy.Info.CookieList.Single());
+    }
+
+    [TestMethod]
+    public async Task PerformAsync_OnlyCookieStrings_ListsNoCookies()
+    {
+        const string SetsCookie = "HTTP/1.1 200 OK\r\nSet-Cookie: a=1\r\nContent-Length: 0\r\n\r\n";
+        await using IEasyTransfer easy = CreateEngine(new ScriptedConnector([Encoding.ASCII.GetBytes(SetsCookie)])).CreateEasy();
+        easy.Options = new EasyOptions
+        {
+            Network = new EasyNetworkOptions { Url = "http://h/x" },
+            Http = new EasyHttpOptions { Cookie = "b=2" },
+        };
+
+        await easy.PerformAsync(CancellationToken.None);
+
+        Assert.IsEmpty(easy.Info.CookieList);
+    }
+
+    [TestMethod]
+    public async Task PerformAsync_UploadWithInFileSize_ReportsItAsTheUploadContentLength()
+    {
+        await using IEasyTransfer easy = CreateEngine(new ScriptedConnector([Encoding.ASCII.GetBytes(Response)])).CreateEasy();
+        easy.Options = new EasyOptions
+        {
+            Network = new EasyNetworkOptions { Url = "http://h/up" },
+            Transfer = new EasyTransferOptions { Upload = true, InFileSize = 3 },
+            Callbacks = new() { Read = ReadOf("abc") },
+        };
+
+        await easy.PerformAsync(CancellationToken.None);
+
+        Assert.AreEqual(3, easy.Info.ContentLengthUpload);
+    }
+
+    [TestMethod]
+    [DataRow(false, 7L, null, -1L, false, -1L)]
+    [DataRow(false, -1L, "abc", -1L, false, 3L)]
+    [DataRow(false, -1L, "abc", 2L, false, 2L)]
+    [DataRow(false, -1L, null, 9L, true, 9L)]
+    [DataRow(false, -1L, null, -1L, true, -1L)]
+    [DataRow(false, -1L, null, 9L, false, -1L)]
+    [DataRow(true, 7L, "abc", 2L, true, 7L)]
+    public void ContentLengthUploadOf_Options_AnswersLibcurlsKnownUploadSize(bool upload, long inFileSize, string? postFields, long postFieldSize, bool post, long expected) =>
+        Assert.AreEqual(expected, ManagedEasyTransfer.ContentLengthUploadOf(new EasyOptions
+        {
+            Transfer = new EasyTransferOptions { Upload = upload, InFileSize = inFileSize },
+            Http = new EasyHttpOptions
+            {
+                PostFields = postFields is null ? (ReadOnlyMemory<byte>?)null : Encoding.ASCII.GetBytes(postFields),
+                PostFieldSize = postFieldSize,
+                Post = post,
+            },
+        }));
+
+    [TestMethod]
     public async Task PerformAsync_TwoHandlesOfOneEngine_ShareTheCookiesAndThePooledConnection()
     {
         const string SetsCookie = "HTTP/1.1 200 OK\r\nSet-Cookie: a=1\r\nContent-Length: 0\r\n\r\n";
