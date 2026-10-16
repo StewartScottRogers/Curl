@@ -16,7 +16,8 @@ namespace Curl.Engine;
 /// <c>%{xfer_id}</c> numbering belong to the engine object (<see cref="ManagedEngineSharedState" />,
 /// ADR-0542), shared by its handles as the curl tool's transfers share them across a run, and none is
 /// static, so two engines in one process share nothing.
-/// The multi, share, URL and MIME handles are phase 3 work (ADR-0506) and throw
+/// The multi handle is <see cref="ManagedMultiTransfer" />; the share, URL and MIME handles are phase 3
+/// work (ADR-0506) and throw
 /// <see cref="NotSupportedException" /> here.
 /// </summary>
 public sealed class ManagedCurlEngine : ICurlEngine
@@ -70,10 +71,12 @@ public sealed class ManagedCurlEngine : ICurlEngine
     /// <inheritdoc />
     public IEasyTransfer CreateEasy() => new ManagedEasyTransfer(createDispatcher, shared);
 
-    /// <summary>Not supported yet: the multi handle is phase 3's multi interface work (ADR-0506).</summary>
-    /// <returns>Never returns.</returns>
-    /// <exception cref="NotSupportedException">Always.</exception>
-    public IMultiTransfer CreateMulti() => throw new NotSupportedException("The multi interface is phase 3 work (ADR-0506).");
+    /// <summary>
+    /// <c>curl_multi_init</c>: a <see cref="ManagedMultiTransfer" /> whose transfers run over the
+    /// engine's shared connections (ADR-0594).
+    /// </summary>
+    /// <returns>The new multi handle; the caller disposes it (<c>curl_multi_cleanup</c>).</returns>
+    public IMultiTransfer CreateMulti() => new ManagedMultiTransfer(shared.MultiOwners);
 
     /// <summary>Not supported yet: the share handle is phase 3's share interface work (ADR-0506).</summary>
     /// <returns>Never returns.</returns>

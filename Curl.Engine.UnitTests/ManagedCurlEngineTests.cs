@@ -1,5 +1,6 @@
 using Curl.Api.Codes;
 using Curl.Api.EngineContracts;
+using Curl.Api.EngineContracts.Multi;
 using Curl.Api.Options;
 using Curl.Api.Options.Network;
 
@@ -83,11 +84,22 @@ public sealed class ManagedCurlEngineTests
     }
 
     [TestMethod]
-    public async Task MultiShareUrlMimeAndForm_NotYetBuilt_ThrowNotSupported()
+    public async Task CreateMulti_ProductionEngine_GivesANewManagedMultiHandleEachCall()
     {
         await using ManagedCurlEngine engine = new();
 
-        Assert.ThrowsExactly<NotSupportedException>(() => engine.CreateMulti());
+        await using IMultiTransfer first = engine.CreateMulti();
+        await using IMultiTransfer second = engine.CreateMulti();
+
+        Assert.IsInstanceOfType<ManagedMultiTransfer>(first);
+        Assert.AreNotSame(first, second);
+    }
+
+    [TestMethod]
+    public async Task ShareUrlMimeAndForm_NotYetBuilt_ThrowNotSupported()
+    {
+        await using ManagedCurlEngine engine = new();
+
         Assert.ThrowsExactly<NotSupportedException>(() => engine.CreateShare());
         Assert.ThrowsExactly<NotSupportedException>(() => engine.CreateUrl());
         Assert.ThrowsExactly<NotSupportedException>(() => engine.CreateMime());

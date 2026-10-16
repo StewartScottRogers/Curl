@@ -245,9 +245,9 @@ connector under the handlers. Its connection, TLS session and DNS caches are fie
 object, never static, so two engines in one process share nothing; `DisposeAsync` closes its pooled
 connections. `CreateDispatcher` builds a transfer's dispatcher as `Curl.Console`'s composition
 builds an option group's: `EngineComposition.CreateTransports` over the handle's easy groups and the
-engine's caches, then `CreateProtocolHandlers` over its pooling connector. `CreateMulti`,
-`CreateShare`, `CreateUrl`, `CreateMime` and `CreateForm` throw `NotSupportedException`: they are
-phase 3 work.
+engine's caches, then `CreateProtocolHandlers` over its pooling connector. `CreateMulti`
+gives a `ManagedMultiTransfer` (BL-2424, below); `CreateShare`, `CreateUrl`, `CreateMime` and
+`CreateForm` throw `NotSupportedException`: they are phase 3 work.
 
 `ManagedEasyTransfer` is its `IEasyTransfer`. `PerformAsync` reads `EasyNetworkOptions.Url` (none is
 `CurlCode.UrlMalformat` with `No URL set`, one that does not parse the same code with libcurl's
@@ -328,3 +328,7 @@ The internal `ManagedEasyTransfer.ToolProgress` (`EngineToolTransferProgress`: t
 ## The write, read and header callbacks' pause and abort (BL-2415)
 
 Each `ManagedEasyTransfer` owns an `EasyPauseGate` (the handle's `CurlPause` bits; `Pause` sets them and `PausedDirections` reads them). A write or header callback that returns `WriteCallbackResult.Pause` pauses receiving, and `CallbackWriteStream.WriteAsync` waits under the transfer's token until `Pause` clears that bit, then hands the same chunk over again; a read callback's `ReadCallbackResult.Pause` pauses sending and `CallbackReadStream.ReadAsync` asks again the same way. A `file` URL gets no gate (libcurl's `PROTOPT_NONETWORK`), and the synchronous `Write` and `Read` cannot wait, so a pause there fails with libcurl's `Write callback asked for PAUSE when not supported` (`CURLE_WRITE_ERROR`) or `Read callback asked for PAUSE when not supported`. `ReadCallbackResult.Abort` marks the stream `Aborted`, and the perform answers `CurlCode.AbortedByCallback` with `operation aborted by callback`; `WriteCallbackResult.Error` is a short write (ADR-0573). Their tests are `EasyPauseGateTests`, `CallbackWriteStreamTests`, `CallbackReadStreamTests` and `ManagedEasyTransferTests.Callbacks.cs`.
+
+## The multi handle's event loop (BL-2424)
+
+`ManagedCurlEngine.CreateMulti` gives a `ManagedMultiTransfer`, the engine's `IMultiTransfer`: each added transfer runs as its own `IEasyTransfer.PerformAsync`, started by the next `PerformAsync` of the multi handle, so the transfers run at once over the engine's shared caches. `PerformAsync` never waits: it starts what is new, queues one `CURLMSG_DONE` `CurlMultiMessage` with the transfer's `CurlCode` for each perform that has completed, in add order, and answers the transfers not yet done; `TryReadInfo` takes the messages oldest first. `ManagedEngineSharedState.MultiOwners` keeps each added transfer's multi handle by reference, so a transfer is in one of the engine's multi handles at a time (`AddedAlready`); `Remove` answers `Ok` for a transfer in none and `BadEasyHandle` for one in another, cancels a running perform and drops its unread message. `DisposeAsync` cancels and awaits every perform, and later calls answer `BadHandle`. Wait, poll, wakeup and the timeout (BL-2425), the socket-action API (BL-2426) and get_handles, waitfds, get_offt and the notifications (BL-2427) throw `NotSupportedException` naming their task (ADR-0594). Its tests are `ManagedMultiTransferTests`, which drive fake transfers that finish when the test says.

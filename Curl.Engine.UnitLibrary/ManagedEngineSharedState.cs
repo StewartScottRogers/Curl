@@ -37,6 +37,9 @@ internal sealed class ManagedEngineSharedState(TimeProvider timeProvider, Func<C
     /// <summary>Gets the <c>%{conn_id}</c> of each connection a handle's transfer opened, by the pool's number for it, which a later transfer reusing it takes (<see cref="EngineConnectionIdTransferEvents" />).</summary>
     internal ConcurrentDictionary<long, long> ConnectionIdsByPoolNumber { get; } = new();
 
+    /// <summary>Gets the multi handle each transfer added to one of the engine's multi handles is in, so it is in one at a time (<see cref="ManagedMultiTransfer" />).</summary>
+    internal ConcurrentDictionary<Api.EngineContracts.IEasyTransfer, ManagedMultiTransfer> MultiOwners { get; } = new(ReferenceEqualityComparer.Instance);
+
     /// <summary>Gets the performer that numbers the engine's transfers and connections and holds curl's easy error text.</summary>
     internal TransferPerformer Performer { get; } = new(timeProvider, easyErrorText);
 }
