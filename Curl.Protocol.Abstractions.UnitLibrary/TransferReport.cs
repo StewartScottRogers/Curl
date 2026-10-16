@@ -198,6 +198,13 @@ public sealed record TransferReport
     public long OsErrno { get; init; }
 
     /// <summary>
+    /// Gets why the transfer's SOCKS proxy handshake failed, copied from
+    /// <see cref="ConnectResult.ProxyError" />, the source of <c>CURLINFO_PROXY_ERROR</c> (BL-2375);
+    /// <see cref="CurlProxyCode.Ok" /> when no SOCKS handshake failed.
+    /// </summary>
+    public CurlProxyCode ProxyError { get; init; }
+
+    /// <summary>
     /// Gets the directory the FTP server's <c>257</c> reply to <c>PWD</c> named at login,
     /// its doubled quotes undoubled, the source of <c>%{ftp_entry_path}</c>;
     /// <see langword="null" /> for a transfer that is not FTP, or when the reply named no

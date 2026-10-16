@@ -101,6 +101,13 @@ public sealed class ConnectResult
     public SocketError LastSocketError { get; private init; }
 
     /// <summary>
+    /// Gets why a SOCKS proxy handshake failed, libcurl's <c>CURLPX_*</c> code and the source of
+    /// <c>CURLINFO_PROXY_ERROR</c> (BL-2375); <see cref="CurlProxyCode.Ok" /> for a success and for
+    /// every failure that is not a SOCKS handshake's.
+    /// </summary>
+    public CurlProxyCode ProxyError { get; private init; }
+
+    /// <summary>
     /// Gets the application protocol the TLS handshake agreed with ALPN, such as <c>h2</c> or
     /// <c>http/1.1</c>; <see langword="null" /> when none was agreed, for a connection without
     /// TLS, and for a failed connect. <c>h2</c> makes the HTTP handler speak HTTP/2 (ADR-0141).
@@ -282,6 +289,10 @@ public sealed class ConnectResult
     /// The socket error of the last connect attempt that failed; <see cref="SocketError.Success" />
     /// when the failure had none.
     /// </param>
+    /// <param name="proxyError">
+    /// Why the SOCKS proxy handshake failed; <see cref="CurlProxyCode.Ok" /> when the failure was
+    /// not a SOCKS handshake's.
+    /// </param>
     /// <returns>A result with no <see cref="Connection" />.</returns>
     /// <exception cref="ArgumentOutOfRangeException">
     /// <paramref name="exitCode" /> is <see cref="CurlExitCode.Ok" />, which is not a
@@ -293,7 +304,8 @@ public sealed class ConnectResult
         ConnectTimings? timings,
         long connectionNumber = 0,
         int proxyConnectResponseCode = 0,
-        SocketError lastSocketError = SocketError.Success)
+        SocketError lastSocketError = SocketError.Success,
+        CurlProxyCode proxyError = CurlProxyCode.Ok)
     {
         if (exitCode == CurlExitCode.Ok)
         {
@@ -309,6 +321,7 @@ public sealed class ConnectResult
             ConnectionNumber = connectionNumber,
             ProxyConnectResponseCode = proxyConnectResponseCode,
             LastSocketError = lastSocketError,
+            ProxyError = proxyError,
         };
     }
 

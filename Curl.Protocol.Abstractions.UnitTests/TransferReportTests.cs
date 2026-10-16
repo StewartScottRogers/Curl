@@ -46,6 +46,7 @@ public sealed class TransferReportTests
         Assert.IsEmpty(report.PeerCertificates);
         Assert.AreEqual(0L, report.SslVerifyResult);
         Assert.AreEqual(0L, report.ProxySslVerifyResult);
+        Assert.AreEqual(CurlProxyCode.Ok, report.ProxyError);
     }
 
     [TestMethod]
@@ -100,6 +101,7 @@ public sealed class TransferReportTests
             Timings = timings,
             SslVerifyResult = 19,
             ProxySslVerifyResult = 20,
+            ProxyError = CurlProxyCode.ReplyConnectionRefused,
         };
 
         diagnostics.Act("ResponseCode", report.ResponseCode);
@@ -127,6 +129,7 @@ public sealed class TransferReportTests
         Assert.AreSame(timings, report.Timings);
         Assert.AreEqual(19L, report.SslVerifyResult);
         Assert.AreEqual(20L, report.ProxySslVerifyResult);
+        Assert.AreEqual(CurlProxyCode.ReplyConnectionRefused, report.ProxyError);
     }
 
     [TestMethod]

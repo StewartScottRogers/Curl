@@ -481,6 +481,34 @@ public sealed class ConnectResultTests
     }
 
     [TestMethod]
+    public void Failed_WithAProxyError_CarriesIt()
+    {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("proxy error", CurlProxyCode.ReplyConnectionRefused);
+
+        var result = ConnectResult.Failed(CurlExitCode.Proxy, "cannot complete SOCKS5 connection", null, proxyError: CurlProxyCode.ReplyConnectionRefused);
+
+        diagnostics.Assert("proxy error", CurlProxyCode.ReplyConnectionRefused, result.ProxyError);
+        Assert.AreEqual(CurlProxyCode.ReplyConnectionRefused, result.ProxyError);
+    }
+
+    [TestMethod]
+    public void FailedConnectedAndRefused_WithoutAProxyError_CarryOk()
+    {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+
+        CurlProxyCode[] errors =
+        [
+            ConnectResult.Failed(CurlExitCode.CouldntConnect, "failed").ProxyError,
+            ConnectResult.Connected(new UnusedConnection()).ProxyError,
+            ConnectResult.Refused("refused").ProxyError,
+        ];
+
+        diagnostics.Assert("proxy errors", "Ok, Ok, Ok", string.Join(", ", errors));
+        CollectionAssert.AreEqual(new[] { CurlProxyCode.Ok, CurlProxyCode.Ok, CurlProxyCode.Ok }, errors);
+    }
+
+    [TestMethod]
     public void FailedAndConnected_WithoutALastSocketError_CarrySuccess()
     {
         TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
