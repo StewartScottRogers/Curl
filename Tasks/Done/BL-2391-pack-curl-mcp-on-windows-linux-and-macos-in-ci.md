@@ -9,7 +9,7 @@ touches: [.github/workflows/ci.yml]
 lane: no
 requirement: none
 created: 2026-10-15
-completed:
+completed: 2026-10-16
 ---
 
 ## Goal
@@ -24,15 +24,19 @@ ADR-0548 (`Documentation/Planning/Decisions/ADR-0548-curl-mcp-an-mcp-server-over
 
 ## Acceptance criteria
 
-- [ ] `ci.yml` has a job (or matrix entries) that packs `Curl.Mcp` on ubuntu, windows and macos and uploads the package, named so the log says which platform failed.
-- [ ] `Curl.Mcp.IntegrationTests` run on all three platforms, or Notes states exactly which platform cannot and why.
-- [ ] The first CI run on the merged branch is green on all three platforms; the run id is in Notes.
-- [ ] The `audit-guard` job passes for the change (the PR goes through the audit route).
+- [x] `ci.yml` has a job (or matrix entries) that packs `Curl.Mcp` on ubuntu, windows and macos and uploads the package, named so the log says which platform failed.
+- [x] `Curl.Mcp.IntegrationTests` run on all three platforms, or Notes states exactly which platform cannot and why.
+- [x] The first CI run on the merged branch is green on all three platforms; the run id is in Notes.
+- [x] The `audit-guard` job passes for the change (the PR goes through the audit route).
 
 ## Notes
 
 Plan: Documentation/Planning/Curl-Mcp.md. Decision: ADR-0548.
 
+- 2026-10-16 (Claude): PR #157 (guard route, branch from master) added the `mcp-pack` job to ci.yml: `Pack Curl.Mcp (<os>)` on windows, ubuntu and macos runs Curl.Mcp.IntegrationTests (blocking; integration.yml also runs them, non-blocking), packs the 7 packages (tool + 6 RIDs, self-contained per ADR-0598), checks `.mcp/server.json`, uploads `curl-mcp-<os>`. PR CI 38901908004 green; first CI run on master after the merge (b48a65c5c) is 38904877686, green on all three. audit-guard runs only on work/dark-factory, so it skipped on the PR; it passes for the master merge into work/dark-factory (52a2cf199).
+
 ## Log
 
 - 2026-10-15: Created.
+- 2026-10-16: Backlog -> Doing.
+- 2026-10-16: Doing -> Done. ci.yml mcp-pack job merged (PR #157); master CI 38904877686 green on all three platforms
