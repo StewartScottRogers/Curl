@@ -74,7 +74,11 @@ folder under `Libcurl/Multi`, keeping the namespace `Libcurl.Multi`. `Multi/Core
 `RemoveHandle`, `PerformAsync`, `InfoRead` and `DisposeAsync` (`curl_multi_cleanup`); it maps each
 added engine transfer back to its `CurlEasy`, so `InfoRead` answers a `CurlMessage` naming the handle
 the caller added. A `null` or cleaned-up `CurlEasy` answers `BadEasyHandle`, one this multi holds
-already `AddedAlready`, both without calling the engine.
+already `AddedAlready`, both without calling the engine. `Multi/Settings` has `SetOption`
+(`curl_multi_setopt`, every `CurlMultiOption` through `MultiOptionSetters` with `multi.c`'s checks,
+writing `MultiOptions` back only on `Ok`), `GetHandles` (the engine's transfers mapped to their
+`CurlEasy`), `WaitFds`, `GetInfo` (`curl_multi_get_offt`) and `NotifyEnable`/`NotifyDisable`; a count
+or notification `multi.h` lacks answers `UnknownOption` without calling the engine (ADR-0582).
 
 `Share` holds `CurlShare`, the share handle `CurlLibrary.ShareInit` (`curl_share_init`) returns over
 the engine's `IShareHandle`, and `CurlShareOption` (ADR-0581). `SetOption` is `curl_share_setopt`:
