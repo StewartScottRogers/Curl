@@ -5,9 +5,10 @@ namespace Curl.Console;
 /// <summary>
 /// Passes every event on to <paramref name="inner" /> unchanged and records the TLS results
 /// <c>-w</c> prints on <paramref name="state" />: each reported certificate verify code, the
-/// origin's as <see cref="RunningTransferState.SslVerifyResult" /> and an HTTPS proxy's as
-/// <see cref="RunningTransferState.ProxySslVerifyResult" /> (BL-661), and the TLS 1.3 early data
-/// bytes sent as <see cref="RunningTransferState.TlsEarlyDataSent" /> (BL-1150).
+/// origin's as <see cref="Engine.EngineTransferState.SslVerifyResult" /> and an HTTPS proxy's as
+/// <see cref="Engine.EngineTransferState.ProxySslVerifyResult" /> (BL-661), and the TLS 1.3 early data
+/// bytes sent as <see cref="Engine.EngineTransferState.TlsEarlyDataSent" /> (BL-1150), which the transfer's
+/// tool-hooked easy handle answers <c>curl_easy_getinfo</c> with (BL-2495).
 /// </summary>
 /// <param name="inner">The transfer's own events.</param>
 /// <param name="state">The running transfer the results belong to.</param>

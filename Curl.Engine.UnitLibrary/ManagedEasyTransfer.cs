@@ -307,7 +307,7 @@ internal sealed class ManagedEasyTransfer(
         }
 
         EngineTransferSettings settings = ToolSettings ?? TransferSettingsOf(options);
-        long transferId = shared.Performer.TakeTransferId();
+        long transferId = TransferIdOf(ToolEvents);
         Info = new TransferInfo { EffectiveUrl = urlText, TransferId = transferId, ConnectionId = NoConnectionId };
         performedHsts = PerformShared.Hsts;
         CurlCode loaded = LoadHstsFromCallback(options, performedHsts);
@@ -323,6 +323,15 @@ internal sealed class ManagedEasyTransfer(
 
         return await PerformResumingUploadAsync(options, settings, url, urlText, transferId, cancellationToken).ConfigureAwait(false);
     }
+
+    /// <summary>
+    /// The perform's <c>%{xfer_id}</c>: the curl tool's runner's (its <c>--retry</c> attempt's, else its transfer's)
+    /// when it gave <paramref name="toolEvents" />, so the handle answers its numbering (BL-2495); else the engine's next.
+    /// </summary>
+    /// <param name="toolEvents">The runner's events and state, or <see langword="null" /> for a handle's own.</param>
+    /// <returns>The <c>%{xfer_id}</c>.</returns>
+    private long TransferIdOf(EngineToolTransferEvents? toolEvents) =>
+        toolEvents is { State: var state } ? state.RetryTransferId ?? state.TransferId : shared.Performer.TakeTransferId();
 
     /// <summary>
     /// Skips a read-callback upload's <c>CURLOPT_RESUME_FROM</c> offset (<see cref="CallbackUploadResume.SkipUnlessToolGave" />)
@@ -526,7 +535,8 @@ internal sealed class ManagedEasyTransfer(
         CancellationToken cancellationToken)
     {
         CookieEngine? cookies = CookieEngine.FromHttpOptions(options.Http, PerformShared.Cookies);
-        (EngineTransferState state, ITransferEvents events, TlsVerifyResultRecordingTransferEvents? recorder) = StateAndEventsOf(ToolEvents, options);
+        EngineToolTransferEvents? toolEvents = ToolEvents;
+        (EngineTransferState state, ITransferEvents events, TlsVerifyResultRecordingTransferEvents? recorder) = StateAndEventsOf(toolEvents, options);
         string transferUrl = await SetUpUnlessToolDidAsync(toolInputs, options, settings, cookies, state, urlText, events).ConfigureAwait(false);
         EngineToolTransferDispatch? toolDispatch = ToolDispatch;
         RedirectFollower follower = FollowerOf(toolDispatch, options, cookies);
@@ -553,7 +563,8 @@ internal sealed class ManagedEasyTransfer(
             callbackReads).ConfigureAwait(false);
         await CleanUpUnlessToolDoesAsync(toolInputs, options, settings, cookies, state, transferUrl).ConfigureAwait(false);
         LastResult = recorder is null ? result : recorder.ReportOn(result);
-        return FinishPerformed(LastResult, options, transferId, cookies, ConnectionIdOf(result, state), AbortedTextOf(callbackReads));
+        long connectionId = toolEvents is null ? ConnectionIdOf(result, state) : ToolConnectionIdOf(result, state, toolEvents);
+        return FinishPerformed(LastResult, options, transferId, cookies, connectionId, AbortedTextOf(callbackReads), toolEvents?.State);
     }
 
     /// <summary>
@@ -890,9 +901,47 @@ internal sealed class ManagedEasyTransfer(
     /// <param name="state">The running transfer.</param>
     /// <returns>The <c>%{conn_id}</c>.</returns>
     private long ConnectionIdOf(TransferResult? result, EngineTransferState state) =>
-        result is { ExitCode: CurlExitCode.UnsupportedProtocol or CurlExitCode.UrlMalformat }
+        FailedBeforeConnecting(result)
             ? NoConnectionId
             : state.ConnectionId ?? shared.Performer.TakeConnectionId();
+
+    /// <summary>
+    /// The finished transfer's <c>%{conn_id}</c> under the curl tool's runner's <paramref name="toolEvents" />, as its
+    /// <c>-w</c> output prints it (BL-2495): -1 when it failed before connecting; a <c>--retry</c> attempt that reused
+    /// the retried attempt's connection keeps that attempt's (<see cref="TransferPerformer.KeepRetriedConnectionIdWhenReused" />);
+    /// else the connection's the runner's recorder kept, or else the runner's next, kept on the state so the runner
+    /// reads the same number and takes no other.
+    /// </summary>
+    /// <param name="result">The attempt's result, or <see langword="null" /> when a callback aborted it.</param>
+    /// <param name="state">The running transfer.</param>
+    /// <param name="toolEvents">The runner's events, whose numbering gives a transfer that took none its <c>%{conn_id}</c>.</param>
+    /// <returns>The <c>%{conn_id}</c>.</returns>
+    private long ToolConnectionIdOf(TransferResult? result, EngineTransferState state, EngineToolTransferEvents toolEvents) =>
+        FailedBeforeConnecting(result) ? NoConnectionId : ToolConnectionIdAfterConnectingOf(result, state, toolEvents);
+
+    /// <summary>
+    /// <see cref="ToolConnectionIdOf" /> for a transfer that got as far as connecting: the retried attempt's when the
+    /// attempt reused its connection, else the one the state holds, else the runner's next, kept on the state.
+    /// </summary>
+    /// <param name="result">The attempt's result, or <see langword="null" /> when a callback aborted it.</param>
+    /// <param name="state">The running transfer.</param>
+    /// <param name="toolEvents">The runner's events, whose numbering gives a transfer that took none its <c>%{conn_id}</c>.</param>
+    /// <returns>The <c>%{conn_id}</c>.</returns>
+    private long ToolConnectionIdAfterConnectingOf(TransferResult? result, EngineTransferState state, EngineToolTransferEvents toolEvents)
+    {
+        if (result is not null)
+        {
+            TransferPerformer.KeepRetriedConnectionIdWhenReused(state, LastContext!, result);
+        }
+
+        return state.ConnectionId ??= toolEvents.TakeConnectionId();
+    }
+
+    /// <summary>Whether the transfer failed before connecting: an unsupported scheme or a malformed URL.</summary>
+    /// <param name="result">The attempt's result, or <see langword="null" /> when a callback aborted it.</param>
+    /// <returns><see langword="true" /> when it took no connection.</returns>
+    private static bool FailedBeforeConnecting(TransferResult? result) =>
+        result is { ExitCode: CurlExitCode.UnsupportedProtocol or CurlExitCode.UrlMalformat };
 
     /// <summary>
     /// <c>CURLINFO_CONTENT_LENGTH_UPLOAD</c> of a performed transfer: the upload's declared size -
@@ -919,8 +968,12 @@ internal sealed class ManagedEasyTransfer(
     /// <param name="cookies">The transfer's cookies, or <see langword="null" /> when no cookie option is set.</param>
     /// <param name="connectionId">The transfer's <c>%{conn_id}</c>.</param>
     /// <param name="abortedText">The text of an aborted transfer (<see cref="AbortedTextOf" />).</param>
+    /// <param name="toolState">
+    /// The curl tool's runner's running transfer, whose answers <see cref="WithToolAnswers" /> lays on the info, or
+    /// <see langword="null" /> for a handle's own.
+    /// </param>
     /// <returns>The transfer's code.</returns>
-    private CurlCode FinishPerformed(TransferResult? result, EasyOptions options, long transferId, CookieEngine? cookies, long connectionId, string abortedText)
+    private CurlCode FinishPerformed(TransferResult? result, EasyOptions options, long transferId, CookieEngine? cookies, long connectionId, string abortedText, EngineTransferState? toolState)
     {
         string urlText = options.Network.Url!;
         IReadOnlyList<string> cookieList = cookies?.ListLines ?? [];
@@ -935,14 +988,55 @@ internal sealed class ManagedEasyTransfer(
         return Finish(
             result.ExitCode.ToCurlCode(),
             result.ErrorMessage ?? string.Empty,
-            TransferInfoFromReport.Of(result, urlText, options.Transfer.FileTime, shared.TimeProvider, options.Tls.GatherCertificateInfo) with
-            {
-                TransferId = transferId,
-                ConnectionId = connectionId,
-                CookieList = cookieList,
-                ContentLengthUpload = ContentLengthUploadOf(options),
-            });
+            PerformedInfoOf(result, options, transferId, cookieList, connectionId, toolState));
     }
+
+    /// <summary>
+    /// The info of a transfer that performed: what <see cref="TransferInfoFromReport.Of" /> fills from its report, the
+    /// curl tool's runner's request URL standing in for the URL set when it gave one, with its IDs, cookie list and
+    /// declared upload size, and the runner's answers (<see cref="WithToolAnswers" />) when it gave <paramref name="toolState" />.
+    /// </summary>
+    /// <param name="result">The attempt's result.</param>
+    /// <param name="options">The handle's options.</param>
+    /// <param name="transferId">The transfer's <c>%{xfer_id}</c>.</param>
+    /// <param name="cookieList">The cookie engine's list.</param>
+    /// <param name="connectionId">The transfer's <c>%{conn_id}</c>.</param>
+    /// <param name="toolState">The runner's running transfer, or <see langword="null" /> for a handle's own.</param>
+    /// <returns>The info.</returns>
+    private TransferInfo PerformedInfoOf(TransferResult result, EasyOptions options, long transferId, IReadOnlyList<string> cookieList, long connectionId, EngineTransferState? toolState)
+    {
+        string requestUrl = toolState?.RequestUrl ?? options.Network.Url!;
+        TransferInfo info = TransferInfoFromReport.Of(result, requestUrl, options.Transfer.FileTime, shared.TimeProvider, options.Tls.GatherCertificateInfo) with
+        {
+            TransferId = transferId,
+            ConnectionId = connectionId,
+            CookieList = cookieList,
+            ContentLengthUpload = ContentLengthUploadOf(options),
+        };
+        return toolState is null ? info : WithToolAnswers(info, result, options, toolState, requestUrl);
+    }
+
+    /// <summary>
+    /// The info of a transfer the curl tool's runner performed, with the answers its <c>-w</c> output prints in place of
+    /// the report's (BL-2495): the scheme of <paramref name="requestUrl" /> (<see cref="TransferInfoFromReport.RequestSchemeOf" />),
+    /// the <c>Referer</c> the last request was sent with else <c>CURLOPT_REFERER</c>, and the verify results and early
+    /// data the runner's recorder kept on <paramref name="toolState" />.
+    /// </summary>
+    /// <param name="info">The info from the report.</param>
+    /// <param name="result">The transfer's result.</param>
+    /// <param name="options">The handle's options.</param>
+    /// <param name="toolState">The runner's running transfer.</param>
+    /// <param name="requestUrl">The URL the runner transfers.</param>
+    /// <returns>The info.</returns>
+    private static TransferInfo WithToolAnswers(TransferInfo info, TransferResult result, EasyOptions options, EngineTransferState toolState, string requestUrl) =>
+        info with
+        {
+            Scheme = TransferInfoFromReport.RequestSchemeOf(requestUrl, result),
+            Referer = info.Referer ?? options.Http.Referer,
+            SslVerifyResult = toolState.SslVerifyResult,
+            ProxySslVerifyResult = toolState.ProxySslVerifyResult,
+            EarlyDataSent = toolState.TlsEarlyDataSent,
+        };
 
     /// <summary>
     /// Performs the attempt with <see cref="TransferPerformer.FollowWatchingSpeedAsync" />, unless the

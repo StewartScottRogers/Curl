@@ -1,8 +1,10 @@
 using System.Text;
+using Curl.Api.Callbacks;
 using Curl.Api.Codes;
 using Curl.Api.EngineContracts;
 using Curl.Api.Options;
 using Curl.Api.Options.Behaviour;
+using Curl.Api.Options.Http;
 using Curl.Api.Options.Network;
 using Curl.Core;
 using Curl.Protocol.Abstractions;
@@ -27,7 +29,7 @@ public sealed partial class ManagedEasyTransferTests
         RecordingToolEvents fromOptions = new(fromOptionsState, 7);
         await using ManagedEasyTransfer easy = (ManagedEasyTransfer)CreateEngine(new ScriptedConnector([Encoding.ASCII.GetBytes(EventsResponse)])).CreateEasy();
         easy.Options = options;
-        easy.ToolEvents = new EngineToolTransferEvents(fromOptions, fromOptionsState);
+        easy.ToolEvents = new EngineToolTransferEvents(fromOptions, fromOptionsState, () => -2);
         CurlCode code = await easy.PerformAsync(CancellationToken.None);
 
         EngineTransferState attemptState = new();
@@ -72,7 +74,7 @@ public sealed partial class ManagedEasyTransferTests
             Callbacks = new() { Debug = (_, _) => ++debugCalls },
         };
         EngineTransferState state = new();
-        easy.ToolEvents = new EngineToolTransferEvents(new RecordingToolEvents(state, 7), state);
+        easy.ToolEvents = new EngineToolTransferEvents(new RecordingToolEvents(state, 7), state, () => -2);
 
         await easy.PerformAsync(CancellationToken.None);
         long toolConnectionId = easy.Info.ConnectionId;
@@ -90,13 +92,84 @@ public sealed partial class ManagedEasyTransferTests
     public async Task Duplicate_HandleWithToolEvents_DoesNotCopyThemAndResetClearsThem()
     {
         await using ManagedEasyTransfer easy = EasyOver(RecordingProtocolHandler.WritingPath("http"));
-        easy.ToolEvents = new EngineToolTransferEvents(NoTransferEvents.Instance, new EngineTransferState());
+        easy.ToolEvents = new EngineToolTransferEvents(NoTransferEvents.Instance, new EngineTransferState(), () => -2);
 
         await using IEasyTransfer copy = easy.Duplicate();
         easy.Reset();
 
         Assert.IsNull(((ManagedEasyTransfer)copy).ToolEvents);
         Assert.IsNull(easy.ToolEvents);
+    }
+
+    [TestMethod]
+    public async Task PerformAsync_ToolEventsSet_InfoAnswersTheRunnersIdsSchemeRefererAndTlsResults()
+    {
+        await using ManagedEasyTransfer easy = (ManagedEasyTransfer)CreateEngine(new ScriptedConnector([Encoding.ASCII.GetBytes(EventsResponse)])).CreateEasy();
+        easy.Options = new EasyOptions
+        {
+            Network = new EasyNetworkOptions { Url = "HTTP://h/x" },
+            Http = new EasyHttpOptions { Referer = "http://r/" },
+        };
+        EngineTransferState state = new()
+        {
+            TransferId = 5,
+            RequestUrl = "http://h/x?q=1",
+            SslVerifyResult = 18,
+            ProxySslVerifyResult = 20,
+            TlsEarlyDataSent = -3,
+        };
+        int takes = 0;
+        easy.ToolEvents = new EngineToolTransferEvents(NoTransferEvents.Instance, state, () => 9 + takes++);
+
+        CurlCode code = await easy.PerformAsync(CancellationToken.None);
+
+        Assert.AreEqual(CurlCode.Ok, code);
+        Assert.AreEqual(5, easy.Info.TransferId);
+        Assert.AreEqual(9, easy.Info.ConnectionId);
+        Assert.AreEqual(9, state.ConnectionId);
+        Assert.AreEqual(1, takes);
+        Assert.AreEqual("http", easy.Info.Scheme);
+        Assert.AreEqual("http://r/", easy.Info.Referer);
+        Assert.AreEqual(18, easy.Info.SslVerifyResult);
+        Assert.AreEqual(20, easy.Info.ProxySslVerifyResult);
+        Assert.AreEqual(-3, easy.Info.EarlyDataSent);
+    }
+
+    [TestMethod]
+    public async Task PerformAsync_ToolEventsSetForAnUnsupportedScheme_AnswersTheRetrysTransferIdNoConnectionAndNoScheme()
+    {
+        await using ManagedEasyTransfer easy = (ManagedEasyTransfer)CreateEngine(new ScriptedConnector([])).CreateEasy();
+        easy.Options = new EasyOptions { Network = new EasyNetworkOptions { Url = "xyz://a/b" } };
+        EngineTransferState state = new() { TransferId = 1, RetryTransferId = 3, RequestUrl = "xyz://a/b" };
+        easy.ToolEvents = new EngineToolTransferEvents(NoTransferEvents.Instance, state, () => 9);
+
+        CurlCode code = await easy.PerformAsync(CancellationToken.None);
+
+        Assert.AreEqual(CurlCode.UnsupportedProtocol, code);
+        Assert.AreEqual(3, easy.Info.TransferId);
+        Assert.AreEqual(ManagedEasyTransfer.NoConnectionId, easy.Info.ConnectionId);
+        Assert.IsNull(state.ConnectionId);
+        Assert.IsNull(easy.Info.Scheme);
+    }
+
+    [TestMethod]
+    public async Task PerformAsync_ToolEventsSetAndAReadCallbackAborts_TakesTheRunnersNextConnectionId()
+    {
+        await using ManagedEasyTransfer easy = (ManagedEasyTransfer)CreateEngine(new ScriptedConnector([Encoding.ASCII.GetBytes(Continue + Response)])).CreateEasy();
+        easy.Options = new EasyOptions
+        {
+            Network = new EasyNetworkOptions { Url = "http://h/up" },
+            Transfer = new EasyTransferOptions { Upload = true },
+            Callbacks = new() { Read = _ => ReadCallbackResult.Abort },
+        };
+        EngineTransferState state = new() { TransferId = 2 };
+        easy.ToolEvents = new EngineToolTransferEvents(NoTransferEvents.Instance, state, () => 4);
+
+        CurlCode code = await easy.PerformAsync(CancellationToken.None);
+
+        Assert.AreEqual(CurlCode.AbortedByCallback, code);
+        Assert.AreEqual(2, easy.Info.TransferId);
+        Assert.AreEqual(4, easy.Info.ConnectionId);
     }
 
     // Logs every event the runner's -v and --trace writers would see, its bytes as Latin-1, and numbers a

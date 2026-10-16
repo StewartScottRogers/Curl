@@ -151,25 +151,6 @@ internal sealed class RunningTransferState(
     internal ITransferEvents Events { get; set; } = NoTransferEvents.Instance;
 
     /// <summary>
-    /// Gets or sets the OpenSSL verify code of the origin's last certificate check, which
-    /// <c>%{ssl_verify_result}</c> prints; <c>0</c> until one is reported (task BL-661).
-    /// </summary>
-    internal long SslVerifyResult { get; set; }
-
-    /// <summary>
-    /// Gets or sets the OpenSSL verify code of the HTTPS proxy's last certificate check, which
-    /// <c>%{proxy_ssl_verify_result}</c> prints; <c>0</c> until one is reported (task BL-661).
-    /// </summary>
-    internal long ProxySslVerifyResult { get; set; }
-
-    /// <summary>
-    /// Gets or sets the TLS 1.3 early data bytes the origin connection sent, negative when the
-    /// server rejected them, which <c>%{tls_earlydata}</c> prints; <c>0</c> until one is reported
-    /// (task BL-1150).
-    /// </summary>
-    internal long TlsEarlyDataSent { get; set; }
-
-    /// <summary>
     /// Gets or sets the <c>If-None-Match</c> lines <c>--etag-compare</c> has added to the transfer's option
     /// group, this transfer's last; <see langword="null" /> without <c>--etag-compare</c> (task BL-619).
     /// </summary>
