@@ -64,7 +64,10 @@ implementing its `Add<Group>Readers` partial method in an `EasyInfoReaders` part
 keeping the namespace `Libcurl.Info`, with each reader a named method in an explicit
 `new EasyInfoReader(...)` (a lambda or cached method group counts against the adding method's
 complexity). `Info/Strings` reads the strings, lists, `PRIVATE` and `TLS_SSL_PTR`, which answers a
-`CurlTlsSessionInfo` with the build's backend and no native pointer.
+`CurlTlsSessionInfo` with the build's backend and no native pointer. `Info/Times` reads the times,
+sizes, speeds, content lengths, `RETRY_AFTER` and `EARLYDATA_SENT_T`: a time's `_T` form is its
+`TimeSpan` in whole (truncated) microseconds and its double form that count over 1,000,000, as
+`getinfo.c` derives both; a size or speed is the same `long` in both forms.
 
 Reference `Curl.Api.UnitLibrary` only. Never reference `Curl.Api`, a protocol library, or
 `Curl.Engine.UnitLibrary` before the task that adds the engine-building overloads.
