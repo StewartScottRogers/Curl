@@ -29,3 +29,4 @@ Line 31 cites Curl.Console/CurlComposition.cs lines 144-161 for the per-scheme L
 ## Log
 
 - 2026-10-15: Created.
+- 2026-10-15: Backlog -> Doing.
