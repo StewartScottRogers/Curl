@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Curl.Mcp</RootNamespace>
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Curl.Mcp.UnitTests" />
+  </ItemGroup>
+
+  <!-- The only project that takes the MCP SDK packages (ADR-0548). -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" />
+    <PackageReference Include="ModelContextProtocol" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Curl.Mcp.UnitLibrary\Curl.Mcp.UnitLibrary.csproj" />
+  </ItemGroup>
+
+</Project>

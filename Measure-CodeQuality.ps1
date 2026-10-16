@@ -37,7 +37,7 @@
 
 .PARAMETER Library
     Assembly names to report on, wildcards allowed. Defaults to every production
-    assembly - anything named *.UnitLibrary, plus Curl.Console, Curl.Api and Libcurl. Curl.Console's
+    assembly - anything named *.UnitLibrary, plus Curl.Console, Curl.Api, Curl.Mcp and Libcurl. Curl.Console's
     assembly is named curl, and is reported and matched here as Curl.Console.
 
     With -Library, the tests that run are only the *.UnitTests projects whose project
@@ -249,13 +249,13 @@ if ($coverageFiles.Count -eq 0) {
 
 # --- 2. Merge every report into one table of production methods -------------------
 
-# Production code is *.UnitLibrary, Curl.Console, Curl.Api and Libcurl only. Test assemblies of both kinds,
+# Production code is *.UnitLibrary, Curl.Console, Curl.Api, Curl.Mcp and Libcurl only. Test assemblies of both kinds,
 # *.UnitTests and *.IntegrationTests, are never production code (ADR-0421).
 function Test-IsProductionAssembly {
     param([string] $Name)
 
     if ($Name -like '*.UnitTests' -or $Name -like '*.IntegrationTests') { return $false }
-    return ($Name -like '*.UnitLibrary') -or ($Name -in 'Curl.Console', 'Curl.Api', 'Libcurl')
+    return ($Name -like '*.UnitLibrary') -or ($Name -in 'Curl.Console', 'Curl.Api', 'Curl.Mcp', 'Libcurl')
 }
 
 # Curl.Console.csproj sets <AssemblyName>curl</AssemblyName> so the binary is a drop-in
