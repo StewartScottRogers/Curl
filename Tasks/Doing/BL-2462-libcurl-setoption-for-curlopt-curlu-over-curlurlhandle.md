@@ -32,3 +32,4 @@ Split from BL-2402, which set every other `EasyNetworkOptions` option in `Libcur
 ## Log
 
 - 2026-10-15: Created.
+- 2026-10-16: Backlog -> Doing.
