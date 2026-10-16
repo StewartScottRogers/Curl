@@ -2731,9 +2731,13 @@ internal sealed class CurlCommandRunner(
     }
 
     /// <summary>
-    /// The values <c>-w</c> prints for one transfer. <c>%{referer}</c> is the <c>Referer</c> the
-    /// last request was sent with - under <c>-e "...;auto" -L</c> the URL the last redirect came
-    /// from, as the redirect follower reports it - else the <c>-e</c> text (BL-361 Notes).
+    /// The values <c>-w</c> prints for one transfer: the libcurl variables from the transfer's
+    /// <see cref="Api.Info.TransferInfo" />, as curl's tool reads them with <c>curl_easy_getinfo</c>
+    /// (<see cref="WriteOutTransferInfo.FromReport" /> and the run's own answers for the scheme,
+    /// <c>Referer</c>, IDs, verify results and early data; BL-2319), and the tool's own beside it.
+    /// <c>%{referer}</c> is the <c>Referer</c> the last request was sent with - under
+    /// <c>-e "...;auto" -L</c> the URL the last redirect came from, as the redirect follower reports
+    /// it - else the <c>-e</c> text (BL-361 Notes).
     /// </summary>
     private TransferWriteOutVariables WriteOutVariables(
         CommandLineOptions options,
@@ -2744,16 +2748,20 @@ internal sealed class CurlCommandRunner(
         long connectionId)
     {
         string requestUrl = UrlEffective.Normalize(QueryUrl.Append(transferUrl, options), options.PathAsIs);
-        return new(result, givenUrl, transfer.UrlNumber, requestUrl, WriteOutScheme(requestUrl, result), timeProvider)
+        Api.Info.TransferInfo info = WriteOutTransferInfo.FromReport(result, requestUrl, timeProvider) with
         {
+            Scheme = WriteOutScheme(requestUrl, result),
             Referer = result.Report?.Referer ?? options.Referer,
-            OutputFileName = Running.OutputFileName,
             ConnectionId = connectionId,
             TransferId = HasNoTransferNumber(result) ? NoTransferId : Running.RetryTransferId ?? transfer.TransferId,
-            RetryCount = Running.RetryCount,
             SslVerifyResult = Running.SslVerifyResult,
             ProxySslVerifyResult = Running.ProxySslVerifyResult,
-            TlsEarlyDataSent = Running.TlsEarlyDataSent,
+            EarlyDataSent = Running.TlsEarlyDataSent,
+        };
+        return new(info, result, givenUrl, transfer.UrlNumber)
+        {
+            OutputFileName = Running.OutputFileName,
+            RetryCount = Running.RetryCount,
         };
     }
 
