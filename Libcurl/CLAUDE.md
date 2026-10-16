@@ -79,9 +79,13 @@ already `AddedAlready`, both without calling the engine. `Multi/Settings` has `S
 writing `MultiOptions` back only on `Ok`), `GetHandles` (the engine's transfers mapped to their
 `CurlEasy`), `WaitFds`, `GetInfo` (`curl_multi_get_offt`) and `NotifyEnable`/`NotifyDisable`; a count
 or notification `multi.h` lacks answers `UnknownOption` without calling the engine (ADR-0582).
+`Multi/Wait` has `WaitAsync`, `PollAsync`, `Wakeup`, `Timeout` and `FdSet` (ADR-0584): a negative
+`timeout_ms` answers `BadFunctionArgument` without the engine, and `FdSet` fills `ISet<CurlSocket>`
+read, write and exception sets from the engine's `GetWaitSockets` (`curl_multi_waitfds`), since the
+seam has no `fdset`.
 
 `Share` holds `CurlShare`, the share handle `CurlLibrary.ShareInit` (`curl_share_init`) returns over
-the engine's `IShareHandle`, and `CurlShareOption` (ADR-0583). `SetOption` is `curl_share_setopt`:
+the engine's `IShareHandle`, and `CurlShareOption` (ADR-0581). `SetOption` is `curl_share_setopt`:
 `SHARE`/`UNSHARE` of `COOKIE` to `HSTS` and the seam's lock delegates go to the engine, `NONE`, `SHARE`,
 an unknown kind or option, or a value of the wrong type answer `BadOption` without it, and `USERDATA` is
 kept as `UserData`. `Cleanup` is `curl_share_cleanup`; after the engine's `Ok` every call answers
