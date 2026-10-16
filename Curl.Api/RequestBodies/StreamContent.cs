@@ -1,3 +1,4 @@
+using Curl.Api.EngineContracts;
 using Curl.Api.Options;
 
 namespace Curl.Api;
@@ -10,11 +11,9 @@ namespace Curl.Api;
 /// <param name="length">The bytes to send, or <see langword="null"/> to work it out when sent.</param>
 internal sealed class StreamContent(Stream stream, long? length) : CurlContent
 {
-    internal override EasyOptions ApplyTo(EasyOptions options)
+    internal override EasyOptions ApplyTo(EasyOptions options, ICurlEngine engine, ICollection<IDisposable> owned)
     {
-        long start = stream.CanSeek ? stream.Position : 0;
-        long size = length ?? (stream.CanSeek ? stream.Length - start : -1);
-        StreamUpload upload = new(stream, start);
+        (StreamUpload upload, long size) = StreamUpload.FromPosition(stream, length);
         return options with
         {
             Http = options.Http with { PostFields = null, PostFieldSize = size },

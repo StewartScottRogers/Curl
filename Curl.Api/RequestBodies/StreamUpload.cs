@@ -10,6 +10,20 @@ namespace Curl.Api;
 /// <param name="start">The stream's position when the upload began; offsets from the start count from here.</param>
 internal sealed class StreamUpload(Stream stream, long start)
 {
+    /// <summary>
+    /// An upload of <paramref name="stream"/> from its position now, and its size: <paramref name="length"/>
+    /// when given, else a seekable stream's remaining length, else -1 (unknown).
+    /// </summary>
+    /// <param name="stream">The readable stream.</param>
+    /// <param name="length">The bytes to send, or <see langword="null"/> to work it out.</param>
+    /// <returns>The upload and the size to declare.</returns>
+    public static (StreamUpload Upload, long Size) FromPosition(Stream stream, long? length)
+    {
+        long start = stream.CanSeek ? stream.Position : 0;
+        long size = length ?? (stream.CanSeek ? stream.Length - start : -1);
+        return (new StreamUpload(stream, start), size);
+    }
+
     /// <summary>The <see cref="ReadCallback"/>: fills <paramref name="buffer"/> from the stream.</summary>
     /// <param name="buffer">The buffer to fill.</param>
     /// <returns>The bytes read (0 at the end), or <see cref="ReadCallbackResult.Abort"/> when the read threw.</returns>

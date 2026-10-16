@@ -3,7 +3,7 @@
 The .NET-idiomatic programming interface to Curl (ADR-0506), not a `Curl.<Area>.UnitLibrary`:
 `Curl.Api` is a naming exception, with `Curl.Console` and `Libcurl`. Namespace `Curl.Api`
 for `Client/` (`CurlClient` and `CurlClientOptions`) and `Composition/` (the engine-building
-half of the partial `CurlClient`), `Messages/`, `ResponseBodies/` and `RequestBodies/`; `Curl.Api.Errors` for `Errors/`.
+half of the partial `CurlClient`), `Messages/`, `ResponseBodies/`, `RequestBodies/` and `Mime/`; `Curl.Api.Errors` for `Errors/`.
 
 - `Messages/`: `CurlRequest` and `CurlResponse` records and the `SendAsync` half of the partial
   `CurlClient` (BL-2499, ADR-0632). `CurlRequestOptions` maps a request onto `EasyOptions`;
@@ -14,14 +14,20 @@ half of the partial `CurlClient`), `Messages/`, `ResponseBodies/` and `RequestBo
 - `ResponseBodies/`: the streamed `CurlResponse.Body` (BL-2501, ADR-0635). `ResponseBodyBuffer` is
   the write callback: a bounded buffer that answers `CURL_WRITEFUNC_PAUSE` when full and unpauses the
   handle once read down to half. `ResponseBodyStream` is the async-only, read-only body over it; it
-  owns the easy handle, disposes it when the transfer ends, and aborts the transfer when disposed
+  owns the easy handle and the handles the request body created (`Owned`), disposes them when the transfer ends, and aborts the transfer when disposed
   first. Its tests drive `SteppedEasyTransfer`, a fake fed chunk by chunk, in
   `Curl.Api.UnitTests/ResponseBodies`.
 
 - `RequestBodies/`: `CurlContent`, the type of `CurlRequest.Body` (BL-2500, ADR-0634). `BytesContent`
   posts in-memory bytes as `CURLOPT_POSTFIELDS`; `StreamContent` uploads a stream through
   `StreamUpload`'s read and seek callbacks, which never let an exception reach the engine. Its tests
-  use the uploading fakes in `Curl.Api.UnitTests/RequestBodies`.
+  use the uploading fakes in `Curl.Api.UnitTests/RequestBodies`. `CurlContent.ApplyTo` gets the engine and
+  a list of owned handles, the body stream's `Owned`, disposed when the transfer ends.
+
+- `Mime/`: `CurlMultipartContent`, the multipart `CurlContent` of immutable `CurlMimePart`s (BL-2506,
+  ADR-0637): text, bytes, file, stream or nested parts with name, file name, type, encoder and headers,
+  built on a new `IMimeBuilder` per send as `CURLOPT_MIMEPOST` (`MimeDataSetter` sets each content kind).
+  A failing setter throws `CurlException`. Its tests use the MIME fakes in `Curl.Api.UnitTests/Mime`.
 
 - `Errors/`: `CurlException`, the one exception every failure in `Curl.Api` throws, carrying the
   `CurlCode`; `CurlException.ThrowIfFailed` maps a call's result to it, and `CurlCodeText` is its own

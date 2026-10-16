@@ -7,8 +7,8 @@ namespace Curl.Api;
 /// <summary>
 /// <see cref="CurlResponse.Body"/> while its transfer runs (ADR-0635): a read-only, forward-only
 /// <see cref="Stream"/> over a <see cref="ResponseBodyBuffer"/> that the transfer's write callback
-/// (<see cref="TakeBody"/>) fills. It owns the easy handle: the handle is disposed when the transfer
-/// ends, and disposing the stream before then aborts the transfer. Reading is asynchronous only.
+/// (<see cref="TakeBody"/>) fills. It owns the easy handle and the handles in <see cref="Owned"/>: they
+/// are disposed when the transfer ends, and disposing the stream before then aborts the transfer. Reading is asynchronous only.
 /// </summary>
 internal sealed class ResponseBodyStream : Stream
 {
@@ -18,6 +18,7 @@ internal sealed class ResponseBodyStream : Stream
     private readonly IEasyTransfer _easy;
     private readonly ResponseBodyBuffer _buffer;
     private readonly CancellationTokenSource _abort;
+    private readonly List<IDisposable> _owned = [];
     private Task _transfer = Task.CompletedTask;
     private Task? _closing;
 
@@ -34,6 +35,12 @@ internal sealed class ResponseBodyStream : Stream
 
     /// <summary>The <c>CURLOPT_WRITEFUNCTION</c> that fills the stream.</summary>
     public WriteCallback TakeBody => _buffer.Write;
+
+    /// <summary>
+    /// Takes every handle the request body creates (a multipart body's MIME builder); each is
+    /// disposed after the easy handle, once the transfer ends.
+    /// </summary>
+    public ICollection<IDisposable> Owned => _owned;
 
     /// <inheritdoc />
     public override bool CanRead => _closing is null;
@@ -70,6 +77,18 @@ internal sealed class ResponseBodyStream : Stream
             await _transfer.ConfigureAwait(false);
             _buffer.ThrowIfFailed();
         }
+    }
+
+    /// <summary>
+    /// Disposes the easy handle and every handle in <see cref="Owned"/> for a transfer that will never
+    /// start, as when setting up the request failed.
+    /// </summary>
+    /// <returns>A task that completes once every handle is disposed.</returns>
+    public async Task DisposeUnstartedAsync()
+    {
+        await _easy.DisposeAsync().ConfigureAwait(false);
+        _owned.ForEach(handle => handle.Dispose());
+        _abort.Dispose();
     }
 
     /// <summary>Reads the next bytes of the body, waiting for the transfer to deliver some.</summary>
@@ -126,9 +145,16 @@ internal sealed class ResponseBodyStream : Stream
 
     private async Task PerformAsync()
     {
-        await using (_easy.ConfigureAwait(false))
+        try
         {
-            _buffer.Complete(await _easy.PerformAsync(_abort.Token).ConfigureAwait(false), _easy.ErrorText);
+            await using (_easy.ConfigureAwait(false))
+            {
+                _buffer.Complete(await _easy.PerformAsync(_abort.Token).ConfigureAwait(false), _easy.ErrorText);
+            }
+        }
+        finally
+        {
+            _owned.ForEach(handle => handle.Dispose());
         }
     }
 

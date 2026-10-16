@@ -46,7 +46,8 @@ public sealed partial record CurlRequest
 
     /// <summary>
     /// The request body, or <see langword="null"/> for none: bytes (<c>CURLOPT_POSTFIELDS</c> with
-    /// their size; a byte array converts implicitly) or a stream (<see cref="CurlContent.FromStream"/>).
+    /// their size; a byte array converts implicitly), a stream (<see cref="CurlContent.FromStream"/>) or a
+    /// multipart body (<see cref="CurlMultipartContent"/>).
     /// A body sent with a method other than <c>POST</c> keeps that method. Default <see langword="null"/>.
     /// </summary>
     public CurlContent? Body { get; init; }

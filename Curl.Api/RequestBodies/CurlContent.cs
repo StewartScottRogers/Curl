@@ -1,3 +1,4 @@
+using Curl.Api.EngineContracts;
 using Curl.Api.Options;
 
 namespace Curl.Api;
@@ -5,7 +6,7 @@ namespace Curl.Api;
 /// <summary>
 /// The body of a <see cref="CurlRequest"/>: in-memory bytes, sent as <c>CURLOPT_POSTFIELDS</c>, or a
 /// <see cref="Stream"/>, uploaded through the read callback and rewound through the seek callback
-/// (ADR-0634). A byte array or <see cref="ReadOnlyMemory{T}"/> converts to bytes content implicitly.
+/// (ADR-0634), or a <see cref="CurlMultipartContent"/>, sent as <c>CURLOPT_MIMEPOST</c> (ADR-0637). A byte array or <see cref="ReadOnlyMemory{T}"/> converts to bytes content implicitly.
 /// </summary>
 public abstract class CurlContent
 {
@@ -40,6 +41,18 @@ public abstract class CurlContent
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="length"/> is negative.</exception>
     public static CurlContent FromStream(Stream stream, long? length = null)
     {
+        ThrowIfNotUploadable(stream, length);
+        return new StreamContent(stream, length);
+    }
+
+    /// <summary>Throws unless <paramref name="stream"/> can be uploaded with <paramref name="length"/>.</summary>
+    /// <param name="stream">The stream to upload.</param>
+    /// <param name="length">The bytes to send, or <see langword="null"/> to work it out when sent.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="stream"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentException"><paramref name="stream"/> cannot be read.</exception>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="length"/> is negative.</exception>
+    internal static void ThrowIfNotUploadable(Stream stream, long? length)
+    {
         ArgumentNullException.ThrowIfNull(stream);
         if (!stream.CanRead)
         {
@@ -50,8 +63,6 @@ public abstract class CurlContent
         {
             ArgumentOutOfRangeException.ThrowIfNegative(known, nameof(length));
         }
-
-        return new StreamContent(stream, length);
     }
 
     /// <summary>Bytes content of <paramref name="bytes"/>; the same as <see cref="FromBytes"/>.</summary>
@@ -69,9 +80,11 @@ public abstract class CurlContent
 
     /// <summary>
     /// <paramref name="options"/> with this content set as the body of a posting request: the post
-    /// fields or the read and seek callbacks, and the size.
+    /// fields, the read and seek callbacks, or the <c>CURLOPT_MIMEPOST</c> body, and the size.
     /// </summary>
     /// <param name="options">The options, with <c>CURLOPT_POST</c> already set.</param>
+    /// <param name="engine">The engine performing the request, whose handles a body may create.</param>
+    /// <param name="owned">Takes every handle the body creates, to dispose when the request ends.</param>
     /// <returns>The options to perform the request with.</returns>
-    internal abstract EasyOptions ApplyTo(EasyOptions options);
+    internal abstract EasyOptions ApplyTo(EasyOptions options, ICurlEngine engine, ICollection<IDisposable> owned);
 }

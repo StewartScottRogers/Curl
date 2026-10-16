@@ -1,4 +1,5 @@
 using Curl.Api.Callbacks;
+using Curl.Api.EngineContracts;
 using Curl.Api.Options;
 using Curl.Api.Options.Behaviour;
 
@@ -15,8 +16,10 @@ internal static class CurlRequestOptions
     /// <param name="request">The request to perform.</param>
     /// <param name="header">The <c>CURLOPT_HEADERFUNCTION</c> that takes the response's header lines.</param>
     /// <param name="write">The <c>CURLOPT_WRITEFUNCTION</c> that takes the response's body.</param>
+    /// <param name="engine">The engine performing the request, whose handles the body may create.</param>
+    /// <param name="owned">Takes every handle the body creates, to dispose when the transfer ends.</param>
     /// <returns>The options to perform the request with.</returns>
-    public static EasyOptions Apply(EasyOptions options, CurlRequest request, HeaderCallback header, WriteCallback write)
+    public static EasyOptions Apply(EasyOptions options, CurlRequest request, HeaderCallback header, WriteCallback write, ICurlEngine engine, ICollection<IDisposable> owned)
     {
         bool post = request.Body is not null || request.Method == HttpMethod.Post;
         EasyOptions applied = options with
@@ -26,7 +29,7 @@ internal static class CurlRequestOptions
             Http = options.Http with { HttpHeaders = [.. request.Headers.Select(HeaderLine)], Post = post },
             Callbacks = options.Callbacks with { Header = header, Write = write },
         };
-        return post ? (request.Body ?? CurlContent.Empty).ApplyTo(applied) : applied;
+        return post ? (request.Body ?? CurlContent.Empty).ApplyTo(applied, engine, owned) : applied;
     }
 
     private static EasyTransferOptions ApplyMethod(EasyTransferOptions transfer, HttpMethod method, bool post) =>

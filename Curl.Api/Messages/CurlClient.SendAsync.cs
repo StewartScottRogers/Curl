@@ -19,7 +19,8 @@ public sealed partial class CurlClient
     /// Starts <paramref name="request"/> on a new easy handle with <see cref="Options"/> applied and
     /// returns the final response as soon as its body starts or the transfer ends (ADR-0635). The
     /// body streams from <see cref="CurlResponse.Body"/> while the transfer goes on; dispose it to
-    /// free the handle, or before the end to abort the transfer.
+    /// free the handle, or before the end to abort the transfer. The handle and every handle the
+    /// request body created (a multipart body's MIME builder) are disposed when the transfer ends.
     /// </summary>
     /// <param name="request">The request to perform.</param>
     /// <param name="cancellationToken">Stops the transfer, while the body streams too; it then ends with the engine's error code.</param>
@@ -41,8 +42,17 @@ public sealed partial class CurlClient
         IEasyTransfer easy = CreateEasy();
         ResponseHeaderCollector collector = new();
         ResponseBodyStream body = new(easy, bodyCapacity, cancellationToken);
-        easy.Options = CurlTransportOptions.Apply(easy.Options, request.Network, request.Tls, request.Proxy);
-        easy.Options = CurlRequestOptions.Apply(easy.Options, request, collector.Take, body.TakeBody);
+        try
+        {
+            easy.Options = CurlTransportOptions.Apply(easy.Options, request.Network, request.Tls, request.Proxy);
+            easy.Options = CurlRequestOptions.Apply(easy.Options, request, collector.Take, body.TakeBody, _engine, body.Owned);
+        }
+        catch
+        {
+            await body.DisposeUnstartedAsync().ConfigureAwait(false);
+            throw;
+        }
+
         await body.StartAsync().ConfigureAwait(false);
         TransferInfo info = easy.Info;
         return new CurlResponse
