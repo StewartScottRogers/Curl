@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Sockets;
 using Curl.Protocol.Abstractions;
 using Curl.Testing;
 using Curl.Engine;
@@ -143,6 +144,28 @@ public sealed class EndPointRecordingConnectorTests
         Diagnostics.Act("result returned unchanged", ReferenceEquals(result, recorder.ReportOn(result)));
         Diagnostics.Assert("result returned unchanged", true, ReferenceEquals(result, recorder.ReportOn(result)));
         Assert.AreSame(result, recorder.ReportOn(result));
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_Refused_RecordsTheOsErrno()
+    {
+        ConnectionEndPointRecorder recorder = new();
+        EndPointRecordingConnector connector = new(new RefusingConnector(), recorder);
+        Diagnostics.Arrange("inner connector", "refuses");
+
+        ConnectResult connect = await connector.ConnectAsync(Target, CancellationToken.None);
+
+        TransferReport report = recorder.ReportOn(TransferResult.Success(0)).Report!;
+        Diagnostics.Assert("os errno", ConnectionEndPointRecorder.OsErrnoOf(SocketError.ConnectionRefused), report.OsErrno);
+        Assert.AreEqual(ConnectionEndPointRecorder.OsErrnoOf(SocketError.ConnectionRefused), report.OsErrno);
+        Assert.IsTrue(connect.IsConnectionRefused);
+    }
+
+    /// <summary>A connector whose every connect the peer refuses.</summary>
+    private sealed class RefusingConnector : IConnector
+    {
+        public ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, CancellationToken cancellationToken) =>
+            ValueTask.FromResult(ConnectResult.Refused("Failed to connect"));
     }
 
     /// <summary>A session over a QUIC connection that only names the server's endpoint.</summary>

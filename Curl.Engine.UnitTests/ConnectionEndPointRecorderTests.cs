@@ -242,4 +242,101 @@ public sealed class ConnectionEndPointRecorderTests
         Diagnostics.Assert("same result returned", true, ReferenceEquals(result, reported));
         Assert.AreSame(result, recorder.ReportOn(result));
     }
+
+    [TestMethod]
+    public void ReportOn_FailedConnectRecordedWithoutAReport_BuildsOneCarryingTheOsErrno()
+    {
+        ConnectionEndPointRecorder recorder = new();
+        recorder.RecordFailedConnect(SocketError.ConnectionRefused);
+        Diagnostics.Arrange("failed connect", SocketError.ConnectionRefused);
+
+        TransferReport report = recorder.ReportOn(TransferResult.Success(5)).Report!;
+
+        Diagnostics.Assert("os errno", ConnectionEndPointRecorder.OsErrnoOf(SocketError.ConnectionRefused), report.OsErrno);
+        Assert.AreEqual(ConnectionEndPointRecorder.OsErrnoOf(SocketError.ConnectionRefused), report.OsErrno);
+        Assert.AreEqual(5, report.DownloadSize);
+    }
+
+    [TestMethod]
+    public void ReportOn_FailedConnectThenConnection_ReportsTheOsErrnoAndTheEndPointsOnTheHandlersReport()
+    {
+        ConnectionEndPointRecorder recorder = new();
+        recorder.RecordFailedConnect(SocketError.TimedOut);
+        recorder.Record(Local, Remote);
+        TransferResult result = TransferResult.Success(0) with { Report = new TransferReport { ResponseCode = 200 } };
+        Diagnostics.Arrange("failed connect", SocketError.TimedOut);
+
+        TransferReport report = recorder.ReportOn(result).Report!;
+
+        Diagnostics.Assert("os errno", ConnectionEndPointRecorder.OsErrnoOf(SocketError.TimedOut), report.OsErrno);
+        Assert.AreEqual(ConnectionEndPointRecorder.OsErrnoOf(SocketError.TimedOut), report.OsErrno);
+        Assert.AreEqual(200, report.ResponseCode);
+        Assert.AreEqual(Remote, report.RemoteEndPoint);
+    }
+
+    [TestMethod]
+    public void RecordFailedConnect_Success_RecordsNothing()
+    {
+        ConnectionEndPointRecorder recorder = new();
+        TransferResult result = TransferResult.Success(0);
+        Diagnostics.Arrange("failed connect", SocketError.Success);
+
+        recorder.RecordFailedConnect(SocketError.Success);
+
+        Diagnostics.Assert("same result returned", true, ReferenceEquals(result, recorder.ReportOn(result)));
+        Assert.AreSame(result, recorder.ReportOn(result));
+    }
+
+    [TestMethod]
+    public void Clear_AfterAFailedConnect_ForgetsTheOsErrno()
+    {
+        ConnectionEndPointRecorder recorder = new();
+        recorder.RecordFailedConnect(SocketError.ConnectionRefused);
+        TransferResult result = TransferResult.Success(0);
+        Diagnostics.Arrange("failed connect", SocketError.ConnectionRefused);
+
+        recorder.Clear();
+
+        Diagnostics.Assert("same result returned", true, ReferenceEquals(result, recorder.ReportOn(result)));
+        Assert.AreSame(result, recorder.ReportOn(result));
+    }
+
+    [TestMethod]
+    [OSCondition(OperatingSystems.Windows)]
+    public void OsErrnoOf_ConnectionRefusedOnWindows_IsWsaeConnRefused()
+    {
+        // The Schannel build's CURLINFO_OS_ERRNO is the Winsock code: WSAECONNREFUSED 10061.
+        Diagnostics.Arrange("socket error", SocketError.ConnectionRefused);
+
+        long errno = ConnectionEndPointRecorder.OsErrnoOf(SocketError.ConnectionRefused);
+
+        Diagnostics.Assert("os errno", 10061L, errno);
+        Assert.AreEqual(10061L, errno);
+    }
+
+    [TestMethod]
+    [OSCondition(OperatingSystems.Linux)]
+    public void OsErrnoOf_ConnectionRefusedOnLinux_IsEconnRefused()
+    {
+        // The OpenSSL build's CURLINFO_OS_ERRNO is errno: ECONNREFUSED is 111 on Linux.
+        Diagnostics.Arrange("socket error", SocketError.ConnectionRefused);
+
+        long errno = ConnectionEndPointRecorder.OsErrnoOf(SocketError.ConnectionRefused);
+
+        Diagnostics.Assert("os errno", 111L, errno);
+        Assert.AreEqual(111L, errno);
+    }
+
+    [TestMethod]
+    [OSCondition(OperatingSystems.OSX)]
+    public void OsErrnoOf_ConnectionRefusedOnMacOS_IsEconnRefused()
+    {
+        // The OpenSSL build's CURLINFO_OS_ERRNO is errno: ECONNREFUSED is 61 on macOS.
+        Diagnostics.Arrange("socket error", SocketError.ConnectionRefused);
+
+        long errno = ConnectionEndPointRecorder.OsErrnoOf(SocketError.ConnectionRefused);
+
+        Diagnostics.Assert("os errno", 61L, errno);
+        Assert.AreEqual(61L, errno);
+    }
 }

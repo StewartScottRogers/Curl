@@ -140,6 +140,7 @@ internal static class TransferInfoFromReport
         ContentLengthDownload = ContentLengthOf(report),
         SslVerifyResult = report.SslVerifyResult,
         ProxySslVerifyResult = report.ProxySslVerifyResult,
+        OsErrno = report.OsErrno,
     };
 
     /// <summary>

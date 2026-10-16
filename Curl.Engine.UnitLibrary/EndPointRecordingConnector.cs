@@ -13,8 +13,8 @@ namespace Curl.Engine;
 internal sealed class EndPointRecordingConnector(IConnector connector, ConnectionEndPointRecorder recorder) : IConnector
 {
     /// <summary>
-    /// Connects as the wrapped connector does and records the connection it opened;
-    /// a failed connect records nothing.
+    /// Connects as the wrapped connector does and records the connection it opened, or a failed
+    /// connect's last socket error (BL-2374).
     /// </summary>
     /// <param name="target">Where to connect.</param>
     /// <param name="cancellationToken">Cancels the connect.</param>
@@ -25,6 +25,10 @@ internal sealed class EndPointRecordingConnector(IConnector connector, Connectio
         if (connect.Connection is { } connection)
         {
             recorder.Record(connect.LocalEndPoint, connection.RemoteEndPoint);
+        }
+        else
+        {
+            recorder.RecordFailedConnect(connect.LastSocketError);
         }
 
         return connect;
@@ -50,7 +54,7 @@ internal sealed class EndPointRecordingConnector(IConnector connector, Connectio
 
     /// <summary>
     /// Opens the QUIC session through the wrapped connector, so its pool shares it, recording
-    /// the endpoints of a new or reused one as <see cref="ConnectAsync" /> does (BL-735).
+    /// the endpoints of a new or reused one, or a failure's last socket error, as <see cref="ConnectAsync" /> does (BL-735).
     /// </summary>
     /// <param name="target">What to connect to.</param>
     /// <param name="openSession">Builds the session over a new QUIC connection.</param>
@@ -65,6 +69,10 @@ internal sealed class EndPointRecordingConnector(IConnector connector, Connectio
         if (connect.Connection is { } connection)
         {
             recorder.Record(connect.LocalEndPoint, connection.RemoteEndPoint);
+        }
+        else
+        {
+            recorder.RecordFailedConnect(connect.LastSocketError);
         }
 
         return connect;

@@ -275,7 +275,10 @@ copy of the runner's `TlsResultRecordingTransferEvents`, keeps the verify codes 
 puts them on its `TransferReport` (`SslVerifyResult`, `ProxySslVerifyResult`). BL-2367 added
 `CURLINFO_PROXYAUTH_USED` (the report's `ProxyAuthSchemePicked`, the scheme the HTTP handler answered a
 forward proxy's 407 with) and the RTSP handler's `CURLINFO_RTSP_SESSION_ID`, `RTSP_CLIENT_CSEQ`,
-`RTSP_SERVER_CSEQ` and `RTSP_CSEQ_RECV`. `CURLINFO_OS_ERRNO` waits on BL-2374 and `CURLINFO_PROXY_ERROR`
+`RTSP_SERVER_CSEQ` and `RTSP_CSEQ_RECV`. BL-2374 added `CURLINFO_OS_ERRNO`: `TcpConnector` puts a failed dial's last `SocketError` on
+`ConnectResult.LastSocketError`, `EndPointRecordingConnector` hands it to `ConnectionEndPointRecorder`,
+which keeps it as the platform's number (`SocketException.NativeErrorCode`: the Winsock code on
+Windows, `errno` elsewhere) and puts it on `TransferReport.OsErrno`. `CURLINFO_PROXY_ERROR` waits
 on BL-2375. BL-2368 added `CURLINFO_CERTINFO` under `EasyTlsOptions.GatherCertificateInfo` (`CURLOPT_CERTINFO`):
 one list per `TransferReport.PeerCertificates` entry, each `label:value` line of `Curl.Output`'s
 `PeerCertificateText` one string and its PEM block the last, `Cert:` and the block

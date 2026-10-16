@@ -48,6 +48,7 @@ public sealed class TransferInfoFromReportTests
         AuthSchemePicked = HttpAuthSchemes.Digest,
         SslVerifyResult = 19,
         ProxySslVerifyResult = 20,
+        OsErrno = 10061,
         ProxyAuthSchemePicked = HttpAuthSchemes.Ntlm,
         RtspSessionId = "s1",
         RtspClientSequenceNumber = 3,
@@ -144,6 +145,12 @@ public sealed class TransferInfoFromReportTests
         Assert.AreEqual(0, info.SslVerifyResult);
         Assert.AreEqual(0, info.ProxySslVerifyResult);
     }
+
+    [TestMethod]
+    public void Of_Report_TakesTheOsErrno() => Assert.AreEqual(10061, Full.OsErrno);
+
+    [TestMethod]
+    public void Of_ReportWithoutOsErrno_AnswersZero() => Assert.AreEqual(0, Of(new TransferReport()).OsErrno);
 
     [TestMethod]
     public void Of_Report_TakesTheResponseCode() => Assert.AreEqual(401, Full.ResponseCode);

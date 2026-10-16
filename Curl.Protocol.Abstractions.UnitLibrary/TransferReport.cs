@@ -191,6 +191,13 @@ public sealed record TransferReport
     public long ProxySslVerifyResult { get; init; }
 
     /// <summary>
+    /// Gets the operating system's error number of the transfer's last failed connect attempt,
+    /// the source of <c>CURLINFO_OS_ERRNO</c> (BL-2374): the Winsock code on Windows, <c>errno</c>
+    /// elsewhere; <c>0</c> when no connect attempt failed.
+    /// </summary>
+    public long OsErrno { get; init; }
+
+    /// <summary>
     /// Gets the directory the FTP server's <c>257</c> reply to <c>PWD</c> named at login,
     /// its doubled quotes undoubled, the source of <c>%{ftp_entry_path}</c>;
     /// <see langword="null" /> for a transfer that is not FTP, or when the reply named no

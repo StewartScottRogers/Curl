@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Sockets;
 using Curl.Testing;
 
 namespace Curl.Protocol.Abstractions;
@@ -453,6 +454,44 @@ public sealed class ConnectResultTests
         Assert.AreEqual("Failed to connect to 127.0.0.1:1 after 0 ms: Could not connect to server", result.ErrorMessage);
         Assert.IsTrue(result.IsConnectionRefused);
         Assert.IsNull(result.Connection);
+    }
+
+    [TestMethod]
+    public void Refused_Always_CarriesTheRefusedSocketError()
+    {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("message", "refused");
+
+        var result = ConnectResult.Refused("refused");
+
+        diagnostics.Assert("last socket error", SocketError.ConnectionRefused, result.LastSocketError);
+        Assert.AreEqual(SocketError.ConnectionRefused, result.LastSocketError);
+    }
+
+    [TestMethod]
+    public void Failed_WithALastSocketError_CarriesIt()
+    {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("last socket error", SocketError.TimedOut);
+
+        var result = ConnectResult.Failed(CurlExitCode.OperationTimedOut, "timed out", null, lastSocketError: SocketError.TimedOut);
+
+        diagnostics.Assert("last socket error", SocketError.TimedOut, result.LastSocketError);
+        Assert.AreEqual(SocketError.TimedOut, result.LastSocketError);
+    }
+
+    [TestMethod]
+    public void FailedAndConnected_WithoutALastSocketError_CarrySuccess()
+    {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("exit code", CurlExitCode.CouldntResolveHost);
+
+        var failed = ConnectResult.Failed(CurlExitCode.CouldntResolveHost, "no host");
+        var connected = ConnectResult.Connected(new UnusedConnection());
+
+        diagnostics.Assert("failed last socket error", SocketError.Success, failed.LastSocketError);
+        Assert.AreEqual(SocketError.Success, failed.LastSocketError);
+        Assert.AreEqual(SocketError.Success, connected.LastSocketError);
     }
 
     [TestMethod]

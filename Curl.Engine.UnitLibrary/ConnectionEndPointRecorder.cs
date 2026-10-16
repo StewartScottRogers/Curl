@@ -40,6 +40,9 @@ internal sealed class ConnectionEndPointRecorder
     /// </summary>
     private string? unixSocketRemoteIp;
 
+    /// <summary>The operating system's error number of the last failed connect attempt, or <c>0</c>.</summary>
+    private long osErrno;
+
     /// <summary>Forgets what the previous transfer recorded.</summary>
     internal void Clear()
     {
@@ -47,7 +50,32 @@ internal sealed class ConnectionEndPointRecorder
         localEndPoint = null;
         remoteEndPoint = null;
         unixSocketRemoteIp = null;
+        osErrno = 0;
     }
+
+    /// <summary>
+    /// Records the socket error of a failed connect's last attempt as the operating system's error
+    /// number, the transfer's <c>CURLINFO_OS_ERRNO</c> (BL-2374); a later failure replaces it, and
+    /// <see cref="SocketError.Success" /> leaves what was recorded.
+    /// </summary>
+    /// <param name="lastSocketError">The failed connect's <see cref="ConnectResult.LastSocketError" />.</param>
+    internal void RecordFailedConnect(SocketError lastSocketError)
+    {
+        if (lastSocketError != SocketError.Success)
+        {
+            osErrno = OsErrnoOf(lastSocketError);
+        }
+    }
+
+    /// <summary>
+    /// The operating system's number for <paramref name="socketError" />, as the platform's curl reports
+    /// <c>CURLINFO_OS_ERRNO</c>: the Winsock code on Windows (the Schannel build, <c>WSAECONNREFUSED</c>
+    /// 10061), <c>errno</c> elsewhere (the OpenSSL builds, <c>ECONNREFUSED</c> 111 on Linux and 61 on
+    /// macOS), which the runtime's <c>SocketException.NativeErrorCode</c> maps to.
+    /// </summary>
+    /// <param name="socketError">The socket error.</param>
+    /// <returns>The platform's error number.</returns>
+    internal static long OsErrnoOf(SocketError socketError) => new SocketException((int)socketError).NativeErrorCode;
 
     /// <summary>
     /// Records a connection the transfer opened, unless it already opened one.
@@ -97,7 +125,19 @@ internal sealed class ConnectionEndPointRecorder
     /// without a report. <paramref name="result" /> itself when nothing was recorded or the
     /// handler reported an end point.
     /// </returns>
-    internal TransferResult ReportOn(TransferResult result)
+    internal TransferResult ReportOn(TransferResult result) => WithEndPoints(WithOsErrno(result));
+
+    /// <summary>
+    /// Puts the recorded <see cref="TransferReport.OsErrno" /> on <paramref name="result" />'s report,
+    /// building one as <see cref="ReportOn" /> does when the handler returned none; <paramref name="result" />
+    /// itself when no connect attempt failed.
+    /// </summary>
+    private TransferResult WithOsErrno(TransferResult result) => osErrno == 0
+        ? result
+        : result with { Report = (result.Report ?? new TransferReport { DownloadSize = result.BytesTransferred }) with { OsErrno = osErrno } };
+
+    /// <summary>The end points half of <see cref="ReportOn" />.</summary>
+    private TransferResult WithEndPoints(TransferResult result)
     {
         if (!connectionRecorded)
         {

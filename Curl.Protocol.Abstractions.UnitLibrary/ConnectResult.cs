@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Sockets;
 
 namespace Curl.Protocol.Abstractions;
 
@@ -91,6 +92,13 @@ public sealed class ConnectResult
     /// and for every other failure. Set only by <see cref="Refused(string)" />.
     /// </summary>
     public bool IsConnectionRefused { get; private init; }
+
+    /// <summary>
+    /// Gets the socket error of the last connect attempt that failed, the source of libcurl's
+    /// <c>CURLINFO_OS_ERRNO</c> (BL-2374); <see cref="SocketError.Success" /> for a success and
+    /// for a failure the connector built without one, such as a failed resolve.
+    /// </summary>
+    public SocketError LastSocketError { get; private init; }
 
     /// <summary>
     /// Gets the application protocol the TLS handshake agreed with ALPN, such as <c>h2</c> or
@@ -270,6 +278,10 @@ public sealed class ConnectResult
     /// The status code of the proxy's reply to a CONNECT that did not open the tunnel, which
     /// curl 8.21.0 still reports as <c>%{http_connect}</c> (BL-1857); <c>0</c> when none.
     /// </param>
+    /// <param name="lastSocketError">
+    /// The socket error of the last connect attempt that failed; <see cref="SocketError.Success" />
+    /// when the failure had none.
+    /// </param>
     /// <returns>A result with no <see cref="Connection" />.</returns>
     /// <exception cref="ArgumentOutOfRangeException">
     /// <paramref name="exitCode" /> is <see cref="CurlExitCode.Ok" />, which is not a
@@ -280,7 +292,8 @@ public sealed class ConnectResult
         string errorMessage,
         ConnectTimings? timings,
         long connectionNumber = 0,
-        int proxyConnectResponseCode = 0)
+        int proxyConnectResponseCode = 0,
+        SocketError lastSocketError = SocketError.Success)
     {
         if (exitCode == CurlExitCode.Ok)
         {
@@ -295,13 +308,15 @@ public sealed class ConnectResult
             Timings = timings,
             ConnectionNumber = connectionNumber,
             ProxyConnectResponseCode = proxyConnectResponseCode,
+            LastSocketError = lastSocketError,
         };
     }
 
     /// <summary>
     /// Creates the result of a TCP connect whose last attempt the peer refused
     /// (<c>ECONNREFUSED</c>): exit 7 with <see cref="IsConnectionRefused" /> set, the one
-    /// exit 7 curl's <c>--retry-connrefused</c> retries.
+    /// exit 7 curl's <c>--retry-connrefused</c> retries, and <see cref="LastSocketError" />
+    /// <see cref="SocketError.ConnectionRefused" />.
     /// </summary>
     /// <param name="errorMessage">The message curl prints for the failure.</param>
     /// <returns>
@@ -333,6 +348,7 @@ public sealed class ConnectResult
         new(null, CurlExitCode.CouldntConnect, errorMessage)
         {
             IsConnectionRefused = true,
+            LastSocketError = SocketError.ConnectionRefused,
             Timings = timings,
             ConnectionNumber = connectionNumber,
         };
