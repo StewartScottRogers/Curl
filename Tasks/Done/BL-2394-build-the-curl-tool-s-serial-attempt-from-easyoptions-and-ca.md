@@ -8,7 +8,7 @@ depends-on: [BL-2318, BL-2395, BL-2396, BL-2397, BL-2398, BL-2479]
 touches: [Curl.Console, Curl.Console.UnitTests, Curl.Engine.UnitLibrary, Curl.Engine.UnitTests]
 requirement: none
 created: 2026-10-15
-completed:
+completed: 2026-10-16
 ---
 # BL-2394 — Build the curl tool's serial attempt from EasyOptions and callbacks inside ManagedEasyTransfer, retiring ToolAttempt
 
@@ -22,15 +22,17 @@ ADR-0506 phase 2, ADR-0552. BL-2318 routed every serial attempt through `IEasyTr
 
 ## Acceptance criteria
 
-- [ ] `ToolAttempt` and `IToolAttemptTransfer` are gone and `CurlCommandRunnerEasyTransferTests` still shows one `PerformAsync` per attempt.
-- [ ] `dotnet build` is clean and the fast tests pass with no test deleted, skipped or weakened.
-- [ ] `Curl.Conformance.UnitTests/PassingUpstreamCases.txt` is unchanged and every case it lists still passes.
-- [ ] `Measure-CodeQuality.ps1 -Library Curl.Console,Curl.Engine.UnitLibrary` reports 0 failing members.
+- [x] `ToolAttempt` and `IToolAttemptTransfer` are gone and `CurlCommandRunnerEasyTransferTests` still shows one `PerformAsync` per attempt.
+- [x] `dotnet build` is clean and the fast tests pass with no test deleted, skipped or weakened.
+- [x] `Curl.Conformance.UnitTests/PassingUpstreamCases.txt` is unchanged and every case it lists still passes.
+- [x] `Measure-CodeQuality.ps1 -Library Curl.Console,Curl.Engine.UnitLibrary` reports 0 failing members.
 
 ## Notes
 
 - 2026-10-15 (lane 2, first claim): sized before any edit and split. The runner's serial context (`CurlCommandRunner` lines ~3533 and ~4377, `FollowRetryingThroughAsync`) carries about twenty tool-side pieces - the output chain (`--limit-rate`, `-N`, `--use-ascii`, gated standard output), the `-D` tee, the `-J` watcher, styled headers, the progress recorder, the run's `-v`/trace events with their `HoldableStream`, the `-Y`/`-y`/`-m` watchdogs on `RunningTransferState`, the proxy and credential choice, SSH options, `If-None-Match` lines, the alt-svc cache, range, offset, form body and upload - each of which must stay byte for byte the same. That is several runs, so the engine-side capability moves first, one step per task: BL-2395 (the whole-`TransferResult` ADR and the per-transfer inputs), BL-2396 (body and header outputs through the callbacks), BL-2397 (`-v`/trace through the debug path), BL-2398 (progress meter and watchdogs). This task stays the last step: switch `FollowRetryingThroughAsync` to a perform from options with those hooks set, drop the runner's duplicate setup, and delete `ToolAttempt`, `IToolAttemptTransfer` and `ToolAttemptResult` with `ManagedEasyTransferTests.ToolAttempt.cs` folded into the from-options tests. No code was changed in this claim.
 - 2026-10-16 (lane 2, second claim): prerequisite pass before any edit. BL-2395 to BL-2398 are Done and give the inputs, outputs, events and progress hooks, but a perform from the options still builds its own follower (`createDispatcher`: the engine's real-network dispatcher and its own connection cache, not the option group's `TransferDispatch` that tests inject fake connectors into and whose run-wide `ConnectionCache` keeps `%{conn_id}` reuse) and its own `TransferContextFactory` (no standard input, default credential encoding). No task covered that, so filed BL-2479 (engine-side hook for the runner's follower and context factory, plus the attempt's parsed URL the `TransferRetrier` and `KeepRetriedConnectionIdWhenReused` read) and added it to `depends-on`. What is left here once it is Done: in `FollowRetryingThroughAsync` set `ToolSettings`, `Host`, `TraceComponents` once and `ToolInputs` (per-attempt `ResumeFrom`), `ToolOutputs` (fresh `RateLimited` chain), `ToolEvents` (`Running.Events`, `Running`), `ToolProgress` (`Running.Progress`, `Running.AbortToken`, after `StartTransferProgress` on a retry) and the dispatch hook per attempt; set `Options.Transfer` to `TransferOptionsOf(options, upload)` and `Options.Network.Url` to the runner's checked URL; read `LastResult`; then delete `ToolAttempt`, `IToolAttemptTransfer` and `ToolAttemptResult`, fold `ManagedEasyTransferTests.ToolAttempt.cs` into the from-options tests and change the ToolOutputs/ToolEvents/ToolProgress tests' reference runs from a `ToolAttempt` to a direct `TransferPerformer.FollowWatchingSpeedAsync` on a `TransferContextFactory.Create` context. The `-Z` path keeps performing directly.
+
+- 2026-10-16 (lane 2, third claim): done. `FollowRetryingThroughAsync` now sets `Options` (with `TransferOptionsOf`'s upload), `ToolSettings` and `Host` (the run's diagnostic log) once and `ToolInputs`, `ToolOutputs`, `ToolEvents`, `ToolProgress` and `ToolDispatch` per attempt, and reads `LastResult`; both paths build from one `TransferAttemptPieces` record and `-Z` still performs directly. `ToolAttempt`, `IToolAttemptTransfer` and `ToolAttemptResult` are deleted; `IToolEasyTransfer` carries the hooks so `CurlCommandRunnerEasyTransferTests` still counts one `PerformAsync` per attempt. Engine changes found by the tests: `EngineToolTransferInputs.Url` (the runner's checked URL, so its text is never reparsed), the runner's events passed unwrapped and its abort token passed as it is (handlers and `ConnectTarget`s compared them by identity). ADR-0621 records it. The Tool* engine tests compare against a direct `TransferPerformer.FollowWatchingSpeedAsync` on the runner's context. Fast tests all green (Console 2782, Engine 1607, Conformance 3130, ratchet unchanged); `Measure-CodeQuality.ps1 -Library Curl.Engine.UnitLibrary,Curl.Console` 0 failing members after `TransferUrlOf` took the URL choice out of `PerformFromOptionsOverCachesAsync` (it measured 14).
 
 ## Log
 
@@ -40,3 +42,4 @@ ADR-0506 phase 2, ADR-0552. BL-2318 routed every serial attempt through `IEasyTr
 - 2026-10-16: Backlog -> Doing.
 - 2026-10-16: Doing -> Backlog. Waits on BL-2479: the engine has no hook to perform from the options through the runner's follower and context factory
 - 2026-10-16: Backlog -> Doing.
+- 2026-10-16: Doing -> Done. The runner's serial attempts perform from EasyOptions through ManagedEasyTransfer's hooks; ToolAttempt is retired
