@@ -4,6 +4,7 @@ using Curl.Api.EngineContracts;
 using Curl.Api.EngineContracts.ConnectOnly;
 using Curl.Api.Options;
 using Curl.Api.Options.Network;
+using Curl.Api.Options.Proxy;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Engine;
@@ -59,6 +60,58 @@ public sealed partial class ManagedEasyTransferTests
         await easy.PerformAsync(CancellationToken.None);
 
         Assert.AreEqual(new ConnectTarget("h", 443, true), connector.Targets.Single());
+    }
+
+    [TestMethod]
+    public async Task PerformAsync_ConnectOnlyWithAProxy_DialsTheTargetThroughThatProxy()
+    {
+        (IEasyTransfer easy, TargetRecordingConnector connector) = CreateConnectOnlyEasy(ConnectResult.Connected(new ControlledConnection()));
+        await using IEasyTransfer handle = easy;
+        easy.Options = ConnectOnlyTo("http://h:8080/x") with { Proxy = new EasyProxyOptions { Proxy = "http://proxy:3128" } };
+
+        CurlCode code = await easy.PerformAsync(CancellationToken.None);
+
+        Assert.AreEqual(CurlCode.Ok, code);
+        ConnectTarget target = connector.Targets.Single();
+        Assert.AreEqual(new ConnectTarget("h", 8080, false) { Proxy = new ProxyEndpoint(ProxyKind.Http, "proxy", 3128, null) }, target);
+    }
+
+    [TestMethod]
+    public async Task PerformAsync_ConnectOnlyWithASocks5Proxy_DialsTheTargetThroughThatProxy()
+    {
+        (IEasyTransfer easy, TargetRecordingConnector connector) = CreateConnectOnlyEasy(ConnectResult.Connected(new ControlledConnection()));
+        await using IEasyTransfer handle = easy;
+        easy.Options = ConnectOnlyTo("https://h/") with { Proxy = new EasyProxyOptions { Proxy = "socks5://s:1080" } };
+
+        await easy.PerformAsync(CancellationToken.None);
+
+        Assert.AreEqual(new ConnectTarget("h", 443, true) { Proxy = new ProxyEndpoint(ProxyKind.Socks5, "s", 1080, null) }, connector.Targets.Single());
+    }
+
+    [TestMethod]
+    public async Task PerformAsync_ConnectOnlyToAHostInTheNoProxyList_DialsNoProxy()
+    {
+        (IEasyTransfer easy, TargetRecordingConnector connector) = CreateConnectOnlyEasy(ConnectResult.Connected(new ControlledConnection()));
+        await using IEasyTransfer handle = easy;
+        easy.Options = ConnectOnlyTo("http://h:8080/x") with { Proxy = new EasyProxyOptions { Proxy = "http://proxy:3128", NoProxy = "h" } };
+
+        await easy.PerformAsync(CancellationToken.None);
+
+        Assert.IsNull(connector.Targets.Single().Proxy);
+    }
+
+    [TestMethod]
+    public async Task PerformAsync_ConnectOnlyWithUnusableProxyText_AnswersTheSelectorsFailureAndDialsNothing()
+    {
+        (IEasyTransfer easy, TargetRecordingConnector connector) = CreateConnectOnlyEasy(ConnectResult.Connected(new ControlledConnection()));
+        await using IEasyTransfer handle = easy;
+        easy.Options = ConnectOnlyTo("http://h/") with { Proxy = new EasyProxyOptions { Proxy = "foo://proxy:1" } };
+
+        CurlCode code = await easy.PerformAsync(CancellationToken.None);
+
+        Assert.AreEqual(CurlCode.CouldntConnect, code);
+        Assert.AreEqual("Unsupported proxy scheme for 'foo://proxy:1'", easy.ErrorText);
+        Assert.IsEmpty(connector.Targets);
     }
 
     [TestMethod]

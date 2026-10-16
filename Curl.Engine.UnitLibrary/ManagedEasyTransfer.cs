@@ -318,7 +318,7 @@ internal sealed class ManagedEasyTransfer(
 
         if (IsRawConnectOnly(options.Network.ConnectOnly, url))
         {
-            return await PerformConnectOnlyAsync(options, url, cancellationToken).ConfigureAwait(false);
+            return await PerformConnectOnlyAsync(options, settings, url, cancellationToken).ConfigureAwait(false);
         }
 
         return await PerformBuildingMimePostAsync(options, settings, url, urlText, transferId, cancellationToken).ConfigureAwait(false);
@@ -368,6 +368,12 @@ internal sealed class ManagedEasyTransfer(
     }
 
     /// <summary>
+    /// The selector a <c>CURLOPT_CONNECT_ONLY</c> 1 perform chooses its proxy with: the handle's own proxy options
+    /// only, no proxy environment variable, as the engine's other performs read none (ADR-0608).
+    /// </summary>
+    private static readonly ProxySelector ConnectOnlyProxySelector = new(_ => null);
+
+    /// <summary>
     /// Whether the perform only connects (<see cref="PerformConnectOnlyAsync" />): under <c>CURLOPT_CONNECT_ONLY</c> 1,
     /// and under 2 for a URL that is not <c>ws</c> or <c>wss</c>, as libcurl, which upgrades only those (ADR-0616).
     /// </summary>
@@ -388,17 +394,27 @@ internal sealed class ManagedEasyTransfer(
 
     /// <summary>
     /// <c>CURLOPT_CONNECT_ONLY</c> 1: connects to the URL's host and port through <see cref="CreateConnectOnlyConnector" />'s
-    /// connector, with TLS for a TLS scheme, sends nothing, and keeps the connection for <see cref="Connection" />; a
-    /// failed connect ends the perform with the connector's code and text (ADR-0608).
+    /// connector, with TLS for a TLS scheme, through the proxy <see cref="TransferProxySelection" /> chooses from
+    /// <see cref="EasyOptions.Proxy" /> (a tunnel through an HTTP or HTTPS proxy, the handshake of a SOCKS one, as
+    /// libcurl tunnels for connect-only without <c>CURLOPT_HTTPPROXYTUNNEL</c>), sends nothing, and keeps the
+    /// connection for <see cref="Connection" />; proxy text that cannot be used ends the perform with the selector's
+    /// failure, and a failed connect with the connector's code and text (ADR-0608).
     /// </summary>
     /// <param name="options">The handle's options.</param>
+    /// <param name="settings">The tool settings, for the proxy credentials and the Unix socket.</param>
     /// <param name="url">The URL set, parsed.</param>
     /// <param name="cancellationToken">Stops the connect.</param>
     /// <returns>The perform's code.</returns>
-    private async Task<CurlCode> PerformConnectOnlyAsync(EasyOptions options, CurlUrl url, CancellationToken cancellationToken)
+    private async Task<CurlCode> PerformConnectOnlyAsync(EasyOptions options, EngineTransferSettings settings, CurlUrl url, CancellationToken cancellationToken)
     {
+        if (!TransferProxySelection.TrySelect(ConnectOnlyProxySelector, options.Proxy, settings.OverUnixSocket, settings.ProxyCredentials, url, out ProxyEndpoint? proxy, out TransferResult? refused, Host.DiagnosticLog))
+        {
+            return Finish(refused.ExitCode.ToCurlCode(), refused.ErrorMessage!, Info);
+        }
+
         IConnector connector = CreateConnectOnlyConnector(options, PerformShared);
-        ConnectResult connect = await connector.ConnectAsync(new ConnectTarget(url.IdnHost, url.Port, ConnectOnlyConnection.UsesTls(url.Scheme)), cancellationToken).ConfigureAwait(false);
+        ConnectTarget target = new(url.IdnHost, url.Port, ConnectOnlyConnection.UsesTls(url.Scheme)) { Proxy = proxy };
+        ConnectResult connect = await connector.ConnectAsync(target, cancellationToken).ConfigureAwait(false);
         if (connect.Connection is not { } opened)
         {
             // ConnectResult.Failed takes a non-null message, so a result with no connection always has one.
