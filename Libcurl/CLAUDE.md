@@ -59,7 +59,9 @@ freed afterwards leaves the option as set; a new list setter must copy too.
 `Easy` holds `CurlEasy`, the easy handle `CurlLibrary.EasyInit` (`curl_easy_init`) returns over the
 engine's `IEasyTransfer` (ADR-0563): `SetOption` goes through `EasyOptionDispatch` and writes the
 changed `EasyOptions` back to the transfer only on `Ok`; `PerformAsync` is the native shape, and
-`Perform` blocks on it, the one sanctioned sync-over-async bridge in Libcurl. `Dispose` and
+`Perform` blocks on it; `Upkeep` (`curl_easy_upkeep`) blocks on `UpkeepAsync` the same way, and these
+two are Libcurl's only sanctioned sync-over-async bridges. `Pause` is `curl_easy_pause` and passes the
+engine only the `Receive` and `Send` bits, dropping the rest as libcurl does. `Dispose` and
 `DisposeAsync` are `curl_easy_cleanup` and dispose the transfer once; a member used afterwards throws
 `ObjectDisposedException`. `GetInfo` is `curl_easy_getinfo` and goes through `Info`'s dispatch.
 `Reset` is `curl_easy_reset` and `DupHandle` is `curl_easy_duphandle`, each a call to the transfer's

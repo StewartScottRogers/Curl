@@ -12,7 +12,8 @@ namespace Libcurl.UnitTests.Easy;
 /// An <see cref="IEasyTransfer"/> whose perform answers <see cref="Result"/> and records the options and
 /// token it ran with, and which counts its disposals. <see cref="Reset"/> and <see cref="Duplicate"/> follow
 /// <see cref="IEasyTransfer"/>'s contract: a reset restores the default options and keeps the open connection,
-/// a duplicate carries the options and nothing else. Its other members are not called by these tests.
+/// a duplicate carries the options and nothing else. <see cref="Pause"/> and <see cref="UpkeepAsync"/> record
+/// what they were given and answer <see cref="PauseAndUpkeepResult"/>. Its other members are not called by these tests.
 /// </summary>
 internal sealed class FakeEasyTransfer : IEasyTransfer
 {
@@ -56,9 +57,26 @@ internal sealed class FakeEasyTransfer : IEasyTransfer
         Options = new();
     }
 
-    public CurlCode Pause(CurlPause directions) => throw new NotSupportedException();
+    /// <summary>What <see cref="Pause"/> and <see cref="UpkeepAsync"/> answer.</summary>
+    public CurlCode PauseAndUpkeepResult { get; init; } = CurlCode.Ok;
 
-    public ValueTask<CurlCode> UpkeepAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
+    /// <summary>The directions each <see cref="Pause"/> call was given, in order.</summary>
+    public List<CurlPause> PausedWith { get; } = [];
+
+    /// <summary>The token each <see cref="UpkeepAsync"/> call was given, in order.</summary>
+    public List<CancellationToken> UpkeptWith { get; } = [];
+
+    public CurlCode Pause(CurlPause directions)
+    {
+        PausedWith.Add(directions);
+        return PauseAndUpkeepResult;
+    }
+
+    public ValueTask<CurlCode> UpkeepAsync(CancellationToken cancellationToken)
+    {
+        UpkeptWith.Add(cancellationToken);
+        return ValueTask.FromResult(PauseAndUpkeepResult);
+    }
 
     public ValueTask DisposeAsync()
     {

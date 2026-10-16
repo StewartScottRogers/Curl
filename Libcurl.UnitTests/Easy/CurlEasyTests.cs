@@ -1,4 +1,5 @@
 using Curl.Api.Codes;
+using Curl.Api.EngineContracts;
 using Curl.Api.Options;
 using Libcurl.Easy;
 using Libcurl.Global;
@@ -169,6 +170,82 @@ public sealed class CurlEasyTests
         Assert.ThrowsExactly<ObjectDisposedException>(easy.Reset);
         Assert.ThrowsExactly<ObjectDisposedException>(() => easy.DupHandle());
         Assert.AreEqual(0, transfer.ResetCount);
+    }
+
+    [TestMethod]
+    [DataRow(CurlPause.Continue, CurlPause.Continue)]
+    [DataRow(CurlPause.Receive, CurlPause.Receive)]
+    [DataRow(CurlPause.Send, CurlPause.Send)]
+    [DataRow(CurlPause.All, CurlPause.All)]
+    [DataRow((CurlPause)(1 << 1), CurlPause.Continue)]
+    [DataRow((CurlPause)(-1), CurlPause.All)]
+    [DataRow((CurlPause)(1 | 1 << 3), CurlPause.Receive)]
+    public void Pause_EachCombination_PassesOnlyTheReceiveAndSendBits(CurlPause given, CurlPause expected)
+    {
+        var transfer = new FakeEasyTransfer();
+        using var easy = new CurlEasy(transfer, VerboseOnly);
+
+        var code = easy.Pause(given);
+
+        Assert.AreEqual(CurlCode.Ok, code);
+        Assert.HasCount(1, transfer.PausedWith);
+        Assert.AreEqual(expected, transfer.PausedWith[0]);
+    }
+
+    [TestMethod]
+    [DataRow(CurlPause.Continue)]
+    [DataRow(CurlPause.Receive)]
+    [DataRow(CurlPause.Send)]
+    [DataRow(CurlPause.All)]
+    public void Pause_EngineRefuses_ReturnsTheEnginesCode(CurlPause given)
+    {
+        var transfer = new FakeEasyTransfer { PauseAndUpkeepResult = CurlCode.BadFunctionArgument };
+        using var easy = new CurlEasy(transfer, VerboseOnly);
+
+        var code = easy.Pause(given);
+
+        Assert.AreEqual(CurlCode.BadFunctionArgument, code);
+        Assert.AreEqual(given, transfer.PausedWith[0]);
+    }
+
+    [TestMethod]
+    public void Upkeep_ReturnsTheEnginesCodeWithNoToken()
+    {
+        var transfer = new FakeEasyTransfer { PauseAndUpkeepResult = CurlCode.SendError };
+        using var easy = new CurlEasy(transfer, VerboseOnly);
+
+        var code = easy.Upkeep();
+
+        Assert.AreEqual(CurlCode.SendError, code);
+        Assert.HasCount(1, transfer.UpkeptWith);
+        Assert.AreEqual(CancellationToken.None, transfer.UpkeptWith[0]);
+    }
+
+    [TestMethod]
+    public async Task UpkeepAsync_ReturnsTheEnginesCodeAndPassesTheToken()
+    {
+        var transfer = new FakeEasyTransfer();
+        await using var easy = new CurlEasy(transfer, VerboseOnly);
+        using var source = new CancellationTokenSource();
+
+        var code = await easy.UpkeepAsync(source.Token);
+
+        Assert.AreEqual(CurlCode.Ok, code);
+        Assert.AreEqual(source.Token, transfer.UpkeptWith[0]);
+    }
+
+    [TestMethod]
+    public async Task PauseAndUpkeep_AfterCleanup_ThrowObjectDisposed()
+    {
+        var transfer = new FakeEasyTransfer();
+        var easy = new CurlEasy(transfer, VerboseOnly);
+        easy.Dispose();
+
+        Assert.ThrowsExactly<ObjectDisposedException>(() => easy.Pause(CurlPause.All));
+        Assert.ThrowsExactly<ObjectDisposedException>(() => easy.Upkeep());
+        await Assert.ThrowsExactlyAsync<ObjectDisposedException>(() => easy.UpkeepAsync().AsTask());
+        Assert.IsEmpty(transfer.PausedWith);
+        Assert.IsEmpty(transfer.UpkeptWith);
     }
 
     [TestMethod]

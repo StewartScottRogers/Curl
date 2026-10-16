@@ -11,7 +11,8 @@ namespace Libcurl.Easy;
 /// <see cref="Global.CurlLibrary.EasyInit"/> over the engine's <see cref="IEasyTransfer"/>.
 /// <see cref="SetOption"/> is <c>curl_easy_setopt</c>, <see cref="GetInfo"/> is <c>curl_easy_getinfo</c>, <see cref="Perform"/> and
 /// <see cref="PerformAsync"/> are <c>curl_easy_perform</c>, <see cref="Reset"/> is <c>curl_easy_reset</c>,
-/// <see cref="DupHandle"/> is <c>curl_easy_duphandle</c>, and <see cref="Dispose"/> (or
+/// <see cref="DupHandle"/> is <c>curl_easy_duphandle</c>, <see cref="Pause"/> is <c>curl_easy_pause</c>,
+/// <see cref="Upkeep"/> and <see cref="UpkeepAsync"/> are <c>curl_easy_upkeep</c>, and <see cref="Dispose"/> (or
 /// <see cref="DisposeAsync"/>) is <c>curl_easy_cleanup</c>.
 /// </summary>
 public sealed class CurlEasy : IDisposable, IAsyncDisposable
@@ -110,6 +111,31 @@ public sealed class CurlEasy : IDisposable, IAsyncDisposable
     /// <returns>The new handle; the caller disposes it (<c>curl_easy_cleanup</c>).</returns>
     /// <exception cref="ObjectDisposedException">The handle has been cleaned up.</exception>
     public CurlEasy DupHandle() => new(LiveTransfer().Duplicate(), dispatch);
+
+    /// <summary>
+    /// <c>curl_easy_pause</c>: leaves the directions set in <paramref name="directions"/> paused and
+    /// unpauses the others. Bits other than <see cref="CurlPause.Receive"/> and <see cref="CurlPause.Send"/>
+    /// are dropped before the engine sees them, as libcurl reads only those two.
+    /// </summary>
+    /// <param name="directions">The <c>CURLPAUSE_*</c> bitmask; <see cref="CurlPause.Continue"/> unpauses both directions.</param>
+    /// <returns>The engine's answer.</returns>
+    /// <exception cref="ObjectDisposedException">The handle has been cleaned up.</exception>
+    public CurlCode Pause(CurlPause directions) => LiveTransfer().Pause(directions & CurlPause.All);
+
+    /// <summary>
+    /// <c>curl_easy_upkeep</c>, synchronously as libcurl's is: blocks on <see cref="UpkeepAsync"/>. Like
+    /// <see cref="Perform"/>, a sanctioned sync-over-async bridge kept for fidelity with libcurl's blocking call.
+    /// </summary>
+    /// <returns>The engine's answer.</returns>
+    /// <exception cref="ObjectDisposedException">The handle has been cleaned up.</exception>
+    public CurlCode Upkeep() => UpkeepAsync(CancellationToken.None).AsTask().GetAwaiter().GetResult();
+
+    /// <summary><c>curl_easy_upkeep</c>: keeps the handle's idle connections alive.</summary>
+    /// <param name="cancellationToken">Stops the upkeep.</param>
+    /// <returns>The engine's answer.</returns>
+    /// <exception cref="ObjectDisposedException">The handle has been cleaned up.</exception>
+    public ValueTask<CurlCode> UpkeepAsync(CancellationToken cancellationToken = default) =>
+        LiveTransfer().UpkeepAsync(cancellationToken);
 
     /// <summary>
     /// <c>curl_easy_cleanup</c>, synchronously: blocks on <see cref="DisposeAsync"/>. A second cleanup
