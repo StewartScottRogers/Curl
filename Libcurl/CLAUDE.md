@@ -25,7 +25,7 @@ lookup, so a new upstream code is one appended string. `curl_easy_strerror` is s
 `Curl.Console`'s `CurlEasyErrorText` until BL-2450 moves it.
 
 `Easy` holds `CurlEasy`, the easy handle `CurlLibrary.EasyInit` (`curl_easy_init`) returns over the
-engine's `IEasyTransfer` (ADR-0509): `SetOption` goes through `EasyOptionDispatch` and writes the
+engine's `IEasyTransfer` (ADR-0563): `SetOption` goes through `EasyOptionDispatch` and writes the
 changed `EasyOptions` back to the transfer only on `Ok`; `PerformAsync` is the native shape, and
 `Perform` blocks on it, the one sanctioned sync-over-async bridge in Libcurl. `Dispose` and
 `DisposeAsync` are `curl_easy_cleanup` and dispose the transfer once; a member used afterwards throws
