@@ -4556,7 +4556,8 @@ internal sealed class CurlCommandRunner(
     /// Sets what stays the same for every attempt of the transfer on its easy handle: on the hooks, the option
     /// group's easy options less what <c>curl_easy_setopt</c> sets (<see cref="EasySetoptsFromCommandLine.KeptOnHooks" />);
     /// through <c>curl_easy_setopt</c>, the transfer URL as <c>CURLOPT_URL</c> and every behaviour, transfer (with the
-    /// transfer's <c>-T</c> upload) and network option the command line sets (ADR-0631); then the tool's own settings,
+    /// transfer's <c>-T</c> upload), network, TLS, authentication and proxy option the command line sets (ADR-0631,
+    /// ADR-0639); then the tool's own settings,
     /// and the run's diagnostic log, which the handle's <c>-Y</c>/<c>-y</c> and <c>-m</c> watchdogs write to.
     /// </summary>
     /// <param name="easy">The transfer's easy handle.</param>

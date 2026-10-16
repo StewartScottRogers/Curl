@@ -108,6 +108,24 @@ public sealed class CurlCommandRunnerEasyTransferTests
     }
 
     [TestMethod]
+    public async Task RunAsync_OneOptionOfEachSecurityGroup_SetsItThroughSetOptionAndNotOnTheHooks()
+    {
+        int exitCode = await RunAsync([Ok], "-k", "-u", "user:secret", "--noproxy", "example", Url);
+
+        RecordingEasyTransfer handle = engine.Handles[0];
+        EasyOptions hooks = handle.OptionsSet[0];
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual("hello", StandardOutputText);
+        Assert.IsTrue(hooks.Tls.Origin.VerifyPeer);
+        Assert.IsNull(hooks.Authentication.UserPassword);
+        Assert.IsNull(hooks.Proxy.NoProxy);
+        Assert.IsFalse(handle.Options.Tls.Origin.VerifyPeer);
+        Assert.IsFalse(handle.Options.Tls.Origin.VerifyHost);
+        Assert.AreEqual("user:secret", handle.Options.Authentication.UserPassword);
+        Assert.AreEqual("example", handle.Options.Proxy.NoProxy);
+    }
+
+    [TestMethod]
     public async Task RunAsync_LimitRateBelowTheSmallestBuffer_KeepsTheReceiveBufferOnTheHooks()
     {
         int exitCode = await RunAsync([Ok], "--limit-rate", "100", Url);

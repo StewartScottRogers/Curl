@@ -1,6 +1,9 @@
 using Curl.Api.Options;
 using Curl.Api.Options.Behaviour;
+using Curl.Api.Options.Authentication;
 using Curl.Api.Options.Network;
+using Curl.Api.Options.Proxy;
+using Curl.Api.Options.Tls;
 using Libcurl.Options;
 
 namespace Curl.Console;
@@ -122,5 +125,90 @@ public sealed class EasySetoptsFromCommandLineTests
         Assert.AreEqual(3, kept.Network.VlanPriority);
         Assert.IsTrue(kept.Network.MultipathTcp);
         Assert.AreSame(options.Http, kept.Http);
+    }
+
+    [TestMethod]
+    public void Of_OneFieldOfEachSecurityGroup_MakesOneCallEachInGroupOrder()
+    {
+        EasyOptions options = new()
+        {
+            Tls = new EasyTlsOptions
+            {
+                Origin = new TlsPeerOptions { VerifyPeer = false, VerifyHost = false, SslVersion = SslVersion.Tls12, SslVersionMaximum = SslVersionMaximum.Tls13 },
+                Proxy = new TlsPeerOptions { CertificateAuthorityFile = "proxy.pem" },
+                DohVerifyHost = false,
+            },
+            Authentication = new EasyAuthenticationOptions { AwsSigV4 = "aws:amz", HttpAuthentication = HttpAuthenticationMethods.AwsSigV4 | HttpAuthenticationMethods.Digest },
+            Proxy = new EasyProxyOptions { NoProxy = "example", ProxyHeaders = ["X: 1"], HaProxyClientIp = "1.2.3.4" },
+        };
+
+        IReadOnlyList<EasySetopt> setopts = EasySetoptsFromCommandLine.Of(options);
+
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                new EasySetopt(CurlOption.Sslversion, (long)SslVersion.Tls12 | (long)SslVersionMaximum.Tls13),
+                new EasySetopt(CurlOption.SslVerifypeer, 0L),
+                new EasySetopt(CurlOption.SslVerifyhost, 0L),
+                new EasySetopt(CurlOption.ProxyCainfo, "proxy.pem"),
+                new EasySetopt(CurlOption.DohSslVerifyhost, 0L),
+                new EasySetopt(CurlOption.AwsSigv4, "aws:amz"),
+                new EasySetopt(CurlOption.Httpauth, (long)(HttpAuthenticationMethods.AwsSigV4 | HttpAuthenticationMethods.Digest)),
+                new EasySetopt(CurlOption.Noproxy, "example"),
+            },
+            setopts.Where(setopt => setopt.Option is not (CurlOption.Proxyheader or CurlOption.HaproxyClientIp)).ToArray());
+        CollectionAssert.AreEqual(new[] { "X: 1" }, (string[])setopts.Single(setopt => setopt.Option == CurlOption.Proxyheader).Value!);
+        Assert.AreEqual(new EasySetopt(CurlOption.HaproxyClientIp, "1.2.3.4"), setopts[^1]);
+    }
+
+    [TestMethod]
+    public void Of_EchModeAndValues_SetsThemAsCurlsToolDoes()
+    {
+        EasyOptions options = new() { Tls = new EasyTlsOptions { EncryptedClientHello = "hard", EncryptedClientHelloPublicName = "pn.example", EncryptedClientHelloConfigList = "AAAA" } };
+
+        IReadOnlyList<EasySetopt> setopts = EasySetoptsFromCommandLine.Of(options);
+        EasyOptions kept = EasySetoptsFromCommandLine.KeptOnHooks(options);
+
+        CollectionAssert.AreEqual(
+            new[] { new EasySetopt(CurlOption.Ech, "hard"), new EasySetopt(CurlOption.Ech, "pn:pn.example"), new EasySetopt(CurlOption.Ech, "ecl:AAAA") },
+            setopts.ToArray());
+        Assert.IsNull(kept.Tls.EncryptedClientHello);
+        Assert.IsNull(kept.Tls.EncryptedClientHelloPublicName);
+        Assert.IsNull(kept.Tls.EncryptedClientHelloConfigList);
+    }
+
+    [TestMethod]
+    public void Of_EchTextTheSetterWouldIgnore_LeavesItOnTheHooks()
+    {
+        EasyOptions options = new() { Tls = new EasyTlsOptions { EncryptedClientHello = "maybe", EncryptedClientHelloPublicName = "p", EncryptedClientHelloConfigList = "A" } };
+
+        IReadOnlyList<EasySetopt> setopts = EasySetoptsFromCommandLine.Of(options);
+        EasyOptions kept = EasySetoptsFromCommandLine.KeptOnHooks(options);
+
+        Assert.IsEmpty(setopts);
+        Assert.AreEqual("maybe", kept.Tls.EncryptedClientHello);
+        Assert.AreEqual("p", kept.Tls.EncryptedClientHelloPublicName);
+        Assert.AreEqual("A", kept.Tls.EncryptedClientHelloConfigList);
+    }
+
+    [TestMethod]
+    public void KeptOnHooks_SecurityFieldsWithoutAKeptValue_StayOnTheHooksAndTheRestAreLibcurlDefaults()
+    {
+        EasyOptions options = new()
+        {
+            Tls = new EasyTlsOptions { Engine = "pkcs11", Origin = new TlsPeerOptions { VerifyPeer = false } },
+            Authentication = new EasyAuthenticationOptions { UserPassword = "u:p", HttpSignatureKey = "key.pem", TlsAuthType = "SRP" },
+            Proxy = new EasyProxyOptions { Proxy = "http://proxy:3128" },
+        };
+
+        EasyOptions kept = EasySetoptsFromCommandLine.KeptOnHooks(options);
+
+        Assert.AreEqual("pkcs11", kept.Tls.Engine);
+        Assert.IsTrue(kept.Tls.Origin.VerifyPeer);
+        Assert.AreEqual("key.pem", kept.Authentication.HttpSignatureKey);
+        Assert.AreEqual("SRP", kept.Authentication.TlsAuthType);
+        Assert.IsNull(kept.Authentication.UserPassword);
+        Assert.IsNull(kept.Proxy.Proxy);
+        CollectionAssert.DoesNotContain(EasySetoptsFromCommandLine.Of(options).Select(setopt => setopt.Option).ToArray(), CurlOption.Sslengine);
     }
 }
