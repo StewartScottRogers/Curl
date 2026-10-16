@@ -36,8 +36,8 @@ Prerequisite of BL-2478 (the FTP wildcard download loop) and so of BL-2420 (CURL
   link target). Devices: `b`/`c` lines with a plain size parse; a `1,   3` major/minor size is exit 87, as in curl.
 - Ported as a byte state machine: `FtpFileListParser` (public: chunks in, `Entries`, `Failure`) over
   `FtpUnixListLineReader` and `FtpDosListLineReader`; `FtpWildcardPattern` (public) with `FtpWildcardSet`.
-  Decisions in ADR-0612: curl's own matcher on every platform (system `fnmatch` differences on Linux and macOS
-  filed as BL-2479), texts as Latin-1 cut at the first NUL, hard link limit by `runsOnWindows`, a selector
+  Decisions in ADR-0613: curl's own matcher on every platform (system `fnmatch` differences on Linux and macOS
+  filed as BL-2480), texts as Latin-1 cut at the first NUL, hard link limit by `runsOnWindows`, a selector
   predicate asked once per entry, an entry past 9,999 bytes is exit 27 (`CURLE_OUT_OF_MEMORY`).
 - Quality: 100% line and branch, 0 failing members, worst CRAP 10 (448 members).
 

@@ -23,7 +23,7 @@ not fixed by the source alone:
 1. **curl's own matcher on every platform.** `FtpWildcardPattern.Matches` ports `Curl_fnmatch`'s custom loop,
    quirks included (at most two star groups, a malformed set never matches, only the first class named in a set in
    curl's order counts, `[:space:]` tests blanks), and its tests pin the custom column of `unit1307.c`. Matching the
-   Linux and macOS builds' system `fnmatch` where it differs is filed as its own task (BL-2479), so this one stays
+   Linux and macOS builds' system `fnmatch` where it differs is filed as its own task (BL-2480), so this one stays
    one library's port.
 2. **Bytes as Latin-1.** The parser reads bytes and gives every text one character per byte (Latin-1), cut at the
    first NUL as curl's C strings are; the matcher turns its strings back into Latin-1 bytes. A name in UTF-8 is
@@ -42,4 +42,4 @@ not fixed by the source alone:
 
 The engine (BL-2420, BL-2478) maps `FtpFileListEntry` to `CurlFileInfo` and drives the download loop; neither
 type references `Curl.Api`. Off Windows, patterns where system `fnmatch` answers differently match as Windows'
-curl does until BL-2479 lands.
+curl does until BL-2480 lands.
