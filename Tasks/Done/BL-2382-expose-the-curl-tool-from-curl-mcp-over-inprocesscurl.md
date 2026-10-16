@@ -32,7 +32,7 @@ ADR-0548 (`Documentation/Planning/Decisions/ADR-0548-curl-mcp-an-mcp-server-over
 
 Plan: Documentation/Planning/Curl-Mcp.md. Decision: ADR-0548.
 
-Decisions (ADR-0570, decided by Claude under Stewart's delegation):
+Decisions (ADR-0575, decided by Claude under Stewart's delegation):
 - `InProcessCurl` takes no working directory and no cancellation token, so `CurlMcpHost.Build` reads `CURL_MCP_ROOT` and `CURL_MCP_MAX_RESPONSE_BYTES` once (a bad value stops the server) and makes the root the process's current directory once before serving. `InProcessCurlCommandRunner` refuses any other working directory, so relative paths cannot escape the root; the token is not passed on.
 - The adapter uses the dialing overload: the production `TcpConnector` over `TcpDialer` with default `TcpSocketOptions`, `SystemDnsResolver` and `UdpDatagramConnector`. Referencing the `Curl.Console` exe from `Curl.Mcp` builds cleanly; the AOT publish is BL-2389's to try.
 - `CurlCommandTool.RunCurlAsync` returns a `CallToolResult`: one text block holding the `McpCurlToolResult` as camel-case JSON (enum names), with `IsError` taken from the result. The JSON comes from the source-generated `CurlMcpJsonContext`, combined with `McpJsonUtilities.DefaultOptions` to register the tool. Its generated members are excluded from coverage: the first measurement counted 68 generated members against the gates.
