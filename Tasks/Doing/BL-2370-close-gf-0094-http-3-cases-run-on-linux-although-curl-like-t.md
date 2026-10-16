@@ -48,3 +48,4 @@ In Curl.Conformance.UnitLibrary, remove 'http/3' from UpstreamCurlPlatform.Unix 
 ## Log
 
 - 2026-10-15: Created.
+- 2026-10-15: Backlog -> Doing.
