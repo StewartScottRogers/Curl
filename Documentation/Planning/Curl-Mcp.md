@@ -78,7 +78,7 @@ Every task also depends on BL-2321.
 `dotnet pack Curl.Mcp`: `PackAsTool`, `PackageType` `McpServer`, `.mcp/server.json`
 (`name` `io.github.StewartScottRogers/Curl`, `registryType` `nuget`, `CURL_MCP_ROOT`
 required), self-contained per runtime identifier, native AOT where the SDK allows it
-(BL-2389 decides and records why if not). Publishing is Stewart's release step (BL-2393).
+(BL-2389 tried it: [ADR-0598](Decisions/ADR-0598-curl-mcp-native-aot-fails-keeps-self-contained.md) records why it stays self-contained). Publishing is Stewart's release step (BL-2393).
 
 ## Not planned
 

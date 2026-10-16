@@ -14,8 +14,11 @@ namespace Curl.Engine;
 /// A write is therefore split after each line feed, whatever the handler wrote at once. The
 /// two streams belong to the caller and are neither flushed nor closed here.
 /// </remarks>
-internal sealed class HeaderLineTeeStream(Stream dumpHeaderOutput, Stream bodyOutput) : Stream
+internal sealed class HeaderLineTeeStream(Stream dumpHeaderOutput, Stream bodyOutput) : Stream, IConnectReplyHeadMarking
 {
+    /// <summary>Passes the mark on to the <c>-D</c> output when it takes one (ADR-0603).</summary>
+    public void MarkConnectReplyHead() => (dumpHeaderOutput as IConnectReplyHeadMarking)?.MarkConnectReplyHead();
+
     /// <inheritdoc />
     public override bool CanRead => false;
 

@@ -330,7 +330,14 @@ it performs one attempt through `RedirectFollower` under the attempt's `-Y`/`-y`
 its exit 28 failure, numbers the run's `%{xfer_id}` and `%{conn_id}` (`TakeNextAttemptIds`,
 `KeepRetriedConnectionIdWhenReused`) and keeps the serial attempt start `--rate` measures from.
 The `--retry` loop around it (`FollowRetryingAsync`, the retry lines, the `-o` attempt bytes) stays
-in the runner, as retrying is the curl tool's work. `CurlComposition.CreateRunner` builds it; a
+in the runner, as retrying is the curl tool's work. A serial transfer performs its attempts through
+the runner's `ICurlEngine` (`curlEngine`; `CreateRunner` passes a `ManagedCurlEngine` with curl's easy
+error text, and a runner given none makes one on its clock): one easy handle per transfer, its
+`Options` from `EasyOptionsFromCommandLine.EasyOptionsOf`, one `PerformAsync` per attempt, `--retry`
+attempts included, each carrying the attempt the runner set up as the internal `ToolAttempt` and
+reading back its `ToolAttemptResult` (ADR-0552). `-Z` transfers still perform directly
+(`TransferPerformer.FollowWatchingSpeedAsync`) until the engine's multi handle lands in phase 3;
+building the attempt inside the handle from the options and callbacks is BL-2394. `CurlComposition.CreateRunner` builds it; a
 runner given none makes one on its own clock. Both hand it `CurlEasyErrorText.Of`, which stays here, for the text its known-hosts and cookie-line failures carry.
 It also owns the per-transfer setup libcurl does before it connects (`TransferPerformer.Setup.cs`,
 BL-2283): the URL parse and its refusals (`TryParseTransferUrl`, `ReportUrlRejected`,

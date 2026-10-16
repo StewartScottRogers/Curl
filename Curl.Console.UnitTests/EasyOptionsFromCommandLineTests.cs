@@ -129,6 +129,24 @@ public sealed partial class EasyOptionsFromCommandLineTests
 
     private static object?[] Absent(string member, Func<EasyNetworkOptions, object?> read) => [member, read];
 
+    [TestMethod]
+    public void EasyOptionsOf_CommandLine_SetsTheUrlAndEachGroupFromItsMapping()
+    {
+        CommandLineOptions options = Parse("-v", "-m", "5", "--path-as-is");
+
+        Api.Options.EasyOptions easy = EasyOptionsFromCommandLine.EasyOptionsOf(options, "http://h/x");
+
+        Assert.AreEqual("http://h/x", easy.Network.Url);
+        Assert.IsTrue(easy.Network.PathAsIs);
+        Assert.AreEqual(EasyOptionsFromCommandLine.BehaviourOf(options), easy.Behaviour);
+        Assert.AreEqual(EasyOptionsFromCommandLine.TransferOf(options).Timeout, easy.Transfer.Timeout);
+        Assert.AreEqual(EasyOptionsFromCommandLine.TlsOf(options).Origin.VerifyPeer, easy.Tls.Origin.VerifyPeer);
+        Assert.AreEqual(EasyOptionsFromCommandLine.AuthenticationOf(options).UserName, easy.Authentication.UserName);
+        Assert.AreEqual(EasyOptionsFromCommandLine.ProxyOf(options).Proxy, easy.Proxy.Proxy);
+        Assert.AreEqual(EasyOptionsFromCommandLine.HttpOf(options).UserAgent, easy.Http.UserAgent);
+        Assert.AreEqual(EasyOptionsFromCommandLine.ProtocolOf(options).Ftp.UseEpsv, easy.Protocols.Ftp.UseEpsv);
+    }
+
     private static CommandLineOptions Parse(params string[] arguments)
     {
         CommandLineParseResult result = QuicBuildParser.Parse([.. arguments, Url], _ => true);

@@ -53,6 +53,68 @@ public sealed class CallbackReadStreamTests
     }
 
     [TestMethod]
+    public void Read_ReadCallbackAborts_MarksTheStreamAbortedAndThrowsWithLibcurlsText()
+    {
+        using CallbackReadStream stream = new(_ => ReadCallbackResult.Abort);
+
+        IOException failure = Assert.ThrowsExactly<IOException>(() => stream.Read(new byte[2], 0, 2));
+
+        Assert.AreEqual(CallbackReadStream.AbortedText, failure.Message);
+        Assert.IsTrue(stream.Aborted);
+    }
+
+    [TestMethod]
+    public async Task ReadAsync_ReadCallbackPauses_WaitsForUnpauseThenAsksAgain()
+    {
+        EasyPauseGate gate = new();
+        int calls = 0;
+        ReadCallback callback = buffer =>
+        {
+            calls++;
+            if (calls == 1)
+            {
+                return ReadCallbackResult.Pause;
+            }
+
+            buffer[0] = 7;
+            return 1;
+        };
+        await using CallbackReadStream stream = new(callback, gate);
+        byte[] buffer = new byte[4];
+
+        Task<int> reading = stream.ReadAsync(buffer.AsMemory()).AsTask();
+        bool pausedWhileWaiting = gate.Directions == Api.EngineContracts.CurlPause.Send && !reading.IsCompleted;
+        gate.Set(Api.EngineContracts.CurlPause.Continue);
+        int read = await reading;
+
+        Assert.IsTrue(pausedWhileWaiting);
+        Assert.AreEqual(1, read);
+        Assert.AreEqual(7, buffer[0]);
+        Assert.AreEqual(2, calls);
+        Assert.IsFalse(stream.Aborted);
+    }
+
+    [TestMethod]
+    public async Task ReadAsync_ReadCallbackPausesWithNoGate_ThrowsWithLibcurlsPauseNotSupportedText()
+    {
+        await using CallbackReadStream stream = new(_ => ReadCallbackResult.Pause);
+
+        IOException failure = await Assert.ThrowsExactlyAsync<IOException>(async () => _ = await stream.ReadAsync(new byte[2].AsMemory()));
+
+        Assert.AreEqual(CallbackReadStream.PauseNotSupportedText, failure.Message);
+    }
+
+    [TestMethod]
+    public void Read_ReadCallbackPausesOnTheSynchronousPath_ThrowsWithLibcurlsPauseNotSupportedText()
+    {
+        using CallbackReadStream stream = new(_ => ReadCallbackResult.Pause, new EasyPauseGate());
+
+        IOException failure = Assert.ThrowsExactly<IOException>(() => stream.Read(new byte[2], 0, 2));
+
+        Assert.AreEqual(CallbackReadStream.PauseNotSupportedText, failure.Message);
+    }
+
+    [TestMethod]
     public void Capabilities_ReadOnlyStream_RefuseWriteSeekAndLength()
     {
         using CallbackReadStream stream = new(_ => 0);

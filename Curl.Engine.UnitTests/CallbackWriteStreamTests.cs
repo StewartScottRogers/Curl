@@ -1,4 +1,5 @@
 using Curl.Api.Callbacks;
+using Curl.Protocol.Abstractions;
 
 namespace Curl.Engine;
 
@@ -26,12 +27,79 @@ public sealed class CallbackWriteStreamTests
     }
 
     [TestMethod]
-    public void Write_HeaderCallbackTakesFewerBytes_ThrowsIOException()
+    public void Write_HeaderCallbackTakesFewerBytes_ThrowsOutputWriteFailedWithWhatItTook()
     {
         HeaderCallback callback = header => header.Length - 1;
         using CallbackWriteStream stream = CallbackWriteStream.Of(callback);
 
-        Assert.ThrowsExactly<IOException>(() => stream.Write([1, 2]));
+        OutputWriteFailedException failure = Assert.ThrowsExactly<OutputWriteFailedException>(() => stream.Write([1, 2]));
+
+        Assert.AreEqual(1, failure.BytesAccepted);
+        Assert.AreEqual("Failure writing output to destination, passed 2 returned 1", failure.Message);
+    }
+
+    [TestMethod]
+    public void Write_WriteCallbackReturnsANegativeCount_AcceptsNothingAndSaysWhatItReturned()
+    {
+        using CallbackWriteStream stream = new(_ => -1);
+
+        OutputWriteFailedException failure = Assert.ThrowsExactly<OutputWriteFailedException>(() => stream.Write([1, 2, 3]));
+
+        Assert.AreEqual(0, failure.BytesAccepted);
+        Assert.AreEqual("Failure writing output to destination, passed 3 returned -1", failure.Message);
+    }
+
+    [TestMethod]
+    public void Write_WriteCallbackReturnsWriteFuncError_SaysItReturnedLibcurlsErrorValue()
+    {
+        using CallbackWriteStream stream = new(_ => WriteCallbackResult.Error);
+
+        OutputWriteFailedException failure = Assert.ThrowsExactly<OutputWriteFailedException>(() => stream.Write([1, 2]));
+
+        Assert.AreEqual("Failure writing output to destination, passed 2 returned 4294967295", failure.Message);
+    }
+
+    [TestMethod]
+    public async Task WriteAsync_WriteCallbackPauses_WaitsForUnpauseThenHandsTheSameChunkAgain()
+    {
+        EasyPauseGate gate = new();
+        List<byte[]> calls = [];
+        WriteCallback callback = data =>
+        {
+            calls.Add(data.ToArray());
+            return calls.Count == 1 ? WriteCallbackResult.Pause : data.Length;
+        };
+        await using CallbackWriteStream stream = CallbackWriteStream.Of(callback, gate);
+
+        Task writing = stream.WriteAsync(new byte[] { 1, 2 }).AsTask();
+        bool pausedWhileWaiting = gate.Directions == Api.EngineContracts.CurlPause.Receive && !writing.IsCompleted;
+        gate.Set(Api.EngineContracts.CurlPause.Continue);
+        await writing;
+
+        Assert.IsTrue(pausedWhileWaiting);
+        Assert.HasCount(2, calls);
+        CollectionAssert.AreEqual(calls[0], calls[1]);
+    }
+
+    [TestMethod]
+    public async Task WriteAsync_HeaderCallbackPausesWithNoGate_FailsWithLibcurlsPauseNotSupportedText()
+    {
+        HeaderCallback callback = _ => WriteCallbackResult.Pause;
+        await using CallbackWriteStream stream = CallbackWriteStream.Of(callback);
+
+        OutputWriteFailedException failure = await Assert.ThrowsExactlyAsync<OutputWriteFailedException>(async () => await stream.WriteAsync(new byte[] { 1 }));
+
+        Assert.AreEqual(CallbackWriteStream.PauseNotSupportedText, failure.Message);
+    }
+
+    [TestMethod]
+    public void Write_WriteCallbackPausesOnTheSynchronousPath_FailsWithLibcurlsPauseNotSupportedText()
+    {
+        using CallbackWriteStream stream = new(_ => WriteCallbackResult.Pause, new EasyPauseGate());
+
+        OutputWriteFailedException failure = Assert.ThrowsExactly<OutputWriteFailedException>(() => stream.Write([1]));
+
+        Assert.AreEqual(CallbackWriteStream.PauseNotSupportedText, failure.Message);
     }
 
     [TestMethod]

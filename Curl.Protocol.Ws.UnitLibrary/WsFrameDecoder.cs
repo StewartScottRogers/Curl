@@ -24,7 +24,11 @@ namespace Curl.Protocol.Ws;
 /// Receives curl's <c>--trace-config ws</c> lines for each frame decoded and each run of payload
 /// passed on (<see cref="WsFrameTrace" />, BL-1164); <see langword="null" /> writes none.
 /// </param>
-internal sealed class WsFrameDecoder(IDiagnosticLog? diagnosticLog = null, WsFrameTrace? trace = null)
+/// <param name="recordsRuns">
+/// Whether each run of payload, ping payloads included, is kept with its frame's metadata for
+/// <see cref="TakeRuns" /> (<see cref="WsFrameMetadataDecoder" />, BL-2471).
+/// </param>
+internal sealed class WsFrameDecoder(IDiagnosticLog? diagnosticLog = null, WsFrameTrace? trace = null, bool recordsRuns = false)
 {
     private const byte FinalFragment = 0x80;
 
@@ -52,6 +56,8 @@ internal sealed class WsFrameDecoder(IDiagnosticLog? diagnosticLog = null, WsFra
 
     // A ping's payload, echoed in a pong, or a close frame's, whose code is logged.
     private readonly ArrayBufferWriter<byte> controlPayload = new(Longest7BitLength);
+
+    private readonly List<WsFrameRun>? runs = recordsRuns ? [] : null;
 
     private int headCount;
 
@@ -91,6 +97,17 @@ internal sealed class WsFrameDecoder(IDiagnosticLog? diagnosticLog = null, WsFra
         return new WsDecodedBytes(payload.WrittenSpan.ToArray(), lastPing, null);
     }
 
+    /// <summary>
+    /// Gives the runs of payload decoded since the last call, with their frames' metadata, and
+    /// forgets them; only for a decoder made to record runs.
+    /// </summary>
+    internal WsFrameRun[] TakeRuns()
+    {
+        WsFrameRun[] taken = [.. runs!];
+        runs!.Clear();
+        return taken;
+    }
+
     private ReadOnlySpan<byte> ConsumeHeadByte(ReadOnlySpan<byte> received)
     {
         head[headCount++] = received[0];
@@ -121,6 +138,7 @@ internal sealed class WsFrameDecoder(IDiagnosticLog? diagnosticLog = null, WsFra
             controlPayload.Write(chunk);
         }
 
+        runs?.Add(new WsFrameRun(opcode, IsFinal(), payloadLength - payloadRemaining, payloadRemaining - length, chunk.ToArray()));
         payloadRemaining -= length;
         trace.PayloadPassed(opcode, IsFinal(), length, payloadLength - payloadRemaining, payloadLength);
         if (payloadRemaining == 0)
@@ -234,6 +252,7 @@ internal sealed class WsFrameDecoder(IDiagnosticLog? diagnosticLog = null, WsFra
         controlPayload.ResetWrittenCount();
         if (payloadRemaining == 0)
         {
+            runs?.Add(new WsFrameRun(opcode, IsFinal(), 0, 0, ReadOnlyMemory<byte>.Empty));
             CloseFrame();
         }
         else if (isLastByteOfRead)

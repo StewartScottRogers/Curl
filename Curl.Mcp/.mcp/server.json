@@ -1,0 +1,35 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-10-17/server.schema.json",
+  "description": "Runs curl for AI agents: Curl, the drop-in C# replacement for the curl command-line tool, over standard input and output.",
+  "name": "io.github.StewartScottRogers/Curl",
+  "version": "0.1.0",
+  "packages": [
+    {
+      "registryType": "nuget",
+      "identifier": "Curl.Mcp",
+      "version": "0.1.0",
+      "transport": {
+        "type": "stdio"
+      },
+      "packageArguments": [],
+      "environmentVariables": [
+        {
+          "name": "CURL_MCP_ROOT",
+          "description": "The directory every file curl reads or writes must lie inside.",
+          "isRequired": true,
+          "format": "filepath"
+        },
+        {
+          "name": "CURL_MCP_MAX_RESPONSE_BYTES",
+          "description": "The most bytes of output a tool returns; 1048576 when unset.",
+          "isRequired": false,
+          "format": "number"
+        }
+      ]
+    }
+  ],
+  "repository": {
+    "url": "https://github.com/StewartScottRogers/Curl",
+    "source": "github"
+  }
+}

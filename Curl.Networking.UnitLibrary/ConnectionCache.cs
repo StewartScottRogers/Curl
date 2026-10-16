@@ -54,6 +54,25 @@ public sealed class ConnectionCache(TimeProvider timeProvider) : IAsyncDisposabl
     }
 
     /// <summary>
+    /// Closes every idle connection, as libcurl's <c>CURLMNWC_CLEAR_CONNS</c> does when the network
+    /// changed: they leave the cache before this returns its task, so no later transfer reuses one. The
+    /// cache stays open, and a connection in use is kept when it is handed back, as before.
+    /// </summary>
+    /// <returns>A task that completes when every idle connection is closed.</returns>
+    public async ValueTask CloseIdleAsync()
+    {
+        List<PoolEntry> closing;
+
+        lock (Gate)
+        {
+            closing = [.. Idle];
+            Idle.Clear();
+        }
+
+        await CloseAllAsync(closing);
+    }
+
+    /// <summary>
     /// Takes the next connection number, from <c>0</c> across the whole run, whether a TCP
     /// connection, a TFTP channel or a <c>file://</c> transfer takes it (ADR-0109, BL-977).
     /// </summary>

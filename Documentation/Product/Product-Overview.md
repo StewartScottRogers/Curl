@@ -216,7 +216,18 @@ Dependencies point one way — `Console → Cli, Engine → Core → {Protocols}
 with `Networking`, `Authentication`, `Cookies` and `Output` injected as services, and the
 hand-built libraries below them (`Networking → Tls, Quic, Http2, Kerberos`;
 `Protocol.Http → Http2, Http3, Zstandard`; `Tls, Quic, Kerberos, Ntlm → Cryptography`).
-Nothing points back up. `Curl.Engine` sits beneath `Curl.Console`, `Curl.Api` and `Libcurl` and never references them or `Curl.Cli`; `Curl.Console` is the only project that reads the command line and builds the option groups the engine takes.
+Nothing points back up.
+
+The layering of the tool and the two public APIs ([the plan](../Planning/Curl-Api-And-libcurl.md),
+[ADR-0506](../Planning/Decisions/ADR-0506-libcurl-and-curl-api-over-one-transfer-engine.md)),
+top to bottom: the **tool** (`Curl.Console`) and .NET programs call `Libcurl` (the
+libcurl-faithful API) or `Curl.Api` (the .NET API); both call the **seam**
+(`Curl.Api.UnitLibrary`: engine contracts, `CurlCode`, the easy option groups, `TransferInfo`);
+the seam is implemented by the **engine** (`Curl.Engine.UnitLibrary`), which composes the
+libraries below it. `Libcurl` and `Curl.Api` are requirements FR-108 and FR-109, planned. The terms are in
+the [glossary](../Wiki/Glossary.md).
+
+`Curl.Engine` sits beneath `Curl.Console`, `Curl.Api` and `Libcurl` and never references them or `Curl.Cli`; `Curl.Console` is the only project that reads the command line and builds the option groups the engine takes.
 
 ## Project layout
 

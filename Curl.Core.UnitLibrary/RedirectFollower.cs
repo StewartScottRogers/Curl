@@ -238,6 +238,12 @@ public sealed class RedirectFollower(
             Rewind(bodyContent, bodyStart, bodyDropped);
             log.Followed(responseCode, target, bodyDropped, methodDropped);
             chain.Followed(target);
+            if (UploadRewindFailure(context, uploadStart, bodyDropped, result) is { } rewindFailure)
+            {
+                chain.Refused(keepsRedirectUrl: false);
+                return chain.Merge(rewindFailure);
+            }
+
             // No stop means the target parsed, so next is set.
             hop = NextHop(context, hop.Url, next!, HopMethod(http, methodDropped) with { RedirectsFollowed = chain.RedirectCount, ResponseHeadersStored = result.Report.ResponseHeadersStored, AuthSchemePicked = result.Report.AuthSchemePicked, KeptDigestAuthorization = result.Report.DigestAuthorizationSent, EarlierResponseWasHttp10 = receivedHttp10 }, hopProxy, bodyDropped, policy.LocationTrusted || IsSameOrigin(context.Url, next!), operationStarted, selectHopAltSvc, selectHopCredentials);
         }
@@ -569,6 +575,30 @@ public sealed class RedirectFollower(
             // A seekable stream's start was only recorded when the stream exists.
             content!.Position = position;
         }
+    }
+
+    /// <summary>
+    /// Rewinds a kept upload that cannot seek but implements <see cref="IUploadRewinder" />, once
+    /// some of it was read, as curl 8.22.0's <c>cr_in_rewind</c> does when the next hop starts; gives
+    /// the hop's failure when the rewind fails: exit 65 with the rewinder's message, after the
+    /// <c>-v</c> lines for it and <see cref="IUploadRewinder.ReaderRewindFailedLine" />.
+    /// <see langword="null" /> when the rewind succeeded or none was needed.
+    /// </summary>
+    private static TransferResult? UploadRewindFailure(ITransferContext context, long? uploadStart, bool bodyDropped, TransferResult result)
+    {
+        if (bodyDropped || uploadStart is not null || context.Upload is not IUploadRewinder { HasBeenRead: true } rewinder)
+        {
+            return null;
+        }
+
+        if (rewinder.RewindToStart() is not { } message)
+        {
+            return null;
+        }
+
+        context.Events.ReportInfo(message);
+        context.Events.ReportInfo(IUploadRewinder.ReaderRewindFailedLine);
+        return TransferResult.Failure(CurlExitCode.SendFailRewind, message, result.BytesTransferred);
     }
 
     private static bool IsSameOrigin(CurlUrl first, CurlUrl next) =>

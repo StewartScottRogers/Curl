@@ -1,3 +1,5 @@
+using Curl.Api.Codes;
+using Curl.Api.EngineContracts.Url;
 using Curl.Api.Options.Network;
 
 namespace Curl.Api.UnitTests.Options.Network;
@@ -11,7 +13,7 @@ public sealed class EasyNetworkOptionsTests
     public void New_StringOptions_DefaultToNull()
     {
         Assert.IsNull(Defaults.Url);
-        Assert.IsNull(Defaults.UrlFromUrlHandle);
+        Assert.IsNull(Defaults.UrlHandle);
         Assert.IsNull(Defaults.Protocols);
         Assert.IsNull(Defaults.RedirectProtocols);
         Assert.IsNull(Defaults.DefaultProtocol);
@@ -99,7 +101,7 @@ public sealed class EasyNetworkOptionsTests
     public static IEnumerable<object[]> SingleOptionChanges =>
     [
         Change("Url", o => o with { Url = "http://example.com/" }, o => o with { Url = Defaults.Url }),
-        Change("UrlFromUrlHandle", o => o with { UrlFromUrlHandle = "http://example.com/" }, o => o with { UrlFromUrlHandle = Defaults.UrlFromUrlHandle }),
+        Change("UrlHandle", o => o with { UrlHandle = new UrlHandleStub() }, o => o with { UrlHandle = Defaults.UrlHandle }),
         Change("PathAsIs", o => o with { PathAsIs = true }, o => o with { PathAsIs = Defaults.PathAsIs }),
         Change("Protocols", o => o with { Protocols = "http,https" }, o => o with { Protocols = Defaults.Protocols }),
         Change("RedirectProtocols", o => o with { RedirectProtocols = "https" }, o => o with { RedirectProtocols = Defaults.RedirectProtocols }),
@@ -169,4 +171,18 @@ public sealed class EasyNetworkOptionsTests
         string option,
         Func<EasyNetworkOptions, EasyNetworkOptions> set,
         Func<EasyNetworkOptions, EasyNetworkOptions> restore) => [option, set, restore];
+
+    /// <summary>An <see cref="ICurlUrlHandle"/> to set on <see cref="EasyNetworkOptions.UrlHandle"/>; never called.</summary>
+    private sealed class UrlHandleStub : ICurlUrlHandle
+    {
+        public CurlUrlCode Get(CurlUrlPart part, CurlUrlFlags flags, out string? value) => throw new NotSupportedException();
+
+        public CurlUrlCode Set(CurlUrlPart part, string? value, CurlUrlFlags flags) => throw new NotSupportedException();
+
+        public ICurlUrlHandle Duplicate() => throw new NotSupportedException();
+
+        public void Dispose()
+        {
+        }
+    }
 }

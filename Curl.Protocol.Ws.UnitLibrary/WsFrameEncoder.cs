@@ -3,11 +3,12 @@ using System.Buffers.Binary;
 namespace Curl.Protocol.Ws;
 
 /// <summary>
-/// Writes one client frame as RFC 6455 requires and curl 8.21.0 sends it: the FIN bit set, the
-/// mask bit set, the shortest of the 7-, 16- and 64-bit length forms, then a 4-byte mask drawn
-/// from the injected random source and the payload masked with it (ADR-0128, ADR-0131).
+/// Writes one client frame as RFC 6455 requires and curl 8.21.0 sends it: the FIN bit as asked
+/// (set for every frame the tool sends), the mask bit set, the shortest of the 7-, 16- and 64-bit
+/// length forms, then a 4-byte mask drawn from the injected random source and the payload masked
+/// with it (ADR-0128, ADR-0131). Public for libcurl's <c>curl_ws_send</c> (BL-2471).
 /// </summary>
-internal static class WsFrameEncoder
+public static class WsFrameEncoder
 {
     /// <summary>The longest payload the 7-bit length form carries.</summary>
     private const int Longest7BitLength = 125;
@@ -29,13 +30,28 @@ internal static class WsFrameEncoder
     /// <param name="payload">The payload, unmasked.</param>
     /// <param name="randomSource">Supplies the frame's 4-byte mask.</param>
     /// <returns>The frame's bytes, ready to send.</returns>
-    internal static byte[] Encode(WsOpcode opcode, ReadOnlySpan<byte> payload, IWebSocketRandomSource randomSource)
+    internal static byte[] Encode(WsOpcode opcode, ReadOnlySpan<byte> payload, IWebSocketRandomSource randomSource) =>
+        Encode(opcode, isFinal: true, payload, randomSource);
+
+    /// <summary>
+    /// Writes a masked frame of any opcode, with the FIN bit clear for a fragment that more
+    /// fragments follow: a first fragment's opcode is <see cref="WsOpcode.Text" /> or
+    /// <see cref="WsOpcode.Binary" />, and every later one's <see cref="WsOpcode.Continuation" />.
+    /// </summary>
+    /// <param name="opcode">What the frame carries.</param>
+    /// <param name="isFinal">Whether the FIN bit is set: the frame ends its message.</param>
+    /// <param name="payload">The payload, unmasked.</param>
+    /// <param name="randomSource">Supplies the frame's 4-byte mask.</param>
+    /// <returns>The frame's bytes, ready to send.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="randomSource" /> is <see langword="null" />.</exception>
+    public static byte[] Encode(WsOpcode opcode, bool isFinal, ReadOnlySpan<byte> payload, IWebSocketRandomSource randomSource)
     {
+        ArgumentNullException.ThrowIfNull(randomSource);
         int lengthFieldLength = LengthFieldLength(payload.Length);
         int maskOffset = 2 + lengthFieldLength;
         int payloadOffset = maskOffset + MaskLength;
         byte[] frame = new byte[payloadOffset + payload.Length];
-        frame[0] = (byte)(FinalFragment | (byte)opcode);
+        frame[0] = (byte)((isFinal ? FinalFragment : 0) | (byte)opcode);
         WriteLength(frame, payload.Length, lengthFieldLength);
         Span<byte> mask = frame.AsSpan(maskOffset, MaskLength);
         randomSource.Fill(mask);

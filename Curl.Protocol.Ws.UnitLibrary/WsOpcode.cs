@@ -1,7 +1,10 @@
 namespace Curl.Protocol.Ws;
 
-/// <summary>The RFC 6455 frame opcodes curl 8.21.0 accepts; any other value fails with 56.</summary>
-internal enum WsOpcode
+/// <summary>
+/// The RFC 6455 frame opcodes curl 8.21.0 accepts; a received frame with any other value fails
+/// with 56. Public so the engine can map a frame to libcurl's <c>CURLWS_*</c> flags (BL-2471).
+/// </summary>
+public enum WsOpcode
 {
     /// <summary>A continuation fragment of the message in progress.</summary>
     Continuation = 0x0,

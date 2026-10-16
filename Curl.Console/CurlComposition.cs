@@ -106,7 +106,8 @@ internal static class CurlComposition
             tlsSessions: tlsSessions,
             extendedAttributeWriter: NativeExtendedAttributeWriter.ForCurrentPlatform(),
             lateBoundDiagnosticLog: runLog,
-            transferPerformer: new TransferPerformer(TimeProvider.System, EasyErrorText));
+            transferPerformer: new TransferPerformer(TimeProvider.System, EasyErrorText),
+            curlEngine: new ManagedCurlEngine(TimeProvider.System, null, EasyErrorText));
     }
 
     /// <summary>

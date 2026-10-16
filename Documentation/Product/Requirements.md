@@ -348,6 +348,19 @@ with exit 2, so no working script can pass them (ADR-0222). It is separate from 
 | --- | --- | --- | --- | --- | --- |
 | FR-107 | `--log-level <level>` takes `none`, `error`, `warning`, `info` or `verbose` (ignoring case, cumulative in that order) and `--log-file <path>` writes the log to that file (UTF-8, no byte order mark) instead of standard error; `--log-file` alone means `info`, both are global and the last one wins, and `-s` does not silence the log. The default is `none`, which writes zero extra bytes anywhere: standard output, standard error, `--trace` and `-o` files and the exit code are identical to a run without the option. Each line is `[<UTC timestamp>] [<level>] [<component>] <message>`, e.g. `[2026-09-29T14:03:07.123Z] [info] [http] reply HTTP/1.1 200 after 12 ms`, and never carries a password, token, cookie value or key. Any other level is refused with `curl: option --log-level: is badly used here`, curl's `try 'curl --help'` line and exit 2 (`CurlExitCode.FailedInit`). Decided in [ADR-0222](../Planning/Decisions/ADR-0222-curl-s-own-diagnostic-log-is-log-level-and-log-file-off-by-default-with-zero-extra-bytes.md); built by tasks BL-938 and BL-917 to BL-929, and shown writing lines at `info` by `CurlCommandRunnerDiagnosticLogTests.RunAsync_LogLevelInfoUnderSilent_WritesTheLinesToStandardError`. | None: real curl has no such option ([manpage](https://curl.se/docs/manpage.html), curl 8.23.0) | Should | Draft | curl 8.21.0 (rejects both, exit 2) |
 
+### The public programming interfaces
+
+Intent, not yet built: two public .NET APIs over one transfer engine, so a .NET program can
+transfer without running `curl` as a process (ADR-0506; plan
+[Curl-Api-And-libcurl.md](../Planning/Curl-Api-And-libcurl.md)). The projects and the seam exist
+(`Libcurl`, `Curl.Api`, `Curl.Api.UnitLibrary`, `Curl.Engine.UnitLibrary`); the API areas are
+planned in the plan's phases 3 and 4.
+
+| ID | Requirement | Upstream reference | Priority | Status | Checked against |
+| --- | --- | --- | --- | --- | --- |
+| FR-108 | `Libcurl` offers the libcurl API surface (easy, multi, share, URL, MIME and form, WebSocket, header and options-metadata areas) with libcurl's names, option numbers, `CurlCode` results and semantics, over the engine through the seam. Planned: phase 3 of the plan. | [libcurl API](https://curl.se/libcurl/c/) | Should | Planned | not yet measured |
+| FR-109 | `Curl.Api` offers the same transfers as an idiomatic .NET API (option records, `TransferInfo`, async methods), over the same engine and seam as `Libcurl`. Planned: phase 4 of the plan. | None: a Curl-only addition | Could | Planned | not applicable |
+
 Priorities use MoSCoW (Must / Should / Could / Won't). "Must" means the release is
 not shippable without it — if everything is a Must, nothing is.
 

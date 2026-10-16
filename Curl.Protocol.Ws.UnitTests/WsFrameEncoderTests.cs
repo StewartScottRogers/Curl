@@ -135,6 +135,69 @@ public sealed class WsFrameEncoderTests
         Assert.AreEqual(14 + 65536, frame.Length);
     }
 
+    [TestMethod]
+    [DataRow(WsOpcode.Text, true, "6869", "818201020304696b", DisplayName = "text 'hi', FIN")]
+    [DataRow(WsOpcode.Binary, false, "ff", "028101020304fe", DisplayName = "binary first fragment, FIN clear")]
+    [DataRow(WsOpcode.Continuation, false, "61", "00810102030460", DisplayName = "continuation, FIN clear")]
+    [DataRow(WsOpcode.Continuation, true, "", "808001020304", DisplayName = "last continuation, empty")]
+    [DataRow(WsOpcode.Close, true, "03e8", "88820102030402ea", DisplayName = "close 1000")]
+    [DataRow(WsOpcode.Ping, true, "70", "89810102030471", DisplayName = "ping 'p'")]
+    [DataRow(WsOpcode.Pong, true, "", "8a8001020304", DisplayName = "empty pong")]
+    public void EncodeWithFin_EachOpcode_WritesTheMaskedFrame(WsOpcode opcode, bool isFinal, string payloadHex, string expectedHex)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("opcode", opcode);
+        diagnostics.Arrange("FIN", isFinal);
+        diagnostics.Arrange("payload", payloadHex);
+
+        byte[] frame = WsFrameEncoder.Encode(opcode, isFinal, Convert.FromHexString(payloadHex), new ScriptedRandomSource(1, 2, 3, 4));
+
+        byte[] expected = Convert.FromHexString(expectedHex);
+        diagnostics.Diff("frame", expected, frame);
+        CollectionAssert.AreEqual(expected, frame);
+    }
+
+    [TestMethod]
+    public void EncodeWithFin_126BytePayload_Uses16BitLength()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        byte[] payload = Enumerable.Repeat((byte)'x', 126).ToArray();
+        diagnostics.Arrange("payload", "126 bytes of 'x', mask 00 00 00 00");
+
+        byte[] frame = WsFrameEncoder.Encode(WsOpcode.Binary, isFinal: true, payload, new ScriptedRandomSource(0, 0, 0, 0));
+
+        byte[] expected = [0x82, 0xfe, 0x00, 0x7e, 0, 0, 0, 0, .. payload];
+        diagnostics.Diff("frame", expected, frame);
+        CollectionAssert.AreEqual(expected, frame);
+    }
+
+    [TestMethod]
+    public void EncodeWithFinClear_65536BytePayload_Uses64BitLengthAndClearsFin()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        byte[] payload = Enumerable.Repeat((byte)'y', 65536).ToArray();
+        diagnostics.Arrange("payload", "65536 bytes of 'y', mask 00 00 00 00, FIN clear");
+
+        byte[] frame = WsFrameEncoder.Encode(WsOpcode.Text, isFinal: false, payload, new ScriptedRandomSource(0, 0, 0, 0));
+
+        byte[] expected = [0x01, 0xff, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, .. payload];
+        diagnostics.Act("frame length", frame.Length);
+        diagnostics.Assert("frame length", expected.Length, frame.Length);
+        CollectionAssert.AreEqual(expected, frame);
+    }
+
+    [TestMethod]
+    public void EncodeWithFin_NullRandomSource_Throws()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("random source", "(null)");
+
+        ArgumentNullException exception = Assert.ThrowsExactly<ArgumentNullException>(() => WsFrameEncoder.Encode(WsOpcode.Text, isFinal: true, [], null!));
+
+        diagnostics.Assert("parameter", "randomSource", exception.ParamName);
+        Assert.AreEqual("randomSource", exception.ParamName);
+    }
+
     private static void WriteFrame(TestDiagnostics diagnostics, byte[] frame)
     {
         diagnostics.Bytes("frame", frame);

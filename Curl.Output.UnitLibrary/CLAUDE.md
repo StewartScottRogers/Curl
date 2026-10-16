@@ -4,6 +4,8 @@ Phase 1.
 
 The 76 --write-out variables, progress meter, verbose and trace formatting.
 
+`TransferWriteOutVariables` reads every libcurl-measured `-w` variable from a `Curl.Api` `TransferInfo`, as curl's `tool_writeout.c` reads them with `curl_easy_getinfo`; the tool's own (`%{exitcode}`, `%{url}`, `%{filename_effective}`, the headers, `%{certs}` and the like) stay with the result and report. `WriteOutTransferInfo.FromReport` is the one place a report becomes those info fields; `Curl.Engine`'s `TransferInfoFromReport` starts from it (ADR-0553, BL-2319). This library references `Curl.Api.UnitLibrary` for `TransferInfo`, never a protocol library.
+
 `ParallelProgressMeterText` writes the text of a `-Z` run's combined progress meter as curl 8.21.0's
 `progress_meter` in `src/tool_progress.c` does: the header line, and status lines with five-column
 sizes (`max5data`) and eight-column times (`time2str`). The figures come from `Curl.Console`

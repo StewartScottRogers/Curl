@@ -1,3 +1,5 @@
+using Curl.Api.EngineContracts.Url;
+
 namespace Curl.Api.Options.Network;
 
 /// <summary>
@@ -13,10 +15,11 @@ public sealed record EasyNetworkOptions
     public string? Url { get; init; }
 
     /// <summary>
-    /// <c>CURLOPT_CURLU</c>: the full URL of the <c>CURLU</c> handle set on the easy handle, which
-    /// libcurl uses in place of <c>CURLOPT_URL</c> when set. Default <see langword="null"/> (no handle).
+    /// <c>CURLOPT_CURLU</c>: the engine's <c>CURLU</c> handle set on the easy handle, held by reference
+    /// as libcurl holds the pointer, so the engine reads its URL at perform time and uses it in place
+    /// of <see cref="Url"/> (ADR-0590). Default <see langword="null"/> (no handle).
     /// </summary>
-    public string? UrlFromUrlHandle { get; init; }
+    public ICurlUrlHandle? UrlHandle { get; init; }
 
     /// <summary>
     /// <c>CURLOPT_PATH_AS_IS</c>: send the URL path without squashing <c>/../</c> and <c>/./</c>.

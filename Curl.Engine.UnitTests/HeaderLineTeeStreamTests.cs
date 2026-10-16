@@ -132,6 +132,30 @@ public sealed class HeaderLineTeeStreamTests
     }
 
     [TestMethod]
+    public void MarkConnectReplyHead_DumpOutputTakesMarks_PassesTheMarkOn()
+    {
+        Api.EngineContracts.Headers.CurlHeaderOrigin connect = Api.EngineContracts.Headers.CurlHeaderOrigin.Connect;
+        TransferHeaderStore store = new();
+        using HeaderLineTeeStream stream = new(new HeaderRecordingStream(store, null), Stream.Null);
+
+        stream.MarkConnectReplyHead();
+        stream.Write(Encoding.Latin1.GetBytes("HTTP/1.1 200 OK\r\nVia: p\r\n\r\n"));
+
+        Assert.AreEqual(Api.Codes.CurlHeaderCode.Ok, store.TryGet("Via", 0, connect, 0, out _));
+    }
+
+    [TestMethod]
+    public void MarkConnectReplyHead_DumpOutputTakesNoMarks_DoesNothing()
+    {
+        using MemoryStream dumpHeader = new();
+        using HeaderLineTeeStream stream = new(dumpHeader, Stream.Null);
+
+        stream.MarkConnectReplyHead();
+
+        Assert.AreEqual(0, dumpHeader.Length);
+    }
+
+    [TestMethod]
     public void Flush_LeavesBothStreamsAlone()
     {
         using MemoryStream dumpHeader = new();

@@ -29,15 +29,20 @@
     Curl.Protocol.Abstractions.UnitLibrary exercised from another protocol's tests is
     credited for it.
 
+    A whole-solution run builds Curl.slnx once and then runs dotnet test --no-build on
+    each *.UnitTests project in turn, one Cobertura report per project. It never runs
+    dotnet test on Curl.slnx itself, whose single merged report carried no branch counts
+    on CI (BL-2466).
+
     A whole-solution run that leaves any member short of line or branch coverage runs
     the *.UnitTests projects that reach that member's library again, one at a time, into
     a recheck folder under ResultsDirectory, and merges their reports in the same way
-    before scoring again. A whole-solution run can lose one project's coverage although
+    before scoring again. A whole-solution run once lost one project's coverage although
     its tests passed (BL-2269); the recheck restores it, and a real gap still fails.
 
 .PARAMETER Library
     Assembly names to report on, wildcards allowed. Defaults to every production
-    assembly - anything named *.UnitLibrary, plus Curl.Console, Curl.Api and Libcurl. Curl.Console's
+    assembly - anything named *.UnitLibrary, plus Curl.Console, Curl.Api, Curl.Mcp and Libcurl. Curl.Console's
     assembly is named curl, and is reported and matched here as Curl.Console.
 
     With -Library, the tests that run are only the *.UnitTests projects whose project
@@ -173,10 +178,20 @@ function Get-TestProjectsReaching {
     return $reaching
 }
 
+function Get-TestProjects {
+    # Every *.UnitTests project file and, with -IncludeIntegration, every
+    # *.IntegrationTests one: the test projects a whole-solution run measures.
+    param([string] $Root, [switch] $IncludeIntegration)
+    return @(Get-ChildItem -Path $Root -Filter '*.csproj' -Recurse -Depth 1 -File |
+        Where-Object { ($_.BaseName -like '*.UnitTests') -or ($IncludeIntegration -and $_.BaseName -like '*.IntegrationTests') } |
+        Sort-Object BaseName |
+        ForEach-Object { $_.FullName })
+}
+
 function Invoke-CoverageTestRun {
     # Runs dotnet test with Cobertura coverage for each target, writing into Directory,
-    # and throws if any test failed.
-    param([string[]] $Targets, [string] $Directory)
+    # and throws if any test failed. With -NoBuild the targets must already be built.
+    param([string[]] $Targets, [string] $Directory, [switch] $NoBuild)
 
     Write-Host "Running tests with coverage into $Directory ..." -ForegroundColor Cyan
     $testOutput = New-Object System.Collections.Generic.List[string]
@@ -187,6 +202,7 @@ function Invoke-CoverageTestRun {
             '--collect:Code Coverage;Format=cobertura',
             '--results-directory', $Directory
         )
+        if ($NoBuild) { $testArguments += '--no-build' }
         if (-not $IncludeIntegration) { $testArguments += @('--filter', 'TestCategory!=Integration') }
         Write-Host "dotnet test $(Split-Path $target -Leaf)" -ForegroundColor DarkCyan
         & dotnet @testArguments | ForEach-Object {
@@ -232,14 +248,27 @@ if (-not $SkipTestRun) {
     # are the only tests that can execute its code, so its coverage, merged across them,
     # is what a whole-solution run would report; on nine busy lanes that is minutes, not
     # the 40-58 a whole-solution run took (BL-1318). Without -Library, or when no test
-    # project reaches the names given, the whole solution runs as before.
-    $testTargets = @(Join-Path $repositoryRoot 'Curl.slnx')
+    # project reaches the names given, every test project runs.
+    $testTargets = @()
     if ($Library) {
-        $covering = @(Get-TestProjectsReaching -Root $repositoryRoot -Library $Library -IncludeIntegration:$IncludeIntegration)
-        if ($covering.Count) { $testTargets = $covering }
+        $testTargets = @(Get-TestProjectsReaching -Root $repositoryRoot -Library $Library -IncludeIntegration:$IncludeIntegration)
+    }
+    $wholeSolution = $testTargets.Count -eq 0
+
+    if ($wholeSolution) {
+        # A whole-solution run builds Curl.slnx once and then tests each project on its
+        # own, one report per project, rather than running dotnet test on Curl.slnx: that
+        # merges every project's coverage into one Cobertura file, and on CI that merged
+        # file carried no branch counts, so the branch gate passed without measuring a
+        # branch until a recheck added one project's counts and 663 members failed (CI run
+        # 38876049958, BL-2466). It also lost a whole project's coverage once (BL-2269).
+        Write-Host 'Building Curl.slnx ...' -ForegroundColor Cyan
+        & dotnet build (Join-Path $repositoryRoot 'Curl.slnx') | ForEach-Object { Write-Host ([string]$_) }
+        if ($LASTEXITCODE -ne 0) { throw "dotnet build failed with exit code $LASTEXITCODE. Fix the build before measuring quality." }
+        $testTargets = Get-TestProjects -Root $repositoryRoot -IncludeIntegration:$IncludeIntegration
     }
 
-    Invoke-CoverageTestRun -Targets $testTargets -Directory $ResultsDirectory
+    Invoke-CoverageTestRun -Targets $testTargets -Directory $ResultsDirectory -NoBuild:$wholeSolution
 }
 
 $coverageFiles = @(Get-ChildItem -Path $ResultsDirectory -Filter '*.cobertura.xml' -Recurse -ErrorAction SilentlyContinue)
@@ -249,13 +278,13 @@ if ($coverageFiles.Count -eq 0) {
 
 # --- 2. Merge every report into one table of production methods -------------------
 
-# Production code is *.UnitLibrary, Curl.Console, Curl.Api and Libcurl only. Test assemblies of both kinds,
+# Production code is *.UnitLibrary, Curl.Console, Curl.Api, Curl.Mcp and Libcurl only. Test assemblies of both kinds,
 # *.UnitTests and *.IntegrationTests, are never production code (ADR-0421).
 function Test-IsProductionAssembly {
     param([string] $Name)
 
     if ($Name -like '*.UnitTests' -or $Name -like '*.IntegrationTests') { return $false }
-    return ($Name -like '*.UnitLibrary') -or ($Name -in 'Curl.Console', 'Curl.Api', 'Libcurl')
+    return ($Name -like '*.UnitLibrary') -or ($Name -in 'Curl.Console', 'Curl.Api', 'Curl.Mcp', 'Libcurl')
 }
 
 # Curl.Console.csproj sets <AssemblyName>curl</AssemblyName> so the binary is a drop-in
@@ -402,14 +431,13 @@ function Get-ScoredMembers {
 
 $scored = Get-ScoredMembers
 
-# A whole-solution run merges every test project's coverage into one report, and once
-# in a while one project's coverage never reaches it although its tests all passed: CI
-# run 38700283564 lost Curl.Cryptography.UnitTests' and reported 108 members uncovered
-# that the same commit's other run covered in full (BL-2269). So when a whole-solution
-# run leaves a member short of line or branch coverage, run the test projects that reach
-# its library again, one at a time, and merge their reports in. A real gap stays a gap,
-# since merging only ever adds lines some test executed.
-if (-not $SkipTestRun -and $testTargets.Count -eq 1 -and $testTargets[0] -like '*.slnx') {
+# Once in a while a whole-solution run lost one project's coverage although its tests
+# all passed: CI run 38700283564 lost Curl.Cryptography.UnitTests' and reported 108
+# members uncovered that the same commit's other run covered in full (BL-2269). So when a
+# whole-solution run leaves a member short of line or branch coverage, run the test
+# projects that reach its library again, one at a time, and merge their reports in. A
+# real gap stays a gap, since merging only ever adds lines some test executed.
+if (-not $SkipTestRun -and $wholeSolution) {
     $shortAssemblies = @($scored |
         Where-Object { $_.Failures -contains 'line' -or $_.Failures -contains 'branch' } |
         Select-Object -ExpandProperty Assembly -Unique)

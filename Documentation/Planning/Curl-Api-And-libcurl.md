@@ -220,7 +220,7 @@ scores unchanged, leaves `Curl.Console/CurlEasyErrorText.cs` where it is and kee
    `TransferInfo`.
 6. Documents and glossary; then **file phase 3's tasks** from this plan.
 
-### Phase 3 - `Libcurl`, area by area (estimate 55-60 tasks; not filed)
+### Phase 3 - `Libcurl`, area by area (61 tasks, filed; the table is the original estimate, corrected under "Filed tasks")
 
 | Area | Tasks |
 | --- | --- |
@@ -275,7 +275,7 @@ usage README; `--ai-help` is untouched (no option changes).
 | --- | --- |
 | 1 - engine extraction and console re-base | 20 (filed) |
 | 2 - scaffolding and seam | 21 (filed) |
-| 3 - `Libcurl` | 55-60 |
+| 3 - `Libcurl` | 61 (filed) |
 | 4 - `Curl.Api` | 14-16 |
 | 5 - libtest ports and gap measurement | 40-45 |
 | **All** | **150-162** |
@@ -337,3 +337,69 @@ Phase 2 - scaffolding and seam:
 | BL-2319 | Read the `-w` variables from `TransferInfo` |
 | BL-2320 | Glossary and product overview |
 | BL-2321 | File phase 3 tasks for `Libcurl` |
+
+Phase 3 - `Libcurl`, area by area (61 tasks, filed 2026-10-15 by BL-2321; the table under "Phase 3" above is the estimate, corrected to the filed counts: global 4, options 9, easy 4, info 3, callbacks 8, connect-only 1, multi 9, share 3, URL 3, MIME 4, WebSocket 3, header API 1, misc 2, error-text move 2, console re-base 4, phase 4 filing 1). Libcurl-side tasks use fakes of the seam and touch `Libcurl/<Area>`; the engine-side tasks (multi, share, URL, MIME, WebSocket, callbacks) touch `Curl.Engine.UnitLibrary` and run one at a time. BL-2449 is interactive only (`lane: no`, `Gap/`).
+
+| Task | Title |
+| --- | --- |
+| BL-2456 | Libcurl: CurlGlobal.Init(ICurlEngine) and the CurlLibrary object that creates handles |
+| BL-2457 | Libcurl: CurlGlobal.Init() builds the managed engine |
+| BL-2458 | Libcurl: curl_version, curl_version_info and the feature bits |
+| BL-2459 | Libcurl: curl_multi_strerror, curl_share_strerror, curl_url_strerror and the header-API error text |
+| BL-2399 | Libcurl: the options table (options.h) and the SetOption dispatch |
+| BL-2400 | Libcurl: SetOption for the behaviour options (EasyBehaviourOptions) |
+| BL-2401 | Libcurl: SetOption for the transfer options (EasyTransferOptions) |
+| BL-2402 | Libcurl: SetOption for the network options (EasyNetworkOptions) |
+| BL-2403 | Libcurl: SetOption for the TLS options (EasyTlsOptions) |
+| BL-2404 | Libcurl: SetOption for the authentication options (EasyAuthenticationOptions) |
+| BL-2405 | Libcurl: SetOption for the proxy options (EasyProxyOptions) |
+| BL-2406 | Libcurl: SetOption for the HTTP options (EasyHttpOptions) |
+| BL-2407 | Libcurl: SetOption for the protocol options (EasyProtocolOptions) |
+| BL-2408 | Libcurl: CurlEasy with Perform, PerformAsync and Dispose |
+| BL-2409 | Libcurl: CurlEasy.Reset and DupHandle |
+| BL-2410 | Libcurl: CurlEasy.Pause and Upkeep |
+| BL-2411 | Libcurl: CURLOPT_ERRORBUFFER and CurlEasy.ErrorText |
+| BL-2412 | Libcurl: GetInfo for string and list CURLINFO values, and the dispatch |
+| BL-2413 | Libcurl: GetInfo for long CURLINFO values |
+| BL-2414 | Libcurl: GetInfo for time, size and speed CURLINFO values |
+| BL-2415 | Libcurl: write, read and header callbacks wired through the engine |
+| BL-2416 | Libcurl: progress, xferinfo and debug callbacks wired through the engine |
+| BL-2417 | Libcurl: seek callback wired through the engine |
+| BL-2418 | Libcurl: sockopt, opensocket and closesocket callbacks wired through the engine |
+| BL-2419 | Libcurl: prerequest, resolver-start and trailer callbacks wired through the engine |
+| BL-2420 | Libcurl: chunk begin/end, fnmatch and interleave callbacks wired through the engine |
+| BL-2421 | Libcurl: HSTS read and write callbacks wired through the engine |
+| BL-2422 | Libcurl: SSH key callbacks and SSL_CTX_FUNCTION wired through the engine |
+| BL-2423 | Libcurl: CurlEasy.Recv and Send for CURLOPT_CONNECT_ONLY |
+| BL-2424 | Engine: the managed multi event loop (add, remove, perform, info_read) |
+| BL-2425 | Engine: multi timers, wait, poll and wakeup |
+| BL-2426 | Engine: multi socket-action API and CURLMOPT_SOCKETFUNCTION/TIMERFUNCTION |
+| BL-2427 | Engine: multi get_handles, waitfds, get_offt, notifications and network change |
+| BL-2428 | Engine: CURLMOPT settings (pipelining, connection limits, concurrent streams, push) |
+| BL-2429 | Libcurl: CurlMulti with add, remove, perform, info_read and cleanup |
+| BL-2430 | Libcurl: CurlMulti wait, poll, wakeup, fdset and timeout |
+| BL-2431 | Libcurl: CurlMulti socket action, assign and timer callbacks |
+| BL-2432 | Libcurl: CurlMulti get_handles, waitfds, get_offt, notify and CURLMOPT_* SetOption |
+| BL-2433 | Libcurl: CurlShare with SetOption and lock callbacks |
+| BL-2434 | Engine: sharing of cookies, DNS, TLS sessions and connections |
+| BL-2435 | Engine: sharing of the public-suffix list and HSTS |
+| BL-2436 | Engine: ICurlUrlHandle get over CurlUrl for every part and flag |
+| BL-2437 | Engine: ICurlUrlHandle set, append-query, dup and clear |
+| BL-2438 | Libcurl: CurlUrlHandle (get, set, dup, strerror) |
+| BL-2439 | Engine: IMimeBuilder over Curl.Core Multipart |
+| BL-2440 | Engine: ICurlFormBuilder for formadd, formget and formfree |
+| BL-2441 | Libcurl: CurlMime and CurlMimePart |
+| BL-2442 | Libcurl: CurlForm (formadd, formget, formfree) and CURLOPT_HTTPPOST |
+| BL-2443 | Engine: IEasyWebSocket receive, send and metadata |
+| BL-2444 | Engine: WebSocket start_frame, raw mode and no-autopong |
+| BL-2445 | Libcurl: CurlEasy WebSocket API (recv, send, meta, start_frame) |
+| BL-2446 | Libcurl: the header API (curl_easy_header, curl_easy_nextheader) |
+| BL-2447 | Libcurl: escape, unescape, getenv, strequal and strnequal |
+| BL-2448 | Libcurl: curl_getdate and CurlSlist |
+| BL-2449 | Make the gap office's exit-code measurement find CurlEasyErrorText in its new home (interactive, gap branch) |
+| BL-2450 | Move CurlEasyErrorText beside curl_easy_strerror in Libcurl |
+| BL-2451 | Re-base Curl.Console: serial transfers run through Libcurl CurlEasy |
+| BL-2452 | Re-base Curl.Console: -w variables read through Libcurl GetInfo |
+| BL-2453 | Re-base Curl.Console: --parallel through CurlMulti |
+| BL-2454 | Re-base Curl.Console: remove its direct reference to Curl.Engine.UnitLibrary |
+| BL-2455 | File phase 4 tasks for Curl.Api from Documentation/Planning/Curl-Api-And-libcurl.md |

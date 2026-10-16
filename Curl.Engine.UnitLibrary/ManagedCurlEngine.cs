@@ -15,8 +15,9 @@ namespace Curl.Engine;
 /// <see cref="EasyOptions" />. Every cache - connections, TLS sessions, DNS, cookies, HSTS - and the
 /// <c>%{xfer_id}</c> numbering belong to the engine object (<see cref="ManagedEngineSharedState" />,
 /// ADR-0542), shared by its handles as the curl tool's transfers share them across a run, and none is
-/// static, so two engines in one process share nothing.
-/// The multi, share, URL and MIME handles are phase 3 work (ADR-0506) and throw
+/// static, so two engines in one process share nothing but what a <see cref="ManagedShareHandle" /> shares
+/// (ADR-0606). The multi handle is <see cref="ManagedMultiTransfer" /> and the URL handle
+/// <see cref="ManagedCurlUrlHandle" />; the MIME and form handles are phase 3 work (ADR-0506) and throw
 /// <see cref="NotSupportedException" /> here.
 /// </summary>
 public sealed class ManagedCurlEngine : ICurlEngine
@@ -70,25 +71,24 @@ public sealed class ManagedCurlEngine : ICurlEngine
     /// <inheritdoc />
     public IEasyTransfer CreateEasy() => new ManagedEasyTransfer(createDispatcher, shared);
 
-    /// <summary>Not supported yet: the multi handle is phase 3's multi interface work (ADR-0506).</summary>
-    /// <returns>Never returns.</returns>
-    /// <exception cref="NotSupportedException">Always.</exception>
-    public IMultiTransfer CreateMulti() => throw new NotSupportedException("The multi interface is phase 3 work (ADR-0506).");
+    /// <summary>
+    /// <c>curl_multi_init</c>: a <see cref="ManagedMultiTransfer" /> whose transfers run over the
+    /// engine's shared connections (ADR-0594).
+    /// </summary>
+    /// <returns>The new multi handle; the caller disposes it (<c>curl_multi_cleanup</c>).</returns>
+    public IMultiTransfer CreateMulti() => new ManagedMultiTransfer(shared.MultiOwners, shared.TimeProvider, SocketWaitPoller.Instance, shared.Connections.CloseIdleAsync, shared.DnsCache.Clear);
 
-    /// <summary>Not supported yet: the share handle is phase 3's share interface work (ADR-0506).</summary>
-    /// <returns>Never returns.</returns>
-    /// <exception cref="NotSupportedException">Always.</exception>
-    public IShareHandle CreateShare() => throw new NotSupportedException("The share interface is phase 3 work (ADR-0506).");
+    /// <summary><c>curl_share_init</c>: a <see cref="ManagedShareHandle" /> sharing nothing yet, on the engine's clock (ADR-0606).</summary>
+    /// <returns>The new share handle; the caller frees it with <see cref="IShareHandle.Cleanup" />.</returns>
+    public IShareHandle CreateShare() => new ManagedShareHandle(shared.TimeProvider);
 
-    /// <summary>Not supported yet: the URL handle is phase 3's URL API work (ADR-0506).</summary>
-    /// <returns>Never returns.</returns>
-    /// <exception cref="NotSupportedException">Always.</exception>
-    public ICurlUrlHandle CreateUrl() => throw new NotSupportedException("The URL API is phase 3 work (ADR-0506).");
+    /// <summary><c>curl_url</c>: a new URL handle holding no part (ADR-0601).</summary>
+    /// <returns>A <see cref="ManagedCurlUrlHandle" />; the caller disposes it.</returns>
+    public ICurlUrlHandle CreateUrl() => new ManagedCurlUrlHandle();
 
-    /// <summary>Not supported yet: the MIME handle is phase 3's MIME API work (ADR-0506).</summary>
-    /// <returns>Never returns.</returns>
-    /// <exception cref="NotSupportedException">Always.</exception>
-    public IMimeBuilder CreateMime() => throw new NotSupportedException("The MIME API is phase 3 work (ADR-0506).");
+    /// <summary><c>curl_mime_init</c>: a new MIME handle holding no part (BL-2439).</summary>
+    /// <returns>A <see cref="ManagedMimeBuilder" />, whose body <c>CURLOPT_MIMEPOST</c> sends.</returns>
+    public IMimeBuilder CreateMime() => new ManagedMimeBuilder();
 
     /// <summary>Not supported yet: the form API is phase 3's MIME API work (ADR-0506).</summary>
     /// <returns>Never returns.</returns>
@@ -111,8 +111,7 @@ public sealed class ManagedCurlEngine : ICurlEngine
     /// <returns>The dispatcher.</returns>
     internal static ProtocolDispatcher CreateDispatcher(EasyOptions options, ManagedEngineSharedState shared, ICookieStore? cookieStore)
     {
-        EngineToolOptions tool = new(Parallel: false, ParallelImmediate: false, SslSessionsFile: null, MaxTime: options.Transfer.Timeout > TimeSpan.Zero ? options.Transfer.Timeout : null);
-        CurlTransports transports = EngineComposition.CreateTransports(tool, options.Network, options.Tls, options.Http, options.Proxy, options.Authentication, shared.TimeProvider, shared.Connections, shared.TlsSessions, runDnsCache: shared.DnsCache);
+        CurlTransports transports = CreateTransports(options, shared);
         return new ProtocolDispatcher(EngineComposition.CreateProtocolHandlers(
             transports.PoolingConnector,
             transports.UdpDatagramConnector,
@@ -122,5 +121,21 @@ public sealed class ManagedCurlEngine : ICurlEngine
             proxyAuthSchemes: transports.ProxyTunnelOptions.ProxyAuthSchemes,
             negotiateOptions: NegotiateOptionsMapping.Of(options.Authentication),
             ftpDataConnector: EngineComposition.FtpDataConnectorOf(transports)));
+    }
+
+    /// <summary>
+    /// Builds the connector a <c>CURLOPT_CONNECT_ONLY</c> 1 perform dials through: the <c>TcpConnector</c> of
+    /// <see cref="CreateDispatcher" />'s transports, not its pool, so the connection is the handle's own (ADR-0608).
+    /// </summary>
+    /// <param name="options">The transfer's options.</param>
+    /// <param name="shared">The engine's shared caches.</param>
+    /// <returns>The connector.</returns>
+    internal static IConnector CreateConnectOnlyConnector(EasyOptions options, ManagedEngineSharedState shared) =>
+        CreateTransports(options, shared).TcpConnector;
+
+    private static CurlTransports CreateTransports(EasyOptions options, ManagedEngineSharedState shared)
+    {
+        EngineToolOptions tool = new(Parallel: false, ParallelImmediate: false, SslSessionsFile: null, MaxTime: options.Transfer.Timeout > TimeSpan.Zero ? options.Transfer.Timeout : null);
+        return EngineComposition.CreateTransports(tool, options.Network, options.Tls, options.Http, options.Proxy, options.Authentication, shared.TimeProvider, shared.Connections, shared.TlsSessions, runDnsCache: shared.DnsCache);
     }
 }

@@ -76,3 +76,24 @@ worded as `Gap/Instructions/Gap-Format.md` words them.
 | Targeted version | The upstream curl release Curl matches and every measurement is made against; only an ADR moves it. | `version` in `Gap/Baselines/target.json` |
 | Unmeasured | The state of an item the office cannot measure yet, with a reason (for example `needs-server:<protocol>`, `no-probe`); it counts in Y but not in X, so it lowers the score. | `unmeasured` (`items[].state`) |
 | Upstream inventory | What upstream has in one area for one version, read from the release tarball; it holds no measurement. | `Gap/Upstream/<version>/<area>.json` |
+
+## The engine, the seam and the public APIs
+
+Terms used by `Curl.Engine.UnitLibrary`, `Curl.Api.UnitLibrary`, `Curl.Api` and `Libcurl`
+([ADR-0506](../Planning/Decisions/ADR-0506-libcurl-and-curl-api-over-one-transfer-engine.md)),
+laid out in [the plan](../Planning/Curl-Api-And-libcurl.md).
+
+| Term | Meaning | Name in code |
+| --- | --- | --- |
+| `Curl.Api` | The .NET-shaped public API over the engine; planned, with the seam's project beneath it. | the `Curl.Api` project |
+| `CurlCode` | A libcurl function's result (`CURLcode`), used by both public APIs. Its numbers equal `CurlExitCode`'s member for member and the seam converts by number; the two are separate concepts. | `Curl.Api.Codes.CurlCode` |
+| `CurlExitCode` | The engine-internal outcome of a transfer and the curl tool's process exit status. Not renamed, because it would touch every protocol library for no behaviour. | `Curl.Protocol.Abstractions.CurlExitCode` |
+| Easy option group | One group of `CURLOPT_*` settings as an immutable record (authentication, behaviour, callbacks, FTP, HTTP, network, protocols and so on); `EasyOptions` aggregates them. | `Easy<Group>Options`, for example `EasyHttpOptions` |
+| Easy transfer | One libcurl easy handle's worth of work: the engine's object that performs a transfer from `EasyOptions` and reports `TransferInfo`. | `IEasyTransfer` |
+| `EasyOptions` | The aggregate of every easy option group, the whole of what an easy transfer is configured with. | `Curl.Api.Options.EasyOptions` |
+| `EasyOptionsFromCommandLine` | The curl tool's translation of a parsed command line into `EasyOptions`; upstream's `config2setopts`. It lives in the tool, so the engine never reads `Curl.Cli`. | `EasyOptionsFromCommandLine` in `Curl.Console` |
+| Engine contracts | The interfaces the engine implements and both public APIs call: the seam. | `Curl.Api.EngineContracts` (`ICurlEngine`, `IEasyTransfer` and the rest) |
+| `Libcurl` | The libcurl-faithful public API (planned types `CurlEasy`, `CurlMulti` and the rest; the project has none yet), named as upstream's library is; renamed from `Curl.libcurl` on 2026-10-15. The curl tool is re-based onto it. | the `Libcurl` project, root namespace `Libcurl` |
+| Seam | The boundary between the public APIs and the engine: the contracts, codes, option groups, info and callbacks in `Curl.Api.UnitLibrary`. Replacing the engine means one project that implements it. | `Curl.Api.UnitLibrary` |
+| `TransferInfo` | Every `CURLINFO_*` value of a finished transfer, as one record. | `Curl.Api.Info.TransferInfo` |
+| Transfer engine | The managed implementation of the seam that does the transfer: composes the protocol handlers, transports, DNS and TLS; libcurl's half of the old `Curl.Console`. | `Curl.Engine.UnitLibrary`, `ManagedCurlEngine` |
