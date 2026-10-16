@@ -12,10 +12,10 @@ internal static class NumberedConnectFailure
     /// <summary>
     /// Returns <paramref name="failure" /> with <paramref name="connectionNumber" /> as its
     /// <see cref="ConnectResult.ConnectionNumber" />, keeping its exit code, message, timings,
-    /// last socket error and whether it was refused.
+    /// last socket error, SOCKS proxy error and whether it was refused.
     /// </summary>
     public static ConnectResult Of(ConnectResult failure, long connectionNumber) =>
         failure.IsConnectionRefused
             ? ConnectResult.Refused(failure.ErrorMessage!, failure.Timings, connectionNumber)
-            : ConnectResult.Failed(failure.ExitCode, failure.ErrorMessage!, failure.Timings, connectionNumber, failure.ProxyConnectResponseCode, failure.LastSocketError);
+            : ConnectResult.Failed(failure.ExitCode, failure.ErrorMessage!, failure.Timings, connectionNumber, failure.ProxyConnectResponseCode, failure.LastSocketError, failure.ProxyError);
 }
