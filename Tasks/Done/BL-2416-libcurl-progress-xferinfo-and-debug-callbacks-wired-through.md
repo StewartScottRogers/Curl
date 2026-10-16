@@ -34,8 +34,8 @@ ADR-0506; phase 3 of `Documentation/Planning/Curl-Api-And-libcurl.md`. Read the 
   `DebugCallbackTransferEvents`, with `CallbackTransferProgressTests`, `DebugCallbackTransferEventsTests` and
   `ManagedEasyTransferTests` (`PerformAsync_TransferInfoCallbackReturnsNonZero_AbortsWithAbortedByCallback`)
   pinning the arguments and the abort path. So `Curl.Engine.UnitLibrary` is unchanged; this run added the
-  `Libcurl/Callbacks/Progress` setter rows (`EasyProgressCallbackSetters`) and their tests, ADR-0574.
-- Decision: no once-a-second idle progress tick; the engine calls on every report (ADR-0574, point 1).
+  `Libcurl/Callbacks/Progress` setter rows (`EasyProgressCallbackSetters`) and their tests, ADR-0577.
+- Decision: no once-a-second idle progress tick; the engine calls on every report (ADR-0577, point 1).
 - `Measure-CodeQuality.ps1 -Library Libcurl`: 0 failing members. The engine library was not measured
   again since no line of it changed.
 
