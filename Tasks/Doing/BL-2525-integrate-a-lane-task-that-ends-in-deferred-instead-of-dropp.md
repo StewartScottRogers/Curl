@@ -37,3 +37,4 @@ Cause: the outcome chain in `RunDarkFactory.ps1` (around line 5395) handles `Don
 ## Log
 
 - 2026-10-16: Created.
+- 2026-10-16: Backlog -> Doing. Criteria at claim: 321353a6 07c55dd5 f6e836bb 04286d61 3d836d5e.
