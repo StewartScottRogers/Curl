@@ -32,3 +32,4 @@ Found by BL-2558: an easy GET run through the ratchet's libtest engine (`Upstrea
 ## Log
 
 - 2026-10-16: Created.
+- 2026-10-16: Backlog -> Doing. Criteria at claim: 0e2ba537 1754abd7 12a99eee 4272a6b9.
