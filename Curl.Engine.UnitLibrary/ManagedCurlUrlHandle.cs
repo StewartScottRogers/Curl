@@ -11,14 +11,16 @@ namespace Curl.Engine;
 /// <c>curl_url_get</c> reads them, every part and every get flag.
 /// </summary>
 /// <remarks>
-/// <see cref="Set" /> parses a whole URL (<see cref="CurlUrlPart.Url" />) with
-/// <c>CURLU_DEFAULT_SCHEME</c>, <c>CURLU_GUESS_SCHEME</c>, <c>CURLU_PATH_AS_IS</c> and
-/// <c>CURLU_DISALLOW_USER</c>; setting or clearing any other part, relative URLs and
-/// <see cref="Duplicate" /> are BL-2437's work and throw <see cref="NotSupportedException" />.
+/// <see cref="Set" /> parses a whole URL (<see cref="CurlUrlPart.Url" />), a relative one against the
+/// URL held, or sets or clears one part with <see cref="UrlPartSetter" />, as <c>curl_url_set</c> does
+/// (ADR-0602); <see cref="Duplicate" /> is <c>curl_url_dup</c>.
 /// </remarks>
 internal sealed class ManagedCurlUrlHandle : ICurlUrlHandle
 {
     private const string FileScheme = "file";
+
+    /// <summary>The longest URL a set accepts (upstream's <c>CURL_MAX_INPUT_LENGTH</c>).</summary>
+    private const int MaximumInputLength = 8_000_000;
 
     private const string DefaultScheme = "https";
 
@@ -76,34 +78,23 @@ internal sealed class ManagedCurlUrlHandle : ICurlUrlHandle
     }
 
     /// <inheritdoc />
-    /// <exception cref="NotSupportedException">
-    /// <paramref name="part" /> is not <see cref="CurlUrlPart.Url" />, or <paramref name="value" /> is
-    /// <see langword="null" />: BL-2437's work.
-    /// </exception>
     public CurlUrlCode Set(CurlUrlPart part, string? value, CurlUrlFlags flags)
     {
-        if (part != CurlUrlPart.Url || value is null)
+        if ((uint)part > (uint)CurlUrlPart.ZoneId)
         {
-            throw new NotSupportedException("Setting a part other than the whole URL, or clearing one, is BL-2437's work.");
+            return CurlUrlCode.UnknownPart;
         }
 
-        bool parsed = flags.HasFlag(CurlUrlFlags.DisallowUser)
-            ? CurlUrl.TryParseDisallowingUser(value, flags.HasFlag(CurlUrlFlags.PathAsIs), out CurlUrl? url, out CurlUrlRejection rejection)
-            : CurlUrl.TryParse(value, flags.HasFlag(CurlUrlFlags.PathAsIs), out url, out rejection);
-        if (!parsed)
+        if (value is null)
         {
-            return RejectionCodes[(int)rejection];
+            return Keep(UrlPartSetter.Cleared(parts, part));
         }
 
-        UrlHandleParts newParts = UrlHandleParts.Of(url!);
-
-        return newParts.SchemeGuessed ? SetWithoutScheme(value, flags, newParts) : Keep(newParts);
+        return part == CurlUrlPart.Url ? SetUrl(value, flags) : Keep(UrlPartSetter.Set(parts, part, value, flags));
     }
 
-    /// <summary>Not supported yet: <c>curl_url_dup</c> is BL-2437's work.</summary>
-    /// <returns>Never returns.</returns>
-    /// <exception cref="NotSupportedException">Always.</exception>
-    public ICurlUrlHandle Duplicate() => throw new NotSupportedException("curl_url_dup is BL-2437's work.");
+    /// <inheritdoc />
+    public ICurlUrlHandle Duplicate() => new ManagedCurlUrlHandle(parts);
 
     /// <summary><c>curl_url_cleanup</c>: the handle holds nothing to release.</summary>
     public void Dispose()
@@ -221,17 +212,67 @@ internal sealed class ManagedCurlUrlHandle : ICurlUrlHandle
     private static string Suffix(char separator, string? value) => value is null ? string.Empty : separator + value;
 
     /// <summary>
-    /// A URL with no scheme: <c>https</c> under <c>CURLU_DEFAULT_SCHEME</c>, the guessed one under
-    /// <c>CURLU_GUESS_SCHEME</c>, else <see cref="CurlUrlCode.BadScheme" />, as upstream's <c>parseurl</c>.
+    /// A whole URL: empty or longer than upstream's <c>CURL_MAX_INPUT_LENGTH</c> is
+    /// <see cref="CurlUrlCode.MalformedInput" />; a relative one is resolved against the URL held, when
+    /// the handle holds one (<see cref="UrlRelativeReference" />); then it is parsed.
     /// </summary>
-    private CurlUrlCode SetWithoutScheme(string value, CurlUrlFlags flags, UrlHandleParts guessed)
+    private CurlUrlCode SetUrl(string value, CurlUrlFlags flags)
     {
-        if (flags.HasFlag(CurlUrlFlags.DefaultScheme))
+        if (value.Length is 0 or > MaximumInputLength)
         {
-            return Set(CurlUrlPart.Url, DefaultScheme + "://" + value, flags & ~CurlUrlFlags.DefaultScheme);
+            return CurlUrlCode.MalformedInput;
         }
 
-        return flags.HasFlag(CurlUrlFlags.GuessScheme) ? Keep(guessed) : CurlUrlCode.BadScheme;
+        string? current = null;
+        bool relative = !UrlRelativeReference.IsAbsolute(value, flags)
+            && Get(CurlUrlPart.Url, flags & ~CurlUrlFlags.NoGuessScheme, out current) == CurlUrlCode.Ok;
+
+        return Parse(relative ? UrlRelativeReference.Resolve(current!, value) : value, flags);
+    }
+
+    /// <summary>
+    /// Parses a whole URL with <see cref="CurlUrl" /> under <c>CURLU_PATH_AS_IS</c> and
+    /// <c>CURLU_DISALLOW_USER</c>, its spaces read as <c>%20</c> under <c>CURLU_ALLOW_SPACE</c>, each
+    /// <see cref="CurlUrlRejection" /> mapped to its <see cref="CurlUrlCode" />.
+    /// </summary>
+    private CurlUrlCode Parse(string value, CurlUrlFlags flags)
+    {
+        string text = flags.HasFlag(CurlUrlFlags.AllowSpace) ? value.Replace(" ", "%20", StringComparison.Ordinal) : value;
+        bool parsed = flags.HasFlag(CurlUrlFlags.DisallowUser)
+            ? CurlUrl.TryParseDisallowingUser(text, flags.HasFlag(CurlUrlFlags.PathAsIs), out CurlUrl? url, out CurlUrlRejection rejection)
+            : CurlUrl.TryParse(text, flags.HasFlag(CurlUrlFlags.PathAsIs), out url, out rejection);
+        if (!parsed)
+        {
+            return RejectionCodes[(int)rejection];
+        }
+
+        UrlHandleParts newParts = UrlHandleParts.Of(url!);
+        bool spaced = !ReferenceEquals(text, value) && !value.Contains("%20", StringComparison.Ordinal);
+
+        return Accept(value, flags, spaced ? newParts.WithSpaces() : newParts);
+    }
+
+    /// <summary>
+    /// A parsed URL with no scheme: <c>https</c> under <c>CURLU_DEFAULT_SCHEME</c>, the guessed one under
+    /// <c>CURLU_GUESS_SCHEME</c>, else <see cref="CurlUrlCode.BadScheme" />, as upstream's <c>parseurl</c>;
+    /// with one libcurl does not support, <see cref="CurlUrlCode.UnsupportedScheme" /> unless
+    /// <c>CURLU_NON_SUPPORT_SCHEME</c>.
+    /// </summary>
+    private CurlUrlCode Accept(string value, CurlUrlFlags flags, UrlHandleParts newParts)
+    {
+        if (!newParts.SchemeGuessed)
+        {
+            bool supported = flags.HasFlag(CurlUrlFlags.NonSupportScheme) || UrlHandleParts.IsSupportedScheme(newParts.Scheme!);
+
+            return supported ? Keep(newParts) : CurlUrlCode.UnsupportedScheme;
+        }
+
+        if (flags.HasFlag(CurlUrlFlags.DefaultScheme))
+        {
+            return Parse(DefaultScheme + "://" + value, flags & ~CurlUrlFlags.DefaultScheme);
+        }
+
+        return flags.HasFlag(CurlUrlFlags.GuessScheme) ? Keep(newParts) : CurlUrlCode.BadScheme;
     }
 
     private CurlUrlCode Keep(UrlHandleParts newParts)
@@ -239,5 +280,12 @@ internal sealed class ManagedCurlUrlHandle : ICurlUrlHandle
         parts = newParts;
 
         return CurlUrlCode.Ok;
+    }
+
+    private CurlUrlCode Keep(UrlSetResult result)
+    {
+        parts = result.Parts ?? parts;
+
+        return result.Code;
     }
 }

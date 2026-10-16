@@ -4,7 +4,7 @@ using Curl.Api.EngineContracts.Url;
 namespace Curl.Engine;
 
 [TestClass]
-public sealed class ManagedCurlUrlHandleTests
+public sealed partial class ManagedCurlUrlHandleTests
 {
     private const string FullUrl = "https://user:pw@example.com:8080/p/a?q=1#frag";
 
@@ -148,7 +148,7 @@ public sealed class ManagedCurlUrlHandleTests
     [TestMethod]
     public void Get_DefaultPortFlagForASchemeWithoutOne_ReturnsNoPort()
     {
-        using ManagedCurlUrlHandle url = Parsed("foo://h/");
+        using ManagedCurlUrlHandle url = Parsed("foo://h/", CurlUrlFlags.NonSupportScheme);
 
         Assert.AreEqual(CurlUrlCode.NoPort, url.Get(CurlUrlPart.Port, CurlUrlFlags.DefaultPort, out _));
         Assert.AreEqual("foo://h/", GetOk(url, CurlUrlPart.Url, CurlUrlFlags.DefaultPort));
@@ -227,11 +227,12 @@ public sealed class ManagedCurlUrlHandleTests
     [TestMethod]
     public void Set_NoSchemeWithoutGuessOrDefault_ReturnsBadSchemeAndKeepsTheHandle()
     {
-        using ManagedCurlUrlHandle url = Parsed("http://kept/");
+        // A handle holding a whole URL would resolve the text against it (BL-2437), so this one holds a host only.
+        using ManagedCurlUrlHandle url = new(new UrlHandleParts { Host = "kept" });
 
         Assert.AreEqual(CurlUrlCode.BadScheme, url.Set(CurlUrlPart.Url, "example.com/x", CurlUrlFlags.None));
 
-        Assert.AreEqual("http://kept/", GetOk(url, CurlUrlPart.Url));
+        Assert.AreEqual("kept", GetOk(url, CurlUrlPart.Host));
     }
 
     [TestMethod]
@@ -383,15 +384,6 @@ public sealed class ManagedCurlUrlHandleTests
         Assert.AreEqual(CurlUrlCode.BadHostname, unicode.Get(CurlUrlPart.Host, CurlUrlFlags.Punycode, out _));
     }
 
-    [TestMethod]
-    public void Set_PartOtherThanTheUrlOrAClear_ThrowsNotSupported()
-    {
-        using ManagedCurlUrlHandle url = new();
-
-        Assert.ThrowsExactly<NotSupportedException>(() => url.Set(CurlUrlPart.Host, "h", CurlUrlFlags.None));
-        Assert.ThrowsExactly<NotSupportedException>(() => url.Set(CurlUrlPart.Url, null, CurlUrlFlags.None));
-        Assert.ThrowsExactly<NotSupportedException>(() => url.Duplicate());
-    }
 
     [TestMethod]
     public void Dispose_Twice_DoesNotThrow()

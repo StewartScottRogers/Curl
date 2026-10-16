@@ -73,6 +73,31 @@ internal sealed record UrlHandleParts
             ? probe.Port
             : null;
 
+    /// <summary>
+    /// Whether libcurl supports <paramref name="scheme" />: <c>file</c> or one with a default port in
+    /// Curl's URL parser, as <c>Curl_get_scheme_handler</c> finds one.
+    /// </summary>
+    /// <param name="scheme">The scheme, in lower case.</param>
+    /// <returns><see langword="true" /> when the scheme is supported.</returns>
+    public static bool IsSupportedScheme(string scheme) => scheme == "file" || DefaultPortOf(scheme) is not null;
+
+    /// <summary>
+    /// These parts with every <c>%20</c> outside the host turned back into the space it stood for, as a
+    /// URL parsed under <c>CURLU_ALLOW_SPACE</c> keeps its spaces.
+    /// </summary>
+    /// <returns>The parts with their spaces.</returns>
+    public UrlHandleParts WithSpaces() => this with
+    {
+        User = Spaced(User),
+        Password = Spaced(Password),
+        Options = Spaced(Options),
+        Path = Spaced(Path),
+        Query = Spaced(Query),
+        Fragment = Spaced(Fragment),
+    };
+
+    private static string? Spaced(string? text) => text?.Replace("%20", " ", StringComparison.Ordinal);
+
     private static bool IsSchemeGuessed(CurlUrl url) =>
         !url.OriginalString.StartsWith(url.Scheme + ":/", StringComparison.OrdinalIgnoreCase);
 

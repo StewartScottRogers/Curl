@@ -137,7 +137,10 @@ internal static class UrlPartText
     /// Encodes as upstream's <c>urlencode_str</c> does: a byte below 0x20 or from 0x7f up as
     /// <c>%XX</c>, and a space as <c>%20</c>, or as <c>+</c> in a query and after a <c>?</c>.
     /// </summary>
-    private static string Encode(string text, bool query)
+    /// <param name="text">The text.</param>
+    /// <param name="query">Whether the text is a query, where a space is <c>+</c> from the start.</param>
+    /// <returns>The encoded text.</returns>
+    public static string Encode(string text, bool query)
     {
         StringBuilder encoded = new();
         bool beforeQuery = !query;
