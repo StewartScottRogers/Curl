@@ -316,12 +316,41 @@ internal sealed class ManagedEasyTransfer(
             return Finish(loaded, string.Empty, Info);
         }
 
-        if (IsRawConnectOnly(options.Network.ConnectOnly, url))
+        return await PerformThroughProxyAsync(options, settings, url, urlText, transferId, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Chooses the perform's proxy (<see cref="TrySelectProxy" />), then only connects through it
+    /// (<see cref="PerformConnectOnlyAsync" />) or runs the transfer with it on the context; proxy text that cannot
+    /// be used ends the perform with the selector's failure before anything is set up or dialled.
+    /// </summary>
+    /// <param name="options">The handle's options.</param>
+    /// <param name="settings">The tool settings.</param>
+    /// <param name="url">The URL set, parsed.</param>
+    /// <param name="urlText">The URL set.</param>
+    /// <param name="transferId">The transfer's <c>%{xfer_id}</c>.</param>
+    /// <param name="cancellationToken">Stops the transfer.</param>
+    /// <returns>The transfer's code.</returns>
+    private Task<CurlCode> PerformThroughProxyAsync(
+        EasyOptions options,
+        EngineTransferSettings settings,
+        CurlUrl url,
+        string urlText,
+        long transferId,
+        CancellationToken cancellationToken)
+    {
+        if (!TrySelectProxy(options, settings, url, out ProxyEndpoint? proxy, out TransferResult? refused))
         {
-            return await PerformConnectOnlyAsync(options, settings, url, cancellationToken).ConfigureAwait(false);
+            return Task.FromResult(Finish(refused.ExitCode.ToCurlCode(), refused.ErrorMessage!, Info));
         }
 
-        return await PerformResumingUploadAsync(options, settings, url, urlText, transferId, cancellationToken).ConfigureAwait(false);
+        if (IsRawConnectOnly(options.Network.ConnectOnly, url))
+        {
+            return PerformConnectOnlyAsync(options, url, proxy, cancellationToken);
+        }
+
+        selectedProxy = proxy;
+        return PerformResumingUploadAsync(options, settings, url, urlText, transferId, cancellationToken);
     }
 
     /// <summary>
@@ -398,11 +427,37 @@ internal sealed class ManagedEasyTransfer(
         }
     }
 
+    /// <summary>The proxy <see cref="TrySelectProxy" /> chose for the running perform, which <see cref="OwnInputsOf" /> puts on the context.</summary>
+    private ProxyEndpoint? selectedProxy;
+
     /// <summary>
-    /// The selector a <c>CURLOPT_CONNECT_ONLY</c> 1 perform chooses its proxy with: the handle's own proxy options
-    /// only, no proxy environment variable, as the engine's other performs read none (ADR-0608).
+    /// Chooses the perform's proxy: the curl tool's runner's (<see cref="EngineToolTransferInputs.Proxy" />) when it gave
+    /// <see cref="ToolInputs" />; else <see cref="TransferProxySelection" />'s choice from <see cref="EasyOptions.Proxy" />
+    /// and the proxy environment variables the engine's <see cref="ManagedEngineSharedState.ProxySelector" /> reads, as
+    /// libcurl reads them for every handle, connect-only performs included (BL-2519, ADR-0608).
     /// </summary>
-    private static readonly ProxySelector ConnectOnlyProxySelector = new(_ => null);
+    /// <param name="options">The handle's options.</param>
+    /// <param name="settings">The tool settings, for the proxy credentials and the Unix socket.</param>
+    /// <param name="url">The URL set, parsed.</param>
+    /// <param name="proxy">The proxy, or <see langword="null" /> to connect directly.</param>
+    /// <param name="refused">The selector's failure for proxy text that cannot be used; <see langword="null" /> otherwise.</param>
+    /// <returns><see langword="true" /> unless the perform must end with <paramref name="refused" />.</returns>
+    private bool TrySelectProxy(
+        EasyOptions options,
+        EngineTransferSettings settings,
+        CurlUrl url,
+        out ProxyEndpoint? proxy,
+        [System.Diagnostics.CodeAnalysis.NotNullWhen(false)] out TransferResult? refused)
+    {
+        if (ToolInputs is { } toolInputs)
+        {
+            proxy = toolInputs.Proxy;
+            refused = null;
+            return true;
+        }
+
+        return TransferProxySelection.TrySelect(PerformShared.ProxySelector, options.Proxy, settings.OverUnixSocket, settings.ProxyCredentials, url, out proxy, out refused, Host.DiagnosticLog);
+    }
 
     /// <summary>
     /// Whether the perform only connects (<see cref="PerformConnectOnlyAsync" />): under <c>CURLOPT_CONNECT_ONLY</c> 1,
@@ -425,24 +480,18 @@ internal sealed class ManagedEasyTransfer(
 
     /// <summary>
     /// <c>CURLOPT_CONNECT_ONLY</c> 1: connects to the URL's host and port through <see cref="CreateConnectOnlyConnector" />'s
-    /// connector, with TLS for a TLS scheme, through the proxy <see cref="TransferProxySelection" /> chooses from
-    /// <see cref="EasyOptions.Proxy" /> (a tunnel through an HTTP or HTTPS proxy, the handshake of a SOCKS one, as
-    /// libcurl tunnels for connect-only without <c>CURLOPT_HTTPPROXYTUNNEL</c>), sends nothing, and keeps the
-    /// connection for <see cref="Connection" />; proxy text that cannot be used ends the perform with the selector's
-    /// failure, and a failed connect with the connector's code and text (ADR-0608).
+    /// connector, with TLS for a TLS scheme, through the proxy <see cref="TrySelectProxy" /> chose (a tunnel through
+    /// an HTTP or HTTPS proxy, the handshake of a SOCKS one, as libcurl tunnels for connect-only without
+    /// <c>CURLOPT_HTTPPROXYTUNNEL</c>), sends nothing, and keeps the connection for <see cref="Connection" />; a
+    /// failed connect ends the perform with the connector's code and text (ADR-0608).
     /// </summary>
     /// <param name="options">The handle's options.</param>
-    /// <param name="settings">The tool settings, for the proxy credentials and the Unix socket.</param>
     /// <param name="url">The URL set, parsed.</param>
+    /// <param name="proxy">The proxy to connect through, or <see langword="null" /> to connect directly.</param>
     /// <param name="cancellationToken">Stops the connect.</param>
     /// <returns>The perform's code.</returns>
-    private async Task<CurlCode> PerformConnectOnlyAsync(EasyOptions options, EngineTransferSettings settings, CurlUrl url, CancellationToken cancellationToken)
+    private async Task<CurlCode> PerformConnectOnlyAsync(EasyOptions options, CurlUrl url, ProxyEndpoint? proxy, CancellationToken cancellationToken)
     {
-        if (!TransferProxySelection.TrySelect(ConnectOnlyProxySelector, options.Proxy, settings.OverUnixSocket, settings.ProxyCredentials, url, out ProxyEndpoint? proxy, out TransferResult? refused, Host.DiagnosticLog))
-        {
-            return Finish(refused.ExitCode.ToCurlCode(), refused.ErrorMessage!, Info);
-        }
-
         IConnector connector = CreateConnectOnlyConnector(options, PerformShared);
         ConnectTarget target = new(url.IdnHost, url.Port, ConnectOnlyConnection.UsesTls(url.Scheme)) { Proxy = proxy };
         ConnectResult connect = await connector.ConnectAsync(target, cancellationToken).ConfigureAwait(false);
@@ -540,7 +589,7 @@ internal sealed class ManagedEasyTransfer(
         string transferUrl = await SetUpUnlessToolDidAsync(toolInputs, options, settings, cookies, state, urlText, events).ConfigureAwait(false);
         EngineToolTransferDispatch? toolDispatch = ToolDispatch;
         RedirectFollower follower = FollowerOf(toolDispatch, options, cookies);
-        EngineToolTransferInputs inputs = MimePostForm.WithBody(InputsOf(toolInputs, options, settings, url, state, PauseGateFor(url)), formBody, url.Scheme);
+        EngineToolTransferInputs inputs = MimePostForm.WithBody(InputsOf(toolInputs, options, settings, url, state, PauseGateFor(url), selectedProxy), formBody, url.Scheme);
         IReadOnlyList<CallbackReadStream> callbackReads = inputs.Upload is CallbackReadStream upload ? [.. mimeReads, upload] : mimeReads;
         EngineToolTransferProgress? toolProgress = ToolProgress;
         using CancellationTokenSource abort = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, AbortTokenOf(toolProgress));
@@ -738,6 +787,7 @@ internal sealed class ManagedEasyTransfer(
     /// <param name="url">The URL to transfer, whose scheme says whether it takes SSH options.</param>
     /// <param name="state">The running transfer, which keeps the alt-svc cache.</param>
     /// <param name="pauseGate">The pause state a read callback's pause waits on, or <see langword="null" /> when the transfer cannot pause.</param>
+    /// <param name="proxy">The proxy <see cref="TrySelectProxy" /> chose, or <see langword="null" /> to connect directly.</param>
     /// <returns>The pieces.</returns>
     private static EngineToolTransferInputs InputsOf(
         EngineToolTransferInputs? toolInputs,
@@ -745,8 +795,9 @@ internal sealed class ManagedEasyTransfer(
         EngineTransferSettings settings,
         CurlUrl url,
         EngineTransferState state,
-        EasyPauseGate? pauseGate) =>
-        toolInputs ?? OwnInputsOf(options, settings, url, state, pauseGate);
+        EasyPauseGate? pauseGate,
+        ProxyEndpoint? proxy) =>
+        toolInputs ?? OwnInputsOf(options, settings, url, state, pauseGate, proxy);
 
     /// <summary>
     /// The pause state a callback's pause waits on: the handle's, but none for a <c>file</c> URL, which libcurl cannot
@@ -768,7 +819,8 @@ internal sealed class ManagedEasyTransfer(
         reads.Any(read => read.Aborted) ? CallbackReadStream.AbortedText : CallbackTransferProgress.CallbackAbortedText;
 
     /// <summary>
-    /// The pieces a handle with no <see cref="ToolInputs" /> chooses from its options: no proxy, credentials,
+    /// The pieces a handle with no <see cref="ToolInputs" /> chooses from its options: the proxy <see cref="TrySelectProxy" />
+    /// chose from <c>CURLOPT_PROXY</c> and the proxy environment (BL-2519); no credentials,
     /// <c>If-None-Match</c> lines, range or form body of the runner's; <c>CURLOPT_RESUME_FROM</c> when
     /// positive; the read callback under <c>CURLOPT_UPLOAD</c> (<see cref="UploadOf" />); the alt-svc cache its
     /// own setup opened; and for an <c>scp</c> or <c>sftp</c> URL the handle's SSH options with its host-key
@@ -779,9 +831,11 @@ internal sealed class ManagedEasyTransfer(
     /// <param name="url">The URL to transfer, whose scheme says whether it takes SSH options.</param>
     /// <param name="state">The running transfer, which keeps the alt-svc cache.</param>
     /// <param name="pauseGate">The pause state a read callback's pause waits on, or <see langword="null" /> when the transfer cannot pause.</param>
+    /// <param name="proxy">The proxy to connect through, or <see langword="null" /> to connect directly.</param>
     /// <returns>The pieces.</returns>
-    private static EngineToolTransferInputs OwnInputsOf(EasyOptions options, EngineTransferSettings settings, CurlUrl url, EngineTransferState state, EasyPauseGate? pauseGate) =>
+    private static EngineToolTransferInputs OwnInputsOf(EasyOptions options, EngineTransferSettings settings, CurlUrl url, EngineTransferState state, EasyPauseGate? pauseGate, ProxyEndpoint? proxy) =>
         new(
+            Proxy: proxy,
             ResumeFrom: options.Transfer.ResumeFrom > 0 ? options.Transfer.ResumeFrom : null,
             Upload: UploadOf(options, pauseGate),
             AltSvc: state.AltSvc,

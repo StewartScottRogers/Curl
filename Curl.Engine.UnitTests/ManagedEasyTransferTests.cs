@@ -803,5 +803,5 @@ public sealed partial class ManagedEasyTransferTests
             cookies));
 
     private static ManagedCurlEngine CreateEngine(IConnector connector) =>
-        new(TimeProvider.System, (_, _, cookies) => CreateDispatcher(connector, cookies));
+        new(TimeProvider.System, (_, _, cookies) => CreateDispatcher(connector, cookies), readEnvironmentVariable: _ => null);
 }

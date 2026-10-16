@@ -213,7 +213,7 @@ public sealed partial class ManagedEasyTransferTests
     }
 
     private static ManagedEasyTransfer EasyOver(RecordingProtocolHandler handler) =>
-        (ManagedEasyTransfer)new ManagedCurlEngine(TimeProvider.System, (_, _, _) => new ProtocolDispatcher([handler])).CreateEasy();
+        (ManagedEasyTransfer)new ManagedCurlEngine(TimeProvider.System, (_, _, _) => new ProtocolDispatcher([handler]), readEnvironmentVariable: _ => null).CreateEasy();
 
     // The context the handle builds with the inputs, and the one the runner's own
     // transferContextFactory.Create call builds from the same options and pieces.

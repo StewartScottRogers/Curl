@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using Curl.Cookies;
+using Curl.Core;
 using Curl.Core.Hsts;
 using Curl.Networking;
 using Curl.Protocol.Abstractions;
@@ -18,8 +19,13 @@ internal sealed class ManagedEngineSharedState
     /// <summary>Creates an engine's state, every cache its own.</summary>
     /// <param name="timeProvider">The clock the caches, the HSTS cache and the transfers run on.</param>
     /// <param name="easyErrorText">Curl's easy error text for each exit code (<c>Curl.Console</c>'s <c>CurlEasyErrorText.Of</c> in production).</param>
-    internal ManagedEngineSharedState(TimeProvider timeProvider, Func<CurlExitCode, string> easyErrorText)
+    /// <param name="readEnvironmentVariable">
+    /// Reads the proxy environment variables every handle's own perform consults (<see cref="ProxySelector" />):
+    /// <see cref="Environment.GetEnvironmentVariable(string)" />, the default, in production; a dictionary in tests.
+    /// </param>
+    internal ManagedEngineSharedState(TimeProvider timeProvider, Func<CurlExitCode, string> easyErrorText, Func<string, string?>? readEnvironmentVariable = null)
     {
+        ProxySelector = new ProxySelector(readEnvironmentVariable ?? Environment.GetEnvironmentVariable);
         TimeProvider = timeProvider;
         Connections = new ConnectionCache(timeProvider);
         TlsSessions = new TlsSessionCache(timeProvider);
@@ -60,7 +66,15 @@ internal sealed class ManagedEngineSharedState
         MultiOwners = engine.MultiOwners;
         SocketHandles = engine.SocketHandles;
         Performer = engine.Performer;
+        ProxySelector = engine.ProxySelector;
     }
+
+    /// <summary>
+    /// Gets what chooses the proxy of every handle's own perform from <c>CURLOPT_PROXY</c>, <c>CURLOPT_NOPROXY</c>
+    /// and the proxy environment variables (<c>http_proxy</c>, <c>HTTPS_PROXY</c>, <c>ALL_PROXY</c>, <c>NO_PROXY</c>
+    /// and the rest), as libcurl reads them for every handle (BL-2519, ADR-0608).
+    /// </summary>
+    internal ProxySelector ProxySelector { get; }
 
     /// <summary>Gets the clock the engine's transfers run on.</summary>
     internal TimeProvider TimeProvider { get; }

@@ -49,12 +49,17 @@ public sealed class ManagedCurlEngine : ICurlEngine
     /// Curl's easy error text for each exit code: <c>Curl.Console</c>'s <c>CurlEasyErrorText.Of</c>, which
     /// stays there (BL-2291); <see langword="null" /> for an empty text.
     /// </param>
+    /// <param name="readEnvironmentVariable">
+    /// Reads the proxy environment variables each handle's own perform consults, as libcurl reads them for every
+    /// handle (BL-2519); <see langword="null" /> for <see cref="Environment.GetEnvironmentVariable(string)" />.
+    /// </param>
     internal ManagedCurlEngine(
         TimeProvider timeProvider,
         Func<EasyOptions, ManagedEngineSharedState, ICookieStore?, ProtocolDispatcher>? createDispatcher,
-        Func<CurlExitCode, string>? easyErrorText = null)
+        Func<CurlExitCode, string>? easyErrorText = null,
+        Func<string, string?>? readEnvironmentVariable = null)
     {
-        shared = new ManagedEngineSharedState(timeProvider, easyErrorText ?? (_ => string.Empty));
+        shared = new ManagedEngineSharedState(timeProvider, easyErrorText ?? (_ => string.Empty), readEnvironmentVariable);
         this.createDispatcher = createDispatcher ?? CreateDispatcher;
     }
 
