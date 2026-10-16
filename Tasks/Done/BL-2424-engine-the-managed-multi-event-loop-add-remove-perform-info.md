@@ -30,7 +30,7 @@ ADR-0506; phase 3 of `Documentation/Planning/Curl-Api-And-libcurl.md`. Read the 
 
 ## Notes
 
-- Plan: the internal `ManagedMultiTransfer` is the engine's `IMultiTransfer`. Each added transfer runs as its own `IEasyTransfer.PerformAsync`, started by the next multi `PerformAsync`, which never waits and queues one `CURLMSG_DONE` per finished perform in add order. Decisions in ADR-0586 (Decided by Claude under Stewart's delegation).
+- Plan: the internal `ManagedMultiTransfer` is the engine's `IMultiTransfer`. Each added transfer runs as its own `IEasyTransfer.PerformAsync`, started by the next multi `PerformAsync`, which never waits and queues one `CURLMSG_DONE` per finished perform in add order. Decisions in ADR-0594 (Decided by Claude under Stewart's delegation).
 - The seam matched the plan apart from names (`IMultiTransfer.TryReadInfo`, `CurlMultiMessage`), so the plan needed no correction.
 - A transfer is in one of the engine's multi handles at a time (`ManagedEngineSharedState.MultiOwners`, by reference). `Remove` of a transfer in no multi handle answers `Ok`; one in another multi handle answers `BadEasyHandle`, as libcurl's `multi_remove_handle` does.
 - Wait, poll, wakeup and timeout (BL-2425), socket action and assign (BL-2426), and get_handles, waitfds, get_offt and notify (BL-2427) throw `NotSupportedException` naming their task, because those tasks own them.
