@@ -29,7 +29,7 @@ Split from BL-2402, which set every other `EasyNetworkOptions` option in `Libcur
 
 ## Notes
 
-- Decision (ADR-0588): `EasyNetworkOptions.UrlFromUrlHandle` (a string nothing read) is replaced by `ICurlUrlHandle? UrlHandle`, held by reference as libcurl holds the `CURLU *`, so the engine reads the URL at perform time.
+- Decision (ADR-0590): `EasyNetworkOptions.UrlFromUrlHandle` (a string nothing read) is replaced by `ICurlUrlHandle? UrlHandle`, held by reference as libcurl holds the `CURLU *`, so the engine reads the URL at perform time.
 - `SetUrlHandle` in `EasyNetworkOptionSetters`: a `CurlUrlHandle` stores its `EngineHandle`, `null` clears it, and any other object (a string, a bare engine handle) answers `BadFunctionArgument`.
 - Added `Libcurl/CLAUDE.md` to touches (no task in Doing names it): the acceptance criteria require keeping it true.
 - Measured: build clean, fast tests 0 failing projects (Libcurl.UnitTests 791, Curl.Api.UnitTests 429 passed), `Measure-CodeQuality.ps1 -Library Libcurl,Curl.Api.UnitLibrary` 0 failing members.
