@@ -28,7 +28,7 @@ BL-2494 made `WsProtocolHandler.RawMode` hand the received stream to the output 
 ## Notes
 
 - Under CURLWS_RAW_MODE, curl 8.22.0 Curl_ws_accept skips adding the cr_ws_read frame-encoding reader (`if(!data->set.ws_raw_mode)`), so the -T body goes out unframed. Matched in SendUploadAsync; also no frame trace or frame log line. Read from the lib/ws.c source (not measured against a live server).
-- Measure-CodeQuality.ps1 could not run: its full test run fails on unrelated flaky Curl.Api test, filed as BL-2527. Ws tests pass (431); the change adds no new branches beyond RawMode checks both tests cover.
+- Measure-CodeQuality.ps1 could not run: its full test run fails on unrelated flaky Curl.Api test, filed as BL-2557. Ws tests pass (431); the change adds no new branches beyond RawMode checks both tests cover.
 
 ## Log
 

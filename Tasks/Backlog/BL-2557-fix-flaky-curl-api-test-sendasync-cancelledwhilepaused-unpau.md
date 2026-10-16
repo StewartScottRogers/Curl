@@ -1,5 +1,5 @@
 ---
-id: BL-2527
+id: BL-2557
 title: Fix flaky Curl.Api test SendAsync_CancelledWhilePaused_UnpausesAbortsAndFreesTheHandle (ProgressCalls 0)
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-16
 completed:
 ---
-# BL-2527 — Fix flaky Curl.Api test SendAsync_CancelledWhilePaused_UnpausesAbortsAndFreesTheHandle (ProgressCalls 0)
+# BL-2557 — Fix flaky Curl.Api test SendAsync_CancelledWhilePaused_UnpausesAbortsAndFreesTheHandle (ProgressCalls 0)
 
 ## Goal
 
