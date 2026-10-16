@@ -279,6 +279,9 @@ public sealed class RtspProtocolHandler(IConnector connector, IHttpAuthenticator
             Method = RtspMethod.Options.Name,
             HeaderSize = head.Length,
             RequestSize = request.Length,
+            RtspSessionId = session.SessionId,
+            RtspClientSequenceNumber = session.NextSequenceNumber,
+            RtspSequenceNumberReceived = head.SequenceNumber,
         };
         if (StatusFailure(head, options, context.MaxFileSize, events) is { } statusFailure)
         {

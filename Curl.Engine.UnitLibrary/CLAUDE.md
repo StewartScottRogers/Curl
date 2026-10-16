@@ -272,9 +272,11 @@ post's `CURLOPT_POSTFIELDSIZE` or body length, else -1) and `CURLINFO_COOKIELIST
 turns the cookie engine on). `CURLINFO_CONN_ID` came with BL-2362 (below), and `CURLINFO_SSL_VERIFYRESULT`
 and `CURLINFO_PROXY_SSL_VERIFYRESULT` with BL-2366: `TlsVerifyResultRecordingTransferEvents`, the engine's
 copy of the runner's `TlsResultRecordingTransferEvents`, keeps the verify codes the transfer reports and
-puts them on its `TransferReport` (`SslVerifyResult`, `ProxySslVerifyResult`). `CURLINFO_OS_ERRNO` waits
-on BL-2374 and `CURLINFO_PROXY_ERROR` on BL-2375; the rest keep their fresh-handle defaults until BL-2367
-to BL-2369. `Duplicate` copies the options and none of the results, `Reset` restores
+puts them on its `TransferReport` (`SslVerifyResult`, `ProxySslVerifyResult`). BL-2367 added
+`CURLINFO_PROXYAUTH_USED` (the report's `ProxyAuthSchemePicked`, the scheme the HTTP handler answered a
+forward proxy's 407 with) and the RTSP handler's `CURLINFO_RTSP_SESSION_ID`, `RTSP_CLIENT_CSEQ`,
+`RTSP_SERVER_CSEQ` and `RTSP_CSEQ_RECV`. `CURLINFO_OS_ERRNO` waits on BL-2374 and `CURLINFO_PROXY_ERROR`
+on BL-2375; the rest keep their fresh-handle defaults until BL-2368 and BL-2369. `Duplicate` copies the options and none of the results, `Reset` restores
 `new EasyOptions()`, `Pause` records the directions and returns `Ok`, and `UpkeepAsync` returns
 `Ok`. `Headers`, `WebSocket` and `Connection` throw `NotSupportedException` (phase 3). Their tests are
 `ManagedCurlEngineTests`, `ManagedEasyTransferTests` and `CallbackWriteStreamTests`.

@@ -101,6 +101,37 @@ public sealed partial class HttpProtocolHandlerTests
         Assert.AreEqual(expected, result.Report.AuthSchemePicked);
     }
 
+    [TestMethod]
+    public async Task ExecuteAsync_ProxyDigestChallengeAnswered_ReportsDigestPickedForTheProxyOnly()
+    {
+        TurnTakingConnection connection = new(65536, KeepAliveProxyDigestChallengeHead + "PPP", ProxyOkHead + "ok");
+        Diagnostics.Arrange("url, proxy, auth", $"{ProxyAuthUrl}, {ChallengingProxy.Host}:{ChallengingProxy.Port}, Digest");
+
+        TransferResult result = await ProxyChallengeHandler(QueueConnector.For(connection), HttpAuthSchemes.Digest, "e395f7bf9cdabe6947113bd005a4ce2a")
+            .ExecuteAsync(new TransferContext
+            {
+                Url = CurlUrl.Parse(ProxyAuthUrl),
+                Output = new MemoryStream(),
+                Http = new HttpRequestOptions { ForwardProxy = ChallengingProxy },
+            });
+
+        WriteResult(result);
+        Diagnostics.Assert("proxy scheme picked", HttpAuthSchemes.Digest, result.Report!.ProxyAuthSchemePicked);
+        Assert.AreEqual(HttpAuthSchemes.Digest, result.Report.ProxyAuthSchemePicked);
+        Assert.AreEqual(HttpAuthSchemes.None, result.Report.AuthSchemePicked);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_OriginChallengeAnsweredWithoutAProxy_ReportsNoProxySchemePicked()
+    {
+        TurnTakingConnection connection = new(65536, BasicChallengeHead + "nope", OkHead + "ok");
+
+        TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), new ScriptedAuthenticator(null, "Basic dTpw")).ExecuteAsync(PickedSchemeContext(HttpAuthSchemes.None));
+
+        WriteResult(result);
+        Assert.AreEqual(HttpAuthSchemes.None, result.Report!.ProxyAuthSchemePicked);
+    }
+
     private static TransferContext PickedSchemeContext(HttpAuthSchemes picked) => new()
     {
         Url = CurlUrl.Parse(AuthUrl),

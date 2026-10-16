@@ -215,6 +215,41 @@ public sealed record TransferReport
     public HttpAuthSchemes AuthSchemePicked { get; init; }
 
     /// <summary>
+    /// Gets the HTTP authentication scheme the transfer's last request through a forward proxy
+    /// answered the proxy's <c>Proxy-Authenticate</c> challenge with, the source of
+    /// <c>CURLINFO_PROXYAUTH_USED</c> (BL-2367); <see cref="HttpAuthSchemes.None" /> when no
+    /// proxy challenge was answered, or for a transfer that is not HTTP.
+    /// </summary>
+    public HttpAuthSchemes ProxyAuthSchemePicked { get; init; }
+
+    /// <summary>
+    /// Gets the RTSP session ID the server's first <c>Session</c> header gave, the source of
+    /// <c>CURLINFO_RTSP_SESSION_ID</c>; <see langword="null" /> before any, or for a transfer
+    /// that is not RTSP (BL-2367).
+    /// </summary>
+    public string? RtspSessionId { get; init; }
+
+    /// <summary>
+    /// Gets the <c>CSeq</c> the transfer's next RTSP request would be sent with, the source of
+    /// <c>CURLINFO_RTSP_CLIENT_CSEQ</c>; <c>0</c> for a transfer that is not RTSP (BL-2367).
+    /// </summary>
+    public long RtspClientSequenceNumber { get; init; }
+
+    /// <summary>
+    /// Gets the <c>CSeq</c> the transfer expects on the server's next request to it, the source
+    /// of <c>CURLINFO_RTSP_SERVER_CSEQ</c>. Only libcurl's <c>RECEIVE</c> request moves it, and
+    /// Curl's RTSP handler sends <c>OPTIONS</c> only, so it stays <c>0</c> (BL-2367).
+    /// </summary>
+    public long RtspServerSequenceNumber { get; init; }
+
+    /// <summary>
+    /// Gets the <c>CSeq</c> the last RTSP reply carried, the source of
+    /// <c>CURLINFO_RTSP_CSEQ_RECV</c>; <c>0</c> when it carried none, or for a transfer that is
+    /// not RTSP (BL-2367).
+    /// </summary>
+    public long RtspSequenceNumberReceived { get; init; }
+
+    /// <summary>
     /// Gets the Digest <c>Authorization</c> value the transfer's last request to the origin was
     /// sent with, which a followed redirect to a hop that may be sent credentials carries as
     /// <see cref="HttpRequestOptions.KeptDigestAuthorization" /> (upstream test1286, BL-2252);

@@ -45,6 +45,11 @@ public sealed class TransferInfoFromReportTests
         AuthSchemePicked = HttpAuthSchemes.Digest,
         SslVerifyResult = 19,
         ProxySslVerifyResult = 20,
+        ProxyAuthSchemePicked = HttpAuthSchemes.Ntlm,
+        RtspSessionId = "s1",
+        RtspClientSequenceNumber = 3,
+        RtspServerSequenceNumber = 4,
+        RtspSequenceNumberReceived = 2,
         ResponseHeaders =
         [
             new("Content-Length", "1000"),
@@ -101,6 +106,32 @@ public sealed class TransferInfoFromReportTests
 
     [TestMethod]
     public void Of_Report_TakesTheProxySslVerifyResult() => Assert.AreEqual(20, Full.ProxySslVerifyResult);
+
+    [TestMethod]
+    public void Of_ProxyNtlmPicked_AnswersCurlAuthNtlm() => Assert.AreEqual(8, Full.ProxyAuthUsed);
+
+    [TestMethod]
+    public void Of_Report_TakesTheRtspSessionId() => Assert.AreEqual("s1", Full.RtspSessionId);
+
+    [TestMethod]
+    public void Of_Report_TakesTheRtspClientCSeq() => Assert.AreEqual(3, Full.RtspClientCSeq);
+
+    [TestMethod]
+    public void Of_Report_TakesTheRtspServerCSeq() => Assert.AreEqual(4, Full.RtspServerCSeq);
+
+    [TestMethod]
+    public void Of_Report_TakesTheRtspCSeqReceived() => Assert.AreEqual(2, Full.RtspCSeqReceived);
+
+    [TestMethod]
+    public void Of_ReportWithoutProxyAuthOrRtsp_AnswersTheDefaults()
+    {
+        TransferInfo info = Of(new TransferReport());
+
+        Assert.AreEqual(0, info.ProxyAuthUsed);
+        Assert.IsNull(info.RtspSessionId);
+        Assert.AreEqual(0, info.RtspClientCSeq);
+        Assert.AreEqual(0, info.RtspCSeqReceived);
+    }
 
     [TestMethod]
     public void Of_ReportWithoutVerifyResults_AnswersZeroForEach()

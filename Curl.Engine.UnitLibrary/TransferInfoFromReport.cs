@@ -87,6 +87,7 @@ internal static class TransferInfoFromReport
         ContentType = report.ContentType,
         FtpEntryPath = report.FtpEntryPath,
         Referer = report.Referer,
+        RtspSessionId = report.RtspSessionId,
     };
 
     private static TransferInfo WithCounts(TransferInfo info, TransferResult result, TransferReport report) => info with
@@ -101,6 +102,10 @@ internal static class TransferInfoFromReport
         ConditionUnmet = result.TimeConditionUnmet ? 1 : 0,
         UsedProxy = report.UsedProxy ? 1 : 0,
         HttpAuthUsed = CurlAuthBitsOf(report.AuthSchemePicked),
+        ProxyAuthUsed = CurlAuthBitsOf(report.ProxyAuthSchemePicked),
+        RtspClientCSeq = report.RtspClientSequenceNumber,
+        RtspServerCSeq = report.RtspServerSequenceNumber,
+        RtspCSeqReceived = report.RtspSequenceNumberReceived,
         HttpAuthAvailable = report.ResponseCode == 401 ? ChallengedCurlAuthBits(report, "WWW-Authenticate") : 0,
         ProxyAuthAvailable = report.ResponseCode == 407 ? ChallengedCurlAuthBits(report, "Proxy-Authenticate") : 0,
         ContentLengthDownload = ContentLengthOf(report),

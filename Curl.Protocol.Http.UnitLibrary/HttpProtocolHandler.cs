@@ -1374,6 +1374,7 @@ public sealed class HttpProtocolHandler(
             ResponseConnection = timedConnection,
             RedirectCount = plan.RedirectsFollowed - plan.Options.RedirectsFollowed,
             AuthSchemePicked = AuthSchemePickedBy(plan),
+            ProxyAuthSchemePicked = plan.ProxyAuthorizationAnswersChallenge ? SchemeOfAuthorization(plan.ProxyAuthorization) : HttpAuthSchemes.None,
             DigestAuthorizationSent = DigestAuthorizationSentBy(plan),
         };
 
@@ -2961,6 +2962,12 @@ public sealed class HttpProtocolHandler(
         internal HttpAuthSchemes AuthSchemePicked { get; init; }
 
         /// <summary>
+        /// Gets the scheme the exchange's request answered a proxy's challenge with, the
+        /// report's <see cref="TransferReport.ProxyAuthSchemePicked" /> (BL-2367).
+        /// </summary>
+        internal HttpAuthSchemes ProxyAuthSchemePicked { get; init; }
+
+        /// <summary>
         /// Gets the Digest value the exchange's request was sent with, the report's
         /// <see cref="TransferReport.DigestAuthorizationSent" /> (BL-2252).
         /// </summary>
@@ -3003,6 +3010,7 @@ public sealed class HttpProtocolHandler(
                 RedirectCount = RedirectCount,
                 ResponseHeadersStored = body.HeadersStored,
                 AuthSchemePicked = AuthSchemePicked,
+                ProxyAuthSchemePicked = ProxyAuthSchemePicked,
                 DigestAuthorizationSent = DigestAuthorizationSent,
                 ProxyConnectResponseCode = connect.ProxyConnectResponseCode,
                 UsedProxy = UsedProxy,
