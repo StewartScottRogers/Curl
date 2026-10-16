@@ -1,5 +1,5 @@
 ---
-id: BL-2460
+id: BL-2461
 title: Engine: honour EasyHttpOptions.HttpGet so CURLOPT_HTTPGET after POSTFIELDS sends a GET
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-15
 completed:
 ---
-# BL-2460 — Engine: honour EasyHttpOptions.HttpGet so CURLOPT_HTTPGET after POSTFIELDS sends a GET
+# BL-2461 — Engine: honour EasyHttpOptions.HttpGet so CURLOPT_HTTPGET after POSTFIELDS sends a GET
 
 ## Goal
 
@@ -18,7 +18,7 @@ With `EasyHttpOptions.HttpGet` true and `Post` false, `ManagedEasyTransfer` send
 
 ## Context
 
-ADR-0561 (BL-2406): Libcurl's `HTTPGET` setter sets `HttpGet` and clears `Post`, but keeps `PostFields`, because upstream keeps `postfields` and switches only its `method` field. `Curl.Engine.UnitLibrary/ManagedEasyTransfer.cs` (around line 391) treats a non-null `PostFields` as a POST whatever `HttpGet` says. A later `POST` 1 or `POSTFIELDS` clears `HttpGet` again, so a `POST` stays a `POST`.
+ADR-0565 (BL-2406): Libcurl's `HTTPGET` setter sets `HttpGet` and clears `Post`, but keeps `PostFields`, because upstream keeps `postfields` and switches only its `method` field. `Curl.Engine.UnitLibrary/ManagedEasyTransfer.cs` (around line 391) treats a non-null `PostFields` as a POST whatever `HttpGet` says. A later `POST` 1 or `POSTFIELDS` clears `HttpGet` again, so a `POST` stays a `POST`.
 
 ## Acceptance criteria
 

@@ -30,12 +30,12 @@ ADR-0506; phase 3 of `Documentation/Planning/Curl-Api-And-libcurl.md`. Read the 
 
 ## Notes
 
-- Rows live in `Libcurl/Options/Http`: `EasyOptionSetters.Http.cs` implements `AddHttpSetters` and calls `EasyHttpOptionSetters.AddTo`. That method adds 38 rows, one for each option `EasyHttpOptions` holds apart from `MIMEPOST` and `HTTPPOST`, which still answer `NotBuiltIn` and are pinned by a test. The decisions are in ADR-0561.
+- Rows live in `Libcurl/Options/Http`: `EasyOptionSetters.Http.cs` implements `AddHttpSetters` and calls `EasyHttpOptionSetters.AddTo`. That method adds 38 rows, one for each option `EasyHttpOptions` holds apart from `MIMEPOST` and `HTTPPOST`, which still answer `NotBuiltIn` and are pinned by a test. The decisions are in ADR-0565.
 - Quality gate: the first version used a lambda per row. `Measure-CodeQuality.ps1` counts each cached lambda as a branch in the method that builds it, so `AddTo` measured complexity 74. Rows are now `new EasyOptionSetter(NamedMethod)`, and `Measure-CodeQuality.ps1 -Library Libcurl` reports 100% line and branch coverage, 0 failing members and a worst CRAP of 10. Other option groups (BL-2400 to BL-2407) should build their rows the same way.
 - Trap found: in `cond ? ReadOnlyMemory<byte> : null`, the `null` converts through `byte[]` into an empty memory, not a null `ReadOnlyMemory<byte>?`. Cast it with `(ReadOnlyMemory<byte>?)null`.
 - Tests: 44 new tests in `Libcurl.UnitTests/Options/Http/EasyHttpOptionSettersTests.cs`. Libcurl.UnitTests has 117 tests and all pass, and so does the whole fast suite. `PassingUpstreamCases.txt` is unchanged, because Libcurl is not on the conformance path.
 - `Libcurl/CLAUDE.md` is still true; no edit was needed. `--ai-help` is untouched, since no command-line option changed.
-- Follow-up filed: BL-2460. The engine ignores `HttpGet`, so `HTTPGET` after `POSTFIELDS` still posts.
+- Follow-up filed: BL-2461. The engine ignores `HttpGet`, so `HTTPGET` after `POSTFIELDS` still posts.
 
 ## Log
 
