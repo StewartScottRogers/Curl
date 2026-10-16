@@ -259,8 +259,8 @@ and performs the attempt with `TransferPerformer.FollowWatchingSpeedAsync` throu
 `EasyCallbackOptions.Header` through `CallbackWriteStream`, each discarded when unset; a callback that
 takes fewer bytes than it was given fails the transfer with `CurlCode.WriteError`. The result's exit
 code becomes the `CurlCode`, its message `ErrorText`, and `Info` is what `TransferInfoFromReport.Of`
-fills from the result's `TransferReport` (BL-2317): every `CURLINFO_*` the report holds, each worked
-out as `Curl.Output`'s `TransferWriteOutVariables` works out its `-w` variable (times in whole
+fills from the result's `TransferReport` (BL-2317): every `CURLINFO_*` the report holds, those a `-w`
+variable reads filled by `Curl.Output`'s `WriteOutTransferInfo.FromReport`, which `-w` reads them through too (ADR-0553, BL-2319) (times in whole
 microseconds from the handler's start, at least one; speeds over the total time), plus the
 `CURLAUTH_*` bits a 401's `WWW-Authenticate` or a 407's `Proxy-Authenticate` lines offer, the last
 `Content-Length`, the effective URL's scheme and `CURLPROTO_*` bit, and `CURLINFO_FILETIME` only

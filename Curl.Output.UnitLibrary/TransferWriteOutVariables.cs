@@ -1,14 +1,15 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
-using System.Net;
+using Curl.Api.Info;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Output;
 
 /// <summary>
-/// Supplies the <c>-w</c> / <c>--write-out</c> variables of one finished transfer from its
-/// <see cref="TransferResult"/>, its <see cref="TransferReport"/> and the URL it was given,
-/// formatted as curl 8.21.0 prints them.
+/// Supplies the <c>-w</c> / <c>--write-out</c> variables of one finished transfer: every variable
+/// curl's <c>tool_writeout.c</c> reads with <c>curl_easy_getinfo</c> from the transfer's
+/// <see cref="TransferInfo"/>, and the tool's own from its <see cref="TransferResult"/>, its
+/// <see cref="TransferReport"/> and the URL it was given, formatted as curl 8.21.0 prints them.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -30,6 +31,18 @@ namespace Curl.Output;
 /// <c>query</c>, <c>fragment</c> and <c>zoneid</c>. Any other name is reported unknown.
 /// </para>
 /// <para>
+/// From the <see cref="TransferInfo"/> (ADR-0506, BL-2319): the response and <c>CONNECT</c> codes,
+/// the HTTP version, method, content type, redirect URL, effective URL (and the <c>urle.</c>
+/// parts), redirect count, header, request, download and upload sizes, connection count, the
+/// addresses and ports, scheme, every <c>time_*</c>, the speeds, both verify results, the early data
+/// bytes, the FTP entry path, <c>proxy_used</c>, <c>referer</c>, <c>conn_id</c> and <c>xfer_id</c>.
+/// The rest are the tool's: <c>exitcode</c>, <c>errormsg</c>, <c>url</c>, <c>urlnum</c>,
+/// <c>num_retries</c>, <c>filename_effective</c>, and, from the report, <c>size_delivered</c>,
+/// <c>num_headers</c> and the headers (curl reads those through its header API), and <c>certs</c>
+/// and <c>num_certs</c>, printed from the certificates themselves with
+/// <see cref="PeerCertificateText"/>.
+/// </para>
+/// <para>
 /// <c>url.</c> parts come from the URL as given and <c>urle.</c> parts from the
 /// <c>url_effective</c> URL, each parsed with <see cref="CurlUrl"/>; a part the URL does
 /// not have, or a URL that does not parse, prints nothing. See BL-304.
@@ -44,7 +57,7 @@ namespace Curl.Output;
 /// and BL-227.
 /// </para>
 /// <para>
-/// <c>size_download</c> prints <see cref="TransferReport.DownloadSize"/>, the body bytes
+/// <c>size_download</c> prints <see cref="TransferInfo.SizeDownload"/>, the body bytes
 /// after chunked framing is removed and before content decoding, and <c>size_delivered</c>
 /// prints <see cref="TransferReport.DeliveredSize"/>, the bytes after content decoding, or
 /// the <c>size_download</c> value when the report has no decoded count because nothing was
@@ -58,60 +71,31 @@ namespace Curl.Output;
 /// 8.21.0 (mingw, Schannel) for file:// and http://. See ADR-0054 and BL-303.
 /// </para>
 /// <para>
-/// <c>proxy_used</c> is <c>1</c> when <see cref="TransferReport.UsedProxy"/> says the
-/// transfer was set to go through a proxy and <c>0</c> otherwise, as measured on 2026-09-27
-/// against curl 8.21.0 (mingw, Schannel). See ADR-0058 and BL-302.
+/// <c>proxy_used</c> is <see cref="TransferInfo.UsedProxy"/>: <c>1</c> when the transfer was set
+/// to go through a proxy and <c>0</c> otherwise, as measured on 2026-09-27 against curl 8.21.0
+/// (mingw, Schannel). See ADR-0058 and BL-302.
 /// </para>
 /// <para>
-/// <c>referer</c>, <c>filename_effective</c>, <c>conn_id</c> and <c>xfer_id</c> are known
-/// to the command line and the process, not to a handler, so they are set by the caller
-/// through <see cref="Referer"/>, <see cref="OutputFileName"/>, <see cref="ConnectionId"/>
-/// and <see cref="TransferId"/>. Measured on 2026-09-26 against curl 8.21.0 (mingw,
-/// Schannel): no <c>-e</c> and output to standard output print nothing, and a URL curl
-/// rejects prints <c>conn_id</c> <c>-1</c>. See BL-305.
+/// <c>filename_effective</c> and <c>num_retries</c> are known to the command line, not to a
+/// handler, so they are set by the caller through <see cref="OutputFileName"/> and
+/// <see cref="RetryCount"/>. Measured on 2026-09-26 against curl 8.21.0 (mingw, Schannel): no
+/// <c>-e</c> and output to standard output print nothing, and a URL curl rejects prints
+/// <c>conn_id</c> <c>-1</c>. See BL-305.
 /// </para>
 /// <para>
-/// <c>time_queue</c> is the handler's start, the moment the transfer left the queue, so
-/// one microsecond with timings and <c>0.000000</c> without. <c>ssl_verify_result</c> and
-/// <c>proxy_ssl_verify_result</c> are <see cref="SslVerifyResult"/> and
-/// <see cref="ProxySslVerifyResult"/>, set by the caller: <c>0</c> in the Schannel build,
-/// which reports it even for a failed verification (ADR-0043), and OpenSSL's verify code in
-/// the OpenSSL build (BL-661). <c>tls_earlydata</c> is <see cref="TlsEarlyDataSent"/>, set by
-/// the caller: <c>0</c> without early data, as the Schannel build, which sends none, always
-/// prints (BL-906). <c>num_retries</c>
-/// is <see cref="RetryCount"/>, set by the caller (BL-513). <c>ftp_entry_path</c> is
-/// <see cref="TransferReport.FtpEntryPath"/>: nothing, and <c>null</c> in <c>json</c>,
-/// for a transfer that is not FTP or whose <c>PWD</c> reply named no directory (BL-514).
-/// </para>
-/// <para>
-/// A <c>time_*</c> value is the seconds from <see cref="TransferTimings.Started"/> to its
-/// event, in whole microseconds printed with six decimals; an event that happened is at
-/// least one microsecond after the start, and one that did not, or a transfer with no
-/// <see cref="TransferReport.Timings"/>, prints <c>0.000000</c>. A <c>speed_*</c> value is
-/// the bytes per second over <c>time_total</c>, truncated to a whole number, and <c>0</c>
-/// without timings. See ADR-0035.
+/// A <c>time_*</c> value is the info's time in whole microseconds printed with six decimals;
+/// <see cref="WriteOutTransferInfo.FromReport"/> makes an event that happened at least one
+/// microsecond after the start and one that did not <c>0.000000</c>. A <c>speed_*</c> value is
+/// the info's bytes per second. See ADR-0035.
 /// </para>
 /// <para>
 /// What was not learned prints as curl prints it: a status code as <c>000</c>, the HTTP
-/// version as <c>0</c>, the method as <c>GET</c>, a port as <c>-1</c>, and a text value
-/// as nothing. Measured on 2026-09-26 against curl 8.21.0 (mingw, Schannel); the commands
-/// are in BL-225's Notes. Without a report, <c>size_download</c> is
-/// <see cref="TransferResult.BytesTransferred"/> and <c>size_upload</c> is <c>0</c>.
+/// version as <c>0</c>, a port as <c>-1</c> (the info's <c>0</c>), and a text value as nothing.
+/// Measured on 2026-09-26 against curl 8.21.0 (mingw, Schannel); the commands are in BL-225's
+/// Notes.
 /// </para>
 /// </remarks>
-/// <param name="result">The finished transfer.</param>
-/// <param name="url">The URL exactly as given on the command line, printed by <c>%{url}</c>.</param>
-/// <param name="urlNumber">The zero-based position of the URL among the transfers, printed by <c>%{urlnum}</c>.</param>
-/// <param name="requestUrl">The URL handed to the protocol handler, printed by <c>%{url_effective}</c> when the report names no other.</param>
-/// <param name="scheme">The lower-case scheme of the handler that ran, or <see langword="null"/> when no handler supports the URL; printed by <c>%{scheme}</c>.</param>
-/// <param name="timeProvider">The provider whose <see cref="TimeProvider.GetTimestamp"/> took the report's <see cref="TransferTimings"/>, used to turn them into durations.</param>
-public sealed class TransferWriteOutVariables(
-    TransferResult result,
-    string url,
-    int urlNumber,
-    string requestUrl,
-    string? scheme,
-    TimeProvider timeProvider) : IWriteOutVariableSource
+public sealed class TransferWriteOutVariables : IWriteOutVariableSource
 {
     private const int UnknownPort = -1;
 
@@ -139,56 +123,55 @@ public sealed class TransferWriteOutVariables(
 
     private static readonly Dictionary<string, Func<TransferWriteOutVariables, WriteOutValue>> VariableFormatters = AddUrlPartFormatters(new(StringComparer.Ordinal)
     {
-        ["response_code"] = variables => WriteOutValue.FromStatusCode(variables.report.ResponseCode),
-        ["http_code"] = variables => WriteOutValue.FromStatusCode(variables.report.ResponseCode),
-        ["http_connect"] = variables => WriteOutValue.FromStatusCode(variables.report.ProxyConnectResponseCode),
-        ["http_version"] = variables => WriteOutValue.FromText(FormatHttpVersion(variables.report.HttpVersion)),
-        ["method"] = variables => WriteOutValue.FromText(variables.report.Method ?? "GET"),
-        ["content_type"] = variables => WriteOutValue.FromText(variables.report.ContentType),
-        ["redirect_url"] = variables => WriteOutValue.FromText(variables.report.RedirectUrl),
-        ["url_effective"] = variables => WriteOutValue.FromText(variables.EffectiveUrl),
-        ["num_redirects"] = variables => WriteOutValue.FromNumber(variables.report.RedirectCount),
-        ["size_header"] = variables => WriteOutValue.FromNumber(variables.report.HeaderSize),
-        ["size_request"] = variables => WriteOutValue.FromNumber(variables.report.RequestSize),
-        ["size_download"] = variables => WriteOutValue.FromNumber(variables.DownloadSize),
+        ["response_code"] = variables => WriteOutValue.FromStatusCode((int)variables.info.ResponseCode),
+        ["http_code"] = variables => WriteOutValue.FromStatusCode((int)variables.info.ResponseCode),
+        ["http_connect"] = variables => WriteOutValue.FromStatusCode((int)variables.info.HttpConnectCode),
+        ["http_version"] = variables => WriteOutValue.FromText(FormatHttpVersion(variables.info.HttpVersion)),
+        ["method"] = variables => WriteOutValue.FromText(variables.info.EffectiveMethod),
+        ["content_type"] = variables => WriteOutValue.FromText(variables.info.ContentType),
+        ["redirect_url"] = variables => WriteOutValue.FromText(variables.info.RedirectUrl),
+        ["url_effective"] = variables => WriteOutValue.FromText(variables.info.EffectiveUrl),
+        ["num_redirects"] = variables => WriteOutValue.FromNumber(variables.info.RedirectCount),
+        ["size_header"] = variables => WriteOutValue.FromNumber(variables.info.HeaderSize),
+        ["size_request"] = variables => WriteOutValue.FromNumber(variables.info.RequestSize),
+        ["size_download"] = variables => WriteOutValue.FromNumber(variables.info.SizeDownload),
         ["size_delivered"] = variables => WriteOutValue.FromNumber(variables.DeliveredSize),
-        ["size_upload"] = variables => WriteOutValue.FromNumber(variables.report.UploadSize),
-        ["num_connects"] = variables => WriteOutValue.FromNumber(variables.report.ConnectionCount),
+        ["size_upload"] = variables => WriteOutValue.FromNumber(variables.info.SizeUpload),
+        ["num_connects"] = variables => WriteOutValue.FromNumber(variables.info.NumConnects),
         ["num_headers"] = variables => WriteOutValue.FromNumber(
             variables.report.ResponseHeaders.Count + variables.report.PseudoHeaders.Count),
-        ["local_ip"] = variables => WriteOutValue.FromText(FormatAddress(variables.report.LocalEndPoint)),
-        ["local_port"] = variables => WriteOutValue.FromNumber(FindLocalPort(variables.report)),
-        ["remote_ip"] = variables => WriteOutValue.FromText(
-            variables.report.UnixSocketRemoteIp ?? FormatAddress(variables.report.RemoteEndPoint)),
-        ["remote_port"] = variables => WriteOutValue.FromNumber(FindPort(variables.report.RemoteEndPoint)),
+        ["local_ip"] = variables => WriteOutValue.FromText(variables.info.LocalIp),
+        ["local_port"] = variables => WriteOutValue.FromNumber(FindLocalPort(variables.info)),
+        ["remote_ip"] = variables => WriteOutValue.FromText(variables.info.PrimaryIp),
+        ["remote_port"] = variables => WriteOutValue.FromNumber(FindRemotePort(variables.info)),
         ["exitcode"] = variables => WriteOutValue.FromNumber((int)variables.result.ExitCode),
         ["errormsg"] = variables => WriteOutValue.FromText(variables.result.ErrorMessage),
         ["url"] = variables => WriteOutValue.FromText(variables.url),
         ["urlnum"] = variables => WriteOutValue.FromNumber(variables.urlNumber),
-        ["scheme"] = variables => WriteOutValue.FromText(variables.scheme),
-        ["time_queue"] = variables => FormatSeconds(variables.MicrosecondsSinceStart(variables.Timings?.Started)),
-        ["time_namelookup"] = variables => FormatSeconds(variables.MicrosecondsSinceStart(variables.Timings?.Connect?.NameResolved)),
-        ["time_connect"] = variables => FormatSeconds(variables.MicrosecondsSinceStart(variables.Timings?.Connect?.Connected)),
-        ["time_appconnect"] = variables => FormatSeconds(variables.MicrosecondsSinceStart(variables.Timings?.Connect?.TlsHandshakeCompleted)),
-        ["time_pretransfer"] = variables => FormatSeconds(variables.MicrosecondsSinceStart(variables.Timings?.RequestReady)),
-        ["time_posttransfer"] = variables => FormatSeconds(variables.MicrosecondsSinceStart(variables.Timings?.RequestSent)),
-        ["time_starttransfer"] = variables => FormatSeconds(variables.MicrosecondsSinceStart(variables.Timings?.FirstByteReceived)),
-        ["time_redirect"] = variables => FormatSeconds(ToMicroseconds(variables.Timings?.RedirectDuration ?? TimeSpan.Zero)),
-        ["time_total"] = variables => FormatSeconds(variables.TotalMicroseconds),
-        ["speed_download"] = variables => WriteOutValue.FromNumber(ComputeBytesPerSecond(variables.DownloadSize, variables.TotalMicroseconds)),
-        ["speed_upload"] = variables => WriteOutValue.FromNumber(ComputeBytesPerSecond(variables.report.UploadSize, variables.TotalMicroseconds)),
-        ["ssl_verify_result"] = variables => WriteOutValue.FromNumber(variables.SslVerifyResult),
-        ["proxy_ssl_verify_result"] = variables => WriteOutValue.FromNumber(variables.ProxySslVerifyResult),
-        ["tls_earlydata"] = variables => WriteOutValue.FromNumber(variables.TlsEarlyDataSent),
+        ["scheme"] = variables => WriteOutValue.FromText(variables.info.Scheme),
+        ["time_queue"] = variables => FormatSeconds(variables.info.QueueTime),
+        ["time_namelookup"] = variables => FormatSeconds(variables.info.NameLookupTime),
+        ["time_connect"] = variables => FormatSeconds(variables.info.ConnectTime),
+        ["time_appconnect"] = variables => FormatSeconds(variables.info.AppConnectTime),
+        ["time_pretransfer"] = variables => FormatSeconds(variables.info.PreTransferTime),
+        ["time_posttransfer"] = variables => FormatSeconds(variables.info.PostTransferTime),
+        ["time_starttransfer"] = variables => FormatSeconds(variables.info.StartTransferTime),
+        ["time_redirect"] = variables => FormatSeconds(variables.info.RedirectTime),
+        ["time_total"] = variables => FormatSeconds(variables.info.TotalTime),
+        ["speed_download"] = variables => WriteOutValue.FromNumber(variables.info.SpeedDownload),
+        ["speed_upload"] = variables => WriteOutValue.FromNumber(variables.info.SpeedUpload),
+        ["ssl_verify_result"] = variables => WriteOutValue.FromNumber(variables.info.SslVerifyResult),
+        ["proxy_ssl_verify_result"] = variables => WriteOutValue.FromNumber(variables.info.ProxySslVerifyResult),
+        ["tls_earlydata"] = variables => WriteOutValue.FromNumber(variables.info.EarlyDataSent),
         ["num_retries"] = variables => WriteOutValue.FromNumber(variables.RetryCount),
-        ["ftp_entry_path"] = variables => WriteOutValue.FromText(variables.report.FtpEntryPath),
+        ["ftp_entry_path"] = variables => WriteOutValue.FromText(variables.info.FtpEntryPath),
         ["num_certs"] = variables => WriteOutValue.FromNumber(variables.report.PeerCertificates.Count),
-        ["proxy_used"] = variables => WriteOutValue.FromNumber(variables.report.UsedProxy ? 1 : 0),
+        ["proxy_used"] = variables => WriteOutValue.FromNumber(variables.info.UsedProxy),
         ["certs"] = variables => WriteOutValue.FromText(string.Concat(variables.report.PeerCertificates.Select(PeerCertificateText.Format))),
-        ["referer"] = variables => WriteOutValue.FromText(variables.Referer),
+        ["referer"] = variables => WriteOutValue.FromText(variables.info.Referer),
         ["filename_effective"] = variables => WriteOutValue.FromText(variables.OutputFileName),
-        ["conn_id"] = variables => WriteOutValue.FromNumber(variables.ConnectionId),
-        ["xfer_id"] = variables => WriteOutValue.FromNumber(variables.TransferId),
+        ["conn_id"] = variables => WriteOutValue.FromNumber(variables.info.ConnectionId),
+        ["xfer_id"] = variables => WriteOutValue.FromNumber(variables.info.TransferId),
     });
 
     /// <summary>The names <c>%{json}</c> prints before <c>curl_version</c>, in curl's order: ordinal.</summary>
@@ -196,19 +179,69 @@ public sealed class TransferWriteOutVariables(
 
     private static readonly char[] HeaderValueWhitespace = [' ', '\t'];
 
-    private readonly TransferResult result = result ?? throw new ArgumentNullException(nameof(result));
-    private readonly TransferReport report = result.Report ?? new TransferReport();
-    private readonly string url = url ?? throw new ArgumentNullException(nameof(url));
-    private readonly string requestUrl = requestUrl ?? throw new ArgumentNullException(nameof(requestUrl));
-    private readonly int urlNumber = urlNumber;
-    private readonly string? scheme = scheme;
-    private readonly TimeProvider timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
+    /// <summary>The <c>%{http_version}</c> text of each <c>CURL_HTTP_VERSION_*</c> value a transfer reports.</summary>
+    private static readonly Dictionary<long, string> HttpVersionTexts = new()
+    {
+        [1] = "1",
+        [2] = "1.1",
+        [3] = "2",
+        [30] = "3",
+    };
+
+    private readonly TransferResult result;
+    private readonly TransferReport report;
+    private readonly string url;
+    private readonly int urlNumber;
+    private TransferInfo info;
+
+    /// <summary>
+    /// Creates the variables of a transfer whose <c>curl_easy_getinfo</c> answers are
+    /// <paramref name="info"/>, as curl's <c>tool_writeout.c</c> reads each libcurl variable with
+    /// <c>curl_easy_getinfo</c>; the tool's own variables come from <paramref name="result"/> and the
+    /// other arguments.
+    /// </summary>
+    /// <param name="info">The transfer's info, the value of every libcurl variable.</param>
+    /// <param name="result">The finished transfer, for <c>%{exitcode}</c>, <c>%{errormsg}</c>, <c>%{size_delivered}</c>, <c>%{num_headers}</c>, <c>%{certs}</c>, <c>%{num_certs}</c> and the headers.</param>
+    /// <param name="url">The URL exactly as given on the command line, printed by <c>%{url}</c>.</param>
+    /// <param name="urlNumber">The zero-based position of the URL among the transfers, printed by <c>%{urlnum}</c>.</param>
+    public TransferWriteOutVariables(TransferInfo info, TransferResult result, string url, int urlNumber)
+    {
+        this.info = info ?? throw new ArgumentNullException(nameof(info));
+        this.result = result ?? throw new ArgumentNullException(nameof(result));
+        this.url = url ?? throw new ArgumentNullException(nameof(url));
+        this.urlNumber = urlNumber;
+        report = result.Report ?? new TransferReport();
+    }
+
+    /// <summary>
+    /// Creates the variables of a transfer from its report alone: the info is
+    /// <see cref="WriteOutTransferInfo.FromReport"/> with <paramref name="scheme"/>, no
+    /// <c>Referer</c>, <c>%{xfer_id}</c> <c>0</c>, <c>%{conn_id}</c> <c>-1</c> and verify results of
+    /// <c>0</c>, each of which its property may set.
+    /// </summary>
+    /// <param name="result">The finished transfer.</param>
+    /// <param name="url">The URL exactly as given on the command line, printed by <c>%{url}</c>.</param>
+    /// <param name="urlNumber">The zero-based position of the URL among the transfers, printed by <c>%{urlnum}</c>.</param>
+    /// <param name="requestUrl">The URL handed to the protocol handler, printed by <c>%{url_effective}</c> when the report names no other.</param>
+    /// <param name="scheme">The lower-case scheme of the handler that ran, or <see langword="null"/> when no handler supports the URL; printed by <c>%{scheme}</c>.</param>
+    /// <param name="timeProvider">The provider whose <see cref="TimeProvider.GetTimestamp"/> took the report's <see cref="TransferTimings"/>, used to turn them into durations.</param>
+    public TransferWriteOutVariables(
+        TransferResult result,
+        string url,
+        int urlNumber,
+        string requestUrl,
+        string? scheme,
+        TimeProvider timeProvider)
+        : this(ReportOnlyInfoOf(result, requestUrl, scheme, timeProvider), result, url, urlNumber)
+    {
+    }
 
     /// <summary>
     /// Gets the <c>Referer</c> the request was sent with, printed by <c>%{referer}</c>, or
-    /// <see langword="null"/> (printed as nothing) when it was sent without one.
+    /// <see langword="null"/> (printed as nothing) when it was sent without one: the info's
+    /// <see cref="TransferInfo.Referer"/>.
     /// </summary>
-    public string? Referer { get; init; }
+    public string? Referer { get => info.Referer; init => info = info with { Referer = value }; }
 
     /// <summary>
     /// Gets the file the body was saved to, printed by <c>%{filename_effective}</c>, or
@@ -218,14 +251,15 @@ public sealed class TransferWriteOutVariables(
 
     /// <summary>
     /// Gets the process-wide number of the connection the transfer used, printed by
-    /// <c>%{conn_id}</c>; <c>-1</c>, the default, when it used none.
+    /// <c>%{conn_id}</c>; <c>-1</c> when it used none. The info's <see cref="TransferInfo.ConnectionId"/>.
     /// </summary>
-    public long ConnectionId { get; init; } = -1;
+    public long ConnectionId { get => info.ConnectionId; init => info = info with { ConnectionId = value }; }
 
     /// <summary>
-    /// Gets the process-wide zero-based number of the transfer, printed by <c>%{xfer_id}</c>.
+    /// Gets the process-wide zero-based number of the transfer, printed by <c>%{xfer_id}</c>: the
+    /// info's <see cref="TransferInfo.TransferId"/>.
     /// </summary>
-    public long TransferId { get; init; }
+    public long TransferId { get => info.TransferId; init => info = info with { TransferId = value }; }
 
     /// <summary>
     /// Gets how many times <c>--retry</c> ran the transfer again before this, its last attempt,
@@ -238,28 +272,28 @@ public sealed class TransferWriteOutVariables(
 
     /// <summary>
     /// Gets the OpenSSL <c>X509_V_</c> code the origin's certificate check ended with,
-    /// printed by <c>%{ssl_verify_result}</c>; <c>0</c>, the default, without TLS and in the
+    /// printed by <c>%{ssl_verify_result}</c>; <c>0</c> without TLS and in the
     /// Schannel build. curl 8.18.0's OpenSSL build printed <c>18</c> under <c>-k</c> for a
     /// self-signed certificate and <c>0</c> once <c>--cacert</c> trusted it (measured
-    /// 2026-09-30, BL-661).
+    /// 2026-09-30, BL-661). The info's <see cref="TransferInfo.SslVerifyResult"/>.
     /// </summary>
-    public long SslVerifyResult { get; init; }
+    public long SslVerifyResult { get => info.SslVerifyResult; init => info = info with { SslVerifyResult = value }; }
 
     /// <summary>
     /// Gets the OpenSSL <c>X509_V_</c> code an HTTPS proxy's certificate check ended with,
-    /// printed by <c>%{proxy_ssl_verify_result}</c>; <c>0</c>, the default, without an HTTPS
-    /// proxy and in the Schannel build (BL-661).
+    /// printed by <c>%{proxy_ssl_verify_result}</c>; <c>0</c> without an HTTPS
+    /// proxy and in the Schannel build (BL-661). The info's <see cref="TransferInfo.ProxySslVerifyResult"/>.
     /// </summary>
-    public long ProxySslVerifyResult { get; init; }
+    public long ProxySslVerifyResult { get => info.ProxySslVerifyResult; init => info = info with { ProxySslVerifyResult = value }; }
 
     /// <summary>
     /// Gets the bytes the origin's connection sent as TLS 1.3 0-RTT early data, printed by
     /// <c>%{tls_earlydata}</c> (<c>CURLINFO_EARLYDATA_SENT_T</c>): negative when the server
-    /// rejected them, and <c>0</c>, the default, without early data. curl 8.21.0's Schannel
+    /// rejected them, and <c>0</c> without early data. curl 8.21.0's Schannel
     /// build sends none and printed <c>0</c> under <c>--tls-earlydata</c> (measured
-    /// 2026-10-01, BL-906).
+    /// 2026-10-01, BL-906). The info's <see cref="TransferInfo.EarlyDataSent"/>.
     /// </summary>
-    public long TlsEarlyDataSent { get; init; }
+    public long TlsEarlyDataSent { get => info.EarlyDataSent; init => info = info with { EarlyDataSent = value }; }
 
     /// <summary>
     /// Gets the library version <c>%{json}</c> prints last, as <c>curl_version</c>; by
@@ -267,15 +301,7 @@ public sealed class TransferWriteOutVariables(
     /// </summary>
     public string LibraryVersion { get; init; } = FormatLibraryVersion(OperatingSystem.IsWindows(), OperatingSystem.IsMacOS());
 
-    private long DownloadSize => result.Report?.DownloadSize ?? result.BytesTransferred;
-
-    private long DeliveredSize => result.Report?.DeliveredSize ?? DownloadSize;
-
-    private TransferTimings? Timings => report.Timings;
-
-    private string EffectiveUrl => report.EffectiveUrl ?? requestUrl;
-
-    private long TotalMicroseconds => MicrosecondsSinceStart(Timings?.Completed);
+    private long DeliveredSize => report.DeliveredSize ?? info.SizeDownload;
 
     /// <summary>
     /// The library part of <c>-V</c>'s first line, which ADR-0021 limits to the TLS backend
@@ -353,15 +379,19 @@ public sealed class TransferWriteOutVariables(
     }
 
     /// <summary>
-    /// The whole microseconds from the start to <paramref name="timestamp"/>, at least one
-    /// as curl's <c>Curl_pgrsTime</c> makes it; zero when the event did not happen.
+    /// The info the report-only constructor starts from: <see cref="WriteOutTransferInfo.FromReport"/>
+    /// with <paramref name="scheme"/> and the defaults the caller's properties replace.
     /// </summary>
-    private long MicrosecondsSinceStart(long? timestamp)
-    {
-        return timestamp is long reached
-            ? Math.Max(1, ToMicroseconds(timeProvider.GetElapsedTime(Timings!.Started, reached)))
-            : 0;
-    }
+    private static TransferInfo ReportOnlyInfoOf(TransferResult result, string requestUrl, string? scheme, TimeProvider timeProvider) =>
+        WriteOutTransferInfo.FromReport(result, requestUrl, timeProvider) with
+        {
+            Scheme = scheme,
+            Referer = null,
+            TransferId = 0,
+            ConnectionId = -1,
+            SslVerifyResult = 0,
+            ProxySslVerifyResult = 0,
+        };
 
     /// <summary>
     /// Adds <c>url.&lt;part&gt;</c>, read from the URL as given, and <c>urle.&lt;part&gt;</c>,
@@ -373,7 +403,7 @@ public sealed class TransferWriteOutVariables(
         foreach ((string name, Func<CurlUrl, string?> read) in UrlParts)
         {
             formatters["url." + name] = variables => WriteOutValue.FromText(FindUrlPart(variables.url, read));
-            formatters["urle." + name] = variables => WriteOutValue.FromText(FindUrlPart(variables.EffectiveUrl, read));
+            formatters["urle." + name] = variables => WriteOutValue.FromText(FindUrlPart(variables.info.EffectiveUrl, read));
         }
 
         return formatters;
@@ -404,72 +434,45 @@ public sealed class TransferWriteOutVariables(
         return url.Scheme == "file" ? "0" : null;
     }
 
-    private static long ToMicroseconds(TimeSpan duration)
+    /// <summary>Prints a time as seconds with six decimals, in whole microseconds, as curl's <c>-w</c> prints a time.</summary>
+    private static WriteOutValue FormatSeconds(TimeSpan time)
     {
-        return duration.Ticks / TimeSpan.TicksPerMicrosecond;
-    }
-
-    /// <summary>Prints microseconds as seconds with six decimals, as curl's <c>-w</c> prints a time.</summary>
-    private static WriteOutValue FormatSeconds(long microseconds)
-    {
+        long microseconds = time.Ticks / TimeSpan.TicksPerMicrosecond;
         return WriteOutValue.FromFormattedNumber(string.Create(
             CultureInfo.InvariantCulture,
             $"{microseconds / MicrosecondsPerSecond}.{microseconds % MicrosecondsPerSecond:D6}"));
     }
 
-    /// <summary>
-    /// Bytes per second as curl's <c>trspeed</c> computes it: truncated, without overflowing
-    /// for a size too large to multiply by a million. <paramref name="microseconds"/> of zero
-    /// means no timings, which prints <c>0</c>.
-    /// </summary>
-    private static long ComputeBytesPerSecond(long size, long microseconds)
-    {
-        if (microseconds == 0)
-        {
-            return 0;
-        }
-
-        if (size < long.MaxValue / MicrosecondsPerSecond)
-        {
-            return size * MicrosecondsPerSecond / microseconds;
-        }
-
-        return microseconds >= MicrosecondsPerSecond ? size / (microseconds / MicrosecondsPerSecond) : long.MaxValue;
-    }
-
-    private static string FormatHttpVersion(Version? version)
-    {
-        return version switch
-        {
-            { Major: 1 } => version.Minor == 0 ? "1" : "1.1",
-            { Major: 2 or 3 } => FormatNumber(version.Major),
-            _ => "0",
-        };
-    }
+    /// <summary>The <c>%{http_version}</c> text of a <c>CURL_HTTP_VERSION_*</c> value; <c>0</c> for none.</summary>
+    private static string FormatHttpVersion(long version) => HttpVersionTexts.GetValueOrDefault(version, "0");
 
     private static string FormatNumber(long number)
     {
         return number.ToString(CultureInfo.InvariantCulture);
     }
 
-    private static string FormatAddress(IPEndPoint? endPoint)
+    /// <summary>
+    /// The <c>%{remote_port}</c> of <paramref name="info"/>: its primary port; <c>-1</c> when no
+    /// connection was made, which <see cref="TransferInfo.PrimaryPort"/> answers as <c>0</c>.
+    /// </summary>
+    private static long FindRemotePort(TransferInfo info)
     {
-        return endPoint?.Address.ToString() ?? string.Empty;
-    }
-
-    private static int FindPort(IPEndPoint? endPoint)
-    {
-        return endPoint?.Port ?? UnknownPort;
+        return info.PrimaryPort == 0 ? UnknownPort : info.PrimaryPort;
     }
 
     /// <summary>
-    /// The <c>%{local_port}</c> of <paramref name="report" />: its local end point's port;
-    /// <c>0</c> when a connection was made but has no local end to report, as curl 8.21.0
-    /// prints for its unconnected TFTP socket; <c>-1</c> when no connection was made
-    /// (measured, BL-515 Notes; ADR-0119).
+    /// The <c>%{local_port}</c> of <paramref name="info"/>: its local port when it has a local
+    /// address; <c>0</c> when a connection was made but has no local end to report, as curl 8.21.0
+    /// prints for its unconnected TFTP socket; <c>-1</c> when no connection was made (measured,
+    /// BL-515 Notes; ADR-0119).
     /// </summary>
-    private static int FindLocalPort(TransferReport report)
+    private static long FindLocalPort(TransferInfo info)
     {
-        return report.LocalEndPoint?.Port ?? (report.RemoteEndPoint is null ? UnknownPort : UnreportedLocalPort);
+        if (info.LocalIp.Length != 0)
+        {
+            return info.LocalPort;
+        }
+
+        return info.PrimaryPort == 0 ? UnknownPort : UnreportedLocalPort;
     }
 }

@@ -1,4 +1,3 @@
-using System.Net;
 using Curl.Api.Info;
 using Curl.Core;
 using Curl.Output;
@@ -9,14 +8,12 @@ namespace Curl.Engine;
 /// <summary>
 /// Fills the <see cref="TransferInfo" /> <c>curl_easy_getinfo</c> reports from a finished transfer's
 /// <see cref="TransferResult" /> and its <see cref="TransferReport" /> (ADR-0506, BL-2317): every
-/// <c>CURLINFO_*</c> the engine measures, each worked out as the <c>-w</c> variable of the same name
-/// is in <c>Curl.Output</c>'s <c>TransferWriteOutVariables</c>. A value the report does not hold
+/// <c>CURLINFO_*</c> the engine measures, the part the <c>-w</c> variables read filled by
+/// <c>Curl.Output</c>'s <see cref="WriteOutTransferInfo" />, the rest worked out here. A value the report does not hold
 /// keeps <see cref="TransferInfo" />'s fresh-handle default.
 /// </summary>
 internal static class TransferInfoFromReport
 {
-    private const long MicrosecondsPerSecond = 1_000_000;
-
     /// <summary>The line a certificate's PEM block starts with.</summary>
     private const string PemBeginLine = "-----BEGIN CERTIFICATE-----";
 
@@ -74,7 +71,7 @@ internal static class TransferInfoFromReport
     {
         TransferReport report = result.Report ?? new TransferReport();
         string effectiveUrl = report.EffectiveUrl ?? requestUrl;
-        TransferInfo info = WithTimesAndSpeeds(WithEndPoints(WithCounts(WithTexts(new TransferInfo(), report, effectiveUrl), result, report), report), result, report, timeProvider);
+        TransferInfo info = WithCounts(WriteOutTransferInfo.FromReport(result, requestUrl, timeProvider), result, report);
         return result.Report is null ? info : info with
         {
             Scheme = SchemeOf(effectiveUrl),
@@ -108,28 +105,9 @@ internal static class TransferInfoFromReport
             : [.. certificateText[..pemStart].Split('\n', StringSplitOptions.RemoveEmptyEntries), "Cert:" + certificateText[pemStart..]];
     }
 
-    private static TransferInfo WithTexts(TransferInfo info, TransferReport report, string effectiveUrl) => info with
-    {
-        EffectiveUrl = effectiveUrl,
-        EffectiveMethod = report.Method ?? "GET",
-        RedirectUrl = report.RedirectUrl,
-        ContentType = report.ContentType,
-        FtpEntryPath = report.FtpEntryPath,
-        Referer = report.Referer,
-        RtspSessionId = report.RtspSessionId,
-    };
-
     private static TransferInfo WithCounts(TransferInfo info, TransferResult result, TransferReport report) => info with
     {
-        ResponseCode = report.ResponseCode,
-        HttpConnectCode = report.ProxyConnectResponseCode,
-        HttpVersion = HttpVersionOf(report.HttpVersion),
-        RedirectCount = report.RedirectCount,
-        HeaderSize = report.HeaderSize,
-        RequestSize = report.RequestSize,
-        NumConnects = report.ConnectionCount,
         ConditionUnmet = result.TimeConditionUnmet ? 1 : 0,
-        UsedProxy = report.UsedProxy ? 1 : 0,
         HttpAuthUsed = CurlAuthBitsOf(report.AuthSchemePicked),
         ProxyAuthUsed = CurlAuthBitsOf(report.ProxyAuthSchemePicked),
         RtspClientCSeq = report.RtspClientSequenceNumber,
@@ -138,8 +116,6 @@ internal static class TransferInfoFromReport
         HttpAuthAvailable = report.ResponseCode == 401 ? ChallengedCurlAuthBits(report, "WWW-Authenticate") : 0,
         ProxyAuthAvailable = report.ResponseCode == 407 ? ChallengedCurlAuthBits(report, "Proxy-Authenticate") : 0,
         ContentLengthDownload = ContentLengthOf(report),
-        SslVerifyResult = report.SslVerifyResult,
-        ProxySslVerifyResult = report.ProxySslVerifyResult,
         OsErrno = report.OsErrno,
         ProxyError = (long)report.ProxyError,
     };
@@ -153,83 +129,6 @@ internal static class TransferInfoFromReport
             .Where(header => string.Equals(header.Key, "Retry-After", StringComparison.OrdinalIgnoreCase))
             .Select(header => RetryAfterHeader.ParseSeconds(header.Value, timeProvider.GetUtcNow()))
             .LastOrDefault());
-
-    private static TransferInfo WithEndPoints(TransferInfo info, TransferReport report) => info with
-    {
-        PrimaryIp = report.UnixSocketRemoteIp ?? AddressOf(report.RemoteEndPoint),
-        PrimaryPort = report.RemoteEndPoint?.Port ?? 0,
-        LocalIp = AddressOf(report.LocalEndPoint),
-        LocalPort = report.LocalEndPoint?.Port ?? 0,
-    };
-
-    private static TransferInfo WithTimesAndSpeeds(TransferInfo info, TransferResult result, TransferReport report, TimeProvider timeProvider)
-    {
-        long downloadSize = result.Report?.DownloadSize ?? result.BytesTransferred;
-        TransferInfo timed = report.Timings is { } timings ? WithTimes(info, timings, timeProvider) : info;
-        long totalMicroseconds = timed.TotalTime.Ticks / TimeSpan.TicksPerMicrosecond;
-        return timed with
-        {
-            SizeDownload = downloadSize,
-            SizeUpload = report.UploadSize,
-            SpeedDownload = BytesPerSecond(downloadSize, totalMicroseconds),
-            SpeedUpload = BytesPerSecond(report.UploadSize, totalMicroseconds),
-        };
-    }
-
-    private static TransferInfo WithTimes(TransferInfo info, TransferTimings timings, TimeProvider timeProvider)
-    {
-        ConnectTimings connect = timings.Connect ?? new ConnectTimings(timings.Started, null, null, null);
-        return info with
-        {
-            TotalTime = TimeSinceStart(timings, timings.Completed, timeProvider),
-            QueueTime = TimeSinceStart(timings, timings.Started, timeProvider),
-            NameLookupTime = TimeSinceStart(timings, connect.NameResolved, timeProvider),
-            ConnectTime = TimeSinceStart(timings, connect.Connected, timeProvider),
-            AppConnectTime = TimeSinceStart(timings, connect.TlsHandshakeCompleted, timeProvider),
-            PreTransferTime = TimeSinceStart(timings, timings.RequestReady, timeProvider),
-            PostTransferTime = TimeSinceStart(timings, timings.RequestSent, timeProvider),
-            StartTransferTime = TimeSinceStart(timings, timings.FirstByteReceived, timeProvider),
-            RedirectTime = TimeSpan.FromMicroseconds(timings.RedirectDuration.Ticks / TimeSpan.TicksPerMicrosecond),
-        };
-    }
-
-    /// <summary>
-    /// The whole microseconds from the start to <paramref name="timestamp" />, at least one as curl's
-    /// <c>Curl_pgrsTime</c> makes it; zero when the event did not happen.
-    /// </summary>
-    private static TimeSpan TimeSinceStart(TransferTimings timings, long? timestamp, TimeProvider timeProvider) =>
-        TimeSpan.FromMicroseconds(timestamp is long reached
-            ? Math.Max(1, timeProvider.GetElapsedTime(timings.Started, reached).Ticks / TimeSpan.TicksPerMicrosecond)
-            : 0);
-
-    /// <summary>
-    /// Bytes per second as curl's <c>trspeed</c> computes it: truncated, without overflowing for a
-    /// size too large to multiply by a million; 0 without timings.
-    /// </summary>
-    private static long BytesPerSecond(long size, long microseconds)
-    {
-        if (microseconds == 0)
-        {
-            return 0;
-        }
-
-        if (size < long.MaxValue / MicrosecondsPerSecond)
-        {
-            return size * MicrosecondsPerSecond / microseconds;
-        }
-
-        return microseconds >= MicrosecondsPerSecond ? size / (microseconds / MicrosecondsPerSecond) : long.MaxValue;
-    }
-
-    /// <summary>The <c>CURL_HTTP_VERSION_*</c> value of a status line's version; 0 for none.</summary>
-    private static long HttpVersionOf(Version? version) => version switch
-    {
-        { Major: 1, Minor: 0 } => 1,
-        { Major: 1 } => 2,
-        { Major: 2 } => 3,
-        { Major: 3 } => 30,
-        _ => 0,
-    };
 
     /// <summary>The <c>CURLAUTH_*</c> bits of the engine's schemes.</summary>
     private static long CurlAuthBitsOf(HttpAuthSchemes schemes) =>
@@ -252,8 +151,6 @@ internal static class TransferInfoFromReport
             .Where(header => string.Equals(header.Key, "Content-Length", StringComparison.OrdinalIgnoreCase))
             .Select(header => long.TryParse(header.Value.Trim(), out long length) ? length : -1)
             .LastOrDefault(-1);
-
-    private static string AddressOf(IPEndPoint? endPoint) => endPoint?.Address.ToString() ?? string.Empty;
 
     private static string? SchemeOf(string effectiveUrl) =>
         CurlUrl.TryParse(effectiveUrl, pathAsIs: false, out CurlUrl? url) ? url.Scheme : null;
