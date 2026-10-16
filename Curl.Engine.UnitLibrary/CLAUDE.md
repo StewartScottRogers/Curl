@@ -393,7 +393,7 @@ When a handle sets `EasyCallbackOptions.Prerequest`, `ManagedCurlEngine.CreateDi
 
 ## The trailer callback (BL-2475)
 
-A read-callback upload carries `EasyCallbackOptions.Trailer` as `CallbackReadStream.Trailer`, and `CallbackReadStream` implements `Curl.Protocol.Abstractions`' `IUploadTrailerSource` over it: with no trailer callback `SuppliesTrailers` is false and the HTTP handler sends the plain `0\r\n\r\n`; with one, the handler calls it once the read callback has ended a chunked HTTP/1.1 upload and sends the `Name: value` lines it added in the closing chunk, skipping a line whose first colon is not followed by a space, and `TrailerResult.Abort` fails the perform with `CurlCode.AbortedByCallback` and `operation aborted by trailing headers callback`, as curl 8.22.0's `add_last_chunk` in `lib/http_chunks.c` (ADR-0642). Its tests are `CallbackReadStreamTests` and `ManagedEasyTransferTests.Callbacks.cs`.
+A read-callback upload carries `EasyCallbackOptions.Trailer` as `CallbackReadStream.Trailer`, and `CallbackReadStream` implements `Curl.Protocol.Abstractions`' `IUploadTrailerSource` over it: with no trailer callback `SuppliesTrailers` is false and the HTTP handler sends the plain `0\r\n\r\n`; with one, the handler calls it once the read callback has ended a chunked HTTP/1.1 upload and sends the `Name: value` lines it added in the closing chunk, skipping a line whose first colon is not followed by a space, and `TrailerResult.Abort` fails the perform with `CurlCode.AbortedByCallback` and `operation aborted by trailing headers callback`, as curl 8.22.0's `add_last_chunk` in `lib/http_chunks.c` (ADR-0646). Its tests are `CallbackReadStreamTests` and `ManagedEasyTransferTests.Callbacks.cs`.
 
 ## The runner's follower and context factory (BL-2479)
 

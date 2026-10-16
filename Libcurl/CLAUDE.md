@@ -51,7 +51,7 @@ TCP connection over opaque `CurlSocket` handles; their `*DATA` options take any 
 each request is given its connection and before each look-up its DNS cache misses; `PREREQDATA` and
 `RESOLVER_START_DATA` take any value and change nothing, and `TRAILERFUNCTION` takes a `TrailerCallback` the same way,
 which the engine calls once a chunked HTTP/1.1 upload's body ends, sending its lines in the closing chunk; `TRAILERDATA`
-takes any value and changes nothing (BL-2419, ADR-0611; BL-2475, ADR-0642). `Callbacks/Wildcard` sets `CURLOPT_CHUNK_BGN_FUNCTION`, `CHUNK_END_FUNCTION`, `FNMATCH_FUNCTION`
+takes any value and changes nothing (BL-2419, ADR-0611; BL-2475, ADR-0646). `Callbacks/Wildcard` sets `CURLOPT_CHUNK_BGN_FUNCTION`, `CHUNK_END_FUNCTION`, `FNMATCH_FUNCTION`
 and `INTERLEAVEFUNCTION` the same way, which the engine calls around each file of an FTP wildcard download under
 `CURLOPT_WILDCARDMATCH` and for each interleaved RTP frame of an RTSP transfer; `CHUNK_DATA`, `FNMATCH_DATA` and
 `INTERLEAVEDATA` take any value and change nothing (BL-2420, ADR-0619). `Callbacks/Hsts` sets `CURLOPT_HSTSREADFUNCTION`

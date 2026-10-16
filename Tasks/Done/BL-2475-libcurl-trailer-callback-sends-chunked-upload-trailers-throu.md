@@ -31,7 +31,7 @@ Split from BL-2419 (ADR-0611), which wired the prerequest and resolver-start cal
 
 ## Notes
 
-- Plan (ADR-0642): new `IUploadTrailerSource` in `Curl.Protocol.Abstractions` beside `IUploadRewinder`
+- Plan (ADR-0646): new `IUploadTrailerSource` in `Curl.Protocol.Abstractions` beside `IUploadRewinder`
   (`SuppliesTrailers`, `TryTakeTrailers`); `HttpRequestBodyWriter` makes the closing chunk once per send when
   the body's end is first reached (trace or write), with the source's well-formed lines; `CallbackReadStream`
   implements it over `EasyCallbackOptions.Trailer`, set by `ManagedEasyTransfer.CallbackUploadOf`; Libcurl's
@@ -45,7 +45,7 @@ Split from BL-2419 (ADR-0611), which wired the prerequest and resolver-start cal
 - HTTP/2 and HTTP/3: upstream installs the chunked reader only for HTTP/1.x uploads, so it never calls the
   trailer callback there; nothing is left to file.
 - Decided: trailer lines are sent as UTF-8; the `-> 42` trace line upstream writes after an abort is not
-  written (recorded in ADR-0642).
+  written (recorded in ADR-0646).
 - `SetOption_TrailerFunction_StillAnswersNotBuiltIn` pinned the old placeholder; it became
   `SetOption_TrailerFunction_SetsTheCallbackAndNullClearsIt`, and `Trailerfunction` and `Trailerdata` joined
   the bad-argument and data rows.
