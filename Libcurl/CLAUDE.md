@@ -16,7 +16,10 @@ the object `Init` returns over an injected `ICurlEngine`; its `DisposeAsync` is 
 `_by_id`, `_next`) generated from curl 8.22.0's `lib/easyoptions.c` and `curl.h`, and the internal
 `EasyOptionDispatch` `SetOption` goes through. Each option group adds its setter rows by implementing
 its `Add<Group>Setters` partial method in an `EasyOptionSetters` part in `Options/<Group>`, keeping the
-namespace `Libcurl.Options`; an option no group sets yet answers `NotBuiltIn`.
+namespace `Libcurl.Options`; an option no group sets yet answers `NotBuiltIn`. `Options/Behaviour` sets
+the `EasyBehaviourOptions` options: an on/off option is on for any value but 0, the two permission
+options take 0 to 0777, and an object option given a value its field cannot hold answers
+`BadFunctionArgument`, as libcurl's `setopt.c` does.
 
 `Misc/ErrorText` holds `CurlErrorText`: `Multi`, `Share` and `Url` are `curl_multi_strerror`,
 `curl_share_strerror` and `curl_url_strerror` with upstream's test1538 strings and fallbacks, and
