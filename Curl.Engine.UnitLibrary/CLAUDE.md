@@ -286,7 +286,7 @@ one list per `TransferReport.PeerCertificates` entry, each `label:value` line of
 `PeerCertificateText` one string and its PEM block the last, `Cert:` and the block
 (`TransferInfoFromReport.CertInfoRecordsOf`). The rest keep their fresh-handle defaults until BL-2369. `Duplicate` copies the options and none of the results, `Reset` restores
 `new EasyOptions()`, `Pause` records the directions and returns `Ok`, and `UpkeepAsync` returns
-`Ok`. `Headers`, `WebSocket` and `Connection` throw `NotSupportedException` (phase 3). Their tests are
+`Ok`. `WebSocket` and `Connection` throw `NotSupportedException` (phase 3); `Headers` came with BL-2446 (below). Their tests are
 `ManagedCurlEngineTests`, `ManagedEasyTransferTests` and `CallbackWriteStreamTests`.
 
 ## The tool's settings and the engine-wide state (BL-2359)
@@ -348,3 +348,7 @@ Each `ManagedEasyTransfer` owns an `EasyPauseGate` (the handle's `CurlPause` bit
 ## The URL handle's set, dup and clear (BL-2437)
 
 `Set` with a null value clears the part (`UrlPartSetter.Cleared`; the whole URL clears them all), and with a value sets any part as curl 8.22.0's `curl_url_set` (`UrlPartSetter.Set`, answering a `UrlSetResult`): the scheme, port and host checked with upstream's `CurlUrlCode`s, `CURLU_URLENCODE` escaping, `CURLU_APPENDQUERY` joining with one `&`, `CURLU_NON_SUPPORT_SCHEME` and `CURLU_NO_AUTHORITY`, and the handle unchanged on failure. A whole URL that is not absolute (`UrlRelativeReference.IsAbsolute`) is resolved against the URL held (`UrlRelativeReference.Resolve`, upstream's `redirect_url`); a scheme libcurl does not support (`UrlHandleParts.IsSupportedScheme`) is `UnsupportedScheme` without `CURLU_NON_SUPPORT_SCHEME`; under `CURLU_ALLOW_SPACE` spaces are parsed as `%20` and put back (`UrlHandleParts.WithSpaces`). `Duplicate` is a new handle over the same immutable parts (ADR-0602). Its tests are `ManagedCurlUrlHandleTests.Set.cs` and `UrlRelativeReferenceTests`.
+
+## The header API (BL-2446)
+
+`ManagedEasyTransfer.Headers` is a `TransferHeaderStore`, the engine's `ITransferHeaders`. A perform from the options of an `http`, `https`, `ws` or `wss` URL writes its header lines through `HeaderRecordingStream`, which records each complete line in the store and passes the write on to the header callback when one is set; other schemes, and the curl tool's `ToolAttempt` and `ToolOutputs`, record nothing. The store numbers requests from 0, each status line after a final head starting the next (so each redirect hop is its own request), and tags lines `Informational` under a 1xx status, `Connect` under a CONNECT reply (`ConnectReplyHeadWritingEvents` marks the output through `IConnectReplyHeadMarking`, which `HeaderLineTeeStream` passes to its `-D` side), `Trailer` after a final head and `Header` otherwise, with an `HTTP/2` or `HTTP/3` status line's `:status` as `Pseudo`. `TryGet` and `Next` are curl 8.22.0's `curl_easy_header` and `curl_easy_nextheader`, `Next` finding its place from the `CurlHeader` it answered before by reference. Every perform and `Reset` forget the headers (ADR-0603). Their tests are `TransferHeaderStoreTests`, `HeaderRecordingStreamTests` and `ManagedEasyTransferTests.Headers.cs`.

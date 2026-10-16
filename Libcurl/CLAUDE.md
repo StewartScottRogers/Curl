@@ -91,6 +91,11 @@ parameters, `WebSocketRecv` answering 0 bytes and no frame unless `Ok`; `WebSock
 `null` or cleaned-up handle answers `BadFunctionArgument` (`WebSocketMeta` `null`) without the engine;
 every other check is the engine's.
 
+`Headers` holds `CurlEasyHeaders`, libcurl's header API as `CurlEasy` extension methods over the
+transfer's `ITransferHeaders` (ADR-0603): `Header` is `curl_easy_header` and `NextHeader`
+`curl_easy_nextheader`. A `null` or cleaned-up handle, or a `null` name, answers `BadArgument`
+(`NextHeader` `null`) without the engine; every other `CURLHE_*` answer is the engine's.
+
 `Multi` holds `CurlMulti`, the multi handle `CurlLibrary.MultiInit` (`curl_multi_init`) returns over
 the engine's `IMultiTransfer` (ADR-0570). It is `partial`: each multi area adds its members in its own
 folder under `Libcurl/Multi`, keeping the namespace `Libcurl.Multi`. `Multi/Core` has `AddHandle`,
