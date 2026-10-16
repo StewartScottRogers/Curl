@@ -6,7 +6,8 @@ It holds the shared result plumbing (ADR-0555): `McpToolFailure` for tool errors
 `McpReturnedBytes` for text-or-base64 output cut to `McpResponseCap`, and `McpToolRunner`,
 which passes the request's cancellation token through. `McpConfinementRoot` (ADR-0557) checks
 that a path, with `..` and symbolic links resolved, lies inside `CURL_MCP_ROOT`, answering with
-an `McpPathCheck`. The later tasks of `Documentation/Planning/Curl-Mcp.md` add the rest.
+an `McpPathCheck`. `McpOptionPathTable` (ADR-0559) says how every curl option uses a local path
+(`McpOptionPathUse`); an option it does not name is refused. The later tasks of `Documentation/Planning/Curl-Mcp.md` add the rest.
 
 Base class library only. Only `Curl.Mcp` may take the MCP SDK packages (`ModelContextProtocol`
 and `Microsoft.Extensions.Hosting`); this library references no package. Reference
