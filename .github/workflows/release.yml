@@ -1,7 +1,9 @@
-# Publishes the native-AOT `curl` binary for every supported platform.
+# Publishes the native-AOT `curl` binary for every supported platform, and the Curl.Mcp
+# NuGet packages (BL-2485; they stay off nuget.org until the port is complete).
 #
-#   * Pushing a tag `v*` (e.g. v0.1.0) builds all six packages and attaches them, with a
-#     SHA256SUMS file, to a GitHub release of that name. A tag with a hyphen
+#   * Pushing a tag `v*` (e.g. v0.1.0) builds all six curl packages and the seven Curl.Mcp
+#     `.nupkg` files, stamped with the tag's version, and attaches them, with a SHA256SUMS
+#     file covering all of them, to a GitHub release of that name. A tag with a hyphen
 #     (v0.1.0-preview.1) makes a pre-release. Tags and releases need Stewart's say-so
 #     (CLAUDE.md), so this workflow never creates a tag itself.
 #   * Running it by hand (workflow_dispatch) builds the same packages and uploads them as
@@ -11,7 +13,7 @@
 # Native AOT cannot cross-compile between operating systems, so each package is built on
 # a runner of its own OS. Linux builds on Ubuntu 22.04 so the binary runs on glibc 2.35
 # and newer. DOWNLOAD.md, install.sh and install.ps1 rely on the package names below;
-# keep the four in step. DOWNLOAD.md links to one version by tag, because
+# keep the four in step. The Curl.Mcp package names come from Curl.Mcp.csproj (ADR-0548). DOWNLOAD.md links to one version by tag, because
 # releases/latest skips pre-releases: point it at each new release's tag.
 name: Release
 
@@ -22,6 +24,7 @@ on:
     paths:
       - .github/workflows/release.yml
       - Curl.Console/**
+      - Curl.Mcp/**
       - Directory.Build.props
       - global.json
   workflow_dispatch:
@@ -80,13 +83,8 @@ jobs:
         if: matrix.rid != 'osx-x64'
         shell: bash
         run: |
-          # The binary must start; until Phase 1 lands it exits 2 (CURLE_FAILED_INIT).
-          set +e
+          # The binary must start and answer --version.
           ./publish/curl --version
-          code=$?
-          set -e
-          echo "exit code $code"
-          [ "$code" -eq 0 ] || [ "$code" -eq 2 ]
 
       - name: Package
         shell: bash
@@ -108,9 +106,68 @@ jobs:
           path: ${{ env.PACKAGE }}
           if-no-files-found: error
 
+  pack-mcp:
+    name: Pack Curl.Mcp
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Work out the version
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+          else
+            echo "VERSION=0.0.0-dev.${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
+          fi
+
+      # The repository's server.json keeps the version of Curl.Mcp.csproj; a release packs a
+      # copy that says the release's version in both places.
+      - name: Stamp the version into server.json
+        shell: pwsh
+        run: |
+          $path = 'Curl.Mcp/.mcp/server.json'
+          $json = Get-Content $path -Raw
+          $json = $json -replace '("version":\s*)"[^"]*"', "`$1`"$env:VERSION`""
+          Set-Content $path $json -NoNewline
+
+      - name: Pack Curl.Mcp
+        run: dotnet pack Curl.Mcp -c Release -p:Version="$VERSION" -o curl-mcp-packages
+
+      - name: Check the seven packages and the tool package's .mcp/server.json
+        shell: pwsh
+        run: |
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $files = @(Get-ChildItem curl-mcp-packages -Filter '*.nupkg')
+          $files | ForEach-Object { Write-Host "$($_.Name) $($_.Length)" }
+          if ($files.Count -ne 7) { throw "expected 7 packages, found $($files.Count)" }
+          foreach ($f in $files) { if ($f.Name -notlike "*.$env:VERSION.nupkg") { throw "$($f.Name) is not at version $env:VERSION" } }
+          $tool = @($files | Where-Object { $_.Name -eq "Curl.Mcp.$env:VERSION.nupkg" })
+          if ($tool.Count -ne 1) { throw 'no single Curl.Mcp tool package' }
+          $zip = [IO.Compression.ZipFile]::OpenRead($tool[0].FullName)
+          try {
+            $entry = $zip.Entries | Where-Object { $_.FullName -eq '.mcp/server.json' }
+            if (-not $entry) { throw "$($tool[0].Name) has no .mcp/server.json" }
+            $reader = [IO.StreamReader]::new($entry.Open())
+            try { $server = $reader.ReadToEnd() | ConvertFrom-Json } finally { $reader.Dispose() }
+          }
+          finally { $zip.Dispose() }
+          if ($server.version -ne $env:VERSION -or $server.packages[0].version -ne $env:VERSION) { throw "server.json does not say $env:VERSION" }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: curl-mcp-packages
+          path: curl-mcp-packages/*.nupkg
+          if-no-files-found: error
+
   release:
     name: Create the GitHub release
-    needs: publish
+    needs: [publish, pack-mcp]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
@@ -123,7 +180,7 @@ jobs:
 
       - name: Checksums
         working-directory: dist
-        run: sha256sum curl-* > SHA256SUMS && cat SHA256SUMS
+        run: sha256sum curl-* *.nupkg > SHA256SUMS && cat SHA256SUMS
 
       - name: Release
         env:
