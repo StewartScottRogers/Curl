@@ -49,6 +49,7 @@ public sealed class TransferInfoFromReportTests
         SslVerifyResult = 19,
         ProxySslVerifyResult = 20,
         OsErrno = 10061,
+        ProxyError = CurlProxyCode.ReplyConnectionRefused,
         ProxyAuthSchemePicked = HttpAuthSchemes.Ntlm,
         RtspSessionId = "s1",
         RtspClientSequenceNumber = 3,
@@ -151,6 +152,12 @@ public sealed class TransferInfoFromReportTests
 
     [TestMethod]
     public void Of_ReportWithoutOsErrno_AnswersZero() => Assert.AreEqual(0, Of(new TransferReport()).OsErrno);
+
+    [TestMethod]
+    public void Of_Report_TakesTheProxyError() => Assert.AreEqual(19, Full.ProxyError);
+
+    [TestMethod]
+    public void Of_ReportWithoutProxyError_AnswersZero() => Assert.AreEqual(0, Of(new TransferReport()).ProxyError);
 
     [TestMethod]
     public void Of_Report_TakesTheResponseCode() => Assert.AreEqual(401, Full.ResponseCode);

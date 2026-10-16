@@ -141,6 +141,7 @@ internal static class TransferInfoFromReport
         SslVerifyResult = report.SslVerifyResult,
         ProxySslVerifyResult = report.ProxySslVerifyResult,
         OsErrno = report.OsErrno,
+        ProxyError = (long)report.ProxyError,
     };
 
     /// <summary>

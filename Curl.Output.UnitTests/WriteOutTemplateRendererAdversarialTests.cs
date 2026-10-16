@@ -41,6 +41,19 @@ public sealed class WriteOutTemplateRendererAdversarialTests
     }
 
     [TestMethod]
+    public async Task RenderAsync_ProxyError_IsAnUnknownVariableAsInCurl8220()
+    {
+        // curl 8.22.0 -w "[%{proxy_error}]" wrote "[]" and the warning, through a SOCKS5 proxy that
+        // refused the request (exit 97) and with no proxy alike (BL-2375 Notes).
+        Fixture fixture = new();
+
+        await fixture.RenderAsync("[%{proxy_error}]", TestContext);
+
+        Assert.AreEqual("[]", fixture.StandardOutputText);
+        Assert.AreEqual("curl: unknown --write-out variable: 'proxy_error'\n", fixture.StandardErrorText);
+    }
+
+    [TestMethod]
     public async Task RenderAsync_VariableNameOf24Bytes_EndsTheRenderingSilently()
     {
         // curl -w "1%{<24 a>}2|" wrote "1" and nothing on standard error.

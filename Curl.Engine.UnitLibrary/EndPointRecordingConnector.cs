@@ -28,7 +28,7 @@ internal sealed class EndPointRecordingConnector(IConnector connector, Connectio
         }
         else
         {
-            recorder.RecordFailedConnect(connect.LastSocketError);
+            recorder.RecordFailedConnect(connect.LastSocketError, connect.ProxyError);
         }
 
         return connect;
@@ -72,7 +72,7 @@ internal sealed class EndPointRecordingConnector(IConnector connector, Connectio
         }
         else
         {
-            recorder.RecordFailedConnect(connect.LastSocketError);
+            recorder.RecordFailedConnect(connect.LastSocketError, connect.ProxyError);
         }
 
         return connect;

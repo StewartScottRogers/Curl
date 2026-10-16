@@ -275,6 +275,35 @@ public sealed class ConnectionEndPointRecorderTests
     }
 
     [TestMethod]
+    public void ReportOn_FailedSocksHandshakeRecorded_ReportsItsProxyErrorAndNoOsErrno()
+    {
+        ConnectionEndPointRecorder recorder = new();
+        recorder.RecordFailedConnect(SocketError.Success, CurlProxyCode.ReplyConnectionRefused);
+        recorder.RecordFailedConnect(SocketError.Success, CurlProxyCode.Ok);
+        Diagnostics.Arrange("failed connects", "a refused SOCKS5 request, then a failure with no proxy error");
+
+        TransferReport report = recorder.ReportOn(TransferResult.Success(0)).Report!;
+
+        Diagnostics.Assert("proxy error", CurlProxyCode.ReplyConnectionRefused, report.ProxyError);
+        Assert.AreEqual(CurlProxyCode.ReplyConnectionRefused, report.ProxyError);
+        Assert.AreEqual(0, report.OsErrno);
+    }
+
+    [TestMethod]
+    public void Clear_AfterAFailedSocksHandshake_ForgetsTheProxyError()
+    {
+        ConnectionEndPointRecorder recorder = new();
+        recorder.RecordFailedConnect(SocketError.Success, CurlProxyCode.Closed);
+        TransferResult result = TransferResult.Success(0);
+        Diagnostics.Arrange("failed connect", CurlProxyCode.Closed);
+
+        recorder.Clear();
+
+        Diagnostics.Assert("same result returned", true, ReferenceEquals(result, recorder.ReportOn(result)));
+        Assert.AreSame(result, recorder.ReportOn(result));
+    }
+
+    [TestMethod]
     public void RecordFailedConnect_Success_RecordsNothing()
     {
         ConnectionEndPointRecorder recorder = new();

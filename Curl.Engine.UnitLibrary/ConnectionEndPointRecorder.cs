@@ -43,6 +43,9 @@ internal sealed class ConnectionEndPointRecorder
     /// <summary>The operating system's error number of the last failed connect attempt, or <c>0</c>.</summary>
     private long osErrno;
 
+    /// <summary>Why the last failed SOCKS proxy handshake failed, or <see cref="CurlProxyCode.Ok" />.</summary>
+    private CurlProxyCode proxyError;
+
     /// <summary>Forgets what the previous transfer recorded.</summary>
     internal void Clear()
     {
@@ -51,19 +54,27 @@ internal sealed class ConnectionEndPointRecorder
         remoteEndPoint = null;
         unixSocketRemoteIp = null;
         osErrno = 0;
+        proxyError = CurlProxyCode.Ok;
     }
 
     /// <summary>
     /// Records the socket error of a failed connect's last attempt as the operating system's error
-    /// number, the transfer's <c>CURLINFO_OS_ERRNO</c> (BL-2374); a later failure replaces it, and
-    /// <see cref="SocketError.Success" /> leaves what was recorded.
+    /// number, the transfer's <c>CURLINFO_OS_ERRNO</c> (BL-2374), and why its SOCKS proxy handshake
+    /// failed, the transfer's <c>CURLINFO_PROXY_ERROR</c> (BL-2375); a later failure replaces each,
+    /// and <see cref="SocketError.Success" /> or <see cref="CurlProxyCode.Ok" /> leaves what was recorded.
     /// </summary>
     /// <param name="lastSocketError">The failed connect's <see cref="ConnectResult.LastSocketError" />.</param>
-    internal void RecordFailedConnect(SocketError lastSocketError)
+    /// <param name="failedProxyError">The failed connect's <see cref="ConnectResult.ProxyError" />.</param>
+    internal void RecordFailedConnect(SocketError lastSocketError, CurlProxyCode failedProxyError = CurlProxyCode.Ok)
     {
         if (lastSocketError != SocketError.Success)
         {
             osErrno = OsErrnoOf(lastSocketError);
+        }
+
+        if (failedProxyError != CurlProxyCode.Ok)
+        {
+            proxyError = failedProxyError;
         }
     }
 
@@ -125,16 +136,19 @@ internal sealed class ConnectionEndPointRecorder
     /// without a report. <paramref name="result" /> itself when nothing was recorded or the
     /// handler reported an end point.
     /// </returns>
-    internal TransferResult ReportOn(TransferResult result) => WithEndPoints(WithOsErrno(result));
+    internal TransferResult ReportOn(TransferResult result) => WithEndPoints(WithConnectFailure(result));
 
     /// <summary>
-    /// Puts the recorded <see cref="TransferReport.OsErrno" /> on <paramref name="result" />'s report,
-    /// building one as <see cref="ReportOn" /> does when the handler returned none; <paramref name="result" />
-    /// itself when no connect attempt failed.
+    /// Puts the recorded <see cref="TransferReport.OsErrno" /> and <see cref="TransferReport.ProxyError" />
+    /// on <paramref name="result" />'s report, building one as <see cref="ReportOn" /> does when the
+    /// handler returned none; <paramref name="result" /> itself when no connect attempt failed.
     /// </summary>
-    private TransferResult WithOsErrno(TransferResult result) => osErrno == 0
+    private TransferResult WithConnectFailure(TransferResult result) => osErrno == 0 && proxyError == CurlProxyCode.Ok
         ? result
-        : result with { Report = (result.Report ?? new TransferReport { DownloadSize = result.BytesTransferred }) with { OsErrno = osErrno } };
+        : result with
+        {
+            Report = (result.Report ?? new TransferReport { DownloadSize = result.BytesTransferred }) with { OsErrno = osErrno, ProxyError = proxyError },
+        };
 
     /// <summary>The end points half of <see cref="ReportOn" />.</summary>
     private TransferResult WithEndPoints(TransferResult result)

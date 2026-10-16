@@ -161,6 +161,27 @@ public sealed class EndPointRecordingConnectorTests
         Assert.IsTrue(connect.IsConnectionRefused);
     }
 
+    [TestMethod]
+    public async Task ConnectAsync_SocksHandshakeFailed_RecordsTheProxyError()
+    {
+        ConnectionEndPointRecorder recorder = new();
+        EndPointRecordingConnector connector = new(new SocksRefusingConnector(), recorder);
+        Diagnostics.Arrange("inner connector", "fails its SOCKS5 request with reply 5");
+
+        await connector.ConnectAsync(Target, CancellationToken.None);
+
+        TransferReport report = recorder.ReportOn(TransferResult.Success(0)).Report!;
+        Diagnostics.Assert("proxy error", CurlProxyCode.ReplyConnectionRefused, report.ProxyError);
+        Assert.AreEqual(CurlProxyCode.ReplyConnectionRefused, report.ProxyError);
+    }
+
+    /// <summary>A connector whose every SOCKS5 request the proxy refuses.</summary>
+    private sealed class SocksRefusingConnector : IConnector
+    {
+        public ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, CancellationToken cancellationToken) =>
+            ValueTask.FromResult(ConnectResult.Failed(CurlExitCode.Proxy, "cannot complete SOCKS5 connection to h. (5)", null, proxyError: CurlProxyCode.ReplyConnectionRefused));
+    }
+
     /// <summary>A connector whose every connect the peer refuses.</summary>
     private sealed class RefusingConnector : IConnector
     {
