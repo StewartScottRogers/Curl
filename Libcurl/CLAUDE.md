@@ -23,7 +23,9 @@ options take 0 to 0777, and an object option given a value its field cannot hold
 options with `setopt.c`'s range checks, and turns the `PROTOCOLS` bitmasks into `PROTOCOLS_STR` names
 (ADR-0568); `CURLU` still answers `NotBuiltIn` until BL-2462. `Options/Transfer` sets the
 `EasyTransferOptions` options with `setopt.c`'s checks, each `_LARGE` or `_MS` alias setting the same
-field as the option it extends, and clamps the two buffer sizes rather than refusing them (ADR-0572).
+field as the option it extends, and clamps the two buffer sizes rather than refusing them (ADR-0572). `Options/Proxy` sets the
+`EasyProxyOptions` options with `setopt.c`'s checks, keeps a copy of the `PROXYHEADER` list, and
+turns `HAPROXYPROTOCOL` on whenever `HAPROXY_CLIENT_IP` is set (ADR-0573).
 
 `Options/Callbacks` implements `AddCallbackSetters` once, calling one partial method per callback area
 (`AddReadWriteCallbackSetters`, `AddProgressCallbackSetters` and the rest), which each area implements in
