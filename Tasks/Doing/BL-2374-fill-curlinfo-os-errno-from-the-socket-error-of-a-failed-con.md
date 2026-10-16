@@ -33,3 +33,4 @@ Split from BL-2366, which filled the two TLS verify results. `TcpConnector.DialF
 ## Log
 
 - 2026-10-15: Created.
+- 2026-10-15: Backlog -> Doing.
