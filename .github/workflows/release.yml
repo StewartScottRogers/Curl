@@ -1,5 +1,6 @@
 # Publishes the native-AOT `curl` binary for every supported platform, and the Curl.Mcp
-# NuGet packages (BL-2485; they stay off nuget.org until the port is complete).
+# NuGet packages (BL-2485; they stay off nuget.org until the port is complete), each runtime's
+# holding a native-AOT Curl.Mcp packed on its own OS (BL-2486).
 #
 #   * Pushing a tag `v*` (e.g. v0.1.0) builds all six curl packages and the seven Curl.Mcp
 #     `.nupkg` files, stamped with the tag's version, and attaches them, with a SHA256SUMS
@@ -106,10 +107,27 @@ jobs:
           path: ${{ env.PACKAGE }}
           if-no-files-found: error
 
+  # Curl.Mcp packs as a .NET tool of native-AOT binaries (ADR-0599): with -p:PublishAot=true,
+  # `dotnet pack` with no runtime makes the tool package that points at the six runtime packages, and `dotnet pack -r <rid>`
+  # makes each runtime's package. AOT cannot cross-compile between operating systems, so each
+  # runtime package is packed on a runner of its own OS, as the curl binaries are published above.
   pack-mcp:
-    name: Pack Curl.Mcp
-    runs-on: ubuntu-latest
+    name: Pack Curl.Mcp ${{ matrix.rid }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { rid: any,         runner: ubuntu-latest }
+          - { rid: win-x64,     runner: windows-latest }
+          - { rid: win-arm64,   runner: windows-11-arm }
+          - { rid: linux-x64,   runner: ubuntu-22.04 }
+          - { rid: linux-arm64, runner: ubuntu-22.04-arm }
+          - { rid: osx-x64,     runner: macos-latest }
+          - { rid: osx-arm64,   runner: macos-latest }
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 30
+    env:
+      RID: ${{ matrix.rid }}
     steps:
       - uses: actions/checkout@v4
 
@@ -136,32 +154,75 @@ jobs:
           $json = $json -replace '("version":\s*)"[^"]*"', "`$1`"$env:VERSION`""
           Set-Content $path $json -NoNewline
 
-      - name: Pack Curl.Mcp
-        run: dotnet pack Curl.Mcp -c Release -p:Version="$VERSION" -o curl-mcp-packages
+      # The AOT linker finds MSVC through vswhere, which must be on PATH.
+      - name: Put vswhere on PATH
+        if: runner.os == 'Windows'
+        shell: bash
+        run: echo "C:\\Program Files (x86)\\Microsoft Visual Studio\\Installer" >> "$GITHUB_PATH"
 
-      - name: Check the seven packages and the tool package's .mcp/server.json
+      - name: Install the native toolchain
+        if: runner.os == 'Linux' && matrix.rid != 'any'
+        run: sudo apt-get update && sudo apt-get install -y clang zlib1g-dev
+
+      - name: Pack the tool package
+        if: matrix.rid == 'any'
+        shell: bash
+        run: dotnet pack Curl.Mcp -c Release -p:PublishAot=true -p:Version="$VERSION" -o curl-mcp-packages
+
+      - name: Pack the runtime package
+        if: matrix.rid != 'any'
+        shell: bash
+        run: dotnet pack Curl.Mcp -c Release -r "$RID" -p:PublishAot=true -p:Version="$VERSION" -o curl-mcp-packages
+
+      # The tool package carries .mcp/server.json at the release's version; a runtime package
+      # carries its native binary, never Curl.Mcp.dll, and (where the runner can run it) that
+      # binary answers initialize over standard input and output.
+      - name: Check the package
         shell: pwsh
         run: |
           Add-Type -AssemblyName System.IO.Compression.FileSystem
           $files = @(Get-ChildItem curl-mcp-packages -Filter '*.nupkg')
           $files | ForEach-Object { Write-Host "$($_.Name) $($_.Length)" }
-          if ($files.Count -ne 7) { throw "expected 7 packages, found $($files.Count)" }
-          foreach ($f in $files) { if ($f.Name -notlike "*.$env:VERSION.nupkg") { throw "$($f.Name) is not at version $env:VERSION" } }
-          $tool = @($files | Where-Object { $_.Name -eq "Curl.Mcp.$env:VERSION.nupkg" })
-          if ($tool.Count -ne 1) { throw 'no single Curl.Mcp tool package' }
-          $zip = [IO.Compression.ZipFile]::OpenRead($tool[0].FullName)
+          $name = if ($env:RID -eq 'any') { "Curl.Mcp.$env:VERSION.nupkg" } else { "Curl.Mcp.$env:RID.$env:VERSION.nupkg" }
+          if ($files.Count -ne 1 -or $files[0].Name -ne $name) { throw "expected only $name" }
+          $zip = [IO.Compression.ZipFile]::OpenRead($files[0].FullName)
           try {
-            $entry = $zip.Entries | Where-Object { $_.FullName -eq '.mcp/server.json' }
-            if (-not $entry) { throw "$($tool[0].Name) has no .mcp/server.json" }
-            $reader = [IO.StreamReader]::new($entry.Open())
-            try { $server = $reader.ReadToEnd() | ConvertFrom-Json } finally { $reader.Dispose() }
+            if ($env:RID -eq 'any') {
+              $entry = $zip.Entries | Where-Object { $_.FullName -eq '.mcp/server.json' }
+              if (-not $entry) { throw "$name has no .mcp/server.json" }
+              $reader = [IO.StreamReader]::new($entry.Open())
+              try { $server = $reader.ReadToEnd() | ConvertFrom-Json } finally { $reader.Dispose() }
+              if ($server.version -ne $env:VERSION -or $server.packages[0].version -ne $env:VERSION) { throw "server.json does not say $env:VERSION" }
+              return
+            }
+            $binary = if ($env:RID -like 'win-*') { 'Curl.Mcp.exe' } else { 'Curl.Mcp' }
+            $entry = $zip.Entries | Where-Object { $_.FullName -eq "tools/any/$env:RID/$binary" }
+            if (-not $entry) { throw "$name has no native tools/any/$env:RID/$binary" }
+            if ($zip.Entries | Where-Object { $_.FullName -eq "tools/any/$env:RID/Curl.Mcp.dll" }) { throw "$name holds Curl.Mcp.dll: it was not published native AOT" }
+            $native = Join-Path $env:RUNNER_TEMP $binary
+            [IO.Compression.ZipFileExtensions]::ExtractToFile($entry, $native, $true)
           }
           finally { $zip.Dispose() }
-          if ($server.version -ne $env:VERSION -or $server.packages[0].version -ne $env:VERSION) { throw "server.json does not say $env:VERSION" }
+          if ($env:RID -eq 'osx-x64') { return }
+          if (-not $IsWindows) { chmod +x $native }
+          # Standard input stays open until the answer is read: the server stops at end of input,
+          # whether or not it has answered.
+          $start = [Diagnostics.ProcessStartInfo]::new($native)
+          $start.RedirectStandardInput = $true
+          $start.RedirectStandardOutput = $true
+          $server = [Diagnostics.Process]::Start($start)
+          $server.StandardInput.WriteLine('{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"release","version":"1"}}}')
+          $server.StandardInput.Flush()
+          $read = $server.StandardOutput.ReadLineAsync()
+          $answer = if ($read.Wait(60000)) { $read.Result } else { '' }
+          $server.StandardInput.Close()
+          if (-not $server.WaitForExit(10000)) { $server.Kill($true) }
+          Write-Host $answer
+          if ("$answer" -notlike '*"serverInfo"*') { throw "$binary did not answer initialize" }
 
       - uses: actions/upload-artifact@v4
         with:
-          name: curl-mcp-packages
+          name: curl-mcp-${{ matrix.rid }}
           path: curl-mcp-packages/*.nupkg
           if-no-files-found: error
 

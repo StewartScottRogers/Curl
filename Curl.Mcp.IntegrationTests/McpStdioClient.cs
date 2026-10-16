@@ -61,6 +61,30 @@ internal sealed class McpStdioClient : IAsyncDisposable
         startInfo.ArgumentList.Add("--depsfile");
         startInfo.ArgumentList.Add(Path.Combine(directory, $"{testName}.deps.json"));
         startInfo.ArgumentList.Add(Path.Combine(directory, "Curl.Mcp.dll"));
+        return Start(startInfo, root);
+    }
+
+    /// <summary>Starts a native-AOT Curl.Mcp binary directly, with no <c>dotnet</c> host.</summary>
+    /// <param name="binary">The published native binary.</param>
+    /// <param name="root">The folder <c>CURL_MCP_ROOT</c> names.</param>
+    /// <returns>The started client, not yet initialized.</returns>
+    internal static McpStdioClient StartNative(string binary, string root)
+    {
+        ProcessStartInfo startInfo = new(binary)
+        {
+            RedirectStandardInput = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            StandardInputEncoding = new UTF8Encoding(false),
+            StandardOutputEncoding = new UTF8Encoding(false),
+            UseShellExecute = false,
+            WorkingDirectory = Path.GetDirectoryName(binary)!,
+        };
+        return Start(startInfo, root);
+    }
+
+    private static McpStdioClient Start(ProcessStartInfo startInfo, string root)
+    {
         startInfo.Environment[McpConfinementRoot.VariableName] = root;
         Process process = Process.Start(startInfo) ?? throw new InvalidOperationException("Curl.Mcp did not start.");
         McpStdioClient client = new(process);

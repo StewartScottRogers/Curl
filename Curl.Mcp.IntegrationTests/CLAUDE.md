@@ -14,8 +14,12 @@ It holds:
   outside the root and written inside it (BL-2390).
 - `CurlMcpPackIntegrationTests`: `dotnet pack Curl.Mcp -c Release` into a temporary folder, and the
   package holds `.mcp/server.json` and the McpServer package type (BL-2390).
+- `CurlMcpNativeAotIntegrationTests`: `dotnet publish Curl.Mcp -r <this machine's runtime>
+  -p:PublishAot=true` once for the class, then the native binary over stdio - `initialize`,
+  `tools/list` and a `transfer` call with one request header against a loopback listener (BL-2486,
+  ADR-0599).
 
 `McpStdioClient` is a hand-written newline-delimited JSON-RPC client (`System.Text.Json`; the SDK
 stays in `Curl.Mcp`, ADR-0548). It runs `Curl.Mcp.dll` from this project's output through
 `dotnet exec` with this project's runtime configuration and dependency file, which carry every
-assembly the server needs. `LoopbackHttpResponder` answers one request on a loopback listener.
+assembly the server needs, or, through `StartNative`, a published native binary directly. `LoopbackHttpResponder` answers one request on a loopback listener.
