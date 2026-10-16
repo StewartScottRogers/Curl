@@ -31,6 +31,27 @@ namespace Curl.Console;
 internal static class EasyOptionsFromCommandLine
 {
     /// <summary>
+    /// Every easy option group of one option group, as the runner sets them on a serial transfer's easy handle
+    /// (ADR-0552), with <paramref name="url" /> as <c>CURLOPT_URL</c>; the callbacks keep libcurl's defaults, as the
+    /// runner's attempt carries its own output, header, progress and event wiring.
+    /// </summary>
+    /// <param name="options">The parsed command line.</param>
+    /// <param name="url">The transfer's URL.</param>
+    /// <returns>The easy options.</returns>
+    internal static Api.Options.EasyOptions EasyOptionsOf(CommandLineOptions options, string url) =>
+        new()
+        {
+            Behaviour = BehaviourOf(options),
+            Transfer = TransferOf(options),
+            Network = NetworkOf(options) with { Url = url },
+            Tls = TlsOf(options),
+            Authentication = AuthenticationOf(options),
+            Proxy = ProxyOf(options),
+            Http = HttpOf(options),
+            Protocols = ProtocolOf(options),
+        };
+
+    /// <summary>
     /// The run's <c>--trace-config</c> components as the engine takes them: curl's <c>curl_global_trace</c> is a
     /// global, so no option group holds it, and the command line's <c>--trace-config</c>, <c>-v</c> and <c>--no-verbose</c>
     /// are all that set it (BL-2355).
