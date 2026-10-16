@@ -32,7 +32,7 @@ ADR-0506; phase 3 of `Documentation/Planning/Curl-Api-And-libcurl.md`. Read the 
 
 - `touches` gains `Libcurl/CLAUDE.md`: the acceptance criteria require it kept true, and it now describes `Libcurl/Url`. No other task in Doing names it.
 - "`CURLOPT_CURLU` uses it" is BL-2462's work (it depends on this task and owns `Libcurl/Options/Network`), so it is left there (AF-0148). `CurlUrlHandle` exposes the internal `EngineHandle` BL-2462 needs.
-- Decisions in ADR-0581: `curl_url` is `CurlLibrary.UrlInit()` (beside `EasyInit`/`MultiInit`, not shadowing the `Libcurl.Url` namespace); `Get`/`Set` pass straight through to the engine, which owns part and flag checks; `curl_url_strerror` is `CurlUrlHandle.ErrorText` over `CurlErrorText.Url`; a cleaned-up handle throws `ObjectDisposedException` like `CurlEasy`.
+- Decisions in ADR-0587: `curl_url` is `CurlLibrary.UrlInit()` (beside `EasyInit`/`MultiInit`, not shadowing the `Libcurl.Url` namespace); `Get`/`Set` pass straight through to the engine, which owns part and flag checks; `curl_url_strerror` is `CurlUrlHandle.ErrorText` over `CurlErrorText.Url`; a cleaned-up handle throws `ObjectDisposedException` like `CurlEasy`.
 - Measured: `Measure-CodeQuality.ps1 -Library Libcurl` 0 failing members; Libcurl.UnitTests 612 passed; full fast run green; `PassingUpstreamCases.txt` unchanged.
 
 ## Log
