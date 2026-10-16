@@ -35,3 +35,4 @@ before pinning. If FreeBSD's `rangematch` reads them too, give `FtpAppleBracket`
 ## Log
 
 - 2026-10-16: Created.
+- 2026-10-16: Backlog -> Doing.
