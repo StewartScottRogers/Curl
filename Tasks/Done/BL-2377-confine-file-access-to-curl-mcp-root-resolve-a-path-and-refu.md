@@ -36,7 +36,7 @@ Plan: Documentation/Planning/Curl-Mcp.md. Decision: ADR-0548.
 Delivered (2026-10-15, lane 1): `McpConfinementRoot` (built from a root path or `FromEnvironment(Func<string,string?>)`;
 `NotConfigured` when `CURL_MCP_ROOT` is unset), `McpPathCheck` (path, verdict, resolved path, reason for
 `McpToolFailure.PathRefused`) and `McpPathVerdict` (Inside, Outside, Unresolvable, NoRootConfigured).
-Decisions in ADR-0556: a path is resolved both as written and step by step through every symbolic link and is
+Decisions in ADR-0557: a path is resolved both as written and step by step through every symbolic link and is
 inside only when both are; the case rule is measured at the root by probing the case-swapped path (not assumed
 from `OperatingSystem`), since a case-insensitive volume can sit on Linux and a case-sensitive one on macOS;
 set-but-empty is an `ArgumentException`, only unset is "no root configured". `..` past the file system root stays
