@@ -5,11 +5,11 @@ area: behaviour
 platform: linux
 key: behaviour:output-open-warning-unix-strerror
 severity: Medium
-status: open
+status: closed
 scope: target
 introduced-in:
 opened: 2026-10-15_0751
-closed:
+closed: 2026-10-15_1657
 regression: false
 items: [behaviour:test3036]
 touches: [Curl.Console, Curl.Console.UnitTests, Curl.Protocol.Abstractions.UnitLibrary]
@@ -33,8 +33,10 @@ Make Curl.Console's 'Warning: Failed to open the file <path>: <reason>' line (Ou
 ## Measurements
 
 - 2026-10-15_0751: 1 of 1 items are gaps.
+- 2026-10-15_1657: 0 of 1 items are gaps.
 
 ## Log
 
 - 2026-10-15_0751: Opened by gap-behaviour.
 - 2026-10-15_0900: Filed BL-2328.
+- 2026-10-15_1657: Closed: run 2026-10-15_1657 measured every item as match or excluded on linux.

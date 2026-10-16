@@ -5,11 +5,11 @@ area: options
 platform: linux
 key: options:http3-refused-by-openssl-build
 severity: Medium
-status: open
+status: closed
 scope: target
 introduced-in: 7.66.0
 opened: 2026-10-15_0751
-closed:
+closed: 2026-10-15_1657
 regression: false
 items: [options:--http3, options:--http3-only]
 touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests]
@@ -33,8 +33,10 @@ Make the refusal follow the platform's reference build, not only the Schannel bu
 ## Measurements
 
 - 2026-10-15_0751: 2 of 2 items are gaps.
+- 2026-10-15_1657: 0 of 2 items are gaps.
 
 ## Log
 
 - 2026-10-15_0751: Opened by gap-options.
 - 2026-10-15_0900: Filed BL-2332.
+- 2026-10-15_1657: Closed: run 2026-10-15_1657 measured every item as match or excluded on linux.

@@ -5,11 +5,11 @@ area: protocols
 platform: macos
 key: protocols:ssh-exit-code
 severity: Medium
-status: open
+status: closed
 scope: target
 introduced-in:
 opened: 2026-10-15_0751
-closed:
+closed: 2026-10-15_1657
 regression: false
 items: [protocols:scp, protocols:sftp]
 touches: [Curl.Protocol.Ssh.UnitLibrary, Curl.Protocol.Ssh.UnitTests]
@@ -33,8 +33,10 @@ In Curl.Protocol.Ssh.UnitLibrary, make a refused or unreachable connection on sc
 ## Measurements
 
 - 2026-10-15_0751: 2 of 2 items are gaps.
+- 2026-10-15_1657: 0 of 2 items are gaps.
 
 ## Log
 
 - 2026-10-15_0751: Opened by gap-protocols.
 - 2026-10-15_0900: Filed BL-2336.
+- 2026-10-15_1657: Closed: run 2026-10-15_1657 measured every item as match or excluded on macos.

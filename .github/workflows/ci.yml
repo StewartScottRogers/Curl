@@ -71,6 +71,50 @@ jobs:
       - name: Fast tests
         run: dotnet test -c Release --no-build --filter "TestCategory!=Integration"
 
+  # Packs the Curl.Mcp MCP server and runs its Integration tests on every operating system
+  # (BL-2391). The packages are self-contained, not native AOT (ADR-0598), so each runner packs
+  # all seven of ADR-0596: the Curl.Mcp tool package with .mcp/server.json and one
+  # Curl.Mcp.<rid> package per runtime identifier. The packages are uploaded, never published.
+  mcp-pack:
+    name: Pack Curl.Mcp (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Curl.Mcp Integration tests
+        run: dotnet test Curl.Mcp.IntegrationTests -c Release --filter "TestCategory=Integration"
+
+      - name: Pack Curl.Mcp
+        run: dotnet pack Curl.Mcp -c Release -o "${{ runner.temp }}/curl-mcp-packages"
+
+      - name: Check the packages and the tool package's .mcp/server.json
+        shell: pwsh
+        run: |
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $files = @(Get-ChildItem (Join-Path $env:RUNNER_TEMP 'curl-mcp-packages') -Filter '*.nupkg')
+          $files | ForEach-Object { Write-Host "$($_.Name) $($_.Length)" }
+          if ($files.Count -ne 7) { throw "expected 7 packages, found $($files.Count)" }
+          $tool = @($files | Where-Object { $_.Name -match '^Curl\.Mcp\.\d' })
+          if ($tool.Count -ne 1) { throw 'no single Curl.Mcp tool package' }
+          $zip = [IO.Compression.ZipFile]::OpenRead($tool[0].FullName)
+          try { if ($zip.Entries.FullName -notcontains '.mcp/server.json') { throw "$($tool[0].Name) has no .mcp/server.json" } }
+          finally { $zip.Dispose() }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: curl-mcp-${{ matrix.os }}
+          path: ${{ runner.temp }}/curl-mcp-packages/*.nupkg
+          if-no-files-found: error
+
   # The four quality gates (CLAUDE.md "Quality gates"): 100% line and branch coverage,
   # complexity at most 10 and CRAP at most 30 for every member, measured as the coverage
   # page measures them. The build's CA1502 counts complexity on the source and can pass a
