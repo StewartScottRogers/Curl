@@ -6,7 +6,7 @@ namespace Libcurl.Info;
 /// <remarks>
 /// Each info group adds its rows from its own folder (<c>Libcurl/Info/&lt;Group&gt;</c>) by
 /// implementing its partial method below in a part of this class there, in this namespace, so group
-/// tasks never edit one shared file (ADR-0564). Until a group's part exists its method adds nothing,
+/// tasks never edit one shared file (ADR-0566). Until a group's part exists its method adds nothing,
 /// and its infos answer <see cref="Curl.Api.Codes.CurlCode.NotBuiltIn"/>.
 /// </remarks>
 internal static partial class EasyInfoReaders

@@ -3,7 +3,7 @@ namespace Libcurl.Info;
 /// <summary>
 /// libcurl's <c>struct curl_tlssessioninfo</c>, the answer to <see cref="CurlInfo.TlsSslPtr"/> and
 /// <see cref="CurlInfo.TlsSession"/>: the build's <c>curl_sslbackend</c> and the backend's native
-/// session pointer (ADR-0549, ADR-0564).
+/// session pointer (ADR-0549, ADR-0566).
 /// </summary>
 /// <param name="Backend">
 /// The <c>curl_sslbackend</c> value: 8 (<c>CURLSSLBACKEND_SCHANNEL</c>) on Windows, the Schannel

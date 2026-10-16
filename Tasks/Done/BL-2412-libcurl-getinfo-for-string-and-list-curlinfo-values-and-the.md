@@ -31,7 +31,7 @@ ADR-0506; phase 3 of `Documentation/Planning/Curl-Api-And-libcurl.md`. Read the 
 ## Notes
 
 - The goal assumed `CurlInfo` and `GetInfo` already existed; they did not, so this task built them
-  (ADR-0564): `CurlInfo` (every `CURLINFO_*` of 8.22.0's `curl.h`, `HttpCode` alias),
+  (ADR-0566): `CurlInfo` (every `CURLINFO_*` of 8.22.0's `curl.h`, `HttpCode` alias),
   `CurlEasy.GetInfo(CurlInfo, out object?)`, the internal `EasyInfoDispatch` (`UnknownOption` for an
   id `curl.h` lacks, `NotBuiltIn` for a known info no group reads yet) and `EasyInfoReaders` with
   `AddStringReaders`, `AddLongReaders` (BL-2413) and `AddTimeReaders` (BL-2414) partial methods.
