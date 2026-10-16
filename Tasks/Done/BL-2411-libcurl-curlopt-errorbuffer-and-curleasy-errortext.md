@@ -32,7 +32,7 @@ ADR-0506; phase 3 of `Documentation/Planning/Curl-Api-And-libcurl.md`. Read the 
 
 - Decision (rule 1): the 255-byte cut is Libcurl's own `Libcurl/Easy/EasyErrorBuffer.Cut`, the same algorithm as the engine's internal `CurlErrorBuffer.Truncate`. The engine class is `internal` and `Curl.Engine.UnitLibrary` is outside this task's `touches`, and `ManagedEasyTransfer.ErrorText` is not cut, so the plan's "cut by the engine's CurlErrorBuffer" is met by the same rule in Libcurl rather than by an `InternalsVisibleTo` change to the engine.
 - A perform clears the buffer whatever its result (libcurl clears it when a transfer starts) and writes the cut text only on failure; with no buffer set nothing is written, and `CurlEasy.ErrorText` answers the cut text either way.
-- Whether libcurl falls back to `curl_easy_strerror` text when no detail was written is left to BL-2463 (needs BL-2450's move of `CurlEasyErrorText`).
+- Whether libcurl falls back to `curl_easy_strerror` text when no detail was written is left to BL-2464 (needs BL-2450's move of `CurlEasyErrorText`).
 - Measured: `Measure-CodeQuality.ps1 -Library Libcurl` reported 0 failing members; full build clean, fast tests green (no failing assembly). `PassingUpstreamCases.txt` unchanged.
 
 ## Log

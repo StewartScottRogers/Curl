@@ -1,5 +1,5 @@
 ---
-id: BL-2463
+id: BL-2464
 title: Libcurl: fill CURLOPT_ERRORBUFFER with curl_easy_strerror text when the engine gives no detail
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-15
 completed:
 ---
-# BL-2463 — Libcurl: fill CURLOPT_ERRORBUFFER with curl_easy_strerror text when the engine gives no detail
+# BL-2464 — Libcurl: fill CURLOPT_ERRORBUFFER with curl_easy_strerror text when the engine gives no detail
 
 ## Goal
 
