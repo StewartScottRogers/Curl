@@ -13,7 +13,7 @@ internal sealed class ScriptedCurlEngine(IEasyTransfer easy) : ICurlEngine
 
     public IEasyTransfer CreateEasy() => easy;
 
-    public IMultiTransfer CreateMulti() => throw new NotSupportedException();
+    public IMultiTransfer CreateMulti() => new Concurrency.EasyPerformingMultiTransfer();
 
     public IShareHandle CreateShare() => throw new NotSupportedException();
 

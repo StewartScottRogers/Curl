@@ -47,7 +47,7 @@ public sealed partial class CurlClient
         cancellationToken.ThrowIfCancellationRequested();
         IEasyTransfer easy = CreateEasy();
         ResponseHeaderCollector collector = new();
-        ResponseBodyStream body = new(easy, bodyCapacity, cancellationToken, request.Progress);
+        ResponseBodyStream body = new(easy, bodyCapacity, Transfers.RunAsync, cancellationToken, _closing.Token, request.Progress);
         ExceptionDispatchInfo? setUpFailure = TrySetUp(easy, request, collector, body);
         if (setUpFailure is not null)
         {

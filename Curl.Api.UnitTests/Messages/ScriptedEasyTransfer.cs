@@ -59,7 +59,7 @@ internal sealed class ScriptedEasyTransfer : IEasyTransfer
 
     public void Reset() => throw new NotSupportedException();
 
-    public CurlCode Pause(CurlPause directions) => throw new NotSupportedException();
+    public CurlCode Pause(CurlPause directions) => CurlCode.Ok;
 
     public ValueTask<CurlCode> UpkeepAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
 

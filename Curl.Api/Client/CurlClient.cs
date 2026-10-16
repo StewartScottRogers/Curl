@@ -5,8 +5,9 @@ namespace Curl.Api;
 
 /// <summary>
 /// The entry point of <c>Curl.Api</c> (ADR-0506): a client over one <see cref="ICurlEngine"/>
-/// that creates an easy handle for each transfer, with <see cref="Options"/> applied. Disposing
-/// it disposes the engine when the client owns it; after <see cref="DisposeAsync"/> every member
+/// that creates an easy handle for each transfer, with <see cref="Options"/> applied, and runs its
+/// transfers together on one multi handle (ADR-0644). Disposing it cancels every running transfer and
+/// disposes the engine when the client owns it; after <see cref="DisposeAsync"/> every member
 /// that uses the engine throws <see cref="ObjectDisposedException"/>.
 /// </summary>
 public sealed partial class CurlClient : IAsyncDisposable
@@ -64,13 +65,20 @@ public sealed partial class CurlClient : IAsyncDisposable
     }
 
     /// <summary>
-    /// Disposes the engine when the client owns it. Safe to call more than once; only the first
-    /// call disposes anything.
+    /// Cancels every transfer still running (each <c>SendAsync</c> call or body read then throws
+    /// <see cref="OperationCanceledException"/>), disposes the multi handle they ran on, then disposes
+    /// the engine when the client owns it. Safe to call more than once; only the first call disposes anything.
     /// </summary>
-    /// <returns>A task that completes when the engine (if owned) is disposed.</returns>
+    /// <returns>A task that completes when the multi handle and the engine (if owned) are disposed.</returns>
     public async ValueTask DisposeAsync()
     {
-        if (Interlocked.Exchange(ref _disposed, 1) != 0 || !_ownsEngine)
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
+        {
+            return;
+        }
+
+        await StopTransfersAsync().ConfigureAwait(false);
+        if (!_ownsEngine)
         {
             return;
         }

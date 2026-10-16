@@ -3,7 +3,7 @@
 The .NET-idiomatic programming interface to Curl (ADR-0506), not a `Curl.<Area>.UnitLibrary`:
 `Curl.Api` is a naming exception, with `Curl.Console` and `Libcurl`. Namespace `Curl.Api`
 for `Client/` (`CurlClient` and `CurlClientOptions`) and `Composition/` (the engine-building
-half of the partial `CurlClient`), `Messages/`, `ResponseBodies/`, `RequestBodies/`, `Mime/`, `Cancellation/` and `Progress/`; `Curl.Api.Errors` for `Errors/`.
+half of the partial `CurlClient`), `Messages/`, `ResponseBodies/`, `RequestBodies/`, `Mime/`, `Cancellation/`, `Progress/` and `Concurrency/`; `Curl.Api.Errors` for `Errors/`.
 
 - `Cancellation/`: `TransferCancellation` (BL-2504, ADR-0639) carries a call's `CancellationToken`
   into its transfer: the `CURLOPT_XFERINFOFUNCTION` answers abort once the token is cancelled and
@@ -19,6 +19,16 @@ half of the partial `CurlClient`), `Messages/`, `ResponseBodies/`, `RequestBodie
   `AbortedByCallback`), and `ResponseBodyStream` ends its reports when perform returns. Its tests use
   `ProgressEasyTransfer` in `Curl.Api.UnitTests/Progress`.
 
+- `Concurrency/`: `MultiTransferDriver` (BL-2509, ADR-0644) runs every `SendAsync` transfer of a client
+  on one multi handle, created on the first transfer and disposed with the client: one loop adds,
+  performs, finishes each `CURLMSG_DONE` transfer and waits in `PollAsync`, woken by `Wakeup`; only the
+  loop calls the handle. A cancelled call's transfer is removed from the handle. `CurlClientOptions`'
+  `MaxConnections` and `MaxConnectionsPerHost` (this folder's partial half) set
+  `CURLMOPT_MAX_TOTAL_CONNECTIONS` and `CURLMOPT_MAX_HOST_CONNECTIONS`, and `CurlClient`'s partial half
+  here holds the driver and the closing token `DisposeAsync` cancels to abort every running transfer.
+  Its tests use `ConcurrentCurlEngine`, `GatedEasyTransfer` and `EasyPerformingMultiTransfer` (the fake
+  multi handle every sending test engine returns) in `Curl.Api.UnitTests/Concurrency`.
+
 - `Messages/`: `CurlRequest` and `CurlResponse` records and the `SendAsync` half of the partial
   `CurlClient` (BL-2499, ADR-0632). `CurlRequestOptions` maps a request onto `EasyOptions`;
   `ResponseHeaderCollector` is the header callback that splits header lines into status code,
@@ -29,7 +39,7 @@ half of the partial `CurlClient`), `Messages/`, `ResponseBodies/`, `RequestBodie
   the write callback: a bounded buffer that answers `CURL_WRITEFUNC_PAUSE` when full and unpauses the
   handle once read down to half. `ResponseBodyStream` is the async-only, read-only body over it; it
   owns the easy handle and the handles the request body created (`Owned`), disposes them when the transfer ends, and aborts the transfer (unpausing it)
-  when disposed first or when the `SendAsync` token is cancelled. Its tests drive `SteppedEasyTransfer`, a fake fed chunk by chunk, in
+  when disposed first, when the `SendAsync` token is cancelled or when the client is disposed. Its tests drive `SteppedEasyTransfer`, a fake fed chunk by chunk, in
   `Curl.Api.UnitTests/ResponseBodies`.
 
 - `RequestBodies/`: `CurlContent`, the type of `CurlRequest.Body` (BL-2500, ADR-0634). `BytesContent`

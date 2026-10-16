@@ -21,7 +21,7 @@ internal sealed class CancellableCurlEngine : ICurlEngine
         return Transfer;
     }
 
-    public IMultiTransfer CreateMulti() => throw new NotSupportedException();
+    public IMultiTransfer CreateMulti() => new Concurrency.EasyPerformingMultiTransfer();
 
     public IShareHandle CreateShare() => throw new NotSupportedException();
 

@@ -1,4 +1,5 @@
 using Curl.Api.Callbacks;
+using Curl.Api.Codes;
 using Curl.Api.EngineContracts;
 using Curl.Api.Errors;
 
@@ -17,6 +18,7 @@ internal sealed class ResponseBodyStream : Stream
 
     private readonly IEasyTransfer _easy;
     private readonly ResponseBodyBuffer _buffer;
+    private readonly Func<IEasyTransfer, CancellationToken, Task<CurlCode>> _perform;
     private readonly CancellationTokenSource _abort;
     private readonly List<IDisposable> _owned = [];
     private readonly TransferCancellation _cancellation;
@@ -36,10 +38,24 @@ internal sealed class ResponseBodyStream : Stream
     /// <see langword="null"/> for none.
     /// </param>
     public ResponseBodyStream(IEasyTransfer easy, int capacity, CancellationToken cancellationToken, IProgress<CurlTransferProgress>? progress = null)
+        : this(easy, capacity, static (transfer, token) => transfer.PerformAsync(token).AsTask(), cancellationToken, CancellationToken.None, progress)
+    {
+    }
+
+    /// <summary>A body for the transfer <paramref name="easy"/> is about to run through <paramref name="perform"/>.</summary>
+    /// <param name="easy">The handle; the stream disposes it once its transfer ends.</param>
+    /// <param name="capacity">The bytes buffered before the transfer is paused.</param>
+    /// <param name="perform">Runs the transfer and gives its result: a client's multi handle driver (ADR-0644).</param>
+    /// <param name="cancellationToken">The caller's token, which aborts the transfer as above.</param>
+    /// <param name="clientClosing">The client's own token, cancelled when the client is disposed; it aborts the transfer as <paramref name="cancellationToken"/> does.</param>
+    /// <param name="progress">Takes a report each time the engine calls the transfer-info callback, as above; <see langword="null"/> for none.</param>
+    public ResponseBodyStream(IEasyTransfer easy, int capacity, Func<IEasyTransfer, CancellationToken, Task<CurlCode>> perform, CancellationToken cancellationToken, CancellationToken clientClosing, IProgress<CurlTransferProgress>? progress = null)
     {
         _easy = easy;
-        _abort = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        _buffer = new ResponseBodyBuffer(capacity, () => easy.Pause(CurlPause.Continue), cancellationToken);
+        _perform = perform;
+
+        _abort = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, clientClosing);
+        _buffer = new ResponseBodyBuffer(capacity, () => easy.Pause(CurlPause.Continue), cancellationToken, clientClosing);
         _cancellation = new TransferCancellation(easy, _abort.Token, _buffer.Abort);
         easy.Options = _cancellation.ApplyTo(easy.Options);
         if (progress is not null)
@@ -169,7 +185,7 @@ internal sealed class ResponseBodyStream : Stream
             {
                 using (_cancellation)
                 {
-                    _buffer.Complete(await _easy.PerformAsync(_abort.Token).ConfigureAwait(false), _easy.ErrorText);
+                    _buffer.Complete(await _perform(_easy, _abort.Token).ConfigureAwait(false), _easy.ErrorText);
                 }
             }
         }

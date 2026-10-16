@@ -15,7 +15,8 @@ namespace Curl.Api;
 /// <param name="capacity">The bytes held before the transfer is paused; one delivery larger than that is still taken whole into an empty buffer.</param>
 /// <param name="resume">Unpauses the transfer (<c>curl_easy_pause(CURLPAUSE_CONT)</c>).</param>
 /// <param name="cancellation">The caller's token: a transfer that fails once it is cancelled is thrown as <see cref="OperationCanceledException"/>, not <see cref="CurlException"/> (ADR-0639).</param>
-internal sealed class ResponseBodyBuffer(int capacity, Action resume, CancellationToken cancellation = default)
+/// <param name="closing">The client's own token, cancelled when the client is disposed (ADR-0644): a transfer that fails once it is cancelled, and the caller's is not, is thrown as <see cref="OperationCanceledException"/> carrying it.</param>
+internal sealed class ResponseBodyBuffer(int capacity, Action resume, CancellationToken cancellation = default, CancellationToken closing = default)
 {
     private readonly Lock _gate = new();
     private readonly Queue<byte[]> _chunks = new();
@@ -93,7 +94,7 @@ internal sealed class ResponseBodyBuffer(int capacity, Action resume, Cancellati
             _ended = true;
             _code = code;
             _errorText = errorText;
-            _cancelledBy = cancellation.IsCancellationRequested ? cancellation : CancellationToken.None;
+            _cancelledBy = CancelledBy(cancellation, closing);
             arrived = SwapArrived();
         }
 
@@ -187,6 +188,12 @@ internal sealed class ResponseBodyBuffer(int capacity, Action resume, Cancellati
         _buffered -= copied;
         return copied;
     }
+
+    /// <summary>The token a failure is thrown as cancelled by: the caller's when cancelled, else the client's when it is closing, else none.</summary>
+    private static CancellationToken CancelledBy(CancellationToken cancellation, CancellationToken closing) =>
+        cancellation.IsCancellationRequested ? cancellation
+        : closing.IsCancellationRequested ? closing
+        : CancellationToken.None;
 
     private TaskCompletionSource SwapArrived()
     {

@@ -24,7 +24,7 @@ internal sealed class MimeCurlEngine(ScriptedEasyTransfer easy) : ICurlEngine
 
     public IEasyTransfer CreateEasy() => easy;
 
-    public IMultiTransfer CreateMulti() => throw new NotSupportedException();
+    public IMultiTransfer CreateMulti() => new Concurrency.EasyPerformingMultiTransfer();
 
     public IShareHandle CreateShare() => throw new NotSupportedException();
 
