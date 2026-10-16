@@ -32,3 +32,4 @@ ADR-0506 phase 2, ADR-0552, ADR-0554/0558/0561/0567. BL-2394 (switch `CurlComman
 ## Log
 
 - 2026-10-16: Created.
+- 2026-10-16: Backlog -> Doing.
