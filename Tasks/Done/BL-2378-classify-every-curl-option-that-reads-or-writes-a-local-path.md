@@ -33,7 +33,7 @@ The option table is `Curl.Cli.UnitLibrary/CommandLineOptionTable.cs` (and `Comma
 
 Plan: Documentation/Planning/Curl-Mcp.md. Decision: ADR-0548.
 
-- Classification and its reasons: ADR-0558. `McpOptionPathTable.TryFind` answers false for an unknown option (refused); the drift test is `McpOptionPathTableTests.Classifications_EveryOptionInCommandLineOptionTable_IsClassified`, with a reverse test for stale names.
+- Classification and its reasons: ADR-0559. `McpOptionPathTable.TryFind` answers false for an unknown option (refused); the drift test is `McpOptionPathTableTests.Classifications_EveryOptionInCommandLineOptionTable_IsClassified`, with a reverse test for stale names.
 - `Curl.Mcp.UnitTests` now references `Curl.Cli.UnitLibrary` for the drift test; the library itself does not.
 - Defaults taken: path-less flags (`-O`, `-J`, `--remote-name-all`, `-n`, `--netrc-optional`) classified by the file they imply; `--url` and the proxy options are `ValueEmbedded` (file:// and Unix socket URLs, BL-2379); `--abstract-unix-socket` is `UnixSocketPath` so it is refused rather than passed.
 - `-w @file` is `ValueEmbedded`: the read path sits inside the value (also `%output{}`, a write), so BL-2379 finds it there.
