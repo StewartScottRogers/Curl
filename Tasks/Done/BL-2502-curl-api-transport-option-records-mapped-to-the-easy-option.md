@@ -30,7 +30,7 @@ Phase 4 of `Documentation/Planning/Curl-Api-And-libcurl.md`; ADR-0506. `Curl.Api
 
 ## Notes
 
-- Design in ADR-0634 (decided by Claude under Stewart's delegation): `CurlNetworkOptions`,
+- Design in ADR-0636 (decided by Claude under Stewart's delegation): `CurlNetworkOptions`,
   `CurlTlsOptions` + `CurlTlsPeerOptions`, `CurlProxyOptions` mirror the seam records member for
   member (seam enums reused); validation runs in each `init` accessor (`TransportOptionGuard`), so an
   invalid record cannot be built and no transfer starts with one. A request's record replaces the
