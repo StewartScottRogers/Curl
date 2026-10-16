@@ -63,6 +63,11 @@ and the engine's TLS backend, the tail of `curl -V`'s first line; `Info(library,
 `CurlVersionAge.Now` from `ICurlEngine.VersionInfo`, its `CurlVersionFeatures` bits the OR of
 `FeatureBit` over the feature names (`lib/version.c`'s table) and every library version the seam lacks
 `null` or 0. Both answer after `curl_global_cleanup`.
+`Misc/Strings` holds `CurlStrings` (ADR-0595): `Escape` and `Unescape` are `curl_easy_escape` and
+`curl_easy_unescape` (their handle-less forms the `[Obsolete]` `curl_escape` and `curl_unescape`),
+reading text as UTF-8 bytes with lengths in bytes, `Unescape` answering `byte[]`; `null`, a negative
+length or one past the end answers `null`. `GetEnv` is `curl_getenv` (`null` for unset or empty), and
+`StrEqual`/`StrNEqual` are `curl_strequal`/`curl_strnequal`, ignoring ASCII case only.
 
 `Easy` holds `CurlEasy`, the easy handle `CurlLibrary.EasyInit` (`curl_easy_init`) returns over the
 engine's `IEasyTransfer` (ADR-0563): `SetOption` goes through `EasyOptionDispatch` and writes the
