@@ -6,6 +6,8 @@ using Curl.Api.EngineContracts.Share;
 using Curl.Api.EngineContracts.Url;
 using Curl.Api.Options;
 using Curl.Core;
+using Curl.Core.FileSystem;
+using Curl.Core.Multipart;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Engine;
@@ -18,8 +20,8 @@ namespace Curl.Engine;
 /// ADR-0542), shared by its handles as the curl tool's transfers share them across a run, and none is
 /// static, so two engines in one process share nothing but what a <see cref="ManagedShareHandle" /> shares
 /// (ADR-0606). The multi handle is <see cref="ManagedMultiTransfer" /> and the URL handle
-/// <see cref="ManagedCurlUrlHandle" />; the MIME and form handles are phase 3 work (ADR-0506) and throw
-/// <see cref="NotSupportedException" /> here.
+/// <see cref="ManagedCurlUrlHandle" />, the MIME handle <see cref="ManagedMimeBuilder" /> and the form
+/// <see cref="ManagedFormBuilder" />.
 /// </summary>
 public sealed class ManagedCurlEngine : ICurlEngine
 {
@@ -91,10 +93,9 @@ public sealed class ManagedCurlEngine : ICurlEngine
     /// <returns>A <see cref="ManagedMimeBuilder" />, whose body <c>CURLOPT_MIMEPOST</c> sends.</returns>
     public IMimeBuilder CreateMime() => new ManagedMimeBuilder();
 
-    /// <summary>Not supported yet: the form API is phase 3's MIME API work (ADR-0506).</summary>
-    /// <returns>Never returns.</returns>
-    /// <exception cref="NotSupportedException">Always.</exception>
-    public ICurlFormBuilder CreateForm() => throw new NotSupportedException("The form API is phase 3 work (ADR-0506).");
+    /// <summary><c>curl_formadd</c> on a null <c>httppost</c>: a new form holding no field (BL-2440).</summary>
+    /// <returns>A <see cref="ManagedFormBuilder" /> whose <c>curl_formget</c> reads files from disk under curl's random boundary.</returns>
+    public ICurlFormBuilder CreateForm() => new ManagedFormBuilder(new PhysicalFileSystem(), MultipartBoundary.CreateRandom);
 
     /// <summary>Closes every connection the engine's transfers kept open (<c>curl_global_cleanup</c>).</summary>
     /// <returns>A task that completes once they are closed.</returns>

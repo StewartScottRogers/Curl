@@ -128,10 +128,13 @@ public sealed class ManagedCurlEngineTests
     }
 
     [TestMethod]
-    public async Task CreateForm_NotYetBuilt_ThrowsNotSupported()
+    public async Task CreateForm_Called_GivesAManagedFormBuilderWithNoFields()
     {
         await using ManagedCurlEngine engine = new();
 
-        Assert.ThrowsExactly<NotSupportedException>(() => engine.CreateForm());
+        ICurlFormBuilder form = engine.CreateForm();
+
+        Assert.IsInstanceOfType<ManagedFormBuilder>(form);
+        Assert.IsEmpty(form.Build().Parts);
     }
 }
