@@ -40,3 +40,4 @@ ADR-0506; phase 3 of `Documentation/Planning/Curl-Api-And-libcurl.md`. Read the 
 - 2026-10-15: Created.
 - 2026-10-16: Backlog -> Doing.
 - 2026-10-16: Doing -> Backlog. Waits on BL-2423 (engine connect-only perform) and BL-2471 (public Ws frame codec and upgrade-only connect)
+- 2026-10-16: Backlog -> Doing.
