@@ -33,3 +33,4 @@ BL-2428 (ADR-0605) built the engine side: `ManagedMultiTransfer.OfferPush` answe
 ## Log
 
 - 2026-10-16: Created.
+- 2026-10-16: Backlog -> Doing.
