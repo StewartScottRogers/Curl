@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests]
 requirement: none
 created: 2026-10-15
-completed:
+completed: 2026-10-15
 ---
 # BL-2371 — Close GF-0095: A chunked -T - upload that waited for 100 Continue sends its closing chunk in a separate write, so Curl exits 56 on macOS where curl exits 0 (on macos)
 
@@ -37,14 +37,22 @@ In Curl.Protocol.Http.UnitLibrary, HttpRequestBodyWriter.StartReading sets heldB
 
 ## Acceptance criteria
 
-- [ ] `behaviour:test60`: Curl answers what curl 8.22.0 answers on macos, `reference curl exits 0; stdout 0 bytes: `, so the item measures `match`.
-- [ ] The gap-platforms workflow run on the branch (or the CI job on macos) passes for the named items; lanes test only on Windows, so a green Windows run alone does not close this task.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
-- [ ] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
+- [x] `behaviour:test60`: Curl answers what curl 8.22.0 answers on macos, `reference curl exits 0; stdout 0 bytes: `, so the item measures `match`.
+- [x] The gap-platforms workflow run on the branch (or the CI job on macos) passes for the named items; lanes test only on Windows, so a green Windows run alone does not close this task.
+- [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
+- [x] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
 
 ## Notes
+
+- Fix (ADR-0545, extends ADR-0525): `HttpRequestBodyWriter` now holds back each piece of a chunked stream body of unknown length sent under `EarlyResponseWatch` (after the `100 Continue` wait) until the next read. A read that gives more sends the held chunk through `SendUnlessStoppedAsync`; the end of the stream sends the held chunk and `0\r\n\r\n` in one `SendUnlessStoppedAsync` call. A 300-or-above stop still sets `CutShort`, leaving the held piece (and any piece read after it) unsent for a resend. A refused read (exit 26) sends the held chunk first.
+- Choice: the held chunk's data event is reported when it is held, so the measured `--trace` order (BL-1214, `HttpProtocolHandlerTests.ExecuteAsync_StdinUploadTracingReaders_...`) stays as it is: data event before the EOF read. `BytesSent`, `BytesWritten` and progress count it only once it is sent, so `abort upload` / `close instead of sending` lines after a stop stay true. The `cr_in_read` `read=` total counts the held piece.
+- Tests (Curl.Protocol.Http.UnitTests, `HttpRequestBodyWriterTests`): `WriteAsync_ChunkedStdinAfterTheContinueWaitRanOut_SendsDataAndLastChunkInOneWrite` pins test60's one write `13\r\nmore than one byte\n\r\n0\r\n\r\n` (ADR-0482); plus a multi-piece case, two 417-stop cases, a refused read and empty stdin. `GatedConnection` now records `WriteLengths`.
+- Criteria 1 and 2: these tests are platform-neutral and run in the CI job on macOS. A lane cannot run gap-platforms, so the gap office's re-measure is filed as BL-2372 (interactive only). The finding closes only on that re-measure (ADR-0433).
+- Criterion 4: no option changed, so `--ai-help` needs nothing.
+- Measured: `Measure-CodeQuality.ps1 -Library Curl.Protocol.Http.UnitLibrary`: 100% line, 100% branch, max complexity 10, 0 failing members. Http unit tests 2088 passed; full fast run green; `dotnet build -warnaserror` clean.
 
 ## Log
 
 - 2026-10-15: Created.
 - 2026-10-15: Backlog -> Doing.
+- 2026-10-15: Doing -> Done. A chunked -T - upload sent after an expired 100 Continue wait sends its last data chunk and the closing chunk in one write (test60 on macOS, ADR-0545)
