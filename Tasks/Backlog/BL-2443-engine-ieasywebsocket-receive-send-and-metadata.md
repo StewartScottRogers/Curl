@@ -4,7 +4,7 @@ title: Engine: IEasyWebSocket receive, send and metadata
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-2408]
+depends-on: [BL-2408, BL-2423, BL-2471]
 touches: [Curl.Engine.UnitLibrary, Curl.Engine.UnitTests]
 requirement: none
 created: 2026-10-15
@@ -30,7 +30,13 @@ ADR-0506; phase 3 of `Documentation/Planning/Curl-Api-And-libcurl.md`. Read the 
 
 ## Notes
 
+- 2026-10-16 (lane 2, first pass, no code written): two prerequisites found, so requeued once for both.
+  - BL-2423: the managed engine has no connect-only perform yet (`ManagedEasyTransfer.Connection` and `.WebSocket` both throw `NotSupportedException`); a `CONNECT_ONLY` perform that keeps the connection open is BL-2423's engine work, and `CONNECT_ONLY=2` builds on it.
+  - BL-2471 (filed): `Curl.Protocol.Ws` keeps its frame codec `internal`, its encoder writes only FIN frames, its decoder gives no per-frame metadata, and `WsProtocolHandler` always reads until the server closes, with no way to stop after the `101` and hand back the connection. The engine cannot reach any of it, and copying the codec into the engine would duplicate it, so the public surface goes into the Ws library first.
+  - Once both are Done, this task is the engine side only: honour `ConnectOnly.WebSocket` in perform through BL-2471's upgrade-only entry point, and implement `IEasyWebSocket` (Recv/Send/Meta, `CURLWS_*` flag mapping, auto-pong unless `WebSocketOptionBits.NoAutoPong`) over the held connection with a fake server connection in tests.
+
 ## Log
 
 - 2026-10-15: Created.
 - 2026-10-16: Backlog -> Doing.
+- 2026-10-16: Doing -> Backlog. Waits on BL-2423 (engine connect-only perform) and BL-2471 (public Ws frame codec and upgrade-only connect)
