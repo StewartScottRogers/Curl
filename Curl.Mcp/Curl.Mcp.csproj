@@ -17,6 +17,8 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- For its public InProcessCurl, which the curl tool's runner adapter calls (BL-2382). -->
+    <ProjectReference Include="..\Curl.Console\Curl.Console.csproj" />
     <ProjectReference Include="..\Curl.Mcp.UnitLibrary\Curl.Mcp.UnitLibrary.csproj" />
   </ItemGroup>
 
