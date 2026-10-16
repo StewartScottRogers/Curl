@@ -24,6 +24,6 @@ reference them.
 Held to the four quality gates in the root `CLAUDE.md`. Its tests live in `Curl.Mcp.UnitTests`,
 which tests both this project and `Curl.Mcp.UnitLibrary`.
 
-It packs as a NuGet MCP server (ADR-0594): `dotnet pack` makes a `.NET` tool of `PackageType` `McpServer`
+It packs as a NuGet MCP server (ADR-0596): `dotnet pack` makes a `.NET` tool of `PackageType` `McpServer`
 with `.mcp/server.json`, one self-contained package per runtime; the version in the csproj and in
 `server.json` are held equal by `McpPackagingTests`.

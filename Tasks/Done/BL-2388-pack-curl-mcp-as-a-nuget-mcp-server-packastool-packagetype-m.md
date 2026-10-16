@@ -33,7 +33,7 @@ Follow Microsoft's guidance (https://learn.microsoft.com/dotnet/ai/quickstarts/b
 
 Plan: Documentation/Planning/Curl-Mcp.md. Decision: ADR-0548.
 
-- Decision: ADR-0594. Fields copied from the local `dotnet new mcpserver` template output
+- Decision: ADR-0596. Fields copied from the local `dotnet new mcpserver` template output
   (schema `https://static.modelcontextprotocol.io/schemas/2025-10-17/server.schema.json`).
   RuntimeIdentifiers follow this task's list, not the template's (which has linux-musl-x64 and no osx-x64).
   Version 0.1.0 set in the csproj; metadata set there because Directory.Build.props has none.
