@@ -54,6 +54,13 @@ public sealed record McpToolFailure(McpToolFailureKind Kind, string Text, int? E
     public static McpToolFailure PathRefused(string option, string reason) =>
         new(McpToolFailureKind.PathRefused, $"Refused {option}: {reason}", null);
 
+    /// <summary>The tool error for a request field that is invalid, so nothing ran.</summary>
+    /// <param name="field">The field, as the tool's request names it, e.g. <c>headers[0].name</c>.</param>
+    /// <param name="reason">Why the field is invalid.</param>
+    /// <returns>The tool error naming the field.</returns>
+    public static McpToolFailure InvalidRequest(string field, string reason) =>
+        new(McpToolFailureKind.InvalidRequest, $"Invalid {field}: {reason}", null);
+
     /// <summary>The tool error for a request cancelled before curl finished.</summary>
     public static McpToolFailure Cancelled { get; } = new(McpToolFailureKind.Cancelled, CancelledText, null);
 }

@@ -13,7 +13,11 @@ answering with an `McpArgumentCheck`. `McpCurlTool` (ADR-0569) is the `curl` too
 arguments, runs them through the injected `ICurlCommandRunner` with the root as working directory,
 captures standard output and error in `McpCappedCaptureStream`, and answers with an
 `McpCurlToolResult`. `McpAiHelpResourceCatalogue` (ADR-0589) lists the `--ai-help` resources, one
-`McpAiHelpResource` per subject, from `CurlHelpText.Categories`. The later tasks of `Documentation/Planning/Curl-Mcp.md` add the rest.
+`McpAiHelpResource` per subject, from `CurlHelpText.Categories`. `McpTransferTool` (ADR-0593) is
+the `transfer` tool's logic: `McpTransferRequestCheck` checks an `McpTransferRequest`,
+`McpTransferOptions` turns it into `EasyOptions`, one easy handle of the injected `ICurlEngine` runs
+it, `McpResponseHeaderCollector` keeps the last response's headers, and it answers with an
+`McpTransferToolResult` holding `McpTransferInfo`. The later tasks of `Documentation/Planning/Curl-Mcp.md` add the rest.
 
 Base class library only. Only `Curl.Mcp` may take the MCP SDK packages (`ModelContextProtocol`
 and `Microsoft.Extensions.Hosting`); this library references no package. Reference

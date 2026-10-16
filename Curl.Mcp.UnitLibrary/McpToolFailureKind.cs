@@ -13,4 +13,7 @@ public enum McpToolFailureKind
 
     /// <summary>The MCP request was cancelled before curl finished.</summary>
     Cancelled,
+
+    /// <summary>A field of the tool's request is invalid, so nothing ran.</summary>
+    InvalidRequest,
 }
