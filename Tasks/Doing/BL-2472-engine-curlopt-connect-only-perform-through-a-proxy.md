@@ -32,3 +32,4 @@ ADR-0608 (BL-2423): `ManagedEasyTransfer.PerformConnectOnlyAsync` dials `Managed
 ## Log
 
 - 2026-10-16: Created.
+- 2026-10-16: Backlog -> Doing. Criteria at claim: 4375e90e 4272a6b9 c4aff572 612192e3.
