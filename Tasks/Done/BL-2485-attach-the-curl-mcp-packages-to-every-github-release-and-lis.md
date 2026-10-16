@@ -28,7 +28,7 @@ A `v*` tag's GitHub release carries the 7 Curl.Mcp `.nupkg` files beside the six
 ## Acceptance criteria
 
 - [x] `release.yml` has a job that packs Curl.Mcp at the tag's version, checks there are 7 `.nupkg` files and that the tool package's `.mcp/server.json` carries the same version, and the release job attaches them; `SHA256SUMS` covers them too.
-- [x] The `workflow_dispatch` dry run of `release.yml` is filed as BL-2486 (a lane cannot push, so it cannot run it); the job's checks run in the dry run and the release alike.
+- [x] The `workflow_dispatch` dry run of `release.yml` is filed as BL-2487 (a lane cannot push, so it cannot run it); the job's checks run in the dry run and the release alike.
 - [x] `DOWNLOAD.md` has a Curl.Mcp section: what it is, the 7 package names linked by tag, how to run one locally without nuget.org (e.g. `dotnet tool install --add-source <folder> Curl.Mcp` or a local-feed `dnx`), `CURL_MCP_ROOT`, and that it is not on nuget.org yet.
 - [x] `DOWNLOAD.md`'s status note states what the curl binary does now; its version links are left for the tagging session to point at `v0.2.0-preview.1`, or already point there.
 - [x] `release.yml`'s header comment says what the workflow now publishes.
@@ -45,4 +45,4 @@ A `v*` tag's GitHub release carries the 7 Curl.Mcp `.nupkg` files beside the six
 
 - 2026-10-16: Created.
 - 2026-10-16: Backlog -> Doing.
-- 2026-10-16: Doing -> Done. release.yml packs, checks and attaches the 7 Curl.Mcp packages at the tag version; DOWNLOAD.md lists them. The dry run is BL-2486.
+- 2026-10-16: Doing -> Done. release.yml packs, checks and attaches the 7 Curl.Mcp packages at the tag version; DOWNLOAD.md lists them. The dry run is BL-2487.

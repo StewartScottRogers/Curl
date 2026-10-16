@@ -1,5 +1,5 @@
 ---
-id: BL-2486
+id: BL-2487
 title: Dry-run release.yml on the pushed branch and link the run under BL-2485
 priority: High
 assignee: Claude
@@ -11,7 +11,7 @@ requirement: none
 created: 2026-10-16
 completed:
 ---
-# BL-2486 — Dry-run release.yml on the pushed branch and link the run under BL-2485
+# BL-2487 — Dry-run release.yml on the pushed branch and link the run under BL-2485
 
 ## Goal
 
