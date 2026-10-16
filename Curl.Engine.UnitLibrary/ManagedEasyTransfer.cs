@@ -35,7 +35,7 @@ namespace Curl.Engine;
 /// <param name="shared">What the engine's handles share.</param>
 internal sealed class ManagedEasyTransfer(
     Func<EasyOptions, ManagedEngineSharedState, ICookieStore?, ProtocolDispatcher> createDispatcher,
-    ManagedEngineSharedState shared) : IEasyTransfer
+    ManagedEngineSharedState shared) : IToolAttemptTransfer
 {
     /// <summary>libcurl's <c>CURLE_URL_MALFORMAT</c> text for a perform with no URL set.</summary>
     internal const string NoUrlSetText = "No URL set";
@@ -58,7 +58,7 @@ internal sealed class ManagedEasyTransfer(
     /// <summary>
     /// Gets or sets the curl tool's own settings for the handle's transfers - <c>-s</c>, <c>-S</c>,
     /// <c>--fail-with-body</c> and the rest that <see cref="TransferSettingsOf" /> can only default - for
-    /// <c>Curl.Console</c> to set from its command line once its runner performs through the engine (BL-2318, ADR-0542); <see langword="null" />, as for every
+    /// <c>Curl.Console</c> to set from its command line once the handle builds the runner's serial attempts from the options (BL-2394, ADR-0542); <see langword="null" />, as for every
     /// <c>Curl.Api</c> and <c>Libcurl</c> handle, to take them from <see cref="Options" />.
     /// </summary>
     internal EngineTransferSettings? ToolSettings { get; set; }
@@ -67,7 +67,7 @@ internal sealed class ManagedEasyTransfer(
     /// Gets or sets what the handle's transfers reach outside the engine for their setup and cleanup -
     /// the file system the <c>-b</c>, <c>-c</c>, <c>--alt-svc</c> and <c>--hsts</c> files go through,
     /// standard input for <c>-b -</c>, the <c>-c -</c> print target and the diagnostic log (ADR-0544) -
-    /// for <c>Curl.Console</c> to set from its runner (BL-2318); <see cref="EasyTransferHost.Library" />,
+    /// for <c>Curl.Console</c> to set from its runner once the handle builds its serial attempts (BL-2394); <see cref="EasyTransferHost.Library" />,
     /// as for every <c>Curl.Api</c> and <c>Libcurl</c> handle, by default. <see cref="Duplicate" /> copies it
     /// and <see cref="Reset" /> leaves it, as it is the host's wiring, not an option.
     /// </summary>
@@ -76,11 +76,17 @@ internal sealed class ManagedEasyTransfer(
     /// <summary>
     /// Gets or sets the run's <c>--trace-config</c> components, libcurl's <c>curl_global_trace</c> setting,
     /// which add the <c>[READ]</c>, <c>[WRITE]</c> and <c>[TIMER]</c> lines to the debug callback's events
-    /// (<see cref="WithTraceComponentEvents" />), for <c>Curl.Console</c> to set from its command line (BL-2318,
+    /// (<see cref="WithTraceComponentEvents" />), for <c>Curl.Console</c> to set from its command line (BL-2394,
     /// ADR-0545); <see cref="EngineTraceComponents.None" /> by default. <see cref="Duplicate" /> copies it and
     /// <see cref="Reset" /> leaves it, as it is a global setting, not an option.
     /// </summary>
     internal EngineTraceComponents TraceComponents { get; set; } = EngineTraceComponents.None;
+
+    /// <inheritdoc />
+    public ToolAttempt? ToolAttempt { get; set; }
+
+    /// <inheritdoc />
+    public TransferResult? ToolAttemptResult { get; private set; }
 
     /// <summary>The <c>%{conn_id}</c> of a transfer that failed before it could connect.</summary>
     internal const long NoConnectionId = -1;
@@ -98,7 +104,15 @@ internal sealed class ManagedEasyTransfer(
     public IConnectOnlyConnection Connection => throw new NotSupportedException("The connect-only API is phase 3 work (ADR-0506).");
 
     /// <inheritdoc />
-    public async ValueTask<CurlCode> PerformAsync(CancellationToken cancellationToken)
+    public async ValueTask<CurlCode> PerformAsync(CancellationToken cancellationToken) =>
+        ToolAttempt is { } attempt
+            ? await PerformToolAttemptAsync(attempt).ConfigureAwait(false)
+            : await PerformFromOptionsAsync(cancellationToken).ConfigureAwait(false);
+
+    /// <summary>Runs one transfer from <see cref="Options" />, as <see cref="PerformAsync" /> describes.</summary>
+    /// <param name="cancellationToken">Stops the transfer.</param>
+    /// <returns>The transfer's code.</returns>
+    private async Task<CurlCode> PerformFromOptionsAsync(CancellationToken cancellationToken)
     {
         EasyOptions options = Options;
         if (options.Network.Url is not { } urlText)
@@ -130,6 +144,29 @@ internal sealed class ManagedEasyTransfer(
         await shared.Performer.WriteCookieJarAltSvcAndHstsFilesAsync(
             cookies, settings, options.Http, transferUrl, Host.JarPrintTarget, state, shared.Hsts, Host.FileSystem, Host.RunsOnWindows).ConfigureAwait(false);
         return FinishPerformed(events.ReportOn(result), options, transferId, cookies, ConnectionIdOf(result, state));
+    }
+
+    /// <summary>
+    /// Performs an attempt the curl tool's runner set up (ADR-0552) under its watchdogs
+    /// (<see cref="TransferPerformer.FollowWatchingSpeedAsync" />), keeps its whole result as
+    /// <see cref="ToolAttemptResult" />, and records its code, message and <see cref="Info" />, the request URL
+    /// being <see cref="Options" />' and the <c>%{conn_id}</c> the running transfer's (-1 before it connects).
+    /// </summary>
+    /// <param name="attempt">The attempt; cleared from <see cref="ToolAttempt" /> before it runs.</param>
+    /// <returns>The attempt's code.</returns>
+    private async Task<CurlCode> PerformToolAttemptAsync(ToolAttempt attempt)
+    {
+        ToolAttempt = null;
+        EasyOptions options = Options;
+        TransferResult result = await TransferPerformer.FollowWatchingSpeedAsync(attempt.State, attempt.Follower, attempt.Context, attempt.RedirectPolicy).ConfigureAwait(false);
+        ToolAttemptResult = result;
+        return Finish(
+            result.ExitCode.ToCurlCode(),
+            result.ErrorMessage ?? string.Empty,
+            TransferInfoFromReport.Of(result, options.Network.Url ?? string.Empty, options.Transfer.FileTime, shared.TimeProvider, options.Tls.GatherCertificateInfo) with
+            {
+                ConnectionId = attempt.State.ConnectionId ?? NoConnectionId,
+            });
     }
 
     /// <summary>

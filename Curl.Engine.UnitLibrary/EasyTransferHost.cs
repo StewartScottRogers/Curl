@@ -9,7 +9,7 @@ namespace Curl.Engine;
 /// the <c>--hsts</c> file are read and written through, what <c>-b -</c> reads, where <c>-c -</c> prints the
 /// jar, the diagnostic log every transfer's context carries, and the platform's line endings for the
 /// <c>--hsts</c> file. <c>Curl.Console</c> sets its own on <see cref="ManagedEasyTransfer.Host" /> once its
-/// runner performs through the engine (BL-2318); every other handle takes <see cref="Library" />.
+/// runner's serial attempts are built from the easy options (BL-2394); every other handle takes <see cref="Library" />.
 /// </summary>
 /// <param name="FileSystem">Reads and writes the cookie, alt-svc and HSTS files.</param>
 /// <param name="StandardInput">What a <c>-b -</c> file reads.</param>
