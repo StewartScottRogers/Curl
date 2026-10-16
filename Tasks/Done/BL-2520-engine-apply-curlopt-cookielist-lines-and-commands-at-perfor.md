@@ -32,7 +32,7 @@ Found by BL-2507 (ADR-0645): `Curl.Api`'s `CurlCookieStore` starts every transfe
 - Touches widened to `Curl.Cookies.UnitLibrary` and `Curl.Cookies.UnitTests`: `CookieStore` had no way to remove
   cookies, which `ALL` and `SESS` need, so it gains `RemoveAll` and `RemoveSessionCookies` (under its lock). No task
   in Doing on `origin/work/dark-factory` named either project (BL-2517, BL-2556 checked).
-- Decisions in ADR-0656: the items apply in `SetUpAsync` before the cookie files load (libcurl applies them at
+- Decisions in ADR-0657: the items apply in `SetUpAsync` before the cookie files load (libcurl applies them at
   setopt, before `Curl_pretransfer` loads the files); a non-command item turns the cookie engine on; with the
   engine off every item is ignored; `RELOAD` loads the files again (the perform's own load still follows, as
   libcurl loads them on every perform); a line goes through the cookie-file reader, which reads Netscape and
@@ -43,4 +43,4 @@ Found by BL-2507 (ADR-0645): `Curl.Api`'s `CurlCookieStore` starts every transfe
 
 - 2026-10-16: Created.
 - 2026-10-16: Backlog -> Doing. Criteria at claim: baf0dd60 4272a6b9 c4aff572 8738c7f6.
-- 2026-10-16: Doing -> Done. ManagedEasyTransfer applies CURLOPT_COOKIELIST (ALL, SESS, FLUSH, RELOAD, Netscape and Set-Cookie lines) to its cookie engine before the request (ADR-0656)
+- 2026-10-16: Doing -> Done. ManagedEasyTransfer applies CURLOPT_COOKIELIST (ALL, SESS, FLUSH, RELOAD, Netscape and Set-Cookie lines) to its cookie engine before the request (ADR-0657)
