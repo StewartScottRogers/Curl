@@ -31,3 +31,4 @@ BL-2444 gave `ManagedEasyWebSocket` (the `CURLOPT_CONNECT_ONLY` 2 API) `CURLWS_R
 ## Log
 
 - 2026-10-16: Created.
+- 2026-10-16: Backlog -> Doing. Criteria at claim: bee24eaa 4f85dbc5 0f90c956.
