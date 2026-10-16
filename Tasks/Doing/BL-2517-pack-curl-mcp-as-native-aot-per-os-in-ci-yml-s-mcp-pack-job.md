@@ -33,6 +33,7 @@ completed:
 - [ ] The pull request's CI passed on Windows, Linux and macOS, with the new `mcp-pack` legs green; it is linked under Notes.
 
 ## Notes
+- Release dry run https://github.com/StewartScottRogers/Curl/actions/runs/38947869013 on `work/dark-factory` 492774dc5 (BL-2486's AOT `pack-mcp`): all 7 Curl.Mcp legs and 6 curl Publish legs green. This is the shape `mcp-pack` should mirror. Waiting for BL-2486 to reach `master` at the shift-end merge before opening the `audit` PR, since `master` lacks the ToolOptions fix.
 
 ## Log
 
