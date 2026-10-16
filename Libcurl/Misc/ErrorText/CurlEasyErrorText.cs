@@ -1,14 +1,14 @@
 using Curl.Protocol.Abstractions;
 
-namespace Curl.Console;
+namespace Libcurl.Misc.ErrorText;
 
 /// <summary>
-/// The text libcurl's <c>curl_easy_strerror</c> gives each exit code, read from curl 8.21.0's
+/// <c>curl_easy_strerror</c>: the text libcurl gives each exit code, read from curl 8.21.0's
 /// <c>libcurl-4.dll</c> (mingw, Schannel) on 2026-09-27 (BL-440 Notes). The tool prints it when a
 /// transfer ends with a code but no message of its own, as when a <c>-T</c> glob match that cannot
 /// be opened reports the transfer before it.
 /// </summary>
-internal static class CurlEasyErrorText
+public static class CurlEasyErrorText
 {
     /// <summary>The text for a code libcurl does not name.</summary>
     public const string UnknownError = "Unknown error";

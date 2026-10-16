@@ -12,7 +12,7 @@ calls - no container, no reflection, no assembly scanning, so native AOT sees ev
 type. It keeps `CreateRunner` and the runner wiring; the factories that build the protocol
 handlers, transports, DNS resolvers, TLS providers, security-context factories and
 authenticators are `Curl.Engine.UnitLibrary`'s `EngineComposition`, which it calls (BL-2289),
-handing it `CurlEasyErrorText.Of` for the DoH resolver's error text. Where this file names an
+handing it `Libcurl`'s `CurlEasyErrorText.Of` for the DoH resolver's error text. Where this file names an
 `EngineComposition` member, that member is engine code described here for the runner's sake;
 `Curl.Engine.UnitLibrary/CLAUDE.md` owns it. `Curl.Core.UnitLibrary` dispatches through the `IProtocolHandler` instances it is
 given and must never reference a protocol library directly.
@@ -338,7 +338,7 @@ attempts included, each carrying the attempt the runner set up as the internal `
 reading back its `ToolAttemptResult` (ADR-0552). `-Z` transfers still perform directly
 (`TransferPerformer.FollowWatchingSpeedAsync`) until the engine's multi handle lands in phase 3;
 building the attempt inside the handle from the options and callbacks is BL-2394. `CurlComposition.CreateRunner` builds it; a
-runner given none makes one on its own clock. Both hand it `CurlEasyErrorText.Of`, which stays here, for the text its known-hosts and cookie-line failures carry.
+runner given none makes one on its own clock. Both hand it `Libcurl`'s `CurlEasyErrorText.Of` (`curl_easy_strerror`'s table, BL-2450) for the text its known-hosts and cookie-line failures carry.
 It also owns the per-transfer setup libcurl does before it connects (`TransferPerformer.Setup.cs`,
 BL-2283): the URL parse and its refusals (`TryParseTransferUrl`, `ReportUrlRejected`,
 `ParsedUrlRefusal`), the `--interface` and `--ech` setopt refusals (`RefuseMalformedSetopt`), the

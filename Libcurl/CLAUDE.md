@@ -55,8 +55,12 @@ each request is given its connection and before each look-up its DNS cache misse
 `Misc/ErrorText` holds `CurlErrorText`: `Multi`, `Share` and `Url` are `curl_multi_strerror`,
 `curl_share_strerror` and `curl_url_strerror` with upstream's test1538 strings and fallbacks, and
 `Header` is the header API's text, which upstream has no function for (ADR-0562). Each is a table
-lookup, so a new upstream code is one appended string. `curl_easy_strerror` is still
-`Curl.Console`'s `CurlEasyErrorText` until BL-2450 moves it.
+lookup, so a new upstream code is one appended string. `Easy` is `curl_easy_strerror` over
+`CurlEasyErrorText`, the `CURLE_*` table keyed by `CurlExitCode` (`"Unknown error"` for a code it does
+not name), which moved here from `Curl.Console` (BL-2450); `Curl.Console` references Libcurl for it,
+as the tool prints the same texts. The gap office's exit-code measurement reads
+`Misc/ErrorText/CurlEasyErrorText.cs` by path and parses its `[CurlExitCode.X] = "..."` lines
+(BL-2449), so keep the file's name and that line shape.
 
 `Misc/DatesAndLists` holds `CurlDate` and `CurlSlist` (ADR-0578). `CurlDate.Parse` is `curl_getdate`
 over `Curl.Protocol.Abstractions`' `CurlDateParser` (the plan's "Curl.Core date parser"), answering -1

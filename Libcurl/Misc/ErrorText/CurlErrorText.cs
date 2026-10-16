@@ -3,11 +3,10 @@ using Curl.Api.Codes;
 namespace Libcurl.Misc.ErrorText;
 
 /// <summary>
-/// The strerror family for libcurl's non-easy result codes: <c>curl_multi_strerror</c>,
-/// <c>curl_share_strerror</c> and <c>curl_url_strerror</c>, with upstream curl 8.22.0's exact
-/// strings from <c>lib/strerror.c</c> (pinned by upstream's test1538), and the header API's text,
-/// which upstream has no function for (ADR-0562). <c>curl_easy_strerror</c> is
-/// <c>CurlEasyErrorText</c>, which stays in <c>Curl.Console</c> until it moves here.
+/// libcurl's strerror family: <c>curl_easy_strerror</c> over <see cref="CurlEasyErrorText"/>'s table,
+/// and <c>curl_multi_strerror</c>, <c>curl_share_strerror</c> and <c>curl_url_strerror</c>, with
+/// upstream curl 8.22.0's exact strings from <c>lib/strerror.c</c> (pinned by upstream's test1538),
+/// and the header API's text, which upstream has no function for (ADR-0562).
 /// </summary>
 public static class CurlErrorText
 {
@@ -94,6 +93,14 @@ public static class CurlErrorText
         "A requested argument was bad",
         "The header API was disabled in the build",
     ];
+
+    /// <summary>
+    /// <c>curl_easy_strerror</c>: libcurl's text for <paramref name="code"/>, or
+    /// <c>"Unknown error"</c> for a code libcurl does not name (<see cref="CurlEasyErrorText"/>).
+    /// </summary>
+    /// <param name="code">The easy result code to describe.</param>
+    /// <returns>libcurl's text for the code.</returns>
+    public static string Easy(CurlCode code) => CurlEasyErrorText.Of(code.ToCurlExitCode());
 
     /// <summary>
     /// <c>curl_multi_strerror</c>: upstream's text for <paramref name="code"/>, or

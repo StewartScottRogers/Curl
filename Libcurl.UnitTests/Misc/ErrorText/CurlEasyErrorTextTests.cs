@@ -1,7 +1,8 @@
 using Curl.Protocol.Abstractions;
 using Curl.Testing;
+using Libcurl.Misc.ErrorText;
 
-namespace Curl.Console;
+namespace Libcurl.UnitTests.Misc.ErrorText;
 
 /// <summary>
 /// Pins <see cref="CurlEasyErrorText" /> against the texts read from curl 8.21.0's

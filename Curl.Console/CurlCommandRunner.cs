@@ -15,6 +15,7 @@ using Curl.Engine;
 using Curl.Networking;
 using Curl.Output;
 using Curl.Protocol.Abstractions;
+using Libcurl.Misc.ErrorText;
 using EasyAuthenticationOptions = Curl.Api.Options.Authentication.EasyAuthenticationOptions;
 using EasyHttpOptions = Curl.Api.Options.Http.EasyHttpOptions;
 using EasyMimeBody = Curl.Api.Options.Http.EasyMimeBody;
