@@ -32,3 +32,4 @@ Found by BL-2507 (ADR-0645): `Curl.Api`'s `CurlCookieStore` starts every transfe
 ## Log
 
 - 2026-10-16: Created.
+- 2026-10-16: Backlog -> Doing. Criteria at claim: baf0dd60 4272a6b9 c4aff572 8738c7f6.
