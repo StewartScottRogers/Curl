@@ -346,7 +346,14 @@ transfer's `-T` upload) and network field off libcurl's default: `EasySetoptsFro
 TLS (origin, `PROXY_*` twins, then the handle's own), authentication and proxy field
 (`EasySetoptsFromCommandLine.TlsAuthenticationProxy.cs`; `CURLOPT_AWS_SIGV4` before `CURLOPT_HTTPAUTH`,
 `CURLOPT_HAPROXY_CLIENT_IP` before `CURLOPT_HAPROXYPROTOCOL`, `--ech` as its mode, `pn:` and `ecl:` calls; BL-2492,
-ADR-0642). The hooks keep the HTTP and protocol groups whole, and of the other six only `--ip-tos`, `--vlan-priority`
+ADR-0642), and so does every HTTP and protocol field (`EasySetoptsFromCommandLine.HttpProtocols.cs`; one
+`CURLOPT_COOKIEFILE` per `-b` file, `CURLOPT_POSTFIELDS` before `CURLOPT_POSTFIELDSIZE_LARGE`; BL-2493, ADR-0650). The
+`-F` form is built by `CurlMimeFromFormBody` as a `curl_mime` tree on the runner's library (`ToolCurlEngine.MimeInit`)
+and set last as `CURLOPT_MIMEPOST`; a form with a `@-` or `<-` part or an encoder `curl_mime_encoder` refuses stays
+on the hooks whole, as `MimePost`. The hooks keep the callbacks group whole, of the HTTP and protocol groups only
+that form, `HttpPost`, `StreamDependency` and `CookieList` (never set by the command line), a `--max-redirs` below -1, an
+`--expect100-timeout` that is not whole milliseconds up to `INT_MAX`, a stream weight outside 1 to 256, a
+`--tftp-blksize` outside 8 to 65464 and a `--hostpubmd5` that is not 32 characters, and of the other six only `--ip-tos`, `--vlan-priority`
 and `--mptcp` (no `CURLOPT_*`), a receive buffer outside 1024 bytes to 10 MB (`--limit-rate` below 1024), a `-y`, `-m`,
 `--connect-timeout`, `--happy-eyeballs-timeout-ms` or `--keepalive-time` that is not a whole number of the setter's
 unit up to `INT_MAX`, `--engine` (its setter answers `CURLE_NOT_BUILT_IN`; the engine's setup failure prints curl's
@@ -355,8 +362,7 @@ TLS-SRP fields, and Curl's `--httpsig-*` options (no `CURLOPT_*`).
 A call libcurl refuses (no command line reaches one; the runner's `easySetoptsOf` lets tests pass one) ends the
 transfer before any perform with its code and `setopt 0x<option> got bad argument`, and ends the run. Each
 attempt, `--retry` attempts included, is one `CurlEasy.PerformAsync`
-with the runner's hooks set and its `LastResult` read back (ADR-0552, ADR-0622); the other option
-groups move to `SetOption` in BL-2493. A `-Z` attempt goes instead through the run's one
+with the runner's hooks set and its `LastResult` read back (ADR-0552, ADR-0622). A `-Z` attempt goes instead through the run's one
 `CurlMulti` (`ToolCurlEngine.MultiInit`, `curl_multi_init`), held by `ParallelTransferMulti` as
 `ParallelRun.Transfers` and cleaned up by `ParallelRun.EndAsync`: the attempt adds its handle and calls
 `curl_multi_perform` in its own flow, so its transfer starts there, and one loop polls, performs and reads

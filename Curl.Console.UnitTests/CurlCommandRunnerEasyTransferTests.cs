@@ -126,6 +126,35 @@ public sealed class CurlCommandRunnerEasyTransferTests
     }
 
     [TestMethod]
+    public async Task RunAsync_OneOptionOfTheHttpAndProtocolGroupsAndAForm_SetsThemThroughSetOptionAndNotOnTheHooks()
+    {
+        int exitCode = await RunAsync([Ok], "-A", "agent/1", "--ftp-pret", "-F", "a=b", Url);
+
+        RecordingEasyTransfer handle = engine.Handles[0];
+        EasyOptions hooks = handle.OptionsSet[0];
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual("hello", StandardOutputText);
+        Assert.IsNull(hooks.Http.UserAgent);
+        Assert.IsNull(hooks.Http.MimePost);
+        Assert.IsFalse(hooks.Protocols.Ftp.UsePret);
+        Assert.AreEqual("agent/1", handle.Options.Http.UserAgent);
+        Assert.AreEqual("a", handle.Options.Http.MimePost!.Parts[0].Name);
+        Assert.AreEqual("b", Encoding.UTF8.GetString(((Api.Options.Http.EasyMimeBytes)handle.Options.Http.MimePost.Parts[0].Data!).Bytes.Span));
+        Assert.IsTrue(handle.Options.Protocols.Ftp.UsePret);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_FormWithAStandardInputPart_KeepsTheFormOnTheHooks()
+    {
+        int exitCode = await RunAsync([Ok], "-F", "a=@-", Url);
+
+        EasyOptions hooks = engine.Handles[0].OptionsSet[0];
+        Assert.AreEqual(0, exitCode);
+        Assert.IsInstanceOfType<Api.Options.Http.EasyMimeStandardInput>(hooks.Http.MimePost!.Parts[0].Data);
+        Assert.AreSame(hooks.Http.MimePost, engine.Handles[0].Options.Http.MimePost);
+    }
+
+    [TestMethod]
     public async Task RunAsync_LimitRateBelowTheSmallestBuffer_KeepsTheReceiveBufferOnTheHooks()
     {
         int exitCode = await RunAsync([Ok], "--limit-rate", "100", Url);

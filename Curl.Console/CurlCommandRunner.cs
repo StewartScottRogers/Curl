@@ -15,6 +15,7 @@ using Curl.Engine;
 using Curl.Networking;
 using Curl.Output;
 using Curl.Protocol.Abstractions;
+using Libcurl.Mime;
 using Libcurl.Misc.ErrorText;
 using Libcurl.Options;
 using EasyAuthenticationOptions = Curl.Api.Options.Authentication.EasyAuthenticationOptions;
@@ -4556,8 +4557,9 @@ internal sealed class CurlCommandRunner(
     /// Sets what stays the same for every attempt of the transfer on its easy handle: on the hooks, the option
     /// group's easy options less what <c>curl_easy_setopt</c> sets (<see cref="EasySetoptsFromCommandLine.KeptOnHooks" />);
     /// through <c>curl_easy_setopt</c>, the transfer URL as <c>CURLOPT_URL</c> and every behaviour, transfer (with the
-    /// transfer's <c>-T</c> upload), network, TLS, authentication and proxy option the command line sets (ADR-0631,
-    /// ADR-0642); then the tool's own settings,
+    /// transfer's <c>-T</c> upload), network, TLS, authentication, proxy, HTTP and protocol option the command line sets
+    /// (ADR-0631, ADR-0642, ADR-0650), and the <c>-F</c> form as <c>CURLOPT_MIMEPOST</c> when
+    /// <see cref="CurlMimeFromFormBody" /> can build it; then the tool's own settings,
     /// and the run's diagnostic log, which the handle's <c>-Y</c>/<c>-y</c> and <c>-m</c> watchdogs write to.
     /// </summary>
     /// <param name="easy">The transfer's easy handle.</param>
@@ -4567,14 +4569,24 @@ internal sealed class CurlCommandRunner(
     private TransferResult? SetUpToolEasy(ToolEasyHandle easy, CommandLineOptions options, TransferAttemptPieces attempt)
     {
         Api.Options.EasyOptions groups = EasyOptionsFromCommandLine.EasyOptionsOf(options, url: null) with { Transfer = attempt.Transfer };
-        easy.Hooks.Options = EasySetoptsFromCommandLine.KeptOnHooks(groups);
+        using CurlMime? form = CurlMimeFromFormBody.Of(engine.MimeInit, groups.Http.MimePost);
+        Api.Options.EasyOptions hooks = EasySetoptsFromCommandLine.KeptOnHooks(groups);
+        easy.Hooks.Options = form is null ? hooks : hooks with { Http = hooks.Http with { MimePost = null } };
 
         // CURLOPT_URL takes any string, so its answer is always CURLE_OK.
         _ = easy.Easy.SetOption(CurlOption.Url, StyledHeaderBaseUrl(attempt.Url));
         easy.Hooks.ToolSettings = EasyOptionsFromCommandLine.TransferSettingsOf(options);
         easy.Hooks.Host = EasyTransferHost.Library with { DiagnosticLog = diagnosticLog };
-        return easy.SetOptions(easySetoptsOf(groups));
+        return easy.SetOptions([.. easySetoptsOf(groups), .. FormSetoptOf(form)]);
     }
+
+    /// <summary>
+    /// The <c>CURLOPT_MIMEPOST</c> call for the transfer's <c>-F</c> form, after the option groups' calls; none when
+    /// there is no form or it stays on the hooks.
+    /// </summary>
+    /// <param name="form">The built form, or <see langword="null" />.</param>
+    /// <returns>The call, or none.</returns>
+    private static EasySetopt[] FormSetoptOf(CurlMime? form) => form is null ? [] : [new EasySetopt(CurlOption.Mimepost, form)];
 
     /// <summary>
     /// Performs one transfer's attempts, as <see cref="FollowRetryingAsync" /> describes, each through

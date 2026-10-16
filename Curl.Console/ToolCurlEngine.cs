@@ -6,6 +6,7 @@ using Curl.Api.EngineContracts.Url;
 using Curl.Engine;
 using Libcurl.Easy;
 using Libcurl.Global;
+using Libcurl.Mime;
 using Libcurl.Multi;
 
 namespace Curl.Console;
@@ -58,6 +59,10 @@ internal sealed class ToolCurlEngine : ICurlEngine
     /// <summary><c>curl_multi_init</c> on the library, for a <c>-Z</c> run's transfers (ADR-0628).</summary>
     /// <returns>The multi handle; disposing it is <c>curl_multi_cleanup</c>.</returns>
     internal CurlMulti MultiInit() => library.MultiInit();
+
+    /// <summary><c>curl_mime_init</c> on the library, for a transfer's <c>-F</c> form (BL-2493, ADR-0650).</summary>
+    /// <returns>The empty form; disposing it is <c>curl_mime_free</c>.</returns>
+    internal CurlMime MimeInit() => library.MimeInit();
 
     /// <summary>Creates the engine's easy transfer and keeps it for <see cref="EasyInit" /> to pair with its handle.</summary>
     /// <returns>The engine's transfer.</returns>

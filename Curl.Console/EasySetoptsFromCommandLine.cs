@@ -7,7 +7,8 @@ namespace Curl.Console;
 
 /// <summary>
 /// The <c>curl_easy_setopt</c> calls the curl tool's <c>config2setopts.c</c> makes for a serial transfer's
-/// behaviour, transfer, network (BL-2491, ADR-0631), TLS, authentication and proxy options (BL-2492, ADR-0642): one <see cref="EasySetopt" /> per
+/// behaviour, transfer, network (BL-2491, ADR-0631), TLS, authentication and proxy options (BL-2492, ADR-0642), and
+/// its HTTP and protocol options (BL-2493, ADR-0650): one <see cref="EasySetopt" /> per
 /// <c>CURLOPT_*</c> whose value the command line moved off libcurl's default. What libcurl has no
 /// <c>CURLOPT_*</c> for, or what its setter would clamp to another value than the command line's, stays on
 /// the engine transfer's hooks (<see cref="KeptOnHooks" />).
@@ -92,8 +93,9 @@ internal static partial class EasySetoptsFromCommandLine
 
     /// <summary>
     /// The <c>curl_easy_setopt</c> calls for <paramref name="options" />' behaviour, transfer, network, TLS (origin,
-    /// proxy, then the handle's own), authentication and proxy groups: one per field with a <c>CURLOPT_*</c> whose value
-    /// differs from libcurl's default, in the groups' order.
+    /// proxy, then the handle's own), authentication, proxy, HTTP and protocol groups: one per field with a
+    /// <c>CURLOPT_*</c> whose value differs from libcurl's default, in the groups' order, and one
+    /// <c>CURLOPT_COOKIEFILE</c> per <c>-b</c> file. The <c>-F</c> form is the runner's to set (<see cref="CurlMimeFromFormBody" />).
     /// </summary>
     /// <param name="options">The transfer's easy options, as <see cref="EasyOptionsFromCommandLine.EasyOptionsOf" /> maps them.</param>
     /// <returns>The calls.</returns>
@@ -103,6 +105,7 @@ internal static partial class EasySetoptsFromCommandLine
         .. SetoptsOf(TransferRows, options.Transfer, UnsetTransfer),
         .. SetoptsOf(NetworkRows, options.Network, UnsetNetwork),
         .. TlsAuthenticationAndProxySetoptsOf(options),
+        .. HttpAndProtocolSetoptsOf(options),
     ];
 
     /// <summary>
@@ -110,9 +113,11 @@ internal static partial class EasySetoptsFromCommandLine
     /// groups <see cref="Of" /> sets only what it does not - libcurl's defaults, with
     /// <c>--ip-tos</c>, <c>--vlan-priority</c> and <c>--mptcp</c> (no <c>CURLOPT_*</c>; curl's tool sets them in its
     /// socket callbacks), a receive buffer, <c>-y</c>, <c>-m</c>, <c>--connect-timeout</c>,
-    /// <c>--happy-eyeballs-timeout-ms</c> or <c>--keepalive-time</c> its setter would hold to another value,
-    /// <c>--engine</c>, an <c>--ech</c> value <c>CURLOPT_ECH</c> would ignore, the TLS-SRP fields and Curl's
-    /// <c>--httpsig-*</c> options (ADR-0642).
+    /// <c>--happy-eyeballs-timeout-ms</c>, <c>--keepalive-time</c>, <c>--expect100-timeout</c>, <c>--max-redirs</c>,
+    /// <c>--tftp-blksize</c> or <c>--hostpubmd5</c> its setter would hold to another value or refuse,
+    /// <c>--engine</c>, an <c>--ech</c> value <c>CURLOPT_ECH</c> would ignore, the TLS-SRP fields, Curl's
+    /// <c>--httpsig-*</c> options (ADR-0642), and the <c>-F</c> form, which the runner moves to <c>CURLOPT_MIMEPOST</c>
+    /// itself when it can build it (ADR-0650).
     /// </summary>
     /// <param name="options">The transfer's easy options.</param>
     /// <returns>The options for the hooks.</returns>
@@ -125,6 +130,8 @@ internal static partial class EasySetoptsFromCommandLine
             Tls = TlsKeptOnHooks(options.Tls),
             Authentication = AuthenticationKeptOnHooks(options.Authentication),
             Proxy = UnsetProxy,
+            Http = HttpKeptOnHooks(options.Http),
+            Protocols = ProtocolsKeptOnHooks(options.Protocols),
         };
 
     private static EasyTransferOptions TransferKeptOnHooks(EasyTransferOptions transfer) =>
