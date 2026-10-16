@@ -33,3 +33,4 @@ Prerequisite of BL-2478 (the FTP wildcard download loop) and so of BL-2420 (CURL
 ## Log
 
 - 2026-10-16: Created.
+- 2026-10-16: Backlog -> Doing.
