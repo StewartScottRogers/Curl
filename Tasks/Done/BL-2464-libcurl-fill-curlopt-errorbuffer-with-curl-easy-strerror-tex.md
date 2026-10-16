@@ -5,10 +5,10 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: [BL-2411, BL-2450]
-touches: [Libcurl/Easy, Libcurl.UnitTests/Easy]
+touches: [Libcurl/Easy, Libcurl.UnitTests/Easy, Libcurl/CLAUDE.md]
 requirement: none
 created: 2026-10-15
-completed:
+completed: 2026-10-16
 ---
 # BL-2464 — Libcurl: fill CURLOPT_ERRORBUFFER with curl_easy_strerror text when the engine gives no detail
 
@@ -22,9 +22,9 @@ BL-2411 made a perform clear the buffer and write the engine's text cut to 255 b
 
 ## Acceptance criteria
 
-- [ ] A test in `Libcurl.UnitTests/Easy/CurlEasyTests.cs` pins the buffer's text for a failure with empty engine text, matching libcurl 8.22.0's source.
-- [ ] `Measure-CodeQuality.ps1 -Library Libcurl` reports 0 failing members.
-- [ ] `Libcurl/CLAUDE.md` says what the buffer holds when the engine gives no detail.
+- [x] A test in `Libcurl.UnitTests/Easy/CurlEasyTests.cs` pins the buffer's text for a failure with empty engine text, matching libcurl 8.22.0's source.
+- [x] `Measure-CodeQuality.ps1 -Library Libcurl` reports 0 failing members.
+- [x] `Libcurl/CLAUDE.md` says what the buffer holds when the engine gives no detail.
 
 ## Notes
 
@@ -32,3 +32,4 @@ BL-2411 made a perform clear the buffer and write the engine's text cut to 255 b
 
 - 2026-10-15: Created.
 - 2026-10-16: Backlog -> Doing.
+- 2026-10-16: Doing -> Done. Pinned that a failure with no engine detail leaves CURLOPT_ERRORBUFFER empty, as libcurl 8.22.0 never falls back to curl_easy_strerror

@@ -92,6 +92,8 @@ connection) is the engine's. These and `WebSocket`'s blocking calls are Libcurl'
 engine only the `Receive` and `Send` bits, dropping the rest as libcurl does. A perform clears the
 `CURLOPT_ERRORBUFFER` buffer, if one is set, and on failure writes the engine's `ErrorText` into it
 cut to 255 UTF-8 bytes (`EasyErrorBuffer`, libcurl's 256-byte `CURL_ERROR_SIZE` less the NUL);
+when the engine gives no detail (empty `ErrorText`) the buffer stays empty, never `curl_easy_strerror`'s
+text, as libcurl 8.22.0 writes it only through `failf` (`lib/curl_trc.c`) and nowhere falls back (BL-2464);
 `CurlEasy.ErrorText` answers the same cut text with or without a buffer. `Dispose` and
 `DisposeAsync` are `curl_easy_cleanup` and dispose the transfer once; a member used afterwards throws
 `ObjectDisposedException`. `GetInfo` is `curl_easy_getinfo` and goes through `Info`'s dispatch.
