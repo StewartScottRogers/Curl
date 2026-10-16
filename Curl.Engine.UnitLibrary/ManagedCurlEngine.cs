@@ -122,7 +122,9 @@ public sealed class ManagedCurlEngine : ICurlEngine
             cookieStore,
             proxyAuthSchemes: transports.ProxyTunnelOptions.ProxyAuthSchemes,
             negotiateOptions: NegotiateOptionsMapping.Of(options.Authentication),
-            ftpDataConnector: PoolOf(transports, transports.TcpConnector.ForFtpDataConnections(), options.Callbacks, shared)));
+            ftpDataConnector: PoolOf(transports, transports.TcpConnector.ForFtpDataConnections(), options.Callbacks, shared),
+            ftpWildcardHooks: CallbackWildcardHooks.Of(options),
+            rtspInterleaveSink: CallbackInterleaveSink.Of(options.Callbacks.Interleave)));
     }
 
     /// <summary>

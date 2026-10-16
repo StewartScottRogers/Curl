@@ -50,7 +50,10 @@ TCP connection over opaque `CurlSocket` handles; their `*DATA` options take any 
 `Callbacks/Phases` sets `CURLOPT_PREREQFUNCTION` and `RESOLVER_START_FUNCTION` the same way, which the engine calls as
 each request is given its connection and before each look-up its DNS cache misses; `PREREQDATA` and
 `RESOLVER_START_DATA` take any value and change nothing, and `TRAILERFUNCTION` answers `NotBuiltIn` until BL-2475
-(BL-2419, ADR-0611).
+(BL-2419, ADR-0611). `Callbacks/Wildcard` sets `CURLOPT_CHUNK_BGN_FUNCTION`, `CHUNK_END_FUNCTION`, `FNMATCH_FUNCTION`
+and `INTERLEAVEFUNCTION` the same way, which the engine calls around each file of an FTP wildcard download under
+`CURLOPT_WILDCARDMATCH` and for each interleaved RTP frame of an RTSP transfer; `CHUNK_DATA`, `FNMATCH_DATA` and
+`INTERLEAVEDATA` take any value and change nothing (BL-2420, ADR-0619).
 
 `Misc/ErrorText` holds `CurlErrorText`: `Multi`, `Share` and `Url` are `curl_multi_strerror`,
 `curl_share_strerror` and `curl_url_strerror` with upstream's test1538 strings and fallbacks, and
