@@ -31,7 +31,7 @@ report (`WriteOutTransferInfo.FromReport`). Measured against the engine as it is
    URL when the report names none. Otherwise, for `-Z` and for a transfer that never reached its handle, they come from
    `WriteOutTransferInfo.FromReport`, as before.
 3. The runner still lays its own answers over them: the scheme, `Referer`, `xfer_id`, `conn_id`, both verify results
-   and the early data. BL-2494 moves those into the engine transfer's `Info` so the overlay can go.
+   and the early data. BL-2495 moves those into the engine transfer's `Info` so the overlay can go.
 
 ## Consequences
 

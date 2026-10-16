@@ -38,7 +38,7 @@ ADR-0506; phase 3 of `Documentation/Planning/Curl-Api-And-libcurl.md`. Read the 
   (`TransferInfoFromReport` starts from `WriteOutTransferInfo`), but its `xfer_id`/`conn_id` come from the engine's own
   `TransferPerformer`, and its effective URL falls back to `CURLOPT_URL`. So the runner's scheme, `Referer`, IDs, verify
   results and early data still lie over the answers, and the request URL stands in when the report names no
-  effective URL. Moving those into the engine is BL-2494 (filed). `-Z` stays on `FromReport` until BL-2453.
+  effective URL. Moving those into the engine is BL-2495 (filed). `-Z` stays on `FromReport` until BL-2453.
 - The plan's "-w through GetInfo" line is corrected by ADR-0625's split; `Libcurl/CLAUDE.md` needs no change (no
   Libcurl member was added); `Curl.Console/CLAUDE.md` describes the new read.
 - Verified: `dotnet build` clean; fast tests all green (Curl.Console.UnitTests 2790 passed, Curl.Conformance.UnitTests

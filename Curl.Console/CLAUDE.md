@@ -472,7 +472,7 @@ cannot be opened included), with `TransferWriteOutVariables` as its values. A se
 `curl_easy_getinfo` answers, read through `CurlEasy.GetInfo` after its last attempt and before cleanup
 (`EasyHandleWriteOutInfo`, kept as `RunningTransferState.EasyWriteOutInfo`) and used when they describe the
 reported result; a `-Z` transfer, or one that never reached its handle, gets `WriteOutTransferInfo.FromReport`'s,
-and the runner's own scheme, `Referer`, IDs, verify results and early data lie over either until BL-2494
+and the runner's own scheme, `Referer`, IDs, verify results and early data lie over either until BL-2495
 (ADR-0625, BL-2452). Its `%time{format}`
 follows the `WriteOutTimeDialect` the runner is given: `CurlComposition.WriteOutTimeDialectFor`
 passes `WindowsCRuntime` on Windows and `Glibc` elsewhere (ADR-0078, BL-387). On Windows the

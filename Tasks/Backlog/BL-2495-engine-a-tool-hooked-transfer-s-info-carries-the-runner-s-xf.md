@@ -1,5 +1,5 @@
 ---
-id: BL-2494
+id: BL-2495
 title: Engine: a tool-hooked transfer's Info carries the runner's xfer_id, conn_id, scheme, Referer, verify results and early data
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-16
 completed:
 ---
-# BL-2494 — Engine: a tool-hooked transfer's Info carries the runner's xfer_id, conn_id, scheme, Referer, verify results and early data
+# BL-2495 — Engine: a tool-hooked transfer's Info carries the runner's xfer_id, conn_id, scheme, Referer, verify results and early data
 
 ## Goal
 
