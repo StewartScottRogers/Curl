@@ -7,7 +7,7 @@ using Libcurl.Options;
 namespace Curl.Console;
 
 /// <summary>
-/// The TLS, authentication and proxy half of <see cref="EasySetoptsFromCommandLine" /> (BL-2492, ADR-0639): the
+/// The TLS, authentication and proxy half of <see cref="EasySetoptsFromCommandLine" /> (BL-2492, ADR-0642): the
 /// <c>curl_easy_setopt</c> calls <c>config2setopts.c</c> makes for those groups, and what of them stays on the hooks.
 /// </summary>
 internal static partial class EasySetoptsFromCommandLine

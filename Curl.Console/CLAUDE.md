@@ -346,7 +346,7 @@ transfer's `-T` upload) and network field off libcurl's default: `EasySetoptsFro
 TLS (origin, `PROXY_*` twins, then the handle's own), authentication and proxy field
 (`EasySetoptsFromCommandLine.TlsAuthenticationProxy.cs`; `CURLOPT_AWS_SIGV4` before `CURLOPT_HTTPAUTH`,
 `CURLOPT_HAPROXY_CLIENT_IP` before `CURLOPT_HAPROXYPROTOCOL`, `--ech` as its mode, `pn:` and `ecl:` calls; BL-2492,
-ADR-0639). The hooks keep the HTTP and protocol groups whole, and of the other six only `--ip-tos`, `--vlan-priority`
+ADR-0642). The hooks keep the HTTP and protocol groups whole, and of the other six only `--ip-tos`, `--vlan-priority`
 and `--mptcp` (no `CURLOPT_*`), a receive buffer outside 1024 bytes to 10 MB (`--limit-rate` below 1024), a `-y`, `-m`,
 `--connect-timeout`, `--happy-eyeballs-timeout-ms` or `--keepalive-time` that is not a whole number of the setter's
 unit up to `INT_MAX`, `--engine` (its setter answers `CURLE_NOT_BUILT_IN`; the engine's setup failure prints curl's
