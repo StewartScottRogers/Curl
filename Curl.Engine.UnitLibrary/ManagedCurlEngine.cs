@@ -114,7 +114,7 @@ public sealed class ManagedCurlEngine : ICurlEngine
     {
         CurlTransports transports = CreateTransports(options, shared);
         return new ProtocolDispatcher(EngineComposition.CreateProtocolHandlers(
-            PoolOf(transports, transports.TcpConnector, options.Callbacks, shared),
+            PrerequestConnector.Over(PoolOf(transports, transports.TcpConnector, options.Callbacks, shared), options.Callbacks.Prerequest),
             transports.UdpDatagramConnector,
             transports.TlsProvider,
             transports.DnsResolver,
@@ -127,13 +127,13 @@ public sealed class ManagedCurlEngine : ICurlEngine
     /// <summary>
     /// Builds the connector a <c>CURLOPT_CONNECT_ONLY</c> 1 perform dials through: the <c>TcpConnector</c> of
     /// <see cref="CreateDispatcher" />'s transports, not its pool, so the connection is the handle's own (ADR-0608),
-    /// under the handle's socket callbacks (ADR-0610).
+    /// under the handle's socket callbacks (ADR-0610) and its prerequest callback (ADR-0611).
     /// </summary>
     /// <param name="options">The transfer's options.</param>
     /// <param name="shared">The engine's shared caches.</param>
     /// <returns>The connector.</returns>
     internal static IConnector CreateConnectOnlyConnector(EasyOptions options, ManagedEngineSharedState shared) =>
-        SocketCallbackConnector.Over(CreateTransports(options, shared).TcpConnector, options.Callbacks, shared);
+        PrerequestConnector.Over(SocketCallbackConnector.Over(CreateTransports(options, shared).TcpConnector, options.Callbacks, shared), options.Callbacks.Prerequest);
 
     /// <summary>
     /// The pool a transfer's TCP handlers connect through: the transports' own over their <c>TcpConnector</c>, as
@@ -155,6 +155,6 @@ public sealed class ManagedCurlEngine : ICurlEngine
     private static CurlTransports CreateTransports(EasyOptions options, ManagedEngineSharedState shared)
     {
         EngineToolOptions tool = new(Parallel: false, ParallelImmediate: false, SslSessionsFile: null, MaxTime: options.Transfer.Timeout > TimeSpan.Zero ? options.Transfer.Timeout : null);
-        return EngineComposition.CreateTransports(tool, options.Network, options.Tls, options.Http, options.Proxy, options.Authentication, shared.TimeProvider, shared.Connections, shared.TlsSessions, runDnsCache: shared.DnsCache);
+        return EngineComposition.CreateTransports(tool, options.Network, options.Tls, options.Http, options.Proxy, options.Authentication, shared.TimeProvider, shared.Connections, shared.TlsSessions, diagnosticLog: null, shared.DnsCache, easyErrorText: null, traces: null, resolver => ResolverStartDnsResolver.Over(resolver, options.Callbacks.ResolverStart));
     }
 }

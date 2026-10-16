@@ -47,6 +47,10 @@ other value `BadFunctionArgument`), which the engine calls to rewind a read-call
 authentication retry sends again; `SEEKDATA` takes any value and changes nothing (BL-2417, ADR-0609). `Callbacks/Sockets` sets
 `CURLOPT_SOCKOPTFUNCTION`, `OPENSOCKETFUNCTION` and `CLOSESOCKETFUNCTION` the same way, which the engine calls around each
 TCP connection over opaque `CurlSocket` handles; their `*DATA` options take any value and change nothing (BL-2418, ADR-0610).
+`Callbacks/Phases` sets `CURLOPT_PREREQFUNCTION` and `RESOLVER_START_FUNCTION` the same way, which the engine calls as
+each request is given its connection and before each look-up its DNS cache misses; `PREREQDATA` and
+`RESOLVER_START_DATA` take any value and change nothing, and `TRAILERFUNCTION` answers `NotBuiltIn` until BL-2475
+(BL-2419, ADR-0611).
 
 `Misc/ErrorText` holds `CurlErrorText`: `Multi`, `Share` and `Url` are `curl_multi_strerror`,
 `curl_share_strerror` and `curl_url_strerror` with upstream's test1538 strings and fallbacks, and

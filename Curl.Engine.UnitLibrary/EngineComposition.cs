@@ -766,12 +766,37 @@ internal static class EngineComposition
     /// <param name="runDnsCache">The run's DNS cache, which every option group's TCP connector answers from and adds to as curl 8.21.0 shares its cache (BL-1053); <see langword="null" /> for a cache of the group's own.</param>
     /// <param name="easyErrorText">Curl's easy error text for each exit code, which the DoH resolver's <c>--trace-config doh</c> lines carry (BL-1102): <c>Curl.Console</c>'s <c>CurlEasyErrorText.Of</c> in production; <see langword="null" /> for an empty text.</param>
     /// <param name="traces">The run's <c>--trace-config</c> components; <see langword="null" /> for none.</param>
-    internal static CurlTransports CreateTransports(EngineToolOptions tool, EasyNetworkOptions network, EasyTlsOptions tls, EasyHttpOptions http, EasyProxyOptions proxy, EasyAuthenticationOptions authentication, TimeProvider timeProvider, ConnectionCache? runConnections = null, TlsSessionCache? tlsSessions = null, IDiagnosticLog? diagnosticLog = null, DnsCache? runDnsCache = null, Func<CurlExitCode, string>? easyErrorText = null, EngineTraceComponents? traces = null)
+    internal static CurlTransports CreateTransports(EngineToolOptions tool, EasyNetworkOptions network, EasyTlsOptions tls, EasyHttpOptions http, EasyProxyOptions proxy, EasyAuthenticationOptions authentication, TimeProvider timeProvider, ConnectionCache? runConnections = null, TlsSessionCache? tlsSessions = null, IDiagnosticLog? diagnosticLog = null, DnsCache? runDnsCache = null, Func<CurlExitCode, string>? easyErrorText = null, EngineTraceComponents? traces = null) =>
+        CreateTransports(tool, network, tls, http, proxy, authentication, timeProvider, runConnections, tlsSessions, diagnosticLog, runDnsCache, easyErrorText, traces, static resolver => resolver);
+
+    /// <summary>
+    /// Creates the network transports as the overload without <paramref name="wrapLookUps" /> does, with the
+    /// resolver the TCP and UDP connectors ask on a DNS cache miss wrapped by <paramref name="wrapLookUps" />: the
+    /// managed engine's <see cref="ResolverStartDnsResolver" />, which calls <c>CURLOPT_RESOLVER_START_FUNCTION</c>
+    /// before each look-up (ADR-0611). <see cref="CurlTransports.DnsResolver" /> stays the resolver unwrapped.
+    /// </summary>
+    /// <param name="tool">The curl tool's own settings.</param>
+    /// <param name="network">The option group's network options.</param>
+    /// <param name="tls">The option group's TLS options.</param>
+    /// <param name="http">The option group's HTTP options.</param>
+    /// <param name="proxy">The option group's proxy options.</param>
+    /// <param name="authentication">The option group's authentication options.</param>
+    /// <param name="timeProvider">The clock every transport times on.</param>
+    /// <param name="runConnections">The run's connection cache; <see langword="null" /> for a pool of the group's own.</param>
+    /// <param name="tlsSessions">The run's <c>--ssl-sessions</c> cache; <see langword="null" /> for none.</param>
+    /// <param name="diagnosticLog">The run's diagnostic log; <see langword="null" /> for none.</param>
+    /// <param name="runDnsCache">The run's DNS cache; <see langword="null" /> for a cache of the group's own.</param>
+    /// <param name="easyErrorText">Curl's easy error text for each exit code; <see langword="null" /> for an empty text.</param>
+    /// <param name="traces">The run's <c>--trace-config</c> components; <see langword="null" /> for none.</param>
+    /// <param name="wrapLookUps">Wraps the resolver the connectors look names up through.</param>
+    /// <returns>The connectors and the pieces they were built from.</returns>
+    internal static CurlTransports CreateTransports(EngineToolOptions tool, EasyNetworkOptions network, EasyTlsOptions tls, EasyHttpOptions http, EasyProxyOptions proxy, EasyAuthenticationOptions authentication, TimeProvider timeProvider, ConnectionCache? runConnections, TlsSessionCache? tlsSessions, IDiagnosticLog? diagnosticLog, DnsCache? runDnsCache, Func<CurlExitCode, string>? easyErrorText, EngineTraceComponents? traces, Func<IDnsResolver, IDnsResolver> wrapLookUps)
     {
         traces ??= EngineTraceComponents.None;
         TcpDialer tcpDialer = new(TcpSocketOptionsOf(network));
         FlowScopedTransferEvents? resolverEvents = TracesDns(traces) ? new() : null;
         IDnsResolver dnsResolver = CreateDnsResolver(network, tls, timeProvider, tcpDialer, resolverEvents, easyErrorText, traces);
+        IDnsResolver lookUps = wrapLookUps(dnsResolver);
         TlsClientOptions tlsClientOptions = TlsClientOptionsMapping.Of(tls, http.SslEnableAlpn, tool.SslSessionsFile);
         ITlsProviderWithWarnings tlsProvider = CreateTlsProvider(tlsClientOptions, timeProvider, tlsSessions, dnsResolver as IEchConfigListLookup);
         TlsClientOptions proxyTlsClientOptions = TlsClientOptionsMapping.ProxyOf(tls, http.SslEnableAlpn);
@@ -779,8 +804,8 @@ internal static class EngineComposition
         LateBoundSecurityContextFactory proxyContexts = new();
         HttpProxyTunnelOptions proxyTunnelOptions = CreateProxyTunnelOptions(http, proxy, authentication, proxyContexts, diagnosticLog);
         QuicDialer quicDialer = new(tlsClientOptions, timeProvider) { WritesHttp3ConnectionLines = TracesHttp3(traces) };
-        TcpConnector tcpConnector = CreateTcpConnector(tool, traces, network, http, proxy, authentication, dnsResolver, tcpDialer, tlsProvider, timeProvider, proxyTunnelOptions, proxyTlsProvider, quicDialer, proxyContexts, runDnsCache, resolverEvents);
-        UdpDatagramConnector udpDatagramConnector = CreateUdpDatagramConnector(network, dnsResolver, timeProvider, diagnosticLog);
+        TcpConnector tcpConnector = CreateTcpConnector(tool, traces, network, http, proxy, authentication, lookUps, tcpDialer, tlsProvider, timeProvider, proxyTunnelOptions, proxyTlsProvider, quicDialer, proxyContexts, runDnsCache, resolverEvents);
+        UdpDatagramConnector udpDatagramConnector = CreateUdpDatagramConnector(network, lookUps, timeProvider, diagnosticLog);
         PoolingConnector poolingConnector = CreatePoolingConnector(tool, network, tls, http, proxy, tcpConnector, timeProvider, runConnections);
 
         // The tunnel answers --proxy-ntlm and --proxy-negotiate on the same router the origin's
