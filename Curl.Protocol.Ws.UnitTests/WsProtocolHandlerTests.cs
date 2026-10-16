@@ -387,6 +387,22 @@ public sealed class WsProtocolHandlerTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_RawModeUpload_SendsTheBytesUnframed()
+    {
+        // curl 8.22.0 Curl_ws_accept (lib/ws.c) adds the cr_ws_read frame-encoding reader only
+        // `if(!data->set.ws_raw_mode)`, so under CURLWS_RAW_MODE the -T body goes out as it is (BL-2526).
+        var connection = new ScriptedConnection(Bytes(Head101 + "\x81\x02ok"));
+        var context = new TransferContext { Url = CurlUrl.Parse("ws://127.0.0.1:47901/chat"), Output = new MemoryStream(), Upload = new MemoryStream(Bytes("abc")) };
+
+        TransferResult result = await new WsProtocolHandler(Connector(connection), new RecordingAuthenticator(), new FixedRandomSource()) { RawMode = true }
+            .ExecuteAsync(context);
+
+        Assert.AreEqual(Request + "abc", Encoding.Latin1.GetString(connection.Sent));
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(3L, result.Report!.UploadSize);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_UploadReadFails_SendsWhatWasReadBeforeTheFailure()
     {
         var diagnostics = TestDiagnostics.For(TestContext);

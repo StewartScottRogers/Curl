@@ -42,4 +42,5 @@ upload reader after the `101`, each frame decoded and each run of payload passed
 `CURLWS_RAW_MODE` on a transfer that exchanges frames (BL-2494): with `WsProtocolHandler.RawMode`
 set, `WsFrameReceiver` hands every byte after the `101` to the output as it came, frame heads
 included, decoding nothing and answering no ping, as curl 8.22.0's `ws_cw_write` passes the body
-on under `ws_raw_mode`; the `-T` upload is still sent as one frame.
+on under `ws_raw_mode`; the `-T` upload goes out unframed too (BL-2526), as `Curl_ws_accept` adds the frame-encoding
+client reader only when `ws_raw_mode` is off.
