@@ -7,7 +7,7 @@ namespace Libcurl.Options;
 
 /// <summary>
 /// The setter rows of every <c>CURLOPT_*</c> <see cref="EasyTransferOptions"/> holds, each checking
-/// its value as curl 8.22.0's <c>lib/setopt.c</c> does (ADR-0571); a <c>_LARGE</c> or <c>_MS</c>
+/// its value as curl 8.22.0's <c>lib/setopt.c</c> does (ADR-0572); a <c>_LARGE</c> or <c>_MS</c>
 /// alias sets the same field as the option it extends.
 /// </summary>
 internal static class EasyTransferOptionSetters
