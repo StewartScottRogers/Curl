@@ -1,3 +1,4 @@
+using System.Text;
 using Curl.Api.Codes;
 using Curl.Api.EngineContracts;
 using Curl.Api.Options;
@@ -19,6 +20,9 @@ public sealed class CurlEasyTests
             return CurlCode.Ok;
         },
     });
+
+    private static EasyOptions WithErrorBuffer(StringBuilder buffer) =>
+        new() { Behaviour = new() { ErrorBuffer = buffer } };
 
     [TestMethod]
     public void Perform_ReturnsTheEnginesCodeAndPassesTheHandlesOptions()
@@ -47,6 +51,71 @@ public sealed class CurlEasyTests
         Assert.AreEqual(CurlCode.RecvError, code);
         Assert.AreEqual(source.Token, transfer.PerformedToken);
         Assert.AreSame(transfer.Options, transfer.PerformedWith);
+    }
+
+    [TestMethod]
+    public void Perform_AFailure_FillsTheErrorBufferWithTheEnginesText()
+    {
+        var buffer = new StringBuilder("stale");
+        var transfer = new FakeEasyTransfer { Result = CurlCode.CouldntConnect, ErrorText = "Failed to connect", Options = WithErrorBuffer(buffer) };
+        using var easy = new CurlEasy(transfer, VerboseOnly);
+
+        var code = easy.Perform();
+
+        Assert.AreEqual(CurlCode.CouldntConnect, code);
+        Assert.AreEqual("Failed to connect", buffer.ToString());
+        Assert.AreEqual("Failed to connect", easy.ErrorText);
+    }
+
+    [TestMethod]
+    public async Task PerformAsync_ALongFailureText_CutsItTo255BytesLeavingRoomForTheTerminator()
+    {
+        var buffer = new StringBuilder();
+        var transfer = new FakeEasyTransfer { Result = CurlCode.ReadError, ErrorText = new string('a', 254) + "é" + "tail", Options = WithErrorBuffer(buffer) };
+        await using var easy = new CurlEasy(transfer, VerboseOnly);
+
+        await easy.PerformAsync();
+
+        Assert.AreEqual(new string('a', 254), buffer.ToString());
+        Assert.AreEqual(new string('a', 254), easy.ErrorText);
+    }
+
+    [TestMethod]
+    public async Task PerformAsync_AFailureTextOf255Bytes_KeepsItWhole()
+    {
+        var buffer = new StringBuilder();
+        var text = new string('b', 253) + "é";
+        var transfer = new FakeEasyTransfer { Result = CurlCode.ReadError, ErrorText = text, Options = WithErrorBuffer(buffer) };
+        await using var easy = new CurlEasy(transfer, VerboseOnly);
+
+        await easy.PerformAsync();
+
+        Assert.AreEqual(text, buffer.ToString());
+        Assert.AreEqual(EasyErrorBuffer.MessageByteLimit, Encoding.UTF8.GetByteCount(buffer.ToString()));
+    }
+
+    [TestMethod]
+    public void Perform_ASuccess_ClearsTheErrorBuffer()
+    {
+        var buffer = new StringBuilder("an earlier failure");
+        var transfer = new FakeEasyTransfer { ErrorText = "detail the engine left", Options = WithErrorBuffer(buffer) };
+        using var easy = new CurlEasy(transfer, VerboseOnly);
+
+        Assert.AreEqual(CurlCode.Ok, easy.Perform());
+
+        Assert.AreEqual(string.Empty, buffer.ToString());
+    }
+
+    [TestMethod]
+    public void Perform_NoErrorBufferSet_StillAnswersTheErrorText()
+    {
+        var transfer = new FakeEasyTransfer { Result = CurlCode.CouldntResolveHost, ErrorText = "Could not resolve host: nowhere" };
+        using var easy = new CurlEasy(transfer, VerboseOnly);
+
+        Assert.AreEqual(CurlCode.CouldntResolveHost, easy.Perform());
+
+        Assert.IsNull(transfer.Options.Behaviour.ErrorBuffer);
+        Assert.AreEqual("Could not resolve host: nowhere", easy.ErrorText);
     }
 
     [TestMethod]

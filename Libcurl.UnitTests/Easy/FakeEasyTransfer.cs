@@ -29,7 +29,8 @@ internal sealed class FakeEasyTransfer : IEasyTransfer
 
     public TransferInfo Info { get; init; } = new();
 
-    public string ErrorText => throw new NotSupportedException();
+    /// <summary>The error text the engine reports after a perform, whatever its result.</summary>
+    public string ErrorText { get; init; } = string.Empty;
 
     public ITransferHeaders Headers => throw new NotSupportedException();
 

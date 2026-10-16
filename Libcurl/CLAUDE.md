@@ -61,7 +61,10 @@ engine's `IEasyTransfer` (ADR-0563): `SetOption` goes through `EasyOptionDispatc
 changed `EasyOptions` back to the transfer only on `Ok`; `PerformAsync` is the native shape, and
 `Perform` blocks on it; `Upkeep` (`curl_easy_upkeep`) blocks on `UpkeepAsync` the same way, and these
 two and `WebSocket`'s blocking calls are Libcurl's only sanctioned sync-over-async bridges. `Pause` is `curl_easy_pause` and passes the
-engine only the `Receive` and `Send` bits, dropping the rest as libcurl does. `Dispose` and
+engine only the `Receive` and `Send` bits, dropping the rest as libcurl does. A perform clears the
+`CURLOPT_ERRORBUFFER` buffer, if one is set, and on failure writes the engine's `ErrorText` into it
+cut to 255 UTF-8 bytes (`EasyErrorBuffer`, libcurl's 256-byte `CURL_ERROR_SIZE` less the NUL);
+`CurlEasy.ErrorText` answers the same cut text with or without a buffer. `Dispose` and
 `DisposeAsync` are `curl_easy_cleanup` and dispose the transfer once; a member used afterwards throws
 `ObjectDisposedException`. `GetInfo` is `curl_easy_getinfo` and goes through `Info`'s dispatch.
 `Reset` is `curl_easy_reset` and `DupHandle` is `curl_easy_duphandle`, each a call to the transfer's

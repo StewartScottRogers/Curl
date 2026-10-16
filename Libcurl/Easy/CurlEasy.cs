@@ -94,7 +94,14 @@ public sealed class CurlEasy : IDisposable, IAsyncDisposable
     /// <returns>The engine's result for the transfer.</returns>
     /// <exception cref="ObjectDisposedException">The handle has been cleaned up.</exception>
     public ValueTask<CurlCode> PerformAsync(CancellationToken cancellationToken = default) =>
-        LiveTransfer().PerformAsync(cancellationToken);
+        PerformFillingErrorBufferAsync(LiveTransfer(), cancellationToken);
+
+    /// <summary>
+    /// The text of the last perform's error as <c>CURLOPT_ERRORBUFFER</c> holds it: the engine's text cut
+    /// to 255 UTF-8 bytes; empty when the last perform succeeded or gave no detail.
+    /// </summary>
+    /// <exception cref="ObjectDisposedException">The handle has been cleaned up.</exception>
+    public string ErrorText => EasyErrorBuffer.Cut(LiveTransfer().ErrorText);
 
     /// <summary>
     /// <c>curl_easy_reset</c>: every option back to its default, as a new handle has them. The engine
@@ -153,6 +160,14 @@ public sealed class CurlEasy : IDisposable, IAsyncDisposable
         }
 
         await transfer.DisposeAsync().ConfigureAwait(false);
+    }
+
+    private static async ValueTask<CurlCode> PerformFillingErrorBufferAsync(IEasyTransfer live, CancellationToken cancellationToken)
+    {
+        var buffer = live.Options.Behaviour.ErrorBuffer;
+        var code = await live.PerformAsync(cancellationToken).ConfigureAwait(false);
+        EasyErrorBuffer.Fill(buffer, code, live.ErrorText);
+        return code;
     }
 
     private IEasyTransfer LiveTransfer()
