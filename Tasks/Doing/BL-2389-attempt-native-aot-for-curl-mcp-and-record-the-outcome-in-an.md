@@ -24,13 +24,15 @@ ADR-0548 decision 6: native AOT where the SDK allows it, as Microsoft's `mcpserv
 ## Acceptance criteria
 
 - [ ] If AOT works: `PublishAot` is set for the packed runtime identifiers, the published binary answers `initialize` and `tools/list` listing `curl`, `transfer`, `parse_url`, `build_url` and `version`, and a new ADR records the sizes measured.
-- [ ] If AOT fails: the property stays off, a new ADR (`Documentation/Planning/Decisions/ADR-####-...`, number from the folder) names the exact trim or SDK error and the SDK version, and states that Curl.Mcp ships self-contained; the exact failing command is in the ADR.
-- [ ] The ADR is marked "Decided by Claude under Stewart's delegation" and `Documentation/Planning/Curl-Mcp.md` links it.
-- [ ] `dotnet build Curl.Mcp -warnaserror` and the fast tests of `Curl.Mcp.UnitTests` are green.
+- [x] If AOT fails: the property stays off, a new ADR (`Documentation/Planning/Decisions/ADR-####-...`, number from the folder) names the exact trim or SDK error and the SDK version, and states that Curl.Mcp ships self-contained; the exact failing command is in the ADR.
+- [x] The ADR is marked "Decided by Claude under Stewart's delegation" and `Documentation/Planning/Curl-Mcp.md` links it.
+- [x] `dotnet build Curl.Mcp -warnaserror` and the fast tests of `Curl.Mcp.UnitTests` are green.
 
 ## Notes
 
 Plan: Documentation/Planning/Curl-Mcp.md. Decision: ADR-0548.
+
+Outcome: AOT publish builds clean but the server crashes at start (McpTransferHeader[] has no JsonTypeInfo in the SDK marshaller); recorded in ADR-0598, self-contained kept. `parse_url`/`build_url` were not yet present, so the five-tool listing was not reachable.
 
 ## Log
 
