@@ -39,3 +39,4 @@ A `v*` tag's GitHub release carries the 7 Curl.Mcp `.nupkg` files beside the six
 ## Log
 
 - 2026-10-16: Created.
+- 2026-10-16: Backlog -> Doing.
