@@ -138,3 +138,9 @@ Reference `Curl.Api.UnitLibrary` (the seam) and `Curl.Engine.UnitLibrary` (only 
 library.
 
 Held to the four quality gates in the root `CLAUDE.md`. Its tests live in `Curl.Api.UnitTests`.
+
+`README.md` (BL-2513) is the usage guide: each of its `csharp` blocks follows a `<!-- sample: name -->`
+line and is identical to the source between the matching `// <sample name>` markers in
+`Curl.Api.UnitTests/Readme/ReadmeSamples.cs`, which `ReadmeTests` runs against `ReadmeEngine`'s fakes; the
+test also fails when a public type of `Curl.Api` is not named in backticks in the README. Change a
+sample in both places.

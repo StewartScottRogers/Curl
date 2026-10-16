@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: docs
 depends-on: [BL-2511, BL-2512, BL-2508, BL-2497]
-touches: [Curl.Api/README.md, Curl.Api/CLAUDE.md, Curl.Api.UnitTests/Readme]
+touches: [Curl.Api/README.md, Curl.Api/CLAUDE.md, Curl.Api.UnitTests/Readme, Curl.Api.UnitTests/Curl.Api.UnitTests.csproj]
 requirement: none
 created: 2026-10-16
-completed:
+completed: 2026-10-16
 ---
 # BL-2513 — Curl.Api: usage README
 
@@ -22,10 +22,10 @@ Phase 4 of `Documentation/Planning/Curl-Api-And-libcurl.md`; ADR-0506. `Curl.Api
 
 ## Acceptance criteria
 
-- [ ] Every code block in the README has a test of the same sample that passes.
-- [ ] The README names every public type of `Curl.Api` and says what it does; no statement in it is untrue of the code.
-- [ ] `dotnet build` is clean and the fast tests pass with no test deleted, skipped or weakened.
-- [ ] `Curl.Conformance.UnitTests/PassingUpstreamCases.txt` is unchanged or grown, and every case it lists still passes.
+- [x] Every code block in the README has a test of the same sample that passes.
+- [x] The README names every public type of `Curl.Api` and says what it does; no statement in it is untrue of the code.
+- [x] `dotnet build` is clean and the fast tests pass with no test deleted, skipped or weakened.
+- [x] `Curl.Conformance.UnitTests/PassingUpstreamCases.txt` is unchanged or grown, and every case it lists still passes.
 
 ## Notes
 
@@ -33,3 +33,4 @@ Phase 4 of `Documentation/Planning/Curl-Api-And-libcurl.md`; ADR-0506. `Curl.Api
 
 - 2026-10-16: Created.
 - 2026-10-16: Backlog -> Doing. Criteria at claim: 57833265 602f547a 4272a6b9 8738c7f6.
+- 2026-10-16: Doing -> Done. Curl.Api/README.md shows create, send/stream, options, uploads, cancel, progress, WebSocket, concurrency and HttpClient handler; every block is a passing test
