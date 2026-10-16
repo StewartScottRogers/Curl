@@ -14,10 +14,11 @@ namespace Curl.Engine;
 /// again, or, with no gate or on the synchronous path, fails with libcurl's
 /// <c>Read callback asked for PAUSE when not supported</c> (ADR-0573). Any other return below zero or
 /// past the buffer's length fails the read with libcurl's <c>CURLE_READ_ERROR</c> text.
+/// <see cref="SeekingCallbackReadStream" /> adds the seek callback that rewinds it.
 /// </summary>
 /// <param name="callback">The read callback.</param>
 /// <param name="pauseGate">The handle's pause state, or <see langword="null" /> when the transfer cannot pause.</param>
-internal sealed class CallbackReadStream(ReadCallback callback, EasyPauseGate? pauseGate = null) : Stream
+internal class CallbackReadStream(ReadCallback callback, EasyPauseGate? pauseGate = null) : Stream
 {
     /// <summary>libcurl's text for a read callback that returned more than it was asked for.</summary>
     internal const string FunnyValueText = "read function returned funny value";
@@ -30,6 +31,9 @@ internal sealed class CallbackReadStream(ReadCallback callback, EasyPauseGate? p
 
     /// <summary>Gets a value indicating whether the read callback returned <see cref="ReadCallbackResult.Abort" />.</summary>
     internal bool Aborted { get; private set; }
+
+    /// <summary>Gets or sets how many bytes the read callback has given since the stream was made or last rewound.</summary>
+    internal long BytesReadSinceRewind { get; set; }
 
     /// <inheritdoc />
     public override bool CanRead => true;
@@ -106,6 +110,12 @@ internal sealed class CallbackReadStream(ReadCallback callback, EasyPauseGate? p
             throw new IOException(AbortedText);
         }
 
-        return read >= 0 && read <= length ? (int)read : throw new IOException(FunnyValueText);
+        if (read < 0 || read > length)
+        {
+            throw new IOException(FunnyValueText);
+        }
+
+        BytesReadSinceRewind += read;
+        return (int)read;
     }
 }

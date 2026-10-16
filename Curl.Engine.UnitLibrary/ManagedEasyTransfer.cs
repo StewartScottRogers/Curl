@@ -901,15 +901,24 @@ internal sealed class ManagedEasyTransfer(
     /// <summary>
     /// The upload source of a <see cref="Api.Options.Behaviour.EasyTransferOptions.Upload" /> transfer: the read callback, or
     /// nothing to read when none is set, as the engine has no standard input of its own; the host hands
-    /// standard input or a <c>-T</c> file over as a read callback (ADR-0542).
+    /// standard input or a <c>-T</c> file over as a read callback (ADR-0542). With a seek callback too, the
+    /// upload is a <see cref="SeekingCallbackReadStream" />, which a resend rewinds through it (BL-2417).
     /// </summary>
     /// <param name="options">The handle's options.</param>
     /// <param name="pauseGate">The pause state a read callback's pause waits on, or <see langword="null" /> when the transfer cannot pause.</param>
     /// <returns>The upload stream, or <see langword="null" /> when the transfer uploads nothing.</returns>
     private static Stream? UploadOf(EasyOptions options, EasyPauseGate? pauseGate) =>
         options.Transfer.Upload
-            ? options.Callbacks.Read is { } read ? new CallbackReadStream(read, pauseGate) : Stream.Null
+            ? options.Callbacks.Read is { } read ? CallbackUploadOf(read, options.Callbacks.Seek, pauseGate) : Stream.Null
             : null;
+
+    /// <summary>The read callback's upload stream: one the seek callback rewinds when one is set.</summary>
+    /// <param name="read">The read callback.</param>
+    /// <param name="seek">The seek callback, or <see langword="null" />.</param>
+    /// <param name="pauseGate">The pause state a read callback's pause waits on, or <see langword="null" />.</param>
+    /// <returns>The upload stream.</returns>
+    private static CallbackReadStream CallbackUploadOf(ReadCallback read, SeekCallback? seek, EasyPauseGate? pauseGate) =>
+        seek is null ? new CallbackReadStream(read, pauseGate) : new SeekingCallbackReadStream(read, seek, pauseGate);
 
     /// <summary>
     /// The curl tool's own settings for a transfer driven through the easy interface with no

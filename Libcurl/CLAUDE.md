@@ -42,7 +42,9 @@ delegate `BadFunctionArgument`) and the `*DATA` pointers: the delegate's closure
 function is set) and any other value is taken and changes nothing. `Callbacks/Progress` sets
 `CURLOPT_PROGRESSFUNCTION`, `XFERINFOFUNCTION` and `DEBUGFUNCTION` the same way, which the engine already
 calls (ADR-0543); `XFERINFODATA` (`PROGRESSDATA` is the same option) and `DEBUGDATA` take any value and
-change nothing (ADR-0577).
+change nothing (ADR-0577). `Callbacks/Seek` sets `CURLOPT_SEEKFUNCTION` (a `SeekCallback` or `null`, any
+other value `BadFunctionArgument`), which the engine calls to rewind a read-callback upload a redirect or
+authentication retry sends again; `SEEKDATA` takes any value and changes nothing (BL-2417, ADR-0609).
 
 `Misc/ErrorText` holds `CurlErrorText`: `Multi`, `Share` and `Url` are `curl_multi_strerror`,
 `curl_share_strerror` and `curl_url_strerror` with upstream's test1538 strings and fallbacks, and
