@@ -18,7 +18,7 @@ A `ManagedCurlEngine` transfer whose `EasyHttpOptions.CookieList` holds cookie l
 
 ## Context
 
-Found by BL-2507 (ADR-0641): `Curl.Api`'s `CurlCookieStore` starts every transfer from `CURLOPT_COOKIELIST` `ALL` then one Netscape line per stored cookie, and reads the result back from `CURLINFO_COOKIELIST`. `ManagedEasyTransfer` fills `TransferInfo.CookieList` but never reads `Options.Http.CookieList`, so with the real engine the stored cookies are not sent (tests of `Curl.Api` use fakes, so they pass). libcurl's commands: `ALL` (erase every cookie), `SESS` (erase session cookies), `FLUSH` (write the jar), `RELOAD` (load the cookie files); any other line is a Netscape cookie-file line or a `Set-Cookie:` header line. Each item applies in order; the cookie engine starts as `CookieEngine.FromHttpOptions` makes it. Libcurl's setter (`Libcurl/Options/Http/EasyHttpOptionSetters.cs`) already collects the list.
+Found by BL-2507 (ADR-0645): `Curl.Api`'s `CurlCookieStore` starts every transfer from `CURLOPT_COOKIELIST` `ALL` then one Netscape line per stored cookie, and reads the result back from `CURLINFO_COOKIELIST`. `ManagedEasyTransfer` fills `TransferInfo.CookieList` but never reads `Options.Http.CookieList`, so with the real engine the stored cookies are not sent (tests of `Curl.Api` use fakes, so they pass). libcurl's commands: `ALL` (erase every cookie), `SESS` (erase session cookies), `FLUSH` (write the jar), `RELOAD` (load the cookie files); any other line is a Netscape cookie-file line or a `Set-Cookie:` header line. Each item applies in order; the cookie engine starts as `CookieEngine.FromHttpOptions` makes it. Libcurl's setter (`Libcurl/Options/Http/EasyHttpOptionSetters.cs`) already collects the list.
 
 ## Acceptance criteria
 
