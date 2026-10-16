@@ -3,6 +3,7 @@ using Curl.Api.Codes;
 using Curl.Api.EngineContracts.Share;
 using Curl.Api.Options;
 using Curl.Api.Options.Behaviour;
+using Libcurl.Share;
 
 namespace Libcurl.Options;
 
@@ -40,7 +41,7 @@ internal static partial class EasyOptionSetters
     {
         setters[CurlOption.Errorbuffer] = Reference<StringBuilder>(static (b, buffer) => b with { ErrorBuffer = buffer });
         setters[CurlOption.Stderr] = Reference<Stream>(static (b, stream) => b with { StandardError = stream });
-        setters[CurlOption.Share] = Reference<IShareHandle>(static (b, share) => b with { Share = share });
+        setters[CurlOption.Share] = SetShare;
         setters[CurlOption.Private] = static (ref EasyOptions options, object? value) =>
             SetBehaviour(ref options, options.Behaviour with { Private = value });
     }
@@ -78,6 +79,22 @@ internal static partial class EasyOptionSetters
                 ? CurlCode.BadFunctionArgument
                 : SetBehaviour(ref options, set(options.Behaviour, (UnixFileMode)mode));
         };
+
+    /// <summary>
+    /// The <c>CURLOPT_SHARE</c> row: a <see cref="CurlShare"/> attaches its engine handle (none once it is
+    /// cleaned up, which detaches, as libcurl does for a freed share), an <see cref="IShareHandle"/> attaches
+    /// itself, and <see langword="null"/> detaches; any other value is <see cref="CurlCode.BadFunctionArgument"/>.
+    /// </summary>
+    /// <param name="options">The handle's options, replaced by the changed copy on success.</param>
+    /// <param name="value">The value given to <c>SetOption</c>.</param>
+    /// <returns><see cref="CurlCode.Ok"/>, or <see cref="CurlCode.BadFunctionArgument"/>.</returns>
+    private static CurlCode SetShare(ref EasyOptions options, object? value)
+    {
+        var handle = value is CurlShare share ? share.EngineHandle : value;
+        return handle is null or IShareHandle
+            ? SetBehaviour(ref options, options.Behaviour with { Share = (IShareHandle?)handle })
+            : CurlCode.BadFunctionArgument;
+    }
 
     private static CurlCode SetBehaviour(ref EasyOptions options, EasyBehaviourOptions behaviour)
     {

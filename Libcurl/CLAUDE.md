@@ -74,6 +74,14 @@ added engine transfer back to its `CurlEasy`, so `InfoRead` answers a `CurlMessa
 the caller added. A `null` or cleaned-up `CurlEasy` answers `BadEasyHandle`, one this multi holds
 already `AddedAlready`, both without calling the engine.
 
+`Share` holds `CurlShare`, the share handle `CurlLibrary.ShareInit` (`curl_share_init`) returns over
+the engine's `IShareHandle`, and `CurlShareOption` (ADR-0581). `SetOption` is `curl_share_setopt`:
+`SHARE`/`UNSHARE` of `COOKIE` to `HSTS` and the seam's lock delegates go to the engine, `NONE`, `SHARE`,
+an unknown kind or option, or a value of the wrong type answer `BadOption` without it, and `USERDATA` is
+kept as `UserData`. `Cleanup` is `curl_share_cleanup`; after the engine's `Ok` every call answers
+`Invalid`. `CURLOPT_SHARE` (`Options/Behaviour`) stores a `CurlShare`'s engine handle, and a cleaned-up
+`CurlShare` or `null` detaches.
+
 `Info` holds `CurlInfo` (every `CURLINFO_*` of curl 8.22.0's `curl.h` by name and number) and the
 internal `EasyInfoDispatch` `CurlEasy.GetInfo` goes through (ADR-0566): an id `curl.h` lacks answers
 `UnknownOption`, a known info no group reads yet `NotBuiltIn`. Each info group adds its reader rows by
