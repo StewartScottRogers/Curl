@@ -227,6 +227,65 @@ public sealed partial class ManagedEasyTransferTests
         Assert.AreEqual(0, seeks);
     }
 
+    [TestMethod]
+    public async Task PerformAsync_ResumeFromAndSeekReturnsOk_SendsTheBytesFromTheOffset()
+    {
+        ScriptedConnector connector = new([Encoding.ASCII.GetBytes(Continue + Response)]);
+        await using IEasyTransfer easy = CreateEngine(connector).CreateEasy();
+        MemoryStream source = new(Encoding.ASCII.GetBytes("abcde"));
+        List<(long Offset, SeekOrigin Origin)> seeks = [];
+        easy.Options = ResumingUploadOptions(
+            buffer => source.Read(buffer),
+            (offset, origin) =>
+            {
+                seeks.Add((offset, origin));
+                source.Position = offset;
+                return SeekResult.Ok;
+            });
+
+        CurlCode code = await easy.PerformAsync(CancellationToken.None);
+
+        Assert.AreEqual(CurlCode.Ok, code);
+        CollectionAssert.AreEqual(new[] { (2L, SeekOrigin.Begin) }, seeks);
+        StringAssert.EndsWith(Encoding.ASCII.GetString(connector.Written), "\r\n3\r\ncde\r\n0\r\n\r\n");
+    }
+
+    [TestMethod]
+    public async Task PerformAsync_ResumeFromAndSeekCantSeek_ReadsAndDiscardsTheOffsetThenSendsTheRest()
+    {
+        ScriptedConnector connector = new([Encoding.ASCII.GetBytes(Continue + Response)]);
+        await using IEasyTransfer easy = CreateEngine(connector).CreateEasy();
+        MemoryStream source = new(Encoding.ASCII.GetBytes("abcde"));
+        easy.Options = ResumingUploadOptions(buffer => source.Read(buffer), (_, _) => SeekResult.CantSeek);
+
+        CurlCode code = await easy.PerformAsync(CancellationToken.None);
+
+        Assert.AreEqual(CurlCode.Ok, code);
+        StringAssert.EndsWith(Encoding.ASCII.GetString(connector.Written), "\r\n3\r\ncde\r\n0\r\n\r\n");
+    }
+
+    [TestMethod]
+    public async Task PerformAsync_ResumeFromAndSeekFails_ReturnsReadErrorAndSendsNothing()
+    {
+        ScriptedConnector connector = new([Encoding.ASCII.GetBytes(Continue + Response)]);
+        await using IEasyTransfer easy = CreateEngine(connector).CreateEasy();
+        easy.Options = ResumingUploadOptions(ReadOf("abcde"), (_, _) => SeekResult.Fail);
+
+        CurlCode code = await easy.PerformAsync(CancellationToken.None);
+
+        Assert.AreEqual(CurlCode.ReadError, code);
+        Assert.AreEqual(CallbackUploadResume.CouldNotSeekText, easy.ErrorText);
+        Assert.IsEmpty(connector.Written);
+    }
+
+    /// <summary>A <c>PUT</c> of the read callback's bytes to <c>http://h/up</c> resumed from offset 2, with a seek callback.</summary>
+    private static EasyOptions ResumingUploadOptions(ReadCallback read, SeekCallback seek) => new()
+    {
+        Network = new EasyNetworkOptions { Url = "http://h/up" },
+        Transfer = new EasyTransferOptions { Upload = true, ResumeFrom = 2 },
+        Callbacks = new() { Read = read, Seek = seek },
+    };
+
     /// <summary>A <c>PUT</c> of the read callback's bytes to <c>http://h/up</c> under <c>CURLOPT_FOLLOWLOCATION</c>, with a seek callback.</summary>
     private static EasyOptions SeekingUploadOptions(ReadCallback read, SeekCallback seek) => new()
     {

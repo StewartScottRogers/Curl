@@ -321,8 +321,30 @@ internal sealed class ManagedEasyTransfer(
             return await PerformConnectOnlyAsync(options, settings, url, cancellationToken).ConfigureAwait(false);
         }
 
-        return await PerformBuildingMimePostAsync(options, settings, url, urlText, transferId, cancellationToken).ConfigureAwait(false);
+        return await PerformResumingUploadAsync(options, settings, url, urlText, transferId, cancellationToken).ConfigureAwait(false);
     }
+
+    /// <summary>
+    /// Skips a read-callback upload's <c>CURLOPT_RESUME_FROM</c> offset (<see cref="CallbackUploadResume.SkipUnlessToolGave" />)
+    /// and runs the transfer, or ends the perform with the skip's failure before anything is set up or sent (ADR-0641).
+    /// </summary>
+    /// <param name="options">The handle's options.</param>
+    /// <param name="settings">The tool settings.</param>
+    /// <param name="url">The URL set, parsed.</param>
+    /// <param name="urlText">The URL set.</param>
+    /// <param name="transferId">The transfer's <c>%{xfer_id}</c>.</param>
+    /// <param name="cancellationToken">Stops the transfer.</param>
+    /// <returns>The transfer's code.</returns>
+    private Task<CurlCode> PerformResumingUploadAsync(
+        EasyOptions options,
+        EngineTransferSettings settings,
+        CurlUrl url,
+        string urlText,
+        long transferId,
+        CancellationToken cancellationToken) =>
+        CallbackUploadResume.SkipUnlessToolGave(ToolInputs, options) is { } refused
+            ? Task.FromResult(Finish(refused.Code, refused.Text, Info))
+            : PerformBuildingMimePostAsync(options, settings, url, urlText, transferId, cancellationToken);
 
     /// <summary>
     /// The URL the perform transfers: the one the curl tool's runner parsed and checked (<see cref="EngineToolTransferInputs.Url" />),
