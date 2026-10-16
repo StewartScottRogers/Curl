@@ -1,5 +1,5 @@
 ---
-id: BL-2372
+id: BL-2373
 title: Fix flaky test SslStreamTlsProviderTests AuthenticateAsClientAsync_WithoutClientCertificateAfterAHandshakeThatPresentedOne_PresentsNone (True)
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-15
 completed:
 ---
-# BL-2372 — Fix flaky test SslStreamTlsProviderTests AuthenticateAsClientAsync_WithoutClientCertificateAfterAHandshakeThatPresentedOne_PresentsNone (True)
+# BL-2373 — Fix flaky test SslStreamTlsProviderTests AuthenticateAsClientAsync_WithoutClientCertificateAfterAHandshakeThatPresentedOne_PresentsNone (True)
 
 ## Goal
 

@@ -28,9 +28,9 @@ Found by BL-2360. ADR-0543 keeps `DebugCallback`'s libcurl signature: curl's too
 
 ## Notes
 
-- Design (ADR-0546): `ManagedEasyTransfer.Info` is updated while the transfer performs, as `curl_easy_getinfo` reads it: a fresh `TransferInfo` with `TransferId` and `ConnectionId` -1 once the transfer ID is taken, and `EngineConnectionIdTransferEvents` gets a `connectionIdTaken` action it calls with each `%{conn_id}` it takes (opened or reused) before passing the event on, so the `Connected to` line already reads the number. No `Curl.Api` change was needed.
+- Design (ADR-0547): `ManagedEasyTransfer.Info` is updated while the transfer performs, as `curl_easy_getinfo` reads it: a fresh `TransferInfo` with `TransferId` and `ConnectionId` -1 once the transfer ID is taken, and `EngineConnectionIdTransferEvents` gets a `connectionIdTaken` action it calls with each `%{conn_id}` it takes (opened or reused) before passing the event on, so the `Connected to` line already reads the number. No `Curl.Api` change was needed.
 - Test: `PerformAsync_DebugCallbackReadsTheHandlesIds_GetsNoConnectionBeforeItOpensAndItsNumberAfter`; `ScriptedConnector` gained `ReportsTheConnectionOpened` (a `Trying` info line, then connection 1 opened) since the fake reported no connection before.
-- Fast run: all green except one unrelated `Curl.Networking.UnitTests` TLS client-certificate test that passed alone; filed as BL-2372.
+- Fast run: all green except one unrelated `Curl.Networking.UnitTests` TLS client-certificate test that passed alone; filed as BL-2373.
 - Measure-CodeQuality.ps1 -Library Curl.Engine.UnitLibrary: 0 failing members.
 
 ## Log
