@@ -30,3 +30,4 @@ BL-2446's `Measure-CodeQuality.ps1 -Library Libcurl,Curl.Engine.UnitLibrary` (20
 ## Log
 
 - 2026-10-16: Created.
+- 2026-10-16: Backlog -> Doing.
