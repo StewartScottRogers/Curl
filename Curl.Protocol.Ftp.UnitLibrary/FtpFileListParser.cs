@@ -26,7 +26,8 @@ public sealed class FtpFileListParser
     /// <summary>Creates a parser at the start of a reply.</summary>
     /// <param name="selectsFileName">
     /// Tells whether an entry's file name is wanted, as libcurl's <c>CURLOPT_FNMATCH_FUNCTION</c>
-    /// (by default <see cref="FtpWildcardPattern.Matches" /> against the URL's pattern) answers 0;
+    /// (by default <see cref="FtpWildcardPattern.Match" /> against the URL's pattern, as the platform's curl
+    /// matches) answers 0;
     /// called once for every completed entry, in the reply's order.
     /// </param>
     /// <param name="runsOnWindows">

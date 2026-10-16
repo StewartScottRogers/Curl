@@ -46,7 +46,9 @@ transfer start and end as `info`, and each command and reply as `verbose`, the a
 of `PASS` and `ACCT` never; both connect targets carry the log on. For wildcard downloads
 (BL-2476, ADR-0613), `FtpFileListParser` turns a `LIST` reply into `FtpFileListEntry` values
 as curl 8.22.0's `lib/ftplistparser.c` does (Unix `ls -l` and DOS formats; malformed is exit
-87), and `FtpWildcardPattern` matches names as curl's own `Curl_fnmatch` does. With
+87), and `FtpWildcardPattern` matches names as the platform's curl does: curl's own `Curl_fnmatch`
+on Windows, and through `FtpWildcardMatcher` glibc's `fnmatch` on Linux (`FtpGlibcBracket`) or macOS
+libc's (`FtpAppleBracket`), with `FtpSystemFnmatch` and `FtpWideCharacterClass` (BL-2480). With
 `FtpProtocolHandler.WildcardHooks` set (`IFtpWildcardHooks`; `FtpDownloadEveryMatch` is
 libcurl's default), a download URL whose last part is a pattern lists the directory and
 downloads each match on the same connection, calling the match, chunk-begin and chunk-end

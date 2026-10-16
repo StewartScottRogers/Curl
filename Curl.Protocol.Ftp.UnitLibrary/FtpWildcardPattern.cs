@@ -22,13 +22,41 @@ public static class FtpWildcardPattern
     {
         ArgumentNullException.ThrowIfNull(pattern);
         ArgumentNullException.ThrowIfNull(fileName);
-        return Match(ToCString(pattern), 0, ToCString(fileName), 0, MaxStarGroups);
+        return MatchFrom(ToCString(pattern), 0, ToCString(fileName), 0, MaxStarGroups);
     }
+
+    /// <summary>
+    /// Matches <paramref name="fileName" /> against <paramref name="pattern" /> as the given platform's
+    /// curl does: curl's own matcher (<see cref="Matches" />) or the system <c>fnmatch</c> of the Linux
+    /// or macOS build (BL-2480).
+    /// </summary>
+    /// <param name="pattern">The wildcard pattern, the last part of the URL's path.</param>
+    /// <param name="fileName">The file name from the listing.</param>
+    /// <param name="matcher">Which platform's <c>Curl_fnmatch</c> to answer as.</param>
+    /// <returns>What that platform's <c>Curl_fnmatch</c> returns.</returns>
+    public static FtpNameMatchAnswer Match(string pattern, string fileName, FtpWildcardMatcher matcher)
+    {
+        ArgumentNullException.ThrowIfNull(pattern);
+        ArgumentNullException.ThrowIfNull(fileName);
+        if (matcher == FtpWildcardMatcher.Curl)
+        {
+            return Matches(pattern, fileName) ? FtpNameMatchAnswer.Match : FtpNameMatchAnswer.NoMatch;
+        }
+
+        return FtpSystemFnmatch.Match(pattern, fileName, matcher == FtpWildcardMatcher.MacOs);
+    }
+
+    /// <summary>The matcher the curl build of a platform uses: its own on Windows, the system <c>fnmatch</c> elsewhere.</summary>
+    /// <param name="runsOnWindows">Whether Curl runs on Windows.</param>
+    /// <param name="runsOnMacOs">Whether Curl runs on macOS.</param>
+    /// <returns>The platform's matcher.</returns>
+    public static FtpWildcardMatcher MatcherFor(bool runsOnWindows, bool runsOnMacOs) =>
+        runsOnWindows ? FtpWildcardMatcher.Curl : runsOnMacOs ? FtpWildcardMatcher.MacOs : FtpWildcardMatcher.Linux;
 
     private static byte[] ToCString(string text) => Encoding.Latin1.GetBytes(text + '\0');
 
     // curl's loop(): p walks the pattern and s the string, both ending at a NUL.
-    private static bool Match(byte[] p, int pi, byte[] s, int si, int starGroupsLeft)
+    private static bool MatchFrom(byte[] p, int pi, byte[] s, int si, int starGroupsLeft)
     {
         while (true)
         {
@@ -105,7 +133,7 @@ public static class FtpWildcardPattern
     {
         for (; s[si] != 0; si++)
         {
-            if (Match(p, pi, s, si, starGroupsLeft))
+            if (MatchFrom(p, pi, s, si, starGroupsLeft))
             {
                 return true;
             }

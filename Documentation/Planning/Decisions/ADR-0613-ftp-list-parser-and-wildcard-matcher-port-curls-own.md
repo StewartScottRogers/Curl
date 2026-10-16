@@ -41,5 +41,35 @@ not fixed by the source alone:
 ## Consequences
 
 The engine (BL-2420, BL-2478) maps `FtpFileListEntry` to `CurlFileInfo` and drives the download loop; neither
-type references `Curl.Api`. Off Windows, patterns where system `fnmatch` answers differently match as Windows'
-curl does until BL-2480 lands.
+type references `Curl.Api`. Off Windows, patterns where system `fnmatch` answers differently matched as Windows'
+curl does until BL-2480 (see its addendum below).
+
+## Addendum (BL-2480): each platform's matcher
+
+**Decided by Claude under Stewart's delegation**, 2026-10-16.
+
+Decision 1 now holds for Windows only. `FtpWildcardPattern.Match(pattern, name, FtpWildcardMatcher)` answers as
+the platform's curl build: `Curl` is curl's own `Curl_fnmatch` (the Schannel build), `Linux` glibc's
+`fnmatch(pattern, name, 0)` and `MacOs` macOS libc's, both in a UTF-8 locale since the curl tool calls
+`setlocale(LC_ALL, "")`. `FtpWildcardPattern.MatcherFor(runsOnWindows, runsOnMacOs)` picks one, and
+`FtpDownloadEveryMatch.Instance` uses the running platform's, so both answers are tested on any platform, as
+`FtpFileListParser`'s `runsOnWindows` is. `Matches` stays curl's own matcher.
+
+- **Shared:** texts are decoded from bytes as UTF-8 code points; stars are unlimited (no two-group cap); ranges
+  run in code point order (glibc 2.28 and later, and macOS, give `[a-z]` no upper case letters, as `unit1307.c`
+  pins); the twelve POSIX classes test code points with .NET's Unicode categories, approximating `iswctype`.
+- **glibc** (`posix/fnmatch_loop.c`): a pattern or name that is not UTF-8 fails (`mbsrtowcs`, `-1`, which
+  `Curl_fnmatch` returns as `CURL_FNMATCH_FAIL`); a bracket left open before any member matched makes its `[`
+  ordinary, but one left open after a match, an unknown class name, a trailing backslash or a range with no end
+  gives no match whatever the negation; a trailing backslash outside a bracket never matches.
+- **macOS** (FreeBSD's `fnmatch` with Apple's changes): a malformed bracket - left open, an unknown class, a
+  range with no end or a byte that is not UTF-8 - fails the whole match, as `unit1307.c`'s `MAC_FAIL` rows
+  require; a pattern byte that is not UTF-8 outside a bracket gives no match, and a name byte that is not UTF-8
+  reads as itself (FreeBSD's `mbrtowc` fallback); a trailing backslash is itself.
+
+The `macOS` model is inferred from FreeBSD's source and the `MAC_*` rows of `unit1307.c`: no macOS machine was
+available to measure on. glibc 2.43 (WSL Ubuntu, `C.UTF-8`) was measured through `find -name`, which calls
+`fnmatch`: `[` matches `[`, `[]` matches `[]`, `\` does not match `\` and `[[:foo:]]` does not match `f]`, as
+modelled. The curl tool has no option for `CURLOPT_WILDCARDMATCH`, so curl itself cannot be measured from the
+command line. glibc's `[=a=]` equivalence classes and `[.a.]` collating symbols are not read yet; BL-2481 adds them.
+`FtpWildcardMatcher.Curl`'s answers are unchanged.

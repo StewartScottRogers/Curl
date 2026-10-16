@@ -2,16 +2,15 @@ namespace Curl.Protocol.Ftp;
 
 /// <summary>
 /// Pins <see cref="FtpWildcardPattern" /> on every case of upstream curl 8.22.0's
-/// <c>tests/unit/unit1307.c</c>, with the answer it expects of curl's own <c>Curl_fnmatch</c>
-/// (the custom column, not the Linux or macOS system <c>fnmatch</c>) (BL-2476).
+/// <c>tests/unit/unit1307.c</c>: rows with one answer give it for curl's own <c>Curl_fnmatch</c>
+/// (Windows) and the Linux and macOS system <c>fnmatch</c> alike, and the rows marked
+/// <c>LINUX_*</c> or <c>MAC_*</c> give each platform's own answer (BL-2476, BL-2480).
 /// </summary>
 [TestClass]
 public sealed class FtpWildcardPatternTests
 {
     [TestMethod]
     [DataRow("\\[", "[", true)]
-    [DataRow("[", "[", false)]
-    [DataRow("[]", "[]", false)]
     [DataRow("[][]", "[", true)]
     [DataRow("[][]", "]", true)]
     [DataRow("[[]", "[", true)]
@@ -49,7 +48,6 @@ public sealed class FtpWildcardPatternTests
     [DataRow("[][?*-]", "*", true)]
     [DataRow("[][?*-]", "-", true)]
     [DataRow("[]?*-]", "-", true)]
-    [DataRow("[ÿ]", "ÿ", true)]
     [DataRow("?/b/c", "a/b/c", true)]
     [DataRow("^_{}~", "^_{}~", true)]
     [DataRow("!#%+,-./01234567889", "!#%+,-./01234567889", true)]
@@ -57,7 +55,7 @@ public sealed class FtpWildcardPatternTests
     [DataRow(":;=@ABCDEFGHIJKLMNO", ":;=@ABCDEFGHIJKLMNO", true)]
     public void Matches_BracketSyntax_AnswersAsUnit1307(string pattern, string fileName, bool expected)
     {
-        Assert.AreEqual(expected, FtpWildcardPattern.Matches(pattern, fileName));
+        AssertEveryPlatformAnswers(pattern, fileName, expected);
     }
 
     [TestMethod]
@@ -75,15 +73,12 @@ public sealed class FtpWildcardPatternTests
     [DataRow("*[^a].t?t", "ca.txt", false)]
     [DataRow("*[^a].t?t", "ac.txt", true)]
     [DataRow("*[^a]", "", false)]
-    [DataRow("[!ÿ]", "", false)]
-    [DataRow("[!ÿ]", "ÿ", false)]
-    [DataRow("[!ÿ]", "a", true)]
     [DataRow("[!?*[]", "?", false)]
     [DataRow("[!!]", "!", false)]
     [DataRow("[!!]", "x", true)]
     public void Matches_Negation_AnswersAsUnit1307(string pattern, string fileName, bool expected)
     {
-        Assert.AreEqual(expected, FtpWildcardPattern.Matches(pattern, fileName));
+        AssertEveryPlatformAnswers(pattern, fileName, expected);
     }
 
     [TestMethod]
@@ -118,15 +113,13 @@ public sealed class FtpWildcardPatternTests
     [DataRow("[^[:blank:]]", "\t", false)]
     [DataRow("[^[:print:]]", "\b", true)]
     [DataRow("[[:lower:]][[:lower:]]", "ll", true)]
-    [DataRow("[[:foo:]]", "bar", false)]
-    [DataRow("[[:foo:]]", "f]", true)]
     [DataRow("curl[[:blank:]];-)", "curl ;-)", true)]
     [DataRow("*[[:blank:]]*", " ", true)]
     [DataRow("*[[:blank:]]*", "", false)]
     [DataRow("*[[:blank:]]*", "hi, im_Pavel", true)]
     public void Matches_CharacterClasses_AnswersAsUnit1307(string pattern, string fileName, bool expected)
     {
-        Assert.AreEqual(expected, FtpWildcardPattern.Matches(pattern, fileName));
+        AssertEveryPlatformAnswers(pattern, fileName, expected);
     }
 
     [TestMethod]
@@ -156,11 +149,10 @@ public sealed class FtpWildcardPatternTests
     [DataRow("x", "", false)]
     public void Matches_CommonPatterns_AnswersAsUnit1307(string pattern, string fileName, bool expected)
     {
-        Assert.AreEqual(expected, FtpWildcardPattern.Matches(pattern, fileName));
+        AssertEveryPlatformAnswers(pattern, fileName, expected);
     }
 
     [TestMethod]
-    [DataRow("\\", "\\", true)]
     [DataRow("\\\\", "\\", true)]
     [DataRow("\\\\", "\\\\", false)]
     [DataRow("\\?", "?", true)]
@@ -192,7 +184,7 @@ public sealed class FtpWildcardPatternTests
     [DataRow("LindmÃ¤tarv", "LindmÃ¤tarv", true)]
     public void Matches_BackslashesAndStars_AnswersAsUnit1307(string pattern, string fileName, bool expected)
     {
-        Assert.AreEqual(expected, FtpWildcardPattern.Matches(pattern, fileName));
+        AssertEveryPlatformAnswers(pattern, fileName, expected);
     }
 
     [TestMethod]
@@ -211,6 +203,47 @@ public sealed class FtpWildcardPatternTests
             + "*[\u0013]**[*\u0013)]*]*[*[\u0013]*[~r]*]*º\u0013¦~b-]*";
 
         Assert.IsFalse(FtpWildcardPattern.Matches(pattern, "a"));
+    }
+
+    [TestMethod]
+    public void Match_LongRunOfLeftBrackets_FailsOnlyOnMacOs()
+    {
+        string pattern = "*[*" + new string('[', 177) + "\u0001\u007F" + new string('[', 21);
+        string fileName = new('[', 200);
+
+        Assert.AreEqual(FtpNameMatchAnswer.NoMatch, FtpWildcardPattern.Match(pattern, fileName, FtpWildcardMatcher.Curl));
+        Assert.AreEqual(FtpNameMatchAnswer.NoMatch, FtpWildcardPattern.Match(pattern, fileName, FtpWildcardMatcher.Linux));
+        Assert.AreEqual(FtpNameMatchAnswer.Fail, FtpWildcardPattern.Match(pattern, fileName, FtpWildcardMatcher.MacOs));
+    }
+
+    [TestMethod]
+    public void Match_FuzzedPatternOfStarsAndSets_FailsOnlyOnLinux()
+    {
+        string pattern = "**]*[*[\u0013]**[*\u0013)]*]*[**[*\u0013~r-]*]**[.*]*[" + new string('ã', 29)
+            + "*[\u0013]**[*\u0013)]*]*[*[\u0013]*[~r]*]*º\u0013¦~b-]*";
+
+        Assert.AreEqual(FtpNameMatchAnswer.NoMatch, FtpWildcardPattern.Match(pattern, "a", FtpWildcardMatcher.Curl));
+        Assert.AreEqual(FtpNameMatchAnswer.Fail, FtpWildcardPattern.Match(pattern, "a", FtpWildcardMatcher.Linux));
+        Assert.AreEqual(FtpNameMatchAnswer.NoMatch, FtpWildcardPattern.Match(pattern, "a", FtpWildcardMatcher.MacOs));
+    }
+
+    // The rows unit1307.c marks LINUX_* or MAC_*: curl's own answer, then glibc's, then macOS libc's.
+    [TestMethod]
+    [DataRow("[", "[", FtpNameMatchAnswer.NoMatch, FtpNameMatchAnswer.Match, FtpNameMatchAnswer.Fail)]
+    [DataRow("[]", "[]", FtpNameMatchAnswer.NoMatch, FtpNameMatchAnswer.Match, FtpNameMatchAnswer.Fail)]
+    [DataRow("[ÿ]", "ÿ", FtpNameMatchAnswer.Match, FtpNameMatchAnswer.Fail, FtpNameMatchAnswer.Fail)]
+    [DataRow("[!ÿ]", "", FtpNameMatchAnswer.NoMatch, FtpNameMatchAnswer.Fail, FtpNameMatchAnswer.NoMatch)]
+    [DataRow("[!ÿ]", "ÿ", FtpNameMatchAnswer.NoMatch, FtpNameMatchAnswer.Fail, FtpNameMatchAnswer.Fail)]
+    [DataRow("[!ÿ]", "a", FtpNameMatchAnswer.Match, FtpNameMatchAnswer.Fail, FtpNameMatchAnswer.Fail)]
+    [DataRow("[[:foo:]]", "bar", FtpNameMatchAnswer.NoMatch, FtpNameMatchAnswer.NoMatch, FtpNameMatchAnswer.Fail)]
+    [DataRow("[[:foo:]]", "f]", FtpNameMatchAnswer.Match, FtpNameMatchAnswer.NoMatch, FtpNameMatchAnswer.Fail)]
+    [DataRow("\\", "\\", FtpNameMatchAnswer.Match, FtpNameMatchAnswer.NoMatch, FtpNameMatchAnswer.Match)]
+    public void Match_RowsWherePlatformsDiffer_AnswersEachPlatformAsUnit1307(
+        string pattern, string fileName, FtpNameMatchAnswer curl, FtpNameMatchAnswer linux, FtpNameMatchAnswer macOs)
+    {
+        Assert.AreEqual(curl, FtpWildcardPattern.Match(pattern, fileName, FtpWildcardMatcher.Curl));
+        Assert.AreEqual(linux, FtpWildcardPattern.Match(pattern, fileName, FtpWildcardMatcher.Linux));
+        Assert.AreEqual(macOs, FtpWildcardPattern.Match(pattern, fileName, FtpWildcardMatcher.MacOs));
     }
 
     [TestMethod]
@@ -246,5 +279,15 @@ public sealed class FtpWildcardPatternTests
     {
         Assert.IsFalse(FtpWildcardPattern.Matches("*a*b*", "xaybz"));
         Assert.IsTrue(FtpWildcardPattern.Matches("*a*b", "xayb"));
+    }
+
+    // A row unit1307.c gives one answer for: curl's own matcher, glibc's and macOS libc's all give it.
+    private static void AssertEveryPlatformAnswers(string pattern, string fileName, bool matches)
+    {
+        Assert.AreEqual(matches, FtpWildcardPattern.Matches(pattern, fileName));
+        FtpNameMatchAnswer expected = matches ? FtpNameMatchAnswer.Match : FtpNameMatchAnswer.NoMatch;
+        Assert.AreEqual(expected, FtpWildcardPattern.Match(pattern, fileName, FtpWildcardMatcher.Curl));
+        Assert.AreEqual(expected, FtpWildcardPattern.Match(pattern, fileName, FtpWildcardMatcher.Linux), "Linux");
+        Assert.AreEqual(expected, FtpWildcardPattern.Match(pattern, fileName, FtpWildcardMatcher.MacOs), "macOS");
     }
 }
