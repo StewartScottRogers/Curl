@@ -33,3 +33,4 @@ Split out of BL-2469. Follow curl 8.22.0's `lib/http2.c` (`push_promise`, `on_fr
 ## Log
 
 - 2026-10-16: Created.
+- 2026-10-16: Backlog -> Doing. Criteria at claim: 91fd7663 3fd2c7ef d0b60817 4272a6b9 3bf8be13.
