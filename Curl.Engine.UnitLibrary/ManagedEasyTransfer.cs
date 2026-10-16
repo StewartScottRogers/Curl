@@ -863,10 +863,22 @@ internal sealed class ManagedEasyTransfer(
         ITransferEvents events)
     {
         EasyTransferHost host = Host;
+        await ApplyCookieListAsync(cookies, host, events).ConfigureAwait(false);
         await shared.Performer.LoadCookieFilesAsync(cookies, settings, urlText, host.FileSystem, host.StandardInput, events).ConfigureAwait(false);
         await shared.Performer.OpenAltSvcCacheAsync(state, settings, options.Network, options.Http, urlText, host.FileSystem, host.DiagnosticLog, host.AltSvcUsesOverHttp).ConfigureAwait(false);
         return await TransferPerformer.SwitchToHttpsForHstsAsync(PerformShared.Hsts, settings, options.Network, options.Http, urlText, host.FileSystem, events).ConfigureAwait(false);
     }
+
+    /// <summary>
+    /// Applies <c>CURLOPT_COOKIELIST</c> (<see cref="Api.Options.Http.EasyHttpOptions.CookieList" />) to the transfer's cookies before the
+    /// cookie files load, as libcurl applies each item when it is set, before the perform loads the files (BL-2520).
+    /// </summary>
+    /// <param name="cookies">The transfer's cookies, or <see langword="null" /> when no cookie option turns them on.</param>
+    /// <param name="host">What the cookie files, the jar and <c>-</c> reach.</param>
+    /// <param name="events">Where refused <c>Set-Cookie:</c> lines are reported.</param>
+    /// <returns>A task that completes once every item is applied.</returns>
+    private Task ApplyCookieListAsync(CookieEngine? cookies, EasyTransferHost host, ITransferEvents events) =>
+        cookies?.ApplyCookieListAsync(host.FileSystem, host.StandardInput, host.JarPrintTarget, shared.TimeProvider.GetUtcNow(), events) ?? Task.CompletedTask;
 
     /// <summary>
     /// The running transfer, the events it reports to and what records its verify codes: the runner's
