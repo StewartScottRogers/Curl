@@ -41,7 +41,12 @@ Guard file: `task-board.ps1` changes only through the `audit` branch (CLAUDE.md,
 - [x] `.claude/skills/task-board/SKILL.md` describes what `dedupe` now compares.
 - [x] The change reaches `master` through a pull request from the `audit` branch with CI green on Windows, Linux and macOS, and `master` is merged into `work/dark-factory`.
 
-## Notesn- Fix in PR #160 (audit -> master, merged with CI green on Windows, Linux and macOS), merged into work/dark-factory as 5dcd86270. Also fixed: the changed-file rewrite compared forward-slash git paths with backslash task paths, so when two new tasks collided it rewrote the kept task's own id line.n- The fixed dedupe renumbered live BL-2496 -> BL-2523 (Deferred) and BL-2482 -> BL-2524 (Done); no other live task named either ID. status now warns about no duplicates.n
+## Notes
+
+- Fix in PR #160 (audit -> master, merged with CI green on Windows, Linux and macOS), merged into work/dark-factory as 5dcd86270. Also fixed: the changed-file rewrite compared forward-slash git paths with backslash task paths, so when two new tasks collided it rewrote the kept task's own id line.
+- Test-TaskBoardDedupe.ps1 11/11 and Test-TaskBoardCriteria.ps1 10/10 under Windows PowerShell 5.1 and pwsh.
+- The fixed dedupe renumbered live BL-2496 -> BL-2523 (Deferred) and BL-2482 -> BL-2524 (Done); no other live task named either ID. status now warns about no duplicates.
+- Found on the way: lane 3's Deferred move of BL-2496 was dropped as a stall; filed BL-2525.
 ## Log
 
 - 2026-10-16: Created.
