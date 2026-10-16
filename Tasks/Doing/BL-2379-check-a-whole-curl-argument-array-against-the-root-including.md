@@ -37,3 +37,4 @@ Plan: Documentation/Planning/Curl-Mcp.md. Decision: ADR-0548.
 ## Log
 
 - 2026-10-15: Created.
+- 2026-10-15: Backlog -> Doing.
