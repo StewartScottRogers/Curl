@@ -4,6 +4,7 @@ using Curl.Api.Callbacks;
 using Curl.Api.Codes;
 using Curl.Api.EngineContracts;
 using Curl.Api.EngineContracts.Multi;
+using Curl.Api.Options.Http;
 using Curl.Networking;
 
 namespace Curl.Engine;
@@ -22,7 +23,11 @@ namespace Curl.Engine;
 /// running transfer is one engine-numbered socket, and while any runs the timer asks to be called back
 /// every <see cref="RunningTransferCheckInterval" /> (ADR-0599). <see cref="GetHandles" />,
 /// <see cref="GetWaitSockets" />, <see cref="GetInfo" />, the notifications and
-/// <c>CURLMOPT_NETWORK_CHANGED</c> follow curl 8.22.0 (ADR-0604).
+/// <c>CURLMOPT_NETWORK_CHANGED</c> follow curl 8.22.0 (ADR-0604). A transfer that would open a connection
+/// past <see cref="MultiOptions.MaxHostConnections" /> or <see cref="MultiOptions.MaxTotalConnections" />
+/// waits, pending, until a running one finishes; under <see cref="CurlPipelining.Multiplex" /> transfers to
+/// one origin that can multiplex share a connection, <see cref="MultiOptions.MaxConcurrentStreams" /> at a
+/// time, and <see cref="OfferPush" /> answers a server push through <see cref="MultiOptions.Push" /> (ADR-0605).
 /// </summary>
 /// <param name="owners">
 /// The multi handle each of the engine's transfers is in, shared by all its multi handles, so a
@@ -72,6 +77,12 @@ internal sealed class ManagedMultiTransfer(
     /// <see cref="SocketActionAsync" /> to see the transfer finish.
     /// </summary>
     internal static TimeSpan RunningTransferCheckInterval { get; } = TimeSpan.FromMilliseconds(10);
+
+    /// <summary>
+    /// Gets the streams per multiplexed connection when <see cref="MultiOptions.MaxConcurrentStreams" /> is
+    /// below 1 or past <see cref="int.MaxValue" />, as libcurl's <c>CURLMOPT_MAX_CONCURRENT_STREAMS</c> falls back.
+    /// </summary>
+    internal static long DefaultConcurrentStreams { get; } = 100;
 
     /// <summary>
     /// Gets or sets every option of the handle (<c>curl_multi_setopt</c>). <c>CURLMOPT_NETWORK_CHANGED</c>
@@ -388,10 +399,9 @@ internal sealed class ManagedMultiTransfer(
 
     /// <summary>
     /// <c>curl_multi_get_offt</c>: one of the handle's transfer counts, as curl 8.22.0 keeps them. Current is
-    /// every transfer added and not removed; running every one of those whose message is not yet queued,
-    /// started or not; done every one whose message is queued; added every transfer ever added. Pending is
-    /// always 0: the managed engine starts every transfer on the next perform, holding none back for a
-    /// connection limit.
+    /// every transfer added and not removed; pending every one of those not started that a connection limit
+    /// holds back; running every other one whose message is not yet queued, started or not; done every one
+    /// whose message is queued; added every transfer ever added.
     /// </summary>
     /// <param name="info">The count to report.</param>
     /// <returns>
@@ -409,8 +419,8 @@ internal sealed class ManagedMultiTransfer(
         return info switch
         {
             CurlMultiInfo.TransfersCurrent => (CurlMultiCode.Ok, entries.Count),
-            CurlMultiInfo.TransfersRunning => (CurlMultiCode.Ok, entries.Count(entry => !entry.Done)),
-            CurlMultiInfo.TransfersPending => (CurlMultiCode.Ok, 0),
+            CurlMultiInfo.TransfersRunning => (CurlMultiCode.Ok, entries.Count(entry => !entry.Done && !IsPending(entry))),
+            CurlMultiInfo.TransfersPending => (CurlMultiCode.Ok, entries.Count(IsPending)),
             CurlMultiInfo.TransfersDone => (CurlMultiCode.Ok, entries.Count(entry => entry.Done)),
             CurlMultiInfo.TransfersAdded => (CurlMultiCode.Ok, transfersAdded),
             _ => (CurlMultiCode.UnknownOption, 0),
@@ -437,6 +447,55 @@ internal sealed class ManagedMultiTransfer(
     /// <returns>As <see cref="EnableNotification" />.</returns>
     public CurlMultiCode DisableNotification(CurlMultiNotification notification) =>
         ChangeNotification(notification, enable: false);
+
+    /// <summary>
+    /// A server push on <paramref name="parent" />, as libcurl's HTTP/2 push promise handling answers it:
+    /// refused when the handle is disposed, <paramref name="parent" /> is not in it, no
+    /// <see cref="MultiOptions.Push" /> is set or <paramref name="pushed" /> is in a multi handle already;
+    /// otherwise the callback decides. <see cref="CurlPushResult.Ok" /> adds <paramref name="pushed" />,
+    /// which starts on the next perform as an added transfer does; <see cref="CurlPushResult.ErrorOut" />
+    /// refuses it and ends <paramref name="parent" /> with <see cref="CurlCode.Http2" /> on the next perform;
+    /// any other answer refuses it, as libcurl treats every answer but <c>CURL_PUSH_OK</c>.
+    /// </summary>
+    /// <param name="parent">The transfer the server pushed on.</param>
+    /// <param name="pushed">The new transfer for the pushed stream.</param>
+    /// <param name="headers">The push promise's headers as <c>name: value</c> lines, in order.</param>
+    /// <returns><see cref="CurlPushResult.Ok" /> when the push joined the handle, else what refused it.</returns>
+    internal CurlPushResult OfferPush(IEasyTransfer parent, IEasyTransfer pushed, IReadOnlyList<string> headers)
+    {
+        MultiEntry? parentEntry = PushParentOf(parent, pushed);
+        if (parentEntry is null || Options.Push is not { } callback)
+        {
+            return CurlPushResult.Deny;
+        }
+
+        CurlPushResult answer = callback(parent, pushed, headers);
+        if (answer == CurlPushResult.ErrorOut)
+        {
+            parentEntry.ForcedResult = CurlCode.Http2;
+            return answer;
+        }
+
+        if (answer != CurlPushResult.Ok)
+        {
+            return CurlPushResult.Deny;
+        }
+
+        // The timer's answer to the add is the handle's to report on its next call, not the push's.
+        Add(pushed);
+        return CurlPushResult.Ok;
+    }
+
+    /// <summary>The parent's entry, or <see langword="null" /> when the handle is disposed, the parent is not in it, or the pushed transfer is null or in a multi handle already.</summary>
+    private MultiEntry? PushParentOf(IEasyTransfer parent, IEasyTransfer pushed)
+    {
+        if (disposed || pushed is null || owners.ContainsKey(pushed))
+        {
+            return null;
+        }
+
+        return entries.Find(candidate => candidate.Transfer == parent);
+    }
 
     private static bool IsNotificationNumber(CurlMultiNotification notification) => (uint)notification < 32;
 
@@ -501,7 +560,58 @@ internal sealed class ManagedMultiTransfer(
 
     private static TaskCompletionSource NewWakeupSignal() => new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-    private static bool HasWorkForPerform(MultiEntry entry) => (!entry.Done && entry.Perform is null) || IsFinishedUnreported(entry);
+    private bool HasWorkForPerform(MultiEntry entry) => (!entry.Done && entry.Perform is null && CanStart(entry)) || IsFinishedUnreported(entry);
+
+    private bool IsPending(MultiEntry entry) => !entry.Done && entry.Perform is null && !CanStart(entry);
+
+    /// <summary>
+    /// Whether <paramref name="candidate" /> may start now: it joins a multiplexed connection to its origin
+    /// with a stream free, or the connection it opens stays within both connection limits.
+    /// </summary>
+    private bool CanStart(MultiEntry candidate)
+    {
+        List<MultiEntry> running = entries.FindAll(entry => entry.Perform is not null && !entry.Done);
+        string origin = OriginOf(candidate.Transfer);
+        if (IsMultiplexed(candidate.Transfer, origin) && running.Count(entry => entry.Origin == origin && entry.Multiplexed) % ConcurrentStreams() != 0)
+        {
+            return true;
+        }
+
+        return IsWithin(Options.MaxHostConnections, ConnectionsUsed(running.FindAll(entry => entry.Origin == origin)))
+            && IsWithin(Options.MaxTotalConnections, ConnectionsUsed(running));
+    }
+
+    private static bool IsWithin(long limit, long used) => limit <= 0 || used < limit;
+
+    private long ConnectionsUsed(List<MultiEntry> running)
+    {
+        long streams = ConcurrentStreams();
+        return running.GroupBy(entry => (entry.Origin, entry.Multiplexed))
+            .Sum(group => group.Key.Multiplexed ? (group.Count() + streams - 1) / streams : group.Count());
+    }
+
+    private long ConcurrentStreams() =>
+        Options.MaxConcurrentStreams is < 1 or > int.MaxValue ? DefaultConcurrentStreams : Options.MaxConcurrentStreams;
+
+    /// <summary>
+    /// Whether a transfer to <paramref name="origin" /> shares its connection under
+    /// <see cref="CurlPipelining.Multiplex" />: an <c>https</c> URL not held to HTTP/1 (ALPN offers h2 by
+    /// default) or HTTP/2 with prior knowledge.
+    /// </summary>
+    private bool IsMultiplexed(IEasyTransfer transfer, string origin)
+    {
+        HttpVersion version = transfer.Options.Http.HttpVersion;
+        return Options.Pipelining.HasFlag(CurlPipelining.Multiplex)
+            && version is not (HttpVersion.Http10 or HttpVersion.Http11)
+            && (origin.StartsWith("https://", StringComparison.Ordinal) || version == HttpVersion.Http2PriorKnowledge);
+    }
+
+    /// <summary>The scheme, host and port of the transfer's URL, or the URL text as it is when it does not parse.</summary>
+    private static string OriginOf(IEasyTransfer transfer)
+    {
+        string? url = transfer.Options.Network.Url;
+        return Uri.TryCreate(url, UriKind.Absolute, out Uri? uri) ? $"{uri.Scheme}://{uri.IdnHost}:{uri.Port}" : url ?? string.Empty;
+    }
 
     private static bool IsFinishedUnreported(MultiEntry entry) => !entry.Done && entry.Perform is { IsCompleted: true };
 
@@ -526,32 +636,66 @@ internal sealed class ManagedMultiTransfer(
         }
 
         cancellationToken.ThrowIfCancellationRequested();
-        foreach (MultiEntry entry in entries)
-        {
-            MoveOn(entry);
-        }
-
+        MoveEveryTransferOn();
         SendNotifications();
         CurlMultiCode code = UpdateSockets() ? UpdateTimer(timerFired) : CurlMultiCode.AbortedByCallback;
         return ValueTask.FromResult((code, entries.Count(entry => !entry.Done)));
     }
 
+    /// <summary>The started transfers first, so a slot one of them frees goes to a pending one in this call.</summary>
+    private void MoveEveryTransferOn()
+    {
+        List<MultiEntry> notStarted = entries.FindAll(entry => entry.Perform is null);
+        foreach (MultiEntry entry in entries.FindAll(entry => entry.Perform is not null))
+        {
+            MoveOn(entry);
+        }
+
+        foreach (MultiEntry entry in notStarted)
+        {
+            MoveOn(entry);
+        }
+    }
+
     private void MoveOn(MultiEntry entry)
     {
-        if (entry.Done)
+        if (entry.Done || EndedByForce(entry) || !IsStartedOrStarting(entry))
         {
             return;
         }
 
-        if (abortedByCallback)
-        {
-            entry.Cancellation.Cancel();
-            QueueDoneMessage(entry, CurlCode.AbortedByCallback);
-            return;
-        }
-
-        entry.Perform ??= Start(entry);
         QueueDoneMessageWhenFinished(entry);
+    }
+
+    /// <summary>Ends the transfer when a callback aborted the handle or a push answer failed it.</summary>
+    private bool EndedByForce(MultiEntry entry)
+    {
+        CurlCode? forced = abortedByCallback ? CurlCode.AbortedByCallback : entry.ForcedResult;
+        if (forced is null)
+        {
+            return false;
+        }
+
+        entry.Cancellation.Cancel();
+        QueueDoneMessage(entry, forced.Value);
+        return true;
+    }
+
+    /// <summary>Starts the transfer when it has not started and a connection limit does not hold it pending.</summary>
+    private bool IsStartedOrStarting(MultiEntry entry)
+    {
+        if (entry.Perform is not null)
+        {
+            return true;
+        }
+
+        if (!CanStart(entry))
+        {
+            return false;
+        }
+
+        entry.Perform = Start(entry);
+        return true;
     }
 
     private bool UpdateSockets()
@@ -576,7 +720,7 @@ internal sealed class ManagedMultiTransfer(
 
     private int TellSocketCallback(MultiSocketCallback callback, MultiEntry entry)
     {
-        if (!entry.Done && entry.Socket is null)
+        if (NeedsSocket(entry))
         {
             entry.Socket = SocketNumberOf(entry);
             return callback(entry.Transfer, entry.Socket.Value, CurlPoll.In, null);
@@ -590,6 +734,8 @@ internal sealed class ManagedMultiTransfer(
 
         return 0;
     }
+
+    private static bool NeedsSocket(MultiEntry entry) => !entry.Done && entry.Perform is not null && entry.Socket is null;
 
     private CurlMultiCode UpdateTimer(bool timerFired)
     {
@@ -630,13 +776,15 @@ internal sealed class ManagedMultiTransfer(
     private Task<CurlCode> Start(MultiEntry entry)
     {
         entry.StartTimestamp = timeProvider.GetTimestamp();
+        entry.Origin = OriginOf(entry.Transfer);
+        entry.Multiplexed = IsMultiplexed(entry.Transfer, entry.Origin);
         return entry.Transfer.PerformAsync(entry.Cancellation.Token).AsTask();
     }
 
     private long RemainingMilliseconds(MultiEntry entry)
     {
         TimeSpan limit = entry.Transfer.Options.Transfer.Timeout;
-        if (entry.Done || limit <= TimeSpan.Zero)
+        if (entry.Done || entry.Perform is null || limit <= TimeSpan.Zero)
         {
             return -1;
         }
@@ -698,8 +846,8 @@ internal sealed class ManagedMultiTransfer(
             return TakeWakeup() || left <= TimeSpan.Zero;
         }
 
-        // Every transfer has started by now (one not started makes the handle's timeout 0), so one
-        // not done is one still running.
+        // Every transfer that can start has (one that can makes the handle's timeout 0), and one held
+        // pending by a connection limit means another runs, so one not done means one still running.
         return left <= TimeSpan.Zero || (extraSocketCount == 0 && entries.TrueForAll(entry => entry.Done));
     }
 
@@ -768,5 +916,11 @@ internal sealed class ManagedMultiTransfer(
         public CurlSocket? Socket { get; set; }
 
         public object? SocketState { get; set; }
+
+        public string Origin { get; set; } = string.Empty;
+
+        public bool Multiplexed { get; set; }
+
+        public CurlCode? ForcedResult { get; set; }
     }
 }
