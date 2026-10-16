@@ -32,3 +32,4 @@ BL-2439 built `IMimeBuilder` and sent MIMEPOST through `Curl.Engine`'s `MimePost
 ## Log
 
 - 2026-10-16: Created.
+- 2026-10-16: Backlog -> Doing.
