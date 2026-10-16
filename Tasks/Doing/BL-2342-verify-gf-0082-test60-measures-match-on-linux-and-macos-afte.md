@@ -33,3 +33,4 @@ A gap-platforms run on a branch holding BL-2341's fix measures `behaviour:test60
 ## Log
 
 - 2026-10-15: Created.
+- 2026-10-16: Backlog -> Doing.
