@@ -86,4 +86,19 @@ public sealed class McpReturnedBytesTests
         Assert.AreEqual(4, returned.ReturnedBytes);
         Assert.AreEqual(6, returned.TotalBytes);
     }
+
+    [TestMethod]
+    public void Encode_KeptStartOfALongerOutput_ReportsTheWholeOutputsTotal()
+    {
+        McpReturnedBytes returned = McpReturnedBytes.Encode("abcde"u8, 1000, new McpResponseCap(4));
+
+        Assert.AreEqual("abcd", returned.Content);
+        Assert.AreEqual(1000, returned.TotalBytes);
+    }
+
+    [TestMethod]
+    public void Encode_TotalBelowTheKeptBytes_Throws()
+    {
+        Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => McpReturnedBytes.Encode("abc"u8, 2, new McpResponseCap(4)));
+    }
 }

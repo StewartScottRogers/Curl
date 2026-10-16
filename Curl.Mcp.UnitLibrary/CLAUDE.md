@@ -9,7 +9,10 @@ that a path, with `..` and symbolic links resolved, lies inside `CURL_MCP_ROOT`,
 an `McpPathCheck`. `McpOptionPathTable` (ADR-0559) says how every curl option uses a local path
 (`McpOptionPathUse`); an option it does not name is refused. `McpArgumentChecker` (ADR-0564)
 checks a whole curl argument array, paths embedded in values, `file:` URLs and `-K` files,
-answering with an `McpArgumentCheck`. The later tasks of `Documentation/Planning/Curl-Mcp.md` add the rest.
+answering with an `McpArgumentCheck`. `McpCurlTool` (ADR-0569) is the `curl` tool: it checks the
+arguments, runs them through the injected `ICurlCommandRunner` with the root as working directory,
+captures standard output and error in `McpCappedCaptureStream`, and answers with an
+`McpCurlToolResult`. The later tasks of `Documentation/Planning/Curl-Mcp.md` add the rest.
 
 Base class library only. Only `Curl.Mcp` may take the MCP SDK packages (`ModelContextProtocol`
 and `Microsoft.Extensions.Hosting`); this library references no package. Reference

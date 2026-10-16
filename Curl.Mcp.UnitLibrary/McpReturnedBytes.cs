@@ -31,14 +31,27 @@ public sealed record McpReturnedBytes(string Content, bool IsBase64, int TotalBy
     /// <param name="output">The output bytes.</param>
     /// <param name="cap">The most bytes to return.</param>
     /// <returns>The returned bytes.</returns>
-    public static McpReturnedBytes Encode(ReadOnlySpan<byte> output, McpResponseCap cap)
+    public static McpReturnedBytes Encode(ReadOnlySpan<byte> output, McpResponseCap cap) =>
+        Encode(output, output.Length, cap);
+
+    /// <summary>
+    /// Encodes the kept start of an output of <paramref name="totalBytes" /> bytes, as
+    /// <see cref="Encode(ReadOnlySpan{byte}, McpResponseCap)" /> does; <paramref name="kept" /> holds
+    /// at least one byte past the cap whenever the output was longer than it.
+    /// </summary>
+    /// <param name="kept">The start of the output that was kept.</param>
+    /// <param name="totalBytes">How many bytes the whole output had.</param>
+    /// <param name="cap">The most bytes to return.</param>
+    /// <returns>The returned bytes.</returns>
+    public static McpReturnedBytes Encode(ReadOnlySpan<byte> kept, int totalBytes, McpResponseCap cap)
     {
-        int length = Math.Min(output.Length, cap.MaxBytes);
-        int textLength = BackOffToCharacterStart(output, length);
-        ReadOnlySpan<byte> text = output[..textLength];
+        ArgumentOutOfRangeException.ThrowIfLessThan(totalBytes, kept.Length);
+        int length = Math.Min(kept.Length, cap.MaxBytes);
+        int textLength = BackOffToCharacterStart(kept, length);
+        ReadOnlySpan<byte> text = kept[..textLength];
         return Utf8.IsValid(text)
-            ? new McpReturnedBytes(Encoding.UTF8.GetString(text), false, output.Length, textLength)
-            : new McpReturnedBytes(Convert.ToBase64String(output[..length]), true, output.Length, length);
+            ? new McpReturnedBytes(Encoding.UTF8.GetString(text), false, totalBytes, textLength)
+            : new McpReturnedBytes(Convert.ToBase64String(kept[..length]), true, totalBytes, length);
     }
 
     /// <summary>
