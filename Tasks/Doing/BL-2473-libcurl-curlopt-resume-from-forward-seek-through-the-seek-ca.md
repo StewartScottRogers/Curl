@@ -32,3 +32,4 @@ ADR-0609 (BL-2417) wired `CURLOPT_SEEKFUNCTION` for rewinds only, through `Seeki
 ## Log
 
 - 2026-10-16: Created.
+- 2026-10-16: Backlog -> Doing. Criteria at claim: 6db39b31 4272a6b9 c4aff572 aa1ad728.
