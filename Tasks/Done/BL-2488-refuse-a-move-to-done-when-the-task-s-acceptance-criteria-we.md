@@ -9,7 +9,7 @@ touches: [.claude/skills/task-board/task-board.ps1, .claude/skills/task-board/SK
 lane: no
 requirement: none
 created: 2026-10-16
-completed:
+completed: 2026-10-16
 ---
 # BL-2488 — Refuse a move to Done when the task's acceptance criteria were reworded after it was claimed
 
@@ -27,14 +27,20 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] In a scratch board, a task claimed, then edited to reword one criterion and ticked, is refused by `move -To Done` with a message naming the changed line and how to change criteria properly; the same task with only its boxes ticked moves to Done.
-- [ ] A task whose criteria were changed while it sat in `Backlog`, then claimed, moves to Done once ticked (the snapshot is taken at the claim).
-- [ ] `task-board.ps1`'s own self-test or test script covers both cases and passes on Windows PowerShell 5.1 and pwsh.
-- [ ] `.claude/skills/task-board/SKILL.md` lists the new refusal under "The script refuses", and `.claude/commands/task-run.md` states the never-reword and run-the-check rules.
-- [ ] The change reached `master` through an `audit`-branch pull request whose CI passed on Windows, Linux and macOS; the PR is linked under Notes.
+- [x] In a scratch board, a task claimed, then edited to reword one criterion and ticked, is refused by `move -To Done` with a message naming the changed line and how to change criteria properly; the same task with only its boxes ticked moves to Done.
+- [x] A task whose criteria were changed while it sat in `Backlog`, then claimed, moves to Done once ticked (the snapshot is taken at the claim).
+- [x] `task-board.ps1`'s own self-test or test script covers both cases and passes on Windows PowerShell 5.1 and pwsh.
+- [x] `.claude/skills/task-board/SKILL.md` lists the new refusal under "The script refuses", and `.claude/commands/task-run.md` states the never-reword and run-the-check rules.
+- [x] The change reached `master` through an `audit`-branch pull request whose CI passed on Windows, Linux and macOS; the PR is linked under Notes.
 
 ## Notes
+
+- `task-board.ps1`: `move -To Doing` appends `Criteria at claim: <8-hex per criterion>.` to its Log line; `move -To Done` calls `Assert-CriteriaUnchangedSinceClaim` after the unticked-box check and refuses with each added or reworded criterion named and removed ones counted. Snapshot per criterion (not one hash) so the refusal can name lines without git; works on scratch boards and adopted lanes.
+- `.claude/skills/task-board/Test-TaskBoardCriteria.ps1` (new, beside the script): 10 checks - ticked only, reworded, removed, added, rewrapped, edited in Backlog, sent back and reclaimed, claimed before snapshots. 10/10 PASS under Windows PowerShell 5.1 and pwsh (pwsh here is a dotnet global tool, so the test picks the child shell by edition).
+- PR https://github.com/StewartScottRogers/Curl/pull/159 merged as 647e46fd7 after CI passed on Windows, Linux and macOS (`audit` -> `master`; carries the merge of `master` into `audit`, which was 628 behind).
 
 ## Log
 
 - 2026-10-16: Created.
+- 2026-10-16: Backlog -> Doing.
+- 2026-10-16: Doing -> Done. task-board.ps1 refuses Done when acceptance criteria changed after the claim, naming each one; on master via audit PR #159
