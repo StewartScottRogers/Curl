@@ -160,15 +160,177 @@ public sealed class SocketCallbackConnectorTests
     }
 
     [TestMethod]
-    public async Task ConnectMultiplexed_BothQuicCalls_PassThroughToTheInnerConnector()
+    public async Task ConnectMultiplexedAsync_AllCallbacksSet_CallsOpenWithADatagramPeerThenSockoptAndCloseOnceOnDispose()
     {
-        SocketCallbackConnector connector = Create(new FakeConnector(new FakeConnection()), new EasyCallbackOptions { CloseSocket = _ => 0 });
+        List<string> calls = [];
+        FakeMultiplexedConnection quic = new() { RemoteEndPoint = new IPEndPoint(IPAddress.Loopback, 443) };
+        ConnectTimings timings = new(1, null, 2, 2);
+        CurlSocketAddress? seen = null;
+        SocketCallbackConnector connector = Create(new FakeConnector(MultiplexedConnectResult.Connected(quic, timings)), new EasyCallbackOptions
+        {
+            OpenSocket = (purpose, address) =>
+            {
+                seen = address;
+                calls.Add($"open {purpose}");
+                return new CurlSocket(9);
+            },
+            SocketOption = (socket, _) =>
+            {
+                calls.Add($"sockopt {socket.Handle}");
+                return SocketOptionResult.Ok;
+            },
+            CloseSocket = socket =>
+            {
+                calls.Add($"close {socket.Handle}");
+                return 0;
+            },
+        });
 
-        MultiplexedConnectResult quic = await connector.ConnectMultiplexedAsync(Target, CancellationToken.None);
-        ConnectResult session = await connector.ConnectMultiplexedSessionAsync(Target, _ => new FakeConnection(), CancellationToken.None);
+        MultiplexedConnectResult connect = await connector.ConnectMultiplexedAsync(Target, CancellationToken.None);
+        SocketCallbackMultiplexedConnection connection = (SocketCallbackMultiplexedConnection)connect.Connection!;
+        await connection.DisposeAsync();
+        await connection.DisposeAsync();
 
-        Assert.AreEqual("QUIC is not available on this connector", quic.ErrorMessage);
-        Assert.AreEqual("QUIC is not available on this connector", session.ErrorMessage);
+        Assert.AreSame(timings, connect.Timings);
+        Assert.AreEqual(new CurlSocket(9), connection.Socket);
+        Assert.IsTrue(quic.Disposed);
+        CollectionAssert.AreEqual(new[] { "open IpConnection", "sockopt 9", "close 9" }, calls);
+        Assert.AreEqual(2, seen!.Family);
+        Assert.AreEqual(SocketCallbackConnector.DatagramSocketType, seen.SocketType);
+        Assert.AreEqual(SocketCallbackConnector.UdpProtocol, seen.Protocol);
+        Assert.AreEqual(16, seen.Address.Length);
+    }
+
+    [TestMethod]
+    public async Task ConnectMultiplexedAsync_OpenSocketReturnsBad_DisposesTheConnectionAndFailsWithCouldntConnect()
+    {
+        int others = 0;
+        FakeMultiplexedConnection quic = new();
+        SocketCallbackConnector connector = Create(new FakeConnector(MultiplexedConnectResult.Connected(quic, null)), new EasyCallbackOptions
+        {
+            OpenSocket = (_, _) => CurlSocket.Bad,
+            SocketOption = (_, _) => (SocketOptionResult)(++others),
+            CloseSocket = _ => ++others,
+        });
+
+        MultiplexedConnectResult connect = await connector.ConnectMultiplexedAsync(Target, CancellationToken.None);
+
+        Assert.AreEqual(CurlExitCode.CouldntConnect, connect.ExitCode);
+        Assert.AreEqual("Failed to connect to h:80 after 0 ms: Could not connect to server", connect.ErrorMessage);
+        Assert.IsTrue(quic.Disposed);
+        Assert.AreEqual(0, others);
+    }
+
+    [TestMethod]
+    public async Task ConnectMultiplexedAsync_SockoptReturnsError_DisposesTheConnectionCallsCloseAndFailsWithAbortedByCallback()
+    {
+        List<CurlSocket> closed = [];
+        FakeMultiplexedConnection quic = new();
+        SocketCallbackConnector connector = Create(new FakeConnector(MultiplexedConnectResult.Connected(quic, null)), new EasyCallbackOptions
+        {
+            SocketOption = (_, _) => SocketOptionResult.Error,
+            CloseSocket = socket =>
+            {
+                closed.Add(socket);
+                return 0;
+            },
+        });
+
+        MultiplexedConnectResult connect = await connector.ConnectMultiplexedAsync(Target, CancellationToken.None);
+
+        Assert.AreEqual(CurlExitCode.AbortedByCallback, connect.ExitCode);
+        Assert.AreEqual("Failed to connect to h:80 after 0 ms: Operation was aborted by an application callback", connect.ErrorMessage);
+        Assert.IsTrue(quic.Disposed);
+        CollectionAssert.AreEqual(new[] { new CurlSocket(1) }, closed);
+    }
+
+    [TestMethod]
+    public async Task ConnectMultiplexedAsync_InnerConnectFails_ReturnsItsResultAndCallsNoCallback()
+    {
+        int calls = 0;
+        MultiplexedConnectResult failed = MultiplexedConnectResult.Failed(CurlExitCode.QuicConnectError, "QUIC failed");
+        SocketCallbackConnector connector = Create(new FakeConnector(failed), new EasyCallbackOptions { OpenSocket = (_, _) => new CurlSocket(++calls) });
+
+        MultiplexedConnectResult connect = await connector.ConnectMultiplexedAsync(Target, CancellationToken.None);
+
+        Assert.AreSame(failed, connect);
+        Assert.AreEqual(0, calls);
+    }
+
+    [TestMethod]
+    public async Task ConnectMultiplexedSessionAsync_Accepted_BuildsTheSessionOverTheWrappedConnection()
+    {
+        List<string> calls = [];
+        FakeMultiplexedConnection quic = new() { LocalEndPoint = new IPEndPoint(IPAddress.Loopback, 5000) };
+        IMultiplexedConnection? given = null;
+        FakeConnection session = new();
+        SocketCallbackConnector connector = Create(new FakeConnector(MultiplexedConnectResult.Connected(quic, null)), new EasyCallbackOptions
+        {
+            SocketOption = (socket, _) =>
+            {
+                calls.Add($"sockopt {socket.Handle}");
+                return SocketOptionResult.Ok;
+            },
+        });
+
+        ConnectResult connect = await connector.ConnectMultiplexedSessionAsync(
+            Target,
+            connection =>
+            {
+                given = connection;
+                return session;
+            },
+            CancellationToken.None);
+
+        Assert.AreSame(session, connect.Connection);
+        Assert.AreEqual("h3", connect.ApplicationProtocol);
+        Assert.AreSame(quic.LocalEndPoint, connect.LocalEndPoint);
+        Assert.AreEqual(new CurlSocket(1), ((SocketCallbackMultiplexedConnection)given!).Socket);
+        CollectionAssert.AreEqual(new[] { "sockopt 1" }, calls);
+    }
+
+    [TestMethod]
+    public async Task ConnectMultiplexedSessionAsync_OpenSocketReturnsBad_FailsWithCouldntConnectAndBuildsNoSession()
+    {
+        int sessions = 0;
+        SocketCallbackConnector connector = Create(new FakeConnector(MultiplexedConnectResult.Connected(new FakeMultiplexedConnection(), null)), new EasyCallbackOptions { OpenSocket = (_, _) => CurlSocket.Bad });
+
+        ConnectResult connect = await connector.ConnectMultiplexedSessionAsync(
+            Target,
+            _ =>
+            {
+                sessions++;
+                return new FakeConnection();
+            },
+            CancellationToken.None);
+
+        Assert.AreEqual(CurlExitCode.CouldntConnect, connect.ExitCode);
+        Assert.AreEqual("Failed to connect to h:80 after 0 ms: Could not connect to server", connect.ErrorMessage);
+        Assert.AreEqual(0, sessions);
+    }
+
+    [TestMethod]
+    public async Task MultiplexedConnection_EveryMember_AnswersAsTheInnerConnection()
+    {
+        FakeMultiplexedConnection inner = new() { RemoteEndPoint = new IPEndPoint(IPAddress.Loopback, 1), LocalEndPoint = new IPEndPoint(IPAddress.Loopback, 2) };
+        SocketCallbackMultiplexedConnection connection = new(inner, new CurlSocketCloser(new CurlSocket(3), null));
+
+        IMultiplexedStream bidirectional = await connection.OpenBidirectionalStreamAsync(CancellationToken.None);
+        IMultiplexedStream unidirectional = await connection.OpenUnidirectionalStreamAsync(CancellationToken.None);
+        IMultiplexedStream accepted = await connection.AcceptUnidirectionalStreamAsync(CancellationToken.None);
+        await connection.CloseAsync(0x100, CancellationToken.None);
+        await connection.DisposeAsync();
+
+        Assert.AreSame(inner.RemoteEndPoint, connection.RemoteEndPoint);
+        Assert.AreSame(inner.LocalEndPoint, connection.LocalEndPoint);
+        Assert.AreEqual("h3", connection.ApplicationProtocol);
+        Assert.AreEqual(7L, connection.BidirectionalStreamLimit);
+        Assert.AreEqual(TimeSpan.FromSeconds(30), connection.PeerIdleTimeout);
+        Assert.AreSame(inner.Bidirectional, bidirectional);
+        Assert.AreSame(inner.Unidirectional, unidirectional);
+        Assert.AreSame(inner.Accepted, accepted);
+        Assert.AreEqual(0x100L, inner.CloseCode);
+        Assert.IsTrue(inner.Disposed);
     }
 
     [TestMethod]
@@ -268,14 +430,21 @@ public sealed class SocketCallbackConnectorTests
     }
 
     /// <summary>Answers every connect with one result.</summary>
-    private sealed class FakeConnector(ConnectResult result) : IConnector
+    private sealed class FakeConnector(ConnectResult result, MultiplexedConnectResult? quic = null) : IConnector
     {
         public FakeConnector(IConnection connection)
             : this(ConnectResult.Connected(connection))
         {
         }
 
+        public FakeConnector(MultiplexedConnectResult quic)
+            : this(ConnectResult.Failed(CurlExitCode.CouldntConnect, "TCP is not scripted"), quic)
+        {
+        }
+
         public ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, CancellationToken cancellationToken) => ValueTask.FromResult(result);
+
+        public ValueTask<MultiplexedConnectResult> ConnectMultiplexedAsync(ConnectTarget target, CancellationToken cancellationToken) => ValueTask.FromResult(quic!);
     }
 
     /// <summary>A connection that answers every member with something other than the interface's default.</summary>
@@ -318,6 +487,48 @@ public sealed class SocketCallbackConnectorTests
         public void MarkReusable() => MarkedReusable = true;
 
         public ValueTask<IConnection?> ClearTlsAsync(bool sendCloseNotifyFirst, CancellationToken cancellationToken) => ValueTask.FromResult(Plain);
+
+        public ValueTask DisposeAsync()
+        {
+            Disposed = true;
+            return ValueTask.CompletedTask;
+        }
+    }
+
+    /// <summary>A QUIC connection that answers every member with something of its own and records its close.</summary>
+    private sealed class FakeMultiplexedConnection : IMultiplexedConnection
+    {
+        public EndPoint? RemoteEndPoint { get; init; }
+
+        public EndPoint? LocalEndPoint { get; init; }
+
+        public string ApplicationProtocol => "h3";
+
+        public long? BidirectionalStreamLimit => 7;
+
+        public TimeSpan? PeerIdleTimeout => TimeSpan.FromSeconds(30);
+
+        public ScriptedMultiplexedStream Bidirectional { get; } = new(0, []);
+
+        public ScriptedMultiplexedStream Unidirectional { get; } = new(2, []);
+
+        public ScriptedMultiplexedStream Accepted { get; } = new(3, []);
+
+        public long? CloseCode { get; private set; }
+
+        public bool Disposed { get; private set; }
+
+        public ValueTask<IMultiplexedStream> OpenBidirectionalStreamAsync(CancellationToken cancellationToken) => ValueTask.FromResult<IMultiplexedStream>(Bidirectional);
+
+        public ValueTask<IMultiplexedStream> OpenUnidirectionalStreamAsync(CancellationToken cancellationToken) => ValueTask.FromResult<IMultiplexedStream>(Unidirectional);
+
+        public ValueTask<IMultiplexedStream> AcceptUnidirectionalStreamAsync(CancellationToken cancellationToken) => ValueTask.FromResult<IMultiplexedStream>(Accepted);
+
+        public ValueTask CloseAsync(long applicationErrorCode, CancellationToken cancellationToken)
+        {
+            CloseCode = applicationErrorCode;
+            return ValueTask.CompletedTask;
+        }
 
         public ValueTask DisposeAsync()
         {
