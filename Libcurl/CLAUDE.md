@@ -60,13 +60,20 @@ freed afterwards leaves the option as set; a new list setter must copy too.
 engine's `IEasyTransfer` (ADR-0563): `SetOption` goes through `EasyOptionDispatch` and writes the
 changed `EasyOptions` back to the transfer only on `Ok`; `PerformAsync` is the native shape, and
 `Perform` blocks on it; `Upkeep` (`curl_easy_upkeep`) blocks on `UpkeepAsync` the same way, and these
-two are Libcurl's only sanctioned sync-over-async bridges. `Pause` is `curl_easy_pause` and passes the
+two and `WebSocket`'s blocking calls are Libcurl's only sanctioned sync-over-async bridges. `Pause` is `curl_easy_pause` and passes the
 engine only the `Receive` and `Send` bits, dropping the rest as libcurl does. `Dispose` and
 `DisposeAsync` are `curl_easy_cleanup` and dispose the transfer once; a member used afterwards throws
 `ObjectDisposedException`. `GetInfo` is `curl_easy_getinfo` and goes through `Info`'s dispatch.
 `Reset` is `curl_easy_reset` and `DupHandle` is `curl_easy_duphandle`, each a call to the transfer's
 `Reset` or `Duplicate`: what survives each (connections kept by a reset, only the options carried by a
 duplicate) is the engine's contract on `IEasyTransfer`, not Libcurl's.
+
+`WebSocket` holds `CurlEasyWebSocket`, libcurl's WebSocket API as `CurlEasy` extension methods over the
+transfer's `IEasyWebSocket` (ADR-0585): `WebSocketRecv` (`curl_ws_recv`), `WebSocketSend` (`curl_ws_send`)
+and `WebSocketStartFrame` (`curl_ws_start_frame`) block on their `Async` forms and keep libcurl's out
+parameters, `WebSocketRecv` answering 0 bytes and no frame unless `Ok`; `WebSocketMeta` is `curl_ws_meta`. A
+`null` or cleaned-up handle answers `BadFunctionArgument` (`WebSocketMeta` `null`) without the engine;
+every other check is the engine's.
 
 `Multi` holds `CurlMulti`, the multi handle `CurlLibrary.MultiInit` (`curl_multi_init`) returns over
 the engine's `IMultiTransfer` (ADR-0570). It is `partial`: each multi area adds its members in its own
