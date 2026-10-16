@@ -31,3 +31,4 @@ Phase 5 section of the plan; ADR-0506. Read `Libcurl` as it is, the upstream cas
 ## Log
 
 - 2026-10-16: Created.
+- 2026-10-16: Backlog -> Doing. Criteria at claim: 1f588d3c 4272a6b9 8738c7f6.
