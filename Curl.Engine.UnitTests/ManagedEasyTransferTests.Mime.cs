@@ -251,7 +251,7 @@ public sealed partial class ManagedEasyTransferTests
         MultipartFormBuildResult form = await new MultipartFormBodyBuilder(new PhysicalFileSystem(), Encoding.UTF8, () => FormBoundary)
             .BuildAsync(MultipartFormPartMapping.FromMimeBody(mimePost), MultipartNameEscaping.Percent, null, CancellationToken.None);
         Assert.IsTrue(form.IsBuilt);
-        EasyOptions options = new() { Network = new EasyNetworkOptions { Url = url } };
+        EasyOptions options = ManagedEasyTransfer.WithoutDefaultUserAgent(new() { Network = new EasyNetworkOptions { Url = url } });
         EngineTransferSettings settings = ManagedEasyTransfer.TransferSettingsOf(options);
         ScriptedConnector connector = new([Encoding.ASCII.GetBytes(Response)]);
         Assert.IsTrue(CurlUrl.TryParse(url, pathAsIs: false, out CurlUrl? transferUrl));

@@ -39,7 +39,7 @@ public sealed partial class ManagedEasyTransferTests
             new RedirectFollower(CreateDispatcher(new ScriptedConnector([Encoding.ASCII.GetBytes(EventsResponse)]), null)),
             new TransferContextFactory(Stream.Null, TimeProvider.System).Create(
                 ManagedEasyTransfer.TransferSettingsOf(options),
-                options.Http,
+                ManagedEasyTransfer.WithoutDefaultUserAgent(options).Http,
                 options.Behaviour,
                 options.Transfer,
                 options.Protocols,

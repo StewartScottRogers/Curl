@@ -74,6 +74,43 @@ public sealed partial class ManagedEasyTransferTests
     }
 
     [TestMethod]
+    public async Task PerformAsync_HttpGetWithNoUserAgent_SendsNoUserAgentLine()
+    {
+        EasyOptions options = new() { Network = new EasyNetworkOptions { Url = "http://h/x" } };
+
+        (byte[] written, CurlCode code) = await PerformThroughEasyAsync(options, toolSettings: null, Response);
+
+        Assert.AreEqual(CurlCode.Ok, code);
+        Assert.AreEqual("GET /x HTTP/1.1\r\nHost: h\r\nAccept: */*\r\n\r\n", Encoding.ASCII.GetString(written));
+    }
+
+    [TestMethod]
+    public async Task PerformAsync_HttpGetWithUserAgent_SendsIt()
+    {
+        EasyOptions options = new()
+        {
+            Network = new EasyNetworkOptions { Url = "http://h/x" },
+            Http = new EasyHttpOptions { UserAgent = "x" },
+        };
+
+        (byte[] written, CurlCode code) = await PerformThroughEasyAsync(options, toolSettings: null, Response);
+
+        Assert.AreEqual(CurlCode.Ok, code);
+        Assert.AreEqual("GET /x HTTP/1.1\r\nHost: h\r\nUser-Agent: x\r\nAccept: */*\r\n\r\n", Encoding.ASCII.GetString(written));
+    }
+
+    [TestMethod]
+    public async Task PerformAsync_HttpGetWithNoUserAgentUnderToolSettings_SendsTheCurlToolsUserAgent()
+    {
+        EasyOptions options = new() { Network = new EasyNetworkOptions { Url = "http://h/x" } };
+
+        (byte[] written, CurlCode code) = await PerformThroughEasyAsync(options, ManagedEasyTransfer.TransferSettingsOf(options), Response);
+
+        Assert.AreEqual(CurlCode.Ok, code);
+        StringAssert.Contains(Encoding.ASCII.GetString(written), "\r\nUser-Agent: curl/8.22.0\r\n");
+    }
+
+    [TestMethod]
     public async Task PerformAsync_NoCallbacksSet_DiscardsTheBodyAndHeadersAndSucceeds()
     {
         ScriptedConnector connector = new([Encoding.ASCII.GetBytes(Response)]);
@@ -755,9 +792,10 @@ public sealed partial class ManagedEasyTransferTests
     }
 
     // The tool's serial attempt today: the runner's context from TransferContextFactory and the
-    // attempt TransferPerformer.FollowWatchingSpeedAsync performs (CurlCommandRunner.TransferWithBodyAsync).
+    // attempt TransferPerformer.FollowWatchingSpeedAsync performs (CurlCommandRunner.TransferWithBodyAsync), over the
+    // options a handle with no CURLOPT_USERAGENT performs with, as the tool sets its own (BL-2559).
     private static async Task<(byte[] Written, CurlCode Code)> PerformThroughToolAsync(
-        EasyOptions options,
+        EasyOptions handleOptions,
         EngineTransferSettings settings,
         string urlText,
         string response,
@@ -765,6 +803,7 @@ public sealed partial class ManagedEasyTransferTests
         ITransferEvents? events = null,
         ITransferProgress? progress = null)
     {
+        EasyOptions options = ManagedEasyTransfer.WithoutDefaultUserAgent(handleOptions);
         ScriptedConnector connector = new([Encoding.ASCII.GetBytes(response)]);
         Assert.IsTrue(CurlUrl.TryParse(settings.AppendUrlQuery(urlText), pathAsIs: false, out CurlUrl? url));
         TransferContext context = new TransferContextFactory(Stream.Null, TimeProvider.System).Create(

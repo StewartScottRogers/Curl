@@ -288,12 +288,23 @@ internal sealed class ManagedEasyTransfer(
     private ICookieStore? HandlerCookieStoreOf(CookieEngine? cookies) =>
         performShare is { } share ? share.CookieStoreFor(cookies?.HandlerStore, this) : cookies?.HandlerStore;
 
+    /// <summary>
+    /// <paramref name="options" /> with no <c>CURLOPT_USERAGENT</c> set as an empty one, which sends no
+    /// <c>User-Agent</c> line to the origin or a proxy's <c>CONNECT</c>, as libcurl 8.22.0 sends none without it; the
+    /// HTTP handler's <c>curl/8.22.0</c> default is the curl tool's, which a perform with <see cref="ToolSettings" />
+    /// keeps (BL-2559, ADR-0659).
+    /// </summary>
+    /// <param name="options">The handle's options.</param>
+    /// <returns>The options the perform runs with.</returns>
+    internal static EasyOptions WithoutDefaultUserAgent(EasyOptions options) =>
+        options.Http.UserAgent is null ? options with { Http = options.Http with { UserAgent = string.Empty } } : options;
+
     /// <summary>Runs one transfer from <see cref="Options" />, as <see cref="PerformAsync" /> describes, over <see cref="PerformShared" />.</summary>
     /// <param name="cancellationToken">Stops the transfer.</param>
     /// <returns>The transfer's code.</returns>
     private async Task<CurlCode> PerformFromOptionsOverCachesAsync(CancellationToken cancellationToken)
     {
-        EasyOptions options = Options;
+        EasyOptions options = ToolSettings is null ? WithoutDefaultUserAgent(Options) : Options;
         LastResult = null;
         LastContext = null;
         if (options.Network.Url is not { } urlText)
