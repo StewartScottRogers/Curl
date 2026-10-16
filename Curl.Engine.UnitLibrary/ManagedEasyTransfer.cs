@@ -70,6 +70,15 @@ internal sealed class ManagedEasyTransfer(
     /// </summary>
     internal EasyTransferHost Host { get; set; } = EasyTransferHost.Library;
 
+    /// <summary>
+    /// Gets or sets the run's <c>--trace-config</c> components, libcurl's <c>curl_global_trace</c> setting,
+    /// which add the <c>[READ]</c>, <c>[WRITE]</c> and <c>[TIMER]</c> lines to the debug callback's events
+    /// (<see cref="WithTraceComponentEvents" />), for <c>Curl.Console</c> to set from its command line (BL-2318,
+    /// ADR-0545); <see cref="EngineTraceComponents.None" /> by default. <see cref="Duplicate" /> copies it and
+    /// <see cref="Reset" /> leaves it, as it is a global setting, not an option.
+    /// </summary>
+    internal EngineTraceComponents TraceComponents { get; set; } = EngineTraceComponents.None;
+
     /// <summary>The <c>%{conn_id}</c> of a transfer that failed before it could connect.</summary>
     internal const long NoConnectionId = -1;
 
@@ -147,7 +156,8 @@ internal sealed class ManagedEasyTransfer(
     }
 
     /// <summary>
-    /// The transfer's events: the debug callback's under <c>CURLOPT_VERBOSE</c>, else none, kept by
+    /// The transfer's events: the debug callback's under <c>CURLOPT_VERBOSE</c>, else none, with the
+    /// <see cref="TraceComponents" />' lines added (<see cref="WithTraceComponentEvents" />), kept by
     /// <see cref="EngineConnectionIdTransferEvents" />, which gives the transfer its <c>%{conn_id}</c>
     /// when it opens a connection and the opener's when it reuses one.
     /// </summary>
@@ -156,10 +166,35 @@ internal sealed class ManagedEasyTransfer(
     /// <returns>The events.</returns>
     private EngineConnectionIdTransferEvents EventsOf(EasyOptions options, EngineTransferState state) =>
         new(
-            (ITransferEvents?)DebugCallbackTransferEvents.Of(options.Behaviour.Verbose, options.Callbacks.Debug) ?? NoTransferEvents.Instance,
+            WithTraceComponentEvents(
+                (ITransferEvents?)DebugCallbackTransferEvents.Of(options.Behaviour.Verbose, options.Callbacks.Debug) ?? NoTransferEvents.Instance,
+                options,
+                TraceComponents),
             state,
             shared.ConnectionIdsByPoolNumber,
             () => state.ConnectionId ??= shared.Performer.TakeConnectionId());
+
+    /// <summary>
+    /// Wraps <paramref name="events" /> in the decorators the curl tool's runner adds under the same
+    /// components (<c>CurlCommandRunner.WithTraceLineEvents</c>), in its order: under <c>timer</c> the response
+    /// wait's <c>[TIMER]</c> lines through <see cref="ResponseWaitTimerTraceEvents" />, under <c>read</c>
+    /// <see cref="ClientReaderResetTraceEvents" />, and outermost, under <c>write</c>,
+    /// <see cref="ClientWriterTraceEvents" />. The engine has no multi of its own, so the <c>[TIMER]</c> lines are
+    /// the ones the runner writes with the multi not traced, and the <c>[MULTI]</c> lines stay the tool's (ADR-0545).
+    /// </summary>
+    /// <param name="events">The transfer's own events.</param>
+    /// <param name="options">The handle's options, whose <c>CURLOPT_TIMEOUT</c> and <c>CURLOPT_CONNECTTIMEOUT</c> are the timers.</param>
+    /// <param name="traces">The trace components.</param>
+    /// <returns>The events the transfer reports to.</returns>
+    internal static ITransferEvents WithTraceComponentEvents(ITransferEvents events, EasyOptions options, EngineTraceComponents traces)
+    {
+        IReadOnlyList<string> waitLines = EngineComposition.TracesTimer(traces)
+            ? TransferTimers.Of(options.Network, options.Transfer).WaitLines(tracesExpiry: false)
+            : [];
+        ITransferEvents timer = waitLines.Count > 0 ? new ResponseWaitTimerTraceEvents(events, waitLines) : events;
+        ITransferEvents readers = EngineComposition.TracesRead(traces) ? new ClientReaderResetTraceEvents(timer) : timer;
+        return EngineComposition.TracesWrite(traces) ? new ClientWriterTraceEvents(readers) : readers;
+    }
 
     /// <summary>
     /// The finished transfer's <c>%{conn_id}</c>, as the runner gives it: -1 when it failed before
@@ -255,7 +290,7 @@ internal sealed class ManagedEasyTransfer(
     }
 
     /// <inheritdoc />
-    public IEasyTransfer Duplicate() => new ManagedEasyTransfer(createDispatcher, shared) { Options = Options, ToolSettings = ToolSettings, Host = Host };
+    public IEasyTransfer Duplicate() => new ManagedEasyTransfer(createDispatcher, shared) { Options = Options, ToolSettings = ToolSettings, Host = Host, TraceComponents = TraceComponents };
 
     /// <inheritdoc />
     public void Reset()

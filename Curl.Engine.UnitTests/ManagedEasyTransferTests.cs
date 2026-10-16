@@ -528,6 +528,70 @@ public sealed partial class ManagedEasyTransferTests
     }
 
     [TestMethod]
+    public async Task PerformAsync_ReadAndWriteTraceComponents_GiveTheDebugCallbackTheReadAndWriteLinesTheToolsEventsReceive()
+    {
+        List<(CurlInfoType Type, string Data)> easyCalls = [];
+        List<(CurlInfoType Type, string Data)> toolCalls = [];
+        EasyOptions options = new()
+        {
+            Network = new EasyNetworkOptions { Url = "http://h/x" },
+            Behaviour = new EasyBehaviourOptions { Verbose = true },
+        };
+
+        (_, CurlCode easyCode) = await PerformThroughEasyAsync(
+            options with { Callbacks = new() { Debug = RecordingDebug(easyCalls) } }, null, Response, TracesOf("read", "write"));
+        await PerformThroughToolAsync(
+            options,
+            ManagedEasyTransfer.TransferSettingsOf(options),
+            "http://h/x",
+            Response,
+            events: new ClientWriterTraceEvents(new ClientReaderResetTraceEvents(new DebugCallbackTransferEvents(RecordingDebug(toolCalls), PlatformTlsBackend.ForProcess))));
+
+        Assert.AreEqual(CurlCode.Ok, easyCode);
+        CollectionAssert.AreEqual(toolCalls, easyCalls);
+        List<string> texts = [.. easyCalls.Where(call => call.Type == CurlInfoType.Text).Select(call => call.Data)];
+        CollectionAssert.Contains(texts, "[READ] client_reset, clear readers\n");
+        CollectionAssert.Contains(texts, ClientWriterTraceEvents.DoneLine + "\n");
+        Assert.IsTrue(texts.IndexOf(ClientWriterTraceEvents.DoneLine + "\n") < texts.IndexOf("[READ] client_reset, clear readers\n"));
+    }
+
+    [TestMethod]
+    public async Task PerformAsync_TimerTraceComponent_GivesTheDebugCallbackTheWaitTimerLinesAfterTheRequestIsSent()
+    {
+        List<(CurlInfoType Type, string Data)> calls = [];
+        EasyOptions options = new()
+        {
+            Network = new EasyNetworkOptions { Url = "http://h/x" },
+            Behaviour = new EasyBehaviourOptions { Verbose = true },
+            Transfer = new EasyTransferOptions { Timeout = TimeSpan.FromSeconds(5) },
+            Callbacks = new() { Debug = RecordingDebug(calls) },
+        };
+
+        (_, CurlCode code) = await PerformThroughEasyAsync(options, null, Response, TracesOf("timer"));
+
+        Assert.AreEqual(CurlCode.Ok, code);
+        List<string> texts = [.. calls.Where(call => call.Type == CurlInfoType.Text).Select(call => call.Data)];
+        int sent = texts.IndexOf(ResponseWaitTimerTraceEvents.RequestSentLine + "\n");
+        Assert.IsGreaterThanOrEqualTo(0, sent);
+        Assert.AreEqual("[TIMER] [TIMEOUT] gives multi timeout in 5000ms\n", texts[sent + 1]);
+        Assert.IsFalse(texts.Any(text => text.StartsWith("[READ]", StringComparison.Ordinal) || text.StartsWith("[WRITE]", StringComparison.Ordinal)));
+    }
+
+    [TestMethod]
+    public async Task ResetAndDuplicate_TraceComponentsSet_BothKeepThem()
+    {
+        await using ManagedEasyTransfer easy = (ManagedEasyTransfer)CreateEngine(new RecordingConnector(CurlExitCode.CouldntConnect, ConnectFailure)).CreateEasy();
+        EngineTraceComponents traces = TracesOf("read");
+        easy.TraceComponents = traces;
+
+        await using ManagedEasyTransfer copy = (ManagedEasyTransfer)easy.Duplicate();
+        easy.Reset();
+
+        Assert.AreSame(traces, copy.TraceComponents);
+        Assert.AreSame(traces, easy.TraceComponents);
+    }
+
+    [TestMethod]
     public async Task PerformAsync_TransferInfoCallback_GetsTheCountsTheToolsProgressSinkReceives()
     {
         List<string> easyCalls = [];
@@ -638,12 +702,20 @@ public sealed partial class ManagedEasyTransferTests
         return buffer => source.Read(buffer);
     }
 
-    private static async Task<(byte[] Written, CurlCode Code)> PerformThroughEasyAsync(EasyOptions options, EngineTransferSettings? toolSettings, string response)
+    private static EngineTraceComponents TracesOf(params string[] components) =>
+        new(new HashSet<string>(components, StringComparer.Ordinal), new HashSet<string>(StringComparer.Ordinal));
+
+    private static async Task<(byte[] Written, CurlCode Code)> PerformThroughEasyAsync(
+        EasyOptions options,
+        EngineTransferSettings? toolSettings,
+        string response,
+        EngineTraceComponents? traces = null)
     {
         ScriptedConnector connector = new([Encoding.ASCII.GetBytes(response)]);
         await using ManagedEasyTransfer easy = (ManagedEasyTransfer)CreateEngine(connector).CreateEasy();
         easy.Options = options;
         easy.ToolSettings = toolSettings;
+        easy.TraceComponents = traces ?? EngineTraceComponents.None;
 
         CurlCode code = await easy.PerformAsync(CancellationToken.None);
 
