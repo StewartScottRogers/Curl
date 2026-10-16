@@ -11,8 +11,8 @@ namespace Curl.Engine;
 
 /// <summary>
 /// Pins <see cref="ManagedEasyTransfer.ToolEvents" /> (BL-2397, ADR-0561): a perform from the options with the curl
-/// tool's events set reports the same event sequence, byte for byte, as the same attempt the runner sets up and runs
-/// through <see cref="ManagedEasyTransfer.ToolAttempt" />, reports none to the debug callback, and takes the
+/// tool's events set reports the same event sequence, byte for byte, as the same attempt the runner's own context
+/// gives when performed directly (<see cref="TransferPerformer.FollowWatchingSpeedAsync" />), reports none to the debug callback, and takes the
 /// <c>%{conn_id}</c> the runner's recorder kept on its state without numbering one itself.
 /// </summary>
 public sealed partial class ManagedEasyTransferTests
@@ -20,7 +20,7 @@ public sealed partial class ManagedEasyTransferTests
     private const string EventsResponse = "HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nhello";
 
     [TestMethod]
-    public async Task PerformAsync_ToolEventsSet_ReportsTheEventSequenceTheToolAttemptReports()
+    public async Task PerformAsync_ToolEventsSet_ReportsTheEventSequenceTheRunnersContextReports()
     {
         EasyOptions options = new() { Network = new EasyNetworkOptions { Url = "http://h/x" } };
         EngineTransferState fromOptionsState = new();
@@ -32,9 +32,7 @@ public sealed partial class ManagedEasyTransferTests
 
         EngineTransferState attemptState = new();
         RecordingToolEvents fromAttempt = new(attemptState, 7);
-        await using ManagedEasyTransfer runner = (ManagedEasyTransfer)CreateEngine(new ScriptedConnector([Encoding.ASCII.GetBytes(EventsResponse)])).CreateEasy();
-        runner.Options = options;
-        runner.ToolAttempt = new ToolAttempt(
+        await TransferPerformer.FollowWatchingSpeedAsync(
             attemptState,
             new RedirectFollower(CreateDispatcher(new ScriptedConnector([Encoding.ASCII.GetBytes(EventsResponse)]), null)),
             new TransferContextFactory(Stream.Null, TimeProvider.System).Create(
@@ -53,13 +51,12 @@ public sealed partial class ManagedEasyTransferTests
                 headerOutput: null,
                 events: fromAttempt),
             new RedirectPolicy());
-        await runner.PerformAsync(CancellationToken.None);
 
         Assert.AreEqual(CurlCode.Ok, code);
         Assert.IsTrue(fromOptions.Log.Any(entry => entry.StartsWith("header-out:GET /x HTTP/1.1\r\n", StringComparison.Ordinal)));
         Assert.Contains("header-in:HTTP/1.1 200 OK\r\n", fromOptions.Log);
         CollectionAssert.AreEqual(fromAttempt.Log.ToArray(), fromOptions.Log.ToArray());
-        Assert.AreEqual(runner.Info.ConnectionId, easy.Info.ConnectionId);
+        Assert.AreEqual(attemptState.ConnectionId, easy.Info.ConnectionId);
     }
 
     [TestMethod]

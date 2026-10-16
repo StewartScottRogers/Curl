@@ -120,7 +120,7 @@ namespace Curl.Console;
 /// <param name="curlEngine">
 /// The engine whose easy handles perform each serial transfer's attempts (ADR-0506, ADR-0552): one handle per
 /// transfer, one <see cref="Api.EngineContracts.IEasyTransfer.PerformAsync" /> per attempt, <c>--retry</c> attempts
-/// included; each handle must be an <see cref="IToolAttemptTransfer" />. <see langword="null" /> for a
+/// included; each handle must be an <see cref="IToolEasyTransfer" />. <see langword="null" /> for a
 /// <see cref="ManagedCurlEngine" /> on the runner's clock. <c>-Z</c> transfers still perform directly until
 /// the engine's multi handle lands (ADR-0506, phase 3).
 /// </param>
@@ -3531,36 +3531,17 @@ internal sealed class CurlCommandRunner(
         {
             bool toStandardOutput = !transfer.DiscardsBody;
             StartTransferProgress(options, options.ResumeFrom, toStandardOutput);
-            Func<long?, TransferContext> createAttemptContext = _ => transferContextFactory.Create(
-                EasyOptionsFromCommandLine.TransferSettingsOf(options),
-                EasyOptionsFromCommandLine.HttpOf(options),
-                EasyOptionsFromCommandLine.BehaviourOf(options),
-                transferOptions,
-                EasyOptionsFromCommandLine.ProtocolOf(options),
-                EasyOptionsFromCommandLine.ProxyOf(options),
-                EasyOptionsFromCommandLine.AuthenticationOf(options),
-                EasyOptionsFromCommandLine.NetworkOf(options),
+            TransferAttemptPieces attempt = new(
                 url,
-                RateLimited(options, toStandardOutput ? FlushedEachWriteUnderNoBuffer(options, InTextModeUnderUseAscii(options, Running.GatedStandardOutput)) : Stream.Null),
-                range,
-                options.ResumeFrom,
-                headerOutput,
-                formBody,
-                upload,
-                proxy,
-                progress: Running.Progress,
-                events: Running.Events,
-                lowSpeedWatchdog: transferPerformer.StartLowSpeedWatchdog(Running, transferOptions, diagnosticLog),
-                abortToken: Running.AbortToken,
-                maxTimeWatchdog: transferPerformer.StartMaxTimeWatchdog(Running, transferOptions, diagnosticLog),
-                lookedUpCredentials: Running.LookedUpCredentials,
-                ifNoneMatchHeaders: Running.IfNoneMatchHeaders,
-                altSvc: Running.AltSvc,
-                bodyHeaderStyles: toStandardOutput ? HeaderStylesFor(options, url) : null,
-                ssh: Running.Ssh);
+                transferOptions,
+                () => new EngineToolTransferOutputs(
+                    RateLimited(options, toStandardOutput ? FlushedEachWriteUnderNoBuffer(options, InTextModeUnderUseAscii(options, Running.GatedStandardOutput)) : Stream.Null),
+                    headerOutput,
+                    BodyHeaderStyles: toStandardOutput ? HeaderStylesFor(options, url) : null),
+                _ => AttemptInputsOf(range, options.ResumeFrom, formBody, upload, proxy));
             TransferResult result = toStandardOutput
-                ? await TransferToStandardOutputAsync(follower, options, createAttemptContext).ConfigureAwait(false)
-                : await FollowRetryingAsync(follower, options, createAttemptContext, options.ResumeFrom, null).ConfigureAwait(false);
+                ? await TransferToStandardOutputAsync(follower, options, attempt).ConfigureAwait(false)
+                : await FollowRetryingAsync(follower, options, attempt, options.ResumeFrom, null).ConfigureAwait(false);
 
             return await WriteProgressAndAbandonedRetryWarningAsync(options, result, options.ResumeFrom, toStandardOutput)
                 .ConfigureAwait(false);
@@ -4375,33 +4356,11 @@ internal sealed class CurlCommandRunner(
             TransferResult fileResult = await FollowRetryingAsync(
                     follower,
                     options,
-                    attemptResumeFrom => transferContextFactory.Create(
-                        EasyOptionsFromCommandLine.TransferSettingsOf(options),
-                        EasyOptionsFromCommandLine.HttpOf(options),
-                        EasyOptionsFromCommandLine.BehaviourOf(options),
-                        transferOptions,
-                        EasyOptionsFromCommandLine.ProtocolOf(options),
-                        EasyOptionsFromCommandLine.ProxyOf(options),
-                        EasyOptionsFromCommandLine.AuthenticationOf(options),
-                        EasyOptionsFromCommandLine.NetworkOf(options),
+                    new TransferAttemptPieces(
                         url,
-                        RateLimited(options, FlushedEachWriteUnderNoBuffer(options, output)),
-                        range,
-                        attemptResumeFrom,
-                        headerOutput,
-                        formBody,
-                        upload,
-                        proxy,
-                        watchHeaderOutput,
-                        Running.Progress,
-                        Running.Events,
-                        transferPerformer.StartLowSpeedWatchdog(Running, transferOptions, diagnosticLog),
-                        Running.AbortToken,
-                        transferPerformer.StartMaxTimeWatchdog(Running, transferOptions, diagnosticLog),
-                        Running.LookedUpCredentials,
-                        Running.IfNoneMatchHeaders,
-                        Running.AltSvc,
-                        ssh: Running.Ssh),
+                        transferOptions,
+                        () => new EngineToolTransferOutputs(RateLimited(options, FlushedEachWriteUnderNoBuffer(options, output)), headerOutput, watchHeaderOutput),
+                        attemptResumeFrom => AttemptInputsOf(range, attemptResumeFrom, formBody, upload, proxy)),
                     resumeFrom,
                     output)
                 .ConfigureAwait(false);
@@ -4455,158 +4414,247 @@ internal sealed class CurlCommandRunner(
         return CannotOpenForResumeFailure;
     }
 
-    /// <summary>
-    /// Performs one transfer whose output is standard output, and flushes it.
-    /// </summary>
-    /// <param name="follower">Performs the transfer with the handler for its scheme, following redirects under <c>-L</c>.</param>
-    /// <param name="options">The accepted command line, whose redirect options the follower applies.</param>
-    /// <param name="createAttemptContext">
-    /// Creates the context of each attempt, whose output is standard output, on the transfer's
-    /// current <see cref="RunningTransferState.Progress" />.
-    /// </param>
-    /// <returns>
-    /// <see cref="StandardOutputWriteFailure" /> when the handler succeeded but standard
-    /// output failed, which is curl's failed flush at the end of the transfer; otherwise the
-    /// handler's result, including its own write failure when curl's stdio buffer would have
-    /// filled (see <see cref="StandardOutputFailureDeferringStream" />).
-    /// </returns>
-    private async Task<TransferResult> TransferToStandardOutputAsync(
-        RedirectFollower follower,
-        CommandLineOptions options,
-        Func<long?, TransferContext> createAttemptContext)
-    {
-        RunningTransferState state = Running;
-        state.StandardOutput.ClearWriteFailure();
-        TransferResult result = await FollowRetryingAsync(follower, options, createAttemptContext, options.ResumeFrom, null)
-            .ConfigureAwait(false);
-        await state.GatedStandardOutput.FlushAsync().ConfigureAwait(false);
+/// <summary>
+/// Performs one transfer whose output is standard output, and flushes it.
+/// </summary>
+/// <param name="follower">Performs the transfer with the handler for its scheme, following redirects under <c>-L</c>.</param>
+/// <param name="options">The accepted command line, whose redirect options the follower applies.</param>
+/// <param name="attempt">What each attempt, whose output is standard output, is built from.</param>
+/// <returns>
+/// <see cref="StandardOutputWriteFailure" /> when the handler succeeded but standard
+/// output failed, which is curl's failed flush at the end of the transfer; otherwise the
+/// handler's result, including its own write failure when curl's stdio buffer would have
+/// filled (see <see cref="StandardOutputFailureDeferringStream" />).
+/// </returns>
+private async Task<TransferResult> TransferToStandardOutputAsync(
+    RedirectFollower follower,
+    CommandLineOptions options,
+    TransferAttemptPieces attempt)
+{
+    RunningTransferState state = Running;
+    state.StandardOutput.ClearWriteFailure();
+    TransferResult result = await FollowRetryingAsync(follower, options, attempt, options.ResumeFrom, null)
+        .ConfigureAwait(false);
+    await state.GatedStandardOutput.FlushAsync().ConfigureAwait(false);
 
-        return result.IsSuccess && state.StandardOutput.HasWriteFailed ? StandardOutputWriteFailure : result;
+    return result.IsSuccess && state.StandardOutput.HasWriteFailed ? StandardOutputWriteFailure : result;
+}
+
+/// <summary>
+/// The pieces of one attempt the runner chose before connecting: the proxy and the running transfer's looked-up
+/// credentials, SSH options, <c>If-None-Match</c> lines and alt-svc cache, beside the range, offset, form body
+/// and upload given.
+/// </summary>
+/// <param name="range">The parsed <c>-r</c> range, or <see langword="null" />.</param>
+/// <param name="resumeFrom">The <c>-C</c> offset the attempt resumes from, or <see langword="null" />.</param>
+/// <param name="formBody">The <c>-F</c> body, or <see langword="null" />.</param>
+/// <param name="upload">The <c>-T</c> source, or <see langword="null" />.</param>
+/// <param name="proxy">The proxy chosen, or <see langword="null" /> to connect directly.</param>
+/// <returns>The pieces.</returns>
+private EngineToolTransferInputs AttemptInputsOf(ByteRange? range, long? resumeFrom, HttpRequestBody? formBody, Stream? upload, ProxyEndpoint? proxy)
+{
+    RunningTransferState state = Running;
+    return new(proxy, state.LookedUpCredentials, state.Ssh, state.IfNoneMatchHeaders, range, resumeFrom, formBody, upload, state.AltSvc);
+}
+
+/// <summary>
+/// Performs one transfer through <paramref name="follower" />, run again by
+/// <see cref="TransferRetrier" /> under <c>--retry</c> (<see cref="RetryPolicyMapping" />),
+/// each attempt with outputs and progress of its own.
+/// </summary>
+/// <param name="follower">Performs each attempt, following redirects under <c>-L</c>.</param>
+/// <param name="options">The accepted command line.</param>
+/// <param name="attempt">
+/// What each attempt is built from, on the transfer's current <see cref="RunningTransferState.Progress" />;
+/// read for the first attempt and again after each retried one's lines are written.
+/// </param>
+/// <param name="resumeFrom">The resolved <c>-C</c> offset, or <see langword="null" />.</param>
+/// <param name="outputFile">
+/// The <c>-o</c> file, whose retried attempt's bytes are kept or cut back
+/// (<see cref="AttemptBytesKeptForResume" />); <see langword="null" /> when the body goes
+/// to standard output, where every attempt's body stays, as curl 8.21.0 leaves it.
+/// </param>
+/// <returns>The result of the attempt not retried.</returns>
+/// <remarks>
+/// A serial transfer performs its attempts through one easy handle of the runner's <see cref="engine" />
+/// (ADR-0552), whose options are the option group's (<see cref="EasyOptionsFromCommandLine.EasyOptionsOf" />)
+/// and which builds each attempt's context itself from them and the runner's hooks (BL-2394);
+/// a <c>-Z</c> transfer performs them directly until the engine's multi handle lands.
+/// </remarks>
+private async Task<TransferResult> FollowRetryingAsync(
+    RedirectFollower follower,
+    CommandLineOptions options,
+    TransferAttemptPieces attempt,
+    long? resumeFrom,
+    DeferredOutputFileStream? outputFile)
+{
+    if (parallelRun is not null)
+    {
+        return await FollowRetryingThroughAsync(null, follower, options, attempt, resumeFrom, outputFile).ConfigureAwait(false);
     }
 
-    /// <summary>
-    /// Performs one transfer through <paramref name="follower" />, run again by
-    /// <see cref="TransferRetrier" /> under <c>--retry</c> (<see cref="RetryPolicyMapping" />),
-    /// each attempt on a context of its own.
-    /// </summary>
-    /// <param name="follower">Performs each attempt, following redirects under <c>-L</c>.</param>
-    /// <param name="options">The accepted command line.</param>
-    /// <param name="createAttemptContext">
-    /// Creates an attempt's context from the <c>-C</c> offset it resumes from, on the transfer's
-    /// current <see cref="RunningTransferState.Progress" />; called once before the first attempt
-    /// and again after each retried one's lines are written.
-    /// </param>
-    /// <param name="resumeFrom">The resolved <c>-C</c> offset, or <see langword="null" />.</param>
-    /// <param name="outputFile">
-    /// The <c>-o</c> file, whose retried attempt's bytes are kept or cut back
-    /// (<see cref="AttemptBytesKeptForResume" />); <see langword="null" /> when the body goes
-    /// to standard output, where every attempt's body stays, as curl 8.21.0 leaves it.
-    /// </param>
-    /// <returns>The result of the attempt not retried.</returns>
-    /// <remarks>
-    /// A serial transfer performs its attempts through one easy handle of the runner's <see cref="engine" />
-    /// (ADR-0552), whose options are the option group's (<see cref="EasyOptionsFromCommandLine.EasyOptionsOf" />);
-    /// a <c>-Z</c> transfer performs them directly until the engine's multi handle lands.
-    /// </remarks>
-    private async Task<TransferResult> FollowRetryingAsync(
-        RedirectFollower follower,
-        CommandLineOptions options,
-        Func<long?, TransferContext> createAttemptContext,
-        long? resumeFrom,
-        DeferredOutputFileStream? outputFile)
+    IEasyTransfer easy = engine.CreateEasy();
+    await using (easy.ConfigureAwait(false))
     {
-        if (parallelRun is not null)
-        {
-            return await FollowRetryingThroughAsync(null, follower, options, createAttemptContext, resumeFrom, outputFile).ConfigureAwait(false);
-        }
-
-        IEasyTransfer easy = engine.CreateEasy();
-        await using (easy.ConfigureAwait(false))
-        {
-            return await FollowRetryingThroughAsync((IToolAttemptTransfer)easy, follower, options, createAttemptContext, resumeFrom, outputFile).ConfigureAwait(false);
-        }
+        IToolEasyTransfer toolEasy = (IToolEasyTransfer)easy;
+        SetUpToolEasy(toolEasy, options, attempt);
+        return await FollowRetryingThroughAsync(toolEasy, follower, options, attempt, resumeFrom, outputFile).ConfigureAwait(false);
     }
+}
 
-    /// <summary>
-    /// Performs one transfer's attempts, as <see cref="FollowRetryingAsync" /> describes, each through
-    /// <paramref name="easy" /> when there is one (<see cref="PerformThroughEasyAsync" />) and directly otherwise.
-    /// </summary>
-    /// <param name="easy">The transfer's easy handle, or <see langword="null" /> for a <c>-Z</c> transfer.</param>
-    /// <param name="follower">Performs each attempt, following redirects under <c>-L</c>.</param>
-    /// <param name="options">The accepted command line.</param>
-    /// <param name="createAttemptContext">Creates an attempt's context from the <c>-C</c> offset it resumes from.</param>
-    /// <param name="resumeFrom">The resolved <c>-C</c> offset, or <see langword="null" />.</param>
-    /// <param name="outputFile">The <c>-o</c> file, or <see langword="null" /> when the body goes to standard output.</param>
-    /// <returns>The result of the attempt not retried.</returns>
-    private async Task<TransferResult> FollowRetryingThroughAsync(
-        IToolAttemptTransfer? easy,
-        RedirectFollower follower,
-        CommandLineOptions options,
-        Func<long?, TransferContext> createAttemptContext,
-        long? resumeFrom,
-        DeferredOutputFileStream? outputFile)
+/// <summary>
+/// Sets what stays the same for every attempt of the transfer on its easy handle: the option group's easy
+/// options, named by the transfer URL and with the transfer's <c>-T</c> upload, the tool's own settings, and the
+/// run's diagnostic log, which the handle's <c>-Y</c>/<c>-y</c> and <c>-m</c> watchdogs write to.
+/// </summary>
+/// <param name="easy">The transfer's easy handle.</param>
+/// <param name="options">The accepted command line.</param>
+/// <param name="attempt">What each attempt is built from.</param>
+private void SetUpToolEasy(IToolEasyTransfer easy, CommandLineOptions options, TransferAttemptPieces attempt)
+{
+    easy.Options = EasyOptionsFromCommandLine.EasyOptionsOf(options, StyledHeaderBaseUrl(attempt.Url)) with { Transfer = attempt.Transfer };
+    easy.ToolSettings = EasyOptionsFromCommandLine.TransferSettingsOf(options);
+    easy.Host = EasyTransferHost.Library with { DiagnosticLog = diagnosticLog };
+}
+
+/// <summary>
+/// Performs one transfer's attempts, as <see cref="FollowRetryingAsync" /> describes, each through
+/// <paramref name="easy" /> when there is one (<see cref="PerformThroughEasyAsync" />) and directly otherwise
+/// (<see cref="PerformDirectlyAsync" />).
+/// </summary>
+/// <param name="easy">The transfer's easy handle, or <see langword="null" /> for a <c>-Z</c> transfer.</param>
+/// <param name="follower">Performs each attempt, following redirects under <c>-L</c>.</param>
+/// <param name="options">The accepted command line.</param>
+/// <param name="attempt">What each attempt is built from.</param>
+/// <param name="resumeFrom">The resolved <c>-C</c> offset, or <see langword="null" />.</param>
+/// <param name="outputFile">The <c>-o</c> file, or <see langword="null" /> when the body goes to standard output.</param>
+/// <returns>The result of the attempt not retried.</returns>
+private async Task<TransferResult> FollowRetryingThroughAsync(
+    IToolEasyTransfer? easy,
+    RedirectFollower follower,
+    CommandLineOptions options,
+    TransferAttemptPieces attempt,
+    long? resumeFrom,
+    DeferredOutputFileStream? outputFile)
+{
+    long? attemptResumeFrom = resumeFrom;
+    TransferContext transfer = new()
     {
-        RedirectPolicy redirectPolicy = RedirectPolicyMapping.Of(EasyOptionsFromCommandLine.TransferSettingsOf(options), EasyOptionsFromCommandLine.HttpOf(options), EasyOptionsFromCommandLine.AuthenticationOf(options));
-        long? attemptResumeFrom = resumeFrom;
-        TransferContext? firstContext = createAttemptContext(attemptResumeFrom);
-        string scheme = firstContext.Url.Scheme;
-        if (easy is not null)
-        {
-            easy.Options = EasyOptionsFromCommandLine.EasyOptionsOf(options, StyledHeaderBaseUrl(firstContext.Url));
-        }
-
-        Task retryLinesWritten = Task.CompletedTask;
-        TransferRetrier retrier = new(async _ =>
-        {
-            await retryLinesWritten.ConfigureAwait(false);
-            transferPerformer.RecordSerialAttemptStart(runsInParallel: parallelRun is not null);
-            TransferContext context = firstContext ?? TransferPerformer.CreateRetryAttemptContext(
-                () => StartTransferProgress(options, attemptResumeFrom, toStandardOutput: outputFile is null),
-                createAttemptContext,
-                attemptResumeFrom);
-            firstContext = null;
-            RunningTransferState state = Running;
-            TransferResult attemptResult = easy is null
-                ? await TransferPerformer.FollowWatchingSpeedAsync(state, follower, context, redirectPolicy).ConfigureAwait(false)
-                : await PerformThroughEasyAsync(easy, new ToolAttempt(state, follower, context, redirectPolicy)).ConfigureAwait(false);
-            TransferPerformer.KeepRetriedConnectionIdWhenReused(state, context, attemptResult);
-            return attemptResult;
-        });
-
-        TransferResult result = await retrier
-            .RunAsync(
-                firstContext,
-                RetryPolicyMapping.FromCommandLine(options),
-                (attempt, warning) =>
-                {
-                    Running.RetryCount++;
-                    transferPerformer.TakeNextAttemptIds(Running);
-                    long? retriedResumeFrom = attemptResumeFrom;
-                    long keptBytes = AttemptBytesKeptForResume(options, attempt, scheme, retriedResumeFrom, outputFile);
-                    attemptResumeFrom = keptBytes > 0 ? retriedResumeFrom.GetValueOrDefault() + keptBytes : retriedResumeFrom;
-                    retryLinesWritten = WriteRetryLinesAsync(options, attempt, warning, new RetriedAttemptOffsets(retriedResumeFrom, attemptResumeFrom), outputFile);
-                },
-                (_, warning) => Running.AbandonedRetryWarning = warning)
-            .ConfigureAwait(false);
+        Url = attempt.Url,
+        Output = Stream.Null,
+        TimeProvider = timeProvider,
+        DiagnosticLog = diagnosticLog,
+        CancellationToken = Running.AbortToken,
+    };
+    bool retried = false;
+    Task retryLinesWritten = Task.CompletedTask;
+    TransferRetrier retrier = new(async _ =>
+    {
         await retryLinesWritten.ConfigureAwait(false);
+        transferPerformer.RecordSerialAttemptStart(runsInParallel: parallelRun is not null);
+        if (retried)
+        {
+            StartTransferProgress(options, attemptResumeFrom, toStandardOutput: outputFile is null);
+        }
 
-        return result;
-    }
+        RunningTransferState state = Running;
+        TransferResult attemptResult = easy is null
+            ? await PerformDirectlyAsync(follower, options, attempt, attemptResumeFrom).ConfigureAwait(false)
+            : await PerformThroughEasyAsync(easy, follower, attempt, attemptResumeFrom).ConfigureAwait(false);
+        TransferPerformer.KeepRetriedConnectionIdWhenReused(state, transfer, attemptResult);
+        return attemptResult;
+    });
 
-    /// <summary>
-    /// Performs one attempt through <paramref name="easy" />: hands it the attempt the runner set up, calls
-    /// <see cref="Api.EngineContracts.IEasyTransfer.PerformAsync" />, and takes the attempt's whole result back
-    /// (ADR-0552).
-    /// </summary>
-    /// <param name="easy">The transfer's easy handle.</param>
-    /// <param name="attempt">The attempt.</param>
-    /// <returns>The attempt's result.</returns>
-    private static async Task<TransferResult> PerformThroughEasyAsync(IToolAttemptTransfer easy, ToolAttempt attempt)
-    {
-        easy.ToolAttempt = attempt;
-        _ = await easy.PerformAsync(attempt.Context.CancellationToken).ConfigureAwait(false);
-        return easy.ToolAttemptResult!;
-    }
+    TransferResult result = await retrier
+        .RunAsync(
+            transfer,
+            RetryPolicyMapping.FromCommandLine(options),
+            (attemptResult, warning) =>
+            {
+                retried = true;
+                Running.RetryCount++;
+                transferPerformer.TakeNextAttemptIds(Running);
+                long? retriedResumeFrom = attemptResumeFrom;
+                long keptBytes = AttemptBytesKeptForResume(options, attemptResult, attempt.Url.Scheme, retriedResumeFrom, outputFile);
+                attemptResumeFrom = keptBytes > 0 ? retriedResumeFrom.GetValueOrDefault() + keptBytes : retriedResumeFrom;
+                retryLinesWritten = WriteRetryLinesAsync(options, attemptResult, warning, new RetriedAttemptOffsets(retriedResumeFrom, attemptResumeFrom), outputFile);
+            },
+            (_, warning) => Running.AbandonedRetryWarning = warning)
+        .ConfigureAwait(false);
+    await retryLinesWritten.ConfigureAwait(false);
+
+    return result;
+}
+
+/// <summary>
+/// Performs one <c>-Z</c> attempt directly (<see cref="TransferPerformer.FollowWatchingSpeedAsync" />), on a
+/// context the runner's <see cref="transferContextFactory" /> builds from <paramref name="attempt" />, starting the
+/// attempt's <c>-Y</c>/<c>-y</c> and <c>-m</c> watchdogs on the running transfer.
+/// </summary>
+/// <param name="follower">Performs the attempt, following redirects under <c>-L</c>.</param>
+/// <param name="options">The accepted command line.</param>
+/// <param name="attempt">What the attempt is built from.</param>
+/// <param name="resumeFrom">The <c>-C</c> offset the attempt resumes from, or <see langword="null" />.</param>
+/// <returns>The attempt's result.</returns>
+private async Task<TransferResult> PerformDirectlyAsync(RedirectFollower follower, CommandLineOptions options, TransferAttemptPieces attempt, long? resumeFrom)
+{
+    RunningTransferState state = Running;
+    EngineToolTransferOutputs outputs = attempt.Outputs();
+    EngineToolTransferInputs inputs = attempt.Inputs(resumeFrom);
+    TransferContext context = transferContextFactory.Create(
+        EasyOptionsFromCommandLine.TransferSettingsOf(options),
+        EasyOptionsFromCommandLine.HttpOf(options),
+        EasyOptionsFromCommandLine.BehaviourOf(options),
+        attempt.Transfer,
+        EasyOptionsFromCommandLine.ProtocolOf(options),
+        EasyOptionsFromCommandLine.ProxyOf(options),
+        EasyOptionsFromCommandLine.AuthenticationOf(options),
+        EasyOptionsFromCommandLine.NetworkOf(options),
+        attempt.Url,
+        outputs.Output,
+        inputs.Range,
+        inputs.ResumeFrom,
+        outputs.HeaderOutput,
+        inputs.FormBody,
+        inputs.Upload,
+        inputs.Proxy,
+        outputs.WatchHeaderOutput,
+        state.Progress,
+        state.Events,
+        transferPerformer.StartLowSpeedWatchdog(state, attempt.Transfer, diagnosticLog),
+        state.AbortToken,
+        transferPerformer.StartMaxTimeWatchdog(state, attempt.Transfer, diagnosticLog),
+        inputs.LookedUpCredentials,
+        inputs.IfNoneMatchHeaders,
+        inputs.AltSvc,
+        bodyHeaderStyles: outputs.BodyHeaderStyles,
+        ssh: inputs.Ssh);
+    RedirectPolicy redirectPolicy = RedirectPolicyMapping.Of(EasyOptionsFromCommandLine.TransferSettingsOf(options), EasyOptionsFromCommandLine.HttpOf(options), EasyOptionsFromCommandLine.AuthenticationOf(options));
+    return await TransferPerformer.FollowWatchingSpeedAsync(state, follower, context, redirectPolicy).ConfigureAwait(false);
+}
+
+/// <summary>
+/// Performs one serial attempt through <paramref name="easy" /> (ADR-0552, BL-2394): hands it the attempt's
+/// outputs, inputs and transfer URL, the running transfer's events and progress, and the runner's follower and
+/// context factory, calls <see cref="Api.EngineContracts.IEasyTransfer.PerformAsync" />, which builds the
+/// attempt's context and starts its watchdogs itself, and takes the attempt's whole result back.
+/// </summary>
+/// <param name="easy">The transfer's easy handle, set up by <see cref="SetUpToolEasy" />.</param>
+/// <param name="follower">Performs the attempt, following redirects under <c>-L</c>.</param>
+/// <param name="attempt">What the attempt is built from.</param>
+/// <param name="resumeFrom">The <c>-C</c> offset the attempt resumes from, or <see langword="null" />.</param>
+/// <returns>The attempt's result.</returns>
+private async Task<TransferResult> PerformThroughEasyAsync(IToolEasyTransfer easy, RedirectFollower follower, TransferAttemptPieces attempt, long? resumeFrom)
+{
+    RunningTransferState state = Running;
+    easy.ToolOutputs = attempt.Outputs();
+    easy.ToolInputs = attempt.Inputs(resumeFrom) with { Url = attempt.Url };
+    easy.ToolEvents = new EngineToolTransferEvents(state.Events, state);
+    easy.ToolProgress = new EngineToolTransferProgress(state.Progress, state.AbortToken);
+    easy.ToolDispatch = new EngineToolTransferDispatch(follower, transferContextFactory);
+    _ = await easy.PerformAsync(CancellationToken.None).ConfigureAwait(false);
+    return easy.LastResult!;
+}
 
     /// <summary>Tells whether <paramref name="scheme" /> is <c>http</c> or <c>https</c>.</summary>
     /// <param name="scheme">The scheme, in lower case.</param>
@@ -4619,7 +4667,7 @@ internal sealed class CurlCommandRunner(
     /// without <c>-S</c>, then the retry warning unless <c>-s</c> was given, whether or not with
     /// <c>-S</c> (measured 2026-09-27, BL-241 Notes). The attempt's <c>-o</c> bytes are then kept
     /// or cut back (<see cref="KeepOrThrowAwayAttemptBytesAsync" />); the next attempt gets fresh
-    /// progress once the retry wait is over (<see cref="TransferPerformer.CreateRetryAttemptContext" />).
+    /// progress once the retry wait is over (<see cref="FollowRetryingThroughAsync" />).
     /// </summary>
     /// <param name="options">The accepted command line.</param>
     /// <param name="attempt">The attempt's result.</param>

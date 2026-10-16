@@ -117,7 +117,7 @@ public sealed class CurlCommandRunnerEasyTransferTests
 
         public IEasyTransfer CreateEasy()
         {
-            RecordingEasyTransfer handle = new((IToolAttemptTransfer)inner.CreateEasy());
+            RecordingEasyTransfer handle = new((IToolEasyTransfer)inner.CreateEasy());
             Handles.Add(handle);
             return handle;
         }
@@ -137,7 +137,7 @@ public sealed class CurlCommandRunnerEasyTransferTests
 
     /// <summary>An easy handle that counts its performs and passes everything to the managed one.</summary>
     /// <param name="inner">The managed handle.</param>
-    private sealed class RecordingEasyTransfer(IToolAttemptTransfer inner) : IToolAttemptTransfer
+    private sealed class RecordingEasyTransfer(IToolEasyTransfer inner) : IToolEasyTransfer
     {
         public int Performs { get; private set; }
 
@@ -155,9 +155,21 @@ public sealed class CurlCommandRunnerEasyTransferTests
 
         public IConnectOnlyConnection Connection => inner.Connection;
 
-        public ToolAttempt? ToolAttempt { get => inner.ToolAttempt; set => inner.ToolAttempt = value; }
+        public EngineTransferSettings? ToolSettings { get => inner.ToolSettings; set => inner.ToolSettings = value; }
 
-        public TransferResult? ToolAttemptResult => inner.ToolAttemptResult;
+        public EasyTransferHost Host { get => inner.Host; set => inner.Host = value; }
+
+        public EngineToolTransferInputs? ToolInputs { get => inner.ToolInputs; set => inner.ToolInputs = value; }
+
+        public EngineToolTransferOutputs? ToolOutputs { get => inner.ToolOutputs; set => inner.ToolOutputs = value; }
+
+        public EngineToolTransferEvents? ToolEvents { get => inner.ToolEvents; set => inner.ToolEvents = value; }
+
+        public EngineToolTransferProgress? ToolProgress { get => inner.ToolProgress; set => inner.ToolProgress = value; }
+
+        public EngineToolTransferDispatch? ToolDispatch { get => inner.ToolDispatch; set => inner.ToolDispatch = value; }
+
+        public TransferResult? LastResult => inner.LastResult;
 
         public ValueTask<CurlCode> PerformAsync(CancellationToken cancellationToken)
         {

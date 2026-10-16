@@ -20,6 +20,10 @@ namespace Curl.Engine;
 /// <param name="FormBody">The <c>-F</c> body built for this transfer, or <see langword="null" /> without <c>-F</c>.</param>
 /// <param name="Upload">The <c>-T</c> source, or <see langword="null" /> without <c>-T</c>.</param>
 /// <param name="AltSvc">The transfer's <c>--alt-svc</c> cache the runner opened, or <see langword="null" /> for none.</param>
+/// <param name="Url">
+/// The transfer URL the runner parsed and checked, transferred in place of a parse of
+/// <c>EasyNetworkOptions.Url</c>, which then only names the transfer (BL-2394); <see langword="null" /> to parse that.
+/// </param>
 internal sealed record EngineToolTransferInputs(
     ProxyEndpoint? Proxy = null,
     NetworkCredential? LookedUpCredentials = null,
@@ -29,4 +33,5 @@ internal sealed record EngineToolTransferInputs(
     long? ResumeFrom = null,
     HttpRequestBody? FormBody = null,
     Stream? Upload = null,
-    AltSvcTransferCache? AltSvc = null);
+    AltSvcTransferCache? AltSvc = null,
+    CurlUrl? Url = null);

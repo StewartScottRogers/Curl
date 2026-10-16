@@ -12,8 +12,8 @@ namespace Curl.Engine;
 
 /// <summary>
 /// Pins <see cref="ManagedEasyTransfer.ToolOutputs" /> (BL-2396, ADR-0558): a perform from the options with the
-/// curl tool's outputs set writes the same bytes, in the same order, as the same attempt the runner sets up and
-/// runs through <see cref="ManagedEasyTransfer.ToolAttempt" />, for a body, <c>-i</c>, <c>-D</c>, <c>-J</c> and
+/// curl tool's outputs set writes the same bytes, in the same order, as the same attempt performed directly on
+/// the runner's own context (<see cref="TransferPerformer.FollowWatchingSpeedAsync" />), for a body, <c>-i</c>, <c>-D</c>, <c>-J</c> and
 /// <c>--styled-output</c>, and a failing write ends both with the same exit 23 text.
 /// </summary>
 public sealed partial class ManagedEasyTransferTests
@@ -22,7 +22,7 @@ public sealed partial class ManagedEasyTransferTests
         "HTTP/1.1 200 OK\r\nContent-Length: 5\r\nContent-Disposition: attachment; filename=\"f.txt\"\r\n\r\nhello";
 
     [TestMethod]
-    public async Task PerformAsync_ToolOutputsForABody_WritesWhatTheToolAttemptWrites()
+    public async Task PerformAsync_ToolOutputsForABody_WritesWhatTheRunnersContextWrites()
     {
         (IReadOnlyList<string> fromOptions, IReadOnlyList<string> fromAttempt, _) = await WritesBothWaysAsync(new EasyBehaviourOptions(), dumpHeaders: false, watchHeaders: false, styled: false);
 
@@ -31,7 +31,7 @@ public sealed partial class ManagedEasyTransferTests
     }
 
     [TestMethod]
-    public async Task PerformAsync_ToolOutputsUnderInclude_WritesTheHeadLinesBeforeTheBodyAsTheToolAttemptDoes()
+    public async Task PerformAsync_ToolOutputsUnderInclude_WritesTheHeadLinesBeforeTheBodyAsTheRunnersContextDoes()
     {
         (IReadOnlyList<string> fromOptions, IReadOnlyList<string> fromAttempt, _) = await WritesBothWaysAsync(new EasyBehaviourOptions { IncludeHeader = true }, dumpHeaders: false, watchHeaders: false, styled: false);
 
@@ -41,7 +41,7 @@ public sealed partial class ManagedEasyTransferTests
     }
 
     [TestMethod]
-    public async Task PerformAsync_ToolOutputsWithDumpHeaderUnderInclude_TeesEachLineDumpFirstAsTheToolAttemptDoes()
+    public async Task PerformAsync_ToolOutputsWithDumpHeaderUnderInclude_TeesEachLineDumpFirstAsTheRunnersContextDoes()
     {
         (IReadOnlyList<string> fromOptions, IReadOnlyList<string> fromAttempt, _) = await WritesBothWaysAsync(new EasyBehaviourOptions { IncludeHeader = true }, dumpHeaders: true, watchHeaders: false, styled: false);
 
@@ -51,7 +51,7 @@ public sealed partial class ManagedEasyTransferTests
     }
 
     [TestMethod]
-    public async Task PerformAsync_ToolOutputsWithARemoteHeaderNameWatcher_ShowsItEachLineBeforeTheDumpAsTheToolAttemptDoes()
+    public async Task PerformAsync_ToolOutputsWithARemoteHeaderNameWatcher_ShowsItEachLineBeforeTheDumpAsTheRunnersContextDoes()
     {
         (IReadOnlyList<string> fromOptions, IReadOnlyList<string> fromAttempt, _) = await WritesBothWaysAsync(new EasyBehaviourOptions(), dumpHeaders: true, watchHeaders: true, styled: false);
 
@@ -62,7 +62,7 @@ public sealed partial class ManagedEasyTransferTests
     }
 
     [TestMethod]
-    public async Task PerformAsync_ToolOutputsWithStyledHeaders_StylesTheIncludedLinesAsTheToolAttemptDoes()
+    public async Task PerformAsync_ToolOutputsWithStyledHeaders_StylesTheIncludedLinesAsTheRunnersContextDoes()
     {
         (IReadOnlyList<string> fromOptions, IReadOnlyList<string> fromAttempt, _) = await WritesBothWaysAsync(new EasyBehaviourOptions { IncludeHeader = true }, dumpHeaders: true, watchHeaders: false, styled: true);
 
@@ -92,7 +92,7 @@ public sealed partial class ManagedEasyTransferTests
     }
 
     [TestMethod]
-    public async Task PerformAsync_ToolOutputThatFailsAWrite_EndsWithTheToolAttemptsExit23Text()
+    public async Task PerformAsync_ToolOutputThatFailsAWrite_EndsWithTheRunnersContextsExit23Text()
     {
         (_, _, (CurlCode Code, string Text, string AttemptText) failure) = await WritesBothWaysAsync(new EasyBehaviourOptions(), dumpHeaders: false, watchHeaders: false, styled: false, failBody: true);
 
@@ -130,8 +130,8 @@ public sealed partial class ManagedEasyTransferTests
         Assert.IsNull(easy.ToolOutputs);
     }
 
-    // Runs the response once from the options with ToolOutputs and once as the runner's own ToolAttempt, whose
-    // context its transferContextFactory.Create call builds from the same options and outputs, each writing into
+    // Runs the response once from the options with ToolOutputs and once performed directly on the runner's own
+    // context, which its transferContextFactory.Create call builds from the same options and outputs, each writing into
     // its own log; returns both logs and, for a failing body, both texts.
     private static async Task<(IReadOnlyList<string> FromOptions, IReadOnlyList<string> FromAttempt, (CurlCode Code, string Text, string AttemptText) Failure)> WritesBothWaysAsync(
         EasyBehaviourOptions behaviour,
@@ -149,8 +149,6 @@ public sealed partial class ManagedEasyTransferTests
 
         List<string> fromAttempt = [];
         EngineToolTransferOutputs attemptOutputs = OutputsOf(fromAttempt, dumpHeaders, watchHeaders, styled, failBody);
-        await using ManagedEasyTransfer runner = (ManagedEasyTransfer)CreateEngine(new ScriptedConnector([Encoding.ASCII.GetBytes(HeadedResponse)])).CreateEasy();
-        runner.Options = options;
         TransferContext context = new TransferContextFactory(Stream.Null, TimeProvider.System).Create(
             ManagedEasyTransfer.TransferSettingsOf(options),
             options.Http,
@@ -167,14 +165,13 @@ public sealed partial class ManagedEasyTransferTests
             attemptOutputs.HeaderOutput,
             watchHeaderOutput: attemptOutputs.WatchHeaderOutput,
             bodyHeaderStyles: attemptOutputs.BodyHeaderStyles);
-        runner.ToolAttempt = new ToolAttempt(
+        TransferResult attempt = await TransferPerformer.FollowWatchingSpeedAsync(
             new EngineTransferState(),
             new RedirectFollower(CreateDispatcher(new ScriptedConnector([Encoding.ASCII.GetBytes(HeadedResponse)]), null)),
             context,
             new RedirectPolicy());
-        await runner.PerformAsync(CancellationToken.None);
 
-        return (fromOptions, fromAttempt, (code, easy.ErrorText, runner.ErrorText));
+        return (fromOptions, fromAttempt, (code, easy.ErrorText, attempt.ErrorMessage ?? string.Empty));
     }
 
     private static EngineToolTransferOutputs OutputsOf(List<string> log, bool dumpHeaders, bool watchHeaders, bool styled, bool failBody) =>
