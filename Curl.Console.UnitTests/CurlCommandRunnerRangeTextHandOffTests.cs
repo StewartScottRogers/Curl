@@ -1,3 +1,4 @@
+using Curl.Engine;
 using System.Text;
 using System.Text.RegularExpressions;
 using Curl.Core;
@@ -199,7 +200,7 @@ public sealed partial class CurlCommandRunnerRangeTextHandOffTests
     {
         PhysicalFileSystem files = new();
         TransferDispatch dispatch = new(
-            new ProtocolDispatcher(CurlComposition.CreateProtocolHandlers(
+            new ProtocolDispatcher(EngineComposition.CreateProtocolHandlers(
                 connector,
                 new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"),
                 new PassThroughTlsProvider(),

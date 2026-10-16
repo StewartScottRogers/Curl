@@ -1,6 +1,6 @@
 # ADR-0448 — `curl -V` on Windows does not list `ECH`
 
-- **Status:** Accepted
+- **Status:** Accepted (Linux and macOS half superseded by ADR-0520)
 - **Date:** 2026-10-08
 
 Decided by Claude under Stewart's delegation (task BL-1822, GF-0029).

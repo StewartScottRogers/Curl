@@ -39,7 +39,7 @@ unit test. A slow test that is pure computation is not an Integration test: it s
 Always build and run the fast tests before declaring a task finished.
 
 ## Quality gates
-Every `*.UnitLibrary` (and `Curl.Console`) is held to 100% line coverage, 100% branch
+Every `*.UnitLibrary` (and `Curl.Console`, `Curl.Api` and `Libcurl`) is held to 100% line coverage, 100% branch
 coverage, cyclomatic complexity of at most 10 per method, and a CRAP score of at most 30.
 All four are measured with tooling the solution already has - the coverage collector the
 MSTest meta-package brings, and the SDK's own `CA1502` analyzer - so no package is needed
@@ -265,7 +265,7 @@ Curl/
 ├── Curl.Networking.IntegrationTests/ ← its Integration tests, just before the library
 ├── Curl.Networking.UnitLibrary/
 ├── Curl.Networking.UnitTests/
-├── ...                           ← 75 projects, one flat alphabetical run
+├── ...                           ← 84 projects, one flat alphabetical run
 ├── Documentation/                ← shared project (docs and planning)
 ├── Tasks/                        ← shared project (task board)
 ├── Audit/                        ← shared project (the audit office; never written by the factory)
@@ -278,11 +278,19 @@ Curl/
 - Tests: the same name with `.UnitTests` instead of `.UnitLibrary`.
 - Integration tests, once an area has any: the same name with `.IntegrationTests`
   instead of `.UnitLibrary` (ADR-0421).
-- The executable is `Curl.Console` — no `.UnitLibrary` suffix, because it is not a
-  library. It is the only exception.
+- Four projects are exceptions to the `Curl.<Area>.UnitLibrary` rule: the executable
+  `Curl.Console` (no `.UnitLibrary` suffix, because it is not a library), the two
+  programming interfaces `Curl.Api` and `Libcurl` (ADR-0506), and the MCP server host
+  `Curl.Mcp` (ADR-0548). `Libcurl` also has no `Curl.` prefix, matching upstream's library
+  name. `Curl.Api`, `Libcurl` and `Curl.Mcp` are held to the four quality gates like a
+  `*.UnitLibrary`. `Curl.Api.UnitTests` tests both `Curl.Api` and `Curl.Api.UnitLibrary`,
+  `Curl.Mcp.UnitTests` tests both `Curl.Mcp` and `Curl.Mcp.UnitLibrary`, and
+  `Libcurl.UnitTests` tests `Libcurl`.
 - Names sort so each `.UnitTests` lands directly after the library it tests, and each
   `.IntegrationTests` directly before it (for `Curl.Console`, directly before
-  `Curl.Console.UnitTests`). Keep it that way.
+  `Curl.Console.UnitTests`). Keep it that way. `Libcurl` and `Libcurl.UnitTests` sort after
+  every `Curl.*` project; in `Curl.slnx`, `Curl.Api`, `Curl.Api.UnitLibrary` and
+  `Curl.Api.UnitTests` come first, before `Curl.Authentication.UnitLibrary`.
 
 In `Curl.slnx`, projects are listed as one flat run with no solution folders around
 them. The `Solution Items` and `Scripts` solution folders hold loose files only.
@@ -306,10 +314,11 @@ Each project folder may contain its own `CLAUDE.md` with project-specific rules;
 - **Base class library only.** Write against `System.*`. Sockets, TLS, HTTP, DNS,
   compression, JSON and argument handling are all in the BCL already, and
   `Curl.Console` publishes native AOT, where every dependency is a trim risk. The
-  one package in `Directory.Packages.props` — Microsoft's `MSTest` meta-package —
-  is the test harness and is the only approved dependency in the solution. Adding a
-  second needs Stewart's explicit approval, asked for *before* the reference is
-  added — hand-roll the small piece needed, or stop and ask. Test projects use
+  approved packages are Microsoft's `MSTest` meta-package, the test harness, and, for
+  `Curl.Mcp` alone, `ModelContextProtocol` and `Microsoft.Extensions.Hosting` (Stewart,
+  2026-10-15, ADR-0548); no other project, and no `*.UnitLibrary`, may reference those two.
+  Adding any other package needs Stewart's explicit approval, asked for *before* the
+  reference is added — hand-roll the small piece needed, or stop and ask. Test projects use
   MSTest, the framework in the .NET SDK; no third-party test, mocking or assertion
   library is permitted.
 - **Tests pass on Windows, Linux and macOS.** CI runs the fast tests on all three, and

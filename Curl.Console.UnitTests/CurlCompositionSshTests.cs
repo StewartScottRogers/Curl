@@ -1,3 +1,4 @@
+using Curl.Engine;
 using System.Text;
 using Curl.Cli;
 using Curl.Protocol.Abstractions;
@@ -8,7 +9,7 @@ namespace Curl.Console;
 
 /// <summary>
 /// Pins <c>sftp://</c> and <c>scp://</c> end to end through the production composition: the
-/// <see cref="Curl.Protocol.Ssh.SshProtocolHandler" /> <see cref="CurlComposition.CreateProtocolHandlers" />
+/// <see cref="Curl.Protocol.Ssh.SshProtocolHandler" /> <see cref="EngineComposition.CreateProtocolHandlers" />
 /// registers, connected to the <see cref="InMemorySshServer" /> of <c>Curl.Protocol.Ssh.UnitTests</c>
 /// in place of the network. The outcomes are those BL-569 and BL-574 measured from curl 8.21.0: the
 /// file's bytes on standard output, nothing on standard error and exit 0, or exit 78 with curl's

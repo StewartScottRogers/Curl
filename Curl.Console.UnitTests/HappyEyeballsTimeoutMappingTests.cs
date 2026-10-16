@@ -1,4 +1,7 @@
+using Curl.Api.Options.Authentication;
+using Curl.Api.Options.Behaviour;
 using Curl.Cli;
+using Curl.Engine;
 using Curl.Networking;
 using Curl.Protocol.Abstractions;
 using Curl.Testing;
@@ -8,9 +11,9 @@ namespace Curl.Console;
 
 /// <summary>
 /// Pins how <c>--happy-eyeballs-timeout-ms</c> reaches <see cref="HttpRequestOptions.HappyEyeballsTimeout" />
-/// through <see cref="HttpRequestOptionsMapping.FromCommandLine" />, the QUIC-against-TCP race of a
+/// through <see cref="HttpRequestOptionsMapping.Of" />, the QUIC-against-TCP race of a
 /// <c>--http3</c> transfer (ADR-0144), and <see cref="TcpConnector.HappyEyeballsTimeout" /> through
-/// <see cref="CurlComposition.CreateTcpConnector" />, the IPv4-against-IPv6 race (ADR-0254, BL-889).
+/// <see cref="EngineComposition.CreateTcpConnector" />, the IPv4-against-IPv6 race (ADR-0254, BL-889).
 /// </summary>
 [TestClass]
 public sealed class HappyEyeballsTimeoutMappingTests
@@ -26,7 +29,7 @@ public sealed class HappyEyeballsTimeoutMappingTests
     {
         Diagnostics.Arrange("arguments", "--http3 --happy-eyeballs-timeout-ms 1000");
 
-        HttpRequestOptions http = HttpRequestOptionsMapping.FromCommandLine(Parse("--http3", "--happy-eyeballs-timeout-ms", "1000"));
+        HttpRequestOptions http = HttpRequestOptionsMapping.Of(EasyOptionsFromCommandLine.TransferSettingsOf(Parse("--http3", "--happy-eyeballs-timeout-ms", "1000")), EasyOptionsFromCommandLine.HttpOf(Parse("--http3", "--happy-eyeballs-timeout-ms", "1000")), new EasyBehaviourOptions(), new EasyTransferOptions(), new EasyAuthenticationOptions());
 
         Diagnostics.Act("HappyEyeballsTimeout", http.HappyEyeballsTimeout);
 
@@ -39,7 +42,7 @@ public sealed class HappyEyeballsTimeoutMappingTests
     {
         Diagnostics.Arrange("arguments", "--http3");
 
-        HttpRequestOptions http = HttpRequestOptionsMapping.FromCommandLine(Parse("--http3"));
+        HttpRequestOptions http = HttpRequestOptionsMapping.Of(EasyOptionsFromCommandLine.TransferSettingsOf(Parse("--http3")), EasyOptionsFromCommandLine.HttpOf(Parse("--http3")), new EasyBehaviourOptions(), new EasyTransferOptions(), new EasyAuthenticationOptions());
 
         Diagnostics.Act("HappyEyeballsTimeout", http.HappyEyeballsTimeout);
 
@@ -54,7 +57,7 @@ public sealed class HappyEyeballsTimeoutMappingTests
     {
         Diagnostics.Arrange("arguments", "--happy-eyeballs-timeout-ms 9000000000000");
 
-        HttpRequestOptions http = HttpRequestOptionsMapping.FromCommandLine(Parse("--happy-eyeballs-timeout-ms", "9000000000000"));
+        HttpRequestOptions http = HttpRequestOptionsMapping.Of(EasyOptionsFromCommandLine.TransferSettingsOf(Parse("--happy-eyeballs-timeout-ms", "9000000000000")), EasyOptionsFromCommandLine.HttpOf(Parse("--happy-eyeballs-timeout-ms", "9000000000000")), new EasyBehaviourOptions(), new EasyTransferOptions(), new EasyAuthenticationOptions());
 
         Diagnostics.Act("HappyEyeballsTimeout", http.HappyEyeballsTimeout);
 
@@ -90,14 +93,14 @@ public sealed class HappyEyeballsTimeoutMappingTests
 
     private static CommandLineOptions Parse(params string[] arguments)
     {
-        CommandLineParseResult result = OpenSslBuildParser.Parse([.. arguments, Url], _ => true);
+        CommandLineParseResult result = QuicBuildParser.Parse([.. arguments, Url], _ => true);
         Assert.IsTrue(result.IsAccepted);
         return result.Options;
     }
 
     private static TcpConnector CreateTcpConnector(CommandLineOptions options) =>
-        CurlComposition.CreateTcpConnector(
-            options,
+        EngineComposition.CreateTcpConnector(
+            EasyOptionsFromCommandLine.ToolOptionsOf(options), EasyOptionsFromCommandLine.TraceComponentsOf(options), EasyOptionsFromCommandLine.NetworkOf(options), EasyOptionsFromCommandLine.HttpOf(options), EasyOptionsFromCommandLine.ProxyOf(options), EasyOptionsFromCommandLine.AuthenticationOf(options),
             new LoopbackDnsResolver(),
             new ScriptedTcpDialer(new ScriptedConnector([])),
             new PassThroughTlsProvider(),

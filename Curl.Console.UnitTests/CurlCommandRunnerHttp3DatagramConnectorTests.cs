@@ -1,3 +1,4 @@
+using Curl.Engine;
 using System.Net;
 using System.Net.Sockets;
 using Curl.Networking;
@@ -25,7 +26,7 @@ public sealed class CurlCommandRunnerHttp3DatagramConnectorTests
                 new RefusingTcpDialer(),
                 new LoopbackDnsResolver(),
                 datagrams,
-                parsesAsWindowsBuild: false)
+                parsesAsWindowsBuild: false, parsesAsQuicBuild: true)
             .RunAsync(["-s", "--http3-only", "https://127.0.0.1:47260/"]);
 
         Assert.AreEqual((int)CurlExitCode.RecvError, exitCode);
@@ -40,7 +41,7 @@ public sealed class CurlCommandRunnerHttp3DatagramConnectorTests
     {
         Curl.Cli.CommandLineOptions options = Curl.Cli.CommandLineParser.Parse(["--trace-config", "http/3", "https://h3.example/"], _ => true).Options!;
 
-        QuicDialer dialer = CurlComposition.CreateDatagramConnectorQuicDialer(options, new TlsClientOptions(), new RecordingDatagramConnector());
+        QuicDialer dialer = EngineComposition.CreateDatagramConnectorQuicDialer(EasyOptionsFromCommandLine.TraceComponentsOf(options), new TlsClientOptions(), new RecordingDatagramConnector());
 
         Assert.IsTrue(dialer.WritesHttp3ConnectionLines);
     }

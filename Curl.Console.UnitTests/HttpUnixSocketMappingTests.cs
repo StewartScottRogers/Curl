@@ -1,4 +1,7 @@
+using Curl.Api.Options.Authentication;
+using Curl.Api.Options.Behaviour;
 using Curl.Cli;
+using Curl.Engine;
 using Curl.Testing;
 using HttpRequestOptions = Curl.Protocol.Abstractions.HttpRequestOptions;
 
@@ -7,7 +10,7 @@ namespace Curl.Console;
 /// <summary>
 /// Pins how <c>--unix-socket</c> and <c>--abstract-unix-socket</c> reach
 /// <see cref="HttpRequestOptions.OverUnixSocket" /> through
-/// <see cref="HttpRequestOptionsMapping.FromCommandLine" />, so the HTTP handler can refuse
+/// <see cref="HttpRequestOptionsMapping.Of" />, so the HTTP handler can refuse
 /// HTTP/3 over a Unix domain socket before connecting, as curl 8.21.0 does (BL-867).
 /// </summary>
 [TestClass]
@@ -29,11 +32,11 @@ public sealed class HttpUnixSocketMappingTests
         Diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
 
-        bool overUnixSocket = HttpRequestOptionsMapping.FromCommandLine(result.Options).OverUnixSocket;
+        bool overUnixSocket = HttpRequestOptionsMapping.Of(EasyOptionsFromCommandLine.TransferSettingsOf(result.Options), EasyOptionsFromCommandLine.HttpOf(result.Options), new EasyBehaviourOptions(), new EasyTransferOptions(), new EasyAuthenticationOptions()).OverUnixSocket;
         Diagnostics.Act("over unix socket", overUnixSocket);
 
         Diagnostics.Assert("over unix socket", true, overUnixSocket);
-        Assert.IsTrue(HttpRequestOptionsMapping.FromCommandLine(result.Options).OverUnixSocket);
+        Assert.IsTrue(HttpRequestOptionsMapping.Of(EasyOptionsFromCommandLine.TransferSettingsOf(result.Options), EasyOptionsFromCommandLine.HttpOf(result.Options), new EasyBehaviourOptions(), new EasyTransferOptions(), new EasyAuthenticationOptions()).OverUnixSocket);
     }
 
     [TestMethod]
@@ -44,10 +47,10 @@ public sealed class HttpUnixSocketMappingTests
         Diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
 
-        bool overUnixSocket = HttpRequestOptionsMapping.FromCommandLine(result.Options).OverUnixSocket;
+        bool overUnixSocket = HttpRequestOptionsMapping.Of(EasyOptionsFromCommandLine.TransferSettingsOf(result.Options), EasyOptionsFromCommandLine.HttpOf(result.Options), new EasyBehaviourOptions(), new EasyTransferOptions(), new EasyAuthenticationOptions()).OverUnixSocket;
         Diagnostics.Act("over unix socket", overUnixSocket);
 
         Diagnostics.Assert("over unix socket", false, overUnixSocket);
-        Assert.IsFalse(HttpRequestOptionsMapping.FromCommandLine(result.Options).OverUnixSocket);
+        Assert.IsFalse(HttpRequestOptionsMapping.Of(EasyOptionsFromCommandLine.TransferSettingsOf(result.Options), EasyOptionsFromCommandLine.HttpOf(result.Options), new EasyBehaviourOptions(), new EasyTransferOptions(), new EasyAuthenticationOptions()).OverUnixSocket);
     }
 }

@@ -134,6 +134,13 @@ public sealed record Tls12ClientSettings
     public bool InsertEmptyFragment { get; init; } = true;
 
     /// <summary>
+    /// Gets where the connection's master secret is logged, as a <c>CLIENT_RANDOM</c> entry once
+    /// the keys are installed, for a full handshake and a resumed one alike; <see langword="null" />
+    /// to log nothing. curl's OpenSSL build logs to <c>SSLKEYLOGFILE</c> (BL-2327).
+    /// </summary>
+    public ITlsKeyLog? KeyLog { get; init; }
+
+    /// <summary>
     /// Gets the suites the ClientHello carries: <see cref="CipherSuites" /> without those that
     /// need TLS 1.2 when <see cref="MaximumVersion" /> is below it, as OpenSSL leaves out a
     /// suite the highest offered version cannot run.

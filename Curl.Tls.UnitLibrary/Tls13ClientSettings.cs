@@ -168,6 +168,17 @@ public sealed record Tls13ClientSettings
     public bool SendEncryptedClientHelloGrease { get; init; }
 
     /// <summary>
+    /// Gets where the handshake logs its secrets as NSS key-log entries, in OpenSSL's order:
+    /// <c>CLIENT_EARLY_TRAFFIC_SECRET</c> when early data is offered,
+    /// <c>CLIENT_HANDSHAKE_TRAFFIC_SECRET</c> and <c>SERVER_HANDSHAKE_TRAFFIC_SECRET</c> after the
+    /// ServerHello, and <c>CLIENT_TRAFFIC_SECRET_0</c>, <c>SERVER_TRAFFIC_SECRET_0</c> and
+    /// <c>EXPORTER_SECRET</c> after the server's Finished, each with the random of the hello the
+    /// transcript holds (the inner one with an ECH offer); <see langword="null" /> to log nothing.
+    /// curl's OpenSSL build logs to <c>SSLKEYLOGFILE</c> (BL-2339).
+    /// </summary>
+    public ITlsKeyLog? KeyLog { get; init; }
+
+    /// <summary>
     /// Gets the TLS 1.2-and-below offer the same ClientHello also carries, or
     /// <see langword="null" /> to offer TLS 1.3 alone (<see cref="TlsClientConnection" />):
     /// its versions follow TLS 1.3 in <c>supported_versions</c>, its suites follow the TLS 1.3

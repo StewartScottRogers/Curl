@@ -48,7 +48,9 @@ internal static class FileOpenFailure
     /// <see cref="FileAccessStatus.AccessDenied" /> for a refusal;
     /// <see cref="FileAccessStatus.AlreadyExists" /> for the <see cref="IOException" /> a
     /// <see cref="FileMode.CreateNew" /> open raises over an existing file
-    /// (<see cref="IsFileExists(Exception)" />); and
+    /// (<see cref="IsFileExists(Exception)" />);
+    /// <see cref="FileAccessStatus.NotADirectory" /> for <c>ENOTDIR</c>
+    /// (<see cref="IsNotADirectory(Exception)" />); and
     /// <see cref="FileAccessStatus.IoError" /> for everything else, an invalid or
     /// over-long path included.
     /// </returns>
@@ -63,9 +65,45 @@ internal static class FileOpenFailure
         {
             FileNotFoundException or DirectoryNotFoundException => FileAccessStatus.NotFound,
             UnauthorizedAccessException => FileAccessStatus.AccessDenied,
-            _ when IsFileExists(exception) => FileAccessStatus.AlreadyExists,
-            _ => FileAccessStatus.IoError,
+            _ => StatusForErrorCode(exception),
         };
+    }
+
+    /// <summary>
+    /// Chooses the <see cref="FileAccessStatus" /> for a failed open that .NET reported with
+    /// no exception type of its own, from the error code it carries.
+    /// </summary>
+    /// <param name="exception">The exception the open threw.</param>
+    /// <returns>
+    /// <see cref="FileAccessStatus.AlreadyExists" />, <see cref="FileAccessStatus.NotADirectory" />,
+    /// or <see cref="FileAccessStatus.IoError" /> for any other code.
+    /// </returns>
+    private static FileAccessStatus StatusForErrorCode(Exception exception)
+    {
+        if (IsFileExists(exception))
+        {
+            return FileAccessStatus.AlreadyExists;
+        }
+
+        return IsNotADirectory(exception) ? FileAccessStatus.NotADirectory : FileAccessStatus.IoError;
+    }
+
+    /// <summary>
+    /// Tells whether <paramref name="exception" /> is the <see cref="IOException" /> .NET
+    /// raises off Windows when a component of the path's parent is a file: <c>ENOTDIR</c>,
+    /// which it maps to no exception type of its own.
+    /// </summary>
+    /// <param name="exception">The exception the open threw.</param>
+    /// <returns>
+    /// <see langword="true" /> when its <see cref="Exception.HResult" /> is <c>ENOTDIR</c>
+    /// (20 on Linux and macOS), the raw <c>errno</c> .NET carries off Windows; a Windows
+    /// <c>HRESULT</c> is never that small.
+    /// </returns>
+    internal static bool IsNotADirectory(Exception exception)
+    {
+        const int PosixErrorNotADirectory = 20;
+
+        return exception is IOException && exception.HResult == PosixErrorNotADirectory;
     }
 
     /// <summary>

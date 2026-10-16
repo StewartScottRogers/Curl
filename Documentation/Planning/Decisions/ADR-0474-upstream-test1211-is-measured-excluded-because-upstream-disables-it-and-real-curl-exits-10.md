@@ -47,11 +47,12 @@ against curl.
    8.21.0 exits 10 after QUIT, which Curl matches; this ADR is the record of why that
    exclusion is right, so GF-0048's item can close.
 4. Any other case upstream's `DISABLED` lists, whose expectation real curl contradicts, is
-   handled the same way: measure real curl, match it, and exclude the case with that reason.
+   handled the same way: measure real curl and match it; the converter's general
+   `disabled-upstream` rule excludes the case, with no reason specific to it.
 
 ## Consequences
 
 Matching test1211's text would make Curl differ from real curl on the same exchange, which a
-drop-in replacement cannot do. Applying the exclusion in the gap office's measurement lives
-under `Gap/`, which the dark factory never reads or changes, so it is left to an interactive
-session's next gap run.
+drop-in replacement cannot do. The exclusion needs no change under `Gap/`: the gap run
+2026-10-15_0304 records `behaviour:test1211` as `excluded`, `disabled-upstream` (AF-0202,
+BL-2274).

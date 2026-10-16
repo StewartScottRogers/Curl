@@ -422,7 +422,14 @@ public sealed class TftpProtocolHandlerTests
     {
         Diagnostics.Arrange("url", url);
         Diagnostics.Arrange("TFTP block size", tftpBlockSize?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "(default)");
-        return new() { Url = CurlUrl.Parse(url), Output = output ?? new MemoryStream(), TftpBlockSize = tftpBlockSize };
+        // A frozen clock keeps the timeout option at 6 however slowly the run goes (BL-2351).
+        return new()
+        {
+            Url = CurlUrl.Parse(url),
+            Output = output ?? new MemoryStream(),
+            TftpBlockSize = tftpBlockSize,
+            TimeProvider = new ManualTimeProvider(),
+        };
     }
 
     private ScriptedDatagramChannel Channel(params (byte[] Datagram, EndPoint Source)[] script)

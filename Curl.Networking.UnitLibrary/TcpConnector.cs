@@ -2354,8 +2354,8 @@ public sealed partial class TcpConnector(
             LocalBindFailure.InterfaceFailed => ConnectResult.Failed(CurlExitCode.InterfaceFailed, errorMessage, timings),
             LocalBindFailure.BadArgument => ConnectResult.Failed(CurlExitCode.BadFunctionArgument, errorMessage, timings),
             _ when lastError == SocketError.ConnectionRefused => ConnectResult.Refused(errorMessage, timings),
-            _ when lastError == SocketError.TimedOut => ConnectResult.Failed(CurlExitCode.OperationTimedOut, errorMessage, timings),
-            _ => ConnectResult.Failed(CurlExitCode.CouldntConnect, errorMessage, timings),
+            _ when lastError == SocketError.TimedOut => ConnectResult.Failed(CurlExitCode.OperationTimedOut, errorMessage, timings, lastSocketError: lastError),
+            _ => ConnectResult.Failed(CurlExitCode.CouldntConnect, errorMessage, timings, lastSocketError: lastError),
         };
     }
 

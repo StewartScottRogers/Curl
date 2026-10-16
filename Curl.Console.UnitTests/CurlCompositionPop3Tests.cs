@@ -1,3 +1,4 @@
+using Curl.Engine;
 using System.Text;
 
 using Curl.Protocol.Abstractions;
@@ -7,7 +8,7 @@ namespace Curl.Console;
 
 /// <summary>
 /// Pins <c>pop3://</c> and <c>pop3s://</c> end to end through the production composition over
-/// fake connectors: the handler <see cref="CurlComposition.CreateProtocolHandlers" /> registers
+/// fake connectors: the handler <see cref="EngineComposition.CreateProtocolHandlers" /> registers
 /// and the SASL authenticator it composes. Every exchange was recorded from curl 8.21.0 (mingw,
 /// Schannel) on 2026-09-28 with <c>Record-CurlExchange.ps1 -Pop3</c> (BL-548 and BL-549 Notes):
 /// curl running <c>-sS [-u u:p] pop3://127.0.0.1:18110/1</c> against the recorder's default

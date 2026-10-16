@@ -1,3 +1,4 @@
+using Curl.Engine;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -180,7 +181,7 @@ public sealed class CurlCommandRunnerEndPointTests
         {
             exitCode = await new CurlCommandRunner(
                     _ => new TransferDispatch(new ProtocolDispatcher(
-                        CurlComposition.CreateProtocolHandlers(connector, datagramConnector, new PassThroughTlsProvider(), new LoopbackDnsResolver()))),
+                        EngineComposition.CreateProtocolHandlers(connector, datagramConnector, new PassThroughTlsProvider(), new LoopbackDnsResolver()))),
                     new InMemoryFileSystem(),
                     new InMemoryFileSystem(),
                     standardOutput,

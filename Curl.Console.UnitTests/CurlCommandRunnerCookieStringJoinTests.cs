@@ -1,3 +1,4 @@
+using Curl.Engine;
 using System.Text;
 
 using Curl.Core;
@@ -190,8 +191,8 @@ public sealed class CurlCommandRunnerCookieStringJoinTests
     /// <summary>The production handler set over <paramref name="connector" />, with the run's cookies.</summary>
     private static TransferDispatch CreateTransferDispatch(IConnector connector, Cli.CommandLineOptions options)
     {
-        CookieEngine? cookies = CookieEngine.FromCommandLine(options);
-        IReadOnlyList<IProtocolHandler> handlers = CurlComposition.CreateProtocolHandlers(
+        CookieEngine? cookies = CookieEngine.FromHttpOptions(EasyOptionsFromCommandLine.HttpOf(options));
+        IReadOnlyList<IProtocolHandler> handlers = EngineComposition.CreateProtocolHandlers(
             connector,
             new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"),
             new PassThroughTlsProvider(),

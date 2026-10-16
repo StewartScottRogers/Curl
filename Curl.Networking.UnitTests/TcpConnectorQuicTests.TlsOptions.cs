@@ -36,7 +36,7 @@ public sealed partial class TcpConnectorQuicTests
         var opener = new QuicServerChannelOpener { ServerFor = _ => Server(requestClientCertificate: true) };
         var options = new TlsClientOptions(
             Insecure: true,
-            ClientCertificate: Escaped(WriteFile("client.pem", s_clientCertificate.ExportCertificatePem())),
+            ClientCertificate: WriteFile("client.pem", s_clientCertificate.ExportCertificatePem()),
             PrivateKey: WriteFile("key.pem", s_clientKey.ExportPkcs8PrivateKeyPem()));
         Diagnostics.Arrange("client certificate", "client.pem with key.pem, server asks for one");
 

@@ -676,6 +676,14 @@ internal static class TlsFailureMessages
     /// <summary>The OpenSSL build's message for exit 58: <c>--cert-type ENG</c>.</summary>
     public const string OpenSslClientCertificateEngineNotSet = "crypto engine not set, cannot load certificate";
 
+    /// <summary>
+    /// The OpenSSL build's message for exit 58: a <c>pkcs11:</c> certificate or key of type
+    /// <c>ENG</c> or <c>PROV</c>, which makes OpenSSL 3 try to load the pkcs11 provider, on a
+    /// system without one (curl 8.18.0 with OpenSSL 3.5.5, measured 2026-10-15, BL-2349).
+    /// </summary>
+    public const string OpenSslPkcs11ProviderNotLoaded =
+        "Failed to initialize provider: error:12800067:DSO support routines::could not load the shared library";
+
     /// <summary>The OpenSSL build's message for exit 58: <c>--cert-type PROV</c>.</summary>
     public const string OpenSslClientCertificateProviderNotSet = "crypto provider not set, cannot load certificate";
 

@@ -39,6 +39,25 @@ public sealed class HttpStatusLineTests
     }
 
     [TestMethod]
+    [DataRow("HTTP/2 101 OK", true, DisplayName = "HTTP/2 101")]
+    [DataRow("HTTP/3 100", true, DisplayName = "HTTP/3 100")]
+    [DataRow("HTTP/2 200 OK", false, DisplayName = "HTTP/2 200 is final")]
+    [DataRow("HTTP/2 10", false, DisplayName = "Too short")]
+    [DataRow("HTTP/2 1x1", false, DisplayName = "Code not digits")]
+    [DataRow("HTTP/1.1 101", false, DisplayName = "HTTP/1.1")]
+    [DataRow("HTTP/4 101", false, DisplayName = "HTTP/4")]
+    public void IsHttp2OrHttp3Interim_StatusLine_TellsWhetherItIsAnHttp2OrHttp3Interim(string line, bool expected)
+    {
+        Diagnostics.Arrange("line", line);
+
+        bool actual = HttpStatusLine.IsHttp2OrHttp3Interim(line);
+
+        Diagnostics.Act("is interim", actual);
+        Diagnostics.Assert("is interim", expected, actual);
+        Assert.AreEqual(expected, actual);
+    }
+
+    [TestMethod]
     public void ParseHttp2OrHttp3_StatusLineTheHttp2StreamWrites_IsVersion2WithTheCodeAndNoReason()
     {
         Diagnostics.Arrange("line", "HTTP/2 404 ");

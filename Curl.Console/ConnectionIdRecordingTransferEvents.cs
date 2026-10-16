@@ -15,7 +15,7 @@ namespace Curl.Console;
 /// the <c>N</c> of <c>Connection #N</c> (ADR-0109).
 /// </summary>
 /// <param name="inner">The transfer's own events.</param>
-/// <param name="state">The running transfer whose <see cref="RunningTransferState.ConnectionId" /> is kept.</param>
+/// <param name="state">The running transfer whose <see cref="Curl.Engine.EngineTransferState.ConnectionId" /> is kept.</param>
 /// <param name="connectionIds">The run's <c>%{conn_id}</c> of each connection, by the pool's number for it.</param>
 /// <param name="takeConnectionId">Gives the transfer its <c>%{conn_id}</c>, taking the next one when it has none.</param>
 internal sealed class ConnectionIdRecordingTransferEvents(

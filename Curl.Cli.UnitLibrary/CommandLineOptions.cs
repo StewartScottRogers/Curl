@@ -272,12 +272,23 @@ public sealed class CommandLineOptions
 
     /// <summary>
     /// <see langword="true"/> when the command line is read as curl's Windows Schannel build reads it: that
-    /// build's libcurl has no HTTP/2, HTTP/3, TLS-SRP or SSL session export, so <c>--http2</c>,
-    /// <c>--http2-prior-knowledge</c>, <c>--http3</c>, <c>--http3-only</c> and <c>--ssl-sessions</c> are refused with
+    /// build's libcurl has no HTTP/2 or SSL session export, so <c>--http2</c>, <c>--http2-prior-knowledge</c>,
+    /// <c>--proxy-http2</c> and <c>--ssl-sessions</c> are refused with
     /// <see cref="CommandLineRefusal.InstalledLibcurlDoesNotSupport"/> (<see cref="CommandLineOption.RefusedBySchannelBuild"/>,
     /// ADR-0397). Set by <see cref="CommandLineParser"/> for the platform it is asked to behave as.
     /// </summary>
     public bool ActsAsWindowsSchannelBuild { get => globals.ActsAsWindowsSchannelBuild; internal set => globals.ActsAsWindowsSchannelBuild = value; }
+
+    /// <summary>
+    /// <see langword="true"/> when the command line is read as a curl built with a QUIC library reads it, as
+    /// curl.se's ngtcp2 build does: <c>--http3</c> and <c>--http3-only</c> are accepted and run over Curl's
+    /// hand-built HTTP/3 (ADR-0144). <see langword="false"/> as every reference build reads it - Schannel on
+    /// Windows, OpenSSL without a QUIC library on Linux and macOS - which refuses both with
+    /// <see cref="CommandLineRefusal.InstalledLibcurlDoesNotSupport"/> (<see cref="CommandLineOption.RefusedWithoutQuic"/>,
+    /// ADR-0540). The executable never sets it; tests and the conformance harness ask
+    /// <see cref="CommandLineParser"/> for it to reach the HTTP/3 stack.
+    /// </summary>
+    public bool ActsAsQuicBuild { get => globals.ActsAsQuicBuild; internal set => globals.ActsAsQuicBuild = value; }
 
     /// <summary>
     /// Reads an environment variable for <c>--variable %name</c>; <see langword="null"/> when it is not set.

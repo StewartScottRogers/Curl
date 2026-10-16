@@ -29,11 +29,25 @@ public sealed class OutputFileOpenWarningTests
     }
 
     [TestMethod]
+    public void For_ParentIsAFileOnLinux_MatchesCurlsUpstreamTest3036Line()
+    {
+        Diagnostics.Arrange("path", "log/present/MMM3036MMM");
+        Diagnostics.Arrange("status", FileAccessStatus.NotADirectory);
+
+        string line = OutputFileOpenWarning.For("log/present/MMM3036MMM", FileAccessStatus.NotADirectory);
+        Diagnostics.Act("warning line", line);
+
+        Diagnostics.Diff("warning line", "Warning: Failed to open the file log/present/MMM3036MMM: Not a directory", line);
+        Assert.AreEqual("Warning: Failed to open the file log/present/MMM3036MMM: Not a directory", line);
+    }
+
+    [TestMethod]
     [DataRow(FileAccessStatus.NotFound, "No such file or directory")]
     [DataRow(FileAccessStatus.AccessDenied, "Permission denied")]
     [DataRow(FileAccessStatus.IsDirectory, "Permission denied")]
     [DataRow(FileAccessStatus.IoError, "Invalid argument")]
     [DataRow(FileAccessStatus.AlreadyExists, "File exists")]
+    [DataRow(FileAccessStatus.NotADirectory, "Not a directory")]
     [DataRow(FileAccessStatus.Ok, "Invalid argument")]
     [DataRow((FileAccessStatus)99, "Invalid argument")]
     public void ReasonFor_EachStatus_IsCurlsStrerrorText(FileAccessStatus status, string expected)

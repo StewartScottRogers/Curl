@@ -379,6 +379,19 @@ public sealed class CommandLineParserTests
     }
 
     [TestMethod]
+    public void Parse_RefusedOrAccepted_KeepsTheOptionsReadOnlyWhenRefused()
+    {
+        CommandLineParseResult refused = Parse(["-s"]);
+        CommandLineParseResult accepted = Parse(["-s", "http://h/"]);
+        Diagnostics.Act("refused keeps options with -s", refused.OptionsReadBeforeRefusal?.Silent);
+        Diagnostics.Act("accepted keeps none", accepted.OptionsReadBeforeRefusal is null);
+
+        Diagnostics.Assert("refused keeps options with -s", true, refused.OptionsReadBeforeRefusal?.Silent);
+        Assert.IsTrue(refused.OptionsReadBeforeRefusal?.Silent);
+        Assert.IsNull(accepted.OptionsReadBeforeRefusal);
+    }
+
+    [TestMethod]
     public void Parse_UnknownOptionAndNoUrl_RefusesAsUnknownNotAsNoUrl()
     {
         CommandLineParseResult result = Parse(["--bogus"]);

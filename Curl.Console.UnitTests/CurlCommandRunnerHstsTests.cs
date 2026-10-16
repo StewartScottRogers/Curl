@@ -1,3 +1,4 @@
+using Curl.Engine;
 using System.Text;
 using Curl.Core;
 using Curl.Protocol.Abstractions;
@@ -346,7 +347,7 @@ public sealed class CurlCommandRunnerHstsTests
     }
 
     private static TransferDispatch CreateTransferDispatch(IConnector connector) =>
-        new(new ProtocolDispatcher(CurlComposition.CreateProtocolHandlers(
+        new(new ProtocolDispatcher(EngineComposition.CreateProtocolHandlers(
             connector,
             new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"),
             new PassThroughTlsProvider(),

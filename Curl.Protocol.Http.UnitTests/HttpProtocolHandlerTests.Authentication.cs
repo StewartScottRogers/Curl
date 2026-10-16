@@ -409,7 +409,8 @@ public sealed partial class HttpProtocolHandlerTests
     /// A body chunked for its unknown length, as stdin's is, drawing a 401 from an HTTP/1.0
     /// server: curl 8.21.0 says it needs to rewind the upload, closes the HTTP/1.0 connection,
     /// connects again for the answer, which goes out as HTTP/1.0 and cannot carry the body, and
-    /// fails it with exit 25 before writing a byte to the new connection (BL-2130, upstream test1072).
+    /// fails it with exit 25 before writing a byte to the new connection, where rewinding the body
+    /// does not fail, as on Windows (BL-2130, upstream test1072; BL-2337).
     /// </summary>
     [TestMethod]
     public async Task ExecuteAsync_Http10ChallengeToABodyOfUnknownLength_ReconnectsThenReturnsUploadFailed()
@@ -442,6 +443,45 @@ public sealed partial class HttpProtocolHandlerTests
         Assert.AreEqual(string.Empty, second.Written);
         CollectionAssert.IsSubsetOf(
             new[] { "* Need to rewind upload for next request", "* Issue another request to this URL: 'http://127.0.0.1:18183/a'" },
+            events.Events);
+    }
+
+    /// <summary>
+    /// The same 401 from an HTTP/1.0 server where rewinding an upload that cannot seek fails, as
+    /// the OpenSSL build of curl 8.22.0 fails to <c>lseek</c> stdin read through a pipe on Linux
+    /// and macOS: the retry fails with exit 65 <c>seek callback returned error 2</c> before it
+    /// connects again (measured, BL-2337 Notes; upstream test1072 as GF-0082 runs it).
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_Http10ChallengeToABodyOfUnknownLengthThatCannotRewind_ReturnsSendFailRewindWithoutReconnecting()
+    {
+        string http10Challenge = ChallengeHead.Replace("HTTP/1.1", "HTTP/1.0", StringComparison.Ordinal);
+        TurnTakingConnection first = new(65536, http10Challenge + "nope");
+        TurnTakingConnection second = new(65536, OkHead + "ok");
+        MemoryStream output = new();
+        RecordingTransferEvents events = new();
+        TransferContext context = new()
+        {
+            Url = CurlUrl.Parse(AuthUrl),
+            Output = output,
+            Http = new HttpRequestOptions { Body = new StreamBody(new UnrewindableStream("hello"u8.ToArray()), null, "application/octet-stream") },
+            Events = events,
+        };
+        HttpProtocolHandler handler = new(QueueConnector.For(first, second), new ScriptedAuthenticator(null, DigestValue));
+        Diagnostics.Arrange("url, body, response", $"{AuthUrl}, an unseekable stream body of unknown length, {OneLine(http10Challenge)}");
+
+        TransferResult result = await handler.ExecuteAsync(context);
+
+        WriteResult(result);
+        WriteEvents("events", events.Events);
+        Diagnostics.Assert("exit code", CurlExitCode.SendFailRewind, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.SendFailRewind, result.ExitCode);
+        Assert.AreEqual("seek callback returned error 2", result.ErrorMessage);
+        Assert.AreEqual(string.Empty, Latin1(output.ToArray()));
+        Assert.AreEqual(1, result.Report!.ConnectionCount);
+        Assert.AreEqual(string.Empty, second.Written);
+        CollectionAssert.IsSubsetOf(
+            new[] { "* Need to rewind upload for next request", "* seek callback returned error 2", "* rewind of client reader 'cr-in' failed: 65" },
             events.Events);
     }
 

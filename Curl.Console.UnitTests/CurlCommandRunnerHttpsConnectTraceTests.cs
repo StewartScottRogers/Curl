@@ -1,9 +1,11 @@
+using Curl.Engine;
 using System.Text;
 using Curl.Cli;
 using Curl.Core;
 using Curl.Networking;
 using Curl.Protocol.Abstractions;
 using Curl.Testing;
+using HttpVersion = Curl.Api.Options.Http.HttpVersion;
 
 namespace Curl.Console;
 
@@ -98,20 +100,20 @@ public sealed class CurlCommandRunnerHttpsConnectTraceTests
     }
 
     [TestMethod]
-    [DataRow(null, "h2")]
-    [DataRow(RequestedHttpVersion.Http10, "h1")]
-    [DataRow(RequestedHttpVersion.Http11, "h1")]
-    [DataRow(RequestedHttpVersion.Http2, "h2")]
-    [DataRow(RequestedHttpVersion.Http2PriorKnowledge, "h2")]
-    [DataRow(RequestedHttpVersion.Http3, "h3")]
-    [DataRow(RequestedHttpVersion.Http3Only, "h3")]
-    public void HttpsConnectFirstAttemptVersionOf_EachVersionOption_NamesTheFirstAttemptsVersion(RequestedHttpVersion? version, string expected)
+    [DataRow(HttpVersion.None, "h2")]
+    [DataRow(HttpVersion.Http10, "h1")]
+    [DataRow(HttpVersion.Http11, "h1")]
+    [DataRow(HttpVersion.Http2, "h2")]
+    [DataRow(HttpVersion.Http2PriorKnowledge, "h2")]
+    [DataRow(HttpVersion.Http3, "h3")]
+    [DataRow(HttpVersion.Http3Only, "h3")]
+    public void HttpsConnectFirstAttemptVersionOf_EachVersionOption_NamesTheFirstAttemptsVersion(HttpVersion version, string expected)
     {
-        Diagnostics.Arrange("requested version", version?.ToString() ?? "(none)");
+        Diagnostics.Arrange("option group version", version.ToString());
         string actual;
         using (Diagnostics.Phase("run"))
         {
-            actual = CurlComposition.HttpsConnectFirstAttemptVersionOf(version);
+            actual = EngineComposition.HttpsConnectFirstAttemptVersionOf(version);
         }
 
         Diagnostics.Act("first attempt version", actual);
@@ -127,15 +129,15 @@ public sealed class CurlCommandRunnerHttpsConnectTraceTests
     {
         // curl.se's curl 8.22.0 ngtcp2 build: --http3 names "2nd attempt uses h2", --http3-only none (BL-1284 Notes).
         Diagnostics.Arrange("option", option);
-        CommandLineParseResult parsed = OpenSslBuildParser.Parse(["-k", "-v", "--trace-config", "https-connect", option, "https://127.0.0.1:18713/"], _ => true);
+        CommandLineParseResult parsed = QuicBuildParser.Parse(["-k", "-v", "--trace-config", "https-connect", option, "https://127.0.0.1:18713/"], _ => true);
         Diagnostics.Assert("parse accepted", true, parsed.IsAccepted);
         Assert.IsTrue(parsed.IsAccepted);
 
         TcpConnector connector;
         using (Diagnostics.Phase("run"))
         {
-            connector = CurlComposition.CreateTcpConnector(
-                parsed.Options!,
+            connector = EngineComposition.CreateTcpConnector(
+                EasyOptionsFromCommandLine.ToolOptionsOf(parsed.Options!), EasyOptionsFromCommandLine.TraceComponentsOf(parsed.Options!), EasyOptionsFromCommandLine.NetworkOf(parsed.Options!), EasyOptionsFromCommandLine.HttpOf(parsed.Options!), EasyOptionsFromCommandLine.ProxyOf(parsed.Options!), EasyOptionsFromCommandLine.AuthenticationOf(parsed.Options!),
                 new LoopbackDnsResolver(),
                 new ScriptedTcpDialer(new ScriptedConnector([Response])),
                 new PassThroughTlsProvider(),
@@ -350,8 +352,8 @@ public sealed class CurlCommandRunnerHttpsConnectTraceTests
         Diagnostics.Arrange("scripted reads", string.Join(" | ", reads.Select(read => Encoding.Latin1.GetString(read).Replace("\r\n", "\\r\\n", StringComparison.Ordinal))));
         CommandLineParseResult parsed = CommandLineParser.Parse(["-s", .. arguments], _ => true);
         Assert.IsTrue(parsed.IsAccepted);
-        TcpConnector connector = CurlComposition.CreateTcpConnector(
-            parsed.Options,
+        TcpConnector connector = EngineComposition.CreateTcpConnector(
+            EasyOptionsFromCommandLine.ToolOptionsOf(parsed.Options), EasyOptionsFromCommandLine.TraceComponentsOf(parsed.Options), EasyOptionsFromCommandLine.NetworkOf(parsed.Options), EasyOptionsFromCommandLine.HttpOf(parsed.Options), EasyOptionsFromCommandLine.ProxyOf(parsed.Options), EasyOptionsFromCommandLine.AuthenticationOf(parsed.Options),
             new LoopbackDnsResolver(),
             new ScriptedTcpDialer(new ScriptedConnector(reads)),
             new PassThroughTlsProvider(),
@@ -364,7 +366,7 @@ public sealed class CurlCommandRunnerHttpsConnectTraceTests
         {
             exitCode = await new CurlCommandRunner(
                     _ => new TransferDispatch(
-                        new ProtocolDispatcher(CurlComposition.CreateProtocolHandlers(connector, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new PassThroughTlsProvider(), new LoopbackDnsResolver())),
+                        new ProtocolDispatcher(EngineComposition.CreateProtocolHandlers(connector, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new PassThroughTlsProvider(), new LoopbackDnsResolver())),
                         [],
                         loadResolveEntries: connector.LoadResolveEntries),
                     files,

@@ -1,0 +1,155 @@
+using Curl.Console;
+using Curl.Engine;
+using System.Net;
+using System.Net.Security;
+using System.Net.Sockets;
+using System.Security.Authentication;
+using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
+using Curl.Cli;
+using Curl.Networking;
+using Curl.Protocol.Abstractions;
+using Curl.Testing;
+
+namespace Curl.Engine;
+
+// Pins that --proxy-pinnedpubkey, --proxy-crlfile, --proxy-ca-native, --proxy-ssl-auto-client-cert and
+// --proxy-ssl-allow-beast reach the handshake to an HTTPS proxy only, as their origin counterparts reach
+// the origin's (BL-611). Measured with curl 8.21.0 (Schannel) against Record-CurlExchange.ps1 -Tls as the
+// proxy, 2026-09-30: a wrong --proxy-pinnedpubkey is exit 90, the right one and a wrong --pinnedpubkey
+// (the origin's, over plain HTTP) are exit 0.
+public sealed partial class EngineCompositionTests
+{
+    private const string WrongProxyPin = "sha256//AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+
+    [TestMethod]
+    public async Task CreateTransports_WrongProxyPinnedpubkey_FailsTheProxysHandshakeWithExit90()
+    {
+        // curl -sS --proxy https://127.0.0.1:47611 --proxy-insecure --proxy-pinnedpubkey sha256//AAAA...= http://example.test/
+        // curl: (90) SSL: public key does not match pinned public key (curl 8.21.0, 2026-09-30).
+        Diagnostics.Arrange("proxy tls arguments", "--proxy-pinnedpubkey " + WrongProxyPin);
+        ConnectResult result;
+        using (Diagnostics.Phase("handshake"))
+        {
+            result = await LoopbackProxyHandshakeAsync(_ => ["--proxy-pinnedpubkey", WrongProxyPin]);
+        }
+
+        Diagnostics.Act("exit code", result.ExitCode);
+        Diagnostics.Act("error message", result.ErrorMessage);
+        Diagnostics.Assert("exit code", CurlExitCode.SslPinnedPubKeyNotMatch, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.SslPinnedPubKeyNotMatch, result.ExitCode);
+        Assert.AreEqual("SSL: public key does not match pinned public key", result.ErrorMessage);
+    }
+
+    [TestMethod]
+    public async Task CreateTransports_TheProxysKeyPinned_CompletesTheProxysHandshake()
+    {
+        // curl ... --proxy-pinnedpubkey sha256//<the proxy's key> http://example.test/ -> exit 0.
+        Diagnostics.Arrange("proxy tls arguments", "--proxy-pinnedpubkey sha256//<the proxy's key hash>");
+        ConnectResult result;
+        using (Diagnostics.Phase("handshake"))
+        {
+            result = await LoopbackProxyHandshakeAsync(
+                key => ["--proxy-pinnedpubkey", "sha256//" + Convert.ToBase64String(SHA256.HashData(key))]);
+        }
+
+        Diagnostics.Act("exit code", result.ExitCode);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        await result.Connection!.DisposeAsync();
+    }
+
+    [TestMethod]
+    public async Task CreateTransports_WrongOriginPinnedpubkey_LeavesTheProxysHandshakeAlone()
+    {
+        // curl ... --proxy-insecure --pinnedpubkey sha256//AAAA...= http://example.test/ -> exit 0.
+        Diagnostics.Arrange("proxy tls arguments", "--pinnedpubkey " + WrongProxyPin);
+        ConnectResult result;
+        using (Diagnostics.Phase("handshake"))
+        {
+            result = await LoopbackProxyHandshakeAsync(_ => ["--pinnedpubkey", WrongProxyPin]);
+        }
+
+        Diagnostics.Act("exit code", result.ExitCode);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        await result.Connection!.DisposeAsync();
+    }
+
+    [TestMethod]
+    public void CreateTransports_ProxyPinnedpubkeyAndProxyCrlfile_ReachTheProxysOptionsOnly()
+    {
+        Diagnostics.Arrange("arguments", $"-x {HttpsProxyUrl} --proxy-pinnedpubkey {WrongProxyPin} --proxy-crlfile proxy.crl {ProxiedUrl}");
+        CurlTransports transports = EngineComposition.CreateTransports(
+            EasyOptionsFromCommandLine.ToolOptionsOf(Parse("-x", HttpsProxyUrl, "--proxy-pinnedpubkey", WrongProxyPin, "--proxy-crlfile", "proxy.crl", ProxiedUrl)), EasyOptionsFromCommandLine.NetworkOf(Parse("-x", HttpsProxyUrl, "--proxy-pinnedpubkey", WrongProxyPin, "--proxy-crlfile", "proxy.crl", ProxiedUrl)), EasyOptionsFromCommandLine.TlsOf(Parse("-x", HttpsProxyUrl, "--proxy-pinnedpubkey", WrongProxyPin, "--proxy-crlfile", "proxy.crl", ProxiedUrl)), EasyOptionsFromCommandLine.HttpOf(Parse("-x", HttpsProxyUrl, "--proxy-pinnedpubkey", WrongProxyPin, "--proxy-crlfile", "proxy.crl", ProxiedUrl)), EasyOptionsFromCommandLine.ProxyOf(Parse("-x", HttpsProxyUrl, "--proxy-pinnedpubkey", WrongProxyPin, "--proxy-crlfile", "proxy.crl", ProxiedUrl)), EasyOptionsFromCommandLine.AuthenticationOf(Parse("-x", HttpsProxyUrl, "--proxy-pinnedpubkey", WrongProxyPin, "--proxy-crlfile", "proxy.crl", ProxiedUrl)));
+
+        Diagnostics.Act("proxy pinned public key", transports.ProxyTlsClientOptions.PinnedPublicKey);
+        Diagnostics.Act("target pinned public key", transports.TlsClientOptions.PinnedPublicKey);
+        Diagnostics.Assert("proxy pinned public key", WrongProxyPin, transports.ProxyTlsClientOptions.PinnedPublicKey);
+        Assert.AreEqual(WrongProxyPin, transports.ProxyTlsClientOptions.PinnedPublicKey);
+        Assert.AreEqual("proxy.crl", transports.ProxyTlsClientOptions.CertificateRevocationListFile);
+        Assert.IsNull(transports.TlsClientOptions.PinnedPublicKey);
+        Assert.IsNull(transports.TlsClientOptions.CertificateRevocationListFile);
+    }
+
+    [TestMethod]
+    public void CreateTransports_ProxyCaNativeAndProxySslAllowBeast_LeaveTheTargetAndChangeOnlyTheProxysSplit()
+    {
+        // curl ... --proxy-ca-native (without --proxy-insecure) against a self-signed proxy is exit 60, as
+        // without it; --proxy-ssl-allow-beast is exit 0 (curl 8.21.0, 2026-09-30).
+        CurlTransports without = EngineComposition.CreateTransports(EasyOptionsFromCommandLine.ToolOptionsOf(Parse("-x", HttpsProxyUrl, ProxiedUrl)), EasyOptionsFromCommandLine.NetworkOf(Parse("-x", HttpsProxyUrl, ProxiedUrl)), EasyOptionsFromCommandLine.TlsOf(Parse("-x", HttpsProxyUrl, ProxiedUrl)), EasyOptionsFromCommandLine.HttpOf(Parse("-x", HttpsProxyUrl, ProxiedUrl)), EasyOptionsFromCommandLine.ProxyOf(Parse("-x", HttpsProxyUrl, ProxiedUrl)), EasyOptionsFromCommandLine.AuthenticationOf(Parse("-x", HttpsProxyUrl, ProxiedUrl)));
+        CurlTransports with = EngineComposition.CreateTransports(
+            EasyOptionsFromCommandLine.ToolOptionsOf(Parse("-x", HttpsProxyUrl, "--proxy-ca-native", "--proxy-ssl-allow-beast", ProxiedUrl)), EasyOptionsFromCommandLine.NetworkOf(Parse("-x", HttpsProxyUrl, "--proxy-ca-native", "--proxy-ssl-allow-beast", ProxiedUrl)), EasyOptionsFromCommandLine.TlsOf(Parse("-x", HttpsProxyUrl, "--proxy-ca-native", "--proxy-ssl-allow-beast", ProxiedUrl)), EasyOptionsFromCommandLine.HttpOf(Parse("-x", HttpsProxyUrl, "--proxy-ca-native", "--proxy-ssl-allow-beast", ProxiedUrl)), EasyOptionsFromCommandLine.ProxyOf(Parse("-x", HttpsProxyUrl, "--proxy-ca-native", "--proxy-ssl-allow-beast", ProxiedUrl)), EasyOptionsFromCommandLine.AuthenticationOf(Parse("-x", HttpsProxyUrl, "--proxy-ca-native", "--proxy-ssl-allow-beast", ProxiedUrl)));
+
+        Diagnostics.Arrange("arguments", $"-x {HttpsProxyUrl} --proxy-ca-native --proxy-ssl-allow-beast {ProxiedUrl}");
+        Diagnostics.Act("proxy tls client options without", without.ProxyTlsClientOptions);
+        Diagnostics.Act("proxy tls client options with", with.ProxyTlsClientOptions);
+        Diagnostics.Assert("proxy tls client options", without.ProxyTlsClientOptions with { AllowBeast = true }, with.ProxyTlsClientOptions);
+        Assert.AreEqual(without.ProxyTlsClientOptions with { AllowBeast = true }, with.ProxyTlsClientOptions);
+        Assert.AreEqual(without.TlsClientOptions, with.TlsClientOptions);
+    }
+
+    // Runs the HTTPS proxy's handshake against a loopback TLS server with a throwaway self-signed key.
+    private static async Task<ConnectResult> LoopbackProxyHandshakeAsync(
+        Func<byte[], string[]> proxyTlsArguments,
+        ITransferEvents? events = null)
+    {
+        using RSA key = RSA.Create(2048);
+        CertificateRequest request = new("CN=127.0.0.1", key, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+        using X509Certificate2 created = request.CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddDays(1));
+        using X509Certificate2 certificate = X509CertificateLoader.LoadPkcs12(created.Export(X509ContentType.Pfx), null);
+        using TcpListener listener = new(IPAddress.Loopback, 0);
+        listener.Start();
+        Task serverTask = ServeOneHandshakeAsync(listener, certificate);
+
+        CurlTransports transports = EngineComposition.CreateTransports(
+            EasyOptionsFromCommandLine.ToolOptionsOf(Parse(["-x", HttpsProxyUrl, "--proxy-insecure", .. proxyTlsArguments(key.ExportSubjectPublicKeyInfo()), ProxiedUrl])), EasyOptionsFromCommandLine.NetworkOf(Parse(["-x", HttpsProxyUrl, "--proxy-insecure", .. proxyTlsArguments(key.ExportSubjectPublicKeyInfo()), ProxiedUrl])), EasyOptionsFromCommandLine.TlsOf(Parse(["-x", HttpsProxyUrl, "--proxy-insecure", .. proxyTlsArguments(key.ExportSubjectPublicKeyInfo()), ProxiedUrl])), EasyOptionsFromCommandLine.HttpOf(Parse(["-x", HttpsProxyUrl, "--proxy-insecure", .. proxyTlsArguments(key.ExportSubjectPublicKeyInfo()), ProxiedUrl])), EasyOptionsFromCommandLine.ProxyOf(Parse(["-x", HttpsProxyUrl, "--proxy-insecure", .. proxyTlsArguments(key.ExportSubjectPublicKeyInfo()), ProxiedUrl])), EasyOptionsFromCommandLine.AuthenticationOf(Parse(["-x", HttpsProxyUrl, "--proxy-insecure", .. proxyTlsArguments(key.ExportSubjectPublicKeyInfo()), ProxiedUrl])));
+        TcpClient client = new();
+        await client.ConnectAsync((IPEndPoint)listener.LocalEndpoint);
+        ConnectResult result = await ((SslStreamTlsProvider)transports.ProxyTlsProvider).AuthenticateAsClientAsync(
+            new StreamConnection(client.GetStream(), listener.LocalEndpoint), "127.0.0.1", events ?? NoTransferEvents.Instance, isProxy: true, CancellationToken.None);
+
+        if (result.Connection is null)
+        {
+            client.Dispose();
+        }
+
+        try
+        {
+            await serverTask;
+        }
+        catch (Exception exception) when (exception is IOException or AuthenticationException or SocketException)
+        {
+            // The client closed the connection on a failed pin.
+        }
+
+        return result;
+    }
+
+    private static async Task ServeOneHandshakeAsync(TcpListener listener, X509Certificate2 certificate)
+    {
+        using TcpClient accepted = await listener.AcceptTcpClientAsync();
+        await using SslStream server = new(accepted.GetStream());
+        await server.AuthenticateAsServerAsync(certificate);
+    }
+}

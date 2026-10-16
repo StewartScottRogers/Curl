@@ -52,7 +52,7 @@ internal static class Socks4Handshake
         var userId = Encoding.UTF8.GetBytes(proxy.Credential?.UserName ?? string.Empty);
         if (userId.Length > MaximumUserIdBytes)
         {
-            return SocksProxyTunnel.Failed("Too long SOCKS proxy username");
+            return SocksProxyTunnel.Failed(CurlProxyCode.LongUser, "Too long SOCKS proxy username");
         }
 
         var (destination, failure) = proxy.Kind == ProxyKind.Socks4a
@@ -105,7 +105,7 @@ internal static class Socks4Handshake
         var reply = new byte[8];
         return await SocksProxyTunnel.ReadExactlyAsync(connection, reply, cancellationToken).ConfigureAwait(false)
             ? CheckReply(reply)
-            : SocksProxyTunnel.Failed(SocksProxyTunnel.ProxyClosedMessage);
+            : SocksProxyTunnel.Failed(CurlProxyCode.Closed, SocksProxyTunnel.ProxyClosedMessage);
     }
 
     // SOCKS4a names the host after the user ID and asks for 0.0.0.1, which tells the proxy to resolve it.
@@ -113,7 +113,7 @@ internal static class Socks4Handshake
     {
         var hostBytes = Encoding.UTF8.GetBytes(host);
         return hostBytes.Length > MaximumHostBytes
-            ? (default, SocksProxyTunnel.Failed("SOCKS4: too long hostname"))
+            ? (default, SocksProxyTunnel.Failed(CurlProxyCode.LongHostname, "SOCKS4: too long hostname"))
             : (new Socks4Destination([0, 0, 0, 1], hostBytes), null);
     }
 
@@ -133,7 +133,7 @@ internal static class Socks4Handshake
 
         return addresses.FirstOrDefault(address => address.AddressFamily == AddressFamily.InterNetwork) is { } ipv4
             ? (new Socks4Destination(ipv4.GetAddressBytes(), null), null)
-            : (default, SocksProxyTunnel.Failed($"SOCKS4 connection to {addresses[0]} not supported"));
+            : (default, SocksProxyTunnel.Failed(CurlProxyCode.ResolveHost, $"SOCKS4 connection to {addresses[0]} not supported"));
     }
 
     private static byte[] BuildRequest(int port, Socks4Destination destination, byte[] userId)
@@ -155,7 +155,7 @@ internal static class Socks4Handshake
     {
         if (reply[0] != 0)
         {
-            return SocksProxyTunnel.Failed("SOCKS4 reply has wrong version, version should be 0.");
+            return SocksProxyTunnel.Failed(CurlProxyCode.BadVersion, "SOCKS4 reply has wrong version, version should be 0.");
         }
 
         if (reply[1] == RequestGranted)
@@ -165,7 +165,7 @@ internal static class Socks4Handshake
 
         // The address and port are the reply's own, as curl prints them.
         var boundPort = BinaryPrimitives.ReadUInt16BigEndian(reply.AsSpan(2));
-        return SocksProxyTunnel.Failed(string.Create(
+        return SocksProxyTunnel.Failed(RejectionProxyError(reply[1]), string.Create(
             CultureInfo.InvariantCulture,
             $"[SOCKS] cannot complete SOCKS4 connection to {reply[4]}.{reply[5]}.{reply[6]}.{reply[7]}:{boundPort}. ({reply[1]}), {RejectionReason(reply[1])}"));
     }
@@ -176,6 +176,15 @@ internal static class Socks4Handshake
         0x5C => "request rejected because SOCKS server cannot connect to identd on the client.",
         0x5D => "request rejected because the client program and identd report different user-ids.",
         _ => "Unknown.",
+    };
+
+    // The CURLPX code upstream's socks.c gives each rejection.
+    private static CurlProxyCode RejectionProxyError(byte code) => code switch
+    {
+        0x5B => CurlProxyCode.RequestFailed,
+        0x5C => CurlProxyCode.Identd,
+        0x5D => CurlProxyCode.IdentdDiffer,
+        _ => CurlProxyCode.UnknownFail,
     };
 
     // The four address bytes of the request, and SOCKS4a's host name or null.

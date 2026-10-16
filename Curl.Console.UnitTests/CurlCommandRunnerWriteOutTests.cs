@@ -1,3 +1,4 @@
+using Curl.Engine;
 using System.Diagnostics.CodeAnalysis;
 using System.Text;
 using Curl.Authentication;

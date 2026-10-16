@@ -1,3 +1,4 @@
+using Curl.Engine;
 using Curl.Authentication;
 using Curl.Cli;
 using Curl.Networking;
@@ -20,8 +21,8 @@ public sealed class CurlTransportsTests
     [TestMethod]
     public void CurlTransports_WithExpressionNamingEveryProperty_ReplacesEachProperty()
     {
-        CurlTransports original = CurlComposition.CreateTransports(NoOptions());
-        CurlTransports replacement = CurlComposition.CreateTransports(NoOptions());
+        CurlTransports original = EngineComposition.CreateTransports(EasyOptionsFromCommandLine.ToolOptionsOf(NoOptions()), EasyOptionsFromCommandLine.NetworkOf(NoOptions()), EasyOptionsFromCommandLine.TlsOf(NoOptions()), EasyOptionsFromCommandLine.HttpOf(NoOptions()), EasyOptionsFromCommandLine.ProxyOf(NoOptions()), EasyOptionsFromCommandLine.AuthenticationOf(NoOptions()));
+        CurlTransports replacement = EngineComposition.CreateTransports(EasyOptionsFromCommandLine.ToolOptionsOf(NoOptions()), EasyOptionsFromCommandLine.NetworkOf(NoOptions()), EasyOptionsFromCommandLine.TlsOf(NoOptions()), EasyOptionsFromCommandLine.HttpOf(NoOptions()), EasyOptionsFromCommandLine.ProxyOf(NoOptions()), EasyOptionsFromCommandLine.AuthenticationOf(NoOptions()));
         TimeProvider replacementTimeProvider = new ReplacementTimeProvider();
 
         CurlTransports copy = original with
@@ -59,8 +60,8 @@ public sealed class CurlTransportsTests
     [TestMethod]
     public void CurlTransports_WithExpressionNamingOneProperty_CopiesTheRest()
     {
-        CurlTransports original = CurlComposition.CreateTransports(NoOptions());
-        CurlTransports replacement = CurlComposition.CreateTransports(NoOptions());
+        CurlTransports original = EngineComposition.CreateTransports(EasyOptionsFromCommandLine.ToolOptionsOf(NoOptions()), EasyOptionsFromCommandLine.NetworkOf(NoOptions()), EasyOptionsFromCommandLine.TlsOf(NoOptions()), EasyOptionsFromCommandLine.HttpOf(NoOptions()), EasyOptionsFromCommandLine.ProxyOf(NoOptions()), EasyOptionsFromCommandLine.AuthenticationOf(NoOptions()));
+        CurlTransports replacement = EngineComposition.CreateTransports(EasyOptionsFromCommandLine.ToolOptionsOf(NoOptions()), EasyOptionsFromCommandLine.NetworkOf(NoOptions()), EasyOptionsFromCommandLine.TlsOf(NoOptions()), EasyOptionsFromCommandLine.HttpOf(NoOptions()), EasyOptionsFromCommandLine.ProxyOf(NoOptions()), EasyOptionsFromCommandLine.AuthenticationOf(NoOptions()));
 
         CurlTransports copy = original with { DnsResolver = replacement.DnsResolver };
         Diagnostics.Act("copy dns resolver is the replacement", ReferenceEquals(replacement.DnsResolver, copy.DnsResolver));
@@ -82,7 +83,7 @@ public sealed class CurlTransportsTests
     [TestMethod]
     public void CreateTransports_WithUserAgent_TunnelOptionsCarryIt()
     {
-        CurlTransports transports = CurlComposition.CreateTransports(Options("-A", "agent/1.0", "gophers://example.com/"));
+        CurlTransports transports = EngineComposition.CreateTransports(EasyOptionsFromCommandLine.ToolOptionsOf(Options("-A", "agent/1.0", "gophers://example.com/")), EasyOptionsFromCommandLine.NetworkOf(Options("-A", "agent/1.0", "gophers://example.com/")), EasyOptionsFromCommandLine.TlsOf(Options("-A", "agent/1.0", "gophers://example.com/")), EasyOptionsFromCommandLine.HttpOf(Options("-A", "agent/1.0", "gophers://example.com/")), EasyOptionsFromCommandLine.ProxyOf(Options("-A", "agent/1.0", "gophers://example.com/")), EasyOptionsFromCommandLine.AuthenticationOf(Options("-A", "agent/1.0", "gophers://example.com/")));
         Diagnostics.Act("tunnel user agent", transports.ProxyTunnelOptions.UserAgent);
 
         Diagnostics.Assert("tunnel user agent", "agent/1.0", transports.ProxyTunnelOptions.UserAgent);
@@ -92,7 +93,7 @@ public sealed class CurlTransportsTests
     [TestMethod]
     public void CreateTransports_WithEmptyUserAgent_TunnelOptionsUserAgentIsNull()
     {
-        CurlTransports transports = CurlComposition.CreateTransports(Options("-A", "", "gophers://example.com/"));
+        CurlTransports transports = EngineComposition.CreateTransports(EasyOptionsFromCommandLine.ToolOptionsOf(Options("-A", "", "gophers://example.com/")), EasyOptionsFromCommandLine.NetworkOf(Options("-A", "", "gophers://example.com/")), EasyOptionsFromCommandLine.TlsOf(Options("-A", "", "gophers://example.com/")), EasyOptionsFromCommandLine.HttpOf(Options("-A", "", "gophers://example.com/")), EasyOptionsFromCommandLine.ProxyOf(Options("-A", "", "gophers://example.com/")), EasyOptionsFromCommandLine.AuthenticationOf(Options("-A", "", "gophers://example.com/")));
         Diagnostics.Act("tunnel user agent", transports.ProxyTunnelOptions.UserAgent ?? "null");
 
         Diagnostics.Assert("tunnel user agent", "null", transports.ProxyTunnelOptions.UserAgent ?? "null");
@@ -102,7 +103,7 @@ public sealed class CurlTransportsTests
     [TestMethod]
     public void CreateTransports_WithoutUserAgent_TunnelOptionsUserAgentIsCurl8210()
     {
-        CurlTransports transports = CurlComposition.CreateTransports(NoOptions());
+        CurlTransports transports = EngineComposition.CreateTransports(EasyOptionsFromCommandLine.ToolOptionsOf(NoOptions()), EasyOptionsFromCommandLine.NetworkOf(NoOptions()), EasyOptionsFromCommandLine.TlsOf(NoOptions()), EasyOptionsFromCommandLine.HttpOf(NoOptions()), EasyOptionsFromCommandLine.ProxyOf(NoOptions()), EasyOptionsFromCommandLine.AuthenticationOf(NoOptions()));
         Diagnostics.Act("tunnel user agent", transports.ProxyTunnelOptions.UserAgent);
 
         Diagnostics.Assert("tunnel user agent", "curl/8.22.0", transports.ProxyTunnelOptions.UserAgent);
@@ -112,8 +113,8 @@ public sealed class CurlTransportsTests
     [TestMethod]
     public void CreateTransports_WithProxyHeadersAndHeaders_TunnelOptionsCarryOnlyTheProxyHeaders()
     {
-        CurlTransports transports = CurlComposition.CreateTransports(
-            Options("--proxy-header", "X-P: 1", "-H", "X-A: 1", "--proxy-header", "X-Q: 2", "gophers://example.com/"));
+        CurlTransports transports = EngineComposition.CreateTransports(
+            EasyOptionsFromCommandLine.ToolOptionsOf(Options("--proxy-header", "X-P: 1", "-H", "X-A: 1", "--proxy-header", "X-Q: 2", "gophers://example.com/")), EasyOptionsFromCommandLine.NetworkOf(Options("--proxy-header", "X-P: 1", "-H", "X-A: 1", "--proxy-header", "X-Q: 2", "gophers://example.com/")), EasyOptionsFromCommandLine.TlsOf(Options("--proxy-header", "X-P: 1", "-H", "X-A: 1", "--proxy-header", "X-Q: 2", "gophers://example.com/")), EasyOptionsFromCommandLine.HttpOf(Options("--proxy-header", "X-P: 1", "-H", "X-A: 1", "--proxy-header", "X-Q: 2", "gophers://example.com/")), EasyOptionsFromCommandLine.ProxyOf(Options("--proxy-header", "X-P: 1", "-H", "X-A: 1", "--proxy-header", "X-Q: 2", "gophers://example.com/")), EasyOptionsFromCommandLine.AuthenticationOf(Options("--proxy-header", "X-P: 1", "-H", "X-A: 1", "--proxy-header", "X-Q: 2", "gophers://example.com/")));
         Diagnostics.Act("tunnel proxy headers", string.Join(" | ", transports.ProxyTunnelOptions.ProxyHeaders));
 
         Diagnostics.Assert("tunnel proxy headers", "X-P: 1 | X-Q: 2", string.Join(" | ", transports.ProxyTunnelOptions.ProxyHeaders));
@@ -123,7 +124,7 @@ public sealed class CurlTransportsTests
     [TestMethod]
     public void CreateTransports_TunnelOptionsCredentialEncoding_IsForPlatform()
     {
-        CurlTransports transports = CurlComposition.CreateTransports(NoOptions());
+        CurlTransports transports = EngineComposition.CreateTransports(EasyOptionsFromCommandLine.ToolOptionsOf(NoOptions()), EasyOptionsFromCommandLine.NetworkOf(NoOptions()), EasyOptionsFromCommandLine.TlsOf(NoOptions()), EasyOptionsFromCommandLine.HttpOf(NoOptions()), EasyOptionsFromCommandLine.ProxyOf(NoOptions()), EasyOptionsFromCommandLine.AuthenticationOf(NoOptions()));
         bool isForPlatform = Equals(CredentialEncoding.ForPlatform(OperatingSystem.IsWindows()), transports.ProxyTunnelOptions.CredentialEncoding);
         Diagnostics.Act("credential encoding is the platform's", isForPlatform);
 
@@ -134,7 +135,7 @@ public sealed class CurlTransportsTests
     [TestMethod]
     public void CreateTransports_WithoutSocketSwitches_DialsWithNoDelayAndKeepAlive()
     {
-        CurlTransports transports = CurlComposition.CreateTransports(NoOptions());
+        CurlTransports transports = EngineComposition.CreateTransports(EasyOptionsFromCommandLine.ToolOptionsOf(NoOptions()), EasyOptionsFromCommandLine.NetworkOf(NoOptions()), EasyOptionsFromCommandLine.TlsOf(NoOptions()), EasyOptionsFromCommandLine.HttpOf(NoOptions()), EasyOptionsFromCommandLine.ProxyOf(NoOptions()), EasyOptionsFromCommandLine.AuthenticationOf(NoOptions()));
         Diagnostics.Act("socket options", transports.TcpDialer.SocketOptions);
 
         Diagnostics.Assert("socket options", new TcpSocketOptions(NoDelay: true, KeepAlive: true), transports.TcpDialer.SocketOptions);
@@ -146,7 +147,7 @@ public sealed class CurlTransportsTests
     [DataRow("--no-keepalive", true, false)]
     public void CreateTransports_WithANoSocketSwitch_DialsWithThatOptionOff(string argument, bool noDelay, bool keepAlive)
     {
-        CurlTransports transports = CurlComposition.CreateTransports(Options(argument, "gophers://example.com/"));
+        CurlTransports transports = EngineComposition.CreateTransports(EasyOptionsFromCommandLine.ToolOptionsOf(Options(argument, "gophers://example.com/")), EasyOptionsFromCommandLine.NetworkOf(Options(argument, "gophers://example.com/")), EasyOptionsFromCommandLine.TlsOf(Options(argument, "gophers://example.com/")), EasyOptionsFromCommandLine.HttpOf(Options(argument, "gophers://example.com/")), EasyOptionsFromCommandLine.ProxyOf(Options(argument, "gophers://example.com/")), EasyOptionsFromCommandLine.AuthenticationOf(Options(argument, "gophers://example.com/")));
         Diagnostics.Act("socket options", transports.TcpDialer.SocketOptions);
 
         Diagnostics.Assert("socket options", new TcpSocketOptions(noDelay, keepAlive), transports.TcpDialer.SocketOptions);
@@ -156,8 +157,8 @@ public sealed class CurlTransportsTests
     [TestMethod]
     public void CreateTransports_WithKeepAliveTimeAndCount_DialsWithThoseTimers()
     {
-        CurlTransports transports = CurlComposition.CreateTransports(
-            Options("--keepalive-time", "5", "--keepalive-cnt", "3", "gophers://example.com/"));
+        CurlTransports transports = EngineComposition.CreateTransports(
+            EasyOptionsFromCommandLine.ToolOptionsOf(Options("--keepalive-time", "5", "--keepalive-cnt", "3", "gophers://example.com/")), EasyOptionsFromCommandLine.NetworkOf(Options("--keepalive-time", "5", "--keepalive-cnt", "3", "gophers://example.com/")), EasyOptionsFromCommandLine.TlsOf(Options("--keepalive-time", "5", "--keepalive-cnt", "3", "gophers://example.com/")), EasyOptionsFromCommandLine.HttpOf(Options("--keepalive-time", "5", "--keepalive-cnt", "3", "gophers://example.com/")), EasyOptionsFromCommandLine.ProxyOf(Options("--keepalive-time", "5", "--keepalive-cnt", "3", "gophers://example.com/")), EasyOptionsFromCommandLine.AuthenticationOf(Options("--keepalive-time", "5", "--keepalive-cnt", "3", "gophers://example.com/")));
         Diagnostics.Act("socket options", transports.TcpDialer.SocketOptions);
 
         Diagnostics.Assert("socket options", new TcpSocketOptions(KeepAliveSeconds: 5, KeepAliveProbeCount: 3), transports.TcpDialer.SocketOptions);
@@ -167,8 +168,8 @@ public sealed class CurlTransportsTests
     [TestMethod]
     public void CreateTransports_WithIpTosAndVlanPriority_DialsWithBoth()
     {
-        CurlTransports transports = CurlComposition.CreateTransports(
-            Options("--ip-tos", "CS1", "--vlan-priority", "3", "gophers://example.com/"));
+        CurlTransports transports = EngineComposition.CreateTransports(
+            EasyOptionsFromCommandLine.ToolOptionsOf(Options("--ip-tos", "CS1", "--vlan-priority", "3", "gophers://example.com/")), EasyOptionsFromCommandLine.NetworkOf(Options("--ip-tos", "CS1", "--vlan-priority", "3", "gophers://example.com/")), EasyOptionsFromCommandLine.TlsOf(Options("--ip-tos", "CS1", "--vlan-priority", "3", "gophers://example.com/")), EasyOptionsFromCommandLine.HttpOf(Options("--ip-tos", "CS1", "--vlan-priority", "3", "gophers://example.com/")), EasyOptionsFromCommandLine.ProxyOf(Options("--ip-tos", "CS1", "--vlan-priority", "3", "gophers://example.com/")), EasyOptionsFromCommandLine.AuthenticationOf(Options("--ip-tos", "CS1", "--vlan-priority", "3", "gophers://example.com/")));
         Diagnostics.Act("socket options", transports.TcpDialer.SocketOptions);
 
         Diagnostics.Assert("socket options", new TcpSocketOptions(TypeOfService: 0x20, VlanPriority: 3), transports.TcpDialer.SocketOptions);
@@ -178,8 +179,8 @@ public sealed class CurlTransportsTests
     [TestMethod]
     public void CreateTransports_WithTcpFastOpenAndMptcp_DialsWithBoth()
     {
-        CurlTransports transports = CurlComposition.CreateTransports(
-            Options("--tcp-fastopen", "--mptcp", "gophers://example.com/"));
+        CurlTransports transports = EngineComposition.CreateTransports(
+            EasyOptionsFromCommandLine.ToolOptionsOf(Options("--tcp-fastopen", "--mptcp", "gophers://example.com/")), EasyOptionsFromCommandLine.NetworkOf(Options("--tcp-fastopen", "--mptcp", "gophers://example.com/")), EasyOptionsFromCommandLine.TlsOf(Options("--tcp-fastopen", "--mptcp", "gophers://example.com/")), EasyOptionsFromCommandLine.HttpOf(Options("--tcp-fastopen", "--mptcp", "gophers://example.com/")), EasyOptionsFromCommandLine.ProxyOf(Options("--tcp-fastopen", "--mptcp", "gophers://example.com/")), EasyOptionsFromCommandLine.AuthenticationOf(Options("--tcp-fastopen", "--mptcp", "gophers://example.com/")));
         Diagnostics.Act("socket options", transports.TcpDialer.SocketOptions);
 
         Diagnostics.Assert("socket options", new TcpSocketOptions(FastOpen: true, MultipathTcp: true), transports.TcpDialer.SocketOptions);

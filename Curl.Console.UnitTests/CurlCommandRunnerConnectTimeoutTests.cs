@@ -1,3 +1,4 @@
+using Curl.Engine;
 using System.Net;
 using System.Text;
 using Curl.Cli;
@@ -15,7 +16,7 @@ namespace Curl.Console;
 /// dict://10.255.255.1/d:x</c> printed <c>*   Trying 10.255.255.1:2628...</c>, <c>* Connection
 /// timed out after 1010 milliseconds</c>, <c>* closing connection #0</c> and <c>curl: (28)
 /// Connection timed out after 1010 milliseconds</c>, exit 28. The transfer runs through the
-/// production handler set over the connector <see cref="CurlComposition.CreateTcpConnector" />
+/// production handler set over the connector <see cref="EngineComposition.CreateTcpConnector" />
 /// builds, dialing a <see cref="StallingTcpDialer" /> on an <see cref="ImmediateTimerTimeProvider" />.
 /// </summary>
 [TestClass]
@@ -86,12 +87,12 @@ public sealed class CurlCommandRunnerConnectTimeoutTests
         TimeSpan actual;
         using (Diagnostics.Phase("connect timeout of"))
         {
-            actual = CurlComposition.ConnectTimeoutOf(parsed.Options!);
+            actual = EngineComposition.ConnectTimeoutOf(EasyOptionsFromCommandLine.NetworkOf(parsed.Options!), parsed.Options!.MaxTime);
         }
 
         Diagnostics.Act("connect timeout", actual);
         Diagnostics.Assert("connect timeout", TimeSpan.FromMilliseconds(expectedMilliseconds), actual);
-        Assert.AreEqual(TimeSpan.FromMilliseconds(expectedMilliseconds), CurlComposition.ConnectTimeoutOf(parsed.Options!));
+        Assert.AreEqual(TimeSpan.FromMilliseconds(expectedMilliseconds), EngineComposition.ConnectTimeoutOf(EasyOptionsFromCommandLine.NetworkOf(parsed.Options!), parsed.Options!.MaxTime));
     }
 
     /// <summary>
@@ -104,8 +105,8 @@ public sealed class CurlCommandRunnerConnectTimeoutTests
         Diagnostics.Arrange("dialer", "every dial stalls until cancelled, on a timer that fires at once");
         CommandLineParseResult parsed = CommandLineParser.Parse(arguments, _ => true);
         Assert.IsTrue(parsed.IsAccepted);
-        TcpConnector connector = CurlComposition.CreateTcpConnector(
-            parsed.Options,
+        TcpConnector connector = EngineComposition.CreateTcpConnector(
+            EasyOptionsFromCommandLine.ToolOptionsOf(parsed.Options), EasyOptionsFromCommandLine.TraceComponentsOf(parsed.Options), EasyOptionsFromCommandLine.NetworkOf(parsed.Options), EasyOptionsFromCommandLine.HttpOf(parsed.Options), EasyOptionsFromCommandLine.ProxyOf(parsed.Options), EasyOptionsFromCommandLine.AuthenticationOf(parsed.Options),
             new LoopbackDnsResolver(),
             new StallingTcpDialer(),
             new PassThroughTlsProvider(),
@@ -118,7 +119,7 @@ public sealed class CurlCommandRunnerConnectTimeoutTests
         {
             exitCode = await new CurlCommandRunner(
                     _ => new TransferDispatch(
-                        new ProtocolDispatcher(CurlComposition.CreateProtocolHandlers(connector, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new PassThroughTlsProvider(), new LoopbackDnsResolver())),
+                        new ProtocolDispatcher(EngineComposition.CreateProtocolHandlers(connector, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new PassThroughTlsProvider(), new LoopbackDnsResolver())),
                         [],
                         loadResolveEntries: connector.LoadResolveEntries),
                     files,

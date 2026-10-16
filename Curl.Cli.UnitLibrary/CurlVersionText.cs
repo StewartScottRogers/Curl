@@ -7,7 +7,7 @@ namespace Curl.Cli;
 /// terminator; the console layer chooses the newline (CRLF on Windows, as the mingw reference writes).
 /// </summary>
 /// <remarks>
-/// Keep <see cref="ProtocolsLine"/>, <see cref="WindowsProtocolsLine"/> and <see cref="FeaturesLine"/> current (ADR-0021, Decision 6): the task
+/// Keep <see cref="ProtocolsLine"/> and <see cref="FeaturesLine"/> current (ADR-0021, Decision 6): the task
 /// that registers a handler in <c>CurlComposition.CreateProtocolHandlers</c>, or lands a feature curl
 /// lists, adds it here and to <c>CurlVersionTextTests</c> in the same change.
 /// </remarks>
@@ -19,36 +19,35 @@ public static class CurlVersionText
     /// <summary>
     /// The third line: the schemes the registered handlers serve, in curl's alphabetical order —
     /// <c>file</c>, <c>dict</c>, <c>ftp</c>/<c>ftps</c>, <c>gopher</c>/<c>gophers</c>, <c>telnet</c>, <c>tftp</c>,
-    /// <c>imap</c>/<c>imaps</c>, <c>mqtt</c>/<c>mqtts</c>, <c>pop3</c>/<c>pop3s</c>, <c>rtsp</c>, <c>scp</c>/<c>sftp</c>, <c>smb</c>/<c>smbs</c>, <c>smtp</c>/<c>smtps</c>, <c>ws</c>/<c>wss</c> and <c>http</c>/<c>https</c> —
+    /// <c>imap</c>/<c>imaps</c>, <c>mqtt</c>/<c>mqtts</c>, <c>pop3</c>/<c>pop3s</c>, <c>rtsp</c>, <c>scp</c>/<c>sftp</c>, <c>smtp</c>/<c>smtps</c>, <c>ws</c>/<c>wss</c> and <c>http</c>/<c>https</c> —
     /// and <c>ipfs</c>/<c>ipns</c>, which the tool serves by rewriting to a gateway as curl does and which
-    /// every curl 8.21.0 build lists (ADR-0021 amendment, BL-1417).
+    /// every curl 8.21.0 build lists (ADR-0021 amendment, BL-1417). The same line on every platform.
+    /// No <c>smb</c> or <c>smbs</c>: neither the Schannel reference build nor the OpenSSL reference build of
+    /// curl 8.22.0 lists them, though <c>smb://</c> and <c>smbs://</c> URLs still work (ADR-0453, ADR-0523, BL-2334).
     /// </summary>
-    public const string ProtocolsLine = "Protocols: dict file ftp ftps gopher gophers http https imap imaps ipfs ipns ldap ldaps mqtt mqtts pop3 pop3s rtsp scp sftp smb smbs smtp smtps telnet tftp ws wss";
-
-    /// <summary>
-    /// The third line on Windows: <see cref="ProtocolsLine"/> without <c>smb</c> and <c>smbs</c>, which the
-    /// Schannel reference build of curl 8.21.0 does not list, though <c>smb://</c> and <c>smbs://</c> URLs
-    /// still work (ADR-0453, BL-1830).
-    /// </summary>
-    public const string WindowsProtocolsLine = "Protocols: dict file ftp ftps gopher gophers http https imap imaps ipfs ipns ldap ldaps mqtt mqtts pop3 pop3s rtsp scp sftp smtp smtps telnet tftp ws wss";
+    public const string ProtocolsLine = "Protocols: dict file ftp ftps gopher gophers http https imap imaps ipfs ipns ldap ldaps mqtt mqtts pop3 pop3s rtsp scp sftp smtp smtps telnet tftp ws wss";
 
     /// <summary>
     /// The fourth line: the curl features the code gives evidence for, in curl's order (alphabetical,
     /// ignoring case): the line for Linux and macOS, the OpenSSL reference build. <see cref="WindowsFeaturesLine"/>
-    /// is the Windows line, which drops <c>ECH</c>, <c>GSS-API</c>, <c>HTTP2</c> and <c>HTTP3</c>
+    /// is the Windows line, which drops <c>GSS-API</c> and <c>HTTP2</c>
     /// and adds <c>SSPI</c>. ADR-0021's four, plus <c>brotli</c> and <c>libz</c> now that the registered
     /// HTTP handler decodes <c>br</c>, <c>gzip</c> and <c>deflate</c> bodies, and <c>HTTP2</c> off Windows
     /// now that <c>--http2</c> is accepted (ADR-0141, Decision 5), and <c>GSS-API</c> off Windows, and
     /// <c>Kerberos</c> and <c>SPNEGO</c> on every platform, now that <c>--negotiate</c> is answered
-    /// (ADR-0142, ADR-0176), <c>NTLM</c> on every platform now that <c>--ntlm</c> is (ADR-0181), and
-    /// <c>HTTP3</c> off Windows now that <c>--http3</c> and <c>--http3-only</c> work (ADR-0144).
+    /// (ADR-0142, ADR-0176), <c>NTLM</c> on every platform now that <c>--ntlm</c> is (ADR-0181).
+    /// No <c>HTTP3</c>: the OpenSSL reference build has no QUIC library, so it lists no <c>HTTP3</c> and refuses <c>--http3</c> and <c>--http3-only</c>, as Curl does unless the parse reads as a QUIC build (ADR-0144, ADR-0451, ADR-0521, ADR-0540, BL-2330, BL-2332).
     /// No <c>TLS-SRP</c>: curl 8.22.0 dropped TLS-SRP, so its <c>lib/version.c</c> lists it no more (ADR-0480, BL-2152).
-    /// BL-1417's audit added <c>alt-svc</c>, <c>ECH</c>, <c>HSTS</c>, <c>HTTPS-proxy</c>, <c>HTTPSRR</c>, <c>IDN</c>,
+    /// BL-1417's audit added <c>alt-svc</c>, <c>HSTS</c>, <c>HTTPS-proxy</c>, <c>HTTPSRR</c>, <c>IDN</c>,
     /// <c>PSL</c>, <c>UnixSockets</c> and <c>zstd</c>, each with evidence in the code (ADR-0021 amendment).
+    /// No <c>ECH</c>: no reference build lists it, since curl builds ECH only on request, though <c>--ech</c> still works (ADR-0448, ADR-0520, BL-2329).
     /// <c>threadsafe</c> on every platform, after <c>SSL</c> (and <c>SSPI</c>) as both reference builds list it,
     /// because Curl's process-wide set-up is thread-safe (ADR-0444, BL-1828).
+    /// <c>SSLS-EXPORT</c> off Windows, after <c>SSL</c>, as the OpenSSL reference build lists it, because
+    /// <c>--ssl-sessions</c> loads and saves TLS session tickets there (ADR-0319, ADR-0519, BL-2331); the
+    /// Schannel build refuses <c>--ssl-sessions</c> (ADR-0397), so <see cref="WindowsFeaturesLine"/> leaves it out.
     /// </summary>
-    public const string FeaturesLine = "Features: alt-svc AsynchDNS brotli ECH GSS-API HSTS HTTP2 HTTP3 HTTPS-proxy HTTPSRR IDN IPv6 Kerberos Largefile libz NTLM PSL SPNEGO SSL threadsafe UnixSockets zstd";
+    public const string FeaturesLine = "Features: alt-svc AsynchDNS brotli GSS-API HSTS HTTP2 HTTPS-proxy HTTPSRR IDN IPv6 Kerberos Largefile libz NTLM PSL SPNEGO SSL SSLS-EXPORT threadsafe UnixSockets zstd";
 
     /// <summary>
     /// The fourth line on Windows: <see cref="FeaturesLine"/> with <c>SSPI</c> after <c>SSL</c>, as the
@@ -67,15 +66,14 @@ public static class CurlVersionText
     /// <param name="isWindows">Whether the running system is Windows (<see cref="OperatingSystem.IsWindows"/>).</param>
     /// <param name="isMacOS">Whether the running system is macOS (<see cref="OperatingSystem.IsMacOS"/>); read only when <paramref name="isWindows"/> is <see langword="false"/>.</param>
     /// <returns>
-    /// The version line, <see cref="ReleaseDateLine"/>, <see cref="WindowsProtocolsLine"/> and
-    /// <see cref="WindowsFeaturesLine"/> on Windows or <see cref="ProtocolsLine"/> and
-    /// <see cref="FeaturesLine"/> anywhere else.
+    /// The version line, <see cref="ReleaseDateLine"/>, <see cref="ProtocolsLine"/>, and
+    /// <see cref="WindowsFeaturesLine"/> on Windows or <see cref="FeaturesLine"/> anywhere else.
     /// The version line names the mingw triple and <c>Schannel</c> on Windows, the Apple triple and
     /// <c>SecureTransport</c> on macOS, and the GNU/Linux triple and <c>OpenSSL</c> anywhere else.
     /// </returns>
     public static IReadOnlyList<string> Lines(bool isWindows, bool isMacOS) =>
         isWindows
-            ? [VersionLine(isWindows, isMacOS), ReleaseDateLine, WindowsProtocolsLine, WindowsFeaturesLine]
+            ? [VersionLine(isWindows, isMacOS), ReleaseDateLine, ProtocolsLine, WindowsFeaturesLine]
             : [VersionLine(isWindows, isMacOS), ReleaseDateLine, ProtocolsLine, FeaturesLine];
 
     private static string VersionLine(bool isWindows, bool isMacOS) =>

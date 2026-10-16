@@ -804,6 +804,7 @@ public sealed class Tls12ClientHandshake
         RecordProtection = CipherSuite!.RecordProtectionFor(Version!.Value, encryptThenMac);
         byte[] keyBlock = Prf.ComputeKeyBlock(masterSecret, serverRandom, clientHello!.Random, RecordProtection.KeyBlockLength);
         KeyBlock = Tls12KeyBlock.Partition(RecordProtection, keyBlock);
+        settings.KeyLog?.Append("CLIENT_RANDOM", clientHello.Random, masterSecret);
     }
 
     private void SendChangeCipherSpecAndFinished(List<Tls12OutgoingMessage> output)

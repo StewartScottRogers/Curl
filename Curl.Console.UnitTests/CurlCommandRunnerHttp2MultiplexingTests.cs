@@ -1,3 +1,4 @@
+using Curl.Engine;
 using Curl.Authentication;
 using Curl.Core;
 using Curl.Networking;
@@ -147,7 +148,7 @@ public sealed class CurlCommandRunnerHttp2MultiplexingTests
     /// <summary>
     /// Runs <paramref name="arguments" /> through the HTTP handler over a pool of
     /// <paramref name="server" />'s connections, the pool waiting for multiplexing as the
-    /// composition sets it (<see cref="CurlComposition.WaitsForMultiplexing" />).
+    /// composition sets it (<see cref="EngineComposition.WaitsForMultiplexing" />).
     /// </summary>
     private async Task<int> RunAsync(Http2ServerConnector server, string[] arguments)
     {
@@ -155,7 +156,7 @@ public sealed class CurlCommandRunnerHttp2MultiplexingTests
         CurlCommandRunner runner = new(
             options =>
             {
-                PoolingConnector pool = new(server, TimeProvider.System) { WaitsForMultiplexing = CurlComposition.WaitsForMultiplexing(options) };
+                PoolingConnector pool = new(server, TimeProvider.System) { WaitsForMultiplexing = EngineComposition.WaitsForMultiplexing(EasyOptionsFromCommandLine.ToolOptionsOf(options)) };
                 HttpProtocolHandler http = new(pool, new BasicAndBearerAuthenticator(CredentialEncoding.ForPlatform(isWindows: false)));
                 return new TransferDispatch(new ProtocolDispatcher([http]), [], connectionPool: pool);
             },

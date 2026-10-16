@@ -53,14 +53,18 @@ internal sealed class TlsServerConnection : IConnection
 
     // Whatever ends the exchange - a failed handshake, the client closing or vanishing, a
     // cancelled wait - ends this connection as a closed socket would; the client sees the end
-    // of its stream.
+    // of its stream. A failed handshake, such as plain HTTP sent to the HTTPS port (test1244),
+    // is a reset instead, as stunnel resets it, so curl reports exit 56 "Recv failure:
+    // Connection was reset" rather than exit 52 for an empty reply (GF-0081).
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "Any failure ends the connection, as stunnel drops it.")]
     private static async Task ServeAsync(SwsHttpServerConnection server, InMemoryDuplexStream serverEnd, TlsServerOptions options, CancellationToken cancellationToken)
     {
         await Task.Yield();
         try
         {
-            await using SslStream tls = await TlsServerStream.AuthenticateAsync(serverEnd, options, cancellationToken).ConfigureAwait(false);
+            serverEnd.ResetsWhenDisposed = true;
+            await using Stream tls = await TlsServerStream.AcceptAsync(serverEnd, options, TlsServerStream.PlatformServesTls13, cancellationToken).ConfigureAwait(false);
+            serverEnd.ResetsWhenDisposed = false;
             await RelayAsync(server, tls, cancellationToken).ConfigureAwait(false);
         }
         catch (Exception)
@@ -73,7 +77,7 @@ internal sealed class TlsServerConnection : IConnection
         await server.DisposeAsync().ConfigureAwait(false);
     }
 
-    private static async Task RelayAsync(SwsHttpServerConnection server, SslStream tls, CancellationToken cancellationToken)
+    private static async Task RelayAsync(SwsHttpServerConnection server, Stream tls, CancellationToken cancellationToken)
     {
         byte[] buffer = new byte[RelayBufferSize];
         int read;
@@ -88,7 +92,7 @@ internal sealed class TlsServerConnection : IConnection
             if (!server.ReadsRequests)
             {
                 // stunnel sends close_notify when sws closes, so curl sees a clean end of the stream.
-                await tls.ShutdownAsync().ConfigureAwait(false);
+                await TlsServerStream.ShutdownAsync(tls).ConfigureAwait(false);
                 return;
             }
         }

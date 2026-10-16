@@ -1,3 +1,4 @@
+using Curl.Engine;
 using System.Net;
 using System.Text;
 using Curl.Core;
@@ -181,7 +182,7 @@ public sealed class CurlCommandRunnerFtpTimeLimitTests
         Diagnostics.Arrange("command line", "curl " + string.Join(" ", arguments));
         InMemoryFileSystem files = new();
         TransferDispatch dispatch = new(
-            new ProtocolDispatcher(CurlComposition.CreateProtocolHandlers(
+            new ProtocolDispatcher(EngineComposition.CreateProtocolHandlers(
                 connector,
                 new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"),
                 new PassThroughTlsProvider(),

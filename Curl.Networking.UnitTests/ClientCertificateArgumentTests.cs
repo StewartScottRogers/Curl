@@ -19,6 +19,24 @@ public sealed class ClientCertificateArgumentTests
     private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
 
     [TestMethod]
+    [DataRow("pkcs11:token=a", true)]
+    [DataRow("PKCS11:token=a", true)]
+    [DataRow("pkcs11:", true)]
+    [DataRow("pkcs11", false)]
+    [DataRow("client.pem", false)]
+    [DataRow(null, false)]
+    public void IsPkcs11Uri_OfAValue_IsTrueOnlyForAPkcs11Prefix(string? value, bool expected)
+    {
+        Diagnostics.Arrange("value", value);
+
+        var isPkcs11Uri = ClientCertificateArgument.IsPkcs11Uri(value);
+        Diagnostics.Act("is pkcs11 URI", isPkcs11Uri);
+        Diagnostics.Assert("is pkcs11 URI", expected, isPkcs11Uri);
+
+        Assert.AreEqual(expected, isPkcs11Uri);
+    }
+
+    [TestMethod]
     [DataRow("nonexist.p12", "nonexist.p12", null)]
     [DataRow("nonexist.p12:pw", "nonexist.p12", "pw")]
     [DataRow("colon.p12:sec:ret", "colon.p12", "sec:ret")]

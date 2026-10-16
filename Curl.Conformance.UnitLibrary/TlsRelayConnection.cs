@@ -57,7 +57,7 @@ internal sealed class TlsRelayConnection : IConnection
         using CancellationTokenSource clientClosed = new();
         try
         {
-            await using SslStream tls = await TlsServerStream.AuthenticateAsync(serverEnd, options, CancellationToken.None).ConfigureAwait(false);
+            await using Stream tls = await TlsServerStream.AcceptAsync(serverEnd, options, TlsServerStream.PlatformServesTls13, CancellationToken.None).ConfigureAwait(false);
             Task fromServer = RelayFromServerAsync(server, tls, clientClosed.Token);
             await RelayFromClientAsync(tls, server).ConfigureAwait(false);
             await clientClosed.CancelAsync().ConfigureAwait(false);
@@ -74,7 +74,7 @@ internal sealed class TlsRelayConnection : IConnection
         await server.DisposeAsync().ConfigureAwait(false);
     }
 
-    private static async Task RelayFromClientAsync(SslStream tls, IConnection server)
+    private static async Task RelayFromClientAsync(Stream tls, IConnection server)
     {
         byte[] buffer = new byte[RelayBufferSize];
         int read;
@@ -84,7 +84,7 @@ internal sealed class TlsRelayConnection : IConnection
         }
     }
 
-    private static async Task RelayFromServerAsync(IConnection server, SslStream tls, CancellationToken cancellationToken)
+    private static async Task RelayFromServerAsync(IConnection server, Stream tls, CancellationToken cancellationToken)
     {
         byte[] buffer = new byte[RelayBufferSize];
         int read;
@@ -94,6 +94,6 @@ internal sealed class TlsRelayConnection : IConnection
         }
 
         // stunnel sends close_notify when the server closes, so curl sees a clean end of the stream.
-        await tls.ShutdownAsync().ConfigureAwait(false);
+        await TlsServerStream.ShutdownAsync(tls).ConfigureAwait(false);
     }
 }

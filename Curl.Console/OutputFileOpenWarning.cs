@@ -28,7 +28,9 @@ internal static class OutputFileOpenWarning
     /// <c>No such file or directory</c> for a missing parent directory,
     /// <c>Permission denied</c> for a refusal or a directory, <c>File exists</c> for a
     /// <c>-J</c> name that is already taken, which curl 8.21.0 refuses to overwrite (measured
-    /// 2026-09-27, BL-239 Notes), and <c>Invalid argument</c> for any other failure.
+    /// 2026-09-27, BL-239 Notes), <c>Not a directory</c> for the <c>ENOTDIR</c> Linux and macOS
+    /// give when a parent component is a file (upstream test 3036, BL-2328), and
+    /// <c>Invalid argument</c> for any other failure.
     /// </summary>
     /// <param name="status">Why the open failed.</param>
     /// <returns>The reason text.</returns>
@@ -37,6 +39,7 @@ internal static class OutputFileOpenWarning
         FileAccessStatus.NotFound => "No such file or directory",
         FileAccessStatus.AccessDenied or FileAccessStatus.IsDirectory => "Permission denied",
         FileAccessStatus.AlreadyExists => "File exists",
+        FileAccessStatus.NotADirectory => "Not a directory",
         _ => "Invalid argument",
     };
 }

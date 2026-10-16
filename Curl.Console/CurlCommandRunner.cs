@@ -10,9 +10,15 @@ using Curl.Core.FileSystem;
 using Curl.Core.Globbing;
 using Curl.Core.Hsts;
 using Curl.Core.Multipart;
+using Curl.Engine;
 using Curl.Networking;
 using Curl.Output;
 using Curl.Protocol.Abstractions;
+using EasyAuthenticationOptions = Curl.Api.Options.Authentication.EasyAuthenticationOptions;
+using EasyHttpOptions = Curl.Api.Options.Http.EasyHttpOptions;
+using EasyMimeBody = Curl.Api.Options.Http.EasyMimeBody;
+using EasyProxyOptions = Curl.Api.Options.Proxy.EasyProxyOptions;
+using EasyTransferOptions = Curl.Api.Options.Behaviour.EasyTransferOptions;
 
 namespace Curl.Console;
 
@@ -99,6 +105,15 @@ namespace Curl.Console;
 /// Whether each <c>--alt-svc</c> cache learns <c>Alt-Svc</c> headers received over plain <c>http</c>
 /// and looks up a plain <c>http</c> origin's alternatives too: the harness's stand-in for curl's debug
 /// build under <c>CURL_ALTSVC_HTTP</c> (ADR-0497, BL-2263); off by default, as in curl's release build.
+/// </param>
+/// <param name="transferPerformer">
+/// Performs each transfer attempt and numbers the run's transfers and connections (ADR-0506, BL-2282);
+/// <see langword="null" /> for one on the runner's clock.
+/// </param>
+/// <param name="parsesAsQuicBuild">
+/// Whether the command line is read as a curl built with a QUIC library reads it (<see cref="CommandLineOptions.ActsAsQuicBuild" />),
+/// accepting <c>--http3</c> and <c>--http3-only</c>; off by default, as every reference build refuses them (ADR-0540).
+/// Tests and the conformance harness turn it on to reach the hand-built HTTP/3.
 /// </param>
 /// <param name="writeOutTimeDialect">
 /// The C runtime whose <c>strftime</c> a <c>-w</c> <c>%time{format}</c> follows; the composition
@@ -218,8 +233,8 @@ namespace Curl.Console;
 /// </para>
 /// <para>
 /// Every transfer goes through <see cref="RedirectFollower" /> with the
-/// <see cref="RedirectPolicy" /> <see cref="RedirectPolicyMapping" /> maps from the command
-/// line, so under <c>-L</c> each redirect is followed into the same body and header outputs:
+/// <see cref="RedirectPolicy" /> <see cref="RedirectPolicyMapping" /> maps from the option
+/// group, so under <c>-L</c> each redirect is followed into the same body and header outputs:
 /// <c>-L -i</c> writes every response's head and the last response's body, and following one
 /// redirect more than <c>--max-redirs</c> allows fails with exit 47,
 /// <c>Maximum (N) redirects followed</c>, as curl 8.21.0 does. Without <c>-L</c> the
@@ -250,13 +265,13 @@ namespace Curl.Console;
 /// <para>
 /// With <c>-b</c> or <c>-c</c>, the <see cref="TransferDispatch.Cookies" /> load their <c>-b</c>
 /// files, <c>-b -</c> from standard input, before the first <c>http</c> or <c>https</c> transfer
-/// (<see cref="LoadCookieFilesAsync" />), and the <c>-c</c> jar is written after each <c>http</c> or
-/// <c>https</c> transfer's <c>-w</c> output (<see cref="WriteCookieJarAsync" />), as curl 8.21.0
+/// (<see cref="TransferPerformer.LoadCookieFilesAsync" />), and the <c>-c</c> jar is written after each <c>http</c> or
+/// <c>https</c> transfer's <c>-w</c> output (<see cref="TransferPerformer.WriteCookieJarAltSvcAndHstsFilesAsync" />), as curl 8.21.0
 /// does (measured 2026-09-26, BL-237).
 /// </para>
 /// </remarks>
 /// <param name="lateBoundDiagnosticLog">The log the authenticators were composed with, bound to the run's diagnostic log once it is open (BL-923); <see langword="null" /> when none was composed.</param>
-/// <param name="parsesAsWindowsBuild">Whether the command line is read as curl's Windows Schannel build reads it (<see cref="CommandLineOptions.ActsAsWindowsSchannelBuild" />); <see langword="null" />, the default, reads it as this process's platform's build does. Tests pass <see langword="false" /> to reach the HTTP/2, HTTP/3 and TLS-SRP options on any platform.</param>
+/// <param name="parsesAsWindowsBuild">Whether the command line is read as curl's Windows Schannel build reads it (<see cref="CommandLineOptions.ActsAsWindowsSchannelBuild" />); <see langword="null" />, the default, reads it as this process's platform's build does. Tests pass <see langword="false" /> to reach the HTTP/2 options and <c>--ssl-sessions</c> on any platform.</param>
 internal sealed class CurlCommandRunner(
     Func<CommandLineOptions, TransferDispatch> createTransferDispatch,
     IFileSystem fileSystem,
@@ -285,23 +300,10 @@ internal sealed class CurlCommandRunner(
     bool? parsesAsWindowsBuild = null,
     TimeProvider? hstsClock = null,
     bool hstsLearnsOverHttp = false,
-    bool altSvcUsesOverHttp = false)
+    bool altSvcUsesOverHttp = false,
+    TransferPerformer? transferPerformer = null,
+    bool parsesAsQuicBuild = false)
 {
-    /// <summary>
-    /// What curl 8.21.0 prints before its URL parser's reason when it rejects a transfer
-    /// URL, as in <c>URL rejected: Bad file:// URL</c>.
-    /// </summary>
-    internal const string UrlRejectedPrefix = "URL rejected: ";
-
-    /// <summary>
-    /// The longest percent-decoded host, in bytes, curl 8.21.0 connects to; a longer one
-    /// fails with <see cref="TooLongHostnameMessage" /> before any connection.
-    /// </summary>
-    internal const int MaximumHostLength = 65535;
-
-    /// <summary>curl 8.21.0's message for a host longer than <see cref="MaximumHostLength" />.</summary>
-    internal const string TooLongHostnameMessage = "Too long hostname (maximum is 65535)";
-
     /// <summary>
     /// The line curl 8.21.0's own write callback prints, with no <c>(23)</c>, when standard
     /// output is closed or its reader has gone and the body fits its stdio buffer; measured on
@@ -325,24 +327,23 @@ internal sealed class CurlCommandRunner(
     /// </summary>
     private IDataFileReader DataFileReader => configFileReader ?? DiskDataFileReader.ForProcess.WithStandardInput(() => standardInput);
 
+    /// <summary>Reads a file through <see cref="DataFileReader" /> for the engine's lookups.</summary>
+    /// <param name="path">The file's path.</param>
+    /// <returns>The file's bytes, or <see langword="null" /> when it cannot be read.</returns>
+    private byte[]? ReadDataFile(string path) => DataFileReader.TryReadFile(path, out byte[] contents) ? contents : null;
+
     /// <summary>
     /// Gets what chooses each transfer's credentials from the URL and the netrc file, reading it with
     /// <see cref="DataFileReader" /> and the home directory from the runner's environment (BL-505, BL-791).
     /// </summary>
     private TransferCredentialLookup CredentialLookup =>
-        new(DataFileReader, EnvironmentVariables, runsOnWindows, diagnosticLog);
+        new(ReadDataFile, EnvironmentVariables, runsOnWindows, diagnosticLog);
 
     /// <summary>
     /// Gets where an <c>scp</c> or <c>sftp</c> transfer looks for its known-hosts file, from the runner's
     /// environment and <c>accountHomeDirectory</c> (BL-576).
     /// </summary>
     private SshKnownHostsFileSearch KnownHostsSearch => new(EnvironmentVariables, runsOnWindows, accountHomeDirectory);
-
-    /// <summary>The line curl 8.21.0 prints before exit 2 when an SSH transfer has no known-hosts file.</summary>
-    internal const string KnownHostsFileMissingLine = "curl: Could not find a known_hosts file";
-
-    /// <summary>The warning curl 8.21.0 prints instead when a host key fingerprint was given.</summary>
-    internal const string KnownHostsFileMissingWarning = "Warning: Could not find a known_hosts file";
 
     /// <summary>
     /// Reads no environment variable, created once with <see langword="new" /> so no use of it carries
@@ -556,42 +557,11 @@ internal sealed class CurlCommandRunner(
         TransferResult.Failure(CurlExitCode.ReadError, MultipartFormBodyBuilder.OpenFailedMessage);
 
     /// <summary>
-    /// The result of an <c>scp</c> or <c>sftp</c> transfer with no <c>-k</c>, no <c>--knownhosts</c>, no
-    /// host key fingerprint and no known-hosts file to be found: exit 2 with curl's text for it, before
-    /// any connection, measured on curl 8.21.0 (BL-576 Notes). It is compared by reference, so that
-    /// <see cref="TransferAllAsync" /> stops before the remaining URLs, as curl does.
-    /// </summary>
-    private static readonly TransferResult KnownHostsFileMissingFailure =
-        TransferResult.Failure(CurlExitCode.FailedInit, CurlEasyErrorText.Of(CurlExitCode.FailedInit));
-
-    /// <summary>
     /// The end a <c>-Z</c> run records for a <c>-T</c> upload refused because another request method is
     /// selected (<see cref="RefusedUploadRequestMethodAsync" />): exit 2, its warning already written.
     /// </summary>
     private static readonly TransferResult UploadRequestMethodConflictFailure =
         TransferResult.Failure(CurlExitCode.FailedInit, CurlEasyErrorText.Of(CurlExitCode.FailedInit));
-
-    /// <summary>
-    /// The result of a transfer whose <c>--interface</c> value libcurl refuses when curl sets it
-    /// (<c>CURLOPT_INTERFACE</c>, option 10062, 0x274e): exit 43 with curl 8.21.0's message, before
-    /// any connection (measured 2026-09-29, BL-600 Notes). It is compared by reference, so that
-    /// <see cref="TransferAllAsync" /> stops before the remaining URLs, as curl does.
-    /// </summary>
-    private static readonly TransferResult InterfaceSetoptFailure =
-        TransferResult.Failure(CurlExitCode.BadFunctionArgument, InterfaceSetoptMessage);
-
-    private const string InterfaceSetoptMessage = "setopt 0x274e got bad argument";
-
-    /// <summary>
-    /// The result of a transfer whose <c>--ech</c> mode libcurl refuses when curl sets it
-    /// (<c>CURLOPT_ECH</c>, option 10325, 0x2855): exit 43 with curl 8.21.0's message, before any
-    /// connection (measured with curl's ECH build 2026-10-02, BL-1107; ADR-0378). It is compared by
-    /// reference, so that <see cref="TransferAllAsync" /> stops before the remaining URLs, as curl does.
-    /// </summary>
-    private static readonly TransferResult EchSetoptFailure =
-        TransferResult.Failure(CurlExitCode.BadFunctionArgument, EchSetoptMessage);
-
-    private const string EchSetoptMessage = "setopt 0x2855 got bad argument";
 
     /// <summary>
     /// Standard output, deferring a write failure as curl's stdio buffer does and recording
@@ -644,13 +614,11 @@ internal sealed class CurlCommandRunner(
     private TransferResult? previousTransferResult;
 
     /// <summary>
-    /// When the run's last serial transfer started - its last <c>--retry</c> attempt's start, set by
-    /// <see cref="RecordSerialAttemptStart" /> - as a <see cref="TimeProvider.GetTimestamp" />, which
-    /// <see cref="WaitForTransferStartRateAsync" /> measures <c>--rate</c> from; <see langword="null" />
-    /// before the first.
+    /// Performs each attempt of a transfer under its watchdogs, following its redirects, and numbers the
+    /// run's transfers and connections and keeps when its last serial attempt started, which
+    /// <see cref="WaitForTransferStartRateAsync" /> measures <c>--rate</c> from (ADR-0506, BL-2282).
     /// </summary>
-    private long? previousSerialTransferStart;
-
+    private readonly TransferPerformer transferPerformer = TransferPerformer.GivenOrOnClock(transferPerformer, timeProvider, EasyErrorText);
     /// <summary>
     /// The run's HSTS cache, shared by every transfer of every option group and on with or without
     /// <c>--hsts</c>, as curl 8.21.0's tool shares one through its share handle: an <c>https</c>
@@ -691,21 +659,10 @@ internal sealed class CurlCommandRunner(
     private TransferResult? cannotOpenUploadFileAfterFailure;
 
     /// <summary>
-    /// The <c>%{conn_id}</c> the next transfer that connects takes, counted per run from zero.
-    /// </summary>
-    private long nextConnectionId;
-
-    /// <summary>
     /// The <c>%{conn_id}</c> of each connection a transfer of the run opened, by the pool's number
     /// for it, which a later transfer that reuses the connection takes (<see cref="ConnectionIdRecordingTransferEvents" />, BL-1052).
     /// </summary>
     private readonly ConcurrentDictionary<long, long> connectionIdsByPoolNumber = new();
-
-    /// <summary>
-    /// The <c>%{xfer_id}</c> the next transfer takes, counted per run from zero, one for every URL
-    /// a glob expands to.
-    /// </summary>
-    private long nextTransferId;
 
     /// <summary>
     /// The <c>%{xfer_id}</c> of the running <c>-:</c> / <c>--next</c> option group's first transfer,
@@ -911,7 +868,7 @@ internal sealed class CurlCommandRunner(
     {
         if (!parsed.IsAccepted)
         {
-            await WriteRefusalAsync(parsed.Refusal, parsed.NotedDefaultConfigFile).ConfigureAwait(false);
+            await WriteRefusalAsync(parsed.Refusal, parsed.NotedDefaultConfigFile, parsed.OptionsReadBeforeRefusal).ConfigureAwait(false);
 
             return (int)parsed.Refusal.ExitCode;
         }
@@ -1383,7 +1340,8 @@ internal sealed class CurlCommandRunner(
             fileReader,
             defaultConfigFileSearch ?? NoDefaultConfigFile,
             parsesAsWindowsBuild ?? OperatingSystem.IsWindows(),
-            EnvironmentVariables);
+            EnvironmentVariables,
+            parsesAsQuicBuild);
 
     /// <summary>
     /// Transfers every URL of one option group in order, each command-line URL once for every URL
@@ -1399,7 +1357,7 @@ internal sealed class CurlCommandRunner(
     /// </returns>
     private async Task<(CurlExitCode ExitCode, bool RunEnded)> TransferAllAsync(CommandLineOptions options, CurlExitCode exitCode)
     {
-        firstTransferIdOfGroup = nextTransferId;
+        firstTransferIdOfGroup = transferPerformer.NextTransferId;
         TransferDispatch dispatch = createTransferDispatch(options);
 
         return await ThenCleanUpAsync(TransferEachUrlAsync(dispatch, options, exitCode), () => EndGroupAsync(dispatch, options)).ConfigureAwait(false);
@@ -1524,7 +1482,7 @@ internal sealed class CurlCommandRunner(
     /// <returns>The exit code, or <see langword="null" /> when the checks pass.</returns>
     private async Task<CurlExitCode?> RefusedHttpSignatureSetupAsync(CommandLineOptions options)
     {
-        HttpSignatureSetup setup = HttpSignatureSetup.Of(options);
+        HttpSignatureSetup setup = HttpSignatureSetup.Of(EasyOptionsFromCommandLine.AuthenticationOf(options));
         if (setup.ErrorLine is not { } line)
         {
             return null;
@@ -1593,7 +1551,7 @@ internal sealed class CurlCommandRunner(
         {
             foreach (UrlGlobMatch match in glob.Expand())
             {
-                if (!UrlTransfer.TryCreate(options, index, firstUrlNumberOfGroup + index, nextTransferId++, match, uploadMatch, runsOnWindows, out UrlTransfer? transfer, out TransferResult? nameFailure))
+                if (!UrlTransfer.TryCreate(options, index, firstUrlNumberOfGroup + index, transferPerformer.TakeTransferId(), match, uploadMatch, runsOnWindows, out UrlTransfer? transfer, out TransferResult? nameFailure))
                 {
                     await WriteGlobFailureLinesAsync(options, nameFailure).ConfigureAwait(false);
                     await RecordParallelRunEndAsync(nameFailure).ConfigureAwait(false);
@@ -1709,7 +1667,7 @@ internal sealed class CurlCommandRunner(
         }
 
         await WaitForTransferStartRateAsync(options).ConfigureAwait(false);
-        previousSerialTransferStart = timeProvider.GetTimestamp();
+        transferPerformer.RecordSerialAttemptStart(runsInParallel: false);
         TransferResult result = await TransferAndReportAsync(dispatch, options, transfer).ConfigureAwait(false);
 
         return ReferenceEquals(result, EtagSaveFileSkippedTransfer)
@@ -1753,7 +1711,7 @@ internal sealed class CurlCommandRunner(
     private long MillisecondsUntilTransferMayStart(long? interval, out long took)
     {
         took = 0;
-        if (interval is not { } least || previousSerialTransferStart is not { } previousStart)
+        if (interval is not { } least || transferPerformer.SerialTransferStart is not { } previousStart)
         {
             return 0;
         }
@@ -2075,9 +2033,23 @@ internal sealed class CurlCommandRunner(
         bool standardOutputIsBinary = IsStandardOutputBinaryForWriteOut(
             options, transfer.UrlIndex, standardOutputSwitchedToBinary, endsTheRun);
         await WriteOutAsync(options, transfer, givenUrl, transferUrl, result, standardOutputIsBinary).ConfigureAwait(false);
-        await WriteCookieJarAltSvcAndHstsFilesAsync(dispatch, options, transferUrl, standardOutputIsBinary, state).ConfigureAwait(false);
+        await transferPerformer.WriteCookieJarAltSvcAndHstsFilesAsync(
+                dispatch.Cookies, EasyOptionsFromCommandLine.TransferSettingsOf(options), EasyOptionsFromCommandLine.HttpOf(options), transferUrl, () => CookieJarStandardOutput(standardOutputIsBinary), state, Hsts, fileSystem, runsOnWindows)
+            .ConfigureAwait(false);
 
         previousTransferResult = result;
+    }
+
+    /// <summary>
+    /// Where <c>-c -</c> prints the jar: standard output in the mode it is in, or nowhere once it
+    /// has failed (BL-237 Notes).
+    /// </summary>
+    /// <param name="standardOutputIsBinary">Whether standard output keeps its line feeds.</param>
+    /// <returns>The stream the jar is printed to.</returns>
+    private Stream CookieJarStandardOutput(bool standardOutputIsBinary)
+    {
+        Stream liveStandardOutput = Running.StandardOutput.HasWriteFailed ? Stream.Null : Running.StandardOutput;
+        return standardOutputIsBinary ? liveStandardOutput : new LineFeedToCrLfStream(liveStandardOutput);
     }
 
     /// <summary>
@@ -2213,16 +2185,17 @@ internal sealed class CurlCommandRunner(
         }
 
         ITransferEvents eventsBeforeConnecting = SetUpTransferEvents(options, transfer);
-        if (RefuseMalformedSetopt(options, eventsBeforeConnecting) is { } setoptFailure)
+        if (TransferPerformer.RefuseMalformedSetopt(EasyOptionsFromCommandLine.NetworkOf(options), EasyOptionsFromCommandLine.TransferSettingsOf(options), eventsBeforeConnecting) is { } setoptFailure)
         {
             return (setoptFailure, givenUrl, transferUrl);
         }
 
         dispatch.LoadResolveEntries(eventsBeforeConnecting);
         TraceTransferStart(options, eventsBeforeConnecting);
-        await LoadCookieFilesAsync(dispatch, options, transferUrl, eventsBeforeConnecting).ConfigureAwait(false);
-        await OpenAltSvcCacheAsync(options, transferUrl).ConfigureAwait(false);
-        transferUrl = await SwitchToHttpsForHstsAsync(options, transferUrl, eventsBeforeConnecting).ConfigureAwait(false);
+        await transferPerformer.LoadCookieFilesAsync(dispatch.Cookies, EasyOptionsFromCommandLine.TransferSettingsOf(options), transferUrl, fileSystem, standardInput, eventsBeforeConnecting).ConfigureAwait(false);
+        EasyHttpOptions http = EasyOptionsFromCommandLine.HttpOf(options);
+        await transferPerformer.OpenAltSvcCacheAsync(Running, EasyOptionsFromCommandLine.TransferSettingsOf(options), EasyOptionsFromCommandLine.NetworkOf(options), http, transferUrl, fileSystem, diagnosticLog, altSvcUsesOverHttp).ConfigureAwait(false);
+        transferUrl = await TransferPerformer.SwitchToHttpsForHstsAsync(Hsts, EasyOptionsFromCommandLine.TransferSettingsOf(options), EasyOptionsFromCommandLine.NetworkOf(options), http, transferUrl, fileSystem, eventsBeforeConnecting).ConfigureAwait(false);
         TransferResult result = await TransferWithHeaderOutputAsync(dispatch, options, transfer, transferUrl, uploadFile)
             .ConfigureAwait(false);
         return (result, givenUrl, transferUrl);
@@ -2243,15 +2216,6 @@ internal sealed class CurlCommandRunner(
         transferUrl = UrlSchemeGuesser.AddScheme(givenUrl, options.DefaultProtocol);
         return uploadFile is null || UploadTransferUrl.TryResolve(transferUrl, uploadFile, out transferUrl);
     }
-
-    /// <summary>
-    /// Refuses an <c>--interface</c> and then an <c>--ech</c> value curl's setopt refuses, before the transfer connects.
-    /// </summary>
-    /// <param name="options">The accepted command line.</param>
-    /// <param name="events">The transfer's events before connecting.</param>
-    /// <returns>The first refusal, or <see langword="null" /> when both are accepted.</returns>
-    private static TransferResult? RefuseMalformedSetopt(CommandLineOptions options, ITransferEvents events) =>
-        RefuseMalformedInterface(options, events) ?? RefuseMalformedEchMode(options, events);
 
     /// <summary>
     /// Sets the transfer up for <c>--etag-compare</c> and <c>--etag-save</c>, in that order, as curl 8.21.0
@@ -2769,134 +2733,6 @@ internal sealed class CurlCommandRunner(
     }
 
     /// <summary>
-    /// Writes the run's <c>-c</c> jar after the transfer of <paramref name="transferUrl" />,
-    /// when there is a jar and the URL is <c>http</c> or <c>https</c>, whatever the transfer's
-    /// outcome: curl 8.21.0 writes it after every HTTP transfer, after its <c>-w</c> output, and
-    /// not after a <c>file</c> or <c>dict</c> one (measured 2026-09-26, BL-237 Notes). The jar
-    /// file is replaced each time; <c>-c -</c> prints the jar once per HTTP transfer, in the mode
-    /// standard output is in, and not at all once standard output has failed.
-    /// </summary>
-    /// <param name="dispatch">What the run transfers through, with its cookies.</param>
-    /// <param name="options">The accepted command line.</param>
-    /// <param name="transferUrl">The URL transferred, as typed or as a <c>-T</c> upload resolved it.</param>
-    /// <param name="standardOutputIsBinary">Whether standard output keeps its line feeds.</param>
-    /// <returns>A task that completes when the jar is written.</returns>
-    private async Task WriteCookieJarAsync(TransferDispatch dispatch, CommandLineOptions options, string transferUrl, bool standardOutputIsBinary)
-    {
-        if (dispatch.Cookies is not { } cookies || !IsHttpUrl(QueryUrl.Append(transferUrl, options)))
-        {
-            return;
-        }
-
-        Stream liveStandardOutput = Running.StandardOutput.HasWriteFailed ? Stream.Null : Running.StandardOutput;
-        Stream jarStandardOutput = standardOutputIsBinary ? liveStandardOutput : new LineFeedToCrLfStream(liveStandardOutput);
-        await cookies.WriteCookieJarAsync(fileSystem, jarStandardOutput, timeProvider.GetUtcNow()).ConfigureAwait(false);
-    }
-
-    /// <summary>
-    /// Writes the <c>-c</c> jar (<see cref="WriteCookieJarAsync" />), then the transfer's <c>--alt-svc</c>
-    /// file, when it has one (<see cref="RunningTransferState.AltSvc" />), then the group's <c>--hsts</c>
-    /// file, when it has one (<see cref="HstsCacheFile.WriteAsync" />).
-    /// </summary>
-    /// <param name="dispatch">What the run transfers through, with its cookies.</param>
-    /// <param name="options">The transfer's option group.</param>
-    /// <param name="transferUrl">The URL transferred.</param>
-    /// <param name="standardOutputIsBinary">Whether standard output is in binary mode for <c>-c -</c>.</param>
-    /// <param name="state">The transfer's state, with its alt-svc cache.</param>
-    /// <returns>A task that completes when all are written.</returns>
-    private async Task WriteCookieJarAltSvcAndHstsFilesAsync(
-        TransferDispatch dispatch,
-        CommandLineOptions options,
-        string transferUrl,
-        bool standardOutputIsBinary,
-        RunningTransferState state)
-    {
-        await WriteCookieJarAsync(dispatch, options, transferUrl, standardOutputIsBinary).ConfigureAwait(false);
-        if (state.AltSvc is { } altSvc)
-        {
-            await altSvc.WriteAsync(fileSystem).ConfigureAwait(false);
-        }
-
-        if (options.HstsFile is { } hstsFile)
-        {
-            await HstsCacheFile.WriteAsync(hstsFile, Hsts, fileSystem, runsOnWindows).ConfigureAwait(false);
-        }
-    }
-
-    /// <summary>
-    /// Loads the run's <c>-b</c> files before its first <c>http</c> or <c>https</c> transfer and
-    /// not before any other: curl 8.21.0 reads <c>-b -</c> from standard input only then, so a
-    /// <c>telnet</c> transfer or <c>file</c> upload before it gets standard input and the
-    /// <c>-b -</c> after it finds it empty, and a <c>-T -</c> upload in the same transfer finds it
-    /// empty (measured 2026-09-27, BL-316 Notes).
-    /// </summary>
-    /// <param name="dispatch">What the run transfers through, with its cookies.</param>
-    /// <param name="options">The accepted command line.</param>
-    /// <param name="transferUrl">The URL about to be transferred.</param>
-    /// <param name="events">Where the files' <c>-v</c> lines go.</param>
-    /// <returns>A task that completes when the files are loaded.</returns>
-    private async Task LoadCookieFilesAsync(TransferDispatch dispatch, CommandLineOptions options, string transferUrl, ITransferEvents events)
-    {
-        if (dispatch.Cookies is { } cookies && IsHttpUrl(QueryUrl.Append(transferUrl, options)))
-        {
-            await cookies.LoadCookieFilesAsync(fileSystem, standardInput, timeProvider.GetUtcNow(), events).ConfigureAwait(false);
-        }
-    }
-
-    /// <summary>
-    /// Reads the group's <c>--hsts</c> file into the run's HSTS cache, then switches an <c>http</c> URL whose
-    /// host the cache knows to <c>https</c>, printing curl 8.21.0's <c>-v</c> line with the URL
-    /// <c>%{url_effective}</c> then shows, as curl does just before it connects (BL-621 Notes).
-    /// </summary>
-    /// <param name="options">The transfer's option group.</param>
-    /// <param name="transferUrl">The URL about to be transferred.</param>
-    /// <param name="events">Where the <c>-v</c> line goes.</param>
-    /// <returns>The URL to transfer: switched, or as it was.</returns>
-    private async Task<string> SwitchToHttpsForHstsAsync(CommandLineOptions options, string transferUrl, ITransferEvents events)
-    {
-        if (options.HstsFile is { } file)
-        {
-            await HstsCacheFile.ReadAsync(file, Hsts, fileSystem).ConfigureAwait(false);
-        }
-
-        if (!CurlUrl.TryParse(QueryUrl.Append(transferUrl, options), options.PathAsIs, out CurlUrl? url)
-            || !Hsts.TrySwitchToHttps(transferUrl, url, out string? httpsUrl))
-        {
-            return transferUrl;
-        }
-
-        events.ReportInfo(HstsTransferPolicy.SwitchedMessagePrefix + UrlEffective.Normalize(QueryUrl.Append(httpsUrl, options), options.PathAsIs));
-        return httpsUrl;
-    }
-
-    /// <summary>
-    /// Gives an <c>http</c> or <c>https</c> transfer of a group with <c>--alt-svc</c> its own alt-svc cache,
-    /// its file read now, as curl 8.21.0 gives each transfer's handle one; any other transfer gets none, and
-    /// its file is neither read nor written (measured 2026-09-29, BL-623 Notes).
-    /// </summary>
-    /// <param name="options">The transfer's option group.</param>
-    /// <param name="transferUrl">The URL transferred.</param>
-    /// <returns>A task that completes when the file is read.</returns>
-    private async Task OpenAltSvcCacheAsync(CommandLineOptions options, string transferUrl)
-    {
-        if (options.AltSvcFile is { } file && IsHttpUrl(QueryUrl.Append(transferUrl, options)))
-        {
-            Running.AltSvc = await AltSvcTransferCache
-                .OpenAsync(file, options.HttpVersion, options.ConnectToEntries, fileSystem, timeProvider, diagnosticLog, altSvcUsesOverHttp)
-                .ConfigureAwait(false);
-        }
-    }
-
-    /// <summary>
-    /// Tells whether <paramref name="requestUrl" /> is an absolute <c>http</c> or <c>https</c> URL.
-    /// </summary>
-    /// <param name="requestUrl">The URL, with any <c>-G</c> / <c>--url-query</c> query.</param>
-    /// <returns><see langword="true" /> for an HTTP URL.</returns>
-    private static bool IsHttpUrl(string requestUrl) =>
-        CurlUrl.TryParse(requestUrl, pathAsIs: false, out CurlUrl? url)
-        && url.Scheme is "http" or "https";
-
-    /// <summary>
     /// The <c>%{conn_id}</c> of a transfer that used no connection, as curl 8.21.0 prints it.
     /// </summary>
     private const long NoConnectionId = -1;
@@ -2924,7 +2760,7 @@ internal sealed class CurlCommandRunner(
     /// <param name="result">The transfer's result.</param>
     /// <returns>The number <c>%{conn_id}</c> prints.</returns>
     private long TakeConnectionId(TransferResult result) =>
-        UsedAConnection(result) ? Running.ConnectionId ?? nextConnectionId++ : NoConnectionId;
+        UsedAConnection(result) ? Running.ConnectionId ?? transferPerformer.TakeConnectionId() : NoConnectionId;
 
     /// <summary>
     /// Sets the running transfer's <see cref="RunningTransferState.Events" />, whose lines under
@@ -2948,7 +2784,7 @@ internal sealed class CurlCommandRunner(
     private ITransferEvents SetUpTransferEvents(CommandLineOptions options, UrlTransfer transfer)
     {
         RunningTransferState state = Running;
-        Func<long> takeConnectionId = () => state.ConnectionId ??= nextConnectionId++;
+        Func<long> takeConnectionId = () => state.ConnectionId ??= transferPerformer.TakeConnectionId();
         ITransferEvents output = transferEventOutput.EventsFor(transfer.TransferId, () => takeConnectionId());
         ITransferEvents events = WithTraceLineEvents(options, output, takeConnectionId);
         ITransferEvents recorded = options.WriteOut is null ? events : new TlsResultRecordingTransferEvents(events, state);
@@ -2970,12 +2806,12 @@ internal sealed class CurlCommandRunner(
     /// <summary>
     /// Wraps <paramref name="output" /> in the events that add the trace lines the transfer writes
     /// after its connect has returned: <see cref="AsyncResolveTeardownTraceEvents" /> under
-    /// <see cref="CurlComposition.TracesDns" />, <see cref="MultiStateTraceEvents" /> under
-    /// <see cref="CurlComposition.TracesMulti" />, <see cref="ClientReaderResetTraceEvents" /> under
-    /// <see cref="CurlComposition.TracesRead" /> and, outermost so its <c>[WRITE] [OUT] done</c> comes before
-    /// the <c>[READ]</c> line, <see cref="ClientWriterTraceEvents" /> under <see cref="CurlComposition.TracesWrite" />.
+    /// <see cref="EngineComposition.TracesDns" />, <see cref="MultiStateTraceEvents" /> under
+    /// <see cref="EngineComposition.TracesMulti" />, <see cref="ClientReaderResetTraceEvents" /> under
+    /// <see cref="EngineComposition.TracesRead" /> and, outermost so its <c>[WRITE] [OUT] done</c> comes before
+    /// the <c>[READ]</c> line, <see cref="ClientWriterTraceEvents" /> under <see cref="EngineComposition.TracesWrite" />.
     /// The <c>[MULTI]</c> lines sit inside the other two, which is what lets them find their place among those lines.
-    /// Under <see cref="CurlComposition.TracesTimer" /> the response wait's <c>[TIMER]</c> lines
+    /// Under <see cref="EngineComposition.TracesTimer" /> the response wait's <c>[TIMER]</c> lines
     /// (<see cref="TransferTimers.WaitLines" />) go among the <c>[MULTI]</c> lines, or, with the multi not
     /// traced, through <see cref="ResponseWaitTimerTraceEvents" /> in their place (BL-1258).
     /// </summary>
@@ -2985,17 +2821,38 @@ internal sealed class CurlCommandRunner(
     /// <returns>The events the transfer reports to.</returns>
     private ITransferEvents WithTraceLineEvents(CommandLineOptions options, ITransferEvents output, Func<long> takeConnectionId)
     {
-        ITransferEvents teardown = CurlComposition.TracesDns(options) ? new AsyncResolveTeardownTraceEvents(output) : output;
+        ITransferEvents teardown = EngineComposition.TracesDns(EasyOptionsFromCommandLine.TraceComponentsOf(options)) ? new AsyncResolveTeardownTraceEvents(output) : output;
         ITransferEvents multi = WithMultiOrTimerEvents(options, teardown, takeConnectionId);
-        ITransferEvents readers = CurlComposition.TracesRead(options) ? new ClientReaderResetTraceEvents(multi) : multi;
-        return CurlComposition.TracesWrite(options) ? new ClientWriterTraceEvents(readers) : readers;
+        ITransferEvents readers = EngineComposition.TracesRead(EasyOptionsFromCommandLine.TraceComponentsOf(options)) ? new ClientReaderResetTraceEvents(multi) : multi;
+        return EngineComposition.TracesWrite(EasyOptionsFromCommandLine.TraceComponentsOf(options)) ? new ClientWriterTraceEvents(readers) : readers;
+    }
+
+    /// <summary>
+    /// Gets one transfer's transfer options: its group's, with the <c>-T</c> <paramref name="upload" /> when
+    /// there is one, and under <c>-C -</c> that upload resuming from offset -1, the end of the remote file, as
+    /// curl's tool sets <c>CURLOPT_RESUME_FROM_LARGE</c> for it (ADR-0534). The upload's size stays unknown
+    /// (-1): the engine sends the stream as it reads it.
+    /// </summary>
+    /// <param name="options">The accepted command line.</param>
+    /// <param name="upload">The <c>-T</c> source, or <see langword="null" /> without <c>-T</c>.</param>
+    /// <returns>The transfer options.</returns>
+    private static EasyTransferOptions TransferOptionsOf(CommandLineOptions options, Stream? upload)
+    {
+        EasyTransferOptions group = EasyOptionsFromCommandLine.TransferOf(options);
+        if (upload is null)
+        {
+            return group;
+        }
+
+        EasyTransferOptions uploading = EasyOptionsFromCommandLine.UploadTransferOf(group, uploadFileSize: null);
+        return options.ResumeFromOutputSize ? uploading with { ResumeFrom = -1 } : uploading;
     }
 
     private ITransferEvents WithMultiOrTimerEvents(CommandLineOptions options, ITransferEvents inner, Func<long> takeConnectionId)
     {
-        TransferTimers timers = TransferTimers.Of(options);
-        bool tracesMulti = CurlComposition.TracesMulti(options);
-        IReadOnlyList<string> waitLines = CurlComposition.TracesTimer(options) ? timers.WaitLines(tracesMulti) : [];
+        TransferTimers timers = TransferTimers.Of(EasyOptionsFromCommandLine.NetworkOf(options), EasyOptionsFromCommandLine.TransferOf(options));
+        bool tracesMulti = EngineComposition.TracesMulti(EasyOptionsFromCommandLine.TraceComponentsOf(options));
+        IReadOnlyList<string> waitLines = EngineComposition.TracesTimer(EasyOptionsFromCommandLine.TraceComponentsOf(options)) ? timers.WaitLines(tracesMulti) : [];
         if (tracesMulti)
         {
             return new MultiStateTraceEvents(inner, timeProvider, takeConnectionId, timers, waitLines);
@@ -3015,7 +2872,7 @@ internal sealed class CurlCommandRunner(
     /// <param name="eventsBeforeConnecting">The transfer's events before it has a connection.</param>
     private static void TraceTransferStart(CommandLineOptions options, ITransferEvents eventsBeforeConnecting)
     {
-        if (CurlComposition.TracesMulti(options))
+        if (EngineComposition.TracesMulti(EasyOptionsFromCommandLine.TraceComponentsOf(options)))
         {
             foreach (string line in MultiStateTraceEvents.StartLines)
             {
@@ -3023,51 +2880,10 @@ internal sealed class CurlCommandRunner(
             }
         }
 
-        if (CurlComposition.TracesRead(options))
+        if (EngineComposition.TracesRead(EasyOptionsFromCommandLine.TraceComponentsOf(options)))
         {
             eventsBeforeConnecting.ReportInfo(ClientReaderResetTraceEvents.ResetLine);
         }
-    }
-
-    /// <summary>
-    /// Refuses a <c>--interface</c> value libcurl refuses when curl sets it
-    /// (<see cref="InterfaceBinding.IsMalformed" />): curl 8.21.0 reports <c>setopt 0x274e got bad
-    /// argument</c> as a <c>-v</c> line, fails the transfer with exit 43 and that message, still writes
-    /// its <c>-w</c> output, and transfers nothing after it (measured 2026-09-29, BL-600 Notes).
-    /// </summary>
-    /// <param name="options">The transfer's option group.</param>
-    /// <param name="events">Where the <c>-v</c> line goes.</param>
-    /// <returns><see cref="InterfaceSetoptFailure" />, or <see langword="null" /> when the value was accepted.</returns>
-    private static TransferResult? RefuseMalformedInterface(CommandLineOptions options, ITransferEvents events)
-    {
-        if (options.Interface is not { IsMalformed: true })
-        {
-            return null;
-        }
-
-        events.ReportInfo(InterfaceSetoptMessage);
-        return InterfaceSetoptFailure;
-    }
-
-    /// <summary>
-    /// Refuses an <c>--ech</c> mode libcurl refuses when curl sets it
-    /// (<see cref="CommandLineOptions.EchModeIsMalformed" />): curl 8.21.0's ECH build reports
-    /// <c>setopt 0x2855 got bad argument</c> and fails the transfer with exit 43 (BL-1107), as it
-    /// fails a malformed <c>--interface</c>, so the <c>-v</c> line and the <c>-w</c> output follow that
-    /// measurement (ADR-0378).
-    /// </summary>
-    /// <param name="options">The transfer's option group.</param>
-    /// <param name="events">Where the <c>-v</c> line goes.</param>
-    /// <returns><see cref="EchSetoptFailure" />, or <see langword="null" /> when the mode was accepted.</returns>
-    private static TransferResult? RefuseMalformedEchMode(CommandLineOptions options, ITransferEvents events)
-    {
-        if (!options.EchModeIsMalformed)
-        {
-            return null;
-        }
-
-        events.ReportInfo(EchSetoptMessage);
-        return EchSetoptFailure;
     }
 
     /// <summary>
@@ -3096,6 +2912,7 @@ internal sealed class CurlCommandRunner(
     /// <returns><see langword="true" /> when no further URL is transferred.</returns>
     private bool EndsTheRun(CommandLineOptions options, TransferResult result) =>
         RunEndingFailures.Contains(result)
+        || ReferenceEquals(result, transferPerformer.KnownHostsFileMissingFailure)
         || ReferenceEquals(result, cannotOpenUploadFileAfterFailure)
         || (options.FailEarly && !result.IsSuccess);
 
@@ -3123,11 +2940,18 @@ internal sealed class CurlCommandRunner(
     }
 
     /// <summary>
+    /// <see cref="CurlEasyErrorText.Of" /> as one delegate made once, so no call site re-checks a
+    /// compiler-cached method-group delegate (BL-2291).
+    /// </summary>
+    private static readonly Func<CurlExitCode, string> EasyErrorText = new(CurlEasyErrorText.Of);
+
+    /// <summary>
     /// The results, compared by reference, after which no further URL is transferred whatever
     /// the options: a resumed <c>-o</c> file, a <c>-T</c> or <c>-D</c> file that cannot be opened,
     /// a <c>--create-dirs</c> directory that cannot be created, an IPFS URL that cannot be
-    /// rewritten or asked for its remote name, an SSH transfer with no known-hosts file, and an
-    /// <c>--interface</c> value or <c>--ech</c> mode libcurl refuses when curl sets it.
+    /// rewritten or asked for its remote name, and an <c>--interface</c> value or <c>--ech</c> mode
+    /// libcurl refuses when curl sets it. An SSH transfer with no known-hosts file ends the run too,
+    /// through the performer's own <see cref="TransferPerformer.KnownHostsFileMissingFailure" />.
     /// </summary>
     private static readonly HashSet<TransferResult> RunEndingFailures = new(ReferenceEqualityComparer.Instance)
     {
@@ -3139,9 +2963,8 @@ internal sealed class CurlCommandRunner(
         IpfsMalformedGatewayOptionFailure,
         IpfsMalformedTargetUrlFailure,
         IpfsRemoteNameFailure,
-        KnownHostsFileMissingFailure,
-        InterfaceSetoptFailure,
-        EchSetoptFailure,
+        TransferPerformer.InterfaceSetoptFailure,
+        TransferPerformer.EchSetoptFailure,
     };
 
     /// <summary>
@@ -3175,13 +2998,13 @@ internal sealed class CurlCommandRunner(
 
     /// <summary>
     /// Formats the line printed for a failed transfer that carries a message, with the message
-    /// cut to curl's error buffer (<see cref="CurlErrorBuffer" />). A bad glob's lines are not
+    /// cut to curl's error buffer (<see cref="Curl.Engine.CurlErrorBuffer" />). A bad glob's lines are not
     /// cut: curl's tool formats them itself (measured 2026-09-27, BL-380 Notes).
     /// </summary>
     /// <param name="result">The failed transfer's result.</param>
     /// <returns>The line <see cref="FormatErrorLine" /> gives for the cut message.</returns>
     private static string FormatTransferErrorLine(TransferResult result) =>
-        FormatErrorLine(result, CurlErrorBuffer.Truncate(result.ErrorMessage));
+        FormatErrorLine(result, Curl.Engine.CurlErrorBuffer.Truncate(result.ErrorMessage));
 
     /// <summary>
     /// Formats the line printed for a failure that carries a message.
@@ -3403,22 +3226,18 @@ internal sealed class CurlCommandRunner(
 
         await WriteCustomRequestLinesAsync(options, uploadFile).ConfigureAwait(false);
         Stream? etagWatchedHeaderOutput = Running.SaveEtag is { } saveEtag ? new EtagSaveStream(saveEtag, headerOutput) : headerOutput;
-        return await SetupFailureAsync(dispatch, options).ConfigureAwait(false)
+        return await transferPerformer.SetupFailureAsync(dispatch.Cookies, EasyOptionsFromCommandLine.TransferSettingsOf(options), runsOnWindows, WriteWrappedWarningAsync).ConfigureAwait(false)
             ?? await TransferOpeningUploadFileAsync(dispatch, options, url, uploadFile, transfer, etagWatchedHeaderOutput).ConfigureAwait(false);
     }
 
     /// <summary>
-    /// The failure a transfer ends with while curl 8.21.0 sets its options, before any upload file
-    /// is opened or the URL parsed: <see cref="CookieLineTooLongFailureAsync" />'s when the group's
-    /// joined <c>-b name=value</c> strings are too long, else <see cref="NoCryptoEngines.LoadFailure" />'s.
+    /// Writes a warning's text to standard error as curl's <c>warnf</c> does: <c>Warning: </c> in front,
+    /// wrapped at <c>terminalColumns</c> (<see cref="WarningLineWrapper.WrapText" />).
     /// </summary>
-    /// <param name="dispatch">The option group's dispatch, which holds its cookies.</param>
-    /// <param name="options">The accepted command line.</param>
-    /// <returns>The failure, or <see langword="null" /> when the transfer goes ahead.</returns>
-    private async Task<TransferResult?> SetupFailureAsync(TransferDispatch dispatch, CommandLineOptions options) =>
-        dispatch.Cookies is { CookieLineTooLong: true }
-            ? await CookieLineTooLongFailureAsync(options).ConfigureAwait(false)
-            : NoCryptoEngines.LoadFailure(options.Engine, runsOnWindows);
+    /// <param name="text">The warning's text, without <c>Warning: </c>.</param>
+    /// <returns>A task that completes when the lines are flushed.</returns>
+    private Task WriteWrappedWarningAsync(string text) =>
+        WriteErrorPiecesAsync(WarningLineWrapper.WrapText(text, terminalColumns));
 
     /// <summary>
     /// Writes curl 8.21.0's <c>customrequest_helper</c> lines (<c>src/tool_helpers.c</c>) before a
@@ -3452,25 +3271,6 @@ internal sealed class CurlCommandRunner(
                 "Setting custom HTTP method to HEAD with -X/--request may not work the way you want. Consider using -I/--head instead.",
                 terminalColumns)).ConfigureAwait(false);
         }
-    }
-
-    /// <summary>
-    /// Fails a transfer whose joined <c>-b name=value</c> strings reach
-    /// <see cref="CookieEngine.LongestCookieLine" /> bytes before it connects, as curl 8.21.0's
-    /// <c>cookie_setopts</c> does: <see cref="CookieEngine.CookieLineTooLongWarning" />, wrapped,
-    /// unless <c>-s</c>, then exit 100 with <c>A value or data field grew larger than allowed</c>
-    /// (measured 2026-10-03, BL-1391).
-    /// </summary>
-    /// <param name="options">The accepted command line.</param>
-    /// <returns>The transfer's failure.</returns>
-    private async Task<TransferResult> CookieLineTooLongFailureAsync(CommandLineOptions options)
-    {
-        if (!options.Silent)
-        {
-            await WriteErrorPiecesAsync(WarningLineWrapper.WrapText(CookieEngine.CookieLineTooLongWarning, terminalColumns)).ConfigureAwait(false);
-        }
-
-        return TransferResult.Failure(CurlExitCode.TooLarge, CurlEasyErrorText.Of(CurlExitCode.TooLarge));
     }
 
     /// <summary>
@@ -3558,28 +3358,31 @@ internal sealed class CurlCommandRunner(
         UrlTransfer transfer,
         Stream? headerOutput)
     {
+        EasyProxyOptions proxyOptions = EasyOptionsFromCommandLine.ProxyOf(options);
+        EasyAuthenticationOptions authentication = EasyOptionsFromCommandLine.AuthenticationOf(options);
         RedirectFollower follower = new(
             dispatch.Dispatcher,
             (CurlUrl hopUrl, out ProxyEndpoint? hopProxy, [NotNullWhen(false)] out TransferResult? hopFailure) =>
-                TransferProxySelection.TrySelect(dispatch.ProxySelector, options, hopUrl, out hopProxy, out hopFailure, diagnosticLog)
-                && TransferCredentialLookup.TryCheckUrlCredentials(options, hopUrl, out hopFailure),
+                TransferProxySelection.TrySelect(dispatch.ProxySelector, proxyOptions, options.UnixSocketPath is not null, options.ProxyCredentials, hopUrl, out hopProxy, out hopFailure, diagnosticLog)
+                && TransferCredentialLookup.TryCheckUrlCredentials(authentication, hopUrl, out hopFailure),
             hsts: Hsts,
             selectHopAltSvc: (hopUrl, hopHttp) => Running.AltSvc is { } altSvc ? altSvc.ApplyTo(hopUrl, hopHttp) : hopHttp,
-            selectHopCredentials: CredentialLookup.ForRedirectHops(options));
+            selectHopCredentials: CredentialLookup.ForRedirectHops(authentication));
 
-        if (!TryParseTransferUrl(QueryUrl.Append(url, options), options, out CurlUrl? transferUrl, out CurlUrlRejection rejection))
+        if (!TransferPerformer.TryParseTransferUrl(QueryUrl.Append(url, options), options.DisallowUsernameInUrl, options.PathAsIs, out CurlUrl? transferUrl, out CurlUrlRejection rejection))
         {
-            return ReportUrlRejected(rejection, EventsBeforeConnecting(transfer));
+            return TransferPerformer.ReportUrlRejected(rejection, EventsBeforeConnecting(transfer));
         }
 
-        if (ParsedUrlRefusal(transferUrl) is { } refusal)
+        if (TransferPerformer.ParsedUrlRefusal(transferUrl) is { } refusal)
         {
             return refusal;
         }
 
         ByteRange? range = ParseRange(options.Range);
 
-        if (options.FormParts.Count == 0)
+        EasyMimeBody? mimePost = EasyOptionsFromCommandLine.HttpOf(options).MimePost;
+        if (mimePost is null)
         {
             return await TransferWithBodyAsync(
                     follower, dispatch, options, transferUrl, transfer, range, headerOutput, null, upload)
@@ -3587,7 +3390,7 @@ internal sealed class CurlCommandRunner(
         }
 
         bool mimeMessage = MailRequestOptionsMapping.SendsFormAsMimeMessage(transferUrl.Scheme);
-        MultipartFormBuildResult form = await BuildFormAsync(options, transferUrl.Scheme, mimeMessage).ConfigureAwait(false);
+        MultipartFormBuildResult form = await BuildFormAsync(options, mimePost, transferUrl.Scheme, mimeMessage).ConfigureAwait(false);
         if (!form.IsBuilt)
         {
             return form.Failure;
@@ -3611,174 +3414,22 @@ internal sealed class CurlCommandRunner(
     /// <paramref name="mimeMessage" /> is set, otherwise as the HTTP form body (BL-1988).
     /// </summary>
     /// <param name="options">The parsed command line.</param>
+    /// <param name="mimePost">The <c>-F</c> parts, as <see cref="EasyOptionsFromCommandLine.HttpOf" /> maps them.</param>
     /// <param name="scheme">The transfer URL's scheme, which picks the names' escaping.</param>
     /// <param name="mimeMessage">Whether the parts are a mail message rather than a form.</param>
     /// <returns>The body, or the failure that stops the transfer before it connects.</returns>
-    private ValueTask<MultipartFormBuildResult> BuildFormAsync(CommandLineOptions options, string scheme, bool mimeMessage) =>
+    private ValueTask<MultipartFormBuildResult> BuildFormAsync(CommandLineOptions options, EasyMimeBody mimePost, string scheme, bool mimeMessage) =>
         mimeMessage
             ? formBodyBuilder.BuildMailMessageAsync(
-                MultipartFormPartMapping.FromCommandLine(options.FormParts),
-                MultipartFormPartMapping.NameEscapingOf(options, scheme),
+                MultipartFormPartMapping.FromMimeBody(mimePost),
+                MultipartFormPartMapping.NameEscapingOf(options.FormEscape, scheme),
                 options.Headers,
                 CancellationToken.None)
             : formBodyBuilder.BuildAsync(
-                MultipartFormPartMapping.FromCommandLine(options.FormParts),
-                MultipartFormPartMapping.NameEscapingOf(options, scheme),
-                MultipartFormPartMapping.RequestContentTypeOf(options),
+                MultipartFormPartMapping.FromMimeBody(mimePost),
+                MultipartFormPartMapping.NameEscapingOf(options.FormEscape, scheme),
+                MultipartFormPartMapping.RequestContentTypeOf(options.Headers),
                 CancellationToken.None);
-
-    /// <summary>
-    /// Parses the transfer's URL; under <c>--disallow-username-in-url</c> a URL with user information,
-    /// even an empty user, is rejected with <see cref="CurlUrlRejection.UserNotAllowed" /> before its
-    /// host and port are checked, so it fails with exit 67 even when its host or port is bad (curl
-    /// 8.21.0, measured, BL-626 and BL-910 Notes).
-    /// </summary>
-    private static bool TryParseTransferUrl(
-        string text,
-        CommandLineOptions options,
-        [NotNullWhen(true)] out CurlUrl? url,
-        out CurlUrlRejection rejection) =>
-        options.DisallowUsernameInUrl
-            ? CurlUrl.TryParseDisallowingUser(text, options.PathAsIs, out url, out rejection)
-            : CurlUrl.TryParse(text, options.PathAsIs, out url, out rejection);
-
-    /// <summary>
-    /// The failure for a transfer URL curl's parser rejects: exit 67 for
-    /// <see cref="CurlUrlRejection.UserNotAllowed" />, exit 3 for every other rejection, each with
-    /// <c>URL rejected: </c> and curl's message.
-    /// </summary>
-    private static TransferResult UrlRejectedFailure(CurlUrlRejection rejection) =>
-        TransferResult.Failure(
-            rejection == CurlUrlRejection.UserNotAllowed ? CurlExitCode.LoginDenied : CurlExitCode.UrlMalformat,
-            UrlRejectedPrefix + rejection.ToCurlMessage());
-
-    /// <summary>
-    /// Reports a transfer URL curl's parser rejects as the <c>-v</c> info line
-    /// <c>URL rejected: &lt;reason&gt;</c>, as curl 8.21.0's <c>failf</c> in <c>lib/url.c</c> does
-    /// (measured 2026-10-03, BL-1332), and returns <see cref="UrlRejectedFailure" />.
-    /// </summary>
-    /// <param name="rejection">Why the URL was rejected.</param>
-    /// <param name="events">The transfer's events before connecting.</param>
-    /// <returns>The failure carrying the same text.</returns>
-    private static TransferResult ReportUrlRejected(CurlUrlRejection rejection, ITransferEvents events)
-    {
-        events.ReportInfo(UrlRejectedPrefix + rejection.ToCurlMessage());
-        return UrlRejectedFailure(rejection);
-    }
-
-    /// <summary>
-    /// Why the parsed URL is refused before any connection, or <see langword="null" /> when it is not:
-    /// a host longer than <see cref="MaximumHostLength" /> fails with exit 3 and
-    /// <see cref="TooLongHostnameMessage" />.
-    /// </summary>
-    private static TransferResult? ParsedUrlRefusal(CurlUrl url)
-    {
-        return Encoding.UTF8.GetByteCount(url.Host) > MaximumHostLength
-            ? TransferResult.Failure(CurlExitCode.UrlMalformat, TooLongHostnameMessage)
-            : null;
-    }
-
-    /// <summary>
-    /// Chooses the transfer's proxy with <see cref="TransferProxySelection" />, then its credentials
-    /// with <see cref="TransferCredentialLookup" />, which it keeps as the running transfer's
-    /// <see cref="RunningTransferState.LookedUpCredentials" /> for every attempt's context.
-    /// </summary>
-    /// <param name="dispatch">The run's dispatch: its dispatcher says whether the URL's scheme is served, its proxy selector chooses the proxy.</param>
-    /// <param name="options">The accepted command line.</param>
-    /// <param name="url">The transfer's URL.</param>
-    /// <param name="transfer">
-    /// The transfer, whose events get curl's <c>-v</c> info line for every credential failure: credentials
-    /// refused for a control character (BL-1411) and a required netrc file missing or malformed (BL-1447).
-    /// </param>
-    /// <param name="proxy">The proxy chosen, or <see langword="null" /> to connect directly.</param>
-    /// <param name="failure">The proxy's, the credentials' or the netrc file's failure, when one refuses the transfer.</param>
-    /// <returns><see langword="false" /> when the transfer ends before it starts.</returns>
-    private bool TrySelectProxyAndCredentials(
-        TransferDispatch dispatch,
-        CommandLineOptions options,
-        CurlUrl url,
-        UrlTransfer transfer,
-        out ProxyEndpoint? proxy,
-        [NotNullWhen(false)] out TransferResult? failure)
-    {
-        proxy = null;
-        if (!dispatch.Dispatcher.Serves(url.Scheme))
-        {
-            failure = TransferResult.Failure(CurlExitCode.UnsupportedProtocol, $"Protocol \"{url.Scheme.ToLowerInvariant()}\" not supported");
-            EventsBeforeConnecting(transfer).ReportInfo(failure.ErrorMessage!);
-            return false;
-        }
-
-        if (!TransferProxySelection.TrySelect(dispatch.ProxySelector, options, url, out proxy, out failure, diagnosticLog))
-        {
-            return false;
-        }
-
-        bool looked = CredentialLookup.TryLookUp(
-            options, url, out NetworkCredential? lookedUpCredentials, out failure, EventsBeforeConnecting(transfer).ReportInfo);
-        Running.LookedUpCredentials = lookedUpCredentials;
-        if (failure is not null)
-        {
-            EventsBeforeConnecting(transfer).ReportInfo(failure.ErrorMessage!);
-        }
-
-        return looked;
-    }
-
-    /// <summary>
-    /// Sets <see cref="RunningTransferState.Ssh" /> for an <c>scp</c> or <c>sftp</c> transfer, resolving its
-    /// known-hosts file as curl 8.21.0's tool does (ADR-0122): none under <c>-k</c>, whatever
-    /// <c>--knownhosts</c> says; else the <c>--knownhosts</c> file; else <see cref="KnownHostsSearch" />'s.
-    /// When none is found, a <c>--hostpubmd5</c> or <c>--hostpubsha256</c> fingerprint lets the transfer
-    /// go on after <c>Warning: Could not find a known_hosts file</c> (hidden by <c>-s</c>); without one,
-    /// <c>curl: Could not find a known_hosts file</c> (hidden by <c>-s</c> unless <c>-S</c>) and
-    /// <see cref="KnownHostsFileMissingFailure" /> end the run before any connection (measured 2026-09-29,
-    /// BL-576 Notes). Any other scheme is left without SSH options.
-    /// </summary>
-    /// <param name="options">The transfer's option group.</param>
-    /// <param name="url">The URL to transfer.</param>
-    /// <returns><see cref="KnownHostsFileMissingFailure" />, or <see langword="null" /> to go on.</returns>
-    private async Task<TransferResult?> ResolveSshOptionsAsync(CommandLineOptions options, CurlUrl url)
-    {
-        if (!SshOptionsMapping.IsSshScheme(url.Scheme))
-        {
-            return null;
-        }
-
-        string? knownHosts = options.Insecure ? null : options.SshKnownHostsFile ?? KnownHostsSearch.Find(DataFileReader);
-        UpdateLibcurlTransfer(entry => entry with { SshKnownHostsFile = knownHosts, SshKnownHostsFileMissing = knownHosts is null && !options.Insecure });
-        if (knownHosts is null && !options.Insecure
-            && await ReportKnownHostsFileMissingAsync(options).ConfigureAwait(false) is { } failure)
-        {
-            return failure;
-        }
-
-        Running.Ssh = SshOptionsMapping.FromCommandLine(options, knownHosts);
-        return null;
-    }
-
-    /// <summary>
-    /// Reports that an SSH transfer checked by known hosts has no known-hosts file, for
-    /// <see cref="ResolveSshOptionsAsync" />: a warning when a host key fingerprint was given, and
-    /// otherwise curl's line and <see cref="KnownHostsFileMissingFailure" />.
-    /// </summary>
-    /// <param name="options">The transfer's option group.</param>
-    /// <returns><see cref="KnownHostsFileMissingFailure" />, or <see langword="null" /> when the transfer goes on.</returns>
-    private async Task<TransferResult?> ReportKnownHostsFileMissingAsync(CommandLineOptions options)
-    {
-        if (options.SshHostPublicKeyMd5 is not null || options.SshHostPublicKeySha256 is not null)
-        {
-            await WriteWarningUnlessSilentAsync(options, KnownHostsFileMissingWarning).ConfigureAwait(false);
-            return null;
-        }
-
-        if (ShowsErrors(options))
-        {
-            await WriteErrorLineAsync(KnownHostsFileMissingLine).ConfigureAwait(false);
-        }
-
-        return KnownHostsFileMissingFailure;
-    }
 
     /// <summary>
     /// Performs one checked transfer, sending <paramref name="formBody" /> when given, to the file
@@ -3787,7 +3438,7 @@ internal sealed class CurlCommandRunner(
     /// output otherwise, and writes the progress meter after it. The transfer goes through the proxy
     /// <see cref="TransferProxySelection" /> chooses, with the credentials
     /// <see cref="TransferCredentialLookup" /> chooses; when either fails, the transfer ends with its
-    /// failure and nothing is sent (<see cref="TrySelectProxyAndCredentials" />).
+    /// failure and nothing is sent (<see cref="TransferPerformer.TrySelectProxyAndCredentials" />).
     /// </summary>
     /// <param name="follower">Performs the transfer with the handler for its scheme, following redirects under <c>-L</c>.</param>
     /// <param name="dispatch">The run's dispatch, whose dispatcher says whether the URL's scheme is served and whose proxy selector chooses the transfer's proxy.</param>
@@ -3816,6 +3467,7 @@ internal sealed class CurlCommandRunner(
         Stream? upload)
     {
         Running.UploadResumesFromUnknownOffset = options.ResumeFromOutputSize && upload is not null;
+        EasyTransferOptions transferOptions = TransferOptionsOf(options, upload);
         string? outputFile = ResolveOutputFile(options, transfer, url);
         if (outputFile is not null
             && await CreateOutputDirectoriesOrSkipAsync(options, outputFile).ConfigureAwait(false) is { } unstarted)
@@ -3823,12 +3475,20 @@ internal sealed class CurlCommandRunner(
             return unstarted;
         }
 
-        if (!TrySelectProxyAndCredentials(dispatch, options, url, transfer, out ProxyEndpoint? proxy, out TransferResult? proxyFailure))
+        if (!TransferPerformer.TrySelectProxyAndCredentials(
+                dispatch, EasyOptionsFromCommandLine.TransferSettingsOf(options), EasyOptionsFromCommandLine.ProxyOf(options), EasyOptionsFromCommandLine.AuthenticationOf(options), url, Running, EventsBeforeConnecting(transfer), diagnosticLog, CredentialLookup, out ProxyEndpoint? proxy, out TransferResult? proxyFailure))
         {
             return proxyFailure;
         }
 
-        if (await ResolveSshOptionsAsync(options, url).ConfigureAwait(false) is { } sshFailure)
+        if (await transferPerformer.ResolveSshOptionsAsync(
+                EasyOptionsFromCommandLine.TransferSettingsOf(options),
+                EasyOptionsFromCommandLine.ProtocolOf(options).Ssh,
+                url,
+                Running,
+                () => KnownHostsSearch.Find(ReadDataFile),
+                (knownHosts, missing) => UpdateLibcurlTransfer(entry => entry with { SshKnownHostsFile = knownHosts, SshKnownHostsFileMissing = missing }),
+                WriteErrorLineAsync).ConfigureAwait(false) is { } sshFailure)
         {
             return sshFailure;
         }
@@ -3838,7 +3498,14 @@ internal sealed class CurlCommandRunner(
             bool toStandardOutput = !transfer.DiscardsBody;
             StartTransferProgress(options, options.ResumeFrom, toStandardOutput);
             Func<long?, TransferContext> createAttemptContext = _ => transferContextFactory.Create(
-                options,
+                EasyOptionsFromCommandLine.TransferSettingsOf(options),
+                EasyOptionsFromCommandLine.HttpOf(options),
+                EasyOptionsFromCommandLine.BehaviourOf(options),
+                transferOptions,
+                EasyOptionsFromCommandLine.ProtocolOf(options),
+                EasyOptionsFromCommandLine.ProxyOf(options),
+                EasyOptionsFromCommandLine.AuthenticationOf(options),
+                EasyOptionsFromCommandLine.NetworkOf(options),
                 url,
                 RateLimited(options, toStandardOutput ? FlushedEachWriteUnderNoBuffer(options, InTextModeUnderUseAscii(options, Running.GatedStandardOutput)) : Stream.Null),
                 range,
@@ -3849,9 +3516,9 @@ internal sealed class CurlCommandRunner(
                 proxy,
                 progress: Running.Progress,
                 events: Running.Events,
-                lowSpeedWatchdog: StartLowSpeedWatchdog(options),
+                lowSpeedWatchdog: transferPerformer.StartLowSpeedWatchdog(Running, transferOptions, diagnosticLog),
                 abortToken: Running.AbortToken,
-                maxTimeWatchdog: StartMaxTimeWatchdog(options),
+                maxTimeWatchdog: transferPerformer.StartMaxTimeWatchdog(Running, transferOptions, diagnosticLog),
                 lookedUpCredentials: Running.LookedUpCredentials,
                 ifNoneMatchHeaders: Running.IfNoneMatchHeaders,
                 altSvc: Running.AltSvc,
@@ -4026,7 +3693,7 @@ internal sealed class CurlCommandRunner(
     private static bool FallsBackToDefaultRemoteName(CommandLineOptions options, string url, UrlTransfer transfer) =>
         transfer.OutputFileName is null
         && transfer.UsesRemoteName
-        && TryParseTransferUrl(QueryUrl.Append(url, options), options, out CurlUrl? parsed, out _)
+        && TransferPerformer.TryParseTransferUrl(QueryUrl.Append(url, options), options.DisallowUsernameInUrl, options.PathAsIs, out CurlUrl? parsed, out _)
         && RemoteFileName.FromUrlPath(RemoteNameUrlPath(transfer, parsed)) is null;
 
     /// <summary>
@@ -4670,11 +4337,19 @@ internal sealed class CurlCommandRunner(
                 return await ReportCannotOpenForResumeAsync(options, output.Path).ConfigureAwait(false);
             }
 
+            EasyTransferOptions transferOptions = TransferOptionsOf(options, upload);
             TransferResult fileResult = await FollowRetryingAsync(
                     follower,
                     options,
                     attemptResumeFrom => transferContextFactory.Create(
-                        options,
+                        EasyOptionsFromCommandLine.TransferSettingsOf(options),
+                        EasyOptionsFromCommandLine.HttpOf(options),
+                        EasyOptionsFromCommandLine.BehaviourOf(options),
+                        transferOptions,
+                        EasyOptionsFromCommandLine.ProtocolOf(options),
+                        EasyOptionsFromCommandLine.ProxyOf(options),
+                        EasyOptionsFromCommandLine.AuthenticationOf(options),
+                        EasyOptionsFromCommandLine.NetworkOf(options),
                         url,
                         RateLimited(options, FlushedEachWriteUnderNoBuffer(options, output)),
                         range,
@@ -4686,9 +4361,9 @@ internal sealed class CurlCommandRunner(
                         watchHeaderOutput,
                         Running.Progress,
                         Running.Events,
-                        StartLowSpeedWatchdog(options),
+                        transferPerformer.StartLowSpeedWatchdog(Running, transferOptions, diagnosticLog),
                         Running.AbortToken,
-                        StartMaxTimeWatchdog(options),
+                        transferPerformer.StartMaxTimeWatchdog(Running, transferOptions, diagnosticLog),
                         Running.LookedUpCredentials,
                         Running.IfNoneMatchHeaders,
                         Running.AltSvc,
@@ -4801,7 +4476,7 @@ internal sealed class CurlCommandRunner(
         long? resumeFrom,
         DeferredOutputFileStream? outputFile)
     {
-        RedirectPolicy redirectPolicy = RedirectPolicyMapping.FromCommandLine(options);
+        RedirectPolicy redirectPolicy = RedirectPolicyMapping.Of(EasyOptionsFromCommandLine.TransferSettingsOf(options), EasyOptionsFromCommandLine.HttpOf(options), EasyOptionsFromCommandLine.AuthenticationOf(options));
         long? attemptResumeFrom = resumeFrom;
         TransferContext? firstContext = createAttemptContext(attemptResumeFrom);
         string scheme = firstContext.Url.Scheme;
@@ -4809,11 +4484,15 @@ internal sealed class CurlCommandRunner(
         TransferRetrier retrier = new(async _ =>
         {
             await retryLinesWritten.ConfigureAwait(false);
-            RecordSerialAttemptStart();
-            TransferContext context = firstContext ?? CreateRetryAttemptContext(options, createAttemptContext, attemptResumeFrom, outputFile);
+            transferPerformer.RecordSerialAttemptStart(runsInParallel: parallelRun is not null);
+            TransferContext context = firstContext ?? TransferPerformer.CreateRetryAttemptContext(
+                () => StartTransferProgress(options, attemptResumeFrom, toStandardOutput: outputFile is null),
+                createAttemptContext,
+                attemptResumeFrom);
             firstContext = null;
-            TransferResult attemptResult = await FollowWatchingSpeedAsync(follower, context, redirectPolicy).ConfigureAwait(false);
-            KeepRetriedConnectionIdWhenReused(context, attemptResult);
+            RunningTransferState state = Running;
+            TransferResult attemptResult = await TransferPerformer.FollowWatchingSpeedAsync(state, follower, context, redirectPolicy).ConfigureAwait(false);
+            TransferPerformer.KeepRetriedConnectionIdWhenReused(state, context, attemptResult);
             return attemptResult;
         });
 
@@ -4824,7 +4503,7 @@ internal sealed class CurlCommandRunner(
                 (attempt, warning) =>
                 {
                     Running.RetryCount++;
-                    TakeNextAttemptIds();
+                    transferPerformer.TakeNextAttemptIds(Running);
                     long? retriedResumeFrom = attemptResumeFrom;
                     long keptBytes = AttemptBytesKeptForResume(options, attempt, scheme, retriedResumeFrom, outputFile);
                     attemptResumeFrom = keptBytes > 0 ? retriedResumeFrom.GetValueOrDefault() + keptBytes : retriedResumeFrom;
@@ -4837,142 +4516,10 @@ internal sealed class CurlCommandRunner(
         return result;
     }
 
-    /// <summary>
-    /// Creates the context of an attempt <c>--retry</c> runs again, on fresh progress started now,
-    /// once the retry wait is over, so its meter counts from the attempt's start as curl 8.21.0's
-    /// does: after a one-second wait curl drew no <c>00:01</c> status line for a 6-byte body,
-    /// which progress started before the wait did (measured 2026-10-09, BL-1849 Notes).
-    /// </summary>
-    /// <param name="options">The accepted command line.</param>
-    /// <param name="createAttemptContext">Creates an attempt's context on the transfer's current progress.</param>
-    /// <param name="resumeFrom">The <c>-C</c> offset the attempt resumes from, or <see langword="null" />.</param>
-    /// <param name="outputFile">The <c>-o</c> file, or <see langword="null" /> for standard output.</param>
-    /// <returns>The attempt's context.</returns>
-    private TransferContext CreateRetryAttemptContext(
-        CommandLineOptions options,
-        Func<long?, TransferContext> createAttemptContext,
-        long? resumeFrom,
-        DeferredOutputFileStream? outputFile)
-    {
-        StartTransferProgress(options, resumeFrom, toStandardOutput: outputFile is null);
-
-        return createAttemptContext(resumeFrom);
-    }
-
-    /// <summary>
-    /// Moves <see cref="previousSerialTransferStart" /> to now as a serial transfer's attempt starts, after any
-    /// <c>--retry</c> wait, so <c>--rate</c> measures from the last attempt's start, as curl 8.21.0's
-    /// <c>serial_transfers</c> resets its start on every retry: 503 then 200 with <c>--retry-delay 1</c> and
-    /// 300 ms answers printed <c>Note: Transfer took 315 ms</c> (measured 2026-10-02, BL-971 Notes). Under
-    /// <c>-Z</c>, where <c>--rate</c> waits for nothing, it is left alone.
-    /// </summary>
-    private void RecordSerialAttemptStart()
-    {
-        if (parallelRun is null)
-        {
-            previousSerialTransferStart = timeProvider.GetTimestamp();
-        }
-    }
-
-    /// <summary>
-    /// Numbers the attempt <c>--retry</c> is about to run as a transfer of its own, as curl 8.21.0
-    /// does: it takes the next <c>%{xfer_id}</c>, and the retried attempt keeps the <c>%{conn_id}</c>
-    /// it connected with, so the next attempt takes a new one unless it reuses that connection
-    /// (<see cref="KeepRetriedConnectionIdWhenReused" />). Against 503, 503, 200 on connections the
-    /// server closed, curl printed <c>xfer_id</c> 2 and <c>conn_id</c> 2 (measured 2026-09-29, BL-799 Notes).
-    /// </summary>
-    private void TakeNextAttemptIds()
-    {
-        RunningTransferState state = Running;
-        state.RetriedConnectionId = state.ConnectionId ?? nextConnectionId++;
-        state.ConnectionId = null;
-        state.RetryTransferId = nextTransferId++;
-    }
-
-    /// <summary>
-    /// Gives a <c>--retry</c> attempt that reused the retried attempt's connection that attempt's
-    /// <c>%{conn_id}</c>, as curl 8.21.0 printed <c>conn_id</c> 0 after three attempts over one
-    /// kept-alive connection (measured 2026-09-29, BL-799 Notes). Only an <c>http</c> or
-    /// <c>https</c> attempt says whether it opened a connection (<see cref="TransferReport.ConnectionCount" />);
-    /// any other is taken to have opened one.
-    /// </summary>
-    /// <param name="context">The attempt's context.</param>
-    /// <param name="attempt">The attempt's result.</param>
-    private void KeepRetriedConnectionIdWhenReused(TransferContext context, TransferResult attempt)
-    {
-        RunningTransferState state = Running;
-        if (state.RetriedConnectionId is { } retriedConnectionId && ReportsNoConnectionOpened(context, attempt))
-        {
-            state.ConnectionId = retriedConnectionId;
-        }
-    }
-
-    /// <summary>
-    /// Tells whether an attempt said it opened no connection: an <c>http</c> or <c>https</c> one
-    /// whose report counts none.
-    /// </summary>
-    /// <param name="context">The attempt's context.</param>
-    /// <param name="attempt">The attempt's result.</param>
-    /// <returns><see langword="true" /> when the attempt reused a connection.</returns>
-    private static bool ReportsNoConnectionOpened(TransferContext context, TransferResult attempt) =>
-        IsHttpScheme(context.Url.Scheme) && attempt.Report is { ConnectionCount: 0 };
-
     /// <summary>Tells whether <paramref name="scheme" /> is <c>http</c> or <c>https</c>.</summary>
     /// <param name="scheme">The scheme, in lower case.</param>
     /// <returns><see langword="true" /> for <c>http</c> and <c>https</c>.</returns>
     private static bool IsHttpScheme(string scheme) => scheme is "http" or "https";
-
-    /// <summary>
-    /// Starts the <c>-Y</c>/<c>-y</c> watchdog for the attempt whose context is being created, on
-    /// the runner's clock, and keeps it for <see cref="FollowWatchingSpeedAsync" />: <c>-Y</c>
-    /// alone watches for 30 seconds and <c>-y</c> alone for 1 byte per second, as curl 8.21.0
-    /// does (measured 2026-09-27, BL-400 Notes).
-    /// </summary>
-    /// <param name="options">The accepted command line.</param>
-    /// <returns>The started watchdog, or <see langword="null" /> when the speed is not watched.</returns>
-    private LowSpeedWatchdog? StartLowSpeedWatchdog(CommandLineOptions options) =>
-        Running.AttemptLowSpeedWatchdog = LowSpeedWatchdog.StartFromCommandLine(options.SpeedLimit, options.SpeedTimeSeconds, timeProvider, diagnosticLog);
-
-    /// <summary>
-    /// Starts the <c>-m</c> watchdog for the attempt whose context is being created, on the
-    /// runner's clock, and keeps it for <see cref="FollowWatchingSpeedAsync" /> (ADR-0117): each
-    /// <c>--retry</c> attempt gets a fresh <c>-m</c>, as in curl 8.21.0.
-    /// </summary>
-    /// <param name="options">The accepted command line.</param>
-    /// <returns>The started watchdog, or <see langword="null" /> without a positive <c>-m</c>.</returns>
-    private MaxTimeWatchdog? StartMaxTimeWatchdog(CommandLineOptions options) =>
-        Running.AttemptMaxTimeWatchdog = MaxTimeWatchdog.StartFromCommandLine(options.MaxTime, timeProvider, diagnosticLog);
-
-    /// <summary>
-    /// Performs one attempt through <paramref name="follower" /> under the <c>-Y</c>/<c>-y</c> and
-    /// <c>-m</c> watchdogs its context was created with, stopping both when the attempt ends. An
-    /// attempt either watchdog cancelled ends with that watchdog's exit 28 failure, which
-    /// <c>--retry</c> counts as transient.
-    /// </summary>
-    /// <param name="follower">Performs the attempt, following redirects under <c>-L</c>.</param>
-    /// <param name="context">The attempt's context.</param>
-    /// <param name="redirectPolicy">The <c>-L</c> policy.</param>
-    /// <returns>The attempt's result, or a watchdog's failure.</returns>
-    private async Task<TransferResult> FollowWatchingSpeedAsync(RedirectFollower follower, TransferContext context, RedirectPolicy redirectPolicy)
-    {
-        RunningTransferState state = Running;
-        using LowSpeedWatchdog? watchdog = state.AttemptLowSpeedWatchdog;
-        using MaxTimeWatchdog? maxTimeWatchdog = state.AttemptMaxTimeWatchdog;
-        state.AttemptLowSpeedWatchdog = null;
-        state.AttemptMaxTimeWatchdog = null;
-        try
-        {
-            return await follower.FollowAsync(context, redirectPolicy).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException) when (watchdog is { IsTooSlow: true })
-        {
-            return watchdog.Failure;
-        }
-        catch (OperationCanceledException) when (maxTimeWatchdog is { HasTimedOut: true })
-        {
-            return maxTimeWatchdog.Failure;
-        }
-    }
 
     /// <summary>
     /// Writes what curl 8.21.0 prints for an attempt <c>--retry</c> runs again, and readies the
@@ -4980,7 +4527,7 @@ internal sealed class CurlCommandRunner(
     /// without <c>-S</c>, then the retry warning unless <c>-s</c> was given, whether or not with
     /// <c>-S</c> (measured 2026-09-27, BL-241 Notes). The attempt's <c>-o</c> bytes are then kept
     /// or cut back (<see cref="KeepOrThrowAwayAttemptBytesAsync" />); the next attempt gets fresh
-    /// progress once the retry wait is over (<see cref="CreateRetryAttemptContext" />).
+    /// progress once the retry wait is over (<see cref="TransferPerformer.CreateRetryAttemptContext" />).
     /// </summary>
     /// <param name="options">The accepted command line.</param>
     /// <param name="attempt">The attempt's result.</param>
@@ -5230,7 +4777,7 @@ internal sealed class CurlCommandRunner(
         { ManualRequested: true } => CurlManual.Lines(),
         { HelpRequested: true, HelpSubject: var subject } when !CurlHelpText.IsOptionSubject(subject) =>
             CurlHelpText.Lines(subject, terminalColumns),
-        _ => TlsBuildInformation.Lines(options),
+        _ => TlsBuildInformation.Lines(EasyOptionsFromCommandLine.TlsOf(options), options.CaEmbedDumpRequested),
     };
 
     /// <summary>
@@ -5295,17 +4842,23 @@ internal sealed class CurlCommandRunner(
     /// Writes a refused command line's lines and, where curl 8.21.0 prints it, the default config
     /// file's note: before the lines for a refusal curl meets at transfer setup
     /// (<see cref="CommandLineRefusal.FoundAtTransferSetup" />), after them for one it meets while
-    /// reading the command line (measured 2026-09-27, BL-352).
+    /// reading the command line (measured 2026-09-27, BL-352). A refusal met at transfer setup
+    /// also loads the <c>--ssl-sessions</c> file before its lines and saves it after them, as
+    /// curl 8.22.0's <c>operate</c> loads it before <c>run_all_transfers</c> and saves it after
+    /// (gap finding GF-0090, BL-2333).
     /// </summary>
     /// <param name="refusal">The refusal.</param>
     /// <param name="notedDefaultConfigFile">The default config file to announce, or <see langword="null" /> for none.</param>
+    /// <param name="optionsRead">The options read before the refusal, which name the <c>--ssl-sessions</c> file.</param>
     /// <returns>A task that completes when everything is flushed.</returns>
-    private async Task WriteRefusalAsync(CommandLineRefusal refusal, string? notedDefaultConfigFile)
+    private async Task WriteRefusalAsync(CommandLineRefusal refusal, string? notedDefaultConfigFile, CommandLineOptions optionsRead)
     {
         if (refusal.FoundAtTransferSetup)
         {
             await WriteDefaultConfigFileNoteAsync(notedDefaultConfigFile).ConfigureAwait(false);
+            await WriteTlsSessionLinesAsync(optionsRead, TlsSessionFileLines.Load).ConfigureAwait(false);
             await WriteErrorLinesAsync(refusal.StandardErrorLines).ConfigureAwait(false);
+            await WriteTlsSessionLinesAsync(optionsRead, (sessions, options) => TlsSessionFileLines.Save(sessions, options, runsOnWindows)).ConfigureAwait(false);
         }
         else
         {

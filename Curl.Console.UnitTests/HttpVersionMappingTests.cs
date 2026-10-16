@@ -1,4 +1,8 @@
+using Curl.Api.Options.Authentication;
+using Curl.Api.Options.Behaviour;
+using Curl.Api.Options.Http;
 using Curl.Cli;
+using Curl.Engine;
 using Curl.Networking;
 using Curl.Protocol.Abstractions;
 using Curl.Testing;
@@ -20,15 +24,15 @@ public sealed class HttpVersionMappingTests
     private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
 
     [TestMethod]
-    [DataRow(null, HttpVersionPreference.Http11)]
-    [DataRow(RequestedHttpVersion.Http10, HttpVersionPreference.Http10)]
-    [DataRow(RequestedHttpVersion.Http11, HttpVersionPreference.Http11)]
-    [DataRow(RequestedHttpVersion.Http2, HttpVersionPreference.Http2)]
-    [DataRow(RequestedHttpVersion.Http2PriorKnowledge, HttpVersionPreference.Http2PriorKnowledge)]
-    [DataRow(RequestedHttpVersion.Http3, HttpVersionPreference.Http3)]
-    [DataRow(RequestedHttpVersion.Http3Only, HttpVersionPreference.Http3Only)]
-    [DataRow((RequestedHttpVersion)99, HttpVersionPreference.Http11)]
-    public void ToHttpVersionPreference_MapsEachVersionOption(RequestedHttpVersion? version, HttpVersionPreference expected)
+    [DataRow(HttpVersion.None, HttpVersionPreference.Http11)]
+    [DataRow(HttpVersion.Http10, HttpVersionPreference.Http10)]
+    [DataRow(HttpVersion.Http11, HttpVersionPreference.Http11)]
+    [DataRow(HttpVersion.Http2, HttpVersionPreference.Http2)]
+    [DataRow(HttpVersion.Http2PriorKnowledge, HttpVersionPreference.Http2PriorKnowledge)]
+    [DataRow(HttpVersion.Http3, HttpVersionPreference.Http3)]
+    [DataRow(HttpVersion.Http3Only, HttpVersionPreference.Http3Only)]
+    [DataRow((HttpVersion)99, HttpVersionPreference.Http11)]
+    public void ToHttpVersionPreference_MapsEachVersionOption(HttpVersion version, HttpVersionPreference expected)
     {
         Diagnostics.Arrange("version", version);
 
@@ -41,21 +45,21 @@ public sealed class HttpVersionMappingTests
     }
 
     [TestMethod]
-    [DataRow(null, true, "http/1.1")]
-    [DataRow(null, false, "h2,http/1.1")]
-    [DataRow(RequestedHttpVersion.Http10, true, "http/1.1")]
-    [DataRow(RequestedHttpVersion.Http10, false, "http/1.1")]
-    [DataRow(RequestedHttpVersion.Http11, true, "http/1.1")]
-    [DataRow(RequestedHttpVersion.Http11, false, "http/1.1")]
-    [DataRow(RequestedHttpVersion.Http2, true, "h2,http/1.1")]
-    [DataRow(RequestedHttpVersion.Http2, false, "h2,http/1.1")]
-    [DataRow(RequestedHttpVersion.Http2PriorKnowledge, true, "h2")]
-    [DataRow(RequestedHttpVersion.Http2PriorKnowledge, false, "h2")]
-    [DataRow(RequestedHttpVersion.Http3, true, "h2,http/1.1")]
-    [DataRow(RequestedHttpVersion.Http3, false, "h2,http/1.1")]
-    [DataRow(RequestedHttpVersion.Http3Only, true, "h2,http/1.1")]
-    [DataRow(RequestedHttpVersion.Http3Only, false, "h2,http/1.1")]
-    public void HttpOverTlsApplicationProtocolsOf_OffersWhatThePlatformsCurlOffers(RequestedHttpVersion? version, bool isWindows, string expected)
+    [DataRow(HttpVersion.None, true, "http/1.1")]
+    [DataRow(HttpVersion.None, false, "h2,http/1.1")]
+    [DataRow(HttpVersion.Http10, true, "http/1.1")]
+    [DataRow(HttpVersion.Http10, false, "http/1.1")]
+    [DataRow(HttpVersion.Http11, true, "http/1.1")]
+    [DataRow(HttpVersion.Http11, false, "http/1.1")]
+    [DataRow(HttpVersion.Http2, true, "h2,http/1.1")]
+    [DataRow(HttpVersion.Http2, false, "h2,http/1.1")]
+    [DataRow(HttpVersion.Http2PriorKnowledge, true, "h2")]
+    [DataRow(HttpVersion.Http2PriorKnowledge, false, "h2")]
+    [DataRow(HttpVersion.Http3, true, "h2,http/1.1")]
+    [DataRow(HttpVersion.Http3, false, "h2,http/1.1")]
+    [DataRow(HttpVersion.Http3Only, true, "h2,http/1.1")]
+    [DataRow(HttpVersion.Http3Only, false, "h2,http/1.1")]
+    public void HttpOverTlsApplicationProtocolsOf_OffersWhatThePlatformsCurlOffers(HttpVersion version, bool isWindows, string expected)
     {
         Diagnostics.Arrange("version", version);
         Diagnostics.Arrange("isWindows", isWindows);
@@ -123,10 +127,10 @@ public sealed class HttpVersionMappingTests
     public void HttpRequestOptionsFromCommandLine_Http2OrHttp3Option_SetsTheVersion(string option, HttpVersionPreference expected)
     {
         Diagnostics.Arrange("option", option);
-        CommandLineParseResult result = OpenSslBuildParser.Parse([option, Url]);
+        CommandLineParseResult result = QuicBuildParser.Parse([option, Url]);
         Assert.IsTrue(result.IsAccepted);
 
-        HttpVersionPreference actual = HttpRequestOptionsMapping.FromCommandLine(result.Options).Version;
+        HttpVersionPreference actual = HttpRequestOptionsMapping.Of(EasyOptionsFromCommandLine.TransferSettingsOf(result.Options), EasyOptionsFromCommandLine.HttpOf(result.Options), new EasyBehaviourOptions(), new EasyTransferOptions(), new EasyAuthenticationOptions()).Version;
 
         Diagnostics.Act("version", actual);
 
@@ -136,10 +140,10 @@ public sealed class HttpVersionMappingTests
 
     private static string OfferedBy(params string[] arguments)
     {
-        CommandLineParseResult result = OpenSslBuildParser.Parse(arguments);
+        CommandLineParseResult result = QuicBuildParser.Parse(arguments);
         Assert.IsTrue(result.IsAccepted);
 
-        CurlTransports transports = CurlComposition.CreateTransports(result.Options, TimeProvider.System);
+        CurlTransports transports = EngineComposition.CreateTransports(EasyOptionsFromCommandLine.ToolOptionsOf(result.Options), EasyOptionsFromCommandLine.NetworkOf(result.Options), EasyOptionsFromCommandLine.TlsOf(result.Options), EasyOptionsFromCommandLine.HttpOf(result.Options), EasyOptionsFromCommandLine.ProxyOf(result.Options), EasyOptionsFromCommandLine.AuthenticationOf(result.Options), TimeProvider.System, traces: EasyOptionsFromCommandLine.TraceComponentsOf(result.Options));
 
         return string.Join(',', transports.TcpConnector.HttpOverTlsApplicationProtocols);
     }

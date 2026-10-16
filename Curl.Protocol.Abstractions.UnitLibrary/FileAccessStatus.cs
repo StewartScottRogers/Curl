@@ -35,4 +35,11 @@ public enum FileAccessStatus
     /// left it as it was.
     /// </summary>
     AlreadyExists,
+
+    /// <summary>
+    /// A component of the path's parent is an existing file, not a directory: Linux and
+    /// macOS fail the open with <c>ENOTDIR</c>, where Windows reports a missing path
+    /// (<see cref="NotFound" />).
+    /// </summary>
+    NotADirectory,
 }

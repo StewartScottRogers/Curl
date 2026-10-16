@@ -44,7 +44,7 @@ public sealed class UpstreamCurlPlatformTests
 
         UpstreamCurlPlatform platform = UpstreamCurlPlatform.Unix;
 
-        bool featuresMatch = platform.Features.SetEquals([.. CommonFeatures, "OpenSSL", "xattr", "http/2", "h2c", "http/3"]);
+        bool featuresMatch = platform.Features.SetEquals([.. CommonFeatures, "OpenSSL", "xattr", "http/2", "h2c"]);
         diagnostics.Act("feature count", platform.Features.Count);
         diagnostics.Act("null device", platform.NullDevice);
         diagnostics.Assert("features equal common + OpenSSL + xattr", true, featuresMatch);
@@ -104,6 +104,20 @@ public sealed class UpstreamCurlPlatformTests
         diagnostics.Assert("listed on Unix", false, onUnix);
         Assert.IsFalse(UpstreamCurlPlatform.Windows.Features.Contains(feature));
         Assert.IsFalse(UpstreamCurlPlatform.Unix.Features.Contains(feature));
+    }
+
+    // Curl refuses --http3 on every reference build, none of which has QUIC (ADR-0540), so runtests.pl skips
+    // the http/3 cases for it as for the reference curl (BL-2370, GF-0094).
+    [TestMethod]
+    public void AllPlatforms_LeaveOffHttp3()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+
+        bool onAny = UpstreamCurlPlatform.All.Any(platform => platform.Features.Contains("http/3"));
+
+        diagnostics.Act("listed on any platform", onAny);
+        diagnostics.Assert("listed on any platform", false, onAny);
+        Assert.IsFalse(onAny);
     }
 
     // Curl writes -w %header{name} and %{header_json}, which curl writes only with libcurl's headers API (BL-2264).

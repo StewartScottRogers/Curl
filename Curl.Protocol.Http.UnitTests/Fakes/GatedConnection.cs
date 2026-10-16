@@ -78,6 +78,22 @@ public sealed class GatedConnection : IConnection
     }
 
     /// <summary>
+    /// Gets the length of each write so far, in order.
+    /// </summary>
+    public IReadOnlyList<int> WriteLengths
+    {
+        get
+        {
+            lock (gate)
+            {
+                return [.. writeLengths];
+            }
+        }
+    }
+
+    private readonly List<int> writeLengths = [];
+
+    /// <summary>
     /// Returns a task that completes once at least <paramref name="length" /> bytes have been
     /// written.
     /// </summary>
@@ -120,6 +136,7 @@ public sealed class GatedConnection : IConnection
         lock (gate)
         {
             written.Write(buffer.Span);
+            writeLengths.Add(buffer.Length);
             foreach ((int length, TaskCompletionSource reached) in writeWaiters.Where(waiter => written.Length >= waiter.Length))
             {
                 reached.TrySetResult();

@@ -4,6 +4,7 @@ using Curl.Cli;
 using Curl.Protocol.Abstractions;
 
 using Curl.Testing;
+using Curl.Engine;
 
 namespace Curl.Console;
 
@@ -70,7 +71,7 @@ public sealed class CurlCompositionNegotiateTests
         CommandLineParseResult parsed = CommandLineParser.Parse([.. arguments, Url], _ => true);
         Assert.IsNotNull(parsed.Options);
 
-        NegotiateOptions options = NegotiateOptionsMapping.FromCommandLine(parsed.Options);
+        NegotiateOptions options = NegotiateOptionsMapping.Of(EasyOptionsFromCommandLine.AuthenticationOf(parsed.Options));
         Diagnostics.Act("Negotiate options", options);
 
         NegotiateOptions expected = new(serviceName, proxyServiceName, delegation);

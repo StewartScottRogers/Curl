@@ -37,17 +37,18 @@ pin which revocation errors the option lets through.
 
 1. test2043 stays skipped by `UpstreamCaseScreening` in the in-process ratchet (ADR-0455, decision
    2) and is not added to `PassingUpstreamCases.txt`.
-2. The gap office is to measure `behaviour:test2043` as `excluded`, with the reason "reaches
-   revoked.badssl.com on the internet; `--ssl-no-revoke` is pinned by unit tests (ADR-0473)", so
-   gap finding GF-0001's item can close. This is intent: today `Gap/Tools/ConvertTo-BehaviourMeasurement.ps1`
-   has no internet-host rule, so it records the skipped case as `unmeasured` (`harness-unsupported`).
-3. The same is intended for any other upstream case the screening skips because it reaches a named
-   internet host with no `<server>`: it is to be `excluded` with that reason, never a stand-in that
-   answers for the public host.
+2. The gap office measures `behaviour:test2043` as `excluded`. It needs no rule of its own: since
+   the curl 8.22.0 retarget (ADR-0479) upstream's `tests/data/DISABLED` lists test2043, so
+   `Gap/Tools/ConvertTo-BehaviourMeasurement.ps1` records it with its general rule for disabled
+   cases, reason `disabled-upstream` and evidence "disabled upstream" (gap run 2026-10-15_0304).
+   The converter has no internet-host rule.
+3. Any other upstream case the screening skips because it reaches a named internet host with no
+   `<server>` is never answered by a stand-in for the public host. Until upstream disables it too,
+   the converter records it `unmeasured` (`harness-unsupported`) with the screening's reason as
+   evidence.
 
 ## Consequences
 
-GF-0001's last item closes on a re-measurement that records `excluded` with a reason, as the gap
-office's rules allow, once the converter has the rule. Adding that rule to the gap office's own
-measurement lives under `Gap/`, which the dark factory never reads or changes, so it is left to an
-interactive session, and the exclusion takes effect with the gap run after it.
+GF-0001's last item closed on the 2026-10-15_0304 re-measurement, which records test2043
+`excluded`, `disabled-upstream`, as the gap office's rules allow. No change under `Gap/` was
+needed (AF-0159, BL-2273).

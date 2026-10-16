@@ -1,3 +1,4 @@
+using Curl.Engine;
 namespace Curl.Console;
 
 /// <summary>

@@ -1,3 +1,4 @@
+using Curl.Engine;
 using System.Text;
 using Curl.Core;
 using Curl.Protocol.Abstractions;
@@ -87,7 +88,7 @@ public sealed class CurlCommandRunnerConnectionPoolTests
                     _ =>
                     {
                         groupsBuilt++;
-                        return new TransferDispatch(new ProtocolDispatcher(CurlComposition.CreateProtocolHandlers(new RecordingConnector(CurlExitCode.CouldntConnect, "Failed to connect"), new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new PassThroughTlsProvider(), new LoopbackDnsResolver())), []);
+                        return new TransferDispatch(new ProtocolDispatcher(EngineComposition.CreateProtocolHandlers(new RecordingConnector(CurlExitCode.CouldntConnect, "Failed to connect"), new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new PassThroughTlsProvider(), new LoopbackDnsResolver())), []);
                     },
                     fileSystem,
                     fileSystem,
@@ -139,7 +140,7 @@ public sealed class CurlCommandRunnerConnectionPoolTests
         {
             exitCode = await new CurlCommandRunner(
                     _ => new TransferDispatch(
-                        new ProtocolDispatcher(CurlComposition.CreateProtocolHandlers(connector, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new PassThroughTlsProvider(), new LoopbackDnsResolver())),
+                        new ProtocolDispatcher(EngineComposition.CreateProtocolHandlers(connector, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new PassThroughTlsProvider(), new LoopbackDnsResolver())),
                         [],
                         connectionPool: pool),
                     fileSystem,

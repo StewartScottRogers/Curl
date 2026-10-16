@@ -178,6 +178,33 @@ public sealed record TransferReport
     public IReadOnlyList<ReadOnlyMemory<byte>> PeerCertificates { get; init; } = [];
 
     /// <summary>
+    /// Gets the certificate verify code last reported for the origin's TLS handshake
+    /// (<see cref="ITransferEvents.ReportCertificateVerifyResult" />), the source of
+    /// <c>CURLINFO_SSL_VERIFYRESULT</c>; <c>0</c> without TLS, and always in the Schannel build.
+    /// </summary>
+    public long SslVerifyResult { get; init; }
+
+    /// <summary>
+    /// Gets the certificate verify code last reported for an HTTPS proxy's TLS handshake, the
+    /// source of <c>CURLINFO_PROXY_SSL_VERIFYRESULT</c>; <c>0</c> without an HTTPS proxy.
+    /// </summary>
+    public long ProxySslVerifyResult { get; init; }
+
+    /// <summary>
+    /// Gets the operating system's error number of the transfer's last failed connect attempt,
+    /// the source of <c>CURLINFO_OS_ERRNO</c> (BL-2374): the Winsock code on Windows, <c>errno</c>
+    /// elsewhere; <c>0</c> when no connect attempt failed.
+    /// </summary>
+    public long OsErrno { get; init; }
+
+    /// <summary>
+    /// Gets why the transfer's SOCKS proxy handshake failed, copied from
+    /// <see cref="ConnectResult.ProxyError" />, the source of <c>CURLINFO_PROXY_ERROR</c> (BL-2375);
+    /// <see cref="CurlProxyCode.Ok" /> when no SOCKS handshake failed.
+    /// </summary>
+    public CurlProxyCode ProxyError { get; init; }
+
+    /// <summary>
     /// Gets the directory the FTP server's <c>257</c> reply to <c>PWD</c> named at login,
     /// its doubled quotes undoubled, the source of <c>%{ftp_entry_path}</c>;
     /// <see langword="null" /> for a transfer that is not FTP, or when the reply named no
@@ -200,6 +227,41 @@ public sealed record TransferReport
     /// when no server picked one, or for a transfer that is not HTTP.
     /// </summary>
     public HttpAuthSchemes AuthSchemePicked { get; init; }
+
+    /// <summary>
+    /// Gets the HTTP authentication scheme the transfer's last request through a forward proxy
+    /// answered the proxy's <c>Proxy-Authenticate</c> challenge with, the source of
+    /// <c>CURLINFO_PROXYAUTH_USED</c> (BL-2367); <see cref="HttpAuthSchemes.None" /> when no
+    /// proxy challenge was answered, or for a transfer that is not HTTP.
+    /// </summary>
+    public HttpAuthSchemes ProxyAuthSchemePicked { get; init; }
+
+    /// <summary>
+    /// Gets the RTSP session ID the server's first <c>Session</c> header gave, the source of
+    /// <c>CURLINFO_RTSP_SESSION_ID</c>; <see langword="null" /> before any, or for a transfer
+    /// that is not RTSP (BL-2367).
+    /// </summary>
+    public string? RtspSessionId { get; init; }
+
+    /// <summary>
+    /// Gets the <c>CSeq</c> the transfer's next RTSP request would be sent with, the source of
+    /// <c>CURLINFO_RTSP_CLIENT_CSEQ</c>; <c>0</c> for a transfer that is not RTSP (BL-2367).
+    /// </summary>
+    public long RtspClientSequenceNumber { get; init; }
+
+    /// <summary>
+    /// Gets the <c>CSeq</c> the transfer expects on the server's next request to it, the source
+    /// of <c>CURLINFO_RTSP_SERVER_CSEQ</c>. Only libcurl's <c>RECEIVE</c> request moves it, and
+    /// Curl's RTSP handler sends <c>OPTIONS</c> only, so it stays <c>0</c> (BL-2367).
+    /// </summary>
+    public long RtspServerSequenceNumber { get; init; }
+
+    /// <summary>
+    /// Gets the <c>CSeq</c> the last RTSP reply carried, the source of
+    /// <c>CURLINFO_RTSP_CSEQ_RECV</c>; <c>0</c> when it carried none, or for a transfer that is
+    /// not RTSP (BL-2367).
+    /// </summary>
+    public long RtspSequenceNumberReceived { get; init; }
 
     /// <summary>
     /// Gets the Digest <c>Authorization</c> value the transfer's last request to the origin was

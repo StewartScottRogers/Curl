@@ -1,3 +1,4 @@
+using Curl.Engine;
 using System.Text;
 
 using Curl.Cli;
@@ -114,7 +115,7 @@ public sealed class TlsSessionFileLinesTests
         Diagnostics.Arrange("connector script", "connect fails: CouldntConnect");
 
         int exitCode = await new CurlCommandRunner(
-                _ => new TransferDispatch(new ProtocolDispatcher(CurlComposition.CreateProtocolHandlers(new RecordingConnector(CurlExitCode.CouldntConnect, "Failed to connect"), new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new PassThroughTlsProvider(), new LoopbackDnsResolver())), []),
+                _ => new TransferDispatch(new ProtocolDispatcher(EngineComposition.CreateProtocolHandlers(new RecordingConnector(CurlExitCode.CouldntConnect, "Failed to connect"), new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new PassThroughTlsProvider(), new LoopbackDnsResolver())), []),
                 fileSystem,
                 fileSystem,
                 new MemoryStream(),
@@ -137,17 +138,55 @@ public sealed class TlsSessionFileLinesTests
         Assert.AreEqual(string.Empty, fileText);
     }
 
+    // curl 8.22.0 loads the file before it sets up the transfers, where it meets "no URL
+    // specified", and saves it after (gap finding GF-0090, BL-2333).
+    [TestMethod]
+    public async Task RunAsync_NoUrlWithSslSessions_WarnsAboutTheFileBeforeTheRefusalAndSavesIt()
+    {
+        File.WriteAllText(_file, "no colon\n!!:x\n");
+        var standardError = new MemoryStream();
+        var fileSystem = new InMemoryFileSystem();
+        Diagnostics.Arrange("command line", "--ssl-sessions <file>");
+        Diagnostics.Arrange("session file", "no colon\\n!!:x\\n");
+
+        int exitCode = await new CurlCommandRunner(
+                _ => throw new InvalidOperationException("no transfer is set up"),
+                fileSystem,
+                fileSystem,
+                new MemoryStream(),
+                standardError,
+                new MemoryStream(),
+                runsOnWindows: false,
+                parsesAsWindowsBuild: false,
+                tlsSessions: new TlsSessionCache(TimeProvider.System))
+            .RunAsync(["--ssl-sessions", _file]);
+        string error = Encoding.UTF8.GetString(standardError.ToArray());
+        string fileText = File.ReadAllText(_file);
+        int unrecognized = error.IndexOf("Warning: unrecognized line 1 in SSL session file", StringComparison.Ordinal);
+        int invalidBase64 = error.IndexOf("Warning: invalid shmax base64 encoding in line 2", StringComparison.Ordinal);
+        int noUrl = error.IndexOf("curl: (2) no URL specified", StringComparison.Ordinal);
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Act("stderr", Shown(error));
+
+        Diagnostics.Assert("exit code", 2, exitCode);
+        Diagnostics.Assert("warnings in order, before the refusal", true, unrecognized >= 0 && unrecognized < invalidBase64 && invalidBase64 < noUrl);
+        Diagnostics.Assert("session file length after the save", 0, fileText.Length);
+        Assert.AreEqual(2, exitCode);
+        Assert.IsTrue(unrecognized >= 0 && unrecognized < invalidBase64 && invalidBase64 < noUrl, Shown(error));
+        Assert.AreEqual(string.Empty, fileText);
+    }
+
     [TestMethod]
     public void CreateTlsProvider_WithSessionsAndTheOption_IsTheHandBuiltProvider()
     {
         var sessions = new TlsSessionCache(TimeProvider.System);
         Diagnostics.Arrange("cases", "sessions file, curves, sessions file without a cache, no options, no session id");
 
-        var withFile = CurlComposition.CreateTlsProvider(new TlsClientOptions(SslSessionsFile: "s"), TimeProvider.System, sessions);
-        var withCurves = CurlComposition.CreateTlsProvider(new TlsClientOptions(Curves: "X25519"), TimeProvider.System, sessions);
-        var withFileNoCache = CurlComposition.CreateTlsProvider(new TlsClientOptions(SslSessionsFile: "s"), TimeProvider.System);
-        var plain = CurlComposition.CreateTlsProvider(new TlsClientOptions(), TimeProvider.System, sessions);
-        var noSessionId = CurlComposition.CreateTlsProvider(new TlsClientOptions(NoSessionId: true), TimeProvider.System, sessions);
+        var withFile = EngineComposition.CreateTlsProvider(new TlsClientOptions(SslSessionsFile: "s"), TimeProvider.System, sessions);
+        var withCurves = EngineComposition.CreateTlsProvider(new TlsClientOptions(Curves: "X25519"), TimeProvider.System, sessions);
+        var withFileNoCache = EngineComposition.CreateTlsProvider(new TlsClientOptions(SslSessionsFile: "s"), TimeProvider.System);
+        var plain = EngineComposition.CreateTlsProvider(new TlsClientOptions(), TimeProvider.System, sessions);
+        var noSessionId = EngineComposition.CreateTlsProvider(new TlsClientOptions(NoSessionId: true), TimeProvider.System, sessions);
         string providers = string.Join(", ", new object[] { withFile, withCurves, withFileNoCache, plain, noSessionId }.Select(provider => provider.GetType().Name));
         Diagnostics.Act("providers", providers);
 

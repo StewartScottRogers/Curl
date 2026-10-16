@@ -78,6 +78,21 @@ public sealed class Rfc8448ResumedHandshakeTests
         Assert.AreSame(Tls13CipherSuite.Aes128GcmSha256, client.EarlyDataCipherSuite);
     }
 
+    // BL-2339: with a key log, the early traffic secret is logged as OpenSSL logs it.
+    [TestMethod]
+    public void ResumedHandshakeWithKeyLogLogsTheTraceEarlyTrafficSecret()
+    {
+        Tls13ClientKeyLogTests.RecordingKeyLog keyLog = new();
+        using Tls13ClientHandshake client = ResumedClient(RecordedSimpleSession(), settings => settings with { KeyLog = keyLog });
+
+        client.Start();
+
+        (string label, byte[] random, byte[] secret) = keyLog.Entries.Single();
+        Assert.AreEqual("CLIENT_EARLY_TRAFFIC_SECRET", label);
+        AssertHex(ResumedClientRandom, random);
+        AssertHex("3fbbe6a60deb66c30a32795aba0eff7eaa10105586e7be5c09678d63b6caab62", secret);
+    }
+
     // Section 4: {client} send application_data record, the six bytes "ABCDEF" under the early keys.
     [TestMethod]
     public void EarlyTrafficSecretProtectsTheTraceEarlyDataRecord()

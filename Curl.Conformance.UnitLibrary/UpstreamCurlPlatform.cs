@@ -10,8 +10,10 @@ namespace Curl.Conformance;
 /// A feature is listed when Curl has it, by the name upstream's <c>runtests.pl</c> gives it: the
 /// protocols the harness can serve (<c>ws</c>, <c>wss</c> and <c>ipfs</c> among them, and <c>sftp</c>
 /// and <c>scp</c>, which Curl serves and <c>UpstreamSshServer</c> emulates); every
-/// feature on Curl's <c>curl -V</c> <c>Features:</c> line, with <c>HTTP2</c> as <c>http/2</c> and
-/// <c>h2c</c> and <c>HTTP3</c> as <c>http/3</c>; <c>crypto</c>, which upstream derives from
+/// feature on Curl's <c>curl -V</c> <c>Features:</c> line, except that <c>ECH</c> is listed because
+/// Curl still serves <c>--ech</c>, though the line does not name it (ADR-0520), which keeps the cases
+/// that need it measured; <c>HTTP2</c> is reported as
+/// <c>http/2</c> and <c>h2c</c>; <c>crypto</c>, which upstream derives from
 /// <c>NTLM</c>, <c>Kerberos</c> and <c>SPNEGO</c>; the tool features a curl build has unless it
 /// disables them (<c>cookies</c>, <c>proxy</c>, <c>Mime</c>, <c>manual</c>, <c>DoH</c>,
 /// <c>digest</c>, <c>aws</c>, <c>netrc</c>, <c>verbose-strings</c>, <c>large-time</c>,
@@ -21,8 +23,10 @@ namespace Curl.Conformance;
 /// <c>local-http</c> (the harness's server is at <c>127.0.0.1</c>); <c>win32</c> on Windows, as
 /// <c>runtests.pl</c> sets it there; the TLS backend; <c>xattr</c> off Windows, where curl
 /// cannot write extended attributes; <c>http/2</c> and <c>h2c</c> off Windows only, since the
-/// Schannel build Curl matches there has no <c>HTTP2</c> and refuses <c>--http2</c> (BL-2230); and
-/// <c>http/3</c> off Windows only, since that build refuses <c>--http3</c> too (BL-2261).
+/// Schannel build Curl matches there has no <c>HTTP2</c> and refuses <c>--http2</c> (BL-2230).
+/// <c>http/3</c> is listed on no platform: Curl refuses <c>--http3</c> and <c>--http3-only</c> on
+/// every reference build, none of which has a QUIC library (ADR-0540), so upstream's <c>runtests.pl</c>
+/// skips the cases that need it, as it does for the reference curl (BL-2370, GF-0094).
 /// </para>
 /// <para>
 /// These stay off, so the cases that need them are skipped rather than counted as failures:
@@ -66,10 +70,10 @@ public sealed class UpstreamCurlPlatform
     public static UpstreamCurlPlatform Windows { get; } = new(["win32", "Schannel"], "NUL", "MSWin32");
 
     /// <summary>Linux, where Curl matches curl's OpenSSL build.</summary>
-    public static UpstreamCurlPlatform Unix { get; } = new(["OpenSSL", "xattr", "http/2", "h2c", "http/3"], "/dev/null", "linux");
+    public static UpstreamCurlPlatform Unix { get; } = new(["OpenSSL", "xattr", "http/2", "h2c"], "/dev/null", "linux");
 
     /// <summary>macOS, where Curl matches curl's OpenSSL build as on Linux; only Perl's name for it differs.</summary>
-    public static UpstreamCurlPlatform MacOS { get; } = new(["OpenSSL", "xattr", "http/2", "h2c", "http/3"], "/dev/null", "darwin");
+    public static UpstreamCurlPlatform MacOS { get; } = new(["OpenSSL", "xattr", "http/2", "h2c"], "/dev/null", "darwin");
 
     /// <summary>Every platform Curl's conformance run stands for: Windows, Linux and macOS.</summary>
     public static IReadOnlyList<UpstreamCurlPlatform> All { get; } = [Windows, Unix, MacOS];

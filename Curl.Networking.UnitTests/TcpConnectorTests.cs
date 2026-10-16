@@ -93,6 +93,30 @@ public sealed partial class TcpConnectorTests
     }
 
     [TestMethod]
+    public async Task ConnectAsync_WhenTheLastAddressRefuses_CarriesTheRefusedSocketError()
+    {
+        var dialer = new FakeTcpDialer { DialOutcome = _ => throw new System.Net.Sockets.SocketException((int)System.Net.Sockets.SocketError.ConnectionRefused) };
+        var connector = CreateConnector(new FakeDnsResolver(Loopback), dialer, new FakeTlsProvider());
+
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("127.0.0.1", 1, UseTls: false));
+
+        Diagnostics.Assert("last socket error", System.Net.Sockets.SocketError.ConnectionRefused, result.LastSocketError);
+        Assert.AreEqual(System.Net.Sockets.SocketError.ConnectionRefused, result.LastSocketError);
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_WhenTheLastAddressFailsForAnotherReason_CarriesThatSocketError()
+    {
+        var dialer = new FakeTcpDialer { DialOutcome = _ => throw new System.Net.Sockets.SocketException((int)System.Net.Sockets.SocketError.NetworkUnreachable) };
+        var connector = CreateConnector(new FakeDnsResolver(Loopback), dialer, new FakeTlsProvider());
+
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("127.0.0.1", 1, UseTls: false));
+
+        Diagnostics.Assert("last socket error", System.Net.Sockets.SocketError.NetworkUnreachable, result.LastSocketError);
+        Assert.AreEqual(System.Net.Sockets.SocketError.NetworkUnreachable, result.LastSocketError);
+    }
+
+    [TestMethod]
     public async Task ConnectAsync_WhenAForwardProxyFailsToDial_NamesTheProxyInTheCouldntConnectMessage()
     {
         // curl 8.21.0 (Schannel): curl -sS -x http://127.0.0.1:1 http://example.com/ -> exit 7,

@@ -1,6 +1,7 @@
 using Curl.Cli;
 using Curl.Core;
 using Curl.Protocol.Abstractions;
+using Curl.Engine;
 
 namespace Curl.Console;
 
@@ -28,7 +29,7 @@ internal sealed class RunningTransferState(
     IReadOnlyList<CommandLineOptions> laterGroups,
     CancellationToken abortToken,
     StandardOutputFailureDeferringStream standardOutput,
-    Stream gatedStandardOutput)
+    Stream gatedStandardOutput) : EngineTransferState
 {
     /// <summary>
     /// Gets standard output as the transfer writes it, which records the transfer's write failure:
@@ -66,18 +67,6 @@ internal sealed class RunningTransferState(
     /// the status lines its byte reports draw; a new one for each attempt. The first is only a placeholder.
     /// </summary>
     internal TransferProgressRecorder Progress { get; set; } = new(TimeProvider.System);
-
-    /// <summary>
-    /// Gets or sets the <c>-Y</c>/<c>-y</c> watchdog started for the attempt whose context was created
-    /// last, until the attempt takes it; <see langword="null" /> when the speed is not watched.
-    /// </summary>
-    internal LowSpeedWatchdog? AttemptLowSpeedWatchdog { get; set; }
-
-    /// <summary>
-    /// Gets or sets the <c>-m</c> watchdog started for the attempt whose context was created last,
-    /// until the attempt takes it; <see langword="null" /> without a positive <c>-m</c>.
-    /// </summary>
-    internal MaxTimeWatchdog? AttemptMaxTimeWatchdog { get; set; }
 
     /// <summary>
     /// Gets or sets the transfer's <c>-#</c> bar, which <see cref="Progress" /> passes every report on
@@ -128,18 +117,6 @@ internal sealed class RunningTransferState(
     internal bool SucceededBeforeOutputFileCreationFailed { get; set; }
 
     /// <summary>
-    /// Gets or sets the <c>%{xfer_id}</c> of the latest attempt <c>--retry</c> ran, which curl
-    /// 8.21.0 makes a transfer of its own; <see langword="null" /> until the first retry (task BL-799).
-    /// </summary>
-    internal long? RetryTransferId { get; set; }
-
-    /// <summary>
-    /// Gets or sets the <c>%{conn_id}</c> of the attempt <c>--retry</c> last ran again, which the next
-    /// attempt keeps when it reuses that connection; <see langword="null" /> until the first retry (task BL-799).
-    /// </summary>
-    internal long? RetriedConnectionId { get; set; }
-
-    /// <summary>
     /// Gets or sets the <see cref="TimeProvider.GetTimestamp" /> the transfer started at, which the
     /// diagnostic log's end line measures its elapsed milliseconds from (ADR-0222).
     /// </summary>
@@ -161,29 +138,10 @@ internal sealed class RunningTransferState(
     internal bool UploadsFromStandardInputWithoutBlocking { get; set; }
 
     /// <summary>
-    /// Gets or sets the credentials <see cref="TransferCredentialLookup" /> chose for the transfer, sent in
-    /// place of the <c>-u</c> ones; <see langword="null" /> when neither the netrc file nor the URL had anything to say
-    /// (tasks BL-505, BL-791).
-    /// </summary>
-    internal System.Net.NetworkCredential? LookedUpCredentials { get; set; }
-
-    /// <summary>
-    /// Gets or sets the SSH options of an <c>scp</c> or <c>sftp</c> transfer, with the known-hosts file the
-    /// runner resolved (task BL-576); <see langword="null" /> for any other scheme.
-    /// </summary>
-    internal SshOptions? Ssh { get; set; }
-
-    /// <summary>
     /// Gets or sets where the transfer's <c>-v</c> and trace events go once it is set up to connect:
     /// under <c>--trace-ids</c> marked with its IDs (task BL-648); <see cref="NoTransferEvents.Instance" /> until then.
     /// </summary>
     internal ITransferEvents Events { get; set; } = NoTransferEvents.Instance;
-
-    /// <summary>
-    /// Gets or sets the <c>%{conn_id}</c> the transfer took for its <c>--trace-ids</c> marker, which its
-    /// <c>-w</c> output then prints; <see langword="null" /> until its first event (task BL-648).
-    /// </summary>
-    internal long? ConnectionId { get; set; }
 
     /// <summary>
     /// Gets or sets the OpenSSL verify code of the origin's last certificate check, which
@@ -215,12 +173,6 @@ internal sealed class RunningTransferState(
     /// <see langword="null" /> without <c>--libcurl</c> (task BL-1177).
     /// </summary>
     internal int? LibcurlTransferIndex { get; set; }
-
-    /// <summary>
-    /// Gets or sets the transfer's alt-svc cache, read before it connects and written when it is reported;
-    /// <see langword="null" /> without <c>--alt-svc</c> and for a URL that is not <c>http</c> or <c>https</c> (task BL-623).
-    /// </summary>
-    internal AltSvcTransferCache? AltSvc { get; set; }
 
     /// <summary>
     /// Gets or sets what saves an <c>ETag</c> line for <c>--etag-save</c>, which the transfer's

@@ -64,7 +64,7 @@ internal static class Socks5Handshake
         var hostName = proxy.Kind == ProxyKind.Socks5Hostname && literal is null ? Encoding.UTF8.GetBytes(host) : null;
         if (hostName?.Length > MaximumHostBytes)
         {
-            return SocksProxyTunnel.Failed("SOCKS5: the destination hostname is too long to be resolved remotely by the proxy.");
+            return SocksProxyTunnel.Failed(CurlProxyCode.LongHostname, "SOCKS5: the destination hostname is too long to be resolved remotely by the proxy.");
         }
 
         var destination = new Socks5Destination(host, port, hostName, literal, proxy.Kind == ProxyKind.Socks5Hostname);
@@ -87,17 +87,17 @@ internal static class Socks5Handshake
 
         return await SocksProxyTunnel.ReadReplyAsync(connection, 2, cancellationToken).ConfigureAwait(false) switch
         {
-            null => SocksProxyTunnel.Failed(SocksProxyTunnel.ProxyClosedMessage),
-            [not 5, _] => SocksProxyTunnel.Failed("Received invalid version in initial SOCKS5 response."),
+            null => SocksProxyTunnel.Failed(CurlProxyCode.Closed, SocksProxyTunnel.ProxyClosedMessage),
+            [not 5, _] => SocksProxyTunnel.Failed(CurlProxyCode.BadVersion, "Received invalid version in initial SOCKS5 response."),
             [_, NoAuthentication] => null,
             [_, UserNameAndPassword] when !authentication.AllowUserNameAndPassword =>
-                SocksProxyTunnel.Failed("BASIC authentication proposed but not enabled."),
+                SocksProxyTunnel.Failed(CurlProxyCode.NoAuthentication, "BASIC authentication proposed but not enabled."),
             [_, UserNameAndPassword] => await AuthenticateAsync(connection, credential, cancellationToken).ConfigureAwait(false),
             [_, Gssapi] when !authentication.AllowGssapi =>
-                SocksProxyTunnel.Failed("SOCKS5 GSSAPI per-message authentication is not enabled."),
+                SocksProxyTunnel.Failed(CurlProxyCode.GssapiPerMessage, "SOCKS5 GSSAPI per-message authentication is not enabled."),
             [_, Gssapi] => await Socks5GssapiNegotiation.RunAsync(connection, proxy.Host, authentication, events, cancellationToken).ConfigureAwait(false),
-            [_, NoAcceptableMethod] => SocksProxyTunnel.Failed("No authentication method was acceptable."),
-            _ => SocksProxyTunnel.Failed("Unknown SOCKS5 mode attempted to be used by server."),
+            [_, NoAcceptableMethod] => SocksProxyTunnel.Failed(CurlProxyCode.NoAuthentication, "No authentication method was acceptable."),
+            _ => SocksProxyTunnel.Failed(CurlProxyCode.UnknownMode, "Unknown SOCKS5 mode attempted to be used by server."),
         };
     }
 
@@ -134,9 +134,9 @@ internal static class Socks5Handshake
         await SocksProxyTunnel.SendAsync(connection, request, cancellationToken).ConfigureAwait(false);
         return await SocksProxyTunnel.ReadReplyAsync(connection, 2, cancellationToken).ConfigureAwait(false) switch
         {
-            null => SocksProxyTunnel.Failed(SocksProxyTunnel.ProxyClosedMessage),
+            null => SocksProxyTunnel.Failed(CurlProxyCode.Closed, SocksProxyTunnel.ProxyClosedMessage),
             [_, 0] => null,
-            { } status => SocksProxyTunnel.Failed($"User was rejected by the SOCKS5 server ({status[0]} {status[1]})."),
+            { } status => SocksProxyTunnel.Failed(CurlProxyCode.UserRejected, $"User was rejected by the SOCKS5 server ({status[0]} {status[1]})."),
         };
     }
 
@@ -147,11 +147,11 @@ internal static class Socks5Handshake
         var password = EncodeUtf8(credential?.Password);
         if (userName.Length > MaximumCredentialBytes)
         {
-            return ([], SocksProxyTunnel.Failed("Excessive username length for proxy auth"));
+            return ([], SocksProxyTunnel.Failed(CurlProxyCode.LongUser, "Excessive username length for proxy auth"));
         }
 
         return password.Length > MaximumCredentialBytes
-            ? ([], SocksProxyTunnel.Failed("Excessive password length for proxy auth"))
+            ? ([], SocksProxyTunnel.Failed(CurlProxyCode.LongPassword, "Excessive password length for proxy auth"))
             : (FormatAuthenticationRequest(userName, password), null);
     }
 
@@ -230,7 +230,7 @@ internal static class Socks5Handshake
     {
         if (await SocksProxyTunnel.ReadReplyAsync(connection, 5, cancellationToken).ConfigureAwait(false) is not { } header)
         {
-            return SocksProxyTunnel.Failed(SocksProxyTunnel.ProxyClosedMessage);
+            return SocksProxyTunnel.Failed(CurlProxyCode.Closed, SocksProxyTunnel.ProxyClosedMessage);
         }
 
         var (remainingBytes, failure) = CheckConnectReplyHeader(header, host);
@@ -240,7 +240,7 @@ internal static class Socks5Handshake
         }
 
         return await SocksProxyTunnel.ReadReplyAsync(connection, remainingBytes, cancellationToken).ConfigureAwait(false) is null
-            ? SocksProxyTunnel.Failed(SocksProxyTunnel.ProxyClosedMessage)
+            ? SocksProxyTunnel.Failed(CurlProxyCode.Closed, SocksProxyTunnel.ProxyClosedMessage)
             : null;
     }
 
@@ -249,18 +249,33 @@ internal static class Socks5Handshake
     {
         if (header[0] != 5)
         {
-            return (0, SocksProxyTunnel.Failed("SOCKS5 reply has wrong version, version should be 5."));
+            return (0, SocksProxyTunnel.Failed(CurlProxyCode.BadVersion, "SOCKS5 reply has wrong version, version should be 5."));
         }
 
         if (header[1] != 0)
         {
-            return (0, SocksProxyTunnel.Failed($"cannot complete SOCKS5 connection to {host}. ({header[1]})"));
+            return (0, SocksProxyTunnel.Failed(ReplyProxyError(header[1]), $"cannot complete SOCKS5 connection to {host}. ({header[1]})"));
         }
 
         return RemainingAfterHeader(header[3], header[4]) is { } remainingBytes
             ? (remainingBytes, null)
-            : (0, SocksProxyTunnel.Failed("SOCKS5 reply has wrong address type."));
+            : (0, SocksProxyTunnel.Failed(CurlProxyCode.BadAddressType, "SOCKS5 reply has wrong address type."));
     }
+
+    // The CURLPX code upstream's socks.c gives a CONNECT reply's status: RFC 1928's eight
+    // failures by name, anything above them as unassigned.
+    private static CurlProxyCode ReplyProxyError(byte status) => status switch
+    {
+        1 => CurlProxyCode.ReplyGeneralServerFailure,
+        2 => CurlProxyCode.ReplyNotAllowed,
+        3 => CurlProxyCode.ReplyNetworkUnreachable,
+        4 => CurlProxyCode.ReplyHostUnreachable,
+        5 => CurlProxyCode.ReplyConnectionRefused,
+        6 => CurlProxyCode.ReplyTtlExpired,
+        7 => CurlProxyCode.ReplyCommandNotSupported,
+        8 => CurlProxyCode.ReplyAddressTypeNotSupported,
+        _ => CurlProxyCode.ReplyUnassigned,
+    };
 
     // The bytes after the fifth: the rest of an IPv4 or IPv6 address, or a host name whose
     // length is the fifth byte; then the two-byte port. Null for an unknown address type.

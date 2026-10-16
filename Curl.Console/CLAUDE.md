@@ -9,37 +9,46 @@ executable rather than a library.
 It is also the only project that references every library: composing the services
 is its job. `CurlComposition` is the composition root, written as plain constructor
 calls - no container, no reflection, no assembly scanning, so native AOT sees every
-type. `Curl.Core.UnitLibrary` dispatches through the `IProtocolHandler` instances it is
+type. It keeps `CreateRunner` and the runner wiring; the factories that build the protocol
+handlers, transports, DNS resolvers, TLS providers, security-context factories and
+authenticators are `Curl.Engine.UnitLibrary`'s `EngineComposition`, which it calls (BL-2289),
+handing it `CurlEasyErrorText.Of` for the DoH resolver's error text. Where this file names an
+`EngineComposition` member, that member is engine code described here for the runner's sake;
+`Curl.Engine.UnitLibrary/CLAUDE.md` owns it. `Curl.Core.UnitLibrary` dispatches through the `IProtocolHandler` instances it is
 given and must never reference a protocol library directly.
 
-`CurlComposition.CreateTransports` wraps an option group's `TcpConnector` in one `PoolingConnector`,
-which every TCP handler connects through, so a later URL to the same pool key reuses an
-earlier URL's connection; `TransferDispatch` holds it as its `ConnectionPool`. In production the
-connector shares the run's `ConnectionCache`, which the runner closes without writing anything once
-the run's transfers end, whatever their outcome (ADR-0050, BL-334, ADR-0285); a connector made
-without one owns its pool, which disposing the dispatch closes. It also holds the `TcpConnector`'s
-`LoadResolveEntries`, which the runner calls at the start of every URL's transfer, just before
-the `-b` files load, so `-v` prints the `--resolve` entries' `Added ... to DNS cache` lines for
-each URL; a `--retry` attempt and a followed redirect reload nothing, as in curl 8.21.0 (BL-486).
-The origin's and the HTTPS proxy's TLS providers come from `CurlComposition.CreateTlsProvider`,
-which builds `HandBuiltTlsProvider` when `TlsClientRouting.Choose` routes the options to the
-hand-built client (a `--tls-max` of 1.0 or 1.1 today) and `SslStreamTlsProvider` otherwise
-(ADR-0140, ADR-0162, BL-708).
+`CurlComposition` calls `EngineComposition`'s factories for the transports, TLS providers and protocol handlers; what they build and how they wire it is described in `Curl.Engine.UnitLibrary/CLAUDE.md`.
 
-`CurlComposition.CreateProtocolHandlers` gives every handler an `EndPointRecordingConnector` and
-an `EndPointRecordingDatagramConnector` sharing one `ConnectionEndPointRecorder`, and wraps
-each handler in an `EndPointReportingProtocolHandler`, which puts the end points of the
-transfer's first connection (FTP's control connection) on its report when the handler reported
-neither, so `%{local_ip}`, `%{local_port}`, `%{remote_ip}` and `%{remote_port}` work for every
-scheme without handler code; HTTP keeps its own (ADR-0119, BL-515). Each handler sits behind a
-`LazyProtocolHandler` that names its schemes and builds the handler on its first transfer, as do the
-security context factory and the HTTP authenticator, so a run builds only what its URLs' schemes use
-(BL-1715, AF-0063); `EndPointReportingProtocolHandler.Handler` gives the built handler.
+`EasyOptionsFromCommandLine` is the curl tool's `config2setopts.c`: it maps one option group's
+`CommandLineOptions` onto `Curl.Api.UnitLibrary`'s easy option groups, one method per group, as
+curl hands its options to libcurl (ADR-0506). `NetworkOf` builds `EasyNetworkOptions` from the
+connection, DNS, socket, timeout, protocol and `--ssl` options; an option left out keeps libcurl's
+default, and where its mapping differs from the `CURLOPT_*` lines `--libcurl` writes, the command
+line's behaviour wins (ADR-0513). `TlsOf` builds `EasyTlsOptions` from the origin's, the HTTPS proxy's and
+DoH's TLS options, splitting `-E` with `Curl.Networking`'s `ClientCertificateArgument` (ADR-0514).
+`ProxyOf` builds `EasyProxyOptions` from the proxy, pre-proxy, `--noproxy`, tunnel, proxy-header,
+SOCKS5 and HAProxy options; the proxy environment variables stay the engine's (ADR-0515).
+`AuthenticationOf` builds `EasyAuthenticationOptions` from the credential, netrc, method, SASL,
+GSS-API, AWS SigV4, redirect-trust and `--httpsig-*` options (ADR-0516).
+`HttpOf` builds `EasyHttpOptions` from the header, `--json`, user-agent, referer, encoding, redirect,
+`-d` body, `-F`/`--form-string` parts (`MimePost`, ADR-0531), HTTP version, cookie, alt-svc, HSTS and
+`--no-alpn` options; `-X` and `-I` are left to other groups (ADR-0527). The runner reads `MimePost`
+for each transfer's form body (BL-2344).
+`BehaviourOf` builds `EasyBehaviourOptions` from `-v`/`--trace*`, `-i`/`-I`, `-s`/`--no-progress-meter`,
+`-f` and `--create-file-mode`; `TransferOf` builds `EasyTransferOptions` from `-r`, `-C`, `-X`, `-R`,
+`-l`, `-I`, `--max-filesize`, `-z`, `-B`, `--crlf`, `-Y`/`-y`, `--limit-rate` and `-m`, and
+`UploadTransferOf` adds one transfer's `-T` upload and its size; `-C -` stays per transfer (ADR-0528).
+`ProtocolOf` builds `EasyProtocolOptions` from the FTP (`-P`, `-Q` split by its `+`/`-` prefix, `-a`,
+`--ftp-*`, `--disable-epsv`/`--disable-eprt`), SSH (`--key`, `--pubkey`, `--hostpub*`, `--knownhosts`,
+`--compressed-ssh`), mail, TFTP and `-t` options; RTSP and WebSocket keep libcurl's defaults, and the
+known-hosts file found without `--knownhosts` stays per transfer (ADR-0529).
+`NetworkOf` is read by the engine's connection factories (BL-2323); the others are not read yet:
+BL-2324, BL-2325, BL-2338 and BL-2348 hand their records to the engine's classes. `BehaviourOf` and `TransferOf` are read by `TransferContextFactory`, `HttpRequestOptionsMapping`, `MailRequestOptionsMapping`, the performer's watchdog starts and `TransferTimers`; the runner adds each transfer's `-T` upload, resuming from -1 under `-C -` (`TransferOptionsOf`, BL-2347, ADR-0534). `HttpOf` is also read by `HttpRequestOptionsMapping`, `RedirectPolicyMapping` and `TransferContextFactory` (BL-2345, ADR-0532), by the transport, TCP connector and pooling connector factories for the HTTP version (BL-2350), and by `CookieEngine`, `AltSvcTransferCache`, `HstsCacheFile` and the performer's cookie, HSTS and alt-svc steps (BL-2346, ADR-0533).
 
 `Program.Main` only opens the standard streams, builds the composition and hands the
 arguments to `CurlCommandRunner`, which parses them, runs each URL and prints curl's
 `curl: (N) <message>` lines, each transfer's message cut to curl's 255-byte error buffer by
-`CurlErrorBuffer` (a bad glob's lines are not cut; ADR-0072, BL-380). The parse reads the default config file first, where
+`Curl.Engine`'s `CurlErrorBuffer` (a bad glob's lines are not cut; ADR-0072, BL-380). The parse reads the default config file first, where
 `DefaultConfigFileSearch.ForProcess` finds it (the composition passes it; a runner given none
 reads no `.curlrc`, which keeps tests off the real home directory), unless the first argument
 starts with `-q` or is `--disable`; `-K` files apply where they stand. Both are read through
@@ -75,7 +84,7 @@ gateway or not: `curl: Failed to extract a filename from the URL to use for stor
 `-1`, exit 1, and the run ends (BL-372 Notes). A URL still without a
 scheme gets the one `UrlSchemeGuesser` guesses (`http`, or `ftp` for `ftp.` and so on), which
 `%{url_effective}` shows while `%{url}` keeps the URL as typed. Measured on curl 8.21.0
-(BL-240 Notes). `%{url_effective}` prints the URL `UrlEffective` rebuilds: the scheme in
+(BL-240 Notes). `%{url_effective}` prints the URL `Curl.Engine`'s `UrlEffective` rebuilds: the scheme in
 lower case, the authority as typed, and the path as curl sends it - `/` when empty, dot
 segments removed unless `--path-as-is` - before the query and fragment; a URL curl rejects
 prints as typed, as curl 8.21.0 does (BL-371 and BL-444 Notes).
@@ -89,11 +98,11 @@ header lines and replaces the file with the value of each `ETag` of a 200-399 re
 that cannot be created skips the transfer - no report, no `-w` - and a run whose every transfer was
 skipped ends with `curl: no transfer performed` and exit 26 (BL-619 Notes).
 
-Under `--alt-svc <file>` each `http` or `https` transfer gets its own `AltSvcTransferCache` (an
+Under `--alt-svc <file>` each `http` or `https` transfer gets its own `Curl.Engine` `AltSvcTransferCache` (an
 `AltSvcCache` from `Curl.Core`, ADR-0175), as curl gives each transfer's handle one: the file is read
 just after the `-b` files, a missing one as empty, and written back after the `-c` jar, created if
 missing and silently left alone if it cannot be written; no other scheme reads or writes it, and
-`--alt-svc ""` does neither. `TransferContextFactory` puts it on `HttpRequestOptions.AltSvcStore`, so
+`--alt-svc ""` does neither. `Curl.Engine`'s `TransferContextFactory` puts it on `HttpRequestOptions.AltSvcStore`, so
 the HTTP handler learns each `Alt-Svc` header of an `https` response and prints `* Added alt-svc`,
 and `AltSvcTransferCache.ApplyTo` sets `AltSvcRoute` and `Version` for an `https` origin, unless a
 `--connect-to` mapping matches it: the version option decides which `h1`, `h2` and `h3` entries apply,
@@ -107,13 +116,13 @@ The HTTP handler hands the cache every `Alt-Svc` header, `http` or `https`, and 
 does; the shipped `curl` never turns it on (ADR-0497, BL-2263).
 
 The run holds one HSTS cache, `Curl.Core`'s `HstsTransferPolicy`, shared by every transfer of every
-group with or without `--hsts`. Under `--hsts <file>` each transfer reads the file (`HstsCacheFile`)
+group with or without `--hsts`. Under `--hsts <file>` each transfer reads the file (`Curl.Engine`'s `HstsCacheFile`)
 just before it connects, a missing one as empty, and writes the cache back after the `--alt-svc`
 file, whatever the outcome; one that cannot be written is left alone, and `--hsts ""` does neither.
 An `http` URL whose host the cache knows is switched to `https` (the scheme only; an explicit port
 stays), `-v` printing `* Switched from HTTP to HTTPS due to HSTS => <url>`; `RedirectFollower` learns
 every hop's `https` `Strict-Transport-Security` and switches a known `http` redirect target the same
-way before `--proto-redir` checks it. Measured on curl 8.21.0 (ADR-0218, BL-621 Notes). Behind the harness seam `CreateRunner(honoursHstsTimeVariable: true)`, a `CURL_TIME` of whole seconds fixes that cache's clock (`FixedWallClock`, `ClockOverridingHstsStore`), as curl's debug build does; the shipped `curl` never turns it on (ADR-0493, BL-2234). Behind `CreateRunner(honoursHstsHttpVariable: true)` a set `CURL_HSTS_HTTP` makes the cache learn `Strict-Transport-Security` over plain `http` too (`HstsTransferPolicy`'s `learnsOverHttp`), as curl's debug build does; the HTTP handler hands the store every such header and the store decides (ADR-0494, BL-2250).
+way before `--proto-redir` checks it. Measured on curl 8.21.0 (ADR-0218, BL-621 Notes). Behind the harness seam `CreateRunner(honoursHstsTimeVariable: true)`, a `CURL_TIME` of whole seconds fixes that cache's clock (`Curl.Engine`'s `FixedWallClock` and `ClockOverridingHstsStore`), as curl's debug build does; the shipped `curl` never turns it on (ADR-0493, BL-2234). Behind `CreateRunner(honoursHstsHttpVariable: true)` a set `CURL_HSTS_HTTP` makes the cache learn `Strict-Transport-Security` over plain `http` too (`HstsTransferPolicy`'s `learnsOverHttp`), as curl's debug build does; the HTTP handler hands the store every such header and the store decides (ADR-0494, BL-2250).
 
 Each URL's output comes from `CommandLineOptions.UrlOutputs`: an `-o` name, or for `-O` /
 `--remote-name-all` the name `RemoteFileName` takes from the URL path (last non-empty
@@ -134,14 +143,14 @@ name already taken is refused with `File exists` and exit 23. Measured on curl 8
 at (`RedirectLocationFileName`), so `-J -L -O` with no `Content-Disposition` names the file
 after the last URL followed, as upstream tests 1642 and 1643 expect (BL-1809).
 
-`TransferContextFactory` builds each transfer's context from the parsed options; the
+`Curl.Engine`'s `TransferContextFactory` builds each transfer's context from the parsed options; the
 context carries the `-r` text as given (`RangeText`, which the HTTP handler sends verbatim)
 and its parsed range (`ByteRangeParser`; text that names no range goes to every handler with a `null` range, as
 curl 8.21.0 hands it on: FTP and file parse it themselves, SFTP after `STAT`, HTTP, RTSP and
 WebSocket send it, the rest, SCP among them, ignore it, BL-386, BL-1322, BL-1396), the `-C` offset and the
 `--max-filesize` limit. `-C -` resumes from the size of the URL's `-o` file, and a transfer
 that resumes past byte zero opens that file for appending before it starts, as curl does.
-Every context also carries `Http`, which `HttpRequestOptionsMapping` fills from `-X`,
+Every context also carries `Http`, which `Curl.Engine`'s `HttpRequestOptionsMapping` fills from `-X`,
 `--request-target` (sent verbatim as the request-line target), `-H`, `-A`, `-e`, the `-d` family and `--json`: `--json` appends `Content-Type: application/json` and
 `Accept: application/json` after the `-H` headers unless a `-H` header already starts with
 that name (case-insensitive), and a body is a `BytesBody` sent as
@@ -151,17 +160,13 @@ the `-G` / `--url-query` query with `QueryUrl` before the URL is parsed. `http` 
 `RankedHttpAuthenticator` (Basic and Bearer, and Digest with a random client nonce, all in the
 platform's credential encoding, and Negotiate), which answers the scheme `-u`, `--basic`, `--digest`,
 `--negotiate`, `--anyauth` and `--oauth2-bearer` allow (`HttpRequestOptions.AuthSchemes` and `BearerToken`),
-wrapped for the HTTP handler alone in an `AwsSigV4HttpAuthenticator` that signs every request with
-`--aws-sigv4` in place of those schemes (`HttpRequestOptions.AwsSigV4`, ADR-0243), itself wrapped in an
-`HttpSignatureHttpAuthenticator` that signs every request with the `--httpsig-*` options' `Signature-Input` and
-`Signature` lines in place of all of them (`HttpRequestOptions.HttpSignature`, BL-2182, ADR-0485); `HttpSignatureSetup`
-runs curl 8.22.0's setup checks for those options at each URL, refusing with exit 2, 26 or 43 and its `errorf` line.
-Negotiate's contexts come from `CurlComposition.CreateSecurityContextFactory`, ADR-0142's router:
+wrapped for the HTTP handler alone in `Curl.Engine`'s `AwsSigV4HttpAuthenticator` (`--aws-sigv4`) and that in its `HttpSignatureHttpAuthenticator` (the `--httpsig-*` options); `Curl.Engine`'s `HttpSignatureSetup` runs their setup checks at each URL. Both are described in `Curl.Engine.UnitLibrary/CLAUDE.md`.
+Negotiate's contexts come from `EngineComposition.CreateSecurityContextFactory`, ADR-0142's router:
 SSPI on Windows, elsewhere the system GSS-API with the hand-built SPNEGO and Kerberos behind it,
 reaching KDCs through `Curl.Networking`'s `KerberosKdcSocketTransport` over the run's connectors
-and finding them through `KerberosDnsSrvLookup`. `HandBuiltKerberosSources` reads `krb5.conf`
-and the credential cache from disk (`KerberosDiskFileReader`) only when a hand-built context first
-asks, with the `<uid>` of `/tmp/krb5cc_<uid>` from `ProcessUserId` (BL-527, ADR-0176). The same
+and finding them through `KerberosDnsSrvLookup`. `Curl.Engine`'s `HandBuiltKerberosSources` reads `krb5.conf`
+and the credential cache from disk only when a hand-built context first asks, with the `<uid>` of
+`/tmp/krb5cc_<uid>` from `Curl.Engine`'s `ProcessUserId` (BL-527, ADR-0176). The same
 factory goes to `CreateSaslAuthenticator`, so SMTP, IMAP and POP3 answer SASL `GSSAPI` and `NTLM`
 on it (ADR-0184, BL-852). Tests pass their own `ISecurityContextFactory` to `CreateRunner`.
 `-0` / `--http1.0` and `--http1.1` set `HttpRequestOptions.Version` (the last one wins, HTTP/1.1
@@ -169,7 +174,7 @@ when neither is given), as do `--http3` and `--http3-only`, for which the TCP co
 QUIC connects to the group's `QuicDialer` (ADR-0182, BL-732), and `--compressed`, `--tr-encoding`, `--raw` and `--ignore-content-length`
 are copied as they are (BL-236); `CurlCommandRunnerTransferEncodingTests` pins each one's request
 bytes and output as BL-177, BL-180 and BL-315 measured them.
-With `-b` or `-c` the handler also gets the option group's `CookieEngine`: one `CookieStore`
+With `-b` or `-c` the handler also gets the option group's `CookieEngine` (in `Curl.Engine`): one `CookieStore`
 shared by every URL of every group (`CurlComposition.SharingRunCookies`), the `-b` files loaded before the first transfer (session cookies dropped under
 `-j`, a missing file ignored), the `-b name=value` strings sent after the stored cookies (left out when an `-H` value names
 `Cookie`, BL-291) as one string joined as curl's `cookie_setopts` joins them (`;` and a space,
@@ -187,7 +192,7 @@ for `--stderr -`, as curl 8.21.0's `freopen`ed C `stderr` does (BL-1815); any ot
 its leading directories first made under `--create-dirs` as for `-o` (upstream test 3031, BL-1852),
 and one that cannot be opened prints `curl: Failed to open <file>` and stops the run with
 exit 23. `-i` and `-I` send the header lines to the body output too (standard output or the
-`-o` file); with `-D` as well, `HeaderLineTeeStream` writes each line to the `-D` output and
+`-o` file); with `-D` as well, `Curl.Engine`'s `HeaderLineTeeStream` writes each line to the `-D` output and
 then the body output before the next, so `-i -D -` prints every header line twice in a row,
 as curl 8.21.0 does. When standard output is a terminal that renders bold (`terminalRendersStyles`:
 true off Windows, and on Windows once `StandardOutputVirtualTerminal` has turned on
@@ -210,10 +215,10 @@ in a later option group, once the groups before it have run (BL-509). A URL with
 
 The `-:`/`--next` option groups (`CommandLineParseResult.Groups`) run in order, up to and
 including the first with an output option left over (ADR-0126, BL-509). Each group's URLs use
-that group's options through a `TransferDispatch` the factory builds for the group and the runner
+that group's options through a `Curl.Engine` `TransferDispatch` the factory builds for the group and the runner
 disposes when the group ends. Every group's `PoolingConnector` shares the run's one
-`ConnectionCache` (`CurlComposition.CreatePoolingConnector`), keyed on the group's
-`OptionGroupConnectionSettings`, so a later group reuses an earlier group's connection when their
+`ConnectionCache` (`EngineComposition.CreatePoolingConnector`), keyed on the group's
+`Curl.Engine`'s `OptionGroupConnectionSettings`, so a later group reuses an earlier group's connection when their
 TLS, proxy TLS and other connection settings are equal, and the runner closes the cache when the
 run ends (ADR-0285, BL-754).
 `%{urlnum}` (`UrlTransfer.UrlNumber`), `%{xfer_id}` and `%{conn_id}` count on across groups, the
@@ -264,64 +269,43 @@ failed, it reports that transfer's code instead, with the text `CurlEasyErrorTex
 unless `-s`, as curl 8.21.0 does (upstream test1072, BL-2088). `%{url_effective}` prints the
 resolved URL.
 
-Each transfer's proxy is chosen by `TransferProxySelection`, after the URL, range and `-F`
-body are checked: `Curl.Core`'s `ProxySelector` (held by `TransferDispatch`, reading the
+Each transfer's proxy is chosen by `Curl.Engine`'s `TransferProxySelection`, after the URL, range and `-F`
+body are checked: `Curl.Core`'s `ProxySelector` (held by `Curl.Engine`'s `TransferDispatch`, reading the
 process's proxy environment variables in production and none in tests unless given) picks it
 from `-x` or a `--socks` option, `--noproxy` and the variables; `-U` replaces its credential;
 it goes into `HttpRequestOptions.ForwardProxy` with `-p` as `ProxyTunnel`. A CONNECT tunnel
 authenticates with the scheme `--proxy-basic`, `--proxy-digest`, `--proxy-ntlm`, `--proxy-negotiate` and `--proxy-anyauth` pick,
-through the same `RankedHttpAuthenticator` the origin uses (`CreateProxyTunnelOptions`, ADR-0186), its contexts from ADR-0142's router through a `LateBoundSecurityContextFactory` bound once the connectors exist (ADR-0270),
+through the same `RankedHttpAuthenticator` the origin uses (`CreateProxyTunnelOptions`, ADR-0186), its contexts from ADR-0142's router through `Curl.Engine`'s `LateBoundSecurityContextFactory` bound once the connectors exist (ADR-0270),
 and a forward proxy's `407` is answered with the same pick, which `CreateProtocolHandlers` hands
 the HTTP handler (ADR-0239). Under
 `--unix-socket` or `--abstract-unix-socket` no proxy is chosen or even parsed, and the group's
-`TcpConnector` dials that socket (`CurlComposition.UnixSocketOf`), as curl 8.21.0 does (ADR-0149, BL-507).
+`TcpConnector` dials that socket (`EngineComposition.UnixSocketOf`), as curl 8.21.0 does (ADR-0149, BL-507).
 With `--preproxy` (ADR-0273, BL-614) the environment is not read: `--noproxy` drops both proxies, an
 HTTP pre-proxy or a SOCKS `-x` beside one is exit 5, a lone pre-proxy is the transfer's SOCKS proxy,
 and an HTTP `-x` is reached through the pre-proxy the group's `TcpConnector` gets from
-`CurlComposition.PreProxyOf`. The `--socks5-*` options reach the same connector through
-`Socks5AuthenticationMapping`, with the tunnel's `LateBoundSecurityContextFactory` for GSS-API
+`EngineComposition.PreProxyOf`. The `--socks5-*` options reach the same connector through
+`Curl.Engine`'s `Socks5AuthenticationMapping`, with the tunnel's `LateBoundSecurityContextFactory` for GSS-API
 (ADR-0276, BL-615). Proxy text curl
 cannot use ends the transfer with the selector's exit 5 or 7, and a SOCKS proxy, or an HTTPS
 proxy for `https` or under `-p` or `-L`, ends an `http`/`https` transfer with exit 4 until the connector opens those tunnels
 (ADR-0053, BL-328). Other schemes do not read the proxy yet (BL-330), and redirect hops keep
 the first URL's proxy (BL-329). Measured on curl 8.21.0 (BL-238 Notes).
 
-`TransferCredentialLookup` then chooses the transfer's credentials, once per URL. When `-u` gives
-no user name, the URL's percent-decoded user name and password are sent (`http://zz@host/` sends
-`zz:`, `http://:x@host/` sends `:x`, `http://@host/` nothing), replacing a `-u :pw` whole (BL-791).
-Under `-n`, `--netrc-file` or `--netrc-optional` the netrc file has its say too, and the runner keeps them as the running transfer's
-`LookedUpCredentials`, which `TransferContextFactory` puts on every attempt's context in place of
-`-u`'s. A `-u` with a user name wins and no file is read. The file is the `--netrc-file` one, else the one a
-non-empty `NETRC` names (BL-2114), else `.netrc` in `HOME` (on Windows `_netrc` after it, and `USERPROFILE` when `HOME` is not set), read
-through the runner's `IDataFileReader` and environment. The URL's percent-decoded user name picks
-the entry (`Curl.Authentication`'s `NetrcFile`), whose password beats the URL's; an entry with no
-login takes the URL's user name, and one with no password sends an empty one, never the URL's
-(BL-1356); with no entry the URL's user and password are sent. Under `--netrc-optional` a URL
-with a password is not looked up at all, and its own credentials are sent (upstream test381,
-BL-1986). A NUL byte in the file ends its line (upstream test793). A required file that is missing or malformed fails each URL with
-`curl: (26) .netrc error: no such file` or `syntax error` before anything is sent, `-v` writing
-the same text as an info line first (BL-1447);
-`--netrc-optional` ignores both. When the file is in use, `TransferCredentialLookup.ForRedirectHops`
-gives `RedirectFollower` the same lookup for each redirect hop's URL, so every hop sends its own
-host's entry or none, `--location-trusted` or not (BL-790). Measured on curl 8.21.0 (BL-505 Notes).
-URL credentials that percent-decode to a byte below 0x20 (only `%00` for `http`, `https`, `ws` and
-`wss`) fail with `curl: (3) error extracting credentials from URL` before connecting, a redirect
-hop's too, and a matching netrc entry holding one with `curl: (26) control code detected in .netrc
-credentials` except over those four schemes; `-v` writes each as an info line first (BL-1411).
-An `ftp` or `ftps` URL is claimed by `RoutingFtpProtocolHandler`, which hands an `ftp` one to
+The runner asks `Curl.Engine`'s `TransferCredentialLookup` for the transfer's credentials, once per URL, and keeps them as the running transfer's `LookedUpCredentials`, which `TransferContextFactory` puts on every attempt's context in place of `-u`'s; `RedirectFollower` gets `TransferCredentialLookup.ForRedirectHops` for each hop. The lookup's rules (URL credentials, netrc) are in `Curl.Engine.UnitLibrary/CLAUDE.md`.
+An `ftp` or `ftps` URL is claimed by `Curl.Engine`'s `RoutingFtpProtocolHandler`, which hands an `ftp` one to
 the HTTP handler when its proxy is `Http` or `Http10` and `-p` is not given, so it is forwarded
 to the proxy as `GET ftp://host/path` with `Host: host:21` (ADR-0056, rule 3; BL-344); any
 other transfer, `ftps` through an HTTP proxy included (curl 8.21.0 tunnels it with
 `CONNECT host:990`, BL-458), goes to `FtpProtocolHandler` over the pooling connector
-(ADR-0323, BL-434), its passive data connections over `CurlComposition.FtpDataConnectorOf`'s
+(ADR-0323, BL-434), its passive data connections over `EngineComposition.FtpDataConnectorOf`'s
 `PoolingConnector.Over(TcpConnector.ForFtpDataConnections())`, which `--connect-timeout` does not
-limit (ADR-0286, BL-797) and `--connect-to` maps to its host only, keeping the reply's port (BL-1976, BL-2042). `CurlComposition.CreateFtpProtocolHandler` builds it with a
+limit (ADR-0286, BL-797) and `--connect-to` maps to its host only, keeping the reply's port (BL-1976, BL-2042). `EngineComposition.CreateFtpProtocolHandler` builds it with a
 `TcpConnectionListener` for `-P`, the run's TLS provider and DNS resolver, and a
-`SystemNetworkInterfaceLookup` (ADR-0102, ADR-0108, ADR-0110), and `TransferContextFactory`
+`SystemNetworkInterfaceLookup` (ADR-0102, ADR-0108, ADR-0110), and `Curl.Engine`'s `TransferContextFactory`
 copies `-P`, `--disable-eprt`, `--ssl`/`--ssl-reqd` and `--ftp-ssl-control` into the context.
 
 Every transfer goes through `Curl.Core`'s `RedirectFollower`. `-L` becomes
-`HttpRequestOptions.FollowRedirects`, and `RedirectPolicyMapping` turns `--max-redirs`,
+`HttpRequestOptions.FollowRedirects`, and `Curl.Engine`'s `RedirectPolicyMapping` turns `--max-redirs`,
 `--post301`/`--post302`/`--post303` and `--location-trusted` into its `RedirectPolicy`; `--follow`
 follows as `-L` does but drops a `-X` method whenever a redirect switches the request to GET
 (`RedirectPolicy.DropsCustomMethodOnSwitchToGet`, BL-627). Every
@@ -340,8 +324,34 @@ the retry warning. A `-J` name lasts for the whole transfer (`NamedByContentDisp
 `honor_cd_filename`), so a later attempt opens that file at its first body write. Each attempt's
 progress meter starts once the retry wait is over (upstream test 3036, BL-1849).
 
+`Curl.Engine`'s `TransferPerformer` is libcurl's half of an attempt, split out of the runner (ADR-0506, BL-2282) and moved to the engine (BL-2291):
+it performs one attempt through `RedirectFollower` under the attempt's `-Y`/`-y` and `-m` watchdogs
+(started by it on its clock and kept on the transfer's `EngineTransferState`, the engine part `RunningTransferState` derives from), turns a watchdog's cancel into
+its exit 28 failure, numbers the run's `%{xfer_id}` and `%{conn_id}` (`TakeNextAttemptIds`,
+`KeepRetriedConnectionIdWhenReused`) and keeps the serial attempt start `--rate` measures from.
+The `--retry` loop around it (`FollowRetryingAsync`, the retry lines, the `-o` attempt bytes) stays
+in the runner, as retrying is the curl tool's work. `CurlComposition.CreateRunner` builds it; a
+runner given none makes one on its own clock. Both hand it `CurlEasyErrorText.Of`, which stays here, for the text its known-hosts and cookie-line failures carry.
+It also owns the per-transfer setup libcurl does before it connects (`TransferPerformer.Setup.cs`,
+BL-2283): the URL parse and its refusals (`TryParseTransferUrl`, `ReportUrlRejected`,
+`ParsedUrlRefusal`), the `--interface` and `--ech` setopt refusals (`RefuseMalformedSetopt`), the
+scheme, proxy and credential choice (`TrySelectProxyAndCredentials`), the SSH options and the
+known-hosts check (`ResolveSshOptionsAsync`), the `-b` files (`LoadCookieFilesAsync`), the HSTS
+upgrade (`SwitchToHttpsForHstsAsync`), the alt-svc cache (`OpenAltSvcCacheAsync`), the setup
+failures (`SetupFailureAsync`: the too-long `-b` string, `--engine`), and the `-c` jar, alt-svc and
+HSTS write-back libcurl does at cleanup (`WriteCookieJarAltSvcAndHstsFilesAsync`). Its run-ending
+failures (`KnownHostsFileMissingFailure`, one per performer, and the static `InterfaceSetoptFailure` and `EchSetoptFailure`) are
+compared by reference in the runner. A step that writes to standard error does it through a
+delegate the runner passes (`WriteErrorLineAsync`, its wrapped warning writer), `-c -` prints the
+jar to the stream the runner's `jarPrintTarget` gives, and an attempt's body and header bytes go to
+the context's `Output` and `HeaderOutput` streams: the performer names none of the runner's standard
+streams, `WriteGate`, `WarningLineWrapper` or progress meters, as libcurl writes only through its
+write, header and debug callbacks (BL-2284); the runner still
+does the curl tool's part: globbing, IPFS, `--etag-*`, output files, upload files, the progress
+meter, `-w` and the `curl: (N)` lines.
+
 Under `-Y`/`--speed-limit` or `-y`/`--speed-time` each attempt gets a `Curl.Core`
-`LowSpeedWatchdog` on the runner's clock: `TransferContextFactory` wraps the output and the
+`LowSpeedWatchdog` on the runner's clock: `Curl.Engine`'s `TransferContextFactory` wraps the output and the
 progress sink so it counts the bytes moved, and gives the context its token. An attempt it
 cancels after `-y` seconds below `-Y` (30 seconds, or 1 byte per second, when only one is
 given) ends with `curl: (28) Operation too slow. Less than N bytes/sec transferred the last T
@@ -349,7 +359,7 @@ seconds`, as measured on curl 8.21.0 (ADR-0106, BL-400).
 
 Under a positive `-m`/`--max-time` each attempt also gets a `Curl.Core` `MaxTimeWatchdog` on the
 runner's clock (ADR-0117 and its BL-511 amendment): its start becomes the context's
-`OperationStarted`, `TransferContextFactory` wraps the progress sink so it learns whether the
+`OperationStarted`, `Curl.Engine`'s `TransferContextFactory` wraps the progress sink so it learns whether the
 handler reported the transfer started and how many body bytes it received, and its token also
 cancels the context's. An attempt it cancels ends with exit 28 and `Operation timed out after N
 milliseconds with M bytes received` (`with M out of T` when the size is known), or `Connection
@@ -361,7 +371,7 @@ Under `-R`/`--remote-time` a successful transfer to an `-o` file whose result ca
 (`PhysicalFileSystem` in production), even when no body was written, as curl does. A
 failed stamp prints curl's `Failed to set filetime` warning lines unless `-s`: the Windows
 build's `CreateFile failed: GetLastError` form on Windows when the file does not open and its `SetFileTime failed` form when the time is refused once it has (BL-1453), and elsewhere the POSIX build's
-`on '<file>': <strerror>`, worded from `utimes`'s errno by `CRuntimeErrorNumbers` (BL-1433). On Windows a
+`on '<file>': <strerror>`, worded from `utimes`'s errno by `Curl.Engine`'s `CRuntimeErrorNumbers` (BL-1433). On Windows a
 time before 1752-09-14T00:00:00Z is first capped to it with `Warning: Capping set filetime to
 minimum to avoid overflow` (unless `-s`), as curl 8.21.0 does; off Windows it is set as given
 (BL-1392).
@@ -390,12 +400,12 @@ Under `--trace-config read` (or `all`, `-vvv`, `-vvvv`) the runner writes curl's
 `[READ] client_reset, clear readers` as each transfer starts, after the `--resolve` lines, and
 `ClientReaderResetTraceEvents` writes it again before a finished transfer's `left intact` or
 `shutting down connection` line (ADR-0357's BL-1159 amendment) and after each followed redirect's
-`Issue another request to this URL` line; `CurlTransports.TracesRead` has the HTTP handler write an
+`Issue another request to this URL` line; `Curl.Engine`'s `CurlTransports.TracesRead` has the HTTP handler write an
 HTTP/1.x `-d` or `-T` body's upload reader lines (ADR-0383, BL-1189).
 Under `--trace-config multi` (or `network`, `all`, `-vvvv`) the runner writes curl's `[MULTI] [INIT]`
 lines up to `[SETUP] -> [CONNECT]` before that, and `MultiStateTraceEvents`, inside the `[READ]` and
 `[WRITE]` events, writes each later group of `[MULTI]` lines beside the transfer line curl writes it
-next to (ADR-0382, BL-1188). Its poll lines give `timeouts=` and `tinternal=` from `TransferTimers`
+next to (ADR-0382, BL-1188). Its poll lines give `timeouts=` and `tinternal=` from `Curl.Engine`'s `TransferTimers`
 (a positive `-m` and `--connect-timeout`), and under `--trace-config timer` the response wait's
 `[TIMER]` lines (`TransferTimers.WaitLines`) go between its `PERFORMING` poll lines; with the multi
 not traced, `ResponseWaitTimerTraceEvents` writes them after `Request completely sent off` (ADR-0401, BL-1258).
@@ -518,7 +528,7 @@ it follows `--stderr`) or over the `--log-file`, truncated, UTF-8 without a byte
 closed when the run ends. Every line goes through `GatedDiagnosticLog`, which takes the run's
 `WriteGate` before the writer's lock. A `--log-file` that cannot be opened prints
 `Warning: Failed to open the --log-file <path>`, even under `-s`, and the run carries on without a
-log. `TransferContextFactory.DiagnosticLog` puts the log on every transfer's context. The runner
+log. `Curl.Engine`'s `TransferContextFactory.DiagnosticLog` puts the log on every transfer's context. The runner
 logs under `cli` the files the parse tried to read (`RecordingDataFileReader`), the parser's
 `Warning: ` lines and the accepted command line, and under `runner` every `Warning: ` line it
 prints, each transfer's start and end (`TransferDiagnosticLines`: never a credential, only

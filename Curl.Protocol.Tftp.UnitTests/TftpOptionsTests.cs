@@ -167,6 +167,7 @@ public sealed class TftpOptionsTests
             Output = new MemoryStream(),
             Upload = new MemoryStream("abc"u8.ToArray()),
             TftpBlockSize = 70000,
+            TimeProvider = new ManualTimeProvider(),
         });
 
         byte[] expected = WriteRequest("dest.txt\0octet\0tsize\03\0blksize\065464\0timeout\06\0");
@@ -201,6 +202,10 @@ public sealed class TftpOptionsTests
             Output = output ?? new MemoryStream(),
             TftpBlockSize = tftpBlockSize,
             TftpNoOptions = noOptions,
+
+            // A frozen clock keeps the 300 seconds the timeout option is derived from
+            // whole, however slowly a coverage run reaches the request (BL-2351).
+            TimeProvider = new ManualTimeProvider(),
         };
     }
 

@@ -1,3 +1,4 @@
+using Curl.Engine;
 using Curl.Cli;
 using Curl.Networking;
 using Curl.Protocol.Abstractions;
@@ -25,7 +26,7 @@ public sealed class Socks5AuthenticationMappingTests
     [DataRow(new[] { "--socks5-gssapi" }, false, true, DisplayName = "--socks5-gssapi alone")]
     [DataRow(new[] { "--socks5-basic", "--socks5-gssapi" }, true, true, DisplayName = "Both")]
     [DataRow(new[] { "--socks5-basic", "--no-socks5-basic" }, true, true, DisplayName = "Turned off again")]
-    public void FromCommandLine_AllowsTheMethodsTheOptionsName(string[] arguments, bool allowBasic, bool allowGssapi)
+    public void Of_AllowsTheMethodsTheOptionsName(string[] arguments, bool allowBasic, bool allowGssapi)
     {
         Socks5AuthenticationOptions options = Map([.. arguments, Url]);
         Diagnostics.Act("allow basic / gssapi", $"{options.AllowUserNameAndPassword} / {options.AllowGssapi}");
@@ -39,7 +40,7 @@ public sealed class Socks5AuthenticationMappingTests
     [DataRow(new[] { "--proxy-service-name", "proxysvc" }, "proxysvc")]
     [DataRow(new[] { "--socks5-gssapi-service", "sockssvc", "--proxy-service-name", "proxysvc" }, "sockssvc")]
     [DataRow(new[] { "--socks5-gssapi-service", "" }, "")]
-    public void FromCommandLine_TakesTheGssapiServiceInCurlsOrder(string[] arguments, string service)
+    public void Of_TakesTheGssapiServiceInCurlsOrder(string[] arguments, string service)
     {
         Socks5AuthenticationOptions options = Map([.. arguments, Url]);
         Diagnostics.Act("gssapi service name", options.GssapiServiceName);
@@ -49,12 +50,12 @@ public sealed class Socks5AuthenticationMappingTests
     }
 
     [TestMethod]
-    public void FromCommandLine_CopiesNecAndTheContextFactory()
+    public void Of_CopiesNecAndTheContextFactory()
     {
         LateBoundSecurityContextFactory contexts = new();
         Diagnostics.Arrange("uses SSPI", true);
 
-        Socks5AuthenticationOptions options = Socks5AuthenticationMapping.FromCommandLine(Parse("--socks5-gssapi-nec", Url), contexts, usesSspi: true);
+        Socks5AuthenticationOptions options = Map(Parse("--socks5-gssapi-nec", Url), contexts, usesSspi: true);
         Diagnostics.Act("nec / same contexts / SSPI texts", $"{options.GssapiNec} / {ReferenceEquals(contexts, options.SecurityContexts)} / {options.UsesSspiTexts}");
 
         Diagnostics.Assert("nec / same contexts / SSPI texts", "True / True / True", $"{options.GssapiNec} / {ReferenceEquals(contexts, options.SecurityContexts)} / {options.UsesSspiTexts}");
@@ -66,10 +67,10 @@ public sealed class Socks5AuthenticationMappingTests
     [TestMethod]
     [DataRow(true, SecurityDelegation.None, DisplayName = "SSPI build: no delegation")]
     [DataRow(false, SecurityDelegation.Always, DisplayName = "GSS-API build: --delegation")]
-    public void FromCommandLine_AppliesDelegationOnlyInTheGssapiBuild(bool usesSspi, SecurityDelegation delegation)
+    public void Of_AppliesDelegationOnlyInTheGssapiBuild(bool usesSspi, SecurityDelegation delegation)
     {
         Diagnostics.Arrange("uses SSPI", usesSspi);
-        Socks5AuthenticationOptions options = Socks5AuthenticationMapping.FromCommandLine(Parse("--delegation", "always", Url), null, usesSspi);
+        Socks5AuthenticationOptions options = Map(Parse("--delegation", "always", Url), null, usesSspi);
         Diagnostics.Act("delegation / SSPI texts", $"{options.GssapiDelegation} / {options.UsesSspiTexts}");
 
         Diagnostics.Assert("delegation / SSPI texts", $"{delegation} / {usesSspi}", $"{options.GssapiDelegation} / {options.UsesSspiTexts}");
@@ -80,7 +81,7 @@ public sealed class Socks5AuthenticationMappingTests
     [TestMethod]
     public void CreateTransports_WithSocks5Basic_GivesTheTcpConnectorTheOptionsAndTheRunsContexts()
     {
-        CurlTransports transports = CurlComposition.CreateTransports(Parse("--socks5-basic", Url));
+        CurlTransports transports = EngineComposition.CreateTransports(EasyOptionsFromCommandLine.ToolOptionsOf(Parse("--socks5-basic", Url)), EasyOptionsFromCommandLine.NetworkOf(Parse("--socks5-basic", Url)), EasyOptionsFromCommandLine.TlsOf(Parse("--socks5-basic", Url)), EasyOptionsFromCommandLine.HttpOf(Parse("--socks5-basic", Url)), EasyOptionsFromCommandLine.ProxyOf(Parse("--socks5-basic", Url)), EasyOptionsFromCommandLine.AuthenticationOf(Parse("--socks5-basic", Url)));
 
         Socks5AuthenticationOptions options = transports.TcpConnector.Socks5Authentication;
         Diagnostics.Act("allow basic / gssapi / has contexts", $"{options.AllowUserNameAndPassword} / {options.AllowGssapi} / {options.SecurityContexts is not null}");
@@ -90,7 +91,10 @@ public sealed class Socks5AuthenticationMappingTests
     }
 
     private Socks5AuthenticationOptions Map(string[] arguments) =>
-        Socks5AuthenticationMapping.FromCommandLine(Parse(arguments), null, OperatingSystem.IsWindows());
+        Map(Parse(arguments), null, OperatingSystem.IsWindows());
+
+    private static Socks5AuthenticationOptions Map(CommandLineOptions options, ISecurityContextFactory? contexts, bool usesSspi) =>
+        Socks5AuthenticationMapping.Of(EasyOptionsFromCommandLine.ProxyOf(options), NegotiateOptionsMapping.Of(EasyOptionsFromCommandLine.AuthenticationOf(options)), contexts, usesSspi);
 
     private CommandLineOptions Parse(params string[] arguments)
     {

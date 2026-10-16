@@ -288,6 +288,86 @@ public sealed partial class PhysicalFileSystemTests
     }
 
     [TestMethod]
+    [OSCondition(OperatingSystems.Linux | OperatingSystems.OSX | OperatingSystems.FreeBSD)]
+    public async Task OpenForWriteAsync_ParentIsAFileOnPosix_IsNotADirectory()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        using var directory = new TemporaryDirectory();
+        File.WriteAllText(directory.Combine("present"), "file");
+        diagnostics.Arrange("path", "present/destination.txt, present being a file");
+
+        var result = await new PhysicalFileSystem()
+            .OpenForWriteAsync(directory.Combine("present/destination.txt"), FileWriteMode.CreateNew, DefaultCreateMode, CancellationToken.None);
+
+        ActResult(diagnostics, result);
+        AssertFailed(FileAccessStatus.NotADirectory, result);
+    }
+
+    [TestMethod]
+    public async Task OpenForWriteAsync_ParentIsAFileReportedAsNotADirectory_IsNotADirectory()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        using var directory = new TemporaryDirectory();
+        File.WriteAllText(directory.Combine("present"), "file");
+        var fileSystem = new PhysicalFileSystem(setsUnixCreateMode: false, reportsFileInPathAsNotADirectory: true);
+        diagnostics.Arrange("path", "present/missing/destination.txt, present being a file");
+        diagnostics.Arrange("reports file in path as not a directory", true);
+
+        var result = await fileSystem
+            .OpenForWriteAsync(directory.Combine("present/missing/destination.txt"), FileWriteMode.CreateNew, DefaultCreateMode, CancellationToken.None);
+
+        ActResult(diagnostics, result);
+        AssertFailed(FileAccessStatus.NotADirectory, result);
+    }
+
+    [TestMethod]
+    public async Task OpenForWriteAsync_DirectoryMissingReportedAsNotADirectory_IsNotFound()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        using var directory = new TemporaryDirectory();
+        var fileSystem = new PhysicalFileSystem(setsUnixCreateMode: false, reportsFileInPathAsNotADirectory: true);
+        diagnostics.Arrange("path", "missing/destination.txt");
+        diagnostics.Arrange("reports file in path as not a directory", true);
+
+        var result = await fileSystem
+            .OpenForWriteAsync(directory.Combine("missing/destination.txt"), FileWriteMode.CreateNew, DefaultCreateMode, CancellationToken.None);
+
+        ActResult(diagnostics, result);
+        AssertFailed(FileAccessStatus.NotFound, result);
+    }
+
+    [TestMethod]
+    public async Task OpenForReadAsync_RelativeMissingFileReportedAsNotADirectory_IsNotFound()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        var fileSystem = new PhysicalFileSystem(setsUnixCreateMode: false, reportsFileInPathAsNotADirectory: true);
+        string path = $"missing-{Guid.NewGuid():N}.txt";
+        diagnostics.Arrange("path", path);
+        diagnostics.Arrange("reports file in path as not a directory", true);
+
+        var result = await fileSystem.OpenForReadAsync(path, CancellationToken.None);
+
+        ActResult(diagnostics, result);
+        AssertFailed(FileAccessStatus.NotFound, result);
+    }
+
+    [TestMethod]
+    [OSCondition(OperatingSystems.Windows)]
+    public async Task OpenForWriteAsync_ParentIsAFileOnWindows_IsNotFound()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        using var directory = new TemporaryDirectory();
+        File.WriteAllText(directory.Combine("present"), "file");
+        diagnostics.Arrange("path", "present/destination.txt, present being a file");
+
+        var result = await new PhysicalFileSystem()
+            .OpenForWriteAsync(directory.Combine("present/destination.txt"), FileWriteMode.CreateNew, DefaultCreateMode, CancellationToken.None);
+
+        ActResult(diagnostics, result);
+        AssertFailed(FileAccessStatus.NotFound, result);
+    }
+
+    [TestMethod]
     public async Task OpenForWriteAsync_Directory_IsIsDirectory()
     {
         var diagnostics = TestDiagnostics.For(TestContext);

@@ -62,15 +62,19 @@ public sealed class PhysicalFileSystem : IFileSystem, IDirectoryLister, IFileTim
 
     private readonly bool reportsUnreadableTimestampAsEpoch;
 
+    private readonly bool reportsFileInPathAsNotADirectory;
+
     /// <summary>
     /// Initializes a new instance of the <see cref="PhysicalFileSystem" /> class that sets
-    /// the create mode of a written file everywhere except Windows, and reports the Unix
-    /// epoch for an unreadable timestamp only on Windows.
+    /// the create mode of a written file everywhere except Windows, reports the Unix
+    /// epoch for an unreadable timestamp only on Windows, and reports a path whose parent
+    /// is a file as <see cref="FileAccessStatus.NotADirectory" /> everywhere except Windows.
     /// </summary>
     public PhysicalFileSystem()
         : this(
             setsUnixCreateMode: !OperatingSystem.IsWindows(),
-            reportsUnreadableTimestampAsEpoch: OperatingSystem.IsWindows())
+            reportsUnreadableTimestampAsEpoch: OperatingSystem.IsWindows(),
+            reportsFileInPathAsNotADirectory: !OperatingSystem.IsWindows())
     {
     }
 
@@ -88,10 +92,21 @@ public sealed class PhysicalFileSystem : IFileSystem, IDirectoryLister, IFileTim
     /// <c>fstat</c> does, for a handle whose last-write time cannot be read;
     /// <see langword="false" /> to report <see langword="null" />.
     /// </param>
-    internal PhysicalFileSystem(bool setsUnixCreateMode, bool reportsUnreadableTimestampAsEpoch = false)
+    /// <param name="reportsFileInPathAsNotADirectory">
+    /// <see langword="true" /> to report an open that fails as not found, when a file stands
+    /// where the path needs a directory, as <see cref="FileAccessStatus.NotADirectory" />:
+    /// curl's <c>open(2)</c> gets <c>ENOTDIR</c> there, which .NET off Windows raises as a
+    /// <see cref="DirectoryNotFoundException" />. <see langword="false" /> keeps
+    /// <see cref="FileAccessStatus.NotFound" />, as Windows reports it.
+    /// </param>
+    internal PhysicalFileSystem(
+        bool setsUnixCreateMode,
+        bool reportsUnreadableTimestampAsEpoch = false,
+        bool reportsFileInPathAsNotADirectory = false)
     {
         this.setsUnixCreateMode = setsUnixCreateMode;
         this.reportsUnreadableTimestampAsEpoch = reportsUnreadableTimestampAsEpoch;
+        this.reportsFileInPathAsNotADirectory = reportsFileInPathAsNotADirectory;
     }
 
     /// <inheritdoc />
@@ -265,14 +280,50 @@ public sealed class PhysicalFileSystem : IFileSystem, IDirectoryLister, IFileTim
     /// <param name="path">The operating-system path that failed to open.</param>
     /// <param name="exception">The exception the open threw.</param>
     /// <returns>The failed result.</returns>
-    private static FileOpenResult FailedOpenOf(string path, Exception exception)
+    private FileOpenResult FailedOpenOf(string path, Exception exception)
     {
-        bool isDirectory = Directory.Exists(path);
-        FileOpenResult failed = FileOpenResult.Failed(FileOpenFailure.StatusFor(exception, isDirectory), exception);
+        FileOpenResult failed = FileOpenResult.Failed(StatusOfFailedOpen(path, exception), exception);
 
         return failed.Status == FileAccessStatus.IsDirectory
             ? failed with { LastWriteTimeUtc = new DateTimeOffset(Directory.GetLastWriteTimeUtc(path), TimeSpan.Zero) }
             : failed;
+    }
+
+    /// <summary>
+    /// The <see cref="FileAccessStatus" /> of an open that threw: the one
+    /// <see cref="FileOpenFailure.StatusFor(Exception, bool)" /> chooses, except that a not
+    /// found path with a file among its parents is
+    /// <see cref="FileAccessStatus.NotADirectory" /> when this instance reports it so.
+    /// </summary>
+    /// <param name="path">The operating-system path that failed to open.</param>
+    /// <param name="exception">The exception the open threw.</param>
+    /// <returns>The status to report.</returns>
+    private FileAccessStatus StatusOfFailedOpen(string path, Exception exception)
+    {
+        FileAccessStatus status = FileOpenFailure.StatusFor(exception, Directory.Exists(path));
+
+        return status == FileAccessStatus.NotFound && reportsFileInPathAsNotADirectory && AParentIsAFile(path)
+            ? FileAccessStatus.NotADirectory
+            : status;
+    }
+
+    /// <summary>
+    /// Tells whether any parent of <paramref name="path" />, nearest first, is an existing
+    /// file rather than a directory.
+    /// </summary>
+    /// <param name="path">The operating-system path.</param>
+    /// <returns><see langword="true" /> when a parent is a file.</returns>
+    private static bool AParentIsAFile(string path)
+    {
+        for (string? parent = Path.GetDirectoryName(path); !string.IsNullOrEmpty(parent); parent = Path.GetDirectoryName(parent))
+        {
+            if (File.Exists(parent))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /// <summary>

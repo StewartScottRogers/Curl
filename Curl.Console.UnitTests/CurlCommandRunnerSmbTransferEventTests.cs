@@ -1,3 +1,4 @@
+using Curl.Engine;
 using System.Net;
 using System.Text;
 using Curl.Core;
@@ -129,7 +130,7 @@ public sealed class CurlCommandRunnerSmbTransferEventTests
     {
         return new CurlCommandRunner(
                 _ => new TransferDispatch(
-                    new ProtocolDispatcher(CurlComposition.CreateProtocolHandlers(
+                    new ProtocolDispatcher(EngineComposition.CreateProtocolHandlers(
                         new ReportingConnector(scripted, 54210),
                         new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"),
                         new PassThroughTlsProvider(),

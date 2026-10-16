@@ -1,3 +1,4 @@
+using Curl.Engine;
 using System.Text;
 
 using Curl.Protocol.Abstractions;
@@ -7,7 +8,7 @@ namespace Curl.Console;
 
 /// <summary>
 /// Pins <c>imap://</c> and <c>imaps://</c> end to end through the production composition over
-/// fake connectors: the handler <see cref="CurlComposition.CreateProtocolHandlers" /> registers,
+/// fake connectors: the handler <see cref="EngineComposition.CreateProtocolHandlers" /> registers,
 /// the SASL authenticator it composes and the runner's <c>-T</c> handling. Every exchange was
 /// recorded from curl 8.21.0 (mingw, Schannel) on 2026-09-28 with
 /// <c>Record-CurlExchange.ps1 -Imap</c> (BL-554, BL-555 and BL-557 Notes): curl running

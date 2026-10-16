@@ -1,3 +1,4 @@
+using Curl.Engine;
 using System.Globalization;
 using System.Text;
 using Curl.Core;

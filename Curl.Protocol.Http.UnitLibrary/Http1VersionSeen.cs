@@ -48,9 +48,20 @@ internal sealed class Http1VersionSeen : IConnectionSession
     /// <param name="connection">The connection the response came on.</param>
     /// <param name="version">The version the response named.</param>
     /// <exception cref="HttpTransferException">The major versions differ (exit 8).</exception>
-    internal static void ThrowIfMismatched(IConnection connection, Version version)
+    internal static void ThrowIfMismatched(IConnection connection, Version version) =>
+        ThrowIfMismatched(Of(connection), version);
+
+    /// <summary>
+    /// Fails a status line whose major version differs from <paramref name="seen" />, the one
+    /// an earlier response or interim head named, as curl does with <c>Version mismatch (from
+    /// HTTP/2 to HTTP/1)</c> (upstream test1704).
+    /// </summary>
+    /// <param name="seen">The version named before, or <see langword="null" /> for none.</param>
+    /// <param name="version">The version the status line named.</param>
+    /// <exception cref="HttpTransferException">The major versions differ (exit 8).</exception>
+    internal static void ThrowIfMismatched(Version? seen, Version version)
     {
-        if (Of(connection) is { } seen && seen.Major != version.Major)
+        if (seen is not null && seen.Major != version.Major)
         {
             throw new HttpTransferException(
                 CurlExitCode.WeirdServerReply,

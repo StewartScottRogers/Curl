@@ -1,3 +1,4 @@
+using Curl.Engine;
 using System.Text;
 
 using Curl.Authentication;
@@ -37,7 +38,7 @@ public sealed class CurlCommandRunnerHeaderEncodingTests
         {
             exitCode = await new CurlCommandRunner(
                     _ => new TransferDispatch(new ProtocolDispatcher(
-                        CurlComposition.CreateProtocolHandlers(server, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new PassThroughTlsProvider(), new LoopbackDnsResolver()))),
+                        EngineComposition.CreateProtocolHandlers(server, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new PassThroughTlsProvider(), new LoopbackDnsResolver()))),
                     new InMemoryFileSystem(),
                     new InMemoryFileSystem(),
                     new MemoryStream(),
@@ -74,7 +75,7 @@ public sealed class CurlCommandRunnerHeaderEncodingTests
         {
             exitCode = await new CurlCommandRunner(
                     _ => new TransferDispatch(new ProtocolDispatcher(
-                        CurlComposition.CreateProtocolHandlers(server, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new PassThroughTlsProvider(), new LoopbackDnsResolver()))),
+                        EngineComposition.CreateProtocolHandlers(server, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new PassThroughTlsProvider(), new LoopbackDnsResolver()))),
                     new InMemoryFileSystem(),
                     new InMemoryFileSystem(),
                     new MemoryStream(),
@@ -114,7 +115,7 @@ public sealed class CurlCommandRunnerHeaderEncodingTests
         {
             exitCode = await new CurlCommandRunner(
                     _ => new TransferDispatch(new ProtocolDispatcher(
-                        CurlComposition.CreateProtocolHandlers(server, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new PassThroughTlsProvider(), new LoopbackDnsResolver()))),
+                        EngineComposition.CreateProtocolHandlers(server, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new PassThroughTlsProvider(), new LoopbackDnsResolver()))),
                     new InMemoryFileSystem(),
                     new InMemoryFileSystem(),
                     new MemoryStream(),

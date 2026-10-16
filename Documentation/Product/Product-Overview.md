@@ -184,7 +184,9 @@ fuzzed and checked for timing leaks by the audit office's security auditor.
 
 | Project | Responsibility |
 | --- | --- |
-| `Curl.Console` | Entry point and composition root. `AssemblyName` is `curl`, published as a native AOT binary so it drops onto PATH as `curl.exe`. |
+| `Curl.Console` | The curl tool: entry point and composition root. `AssemblyName` is `curl`, published as a native AOT binary so it drops onto PATH as `curl.exe`. It does the tool's part - globbing, output files, `--retry`, the progress meter, `-w` and the `curl: (N)` lines - and builds the easy option groups from the command line. |
+| `Curl.Engine.UnitLibrary` | The managed transfer engine (libcurl's half, namespace `Curl.Engine`): the composition of protocol handlers, transports, DNS and TLS, the transfer context and dispatch, the per-attempt `TransferPerformer`, and `ManagedCurlEngine`, the `ICurlEngine` behind `Curl.Api` and `Libcurl`. Reads only the easy option groups, never `Curl.Cli`. |
+| `Curl.Api` / `Curl.Api.UnitLibrary` / `Libcurl` | The programming interfaces over the engine: the easy option groups and `ICurlEngine`, and the libcurl-shaped surface ([ADR-0506](../Planning/Decisions/ADR-0506-libcurl-and-curl-api-over-one-transfer-engine.md)). |
 | `Curl.Cli.UnitLibrary` | The option table, argument parsing, `.curlrc` and `-K`, `--variable`, `--help` and `--ai-help` text, exit-code mapping. |
 | `Curl.Core.UnitLibrary` | Transfer engine: URL parsing, scheme dispatch, redirects, resume, retries, rate limiting, IPFS gateway rewriting. |
 | `Curl.Networking.UnitLibrary` | `IConnection`/`IDnsResolver`/`ITlsProvider` implementations, TCP and QUIC dialers, the TLS choice (`SslStream` or the hand-built client), proxy and SOCKS handling, connection reuse. |
@@ -210,11 +212,11 @@ its own library with its own tests and the same quality gates
 | `Curl.Ntlm.UnitLibrary` | NTLM messages and NTLMv1/NTLMv2 responses (MS-NLMP). |
 | `Curl.Zstandard.UnitLibrary` | A Zstandard decoder (RFC 8878) for `--compressed` and TLS certificate compression. |
 
-Dependencies point one way — `Console → Cli → Core → {Protocols} → Abstractions` —
+Dependencies point one way — `Console → Cli, Engine → Core → {Protocols} → Abstractions` —
 with `Networking`, `Authentication`, `Cookies` and `Output` injected as services, and the
 hand-built libraries below them (`Networking → Tls, Quic, Http2, Kerberos`;
 `Protocol.Http → Http2, Http3, Zstandard`; `Tls, Quic, Kerberos, Ntlm → Cryptography`).
-Nothing points back up.
+Nothing points back up. `Curl.Engine` sits beneath `Curl.Console`, `Curl.Api` and `Libcurl` and never references them or `Curl.Cli`; `Curl.Console` is the only project that reads the command line and builds the option groups the engine takes.
 
 ## Project layout
 
@@ -225,50 +227,14 @@ each `.UnitTests` project sits directly after the `.UnitLibrary` it tests, and a
 `.IntegrationTests` project sits directly before it
 ([ADR-0421](../Planning/Decisions/ADR-0421-integration-tests-live-only-in-integrationtests-projects.md)).
 
-**33 production projects (32 libraries and `Curl.Console`), 33 unit test projects and
-1 integration test project: 67 in total.** Four shared projects hold no code:
-`Documentation`, `Tasks`, `Audit` and `.claude`.
+Every production project is `Curl.Console`, `Curl.Api`, `Libcurl` or a `Curl.<Area>.UnitLibrary`
+(protocols are `Curl.Protocol.<Name>.UnitLibrary`); each has a `.UnitTests` project beside it, and
+an area with Integration tests has a `.IntegrationTests` project too. `Curl.slnx` is the list.
+Four shared projects hold no code: `Documentation`, `Tasks`, `Audit` and `.claude`.
 
-```
-Curl.Authentication.UnitLibrary/          Curl.Protocol.Ftp.UnitLibrary/
-Curl.Authentication.UnitTests/            Curl.Protocol.Ftp.UnitTests/
-Curl.Cli.UnitLibrary/                     Curl.Protocol.Gopher.UnitLibrary/
-Curl.Cli.UnitTests/                       Curl.Protocol.Gopher.UnitTests/
-Curl.Conformance.UnitLibrary/             Curl.Protocol.Http.UnitLibrary/
-Curl.Conformance.UnitTests/               Curl.Protocol.Http.UnitTests/
-Curl.Console/                             Curl.Protocol.Imap.UnitLibrary/
-Curl.Console.UnitTests/                   Curl.Protocol.Imap.UnitTests/
-Curl.Cookies.UnitLibrary/                 Curl.Protocol.Ldap.UnitLibrary/
-Curl.Cookies.UnitTests/                   Curl.Protocol.Ldap.UnitTests/
-Curl.Core.UnitLibrary/                    Curl.Protocol.Mqtt.UnitLibrary/
-Curl.Core.UnitTests/                      Curl.Protocol.Mqtt.UnitTests/
-Curl.Cryptography.UnitLibrary/            Curl.Protocol.Pop3.UnitLibrary/
-Curl.Cryptography.UnitTests/              Curl.Protocol.Pop3.UnitTests/
-Curl.Http2.UnitLibrary/                   Curl.Protocol.Rtsp.UnitLibrary/
-Curl.Http2.UnitTests/                     Curl.Protocol.Rtsp.UnitTests/
-Curl.Http3.UnitLibrary/                   Curl.Protocol.Smb.UnitLibrary/
-Curl.Http3.UnitTests/                     Curl.Protocol.Smb.UnitTests/
-Curl.Kerberos.UnitLibrary/                Curl.Protocol.Smtp.UnitLibrary/
-Curl.Kerberos.UnitTests/                  Curl.Protocol.Smtp.UnitTests/
-Curl.Networking.IntegrationTests/         Curl.Protocol.Ssh.UnitLibrary/
-Curl.Networking.UnitLibrary/              Curl.Protocol.Ssh.UnitTests/
-Curl.Networking.UnitTests/                Curl.Protocol.Telnet.UnitLibrary/
-Curl.Ntlm.UnitLibrary/                    Curl.Protocol.Telnet.UnitTests/
-Curl.Ntlm.UnitTests/                      Curl.Protocol.Tftp.UnitLibrary/
-Curl.Output.UnitLibrary/                  Curl.Protocol.Tftp.UnitTests/
-Curl.Output.UnitTests/                    Curl.Protocol.Ws.UnitLibrary/
-Curl.Protocol.Abstractions.UnitLibrary/   Curl.Protocol.Ws.UnitTests/
-Curl.Protocol.Abstractions.UnitTests/     Curl.Quic.UnitLibrary/
-Curl.Protocol.Dict.UnitLibrary/           Curl.Quic.UnitTests/
-Curl.Protocol.Dict.UnitTests/             Curl.Tls.UnitLibrary/
-Curl.Protocol.File.UnitLibrary/           Curl.Tls.UnitTests/
-Curl.Protocol.File.UnitTests/             Curl.Zstandard.UnitLibrary/
-                                          Curl.Zstandard.UnitTests/
-```
-
-`Curl.Console` carries no `.UnitLibrary` suffix because it is an executable, not a
-library. It is the only exception.
-
+`Curl.Console`, `Curl.Api` and `Libcurl` carry no `.UnitLibrary` suffix: `Curl.Console` is an
+executable, and `Curl.Api` and `Libcurl` are the two programming interfaces
+([ADR-0506](../Planning/Decisions/ADR-0506-libcurl-and-curl-api-over-one-transfer-engine.md)). They are the only exceptions.
 ## Success criteria
 
 Checkable by someone outside the project, in priority order:

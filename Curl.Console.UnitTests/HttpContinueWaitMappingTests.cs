@@ -1,4 +1,7 @@
+using Curl.Api.Options.Authentication;
+using Curl.Api.Options.Behaviour;
 using Curl.Cli;
+using Curl.Engine;
 using Curl.Protocol.Abstractions;
 using Curl.Testing;
 using HttpRequestOptions = Curl.Protocol.Abstractions.HttpRequestOptions;
@@ -7,7 +10,7 @@ namespace Curl.Console;
 
 /// <summary>
 /// Pins how <c>--expect100-timeout</c> reaches <see cref="HttpRequestOptions.ContinueWait" />
-/// through <see cref="HttpRequestOptionsMapping.FromCommandLine" />: curl 8.21.0 waited 200 ms
+/// through <see cref="HttpRequestOptionsMapping.Of" />: curl 8.21.0 waited 200 ms
 /// for <c>0.2</c>, 3 s for <c>3</c>, and its default one second for <c>0</c> and
 /// <c>0.0001</c> and without the option (measured, BL-624 Notes).
 /// </summary>
@@ -32,11 +35,11 @@ public sealed class HttpContinueWaitMappingTests
         Diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
 
-        TimeSpan continueWait = HttpRequestOptionsMapping.FromCommandLine(result.Options).ContinueWait;
+        TimeSpan continueWait = HttpRequestOptionsMapping.Of(EasyOptionsFromCommandLine.TransferSettingsOf(result.Options), EasyOptionsFromCommandLine.HttpOf(result.Options), new EasyBehaviourOptions(), new EasyTransferOptions(), new EasyAuthenticationOptions()).ContinueWait;
         Diagnostics.Act("continue wait", continueWait);
 
         Diagnostics.Assert("continue wait", TimeSpan.FromMilliseconds(expectedMilliseconds), continueWait);
-        Assert.AreEqual(TimeSpan.FromMilliseconds(expectedMilliseconds), HttpRequestOptionsMapping.FromCommandLine(result.Options).ContinueWait);
+        Assert.AreEqual(TimeSpan.FromMilliseconds(expectedMilliseconds), HttpRequestOptionsMapping.Of(EasyOptionsFromCommandLine.TransferSettingsOf(result.Options), EasyOptionsFromCommandLine.HttpOf(result.Options), new EasyBehaviourOptions(), new EasyTransferOptions(), new EasyAuthenticationOptions()).ContinueWait);
     }
 
     [TestMethod]
@@ -47,10 +50,10 @@ public sealed class HttpContinueWaitMappingTests
         Diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
 
-        TimeSpan continueWait = HttpRequestOptionsMapping.FromCommandLine(result.Options).ContinueWait;
+        TimeSpan continueWait = HttpRequestOptionsMapping.Of(EasyOptionsFromCommandLine.TransferSettingsOf(result.Options), EasyOptionsFromCommandLine.HttpOf(result.Options), new EasyBehaviourOptions(), new EasyTransferOptions(), new EasyAuthenticationOptions()).ContinueWait;
         Diagnostics.Act("continue wait", continueWait);
 
         Diagnostics.Assert("continue wait", HttpRequestOptions.DefaultContinueWait, continueWait);
-        Assert.AreEqual(HttpRequestOptions.DefaultContinueWait, HttpRequestOptionsMapping.FromCommandLine(result.Options).ContinueWait);
+        Assert.AreEqual(HttpRequestOptions.DefaultContinueWait, HttpRequestOptionsMapping.Of(EasyOptionsFromCommandLine.TransferSettingsOf(result.Options), EasyOptionsFromCommandLine.HttpOf(result.Options), new EasyBehaviourOptions(), new EasyTransferOptions(), new EasyAuthenticationOptions()).ContinueWait);
     }
 }

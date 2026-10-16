@@ -1,3 +1,4 @@
+using Curl.Engine;
 using System.Text;
 
 using Curl.Authentication;
@@ -363,53 +364,6 @@ public sealed partial class CurlCompositionProxyTests
     }
 
     [TestMethod]
-    public void CreateProxyTunnelOptions_EncodesCommandLineTextInThePlatformEncoding()
-    {
-        HttpProxyTunnelOptions options = TunnelOptionsFor(["-p", "-x", "127.0.0.1:18238", "http://example.com/a"]);
-
-        // The code page itself differs by platform, so only whether it is the platform's is written.
-        Diagnostics.Assert(
-            "command-line text is in the platform's credential encoding",
-            true,
-            CredentialEncoding.ForPlatform(OperatingSystem.IsWindows()).CodePage == options.CommandLineTextEncoding.CodePage);
-        Assert.AreEqual(
-            CredentialEncoding.ForPlatform(OperatingSystem.IsWindows()).CodePage,
-            options.CommandLineTextEncoding.CodePage);
-    }
-
-    [TestMethod]
-    [DataRow(new[] { "-p", "-x", "127.0.0.1:18602", "http://example.com/a" }, HttpAuthSchemes.Basic)]
-    [DataRow(new[] { "--proxy-digest", "-p", "-x", "127.0.0.1:18602", "http://example.com/a" }, HttpAuthSchemes.Digest)]
-    [DataRow(new[] { "--proxy-anyauth", "-p", "-x", "127.0.0.1:18602", "http://example.com/a" }, HttpAuthSchemes.Any)]
-    public void CreateProxyTunnelOptions_AllowsTheSchemeTheProxyAuthSwitchesPickAndAnswersWithTheRankedAuthenticator(string[] arguments, HttpAuthSchemes expected)
-    {
-        HttpProxyTunnelOptions options = TunnelOptionsFor(arguments);
-
-        Diagnostics.Assert("options.ProxyAuthSchemes", expected, options.ProxyAuthSchemes);
-        Assert.AreEqual(expected, options.ProxyAuthSchemes);
-        Assert.IsInstanceOfType<RankedHttpAuthenticator>(options.ProxyAuthenticator);
-    }
-
-    [TestMethod]
-    public async Task CreateTransports_ProxyNtlm_AnswersTheTunnelWithTheRoutersType1()
-    {
-        // The tunnel's authenticator is bound to ADR-0142's router once the connectors exist
-        // (BL-604): SSPI's Type 1 on Windows, curl's own NTLM's elsewhere.
-        string[] arguments = ["--proxy-ntlm", "-U", "u:p", "-p", "-x", "127.0.0.1:18604", "http://example.test/"];
-        Diagnostics.ArrangeCommandLine(arguments);
-        CurlTransports transports = CurlComposition.CreateTransports(
-            CommandLineParser.Parse(arguments, _ => true).Options!);
-        HttpAuthRequest request = new("CONNECT", CurlUrl.Parse("http://127.0.0.1:18604/"), "example.test:80", new System.Net.NetworkCredential("u", "p"), null, HttpAuthSchemes.Ntlm, IsProxy: true);
-
-        string? value = await transports.ProxyTunnelOptions.ProxyAuthenticator!.CreateAuthorizationAsync(request, [], CancellationToken.None);
-        bool isType1 = value?.StartsWith("NTLM TlRMTVNTUAAB", StringComparison.Ordinal) == true;
-        Diagnostics.Act("Proxy-Authorization is an NTLM Type 1", isType1);
-
-        Diagnostics.Assert("Proxy-Authorization is an NTLM Type 1", true, isType1);
-        StringAssert.StartsWith(value, "NTLM TlRMTVNTUAAB", StringComparison.Ordinal);
-    }
-
-    [TestMethod]
     public async Task RunAsync_ForwardProxyWithProxyAnyAuth_AnswersTheProxysBasicChallengeOnTheSameConnection()
     {
         // curl -x http://127.0.0.1:18603 -U u:p --proxy-anyauth http://example.invalid/ against a 407 offering Basic (BL-603 Notes).
@@ -622,7 +576,7 @@ public sealed partial class CurlCompositionProxyTests
     {
         Diagnostics.ArrangeCommandLine(arguments);
         HttpProxyTunnelOptions options =
-            CurlComposition.CreateProxyTunnelOptions(CommandLineParser.Parse(arguments, _ => true).Options!, new SystemSecurityContextFactory());
+            EngineComposition.CreateProxyTunnelOptions(EasyOptionsFromCommandLine.HttpOf(CommandLineParser.Parse(arguments, _ => true).Options!), EasyOptionsFromCommandLine.ProxyOf(CommandLineParser.Parse(arguments, _ => true).Options!), EasyOptionsFromCommandLine.AuthenticationOf(CommandLineParser.Parse(arguments, _ => true).Options!), new SystemSecurityContextFactory());
         Diagnostics.Act("proxy auth schemes, HTTP/2 tunnel", $"{options.ProxyAuthSchemes}, {options.ProxyHttp2}");
         return options;
     }

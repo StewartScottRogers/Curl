@@ -64,6 +64,45 @@ public sealed partial class SslStreamTlsProviderTests
     }
 
     [TestMethod]
+    [DataRow(SchannelBuild)]
+    [DataRow(OpenSslBuild)]
+    public async Task AuthenticateAsClientAsync_WithCaCertificateFileHoldingARootWithoutRevocationEndpointAndAnotherKeysHashPinned_FailsWithExit90(bool matchesSchannelBuild)
+    {
+        // curl 8.21.0 Schannel -sS --cacert root.pem --pinnedpubkey sha256//<wrong>, a private
+        // root with no revocation endpoint -> exit 90: the pin is judged before the chain
+        // (measured 2026-10-15, BL-2270; upstream test2035, test2038, test2042). The OpenSSL
+        // build accepts the chain and refuses the pin.
+        using var root = CreateRootAuthority();
+        using var leaf = CreateServerLeaf(root, DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddDays(1));
+        var caFile = WriteCaFile("root.pem", root.ExportCertificatePem());
+
+        var result = await HandshakeWithServerCertificateAsync(
+            new SslStreamTlsProvider(new TlsClientOptions(CaCertificateFile: caFile, PinnedPublicKey: WrongPin), matchesSchannelBuild), leaf);
+
+        Diagnostics.Assert("exit code", CurlExitCode.SslPinnedPubKeyNotMatch, result.Result.ExitCode);
+        Assert.AreEqual(CurlExitCode.SslPinnedPubKeyNotMatch, result.Result.ExitCode);
+        Assert.AreEqual(TlsFailureMessages.PinnedPublicKeyMismatch, result.Result.ErrorMessage);
+    }
+
+    [TestMethod]
+    public async Task AuthenticateAsClientAsync_WithCaCertificateFileHoldingARootWithoutRevocationEndpointAndTheServerKeysHashPinnedInTheSchannelBuild_ReportsTheRevocationStatusIsUnknown()
+    {
+        // curl 8.21.0 Schannel -sS --cacert root.pem --pinnedpubkey sha256//<right> -> exit 60,
+        // "schannel: the revocation status is unknown" (measured 2026-10-15, BL-2270).
+        using var root = CreateRootAuthority();
+        using var leaf = CreateServerLeaf(root, DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddDays(1));
+        var caFile = WriteCaFile("root.pem", root.ExportCertificatePem());
+        var pin = PinnedPublicKey.HashPrefix + PinnedPublicKey.HashOf(leaf.PublicKey.ExportSubjectPublicKeyInfo());
+
+        var result = await HandshakeWithServerCertificateAsync(
+            new SslStreamTlsProvider(new TlsClientOptions(CaCertificateFile: caFile, PinnedPublicKey: pin), SchannelBuild), leaf);
+
+        Diagnostics.Assert("exit code", CurlExitCode.PeerFailedVerification, result.Result.ExitCode);
+        Assert.AreEqual(CurlExitCode.PeerFailedVerification, result.Result.ExitCode);
+        Assert.AreEqual("schannel: the revocation status is unknown", result.Result.ErrorMessage);
+    }
+
+    [TestMethod]
     [DataRow(-10, -5)]
     [DataRow(5, 10)]
     public async Task AuthenticateAsClientAsync_WithCaCertificateFileAndALeafOutOfItsValidityPeriodInTheSchannelBuild_ReportsTheChainIsNotTimeValid(

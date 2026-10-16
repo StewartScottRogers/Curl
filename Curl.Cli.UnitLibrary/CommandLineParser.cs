@@ -174,17 +174,37 @@ public static class CommandLineParser
     /// <param name="readEnvironmentVariable">Reads an environment variable; <see langword="null"/> when it is not set.</param>
     /// <returns>As the overload without <paramref name="readEnvironmentVariable"/> returns.</returns>
     /// <exception cref="ArgumentNullException">An argument is <see langword="null"/>.</exception>
-    public static CommandLineParseResult Parse(IReadOnlyList<string> arguments, Func<string, bool> pathExists, IPasswordPrompt passwordPrompt, IDataFileReader dataFileReader, DefaultConfigFileSearch defaultConfigFileSearch, bool isWindows, Func<string, string?> readEnvironmentVariable)
+    public static CommandLineParseResult Parse(IReadOnlyList<string> arguments, Func<string, bool> pathExists, IPasswordPrompt passwordPrompt, IDataFileReader dataFileReader, DefaultConfigFileSearch defaultConfigFileSearch, bool isWindows, Func<string, string?> readEnvironmentVariable) =>
+        Parse(arguments, pathExists, passwordPrompt, dataFileReader, defaultConfigFileSearch, isWindows, readEnvironmentVariable, actsAsQuicBuild: false);
+
+    /// <summary>
+    /// Parses <paramref name="arguments"/> as the overload without <paramref name="actsAsQuicBuild"/> does, but,
+    /// when <paramref name="actsAsQuicBuild"/> is <see langword="true"/>, as a curl built with a QUIC library
+    /// reads them (<see cref="CommandLineOptions.ActsAsQuicBuild"/>): <c>--http3</c> and <c>--http3-only</c> are
+    /// accepted rather than refused as every reference build refuses them (ADR-0540). The executable never asks
+    /// for it; tests and the conformance harness do, to reach Curl's hand-built HTTP/3.
+    /// </summary>
+    /// <param name="arguments">The arguments; a <see langword="null"/> element reads as an empty argument.</param>
+    /// <param name="pathExists">Reports whether a file or directory exists at a path.</param>
+    /// <param name="passwordPrompt">Asks for the password of a <c>-u</c> user given without one; called at most once.</param>
+    /// <param name="dataFileReader">Reads the default config file, and every file an option names.</param>
+    /// <param name="defaultConfigFileSearch">Lists where to look for the default config file; <see cref="DefaultConfigFileSearch.ForProcess"/> for this process.</param>
+    /// <param name="isWindows">Whether to read the arguments as curl's Windows Schannel build does.</param>
+    /// <param name="readEnvironmentVariable">Reads an environment variable; <see langword="null"/> when it is not set.</param>
+    /// <param name="actsAsQuicBuild">Whether to read the arguments as a curl built with a QUIC library does.</param>
+    /// <returns>As the overload without <paramref name="actsAsQuicBuild"/> returns.</returns>
+    /// <exception cref="ArgumentNullException">An argument is <see langword="null"/>.</exception>
+    public static CommandLineParseResult Parse(IReadOnlyList<string> arguments, Func<string, bool> pathExists, IPasswordPrompt passwordPrompt, IDataFileReader dataFileReader, DefaultConfigFileSearch defaultConfigFileSearch, bool isWindows, Func<string, string?> readEnvironmentVariable, bool actsAsQuicBuild)
     {
         ArgumentNullException.ThrowIfNull(defaultConfigFileSearch);
 
-        return Parse(arguments, pathExists, passwordPrompt, dataFileReader, defaultConfigFileSearch.CandidatePaths(), isWindows, readEnvironmentVariable);
+        return Parse(arguments, pathExists, passwordPrompt, dataFileReader, defaultConfigFileSearch.CandidatePaths(), isWindows, readEnvironmentVariable, actsAsQuicBuild);
     }
 
     private static CommandLineParseResult Parse(IReadOnlyList<string> arguments, Func<string, bool> pathExists, IPasswordPrompt passwordPrompt, IDataFileReader dataFileReader, IReadOnlyList<string> defaultConfigFileCandidates, bool isWindows) =>
-        Parse(arguments, pathExists, passwordPrompt, dataFileReader, defaultConfigFileCandidates, isWindows, ProcessEnvironmentVariable);
+        Parse(arguments, pathExists, passwordPrompt, dataFileReader, defaultConfigFileCandidates, isWindows, ProcessEnvironmentVariable, actsAsQuicBuild: false);
 
-    private static CommandLineParseResult Parse(IReadOnlyList<string> arguments, Func<string, bool> pathExists, IPasswordPrompt passwordPrompt, IDataFileReader dataFileReader, IReadOnlyList<string> defaultConfigFileCandidates, bool isWindows, Func<string, string?> readEnvironmentVariable)
+    private static CommandLineParseResult Parse(IReadOnlyList<string> arguments, Func<string, bool> pathExists, IPasswordPrompt passwordPrompt, IDataFileReader dataFileReader, IReadOnlyList<string> defaultConfigFileCandidates, bool isWindows, Func<string, string?> readEnvironmentVariable, bool actsAsQuicBuild)
     {
         ArgumentNullException.ThrowIfNull(arguments);
         ArgumentNullException.ThrowIfNull(pathExists);
@@ -192,7 +212,7 @@ public static class CommandLineParser
         ArgumentNullException.ThrowIfNull(dataFileReader);
         ArgumentNullException.ThrowIfNull(readEnvironmentVariable);
 
-        CommandLineOptions options = new() { ReadsArgumentsAsUtf8 = !isWindows, ActsAsWindowsSchannelBuild = isWindows, ReadEnvironmentVariable = readEnvironmentVariable };
+        CommandLineOptions options = new() { ReadsArgumentsAsUtf8 = !isWindows, ActsAsWindowsSchannelBuild = isWindows, ActsAsQuicBuild = actsAsQuicBuild, ReadEnvironmentVariable = readEnvironmentVariable };
         if (isWindows)
         {
             options.ConfigFileWireTextEncoding = ConfigFileWireText.WindowsAnsiCodePage(() => System.Text.CodePagesEncodingProvider.Instance.GetEncoding(0));

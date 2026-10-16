@@ -182,6 +182,16 @@ internal sealed class HttpResponseHeadReader
     internal bool IsThroughHttpProxy { get; init; }
 
     /// <summary>
+    /// Gets a value indicating whether an interim status line naming HTTP/2 or HTTP/3 over
+    /// HTTP/1.x (<c>HTTP/2 101</c>) is parsed as that version's 1xx rather than as an assumed
+    /// <c>HTTP/1.0 200</c>, so a later head naming HTTP/1 fails with exit 8, <c>Version mismatch
+    /// (from HTTP/2 to HTTP/1)</c>, as the OpenSSL build of curl 8.22.0 on Linux and macOS
+    /// does (upstream test1704, BL-2326). By default it is so everywhere but Windows, whose
+    /// Schannel build has no h2c and takes the line as an assumed <c>HTTP/1.0 200</c>.
+    /// </summary>
+    internal bool ParsesHttp2InterimStatusLines { get; init; } = !OperatingSystem.IsWindows();
+
+    /// <summary>
     /// Gets what tells, before each status line is parsed, whether the connection has switched
     /// to HTTP/2 after an h2c upgrade's <c>101</c> (<see cref="HttpH2cUpgradeConnection.IsUpgraded" />),
     /// so the line is an HTTP/2 stream's as for <see cref="IsHttp2OrHttp3" />. By default it never has.
@@ -274,11 +284,11 @@ internal sealed class HttpResponseHeadReader
             return http09;
         }
 
-        bool afterInformational = false;
+        Version? interimVersion = null;
         while (true)
         {
-            HttpStatusLine statusLine = await ReadStatusLineAfterAsync(afterInformational, cancellationToken).ConfigureAwait(false);
-            afterInformational = true;
+            HttpStatusLine statusLine = await ReadStatusLineAfterAsync(interimVersion, cancellationToken).ConfigureAwait(false);
+            interimVersion = statusLine.Version;
             bool closed;
             try
             {
@@ -445,25 +455,50 @@ internal sealed class HttpResponseHeadReader
     /// <summary>
     /// Reads a status line; after a 1xx head, bytes that cannot begin one are a weird server
     /// reply (exit 8, <c>Invalid status line</c>) rather than an HTTP/0.9 response (exit 1), as
-    /// curl 8.21.0 fails them (upstream test1480, BL-1805).
+    /// curl 8.21.0 fails them (upstream test1480, BL-1805); and a line naming another major
+    /// version than the 1xx head did fails with exit 8, <c>Version mismatch</c> (upstream
+    /// test1704, BL-2326).
     /// </summary>
-    private async ValueTask<HttpStatusLine> ReadStatusLineAfterAsync(bool afterInformational, CancellationToken cancellationToken)
+    /// <param name="interimVersion">The version the 1xx head before named, or <see langword="null" /> for the first head.</param>
+    /// <param name="cancellationToken">Cancels the read.</param>
+    private async ValueTask<HttpStatusLine> ReadStatusLineAfterAsync(Version? interimVersion, CancellationToken cancellationToken)
     {
+        HttpStatusLine statusLine;
         try
         {
-            return await ReadStatusLineAsync(cancellationToken).ConfigureAwait(false);
+            statusLine = await ReadStatusLineAsync(cancellationToken).ConfigureAwait(false);
         }
-        catch (HttpTransferException failure) when (afterInformational && failure.Message == HttpTransferMessages.Http09NotAllowed)
+        catch (HttpTransferException failure) when (interimVersion is not null && failure.Message == HttpTransferMessages.Http09NotAllowed)
         {
             throw new HttpTransferException(CurlExitCode.WeirdServerReply, HttpTransferMessages.InvalidStatusLine);
         }
+
+        ThrowIfVersionChanged(interimVersion, statusLine.Version);
+        return statusLine;
     }
+
+    /// <summary>
+    /// Fails a status line naming another major version than the 1xx head before it, except
+    /// the upgraded stream's HTTP/2 head after an h2c upgrade's <c>101</c>.
+    /// </summary>
+    private void ThrowIfVersionChanged(Version? interimVersion, Version version) =>
+        Http1VersionSeen.ThrowIfMismatched(IsSwitchedToHttp2() ? null : interimVersion, version);
+
+    /// <summary>
+    /// Parses a status line as an HTTP/2 or HTTP/3 stream's when the heads are one's, or when it
+    /// is an HTTP/2 or HTTP/3 interim line that <see cref="ParsesHttp2InterimStatusLines" /> takes,
+    /// and else as HTTP/1.x.
+    /// </summary>
+    private HttpStatusLine ParseStatusLine(string line) =>
+        IsHttp2OrHttp3 || IsSwitchedToHttp2() || (ParsesHttp2InterimStatusLines && HttpStatusLine.IsHttp2OrHttp3Interim(line))
+            ? HttpStatusLine.ParseHttp2OrHttp3(line)
+            : HttpStatusLine.Parse(line);
 
     private async ValueTask<HttpStatusLine> ReadStatusLineAsync(CancellationToken cancellationToken)
     {
         byte[] bytes = await lines.ReadLineAsync(true, cancellationToken).ConfigureAwait(false) ?? throw EmptyReply();
         HttpLine line = HttpLine.Split(bytes);
-        HttpStatusLine statusLine = IsHttp2OrHttp3 || IsSwitchedToHttp2() ? HttpStatusLine.ParseHttp2OrHttp3(line.Content) : HttpStatusLine.Parse(line.Content);
+        HttpStatusLine statusLine = ParseStatusLine(line.Content);
         SwitchedProtocols |= statusLine.StatusCode == 101;
         builder.StartHead(line);
         if (line.Content.StartsWith("HTTP/1.0", StringComparison.Ordinal))

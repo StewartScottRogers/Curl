@@ -1285,6 +1285,20 @@ public sealed class UpstreamCaseRunnerTests
     }
 
     [TestMethod]
+    public async Task HttpUnixSocketTarget_TheHttpUnixPath_ReachesTheSwsEmulationOnTheHttpPort()
+    {
+        SwsHttpServerConnector server = new(ParsedTestCase.From("<reply>\n<data>\nHTTP/1.1 200 OK\n\n</data>\n</reply>\n"));
+
+        ConnectTarget target = UpstreamCaseRunner.HttpUnixSocketTarget(UpstreamCaseRunner.HttpUnixPath);
+        ConnectResult connected = await server.ConnectAsync(target, CancellationToken.None);
+
+        Assert.AreEqual(UpstreamCaseRunner.HttpUnixPath, target.Host);
+        Assert.AreEqual(UpstreamCaseRunner.HttpPort, target.Port.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        Assert.IsFalse(target.UseTls);
+        Assert.IsNotNull(connected.Connection, connected.ErrorMessage);
+    }
+
+    [TestMethod]
     public async Task RunAsync_Ipv6Variables_HaveTheValuesOfTheInMemoryIpv6Servers()
     {
         string? commandLine = null;
@@ -1375,14 +1389,14 @@ public sealed class UpstreamCaseRunnerTests
         }
 
         string[]? arguments = null;
-        int read = -1;
+        IOException? failure = null;
         UpstreamCaseRunner runner = Runner(async invocation =>
         {
             arguments = [.. CommandArguments(invocation)];
             ConnectResult connected = await invocation.Connector.ConnectAsync(new ConnectTarget("127.0.0.1", HttpsServerConnector.HttpsPort, false), CancellationToken.None);
             await using IConnection connection = connected.Connection!;
             await connection.WriteAsync("GET / HTTP/1.1\r\n\r\n"u8.ToArray(), CancellationToken.None);
-            read = await connection.ReadAsync(new byte[16], CancellationToken.None);
+            failure = await Assert.ThrowsExactlyAsync<IOException>(() => connection.ReadAsync(new byte[16], CancellationToken.None).AsTask());
             return 0;
         });
         string testFile = "<testcase>\n<client>\n<server>\nhttps\n</server>\n<command option=\"no-output,no-include\">\nhttps://localhost:%HTTPSPORT/\n</command>\n</client>\n</testcase>\n";
@@ -1392,7 +1406,7 @@ public sealed class UpstreamCaseRunnerTests
 
         Assert.AreEqual(UpstreamCaseOutcomeKind.Passed, outcome.Kind, outcome.Detail);
         CollectionAssert.AreEqual(new[] { "https://localhost:" + UpstreamCaseRunner.HttpsPort + "/" }, arguments);
-        Assert.AreEqual(0, read, "a plain-text request to the TLS server ends the connection");
+        Assert.AreEqual(System.Net.Sockets.SocketError.ConnectionReset, ((System.Net.Sockets.SocketException)failure!.InnerException!).SocketErrorCode, "a plain-text request to the TLS server resets the connection, as stunnel does");
     }
 
     [TestMethod]

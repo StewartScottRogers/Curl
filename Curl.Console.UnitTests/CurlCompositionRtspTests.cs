@@ -1,3 +1,4 @@
+using Curl.Engine;
 using System.Text;
 using Curl.Cli;
 using Curl.Networking;
@@ -8,7 +9,7 @@ namespace Curl.Console;
 
 /// <summary>
 /// Pins <c>rtsp://</c> end to end through the production composition over a fake connector:
-/// the handler <see cref="CurlComposition.CreateProtocolHandlers" /> registers, the request bytes,
+/// the handler <see cref="EngineComposition.CreateProtocolHandlers" /> registers, the request bytes,
 /// standard output, the <c>-v</c> lines and the exit code, and the <c>-V</c> protocol list.
 /// Recorded from curl 8.21.0 (mingw, Schannel) with <c>Record-CurlExchange.ps1</c> (ADR-0169's
 /// table, BL-593 Notes). The connector reports no <c>Trying</c> or <c>Established connection</c>

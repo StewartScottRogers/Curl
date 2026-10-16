@@ -28,7 +28,17 @@ public sealed class CommandLineParseResult
     /// </summary>
     [MemberNotNullWhen(true, nameof(Options))]
     [MemberNotNullWhen(false, nameof(Refusal))]
+    [MemberNotNullWhen(false, nameof(OptionsReadBeforeRefusal))]
     public bool IsAccepted => Options is not null;
+
+    /// <summary>
+    /// The options read before the refusal, first group first; <see langword="null"/> when the
+    /// command line was accepted. curl 8.22.0 loads the <c>--ssl-sessions</c> file
+    /// (<see cref="CommandLineOptions.SslSessionsFile"/>) before it sets up the transfers, so a
+    /// refusal met there (<see cref="CommandLineRefusal.FoundAtTransferSetup"/>) comes after the
+    /// file's warnings, which the console layer writes from these options (BL-2333).
+    /// </summary>
+    public CommandLineOptions? OptionsReadBeforeRefusal { get; private init; }
 
     /// <summary>
     /// The parsed options of the first option group, the only one unless <c>-:</c> / <c>--next</c> started
@@ -157,7 +167,7 @@ public sealed class CommandLineParseResult
     /// <param name="options">The options read before the refusal, whose warning lines it keeps.</param>
     /// <returns>A result whose <see cref="IsAccepted"/> is <see langword="false"/>.</returns>
     internal static CommandLineParseResult Refused(CommandLineRefusal refusal, CommandLineOptions options) =>
-        new(null, [], refusal, null, options.WarningLines, [], NotedDefaultConfigFileOf(options), options.ConfigFileHelpSubjects, options.StandardErrorRedirects);
+        new(null, [], refusal, null, options.WarningLines, [], NotedDefaultConfigFileOf(options), options.ConfigFileHelpSubjects, options.StandardErrorRedirects) { OptionsReadBeforeRefusal = options };
 
     /// <summary>
     /// Creates the result for <see cref="CommandLineRefusal.EmptyCommandLine"/>, which names no
@@ -166,7 +176,7 @@ public sealed class CommandLineParseResult
     /// <param name="options">The options the default config file filled in, whose warning lines and help subjects it keeps.</param>
     /// <returns>A result whose <see cref="IsAccepted"/> is <see langword="false"/>.</returns>
     internal static CommandLineParseResult RefusedEmpty(CommandLineOptions options) =>
-        new(null, [], CommandLineRefusal.EmptyCommandLine(), null, options.WarningLines, [], null, options.ConfigFileHelpSubjects, options.StandardErrorRedirects);
+        new(null, [], CommandLineRefusal.EmptyCommandLine(), null, options.WarningLines, [], null, options.ConfigFileHelpSubjects, options.StandardErrorRedirects) { OptionsReadBeforeRefusal = options };
 
     /// <summary>
     /// <see cref="CommandLineOptions.DefaultConfigFile"/> when <c>-v</c> or a <c>--trace</c> option is

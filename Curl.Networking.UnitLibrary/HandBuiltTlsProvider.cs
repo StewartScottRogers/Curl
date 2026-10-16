@@ -615,6 +615,7 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
                 {
                     RequestOcspStatus = _options.RequireCertificateStatus,
                     TimeProvider = _timeProvider,
+                    KeyLog = _options.KeyLogFile is { } keyLogFile ? new NssKeyLogFile(keyLogFile) : null,
                 },
                 clientCertificate,
                 new HandBuiltCertificateVerifier(_verification, chainPolicy, anchorsBesideSystemStore, revocationLists, targetHost)), null, null);
@@ -788,6 +789,9 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
 
         internal TimeProvider TimeProvider { get; init; } = TimeProvider.System;
 
+        // SSLKEYLOGFILE: where the TLS 1.3 and TLS 1.2 handshakes log their secrets (BL-2327, BL-2339).
+        internal ITlsKeyLog? KeyLog { get; init; }
+
         private IReadOnlyList<ushort> OfferedSuites => CipherSuites ?? Profile.CipherSuites;
 
         internal static ClientSettings Of(
@@ -820,6 +824,7 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
             SendLegacySessionId = true,
             EncryptedClientHelloConfigs = EchConfigs,
             SendEncryptedClientHelloGrease = SendEchGrease,
+            KeyLog = KeyLog,
         };
 
         // padding follows the measured extensions and early_data, where OpenSSL sends it (BL-1048).
@@ -859,6 +864,7 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
             ExtensionOrder = ClientHelloProfileMapping.Tls12ExtensionOrder(Profile, RequestOcspStatus),
             FixedExtensions = ClientHelloProfileMapping.Tls12FixedExtensions(Profile),
             InsertEmptyFragment = InsertsEmptyFragment(options),
+            KeyLog = KeyLog,
         };
 
         // Schannel's hello below a TLS 1.3 ceiling is in a record of that ceiling; a TLS 1.2

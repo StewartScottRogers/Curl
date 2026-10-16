@@ -1,3 +1,4 @@
+using Curl.Engine;
 using System.Buffers.Binary;
 using System.Net;
 using System.Net.Sockets;
@@ -73,14 +74,14 @@ public sealed class CurlCommandRunnerDnsServerVariableTests
     {
         FixedDnsResolver given = new(IPAddress.Loopback);
 
-        IDnsResolver chosen = CurlComposition.DnsServerVariableResolverOf(Curl.Cli.CommandLineParser.Parse(["http://dns.example/"], _ => true).Options!, string.Empty, given, new DnsStandIn(null));
+        IDnsResolver chosen = EngineComposition.DnsServerVariableResolverOf(EasyOptionsFromCommandLine.NetworkOf(Curl.Cli.CommandLineParser.Parse(["http://dns.example/"], _ => true).Options!), string.Empty, given, new DnsStandIn(null));
 
         Assert.AreSame(given, chosen);
     }
 
     private async Task<int> RunAsync(DnsStandIn dns, RefusingTcpDialer dialer, IDnsResolver resolver, bool honours, params string[] arguments)
     {
-        Dictionary<string, string> environment = new() { [CurlComposition.DnsServerVariableName] = "127.0.0.1:5353" };
+        Dictionary<string, string> environment = new() { [EngineComposition.DnsServerVariableName] = "127.0.0.1:5353" };
         return await CurlComposition.CreateRunner(
                 new MemoryStream(),
                 standardError,

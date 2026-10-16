@@ -13,13 +13,22 @@ namespace Curl.Networking;
 /// <c>pkcs11:</c>, in any case, is not split. Only the Windows build of curl reads a letter,
 /// <c>:</c> and <c>\</c> or <c>/</c> at the start as a drive letter rather than a separator.
 /// </remarks>
-internal static class ClientCertificateArgument
+public static class ClientCertificateArgument
 {
     private const string Pkcs11UriScheme = "pkcs11:";
 
     private const char Backslash = '\\';
 
     private const char Separator = ':';
+
+    /// <summary>
+    /// Whether a <c>--cert</c> or <c>--key</c> value is a PKCS#11 URI: it starts <c>pkcs11:</c>,
+    /// in any case, as curl's tool's <c>is_pkcs11_uri</c> reads it.
+    /// </summary>
+    /// <param name="value">The value, verbatim, or <see langword="null" />.</param>
+    /// <returns><see langword="true" /> when the value starts <c>pkcs11:</c>.</returns>
+    public static bool IsPkcs11Uri(string? value) =>
+        value is not null && value.StartsWith(Pkcs11UriScheme, StringComparison.OrdinalIgnoreCase);
 
     /// <summary>Splits a <c>--cert</c> value.</summary>
     /// <param name="value">The value, verbatim.</param>
@@ -29,7 +38,7 @@ internal static class ClientCertificateArgument
     /// <returns>The certificate file path and the passphrase, <see langword="null" /> when none.</returns>
     public static (string Path, string? Passphrase) Split(string value, bool recognisesDriveLetters)
     {
-        if (value.StartsWith(Pkcs11UriScheme, StringComparison.OrdinalIgnoreCase))
+        if (IsPkcs11Uri(value))
         {
             return (value, null);
         }

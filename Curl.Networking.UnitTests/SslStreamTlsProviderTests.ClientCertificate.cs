@@ -39,7 +39,11 @@ public sealed partial class SslStreamTlsProviderTests
     // BL-254: on Windows SslStream caches the credential handle of a handshake that
     // presented a certificate under the key of one that presents none, so every later
     // handshake without --cert in the process presented it too. Real curl presents none.
+    // BL-2373: that cache is process-wide, so a handshake of a test running beside this one
+    // could land between its two handshakes and make the second present a certificate;
+    // the test runs alone.
     [TestMethod]
+    [DoNotParallelize]
     [DataRow(SchannelBuild)]
     [DataRow(OpenSslBuild)]
     public async Task AuthenticateAsClientAsync_WithoutClientCertificateAfterAHandshakeThatPresentedOne_PresentsNone(bool matchesSchannelBuild)
@@ -355,7 +359,12 @@ public sealed partial class SslStreamTlsProviderTests
         return request.CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddDays(1));
     }
 
-    private static TlsClientOptions ClientCertificate(string value) => new(Insecure: true, ClientCertificate: value);
+    // The -E value split into the certificate and its pass phrase as curl's tool splits it before the loader sees it (ADR-0514).
+    private static TlsClientOptions ClientCertificate(string value)
+    {
+        var (path, passphrase) = ClientCertificateArgument.Split(value, OperatingSystem.IsWindows());
+        return new(Insecure: true, ClientCertificate: path, Passphrase: passphrase);
+    }
 
     // The OpenSSL build splits at a drive letter's colon, so on Windows a temporary path is
     // given to it with the colon escaped, as a user of that build would write it.

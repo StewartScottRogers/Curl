@@ -368,7 +368,7 @@ public sealed class LibcurlSourceCodeProtocolOptionTests
     {
         string[] parsedArguments = ["-s", .. arguments.Split('|')];
         Diagnostics.ArrangeArguments(parsedArguments);
-        return OpenSslBuildParser.Parse(parsedArguments, _ => true).Options!;
+        return QuicBuildParser.Parse(parsedArguments, _ => true).Options!;
     }
 
     /// <summary>Generates the libcurl source for <paramref name="arguments"/>, whose last element is the URL, and writes it.</summary>

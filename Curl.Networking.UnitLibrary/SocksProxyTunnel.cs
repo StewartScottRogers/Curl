@@ -125,11 +125,14 @@ internal static class SocksProxyTunnel
             : null;
 
     /// <summary>
-    /// Creates the exit 97 failure with <paramref name="message" />.
+    /// Creates the exit 97 failure with <paramref name="message" /> and the <c>CURLPX_*</c> code
+    /// curl gives it (BL-2375).
     /// </summary>
+    /// <param name="proxyError">Why the handshake failed, as <c>CURLINFO_PROXY_ERROR</c> reports it.</param>
     /// <param name="message">curl's message.</param>
     /// <returns>A failed <see cref="ConnectResult" />.</returns>
-    public static ConnectResult? Failed(string message) => ConnectResult.Failed(CurlExitCode.Proxy, message);
+    public static ConnectResult? Failed(CurlProxyCode proxyError, string message) =>
+        ConnectResult.Failed(CurlExitCode.Proxy, message, null, proxyError: proxyError);
 
     /// <summary>
     /// Creates the failure for a host that does not resolve: exit 6 with the resolver's reason

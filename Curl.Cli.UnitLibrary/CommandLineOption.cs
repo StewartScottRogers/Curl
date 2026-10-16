@@ -7,7 +7,7 @@ namespace Curl.Cli;
 /// </summary>
 public sealed class CommandLineOption
 {
-    private CommandLineOption(string longName, char? shortName, bool takesValue, CommandLineOptionApplier apply, CommandLineOptionApplier? negate = null, bool takesSubject = false, bool endsBundle = false, bool shortNameTurnsOff = false, bool warnsAboutLeadingUnicode = true, bool refusedByWindowsSchannelBuild = false, bool refusedWhenTurnedOn = false)
+    private CommandLineOption(string longName, char? shortName, bool takesValue, CommandLineOptionApplier apply, CommandLineOptionApplier? negate = null, bool takesSubject = false, bool endsBundle = false, bool shortNameTurnsOff = false, bool warnsAboutLeadingUnicode = true, bool refusedByWindowsSchannelBuild = false, bool refusedWhenTurnedOn = false, bool refusedByEveryReferenceBuild = false)
     {
         RefusedWhenTurnedOn = refusedWhenTurnedOn;
         LongName = longName;
@@ -19,6 +19,7 @@ public sealed class CommandLineOption
         EndsBundle = endsBundle;
         ShortNameTurnsOff = shortNameTurnsOff;
         RefusedByWindowsSchannelBuild = refusedByWindowsSchannelBuild;
+        RefusedByEveryReferenceBuild = refusedByEveryReferenceBuild;
     }
 
     /// <summary>
@@ -73,6 +74,13 @@ public sealed class CommandLineOption
     public bool RefusedByWindowsSchannelBuild { get; }
 
     /// <summary>
+    /// <see langword="true"/> for a row returned by <see cref="RefusedWithoutQuic"/>: every reference build -
+    /// Schannel on Windows, OpenSSL without a QUIC library on Linux and macOS - refuses the option with exit 2,
+    /// and so does Curl unless the parse reads as a QUIC build (<see cref="CommandLineOptions.ActsAsQuicBuild"/>, ADR-0540).
+    /// </summary>
+    public bool RefusedByEveryReferenceBuild { get; }
+
+    /// <summary>
     /// <see langword="true"/> for a row built with <see cref="UnsupportedFlagTurnedOffQuietly"/>: turning the
     /// flag on is refused on every build, so the option is not supported, though its <c>--no-</c> spelling is accepted.
     /// </summary>
@@ -116,8 +124,8 @@ public sealed class CommandLineOption
             LongName,
             ShortName,
             TakesValue,
-            RefusingOnSchannelBuild(Apply),
-            Negate is null ? null : RefusingOnSchannelBuild(Negate),
+            Refusing(options => options.ActsAsWindowsSchannelBuild, Apply),
+            Negate is null ? null : Refusing(options => options.ActsAsWindowsSchannelBuild, Negate),
             TakesSubject,
             EndsBundle,
             ShortNameTurnsOff,
@@ -126,11 +134,36 @@ public sealed class CommandLineOption
     }
 
     /// <summary>
-    /// Wraps <paramref name="apply"/> so it refuses on the Windows Schannel build. curl 8.21.0 checks the
-    /// feature before it reads the toggle, so the <c>--no-</c> spelling is refused too (<c>--no-proxy-http2</c>).
+    /// Returns this flag row refused with <see cref="CommandLineRefusal.InstalledLibcurlDoesNotSupport"/> unless
+    /// the parse reads as a curl built with a QUIC library (<see cref="CommandLineOptions.ActsAsQuicBuild"/>), and
+    /// otherwise applied as before. Every reference build lacks one - the Schannel build on Windows and the OpenSSL
+    /// build from the release tarball on Linux and macOS - so <c>--http3</c> and <c>--http3-only</c> are refused on
+    /// every platform, as curl 8.22.0 refuses them there (gap finding GF-0089, ADR-0540). The row has no
+    /// <see cref="Negate"/>, so its <c>--no-</c> spelling stays refused as not reversible.
     /// </summary>
-    private static CommandLineOptionApplier RefusingOnSchannelBuild(CommandLineOptionApplier apply) =>
-        (options, value, spelledOption, pathExists, dataFileReader) => options.ActsAsWindowsSchannelBuild
+    /// <returns>The row, refused on every reference build.</returns>
+    public CommandLineOption RefusedWithoutQuic()
+    {
+        return new CommandLineOption(
+            LongName,
+            ShortName,
+            TakesValue,
+            Refusing(options => !options.ActsAsQuicBuild, Apply),
+            negate: null,
+            TakesSubject,
+            EndsBundle,
+            ShortNameTurnsOff,
+            warnsAboutLeadingUnicode: false,
+            refusedByEveryReferenceBuild: true);
+    }
+
+    /// <summary>
+    /// Wraps <paramref name="apply"/> so it refuses when <paramref name="refuses"/> says the build lacks the
+    /// feature. curl 8.21.0 checks the feature before it reads the toggle, so the <c>--no-</c> spelling is
+    /// refused too (<c>--no-proxy-http2</c>).
+    /// </summary>
+    private static CommandLineOptionApplier Refusing(Func<CommandLineOptions, bool> refuses, CommandLineOptionApplier apply) =>
+        (options, value, spelledOption, pathExists, dataFileReader) => refuses(options)
             ? CommandLineRefusal.InstalledLibcurlDoesNotSupport(spelledOption)
             : apply(options, value, spelledOption, pathExists, dataFileReader);
 

@@ -1,0 +1,164 @@
+using Curl.Console;
+using System.Text;
+using Curl.Cli;
+using Curl.Protocol.Abstractions;
+using Curl.Testing;
+
+namespace Curl.Engine;
+
+/// <summary>
+/// Pins which <c>--trace-config</c> components turn on curl 8.21.0's <c>[WS]</c> lines - <c>ws</c>,
+/// <c>protocol</c> and <c>all</c>, so <c>-vv</c> too - and that the composition hands that choice
+/// to the WebSocket handler (BL-1164). The lines themselves are pinned in
+/// <c>Curl.Protocol.Ws.UnitTests</c>.
+/// </summary>
+[TestClass]
+public sealed class EngineCompositionWsTraceTests
+{
+    private const string Head101AndText =
+        "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: x\r\n\r\n\x81\x02hi";
+
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
+    [TestMethod]
+    [DataRow("-v", "--trace-config", "ws")]
+    [DataRow("-v", "--trace-config", "protocol")]
+    [DataRow("-v", "--trace-config", "all")]
+    [DataRow("-v", "--trace-config", "tls,WS")]
+    [DataRow("-vv")]
+    public void TracesWs_WithTheWsComponent_IsTrue(params string[] arguments)
+    {
+        Diagnostics.Arrange("command line arguments", string.Join(" ", arguments));
+
+        bool tracesWs = EngineComposition.TracesWs(EasyOptionsFromCommandLine.TraceComponentsOf(Parse(arguments)));
+        Diagnostics.Act("traces ws", tracesWs);
+
+        Diagnostics.Assert("traces ws", true, tracesWs);
+        Assert.IsTrue(EngineComposition.TracesWs(EasyOptionsFromCommandLine.TraceComponentsOf(Parse(arguments))));
+    }
+
+    [TestMethod]
+    [DataRow("-v")]
+    [DataRow("-v", "--trace-config", "smtp")]
+    [DataRow("-v", "--trace-config", "ws,-ws")]
+    [DataRow("-v", "--trace-config", "network")]
+    public void TracesWs_WithoutTheWsComponent_IsFalse(params string[] arguments)
+    {
+        Diagnostics.Arrange("command line arguments", string.Join(" ", arguments));
+
+        bool tracesWs = EngineComposition.TracesWs(EasyOptionsFromCommandLine.TraceComponentsOf(Parse(arguments)));
+        Diagnostics.Act("traces ws", tracesWs);
+
+        Diagnostics.Assert("traces ws", false, tracesWs);
+        Assert.IsFalse(EngineComposition.TracesWs(EasyOptionsFromCommandLine.TraceComponentsOf(Parse(arguments))));
+    }
+
+    [TestMethod]
+    public void CreateTransports_UnderTraceConfigWs_TracesWs()
+    {
+        Diagnostics.Arrange("command line arguments", "-v --trace-config ws");
+        CurlTransports transports = EngineComposition.CreateTransports(EasyOptionsFromCommandLine.ToolOptionsOf(Parse("-v", "--trace-config", "ws")), EasyOptionsFromCommandLine.NetworkOf(Parse("-v", "--trace-config", "ws")), EasyOptionsFromCommandLine.TlsOf(Parse("-v", "--trace-config", "ws")), EasyOptionsFromCommandLine.HttpOf(Parse("-v", "--trace-config", "ws")), EasyOptionsFromCommandLine.ProxyOf(Parse("-v", "--trace-config", "ws")), EasyOptionsFromCommandLine.AuthenticationOf(Parse("-v", "--trace-config", "ws")), TimeProvider.System, traces: EasyOptionsFromCommandLine.TraceComponentsOf(Parse("-v", "--trace-config", "ws")));
+        Diagnostics.Act("traces ws", transports.TracesWs);
+
+        Diagnostics.Assert("traces ws", true, transports.TracesWs);
+        Assert.IsTrue(transports.TracesWs);
+    }
+
+    [TestMethod]
+    public void CreateTransports_WithoutTheWsComponent_DoesNotTraceWs()
+    {
+        Diagnostics.Arrange("command line arguments", "-v");
+        CurlTransports transports = EngineComposition.CreateTransports(EasyOptionsFromCommandLine.ToolOptionsOf(Parse("-v")), EasyOptionsFromCommandLine.NetworkOf(Parse("-v")), EasyOptionsFromCommandLine.TlsOf(Parse("-v")), EasyOptionsFromCommandLine.HttpOf(Parse("-v")), EasyOptionsFromCommandLine.ProxyOf(Parse("-v")), EasyOptionsFromCommandLine.AuthenticationOf(Parse("-v")), TimeProvider.System, traces: EasyOptionsFromCommandLine.TraceComponentsOf(Parse("-v")));
+        Diagnostics.Act("traces ws", transports.TracesWs);
+
+        Diagnostics.Assert("traces ws", false, transports.TracesWs);
+        Assert.IsFalse(transports.TracesWs);
+    }
+
+    [TestMethod]
+    [DataRow(true)]
+    [DataRow(false)]
+    public async Task CreateProtocolHandlers_WsTransfer_WritesTheWsLinesOnlyWhenTraced(bool tracesWs)
+    {
+        ScriptedConnector server = new([Encoding.Latin1.GetBytes(Head101AndText)]);
+        Diagnostics.Arrange("traces ws", tracesWs);
+        Diagnostics.Bytes("scripted response", Encoding.Latin1.GetBytes(Head101AndText));
+        IProtocolHandler ws = EngineComposition
+            .CreateProtocolHandlers(server, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new PassThroughTlsProvider(), new LoopbackDnsResolver(), tracesWs: tracesWs)
+            .Single(handler => handler.SupportedSchemes.Contains("ws"));
+        InfoRecordingEvents events = new();
+
+        TransferResult result = await ws.ExecuteAsync(new TransferContext
+        {
+            Url = CurlUrl.Parse("ws://127.0.0.1/"),
+            Output = new MemoryStream(),
+            Events = events,
+        });
+        Diagnostics.Act("exit code", result.ExitCode);
+        Diagnostics.Act("info lines", string.Join(" | ", events.Info));
+
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Assert("[WS] lines", tracesWs ? 6 : 1, events.Info.Count(line => line.StartsWith("[WS] ", StringComparison.Ordinal)));
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(tracesWs, events.Info.Contains("[WS] websocket established, callback mode"));
+        // The switch line every -v writes, then the five a traced text frame adds (BL-1164 Notes).
+        Assert.AreEqual(tracesWs ? 6 : 1, events.Info.Count(line => line.StartsWith("[WS] ", StringComparison.Ordinal)));
+    }
+
+    private static CommandLineOptions Parse(params string[] arguments)
+    {
+        CommandLineParseResult parsed = CommandLineParser.Parse([.. arguments, "ws://127.0.0.1/"], _ => true);
+        Assert.IsTrue(parsed.IsAccepted);
+        return parsed.Options;
+    }
+
+    /// <summary>Records the info lines; drops the rest.</summary>
+    private sealed class InfoRecordingEvents : ITransferEvents
+    {
+        public List<string> Info { get; } = [];
+
+        public void ReportInfo(string text) => Info.Add(text);
+
+        public void ReportConnectionOpened(ConnectionOpenedEvent opened)
+        {
+        }
+
+        public void ReportConnectionReused(ConnectionReusedEvent reused)
+        {
+        }
+
+        public void ReportTlsHandshake(TlsHandshakeEvent handshake)
+        {
+        }
+
+        public void ReportTlsData(ReadOnlySpan<byte> bytes, bool sent)
+        {
+        }
+
+        public void ReportTlsMessage(TlsMessageEvent message)
+        {
+        }
+
+        public void ReportTlsTrust(TlsTrustEvent trust)
+        {
+        }
+
+        public void ReportRequestHeader(ReadOnlySpan<byte> bytes)
+        {
+        }
+
+        public void ReportResponseHeader(ReadOnlySpan<byte> bytes)
+        {
+        }
+
+        public void ReportDataSent(ReadOnlySpan<byte> bytes)
+        {
+        }
+
+        public void ReportDataReceived(ReadOnlySpan<byte> bytes)
+        {
+        }
+    }
+}

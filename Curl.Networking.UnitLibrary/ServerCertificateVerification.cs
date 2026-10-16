@@ -103,7 +103,9 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
     /// and whether it is accepted. A certificate <see cref="VerifyPeer" /> accepts, or any
     /// under <c>-k</c>, is then checked against <see cref="TlsClientOptions.PinnedPublicKey" />:
     /// a key the pin does not name is exit 90, so a certificate that fails both is exit 60, as
-    /// curl reports it (ADR-0193, BL-608). Before the pin, a certificate
+    /// curl reports it (ADR-0193, BL-608). The Schannel build with <c>--cacert</c> is the
+    /// exception: it judges the pin first, so a certificate that fails both is exit 90
+    /// (ADR-0504, BL-2270). Before the pin, a certificate
     /// <see cref="VerifyPeer" /> accepts is checked against the <c>--crlfile</c> lists, when
     /// there are any: a refusal is exit 60 with OpenSSL's verify result (ADR-0197, BL-609).
     /// </summary>
@@ -130,8 +132,21 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
         };
         var refusal = VerifyPeer(anchoredErrors, chain, targetHost, [])
             ?? RevocationListRefusal(revocationLists, chain);
+        if (JudgesPinnedPublicKeyBeforeVerification)
+        {
+            var pinned = JudgePinnedPublicKey(observed, peerCertificates);
+            return (pinned.Observed, pinned.Failure ?? refusal);
+        }
+
         return refusal is null ? JudgePinnedPublicKey(observed, peerCertificates) : (observed, refusal);
     }
+
+    // With --cacert curl's Schannel build validates the chain itself after the handshake, and
+    // checks the pin before that, so a wrong pin is exit 90 even where the chain would fail
+    // (measured with curl 8.21.0, BL-2270; upstream test2035, test2038, test2042). Without
+    // --cacert Schannel validates inside the handshake, before the pin.
+    private bool JudgesPinnedPublicKeyBeforeVerification =>
+        matchesSchannelBuild && options.CaCertificateFile is not null;
 
     // The pin is checked only once the certificate is accepted, and only then does curl print
     // the " public key hash:" line (ADR-0336, BL-877).

@@ -56,7 +56,7 @@ internal static class Socks5GssapiNegotiation
     {
         if (options.SecurityContexts is not { } factory)
         {
-            return SocksProxyTunnel.Failed(texts.ContextFailed(SecurityContextStatus.NoCredentials));
+            return SocksProxyTunnel.Failed(CurlProxyCode.Gssapi, texts.ContextFailed(SecurityContextStatus.NoCredentials));
         }
 
         using var context = factory.Create(RequestFor(proxyHost, options));
@@ -96,7 +96,7 @@ internal static class Socks5GssapiNegotiation
             var step = await context.NextTokenAsync(incoming, cancellationToken).ConfigureAwait(false);
             if (step.Status is not (SecurityContextStatus.ContinueNeeded or SecurityContextStatus.Completed))
             {
-                return SocksProxyTunnel.Failed(texts.ContextFailed(step.Status));
+                return SocksProxyTunnel.Failed(CurlProxyCode.Gssapi, texts.ContextFailed(step.Status));
             }
 
             if (step.Token.Length > 0)
@@ -132,16 +132,16 @@ internal static class Socks5GssapiNegotiation
         var header = await SocksProxyTunnel.ReadReplyAsync(connection, 4, cancellationToken).ConfigureAwait(false);
         if (header is null)
         {
-            return ([], SocksProxyTunnel.Failed(headerLost));
+            return ([], SocksProxyTunnel.Failed(CurlProxyCode.Gssapi, headerLost));
         }
 
         if (header[1] != expectedType)
         {
-            return ([], SocksProxyTunnel.Failed(header[1] == RejectionMessage ? Socks5GssapiFailureText.Rejected(header) : invalidType(header)));
+            return ([], SocksProxyTunnel.Failed(CurlProxyCode.Gssapi, header[1] == RejectionMessage ? Socks5GssapiFailureText.Rejected(header) : invalidType(header)));
         }
 
         var body = await SocksProxyTunnel.ReadReplyAsync(connection, (header[2] << 8) | header[3], cancellationToken).ConfigureAwait(false);
-        return body is null ? ([], SocksProxyTunnel.Failed(bodyLost)) : (body, null);
+        return body is null ? ([], SocksProxyTunnel.Failed(CurlProxyCode.Gssapi, bodyLost)) : (body, null);
     }
 
     // curl works out the level the context could give, then offers none.
@@ -155,7 +155,7 @@ internal static class Socks5GssapiNegotiation
         byte[] level = [NoProtection];
         if ((nec ? level : context.Wrap(level, encrypt: false)) is not { } body)
         {
-            return SocksProxyTunnel.Failed(texts.WrapFailed);
+            return SocksProxyTunnel.Failed(CurlProxyCode.Gssapi, texts.WrapFailed);
         }
 
         await SendMessageAsync(connection, ProtectionMessage, body, cancellationToken).ConfigureAwait(false);
@@ -171,10 +171,10 @@ internal static class Socks5GssapiNegotiation
     // The level must be one byte, and none: curl applies no protection to the tunnel.
     private static ConnectResult? CheckGrantedLevel(byte[]? granted, Socks5GssapiFailureText texts) => granted switch
     {
-        null => SocksProxyTunnel.Failed(texts.UnwrapFailed),
-        { Length: not 1 } => SocksProxyTunnel.Failed(texts.InvalidEncryptionLength(granted.Length)),
+        null => SocksProxyTunnel.Failed(CurlProxyCode.Gssapi, texts.UnwrapFailed),
+        { Length: not 1 } => SocksProxyTunnel.Failed(CurlProxyCode.Gssapi, texts.InvalidEncryptionLength(granted.Length)),
         [NoProtection] => null,
-        _ => SocksProxyTunnel.Failed(Socks5GssapiFailureText.ProtectionNotImplemented),
+        _ => SocksProxyTunnel.Failed(CurlProxyCode.Gssapi, Socks5GssapiFailureText.ProtectionNotImplemented),
     };
 
     private static ValueTask SendMessageAsync(IConnection connection, byte messageType, byte[] body, CancellationToken cancellationToken) =>

@@ -7,8 +7,9 @@ them with curl's own standard-error lines and exit code. The project's own view 
 `Curl.Cli.UnitTests` against the local curl 8.21.0 on 2026-09-26, with the option list
 per the [curl manpage](https://curl.se/docs/manpage.html).
 
-`Curl.Console` references the project but does not call the parser yet, so nothing in
-the shipped executable reads its command line this way today.
+`Curl.Console` calls the parser: `CurlCommandRunner` parses the arguments, then
+`EasyOptionsFromCommandLine` maps each option group onto the easy option groups that
+`Curl.Engine.UnitLibrary` reads. The engine never references `Curl.Cli.UnitLibrary`.
 
 ## Entry point and result
 

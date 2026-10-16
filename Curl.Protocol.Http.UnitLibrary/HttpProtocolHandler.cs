@@ -742,7 +742,13 @@ public sealed class HttpProtocolHandler(
     /// <summary>
     /// Gives the failure a request meets before it connects: <c>--http3-only</c> with a URL that
     /// is not <c>https://</c> (<see cref="Http3NeedsHttps" />), or a resend whose <c>-T</c> upload
-    /// cannot be rewound (<see cref="UploadRewindFailed" />); <see langword="null" /> for none.
+    /// cannot be rewound (<see cref="UploadRewindFailed" />): one marked so
+    /// (<see cref="HttpRequestPlan.UploadCannotRewind" />), or a chunked resend to an HTTP/1.0
+    /// server (<see cref="IsChunkedResendToHttp10" />) of an upload whose
+    /// <see cref="IRewindableUpload.CanRewind" /> says no, as stdin read through a pipe off Windows
+    /// is, which curl 8.22.0 fails rewinding before it reaches the exit 25 of
+    /// <see cref="ThrowIfChunkedResendToHttp10" /> (upstream test1072 and test1073 as GF-0082 runs
+    /// them, ADR-0524, BL-2337); <see langword="null" /> for none.
     /// </summary>
     private static TransferResult? FailureBeforeConnecting(HttpRequestPlan plan, TransferReport? earlier)
     {
@@ -751,8 +757,22 @@ public sealed class HttpProtocolHandler(
             return Http3NeedsHttps(plan);
         }
 
-        return plan.UploadCannotRewind ? UploadRewindFailed(plan, earlier) : null;
+        return RewindFails(plan) ? UploadRewindFailed(plan, earlier) : null;
     }
+
+    /// <summary>
+    /// Tells whether <paramref name="plan" />'s upload cannot be rewound for it: one marked so, or a
+    /// chunked resend to an HTTP/1.0 server of an upload curl could not rewind.
+    /// </summary>
+    private static bool RewindFails(HttpRequestPlan plan) =>
+        plan.UploadCannotRewind || (IsChunkedResendToHttp10(plan) && CannotRewind(plan.Framing.Body));
+
+    /// <summary>
+    /// Tells whether <paramref name="body" /> is a stream whose <see cref="IRewindableUpload.CanRewind" />
+    /// says curl could not rewind it.
+    /// </summary>
+    private static bool CannotRewind(HttpRequestBody? body) =>
+        body is StreamBody { Content: IRewindableUpload { CanRewind: false } };
 
     /// <summary>
     /// Fails <c>--http3-only</c> with a URL that is not <c>https://</c> before connecting: exit 3,
@@ -1354,6 +1374,7 @@ public sealed class HttpProtocolHandler(
             ResponseConnection = timedConnection,
             RedirectCount = plan.RedirectsFollowed - plan.Options.RedirectsFollowed,
             AuthSchemePicked = AuthSchemePickedBy(plan),
+            ProxyAuthSchemePicked = plan.ProxyAuthorizationAnswersChallenge ? SchemeOfAuthorization(plan.ProxyAuthorization) : HttpAuthSchemes.None,
             DigestAuthorizationSent = DigestAuthorizationSentBy(plan),
         };
 
@@ -2713,11 +2734,20 @@ public sealed class HttpProtocolHandler(
     /// <exception cref="HttpTransferException">The request is such a resend (exit 25).</exception>
     private static void ThrowIfChunkedResendToHttp10(HttpRequestPlan plan)
     {
-        if (plan.Framing.ChunksForUnknownLength && plan.Options.EarlierResponseWasHttp10)
+        if (IsChunkedResendToHttp10(plan))
         {
             throw new HttpTransferException(CurlExitCode.UploadFailed, HttpTransferMessages.ChunkedUploadNeedsHttp11);
         }
     }
+
+    /// <summary>
+    /// Tells whether <paramref name="plan" /> resends a body chunked for its unknown length, as
+    /// stdin's is, after a response from an HTTP/1.0 server
+    /// (<see cref="HttpRequestOptions.EarlierResponseWasHttp10" />): an authentication retry or a
+    /// <c>-L</c> hop.
+    /// </summary>
+    private static bool IsChunkedResendToHttp10(HttpRequestPlan plan) =>
+        plan.Framing.ChunksForUnknownLength && plan.Options.EarlierResponseWasHttp10;
 
     /// <summary>
     /// Gets the values of every <paramref name="name" /> header of <paramref name="head" />,
@@ -2932,6 +2962,12 @@ public sealed class HttpProtocolHandler(
         internal HttpAuthSchemes AuthSchemePicked { get; init; }
 
         /// <summary>
+        /// Gets the scheme the exchange's request answered a proxy's challenge with, the
+        /// report's <see cref="TransferReport.ProxyAuthSchemePicked" /> (BL-2367).
+        /// </summary>
+        internal HttpAuthSchemes ProxyAuthSchemePicked { get; init; }
+
+        /// <summary>
         /// Gets the Digest value the exchange's request was sent with, the report's
         /// <see cref="TransferReport.DigestAuthorizationSent" /> (BL-2252).
         /// </summary>
@@ -2974,6 +3010,7 @@ public sealed class HttpProtocolHandler(
                 RedirectCount = RedirectCount,
                 ResponseHeadersStored = body.HeadersStored,
                 AuthSchemePicked = AuthSchemePicked,
+                ProxyAuthSchemePicked = ProxyAuthSchemePicked,
                 DigestAuthorizationSent = DigestAuthorizationSent,
                 ProxyConnectResponseCode = connect.ProxyConnectResponseCode,
                 UsedProxy = UsedProxy,

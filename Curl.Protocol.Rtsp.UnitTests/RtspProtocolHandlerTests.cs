@@ -893,6 +893,33 @@ public sealed class RtspProtocolHandlerTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_ReplyWithSession_ReportsTheSessionIdAndSequenceNumbers()
+    {
+        TransferResult result = await Handler(Server("RTSP/1.0 200 OK\r\nCSeq: 1\r\nSession: abc;timeout=60\r\n\r\n")).ExecuteAsync(Context());
+
+        Diagnostics.ActResult(result);
+        Diagnostics.Assert(
+            "session, client CSeq, server CSeq, CSeq received",
+            "abc, 2, 0, 1",
+            $"{result.Report?.RtspSessionId}, {result.Report?.RtspClientSequenceNumber}, {result.Report?.RtspServerSequenceNumber}, {result.Report?.RtspSequenceNumberReceived}");
+        Assert.AreEqual("abc", result.Report!.RtspSessionId);
+        Assert.AreEqual(2L, result.Report.RtspClientSequenceNumber);
+        Assert.AreEqual(0L, result.Report.RtspServerSequenceNumber);
+        Assert.AreEqual(1L, result.Report.RtspSequenceNumberReceived);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ReplyWithMismatchedCSeqAndNoSession_ReportsTheCSeqReceivedAndNoSession()
+    {
+        TransferResult result = await Handler(Server("RTSP/1.0 200 OK\r\nCSeq: 7\r\n\r\n")).ExecuteAsync(Context());
+
+        Diagnostics.ActResult(result);
+        Assert.AreEqual(CurlExitCode.RtspCseqError, result.ExitCode);
+        Assert.IsNull(result.Report!.RtspSessionId);
+        Assert.AreEqual(7L, result.Report.RtspSequenceNumberReceived);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_HeadSplitOverReads_IsReadWhole()
     {
         byte[][] reads = [.. Ok.Select(character => new[] { (byte)character })];

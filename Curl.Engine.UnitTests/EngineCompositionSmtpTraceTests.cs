@@ -1,0 +1,164 @@
+using Curl.Console;
+using System.Text;
+using Curl.Cli;
+using Curl.Protocol.Abstractions;
+using Curl.Testing;
+
+namespace Curl.Engine;
+
+/// <summary>
+/// Pins which <c>--trace-config</c> components turn on curl 8.21.0's <c>[SMTP]</c> lines - <c>smtp</c>,
+/// <c>protocol</c> and <c>all</c>, so <c>-vv</c> too - measured with <c>Record-CurlExchange.ps1 -Smtp</c>
+/// on 2026-10-02 (BL-1163 Notes), and that the composition hands that choice to the SMTP handler.
+/// The lines themselves are pinned in <c>Curl.Protocol.Smtp.UnitTests</c>.
+/// </summary>
+[TestClass]
+public sealed class EngineCompositionSmtpTraceTests
+{
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
+    private const string ControlReplies =
+        "220 localhost ESMTP\r\n250-localhost\r\n250 SMTPUTF8\r\n250 Recorder <recorder@localhost>\r\n221 Bye\r\n";
+
+    [TestMethod]
+    [DataRow("-v", "--trace-config", "smtp")]
+    [DataRow("-v", "--trace-config", "protocol")]
+    [DataRow("-v", "--trace-config", "all")]
+    [DataRow("-v", "--trace-config", "tls,SMTP")]
+    [DataRow("-vv")]
+    public void TracesSmtp_WithTheSmtpComponent_IsTrue(params string[] arguments)
+    {
+        Diagnostics.Arrange("command line arguments", string.Join(" ", arguments));
+        bool tracesSmtp = EngineComposition.TracesSmtp(EasyOptionsFromCommandLine.TraceComponentsOf(Parse(arguments)));
+        Diagnostics.Act("traces smtp", tracesSmtp);
+
+        Diagnostics.Assert("traces smtp", true, tracesSmtp);
+        Assert.IsTrue(tracesSmtp);
+    }
+
+    [TestMethod]
+    [DataRow("-v")]
+    [DataRow("-v", "--trace-config", "ftp")]
+    [DataRow("-v", "--trace-config", "smtp,-smtp")]
+    [DataRow("-v", "--trace-config", "network")]
+    public void TracesSmtp_WithoutTheSmtpComponent_IsFalse(params string[] arguments)
+    {
+        Diagnostics.Arrange("command line arguments", string.Join(" ", arguments));
+        bool tracesSmtp = EngineComposition.TracesSmtp(EasyOptionsFromCommandLine.TraceComponentsOf(Parse(arguments)));
+        Diagnostics.Act("traces smtp", tracesSmtp);
+
+        Diagnostics.Assert("traces smtp", false, tracesSmtp);
+        Assert.IsFalse(tracesSmtp);
+    }
+
+    [TestMethod]
+    public void CreateTransports_UnderTraceConfigSmtp_TracesSmtp()
+    {
+        Diagnostics.Arrange("command line arguments", "-v --trace-config smtp");
+        CurlTransports transports = EngineComposition.CreateTransports(EasyOptionsFromCommandLine.ToolOptionsOf(Parse("-v", "--trace-config", "smtp")), EasyOptionsFromCommandLine.NetworkOf(Parse("-v", "--trace-config", "smtp")), EasyOptionsFromCommandLine.TlsOf(Parse("-v", "--trace-config", "smtp")), EasyOptionsFromCommandLine.HttpOf(Parse("-v", "--trace-config", "smtp")), EasyOptionsFromCommandLine.ProxyOf(Parse("-v", "--trace-config", "smtp")), EasyOptionsFromCommandLine.AuthenticationOf(Parse("-v", "--trace-config", "smtp")), TimeProvider.System, traces: EasyOptionsFromCommandLine.TraceComponentsOf(Parse("-v", "--trace-config", "smtp")));
+        Diagnostics.Act("transports trace smtp", transports.TracesSmtp);
+
+        Diagnostics.Assert("transports trace smtp", true, transports.TracesSmtp);
+        Assert.IsTrue(transports.TracesSmtp);
+    }
+
+    [TestMethod]
+    public void CreateTransports_WithoutTheSmtpComponent_DoesNotTraceSmtp()
+    {
+        Diagnostics.Arrange("command line arguments", "-v");
+        CurlTransports transports = EngineComposition.CreateTransports(EasyOptionsFromCommandLine.ToolOptionsOf(Parse("-v")), EasyOptionsFromCommandLine.NetworkOf(Parse("-v")), EasyOptionsFromCommandLine.TlsOf(Parse("-v")), EasyOptionsFromCommandLine.HttpOf(Parse("-v")), EasyOptionsFromCommandLine.ProxyOf(Parse("-v")), EasyOptionsFromCommandLine.AuthenticationOf(Parse("-v")), TimeProvider.System, traces: EasyOptionsFromCommandLine.TraceComponentsOf(Parse("-v")));
+        Diagnostics.Act("transports trace smtp", transports.TracesSmtp);
+
+        Diagnostics.Assert("transports trace smtp", false, transports.TracesSmtp);
+        Assert.IsFalse(transports.TracesSmtp);
+    }
+
+    [TestMethod]
+    [DataRow(true)]
+    [DataRow(false)]
+    public async Task CreateProtocolHandlers_SmtpTransfer_WritesTheSmtpLinesOnlyWhenTraced(bool tracesSmtp)
+    {
+        Diagnostics.Arrange("traces smtp requested", tracesSmtp);
+        Diagnostics.Arrange("scripted server replies", ControlReplies);
+        ScriptedConnector server = new([Encoding.Latin1.GetBytes(ControlReplies)]);
+        IProtocolHandler smtp = EngineComposition
+            .CreateProtocolHandlers(server, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new PassThroughTlsProvider(), new LoopbackDnsResolver(), tracesSmtp: tracesSmtp)
+            .Single(handler => handler.SupportedSchemes.Contains("smtp"));
+        InfoRecordingEvents events = new();
+
+        TransferResult result = await smtp.ExecuteAsync(new TransferContext
+        {
+            Url = CurlUrl.Parse("smtp://127.0.0.1/client"),
+            Output = new MemoryStream(),
+            Events = events,
+            Mail = new MailRequestOptions { Recipients = ["c@d"] },
+        });
+
+        int smtpLineCount = events.Info.Count(line => line.StartsWith("[SMTP] ", StringComparison.Ordinal));
+        Diagnostics.Act("exit code", result.ExitCode);
+        Diagnostics.Act("smtp info line count", smtpLineCount);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Assert("smtp info line count", tracesSmtp ? 13 : 0, smtpLineCount);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(tracesSmtp, events.Info.Contains("[SMTP] smtp_setup_connection() -> 0"));
+        // The 13 lines curl 8.21.0 writes for a VRFY (BL-1163 Notes).
+        Assert.AreEqual(tracesSmtp ? 13 : 0, events.Info.Count(line => line.StartsWith("[SMTP] ", StringComparison.Ordinal)));
+    }
+
+    private static CommandLineOptions Parse(params string[] arguments)
+    {
+        CommandLineParseResult parsed = CommandLineParser.Parse([.. arguments, "smtp://127.0.0.1/"], _ => true);
+        Assert.IsTrue(parsed.IsAccepted);
+        return parsed.Options;
+    }
+
+    /// <summary>Records the info lines; drops the rest.</summary>
+    private sealed class InfoRecordingEvents : ITransferEvents
+    {
+        public List<string> Info { get; } = [];
+
+        public void ReportInfo(string text) => Info.Add(text);
+
+        public void ReportConnectionOpened(ConnectionOpenedEvent opened)
+        {
+        }
+
+        public void ReportConnectionReused(ConnectionReusedEvent reused)
+        {
+        }
+
+        public void ReportTlsHandshake(TlsHandshakeEvent handshake)
+        {
+        }
+
+        public void ReportTlsData(ReadOnlySpan<byte> bytes, bool sent)
+        {
+        }
+
+        public void ReportTlsMessage(TlsMessageEvent message)
+        {
+        }
+
+        public void ReportTlsTrust(TlsTrustEvent trust)
+        {
+        }
+
+        public void ReportRequestHeader(ReadOnlySpan<byte> bytes)
+        {
+        }
+
+        public void ReportResponseHeader(ReadOnlySpan<byte> bytes)
+        {
+        }
+
+        public void ReportDataSent(ReadOnlySpan<byte> bytes)
+        {
+        }
+
+        public void ReportDataReceived(ReadOnlySpan<byte> bytes)
+        {
+        }
+    }
+}

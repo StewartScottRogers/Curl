@@ -440,6 +440,43 @@ public sealed class TcpDialerTests
         CollectionAssert.AreEqual(bindsAddress ? new[] { chosen } : Array.Empty<IPEndPoint>(), bound);
     }
 
+    // AF-0222: a dialed connection's dispose must close its socket, or the peer sees no FIN until the process exits.
+    [TestMethod]
+    public async Task Connected_WithAConnectedSocket_DisposingTheConnectionClosesTheSocket()
+    {
+        using var listener = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        listener.Bind(new IPEndPoint(IPAddress.Loopback, 0));
+        listener.Listen();
+        var endPoint = (IPEndPoint)listener.LocalEndPoint!;
+        var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        await socket.ConnectAsync(endPoint, TestContext.CancellationToken);
+        Diagnostics.Arrange("socket", "connected to a loopback listener, no byte sent");
+
+        var dialed = TcpDialer.Connected(socket, endPoint);
+        await dialed.Connection.DisposeAsync();
+
+        Diagnostics.Act("socket closed", socket.SafeHandle.IsClosed);
+        Diagnostics.Assert("socket closed", true, socket.SafeHandle.IsClosed);
+
+        Assert.IsTrue(socket.SafeHandle.IsClosed);
+    }
+
+    [TestMethod]
+    public async Task Connected_WithASocketWhoseConnectIsDeferred_DisposingTheConnectionClosesTheSocket()
+    {
+        var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        socket.Bind(new IPEndPoint(IPAddress.Loopback, 0));
+        Diagnostics.Arrange("socket", "bound, not connected (connectx deferred the connect)");
+
+        var dialed = TcpDialer.Connected(socket, new IPEndPoint(IPAddress.Loopback, 9));
+        await dialed.Connection.DisposeAsync();
+
+        Diagnostics.Act("socket closed", socket.SafeHandle.IsClosed);
+        Diagnostics.Assert("socket closed", true, socket.SafeHandle.IsClosed);
+
+        Assert.IsTrue(socket.SafeHandle.IsClosed);
+    }
+
     private string LastLineOfABusyPortBind()
     {
         var events = new RecordingTransferEvents();

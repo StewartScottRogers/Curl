@@ -28,7 +28,7 @@ One executable per protocol, each a subset of Curl:
 
 | Fact | Where | Why it helps |
 |---|---|---|
-| Every protocol is registered in one place, as a `LazyProtocolHandler` per scheme set | `Curl.Console/CurlComposition.cs`, lines 144-161 at the time of writing | A sub-console is mostly this list made shorter |
+| Every protocol is registered in one place, as a `LazyProtocolHandler` per scheme set | `EngineComposition.CreateProtocolHandlers` in `Curl.Engine.UnitLibrary/EngineComposition.cs` | A sub-console is mostly this list made shorter |
 | Protocol libraries never reference each other; the build fails if one does | CLAUDE.md, solution-wide conventions | Leaving a protocol out cannot break another |
 | Help categories copy curl 8.21.0's `CURLHELP_*` bits (`http`, `ftp`, `file`, `smtp`, ...) | `Curl.Cli.UnitLibrary/CurlHelpCategories.cs` | Help filtering has a starting point |
 | `--ai-help` is Markdown help for agents, by category | `Curl.Cli.UnitLibrary/CurlAiHelpText.cs` (BL-911) | Gives MCP tool descriptions for free |

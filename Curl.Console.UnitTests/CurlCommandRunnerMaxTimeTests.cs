@@ -1,3 +1,4 @@
+using Curl.Engine;
 using System.Text;
 using Curl.Core;
 using Curl.Protocol.Abstractions;
@@ -221,7 +222,7 @@ public sealed class CurlCommandRunnerMaxTimeTests
     private Task<int> RunAsync(IConnector connector, params string[] arguments) =>
         RunAsync(
             new TransferDispatch(
-                new ProtocolDispatcher(CurlComposition.CreateProtocolHandlers(
+                new ProtocolDispatcher(EngineComposition.CreateProtocolHandlers(
                     connector,
                     new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"),
                     new PassThroughTlsProvider(),

@@ -348,6 +348,9 @@ public sealed class TftpUploadTests
                 Url = CurlUrl.Parse("tftp://h/dest.txt"),
                 Output = output,
                 Upload = upload,
+
+                // A frozen clock keeps the timeout option at 6 however slowly the run goes (BL-2351).
+                TimeProvider = new ManualTimeProvider(),
             });
         }
 

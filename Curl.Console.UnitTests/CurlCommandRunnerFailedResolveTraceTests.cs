@@ -1,3 +1,4 @@
+using Curl.Engine;
 using System.Net;
 using System.Text;
 using Curl.Cli;
@@ -14,7 +15,7 @@ namespace Curl.Console;
 /// <c>Record-CurlExchange.ps1</c> (BL-1157 Notes), leaving out the threaded resolver's
 /// <c>queueing query</c>, <c>resolve incomplete</c>, repeated <c>done=0</c> and per-family
 /// <c>resolved IPv4: (none)</c> lines, which follow curl's poll timing (ADR-0366). The transfer runs
-/// through the production handler set over the connector <see cref="CurlComposition.CreateTcpConnector" />
+/// through the production handler set over the connector <see cref="EngineComposition.CreateTcpConnector" />
 /// builds from the command line, whose resolver answers nothing.
 /// </summary>
 [TestClass]
@@ -103,8 +104,8 @@ public sealed class CurlCommandRunnerFailedResolveTraceTests
         Diagnostics.Arrange("command line", "curl " + string.Join(" ", arguments));
         CommandLineParseResult parsed = CommandLineParser.Parse(arguments, _ => true);
         Assert.IsTrue(parsed.IsAccepted);
-        TcpConnector connector = CurlComposition.CreateTcpConnector(
-            parsed.Options,
+        TcpConnector connector = EngineComposition.CreateTcpConnector(
+            EasyOptionsFromCommandLine.ToolOptionsOf(parsed.Options), EasyOptionsFromCommandLine.TraceComponentsOf(parsed.Options), EasyOptionsFromCommandLine.NetworkOf(parsed.Options), EasyOptionsFromCommandLine.HttpOf(parsed.Options), EasyOptionsFromCommandLine.ProxyOf(parsed.Options), EasyOptionsFromCommandLine.AuthenticationOf(parsed.Options),
             new UnresolvingDnsResolver(),
             new UnusedTcpDialer(),
             new PassThroughTlsProvider(),
@@ -117,7 +118,7 @@ public sealed class CurlCommandRunnerFailedResolveTraceTests
         {
             exitCode = await new CurlCommandRunner(
                     _ => new TransferDispatch(
-                        new ProtocolDispatcher(CurlComposition.CreateProtocolHandlers(connector, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new PassThroughTlsProvider(), new UnresolvingDnsResolver())),
+                        new ProtocolDispatcher(EngineComposition.CreateProtocolHandlers(connector, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new PassThroughTlsProvider(), new UnresolvingDnsResolver())),
                         [],
                         loadResolveEntries: connector.LoadResolveEntries),
                     files,

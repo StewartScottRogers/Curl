@@ -26,9 +26,9 @@ namespace Curl.Networking;
 /// <paramref name="Insecure" /> is set.
 /// </param>
 /// <param name="ClientCertificate">
-/// curl's <c>-E</c>/<c>--cert</c> value, verbatim: a certificate file path, optionally
-/// followed by <c>:</c> and its passphrase, split as curl splits it
-/// (<see cref="ClientCertificateArgument" />). The Schannel build loads it as PKCS#12, the
+/// The certificate file path (or Schannel store path) curl's <c>-E</c>/<c>--cert</c> names, already
+/// split from its pass phrase as curl's tool splits it (<see cref="ClientCertificateArgument" />,
+/// ADR-0514). The Schannel build loads it as PKCS#12, the
 /// OpenSSL build as <paramref name="CertificateType" /> says, as ADR-0009 decides; the
 /// certificate is presented when the server asks for one. <see langword="null" /> presents
 /// none.
@@ -63,11 +63,9 @@ namespace Curl.Networking;
 /// it. <see langword="null" /> is PEM.
 /// </param>
 /// <param name="Passphrase">
-/// curl's <c>--pass</c>: the passphrase for the private key, used in place of any passphrase
-/// in <paramref name="ClientCertificate" />, since curl keeps whichever of the two came last
-/// and the caller passes this only when <c>--pass</c> did. It opens an encrypted PEM key in
-/// the OpenSSL build and a protected PKCS#12 file in either. <see langword="null" /> uses the
-/// passphrase in <paramref name="ClientCertificate" />, if any.
+/// The pass phrase for the private key: curl's <c>--pass</c>, else the one split from
+/// <c>--cert</c>'s value, as curl's tool keeps them (ADR-0514). It opens an encrypted PEM key in
+/// the OpenSSL build and a protected PKCS#12 file in either. <see langword="null" /> for none.
 /// </param>
 /// <param name="SkipRevocationCheck">
 /// <see langword="true" /> for curl's <c>--ssl-no-revoke</c>: the Schannel build does not
@@ -173,6 +171,12 @@ namespace Curl.Networking;
 /// before it (ADR-0150). <see cref="TlsClientRouting" /> sends a connection with it whose range reaches
 /// TLS 1.0 to <see cref="HandBuiltTlsProvider" />, since <c>SslStream</c> has no control for the split.
 /// </param>
+/// <param name="KeyLogFile">
+/// The file the <c>SSLKEYLOGFILE</c> environment variable names, which the OpenSSL build appends the
+/// connection's secrets to (<see cref="NssKeyLogFile" />, BL-2327); <see langword="null" /> when it is
+/// not set, and always on Windows, where the Schannel build ignores it. <c>SslStream</c> cannot log its
+/// secrets, so <see cref="TlsClientRouting" /> sends such a connection to <see cref="HandBuiltTlsProvider" />.
+/// </param>
 public sealed record TlsClientOptions(
     bool Insecure = false,
     TlsVersion MinimumVersion = TlsVersion.SystemDefault,
@@ -202,4 +206,5 @@ public sealed record TlsClientOptions(
     string? PinnedPublicKey = null,
     string? CertificateRevocationListFile = null,
     bool NoSessionId = false,
-    bool AllowBeast = false);
+    bool AllowBeast = false,
+    string? KeyLogFile = null);

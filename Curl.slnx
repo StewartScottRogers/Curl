@@ -47,6 +47,9 @@
     <File Path="install.ps1" />
     <File Path="install.sh" />
   </Folder>
+  <Project Path="Curl.Api/Curl.Api.csproj" />
+  <Project Path="Curl.Api.UnitLibrary/Curl.Api.UnitLibrary.csproj" />
+  <Project Path="Curl.Api.UnitTests/Curl.Api.UnitTests.csproj" />
   <Project Path="Curl.Authentication.UnitLibrary/Curl.Authentication.UnitLibrary.csproj" />
   <Project Path="Curl.Authentication.UnitTests/Curl.Authentication.UnitTests.csproj" />
   <Project Path="Curl.Cli.IntegrationTests/Curl.Cli.IntegrationTests.csproj" />
@@ -70,6 +73,9 @@
   <Project Path="Curl.Core.UnitTests/Curl.Core.UnitTests.csproj" />
   <Project Path="Curl.Cryptography.UnitLibrary/Curl.Cryptography.UnitLibrary.csproj" />
   <Project Path="Curl.Cryptography.UnitTests/Curl.Cryptography.UnitTests.csproj" />
+  <Project Path="Curl.Engine.IntegrationTests/Curl.Engine.IntegrationTests.csproj" />
+  <Project Path="Curl.Engine.UnitLibrary/Curl.Engine.UnitLibrary.csproj" />
+  <Project Path="Curl.Engine.UnitTests/Curl.Engine.UnitTests.csproj" />
   <Project Path="Curl.Http2.UnitLibrary/Curl.Http2.UnitLibrary.csproj" />
   <Project Path="Curl.Http2.UnitTests/Curl.Http2.UnitTests.csproj" />
   <Project Path="Curl.Http3.UnitLibrary/Curl.Http3.UnitLibrary.csproj" />
@@ -129,6 +135,8 @@
 
   <Project Path="Documentation/Documentation.shproj" />
   <Project Path=".claude/Claude.shproj" />
+  <Project Path="Libcurl/Libcurl.csproj" />
+  <Project Path="Libcurl.UnitTests/Libcurl.UnitTests.csproj" />
   <Project Path="Tasks/Tasks.shproj" />
   <Project Path="Audit/Audit.shproj" />
   <Project Path="Gap/Gap.shproj" />

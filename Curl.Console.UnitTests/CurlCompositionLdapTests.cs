@@ -1,3 +1,4 @@
+using Curl.Engine;
 using System.Net;
 using System.Text;
 using Curl.Cli;
@@ -9,7 +10,7 @@ namespace Curl.Console;
 
 /// <summary>
 /// Pins <c>ldap://</c> and <c>ldaps://</c> end to end through the production composition over
-/// fake connectors: the handler <see cref="CurlComposition.CreateProtocolHandlers" /> registers,
+/// fake connectors: the handler <see cref="EngineComposition.CreateProtocolHandlers" /> registers,
 /// the bytes it sends, its standard output, its <c>-v</c> lines and exit code, and the
 /// <c>-V</c> protocol list. Recorded on 2026-09-29 with <c>Record-CurlExchange.ps1 -Script</c>
 /// (BL-589 Notes), curl running <c>-sv -u cn=u,dc=x:secret ldap://127.0.0.1:18389/dc=example</c>

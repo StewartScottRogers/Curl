@@ -119,7 +119,7 @@ read with no reply waiting returns 0, because in memory nothing else can arrive.
 
 `%HTTP2PORT` is 9009 (`UpstreamCaseRunner.Http2Port`, BL-2175), so no case skips for it. The stand-in for upstream's `nghttpx` h2c front lives in `Curl.Conformance.Http2Server.UnitLibrary` (ADR-0491), which references this library, so the runner reaches it through `UpstreamHttp2Server` (BL-2230), a record the caller builds (`new UpstreamHttp2Server(UpstreamHttp2ServerFactory.Create)`) and passes as `UpstreamCaseRunner`'s optional `http2Server`, as it does `UpstreamSshServer`. Given one, `InFrontOf` puts a fresh h2c server, relaying each stream to the case's `sws` emulation as HTTP/1.1 (so the relayed requests land in its `ReceivedBytes`), on 9009 in front of every stand-in but the https-proxy one, and screening lets a case naming the `http/2` server run; without one screening skips it and a connection to 9009 reaches the `sws` emulation like any other port. `%H2CVER` is `h2c` (`UpstreamCaseRunner.H2cVersion`), as `runtests.pl` sets it. `UpstreamCurlPlatform` reports `http/2` and `h2c` on Linux and macOS only, since Curl's Windows build matches curl's Schannel build, which has no `HTTP2` and refuses `--http2` (ADR-0495): on Windows 358, 471, 1700, 1702, 1800 and 1801 are `SkippedOnThisPlatform`, and they are measured on Linux and macOS. `%HTTP2TLSPORT` is 9018 (`UpstreamCaseRunner.Http2TlsPort`, BL-2245, ADR-0496) and, like the other stunnel-fronted ports, has a value only with a certificate directory: given an `UpstreamHttp2Server` with its optional `CreateTlsServer` (`new UpstreamHttp2Server(UpstreamHttp2ServerFactory.Create, UpstreamHttp2ServerFactory.CreateTls)`), `InFrontOf` puts nghttpx's TLS front there, presenting `%CERTDIR/certs/test-localhost.pem` with ALPN `h2`, loaded only for a case naming the `http/2` server. On Windows 2400-2404 and 2406 are `SkippedOnThisPlatform` for `http/2`; on Linux and macOS 2403 passes (measured on Windows emulating that build, BL-2264) and 2404 skips for its `<tool>` (`lib2404`). The conformance tests report `Debug` to a case whose command names `%HTTP2TLSPORT` (2400, 2401, 2406 use nothing debug-only) and to an `alt-svc` case setting `CURL_ALTSVC_HTTP` (358, 359), which Curl honours behind `CreateRunner(honoursAltSvcHttpVariable: true)`; `FindFeatureOfAnotherPlatform` counts such a stand-in feature, one no platform reports, as met on every platform, so these listed cases are `SkippedOnThisPlatform` on Windows (ADR-0497, BL-2263); test2407 skips first for its `<tool>`.
 
-`%HTTP3PORT` is 9019 (`UpstreamCaseRunner.Http3Port`, BL-2261, ADR-0498) and has a value only when the caller names a certificate directory and gives an `UpstreamHttp3Server`, the record through which the runner reaches the nghttpx-h3 stand-in in `Curl.Conformance.Http3Server.UnitLibrary` (which references this library), passed as `UpstreamCaseRunner`'s optional `http3Server`. Its `CreateServer` takes the case's `sws` emulation and `%CERTDIR/certs/test-localhost.pem`; the conformance tests build it with `UpstreamHttp3ServerFactory.Create` and TLS settings signing with the certificate's P-256 key. Given one, the platform reports `nghttpx-h3` (`UpstreamCaseRunner.Http3ServerFeature`), screening lets a case naming the `http/3` server run, for such a case `InFrontOf` puts a fresh stand-in on datagram port 9019 in front of the dnsd and tftpd stand-ins (so the relayed HTTP/1.1 requests land in the `sws` emulation's `ReceivedBytes`), and `RefusingTcpOnHttp3Port` refuses a TCP connection to 9019, so `--http3`'s race of TCP against QUIC settles on QUIC. `UpstreamCurlPlatform` reports `http/3` on Linux and macOS only, since Curl's Windows build refuses `--http3` as curl's Schannel build does: on Windows 2500 is `SkippedOnThisPlatform`, and it passes on Linux and macOS (measured on Windows emulating that build). 2501 skips for `Debug` and 2502 for its `<tool>`; 2503 is measured and differs (`UpstreamCurlPlatform` reports `headers-api` since BL-2264, as Curl writes `%header{name}` and `%{header_json}`).
+`%HTTP3PORT` is 9019 (`UpstreamCaseRunner.Http3Port`, BL-2261, ADR-0498) and has a value only when the caller names a certificate directory and gives an `UpstreamHttp3Server`, the record through which the runner reaches the nghttpx-h3 stand-in in `Curl.Conformance.Http3Server.UnitLibrary` (which references this library), passed as `UpstreamCaseRunner`'s optional `http3Server`. Its `CreateServer` takes the case's `sws` emulation and `%CERTDIR/certs/test-localhost.pem`; the conformance tests build it with `UpstreamHttp3ServerFactory.Create` and TLS settings signing with the certificate's P-256 key. Given one, the platform reports `nghttpx-h3` (`UpstreamCaseRunner.Http3ServerFeature`), screening lets a case naming the `http/3` server run, for such a case `InFrontOf` puts a fresh stand-in on datagram port 9019 in front of the dnsd and tftpd stand-ins (so the relayed HTTP/1.1 requests land in the `sws` emulation's `ReceivedBytes`), and `RefusingTcpOnHttp3Port` refuses a TCP connection to 9019, so `--http3`'s race of TCP against QUIC settles on QUIC. `UpstreamCurlPlatform` reports `http/3` on no platform, since Curl refuses `--http3` and `--http3-only` on every reference build, none of which has a QUIC library (ADR-0540): 2500 to 2503 skip for `Curl lacks the feature http/3` everywhere, as `runtests.pl` skips them for the reference curl, and are off `PassingUpstreamCases.txt` (BL-2370, GF-0094). The stand-in stays for a caller whose platform adds `http/3` with `WithFeatures`.
 
 `LineProtocolServerConnector` is the shared core of the line-protocol stand-ins for upstream's
 `tests/ftpserver.pl` (BL-1895), the base that the FTP, SMTP, IMAP and POP3 stand-ins of
@@ -150,8 +150,17 @@ none, as stunnel by default) and client-certificate request, accepting any clien
 as stunnel at `verify = 0` does, and disposes the stream if the handshake fails.
 `InMemoryDuplexStream.CreatePair` makes the two connected ends it runs over: each end reads,
 asynchronously only, what the other writes, and reads 0 once the other end is disposed and
-drained. Tests reload a generated certificate through PKCS#12, since Windows Schannel and macOS
+drained, or gets a connection reset (`IOException` carrying `SocketError.ConnectionReset`) when
+the disposed end had `ResetsWhenDisposed` set. Tests reload a generated certificate through PKCS#12, since Windows Schannel and macOS
 reject an ephemeral server key.
+The stand-ins call `AcceptAsync` with `PlatformServesTls13`, false on macOS only, where .NET's
+`SslStream` server negotiates at most TLS 1.2 (BL-2335, ADR-0522). Elsewhere it is
+`AuthenticateAsync`. On macOS it reads the client's first record: a ClientHello offering only TLS
+1.3, with no client certificate asked for, is answered by `Tls13ServerStream`, Curl's own TLS 1.3
+server from `Curl.Tls.UnitLibrary` (`Tls13ServerHandshake`: TLS_AES_128_GCM_SHA256, the client's
+X25519 share, the certificate's ECDSA key, ECH ignored as stunnel without ECH keys does), so
+test4001's `--ech` client exits 101 there as on Windows and Linux; any other first record goes
+back to `SslStream` through `ReplayedPrefixStream`. `ShutdownAsync` sends close_notify on either.
 
 `HttpsServerConnector` (BL-1912) stands in for upstream's HTTPS server, `sws` behind stunnel, on
 port 8989, the runner's `%HTTPSPORT`, which has a value only when the caller names a certificate
@@ -160,15 +169,17 @@ the certificate the case's `<server>` line `https [file]` names from `%CERTDIR/c
 (`test-localhost.pem` when none, loaded by `LoadCertificate`), offers no ALPN and asks for no client
 certificate, as stunnel does, and relays the decrypted requests to an `sws` emulation connection in
 turns (request bytes in, every reply byte out), so they land in its `ReceivedBytes` for
-`<verify><protocol>`; once sws closes the connection it sends close_notify, as stunnel does. It
+`<verify><protocol>`; once sws closes the connection it sends close_notify, as stunnel does, and a
+failed handshake (plain HTTP sent to the port, test1244) resets the connection, as stunnel does, so
+curl reports exit 56 (BL-2272). It
 sits between `FtpServerConnector` and `NoListenPortConnector`. Screening lets `https` cases run,
 those that also name `http-proxy` included: a `CONNECT` to `%HTTPSPORT` through the proxy stand-in
 is relayed to `HttpsServerConnector`, so the TLS handshake travels inside the tunnel, the `CONNECT`
 lands in `ProxyReceivedBytes` and the decrypted requests in `ReceivedBytes` (BL-2225; 1849 and 3106
 pass; 780 to 783 pass with the Debug stand-in below, and 446 fails until Curl honours `CURL_HSTS_HTTP`, BL-2250). On
-Windows 25 HTTPS cases pass (300, 303, 304, 306, 309, 311, 312, 325, 364, 410, 414, 417, 474,
-1561, 1562, 2009-2011, 2033, 2048, 2070, 2079, 2087, 3023, 3024, ...) and 2035, 2038, 2042,
-323 and 1244 fail on a difference the next gap run files; the `!Schannel` cases run on Linux and macOS.
+Windows 26 HTTPS cases pass (300, 303, 304, 306, 309, 311, 312, 325, 364, 410, 414, 417, 474,
+1244, 1561, 1562, 2009-2011, 2033, 2048, 2070, 2079, 2087, 3023, 3024, ...) and 2035, 2038, 2042
+and 323 fail on a difference the next gap run files; the `!Schannel` cases run on Linux and macOS.
 
 `MailTlsServerConnector` (BL-1914, ADR-0459) stands in for stunnel in front of the mail
 stand-ins: ports 9000, 9001 and 9002, the runner's `%SMTPSPORT`, `%IMAPSPORT` and `%POP3SPORT`
@@ -253,7 +264,8 @@ failed to resolve, where curl caches the failure).
 path `runtests.pl`'s `http.sock` has under its relative log directory, so it fits a `sockaddr_un`
 wherever the harness's log directory is. Nothing listens on it: upstream's `http-unix` server is the
 `sws` emulation, and the conformance tests' `InMemoryServerTcpDialer` sends a `--unix-socket` dial to
-the connector chain at `%HTTPPORT`, so it reaches `SwsHttpServerConnector` through `TcpConnector`'s own
+the connector chain at `%HTTPPORT` through `UpstreamCaseRunner.HttpUnixSocketTarget` (BL-2271, the one
+public way to dial it, for the gap office's tool too), so it reaches `SwsHttpServerConnector` through `TcpConnector`'s own
 Unix-socket code. Screening lets `http-unix` cases run: 1435 and 1436 pass.
 A `<client><stdout>` part is accepted and never compared, since `runtests.pl` at `curl-8_22_0` reads
 stdout only from `<verify>` (BL-2221): 210 passes, and 211 and 212 differ (Curl retries a refused
@@ -395,8 +407,8 @@ What it is to hold in full, per ADR-0013 decision 2:
   from `Curl.Protocol.Abstractions.UnitLibrary`, which record the bytes they receive;
 - the comparison of a case's results against its `<verify>` section.
 
-This library references `Curl.Protocol.Abstractions.UnitLibrary` and no protocol
-library. It never opens a socket: every connection goes to an in-memory server. It is
+This library references `Curl.Protocol.Abstractions.UnitLibrary`, `Curl.Tls.UnitLibrary`
+(for the TLS 1.3 stand-in, ADR-0522) and no protocol library. It never opens a socket: every connection goes to an in-memory server. It is
 held to the same quality gates as every other `.UnitLibrary` (100% line and branch
 coverage, complexity at most 10, CRAP at most 30) and is AOT-compatible like every
 production project.
