@@ -11,8 +11,9 @@ namespace Curl.Console;
 /// the report of the perform it describes.
 /// </summary>
 /// <param name="Info">
-/// The handle's answers, as a <see cref="TransferInfo" />: every field a <c>-w</c> variable prints but the ones the
-/// runner still answers itself (the scheme, <c>Referer</c>, both IDs, both verify results and the early data).
+/// The handle's answers, as a <see cref="TransferInfo" />: every field a <c>-w</c> libcurl variable prints, the scheme,
+/// <c>Referer</c>, both IDs, both verify results and the early data among them, which the tool-hooked handle answers
+/// with the runner's own (BL-2495).
 /// </param>
 /// <param name="PerformedReport">The report of the handle's last perform, or <see langword="null" /> when it reported none.</param>
 internal sealed record EasyHandleWriteOutInfo(TransferInfo Info, TransferReport? PerformedReport)
@@ -57,6 +58,13 @@ internal sealed record EasyHandleWriteOutInfo(TransferInfo Info, TransferReport?
             SizeUpload = Number(easy, CurlInfo.SizeUploadT),
             SpeedDownload = Number(easy, CurlInfo.SpeedDownloadT),
             SpeedUpload = Number(easy, CurlInfo.SpeedUploadT),
+            Scheme = Text(easy, CurlInfo.Scheme),
+            Referer = Text(easy, CurlInfo.Referer),
+            TransferId = Number(easy, CurlInfo.XferId),
+            ConnectionId = Number(easy, CurlInfo.ConnId),
+            SslVerifyResult = Number(easy, CurlInfo.SslVerifyresult),
+            ProxySslVerifyResult = Number(easy, CurlInfo.ProxySslVerifyresult),
+            EarlyDataSent = Number(easy, CurlInfo.EarlydataSentT),
         },
         performed?.Report);
 

@@ -90,6 +90,38 @@ public sealed class CurlCommandRunnerEasyTransferTests
     }
 
     [TestMethod]
+    public async Task RunAsync_ParallelTransferRetriedWithAReferer_WritesOutTheRetrysTransferIdAndTheRefererSent()
+    {
+        int exitCode = await RunAsync([Busy, Ok], "-Z", "--retry", "1", "-e", "http://r/", "-w", "[%{xfer_id} %{referer} %{scheme}]", Url);
+
+        Diagnostics.Assert("standard output", "busyhello[1 http://r/ http]", StandardOutputText);
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual("busyhello[1 http://r/ http]", StandardOutputText);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_ParallelTransferRedirectedUnderAutoReferer_WritesOutTheRefererTheLastRequestSent()
+    {
+        const string Moved = "HTTP/1.1 301 Moved Permanently\r\nLocation: /b\r\nContent-Length: 0\r\n\r\n";
+
+        int exitCode = await RunAsync([Moved, Ok], "-Z", "-L", "-e", ";auto", "-w", "[%{referer}]", Url);
+
+        Diagnostics.Assert("standard output", "hello[" + Url + "]", StandardOutputText);
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual("hello[" + Url + "]", StandardOutputText);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_SerialTransferRetriedWithAReferer_WritesOutTheHandlesTransferIdRefererAndScheme()
+    {
+        int exitCode = await RunAsync([Busy, Ok], "--retry", "1", "-e", "http://r/", "-w", "[%{xfer_id} %{conn_id} %{referer} %{scheme}]", Url);
+
+        Diagnostics.Assert("standard output", "busyhello[1 1 http://r/ http]", StandardOutputText);
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual("busyhello[1 1 http://r/ http]", StandardOutputText);
+    }
+
+    [TestMethod]
     public async Task RunAsync_OneOptionOfEachGroup_SetsItThroughSetOptionAndNotOnTheHooks()
     {
         int exitCode = await RunAsync([Ok], "-f", "--max-filesize", "100", "--path-as-is", Url);

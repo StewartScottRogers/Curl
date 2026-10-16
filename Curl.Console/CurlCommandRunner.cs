@@ -2247,6 +2247,8 @@ internal sealed class CurlCommandRunner(
         EasyHttpOptions http = EasyOptionsFromCommandLine.HttpOf(options);
         await transferPerformer.OpenAltSvcCacheAsync(Running, EasyOptionsFromCommandLine.TransferSettingsOf(options), EasyOptionsFromCommandLine.NetworkOf(options), http, transferUrl, fileSystem, diagnosticLog, altSvcUsesOverHttp).ConfigureAwait(false);
         transferUrl = await TransferPerformer.SwitchToHttpsForHstsAsync(Hsts, EasyOptionsFromCommandLine.TransferSettingsOf(options), EasyOptionsFromCommandLine.NetworkOf(options), http, transferUrl, fileSystem, eventsBeforeConnecting).ConfigureAwait(false);
+        Running.TransferId = transfer.TransferId;
+        Running.RequestUrl = WriteOutRequestUrl(options, transferUrl);
         TransferResult result = await TransferWithHeaderOutputAsync(dispatch, options, transfer, transferUrl, uploadFile)
             .ConfigureAwait(false);
         return (result, givenUrl, transferUrl);
@@ -2758,9 +2760,9 @@ internal sealed class CurlCommandRunner(
 
     /// <summary>
     /// The values <c>-w</c> prints for one transfer: the libcurl variables from the transfer's
-    /// <see cref="Api.Info.TransferInfo" />, as curl's tool reads them with <c>curl_easy_getinfo</c>
-    /// (<see cref="LibcurlWriteOutInfo" /> and the run's own answers for the scheme,
-    /// <c>Referer</c>, IDs, verify results and early data; BL-2319), and the tool's own beside it.
+    /// <see cref="Api.Info.TransferInfo" />, as curl's tool reads them with <c>curl_easy_getinfo</c>: its easy
+    /// handle's answers as they are when they describe <paramref name="result" /> (ADR-0625, BL-2495), else
+    /// <see cref="ReportWriteOutInfo" />'s; and the tool's own beside it.
     /// <c>%{referer}</c> is the <c>Referer</c> the last request was sent with - under
     /// <c>-e "...;auto" -L</c> the URL the last redirect came from, as the redirect follower reports
     /// it - else the <c>-e</c> text (BL-361 Notes).
@@ -2773,17 +2775,9 @@ internal sealed class CurlCommandRunner(
         TransferResult result,
         long connectionId)
     {
-        string requestUrl = UrlEffective.Normalize(QueryUrl.Append(transferUrl, options), options.PathAsIs);
-        Api.Info.TransferInfo info = LibcurlWriteOutInfo(result, requestUrl) with
-        {
-            Scheme = WriteOutScheme(requestUrl, result),
-            Referer = result.Report?.Referer ?? options.Referer,
-            ConnectionId = connectionId,
-            TransferId = HasNoTransferNumber(result) ? NoTransferId : Running.RetryTransferId ?? transfer.TransferId,
-            SslVerifyResult = Running.SslVerifyResult,
-            ProxySslVerifyResult = Running.ProxySslVerifyResult,
-            EarlyDataSent = Running.TlsEarlyDataSent,
-        };
+        Api.Info.TransferInfo info = Running.EasyWriteOutInfo is { } easyInfo && easyInfo.Describes(result)
+            ? easyInfo.Info
+            : ReportWriteOutInfo(options, transfer, transferUrl, result, connectionId);
         return new(info, result, givenUrl, transfer.UrlNumber)
         {
             OutputFileName = Running.OutputFileName,
@@ -2792,22 +2786,47 @@ internal sealed class CurlCommandRunner(
     }
 
     /// <summary>
-    /// The libcurl part of a transfer's <c>-w</c> values: what its easy handle answered to <c>curl_easy_getinfo</c>
-    /// (<see cref="RunningTransferState.EasyWriteOutInfo" />, ADR-0625) when those answers describe
-    /// <paramref name="result" />, with <paramref name="requestUrl" /> as the effective URL when the report names none,
-    /// as the handle's URL is not yet the tool's normalized one; else, for a transfer that never reached its handle, <see cref="WriteOutTransferInfo.FromReport" />'s, which fills the same fields the same way.
+    /// The URL a transfer of <paramref name="transferUrl" /> requests, which <c>%{url_effective}</c> prints when the
+    /// report names no other and whose scheme <c>%{scheme}</c> prints: with any <c>-G</c> / <c>--url-query</c> query,
+    /// normalized.
     /// </summary>
-    /// <param name="result">The transfer's result.</param>
-    /// <param name="requestUrl">The URL, with any <c>-G</c> / <c>--url-query</c> query, normalized.</param>
-    /// <returns>The info the runner's own answers are laid over.</returns>
-    private Api.Info.TransferInfo LibcurlWriteOutInfo(TransferResult result, string requestUrl)
-    {
-        if (Running.EasyWriteOutInfo is not { } easyInfo || !easyInfo.Describes(result))
-        {
-            return WriteOutTransferInfo.FromReport(result, requestUrl, timeProvider);
-        }
+    /// <param name="options">The transfer's option group.</param>
+    /// <param name="transferUrl">The URL transferred.</param>
+    /// <returns>The request URL.</returns>
+    private static string WriteOutRequestUrl(CommandLineOptions options, string transferUrl) =>
+        UrlEffective.Normalize(QueryUrl.Append(transferUrl, options), options.PathAsIs);
 
-        return easyInfo.PerformedReport!.EffectiveUrl is null ? easyInfo.Info with { EffectiveUrl = requestUrl } : easyInfo.Info;
+    /// <summary>
+    /// The libcurl values <c>-w</c> prints for a transfer its easy handle's answers do not describe - a <c>-Z</c>
+    /// transfer, or one that never reached its handle: <see cref="WriteOutTransferInfo.FromReport" />'s, with the
+    /// runner's own scheme, <c>Referer</c>, IDs, verify results and early data, as a tool-hooked handle answers them
+    /// (BL-2495).
+    /// </summary>
+    /// <param name="options">The transfer's option group.</param>
+    /// <param name="transfer">The transfer.</param>
+    /// <param name="transferUrl">The URL transferred.</param>
+    /// <param name="result">The transfer's result.</param>
+    /// <param name="connectionId">The transfer's <c>%{conn_id}</c>.</param>
+    /// <returns>The info.</returns>
+    private Api.Info.TransferInfo ReportWriteOutInfo(
+        CommandLineOptions options,
+        UrlTransfer transfer,
+        string transferUrl,
+        TransferResult result,
+        long connectionId)
+    {
+        string requestUrl = WriteOutRequestUrl(options, transferUrl);
+        Api.Info.TransferInfo info = WriteOutTransferInfo.FromReport(result, requestUrl, timeProvider);
+        return info with
+        {
+            Scheme = TransferInfoFromReport.RequestSchemeOf(requestUrl, result),
+            Referer = info.Referer ?? options.Referer,
+            ConnectionId = connectionId,
+            TransferId = HasNoTransferNumber(result) ? NoTransferId : Running.RetryTransferId ?? transfer.TransferId,
+            SslVerifyResult = Running.SslVerifyResult,
+            ProxySslVerifyResult = Running.ProxySslVerifyResult,
+            EarlyDataSent = Running.TlsEarlyDataSent,
+        };
     }
 
     /// <summary>
@@ -2841,6 +2860,15 @@ internal sealed class CurlCommandRunner(
         UsedAConnection(result) ? Running.ConnectionId ?? transferPerformer.TakeConnectionId() : NoConnectionId;
 
     /// <summary>
+    /// Gives what takes <paramref name="state" />'s <c>%{conn_id}</c>: the run's next connection number, kept on the
+    /// state, when it holds none yet; the one it holds otherwise.
+    /// </summary>
+    /// <param name="state">The running transfer.</param>
+    /// <returns>The taker.</returns>
+    private Func<long> ConnectionIdTakerFor(RunningTransferState state) =>
+        () => state.ConnectionId ??= transferPerformer.TakeConnectionId();
+
+    /// <summary>
     /// Sets the running transfer's <see cref="RunningTransferState.Events" />, whose lines under
     /// <c>--trace-ids</c> carry <c>[&lt;xfer&gt;-&lt;conn&gt;] </c>, the transfer taking its
     /// <c>%{conn_id}</c> at its first event; and returns the sink for what comes before it
@@ -2862,7 +2890,7 @@ internal sealed class CurlCommandRunner(
     private ITransferEvents SetUpTransferEvents(CommandLineOptions options, UrlTransfer transfer)
     {
         RunningTransferState state = Running;
-        Func<long> takeConnectionId = () => state.ConnectionId ??= transferPerformer.TakeConnectionId();
+        Func<long> takeConnectionId = ConnectionIdTakerFor(state);
         ITransferEvents output = transferEventOutput.EventsFor(transfer.TransferId, () => takeConnectionId());
         ITransferEvents events = WithTraceLineEvents(options, output, takeConnectionId);
         ITransferEvents recorded = options.WriteOut is null ? events : new TlsResultRecordingTransferEvents(events, state);
@@ -2963,20 +2991,6 @@ internal sealed class CurlCommandRunner(
             eventsBeforeConnecting.ReportInfo(ClientReaderResetTraceEvents.ResetLine);
         }
     }
-
-    /// <summary>
-    /// The scheme <c>%{scheme}</c> prints: the URL's, in lower case, or <see langword="null" />
-    /// (printed as nothing) when the URL cannot be parsed or no handler serves its scheme, as
-    /// curl 8.21.0 prints it for <c>dict://exa mple.com/</c> and <c>xyz://a/b</c>.
-    /// </summary>
-    /// <param name="requestUrl">The URL, with any <c>-G</c> / <c>--url-query</c> query.</param>
-    /// <param name="result">The transfer's result.</param>
-    /// <returns>The scheme, or <see langword="null" />.</returns>
-    private static string? WriteOutScheme(string requestUrl, TransferResult result) =>
-        result.ExitCode != CurlExitCode.UnsupportedProtocol
-        && CurlUrl.TryParse(requestUrl, pathAsIs: false, out CurlUrl? url)
-            ? url.Scheme
-            : null;
 
     /// <summary>
     /// Tells whether a transfer's result stops the URLs after it: a resumed transfer whose
@@ -4627,10 +4641,7 @@ internal sealed class CurlCommandRunner(
                 StartTransferProgress(options, attemptResumeFrom, toStandardOutput: outputFile is null);
             }
 
-            RunningTransferState state = Running;
-            TransferResult attemptResult = await PerformThroughEasyAsync(easy, follower, attempt, attemptResumeFrom).ConfigureAwait(false);
-            TransferPerformer.KeepRetriedConnectionIdWhenReused(state, transfer, attemptResult);
-            return attemptResult;
+            return await PerformThroughEasyAsync(easy, follower, attempt, attemptResumeFrom).ConfigureAwait(false);
         });
 
         TransferResult result = await retrier
@@ -4673,7 +4684,7 @@ internal sealed class CurlCommandRunner(
         IToolEasyTransfer hooks = easy.Hooks;
         hooks.ToolOutputs = attempt.Outputs();
         hooks.ToolInputs = attempt.Inputs(resumeFrom) with { Url = attempt.Url };
-        hooks.ToolEvents = new EngineToolTransferEvents(state.Events, state);
+        hooks.ToolEvents = new EngineToolTransferEvents(state.Events, state, ConnectionIdTakerFor(state));
         hooks.ToolProgress = new EngineToolTransferProgress(state.Progress, state.AbortToken);
         hooks.ToolDispatch = new EngineToolTransferDispatch(follower, transferContextFactory);
         _ = parallelRun is null

@@ -500,9 +500,10 @@ after its failure lines, after a failure as after a success (a `-D` or resumed `
 cannot be opened included), with `TransferWriteOutVariables` as its values. A transfer's libcurl values, `-Z` or not, are its easy handle's
 `curl_easy_getinfo` answers, read through `CurlEasy.GetInfo` after its last attempt and before cleanup
 (`EasyHandleWriteOutInfo`, kept as `RunningTransferState.EasyWriteOutInfo`) and used when they describe the
-reported result (ADR-0628); one that never reached its handle gets `WriteOutTransferInfo.FromReport`'s,
-and the runner's own scheme, `Referer`, IDs, verify results and early data lie over either until BL-2495
-(ADR-0625, BL-2452). Its `%time{format}`
+reported result (ADR-0628), as they are: the handle answers the runner's own scheme, `Referer`, IDs, verify results
+and early data, which the runner hands it on the running transfer (`TransferId`, `RequestUrl`) and through
+`EngineToolTransferEvents.TakeConnectionId` (ADR-0654, BL-2495). One that never reached its handle, or a `-Z` one,
+gets `WriteOutTransferInfo.FromReport`'s with the runner's values laid over them (`ReportWriteOutInfo`; ADR-0625, BL-2452). Its `%time{format}`
 follows the `WriteOutTimeDialect` the runner is given: `CurlComposition.WriteOutTimeDialectFor`
 passes `WindowsCRuntime` on Windows and `Glibc` elsewhere (ADR-0078, BL-387). On Windows the
 line feeds it writes to standard error, and to standard output while curl's standard output
