@@ -14,7 +14,7 @@ namespace Libcurl.Multi;
 /// </summary>
 /// <remarks>
 /// The class is <see langword="partial"/>: each multi area adds its members in its own folder under
-/// <c>Libcurl/Multi</c>, keeping the namespace <c>Libcurl.Multi</c> (ADR-0567). Like libcurl's, a multi
+/// <c>Libcurl/Multi</c>, keeping the namespace <c>Libcurl.Multi</c> (ADR-0570). Like libcurl's, a multi
 /// handle is for one thread at a time.
 /// </remarks>
 public sealed partial class CurlMulti : IAsyncDisposable

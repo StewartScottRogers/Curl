@@ -31,7 +31,7 @@ ADR-0506; phase 3 of `Documentation/Planning/Curl-Api-And-libcurl.md`. Read the 
 ## Notes
 
 - Added `Libcurl/Easy/CurlEasy.cs` to touches: `CurlMulti` needs the easy handle's engine transfer, so `CurlEasy` gains an internal `Transfer` property; no task in Doing on `origin/work/dark-factory` touches `Libcurl/Easy`. `Libcurl/CLAUDE.md` added for the acceptance criterion that keeps it true.
-- Decisions in ADR-0567: `CurlMulti` is partial in namespace `Libcurl.Multi` (BL-2430 to BL-2432 add parts in sibling folders); `InfoRead` answers Libcurl's own `CurlMessage` naming the added `CurlEasy`; null or cleaned-up handles answer `BadEasyHandle` and a handle this multi holds `AddedAlready` without calling the engine; no synchronous `Perform`.
+- Decisions in ADR-0570: `CurlMulti` is partial in namespace `Libcurl.Multi` (BL-2430 to BL-2432 add parts in sibling folders); `InfoRead` answers Libcurl's own `CurlMessage` naming the added `CurlEasy`; null or cleaned-up handles answer `BadEasyHandle` and a handle this multi holds `AddedAlready` without calling the engine; no synchronous `Perform`.
 - `Measure-CodeQuality.ps1 -Library Libcurl`: 0 failing members. `PassingUpstreamCases.txt` unchanged.
 
 ## Log

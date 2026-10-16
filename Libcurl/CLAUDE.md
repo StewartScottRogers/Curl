@@ -37,7 +37,7 @@ changed `EasyOptions` back to the transfer only on `Ok`; `PerformAsync` is the n
 `ObjectDisposedException`. `GetInfo` is `curl_easy_getinfo` and goes through `Info`'s dispatch.
 
 `Multi` holds `CurlMulti`, the multi handle `CurlLibrary.MultiInit` (`curl_multi_init`) returns over
-the engine's `IMultiTransfer` (ADR-0567). It is `partial`: each multi area adds its members in its own
+the engine's `IMultiTransfer` (ADR-0570). It is `partial`: each multi area adds its members in its own
 folder under `Libcurl/Multi`, keeping the namespace `Libcurl.Multi`. `Multi/Core` has `AddHandle`,
 `RemoveHandle`, `PerformAsync`, `InfoRead` and `DisposeAsync` (`curl_multi_cleanup`); it maps each
 added engine transfer back to its `CurlEasy`, so `InfoRead` answers a `CurlMessage` naming the handle
