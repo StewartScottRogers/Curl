@@ -12,7 +12,7 @@ using Curl.Api.Options.Network;
 namespace Curl.Engine;
 
 [TestClass]
-public sealed class ManagedMultiTransferTests
+public sealed partial class ManagedMultiTransferTests
 {
     [TestMethod]
     public async Task PerformAsync_SeveralTransfers_RunAtOnceAndQueueADoneMessageAsEachFinishes()
@@ -272,15 +272,11 @@ public sealed class ManagedMultiTransferTests
     }
 
     [TestMethod]
-    public async Task WaitSocketAndCountMembers_NotYetBuilt_ThrowNotSupported()
+    public async Task SocketActionAndCountMembers_NotYetBuilt_ThrowNotSupported()
     {
         await using ManagedCurlEngine engine = new();
         await using IMultiTransfer multi = engine.CreateMulti();
 
-        Assert.ThrowsExactly<NotSupportedException>(() => multi.WaitAsync(Memory<CurlWaitSocket>.Empty, TimeSpan.Zero, CancellationToken.None));
-        Assert.ThrowsExactly<NotSupportedException>(() => multi.PollAsync(Memory<CurlWaitSocket>.Empty, TimeSpan.Zero, CancellationToken.None));
-        Assert.ThrowsExactly<NotSupportedException>(() => multi.Wakeup());
-        Assert.ThrowsExactly<NotSupportedException>(() => multi.GetTimeout());
         Assert.ThrowsExactly<NotSupportedException>(() => multi.SocketActionAsync(CurlMultiSockets.Timeout, CurlSocketSelect.None, CancellationToken.None));
         Assert.ThrowsExactly<NotSupportedException>(() => multi.Assign(CurlSocket.Bad, null));
         Assert.ThrowsExactly<NotSupportedException>(() => multi.GetHandles());
