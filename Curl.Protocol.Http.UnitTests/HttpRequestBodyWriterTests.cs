@@ -10,7 +10,7 @@ namespace Curl.Protocol.Http;
 /// server, and to the exit 26 it returned for a body file that failed a read (BL-175 Notes).
 /// </summary>
 [TestClass]
-public sealed class HttpRequestBodyWriterTests
+public sealed partial class HttpRequestBodyWriterTests
 {
     public TestContext TestContext { get; set; } = null!;
 

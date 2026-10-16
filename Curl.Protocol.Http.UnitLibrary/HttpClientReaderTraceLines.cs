@@ -15,6 +15,12 @@ internal static class HttpClientReaderTraceLines
     internal const string AddedLastChunk = "[READ] http_chunk, added last, empty chunk";
 
     /// <summary>
+    /// The chunk encoder's line for the closing chunk when <c>CURLOPT_TRAILERFUNCTION</c> is set, written
+    /// after the trailer source gave its lines (curl 8.22.0's <c>add_last_chunk</c>, BL-2475).
+    /// </summary>
+    internal const string AddedLastChunkWithTrailers = "[READ] http_chunk, added last chunk with trailers from client -> 0";
+
+    /// <summary>
     /// Gives whether curl reads <paramref name="body" /> through client readers at all: every body but
     /// an empty one, which curl sends without a reader.
     /// </summary>
