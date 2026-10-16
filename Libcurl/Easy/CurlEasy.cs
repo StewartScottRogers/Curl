@@ -35,6 +35,10 @@ public sealed class CurlEasy : IDisposable, IAsyncDisposable
     /// <exception cref="ObjectDisposedException">The handle has been cleaned up.</exception>
     public EasyOptions Options => LiveTransfer().Options;
 
+    /// <summary>The engine's transfer, which <see cref="Multi.CurlMulti"/> adds to and removes from its multi transfer.</summary>
+    /// <exception cref="ObjectDisposedException">The handle has been cleaned up.</exception>
+    internal IEasyTransfer Transfer => LiveTransfer();
+
     /// <summary><c>curl_easy_setopt</c>: sets <paramref name="option"/> to <paramref name="value"/>.</summary>
     /// <param name="option">The option to set.</param>
     /// <param name="value">The value, of the .NET type the option's <see cref="CurlOptionType"/> takes.</param>

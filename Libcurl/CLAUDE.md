@@ -36,6 +36,14 @@ changed `EasyOptions` back to the transfer only on `Ok`; `PerformAsync` is the n
 `DisposeAsync` are `curl_easy_cleanup` and dispose the transfer once; a member used afterwards throws
 `ObjectDisposedException`. `GetInfo` is `curl_easy_getinfo` and goes through `Info`'s dispatch.
 
+`Multi` holds `CurlMulti`, the multi handle `CurlLibrary.MultiInit` (`curl_multi_init`) returns over
+the engine's `IMultiTransfer` (ADR-0567). It is `partial`: each multi area adds its members in its own
+folder under `Libcurl/Multi`, keeping the namespace `Libcurl.Multi`. `Multi/Core` has `AddHandle`,
+`RemoveHandle`, `PerformAsync`, `InfoRead` and `DisposeAsync` (`curl_multi_cleanup`); it maps each
+added engine transfer back to its `CurlEasy`, so `InfoRead` answers a `CurlMessage` naming the handle
+the caller added. A `null` or cleaned-up `CurlEasy` answers `BadEasyHandle`, one this multi holds
+already `AddedAlready`, both without calling the engine.
+
 `Info` holds `CurlInfo` (every `CURLINFO_*` of curl 8.22.0's `curl.h` by name and number) and the
 internal `EasyInfoDispatch` `CurlEasy.GetInfo` goes through (ADR-0566): an id `curl.h` lacks answers
 `UnknownOption`, a known info no group reads yet `NotBuiltIn`. Each info group adds its reader rows by
