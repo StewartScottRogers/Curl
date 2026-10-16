@@ -31,7 +31,7 @@ Prerequisite of BL-2420, which adapts libcurl's CURLOPT_CHUNK_BGN_FUNCTION, CHUN
 
 - 2026-10-16 (lane 1): read upstream curl 8.22.0's `lib/ftp.c` (`init_wc_data`, `wc_statemach`,
   `ftp_done_wildcard`, `ftp_done_status`), `lib/ftplistparser.c` (`ftp_pl_insert_finfo`) and tests
-  574 and 576. Two acceptance details differ from upstream and follow upstream instead (ADR-0614):
+  574 and 576. Two acceptance details differ from upstream and follow upstream instead (ADR-0615):
   curl ignores the chunk-end callback's return value, so a failing end hook is pinned as ignored
   (every match still downloaded, exit 0), and a failing match hook only leaves the entry out, so
   with every entry left out the download ends with 78, not 87. 87 comes from a malformed listing
