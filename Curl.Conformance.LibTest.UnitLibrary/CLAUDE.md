@@ -13,6 +13,11 @@ upstream case runner runs for a case whose `<client><tool>` line names `lib%TEST
   the program name, copied), `Url` (`argv[1]`) and `Argument2` to `Argument4`
   (`libtest_arg2` to `_arg4`, `null` when not given).
 - `LibTestResult` is the exit code `main()` returns: `Success` (0), or `FromCurlCode` by number.
+- `LibTestErrorCodes` is `first.h`'s `TEST_ERR_*` codes, 8.22.0's `CURLE_OBSOLETE*` values (ADR-0653).
+- `LibTestSteps` is `first.h`'s step macros carrying `result` as `Result`: `GlobalInit`,
+  `EasyInit`, `EasySetOption` (`easy_setopt`), `EasyPerformAsync`, `EasyGetInfo` and
+  `SlistAppend`. Each answers whether the program goes on; on `false` the port goes to its
+  cleanup and returns `ToLibTestResult()`.
 
 ## Rules
 
