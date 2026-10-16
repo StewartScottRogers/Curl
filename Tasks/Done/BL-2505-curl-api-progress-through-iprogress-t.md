@@ -30,7 +30,7 @@ Phase 4 of `Documentation/Planning/Curl-Api-And-libcurl.md`; ADR-0506. `Curl.Api
 
 ## Notes
 
-- Plan: `CurlRequest.Progress` (`IProgress<CurlTransferProgress>?`) in `Curl.Api/Progress`; `TransferProgressReporter` is the transfer-info callback, reporting then chaining to `TransferCancellation.Progress`; `ResponseBodyStream` builds it and ends it when perform returns. ADR-0640.
+- Plan: `CurlRequest.Progress` (`IProgress<CurlTransferProgress>?`) in `Curl.Api/Progress`; `TransferProgressReporter` is the transfer-info callback, reporting then chaining to `TransferCancellation.Progress`; `ResponseBodyStream` builds it and ends it when perform returns. ADR-0643.
 - Choices: speeds come from the handle's `CURLINFO_SPEED_*_T` (no clock needed); `CurlTransferPhase` (Connecting, Uploading, Downloading) is read from the byte counts alone; a throwing report answers abort on that and every later call, so the transfer fails as `CurlException` (`AbortedByCallback`) and the exception never reaches the engine.
 - Touches widened to `Curl.Api/ResponseBodies`, `Curl.Api/Messages` and `Curl.Api/CLAUDE.md`: the callback must be wired where the transfer is built and ends; no task in Doing on `origin/work/dark-factory` names them (BL-2503 holds `Curl.Api/Options/Protocol` only).
 - The first quality run found `SendWithBodyCapacityAsync`'s await-in-catch rethrow line uncovered (a compiler-generated path); set-up failures are now captured with `ExceptionDispatchInfo` and rethrown after the handles are disposed.
