@@ -276,14 +276,18 @@ public sealed class MultipartFormBodyBuilder(
             return TransferResult.Failure(CurlExitCode.BadFunctionArgument, UnknownEncoderMessage);
         }
 
-        if (part.Kind == MultipartFormPartKind.Text)
+        if (!ReadsAFile(part))
         {
-            AddTextPart(segments, part, disposition, nameEscaping, forMail, encoder);
+            AddPartWithoutFile(segments, part, disposition, nameEscaping, forMail, encoder);
             return null;
         }
 
         return await AddFilePartAsync(segments, part, disposition, nameEscaping, forMail, encoder, cancellationToken).ConfigureAwait(false);
     }
+
+    /// <summary>Whether <paramref name="part" /> is a <see cref="MultipartFormPartKind.FileUpload" /> or <see cref="MultipartFormPartKind.FileContent" /> part.</summary>
+    private static bool ReadsAFile(MultipartFormPart part) =>
+        part.Kind is MultipartFormPartKind.FileUpload or MultipartFormPartKind.FileContent;
 
     /// <summary>Finds the encoder <paramref name="name" /> names; no name finds no encoder, which is not a failure.</summary>
     private static bool TryFindEncoder(string? name, out MultipartPartEncoder? encoder)
@@ -414,9 +418,45 @@ public sealed class MultipartFormBodyBuilder(
         return null;
     }
 
-    private void AddTextPart(MultipartBodySegments segments, MultipartFormPart part, string? disposition, MultipartNameEscaping nameEscaping, bool forMail, MultipartPartEncoder? encoder)
+    /// <summary>
+    /// Adds a <see cref="MultipartFormPartKind.Text" />, <see cref="MultipartFormPartKind.Bytes" /> or
+    /// <see cref="MultipartFormPartKind.Reader" /> part: its headers, then its text, its bytes as they
+    /// are, or the stream its <see cref="MultipartFormPart.OpenContent" /> opens.
+    /// </summary>
+    private void AddPartWithoutFile(MultipartBodySegments segments, MultipartFormPart part, string? disposition, MultipartNameEscaping nameEscaping, bool forMail, MultipartPartEncoder? encoder)
     {
         segments.AddText(MultipartPartHeaders.Format(part, disposition, null, encoder?.Name, nameEscaping, forMail, out _));
+        switch (part.Kind)
+        {
+            case MultipartFormPartKind.Bytes:
+                AddData(segments, part.Bytes.ToArray(), encoder, forMail);
+                break;
+            case MultipartFormPartKind.Reader:
+                AddReaderData(segments, part.OpenContent?.Invoke() ?? Stream.Null, part.ContentLength, encoder);
+                break;
+            default:
+                AddTextData(segments, part, encoder, forMail);
+                break;
+        }
+    }
+
+    /// <summary>
+    /// Adds a reader part's stream, encoded as it is sent when its encoder encodes; it is never read
+    /// ahead, so a <c>7bit</c> refusal fails the read that reaches it, as libcurl meets a callback part's.
+    /// </summary>
+    private static void AddReaderData(MultipartBodySegments segments, Stream content, long? length, MultipartPartEncoder? encoder)
+    {
+        if (encoder is null || encoder.PassesDataThrough)
+        {
+            segments.AddStream(content, length);
+            return;
+        }
+
+        segments.AddStream(encoder.EncodeWhileReading(content, length), encoder.EncodedLength(length));
+    }
+
+    private void AddTextData(MultipartBodySegments segments, MultipartFormPart part, MultipartPartEncoder? encoder, bool forMail)
+    {
         if (encoder is null)
         {
             segments.AddText(part.Content);

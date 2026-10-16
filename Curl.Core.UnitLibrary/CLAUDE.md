@@ -105,7 +105,10 @@ builder is given whole, never closing it, so the body keeps its `Content-Length`
 one it opens the path `-` as before (BL-275). A file that cannot seek declares the length
 `UnseekableFileLength` gives it (ADR-0097); one that can declares its length, except a device
 under `/dev/` off Windows, which `SeekableFileLength` sends chunked as libcurl does
-(ADR-0104). Names and file names are escaped as `MultipartNameEscaping` says: `%22`, `%0D`, `%0A` by default, `\\` and `\"` under `--form-escape` (BL-625). `Curl.Console` builds every `-F` body with it.
+(ADR-0104). Names and file names are escaped as `MultipartNameEscaping` says: `%22`, `%0D`, `%0A` by default, `\\` and `\"` under `--form-escape` (BL-625). `Curl.Console` builds every `-F` body with it. Two kinds no command line gives serve
+libcurl's MIME API (BL-2470, ADR-0626): a `Bytes` part sends `MultipartFormPart.Bytes` verbatim, and a `Reader`
+part streams what `OpenContent` opens, never read ahead, with `ContentLength` `null` leaving the body's length
+unknown (sent chunked); both take a text part's headers.
 
 `Globbing\UrlGlob` is curl 8.21.0's URL globbing (ADR-0032): `TryParse` reads `{a,b}` sets
 and `[1-10]`, `[01-10]`, `[a-z:2]` ranges as `tool_urlglob.c` does, failing with exit 3 and
