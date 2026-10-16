@@ -1,7 +1,8 @@
 # Libcurl and Curl.Api: two public .NET APIs over one engine
 
-**Status: approved by Stewart 2026-10-15; phases 1 and 2 filed as tasks, phases 3-5 described
-here and filed by the last phase 2 task.** Nothing below exists in the code yet except where it
+**Status: approved by Stewart 2026-10-15; phases 1 and 2 filed as tasks, phase 3 filed by the
+last phase 2 task, phase 4 by the last phase 3 task, phase 5 described here and filed by the last
+phase 4 task (BL-2514).** Nothing below exists in the code yet except where it
 says "today". The decision record is ADR-0506; where this plan and the ADR disagree, the ADR wins
 and this plan is corrected.
 
@@ -240,7 +241,7 @@ scores unchanged, leaves `Curl.Console/CurlEasyErrorText.cs` where it is and kee
 | Move `CurlEasyErrorText` beside `curl_easy_strerror` - paired with an **interactive** `Gap/Tools/Measure-ExitCodeGap.ps1` change on the `gap` branch first (`lane: no`) | 2 |
 | Re-base `Curl.Console` onto `Libcurl`: serial transfers, `-w` and info, `--parallel` through `CurlMulti`, removing its direct engine reference | 4 |
 
-### Phase 4 - `Curl.Api` (estimate 14-16 tasks; filed after phase 3's easy and multi areas)
+### Phase 4 - `Curl.Api` (19 tasks, filed 2026-10-16 by BL-2455; the estimate was 14-16, corrected under "Filed tasks")
 
 `CurlClient` lifecycle and engine choice; request/response records and `Stream` bodies; option
 records mapped to the easy option groups; `CurlException` and code mapping; cancellation through
@@ -276,7 +277,7 @@ usage README; `--ai-help` is untouched (no option changes).
 | 1 - engine extraction and console re-base | 20 (filed) |
 | 2 - scaffolding and seam | 21 (filed) |
 | 3 - `Libcurl` | 61 (filed) |
-| 4 - `Curl.Api` | 14-16 |
+| 4 - `Curl.Api` | 19 (filed) |
 | 5 - libtest ports and gap measurement | 40-45 |
 | **All** | **150-162** |
 
@@ -403,3 +404,36 @@ Phase 3 - `Libcurl`, area by area (61 tasks, filed 2026-10-15 by BL-2321; the ta
 | BL-2453 | Re-base Curl.Console: --parallel through CurlMulti |
 | BL-2454 | Re-base Curl.Console: remove its direct reference to Curl.Engine.UnitLibrary |
 | BL-2455 | File phase 4 tasks for Curl.Api from Documentation/Planning/Curl-Api-And-libcurl.md |
+
+Phase 4 - `Curl.Api` (19 tasks, filed 2026-10-16 by BL-2455). `Curl.Api` is built on the seam
+(`ICurlEngine` and the rest of `Curl.Api.UnitLibrary`), not on `Libcurl`, so its tasks wait on
+each other, not on phase 3: every engine-side dependency they have is already Done. Code lives in
+`Curl.Api/<Area>` with tests in `Curl.Api.UnitTests/<Area>`, so areas with disjoint `touches` can
+run in parallel lanes. The estimate's bullets map to tasks as: lifecycle and engine choice
+(BL-2496, BL-2497); records and `Stream` bodies (BL-2499, BL-2500, BL-2501); option records
+(BL-2502, BL-2503); `CurlException` (BL-2498); cancellation (BL-2504); progress (BL-2505); MIME
+(BL-2506); stores (BL-2507); WebSocket (BL-2508); concurrency (BL-2509); `CurlHttpMessageHandler`
+(BL-2510 to BL-2512); README (BL-2513); phase 5 filing (BL-2514). The estimate's HTTP/2 and
+HTTP/3 policy, decompression, redirects, auth and proxy bullets are BL-2511 and BL-2512.
+
+| Task | Title |
+| --- | --- |
+| BL-2496 | `Curl.Api`: CurlClient lifecycle over an ICurlEngine |
+| BL-2497 | `Curl.Api`: CurlClient.Create builds the managed engine |
+| BL-2498 | `Curl.Api`: CurlException carrying the CurlCode |
+| BL-2499 | `Curl.Api`: CurlRequest and CurlResponse records |
+| BL-2500 | `Curl.Api`: request bodies from a Stream or byte content |
+| BL-2501 | `Curl.Api`: streamed response bodies |
+| BL-2502 | `Curl.Api`: transport option records mapped to the easy option groups |
+| BL-2503 | `Curl.Api`: HTTP, authentication and protocol option records |
+| BL-2504 | `Curl.Api`: cancellation through CancellationToken |
+| BL-2505 | `Curl.Api`: progress through IProgress<T> |
+| BL-2506 | `Curl.Api`: MIME multipart bodies |
+| BL-2507 | `Curl.Api`: cookie, HSTS and alt-svc stores |
+| BL-2508 | `Curl.Api`: WebSocket client with IAsyncEnumerable messages |
+| BL-2509 | `Curl.Api`: concurrent transfers over the multi contract |
+| BL-2510 | `Curl.Api`: CurlHttpMessageHandler maps HttpRequestMessage and HttpResponseMessage |
+| BL-2511 | `Curl.Api`: CurlHttpMessageHandler HTTP version policy and proxy |
+| BL-2512 | `Curl.Api`: CurlHttpMessageHandler decompression, redirects and authentication |
+| BL-2513 | `Curl.Api`: usage README |
+| BL-2514 | File phase 5 tasks: port tests/libtest and measure libcurl-api |
