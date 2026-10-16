@@ -31,7 +31,7 @@ Phase 5 of `Documentation/Planning/Curl-Api-And-libcurl.md` and ADR-0506. Upstre
 
 - Read `first.h`, `testutil.c` and `testtrace.c` at the `curl-8_22_0` tag. 8.22.0 has no
   `test.h`, no `tutil_tvnow`/`tutil_tvdiff` (now `curlx_now`/`curlx_timediff_ms`), no `multi_wait`
-  macro and no `share_init`/`url_init` macro; decisions for each are in ADR-0654.
+  macro and no `share_init`/`url_init` macro; decisions for each are in ADR-0655.
 - Added: the multi steps, `ShareInit`, `UrlInit` and `AbortOnTestTimeout` on `LibTestSteps`
   (partial files); `LibTestClock` (`TimeProvider`: `Now`, `DifferenceMilliseconds`,
   `StartTestTiming`, `WaitAsync`); `LibTestUtilities` (`SubUrl`, `ThrowawayWrite`);
