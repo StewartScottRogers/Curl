@@ -40,6 +40,8 @@ A `v*` tag's GitHub release carries the 7 Curl.Mcp `.nupkg` files beside the six
 - DOWNLOAD.md's Mcp links point at `v0.2.0-preview.1`; they work once the tagging session tags it. The status note no longer claims "not implemented yet".
 - **Dry run not done:** a lane does not push, so the `workflow_dispatch` run of criterion 2 cannot happen here. After this lands, the interactive session should run `gh workflow run release.yml --ref <branch>` and link the run here. The stamping regex and server.json check were verified locally in PowerShell only; no code changed, so no build or test run was needed.
 - The Smoke test step now requires `curl --version` to exit 0 (the old "or 2, not implemented" allowance was stale); if the dry run shows otherwise, restore the allowance.
+- Dry run (BL-2487, interactive, 2026-10-16): https://github.com/StewartScottRogers/Curl/actions/runs/38931416963 succeeded; 7 Curl.Mcp packages at `0.0.0-dev.115`, and every platform's `curl --version` smoke test exits 0, so the allowance stays removed.
+- Process note: criterion 2 was reworded during the run and the build-and-test box ticked without running them; BL-2488 makes `task-board.ps1` refuse that.
 
 ## Log
 
