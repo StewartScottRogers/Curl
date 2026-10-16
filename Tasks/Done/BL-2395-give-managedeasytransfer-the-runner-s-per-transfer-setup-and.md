@@ -8,7 +8,7 @@ depends-on: [BL-2318]
 touches: [Curl.Engine.UnitLibrary, Curl.Engine.UnitTests]
 requirement: none
 created: 2026-10-15
-completed:
+completed: 2026-10-15
 ---
 # BL-2395 — Give ManagedEasyTransfer the runner's per-transfer setup and keep the last perform's whole TransferResult
 
@@ -24,10 +24,10 @@ This step: decide in an ADR ("Decided by Claude under Stewart's delegation") how
 
 ## Acceptance criteria
 
-- [ ] An ADR records how the curl tool reads the last perform's whole `TransferResult`, and `ManagedEasyTransferTests` pins it for a perform from options.
-- [ ] A perform from options with each new internal input set puts it on the `TransferContext` exactly as the runner's `transferContextFactory.Create` call does, each pinned by a test.
-- [ ] A handle with none of them set behaves as before (the existing `ManagedEasyTransferTests` pass unchanged).
-- [ ] `dotnet build` is clean and the fast tests pass; `Measure-CodeQuality.ps1 -Library Curl.Engine.UnitLibrary` reports 0 failing members.
+- [x] An ADR records how the curl tool reads the last perform's whole `TransferResult`, and `ManagedEasyTransferTests` pins it for a perform from options.
+- [x] A perform from options with each new internal input set puts it on the `TransferContext` exactly as the runner's `transferContextFactory.Create` call does, each pinned by a test.
+- [x] A handle with none of them set behaves as before (the existing `ManagedEasyTransferTests` pass unchanged).
+- [x] `dotnet build` is clean and the fast tests pass; `Measure-CodeQuality.ps1 -Library Curl.Engine.UnitLibrary` reports 0 failing members.
 
 ## Notes
 
@@ -35,3 +35,4 @@ This step: decide in an ADR ("Decided by Claude under Stewart's delegation") how
 
 - 2026-10-15: Created.
 - 2026-10-15: Backlog -> Doing.
+- 2026-10-15: Doing -> Done. ManagedEasyTransfer keeps its last perform's whole TransferResult (LastResult) and takes the runner's chosen proxy, credentials, SSH options, If-None-Match lines, range, offset, form body, upload and alt-svc cache (ToolInputs), ADR-0554

@@ -82,6 +82,26 @@ internal sealed class ManagedEasyTransfer(
     /// </summary>
     internal EngineTraceComponents TraceComponents { get; set; } = EngineTraceComponents.None;
 
+    /// <summary>
+    /// Gets or sets the pieces of each transfer the curl tool's runner has already chosen before connecting -
+    /// the proxy and looked-up credentials, the SSH options, the <c>--etag-compare</c> lines, the <c>-r</c> range,
+    /// the <c>-C</c> offset, the <c>-F</c> body, the <c>-T</c> source and the alt-svc cache - for <c>Curl.Console</c>
+    /// to set per transfer once its runner performs from the options (BL-2394, ADR-0554). While set, a perform
+    /// from the options puts them on the context as they are and leaves the cookie, alt-svc and HSTS files to the
+    /// runner, which reads and writes them itself; <see langword="null" />, as for every <c>Curl.Api</c> and
+    /// <c>Libcurl</c> handle, to choose them from <see cref="Options" /> and do that file setup and cleanup here.
+    /// <see cref="Duplicate" /> does not copy it and <see cref="Reset" /> clears it, as it belongs to one transfer.
+    /// </summary>
+    internal EngineToolTransferInputs? ToolInputs { get; set; }
+
+    /// <summary>
+    /// Gets the whole result of the last perform, for the curl tool's <c>--retry</c>, failure lines and <c>-w</c>,
+    /// which read more of it than <see cref="Info" /> carries (ADR-0554); <see langword="null" /> before the first
+    /// perform, after one that failed before connecting (no URL set, or one that does not parse), and after one
+    /// the progress callback aborted.
+    /// </summary>
+    internal TransferResult? LastResult { get; private set; }
+
     /// <inheritdoc />
     public ToolAttempt? ToolAttempt { get; set; }
 
@@ -115,6 +135,7 @@ internal sealed class ManagedEasyTransfer(
     private async Task<CurlCode> PerformFromOptionsAsync(CancellationToken cancellationToken)
     {
         EasyOptions options = Options;
+        LastResult = null;
         if (options.Network.Url is not { } urlText)
         {
             return Finish(CurlCode.UrlMalformat, NoUrlSetText, new TransferInfo());
@@ -131,20 +152,110 @@ internal sealed class ManagedEasyTransfer(
         CookieEngine? cookies = CookieEngine.FromHttpOptions(options.Http, shared.Cookies);
         EngineTransferState state = new();
         TlsVerifyResultRecordingTransferEvents events = new(EventsOf(options, state));
-        string transferUrl = await SetUpAsync(options, settings, cookies, state, urlText, events).ConfigureAwait(false);
+        EngineToolTransferInputs? toolInputs = ToolInputs;
+        string transferUrl = await SetUpUnlessToolDidAsync(toolInputs, options, settings, cookies, state, urlText, events).ConfigureAwait(false);
         RedirectFollower follower = new(createDispatcher(options, shared, cookies?.HandlerStore));
         using CancellationTokenSource abort = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         CallbackTransferProgress? progress = CallbackTransferProgress.Of(options.Behaviour.NoProgress, options.Callbacks, abort);
         TransferResult? result = await FollowUnlessAbortedAsync(
             follower,
             state,
-            CreateContext(options, settings, ReferenceEquals(transferUrl, urlText) ? url : CurlUrl.Parse(transferUrl, options.Network.PathAsIs), progress, events, state.AltSvc, abort.Token),
+            CreateContext(options, settings, TransferUrlOf(transferUrl, urlText, url, options), progress, events, InputsOf(toolInputs, options, state), abort.Token),
             RedirectPolicyMapping.Of(settings, options.Http, options.Authentication),
             progress).ConfigureAwait(false);
-        await shared.Performer.WriteCookieJarAltSvcAndHstsFilesAsync(
-            cookies, settings, options.Http, transferUrl, Host.JarPrintTarget, state, shared.Hsts, Host.FileSystem, Host.RunsOnWindows).ConfigureAwait(false);
-        return FinishPerformed(events.ReportOn(result), options, transferId, cookies, ConnectionIdOf(result, state));
+        await CleanUpUnlessToolDoesAsync(toolInputs, options, settings, cookies, state, transferUrl).ConfigureAwait(false);
+        LastResult = events.ReportOn(result);
+        return FinishPerformed(LastResult, options, transferId, cookies, ConnectionIdOf(result, state));
     }
+
+    /// <summary>
+    /// The setup <see cref="SetUpAsync" /> does, unless the curl tool's runner gave <paramref name="toolInputs" />,
+    /// having done it itself: then the handle reads no file and transfers <paramref name="urlText" /> as it is
+    /// (ADR-0554).
+    /// </summary>
+    /// <param name="toolInputs">The runner's chosen pieces, or <see langword="null" /> for a handle that sets itself up.</param>
+    /// <param name="options">The handle's options.</param>
+    /// <param name="settings">The tool settings.</param>
+    /// <param name="cookies">The transfer's cookies, or <see langword="null" /> when no cookie option is set.</param>
+    /// <param name="state">The running transfer, which keeps the alt-svc cache.</param>
+    /// <param name="urlText">The URL set.</param>
+    /// <param name="events">Where the setup's <c>-v</c> lines go.</param>
+    /// <returns>The URL to transfer.</returns>
+    private async Task<string> SetUpUnlessToolDidAsync(
+        EngineToolTransferInputs? toolInputs,
+        EasyOptions options,
+        EngineTransferSettings settings,
+        CookieEngine? cookies,
+        EngineTransferState state,
+        string urlText,
+        ITransferEvents events)
+    {
+        if (toolInputs is not null)
+        {
+            state.AltSvc = toolInputs.AltSvc;
+            return urlText;
+        }
+
+        return await SetUpAsync(options, settings, cookies, state, urlText, events).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Writes the <c>-c</c> jar, alt-svc and HSTS files after the attempt, unless the curl tool's runner gave
+    /// <paramref name="toolInputs" />, as it writes them itself (ADR-0554).
+    /// </summary>
+    /// <param name="toolInputs">The runner's chosen pieces, or <see langword="null" /> for a handle that cleans up itself.</param>
+    /// <param name="options">The handle's options.</param>
+    /// <param name="settings">The tool settings.</param>
+    /// <param name="cookies">The transfer's cookies, or <see langword="null" /> when no cookie option is set.</param>
+    /// <param name="state">The running transfer, which keeps the alt-svc cache.</param>
+    /// <param name="transferUrl">The URL transferred.</param>
+    /// <returns>A task that completes once the files are written.</returns>
+    private async Task CleanUpUnlessToolDoesAsync(
+        EngineToolTransferInputs? toolInputs,
+        EasyOptions options,
+        EngineTransferSettings settings,
+        CookieEngine? cookies,
+        EngineTransferState state,
+        string transferUrl)
+    {
+        if (toolInputs is null)
+        {
+            await shared.Performer.WriteCookieJarAltSvcAndHstsFilesAsync(
+                cookies, settings, options.Http, transferUrl, Host.JarPrintTarget, state, shared.Hsts, Host.FileSystem, Host.RunsOnWindows).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>The URL to transfer: <paramref name="url" /> when the setup kept the URL set, else the <c>https</c> one HSTS switched it to.</summary>
+    /// <param name="transferUrl">The URL the setup chose.</param>
+    /// <param name="urlText">The URL set.</param>
+    /// <param name="url">The URL set, parsed.</param>
+    /// <param name="options">The handle's options, whose <c>CURLOPT_PATH_AS_IS</c> the switched URL is parsed under.</param>
+    /// <returns>The parsed URL to transfer.</returns>
+    private static CurlUrl TransferUrlOf(string transferUrl, string urlText, CurlUrl url, EasyOptions options) =>
+        ReferenceEquals(transferUrl, urlText) ? url : CurlUrl.Parse(transferUrl, options.Network.PathAsIs);
+
+    /// <summary>The pieces the context takes: the runner's <paramref name="toolInputs" />, or the handle's own (<see cref="OwnInputsOf" />) without them.</summary>
+    /// <param name="toolInputs">The runner's chosen pieces, or <see langword="null" />.</param>
+    /// <param name="options">The handle's options.</param>
+    /// <param name="state">The running transfer, which keeps the alt-svc cache.</param>
+    /// <returns>The pieces.</returns>
+    private static EngineToolTransferInputs InputsOf(EngineToolTransferInputs? toolInputs, EasyOptions options, EngineTransferState state) =>
+        toolInputs ?? OwnInputsOf(options, state);
+
+    /// <summary>
+    /// The pieces a handle with no <see cref="ToolInputs" /> chooses from its options: no proxy, credentials, SSH
+    /// options, <c>If-None-Match</c> lines, range or form body of the runner's; <c>CURLOPT_RESUME_FROM</c> when
+    /// positive; the read callback under <c>CURLOPT_UPLOAD</c> (<see cref="UploadOf" />); and the alt-svc cache its
+    /// own setup opened.
+    /// </summary>
+    /// <param name="options">The handle's options.</param>
+    /// <param name="state">The running transfer, which keeps the alt-svc cache.</param>
+    /// <returns>The pieces.</returns>
+    private static EngineToolTransferInputs OwnInputsOf(EasyOptions options, EngineTransferState state) =>
+        new(
+            ResumeFrom: options.Transfer.ResumeFrom > 0 ? options.Transfer.ResumeFrom : null,
+            Upload: UploadOf(options),
+            AltSvc: state.AltSvc);
 
     /// <summary>
     /// Performs an attempt the curl tool's runner set up (ADR-0552) under its watchdogs
@@ -160,6 +271,7 @@ internal sealed class ManagedEasyTransfer(
         EasyOptions options = Options;
         TransferResult result = await TransferPerformer.FollowWatchingSpeedAsync(attempt.State, attempt.Follower, attempt.Context, attempt.RedirectPolicy).ConfigureAwait(false);
         ToolAttemptResult = result;
+        LastResult = result;
         return Finish(
             result.ExitCode.ToCurlCode(),
             result.ErrorMessage ?? string.Empty,
@@ -341,6 +453,7 @@ internal sealed class ManagedEasyTransfer(
     {
         Options = new EasyOptions();
         ToolSettings = null;
+        ToolInputs = null;
     }
 
     /// <summary>
@@ -372,7 +485,7 @@ internal sealed class ManagedEasyTransfer(
         CurlUrl url,
         CallbackTransferProgress? progress,
         ITransferEvents events,
-        AltSvcTransferCache? altSvc,
+        EngineToolTransferInputs inputs,
         CancellationToken cancellationToken) =>
         new TransferContextFactory(Stream.Null, shared.TimeProvider) { HstsStore = shared.Hsts, DiagnosticLog = Host.DiagnosticLog }.Create(
             settings,
@@ -385,14 +498,19 @@ internal sealed class ManagedEasyTransfer(
             options.Network,
             url,
             options.Callbacks.Write is { } write ? CallbackWriteStream.Of(write) : Stream.Null,
-            range: null,
-            resumeFrom: options.Transfer.ResumeFrom > 0 ? options.Transfer.ResumeFrom : null,
+            range: inputs.Range,
+            resumeFrom: inputs.ResumeFrom,
             headerOutput: options.Callbacks.Header is { } header ? CallbackWriteStream.Of(header) : null,
-            upload: UploadOf(options),
+            formBody: inputs.FormBody,
+            upload: inputs.Upload,
+            proxy: inputs.Proxy,
             progress: progress,
             events: events,
-            altSvc: altSvc,
-            abortToken: cancellationToken);
+            lookedUpCredentials: inputs.LookedUpCredentials,
+            ifNoneMatchHeaders: inputs.IfNoneMatchHeaders,
+            altSvc: inputs.AltSvc,
+            abortToken: cancellationToken,
+            ssh: inputs.Ssh);
 
     /// <summary>
     /// The upload source of a <see cref="Api.Options.Behaviour.EasyTransferOptions.Upload" /> transfer: the read callback, or
