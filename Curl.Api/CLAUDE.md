@@ -3,7 +3,7 @@
 The .NET-idiomatic programming interface to Curl (ADR-0506), not a `Curl.<Area>.UnitLibrary`:
 `Curl.Api` is a naming exception, with `Curl.Console` and `Libcurl`. Namespace `Curl.Api`
 for `Client/` (`CurlClient` and `CurlClientOptions`) and `Composition/` (the engine-building
-half of the partial `CurlClient`), `Messages/`, `ResponseBodies/`, `RequestBodies/`, `Mime/`, `Cancellation/`, `Progress/`, `Concurrency/`, `Stores/` and `HttpMessageHandler/Core/`; `Curl.Api.Errors` for `Errors/`.
+half of the partial `CurlClient`), `Messages/`, `ResponseBodies/`, `RequestBodies/`, `Mime/`, `Cancellation/`, `Progress/`, `Concurrency/`, `Stores/` and `HttpMessageHandler/` (`Core/`, `Versions/`, `Proxy/`); `Curl.Api.Errors` for `Errors/`.
 
 - `Cancellation/`: `TransferCancellation` (BL-2504, ADR-0639) carries a call's `CancellationToken`
   into its transfer: the `CURLOPT_XFERINFOFUNCTION` answers abort once the token is cancelled and
@@ -112,6 +112,16 @@ transfer's `CURLINFO_COOKIELIST`. Tests use the fakes in `Curl.Api.UnitTests/Sto
 split by .NET's header table, the body streamed through `TrailerFillingStream`, which fills
 `TrailingHeaders` at the body's end. A `CurlException` becomes `HttpRequestException`. Tests drive an
 `HttpClient` over the existing fakes in `Curl.Api.UnitTests/HttpMessageHandler/Core`.
+
+`HttpMessageHandler/Versions/` (BL-2511, ADR-0649): `HttpVersionPolicyGuard` lets only HTTP 1.0, 1.1, 2.0
+and 3.0 through (a higher one under `RequestVersionOrLower` as 3.0) and checks the response's major
+version against `VersionPolicy` (`Exact` the same, `OrHigher` no lower), the handler disposing a refused
+response's body; either failure is `HttpRequestException` with `VersionNegotiationError`.
+`HttpMessageHandler/Proxy/` (BL-2511, ADR-0649): the handler's partial half with `HttpClientHandler`'s
+`Proxy`, `UseProxy`, `DefaultProxyCredentials` and `Credentials`; `HandlerProxyMapping` asks the proxy per
+request (`IsBypassed`, `GetProxy`) for `CURLOPT_PROXY` on the client's `CurlProxyOptions` (`""` for a
+direct connection) and puts the credentials on the client's `CurlAuthenticationOptions`. Tests in
+`Curl.Api.UnitTests/HttpMessageHandler/Versions` and `/Proxy`.
 
 Reference `Curl.Api.UnitLibrary` (the seam) and `Curl.Engine.UnitLibrary` (only for
 `ManagedCurlEngine` in `Composition/`), nothing else. Never reference `Libcurl` or a protocol

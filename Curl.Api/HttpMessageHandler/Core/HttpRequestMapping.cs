@@ -16,17 +16,19 @@ internal static class HttpRequestMapping
     /// <param name="cancellationToken">Cancels reading the content's stream.</param>
     /// <returns>The request to send.</returns>
     /// <exception cref="InvalidOperationException"><paramref name="request"/> has no absolute URI.</exception>
+    /// <exception cref="HttpRequestException">The engine speaks no version the request's version policy allows (<see cref="HttpVersionPolicyGuard.SupportedVersion"/>).</exception>
     public static async Task<CurlRequest> ToCurlRequestAsync(HttpRequestMessage request, CurlHttpOptions? clientHttp, CancellationToken cancellationToken)
     {
         Uri uri = request.RequestUri is { IsAbsoluteUri: true } absolute
             ? absolute
             : throw new InvalidOperationException("The request URI must be set and absolute.");
+        CurlHttpVersion version = VersionOf(HttpVersionPolicyGuard.SupportedVersion(request.Version, request.VersionPolicy), request.VersionPolicy);
         CurlContent? body = request.Content is null ? null : await BodyOfAsync(request.Content, cancellationToken).ConfigureAwait(false);
         return new CurlRequest(request.Method, uri.AbsoluteUri)
         {
             Headers = [.. FieldsOf(request.Headers), .. FieldsOf(request.Content?.Headers)],
             Body = body,
-            Http = (clientHttp ?? new CurlHttpOptions()) with { HttpVersion = VersionOf(request.Version, request.VersionPolicy) },
+            Http = (clientHttp ?? new CurlHttpOptions()) with { HttpVersion = version },
         };
     }
 
