@@ -32,7 +32,7 @@ The in-process runner today is `Curl.Console.InProcessCurl.RunAsync(arguments, s
 
 ## Notes
 
-Plan: Documentation/Planning/Curl-Mcp.md. Decision: ADR-0548, and ADR-0565 for this tool's shape.
+Plan: Documentation/Planning/Curl-Mcp.md. Decision: ADR-0548, and ADR-0569 for this tool's shape.
 
 - Built directly (no protocol-architect stage): the plan and ADR-0548/0555/0564 already fixed the design, so a planning sub-agent would cost more than it saves.
 - `ICurlCommandRunner` takes the arguments, three streams, a nullable working directory (the resolved root; null when CURL_MCP_ROOT is unset, since the checker has refused every file path then) and the token, and gives the exit code.
