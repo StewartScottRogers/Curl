@@ -95,6 +95,34 @@ public sealed class CallbackReadStreamTests
     }
 
     [TestMethod]
+    public async Task ReadAsync_UnpauseArrivesBeforeThePauseIsRecorded_AsksAgainAndReadsOnce()
+    {
+        EasyPauseGate gate = new();
+        int calls = 0;
+        ReadCallback callback = buffer =>
+        {
+            calls++;
+            if (calls == 1)
+            {
+                gate.Set(Api.EngineContracts.CurlPause.Continue);
+                return ReadCallbackResult.Pause;
+            }
+
+            buffer[0] = 9;
+            return 1;
+        };
+        await using CallbackReadStream stream = new(callback, gate);
+        byte[] buffer = new byte[4];
+
+        int read = await stream.ReadAsync(buffer.AsMemory()).AsTask().WaitAsync(TimeSpan.FromSeconds(30));
+
+        Assert.AreEqual(1, read);
+        Assert.AreEqual(9, buffer[0]);
+        Assert.AreEqual(2, calls);
+        Assert.AreEqual(Api.EngineContracts.CurlPause.Continue, gate.Directions);
+    }
+
+    [TestMethod]
     public async Task ReadAsync_ReadCallbackPausesWithNoGate_ThrowsWithLibcurlsPauseNotSupportedText()
     {
         await using CallbackReadStream stream = new(_ => ReadCallbackResult.Pause);

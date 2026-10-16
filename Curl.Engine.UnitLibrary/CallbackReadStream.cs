@@ -89,12 +89,14 @@ internal class CallbackReadStream(ReadCallback callback, EasyPauseGate? pauseGat
     /// <inheritdoc />
     public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
     {
+        int unpauses = pauseGate?.Unpauses ?? 0;
         long read = callback(buffer.Span);
         while (read == ReadCallbackResult.Pause)
         {
             EasyPauseGate gate = pauseGate ?? throw new IOException(PauseNotSupportedText);
-            gate.Pause(CurlPause.Send);
+            gate.Pause(CurlPause.Send, unpauses);
             await gate.WhenResumedAsync(CurlPause.Send, cancellationToken).ConfigureAwait(false);
+            unpauses = gate.Unpauses;
             read = callback(buffer.Span);
         }
 

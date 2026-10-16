@@ -82,6 +82,30 @@ public sealed class CallbackWriteStreamTests
     }
 
     [TestMethod]
+    public async Task WriteAsync_UnpauseArrivesBeforeThePauseIsRecorded_DeliversTheChunkOnceMore()
+    {
+        EasyPauseGate gate = new();
+        int calls = 0;
+        WriteCallback callback = data =>
+        {
+            calls++;
+            if (calls == 1)
+            {
+                gate.Set(Api.EngineContracts.CurlPause.Continue);
+                return WriteCallbackResult.Pause;
+            }
+
+            return data.Length;
+        };
+        await using CallbackWriteStream stream = CallbackWriteStream.Of(callback, gate);
+
+        await stream.WriteAsync(new byte[] { 1, 2 }).AsTask().WaitAsync(TimeSpan.FromSeconds(30));
+
+        Assert.AreEqual(2, calls);
+        Assert.AreEqual(Api.EngineContracts.CurlPause.Continue, gate.Directions);
+    }
+
+    [TestMethod]
     public async Task WriteAsync_HeaderCallbackPausesWithNoGate_FailsWithLibcurlsPauseNotSupportedText()
     {
         HeaderCallback callback = _ => WriteCallbackResult.Pause;
