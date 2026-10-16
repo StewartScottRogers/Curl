@@ -25,6 +25,15 @@ creates easy handles with `CurlClientOptions` applied (internal `CreateEasy`), a
 `Curl.Api.UnitTests/Composition` is the one place tests use the real engine, for version info
 and handle creation only; nothing is sent over the network.
 
+`WebSockets/` (BL-2508, ADR-0633, namespace `Curl.Api`): `CurlClient.ConnectWebSocketAsync`
+(the WebSocket half of the partial `CurlClient`) performs a handle with `CURLOPT_CONNECT_ONLY` 2 and
+`CurlWebSocketOptions`' `CURLOPT_WS_OPTIONS`, and `CurlWebSocket` owns it: `ReceiveAsync` gives whole
+`CurlWebSocketMessage`s (fragments joined, control frames between them), `ReadMessagesAsync`
+(`CurlWebSocketMessageReader`) enumerates them through the peer's close frame, the send methods
+frame text, binary, ping, pong, close and raw bytes, and `ReceiveFrameAsync`, `SendFrameAsync` and
+`CurrentFrame` are the frame API. A call the engine answers `Again` waits 1 ms and asks again. Tests
+use the fakes in `Curl.Api.UnitTests/WebSockets` (`FakeEasyWebSocket` and friends).
+
 Reference `Curl.Api.UnitLibrary` (the seam) and `Curl.Engine.UnitLibrary` (only for
 `ManagedCurlEngine` in `Composition/`), nothing else. Never reference `Libcurl` or a protocol
 library.
