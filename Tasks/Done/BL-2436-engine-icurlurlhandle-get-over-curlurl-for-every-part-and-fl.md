@@ -30,7 +30,7 @@ ADR-0506; phase 3 of `Documentation/Planning/Curl-Api-And-libcurl.md`. Read the 
 
 ## Notes
 
-- Plan: `ManagedCurlUrlHandle` (the engine's `ICurlUrlHandle`) over `UrlHandleParts` (one nullable field per upstream part), read by per-part readers with `UrlPartText` for the URLDECODE, URLENCODE, PUNYCODE and PUNY2IDN transforms, following curl 8.22.0's `curl_url_get` (ADR-0600). `ManagedCurlEngine.CreateUrl` now returns it.
+- Plan: `ManagedCurlUrlHandle` (the engine's `ICurlUrlHandle`) over `UrlHandleParts` (one nullable field per upstream part), read by per-part readers with `UrlPartText` for the URLDECODE, URLENCODE, PUNYCODE and PUNY2IDN transforms, following curl 8.22.0's `curl_url_get` (ADR-0601). `ManagedCurlEngine.CreateUrl` now returns it.
 - A get needs a parsed URL, so `Set(CurlUrlPart.Url, ...)` parses a whole URL here (DEFAULT_SCHEME, GUESS_SCHEME else BadScheme, PATH_AS_IS, DISALLOW_USER, each `CurlUrlRejection` mapped to its `CurlUrlCode`). Other parts, clearing, relative URLs and `Duplicate` throw `NotSupportedException` and are left to BL-2437.
 - Default: `CurlUrl` hides whether the port was written and whether the scheme was guessed, so both are recovered from the URL text (`UrlHandleParts.Of`); this keeps `Curl.Protocol.Abstractions`, outside `touches`, unchanged. A scheme's default port is the one `CurlUrl` gives `scheme://localhost/`.
 - Default: a `file` URL is rebuilt as `file://` + path + query + fragment, as 8.22.0 does.
