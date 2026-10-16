@@ -7,7 +7,11 @@ This is the only project without a `.UnitLibrary` suffix, because it is an
 executable rather than a library.
 
 It is also the only project that references every library: composing the services
-is its job. `CurlComposition` is the composition root, written as plain constructor
+is its job. It references `Libcurl`, not `Curl.Engine.UnitLibrary`: the engine comes to it
+transitively through `Libcurl`'s own reference, and a transfer reaches it through the
+`CurlLibrary` that `ToolCurlEngine` gets from `CurlGlobal.Init` (BL-2454, ADR-0629). The engine
+types it still names (`EngineComposition`, `TransferPerformer` and the like) are the tool's
+`ICurlEngine` built from the engine's parts. `CurlComposition` is the composition root, written as plain constructor
 calls - no container, no reflection, no assembly scanning, so native AOT sees every
 type. It keeps `CreateRunner` and the runner wiring; the factories that build the protocol
 handlers, transports, DNS resolvers, TLS providers, security-context factories and
