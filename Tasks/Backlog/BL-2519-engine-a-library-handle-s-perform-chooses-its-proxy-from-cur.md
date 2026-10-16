@@ -1,5 +1,5 @@
 ---
-id: BL-2518
+id: BL-2519
 title: Engine: a library handle's perform chooses its proxy from CURLOPT_PROXY and the proxy environment
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-16
 completed:
 ---
-# BL-2518 — Engine: a library handle's perform chooses its proxy from CURLOPT_PROXY and the proxy environment
+# BL-2519 — Engine: a library handle's perform chooses its proxy from CURLOPT_PROXY and the proxy environment
 
 ## Goal
 

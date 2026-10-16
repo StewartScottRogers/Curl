@@ -30,7 +30,7 @@ ADR-0608 (BL-2423): `ManagedEasyTransfer.PerformConnectOnlyAsync` dials `Managed
 ## Notes
 
 - `PerformConnectOnlyAsync` now takes the transfer settings and calls `TransferProxySelection.TrySelect` (proxy, pre-proxy, proxy type, no-proxy list, `-U` from `ToolSettings`, Unix socket) before dialling, putting the proxy on `ConnectTarget.Proxy`; the `TcpConnector` already tunnels (CONNECT for HTTP/HTTPS, handshake for SOCKS) for a target with a proxy. Unusable proxy text ends the perform with the selector's code and text, nothing dialled.
-- Decision (recorded as ADR-0608 rule 6): the selector reads no proxy environment variable, because the engine's normal library perform chooses no proxy at all today (`OwnInputsOf`); reading the environment for both is BL-2518, filed for it.
+- Decision (recorded as ADR-0608 rule 6): the selector reads no proxy environment variable, because the engine's normal library perform chooses no proxy at all today (`OwnInputsOf`); reading the environment for both is BL-2519, filed for it.
 - Added the ADR-0608 file to `touches` (the criterion names it); no task in Doing names it.
 - Tests: `ManagedEasyTransferTests.ConnectOnly.cs` - HTTP proxy, SOCKS5 proxy with TLS, no-proxy host, unusable proxy text. `Measure-CodeQuality.ps1 -Library Curl.Engine.UnitLibrary`: 0 failing members.
 
