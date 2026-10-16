@@ -71,5 +71,16 @@ The `macOS` model is inferred from FreeBSD's source and the `MAC_*` rows of `uni
 available to measure on. glibc 2.43 (WSL Ubuntu, `C.UTF-8`) was measured through `find -name`, which calls
 `fnmatch`: `[` matches `[`, `[]` matches `[]`, `\` does not match `\` and `[[:foo:]]` does not match `f]`, as
 modelled. The curl tool has no option for `CURLOPT_WILDCARDMATCH`, so curl itself cannot be measured from the
-command line. glibc's `[=a=]` equivalence classes and `[.a.]` collating symbols are not read yet; BL-2482 adds them.
-`FtpWildcardMatcher.Curl`'s answers are unchanged.
+command line. `FtpWildcardMatcher.Curl`'s answers are unchanged.
+
+**BL-2482: `[=a=]` and `[.a.]`.** glibc's equivalence classes and collating symbols are read as in a locale with no
+collation rules (`C.UTF-8`, glibc's code point collation; the WSL machine has no other UTF-8 locale to measure, and
+a locale with rules would need its whole collation table): `[=c=]` is the character `c` and starts no range, and
+`[.c.]` is `c` and may start or end a range, a `-` after it starting one even before `]`. A `[.` naming no character
+or more than one, or never closed, gives no match whatever the negation; a `[=` at the pattern's end leaves the
+bracket open, and one not closed by `=]` one character on is an ordinary `[`. Skipping the rest of a matched bracket
+fails at a `[=` that is not `[=c=]` and a `[.` that never closes. Each answer `FtpGlibcBracketTests` pins was
+measured from glibc 2.43 through `find -name`, except `[[.a.]-` (read from `fnmatch_loop.c`). That `find`
+imports no `fnmatch` from glibc, so it runs its own bundled copy, and for `[[=é=]]` it also matched `[]`, a
+byte-wise reading of the pattern; the port reads code points throughout and does not match `[]` there. `FtpAppleBracket` is unchanged:
+FreeBSD's `rangematch` reads no `[=` or `[.`, and no macOS machine was available to measure Apple's.

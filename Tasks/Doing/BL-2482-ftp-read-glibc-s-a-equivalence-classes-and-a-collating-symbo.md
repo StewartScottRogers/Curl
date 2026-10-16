@@ -26,11 +26,21 @@ before pinning. If FreeBSD's `rangematch` reads them too, give `FtpAppleBracket`
 
 ## Acceptance criteria
 
-- [ ] `FtpGlibcBracketTests` pins `[[=a=]]`, `[[.a.]]`, `[[.-.]]` and a matched bracket skipping a `[=x=]`, with the answers measured from glibc.
-- [ ] `Measure-CodeQuality.ps1 -Library Curl.Protocol.Ftp.UnitLibrary` reports 0 failing members.
-- [ ] ADR-0613's BL-2480 addendum no longer says these are unread.
+- [x] `FtpGlibcBracketTests` pins `[[=a=]]`, `[[.a.]]`, `[[.-.]]` and a matched bracket skipping a `[=x=]`, with the answers measured from glibc.
+- [x] `Measure-CodeQuality.ps1 -Library Curl.Protocol.Ftp.UnitLibrary` reports 0 failing members.
+- [x] ADR-0613's BL-2480 addendum no longer says these are unread.
 
 ## Notes
+
+- Measured glibc 2.43 in WSL Ubuntu through `find -name`. Only `C.UTF-8` is installed there (`locale -a`: C,
+  C.utf8, POSIX), so `en_US.UTF-8` fell back to C and was not a real measurement. Default taken: read `[=` and `[.`
+  as in a locale with no collation rules (C.UTF-8), recorded in ADR-0613's BL-2480 addendum (BL-2482 paragraph).
+- Measured quirks the port keeps: `[[=` matches `[[=` (a `[=` at the pattern's end leaves the bracket open);
+  `[[.a.]-]` matches `-` but not `a`; `[[=a=]-c]` matches `-`, `c` and `a` but not `b`; `[a[=xy=]]` matches `x]`
+  and `[]` but not `a`; `[a-\[.c.]]` reads the escaped `[` literally.
+- Not modelled: `find` (which runs its own bundled fnmatch) matched `[]` for `[[=é=]]` byte-wise; the port reads code
+  points. `FtpAppleBracket` unchanged: FreeBSD's rangematch reads no `[=`/`[.` and no macOS machine to measure.
+- The previous run of this task had only rewritten the class's doc comment; this run measured, ported and tested.
 
 ## Log
 

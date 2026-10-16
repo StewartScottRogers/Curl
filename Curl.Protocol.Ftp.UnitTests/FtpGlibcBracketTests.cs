@@ -45,7 +45,74 @@ public sealed class FtpGlibcBracketTests
         Assert.AreEqual(expected, FtpWildcardPattern.Match(pattern, fileName, FtpWildcardMatcher.Linux));
     }
 
+    // Measured from glibc 2.43 in C.UTF-8 through find -name (BL-2482).
     [TestMethod]
+    [DataRow("[[=a=]]", "a", FtpNameMatchAnswer.Match)]
+    [DataRow("[[=a=]]", "b", FtpNameMatchAnswer.NoMatch)]
+    [DataRow("[![=a=]]", "a", FtpNameMatchAnswer.NoMatch)]
+    [DataRow("[![=a=]]", "b", FtpNameMatchAnswer.Match)]
+    [DataRow("[[=-=]]", "-", FtpNameMatchAnswer.Match)]
+    [DataRow("[[=]=]]", "]", FtpNameMatchAnswer.Match)]
+    [DataRow("[[=Ã©=]]", "Ã©", FtpNameMatchAnswer.Match)]
+    [DataRow("[[=ab=]]", "a]", FtpNameMatchAnswer.Match)]
+    [DataRow("[[=a]", "=", FtpNameMatchAnswer.Match)]
+    [DataRow("[[=", "[[=", FtpNameMatchAnswer.Match)]
+    [DataRow("[[=a=]-c]", "b", FtpNameMatchAnswer.NoMatch)]
+    [DataRow("[[=a=]-c]", "-", FtpNameMatchAnswer.Match)]
+    [DataRow("[[.a.]]", "a", FtpNameMatchAnswer.Match)]
+    [DataRow("[![.a.]]", "a", FtpNameMatchAnswer.NoMatch)]
+    [DataRow("[[.-.]]", "-", FtpNameMatchAnswer.Match)]
+    [DataRow("[[.].]]", "]", FtpNameMatchAnswer.Match)]
+    [DataRow("[[.=.]]", "=", FtpNameMatchAnswer.Match)]
+    [DataRow("[[.Ã©.]]", "Ã©", FtpNameMatchAnswer.Match)]
+    [DataRow("[\\[.a.]]", "a]", FtpNameMatchAnswer.Match)]
+    [DataRow("[[.a.]-c]", "b", FtpNameMatchAnswer.Match)]
+    [DataRow("[[.a.]-]", "a", FtpNameMatchAnswer.NoMatch)]
+    [DataRow("[[.a.]-]", "-", FtpNameMatchAnswer.Match)]
+    [DataRow("[a-[.c.]]", "b", FtpNameMatchAnswer.Match)]
+    [DataRow("[[.a.]-[.c.]]", "c", FtpNameMatchAnswer.Match)]
+    [DataRow("[[.a.]-\\c]", "b", FtpNameMatchAnswer.Match)]
+    [DataRow("[a-\\[.c.]]", ".]", FtpNameMatchAnswer.Match)]
+    [DataRow("[b-[=]", "=", FtpNameMatchAnswer.Match)]
+    public void Match_EquivalenceClassOrCollatingSymbol_AnswersAsGlibcInCUtf8(string pattern, string fileName, FtpNameMatchAnswer expected)
+    {
+        Assert.AreEqual(expected, FtpWildcardPattern.Match(pattern, fileName, FtpWildcardMatcher.Linux));
+    }
+
+    // Measured from glibc 2.43 in C.UTF-8 through find -name (BL-2482).
+    [TestMethod]
+    [DataRow("[a[=x=]]", "a", FtpNameMatchAnswer.Match)]
+    [DataRow("[a[=x=]]", "x", FtpNameMatchAnswer.Match)]
+    [DataRow("[[=a=][.b.]]", "b", FtpNameMatchAnswer.Match)]
+    [DataRow("[a[.x.]]", "a", FtpNameMatchAnswer.Match)]
+    [DataRow("[a[.xy.]]", "a", FtpNameMatchAnswer.Match)]
+    [DataRow("[a[.].]]", "a", FtpNameMatchAnswer.Match)]
+    [DataRow("[a[.\\].]]", "a", FtpNameMatchAnswer.Match)]
+    [DataRow("[a[=xy=]]", "a", FtpNameMatchAnswer.NoMatch)]
+    [DataRow("[a[=xy=]]", "x]", FtpNameMatchAnswer.Match)]
+    [DataRow("[a[=xy=]]", "[]", FtpNameMatchAnswer.Match)]
+    [DataRow("[x[=xy=]]", "x]", FtpNameMatchAnswer.NoMatch)]
+    [DataRow("[a[=]]", "a", FtpNameMatchAnswer.NoMatch)]
+    [DataRow("[a[=]]", "[]", FtpNameMatchAnswer.Match)]
+    [DataRow("[a[=", "a", FtpNameMatchAnswer.NoMatch)]
+    [DataRow("[a[=", "[a[=", FtpNameMatchAnswer.Match)]
+    [DataRow("[a[.]", "a", FtpNameMatchAnswer.NoMatch)]
+    [DataRow("[a[.x]]", "a", FtpNameMatchAnswer.NoMatch)]
+    public void Match_EquivalenceClassOrCollatingSymbolSkippedAfterAMatch_AnswersAsGlibc(string pattern, string fileName, FtpNameMatchAnswer expected)
+    {
+        Assert.AreEqual(expected, FtpWildcardPattern.Match(pattern, fileName, FtpWildcardMatcher.Linux));
+    }
+
+    [TestMethod]
+    [DataRow("[[.ab.]]", "a")]
+    [DataRow("[![.ab.]]", "x")]
+    [DataRow("[[..]]", "a")]
+    [DataRow("[![..]]", "a")]
+    [DataRow("[[.a]", "[")]
+    [DataRow("[x[.", "x")]
+    [DataRow("[a-[.cd.]]", "b")]
+    [DataRow("[a-[.c]", "b")]
+    [DataRow("[[.a.]-", "-")]
     [DataRow("[\\", "a")]
     [DataRow("[!\\", "a")]
     [DataRow("[a-", "b")]
