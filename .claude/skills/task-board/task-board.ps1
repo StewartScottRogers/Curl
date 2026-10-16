@@ -43,8 +43,9 @@
       dedupe   Renumber tasks that share an ID with another. A task file that exists
                at -Since (a git ref; the shared branch before this lane's work) keeps
                its ID; the others get the next free IDs, and the old ID is rewritten in
-               every Markdown file changed since -Since. Dark factory lanes run it
-               after rebasing, before they push.
+               every Markdown file changed since -Since. A live task that shares its ID
+               with an archived one is always renumbered; archived tasks never are.
+               Dark factory lanes run it after rebasing, before they push.
 
     Keep this file ASCII only: Windows PowerShell 5.1 reads a script without a
     byte-order mark in the system code page, so a non-ASCII literal would be
@@ -254,7 +255,9 @@ function Test-Overlap([string[]] $A, [string[]] $B) {
 function Get-Tasks {
     $files = @(Get-ChildItem -Path $Board -Recurse -File -Filter 'BL-*.md')
     $tasks = @($files | ForEach-Object { ConvertTo-Task $_ } | Where-Object { $States -contains $_.State })
-    foreach ($duplicate in @($tasks | Group-Object Id | Where-Object { $_.Count -gt 1 })) {
+    # Archived tasks that share an ID are history and never change, so only a pair with a live
+    # task in it is warned about; 'dedupe' renumbers that live task (BL-2521).
+    foreach ($duplicate in @($tasks | Group-Object Id | Where-Object { $_.Count -gt 1 -and @($_.Group | Where-Object { -not $_.Archived }).Count -gt 0 })) {
         $where = ($duplicate.Group | ForEach-Object { $_.Relative }) -join ', '
         Write-Warning "Duplicate task ID $($duplicate.Name): $where"
     }
@@ -646,17 +649,23 @@ switch ($Command) {
         $ErrorActionPreference = 'Continue'
         $tasks = Get-Tasks
         $changed = @(& git -C $RepoRoot diff --name-only "$Since" -- '*.md' 2>$null | Where-Object { $_ } |
-            ForEach-Object { Join-Path $RepoRoot $_ } | Where-Object { Test-Path -LiteralPath $_ })
+            ForEach-Object { [IO.Path]::GetFullPath((Join-Path $RepoRoot $_)) } | Where-Object { Test-Path -LiteralPath $_ })
         $renamed = 0
-        foreach ($group in @($tasks | Where-Object { -not $_.Archived } | Group-Object Id | Where-Object { $_.Count -gt 1 })) {
+        # A group counts when it holds a live task: another session can archive its Done copy of
+        # an ID while this one files a new task with it. An archived task never changes, so
+        # every live task beside an archived one is renumbered (BL-2521).
+        foreach ($group in @($tasks | Group-Object Id | Where-Object { $_.Count -gt 1 -and @($_.Group | Where-Object { -not $_.Archived }).Count -gt 0 })) {
             $shared = @(); $mine = @()
-            foreach ($task in $group.Group) {
+            $archivedCopies = @($group.Group | Where-Object { $_.Archived })
+            foreach ($task in @($group.Group | Where-Object { -not $_.Archived })) {
+                if ($archivedCopies.Count -gt 0) { $mine += $task; continue }
                 $relative = $task.Path.Substring($RepoRoot.Length).TrimStart('\', '/').Replace([string][char]92, '/')
                 & git -C $RepoRoot cat-file -e "${Since}:$relative" 2>$null
                 if ($LASTEXITCODE -eq 0) { $shared += $task } else { $mine += $task }
             }
             # With nothing shared (both new), the first keeps the ID.
-            if ($shared.Count -eq 0) { $mine = @($mine | Select-Object -Skip 1) }
+            if ($shared.Count -eq 0 -and $archivedCopies.Count -eq 0) { $mine = @($mine | Select-Object -Skip 1) }
+            $groupPaths = @($group.Group | ForEach-Object { [IO.Path]::GetFullPath($_.Path) })
             foreach ($task in $mine) {
                 $old = $task.Id
                 $new = Get-NextId (Get-Tasks)
@@ -666,14 +675,15 @@ switch ($Command) {
                 Write-Text $task.Path $text
                 $target = Join-Path (Split-Path $task.Path -Parent) ((Split-Path $task.Path -Leaf) -replace "^$old", $new)
                 Move-Item -LiteralPath $task.Path -Destination $target
-                # This lane's other changes that mention the old ID meant this task.
+                # This lane's other changes that mention the old ID meant this task; the
+                # group's other task files keep their own ID line.
                 foreach ($file in $changed) {
-                    if ($file -eq $task.Path -or -not (Test-Path -LiteralPath $file)) { continue }
+                    if ($groupPaths -contains $file -or -not (Test-Path -LiteralPath $file)) { continue }
                     $body = Read-Text $file
                     $updated = [regex]::Replace($body, "\b$old\b", $new)
                     if ($updated -ne $body) { Write-Text $file $updated }
                 }
-                $changed = @($changed | ForEach-Object { if ($_ -eq $task.Path) { $target } else { $_ } })
+                $changed = @($changed | ForEach-Object { if ($_ -eq [IO.Path]::GetFullPath($task.Path)) { [IO.Path]::GetFullPath($target) } else { $_ } })
                 Write-Output "$old -> $new  $($task.Title)"
                 $renamed++
             }
