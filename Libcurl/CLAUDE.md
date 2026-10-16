@@ -19,7 +19,9 @@ its `Add<Group>Setters` partial method in an `EasyOptionSetters` part in `Option
 namespace `Libcurl.Options`; an option no group sets yet answers `NotBuiltIn`. `Options/Behaviour` sets
 the `EasyBehaviourOptions` options: an on/off option is on for any value but 0, the two permission
 options take 0 to 0777, and an object option given a value its field cannot hold answers
-`BadFunctionArgument`, as libcurl's `setopt.c` does.
+`BadFunctionArgument`, as libcurl's `setopt.c` does. `Options/Network` sets the `EasyNetworkOptions`
+options with `setopt.c`'s range checks, and turns the `PROTOCOLS` bitmasks into `PROTOCOLS_STR` names
+(ADR-0568); `CURLU` still answers `NotBuiltIn` until BL-2462.
 
 `Misc/ErrorText` holds `CurlErrorText`: `Multi`, `Share` and `Url` are `curl_multi_strerror`,
 `curl_share_strerror` and `curl_url_strerror` with upstream's test1538 strings and fallbacks, and
