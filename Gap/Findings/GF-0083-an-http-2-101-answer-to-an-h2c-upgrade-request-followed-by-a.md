@@ -33,6 +33,7 @@ In Curl.Protocol.Http.UnitLibrary, fail with exit 8 (CURLE_WEIRD_SERVER_REPLY) w
 ## Measurements
 
 - 2026-10-15_0751: 1 of 1 items are gaps.
+- 2026-10-15_1657: 1 of 1 items are gaps.
 
 ## Log
 

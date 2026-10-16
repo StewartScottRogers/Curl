@@ -5,11 +5,11 @@ area: protocols
 platform: linux
 key: protocols:smb-not-in-reference
 severity: Medium
-status: open
+status: closed
 scope: target
 introduced-in:
 opened: 2026-10-15_0751
-closed:
+closed: 2026-10-15_1657
 regression: false
 items: [protocols:smb, protocols:smbs]
 touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests]
@@ -33,8 +33,10 @@ In Curl.Cli.UnitLibrary/CurlVersionText.cs, give Linux and macOS a third Protoco
 ## Measurements
 
 - 2026-10-15_0751: 2 of 2 items are gaps.
+- 2026-10-15_1657: 0 of 2 items are gaps.
 
 ## Log
 
 - 2026-10-15_0751: Opened by gap-protocols.
 - 2026-10-15_0900: Filed BL-2334.
+- 2026-10-15_1657: Closed: run 2026-10-15_1657 measured every item as match or excluded on linux.

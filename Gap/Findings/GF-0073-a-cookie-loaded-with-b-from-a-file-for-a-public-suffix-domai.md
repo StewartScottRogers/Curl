@@ -37,6 +37,7 @@ In Curl.Cookies.UnitLibrary, apply the Public Suffix List to cookies loaded from
 - 2026-10-15_0304: 0 of 1 items are gaps.
 - 2026-10-15_0543: 0 of 1 items are gaps.
 - 2026-10-15_0751: 0 of 1 items are gaps.
+- 2026-10-15_1657: 0 of 1 items are gaps.
 
 ## Log
 
