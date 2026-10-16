@@ -32,3 +32,4 @@ BL-2440 (ADR-0618) built `ManagedFormBuilder`: `Build` gives the `EasyMimeBody` 
 ## Log
 
 - 2026-10-16: Created.
+- 2026-10-16: Backlog -> Doing. Criteria at claim: 0e6d98c3 2be10853 a618ea01 aa1ad728.
