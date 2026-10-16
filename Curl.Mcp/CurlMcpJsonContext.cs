@@ -18,6 +18,8 @@ namespace Curl.Mcp;
 [JsonSerializable(typeof(McpTransferBody))]
 [JsonSerializable(typeof(McpTransferToolResult))]
 [JsonSerializable(typeof(McpVersionToolResult))]
+[JsonSerializable(typeof(McpParseUrlToolResult))]
+[JsonSerializable(typeof(McpBuildUrlToolResult))]
 internal sealed partial class CurlMcpJsonContext : JsonSerializerContext
 {
     /// <summary>The options the tools are registered with: these contracts first, then the SDK's own protocol types.</summary>
