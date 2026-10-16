@@ -76,7 +76,7 @@ public sealed class ManagedCurlEngine : ICurlEngine
     /// engine's shared connections (ADR-0594).
     /// </summary>
     /// <returns>The new multi handle; the caller disposes it (<c>curl_multi_cleanup</c>).</returns>
-    public IMultiTransfer CreateMulti() => new ManagedMultiTransfer(shared.MultiOwners, shared.TimeProvider, SocketWaitPoller.Instance);
+    public IMultiTransfer CreateMulti() => new ManagedMultiTransfer(shared.MultiOwners, shared.TimeProvider, SocketWaitPoller.Instance, shared.Connections.CloseIdleAsync, shared.DnsCache.Clear);
 
     /// <summary>Not supported yet: the share handle is phase 3's share interface work (ADR-0506).</summary>
     /// <returns>Never returns.</returns>

@@ -271,19 +271,6 @@ public sealed partial class ManagedMultiTransferTests
         Assert.AreSame(replaced, multi.Options);
     }
 
-    [TestMethod]
-    public async Task CountAndNotificationMembers_NotYetBuilt_ThrowNotSupported()
-    {
-        await using ManagedCurlEngine engine = new();
-        await using IMultiTransfer multi = engine.CreateMulti();
-
-        Assert.ThrowsExactly<NotSupportedException>(() => multi.GetHandles());
-        Assert.ThrowsExactly<NotSupportedException>(() => multi.GetWaitSockets(Span<CurlWaitSocket>.Empty, out _));
-        Assert.ThrowsExactly<NotSupportedException>(() => multi.GetInfo(CurlMultiInfo.TransfersRunning));
-        Assert.ThrowsExactly<NotSupportedException>(() => multi.EnableNotification(CurlMultiNotification.InfoRead));
-        Assert.ThrowsExactly<NotSupportedException>(() => multi.DisableNotification(CurlMultiNotification.InfoRead));
-    }
-
     /// <summary>A fake easy transfer whose perform finishes when the test says.</summary>
     private sealed class ControlledEasyTransfer : IEasyTransfer
     {

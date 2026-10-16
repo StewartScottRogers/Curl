@@ -4,6 +4,7 @@ using Curl.Api.Callbacks;
 using Curl.Api.Codes;
 using Curl.Api.EngineContracts;
 using Curl.Api.EngineContracts.Multi;
+using Curl.Networking;
 
 namespace Curl.Engine;
 
@@ -19,8 +20,9 @@ namespace Curl.Engine;
 /// (ADR-0597). <see cref="SocketActionAsync" /> moves the transfers on as <see cref="PerformAsync" /> does, and
 /// both tell <see cref="MultiOptions.Socket" /> and <see cref="MultiOptions.Timer" /> what to wait for: each
 /// running transfer is one engine-numbered socket, and while any runs the timer asks to be called back
-/// every <see cref="RunningTransferCheckInterval" /> (ADR-0599). get_handles, waitfds, get_offt and
-/// notifications (BL-2427) throw <see cref="NotSupportedException" /> until their task lands.
+/// every <see cref="RunningTransferCheckInterval" /> (ADR-0599). <see cref="GetHandles" />,
+/// <see cref="GetWaitSockets" />, <see cref="GetInfo" />, the notifications and
+/// <c>CURLMOPT_NETWORK_CHANGED</c> follow curl 8.22.0 (ADR-0604).
 /// </summary>
 /// <param name="owners">
 /// The multi handle each of the engine's transfers is in, shared by all its multi handles, so a
@@ -28,14 +30,23 @@ namespace Curl.Engine;
 /// </param>
 /// <param name="timeProvider">The clock the timeout and the waits are measured on.</param>
 /// <param name="socketPoller">Checks the extra sockets a wait or poll is given.</param>
+/// <param name="closeIdleConnections">Closes the engine's idle connections, for <see cref="CurlNetworkChange.ClearConnections" /> (<see cref="ConnectionCache.CloseIdleAsync" />).</param>
+/// <param name="clearDnsCache">Empties the engine's DNS cache, for <see cref="CurlNetworkChange.ClearDns" /> (<see cref="DnsCache.Clear" />).</param>
 internal sealed class ManagedMultiTransfer(
     ConcurrentDictionary<IEasyTransfer, ManagedMultiTransfer> owners,
     TimeProvider timeProvider,
-    IWaitSocketPoller socketPoller) : IMultiTransfer
+    IWaitSocketPoller socketPoller,
+    Func<ValueTask> closeIdleConnections,
+    Action clearDnsCache) : IMultiTransfer
 {
     private readonly List<MultiEntry> entries = [];
     private readonly List<CurlMultiMessage> messages = [];
+    private readonly List<(CurlMultiNotification Notification, IEasyTransfer Transfer)> pendingNotifications = [];
     private readonly Lock wakeupLock = new();
+    private Task idleConnectionsClosing = Task.CompletedTask;
+    private MultiOptions options = new();
+    private uint enabledNotifications;
+    private long transfersAdded;
     private TaskCompletionSource wakeupSignal = NewWakeupSignal();
     private nint nextTransferSocket = FirstTransferSocket;
     private long reportedTimerMilliseconds = -1;
@@ -62,8 +73,31 @@ internal sealed class ManagedMultiTransfer(
     /// </summary>
     internal static TimeSpan RunningTransferCheckInterval { get; } = TimeSpan.FromMilliseconds(10);
 
-    /// <inheritdoc />
-    public MultiOptions Options { get; set; } = new();
+    /// <summary>
+    /// Gets or sets every option of the handle (<c>curl_multi_setopt</c>). <c>CURLMOPT_NETWORK_CHANGED</c>
+    /// is an action, not a setting, as in libcurl: a value whose <see cref="MultiOptions.NetworkChanged" />
+    /// is not <see cref="CurlNetworkChange.None" /> closes the engine's idle connections
+    /// (<see cref="CurlNetworkChange.ClearConnections" />) and empties its DNS cache
+    /// (<see cref="CurlNetworkChange.ClearDns" />) at once, and is kept with it set back to
+    /// <see cref="CurlNetworkChange.None" />, so a later <see langword="with" /> on it clears nothing again.
+    /// </summary>
+    /// <exception cref="ArgumentNullException">The value is <see langword="null" />.</exception>
+    public MultiOptions Options
+    {
+        get => options;
+        set
+        {
+            ArgumentNullException.ThrowIfNull(value);
+            if (value.NetworkChanged == CurlNetworkChange.None)
+            {
+                options = value;
+                return;
+            }
+
+            ClearForNetworkChange(value.NetworkChanged);
+            options = value with { NetworkChanged = CurlNetworkChange.None };
+        }
+    }
 
     /// <summary>
     /// <c>curl_multi_add_handle</c>: adds <paramref name="transfer" />, which starts on the next
@@ -95,6 +129,7 @@ internal sealed class ManagedMultiTransfer(
         }
 
         entries.Add(new MultiEntry(transfer));
+        transfersAdded++;
         return UpdateTimer(timerFired: false);
     }
 
@@ -239,6 +274,7 @@ internal sealed class ManagedMultiTransfer(
         entries.Clear();
         messages.Clear();
         await Task.WhenAll(performs).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+        await idleConnectionsClosing.ConfigureAwait(false);
     }
 
     /// <summary>
@@ -314,37 +350,154 @@ internal sealed class ManagedMultiTransfer(
         return (CurlMultiCode.Ok, entries.Select(RemainingMilliseconds).Where(milliseconds => milliseconds >= 0).DefaultIfEmpty(-1).Min());
     }
 
-    /// <summary>Not supported yet: <c>curl_multi_get_handles</c> is BL-2427's.</summary>
-    /// <returns>Never returns.</returns>
-    /// <exception cref="NotSupportedException">Always.</exception>
-    public IReadOnlyList<IEasyTransfer> GetHandles() => throw NotYet("curl_multi_get_handles", "BL-2427");
+    /// <summary>
+    /// <c>curl_multi_get_handles</c>: every transfer added and not yet removed, in the order added.
+    /// </summary>
+    /// <returns>The transfers; none once this handle is disposed, as libcurl answers a bad handle with no list.</returns>
+    public IReadOnlyList<IEasyTransfer> GetHandles() => [.. entries.Select(entry => entry.Transfer)];
 
-    /// <summary>Not supported yet: <c>curl_multi_waitfds</c> is BL-2427's.</summary>
-    /// <param name="sockets">Unused.</param>
-    /// <param name="socketCount">Unused.</param>
-    /// <returns>Never returns.</returns>
-    /// <exception cref="NotSupportedException">Always.</exception>
-    public CurlMultiCode GetWaitSockets(Span<CurlWaitSocket> sockets, out int socketCount) => throw NotYet("curl_multi_waitfds", "BL-2427");
+    /// <summary>
+    /// <c>curl_multi_waitfds</c>: one <see cref="CurlWaitEvents.PollIn" /> socket for each transfer whose
+    /// perform has started and whose message is not yet queued, in the order added - the engine-numbered
+    /// socket the socket callback is told of for the same transfer (<see cref="FirstTransferSocket" />).
+    /// </summary>
+    /// <param name="sockets">Filled with up to its length of sockets, each with no returned events.</param>
+    /// <param name="socketCount">How many sockets the handle waits on, even past <paramref name="sockets" />' length.</param>
+    /// <returns>
+    /// <see cref="CurlMultiCode.Ok" />; <see cref="CurlMultiCode.OutOfMemory" /> when <paramref name="sockets" />
+    /// is too short, as libcurl answers, and <see cref="CurlMultiCode.BadHandle" /> with a count of 0 once
+    /// this handle is disposed.
+    /// </returns>
+    public CurlMultiCode GetWaitSockets(Span<CurlWaitSocket> sockets, out int socketCount)
+    {
+        socketCount = 0;
+        if (disposed)
+        {
+            return CurlMultiCode.BadHandle;
+        }
 
-    /// <summary>Not supported yet: <c>curl_multi_get_offt</c> is BL-2427's.</summary>
-    /// <param name="info">Unused.</param>
-    /// <returns>Never returns.</returns>
-    /// <exception cref="NotSupportedException">Always.</exception>
-    public (CurlMultiCode Code, long Value) GetInfo(CurlMultiInfo info) => throw NotYet("curl_multi_get_offt", "BL-2427");
+        List<MultiEntry> waiting = entries.FindAll(entry => !entry.Done && entry.Perform is not null);
+        socketCount = waiting.Count;
+        for (int index = 0; index < Math.Min(waiting.Count, sockets.Length); index++)
+        {
+            sockets[index] = new CurlWaitSocket(SocketNumberOf(waiting[index]), CurlWaitEvents.PollIn, CurlWaitEvents.None);
+        }
 
-    /// <summary>Not supported yet: <c>curl_multi_notify_enable</c> is BL-2427's.</summary>
-    /// <param name="notification">Unused.</param>
-    /// <returns>Never returns.</returns>
-    /// <exception cref="NotSupportedException">Always.</exception>
-    public CurlMultiCode EnableNotification(CurlMultiNotification notification) => throw NotYet("curl_multi_notify_enable", "BL-2427");
+        return waiting.Count > sockets.Length ? CurlMultiCode.OutOfMemory : CurlMultiCode.Ok;
+    }
 
-    /// <summary>Not supported yet: <c>curl_multi_notify_disable</c> is BL-2427's.</summary>
-    /// <param name="notification">Unused.</param>
-    /// <returns>Never returns.</returns>
-    /// <exception cref="NotSupportedException">Always.</exception>
-    public CurlMultiCode DisableNotification(CurlMultiNotification notification) => throw NotYet("curl_multi_notify_disable", "BL-2427");
+    /// <summary>
+    /// <c>curl_multi_get_offt</c>: one of the handle's transfer counts, as curl 8.22.0 keeps them. Current is
+    /// every transfer added and not removed; running every one of those whose message is not yet queued,
+    /// started or not; done every one whose message is queued; added every transfer ever added. Pending is
+    /// always 0: the managed engine starts every transfer on the next perform, holding none back for a
+    /// connection limit.
+    /// </summary>
+    /// <param name="info">The count to report.</param>
+    /// <returns>
+    /// <see cref="CurlMultiCode.Ok" /> and the count; <see cref="CurlMultiCode.UnknownOption" /> and 0 for
+    /// <see cref="CurlMultiInfo.None" /> or any other value, and <see cref="CurlMultiCode.BadHandle" /> and 0
+    /// once this handle is disposed.
+    /// </returns>
+    public (CurlMultiCode Code, long Value) GetInfo(CurlMultiInfo info)
+    {
+        if (disposed)
+        {
+            return (CurlMultiCode.BadHandle, 0);
+        }
 
-    private static NotSupportedException NotYet(string function, string task) => new($"{function} is not built yet ({task}).");
+        return info switch
+        {
+            CurlMultiInfo.TransfersCurrent => (CurlMultiCode.Ok, entries.Count),
+            CurlMultiInfo.TransfersRunning => (CurlMultiCode.Ok, entries.Count(entry => !entry.Done)),
+            CurlMultiInfo.TransfersPending => (CurlMultiCode.Ok, 0),
+            CurlMultiInfo.TransfersDone => (CurlMultiCode.Ok, entries.Count(entry => entry.Done)),
+            CurlMultiInfo.TransfersAdded => (CurlMultiCode.Ok, transfersAdded),
+            _ => (CurlMultiCode.UnknownOption, 0),
+        };
+    }
+
+    /// <summary>
+    /// <c>curl_multi_notify_enable</c>: from the next perform or socket action on, sends
+    /// <paramref name="notification" /> to <see cref="MultiOptions.Notify" />: <see cref="CurlMultiNotification.InfoRead" />
+    /// when a message is queued with none queued before it, then <see cref="CurlMultiNotification.EasyDone" />
+    /// for each transfer whose message is queued, each with that transfer, once the call has moved every
+    /// transfer on and before it tells the socket and timer callbacks.
+    /// </summary>
+    /// <param name="notification">The notification to switch on; any number from 0 to 31 is kept.</param>
+    /// <returns>
+    /// <see cref="CurlMultiCode.Ok" />; <see cref="CurlMultiCode.UnknownOption" /> for a number outside 0 to 31
+    /// and <see cref="CurlMultiCode.BadHandle" /> once this handle is disposed.
+    /// </returns>
+    public CurlMultiCode EnableNotification(CurlMultiNotification notification) =>
+        ChangeNotification(notification, enable: true);
+
+    /// <summary><c>curl_multi_notify_disable</c>: stops sending <paramref name="notification" />.</summary>
+    /// <param name="notification">The notification to switch off.</param>
+    /// <returns>As <see cref="EnableNotification" />.</returns>
+    public CurlMultiCode DisableNotification(CurlMultiNotification notification) =>
+        ChangeNotification(notification, enable: false);
+
+    private static bool IsNotificationNumber(CurlMultiNotification notification) => (uint)notification < 32;
+
+    private CurlMultiCode ChangeNotification(CurlMultiNotification notification, bool enable)
+    {
+        if (disposed)
+        {
+            return CurlMultiCode.BadHandle;
+        }
+
+        if (!IsNotificationNumber(notification))
+        {
+            return CurlMultiCode.UnknownOption;
+        }
+
+        uint bit = 1u << (int)notification;
+        enabledNotifications = enable ? enabledNotifications | bit : enabledNotifications & ~bit;
+        return CurlMultiCode.Ok;
+    }
+
+    private bool IsEnabled(CurlMultiNotification notification) => (enabledNotifications & (1u << (int)notification)) != 0;
+
+    private void QueueDoneMessage(MultiEntry entry, CurlCode result)
+    {
+        entry.Done = true;
+        if (messages.Count == 0 && IsEnabled(CurlMultiNotification.InfoRead))
+        {
+            pendingNotifications.Add((CurlMultiNotification.InfoRead, entry.Transfer));
+        }
+
+        messages.Add(new CurlMultiMessage(CurlMultiMessageType.Done, entry.Transfer, result));
+        if (IsEnabled(CurlMultiNotification.EasyDone))
+        {
+            pendingNotifications.Add((CurlMultiNotification.EasyDone, entry.Transfer));
+        }
+    }
+
+    private void SendNotifications()
+    {
+        (CurlMultiNotification Notification, IEasyTransfer Transfer)[] sending = [.. pendingNotifications];
+        pendingNotifications.Clear();
+        foreach ((CurlMultiNotification notification, IEasyTransfer transfer) in sending)
+        {
+            Options.Notify?.Invoke(notification, transfer);
+        }
+    }
+
+    private void ClearForNetworkChange(CurlNetworkChange change)
+    {
+        if (change.HasFlag(CurlNetworkChange.ClearConnections))
+        {
+            idleConnectionsClosing = Task.WhenAll(idleConnectionsClosing, closeIdleConnections().AsTask());
+        }
+
+        if (change.HasFlag(CurlNetworkChange.ClearDns))
+        {
+            clearDnsCache();
+        }
+    }
+
+    private CurlSocket SocketNumberOf(MultiEntry entry) => entry.Number ??= new CurlSocket(nextTransferSocket++);
 
     private static TaskCompletionSource NewWakeupSignal() => new(TaskCreationOptions.RunContinuationsAsynchronously);
 
@@ -378,6 +531,7 @@ internal sealed class ManagedMultiTransfer(
             MoveOn(entry);
         }
 
+        SendNotifications();
         CurlMultiCode code = UpdateSockets() ? UpdateTimer(timerFired) : CurlMultiCode.AbortedByCallback;
         return ValueTask.FromResult((code, entries.Count(entry => !entry.Done)));
     }
@@ -392,8 +546,7 @@ internal sealed class ManagedMultiTransfer(
         if (abortedByCallback)
         {
             entry.Cancellation.Cancel();
-            entry.Done = true;
-            messages.Add(new CurlMultiMessage(CurlMultiMessageType.Done, entry.Transfer, CurlCode.AbortedByCallback));
+            QueueDoneMessage(entry, CurlCode.AbortedByCallback);
             return;
         }
 
@@ -425,7 +578,7 @@ internal sealed class ManagedMultiTransfer(
     {
         if (!entry.Done && entry.Socket is null)
         {
-            entry.Socket = new CurlSocket(nextTransferSocket++);
+            entry.Socket = SocketNumberOf(entry);
             return callback(entry.Transfer, entry.Socket.Value, CurlPoll.In, null);
         }
 
@@ -587,13 +740,15 @@ internal sealed class ManagedMultiTransfer(
             return;
         }
 
+        // Done before the result is read, so a perform that threw is not read again.
         entry.Done = true;
-        messages.Add(new CurlMultiMessage(CurlMultiMessageType.Done, entry.Transfer, entry.Perform.GetAwaiter().GetResult()));
+        QueueDoneMessage(entry, entry.Perform.GetAwaiter().GetResult());
     }
 
     /// <summary>
-    /// One added transfer: its perform once started and when, whether its message was queued, and the
-    /// socket the socket callback was told of with the value <see cref="Assign" /> gave it.
+    /// One added transfer: its perform once started and when, whether its message was queued, its
+    /// engine-numbered socket once one was given, and the socket the socket callback was told of with
+    /// the value <see cref="Assign" /> gave it.
     /// </summary>
     /// <param name="transfer">The transfer.</param>
     private sealed class MultiEntry(IEasyTransfer transfer)
@@ -607,6 +762,8 @@ internal sealed class ManagedMultiTransfer(
         public long StartTimestamp { get; set; }
 
         public bool Done { get; set; }
+
+        public CurlSocket? Number { get; set; }
 
         public CurlSocket? Socket { get; set; }
 
