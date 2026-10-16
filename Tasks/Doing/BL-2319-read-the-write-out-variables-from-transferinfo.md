@@ -34,3 +34,4 @@ ADR-0506, plan phase 2 step 5; needs BL-2317 and BL-2318. `Curl.Output.UnitLibra
 ## Log
 
 - 2026-10-15: Created.
+- 2026-10-15: Backlog -> Doing.
