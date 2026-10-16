@@ -3,7 +3,7 @@
 The .NET-idiomatic programming interface to Curl (ADR-0506), not a `Curl.<Area>.UnitLibrary`:
 `Curl.Api` is a naming exception, with `Curl.Console` and `Libcurl`. Namespace `Curl.Api`
 for `Client/` (`CurlClient` and `CurlClientOptions`) and `Composition/` (the engine-building
-half of the partial `CurlClient`), `Messages/`, `ResponseBodies/`, `RequestBodies/`, `Mime/`, `Cancellation/`, `Progress/`, `Concurrency/`, `Stores/` and `HttpMessageHandler/` (`Core/`, `Versions/`, `Proxy/`); `Curl.Api.Errors` for `Errors/`.
+half of the partial `CurlClient`), `Messages/`, `ResponseBodies/`, `RequestBodies/`, `Mime/`, `Cancellation/`, `Progress/`, `Concurrency/`, `Stores/` and `HttpMessageHandler/` (`Core/`, `Versions/`, `Proxy/`, `Behaviour/`); `Curl.Api.Errors` for `Errors/`.
 
 - `Cancellation/`: `TransferCancellation` (BL-2504, ADR-0639) carries a call's `CancellationToken`
   into its transfer: the `CURLOPT_XFERINFOFUNCTION` answers abort once the token is cancelled and
@@ -118,10 +118,20 @@ and 3.0 through (a higher one under `RequestVersionOrLower` as 3.0) and checks t
 version against `VersionPolicy` (`Exact` the same, `OrHigher` no lower), the handler disposing a refused
 response's body; either failure is `HttpRequestException` with `VersionNegotiationError`.
 `HttpMessageHandler/Proxy/` (BL-2511, ADR-0649): the handler's partial half with `HttpClientHandler`'s
-`Proxy`, `UseProxy`, `DefaultProxyCredentials` and `Credentials`; `HandlerProxyMapping` asks the proxy per
+`Proxy`, `UseProxy` and `DefaultProxyCredentials`; `HandlerProxyMapping` asks the proxy per
 request (`IsBypassed`, `GetProxy`) for `CURLOPT_PROXY` on the client's `CurlProxyOptions` (`""` for a
-direct connection) and puts the credentials on the client's `CurlAuthenticationOptions`. Tests in
+direct connection) and puts the proxy credentials on the request's `CurlAuthenticationOptions`. Tests in
 `Curl.Api.UnitTests/HttpMessageHandler/Versions` and `/Proxy`.
+
+`HttpMessageHandler/Behaviour/` (BL-2512, ADR-0650): the partial handler's `SocketsHttpHandler`
+properties with its defaults. `AutomaticDecompression` sets `CURLOPT_ACCEPT_ENCODING` and drops the
+decoded response's `Content-Encoding` and `Content-Length`; `AllowAutoRedirect` and
+`MaxAutomaticRedirections` set `CURLFOLLOW_OBEYCODE` and `CURLOPT_MAXREDIRS` (a limit exceeded is
+`HttpRequestException`) and move `RequestUri` to the effective URL; `Credentials` gives the strongest
+scheme's user and password with `CURLAUTH_ONLY` unless `PreAuthenticate`; `UseCookies` sends
+`CookieContainer`'s cookies as `CURLOPT_COOKIE` and stores the final response's `Set-Cookie`. Core's
+`SendAsync` calls its `WithBehaviour`, then `HandlerProxyMapping`, and `ApplyBehaviour`. Tests in
+`Curl.Api.UnitTests/HttpMessageHandler/Behaviour`.
 
 Reference `Curl.Api.UnitLibrary` (the seam) and `Curl.Engine.UnitLibrary` (only for
 `ManagedCurlEngine` in `Composition/`), nothing else. Never reference `Libcurl` or a protocol

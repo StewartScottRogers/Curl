@@ -9,6 +9,7 @@ namespace Curl.Api;
 /// <see cref="CurlRequest"/>, and the <see cref="CurlResponse"/> comes back as an
 /// <see cref="HttpResponseMessage"/> whose content streams the body and whose trailing headers fill when
 /// the body has been read to its end. The handler does not own the client; dispose the client yourself.
+/// Its decompression, redirect, credential and cookie properties are <see cref="SocketsHttpHandler"/>'s (ADR-0650).
 /// </summary>
 public sealed partial class CurlHttpMessageHandler : HttpMessageHandler
 {
@@ -39,7 +40,8 @@ public sealed partial class CurlHttpMessageHandler : HttpMessageHandler
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
-        CurlRequest curlRequest = await HttpRequestMapping.ToCurlRequestAsync(request, Client.Options.Http, cancellationToken).ConfigureAwait(false);
+        CurlRequest curlRequest = WithBehaviour(
+            await HttpRequestMapping.ToCurlRequestAsync(request, Client.Options.Http, cancellationToken).ConfigureAwait(false), request.RequestUri!);
         curlRequest = HandlerProxyMapping.Apply(curlRequest, request.RequestUri!, this);
         CurlResponse response;
         try
@@ -52,7 +54,9 @@ public sealed partial class CurlHttpMessageHandler : HttpMessageHandler
         }
 
         await ThrowIfVersionPolicyNotMetAsync(request, response).ConfigureAwait(false);
-        return HttpResponseMapping.ToHttpResponseMessage(response, request);
+        HttpResponseMessage message = HttpResponseMapping.ToHttpResponseMessage(response, request);
+        ApplyBehaviour(message, response);
+        return message;
     }
 
     /// <summary>Throws, aborting the transfer, when the response's version breaks the request's version policy.</summary>

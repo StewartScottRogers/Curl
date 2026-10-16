@@ -123,16 +123,20 @@ public sealed class HandlerProxyMappingTests
     }
 
     [TestMethod]
-    public async Task Send_ServerCredentials_SetTheUserAndPasswordOnTheClientsAuthentication()
+    public async Task Send_ServerAndProxyCredentials_KeepTheServerCredentialBesideTheProxys()
     {
-        CurlClientOptions options = new() { Authentication = new CurlAuthenticationOptions { HttpAuthentication = Options.Authentication.HttpAuthenticationMethods.Digest } };
+        CurlClientOptions options = new() { Authentication = new CurlAuthenticationOptions { ProxyUserName = "client" } };
 
-        EasyOptions sent = await SendAsync("http://example/", handler => handler.Credentials = new NetworkCredential("su", "sp"), options);
+        EasyOptions sent = await SendAsync("http://example/", handler =>
+        {
+            handler.Credentials = new NetworkCredential("su", "sp");
+            handler.Proxy = new WebProxy("http://proxy.test:8080") { Credentials = new NetworkCredential("pu", "pp") };
+        }, options);
 
         Assert.AreEqual("su", sent.Authentication.UserName);
         Assert.AreEqual("sp", sent.Authentication.Password);
-        Assert.AreEqual(Options.Authentication.HttpAuthenticationMethods.Digest, sent.Authentication.HttpAuthentication);
-        Assert.IsNull(sent.Proxy.Proxy);
+        Assert.AreEqual("pu", sent.Authentication.ProxyUserName);
+        Assert.AreEqual("pp", sent.Authentication.ProxyPassword);
     }
 
     [TestMethod]
