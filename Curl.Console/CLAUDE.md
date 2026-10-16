@@ -166,7 +166,7 @@ SSPI on Windows, elsewhere the system GSS-API with the hand-built SPNEGO and Ker
 reaching KDCs through `Curl.Networking`'s `KerberosKdcSocketTransport` over the run's connectors
 and finding them through `KerberosDnsSrvLookup`. `Curl.Engine`'s `HandBuiltKerberosSources` reads `krb5.conf`
 and the credential cache from disk only when a hand-built context first asks, with the `<uid>` of
-`/tmp/krb5cc_<uid>` from `ProcessUserId` (BL-527, ADR-0176). The same
+`/tmp/krb5cc_<uid>` from `Curl.Engine`'s `ProcessUserId` (BL-527, ADR-0176). The same
 factory goes to `CreateSaslAuthenticator`, so SMTP, IMAP and POP3 answer SASL `GSSAPI` and `NTLM`
 on it (ADR-0184, BL-852). Tests pass their own `ISecurityContextFactory` to `CreateRunner`.
 `-0` / `--http1.0` and `--http1.1` set `HttpRequestOptions.Version` (the last one wins, HTTP/1.1
@@ -218,7 +218,7 @@ including the first with an output option left over (ADR-0126, BL-509). Each gro
 that group's options through a `Curl.Engine` `TransferDispatch` the factory builds for the group and the runner
 disposes when the group ends. Every group's `PoolingConnector` shares the run's one
 `ConnectionCache` (`EngineComposition.CreatePoolingConnector`), keyed on the group's
-`OptionGroupConnectionSettings`, so a later group reuses an earlier group's connection when their
+`Curl.Engine`'s `OptionGroupConnectionSettings`, so a later group reuses an earlier group's connection when their
 TLS, proxy TLS and other connection settings are equal, and the runner closes the cache when the
 run ends (ADR-0285, BL-754).
 `%{urlnum}` (`UrlTransfer.UrlNumber`), `%{xfer_id}` and `%{conn_id}` count on across groups, the
@@ -292,7 +292,7 @@ proxy for `https` or under `-p` or `-L`, ends an `http`/`https` transfer with ex
 the first URL's proxy (BL-329). Measured on curl 8.21.0 (BL-238 Notes).
 
 The runner asks `Curl.Engine`'s `TransferCredentialLookup` for the transfer's credentials, once per URL, and keeps them as the running transfer's `LookedUpCredentials`, which `TransferContextFactory` puts on every attempt's context in place of `-u`'s; `RedirectFollower` gets `TransferCredentialLookup.ForRedirectHops` for each hop. The lookup's rules (URL credentials, netrc) are in `Curl.Engine.UnitLibrary/CLAUDE.md`.
-An `ftp` or `ftps` URL is claimed by `RoutingFtpProtocolHandler`, which hands an `ftp` one to
+An `ftp` or `ftps` URL is claimed by `Curl.Engine`'s `RoutingFtpProtocolHandler`, which hands an `ftp` one to
 the HTTP handler when its proxy is `Http` or `Http10` and `-p` is not given, so it is forwarded
 to the proxy as `GET ftp://host/path` with `Host: host:21` (ADR-0056, rule 3; BL-344); any
 other transfer, `ftps` through an HTTP proxy included (curl 8.21.0 tunnels it with
