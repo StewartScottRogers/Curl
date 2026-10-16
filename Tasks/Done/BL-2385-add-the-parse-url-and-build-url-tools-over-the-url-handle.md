@@ -8,7 +8,7 @@ depends-on: [BL-2321, BL-2376, BL-2380, BL-2436, BL-2437]
 touches: [Curl.Mcp, Curl.Mcp.UnitLibrary, Curl.Mcp.UnitTests]
 requirement: none
 created: 2026-10-15
-completed:
+completed: 2026-10-16
 ---
 
 ## Goal
@@ -23,10 +23,10 @@ ADR-0548 (`Documentation/Planning/Decisions/ADR-0548-curl-mcp-an-mcp-server-over
 
 ## Acceptance criteria
 
-- [ ] Fake-handle tests: every part is returned and an absent part is reported as absent, not empty; `build_url` sets only the supplied parts; `CurlUrlCode` failures (bad URL, no host, bad port) become tool errors naming the code.
-- [ ] One test per tool through the real handle: `https://user:pw@example.com:8443/a/b?x=1#f` parses to its parts and `build_url` of those parts returns the same URL.
-- [ ] The server lists `parse_url` and `build_url` with descriptions.
-- [ ] - `dotnet build Curl.Mcp -warnaserror` and `dotnet build Curl.Mcp.UnitLibrary -warnaserror` are clean; `dotnet test Curl.Mcp.UnitTests --filter "TestCategory!=Integration"` is green; `powershell -NoProfile -File Measure-CodeQuality.ps1` reports no member of `Curl.Mcp.UnitLibrary` or `Curl.Mcp` outside the four gates (100% line, 100% branch, complexity at most 10, CRAP at most 30).
+- [x] Fake-handle tests: every part is returned and an absent part is reported as absent, not empty; `build_url` sets only the supplied parts; `CurlUrlCode` failures (bad URL, no host, bad port) become tool errors naming the code.
+- [x] One test per tool through the real handle: `https://user:pw@example.com:8443/a/b?x=1#f` parses to its parts and `build_url` of those parts returns the same URL.
+- [x] The server lists `parse_url` and `build_url` with descriptions.
+- [x] - `dotnet build Curl.Mcp -warnaserror` and `dotnet build Curl.Mcp.UnitLibrary -warnaserror` are clean; `dotnet test Curl.Mcp.UnitTests --filter "TestCategory!=Integration"` is green; `powershell -NoProfile -File Measure-CodeQuality.ps1` reports no member of `Curl.Mcp.UnitLibrary` or `Curl.Mcp` outside the four gates (100% line, 100% branch, complexity at most 10, CRAP at most 30).
 
 ## Notes
 
@@ -34,9 +34,12 @@ Plan: Documentation/Planning/Curl-Mcp.md. Decision: ADR-0548.
 
 2026-10-16 (lane 6): requeued before any code. The acceptance criterion "one test per tool through the real handle" cannot be met yet: `ManagedCurlEngine.CreateUrl` throws `NotSupportedException` ("The URL API is phase 3 work"), and no production `ICurlUrlHandle` exists. BL-2436 (get over `CurlUrl`) and BL-2437 (set, dup, clear) build it; both are in Backlog, so they are added to `depends-on`. No other prerequisite found: the tool logic will take an injected `Func<ICurlUrlHandle>` (the engine's `CreateUrl`) in `Curl.Mcp.UnitLibrary`, failures map to an `McpToolFailure` naming the `CurlUrlCode`, and `Curl.Mcp` registers both tools in `CurlMcpHost` over `ManagedCurlEngine`.
 
+2026-10-16 (lane 2): delivered. `McpUrlTool` (Curl.Mcp.UnitLibrary) runs one handle from an injected `Func<ICurlUrlHandle>`; `CurlUrlTool` (Curl.Mcp) forwards `parse_url` and `build_url`, registered in `CurlMcpHost` over `ManagedCurlEngine.CreateUrl`. Choices (sensible defaults, within ADR-0548): flags are passed by `CurlUrlFlags` name, matched without case, and the same flags go to every set and get; a get answering a `CURLUE_NO_*` code is an absent part (JSON null), any other non-Ok code is a tool error; a refused URL or part is the new `McpToolFailureKind.UrlRefused`, text `The URL parser refused <part>: CURLUcode <n> (<Name>)`; `parse_url` also returns the whole URL as the parser rebuilt it. Measured: `Measure-CodeQuality.ps1 -Library Curl.Mcp.UnitLibrary,Curl.Mcp` reports 0 failing members; Curl.Mcp.UnitTests 466 passed; solution build 0 warnings.
+
 ## Log
 
 - 2026-10-15: Created.
 - 2026-10-16: Backlog -> Doing.
 - 2026-10-16: Doing -> Backlog. Waits on BL-2436 and BL-2437: the engine has no real ICurlUrlHandle yet (CreateUrl throws), so the real-handle tests cannot pass
 - 2026-10-16: Backlog -> Doing.
+- 2026-10-16: Doing -> Done. MCP tools parse_url and build_url run libcurl's URL API over the engine's URL handle
