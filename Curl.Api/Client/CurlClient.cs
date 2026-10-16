@@ -61,13 +61,14 @@ public sealed partial class CurlClient : IAsyncDisposable
         };
         easy.Options = CurlTransportOptions.Apply(easy.Options, Options.Network, Options.Tls, Options.Proxy);
         easy.Options = CurlProtocolOptions.Apply(easy.Options, Options.ProtocolRecords);
-        return easy;
+        return BindStores(easy);
     }
 
     /// <summary>
     /// Cancels every transfer still running (each <c>SendAsync</c> call or body read then throws
     /// <see cref="OperationCanceledException"/>), disposes the multi handle they ran on, then disposes
-    /// the engine when the client owns it. Safe to call more than once; only the first call disposes anything.
+    /// the client's own <see cref="Stores"/>, if it made any, and the engine when the client owns it.
+    /// Safe to call more than once; only the first call disposes anything.
     /// </summary>
     /// <returns>A task that completes when the multi handle and the engine (if owned) are disposed.</returns>
     public async ValueTask DisposeAsync()
@@ -78,11 +79,10 @@ public sealed partial class CurlClient : IAsyncDisposable
         }
 
         await StopTransfersAsync().ConfigureAwait(false);
-        if (!_ownsEngine)
+        DisposeOwnStores();
+        if (_ownsEngine)
         {
-            return;
+            await _engine.DisposeAsync().ConfigureAwait(false);
         }
-
-        await _engine.DisposeAsync().ConfigureAwait(false);
     }
 }

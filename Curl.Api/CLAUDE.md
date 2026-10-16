@@ -3,7 +3,7 @@
 The .NET-idiomatic programming interface to Curl (ADR-0506), not a `Curl.<Area>.UnitLibrary`:
 `Curl.Api` is a naming exception, with `Curl.Console` and `Libcurl`. Namespace `Curl.Api`
 for `Client/` (`CurlClient` and `CurlClientOptions`) and `Composition/` (the engine-building
-half of the partial `CurlClient`), `Messages/`, `ResponseBodies/`, `RequestBodies/`, `Mime/`, `Cancellation/`, `Progress/` and `Concurrency/`; `Curl.Api.Errors` for `Errors/`.
+half of the partial `CurlClient`), `Messages/`, `ResponseBodies/`, `RequestBodies/`, `Mime/`, `Cancellation/`, `Progress/`, `Concurrency/` and `Stores/`; `Curl.Api.Errors` for `Errors/`.
 
 - `Cancellation/`: `TransferCancellation` (BL-2504, ADR-0639) carries a call's `CancellationToken`
   into its transfer: the `CURLOPT_XFERINFOFUNCTION` answers abort once the token is cancelled and
@@ -58,7 +58,8 @@ half of the partial `CurlClient`), `Messages/`, `ResponseBodies/`, `RequestBodie
   copy of curl 8.22.0's `curl_easy_strerror` text (ADR-0630).
 
 `CurlClient` (BL-2496) is constructed over an `ICurlEngine`, owns it unless told not to,
-creates easy handles with `CurlClientOptions` applied (internal `CreateEasy`), and throws
+creates easy handles with `CurlClientOptions` applied (internal `CreateEasy`, which binds them to the
+client's stores once it has any), and throws
 `ObjectDisposedException` after `DisposeAsync`. Tests use the hand-written fakes in
 `Curl.Api.UnitTests/Client`, never a real engine.
 
@@ -92,6 +93,16 @@ under the same names less `Curl` and `Options` (`Mail` for SMTP); `CurlProtocolO
 on after the transport records. `CurlHttpOptions` leaves the request's headers, method and body to
 `CurlRequest`; `CurlAuthenticationOptions.ToString()` redacts every secret. Tests in
 `Curl.Api.UnitTests/Options/Protocol`.
+
+`Stores/` (BL-2507, ADR-0645, namespace `Curl.Api`): `CurlStores` holds the `CurlCookieStore`
+(Netscape cookie-file lines), `CurlHstsStore` (`HstsEntry`s) and `CurlAltSvcStore` (the alt-svc cache
+file, with `CurlAltSvcEntry` lines), each loadable from and savable to curl's file format, and owns one
+`IShareHandle` sharing cookies and HSTS. `CurlClientOptions.Stores` shares them between clients;
+otherwise `CurlClient.Stores` (and `.Cookies`, `.Hsts`, `.AltSvc`) makes the client's own on first use,
+disposed with the client. Once a client has stores, `CreateEasy` wraps each handle in
+`StoreBoundEasyTransfer`, which applies them at perform (`CURLOPT_SHARE`, `CURLOPT_COOKIELIST` `ALL`
+then each cookie, the HSTS read and write callbacks, the alt-svc file) and, at dispose, keeps the
+transfer's `CURLINFO_COOKIELIST`. Tests use the fakes in `Curl.Api.UnitTests/Stores` (`StoreEngine` and friends).
 
 Reference `Curl.Api.UnitLibrary` (the seam) and `Curl.Engine.UnitLibrary` (only for
 `ManagedCurlEngine` in `Composition/`), nothing else. Never reference `Libcurl` or a protocol
