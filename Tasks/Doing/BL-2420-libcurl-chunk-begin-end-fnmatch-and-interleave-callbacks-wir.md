@@ -47,3 +47,4 @@ ADR-0506; phase 3 of `Documentation/Planning/Curl-Api-And-libcurl.md`. Read the 
 - 2026-10-15: Created.
 - 2026-10-16: Backlog -> Doing.
 - 2026-10-16: Doing -> Backlog. Waits on BL-2477 (RTSP interleave sink) and BL-2478 (FTP wildcard loop, after BL-2476): the engine has nothing to wire the callbacks to yet
+- 2026-10-16: Backlog -> Doing.
