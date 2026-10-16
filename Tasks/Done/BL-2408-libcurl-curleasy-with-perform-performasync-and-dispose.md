@@ -8,7 +8,7 @@ depends-on: [BL-2456, BL-2399]
 touches: [Libcurl/Easy, Libcurl.UnitTests/Easy, Libcurl/CLAUDE.md]
 requirement: none
 created: 2026-10-15
-completed:
+completed: 2026-10-15
 ---
 # BL-2408 — Libcurl: CurlEasy with Perform, PerformAsync and Dispose
 
@@ -38,3 +38,4 @@ ADR-0506; phase 3 of `Documentation/Planning/Curl-Api-And-libcurl.md`. Read the 
 
 - 2026-10-15: Created.
 - 2026-10-15: Backlog -> Doing.
+- 2026-10-15: Doing -> Done. CurlEasy with SetOption, Perform, PerformAsync and Dispose over IEasyTransfer; ADR-0561
