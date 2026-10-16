@@ -31,3 +31,4 @@ BL-2476 ported curl 8.22.0's own `Curl_fnmatch` (`lib/curl_fnmatch.c`) and pinne
 ## Log
 
 - 2026-10-16: Created.
+- 2026-10-16: Backlog -> Doing.
