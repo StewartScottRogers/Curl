@@ -8,6 +8,7 @@ using Curl.Api.EngineContracts.WebSocket;
 using Curl.Api.Info;
 using Curl.Api.Options;
 using Curl.Core;
+using Curl.Core.Hsts;
 using Curl.Core.Multipart;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Ws;
@@ -33,7 +34,8 @@ namespace Curl.Engine;
 /// callback's <c>--trace-ids</c> prefix (ADR-0547). The certificate verify codes the transfer reports
 /// reach <see cref="Info" /> through <see cref="TlsVerifyResultRecordingTransferEvents" /> (BL-2366). Around the attempt it does the runner's setup and cleanup:
 /// the <c>-b</c> files, <c>--alt-svc</c> and <c>--hsts</c> files read before it and the <c>-c</c> jar,
-/// alt-svc and HSTS files written after it, through <see cref="Host" /> (ADR-0544). <see cref="Headers" /> keeps the
+/// alt-svc and HSTS files written after it, through <see cref="Host" /> (ADR-0544); <c>CURLOPT_HSTSREADFUNCTION</c> is
+/// asked for entries before each perform and <c>CURLOPT_HSTSWRITEFUNCTION</c> given them at cleanup (ADR-0620). <see cref="Headers" /> keeps the
 /// headers of the last perform's HTTP responses (ADR-0603), and <see cref="Connection" /> the connection a
 /// <c>CURLOPT_CONNECT_ONLY</c> 1 perform left open (ADR-0608), and <see cref="WebSocket" /> the connection a
 /// <c>CURLOPT_CONNECT_ONLY</c> 2 perform of a <c>ws</c> or <c>wss</c> URL upgraded (ADR-0616).
@@ -315,12 +317,52 @@ internal sealed class ManagedEasyTransfer(
         EngineTransferSettings settings = ToolSettings ?? TransferSettingsOf(options);
         long transferId = shared.Performer.TakeTransferId();
         Info = new TransferInfo { EffectiveUrl = urlText, TransferId = transferId, ConnectionId = NoConnectionId };
+        performedHsts = PerformShared.Hsts;
+        CurlCode loaded = LoadHstsFromCallback(options, performedHsts);
+        if (loaded != CurlCode.Ok)
+        {
+            return Finish(loaded, string.Empty, Info);
+        }
+
         if (IsRawConnectOnly(options.Network.ConnectOnly, url))
         {
             return await PerformConnectOnlyAsync(options, url, cancellationToken).ConfigureAwait(false);
         }
 
         return await PerformBuildingMimePostAsync(options, settings, url, urlText, transferId, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// The HSTS cache the last perform from the options used - the engine's, or its share handle's - which
+    /// <see cref="DisposeAsync" /> hands to <c>CURLOPT_HSTSWRITEFUNCTION</c>; <see langword="null" /> before one.
+    /// </summary>
+    private HstsTransferPolicy? performedHsts;
+
+    /// <summary>
+    /// <c>CURLOPT_HSTSREADFUNCTION</c> before the transfer, as libcurl's <c>Curl_pretransfer</c> calls it: the entries
+    /// it hands over loaded into <paramref name="hsts" /> (<see cref="CallbackHstsCache.Load" />) while the handle's HSTS
+    /// cache is enabled (<see cref="CallbackHstsCache.IsEnabled" />); nothing without the callback (ADR-0620).
+    /// </summary>
+    /// <param name="options">The handle's options.</param>
+    /// <param name="hsts">The HSTS cache the perform uses.</param>
+    /// <returns><see cref="CurlCode.Ok" />, or the code that fails the perform.</returns>
+    private static CurlCode LoadHstsFromCallback(EasyOptions options, HstsTransferPolicy hsts) =>
+        options.Callbacks.HstsRead is { } read && CallbackHstsCache.IsEnabled(options.Http)
+            ? CallbackHstsCache.Load(read, hsts)
+            : CurlCode.Ok;
+
+    /// <summary>
+    /// <c>CURLOPT_HSTSWRITEFUNCTION</c> at cleanup, as libcurl's <c>Curl_close</c> calls it: every entry of the HSTS
+    /// cache the last perform used (the engine's before any) handed to it (<see cref="CallbackHstsCache.Save" />) while
+    /// the handle's HSTS cache is enabled; nothing without the callback (ADR-0620).
+    /// </summary>
+    private void SaveHstsToCallback()
+    {
+        EasyOptions options = Options;
+        if (options.Callbacks.HstsWrite is { } write && CallbackHstsCache.IsEnabled(options.Http))
+        {
+            CallbackHstsCache.Save(write, performedHsts ?? shared.Hsts);
+        }
     }
 
     /// <summary>
@@ -922,10 +964,14 @@ internal sealed class ManagedEasyTransfer(
     /// <returns><see cref="CurlCode.Ok" />.</returns>
     public ValueTask<CurlCode> UpkeepAsync(CancellationToken cancellationToken) => ValueTask.FromResult(CurlCode.Ok);
 
-    /// <summary><c>curl_easy_cleanup</c>: closes the connection a connect-only perform left open or upgraded, if any.</summary>
+    /// <summary>
+    /// <c>curl_easy_cleanup</c>: hands the HSTS cache to <c>CURLOPT_HSTSWRITEFUNCTION</c> (<see cref="SaveHstsToCallback" />),
+    /// then closes the connection a connect-only perform left open or upgraded, if any.
+    /// </summary>
     /// <returns>A task that completes once it is closed.</returns>
     public async ValueTask DisposeAsync()
     {
+        SaveHstsToCallback();
         await (connectOnly?.CloseAsync() ?? ValueTask.CompletedTask).ConfigureAwait(false);
         await (webSocket?.CloseAsync() ?? ValueTask.CompletedTask).ConfigureAwait(false);
     }
