@@ -6,7 +6,7 @@ using Libcurl.Multi;
 namespace Curl.Console;
 
 /// <summary>
-/// The one <c>Libcurl</c> <see cref="CurlMulti" /> a <c>-Z</c> run's transfers perform through (ADR-0626), as
+/// The one <c>Libcurl</c> <see cref="CurlMulti" /> a <c>-Z</c> run's transfers perform through (ADR-0628), as
 /// curl's tool adds each parallel transfer's easy handle to its multi handle. Each attempt is
 /// <see cref="PerformAsync" />: the handle is added and the multi handle performed in the transfer's own flow, so
 /// its transfer starts there and sees the transfer's own <see cref="RunningTransferState" />; a loop then performs

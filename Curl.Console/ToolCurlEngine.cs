@@ -55,7 +55,7 @@ internal sealed class ToolCurlEngine : ICurlEngine
         }
     }
 
-    /// <summary><c>curl_multi_init</c> on the library, for a <c>-Z</c> run's transfers (ADR-0626).</summary>
+    /// <summary><c>curl_multi_init</c> on the library, for a <c>-Z</c> run's transfers (ADR-0628).</summary>
     /// <returns>The multi handle; disposing it is <c>curl_multi_cleanup</c>.</returns>
     internal CurlMulti MultiInit() => library.MultiInit();
 

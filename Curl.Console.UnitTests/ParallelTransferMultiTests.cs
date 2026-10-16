@@ -16,7 +16,7 @@ using Libcurl.Global;
 namespace Curl.Console;
 
 /// <summary>
-/// Pins <see cref="ParallelTransferMulti" /> (ADR-0626): each attempt adds its easy handle to the run's one multi
+/// Pins <see cref="ParallelTransferMulti" /> (ADR-0628): each attempt adds its easy handle to the run's one multi
 /// handle, its transfer starts in the attempt's own flow, and it ends with its own <c>CURLMSG_DONE</c> result in
 /// whatever order the transfers finish, its handle removed again.
 /// </summary>

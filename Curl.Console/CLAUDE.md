@@ -345,7 +345,7 @@ groups move to `SetOption` in BL-2491 to BL-2493. A `-Z` attempt goes instead th
 each `CURLMSG_DONE` with `curl_multi_info_read`, removing the handle and handing the attempt its result; every
 call on the multi handle holds one gate, and an attempt about to add wakes the loop's poll. No connection limit
 is set on the multi handle, so `ParallelTransferQueue` and `ParallelHostQueue` still decide when a transfer
-starts (ADR-0626, BL-2453). `CurlComposition.CreateRunner` builds the engine; a
+starts (ADR-0628, BL-2453). `CurlComposition.CreateRunner` builds the engine; a
 runner given none makes one on its own clock. Both hand it `Libcurl`'s `CurlEasyErrorText.Of` (`curl_easy_strerror`'s table, BL-2450) for the text its known-hosts and cookie-line failures carry.
 It also owns the per-transfer setup libcurl does before it connects (`TransferPerformer.Setup.cs`,
 BL-2283): the URL parse and its refusals (`TryParseTransferUrl`, `ReportUrlRejected`,
@@ -476,7 +476,7 @@ after its failure lines, after a failure as after a success (a `-D` or resumed `
 cannot be opened included), with `TransferWriteOutVariables` as its values. A transfer's libcurl values, `-Z` or not, are its easy handle's
 `curl_easy_getinfo` answers, read through `CurlEasy.GetInfo` after its last attempt and before cleanup
 (`EasyHandleWriteOutInfo`, kept as `RunningTransferState.EasyWriteOutInfo`) and used when they describe the
-reported result (ADR-0626); one that never reached its handle gets `WriteOutTransferInfo.FromReport`'s,
+reported result (ADR-0628); one that never reached its handle gets `WriteOutTransferInfo.FromReport`'s,
 and the runner's own scheme, `Referer`, IDs, verify results and early data lie over either until BL-2495
 (ADR-0625, BL-2452). Its `%time{format}`
 follows the `WriteOutTimeDialect` the runner is given: `CurlComposition.WriteOutTimeDialectFor`

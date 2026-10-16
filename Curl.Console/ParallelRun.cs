@@ -45,7 +45,7 @@ internal sealed class ParallelRun(int maxRunning, int maxPerHost, bool parallelI
     internal ParallelProgressMeter? ProgressMeter { get; set; }
 
     /// <summary>
-    /// Gets the multi handle the run's transfers perform through (ADR-0626), cleaned up by <see cref="EndAsync" />;
+    /// Gets the multi handle the run's transfers perform through (ADR-0628), cleaned up by <see cref="EndAsync" />;
     /// <see langword="null" /> for a run built without one, as the tests of the run alone build it.
     /// </summary>
     internal ParallelTransferMulti? Transfers { get; init; }

@@ -4502,7 +4502,7 @@ internal sealed class CurlCommandRunner(
     /// the runner's <see cref="engine" /> (ADR-0552, ADR-0624), whose options are the option group's
     /// (<see cref="EasyOptionsFromCommandLine.EasyOptionsOf" />) and which builds each attempt's context itself from
     /// them and the runner's hooks (BL-2394); a <c>-Z</c> transfer's handle performs through the run's
-    /// <see cref="ParallelRun.Transfers" /> multi handle (ADR-0626).
+    /// <see cref="ParallelRun.Transfers" /> multi handle (ADR-0628).
     /// </remarks>
     private async Task<TransferResult> FollowRetryingAsync(
         RedirectFollower follower,
@@ -4615,7 +4615,7 @@ internal sealed class CurlCommandRunner(
     /// outputs, inputs and transfer URL, the running transfer's events and progress, and the runner's follower and
     /// context factory, calls <see cref="Libcurl.Easy.CurlEasy.PerformAsync" /> (<c>curl_easy_perform</c>) for a serial
     /// transfer, or <see cref="ParallelTransferMulti.PerformAsync" /> through the run's multi handle for a <c>-Z</c> one
-    /// (ADR-0626), whose engine transfer builds the attempt's context and starts its watchdogs itself, and takes the
+    /// (ADR-0628), whose engine transfer builds the attempt's context and starts its watchdogs itself, and takes the
     /// attempt's whole result back from the hooks.
     /// </summary>
     /// <param name="easy">The transfer's easy handle, set up by <see cref="SetUpToolEasy" />.</param>

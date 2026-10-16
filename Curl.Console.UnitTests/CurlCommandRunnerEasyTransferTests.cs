@@ -24,7 +24,7 @@ namespace Curl.Console;
 /// (ADR-0506, ADR-0552): one <c>Libcurl</c> easy handle per transfer (ADR-0624), set with the option group's easy
 /// options and <c>CURLOPT_URL</c>, and one <c>curl_easy_perform</c>, so one <see cref="IEasyTransfer.PerformAsync" />,
 /// per attempt, <c>--retry</c> attempts included, with the output unchanged; a <c>-Z</c> transfer adds its handle to the
-/// run's one multi handle for each attempt (ADR-0626).
+/// run's one multi handle for each attempt (ADR-0628).
 /// </summary>
 [TestClass]
 public sealed class CurlCommandRunnerEasyTransferTests
