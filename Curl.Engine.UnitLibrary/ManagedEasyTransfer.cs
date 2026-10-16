@@ -108,6 +108,19 @@ internal sealed class ManagedEasyTransfer(
     internal EngineToolTransferOutputs? ToolOutputs { get; set; }
 
     /// <summary>
+    /// Gets or sets the curl tool's runner's events for each transfer and the running transfer they keep - its
+    /// <c>-v</c>, <c>--trace</c>, <c>--trace-ascii</c>, <c>--trace-ids</c> and <c>--trace-config</c> chain and its
+    /// <c>%{conn_id}</c> recorder - for <c>Curl.Console</c> to set per transfer once its runner performs from the
+    /// options (BL-2394, ADR-0561). While set, a perform from the options reports every event there alone, in place
+    /// of <see cref="EasyCallbackOptions.Debug" /> and <see cref="TraceComponents" />' lines, runs on its
+    /// <see cref="EngineToolTransferEvents.State" /> and takes the <c>%{conn_id}</c> the runner's recorder kept there,
+    /// numbering none itself; <see langword="null" />, as for every <c>Curl.Api</c> and <c>Libcurl</c> handle, to
+    /// report to the debug callback and number <c>%{conn_id}</c> through <see cref="EngineConnectionIdTransferEvents" />.
+    /// <see cref="Duplicate" /> does not copy it and <see cref="Reset" /> clears it, as it belongs to one transfer.
+    /// </summary>
+    internal EngineToolTransferEvents? ToolEvents { get; set; }
+
+    /// <summary>
     /// Gets the whole result of the last perform, for the curl tool's <c>--retry</c>, failure lines and <c>-w</c>,
     /// which read more of it than <see cref="Info" /> carries (ADR-0554); <see langword="null" /> before the first
     /// perform, after one that failed before connecting (no URL set, or one that does not parse), and after one
@@ -163,8 +176,7 @@ internal sealed class ManagedEasyTransfer(
         long transferId = shared.Performer.TakeTransferId();
         Info = new TransferInfo { EffectiveUrl = urlText, TransferId = transferId, ConnectionId = NoConnectionId };
         CookieEngine? cookies = CookieEngine.FromHttpOptions(options.Http, shared.Cookies);
-        EngineTransferState state = new();
-        TlsVerifyResultRecordingTransferEvents events = new(EventsOf(options, state));
+        (EngineTransferState state, TlsVerifyResultRecordingTransferEvents events) = StateAndEventsOf(ToolEvents, options);
         EngineToolTransferInputs? toolInputs = ToolInputs;
         string transferUrl = await SetUpUnlessToolDidAsync(toolInputs, options, settings, cookies, state, urlText, events).ConfigureAwait(false);
         RedirectFollower follower = new(createDispatcher(options, shared, cookies?.HandlerStore));
@@ -322,6 +334,26 @@ internal sealed class ManagedEasyTransfer(
     }
 
     /// <summary>
+    /// The running transfer and the events it reports to, kept by <see cref="TlsVerifyResultRecordingTransferEvents" />
+    /// for <c>CURLINFO_SSL_VERIFYRESULT</c>: the runner's <paramref name="toolEvents" /> and their state as they are,
+    /// whose recorder numbers <c>%{conn_id}</c>, or a new state and the handle's own events (<see cref="EventsOf" />)
+    /// without them (ADR-0561).
+    /// </summary>
+    /// <param name="toolEvents">The runner's events and state, or <see langword="null" /> for a handle's own.</param>
+    /// <param name="options">The handle's options.</param>
+    /// <returns>The state and the events.</returns>
+    private (EngineTransferState State, TlsVerifyResultRecordingTransferEvents Events) StateAndEventsOf(EngineToolTransferEvents? toolEvents, EasyOptions options)
+    {
+        if (toolEvents is not null)
+        {
+            return (toolEvents.State, new TlsVerifyResultRecordingTransferEvents(toolEvents.Events));
+        }
+
+        EngineTransferState state = new();
+        return (state, new TlsVerifyResultRecordingTransferEvents(EventsOf(options, state)));
+    }
+
+    /// <summary>
     /// The transfer's events: the debug callback's under <c>CURLOPT_VERBOSE</c>, else none, with the
     /// <see cref="TraceComponents" />' lines added (<see cref="WithTraceComponentEvents" />), kept by
     /// <see cref="EngineConnectionIdTransferEvents" />, which gives the transfer its <c>%{conn_id}</c>
@@ -468,6 +500,7 @@ internal sealed class ManagedEasyTransfer(
         ToolSettings = null;
         ToolInputs = null;
         ToolOutputs = null;
+        ToolEvents = null;
     }
 
     /// <summary>
