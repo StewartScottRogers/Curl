@@ -114,6 +114,13 @@ new builder and set only on `Ok`; `Get` is `curl_formget`, and `Free` or `Dispos
 after which the form throws `ObjectDisposedException`. It implements `AddFormPostSetters`:
 `CURLOPT_HTTPPOST` takes a `CurlForm` (else `BadFunctionArgument`) and stores its body as it is when set.
 
+`Url` holds `CurlUrlHandle`, the URL handle `CurlLibrary.UrlInit` (`curl_url`) returns over the
+engine's `ICurlUrlHandle` (ADR-0587): `Get` and `Set` (`curl_url_get`, `_set`) pass through to the
+engine and answer its code, `Duplicate` (`curl_url_dup`) wraps the engine's copy in a new handle, and
+`ErrorText` is `curl_url_strerror` over `CurlErrorText.Url`. `Dispose` is `curl_url_cleanup` and
+disposes the engine handle once; a member used afterwards throws `ObjectDisposedException`. The internal
+`EngineHandle` is for `CURLOPT_CURLU` (BL-2462).
+
 `Info` holds `CurlInfo` (every `CURLINFO_*` of curl 8.22.0's `curl.h` by name and number) and the
 internal `EasyInfoDispatch` `CurlEasy.GetInfo` goes through (ADR-0566): an id `curl.h` lacks answers
 `UnknownOption`, a known info no group reads yet `NotBuiltIn`. Each info group adds its reader rows by
