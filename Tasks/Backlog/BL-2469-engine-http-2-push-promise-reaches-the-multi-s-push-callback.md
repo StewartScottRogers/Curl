@@ -4,7 +4,7 @@ title: Engine: HTTP/2 PUSH_PROMISE reaches the multi's push callback
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-2428]
+depends-on: [BL-2428, BL-2515, BL-2516]
 touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests, Curl.Engine.UnitLibrary, Curl.Engine.UnitTests]
 requirement: none
 created: 2026-10-16
@@ -22,7 +22,7 @@ BL-2428 (ADR-0605) built the engine side: `ManagedMultiTransfer.OfferPush` answe
 
 ## Acceptance criteria
 
-- [ ] `Curl.Protocol.Http.UnitTests` pins a `PUSH_PROMISE` handed to a push sink with its headers, and a refused one answered with `RST_STREAM` `CANCEL`.
+- [ ] `Curl.Engine.UnitTests` pins a server's `PUSH_PROMISE` on a multi transfer with `MultiOptions.Push` reaching the callback with its headers, through the push sink BL-2516 gives the HTTP handler (pinning the frame layer and session themselves is BL-2515's and BL-2516's).
 - [ ] `Curl.Engine.UnitTests` pins an accepted push's transfer receiving the pushed body, and `ErrorOut` ending the parent with `CurlCode.Http2`.
 - [ ] `dotnet build` is clean and the fast tests pass with no test deleted, skipped or weakened.
 - [ ] `Measure-CodeQuality.ps1 -Library Curl.Protocol.Http.UnitLibrary,Curl.Engine.UnitLibrary` reports 0 failing members.
@@ -30,7 +30,10 @@ BL-2428 (ADR-0605) built the engine side: `ManagedMultiTransfer.OfferPush` answe
 
 ## Notes
 
+- 2026-10-16 (lane 2, first claim): split before any code. The work spans three libraries: the frame layer (`Curl.Http2.UnitLibrary`'s `Http2Connection` rejects every PUSH_PROMISE as a PROTOCOL_ERROR and always sends ENABLE_PUSH 0, and `Curl.Http2.UnitLibrary` was not in `touches`), the HTTP session and handler (a push sink and the pushed response), and the engine wiring here. Each needs its own Measure-CodeQuality run (30-45 minutes each while lanes build), which does not fit one 120-minute run. Filed BL-2515 (frame layer) and BL-2516 (`Http2Session` and the handler's push sink, which now carries this task's first criterion). This task keeps the engine side: `EngineComposition.CreateProtocolHandlers` gives the HTTP handler a push sink that, for a transfer in a multi handle with `MultiOptions.Push`, duplicates the parent, binds the pushed response to the duplicate and calls `ManagedMultiTransfer.OfferPush` (refusing on `Deny` and `ErrorOut`), and the pushed `ManagedEasyTransfer`'s perform reads that response to its header and write callbacks instead of sending a request. The HTTP projects stay in `touches` only for the handler-constructor parameter BL-2516 adds; drop them if that lands complete.
+
 ## Log
 
 - 2026-10-16: Created.
 - 2026-10-16: Backlog -> Doing.
+- 2026-10-16: Doing -> Backlog. Split: waits on BL-2515 (Http2Connection accepts PUSH_PROMISE) and BL-2516 (Http2Session push sink); engine wiring stays here
