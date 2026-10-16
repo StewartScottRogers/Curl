@@ -14,6 +14,14 @@ else horizontal. Referencing another protocol library is a build break, and
 constructor and asks it for one connection per transfer; it never takes an
 `IConnection` there.
 
+libcurl's WebSocket API (ADR-0607, BL-2471): `WsProtocolHandler.ConnectAndUpgradeOnlyAsync`
+runs the same upgrade as `ExecuteAsync` but stops after the `101`, returning a
+`WsUpgradeOutcome` with the open connection (the caller owns it) and the bytes after the head;
+`WsFrameEncoder.Encode(opcode, isFinal, ...)` writes any masked client frame;
+`WsFrameMetadataDecoder` decodes incrementally into `WsFrameRun`s (opcode, FIN, offset, bytes
+left) with the completed ping and the tool decoder's own violation messages. These types are the
+library's own (`WsOpcode` included): it must not reference `Curl.Api`.
+
 Never construct a `Socket`, `SslStream` or `HttpClient` here. Take `IConnector`
 so the tests in the matching `.UnitTests` project can drive this code from a
 recorded byte stream with no network.

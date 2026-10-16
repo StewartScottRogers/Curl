@@ -90,13 +90,46 @@ public sealed class WsProtocolHandler(
         ArgumentNullException.ThrowIfNull(context);
 
         long startTimestamp = context.TimeProvider.GetTimestamp();
-        TransferResult result = await ConnectAndUpgradeAsync(context).ConfigureAwait(false);
+        TransferResult result = (await ConnectAndUpgradeAsync(context, exchangesFrames: true).ConfigureAwait(false)).Result;
         new WsTransferLog(context.DiagnosticLog).Ended(result, context.TimeProvider.GetElapsedTime(startTimestamp));
         return result;
     }
 
-    // Connects, upgrades and exchanges frames; ExecuteAsync logs how it ended.
-    private async ValueTask<TransferResult> ConnectAndUpgradeAsync(ITransferContext context)
+    /// <summary>
+    /// Connects and runs the upgrade exactly as <see cref="ExecuteAsync" /> does - the same request
+    /// bytes, <c>-v</c> lines and refusals - but stops after an accepted <c>101</c> and hands back
+    /// the open connection instead of reading frames: libcurl's <c>CURLOPT_CONNECT_ONLY</c> 2 for a
+    /// WebSocket URL, after which <c>curl_ws_recv</c> and <c>curl_ws_send</c> carry the frames
+    /// (BL-2471).
+    /// </summary>
+    /// <param name="context">The transfer to upgrade.</param>
+    /// <returns>
+    /// The open connection and the bytes that came with the reply head, or the failure the tool's
+    /// transfer would end with; a failure is written to the diagnostic log as the transfer's end.
+    /// </returns>
+    /// <exception cref="ArgumentNullException">
+    /// <paramref name="context" /> is <see langword="null" />.
+    /// </exception>
+    /// <exception cref="OperationCanceledException">
+    /// <see cref="ITransferContext.CancellationToken" /> was cancelled.
+    /// </exception>
+    public async ValueTask<WsUpgradeOutcome> ConnectAndUpgradeOnlyAsync(ITransferContext context)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+
+        long startTimestamp = context.TimeProvider.GetTimestamp();
+        WsUpgradeOutcome outcome = await ConnectAndUpgradeAsync(context, exchangesFrames: false).ConfigureAwait(false);
+        if (outcome.Connection is null)
+        {
+            new WsTransferLog(context.DiagnosticLog).Ended(outcome.Result, context.TimeProvider.GetElapsedTime(startTimestamp));
+        }
+
+        return outcome;
+    }
+
+    // Connects and upgrades, then exchanges frames or hands the open connection back; the
+    // connection is closed unless the outcome hands it back.
+    private async ValueTask<WsUpgradeOutcome> ConnectAndUpgradeAsync(ITransferContext context, bool exchangesFrames)
     {
         CurlUrl url = context.Url;
         var target = new ConnectTarget(url.IdnHost, url.Port, url.Scheme == "wss")
@@ -108,29 +141,35 @@ public sealed class WsProtocolHandler(
         ConnectResult connect = await connector.ConnectAsync(target, context.CancellationToken).ConfigureAwait(false);
         if (connect.Connection is not { } connection)
         {
-            return new TransferResult(connect.ExitCode, 0, connect.ErrorMessage) { IsConnectionRefused = connect.IsConnectionRefused };
+            return WithoutConnection(new TransferResult(connect.ExitCode, 0, connect.ErrorMessage) { IsConnectionRefused = connect.IsConnectionRefused });
         }
 
         context.Progress.ReportTransferStarted();
         context.Events.ReportInfo(WsInfoLines.UsingHttp1);
         var authLines = new WsInfoLineRecorder();
-        TransferResult result;
-        await using (connection.ConfigureAwait(false))
+        var lease = new WsConnectionLease(connection);
+        WsUpgradeOutcome outcome;
+        await using (lease.ConfigureAwait(false))
         {
             try
             {
-                result = await UpgradeAsync(connection, context, connect.ConnectionNumber, authLines).ConfigureAwait(false);
+                outcome = await UpgradeAsync(connection, context, connect.ConnectionNumber, authLines, exchangesFrames).ConfigureAwait(false);
             }
             catch (WsTransferException failure)
             {
                 context.Events.ReportInfo(failure.Message);
                 context.Events.ReportInfo(WsInfoLines.Closing(connect.ConnectionNumber));
-                result = TransferResult.Failure(failure.ExitCode, failure.Message);
+                outcome = WithoutConnection(TransferResult.Failure(failure.ExitCode, failure.Message));
             }
+
+            lease.IsHandedBack = outcome.Connection is not null;
         }
 
-        return WithFirstAuthFailure(result, authLines.Lines);
+        return outcome with { Result = WithFirstAuthFailure(outcome.Result, authLines.Lines) };
     }
+
+    /// <summary>An outcome that hands no connection back.</summary>
+    private static WsUpgradeOutcome WithoutConnection(TransferResult result) => new(result, null, ReadOnlyMemory<byte>.Empty);
 
     /// <summary>
     /// Gives a failed transfer the message of the first line the authenticator reported for the
@@ -258,9 +297,10 @@ public sealed class WsProtocolHandler(
     /// <summary>
     /// Sends the upgrade request and reads the reply head, reporting both for <c>-v</c> and
     /// <c>--trace</c> as curl 8.21.0 does (BL-584): the request as one header event, the head
-    /// one line at a time, and on a refusal <c>closing connection #N</c>.
+    /// one line at a time, and on a refusal <c>closing connection #N</c>. An accepted upgrade goes
+    /// on to the frames, or, unless <paramref name="exchangesFrames" />, hands the connection back.
     /// </summary>
-    private async Task<TransferResult> UpgradeAsync(IConnection connection, ITransferContext context, long connectionNumber, WsInfoLineRecorder authLines)
+    private async Task<WsUpgradeOutcome> UpgradeAsync(IConnection connection, ITransferContext context, long connectionNumber, WsInfoLineRecorder authLines, bool exchangesFrames)
     {
         HttpRequestOptions options = context.Http ?? new HttpRequestOptions();
         string method = options.CustomMethod ?? (context.NoBody ? "HEAD" : "GET");
@@ -293,12 +333,35 @@ public sealed class WsProtocolHandler(
         };
         if (response.StatusCode != SwitchingProtocols || lengths.FailureMessage is not null)
         {
-            return (await RefuseAsync(context, authRequest, authorization, response, lengths, connectionNumber).ConfigureAwait(false)) with { Report = report };
+            return WithoutConnection((await RefuseAsync(context, authRequest, authorization, response, lengths, connectionNumber).ConfigureAwait(false)) with { Report = report });
         }
 
         ReportHead(context.Events, response.Head, refusal: null, challengeLines: [], problemScheme: null, overflowLineStarts: []);
         log.UpgradeAccepted();
-        return await SwitchToWebSocketAsync(connection, context, response.Remaining, report, connectionNumber).ConfigureAwait(false);
+        return await AcceptAsync(connection, context, response.Remaining, report, connectionNumber, exchangesFrames).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Takes an accepted upgrade on to the frames, or, unless <paramref name="exchangesFrames" />,
+    /// hands the open connection back.
+    /// </summary>
+    private async ValueTask<WsUpgradeOutcome> AcceptAsync(IConnection connection, ITransferContext context, byte[] alreadyReceived, TransferReport report, long connectionNumber, bool exchangesFrames) =>
+        exchangesFrames
+            ? WithoutConnection(await SwitchToWebSocketAsync(connection, context, alreadyReceived, report, connectionNumber).ConfigureAwait(false))
+            : HandBack(connection, context, alreadyReceived, report);
+
+    /// <summary>
+    /// Ends an upgrade-only transfer after the <c>101</c>: curl 8.21.0's <c>Received 101</c> lines
+    /// and chunk-size trace, as for any accepted upgrade, then the open connection handed back
+    /// with the bytes that came with the reply head, undecoded (BL-2471).
+    /// </summary>
+    private WsUpgradeOutcome HandBack(IConnection connection, ITransferContext context, byte[] alreadyReceived, TransferReport report)
+    {
+        var trace = new WsFrameTrace(context.Events, TracesFrames);
+        context.Events.ReportInfo(WsInfoLines.SwitchingToWebSocket);
+        trace.UsingChunkSize();
+        context.Events.ReportInfo(WsInfoLines.SwitchedToWebSocket);
+        return new WsUpgradeOutcome(TransferResult.Success(0) with { Report = report }, connection, alreadyReceived);
     }
 
     /// <summary>
