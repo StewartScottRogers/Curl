@@ -33,3 +33,4 @@ ADR-0506 phase 2; found by BL-2318, which needs it to route `Curl.Console`'s ser
 ## Log
 
 - 2026-10-15: Created.
+- 2026-10-15: Backlog -> Doing.
