@@ -8,6 +8,12 @@
     <Using Include="Microsoft.VisualStudio.TestTools.UnitTesting" />
   </ItemGroup>
 
+  <!-- The packing files McpPackagingTests reads (BL-2388). -->
+  <ItemGroup>
+    <None Include="..\Curl.Mcp\Curl.Mcp.csproj" Link="Packaging\Curl.Mcp.csproj" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\Curl.Mcp\.mcp\server.json" Link="Packaging\server.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\Curl.Cli.UnitLibrary\Curl.Cli.UnitLibrary.csproj" />
     <ProjectReference Include="..\Curl.Mcp\Curl.Mcp.csproj" />

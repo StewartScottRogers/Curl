@@ -6,6 +6,38 @@
     <InvariantGlobalization>true</InvariantGlobalization>
   </PropertyGroup>
 
+  <!--
+    Packed as an MCP server the way Microsoft's mcpserver template does it (BL-2388): a .NET
+    tool package of PackageType McpServer that `dnx Curl.Mcp` runs, one self-contained package
+    per runtime identifier, with .mcp/server.json for the MCP registry. Its version is the
+    version in .mcp/server.json; Curl.Mcp.UnitTests holds the two equal.
+  -->
+  <PropertyGroup>
+    <PackAsTool>true</PackAsTool>
+    <PackageType>McpServer</PackageType>
+    <ToolCommandName>curl-mcp</ToolCommandName>
+    <RuntimeIdentifiers>win-x64;win-arm64;linux-x64;linux-arm64;osx-arm64;osx-x64</RuntimeIdentifiers>
+    <PublishSelfContained>true</PublishSelfContained>
+    <!-- Curl.Console is referenced as a library for its InProcessCurl, never run as its own executable. -->
+    <ValidateExecutableReferencesMatchSelfContained>false</ValidateExecutableReferencesMatchSelfContained>
+    <PackageId>Curl.Mcp</PackageId>
+    <Version>0.1.0</Version>
+    <Authors>Stewart Scott Rogers</Authors>
+    <Description>An MCP server that runs curl for AI agents: Curl, the drop-in C# replacement for the curl command-line tool, served over standard input and output.</Description>
+    <PackageTags>AI; MCP; server; stdio; curl</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
+    <PackageProjectUrl>https://github.com/StewartScottRogers/Curl</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/StewartScottRogers/Curl</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include=".mcp\server.json" Pack="true" PackagePath="/.mcp/" />
+    <None Include="README.md" Pack="true" PackagePath="/" />
+    <None Include="..\LICENSE.txt" Pack="true" PackagePath="/" Visible="false" />
+  </ItemGroup>
+
   <ItemGroup>
     <InternalsVisibleTo Include="Curl.Mcp.UnitTests" />
   </ItemGroup>
@@ -18,7 +50,8 @@
 
   <ItemGroup>
     <!-- For its public InProcessCurl, which the curl tool's runner adapter calls (BL-2382). -->
-    <ProjectReference Include="..\Curl.Console\Curl.Console.csproj" />
+    <!-- Built runtime-agnostic, as a library, so each per-runtime pack needs no restore of it for that runtime. -->
+    <ProjectReference Include="..\Curl.Console\Curl.Console.csproj" GlobalPropertiesToRemove="RuntimeIdentifier;SelfContained" />
     <ProjectReference Include="..\Curl.Mcp.UnitLibrary\Curl.Mcp.UnitLibrary.csproj" />
   </ItemGroup>
 
