@@ -30,3 +30,4 @@ BL-2485 added the `pack-mcp` job; a lane cannot push, so the dry run it asks for
 ## Log
 
 - 2026-10-16: Created.
+- 2026-10-16: Backlog -> Doing.
