@@ -29,8 +29,9 @@ namespace Curl.Engine;
 /// callback's <c>--trace-ids</c> prefix (ADR-0547). The certificate verify codes the transfer reports
 /// reach <see cref="Info" /> through <see cref="TlsVerifyResultRecordingTransferEvents" /> (BL-2366). Around the attempt it does the runner's setup and cleanup:
 /// the <c>-b</c> files, <c>--alt-svc</c> and <c>--hsts</c> files read before it and the <c>-c</c> jar,
-/// alt-svc and HSTS files written after it, through <see cref="Host" /> (ADR-0544). The header, WebSocket and connect-only
-/// APIs are phase 3 work and throw <see cref="NotSupportedException" />.
+/// alt-svc and HSTS files written after it, through <see cref="Host" /> (ADR-0544). <see cref="Headers" /> keeps the
+/// headers of the last perform's HTTP responses (ADR-0603); the WebSocket and connect-only APIs are phase 3 work and
+/// throw <see cref="NotSupportedException" />.
 /// </summary>
 /// <param name="createDispatcher">Builds a transfer's dispatcher from its options, the engine's shared state and the cookie store its HTTP handler keeps.</param>
 /// <param name="shared">What the engine's handles share.</param>
@@ -153,9 +154,15 @@ internal sealed class ManagedEasyTransfer(
     /// <summary>The <c>%{conn_id}</c> of a transfer that failed before it could connect.</summary>
     internal const long NoConnectionId = -1;
 
-    /// <summary>Not supported yet: the header API is phase 3's headers work (ADR-0506).</summary>
-    /// <exception cref="NotSupportedException">Always.</exception>
-    public ITransferHeaders Headers => throw new NotSupportedException("The header API is phase 3 work (ADR-0506).");
+    /// <summary>The headers the last perform from the options received over HTTP, for the header API (ADR-0603).</summary>
+    private readonly TransferHeaderStore headers = new();
+
+    /// <summary>
+    /// The header API over the headers the last perform from <see cref="Options" /> received over <c>http</c>,
+    /// <c>https</c>, <c>ws</c> or <c>wss</c>: every perform and <see cref="Reset" /> forget them, and a perform of the
+    /// curl tool's <see cref="ToolAttempt" /> records none (ADR-0603).
+    /// </summary>
+    public ITransferHeaders Headers => headers;
 
     /// <summary>Not supported yet: the WebSocket API is phase 3's WebSocket work (ADR-0506).</summary>
     /// <exception cref="NotSupportedException">Always.</exception>
@@ -166,10 +173,13 @@ internal sealed class ManagedEasyTransfer(
     public IConnectOnlyConnection Connection => throw new NotSupportedException("The connect-only API is phase 3 work (ADR-0506).");
 
     /// <inheritdoc />
-    public async ValueTask<CurlCode> PerformAsync(CancellationToken cancellationToken) =>
-        ToolAttempt is { } attempt
+    public async ValueTask<CurlCode> PerformAsync(CancellationToken cancellationToken)
+    {
+        headers.Clear();
+        return ToolAttempt is { } attempt
             ? await PerformToolAttemptAsync(attempt).ConfigureAwait(false)
             : await PerformFromOptionsAsync(cancellationToken).ConfigureAwait(false);
+    }
 
     /// <summary>Runs one transfer from <see cref="Options" />, as <see cref="PerformAsync" /> describes.</summary>
     /// <param name="cancellationToken">Stops the transfer.</param>
@@ -592,6 +602,7 @@ internal sealed class ManagedEasyTransfer(
     /// <inheritdoc />
     public void Reset()
     {
+        headers.Clear();
         Options = new EasyOptions();
         ToolSettings = null;
         ToolInputs = null;
@@ -633,7 +644,7 @@ internal sealed class ManagedEasyTransfer(
         EngineTransferState state,
         CancellationToken cancellationToken)
     {
-        EngineToolTransferOutputs outputs = ToolOutputs ?? OwnOutputsOf(options.Callbacks, PauseGateFor(url));
+        EngineToolTransferOutputs outputs = ToolOutputs ?? OwnOutputsOf(options.Callbacks, PauseGateFor(url), RecordsHeaders(url) ? headers : null);
         return new TransferContextFactory(Stream.Null, shared.TimeProvider) { HstsStore = shared.Hsts, DiagnosticLog = Host.DiagnosticLog }.Create(
             settings,
             options.Http,
@@ -667,15 +678,29 @@ internal sealed class ManagedEasyTransfer(
     /// <summary>
     /// The outputs a handle with no <see cref="ToolOutputs" /> writes to: the body to the write callback and the
     /// header lines to the header callback through <see cref="CallbackWriteStream" />, the body discarded and the
-    /// header lines dropped when the callback is unset.
+    /// header lines dropped when the callback is unset; with <paramref name="headerStore" />, every header line is
+    /// recorded there first (<see cref="HeaderRecordingStream" />).
     /// </summary>
     /// <param name="callbacks">The handle's callbacks.</param>
     /// <param name="pauseGate">The pause state a callback's pause waits on, or <see langword="null" /> when the transfer cannot pause.</param>
+    /// <param name="headerStore">Where the header lines are recorded, or <see langword="null" /> to record none.</param>
     /// <returns>The outputs.</returns>
-    private static EngineToolTransferOutputs OwnOutputsOf(EasyCallbackOptions callbacks, EasyPauseGate? pauseGate) =>
-        new(
+    private static EngineToolTransferOutputs OwnOutputsOf(EasyCallbackOptions callbacks, EasyPauseGate? pauseGate, TransferHeaderStore? headerStore)
+    {
+        Stream? headerCallback = callbacks.Header is { } header ? CallbackWriteStream.Of(header, pauseGate) : null;
+        return new(
             callbacks.Write is { } write ? CallbackWriteStream.Of(write, pauseGate) : Stream.Null,
-            HeaderOutput: callbacks.Header is { } header ? CallbackWriteStream.Of(header, pauseGate) : null);
+            HeaderOutput: headerStore is null ? headerCallback : new HeaderRecordingStream(headerStore, headerCallback));
+    }
+
+    /// <summary>
+    /// Whether a transfer of <paramref name="url" /> records its headers for the header API: only HTTP's and
+    /// WebSocket's, as libcurl keeps only HTTP headers; other schemes' header lines (FTP's server replies and the
+    /// like) are not <c>name: value</c> headers (ADR-0603).
+    /// </summary>
+    /// <param name="url">The URL transferred.</param>
+    /// <returns>Whether its headers are recorded.</returns>
+    private static bool RecordsHeaders(CurlUrl url) => url.Scheme.ToLowerInvariant() is "http" or "https" or "ws" or "wss";
 
     /// <summary>
     /// The upload source of a <see cref="Api.Options.Behaviour.EasyTransferOptions.Upload" /> transfer: the read callback, or

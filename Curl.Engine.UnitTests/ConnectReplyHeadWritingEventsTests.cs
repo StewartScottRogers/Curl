@@ -35,6 +35,17 @@ public sealed class ConnectReplyHeadWritingEventsTests
     }
 
     [TestMethod]
+    public async Task WriteConnectReplyHeadAsync_OutputTakesMarks_MarksTheHeadAsAConnectReply()
+    {
+        TransferHeaderStore store = new();
+        ConnectReplyHeadWritingEvents events = new(new CallRecordingEvents(), new HeaderRecordingStream(store, null));
+
+        await events.WriteConnectReplyHeadAsync(Encoding.Latin1.GetBytes("HTTP/1.1 200 OK\r\nVia: p\r\n\r\n"), CancellationToken.None);
+
+        Assert.AreEqual(Api.Codes.CurlHeaderCode.Ok, store.TryGet("Via", 0, Api.EngineContracts.Headers.CurlHeaderOrigin.Connect, 0, out _));
+    }
+
+    [TestMethod]
     public void EveryOtherEvent_GoesOnToTheInnerEvents()
     {
         using MemoryStream headerOutput = new();

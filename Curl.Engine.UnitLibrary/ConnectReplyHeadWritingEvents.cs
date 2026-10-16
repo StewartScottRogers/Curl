@@ -13,9 +13,18 @@ namespace Curl.Engine;
 /// <param name="headerOutput">The transfer's header output; it belongs to the caller and is neither flushed nor closed here.</param>
 internal sealed class ConnectReplyHeadWritingEvents(ITransferEvents inner, Stream headerOutput) : IConnectReplyHeadWritingEvents
 {
-    /// <inheritdoc />
-    public ValueTask WriteConnectReplyHeadAsync(ReadOnlyMemory<byte> head, CancellationToken cancellationToken) =>
-        headerOutput.WriteAsync(head, cancellationToken);
+    /// <summary>
+    /// Writes <paramref name="head" /> to the header output, first marking it as a CONNECT reply's when the output
+    /// is an <see cref="IConnectReplyHeadMarking" />, for the header API (ADR-0603).
+    /// </summary>
+    /// <param name="head">The CONNECT reply head.</param>
+    /// <param name="cancellationToken">Stops the write.</param>
+    /// <returns>A task that completes once the head is written.</returns>
+    public ValueTask WriteConnectReplyHeadAsync(ReadOnlyMemory<byte> head, CancellationToken cancellationToken)
+    {
+        (headerOutput as IConnectReplyHeadMarking)?.MarkConnectReplyHead();
+        return headerOutput.WriteAsync(head, cancellationToken);
+    }
 
     /// <inheritdoc />
     public void ReportInfo(string text) => inner.ReportInfo(text);

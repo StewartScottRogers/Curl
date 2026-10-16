@@ -199,11 +199,10 @@ public sealed partial class ManagedEasyTransferTests
     }
 
     [TestMethod]
-    public async Task HeadersWebSocketAndConnection_NotYetBuilt_ThrowNotSupported()
+    public async Task WebSocketAndConnection_NotYetBuilt_ThrowNotSupported()
     {
         await using IEasyTransfer easy = CreateEngine(new RecordingConnector(CurlExitCode.CouldntConnect, ConnectFailure)).CreateEasy();
 
-        Assert.ThrowsExactly<NotSupportedException>(() => easy.Headers);
         Assert.ThrowsExactly<NotSupportedException>(() => easy.WebSocket);
         Assert.ThrowsExactly<NotSupportedException>(() => easy.Connection);
     }
