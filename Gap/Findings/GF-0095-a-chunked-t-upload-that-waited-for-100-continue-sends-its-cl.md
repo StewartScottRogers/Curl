@@ -13,8 +13,8 @@ closed:
 regression: false
 items: [behaviour:test60]
 touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests]
-task:
-tasks: []
+task: BL-2371
+tasks: [BL-2371]
 ---
 # GF-0095 - A chunked -T - upload that waited for 100 Continue sends its closing chunk in a separate write, so Curl exits 56 on macOS where curl exits 0
 
@@ -37,3 +37,4 @@ In Curl.Protocol.Http.UnitLibrary, HttpRequestBodyWriter.StartReading sets heldB
 ## Log
 
 - 2026-10-15_1657: Opened by gap-behaviour.
+- 2026-10-15_1753: Filed BL-2371.

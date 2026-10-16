@@ -13,8 +13,8 @@ closed:
 regression: false
 items: [behaviour:test2500, behaviour:test2503]
 touches: [Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests]
-task:
-tasks: []
+task: BL-2370
+tasks: [BL-2370]
 ---
 # GF-0094 - HTTP/3 cases run on Linux although Curl, like the OpenSSL reference curl, refuses --http3 and --http3-only there
 
@@ -37,3 +37,4 @@ In Curl.Conformance.UnitLibrary, remove 'http/3' from UpstreamCurlPlatform.Unix 
 ## Log
 
 - 2026-10-15_1657: Opened by gap-behaviour.
+- 2026-10-15_1753: Filed BL-2370.
