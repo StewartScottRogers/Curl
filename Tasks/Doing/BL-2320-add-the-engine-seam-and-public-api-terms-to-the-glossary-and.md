@@ -32,3 +32,4 @@ ADR-0506, plan phase 2 step 6; `align-and-document` work. Terms: transfer engine
 ## Log
 
 - 2026-10-15: Created.
+- 2026-10-15: Backlog -> Doing.
