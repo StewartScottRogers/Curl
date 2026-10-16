@@ -34,3 +34,4 @@ Split from BL-2419 (ADR-0611), which wired the prerequest and resolver-start cal
 ## Log
 
 - 2026-10-16: Created.
+- 2026-10-16: Backlog -> Doing. Criteria at claim: 76246c42 98e69f6c 331a7113 4272a6b9 81cc0a51 1c406d8f.
