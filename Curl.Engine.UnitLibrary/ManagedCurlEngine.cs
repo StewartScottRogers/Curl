@@ -15,9 +15,9 @@ namespace Curl.Engine;
 /// <see cref="EasyOptions" />. Every cache - connections, TLS sessions, DNS, cookies, HSTS - and the
 /// <c>%{xfer_id}</c> numbering belong to the engine object (<see cref="ManagedEngineSharedState" />,
 /// ADR-0542), shared by its handles as the curl tool's transfers share them across a run, and none is
-/// static, so two engines in one process share nothing.
-/// The multi handle is <see cref="ManagedMultiTransfer" />; the share, URL and MIME handles are phase 3
-/// work (ADR-0506) and throw
+/// static, so two engines in one process share nothing but what a <see cref="ManagedShareHandle" /> shares
+/// (ADR-0606). The multi handle is <see cref="ManagedMultiTransfer" /> and the URL handle
+/// <see cref="ManagedCurlUrlHandle" />; the MIME and form handles are phase 3 work (ADR-0506) and throw
 /// <see cref="NotSupportedException" /> here.
 /// </summary>
 public sealed class ManagedCurlEngine : ICurlEngine
@@ -78,10 +78,9 @@ public sealed class ManagedCurlEngine : ICurlEngine
     /// <returns>The new multi handle; the caller disposes it (<c>curl_multi_cleanup</c>).</returns>
     public IMultiTransfer CreateMulti() => new ManagedMultiTransfer(shared.MultiOwners, shared.TimeProvider, SocketWaitPoller.Instance, shared.Connections.CloseIdleAsync, shared.DnsCache.Clear);
 
-    /// <summary>Not supported yet: the share handle is phase 3's share interface work (ADR-0506).</summary>
-    /// <returns>Never returns.</returns>
-    /// <exception cref="NotSupportedException">Always.</exception>
-    public IShareHandle CreateShare() => throw new NotSupportedException("The share interface is phase 3 work (ADR-0506).");
+    /// <summary><c>curl_share_init</c>: a <see cref="ManagedShareHandle" /> sharing nothing yet, on the engine's clock (ADR-0606).</summary>
+    /// <returns>The new share handle; the caller frees it with <see cref="IShareHandle.Cleanup" />.</returns>
+    public IShareHandle CreateShare() => new ManagedShareHandle(shared.TimeProvider);
 
     /// <summary><c>curl_url</c>: a new URL handle holding no part (ADR-0601).</summary>
     /// <returns>A <see cref="ManagedCurlUrlHandle" />; the caller disposes it.</returns>

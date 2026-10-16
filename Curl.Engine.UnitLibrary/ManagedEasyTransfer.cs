@@ -24,7 +24,8 @@ namespace Curl.Engine;
 /// (<see cref="CallbackTransferProgress" />), whose abort ends the transfer with
 /// <see cref="CurlCode.AbortedByCallback" /> (ADR-0543). Cookies, the HSTS cache, pooled
 /// connections and the <c>%{xfer_id}</c> and <c>%{conn_id}</c> numbering are the engine's (<see cref="ManagedEngineSharedState" />),
-/// shared with its other handles (ADR-0542); while a transfer performs, <see cref="Info" /> holds its
+/// shared with its other handles (ADR-0542), and a perform attached to a <see cref="ManagedShareHandle" /> through
+/// <c>CURLOPT_SHARE</c> uses the share's caches for the kinds it shares (ADR-0606); while a transfer performs, <see cref="Info" /> holds its
 /// <c>%{xfer_id}</c> from the start and its <c>%{conn_id}</c> once it connects (-1 before), for the debug
 /// callback's <c>--trace-ids</c> prefix (ADR-0547). The certificate verify codes the transfer reports
 /// reach <see cref="Info" /> through <see cref="TlsVerifyResultRecordingTransferEvents" /> (BL-2366). Around the attempt it does the runner's setup and cleanup:
@@ -53,6 +54,15 @@ internal sealed class ManagedEasyTransfer(
 
     /// <inheritdoc />
     public string ErrorText { get; private set; } = string.Empty;
+
+    /// <summary>The caches the share handle the running perform is attached to gives (ADR-0606), or <see langword="null" /> for none.</summary>
+    private ManagedEngineSharedState? attachedShared;
+
+    /// <summary>Gets the caches the running perform uses: those its share handle gives, else the engine's.</summary>
+    private ManagedEngineSharedState PerformShared => attachedShared ?? shared;
+
+    /// <summary>The share handle the running perform is attached to, or <see langword="null" /> for none.</summary>
+    private ManagedShareHandle? performShare;
 
     /// <summary>The handle's pause state, which <see cref="Pause" /> sets and a pausing callback waits on (ADR-0573).</summary>
     private readonly EasyPauseGate pauseGate = new();
@@ -181,10 +191,47 @@ internal sealed class ManagedEasyTransfer(
             : await PerformFromOptionsAsync(cancellationToken).ConfigureAwait(false);
     }
 
-    /// <summary>Runs one transfer from <see cref="Options" />, as <see cref="PerformAsync" /> describes.</summary>
+    /// <summary>
+    /// Runs one transfer from <see cref="Options" /> over the engine's caches, or, while
+    /// <see cref="Api.Options.Behaviour.EasyBehaviourOptions.Share" /> names a <see cref="ManagedShareHandle" />,
+    /// attached to it and over the caches it shares (ADR-0606); a share handle of another engine kind shares nothing.
+    /// </summary>
     /// <param name="cancellationToken">Stops the transfer.</param>
     /// <returns>The transfer's code.</returns>
     private async Task<CurlCode> PerformFromOptionsAsync(CancellationToken cancellationToken)
+    {
+        if (Options.Behaviour.Share is not ManagedShareHandle share)
+        {
+            return await PerformFromOptionsOverCachesAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        performShare = share;
+        attachedShared = share.Attach(this, shared);
+        try
+        {
+            return await PerformFromOptionsOverCachesAsync(cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            share.Detach(this);
+            performShare = null;
+            attachedShared = null;
+        }
+    }
+
+    /// <summary>
+    /// The cookie store the transfer's HTTP handler keeps: <paramref name="cookies" />' own, under the share
+    /// handle's cookie lock while the perform is attached to one (<see cref="ManagedShareHandle.CookieStoreFor" />).
+    /// </summary>
+    /// <param name="cookies">The transfer's cookies, or <see langword="null" /> when no cookie option is set.</param>
+    /// <returns>The store, or <see langword="null" /> for none.</returns>
+    private ICookieStore? HandlerCookieStoreOf(CookieEngine? cookies) =>
+        performShare is { } share ? share.CookieStoreFor(cookies?.HandlerStore, this) : cookies?.HandlerStore;
+
+    /// <summary>Runs one transfer from <see cref="Options" />, as <see cref="PerformAsync" /> describes, over <see cref="PerformShared" />.</summary>
+    /// <param name="cancellationToken">Stops the transfer.</param>
+    /// <returns>The transfer's code.</returns>
+    private async Task<CurlCode> PerformFromOptionsOverCachesAsync(CancellationToken cancellationToken)
     {
         EasyOptions options = Options;
         LastResult = null;
@@ -201,11 +248,11 @@ internal sealed class ManagedEasyTransfer(
         EngineTransferSettings settings = ToolSettings ?? TransferSettingsOf(options);
         long transferId = shared.Performer.TakeTransferId();
         Info = new TransferInfo { EffectiveUrl = urlText, TransferId = transferId, ConnectionId = NoConnectionId };
-        CookieEngine? cookies = CookieEngine.FromHttpOptions(options.Http, shared.Cookies);
+        CookieEngine? cookies = CookieEngine.FromHttpOptions(options.Http, PerformShared.Cookies);
         (EngineTransferState state, TlsVerifyResultRecordingTransferEvents events) = StateAndEventsOf(ToolEvents, options);
         EngineToolTransferInputs? toolInputs = ToolInputs;
         string transferUrl = await SetUpUnlessToolDidAsync(toolInputs, options, settings, cookies, state, urlText, events).ConfigureAwait(false);
-        RedirectFollower follower = new(createDispatcher(options, shared, cookies?.HandlerStore));
+        RedirectFollower follower = new(createDispatcher(options, PerformShared, HandlerCookieStoreOf(cookies)));
         EngineToolTransferInputs inputs = InputsOf(toolInputs, options, state, PauseGateFor(url));
         CallbackReadStream? callbackUpload = inputs.Upload as CallbackReadStream;
         EngineToolTransferProgress? toolProgress = ToolProgress;
@@ -328,7 +375,7 @@ internal sealed class ManagedEasyTransfer(
         if (toolInputs is null)
         {
             await shared.Performer.WriteCookieJarAltSvcAndHstsFilesAsync(
-                cookies, settings, options.Http, transferUrl, Host.JarPrintTarget, state, shared.Hsts, Host.FileSystem, Host.RunsOnWindows).ConfigureAwait(false);
+                cookies, settings, options.Http, transferUrl, Host.JarPrintTarget, state, PerformShared.Hsts, Host.FileSystem, Host.RunsOnWindows).ConfigureAwait(false);
         }
     }
 
@@ -432,7 +479,7 @@ internal sealed class ManagedEasyTransfer(
         EasyTransferHost host = Host;
         await shared.Performer.LoadCookieFilesAsync(cookies, settings, urlText, host.FileSystem, host.StandardInput, events).ConfigureAwait(false);
         await shared.Performer.OpenAltSvcCacheAsync(state, settings, options.Network, options.Http, urlText, host.FileSystem, host.DiagnosticLog, host.AltSvcUsesOverHttp).ConfigureAwait(false);
-        return await TransferPerformer.SwitchToHttpsForHstsAsync(shared.Hsts, settings, options.Network, options.Http, urlText, host.FileSystem, events).ConfigureAwait(false);
+        return await TransferPerformer.SwitchToHttpsForHstsAsync(PerformShared.Hsts, settings, options.Network, options.Http, urlText, host.FileSystem, events).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -645,7 +692,7 @@ internal sealed class ManagedEasyTransfer(
         CancellationToken cancellationToken)
     {
         EngineToolTransferOutputs outputs = ToolOutputs ?? OwnOutputsOf(options.Callbacks, PauseGateFor(url), RecordsHeaders(url) ? headers : null);
-        return new TransferContextFactory(Stream.Null, shared.TimeProvider) { HstsStore = shared.Hsts, DiagnosticLog = Host.DiagnosticLog }.Create(
+        return new TransferContextFactory(Stream.Null, shared.TimeProvider) { HstsStore = PerformShared.Hsts, DiagnosticLog = Host.DiagnosticLog }.Create(
             settings,
             options.Http,
             options.Behaviour,

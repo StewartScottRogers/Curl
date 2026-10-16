@@ -108,11 +108,18 @@ public sealed class ManagedCurlEngineTests
     }
 
     [TestMethod]
-    public async Task ShareMimeAndForm_NotYetBuilt_ThrowNotSupported()
+    public async Task CreateShare_Called_GivesAManagedShareHandle()
     {
         await using ManagedCurlEngine engine = new();
 
-        Assert.ThrowsExactly<NotSupportedException>(() => engine.CreateShare());
+        Assert.IsInstanceOfType<ManagedShareHandle>(engine.CreateShare());
+    }
+
+    [TestMethod]
+    public async Task MimeAndForm_NotYetBuilt_ThrowNotSupported()
+    {
+        await using ManagedCurlEngine engine = new();
+
         Assert.ThrowsExactly<NotSupportedException>(() => engine.CreateMime());
         Assert.ThrowsExactly<NotSupportedException>(() => engine.CreateForm());
     }
