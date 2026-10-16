@@ -4,7 +4,7 @@ title: Engine: ICurlUrlHandle get over CurlUrl for every part and flag
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-2395]
+depends-on: [BL-2456]
 touches: [Curl.Engine.UnitLibrary, Curl.Engine.UnitTests]
 requirement: none
 created: 2026-10-15

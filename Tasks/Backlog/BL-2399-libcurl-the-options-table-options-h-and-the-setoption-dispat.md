@@ -4,7 +4,7 @@ title: Libcurl: the options table (options.h) and the SetOption dispatch
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-2395]
+depends-on: [BL-2456]
 touches: [Libcurl/Options, Libcurl.UnitTests/Options]
 requirement: none
 created: 2026-10-15

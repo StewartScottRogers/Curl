@@ -4,7 +4,7 @@ title: Re-base Curl.Console: serial transfers run through Libcurl CurlEasy
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-2409, BL-2410, BL-2411, BL-2400, BL-2401, BL-2402, BL-2403, BL-2404, BL-2405, BL-2406, BL-2407, BL-2422, BL-2414, BL-2446, BL-2448, BL-2450, BL-2396, BL-2394]
+depends-on: [BL-2409, BL-2410, BL-2411, BL-2400, BL-2401, BL-2402, BL-2403, BL-2404, BL-2405, BL-2406, BL-2407, BL-2422, BL-2414, BL-2446, BL-2448, BL-2450, BL-2457, BL-2394]
 touches: [Curl.Console, Curl.Console.UnitTests]
 requirement: none
 created: 2026-10-15

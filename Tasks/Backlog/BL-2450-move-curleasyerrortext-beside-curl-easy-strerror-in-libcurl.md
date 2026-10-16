@@ -4,7 +4,7 @@ title: Move CurlEasyErrorText beside curl_easy_strerror in Libcurl
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-2449, BL-2398]
+depends-on: [BL-2449, BL-2459]
 touches: [Libcurl/Misc/ErrorText, Libcurl.UnitTests/Misc/ErrorText, Curl.Console, Curl.Console.UnitTests]
 requirement: none
 created: 2026-10-15

@@ -37,4 +37,4 @@ ADR-0506; the plan's "Phase 3" table (about 55-60 tasks). Phases 1 and 2 decided
 
 - 2026-10-15: Created.
 - 2026-10-15: Backlog -> Doing.
-- 2026-10-15: Doing -> Done. Phase 3 filed as BL-2395 to BL-2455 (61 tasks) and the plan lists them
+- 2026-10-15: Doing -> Done. Phase 3 filed as BL-2456 to BL-2455 (61 tasks) and the plan lists them

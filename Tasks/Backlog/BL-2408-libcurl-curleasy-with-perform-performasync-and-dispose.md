@@ -4,7 +4,7 @@ title: Libcurl: CurlEasy with Perform, PerformAsync and Dispose
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-2395, BL-2399]
+depends-on: [BL-2456, BL-2399]
 touches: [Libcurl/Easy, Libcurl.UnitTests/Easy]
 requirement: none
 created: 2026-10-15

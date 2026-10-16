@@ -4,7 +4,7 @@ title: Libcurl: CurlShare with SetOption and lock callbacks
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-2395]
+depends-on: [BL-2456]
 touches: [Libcurl/Share, Libcurl.UnitTests/Share]
 requirement: none
 created: 2026-10-15

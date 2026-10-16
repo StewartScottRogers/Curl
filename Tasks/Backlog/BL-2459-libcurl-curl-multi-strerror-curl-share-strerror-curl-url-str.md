@@ -1,20 +1,20 @@
 ---
-id: BL-2396
-title: Libcurl: CurlGlobal.Init() builds the managed engine
+id: BL-2459
+title: Libcurl: curl_multi_strerror, curl_share_strerror, curl_url_strerror and the header-API error text
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-2395]
-touches: [Libcurl/Global, Libcurl.UnitTests/Global, Libcurl/Libcurl.csproj]
+depends-on: [BL-2456]
+touches: [Libcurl/Misc/ErrorText, Libcurl.UnitTests/Misc/ErrorText]
 requirement: none
 created: 2026-10-15
 completed:
 ---
-# BL-2396 — Libcurl: CurlGlobal.Init() builds the managed engine
+# BL-2459 — Libcurl: curl_multi_strerror, curl_share_strerror, curl_url_strerror and the header-API error text
 
 ## Goal
 
-Parameterless `CurlGlobal.Init()` creates a library over the managed engine (`Curl.Engine.UnitLibrary`), as `curl_global_init` needs no argument in C.
+Libcurl has `CurlErrorText.Multi`, `Share`, `Url` and `Header` returning upstream's exact strings for every `CurlMultiCode`, `CurlShareCode`, `CurlUrlCode` and `CurlHeaderCode`. `curl_easy_strerror` waits for the `CurlEasyErrorText` move.
 
 ## Context
 
@@ -22,8 +22,7 @@ ADR-0506; phase 3 of `Documentation/Planning/Curl-Api-And-libcurl.md`. Read the 
 
 ## Acceptance criteria
 
-- [ ] `Libcurl.csproj` references `Curl.Engine.UnitLibrary` (a project reference, no package) and `Libcurl/CLAUDE.md` says so, replacing its "empty of logic" text.
-- [ ] A test shows `CurlGlobal.Init()` returns a library whose `CreateEasy()` is backed by `ManagedCurlEngine`.
+- [ ] Every member of each code enum has a test row naming upstream's string, and an unknown code answers upstream's fallback text.
 - [ ] `dotnet build` is clean and the fast tests pass with no test deleted, skipped or weakened.
 - [ ] `Curl.Conformance.UnitTests/PassingUpstreamCases.txt` is unchanged or grown, and every case it lists still passes.
 - [ ] `Measure-CodeQuality.ps1 -Library Libcurl` reports 0 failing members (100% line and branch coverage, complexity at most 10, CRAP at most 30).

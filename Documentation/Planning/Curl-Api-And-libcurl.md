@@ -342,10 +342,10 @@ Phase 3 - `Libcurl`, area by area (61 tasks, filed 2026-10-15 by BL-2321; the ta
 
 | Task | Title |
 | --- | --- |
-| BL-2395 | Libcurl: CurlGlobal.Init(ICurlEngine) and the CurlLibrary object that creates handles |
-| BL-2396 | Libcurl: CurlGlobal.Init() builds the managed engine |
-| BL-2397 | Libcurl: curl_version, curl_version_info and the feature bits |
-| BL-2398 | Libcurl: curl_multi_strerror, curl_share_strerror, curl_url_strerror and the header-API error text |
+| BL-2456 | Libcurl: CurlGlobal.Init(ICurlEngine) and the CurlLibrary object that creates handles |
+| BL-2457 | Libcurl: CurlGlobal.Init() builds the managed engine |
+| BL-2458 | Libcurl: curl_version, curl_version_info and the feature bits |
+| BL-2459 | Libcurl: curl_multi_strerror, curl_share_strerror, curl_url_strerror and the header-API error text |
 | BL-2399 | Libcurl: the options table (options.h) and the SetOption dispatch |
 | BL-2400 | Libcurl: SetOption for the behaviour options (EasyBehaviourOptions) |
 | BL-2401 | Libcurl: SetOption for the transfer options (EasyTransferOptions) |

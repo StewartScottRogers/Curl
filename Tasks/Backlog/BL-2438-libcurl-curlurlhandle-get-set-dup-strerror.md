@@ -4,7 +4,7 @@ title: Libcurl: CurlUrlHandle (get, set, dup, strerror)
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-2395, BL-2398]
+depends-on: [BL-2456, BL-2459]
 touches: [Libcurl/Url, Libcurl.UnitTests/Url]
 requirement: none
 created: 2026-10-15

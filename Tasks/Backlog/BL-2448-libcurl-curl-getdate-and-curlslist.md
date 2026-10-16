@@ -4,7 +4,7 @@ title: Libcurl: curl_getdate and CurlSlist
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-2395]
+depends-on: [BL-2456]
 touches: [Libcurl/Misc/DatesAndLists, Libcurl.UnitTests/Misc/DatesAndLists]
 requirement: none
 created: 2026-10-15

@@ -1,20 +1,20 @@
 ---
-id: BL-2395
-title: Libcurl: CurlGlobal.Init(ICurlEngine) and the CurlLibrary object that creates handles
+id: BL-2458
+title: Libcurl: curl_version, curl_version_info and the feature bits
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: []
-touches: [Libcurl/Global, Libcurl.UnitTests/Global]
+depends-on: [BL-2456]
+touches: [Libcurl/Misc/Version, Libcurl.UnitTests/Misc/Version]
 requirement: none
 created: 2026-10-15
 completed:
 ---
-# BL-2395 — Libcurl: CurlGlobal.Init(ICurlEngine) and the CurlLibrary object that creates handles
+# BL-2458 — Libcurl: curl_version, curl_version_info and the feature bits
 
 ## Goal
 
-Libcurl has `CurlGlobal.Init(ICurlEngine engine, CurlGlobalFlags flags)` returning a disposable library object (`CurlLibrary`) that holds the engine, honours `CURL_GLOBAL_*` flags, counts init/cleanup like `curl_global_init`/`curl_global_cleanup`, and creates `CurlEasy`, `CurlMulti`, `CurlShare`, `CurlUrlHandle`, `CurlMime` and `CurlForm` handles from the engine (the creating methods may throw until their area task lands, each naming that area).
+Libcurl has `CurlVersion.Text` (`curl_version`), `CurlVersion.Info(CurlVersionAge)` (`curl_version_info` with every `CURLVERSION_*` age) and the `CURL_VERSION_*` feature bits, taken from `ICurlEngine.VersionInfo`, matching `curl -V`.
 
 ## Context
 
@@ -22,9 +22,7 @@ ADR-0506; phase 3 of `Documentation/Planning/Curl-Api-And-libcurl.md`. Read the 
 
 ## Acceptance criteria
 
-- [ ] A unit test with a fake `ICurlEngine` shows Init, flag handling, double cleanup and handle creation delegating to the engine.
-- [ ] `curl_global_init_mem` (`CurlGlobal.InitMemory`) is accepted and its allocation callbacks ignored, documented in its XML doc.
-- [ ] `curl_global_sslset` and `curl_global_trace` are present and answer as the Schannel build does, each with a test.
+- [ ] A test pins the version string, protocol list and feature bits for each age against the fake engine, and one test checks they agree with `curl -V` output from `Curl.Console`.
 - [ ] `dotnet build` is clean and the fast tests pass with no test deleted, skipped or weakened.
 - [ ] `Curl.Conformance.UnitTests/PassingUpstreamCases.txt` is unchanged or grown, and every case it lists still passes.
 - [ ] `Measure-CodeQuality.ps1 -Library Libcurl` reports 0 failing members (100% line and branch coverage, complexity at most 10, CRAP at most 30).

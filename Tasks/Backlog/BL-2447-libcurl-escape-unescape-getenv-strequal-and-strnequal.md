@@ -4,7 +4,7 @@ title: Libcurl: escape, unescape, getenv, strequal and strnequal
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-2395]
+depends-on: [BL-2456]
 touches: [Libcurl/Misc/Strings, Libcurl.UnitTests/Misc/Strings]
 requirement: none
 created: 2026-10-15
