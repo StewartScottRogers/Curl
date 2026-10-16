@@ -20,7 +20,7 @@ upstream case runner runs for a case whose `<client><tool>` line names `lib%TEST
   cleanup and returns `ToLibTestResult()`. The multi steps (`MultiInit`, `MultiSetOption`,
   `MultiAddHandle`, `MultiRemoveHandle`, `MultiPerformAsync`, `MultiFdSet`, `MultiTimeout`,
   `MultiPollAsync`, `MultiWaitAsync`, `MultiWakeup`), `ShareInit`, `UrlInit` and
-  `AbortOnTestTimeout` are in its other `partial` files (ADR-0654).
+  `AbortOnTestTimeout` are in its other `partial` files (ADR-0655).
 - `LibTestClock` is libtest's time over an injected `TimeProvider`: `Now` (`curlx_now`),
   `DifferenceMilliseconds` (`curlx_timediff_ms`), `StartTestTiming` and `WaitAsync` (`curlx_wait_ms`).
 - `LibTestUtilities` is `testutil.c`: `SubUrl` (`tutil_suburl`) and `ThrowawayWrite`
