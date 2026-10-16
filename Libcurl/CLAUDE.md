@@ -22,7 +22,8 @@ the `EasyBehaviourOptions` options: an on/off option is on for any value but 0, 
 options take 0 to 0777, and an object option given a value its field cannot hold answers
 `BadFunctionArgument`, as libcurl's `setopt.c` does. `Options/Network` sets the `EasyNetworkOptions`
 options with `setopt.c`'s range checks, and turns the `PROTOCOLS` bitmasks into `PROTOCOLS_STR` names
-(ADR-0568); `CURLU` still answers `NotBuiltIn` until BL-2462. `Options/Transfer` sets the
+(ADR-0568); `CURLU` takes a `CurlUrlHandle` and stores its engine `ICurlUrlHandle` by reference as
+`UrlHandle`, `null` clears it and any other object answers `BadFunctionArgument` (ADR-0590). `Options/Transfer` sets the
 `EasyTransferOptions` options with `setopt.c`'s checks, each `_LARGE` or `_MS` alias setting the same
 field as the option it extends, and clamps the two buffer sizes rather than refusing them (ADR-0572). `Options/Proxy` sets the
 `EasyProxyOptions` options with `setopt.c`'s checks, keeps a copy of the `PROXYHEADER` list, and
@@ -123,7 +124,7 @@ engine's `ICurlUrlHandle` (ADR-0587): `Get` and `Set` (`curl_url_get`, `_set`) p
 engine and answer its code, `Duplicate` (`curl_url_dup`) wraps the engine's copy in a new handle, and
 `ErrorText` is `curl_url_strerror` over `CurlErrorText.Url`. `Dispose` is `curl_url_cleanup` and
 disposes the engine handle once; a member used afterwards throws `ObjectDisposedException`. The internal
-`EngineHandle` is for `CURLOPT_CURLU` (BL-2462).
+`EngineHandle` is what `CURLOPT_CURLU` stores (ADR-0590).
 
 `Info` holds `CurlInfo` (every `CURLINFO_*` of curl 8.22.0's `curl.h` by name and number) and the
 internal `EasyInfoDispatch` `CurlEasy.GetInfo` goes through (ADR-0566): an id `curl.h` lacks answers

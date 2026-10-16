@@ -2,6 +2,8 @@ using Curl.Api.Codes;
 using Curl.Api.Options;
 using Curl.Api.Options.Network;
 using Libcurl.Options;
+using Libcurl.UnitTests.Url;
+using Libcurl.Url;
 
 namespace Libcurl.UnitTests.Options.Network;
 
@@ -291,6 +293,39 @@ public sealed class EasyNetworkOptionSettersTests
 
         Assert.AreEqual(CurlCode.Ok, Set(ref options, option, bits));
         Assert.AreEqual(names, ProtocolsOf(options.Network, option));
+    }
+
+    [TestMethod]
+    public void SetOption_CurluWithAUrlHandle_StoresItsEngineHandle()
+    {
+        var engine = new FakeCurlUrlHandle();
+        using var url = new CurlUrlHandle(engine);
+        var options = new EasyOptions();
+
+        var code = Set(ref options, CurlOption.Curlu, url);
+
+        Assert.AreEqual(CurlCode.Ok, code);
+        Assert.AreSame(engine, options.Network.UrlHandle);
+    }
+
+    [TestMethod]
+    public void SetOption_CurluNull_ClearsTheUrlHandle()
+    {
+        using var url = new CurlUrlHandle(new FakeCurlUrlHandle());
+        var options = new EasyOptions();
+        Set(ref options, CurlOption.Curlu, url);
+
+        var code = Set(ref options, CurlOption.Curlu, null);
+
+        Assert.AreEqual(CurlCode.Ok, code);
+        Assert.IsNull(options.Network.UrlHandle);
+    }
+
+    [TestMethod]
+    public void SetOption_CurluAnyOtherObject_AnswersBadFunctionArgument()
+    {
+        AssertBadFunctionArgument(CurlOption.Curlu, "http://example.com/");
+        AssertBadFunctionArgument(CurlOption.Curlu, new FakeCurlUrlHandle());
     }
 
     private static string? ProtocolsOf(EasyNetworkOptions network, CurlOption option) =>

@@ -2,13 +2,13 @@ using System.Globalization;
 using Curl.Api.Codes;
 using Curl.Api.Options;
 using Curl.Api.Options.Network;
+using Libcurl.Url;
 
 namespace Libcurl.Options;
 
 /// <summary>
-/// The setter rows of every <c>CURLOPT_*</c> <see cref="EasyNetworkOptions"/> holds but
-/// <c>CURLOPT_CURLU</c> (BL-2462), each checking its value as curl 8.22.0's <c>lib/setopt.c</c> does
-/// (ADR-0568).
+/// The setter rows of every <c>CURLOPT_*</c> <see cref="EasyNetworkOptions"/> holds, each checking its
+/// value as curl 8.22.0's <c>lib/setopt.c</c> does (ADR-0568, ADR-0590).
 /// </summary>
 internal static class EasyNetworkOptionSetters
 {
@@ -42,6 +42,7 @@ internal static class EasyNetworkOptionSetters
     private static void AddAddressSetters(Dictionary<CurlOption, EasyOptionSetter> setters)
     {
         setters[CurlOption.Url] = new(SetUrl);
+        setters[CurlOption.Curlu] = new(SetUrlHandle);
         setters[CurlOption.PathAsIs] = new(SetPathAsIs);
         setters[CurlOption.Protocols] = new(SetProtocolBits);
         setters[CurlOption.ProtocolsStr] = new(SetProtocols);
@@ -101,6 +102,18 @@ internal static class EasyNetworkOptionSetters
     }
 
     private static CurlCode SetUrl(ref EasyOptions o, object? v) => Set(ref o, n => n with { Url = (string?)v });
+
+    /// <summary>
+    /// <c>CURLOPT_CURLU</c>: a <see cref="CurlUrlHandle"/>x27s engine handle, held by reference as libcurl
+    /// holds the pointer; <see langword="null"/> clears it, and any other object is
+    /// <see cref="CurlCode.BadFunctionArgument"/> (ADR-0590).
+    /// </summary>
+    private static CurlCode SetUrlHandle(ref EasyOptions o, object? v) => v switch
+    {
+        null => Set(ref o, n => n with { UrlHandle = null }),
+        CurlUrlHandle url => Set(ref o, n => n with { UrlHandle = url.EngineHandle }),
+        _ => CurlCode.BadFunctionArgument,
+    };
 
     private static CurlCode SetPathAsIs(ref EasyOptions o, object? v) => Set(ref o, n => n with { PathAsIs = IsOn(v) });
 
