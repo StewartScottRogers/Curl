@@ -101,6 +101,24 @@ public sealed partial class ManagedEasyTransferTests
     }
 
     [TestMethod]
+    public async Task PerformAsync_WebSocketConnectOnlyWithRawMode_SendsTheBytesUnframedAndNoPong()
+    {
+        (ManagedEasyTransfer easy, _, QueuedConnection peer) =
+            CreateWebSocketEasy([.. Ascii(SwitchingProtocolsHead), .. ManagedEasyWebSocketTests.ServerFrame(WsOpcode.Ping, true, "?")]);
+        await using IEasyTransfer handle = easy;
+        easy.Options = WebSocketConnectOnlyTo("ws://h/", WebSocketOptionBits.RawMode);
+
+        await easy.PerformAsync(CancellationToken.None);
+        int requestLength = peer.Written.Length;
+        CurlWebSocketReceiveResult ping = await easy.WebSocket.ReceiveAsync(new byte[4], CancellationToken.None);
+        CurlWebSocketSendResult sent = await easy.WebSocket.SendAsync(Ascii("raw"), 0, CurlWebSocketFlags.None, CancellationToken.None);
+
+        Assert.AreEqual(CurlWebSocketFlags.Ping, ping.Frame.Flags);
+        Assert.AreEqual(new CurlWebSocketSendResult(CurlCode.Ok, 3), sent);
+        CollectionAssert.AreEqual(Ascii("raw"), peer.Written[requestLength..]);
+    }
+
+    [TestMethod]
     public async Task PerformAsync_WebSocketUpgradeRefused_AnswersTheTransfersCodeAndLeavesNoWebSocket()
     {
         (ManagedEasyTransfer easy, _, QueuedConnection peer) = CreateWebSocketEasy(Ascii("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n"));

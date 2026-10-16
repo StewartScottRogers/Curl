@@ -1,6 +1,7 @@
 using System.Text;
 using Curl.Api.Codes;
 using Curl.Api.EngineContracts.WebSocket;
+using Curl.Api.Options.Protocols;
 using Curl.Protocol.Ws;
 
 namespace Curl.Engine;
@@ -22,9 +23,9 @@ public sealed class ManagedEasyWebSocketTests
         return [(byte)((isFinal ? 0x80 : 0) | (int)opcode), (byte)(0x80 | bytes.Length), 0, 0, 0, 0, .. bytes];
     }
 
-    private static async Task<(ManagedEasyWebSocket WebSocket, QueuedConnection Peer)> OpenAsync(bool answersPings = true, params byte[][] alreadyReceived)
+    private static async Task<(ManagedEasyWebSocket WebSocket, QueuedConnection Peer)> OpenAsync(WebSocketOptionBits options = WebSocketOptionBits.None, params byte[][] alreadyReceived)
     {
-        ManagedEasyWebSocket webSocket = new(() => true, () => answersPings, new ZeroMaskSource());
+        ManagedEasyWebSocket webSocket = new(() => true, () => options, new ZeroMaskSource());
         QueuedConnection peer = new();
         await webSocket.OpenAsync(peer, alreadyReceived.SelectMany(chunk => chunk).ToArray());
         return (webSocket, peer);
@@ -36,7 +37,7 @@ public sealed class ManagedEasyWebSocketTests
     [TestMethod]
     public async Task ReceiveAsync_BytesThatCameWithTheUpgrade_HandsTheFrameOverWithItsMetadata()
     {
-        (ManagedEasyWebSocket webSocket, _) = await OpenAsync(true, ServerFrame(WsOpcode.Text, true, "hello"));
+        (ManagedEasyWebSocket webSocket, _) = await OpenAsync(WebSocketOptionBits.None, ServerFrame(WsOpcode.Text, true, "hello"));
         byte[] buffer = new byte[16];
 
         CurlWebSocketReceiveResult result = await webSocket.ReceiveAsync(buffer, CancellationToken.None);
@@ -49,7 +50,7 @@ public sealed class ManagedEasyWebSocketTests
     [TestMethod]
     public async Task ReceiveAsync_BufferSmallerThanTheFrame_HandsItOverInPiecesWithOffsetAndBytesLeft()
     {
-        (ManagedEasyWebSocket webSocket, _) = await OpenAsync(true, ServerFrame(WsOpcode.Binary, true, "abcde"));
+        (ManagedEasyWebSocket webSocket, _) = await OpenAsync(WebSocketOptionBits.None, ServerFrame(WsOpcode.Binary, true, "abcde"));
         byte[] buffer = new byte[2];
 
         CurlWebSocketReceiveResult first = await webSocket.ReceiveAsync(buffer, CancellationToken.None);
@@ -87,7 +88,7 @@ public sealed class ManagedEasyWebSocketTests
     [TestMethod]
     public async Task ReceiveAsync_PingWithAutoPongOff_HandsThePingOverAndSendsNothing()
     {
-        (ManagedEasyWebSocket webSocket, QueuedConnection peer) = await OpenAsync(false, ServerFrame(WsOpcode.Ping, true, ""));
+        (ManagedEasyWebSocket webSocket, QueuedConnection peer) = await OpenAsync(WebSocketOptionBits.NoAutoPong, ServerFrame(WsOpcode.Ping, true, ""));
 
         CurlWebSocketReceiveResult ping = await webSocket.ReceiveAsync(new byte[4], CancellationToken.None);
 
@@ -99,7 +100,7 @@ public sealed class ManagedEasyWebSocketTests
     public async Task ReceiveAsync_PartOfAFrame_AnswersAgainUntilTheRestComes()
     {
         byte[] frame = ServerFrame(WsOpcode.Text, true, "abc");
-        (ManagedEasyWebSocket webSocket, QueuedConnection peer) = await OpenAsync(true, frame[..2]);
+        (ManagedEasyWebSocket webSocket, QueuedConnection peer) = await OpenAsync(WebSocketOptionBits.None, frame[..2]);
         byte[] buffer = new byte[8];
 
         peer.Enqueue(frame[2..3]);
@@ -153,7 +154,7 @@ public sealed class ManagedEasyWebSocketTests
     public async Task ReceiveAsync_MaskedServerFrameAfterAFrame_HandsTheFrameOverThenAnswersRecvErrorFromThenOn()
     {
         byte[] masked = [0x81, 0x81, 1, 2, 3, 4, 5];
-        (ManagedEasyWebSocket webSocket, _) = await OpenAsync(true, ServerFrame(WsOpcode.Text, true, "ok"), masked);
+        (ManagedEasyWebSocket webSocket, _) = await OpenAsync(WebSocketOptionBits.None, ServerFrame(WsOpcode.Text, true, "ok"), masked);
         byte[] buffer = new byte[8];
 
         CurlWebSocketReceiveResult first = await webSocket.ReceiveAsync(buffer, CancellationToken.None);
@@ -179,7 +180,7 @@ public sealed class ManagedEasyWebSocketTests
     [TestMethod]
     public async Task ReceiveAsync_PongCannotBeWritten_AnswersSendErrorAfterThePing()
     {
-        ManagedEasyWebSocket webSocket = new(() => true, () => true, new ZeroMaskSource());
+        ManagedEasyWebSocket webSocket = new(() => true, () => WebSocketOptionBits.None, new ZeroMaskSource());
         QueuedConnection peer = new() { WriteFailure = new IOException("gone") };
         await webSocket.OpenAsync(peer, ServerFrame(WsOpcode.Ping, true, "x"));
         byte[] buffer = new byte[8];
@@ -194,7 +195,7 @@ public sealed class ManagedEasyWebSocketTests
     [TestMethod]
     public async Task ReceiveAsync_PingThenAViolationAndThePongCannotBeWritten_KeepsRecvError()
     {
-        ManagedEasyWebSocket webSocket = new(() => true, () => true, new ZeroMaskSource());
+        ManagedEasyWebSocket webSocket = new(() => true, () => WebSocketOptionBits.None, new ZeroMaskSource());
         QueuedConnection peer = new() { WriteFailure = new IOException("gone") };
         await webSocket.OpenAsync(peer, (byte[])[.. ServerFrame(WsOpcode.Ping, true, "x"), 0x81, 0x81, 1, 2, 3, 4, 5]);
         byte[] buffer = new byte[8];
@@ -208,7 +209,7 @@ public sealed class ManagedEasyWebSocketTests
     [TestMethod]
     public async Task ReceiveAndSend_NoConnection_AnswerBadFunctionArgument()
     {
-        ManagedEasyWebSocket webSocket = new(() => true, () => true, new ZeroMaskSource());
+        ManagedEasyWebSocket webSocket = new(() => true, () => WebSocketOptionBits.None, new ZeroMaskSource());
 
         CurlWebSocketReceiveResult received = await webSocket.ReceiveAsync(new byte[1], CancellationToken.None);
         CurlWebSocketSendResult sent = await webSocket.SendAsync("x"u8.ToArray(), 0, CurlWebSocketFlags.Text, CancellationToken.None);
@@ -222,7 +223,7 @@ public sealed class ManagedEasyWebSocketTests
     public async Task ReceiveAndSend_OptionsNoLongerConnectOnly_AnswerUnsupportedProtocol()
     {
         bool connectOnly = true;
-        ManagedEasyWebSocket webSocket = new(() => connectOnly, () => true, new ZeroMaskSource());
+        ManagedEasyWebSocket webSocket = new(() => connectOnly, () => WebSocketOptionBits.None, new ZeroMaskSource());
         await webSocket.OpenAsync(new QueuedConnection(), ServerFrame(WsOpcode.Text, true, "x"));
         connectOnly = false;
 
@@ -282,6 +283,54 @@ public sealed class ManagedEasyWebSocketTests
     }
 
     [TestMethod]
+    public async Task SendAsync_RawMode_WritesTheBytesUnframed()
+    {
+        (ManagedEasyWebSocket webSocket, QueuedConnection peer) = await OpenAsync(WebSocketOptionBits.RawMode);
+        byte[] raw = [0x81, 0x82, 0, 0, 0, 0, (byte)'h', (byte)'i'];
+
+        CurlWebSocketSendResult result = await webSocket.SendAsync(raw, 0, CurlWebSocketFlags.None, CancellationToken.None);
+
+        Assert.AreEqual(new CurlWebSocketSendResult(CurlCode.Ok, raw.Length), result);
+        CollectionAssert.AreEqual(raw, peer.Written);
+    }
+
+    [TestMethod]
+    [DataRow(CurlWebSocketFlags.Text, 0L)]
+    [DataRow(CurlWebSocketFlags.None, 4L)]
+    public async Task SendAsync_RawModeWithFlagsOrFragmentSize_AnswersBadFunctionArgumentAndWritesNothing(CurlWebSocketFlags flags, long fragmentSize)
+    {
+        (ManagedEasyWebSocket webSocket, QueuedConnection peer) = await OpenAsync(WebSocketOptionBits.RawMode);
+
+        CurlWebSocketSendResult result = await webSocket.SendAsync("x"u8.ToArray(), fragmentSize, flags, CancellationToken.None);
+
+        Assert.AreEqual(new CurlWebSocketSendResult(CurlCode.BadFunctionArgument, 0), result);
+        Assert.IsEmpty(peer.Written);
+    }
+
+    [TestMethod]
+    public async Task SendAsync_RawModeWriteFails_AnswersSendError()
+    {
+        (ManagedEasyWebSocket webSocket, QueuedConnection peer) = await OpenAsync(WebSocketOptionBits.RawMode);
+        peer.WriteFailure = new IOException("gone");
+
+        CurlWebSocketSendResult result = await webSocket.SendAsync("x"u8.ToArray(), 0, CurlWebSocketFlags.None, CancellationToken.None);
+
+        Assert.AreEqual(new CurlWebSocketSendResult(CurlCode.SendError, 0), result);
+    }
+
+    [TestMethod]
+    public async Task ReceiveAsync_RawModePing_DecodesThePingAndSendsNoPong()
+    {
+        (ManagedEasyWebSocket webSocket, QueuedConnection peer) = await OpenAsync(WebSocketOptionBits.RawMode, ServerFrame(WsOpcode.Ping, true, "p"));
+        byte[] buffer = new byte[4];
+
+        CurlWebSocketReceiveResult ping = await webSocket.ReceiveAsync(buffer, CancellationToken.None);
+
+        Assert.AreEqual(new CurlWebSocketReceiveResult(CurlCode.Ok, 1, new CurlWebSocketFrame(0, CurlWebSocketFlags.Ping, 0, 0, 1)), ping);
+        Assert.IsEmpty(peer.Written);
+    }
+
+    [TestMethod]
     public async Task StartFrameAsync_AnyFrame_AnswersBadFunctionArgument()
     {
         (ManagedEasyWebSocket webSocket, _) = await OpenAsync();
@@ -294,7 +343,7 @@ public sealed class ManagedEasyWebSocketTests
     [TestMethod]
     public async Task OpenAsync_SecondConnection_ClosesTheFirstAndForgetsItsFrames()
     {
-        (ManagedEasyWebSocket webSocket, QueuedConnection first) = await OpenAsync(true, ServerFrame(WsOpcode.Text, true, "old"));
+        (ManagedEasyWebSocket webSocket, QueuedConnection first) = await OpenAsync(WebSocketOptionBits.None, ServerFrame(WsOpcode.Text, true, "old"));
         await webSocket.ReceiveAsync(new byte[1], CancellationToken.None);
         QueuedConnection second = new();
 

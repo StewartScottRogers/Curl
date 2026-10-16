@@ -1,5 +1,6 @@
 using Curl.Api.Codes;
 using Curl.Api.EngineContracts.WebSocket;
+using Curl.Api.Options.Protocols;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Ws;
 
@@ -11,16 +12,21 @@ namespace Curl.Engine;
 /// <see cref="WsFrameMetadataDecoder" /> and hands their payload over a run at a time, as much as the buffer holds,
 /// with the frame's <c>CURLWS_*</c> bits, offset and bytes left; it never waits: it starts one read and answers
 /// <see cref="CurlCode.Again" /> while that read runs or while only part of a frame has come. Unless
-/// <paramref name="answersPings" /> says no (<c>CURLWS_NOAUTOPONG</c>), each ping received is answered with a pong
-/// carrying its payload; the ping is still handed over. A send writes one masked frame from the bits given
-/// (<see cref="WebSocketFrameFlags.TryFrameOf" />). With options no longer connect-only both answer
+/// <paramref name="options" /> holds <c>CURLWS_NOAUTOPONG</c> or <c>CURLWS_RAW_MODE</c>, each ping received is answered
+/// with a pong carrying its payload; the ping is still handed over. A send writes one masked frame from the bits given
+/// (<see cref="WebSocketFrameFlags.TryFrameOf" />), or under <c>CURLWS_RAW_MODE</c> the bytes as they are, which
+/// <c>lib/ws.c</c> allows only with no bits and no fragment size (BL-2444); a receive decodes frames either way, as
+/// <c>curl_ws_recv</c> does. With options no longer connect-only both answer
 /// <see cref="CurlCode.UnsupportedProtocol" />, and with no upgraded connection <see cref="CurlCode.BadFunctionArgument" />.
 /// </summary>
 /// <param name="isConnectOnly">Whether the handle's options set <c>CURLOPT_CONNECT_ONLY</c> now.</param>
-/// <param name="answersPings">Whether a received ping is answered with a pong now.</param>
+/// <param name="options">The handle's <c>CURLOPT_WS_OPTIONS</c> bits now.</param>
 /// <param name="randomSource">Supplies each sent frame's mask.</param>
-internal sealed class ManagedEasyWebSocket(Func<bool> isConnectOnly, Func<bool> answersPings, IWebSocketRandomSource randomSource) : IEasyWebSocket
+internal sealed class ManagedEasyWebSocket(Func<bool> isConnectOnly, Func<WebSocketOptionBits> options, IWebSocketRandomSource randomSource) : IEasyWebSocket
 {
+    /// <summary>The bits either of which leaves a received ping unanswered, as <c>lib/ws.c</c> sends no pong under them.</summary>
+    private const WebSocketOptionBits SilencesPongs = WebSocketOptionBits.NoAutoPong | WebSocketOptionBits.RawMode;
+
     /// <summary>How many bytes one read asks the connection for.</summary>
     internal const int ReadSize = 16 * 1024;
 
@@ -106,18 +112,9 @@ internal sealed class ManagedEasyWebSocket(Func<bool> isConnectOnly, Func<bool> 
             return new CurlWebSocketSendResult(usable, 0);
         }
 
-        if ((flags & CurlWebSocketFlags.Offset) != 0 || !WebSocketFrameFlags.TryFrameOf(flags, continuesSentMessage, out WsOpcode opcode, out bool isFinal))
-        {
-            return new CurlWebSocketSendResult(CurlCode.BadFunctionArgument, 0);
-        }
-
-        if (!await TrySendFrameAsync(live!, opcode, isFinal, buffer).ConfigureAwait(false))
-        {
-            return new CurlWebSocketSendResult(CurlCode.SendError, 0);
-        }
-
-        continuesSentMessage = opcode is WsOpcode.Close or WsOpcode.Ping or WsOpcode.Pong ? continuesSentMessage : !isFinal;
-        return new CurlWebSocketSendResult(CurlCode.Ok, buffer.Length);
+        return (options() & WebSocketOptionBits.RawMode) != 0
+            ? await SendRawAsync(live!, buffer, fragmentSize, flags).ConfigureAwait(false)
+            : await SendFramedAsync(live!, buffer, flags).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -129,6 +126,51 @@ internal sealed class ManagedEasyWebSocket(Func<bool> isConnectOnly, Func<bool> 
     {
         cancellationToken.ThrowIfCancellationRequested();
         return ValueTask.FromResult(CurlCode.BadFunctionArgument);
+    }
+
+    /// <summary>
+    /// <c>curl_ws_send</c> outside raw mode: writes one masked frame from <paramref name="flags" />, refusing
+    /// <c>CURLWS_OFFSET</c> and the bits libcurl refuses with <see cref="CurlCode.BadFunctionArgument" />.
+    /// </summary>
+    /// <param name="live">The upgraded connection.</param>
+    /// <param name="buffer">The frame's payload.</param>
+    /// <param name="flags">The frame's bits.</param>
+    /// <returns>The send's result.</returns>
+    private async ValueTask<CurlWebSocketSendResult> SendFramedAsync(IConnection live, ReadOnlyMemory<byte> buffer, CurlWebSocketFlags flags)
+    {
+        if ((flags & CurlWebSocketFlags.Offset) != 0 || !WebSocketFrameFlags.TryFrameOf(flags, continuesSentMessage, out WsOpcode opcode, out bool isFinal))
+        {
+            return new CurlWebSocketSendResult(CurlCode.BadFunctionArgument, 0);
+        }
+
+        if (!await TrySendFrameAsync(live, opcode, isFinal, buffer).ConfigureAwait(false))
+        {
+            return new CurlWebSocketSendResult(CurlCode.SendError, 0);
+        }
+
+        continuesSentMessage = opcode is WsOpcode.Close or WsOpcode.Ping or WsOpcode.Pong ? continuesSentMessage : !isFinal;
+        return new CurlWebSocketSendResult(CurlCode.Ok, buffer.Length);
+    }
+
+    /// <summary>
+    /// <c>curl_ws_send</c> under <c>CURLWS_RAW_MODE</c>: writes <paramref name="buffer" /> to the connection unframed,
+    /// refusing any bit or fragment size with <see cref="CurlCode.BadFunctionArgument" /> as <c>lib/ws.c</c> does.
+    /// </summary>
+    /// <param name="live">The upgraded connection.</param>
+    /// <param name="buffer">The bytes to write.</param>
+    /// <param name="fragmentSize">Must be 0.</param>
+    /// <param name="flags">Must be <see cref="CurlWebSocketFlags.None" />.</param>
+    /// <returns>The send's result.</returns>
+    private static async ValueTask<CurlWebSocketSendResult> SendRawAsync(IConnection live, ReadOnlyMemory<byte> buffer, long fragmentSize, CurlWebSocketFlags flags)
+    {
+        if (fragmentSize != 0 || flags != CurlWebSocketFlags.None)
+        {
+            return new CurlWebSocketSendResult(CurlCode.BadFunctionArgument, 0);
+        }
+
+        return await TryWriteAsync(live, buffer).ConfigureAwait(false)
+            ? new CurlWebSocketSendResult(CurlCode.Ok, buffer.Length)
+            : new CurlWebSocketSendResult(CurlCode.SendError, 0);
     }
 
     /// <summary>The connection a receive or send may use, or why there is none.</summary>
@@ -205,7 +247,8 @@ internal sealed class ManagedEasyWebSocket(Func<bool> isConnectOnly, Func<bool> 
     /// <summary>
     /// Decodes <paramref name="received" />, queueing its runs of payload, keeping a protocol violation as the stream's
     /// failure and answering the last ping completed in it with a pong unless pings go unanswered; a pong that cannot
-    /// be written fails the stream with <see cref="CurlCode.SendError" />.
+    /// be written fails the stream with <see cref="CurlCode.SendError" />. Pings go unanswered under
+    /// <c>CURLWS_NOAUTOPONG</c> or <c>CURLWS_RAW_MODE</c>.
     /// </summary>
     /// <param name="live">The upgraded connection.</param>
     /// <param name="received">The bytes received.</param>
@@ -223,7 +266,7 @@ internal sealed class ManagedEasyWebSocket(Func<bool> isConnectOnly, Func<bool> 
             streamFailure = CurlCode.RecvError;
         }
 
-        if (decoded.CompletedPing is { } ping && answersPings() && !await TrySendFrameAsync(live, WsOpcode.Pong, true, ping).ConfigureAwait(false))
+        if (decoded.CompletedPing is { } ping && (options() & SilencesPongs) == 0 && !await TrySendFrameAsync(live, WsOpcode.Pong, true, ping).ConfigureAwait(false))
         {
             streamFailure ??= CurlCode.SendError;
         }
@@ -235,12 +278,18 @@ internal sealed class ManagedEasyWebSocket(Func<bool> isConnectOnly, Func<bool> 
     /// <param name="isFinal">Whether the frame's FIN bit is set.</param>
     /// <param name="payload">The frame's payload.</param>
     /// <returns><see langword="false" /> when the write failed with an <see cref="IOException" />.</returns>
-    private async ValueTask<bool> TrySendFrameAsync(IConnection live, WsOpcode opcode, bool isFinal, ReadOnlyMemory<byte> payload)
+    private ValueTask<bool> TrySendFrameAsync(IConnection live, WsOpcode opcode, bool isFinal, ReadOnlyMemory<byte> payload) =>
+        TryWriteAsync(live, WsFrameEncoder.Encode(opcode, isFinal, payload.Span, randomSource));
+
+    /// <summary>Writes and flushes <paramref name="bytes" />.</summary>
+    /// <param name="live">The upgraded connection.</param>
+    /// <param name="bytes">The bytes to write.</param>
+    /// <returns><see langword="false" /> when the write failed with an <see cref="IOException" />.</returns>
+    private static async ValueTask<bool> TryWriteAsync(IConnection live, ReadOnlyMemory<byte> bytes)
     {
-        byte[] frame = WsFrameEncoder.Encode(opcode, isFinal, payload.Span, randomSource);
         try
         {
-            await live.WriteAsync(frame, CancellationToken.None).ConfigureAwait(false);
+            await live.WriteAsync(bytes, CancellationToken.None).ConfigureAwait(false);
             await live.FlushAsync(CancellationToken.None).ConfigureAwait(false);
             return true;
         }

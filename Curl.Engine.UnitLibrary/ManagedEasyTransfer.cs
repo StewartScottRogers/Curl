@@ -213,7 +213,7 @@ internal sealed class ManagedEasyTransfer(
 
     private ManagedEasyWebSocket WebSocketConnection => webSocket ??= new ManagedEasyWebSocket(
         () => Options.Network.ConnectOnly != Api.Options.Network.ConnectOnly.Disabled,
-        () => (Options.Protocols.WebSocket.Options & Api.Options.Protocols.WebSocketOptionBits.NoAutoPong) == 0,
+        () => Options.Protocols.WebSocket.Options,
         WebSocketRandomSource);
 
     /// <summary>
