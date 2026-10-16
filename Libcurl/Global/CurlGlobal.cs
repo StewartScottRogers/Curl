@@ -4,7 +4,7 @@ using Curl.Api.EngineContracts;
 namespace Libcurl.Global;
 
 /// <summary>
-/// libcurl's global functions (ADR-0506, ADR-0555): <c>curl_global_init</c> and
+/// libcurl's global functions (ADR-0506, ADR-0556): <c>curl_global_init</c> and
 /// <c>curl_global_init_mem</c>, which return a <see cref="CurlLibrary"/> whose
 /// <see cref="CurlLibrary.DisposeAsync"/> is <c>curl_global_cleanup</c>, and
 /// <c>curl_global_sslset</c> and <c>curl_global_trace</c>, which answer as the build Curl matches

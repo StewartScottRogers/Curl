@@ -7,7 +7,7 @@ with its tests in the same folder of `Libcurl.UnitTests`.
 
 `Global` holds `CurlGlobal` (`curl_global_init`, `_init_mem`, `_sslset`, `_trace`) and `CurlLibrary`,
 the object `Init` returns over an injected `ICurlEngine`; its `DisposeAsync` is `curl_global_cleanup`
-(ADR-0555). `CurlLibrary` is `partial`: each handle area adds its public creating method
+(ADR-0556). `CurlLibrary` is `partial`: each handle area adds its public creating method
 (`curl_easy_init` and the rest) as a `CurlLibrary` part in its own folder, over the internal
 `Create*` methods in `Global`. Tests that count inits use `CurlGlobal.InitCounting` with their own
 `GlobalInitCounter`, never the process-wide count, since tests run in parallel.

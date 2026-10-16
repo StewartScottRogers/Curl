@@ -16,7 +16,7 @@ namespace Libcurl.Global;
 /// (<c>curl_easy_init</c>, <c>curl_multi_init</c>, <c>curl_share_init</c>, <c>curl_url</c>,
 /// <c>curl_mime_init</c>, the first <c>curl_formadd</c>) in its own folder, over the internal
 /// creating methods here, which check the library is still live and delegate to the engine
-/// (ADR-0555).
+/// (ADR-0556).
 /// </remarks>
 public sealed partial class CurlLibrary : IAsyncDisposable
 {
