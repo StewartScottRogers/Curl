@@ -8,7 +8,7 @@ depends-on: []
 touches: [RunDarkFactory.ps1]
 requirement: none
 created: 2026-10-16
-completed:
+completed: 2026-10-16
 ---
 # BL-2525 — Integrate a lane task that ends in Deferred instead of dropping it as a stall
 
@@ -26,15 +26,18 @@ Cause: the outcome chain in `RunDarkFactory.ps1` (around line 5395) handles `Don
 
 ## Acceptance criteria
 
-- [ ] A lane run that ends with its task in `Deferred` integrates the lane's commits into `work/dark-factory` the same way a `Blocked` outcome does, so the task file is in `Tasks/Deferred` on the shared branch.
-- [ ] The trace writes a `DEFERRED` line with the task's last Log line, and the shift-end summary counts it, not a `STALL`.
-- [ ] A `Deferred` outcome does not add to the run fail streak.
-- [ ] Any other unexpected end state (for example `Doing`) still reports STALLED as now.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] A lane run that ends with its task in `Deferred` integrates the lane's commits into `work/dark-factory` the same way a `Blocked` outcome does, so the task file is in `Tasks/Deferred` on the shared branch.
+- [x] The trace writes a `DEFERRED` line with the task's last Log line, and the shift-end summary counts it, not a `STALL`.
+- [x] A `Deferred` outcome does not add to the run fail streak.
+- [x] Any other unexpected end state (for example `Doing`) still reports STALLED as now.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+Deferred is handled in the lane outcome chain beside Blocked; Invoke-Integrate needed no change. The fast tests do not cover the script; checked by parse and build.
 
 ## Log
 
 - 2026-10-16: Created.
 - 2026-10-16: Backlog -> Doing. Criteria at claim: 321353a6 07c55dd5 f6e836bb 04286d61 3d836d5e.
+- 2026-10-16: Doing -> Done. Lane integrates Deferred like Blocked, traces DEFERRED, no fail streak
