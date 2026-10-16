@@ -33,6 +33,10 @@ ADR-0421: an Integration test touches something real outside the process (a chil
 
 Plan: Documentation/Planning/Curl-Mcp.md. Decision: ADR-0548.
 
+BL-2384 (2026-10-16) already created `Curl.Mcp.IntegrationTests`, in `Curl.slnx` directly before
+`Curl.Mcp`, with `CurlTransferToolIntegrationTests` (the `transfer` tool against a loopback
+listener through the host's composition); this task adds its tests to that project.
+
 ## Log
 
 - 2026-10-15: Created.
