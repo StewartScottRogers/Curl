@@ -34,3 +34,4 @@ This step: decide in an ADR ("Decided by Claude under Stewart's delegation") how
 ## Log
 
 - 2026-10-15: Created.
+- 2026-10-15: Backlog -> Doing.
