@@ -23,8 +23,10 @@ internal sealed class ManagedEngineSharedState
     /// Reads the proxy environment variables every handle's own perform consults (<see cref="ProxySelector" />):
     /// <see cref="Environment.GetEnvironmentVariable(string)" />, the default, in production; a dictionary in tests.
     /// </param>
-    internal ManagedEngineSharedState(TimeProvider timeProvider, Func<CurlExitCode, string> easyErrorText, Func<string, string?>? readEnvironmentVariable = null)
+    /// <param name="dialing">What the transfers dial and resolve through in place of sockets (ADR-0658); <see langword="null" />, in production, for sockets.</param>
+    internal ManagedEngineSharedState(TimeProvider timeProvider, Func<CurlExitCode, string> easyErrorText, Func<string, string?>? readEnvironmentVariable = null, EngineDialing? dialing = null)
     {
+        Dialing = dialing;
         ProxySelector = new ProxySelector(readEnvironmentVariable ?? Environment.GetEnvironmentVariable);
         TimeProvider = timeProvider;
         Connections = new ConnectionCache(timeProvider);
@@ -48,6 +50,7 @@ internal sealed class ManagedEngineSharedState
     /// <param name="dnsCache">The resolved names.</param>
     /// <param name="cookies">The cookies.</param>
     /// <param name="hsts">The HSTS cache.</param>
+    /// <remarks>It dials as <paramref name="engine" /> dials (<see cref="Dialing" />).</remarks>
     internal ManagedEngineSharedState(
         ManagedEngineSharedState engine,
         ConnectionCache connections,
@@ -67,6 +70,7 @@ internal sealed class ManagedEngineSharedState
         SocketHandles = engine.SocketHandles;
         Performer = engine.Performer;
         ProxySelector = engine.ProxySelector;
+        Dialing = engine.Dialing;
     }
 
     /// <summary>
@@ -75,6 +79,12 @@ internal sealed class ManagedEngineSharedState
     /// and the rest), as libcurl reads them for every handle (BL-2519, ADR-0608).
     /// </summary>
     internal ProxySelector ProxySelector { get; }
+
+    /// <summary>
+    /// Gets what the engine's transfers dial and resolve through in place of sockets: the conformance harness's in-memory
+    /// servers (ADR-0658); <see langword="null" /> in production.
+    /// </summary>
+    internal EngineDialing? Dialing { get; }
 
     /// <summary>Gets the clock the engine's transfers run on.</summary>
     internal TimeProvider TimeProvider { get; }

@@ -1,3 +1,4 @@
+using Curl.Api.Callbacks;
 using Curl.Api.Codes;
 using Curl.Api.EngineContracts;
 using Curl.Api.EngineContracts.Mime;
@@ -136,5 +137,56 @@ public sealed class ManagedCurlEngineTests
 
         Assert.IsInstanceOfType<ManagedFormBuilder>(form);
         Assert.IsEmpty(form.Build().Parts);
+    }
+
+    [TestMethod]
+    public async Task PerformAsync_DialingGiven_DialsResolvesAndGetsThroughIt()
+    {
+        ScriptedConnector server = new(["HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok"u8.ToArray()]);
+        EngineDialing dialing = new(new ScriptedTcpDialer(server), new LoopbackDnsResolver(), new RecordingDatagramConnector(Curl.Protocol.Abstractions.CurlExitCode.CouldntConnect, "no udp"));
+        await using ManagedCurlEngine engine = new(TimeProvider.System, null, dialing: dialing);
+        await using IEasyTransfer easy = engine.CreateEasy();
+        MemoryStream body = new();
+        easy.Options = new EasyOptions
+        {
+            Network = new EasyNetworkOptions { Url = "http://bl2558.test/" },
+            Callbacks = new EasyCallbackOptions { Write = data => WriteTo(body, data) },
+        };
+
+        CurlCode code = await easy.PerformAsync(CancellationToken.None);
+
+        Assert.AreEqual(CurlCode.Ok, code);
+        Assert.AreEqual("ok", System.Text.Encoding.ASCII.GetString(body.ToArray()));
+        Assert.AreEqual("127.0.0.1", server.Targets.Single().Host);
+        Assert.AreSame(dialing, engine.Shared.Dialing);
+    }
+
+    [TestMethod]
+    public async Task PerformAsync_DialingGivenAndATftpUrl_OpensTheChannelThroughItsDatagramConnector()
+    {
+        RecordingDatagramConnector datagrams = new(Curl.Protocol.Abstractions.CurlExitCode.CouldntConnect, "no udp");
+        EngineDialing dialing = new(new ScriptedTcpDialer(new ScriptedConnector([])), new LoopbackDnsResolver(), datagrams);
+        await using ManagedCurlEngine engine = new(TimeProvider.System, null, dialing: dialing);
+        await using IEasyTransfer easy = engine.CreateEasy();
+        easy.Options = new EasyOptions { Network = new EasyNetworkOptions { Url = "tftp://bl2558.test/file" } };
+
+        CurlCode code = await easy.PerformAsync(CancellationToken.None);
+
+        Assert.AreEqual(CurlCode.CouldntConnect, code);
+        Assert.AreEqual(("bl2558.test", 69), datagrams.Opens.Single());
+    }
+
+    [TestMethod]
+    public async Task Shared_NoDialing_IsNull()
+    {
+        await using ManagedCurlEngine engine = new();
+
+        Assert.IsNull(engine.Shared.Dialing);
+    }
+
+    private static long WriteTo(MemoryStream body, ReadOnlySpan<byte> data)
+    {
+        body.Write(data);
+        return data.Length;
     }
 }

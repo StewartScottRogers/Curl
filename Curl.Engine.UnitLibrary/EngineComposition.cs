@@ -796,13 +796,19 @@ internal static class EngineComposition
     /// <param name="easyErrorText">Curl's easy error text for each exit code; <see langword="null" /> for an empty text.</param>
     /// <param name="traces">The run's <c>--trace-config</c> components; <see langword="null" /> for none.</param>
     /// <param name="wrapLookUps">Wraps the resolver the connectors look names up through.</param>
+    /// <param name="dialing">
+    /// What the conformance harness's engine dials and resolves through in place of sockets (ADR-0658): the
+    /// <see cref="TcpConnector" /> dials through its dialer, its resolver is <see cref="CurlTransports.DnsResolver" />,
+    /// and the datagram protocols and QUIC open their channels through its connector, as <c>Curl.Console</c>'s
+    /// dialing runner composes them; <see langword="null" />, in production, for sockets and the resolver the options pick.
+    /// </param>
     /// <returns>The connectors and the pieces they were built from.</returns>
-    internal static CurlTransports CreateTransports(EngineToolOptions tool, EasyNetworkOptions network, EasyTlsOptions tls, EasyHttpOptions http, EasyProxyOptions proxy, EasyAuthenticationOptions authentication, TimeProvider timeProvider, ConnectionCache? runConnections, TlsSessionCache? tlsSessions, IDiagnosticLog? diagnosticLog, DnsCache? runDnsCache, Func<CurlExitCode, string>? easyErrorText, EngineTraceComponents? traces, Func<IDnsResolver, IDnsResolver> wrapLookUps)
+    internal static CurlTransports CreateTransports(EngineToolOptions tool, EasyNetworkOptions network, EasyTlsOptions tls, EasyHttpOptions http, EasyProxyOptions proxy, EasyAuthenticationOptions authentication, TimeProvider timeProvider, ConnectionCache? runConnections, TlsSessionCache? tlsSessions, IDiagnosticLog? diagnosticLog, DnsCache? runDnsCache, Func<CurlExitCode, string>? easyErrorText, EngineTraceComponents? traces, Func<IDnsResolver, IDnsResolver> wrapLookUps, EngineDialing? dialing = null)
     {
         traces ??= EngineTraceComponents.None;
         TcpDialer tcpDialer = new(TcpSocketOptionsOf(network));
         FlowScopedTransferEvents? resolverEvents = TracesDns(traces) ? new() : null;
-        IDnsResolver dnsResolver = CreateDnsResolver(network, tls, timeProvider, tcpDialer, resolverEvents, easyErrorText, traces);
+        IDnsResolver dnsResolver = ResolverOf(dialing, () => CreateDnsResolver(network, tls, timeProvider, tcpDialer, resolverEvents, easyErrorText, traces));
         IDnsResolver lookUps = wrapLookUps(dnsResolver);
         TlsClientOptions tlsClientOptions = TlsClientOptionsMapping.Of(tls, http.SslEnableAlpn, tool.SslSessionsFile);
         ITlsProviderWithWarnings tlsProvider = CreateTlsProvider(tlsClientOptions, timeProvider, tlsSessions, dnsResolver as IEchConfigListLookup);
@@ -810,9 +816,8 @@ internal static class EngineComposition
         ITlsProviderWithWarnings proxyTlsProvider = CreateTlsProvider(proxyTlsClientOptions, timeProvider);
         LateBoundSecurityContextFactory proxyContexts = new();
         HttpProxyTunnelOptions proxyTunnelOptions = CreateProxyTunnelOptions(http, proxy, authentication, proxyContexts, diagnosticLog);
-        QuicDialer quicDialer = new(tlsClientOptions, timeProvider) { WritesHttp3ConnectionLines = TracesHttp3(traces) };
-        TcpConnector tcpConnector = CreateTcpConnector(tool, traces, network, http, proxy, authentication, lookUps, tcpDialer, tlsProvider, timeProvider, proxyTunnelOptions, proxyTlsProvider, quicDialer, proxyContexts, runDnsCache, resolverEvents);
-        UdpDatagramConnector udpDatagramConnector = CreateUdpDatagramConnector(network, lookUps, timeProvider, diagnosticLog);
+        (QuicDialer quicDialer, ITcpDialer connectorDialer, IDatagramConnector udpDatagramConnector) = DialersOf(dialing, tcpDialer, tlsClientOptions, traces, timeProvider, () => CreateUdpDatagramConnector(network, lookUps, timeProvider, diagnosticLog));
+        TcpConnector tcpConnector = CreateTcpConnector(tool, traces, network, http, proxy, authentication, lookUps, connectorDialer, tlsProvider, timeProvider, proxyTunnelOptions, proxyTlsProvider, quicDialer, proxyContexts, runDnsCache, resolverEvents);
         PoolingConnector poolingConnector = CreatePoolingConnector(tool, network, tls, http, proxy, tcpConnector, timeProvider, runConnections);
 
         // The tunnel answers --proxy-ntlm and --proxy-negotiate on the same router the origin's
@@ -840,6 +845,37 @@ internal static class EngineComposition
             TracesHttp3(traces),
             TracesRead(traces));
     }
+
+    /// <summary>The resolver the transports use: <paramref name="dialing" />'s, or, without one, the one <paramref name="createResolver" /> builds from the options (ADR-0658).</summary>
+    /// <param name="dialing">What the harness's engine dials through, or <see langword="null" />.</param>
+    /// <param name="createResolver">Builds the resolver the options pick.</param>
+    /// <returns>The resolver.</returns>
+    private static IDnsResolver ResolverOf(EngineDialing? dialing, Func<IDnsResolver> createResolver) =>
+        dialing is null ? createResolver() : dialing.DnsResolver;
+
+    /// <summary>
+    /// The QUIC dialer, the dialer the <see cref="TcpConnector" /> dials through and the datagram connector the transports
+    /// use: without <paramref name="dialing" />, a socket <see cref="QuicDialer" />, <paramref name="tcpDialer" /> and the
+    /// connector <paramref name="createDatagramConnector" /> builds; with one, a QUIC dialer over its datagram connector,
+    /// its dialer and its datagram connector (ADR-0658).
+    /// </summary>
+    /// <param name="dialing">What the harness's engine dials through, or <see langword="null" />.</param>
+    /// <param name="tcpDialer">The socket dialer built from the options.</param>
+    /// <param name="tlsClientOptions">The origin's TLS options, for the QUIC dialer.</param>
+    /// <param name="traces">The run's <c>--trace-config</c> components, for the HTTP/3 connection lines.</param>
+    /// <param name="timeProvider">The clock the socket QUIC dialer times on.</param>
+    /// <param name="createDatagramConnector">Builds the UDP datagram connector the options pick.</param>
+    /// <returns>The three.</returns>
+    private static (QuicDialer QuicDialer, ITcpDialer TcpDialer, IDatagramConnector DatagramConnector) DialersOf(
+        EngineDialing? dialing,
+        TcpDialer tcpDialer,
+        TlsClientOptions tlsClientOptions,
+        EngineTraceComponents traces,
+        TimeProvider timeProvider,
+        Func<IDatagramConnector> createDatagramConnector) =>
+        dialing is null
+            ? (new QuicDialer(tlsClientOptions, timeProvider) { WritesHttp3ConnectionLines = TracesHttp3(traces) }, tcpDialer, createDatagramConnector())
+            : (CreateDatagramConnectorQuicDialer(traces, tlsClientOptions, dialing.DatagramConnector), dialing.TcpDialer, dialing.DatagramConnector);
 
     /// <summary>
     /// The socket options each TCP connection is given: <c>TCP_NODELAY</c>, keepalive with its idle time and

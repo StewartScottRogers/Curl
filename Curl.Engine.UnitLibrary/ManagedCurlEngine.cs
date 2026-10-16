@@ -53,13 +53,19 @@ public sealed class ManagedCurlEngine : ICurlEngine
     /// Reads the proxy environment variables each handle's own perform consults, as libcurl reads them for every
     /// handle (BL-2519); <see langword="null" /> for <see cref="Environment.GetEnvironmentVariable(string)" />.
     /// </param>
+    /// <param name="dialing">
+    /// What the production dispatcher's transports dial, resolve and open datagram channels through in place of
+    /// sockets: the conformance harness's in-memory servers, as <c>Curl.Console</c>'s dialing runner takes them
+    /// (ADR-0658); <see langword="null" /> for the real network.
+    /// </param>
     internal ManagedCurlEngine(
         TimeProvider timeProvider,
         Func<EasyOptions, ManagedEngineSharedState, ICookieStore?, ProtocolDispatcher>? createDispatcher,
         Func<CurlExitCode, string>? easyErrorText = null,
-        Func<string, string?>? readEnvironmentVariable = null)
+        Func<string, string?>? readEnvironmentVariable = null,
+        EngineDialing? dialing = null)
     {
-        shared = new ManagedEngineSharedState(timeProvider, easyErrorText ?? (_ => string.Empty), readEnvironmentVariable);
+        shared = new ManagedEngineSharedState(timeProvider, easyErrorText ?? (_ => string.Empty), readEnvironmentVariable, dialing);
         this.createDispatcher = createDispatcher ?? CreateDispatcher;
     }
 
@@ -183,6 +189,6 @@ public sealed class ManagedCurlEngine : ICurlEngine
     private static CurlTransports CreateTransports(EasyOptions options, ManagedEngineSharedState shared)
     {
         EngineToolOptions tool = new(Parallel: false, ParallelImmediate: false, SslSessionsFile: null, MaxTime: options.Transfer.Timeout > TimeSpan.Zero ? options.Transfer.Timeout : null);
-        return EngineComposition.CreateTransports(tool, options.Network, options.Tls, options.Http, options.Proxy, options.Authentication, shared.TimeProvider, shared.Connections, shared.TlsSessions, diagnosticLog: null, shared.DnsCache, easyErrorText: null, traces: null, resolver => ResolverStartDnsResolver.Over(resolver, options.Callbacks.ResolverStart));
+        return EngineComposition.CreateTransports(tool, options.Network, options.Tls, options.Http, options.Proxy, options.Authentication, shared.TimeProvider, shared.Connections, shared.TlsSessions, diagnosticLog: null, shared.DnsCache, easyErrorText: null, traces: null, resolver => ResolverStartDnsResolver.Over(resolver, options.Callbacks.ResolverStart), shared.Dialing);
     }
 }
