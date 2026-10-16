@@ -30,8 +30,8 @@ ADR-0506; phase 3 of `Documentation/Planning/Curl-Api-And-libcurl.md`. Read the 
 
 ## Notes
 
-- Plan (ADR-0607): a `ConnectOnly.Connect` perform connects through `ManagedCurlEngine.CreateConnectOnlyConnector` (the transports' `TcpConnector`, not the pool), sends nothing, and keeps the `IConnection` in the new `ConnectOnlyConnection`. Recv/send never block: a receive starts one read and answers `Again` until it completes; a send hands bytes to one write-and-flush and answers `Again` while it runs. No connection, or options no longer connect-only, answer `UnsupportedProtocol` (libcurl's `easy_connection`).
-- Seam as found: `IConnectOnlyConnection` and `CurlConnectOnlyResult` already existed (ADR-0512); the engine's `Connection` threw. `Documentation/Planning/Curl-Api-And-libcurl.md` is outside `touches`, so it is not edited here; ADR-0607 records the shape.
+- Plan (ADR-0608): a `ConnectOnly.Connect` perform connects through `ManagedCurlEngine.CreateConnectOnlyConnector` (the transports' `TcpConnector`, not the pool), sends nothing, and keeps the `IConnection` in the new `ConnectOnlyConnection`. Recv/send never block: a receive starts one read and answers `Again` until it completes; a send hands bytes to one write-and-flush and answers `Again` while it runs. No connection, or options no longer connect-only, answer `UnsupportedProtocol` (libcurl's `easy_connection`).
+- Seam as found: `IConnectOnlyConnection` and `CurlConnectOnlyResult` already existed (ADR-0512); the engine's `Connection` threw. `Documentation/Planning/Curl-Api-And-libcurl.md` is outside `touches`, so it is not edited here; ADR-0608 records the shape.
 - Libcurl: `CurlEasy.Recv`/`Send` (libcurl's `*n` out parameter, 0 unless `Ok`) block on `RecvAsync`/`SendAsync`.
 - `WebSocketAndConnection_NotYetBuilt_ThrowNotSupported` became `WebSocket_NotYetBuilt_ThrowsNotSupported`: `Connection` no longer throws by design.
 - Filed BL-2472 (connect-only through a proxy); `ConnectOnly.WebSocket` stays with BL-2443.
