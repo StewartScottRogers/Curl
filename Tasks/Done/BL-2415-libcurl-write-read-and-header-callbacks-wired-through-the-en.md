@@ -31,7 +31,7 @@ ADR-0506; phase 3 of `Documentation/Planning/Curl-Api-And-libcurl.md`. Read the 
 ## Notes
 
 - The engine already handed body, header and upload bytes to the three callbacks (BL-2316, BL-2359); what
-  was missing was the magic returns and the `Libcurl` rows. Decisions in ADR-0569.
+  was missing was the magic returns and the `Libcurl` rows. Decisions in ADR-0573.
 - Engine: `EasyPauseGate` on each `ManagedEasyTransfer`. A `CURL_WRITEFUNC_PAUSE` from the write or header
   callback, or a `CURL_READFUNC_PAUSE` from the read callback, waits until `Pause` clears the direction, then
   hands the same data over again. A `file` URL or the synchronous path answers libcurl's pause-not-supported
