@@ -31,3 +31,4 @@ ADR-0625 (BL-2452): `-w` now takes the handle's `GetInfo` answers (`EasyHandleWr
 ## Log
 
 - 2026-10-16: Created.
+- 2026-10-16: Backlog -> Doing. Criteria at claim: 5fee0aaa bedca47c 830717b9.
