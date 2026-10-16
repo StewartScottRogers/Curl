@@ -32,7 +32,7 @@ ADR-0506; phase 3 of `Documentation/Planning/Curl-Api-And-libcurl.md`. Read the 
 
 - Plan: the Network group's pattern (ADR-0568). `Libcurl/Options/Transfer/EasyTransferOptionSetters.cs`
   holds one named setter per row; `EasyOptionSetters.Transfer.cs` implements `AddTransferSetters`.
-  Each `_LARGE`/`_MS` alias is the same setter on a second row. Checks follow `setopt.c` (ADR-0571).
+  Each `_LARGE`/`_MS` alias is the same setter on a second row. Checks follow `setopt.c` (ADR-0572).
 - The seam already had every field and the options table every entry; no plan correction needed.
   `PROXY_TRANSFER_MODE` is in `EasyTransferOptions`, so it is set here too, beyond the Goal's list.
 - Added `Libcurl/CLAUDE.md` to `touches` to describe `Options/Transfer`; no task in Doing on
