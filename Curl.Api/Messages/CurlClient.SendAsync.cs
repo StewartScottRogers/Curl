@@ -50,6 +50,7 @@ public sealed partial class CurlClient
         try
         {
             easy.Options = CurlTransportOptions.Apply(easy.Options, request.Network, request.Tls, request.Proxy);
+            easy.Options = CurlProtocolOptions.Apply(easy.Options, request.ProtocolRecords);
             easy.Options = CurlRequestOptions.Apply(easy.Options, request, collector.Take, body.TakeBody, _engine, body.Owned);
         }
         catch

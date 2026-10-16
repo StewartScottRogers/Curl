@@ -67,6 +67,15 @@ live in this folder); `CurlTransportOptions.Apply` puts the client's on in `Crea
 request's in `SendAsync`, a set record replacing its whole group. Tests in
 `Curl.Api.UnitTests/Options/Transport`.
 
+`Options/Protocol/` (BL-2503, ADR-0640, namespace `Curl.Api`): `CurlHttpOptions`,
+`CurlAuthenticationOptions`, `CurlFtpOptions`, `CurlSshOptions`, `CurlMailOptions`, `CurlTftpOptions`,
+`CurlTelnetOptions` and `CurlRtspOptions` follow the transport records onto `EasyHttpOptions`,
+`EasyAuthenticationOptions` and `EasyProtocolOptions`, hanging off `CurlClientOptions` and `CurlRequest`
+under the same names less `Curl` and `Options` (`Mail` for SMTP); `CurlProtocolOptions.Apply` puts them
+on after the transport records. `CurlHttpOptions` leaves the request's headers, method and body to
+`CurlRequest`; `CurlAuthenticationOptions.ToString()` redacts every secret. Tests in
+`Curl.Api.UnitTests/Options/Protocol`.
+
 Reference `Curl.Api.UnitLibrary` (the seam) and `Curl.Engine.UnitLibrary` (only for
 `ManagedCurlEngine` in `Composition/`), nothing else. Never reference `Libcurl` or a protocol
 library.
