@@ -1,3 +1,4 @@
+using Curl.Api.Callbacks;
 using Curl.Api.EngineContracts;
 using Curl.Api.EngineContracts.Mime;
 using Curl.Api.EngineContracts.Multi;
@@ -113,25 +114,43 @@ public sealed class ManagedCurlEngine : ICurlEngine
     {
         CurlTransports transports = CreateTransports(options, shared);
         return new ProtocolDispatcher(EngineComposition.CreateProtocolHandlers(
-            transports.PoolingConnector,
+            PoolOf(transports, transports.TcpConnector, options.Callbacks, shared),
             transports.UdpDatagramConnector,
             transports.TlsProvider,
             transports.DnsResolver,
             cookieStore,
             proxyAuthSchemes: transports.ProxyTunnelOptions.ProxyAuthSchemes,
             negotiateOptions: NegotiateOptionsMapping.Of(options.Authentication),
-            ftpDataConnector: EngineComposition.FtpDataConnectorOf(transports)));
+            ftpDataConnector: PoolOf(transports, transports.TcpConnector.ForFtpDataConnections(), options.Callbacks, shared)));
     }
 
     /// <summary>
     /// Builds the connector a <c>CURLOPT_CONNECT_ONLY</c> 1 perform dials through: the <c>TcpConnector</c> of
-    /// <see cref="CreateDispatcher" />'s transports, not its pool, so the connection is the handle's own (ADR-0608).
+    /// <see cref="CreateDispatcher" />'s transports, not its pool, so the connection is the handle's own (ADR-0608),
+    /// under the handle's socket callbacks (ADR-0610).
     /// </summary>
     /// <param name="options">The transfer's options.</param>
     /// <param name="shared">The engine's shared caches.</param>
     /// <returns>The connector.</returns>
     internal static IConnector CreateConnectOnlyConnector(EasyOptions options, ManagedEngineSharedState shared) =>
-        CreateTransports(options, shared).TcpConnector;
+        SocketCallbackConnector.Over(CreateTransports(options, shared).TcpConnector, options.Callbacks, shared);
+
+    /// <summary>
+    /// The pool a transfer's TCP handlers connect through: the transports' own over their <c>TcpConnector</c>, as
+    /// <c>Curl.Console</c>'s composition builds it, or, when the handle sets a socket callback, one over the same cache
+    /// that opens connections through a <see cref="SocketCallbackConnector" /> over <paramref name="opener" />, so the
+    /// callbacks run once per connection opened and the close-socket callback when the pool closes it (ADR-0610).
+    /// </summary>
+    /// <param name="transports">The transfer's transports.</param>
+    /// <param name="opener">Opens the pool's new connections: the <c>TcpConnector</c>, or its FTP data connector.</param>
+    /// <param name="callbacks">The handle's callbacks.</param>
+    /// <param name="shared">The engine's shared state.</param>
+    /// <returns>The pool.</returns>
+    internal static IConnector PoolOf(CurlTransports transports, IConnector opener, EasyCallbackOptions callbacks, ManagedEngineSharedState shared)
+    {
+        IConnector socketCallbacks = SocketCallbackConnector.Over(opener, callbacks, shared);
+        return ReferenceEquals(socketCallbacks, transports.TcpConnector) ? transports.PoolingConnector : transports.PoolingConnector.Over(socketCallbacks);
+    }
 
     private static CurlTransports CreateTransports(EasyOptions options, ManagedEngineSharedState shared)
     {

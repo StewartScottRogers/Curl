@@ -28,6 +28,7 @@ internal sealed class ManagedEngineSharedState
         Hsts = new HstsTransferPolicy(timeProvider);
         ConnectionIdsByPoolNumber = new ConcurrentDictionary<long, long>();
         MultiOwners = new ConcurrentDictionary<Api.EngineContracts.IEasyTransfer, ManagedMultiTransfer>(ReferenceEqualityComparer.Instance);
+        SocketHandles = new CurlSocketHandles();
         Performer = new TransferPerformer(timeProvider, easyErrorText);
     }
 
@@ -57,6 +58,7 @@ internal sealed class ManagedEngineSharedState
         Hsts = hsts;
         ConnectionIdsByPoolNumber = engine.ConnectionIdsByPoolNumber;
         MultiOwners = engine.MultiOwners;
+        SocketHandles = engine.SocketHandles;
         Performer = engine.Performer;
     }
 
@@ -83,6 +85,9 @@ internal sealed class ManagedEngineSharedState
 
     /// <summary>Gets the multi handle each transfer added to one of the engine's multi handles is in, so it is in one at a time (<see cref="ManagedMultiTransfer" />).</summary>
     internal ConcurrentDictionary<Api.EngineContracts.IEasyTransfer, ManagedMultiTransfer> MultiOwners { get; }
+
+    /// <summary>Gets the opaque socket handles the engine gives its connections when no open-socket callback made one (<see cref="SocketCallbackConnector" />).</summary>
+    internal CurlSocketHandles SocketHandles { get; }
 
     /// <summary>Gets the performer that numbers the engine's transfers and connections and holds curl's easy error text.</summary>
     internal TransferPerformer Performer { get; }
