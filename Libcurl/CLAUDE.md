@@ -45,6 +45,13 @@ change nothing (ADR-0577).
 lookup, so a new upstream code is one appended string. `curl_easy_strerror` is still
 `Curl.Console`'s `CurlEasyErrorText` until BL-2450 moves it.
 
+`Misc/DatesAndLists` holds `CurlDate` and `CurlSlist` (ADR-0578). `CurlDate.Parse` is `curl_getdate`
+over `Curl.Protocol.Abstractions`' `CurlDateParser` (the plan's "Curl.Core date parser"), answering -1
+for text that is not a date. `CurlSlist` is `struct curl_slist` as an `IReadOnlyList<string>`, with
+`Append` (`curl_slist_append`, a `null` list starting one) and `FreeAll` (`curl_slist_free_all`,
+emptying it). Every list-valued option setter copies the list when it is set, so a list changed or
+freed afterwards leaves the option as set; a new list setter must copy too.
+
 `Easy` holds `CurlEasy`, the easy handle `CurlLibrary.EasyInit` (`curl_easy_init`) returns over the
 engine's `IEasyTransfer` (ADR-0563): `SetOption` goes through `EasyOptionDispatch` and writes the
 changed `EasyOptions` back to the transfer only on `Ok`; `PerformAsync` is the native shape, and
