@@ -2,6 +2,7 @@ using System.Text;
 using Curl.Api.Callbacks;
 using Curl.Api.Codes;
 using Curl.Api.EngineContracts;
+using Curl.Api.EngineContracts.WebSocket;
 using Curl.Api.Options;
 using Curl.Api.Options.Behaviour;
 using Curl.Api.Options.Http;
@@ -199,11 +200,14 @@ public sealed partial class ManagedEasyTransferTests
     }
 
     [TestMethod]
-    public async Task WebSocket_NotYetBuilt_ThrowsNotSupported()
+    public async Task WebSocket_BeforeAnyPerform_AnswersUnsupportedProtocolWithNoFrame()
     {
         await using IEasyTransfer easy = CreateEngine(new RecordingConnector(CurlExitCode.CouldntConnect, ConnectFailure)).CreateEasy();
 
-        Assert.ThrowsExactly<NotSupportedException>(() => easy.WebSocket);
+        CurlWebSocketReceiveResult received = await easy.WebSocket.ReceiveAsync(new byte[1], CancellationToken.None);
+
+        Assert.AreEqual(CurlCode.UnsupportedProtocol, received.Result);
+        Assert.IsNull(easy.WebSocket.CurrentFrame);
     }
 
     [TestMethod]

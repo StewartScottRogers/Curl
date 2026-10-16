@@ -136,6 +136,22 @@ public sealed class ManagedCurlEngine : ICurlEngine
         PrerequestConnector.Over(SocketCallbackConnector.Over(CreateTransports(options, shared).TcpConnector, options.Callbacks, shared), options.Callbacks.Prerequest);
 
     /// <summary>
+    /// Builds the authenticator a <c>CURLOPT_CONNECT_ONLY</c> 2 perform's WebSocket upgrade answers a challenge with, as
+    /// <see cref="EngineComposition.CreateProtocolHandlers" /> builds the WebSocket handler's: the ranked schemes over the
+    /// security contexts of <see cref="CreateDispatcher" />'s transports, Negotiate as the handle's options say (ADR-0616).
+    /// </summary>
+    /// <param name="options">The transfer's options.</param>
+    /// <param name="shared">The engine's shared caches.</param>
+    /// <returns>The authenticator.</returns>
+    internal static IHttpAuthenticator CreateWebSocketAuthenticator(EasyOptions options, ManagedEngineSharedState shared)
+    {
+        CurlTransports transports = CreateTransports(options, shared);
+        return EngineComposition.CreateHttpAuthenticator(
+            EngineComposition.CreateSecurityContextFactory(transports.TcpConnector, transports.UdpDatagramConnector),
+            NegotiateOptionsMapping.Of(options.Authentication));
+    }
+
+    /// <summary>
     /// The pool a transfer's TCP handlers connect through: the transports' own over their <c>TcpConnector</c>, as
     /// <c>Curl.Console</c>'s composition builds it, or, when the handle sets a socket callback, one over the same cache
     /// that opens connections through a <see cref="SocketCallbackConnector" /> over <paramref name="opener" />, so the

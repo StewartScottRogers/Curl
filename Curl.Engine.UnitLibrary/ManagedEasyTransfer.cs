@@ -10,6 +10,7 @@ using Curl.Api.Options;
 using Curl.Core;
 using Curl.Core.Multipart;
 using Curl.Protocol.Abstractions;
+using Curl.Protocol.Ws;
 
 namespace Curl.Engine;
 
@@ -34,8 +35,8 @@ namespace Curl.Engine;
 /// the <c>-b</c> files, <c>--alt-svc</c> and <c>--hsts</c> files read before it and the <c>-c</c> jar,
 /// alt-svc and HSTS files written after it, through <see cref="Host" /> (ADR-0544). <see cref="Headers" /> keeps the
 /// headers of the last perform's HTTP responses (ADR-0603), and <see cref="Connection" /> the connection a
-/// <c>CURLOPT_CONNECT_ONLY</c> 1 perform left open (ADR-0608); the WebSocket API is phase 3 work and throws
-/// <see cref="NotSupportedException" />.
+/// <c>CURLOPT_CONNECT_ONLY</c> 1 perform left open (ADR-0608), and <see cref="WebSocket" /> the connection a
+/// <c>CURLOPT_CONNECT_ONLY</c> 2 perform of a <c>ws</c> or <c>wss</c> URL upgraded (ADR-0616).
 /// </summary>
 /// <param name="createDispatcher">Builds a transfer's dispatcher from its options, the engine's shared state and the cookie store its HTTP handler keeps.</param>
 /// <param name="shared">What the engine's handles share.</param>
@@ -204,9 +205,27 @@ internal sealed class ManagedEasyTransfer(
     /// </summary>
     public ITransferHeaders Headers => headers;
 
-    /// <summary>Not supported yet: the WebSocket API is phase 3's WebSocket work (ADR-0506).</summary>
-    /// <exception cref="NotSupportedException">Always.</exception>
-    public IEasyWebSocket WebSocket => throw new NotSupportedException("The WebSocket API is phase 3 work (ADR-0506).");
+    /// <summary>
+    /// <c>curl_ws_recv</c>, <c>curl_ws_send</c> and <c>curl_ws_meta</c> on the connection the last perform with
+    /// <c>CURLOPT_CONNECT_ONLY</c> 2 upgraded (<see cref="ManagedEasyWebSocket" />, ADR-0616); every later perform,
+    /// and cleanup, closes it.
+    /// </summary>
+    public IEasyWebSocket WebSocket => WebSocketConnection;
+
+    /// <summary>The connection a WebSocket connect-only perform upgraded, for <see cref="WebSocket" />.</summary>
+    private ManagedEasyWebSocket? webSocket;
+
+    private ManagedEasyWebSocket WebSocketConnection => webSocket ??= new ManagedEasyWebSocket(
+        () => Options.Network.ConnectOnly != Api.Options.Network.ConnectOnly.Disabled,
+        () => (Options.Protocols.WebSocket.Options & Api.Options.Protocols.WebSocketOptionBits.NoAutoPong) == 0,
+        WebSocketRandomSource);
+
+    /// <summary>
+    /// Gets or sets where the WebSocket API's frame masks and a WebSocket connect-only perform's
+    /// <c>Sec-WebSocket-Key</c> come from: <see cref="SystemWebSocketRandomSource" /> by default; tests fix it.
+    /// <see cref="Duplicate" /> copies it and <see cref="Reset" /> leaves it, as it is not an option.
+    /// </summary>
+    internal IWebSocketRandomSource WebSocketRandomSource { get; set; } = new SystemWebSocketRandomSource();
 
     /// <summary>The connection a connect-only perform left open, for <see cref="Connection" />.</summary>
     private ConnectOnlyConnection? connectOnly;
@@ -232,6 +251,7 @@ internal sealed class ManagedEasyTransfer(
     {
         headers.Clear();
         await ConnectOnly.CloseAsync().ConfigureAwait(false);
+        await WebSocketConnection.CloseAsync().ConfigureAwait(false);
         return ToolAttempt is { } attempt
             ? await PerformToolAttemptAsync(attempt).ConfigureAwait(false)
             : await PerformFromOptionsAsync(cancellationToken).ConfigureAwait(false);
@@ -295,13 +315,32 @@ internal sealed class ManagedEasyTransfer(
         EngineTransferSettings settings = ToolSettings ?? TransferSettingsOf(options);
         long transferId = shared.Performer.TakeTransferId();
         Info = new TransferInfo { EffectiveUrl = urlText, TransferId = transferId, ConnectionId = NoConnectionId };
-        if (options.Network.ConnectOnly == Api.Options.Network.ConnectOnly.Connect)
+        if (IsRawConnectOnly(options.Network.ConnectOnly, url))
         {
             return await PerformConnectOnlyAsync(options, url, cancellationToken).ConfigureAwait(false);
         }
 
         return await PerformBuildingMimePostAsync(options, settings, url, urlText, transferId, cancellationToken).ConfigureAwait(false);
     }
+
+    /// <summary>
+    /// Whether the perform only connects (<see cref="PerformConnectOnlyAsync" />): under <c>CURLOPT_CONNECT_ONLY</c> 1,
+    /// and under 2 for a URL that is not <c>ws</c> or <c>wss</c>, as libcurl, which upgrades only those (ADR-0616).
+    /// </summary>
+    /// <param name="connectOnly">The handle's <c>CURLOPT_CONNECT_ONLY</c>.</param>
+    /// <param name="url">The URL set, parsed.</param>
+    /// <returns><see langword="true" /> when the perform connects and sends nothing.</returns>
+    private static bool IsRawConnectOnly(Api.Options.Network.ConnectOnly connectOnly, CurlUrl url) => connectOnly switch
+    {
+        Api.Options.Network.ConnectOnly.Connect => true,
+        Api.Options.Network.ConnectOnly.WebSocket => !IsWebSocket(url),
+        _ => false,
+    };
+
+    /// <summary>Whether <paramref name="url" /> is a <c>ws</c> or <c>wss</c> URL.</summary>
+    /// <param name="url">The URL.</param>
+    /// <returns><see langword="true" /> for either WebSocket scheme.</returns>
+    private static bool IsWebSocket(CurlUrl url) => url.Scheme.ToLowerInvariant() is "ws" or "wss";
 
     /// <summary>
     /// <c>CURLOPT_CONNECT_ONLY</c> 1: connects to the URL's host and port through <see cref="CreateConnectOnlyConnector" />'s
@@ -433,14 +472,35 @@ internal sealed class ManagedEasyTransfer(
     /// <summary>
     /// The follower the transfer runs through: the curl tool's runner's from <paramref name="toolDispatch" />, or
     /// without it one over the dispatcher the engine's factory builds from the options, the caches and the cookie
-    /// store the transfer's HTTP handler keeps (BL-2479).
+    /// store the transfer's HTTP handler keeps (BL-2479); under <c>CURLOPT_CONNECT_ONLY</c> 2 (which reaches here only
+    /// for a <c>ws</c> or <c>wss</c> URL) one over <see cref="WebSocketUpgradeDispatcherOf" /> alone.
     /// </summary>
     /// <param name="toolDispatch">The runner's follower and context factory, or <see langword="null" /> for the handle's own.</param>
     /// <param name="options">The handle's options.</param>
     /// <param name="cookies">The transfer's cookies, or <see langword="null" /> when no cookie option is set.</param>
     /// <returns>The follower.</returns>
     private RedirectFollower FollowerOf(EngineToolTransferDispatch? toolDispatch, EasyOptions options, CookieEngine? cookies) =>
-        toolDispatch?.Follower ?? new RedirectFollower(createDispatcher(options, PerformShared, HandlerCookieStoreOf(cookies)));
+        toolDispatch?.Follower ?? new RedirectFollower(options.Network.ConnectOnly == Api.Options.Network.ConnectOnly.WebSocket
+            ? WebSocketUpgradeDispatcherOf(options)
+            : createDispatcher(options, PerformShared, HandlerCookieStoreOf(cookies)));
+
+    /// <summary>
+    /// The dispatcher of a <c>CURLOPT_CONNECT_ONLY</c> 2 perform: a <see cref="WebSocketUpgradeOnlyHandler" /> whose
+    /// <see cref="WsProtocolHandler" /> dials through <see cref="CreateConnectOnlyConnector" />'s connector, so the
+    /// upgraded connection is the handle's own and never pooled, authenticates as the engine's HTTP handler does
+    /// (<see cref="ManagedCurlEngine.CreateWebSocketAuthenticator" />) and gives the open connection to
+    /// <see cref="WebSocket" /> (ADR-0616).
+    /// </summary>
+    /// <param name="options">The handle's options.</param>
+    /// <returns>The dispatcher.</returns>
+    private ProtocolDispatcher WebSocketUpgradeDispatcherOf(EasyOptions options)
+    {
+        WsProtocolHandler upgrader = new(
+            CreateConnectOnlyConnector(options, PerformShared),
+            ManagedCurlEngine.CreateWebSocketAuthenticator(options, PerformShared),
+            WebSocketRandomSource);
+        return new ProtocolDispatcher([new WebSocketUpgradeOnlyHandler(upgrader, WebSocketConnection)]);
+    }
 
     /// <summary>
     /// The <c>CURLOPT_MIMEPOST</c> body (<see cref="MimePostForm.BuildAsync" />), built in UTF-8 through
@@ -827,7 +887,7 @@ internal sealed class ManagedEasyTransfer(
     }
 
     /// <inheritdoc />
-    public IEasyTransfer Duplicate() => new ManagedEasyTransfer(createDispatcher, shared) { Options = Options, ToolSettings = ToolSettings, Host = Host, TraceComponents = TraceComponents, CreateFormBoundary = CreateFormBoundary, CreateConnectOnlyConnector = CreateConnectOnlyConnector };
+    public IEasyTransfer Duplicate() => new ManagedEasyTransfer(createDispatcher, shared) { Options = Options, ToolSettings = ToolSettings, Host = Host, TraceComponents = TraceComponents, CreateFormBoundary = CreateFormBoundary, CreateConnectOnlyConnector = CreateConnectOnlyConnector, WebSocketRandomSource = WebSocketRandomSource };
 
     /// <inheritdoc />
     public void Reset()
@@ -862,9 +922,13 @@ internal sealed class ManagedEasyTransfer(
     /// <returns><see cref="CurlCode.Ok" />.</returns>
     public ValueTask<CurlCode> UpkeepAsync(CancellationToken cancellationToken) => ValueTask.FromResult(CurlCode.Ok);
 
-    /// <summary><c>curl_easy_cleanup</c>: closes the connection a connect-only perform left open, if any.</summary>
+    /// <summary><c>curl_easy_cleanup</c>: closes the connection a connect-only perform left open or upgraded, if any.</summary>
     /// <returns>A task that completes once it is closed.</returns>
-    public ValueTask DisposeAsync() => connectOnly?.CloseAsync() ?? ValueTask.CompletedTask;
+    public async ValueTask DisposeAsync()
+    {
+        await (connectOnly?.CloseAsync() ?? ValueTask.CompletedTask).ConfigureAwait(false);
+        await (webSocket?.CloseAsync() ?? ValueTask.CompletedTask).ConfigureAwait(false);
+    }
 
     /// <summary>
     /// Builds the transfer's context with <paramref name="toolDispatch" />'s factory, or without one a
