@@ -3,7 +3,7 @@
 The .NET-idiomatic programming interface to Curl (ADR-0506), not a `Curl.<Area>.UnitLibrary`:
 `Curl.Api` is a naming exception, with `Curl.Console` and `Libcurl`. Namespace `Curl.Api`
 for `Client/` (`CurlClient` and `CurlClientOptions`) and `Composition/` (the engine-building
-half of the partial `CurlClient`), `Messages/`, `ResponseBodies/`, `RequestBodies/`, `Mime/`, `Cancellation/`, `Progress/`, `Concurrency/` and `Stores/`; `Curl.Api.Errors` for `Errors/`.
+half of the partial `CurlClient`), `Messages/`, `ResponseBodies/`, `RequestBodies/`, `Mime/`, `Cancellation/`, `Progress/`, `Concurrency/`, `Stores/` and `HttpMessageHandler/Core/`; `Curl.Api.Errors` for `Errors/`.
 
 - `Cancellation/`: `TransferCancellation` (BL-2504, ADR-0639) carries a call's `CancellationToken`
   into its transfer: the `CURLOPT_XFERINFOFUNCTION` answers abort once the token is cancelled and
@@ -103,6 +103,15 @@ disposed with the client. Once a client has stores, `CreateEasy` wraps each hand
 `StoreBoundEasyTransfer`, which applies them at perform (`CURLOPT_SHARE`, `CURLOPT_COOKIELIST` `ALL`
 then each cookie, the HSTS read and write callbacks, the alt-svc file) and, at dispose, keeps the
 transfer's `CURLINFO_COOKIELIST`. Tests use the fakes in `Curl.Api.UnitTests/Stores` (`StoreEngine` and friends).
+
+`HttpMessageHandler/Core/` (BL-2510, ADR-0647, namespace `Curl.Api`): `CurlHttpMessageHandler`, an
+`HttpMessageHandler` over a `CurlClient` it does not own. `HttpRequestMapping` turns an
+`HttpRequestMessage` into a `CurlRequest` (request then content headers with values joined, no
+`Content-Length`, the content as a stream body, the version as `CURLOPT_HTTP_VERSION` on the client's
+`CurlHttpOptions`); `HttpResponseMapping` turns the `CurlResponse` into an `HttpResponseMessage`, headers
+split by .NET's header table, the body streamed through `TrailerFillingStream`, which fills
+`TrailingHeaders` at the body's end. A `CurlException` becomes `HttpRequestException`. Tests drive an
+`HttpClient` over the existing fakes in `Curl.Api.UnitTests/HttpMessageHandler/Core`.
 
 Reference `Curl.Api.UnitLibrary` (the seam) and `Curl.Engine.UnitLibrary` (only for
 `ManagedCurlEngine` in `Composition/`), nothing else. Never reference `Libcurl` or a protocol
