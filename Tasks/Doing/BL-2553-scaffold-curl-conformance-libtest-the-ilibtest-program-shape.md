@@ -33,3 +33,4 @@ ew-project skill; the pair sorts between Curl.Conformance.Http3Server.UnitTests 
 ## Log
 
 - 2026-10-16: Created.
+- 2026-10-16: Backlog -> Doing. Criteria at claim: b1c48a8f 408cc7ba 4272a6b9 8738c7f6.
