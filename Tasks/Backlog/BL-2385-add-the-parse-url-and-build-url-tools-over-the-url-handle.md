@@ -4,7 +4,7 @@ title: Add the parse_url and build_url tools over the URL handle
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-2321, BL-2376, BL-2380]
+depends-on: [BL-2321, BL-2376, BL-2380, BL-2436, BL-2437]
 touches: [Curl.Mcp, Curl.Mcp.UnitLibrary, Curl.Mcp.UnitTests]
 requirement: none
 created: 2026-10-15
@@ -32,7 +32,10 @@ ADR-0548 (`Documentation/Planning/Decisions/ADR-0548-curl-mcp-an-mcp-server-over
 
 Plan: Documentation/Planning/Curl-Mcp.md. Decision: ADR-0548.
 
+2026-10-16 (lane 6): requeued before any code. The acceptance criterion "one test per tool through the real handle" cannot be met yet: `ManagedCurlEngine.CreateUrl` throws `NotSupportedException` ("The URL API is phase 3 work"), and no production `ICurlUrlHandle` exists. BL-2436 (get over `CurlUrl`) and BL-2437 (set, dup, clear) build it; both are in Backlog, so they are added to `depends-on`. No other prerequisite found: the tool logic will take an injected `Func<ICurlUrlHandle>` (the engine's `CreateUrl`) in `Curl.Mcp.UnitLibrary`, failures map to an `McpToolFailure` naming the `CurlUrlCode`, and `Curl.Mcp` registers both tools in `CurlMcpHost` over `ManagedCurlEngine`.
+
 ## Log
 
 - 2026-10-15: Created.
 - 2026-10-16: Backlog -> Doing.
+- 2026-10-16: Doing -> Backlog. Waits on BL-2436 and BL-2437: the engine has no real ICurlUrlHandle yet (CreateUrl throws), so the real-handle tests cannot pass
