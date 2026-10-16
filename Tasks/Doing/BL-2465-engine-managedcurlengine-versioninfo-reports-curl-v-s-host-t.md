@@ -40,3 +40,4 @@ Curl.Engine.UnitLibrary does not reference `Curl.Cli.UnitLibrary`; either pin th
 ## Log
 
 - 2026-10-16: Created.
+- 2026-10-16: Backlog -> Doing.
