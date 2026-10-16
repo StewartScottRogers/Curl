@@ -35,3 +35,4 @@ Plan: Documentation/Planning/Curl-Mcp.md. Decision: ADR-0548.
 ## Log
 
 - 2026-10-15: Created.
+- 2026-10-16: Backlog -> Deferred. Stewart 2026-10-16: no nuget.org push until the entire port is complete; look again when the backlog's port work is done
