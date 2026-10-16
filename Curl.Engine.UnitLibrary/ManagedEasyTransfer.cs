@@ -299,12 +299,25 @@ internal sealed class ManagedEasyTransfer(
     internal static EasyOptions WithoutDefaultUserAgent(EasyOptions options) =>
         options.Http.UserAgent is null ? options with { Http = options.Http with { UserAgent = string.Empty } } : options;
 
+    /// <summary>
+    /// <paramref name="options" /> with <see cref="Curl.Api.Options.Http.EasyHttpOptions.PostFields" /> dropped when
+    /// <see cref="Curl.Api.Options.Http.EasyHttpOptions.HttpGet" /> is set and <see cref="Curl.Api.Options.Http.EasyHttpOptions.Post" /> is not, so a
+    /// <c>CURLOPT_HTTPGET</c> after <c>CURLOPT_POSTFIELDS</c> sends a <c>GET</c> with no body, as libcurl 8.22.0 switches
+    /// only its method and keeps the fields for a later <c>CURLOPT_POST</c> (BL-2461, ADR-0565).
+    /// </summary>
+    /// <param name="options">The handle's options.</param>
+    /// <returns>The options the perform runs with.</returns>
+    internal static EasyOptions WithoutPostFieldsUnderHttpGet(EasyOptions options) =>
+        options.Http is { HttpGet: true, Post: false, PostFields: not null }
+            ? options with { Http = options.Http with { PostFields = null } }
+            : options;
+
     /// <summary>Runs one transfer from <see cref="Options" />, as <see cref="PerformAsync" /> describes, over <see cref="PerformShared" />.</summary>
     /// <param name="cancellationToken">Stops the transfer.</param>
     /// <returns>The transfer's code.</returns>
     private async Task<CurlCode> PerformFromOptionsOverCachesAsync(CancellationToken cancellationToken)
     {
-        EasyOptions options = ToolSettings is null ? WithoutDefaultUserAgent(Options) : Options;
+        EasyOptions options = WithoutPostFieldsUnderHttpGet(ToolSettings is null ? WithoutDefaultUserAgent(Options) : Options);
         LastResult = null;
         LastContext = null;
         if (options.Network.Url is not { } urlText)

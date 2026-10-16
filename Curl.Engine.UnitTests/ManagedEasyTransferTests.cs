@@ -111,6 +111,48 @@ public sealed partial class ManagedEasyTransferTests
     }
 
     [TestMethod]
+    public async Task PerformAsync_PostFieldsThenHttpGet_SendsAGetWithNoBody()
+    {
+        EasyOptions options = new()
+        {
+            Network = new EasyNetworkOptions { Url = "http://h/x" },
+            Http = new EasyHttpOptions { PostFields = "a=b"u8.ToArray(), HttpGet = true, Post = false },
+        };
+
+        (byte[] written, CurlCode code) = await PerformThroughEasyAsync(options, toolSettings: null, Response);
+
+        Assert.AreEqual(CurlCode.Ok, code);
+        Assert.AreEqual("GET /x HTTP/1.1\r\nHost: h\r\nAccept: */*\r\n\r\n", Encoding.ASCII.GetString(written));
+    }
+
+    [TestMethod]
+    public async Task PerformAsync_PostFieldsWithoutHttpGet_SendsAPost()
+    {
+        EasyOptions options = new()
+        {
+            Network = new EasyNetworkOptions { Url = "http://h/x" },
+            Http = new EasyHttpOptions { PostFields = "a=b"u8.ToArray(), Post = true },
+        };
+
+        (byte[] written, CurlCode code) = await PerformThroughEasyAsync(options, toolSettings: null, Response);
+
+        Assert.AreEqual(CurlCode.Ok, code);
+        Assert.AreEqual(
+            "POST /x HTTP/1.1\r\nHost: h\r\nAccept: */*\r\nContent-Length: 3\r\nContent-Type: application/x-www-form-urlencoded\r\n\r\na=b",
+            Encoding.ASCII.GetString(written));
+    }
+
+    [TestMethod]
+    public void WithoutPostFieldsUnderHttpGet_HttpGetWithPost_KeepsThePostFields()
+    {
+        EasyOptions options = new() { Http = new EasyHttpOptions { PostFields = "a=b"u8.ToArray(), HttpGet = true, Post = true } };
+
+        EasyOptions result = ManagedEasyTransfer.WithoutPostFieldsUnderHttpGet(options);
+
+        Assert.AreSame(options, result);
+    }
+
+    [TestMethod]
     public async Task PerformAsync_NoCallbacksSet_DiscardsTheBodyAndHeadersAndSucceeds()
     {
         ScriptedConnector connector = new([Encoding.ASCII.GetBytes(Response)]);

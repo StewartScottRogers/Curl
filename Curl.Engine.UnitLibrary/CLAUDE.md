@@ -434,3 +434,7 @@ A perform from the options with no `ToolInputs` applies `EasyHttpOptions.CookieL
 ## No default User-Agent for a library handle (BL-2559)
 
 A perform from the options with no `ToolSettings` runs with a `null` `EasyHttpOptions.UserAgent` turned into the empty string (`ManagedEasyTransfer.WithoutDefaultUserAgent`), so a `Libcurl` or `Curl.Api` handle without `CURLOPT_USERAGENT` sends no `User-Agent` line to the origin or a proxy's `CONNECT`, as libcurl 8.22.0 does; the HTTP handler's `curl/8.22.0` default is the curl tool's, which keeps it because its runner always sets `ToolSettings` (ADR-0659). Its tests are in `ManagedEasyTransferTests`.
+
+## CURLOPT_HTTPGET after CURLOPT_POSTFIELDS (BL-2461)
+
+A perform from the options with `EasyHttpOptions.HttpGet` set and `Post` clear runs without `PostFields` (`ManagedEasyTransfer.WithoutPostFieldsUnderHttpGet`), so it sends a `GET` with no body and no `Content-Length`, as libcurl 8.22.0 switches only its method and keeps the fields for a later `CURLOPT_POST` (ADR-0565). Its tests are in `ManagedEasyTransferTests`.
