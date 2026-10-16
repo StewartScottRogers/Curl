@@ -32,3 +32,4 @@ ADR-0506 phase 2, ADR-0552. BL-2318 routed every serial attempt through `IEasyTr
 ## Log
 
 - 2026-10-15: Created.
+- 2026-10-15: Backlog -> Doing.
