@@ -30,3 +30,4 @@ BL-2494 made `WsProtocolHandler.RawMode` hand the received stream to the output 
 ## Log
 
 - 2026-10-16: Created.
+- 2026-10-16: Backlog -> Doing. Criteria at claim: 032dcb2c 53bb8082.
