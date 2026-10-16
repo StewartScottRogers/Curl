@@ -31,7 +31,7 @@ Split out of BL-2469. Follow curl 8.22.0's `lib/http2.c` (`push_promise`, `on_fr
 ## Notes
 
 - Plan: public `IHttp2PushSink` and `IHttpPushedResponse` in `Curl.Protocol.Http`; `HttpProtocolHandler` takes the sink as its last optional constructor parameter (`http2PushSink`), creates `Http2Session(connection, isPushEnabled: sink is not null)` and sets each `Http2StreamConnection.PushSink`. `Http2Session` decodes every PUSH_PROMISE block, then `OfferPushAsync` adopts the promised stream (`Http2StreamConnection.AdoptPromised`) and offers it as an `Http2PushedResponse` (a read-only Stream); refused, sinkless or unowned pushes get `Frames.ResetStreamAsync(promised, CANCEL)` under the held frame lock.
-- Decision (ADR-0634): header lines are curl's exact `name:value` strings (`curl_maprintf("%s:%s")` in `lib/http2.c`, what `curl_pushheader_bynum` returns), not the goal text's `name: value`, by the match-curl rule. h2c upgrades keep ENABLE_PUSH 0 (measured `HTTP2-Settings`).
+- Decision (ADR-0638): header lines are curl's exact `name:value` strings (`curl_maprintf("%s:%s")` in `lib/http2.c`, what `curl_pushheader_bynum` returns), not the goal text's `name: value`, by the match-curl rule. h2c upgrades keep ENABLE_PUSH 0 (measured `HTTP2-Settings`).
 - Tests: `Http2SessionPushTests` (6), `Http2PushedResponseTests` (2), `HttpProtocolHandlerTests.Http2Push` (2). Measure-CodeQuality for Curl.Protocol.Http.UnitLibrary: 100% line, 100% branch, 0 failing members (first run found one uncovered branch in `OfferPushAsync`, the unowned-stream case, now tested).
 - Follow-up not filed here: wiring a libcurl `CURLMOPT_PUSHFUNCTION` to the sink through `EngineComposition` belongs to the rest of BL-2469.
 
