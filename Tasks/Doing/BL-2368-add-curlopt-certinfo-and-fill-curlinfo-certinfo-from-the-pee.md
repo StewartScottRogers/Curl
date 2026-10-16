@@ -32,3 +32,4 @@ Left by BL-2361 (ADR-0506 plan phase 2): `Curl.Api`'s `EasyTlsOptions` has no `C
 ## Log
 
 - 2026-10-15: Created.
+- 2026-10-15: Backlog -> Doing.
