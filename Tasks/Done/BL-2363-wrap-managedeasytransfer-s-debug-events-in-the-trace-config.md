@@ -8,7 +8,7 @@ depends-on: [BL-2360]
 touches: [Curl.Engine.UnitLibrary, Curl.Engine.UnitTests]
 requirement: none
 created: 2026-10-15
-completed:
+completed: 2026-10-15
 ---
 # BL-2363 — Wrap ManagedEasyTransfer's debug events in the --trace-config component decorators
 
@@ -22,14 +22,19 @@ Found by BL-2360 (ADR-0543): `DebugCallbackTransferEvents` passes on every event
 
 ## Acceptance criteria
 
-- [ ] A `ManagedEasyTransferTests` test shows the debug callback receiving `[READ] client_reset, clear readers` and the `[WRITE]` lines under `read` and `write` trace components, in the order the runner's events receive them.
-- [ ] A test shows the response wait's `[TIMER]` lines after `Request completely sent off` under the `timer` component.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
-- [ ] `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Engine.UnitLibrary` passes.
+- [x] A `ManagedEasyTransferTests` test shows the debug callback receiving `[READ] client_reset, clear readers` and the `[WRITE]` lines under `read` and `write` trace components, in the order the runner's events receive them.
+- [x] A test shows the response wait's `[TIMER]` lines after `Request completely sent off` under the `timer` component.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Engine.UnitLibrary` passes.
 
 ## Notes
+
+- Decided (ADR-0545): an internal `ManagedEasyTransfer.TraceComponents` hook (default `EngineTraceComponents.None`, copied by `Duplicate`, kept by `Reset` as a global setting) rather than an engine-wide setting, beside `ToolSettings` and `Host`; no public API change. `WithTraceComponentEvents` wraps the debug events as the runner does: timer innermost, read, write outermost.
+- The `[TIMER]` lines are the runner's multi-not-traced form (`WaitLines(tracesExpiry: false)`): the engine has no multi; `MultiStateTraceEvents` and `AsyncResolveTeardownTraceEvents` stay in `Curl.Console` for BL-2318.
+- Measured: Curl.Engine.UnitLibrary 0 failing members; Curl.Engine.UnitTests 971 passed.
 
 ## Log
 
 - 2026-10-15: Created.
 - 2026-10-15: Backlog -> Doing.
+- 2026-10-15: Doing -> Done. ManagedEasyTransfer's debug callback receives the --trace-config read, write and timer lines through its TraceComponents hook
