@@ -36,3 +36,4 @@ Prerequisite of BL-2417 (libcurl's `CURLOPT_SEEKFUNCTION`). Today the only rewin
 ## Log
 
 - 2026-10-15: Created.
+- 2026-10-15: Backlog -> Doing.
