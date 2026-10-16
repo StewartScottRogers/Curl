@@ -2736,7 +2736,7 @@ internal sealed class CurlCommandRunner(
     /// <summary>
     /// The values <c>-w</c> prints for one transfer: the libcurl variables from the transfer's
     /// <see cref="Api.Info.TransferInfo" />, as curl's tool reads them with <c>curl_easy_getinfo</c>
-    /// (<see cref="WriteOutTransferInfo.FromReport" /> and the run's own answers for the scheme,
+    /// (<see cref="LibcurlWriteOutInfo" /> and the run's own answers for the scheme,
     /// <c>Referer</c>, IDs, verify results and early data; BL-2319), and the tool's own beside it.
     /// <c>%{referer}</c> is the <c>Referer</c> the last request was sent with - under
     /// <c>-e "...;auto" -L</c> the URL the last redirect came from, as the redirect follower reports
@@ -2751,7 +2751,7 @@ internal sealed class CurlCommandRunner(
         long connectionId)
     {
         string requestUrl = UrlEffective.Normalize(QueryUrl.Append(transferUrl, options), options.PathAsIs);
-        Api.Info.TransferInfo info = WriteOutTransferInfo.FromReport(result, requestUrl, timeProvider) with
+        Api.Info.TransferInfo info = LibcurlWriteOutInfo(result, requestUrl) with
         {
             Scheme = WriteOutScheme(requestUrl, result),
             Referer = result.Report?.Referer ?? options.Referer,
@@ -2766,6 +2766,26 @@ internal sealed class CurlCommandRunner(
             OutputFileName = Running.OutputFileName,
             RetryCount = Running.RetryCount,
         };
+    }
+
+    /// <summary>
+    /// The libcurl part of a transfer's <c>-w</c> values: what its easy handle answered to <c>curl_easy_getinfo</c>
+    /// (<see cref="RunningTransferState.EasyWriteOutInfo" />, ADR-0625) when those answers describe
+    /// <paramref name="result" />, with <paramref name="requestUrl" /> as the effective URL when the report names none,
+    /// as the handle's URL is not yet the tool's normalized one; else, for a <c>-Z</c> transfer or one that never
+    /// reached its handle, <see cref="WriteOutTransferInfo.FromReport" />'s, which fills the same fields the same way.
+    /// </summary>
+    /// <param name="result">The transfer's result.</param>
+    /// <param name="requestUrl">The URL, with any <c>-G</c> / <c>--url-query</c> query, normalized.</param>
+    /// <returns>The info the runner's own answers are laid over.</returns>
+    private Api.Info.TransferInfo LibcurlWriteOutInfo(TransferResult result, string requestUrl)
+    {
+        if (Running.EasyWriteOutInfo is not { } easyInfo || !easyInfo.Describes(result))
+        {
+            return WriteOutTransferInfo.FromReport(result, requestUrl, timeProvider);
+        }
+
+        return easyInfo.PerformedReport!.EffectiveUrl is null ? easyInfo.Info with { EffectiveUrl = requestUrl } : easyInfo.Info;
     }
 
     /// <summary>
@@ -4500,7 +4520,13 @@ internal sealed class CurlCommandRunner(
         await using (easy.ConfigureAwait(false))
         {
             SetUpToolEasy(easy, options, attempt);
-            return await FollowRetryingThroughAsync(easy, follower, options, attempt, resumeFrom, outputFile).ConfigureAwait(false);
+            TransferResult result = await FollowRetryingThroughAsync(easy, follower, options, attempt, resumeFrom, outputFile).ConfigureAwait(false);
+            if (options.WriteOut is not null)
+            {
+                Running.EasyWriteOutInfo = EasyHandleWriteOutInfo.Read(easy.Easy, easy.Hooks.LastResult);
+            }
+
+            return result;
         }
     }
 

@@ -468,7 +468,12 @@ in curl. No `** Resuming` line is written under `-#` (ADR-0082, BL-132 Notes).
 
 With `-w`, each transfer's template is rendered by `Curl.Output`'s `WriteOutTemplateRenderer`
 after its failure lines, after a failure as after a success (a `-D` or resumed `-o` file that
-cannot be opened included), with `TransferWriteOutVariables` as its values. Its `%time{format}`
+cannot be opened included), with `TransferWriteOutVariables` as its values. A serial transfer's libcurl values are its easy handle's
+`curl_easy_getinfo` answers, read through `CurlEasy.GetInfo` after its last attempt and before cleanup
+(`EasyHandleWriteOutInfo`, kept as `RunningTransferState.EasyWriteOutInfo`) and used when they describe the
+reported result; a `-Z` transfer, or one that never reached its handle, gets `WriteOutTransferInfo.FromReport`'s,
+and the runner's own scheme, `Referer`, IDs, verify results and early data lie over either until BL-2494
+(ADR-0625, BL-2452). Its `%time{format}`
 follows the `WriteOutTimeDialect` the runner is given: `CurlComposition.WriteOutTimeDialectFor`
 passes `WindowsCRuntime` on Windows and `Glibc` elsewhere (ADR-0078, BL-387). On Windows the
 line feeds it writes to standard error, and to standard output while curl's standard output

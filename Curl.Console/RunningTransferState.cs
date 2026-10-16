@@ -94,6 +94,13 @@ internal sealed class RunningTransferState(
     internal int RetryCount { get; set; }
 
     /// <summary>
+    /// Gets or sets what the transfer's easy handle answered to <c>curl_easy_getinfo</c> after its last perform,
+    /// which its <c>-w</c> output prints (ADR-0625, BL-2452); <see langword="null" /> without <c>-w</c>, under
+    /// <c>-Z</c>, and for a transfer that never reached its handle.
+    /// </summary>
+    internal EasyHandleWriteOutInfo? EasyWriteOutInfo { get; set; }
+
+    /// <summary>
     /// Gets or sets the warning <c>--retry</c> gave up its retries with, such as
     /// <see cref="TransferRetryWarning.RetryAfterExceedsMaxTime" />, which curl 8.21.0 prints
     /// after the transfer's progress meter (upstream test366, BL-2008); <see langword="null" />
