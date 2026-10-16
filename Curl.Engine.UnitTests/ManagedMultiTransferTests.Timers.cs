@@ -302,7 +302,7 @@ public sealed partial class ManagedMultiTransferTests
     }
 
     private static ManagedMultiTransfer NewMulti(TimeProvider time, IWaitSocketPoller? poller = null) =>
-        new(new ConcurrentDictionary<IEasyTransfer, ManagedMultiTransfer>(ReferenceEqualityComparer.Instance), time, poller ?? new ScriptedWaitSocketPoller(), () => ValueTask.CompletedTask, () => { });
+        new(new ConcurrentDictionary<IEasyTransfer, ManagedMultiTransfer>(ReferenceEqualityComparer.Instance), time, poller ?? new ScriptedWaitSocketPoller(), () => ValueTask.CompletedTask, _ => ValueTask.CompletedTask, () => { });
 
     private static ControlledEasyTransfer WithTimeout(TimeSpan timeout) =>
         new() { Options = new EasyOptions { Transfer = new EasyTransferOptions { Timeout = timeout } } };

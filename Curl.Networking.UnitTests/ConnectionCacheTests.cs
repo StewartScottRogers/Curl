@@ -70,5 +70,50 @@ public sealed class ConnectionCacheTests
         Assert.HasCount(3, inner.Opened);
     }
 
+    [TestMethod]
+    public async Task CloseIdleBeyondAsync_ThreeIdleAndOneLeasedKeepingTwo_ClosesTheTwoOldestIdleAndKeepsTheLeasedOne()
+    {
+        var cache = new ConnectionCache(new ManualTimeProvider());
+        var inner = new FakeConnector();
+        var connector = new PoolingConnector(inner, cache, configuration: null);
+        foreach (string host in new[] { "oldest.example", "older.example", "newest.example" })
+        {
+            var opened = await connector.ConnectAsync(Target(host), CancellationToken.None);
+            opened.Connection!.MarkReusable();
+            await opened.Connection.DisposeAsync();
+        }
+
+        var inUse = await connector.ConnectAsync(Target("in-use.example"), CancellationToken.None);
+
+        await cache.CloseIdleBeyondAsync(2);
+        var newestAgain = await connector.ConnectAsync(Target("newest.example"), CancellationToken.None);
+
+        Assert.IsTrue(inner.Opened[0].IsDisposed);
+        Assert.IsTrue(inner.Opened[1].IsDisposed);
+        Assert.IsFalse(inner.Opened[2].IsDisposed);
+        Assert.IsFalse(inner.Opened[3].IsDisposed);
+        Assert.IsTrue(newestAgain.IsReused);
+        Assert.IsNotNull(inUse.Connection);
+    }
+
+    [TestMethod]
+    [DataRow(5L, false)]
+    [DataRow(1L, false)]
+    [DataRow(0L, true)]
+    [DataRow(-3L, true)]
+    public async Task CloseIdleBeyondAsync_OneIdleConnection_ClosesItOnlyWhenNoneIsKept(long keep, bool expectedClosed)
+    {
+        var cache = new ConnectionCache(new ManualTimeProvider());
+        var inner = new FakeConnector();
+        var connector = new PoolingConnector(inner, cache, configuration: null);
+        var idle = await connector.ConnectAsync(Target("idle.example"), CancellationToken.None);
+        idle.Connection!.MarkReusable();
+        await idle.Connection.DisposeAsync();
+
+        await cache.CloseIdleBeyondAsync(keep);
+
+        Assert.AreEqual(expectedClosed, inner.Opened[0].IsDisposed);
+    }
+
     private static ConnectTarget Target(string host) => new(host, 80, false) { PoolScheme = "http" };
 }

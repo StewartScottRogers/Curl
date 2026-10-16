@@ -72,7 +72,7 @@ public sealed class ManagedCurlEngine : ICurlEngine
     /// engine's shared connections (ADR-0594).
     /// </summary>
     /// <returns>The new multi handle; the caller disposes it (<c>curl_multi_cleanup</c>).</returns>
-    public IMultiTransfer CreateMulti() => new ManagedMultiTransfer(shared.MultiOwners, shared.TimeProvider, SocketWaitPoller.Instance, shared.Connections.CloseIdleAsync, shared.DnsCache.Clear);
+    public IMultiTransfer CreateMulti() => new ManagedMultiTransfer(shared.MultiOwners, shared.TimeProvider, SocketWaitPoller.Instance, shared.Connections.CloseIdleAsync, shared.Connections.CloseIdleBeyondAsync, shared.DnsCache.Clear);
 
     /// <summary><c>curl_share_init</c>: a <see cref="ManagedShareHandle" /> sharing nothing yet, on the engine's clock (ADR-0606).</summary>
     /// <returns>The new share handle; the caller frees it with <see cref="IShareHandle.Cleanup" />.</returns>
