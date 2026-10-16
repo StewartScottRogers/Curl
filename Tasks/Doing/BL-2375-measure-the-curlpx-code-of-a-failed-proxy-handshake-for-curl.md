@@ -33,3 +33,4 @@ Split from BL-2366. Nothing in Curl measures a `CURLPX_*` code yet, and `Curl.Ou
 ## Log
 
 - 2026-10-15: Created.
+- 2026-10-15: Backlog -> Doing.
