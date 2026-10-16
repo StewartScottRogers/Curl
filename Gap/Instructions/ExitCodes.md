@@ -29,10 +29,17 @@ Put every `gap` item in exactly one group. There are two groups at most:
    `exitcodes:<n>:man` gap, and every `exitcodes:<n>:strerror` gap whose code is missing
    too. The suggestion adds each member to `CurlExitCode` in
    `Curl.Protocol.Abstractions.UnitLibrary`, under upstream's `CURLE_` name and number, and
-   its text to `Curl.Console/CurlEasyErrorText.cs`.
+   its text to `CurlEasyErrorText.cs`.
 2. **Text differences**, key `exitcodes:strerror-text`: every `exitcodes:<n>:strerror` gap
-   whose code exists. The suggestion corrects each entry in
-   `Curl.Console/CurlEasyErrorText.cs` to `strerror.c`'s text, quoting both.
+   whose code exists. The suggestion corrects each entry in `CurlEasyErrorText.cs` to
+   `strerror.c`'s text, quoting both.
+
+`CurlEasyErrorText.cs` is the file a `:strerror` item's `evidence` names:
+`Libcurl/Misc/ErrorText/CurlEasyErrorText.cs`, or `Curl.Console/CurlEasyErrorText.cs`
+in a tree from before BL-2450 moved it there. The measurement reads whichever exists,
+the Libcurl one first, so the move changes no score. Name that path in the suggestion,
+and its project (`Libcurl` and `Libcurl.UnitTests`, or `Curl.Console` and
+`Curl.Console.UnitTests`) in `touches`.
 
 ## Severity
 
