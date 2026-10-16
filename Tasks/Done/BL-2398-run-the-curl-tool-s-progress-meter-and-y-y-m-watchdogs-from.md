@@ -8,7 +8,7 @@ depends-on: [BL-2397]
 touches: [Curl.Engine.UnitLibrary, Curl.Engine.UnitTests]
 requirement: none
 created: 2026-10-15
-completed:
+completed: 2026-10-15
 ---
 # BL-2398 — Run the curl tool's progress meter and -Y/-y/-m watchdogs from inside ManagedEasyTransfer
 
@@ -24,13 +24,18 @@ This step: the runner's `progress`, `lowSpeedWatchdog`, `maxTimeWatchdog` and `a
 
 ## Acceptance criteria
 
-- [ ] Tests show a perform from options with the tool's progress and state set reports the same progress sequence and starts the same watchdogs as the same attempt through `ToolAttempt`, a stalled attempt ending with the same exit 28 text.
-- [ ] Each perform starts fresh watchdogs, so a `--retry` attempt gets a fresh `-m`.
-- [ ] `dotnet build` is clean and the fast tests pass; `Measure-CodeQuality.ps1 -Library Curl.Engine.UnitLibrary` reports 0 failing members.
+- [x] Tests show a perform from options with the tool's progress and state set reports the same progress sequence and starts the same watchdogs as the same attempt through `ToolAttempt`, a stalled attempt ending with the same exit 28 text.
+- [x] Each perform starts fresh watchdogs, so a `--retry` attempt gets a fresh `-m`.
+- [x] `dotnet build` is clean and the fast tests pass; `Measure-CodeQuality.ps1 -Library Curl.Engine.UnitLibrary` reports 0 failing members.
 
 ## Notes
+
+- Decided (ADR-0567): an internal `ToolProgress` hook (`EngineToolTransferProgress`: the runner's `ITransferProgress` recorder and its `--fail-early` abort token), not an adapter on `EasyCallbackOptions.TransferInfo`: the callback's four counts cannot carry the recorder's started, retried, resent and done reports, nor an unknown total. ADR-0562 to ADR-0566 were taken on the shared branch, so this is ADR-0567.
+- While set, a perform from the options reports progress there (no callback), links the abort token, and starts fresh `-Y`/`-y` and `-m` watchdogs from `EasyTransferOptions` on the running transfer (`ToolEvents`' state, else its own) through the engine's `TransferPerformer`, writing to `Host.DiagnosticLog`. Without it no watchdog starts: `Curl.Api`/`Libcurl` behave as before.
+- Tests: `ManagedEasyTransferTests.ToolProgress.cs` (7) - same progress sequence as `ToolAttempt`, same exit 28 text for a stalled `-m` attempt, `-Y`/`-y` too slow, a fresh `-m` per perform, no watchdog without the hook, the abort token, Duplicate/Reset. Engine tests 1042 passed; all fast tests green; Measure-CodeQuality -Library Curl.Engine.UnitLibrary: 0 failing members.
 
 ## Log
 
 - 2026-10-15: Created.
 - 2026-10-15: Backlog -> Doing.
+- 2026-10-15: Doing -> Done. A perform from options drives the curl tool's progress meter and starts fresh -Y/-y and -m watchdogs through the internal ToolProgress hook (ADR-0567)

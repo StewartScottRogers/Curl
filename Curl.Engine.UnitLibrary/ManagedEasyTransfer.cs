@@ -121,6 +121,19 @@ internal sealed class ManagedEasyTransfer(
     internal EngineToolTransferEvents? ToolEvents { get; set; }
 
     /// <summary>
+    /// Gets or sets the curl tool's runner's progress meter for each transfer and its <c>-Z</c> <c>--fail-early</c>
+    /// abort token, for <c>Curl.Console</c> to set per transfer once its runner performs from the options (BL-2394,
+    /// ADR-0567). While set, a perform from the options reports its progress there in place of
+    /// <see cref="EasyCallbackOptions.TransferInfo" /> and <see cref="EasyCallbackOptions.Progress" />, stops on its
+    /// token too, and starts fresh <c>-Y</c>/<c>-y</c> and <c>-m</c> watchdogs from
+    /// <see cref="Api.Options.Behaviour.EasyTransferOptions" /> on the running transfer, writing to
+    /// <see cref="Host" />'s diagnostic log, as the runner does for each attempt; <see langword="null" />, as for every
+    /// <c>Curl.Api</c> and <c>Libcurl</c> handle, to report to those callbacks and start no watchdog.
+    /// <see cref="Duplicate" /> does not copy it and <see cref="Reset" /> clears it, as it belongs to one transfer.
+    /// </summary>
+    internal EngineToolTransferProgress? ToolProgress { get; set; }
+
+    /// <summary>
     /// Gets the whole result of the last perform, for the curl tool's <c>--retry</c>, failure lines and <c>-w</c>,
     /// which read more of it than <see cref="Info" /> carries (ADR-0554); <see langword="null" /> before the first
     /// perform, after one that failed before connecting (no URL set, or one that does not parse), and after one
@@ -180,17 +193,70 @@ internal sealed class ManagedEasyTransfer(
         EngineToolTransferInputs? toolInputs = ToolInputs;
         string transferUrl = await SetUpUnlessToolDidAsync(toolInputs, options, settings, cookies, state, urlText, events).ConfigureAwait(false);
         RedirectFollower follower = new(createDispatcher(options, shared, cookies?.HandlerStore));
-        using CancellationTokenSource abort = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        CallbackTransferProgress? progress = CallbackTransferProgress.Of(options.Behaviour.NoProgress, options.Callbacks, abort);
+        EngineToolTransferProgress? toolProgress = ToolProgress;
+        using CancellationTokenSource abort = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, AbortTokenOf(toolProgress));
+        CallbackTransferProgress? callbackProgress = CallbackProgressUnlessToolGave(toolProgress, options, abort);
         TransferResult? result = await FollowUnlessAbortedAsync(
             follower,
             state,
-            CreateContext(options, settings, TransferUrlOf(transferUrl, urlText, url, options), progress, events, InputsOf(toolInputs, options, state), abort.Token),
+            CreateContext(
+                options,
+                settings,
+                TransferUrlOf(transferUrl, urlText, url, options),
+                ProgressStartingWatchdogsOf(toolProgress, callbackProgress, options, state),
+                events,
+                InputsOf(toolInputs, options, state),
+                state,
+                abort.Token),
             RedirectPolicyMapping.Of(settings, options.Http, options.Authentication),
-            progress).ConfigureAwait(false);
+            callbackProgress).ConfigureAwait(false);
         await CleanUpUnlessToolDoesAsync(toolInputs, options, settings, cookies, state, transferUrl).ConfigureAwait(false);
         LastResult = events.ReportOn(result);
         return FinishPerformed(LastResult, options, transferId, cookies, ConnectionIdOf(result, state));
+    }
+
+    /// <summary>The token the curl tool's runner aborts the transfer through, or none without <paramref name="toolProgress" />.</summary>
+    /// <param name="toolProgress">The runner's progress and abort token, or <see langword="null" />.</param>
+    /// <returns>The token.</returns>
+    private static CancellationToken AbortTokenOf(EngineToolTransferProgress? toolProgress) =>
+        toolProgress?.AbortToken ?? CancellationToken.None;
+
+    /// <summary>
+    /// The progress callback's sink (<see cref="CallbackTransferProgress.Of" />), unless the curl tool's runner gave
+    /// <paramref name="toolProgress" />: then the callbacks are not called and nothing aborts by callback (ADR-0567).
+    /// </summary>
+    /// <param name="toolProgress">The runner's progress, or <see langword="null" /> for a handle's own.</param>
+    /// <param name="options">The handle's options.</param>
+    /// <param name="abort">Cancelled when the callback aborts.</param>
+    /// <returns>The sink, or <see langword="null" /> for none.</returns>
+    private static CallbackTransferProgress? CallbackProgressUnlessToolGave(EngineToolTransferProgress? toolProgress, EasyOptions options, CancellationTokenSource abort) =>
+        toolProgress is null ? CallbackTransferProgress.Of(options.Behaviour.NoProgress, options.Callbacks, abort) : null;
+
+    /// <summary>
+    /// The progress the context reports to: the runner's <paramref name="toolProgress" />, after starting the
+    /// attempt's <c>-Y</c>/<c>-y</c> and <c>-m</c> watchdogs on <paramref name="state" /> as the runner does when it
+    /// creates each attempt's context, so every perform, a <c>--retry</c> attempt's too, gets fresh ones; else
+    /// <paramref name="callbackProgress" />, with no watchdog started (ADR-0567).
+    /// </summary>
+    /// <param name="toolProgress">The runner's progress, or <see langword="null" /> for a handle's own.</param>
+    /// <param name="callbackProgress">The progress callback's sink, or <see langword="null" />.</param>
+    /// <param name="options">The handle's options, whose transfer group holds <c>-Y</c>, <c>-y</c> and <c>-m</c>.</param>
+    /// <param name="state">The running transfer, which keeps the watchdogs.</param>
+    /// <returns>The progress, or <see langword="null" /> for none.</returns>
+    private ITransferProgress? ProgressStartingWatchdogsOf(
+        EngineToolTransferProgress? toolProgress,
+        CallbackTransferProgress? callbackProgress,
+        EasyOptions options,
+        EngineTransferState state)
+    {
+        if (toolProgress is null)
+        {
+            return callbackProgress;
+        }
+
+        shared.Performer.StartLowSpeedWatchdog(state, options.Transfer, Host.DiagnosticLog);
+        shared.Performer.StartMaxTimeWatchdog(state, options.Transfer, Host.DiagnosticLog);
+        return toolProgress.Progress;
     }
 
     /// <summary>
@@ -501,6 +567,7 @@ internal sealed class ManagedEasyTransfer(
         ToolInputs = null;
         ToolOutputs = null;
         ToolEvents = null;
+        ToolProgress = null;
     }
 
     /// <summary>
@@ -530,9 +597,10 @@ internal sealed class ManagedEasyTransfer(
         EasyOptions options,
         EngineTransferSettings settings,
         CurlUrl url,
-        CallbackTransferProgress? progress,
+        ITransferProgress? progress,
         ITransferEvents events,
         EngineToolTransferInputs inputs,
+        EngineTransferState state,
         CancellationToken cancellationToken)
     {
         EngineToolTransferOutputs outputs = ToolOutputs ?? OwnOutputsOf(options.Callbacks);
@@ -556,6 +624,8 @@ internal sealed class ManagedEasyTransfer(
             watchHeaderOutput: outputs.WatchHeaderOutput,
             progress: progress,
             events: events,
+            lowSpeedWatchdog: state.AttemptLowSpeedWatchdog,
+            maxTimeWatchdog: state.AttemptMaxTimeWatchdog,
             lookedUpCredentials: inputs.LookedUpCredentials,
             ifNoneMatchHeaders: inputs.IfNoneMatchHeaders,
             altSvc: inputs.AltSvc,
