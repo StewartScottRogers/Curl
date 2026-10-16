@@ -14,6 +14,9 @@ namespace Curl.Mcp;
 [JsonSourceGenerationOptions(UseStringEnumConverter = true, PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
 [JsonSerializable(typeof(string[]))]
 [JsonSerializable(typeof(McpCurlToolResult))]
+[JsonSerializable(typeof(McpTransferHeader[]))]
+[JsonSerializable(typeof(McpTransferBody))]
+[JsonSerializable(typeof(McpTransferToolResult))]
 internal sealed partial class CurlMcpJsonContext : JsonSerializerContext
 {
     /// <summary>The options the tools are registered with: these contracts first, then the SDK's own protocol types.</summary>

@@ -1,3 +1,4 @@
+using Curl.Engine;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -23,7 +24,9 @@ internal static class CurlMcpHost
     /// <c>CURL_MCP_ROOT</c> and <c>CURL_MCP_MAX_RESPONSE_BYTES</c> once, so a bad value stops the
     /// server before it starts, and makes the root the process's current directory, so curl's
     /// relative paths resolve inside it (ADR-0575). Tools are registered one by one, never by
-    /// scanning an assembly: the <c>curl</c> tool over <see cref="InProcessCurlCommandRunner" />, and the <c>--ai-help</c>
+    /// scanning an assembly: the <c>curl</c> tool over <see cref="InProcessCurlCommandRunner" />, the <c>transfer</c>
+    /// tool over a production <see cref="ManagedCurlEngine" /> that lives as long as the process, as
+    /// <c>Libcurl</c>'s does, and the <c>--ai-help</c>
     /// resources through <see cref="CurlAiHelpResourceHandlers" /> (ADR-0589).
     /// </summary>
     /// <param name="args">The arguments as received from the shell.</param>
@@ -40,10 +43,12 @@ internal static class CurlMcpHost
         builder.Logging.ClearProviders();
         builder.Logging.AddConsole(options => options.LogToStandardErrorThreshold = LogLevel.Trace);
         builder.Services.AddSingleton(new McpCurlTool(new InProcessCurlCommandRunner(), root, cap));
+        builder.Services.AddSingleton(new McpTransferTool(new ManagedCurlEngine(), cap));
         builder.Services
             .AddMcpServer()
             .WithStdioServerTransport()
             .WithTools<CurlCommandTool>(CurlMcpJsonContext.ToolOptions)
+            .WithTools<CurlTransferTool>(CurlMcpJsonContext.ToolOptions)
             .WithListResourcesHandler(CurlAiHelpResourceHandlers.ListAsync)
             .WithReadResourceHandler(CurlAiHelpResourceHandlers.ReadAsync);
         return builder.Build();

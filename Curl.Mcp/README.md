@@ -10,6 +10,13 @@ output.
 dnx Curl.Mcp
 ```
 
+## Tools
+
+| Tool | Does |
+| --- | --- |
+| `curl` | Runs curl with an argument array, exactly as the command line would; returns standard output, standard error and the exit code. |
+| `transfer` | Makes one request described by fields (`url` required; `method`, `headers`, `body`, `followRedirects`, `timeoutSeconds`, `insecure`, `proxy`, `userAgent`); returns the status, headers, body and transfer information. |
+
 ## Environment
 
 | Variable | Required | Meaning |
