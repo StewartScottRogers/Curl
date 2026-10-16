@@ -50,6 +50,59 @@ public sealed class CallbackWriteStreamTests
     }
 
     [TestMethod]
+    public void Write_WriteCallbackReturnsWriteFuncError_SaysItReturnedLibcurlsErrorValue()
+    {
+        using CallbackWriteStream stream = new(_ => WriteCallbackResult.Error);
+
+        OutputWriteFailedException failure = Assert.ThrowsExactly<OutputWriteFailedException>(() => stream.Write([1, 2]));
+
+        Assert.AreEqual("Failure writing output to destination, passed 2 returned 4294967295", failure.Message);
+    }
+
+    [TestMethod]
+    public async Task WriteAsync_WriteCallbackPauses_WaitsForUnpauseThenHandsTheSameChunkAgain()
+    {
+        EasyPauseGate gate = new();
+        List<byte[]> calls = [];
+        WriteCallback callback = data =>
+        {
+            calls.Add(data.ToArray());
+            return calls.Count == 1 ? WriteCallbackResult.Pause : data.Length;
+        };
+        await using CallbackWriteStream stream = CallbackWriteStream.Of(callback, gate);
+
+        Task writing = stream.WriteAsync(new byte[] { 1, 2 }).AsTask();
+        bool pausedWhileWaiting = gate.Directions == Api.EngineContracts.CurlPause.Receive && !writing.IsCompleted;
+        gate.Set(Api.EngineContracts.CurlPause.Continue);
+        await writing;
+
+        Assert.IsTrue(pausedWhileWaiting);
+        Assert.HasCount(2, calls);
+        CollectionAssert.AreEqual(calls[0], calls[1]);
+    }
+
+    [TestMethod]
+    public async Task WriteAsync_HeaderCallbackPausesWithNoGate_FailsWithLibcurlsPauseNotSupportedText()
+    {
+        HeaderCallback callback = _ => WriteCallbackResult.Pause;
+        await using CallbackWriteStream stream = CallbackWriteStream.Of(callback);
+
+        OutputWriteFailedException failure = await Assert.ThrowsExactlyAsync<OutputWriteFailedException>(async () => await stream.WriteAsync(new byte[] { 1 }));
+
+        Assert.AreEqual(CallbackWriteStream.PauseNotSupportedText, failure.Message);
+    }
+
+    [TestMethod]
+    public void Write_WriteCallbackPausesOnTheSynchronousPath_FailsWithLibcurlsPauseNotSupportedText()
+    {
+        using CallbackWriteStream stream = new(_ => WriteCallbackResult.Pause, new EasyPauseGate());
+
+        OutputWriteFailedException failure = Assert.ThrowsExactly<OutputWriteFailedException>(() => stream.Write([1]));
+
+        Assert.AreEqual(CallbackWriteStream.PauseNotSupportedText, failure.Message);
+    }
+
+    [TestMethod]
     public void Capabilities_WriteOnlyStream_RefuseReadSeekAndLength()
     {
         using CallbackWriteStream stream = new(data => data.Length);

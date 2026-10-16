@@ -53,8 +53,11 @@ internal sealed class ManagedEasyTransfer(
     /// <inheritdoc />
     public string ErrorText { get; private set; } = string.Empty;
 
-    /// <summary>The directions <see cref="Pause" /> last left paused.</summary>
-    internal CurlPause PausedDirections { get; private set; }
+    /// <summary>The handle's pause state, which <see cref="Pause" /> sets and a pausing callback waits on (ADR-0569).</summary>
+    private readonly EasyPauseGate pauseGate = new();
+
+    /// <summary>The directions left paused, by <see cref="Pause" /> or by a callback that returned a pause.</summary>
+    internal CurlPause PausedDirections => pauseGate.Directions;
 
     /// <summary>
     /// Gets or sets the curl tool's own settings for the handle's transfers - <c>-s</c>, <c>-S</c>,
@@ -193,6 +196,8 @@ internal sealed class ManagedEasyTransfer(
         EngineToolTransferInputs? toolInputs = ToolInputs;
         string transferUrl = await SetUpUnlessToolDidAsync(toolInputs, options, settings, cookies, state, urlText, events).ConfigureAwait(false);
         RedirectFollower follower = new(createDispatcher(options, shared, cookies?.HandlerStore));
+        EngineToolTransferInputs inputs = InputsOf(toolInputs, options, state, PauseGateFor(url));
+        CallbackReadStream? callbackUpload = inputs.Upload as CallbackReadStream;
         EngineToolTransferProgress? toolProgress = ToolProgress;
         using CancellationTokenSource abort = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, AbortTokenOf(toolProgress));
         CallbackTransferProgress? callbackProgress = CallbackProgressUnlessToolGave(toolProgress, options, abort);
@@ -205,14 +210,15 @@ internal sealed class ManagedEasyTransfer(
                 TransferUrlOf(transferUrl, urlText, url, options),
                 ProgressStartingWatchdogsOf(toolProgress, callbackProgress, options, state),
                 events,
-                InputsOf(toolInputs, options, state),
+                inputs,
                 state,
                 abort.Token),
             RedirectPolicyMapping.Of(settings, options.Http, options.Authentication),
-            callbackProgress).ConfigureAwait(false);
+            callbackProgress,
+            callbackUpload).ConfigureAwait(false);
         await CleanUpUnlessToolDoesAsync(toolInputs, options, settings, cookies, state, transferUrl).ConfigureAwait(false);
         LastResult = events.ReportOn(result);
-        return FinishPerformed(LastResult, options, transferId, cookies, ConnectionIdOf(result, state));
+        return FinishPerformed(LastResult, options, transferId, cookies, ConnectionIdOf(result, state), AbortedTextOf(callbackUpload));
     }
 
     /// <summary>The token the curl tool's runner aborts the transfer through, or none without <paramref name="toolProgress" />.</summary>
@@ -329,9 +335,28 @@ internal sealed class ManagedEasyTransfer(
     /// <param name="toolInputs">The runner's chosen pieces, or <see langword="null" />.</param>
     /// <param name="options">The handle's options.</param>
     /// <param name="state">The running transfer, which keeps the alt-svc cache.</param>
+    /// <param name="pauseGate">The pause state a read callback's pause waits on, or <see langword="null" /> when the transfer cannot pause.</param>
     /// <returns>The pieces.</returns>
-    private static EngineToolTransferInputs InputsOf(EngineToolTransferInputs? toolInputs, EasyOptions options, EngineTransferState state) =>
-        toolInputs ?? OwnInputsOf(options, state);
+    private static EngineToolTransferInputs InputsOf(EngineToolTransferInputs? toolInputs, EasyOptions options, EngineTransferState state, EasyPauseGate? pauseGate) =>
+        toolInputs ?? OwnInputsOf(options, state, pauseGate);
+
+    /// <summary>
+    /// The pause state a callback's pause waits on: the handle's, but none for a <c>file</c> URL, which libcurl cannot
+    /// pause (<c>PROTOPT_NONETWORK</c>), so a pause there fails as libcurl's does (ADR-0569).
+    /// </summary>
+    /// <param name="url">The URL set.</param>
+    /// <returns>The pause state, or <see langword="null" />.</returns>
+    private EasyPauseGate? PauseGateFor(CurlUrl url) =>
+        string.Equals(url.Scheme, "file", StringComparison.OrdinalIgnoreCase) ? null : pauseGate;
+
+    /// <summary>
+    /// The text of a perform a callback aborted: libcurl's <c>operation aborted by callback</c> when the read callback
+    /// returned <c>CURL_READFUNC_ABORT</c>, else the progress callback's <c>Callback aborted</c>.
+    /// </summary>
+    /// <param name="upload">The read callback's stream, or <see langword="null" /> when the transfer reads none.</param>
+    /// <returns>The text.</returns>
+    private static string AbortedTextOf(CallbackReadStream? upload) =>
+        upload is { Aborted: true } ? CallbackReadStream.AbortedText : CallbackTransferProgress.CallbackAbortedText;
 
     /// <summary>
     /// The pieces a handle with no <see cref="ToolInputs" /> chooses from its options: no proxy, credentials, SSH
@@ -341,11 +366,12 @@ internal sealed class ManagedEasyTransfer(
     /// </summary>
     /// <param name="options">The handle's options.</param>
     /// <param name="state">The running transfer, which keeps the alt-svc cache.</param>
+    /// <param name="pauseGate">The pause state a read callback's pause waits on, or <see langword="null" /> when the transfer cannot pause.</param>
     /// <returns>The pieces.</returns>
-    private static EngineToolTransferInputs OwnInputsOf(EasyOptions options, EngineTransferState state) =>
+    private static EngineToolTransferInputs OwnInputsOf(EasyOptions options, EngineTransferState state, EasyPauseGate? pauseGate) =>
         new(
             ResumeFrom: options.Transfer.ResumeFrom > 0 ? options.Transfer.ResumeFrom : null,
-            Upload: UploadOf(options),
+            Upload: UploadOf(options, pauseGate),
             AltSvc: state.AltSvc);
 
     /// <summary>
@@ -492,16 +518,17 @@ internal sealed class ManagedEasyTransfer(
 
     /// <summary>
     /// Records a performed transfer's outcome: the result's code, message and <see cref="Info" />, or
-    /// <see cref="CurlCode.AbortedByCallback" /> with libcurl's <c>Callback aborted</c> when the progress
+    /// <see cref="CurlCode.AbortedByCallback" /> with <paramref name="abortedText" /> when the progress or read
     /// callback aborted it. <see cref="TransferInfo.CookieList" /> is the cookie engine's list either way.
     /// </summary>
-    /// <param name="result">The attempt's result, or <see langword="null" /> when the progress callback aborted it.</param>
+    /// <param name="result">The attempt's result, or <see langword="null" /> when a callback aborted it.</param>
     /// <param name="options">The handle's options.</param>
     /// <param name="transferId">The transfer's <c>%{xfer_id}</c>.</param>
     /// <param name="cookies">The transfer's cookies, or <see langword="null" /> when no cookie option is set.</param>
     /// <param name="connectionId">The transfer's <c>%{conn_id}</c>.</param>
+    /// <param name="abortedText">The text of an aborted transfer (<see cref="AbortedTextOf" />).</param>
     /// <returns>The transfer's code.</returns>
-    private CurlCode FinishPerformed(TransferResult? result, EasyOptions options, long transferId, CookieEngine? cookies, long connectionId)
+    private CurlCode FinishPerformed(TransferResult? result, EasyOptions options, long transferId, CookieEngine? cookies, long connectionId, string abortedText)
     {
         string urlText = options.Network.Url!;
         IReadOnlyList<string> cookieList = cookies?.ListLines ?? [];
@@ -509,7 +536,7 @@ internal sealed class ManagedEasyTransfer(
         {
             return Finish(
                 CurlCode.AbortedByCallback,
-                CallbackTransferProgress.CallbackAbortedText,
+                abortedText,
                 new TransferInfo { EffectiveUrl = urlText, TransferId = transferId, ConnectionId = connectionId, CookieList = cookieList });
         }
 
@@ -528,20 +555,23 @@ internal sealed class ManagedEasyTransfer(
     /// <summary>
     /// Performs the attempt with <see cref="TransferPerformer.FollowWatchingSpeedAsync" />, unless the
     /// progress callback aborts it: then, whether the cancel stopped the attempt or it finished first, the
-    /// transfer is libcurl's <c>CURLE_ABORTED_BY_CALLBACK</c> (ADR-0543).
+    /// transfer is libcurl's <c>CURLE_ABORTED_BY_CALLBACK</c> (ADR-0543), as it is when the read callback
+    /// returned <c>CURL_READFUNC_ABORT</c> (ADR-0569).
     /// </summary>
     /// <param name="follower">Performs the attempt, following redirects.</param>
     /// <param name="state">The running transfer, which keeps the attempt's watchdogs.</param>
     /// <param name="context">The attempt's context.</param>
     /// <param name="redirectPolicy">The redirect policy.</param>
     /// <param name="progress">The progress callback's sink, or <see langword="null" /> for none.</param>
-    /// <returns>The attempt's result, or <see langword="null" /> when the progress callback aborted it.</returns>
+    /// <param name="upload">The read callback's stream, or <see langword="null" /> when the transfer reads none.</param>
+    /// <returns>The attempt's result, or <see langword="null" /> when a callback aborted it.</returns>
     private static async Task<TransferResult?> FollowUnlessAbortedAsync(
         RedirectFollower follower,
         EngineTransferState state,
         TransferContext context,
         RedirectPolicy redirectPolicy,
-        CallbackTransferProgress? progress)
+        CallbackTransferProgress? progress,
+        CallbackReadStream? upload)
     {
         TransferResult result;
         try
@@ -553,7 +583,7 @@ internal sealed class ManagedEasyTransfer(
             return null;
         }
 
-        return progress is { Aborted: true } ? null : result;
+        return progress is { Aborted: true } || upload is { Aborted: true } ? null : result;
     }
 
     /// <inheritdoc />
@@ -571,14 +601,14 @@ internal sealed class ManagedEasyTransfer(
     }
 
     /// <summary>
-    /// <c>curl_easy_pause</c>: records the directions to leave paused. A handle outside a transfer has
-    /// nothing to pause yet, so the call always succeeds, as libcurl's does on an idle handle.
+    /// <c>curl_easy_pause</c>: records the directions to leave paused, and a transfer waiting on a callback's
+    /// pause in a direction now clear hands the callback its data again (ADR-0569). The call always succeeds.
     /// </summary>
     /// <param name="directions">The directions to leave paused.</param>
     /// <returns><see cref="CurlCode.Ok" />.</returns>
     public CurlCode Pause(CurlPause directions)
     {
-        PausedDirections = directions;
+        pauseGate.Set(directions);
         return CurlCode.Ok;
     }
 
@@ -603,7 +633,7 @@ internal sealed class ManagedEasyTransfer(
         EngineTransferState state,
         CancellationToken cancellationToken)
     {
-        EngineToolTransferOutputs outputs = ToolOutputs ?? OwnOutputsOf(options.Callbacks);
+        EngineToolTransferOutputs outputs = ToolOutputs ?? OwnOutputsOf(options.Callbacks, PauseGateFor(url));
         return new TransferContextFactory(Stream.Null, shared.TimeProvider) { HstsStore = shared.Hsts, DiagnosticLog = Host.DiagnosticLog }.Create(
             settings,
             options.Http,
@@ -640,11 +670,12 @@ internal sealed class ManagedEasyTransfer(
     /// header lines dropped when the callback is unset.
     /// </summary>
     /// <param name="callbacks">The handle's callbacks.</param>
+    /// <param name="pauseGate">The pause state a callback's pause waits on, or <see langword="null" /> when the transfer cannot pause.</param>
     /// <returns>The outputs.</returns>
-    private static EngineToolTransferOutputs OwnOutputsOf(EasyCallbackOptions callbacks) =>
+    private static EngineToolTransferOutputs OwnOutputsOf(EasyCallbackOptions callbacks, EasyPauseGate? pauseGate) =>
         new(
-            callbacks.Write is { } write ? CallbackWriteStream.Of(write) : Stream.Null,
-            HeaderOutput: callbacks.Header is { } header ? CallbackWriteStream.Of(header) : null);
+            callbacks.Write is { } write ? CallbackWriteStream.Of(write, pauseGate) : Stream.Null,
+            HeaderOutput: callbacks.Header is { } header ? CallbackWriteStream.Of(header, pauseGate) : null);
 
     /// <summary>
     /// The upload source of a <see cref="Api.Options.Behaviour.EasyTransferOptions.Upload" /> transfer: the read callback, or
@@ -652,10 +683,11 @@ internal sealed class ManagedEasyTransfer(
     /// standard input or a <c>-T</c> file over as a read callback (ADR-0542).
     /// </summary>
     /// <param name="options">The handle's options.</param>
+    /// <param name="pauseGate">The pause state a read callback's pause waits on, or <see langword="null" /> when the transfer cannot pause.</param>
     /// <returns>The upload stream, or <see langword="null" /> when the transfer uploads nothing.</returns>
-    private static Stream? UploadOf(EasyOptions options) =>
+    private static Stream? UploadOf(EasyOptions options, EasyPauseGate? pauseGate) =>
         options.Transfer.Upload
-            ? options.Callbacks.Read is { } read ? new CallbackReadStream(read) : Stream.Null
+            ? options.Callbacks.Read is { } read ? new CallbackReadStream(read, pauseGate) : Stream.Null
             : null;
 
     /// <summary>
