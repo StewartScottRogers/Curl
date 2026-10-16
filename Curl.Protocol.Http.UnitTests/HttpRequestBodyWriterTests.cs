@@ -111,6 +111,113 @@ public sealed class HttpRequestBodyWriterTests
     }
 
     [TestMethod]
+    public async Task WriteAsync_ChunkedStdinAfterTheContinueWaitRanOut_SendsDataAndLastChunkInOneWrite()
+    {
+        // upstream test60 on macOS (GF-0095): curl adds Expect: 100-continue to -T -, the wait
+        // runs out, and curl sends the data chunk and 0\r\n\r\n in one write, so a server that
+        // answers on the data and closes still receives the closing chunk (BL-2371).
+        GatedConnection connection = new(Encoding.Latin1.GetBytes("HTTP/1.1 200 OK\r\n\r\n"), 65536, 1);
+        HttpRequestBodyWriter writer = new(connection) { EarlyResponseWatch = await PastTheContinueWaitAsync(connection) };
+        Diagnostics.Arrange("writer", Describe(writer));
+
+        await writer.WriteAsync(new StreamBody(new MemoryStream("more than one byte\n"u8.ToArray()), null, "a/b"), true, CancellationToken.None);
+        WriteWriter(writer);
+
+        string expected = "13\r\nmore than one byte\n\r\n0\r\n\r\n";
+        Diagnostics.Assert("Encoding.Latin1.GetString(connection.Written)", expected, Encoding.Latin1.GetString(connection.Written));
+        Assert.AreEqual(expected, Encoding.Latin1.GetString(connection.Written));
+        Diagnostics.Assert("connection.WriteLengths", expected.Length.ToString(System.Globalization.CultureInfo.InvariantCulture), string.Join(", ", connection.WriteLengths));
+        CollectionAssert.AreEqual(new[] { expected.Length }, connection.WriteLengths.ToArray());
+        Diagnostics.Assert("writer.BytesSent", (long)expected.Length, writer.BytesSent);
+        Assert.AreEqual((long)expected.Length, writer.BytesSent);
+    }
+
+    [TestMethod]
+    public async Task WriteAsync_ChunkedStdinAfterTheContinueWait_SendsEachChunkWhenTheNextReadGivesMore()
+    {
+        FailingReadStream stream = new("abcde"u8.ToArray(), 2, new IOException("Lock violation."));
+        GatedConnection connection = new([], 1, int.MaxValue);
+        HttpRequestBodyWriter writer = new(connection) { EarlyResponseWatch = await PastTheContinueWaitAsync(connection) };
+        Diagnostics.Arrange("writer", Describe(writer));
+
+        await writer.WriteAsync(new StreamBody(stream, null, "a/b"), true, CancellationToken.None);
+        WriteWriter(writer);
+
+        Diagnostics.Assert("connection.WriteLengths", "7, 7, 11", string.Join(", ", connection.WriteLengths));
+        CollectionAssert.AreEqual(new[] { 7, 7, 11 }, connection.WriteLengths.ToArray());
+        Assert.AreEqual("2\r\nab\r\n2\r\ncd\r\n1\r\ne\r\n0\r\n\r\n", Encoding.Latin1.GetString(connection.Written));
+    }
+
+    [TestMethod]
+    [DataRow("abcde", "cde", DisplayName = "stopped mid body: the held piece and the one read after it are unsent")]
+    [DataRow("abc", "c", DisplayName = "stopped with the closing chunk: the held piece is unsent")]
+    public async Task WriteAsync_ChunkedStdinAfterTheContinueWaitStoppedBy417_LeavesTheHeldPiecesUnsent(string content, string expectedUnsent)
+    {
+        FailingReadStream stream = new(Encoding.Latin1.GetBytes(content), 2, new IOException("Lock violation."));
+        GatedConnection connection = new(Encoding.Latin1.GetBytes("HTTP/1.1 417 Expectation Failed\r\nContent-Length: 0\r\n\r\n"), 65536, 1) { StallsWritesOnceReleased = true };
+        HttpRequestBodyWriter writer = new(connection) { EarlyResponseWatch = await PastTheContinueWaitAsync(connection) };
+        StreamBody body = new(stream, null, "a/b");
+        Diagnostics.Arrange("writer, content", $"{Describe(writer)}, {content}");
+
+        await writer.WriteAsync(body, true, CancellationToken.None);
+        WriteWriter(writer);
+        byte[] resent = new byte[16];
+        int resentLength = await ((StreamBody)writer.Rewound(body)).Content.ReadAsync(resent, CancellationToken.None);
+
+        Diagnostics.Assert("written, cut short, unsent", $"2\r\nab\r\n, True, {expectedUnsent}", $"{Encoding.Latin1.GetString(connection.Written)}, {writer.CutShort}, {Encoding.Latin1.GetString(resent, 0, resentLength)}");
+        Assert.AreEqual("2\r\nab\r\n", Encoding.Latin1.GetString(connection.Written));
+        Assert.IsTrue(writer.CutShort);
+        Assert.AreEqual(2L, writer.BytesWritten);
+        Assert.AreEqual(expectedUnsent, Encoding.Latin1.GetString(resent, 0, resentLength));
+    }
+
+    [TestMethod]
+    public async Task WriteAsync_ChunkedBodyAfterTheContinueWaitReadIsRefused_SendsTheHeldChunkThenFailsWithExit26()
+    {
+        FailingReadStream stream = new("abcde"u8.ToArray(), 2, new RequestBodyReadFailedException("read error getting mime data"));
+        GatedConnection connection = new([], 1, int.MaxValue);
+        HttpRequestBodyWriter writer = new(connection) { EarlyResponseWatch = await PastTheContinueWaitAsync(connection) };
+        Diagnostics.Arrange("writer", Describe(writer));
+
+        HttpTransferException failure = await Assert.ThrowsExactlyAsync<HttpTransferException>(
+            async () => await writer.WriteAsync(new StreamBody(stream, null, "multipart/form-data; boundary=b"), true, CancellationToken.None));
+        WriteWriter(writer);
+
+        Diagnostics.Assert("failure.ExitCode, written", $"{CurlExitCode.ReadError}, 2\r\nab\r\n2\r\ncd\r\n1\r\ne\r\n", $"{failure.ExitCode}, {Encoding.Latin1.GetString(connection.Written)}");
+        Assert.AreEqual(CurlExitCode.ReadError, failure.ExitCode);
+        Assert.AreEqual("2\r\nab\r\n2\r\ncd\r\n1\r\ne\r\n", Encoding.Latin1.GetString(connection.Written));
+        Assert.AreEqual(5L, writer.BytesWritten);
+    }
+
+    [TestMethod]
+    public async Task WriteAsync_EmptyChunkedStdinAfterTheContinueWait_SendsOnlyTheLastChunk()
+    {
+        GatedConnection connection = new([], 1, int.MaxValue);
+        HttpRequestBodyWriter writer = new(connection) { EarlyResponseWatch = await PastTheContinueWaitAsync(connection) };
+        Diagnostics.Arrange("writer", Describe(writer));
+
+        await writer.WriteAsync(new StreamBody(new MemoryStream(), null, "a/b"), true, CancellationToken.None);
+        WriteWriter(writer);
+
+        Diagnostics.Assert("Encoding.Latin1.GetString(connection.Written)", "0\r\n\r\n", Encoding.Latin1.GetString(connection.Written));
+        Assert.AreEqual("0\r\n\r\n", Encoding.Latin1.GetString(connection.Written));
+    }
+
+    /// <summary>
+    /// Wraps <paramref name="connection" /> to wait for <c>100 Continue</c> and lets that wait run out.
+    /// </summary>
+    private static async Task<HttpContinueWaitConnection> PastTheContinueWaitAsync(IConnection connection)
+    {
+        FakeTimeProvider time = new(DateTimeOffset.UnixEpoch);
+        HttpContinueWaitConnection watch = new(connection);
+        Task<bool> wait = watch.WaitForContinueAsync(time, CancellationToken.None).AsTask();
+        await time.FirstTimerCreated;
+        time.Advance(watch.ContinueWait);
+        Assert.IsTrue(await wait);
+        return watch;
+    }
+
+    [TestMethod]
     public async Task WriteAsync_StreamOfKnownLength_ReadsNoFurtherThanItsLength()
     {
         FailingReadStream stream = new(new byte[HttpRequestBodyWriter.UploadBufferSize + 10], int.MaxValue, new IOException("Not reached."));

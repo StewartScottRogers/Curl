@@ -117,6 +117,19 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
     private List<byte>? heldBack;
 
     /// <summary>
+    /// Gets a value indicating whether a chunked stream body of unknown length (<c>-T -</c>) sent
+    /// after the wait for <c>100 Continue</c> holds each piece back until the next read, so the last
+    /// piece and the closing chunk go out in one <see cref="HttpContinueWaitConnection.SendUnlessStoppedAsync" />,
+    /// as <see cref="heldBack" /> does for a body sent without waiting (upstream test60 on macOS, BL-2371).
+    /// </summary>
+    private bool holdsWatchedPieces;
+
+    /// <summary>
+    /// The piece <see cref="holdsWatchedPieces" /> holds back, unframed; empty when none is held.
+    /// </summary>
+    private ReadOnlyMemory<byte> watchedHeldPiece;
+
+    /// <summary>
     /// Gets the connection that waited for <c>100 Continue</c> and so watches for a
     /// status of 300 or above while the body is sent, or <see langword="null" /> when the
     /// request waited for nothing and the body is sent whole.
@@ -177,9 +190,7 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
         await WriteHeldHeadAsync(cancellationToken).ConfigureAwait(false);
         if (isChunked && !CutShort)
         {
-            await SendAsync(LastChunk, cancellationToken).ConfigureAwait(false);
-            ReportSent(LastChunk);
-            Progress.ReportUploaded(BytesSent, expectedLength);
+            await WriteLastChunkAsync(cancellationToken).ConfigureAwait(false);
         }
 
         await ReleaseHeldBackAsync(cancellationToken).ConfigureAwait(false);
@@ -283,12 +294,15 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
 
     /// <summary>
     /// Notes where a seekable stream body begins, for a resend, and starts <see cref="heldBack" />
-    /// for a chunked body of unknown length sent without waiting for <c>100 Continue</c>.
+    /// for a chunked body of unknown length sent without waiting for <c>100 Continue</c>, or
+    /// <see cref="holdsWatchedPieces" /> for one sent after that wait.
     /// </summary>
     private void StartReading(StreamBody body, bool isChunked)
     {
         startPosition = body.Content.CanSeek ? body.Content.Position : null;
-        heldBack = isChunked && body.Length is null && EarlyResponseWatch is null ? [] : null;
+        bool holds = isChunked && body.Length is null;
+        heldBack = holds && EarlyResponseWatch is null ? [] : null;
+        holdsWatchedPieces = holds && EarlyResponseWatch is not null;
     }
 
     /// <summary>
@@ -370,7 +384,7 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
             return;
         }
 
-        long readSoFar = BytesWritten + read;
+        long readSoFar = BytesWritten + watchedHeldPiece.Length + read;
         bool endOfBody = EndsBody(length, readSoFar, read);
         foreach (string line in StreamReadLines(requested, length, readSoFar, read, endOfBody))
         {
@@ -457,6 +471,7 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
         catch (RequestBodyReadFailedException failed)
         {
             await ReleaseHeldBackAsync(cancellationToken).ConfigureAwait(false);
+            await SendWatchedHeldPieceAsync(ReadOnlyMemory<byte>.Empty, cancellationToken).ConfigureAwait(false);
             throw new HttpTransferException(CurlExitCode.ReadError, failed.Message);
         }
         catch (IOException)
@@ -483,20 +498,129 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
             return;
         }
 
+        if (holdsWatchedPieces)
+        {
+            await HoldWatchedPieceAsync(piece, cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
         ReadOnlyMemory<byte> framed = Framed(piece, isChunked);
         if (EarlyResponseWatch is not { } watch)
         {
             await WriteAfterHeldHeadAsync(piece, framed, isChunked, cancellationToken).ConfigureAwait(false);
         }
-        else if (!await watch.SendUnlessStoppedAsync(framed, cancellationToken).ConfigureAwait(false))
+        else if (!await SendUnlessStoppedAsync(watch, piece, framed, cancellationToken).ConfigureAwait(false))
         {
-            CutShort = true;
-            unsent = piece.ToArray();
             return;
         }
 
-        ReportSent(framed.Span);
+        ReportPieceSent(piece, framed);
+    }
+
+    /// <summary>
+    /// Counts a piece as written and reports it, framed, as sent.
+    /// </summary>
+    private void ReportPieceSent(ReadOnlyMemory<byte> piece, ReadOnlyMemory<byte> framed)
+    {
+        Events.ReportDataSent(framed.Span);
+        CountPieceSent(piece, framed);
+    }
+
+    /// <summary>
+    /// Counts a piece as written and its framed bytes as sent, and reports the upload's progress.
+    /// </summary>
+    private void CountPieceSent(ReadOnlyMemory<byte> piece, ReadOnlyMemory<byte> framed)
+    {
+        BytesSent += framed.Length;
         BytesWritten += piece.Length;
+        Progress.ReportUploaded(BytesSent, expectedLength);
+    }
+
+    /// <summary>
+    /// Sends <paramref name="bytes" />, which begin with <paramref name="piece" /> framed, through
+    /// <paramref name="watch" />; when a status of 300 or above stops it, marks the body
+    /// <see cref="CutShort" /> with <paramref name="piece" /> unsent.
+    /// </summary>
+    private async ValueTask<bool> SendUnlessStoppedAsync(HttpContinueWaitConnection watch, ReadOnlyMemory<byte> piece, ReadOnlyMemory<byte> bytes, CancellationToken cancellationToken)
+    {
+        if (await watch.SendUnlessStoppedAsync(bytes, cancellationToken).ConfigureAwait(false))
+        {
+            return true;
+        }
+
+        CutShort = true;
+        unsent = piece.ToArray();
+        return false;
+    }
+
+    /// <summary>
+    /// Holds <paramref name="piece" /> back under <see cref="holdsWatchedPieces" /> and sends the
+    /// piece held before it, now that this read has given more; when a status of 300 or above
+    /// stops that send, both pieces are left unsent. The piece is reported as a data event when it is
+    /// held, where curl 8.21.0's <c>--trace</c> shows it, before the next read (measured, BL-1214 Notes),
+    /// and counted as sent only when it is.
+    /// </summary>
+    private async ValueTask HoldWatchedPieceAsync(ReadOnlyMemory<byte> piece, CancellationToken cancellationToken)
+    {
+        ReadOnlyMemory<byte> previous = watchedHeldPiece;
+        watchedHeldPiece = piece.ToArray();
+        Events.ReportDataSent(Framed(piece, true).Span);
+        if (!await SendWatchedHeldPieceAsync(previous, ReadOnlyMemory<byte>.Empty, cancellationToken).ConfigureAwait(false))
+        {
+            unsent = (byte[])[.. previous.Span, .. piece.Span];
+        }
+    }
+
+    /// <summary>
+    /// Sends the piece <see cref="holdsWatchedPieces" /> holds back, chunk framed and followed by
+    /// <paramref name="closing" /> in the same write, and counts the piece as sent.
+    /// </summary>
+    /// <returns><see langword="false" /> when a status of 300 or above stopped the send.</returns>
+    private ValueTask<bool> SendWatchedHeldPieceAsync(ReadOnlyMemory<byte> closing, CancellationToken cancellationToken)
+    {
+        ReadOnlyMemory<byte> held = watchedHeldPiece;
+        watchedHeldPiece = ReadOnlyMemory<byte>.Empty;
+        return SendWatchedHeldPieceAsync(held, closing, cancellationToken);
+    }
+
+    /// <summary>
+    /// Sends <paramref name="held" />, chunk framed and followed by <paramref name="closing" /> in
+    /// the same write, and counts it as sent; sends nothing for an empty piece.
+    /// </summary>
+    /// <returns><see langword="false" /> when a status of 300 or above stopped the send.</returns>
+    private async ValueTask<bool> SendWatchedHeldPieceAsync(ReadOnlyMemory<byte> held, ReadOnlyMemory<byte> closing, CancellationToken cancellationToken)
+    {
+        if (held.IsEmpty)
+        {
+            return true;
+        }
+
+        ReadOnlyMemory<byte> framed = Framed(held, true);
+        if (!await SendUnlessStoppedAsync(EarlyResponseWatch!, held, (byte[])[.. framed.Span, .. closing.Span], cancellationToken).ConfigureAwait(false))
+        {
+            return false;
+        }
+
+        CountPieceSent(held, framed);
+        return true;
+    }
+
+    /// <summary>
+    /// Writes the closing chunk: in one write with the piece <see cref="holdsWatchedPieces" /> holds
+    /// back, if any, unless a status of 300 or above stops it; otherwise on its own.
+    /// </summary>
+    private async ValueTask WriteLastChunkAsync(CancellationToken cancellationToken)
+    {
+        if (watchedHeldPiece.IsEmpty)
+        {
+            await SendAsync(LastChunk, cancellationToken).ConfigureAwait(false);
+        }
+        else if (!await SendWatchedHeldPieceAsync(LastChunk, cancellationToken).ConfigureAwait(false))
+        {
+            return;
+        }
+
+        ReportSent(LastChunk);
         Progress.ReportUploaded(BytesSent, expectedLength);
     }
 
