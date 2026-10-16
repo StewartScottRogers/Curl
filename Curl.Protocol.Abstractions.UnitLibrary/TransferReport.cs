@@ -178,6 +178,19 @@ public sealed record TransferReport
     public IReadOnlyList<ReadOnlyMemory<byte>> PeerCertificates { get; init; } = [];
 
     /// <summary>
+    /// Gets the certificate verify code last reported for the origin's TLS handshake
+    /// (<see cref="ITransferEvents.ReportCertificateVerifyResult" />), the source of
+    /// <c>CURLINFO_SSL_VERIFYRESULT</c>; <c>0</c> without TLS, and always in the Schannel build.
+    /// </summary>
+    public long SslVerifyResult { get; init; }
+
+    /// <summary>
+    /// Gets the certificate verify code last reported for an HTTPS proxy's TLS handshake, the
+    /// source of <c>CURLINFO_PROXY_SSL_VERIFYRESULT</c>; <c>0</c> without an HTTPS proxy.
+    /// </summary>
+    public long ProxySslVerifyResult { get; init; }
+
+    /// <summary>
     /// Gets the directory the FTP server's <c>257</c> reply to <c>PWD</c> named at login,
     /// its doubled quotes undoubled, the source of <c>%{ftp_entry_path}</c>;
     /// <see langword="null" /> for a transfer that is not FTP, or when the reply named no

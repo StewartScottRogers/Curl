@@ -43,6 +43,8 @@ public sealed class TransferInfoFromReportTests
         Timings = Timings,
         FtpEntryPath = "/home",
         AuthSchemePicked = HttpAuthSchemes.Digest,
+        SslVerifyResult = 19,
+        ProxySslVerifyResult = 20,
         ResponseHeaders =
         [
             new("Content-Length", "1000"),
@@ -93,6 +95,21 @@ public sealed class TransferInfoFromReportTests
 
     [TestMethod]
     public void Of_Report_TakesTheReferer() => Assert.AreEqual("http://ref/", Full.Referer);
+
+    [TestMethod]
+    public void Of_Report_TakesTheSslVerifyResult() => Assert.AreEqual(19, Full.SslVerifyResult);
+
+    [TestMethod]
+    public void Of_Report_TakesTheProxySslVerifyResult() => Assert.AreEqual(20, Full.ProxySslVerifyResult);
+
+    [TestMethod]
+    public void Of_ReportWithoutVerifyResults_AnswersZeroForEach()
+    {
+        TransferInfo info = Of(new TransferReport());
+
+        Assert.AreEqual(0, info.SslVerifyResult);
+        Assert.AreEqual(0, info.ProxySslVerifyResult);
+    }
 
     [TestMethod]
     public void Of_Report_TakesTheResponseCode() => Assert.AreEqual(401, Full.ResponseCode);

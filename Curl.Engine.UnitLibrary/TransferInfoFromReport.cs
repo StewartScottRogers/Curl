@@ -104,6 +104,8 @@ internal static class TransferInfoFromReport
         HttpAuthAvailable = report.ResponseCode == 401 ? ChallengedCurlAuthBits(report, "WWW-Authenticate") : 0,
         ProxyAuthAvailable = report.ResponseCode == 407 ? ChallengedCurlAuthBits(report, "Proxy-Authenticate") : 0,
         ContentLengthDownload = ContentLengthOf(report),
+        SslVerifyResult = report.SslVerifyResult,
+        ProxySslVerifyResult = report.ProxySslVerifyResult,
     };
 
     /// <summary>

@@ -25,7 +25,8 @@ namespace Curl.Engine;
 /// connections and the <c>%{xfer_id}</c> and <c>%{conn_id}</c> numbering are the engine's (<see cref="ManagedEngineSharedState" />),
 /// shared with its other handles (ADR-0542); while a transfer performs, <see cref="Info" /> holds its
 /// <c>%{xfer_id}</c> from the start and its <c>%{conn_id}</c> once it connects (-1 before), for the debug
-/// callback's <c>--trace-ids</c> prefix (ADR-0547). Around the attempt it does the runner's setup and cleanup:
+/// callback's <c>--trace-ids</c> prefix (ADR-0547). The certificate verify codes the transfer reports
+/// reach <see cref="Info" /> through <see cref="TlsVerifyResultRecordingTransferEvents" /> (BL-2366). Around the attempt it does the runner's setup and cleanup:
 /// the <c>-b</c> files, <c>--alt-svc</c> and <c>--hsts</c> files read before it and the <c>-c</c> jar,
 /// alt-svc and HSTS files written after it, through <see cref="Host" /> (ADR-0544). The header, WebSocket and connect-only
 /// APIs are phase 3 work and throw <see cref="NotSupportedException" />.
@@ -115,7 +116,7 @@ internal sealed class ManagedEasyTransfer(
         Info = new TransferInfo { EffectiveUrl = urlText, TransferId = transferId, ConnectionId = NoConnectionId };
         CookieEngine? cookies = CookieEngine.FromHttpOptions(options.Http, shared.Cookies);
         EngineTransferState state = new();
-        ITransferEvents events = EventsOf(options, state);
+        TlsVerifyResultRecordingTransferEvents events = new(EventsOf(options, state));
         string transferUrl = await SetUpAsync(options, settings, cookies, state, urlText, events).ConfigureAwait(false);
         RedirectFollower follower = new(createDispatcher(options, shared, cookies?.HandlerStore));
         using CancellationTokenSource abort = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -128,7 +129,7 @@ internal sealed class ManagedEasyTransfer(
             progress).ConfigureAwait(false);
         await shared.Performer.WriteCookieJarAltSvcAndHstsFilesAsync(
             cookies, settings, options.Http, transferUrl, Host.JarPrintTarget, state, shared.Hsts, Host.FileSystem, Host.RunsOnWindows).ConfigureAwait(false);
-        return FinishPerformed(result, options, transferId, cookies, ConnectionIdOf(result, state));
+        return FinishPerformed(events.ReportOn(result), options, transferId, cookies, ConnectionIdOf(result, state));
     }
 
     /// <summary>

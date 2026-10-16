@@ -44,6 +44,8 @@ public sealed class TransferReportTests
         Assert.IsNull(report.UnixSocketRemoteIp);
         Assert.IsNull(report.Timings);
         Assert.IsEmpty(report.PeerCertificates);
+        Assert.AreEqual(0L, report.SslVerifyResult);
+        Assert.AreEqual(0L, report.ProxySslVerifyResult);
     }
 
     [TestMethod]
@@ -96,6 +98,8 @@ public sealed class TransferReportTests
             LocalEndPoint = localEndPoint,
             RemoteEndPoint = remoteEndPoint,
             Timings = timings,
+            SslVerifyResult = 19,
+            ProxySslVerifyResult = 20,
         };
 
         diagnostics.Act("ResponseCode", report.ResponseCode);
@@ -121,6 +125,8 @@ public sealed class TransferReportTests
         Assert.AreSame(localEndPoint, report.LocalEndPoint);
         Assert.AreSame(remoteEndPoint, report.RemoteEndPoint);
         Assert.AreSame(timings, report.Timings);
+        Assert.AreEqual(19L, report.SslVerifyResult);
+        Assert.AreEqual(20L, report.ProxySslVerifyResult);
     }
 
     [TestMethod]
