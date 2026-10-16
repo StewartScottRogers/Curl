@@ -39,3 +39,4 @@ Plan: Documentation/Planning/Curl-Mcp.md. Decision: ADR-0548.
 - 2026-10-15: Created.
 - 2026-10-16: Backlog -> Doing.
 - 2026-10-16: Doing -> Backlog. Waits on BL-2436 and BL-2437: the engine has no real ICurlUrlHandle yet (CreateUrl throws), so the real-handle tests cannot pass
+- 2026-10-16: Backlog -> Doing.
