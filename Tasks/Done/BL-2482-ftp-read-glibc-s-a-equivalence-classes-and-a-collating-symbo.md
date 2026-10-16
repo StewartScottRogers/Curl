@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Ftp.UnitLibrary, Curl.Protocol.Ftp.UnitTests]
 requirement: none
 created: 2026-10-16
-completed:
+completed: 2026-10-16
 ---
 # BL-2482 — FTP: read glibc's [=a=] equivalence classes and [.a.] collating symbols in the Linux wildcard matcher
 
@@ -46,3 +46,4 @@ before pinning. If FreeBSD's `rangematch` reads them too, give `FtpAppleBracket`
 
 - 2026-10-16: Created.
 - 2026-10-16: Backlog -> Doing.
+- 2026-10-16: Doing -> Done. glibc [=c=] and [.c.] read in FtpGlibcBracket, measured from glibc 2.43 C.UTF-8 and pinned; quality gate 0 failing
