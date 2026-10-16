@@ -83,10 +83,9 @@ public sealed class ManagedCurlEngine : ICurlEngine
     /// <exception cref="NotSupportedException">Always.</exception>
     public IShareHandle CreateShare() => throw new NotSupportedException("The share interface is phase 3 work (ADR-0506).");
 
-    /// <summary>Not supported yet: the URL handle is phase 3's URL API work (ADR-0506).</summary>
-    /// <returns>Never returns.</returns>
-    /// <exception cref="NotSupportedException">Always.</exception>
-    public ICurlUrlHandle CreateUrl() => throw new NotSupportedException("The URL API is phase 3 work (ADR-0506).");
+    /// <summary><c>curl_url</c>: a new URL handle holding no part (ADR-0601).</summary>
+    /// <returns>A <see cref="ManagedCurlUrlHandle" />; the caller disposes it.</returns>
+    public ICurlUrlHandle CreateUrl() => new ManagedCurlUrlHandle();
 
     /// <summary>Not supported yet: the MIME handle is phase 3's MIME API work (ADR-0506).</summary>
     /// <returns>Never returns.</returns>

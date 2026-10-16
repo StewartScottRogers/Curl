@@ -246,7 +246,7 @@ object, never static, so two engines in one process share nothing; `DisposeAsync
 connections. `CreateDispatcher` builds a transfer's dispatcher as `Curl.Console`'s composition
 builds an option group's: `EngineComposition.CreateTransports` over the handle's easy groups and the
 engine's caches, then `CreateProtocolHandlers` over its pooling connector. `CreateMulti`
-gives a `ManagedMultiTransfer` (BL-2424, below); `CreateShare`, `CreateUrl`, `CreateMime` and
+gives a `ManagedMultiTransfer` (BL-2424, below) and `CreateUrl` a `ManagedCurlUrlHandle` (BL-2436, below); `CreateShare`, `CreateMime` and
 `CreateForm` throw `NotSupportedException`: they are phase 3 work.
 
 `ManagedEasyTransfer` is its `IEasyTransfer`. `PerformAsync` reads `EasyNetworkOptions.Url` (none is
@@ -340,3 +340,7 @@ Each `ManagedEasyTransfer` owns an `EasyPauseGate` (the handle's `CurlPause` bit
 ## The multi handle's socket action and callbacks (BL-2426)
 
 `SocketActionAsync` and `PerformAsync` share one loop (`MoveTransfersOnAsync`): start what is new, queue each finished transfer's `CURLMSG_DONE`, then tell `MultiOptions.Socket` of each transfer that started (`CurlPoll.In` on a socket the handle numbers from `FirstTransferSocket`, `0x40000000`, one per running transfer, since the engine's connections are no descriptors an application could wait on) or finished (`CurlPoll.Remove` with the value `Assign` gave), and `MultiOptions.Timer` of the next timeout when it changed or after an action on `CurlMultiSockets.Timeout`. While a transfer runs the timer is at most `RunningTransferCheckInterval` (10 ms), sooner when `GetTimeout` is; it is what brings the application back to see a transfer finish. `Add` tells the timer 0. The socket and events an action names are not read. A callback's -1 answers `AbortedByCallback`, and from the next action every unfinished transfer ends with `CurlCode.AbortedByCallback`, one not started never starting. `Assign` answers `BadSocket` for a socket the callback was not told of or was told to remove, and `Remove` tells the callback `CurlPoll.Remove` for a transfer with a socket (ADR-0599). Its tests are `ManagedMultiTransferTests.SocketAction.cs`, which drive transfers purely through socket actions and pin the callback sequence.
+
+## The URL handle's get (BL-2436)
+
+`ManagedCurlEngine.CreateUrl` gives a `ManagedCurlUrlHandle`, the engine's `ICurlUrlHandle`, holding a `UrlHandleParts` (one nullable field per part, as upstream's `struct Curl_URL`). `Set` parses a whole URL with `CurlUrl` (`UrlHandleParts.Of`: the written port recovered from the text without leading zeros, the scheme guessed when the text does not start with it) under `CURLU_DEFAULT_SCHEME`, `GUESS_SCHEME` (else `BadScheme`), `PATH_AS_IS` and `DISALLOW_USER`, mapping each `CurlUrlRejection` to its `CurlUrlCode`. `Get` reads every part as curl 8.22.0's `curl_url_get`, with the `CURLUE_NO_*` code for a part not set, and every get flag; `UrlPartText` holds the decode, encode, escape and punycode transforms. Setting other parts, clearing, relative URLs and `Duplicate` throw `NotSupportedException` until BL-2437 (ADR-0601). Its tests are `ManagedCurlUrlHandleTests`.

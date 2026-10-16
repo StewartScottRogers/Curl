@@ -1,6 +1,7 @@
 using Curl.Api.Codes;
 using Curl.Api.EngineContracts;
 using Curl.Api.EngineContracts.Multi;
+using Curl.Api.EngineContracts.Url;
 using Curl.Api.Options;
 using Curl.Api.Options.Network;
 
@@ -96,12 +97,22 @@ public sealed class ManagedCurlEngineTests
     }
 
     [TestMethod]
-    public async Task ShareUrlMimeAndForm_NotYetBuilt_ThrowNotSupported()
+    public async Task CreateUrl_ProductionEngine_GivesAnEmptyManagedUrlHandle()
+    {
+        await using ManagedCurlEngine engine = new();
+
+        using ICurlUrlHandle url = engine.CreateUrl();
+
+        Assert.IsInstanceOfType<ManagedCurlUrlHandle>(url);
+        Assert.AreEqual(CurlUrlCode.NoHost, url.Get(CurlUrlPart.Url, CurlUrlFlags.None, out _));
+    }
+
+    [TestMethod]
+    public async Task ShareMimeAndForm_NotYetBuilt_ThrowNotSupported()
     {
         await using ManagedCurlEngine engine = new();
 
         Assert.ThrowsExactly<NotSupportedException>(() => engine.CreateShare());
-        Assert.ThrowsExactly<NotSupportedException>(() => engine.CreateUrl());
         Assert.ThrowsExactly<NotSupportedException>(() => engine.CreateMime());
         Assert.ThrowsExactly<NotSupportedException>(() => engine.CreateForm());
     }
