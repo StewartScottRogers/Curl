@@ -61,15 +61,8 @@ public sealed class ManagedCurlEngine : ICurlEngine
     internal ManagedEngineSharedState Shared => shared;
 
     /// <inheritdoc />
-    public CurlVersionInfo VersionInfo { get; } = new()
-    {
-        Protocols =
-        [
-            "dict", "file", "ftp", "ftps", "gopher", "gophers", "http", "https", "imap", "imaps", "ldap", "ldaps",
-            "mqtt", "mqtts", "pop3", "pop3s", "rtsp", "scp", "sftp", "smb", "smbs", "smtp", "smtps", "telnet", "tftp",
-            "ws", "wss",
-        ],
-    };
+    /// <remarks>The build <c>curl -V</c> describes on the running platform (<see cref="ManagedCurlVersion" />, BL-2465).</remarks>
+    public CurlVersionInfo VersionInfo { get; } = ManagedCurlVersion.For(OperatingSystem.IsWindows(), OperatingSystem.IsMacOS());
 
     /// <inheritdoc />
     public IEasyTransfer CreateEasy() => new ManagedEasyTransfer(createDispatcher, shared);
