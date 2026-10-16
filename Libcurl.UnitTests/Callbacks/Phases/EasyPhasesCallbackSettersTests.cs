@@ -37,6 +37,7 @@ public sealed class EasyPhasesCallbackSettersTests
     [TestMethod]
     [DataRow(CurlOption.Prereqfunction)]
     [DataRow(CurlOption.ResolverStartFunction)]
+    [DataRow(CurlOption.Trailerfunction)]
     public void SetOption_FunctionGivenAnotherDelegateType_ReturnsBadFunctionArgumentAndChangesNothing(CurlOption option)
     {
         var options = new EasyOptions();
@@ -49,6 +50,7 @@ public sealed class EasyPhasesCallbackSettersTests
     [TestMethod]
     [DataRow(CurlOption.Prereqdata)]
     [DataRow(CurlOption.ResolverStartData)]
+    [DataRow(CurlOption.Trailerdata)]
     public void SetOption_Data_TakesAnyValueAndChangesNothing(CurlOption option)
     {
         var options = new EasyOptions();
@@ -60,11 +62,16 @@ public sealed class EasyPhasesCallbackSettersTests
     }
 
     [TestMethod]
-    public void SetOption_TrailerFunction_StillAnswersNotBuiltIn()
+    public void SetOption_TrailerFunction_SetsTheCallbackAndNullClearsIt()
     {
         var options = new EasyOptions();
+        TrailerCallback trailer = _ => TrailerResult.Ok;
 
-        Assert.AreEqual(CurlCode.NotBuiltIn, Set(ref options, CurlOption.Trailerfunction, null));
+        Assert.AreEqual(CurlCode.Ok, Set(ref options, CurlOption.Trailerfunction, trailer));
+        Assert.AreSame(trailer, options.Callbacks.Trailer);
+
+        Assert.AreEqual(CurlCode.Ok, Set(ref options, CurlOption.Trailerfunction, null));
+        Assert.IsNull(options.Callbacks.Trailer);
     }
 
     private static CurlCode Set(ref EasyOptions options, CurlOption option, object? value) =>

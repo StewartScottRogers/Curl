@@ -14,18 +14,33 @@ namespace Libcurl.Callbacks.Phases;
 /// <see cref="CurlCode.AbortedByCallback"/>; and the resolver-start callback before each name look-up its DNS cache
 /// does not answer, any answer but 0 failing with <see cref="CurlCode.CouldntResolveHost"/> (ADR-0611). The managed
 /// callbacks carry their user data in their closures, so the <c>*DATA</c> options take any value and change nothing.
-/// <c>CURLOPT_TRAILERFUNCTION</c> joins them once the engine sends request trailers (BL-2475).
+/// <c>CURLOPT_TRAILERFUNCTION</c> takes a <see cref="TrailerCallback"/> the same way: the engine calls it once a chunked
+/// HTTP/1.1 upload's body ends and sends the lines it adds in the closing chunk, <see cref="TrailerResult.Abort"/> failing
+/// with <see cref="CurlCode.AbortedByCallback"/> (BL-2475).
 /// </summary>
 internal static class EasyPhasesCallbackSetters
 {
-    /// <summary>Adds the prerequest and resolver-start rows to <paramref name="setters"/>.</summary>
+    /// <summary>Adds the prerequest, resolver-start and trailer rows to <paramref name="setters"/>.</summary>
     /// <param name="setters">The rows to add to.</param>
     internal static void AddTo(Dictionary<CurlOption, EasyOptionSetter> setters)
     {
         setters[CurlOption.Prereqfunction] = new(SetPrerequestFunction);
         setters[CurlOption.ResolverStartFunction] = new(SetResolverStartFunction);
+        setters[CurlOption.Trailerfunction] = new(SetTrailerFunction);
         setters[CurlOption.Prereqdata] = new(TakeUserData);
         setters[CurlOption.ResolverStartData] = new(TakeUserData);
+        setters[CurlOption.Trailerdata] = new(TakeUserData);
+    }
+
+    private static CurlCode SetTrailerFunction(ref EasyOptions options, object? value)
+    {
+        if (value is not (null or TrailerCallback))
+        {
+            return CurlCode.BadFunctionArgument;
+        }
+
+        options = options with { Callbacks = options.Callbacks with { Trailer = (TrailerCallback?)value } };
+        return CurlCode.Ok;
     }
 
     private static CurlCode SetPrerequestFunction(ref EasyOptions options, object? value)
