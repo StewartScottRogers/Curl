@@ -30,7 +30,7 @@ ADR-0506; phase 3 of `Documentation/Planning/Curl-Api-And-libcurl.md`. Read the 
 
 ## Notes
 
-- The calls are `CurlEasy` extension methods in `Libcurl/WebSocket` (`Libcurl.WebSocket.CurlEasyWebSocket`), so `CurlEasy.cs` (sealed, not partial, outside `touches`) stays untouched: blocking `WebSocketRecv`, `WebSocketSend`, `WebSocketStartFrame` with libcurl's out parameters over `Async` forms, and `WebSocketMeta`. A `null` or cleaned-up handle answers `BadFunctionArgument` (`Meta` `null`) without the engine, as libcurl's `GOOD_EASY_HANDLE` check does. Decided in ADR-0583.
+- The calls are `CurlEasy` extension methods in `Libcurl/WebSocket` (`Libcurl.WebSocket.CurlEasyWebSocket`), so `CurlEasy.cs` (sealed, not partial, outside `touches`) stays untouched: blocking `WebSocketRecv`, `WebSocketSend`, `WebSocketStartFrame` with libcurl's out parameters over `Async` forms, and `WebSocketMeta`. A `null` or cleaned-up handle answers `BadFunctionArgument` (`Meta` `null`) without the engine, as libcurl's `GOOD_EASY_HANDLE` check does. Decided in ADR-0585.
 - `Libcurl/CLAUDE.md` is edited too, outside `touches`, because the acceptance criteria require it kept true.
 - `Measure-CodeQuality.ps1 -Library Libcurl`: 0 failing members. `Libcurl.UnitTests` 701 passed; every fast test project green; `PassingUpstreamCases.txt` unchanged.
 - The managed engine still throws on `IEasyTransfer.WebSocket` until BL-2443/BL-2444; these calls are tested over fakes only.
