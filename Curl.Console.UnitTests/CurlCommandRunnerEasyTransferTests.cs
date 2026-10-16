@@ -21,9 +21,9 @@ namespace Curl.Console;
 
 /// <summary>
 /// Pins that a serial transfer performs its attempts through the runner's <see cref="ICurlEngine" />
-/// (ADR-0506, ADR-0552): one easy handle per transfer, set with the option group's easy options, and one
-/// <see cref="IEasyTransfer.PerformAsync" /> per attempt, <c>--retry</c> attempts included, with the output
-/// unchanged; a <c>-Z</c> transfer still performs directly.
+/// (ADR-0506, ADR-0552): one <c>Libcurl</c> easy handle per transfer (ADR-0624), set with the option group's easy
+/// options and <c>CURLOPT_URL</c>, and one <c>curl_easy_perform</c>, so one <see cref="IEasyTransfer.PerformAsync" />,
+/// per attempt, <c>--retry</c> attempts included, with the output unchanged; a <c>-Z</c> transfer still performs directly.
 /// </summary>
 [TestClass]
 public sealed class CurlCommandRunnerEasyTransferTests

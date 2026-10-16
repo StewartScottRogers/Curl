@@ -332,10 +332,13 @@ its exit 28 failure, numbers the run's `%{xfer_id}` and `%{conn_id}` (`TakeNextA
 The `--retry` loop around it (`FollowRetryingAsync`, the retry lines, the `-o` attempt bytes) stays
 in the runner, as retrying is the curl tool's work. A serial transfer performs its attempts through
 the runner's `ICurlEngine` (`curlEngine`; `CreateRunner` passes a `ManagedCurlEngine` with curl's easy
-error text, and a runner given none makes one on its clock): one easy handle per transfer, its
-`Options` from `EasyOptionsFromCommandLine.EasyOptionsOf`, one `PerformAsync` per attempt, `--retry`
-attempts included, each with the runner's hooks set on the internal `IToolEasyTransfer` and
-reading back its `LastResult` (ADR-0552, ADR-0622). `-Z` transfers still perform directly
+error text, and a runner given none makes one on its clock), wrapped in `ToolCurlEngine`, which holds a
+`Libcurl` `CurlLibrary` over it (ADR-0624): one `ToolEasyHandle` per transfer from its `EasyInit`
+(`curl_easy_init`), pairing the `CurlEasy` with the engine's internal `IToolEasyTransfer` under it. The
+hooks' `Options` get `EasyOptionsFromCommandLine.EasyOptionsOf` (no URL), `CURLOPT_URL` goes through
+`CurlEasy.SetOption`, and each attempt, `--retry` attempts included, is one `CurlEasy.PerformAsync`
+with the runner's hooks set and its `LastResult` read back (ADR-0552, ADR-0622); the other option
+groups move to `SetOption` in BL-2491 to BL-2493. `-Z` transfers still perform directly
 (`TransferPerformer.FollowWatchingSpeedAsync`) until the engine's multi handle lands in phase 3;
 `CurlComposition.CreateRunner` builds it; a
 runner given none makes one on its own clock. Both hand it `Libcurl`'s `CurlEasyErrorText.Of` (`curl_easy_strerror`'s table, BL-2450) for the text its known-hosts and cookie-line failures carry.
