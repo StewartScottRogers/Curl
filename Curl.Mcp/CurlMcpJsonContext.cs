@@ -27,10 +27,13 @@ internal sealed partial class CurlMcpJsonContext : JsonSerializerContext
     /// Built on first use, never by a static initializer: the generator's <c>Default</c> is set by the static
     /// initializer of its own partial file, which may run after this one's, and
     /// <c>JsonTypeInfoResolver.Combine</c> silently drops a <see langword="null" /> resolver - which left
-    /// every parameter type of these contracts unresolved under native AOT (ADR-0599).
+    /// every parameter type of these contracts unresolved under native AOT (ADR-0599). The build is locked,
+    /// so threads reading it first at once all get the one instance (BL-2490).
     /// </summary>
-    internal static JsonSerializerOptions ToolOptions => field ??= new(McpJsonUtilities.DefaultOptions)
+    internal static JsonSerializerOptions ToolOptions => toolOptions.Value;
+
+    private static readonly Lazy<JsonSerializerOptions> toolOptions = new(() => new(McpJsonUtilities.DefaultOptions)
     {
         TypeInfoResolver = JsonTypeInfoResolver.Combine(Default, McpJsonUtilities.DefaultOptions.TypeInfoResolver),
-    };
+    });
 }

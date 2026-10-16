@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Mcp, Curl.Mcp.UnitTests]
 requirement: none
 created: 2026-10-16
-completed:
+completed: 2026-10-16
 ---
 # BL-2490 — Fix flaky Curl.Mcp test ToolOptions_IsBuiltOnceAndThenShared under parallel runs
 
@@ -22,13 +22,16 @@ During BL-2422's `Measure-CodeQuality.ps1` run on 2026-10-16 (lane 2) it failed 
 
 ## Acceptance criteria
 
-- [ ] `CurlMcpJsonContext.ToolOptions` is built exactly once even when first read from several threads at once, pinned by a test that reads it from parallel tasks.
-- [ ] `dotnet build` is clean and the fast tests pass.
-- [ ] `Measure-CodeQuality.ps1 -Library Curl.Mcp` reports 0 failing members.
+- [x] `CurlMcpJsonContext.ToolOptions` is built exactly once even when first read from several threads at once, pinned by a test that reads it from parallel tasks.
+- [x] `dotnet build` is clean and the fast tests pass.
+- [x] `Measure-CodeQuality.ps1 -Library Curl.Mcp` reports 0 failing members.
 
 ## Notes
+
+Fixed with a static `Lazy<JsonSerializerOptions>` (locked build); the old `field ??=` could build two instances. Lazy only wraps the factory, so ADR-0599's static-initializer ordering concern still holds. Pinned by a 16-task parallel-read test.
 
 ## Log
 
 - 2026-10-16: Created.
 - 2026-10-16: Backlog -> Doing.
+- 2026-10-16: Doing -> Done. CurlMcpJsonContext.ToolOptions is built once under a lock; parallel-read test added

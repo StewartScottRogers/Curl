@@ -48,4 +48,22 @@ public sealed class CurlMcpJsonContextTests
 
         Assert.AreSame(first, second);
     }
+
+    [TestMethod]
+    public async Task ToolOptions_ReadFromManyThreadsAtOnce_IsOneInstance()
+    {
+        using ManualResetEventSlim start = new(false);
+        Task<JsonSerializerOptions>[] readers = Enumerable.Range(0, 16)
+            .Select(_ => Task.Run(() =>
+            {
+                start.Wait();
+                return CurlMcpJsonContext.ToolOptions;
+            }))
+            .ToArray();
+
+        start.Set();
+        JsonSerializerOptions[] results = await Task.WhenAll(readers);
+
+        Assert.IsTrue(results.All(options => ReferenceEquals(options, results[0])));
+    }
 }
