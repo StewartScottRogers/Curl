@@ -33,3 +33,4 @@ ADR-0506; phase 3 of `Documentation/Planning/Curl-Api-And-libcurl.md`. Found by 
 ## Log
 
 - 2026-10-16: Created.
+- 2026-10-16: Backlog -> Doing.
