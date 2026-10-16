@@ -103,5 +103,9 @@ Add to `.mcp.json` in the solution folder (or `%USERPROFILE%\.mcp.json` for ever
 ## Package
 
 `dotnet pack Curl.Mcp` produces a NuGet package of type `McpServer`, with `.mcp/server.json`
-naming it `io.github.StewartScottRogers/Curl`. It is self-contained per runtime identifier;
-native AOT was tried and is not used (ADR-0598).
+naming it `io.github.StewartScottRogers/Curl`, plus one package per runtime identifier.
+With no other property each runtime package is self-contained, and one run makes all seven.
+Released packages are native AOT (ADR-0621): `dotnet pack Curl.Mcp -p:PublishAot=true` makes the
+tool package, and `dotnet pack Curl.Mcp -r <rid> -p:PublishAot=true` makes one runtime's package
+with its native binary. AOT cannot cross-compile between operating systems, so `release.yml` packs
+each runtime on a runner of its own OS.
