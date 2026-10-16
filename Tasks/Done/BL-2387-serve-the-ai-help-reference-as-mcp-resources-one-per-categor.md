@@ -34,7 +34,7 @@ Plan: Documentation/Planning/Curl-Mcp.md. Decision: ADR-0548.
 
 - Done (2026-10-15, lane 6): `McpAiHelpResource` and `McpAiHelpResourceCatalogue` in
   `Curl.Mcp.UnitLibrary`; `CurlAiHelpResourceHandlers` (list and read) registered in `CurlMcpHost`
-  with `WithListResourcesHandler`/`WithReadResourceHandler`. Decisions in ADR-0576.
+  with `WithListResourcesHandler`/`WithReadResourceHandler`. Decisions in ADR-0589.
 - Touches widened to `Curl.Cli.UnitLibrary/Curl.Cli.UnitLibrary.csproj` (no task in Doing on
   `origin/work/dark-factory` names it): `CurlHelpText.Categories` is internal, so the csproj grants
   `InternalsVisibleTo` to `Curl.Mcp.UnitLibrary` and `Curl.Mcp.UnitTests` rather than parsing printed
