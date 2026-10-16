@@ -18,6 +18,12 @@ the object `Init` returns over an injected `ICurlEngine`; its `DisposeAsync` is 
 its `Add<Group>Setters` partial method in an `EasyOptionSetters` part in `Options/<Group>`, keeping the
 namespace `Libcurl.Options`; an option no group sets yet answers `NotBuiltIn`.
 
+`Misc/ErrorText` holds `CurlErrorText`: `Multi`, `Share` and `Url` are `curl_multi_strerror`,
+`curl_share_strerror` and `curl_url_strerror` with upstream's test1538 strings and fallbacks, and
+`Header` is the header API's text, which upstream has no function for (ADR-0562). Each is a table
+lookup, so a new upstream code is one appended string. `curl_easy_strerror` is still
+`Curl.Console`'s `CurlEasyErrorText` until BL-2450 moves it.
+
 Reference `Curl.Api.UnitLibrary` only. Never reference `Curl.Api`, a protocol library, or
 `Curl.Engine.UnitLibrary` before the task that adds the engine-building overloads.
 

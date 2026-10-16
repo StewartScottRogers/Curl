@@ -8,7 +8,7 @@ depends-on: [BL-2456]
 touches: [Libcurl/Misc/ErrorText, Libcurl.UnitTests/Misc/ErrorText]
 requirement: none
 created: 2026-10-15
-completed:
+completed: 2026-10-15
 ---
 # BL-2459 — Libcurl: curl_multi_strerror, curl_share_strerror, curl_url_strerror and the header-API error text
 
@@ -22,15 +22,20 @@ ADR-0506; phase 3 of `Documentation/Planning/Curl-Api-And-libcurl.md`. Read the 
 
 ## Acceptance criteria
 
-- [ ] Every member of each code enum has a test row naming upstream's string, and an unknown code answers upstream's fallback text.
-- [ ] `dotnet build` is clean and the fast tests pass with no test deleted, skipped or weakened.
-- [ ] `Curl.Conformance.UnitTests/PassingUpstreamCases.txt` is unchanged or grown, and every case it lists still passes.
-- [ ] `Measure-CodeQuality.ps1 -Library Libcurl` reports 0 failing members (100% line and branch coverage, complexity at most 10, CRAP at most 30).
-- [ ] Every new public member has an XML doc comment, and `Libcurl/CLAUDE.md` or `Curl.Engine.UnitLibrary`'s CLAUDE.md is kept true.
+- [x] Every member of each code enum has a test row naming upstream's string, and an unknown code answers upstream's fallback text.
+- [x] `dotnet build` is clean and the fast tests pass with no test deleted, skipped or weakened.
+- [x] `Curl.Conformance.UnitTests/PassingUpstreamCases.txt` is unchanged or grown, and every case it lists still passes.
+- [x] `Measure-CodeQuality.ps1 -Library Libcurl` reports 0 failing members (100% line and branch coverage, complexity at most 10, CRAP at most 30).
+- [x] Every new public member has an XML doc comment, and `Libcurl/CLAUDE.md` or `Curl.Engine.UnitLibrary`'s CLAUDE.md is kept true.
 
 ## Notes
+
+- Strings pinned byte for byte from upstream test1538 (`Curl.Conformance.UnitTests/UpstreamTestData/test1538.curltest`), fallbacks included: `Unknown error`, `CURLSHcode unknown`, `CURLUcode unknown`.
+- Upstream has no strerror for `CURLHcode`; `Header` answers the `CURLHE_*` comments from `header.h` and `CURLHcode unknown` (ADR-0562, decided by Claude under Stewart's delegation).
+- Table lookups keep every method at complexity 2; `Measure-CodeQuality.ps1 -Library Libcurl`: 0 failing members. Ratchet file untouched.
 
 ## Log
 
 - 2026-10-15: Created.
 - 2026-10-15: Backlog -> Doing.
+- 2026-10-15: Doing -> Done. CurlErrorText.Multi, Share, Url and Header answer upstream's strerror strings and fallbacks for every code
