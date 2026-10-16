@@ -21,7 +21,9 @@ the `EasyBehaviourOptions` options: an on/off option is on for any value but 0, 
 options take 0 to 0777, and an object option given a value its field cannot hold answers
 `BadFunctionArgument`, as libcurl's `setopt.c` does. `Options/Network` sets the `EasyNetworkOptions`
 options with `setopt.c`'s range checks, and turns the `PROTOCOLS` bitmasks into `PROTOCOLS_STR` names
-(ADR-0568); `CURLU` still answers `NotBuiltIn` until BL-2462.
+(ADR-0568); `CURLU` still answers `NotBuiltIn` until BL-2462. `Options/Transfer` sets the
+`EasyTransferOptions` options with `setopt.c`'s checks, each `_LARGE` or `_MS` alias setting the same
+field as the option it extends, and clamps the two buffer sizes rather than refusing them (ADR-0571).
 
 `Misc/ErrorText` holds `CurlErrorText`: `Multi`, `Share` and `Url` are `curl_multi_strerror`,
 `curl_share_strerror` and `curl_url_strerror` with upstream's test1538 strings and fallbacks, and
