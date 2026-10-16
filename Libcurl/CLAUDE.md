@@ -12,7 +12,7 @@ the object `Init` returns over an injected `ICurlEngine`; its `DisposeAsync` is 
 `Create*` methods in `Global`. Tests that count inits use `CurlGlobal.InitCounting` with their own
 `GlobalInitCounter`, never the process-wide count, since tests run in parallel.
 
-`Options` holds the options table (ADR-0558): `CurlOption` and `CurlOptions` (`curl_easy_option_by_name`,
+`Options` holds the options table (ADR-0560): `CurlOption` and `CurlOptions` (`curl_easy_option_by_name`,
 `_by_id`, `_next`) generated from curl 8.22.0's `lib/easyoptions.c` and `curl.h`, and the internal
 `EasyOptionDispatch` `SetOption` goes through. Each option group adds its setter rows by implementing
 its `Add<Group>Setters` partial method in an `EasyOptionSetters` part in `Options/<Group>`, keeping the

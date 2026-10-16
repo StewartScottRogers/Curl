@@ -6,7 +6,7 @@ namespace Libcurl.Options;
 /// <remarks>
 /// Each option group adds its rows from its own folder (<c>Libcurl/Options/&lt;Group&gt;</c>) by
 /// implementing its partial method below in a part of this class there, in this namespace, so group
-/// tasks never edit one shared file (ADR-0558). Until a group's part exists its method adds nothing,
+/// tasks never edit one shared file (ADR-0560). Until a group's part exists its method adds nothing,
 /// and its options answer <see cref="Curl.Api.Codes.CurlCode.NotBuiltIn"/>.
 /// </remarks>
 internal static partial class EasyOptionSetters
