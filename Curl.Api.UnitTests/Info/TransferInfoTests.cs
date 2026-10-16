@@ -23,8 +23,6 @@ public sealed class TransferInfoTests
         Assert.IsNull(Defaults.RtspSessionId);
         Assert.IsNull(Defaults.Scheme);
         Assert.IsNull(Defaults.Referer);
-        Assert.IsNull(Defaults.CaInfo);
-        Assert.IsNull(Defaults.CaPath);
     }
 
     [TestMethod]
@@ -78,9 +76,38 @@ public sealed class TransferInfoTests
     }
 
     [TestMethod]
-    public void New_TransferInfo_AnswersTheSchannelBackendForTlsSslPtr()
+    [OSCondition(OperatingSystems.Windows)]
+    public void New_TransferInfo_OnWindows_AnswersTheSchannelBuildsBackendAndNoCaBundleOrPath()
     {
         Assert.AreEqual(8L, Defaults.TlsSslBackend);
+        Assert.IsNull(Defaults.CaInfo);
+        Assert.IsNull(Defaults.CaPath);
+    }
+
+    [TestMethod]
+    [OSCondition(OperatingSystems.Linux)]
+    public void New_TransferInfo_OnLinux_AnswersTheOpenSslBuildsBackendCaBundleAndPath()
+    {
+        Assert.AreEqual(1L, Defaults.TlsSslBackend);
+        Assert.AreEqual("/etc/ssl/certs/ca-certificates.crt", Defaults.CaInfo);
+        Assert.AreEqual("/etc/ssl/certs", Defaults.CaPath);
+    }
+
+    [TestMethod]
+    [OSCondition(OperatingSystems.OSX)]
+    public void New_TransferInfo_OnMacOS_AnswersTheOpenSslBuildsBackendAndCaBundleAndNoPath()
+    {
+        Assert.AreEqual(1L, Defaults.TlsSslBackend);
+        Assert.AreEqual("/etc/ssl/cert.pem", Defaults.CaInfo);
+        Assert.IsNull(Defaults.CaPath);
+    }
+
+    [TestMethod]
+    public void New_TransferInfo_AnswersNoSocketAndNoEarlyDataOnEveryPlatform()
+    {
+        Assert.AreEqual(-1L, Defaults.LastSocket);
+        Assert.AreEqual(-1L, Defaults.ActiveSocket);
+        Assert.AreEqual(0L, Defaults.EarlyDataSent);
     }
 
     [TestMethod]
@@ -96,8 +123,8 @@ public sealed class TransferInfoTests
         AssertChangesOnly(Defaults with { RtspSessionId = "s" }, o => o with { RtspSessionId = null });
         AssertChangesOnly(Defaults with { Scheme = "https" }, o => o with { Scheme = null });
         AssertChangesOnly(Defaults with { Referer = "http://f/" }, o => o with { Referer = null });
-        AssertChangesOnly(Defaults with { CaInfo = "ca.pem" }, o => o with { CaInfo = null });
-        AssertChangesOnly(Defaults with { CaPath = "certs" }, o => o with { CaPath = null });
+        AssertChangesOnly(Defaults with { CaInfo = "ca.pem" }, o => o with { CaInfo = Defaults.CaInfo });
+        AssertChangesOnly(Defaults with { CaPath = "certs" }, o => o with { CaPath = Defaults.CaPath });
     }
 
     [TestMethod]
@@ -131,7 +158,7 @@ public sealed class TransferInfoTests
         AssertChangesOnly(Defaults with { ConnectionId = 0 }, o => o with { ConnectionId = -1 });
         AssertChangesOnly(Defaults with { LastSocket = 3 }, o => o with { LastSocket = -1 });
         AssertChangesOnly(Defaults with { ActiveSocket = 3 }, o => o with { ActiveSocket = -1 });
-        AssertChangesOnly(Defaults with { TlsSslBackend = 1 }, o => o with { TlsSslBackend = 8 });
+        AssertChangesOnly(Defaults with { TlsSslBackend = 99 }, o => o with { TlsSslBackend = Defaults.TlsSslBackend });
     }
 
     [TestMethod]

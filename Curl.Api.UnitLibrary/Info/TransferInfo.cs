@@ -71,16 +71,18 @@ public sealed record TransferInfo
     public string? Referer { get; init; }
 
     /// <summary>
-    /// <c>CURLINFO_CAINFO</c>: the build's default CA bundle file. Default
-    /// <see langword="null"/>: the Schannel build has none.
+    /// <c>CURLINFO_CAINFO</c>: the build's default CA bundle file. Default the platform's
+    /// (ADR-0549): <see langword="null"/> on Windows, where the Schannel build has none, and the OpenSSL
+    /// build's <c>/etc/ssl/certs/ca-certificates.crt</c> on Linux and <c>/etc/ssl/cert.pem</c> on macOS.
     /// </summary>
-    public string? CaInfo { get; init; }
+    public string? CaInfo { get; init; } = TlsBuildAnswers.Current.CaInfo;
 
     /// <summary>
-    /// <c>CURLINFO_CAPATH</c>: the build's default CA certificate directory. Default
-    /// <see langword="null"/>: the Schannel build has none.
+    /// <c>CURLINFO_CAPATH</c>: the build's default CA certificate directory. Default the platform's
+    /// (ADR-0549): <c>/etc/ssl/certs</c> for the OpenSSL build on Linux, and <see langword="null"/> on
+    /// Windows and macOS, where the build has none.
     /// </summary>
-    public string? CaPath { get; init; }
+    public string? CaPath { get; init; } = TlsBuildAnswers.Current.CaPath;
 
     /// <summary>
     /// <c>CURLINFO_RESPONSE_CODE</c>: the last response code (HTTP, FTP, SMTP and the like).
@@ -228,13 +230,15 @@ public sealed record TransferInfo
     public long ConnectionId { get; init; } = -1;
 
     /// <summary>
-    /// <c>CURLINFO_LASTSOCKET</c>: the last connection's socket. Default -1: no socket.
+    /// <c>CURLINFO_LASTSOCKET</c>: the last connection's socket. Default -1: no socket. Curl's engine
+    /// hands libcurl no operating-system socket, so it stays -1 after a transfer too (ADR-0549).
     /// </summary>
     public long LastSocket { get; init; } = -1;
 
     /// <summary>
     /// <c>CURLINFO_ACTIVESOCKET</c>: the active connection's socket. Default -1
-    /// (<c>CURL_SOCKET_BAD</c>): no socket.
+    /// (<c>CURL_SOCKET_BAD</c>): no socket. Curl's engine hands libcurl no operating-system socket, so
+    /// it stays -1 after a transfer too (ADR-0549).
     /// </summary>
     public long ActiveSocket { get; init; } = -1;
 
@@ -299,7 +303,8 @@ public sealed record TransferInfo
 
     /// <summary>
     /// <c>CURLINFO_EARLYDATA_SENT_T</c>: the bytes sent as TLS early data. Default 0. (A size, not
-    /// a time, though the plan lists it with the times.)
+    /// a time, though the plan lists it with the times.) Curl never sends TLS early data, so it stays 0
+    /// (ADR-0549).
     /// </summary>
     public long EarlyDataSent { get; init; }
 
@@ -338,8 +343,8 @@ public sealed record TransferInfo
     public long ContentLengthUpload { get; init; } = -1;
 
     /// <summary>
-    /// <c>CURLINFO_SSL_ENGINES</c>: the TLS engines the build supports. Default empty: the
-    /// Schannel build has none.
+    /// <c>CURLINFO_SSL_ENGINES</c>: the TLS engines the build supports. Default empty on every
+    /// platform: Curl has no crypto engines, as <c>--engine list</c> answers (ADR-0151, ADR-0549).
     /// </summary>
     public IReadOnlyList<string> SslEngines { get; init; } = [];
 
@@ -357,8 +362,9 @@ public sealed record TransferInfo
 
     /// <summary>
     /// <c>CURLINFO_TLS_SSL_PTR</c>: the <c>curl_sslbackend</c> value of the build's TLS backend.
-    /// Default 8 (<c>CURLSSLBACKEND_SCHANNEL</c>), the Schannel build's answer; there is no native
-    /// TLS pointer to give, so the <c>internals</c> half is always <see langword="null"/>.
+    /// Default the platform's (ADR-0549): 8 (<c>CURLSSLBACKEND_SCHANNEL</c>) on Windows and 1
+    /// (<c>CURLSSLBACKEND_OPENSSL</c>) elsewhere; there is no native TLS pointer to give, so the
+    /// <c>internals</c> half is always <see langword="null"/>.
     /// </summary>
-    public long TlsSslBackend { get; init; } = 8;
+    public long TlsSslBackend { get; init; } = TlsBuildAnswers.Current.SslBackend;
 }
