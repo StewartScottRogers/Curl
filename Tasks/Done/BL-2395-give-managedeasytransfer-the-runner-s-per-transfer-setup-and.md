@@ -31,6 +31,11 @@ This step: decide in an ADR ("Decided by Claude under Stewart's delegation") how
 
 ## Notes
 
+- ADR-0554 (Decided by Claude under Stewart's delegation): internal `LastResult` on `ManagedEasyTransfer` holds the last perform's whole `TransferResult` (from options or a `ToolAttempt`; `null` before one, after a no-URL or malformed-URL perform and after a progress abort). A property, not a new return type, so `IEasyTransfer` stays libcurl-shaped.
+- Internal `ToolInputs` (`EngineToolTransferInputs`: proxy, looked-up credentials, SSH options, `If-None-Match` lines, range, resume offset, form body, upload, alt-svc cache) replaces the handle's own choices whole when set, nulls included. Sensible default taken: setting it also turns off the handle's cookie, alt-svc and HSTS file setup and cleanup (one switch, as the runner does all three in one place); the HTTP handler's cookie store stays the engine's shared one, and handing the runner's cookie engine over is BL-2394's wiring.
+- `Duplicate` does not copy `ToolInputs` and `Reset` clears it (per-transfer state).
+- Tests: `ManagedEasyTransferTests.ToolInputs.cs` (15 tests), each input compared against a direct `TransferContextFactory.Create` call with the same pieces. Quality: `PerformFromOptionsAsync` first measured at complexity 12; `TransferUrlOf` and `InputsOf` extracted, re-measured 0 failing members.
+
 ## Log
 
 - 2026-10-15: Created.
