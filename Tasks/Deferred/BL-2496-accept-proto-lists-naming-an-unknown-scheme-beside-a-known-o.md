@@ -32,3 +32,4 @@ Measured 2026-10-16 during BL-2491 on Windows' curl 8.21.0 (Schannel): `-s -S --
 
 - 2026-10-16: Created.
 - 2026-10-16: Backlog -> Doing. Criteria at claim: 9cafc694 46d4e715 a0b0533f.
+- 2026-10-16: Doing -> Deferred. Lane 3 measured curl 8.22.0 (the target, ADR-0479) refusing --proto =ipfs,http and http,bogus with exit 2, exactly as Curl does; only 8.21.0 accepted them, so there is nothing to change. The lane's Deferred move was lost (STALL path), applied here.
