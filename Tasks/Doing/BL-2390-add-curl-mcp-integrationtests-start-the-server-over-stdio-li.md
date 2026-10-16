@@ -40,3 +40,4 @@ listener through the host's composition); this task adds its tests to that proje
 ## Log
 
 - 2026-10-15: Created.
+- 2026-10-16: Backlog -> Doing.
