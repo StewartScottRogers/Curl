@@ -30,9 +30,9 @@ ADR-0506, ADR-0624; BL-2451 routed serial transfers through CurlEasy (ToolCurlEn
 ## Notes
 
 - Plan: extend BL-2491's `EasySetoptsFromCommandLine` with a partial file of TLS (origin, `PROXY_*` twins, handle),
-  authentication and proxy rows, and widen `KeptOnHooks` (ADR-0639). Followed ADR-0631's pattern directly; no
+  authentication and proxy rows, and widen `KeptOnHooks` (ADR-0642). Followed ADR-0631's pattern directly; no
   architect stage was needed for a row table.
-- Kept on the hooks, with why (ADR-0639): `--engine` (`CURLOPT_SSLENGINE` answers NOT_BUILT_IN; the engine's own
+- Kept on the hooks, with why (ADR-0642): `--engine` (`CURLOPT_SSLENGINE` answers NOT_BUILT_IN; the engine's own
   setup failure prints curl's text), engine default, False Start, CA cache timeout, an `--ech` value
   `CURLOPT_ECH` would ignore, the TLS-SRP fields, and `--httpsig-*` (no `CURLOPT_*`).
 - Order choices: `AWS_SIGV4` before `HTTPAUTH`; `HAPROXY_CLIENT_IP` before `HAPROXYPROTOCOL` (the setter turns the
@@ -46,4 +46,4 @@ ADR-0506, ADR-0624; BL-2451 routed serial transfers through CurlEasy (ToolCurlEn
 
 - 2026-10-16: Created.
 - 2026-10-16: Backlog -> Doing. Criteria at claim: 9ce46de1 84393800 e3fd321b 908e5cf5.
-- 2026-10-16: Doing -> Done. A serial transfer's TLS, authentication and proxy options reach its CurlEasy through SetOption (ADR-0639)
+- 2026-10-16: Doing -> Done. A serial transfer's TLS, authentication and proxy options reach its CurlEasy through SetOption (ADR-0642)
