@@ -23,7 +23,8 @@ namespace Curl.Console;
 /// Pins that a serial transfer performs its attempts through the runner's <see cref="ICurlEngine" />
 /// (ADR-0506, ADR-0552): one <c>Libcurl</c> easy handle per transfer (ADR-0624), set with the option group's easy
 /// options and <c>CURLOPT_URL</c>, and one <c>curl_easy_perform</c>, so one <see cref="IEasyTransfer.PerformAsync" />,
-/// per attempt, <c>--retry</c> attempts included, with the output unchanged; a <c>-Z</c> transfer still performs directly.
+/// per attempt, <c>--retry</c> attempts included, with the output unchanged; a <c>-Z</c> transfer adds its handle to the
+/// run's one multi handle for each attempt (ADR-0626).
 /// </summary>
 [TestClass]
 public sealed class CurlCommandRunnerEasyTransferTests
@@ -74,13 +75,16 @@ public sealed class CurlCommandRunnerEasyTransferTests
     }
 
     [TestMethod]
-    public async Task RunAsync_ParallelTransfer_PerformsWithoutTheEngine()
+    public async Task RunAsync_ParallelTransfersRetried_PerformEachAttemptThroughTheRunsMultiHandle()
     {
-        int exitCode = await RunAsync([Ok], "-Z", Url);
+        int exitCode = await RunAsync([Busy, Ok, Ok], "-Z", "--parallel-max", "1", "--retry", "1", Url, "http://127.0.0.1:18241/b");
 
+        Diagnostics.Assert("multi handles", 1, engine.MultiHandles);
         Assert.AreEqual(0, exitCode);
-        Assert.AreEqual("hello", StandardOutputText);
-        Assert.AreEqual(0, engine.Handles.Count);
+        Assert.AreEqual("busyhellohello", StandardOutputText);
+        Assert.AreEqual(1, engine.MultiHandles);
+        CollectionAssert.AreEqual(new[] { 2, 1 }, engine.Handles.Select(handle => handle.Performs).ToArray());
+        Assert.IsTrue(engine.Handles.TrueForAll(handle => handle.Disposed));
     }
 
     private async Task<int> RunAsync(string[] responses, params string[] arguments)
@@ -122,7 +126,13 @@ public sealed class CurlCommandRunnerEasyTransferTests
             return handle;
         }
 
-        public IMultiTransfer CreateMulti() => inner.CreateMulti();
+        public int MultiHandles { get; private set; }
+
+        public IMultiTransfer CreateMulti()
+        {
+            MultiHandles++;
+            return inner.CreateMulti();
+        }
 
         public IShareHandle CreateShare() => inner.CreateShare();
 

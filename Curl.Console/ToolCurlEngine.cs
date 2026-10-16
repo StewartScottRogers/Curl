@@ -6,6 +6,7 @@ using Curl.Api.EngineContracts.Url;
 using Curl.Engine;
 using Libcurl.Easy;
 using Libcurl.Global;
+using Libcurl.Multi;
 
 namespace Curl.Console;
 
@@ -21,6 +22,8 @@ internal sealed class ToolCurlEngine : ICurlEngine
     private readonly ICurlEngine engine;
 
     private readonly CurlLibrary library;
+
+    private readonly Lock easyInitLock = new();
 
     private IToolEasyTransfer? createdEasy;
 
@@ -39,11 +42,22 @@ internal sealed class ToolCurlEngine : ICurlEngine
     /// <c>curl_easy_init</c> on the library, paired with the engine transfer the new handle wraps.
     /// </summary>
     /// <returns>The handle and its tool hooks; disposing it is <c>curl_easy_cleanup</c>.</returns>
+    /// <remarks>
+    /// The engine transfer is kept in a field between <see cref="CreateEasy" /> and the pairing, so the pair is
+    /// made under a lock: a <c>-Z</c> run's transfers ask for their handles from several flows at once.
+    /// </remarks>
     internal ToolEasyHandle EasyInit()
     {
-        CurlEasy easy = library.EasyInit();
-        return new ToolEasyHandle(easy, createdEasy!);
+        lock (easyInitLock)
+        {
+            CurlEasy easy = library.EasyInit();
+            return new ToolEasyHandle(easy, createdEasy!);
+        }
     }
+
+    /// <summary><c>curl_multi_init</c> on the library, for a <c>-Z</c> run's transfers (ADR-0626).</summary>
+    /// <returns>The multi handle; disposing it is <c>curl_multi_cleanup</c>.</returns>
+    internal CurlMulti MultiInit() => library.MultiInit();
 
     /// <summary>Creates the engine's easy transfer and keeps it for <see cref="EasyInit" /> to pair with its handle.</summary>
     /// <returns>The engine's transfer.</returns>

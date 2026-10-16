@@ -330,7 +330,7 @@ it performs one attempt through `RedirectFollower` under the attempt's `-Y`/`-y`
 its exit 28 failure, numbers the run's `%{xfer_id}` and `%{conn_id}` (`TakeNextAttemptIds`,
 `KeepRetriedConnectionIdWhenReused`) and keeps the serial attempt start `--rate` measures from.
 The `--retry` loop around it (`FollowRetryingAsync`, the retry lines, the `-o` attempt bytes) stays
-in the runner, as retrying is the curl tool's work. A serial transfer performs its attempts through
+in the runner, as retrying is the curl tool's work. Every transfer performs its attempts through
 the runner's `ICurlEngine` (`curlEngine`; `CreateRunner` passes a `ManagedCurlEngine` with curl's easy
 error text, and a runner given none makes one on its clock), wrapped in `ToolCurlEngine`, which holds a
 `Libcurl` `CurlLibrary` over it (ADR-0624): one `ToolEasyHandle` per transfer from its `EasyInit`
@@ -338,9 +338,14 @@ error text, and a runner given none makes one on its clock), wrapped in `ToolCur
 hooks' `Options` get `EasyOptionsFromCommandLine.EasyOptionsOf` (no URL), `CURLOPT_URL` goes through
 `CurlEasy.SetOption`, and each attempt, `--retry` attempts included, is one `CurlEasy.PerformAsync`
 with the runner's hooks set and its `LastResult` read back (ADR-0552, ADR-0622); the other option
-groups move to `SetOption` in BL-2491 to BL-2493. `-Z` transfers still perform directly
-(`TransferPerformer.FollowWatchingSpeedAsync`) until the engine's multi handle lands in phase 3;
-`CurlComposition.CreateRunner` builds it; a
+groups move to `SetOption` in BL-2491 to BL-2493. A `-Z` attempt goes instead through the run's one
+`CurlMulti` (`ToolCurlEngine.MultiInit`, `curl_multi_init`), held by `ParallelTransferMulti` as
+`ParallelRun.Transfers` and cleaned up by `ParallelRun.EndAsync`: the attempt adds its handle and calls
+`curl_multi_perform` in its own flow, so its transfer starts there, and one loop polls, performs and reads
+each `CURLMSG_DONE` with `curl_multi_info_read`, removing the handle and handing the attempt its result; every
+call on the multi handle holds one gate, and an attempt about to add wakes the loop's poll. No connection limit
+is set on the multi handle, so `ParallelTransferQueue` and `ParallelHostQueue` still decide when a transfer
+starts (ADR-0626, BL-2453). `CurlComposition.CreateRunner` builds the engine; a
 runner given none makes one on its own clock. Both hand it `Libcurl`'s `CurlEasyErrorText.Of` (`curl_easy_strerror`'s table, BL-2450) for the text its known-hosts and cookie-line failures carry.
 It also owns the per-transfer setup libcurl does before it connects (`TransferPerformer.Setup.cs`,
 BL-2283): the URL parse and its refusals (`TryParseTransferUrl`, `ReportUrlRejected`,
@@ -468,10 +473,10 @@ in curl. No `** Resuming` line is written under `-#` (ADR-0082, BL-132 Notes).
 
 With `-w`, each transfer's template is rendered by `Curl.Output`'s `WriteOutTemplateRenderer`
 after its failure lines, after a failure as after a success (a `-D` or resumed `-o` file that
-cannot be opened included), with `TransferWriteOutVariables` as its values. A serial transfer's libcurl values are its easy handle's
+cannot be opened included), with `TransferWriteOutVariables` as its values. A transfer's libcurl values, `-Z` or not, are its easy handle's
 `curl_easy_getinfo` answers, read through `CurlEasy.GetInfo` after its last attempt and before cleanup
 (`EasyHandleWriteOutInfo`, kept as `RunningTransferState.EasyWriteOutInfo`) and used when they describe the
-reported result; a `-Z` transfer, or one that never reached its handle, gets `WriteOutTransferInfo.FromReport`'s,
+reported result (ADR-0626); one that never reached its handle gets `WriteOutTransferInfo.FromReport`'s,
 and the runner's own scheme, `Referer`, IDs, verify results and early data lie over either until BL-2495
 (ADR-0625, BL-2452). Its `%time{format}`
 follows the `WriteOutTimeDialect` the runner is given: `CurlComposition.WriteOutTimeDialectFor`

@@ -1226,6 +1226,7 @@ internal sealed class CurlCommandRunner(
     private ParallelRun NewParallelRun(CommandLineOptions options) =>
         new(options.ParallelMax, options.ParallelMaxHost, options.ParallelImmediate)
         {
+            Transfers = new ParallelTransferMulti(engine.MultiInit()),
             ProgressMeter = writesProgressMeter && !options.Silent && !options.ProgressMeterOff
                 ? new ParallelProgressMeter(timeProvider, writeGate, WriteParallelProgressMeter)
                 : null,
@@ -2772,8 +2773,7 @@ internal sealed class CurlCommandRunner(
     /// The libcurl part of a transfer's <c>-w</c> values: what its easy handle answered to <c>curl_easy_getinfo</c>
     /// (<see cref="RunningTransferState.EasyWriteOutInfo" />, ADR-0625) when those answers describe
     /// <paramref name="result" />, with <paramref name="requestUrl" /> as the effective URL when the report names none,
-    /// as the handle's URL is not yet the tool's normalized one; else, for a <c>-Z</c> transfer or one that never
-    /// reached its handle, <see cref="WriteOutTransferInfo.FromReport" />'s, which fills the same fields the same way.
+    /// as the handle's URL is not yet the tool's normalized one; else, for a transfer that never reached its handle, <see cref="WriteOutTransferInfo.FromReport" />'s, which fills the same fields the same way.
     /// </summary>
     /// <param name="result">The transfer's result.</param>
     /// <param name="requestUrl">The URL, with any <c>-G</c> / <c>--url-query</c> query, normalized.</param>
@@ -4498,11 +4498,11 @@ internal sealed class CurlCommandRunner(
     /// </param>
     /// <returns>The result of the attempt not retried.</returns>
     /// <remarks>
-    /// A serial transfer performs its attempts through one <c>Libcurl</c> <see cref="Libcurl.Easy.CurlEasy" /> of
+    /// Every transfer performs its attempts through one <c>Libcurl</c> <see cref="Libcurl.Easy.CurlEasy" /> of
     /// the runner's <see cref="engine" /> (ADR-0552, ADR-0624), whose options are the option group's
     /// (<see cref="EasyOptionsFromCommandLine.EasyOptionsOf" />) and which builds each attempt's context itself from
-    /// them and the runner's hooks (BL-2394); a <c>-Z</c> transfer performs them directly until the engine's multi
-    /// handle lands.
+    /// them and the runner's hooks (BL-2394); a <c>-Z</c> transfer's handle performs through the run's
+    /// <see cref="ParallelRun.Transfers" /> multi handle (ADR-0626).
     /// </remarks>
     private async Task<TransferResult> FollowRetryingAsync(
         RedirectFollower follower,
@@ -4511,11 +4511,6 @@ internal sealed class CurlCommandRunner(
         long? resumeFrom,
         DeferredOutputFileStream? outputFile)
     {
-        if (parallelRun is not null)
-        {
-            return await FollowRetryingThroughAsync(null, follower, options, attempt, resumeFrom, outputFile).ConfigureAwait(false);
-        }
-
         ToolEasyHandle easy = engine.EasyInit();
         await using (easy.ConfigureAwait(false))
         {
@@ -4551,10 +4546,9 @@ internal sealed class CurlCommandRunner(
 
     /// <summary>
     /// Performs one transfer's attempts, as <see cref="FollowRetryingAsync" /> describes, each through
-    /// <paramref name="easy" /> when there is one (<see cref="PerformThroughEasyAsync" />) and directly otherwise
-    /// (<see cref="PerformDirectlyAsync" />).
+    /// <paramref name="easy" /> (<see cref="PerformThroughEasyAsync" />).
     /// </summary>
-    /// <param name="easy">The transfer's easy handle, or <see langword="null" /> for a <c>-Z</c> transfer.</param>
+    /// <param name="easy">The transfer's easy handle.</param>
     /// <param name="follower">Performs each attempt, following redirects under <c>-L</c>.</param>
     /// <param name="options">The accepted command line.</param>
     /// <param name="attempt">What each attempt is built from.</param>
@@ -4562,7 +4556,7 @@ internal sealed class CurlCommandRunner(
     /// <param name="outputFile">The <c>-o</c> file, or <see langword="null" /> when the body goes to standard output.</param>
     /// <returns>The result of the attempt not retried.</returns>
     private async Task<TransferResult> FollowRetryingThroughAsync(
-        ToolEasyHandle? easy,
+        ToolEasyHandle easy,
         RedirectFollower follower,
         CommandLineOptions options,
         TransferAttemptPieces attempt,
@@ -4590,9 +4584,7 @@ internal sealed class CurlCommandRunner(
             }
 
             RunningTransferState state = Running;
-            TransferResult attemptResult = easy is null
-                ? await PerformDirectlyAsync(follower, options, attempt, attemptResumeFrom).ConfigureAwait(false)
-                : await PerformThroughEasyAsync(easy, follower, attempt, attemptResumeFrom).ConfigureAwait(false);
+            TransferResult attemptResult = await PerformThroughEasyAsync(easy, follower, attempt, attemptResumeFrom).ConfigureAwait(false);
             TransferPerformer.KeepRetriedConnectionIdWhenReused(state, transfer, attemptResult);
             return attemptResult;
         });
@@ -4619,58 +4611,12 @@ internal sealed class CurlCommandRunner(
     }
 
     /// <summary>
-    /// Performs one <c>-Z</c> attempt directly (<see cref="TransferPerformer.FollowWatchingSpeedAsync" />), on a
-    /// context the runner's <see cref="transferContextFactory" /> builds from <paramref name="attempt" />, starting the
-    /// attempt's <c>-Y</c>/<c>-y</c> and <c>-m</c> watchdogs on the running transfer.
-    /// </summary>
-    /// <param name="follower">Performs the attempt, following redirects under <c>-L</c>.</param>
-    /// <param name="options">The accepted command line.</param>
-    /// <param name="attempt">What the attempt is built from.</param>
-    /// <param name="resumeFrom">The <c>-C</c> offset the attempt resumes from, or <see langword="null" />.</param>
-    /// <returns>The attempt's result.</returns>
-    private async Task<TransferResult> PerformDirectlyAsync(RedirectFollower follower, CommandLineOptions options, TransferAttemptPieces attempt, long? resumeFrom)
-    {
-        RunningTransferState state = Running;
-        EngineToolTransferOutputs outputs = attempt.Outputs();
-        EngineToolTransferInputs inputs = attempt.Inputs(resumeFrom);
-        TransferContext context = transferContextFactory.Create(
-            EasyOptionsFromCommandLine.TransferSettingsOf(options),
-            EasyOptionsFromCommandLine.HttpOf(options),
-            EasyOptionsFromCommandLine.BehaviourOf(options),
-            attempt.Transfer,
-            EasyOptionsFromCommandLine.ProtocolOf(options),
-            EasyOptionsFromCommandLine.ProxyOf(options),
-            EasyOptionsFromCommandLine.AuthenticationOf(options),
-            EasyOptionsFromCommandLine.NetworkOf(options),
-            attempt.Url,
-            outputs.Output,
-            inputs.Range,
-            inputs.ResumeFrom,
-            outputs.HeaderOutput,
-            inputs.FormBody,
-            inputs.Upload,
-            inputs.Proxy,
-            outputs.WatchHeaderOutput,
-            state.Progress,
-            state.Events,
-            transferPerformer.StartLowSpeedWatchdog(state, attempt.Transfer, diagnosticLog),
-            state.AbortToken,
-            transferPerformer.StartMaxTimeWatchdog(state, attempt.Transfer, diagnosticLog),
-            inputs.LookedUpCredentials,
-            inputs.IfNoneMatchHeaders,
-            inputs.AltSvc,
-            bodyHeaderStyles: outputs.BodyHeaderStyles,
-            ssh: inputs.Ssh);
-        RedirectPolicy redirectPolicy = RedirectPolicyMapping.Of(EasyOptionsFromCommandLine.TransferSettingsOf(options), EasyOptionsFromCommandLine.HttpOf(options), EasyOptionsFromCommandLine.AuthenticationOf(options));
-        return await TransferPerformer.FollowWatchingSpeedAsync(state, follower, context, redirectPolicy).ConfigureAwait(false);
-    }
-
-    /// <summary>
-    /// Performs one serial attempt through <paramref name="easy" /> (ADR-0552, BL-2394): hands it the attempt's
+    /// Performs one attempt through <paramref name="easy" /> (ADR-0552, BL-2394): hands it the attempt's
     /// outputs, inputs and transfer URL, the running transfer's events and progress, and the runner's follower and
-    /// context factory, calls <see cref="Libcurl.Easy.CurlEasy.PerformAsync" /> (<c>curl_easy_perform</c>), whose
-    /// engine transfer builds the attempt's context and starts its watchdogs itself, and takes the attempt's whole
-    /// result back from the hooks.
+    /// context factory, calls <see cref="Libcurl.Easy.CurlEasy.PerformAsync" /> (<c>curl_easy_perform</c>) for a serial
+    /// transfer, or <see cref="ParallelTransferMulti.PerformAsync" /> through the run's multi handle for a <c>-Z</c> one
+    /// (ADR-0626), whose engine transfer builds the attempt's context and starts its watchdogs itself, and takes the
+    /// attempt's whole result back from the hooks.
     /// </summary>
     /// <param name="easy">The transfer's easy handle, set up by <see cref="SetUpToolEasy" />.</param>
     /// <param name="follower">Performs the attempt, following redirects under <c>-L</c>.</param>
@@ -4686,7 +4632,9 @@ internal sealed class CurlCommandRunner(
         hooks.ToolEvents = new EngineToolTransferEvents(state.Events, state);
         hooks.ToolProgress = new EngineToolTransferProgress(state.Progress, state.AbortToken);
         hooks.ToolDispatch = new EngineToolTransferDispatch(follower, transferContextFactory);
-        _ = await easy.Easy.PerformAsync(CancellationToken.None).ConfigureAwait(false);
+        _ = parallelRun is null
+            ? await easy.Easy.PerformAsync(CancellationToken.None).ConfigureAwait(false)
+            : await parallelRun.Transfers!.PerformAsync(easy.Easy).ConfigureAwait(false);
         return hooks.LastResult!;
     }
 

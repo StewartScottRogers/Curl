@@ -38,6 +38,20 @@ public sealed class ToolCurlEngineTests
     }
 
     [TestMethod]
+    public async Task MultiInit_AddsAHandleFromEasyInit_AcceptsIt()
+    {
+        ToolCurlEngine engine = new(new ManagedCurlEngine());
+        ToolEasyHandle easy = engine.EasyInit();
+        Libcurl.Multi.CurlMulti multi = engine.MultiInit();
+
+        CurlMultiCode code = multi.AddHandle(easy.Easy);
+
+        Assert.AreEqual(CurlMultiCode.Ok, code);
+        await multi.DisposeAsync();
+        await easy.DisposeAsync();
+    }
+
+    [TestMethod]
     public async Task OtherEngineCalls_PassToTheRunnersEngine()
     {
         ManagedCurlEngine managed = new();

@@ -44,6 +44,12 @@ internal sealed class ParallelRun(int maxRunning, int maxPerHost, bool parallelI
     /// </summary>
     internal ParallelProgressMeter? ProgressMeter { get; set; }
 
+    /// <summary>
+    /// Gets the multi handle the run's transfers perform through (ADR-0626), cleaned up by <see cref="EndAsync" />;
+    /// <see langword="null" /> for a run built without one, as the tests of the run alone build it.
+    /// </summary>
+    internal ParallelTransferMulti? Transfers { get; init; }
+
     /// <summary>Gets the token every transfer of the run is aborted through.</summary>
     internal CancellationToken AbortToken => abort.Token;
 
@@ -130,7 +136,7 @@ internal sealed class ParallelRun(int maxRunning, int maxPerHost, bool parallelI
 
     /// <summary>
     /// Waits for every started transfer to end, writes the deferred reports in command-line order and
-    /// the meter's final line, then closes the option groups' dispatches. Every transfer has been
+    /// the meter's final line, then cleans up the multi handle and closes the option groups' dispatches. Every transfer has been
     /// started when it is called, so the meter first draws when due. A run that started no transfer,
     /// one a bad glob or a refused <c>-T</c> upload ended first, draws no meter at all, as curl 8.21.0
     /// draws none (measured 2026-10-07, BL-1683).
@@ -149,6 +155,11 @@ internal sealed class ParallelRun(int maxRunning, int maxPerHost, bool parallelI
         await Queue.WhenAllEndedAsync().ConfigureAwait(false);
         await WriteDeferredReportsAsync().ConfigureAwait(false);
         meter?.DrawFinal();
+        if (Transfers is { } transfers)
+        {
+            await transfers.DisposeAsync().ConfigureAwait(false);
+        }
+
         await CloseDispatchesAsync().ConfigureAwait(false);
         abort.Dispose();
     }
