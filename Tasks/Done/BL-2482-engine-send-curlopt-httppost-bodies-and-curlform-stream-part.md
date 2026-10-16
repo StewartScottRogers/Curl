@@ -29,7 +29,7 @@ BL-2440 (ADR-0618) built `ManagedFormBuilder`: `Build` gives the `EasyMimeBody` 
 
 ## Notes
 
-- Plan (ADR-0650, decided by Claude under Stewart's delegation): `FormPost` gives a `CURLFORM_STREAM` part an
+- Plan (ADR-0651, decided by Claude under Stewart's delegation): `FormPost` gives a `CURLFORM_STREAM` part an
   engine-internal `FormStreamData` (contents length, stream object); `MimePostForm.BodyOf` sends `MimePost`, else
   `HttpPost` (not to a mail URL, as upstream reads it only in `http.c`) with each `FormStreamData` turned into an
   `EasyMimeCallback` over `EasyCallbackOptions.Read`, 0 length as -1 (chunked). The rest is the MIMEPOST path.
