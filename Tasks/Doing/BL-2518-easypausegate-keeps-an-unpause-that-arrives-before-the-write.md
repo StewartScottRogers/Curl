@@ -32,3 +32,4 @@ Found by BL-2501 (ADR-0635). `Curl.Api`'s streamed response body (`Curl.Api/Resp
 ## Log
 
 - 2026-10-16: Created.
+- 2026-10-16: Backlog -> Doing. Criteria at claim: badf3bb8 f82ef2b0 3d836d5e c4aff572.
