@@ -28,6 +28,11 @@ BL-2411 made a perform clear the buffer and write the engine's text cut to 255 b
 
 ## Notes
 
+- Checked libcurl 8.22.0's source (tag `curl-8_22_0`, the whole `lib/` grepped for `set.errorbuffer`): it does NOT copy `curl_easy_strerror` into `CURLOPT_ERRORBUFFER`. The buffer is cleared in `multi.c` (line 512) and `easy.c` (line 752) and written only by `failf` in `lib/curl_trc.c` (line 187); no fallback exists. The option's man page says only that libcurl empties the buffer before a transfer.
+- So Libcurl already matches; no production change. As the Goal says, the task closes saying so, with the behaviour pinned by `Perform_AFailureWithNoEngineText_LeavesTheErrorBufferEmptyNotTheStrerrorText` in `CurlEasyTests` and a sentence in `Libcurl/CLAUDE.md`.
+- Added `Libcurl/CLAUDE.md` to `touches`: the third criterion names it, and no task in Doing touched it (only BL-2440, `Curl.Engine`).
+- `Measure-CodeQuality.ps1 -Library Libcurl`: 0 failing members. Libcurl.UnitTests 1059 passed; solution fast tests green.
+
 ## Log
 
 - 2026-10-15: Created.
