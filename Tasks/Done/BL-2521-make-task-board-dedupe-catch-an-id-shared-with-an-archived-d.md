@@ -9,7 +9,7 @@ touches: [.claude/skills/task-board/task-board.ps1, .claude/skills/task-board/Te
 lane: no
 requirement: none
 created: 2026-10-16
-completed:
+completed: 2026-10-16
 ---
 # BL-2521 — Make task-board dedupe catch an ID shared with an archived Done task
 
@@ -33,17 +33,17 @@ Guard file: `task-board.ps1` changes only through the `audit` branch (CLAUDE.md,
 
 ## Acceptance criteria
 
-- [ ] `task-board.ps1 dedupe -Since <ref>` renumbers a live (not archived) task whose ID an archived Done task also carries, and leaves the archived task's file name and `id:` unchanged.
-- [ ] Two archived tasks that share an ID are left as they are (no rewrite of history), and `status` no longer warns about archived-only pairs.
-- [ ] A new `.claude/skills/task-board/Test-TaskBoardDedupe.ps1` builds a scratch board, as `Test-TaskBoardCriteria.ps1` does, and passes for a live and archived pair, an archived-only pair, and two new live tasks, under both Windows PowerShell 5.1 and pwsh.
-- [ ] `Test-TaskBoardCriteria.ps1` still passes under both Windows PowerShell 5.1 and pwsh.
-- [ ] The live BL-2482 and BL-2496 on the board are renumbered by running the fixed `dedupe`, and every reference to them in other live task files (for example `depends-on`) follows.
-- [ ] `.claude/skills/task-board/SKILL.md` describes what `dedupe` now compares.
-- [ ] The change reaches `master` through a pull request from the `audit` branch with CI green on Windows, Linux and macOS, and `master` is merged into `work/dark-factory`.
+- [x] `task-board.ps1 dedupe -Since <ref>` renumbers a live (not archived) task whose ID an archived Done task also carries, and leaves the archived task's file name and `id:` unchanged.
+- [x] Two archived tasks that share an ID are left as they are (no rewrite of history), and `status` no longer warns about archived-only pairs.
+- [x] A new `.claude/skills/task-board/Test-TaskBoardDedupe.ps1` builds a scratch board, as `Test-TaskBoardCriteria.ps1` does, and passes for a live and archived pair, an archived-only pair, and two new live tasks, under both Windows PowerShell 5.1 and pwsh.
+- [x] `Test-TaskBoardCriteria.ps1` still passes under both Windows PowerShell 5.1 and pwsh.
+- [x] The live BL-2482 and BL-2496 on the board are renumbered by running the fixed `dedupe`, and every reference to them in other live task files (for example `depends-on`) follows.
+- [x] `.claude/skills/task-board/SKILL.md` describes what `dedupe` now compares.
+- [x] The change reaches `master` through a pull request from the `audit` branch with CI green on Windows, Linux and macOS, and `master` is merged into `work/dark-factory`.
 
-## Notes
-
+## Notesn- Fix in PR #160 (audit -> master, merged with CI green on Windows, Linux and macOS), merged into work/dark-factory as 5dcd86270. Also fixed: the changed-file rewrite compared forward-slash git paths with backslash task paths, so when two new tasks collided it rewrote the kept task's own id line.n- The fixed dedupe renumbered live BL-2496 -> BL-2523 (Deferred) and BL-2482 -> BL-2524 (Done); no other live task named either ID. status now warns about no duplicates.n
 ## Log
 
 - 2026-10-16: Created.
 - 2026-10-16: Backlog -> Doing. Criteria at claim: b94827b4 7bc07c93 49428525 0d10730e 8f977375 67fc12e5 fbb6e071.
+- 2026-10-16: Doing -> Done. dedupe renumbers a live task sharing an archived task's ID; status warns only about pairs with a live task
