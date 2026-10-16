@@ -1122,16 +1122,21 @@ internal sealed class ManagedEasyTransfer(
     /// <returns>The upload stream, or <see langword="null" /> when the transfer uploads nothing.</returns>
     private static Stream? UploadOf(EasyOptions options, EasyPauseGate? pauseGate) =>
         options.Transfer.Upload
-            ? options.Callbacks.Read is { } read ? CallbackUploadOf(read, options.Callbacks.Seek, pauseGate) : Stream.Null
+            ? options.Callbacks.Read is { } read ? CallbackUploadOf(read, options.Callbacks, pauseGate) : Stream.Null
             : null;
 
-    /// <summary>The read callback's upload stream: one the seek callback rewinds when one is set.</summary>
+    /// <summary>
+    /// The read callback's upload stream: one the seek callback rewinds when one is set, carrying the trailer
+    /// callback a chunked HTTP upload asks for its trailers (BL-2475).
+    /// </summary>
     /// <param name="read">The read callback.</param>
-    /// <param name="seek">The seek callback, or <see langword="null" />.</param>
+    /// <param name="callbacks">The handle's callbacks, whose seek and trailer callbacks the stream takes.</param>
     /// <param name="pauseGate">The pause state a read callback's pause waits on, or <see langword="null" />.</param>
     /// <returns>The upload stream.</returns>
-    private static CallbackReadStream CallbackUploadOf(ReadCallback read, SeekCallback? seek, EasyPauseGate? pauseGate) =>
-        seek is null ? new CallbackReadStream(read, pauseGate) : new SeekingCallbackReadStream(read, seek, pauseGate);
+    private static CallbackReadStream CallbackUploadOf(ReadCallback read, EasyCallbackOptions callbacks, EasyPauseGate? pauseGate) =>
+        callbacks.Seek is { } seek
+            ? new SeekingCallbackReadStream(read, seek, pauseGate) { Trailer = callbacks.Trailer }
+            : new CallbackReadStream(read, pauseGate) { Trailer = callbacks.Trailer };
 
     /// <summary>
     /// The curl tool's own settings for a transfer driven through the easy interface with no

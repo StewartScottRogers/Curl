@@ -129,4 +129,33 @@ public sealed class CallbackReadStreamTests
         Assert.ThrowsExactly<NotSupportedException>(() => stream.Seek(0, SeekOrigin.Begin));
         Assert.ThrowsExactly<NotSupportedException>(() => stream.SetLength(0));
     }
+
+    [TestMethod]
+    public void SuppliesTrailers_NoTrailerCallbackSet_IsFalse()
+    {
+        using CallbackReadStream stream = new(_ => 0);
+
+        Assert.IsFalse(stream.SuppliesTrailers);
+    }
+
+    [TestMethod]
+    [DataRow(TrailerResult.Ok, true)]
+    [DataRow(TrailerResult.Abort, false)]
+    public void TryTakeTrailers_TrailerCallbackSet_GivesTheLinesItAddedAndWhetherToSendThem(TrailerResult result, bool expected)
+    {
+        using CallbackReadStream stream = new(_ => 0)
+        {
+            Trailer = trailers =>
+            {
+                trailers.Add("X-T: v");
+                return result;
+            },
+        };
+
+        bool send = stream.TryTakeTrailers(out IReadOnlyList<string> lines);
+
+        Assert.IsTrue(stream.SuppliesTrailers);
+        Assert.AreEqual(expected, send);
+        CollectionAssert.AreEqual(new[] { "X-T: v" }, lines.ToArray());
+    }
 }

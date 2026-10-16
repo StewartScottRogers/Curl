@@ -171,6 +171,83 @@ public sealed partial class ManagedEasyTransferTests
     }
 
     [TestMethod]
+    public async Task PerformAsync_TrailerCallbackSet_IsCalledOnceTheReadCallbackEndsAndItsLinesCloseTheChunkedUpload()
+    {
+        ScriptedConnector connector = new([Encoding.ASCII.GetBytes(Continue + Response)]);
+        await using IEasyTransfer easy = CreateEngine(connector).CreateEasy();
+        ReadCallback source = ReadOf("abc");
+        List<string> calls = [];
+        easy.Options = new EasyOptions
+        {
+            Network = new EasyNetworkOptions { Url = "http://h/up" },
+            Transfer = new EasyTransferOptions { Upload = true },
+            Callbacks = new()
+            {
+                Read = buffer =>
+                {
+                    long read = source(buffer);
+                    calls.Add($"read {read}");
+                    return read;
+                },
+                Trailer = trailers =>
+                {
+                    calls.Add("trailer");
+                    trailers.Add("X-Checksum: 900150983cd24fb0");
+                    return TrailerResult.Ok;
+                },
+            },
+        };
+
+        CurlCode code = await easy.PerformAsync(CancellationToken.None);
+
+        Assert.AreEqual(CurlCode.Ok, code);
+        CollectionAssert.AreEqual(new[] { "read 3", "read 0", "trailer" }, calls);
+        StringAssert.EndsWith(Encoding.ASCII.GetString(connector.Written), "\r\n\r\n3\r\nabc\r\n0\r\nX-Checksum: 900150983cd24fb0\r\n\r\n");
+    }
+
+    [TestMethod]
+    public async Task PerformAsync_TrailerCallbackAborts_ReturnsAbortedByCallbackWithLibcurlsText()
+    {
+        ScriptedConnector connector = new([Encoding.ASCII.GetBytes(Continue + Response)]);
+        await using IEasyTransfer easy = CreateEngine(connector).CreateEasy();
+        easy.Options = new EasyOptions
+        {
+            Network = new EasyNetworkOptions { Url = "http://h/up" },
+            Transfer = new EasyTransferOptions { Upload = true },
+            Callbacks = new() { Read = ReadOf("abc"), Trailer = _ => TrailerResult.Abort },
+        };
+
+        CurlCode code = await easy.PerformAsync(CancellationToken.None);
+
+        Assert.AreEqual(CurlCode.AbortedByCallback, code);
+        Assert.AreEqual("operation aborted by trailing headers callback", easy.ErrorText);
+    }
+
+    [TestMethod]
+    public async Task PerformAsync_TrailerCallbackWithASeekCallback_StillClosesTheUploadWithItsLines()
+    {
+        ScriptedConnector connector = new([Encoding.ASCII.GetBytes(Continue + Response)]);
+        await using IEasyTransfer easy = CreateEngine(connector).CreateEasy();
+        EasyOptions seeking = SeekingUploadOptions(ReadOf("abc"), (_, _) => SeekResult.Ok);
+        easy.Options = seeking with
+        {
+            Callbacks = seeking.Callbacks with
+            {
+                Trailer = trailers =>
+                {
+                    trailers.Add("X-T: v");
+                    return TrailerResult.Ok;
+                },
+            },
+        };
+
+        CurlCode code = await easy.PerformAsync(CancellationToken.None);
+
+        Assert.AreEqual(CurlCode.Ok, code);
+        StringAssert.EndsWith(Encoding.ASCII.GetString(connector.Written), "\r\n0\r\nX-T: v\r\n\r\n");
+    }
+
+    [TestMethod]
     public async Task PerformAsync_RedirectResendsAReadCallbackUploadAndSeekSucceeds_RewindsOnceAndSendsTheBodyTwice()
     {
         ScriptedConnector connector = new([Encoding.ASCII.GetBytes(Continue + TemporaryRedirect), Encoding.ASCII.GetBytes(Continue + Response)]);
