@@ -3,7 +3,7 @@
 The .NET-idiomatic programming interface to Curl (ADR-0506), not a `Curl.<Area>.UnitLibrary`:
 `Curl.Api` is a naming exception, with `Curl.Console` and `Libcurl`. Namespace `Curl.Api`
 for `Client/` (`CurlClient` and `CurlClientOptions`) and `Composition/` (the engine-building
-half of the partial `CurlClient`), `Messages/`, `ResponseBodies/`, `RequestBodies/`, `Mime/` and `Cancellation/`; `Curl.Api.Errors` for `Errors/`.
+half of the partial `CurlClient`), `Messages/`, `ResponseBodies/`, `RequestBodies/`, `Mime/`, `Cancellation/` and `Progress/`; `Curl.Api.Errors` for `Errors/`.
 
 - `Cancellation/`: `TransferCancellation` (BL-2504, ADR-0639) carries a call's `CancellationToken`
   into its transfer: the `CURLOPT_XFERINFOFUNCTION` answers abort once the token is cancelled and
@@ -11,6 +11,13 @@ half of the partial `CurlClient`), `Messages/`, `ResponseBodies/`, `RequestBodie
   cancelled throws `OperationCanceledException`; any other failure, a timeout included, throws
   `CurlException`; a token cancelled before the start creates no handle. Its tests drive
   `CancellableEasyTransfer`, a fake that ignores the perform token, in `Curl.Api.UnitTests/Cancellation`.
+
+- `Progress/`: `CurlRequest.Progress` (BL-2505, ADR-0643), an `IProgress<CurlTransferProgress>` given a
+  report (download and upload totals and counts, the engine's speeds, `CurlTransferPhase`) per
+  `CURLOPT_XFERINFOFUNCTION` call on the engine's thread. `TransferProgressReporter` is that callback,
+  chained before the cancellation's; a report that throws aborts the transfer (`CurlException`,
+  `AbortedByCallback`), and `ResponseBodyStream` ends its reports when perform returns. Its tests use
+  `ProgressEasyTransfer` in `Curl.Api.UnitTests/Progress`.
 
 - `Messages/`: `CurlRequest` and `CurlResponse` records and the `SendAsync` half of the partial
   `CurlClient` (BL-2499, ADR-0632). `CurlRequestOptions` maps a request onto `EasyOptions`;

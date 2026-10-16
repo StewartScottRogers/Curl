@@ -20,6 +20,7 @@ internal sealed class ResponseBodyStream : Stream
     private readonly CancellationTokenSource _abort;
     private readonly List<IDisposable> _owned = [];
     private readonly TransferCancellation _cancellation;
+    private readonly TransferProgressReporter? _progress;
     private Task _transfer = Task.CompletedTask;
     private Task? _closing;
 
@@ -30,13 +31,22 @@ internal sealed class ResponseBodyStream : Stream
     /// Aborts the transfer, as disposing the stream does, through the transfer-info callback this
     /// sets on <paramref name="easy"/> (ADR-0639); the failure is then thrown as <see cref="OperationCanceledException"/>.
     /// </param>
-    public ResponseBodyStream(IEasyTransfer easy, int capacity, CancellationToken cancellationToken)
+    /// <param name="progress">
+    /// Takes a report each time the engine calls the transfer-info callback, until the transfer ends (ADR-0643);
+    /// <see langword="null"/> for none.
+    /// </param>
+    public ResponseBodyStream(IEasyTransfer easy, int capacity, CancellationToken cancellationToken, IProgress<CurlTransferProgress>? progress = null)
     {
         _easy = easy;
         _abort = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         _buffer = new ResponseBodyBuffer(capacity, () => easy.Pause(CurlPause.Continue), cancellationToken);
         _cancellation = new TransferCancellation(easy, _abort.Token, _buffer.Abort);
         easy.Options = _cancellation.ApplyTo(easy.Options);
+        if (progress is not null)
+        {
+            _progress = new TransferProgressReporter(easy, progress, _cancellation.Progress);
+            easy.Options = easy.Options with { Callbacks = easy.Options.Callbacks with { TransferInfo = _progress.Report } };
+        }
     }
 
     /// <summary>The <c>CURLOPT_WRITEFUNCTION</c> that fills the stream.</summary>
@@ -165,6 +175,7 @@ internal sealed class ResponseBodyStream : Stream
         }
         finally
         {
+            _progress?.End();
             _owned.ForEach(handle => handle.Dispose());
         }
     }
