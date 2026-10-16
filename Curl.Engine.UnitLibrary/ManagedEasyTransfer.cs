@@ -487,7 +487,7 @@ internal sealed class ManagedEasyTransfer(
         string transferUrl = await SetUpUnlessToolDidAsync(toolInputs, options, settings, cookies, state, urlText, events).ConfigureAwait(false);
         EngineToolTransferDispatch? toolDispatch = ToolDispatch;
         RedirectFollower follower = FollowerOf(toolDispatch, options, cookies);
-        EngineToolTransferInputs inputs = MimePostForm.WithBody(InputsOf(toolInputs, options, state, PauseGateFor(url)), formBody, url.Scheme);
+        EngineToolTransferInputs inputs = MimePostForm.WithBody(InputsOf(toolInputs, options, settings, url, state, PauseGateFor(url)), formBody, url.Scheme);
         CallbackReadStream? callbackUpload = inputs.Upload as CallbackReadStream;
         EngineToolTransferProgress? toolProgress = ToolProgress;
         using CancellationTokenSource abort = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, AbortTokenOf(toolProgress));
@@ -678,11 +678,19 @@ internal sealed class ManagedEasyTransfer(
     /// <summary>The pieces the context takes: the runner's <paramref name="toolInputs" />, or the handle's own (<see cref="OwnInputsOf" />) without them.</summary>
     /// <param name="toolInputs">The runner's chosen pieces, or <see langword="null" />.</param>
     /// <param name="options">The handle's options.</param>
+    /// <param name="settings">The tool settings, whose passphrase an SSH key takes.</param>
+    /// <param name="url">The URL to transfer, whose scheme says whether it takes SSH options.</param>
     /// <param name="state">The running transfer, which keeps the alt-svc cache.</param>
     /// <param name="pauseGate">The pause state a read callback's pause waits on, or <see langword="null" /> when the transfer cannot pause.</param>
     /// <returns>The pieces.</returns>
-    private static EngineToolTransferInputs InputsOf(EngineToolTransferInputs? toolInputs, EasyOptions options, EngineTransferState state, EasyPauseGate? pauseGate) =>
-        toolInputs ?? OwnInputsOf(options, state, pauseGate);
+    private static EngineToolTransferInputs InputsOf(
+        EngineToolTransferInputs? toolInputs,
+        EasyOptions options,
+        EngineTransferSettings settings,
+        CurlUrl url,
+        EngineTransferState state,
+        EasyPauseGate? pauseGate) =>
+        toolInputs ?? OwnInputsOf(options, settings, url, state, pauseGate);
 
     /// <summary>
     /// The pause state a callback's pause waits on: the handle's, but none for a <c>file</c> URL, which libcurl cannot
@@ -703,20 +711,24 @@ internal sealed class ManagedEasyTransfer(
         upload is { Aborted: true } ? CallbackReadStream.AbortedText : CallbackTransferProgress.CallbackAbortedText;
 
     /// <summary>
-    /// The pieces a handle with no <see cref="ToolInputs" /> chooses from its options: no proxy, credentials, SSH
-    /// options, <c>If-None-Match</c> lines, range or form body of the runner's; <c>CURLOPT_RESUME_FROM</c> when
-    /// positive; the read callback under <c>CURLOPT_UPLOAD</c> (<see cref="UploadOf" />); and the alt-svc cache its
-    /// own setup opened.
+    /// The pieces a handle with no <see cref="ToolInputs" /> chooses from its options: no proxy, credentials,
+    /// <c>If-None-Match</c> lines, range or form body of the runner's; <c>CURLOPT_RESUME_FROM</c> when
+    /// positive; the read callback under <c>CURLOPT_UPLOAD</c> (<see cref="UploadOf" />); the alt-svc cache its
+    /// own setup opened; and for an <c>scp</c> or <c>sftp</c> URL the handle's SSH options with its host-key
+    /// callbacks (<see cref="SshOptionsMapping.OfHandle" />, ADR-0623).
     /// </summary>
     /// <param name="options">The handle's options.</param>
+    /// <param name="settings">The tool settings, whose passphrase an SSH key takes.</param>
+    /// <param name="url">The URL to transfer, whose scheme says whether it takes SSH options.</param>
     /// <param name="state">The running transfer, which keeps the alt-svc cache.</param>
     /// <param name="pauseGate">The pause state a read callback's pause waits on, or <see langword="null" /> when the transfer cannot pause.</param>
     /// <returns>The pieces.</returns>
-    private static EngineToolTransferInputs OwnInputsOf(EasyOptions options, EngineTransferState state, EasyPauseGate? pauseGate) =>
+    private static EngineToolTransferInputs OwnInputsOf(EasyOptions options, EngineTransferSettings settings, CurlUrl url, EngineTransferState state, EasyPauseGate? pauseGate) =>
         new(
             ResumeFrom: options.Transfer.ResumeFrom > 0 ? options.Transfer.ResumeFrom : null,
             Upload: UploadOf(options, pauseGate),
-            AltSvc: state.AltSvc);
+            AltSvc: state.AltSvc,
+            Ssh: SshOptionsMapping.IsSshScheme(url.Scheme) ? SshOptionsMapping.OfHandle(options.Protocols.Ssh, options.Callbacks, settings.Passphrase) : null);
 
     /// <summary>
     /// The setup the curl tool's runner does around its serial attempt, before connecting
