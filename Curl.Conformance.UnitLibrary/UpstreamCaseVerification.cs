@@ -15,7 +15,7 @@ namespace Curl.Conformance;
 /// <c>&lt;strip&gt;</c> lines removed from both and <c>&lt;strippart&gt;</c> run on the received
 /// lines; <c>&lt;proxy&gt;</c> the same way against the bytes the http-proxy server on
 /// <c>%PROXYPORT</c> received, as <c>runtests.pl</c> compares its proxy log; <c>&lt;upload&gt;</c>
-/// against the uploaded message with <c>&lt;strippart&gt;</c> run on it but no <c>&lt;strip&gt;</c>; the <c>--output</c> file against <c>&lt;datacheck&gt;</c> (and <c>&lt;datacheck1&gt;</c> to
+/// against the uploaded message with <c>&lt;strippart&gt;</c> run on it but no <c>&lt;strip&gt;</c>; the <c>--output</c> file (a libtest program's stdout for a <c>&lt;tool&gt;</c> run) against <c>&lt;datacheck&gt;</c> (and <c>&lt;datacheck1&gt;</c> to
 /// <c>&lt;datacheck9&gt;</c> after it), or <c>&lt;data&gt;</c> when there is none, unless
 /// <c>&lt;data&gt;</c> says <c>nocheck</c> or both are empty and it does not say <c>sendzero</c>;
 /// <c>&lt;socks&gt;</c> against what the socksd emulation logged, as written; <c>&lt;dns&gt;</c>
@@ -60,7 +60,7 @@ internal static class UpstreamCaseVerification
             () => CompareUpload(testCase, run.UploadedBytes),
             () => CompareSocks(testCase, run.SocksLog),
             () => CompareDns(testCase, run.DnsLog),
-            () => CompareReplyData(testCase, run.OutputFileBytes),
+            () => CompareReplyData(testCase, run),
             () => CompareOutput(testCase, "stdout", "stripfile", run.StandardOutput),
             () => CompareStandardError(testCase, run),
             .. FileSuffixes.Select<string, Func<string?>>(suffix => () => CompareFile(testCase, suffix)),
@@ -121,14 +121,16 @@ internal static class UpstreamCaseVerification
     private static byte[] SortedLines(IEnumerable<string> lines) =>
         Encoding.Latin1.GetBytes(string.Concat(lines.Order(StringComparer.Ordinal).Select(line => line + "\n")));
 
-    private static string? CompareReplyData(UpstreamTestCase testCase, byte[] outputFile)
+    // runtests.pl compares <reply><data> with $CURLOUT: the --output file for a curl run, and for a tool
+    // run the program's stdout, which runner.pm 8.22.0 sets $CURLOUT to (test500, BL-2560).
+    private static string? CompareReplyData(UpstreamTestCase testCase, UpstreamCaseRun run)
     {
         UpstreamTestSection? data = testCase.Find("reply", "data");
         byte[] expected = ExpectedReplyData(testCase, data);
         bool sendsZero = data?.IsAttributeSet("sendzero") == true;
         return data?.IsAttributeSet("nocheck") == true || expected.Length == 0 && !sendsZero
             ? null
-            : UpstreamFirstDifference.Describe("the --output file against <reply><data>", Normalized(expected, data), Normalized(outputFile, data));
+            : UpstreamFirstDifference.Describe($"{run.ReplyDataName} against <reply><data>", Normalized(expected, data), Normalized(run.ReplyDataBytes, data));
     }
 
     private static byte[] ExpectedReplyData(UpstreamTestCase testCase, UpstreamTestSection? data)

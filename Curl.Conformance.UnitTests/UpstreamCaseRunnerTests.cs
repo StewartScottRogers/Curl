@@ -1375,6 +1375,39 @@ public sealed class UpstreamCaseRunnerTests
         Assert.AreEqual("<verify><errorcode>: expected exit code 0, got 7", outcome.Detail);
     }
 
+    // test500's shape: <reply><data> is checked and <verify> has no <stdout>, so runtests.pl 8.22.0
+    // compares the data with the program's stdout, which runner.pm makes a tool run's $CURLOUT (BL-2560).
+    private static string LibCaseCheckingReplyData(string data) =>
+        "<testcase>\n<reply>\n<data>\n" + data + "</data>\n</reply>\n<client>\n<server>\nhttp\n</server>\n<tool>\nlib%TESTNUMBER\n</tool>\n"
+        + "<command>\nhttp://%HOSTIP:%HTTPPORT/%TESTNUMBER\n</command>\n</client>\n"
+        + "<verify>\n<errorcode>\n0\n</errorcode>\n</verify>\n</testcase>\n";
+
+    [TestMethod]
+    public async Task RunAsync_LibCaseCheckingReplyDataTheProgramWroteToStdout_Passes()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        UpstreamCaseRunner runner = LibRunner(new SampleLibTest("lib5", exitCode: 0));
+
+        UpstreamCaseOutcome outcome = await RunAsync(runner, LibCaseCheckingReplyData("hello from lib5\n"));
+
+        diagnostics.Assert("outcome kind", UpstreamCaseOutcomeKind.Passed, outcome.Kind);
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Passed, outcome.Kind, outcome.Detail);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_LibCaseCheckingReplyDataTheProgramDidNotWrite_FailsOnTheProgramsStdout()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        UpstreamCaseRunner runner = LibRunner(new SampleLibTest("lib5", exitCode: 0));
+
+        UpstreamCaseOutcome outcome = await RunAsync(runner, LibCaseCheckingReplyData("HTTP/1.1 200 OK\n"));
+
+        string firstLine = outcome.Detail.Split('\n')[0];
+        diagnostics.Assert("outcome detail", "the program's stdout against <reply><data> differs at byte 0 (line 1)", firstLine);
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Failed, outcome.Kind);
+        StringAssert.StartsWith(firstLine, "the program's stdout against <reply><data> differs at byte 0 (line 1)");
+    }
+
     [TestMethod]
     public async Task RunAsync_LibCaseWhoseProgramIsNotPorted_IsSkippedAsNotPorted()
     {

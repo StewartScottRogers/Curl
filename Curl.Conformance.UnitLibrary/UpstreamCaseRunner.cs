@@ -507,9 +507,11 @@ public sealed class UpstreamCaseRunner(
             (tftp.ProtocolLog, tftp.ProtocolDump),
             (gopher.ReceivedBytes, gopher.ReceivedDump),
         ]);
-        byte[] outputFileBytes = ReadOutputFile(outputFile);
-        return Judge(testCase, () => new UpstreamCaseRun(exitCode, standardOutputBytes, standardError.ToArray(), receivedBytes, outputFileBytes)
+        // runner.pm sets $CURLOUT to a tool run's stdout, and runtests.pl compares <reply><data> with $CURLOUT (BL-2560).
+        byte[] replyDataBytes = libTest is null ? ReadOutputFile(outputFile) : standardOutputBytes;
+        return Judge(testCase, () => new UpstreamCaseRun(exitCode, standardOutputBytes, standardError.ToArray(), receivedBytes, replyDataBytes)
         {
+            ReplyDataName = libTest is null ? "the --output file" : "the program's stdout",
             ProxyReceivedBytes = server.ProxyReceivedBytes.ToArray(),
             LogDirectory = logDirectory,
             SocksLog = System.Text.Encoding.Latin1.GetBytes(socks.ConnectLog),

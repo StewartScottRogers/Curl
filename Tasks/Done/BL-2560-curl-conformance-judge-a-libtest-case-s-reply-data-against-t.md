@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests]
 requirement: none
 created: 2026-10-16
-completed:
+completed: 2026-10-16
 ---
 # BL-2560 — Curl.Conformance: judge a libtest case's <reply><data> against the program's stdout as runtests.pl does
 
@@ -22,14 +22,18 @@ Found by BL-2558: a libtest case run through the ratchet's engine (`UpstreamConf
 
 ## Acceptance criteria
 
-- [ ] A test in `Curl.Conformance.UnitTests` runs a lib case whose `<reply><data>` is checked and whose `<verify>` has no `<stdout>`, the program writing the reply's body to stdout, and the case's outcome is what runtests.pl 8.22.0 gives for it.
-- [ ] `PassingUpstreamCases.txt` is unchanged or grown with every listed case passing.
-- [ ] `Measure-CodeQuality.ps1 -Library Curl.Conformance.UnitLibrary` reports 0 failing members.
-- [ ] `dotnet build` is clean and the fast tests pass with no test deleted, skipped or weakened.
+- [x] A test in `Curl.Conformance.UnitTests` runs a lib case whose `<reply><data>` is checked and whose `<verify>` has no `<stdout>`, the program writing the reply's body to stdout, and the case's outcome is what runtests.pl 8.22.0 gives for it.
+- [x] `PassingUpstreamCases.txt` is unchanged or grown with every listed case passing.
+- [x] `Measure-CodeQuality.ps1 -Library Curl.Conformance.UnitLibrary` reports 0 failing members.
+- [x] `dotnet build` is clean and the fast tests pass with no test deleted, skipped or weakened.
 
 ## Notes
+
+- runner.pm at curl-8_22_0 (`singletest_run`) sets a tool run's `$CURLOUT` to `stdoutfilename($LOGDIR, $testnum)`, and runtests.pl compares `<reply><data>` with `$CURLOUT`; a curl run's `$CURLOUT` stays `curl<N>.out`. No choice, so no ADR: `UpstreamCaseRunner` now passes a libtest run's stdout as `UpstreamCaseRun.ReplyDataBytes` (renamed from `OutputFileBytes`, which no longer says what it holds) and names it `the program's stdout` in a difference (`ReplyDataName`).
+- Tests: `RunAsync_LibCaseCheckingReplyDataTheProgramWroteToStdout_Passes` and `RunAsync_LibCaseCheckingReplyDataTheProgramDidNotWrite_FailsOnTheProgramsStdout`. Measure-CodeQuality -Library Curl.Conformance.UnitLibrary: 0 failing members. PassingUpstreamCases.txt unchanged.
 
 ## Log
 
 - 2026-10-16: Created.
 - 2026-10-16: Backlog -> Doing. Criteria at claim: 147177d6 f9449db5 2fa0c431 4272a6b9.
+- 2026-10-16: Doing -> Done. a libtest case's <reply><data> is compared with the program's stdout, as runtests.pl 8.22.0 compares it with a tool run's CURLOUT

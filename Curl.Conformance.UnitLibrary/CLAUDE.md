@@ -406,7 +406,8 @@ ported programs (`LibTestPrograms`, from `Curl.Conformance.LibTest.UnitLibrary`,
 references) and makes the `Libcurl` engine each run gets from its `UpstreamCurlInvocation`. The
 program gets the command's words alone as its arguments (no `--output`, `--include` or trace), the
 invocation's stdout and a line-feed-only stderr writer, runs under the same time limit, and is judged
-as a curl run is. A lib case whose program is not ported skips with `libtest program not ported`; any
+as a curl run is, except that `<reply><data>` is compared with the program's stdout, since `runner.pm`
+at `curl-8_22_0` sets a tool run's `$CURLOUT` to its stdout file (BL-2560; test500's shape). A lib case whose program is not ported skips with `libtest program not ported`; any
 other tool (`unitNNNN`, `toolNNNN`) with `the harness does not act on <client><tool>`. Until BL-2558
 gives the ratchet a real engine, it passes no `UpstreamLibTests`, so every lib case skips as not ported.
 
