@@ -8,7 +8,7 @@ depends-on: []
 touches: [Libcurl/Multi/Settings, Libcurl.UnitTests/Multi/Settings]
 requirement: none
 created: 2026-10-16
-completed:
+completed: 2026-10-16
 ---
 # BL-2467 — Libcurl: cover CurlMulti.SetOption's last switch branch
 
@@ -22,12 +22,15 @@ BL-2446's `Measure-CodeQuality.ps1 -Library Libcurl,Curl.Engine.UnitLibrary` (20
 
 ## Acceptance criteria
 
-- [ ] `Measure-CodeQuality.ps1 -Library Libcurl` reports 0 failing members.
-- [ ] `dotnet build` is clean and the fast tests pass with no test deleted, skipped or weakened.
+- [x] `Measure-CodeQuality.ps1 -Library Libcurl` reports 0 failing members.
+- [x] `dotnet build` is clean and the fast tests pass with no test deleted, skipped or weakened.
 
 ## Notes
+
+The missing branch was `TimerFunction` given a `CurlMultiSocketCallback`; added `SetOption_LibcurlsSocketCallbackForTimerFunction_AnswersBadFunctionArgument`. `Measure-CodeQuality.ps1 -Library Libcurl`: 0 failing members.
 
 ## Log
 
 - 2026-10-16: Created.
 - 2026-10-16: Backlog -> Doing.
+- 2026-10-16: Doing -> Done. Covered the last SetOption branch; Libcurl quality 0 failing

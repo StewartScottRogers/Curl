@@ -37,6 +37,20 @@ public sealed class CurlMultiSettingsTests
     }
 
     [TestMethod]
+    public async Task SetOption_LibcurlsSocketCallbackForTimerFunction_AnswersBadFunctionArgument()
+    {
+        var before = new MultiOptions { MaxConnects = 9 };
+        var engine = new SettingsFakeMultiTransfer { Options = before };
+        await using var multi = new CurlMulti(engine);
+        CurlMultiSocketCallback socketCallback = (_, _, _, _) => 0;
+
+        var code = multi.SetOption(CurlMultiOption.TimerFunction, socketCallback);
+
+        Assert.AreEqual(CurlMultiCode.BadFunctionArgument, code);
+        Assert.AreSame(before, engine.Options);
+    }
+
+    [TestMethod]
     public async Task GetHandles_AnswersTheAddedEasyHandlesAndLeavesOutTransfersAddedElsewhere()
     {
         var engine = new SettingsFakeMultiTransfer();
