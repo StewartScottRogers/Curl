@@ -8,7 +8,7 @@ depends-on: [BL-2319, BL-2320]
 touches: [Tasks/Backlog, Documentation/Planning/Curl-Api-And-libcurl.md]
 requirement: none
 created: 2026-10-15
-completed:
+completed: 2026-10-15
 ---
 # BL-2321 — File phase 3 tasks for Libcurl from Documentation/Planning/Curl-Api-And-libcurl.md
 
@@ -26,10 +26,10 @@ ADR-0506; the plan's "Phase 3" table (about 55-60 tasks). Phases 1 and 2 decided
 
 ## Acceptance criteria
 
-- [ ] The board holds a task for every row of the plan's phase 3 table (or the plan's table is corrected with the reason), each with non-empty `touches`, a `depends-on` chain and acceptance criteria naming build, fast tests, quality gates and the ratchet.
-- [ ] `/task-check` (or `task-board.ps1 status`) reports no dependency cycle and no duplicate ID.
-- [ ] The plan's "Filed tasks" section lists the phase 3 task IDs.
-- [ ] A final phase 3 task "File phase 4 tasks for Curl.Api from Documentation/Planning/Curl-Api-And-libcurl.md" exists, depending on the phase 3 easy and multi tasks.
+- [x] The board holds a task for every row of the plan's phase 3 table (or the plan's table is corrected with the reason), each with non-empty `touches`, a `depends-on` chain and acceptance criteria naming build, fast tests, quality gates and the ratchet.
+- [x] `/task-check` (or `task-board.ps1 status`) reports no dependency cycle and no duplicate ID.
+- [x] The plan's "Filed tasks" section lists the phase 3 task IDs.
+- [x] A final phase 3 task "File phase 4 tasks for Curl.Api from Documentation/Planning/Curl-Api-And-libcurl.md" exists, depending on the phase 3 easy and multi tasks.
 
 ## Notes
 
@@ -37,3 +37,4 @@ ADR-0506; the plan's "Phase 3" table (about 55-60 tasks). Phases 1 and 2 decided
 
 - 2026-10-15: Created.
 - 2026-10-15: Backlog -> Doing.
+- 2026-10-15: Doing -> Done. Phase 3 filed as BL-2395 to BL-2455 (61 tasks) and the plan lists them
