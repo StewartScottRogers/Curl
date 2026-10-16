@@ -33,7 +33,7 @@ Use `ICurlEngine` / `IEasyTransfer` (`Curl.Api.UnitLibrary/EngineContracts`), th
 
 Plan: Documentation/Planning/Curl-Mcp.md. Decision: ADR-0548.
 
-- Decisions recorded in ADR-0590 (decided by Claude under Stewart's delegation): `file:` URLs are
+- Decisions recorded in ADR-0593 (decided by Claude under Stewart's delegation): `file:` URLs are
   refused (they reach local files; the confined `curl` tool offers them); the method maps as
   `-X`/`-d`/`-I` do; `insecure` is the origin's verification only, as `-k`; headers returned are the
   last response's; "libcurl's message" is the handle's `ErrorText` (`CURLOPT_ERRORBUFFER`), since the
@@ -47,4 +47,4 @@ Plan: Documentation/Planning/Curl-Mcp.md. Decision: ADR-0548.
 
 - 2026-10-15: Created.
 - 2026-10-16: Backlog -> Doing.
-- 2026-10-16: Doing -> Done. transfer tool logic over IEasyTransfer and EasyOptions, ADR-0590; build clean, fast tests green
+- 2026-10-16: Doing -> Done. transfer tool logic over IEasyTransfer and EasyOptions, ADR-0593; build clean, fast tests green
