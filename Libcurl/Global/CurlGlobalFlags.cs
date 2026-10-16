@@ -3,7 +3,7 @@ namespace Libcurl.Global;
 /// <summary>
 /// The <c>CURL_GLOBAL_*</c> flags <c>curl_global_init</c> takes, with upstream curl 8.22.0's numbers
 /// from <c>include/curl/curl.h</c>. The managed engine needs none of the work they ask for - .NET
-/// sockets need no <c>WSAStartup</c> and TLS needs no global set-up - so <see cref="CurlGlobal.Init"/>
+/// sockets need no <c>WSAStartup</c> and TLS needs no global set-up - so <see cref="CurlGlobal.Init(CurlGlobalFlags)"/>
 /// accepts every value, as libcurl does, and keeps it on <see cref="CurlLibrary.Flags"/>.
 /// </summary>
 [Flags]

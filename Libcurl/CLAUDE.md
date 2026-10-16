@@ -6,7 +6,8 @@ Root namespace `Libcurl`; each area is a folder and namespace (`Libcurl/Global` 
 with its tests in the same folder of `Libcurl.UnitTests`.
 
 `Global` holds `CurlGlobal` (`curl_global_init`, `_init_mem`, `_sslset`, `_trace`) and `CurlLibrary`,
-the object `Init` returns over an injected `ICurlEngine`; its `DisposeAsync` is `curl_global_cleanup`
+the object `Init` returns over an injected `ICurlEngine`, or over a new `ManagedCurlEngine` when none is
+given; its `DisposeAsync` is `curl_global_cleanup`
 (ADR-0556). `CurlLibrary` is `partial`: each handle area adds its public creating method
 (`curl_easy_init` and the rest) as a `CurlLibrary` part in its own folder, over the internal
 `Create*` methods in `Global`. Tests that count inits use `CurlGlobal.InitCounting` with their own
@@ -79,8 +80,10 @@ sizes, speeds, content lengths, `RETRY_AFTER` and `EARLYDATA_SENT_T`: a time's `
 `TimeSpan` in whole (truncated) microseconds and its double form that count over 1,000,000, as
 `getinfo.c` derives both; a size or speed is the same `long` in both forms.
 
-Reference `Curl.Api.UnitLibrary` only. Never reference `Curl.Api`, a protocol library, or
-`Curl.Engine.UnitLibrary` before the task that adds the engine-building overloads.
+Reference `Curl.Api.UnitLibrary` and `Curl.Engine.UnitLibrary` only (project references). The engine
+reference is for `CurlGlobal.Init(flags)`, the parameterless `curl_global_init`, which builds a
+`ManagedCurlEngine` (ADR-0577); every other member takes its `ICurlEngine` from the library, so tests
+inject fakes. Never reference `Curl.Api` or a protocol library.
 
 Held to the four quality gates in the root `CLAUDE.md`. Its tests live in `Libcurl.UnitTests`,
 which sorts after every `Curl.*` project.

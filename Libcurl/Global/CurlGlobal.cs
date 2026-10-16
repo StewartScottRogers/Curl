@@ -1,5 +1,6 @@
 using Curl.Api.Codes;
 using Curl.Api.EngineContracts;
+using Curl.Engine;
 
 namespace Libcurl.Global;
 
@@ -15,10 +16,20 @@ public static class CurlGlobal
     private static readonly GlobalInitCounter Counter = new();
 
     /// <summary>
-    /// libcurl's <c>initialized</c> count: the libraries <see cref="Init"/> and <see cref="InitMemory"/>
+    /// libcurl's <c>initialized</c> count: the libraries <see cref="Init(CurlGlobalFlags)"/> and <see cref="InitMemory"/>
     /// have created in this process and not yet cleaned up.
     /// </summary>
     public static int InitCount => Counter.Count;
+
+    /// <summary>
+    /// <c>curl_global_init</c>: a library over a new <see cref="ManagedCurlEngine"/>, the managed
+    /// engine on the system clock and the real network, counted until it is cleaned up. Every
+    /// <paramref name="flags"/> value is accepted, as libcurl accepts it (see <see cref="CurlGlobalFlags"/>).
+    /// </summary>
+    /// <param name="flags">The <c>CURL_GLOBAL_*</c> flags, kept on <see cref="CurlLibrary.Flags"/>.</param>
+    /// <returns>The library; dispose it for <c>curl_global_cleanup</c>.</returns>
+    public static CurlLibrary Init(CurlGlobalFlags flags = CurlGlobalFlags.Default) =>
+        InitCounting(new ManagedCurlEngine(), flags, Counter);
 
     /// <summary>
     /// <c>curl_global_init</c>: a library over <paramref name="engine"/>, counted until it is cleaned up.
@@ -32,7 +43,7 @@ public static class CurlGlobal
         InitCounting(engine, flags, Counter);
 
     /// <summary>
-    /// <c>curl_global_init_mem</c>: the same as <see cref="Init"/>. The five allocation callbacks are
+    /// <c>curl_global_init_mem</c>: the same as <see cref="Init(CurlGlobalFlags)"/>. The five allocation callbacks are
     /// required, as libcurl requires them (it answers <c>CURLE_FAILED_INIT</c> for a missing one; this
     /// throws), and then ignored: the managed engine allocates, frees and copies through the .NET
     /// runtime, so none of them is ever called.

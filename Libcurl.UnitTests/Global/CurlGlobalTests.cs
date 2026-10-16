@@ -1,4 +1,5 @@
 using Curl.Api.Codes;
+using Curl.Engine;
 using Libcurl.Global;
 
 namespace Libcurl.UnitTests.Global;
@@ -72,6 +73,29 @@ public sealed class CurlGlobalTests
         await library.DisposeAsync();
 
         Assert.AreEqual(1, engine.DisposeCount);
+    }
+
+    [TestMethod]
+    public async Task Init_WithoutAnEngine_BuildsTheManagedEngine_AndCreatesEasyTransfersFromIt()
+    {
+        var library = CurlGlobal.Init();
+        Assert.IsInstanceOfType<ManagedCurlEngine>(library.Engine);
+        Assert.AreEqual(CurlGlobalFlags.Default, library.Flags);
+
+        var transfer = library.CreateEasyTransfer();
+        Assert.IsNotNull(transfer);
+        await transfer.DisposeAsync();
+
+        await library.DisposeAsync();
+        Assert.IsTrue(library.IsCleanedUp);
+    }
+
+    [TestMethod]
+    public async Task Init_WithoutAnEngine_KeepsTheFlagsGiven()
+    {
+        await using var library = CurlGlobal.Init(CurlGlobalFlags.Nothing);
+
+        Assert.AreEqual(CurlGlobalFlags.Nothing, library.Flags);
     }
 
     [TestMethod]

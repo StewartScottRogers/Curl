@@ -9,7 +9,7 @@ namespace Libcurl.Global;
 /// <summary>
 /// What <c>curl_global_init</c> sets up, as an object (ADR-0506): it holds the engine every handle
 /// is created from, and <see cref="DisposeAsync"/> is <c>curl_global_cleanup</c>. Created by
-/// <see cref="CurlGlobal.Init"/> or <see cref="CurlGlobal.InitMemory"/>.
+/// <see cref="CurlGlobal.Init(CurlGlobalFlags)"/> or <see cref="CurlGlobal.InitMemory"/>.
 /// </summary>
 /// <remarks>
 /// The class is <see langword="partial"/> so each handle area adds its public creating method
@@ -57,6 +57,9 @@ public sealed partial class CurlLibrary : IAsyncDisposable
         counter.Decrement();
         await engine.DisposeAsync().ConfigureAwait(false);
     }
+
+    /// <summary>The engine every handle of the library is created from.</summary>
+    internal ICurlEngine Engine => engine;
 
     /// <summary><c>curl_easy_init</c>'s engine call.</summary>
     /// <returns>The engine's new easy transfer.</returns>
