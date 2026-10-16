@@ -92,7 +92,11 @@ or notification `multi.h` lacks answers `UnknownOption` without calling the engi
 `Multi/Wait` has `WaitAsync`, `PollAsync`, `Wakeup`, `Timeout` and `FdSet` (ADR-0584): a negative
 `timeout_ms` answers `BadFunctionArgument` without the engine, and `FdSet` fills `ISet<CurlSocket>`
 read, write and exception sets from the engine's `GetWaitSockets` (`curl_multi_waitfds`), since the
-seam has no `fdset`.
+seam has no `fdset`. `Multi/Sockets` has `SocketActionAsync`
+(`curl_multi_socket_action`) and `Assign` (`curl_multi_assign`), straight calls to the engine, and the
+internal `SetSocketFunction` and `SetTimerFunction`, which `SetOption` calls for a `SOCKETFUNCTION` or
+`TIMERFUNCTION` value of Libcurl's own `CurlMultiSocketCallback` (given the added `CurlEasy`) or
+`CurlMultiTimerCallback` (given the `CurlMulti`): they wrap it into the seam's delegate (ADR-0588).
 
 `Share` holds `CurlShare`, the share handle `CurlLibrary.ShareInit` (`curl_share_init`) returns over
 the engine's `IShareHandle`, and `CurlShareOption` (ADR-0581). `SetOption` is `curl_share_setopt`:

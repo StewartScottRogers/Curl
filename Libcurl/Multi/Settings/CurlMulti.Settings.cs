@@ -17,6 +17,8 @@ public sealed partial class CurlMulti
     /// The value: a <see cref="long"/> or <see cref="int"/> for a <c>long</c> or <c>curl_off_t</c> option (or the
     /// option's enum, <see cref="CurlPipelining"/> or <see cref="CurlNetworkChange"/>), the option's own
     /// delegate type or <see langword="null"/> for a function, any value but a delegate for an object pointer.
+    /// <c>SOCKETFUNCTION</c> and <c>TIMERFUNCTION</c> also take Libcurl's <see cref="CurlMultiSocketCallback"/>
+    /// and <see cref="CurlMultiTimerCallback"/>, which receive the <see cref="CurlEasy"/> and this handle (ADR-0588).
     /// </param>
     /// <returns>
     /// <see cref="CurlMultiCode.Ok"/> once the option is set, <see cref="CurlMultiCode.UnknownOption"/> for an
@@ -24,7 +26,14 @@ public sealed partial class CurlMulti
     /// wrong type or out of the option's range; the options are then unchanged.
     /// </returns>
     /// <exception cref="ObjectDisposedException">The multi handle has been cleaned up.</exception>
-    public CurlMultiCode SetOption(CurlMultiOption option, object? value)
+    public CurlMultiCode SetOption(CurlMultiOption option, object? value) => (option, value) switch
+    {
+        (CurlMultiOption.SocketFunction, CurlMultiSocketCallback socketCallback) => SetSocketFunction(socketCallback),
+        (CurlMultiOption.TimerFunction, CurlMultiTimerCallback timerCallback) => SetTimerFunction(timerCallback),
+        _ => SetEngineOption(option, value),
+    };
+
+    private CurlMultiCode SetEngineOption(CurlMultiOption option, object? value)
     {
         var live = LiveTransfer();
         var options = live.Options;
