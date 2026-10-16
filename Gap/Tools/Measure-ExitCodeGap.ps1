@@ -29,9 +29,11 @@
 
     Curl's side is read as source text from <RepositoryRoot>:
     - Curl.Protocol.Abstractions.UnitLibrary/CurlExitCode.cs: "<Member> = <n>," lines.
-    - Curl.Console/CurlEasyErrorText.cs: "[CurlExitCode.<Member>] = "<text>"" entries
-      (the escapes \" and \\ decoded) and its UnknownError constant, the text of a
-      member with no entry.
+    - CurlEasyErrorText.cs: "[CurlExitCode.<Member>] = "<text>"" entries (the escapes
+      \" and \\ decoded) and its UnknownError constant, the text of a member with no
+      entry. It is read from Libcurl/Misc/ErrorText/CurlEasyErrorText.cs, or from
+      Curl.Console/CurlEasyErrorText.cs when that is absent (its home before BL-2450
+      moved it), so the move changes no score.
 
     Scoring:
     - exitcodes:<n> is match when a CurlExitCode member has the number n, else gap.
@@ -95,7 +97,15 @@ param(
 $ErrorActionPreference = 'Stop'
 
 $ExitCodeSource = 'Curl.Protocol.Abstractions.UnitLibrary/CurlExitCode.cs'
-$ErrorTextSource = 'Curl.Console/CurlEasyErrorText.cs'
+$ErrorTextSources = @('Libcurl/Misc/ErrorText/CurlEasyErrorText.cs', 'Curl.Console/CurlEasyErrorText.cs')
+$script:ErrorTextSource = $ErrorTextSources[0]
+
+function Find-ErrorTextSource([string] $Root) {
+    foreach ($candidate in $ErrorTextSources) {
+        if (Test-Path -LiteralPath (Join-Path $Root $candidate)) { return $candidate }
+    }
+    return $null
+}
 
 function Write-Utf8File([string] $Path, [string] $Text) {
     $folder = Split-Path $Path -Parent
@@ -163,8 +173,10 @@ function Read-StrErrorTexts([string] $Path) {
 
 function Read-CurlSide([string] $Root) {
     $enumPath = Join-Path $Root $ExitCodeSource
-    $textPath = Join-Path $Root $ErrorTextSource
-    if (-not (Test-Path -LiteralPath $enumPath) -or -not (Test-Path -LiteralPath $textPath)) { return $null }
+    $found = Find-ErrorTextSource $Root
+    if ($null -ne $found) { $script:ErrorTextSource = $found }
+    if (-not (Test-Path -LiteralPath $enumPath) -or $null -eq $found) { return $null }
+    $textPath = Join-Path $Root $found
     $members = @{}
     foreach ($m in [regex]::Matches([System.IO.File]::ReadAllText($enumPath), '(?m)^\s*([A-Za-z]\w*)\s*=\s*(\d+)\s*,?\s*$')) {
         $members[[int]$m.Groups[2].Value] = $m.Groups[1].Value
@@ -229,7 +241,7 @@ function Measure-Item($Item, $Curl, [string] $Commit) {
     $member = if ($Curl.Members.ContainsKey([int]$a.number)) { $Curl.Members[[int]$a.number] } else { $null }
     if ($facet -eq 'strerror') {
         $result.expected = $a.strerror
-        $result.evidence = "$ErrorTextSource at $Commit"
+        $result.evidence = "$($script:ErrorTextSource) at $Commit"
         if ($null -ne $member) {
             $result.actual = if ($Curl.Texts.ContainsKey($member)) { $Curl.Texts[$member] } else { $Curl.Unknown }
         }
@@ -310,7 +322,18 @@ function Invoke-SelfTest {
         Invoke-ExitCodeGap (Join-Path $fixtures 'upstream') '9.9.9' $temp $out $false $elsewhere | Out-Null
         Report ((Test-Path -LiteralPath (Join-Path $elsewhere '9.9.9/exitcodes.json')) -and -not (Test-Path -LiteralPath (Join-Path $temp 'Gap/Upstream/9.9.9/exitcodes.json'))) 'the inventory goes to -InventoryDirectory, never into the measured tree'
 
-        Remove-Item -LiteralPath (Join-Path $temp $ErrorTextSource)
+        $oldHome = Join-Path $temp 'Curl.Console/CurlEasyErrorText.cs'
+        $newHome = Join-Path $temp 'Libcurl/Misc/ErrorText/CurlEasyErrorText.cs'
+        Report ($state['exitcodes:1:strerror'].evidence -like 'Curl.Console/CurlEasyErrorText.cs at *') 'the text table is read from Curl.Console before the move'
+        New-Item -ItemType Directory -Path (Split-Path $newHome -Parent) -Force | Out-Null
+        Move-Item -LiteralPath $oldHome -Destination $newHome
+        Invoke-ExitCodeGap (Join-Path $fixtures 'upstream') '9.9.9' $temp $out $false $elsewhere | Out-Null
+        $moved = [System.IO.File]::ReadAllText($out) | ConvertFrom-Json
+        $sameStates = (@($moved.items | ForEach-Object { "$($_.key)=$($_.state)" }) -join ';') -eq (@($measurement.items | ForEach-Object { "$($_.key)=$($_.state)" }) -join ';')
+        Report ($sameStates -and ($moved.counts | ConvertTo-Json -Compress) -eq ($measurement.counts | ConvertTo-Json -Compress)) 'moving the text table to Libcurl/Misc/ErrorText scores identically'
+        Report (@($moved.items | Where-Object { $_.key -eq 'exitcodes:1:strerror' })[0].evidence -like 'Libcurl/Misc/ErrorText/CurlEasyErrorText.cs at *') 'the evidence names the text table where it now lives'
+
+        Remove-Item -LiteralPath $newHome
         Invoke-ExitCodeGap (Join-Path $fixtures 'upstream') '9.9.9' $temp $out $false $null | Out-Null
         $missing = [System.IO.File]::ReadAllText($out) | ConvertFrom-Json
         Report (@($missing.items | Where-Object { $_.state -eq 'unmeasured' -and $_.reason -eq 'source-not-found' }).Count -eq ($missing.counts.y)) 'a missing Curl source gives source-not-found'
