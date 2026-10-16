@@ -4,7 +4,7 @@ namespace Curl.Api;
 
 /// <summary>
 /// The <c>CURLOPT_HEADERFUNCTION</c> of one <see cref="CurlClient.SendAsync"/> transfer: splits the
-/// header lines it is given into the final response's reason phrase, header fields and trailer
+/// header lines it is given into the final response's status code, version, reason phrase, header fields and trailer
 /// fields. A status line starts a new response and drops what the previous one collected; a field
 /// after the blank line that ends a response's headers is a trailer.
 /// </summary>
@@ -13,6 +13,21 @@ internal sealed class ResponseHeaderCollector
     private List<KeyValuePair<string, string>> _headers = [];
     private List<KeyValuePair<string, string>> _trailers = [];
     private bool _headersEnded;
+
+    /// <summary>The <c>CURL_HTTP_VERSION_*</c> value of each status line's protocol word.</summary>
+    private static readonly Dictionary<string, long> HttpVersions = new(StringComparer.Ordinal)
+    {
+        ["HTTP/1.0"] = 1,
+        ["HTTP/1.1"] = 2,
+        ["HTTP/2"] = 3,
+        ["HTTP/3"] = 30,
+    };
+
+    /// <summary>The last status line's status code; 0 when no status line came or its code is not a number.</summary>
+    public int StatusCode { get; private set; }
+
+    /// <summary>The last status line's version as a <c>CURL_HTTP_VERSION_*</c> value; 0 when none came or it is not one of 1.0, 1.1, 2 and 3.</summary>
+    public long HttpVersion { get; private set; }
 
     /// <summary>The last status line's reason phrase; empty when it had none.</summary>
     public string ReasonPhrase { get; private set; } = "";
@@ -51,6 +66,8 @@ internal sealed class ResponseHeaderCollector
         _trailers = [];
         _headersEnded = false;
         string[] parts = statusLine.Split(' ', 3);
+        HttpVersion = HttpVersions.GetValueOrDefault(parts[0]);
+        StatusCode = parts.Length > 1 && int.TryParse(parts[1], System.Globalization.CultureInfo.InvariantCulture, out int code) ? code : 0;
         ReasonPhrase = parts.Length == 3 ? parts[2].Trim() : "";
     }
 

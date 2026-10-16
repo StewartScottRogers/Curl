@@ -118,9 +118,35 @@ public sealed class CurlClientSendAsyncTests
             new KeyValuePair<string, string>[] { new("Content-Type", "text/plain") }, response.Headers.ToArray());
         CollectionAssert.AreEqual(new KeyValuePair<string, string>[] { new("X-Sum", "9") }, response.Trailers.ToArray());
         Assert.AreSame(info, response.Info);
-        Assert.AreSame(Stream.Null, response.Body);
         Assert.AreEqual(2, easy.BodyBytesTaken);
         Assert.IsTrue(easy.Disposed);
+        await using Stream body = response.Body;
+        using MemoryStream copy = new();
+        await body.CopyToAsync(copy);
+        CollectionAssert.AreEqual(new byte[] { 1, 2 }, copy.ToArray());
+    }
+
+    [TestMethod]
+    public async Task SendAsync_StatusLineDisagreesWithTransferInfo_TakesTheStatusLine()
+    {
+        ScriptedEasyTransfer easy = new() { Info = new() { ResponseCode = 0, HttpVersion = 0 } };
+        easy.HeaderLines.AddRange(["HTTP/2 404\r\n", "\r\n"]);
+
+        (CurlResponse response, _) = await SendAsync(new(HttpMethod.Get, "http://example/"), easy);
+
+        Assert.AreEqual(404, response.StatusCode);
+        Assert.AreEqual(System.Net.HttpVersion.Version20, response.Version);
+    }
+
+    [TestMethod]
+    public async Task SendAsync_NoStatusLine_TakesStatusAndVersionFromTransferInfo()
+    {
+        ScriptedEasyTransfer easy = new() { Info = new() { ResponseCode = 226, HttpVersion = 0 } };
+
+        (CurlResponse response, _) = await SendAsync(new(HttpMethod.Get, "ftp://example/f"), easy);
+
+        Assert.AreEqual(226, response.StatusCode);
+        Assert.AreEqual(System.Net.HttpVersion.Unknown, response.Version);
     }
 
     [TestMethod]
@@ -128,9 +154,33 @@ public sealed class CurlClientSendAsyncTests
     {
         using CancellationTokenSource source = new();
 
-        (_, ScriptedEasyTransfer easy) = await SendAsync(new(HttpMethod.Get, "http://example/"), cancellationToken: source.Token);
+        (CurlResponse response, ScriptedEasyTransfer easy) = await SendAsync(new(HttpMethod.Get, "http://example/"), cancellationToken: source.Token);
+        await source.CancelAsync();
 
-        Assert.AreEqual(source.Token, easy.PerformedToken);
+        Assert.IsTrue(easy.PerformedToken.IsCancellationRequested);
+        await response.Body.DisposeAsync();
+    }
+
+    [TestMethod]
+    public async Task SendAsync_ReturnsOnceTheBodyStarts_AndTheBodyStreamsTheRest()
+    {
+        ResponseBodies.SteppedEasyTransfer easy = new() { Info = new() { ResponseCode = 0 } };
+        await using CurlClient client = new(new ScriptedCurlEngine(easy));
+        Task<CurlResponse> sending = client.SendWithBodyCapacityAsync(new(HttpMethod.Get, "http://example/"), 2, CancellationToken.None);
+        easy.Options.Callbacks.Header!("HTTP/1.1 200 OK\r\n"u8);
+        easy.Options.Callbacks.Header!("\r\n"u8);
+        easy.Deliver(1, 2);
+
+        CurlResponse response = await sending;
+        easy.Deliver(3, 4, 5);
+        easy.Finish(CurlCode.Ok);
+        await using Stream body = response.Body;
+        using MemoryStream copy = new();
+        await body.CopyToAsync(copy);
+
+        Assert.AreEqual(200, response.StatusCode);
+        Assert.AreEqual(System.Net.HttpVersion.Version11, response.Version);
+        CollectionAssert.AreEqual(new byte[] { 1, 2, 3, 4, 5 }, copy.ToArray());
     }
 
     [TestMethod]

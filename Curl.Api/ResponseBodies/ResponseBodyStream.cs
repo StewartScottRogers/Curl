@@ -1,0 +1,142 @@
+using Curl.Api.Callbacks;
+using Curl.Api.EngineContracts;
+using Curl.Api.Errors;
+
+namespace Curl.Api;
+
+/// <summary>
+/// <see cref="CurlResponse.Body"/> while its transfer runs (ADR-0635): a read-only, forward-only
+/// <see cref="Stream"/> over a <see cref="ResponseBodyBuffer"/> that the transfer's write callback
+/// (<see cref="TakeBody"/>) fills. It owns the easy handle: the handle is disposed when the transfer
+/// ends, and disposing the stream before then aborts the transfer. Reading is asynchronous only.
+/// </summary>
+internal sealed class ResponseBodyStream : Stream
+{
+    /// <summary>The bytes buffered before the transfer is paused for a reader that has fallen behind.</summary>
+    public const int DefaultCapacity = 64 * 1024;
+
+    private readonly IEasyTransfer _easy;
+    private readonly ResponseBodyBuffer _buffer;
+    private readonly CancellationTokenSource _abort;
+    private Task _transfer = Task.CompletedTask;
+    private Task? _closing;
+
+    /// <summary>A body for the transfer <paramref name="easy"/> is about to perform.</summary>
+    /// <param name="easy">The handle; the stream disposes it once its transfer ends.</param>
+    /// <param name="capacity">The bytes buffered before the transfer is paused.</param>
+    /// <param name="cancellationToken">Aborts the transfer, as disposing the stream does.</param>
+    public ResponseBodyStream(IEasyTransfer easy, int capacity, CancellationToken cancellationToken)
+    {
+        _easy = easy;
+        _abort = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        _buffer = new ResponseBodyBuffer(capacity, () => easy.Pause(CurlPause.Continue));
+    }
+
+    /// <summary>The <c>CURLOPT_WRITEFUNCTION</c> that fills the stream.</summary>
+    public WriteCallback TakeBody => _buffer.Write;
+
+    /// <inheritdoc />
+    public override bool CanRead => _closing is null;
+
+    /// <inheritdoc />
+    public override bool CanSeek => false;
+
+    /// <inheritdoc />
+    public override bool CanWrite => false;
+
+    /// <inheritdoc />
+    public override long Length => throw new NotSupportedException();
+
+    /// <inheritdoc />
+    public override long Position
+    {
+        get => throw new NotSupportedException();
+        set => throw new NotSupportedException();
+    }
+
+    /// <summary>
+    /// Starts the transfer and waits until its body starts or it ends. A transfer that has ended by
+    /// then with an error throws here, with the handle already disposed; a later failure is thrown by
+    /// <see cref="ReadAsync(Memory{byte}, CancellationToken)"/>.
+    /// </summary>
+    /// <returns>A task that completes once the body has started or the transfer has ended.</returns>
+    /// <exception cref="CurlException">The transfer ended with an error before the body could be read.</exception>
+    public async Task StartAsync()
+    {
+        _transfer = PerformAsync();
+        await Task.WhenAny(_buffer.Started, _transfer).ConfigureAwait(false);
+        if (_buffer.Ended || _transfer.IsCompleted)
+        {
+            await _transfer.ConfigureAwait(false);
+            _buffer.ThrowIfFailed();
+        }
+    }
+
+    /// <summary>Reads the next bytes of the body, waiting for the transfer to deliver some.</summary>
+    /// <param name="buffer">Where the bytes go.</param>
+    /// <param name="cancellationToken">Stops this read only; the transfer goes on.</param>
+    /// <returns>The bytes read; 0 once the whole body has been read.</returns>
+    /// <exception cref="ObjectDisposedException">The stream has been disposed.</exception>
+    /// <exception cref="CurlException">The transfer failed before the rest of the body arrived.</exception>
+    /// <exception cref="OperationCanceledException"><paramref name="cancellationToken"/> was cancelled while waiting.</exception>
+    public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+    {
+        ObjectDisposedException.ThrowIf(_closing is not null, this);
+        return _buffer.ReadAsync(buffer, cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken) =>
+        ReadAsync(buffer.AsMemory(offset, count), cancellationToken).AsTask();
+
+    /// <summary>Not supported: the body arrives asynchronously, so read it with <c>ReadAsync</c> or <c>CopyToAsync</c>.</summary>
+    /// <exception cref="NotSupportedException">Always.</exception>
+    public override int Read(byte[] buffer, int offset, int count) =>
+        throw new NotSupportedException("A streamed response body is read asynchronously; use ReadAsync or CopyToAsync.");
+
+    /// <inheritdoc />
+    public override void Flush()
+    {
+    }
+
+    /// <inheritdoc />
+    public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+
+    /// <inheritdoc />
+    public override void SetLength(long value) => throw new NotSupportedException();
+
+    /// <inheritdoc />
+    public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+
+    /// <summary>Aborts the transfer if it is still running and disposes the handle once it ends.</summary>
+    /// <returns>A task that completes once the handle is disposed.</returns>
+    public override async ValueTask DisposeAsync()
+    {
+        Dispose();
+        await _closing!.ConfigureAwait(false);
+    }
+
+    /// <summary>Aborts the transfer if it is still running; the handle is disposed once it ends.</summary>
+    /// <param name="disposing">Ignored: the stream has no finalizer, so it is always <see langword="true"/>.</param>
+    protected override void Dispose(bool disposing)
+    {
+        _closing ??= CloseAsync();
+        base.Dispose(disposing);
+    }
+
+    private async Task PerformAsync()
+    {
+        await using (_easy.ConfigureAwait(false))
+        {
+            _buffer.Complete(await _easy.PerformAsync(_abort.Token).ConfigureAwait(false), _easy.ErrorText);
+        }
+    }
+
+    private async Task CloseAsync()
+    {
+        _buffer.Abort();
+        await _abort.CancelAsync().ConfigureAwait(false);
+        await _transfer.ConfigureAwait(false);
+        _abort.Dispose();
+    }
+}

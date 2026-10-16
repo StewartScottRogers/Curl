@@ -27,12 +27,22 @@ public sealed record CurlResponse
     /// </summary>
     public IReadOnlyList<KeyValuePair<string, string>> Headers { get; init; } = [];
 
-    /// <summary>The trailer fields received after the body, in the order received with their casing.</summary>
+    /// <summary>
+    /// The trailer fields received after the body, in the order received with their casing; complete
+    /// once <see cref="Body"/> has been read to its end.
+    /// </summary>
     public IReadOnlyList<KeyValuePair<string, string>> Trailers { get; init; } = [];
 
-    /// <summary>Everything the transfer reported (<c>curl_easy_getinfo</c>).</summary>
+    /// <summary>
+    /// What the transfer reported (<c>curl_easy_getinfo</c>) when <see cref="CurlClient.SendAsync"/>
+    /// returned; final only when the transfer had already ended by then.
+    /// </summary>
     public TransferInfo Info { get; init; } = new();
 
-    /// <summary>The response body. Always empty for now: streamed bodies are BL-2501.</summary>
+    /// <summary>
+    /// The response body, read asynchronously as the transfer delivers it (ADR-0635). Disposing it
+    /// before its end aborts the transfer; a failure after the body started is thrown by its
+    /// <c>ReadAsync</c> as a <see cref="Errors.CurlException"/>. <see cref="Stream.Null"/> by default.
+    /// </summary>
     public Stream Body { get; init; } = Stream.Null;
 }

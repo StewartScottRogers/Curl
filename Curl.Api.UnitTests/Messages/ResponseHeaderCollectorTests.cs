@@ -31,6 +31,30 @@ public sealed class ResponseHeaderCollectorTests
     }
 
     [TestMethod]
+    [DataRow("HTTP/1.0 301 Moved\r\n", 301, 1L)]
+    [DataRow("HTTP/1.1 200 OK\r\n", 200, 2L)]
+    [DataRow("HTTP/2 204\r\n", 204, 3L)]
+    [DataRow("HTTP/3 404\r\n", 404, 30L)]
+    [DataRow("HTTP/0.9 2xx odd\r\n", 0, 0L)]
+    [DataRow("HTTP/1.1\r\n", 0, 2L)]
+    public void Take_StatusLine_GivesStatusCodeAndCurlHttpVersion(string statusLine, int statusCode, long httpVersion)
+    {
+        ResponseHeaderCollector collector = Collect(statusLine);
+
+        Assert.AreEqual(statusCode, collector.StatusCode);
+        Assert.AreEqual(httpVersion, collector.HttpVersion);
+    }
+
+    [TestMethod]
+    public void Take_NoStatusLine_LeavesStatusCodeAndVersionZero()
+    {
+        ResponseHeaderCollector collector = Collect("X-A: 1\r\n");
+
+        Assert.AreEqual(0, collector.StatusCode);
+        Assert.AreEqual(0L, collector.HttpVersion);
+    }
+
+    [TestMethod]
     public void Take_StatusLineWithoutReason_GivesEmptyReason()
     {
         ResponseHeaderCollector collector = Collect("HTTP/2 204\r\n", "\r\n");

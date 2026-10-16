@@ -9,13 +9,14 @@ internal static class CurlRequestOptions
 {
     /// <summary>
     /// <paramref name="options"/> with the request's URL, method, headers and body set, the header
-    /// lines going to <paramref name="header"/> and the body bytes discarded (streamed bodies are BL-2501).
+    /// lines going to <paramref name="header"/> and the body bytes to <paramref name="write"/>.
     /// </summary>
     /// <param name="options">The handle's options, with the client's defaults already applied.</param>
     /// <param name="request">The request to perform.</param>
     /// <param name="header">The <c>CURLOPT_HEADERFUNCTION</c> that takes the response's header lines.</param>
+    /// <param name="write">The <c>CURLOPT_WRITEFUNCTION</c> that takes the response's body.</param>
     /// <returns>The options to perform the request with.</returns>
-    public static EasyOptions Apply(EasyOptions options, CurlRequest request, HeaderCallback header)
+    public static EasyOptions Apply(EasyOptions options, CurlRequest request, HeaderCallback header, WriteCallback write)
     {
         bool post = request.Body is not null || request.Method == HttpMethod.Post;
         EasyOptions applied = options with
@@ -23,7 +24,7 @@ internal static class CurlRequestOptions
             Network = options.Network with { Url = request.Url },
             Transfer = ApplyMethod(options.Transfer, request.Method, post),
             Http = options.Http with { HttpHeaders = [.. request.Headers.Select(HeaderLine)], Post = post },
-            Callbacks = options.Callbacks with { Header = header, Write = DiscardBody },
+            Callbacks = options.Callbacks with { Header = header, Write = write },
         };
         return post ? (request.Body ?? CurlContent.Empty).ApplyTo(applied) : applied;
     }
@@ -44,6 +45,4 @@ internal static class CurlRequestOptions
 
     private static string HeaderLine(KeyValuePair<string, string> field) =>
         field.Value.Length == 0 ? $"{field.Key};" : $"{field.Key}: {field.Value}";
-
-    private static long DiscardBody(ReadOnlySpan<byte> data) => data.Length;
 }

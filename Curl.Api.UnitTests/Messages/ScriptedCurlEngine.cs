@@ -6,8 +6,8 @@ using Curl.Api.EngineContracts.Url;
 
 namespace Curl.Api.Messages;
 
-/// <summary>An <see cref="ICurlEngine"/> whose one easy handle is the <see cref="ScriptedEasyTransfer"/> it was given.</summary>
-internal sealed class ScriptedCurlEngine(ScriptedEasyTransfer easy) : ICurlEngine
+/// <summary>An <see cref="ICurlEngine"/> whose one easy handle is the fake it was given.</summary>
+internal sealed class ScriptedCurlEngine(IEasyTransfer easy) : ICurlEngine
 {
     public CurlVersionInfo VersionInfo => throw new NotSupportedException();
 
