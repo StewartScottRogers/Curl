@@ -246,7 +246,7 @@ object, never static, so two engines in one process share nothing; `DisposeAsync
 connections. `CreateDispatcher` builds a transfer's dispatcher as `Curl.Console`'s composition
 builds an option group's: `EngineComposition.CreateTransports` over the handle's easy groups and the
 engine's caches, then `CreateProtocolHandlers` over its pooling connector. `CreateMulti`
-gives a `ManagedMultiTransfer` (BL-2424, below) and `CreateUrl` a `ManagedCurlUrlHandle` (BL-2436, below); `CreateShare`, `CreateMime` and
+gives a `ManagedMultiTransfer` (BL-2424, below) and `CreateUrl` a `ManagedCurlUrlHandle` (BL-2436 and BL-2437, below); `CreateShare`, `CreateMime` and
 `CreateForm` throw `NotSupportedException`: they are phase 3 work.
 
 `ManagedEasyTransfer` is its `IEasyTransfer`. `PerformAsync` reads `EasyNetworkOptions.Url` (none is
@@ -343,4 +343,8 @@ Each `ManagedEasyTransfer` owns an `EasyPauseGate` (the handle's `CurlPause` bit
 
 ## The URL handle's get (BL-2436)
 
-`ManagedCurlEngine.CreateUrl` gives a `ManagedCurlUrlHandle`, the engine's `ICurlUrlHandle`, holding a `UrlHandleParts` (one nullable field per part, as upstream's `struct Curl_URL`). `Set` parses a whole URL with `CurlUrl` (`UrlHandleParts.Of`: the written port recovered from the text without leading zeros, the scheme guessed when the text does not start with it) under `CURLU_DEFAULT_SCHEME`, `GUESS_SCHEME` (else `BadScheme`), `PATH_AS_IS` and `DISALLOW_USER`, mapping each `CurlUrlRejection` to its `CurlUrlCode`. `Get` reads every part as curl 8.22.0's `curl_url_get`, with the `CURLUE_NO_*` code for a part not set, and every get flag; `UrlPartText` holds the decode, encode, escape and punycode transforms. Setting other parts, clearing, relative URLs and `Duplicate` throw `NotSupportedException` until BL-2437 (ADR-0601). Its tests are `ManagedCurlUrlHandleTests`.
+`ManagedCurlEngine.CreateUrl` gives a `ManagedCurlUrlHandle`, the engine's `ICurlUrlHandle`, holding a `UrlHandleParts` (one nullable field per part, as upstream's `struct Curl_URL`). `Set` parses a whole URL with `CurlUrl` (`UrlHandleParts.Of`: the written port recovered from the text without leading zeros, the scheme guessed when the text does not start with it) under `CURLU_DEFAULT_SCHEME`, `GUESS_SCHEME` (else `BadScheme`), `PATH_AS_IS` and `DISALLOW_USER`, mapping each `CurlUrlRejection` to its `CurlUrlCode`. `Get` reads every part as curl 8.22.0's `curl_url_get`, with the `CURLUE_NO_*` code for a part not set, and every get flag; `UrlPartText` holds the decode, encode, escape and punycode transforms (ADR-0601). Its tests are `ManagedCurlUrlHandleTests`.
+
+## The URL handle's set, dup and clear (BL-2437)
+
+`Set` with a null value clears the part (`UrlPartSetter.Cleared`; the whole URL clears them all), and with a value sets any part as curl 8.22.0's `curl_url_set` (`UrlPartSetter.Set`, answering a `UrlSetResult`): the scheme, port and host checked with upstream's `CurlUrlCode`s, `CURLU_URLENCODE` escaping, `CURLU_APPENDQUERY` joining with one `&`, `CURLU_NON_SUPPORT_SCHEME` and `CURLU_NO_AUTHORITY`, and the handle unchanged on failure. A whole URL that is not absolute (`UrlRelativeReference.IsAbsolute`) is resolved against the URL held (`UrlRelativeReference.Resolve`, upstream's `redirect_url`); a scheme libcurl does not support (`UrlHandleParts.IsSupportedScheme`) is `UnsupportedScheme` without `CURLU_NON_SUPPORT_SCHEME`; under `CURLU_ALLOW_SPACE` spaces are parsed as `%20` and put back (`UrlHandleParts.WithSpaces`). `Duplicate` is a new handle over the same immutable parts (ADR-0602). Its tests are `ManagedCurlUrlHandleTests.Set.cs` and `UrlRelativeReferenceTests`.
