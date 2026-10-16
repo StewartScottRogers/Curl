@@ -38,7 +38,7 @@ public sealed class CurlRequestTests
         CurlRequest changed = original with { Body = new byte[] { 1 } };
 
         Assert.IsNull(original.Body);
-        Assert.AreEqual(1, changed.Body!.Value.Length);
+        Assert.AreEqual(1, ((BytesContent)changed.Body!).Bytes.Length);
         Assert.AreEqual(original.Url, changed.Url);
     }
 }

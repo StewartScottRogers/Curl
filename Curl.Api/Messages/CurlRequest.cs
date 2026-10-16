@@ -45,8 +45,9 @@ public sealed record CurlRequest
     } = [];
 
     /// <summary>
-    /// The request body (<c>CURLOPT_POSTFIELDS</c> with its size), or <see langword="null"/> for none.
+    /// The request body, or <see langword="null"/> for none: bytes (<c>CURLOPT_POSTFIELDS</c> with
+    /// their size; a byte array converts implicitly) or a stream (<see cref="CurlContent.FromStream"/>).
     /// A body sent with a method other than <c>POST</c> keeps that method. Default <see langword="null"/>.
     /// </summary>
-    public ReadOnlyMemory<byte>? Body { get; init; }
+    public CurlContent? Body { get; init; }
 }

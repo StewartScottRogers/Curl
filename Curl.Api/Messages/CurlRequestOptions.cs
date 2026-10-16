@@ -1,7 +1,6 @@
 using Curl.Api.Callbacks;
 using Curl.Api.Options;
 using Curl.Api.Options.Behaviour;
-using Curl.Api.Options.Http;
 
 namespace Curl.Api;
 
@@ -19,13 +18,14 @@ internal static class CurlRequestOptions
     public static EasyOptions Apply(EasyOptions options, CurlRequest request, HeaderCallback header)
     {
         bool post = request.Body is not null || request.Method == HttpMethod.Post;
-        return options with
+        EasyOptions applied = options with
         {
             Network = options.Network with { Url = request.Url },
             Transfer = ApplyMethod(options.Transfer, request.Method, post),
-            Http = ApplyHeadersAndBody(options.Http, request, post),
+            Http = options.Http with { HttpHeaders = [.. request.Headers.Select(HeaderLine)], Post = post },
             Callbacks = options.Callbacks with { Header = header, Write = DiscardBody },
         };
+        return post ? (request.Body ?? CurlContent.Empty).ApplyTo(applied) : applied;
     }
 
     private static EasyTransferOptions ApplyMethod(EasyTransferOptions transfer, HttpMethod method, bool post) =>
@@ -34,18 +34,6 @@ internal static class CurlRequestOptions
             NoBody = method == HttpMethod.Head,
             CustomRequest = IsImpliedBy(method, post) ? null : method.Method,
         };
-
-    private static EasyHttpOptions ApplyHeadersAndBody(EasyHttpOptions http, CurlRequest request, bool post)
-    {
-        ReadOnlyMemory<byte>? postFields = post ? request.Body ?? ReadOnlyMemory<byte>.Empty : default(ReadOnlyMemory<byte>?);
-        return http with
-        {
-            HttpHeaders = [.. request.Headers.Select(HeaderLine)],
-            Post = post,
-            PostFields = postFields,
-            PostFieldSize = postFields?.Length ?? -1,
-        };
-    }
 
     /// <summary>
     /// Whether libcurl sends <paramref name="method"/> without <c>CURLOPT_CUSTOMREQUEST</c>:
