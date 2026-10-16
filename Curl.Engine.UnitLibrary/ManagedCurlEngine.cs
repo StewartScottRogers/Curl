@@ -5,6 +5,7 @@ using Curl.Api.EngineContracts.Multi;
 using Curl.Api.EngineContracts.Share;
 using Curl.Api.EngineContracts.Url;
 using Curl.Api.Options;
+using Curl.Api.Options.Protocols;
 using Curl.Core;
 using Curl.Core.FileSystem;
 using Curl.Core.Multipart;
@@ -117,8 +118,18 @@ public sealed class ManagedCurlEngine : ICurlEngine
             negotiateOptions: NegotiateOptionsMapping.Of(options.Authentication),
             ftpDataConnector: PoolOf(transports, transports.TcpConnector.ForFtpDataConnections(), options.Callbacks, shared),
             ftpWildcardHooks: CallbackWildcardHooks.Of(options),
-            rtspInterleaveSink: CallbackInterleaveSink.Of(options.Callbacks.Interleave)));
+            rtspInterleaveSink: CallbackInterleaveSink.Of(options.Callbacks.Interleave),
+            webSocketRawMode: IsWebSocketRawMode(options)));
     }
+
+    /// <summary>
+    /// Gives whether <c>CURLOPT_WS_OPTIONS</c> holds <c>CURLWS_RAW_MODE</c>, under which a WebSocket transfer that
+    /// is not connect-only hands the write callback the received stream unframed (BL-2494).
+    /// </summary>
+    /// <param name="options">The transfer's options.</param>
+    /// <returns><see langword="true" /> when <see cref="WebSocketOptionBits.RawMode" /> is set.</returns>
+    internal static bool IsWebSocketRawMode(EasyOptions options) =>
+        (options.Protocols.WebSocket.Options & WebSocketOptionBits.RawMode) != 0;
 
     /// <summary>
     /// Builds the connector a <c>CURLOPT_CONNECT_ONLY</c> 1 perform dials through: the <c>TcpConnector</c> of

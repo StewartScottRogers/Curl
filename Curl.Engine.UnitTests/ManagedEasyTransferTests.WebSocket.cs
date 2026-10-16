@@ -6,6 +6,7 @@ using Curl.Api.Options;
 using Curl.Api.Options.Network;
 using Curl.Api.Options.Protocols;
 using Curl.Authentication;
+using Curl.Core;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Ws;
 
@@ -162,6 +163,42 @@ public sealed partial class ManagedEasyTransferTests
         Assert.IsTrue(peer.IsDisposed);
         Assert.AreSame(easy.WebSocketRandomSource, copy.WebSocketRandomSource);
         await copy.DisposeAsync();
+    }
+
+    [TestMethod]
+    [DataRow(WebSocketOptionBits.RawMode, "\x81\x02hi\x89\x01?")]
+    [DataRow(WebSocketOptionBits.None, "hi")]
+    public async Task PerformAsync_WebSocketTransferToTheWriteCallback_HandsOverRawFramesOnlyUnderRawMode(WebSocketOptionBits bits, string expectedBody)
+    {
+        byte[] frames = [.. ManagedEasyWebSocketTests.ServerFrame(WsOpcode.Text, true, "hi"), .. ManagedEasyWebSocketTests.ServerFrame(WsOpcode.Ping, true, "?")];
+        ScriptedConnector connector = new([[.. Ascii(SwitchingProtocolsHead), .. frames]]);
+        await using IEasyTransfer easy = new ManagedCurlEngine(TimeProvider.System, (options, _, cookies) => new ProtocolDispatcher(EngineComposition.CreateProtocolHandlers(
+            connector,
+            new RecordingDatagramConnector(CurlExitCode.CouldntConnect, ConnectFailure),
+            new PassThroughTlsProvider(),
+            new LoopbackDnsResolver(),
+            cookies,
+            webSocketRawMode: ManagedCurlEngine.IsWebSocketRawMode(options)))).CreateEasy();
+        MemoryStream body = new();
+        easy.Options = new EasyOptions
+        {
+            Network = new EasyNetworkOptions { Url = "ws://h/chat" },
+            Protocols = new EasyProtocolOptions { WebSocket = new EasyWebSocketOptions { Options = bits } },
+            Callbacks = new()
+            {
+                Write = data =>
+                {
+                    body.Write(data);
+                    return data.Length;
+                },
+            },
+        };
+
+        CurlCode code = await easy.PerformAsync(CancellationToken.None);
+
+        Assert.AreEqual(CurlCode.Ok, code);
+        Assert.AreEqual(expectedBody, Encoding.Latin1.GetString(body.ToArray()));
+        Assert.AreEqual(101, easy.Info.ResponseCode);
     }
 
     [TestMethod]

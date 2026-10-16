@@ -38,3 +38,8 @@ through the transfer's events when the handler's `TracesFrames` is set - the chu
 upload reader after the `101`, each frame decoded and each run of payload passed on (from
 `WsFrameDecoder`), the pong sent (from `WsFrameReceiver`), the upload frame encoded and
 `websocket established, callback mode`.
+
+`CURLWS_RAW_MODE` on a transfer that exchanges frames (BL-2494): with `WsProtocolHandler.RawMode`
+set, `WsFrameReceiver` hands every byte after the `101` to the output as it came, frame heads
+included, decoding nothing and answering no ping, as curl 8.22.0's `ws_cw_write` passes the body
+on under `ws_raw_mode`; the `-T` upload is still sent as one frame.

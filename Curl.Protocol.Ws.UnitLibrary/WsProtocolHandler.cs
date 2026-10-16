@@ -78,6 +78,14 @@ public sealed class WsProtocolHandler(
     /// </summary>
     public bool TracesFrames { get; init; }
 
+    /// <summary>
+    /// Gets a value indicating whether each transfer that exchanges frames writes the bytes received
+    /// after the <c>101</c> to the output as they came, frame heads included, decoding nothing and
+    /// answering no ping: libcurl's <c>CURLWS_RAW_MODE</c> on a transfer that is not connect-only, as
+    /// curl 8.22.0's <c>ws_cw_write</c> passes the stream on under <c>ws_raw_mode</c> (BL-2494).
+    /// </summary>
+    public bool RawMode { get; init; }
+
     /// <inheritdoc />
     /// <exception cref="ArgumentNullException">
     /// <paramref name="context" /> is <see langword="null" />.
@@ -530,7 +538,7 @@ public sealed class WsProtocolHandler(
         TransferReport report,
         WsFrameTrace trace)
     {
-        var receiver = new WsFrameReceiver(connection, randomSource, context.Progress, context.Events, context.DiagnosticLog, trace, context.MaxFileSize);
+        var receiver = new WsFrameReceiver(connection, randomSource, context.Progress, context.Events, context.DiagnosticLog, trace, context.MaxFileSize, RawMode);
         Func<ReadOnlyMemory<byte>, CancellationToken, ValueTask> writePayload =
             (payload, token) => WriteAsync(context.Output, payload, token);
         long uploaded = 0;

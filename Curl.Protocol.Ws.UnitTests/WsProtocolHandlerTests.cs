@@ -293,6 +293,29 @@ public sealed class WsProtocolHandlerTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_RawMode_WritesTheFrameBytesAsTheyCameAndSendsNoPong()
+    {
+        // curl 8.22.0's ws_cw_write passes the body to the next writer unchanged under ws_raw_mode (BL-2494).
+        var diagnostics = TestDiagnostics.For(TestContext);
+        var output = new MemoryStream();
+        var connection = new ScriptedConnection(Bytes(Head101 + "\x81\x02hi"), Bytes("\x89\x01?\x88\x02\x03\xe8"));
+        diagnostics.Arrange("frames", "text hi, then ping ? and close 1000 in a later read");
+
+        TransferResult result = await new WsProtocolHandler(Connector(connection), new RecordingAuthenticator(), new FixedRandomSource()) { RawMode = true }
+            .ExecuteAsync(Context("ws://127.0.0.1:47901/chat", output));
+
+        string actualWritten = Encoding.Latin1.GetString(output.ToArray());
+        diagnostics.Act("result", Describe(result));
+        diagnostics.Act("output", actualWritten);
+        diagnostics.Diff("output", "\x81\x02hi\x89\x01?\x88\x02\x03\xe8", actualWritten);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual("\x81\x02hi\x89\x01?\x88\x02\x03\xe8", actualWritten);
+        Assert.AreEqual(Request, Encoding.Latin1.GetString(connection.Sent));
+        Assert.AreEqual(11L, result.Report!.DownloadSize);
+        Assert.AreEqual(11L, result.Report.DeliveredSize);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_101ThenNoFrame_FailsWithEmptyReplyAndKeepsCode101()
     {
         // Measured: exit 52, "Empty reply from server", -w "0 101 0 102 192".
