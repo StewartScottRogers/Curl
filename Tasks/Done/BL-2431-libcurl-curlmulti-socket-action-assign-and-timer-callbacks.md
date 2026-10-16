@@ -30,7 +30,7 @@ ADR-0506; phase 3 of `Documentation/Planning/Curl-Api-And-libcurl.md`. Read the 
 
 ## Notes
 
-- Plan (ADR-0582): `Libcurl/Multi/Sockets/CurlMulti.Sockets.cs` adds `SocketActionAsync` and `Assign`,
+- Plan (ADR-0588): `Libcurl/Multi/Sockets/CurlMulti.Sockets.cs` adds `SocketActionAsync` and `Assign`,
   straight calls to the seam's `IMultiTransfer`, and internal `SetSocketFunction`/`SetTimerFunction`
   that wrap Libcurl's own `CurlMultiSocketCallback` (given the added `CurlEasy`) and
   `CurlMultiTimerCallback` (given the `CurlMulti`) into `MultiOptions.Socket`/`Timer`.
