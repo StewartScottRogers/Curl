@@ -158,6 +158,26 @@ internal sealed class ManagedEasyTransfer(
     internal EngineToolTransferProgress? ToolProgress { get; set; }
 
     /// <summary>
+    /// Gets or sets the curl tool's runner's follower and context factory for each transfer - its option group's
+    /// <c>TransferDispatch</c> behind a <see cref="RedirectFollower" />, and its own <see cref="TransferContextFactory" />
+    /// with standard input, the platform's credential encoding, the run's diagnostic log and HSTS store - for
+    /// <c>Curl.Console</c> to set per transfer once its runner performs from the options (BL-2394, BL-2479, ADR-0614).
+    /// While set, a perform from the options runs through that follower and builds its context with that factory, in
+    /// place of the dispatcher the engine's factory builds and a factory with no standard input; <see langword="null" />,
+    /// as for every <c>Curl.Api</c> and <c>Libcurl</c> handle, to build both itself. <see cref="Duplicate" /> does not
+    /// copy it and <see cref="Reset" /> clears it, as it belongs to one transfer.
+    /// </summary>
+    internal EngineToolTransferDispatch? ToolDispatch { get; set; }
+
+    /// <summary>
+    /// Gets the context the last perform from the options built, for the curl tool's <c>--retry</c> and
+    /// <c>%{conn_id}</c> reuse, which read its parsed <see cref="TransferContext.Url" /> (BL-2479); <see langword="null" />
+    /// before the first perform and after one that failed before building it (no URL set, one that does not parse, a
+    /// connect-only perform or a form that could not be built).
+    /// </summary>
+    internal TransferContext? LastContext { get; private set; }
+
+    /// <summary>
     /// Gets the whole result of the last perform, for the curl tool's <c>--retry</c>, failure lines and <c>-w</c>,
     /// which read more of it than <see cref="Info" /> carries (ADR-0554); <see langword="null" /> before the first
     /// perform, after one that failed before connecting (no URL set, or one that does not parse), and after one
@@ -261,6 +281,7 @@ internal sealed class ManagedEasyTransfer(
     {
         EasyOptions options = Options;
         LastResult = null;
+        LastContext = null;
         if (options.Network.Url is not { } urlText)
         {
             return Finish(CurlCode.UrlMalformat, NoUrlSetText, new TransferInfo());
@@ -381,7 +402,8 @@ internal sealed class ManagedEasyTransfer(
         CookieEngine? cookies = CookieEngine.FromHttpOptions(options.Http, PerformShared.Cookies);
         (EngineTransferState state, TlsVerifyResultRecordingTransferEvents events) = StateAndEventsOf(ToolEvents, options);
         string transferUrl = await SetUpUnlessToolDidAsync(toolInputs, options, settings, cookies, state, urlText, events).ConfigureAwait(false);
-        RedirectFollower follower = new(createDispatcher(options, PerformShared, HandlerCookieStoreOf(cookies)));
+        EngineToolTransferDispatch? toolDispatch = ToolDispatch;
+        RedirectFollower follower = FollowerOf(toolDispatch, options, cookies);
         EngineToolTransferInputs inputs = MimePostForm.WithBody(InputsOf(toolInputs, options, state, PauseGateFor(url)), formBody, url.Scheme);
         CallbackReadStream? callbackUpload = inputs.Upload as CallbackReadStream;
         EngineToolTransferProgress? toolProgress = ToolProgress;
@@ -391,6 +413,7 @@ internal sealed class ManagedEasyTransfer(
             follower,
             state,
             CreateContext(
+                toolDispatch,
                 options,
                 settings,
                 TransferUrlOf(transferUrl, urlText, url, options),
@@ -406,6 +429,18 @@ internal sealed class ManagedEasyTransfer(
         LastResult = events.ReportOn(result);
         return FinishPerformed(LastResult, options, transferId, cookies, ConnectionIdOf(result, state), AbortedTextOf(callbackUpload));
     }
+
+    /// <summary>
+    /// The follower the transfer runs through: the curl tool's runner's from <paramref name="toolDispatch" />, or
+    /// without it one over the dispatcher the engine's factory builds from the options, the caches and the cookie
+    /// store the transfer's HTTP handler keeps (BL-2479).
+    /// </summary>
+    /// <param name="toolDispatch">The runner's follower and context factory, or <see langword="null" /> for the handle's own.</param>
+    /// <param name="options">The handle's options.</param>
+    /// <param name="cookies">The transfer's cookies, or <see langword="null" /> when no cookie option is set.</param>
+    /// <returns>The follower.</returns>
+    private RedirectFollower FollowerOf(EngineToolTransferDispatch? toolDispatch, EasyOptions options, CookieEngine? cookies) =>
+        toolDispatch?.Follower ?? new RedirectFollower(createDispatcher(options, PerformShared, HandlerCookieStoreOf(cookies)));
 
     /// <summary>
     /// The <c>CURLOPT_MIMEPOST</c> body (<see cref="MimePostForm.BuildAsync" />), built in UTF-8 through
@@ -804,6 +839,7 @@ internal sealed class ManagedEasyTransfer(
         ToolOutputs = null;
         ToolEvents = null;
         ToolProgress = null;
+        ToolDispatch = null;
     }
 
     /// <summary>
@@ -830,7 +866,23 @@ internal sealed class ManagedEasyTransfer(
     /// <returns>A task that completes once it is closed.</returns>
     public ValueTask DisposeAsync() => connectOnly?.CloseAsync() ?? ValueTask.CompletedTask;
 
+    /// <summary>
+    /// Builds the transfer's context with <paramref name="toolDispatch" />'s factory, or without one a
+    /// factory with no standard input over the engine's clock, the caches' HSTS store and <see cref="Host" />'s
+    /// diagnostic log, and keeps it as <see cref="LastContext" />.
+    /// </summary>
+    /// <param name="toolDispatch">The runner's follower and context factory, or <see langword="null" /> for the handle's own.</param>
+    /// <param name="options">The handle's options.</param>
+    /// <param name="settings">The tool settings.</param>
+    /// <param name="url">The URL to transfer.</param>
+    /// <param name="progress">Where the progress goes, or <see langword="null" />.</param>
+    /// <param name="events">Where the events go.</param>
+    /// <param name="inputs">The pieces chosen before connecting.</param>
+    /// <param name="state">The running transfer, which keeps the watchdogs.</param>
+    /// <param name="cancellationToken">Stops the transfer.</param>
+    /// <returns>The context.</returns>
     private TransferContext CreateContext(
+        EngineToolTransferDispatch? toolDispatch,
         EasyOptions options,
         EngineTransferSettings settings,
         CurlUrl url,
@@ -841,7 +893,8 @@ internal sealed class ManagedEasyTransfer(
         CancellationToken cancellationToken)
     {
         EngineToolTransferOutputs outputs = ToolOutputs ?? OwnOutputsOf(options.Callbacks, PauseGateFor(url), RecordsHeaders(url) ? headers : null);
-        return new TransferContextFactory(Stream.Null, shared.TimeProvider) { HstsStore = PerformShared.Hsts, DiagnosticLog = Host.DiagnosticLog }.Create(
+        TransferContextFactory factory = toolDispatch?.ContextFactory ?? new TransferContextFactory(Stream.Null, shared.TimeProvider) { HstsStore = PerformShared.Hsts, DiagnosticLog = Host.DiagnosticLog };
+        return LastContext = factory.Create(
             settings,
             options.Http,
             options.Behaviour,
