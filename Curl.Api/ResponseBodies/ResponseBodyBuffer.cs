@@ -14,7 +14,8 @@ namespace Curl.Api;
 /// </summary>
 /// <param name="capacity">The bytes held before the transfer is paused; one delivery larger than that is still taken whole into an empty buffer.</param>
 /// <param name="resume">Unpauses the transfer (<c>curl_easy_pause(CURLPAUSE_CONT)</c>).</param>
-internal sealed class ResponseBodyBuffer(int capacity, Action resume)
+/// <param name="cancellation">The caller's token: a transfer that fails once it is cancelled is thrown as <see cref="OperationCanceledException"/>, not <see cref="CurlException"/> (ADR-0639).</param>
+internal sealed class ResponseBodyBuffer(int capacity, Action resume, CancellationToken cancellation = default)
 {
     private readonly Lock _gate = new();
     private readonly Queue<byte[]> _chunks = new();
@@ -27,6 +28,7 @@ internal sealed class ResponseBodyBuffer(int capacity, Action resume)
     private bool _ended;
     private CurlCode _code;
     private string _errorText = "";
+    private CancellationToken _cancelledBy;
 
     /// <summary>Completes on the first delivery of body bytes or the end of the transfer, whichever comes first.</summary>
     public Task Started => _started.Task;
@@ -91,6 +93,7 @@ internal sealed class ResponseBodyBuffer(int capacity, Action resume)
             _ended = true;
             _code = code;
             _errorText = errorText;
+            _cancelledBy = cancellation.IsCancellationRequested ? cancellation : CancellationToken.None;
             arrived = SwapArrived();
         }
 
@@ -109,11 +112,12 @@ internal sealed class ResponseBodyBuffer(int capacity, Action resume)
 
     /// <summary>Throws the transfer's failure once it has ended with one; otherwise returns.</summary>
     /// <exception cref="CurlException">The transfer ended with an error code.</exception>
+    /// <exception cref="OperationCanceledException">The transfer ended with an error code after the caller cancelled it.</exception>
     public void ThrowIfFailed()
     {
         lock (_gate)
         {
-            CurlException.ThrowIfFailed(_code, _errorText);
+            TransferCancellation.ThrowIfFailed(_code, _errorText, _cancelledBy);
         }
     }
 
@@ -122,6 +126,7 @@ internal sealed class ResponseBodyBuffer(int capacity, Action resume)
     /// <param name="cancellationToken">Stops the wait; the transfer goes on.</param>
     /// <returns>The bytes copied; 0 at the end of a successful transfer.</returns>
     /// <exception cref="CurlException">Nothing is left to read and the transfer failed.</exception>
+    /// <exception cref="OperationCanceledException">Nothing is left to read and the caller cancelled the transfer, or <paramref name="cancellationToken"/> stopped the wait.</exception>
     public async ValueTask<int> ReadAsync(Memory<byte> destination, CancellationToken cancellationToken)
     {
         int read;
@@ -146,7 +151,7 @@ internal sealed class ResponseBodyBuffer(int capacity, Action resume)
             read = 0;
             if (_buffered == 0)
             {
-                CurlException.ThrowIfFailed(_code, _errorText);
+                TransferCancellation.ThrowIfFailed(_code, _errorText, _cancelledBy);
                 return _ended ? null : _arrived.Task;
             }
 

@@ -3,7 +3,14 @@
 The .NET-idiomatic programming interface to Curl (ADR-0506), not a `Curl.<Area>.UnitLibrary`:
 `Curl.Api` is a naming exception, with `Curl.Console` and `Libcurl`. Namespace `Curl.Api`
 for `Client/` (`CurlClient` and `CurlClientOptions`) and `Composition/` (the engine-building
-half of the partial `CurlClient`), `Messages/`, `ResponseBodies/`, `RequestBodies/` and `Mime/`; `Curl.Api.Errors` for `Errors/`.
+half of the partial `CurlClient`), `Messages/`, `ResponseBodies/`, `RequestBodies/`, `Mime/` and `Cancellation/`; `Curl.Api.Errors` for `Errors/`.
+
+- `Cancellation/`: `TransferCancellation` (BL-2504, ADR-0639) carries a call's `CancellationToken`
+  into its transfer: the `CURLOPT_XFERINFOFUNCTION` answers abort once the token is cancelled and
+  the handle is unpaused so a paused transfer sees it. A transfer that fails after the caller
+  cancelled throws `OperationCanceledException`; any other failure, a timeout included, throws
+  `CurlException`; a token cancelled before the start creates no handle. Its tests drive
+  `CancellableEasyTransfer`, a fake that ignores the perform token, in `Curl.Api.UnitTests/Cancellation`.
 
 - `Messages/`: `CurlRequest` and `CurlResponse` records and the `SendAsync` half of the partial
   `CurlClient` (BL-2499, ADR-0632). `CurlRequestOptions` maps a request onto `EasyOptions`;
@@ -14,8 +21,8 @@ half of the partial `CurlClient`), `Messages/`, `ResponseBodies/`, `RequestBodie
 - `ResponseBodies/`: the streamed `CurlResponse.Body` (BL-2501, ADR-0635). `ResponseBodyBuffer` is
   the write callback: a bounded buffer that answers `CURL_WRITEFUNC_PAUSE` when full and unpauses the
   handle once read down to half. `ResponseBodyStream` is the async-only, read-only body over it; it
-  owns the easy handle and the handles the request body created (`Owned`), disposes them when the transfer ends, and aborts the transfer when disposed
-  first. Its tests drive `SteppedEasyTransfer`, a fake fed chunk by chunk, in
+  owns the easy handle and the handles the request body created (`Owned`), disposes them when the transfer ends, and aborts the transfer (unpausing it)
+  when disposed first or when the `SendAsync` token is cancelled. Its tests drive `SteppedEasyTransfer`, a fake fed chunk by chunk, in
   `Curl.Api.UnitTests/ResponseBodies`.
 
 - `RequestBodies/`: `CurlContent`, the type of `CurlRequest.Body` (BL-2500, ADR-0634). `BytesContent`
@@ -29,8 +36,8 @@ half of the partial `CurlClient`), `Messages/`, `ResponseBodies/`, `RequestBodie
   built on a new `IMimeBuilder` per send as `CURLOPT_MIMEPOST` (`MimeDataSetter` sets each content kind).
   A failing setter throws `CurlException`. Its tests use the MIME fakes in `Curl.Api.UnitTests/Mime`.
 
-- `Errors/`: `CurlException`, the one exception every failure in `Curl.Api` throws, carrying the
-  `CurlCode`; `CurlException.ThrowIfFailed` maps a call's result to it, and `CurlCodeText` is its own
+- `Errors/`: `CurlException`, the one exception every failure in `Curl.Api` throws (the caller's
+  own cancellation aside, which is `OperationCanceledException`), carrying the `CurlCode`; `CurlException.ThrowIfFailed` maps a call's result to it, and `CurlCodeText` is its own
   copy of curl 8.22.0's `curl_easy_strerror` text (ADR-0630).
 
 `CurlClient` (BL-2496) is constructed over an `ICurlEngine`, owns it unless told not to,

@@ -105,7 +105,8 @@ public sealed class ResponseBodyStreamTests
 
         await body.DisposeAsync();
 
-        Assert.AreEqual(CurlCode.AbortedByCallback, easy.PerformResult);
+        Assert.AreEqual(1, easy.ResumeCount);
+        Assert.AreEqual(CurlCode.WriteError, easy.PerformResult);
         Assert.IsTrue(easy.Disposed);
     }
 
@@ -225,9 +226,10 @@ public sealed class ResponseBodyStreamTests
         await source.CancelAsync();
         byte[] destination = new byte[8];
         Assert.AreEqual(1, await body.ReadAsync(destination));
-        CurlException exception = await Assert.ThrowsExactlyAsync<CurlException>(() => body.ReadAsync(destination).AsTask());
+        OperationCanceledException exception = await Assert.ThrowsExactlyAsync<OperationCanceledException>(() => body.ReadAsync(destination).AsTask());
 
-        Assert.AreEqual(CurlCode.AbortedByCallback, exception.Code);
+        Assert.AreEqual(source.Token, exception.CancellationToken);
+        Assert.AreEqual(CurlCode.AbortedByCallback, easy.PerformResult);
     }
 
     [TestMethod]

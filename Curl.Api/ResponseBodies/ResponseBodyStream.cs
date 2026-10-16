@@ -19,18 +19,24 @@ internal sealed class ResponseBodyStream : Stream
     private readonly ResponseBodyBuffer _buffer;
     private readonly CancellationTokenSource _abort;
     private readonly List<IDisposable> _owned = [];
+    private readonly TransferCancellation _cancellation;
     private Task _transfer = Task.CompletedTask;
     private Task? _closing;
 
     /// <summary>A body for the transfer <paramref name="easy"/> is about to perform.</summary>
     /// <param name="easy">The handle; the stream disposes it once its transfer ends.</param>
     /// <param name="capacity">The bytes buffered before the transfer is paused.</param>
-    /// <param name="cancellationToken">Aborts the transfer, as disposing the stream does.</param>
+    /// <param name="cancellationToken">
+    /// Aborts the transfer, as disposing the stream does, through the transfer-info callback this
+    /// sets on <paramref name="easy"/> (ADR-0639); the failure is then thrown as <see cref="OperationCanceledException"/>.
+    /// </param>
     public ResponseBodyStream(IEasyTransfer easy, int capacity, CancellationToken cancellationToken)
     {
         _easy = easy;
         _abort = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        _buffer = new ResponseBodyBuffer(capacity, () => easy.Pause(CurlPause.Continue));
+        _buffer = new ResponseBodyBuffer(capacity, () => easy.Pause(CurlPause.Continue), cancellationToken);
+        _cancellation = new TransferCancellation(easy, _abort.Token, _buffer.Abort);
+        easy.Options = _cancellation.ApplyTo(easy.Options);
     }
 
     /// <summary>The <c>CURLOPT_WRITEFUNCTION</c> that fills the stream.</summary>
@@ -68,6 +74,7 @@ internal sealed class ResponseBodyStream : Stream
     /// </summary>
     /// <returns>A task that completes once the body has started or the transfer has ended.</returns>
     /// <exception cref="CurlException">The transfer ended with an error before the body could be read.</exception>
+    /// <exception cref="OperationCanceledException">The caller cancelled the transfer before the body could be read.</exception>
     public async Task StartAsync()
     {
         _transfer = PerformAsync();
@@ -86,6 +93,7 @@ internal sealed class ResponseBodyStream : Stream
     /// <returns>A task that completes once every handle is disposed.</returns>
     public async Task DisposeUnstartedAsync()
     {
+        _cancellation.Dispose();
         await _easy.DisposeAsync().ConfigureAwait(false);
         _owned.ForEach(handle => handle.Dispose());
         _abort.Dispose();
@@ -149,7 +157,10 @@ internal sealed class ResponseBodyStream : Stream
         {
             await using (_easy.ConfigureAwait(false))
             {
-                _buffer.Complete(await _easy.PerformAsync(_abort.Token).ConfigureAwait(false), _easy.ErrorText);
+                using (_cancellation)
+                {
+                    _buffer.Complete(await _easy.PerformAsync(_abort.Token).ConfigureAwait(false), _easy.ErrorText);
+                }
             }
         }
         finally

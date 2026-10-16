@@ -23,11 +23,15 @@ public sealed partial class CurlClient
     /// request body created (a multipart body's MIME builder) are disposed when the transfer ends.
     /// </summary>
     /// <param name="request">The request to perform.</param>
-    /// <param name="cancellationToken">Stops the transfer, while the body streams too; it then ends with the engine's error code.</param>
+    /// <param name="cancellationToken">
+    /// Aborts the transfer, whether it is connecting, uploading, downloading or paused, while the body
+    /// streams too (ADR-0639); the call or the body's next read then throws <see cref="OperationCanceledException"/>.
+    /// </param>
     /// <returns>The final response.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="request"/> is <see langword="null"/>.</exception>
     /// <exception cref="ObjectDisposedException">The client has been disposed.</exception>
-    /// <exception cref="CurlException">The transfer failed before its body started; its <see cref="CurlException.Code"/> says how.</exception>
+    /// <exception cref="OperationCanceledException"><paramref name="cancellationToken"/> was cancelled before the body started; no handle is left open.</exception>
+    /// <exception cref="CurlException">The transfer failed before its body started, a timeout included; its <see cref="CurlException.Code"/> says how.</exception>
     public Task<CurlResponse> SendAsync(CurlRequest request, CancellationToken cancellationToken) =>
         SendWithBodyCapacityAsync(request, ResponseBodyStream.DefaultCapacity, cancellationToken);
 
@@ -39,6 +43,7 @@ public sealed partial class CurlClient
     internal async Task<CurlResponse> SendWithBodyCapacityAsync(CurlRequest request, int bodyCapacity, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
+        cancellationToken.ThrowIfCancellationRequested();
         IEasyTransfer easy = CreateEasy();
         ResponseHeaderCollector collector = new();
         ResponseBodyStream body = new(easy, bodyCapacity, cancellationToken);
