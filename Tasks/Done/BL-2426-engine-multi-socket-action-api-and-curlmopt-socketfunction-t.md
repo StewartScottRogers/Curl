@@ -30,10 +30,10 @@ ADR-0506; phase 3 of `Documentation/Planning/Curl-Api-And-libcurl.md`. Read the 
 
 ## Notes
 
-- Plan: `SocketActionAsync` and `PerformAsync` share one loop in `ManagedMultiTransfer`; each running transfer gets one engine-numbered socket (from `0x40000000`) told to `CURLMOPT_SOCKETFUNCTION` as `CURL_POLL_IN`, then `CURL_POLL_REMOVE` with the `Assign` value; `CURLMOPT_TIMERFUNCTION` gets 0 on `Add` and at most 10 ms while transfers run, since the managed connections are no descriptors an application could poll. A callback returning -1 answers `AbortedByCallback` and fails every unfinished transfer with `CURLE_ABORTED_BY_CALLBACK` from the next action. Decision recorded in ADR-0598 (decided by Claude under Stewart's delegation).
+- Plan: `SocketActionAsync` and `PerformAsync` share one loop in `ManagedMultiTransfer`; each running transfer gets one engine-numbered socket (from `0x40000000`) told to `CURLMOPT_SOCKETFUNCTION` as `CURL_POLL_IN`, then `CURL_POLL_REMOVE` with the `Assign` value; `CURLMOPT_TIMERFUNCTION` gets 0 on `Add` and at most 10 ms while transfers run, since the managed connections are no descriptors an application could poll. A callback returning -1 answers `AbortedByCallback` and fails every unfinished transfer with `CURLE_ABORTED_BY_CALLBACK` from the next action. Decision recorded in ADR-0599 (decided by Claude under Stewart's delegation).
 - Default taken: the socket and events given to `SocketActionAsync` are not read, because every managed transfer runs on its own; what `Libcurl` does with the engine-numbered sockets is BL-2431's.
 - Measured: `Measure-CodeQuality.ps1 -Library Curl.Engine.UnitLibrary` 100% line, 100% branch, 0 failing of 678 members, worst CRAP 10. Fast tests: 41 projects pass, `Curl.Engine.UnitTests` 1110 passed. `PassingUpstreamCases.txt` untouched.
-- The plan (`Documentation/Planning/Curl-Api-And-libcurl.md`) says sockets are opaque handles over `IConnection`; in the engine they are one number per running transfer, not per connection (ADR-0598). The plan is outside `touches`, so it is left as is.
+- The plan (`Documentation/Planning/Curl-Api-And-libcurl.md`) says sockets are opaque handles over `IConnection`; in the engine they are one number per running transfer, not per connection (ADR-0599). The plan is outside `touches`, so it is left as is.
 
 ## Log
 
