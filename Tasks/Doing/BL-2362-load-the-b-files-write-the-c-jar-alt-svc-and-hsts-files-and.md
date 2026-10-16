@@ -34,3 +34,4 @@ Left by BL-2359 (ADR-0542), which shares cookies, HSTS, pooled connections and `
 ## Log
 
 - 2026-10-15: Created.
+- 2026-10-15: Backlog -> Doing.
