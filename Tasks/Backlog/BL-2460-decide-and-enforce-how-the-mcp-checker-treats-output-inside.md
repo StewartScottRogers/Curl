@@ -16,7 +16,7 @@ The MCP `curl` tool never lets a `-w @file` template inside `CURL_MCP_ROOT` writ
 
 ## Context
 
-ADR-0560 decision 7: `McpArgumentChecker` (`Curl.Mcp.UnitLibrary/McpArgumentChecker.cs`, BL-2379) checks the `-w @file` path but, reading no file but a `-K` one, does not look inside the template. An agent can write a template holding `%output{/outside}` into the root with `-o` and then run `-w @template`. Choose one: read the template (as `-K` is read) and run `McpOptionValuePaths`' `%output{}` scan over it, or refuse `-w @file` whose file is not empty of `%output{`. Record the choice in an ADR.
+ADR-0564 decision 7: `McpArgumentChecker` (`Curl.Mcp.UnitLibrary/McpArgumentChecker.cs`, BL-2379) checks the `-w @file` path but, reading no file but a `-K` one, does not look inside the template. An agent can write a template holding `%output{/outside}` into the root with `-o` and then run `-w @template`. Choose one: read the template (as `-K` is read) and run `McpOptionValuePaths`' `%output{}` scan over it, or refuse `-w @file` whose file is not empty of `%output{`. Record the choice in an ADR.
 
 ## Acceptance criteria
 

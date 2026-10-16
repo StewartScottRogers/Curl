@@ -34,7 +34,7 @@ Builds on the resolver and classification of the two previous tasks. It must fin
 
 Plan: Documentation/Planning/Curl-Mcp.md. Decision: ADR-0548.
 
-Delivered (2026-10-15): `McpArgumentChecker` and `McpArgumentCheck` in `Curl.Mcp.UnitLibrary`, with the internal `McpOptionValuePaths` (embedded paths, `file:` URLs), `McpConfigFileSyntax` (`-K` line splitting) and `McpValuePath`; decisions in ADR-0560.
+Delivered (2026-10-15): `McpArgumentChecker` and `McpArgumentCheck` in `Curl.Mcp.UnitLibrary`, with the internal `McpOptionValuePaths` (embedded paths, `file:` URLs), `McpConfigFileSyntax` (`-K` line splitting) and `McpValuePath`; decisions in ADR-0564.
 
 - `Curl.Cli`'s parser is not reused: it applies values, reading `-d @file` and `-K` files and prompting for passwords. The checker tokenises itself but reads `CommandLineOptionTable.Rows`, so `Curl.Mcp.UnitLibrary` now references `Curl.Cli.UnitLibrary` (replaces ADR-0559 decision 2's "the library does not"). `ConfigFileSyntax` is internal to `Curl.Cli`, outside `touches`, so its rules are ported without the warnings.
 - Defaults taken: an empty value resolves to the root and is allowed (curl refuses it as blank anyway); `-O`/`-J` are allowed on the assumption that BL-2381 runs curl with the root as its working folder and without `.curlrc`; `-n`/`--netrc-optional`, `--abstract-unix-socket`, `--proto-default file`, `-K -`, globbed `file:` URLs and `-T` names, `-o` names with `#<n>`, and `--expand-` path values holding `{{` are refused because their path cannot be checked before curl runs.
