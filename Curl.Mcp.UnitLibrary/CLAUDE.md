@@ -17,7 +17,9 @@ captures standard output and error in `McpCappedCaptureStream`, and answers with
 the `transfer` tool's logic: `McpTransferRequestCheck` checks an `McpTransferRequest`,
 `McpTransferOptions` turns it into `EasyOptions`, one easy handle of the injected `ICurlEngine` runs
 it, `McpResponseHeaderCollector` keeps the last response's headers, and it answers with an
-`McpTransferToolResult` holding `McpTransferInfo`. The later tasks of `Documentation/Planning/Curl-Mcp.md` add the rest.
+`McpTransferToolResult` holding `McpTransferInfo`. `McpVersionTool` is the `version` tool's logic: it
+answers with an `McpVersionToolResult` holding the injected `ICurlEngine`'s `CurlVersionInfo` fields
+unchanged and the platform's first `CurlVersionText` line. The later tasks of `Documentation/Planning/Curl-Mcp.md` add the rest.
 
 Base class library only. Only `Curl.Mcp` may take the MCP SDK packages (`ModelContextProtocol`
 and `Microsoft.Extensions.Hosting`); this library references no package. Reference

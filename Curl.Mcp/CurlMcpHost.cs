@@ -26,7 +26,7 @@ internal static class CurlMcpHost
     /// relative paths resolve inside it (ADR-0575). Tools are registered one by one, never by
     /// scanning an assembly: the <c>curl</c> tool over <see cref="InProcessCurlCommandRunner" />, the <c>transfer</c>
     /// tool over a production <see cref="ManagedCurlEngine" /> that lives as long as the process, as
-    /// <c>Libcurl</c>'s does, and the <c>--ai-help</c>
+    /// <c>Libcurl</c>'s does, the <c>version</c> tool over that same engine, and the <c>--ai-help</c>
     /// resources through <see cref="CurlAiHelpResourceHandlers" /> (ADR-0589).
     /// </summary>
     /// <param name="args">The arguments as received from the shell.</param>
@@ -43,12 +43,15 @@ internal static class CurlMcpHost
         builder.Logging.ClearProviders();
         builder.Logging.AddConsole(options => options.LogToStandardErrorThreshold = LogLevel.Trace);
         builder.Services.AddSingleton(new McpCurlTool(new InProcessCurlCommandRunner(), root, cap));
-        builder.Services.AddSingleton(new McpTransferTool(new ManagedCurlEngine(), cap));
+        ManagedCurlEngine engine = new();
+        builder.Services.AddSingleton(new McpTransferTool(engine, cap));
+        builder.Services.AddSingleton(new McpVersionTool(engine));
         builder.Services
             .AddMcpServer()
             .WithStdioServerTransport()
             .WithTools<CurlCommandTool>(CurlMcpJsonContext.ToolOptions)
             .WithTools<CurlTransferTool>(CurlMcpJsonContext.ToolOptions)
+            .WithTools<CurlVersionTool>(CurlMcpJsonContext.ToolOptions)
             .WithListResourcesHandler(CurlAiHelpResourceHandlers.ListAsync)
             .WithReadResourceHandler(CurlAiHelpResourceHandlers.ReadAsync);
         return builder.Build();

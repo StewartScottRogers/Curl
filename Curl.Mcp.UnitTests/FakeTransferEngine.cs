@@ -18,7 +18,10 @@ internal sealed class FakeTransferEngine(FakeEasyTransfer transfer) : ICurlEngin
 {
     public int EasyHandlesCreated { get; private set; }
 
-    public CurlVersionInfo VersionInfo => throw new NotSupportedException();
+    /// <summary>What <see cref="VersionInfo" /> reports; when unset, reading it throws.</summary>
+    public CurlVersionInfo? VersionInfoToReport { get; init; }
+
+    public CurlVersionInfo VersionInfo => VersionInfoToReport ?? throw new NotSupportedException();
 
     public IEasyTransfer CreateEasy()
     {

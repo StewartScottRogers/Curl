@@ -12,13 +12,25 @@ namespace Curl.Mcp;
 public sealed class CurlMcpHostTests
 {
     [TestMethod]
-    public void Build_RegistersExactlyTheCurlAndTransferTools()
+    public void Build_RegistersExactlyTheCurlTransferAndVersionTools()
     {
         using IHost host = CurlMcpHost.Build([], _ => null);
 
         CollectionAssert.AreEquivalent(
-            new[] { "curl", "transfer" },
+            new[] { "curl", "transfer", "version" },
             host.Services.GetServices<McpServerTool>().Select(tool => tool.ProtocolTool.Name).ToArray());
+    }
+
+    [TestMethod]
+    public void Build_RegistersTheVersionToolWithItsDescriptionAndNoArguments()
+    {
+        using IHost host = CurlMcpHost.Build([], _ => null);
+
+        McpServerTool tool = host.Services.GetServices<McpServerTool>().Single(tool => tool.ProtocolTool.Name == "version");
+        Assert.AreEqual(CurlVersionTool.ToolDescription, tool.ProtocolTool.Description);
+        StringAssert.Contains(tool.ProtocolTool.Description, "curl -V");
+        Assert.IsFalse(tool.ProtocolTool.InputSchema.TryGetProperty("properties", out JsonElement properties) && properties.EnumerateObject().Any());
+        Assert.IsNotNull(host.Services.GetRequiredService<McpVersionTool>());
     }
 
     [TestMethod]
@@ -48,7 +60,7 @@ public sealed class CurlMcpHostTests
 
         McpServerTool tool = host.Services.GetServices<McpServerTool>().Single(tool => tool.ProtocolTool.Name == "curl");
         McpServerOptions options = host.Services.GetRequiredService<IOptions<McpServerOptions>>().Value;
-        Assert.AreEqual(2, options.ToolCollection?.Count ?? 2);
+        Assert.AreEqual(3, options.ToolCollection?.Count ?? 3);
         Assert.AreEqual("curl", tool.ProtocolTool.Name);
         Assert.AreEqual(CurlCommandTool.ToolDescription, tool.ProtocolTool.Description);
         StringAssert.Contains(tool.ProtocolTool.Description, "without the program name");
