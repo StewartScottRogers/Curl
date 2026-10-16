@@ -22,8 +22,10 @@ namespace Curl.Engine;
 /// <c>CURLOPT_NOPROGRESS</c> the progress goes to the xferinfo or progress callback
 /// (<see cref="CallbackTransferProgress" />), whose abort ends the transfer with
 /// <see cref="CurlCode.AbortedByCallback" /> (ADR-0543). Cookies, the HSTS cache, pooled
-/// connections and the <c>%{xfer_id}</c> numbering are the engine's (<see cref="ManagedEngineSharedState" />),
-/// shared with its other handles (ADR-0542). The header, WebSocket and connect-only
+/// connections and the <c>%{xfer_id}</c> and <c>%{conn_id}</c> numbering are the engine's (<see cref="ManagedEngineSharedState" />),
+/// shared with its other handles (ADR-0542). Around the attempt it does the runner's setup and cleanup:
+/// the <c>-b</c> files, <c>--alt-svc</c> and <c>--hsts</c> files read before it and the <c>-c</c> jar,
+/// alt-svc and HSTS files written after it, through <see cref="Host" /> (ADR-0544). The header, WebSocket and connect-only
 /// APIs are phase 3 work and throw <see cref="NotSupportedException" />.
 /// </summary>
 /// <param name="createDispatcher">Builds a transfer's dispatcher from its options, the engine's shared state and the cookie store its HTTP handler keeps.</param>
@@ -58,6 +60,19 @@ internal sealed class ManagedEasyTransfer(
     /// </summary>
     internal EngineTransferSettings? ToolSettings { get; set; }
 
+    /// <summary>
+    /// Gets or sets what the handle's transfers reach outside the engine for their setup and cleanup -
+    /// the file system the <c>-b</c>, <c>-c</c>, <c>--alt-svc</c> and <c>--hsts</c> files go through,
+    /// standard input for <c>-b -</c>, the <c>-c -</c> print target and the diagnostic log (ADR-0544) -
+    /// for <c>Curl.Console</c> to set from its runner (BL-2318); <see cref="EasyTransferHost.Library" />,
+    /// as for every <c>Curl.Api</c> and <c>Libcurl</c> handle, by default. <see cref="Duplicate" /> copies it
+    /// and <see cref="Reset" /> leaves it, as it is the host's wiring, not an option.
+    /// </summary>
+    internal EasyTransferHost Host { get; set; } = EasyTransferHost.Library;
+
+    /// <summary>The <c>%{conn_id}</c> of a transfer that failed before it could connect.</summary>
+    internal const long NoConnectionId = -1;
+
     /// <summary>Not supported yet: the header API is phase 3's headers work (ADR-0506).</summary>
     /// <exception cref="NotSupportedException">Always.</exception>
     public ITransferHeaders Headers => throw new NotSupportedException("The header API is phase 3 work (ADR-0506).");
@@ -87,16 +102,77 @@ internal sealed class ManagedEasyTransfer(
         EngineTransferSettings settings = ToolSettings ?? TransferSettingsOf(options);
         long transferId = shared.Performer.TakeTransferId();
         CookieEngine? cookies = CookieEngine.FromHttpOptions(options.Http, shared.Cookies);
+        EngineTransferState state = new();
+        ITransferEvents events = EventsOf(options, state);
+        string transferUrl = await SetUpAsync(options, settings, cookies, state, urlText, events).ConfigureAwait(false);
         RedirectFollower follower = new(createDispatcher(options, shared, cookies?.HandlerStore));
         using CancellationTokenSource abort = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         CallbackTransferProgress? progress = CallbackTransferProgress.Of(options.Behaviour.NoProgress, options.Callbacks, abort);
         TransferResult? result = await FollowUnlessAbortedAsync(
             follower,
-            CreateContext(options, settings, url, progress, abort.Token),
+            state,
+            CreateContext(options, settings, ReferenceEquals(transferUrl, urlText) ? url : CurlUrl.Parse(transferUrl, options.Network.PathAsIs), progress, events, state.AltSvc, abort.Token),
             RedirectPolicyMapping.Of(settings, options.Http, options.Authentication),
             progress).ConfigureAwait(false);
-        return FinishPerformed(result, options, transferId, cookies);
+        await shared.Performer.WriteCookieJarAltSvcAndHstsFilesAsync(
+            cookies, settings, options.Http, transferUrl, Host.JarPrintTarget, state, shared.Hsts, Host.FileSystem, Host.RunsOnWindows).ConfigureAwait(false);
+        return FinishPerformed(result, options, transferId, cookies, ConnectionIdOf(result, state));
     }
+
+    /// <summary>
+    /// The setup the curl tool's runner does around its serial attempt, before connecting
+    /// (<c>CurlCommandRunner</c>, BL-2362): the <c>-b</c> files loaded into the engine's cookies, the
+    /// <c>--alt-svc</c> file read into the transfer's own cache, and the <c>--hsts</c> file read, an
+    /// <c>http</c> URL the HSTS cache knows switching to <c>https</c>.
+    /// </summary>
+    /// <param name="options">The handle's options.</param>
+    /// <param name="settings">The tool settings.</param>
+    /// <param name="cookies">The transfer's cookies, or <see langword="null" /> when no cookie option is set.</param>
+    /// <param name="state">The running transfer, which keeps the alt-svc cache.</param>
+    /// <param name="urlText">The URL set.</param>
+    /// <param name="events">Where the setup's <c>-v</c> lines go.</param>
+    /// <returns>The URL to transfer: <paramref name="urlText" /> itself, or the <c>https</c> one HSTS switched it to.</returns>
+    private async Task<string> SetUpAsync(
+        EasyOptions options,
+        EngineTransferSettings settings,
+        CookieEngine? cookies,
+        EngineTransferState state,
+        string urlText,
+        ITransferEvents events)
+    {
+        EasyTransferHost host = Host;
+        await shared.Performer.LoadCookieFilesAsync(cookies, settings, urlText, host.FileSystem, host.StandardInput, events).ConfigureAwait(false);
+        await shared.Performer.OpenAltSvcCacheAsync(state, settings, options.Network, options.Http, urlText, host.FileSystem, host.DiagnosticLog, host.AltSvcUsesOverHttp).ConfigureAwait(false);
+        return await TransferPerformer.SwitchToHttpsForHstsAsync(shared.Hsts, settings, options.Network, options.Http, urlText, host.FileSystem, events).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// The transfer's events: the debug callback's under <c>CURLOPT_VERBOSE</c>, else none, kept by
+    /// <see cref="EngineConnectionIdTransferEvents" />, which gives the transfer its <c>%{conn_id}</c>
+    /// when it opens a connection and the opener's when it reuses one.
+    /// </summary>
+    /// <param name="options">The handle's options.</param>
+    /// <param name="state">The running transfer, which keeps the <c>%{conn_id}</c>.</param>
+    /// <returns>The events.</returns>
+    private EngineConnectionIdTransferEvents EventsOf(EasyOptions options, EngineTransferState state) =>
+        new(
+            (ITransferEvents?)DebugCallbackTransferEvents.Of(options.Behaviour.Verbose, options.Callbacks.Debug) ?? NoTransferEvents.Instance,
+            state,
+            shared.ConnectionIdsByPoolNumber,
+            () => state.ConnectionId ??= shared.Performer.TakeConnectionId());
+
+    /// <summary>
+    /// The finished transfer's <c>%{conn_id}</c>, as the runner gives it: -1 when it failed before
+    /// connecting (an unsupported scheme or a malformed URL), else the connection's it opened or
+    /// reused, or else the next connection number.
+    /// </summary>
+    /// <param name="result">The attempt's result, or <see langword="null" /> when the progress callback aborted it.</param>
+    /// <param name="state">The running transfer.</param>
+    /// <returns>The <c>%{conn_id}</c>.</returns>
+    private long ConnectionIdOf(TransferResult? result, EngineTransferState state) =>
+        result is { ExitCode: CurlExitCode.UnsupportedProtocol or CurlExitCode.UrlMalformat }
+            ? NoConnectionId
+            : state.ConnectionId ?? shared.Performer.TakeConnectionId();
 
     /// <summary>
     /// <c>CURLINFO_CONTENT_LENGTH_UPLOAD</c> of a performed transfer: the upload's declared size -
@@ -121,8 +197,9 @@ internal sealed class ManagedEasyTransfer(
     /// <param name="options">The handle's options.</param>
     /// <param name="transferId">The transfer's <c>%{xfer_id}</c>.</param>
     /// <param name="cookies">The transfer's cookies, or <see langword="null" /> when no cookie option is set.</param>
+    /// <param name="connectionId">The transfer's <c>%{conn_id}</c>.</param>
     /// <returns>The transfer's code.</returns>
-    private CurlCode FinishPerformed(TransferResult? result, EasyOptions options, long transferId, CookieEngine? cookies)
+    private CurlCode FinishPerformed(TransferResult? result, EasyOptions options, long transferId, CookieEngine? cookies, long connectionId)
     {
         string urlText = options.Network.Url!;
         IReadOnlyList<string> cookieList = cookies?.ListLines ?? [];
@@ -131,7 +208,7 @@ internal sealed class ManagedEasyTransfer(
             return Finish(
                 CurlCode.AbortedByCallback,
                 CallbackTransferProgress.CallbackAbortedText,
-                new TransferInfo { EffectiveUrl = urlText, TransferId = transferId, CookieList = cookieList });
+                new TransferInfo { EffectiveUrl = urlText, TransferId = transferId, ConnectionId = connectionId, CookieList = cookieList });
         }
 
         return Finish(
@@ -140,6 +217,7 @@ internal sealed class ManagedEasyTransfer(
             TransferInfoFromReport.Of(result, urlText, options.Transfer.FileTime, shared.TimeProvider) with
             {
                 TransferId = transferId,
+                ConnectionId = connectionId,
                 CookieList = cookieList,
                 ContentLengthUpload = ContentLengthUploadOf(options),
             });
@@ -151,12 +229,14 @@ internal sealed class ManagedEasyTransfer(
     /// transfer is libcurl's <c>CURLE_ABORTED_BY_CALLBACK</c> (ADR-0543).
     /// </summary>
     /// <param name="follower">Performs the attempt, following redirects.</param>
+    /// <param name="state">The running transfer, which keeps the attempt's watchdogs.</param>
     /// <param name="context">The attempt's context.</param>
     /// <param name="redirectPolicy">The redirect policy.</param>
     /// <param name="progress">The progress callback's sink, or <see langword="null" /> for none.</param>
     /// <returns>The attempt's result, or <see langword="null" /> when the progress callback aborted it.</returns>
     private static async Task<TransferResult?> FollowUnlessAbortedAsync(
         RedirectFollower follower,
+        EngineTransferState state,
         TransferContext context,
         RedirectPolicy redirectPolicy,
         CallbackTransferProgress? progress)
@@ -164,7 +244,7 @@ internal sealed class ManagedEasyTransfer(
         TransferResult result;
         try
         {
-            result = await TransferPerformer.FollowWatchingSpeedAsync(new EngineTransferState(), follower, context, redirectPolicy).ConfigureAwait(false);
+            result = await TransferPerformer.FollowWatchingSpeedAsync(state, follower, context, redirectPolicy).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (progress is { Aborted: true })
         {
@@ -175,7 +255,7 @@ internal sealed class ManagedEasyTransfer(
     }
 
     /// <inheritdoc />
-    public IEasyTransfer Duplicate() => new ManagedEasyTransfer(createDispatcher, shared) { Options = Options, ToolSettings = ToolSettings };
+    public IEasyTransfer Duplicate() => new ManagedEasyTransfer(createDispatcher, shared) { Options = Options, ToolSettings = ToolSettings, Host = Host };
 
     /// <inheritdoc />
     public void Reset()
@@ -212,8 +292,10 @@ internal sealed class ManagedEasyTransfer(
         EngineTransferSettings settings,
         CurlUrl url,
         CallbackTransferProgress? progress,
+        ITransferEvents events,
+        AltSvcTransferCache? altSvc,
         CancellationToken cancellationToken) =>
-        new TransferContextFactory(Stream.Null, shared.TimeProvider) { HstsStore = shared.Hsts }.Create(
+        new TransferContextFactory(Stream.Null, shared.TimeProvider) { HstsStore = shared.Hsts, DiagnosticLog = Host.DiagnosticLog }.Create(
             settings,
             options.Http,
             options.Behaviour,
@@ -229,7 +311,8 @@ internal sealed class ManagedEasyTransfer(
             headerOutput: options.Callbacks.Header is { } header ? CallbackWriteStream.Of(header) : null,
             upload: UploadOf(options),
             progress: progress,
-            events: DebugCallbackTransferEvents.Of(options.Behaviour.Verbose, options.Callbacks.Debug),
+            events: events,
+            altSvc: altSvc,
             abortToken: cancellationToken);
 
     /// <summary>

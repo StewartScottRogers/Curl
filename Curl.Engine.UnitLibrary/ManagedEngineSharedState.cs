@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using Curl.Cookies;
 using Curl.Core.Hsts;
 using Curl.Networking;
@@ -33,6 +34,9 @@ internal sealed class ManagedEngineSharedState(TimeProvider timeProvider, Func<C
     /// <summary>Gets the HSTS cache every handle's transfers learn from and switch by.</summary>
     internal HstsTransferPolicy Hsts { get; } = new(timeProvider);
 
-    /// <summary>Gets the performer that numbers the engine's transfers and holds curl's easy error text.</summary>
+    /// <summary>Gets the <c>%{conn_id}</c> of each connection a handle's transfer opened, by the pool's number for it, which a later transfer reusing it takes (<see cref="EngineConnectionIdTransferEvents" />).</summary>
+    internal ConcurrentDictionary<long, long> ConnectionIdsByPoolNumber { get; } = new();
+
+    /// <summary>Gets the performer that numbers the engine's transfers and connections and holds curl's easy error text.</summary>
     internal TransferPerformer Performer { get; } = new(timeProvider, easyErrorText);
 }

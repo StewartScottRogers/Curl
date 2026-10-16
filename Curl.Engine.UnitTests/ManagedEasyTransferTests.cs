@@ -16,7 +16,7 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Engine;
 
 [TestClass]
-public sealed class ManagedEasyTransferTests
+public sealed partial class ManagedEasyTransferTests
 {
     private const string Response = "HTTP/1.1 200 OK\r\nContent-Length: 5\r\nContent-Type: text/plain\r\n\r\nhello";
 
