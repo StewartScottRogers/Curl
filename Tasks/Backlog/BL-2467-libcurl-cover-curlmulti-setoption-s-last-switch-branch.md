@@ -1,5 +1,5 @@
 ---
-id: BL-2466
+id: BL-2467
 title: Libcurl: cover CurlMulti.SetOption's last switch branch
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-16
 completed:
 ---
-# BL-2466 — Libcurl: cover CurlMulti.SetOption's last switch branch
+# BL-2467 — Libcurl: cover CurlMulti.SetOption's last switch branch
 
 ## Goal
 

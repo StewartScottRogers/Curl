@@ -35,7 +35,7 @@ ADR-0506; phase 3 of `Documentation/Planning/Curl-Api-And-libcurl.md`. Read the 
 - Defaults taken: a negative index is `BadArgument` (upstream's is a `size_t`); a line with no colon, or a fold with no header before it, is dropped rather than failing the transfer; a fold keeps one leading blank (upstream's `unfold_value`). No upstream source or real curl was reachable, so these follow upstream's code as written.
 - The replaced `HeadersWebSocketAndConnection_NotYetBuilt_ThrowNotSupported` test is now `WebSocketAndConnection_NotYetBuilt_ThrowNotSupported`: `Headers` no longer throws by design.
 - An end-to-end CONNECT test via `ScriptedConnector` was not possible: the scripted connector stands in for the whole tunnel. The CONNECT tagging is pinned at unit level (`ConnectReplyHeadWritingEventsTests`, `HeaderLineTeeStreamTests`, `HeaderRecordingStreamTests`).
-- Quality: `Curl.Engine.UnitLibrary` 0 failing members after splitting `StartHead` and `CheckArguments`. Every `Libcurl` member this task added is at 100%. The one failing `Libcurl` member, `CurlMulti.SetOption` (87.5% branch), was already there and this task did not change it; filed as BL-2466.
+- Quality: `Curl.Engine.UnitLibrary` 0 failing members after splitting `StartHead` and `CheckArguments`. Every `Libcurl` member this task added is at 100%. The one failing `Libcurl` member, `CurlMulti.SetOption` (87.5% branch), was already there and this task did not change it; filed as BL-2467.
 - Fast tests: all green (Libcurl.UnitTests 931, Curl.Engine.UnitTests 1315, Curl.Conformance.UnitTests 3130 passed).
 
 ## Log
