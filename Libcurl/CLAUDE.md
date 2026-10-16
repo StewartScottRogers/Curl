@@ -25,6 +25,15 @@ options with `setopt.c`'s range checks, and turns the `PROTOCOLS` bitmasks into 
 `EasyTransferOptions` options with `setopt.c`'s checks, each `_LARGE` or `_MS` alias setting the same
 field as the option it extends, and clamps the two buffer sizes rather than refusing them (ADR-0572).
 
+`Options/Callbacks` implements `AddCallbackSetters` once, calling one partial method per callback area
+(`AddReadWriteCallbackSetters`, `AddProgressCallbackSetters` and the rest), which each area implements in
+an `EasyOptionSetters` part in `Libcurl/Callbacks/<Area>`, keeping the namespace `Libcurl.Options`
+(ADR-0569). `Callbacks/ReadWrite` (not `Data`: the `data/` path rule refuses that folder name) sets
+`CURLOPT_WRITEFUNCTION`, `READFUNCTION` and `HEADERFUNCTION` (their own delegate type or `null`, any other
+delegate `BadFunctionArgument`) and the `*DATA` pointers: the delegate's closure is its user data, so a
+`Stream` is the `FILE *` of libcurl's default function (`StreamDataCallbacks`, unless the caller's own
+function is set) and any other value is taken and changes nothing.
+
 `Misc/ErrorText` holds `CurlErrorText`: `Multi`, `Share` and `Url` are `curl_multi_strerror`,
 `curl_share_strerror` and `curl_url_strerror` with upstream's test1538 strings and fallbacks, and
 `Header` is the header API's text, which upstream has no function for (ADR-0562). Each is a table
