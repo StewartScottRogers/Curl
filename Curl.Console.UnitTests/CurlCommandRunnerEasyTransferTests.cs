@@ -16,6 +16,7 @@ using Curl.Engine;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Http;
 using Curl.Testing;
+using Libcurl.Options;
 
 namespace Curl.Console;
 
@@ -40,6 +41,7 @@ public sealed class CurlCommandRunnerEasyTransferTests
     private readonly InMemoryFileSystem outputFiles = new();
     private readonly ImmediateTimerTimeProvider clock = new();
     private readonly RecordingCurlEngine engine = new();
+    private Func<EasyOptions, IReadOnlyList<EasySetopt>>? easySetoptsOf;
 
     public TestContext TestContext { get; set; } = null!;
 
@@ -87,6 +89,49 @@ public sealed class CurlCommandRunnerEasyTransferTests
         Assert.IsTrue(engine.Handles.TrueForAll(handle => handle.Disposed));
     }
 
+    [TestMethod]
+    public async Task RunAsync_OneOptionOfEachGroup_SetsItThroughSetOptionAndNotOnTheHooks()
+    {
+        int exitCode = await RunAsync([Ok], "-f", "--max-filesize", "100", "--path-as-is", Url);
+
+        RecordingEasyTransfer handle = engine.Handles[0];
+        EasyOptions hooks = handle.OptionsSet[0];
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual("hello", StandardOutputText);
+        Assert.IsFalse(hooks.Behaviour.FailOnError);
+        Assert.AreEqual(0, hooks.Transfer.MaxFileSize);
+        Assert.IsFalse(hooks.Network.PathAsIs);
+        Assert.IsTrue(handle.Options.Behaviour.FailOnError);
+        Assert.AreEqual(100, handle.Options.Transfer.MaxFileSize);
+        Assert.IsTrue(handle.Options.Network.PathAsIs);
+        Assert.IsGreaterThan(4, handle.OptionsSet.Count);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_LimitRateBelowTheSmallestBuffer_KeepsTheReceiveBufferOnTheHooks()
+    {
+        int exitCode = await RunAsync([Ok], "--limit-rate", "100", Url);
+
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual(100, engine.Handles[0].OptionsSet[0].Transfer.BufferSize);
+        Assert.AreEqual(100, engine.Handles[0].Options.Transfer.BufferSize);
+        Assert.AreEqual(100, engine.Handles[0].Options.Transfer.MaxReceiveSpeed);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_SetoptLibcurlRefuses_EndsTheRunWithItsCodeBeforeAnyPerform()
+    {
+        easySetoptsOf = _ => [new EasySetopt(CurlOption.Timecondition, 99L)];
+
+        int exitCode = await RunAsync([Ok, Ok], Url, "http://127.0.0.1:18241/b");
+
+        Assert.AreEqual(43, exitCode);
+        Assert.AreEqual(string.Empty, StandardOutputText);
+        Assert.Contains($"curl: (43) setopt 0x{(int)CurlOption.Timecondition:x} got bad argument", Encoding.UTF8.GetString(standardError.ToArray()));
+        Assert.AreEqual(1, engine.Handles.Count);
+        Assert.AreEqual(0, engine.Handles[0].Performs);
+    }
+
     private async Task<int> RunAsync(string[] responses, params string[] arguments)
     {
         ScriptedConnector server = new(responses.Select(Encoding.Latin1.GetBytes));
@@ -102,7 +147,8 @@ public sealed class CurlCommandRunnerEasyTransferTests
                 runsOnWindows: false,
                 writesProgressMeter: false,
                 timeProvider: clock,
-                curlEngine: engine)
+                curlEngine: engine,
+                easySetoptsOf: easySetoptsOf)
             .RunAsync(arguments);
         Diagnostics.Act("exit code", exitCode);
         Diagnostics.Act("stdout", StandardOutputText);
@@ -153,7 +199,17 @@ public sealed class CurlCommandRunnerEasyTransferTests
 
         public bool Disposed { get; private set; }
 
-        public EasyOptions Options { get => inner.Options; set => inner.Options = value; }
+        public List<EasyOptions> OptionsSet { get; } = [];
+
+        public EasyOptions Options
+        {
+            get => inner.Options;
+            set
+            {
+                OptionsSet.Add(value);
+                inner.Options = value;
+            }
+        }
 
         public TransferInfo Info => inner.Info;
 

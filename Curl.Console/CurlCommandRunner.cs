@@ -125,6 +125,11 @@ namespace Curl.Console;
 /// <see cref="ManagedCurlEngine" /> on the runner's clock. <c>-Z</c> transfers still perform directly until
 /// the engine's multi handle lands (ADR-0506, phase 3).
 /// </param>
+/// <param name="easySetoptsOf">
+/// The <c>curl_easy_setopt</c> calls a transfer's easy options make on its handle; <see langword="null" /> for
+/// <see cref="EasySetoptsFromCommandLine.Of" />. Tests pass calls libcurl refuses, which no command line reaches
+/// (BL-2491, ADR-0631).
+/// </param>
 /// <param name="writeOutTimeDialect">
 /// The C runtime whose <c>strftime</c> a <c>-w</c> <c>%time{format}</c> follows; the composition
 /// passes the platform's (<see cref="CurlComposition.WriteOutTimeDialectFor" />), and
@@ -313,7 +318,8 @@ internal sealed class CurlCommandRunner(
     bool altSvcUsesOverHttp = false,
     TransferPerformer? transferPerformer = null,
     bool parsesAsQuicBuild = false,
-    ICurlEngine? curlEngine = null)
+    ICurlEngine? curlEngine = null,
+    Func<Api.Options.EasyOptions, IReadOnlyList<EasySetopt>>? easySetoptsOf = null)
 {
     /// <summary>
     /// The line curl 8.21.0's own write callback prints, with no <c>(23)</c>, when standard
@@ -637,6 +643,21 @@ internal sealed class CurlCommandRunner(
     /// library each handle is created from (ADR-0624).
     /// </summary>
     private readonly ToolCurlEngine engine = new(GivenOrManagedEngine(curlEngine, timeProvider));
+
+    /// <summary>The <c>curl_easy_setopt</c> calls each transfer's easy options make on its handle (ADR-0631).</summary>
+    private readonly Func<Api.Options.EasyOptions, IReadOnlyList<EasySetopt>> easySetoptsOf = GivenOrCommandLineSetopts(easySetoptsOf);
+
+    /// <summary>The setopt calls given, else <see cref="EasySetoptsFromCommandLine.Of" />.</summary>
+    /// <param name="easySetoptsOf">The calls given, or <see langword="null" />.</param>
+    /// <returns>The calls.</returns>
+    private static Func<Api.Options.EasyOptions, IReadOnlyList<EasySetopt>> GivenOrCommandLineSetopts(Func<Api.Options.EasyOptions, IReadOnlyList<EasySetopt>>? easySetoptsOf) =>
+        easySetoptsOf ?? EasySetoptsFromCommandLine.Of;
+
+    /// <summary>
+    /// The results of transfers whose <c>curl_easy_setopt</c> calls libcurl refused, which end the run as curl's
+    /// tool ends it, compared by reference.
+    /// </summary>
+    private readonly ConcurrentDictionary<TransferResult, bool> setoptFailures = new(ReferenceEqualityComparer.Instance);
 
     /// <summary>
     /// The engine the runner was given, else a <see cref="ManagedCurlEngine" /> on <paramref name="timeProvider" />,
@@ -2968,6 +2989,7 @@ internal sealed class CurlCommandRunner(
     /// <returns><see langword="true" /> when no further URL is transferred.</returns>
     private bool EndsTheRun(CommandLineOptions options, TransferResult result) =>
         RunEndingFailures.Contains(result)
+        || setoptFailures.ContainsKey(result)
         || ReferenceEquals(result, transferPerformer.KnownHostsFileMissingFailure)
         || ReferenceEquals(result, cannotOpenUploadFileAfterFailure)
         || (options.FailEarly && !result.IsSuccess);
@@ -4514,7 +4536,12 @@ internal sealed class CurlCommandRunner(
         ToolEasyHandle easy = engine.EasyInit();
         await using (easy.ConfigureAwait(false))
         {
-            SetUpToolEasy(easy, options, attempt);
+            if (SetUpToolEasy(easy, options, attempt) is { } setoptFailure)
+            {
+                _ = setoptFailures.TryAdd(setoptFailure, true);
+                return setoptFailure;
+            }
+
             TransferResult result = await FollowRetryingThroughAsync(easy, follower, options, attempt, resumeFrom, outputFile).ConfigureAwait(false);
             if (options.WriteOut is not null)
             {
@@ -4526,22 +4553,26 @@ internal sealed class CurlCommandRunner(
     }
 
     /// <summary>
-    /// Sets what stays the same for every attempt of the transfer on its easy handle: the option group's easy
-    /// options with the transfer's <c>-T</c> upload, the transfer URL through <c>curl_easy_setopt</c>'s
-    /// <c>CURLOPT_URL</c>, the tool's own settings, and the run's diagnostic log, which the handle's
-    /// <c>-Y</c>/<c>-y</c> and <c>-m</c> watchdogs write to.
+    /// Sets what stays the same for every attempt of the transfer on its easy handle: on the hooks, the option
+    /// group's easy options less what <c>curl_easy_setopt</c> sets (<see cref="EasySetoptsFromCommandLine.KeptOnHooks" />);
+    /// through <c>curl_easy_setopt</c>, the transfer URL as <c>CURLOPT_URL</c> and every behaviour, transfer (with the
+    /// transfer's <c>-T</c> upload) and network option the command line sets (ADR-0631); then the tool's own settings,
+    /// and the run's diagnostic log, which the handle's <c>-Y</c>/<c>-y</c> and <c>-m</c> watchdogs write to.
     /// </summary>
     /// <param name="easy">The transfer's easy handle.</param>
     /// <param name="options">The accepted command line.</param>
     /// <param name="attempt">What each attempt is built from.</param>
-    private void SetUpToolEasy(ToolEasyHandle easy, CommandLineOptions options, TransferAttemptPieces attempt)
+    /// <returns><see langword="null" />, or the transfer's failure when libcurl refused a <c>curl_easy_setopt</c> call.</returns>
+    private TransferResult? SetUpToolEasy(ToolEasyHandle easy, CommandLineOptions options, TransferAttemptPieces attempt)
     {
-        easy.Hooks.Options = EasyOptionsFromCommandLine.EasyOptionsOf(options, url: null) with { Transfer = attempt.Transfer };
+        Api.Options.EasyOptions groups = EasyOptionsFromCommandLine.EasyOptionsOf(options, url: null) with { Transfer = attempt.Transfer };
+        easy.Hooks.Options = EasySetoptsFromCommandLine.KeptOnHooks(groups);
 
         // CURLOPT_URL takes any string, so its answer is always CURLE_OK.
         _ = easy.Easy.SetOption(CurlOption.Url, StyledHeaderBaseUrl(attempt.Url));
         easy.Hooks.ToolSettings = EasyOptionsFromCommandLine.TransferSettingsOf(options);
         easy.Hooks.Host = EasyTransferHost.Library with { DiagnosticLog = diagnosticLog };
+        return easy.SetOptions(easySetoptsOf(groups));
     }
 
     /// <summary>

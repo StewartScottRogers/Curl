@@ -339,10 +339,18 @@ the runner's `ICurlEngine` (`curlEngine`; `CreateRunner` passes a `ManagedCurlEn
 error text, and a runner given none makes one on its clock), wrapped in `ToolCurlEngine`, which holds a
 `Libcurl` `CurlLibrary` over it (ADR-0624): one `ToolEasyHandle` per transfer from its `EasyInit`
 (`curl_easy_init`), pairing the `CurlEasy` with the engine's internal `IToolEasyTransfer` under it. The
-hooks' `Options` get `EasyOptionsFromCommandLine.EasyOptionsOf` (no URL), `CURLOPT_URL` goes through
-`CurlEasy.SetOption`, and each attempt, `--retry` attempts included, is one `CurlEasy.PerformAsync`
+hooks' `Options` get `EasySetoptsFromCommandLine.KeptOnHooks` of `EasyOptionsFromCommandLine.EasyOptionsOf`
+(no URL), `CURLOPT_URL` goes through `CurlEasy.SetOption`, and so does every behaviour, transfer (with the
+transfer's `-T` upload) and network field off libcurl's default: `EasySetoptsFromCommandLine.Of` gives one
+`EasySetopt` per `CURLOPT_*` and `ToolEasyHandle.SetOptions` makes them (BL-2491, ADR-0631). The hooks keep the
+other groups whole, and of these three only `--ip-tos`, `--vlan-priority` and `--mptcp` (no `CURLOPT_*`), a receive
+buffer outside 1024 bytes to 10 MB (`--limit-rate` below 1024), and a `-y`, `-m`, `--connect-timeout`,
+`--happy-eyeballs-timeout-ms` or `--keepalive-time` that is not a whole number of the setter's unit up to `INT_MAX`.
+A call libcurl refuses (no command line reaches one; the runner's `easySetoptsOf` lets tests pass one) ends the
+transfer before any perform with its code and `setopt 0x<option> got bad argument`, and ends the run. Each
+attempt, `--retry` attempts included, is one `CurlEasy.PerformAsync`
 with the runner's hooks set and its `LastResult` read back (ADR-0552, ADR-0622); the other option
-groups move to `SetOption` in BL-2491 to BL-2493. A `-Z` attempt goes instead through the run's one
+groups move to `SetOption` in BL-2492 and BL-2493. A `-Z` attempt goes instead through the run's one
 `CurlMulti` (`ToolCurlEngine.MultiInit`, `curl_multi_init`), held by `ParallelTransferMulti` as
 `ParallelRun.Transfers` and cleaned up by `ParallelRun.EndAsync`: the attempt adds its handle and calls
 `curl_multi_perform` in its own flow, so its transfer starts there, and one loop polls, performs and reads
