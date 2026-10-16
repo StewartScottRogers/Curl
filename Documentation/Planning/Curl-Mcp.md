@@ -1,7 +1,12 @@
 # Curl.Mcp: Curl as a Model Context Protocol server
 
-Status: planned. Tasks BL-2376 to BL-2393 are filed on the board, all behind BL-2321 (the
-last Libcurl and Curl.Api phase 1 and 2 task). Design: [ADR-0548](Decisions/ADR-0548-curl-mcp-an-mcp-server-over-the-api-seam-on-microsofts-sdk.md);
+Status: built and documented; not yet published. Done: the three projects and the integration
+tests (BL-2376 to BL-2390), the `curl`, `transfer`, `parse_url`, `build_url` and `version` tools,
+the `--ai-help` resources, path confinement, packing as a NuGet MCP server, the native AOT
+attempt (BL-2389) and the documentation (BL-2392: `Curl.Mcp/README.md`, the root README row, the
+glossary, the root `CLAUDE.md`). Left: CI packing on three platforms (BL-2391, interactive only)
+and publishing to nuget.org (BL-2393, Stewart's release step). Tasks BL-2376 to BL-2393 were
+filed behind BL-2321 (the last Libcurl and Curl.Api phase 1 and 2 task). Design: [ADR-0548](Decisions/ADR-0548-curl-mcp-an-mcp-server-over-the-api-seam-on-microsofts-sdk.md);
 the seam it stands on: [ADR-0506](Decisions/ADR-0506-libcurl-and-curl-api-over-one-transfer-engine.md) and [Curl-Api-And-libcurl.md](Curl-Api-And-libcurl.md).
 
 ## What it is

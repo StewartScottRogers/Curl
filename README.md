@@ -61,6 +61,8 @@ as the command line ([ADR-0506](Documentation/Planning/Decisions/ADR-0506-libcur
 | [`Curl.Api`](Curl.Api) | The same engine written the way a .NET developer expects: `CurlClient`, `async` with `CancellationToken`, `Stream` bodies, exceptions, `IAsyncEnumerable` for WebSocket messages, and a `CurlHttpMessageHandler` for `HttpClient`. Tested by `Curl.Api.UnitTests`. |
 | [`Curl.Api.UnitLibrary`](Curl.Api.UnitLibrary) | The seam both stand on: the engine contracts (`ICurlEngine`, `IEasyTransfer`), result codes (`CurlCode` and the rest), the option groups (`EasyHttpOptions`, `EasyTlsOptions` and the rest), `TransferInfo` and the callback delegates. Either API can be rewritten another way without touching the engine. |
 | [`Curl.Engine.UnitLibrary`](Curl.Engine.UnitLibrary) | The transfer engine, moved out of `Curl.Console` so the executable and both APIs share it. |
+| [`Curl.Mcp`](Curl.Mcp) | A Model Context Protocol server over stdio, so AI agents (GitHub Copilot, Claude and others) use Curl as a tool: `curl`, `transfer`, `parse_url`, `build_url` and `version`, plus the `--ai-help` text as resources. File access is confined to `CURL_MCP_ROOT`. Run it with `dnx Curl.Mcp`; setup is in [its README](Curl.Mcp/README.md). Tested by `Curl.Mcp.UnitTests` and `Curl.Mcp.IntegrationTests`. |
+| [`Curl.Mcp.UnitLibrary`](Curl.Mcp.UnitLibrary) | All of `Curl.Mcp`'s tool logic, base class library only: the path confinement, the tool implementations, the result and error types. |
 
 Where it stands: the engine is extracted and `Curl.Api.UnitLibrary`'s seam is defined;
 the console is being re-based onto the engine through it. `Libcurl` and `Curl.Api` are

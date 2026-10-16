@@ -8,7 +8,7 @@ depends-on: [BL-2321, BL-2389, BL-2390]
 touches: [Curl.Mcp, Documentation, README.md, CLAUDE.md]
 requirement: none
 created: 2026-10-15
-completed:
+completed: 2026-10-16
 ---
 
 ## Goal
@@ -23,11 +23,11 @@ The root README's "Use it from .NET" table (around line 51) lists `Curl.Api` and
 
 ## Acceptance criteria
 
-- [ ] `Curl.Mcp/README.md` states what it is, the tools and resources (names and one-line purposes), `CURL_MCP_ROOT` and `CURL_MCP_MAX_RESPONSE_BYTES`, how to run it with `dnx Curl.Mcp`, a VS Code `.vscode/mcp.json` example and a Visual Studio example (a `servers` entry with `type` stdio, `command` dnx, `args` and `env`), and the confinement behaviour.
-- [ ] Root `README.md` "Use it from .NET" table has a `Curl.Mcp` row (and its UnitLibrary) and any project count stays accurate.
-- [ ] `Documentation/Wiki/Glossary.md` has entries for MCP server, MCP tool, MCP resource and `CURL_MCP_ROOT`.
-- [ ] Root `CLAUDE.md`: the Curl.Mcp exception to the `Curl.<Area>.UnitLibrary` naming rule, the quality-gate sentence naming `Curl.Mcp`, and the package rule naming the two packages and the one project that may use them.
-- [ ] `Documentation/Planning/Curl-Mcp.md` status section says what is done.
+- [x] `Curl.Mcp/README.md` states what it is, the tools and resources (names and one-line purposes), `CURL_MCP_ROOT` and `CURL_MCP_MAX_RESPONSE_BYTES`, how to run it with `dnx Curl.Mcp`, a VS Code `.vscode/mcp.json` example and a Visual Studio example (a `servers` entry with `type` stdio, `command` dnx, `args` and `env`), and the confinement behaviour.
+- [x] Root `README.md` "Use it from .NET" table has a `Curl.Mcp` row (and its UnitLibrary) and any project count stays accurate.
+- [x] `Documentation/Wiki/Glossary.md` has entries for MCP server, MCP tool, MCP resource and `CURL_MCP_ROOT`.
+- [x] Root `CLAUDE.md`: the Curl.Mcp exception to the `Curl.<Area>.UnitLibrary` naming rule, the quality-gate sentence naming `Curl.Mcp`, and the package rule naming the two packages and the one project that may use them.
+- [x] `Documentation/Planning/Curl-Mcp.md` status section says what is done.
 
 ## Notes
 
@@ -37,3 +37,4 @@ Plan: Documentation/Planning/Curl-Mcp.md. Decision: ADR-0548.
 
 - 2026-10-15: Created.
 - 2026-10-16: Backlog -> Doing.
+- 2026-10-16: Doing -> Done. Curl.Mcp README, root README rows, glossary entries and plan status written; CLAUDE.md already carried the Curl.Mcp sentences
