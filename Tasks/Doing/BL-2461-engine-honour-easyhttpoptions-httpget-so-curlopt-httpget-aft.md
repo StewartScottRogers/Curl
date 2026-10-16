@@ -31,3 +31,4 @@ ADR-0565 (BL-2406): Libcurl's `HTTPGET` setter sets `HttpGet` and clears `Post`,
 ## Log
 
 - 2026-10-15: Created.
+- 2026-10-16: Backlog -> Doing. Criteria at claim: 6e00b714 348f0d70 a618ea01.
