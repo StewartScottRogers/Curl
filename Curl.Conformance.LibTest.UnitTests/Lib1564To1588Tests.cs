@@ -134,7 +134,7 @@ public sealed class Lib1564To1588Tests
         engine.Multi.EachAddedDoneResult = CurlCode.CouldntConnect;
         var run = new PortRun(engine, 1565, "http://x/1565");
 
-        LibTestResult result = await new Lib1565(TimeProvider.System, 50).RunAsync(run.Context, CancellationToken.None);
+        LibTestResult result = await new Lib1565(new FirstTimerAtOnceTimeProvider(), 1000).RunAsync(run.Context, CancellationToken.None);
 
         Assert.AreEqual((int)CurlCode.CouldntConnect, result.ExitCode);
         Assert.AreEqual(2, created);
@@ -438,5 +438,18 @@ public sealed class Lib1564To1588Tests
         LibTestResult result = await new Lib1588().RunAsync(run.Context, CancellationToken.None);
 
         Assert.AreEqual((int)LibTestErrorCodes.MajorBad, result.ExitCode);
+    }
+
+    /// <summary>
+    /// The system clock, except that the first timer fires at once: lib1565's second thread makes its first handle
+    /// straight away and waits the whole second for the next, which the main thread's failure, recorded within it even
+    /// on a busy runner, stops (BL-2678: a 50 ms wait let a slow Linux runner hand over a third handle).
+    /// </summary>
+    private sealed class FirstTimerAtOnceTimeProvider : TimeProvider
+    {
+        private int timers;
+
+        public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period) =>
+            System.CreateTimer(callback, state, Interlocked.Increment(ref timers) == 1 ? TimeSpan.Zero : dueTime, period);
     }
 }
