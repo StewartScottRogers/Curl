@@ -3,8 +3,8 @@ id: AF-0244
 title: Quality gates job red for 103.15 minutes from run 38876049958 on 241c183e: Libcurl CurlMulti.SetOption branch gap, fixed by a separate task, then six cancelled runs
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: process:logs:QualityGates-CurlMulti.SetOption:ci-red
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Log
 
 - 2026-10-16: filed proposed.
+- 2026-10-16: proposed -> accepted.
