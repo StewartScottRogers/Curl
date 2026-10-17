@@ -31,3 +31,4 @@ Found by BL-2527 running test596 through the ported `lib500` (third argument `ac
 ## Log
 
 - 2026-10-17: Created.
+- 2026-10-17: Backlog -> Doing. Criteria at claim: 9f887a5f 904b57ec 3d836d5e.
