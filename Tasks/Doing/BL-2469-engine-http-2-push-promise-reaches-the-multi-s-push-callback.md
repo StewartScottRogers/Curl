@@ -37,3 +37,4 @@ BL-2428 (ADR-0605) built the engine side: `ManagedMultiTransfer.OfferPush` answe
 - 2026-10-16: Created.
 - 2026-10-16: Backlog -> Doing.
 - 2026-10-16: Doing -> Backlog. Split: waits on BL-2515 (Http2Connection accepts PUSH_PROMISE) and BL-2516 (Http2Session push sink); engine wiring stays here
+- 2026-10-17: Backlog -> Doing. Criteria at claim: 97709c31 3c10b8a9 4272a6b9 ab273712 53ae3210.
