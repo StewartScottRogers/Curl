@@ -77,6 +77,7 @@ public static class LibTestRun
     /// <param name="options">The easy options, in the program's order.</param>
     /// <param name="selectTimeoutMilliseconds">The <c>select()</c> timeout of each turn.</param>
     /// <param name="cancellationToken">Stops the transfer.</param>
+    /// <param name="afterTransfer">What the program does with the handle once the loop ended with no step failing, before the cleanup; <see langword="null"/> for nothing.</param>
     /// <returns>A task that completes when the program reaches <c>curl_global_cleanup</c>.</returns>
     /// <exception cref="ArgumentNullException">An argument is <see langword="null"/>.</exception>
     public static async ValueTask SingleMultiTransferAsync(
@@ -85,7 +86,8 @@ public static class LibTestRun
         LibTestClock clock,
         IEnumerable<(Libcurl.Options.CurlOption Option, object? Value)> options,
         int selectTimeoutMilliseconds,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Action<Libcurl.Easy.CurlEasy>? afterTransfer = null)
     {
         ArgumentNullException.ThrowIfNull(steps);
         if (!steps.EasyInit(library, out Libcurl.Easy.CurlEasy? easy))
@@ -102,9 +104,10 @@ public static class LibTestRun
 
             await using (multi.ConfigureAwait(false))
             {
-                if (steps.SetOptionsAndAddHandle(easy, options, multi))
+                if (steps.SetOptionsAndAddHandle(easy, options, multi)
+                    && await steps.PerformUntilDoneAsync(multi, clock, selectTimeoutMilliseconds, cancellationToken).ConfigureAwait(false))
                 {
-                    await steps.PerformUntilDoneAsync(multi, clock, selectTimeoutMilliseconds, cancellationToken).ConfigureAwait(false);
+                    afterTransfer?.Invoke(easy);
                 }
 
                 multi.RemoveHandle(easy);
