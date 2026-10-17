@@ -3,8 +3,8 @@ id: AF-0229
 title: FromReport_Report_FillsTextsCountsAndEndPoints asserts nothing; its checks are TestDiagnostics.Assert log lines
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Output.UnitTests/WriteOutTransferInfoTests.cs:FromReport_Report_FillsTextsCountsAndEndPoints:no-assertion
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Curl.Output.UnitTests/WriteOutTransferInfoTests.cs -Pattern 
 ## Log
 
 - 2026-10-16: filed proposed.
+- 2026-10-16: proposed -> accepted.
