@@ -132,6 +132,7 @@ public sealed class ManagedCurlEngine : ICurlEngine
             ftpDataConnector: PoolOf(transports, transports.TcpConnector.ForFtpDataConnections(), options.Callbacks, shared),
             ftpWildcardHooks: CallbackWildcardHooks.Of(options),
             rtspInterleaveSink: CallbackInterleaveSink.Of(options.Callbacks.Interleave),
+            ftpListener: shared.Dialing?.FtpListener,
             webSocketRawMode: IsWebSocketRawMode(options),
             http2PushSink: pushSink));
     }

@@ -6,6 +6,7 @@ using Curl.Api.EngineContracts.Multi;
 using Curl.Api.EngineContracts.Url;
 using Curl.Api.Options;
 using Curl.Api.Options.Network;
+using Curl.Api.Options.Protocols;
 
 namespace Curl.Engine;
 
@@ -174,6 +175,26 @@ public sealed class ManagedCurlEngineTests
 
         Assert.AreEqual(CurlCode.CouldntConnect, code);
         Assert.AreEqual(("bl2558.test", 69), datagrams.Opens.Single());
+    }
+
+    [TestMethod]
+    public async Task PerformAsync_DialingGivenAnFtpListenerAndAnActiveFtpUrl_ListensThroughIt()
+    {
+        ScriptedConnector server = new(["220 hi\r\n"u8.ToArray(), "331 pass\r\n"u8.ToArray(), "230 in\r\n"u8.ToArray(), "257 \"/\"\r\n"u8.ToArray()]);
+        RecordingConnectionListener listener = new();
+        EngineDialing dialing = new(new ScriptedTcpDialer(server), new LoopbackDnsResolver(), new RecordingDatagramConnector(Curl.Protocol.Abstractions.CurlExitCode.CouldntConnect, "no udp"), listener);
+        await using ManagedCurlEngine engine = new(TimeProvider.System, null, dialing: dialing);
+        await using IEasyTransfer easy = engine.CreateEasy();
+        easy.Options = new EasyOptions
+        {
+            Network = new EasyNetworkOptions { Url = "ftp://bl2597.test/file" },
+            Protocols = new EasyProtocolOptions { Ftp = new EasyFtpOptions { ActiveAddress = "127.0.0.1" } },
+        };
+
+        CurlCode code = await easy.PerformAsync(CancellationToken.None);
+
+        Assert.AreNotEqual(CurlCode.Ok, code);
+        Assert.HasCount(1, listener.Targets);
     }
 
     [TestMethod]
