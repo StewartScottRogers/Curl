@@ -12,8 +12,12 @@ It holds:
   `CURL_MCP_ROOT` set to a temporary folder, driven over stdio by `McpStdioClient` - `initialize`,
   `tools/list`, `resources/list`, `version`, `curl` against a loopback listener, and `-o` refused
   outside the root and written inside it (BL-2390).
-- `CurlMcpPackIntegrationTests`: `dotnet pack Curl.Mcp -c Release` into a temporary folder, and the
-  package holds `.mcp/server.json` and the McpServer package type (BL-2390).
+- `CurlMcpPackIntegrationTests`: `dotnet pack Curl.Mcp -p:PublishAot=true`, in the configuration the
+  test assembly was built in, into a temporary folder; the tool package holds `.mcp/server.json` and the
+  McpServer package type (BL-2390, BL-2561).
+
+Both tests that run the SDK pass `--disable-build-servers`. Otherwise the MSBuild nodes and compiler
+server the child starts inherit its redirected output and hold it open for about 15 minutes (BL-2561).
 - `CurlMcpNativeAotIntegrationTests`: `dotnet publish Curl.Mcp -r <this machine's runtime>
   -p:PublishAot=true` once for the class, then the native binary over stdio - `initialize`,
   `tools/list` and a `transfer` call with one request header against a loopback listener (BL-2486,

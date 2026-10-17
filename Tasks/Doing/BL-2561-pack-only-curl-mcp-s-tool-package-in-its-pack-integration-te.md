@@ -36,6 +36,7 @@ Measured: when it still passed, the Curl.Mcp Integration tests step took 15 min 
 
 - `-p:PublishAot=true` alone did not shorten the test locally: still 15 min 18 s. The local test assembly is built in Debug, so a `-c Release` pack compiled every referenced project cold in Release. Warm, the same Release pack took 11 s. The test now packs in the configuration its own assembly was built in (`AssemblyConfigurationAttribute`): Debug locally, Release in ci.yml's mcp-pack job, which builds the tests with `-c Release`.
 - Measured locally on Windows after the change: the test took 11 s (the `dotnet test` run, including the incremental build, took 33 s). All 12 Curl.Mcp Integration tests passed in 1 min 4 s.
+- CI run 38993851342 (3b0226b17) still cancelled Windows and Ubuntu pack at 30 minutes: both jobs built in about 2 minutes, then sat silent in the test run. Real cause: the pack and the AOT publish tests redirect the child's output, and the MSBuild nodes and compiler server the child starts inherit those pipes and hold them open until they go idle, about 15 minutes, so `ReadToEndAsync` waited 15 minutes per test after the child had exited. That also explains the first local run's 15 min 18 s. Both tests now pass `--disable-build-servers`. After `dotnet build-server shutdown`, all 12 Curl.Mcp Integration tests passed in 1 min 56 s with no build server left running.
 
 ## Log
 

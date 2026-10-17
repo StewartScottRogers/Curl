@@ -13,7 +13,10 @@ namespace Curl.Mcp;
 /// the six self-contained runtime packages, which took over 15 minutes on CI and pushed the mcp-pack job
 /// past its time limit (BL-2561). ci.yml's own pack step still checks all seven packages. It packs in the
 /// configuration this test assembly was built in, so the pack reuses that build rather than compiling every
-/// referenced project again: Debug locally, Release in ci.yml's mcp-pack job.
+/// referenced project again: Debug locally, Release in ci.yml's mcp-pack job. It packs with
+/// <c>--disable-build-servers</c>: MSBuild nodes and the compiler server that a pack starts inherit its
+/// redirected output and hold it open until they go idle, about 15 minutes, so reading that output to its end
+/// waited for them.
 /// </summary>
 [TestClass]
 [TestCategory("Integration")]
@@ -55,7 +58,7 @@ public sealed class CurlMcpPackIntegrationTests
             RedirectStandardError = true,
             UseShellExecute = false,
         };
-        foreach (string argument in new[] { "pack", Path.Combine(RepositoryRoot(), "Curl.Mcp", "Curl.Mcp.csproj"), "-c", BuildConfiguration(), "-p:PublishAot=true", "-o", output, "-nologo" })
+        foreach (string argument in new[] { "pack", Path.Combine(RepositoryRoot(), "Curl.Mcp", "Curl.Mcp.csproj"), "-c", BuildConfiguration(), "-p:PublishAot=true", "-o", output, "-nologo", "--disable-build-servers" })
         {
             startInfo.ArgumentList.Add(argument);
         }

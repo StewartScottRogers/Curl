@@ -13,7 +13,9 @@ namespace Curl.Mcp;
 /// and a <c>transfer</c> call carrying one request header against a loopback listener. Before ADR-0599 the
 /// native binary stopped before <c>initialize</c>, because the tools' parameter types were unresolved without
 /// reflection. It runs the SDK and a child process and sends bytes over a socket, so it is an Integration
-/// test (ADR-0421).
+/// test (ADR-0421). It publishes with <c>--disable-build-servers</c>: MSBuild nodes and the compiler server
+/// that a publish starts inherit its redirected output and hold it open until they go idle, about 15 minutes,
+/// so reading that output to its end waited for them (BL-2561).
 /// </summary>
 [TestClass]
 [TestCategory("Integration")]
@@ -106,7 +108,7 @@ public sealed class CurlMcpNativeAotIntegrationTests
             RedirectStandardError = true,
             UseShellExecute = false,
         };
-        string[] arguments = ["publish", Path.Combine(RepositoryRoot(), "Curl.Mcp", "Curl.Mcp.csproj"), "-c", "Release", "-r", RuntimeInformation.RuntimeIdentifier, "-p:PublishAot=true", "-o", output, "-nologo"];
+        string[] arguments = ["publish", Path.Combine(RepositoryRoot(), "Curl.Mcp", "Curl.Mcp.csproj"), "-c", "Release", "-r", RuntimeInformation.RuntimeIdentifier, "-p:PublishAot=true", "-o", output, "-nologo", "--disable-build-servers"];
         foreach (string argument in arguments)
         {
             startInfo.ArgumentList.Add(argument);
