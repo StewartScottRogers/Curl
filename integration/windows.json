@@ -1,8 +1,8 @@
 {
   "platform": "Windows",
-  "commit": "dc7dfd65780e6482bd2a1b3453298b6553eeb16c",
-  "runUrl": "https://github.com/StewartScottRogers/Curl/actions/runs/39051114688",
-  "measuredAt": "2026-10-17T17:21:08Z",
+  "commit": "bed376eb431ec2d2c78963fecf5498033a6f91ce",
+  "runUrl": "https://github.com/StewartScottRogers/Curl/actions/runs/39052647008",
+  "measuredAt": "2026-10-17T17:46:10Z",
   "resultFiles": 98,
   "projects": 8,
   "passed": 36,
