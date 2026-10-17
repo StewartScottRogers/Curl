@@ -1,24 +1,28 @@
 using Curl.Api.Codes;
 using Curl.Api.EngineContracts.Mime;
 using Curl.Api.Options.Http;
-using Curl.Api.Callbacks;
 
 namespace Curl.Conformance.LibTest.UnitTests;
 
-/// <summary>An <see cref="ICurlFormBuilder"/> that records every <c>curl_formadd</c> call and answers each with <see cref="AddResult"/>.</summary>
 internal sealed class FakeFormBuilder : ICurlFormBuilder
 {
     public CurlFormAddCode AddResult { get; init; } = CurlFormAddCode.Ok;
+
+    public int FailingCall { get; init; }
 
     public List<IReadOnlyList<CurlFormArgument>> Calls { get; } = [];
 
     public CurlFormAddCode Add(IReadOnlyList<CurlFormArgument> arguments)
     {
         Calls.Add(arguments);
-        return AddResult;
+        return Calls.Count == FailingCall ? CurlFormAddCode.Memory : AddResult;
     }
 
-    public int Serialize(FormGetCallback append) => 0;
+    public int Serialize(FormGetCallback append)
+    {
+        _ = append("abc"u8);
+        return 0;
+    }
 
     public EasyMimeBody Build() => new();
 }

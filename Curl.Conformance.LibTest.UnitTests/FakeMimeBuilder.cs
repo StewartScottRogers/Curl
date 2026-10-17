@@ -5,14 +5,13 @@ using Curl.Api.Options.Http;
 
 namespace Curl.Conformance.LibTest.UnitTests;
 
-/// <summary>An <see cref="IMimeBuilder"/> whose parts keep their name and data and build a body naming each part.</summary>
-internal sealed class FakeMimeBuilder : IMimeBuilder
+internal sealed class FakeMimeBuilder(CurlCode answer = CurlCode.Ok) : IMimeBuilder
 {
     public List<FakeMimePartBuilder> Parts { get; } = [];
 
     public IMimePartBuilder AddPart()
     {
-        var part = new FakeMimePartBuilder();
+        var part = new FakeMimePartBuilder(answer);
         Parts.Add(part);
         return part;
     }
@@ -20,36 +19,43 @@ internal sealed class FakeMimeBuilder : IMimeBuilder
     public EasyMimeBody Build() => new() { Parts = [.. Parts.Select(p => new EasyMimePart { Name = p.Name })] };
 }
 
-/// <summary>An <see cref="IMimePartBuilder"/> that keeps the name and data it is given.</summary>
-internal sealed class FakeMimePartBuilder : IMimePartBuilder
+internal sealed class FakeMimePartBuilder(CurlCode answer) : IMimePartBuilder
 {
     public string? Name { get; private set; }
 
     public byte[]? Data { get; private set; }
 
+    public List<string> Calls { get; } = [];
+
     public CurlCode SetName(string? name)
     {
         Name = name;
-        return CurlCode.Ok;
+        return Answer(nameof(SetName));
     }
 
     public CurlCode SetData(byte[]? data)
     {
         Data = data;
-        return CurlCode.Ok;
+        return Answer(nameof(SetData));
     }
 
-    public CurlCode SetFileName(string? fileName) => throw new NotSupportedException();
+    public CurlCode SetFileName(string? fileName) => Answer($"{nameof(SetFileName)} {fileName}");
 
-    public CurlCode SetType(string? type) => throw new NotSupportedException();
+    public CurlCode SetType(string? type) => Answer($"{nameof(SetType)} {type}");
 
-    public CurlCode SetEncoder(string? encoding) => throw new NotSupportedException();
+    public CurlCode SetEncoder(string? encoding) => Answer($"{nameof(SetEncoder)} {encoding}");
 
-    public CurlCode SetFileData(string? path) => throw new NotSupportedException();
+    public CurlCode SetFileData(string? path) => Answer($"{nameof(SetFileData)} {path}");
 
-    public CurlCode SetDataCallback(long size, ReadCallback? read, SeekCallback? seek) => throw new NotSupportedException();
+    public CurlCode SetDataCallback(long size, ReadCallback? read, SeekCallback? seek) => Answer($"{nameof(SetDataCallback)} {size}");
 
-    public CurlCode SetSubParts(IMimeBuilder? subParts) => throw new NotSupportedException();
+    public CurlCode SetSubParts(IMimeBuilder? subParts) => Answer(nameof(SetSubParts));
 
-    public CurlCode SetHeaders(IReadOnlyList<string>? headers) => throw new NotSupportedException();
+    public CurlCode SetHeaders(IReadOnlyList<string>? headers) => Answer($"{nameof(SetHeaders)} {string.Join('|', headers ?? [])}");
+
+    private CurlCode Answer(string call)
+    {
+        Calls.Add(call);
+        return answer;
+    }
 }
