@@ -10,7 +10,7 @@ upstream case runner runs for a case whose `<client><tool>` line names `lib%TEST
 - `ILibTest` is one program: `ProgramName` (such as `lib500`) and `RunAsync(context, token)`,
   libtest's `test()`.
 - `LibTestContext` is what `first.c` hands `test()`: `TestNumber` (`testnum`), `Arguments` (after
-  the program name, copied), `Url` (`argv[1]`) and `Argument2` to `Argument4`
+  the program name, copied, possibly none), `Url` (`argv[1]`, `null` when no argument was given, as `first.c` leaves `URL` for a case with no `<command>`) and `Argument2` to `Argument4`
   (`libtest_arg2` to `_arg4`, `null` when not given), and, set by the case runner, the `Engine`
   the program's `curl_global_init` takes (reaching the case's in-memory servers; the program's
   cleanup disposes it), its `StandardOutput` and its `StandardError`.

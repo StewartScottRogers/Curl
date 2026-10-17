@@ -126,11 +126,11 @@ public sealed class Lib506 : ILibTest
         for (int run = 1; run <= 2; run++)
         {
             output.WriteLine(string.Create(CultureInfo.InvariantCulture, $"*** run {run}"));
-            await FireAsync(context, library, share, LibTestUtilities.SubUrl(context.Url, run), output, cancellationToken).ConfigureAwait(false);
+            await FireAsync(context, library, share, LibTestUtilities.SubUrl(context.Url!, run), output, cancellationToken).ConfigureAwait(false);
         }
 
         output.WriteLine("*** run 3");
-        string url = LibTestUtilities.SubUrl(context.Url, 3);
+        string url = LibTestUtilities.SubUrl(context.Url!, 3);
         return await WriteJarAsync(context, steps, library, share, url, output, cancellationToken).ConfigureAwait(false)
             && await ReloadJarAsync(context, steps, library, share, url, output).ConfigureAwait(false);
     }

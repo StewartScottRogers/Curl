@@ -407,7 +407,7 @@ references) and makes the `Libcurl` engine each run gets from its `UpstreamCurlI
 program gets the command's words alone as its arguments (no `--output`, `--include` or trace), the
 invocation's stdout and a line-feed-only stderr writer, runs under the same time limit, and is judged
 as a curl run is, except that `<reply><data>` is compared with the program's stdout, since `runner.pm`
-at `curl-8_22_0` sets a tool run's `$CURLOUT` to its stdout file (BL-2560; test500's shape). A lib case whose program is not ported skips with `libtest program not ported`; any
+at `curl-8_22_0` sets a tool run's `$CURLOUT` to its stdout file (BL-2560; test500's shape). A lib case with no `<client><command>` (test501, test509) runs its program with no arguments, as runtests.pl runs a tool with an empty command (BL-2589; test501 passes). A lib case whose program is not ported skips with `libtest program not ported`; any
 other tool (`unitNNNN`, `toolNNNN`) with `the harness does not act on <client><tool>`. Until BL-2558
 gives the ratchet a real engine, it passes no `UpstreamLibTests`, so every lib case skips as not ported.
 

@@ -265,9 +265,10 @@ internal static class UpstreamCaseScreening
 
     private static string? UnsupportedCommand(UpstreamTestCase testCase)
     {
+        // runtests.pl runs a <tool> with an empty command too: a libtest program then gets no arguments (test501).
         if (testCase.Find("client", "command") is not { } command)
         {
-            return "the case has no <client><command>";
+            return LibTestProgramName(testCase) is null ? "the case has no <client><command>" : null;
         }
 
         if (command.GetAttribute("type") is { } type)
