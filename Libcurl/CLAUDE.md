@@ -161,7 +161,9 @@ as upstream deprecates it (ADR-0586): `CurlForm.Add(library, ref form, ...)` is 
 `CURLFORM_*` argument passed to the engine's `ICurlFormBuilder` as given, a `null` form started over a
 new builder and set only on `Ok`; `Get` is `curl_formget`, and `Free` or `Dispose` `curl_formfree`,
 after which the form throws `ObjectDisposedException`. It implements `AddFormPostSetters`:
-`CURLOPT_HTTPPOST` takes a `CurlForm` (else `BadFunctionArgument`) and stores its body as it is when set.
+`CURLOPT_HTTPPOST` takes a `CurlForm` (else `BadFunctionArgument`) and stores its body as it is when set,
+or for `null` an empty form, which the engine posts with `Content-Length: 0` (upstream test516, BL-2599);
+either clears `CURLOPT_NOBODY`.
 
 `Url` holds `CurlUrlHandle`, the URL handle `CurlLibrary.UrlInit` (`curl_url`) returns over the
 engine's `ICurlUrlHandle` (ADR-0587): `Get` and `Set` (`curl_url_get`, `_set`) pass through to the

@@ -5,7 +5,7 @@ using Libcurl.Options;
 namespace Curl.Conformance.LibTest;
 
 /// <summary>
-/// <c>lib516.c</c>: a transfer with <c>CURLOPT_HTTPPOST</c> <see langword="null"/>, which makes no POST, verbose and headers on.
+/// <c>lib516.c</c>: a transfer with <c>CURLOPT_HTTPPOST</c> <see langword="null"/>, which posts an empty body, verbose and headers on.
 /// </summary>
 public sealed class Lib516 : ILibTest
 {

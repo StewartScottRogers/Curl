@@ -25,7 +25,11 @@ internal static class MimePostForm
     /// (<see cref="MultipartFormPartMapping.FromMimeBody" />); <see langword="null" /> keeps none.
     /// </param>
     /// <param name="cancellationToken">Cancels the file opens.</param>
-    /// <returns>The body or its failure, or <see langword="null" /> when <see cref="BodyOf" /> gives none.</returns>
+    /// <returns>
+    /// The body or its failure, or <see langword="null" /> when <see cref="BodyOf" /> gives none; an empty
+    /// <see cref="EasyHttpOptions.HttpPost" /> form is an empty body with no <c>Content-Type</c>, which curl 8.22.0
+    /// posts with <c>Content-Length: 0</c> (upstream test516).
+    /// </returns>
     internal static async ValueTask<MultipartFormBuildResult?> BuildAsync(
         MultipartFormBodyBuilder builder,
         EasyHttpOptions http,
@@ -37,6 +41,11 @@ internal static class MimePostForm
         if (BodyOf(http, scheme, read) is not { } body)
         {
             return null;
+        }
+
+        if (http.MimePost is null && body.Parts.Count == 0)
+        {
+            return new MultipartFormBuildResult(new StreamBody(new MemoryStream([], writable: false), 0, string.Empty), null);
         }
 
         IReadOnlyList<MultipartFormPart> parts = MultipartFormPartMapping.FromMimeBody(body, callbackReads);

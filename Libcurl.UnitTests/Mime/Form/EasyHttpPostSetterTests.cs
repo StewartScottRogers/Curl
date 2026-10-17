@@ -26,15 +26,27 @@ public sealed class EasyHttpPostSetterTests
     }
 
     [TestMethod]
-    public void SetOption_HttppostNull_ClearsTheBody()
+    public void SetOption_HttppostNull_SetsAnEmptyFormThatStillPosts()
     {
-        using var form = new CurlForm(new FakeFormBuilder());
+        CurlForm? form = new CurlForm(new FakeFormBuilder());
+        CurlForm.Add(null!, ref form, new CurlFormArgument(CurlFormOption.CopyName, "a"));
         var options = new EasyOptions();
         EasyOptionDispatch.Default.SetOption(ref options, CurlOption.Httppost, form);
 
         Assert.AreEqual(CurlCode.Ok, EasyOptionDispatch.Default.SetOption(ref options, CurlOption.Httppost, null));
 
-        Assert.IsNull(options.Http.HttpPost);
+        Assert.IsEmpty(options.Http.HttpPost!.Parts);
+    }
+
+    [TestMethod]
+    public void SetOption_Httppost_ClearsNoBody()
+    {
+        var options = new EasyOptions();
+        EasyOptionDispatch.Default.SetOption(ref options, CurlOption.Nobody, 1L);
+
+        Assert.AreEqual(CurlCode.Ok, EasyOptionDispatch.Default.SetOption(ref options, CurlOption.Httppost, null));
+
+        Assert.IsFalse(options.Transfer.NoBody);
     }
 
     [TestMethod]

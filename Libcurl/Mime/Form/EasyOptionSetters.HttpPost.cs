@@ -1,5 +1,6 @@
 using Curl.Api.Codes;
 using Curl.Api.Options;
+using Curl.Api.Options.Http;
 using Libcurl.Mime;
 
 namespace Libcurl.Options;
@@ -15,8 +16,9 @@ internal static partial class EasyOptionSetters
     static partial void AddFormPostSetters(Dictionary<CurlOption, EasyOptionSetter> setters) => setters[CurlOption.Httppost] = new(SetHttpPost);
 
     /// <summary>
-    /// <c>CURLOPT_HTTPPOST</c>: a <see cref="CurlForm"/>'s body as its fields are now, or <see langword="null"/>
-    /// to send none; any other value is <see cref="CurlCode.BadFunctionArgument"/>.
+    /// <c>CURLOPT_HTTPPOST</c>: a <see cref="CurlForm"/>'s body as its fields are now, or for <see langword="null"/>
+    /// an empty form, which libcurl still posts with no body (upstream test516); either clears <c>CURLOPT_NOBODY</c>,
+    /// as curl 8.22.0's <c>setopt.c</c> does. Any other value is <see cref="CurlCode.BadFunctionArgument"/>.
     /// </summary>
     /// <exception cref="ObjectDisposedException">The form has been freed.</exception>
     private static CurlCode SetHttpPost(ref EasyOptions options, object? value)
@@ -26,8 +28,8 @@ internal static partial class EasyOptionSetters
             return CurlCode.BadFunctionArgument;
         }
 
-        var body = (value as CurlForm)?.Build();
-        options = options with { Http = options.Http with { HttpPost = body } };
+        var body = (value as CurlForm)?.Build() ?? new EasyMimeBody();
+        options = options with { Http = options.Http with { HttpPost = body }, Transfer = options.Transfer with { NoBody = false } };
         return CurlCode.Ok;
     }
 }
