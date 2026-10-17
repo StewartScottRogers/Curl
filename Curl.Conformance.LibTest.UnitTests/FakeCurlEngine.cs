@@ -12,7 +12,7 @@ using Curl.Api.Options;
 
 namespace Curl.Conformance.LibTest.UnitTests;
 
-/// <summary>An <see cref="ICurlEngine"/> whose easy transfers perform with <see cref="PerformResult"/> and report <see cref="Info"/>, whose multi handle is <see cref="Multi"/>, and whose share and URL handles are fakes; it makes no MIME or form builder.</summary>
+/// <summary>An <see cref="ICurlEngine"/> whose easy transfers perform with <see cref="PerformResult"/> and report <see cref="Info"/>, whose multi handle is <see cref="Multi"/>, and whose share and URL handles are fakes; it makes no MIME builder, and a form builder and connect-only connection only when given one.</summary>
 internal sealed class FakeCurlEngine : ICurlEngine
 {
     public CurlCode PerformResult { get; init; } = CurlCode.Ok;
@@ -45,7 +45,7 @@ internal sealed class FakeCurlEngine : ICurlEngine
     public IEasyTransfer CreateEasy()
     {
         CreatingEasy?.Invoke();
-        return new FakeEasyTransfer(PerformResult, Info, Performing);
+        return new FakeEasyTransfer(PerformResult, Info, Performing) { ConnectOnly = ConnectOnly };
     }
 
     public FakeMultiTransfer Multi { get; } = new();
@@ -67,7 +67,13 @@ internal sealed class FakeCurlEngine : ICurlEngine
 
     public IMimeBuilder CreateMime() => throw new NotSupportedException();
 
-    public ICurlFormBuilder CreateForm() => throw new NotSupportedException();
+    public ICurlFormBuilder CreateForm() => CreatingForm?.Invoke() ?? throw new NotSupportedException();
+
+    /// <summary>Gets the form builder each <c>curl_formadd</c> that starts a form gets; none throws.</summary>
+    public Func<ICurlFormBuilder>? CreatingForm { get; init; }
+
+    /// <summary>Gets the connection every easy transfer's <c>curl_easy_send</c> and <c>curl_easy_recv</c> use; none throws.</summary>
+    public IConnectOnlyConnection? ConnectOnly { get; init; }
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
@@ -83,7 +89,9 @@ internal sealed class FakeCurlEngine : ICurlEngine
 
         public IEasyWebSocket WebSocket => throw new NotSupportedException();
 
-        public IConnectOnlyConnection Connection => throw new NotSupportedException();
+        public IConnectOnlyConnection? ConnectOnly { get; init; }
+
+        public IConnectOnlyConnection Connection => ConnectOnly ?? throw new NotSupportedException();
 
         public ValueTask<CurlCode> PerformAsync(CancellationToken cancellationToken) => ValueTask.FromResult(performing?.Invoke(Options) ?? performResult);
 

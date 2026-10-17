@@ -72,6 +72,15 @@ public sealed class LibTestPrograms
         LibOneVerboseTransfer.ProxyTransferMode,
         new Lib552(TimeProvider.System),
         new Lib553(),
+        new Lib554(),
+        new Lib555(TimeProvider.System),
+        new Lib556(),
+        new Lib558(),
+        new Lib559(),
+        new Lib560(TimeProvider.System),
+        new Lib562(),
+        new Lib564(TimeProvider.System),
+        new Lib566(),
     ]);
 
     /// <summary>The names of the programs in the table, such as <c>lib500</c>.</summary>
