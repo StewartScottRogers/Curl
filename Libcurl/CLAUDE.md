@@ -90,6 +90,12 @@ and the engine's TLS backend, the tail of `curl -V`'s first line; `Info(library,
 reading text as UTF-8 bytes with lengths in bytes, `Unescape` answering `byte[]`; `null`, a negative
 length or one past the end answers `null`. `GetEnv` is `curl_getenv` (`null` for unset or empty), and
 `StrEqual`/`StrNEqual` are `curl_strequal`/`curl_strnequal`, ignoring ASCII case only.
+`Misc/Printf` holds `CurlPrintf` (ADR-0668): `MPrintf`, `MFPrintf` (a `Stream`), `MSPrintf`, `MSNPrintf`
+(a `Span<byte>` whose length is `maxlength`) and `MAPrintf`, a port of curl 8.22.0's `lib/mprintf.c`
+(`PrintfFormatParser` is `parsefmt`, `PrintfRenderer` `formatf`, `PrintfNumberWriter`, `PrintfTextWriter` and
+`PrintfDoubleWriter` its `out_*`). Each argument is read as its conversion's C type, `%ld` 32 bits on Windows
+and 64 elsewhere (`PrintfPlatform`, which tests pin both ways); the `v` forms are the same methods given an
+array. `out_double`'s `snprintf` is hand-written over `ExactDecimal`, so doubles format the same everywhere.
 
 `Easy` holds `CurlEasy`, the easy handle `CurlLibrary.EasyInit` (`curl_easy_init`) returns over the
 engine's `IEasyTransfer` (ADR-0563): `SetOption` goes through `EasyOptionDispatch` and writes the
