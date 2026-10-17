@@ -15,7 +15,8 @@ namespace Curl.Engine;
 /// <paramref name="options" /> holds <c>CURLWS_NOAUTOPONG</c> or <c>CURLWS_RAW_MODE</c>, each ping received is answered
 /// with a pong carrying its payload; the ping is still handed over. A send writes one masked frame from the bits given
 /// (<see cref="WebSocketFrameFlags.TryFrameOf" />), or under <c>CURLWS_RAW_MODE</c> the bytes as they are, which
-/// <c>lib/ws.c</c> allows only with no bits and no fragment size (BL-2444); a receive decodes frames either way, as
+/// <c>lib/ws.c</c> allows only with no bits and no fragment size (BL-2444). A frame may also be sent in parts, its head
+/// announcing the whole payload, under <c>CURLWS_OFFSET</c> or after <see cref="StartFrameAsync" /> (BL-2481); a receive decodes frames either way, as
 /// <c>curl_ws_recv</c> does. With options no longer connect-only both answer
 /// <see cref="CurlCode.UnsupportedProtocol" />, and with no upgraded connection <see cref="CurlCode.BadFunctionArgument" />.
 /// </summary>
@@ -41,6 +42,14 @@ internal sealed class ManagedEasyWebSocket(Func<bool> isConnectOnly, Func<WebSoc
     private CurlWebSocketFlags messageType;
 
     private bool continuesSentMessage;
+
+    /// <summary>The payload bytes of the frame being sent still to come, as libcurl's <c>ws->enc.payload_remain</c>.</summary>
+    private long sendFrameLeft;
+
+    /// <summary>The payload bytes of the frame being sent already written, which places the next part's mask.</summary>
+    private long sendFrameOffset;
+
+    private byte[] sendFrameMask = [];
 
     private CurlCode? streamFailure;
 
@@ -79,6 +88,8 @@ internal sealed class ManagedEasyWebSocket(Func<bool> isConnectOnly, Func<WebSoc
         deliveredOfRun = 0;
         messageType = CurlWebSocketFlags.None;
         continuesSentMessage = false;
+        sendFrameLeft = 0;
+        sendFrameOffset = 0;
         streamFailure = null;
         pendingRead = null;
         CurrentFrame = null;
@@ -102,7 +113,11 @@ internal sealed class ManagedEasyWebSocket(Func<bool> isConnectOnly, Func<WebSoc
     }
 
     /// <inheritdoc />
-    /// <remarks><c>CURLWS_OFFSET</c> is refused with <see cref="CurlCode.BadFunctionArgument" /> until BL-2481.</remarks>
+    /// <remarks>
+    /// Under <c>CURLWS_OFFSET</c> the first call's <paramref name="fragmentSize" /> is the whole payload's size and the
+    /// head announces it; while that frame has payload left, every call continues it whatever its bits, as
+    /// <c>lib/ws.c</c> does (BL-2481, ADR-0648).
+    /// </remarks>
     public async ValueTask<CurlWebSocketSendResult> SendAsync(ReadOnlyMemory<byte> buffer, long fragmentSize, CurlWebSocketFlags flags, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -114,42 +129,125 @@ internal sealed class ManagedEasyWebSocket(Func<bool> isConnectOnly, Func<WebSoc
 
         return (options() & WebSocketOptionBits.RawMode) != 0
             ? await SendRawAsync(live!, buffer, fragmentSize, flags).ConfigureAwait(false)
-            : await SendFramedAsync(live!, buffer, flags).ConfigureAwait(false);
+            : await SendFramedAsync(live!, buffer, fragmentSize, flags).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
     /// <remarks>
-    /// <c>curl_ws_start_frame</c> belongs inside a read callback of a WebSocket upload, which the engine does not run
-    /// yet (BL-2481), so it answers <see cref="CurlCode.BadFunctionArgument" />.
+    /// <c>curl_ws_start_frame</c> as <c>lib/ws.c</c>: under <c>CURLWS_RAW_MODE</c> <see cref="CurlCode.FailedInit" />;
+    /// with no upgraded connection, a frame still unfinished or a negative length <see cref="CurlCode.SendError" />;
+    /// bits naming no frame <see cref="CurlCode.BadFunctionArgument" />; otherwise it writes the frame's head announcing
+    /// <paramref name="frameLength" /> bytes, which the following sends supply. libcurl checks no callback, so the call
+    /// behaves the same inside a read callback and outside one; the engine runs WebSocket transfers only connect-only,
+    /// where no read callback is called (ADR-0648).
     /// </remarks>
-    public ValueTask<CurlCode> StartFrameAsync(CurlWebSocketFlags flags, long frameLength, CancellationToken cancellationToken)
+    public async ValueTask<CurlCode> StartFrameAsync(CurlWebSocketFlags flags, long frameLength, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        return ValueTask.FromResult(CurlCode.BadFunctionArgument);
+        if ((options() & WebSocketOptionBits.RawMode) != 0)
+        {
+            return CurlCode.FailedInit;
+        }
+
+        if (UsableConnection(out IConnection? live) != CurlCode.Ok)
+        {
+            return CurlCode.SendError;
+        }
+
+        CurlCode started = StartFrame(flags, frameLength, out byte[] head);
+        if (started != CurlCode.Ok)
+        {
+            return started;
+        }
+
+        return await TryWriteAsync(live!, head).ConfigureAwait(false) ? CurlCode.Ok : CurlCode.SendError;
     }
 
     /// <summary>
-    /// <c>curl_ws_send</c> outside raw mode: writes one masked frame from <paramref name="flags" />, refusing
-    /// <c>CURLWS_OFFSET</c> and the bits libcurl refuses with <see cref="CurlCode.BadFunctionArgument" />.
+    /// <c>curl_ws_send</c> outside raw mode: continues the frame being sent while it has payload left, else starts one
+    /// from <paramref name="flags" /> announcing <paramref name="fragmentSize" /> bytes under <c>CURLWS_OFFSET</c> and
+    /// <paramref name="buffer" />'s length otherwise, refusing a first part longer than that with
+    /// <see cref="CurlCode.BadFunctionArgument" />.
     /// </summary>
     /// <param name="live">The upgraded connection.</param>
-    /// <param name="buffer">The frame's payload.</param>
+    /// <param name="buffer">The frame's payload, or its next part.</param>
+    /// <param name="fragmentSize">The whole payload's size under <c>CURLWS_OFFSET</c>.</param>
     /// <param name="flags">The frame's bits.</param>
     /// <returns>The send's result.</returns>
-    private async ValueTask<CurlWebSocketSendResult> SendFramedAsync(IConnection live, ReadOnlyMemory<byte> buffer, CurlWebSocketFlags flags)
+    private async ValueTask<CurlWebSocketSendResult> SendFramedAsync(IConnection live, ReadOnlyMemory<byte> buffer, long fragmentSize, CurlWebSocketFlags flags)
     {
-        if ((flags & CurlWebSocketFlags.Offset) != 0 || !WebSocketFrameFlags.TryFrameOf(flags, continuesSentMessage, out WsOpcode opcode, out bool isFinal))
+        if (sendFrameLeft > 0)
+        {
+            return await SendPartAsync(live, [], buffer).ConfigureAwait(false);
+        }
+
+        long frameLength = (flags & CurlWebSocketFlags.Offset) != 0 ? fragmentSize : buffer.Length;
+        if (frameLength >= 0 && buffer.Length > frameLength)
         {
             return new CurlWebSocketSendResult(CurlCode.BadFunctionArgument, 0);
         }
 
-        if (!await TrySendFrameAsync(live, opcode, isFinal, buffer).ConfigureAwait(false))
+        CurlCode started = StartFrame(flags, frameLength, out byte[] head);
+        return started == CurlCode.Ok
+            ? await SendPartAsync(live, head, buffer).ConfigureAwait(false)
+            : new CurlWebSocketSendResult(started, 0);
+    }
+
+    /// <summary>
+    /// Starts a frame as <c>ws_enc_write_head</c> does: <see cref="CurlCode.SendError" /> for a negative length or while
+    /// the frame before has payload left, <see cref="CurlCode.BadFunctionArgument" /> for bits naming no frame
+    /// (<c>CURLWS_OFFSET</c> aside), else the head written and the frame's mask and length kept for its parts.
+    /// </summary>
+    /// <param name="flags">The frame's bits.</param>
+    /// <param name="frameLength">The frame's whole payload size.</param>
+    /// <param name="head">The frame's head, empty unless the answer is <see cref="CurlCode.Ok" />.</param>
+    /// <returns>Whether the frame started.</returns>
+    private CurlCode StartFrame(CurlWebSocketFlags flags, long frameLength, out byte[] head)
+    {
+        head = [];
+        if (frameLength < 0 || sendFrameLeft > 0)
+        {
+            return CurlCode.SendError;
+        }
+
+        if (!WebSocketFrameFlags.TryFrameOf(flags & ~CurlWebSocketFlags.Offset, continuesSentMessage, out WsOpcode opcode, out bool isFinal))
+        {
+            return CurlCode.BadFunctionArgument;
+        }
+
+        head = WsFrameEncoder.EncodeHead(opcode, isFinal, frameLength, randomSource);
+        sendFrameMask = head[^WsFrameEncoder.MaskLength..];
+        sendFrameLeft = frameLength;
+        sendFrameOffset = 0;
+        continuesSentMessage = opcode is WsOpcode.Close or WsOpcode.Ping or WsOpcode.Pong ? continuesSentMessage : !isFinal;
+        return CurlCode.Ok;
+    }
+
+    /// <summary>
+    /// Writes <paramref name="head" /> and <paramref name="part" />, masked at its offset in the frame being sent,
+    /// refusing a part longer than the frame's payload left with <see cref="CurlCode.BadFunctionArgument" /> as
+    /// <c>lib/ws.c</c>'s "unaligned frame size" does.
+    /// </summary>
+    /// <param name="live">The upgraded connection.</param>
+    /// <param name="head">The frame's head when the frame starts here, else empty.</param>
+    /// <param name="part">The payload part.</param>
+    /// <returns>The send's result.</returns>
+    private async ValueTask<CurlWebSocketSendResult> SendPartAsync(IConnection live, byte[] head, ReadOnlyMemory<byte> part)
+    {
+        if (part.Length > sendFrameLeft)
+        {
+            return new CurlWebSocketSendResult(CurlCode.BadFunctionArgument, 0);
+        }
+
+        byte[] bytes = [.. head, .. WsFrameEncoder.MaskPart(part.Span, sendFrameMask, sendFrameOffset)];
+        if (!await TryWriteAsync(live, bytes).ConfigureAwait(false))
         {
             return new CurlWebSocketSendResult(CurlCode.SendError, 0);
         }
 
-        continuesSentMessage = opcode is WsOpcode.Close or WsOpcode.Ping or WsOpcode.Pong ? continuesSentMessage : !isFinal;
-        return new CurlWebSocketSendResult(CurlCode.Ok, buffer.Length);
+        sendFrameOffset += part.Length;
+        sendFrameLeft -= part.Length;
+        return new CurlWebSocketSendResult(CurlCode.Ok, part.Length);
     }
 
     /// <summary>

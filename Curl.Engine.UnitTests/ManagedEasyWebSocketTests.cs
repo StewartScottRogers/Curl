@@ -259,7 +259,6 @@ public sealed class ManagedEasyWebSocketTests
     }
 
     [TestMethod]
-    [DataRow(CurlWebSocketFlags.Text | CurlWebSocketFlags.Offset)]
     [DataRow(CurlWebSocketFlags.Continuation)]
     public async Task SendAsync_RefusedFlags_AnswersBadFunctionArgumentAndWritesNothing(CurlWebSocketFlags flags)
     {
@@ -331,13 +330,178 @@ public sealed class ManagedEasyWebSocketTests
     }
 
     [TestMethod]
-    public async Task StartFrameAsync_AnyFrame_AnswersBadFunctionArgument()
+    public async Task SendAsync_TenByteTextInTwoOffsetParts_WritesOneHeadAnnouncingTenBytesAndTheMaskedPayload()
+    {
+        ManagedEasyWebSocket webSocket = new(() => true, () => WebSocketOptionBits.None, new CountingMaskSource());
+        QueuedConnection peer = new();
+        await webSocket.OpenAsync(peer, ReadOnlyMemory<byte>.Empty);
+
+        CurlWebSocketSendResult first = await webSocket.SendAsync("hell"u8.ToArray(), 10, CurlWebSocketFlags.Text | CurlWebSocketFlags.Offset, CancellationToken.None);
+        CurlWebSocketSendResult second = await webSocket.SendAsync("oworld"u8.ToArray(), 0, CurlWebSocketFlags.Text | CurlWebSocketFlags.Offset, CancellationToken.None);
+
+        Assert.AreEqual(new CurlWebSocketSendResult(CurlCode.Ok, 4), first);
+        Assert.AreEqual(new CurlWebSocketSendResult(CurlCode.Ok, 6), second);
+        byte[] expected = WsFrameEncoder.Encode(WsOpcode.Text, true, "helloworld"u8, new CountingMaskSource());
+        Assert.AreEqual(0x8a, expected[1]);
+        CollectionAssert.AreEqual(expected, peer.Written);
+    }
+
+    [TestMethod]
+    public async Task SendAsync_FrameFinishedInParts_NextSendStartsANewFrame()
+    {
+        (ManagedEasyWebSocket webSocket, QueuedConnection peer) = await OpenAsync();
+
+        await webSocket.SendAsync("ab"u8.ToArray(), 3, CurlWebSocketFlags.Binary | CurlWebSocketFlags.Offset, CancellationToken.None);
+        await webSocket.SendAsync("c"u8.ToArray(), 0, CurlWebSocketFlags.Binary | CurlWebSocketFlags.Offset, CancellationToken.None);
+        await webSocket.SendAsync("x"u8.ToArray(), 0, CurlWebSocketFlags.Text, CancellationToken.None);
+
+        CollectionAssert.AreEqual(ClientFrame(WsOpcode.Binary, true, "abc").Concat(ClientFrame(WsOpcode.Text, true, "x")).ToArray(), peer.Written);
+    }
+
+    [TestMethod]
+    public async Task SendAsync_FirstPartLongerThanTheFragmentSize_AnswersBadFunctionArgumentAndWritesNothing()
+    {
+        (ManagedEasyWebSocket webSocket, QueuedConnection peer) = await OpenAsync();
+
+        CurlWebSocketSendResult result = await webSocket.SendAsync("abc"u8.ToArray(), 2, CurlWebSocketFlags.Text | CurlWebSocketFlags.Offset, CancellationToken.None);
+
+        Assert.AreEqual(new CurlWebSocketSendResult(CurlCode.BadFunctionArgument, 0), result);
+        Assert.IsEmpty(peer.Written);
+    }
+
+    [TestMethod]
+    public async Task SendAsync_PartPastWhatIsLeftOfTheFrame_AnswersBadFunctionArgumentAndWritesNothingMore()
+    {
+        (ManagedEasyWebSocket webSocket, QueuedConnection peer) = await OpenAsync();
+        await webSocket.SendAsync("ab"u8.ToArray(), 4, CurlWebSocketFlags.Text | CurlWebSocketFlags.Offset, CancellationToken.None);
+        int writtenBefore = peer.Written.Length;
+
+        CurlWebSocketSendResult result = await webSocket.SendAsync("cde"u8.ToArray(), 0, CurlWebSocketFlags.Text | CurlWebSocketFlags.Offset, CancellationToken.None);
+
+        Assert.AreEqual(new CurlWebSocketSendResult(CurlCode.BadFunctionArgument, 0), result);
+        Assert.HasCount(writtenBefore, peer.Written);
+    }
+
+    [TestMethod]
+    public async Task SendAsync_NegativeFragmentSize_AnswersSendError()
+    {
+        (ManagedEasyWebSocket webSocket, QueuedConnection peer) = await OpenAsync();
+
+        CurlWebSocketSendResult result = await webSocket.SendAsync("a"u8.ToArray(), -1, CurlWebSocketFlags.Text | CurlWebSocketFlags.Offset, CancellationToken.None);
+
+        Assert.AreEqual(new CurlWebSocketSendResult(CurlCode.SendError, 0), result);
+        Assert.IsEmpty(peer.Written);
+    }
+
+    [TestMethod]
+    public async Task StartFrameAsync_ThenSends_WritesTheHeadAndThePayloadAsOneFrame()
+    {
+        (ManagedEasyWebSocket webSocket, QueuedConnection peer) = await OpenAsync();
+
+        CurlCode started = await webSocket.StartFrameAsync(CurlWebSocketFlags.Text, 5, CancellationToken.None);
+        CurlWebSocketSendResult first = await webSocket.SendAsync("he"u8.ToArray(), 0, CurlWebSocketFlags.None, CancellationToken.None);
+        CurlWebSocketSendResult second = await webSocket.SendAsync("llo"u8.ToArray(), 0, CurlWebSocketFlags.None, CancellationToken.None);
+
+        Assert.AreEqual(CurlCode.Ok, started);
+        Assert.AreEqual(new CurlWebSocketSendResult(CurlCode.Ok, 2), first);
+        Assert.AreEqual(new CurlWebSocketSendResult(CurlCode.Ok, 3), second);
+        CollectionAssert.AreEqual(ClientFrame(WsOpcode.Text, true, "hello"), peer.Written);
+    }
+
+    [TestMethod]
+    public async Task StartFrameAsync_EmptyFrame_WritesTheWholeFrame()
+    {
+        (ManagedEasyWebSocket webSocket, QueuedConnection peer) = await OpenAsync();
+
+        CurlCode result = await webSocket.StartFrameAsync(CurlWebSocketFlags.Ping, 0, CancellationToken.None);
+
+        Assert.AreEqual(CurlCode.Ok, result);
+        CollectionAssert.AreEqual(ClientFrame(WsOpcode.Ping, true, string.Empty), peer.Written);
+    }
+
+    [TestMethod]
+    public async Task StartFrameAsync_PreviousFrameUnfinished_AnswersSendErrorAndWritesNothingMore()
+    {
+        (ManagedEasyWebSocket webSocket, QueuedConnection peer) = await OpenAsync();
+        await webSocket.StartFrameAsync(CurlWebSocketFlags.Text, 3, CancellationToken.None);
+        int writtenBefore = peer.Written.Length;
+
+        CurlCode result = await webSocket.StartFrameAsync(CurlWebSocketFlags.Binary, 1, CancellationToken.None);
+
+        Assert.AreEqual(CurlCode.SendError, result);
+        Assert.HasCount(writtenBefore, peer.Written);
+    }
+
+    [TestMethod]
+    [DataRow(CurlWebSocketFlags.Text, -1L, CurlCode.SendError)]
+    [DataRow(CurlWebSocketFlags.Continuation, 1L, CurlCode.BadFunctionArgument)]
+    [DataRow(CurlWebSocketFlags.Text | CurlWebSocketFlags.Binary, 1L, CurlCode.BadFunctionArgument)]
+    public async Task StartFrameAsync_RefusedLengthOrBits_AnswersLibcurlsCodeAndWritesNothing(CurlWebSocketFlags flags, long frameLength, CurlCode expected)
+    {
+        (ManagedEasyWebSocket webSocket, QueuedConnection peer) = await OpenAsync();
+
+        CurlCode result = await webSocket.StartFrameAsync(flags, frameLength, CancellationToken.None);
+
+        Assert.AreEqual(expected, result);
+        Assert.IsEmpty(peer.Written);
+    }
+
+    [TestMethod]
+    public async Task StartFrameAsync_RawMode_AnswersFailedInit()
+    {
+        (ManagedEasyWebSocket webSocket, QueuedConnection peer) = await OpenAsync(WebSocketOptionBits.RawMode);
+
+        CurlCode result = await webSocket.StartFrameAsync(CurlWebSocketFlags.Text, 1, CancellationToken.None);
+
+        Assert.AreEqual(CurlCode.FailedInit, result);
+        Assert.IsEmpty(peer.Written);
+    }
+
+    [TestMethod]
+    public async Task StartFrameAsync_NoUpgradedConnection_AnswersSendError()
+    {
+        ManagedEasyWebSocket webSocket = new(() => true, () => WebSocketOptionBits.None, new ZeroMaskSource());
+
+        CurlCode result = await webSocket.StartFrameAsync(CurlWebSocketFlags.Text, 1, CancellationToken.None);
+
+        Assert.AreEqual(CurlCode.SendError, result);
+    }
+
+    [TestMethod]
+    public async Task StartFrameAsync_WriteFails_AnswersSendError()
+    {
+        (ManagedEasyWebSocket webSocket, QueuedConnection peer) = await OpenAsync();
+        peer.WriteFailure = new IOException("gone");
+
+        CurlCode result = await webSocket.StartFrameAsync(CurlWebSocketFlags.Text, 1, CancellationToken.None);
+
+        Assert.AreEqual(CurlCode.SendError, result);
+    }
+
+    [TestMethod]
+    public async Task SendAsync_PartWriteFails_AnswersSendError()
+    {
+        (ManagedEasyWebSocket webSocket, QueuedConnection peer) = await OpenAsync();
+        await webSocket.StartFrameAsync(CurlWebSocketFlags.Text, 2, CancellationToken.None);
+        peer.WriteFailure = new IOException("gone");
+
+        CurlWebSocketSendResult result = await webSocket.SendAsync("a"u8.ToArray(), 0, CurlWebSocketFlags.None, CancellationToken.None);
+
+        Assert.AreEqual(new CurlWebSocketSendResult(CurlCode.SendError, 0), result);
+    }
+
+    [TestMethod]
+    public async Task OpenAsync_FrameUnfinishedOnTheOldConnection_TheNewConnectionStartsAFreshFrame()
     {
         (ManagedEasyWebSocket webSocket, _) = await OpenAsync();
+        await webSocket.StartFrameAsync(CurlWebSocketFlags.Text, 3, CancellationToken.None);
+        QueuedConnection second = new();
+        await webSocket.OpenAsync(second, ReadOnlyMemory<byte>.Empty);
 
-        CurlCode result = await webSocket.StartFrameAsync(CurlWebSocketFlags.Text, 4, CancellationToken.None);
+        CurlCode result = await webSocket.StartFrameAsync(CurlWebSocketFlags.Binary, 0, CancellationToken.None);
 
-        Assert.AreEqual(CurlCode.BadFunctionArgument, result);
+        Assert.AreEqual(CurlCode.Ok, result);
+        CollectionAssert.AreEqual(ClientFrame(WsOpcode.Binary, true, string.Empty), second.Written);
     }
 
     [TestMethod]
@@ -371,5 +535,17 @@ public sealed class ManagedEasyWebSocketTests
     internal sealed class ZeroMaskSource : IWebSocketRandomSource
     {
         public void Fill(Span<byte> destination) => destination.Clear();
+    }
+
+    /// <summary>Masks every frame with 01 02 03 04, so a part masked at the wrong offset shows.</summary>
+    private sealed class CountingMaskSource : IWebSocketRandomSource
+    {
+        public void Fill(Span<byte> destination)
+        {
+            for (int index = 0; index < destination.Length; index++)
+            {
+                destination[index] = (byte)(index + 1);
+            }
+        }
     }
 }
