@@ -199,6 +199,16 @@ public sealed class LibTestPrograms
         new Lib1599(),
         new Lib1647(),
         new Lib1648(),
+        new Lib1649(),
+        new Lib1662(),
+        new Lib1678(),
+        new Lib1686(),
+        new Lib1900(),
+        new Lib1901(),
+        new Lib1902(),
+        new Lib1903(),
+        new Lib1905(),
+        new Lib1906(),
     ]);
 
     /// <summary>The names of the programs in the table, such as <c>lib500</c>.</summary>
