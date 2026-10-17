@@ -46,3 +46,4 @@ Upstream's `setopt.c` (curl 8.22.0), `CURLOPT_HTTPPOST`, sets `data->set.method 
 ## Log
 
 - 2026-10-17: Created.
+- 2026-10-17: Backlog -> Doing. Criteria at claim: 0b872f9d 8f5ef050 4272a6b9 93d914d5.
