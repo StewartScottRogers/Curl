@@ -111,7 +111,8 @@ public sealed class ManagedCurlEngine : ICurlEngine
     /// Builds a transfer's dispatcher as <c>Curl.Console</c>'s composition builds an option group's:
     /// <c>EngineComposition.CreateTransports</c>
     /// over the engine's caches, and the handlers over its pooling connector, the HTTP handler keeping
-    /// cookies in <paramref name="cookieStore" />.
+    /// cookies in <paramref name="cookieStore" />. FTP's active-mode listener runs the handle's socket callbacks
+    /// (<see cref="SocketCallbackConnectionListener" />, BL-2588).
     /// </summary>
     /// <param name="options">The transfer's options.</param>
     /// <param name="shared">The engine's shared caches.</param>
@@ -132,7 +133,7 @@ public sealed class ManagedCurlEngine : ICurlEngine
             ftpDataConnector: PoolOf(transports, transports.TcpConnector.ForFtpDataConnections(), options.Callbacks, shared),
             ftpWildcardHooks: CallbackWildcardHooks.Of(options),
             rtspInterleaveSink: CallbackInterleaveSink.Of(options.Callbacks.Interleave),
-            ftpListener: shared.Dialing?.FtpListener,
+            ftpListener: SocketCallbackConnectionListener.Over(shared.Dialing?.FtpListener ?? new Curl.Networking.TcpConnectionListener(), options.Callbacks, shared),
             webSocketRawMode: IsWebSocketRawMode(options),
             http2PushSink: pushSink));
     }
