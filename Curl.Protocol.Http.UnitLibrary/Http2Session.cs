@@ -81,11 +81,16 @@ internal sealed class Http2Session : IHttpStreamSession, IConnectionSession
 
     /// <summary>Initializes a new instance of the <see cref="Http2Session" /> class.</summary>
     /// <param name="connection">The connection; the handler keeps ownership.</param>
-    public Http2Session(IConnection connection)
+    /// <param name="isPushEnabled">
+    /// Whether the connection takes server push (BL-2516): its preface sends SETTINGS_ENABLE_PUSH
+    /// 1 and each PUSH_PROMISE is offered to its stream's <see cref="Http2StreamConnection.PushSink" />;
+    /// without it the preface sends 0, as curl's does when no push callback is set.
+    /// </param>
+    public Http2Session(IConnection connection, bool isPushEnabled = false)
     {
         Connection = connection;
         incoming = new ReadAheadConnectionStream(connection);
-        Frames = new Http2Connection(incoming);
+        Frames = new Http2Connection(incoming) { IsPushEnabled = isPushEnabled };
     }
 
     /// <summary>
@@ -417,11 +422,50 @@ internal sealed class Http2Session : IHttpStreamSession, IConnectionSession
             LogPeerConnectionFrames(wasSettingsReceived, wasGoAwayReceived);
         }
 
-        if (frame is not null)
+        if (frame is null)
         {
-            Route(frame);
+            return;
         }
+
+        if (frame.Type == Http2FrameType.PushPromise)
+        {
+            await OfferPushAsync(frame, Decode(frame.Content), cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        Route(frame);
     }
+
+    /// <summary>
+    /// Offers a PUSH_PROMISE to the push sink of the stream it came on (BL-2516), as curl 8.22.0's
+    /// <c>push_promise</c> offers it to the push callback: a taken push's stream is routed like any
+    /// other, read through the <see cref="Http2PushedResponse" /> the sink was given; a push the sink
+    /// refuses, or one on a stream whose transfer has no sink, is reset with CANCEL. The header block
+    /// was decoded before this either way, so the HPACK context stays in step.
+    /// </summary>
+    private async ValueTask OfferPushAsync(Http2StreamFrame promise, IReadOnlyList<HeaderField> fields, CancellationToken cancellationToken)
+    {
+        if (openStreams.TryGetValue(promise.StreamId, out Http2StreamConnection? parent) && parent.PushSink is { } sink)
+        {
+            Http2StreamConnection pushed = new(this, string.Empty, bodyLength: 0, frameLog: parent.FrameLog);
+            pushed.AdoptPromised(promise.PromisedStreamId);
+            if (sink.TryAcceptPush(PushedHeaderLines(fields), new Http2PushedResponse(pushed)))
+            {
+                openStreams[promise.PromisedStreamId] = pushed;
+                return;
+            }
+        }
+
+        // The frame lock is held here, so the reset goes to the frame layer directly.
+        await Frames.ResetStreamAsync(promise.PromisedStreamId, Http2ErrorCode.Cancel, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Gives a promised request's fields as curl's <c>h2_pushed_hdr</c> list holds them: one
+    /// <c>name:value</c> string per field, in order, made by <c>curl_maprintf("%s:%s", name, value)</c>.
+    /// </summary>
+    private static string[] PushedHeaderLines(IReadOnlyList<HeaderField> fields) =>
+        [.. fields.Select(static field => $"{field.Name}:{field.Value}")];
 
     /// <summary>
     /// Logs the server's first SETTINGS and its GOAWAY when the frame just read brought them;

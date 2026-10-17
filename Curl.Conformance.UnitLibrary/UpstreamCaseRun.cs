@@ -5,8 +5,8 @@ namespace Curl.Conformance;
 /// <param name="standardOutput">Every byte written to standard output.</param>
 /// <param name="standardError">Every byte written to standard error.</param>
 /// <param name="receivedBytes">Every byte the emulated server received.</param>
-/// <param name="outputFileBytes">The <c>--output</c> file the harness added, empty when it was not written.</param>
-internal sealed class UpstreamCaseRun(int exitCode, byte[] standardOutput, byte[] standardError, byte[] receivedBytes, byte[] outputFileBytes)
+/// <param name="replyDataBytes">What <c>&lt;reply&gt;&lt;data&gt;</c> is compared with: the <c>--output</c> file the harness added (empty when it was not written), or a libtest program's stdout.</param>
+internal sealed class UpstreamCaseRun(int exitCode, byte[] standardOutput, byte[] standardError, byte[] receivedBytes, byte[] replyDataBytes)
 {
     /// <summary>curl's exit code.</summary>
     public int ExitCode { get; } = exitCode;
@@ -39,6 +39,13 @@ internal sealed class UpstreamCaseRun(int exitCode, byte[] standardOutput, byte[
     /// </summary>
     public string? LogDirectory { get; init; }
 
-    /// <summary>The <c>--output</c> file the harness added, empty when it was not written.</summary>
-    public byte[] OutputFileBytes { get; } = outputFileBytes;
+    /// <summary>
+    /// What <c>&lt;reply&gt;&lt;data&gt;</c> is compared with, as <c>runtests.pl</c> 8.22.0 reads its
+    /// <c>$CURLOUT</c>: the <c>--output</c> file the harness added for a curl run (empty when it was not
+    /// written), or a libtest program's stdout, which <c>runner.pm</c> sets <c>$CURLOUT</c> to for a tool run.
+    /// </summary>
+    public byte[] ReplyDataBytes { get; } = replyDataBytes;
+
+    /// <summary>What <see cref="ReplyDataBytes"/> holds, as a difference names it: <c>the --output file</c> unless set.</summary>
+    public string ReplyDataName { get; init; } = "the --output file";
 }

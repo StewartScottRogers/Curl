@@ -47,3 +47,9 @@ the server's control and QPACK streams in the background for the connection's li
 (BL-836, ADR-0172 section 8): a `GOAWAY` stops new requests on it, and a broken control or
 QPACK stream fails the transfer's next read with exit 56. Tests drive it with
 `Fakes/FakeMultiplexedConnection` and `Fakes/FakeMultiplexedStream`.
+
+HTTP/2 server push (BL-2516, ADR-0638): an `HttpProtocolHandler` given an `IHttp2PushSink` creates
+its HTTP/2 sessions with push enabled (SETTINGS_ENABLE_PUSH 1) and gives each request stream the
+sink. `Http2Session` decodes every PUSH_PROMISE's header block, then offers it to the sink of the
+stream it came on with curl's `name:value` lines and an `Http2PushedResponse` over the promised
+stream; a refused push, or one on a stream with no sink, is reset with RST_STREAM CANCEL.

@@ -36,9 +36,9 @@ internal static class EasyOptionsFromCommandLine
     /// runner's attempt carries its own output, header, progress and event wiring.
     /// </summary>
     /// <param name="options">The parsed command line.</param>
-    /// <param name="url">The transfer's URL.</param>
+    /// <param name="url">The transfer's URL, or <see langword="null" /> when it is set afterwards with <c>curl_easy_setopt</c>.</param>
     /// <returns>The easy options.</returns>
-    internal static Api.Options.EasyOptions EasyOptionsOf(CommandLineOptions options, string url) =>
+    internal static Api.Options.EasyOptions EasyOptionsOf(CommandLineOptions options, string? url) =>
         new()
         {
             Behaviour = BehaviourOf(options),

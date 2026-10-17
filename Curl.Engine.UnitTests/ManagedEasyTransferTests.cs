@@ -2,6 +2,7 @@ using System.Text;
 using Curl.Api.Callbacks;
 using Curl.Api.Codes;
 using Curl.Api.EngineContracts;
+using Curl.Api.EngineContracts.WebSocket;
 using Curl.Api.Options;
 using Curl.Api.Options.Behaviour;
 using Curl.Api.Options.Http;
@@ -70,6 +71,85 @@ public sealed partial class ManagedEasyTransferTests
         await easy.PerformAsync(CancellationToken.None);
 
         Assert.AreEqual("text/plain", easy.Info.ContentType);
+    }
+
+    [TestMethod]
+    public async Task PerformAsync_HttpGetWithNoUserAgent_SendsNoUserAgentLine()
+    {
+        EasyOptions options = new() { Network = new EasyNetworkOptions { Url = "http://h/x" } };
+
+        (byte[] written, CurlCode code) = await PerformThroughEasyAsync(options, toolSettings: null, Response);
+
+        Assert.AreEqual(CurlCode.Ok, code);
+        Assert.AreEqual("GET /x HTTP/1.1\r\nHost: h\r\nAccept: */*\r\n\r\n", Encoding.ASCII.GetString(written));
+    }
+
+    [TestMethod]
+    public async Task PerformAsync_HttpGetWithUserAgent_SendsIt()
+    {
+        EasyOptions options = new()
+        {
+            Network = new EasyNetworkOptions { Url = "http://h/x" },
+            Http = new EasyHttpOptions { UserAgent = "x" },
+        };
+
+        (byte[] written, CurlCode code) = await PerformThroughEasyAsync(options, toolSettings: null, Response);
+
+        Assert.AreEqual(CurlCode.Ok, code);
+        Assert.AreEqual("GET /x HTTP/1.1\r\nHost: h\r\nUser-Agent: x\r\nAccept: */*\r\n\r\n", Encoding.ASCII.GetString(written));
+    }
+
+    [TestMethod]
+    public async Task PerformAsync_HttpGetWithNoUserAgentUnderToolSettings_SendsTheCurlToolsUserAgent()
+    {
+        EasyOptions options = new() { Network = new EasyNetworkOptions { Url = "http://h/x" } };
+
+        (byte[] written, CurlCode code) = await PerformThroughEasyAsync(options, ManagedEasyTransfer.TransferSettingsOf(options), Response);
+
+        Assert.AreEqual(CurlCode.Ok, code);
+        StringAssert.Contains(Encoding.ASCII.GetString(written), "\r\nUser-Agent: curl/8.22.0\r\n");
+    }
+
+    [TestMethod]
+    public async Task PerformAsync_PostFieldsThenHttpGet_SendsAGetWithNoBody()
+    {
+        EasyOptions options = new()
+        {
+            Network = new EasyNetworkOptions { Url = "http://h/x" },
+            Http = new EasyHttpOptions { PostFields = "a=b"u8.ToArray(), HttpGet = true, Post = false },
+        };
+
+        (byte[] written, CurlCode code) = await PerformThroughEasyAsync(options, toolSettings: null, Response);
+
+        Assert.AreEqual(CurlCode.Ok, code);
+        Assert.AreEqual("GET /x HTTP/1.1\r\nHost: h\r\nAccept: */*\r\n\r\n", Encoding.ASCII.GetString(written));
+    }
+
+    [TestMethod]
+    public async Task PerformAsync_PostFieldsWithoutHttpGet_SendsAPost()
+    {
+        EasyOptions options = new()
+        {
+            Network = new EasyNetworkOptions { Url = "http://h/x" },
+            Http = new EasyHttpOptions { PostFields = "a=b"u8.ToArray(), Post = true },
+        };
+
+        (byte[] written, CurlCode code) = await PerformThroughEasyAsync(options, toolSettings: null, Response);
+
+        Assert.AreEqual(CurlCode.Ok, code);
+        Assert.AreEqual(
+            "POST /x HTTP/1.1\r\nHost: h\r\nAccept: */*\r\nContent-Length: 3\r\nContent-Type: application/x-www-form-urlencoded\r\n\r\na=b",
+            Encoding.ASCII.GetString(written));
+    }
+
+    [TestMethod]
+    public void WithoutPostFieldsUnderHttpGet_HttpGetWithPost_KeepsThePostFields()
+    {
+        EasyOptions options = new() { Http = new EasyHttpOptions { PostFields = "a=b"u8.ToArray(), HttpGet = true, Post = true } };
+
+        EasyOptions result = ManagedEasyTransfer.WithoutPostFieldsUnderHttpGet(options);
+
+        Assert.AreSame(options, result);
     }
 
     [TestMethod]
@@ -199,11 +279,14 @@ public sealed partial class ManagedEasyTransferTests
     }
 
     [TestMethod]
-    public async Task WebSocket_NotYetBuilt_ThrowsNotSupported()
+    public async Task WebSocket_BeforeAnyPerform_AnswersUnsupportedProtocolWithNoFrame()
     {
         await using IEasyTransfer easy = CreateEngine(new RecordingConnector(CurlExitCode.CouldntConnect, ConnectFailure)).CreateEasy();
 
-        Assert.ThrowsExactly<NotSupportedException>(() => easy.WebSocket);
+        CurlWebSocketReceiveResult received = await easy.WebSocket.ReceiveAsync(new byte[1], CancellationToken.None);
+
+        Assert.AreEqual(CurlCode.UnsupportedProtocol, received.Result);
+        Assert.IsNull(easy.WebSocket.CurrentFrame);
     }
 
     [TestMethod]
@@ -751,9 +834,10 @@ public sealed partial class ManagedEasyTransferTests
     }
 
     // The tool's serial attempt today: the runner's context from TransferContextFactory and the
-    // attempt TransferPerformer.FollowWatchingSpeedAsync performs (CurlCommandRunner.TransferWithBodyAsync).
+    // attempt TransferPerformer.FollowWatchingSpeedAsync performs (CurlCommandRunner.TransferWithBodyAsync), over the
+    // options a handle with no CURLOPT_USERAGENT performs with, as the tool sets its own (BL-2559).
     private static async Task<(byte[] Written, CurlCode Code)> PerformThroughToolAsync(
-        EasyOptions options,
+        EasyOptions handleOptions,
         EngineTransferSettings settings,
         string urlText,
         string response,
@@ -761,6 +845,7 @@ public sealed partial class ManagedEasyTransferTests
         ITransferEvents? events = null,
         ITransferProgress? progress = null)
     {
+        EasyOptions options = ManagedEasyTransfer.WithoutDefaultUserAgent(handleOptions);
         ScriptedConnector connector = new([Encoding.ASCII.GetBytes(response)]);
         Assert.IsTrue(CurlUrl.TryParse(settings.AppendUrlQuery(urlText), pathAsIs: false, out CurlUrl? url));
         TransferContext context = new TransferContextFactory(Stream.Null, TimeProvider.System).Create(
@@ -799,5 +884,5 @@ public sealed partial class ManagedEasyTransferTests
             cookies));
 
     private static ManagedCurlEngine CreateEngine(IConnector connector) =>
-        new(TimeProvider.System, (_, _, cookies) => CreateDispatcher(connector, cookies));
+        new(TimeProvider.System, (_, _, cookies) => CreateDispatcher(connector, cookies), readEnvironmentVariable: _ => null);
 }

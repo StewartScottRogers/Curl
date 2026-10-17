@@ -5219,7 +5219,7 @@ if ($Lane) {
 
 Write-Trace '-' 'shift' "start  branch=$branch model=$Model until $($shiftEnd.ToString('HH:mm'))  $LaneMarkerTrace" 'Cyan'
 
-$done = 0; $blocked = 0; $requeued = 0; $stalls = @(); $failStreak = 0; $attempted = @{}
+$done = 0; $blocked = 0; $deferred = 0; $requeued = 0; $stalls = @(); $failStreak = 0; $attempted = @{}
 # Parks whose move to Backlog never reached the shared branch, for the lane's summary.
 $parkLines = @()
 $stopWhy = ''
@@ -5378,7 +5378,7 @@ while ($true) {
     }
     Save-StrayChanges $id
 
-    if ($Lane -and $state -in 'Done', 'Blocked', 'Backlog') {
+    if ($Lane -and $state -in 'Done', 'Blocked', 'Deferred', 'Backlog') {
         $problem = Invoke-Integrate -Id $id -State $state
         if ($problem) {
             $unpushed = Invoke-Park -Id $id -Why $problem
@@ -5402,6 +5402,12 @@ while ($true) {
         if ($capWhy) { } elseif ($null -eq $script:RunResult -or $run.TimedOut) { $failStreak++ } else { $failStreak = 0 }
         $outcome = 'BLOCKED (see Tasks\Blocked)'
         Write-Trace $id 'BLOCKED' (Get-Short (Get-LastLogLine $id)) 'Yellow'
+    } elseif ($state -eq 'Deferred') {
+        # Deferred is a valid /task-run outcome (the task needs nothing more, or cannot be
+        # done yet): integrated like Blocked, reported, and no sign the runs are failing.
+        $deferred++; $failStreak = 0
+        $outcome = 'DEFERRED (see Tasks\Deferred)'
+        Write-Trace $id 'DEFERRED' (Get-Short (Get-LastLogLine $id)) 'Yellow'
     } elseif ($state -in 'Backlog', 'Parked') {
         # Waiting on other tasks, a widened touches, or work that would not integrate: back
         # in the queue for a later run, not a stall.
@@ -5438,7 +5444,7 @@ while ($true) {
   }
 }
 
-Write-Trace '-' 'shift' "end ($stopWhy)  done=$done blocked=$blocked requeued=$requeued stalled=$($stalls.Count)" 'Cyan'
+Write-Trace '-' 'shift' "end ($stopWhy)  done=$done blocked=$blocked deferred=$deferred requeued=$requeued stalled=$($stalls.Count)" 'Cyan'
 Write-Trace '-' 'shift' (Get-ModelCostSummary $LogDir "^BL-\d+-$Stamp$LaneTag[-.]") 'Cyan'
 if ($stopWhy -eq 'runs failing') { $stalls = @('FACTORY STALLED - two runs in a row failed; check ' + $LogDir) + $stalls }
 Set-HeartbeatTask ''
@@ -5449,9 +5455,9 @@ if ($Lane) {
     # The coordinator raises one alarm for every lane; a lane only reports.
     # Every line after SUMMARY reaches the coordinator's end-of-shift report: stalls, and
     # parks whose move to Backlog was never pushed (BL-1071).
-    Write-LaneSummary (@("SUMMARY lane $Lane ended ($stopWhy): done=$done blocked=$blocked requeued=$requeued stalled=$($stalls.Count)  $(Get-ModelCostSummary $LogDir "^BL-\d+-$Stamp$LaneTag[-.]")") + $stalls + $parkLines)
+    Write-LaneSummary (@("SUMMARY lane $Lane ended ($stopWhy): done=$done blocked=$blocked deferred=$deferred requeued=$requeued stalled=$($stalls.Count)  $(Get-ModelCostSummary $LogDir "^BL-\d+-$Stamp$LaneTag[-.]")") + $stalls + $parkLines)
     # A clean lane leaves an empty tab to close; one that blocked, stalled or could not park says read.
-    $endLine = "Lane $Lane ended at $(Get-Date -Format 'HH:mm') ($stopWhy): done=$done blocked=$blocked requeued=$requeued stalled=$($stalls.Count)"
+    $endLine = "Lane $Lane ended at $(Get-Date -Format 'HH:mm') ($stopWhy): done=$done blocked=$blocked deferred=$deferred requeued=$requeued stalled=$($stalls.Count)"
     if (-not $stalls.Count -and -not $parkLines.Count -and -not $blocked) { Show-LaneEmpty $endLine 'empty, close' }
     else { Show-LaneEmpty (@($endLine) + $stalls + $parkLines -join "`n") $(if ($stalls.Count -or $parkLines.Count) { 'STALLED, read' } else { 'BLOCKED, read' }) }
     try { $Host.UI.RawUI.WindowTitle = "Dark factory - lane $Lane finished" } catch { }

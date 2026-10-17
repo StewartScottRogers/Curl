@@ -43,8 +43,25 @@ probe.
    `RecvAsync` and `SendAsync`, which pass straight to the engine; a cleaned-up handle throws
    `ObjectDisposedException` as every `CurlEasy` member does.
 
-Not in this decision, left to their own tasks: a connect-only perform through a proxy (no `ConnectTarget.Proxy`
-is set yet; BL-2472) and `ConnectOnly.WebSocket` (2), the WebSocket upgrade, which is BL-2443's.
+6. **Through a proxy (BL-2472).** The perform chooses its proxy as a normal perform's setup does:
+   `TransferProxySelection.TrySelect` over the handle's `EasyProxyOptions` (the proxy, pre-proxy, proxy
+   type and no-proxy list), and puts it on the `ConnectTarget`'s `Proxy`, so the `TcpConnector` opens a
+   `CONNECT` tunnel through an HTTP or HTTPS proxy, or runs the SOCKS4/5 handshake, before the handle keeps
+   the connection; libcurl tunnels for connect-only even without `CURLOPT_HTTPPROXYTUNNEL`. A host the
+   no-proxy list names is dialled directly, and proxy text the selector cannot use ends the perform with its
+   code and text before anything is dialled. Decided by Claude under Stewart's delegation.
+
+   **Amended by BL-2519:** the selector is the engine's `ManagedEngineSharedState.ProxySelector`, which reads
+   the proxy environment variables (`http_proxy`, `HTTPS_PROXY`, `ALL_PROXY`, `NO_PROXY` and the rest, as
+   `ProxySelector` documents) through a reader the engine is built with - `Environment.GetEnvironmentVariable`
+   in production, a dictionary in tests - as libcurl reads them for every handle; `CURLOPT_PROXY` and
+   `CURLOPT_NOPROXY` still win over them. Every perform from the options of a handle with no `ToolInputs`, not
+   only a connect-only one, now chooses its proxy this way (`ManagedEasyTransfer.TrySelectProxy`) and puts it
+   on the context's `Proxy`; a perform with `ToolInputs` takes the curl tool's runner's choice. Decided by
+   Claude under Stewart's delegation.
+
+Not in this decision, left to its own task: `ConnectOnly.WebSocket` (2), the WebSocket upgrade, which is
+BL-2443's.
 
 ## Consequences
 

@@ -96,6 +96,21 @@ public sealed class CurlEasyTests
     }
 
     [TestMethod]
+    public void Perform_AFailureWithNoEngineText_LeavesTheErrorBufferEmptyNotTheStrerrorText()
+    {
+        // libcurl 8.22.0 writes the buffer only through failf (lib/curl_trc.c); nothing copies
+        // curl_easy_strerror's text in when no failf ran, so the cleared buffer stays empty.
+        var buffer = new StringBuilder("an earlier failure");
+        var transfer = new FakeEasyTransfer { Result = CurlCode.CouldntConnect, ErrorText = string.Empty, Options = WithErrorBuffer(buffer) };
+        using var easy = new CurlEasy(transfer, VerboseOnly);
+
+        Assert.AreEqual(CurlCode.CouldntConnect, easy.Perform());
+
+        Assert.AreEqual(string.Empty, buffer.ToString());
+        Assert.AreEqual(string.Empty, easy.ErrorText);
+    }
+
+    [TestMethod]
     public void Perform_ASuccess_ClearsTheErrorBuffer()
     {
         var buffer = new StringBuilder("an earlier failure");

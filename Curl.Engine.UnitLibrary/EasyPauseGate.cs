@@ -15,8 +15,22 @@ internal sealed class EasyPauseGate
 
     private TaskCompletionSource resumed = NewResumed();
 
+    private int unpauses;
+
     /// <summary>Gets the directions left paused.</summary>
     internal CurlPause Directions { get; private set; }
+
+    /// <summary>Gets how many times <see cref="Set" /> has run; a stream reads it before calling its callback so <see cref="Pause" /> can tell whether an unpause arrived meanwhile.</summary>
+    internal int Unpauses
+    {
+        get
+        {
+            lock (gate)
+            {
+                return unpauses;
+            }
+        }
+    }
 
     /// <summary>Leaves <paramref name="directions" /> paused and resumes every other direction, as <c>curl_easy_pause</c> does.</summary>
     /// <param name="directions">The directions to leave paused.</param>
@@ -26,6 +40,7 @@ internal sealed class EasyPauseGate
         lock (gate)
         {
             Directions = directions;
+            unpauses++;
             released = resumed;
             resumed = NewResumed();
         }
@@ -35,11 +50,15 @@ internal sealed class EasyPauseGate
 
     /// <summary>Pauses <paramref name="direction" />, keeping the other direction as it is.</summary>
     /// <param name="direction">The direction a callback paused.</param>
-    internal void Pause(CurlPause direction)
+    /// <param name="unpausesBeforeCallback">What <see cref="Unpauses" /> was before the callback ran; a <see cref="Set" /> since then already happened, so the pause is not recorded.</param>
+    internal void Pause(CurlPause direction, int unpausesBeforeCallback)
     {
         lock (gate)
         {
-            Directions |= direction;
+            if (unpauses == unpausesBeforeCallback)
+            {
+                Directions |= direction;
+            }
         }
     }
 

@@ -45,6 +45,18 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
     private static readonly byte[] LastChunk = "0\r\n\r\n"u8.ToArray();
 
     /// <summary>
+    /// The upload stream's trailer source when the body is a stream that implements
+    /// <see cref="IUploadTrailerSource" />; <see langword="null" /> for any other body.
+    /// </summary>
+    private IUploadTrailerSource? trailerSource;
+
+    /// <summary>
+    /// The closing chunk with its trailers, made once per send by <see cref="LastChunkBytes" />;
+    /// <see langword="null" /> until then.
+    /// </summary>
+    private byte[]? lastChunk;
+
+    /// <summary>
     /// Gets how many body bytes have been written, chunk framing excluded.
     /// </summary>
     internal long BytesWritten { get; private set; }
@@ -178,8 +190,7 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
     /// </exception>
     internal async ValueTask WriteAsync(HttpRequestBody body, bool isChunked, CancellationToken cancellationToken)
     {
-        expectedLength = body is BytesBody known ? known.Content.Length : ((StreamBody)body).Length;
-        heldBack = null;
+        StartSending(body);
         if (EarlyResponseWatch is null)
         {
             Progress.ReportUploaded(BytesSent, expectedLength);
@@ -204,6 +215,19 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
         heldBack = null;
         await HttpConnectionSend.FlushAsync(connection, cancellationToken).ConfigureAwait(false);
         await HttpConnectionSend.EndStreamRequestAsync(connection, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Resets what one send of <paramref name="body" /> keeps: its length when known, nothing held
+    /// back, and its stream's <see cref="IUploadTrailerSource" /> with no closing chunk made yet.
+    /// </summary>
+    private void StartSending(HttpRequestBody body)
+    {
+        StreamBody? stream = body as StreamBody;
+        expectedLength = stream is null ? ((BytesBody)body).Content.Length : stream.Length;
+        heldBack = null;
+        trailerSource = stream?.Content as IUploadTrailerSource;
+        lastChunk = null;
     }
 
     /// <summary>
@@ -432,13 +456,15 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
         int framed = read;
         if (isChunked)
         {
-            framed = ReportChunkMade(read) + (endOfBody ? LastChunk.Length : 0);
+            framed = ReportChunkMade(read) + (endOfBody ? LastChunkBytes().Length : 0);
             room += ChunkFramingReserve;
         }
 
         if (isChunked && endOfBody)
         {
-            Events.ReportInfo(HttpClientReaderTraceLines.AddedLastChunk);
+            Events.ReportInfo(SuppliesTrailers
+                ? HttpClientReaderTraceLines.AddedLastChunkWithTrailers
+                : HttpClientReaderTraceLines.AddedLastChunk);
         }
 
         Events.ReportInfo(HttpClientReaderTraceLines.ClientRead(room, framed, endOfBody));
@@ -626,17 +652,66 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
     /// </summary>
     private async ValueTask WriteLastChunkAsync(CancellationToken cancellationToken)
     {
+        byte[] last = LastChunkBytes();
         if (watchedHeldPiece.IsEmpty)
         {
-            await SendAsync(LastChunk, cancellationToken).ConfigureAwait(false);
+            await SendAsync(last, cancellationToken).ConfigureAwait(false);
         }
-        else if (!await SendWatchedHeldPieceAsync(LastChunk, cancellationToken).ConfigureAwait(false))
+        else if (!await SendWatchedHeldPieceAsync(last, cancellationToken).ConfigureAwait(false))
         {
             return;
         }
 
-        ReportSent(LastChunk);
+        ReportSent(last);
         Progress.ReportUploaded(BytesSent, expectedLength);
+    }
+
+    /// <summary>Gets a value indicating whether the body's stream has a trailer source that is set.</summary>
+    private bool SuppliesTrailers => trailerSource is { SuppliesTrailers: true };
+
+    /// <summary>
+    /// Gives the closing chunk, made once per send when the body's end is first reached: the plain
+    /// <c>0\r\n\r\n</c>, or with a <see cref="trailerSource" /> its well-formed trailer lines between
+    /// the size line and the final CRLF, as curl 8.22.0's <c>add_last_chunk</c> makes it.
+    /// </summary>
+    /// <exception cref="HttpTransferException">The trailer source aborted (exit 42).</exception>
+    private byte[] LastChunkBytes() => lastChunk ??= SuppliesTrailers ? LastChunkWithTrailers(trailerSource!) : LastChunk;
+
+    /// <summary>
+    /// Asks <paramref name="source" /> for its trailers and gives the closing chunk that carries them,
+    /// reporting <c>Malformatted trailing header, skipping trailer</c> for each line curl 8.22.0 skips.
+    /// </summary>
+    /// <exception cref="HttpTransferException">The trailer source aborted (exit 42).</exception>
+    private byte[] LastChunkWithTrailers(IUploadTrailerSource source)
+    {
+        if (!source.TryTakeTrailers(out IReadOnlyList<string> lines))
+        {
+            throw new HttpTransferException(CurlExitCode.AbortedByCallback, IUploadTrailerSource.AbortedMessage);
+        }
+
+        StringBuilder chunk = new("0\r\n");
+        foreach (string line in lines)
+        {
+            if (IsWellFormedTrailer(line))
+            {
+                chunk.Append(line).Append("\r\n");
+            }
+            else
+            {
+                Events.ReportInfo(HttpTransferMessages.MalformattedTrailer);
+            }
+        }
+
+        return Encoding.UTF8.GetBytes(chunk.Append("\r\n").ToString());
+    }
+
+    /// <summary>
+    /// Tells whether a trailer line is one curl 8.22.0 sends: its first colon is followed by a space.
+    /// </summary>
+    private static bool IsWellFormedTrailer(string line)
+    {
+        int colon = line.IndexOf(':', StringComparison.Ordinal);
+        return colon >= 0 && colon + 1 < line.Length && line[colon + 1] == ' ';
     }
 
     /// <summary>

@@ -73,6 +73,28 @@ public sealed class ConnectionCache(TimeProvider timeProvider) : IAsyncDisposabl
     }
 
     /// <summary>
+    /// Closes the oldest idle connections until no more than <paramref name="keep" /> connections, idle and
+    /// in use, remain or none is idle, as libcurl's connection pool closes its oldest idle connection while
+    /// it holds more than <c>CURLMOPT_MAXCONNECTS</c> (BL-2468). A connection in use is never closed; the ones
+    /// closed leave the cache before this returns its task.
+    /// </summary>
+    /// <param name="keep">The most connections to keep; 0 or less closes every idle one.</param>
+    /// <returns>A task that completes when every connection beyond the cap is closed.</returns>
+    public async ValueTask CloseIdleBeyondAsync(long keep)
+    {
+        List<PoolEntry> closing;
+
+        lock (Gate)
+        {
+            long excess = Idle.Count + Leased.Count - Math.Max(keep, 0);
+            closing = Idle.GetRange(0, (int)Math.Clamp(excess, 0, Idle.Count));
+            Idle.RemoveRange(0, closing.Count);
+        }
+
+        await CloseAllAsync(closing);
+    }
+
+    /// <summary>
     /// Takes the next connection number, from <c>0</c> across the whole run, whether a TCP
     /// connection, a TFTP channel or a <c>file://</c> transfer takes it (ADR-0109, BL-977).
     /// </summary>

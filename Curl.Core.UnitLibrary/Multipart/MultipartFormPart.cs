@@ -14,7 +14,8 @@ namespace Curl.Core.Multipart;
 /// The text of a <see cref="MultipartFormPartKind.Text" /> part; the path of the file of a
 /// <see cref="MultipartFormPartKind.FileUpload" /> or <see cref="MultipartFormPartKind.FileContent" />
 /// part, where <see cref="StandardInputPath" /> names standard input; ignored for a
-/// <see cref="MultipartFormPartKind.Multipart" /> part.
+/// <see cref="MultipartFormPartKind.Multipart" />, <see cref="MultipartFormPartKind.Bytes" /> or
+/// <see cref="MultipartFormPartKind.Reader" /> part.
 /// </param>
 /// <param name="ContentType">The <c>;type=</c> value; <see langword="null" /> lets the builder choose, as curl does.</param>
 /// <param name="FileName">
@@ -52,4 +53,20 @@ public sealed record MultipartFormPart(
     /// syntax never gives an encoder.
     /// </summary>
     public string? Encoder { get; init; }
+
+    /// <summary>Gets the body of a <see cref="MultipartFormPartKind.Bytes" /> part; empty for any other kind.</summary>
+    public ReadOnlyMemory<byte> Bytes { get; init; }
+
+    /// <summary>
+    /// Gets what opens the body of a <see cref="MultipartFormPartKind.Reader" /> part, called once
+    /// while the body is built; the body then owns the stream. <see langword="null" /> for any other
+    /// kind, and a <see cref="MultipartFormPartKind.Reader" /> part without it sends no bytes.
+    /// </summary>
+    public Func<Stream>? OpenContent { get; init; }
+
+    /// <summary>
+    /// Gets the size in bytes of a <see cref="MultipartFormPartKind.Reader" /> part's body, or
+    /// <see langword="null" /> when it is unknown, which leaves the whole body's size unknown.
+    /// </summary>
+    public long? ContentLength { get; init; }
 }

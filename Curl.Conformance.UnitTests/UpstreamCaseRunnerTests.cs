@@ -1,4 +1,5 @@
 using System.Text;
+using Curl.Conformance.LibTest;
 using Curl.Protocol.Abstractions;
 using Curl.Testing;
 
@@ -1335,6 +1336,115 @@ public sealed class UpstreamCaseRunnerTests
         Assert.Contains("[::1]:" + port, commandLine!);
     }
 
+    private const string LibCase =
+        "<testcase>\n<client>\n<server>\nhttp\n</server>\n<tool>\nlib%TESTNUMBER\n</tool>\n"
+        + "<command>\nhttp://%HOSTIP:%HTTPPORT/%TESTNUMBER %LOGDIR/ip%TESTNUMBER\n</command>\n</client>\n"
+        + "<verify>\n<stdout>\nhello from lib5\n</stdout>\n<stderr>\nstep failed\n</stderr>\n<errorcode>\n0\n</errorcode>\n</verify>\n</testcase>\n";
+
+    [TestMethod]
+    public async Task RunAsync_PortedLibCase_RunsItsProgramInPlaceOfCurl()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        SampleLibTest program = new("lib5", exitCode: 0);
+        UpstreamCaseRunner runner = LibRunner(program);
+        string logDirectory = CreateLogDirectory();
+
+        UpstreamCaseOutcome outcome = await RunWithLogDirectoryAsync(runner, LibCase, logDirectory);
+
+        diagnostics.Assert("outcome kind", UpstreamCaseOutcomeKind.Passed, outcome.Kind);
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Passed, outcome.Kind, outcome.Detail);
+        LibTestContext context = program.Context!;
+        string expectedArguments = $"http://127.0.0.1:8990/5 | {logDirectory.Replace('\\', '/')}/ip5";
+        diagnostics.Assert("program arguments", expectedArguments, string.Join(" | ", context.Arguments));
+        Assert.AreEqual(expectedArguments, string.Join(" | ", context.Arguments));
+        Assert.AreEqual(5, context.TestNumber);
+        StubCurlEngine engine = (StubCurlEngine)context.Engine!;
+        CollectionAssert.AreEqual(context.Arguments.ToArray(), engine.Invocation.Arguments.ToArray());
+    }
+
+    [TestMethod]
+    public async Task RunAsync_PortedLibCaseReturningAnotherCode_FailsOnTheExitCode()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        UpstreamCaseRunner runner = LibRunner(new SampleLibTest("lib5", exitCode: 7));
+
+        UpstreamCaseOutcome outcome = await RunAsync(runner, LibCase);
+
+        diagnostics.Assert("outcome detail", "<verify><errorcode>: expected exit code 0, got 7", outcome.Detail);
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Failed, outcome.Kind);
+        Assert.AreEqual("<verify><errorcode>: expected exit code 0, got 7", outcome.Detail);
+    }
+
+    // test500's shape: <reply><data> is checked and <verify> has no <stdout>, so runtests.pl 8.22.0
+    // compares the data with the program's stdout, which runner.pm makes a tool run's $CURLOUT (BL-2560).
+    private static string LibCaseCheckingReplyData(string data) =>
+        "<testcase>\n<reply>\n<data>\n" + data + "</data>\n</reply>\n<client>\n<server>\nhttp\n</server>\n<tool>\nlib%TESTNUMBER\n</tool>\n"
+        + "<command>\nhttp://%HOSTIP:%HTTPPORT/%TESTNUMBER\n</command>\n</client>\n"
+        + "<verify>\n<errorcode>\n0\n</errorcode>\n</verify>\n</testcase>\n";
+
+    [TestMethod]
+    public async Task RunAsync_LibCaseCheckingReplyDataTheProgramWroteToStdout_Passes()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        UpstreamCaseRunner runner = LibRunner(new SampleLibTest("lib5", exitCode: 0));
+
+        UpstreamCaseOutcome outcome = await RunAsync(runner, LibCaseCheckingReplyData("hello from lib5\n"));
+
+        diagnostics.Assert("outcome kind", UpstreamCaseOutcomeKind.Passed, outcome.Kind);
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Passed, outcome.Kind, outcome.Detail);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_LibCaseCheckingReplyDataTheProgramDidNotWrite_FailsOnTheProgramsStdout()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        UpstreamCaseRunner runner = LibRunner(new SampleLibTest("lib5", exitCode: 0));
+
+        UpstreamCaseOutcome outcome = await RunAsync(runner, LibCaseCheckingReplyData("HTTP/1.1 200 OK\n"));
+
+        string firstLine = outcome.Detail.Split('\n')[0];
+        diagnostics.Assert("outcome detail", "the program's stdout against <reply><data> differs at byte 0 (line 1)", firstLine);
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Failed, outcome.Kind);
+        StringAssert.StartsWith(firstLine, "the program's stdout against <reply><data> differs at byte 0 (line 1)");
+    }
+
+    [TestMethod]
+    public async Task RunAsync_LibCaseWhoseProgramIsNotPorted_IsSkippedAsNotPorted()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        UpstreamCaseRunner runner = LibRunner(new SampleLibTest("lib6", exitCode: 0));
+
+        UpstreamCaseOutcome outcome = await RunAsync(runner, LibCase);
+
+        diagnostics.Assert("skip reason", "libtest program not ported", outcome.Detail);
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Skipped, outcome.Kind);
+        Assert.AreEqual("libtest program not ported", outcome.Detail);
+    }
+
+    private static UpstreamCaseRunner LibRunner(ILibTest program) =>
+        new(
+            _ => throw new AssertFailedException("curl must not run for a lib case"),
+            UpstreamCurlPlatform.Unix,
+            TimeProvider.System,
+            TimeSpan.FromSeconds(10),
+            libTests: new UpstreamLibTests(new LibTestPrograms([program]), invocation => new StubCurlEngine(invocation)));
+
+    // A libtest program that keeps its context, writes a line to stdout and one to stderr, and returns its exit code.
+    private sealed class SampleLibTest(string programName, int exitCode) : ILibTest
+    {
+        public LibTestContext? Context { get; private set; }
+
+        public string ProgramName => programName;
+
+        public async Task<LibTestResult> RunAsync(LibTestContext context, CancellationToken cancellationToken)
+        {
+            Context = context;
+            await context.StandardOutput.WriteAsync("hello from lib5\n"u8.ToArray(), cancellationToken);
+            await context.StandardError.WriteLineAsync("step failed".AsMemory(), cancellationToken);
+            return new LibTestResult(exitCode);
+        }
+    }
+
     [TestMethod]
     [DataRow(567)]
     [DataRow(568)]
@@ -1353,9 +1463,9 @@ public sealed class UpstreamCaseRunnerTests
 
         UpstreamCaseOutcome outcome = await RunAsync(runner, testFile);
 
-        diagnostics.Assert("skip reason", "the harness does not act on <client><tool>", outcome.Detail);
+        diagnostics.Assert("skip reason", "libtest program not ported", outcome.Detail);
         Assert.AreEqual(UpstreamCaseOutcomeKind.Skipped, outcome.Kind);
-        Assert.AreEqual("the harness does not act on <client><tool>", outcome.Detail);
+        Assert.AreEqual("libtest program not ported", outcome.Detail);
     }
 
     [TestMethod]

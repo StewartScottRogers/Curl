@@ -19,7 +19,7 @@ public sealed class MimePostFormTests
     [TestMethod]
     public async Task BuildAsync_NoMimePost_GivesNull()
     {
-        MultipartFormBuildResult? form = await MimePostForm.BuildAsync(Builder, new EasyHttpOptions(), "http", CancellationToken.None);
+        MultipartFormBuildResult? form = await MimePostForm.BuildAsync(Builder, new EasyHttpOptions(), "http", null, null, CancellationToken.None);
 
         Assert.IsNull(form);
     }
@@ -27,7 +27,7 @@ public sealed class MimePostFormTests
     [TestMethod]
     public async Task BuildAsync_HttpUrl_BuildsAFormDataBodyWithPercentEscapedNames()
     {
-        MultipartFormBuildResult? form = await MimePostForm.BuildAsync(Builder, new EasyHttpOptions { MimePost = OnePart }, "http", CancellationToken.None);
+        MultipartFormBuildResult? form = await MimePostForm.BuildAsync(Builder, new EasyHttpOptions { MimePost = OnePart }, "http", null, null, CancellationToken.None);
 
         string body = await ContentOfAsync(form!);
         Assert.AreEqual("multipart/form-data; boundary=b0", form!.Body!.ContentType);
@@ -39,7 +39,7 @@ public sealed class MimePostFormTests
     {
         EasyHttpOptions http = new() { MimePost = OnePart, MimeOptions = MimeOptions.FormEscape };
 
-        MultipartFormBuildResult? form = await MimePostForm.BuildAsync(Builder, http, "http", CancellationToken.None);
+        MultipartFormBuildResult? form = await MimePostForm.BuildAsync(Builder, http, "http", null, null, CancellationToken.None);
 
         StringAssert.Contains(await ContentOfAsync(form!), "name=\"a\\\"b\"");
     }
@@ -49,7 +49,7 @@ public sealed class MimePostFormTests
     {
         EasyHttpOptions http = new() { MimePost = OnePart, HttpHeaders = ["Subject: hi"] };
 
-        MultipartFormBuildResult? form = await MimePostForm.BuildAsync(Builder, http, "smtp", CancellationToken.None);
+        MultipartFormBuildResult? form = await MimePostForm.BuildAsync(Builder, http, "smtp", null, null, CancellationToken.None);
 
         string message = await ContentOfAsync(form!);
         StringAssert.StartsWith(message, "Content-Type: multipart/mixed; boundary=b0\r\nMime-Version: 1.0\r\nSubject: hi\r\n");
@@ -84,6 +84,59 @@ public sealed class MimePostFormTests
         Assert.AreSame(body.Content, inputs.Upload);
         Assert.IsNull(inputs.FormBody);
     }
+
+    [TestMethod]
+    public void BodyOf_MimePostAndHttpPost_GivesTheMimePost()
+    {
+        EasyHttpOptions http = new() { MimePost = OnePart, HttpPost = StreamForm(4) };
+
+        Assert.AreSame(OnePart, MimePostForm.BodyOf(http, "http", null));
+    }
+
+    [TestMethod]
+    public void BodyOf_HttpPostToAMailUrl_GivesNone()
+    {
+        Assert.IsNull(MimePostForm.BodyOf(new EasyHttpOptions { HttpPost = StreamForm(4) }, "smtp", _ => 0));
+    }
+
+    [TestMethod]
+    public void BodyOf_HttpPostStreamOfKnownLength_ReadsItThroughTheReadCallbackAtThatSize()
+    {
+        Api.Callbacks.ReadCallback read = _ => 0;
+
+        EasyMimeBody body = MimePostForm.BodyOf(new EasyHttpOptions { HttpPost = StreamForm(4) }, "http", read)!;
+
+        Assert.AreEqual(new EasyMimeCallback(4, read, null), body.Parts[0].Data);
+        Assert.AreEqual("s", body.Parts[0].Name);
+    }
+
+    [TestMethod]
+    public void BodyOf_HttpPostStreamOfLengthZero_ReadsItAtAnUnknownSize()
+    {
+        EasyMimeBody body = MimePostForm.BodyOf(new EasyHttpOptions { HttpPost = StreamForm(0) }, "http", _ => 0)!;
+
+        Assert.AreEqual(-1, ((EasyMimeCallback)body.Parts[0].Data!).Size);
+    }
+
+    [TestMethod]
+    public void BodyOf_HttpPostStreamWithNoReadCallback_SendsItEmpty()
+    {
+        EasyMimeBody body = MimePostForm.BodyOf(new EasyHttpOptions { HttpPost = StreamForm(4) }, "http", null)!;
+
+        Assert.IsNull(body.Parts[0].Data);
+    }
+
+    [TestMethod]
+    public void BodyOf_HttpPostTextPart_KeepsIt()
+    {
+        EasyHttpOptions http = new() { HttpPost = OnePart };
+
+        Assert.AreSame(OnePart.Parts[0], MimePostForm.BodyOf(http, "http", _ => 0)!.Parts[0]);
+    }
+
+    // A CURLOPT_HTTPPOST body of one CURLFORM_STREAM field named s with that CURLFORM_CONTENTSLENGTH.
+    private static EasyMimeBody StreamForm(long contentsLength) =>
+        new() { Parts = [new EasyMimePart { Name = "s", Data = new FormStreamData(contentsLength, new object()) }] };
 
     private static async Task<string> ContentOfAsync(MultipartFormBuildResult form)
     {

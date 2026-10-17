@@ -50,6 +50,7 @@ public sealed class Http2Connection
     private long connectionReceiveWindowTarget;
     private PendingHeaderBlock? pendingHeaderBlock;
     private int highestStartedStreamId;
+    private int highestPromisedStreamId;
     private Http2ProtocolException? connectionError;
 
     /// <summary>
@@ -80,8 +81,8 @@ public sealed class Http2Connection
     public static ReadOnlyMemory<byte> ClientPreface => ClientPrefaceBytes;
 
     /// <summary>
-    /// Gets the SETTINGS sent with the preface, in curl's order: MAX_CONCURRENT_STREAMS 100,
-    /// INITIAL_WINDOW_SIZE 65536, ENABLE_PUSH 0.
+    /// Gets the SETTINGS a connection without push sends with the preface, in curl's order:
+    /// MAX_CONCURRENT_STREAMS 100, INITIAL_WINDOW_SIZE 65536, ENABLE_PUSH 0.
     /// </summary>
     public static IReadOnlyList<Http2Setting> ClientSettings { get; } =
     [
@@ -89,6 +90,30 @@ public sealed class Http2Connection
         new(Http2SettingIdentifier.InitialWindowSize, ClientInitialWindowSize),
         new(Http2SettingIdentifier.EnablePush, 0),
     ];
+
+    /// <summary>
+    /// Gets the SETTINGS a connection with push sends with the preface: <see cref="ClientSettings" />
+    /// with ENABLE_PUSH 1, as curl sends when its multi handle has a push callback.
+    /// </summary>
+    public static IReadOnlyList<Http2Setting> PushEnabledClientSettings { get; } =
+    [
+        new(Http2SettingIdentifier.MaxConcurrentStreams, 100),
+        new(Http2SettingIdentifier.InitialWindowSize, ClientInitialWindowSize),
+        new(Http2SettingIdentifier.EnablePush, 1),
+    ];
+
+    /// <summary>
+    /// Gets whether this connection accepts server push (BL-2515): it advertises
+    /// SETTINGS_ENABLE_PUSH 1 and returns each PUSH_PROMISE from <see cref="ReadFrameAsync" />
+    /// instead of failing the connection with PROTOCOL_ERROR.
+    /// </summary>
+    public bool IsPushEnabled { get; init; }
+
+    /// <summary>
+    /// Gets the SETTINGS <see cref="SendPrefaceAsync" /> sends: <see cref="PushEnabledClientSettings" />
+    /// when <see cref="IsPushEnabled" />, else <see cref="ClientSettings" />.
+    /// </summary>
+    public IReadOnlyList<Http2Setting> Settings => IsPushEnabled ? PushEnabledClientSettings : ClientSettings;
 
     /// <summary>Gets the peer's SETTINGS as applied so far.</summary>
     public Http2Settings PeerSettings { get; } = new();
@@ -102,7 +127,7 @@ public sealed class Http2Connection
     /// <summary>Gets whether the peer's first SETTINGS has arrived (and been acknowledged).</summary>
     public bool IsPeerSettingsReceived { get; private set; }
 
-    /// <summary>Gets whether the peer has acknowledged <see cref="ClientSettings" />.</summary>
+    /// <summary>Gets whether the peer has acknowledged <see cref="Settings" />.</summary>
     public bool IsClientSettingsAcknowledged { get; private set; }
 
     /// <summary>Gets the GOAWAY the peer sent, or <see langword="null" /> if none.</summary>
@@ -117,8 +142,15 @@ public sealed class Http2Connection
     /// </summary>
     public bool IsGoAwaySent { get; private set; }
 
-    /// <summary>Gets how many streams are open or half closed; a closed or reset stream is forgotten.</summary>
-    public int OpenStreamCount => streams.Count;
+    /// <summary>
+    /// Gets how many client streams are open or half closed; a closed or reset stream is
+    /// forgotten. Streams the server reserved with PUSH_PROMISE are counted apart, in
+    /// <see cref="PushedStreamCount" />, and never against the peer's SETTINGS_MAX_CONCURRENT_STREAMS.
+    /// </summary>
+    public int OpenStreamCount => streams.Count - PushedStreamCount;
+
+    /// <summary>Gets how many streams the server reserved with PUSH_PROMISE are still open.</summary>
+    public int PushedStreamCount => streams.Keys.Count(static streamId => streamId % 2 == 0);
 
     /// <summary>
     /// Gets or sets who is told of each frame written or read (BL-1167), or <see langword="null" />
@@ -127,14 +159,14 @@ public sealed class Http2Connection
     public IHttp2FrameObserver? FrameObserver { get; set; }
 
     /// <summary>
-    /// Sends the client preface, <see cref="ClientSettings" /> and the connection
+    /// Sends the client preface, <see cref="Settings" /> and the connection
     /// WINDOW_UPDATE of <see cref="ClientConnectionWindowIncrement" />, in one write.
     /// </summary>
     /// <param name="cancellationToken">Cancels the write.</param>
     /// <returns>A task that completes when the preface is written.</returns>
     public async Task SendPrefaceAsync(CancellationToken cancellationToken)
     {
-        var settings = Http2FrameFactory.CreateSettings(ClientSettings);
+        var settings = Http2FrameFactory.CreateSettings(Settings);
         var windowUpdate = Http2FrameFactory.CreateWindowUpdate(0, ClientConnectionWindowIncrement);
         byte[] bytes =
         [
@@ -534,11 +566,65 @@ public sealed class Http2Connection
 
         if (frame.Type == Http2FrameType.PushPromise)
         {
-            throw ProtocolError($"PUSH_PROMISE on stream {frame.StreamId} though SETTINGS_ENABLE_PUSH is 0");
+            return Task.FromResult(ReceivePushPromise(frame));
         }
 
         return ReceiveConnectionFrameAsync(frame, cancellationToken);
     }
+
+    /// <summary>
+    /// Takes a PUSH_PROMISE (RFC 9113 sections 6.6 and 8.4): with push on, it must come on a
+    /// stream this client opened and promise an even stream above every earlier promise. The
+    /// promised stream is reserved half closed by this endpoint, so its HEADERS and DATA arrive
+    /// like any stream's; the caller resets it if it does not want the push.
+    /// </summary>
+    private Http2StreamFrame? ReceivePushPromise(Http2Frame frame)
+    {
+        if (!IsPushEnabled)
+        {
+            throw ProtocolError($"PUSH_PROMISE on stream {frame.StreamId} though SETTINGS_ENABLE_PUSH is 0");
+        }
+
+        var payload = Http2FramePayloadParser.ParsePushPromise(frame);
+        RequirePushParent(frame.StreamId);
+        ReservePromisedStream(frame.StreamId, payload.PromisedStreamId);
+        if (frame.HasFlag(Http2FrameFlags.EndHeaders))
+        {
+            return CompletePushPromise(frame.StreamId, payload.PromisedStreamId, payload.Fragment);
+        }
+
+        pendingHeaderBlock = new PendingHeaderBlock(frame.StreamId, null, false, payload.PromisedStreamId);
+        pendingHeaderBlock.Fragments.Write(payload.Fragment.Span);
+        return null;
+    }
+
+    private void RequirePushParent(int parentStreamId)
+    {
+        if (parentStreamId % 2 == 0)
+        {
+            throw ProtocolError($"PUSH_PROMISE on stream {parentStreamId}, which the client did not open");
+        }
+
+        _ = FindReceivingStream(parentStreamId);
+    }
+
+    private void ReservePromisedStream(int parentStreamId, int promisedStreamId)
+    {
+        if (promisedStreamId % 2 != 0 || promisedStreamId <= highestPromisedStreamId)
+        {
+            throw ProtocolError($"PUSH_PROMISE on stream {parentStreamId} promised stream {promisedStreamId}, not an even stream above {highestPromisedStreamId}");
+        }
+
+        highestPromisedStreamId = promisedStreamId;
+        streams[promisedStreamId] = new Http2Stream(PeerSettings.InitialWindowSize, streamReceiveWindowSize)
+        {
+            IsHeadersSent = true,
+            IsLocalEnded = true,
+        };
+    }
+
+    private static Http2StreamFrame CompletePushPromise(int parentStreamId, int promisedStreamId, ReadOnlyMemory<byte> headerBlock) =>
+        new(Http2FrameType.PushPromise, parentStreamId, headerBlock, IsEndStream: false) { PromisedStreamId = promisedStreamId };
 
     private async Task<Http2StreamFrame?> ReceiveConnectionFrameAsync(Http2Frame frame, CancellationToken cancellationToken)
     {
@@ -643,7 +729,9 @@ public sealed class Http2Connection
         }
 
         pendingHeaderBlock = null;
-        return CompleteHeaderBlock(pending.StreamId, pending.Stream, pending.Fragments.WrittenMemory, pending.IsEndStream);
+        return pending.PromisedStreamId == 0
+            ? CompleteHeaderBlock(pending.StreamId, pending.Stream, pending.Fragments.WrittenMemory, pending.IsEndStream)
+            : CompletePushPromise(pending.StreamId, pending.PromisedStreamId, pending.Fragments.WrittenMemory);
     }
 
     private Http2StreamFrame CompleteHeaderBlock(int streamId, Http2Stream? receivingStream, ReadOnlyMemory<byte> headerBlock, bool isEndStream)
@@ -740,7 +828,7 @@ public sealed class Http2Connection
     {
         var goAway = Http2FramePayloadParser.ParseGoAway(frame);
         PeerGoAway = goAway;
-        if (goAway.ErrorCode != Http2ErrorCode.NoError || streams.Keys.Any(streamId => streamId > goAway.LastStreamId))
+        if (goAway.ErrorCode != Http2ErrorCode.NoError || streams.Keys.Any(streamId => streamId % 2 == 1 && streamId > goAway.LastStreamId))
         {
             throw new Http2GoAwayException(goAway);
         }
@@ -778,7 +866,13 @@ public sealed class Http2Connection
         return IsIdle(streamId) ? throw ProtocolError($"a frame on stream {streamId}, which was never opened") : null;
     }
 
-    private bool IsIdle(int streamId) => streamId % 2 == 0 || streamId >= nextStreamId;
+    /// <summary>
+    /// Whether a stream is still idle: an odd one this client has not opened, or an even one
+    /// (or 0) no PUSH_PROMISE has reserved.
+    /// </summary>
+    private bool IsIdle(int streamId) => streamId % 2 == 0
+        ? streamId == 0 || streamId > highestPromisedStreamId
+        : streamId >= nextStreamId;
 
     private Http2Stream GetOpenStream(int streamId)
     {
@@ -802,8 +896,11 @@ public sealed class Http2Connection
         FrameObserver?.FrameSent(frame);
     }
 
-    /// <summary>A header block whose HEADERS frame has arrived and whose CONTINUATION frames are still coming.</summary>
-    private sealed record PendingHeaderBlock(int StreamId, Http2Stream? Stream, bool IsEndStream)
+    /// <summary>
+    /// A header block whose HEADERS or PUSH_PROMISE frame has arrived and whose CONTINUATION
+    /// frames are still coming; <c>PromisedStreamId</c> is 0 for HEADERS.
+    /// </summary>
+    private sealed record PendingHeaderBlock(int StreamId, Http2Stream? Stream, bool IsEndStream, int PromisedStreamId = 0)
     {
         public ArrayBufferWriter<byte> Fragments { get; } = new();
 

@@ -58,7 +58,9 @@ SDK, packed as a NuGet MCP server that `dnx` runs and nuget.org lists under
    `PackageType` `McpServer`, `.mcp/server.json`, self-contained per runtime identifier, and
    native AOT where the SDK allows it, as Microsoft's `mcpserver` template does. If the SDK
    breaks the AOT build, `Curl.Mcp` is published self-contained instead, and the task that
-   finds it records why.
+   finds it records why. (ADR-0621: the released runtime packages are native AOT, packed with
+   `-p:PublishAot=true` on each runtime's own OS by `release.yml`; a plain `dotnet pack` without
+   it stays self-contained.)
 7. **Publishing.** Stewart approved publishing `Curl.Mcp` to nuget.org. The push needs a
    nuget.org API key, which only Stewart holds; it is a release step, done when he supplies
    the key, never by a lane.

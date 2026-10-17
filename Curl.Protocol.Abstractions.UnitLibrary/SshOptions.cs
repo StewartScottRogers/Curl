@@ -63,4 +63,20 @@ public sealed record SshOptions
     /// offers zlib compression before <c>none</c>.
     /// </summary>
     public bool Compression { get; init; }
+
+    /// <summary>
+    /// Gets libcurl's <c>CURLOPT_SSH_HOSTKEYFUNCTION</c>: given the host key's type name and blob, it
+    /// answers whether to accept the key, in place of the known-hosts check; <see langword="null" /> when
+    /// not set. It is not asked when a <c>--hostpubmd5</c> or <c>--hostpubsha256</c> fingerprint is given,
+    /// and a <see langword="false" /> answer fails the transfer with exit 60 (ADR-0623).
+    /// </summary>
+    public Func<string, ReadOnlyMemory<byte>, bool>? HostKeyAcceptance { get; init; }
+
+    /// <summary>
+    /// Gets libcurl's <c>CURLOPT_SSH_KEYFUNCTION</c>: once the host key has been looked up in
+    /// <see cref="KnownHostsPath" />, it decides whether to accept it, in place of the rule that accepts
+    /// only a <see cref="SshKnownHostMatch.Match" />; <see langword="null" /> when not set. It is not asked
+    /// without a known-hosts file (ADR-0623).
+    /// </summary>
+    public Func<SshKnownHostQuery, SshKnownHostVerdict>? KnownHostDecision { get; init; }
 }

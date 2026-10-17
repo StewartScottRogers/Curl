@@ -1,5 +1,6 @@
 using Curl.Api.Callbacks;
 using Curl.Api.EngineContracts;
+using Curl.Protocol.Abstractions;
 
 namespace Curl.Engine;
 
@@ -14,10 +15,13 @@ namespace Curl.Engine;
 /// again, or, with no gate or on the synchronous path, fails with libcurl's
 /// <c>Read callback asked for PAUSE when not supported</c> (ADR-0573). Any other return below zero or
 /// past the buffer's length fails the read with libcurl's <c>CURLE_READ_ERROR</c> text.
+/// <see cref="SeekingCallbackReadStream" /> adds the seek callback that rewinds it. With
+/// <see cref="Trailer" /> set (<c>CURLOPT_TRAILERFUNCTION</c>), the HTTP handler asks it, through
+/// <see cref="IUploadTrailerSource" />, for a chunked upload's trailers once the body's end is read (BL-2475).
 /// </summary>
 /// <param name="callback">The read callback.</param>
 /// <param name="pauseGate">The handle's pause state, or <see langword="null" /> when the transfer cannot pause.</param>
-internal sealed class CallbackReadStream(ReadCallback callback, EasyPauseGate? pauseGate = null) : Stream
+internal class CallbackReadStream(ReadCallback callback, EasyPauseGate? pauseGate = null) : Stream, IUploadTrailerSource
 {
     /// <summary>libcurl's text for a read callback that returned more than it was asked for.</summary>
     internal const string FunnyValueText = "read function returned funny value";
@@ -30,6 +34,23 @@ internal sealed class CallbackReadStream(ReadCallback callback, EasyPauseGate? p
 
     /// <summary>Gets a value indicating whether the read callback returned <see cref="ReadCallbackResult.Abort" />.</summary>
     internal bool Aborted { get; private set; }
+
+    /// <summary>Gets or sets how many bytes the read callback has given since the stream was made or last rewound.</summary>
+    internal long BytesReadSinceRewind { get; set; }
+
+    /// <summary>Gets the handle's trailer callback, or <see langword="null" /> when none is set.</summary>
+    internal TrailerCallback? Trailer { get; init; }
+
+    /// <inheritdoc />
+    public bool SuppliesTrailers => Trailer is not null;
+
+    /// <inheritdoc />
+    public bool TryTakeTrailers(out IReadOnlyList<string> lines)
+    {
+        List<string> trailers = [];
+        lines = trailers;
+        return Trailer!(trailers) == TrailerResult.Ok;
+    }
 
     /// <inheritdoc />
     public override bool CanRead => true;
@@ -68,12 +89,14 @@ internal sealed class CallbackReadStream(ReadCallback callback, EasyPauseGate? p
     /// <inheritdoc />
     public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
     {
+        int unpauses = pauseGate?.Unpauses ?? 0;
         long read = callback(buffer.Span);
         while (read == ReadCallbackResult.Pause)
         {
             EasyPauseGate gate = pauseGate ?? throw new IOException(PauseNotSupportedText);
-            gate.Pause(CurlPause.Send);
+            gate.Pause(CurlPause.Send, unpauses);
             await gate.WhenResumedAsync(CurlPause.Send, cancellationToken).ConfigureAwait(false);
+            unpauses = gate.Unpauses;
             read = callback(buffer.Span);
         }
 
@@ -106,6 +129,12 @@ internal sealed class CallbackReadStream(ReadCallback callback, EasyPauseGate? p
             throw new IOException(AbortedText);
         }
 
-        return read >= 0 && read <= length ? (int)read : throw new IOException(FunnyValueText);
+        if (read < 0 || read > length)
+        {
+            throw new IOException(FunnyValueText);
+        }
+
+        BytesReadSinceRewind += read;
+        return (int)read;
     }
 }

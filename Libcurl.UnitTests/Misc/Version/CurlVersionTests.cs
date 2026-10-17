@@ -3,6 +3,8 @@ using Curl.Api.EngineContracts.Mime;
 using Curl.Api.EngineContracts.Multi;
 using Curl.Api.EngineContracts.Share;
 using Curl.Api.EngineContracts.Url;
+using Curl.Cli;
+using Curl.Engine;
 using Libcurl.Global;
 using Libcurl.Misc.Version;
 using Libcurl.UnitTests.Global;
@@ -137,6 +139,31 @@ public sealed class CurlVersionTests
 
         Assert.AreEqual("libcurl/8.22.0 Schannel", CurlVersion.Text(library));
         Assert.AreEqual("8.22.0", CurlVersion.Info(library).Version);
+    }
+
+    [TestMethod]
+    public async Task TextAndInfo_ManagedEngine_AgreeWithCurlVOnTheRunningPlatform()
+    {
+        IReadOnlyList<string> lines = CurlVersionText.Lines(OperatingSystem.IsWindows(), OperatingSystem.IsMacOS());
+        await using CurlLibrary library = CurlGlobal.InitCounting(new ManagedCurlEngine(), CurlGlobalFlags.Default, new GlobalInitCounter());
+
+        string text = CurlVersion.Text(library);
+        CurlVersionInfoData info = CurlVersion.Info(library, CurlVersionAge.Now);
+
+        StringAssert.EndsWith(lines[0], ") " + text);
+        Assert.AreEqual($"curl {info.Version} ({info.Host}) libcurl/{info.Version} {info.SslVersion}", lines[0]);
+        string[] protocols = [.. info.Protocols, "ipfs", "ipns"];
+        Array.Sort(protocols, StringComparer.Ordinal);
+        Assert.AreEqual("Protocols: " + string.Join(' ', protocols), lines[2]);
+        Assert.AreEqual("Features: " + string.Join(' ', info.FeatureNames), lines[3]);
+        CurlVersionFeatures expectedBits = CurlVersionFeatures.None;
+        foreach (string name in info.FeatureNames)
+        {
+            expectedBits |= CurlVersion.FeatureBit(name);
+        }
+
+        Assert.AreEqual(expectedBits, info.Features);
+        Assert.AreNotEqual(CurlVersionFeatures.None, info.Features & CurlVersionFeatures.Ssl);
     }
 
     [TestMethod]

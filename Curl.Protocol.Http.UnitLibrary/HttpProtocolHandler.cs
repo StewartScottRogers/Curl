@@ -28,6 +28,11 @@ namespace Curl.Protocol.Http;
 /// The schemes a forward proxy may be answered with: the <c>--proxy-*</c> auth switches' pick,
 /// or <see cref="HttpAuthSchemes.Basic" />, curl's default.
 /// </param>
+/// <param name="http2PushSink">
+/// Who is offered each HTTP/2 server push (BL-2516), or <see langword="null" /> for none: with one
+/// the handler's HTTP/2 connections send SETTINGS_ENABLE_PUSH 1 and each PUSH_PROMISE on a
+/// transfer's stream goes to it; without one they send 0, as curl does with no push callback.
+/// </param>
 /// <remarks>
 /// <para>
 /// The port is the URL's, or 80 for <c>http</c> and 443 for <c>https</c> when it names none.
@@ -206,7 +211,8 @@ public sealed class HttpProtocolHandler(
     IConnector connector,
     IHttpAuthenticator authenticator,
     ICookieStore? cookieStore = null,
-    HttpAuthSchemes proxyAuthSchemes = HttpAuthSchemes.Basic) : IProtocolHandler
+    HttpAuthSchemes proxyAuthSchemes = HttpAuthSchemes.Basic,
+    IHttp2PushSink? http2PushSink = null) : IProtocolHandler
 {
     /// <summary>
     /// How many times a request whose HTTP/3 stream the server refused is sent again on a new
@@ -237,6 +243,12 @@ public sealed class HttpProtocolHandler(
     /// curl's default, unless the handler was given the <c>--proxy-*</c> auth switches' pick.
     /// </summary>
     internal HttpAuthSchemes ProxyAuthSchemes { get; } = proxyAuthSchemes;
+
+    /// <summary>
+    /// Gets who is offered each HTTP/2 server push (BL-2516), or <see langword="null" /> when the
+    /// handler takes none.
+    /// </summary>
+    internal IHttp2PushSink? Http2PushSink { get; } = http2PushSink;
 
     /// <summary>
     /// Gets or sets whether an HTTP/2 transfer writes curl 8.21.0's <c>--trace-config http/2</c> lines
@@ -1118,10 +1130,10 @@ public sealed class HttpProtocolHandler(
     /// a pooled connection (BL-817), a new HTTP/2 session for a connection that speaks HTTP/2
     /// (<see cref="SpeaksHttp2" />), or <see langword="null" /> for HTTP/1.x.
     /// </summary>
-    private static IHttpStreamSession? StreamSessionOf(HttpRequestPlan plan, ConnectResult connect, IConnection connection) =>
+    private IHttpStreamSession? StreamSessionOf(HttpRequestPlan plan, ConnectResult connect, IConnection connection) =>
         (IHttpStreamSession?)(connection as Http3Session)
             ?? (connection.Session as IHttpStreamSession)
-            ?? (SpeaksHttp2(plan, connect) ? new Http2Session(connection) : null);
+            ?? (SpeaksHttp2(plan, connect) ? new Http2Session(connection, isPushEnabled: Http2PushSink is not null) : null);
 
     /// <summary>
     /// Fails a request whose <c>-z</c> time curl 8.21.0 on Windows cannot write into its header
@@ -1513,16 +1525,21 @@ public sealed class HttpProtocolHandler(
     /// <summary>
     /// Creates the HTTP/2 or HTTP/3 stream the exchange runs on, with the request body's length (0 for
     /// none), reporting curl's <c>OPENED stream</c> lines once it is opened (<see cref="HttpStreamOpenedLines" />),
-    /// or gives <see langword="null" /> when the connection speaks HTTP/1.x.
+    /// or gives <see langword="null" /> when the connection speaks HTTP/1.x. An HTTP/2 stream is given
+    /// <see cref="Http2PushSink" />, so the pushes promised on it are offered to it (BL-2516).
     /// </summary>
-    private IHttpStreamConnection? CreateRequestStream(HttpRequestPlan plan, IHttpStreamSession? streams) =>
-        streams?.CreateStream(
+    private IHttpStreamConnection? CreateRequestStream(HttpRequestPlan plan, IHttpStreamSession? streams)
+    {
+        IHttpStreamConnection? stream = streams?.CreateStream(
             plan.Context.Url.Scheme,
             plan.Framing.Body is null ? 0 : plan.Framing.KnownLength,
             plan.Context.NoBody,
             new HttpStreamOpenedLines(plan.Context.Events, HttpUrlText.Effective(plan.Context.Url)),
             plan.Context.DiagnosticLog,
             TracesStreamsOf(streams) ? plan.Context.Events : null);
+        (stream as Http2StreamConnection)?.PushSink = Http2PushSink;
+        return stream;
+    }
 
     /// <summary>
     /// Whether the session's version is traced: <see cref="TracesHttp3Streams" /> for HTTP/3,

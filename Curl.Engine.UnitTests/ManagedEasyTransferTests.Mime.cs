@@ -105,6 +105,88 @@ public sealed partial class ManagedEasyTransferTests
     }
 
     [TestMethod]
+    public async Task PerformAsync_MimePostOfEveryByteValue_SendsTheBytesUnchanged()
+    {
+        byte[] everyByte = [.. Enumerable.Range(0, 256).Select(value => (byte)value)];
+        ScriptedConnector connector = new([Encoding.ASCII.GetBytes(Response)]);
+        ManagedCurlEngine engine = CreateEngine(connector);
+        IMimeBuilder mime = engine.CreateMime();
+        IMimePartBuilder part = mime.AddPart();
+        part.SetName("b");
+        part.SetData(everyByte);
+        await using ManagedEasyTransfer easy = (ManagedEasyTransfer)engine.CreateEasy();
+
+        CurlCode code = await PerformMimePostAsync(easy, "http://h/form", mime.Build());
+
+        Assert.AreEqual(CurlCode.Ok, code);
+        byte[] expectedBody = [
+            .. Encoding.ASCII.GetBytes($"--{FormBoundary}\r\nContent-Disposition: form-data; name=\"b\"\r\n\r\n"),
+            .. everyByte,
+            .. Encoding.ASCII.GetBytes($"\r\n--{FormBoundary}--\r\n")];
+        string written = Encoding.Latin1.GetString(connector.Written);
+        StringAssert.EndsWith(written, Encoding.Latin1.GetString(expectedBody));
+        StringAssert.Contains(written, $"Content-Length: {expectedBody.Length}\r\n");
+    }
+
+    [TestMethod]
+    public async Task PerformAsync_MimePostOfACallbackPartOfKnownSize_SendsWhatTheToolSendsForTheSameTextWithAContentLength()
+    {
+        ScriptedConnector connector = new([Encoding.ASCII.GetBytes(Response)]);
+        ManagedCurlEngine engine = CreateEngine(connector);
+        IMimeBuilder mime = engine.CreateMime();
+        IMimePartBuilder part = mime.AddPart();
+        part.SetName("c");
+        part.SetDataCallback(5, ReaderOf("hello"), null);
+        await using ManagedEasyTransfer easy = (ManagedEasyTransfer)engine.CreateEasy();
+
+        CurlCode code = await PerformMimePostAsync(easy, "http://h/form", mime.Build());
+        byte[] toolBytes = await PerformToolFormAsync("http://h/form", "-F", "c=hello");
+
+        Assert.AreEqual(CurlCode.Ok, code);
+        Assert.AreEqual(Encoding.ASCII.GetString(toolBytes), Encoding.ASCII.GetString(connector.Written));
+    }
+
+    [TestMethod]
+    public async Task PerformAsync_MimePostOfACallbackPartOfUnknownSize_SendsTheBodyChunkedWithNoContentLength()
+    {
+        // An unknown size asks for 100-continue, as libcurl does, so the server answers it before the body comes.
+        ScriptedConnector connector = new([Encoding.ASCII.GetBytes("HTTP/1.1 100 Continue\r\n\r\n"), Encoding.ASCII.GetBytes(Response)]);
+        ManagedCurlEngine engine = CreateEngine(connector);
+        IMimeBuilder mime = engine.CreateMime();
+        IMimePartBuilder part = mime.AddPart();
+        part.SetName("c");
+        part.SetDataCallback(-1, ReaderOf("hello"), null);
+        await using ManagedEasyTransfer easy = (ManagedEasyTransfer)engine.CreateEasy();
+
+        CurlCode code = await PerformMimePostAsync(easy, "http://h/form", mime.Build());
+
+        Assert.AreEqual(CurlCode.Ok, code);
+        string written = Encoding.ASCII.GetString(connector.Written);
+        string body = $"--{FormBoundary}\r\nContent-Disposition: form-data; name=\"c\"\r\n\r\nhello\r\n--{FormBoundary}--\r\n";
+        StringAssert.Contains(written, "Transfer-Encoding: chunked\r\n");
+        StringAssert.Contains(written, "Expect: 100-continue\r\n");
+        Assert.DoesNotContain("Content-Length", written);
+        Assert.AreEqual(body, Dechunked(written[(written.IndexOf("\r\n\r\n", StringComparison.Ordinal) + 4)..]));
+    }
+
+    [TestMethod]
+    public async Task PerformAsync_MimePostWhoseCallbackAborts_EndsWithAbortedByCallback()
+    {
+        ScriptedConnector connector = new([Encoding.ASCII.GetBytes(Response)]);
+        ManagedCurlEngine engine = CreateEngine(connector);
+        IMimeBuilder mime = engine.CreateMime();
+        IMimePartBuilder part = mime.AddPart();
+        part.SetName("c");
+        part.SetDataCallback(5, _ => Api.Callbacks.ReadCallbackResult.Abort, null);
+        await using ManagedEasyTransfer easy = (ManagedEasyTransfer)engine.CreateEasy();
+
+        CurlCode code = await PerformMimePostAsync(easy, "http://h/form", mime.Build());
+
+        Assert.AreEqual(CurlCode.AbortedByCallback, code);
+        Assert.AreEqual(CallbackReadStream.AbortedText, easy.ErrorText);
+    }
+
+    [TestMethod]
     public async Task Duplicate_FixedFormBoundary_KeepsTheBoundary()
     {
         await using ManagedEasyTransfer easy = (ManagedEasyTransfer)CreateEngine(new ScriptedConnector([])).CreateEasy();
@@ -113,6 +195,39 @@ public sealed partial class ManagedEasyTransferTests
         await using ManagedEasyTransfer copy = (ManagedEasyTransfer)easy.Duplicate();
 
         Assert.AreEqual(FormBoundary, copy.CreateFormBoundary());
+    }
+
+    // A read callback handing out text's ASCII bytes, as much as each buffer holds.
+    private static Api.Callbacks.ReadCallback ReaderOf(string text)
+    {
+        byte[] bytes = Encoding.ASCII.GetBytes(text);
+        int offset = 0;
+        return buffer =>
+        {
+            int count = Math.Min(buffer.Length, bytes.Length - offset);
+            bytes.AsSpan(offset, count).CopyTo(buffer);
+            offset += count;
+            return count;
+        };
+    }
+
+    // The data of a chunked body, its hexadecimal sizes and CRLFs removed.
+    private static string Dechunked(string chunked)
+    {
+        StringBuilder data = new();
+        int position = 0;
+        while (true)
+        {
+            int lineEnd = chunked.IndexOf("\r\n", position, StringComparison.Ordinal);
+            int size = Convert.ToInt32(chunked[position..lineEnd], 16);
+            if (size == 0)
+            {
+                return data.ToString();
+            }
+
+            data.Append(chunked, lineEnd + 2, size);
+            position = lineEnd + 2 + size + 2;
+        }
     }
 
     private static async Task<CurlCode> PerformMimePostAsync(ManagedEasyTransfer easy, string url, EasyMimeBody body)
@@ -136,7 +251,7 @@ public sealed partial class ManagedEasyTransferTests
         MultipartFormBuildResult form = await new MultipartFormBodyBuilder(new PhysicalFileSystem(), Encoding.UTF8, () => FormBoundary)
             .BuildAsync(MultipartFormPartMapping.FromMimeBody(mimePost), MultipartNameEscaping.Percent, null, CancellationToken.None);
         Assert.IsTrue(form.IsBuilt);
-        EasyOptions options = new() { Network = new EasyNetworkOptions { Url = url } };
+        EasyOptions options = ManagedEasyTransfer.WithoutDefaultUserAgent(new() { Network = new EasyNetworkOptions { Url = url } });
         EngineTransferSettings settings = ManagedEasyTransfer.TransferSettingsOf(options);
         ScriptedConnector connector = new([Encoding.ASCII.GetBytes(Response)]);
         Assert.IsTrue(CurlUrl.TryParse(url, pathAsIs: false, out CurlUrl? transferUrl));

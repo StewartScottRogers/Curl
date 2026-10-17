@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using Curl.Cookies;
+using Curl.Core;
 using Curl.Core.Hsts;
 using Curl.Networking;
 using Curl.Protocol.Abstractions;
@@ -17,9 +18,16 @@ internal sealed class ManagedEngineSharedState
 {
     /// <summary>Creates an engine's state, every cache its own.</summary>
     /// <param name="timeProvider">The clock the caches, the HSTS cache and the transfers run on.</param>
-    /// <param name="easyErrorText">Curl's easy error text for each exit code (<c>Curl.Console</c>'s <c>CurlEasyErrorText.Of</c> in production).</param>
-    internal ManagedEngineSharedState(TimeProvider timeProvider, Func<CurlExitCode, string> easyErrorText)
+    /// <param name="easyErrorText">Curl's easy error text for each exit code (<c>CurlEasyErrorText.Of</c> from <c>Libcurl/Misc/ErrorText</c>, passed in by <c>Curl.Console</c>, in production).</param>
+    /// <param name="readEnvironmentVariable">
+    /// Reads the proxy environment variables every handle's own perform consults (<see cref="ProxySelector" />):
+    /// <see cref="Environment.GetEnvironmentVariable(string)" />, the default, in production; a dictionary in tests.
+    /// </param>
+    /// <param name="dialing">What the transfers dial and resolve through in place of sockets (ADR-0658); <see langword="null" />, in production, for sockets.</param>
+    internal ManagedEngineSharedState(TimeProvider timeProvider, Func<CurlExitCode, string> easyErrorText, Func<string, string?>? readEnvironmentVariable = null, EngineDialing? dialing = null)
     {
+        Dialing = dialing;
+        ProxySelector = new ProxySelector(readEnvironmentVariable ?? Environment.GetEnvironmentVariable);
         TimeProvider = timeProvider;
         Connections = new ConnectionCache(timeProvider);
         TlsSessions = new TlsSessionCache(timeProvider);
@@ -28,6 +36,7 @@ internal sealed class ManagedEngineSharedState
         Hsts = new HstsTransferPolicy(timeProvider);
         ConnectionIdsByPoolNumber = new ConcurrentDictionary<long, long>();
         MultiOwners = new ConcurrentDictionary<Api.EngineContracts.IEasyTransfer, ManagedMultiTransfer>(ReferenceEqualityComparer.Instance);
+        SocketHandles = new CurlSocketHandles();
         Performer = new TransferPerformer(timeProvider, easyErrorText);
     }
 
@@ -41,6 +50,7 @@ internal sealed class ManagedEngineSharedState
     /// <param name="dnsCache">The resolved names.</param>
     /// <param name="cookies">The cookies.</param>
     /// <param name="hsts">The HSTS cache.</param>
+    /// <remarks>It dials as <paramref name="engine" /> dials (<see cref="Dialing" />).</remarks>
     internal ManagedEngineSharedState(
         ManagedEngineSharedState engine,
         ConnectionCache connections,
@@ -57,8 +67,24 @@ internal sealed class ManagedEngineSharedState
         Hsts = hsts;
         ConnectionIdsByPoolNumber = engine.ConnectionIdsByPoolNumber;
         MultiOwners = engine.MultiOwners;
+        SocketHandles = engine.SocketHandles;
         Performer = engine.Performer;
+        ProxySelector = engine.ProxySelector;
+        Dialing = engine.Dialing;
     }
+
+    /// <summary>
+    /// Gets what chooses the proxy of every handle's own perform from <c>CURLOPT_PROXY</c>, <c>CURLOPT_NOPROXY</c>
+    /// and the proxy environment variables (<c>http_proxy</c>, <c>HTTPS_PROXY</c>, <c>ALL_PROXY</c>, <c>NO_PROXY</c>
+    /// and the rest), as libcurl reads them for every handle (BL-2519, ADR-0608).
+    /// </summary>
+    internal ProxySelector ProxySelector { get; }
+
+    /// <summary>
+    /// Gets what the engine's transfers dial and resolve through in place of sockets: the conformance harness's in-memory
+    /// servers (ADR-0658); <see langword="null" /> in production.
+    /// </summary>
+    internal EngineDialing? Dialing { get; }
 
     /// <summary>Gets the clock the engine's transfers run on.</summary>
     internal TimeProvider TimeProvider { get; }
@@ -83,6 +109,9 @@ internal sealed class ManagedEngineSharedState
 
     /// <summary>Gets the multi handle each transfer added to one of the engine's multi handles is in, so it is in one at a time (<see cref="ManagedMultiTransfer" />).</summary>
     internal ConcurrentDictionary<Api.EngineContracts.IEasyTransfer, ManagedMultiTransfer> MultiOwners { get; }
+
+    /// <summary>Gets the opaque socket handles the engine gives its connections when no open-socket callback made one (<see cref="SocketCallbackConnector" />).</summary>
+    internal CurlSocketHandles SocketHandles { get; }
 
     /// <summary>Gets the performer that numbers the engine's transfers and connections and holds curl's easy error text.</summary>
     internal TransferPerformer Performer { get; }

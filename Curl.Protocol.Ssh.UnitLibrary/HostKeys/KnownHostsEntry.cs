@@ -12,7 +12,7 @@ namespace Curl.Protocol.Ssh.HostKeys;
 /// <param name="Salt">The hashed entry's salt; empty for a plain entry.</param>
 /// <param name="NameHash">The hashed entry's HMAC-SHA1 of the name; empty for a plain entry.</param>
 /// <param name="KeyType">The key's type.</param>
-/// <param name="Key">The key's base64 text as written, without its comment.</param>
+/// <param name="Key">The key's base64 text as written, without its comment; for an SSH-1 key, the whole rest of the line.</param>
 internal sealed record KnownHostsEntry(
     string? PlainName,
     byte[] Salt,
@@ -20,6 +20,18 @@ internal sealed record KnownHostsEntry(
     KnownHostKeyType KeyType,
     string Key)
 {
+    /// <summary>
+    /// Gets the key type's name as written, which libssh2 keeps to write the line back; empty
+    /// for an SSH-1 key, whose line has none.
+    /// </summary>
+    internal string TypeName { get; init; } = string.Empty;
+
+    /// <summary>
+    /// Gets the text after the key, which libssh2 keeps to write the line back;
+    /// <see langword="null" /> when the line has none.
+    /// </summary>
+    internal string? Comment { get; init; }
+
     /// <summary>
     /// Tells whether this entry names <paramref name="name" />: a plain entry when it is the
     /// same text, case included; a hashed entry when the name's HMAC-SHA1 under the salt is
@@ -32,4 +44,17 @@ internal sealed record KnownHostsEntry(
             ? PlainName == name
             : NameHash.Length == HMACSHA1.HashSizeInBytes
                 && CryptographicOperations.FixedTimeEquals(HMACSHA1.HashData(Salt, Encoding.UTF8.GetBytes(name)), NameHash);
+
+    /// <summary>
+    /// Writes the entry as <c>libssh2_knownhost_writefile</c>'s OpenSSH format does, one line
+    /// per entry: the plain name or <c>|1|salt|hash</c> in base64, the type name (none for an
+    /// SSH-1 key), the key, and the comment when there is one; no line ending.
+    /// </summary>
+    /// <returns>The line.</returns>
+    internal string ToLine()
+    {
+        string name = PlainName ?? $"|1|{Convert.ToBase64String(Salt)}|{Convert.ToBase64String(NameHash)}";
+        string key = KeyType == KnownHostKeyType.Rsa1 ? Key : $"{TypeName} {Key}";
+        return Comment is { Length: > 0 } comment ? $"{name} {key} {comment}" : $"{name} {key}";
+    }
 }

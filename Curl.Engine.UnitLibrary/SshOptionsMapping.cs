@@ -1,3 +1,4 @@
+using Curl.Api.Callbacks;
 using Curl.Api.Options.Protocols;
 using Curl.Protocol.Abstractions;
 
@@ -34,5 +35,22 @@ internal static class SshOptionsMapping
             HostPublicKeyMd5 = ssh.HostPublicKeyMd5,
             HostPublicKeySha256 = ssh.HostPublicKeySha256,
             Compression = ssh.Compression,
+        };
+
+    /// <summary>
+    /// Creates the SSH options of a library handle's <c>scp</c> or <c>sftp</c> transfer, as libcurl sets them
+    /// up: the known-hosts file only when <c>CURLOPT_SSH_KNOWNHOSTS</c> names one (libcurl looks for no default
+    /// file), and the handle's <c>CURLOPT_SSH_HOSTKEYFUNCTION</c> and <c>CURLOPT_SSH_KEYFUNCTION</c> through
+    /// <see cref="CallbackSshHostKeys" /> (ADR-0623).
+    /// </summary>
+    /// <param name="ssh">The handle's SSH options.</param>
+    /// <param name="callbacks">The handle's callbacks.</param>
+    /// <param name="privateKeyPassphrase">The <c>CURLOPT_KEYPASSWD</c> passphrase, or <see langword="null" /> when not set.</param>
+    /// <returns>The options.</returns>
+    internal static SshOptions OfHandle(EasySshOptions ssh, EasyCallbackOptions callbacks, string? privateKeyPassphrase) =>
+        Of(ssh, privateKeyPassphrase, ssh.KnownHostsFile) with
+        {
+            HostKeyAcceptance = CallbackSshHostKeys.AcceptanceOf(callbacks.SshHostKey),
+            KnownHostDecision = CallbackSshHostKeys.DecisionOf(callbacks.SshKey),
         };
 }

@@ -88,12 +88,14 @@ internal sealed class CallbackWriteStream(Func<ReadOnlySpan<byte>, long> callbac
     /// <inheritdoc />
     public override async ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default)
     {
+        int unpauses = pauseGate?.Unpauses ?? 0;
         long returned = callback(buffer.Span);
         while (returned == WriteCallbackResult.Pause)
         {
             EasyPauseGate gate = pauseGate ?? throw PauseNotSupported();
-            gate.Pause(CurlPause.Receive);
+            gate.Pause(CurlPause.Receive, unpauses);
             await gate.WhenResumedAsync(CurlPause.Receive, cancellationToken).ConfigureAwait(false);
+            unpauses = gate.Unpauses;
             returned = callback(buffer.Span);
         }
 

@@ -16,4 +16,7 @@ public enum McpToolFailureKind
 
     /// <summary>A field of the tool's request is invalid, so nothing ran.</summary>
     InvalidRequest,
+
+    /// <summary>libcurl's URL parser refused a URL or one of its parts with a <c>CURLUcode</c>.</summary>
+    UrlRefused,
 }

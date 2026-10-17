@@ -122,6 +122,9 @@ internal static class EngineComposition
     /// <param name="tracesHttp3">Whether the HTTP handler writes the <c>--trace-config http/3</c> lines (<see cref="TracesHttp3" />, BL-1168).</param>
     /// <param name="tracesRead">Whether the HTTP handler writes an HTTP/1.x request body's <c>--trace-config read</c> lines (<see cref="TracesRead" />, BL-1189).</param>
     /// <param name="ftpListener">Listens for FTP's active-mode (<c>-P</c>) data connections; a <see cref="TcpConnectionListener" /> when not given.</param>
+    /// <param name="ftpWildcardHooks">The FTP handler's wildcard hooks (<see cref="CallbackWildcardHooks.Of" />, ADR-0619); <see langword="null" /> fetches a wildcard URL as a plain path.</param>
+    /// <param name="rtspInterleaveSink">Takes the RTSP handler's interleaved frames (<see cref="CallbackInterleaveSink.Of" />, ADR-0619); <see langword="null" /> writes them to the body output.</param>
+    /// <param name="webSocketRawMode">Whether the WebSocket handler writes the received stream unframed (<see cref="WsProtocolHandler.RawMode" />, libcurl's <c>CURLWS_RAW_MODE</c>, BL-2494).</param>
     internal static IReadOnlyList<IProtocolHandler> CreateProtocolHandlers(
         IConnector connector,
         IDatagramConnector datagramConnector,
@@ -141,7 +144,10 @@ internal static class EngineComposition
         bool tracesHttp2 = false,
         bool tracesHttp3 = false,
         bool tracesRead = false,
-        IConnectionListener? ftpListener = null)
+        IConnectionListener? ftpListener = null,
+        IFtpWildcardHooks? ftpWildcardHooks = null,
+        IRtspInterleaveSink? rtspInterleaveSink = null,
+        bool webSocketRawMode = false)
     {
         ConnectionEndPointRecorder recorder = new();
         EndPointRecordingConnector recordingConnector = new(connector, recorder);
@@ -163,8 +169,8 @@ internal static class EngineComposition
             new LazyProtocolHandler(["pop3", "pop3s"], () => new Pop3ProtocolHandler(recordingConnector, tlsProvider, CreateSaslAuthenticator(contexts.Value, saslDelegation, diagnosticLog))),
             new LazyProtocolHandler(["smtp", "smtps"], () => new SmtpProtocolHandler(recordingConnector, tlsProvider, CreateSaslAuthenticator(contexts.Value, saslDelegation, diagnosticLog)) { TracesStateMachine = tracesSmtp }),
             new LazyProtocolHandler(["ldap", "ldaps"], () => new LdapProtocolHandler(recordingConnector, LdapDialectFor(OperatingSystem.IsWindows()))),
-            new LazyProtocolHandler(["ws", "wss"], () => new WsProtocolHandler(recordingConnector, httpAuthenticator.Value, new SystemWebSocketRandomSource()) { TracesFrames = tracesWs }),
-            new LazyProtocolHandler(["rtsp"], () => new RtspProtocolHandler(recordingConnector, httpAuthenticator.Value)),
+            new LazyProtocolHandler(["ws", "wss"], () => new WsProtocolHandler(recordingConnector, httpAuthenticator.Value, new SystemWebSocketRandomSource()) { TracesFrames = tracesWs, RawMode = webSocketRawMode }),
+            new LazyProtocolHandler(["rtsp"], () => new RtspProtocolHandler(recordingConnector, httpAuthenticator.Value, rtspInterleaveSink)),
             new LazyProtocolHandler(["smb", "smbs"], () => new SmbProtocolHandler(recordingConnector)),
             new LazyProtocolHandler(["scp", "sftp"], () => new SshProtocolHandler(
                 recordingConnector,
@@ -174,7 +180,7 @@ internal static class EngineComposition
             http,
             new LazyProtocolHandler(["ftp", "ftps"], () => new RoutingFtpProtocolHandler(
                 http,
-                CreateFtpProtocolHandler(recordingConnector, new EndPointRecordingConnector(ftpDataConnector ?? connector, recorder), tlsProvider, dnsResolver, tracesFtp, ftpListener))),
+                CreateFtpProtocolHandler(recordingConnector, new EndPointRecordingConnector(ftpDataConnector ?? connector, recorder), tlsProvider, dnsResolver, tracesFtp, ftpListener, ftpWildcardHooks))),
         ];
 
         return [.. handlers.Select(handler => new EndPointReportingProtocolHandler(handler, recorder))];
@@ -212,9 +218,10 @@ internal static class EngineComposition
     /// <param name="dnsResolver">Resolves a host name given to <c>-P</c>.</param>
     /// <param name="tracesFtp">Whether it writes the <c>--trace-config ftp</c> lines (<see cref="TracesFtp" />, BL-1162).</param>
     /// <param name="listener">Listens for active-mode data connections; a <see cref="TcpConnectionListener" /> when not given.</param>
+    /// <param name="wildcardHooks">The wildcard hooks (ADR-0615, ADR-0619); <see langword="null" /> fetches a wildcard URL as a plain path.</param>
     /// <returns>The handler.</returns>
-    internal static FtpProtocolHandler CreateFtpProtocolHandler(IConnector connector, IConnector dataConnector, ITlsProvider tlsProvider, IDnsResolver dnsResolver, bool tracesFtp = false, IConnectionListener? listener = null) =>
-        new(connector, dataConnector, listener ?? new TcpConnectionListener(), tlsProvider, dnsResolver, new SystemNetworkInterfaceLookup()) { TracesStateMachine = tracesFtp };
+    internal static FtpProtocolHandler CreateFtpProtocolHandler(IConnector connector, IConnector dataConnector, ITlsProvider tlsProvider, IDnsResolver dnsResolver, bool tracesFtp = false, IConnectionListener? listener = null, IFtpWildcardHooks? wildcardHooks = null) =>
+        new(connector, dataConnector, listener ?? new TcpConnectionListener(), tlsProvider, dnsResolver, new SystemNetworkInterfaceLookup()) { TracesStateMachine = tracesFtp, WildcardHooks = wildcardHooks };
 
     /// <summary>
     /// The connector FTP's passive data connections go through: the option group's pooling
@@ -401,7 +408,7 @@ internal static class EngineComposition
     /// Receives the DoH resolver's <c>--trace-config doh</c> lines (BL-1102); <see langword="null" />
     /// for none.
     /// </param>
-    /// <param name="easyErrorText">Curl's easy error text for each exit code, which the DoH resolver's <c>--trace-config doh</c> lines carry (BL-1102): <c>Curl.Console</c>'s <c>CurlEasyErrorText.Of</c> in production; <see langword="null" /> for an empty text.</param>
+    /// <param name="easyErrorText">Curl's easy error text for each exit code, which the DoH resolver's <c>--trace-config doh</c> lines carry (BL-1102): <c>CurlEasyErrorText.Of</c> (in <c>Libcurl/Misc/ErrorText</c>) passed in by <c>Curl.Console</c> in production; <see langword="null" /> for an empty text.</param>
     /// <param name="traces">The run's <c>--trace-config</c> components, for the DoH connector's DNS filter lines; <see langword="null" /> for none.</param>
     /// <returns>The resolver.</returns>
     internal static IDnsResolver CreateDnsResolver(EasyNetworkOptions network, EasyTlsOptions tls, TimeProvider timeProvider, ITcpDialer tcpDialer, ITransferEvents? dohTrace = null, Func<CurlExitCode, string>? easyErrorText = null, EngineTraceComponents? traces = null)
@@ -438,7 +445,7 @@ internal static class EngineComposition
     /// (BL-1102), and each DoH sub-transfer's own lines through a <see cref="DohSubTransferEvents" />
     /// (BL-1180); <see langword="null" /> for none.
     /// </param>
-    /// <param name="easyErrorText">Curl's easy error text for each exit code, which the DoH resolver's <c>--trace-config doh</c> lines carry (BL-1102): <c>Curl.Console</c>'s <c>CurlEasyErrorText.Of</c> in production; <see langword="null" /> for an empty text.</param>
+    /// <param name="easyErrorText">Curl's easy error text for each exit code, which the DoH resolver's <c>--trace-config doh</c> lines carry (BL-1102): <c>CurlEasyErrorText.Of</c> (in <c>Libcurl/Misc/ErrorText</c>) passed in by <c>Curl.Console</c> in production; <see langword="null" /> for an empty text.</param>
     /// <returns>The resolver.</returns>
     internal static IDnsResolver CreateDohResolver(string dohUrl, IConnector connector, AddressFamily addressFamily, ITransferEvents? dohTrace = null, Func<CurlExitCode, string>? easyErrorText = null) =>
         DohUrlOf(dohUrl) is { } url
@@ -764,23 +771,53 @@ internal static class EngineComposition
     /// <param name="tlsSessions">The run's <c>--ssl-sessions</c> cache, which the origin's TLS provider uses (ADR-0319); <see langword="null" /> for none.</param>
     /// <param name="diagnosticLog">The run's diagnostic log, which the authenticators and security contexts write their choices to (BL-923); <see langword="null" /> for none.</param>
     /// <param name="runDnsCache">The run's DNS cache, which every option group's TCP connector answers from and adds to as curl 8.21.0 shares its cache (BL-1053); <see langword="null" /> for a cache of the group's own.</param>
-    /// <param name="easyErrorText">Curl's easy error text for each exit code, which the DoH resolver's <c>--trace-config doh</c> lines carry (BL-1102): <c>Curl.Console</c>'s <c>CurlEasyErrorText.Of</c> in production; <see langword="null" /> for an empty text.</param>
+    /// <param name="easyErrorText">Curl's easy error text for each exit code, which the DoH resolver's <c>--trace-config doh</c> lines carry (BL-1102): <c>CurlEasyErrorText.Of</c> (in <c>Libcurl/Misc/ErrorText</c>) passed in by <c>Curl.Console</c> in production; <see langword="null" /> for an empty text.</param>
     /// <param name="traces">The run's <c>--trace-config</c> components; <see langword="null" /> for none.</param>
-    internal static CurlTransports CreateTransports(EngineToolOptions tool, EasyNetworkOptions network, EasyTlsOptions tls, EasyHttpOptions http, EasyProxyOptions proxy, EasyAuthenticationOptions authentication, TimeProvider timeProvider, ConnectionCache? runConnections = null, TlsSessionCache? tlsSessions = null, IDiagnosticLog? diagnosticLog = null, DnsCache? runDnsCache = null, Func<CurlExitCode, string>? easyErrorText = null, EngineTraceComponents? traces = null)
+    internal static CurlTransports CreateTransports(EngineToolOptions tool, EasyNetworkOptions network, EasyTlsOptions tls, EasyHttpOptions http, EasyProxyOptions proxy, EasyAuthenticationOptions authentication, TimeProvider timeProvider, ConnectionCache? runConnections = null, TlsSessionCache? tlsSessions = null, IDiagnosticLog? diagnosticLog = null, DnsCache? runDnsCache = null, Func<CurlExitCode, string>? easyErrorText = null, EngineTraceComponents? traces = null) =>
+        CreateTransports(tool, network, tls, http, proxy, authentication, timeProvider, runConnections, tlsSessions, diagnosticLog, runDnsCache, easyErrorText, traces, static resolver => resolver);
+
+    /// <summary>
+    /// Creates the network transports as the overload without <paramref name="wrapLookUps" /> does, with the
+    /// resolver the TCP and UDP connectors ask on a DNS cache miss wrapped by <paramref name="wrapLookUps" />: the
+    /// managed engine's <see cref="ResolverStartDnsResolver" />, which calls <c>CURLOPT_RESOLVER_START_FUNCTION</c>
+    /// before each look-up (ADR-0611). <see cref="CurlTransports.DnsResolver" /> stays the resolver unwrapped.
+    /// </summary>
+    /// <param name="tool">The curl tool's own settings.</param>
+    /// <param name="network">The option group's network options.</param>
+    /// <param name="tls">The option group's TLS options.</param>
+    /// <param name="http">The option group's HTTP options.</param>
+    /// <param name="proxy">The option group's proxy options.</param>
+    /// <param name="authentication">The option group's authentication options.</param>
+    /// <param name="timeProvider">The clock every transport times on.</param>
+    /// <param name="runConnections">The run's connection cache; <see langword="null" /> for a pool of the group's own.</param>
+    /// <param name="tlsSessions">The run's <c>--ssl-sessions</c> cache; <see langword="null" /> for none.</param>
+    /// <param name="diagnosticLog">The run's diagnostic log; <see langword="null" /> for none.</param>
+    /// <param name="runDnsCache">The run's DNS cache; <see langword="null" /> for a cache of the group's own.</param>
+    /// <param name="easyErrorText">Curl's easy error text for each exit code; <see langword="null" /> for an empty text.</param>
+    /// <param name="traces">The run's <c>--trace-config</c> components; <see langword="null" /> for none.</param>
+    /// <param name="wrapLookUps">Wraps the resolver the connectors look names up through.</param>
+    /// <param name="dialing">
+    /// What the conformance harness's engine dials and resolves through in place of sockets (ADR-0658): the
+    /// <see cref="TcpConnector" /> dials through its dialer, its resolver is <see cref="CurlTransports.DnsResolver" />,
+    /// and the datagram protocols and QUIC open their channels through its connector, as <c>Curl.Console</c>'s
+    /// dialing runner composes them; <see langword="null" />, in production, for sockets and the resolver the options pick.
+    /// </param>
+    /// <returns>The connectors and the pieces they were built from.</returns>
+    internal static CurlTransports CreateTransports(EngineToolOptions tool, EasyNetworkOptions network, EasyTlsOptions tls, EasyHttpOptions http, EasyProxyOptions proxy, EasyAuthenticationOptions authentication, TimeProvider timeProvider, ConnectionCache? runConnections, TlsSessionCache? tlsSessions, IDiagnosticLog? diagnosticLog, DnsCache? runDnsCache, Func<CurlExitCode, string>? easyErrorText, EngineTraceComponents? traces, Func<IDnsResolver, IDnsResolver> wrapLookUps, EngineDialing? dialing = null)
     {
         traces ??= EngineTraceComponents.None;
         TcpDialer tcpDialer = new(TcpSocketOptionsOf(network));
         FlowScopedTransferEvents? resolverEvents = TracesDns(traces) ? new() : null;
-        IDnsResolver dnsResolver = CreateDnsResolver(network, tls, timeProvider, tcpDialer, resolverEvents, easyErrorText, traces);
+        IDnsResolver dnsResolver = ResolverOf(dialing, () => CreateDnsResolver(network, tls, timeProvider, tcpDialer, resolverEvents, easyErrorText, traces));
+        IDnsResolver lookUps = wrapLookUps(dnsResolver);
         TlsClientOptions tlsClientOptions = TlsClientOptionsMapping.Of(tls, http.SslEnableAlpn, tool.SslSessionsFile);
         ITlsProviderWithWarnings tlsProvider = CreateTlsProvider(tlsClientOptions, timeProvider, tlsSessions, dnsResolver as IEchConfigListLookup);
         TlsClientOptions proxyTlsClientOptions = TlsClientOptionsMapping.ProxyOf(tls, http.SslEnableAlpn);
         ITlsProviderWithWarnings proxyTlsProvider = CreateTlsProvider(proxyTlsClientOptions, timeProvider);
         LateBoundSecurityContextFactory proxyContexts = new();
         HttpProxyTunnelOptions proxyTunnelOptions = CreateProxyTunnelOptions(http, proxy, authentication, proxyContexts, diagnosticLog);
-        QuicDialer quicDialer = new(tlsClientOptions, timeProvider) { WritesHttp3ConnectionLines = TracesHttp3(traces) };
-        TcpConnector tcpConnector = CreateTcpConnector(tool, traces, network, http, proxy, authentication, dnsResolver, tcpDialer, tlsProvider, timeProvider, proxyTunnelOptions, proxyTlsProvider, quicDialer, proxyContexts, runDnsCache, resolverEvents);
-        UdpDatagramConnector udpDatagramConnector = CreateUdpDatagramConnector(network, dnsResolver, timeProvider, diagnosticLog);
+        (QuicDialer quicDialer, ITcpDialer connectorDialer, IDatagramConnector udpDatagramConnector) = DialersOf(dialing, tcpDialer, tlsClientOptions, traces, timeProvider, () => CreateUdpDatagramConnector(network, lookUps, timeProvider, diagnosticLog));
+        TcpConnector tcpConnector = CreateTcpConnector(tool, traces, network, http, proxy, authentication, lookUps, connectorDialer, tlsProvider, timeProvider, proxyTunnelOptions, proxyTlsProvider, quicDialer, proxyContexts, runDnsCache, resolverEvents);
         PoolingConnector poolingConnector = CreatePoolingConnector(tool, network, tls, http, proxy, tcpConnector, timeProvider, runConnections);
 
         // The tunnel answers --proxy-ntlm and --proxy-negotiate on the same router the origin's
@@ -808,6 +845,37 @@ internal static class EngineComposition
             TracesHttp3(traces),
             TracesRead(traces));
     }
+
+    /// <summary>The resolver the transports use: <paramref name="dialing" />'s, or, without one, the one <paramref name="createResolver" /> builds from the options (ADR-0658).</summary>
+    /// <param name="dialing">What the harness's engine dials through, or <see langword="null" />.</param>
+    /// <param name="createResolver">Builds the resolver the options pick.</param>
+    /// <returns>The resolver.</returns>
+    private static IDnsResolver ResolverOf(EngineDialing? dialing, Func<IDnsResolver> createResolver) =>
+        dialing is null ? createResolver() : dialing.DnsResolver;
+
+    /// <summary>
+    /// The QUIC dialer, the dialer the <see cref="TcpConnector" /> dials through and the datagram connector the transports
+    /// use: without <paramref name="dialing" />, a socket <see cref="QuicDialer" />, <paramref name="tcpDialer" /> and the
+    /// connector <paramref name="createDatagramConnector" /> builds; with one, a QUIC dialer over its datagram connector,
+    /// its dialer and its datagram connector (ADR-0658).
+    /// </summary>
+    /// <param name="dialing">What the harness's engine dials through, or <see langword="null" />.</param>
+    /// <param name="tcpDialer">The socket dialer built from the options.</param>
+    /// <param name="tlsClientOptions">The origin's TLS options, for the QUIC dialer.</param>
+    /// <param name="traces">The run's <c>--trace-config</c> components, for the HTTP/3 connection lines.</param>
+    /// <param name="timeProvider">The clock the socket QUIC dialer times on.</param>
+    /// <param name="createDatagramConnector">Builds the UDP datagram connector the options pick.</param>
+    /// <returns>The three.</returns>
+    private static (QuicDialer QuicDialer, ITcpDialer TcpDialer, IDatagramConnector DatagramConnector) DialersOf(
+        EngineDialing? dialing,
+        TcpDialer tcpDialer,
+        TlsClientOptions tlsClientOptions,
+        EngineTraceComponents traces,
+        TimeProvider timeProvider,
+        Func<IDatagramConnector> createDatagramConnector) =>
+        dialing is null
+            ? (new QuicDialer(tlsClientOptions, timeProvider) { WritesHttp3ConnectionLines = TracesHttp3(traces) }, tcpDialer, createDatagramConnector())
+            : (CreateDatagramConnectorQuicDialer(traces, tlsClientOptions, dialing.DatagramConnector), dialing.TcpDialer, dialing.DatagramConnector);
 
     /// <summary>
     /// The socket options each TCP connection is given: <c>TCP_NODELAY</c>, keepalive with its idle time and

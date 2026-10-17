@@ -78,6 +78,14 @@ public sealed class WsProtocolHandler(
     /// </summary>
     public bool TracesFrames { get; init; }
 
+    /// <summary>
+    /// Gets a value indicating whether each transfer that exchanges frames writes the bytes received
+    /// after the <c>101</c> to the output as they came, frame heads included, decoding nothing and
+    /// answering no ping: libcurl's <c>CURLWS_RAW_MODE</c> on a transfer that is not connect-only, as
+    /// curl 8.22.0's <c>ws_cw_write</c> passes the stream on under <c>ws_raw_mode</c> (BL-2494).
+    /// </summary>
+    public bool RawMode { get; init; }
+
     /// <inheritdoc />
     /// <exception cref="ArgumentNullException">
     /// <paramref name="context" /> is <see langword="null" />.
@@ -530,7 +538,7 @@ public sealed class WsProtocolHandler(
         TransferReport report,
         WsFrameTrace trace)
     {
-        var receiver = new WsFrameReceiver(connection, randomSource, context.Progress, context.Events, context.DiagnosticLog, trace, context.MaxFileSize);
+        var receiver = new WsFrameReceiver(connection, randomSource, context.Progress, context.Events, context.DiagnosticLog, trace, context.MaxFileSize, RawMode);
         Func<ReadOnlyMemory<byte>, CancellationToken, ValueTask> writePayload =
             (payload, token) => WriteAsync(context.Output, payload, token);
         long uploaded = 0;
@@ -570,7 +578,9 @@ public sealed class WsProtocolHandler(
     /// <summary>
     /// Sends the whole of <see cref="ITransferContext.Upload" /> as one masked binary frame, as
     /// curl 8.21.0 sends <c>-T</c> on a WebSocket; a failed read ends the upload, as curl takes
-    /// a file read that fails.
+    /// a file read that fails. Under <see cref="RawMode" /> the bytes go out as they are, with no
+    /// frame, because curl 8.22.0's <c>Curl_ws_accept</c> adds the frame-encoding client reader only
+    /// when <c>ws_raw_mode</c> is off (BL-2526).
     /// </summary>
     /// <returns>The frame's length, or 0 when there is no upload.</returns>
     private async ValueTask<long> SendUploadAsync(IConnection connection, ITransferContext context, WsFrameTrace trace)
@@ -590,11 +600,20 @@ public sealed class WsProtocolHandler(
             // The bytes read before the failure are the upload.
         }
 
-        byte[] frame = WsFrameEncoder.Encode(WsOpcode.Binary, payload.GetBuffer().AsSpan(0, (int)payload.Length), randomSource);
-        trace.FrameEncoded(WsOpcode.Binary, payload.Length);
+        ReadOnlySpan<byte> body = payload.GetBuffer().AsSpan(0, (int)payload.Length);
+        byte[] frame = RawMode ? body.ToArray() : WsFrameEncoder.Encode(WsOpcode.Binary, body, randomSource);
+        if (!RawMode)
+        {
+            trace.FrameEncoded(WsOpcode.Binary, payload.Length);
+        }
+
         context.Events.ReportDataSent(frame);
         await SendAsync(connection, frame, context.CancellationToken).ConfigureAwait(false);
-        new WsTransferLog(context.DiagnosticLog).Frame("sent", WsOpcode.Binary, isFinal: true, payload.Length);
+        if (!RawMode)
+        {
+            new WsTransferLog(context.DiagnosticLog).Frame("sent", WsOpcode.Binary, isFinal: true, payload.Length);
+        }
+
         context.Events.ReportInfo(WsInfoLines.UploadSent(frame.Length));
         context.Progress.ReportUploaded(frame.Length, frame.Length);
         return frame.Length;

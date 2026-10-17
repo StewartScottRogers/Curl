@@ -233,6 +233,14 @@ public sealed class FtpProtocolHandler : IProtocolHandler
     /// </summary>
     public bool TracesStateMachine { get; init; }
 
+    /// <summary>
+    /// Gets the hooks that turn wildcard matching on, as libcurl's <c>CURLOPT_WILDCARDMATCH</c>
+    /// does (BL-2478, ADR-0615): a download URL whose last path part is a pattern
+    /// (<c>ftp://host/dir/*.txt</c>) lists the directory and downloads each match in turn.
+    /// <see langword="null" />, the default, leaves wildcard matching off.
+    /// </summary>
+    public IFtpWildcardHooks? WildcardHooks { get; init; }
+
     /// <inheritdoc />
     /// <exception cref="ArgumentNullException">
     /// <paramref name="context" /> is <see langword="null" />.
@@ -302,7 +310,7 @@ public sealed class FtpProtocolHandler : IProtocolHandler
     {
         var connections = new FtpSessionConnections(dataConnector, listener, tlsProvider, dnsResolver, interfaceLookup, controlOpened);
         using var connectPhase = new FtpConnectPhaseLimit(context, started);
-        var session = new FtpSession(connections, new FtpControlChannel(control, context.Events, connectPhase.Token, new FtpDiagnosticLog(context.DiagnosticLog), context.DumpHeaderOutput, controlConnectEvents), name, context, implicitTls, connectPhase, trace, reused);
+        var session = new FtpSession(connections, new FtpControlChannel(control, context.Events, connectPhase.Token, new FtpDiagnosticLog(context.DiagnosticLog), context.DumpHeaderOutput, controlConnectEvents), name, context, implicitTls, connectPhase, trace, reused, WildcardHooks);
         await using (session.ConfigureAwait(false))
         {
             return await session.RunAsync().ConfigureAwait(false);

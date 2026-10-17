@@ -317,6 +317,8 @@ hands to `FileProtocolHandler`, so a `file://` transfer takes the next number in
 Per ADR-0604 (BL-2427) `ConnectionCache.CloseIdleAsync` closes the idle connections and leaves the
 cache open, and `DnsCache.Clear` drops every entry, `--resolve` ones included: libcurl's
 `CURLMNWC_CLEAR_CONNS` and `CURLMNWC_CLEAR_DNS`, which the engine's multi handle runs.
+Per BL-2468 (ADR-0605) `ConnectionCache.CloseIdleBeyondAsync(keep)` closes the oldest idle connections
+until no more than `keep`, idle and in use, remain, never one in use: the multi handle's `CURLMOPT_MAXCONNECTS`.
 
 Per BL-717 a pooled connection whose `IConnectionSession` multiplexes (HTTP/2) is shared, not
 checked out: while its session's `ConcurrentTransferLimit` has streams to spare, a transfer with the

@@ -7,12 +7,16 @@ This is the only project without a `.UnitLibrary` suffix, because it is an
 executable rather than a library.
 
 It is also the only project that references every library: composing the services
-is its job. `CurlComposition` is the composition root, written as plain constructor
+is its job. It references `Libcurl`, not `Curl.Engine.UnitLibrary`: the engine comes to it
+transitively through `Libcurl`'s own reference, and a transfer reaches it through the
+`CurlLibrary` that `ToolCurlEngine` gets from `CurlGlobal.Init` (BL-2454, ADR-0629). The engine
+types it still names (`EngineComposition`, `TransferPerformer` and the like) are the tool's
+`ICurlEngine` built from the engine's parts. `CurlComposition` is the composition root, written as plain constructor
 calls - no container, no reflection, no assembly scanning, so native AOT sees every
 type. It keeps `CreateRunner` and the runner wiring; the factories that build the protocol
 handlers, transports, DNS resolvers, TLS providers, security-context factories and
 authenticators are `Curl.Engine.UnitLibrary`'s `EngineComposition`, which it calls (BL-2289),
-handing it `CurlEasyErrorText.Of` for the DoH resolver's error text. Where this file names an
+handing it `Libcurl`'s `CurlEasyErrorText.Of` for the DoH resolver's error text. Where this file names an
 `EngineComposition` member, that member is engine code described here for the runner's sake;
 `Curl.Engine.UnitLibrary/CLAUDE.md` owns it. `Curl.Core.UnitLibrary` dispatches through the `IProtocolHandler` instances it is
 given and must never reference a protocol library directly.
@@ -330,15 +334,43 @@ it performs one attempt through `RedirectFollower` under the attempt's `-Y`/`-y`
 its exit 28 failure, numbers the run's `%{xfer_id}` and `%{conn_id}` (`TakeNextAttemptIds`,
 `KeepRetriedConnectionIdWhenReused`) and keeps the serial attempt start `--rate` measures from.
 The `--retry` loop around it (`FollowRetryingAsync`, the retry lines, the `-o` attempt bytes) stays
-in the runner, as retrying is the curl tool's work. A serial transfer performs its attempts through
+in the runner, as retrying is the curl tool's work. Every transfer performs its attempts through
 the runner's `ICurlEngine` (`curlEngine`; `CreateRunner` passes a `ManagedCurlEngine` with curl's easy
-error text, and a runner given none makes one on its clock): one easy handle per transfer, its
-`Options` from `EasyOptionsFromCommandLine.EasyOptionsOf`, one `PerformAsync` per attempt, `--retry`
-attempts included, each carrying the attempt the runner set up as the internal `ToolAttempt` and
-reading back its `ToolAttemptResult` (ADR-0552). `-Z` transfers still perform directly
-(`TransferPerformer.FollowWatchingSpeedAsync`) until the engine's multi handle lands in phase 3;
-building the attempt inside the handle from the options and callbacks is BL-2394. `CurlComposition.CreateRunner` builds it; a
-runner given none makes one on its own clock. Both hand it `CurlEasyErrorText.Of`, which stays here, for the text its known-hosts and cookie-line failures carry.
+error text, and a runner given none makes one on its clock), wrapped in `ToolCurlEngine`, which holds a
+`Libcurl` `CurlLibrary` over it (ADR-0624): one `ToolEasyHandle` per transfer from its `EasyInit`
+(`curl_easy_init`), pairing the `CurlEasy` with the engine's internal `IToolEasyTransfer` under it. The
+hooks' `Options` get `EasySetoptsFromCommandLine.KeptOnHooks` of `EasyOptionsFromCommandLine.EasyOptionsOf`
+(no URL), `CURLOPT_URL` goes through `CurlEasy.SetOption`, and so does every behaviour, transfer (with the
+transfer's `-T` upload) and network field off libcurl's default: `EasySetoptsFromCommandLine.Of` gives one
+`EasySetopt` per `CURLOPT_*` and `ToolEasyHandle.SetOptions` makes them (BL-2491, ADR-0631), and so does every
+TLS (origin, `PROXY_*` twins, then the handle's own), authentication and proxy field
+(`EasySetoptsFromCommandLine.TlsAuthenticationProxy.cs`; `CURLOPT_AWS_SIGV4` before `CURLOPT_HTTPAUTH`,
+`CURLOPT_HAPROXY_CLIENT_IP` before `CURLOPT_HAPROXYPROTOCOL`, `--ech` as its mode, `pn:` and `ecl:` calls; BL-2492,
+ADR-0642), and so does every HTTP and protocol field (`EasySetoptsFromCommandLine.HttpProtocols.cs`; one
+`CURLOPT_COOKIEFILE` per `-b` file, `CURLOPT_POSTFIELDS` before `CURLOPT_POSTFIELDSIZE_LARGE`; BL-2493, ADR-0652). The
+`-F` form is built by `CurlMimeFromFormBody` as a `curl_mime` tree on the runner's library (`ToolCurlEngine.MimeInit`)
+and set last as `CURLOPT_MIMEPOST`; a form with a `@-` or `<-` part or an encoder `curl_mime_encoder` refuses stays
+on the hooks whole, as `MimePost`. The hooks keep the callbacks group whole, of the HTTP and protocol groups only
+that form, `HttpPost`, `StreamDependency` and `CookieList` (never set by the command line), a `--max-redirs` below -1, an
+`--expect100-timeout` that is not whole milliseconds up to `INT_MAX`, a stream weight outside 1 to 256, a
+`--tftp-blksize` outside 8 to 65464 and a `--hostpubmd5` that is not 32 characters, and of the other six only `--ip-tos`, `--vlan-priority`
+and `--mptcp` (no `CURLOPT_*`), a receive buffer outside 1024 bytes to 10 MB (`--limit-rate` below 1024), a `-y`, `-m`,
+`--connect-timeout`, `--happy-eyeballs-timeout-ms` or `--keepalive-time` that is not a whole number of the setter's
+unit up to `INT_MAX`, `--engine` (its setter answers `CURLE_NOT_BUILT_IN`; the engine's setup failure prints curl's
+text), the engine default, False Start and CA cache timeout, an `--ech` value `CURLOPT_ECH` would ignore, the
+TLS-SRP fields, and Curl's `--httpsig-*` options (no `CURLOPT_*`).
+A call libcurl refuses (no command line reaches one; the runner's `easySetoptsOf` lets tests pass one) ends the
+transfer before any perform with its code and `setopt 0x<option> got bad argument`, and ends the run. Each
+attempt, `--retry` attempts included, is one `CurlEasy.PerformAsync`
+with the runner's hooks set and its `LastResult` read back (ADR-0552, ADR-0622). A `-Z` attempt goes instead through the run's one
+`CurlMulti` (`ToolCurlEngine.MultiInit`, `curl_multi_init`), held by `ParallelTransferMulti` as
+`ParallelRun.Transfers` and cleaned up by `ParallelRun.EndAsync`: the attempt adds its handle and calls
+`curl_multi_perform` in its own flow, so its transfer starts there, and one loop polls, performs and reads
+each `CURLMSG_DONE` with `curl_multi_info_read`, removing the handle and handing the attempt its result; every
+call on the multi handle holds one gate, and an attempt about to add wakes the loop's poll. No connection limit
+is set on the multi handle, so `ParallelTransferQueue` and `ParallelHostQueue` still decide when a transfer
+starts (ADR-0628, BL-2453). `CurlComposition.CreateRunner` builds the engine; a
+runner given none makes one on its own clock. Both hand it `Libcurl`'s `CurlEasyErrorText.Of` (`curl_easy_strerror`'s table, BL-2450) for the text its known-hosts and cookie-line failures carry.
 It also owns the per-transfer setup libcurl does before it connects (`TransferPerformer.Setup.cs`,
 BL-2283): the URL parse and its refusals (`TryParseTransferUrl`, `ReportUrlRejected`,
 `ParsedUrlRefusal`), the `--interface` and `--ech` setopt refusals (`RefuseMalformedSetopt`), the
@@ -465,7 +497,13 @@ in curl. No `** Resuming` line is written under `-#` (ADR-0082, BL-132 Notes).
 
 With `-w`, each transfer's template is rendered by `Curl.Output`'s `WriteOutTemplateRenderer`
 after its failure lines, after a failure as after a success (a `-D` or resumed `-o` file that
-cannot be opened included), with `TransferWriteOutVariables` as its values. Its `%time{format}`
+cannot be opened included), with `TransferWriteOutVariables` as its values. A transfer's libcurl values, `-Z` or not, are its easy handle's
+`curl_easy_getinfo` answers, read through `CurlEasy.GetInfo` after its last attempt and before cleanup
+(`EasyHandleWriteOutInfo`, kept as `RunningTransferState.EasyWriteOutInfo`) and used when they describe the
+reported result (ADR-0628), as they are: the handle answers the runner's own scheme, `Referer`, IDs, verify results
+and early data, which the runner hands it on the running transfer (`TransferId`, `RequestUrl`) and through
+`EngineToolTransferEvents.TakeConnectionId` (ADR-0654, BL-2495). One that never reached its handle, or a `-Z` one,
+gets `WriteOutTransferInfo.FromReport`'s with the runner's values laid over them (`ReportWriteOutInfo`; ADR-0625, BL-2452). Its `%time{format}`
 follows the `WriteOutTimeDialect` the runner is given: `CurlComposition.WriteOutTimeDialectFor`
 passes `WindowsCRuntime` on Windows and `Glibc` elsewhere (ADR-0078, BL-387). On Windows the
 line feeds it writes to standard error, and to standard output while curl's standard output

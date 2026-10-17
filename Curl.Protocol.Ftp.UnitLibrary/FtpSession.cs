@@ -25,7 +25,22 @@ namespace Curl.Protocol.Ftp;
 /// The state a previous transfer left on the control connection the run's connection cache served
 /// again, or <see langword="null" /> for a new connection, which greets and logs in (BL-1981).
 /// </param>
+/// <param name="wildcardHooks">
+/// The hooks of a wildcard download, or <see langword="null" /> when wildcard matching is off
+/// (BL-2478, ADR-0615).
+/// </param>
 /// <remarks>
+/// <para>
+/// Wildcard downloads (BL-2478, ADR-0615): with <paramref name="wildcardHooks" /> set, a
+/// download whose path does not end in <c>/</c> takes its last part as a pattern, as curl
+/// 8.22.0's <c>wc_statemach</c> does. The directory is listed with <c>LIST</c>, the reply fed
+/// to <see cref="FtpFileListParser" /> rather than the output, and each entry the match hook
+/// keeps is handed to the chunk-begin hook and, when a file, downloaded on the same
+/// connection with no further <c>CWD</c> and no <c>SIZE</c> (the listing's size is used),
+/// followed by the chunk-end hook. A malformed listing ends with its exit code (87 or 27)
+/// and no <c>QUIT</c>, no match with exit 78 after <c>QUIT</c>, and a failing chunk-begin
+/// hook with exit 88 and no <c>QUIT</c>.
+/// </para>
 /// <para>
 /// TLS (ADR-0102's BL-437 addendum): under <c>--ssl</c>, <c>--ftp-ssl-control</c> or
 /// <c>--ssl-reqd</c> an <c>ftp://</c> greeting is followed by <c>AUTH SSL</c>, then
@@ -137,9 +152,34 @@ internal sealed class FtpSession(
     bool implicitTls,
     FtpConnectPhaseLimit connectPhase,
     FtpStateTrace trace,
-    FtpKeptConnection? reused = null)
+    FtpKeptConnection? reused = null,
+    IFtpWildcardHooks? wildcardHooks = null)
     : IAsyncDisposable
 {
+    /// <summary>The <c>-v</c> lines of a wildcard download and the messages of its failures, as curl 8.22.0 words them.</summary>
+    private const string WildcardParsingStarted = "Wildcard - Parsing started";
+
+    private const string RemoteFileNotFoundMessage = "Remote file not found";
+
+    private const string ChunkFailedMessage = "Chunk callback failed";
+
+    private const string BadFileListMessage = "Failed to parse FTP file list";
+
+    private const string OutOfMemoryMessage = "Out of memory";
+
+    /// <summary>The parser a wildcard download's <c>LIST</c> reply goes to instead of the output; <see langword="null" /> otherwise.</summary>
+    private FtpFileListParser? listParser;
+
+    /// <summary>
+    /// Whether a wildcard download is under way: a transfer that succeeds then leaves the
+    /// control connection open for the next match rather than sending <c>QUIT</c>, and every
+    /// match after the listing needs no <c>CWD</c>.
+    /// </summary>
+    private bool wildcardUnderWay;
+
+    /// <summary>The size the listing gave the match being downloaded, which takes the place of <c>SIZE</c>; curl's <c>known_filesize</c>.</summary>
+    private long? knownFileSize;
+
     private const string AnonymousUser = "anonymous";
 
     private const string AnonymousPassword = "ftp@example.com";
@@ -384,6 +424,12 @@ internal sealed class FtpSession(
     /// </summary>
     private async ValueTask<TransferResult?> ChangeToPathDirectoryAsync(FtpUrlPath path)
     {
+        if (wildcardUnderWay && listParser is null)
+        {
+            // A wildcard match lies in the directory the listing already reached (BL-2478).
+            return null;
+        }
+
         if (reused is null)
         {
             return await ChangeDirectoriesAsync(path.Directories).ConfigureAwait(false);
@@ -717,14 +763,118 @@ internal sealed class FtpSession(
         return null;
     }
 
-    private async ValueTask<TransferResult> TransferPathAsync()
+    private ValueTask<TransferResult> TransferPathAsync() =>
+        wildcardHooks is { } hooks && context.Upload is null && !typeCode.Path.EndsWith('/')
+            ? DownloadMatchesAsync(hooks)
+            : TransferPathAsync(typeCode.Path, context.FtpFileMethod);
+
+    /// <summary>
+    /// Downloads every file of the directory whose name the URL path's last part matches,
+    /// as curl 8.22.0's <c>wc_statemach</c> does (BL-2478): the directory is listed into
+    /// <see cref="FtpFileListParser" />, then each kept entry handled in turn, and
+    /// <c>QUIT</c> sent once all are. <c>--ftp-method nocwd</c> becomes <c>multicwd</c>, as
+    /// curl's <c>init_wc_data</c> makes it.
+    /// </summary>
+    private async ValueTask<TransferResult> DownloadMatchesAsync(IFtpWildcardHooks hooks)
     {
-        if (FtpUrlPath.Parse(typeCode.Path, context.FtpFileMethod) is not { } path)
+        int patternStart = typeCode.Path.LastIndexOf('/') + 1;
+        string directory = typeCode.Path[..patternStart];
+        string pattern = typeCode.Path[patternStart..];
+        FtpFileMethod method = context.FtpFileMethod == FtpFileMethod.NoCwd ? FtpFileMethod.MultiCwd : context.FtpFileMethod;
+        context.Events.ReportInfo(WildcardParsingStarted);
+        var parser = new FtpFileListParser(name => hooks.MatchName(pattern, name) == FtpNameMatchAnswer.Match, OperatingSystem.IsWindows());
+        listParser = parser;
+        wildcardUnderWay = true;
+        TransferResult listed = await TransferPathAsync(directory, method).ConfigureAwait(false);
+        listParser = null;
+        return listed.IsSuccess
+            ? await DownloadEntriesAsync(parser, directory, method, hooks).ConfigureAwait(false)
+            : listed;
+    }
+
+    /// <summary>
+    /// Handles the listing's kept entries: a malformed listing ends with its exit code and no
+    /// <c>QUIT</c>, an empty one with exit 78 after <c>QUIT</c>; otherwise each entry in turn,
+    /// then <c>QUIT</c>, or the connection kept for the next URL.
+    /// </summary>
+    private async ValueTask<TransferResult> DownloadEntriesAsync(FtpFileListParser parser, string directory, FtpFileMethod method, IFtpWildcardHooks hooks)
+    {
+        if (parser.Failure is { } failure)
+        {
+            return TransferResult.Failure(failure, failure == CurlExitCode.OutOfMemory ? OutOfMemoryMessage : BadFileListMessage, bytesTransferred);
+        }
+
+        wildcardUnderWay = parser.Entries.Count > 0;
+        if (!wildcardUnderWay)
+        {
+            return await QuitAndFailLeavingConnectionIntactAsync(CurlExitCode.RemoteFileNotFound, RemoteFileNotFoundMessage).ConfigureAwait(false);
+        }
+
+        for (int index = 0; index < parser.Entries.Count; index++)
+        {
+            if (await DownloadEntryAsync(parser.Entries[index], parser.Entries.Count - index, directory, method, hooks).ConfigureAwait(false) is { } ended)
+            {
+                return ended;
+            }
+        }
+
+        wildcardUnderWay = false;
+        await EndControlConnectionAsync(keepsConnection: true).ConfigureAwait(false);
+        return TransferResult.Success(bytesTransferred);
+    }
+
+    /// <summary>
+    /// Hands one entry to the chunk-begin hook and downloads it when the hook says so and it
+    /// is a file, then calls the chunk-end hook, whose answer curl ignores.
+    /// </summary>
+    /// <returns><see langword="null" /> to go on to the next entry, or how the download ended.</returns>
+    private async ValueTask<TransferResult?> DownloadEntryAsync(FtpFileListEntry entry, int remaining, string directory, FtpFileMethod method, IFtpWildcardHooks hooks)
+    {
+        context.Events.ReportInfo($"Wildcard - START of \"{entry.FileName}\"");
+        FtpChunkBeginAnswer answer = hooks.BeginChunk(entry, remaining);
+        if (answer == FtpChunkBeginAnswer.Fail)
+        {
+            return TransferResult.Failure(CurlExitCode.ChunkFailed, ChunkFailedMessage, bytesTransferred);
+        }
+
+        if (answer == FtpChunkBeginAnswer.Skip)
+        {
+            context.Events.ReportInfo($"Wildcard - \"{entry.FileName}\" skipped by user");
+        }
+
+        TransferResult? ended = answer == FtpChunkBeginAnswer.Skip || entry.FileType != FtpFileType.File
+            ? null
+            : await DownloadMatchAsync(directory + entry.FileName, method, entry.Size).ConfigureAwait(false);
+        hooks.EndChunk();
+        return ended;
+    }
+
+    /// <summary>
+    /// Downloads one match as a transfer of its own on the open connection, with the size the
+    /// listing gave it in place of <c>SIZE</c>, as curl's next <c>ftp_do</c> does.
+    /// </summary>
+    /// <returns><see langword="null" /> when it succeeded, otherwise how the download ended.</returns>
+    private async ValueTask<TransferResult?> DownloadMatchAsync(string urlPath, FtpFileMethod method, long? size)
+    {
+        await DisposeIfOpenAsync(dataConnection).ConfigureAwait(false);
+        await DisposeIfOpenAsync(pendingConnection).ConfigureAwait(false);
+        dataConnection = null;
+        pendingConnection = null;
+        bytesTransferred = 0;
+        expectedSize = null;
+        knownFileSize = size;
+        TransferResult got = await TransferPathAsync(urlPath, method).ConfigureAwait(false);
+        return got.IsSuccess ? null : got;
+    }
+
+    private async ValueTask<TransferResult> TransferPathAsync(string urlPath, FtpFileMethod method)
+    {
+        if (FtpUrlPath.Parse(urlPath, method) is not { } path)
         {
             return TransferResult.Failure(CurlExitCode.UrlMalformat, FtpTransferMessages.PathHasControlCharacters);
         }
 
-        log.PathWalk(context.FtpFileMethod, path.Directories.Count);
+        log.PathWalk(method, path.Directories.Count);
         rememberedDirectory = string.Concat(path.Directories.Select(directory => directory + "/"));
         directoryToRemember = path.DirectoryToRemember;
         return context.Upload is { } upload
@@ -1699,6 +1849,13 @@ internal sealed class FtpSession(
     /// </summary>
     private async ValueTask<TransferResult?> ReadSizeAsync(string fileName, bool skipped)
     {
+        if (knownFileSize is { } known)
+        {
+            // A wildcard match's size came with the listing, so curl sends no SIZE (upstream test574, BL-2478).
+            fileSize = known;
+            return null;
+        }
+
         if (skipped)
         {
             return null;
@@ -1897,6 +2054,13 @@ internal sealed class FtpSession(
             return null;
         }
 
+        if (listParser is { } parser)
+        {
+            // A wildcard download's listing is parsed, not written (BL-2478).
+            parser.Read(bytes.Span);
+            return null;
+        }
+
         try
         {
             await context.Output.WriteAsync(bytes, context.CancellationToken).ConfigureAwait(false);
@@ -2083,6 +2247,12 @@ internal sealed class FtpSession(
     /// </summary>
     private async ValueTask<TransferResult> QuitAfterPostQuotesAsync((FtpQuoteCommand Command, int Code)? refused, bool keepsConnection = true)
     {
+        if (wildcardUnderWay && refused is null)
+        {
+            // The next wildcard match goes over the same connection, QUIT once all are done (BL-2478).
+            return TransferResult.Success(bytesTransferred);
+        }
+
         await EndControlConnectionAsync(keepsConnection && refused is null).ConfigureAwait(false);
         return refused is { } quote
             ? TransferResult.Failure(CurlExitCode.QuoteError, FtpTransferMessages.QuoteNotAccepted(quote.Command.Command), bytesTransferred)

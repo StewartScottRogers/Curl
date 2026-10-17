@@ -152,6 +152,17 @@ internal static class TransferInfoFromReport
             .Select(header => long.TryParse(header.Value.Trim(), out long length) ? length : -1)
             .LastOrDefault(-1);
 
+    /// <summary>
+    /// The scheme <c>%{scheme}</c> prints for a transfer of <paramref name="requestUrl" />: the URL's, in lower case, or
+    /// <see langword="null" /> (printed as nothing) when the URL cannot be parsed or no handler serves its scheme, as
+    /// curl 8.21.0 prints it for <c>dict://exa mple.com/</c> and <c>xyz://a/b</c>.
+    /// </summary>
+    /// <param name="requestUrl">The URL, with any <c>-G</c> / <c>--url-query</c> query.</param>
+    /// <param name="result">The transfer's result.</param>
+    /// <returns>The scheme, or <see langword="null" />.</returns>
+    internal static string? RequestSchemeOf(string requestUrl, TransferResult result) =>
+        result.ExitCode != CurlExitCode.UnsupportedProtocol ? SchemeOf(requestUrl) : null;
+
     private static string? SchemeOf(string effectiveUrl) =>
         CurlUrl.TryParse(effectiveUrl, pathAsIs: false, out CurlUrl? url) ? url.Scheme : null;
 

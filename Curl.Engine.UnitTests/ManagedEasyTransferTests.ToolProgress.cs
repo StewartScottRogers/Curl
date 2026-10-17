@@ -12,8 +12,8 @@ namespace Curl.Engine;
 
 /// <summary>
 /// Pins <see cref="ManagedEasyTransfer.ToolProgress" /> (BL-2398, ADR-0567): a perform from the options with the curl
-/// tool's progress set reports the same progress sequence as the same attempt the runner sets up and runs through
-/// <see cref="ManagedEasyTransfer.ToolAttempt" />, calls no progress callback, starts fresh <c>-Y</c>/<c>-y</c> and
+/// tool's progress set reports the same progress sequence as the same attempt performed directly on the runner's
+/// own context (<see cref="TransferPerformer.FollowWatchingSpeedAsync" />), calls no progress callback, starts fresh <c>-Y</c>/<c>-y</c> and
 /// <c>-m</c> watchdogs on every perform, so a stalled attempt ends with the runner's exit 28 text, and stops on the
 /// runner's abort token.
 /// </summary>
@@ -22,7 +22,7 @@ public sealed partial class ManagedEasyTransferTests
     private const string ProgressResponse = "HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nhello";
 
     [TestMethod]
-    public async Task PerformAsync_ToolProgressSet_ReportsTheProgressSequenceTheToolAttemptReports()
+    public async Task PerformAsync_ToolProgressSet_ReportsTheProgressSequenceTheRunnersContextReports()
     {
         int callbackCalls = 0;
         EasyOptions options = new()
@@ -38,14 +38,11 @@ public sealed partial class ManagedEasyTransferTests
         CurlCode code = await easy.PerformAsync(CancellationToken.None);
 
         RecordingToolProgress fromAttempt = new();
-        await using ManagedEasyTransfer runner = (ManagedEasyTransfer)CreateEngine(new ScriptedConnector([Encoding.ASCII.GetBytes(ProgressResponse)])).CreateEasy();
-        runner.Options = options;
-        runner.ToolAttempt = new ToolAttempt(
+        await TransferPerformer.FollowWatchingSpeedAsync(
             new EngineTransferState(),
             new RedirectFollower(CreateDispatcher(new ScriptedConnector([Encoding.ASCII.GetBytes(ProgressResponse)]), null)),
             RunnersContext(options, TimeProvider.System, progress: fromAttempt),
             new RedirectPolicy());
-        await runner.PerformAsync(CancellationToken.None);
 
         Assert.AreEqual(CurlCode.Ok, code);
         Assert.Contains("downloaded:5/5", fromOptions.Log);
@@ -54,7 +51,7 @@ public sealed partial class ManagedEasyTransferTests
     }
 
     [TestMethod]
-    public async Task PerformAsync_ToolProgressSetAndStalledPastMaxTime_EndsWithTheToolAttemptsExit28Text()
+    public async Task PerformAsync_ToolProgressSetAndStalledPastMaxTime_EndsWithTheRunnersContextsExit28Text()
     {
         EasyOptions options = new() { Network = new EasyNetworkOptions { Url = "http://h/x" }, Transfer = new EasyTransferOptions { Timeout = TimeSpan.FromSeconds(1) } };
         SteppingTimeProvider clock = new();
@@ -71,9 +68,7 @@ public sealed partial class ManagedEasyTransferTests
         StallingProtocolHandler runnerHandler = new();
         TransferPerformer performer = new(runnerClock, _ => string.Empty);
         EngineTransferState state = new();
-        await using ManagedEasyTransfer runner = EasyOn(runnerClock, runnerHandler);
-        runner.Options = options;
-        runner.ToolAttempt = new ToolAttempt(
+        Task<TransferResult> attempt = TransferPerformer.FollowWatchingSpeedAsync(
             state,
             new RedirectFollower(new ProtocolDispatcher([runnerHandler])),
             RunnersContext(
@@ -82,15 +77,14 @@ public sealed partial class ManagedEasyTransferTests
                 lowSpeedWatchdog: performer.StartLowSpeedWatchdog(state, options.Transfer, NoDiagnosticLog.Instance),
                 maxTimeWatchdog: performer.StartMaxTimeWatchdog(state, options.Transfer, NoDiagnosticLog.Instance)),
             new RedirectPolicy());
-        Task<CurlCode> attempt = runner.PerformAsync(CancellationToken.None).AsTask();
         await runnerHandler.Stalled;
         runnerClock.Advance(TimeSpan.FromSeconds(1));
-        CurlCode attemptCode = await attempt;
+        TransferResult attemptResult = await attempt;
 
         Assert.AreEqual(CurlCode.OperationTimedOut, code);
         Assert.AreEqual("Connection timed out after 1000 milliseconds", easy.ErrorText);
-        Assert.AreEqual(attemptCode, code);
-        Assert.AreEqual(runner.ErrorText, easy.ErrorText);
+        Assert.AreEqual(attemptResult.ExitCode.ToCurlCode(), code);
+        Assert.AreEqual(attemptResult.ErrorMessage, easy.ErrorText);
     }
 
     [TestMethod]

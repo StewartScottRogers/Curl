@@ -14,8 +14,8 @@ namespace Curl.Engine;
 /// <param name="timeProvider">The clock the watchdogs and the serial attempt start are read on.</param>
 /// <param name="easyErrorText">
 /// Curl's easy error text for each exit code, which the known-hosts and cookie-line failures carry:
-/// <c>Curl.Console</c>'s <c>CurlEasyErrorText.Of</c> in production, as that table stays in
-/// <c>Curl.Console</c>, where <c>Gap/</c> tooling reads it by path (BL-2291).
+/// <c>CurlEasyErrorText.Of</c> in production, which lives in <c>Libcurl/Misc/ErrorText</c> and
+/// which <c>Curl.Console</c> passes in (BL-2291, BL-2450).
 /// </param>
 internal sealed partial class TransferPerformer(TimeProvider timeProvider, Func<CurlExitCode, string> easyErrorText)
 {

@@ -34,6 +34,7 @@ using Curl.Protocol.Ssh.Negotiation;
 using Curl.Protocol.Telnet;
 using Curl.Protocol.Tftp;
 using Curl.Protocol.Ws;
+using Libcurl.Misc.ErrorText;
 using static Curl.Engine.EngineComposition;
 
 namespace Curl.Console;
