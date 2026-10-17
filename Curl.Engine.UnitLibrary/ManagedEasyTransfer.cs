@@ -353,17 +353,30 @@ internal sealed class ManagedEasyTransfer(
         }
 
         performShare = share;
-        attachedShared = share.Attach(this, shared);
+        attachedShared = share.Attach(this, shared, Options.Http.CookieFiles.Count > 0, ShareHostKeyOf(Options));
         try
         {
             return await PerformFromOptionsOverCachesAsync(cancellationToken).ConfigureAwait(false);
         }
         finally
         {
+            share.LockDnsAtDone(this);
             performShare = null;
             attachedShared = null;
         }
     }
+
+    /// <summary>
+    /// The <c>host:port</c> a perform from <paramref name="options" /> resolves, which a share handle sharing DNS
+    /// looks up and adds under its lock (<see cref="ManagedShareHandle.Attach" />); <see langword="null" /> when no URL
+    /// is set or it does not parse.
+    /// </summary>
+    /// <param name="options">The handle's options.</param>
+    /// <returns>The name, or <see langword="null" />.</returns>
+    internal static string? ShareHostKeyOf(EasyOptions options) =>
+        options.Network.Url is { } urlText && CurlUrl.TryParse(urlText, options.Network.PathAsIs, out CurlUrl? url)
+            ? string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{url.IdnHost}:{url.Port}")
+            : null;
 
     /// <summary>
     /// The cookie store the transfer's HTTP handler keeps: <paramref name="cookies" />' own, under the share

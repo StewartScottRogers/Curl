@@ -29,6 +29,9 @@ internal sealed class ManagedShareHandle(TimeProvider timeProvider) : IShareHand
 
     private readonly HashSet<CurlLockData> sharedKinds = [];
 
+    /// <summary>The <c>host:port</c> names attached performs have resolved while DNS was shared, as libcurl's shared DNS cache holds them.</summary>
+    private readonly HashSet<string> resolvedHosts = new(StringComparer.OrdinalIgnoreCase);
+
     private ShareLockCallback? lockCallback;
 
     private ShareUnlockCallback? unlockCallback;
@@ -141,12 +144,17 @@ internal sealed class ManagedShareHandle(TimeProvider timeProvider) : IShareHand
     /// <summary>
     /// Gives <paramref name="engine" />'s state for one perform of an attached transfer, with each cache this handle
     /// shares in place of the engine's, taking each one under its kind's lock, the public suffix list first when it is
-    /// shared. A handle already cleaned up shares nothing.
+    /// shared. The cookies and DNS cache are taken as curl 8.22.0's perform takes them (upstream test506): the cookie
+    /// lock once for loading <c>CURLOPT_COOKIEFILE</c>'s files when <paramref name="loadsCookieFiles" /> and once more,
+    /// then the DNS lock once to prune the cache, once to look <paramref name="hostKey" /> up and, the first time the
+    /// handle sees it, once more to add it (<see cref="TakeDns" />). A handle already cleaned up shares nothing.
     /// </summary>
     /// <param name="transfer">The transfer about to perform.</param>
     /// <param name="engine">The transfer's engine's state.</param>
+    /// <param name="loadsCookieFiles">Whether the transfer loads cookie files before it connects.</param>
+    /// <param name="hostKey">The <c>host:port</c> the transfer resolves, or <see langword="null" /> when its URL does not parse.</param>
     /// <returns>The state the perform runs over.</returns>
-    internal ManagedEngineSharedState Attach(IEasyTransfer transfer, ManagedEngineSharedState engine)
+    internal ManagedEngineSharedState Attach(IEasyTransfer transfer, ManagedEngineSharedState engine, bool loadsCookieFiles, string? hostKey)
     {
         lock (gate)
         {
@@ -156,14 +164,69 @@ internal sealed class ManagedShareHandle(TimeProvider timeProvider) : IShareHand
             }
 
             _ = TakeShared(transfer, CurlLockData.Psl, own: true, engine: false);
+            ConnectionCache connections = TakeShared(transfer, CurlLockData.Connect, Connections, engine.Connections);
+            TlsSessionCache tlsSessions = TakeShared(transfer, CurlLockData.SslSession, TlsSessions, engine.TlsSessions);
+            CookieStore cookies = TakeCookies(transfer, loadsCookieFiles, engine.Cookies);
             return new ManagedEngineSharedState(
                 engine,
-                TakeShared(transfer, CurlLockData.Connect, Connections, engine.Connections),
-                TakeShared(transfer, CurlLockData.SslSession, TlsSessions, engine.TlsSessions),
-                TakeShared(transfer, CurlLockData.Dns, DnsCache, engine.DnsCache),
-                TakeShared(transfer, CurlLockData.Cookie, Cookies, engine.Cookies),
+                connections,
+                tlsSessions,
+                TakeDns(transfer, hostKey, engine.DnsCache),
+                cookies,
                 TakeShared(transfer, CurlLockData.Hsts, Hsts, engine.Hsts));
         }
+    }
+
+    /// <summary>
+    /// Calls the <see cref="CurlLockData.Dns" /> lock and unlock callbacks once while this handle shares DNS, as curl
+    /// 8.22.0 unlinks the connection's DNS entry once a perform is done (upstream test506).
+    /// </summary>
+    /// <param name="transfer">The transfer whose perform is done.</param>
+    internal void LockDnsAtDone(IEasyTransfer transfer)
+    {
+        if (Shares(CurlLockData.Dns))
+        {
+            _ = Locked(transfer, CurlLockData.Dns, () => true);
+        }
+    }
+
+    /// <summary>
+    /// The cookie store a perform uses: this handle's, after the cookie lock once for loading the cookie files when
+    /// <paramref name="loadsCookieFiles" /> and once more, while it shares cookies; else <paramref name="engine" />.
+    /// </summary>
+    /// <param name="transfer">The transfer taking it.</param>
+    /// <param name="loadsCookieFiles">Whether the transfer loads cookie files.</param>
+    /// <param name="engine">The engine's cookie store.</param>
+    /// <returns>The cookie store the transfer uses.</returns>
+    private CookieStore TakeCookies(IEasyTransfer transfer, bool loadsCookieFiles, CookieStore engine)
+    {
+        LockCookies(transfer, loadsCookieFiles ? 1 : 0);
+        return TakeShared(transfer, CurlLockData.Cookie, Cookies, engine);
+    }
+
+    /// <summary>
+    /// The DNS cache a perform uses: this handle's, after the DNS lock to prune it and, for a URL that parsed, to look
+    /// <paramref name="hostKey" /> up and to add it the first time this handle sees it, while it shares DNS; else
+    /// <paramref name="engine" />.
+    /// </summary>
+    /// <param name="transfer">The transfer taking it.</param>
+    /// <param name="hostKey">The <c>host:port</c> the transfer resolves, or <see langword="null" />.</param>
+    /// <param name="engine">The engine's DNS cache.</param>
+    /// <returns>The DNS cache the transfer uses.</returns>
+    private DnsCache TakeDns(IEasyTransfer transfer, string? hostKey, DnsCache engine)
+    {
+        if (!sharedKinds.Contains(CurlLockData.Dns))
+        {
+            return engine;
+        }
+
+        int locks = hostKey is null ? 1 : resolvedHosts.Add(hostKey) ? 3 : 2;
+        for (int time = 0; time < locks; time++)
+        {
+            _ = Locked(transfer, CurlLockData.Dns, () => time);
+        }
+
+        return DnsCache;
     }
 
     /// <summary>

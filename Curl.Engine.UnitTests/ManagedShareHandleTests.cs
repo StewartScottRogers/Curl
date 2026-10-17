@@ -177,14 +177,66 @@ public sealed class ManagedShareHandleTests
         await PerformAsync(engine, "http://example.com/a", share);
 
         CollectionAssert.AreEqual(
-            new[] { "lock Share Single True", "unlock Share True", "lock Dns Single True", "unlock Dns True", "lock Cookie Single True", "unlock Cookie True" },
-            calls.Take(6).ToArray());
+            new[] { "lock Share Single True", "unlock Share True", "lock Cookie Single True", "unlock Cookie True" },
+            calls.Take(4).ToArray());
         CollectionAssert.AreEqual(new[] { "lock Share Single True", "unlock Share True" }, calls.TakeLast(2).ToArray());
         Assert.IsGreaterThan(8, calls.Count);
         for (int call = 0; call < calls.Count; call += 2)
         {
             Assert.AreEqual(calls[call].Replace("lock ", "unlock ", StringComparison.Ordinal).Replace(" Single", string.Empty, StringComparison.Ordinal), calls[call + 1]);
         }
+    }
+
+    [TestMethod]
+    public async Task PerformAsync_CookiesAndDnsShared_LocksInLibcurlsOrderAndLooksAHostUpOnceAddedOnce()
+    {
+        ScriptedConnector connector = new([Encoding.ASCII.GetBytes(SetsCookie), Encoding.ASCII.GetBytes(SetsCookie)]);
+        await using ManagedCurlEngine engine = CreateEngine(connector);
+        IShareHandle share = engine.CreateShare();
+        share.Share(CurlLockData.Cookie);
+        share.Share(CurlLockData.Dns);
+        List<string> calls = [];
+        share.SetLockCallback((_, data, _) => calls.Add(data.ToString()));
+
+        await PerformAsync(engine, "http://example.com/a", share);
+        int firstPerform = calls.Count;
+        await PerformAsync(engine, "http://example.com/b", share);
+
+        string[] expectedFirst =
+        [
+            "Share", "Cookie", "Cookie", "Dns", "Dns", "Dns", "Cookie", "Cookie", "Dns", "Cookie", "Share",
+        ];
+        CollectionAssert.AreEqual(expectedFirst, calls.Take(firstPerform).ToArray());
+        string[] expectedSecond = ["Share", "Cookie", "Cookie", "Dns", "Dns", "Cookie", "Cookie", "Dns", "Cookie", "Share"];
+        CollectionAssert.AreEqual(expectedSecond, calls.Skip(firstPerform).ToArray());
+    }
+
+    [TestMethod]
+    public async Task PerformAsync_DnsSharedAndUrlMalformed_PrunesAndUnlinksWithoutALookUp()
+    {
+        ScriptedConnector connector = new([]);
+        await using ManagedCurlEngine engine = CreateEngine(connector);
+        IShareHandle share = engine.CreateShare();
+        share.Share(CurlLockData.Dns);
+        List<string> calls = [];
+        share.SetLockCallback((_, data, _) => calls.Add(data.ToString()));
+
+        CurlCode code = await PerformAsync(engine, "http://[x/", share);
+
+        Assert.AreEqual(CurlCode.UrlMalformat, code);
+        CollectionAssert.AreEqual(new[] { "Share", "Dns", "Dns", "Share" }, calls);
+    }
+
+    [TestMethod]
+    public void ShareHostKeyOf_UrlSetOrNot_GivesTheHostAndPortOrNone()
+    {
+        string? parsed = ManagedEasyTransfer.ShareHostKeyOf(new EasyOptions { Network = new EasyNetworkOptions { Url = "http://Example.com/a" } });
+        string? malformed = ManagedEasyTransfer.ShareHostKeyOf(new EasyOptions { Network = new EasyNetworkOptions { Url = "http://[x/" } });
+        string? none = ManagedEasyTransfer.ShareHostKeyOf(new EasyOptions());
+
+        Assert.AreEqual("example.com:80", parsed, ignoreCase: true);
+        Assert.IsNull(malformed);
+        Assert.IsNull(none);
     }
 
     [TestMethod]
