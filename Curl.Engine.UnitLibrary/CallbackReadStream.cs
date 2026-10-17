@@ -1,6 +1,7 @@
 using Curl.Api.Callbacks;
 using Curl.Api.EngineContracts;
 using Curl.Protocol.Abstractions;
+using Curl.Protocol.Ws;
 
 namespace Curl.Engine;
 
@@ -18,11 +19,16 @@ namespace Curl.Engine;
 /// <see cref="SeekingCallbackReadStream" /> adds the seek callback that rewinds it. With
 /// <see cref="Trailer" /> set (<c>CURLOPT_TRAILERFUNCTION</c>), the HTTP handler asks it, through
 /// <see cref="IUploadTrailerSource" />, for a chunked upload's trailers once the body's end is read (BL-2475).
+/// With <see cref="UploadFrames" /> set, a WebSocket upload goes out read by read in those frames, which
+/// <c>curl_ws_start_frame</c> inside the callback starts (<see cref="IWsUploadFrameSource" />, BL-2611).
 /// </summary>
 /// <param name="callback">The read callback.</param>
 /// <param name="pauseGate">The handle's pause state, or <see langword="null" /> when the transfer cannot pause.</param>
-internal class CallbackReadStream(ReadCallback callback, EasyPauseGate? pauseGate = null) : Stream, IUploadTrailerSource
+internal class CallbackReadStream(ReadCallback callback, EasyPauseGate? pauseGate = null) : Stream, IUploadTrailerSource, IWsUploadFrameSource
 {
+    /// <inheritdoc />
+    public WsUploadFrames? UploadFrames { get; init; }
+
     /// <summary>libcurl's text for a read callback that returned more than it was asked for.</summary>
     internal const string FunnyValueText = "read function returned funny value";
 

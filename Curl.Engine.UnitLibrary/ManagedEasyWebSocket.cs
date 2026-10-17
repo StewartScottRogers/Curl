@@ -64,6 +64,12 @@ internal sealed class ManagedEasyWebSocket(Func<bool> isConnectOnly, Func<WebSoc
     public CurlWebSocketFrame? CurrentFrame { get; private set; }
 
     /// <summary>
+    /// Gets the frames a read-callback upload of a perform that is not connect-only goes out in, which
+    /// <see cref="StartFrameAsync" /> starts frames in while the upload is sent (BL-2611, ADR-0669).
+    /// </summary>
+    internal WsUploadFrames UploadFrames { get; } = new();
+
+    /// <summary>
     /// Closes the connection open now, if any, keeps <paramref name="upgraded" /> in its place and decodes
     /// <paramref name="alreadyReceived" />, the bytes that came with the <c>101</c>, answering a ping among them.
     /// </summary>
@@ -137,9 +143,9 @@ internal sealed class ManagedEasyWebSocket(Func<bool> isConnectOnly, Func<WebSoc
     /// <c>curl_ws_start_frame</c> as <c>lib/ws.c</c>: under <c>CURLWS_RAW_MODE</c> <see cref="CurlCode.FailedInit" />;
     /// with no upgraded connection, a frame still unfinished or a negative length <see cref="CurlCode.SendError" />;
     /// bits naming no frame <see cref="CurlCode.BadFunctionArgument" />; otherwise it writes the frame's head announcing
-    /// <paramref name="frameLength" /> bytes, which the following sends supply. libcurl checks no callback, so the call
-    /// behaves the same inside a read callback and outside one; the engine runs WebSocket transfers only connect-only,
-    /// where no read callback is called (ADR-0665).
+    /// <paramref name="frameLength" /> bytes, which the following sends supply (ADR-0665). On a perform that is not
+    /// connect-only the head goes to <see cref="UploadFrames" /> instead, so a read callback that calls it starts the
+    /// frame its bytes fill; outside an upload being sent it answers <see cref="CurlCode.SendError" /> (BL-2611, ADR-0669).
     /// </remarks>
     public async ValueTask<CurlCode> StartFrameAsync(CurlWebSocketFlags flags, long frameLength, CancellationToken cancellationToken)
     {
@@ -147,6 +153,11 @@ internal sealed class ManagedEasyWebSocket(Func<bool> isConnectOnly, Func<WebSoc
         if ((options() & WebSocketOptionBits.RawMode) != 0)
         {
             return CurlCode.FailedInit;
+        }
+
+        if (!isConnectOnly())
+        {
+            return StartUploadFrame(flags, frameLength);
         }
 
         if (UsableConnection(out IConnection? live) != CurlCode.Ok)
@@ -161,6 +172,30 @@ internal sealed class ManagedEasyWebSocket(Func<bool> isConnectOnly, Func<WebSoc
         }
 
         return await TryWriteAsync(live!, head).ConfigureAwait(false) ? CurlCode.Ok : CurlCode.SendError;
+    }
+
+    /// <summary>
+    /// Starts a frame of the upload a perform that is not connect-only is sending, as <c>curl_ws_start_frame</c> writes
+    /// its head to <c>ws->sendbuf</c> for <c>cr_ws_read</c>: <see cref="CurlCode.SendError" /> for a negative length,
+    /// no upload being sent or a frame unfinished, <see cref="CurlCode.BadFunctionArgument" /> for bits naming no frame.
+    /// </summary>
+    /// <param name="flags">The frame's bits.</param>
+    /// <param name="frameLength">The frame's whole payload size.</param>
+    /// <returns>Whether the frame started.</returns>
+    private CurlCode StartUploadFrame(CurlWebSocketFlags flags, long frameLength)
+    {
+        if (frameLength < 0 || !UploadFrames.CanStartFrame)
+        {
+            return CurlCode.SendError;
+        }
+
+        if (!WebSocketFrameFlags.TryFrameOf(flags & ~CurlWebSocketFlags.Offset, UploadFrames.ContinuesMessage, out WsOpcode opcode, out bool isFinal))
+        {
+            return CurlCode.BadFunctionArgument;
+        }
+
+        UploadFrames.StartFrame(opcode, isFinal, frameLength, randomSource);
+        return CurlCode.Ok;
     }
 
     /// <summary>
