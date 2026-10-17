@@ -32,3 +32,4 @@ Found by BL-2528 (lib515 port). curl 8.22.0 sends `POST /515 HTTP/1.1` with `Con
 ## Log
 
 - 2026-10-17: Created.
+- 2026-10-17: Backlog -> Doing. Criteria at claim: 1577eda6 580ce1a6 4272a6b9 c84701f0.
