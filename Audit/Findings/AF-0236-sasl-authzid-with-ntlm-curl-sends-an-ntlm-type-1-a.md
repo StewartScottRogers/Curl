@@ -3,8 +3,8 @@ id: AF-0236
 title: --sasl-authzid with --ntlm: curl sends an NTLM Type-1 Authorization header over HTTP, Curl sends none
 auditor: conformance
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: conformance:Curl.Engine.UnitLibrary/HttpRequestOptionsMapping.cs:--sasl-authzid:request
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ dotnet build Curl.Console -c Release -v q; foreach ($c in @('C:\Program Files\Gi
 ## Log
 
 - 2026-10-16: filed proposed.
+- 2026-10-16: proposed -> accepted.
