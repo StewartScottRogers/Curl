@@ -34,3 +34,4 @@ libtest program `lib557.c` (curl 8.22.0 `tests/libtest/lib557.c`, case 557) exer
 ## Log
 
 - 2026-10-17: Created.
+- 2026-10-17: Backlog -> Doing. Criteria at claim: 287a28d7 8c5bea17 dcc6c724 4272a6b9.
