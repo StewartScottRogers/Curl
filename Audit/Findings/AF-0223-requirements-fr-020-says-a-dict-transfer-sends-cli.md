@@ -3,8 +3,8 @@ id: AF-0223
 title: Requirements FR-020 says a dict:// transfer sends CLIENT libcurl 8.21.0; the code sends CLIENT libcurl 8.22.0
 auditor: truthfulness
 severity: High
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-16_1623.md: the reproduction no longer reproduces.
 key: truthfulness:Documentation/Product/Requirements.md:FR-020:false-statement
 reproduction: none
 task: BL-2276
@@ -13,9 +13,9 @@ found: 2026-10-15
 found-at: 3e1062e68644127a82ba2f5ef33ceb1044cc6f67
 scorecard: 2026-10-15_0156.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-16
+closed-how: reliable-reaudit
+closed-by: 2026-10-16_1623.md
 ---
 # AF-0223 - Requirements FR-020 says a dict:// transfer sends CLIENT libcurl 8.21.0; the code sends CLIENT libcurl 8.22.0
 
@@ -42,7 +42,10 @@ Select-String -Path Documentation/Product/Requirements.md -Pattern 'CLIENT libcu
 
 ## Re-audits
 
+- 2026-10-16 | 2026-10-16_1623.md | reproduces: no | Ran the reproduction: no line number is printed (no 'CLIENT libcurl 8.21.0' in Requirements.md), then 'public const string ClientLine = "CLIENT libcurl 8.22.0";'. Requirements.md:66 FR-020 now says 'CLIENT libcurl 8.22.0\r\n', which matches the code.
+
 ## Log
 
 - 2026-10-15: filed proposed.
 - 2026-10-15: proposed -> accepted.
+- 2026-10-16: accepted -> closed. Re-audit 2026-10-16_1623.md: the reproduction no longer reproduces.

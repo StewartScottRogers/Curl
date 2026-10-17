@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: truthfulness:CLAUDE.md:repository-layout-project-count:false-statement
 reproduction: none
-task: BL-2277
-tasks: BL-2277
+task: BL-2562
+tasks: BL-2277, BL-2562
 found: 2026-10-15
 found-at: 3e1062e68644127a82ba2f5ef33ceb1044cc6f67
 scorecard: 2026-10-15_0156.md
@@ -41,6 +41,8 @@ Run from the repository root:
 - Actual: 79, and the CLAUDE.md line reads '... 75 projects, one flat alphabetical run'
 
 ## Re-audits
+
+- 2026-10-16 | 2026-10-16_1623.md | reproduces: yes | Ran the reproduction: 93, then '... 84 projects, one flat alphabetical run'. The count in CLAUDE.md changed (from 75 to 84), but it still does not match the 93 .csproj entries in Curl.slnx. 93 csproj files are also on disk (ls */*.csproj).
 
 ## Log
 

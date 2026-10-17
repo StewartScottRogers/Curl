@@ -3,8 +3,8 @@ id: AF-0222
 title: TcpDialer.Connected's NetworkStream ownsSocket: true can become false with no test failing, so a dialed socket is never closed on dispose
 auditor: quality
 severity: Medium
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-16_1623.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
 key: quality:Curl.Networking.UnitLibrary/TcpDialer.cs:Connected-true:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/TcpDialer.cs:228:true
 task: BL-2275
@@ -13,9 +13,9 @@ found: 2026-10-15
 found-at: 3e1062e68644127a82ba2f5ef33ceb1044cc6f67
 scorecard: 2026-10-15_0156.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-16
+closed-how: mechanical
+closed-by: 2026-10-16_1623.md
 ---
 # AF-0222 - TcpDialer.Connected's NetworkStream ownsSocket: true can become false with no test failing, so a dialed socket is never closed on dispose
 
@@ -42,7 +42,10 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Netwo
 
 ## Re-audits
 
+- 2026-10-16 | 2026-10-16_1623.md | reproduces: no | Ran 'Invoke-MutationTest.ps1 -Site Curl.Networking.UnitLibrary/TcpDialer.cs:228:true -Member Connected -ExcludeBaselineFailures -TimeoutSeconds 600': resolvedLine 228, mutant 'new NetworkStream(socket, ownsSocket: false)', outcome killed (8328 ms). The baseline left out 3 failing ECH tests, which are unrelated to TcpDialer. Runner's targeted mutation rerun on the clean audited commit: killed.
+
 ## Log
 
 - 2026-10-15: filed proposed.
 - 2026-10-15: proposed -> accepted.
+- 2026-10-16: accepted -> closed. Re-audit 2026-10-16_1623.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.

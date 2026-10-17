@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: process:logs:CI-run-38700283564:ci-red
 reproduction: none
-task: BL-2280
-tasks: BL-2280
+task: BL-2564
+tasks: BL-2280, BL-2564
 found: 2026-10-15
 found-at: 3e1062e68644127a82ba2f5ef33ceb1044cc6f67
 scorecard: 2026-10-15_0156.md
@@ -41,6 +41,8 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 - Actual: ciRedMinutes 170.52; spell 07:50:16Z to 08:17:06Z, 26.83 min, runId 38700283564.
 
 ## Re-audits
+
+- 2026-10-16 | 2026-10-16_1623.md | reproduces: yes | Ran the reproduction: the earlier window still shows 07:50:16Z-08:17:06Z, 26.83 min, run 38700283564 on 639a0aec. By mechanism over this window (ciRedMinutes 181.44 > 60), the Quality gates (windows-latest) job went red again on a lane commit: run 38876049958 on 241c183e, 103.15 min (2026-10-16T09:02:13Z-10:45:22Z). The cause was a Libcurl CurlMulti.SetOption branch gap that a lane had landed; it was fixed by BL-2467 at 03:01:55 local (DarkFactory-20261015-200601-L1.log:437).
 
 ## Log
 

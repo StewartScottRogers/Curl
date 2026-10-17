@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: process:logs:CI-run-38682338635:ci-red
 reproduction: none
-task: BL-2279
-tasks: BL-2279
+task: BL-2563
+tasks: BL-2279, BL-2563
 found: 2026-10-15
 found-at: 3e1062e68644127a82ba2f5ef33ceb1044cc6f67
 scorecard: 2026-10-15_0156.md
@@ -41,6 +41,8 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 - Actual: Spell 04:54:01Z to 05:25:26Z, 31.42 min, runId 38682338635; 'not merged: CI failure on 8d33753' and 'filed: regression test203 on Linux+macOS'.
 
 ## Re-audits
+
+- 2026-10-16 | 2026-10-16_1623.md | reproduces: yes | Ran the reproduction: the earlier window still shows 04:54:01Z-05:25:26Z, 31.42 min, run 38682338635, and DarkFactory-20261014-172412.log:55-58 'not merged: CI failure on 8d33753' / 'filed: regression test203 on Linux+macOS'. By mechanism over this window, the same cause crosses the rule again. A lane commit tested only on Windows failed on Linux+macOS: BL-2328's 1c068661 (lane L1, pushed 14:18:11 local) broke OpenForWriteAsync_ParentIsAFileOnPosix_IsNotADirectory, and CI was red for 36.28 min (run 38808821626, 2026-10-15T21:27:53Z-22:04:10Z). The shift ended 'not merged: CI failure on f4a49d2' (DarkFactory-20261015-062423.log:98).
 
 ## Log
 
