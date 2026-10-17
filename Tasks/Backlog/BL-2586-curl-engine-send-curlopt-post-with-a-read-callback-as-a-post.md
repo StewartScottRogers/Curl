@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Engine.UnitLibrary, Curl.Engine.UnitTests]
+touches: [Curl.Engine.UnitLibrary, Curl.Engine.UnitTests, Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
 requirement: none
 created: 2026-10-17
 completed:
@@ -28,7 +28,10 @@ Found by BL-2527 running test508 through the ported `lib508`: `<verify><protocol
 
 ## Notes
 
+- 2026-10-17 (lane 2): the first acceptance criterion adds test508 to `Curl.Conformance.UnitTests/PassingUpstreamCases.txt`, which `touches` did not name, so it is added. BL-2528 (in Doing) touches the same ratchet file, so the task goes back to Backlog until they no longer overlap. No code was written.
+
 ## Log
 
 - 2026-10-17: Created.
 - 2026-10-17: Backlog -> Doing. Criteria at claim: afe076da 904b57ec 3d836d5e.
+- 2026-10-17: Doing -> Backlog. touches Curl.Conformance.UnitTests/PassingUpstreamCases.txt, which BL-2528 in Doing also touches
