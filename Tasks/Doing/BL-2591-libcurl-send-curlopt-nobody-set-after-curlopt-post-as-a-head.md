@@ -36,3 +36,4 @@ Found by BL-2528 (lib514 port). curl 8.22.0 sends `HEAD /514 HTTP/1.1`; Curl sen
 - 2026-10-17: Created.
 - 2026-10-17: Backlog -> Doing. Criteria at claim: ad030c9b 995038b4 4272a6b9 c84701f0.
 - 2026-10-17: Doing -> Backlog. Touches Curl.Conformance.UnitTests/PassingUpstreamCases.txt, which BL-2595 (in Doing) holds; requeued until they no longer overlap.
+- 2026-10-17: Backlog -> Doing. Criteria at claim: ad030c9b 995038b4 4272a6b9 c84701f0.
