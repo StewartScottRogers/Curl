@@ -37,7 +37,8 @@ public sealed class TransferWriteOutVariablesFromTransferInfoTests
 
         string actual = Render(info, "time_queue", "time_namelookup", "time_connect", "time_appconnect", "time_pretransfer", "time_posttransfer", "time_starttransfer", "time_redirect", "time_total");
 
-        Show(diagnostics, "0.000001|0.001500|0.002000|0.003250|0.003300|0.003400|0.004000|0.000250|1.250000", actual);
+        diagnostics.Act("rendered", actual);
+        Assert.AreEqual("0.000001|0.001500|0.002000|0.003250|0.003300|0.003400|0.004000|0.000250|1.250000", actual);
     }
 
     [TestMethod]
@@ -51,8 +52,10 @@ public sealed class TransferWriteOutVariablesFromTransferInfoTests
         string undecoded = Render(info, TransferResult.Success(0), "size_download", "size_upload", "size_header", "size_request", "size_delivered");
         string delivered = Render(info, decoded, "size_delivered");
 
-        Show(diagnostics, "51|7|111|82|51", undecoded);
-        Show(diagnostics, "501", delivered);
+        diagnostics.Act("rendered undecoded", undecoded);
+        diagnostics.Act("rendered delivered", delivered);
+        Assert.AreEqual("51|7|111|82|51", undecoded);
+        Assert.AreEqual("501", delivered);
     }
 
     [TestMethod]
@@ -64,7 +67,8 @@ public sealed class TransferWriteOutVariablesFromTransferInfoTests
 
         string actual = Render(info, "speed_download", "speed_upload");
 
-        Show(diagnostics, "40960|12", actual);
+        diagnostics.Act("rendered", actual);
+        Assert.AreEqual("40960|12", actual);
     }
 
     [TestMethod]
@@ -80,9 +84,12 @@ public sealed class TransferWriteOutVariablesFromTransferInfoTests
         string unconnectedLocalEndText = Render(unconnectedLocalEnd, "remote_port", "local_ip", "local_port");
         string noConnectionText = Render(noConnection, "remote_ip", "remote_port", "local_ip", "local_port");
 
-        Show(diagnostics, "192.0.2.7|8443|192.0.2.1|50123", connectedText);
-        Show(diagnostics, "69||0", unconnectedLocalEndText);
-        Show(diagnostics, "|-1||-1", noConnectionText);
+        diagnostics.Act("rendered connected", connectedText);
+        diagnostics.Act("rendered unconnected local end", unconnectedLocalEndText);
+        diagnostics.Act("rendered no connection", noConnectionText);
+        Assert.AreEqual("192.0.2.7|8443|192.0.2.1|50123", connectedText);
+        Assert.AreEqual("69||0", unconnectedLocalEndText);
+        Assert.AreEqual("|-1||-1", noConnectionText);
     }
 
     [TestMethod]
@@ -106,9 +113,12 @@ public sealed class TransferWriteOutVariablesFromTransferInfoTests
         string versions = string.Join('|', new long[] { 0, 1, 2, 3, 30, 4, 29, 31, -1 }.Select(version => Render(new TransferInfo { HttpVersion = version }, "http_version")));
         string fresh = Render(new TransferInfo(), "response_code", "http_connect", "method", "content_type", "scheme");
 
-        Show(diagnostics, "404|404|200|1.1|POST|text/html|https|1|/home/u", actual);
-        Show(diagnostics, "0|1|1.1|2|3|0|0|0|0", versions);
-        Show(diagnostics, "000|000|GET||", fresh);
+        diagnostics.Act("rendered", actual);
+        diagnostics.Act("rendered versions", versions);
+        diagnostics.Act("rendered fresh", fresh);
+        Assert.AreEqual("404|404|200|1.1|POST|text/html|https|1|/home/u", actual);
+        Assert.AreEqual("0|1|1.1|2|3|0|0|0|0", versions);
+        Assert.AreEqual("000|000|GET||", fresh);
     }
 
     [TestMethod]
@@ -120,7 +130,8 @@ public sealed class TransferWriteOutVariablesFromTransferInfoTests
 
         string actual = Render(info, "ssl_verify_result", "proxy_ssl_verify_result", "tls_earlydata");
 
-        Show(diagnostics, "18|20|-5", actual);
+        diagnostics.Act("rendered", actual);
+        Assert.AreEqual("18|20|-5", actual);
     }
 
     [TestMethod]
@@ -138,7 +149,8 @@ public sealed class TransferWriteOutVariablesFromTransferInfoTests
 
         string actual = Render(info, "url_effective", "redirect_url", "num_redirects", "referer", "urle.host", "urle.port", "url.host");
 
-        Show(diagnostics, "https://next.test:8443/b?c=1|https://elsewhere.test/|2|https://example.test/a|next.test|8443|example.test", actual);
+        diagnostics.Act("rendered", actual);
+        Assert.AreEqual("https://next.test:8443/b?c=1|https://elsewhere.test/|2|https://example.test/a|next.test|8443|example.test", actual);
     }
 
     [TestMethod]
@@ -151,8 +163,10 @@ public sealed class TransferWriteOutVariablesFromTransferInfoTests
         string actual = Render(info, "conn_id", "xfer_id", "num_connects");
         string fresh = Render(new TransferInfo(), "conn_id", "xfer_id");
 
-        Show(diagnostics, "3|5|1", actual);
-        Show(diagnostics, "-1|-1", fresh);
+        diagnostics.Act("rendered", actual);
+        diagnostics.Act("rendered fresh", fresh);
+        Assert.AreEqual("3|5|1", actual);
+        Assert.AreEqual("-1|-1", fresh);
     }
 
     [TestMethod]
@@ -165,7 +179,8 @@ public sealed class TransferWriteOutVariablesFromTransferInfoTests
 
         string actual = Render(variables, "exitcode", "errormsg", "url", "urlnum", "filename_effective", "num_retries", "num_headers", "num_certs");
 
-        Show(diagnostics, "7|Failed to connect|http://example.test/a|2|out.txt|1|0|0", actual);
+        diagnostics.Act("rendered", actual);
+        Assert.AreEqual("7|Failed to connect|http://example.test/a|2|out.txt|1|0|0", actual);
         Assert.IsTrue(variables.TransferFailed);
     }
 
@@ -186,9 +201,12 @@ public sealed class TransferWriteOutVariablesFromTransferInfoTests
             TlsEarlyDataSent = 50,
         };
         string properties = $"{variables.Referer}|{variables.ConnectionId}|{variables.TransferId}|{variables.SslVerifyResult}|{variables.ProxySslVerifyResult}|{variables.TlsEarlyDataSent}";
+        string rendered = Render(variables, "referer", "conn_id", "xfer_id", "ssl_verify_result", "proxy_ssl_verify_result", "tls_earlydata");
 
-        Show(diagnostics, "b|10|20|30|40|50", properties);
-        Show(diagnostics, "b|10|20|30|40|50", Render(variables, "referer", "conn_id", "xfer_id", "ssl_verify_result", "proxy_ssl_verify_result", "tls_earlydata"));
+        diagnostics.Act("properties", properties);
+        diagnostics.Act("rendered", rendered);
+        Assert.AreEqual("b|10|20|30|40|50", properties);
+        Assert.AreEqual("b|10|20|30|40|50", rendered);
     }
 
     [TestMethod]
@@ -214,10 +232,4 @@ public sealed class TransferWriteOutVariablesFromTransferInfoTests
 
     private static string Render(TransferWriteOutVariables variables, params string[] names) =>
         string.Join('|', names.Select(name => variables.TryGetVariableText(name, out string? text) ? text : "?"));
-
-    private static void Show(TestDiagnostics diagnostics, string expected, string actual)
-    {
-        diagnostics.Act("rendered", actual);
-        diagnostics.Assert("rendered", expected, actual);
-    }
 }

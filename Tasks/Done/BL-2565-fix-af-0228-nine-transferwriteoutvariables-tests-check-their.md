@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Output.UnitTests]
 requirement: none
 created: 2026-10-17
-completed:
+completed: 2026-10-17
 ---
 # BL-2565 — Fix AF-0228: Nine TransferWriteOutVariables tests check their rendered -w text only through Show, which never asserts
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Test-only change, so the feature pipeline was done directly (no production code, no quality run needed). Removed the `Show` helper, whose `diagnostics.Assert` only logged; each test now logs its rendered text with `diagnostics.Act` and checks it with `Assert.AreEqual`. Reproduction now counts 18 assertion lines (expected at least 10). Build clean; fast tests green.
 
 ## Log
 
 - 2026-10-17: Created.
 - 2026-10-17: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-17: Doing -> Done. Every TransferWriteOutVariables test now asserts its rendered -w text with Assert.AreEqual (18 assertions, was 1)
