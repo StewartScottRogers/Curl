@@ -15,13 +15,13 @@ It holds:
 - `CurlMcpPackIntegrationTests`: `dotnet pack Curl.Mcp -p:PublishAot=true`, in the configuration the
   test assembly was built in, into a temporary folder; the tool package holds `.mcp/server.json` and the
   McpServer package type (BL-2390, BL-2561).
-
-Both tests that run the SDK pass `--disable-build-servers`. Otherwise the MSBuild nodes and compiler
-server the child starts inherit its redirected output and hold it open for about 15 minutes (BL-2561).
 - `CurlMcpNativeAotIntegrationTests`: `dotnet publish Curl.Mcp -r <this machine's runtime>
   -p:PublishAot=true` once for the class, then the native binary over stdio - `initialize`,
   `tools/list` and a `transfer` call with one request header against a loopback listener (BL-2486,
   ADR-0599).
+
+Both tests that run the SDK pass `--disable-build-servers`. Otherwise the MSBuild nodes and compiler
+server the child starts inherit its redirected output and hold it open for about 15 minutes (BL-2561).
 
 `McpStdioClient` is a hand-written newline-delimited JSON-RPC client (`System.Text.Json`; the SDK
 stays in `Curl.Mcp`, ADR-0548). It runs `Curl.Mcp.dll` from this project's output through
