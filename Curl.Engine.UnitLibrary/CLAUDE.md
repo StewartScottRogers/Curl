@@ -448,3 +448,7 @@ A perform from the options with no `ToolInputs`, `EasyHttpOptions.Post` set, no 
 ## CURLOPT_NOBODY after CURLOPT_POST (BL-2591)
 
 `HttpRequestOptionsMapping.Of` sends no body when `EasyTransferOptions.NoBody` is set (`RequestBodyOf`), whatever `PostFields` or the form body hold, so a `Libcurl` handle given `CURLOPT_POSTFIELDS`, `CURLOPT_POST` and then `CURLOPT_NOBODY` 1 sends a `HEAD` with no body and no `Content-Length`, as libcurl 8.22.0 does (upstream test514); the curl tool refuses `-I` with a body, so its requests do not change. Its tests are in `ManagedEasyTransferTests` and `HttpRequestOptionsMappingTests`.
+
+## CURLOPT_POSTFIELDS NULL with CURLOPT_POSTFIELDSIZE 0 (BL-2592)
+
+A perform from the options with no `ToolInputs`, `EasyHttpOptions.Post` set, no `PostFields`, no read callback and a `PostFieldSize` of 0 posts an empty `application/x-www-form-urlencoded` body with `Content-Length: 0` (`ManagedEasyTransfer.ReadCallbackPostBodyOf`), as libcurl 8.22.0 does for `CURLOPT_POSTFIELDS` NULL and `CURLOPT_POSTFIELDSIZE` 0 (upstream test515); any other size with no read callback still sends no body. Its tests are `ManagedEasyTransferTests.ReadCallbackPost.cs`.

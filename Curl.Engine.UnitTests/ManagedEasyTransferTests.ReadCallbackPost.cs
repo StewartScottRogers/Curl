@@ -77,6 +77,21 @@ public sealed partial class ManagedEasyTransferTests
         StringAssert.EndsWith(Encoding.ASCII.GetString(connector.Written), "\r\n\r\n");
     }
 
+    [TestMethod]
+    public async Task PerformAsync_PostWithNoPostFieldsAPostFieldSizeOfZeroAndNoReadCallback_PostsAnEmptyBodyWithContentLengthZero()
+    {
+        ScriptedConnector connector = new([Encoding.ASCII.GetBytes(Response)]);
+        await using ManagedEasyTransfer easy = (ManagedEasyTransfer)CreateEngine(connector).CreateEasy();
+        easy.Options = new EasyOptions { Network = new EasyNetworkOptions { Url = "http://h/p" }, Http = new EasyHttpOptions { Post = true, PostFieldSize = 0 } };
+
+        CurlCode code = await easy.PerformAsync(CancellationToken.None);
+
+        Assert.AreEqual(CurlCode.Ok, code);
+        string written = Encoding.ASCII.GetString(connector.Written);
+        StringAssert.StartsWith(written, "POST /p HTTP/1.1\r\n");
+        StringAssert.EndsWith(written, "Content-Length: 0\r\nContent-Type: application/x-www-form-urlencoded\r\n\r\n");
+    }
+
     private static async Task<CurlCode> PerformReadCallbackPostAsync(ManagedEasyTransfer easy, EasyHttpOptions http, EasyTransferOptions transfer)
     {
         easy.Options = new EasyOptions
