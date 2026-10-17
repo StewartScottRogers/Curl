@@ -52,10 +52,16 @@ public sealed class LibTestPrograms
         new Lib517(),
         new Lib518(),
         new Lib519(),
+        LibOneVerboseTransfer.Filetime,
+        new Lib521(),
+        LibOneVerboseTransfer.ProxyPortUser,
+        LibOneVerboseTransfer.Upload,
         new Lib525(TimeProvider.System),
         new Lib526(TimeProvider.System),
         new Lib530(TimeProvider.System),
         new Lib533(TimeProvider.System),
+        new Lib536(),
+        new Lib537(),
     ]);
 
     /// <summary>The names of the programs in the table, such as <c>lib500</c>.</summary>
