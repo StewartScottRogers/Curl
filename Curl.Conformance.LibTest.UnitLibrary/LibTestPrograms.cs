@@ -62,6 +62,16 @@ public sealed class LibTestPrograms
         new Lib533(TimeProvider.System),
         new Lib536(),
         new Lib537(),
+        new Lib539(),
+        new Lib540(TimeProvider.System),
+        new Lib541(),
+        LibOneVerboseTransfer.NobodyWithoutHeader,
+        new Lib543(),
+        new Lib544(),
+        new Lib547(),
+        LibOneVerboseTransfer.ProxyTransferMode,
+        new Lib552(TimeProvider.System),
+        new Lib553(),
     ]);
 
     /// <summary>The names of the programs in the table, such as <c>lib500</c>.</summary>
