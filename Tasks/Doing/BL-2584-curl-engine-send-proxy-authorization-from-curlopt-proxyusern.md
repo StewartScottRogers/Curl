@@ -31,3 +31,4 @@ Found by BL-2527 running test503 through the ported `lib503`: `<verify><proxy>` 
 ## Log
 
 - 2026-10-17: Created.
+- 2026-10-17: Backlog -> Doing. Criteria at claim: 6c7087d7 904b57ec 3d836d5e.
