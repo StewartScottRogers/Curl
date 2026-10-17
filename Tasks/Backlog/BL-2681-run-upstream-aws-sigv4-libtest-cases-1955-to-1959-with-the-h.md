@@ -1,5 +1,5 @@
 ---
-id: BL-2677
+id: BL-2681
 title: Run upstream AWS SigV4 libtest cases 1955 to 1959 with the harness's Debug stand-in
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-17
 completed:
 ---
-# BL-2677 — Run upstream AWS SigV4 libtest cases 1955 to 1959 with the harness's Debug stand-in
+# BL-2681 — Run upstream AWS SigV4 libtest cases 1955 to 1959 with the harness's Debug stand-in
 
 ## Goal
 

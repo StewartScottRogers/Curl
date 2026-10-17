@@ -1,5 +1,5 @@
 ---
-id: BL-2678
+id: BL-2682
 title: Unfold a folded header's value in the header API so upstream case 1941 passes
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-17
 completed:
 ---
-# BL-2678 — Unfold a folded header's value in the header API so upstream case 1941 passes
+# BL-2682 — Unfold a folded header's value in the header API so upstream case 1941 passes
 
 ## Goal
 
