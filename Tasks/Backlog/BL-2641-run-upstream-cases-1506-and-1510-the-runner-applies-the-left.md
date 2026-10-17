@@ -28,6 +28,8 @@ Found by BL-2537, which ported lib1506 and lib1510 (`Curl.Conformance.LibTest.Un
 
 ## Notes
 
+- 2026-10-17 (BL-2538, lane 1): test1512 (lib1512, ported by BL-2538) is skipped for the same `<stripfile>` line; once the runner applies it, run test1512 too and hold it on the ratchet if it passes.
+
 ## Log
 
 - 2026-10-17: Created.
