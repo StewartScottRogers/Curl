@@ -23,10 +23,12 @@ Measured on 2026-10-16 (BL-2483 Notes), with stdin on a real pipe:
 - Curl sends the data chunk and `0\r\n\r\n` in one 30-byte write once the pipe's end is read
   (ADR-0546). curl 8.22.0 sends them in two writes, 25 bytes then 5 (`Curl_xfer_send(len=25)`,
   then `sending last upload chunk of 5 bytes`). The recorder answers as soon as the one body byte
-  its `Content-Length: 1` promises has arrived, so it answers between curl's two writes and then
-  answers the lone `0\r\n\r\n` again as a held request; curl's stdout carries that second answer,
-  Curl's does not. Which side's closing chunk the recorder sees before the exchange ends depends
-  on how the runner schedules the two processes.
+  its `Content-Length: 1` promises has arrived, so it can answer between curl's two writes.
+  test60's response holds `swsclose`, so the cross-check does not hold the connection open: the
+  recorder closes it at once, and curl's closing chunk, sent after that, is not recorded (BL-2522
+  corrected an earlier reading here that the recorder answered it as a held request). Whether
+  curl's two writes reach the recorder's first read together depends on how the runner schedules
+  the two processes.
 
 ## Decision
 
@@ -45,3 +47,13 @@ recorded on macOS when the server answers and closes between them.
 - If that run still differs, the cross-check's recorder settings (answering on the first body
   byte of a request whose `Content-Length` contradicts its chunked coding) are what to look at,
   in the gap office, not Curl.
+- Re-measured by BL-2522 in gap-platforms run 39063808349, on commit
+  `777f9cf84c9a4cf4c210ac4d45ac53591f08b4ea` (BL-2483's commits included): `behaviour:test60` is
+  still a gap on Linux and on macOS, "request differs at byte 179". The run uploads no
+  recordings. Byte 179 is where the reference's request stops: test60's 154-byte head plus curl's
+  first 25-byte write, the data chunk. Curl's single write of the data chunk and the closing chunk
+  cannot end there. So the shorter `request.bin` is the reference's, and the cause is the
+  recorder. `Record-CurlExchange.ps1`'s `Test-RequestComplete` takes `Content-Length` before
+  `Transfer-Encoding: chunked`. Upstream's `tests/server/sws.c` (curl 8.22.0) reads a chunked
+  request to its `\r\n0\r\n\r\n` whatever `Content-Length` says. BL-2647 makes the recorder do the
+  same, and the next gap run's re-measurement closes the difference. Curl is unchanged.
