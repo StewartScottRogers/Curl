@@ -3434,6 +3434,11 @@ Rules for this unattended run, in addition to CLAUDE.md:
    into subtasks, file them all, and requeue once; never file only the layer you hit first
    (AF-0241: BL-2310 was requeued at 21 turns for 4 subtasks and at 26 turns for 4 more,
    $1.60 for two runs that produced only a requeue, before a third claim finished it).
+   Size the task and check its engine hooks in that same pass: before the first edit,
+   name every type, method or hook the work must call, grep that each exists, and file
+   a task for each that does not, with the sizing split, so one requeue names them all
+   (AF-0242: BL-2394 was requeued for size, then again at 23 turns for a missing engine
+   hook, $3.38 for two runs that produced only a requeue, before a third claim finished it).
    The board let this run claim the task only because every ID already in its
    `depends-on` is Done, so those never send it back. Before naming any other task as the
    blocker, check its folder (`ls Tasks/*/<ID>-* Tasks/Done/*/<ID>-*`): a task in Done does
@@ -3575,6 +3580,11 @@ Rules for this unattended run, in addition to CLAUDE.md:
    into subtasks, file them all, and requeue once; never file only the layer you hit first
    (AF-0241: BL-2310 was requeued at 21 turns for 4 subtasks and at 26 turns for 4 more,
    $1.60 for two runs that produced only a requeue, before a third claim finished it).
+   Size the task and check its engine hooks in that same pass: before the first edit,
+   name every type, method or hook the work must call, grep that each exists, and file
+   a task for each that does not, with the sizing split, so one requeue names them all
+   (AF-0242: BL-2394 was requeued for size, then again at 23 turns for a missing engine
+   hook, $3.38 for two runs that produced only a requeue, before a third claim finished it).
    The shift claimed the task only because every ID already in its `depends-on` is Done,
    so those never send it back. Before naming any other task as the blocker, check its
    folder (`ls Tasks/*/<ID>-* Tasks/Done/*/<ID>-*`): a task in Done does not block. And

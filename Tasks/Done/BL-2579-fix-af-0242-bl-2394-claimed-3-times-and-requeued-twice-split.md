@@ -8,7 +8,7 @@ depends-on: []
 touches: [RunDarkFactory.ps1]
 requirement: none
 created: 2026-10-17
-completed:
+completed: 2026-10-17
 ---
 # BL-2579 — Fix AF-0242: BL-2394 claimed 3 times and requeued twice: split for size, then blocked on a missing engine hook, before finishing
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the process auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Fix: the lane prompt rules (both copies in RunDarkFactory.ps1) now tell a run to size the task and grep every engine hook it must call in the first pass, filing all missing pieces so one requeue names them (AF-0242). Reproduction reads audit logs, which a lane may not read; the re-audit confirms.
 
 ## Log
 
 - 2026-10-17: Created.
 - 2026-10-17: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-17: Doing -> Done. Lane prompt now requires sizing and engine-hook check in the first pass
