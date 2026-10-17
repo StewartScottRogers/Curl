@@ -32,3 +32,4 @@ Found by BL-2527: `lib501` and `lib509` are ported and registered in `LibTestPro
 ## Log
 
 - 2026-10-17: Created.
+- 2026-10-17: Backlog -> Doing. Criteria at claim: 803176a2 99aa93a6 904b57ec 3d836d5e.
