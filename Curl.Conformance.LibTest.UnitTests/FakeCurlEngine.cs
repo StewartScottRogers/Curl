@@ -65,7 +65,9 @@ internal sealed class FakeCurlEngine : ICurlEngine
 
     public ICurlUrlHandle CreateUrl() => new FakeUrlHandle();
 
-    public IMimeBuilder CreateMime() => throw new NotSupportedException();
+    public IMimeBuilder CreateMime() => CreatingMime?.Invoke() ?? throw new NotSupportedException();
+
+    public Func<IMimeBuilder>? CreatingMime { get; init; }
 
     public ICurlFormBuilder CreateForm() => CreatingForm?.Invoke() ?? throw new NotSupportedException();
 
