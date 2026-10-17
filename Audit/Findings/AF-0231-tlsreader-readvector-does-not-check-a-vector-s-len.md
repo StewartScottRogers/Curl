@@ -3,8 +3,8 @@ id: AF-0231
 title: TlsReader.ReadVector does not check a vector's length against the bytes left: 23 Curl.Tls and 3 Networking ECH tests fail unmutated
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Tls.UnitLibrary/TlsReader.cs:ReadVector:baseline-failure
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ dotnet test Curl.Tls.UnitTests --filter "TestCategory!=Integration"
 ## Log
 
 - 2026-10-16: filed proposed.
+- 2026-10-16: proposed -> accepted.
