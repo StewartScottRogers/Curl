@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Cryptography.UnitLibrary]
+touches: [Curl.Cryptography.UnitLibrary, Curl.Cryptography.UnitTests]
 requirement: none
 created: 2026-10-17
-completed:
+completed: 2026-10-17
 ---
 # BL-2572 — Fix AF-0235: ML-KEM's FIPS 203 modulus check can accept a first coefficient equal to q with no test failing
 
@@ -41,12 +41,23 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- The code was right; the gap was a missing test. Added
+  `MlKemTests.TryEncapsulate_FirstCoefficientAtTheModulusBoundary_IsRefusedOnlyAtQ`
+  (first even-indexed coefficient 3328 accepted, 3329 refused) in Curl.Cryptography.UnitTests.
+- Added `Curl.Cryptography.UnitTests` to `touches`: the fix is a test, and no task in Doing
+  on origin/work/dark-factory named that project.
+- The audit guard refuses lanes running `Audit/Tools/Invoke-MutationTest.ps1`, so the mutant
+  was applied by hand (`first > Modulus` at MlKemPolynomial.cs:202) and the ML-KEM tests run:
+  the new 3329 case failed (encapsulated True, expected False), so the mutant is killed. The
+  edit was reverted; the re-audit runs the script itself.
 
 ## Log
 
 - 2026-10-17: Created.
 - 2026-10-17: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-17: Doing -> Done. A test now refuses an ML-KEM encapsulation key whose first coefficient is q, killing AF-0235's mutant
