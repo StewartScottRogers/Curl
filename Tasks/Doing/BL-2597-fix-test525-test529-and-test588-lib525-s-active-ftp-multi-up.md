@@ -38,3 +38,4 @@ widen `touches` by the lane rules.
 ## Log
 
 - 2026-10-17: Created.
+- 2026-10-17: Backlog -> Doing. Criteria at claim: 326c7b1a fd6bd9d4 3d836d5e.
