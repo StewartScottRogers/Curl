@@ -188,6 +188,52 @@ public sealed class ManagedShareHandleTests
     }
 
     [TestMethod]
+    public async Task Options_ShareCookieListAndCleanup_LockAsLibcurlDoesAndCleanupInUseTakesNoLock()
+    {
+        await using ManagedCurlEngine engine = CreateEngine(new ScriptedConnector([]));
+        IShareHandle share = engine.CreateShare();
+        share.Share(CurlLockData.Cookie);
+        List<string> calls = [];
+        share.SetLockCallback((_, data, _) => calls.Add($"lock {data}"));
+        share.SetUnlockCallback((_, data) => calls.Add($"unlock {data}"));
+        IEasyTransfer easy = engine.CreateEasy();
+
+        easy.Options = easy.Options with { Behaviour = easy.Options.Behaviour with { Share = share } };
+        easy.Options = easy.Options with { Behaviour = easy.Options.Behaviour with { Share = share } };
+        easy.Options = easy.Options with { Http = easy.Options.Http with { CookieList = ["ALL"] } };
+        easy.Options = easy.Options with { Http = easy.Options.Http with { CookieList = ["ALL", "SESS"] } };
+        calls.Add("set");
+        CurlShareCode inUse = share.Cleanup();
+        await easy.DisposeAsync();
+        CurlShareCode cleaned = share.Cleanup();
+
+        Assert.AreEqual(CurlShareCode.InUse, inUse);
+        Assert.AreEqual(CurlShareCode.Ok, cleaned);
+        CollectionAssert.AreEqual(
+            new[] { "lock Share", "unlock Share", "lock Cookie", "unlock Cookie", "lock Cookie", "unlock Cookie", "set", "lock Cookie", "unlock Cookie", "lock Share", "unlock Share", "lock Share", "unlock Share" },
+            calls);
+    }
+
+    [TestMethod]
+    public async Task Options_ShareChangedOrCleanedUp_DetachesFromTheOldAndAttachesOnlyALiveOne()
+    {
+        await using ManagedCurlEngine engine = CreateEngine(new ScriptedConnector([]));
+        IShareHandle first = engine.CreateShare();
+        IShareHandle cleanedUp = engine.CreateShare();
+        cleanedUp.Cleanup();
+        await using IEasyTransfer easy = engine.CreateEasy();
+
+        easy.Options = easy.Options with { Behaviour = easy.Options.Behaviour with { Share = first } };
+        CurlShareCode whileAttached = first.Share(CurlLockData.Dns);
+        easy.Options = easy.Options with { Behaviour = easy.Options.Behaviour with { Share = cleanedUp } };
+        CurlShareCode afterDetach = first.Share(CurlLockData.Dns);
+
+        Assert.AreEqual(CurlShareCode.InUse, whileAttached);
+        Assert.AreEqual(CurlShareCode.Ok, afterDetach);
+        Assert.AreEqual(CurlShareCode.Ok, first.Cleanup());
+    }
+
+    [TestMethod]
     public async Task SetOptions_WhileATransferIsAttached_AnswerInUse()
     {
         ScriptedConnector connector = new([Encoding.ASCII.GetBytes(SetsCookie)]);

@@ -14,8 +14,9 @@ namespace Curl.Engine;
 /// place of its engine's for each kind <see cref="Share" /> turned on (<see cref="Attach" />), so transfers of any
 /// engine attached to one share handle send each other's cookies and reuse each other's connections. The lock
 /// callbacks are called around each access: <see cref="CurlLockData.Share" /> for the handle's own state as a
-/// transfer attaches and detaches and as it is cleaned up, every shared cache kind as a transfer takes it, and
-/// <see cref="CurlLockData.Cookie" /> around each read and write of the shared cookies. Every transfer of every engine
+/// transfer attaches through <c>CURLOPT_SHARE</c> and detaches (<see cref="Reattach" />) and as it is cleaned up, every
+/// shared cache kind as a performing transfer takes it, and <see cref="CurlLockData.Cookie" /> around each read and
+/// write of the shared cookies, each <c>CURLOPT_COOKIELIST</c> item and each attached transfer's cleanup (<see cref="LockCookies" />). Every transfer of every engine
 /// checks cookie domains against the one embedded public suffix list snapshot, which never changes, so it is shared
 /// whatever the handle says; while <see cref="CurlLockData.Psl" /> is shared, a transfer takes it under its lock as it
 /// takes the shared caches (ADR-0617). An HSTS entry one attached transfer learns switches another's <c>http</c>
@@ -76,9 +77,9 @@ internal sealed class ManagedShareHandle(TimeProvider timeProvider) : IShareHand
     public CurlShareCode SetUnlockCallback(ShareUnlockCallback? callback) => SetOption(() => unlockCallback = callback, data: null);
 
     /// <summary>
-    /// <c>curl_share_cleanup</c>: under the <see cref="CurlLockData.Share" /> lock, refuses with
-    /// <see cref="CurlShareCode.InUse" /> while a transfer is attached, else starts closing the shared connections and frees
-    /// the handle, so every later call answers <see cref="CurlShareCode.Invalid" />.
+    /// <c>curl_share_cleanup</c>: refuses with <see cref="CurlShareCode.InUse" /> while a transfer is attached, without
+    /// calling the lock callbacks (upstream test506), else, under the <see cref="CurlLockData.Share" /> lock, starts
+    /// closing the shared connections and frees the handle, so every later call answers <see cref="CurlShareCode.Invalid" />.
     /// </summary>
     /// <returns><see cref="CurlShareCode.Ok" />, or why not.</returns>
     public CurlShareCode Cleanup()
@@ -86,7 +87,9 @@ internal sealed class ManagedShareHandle(TimeProvider timeProvider) : IShareHand
         CurlShareCode code;
         lock (gate)
         {
-            code = cleanedUp ? CurlShareCode.Invalid : UnderShareLock(null, () => attachedTransfers > 0 ? CurlShareCode.InUse : CurlShareCode.Ok);
+            code = cleanedUp ? CurlShareCode.Invalid
+                : attachedTransfers > 0 ? CurlShareCode.InUse
+                : UnderShareLock(null, () => CurlShareCode.Ok);
             cleanedUp |= code == CurlShareCode.Ok;
         }
 
@@ -99,11 +102,46 @@ internal sealed class ManagedShareHandle(TimeProvider timeProvider) : IShareHand
     }
 
     /// <summary>
-    /// Attaches <paramref name="transfer" /> for one perform: counts it under the <see cref="CurlLockData.Share" /> lock,
-    /// so option changes and <see cref="Cleanup" /> answer <see cref="CurlShareCode.InUse" /> until <see cref="Detach" />,
-    /// and gives <paramref name="engine" />'s state with each cache this handle shares in place of the engine's, taking
-    /// each one under its kind's lock, the public suffix list first when it is shared. A handle already cleaned up
-    /// shares nothing.
+    /// <c>CURLOPT_SHARE</c> naming a share handle where <paramref name="current" /> was named before, as curl 8.22.0's
+    /// <c>lib/setopt.c</c>: detaches <paramref name="transfer" /> from <paramref name="current" /> and attaches it to
+    /// <paramref name="named" />, each under that handle's <see cref="CurlLockData.Share" /> lock, so option changes and
+    /// <see cref="Cleanup" /> answer <see cref="CurlShareCode.InUse" /> while it stays attached. Naming the same handle
+    /// again changes nothing, and a handle already cleaned up is not attached.
+    /// </summary>
+    /// <param name="current">The share handle the transfer is attached to, or <see langword="null" /> for none.</param>
+    /// <param name="named">The share handle the option names now, or <see langword="null" /> for none.</param>
+    /// <param name="transfer">The transfer whose option changed.</param>
+    /// <returns>The share handle the transfer is attached to now, or <see langword="null" /> for none.</returns>
+    internal static ManagedShareHandle? Reattach(ManagedShareHandle? current, ManagedShareHandle? named, IEasyTransfer transfer)
+    {
+        if (ReferenceEquals(current, named))
+        {
+            return current;
+        }
+
+        current?.ChangeAttachedCount(transfer, -1);
+        return named is not null && named.ChangeAttachedCount(transfer, 1) ? named : null;
+    }
+
+    /// <summary>
+    /// Calls the <see cref="CurlLockData.Cookie" /> lock and unlock callbacks <paramref name="times" /> times while this
+    /// handle shares cookies, as curl 8.22.0 takes the lock for each <c>CURLOPT_COOKIELIST</c> item as it is set and for
+    /// the cookie flush of <c>curl_easy_cleanup</c> (upstream test506).
+    /// </summary>
+    /// <param name="transfer">The transfer the callbacks are told of.</param>
+    /// <param name="times">How many times to lock; none when it is 0 or less.</param>
+    internal void LockCookies(IEasyTransfer transfer, int times)
+    {
+        for (int time = 0; time < times && Shares(CurlLockData.Cookie); time++)
+        {
+            _ = Locked(transfer, CurlLockData.Cookie, () => time);
+        }
+    }
+
+    /// <summary>
+    /// Gives <paramref name="engine" />'s state for one perform of an attached transfer, with each cache this handle
+    /// shares in place of the engine's, taking each one under its kind's lock, the public suffix list first when it is
+    /// shared. A handle already cleaned up shares nothing.
     /// </summary>
     /// <param name="transfer">The transfer about to perform.</param>
     /// <param name="engine">The transfer's engine's state.</param>
@@ -117,7 +155,6 @@ internal sealed class ManagedShareHandle(TimeProvider timeProvider) : IShareHand
                 return engine;
             }
 
-            UnderShareLock(transfer, () => ++attachedTransfers);
             _ = TakeShared(transfer, CurlLockData.Psl, own: true, engine: false);
             return new ManagedEngineSharedState(
                 engine,
@@ -129,13 +166,24 @@ internal sealed class ManagedShareHandle(TimeProvider timeProvider) : IShareHand
         }
     }
 
-    /// <summary>Detaches a transfer <see cref="Attach" /> attached, under the <see cref="CurlLockData.Share" /> lock.</summary>
-    /// <param name="transfer">The transfer that performed.</param>
-    internal void Detach(IEasyTransfer transfer)
+    /// <summary>
+    /// Counts a transfer attaching (<paramref name="change" /> 1) or detaching (-1) under the
+    /// <see cref="CurlLockData.Share" /> lock; a handle already cleaned up attaches none.
+    /// </summary>
+    /// <param name="transfer">The transfer attaching or detaching.</param>
+    /// <param name="change">1 to attach, -1 to detach.</param>
+    /// <returns><see langword="true" /> when the count changed.</returns>
+    private bool ChangeAttachedCount(IEasyTransfer transfer, int change)
     {
         lock (gate)
         {
-            UnderShareLock(transfer, () => attachedTransfers = Math.Max(0, attachedTransfers - 1));
+            if (cleanedUp)
+            {
+                return false;
+            }
+
+            UnderShareLock(transfer, () => attachedTransfers += change);
+            return true;
         }
     }
 

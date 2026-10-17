@@ -53,8 +53,28 @@ internal sealed class ManagedEasyTransfer(
     /// <summary>libcurl's <c>CURLE_URL_MALFORMAT</c> text for a URL it cannot parse.</summary>
     internal const string MalformedUrlText = "URL rejected: Malformed input to a URL function";
 
-    /// <inheritdoc />
-    public EasyOptions Options { get; set; } = new();
+    /// <summary>
+    /// Gets or sets every option of the handle (<c>curl_easy_setopt</c>). A <c>CURLOPT_SHARE</c> naming another
+    /// <see cref="ManagedShareHandle" /> detaches the handle from the one before and attaches it to the new one at once,
+    /// and each <c>CURLOPT_COOKIELIST</c> item added takes the attached share's cookie lock, as libcurl does (upstream test506).
+    /// </summary>
+    public EasyOptions Options
+    {
+        get => options;
+        set
+        {
+            EasyOptions previous = options;
+            options = value;
+            optionShare = ManagedShareHandle.Reattach(optionShare, value.Behaviour.Share as ManagedShareHandle, this);
+            optionShare?.LockCookies(this, value.Http.CookieList.Count - previous.Http.CookieList.Count);
+        }
+    }
+
+    /// <summary>The handle's options, which <see cref="Options" /> gives.</summary>
+    private EasyOptions options = new();
+
+    /// <summary>The share handle <c>CURLOPT_SHARE</c> attached the handle to, or <see langword="null" /> for none.</summary>
+    private ManagedShareHandle? optionShare;
 
     /// <inheritdoc />
     public TransferInfo Info { get; private set; } = new();
@@ -340,7 +360,6 @@ internal sealed class ManagedEasyTransfer(
         }
         finally
         {
-            share.Detach(this);
             performShare = null;
             attachedShared = null;
         }
@@ -1267,12 +1286,15 @@ internal sealed class ManagedEasyTransfer(
 
     /// <summary>
     /// <c>curl_easy_cleanup</c>: hands the HSTS cache to <c>CURLOPT_HSTSWRITEFUNCTION</c> (<see cref="SaveHstsToCallback" />),
-    /// then closes the connection a connect-only perform left open or upgraded, if any.
+    /// takes the attached share handle's cookie lock for libcurl's cookie flush and detaches from it, then closes the
+    /// connection a connect-only perform left open or upgraded, if any.
     /// </summary>
     /// <returns>A task that completes once it is closed.</returns>
     public async ValueTask DisposeAsync()
     {
         SaveHstsToCallback();
+        optionShare?.LockCookies(this, 1);
+        optionShare = ManagedShareHandle.Reattach(optionShare, named: null, this);
         await (connectOnly?.CloseAsync() ?? ValueTask.CompletedTask).ConfigureAwait(false);
         await (webSocket?.CloseAsync() ?? ValueTask.CompletedTask).ConfigureAwait(false);
     }
