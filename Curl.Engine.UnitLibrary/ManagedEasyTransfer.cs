@@ -639,8 +639,40 @@ internal sealed class ManagedEasyTransfer(
         MultipartFormBuildResult? form = await MimePostFormUnlessToolGaveAsync(toolInputs, options, url, mimeReads, cancellationToken).ConfigureAwait(false);
         return form is { IsBuilt: false }
             ? Finish(form.Failure.ExitCode.ToCurlCode(), form.Failure.ErrorMessage!, Info)
-            : await PerformDisposingFormAsync(options, settings, url, urlText, transferId, toolInputs, form?.Body, mimeReads, cancellationToken).ConfigureAwait(false);
+            : await PerformDisposingFormAsync(options, settings, url, urlText, transferId, toolInputs, form?.Body ?? ReadCallbackPostBodyOf(toolInputs, options, url, mimeReads), mimeReads, cancellationToken).ConfigureAwait(false);
     }
+
+    /// <summary>
+    /// The body of a <c>CURLOPT_POST</c> with no <c>CURLOPT_POSTFIELDS</c>, read through <c>CURLOPT_READFUNCTION</c>
+    /// (<see cref="CallbackUploadOf" />) and sent as <c>application/x-www-form-urlencoded</c>, with
+    /// <c>CURLOPT_POSTFIELDSIZE</c> as its <c>Content-Length</c> when not negative and chunked otherwise, as libcurl
+    /// 8.22.0 posts (upstream test508, BL-2586); the stream joins <paramref name="reads" />, so its
+    /// <c>CURL_READFUNC_ABORT</c> ends the perform. None when the curl tool's runner gave <paramref name="toolInputs" />,
+    /// for a <c>CURLOPT_UPLOAD</c>, or with no read callback.
+    /// </summary>
+    /// <param name="toolInputs">The runner's chosen pieces, or <see langword="null" /> for a handle's own.</param>
+    /// <param name="options">The handle's options.</param>
+    /// <param name="url">The URL set, whose scheme says whether the transfer can pause.</param>
+    /// <param name="reads">Receives the body's stream.</param>
+    /// <returns>The body, or <see langword="null" /> for none.</returns>
+    private StreamBody? ReadCallbackPostBodyOf(EngineToolTransferInputs? toolInputs, EasyOptions options, CurlUrl url, ICollection<CallbackReadStream> reads)
+    {
+        if (toolInputs is not null || !PostsWithoutFields(options) || options.Callbacks.Read is not { } read)
+        {
+            return null;
+        }
+
+        CallbackReadStream content = CallbackUploadOf(read, options.Callbacks, PauseGateFor(url));
+        reads.Add(content);
+        long size = options.Http.PostFieldSize;
+        return new StreamBody(content, size < 0 ? null : size, HttpRequestOptionsMapping.FormUrlEncoded);
+    }
+
+    /// <summary>Whether the options post with <c>CURLOPT_POST</c>, no <c>CURLOPT_POSTFIELDS</c> and no <c>CURLOPT_UPLOAD</c>.</summary>
+    /// <param name="options">The handle's options.</param>
+    /// <returns>Whether the post's body is the read callback's.</returns>
+    private static bool PostsWithoutFields(EasyOptions options) =>
+        options.Http.Post && options.Http.PostFields is null && !options.Transfer.Upload;
 
     /// <summary><see cref="PerformParsedAsync" />, then disposes <paramref name="formBody" />'s content.</summary>
     /// <param name="options">The handle's options.</param>
