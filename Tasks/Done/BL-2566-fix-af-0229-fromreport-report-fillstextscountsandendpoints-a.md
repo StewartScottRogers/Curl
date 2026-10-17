@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Output.UnitTests]
 requirement: none
 created: 2026-10-17
-completed:
+completed: 2026-10-17
 ---
 # BL-2566 — Fix AF-0229: FromReport_Report_FillsTextsCountsAndEndPoints asserts nothing; its checks are TestDiagnostics.Assert log lines
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Each check in FromReport_Report_FillsTextsCountsAndEndPoints is now Assert.AreEqual, with the values logged through diagnostics.Act (the shape BL-2565 used). FromReport_NoReport_KeepsDefaultsAndTakesTheBytesTransferred had the same defect and FromReport_NullArgument_Throws checked its parameter names the same way, so both now use Assert.AreEqual too. Reproduction now lists Assert lines 50-54 inside the test. Output tests 663 passed; full build clean, fast tests green.
 
 ## Log
 
 - 2026-10-17: Created.
 - 2026-10-17: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-17: Doing -> Done. WriteOutTransferInfo tests assert with Assert.AreEqual; reproduction gives expected lines
