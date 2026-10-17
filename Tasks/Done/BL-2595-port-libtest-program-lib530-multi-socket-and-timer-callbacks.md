@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.LibTest.UnitLibrary, Curl.Conformance.LibTest.UnitTests, Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
 requirement: none
 created: 2026-10-17
-completed:
+completed: 2026-10-17
 ---
 # BL-2595 — Port libtest program lib530 (multi socket and timer callbacks) to C# and add its case to the ratchet
 
@@ -22,14 +22,18 @@ Split from BL-2529 (batch 3 of the libtest ports; phase 5 of `Documentation/Plan
 
 ## Acceptance criteria
 
-- [ ] `Lib530` is a C# `ILibTest` in `Curl.Conformance.LibTest.UnitLibrary` registered in `LibTestPrograms.Ported`, with focused unit tests in `Curl.Conformance.LibTest.UnitTests` over a fake `ICurlEngine` covering each of the five `testone` runs.
-- [ ] test530 is added to `Curl.Conformance.UnitTests/PassingUpstreamCases.txt` if it passes through the runner on Windows and its output does not depend on the platform; otherwise it is left off and filed as a task with the board script (its differing lines).
-- [ ] `Measure-CodeQuality.ps1 -Library Curl.Conformance.LibTest.UnitLibrary` reports 0 failing members.
-- [ ] `dotnet build` is clean and the fast tests pass with no test deleted, skipped or weakened.
+- [x] `Lib530` is a C# `ILibTest` in `Curl.Conformance.LibTest.UnitLibrary` registered in `LibTestPrograms.Ported`, with focused unit tests in `Curl.Conformance.LibTest.UnitTests` over a fake `ICurlEngine` covering each of the five `testone` runs.
+- [x] test530 is added to `Curl.Conformance.UnitTests/PassingUpstreamCases.txt` if it passes through the runner on Windows and its output does not depend on the platform; otherwise it is left off and filed as a task with the board script (its differing lines).
+- [x] `Measure-CodeQuality.ps1 -Library Curl.Conformance.LibTest.UnitLibrary` reports 0 failing members.
+- [x] `dotnet build` is clean and the fast tests pass with no test deleted, skipped or weakened.
 
 ## Notes
+
+- `Lib530` runs the five `testone` calls through `Lib530Run`; `global_init` is called once around them because Libcurl's cleanup disposes the case's engine, and `select()` over the program's socket sets is `curl_multi_wait`, every socket in them then counting as ready (ADR-0663). `FakeMultiTransfer` gained a scripted `SocketActing`, `DoneMessageType` and `Added`.
+- test530 passes through the runner and holds the ratchet; the case checks only the exit code, so it is platform-neutral. Measure-CodeQuality: 0 failing members (SocketCallback split to keep complexity under 10).
 
 ## Log
 
 - 2026-10-17: Created.
 - 2026-10-17: Backlog -> Doing. Criteria at claim: 2f214e3e 528f46b8 e39e1cd8 4272a6b9.
+- 2026-10-17: Doing -> Done. lib530 ported as Lib530 and test530 holds the ratchet

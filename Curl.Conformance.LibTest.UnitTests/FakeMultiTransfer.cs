@@ -41,6 +41,15 @@ internal sealed class FakeMultiTransfer : IMultiTransfer
     /// <summary>The messages left that the read reports.</summary>
     public int MessagesLeftAfterRead { get; set; }
 
+    /// <summary>Answers each socket action in place of a transfer; the action throws when it is not set.</summary>
+    public Func<CurlSocket, CurlSocketSelect, (CurlMultiCode Code, int RunningTransfers)>? SocketActing { get; set; }
+
+    /// <summary>The type of the message <see cref="DoneResult"/> reads.</summary>
+    public CurlMultiMessageType DoneMessageType { get; set; } = CurlMultiMessageType.Done;
+
+    /// <summary>The transfer added last.</summary>
+    public IEasyTransfer? Added => added;
+
     private IEasyTransfer? added;
 
     public CurlMultiCode Add(IEasyTransfer transfer)
@@ -65,13 +74,14 @@ internal sealed class FakeMultiTransfer : IMultiTransfer
 
     public bool TryReadInfo([NotNullWhen(true)] out CurlMultiMessage? message, out int remainingMessages)
     {
-        message = DoneResult is { } result && added is not null ? new CurlMultiMessage(CurlMultiMessageType.Done, added, result) : null;
+        message = DoneResult is { } result && added is not null ? new CurlMultiMessage(DoneMessageType, added, result) : null;
         remainingMessages = MessagesLeftAfterRead;
         DoneResult = null;
         return message is not null;
     }
 
-    public ValueTask<(CurlMultiCode Code, int RunningTransfers)> SocketActionAsync(CurlSocket socket, CurlSocketSelect events, CancellationToken cancellationToken) => throw new NotSupportedException();
+    public ValueTask<(CurlMultiCode Code, int RunningTransfers)> SocketActionAsync(CurlSocket socket, CurlSocketSelect events, CancellationToken cancellationToken) =>
+        SocketActing is { } acting ? ValueTask.FromResult(acting(socket, events)) : throw new NotSupportedException();
 
     public CurlMultiCode Assign(CurlSocket socket, object? socketState) => throw new NotSupportedException();
 
