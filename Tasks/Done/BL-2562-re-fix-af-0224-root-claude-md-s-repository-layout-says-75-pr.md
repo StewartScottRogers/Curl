@@ -8,7 +8,7 @@ depends-on: []
 touches: [CLAUDE.md]
 requirement: none
 created: 2026-10-17
-completed:
+completed: 2026-10-17
 ---
 # BL-2562 — Re-fix AF-0224: Root CLAUDE.md's repository layout says 75 projects; Curl.slnx lists 79
 
@@ -45,12 +45,15 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+CLAUDE.md layout count set to 93, the current Curl.slnx .csproj count (docs only; fast tests unaffected, build clean).
 
 ## Log
 
 - 2026-10-17: Created.
 - 2026-10-17: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-17: Doing -> Done. CLAUDE.md count now 93, matching Curl.slnx
