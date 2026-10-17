@@ -42,3 +42,4 @@ Phase 5 of `Documentation/Planning/Curl-Api-And-libcurl.md` and ADR-0506. Upstre
 - 2026-10-17: Doing -> Backlog. Split for size: waits on BL-2595 (lib530) and BL-2596 (lib525, lib526, lib533); the six single-transfer ports follow
 - 2026-10-17: Backlog -> Doing. Criteria at claim: f0df8e2d ceef976f 6c058a97 408cc7ba 4272a6b9 8738c7f6.
 - 2026-10-17: Doing -> Backlog. Waits on BL-2601: the case runner skips cases 520 to 537 as not ported although the six ports are registered
+- 2026-10-17: Backlog -> Doing. Criteria at claim: f0df8e2d ceef976f 6c058a97 408cc7ba 4272a6b9 8738c7f6.
