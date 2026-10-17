@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary, Curl.Engine.UnitTests, Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests, Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
 requirement: none
 created: 2026-10-17
-completed:
+completed: 2026-10-17
 ---
 # BL-2587 — Curl.Engine: write the headers of a transfer that fails on multiple Location headers (test580)
 
@@ -22,9 +22,9 @@ Found by BL-2527 running test580 through the ported `lib507` (multi interface): 
 
 ## Acceptance criteria
 
-- [ ] test580 passes through the runner and is added to `Curl.Conformance.UnitTests/PassingUpstreamCases.txt`.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the fix (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] test580 passes through the runner and is added to `Curl.Conformance.UnitTests/PassingUpstreamCases.txt`.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the fix (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
 
@@ -50,9 +50,18 @@ Found by BL-2527 running test580 through the ported `lib507` (multi interface): 
   criterion need. Requeued because BL-2571 (Doing) touches `Curl.Protocol.Http.UnitLibrary` and
   BL-2528 (Doing) touches `PassingUpstreamCases.txt`.
 
+- 2026-10-17 (lane 2), done: `HttpResponseHeadBuilder.KeepLocation` now attaches the head bytes committed
+  before the refused line (`HttpTransferException.HeadBytesBeforeFailure`), and
+  `HttpProtocolHandler.ReadHeadAsync` writes them to the header output before it rethrows. The
+  write sits after the catch, not in it: an `await` in a catch left a hidden branch the coverage
+  gate counts. test580 passes and is on the ratchet. The other mid-head failures (NUL byte, header
+  without colon) keep writing nothing, as planned; they have no task yet because no upstream case
+  shows a difference.
+
 ## Log
 
 - 2026-10-17: Created.
 - 2026-10-17: Backlog -> Doing. Criteria at claim: 49be4119 904b57ec 3d836d5e.
 - 2026-10-17: Doing -> Backlog. touches Curl.Protocol.Http.UnitLibrary, held by BL-2571, and Curl.Conformance.UnitTests/PassingUpstreamCases.txt, held by BL-2528
 - 2026-10-17: Backlog -> Doing. Criteria at claim: 49be4119 904b57ec 3d836d5e.
+- 2026-10-17: Doing -> Done. test580 writes the head before the second Location and passes on the ratchet
