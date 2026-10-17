@@ -45,10 +45,13 @@ internal sealed class FakeCurlEngine : ICurlEngine
     /// <summary>What a share handle's cleanup answers.</summary>
     public CurlShareCode ShareCleanupResult { get; init; } = CurlShareCode.Ok;
 
+    /// <summary>The headers every easy transfer answers the header API from; without them, the header API throws.</summary>
+    public ITransferHeaders? Headers { get; init; }
+
     public IEasyTransfer CreateEasy()
     {
         CreatingEasy?.Invoke();
-        return new FakeEasyTransfer(PerformResult, Info, Performing) { Informing = Informing, ConnectOnly = ConnectOnly, Pauses = Pauses };
+        return new FakeEasyTransfer(PerformResult, Info, Performing) { Informing = Informing, ConnectOnly = ConnectOnly, Pauses = Pauses, TransferHeaders = Headers };
     }
 
     public FakeMultiTransfer Multi { get; } = new();
@@ -97,7 +100,9 @@ internal sealed class FakeCurlEngine : ICurlEngine
 
         public string ErrorText => string.Empty;
 
-        public ITransferHeaders Headers => throw new NotSupportedException();
+        public ITransferHeaders? TransferHeaders { get; init; }
+
+        public ITransferHeaders Headers => TransferHeaders ?? throw new NotSupportedException();
 
         public IEasyWebSocket WebSocket => throw new NotSupportedException();
 
