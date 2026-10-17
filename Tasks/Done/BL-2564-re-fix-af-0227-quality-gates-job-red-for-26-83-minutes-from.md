@@ -8,7 +8,7 @@ depends-on: []
 touches: [RunDarkFactory.ps1]
 requirement: none
 created: 2026-10-17
-completed:
+completed: 2026-10-17
 ---
 # BL-2564 — Re-fix AF-0227: Quality gates job red for 26.83 minutes from run 38700283564 on 639a0aec, BL-2268's finish commit
 
@@ -45,8 +45,8 @@ The finding closes only when a later re-audit by the process auditor confirms th
 
 ## Acceptance criteria
 
-- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded. (See Notes, 2026-10-17.)
-- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass. (No code changed.)
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -56,3 +56,4 @@ The finding closes only when a later re-audit by the process auditor confirms th
 
 - 2026-10-17: Created.
 - 2026-10-17: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-17: Doing -> Done. History only: red spells came from lane commits fixed by BL-2269 and BL-2467; prompt already requires a quality run (AF-0213)
