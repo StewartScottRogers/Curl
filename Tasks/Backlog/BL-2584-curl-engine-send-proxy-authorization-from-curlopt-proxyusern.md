@@ -4,7 +4,7 @@ title: Curl.Engine: send Proxy-Authorization from CURLOPT_PROXYUSERNAME and PROX
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: []
+depends-on: [BL-2602]
 touches: [Curl.Engine.UnitLibrary, Curl.Engine.UnitTests, Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
 requirement: none
 created: 2026-10-17
@@ -30,6 +30,7 @@ Found by BL-2527 running test503 through the ported `lib503`: `<verify><proxy>` 
 
 - 2026-10-17 (lane 2): Added `Curl.Conformance.UnitTests/PassingUpstreamCases.txt` to `touches`, since the first criterion adds test503 to it. BL-2528, in Doing, also touches that file, so the task went back to Backlog before any code edit.
 - Likely fix: `ManagedEasyTransfer.TransferSettingsOf` (`Curl.Engine.UnitLibrary/ManagedEasyTransfer.cs`, about line 1414) passes `ProxyCredentials: null`. Build it from `options.Authentication.ProxyUserName` and `ProxyPassword` (and `ProxyUserPassword` split at its first colon), used as given, not URL-decoded.
+- 2026-10-17 (lane 1): Fix done and left in the stash: `ManagedEasyTransfer.TransferSettingsOf` now passes `ProxyCredentialsOf(options.Authentication)` (`CURLOPT_PROXYUSERNAME`/`PROXYPASSWORD` win over `CURLOPT_PROXYUSERPWD` split at its first colon, used as given; split in `SplitAtFirstColon` to keep CA1502 under 11), with tests in `Curl.Engine.UnitTests/ManagedEasyTransferTests.ProxyCredentials.cs` (7 pass) and `503` added to `PassingUpstreamCases.txt`. With it test503's `Proxy-Authorization` line matches; it then differs at `<verify><proxy>` line 6, the missing `[DISCONNECT]`. Recording the close in the proxy connection's starting recording only when a tunnel is relayed did not help (the `%HTTPPORT` tunnel is not relayed), so that is BL-2602. Next claim: apply the stash, wait for BL-2602, rerun `CURL_UPSTREAM_CASE=503`, run Measure-CodeQuality for Curl.Engine.UnitLibrary, then the fast tests.
 
 ## Log
 
@@ -37,3 +38,4 @@ Found by BL-2527 running test503 through the ported `lib503`: `<verify><proxy>` 
 - 2026-10-17: Backlog -> Doing. Criteria at claim: 6c7087d7 904b57ec 3d836d5e.
 - 2026-10-17: Doing -> Backlog. touches Curl.Conformance.UnitTests/PassingUpstreamCases.txt, which BL-2528 in Doing also touches
 - 2026-10-17: Backlog -> Doing. Criteria at claim: 6c7087d7 904b57ec 3d836d5e.
+- 2026-10-17: Doing -> Backlog. Proxy-Authorization fix done (in stash); test503 still lacks the proxy log's [DISCONNECT], filed as BL-2602
