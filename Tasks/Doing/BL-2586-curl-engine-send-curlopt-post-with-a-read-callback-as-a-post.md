@@ -35,3 +35,4 @@ Found by BL-2527 running test508 through the ported `lib508`: `<verify><protocol
 - 2026-10-17: Created.
 - 2026-10-17: Backlog -> Doing. Criteria at claim: afe076da 904b57ec 3d836d5e.
 - 2026-10-17: Doing -> Backlog. touches Curl.Conformance.UnitTests/PassingUpstreamCases.txt, which BL-2528 in Doing also touches
+- 2026-10-17: Backlog -> Doing. Criteria at claim: afe076da 904b57ec 3d836d5e.
