@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Engine.UnitLibrary, Curl.Engine.UnitTests]
+touches: [Curl.Engine.UnitLibrary, Curl.Engine.UnitTests, Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
 requirement: none
 created: 2026-10-17
 completed:
@@ -28,7 +28,11 @@ Found by BL-2527 running test503 through the ported `lib503`: `<verify><proxy>` 
 
 ## Notes
 
+- 2026-10-17 (lane 2): Added `Curl.Conformance.UnitTests/PassingUpstreamCases.txt` to `touches`, since the first criterion adds test503 to it. BL-2528, in Doing, also touches that file, so the task went back to Backlog before any code edit.
+- Likely fix: `ManagedEasyTransfer.TransferSettingsOf` (`Curl.Engine.UnitLibrary/ManagedEasyTransfer.cs`, about line 1414) passes `ProxyCredentials: null`. Build it from `options.Authentication.ProxyUserName` and `ProxyPassword` (and `ProxyUserPassword` split at its first colon), used as given, not URL-decoded.
+
 ## Log
 
 - 2026-10-17: Created.
 - 2026-10-17: Backlog -> Doing. Criteria at claim: 6c7087d7 904b57ec 3d836d5e.
+- 2026-10-17: Doing -> Backlog. touches Curl.Conformance.UnitTests/PassingUpstreamCases.txt, which BL-2528 in Doing also touches
