@@ -92,7 +92,7 @@ internal sealed class SteppedEasyTransfer : IEasyTransfer
             {
                 PauseCount++;
                 _paused.TrySetResult();
-                await _resumed.WaitAsync(cancellationToken);
+                await _resumed.WaitAsync();
             }
 
             if (taken != chunk.Length)
