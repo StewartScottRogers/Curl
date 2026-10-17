@@ -31,3 +31,4 @@ Found by BL-2598 on 2026-10-17 (lane 5, base 1e3c7d613). Two runs of the project
 ## Log
 
 - 2026-10-17: Created.
+- 2026-10-17: Backlog -> Doing. Criteria at claim: 49f0379e a3b7ade7 3d836d5e.
