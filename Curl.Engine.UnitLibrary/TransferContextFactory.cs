@@ -42,6 +42,9 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
     /// <summary>The one scheme whose transfer uploads standard input.</summary>
     private const string TelnetScheme = "telnet";
 
+    /// <summary>The schemes the HTTP handler authenticates, for <see cref="AuthorizationIdentityNtlmCredentialsOf" />.</summary>
+    private static readonly string[] HttpAuthenticationSchemes = ["http", "https", "ws", "wss"];
+
     /// <summary>The TFTP options at libcurl's defaults, whose block size <see cref="BlockSizeOf" /> compares with.</summary>
     private static readonly EasyTftpOptions DefaultTftpOptions = new();
 
@@ -210,7 +213,7 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
             MaxFileSize = MaxFileSizeOf(transfer),
             Upload = UploadOf(url, upload),
             PostData = settings.PostData,
-            Credentials = lookedUpCredentials ?? CredentialsOf(authentication.UserPassword),
+            Credentials = lookedUpCredentials ?? CredentialsOf(authentication.UserPassword) ?? AuthorizationIdentityNtlmCredentialsOf(authentication, url),
             TelnetOptions = protocol.Telnet.TelnetOptions,
             TftpBlockSize = BlockSizeOf(protocol.Tftp),
             TftpNoOptions = protocol.Tftp.NoOptions,
@@ -276,6 +279,25 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
             ? new NetworkCredential(userPassword, string.Empty)
             : new NetworkCredential(userPassword[..colon], userPassword[(colon + 1)..]);
     }
+
+    /// <summary>
+    /// Gets an empty user name and password for an HTTP transfer with <c>--sasl-authzid</c>, <c>--ntlm</c> alone
+    /// and no other credentials, as curl 8.22.0 then sends its NTLM Type-1 message with an empty user (the
+    /// current Windows user under SSPI), as for <c>-u :</c>; a Basic or Digest transfer sends nothing until a
+    /// user is given (measured 2026-10-17, AF-0236, BL-2573). <see langword="null" /> otherwise.
+    /// </summary>
+    /// <param name="authentication">The option group's authentication options.</param>
+    /// <param name="url">The transfer's URL.</param>
+    /// <returns>The credentials the context carries when neither a lookup nor <c>-u</c> gave any.</returns>
+    private static NetworkCredential? AuthorizationIdentityNtlmCredentialsOf(EasyAuthenticationOptions authentication, CurlUrl url) =>
+        SendsNtlmUnderAuthorizationIdentity(authentication) && Array.IndexOf(HttpAuthenticationSchemes, url.Scheme) >= 0
+            ? new NetworkCredential(string.Empty, string.Empty)
+            : null;
+
+    /// <summary>Gets whether <c>--sasl-authzid</c> is given with <c>--ntlm</c> as the only HTTP authentication scheme.</summary>
+    private static bool SendsNtlmUnderAuthorizationIdentity(EasyAuthenticationOptions authentication) =>
+        authentication.SaslAuthorizationIdentity is not null
+            && HttpRequestOptionsMapping.AuthSchemesOf(authentication) == HttpAuthSchemes.Ntlm;
 
     /// <summary>
     /// Gets <paramref name="output" /> counted by <paramref name="lowSpeedWatchdog" />, or as it is

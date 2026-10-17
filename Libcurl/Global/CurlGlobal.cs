@@ -43,18 +43,20 @@ public static class CurlGlobal
         InitCounting(engine, flags, Counter);
 
     /// <summary>
-    /// <c>curl_global_init_mem</c>: the same as <see cref="Init(CurlGlobalFlags)"/>. The five allocation callbacks are
+    /// <c>curl_global_init_mem</c>: the same as <see cref="Init(CurlGlobalFlags)"/>, with five allocation callbacks
     /// required, as libcurl requires them (it answers <c>CURLE_FAILED_INIT</c> for a missing one; this
-    /// throws), and then ignored: the managed engine allocates, frees and copies through the .NET
-    /// runtime, so none of them is ever called.
+    /// throws). Each easy handle of the library allocates through them as libcurl's does (ADR-0664):
+    /// <c>calloc</c> at <c>curl_easy_init</c>, <c>strdup</c> for each string option set, <c>malloc</c> for each
+    /// <c>curl_easy_escape</c> given the handle, and <c>free</c> for all of them at <c>curl_easy_cleanup</c>;
+    /// <c>realloc</c> is never called. The engine itself allocates through the .NET runtime.
     /// </summary>
     /// <param name="engine">The engine every handle of the library is created from; the library disposes it on cleanup.</param>
     /// <param name="flags">The <c>CURL_GLOBAL_*</c> flags, kept on <see cref="CurlLibrary.Flags"/>.</param>
-    /// <param name="malloc">The allocator; ignored.</param>
-    /// <param name="free">The deallocator; ignored.</param>
-    /// <param name="realloc">The reallocator; ignored.</param>
-    /// <param name="strdup">The string duplicator; ignored.</param>
-    /// <param name="calloc">The zeroing allocator; ignored.</param>
+    /// <param name="malloc">The allocator.</param>
+    /// <param name="free">The deallocator.</param>
+    /// <param name="realloc">The reallocator; never called.</param>
+    /// <param name="strdup">The string duplicator.</param>
+    /// <param name="calloc">The zeroing allocator.</param>
     /// <returns>The library; dispose it for <c>curl_global_cleanup</c>.</returns>
     /// <exception cref="ArgumentNullException">The engine or any callback is <see langword="null"/>.</exception>
     public static CurlLibrary InitMemory(
@@ -102,13 +104,14 @@ public static class CurlGlobal
     /// <summary><see cref="InitMemory(ICurlEngine, CurlGlobalFlags, CurlMallocCallback, CurlFreeCallback, CurlReallocCallback, CurlStrdupCallback, CurlCallocCallback)"/> counting on <paramref name="counter"/>.</summary>
     /// <param name="engine">The engine.</param>
     /// <param name="flags">The flags.</param>
-    /// <param name="callbacks">The five allocation callbacks, checked and ignored.</param>
+    /// <param name="callbacks">The five allocation callbacks, checked and kept for the library's easy handles.</param>
     /// <param name="counter">The <c>curl_global_init</c> counter.</param>
     /// <returns>The library.</returns>
     internal static CurlLibrary InitMemoryCounting(ICurlEngine engine, CurlGlobalFlags flags, MemoryCallbacks callbacks, GlobalInitCounter counter)
     {
         callbacks.ThrowIfAnyNull();
-        return InitCounting(engine, flags, counter);
+        ArgumentNullException.ThrowIfNull(engine);
+        return new CurlLibrary(engine, flags, counter, callbacks);
     }
 
     /// <summary><see cref="SslSet(CurlSslBackendId, string?, out IReadOnlyList{CurlSslBackend})"/> for a build whose one backend is <paramref name="built"/>.</summary>

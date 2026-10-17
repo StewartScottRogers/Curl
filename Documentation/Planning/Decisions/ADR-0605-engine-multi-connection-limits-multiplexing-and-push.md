@@ -47,9 +47,16 @@ starts. No upstream source or real curl was reachable from the lane, so the rule
    connection while it holds more than the cap when a transfer hands a connection back. libcurl closes
    one connection per hand-back; closing down to the cap at once reaches the same count, since each
    transfer hands back at most one. `DisposeAsync` waits for those closes.
-6. **Left to follow-up tasks.** The HTTP/2
-   client in `Curl.Protocol.Http.UnitLibrary` still refuses push in its `SETTINGS`, so nothing calls
-   `OfferPush` until BL-2469 wires `PUSH_PROMISE` to it.
+6. **A server push reaches the callback (BL-2469).** While a transfer is in a multi handle with
+   `MultiOptions.Push` set, the engine gives its HTTP handler an `EngineHttp2PushSink` (the HTTP/2
+   session then sends `SETTINGS_ENABLE_PUSH` 1, BL-2515 and BL-2516); without the callback no sink
+   is given and the client keeps sending 0. Each `PUSH_PROMISE` becomes a duplicate of the parent
+   handle (`curl_easy_duphandle`, as curl 8.22.0's `push_promise` makes it) bound to the pushed
+   response and offered to `OfferPush` with the promise's `name:value` lines; a refused push is reset
+   with `RST_STREAM` `CANCEL`. The pushed transfer's perform sends no request: it hands the pushed
+   head to the header callback a line at a time and the body to the write callback, and a failed
+   pushed stream answers `CURLE_RECV_ERROR`. Decided by Claude under Stewart's delegation: the
+   header lines keep the `name:value` form curl's `h2_pushed_hdr` holds, not `name: value`.
 
 ## Consequences
 

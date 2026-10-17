@@ -31,6 +31,17 @@ public sealed class CurlDateTests
         Assert.AreEqual(expected, CurlDate.Parse(text));
     }
 
+    // test517's military zones: A to M are east of UTC and N to Y west, as curl 8.22.0 reads them.
+    [TestMethod]
+    [DataRow("06 Nov 1994 08:49:37 A", 784108177L)]
+    [DataRow("06 Nov 1994 08:49:37 M", 784068577L)]
+    [DataRow("06 Nov 1994 08:49:37 N", 784115377L)]
+    [DataRow("06 Nov 1994 08:49:37 Y", 784154977L)]
+    public void Parse_MilitaryZone_AnswersTest517sSeconds(string text, long expected)
+    {
+        Assert.AreEqual(expected, CurlDate.Parse(text));
+    }
+
     [TestMethod]
     public void Parse_OneSecondBeforeTheEpoch_AnswersZeroNotTheFailureValue()
     {

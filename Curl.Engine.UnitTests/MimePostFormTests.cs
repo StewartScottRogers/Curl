@@ -35,6 +35,24 @@ public sealed class MimePostFormTests
     }
 
     [TestMethod]
+    public async Task BuildAsync_EmptyHttpPostForm_GivesAnEmptyBodyWithNoContentType()
+    {
+        MultipartFormBuildResult? form = await MimePostForm.BuildAsync(Builder, new EasyHttpOptions { HttpPost = new EasyMimeBody() }, "http", null, null, CancellationToken.None);
+
+        Assert.AreEqual(0, form!.Body!.Length);
+        Assert.AreEqual(string.Empty, form.Body.ContentType);
+        Assert.AreEqual(string.Empty, await ContentOfAsync(form));
+    }
+
+    [TestMethod]
+    public async Task BuildAsync_EmptyMimePost_StillBuildsAFormDataBody()
+    {
+        MultipartFormBuildResult? form = await MimePostForm.BuildAsync(Builder, new EasyHttpOptions { MimePost = new EasyMimeBody() }, "http", null, null, CancellationToken.None);
+
+        Assert.AreEqual("multipart/form-data; boundary=b0", form!.Body!.ContentType);
+    }
+
+    [TestMethod]
     public async Task BuildAsync_FormEscape_EscapesNamesWithABackslash()
     {
         EasyHttpOptions http = new() { MimePost = OnePart, MimeOptions = MimeOptions.FormEscape };

@@ -149,7 +149,8 @@ internal sealed class HttpResponseHeadBuilder
     /// <summary>
     /// Keeps the first non-empty <c>Location</c> value of the exchange and refuses a later one
     /// that differs from it, as curl 8.21.0's <c>http_header_l</c> does for every status code;
-    /// an empty value, or an exact repeat, is ignored.
+    /// an empty value, or an exact repeat, is ignored. The refusal carries the head bytes
+    /// accepted before the refused line, which libcurl 8.22.0 has already written (test580).
     /// </summary>
     private void KeepLocation(HttpResponseHeader header)
     {
@@ -160,7 +161,10 @@ internal sealed class HttpResponseHeadBuilder
 
         if (location is not null && !location.Equals(header.Value, StringComparison.Ordinal))
         {
-            throw new HttpTransferException(CurlExitCode.WeirdServerReply, HttpTransferMessages.MultipleLocationHeaders);
+            throw new HttpTransferException(CurlExitCode.WeirdServerReply, HttpTransferMessages.MultipleLocationHeaders)
+            {
+                HeadBytesBeforeFailure = Encoding.Latin1.GetBytes(headText.ToString()),
+            };
         }
 
         location = header.Value;

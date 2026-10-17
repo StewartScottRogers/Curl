@@ -4,7 +4,7 @@ title: Port libtest programs 520 to 537 to C# and add their cases to the ratchet
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-2528]
+depends-on: [BL-2528, BL-2595, BL-2596]
 touches: [Curl.Conformance.LibTest.UnitLibrary, Curl.Conformance.LibTest.UnitTests, Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
 requirement: none
 created: 2026-10-16
@@ -31,6 +31,14 @@ Phase 5 of `Documentation/Planning/Curl-Api-And-libcurl.md` and ADR-0506. Upstre
 
 ## Notes
 
+- 2026-10-17 (lane 1): six ports written and left uncommitted for the shift to stash: `LibOneVerboseTransfer` (lib520, lib523, lib524 differ only in option lists), `Lib521`, `Lib536`, `Lib537`, registered in `LibTestPrograms.Ported`, tests in `Lib520To537Tests.cs` (LibTest tests pass, 217). Cases 520, 524, 536 pass; 521, 522, 523 fail (differences not read); 537 skips (precheck not interpreted). Left: ratchet 520, 524, 536; file 521, 522, 523, 537; one quality run; fast tests; commit. BL-2601 was a false lead (table edit had missed) and is Deferred.
+
+- 2026-10-17 (lane 5, first turns, before any code): split for size. lib530 needs the multi socket-action API (`CURLMOPT_SOCKETFUNCTION`, `CURLMOPT_TIMERFUNCTION`, `curl_multi_socket_action`) driven by a fake that does not support it yet (`FakeMultiTransfer.SocketActionAsync` throws) and its own `select()` over a socket set, so it is BL-2595. lib525, lib526 and lib533 are multi `select_test` loops with `testnum`-dependent cleanup orders across 12 cases, filed as BL-2596. Both register their ports and add their passing cases, so once they are Done this task ports only the six single-transfer programs lib520, lib521, lib523, lib524, lib536 and lib537 (cases 520, 521, 522, 523, 524, 536, 537) and ticks the first criterion for all ten. All ten numbers exist in tests/libtest 8.22.0. Notes for that run: lib521 parses `libtest_arg2` as a port (`curlx_str_number` max 0xffff, MajorBad on failure); lib537 is the `#else` build without getrlimit/setrlimit, like Lib518 (prints `system lacks necessary system function(s)`, answers MajorBad); lib536 prints `This used the proxy` / `This DID NOT use the proxy` from `CURLINFO_USED_PROXY` to stdout.
+
 ## Log
 
 - 2026-10-16: Created.
+- 2026-10-17: Backlog -> Doing. Criteria at claim: f0df8e2d ceef976f 6c058a97 408cc7ba 4272a6b9 8738c7f6.
+- 2026-10-17: Doing -> Backlog. Split for size: waits on BL-2595 (lib530) and BL-2596 (lib525, lib526, lib533); the six single-transfer ports follow
+- 2026-10-17: Backlog -> Doing. Criteria at claim: f0df8e2d ceef976f 6c058a97 408cc7ba 4272a6b9 8738c7f6.
+- 2026-10-17: Doing -> Backlog. Waits on BL-2601: the case runner skips cases 520 to 537 as not ported although the six ports are registered

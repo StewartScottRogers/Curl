@@ -74,9 +74,13 @@ public sealed class LibTestContextTests
     }
 
     [TestMethod]
-    public void Constructor_RefusesNoArgumentsSinceTheUrlIsMissing()
+    public void Url_WithNoArguments_IsNullAsFirstCLeavesIt()
     {
-        Assert.ThrowsExactly<ArgumentException>(() => new LibTestContext(1, []));
+        var context = new LibTestContext(501, []);
+
+        Assert.IsNull(context.Url);
+        Assert.IsEmpty(context.Arguments);
+        Assert.IsNull(context.Argument2);
     }
 
     [TestMethod]

@@ -39,11 +39,19 @@ public sealed class WriteOutTransferInfoTests
 
         TransferInfo info = WriteOutTransferInfo.FromReport(TransferResult.Success(4) with { Report = report }, RequestUrl, TimeProvider.System);
 
-        diagnostics.Assert("effective url", "http://example.test/b", info.EffectiveUrl);
-        diagnostics.Assert("method", "PUT", info.EffectiveMethod);
-        diagnostics.Assert("codes", "201 200 1 1 1 18", $"{info.ResponseCode} {info.HttpConnectCode} {info.HttpVersion} {info.RedirectCount} {info.UsedProxy} {info.SslVerifyResult}");
-        diagnostics.Assert("sizes", "4 9", $"{info.SizeDownload} {info.SizeUpload}");
-        diagnostics.Assert("end points", "127.0.0.1:8080 127.0.0.1:50000", $"{info.PrimaryIp}:{info.PrimaryPort} {info.LocalIp}:{info.LocalPort}");
+        string codes = $"{info.ResponseCode} {info.HttpConnectCode} {info.HttpVersion} {info.RedirectCount} {info.UsedProxy} {info.SslVerifyResult}";
+        string sizes = $"{info.SizeDownload} {info.SizeUpload}";
+        string endPoints = $"{info.PrimaryIp}:{info.PrimaryPort} {info.LocalIp}:{info.LocalPort}";
+        diagnostics.Act("effective url", info.EffectiveUrl);
+        diagnostics.Act("method", info.EffectiveMethod);
+        diagnostics.Act("codes", codes);
+        diagnostics.Act("sizes", sizes);
+        diagnostics.Act("end points", endPoints);
+        Assert.AreEqual("http://example.test/b", info.EffectiveUrl);
+        Assert.AreEqual("PUT", info.EffectiveMethod);
+        Assert.AreEqual("201 200 1 1 1 18", codes);
+        Assert.AreEqual("4 9", sizes);
+        Assert.AreEqual("127.0.0.1:8080 127.0.0.1:50000", endPoints);
     }
 
     [TestMethod]
@@ -54,10 +62,14 @@ public sealed class WriteOutTransferInfoTests
 
         TransferInfo info = WriteOutTransferInfo.FromReport(TransferResult.Success(12), RequestUrl, TimeProvider.System);
 
-        diagnostics.Assert("effective url", RequestUrl, info.EffectiveUrl);
-        diagnostics.Assert("download size", 12L, info.SizeDownload);
-        diagnostics.Assert("total time", TimeSpan.Zero, info.TotalTime);
-        diagnostics.Assert("primary port", 0L, info.PrimaryPort);
+        diagnostics.Act("effective url", info.EffectiveUrl);
+        diagnostics.Act("download size", info.SizeDownload);
+        diagnostics.Act("total time", info.TotalTime);
+        diagnostics.Act("primary port", info.PrimaryPort);
+        Assert.AreEqual(RequestUrl, info.EffectiveUrl);
+        Assert.AreEqual(12L, info.SizeDownload);
+        Assert.AreEqual(TimeSpan.Zero, info.TotalTime);
+        Assert.AreEqual(0L, info.PrimaryPort);
     }
 
     [TestMethod]
@@ -71,8 +83,8 @@ public sealed class WriteOutTransferInfoTests
         var nullUrl = Assert.ThrowsExactly<ArgumentNullException>(() => WriteOutTransferInfo.FromReport(result, null!, TimeProvider.System));
         var nullClock = Assert.ThrowsExactly<ArgumentNullException>(() => WriteOutTransferInfo.FromReport(result, RequestUrl, null!));
 
-        diagnostics.Assert("null result parameter", "result", nullResult.ParamName);
-        diagnostics.Assert("null url parameter", "requestUrl", nullUrl.ParamName);
-        diagnostics.Assert("null clock parameter", "timeProvider", nullClock.ParamName);
+        Assert.AreEqual("result", nullResult.ParamName);
+        Assert.AreEqual("requestUrl", nullUrl.ParamName);
+        Assert.AreEqual("timeProvider", nullClock.ParamName);
     }
 }

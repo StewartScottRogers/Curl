@@ -65,6 +65,48 @@ public sealed class ParallelProgressMeterTests
     }
 
     [TestMethod]
+    public void DrawIfDue_TransferBindingItsInterface_DrawsNothingUntilItEnds()
+    {
+        Diagnostics.Arrange("transfer", "one binding --interface for 2.7 s, then failing without reporting itself started");
+        using ParallelProgressMeter meter = NewMeter();
+        ParallelTransferProgress transfer = meter.AddTransfer();
+        transfer.MarkLive(bindsInterface: true);
+
+        meter.DrawIfDue();
+        clock.Advance(1000);
+        clock.Advance(1000);
+        clock.Advance(700);
+        int writtenWhileBinding = written.Length;
+        transfer.End();
+        Diagnostics.Act("characters written while binding", writtenWhileBinding);
+        Diagnostics.Act("meter output", Neutral(written.ToString()));
+
+        string expected = Header + NewLine + "\r--  --      0     0     1     0           00:00:02              0      ";
+        Diagnostics.Assert("characters written while binding", 0, writtenWhileBinding);
+        Diagnostics.Diff("meter output", Neutral(expected), Neutral(written.ToString()));
+        Assert.AreEqual(0, writtenWhileBinding);
+        Assert.AreEqual(expected, written.ToString());
+    }
+
+    [TestMethod]
+    public void ReportTransferStarted_TransferThatBoundItsInterface_DrawsTheHeldLine()
+    {
+        Diagnostics.Arrange("transfer", "one binding --interface for 1.5 s, then past connect");
+        using ParallelProgressMeter meter = NewMeter();
+        ParallelTransferProgress transfer = meter.AddTransfer();
+        transfer.MarkLive(bindsInterface: true);
+        meter.DrawIfDue();
+        clock.Advance(1500);
+
+        transfer.ReportTransferStarted();
+        Diagnostics.Act("meter output", Neutral(written.ToString()));
+
+        string expected = Header + NewLine + "\r--  --      0     0     1     1           00:00:01              0      ";
+        Diagnostics.Diff("meter output", Neutral(expected), Neutral(written.ToString()));
+        Assert.AreEqual(expected, written.ToString());
+    }
+
+    [TestMethod]
     public void DrawIfDue_WithinHalfASecondOfTheLastDraw_DrawsNothing()
     {
         Diagnostics.Arrange("draws", "one at 0 ms, one at 500 ms, one at 501 ms");

@@ -1897,7 +1897,7 @@ internal sealed class CurlCommandRunner(
     {
         string url = UrlSchemeGuesser.AddScheme(transfer.Url, options.DefaultProtocol);
         await run.Hosts.WaitForHostAsync(url, options.HttpVersion == RequestedHttpVersion.Http2PriorKnowledge, abortToken).ConfigureAwait(false);
-        Running.ParallelProgress?.MarkLive();
+        Running.ParallelProgress?.MarkLive(bindsInterface: options.Interface is not null);
         try
         {
             return await TransferUrlAsync(dispatch, options, transfer).ConfigureAwait(false);

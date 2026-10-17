@@ -88,15 +88,33 @@ public sealed class TcpConnectionListenerTests
     [TestMethod]
     public async Task ListenAsync_WhenTheFirstPortIsTaken_ListensOnTheNextFreeOne()
     {
-        using var held = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-        held.Bind(new IPEndPoint(IPAddress.Loopback, 0));
-        held.Listen(1);
-        var heldPort = ((IPEndPoint)held.LocalEndPoint!).Port;
-        Diagnostics.Arrange("port range", "a port held listening and up to 64 after it");
+        // The OS picks the held port (port 0). Other test runs on the machine take ports from the
+        // same pool at the same time, so a port too close to the top of the port space leaves no
+        // room after it, and a block of neighbours another process holds leaves none free: such a
+        // held port is released and another is taken, as the test is about the next free port.
+        const int PortsAfterTheHeldOne = 64;
+        const int HighestHeldPort = 65535 - PortsAfterTheHeldOne;
+        ListenResult listened = default!;
+        var heldPort = 0;
+        for (var attempt = 0; attempt < 10; attempt++)
+        {
+            using var held = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+            held.Bind(new IPEndPoint(IPAddress.Loopback, 0));
+            held.Listen(1);
+            heldPort = ((IPEndPoint)held.LocalEndPoint!).Port;
+            if (heldPort > HighestHeldPort)
+            {
+                continue;
+            }
 
-        // Up to 64 ports after the held one, so a port another process holds is skipped too.
-        var listened = await ListenAsync(
-            new TcpConnectionListener(), new ListenTarget(IPAddress.Loopback, heldPort, Math.Min(heldPort + 64, 65535)));
+            Diagnostics.Arrange("port range", "a port held listening and up to 64 after it");
+            listened = await ListenAsync(
+                new TcpConnectionListener(), new ListenTarget(IPAddress.Loopback, heldPort, heldPort + PortsAfterTheHeldOne));
+            if (listened.ExitCode == CurlExitCode.Ok)
+            {
+                break;
+            }
+        }
 
         Diagnostics.Assert("exit code", CurlExitCode.Ok, listened.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, listened.ExitCode);

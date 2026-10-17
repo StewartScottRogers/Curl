@@ -11,6 +11,7 @@ using Curl.Core;
 using Curl.Core.Hsts;
 using Curl.Core.Multipart;
 using Curl.Protocol.Abstractions;
+using Curl.Protocol.Http;
 using Curl.Protocol.Ws;
 
 namespace Curl.Engine;
@@ -40,10 +41,10 @@ namespace Curl.Engine;
 /// <c>CURLOPT_CONNECT_ONLY</c> 1 perform left open (ADR-0608), and <see cref="WebSocket" /> the connection a
 /// <c>CURLOPT_CONNECT_ONLY</c> 2 perform of a <c>ws</c> or <c>wss</c> URL upgraded (ADR-0616).
 /// </summary>
-/// <param name="createDispatcher">Builds a transfer's dispatcher from its options, the engine's shared state and the cookie store its HTTP handler keeps.</param>
+/// <param name="createDispatcher">Builds a transfer's dispatcher from its options, the engine's shared state, the cookie store its HTTP handler keeps and the HTTP/2 push sink it offers server pushes to (<see cref="PushSinkOf" />).</param>
 /// <param name="shared">What the engine's handles share.</param>
 internal sealed class ManagedEasyTransfer(
-    Func<EasyOptions, ManagedEngineSharedState, ICookieStore?, ProtocolDispatcher> createDispatcher,
+    Func<EasyOptions, ManagedEngineSharedState, ICookieStore?, IHttp2PushSink?, ProtocolDispatcher> createDispatcher,
     ManagedEngineSharedState shared) : IToolEasyTransfer
 {
     /// <summary>libcurl's <c>CURLE_URL_MALFORMAT</c> text for a perform with no URL set.</summary>
@@ -52,11 +53,83 @@ internal sealed class ManagedEasyTransfer(
     /// <summary>libcurl's <c>CURLE_URL_MALFORMAT</c> text for a URL it cannot parse.</summary>
     internal const string MalformedUrlText = "URL rejected: Malformed input to a URL function";
 
-    /// <inheritdoc />
-    public EasyOptions Options { get; set; } = new();
+    /// <summary>
+    /// Gets or sets every option of the handle (<c>curl_easy_setopt</c>). A <c>CURLOPT_SHARE</c> naming another
+    /// <see cref="ManagedShareHandle" /> detaches the handle from the one before and attaches it to the new one at once,
+    /// and each <c>CURLOPT_COOKIELIST</c> item added takes the attached share's cookie lock, as libcurl does (upstream test506).
+    /// </summary>
+    public EasyOptions Options
+    {
+        get => options;
+        set
+        {
+            EasyOptions previous = options;
+            options = value;
+            optionShare = ManagedShareHandle.Reattach(optionShare, value.Behaviour.Share as ManagedShareHandle, this);
+            TakeCookieListItems(previous.Http.CookieList.Count, value.Http);
+        }
+    }
 
-    /// <inheritdoc />
-    public TransferInfo Info { get; private set; } = new();
+    /// <summary>The handle's options, which <see cref="Options" /> gives.</summary>
+    private EasyOptions options = new();
+
+    /// <summary>The share handle <c>CURLOPT_SHARE</c> attached the handle to, or <see langword="null" /> for none.</summary>
+    private ManagedShareHandle? optionShare;
+
+    /// <summary>
+    /// How many of the first <c>CURLOPT_COOKIELIST</c> items were applied to a share handle's cookies as they were set
+    /// (<see cref="TakeCookieListItems" />), so a perform applies only the rest.
+    /// </summary>
+    private int cookieListItemsApplied;
+
+    /// <summary>
+    /// Gets what the last perform found out (<c>curl_easy_getinfo</c>). While the handle is attached to a share handle
+    /// that shares cookies, <see cref="TransferInfo.CookieList" /> is the share's cookies, read under one cookie lock
+    /// pair when the list is first read (<see cref="ShareCookieListLines" />), as curl 8.22.0's <c>CURLINFO_COOKIELIST</c>
+    /// reads them (upstream test506).
+    /// </summary>
+    public TransferInfo Info
+    {
+        get => optionShare is { SharesCookies: true } share ? field with { CookieList = new ShareCookieListLines(share, this) } : field;
+        private set;
+    } = new();
+
+    /// <summary>
+    /// Takes the <c>CURLOPT_COOKIELIST</c> items added since <paramref name="previousCount" />: while the handle is
+    /// attached to a share handle that shares cookies and every earlier item was applied, applies each to the share's
+    /// cookies at once under its own cookie lock pair, as curl 8.22.0's <c>lib/setopt.c</c> does (upstream test506);
+    /// else takes the share's cookie lock once for each and leaves them to the next perform.
+    /// </summary>
+    /// <param name="previousCount">How many items the options held before.</param>
+    /// <param name="http">The handle's HTTP options now.</param>
+    private void TakeCookieListItems(int previousCount, Api.Options.Http.EasyHttpOptions http)
+    {
+        if (optionShare is { SharesCookies: true } share && cookieListItemsApplied == previousCount)
+        {
+            share.ApplyCookieListItems(this, http.CookieList.Skip(previousCount), (cookies, item) => ApplyCookieListItemNow(http, cookies, item));
+            cookieListItemsApplied = http.CookieList.Count;
+            return;
+        }
+
+        optionShare?.LockCookies(this, http.CookieList.Count - previousCount);
+        cookieListItemsApplied = Math.Min(cookieListItemsApplied, http.CookieList.Count);
+    }
+
+    /// <summary>
+    /// Applies one <c>CURLOPT_COOKIELIST</c> item to a share handle's cookies as it is set, waiting for a <c>RELOAD</c>'s
+    /// files or a <c>FLUSH</c>'s jar, as <c>curl_easy_setopt</c> is synchronous.
+    /// </summary>
+    /// <param name="http">The handle's HTTP options.</param>
+    /// <param name="cookies">The share handle's cookies.</param>
+    /// <param name="item">The item.</param>
+    private void ApplyCookieListItemNow(Api.Options.Http.EasyHttpOptions http, Curl.Cookies.CookieStore cookies, string item)
+    {
+        EasyTransferHost host = Host;
+        CookieEngine.OverSharedCookies(http, cookies)
+            .ApplyCookieListItemAsync(item, host.FileSystem, host.StandardInput, host.JarPrintTarget, shared.TimeProvider.GetUtcNow(), NoTransferEvents.Instance)
+            .GetAwaiter()
+            .GetResult();
+    }
 
     /// <inheritdoc />
     public string ErrorText { get; private set; } = string.Empty;
@@ -248,7 +321,73 @@ internal sealed class ManagedEasyTransfer(
         headers.Clear();
         await ConnectOnly.CloseAsync().ConfigureAwait(false);
         await WebSocketConnection.CloseAsync().ConfigureAwait(false);
+        if (PushedResponse is { } pushed)
+        {
+            PushedResponse = null;
+            return await PerformPushedAsync(pushed, cancellationToken).ConfigureAwait(false);
+        }
+
         return await PerformFromOptionsAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Gets the HTTP/2 server push this handle was duplicated for (<see cref="DuplicateForPush" />), which its next
+    /// perform reads in place of sending a request; <see langword="null" /> for every other handle and after that perform.
+    /// </summary>
+    internal IHttpPushedResponse? PushedResponse { get; private set; }
+
+    /// <summary>
+    /// A duplicate of this handle bound to <paramref name="response" />, as curl 8.22.0's <c>push_promise</c> makes
+    /// the pushed transfer with <c>curl_easy_duphandle</c> of the parent (BL-2469).
+    /// </summary>
+    /// <param name="response">The pushed response the duplicate's next perform reads.</param>
+    /// <returns>The duplicate.</returns>
+    internal ManagedEasyTransfer DuplicateForPush(IHttpPushedResponse response)
+    {
+        ManagedEasyTransfer pushed = (ManagedEasyTransfer)Duplicate();
+        pushed.PushedResponse = response;
+        return pushed;
+    }
+
+    /// <summary>
+    /// The push sink the running perform's HTTP handler offers HTTP/2 server pushes to: an
+    /// <see cref="EngineHttp2PushSink" /> while this handle is in a multi handle whose <c>CURLMOPT_PUSHFUNCTION</c>
+    /// is set, else <see langword="null" />, so the handler keeps advertising <c>SETTINGS_ENABLE_PUSH</c> 0 (BL-2469).
+    /// </summary>
+    /// <returns>The sink, or <see langword="null" />.</returns>
+    private EngineHttp2PushSink? PushSinkOf() =>
+        shared.MultiOwners.TryGetValue(this, out ManagedMultiTransfer? multi) && multi.Options.Push is not null
+            ? new EngineHttp2PushSink(this, multi)
+            : null;
+
+    /// <summary>
+    /// Runs a pushed transfer: the pushed response's head goes to the header callback a line at a time and its body
+    /// to the write callback (<see cref="PushedResponseCopier" />), nothing being sent; a failed stream answers
+    /// <see cref="CurlCode.RecvError" /> and a short take by a callback <see cref="CurlCode.WriteError" />, each with
+    /// its message as <see cref="ErrorText" />.
+    /// </summary>
+    /// <param name="pushed">The pushed response.</param>
+    /// <param name="cancellationToken">Stops the transfer.</param>
+    /// <returns>The transfer's code.</returns>
+    private async Task<CurlCode> PerformPushedAsync(IHttpPushedResponse pushed, CancellationToken cancellationToken)
+    {
+        EngineToolTransferOutputs outputs = OwnOutputsOf(Options.Callbacks, pauseGate: null, headers);
+        try
+        {
+            await PushedResponseCopier.CopyAsync(pushed.Content, outputs.HeaderOutput!, outputs.Output, cancellationToken).ConfigureAwait(false);
+            ErrorText = string.Empty;
+            return CurlCode.Ok;
+        }
+        catch (OutputWriteFailedException exception)
+        {
+            ErrorText = exception.Message;
+            return CurlCode.WriteError;
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            ErrorText = exception.Message;
+            return CurlCode.RecvError;
+        }
     }
 
     /// <summary>
@@ -266,18 +405,30 @@ internal sealed class ManagedEasyTransfer(
         }
 
         performShare = share;
-        attachedShared = share.Attach(this, shared);
+        attachedShared = share.Attach(this, shared, Options.Http.CookieFiles.Count > 0, ShareHostKeyOf(Options));
         try
         {
             return await PerformFromOptionsOverCachesAsync(cancellationToken).ConfigureAwait(false);
         }
         finally
         {
-            share.Detach(this);
+            share.LockDnsAtDone(this);
             performShare = null;
             attachedShared = null;
         }
     }
+
+    /// <summary>
+    /// The <c>host:port</c> a perform from <paramref name="options" /> resolves, which a share handle sharing DNS
+    /// looks up and adds under its lock (<see cref="ManagedShareHandle.Attach" />); <see langword="null" /> when no URL
+    /// is set or it does not parse.
+    /// </summary>
+    /// <param name="options">The handle's options.</param>
+    /// <returns>The name, or <see langword="null" />.</returns>
+    internal static string? ShareHostKeyOf(EasyOptions options) =>
+        options.Network.Url is { } urlText && CurlUrl.TryParse(urlText, options.Network.PathAsIs, out CurlUrl? url)
+            ? string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{url.IdnHost}:{url.Port}")
+            : null;
 
     /// <summary>
     /// The cookie store the transfer's HTTP handler keeps: <paramref name="cookies" />' own, under the share
@@ -553,8 +704,47 @@ internal sealed class ManagedEasyTransfer(
         MultipartFormBuildResult? form = await MimePostFormUnlessToolGaveAsync(toolInputs, options, url, mimeReads, cancellationToken).ConfigureAwait(false);
         return form is { IsBuilt: false }
             ? Finish(form.Failure.ExitCode.ToCurlCode(), form.Failure.ErrorMessage!, Info)
-            : await PerformDisposingFormAsync(options, settings, url, urlText, transferId, toolInputs, form?.Body, mimeReads, cancellationToken).ConfigureAwait(false);
+            : await PerformDisposingFormAsync(options, settings, url, urlText, transferId, toolInputs, form?.Body ?? ReadCallbackPostBodyOf(toolInputs, options, url, mimeReads), mimeReads, cancellationToken).ConfigureAwait(false);
     }
+
+    /// <summary>
+    /// The body of a <c>CURLOPT_POST</c> with no <c>CURLOPT_POSTFIELDS</c>, read through <c>CURLOPT_READFUNCTION</c>
+    /// (<see cref="CallbackUploadOf" />) and sent as <c>application/x-www-form-urlencoded</c>, with
+    /// <c>CURLOPT_POSTFIELDSIZE</c> as its <c>Content-Length</c> when not negative and chunked otherwise, as libcurl
+    /// 8.22.0 posts (upstream test508, BL-2586); the stream joins <paramref name="reads" />, so its
+    /// <c>CURL_READFUNC_ABORT</c> ends the perform. With no read callback and a <c>CURLOPT_POSTFIELDSIZE</c> of 0
+    /// (<c>CURLOPT_POSTFIELDS</c> NULL), an empty body sent with <c>Content-Length: 0</c>, as libcurl 8.22.0 posts
+    /// (upstream test515, BL-2592). None when the curl tool's runner gave <paramref name="toolInputs" />, for a
+    /// <c>CURLOPT_UPLOAD</c>, or with no read callback and any other size.
+    /// </summary>
+    /// <param name="toolInputs">The runner's chosen pieces, or <see langword="null" /> for a handle's own.</param>
+    /// <param name="options">The handle's options.</param>
+    /// <param name="url">The URL set, whose scheme says whether the transfer can pause.</param>
+    /// <param name="reads">Receives the body's stream.</param>
+    /// <returns>The body, or <see langword="null" /> for none.</returns>
+    private StreamBody? ReadCallbackPostBodyOf(EngineToolTransferInputs? toolInputs, EasyOptions options, CurlUrl url, ICollection<CallbackReadStream> reads)
+    {
+        if (toolInputs is not null || !PostsWithoutFields(options))
+        {
+            return null;
+        }
+
+        long size = options.Http.PostFieldSize;
+        if (options.Callbacks.Read is not { } read)
+        {
+            return size == 0 ? new StreamBody(Stream.Null, 0, HttpRequestOptionsMapping.FormUrlEncoded) : null;
+        }
+
+        CallbackReadStream content = CallbackUploadOf(read, options.Callbacks, PauseGateFor(url));
+        reads.Add(content);
+        return new StreamBody(content, size < 0 ? null : size, HttpRequestOptionsMapping.FormUrlEncoded);
+    }
+
+    /// <summary>Whether the options post with <c>CURLOPT_POST</c>, no <c>CURLOPT_POSTFIELDS</c> and no <c>CURLOPT_UPLOAD</c>.</summary>
+    /// <param name="options">The handle's options.</param>
+    /// <returns>Whether the post's body is the read callback's.</returns>
+    private static bool PostsWithoutFields(EasyOptions options) =>
+        options.Http.Post && options.Http.PostFields is null && !options.Transfer.Upload;
 
     /// <summary><see cref="PerformParsedAsync" />, then disposes <paramref name="formBody" />'s content.</summary>
     /// <param name="options">The handle's options.</param>
@@ -653,7 +843,7 @@ internal sealed class ManagedEasyTransfer(
     private RedirectFollower FollowerOf(EngineToolTransferDispatch? toolDispatch, EasyOptions options, CookieEngine? cookies) =>
         toolDispatch?.Follower ?? new RedirectFollower(options.Network.ConnectOnly == Api.Options.Network.ConnectOnly.WebSocket
             ? WebSocketUpgradeDispatcherOf(options)
-            : createDispatcher(options, PerformShared, HandlerCookieStoreOf(cookies)));
+            : createDispatcher(options, PerformShared, HandlerCookieStoreOf(cookies), PushSinkOf()));
 
     /// <summary>
     /// The dispatcher of a <c>CURLOPT_CONNECT_ONLY</c> 2 perform: a <see cref="WebSocketUpgradeOnlyHandler" /> whose
@@ -902,7 +1092,7 @@ internal sealed class ManagedEasyTransfer(
     /// <param name="events">Where refused <c>Set-Cookie:</c> lines are reported.</param>
     /// <returns>A task that completes once every item is applied.</returns>
     private Task ApplyCookieListAsync(CookieEngine? cookies, EasyTransferHost host, ITransferEvents events) =>
-        cookies?.ApplyCookieListAsync(host.FileSystem, host.StandardInput, host.JarPrintTarget, shared.TimeProvider.GetUtcNow(), events) ?? Task.CompletedTask;
+        cookies?.ApplyCookieListAsync(cookieListItemsApplied, host.FileSystem, host.StandardInput, host.JarPrintTarget, shared.TimeProvider.GetUtcNow(), events) ?? Task.CompletedTask;
 
     /// <summary>
     /// The running transfer, the events it reports to and what records its verify codes: the runner's
@@ -1163,7 +1353,7 @@ internal sealed class ManagedEasyTransfer(
     }
 
     /// <inheritdoc />
-    public IEasyTransfer Duplicate() => new ManagedEasyTransfer(createDispatcher, shared) { Options = Options, ToolSettings = ToolSettings, Host = Host, TraceComponents = TraceComponents, CreateFormBoundary = CreateFormBoundary, CreateConnectOnlyConnector = CreateConnectOnlyConnector, WebSocketRandomSource = WebSocketRandomSource };
+    public IEasyTransfer Duplicate() => new ManagedEasyTransfer(createDispatcher, shared) { cookieListItemsApplied = cookieListItemsApplied, Options = Options, ToolSettings = ToolSettings, Host = Host, TraceComponents = TraceComponents, CreateFormBoundary = CreateFormBoundary, CreateConnectOnlyConnector = CreateConnectOnlyConnector, WebSocketRandomSource = WebSocketRandomSource };
 
     /// <inheritdoc />
     public void Reset()
@@ -1200,12 +1390,15 @@ internal sealed class ManagedEasyTransfer(
 
     /// <summary>
     /// <c>curl_easy_cleanup</c>: hands the HSTS cache to <c>CURLOPT_HSTSWRITEFUNCTION</c> (<see cref="SaveHstsToCallback" />),
-    /// then closes the connection a connect-only perform left open or upgraded, if any.
+    /// takes the attached share handle's cookie lock for libcurl's cookie flush and detaches from it, then closes the
+    /// connection a connect-only perform left open or upgraded, if any.
     /// </summary>
     /// <returns>A task that completes once it is closed.</returns>
     public async ValueTask DisposeAsync()
     {
         SaveHstsToCallback();
+        optionShare?.LockCookies(this, 1);
+        optionShare = ManagedShareHandle.Reattach(optionShare, named: null, this);
         await (connectOnly?.CloseAsync() ?? ValueTask.CompletedTask).ConfigureAwait(false);
         await (webSocket?.CloseAsync() ?? ValueTask.CompletedTask).ConfigureAwait(false);
     }

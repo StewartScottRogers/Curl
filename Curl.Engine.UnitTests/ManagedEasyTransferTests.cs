@@ -126,6 +126,22 @@ public sealed partial class ManagedEasyTransferTests
     }
 
     [TestMethod]
+    public async Task PerformAsync_PostFieldsPostThenNoBody_SendsAHeadWithNoBody()
+    {
+        EasyOptions options = new()
+        {
+            Network = new EasyNetworkOptions { Url = "http://h/514" },
+            Http = new EasyHttpOptions { PostFields = "moo"u8.ToArray(), PostFieldSize = 3, Post = true },
+            Transfer = new EasyTransferOptions { NoBody = true },
+        };
+
+        (byte[] written, CurlCode code) = await PerformThroughEasyAsync(options, toolSettings: null, Response);
+
+        Assert.AreEqual(CurlCode.Ok, code);
+        Assert.AreEqual("HEAD /514 HTTP/1.1\r\nHost: h\r\nAccept: */*\r\n\r\n", Encoding.ASCII.GetString(written));
+    }
+
+    [TestMethod]
     public async Task PerformAsync_PostFieldsWithoutHttpGet_SendsAPost()
     {
         EasyOptions options = new()

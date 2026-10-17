@@ -171,6 +171,24 @@ public sealed partial class ManagedEasyTransferTests
     }
 
     [TestMethod]
+    public async Task PerformAsync_PostWithNoFieldsAndAReadCallbackThatAborts_ReturnsAbortedByCallbackWithLibcurlsText()
+    {
+        ScriptedConnector connector = new([Encoding.ASCII.GetBytes(Response)]);
+        await using IEasyTransfer easy = CreateEngine(connector).CreateEasy();
+        easy.Options = new EasyOptions
+        {
+            Network = new EasyNetworkOptions { Url = "http://h/post" },
+            Http = new EasyHttpOptions { Post = true, PostFieldSize = 1 },
+            Callbacks = new() { Read = _ => ReadCallbackResult.Abort },
+        };
+
+        CurlCode code = await easy.PerformAsync(CancellationToken.None);
+
+        Assert.AreEqual(CurlCode.AbortedByCallback, code);
+        Assert.AreEqual(CallbackReadStream.AbortedText, easy.ErrorText);
+    }
+
+    [TestMethod]
     public async Task PerformAsync_TrailerCallbackSet_IsCalledOnceTheReadCallbackEndsAndItsLinesCloseTheChunkedUpload()
     {
         ScriptedConnector connector = new([Encoding.ASCII.GetBytes(Continue + Response)]);

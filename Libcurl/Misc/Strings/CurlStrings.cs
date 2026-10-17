@@ -21,7 +21,10 @@ public static class CurlStrings
     /// <c>curl_easy_escape</c>: <paramref name="text"/> URL-encoded, every byte but the unreserved
     /// <c>A-Z a-z 0-9 - . _ ~</c> written as <c>%XX</c> in uppercase hex.
     /// </summary>
-    /// <param name="handle">The easy handle; libcurl ignores it, and so does this.</param>
+    /// <param name="handle">
+    /// The easy handle; the encoded text's buffer is allocated through its <c>curl_global_init_mem</c>
+    /// <c>malloc</c>, if its library has one, and freed at its cleanup (ADR-0664).
+    /// </param>
     /// <param name="text">The text, read as UTF-8 bytes.</param>
     /// <param name="length">How many of those bytes to encode; 0 means all of them.</param>
     /// <returns>
@@ -29,7 +32,16 @@ public static class CurlStrings
     /// <paramref name="text"/> is <see langword="null"/>, <paramref name="length"/> is negative, or
     /// <paramref name="length"/> is past the end of the bytes.
     /// </returns>
-    public static string? Escape(CurlEasy? handle, string? text, int length) => EscapeBytes(SelectBytes(text, length));
+    public static string? Escape(CurlEasy? handle, string? text, int length)
+    {
+        string? escaped = EscapeBytes(SelectBytes(text, length));
+        if (handle is not null && escaped is not null)
+        {
+            handle.Allocations.Malloc((nuint)escaped.Length + 1);
+        }
+
+        return escaped;
+    }
 
     /// <summary><c>curl_escape</c>, deprecated upstream: <see cref="Escape(CurlEasy?, string?, int)"/> with no handle.</summary>
     /// <param name="text">The text, read as UTF-8 bytes.</param>

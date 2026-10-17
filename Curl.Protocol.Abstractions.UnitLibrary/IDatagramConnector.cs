@@ -1,14 +1,17 @@
 namespace Curl.Protocol.Abstractions;
 
 /// <summary>
-/// Opens an <see cref="IDatagramChannel" /> to a host and port: the seam TFTP, the one
-/// datagram protocol, acquires its transport through, once per transfer.
+/// Opens an <see cref="IDatagramChannel" /> to a host and port: the seam every datagram
+/// transport acquires its channel through. TFTP opens one per transfer; QUIC channels, DNS
+/// UDP queries, the Kerberos KDC transport over UDP and the HTTP/3 conformance stand-in
+/// open through it too.
 /// </summary>
 /// <remarks>
-/// TFTP cannot use <see cref="IConnector" />: datagram boundaries carry meaning, and the
-/// server answers from a new port, its transfer identifier (RFC 1350 section 4), which a
-/// byte stream cannot express (ADR-0005). The handler owns and disposes the channel it is
-/// given, and never constructs a <see cref="System.Net.Sockets.Socket" /> itself.
+/// A datagram transport cannot use <see cref="IConnector" />: datagram boundaries carry
+/// meaning, and TFTP's server answers from a new port, its transfer identifier (RFC 1350
+/// section 4), which a byte stream cannot express (ADR-0005). The caller owns and disposes
+/// the channel it is given, and never constructs a <see cref="System.Net.Sockets.Socket" />
+/// itself.
 /// </remarks>
 public interface IDatagramConnector
 {

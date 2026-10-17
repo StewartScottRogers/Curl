@@ -55,7 +55,7 @@ internal sealed class CookieEngine
 
     private bool cookieFilesLoaded;
 
-    private CookieEngine(EasyHttpOptions http, CookieStore store)
+    private CookieEngine(EasyHttpOptions http, CookieStore store, bool engineOn)
     {
         this.store = store;
         joinedCookieString = http.Cookie ?? string.Empty;
@@ -63,7 +63,7 @@ internal sealed class CookieEngine
         cookieJar = http.CookieJar;
         discardSessionCookies = http.CookieSession;
         cookieList = http.CookieList;
-        HandlerStore = HandlerStoreOf(http, store, SentCookieStringsOf(joinedCookieString, http.HttpHeaders));
+        HandlerStore = HandlerStoreOf(engineOn, store, SentCookieStringsOf(joinedCookieString, http.HttpHeaders));
     }
 
     /// <summary>
@@ -119,7 +119,18 @@ internal sealed class CookieEngine
     /// <c>CURLOPT_COOKIELIST</c> adds no cookie.
     /// </returns>
     internal static CookieEngine? FromHttpOptions(EasyHttpOptions http, CookieStore runCookies) =>
-        http.Cookie is not null || TurnsTheEngineOn(http) ? new CookieEngine(http, runCookies) : null;
+        http.Cookie is not null || TurnsTheEngineOn(http) ? new CookieEngine(http, runCookies, TurnsTheEngineOn(http)) : null;
+
+    /// <summary>
+    /// Creates the cookies a handle attached to a share handle that shares cookies applies its <c>CURLOPT_COOKIELIST</c>
+    /// items to as they are set: over the share's store, with the cookie engine on whatever the handle's options say, as
+    /// libcurl's share keeps cookies of its own (upstream test506).
+    /// </summary>
+    /// <param name="http">The handle's HTTP options, for the cookie files <c>RELOAD</c> loads and the jar <c>FLUSH</c> writes.</param>
+    /// <param name="sharedCookies">The share handle's cookies.</param>
+    /// <returns>The cookies.</returns>
+    internal static CookieEngine OverSharedCookies(EasyHttpOptions http, CookieStore sharedCookies) =>
+        new(http, sharedCookies, engineOn: true);
 
     /// <summary>
     /// Applies the handle's <c>CURLOPT_COOKIELIST</c> items in the order set, as curl 8.22.0's <c>cookielist</c> in
@@ -129,20 +140,21 @@ internal sealed class CookieEngine
     /// any other item is one Netscape cookie-file line or one <c>Set-Cookie:</c> header line, stored as a cookie
     /// file's line is (ADR-0657).
     /// </summary>
+    /// <param name="firstItem">How many items to skip, as they were applied when set (<see cref="OverSharedCookies" />).</param>
     /// <param name="fileSystem">Opens the cookie files and the jar.</param>
     /// <param name="standardInput">What a cookie file <c>-</c> reads; it is left open.</param>
     /// <param name="standardOutput">Where a jar <c>-</c> is written.</param>
     /// <param name="now">The time that decides which cookies have expired.</param>
     /// <param name="events">Where the <c>-v</c> line for each refused <c>Set-Cookie:</c> line is reported.</param>
     /// <returns>A task that completes when every item is applied.</returns>
-    internal async Task ApplyCookieListAsync(IFileSystem fileSystem, Stream standardInput, Func<Stream> standardOutput, DateTimeOffset now, ITransferEvents events)
+    internal async Task ApplyCookieListAsync(int firstItem, IFileSystem fileSystem, Stream standardInput, Func<Stream> standardOutput, DateTimeOffset now, ITransferEvents events)
     {
         if (HandlerStore is not GroupCookies)
         {
             return;
         }
 
-        foreach (string item in cookieList)
+        foreach (string item in cookieList.Skip(firstItem))
         {
             await ApplyCookieListItemAsync(item, fileSystem, standardInput, standardOutput, now, events).ConfigureAwait(false);
         }
@@ -236,12 +248,12 @@ internal sealed class CookieEngine
     /// The store the HTTP handler reads and writes: the run's, while a <c>-b</c> file or <c>-c</c>
     /// turns the cookie engine on, or else one that only sends <paramref name="sentCookieStrings" />.
     /// </summary>
-    /// <param name="http">The option group's HTTP options.</param>
+    /// <param name="engineOn">Whether the cookie engine is on.</param>
     /// <param name="store">The run's store.</param>
     /// <param name="sentCookieStrings">The <c>-b name=value</c> strings sent.</param>
     /// <returns>The handler's store.</returns>
-    private static ICookieStore HandlerStoreOf(EasyHttpOptions http, CookieStore store, string[] sentCookieStrings) =>
-        TurnsTheEngineOn(http)
+    private static ICookieStore HandlerStoreOf(bool engineOn, CookieStore store, string[] sentCookieStrings) =>
+        engineOn
             ? new GroupCookies(store, sentCookieStrings)
             : new CookieStringSender(sentCookieStrings);
 
@@ -275,7 +287,7 @@ internal sealed class CookieEngine
     /// <param name="now">The time that decides which cookies have expired.</param>
     /// <param name="events">Where refused <c>Set-Cookie:</c> lines are reported.</param>
     /// <returns>A task that completes when the item is applied.</returns>
-    private Task ApplyCookieListItemAsync(string item, IFileSystem fileSystem, Stream standardInput, Func<Stream> standardOutput, DateTimeOffset now, ITransferEvents events)
+    internal Task ApplyCookieListItemAsync(string item, IFileSystem fileSystem, Stream standardInput, Func<Stream> standardOutput, DateTimeOffset now, ITransferEvents events)
     {
         if (IsCommand(item, "ALL"))
         {

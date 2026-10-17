@@ -11,7 +11,10 @@ given; its `DisposeAsync` is `curl_global_cleanup`
 (ADR-0556). `CurlLibrary` is `partial`: each handle area adds its public creating method
 (`curl_easy_init` and the rest) as a `CurlLibrary` part in its own folder, over the internal
 `Create*` methods in `Global`. Tests that count inits use `CurlGlobal.InitCounting` with their own
-`GlobalInitCounter`, never the process-wide count, since tests run in parallel.
+`GlobalInitCounter`, never the process-wide count, since tests run in parallel. An `InitMemory`
+library's easy handles allocate through its callbacks (`EasyAllocations`, ADR-0664): `calloc` at init
+and `DupHandle`, `strdup` per accepted string option, `malloc` per `CurlStrings.Escape` given the
+handle, and `free` of each at cleanup.
 
 `Options` holds the options table (ADR-0560): `CurlOption` and `CurlOptions` (`curl_easy_option_by_name`,
 `_by_id`, `_next`) generated from curl 8.22.0's `lib/easyoptions.c` and `curl.h`, and the internal
@@ -158,7 +161,9 @@ as upstream deprecates it (ADR-0586): `CurlForm.Add(library, ref form, ...)` is 
 `CURLFORM_*` argument passed to the engine's `ICurlFormBuilder` as given, a `null` form started over a
 new builder and set only on `Ok`; `Get` is `curl_formget`, and `Free` or `Dispose` `curl_formfree`,
 after which the form throws `ObjectDisposedException`. It implements `AddFormPostSetters`:
-`CURLOPT_HTTPPOST` takes a `CurlForm` (else `BadFunctionArgument`) and stores its body as it is when set.
+`CURLOPT_HTTPPOST` takes a `CurlForm` (else `BadFunctionArgument`) and stores its body as it is when set,
+or for `null` an empty form, which the engine posts with `Content-Length: 0` (upstream test516, BL-2599);
+either clears `CURLOPT_NOBODY`.
 
 `Url` holds `CurlUrlHandle`, the URL handle `CurlLibrary.UrlInit` (`curl_url`) returns over the
 engine's `ICurlUrlHandle` (ADR-0587): `Get` and `Set` (`curl_url_get`, `_set`) pass through to the

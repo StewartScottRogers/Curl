@@ -8,7 +8,9 @@ namespace Curl.Console;
 /// first draw, then a status line of the run's totals whenever the run's loop would draw one - on a
 /// byte report, a transfer going live or ending, the runner having started every transfer it can,
 /// and a second without any of those - but only once more than 500 ms have passed since the last,
-/// and a final line, ended by a line ending, as the run ends.
+/// and a final line, ended by a line ending, as the run ends. While a transfer binds its
+/// <c>--interface</c> and is not yet past connect, nothing but the final line is drawn, as curl's
+/// loop is blocked by that bind (AF-0237, ADR-0661).
 /// </summary>
 /// <remarks>
 /// Every draw is made holding the run's <see cref="WriteGate" />, and the figures are read under the
@@ -132,7 +134,7 @@ internal sealed class ParallelProgressMeter : IDisposable
         lock (figuresLock)
         {
             long now = timeProvider.GetTimestamp();
-            if (!final && !IsDue(now))
+            if (!final && !IsDueAndNotHeld(now))
             {
                 return;
             }
@@ -146,10 +148,34 @@ internal sealed class ParallelProgressMeter : IDisposable
         write(text);
     }
 
+    /// <summary>Tells whether a line that is not the final one is drawn: it is due, and no transfer holds the loop.</summary>
+    /// <param name="now">The clock's timestamp.</param>
+    /// <returns><see langword="true" /> when the line is drawn.</returns>
+    private bool IsDueAndNotHeld(long now) => IsDue(now) && !IsLoopHeld();
+
     /// <summary>Tells whether a line is due: none has been drawn, or the last more than 500 ms ago.</summary>
     /// <param name="now">The clock's timestamp.</param>
     /// <returns><see langword="true" /> when a line is due.</returns>
     private bool IsDue(long now) => lastDraw is not { } last || Milliseconds(last, now) > DrawIntervalMilliseconds;
+
+    /// <summary>
+    /// Tells whether a transfer not yet ended is binding its <c>--interface</c>, which blocks curl's loop
+    /// so it draws nothing (<see cref="ParallelTransferProgress.HoldsTheLoop" />, AF-0237). The idle draw
+    /// is not set again; the transfer draws when it lets go.
+    /// </summary>
+    /// <returns><see langword="true" /> when the draws are held.</returns>
+    private bool IsLoopHeld()
+    {
+        foreach (ParallelTransferProgress transfer in transfers)
+        {
+            if (transfer.HoldsTheLoop)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     /// <summary>Computes the figures at <paramref name="now" />, holding the lock, as <c>progress_meter</c> does.</summary>
     /// <param name="now">The clock's timestamp.</param>

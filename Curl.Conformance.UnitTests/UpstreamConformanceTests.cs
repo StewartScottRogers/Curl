@@ -583,15 +583,15 @@ public sealed class UpstreamConformanceTests
 
     // A ported libtest program's engine, in place of curl (BL-2558, ADR-0658): the managed Libcurl engine, every TCP
     // dial reaching the case's in-memory servers through InMemoryServerTcpDialer, names resolved to loopback, the
-    // datagram protocols on the case's datagram servers and the proxy environment the case's <setenv>, as RunCurlAsync
-    // composes curl.
+    // datagram protocols on the case's datagram servers, FTP's active-mode data connections on the FTP stand-in's
+    // listener (BL-2597) and the proxy environment the case's <setenv>, as RunCurlAsync composes curl.
     internal static ICurlEngine CreateEngine(UpstreamCurlInvocation invocation) =>
         new ManagedCurlEngine(
             TimeProvider.System,
             createDispatcher: null,
             CurlEasyErrorText.Of,
             name => invocation.EnvironmentVariables.GetValueOrDefault(name),
-            new EngineDialing(new InMemoryServerTcpDialer(invocation.Connector), new LoopbackOnlyDnsResolver(), invocation.DatagramConnector));
+            new EngineDialing(new InMemoryServerTcpDialer(invocation.Connector), new LoopbackOnlyDnsResolver(), invocation.DatagramConnector, invocation.ConnectionListener));
 
     // The ported libtest programs the ratchet runs a <tool> case's program from, over CreateEngine.
     private static readonly UpstreamLibTests LibTests = new(LibTestPrograms.Ported, CreateEngine);

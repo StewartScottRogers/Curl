@@ -29,13 +29,44 @@ internal sealed class FakeMultiTransfer : IMultiTransfer
 
     public MultiOptions Options { get; set; } = new();
 
-    public CurlMultiCode Add(IEasyTransfer transfer) => AddResult;
+    /// <summary>Perform answers taken in turn before <see cref="PerformResult"/>.</summary>
+    public Queue<(CurlMultiCode Code, int RunningTransfers)> PerformResults { get; } = new();
+
+    /// <summary>Runs in each wait, before it answers.</summary>
+    public Action? Waiting { get; set; }
+
+    /// <summary>When set, one done message with this code is read for the transfer added last.</summary>
+    public CurlCode? DoneResult { get; set; }
+
+    /// <summary>The messages left that the read reports.</summary>
+    public int MessagesLeftAfterRead { get; set; }
+
+    /// <summary>Answers each socket action in place of a transfer; the action throws when it is not set.</summary>
+    public Func<CurlSocket, CurlSocketSelect, (CurlMultiCode Code, int RunningTransfers)>? SocketActing { get; set; }
+
+    /// <summary>The type of the message <see cref="DoneResult"/> reads.</summary>
+    public CurlMultiMessageType DoneMessageType { get; set; } = CurlMultiMessageType.Done;
+
+    /// <summary>The transfer added last.</summary>
+    public IEasyTransfer? Added => added;
+
+    private IEasyTransfer? added;
+
+    public CurlMultiCode Add(IEasyTransfer transfer)
+    {
+        added = transfer;
+        return AddResult;
+    }
 
     public CurlMultiCode Remove(IEasyTransfer transfer) => RemoveResult;
 
-    public ValueTask<(CurlMultiCode Code, int RunningTransfers)> PerformAsync(CancellationToken cancellationToken) => ValueTask.FromResult(PerformResult);
+    public ValueTask<(CurlMultiCode Code, int RunningTransfers)> PerformAsync(CancellationToken cancellationToken) => ValueTask.FromResult(PerformResults.Count > 0 ? PerformResults.Dequeue() : PerformResult);
 
-    public ValueTask<(CurlMultiCode Code, int ReadySockets)> WaitAsync(Memory<CurlWaitSocket> extraSockets, TimeSpan timeout, CancellationToken cancellationToken) => ValueTask.FromResult(WaitResult);
+    public ValueTask<(CurlMultiCode Code, int ReadySockets)> WaitAsync(Memory<CurlWaitSocket> extraSockets, TimeSpan timeout, CancellationToken cancellationToken)
+    {
+        Waiting?.Invoke();
+        return ValueTask.FromResult(WaitResult);
+    }
 
     public ValueTask<(CurlMultiCode Code, int ReadySockets)> PollAsync(Memory<CurlWaitSocket> extraSockets, TimeSpan timeout, CancellationToken cancellationToken) => ValueTask.FromResult(PollResult);
 
@@ -43,12 +74,14 @@ internal sealed class FakeMultiTransfer : IMultiTransfer
 
     public bool TryReadInfo([NotNullWhen(true)] out CurlMultiMessage? message, out int remainingMessages)
     {
-        message = null;
-        remainingMessages = 0;
-        return false;
+        message = DoneResult is { } result && added is not null ? new CurlMultiMessage(DoneMessageType, added, result) : null;
+        remainingMessages = MessagesLeftAfterRead;
+        DoneResult = null;
+        return message is not null;
     }
 
-    public ValueTask<(CurlMultiCode Code, int RunningTransfers)> SocketActionAsync(CurlSocket socket, CurlSocketSelect events, CancellationToken cancellationToken) => throw new NotSupportedException();
+    public ValueTask<(CurlMultiCode Code, int RunningTransfers)> SocketActionAsync(CurlSocket socket, CurlSocketSelect events, CancellationToken cancellationToken) =>
+        SocketActing is { } acting ? ValueTask.FromResult(acting(socket, events)) : throw new NotSupportedException();
 
     public CurlMultiCode Assign(CurlSocket socket, object? socketState) => throw new NotSupportedException();
 

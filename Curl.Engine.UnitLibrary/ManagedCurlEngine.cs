@@ -10,6 +10,7 @@ using Curl.Core;
 using Curl.Core.FileSystem;
 using Curl.Core.Multipart;
 using Curl.Protocol.Abstractions;
+using Curl.Protocol.Http;
 
 namespace Curl.Engine;
 
@@ -27,7 +28,7 @@ namespace Curl.Engine;
 public sealed class ManagedCurlEngine : ICurlEngine
 {
     private readonly ManagedEngineSharedState shared;
-    private readonly Func<EasyOptions, ManagedEngineSharedState, ICookieStore?, ProtocolDispatcher> createDispatcher;
+    private readonly Func<EasyOptions, ManagedEngineSharedState, ICookieStore?, IHttp2PushSink?, ProtocolDispatcher> createDispatcher;
 
     /// <summary>Creates the engine on the system clock and the real network, with no easy error text.</summary>
     public ManagedCurlEngine()
@@ -66,7 +67,7 @@ public sealed class ManagedCurlEngine : ICurlEngine
         EngineDialing? dialing = null)
     {
         shared = new ManagedEngineSharedState(timeProvider, easyErrorText ?? (_ => string.Empty), readEnvironmentVariable, dialing);
-        this.createDispatcher = createDispatcher ?? CreateDispatcher;
+        this.createDispatcher = createDispatcher is null ? CreateDispatcher : (options, state, cookies, _) => createDispatcher(options, state, cookies);
     }
 
     /// <summary>Gets what the engine's handles share.</summary>
@@ -110,13 +111,15 @@ public sealed class ManagedCurlEngine : ICurlEngine
     /// Builds a transfer's dispatcher as <c>Curl.Console</c>'s composition builds an option group's:
     /// <c>EngineComposition.CreateTransports</c>
     /// over the engine's caches, and the handlers over its pooling connector, the HTTP handler keeping
-    /// cookies in <paramref name="cookieStore" />.
+    /// cookies in <paramref name="cookieStore" />. FTP's active-mode listener runs the handle's socket callbacks
+    /// (<see cref="SocketCallbackConnectionListener" />, BL-2588).
     /// </summary>
     /// <param name="options">The transfer's options.</param>
     /// <param name="shared">The engine's shared caches.</param>
     /// <param name="cookieStore">The cookies the HTTP handler sends and keeps, or <see langword="null" /> with the cookie engine off.</param>
+    /// <param name="pushSink">Where the HTTP handler offers HTTP/2 server pushes (<see cref="EngineHttp2PushSink" />, BL-2469), or <see langword="null" /> to refuse them.</param>
     /// <returns>The dispatcher.</returns>
-    internal static ProtocolDispatcher CreateDispatcher(EasyOptions options, ManagedEngineSharedState shared, ICookieStore? cookieStore)
+    internal static ProtocolDispatcher CreateDispatcher(EasyOptions options, ManagedEngineSharedState shared, ICookieStore? cookieStore, IHttp2PushSink? pushSink = null)
     {
         CurlTransports transports = CreateTransports(options, shared);
         return new ProtocolDispatcher(EngineComposition.CreateProtocolHandlers(
@@ -130,7 +133,9 @@ public sealed class ManagedCurlEngine : ICurlEngine
             ftpDataConnector: PoolOf(transports, transports.TcpConnector.ForFtpDataConnections(), options.Callbacks, shared),
             ftpWildcardHooks: CallbackWildcardHooks.Of(options),
             rtspInterleaveSink: CallbackInterleaveSink.Of(options.Callbacks.Interleave),
-            webSocketRawMode: IsWebSocketRawMode(options)));
+            ftpListener: SocketCallbackConnectionListener.Over(shared.Dialing?.FtpListener ?? new Curl.Networking.TcpConnectionListener(), options.Callbacks, shared),
+            webSocketRawMode: IsWebSocketRawMode(options),
+            http2PushSink: pushSink));
     }
 
     /// <summary>

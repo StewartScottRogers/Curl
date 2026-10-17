@@ -372,6 +372,20 @@ public sealed class UpstreamCaseScreeningTests
     }
 
     [TestMethod]
+    public void FindSkipReason_PortedLibToolWithNoCommand_IsNullSinceTheProgramRunsWithNoArguments()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        const string sections = "<client>\n<tool>\nlib1\n</tool>\n<name>\nno command\n</name>\n</client>\n";
+        diagnostics.Arrange("test sections", sections);
+
+        string? reason = UpstreamCaseScreening.FindSkipReason(CleanExpansion, ParsedTestCase.From(sections), Features, isPortedLibTest: program => program == "lib1");
+        diagnostics.Act("skip reason", reason);
+
+        diagnostics.Assert("skip reason", "(none)", reason ?? "(none)");
+        Assert.IsNull(reason);
+    }
+
+    [TestMethod]
     [DataRow("<client>\n<tool>\nlib%TESTNUMBER\n</tool>\n</client>\n", null)]
     [DataRow("<client>\n<tool>\n lib500 \n</tool>\n</client>\n", "lib500")]
     [DataRow("<client>\n<tool>\ntool1394\n</tool>\n</client>\n", null)]

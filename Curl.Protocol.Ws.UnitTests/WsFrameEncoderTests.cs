@@ -198,6 +198,66 @@ public sealed class WsFrameEncoderTests
         Assert.AreEqual("randomSource", exception.ParamName);
     }
 
+    [TestMethod]
+    public void EncodeHeadAndMaskPart_TwoParts_ReadAsTheWholeFrameEncodedAtOnce()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        byte[] payload = "helloworld"u8.ToArray();
+        diagnostics.Arrange("payload", "'helloworld' in parts of 3 and 7, mask 01 02 03 04");
+
+        byte[] head = WsFrameEncoder.EncodeHead(WsOpcode.Text, isFinal: true, payload.Length, new ScriptedRandomSource(1, 2, 3, 4));
+        byte[] mask = head[^WsFrameEncoder.MaskLength..];
+        byte[] parts = [.. head, .. WsFrameEncoder.MaskPart(payload.AsSpan(0, 3), mask, 0), .. WsFrameEncoder.MaskPart(payload.AsSpan(3), mask, 3)];
+
+        byte[] whole = WsFrameEncoder.Encode(WsOpcode.Text, isFinal: true, payload, new ScriptedRandomSource(1, 2, 3, 4));
+        diagnostics.Diff("frame", whole, parts);
+        CollectionAssert.AreEqual(whole, parts);
+    }
+
+    [TestMethod]
+    [DataRow(125L, "81fd01020304", DisplayName = "125 bytes, 7-bit length")]
+    [DataRow(126L, "81fe007e01020304", DisplayName = "126 bytes, 16-bit length")]
+    [DataRow(4294967296L, "81ff000000010000000001020304", DisplayName = "4 GiB, 64-bit length")]
+    public void EncodeHead_PayloadLength_AnnouncesItInTheShortestForm(long payloadLength, string expectedHex)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("payload length", payloadLength);
+
+        byte[] head = WsFrameEncoder.EncodeHead(WsOpcode.Text, isFinal: true, payloadLength, new ScriptedRandomSource(1, 2, 3, 4));
+
+        byte[] expected = Convert.FromHexString(expectedHex);
+        diagnostics.Diff("head", expected, head);
+        CollectionAssert.AreEqual(expected, head);
+    }
+
+    [TestMethod]
+    public void EncodeHead_NegativeLengthOrNullRandomSource_Throws()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("payload length", -1);
+
+        ArgumentOutOfRangeException negative = Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => WsFrameEncoder.EncodeHead(WsOpcode.Text, true, -1, new FixedRandomSource()));
+        ArgumentNullException missing = Assert.ThrowsExactly<ArgumentNullException>(() => WsFrameEncoder.EncodeHead(WsOpcode.Text, true, 0, null!));
+
+        diagnostics.Assert("parameter", "payloadLength", negative.ParamName);
+        Assert.AreEqual("payloadLength", negative.ParamName);
+        Assert.AreEqual("randomSource", missing.ParamName);
+    }
+
+    [TestMethod]
+    public void MaskPart_WrongMaskLengthOrNegativeOffset_Throws()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("mask", "3 bytes; offset -1");
+
+        ArgumentException shortMask = Assert.ThrowsExactly<ArgumentException>(() => WsFrameEncoder.MaskPart("x"u8, [1, 2, 3], 0));
+        ArgumentOutOfRangeException negative = Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => WsFrameEncoder.MaskPart("x"u8, [1, 2, 3, 4], -1));
+
+        diagnostics.Assert("parameter", "mask", shortMask.ParamName);
+        Assert.AreEqual("mask", shortMask.ParamName);
+        Assert.AreEqual("offset", negative.ParamName);
+    }
+
     private static void WriteFrame(TestDiagnostics diagnostics, byte[] frame)
     {
         diagnostics.Bytes("frame", frame);

@@ -177,6 +177,29 @@ public sealed class MlKemTests
     }
 
     [TestMethod]
+    [DataRow(3328, true)]
+    [DataRow(3329, false)]
+    public void TryEncapsulate_FirstCoefficientAtTheModulusBoundary_IsRefusedOnlyAtQ(int firstCoefficient, bool expected)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        byte[] encapsulationKey = new byte[MlKem.GetEncapsulationKeySize(MlKemParameterSet.MlKem512)];
+        byte[] ciphertext = new byte[MlKem.GetCiphertextSize(MlKemParameterSet.MlKem512)];
+        byte[] sharedSecret = new byte[MlKem.SharedSecretSize];
+        using MlKem key = MlKem.GenerateKey(MlKemParameterSet.MlKem512);
+        key.ExportEncapsulationKey(encapsulationKey);
+        encapsulationKey[0] = (byte)firstCoefficient;
+        encapsulationKey[1] = (byte)((encapsulationKey[1] & 0xF0) | (firstCoefficient >> 8));
+        diagnostics.Arrange("parameter set", MlKemParameterSet.MlKem512);
+        diagnostics.Arrange("encapsulation key", $"a random key with its first (even-indexed) 12-bit coefficient set to {firstCoefficient}; q = 3329 (FIPS 203 section 7.2)");
+
+        bool encapsulated = MlKem.TryEncapsulate(MlKemParameterSet.MlKem512, encapsulationKey, new byte[MlKem.MessageSize], ciphertext, sharedSecret);
+        diagnostics.Act("encapsulated", encapsulated);
+
+        diagnostics.Assert("encapsulated", expected, encapsulated);
+        Assert.AreEqual(expected, encapsulated);
+    }
+
+    [TestMethod]
     [DataRow(MlKemParameterSet.MlKem512, 800, 1632, 768)]
     [DataRow(MlKemParameterSet.MlKem768, 1184, 2400, 1088)]
     [DataRow(MlKemParameterSet.MlKem1024, 1568, 3168, 1568)]
