@@ -45,7 +45,7 @@ internal sealed class FakeCurlEngine : ICurlEngine
     public IEasyTransfer CreateEasy()
     {
         CreatingEasy?.Invoke();
-        return new FakeEasyTransfer(PerformResult, Info, Performing) { ConnectOnly = ConnectOnly };
+        return new FakeEasyTransfer(PerformResult, Info, Performing) { ConnectOnly = ConnectOnly, Pauses = Pauses };
     }
 
     public FakeMultiTransfer Multi { get; } = new();
@@ -79,6 +79,9 @@ internal sealed class FakeCurlEngine : ICurlEngine
     /// <summary>Gets the connection every easy transfer's <c>curl_easy_send</c> and <c>curl_easy_recv</c> use; none throws.</summary>
     public IConnectOnlyConnection? ConnectOnly { get; init; }
 
+    /// <summary>Every <c>curl_easy_pause</c> any of its easy transfers was given.</summary>
+    public List<CurlPause> Pauses { get; } = [];
+
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     private sealed class FakeEasyTransfer(CurlCode performResult, TransferInfo info, Func<EasyOptions, CurlCode>? performing) : IEasyTransfer
@@ -99,11 +102,17 @@ internal sealed class FakeCurlEngine : ICurlEngine
 
         public ValueTask<CurlCode> PerformAsync(CancellationToken cancellationToken) => ValueTask.FromResult(performing?.Invoke(Options) ?? performResult);
 
-        public IEasyTransfer Duplicate() => new FakeEasyTransfer(performResult, info, performing) { Options = Options };
+        public IEasyTransfer Duplicate() => new FakeEasyTransfer(performResult, info, performing) { Options = Options, Pauses = Pauses };
 
         public void Reset() => Options = new();
 
-        public CurlCode Pause(CurlPause directions) => throw new NotSupportedException();
+        public List<CurlPause> Pauses { get; init; } = [];
+
+        public CurlCode Pause(CurlPause directions)
+        {
+            Pauses.Add(directions);
+            return CurlCode.Ok;
+        }
 
         public ValueTask<CurlCode> UpkeepAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
 

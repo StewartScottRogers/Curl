@@ -27,6 +27,9 @@ internal sealed class FakeMultiTransfer : IMultiTransfer
 
     public CurlWaitSocket[] WaitSockets { get; set; } = [];
 
+    /// <summary>The events each wait reports for every extra socket it is given.</summary>
+    public CurlWaitEvents ExtraSocketEvents { get; set; }
+
     public MultiOptions Options { get; set; } = new();
 
     /// <summary>Perform answers taken in turn before <see cref="PerformResult"/>.</summary>
@@ -54,7 +57,7 @@ internal sealed class FakeMultiTransfer : IMultiTransfer
 
     public CurlMultiCode Add(IEasyTransfer transfer)
     {
-        added = transfer;
+        added = AddResult == CurlMultiCode.Ok ? transfer : added;
         return AddResult;
     }
 
@@ -65,6 +68,11 @@ internal sealed class FakeMultiTransfer : IMultiTransfer
     public ValueTask<(CurlMultiCode Code, int ReadySockets)> WaitAsync(Memory<CurlWaitSocket> extraSockets, TimeSpan timeout, CancellationToken cancellationToken)
     {
         Waiting?.Invoke();
+        for (int i = 0; i < extraSockets.Length; i++)
+        {
+            extraSockets.Span[i] = extraSockets.Span[i] with { ReturnedEvents = ExtraSocketEvents };
+        }
+
         return ValueTask.FromResult(WaitResult);
     }
 
