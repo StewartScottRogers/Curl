@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Engine.UnitLibrary, Curl.Engine.UnitTests, Libcurl, Libcurl.UnitTests]
+touches: [Curl.Engine.UnitLibrary, Curl.Engine.UnitTests, Libcurl, Libcurl.UnitTests, Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
 requirement: none
 created: 2026-10-17
 completed:
@@ -28,7 +28,10 @@ Found by BL-2527 running test506 through the ported `lib506`: `<verify><stdout>`
 
 ## Notes
 
+- 2026-10-17 (lane 2): the first criterion adds test506 to `Curl.Conformance.UnitTests/PassingUpstreamCases.txt`, so that file was added to `touches`. BL-2528, in Doing, touches the same file, so the task went back to Backlog before any code was written; the board offers it again once BL-2528 leaves Doing. No code was changed.
+
 ## Log
 
 - 2026-10-17: Created.
 - 2026-10-17: Backlog -> Doing. Criteria at claim: 4e518969 904b57ec 3d836d5e.
+- 2026-10-17: Doing -> Backlog. touches Curl.Conformance.UnitTests/PassingUpstreamCases.txt, which BL-2528 (in Doing) also touches
