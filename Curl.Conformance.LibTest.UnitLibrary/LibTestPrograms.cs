@@ -52,7 +52,10 @@ public sealed class LibTestPrograms
         new Lib517(),
         new Lib518(),
         new Lib519(),
+        new Lib525(TimeProvider.System),
+        new Lib526(TimeProvider.System),
         new Lib530(TimeProvider.System),
+        new Lib533(TimeProvider.System),
     ]);
 
     /// <summary>The names of the programs in the table, such as <c>lib500</c>.</summary>

@@ -89,7 +89,7 @@ internal sealed class FakeCurlEngine : ICurlEngine
 
         public IEasyTransfer Duplicate() => new FakeEasyTransfer(performResult, info, performing) { Options = Options };
 
-        public void Reset() => throw new NotSupportedException();
+        public void Reset() => Options = new();
 
         public CurlCode Pause(CurlPause directions) => throw new NotSupportedException();
 
