@@ -3,8 +3,8 @@ id: AF-0228
 title: Nine TransferWriteOutVariables tests check their rendered -w text only through Show, which never asserts
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Output.UnitTests/TransferWriteOutVariablesFromTransferInfoTests.cs:Show:no-assertion
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Curl.Output.UnitTests/TransferWriteOutVariablesFromTransferI
 ## Log
 
 - 2026-10-16: filed proposed.
+- 2026-10-16: proposed -> accepted.
