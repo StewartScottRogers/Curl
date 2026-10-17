@@ -31,3 +31,4 @@ Found by BL-2584. With BL-2584's Proxy-Authorization fix (left in its stash), te
 ## Log
 
 - 2026-10-17: Created.
+- 2026-10-17: Backlog -> Doing. Criteria at claim: 34955914 e9a7e0b8 3d836d5e.
