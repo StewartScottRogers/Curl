@@ -30,3 +30,4 @@ BL-2611 (ADR-0669) made `WsProtocolHandler` send a read callback's upload (`IWsU
 ## Log
 
 - 2026-10-17: Created.
+- 2026-10-17: Backlog -> Doing. Criteria at claim: 9a4e158c 53bb8082.
