@@ -1,5 +1,5 @@
 ---
-id: BL-2647
+id: BL-2651
 title: Resume a transfer paused by its write callback when the transfer-info callback unpauses it so upstream case 1540 passes
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-17
 completed:
 ---
-# BL-2647 — Resume a transfer paused by its write callback when the transfer-info callback unpauses it so upstream case 1540 passes
+# BL-2651 — Resume a transfer paused by its write callback when the transfer-info callback unpauses it so upstream case 1540 passes
 
 ## Goal
 
