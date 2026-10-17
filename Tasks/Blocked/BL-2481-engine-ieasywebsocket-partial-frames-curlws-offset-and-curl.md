@@ -35,3 +35,4 @@ ADR-0616 (BL-2443) built `curl_ws_recv`, `curl_ws_send` and `curl_ws_meta` over 
 - 2026-10-16: Backlog -> Doing. Criteria at claim: 38ec9a67 b8258fe2 0cf7a8c9 0f90c956.
 - 2026-10-16: Doing -> Backlog. Lane 5 could not integrate: rebase failed. The work is on branch factory/BL-2481-lane-5-20261016-081911; start with git cherry-pick --no-commit factory/BL-2481-lane-5-20261016-081911 and fix it.
 - 2026-10-17: Backlog -> Doing. Criteria at claim: 38ec9a67 b8258fe2 0cf7a8c9 0f90c956.
+- 2026-10-17: Doing -> Blocked. Stewart: dark factory its runs of the last day already cost 2.77 of its 3.53 US dollar cost cap, so it was not run again; split the task; see Z:\repos\Curl.logs\BL-2481-*.jsonl
