@@ -34,3 +34,4 @@ Phase 5 of `Documentation/Planning/Curl-Api-And-libcurl.md` and ADR-0506. Upstre
 ## Log
 
 - 2026-10-16: Created.
+- 2026-10-17: Backlog -> Doing. Criteria at claim: c9522e91 ceef976f 6c058a97 408cc7ba 4272a6b9 8738c7f6.
