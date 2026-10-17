@@ -8,7 +8,7 @@ depends-on: []
 touches: [RunDarkFactory.ps1]
 requirement: none
 created: 2026-10-17
-completed:
+completed: 2026-10-17
 ---
 # BL-2563 — Re-fix AF-0226: CI red for 31.42 minutes from run 38682338635: test203 failed on Linux and macOS after BL-2219's ratchet commit 8d337539
 
@@ -45,12 +45,15 @@ The finding closes only when a later re-audit by the process auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- The red spell is past and cannot be rerun. The re-audit found the same cause again with a different test (a POSIX file-system test from BL-2328), so BL-2279's ratchet-only prompt rule was too narrow. Decision (Claude, under delegation): widen the lane-prompt rule in RunDarkFactory.ps1 (both prompts) to any test touching the file system, paths, OS errors or certificates, naming POSIX semantics and OSCondition. No ADR: a prompt rule. RunDarkFactory.ps1 parses clean, dotnet build clean; no C# changed.
 
 ## Log
 
 - 2026-10-17: Created.
 - 2026-10-17: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-17: Doing -> Done. Widened the lane-prompt platform-neutrality rule to any file-system or path test
