@@ -290,10 +290,10 @@ and an HTTP `-x` is reached through the pre-proxy the group's `TcpConnector` get
 `EngineComposition.PreProxyOf`. The `--socks5-*` options reach the same connector through
 `Curl.Engine`'s `Socks5AuthenticationMapping`, with the tunnel's `LateBoundSecurityContextFactory` for GSS-API
 (ADR-0276, BL-615). Proxy text curl
-cannot use ends the transfer with the selector's exit 5 or 7, and a SOCKS proxy, or an HTTPS
-proxy for `https` or under `-p` or `-L`, ends an `http`/`https` transfer with exit 4 until the connector opens those tunnels
-(ADR-0053, BL-328). Other schemes do not read the proxy yet (BL-330), and redirect hops keep
-the first URL's proxy (BL-329). Measured on curl 8.21.0 (BL-238 Notes).
+cannot use ends the transfer with the selector's exit 5 or 7. A SOCKS proxy, or an HTTPS
+proxy, reaches the connector, which opens the tunnel (`SocksProxyTunnel.OpenAsync` in
+`TcpConnector`; ADR-0053, BL-328); `dict`, `gopher` and `https` URLs carry such a proxy there
+too (BL-330). Redirect hops keep the first URL's proxy (BL-329). Measured on curl 8.21.0 (BL-238 Notes).
 
 The runner asks `Curl.Engine`'s `TransferCredentialLookup` for the transfer's credentials, once per URL, and keeps them as the running transfer's `LookedUpCredentials`, which `TransferContextFactory` puts on every attempt's context in place of `-u`'s; `RedirectFollower` gets `TransferCredentialLookup.ForRedirectHops` for each hop. The lookup's rules (URL credentials, netrc) are in `Curl.Engine.UnitLibrary/CLAUDE.md`.
 An `ftp` or `ftps` URL is claimed by `Curl.Engine`'s `RoutingFtpProtocolHandler`, which hands an `ftp` one to
