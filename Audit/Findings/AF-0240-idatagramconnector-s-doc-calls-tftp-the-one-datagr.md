@@ -3,8 +3,8 @@ id: AF-0240
 title: IDatagramConnector's doc calls TFTP the one datagram protocol using it; QUIC, DNS and the Kerberos KDC transport open through it too
 auditor: truthfulness
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: truthfulness:Curl.Protocol.Abstractions.UnitLibrary/IDatagramConnector.cs:IDatagramConnector:false-doc-comment
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Run from the repository root:
 ## Log
 
 - 2026-10-16: filed proposed.
+- 2026-10-16: proposed -> accepted.
