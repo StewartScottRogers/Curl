@@ -1,0 +1,38 @@
+{
+    "schema":  1,
+    "shift":  "20261017-082706",
+    "branch":  "work/dark-factory",
+    "state":  "running",
+    "publishedAt":  "2026-10-17T17:56:41Z",
+    "autoLanes":  {
+                      "lanes":  1,
+                      "target":  1,
+                      "binding":  "capacity",
+                      "reason":  "lanes 2 -\u003e 1 (1 ready task can run at once)",
+                      "changedAt":  "2026-10-17T17:13:27Z"
+                  },
+    "lanes":  [
+                  {
+                      "lane":  1,
+                      "task":  "BL-2535",
+                      "title":  "Port libtest programs 666 to 695 to C# and add their cases to the ratchet",
+                      "model":  "opus",
+                      "modelWhy":  "feature pipeline",
+                      "phase":  "run",
+                      "step":  "skill task-run BL-2535",
+                      "taskStartedAt":  "2026-10-17T17:54:27Z",
+                      "heartbeatAt":  "2026-10-17T17:56:35Z"
+                  },
+                  {
+                      "lane":  2,
+                      "task":  null,
+                      "title":  null,
+                      "model":  null,
+                      "modelWhy":  null,
+                      "phase":  "finished",
+                      "step":  "retired",
+                      "taskStartedAt":  null,
+                      "heartbeatAt":  "2026-10-17T17:14:31Z"
+                  }
+              ]
+}
