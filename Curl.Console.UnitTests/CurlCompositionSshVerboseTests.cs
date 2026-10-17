@@ -271,7 +271,9 @@ public sealed class CurlCompositionSshVerboseTests
         Assert.AreEqual(0, exitCode);
     }
 
+    // Sets SSH_AUTH_SOCK for the whole process, so it runs alone.
     [TestMethod]
+    [DoNotParallelize]
     public async Task CreateRunner_ScpDownloadWithKeyboardInteractive_WritesTheAgentThenTheMethodAsMeasured()
     {
         Diagnostics.Arrange("url", "scp://127.0.0.1:2222/data/hello.txt");
