@@ -405,6 +405,27 @@ public sealed partial class HttpProtocolHandlerTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_Http3StreamRefusedEveryTime_ClosesTheLastConnectionRatherThanLeavingItIntact()
+    {
+        // AF-0233: the connection the peer refused a sixth time is closed, never kept for the
+        // next URL of the run, so -v ends with "closing connection" and no "left intact".
+        FakeMultiplexedConnection[] connections = [.. Enumerable.Range(0, 7).Select(_ => new FakeMultiplexedConnection(
+            new FakeMultiplexedStream(0, []) { EndException = new MultiplexedStreamResetException(0x10b, "refused") }))];
+        QueueConnector connector = QuicConnector(connections);
+        RecordingTransferEvents events = new();
+
+        Diagnostics.Arrange("url", "https://example.com/");
+        Diagnostics.Arrange("scenario", "Http3StreamRefusedEveryTime_ClosesTheLastConnectionRatherThanLeavingItIntact");
+        TransferResult result = await Handler(connector).ExecuteAsync(Http3Context("https://example.com/", new MemoryStream(), events: events));
+
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.RecvError, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.RecvError, result.ExitCode);
+        Assert.IsFalse(events.Info.Any(line => line.EndsWith(" left intact", StringComparison.Ordinal)), string.Join("\n", events.Info));
+        Assert.StartsWith("closing connection #", events.Info.Last(line => line.Contains("connection #", StringComparison.Ordinal)));
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_Http3StreamRefusedOnceTheResponseBegan_FailsWithExit56WithoutRetrying()
     {
         FakeMultiplexedStream refused = new(0, Http3Response(Http3Head("200", ("content-length", "5"))))
