@@ -150,6 +150,16 @@ public sealed class LibTestPrograms
         new Lib1520(),
         new Lib1522(TimeProvider.System),
         new Lib1523(),
+        LibProxyTunnelUpload.Unified,
+        LibProxyTunnelUpload.Separate,
+        LibProxyTunnelUpload.ExpectContinue,
+        new Lib1528(),
+        new Lib1529(),
+        new Lib1530(),
+        new Lib1531(TimeProvider.System),
+        new Lib1532(),
+        new Lib1533(),
+        new Lib1534(),
     ]);
 
     /// <summary>The names of the programs in the table, such as <c>lib500</c>.</summary>
