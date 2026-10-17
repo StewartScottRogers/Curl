@@ -31,7 +31,7 @@ Phase 5 of `Documentation/Planning/Curl-Api-And-libcurl.md` and ADR-0506. Upstre
 
 ## Notes
 
-- 2026-10-17 (lane 1): lib557 is the `curl_m*printf` test and Libcurl has no printf API; split out to BL-2612, which depends on BL-2611 (the Libcurl API). Criteria edited in Backlog to drop lib557, then reclaimed. Cases for the rest: 554 and 587 (lib554), 555, 556 and 696 (lib556), 558, 559, 560, 562 and 563 (lib562), 564, 566. Case 561 runs lib549, 565 runs lib510 (earlier batches).
+- 2026-10-17 (lane 1): lib557 is the `curl_m*printf` test and Libcurl has no printf API; split out to BL-2612, which depends on BL-2616 (the Libcurl API). Criteria edited in Backlog to drop lib557, then reclaimed. Cases for the rest: 554 and 587 (lib554), 555, 556 and 696 (lib556), 558, 559, 560, 562 and 563 (lib562), 564, 566. Case 561 runs lib549, 565 runs lib510 (earlier batches).
 - Ports: `Lib554` (its `StreamReader` reads the form's streams in order, one byte a call, since a managed read callback gets no `CURLFORM_STREAM` pointer; 587 aborts), `Lib555` (reuses `Lib547.BlurbReader`), `Lib556` (connect-only send/recv, twice for 696), `Lib558`, `Lib559`, `Lib560`, `Lib562`, `Lib564`, `Lib566`. Tests in `Lib554To566Tests.cs`; `FakeCurlEngine` gained `CreatingForm` and `ConnectOnly`, with `FakeFormBuilder` and `FakeConnectOnlyConnection`.
 - On the ratchet: 556, 559, 560, 564, 566, 587, 696. None depends on the platform: HTTP, HTTPS with verification off, SOCKS4 and raw protocol bytes only, and 566 writes `CL -1` to a file whose path is an argument. Failing, filed: 554 (BL-2613, form stream framing), 562 and 563 (BL-2614, CURLOPT_PORT), 558 (BL-2615, skipped as TrackMemory), 555 (BL-2607, no IOCTLFUNCTION, already filed).
 - Quality run on `Curl.Conformance.LibTest.UnitLibrary`: one failing member, `Lib556.ExchangeAsync` at complexity 20 (async); split into `SendSomeAsync` and `ReceiveSomeAsync`, each well under 10, and the unit tests cover every branch of the three; not measured a second time (cost cap). All else 100%/100%.
@@ -40,6 +40,6 @@ Phase 5 of `Documentation/Planning/Curl-Api-And-libcurl.md` and ADR-0506. Upstre
 
 - 2026-10-16: Created.
 - 2026-10-17: Backlog -> Doing. Criteria at claim: a86a911a ceef976f 6c058a97 408cc7ba 4272a6b9 8738c7f6.
-- 2026-10-17: Doing -> Backlog. Split lib557 out to BL-2612 (needs Libcurl curl_mprintf, BL-2611); criteria edited in Backlog to drop lib557
+- 2026-10-17: Doing -> Backlog. Split lib557 out to BL-2612 (needs Libcurl curl_mprintf, BL-2616); criteria edited in Backlog to drop lib557
 - 2026-10-17: Backlog -> Doing. Criteria at claim: 8c36e189 ceef976f 6c058a97 408cc7ba 4272a6b9 8738c7f6.
 - 2026-10-17: Doing -> Done. lib554-lib566 (but lib557, split to BL-2612) ported; cases 556, 559, 560, 564, 566, 587, 696 on the ratchet; the rest filed as BL-2613 to BL-2615

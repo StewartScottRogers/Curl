@@ -4,7 +4,7 @@ title: Port libtest program 557 to C# and add case 557 to the ratchet
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-2611]
+depends-on: [BL-2616]
 touches: [Curl.Conformance.LibTest.UnitLibrary, Curl.Conformance.LibTest.UnitTests, Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
 requirement: none
 created: 2026-10-17
@@ -18,7 +18,7 @@ completed:
 
 ## Context
 
-Split out of BL-2531 (batch 5 of the libtest ports, phase 5 of `Documentation/Planning/Curl-Api-And-libcurl.md`, ADR-0506): lib557 tests libcurl's own printf, which Libcurl gains in BL-2611. Port it as `Lib557` in `Curl.Conformance.LibTest.UnitLibrary`, register it in `LibTestPrograms.Ported`, and test it in `Curl.Conformance.LibTest.UnitTests` like the other ports. Case 557's expected stdout lists the "All ... tests OK!" lines. lib557 is 1422 lines of tables; keep each method at complexity 10 or less by driving the tables through one checker.
+Split out of BL-2531 (batch 5 of the libtest ports, phase 5 of `Documentation/Planning/Curl-Api-And-libcurl.md`, ADR-0506): lib557 tests libcurl's own printf, which Libcurl gains in BL-2616. Port it as `Lib557` in `Curl.Conformance.LibTest.UnitLibrary`, register it in `LibTestPrograms.Ported`, and test it in `Curl.Conformance.LibTest.UnitTests` like the other ports. Case 557's expected stdout lists the "All ... tests OK!" lines. lib557 is 1422 lines of tables; keep each method at complexity 10 or less by driving the tables through one checker.
 
 ## Acceptance criteria
 

@@ -1,5 +1,5 @@
 ---
-id: BL-2611
+id: BL-2616
 title: Add curl_mprintf, curl_msprintf, curl_msnprintf, curl_maprintf and curl_mfprintf to Libcurl
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-17
 completed:
 ---
-# BL-2611 — Add curl_mprintf, curl_msprintf, curl_msnprintf, curl_maprintf and curl_mfprintf to Libcurl
+# BL-2616 — Add curl_mprintf, curl_msprintf, curl_msnprintf, curl_maprintf and curl_mfprintf to Libcurl
 
 ## Goal
 
