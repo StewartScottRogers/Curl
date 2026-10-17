@@ -1,0 +1,1403 @@
+{
+  "generated": "2026-10-16T13:54:08Z",
+  "target": "8.22.0",
+  "newest": "8.22.0",
+  "latest": {
+    "stamp": "2026-10-15_1657",
+    "commit": "adf07bc2bf2b55cd554c8fe52b7a24ddf3d0eba0",
+    "platform": "macos",
+    "targetVersion": "8.22.0",
+    "newestVersion": "8.22.0",
+    "areas": {
+      "options": {
+        "x": 567,
+        "y": 568
+      },
+      "protocols": {
+        "x": 27,
+        "y": 27
+      },
+      "features": {
+        "x": 20,
+        "y": 20
+      },
+      "writeout": {
+        "x": 138,
+        "y": 138
+      },
+      "exitcodes": {
+        "x": 259,
+        "y": 259
+      },
+      "environment": {
+        "x": 28,
+        "y": 33
+      },
+      "behaviour": {
+        "x": 1409,
+        "y": 1445
+      }
+    },
+    "overall": {
+      "x": 2448,
+      "y": 2490
+    },
+    "newest": {
+      "x": 2448,
+      "y": 2490
+    }
+  },
+  "platforms": {
+    "windows": {
+      "stamp": "2026-10-15_1657",
+      "commit": "adf07bc2bf2b55cd554c8fe52b7a24ddf3d0eba0",
+      "platform": "windows",
+      "targetVersion": "8.22.0",
+      "newestVersion": "8.22.0",
+      "areas": {
+        "options": {
+          "x": 568,
+          "y": 568
+        },
+        "protocols": {
+          "x": 27,
+          "y": 27
+        },
+        "features": {
+          "x": 18,
+          "y": 18
+        },
+        "writeout": {
+          "x": 138,
+          "y": 138
+        },
+        "exitcodes": {
+          "x": 259,
+          "y": 259
+        },
+        "environment": {
+          "x": 39,
+          "y": 39
+        },
+        "behaviour": {
+          "x": 1396,
+          "y": 1427
+        }
+      },
+      "overall": {
+        "x": 2445,
+        "y": 2476
+      },
+      "newest": {
+        "x": 2445,
+        "y": 2476
+      }
+    },
+    "linux": {
+      "stamp": "2026-10-15_1657",
+      "commit": "adf07bc2bf2b55cd554c8fe52b7a24ddf3d0eba0",
+      "platform": "linux",
+      "targetVersion": "8.22.0",
+      "newestVersion": "8.22.0",
+      "areas": {
+        "options": {
+          "x": 567,
+          "y": 568
+        },
+        "protocols": {
+          "x": 27,
+          "y": 27
+        },
+        "features": {
+          "x": 20,
+          "y": 20
+        },
+        "writeout": {
+          "x": 138,
+          "y": 138
+        },
+        "exitcodes": {
+          "x": 259,
+          "y": 259
+        },
+        "environment": {
+          "x": 28,
+          "y": 33
+        },
+        "behaviour": {
+          "x": 1410,
+          "y": 1445
+        }
+      },
+      "overall": {
+        "x": 2449,
+        "y": 2490
+      },
+      "newest": {
+        "x": 2449,
+        "y": 2490
+      }
+    },
+    "macos": {
+      "stamp": "2026-10-15_1657",
+      "commit": "adf07bc2bf2b55cd554c8fe52b7a24ddf3d0eba0",
+      "platform": "macos",
+      "targetVersion": "8.22.0",
+      "newestVersion": "8.22.0",
+      "areas": {
+        "options": {
+          "x": 567,
+          "y": 568
+        },
+        "protocols": {
+          "x": 27,
+          "y": 27
+        },
+        "features": {
+          "x": 20,
+          "y": 20
+        },
+        "writeout": {
+          "x": 138,
+          "y": 138
+        },
+        "exitcodes": {
+          "x": 259,
+          "y": 259
+        },
+        "environment": {
+          "x": 28,
+          "y": 33
+        },
+        "behaviour": {
+          "x": 1409,
+          "y": 1445
+        }
+      },
+      "overall": {
+        "x": 2448,
+        "y": 2490
+      },
+      "newest": {
+        "x": 2448,
+        "y": 2490
+      }
+    }
+  },
+  "lowest": {
+    "platform": "macos",
+    "stamp": "2026-10-15_1657",
+    "x": 2448,
+    "y": 2490
+  },
+  "history": [
+    {
+      "stamp": "2026-10-08_1640",
+      "commit": "0fcab8154bc9edd94631a50dfe69b45e56103d61",
+      "platform": "windows",
+      "targetVersion": "8.21.0",
+      "newestVersion": "8.21.0",
+      "areas": {
+        "options": {
+          "x": 567,
+          "y": 573
+        },
+        "protocols": {
+          "x": 27,
+          "y": 29
+        },
+        "features": {
+          "x": 16,
+          "y": 23
+        },
+        "writeout": {
+          "x": 138,
+          "y": 138
+        },
+        "exitcodes": {
+          "x": 259,
+          "y": 259
+        },
+        "environment": {
+          "x": 24,
+          "y": 42
+        },
+        "behaviour": {
+          "x": 578,
+          "y": 1326
+        }
+      },
+      "overall": {
+        "x": 1609,
+        "y": 2390
+      },
+      "newest": {
+        "x": 1609,
+        "y": 2390
+      }
+    },
+    {
+      "stamp": "2026-10-08_2029",
+      "commit": "6383c57058094f578fbb0580b9eea86f7c54cca1",
+      "platform": "windows",
+      "targetVersion": "8.21.0",
+      "newestVersion": "8.22.0",
+      "areas": {
+        "options": {
+          "x": 567,
+          "y": 573
+        },
+        "protocols": {
+          "x": 27,
+          "y": 29
+        },
+        "features": {
+          "x": 18,
+          "y": 23
+        },
+        "writeout": {
+          "x": 138,
+          "y": 138
+        },
+        "exitcodes": {
+          "x": 259,
+          "y": 259
+        },
+        "environment": {
+          "x": 24,
+          "y": 42
+        },
+        "behaviour": {
+          "x": 651,
+          "y": 1327
+        }
+      },
+      "overall": {
+        "x": 1684,
+        "y": 2391
+      },
+      "newest": {
+        "x": 1684,
+        "y": 2391
+      }
+    },
+    {
+      "stamp": "2026-10-10_0657",
+      "commit": "124a991e4e94f00b7f2601b719f980e202d0c231",
+      "platform": "windows",
+      "targetVersion": "8.21.0",
+      "newestVersion": "8.22.0",
+      "areas": {
+        "options": {
+          "x": 568,
+          "y": 573
+        },
+        "protocols": {
+          "x": 27,
+          "y": 27
+        },
+        "features": {
+          "x": 18,
+          "y": 18
+        },
+        "writeout": {
+          "x": 138,
+          "y": 138
+        },
+        "exitcodes": {
+          "x": 259,
+          "y": 259
+        },
+        "environment": {
+          "x": 24,
+          "y": 42
+        },
+        "behaviour": {
+          "x": 1042,
+          "y": 1402
+        }
+      },
+      "overall": {
+        "x": 2076,
+        "y": 2459
+      },
+      "newest": {
+        "x": 2076,
+        "y": 2459
+      }
+    },
+    {
+      "stamp": "2026-10-11_0936",
+      "commit": "73b24de56af52ce71fbb11463260368249d462e3",
+      "platform": "windows",
+      "targetVersion": "8.21.0",
+      "newestVersion": "8.22.0",
+      "areas": {
+        "options": {
+          "x": 568,
+          "y": 568
+        },
+        "protocols": {
+          "x": 27,
+          "y": 27
+        },
+        "features": {
+          "x": 18,
+          "y": 18
+        },
+        "writeout": {
+          "x": 138,
+          "y": 138
+        },
+        "exitcodes": {
+          "x": 259,
+          "y": 259
+        },
+        "environment": {
+          "x": 24,
+          "y": 42
+        },
+        "behaviour": {
+          "x": 1218,
+          "y": 1394
+        }
+      },
+      "overall": {
+        "x": 2252,
+        "y": 2446
+      },
+      "newest": {
+        "x": 2252,
+        "y": 2446
+      }
+    },
+    {
+      "stamp": "2026-10-11_1950",
+      "commit": "9271d48eed05c110220206d6996edd11ecccf1d5",
+      "platform": "windows",
+      "targetVersion": "8.21.0",
+      "newestVersion": "8.22.0",
+      "areas": {
+        "options": {
+          "x": 568,
+          "y": 568
+        },
+        "protocols": {
+          "x": 27,
+          "y": 27
+        },
+        "features": {
+          "x": 18,
+          "y": 18
+        },
+        "writeout": {
+          "x": 138,
+          "y": 138
+        },
+        "exitcodes": {
+          "x": 259,
+          "y": 259
+        },
+        "environment": {
+          "x": 24,
+          "y": 42
+        },
+        "behaviour": {
+          "x": 1241,
+          "y": 1394
+        }
+      },
+      "overall": {
+        "x": 2275,
+        "y": 2446
+      },
+      "newest": {
+        "x": 2275,
+        "y": 2446
+      }
+    },
+    {
+      "stamp": "2026-10-12_0951",
+      "commit": "6e0e22221eb6c219fb70e6d9d9ddf0732717879a",
+      "platform": "windows",
+      "targetVersion": "8.21.0",
+      "newestVersion": "8.22.0",
+      "areas": {
+        "options": {
+          "x": 568,
+          "y": 568
+        },
+        "protocols": {
+          "x": 27,
+          "y": 27
+        },
+        "features": {
+          "x": 18,
+          "y": 18
+        },
+        "writeout": {
+          "x": 138,
+          "y": 138
+        },
+        "exitcodes": {
+          "x": 259,
+          "y": 259
+        },
+        "environment": {
+          "x": 37,
+          "y": 39
+        },
+        "behaviour": {
+          "x": 1240,
+          "y": 1394
+        }
+      },
+      "overall": {
+        "x": 2287,
+        "y": 2443
+      },
+      "newest": {
+        "x": 2287,
+        "y": 2443
+      }
+    },
+    {
+      "stamp": "2026-10-12_2042",
+      "commit": "7851aca9b37fbcc5b3c59186942d0fefd00f04ac",
+      "platform": "windows",
+      "targetVersion": "8.21.0",
+      "newestVersion": "8.22.0",
+      "areas": {
+        "options": {
+          "x": 568,
+          "y": 568
+        },
+        "protocols": {
+          "x": 27,
+          "y": 27
+        },
+        "features": {
+          "x": 18,
+          "y": 18
+        },
+        "writeout": {
+          "x": 138,
+          "y": 138
+        },
+        "exitcodes": {
+          "x": 259,
+          "y": 259
+        },
+        "environment": {
+          "x": 39,
+          "y": 39
+        },
+        "behaviour": {
+          "x": 1241,
+          "y": 1394
+        }
+      },
+      "overall": {
+        "x": 2290,
+        "y": 2443
+      },
+      "newest": {
+        "x": 2290,
+        "y": 2443
+      }
+    },
+    {
+      "stamp": "2026-10-13_1406",
+      "commit": "ea349cba55ff1071102d656cf71828453b0b36c5",
+      "platform": "windows",
+      "targetVersion": "8.22.0",
+      "newestVersion": "8.22.0",
+      "areas": {
+        "options": {
+          "x": 576,
+          "y": 576
+        },
+        "protocols": {
+          "x": 27,
+          "y": 27
+        },
+        "features": {
+          "x": 18,
+          "y": 18
+        },
+        "writeout": {
+          "x": 138,
+          "y": 138
+        },
+        "exitcodes": {
+          "x": 259,
+          "y": 259
+        },
+        "environment": {
+          "x": 39,
+          "y": 39
+        },
+        "behaviour": {
+          "x": 1250,
+          "y": 1417
+        }
+      },
+      "overall": {
+        "x": 2307,
+        "y": 2474
+      },
+      "newest": {
+        "x": 2307,
+        "y": 2474
+      }
+    },
+    {
+      "stamp": "2026-10-14_0904",
+      "commit": "9ffb1cb168b2bd7e9b4c356afb7614996d61993f",
+      "platform": "windows",
+      "targetVersion": "8.22.0",
+      "newestVersion": "8.22.0",
+      "areas": {
+        "options": {
+          "x": 568,
+          "y": 576
+        },
+        "protocols": {
+          "x": 27,
+          "y": 27
+        },
+        "features": {
+          "x": 18,
+          "y": 18
+        },
+        "writeout": {
+          "x": 138,
+          "y": 138
+        },
+        "exitcodes": {
+          "x": 259,
+          "y": 259
+        },
+        "environment": {
+          "x": 39,
+          "y": 39
+        },
+        "behaviour": {
+          "x": 1271,
+          "y": 1387
+        }
+      },
+      "overall": {
+        "x": 2320,
+        "y": 2444
+      },
+      "newest": {
+        "x": 2320,
+        "y": 2444
+      }
+    },
+    {
+      "stamp": "2026-10-15_0304",
+      "commit": "6840229aa577fb1a017a9eafc5f0d758db124387",
+      "platform": "windows",
+      "targetVersion": "8.22.0",
+      "newestVersion": "8.22.0",
+      "areas": {
+        "options": {
+          "x": 568,
+          "y": 568
+        },
+        "protocols": {
+          "x": 27,
+          "y": 27
+        },
+        "features": {
+          "x": 18,
+          "y": 18
+        },
+        "writeout": {
+          "x": 138,
+          "y": 138
+        },
+        "exitcodes": {
+          "x": 259,
+          "y": 259
+        },
+        "environment": {
+          "x": 39,
+          "y": 39
+        },
+        "behaviour": {
+          "x": 1390,
+          "y": 1427
+        }
+      },
+      "overall": {
+        "x": 2439,
+        "y": 2476
+      },
+      "newest": {
+        "x": 2439,
+        "y": 2476
+      }
+    },
+    {
+      "stamp": "2026-10-15_0543",
+      "commit": "433a1953297ac88e63b8a711cf293bfb54f6e77a",
+      "platform": "windows",
+      "targetVersion": "8.22.0",
+      "newestVersion": "8.22.0",
+      "areas": {
+        "options": {
+          "x": 568,
+          "y": 568
+        },
+        "protocols": {
+          "x": 27,
+          "y": 27
+        },
+        "features": {
+          "x": 18,
+          "y": 18
+        },
+        "writeout": {
+          "x": 138,
+          "y": 138
+        },
+        "exitcodes": {
+          "x": 259,
+          "y": 259
+        },
+        "environment": {
+          "x": 39,
+          "y": 39
+        },
+        "behaviour": {
+          "x": 1396,
+          "y": 1427
+        }
+      },
+      "overall": {
+        "x": 2445,
+        "y": 2476
+      },
+      "newest": {
+        "x": 2445,
+        "y": 2476
+      }
+    },
+    {
+      "stamp": "2026-10-15_0751",
+      "commit": "a62a7149d175dc43fac44407f9ba228fbef0947f",
+      "platform": "windows",
+      "targetVersion": "8.22.0",
+      "newestVersion": "8.22.0",
+      "areas": {
+        "options": {
+          "x": 568,
+          "y": 568
+        },
+        "protocols": {
+          "x": 27,
+          "y": 27
+        },
+        "features": {
+          "x": 18,
+          "y": 18
+        },
+        "writeout": {
+          "x": 138,
+          "y": 138
+        },
+        "exitcodes": {
+          "x": 259,
+          "y": 259
+        },
+        "environment": {
+          "x": 39,
+          "y": 39
+        },
+        "behaviour": {
+          "x": 1396,
+          "y": 1427
+        }
+      },
+      "overall": {
+        "x": 2445,
+        "y": 2476
+      },
+      "newest": {
+        "x": 2445,
+        "y": 2476
+      }
+    },
+    {
+      "stamp": "2026-10-15_0751",
+      "commit": "a62a7149d175dc43fac44407f9ba228fbef0947f",
+      "platform": "linux",
+      "targetVersion": "8.22.0",
+      "newestVersion": "8.22.0",
+      "areas": {
+        "options": {
+          "x": 565,
+          "y": 568
+        },
+        "protocols": {
+          "x": 27,
+          "y": 29
+        },
+        "features": {
+          "x": 19,
+          "y": 22
+        },
+        "writeout": {
+          "x": 138,
+          "y": 138
+        },
+        "exitcodes": {
+          "x": 259,
+          "y": 259
+        },
+        "environment": {
+          "x": 28,
+          "y": 33
+        },
+        "behaviour": {
+          "x": 1408,
+          "y": 1445
+        }
+      },
+      "overall": {
+        "x": 2444,
+        "y": 2494
+      },
+      "newest": {
+        "x": 2444,
+        "y": 2494
+      }
+    },
+    {
+      "stamp": "2026-10-15_0751",
+      "commit": "a62a7149d175dc43fac44407f9ba228fbef0947f",
+      "platform": "macos",
+      "targetVersion": "8.22.0",
+      "newestVersion": "8.22.0",
+      "areas": {
+        "options": {
+          "x": 565,
+          "y": 568
+        },
+        "protocols": {
+          "x": 25,
+          "y": 29
+        },
+        "features": {
+          "x": 19,
+          "y": 22
+        },
+        "writeout": {
+          "x": 138,
+          "y": 138
+        },
+        "exitcodes": {
+          "x": 259,
+          "y": 259
+        },
+        "environment": {
+          "x": 28,
+          "y": 33
+        },
+        "behaviour": {
+          "x": 1407,
+          "y": 1445
+        }
+      },
+      "overall": {
+        "x": 2441,
+        "y": 2494
+      },
+      "newest": {
+        "x": 2441,
+        "y": 2494
+      }
+    },
+    {
+      "stamp": "2026-10-15_1657",
+      "commit": "adf07bc2bf2b55cd554c8fe52b7a24ddf3d0eba0",
+      "platform": "windows",
+      "targetVersion": "8.22.0",
+      "newestVersion": "8.22.0",
+      "areas": {
+        "options": {
+          "x": 568,
+          "y": 568
+        },
+        "protocols": {
+          "x": 27,
+          "y": 27
+        },
+        "features": {
+          "x": 18,
+          "y": 18
+        },
+        "writeout": {
+          "x": 138,
+          "y": 138
+        },
+        "exitcodes": {
+          "x": 259,
+          "y": 259
+        },
+        "environment": {
+          "x": 39,
+          "y": 39
+        },
+        "behaviour": {
+          "x": 1396,
+          "y": 1427
+        }
+      },
+      "overall": {
+        "x": 2445,
+        "y": 2476
+      },
+      "newest": {
+        "x": 2445,
+        "y": 2476
+      }
+    },
+    {
+      "stamp": "2026-10-15_1657",
+      "commit": "adf07bc2bf2b55cd554c8fe52b7a24ddf3d0eba0",
+      "platform": "linux",
+      "targetVersion": "8.22.0",
+      "newestVersion": "8.22.0",
+      "areas": {
+        "options": {
+          "x": 567,
+          "y": 568
+        },
+        "protocols": {
+          "x": 27,
+          "y": 27
+        },
+        "features": {
+          "x": 20,
+          "y": 20
+        },
+        "writeout": {
+          "x": 138,
+          "y": 138
+        },
+        "exitcodes": {
+          "x": 259,
+          "y": 259
+        },
+        "environment": {
+          "x": 28,
+          "y": 33
+        },
+        "behaviour": {
+          "x": 1410,
+          "y": 1445
+        }
+      },
+      "overall": {
+        "x": 2449,
+        "y": 2490
+      },
+      "newest": {
+        "x": 2449,
+        "y": 2490
+      }
+    },
+    {
+      "stamp": "2026-10-15_1657",
+      "commit": "adf07bc2bf2b55cd554c8fe52b7a24ddf3d0eba0",
+      "platform": "macos",
+      "targetVersion": "8.22.0",
+      "newestVersion": "8.22.0",
+      "areas": {
+        "options": {
+          "x": 567,
+          "y": 568
+        },
+        "protocols": {
+          "x": 27,
+          "y": 27
+        },
+        "features": {
+          "x": 20,
+          "y": 20
+        },
+        "writeout": {
+          "x": 138,
+          "y": 138
+        },
+        "exitcodes": {
+          "x": 259,
+          "y": 259
+        },
+        "environment": {
+          "x": 28,
+          "y": 33
+        },
+        "behaviour": {
+          "x": 1409,
+          "y": 1445
+        }
+      },
+      "overall": {
+        "x": 2448,
+        "y": 2490
+      },
+      "newest": {
+        "x": 2448,
+        "y": 2490
+      }
+    }
+  ],
+  "open": [
+    {
+      "id": "GF-0083",
+      "title": "An 'HTTP/2 101' answer to an h2c upgrade request followed by an HTTP/1.1 200 exits 0 instead of 8",
+      "area": "behaviour",
+      "platform": "linux",
+      "severity": "High",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "In Curl.Protocol.Http.UnitLibrary, fail with exit 8 (CURLE_WEIRD_SERVER_REPLY) when a response on an HTTP/1.x connection names HTTP/2 in its status line, including the interim response to an h2c upgrade. Today HttpH2cUpgradeConnection switches only on 'HTTP/1.1 101'. Otherwise it reads on as HTTP/1.1, and HttpStatusLine.Parse takes 'HTTP/2 101' as an assumed interim answer before accepting the 200. Have the 1xx head record its version (Http1VersionSeen.VersionNamed) so that Http1VersionSeen.ThrowIfMismatched, or a direct check, refuses the 'HTTP/2' status line as curl does. Add a focused test in Curl.Protocol.Http.UnitTests (ADR-0482). This applies only on the OpenSSL builds, because the Schannel reference lacks h2c.",
+      "items": 1,
+      "tasks": [
+        "BL-2326"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0083-an-http-2-101-answer-to-an-h2c-upgrade-request-followed-by-a.md"
+    },
+    {
+      "id": "GF-0084",
+      "title": "SSLKEYLOGFILE is ignored: no CLIENT_RANDOM key-log line is written for a TLS connection",
+      "area": "behaviour",
+      "platform": "linux",
+      "severity": "High",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "Implement the OpenSSL build's SSLKEYLOGFILE support. When the variable names a file, append NSS key-log lines to it. For TLS 1.2 that is 'CLIENT_RANDOM <client_random hex> <master_secret hex>'. For TLS 1.3 it is the CLIENT_HANDSHAKE_TRAFFIC_SECRET, SERVER_HANDSHAKE_TRAFFIC_SECRET, CLIENT_TRAFFIC_SECRET_0, SERVER_TRAFFIC_SECRET_0 and EXPORTER_SECRET lines. Write them from the hand-built clients in Curl.Tls.UnitLibrary (Tls12ClientConnection, which --tls-max 1.2 routes to through HandBuiltTlsProvider, plus Tls13ClientConnection and TlsClientConnection). Carry the path in through TlsClientOptions, read from the environment in Curl.Engine.UnitLibrary (TlsClientOptionsMapping). Make sure the SslStream path (SslStreamTlsProvider) logs too, or routes to the hand-built client, when the variable is set. Upstream's Schannel build does not support it (test2090 requires !Schannel), so leave the Windows build alone. Add unit tests in Curl.Tls.UnitTests.",
+      "items": 1,
+      "tasks": [
+        "BL-2327"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0084-sslkeylogfile-is-ignored-no-client-random-key-log-line-is-wr.md"
+    },
+    {
+      "id": "GF-0094",
+      "title": "HTTP/3 cases run on Linux although Curl, like the OpenSSL reference curl, refuses --http3 and --http3-only there",
+      "area": "behaviour",
+      "platform": "linux",
+      "severity": "High",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "In Curl.Conformance.UnitLibrary, remove 'http/3' from UpstreamCurlPlatform.Unix and UpstreamCurlPlatform.MacOS. Fix the class remarks that say Curl still serves --http3 off Windows. Upstream's runtests.pl then skips cases needing http/3 on a build without QUIC, as it does for the reference, and they are excluded as on Windows. As an alternative, derive the feature from CommandLineOptions.ActsAsQuicBuild so it follows the CLI's refusal. Update UpstreamCurlPlatformTests. The product needs no change: Curl already matches the reference here. Explained by ADR-0540 (refuse --http3 on every reference build); the harness's feature list predates it (BL-2261).",
+      "items": 2,
+      "tasks": [
+        "BL-2370"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0094-http-3-cases-run-on-linux-although-curl-like-the-openssl-ref.md"
+    },
+    {
+      "id": "GF-0095",
+      "title": "A chunked -T - upload that waited for 100 Continue sends its closing chunk in a separate write, so Curl exits 56 on macOS where curl exits 0",
+      "area": "behaviour",
+      "platform": "macos",
+      "severity": "High",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "In Curl.Protocol.Http.UnitLibrary, HttpRequestBodyWriter.StartReading sets heldBack only when EarlyResponseWatch is null, so a chunked stream body of unknown length that waited for 100 Continue (test60: curl adds Expect: 100-continue to the -T - upload, the 1-second wait runs out) still writes its data chunk through HttpContinueWaitConnection.SendUnlessStoppedAsync and then 0\\r\\n\\r\\n in a write of its own. The sws-like server reads the one byte Content-Length promises after the first write, answers and closes; the closing chunk then meets a closed socket and macOS resets the connection, so the response read fails with exit 56. Extend the BL-2341 hold-back to the early-response path: hold each framed piece until the next read and send the last data chunk and the closing chunk in one SendUnlessStoppedAsync call (keeping the 300-or-above stop and CutShort), as curl fills its upload buffer to end of stream before it sends. Add a focused unit test in Curl.Protocol.Http.UnitTests with a fake IConnection that records writes: an Expect: 100-continue chunked upload of unknown length whose wait runs out gives one write holding '13\\r\\nmore than one byte\\n\\r\\n0\\r\\n\\r\\n' (ADR-0482). Explained by ADR-0525: its decision covers only bodies 'sent without waiting for 100 Continue' and leaves 'bodies sent after 100 Continue (whose early-response watch sends piece by piece)' unchanged, which is exactly test60's path; the macOS exit 56 the ADR's context names is therefore still open. The reset-on-late-write is a BSD socket behaviour, which is why only macOS shows it.",
+      "items": 1,
+      "tasks": [
+        "BL-2371"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0095-a-chunked-t-upload-that-waited-for-100-continue-sends-its-cl.md"
+    },
+    {
+      "id": "GF-0090",
+      "title": "--ssl-sessions on Linux does not read the file and print the session-file warnings real curl prints",
+      "area": "options",
+      "platform": "linux",
+      "severity": "Medium",
+      "scope": "target",
+      "introducedIn": "8.12.0",
+      "suggestion": "In Curl.Cli.UnitLibrary, where SslSessionsFile (CommandLineGlobalState, CommandLineOptions) is applied on non-Schannel builds, load the file when the option is parsed, before the no-URL check, and print curl's warnings to standard error: 'Warning: unrecognized line N in SSL session file', 'Warning: <path>' and 'Warning: invalid shmax base64 encoding in line N', following the session-file format in docs/cmdline-opts/ssl-sessions.md. The TLS library that holds session tickets also needs the load and save. The cause is OpenSSL-build-specific (Schannel refuses the option). Measure real curl for the exact warning text and line rules. Keep `--ai-help` right for the options this changes (CLAUDE.md).",
+      "items": 1,
+      "tasks": [
+        "BL-2333"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0090-ssl-sessions-on-linux-does-not-read-the-file-and-print-the-s.md"
+    }
+  ],
+  "closed": [
+    {
+      "id": "GF-0070",
+      "title": "A user name, FTP account, --ftp-alternative-to-user command or --mail-from address holding CR LF is sent to the server instead of failing with exit 43",
+      "area": "behaviour",
+      "platform": "windows",
+      "severity": "Critical",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "Reject a CR or LF in any value Curl writes into a protocol command line with exit 43 (CurlExitCode.BadFunctionArgument), as curl 8.22.0 does. In Curl.Protocol.Ftp.UnitLibrary (FtpSession): check the user name and password before connecting (test2114: nothing is sent), the --ftp-account value before ACCT is built (test2115: USER and PASS are sent, then the transfer fails) and the --ftp-alternative-to-user command before it is sent (test2116). In Curl.Protocol.Smtp.UnitLibrary (SmtpMailTransaction): check the --mail-from address (and each --mail-rcpt and --mail-auth value the same way) before MAIL FROM is sent, ending the session with QUIT (test2110). Add unit tests pinning the exit code and that no injected command is written.",
+      "items": 4,
+      "tasks": [
+        "BL-2162"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0070-a-user-name-ftp-account-ftp-alternative-to-user-command-or-m.md"
+    },
+    {
+      "id": "GF-0071",
+      "title": "A custom 'Authorization : value' header (white space before the colon) is still sent after -L redirects to another host",
+      "area": "behaviour",
+      "platform": "windows",
+      "severity": "Critical",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "In Curl.Protocol.Http.UnitLibrary, make HttpCustomHeader.Names compare the header name with the white space before its colon (or semicolon) trimmed, so every check that asks whether an -H entry names Authorization, Cookie, Host and the like - the strip on a redirect to another host without --location-trusted included - treats 'Authorization : x' as Authorization, as curl 8.22.0 does. Check RtspCustomHeader.Names and WsCustomHeader.Names for the same comparison. Add a unit test for the redirect strip with 'Authorization :'.",
+      "items": 1,
+      "tasks": [
+        "BL-2163"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0071-a-custom-authorization-value-header-white-space-before-the-c.md"
+    },
+    {
+      "id": "GF-0082",
+      "title": "A chunked -T - upload from stdin ends differently from the reference curl on Linux: the request differs at the terminating chunk, and a 401/301 retry exits 25 where curl exits 65",
+      "area": "behaviour",
+      "platform": "linux",
+      "severity": "Critical",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "Make Curl's chunked upload of an unseekable stdin finish on Linux and macOS the way the reference curl's does. Curl must read stdin to EOF and send the last 0-chunk before it reads the server's answer. Start in Curl.Protocol.Http.UnitLibrary HttpRequestBodyWriter.WriteStreamAsync/WriteAsync, where LastChunk is written, and the Unix stdin stream Curl.Console/Program.cs opens with Console.OpenStandardInput. Find out why the final chunk is not on the wire before the server's 3-second idle answer on Unix (Linux records no last chunk; macOS gets exit 56 writing after the server closed). Then check the retry decision in HttpProtocolHandler. MayRetry/ThrowIfChunkedResendToHttp10 return exit 25 'Chunky upload is not supported by HTTP 1.0' for every chunked resend to an HTTP/1.0 server. The reference instead fails with exit 65 through the rewind path (UploadRewindFailed) once the whole stdin body has been sent and must be rewound for the --anyauth or -L retry. Choose 65 over 25 when the body was fully consumed, and pin each platform's answer in its own unit test if the Windows reference keeps answering 25. Add focused unit tests in Curl.Protocol.Http.UnitTests (ADR-0482). Context: ADR-0033 (a followed PUT redirect passes stdin on as it is) and ADR-0036 (body framing) are the standing decisions this touches.",
+      "items": 3,
+      "tasks": [
+        "BL-2337"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0082-a-chunked-t-upload-from-stdin-ends-differently-from-the-refe.md"
+    },
+    {
+      "id": "GF-0038",
+      "title": "Upstream curl 8.22.0 changed behaviour items",
+      "area": "behaviour",
+      "platform": "windows",
+      "severity": "High",
+      "scope": "target",
+      "introducedIn": "8.22.0",
+      "suggestion": "Bring these items to Curl when the target moves to 8.22.0.",
+      "items": 151,
+      "tasks": [
+        "BL-2160"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0038-upstream-curl-8-22-0-changed-behaviour-items.md"
+    },
+    {
+      "id": "GF-0040",
+      "title": "Upstream curl 8.22.0 changed options items",
+      "area": "options",
+      "platform": "windows",
+      "severity": "High",
+      "scope": "target",
+      "introducedIn": "8.22.0",
+      "suggestion": "Bring these items to Curl when the target moves to 8.22.0.",
+      "items": 8,
+      "tasks": [
+        "BL-2171",
+        "BL-2235"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0040-upstream-curl-8-22-0-changed-options-items.md"
+    },
+    {
+      "id": "GF-0059",
+      "title": ";AUTH=EXTERNAL with no user name skips SASL; curl sends AUTH EXTERNAL with an empty (=) response",
+      "area": "behaviour",
+      "platform": "windows",
+      "severity": "High",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "In Curl.Authentication.UnitLibrary's SaslAuthenticator/SaslMechanismRanking and the IMAP, POP3 and SMTP login decisions, let a ;AUTH=EXTERNAL login option start SASL without a user name or password. EXTERNAL's response is the (empty) user name, sent as '=' when empty, inline under SASL-IR or after the '+' / '334' continuation, as curl 8.21.0 does.",
+      "items": 6,
+      "tasks": [
+        "BL-1989",
+        "BL-2161"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0059-auth-external-with-no-user-name-skips-sasl-curl-sends-auth-e.md"
+    },
+    {
+      "id": "GF-0072",
+      "title": "--next transfers reuse a connection where curl opens a new one (another host name at the same --resolve address) and open one where curl reuses (only --connect-to differs)",
+      "area": "behaviour",
+      "platform": "windows",
+      "severity": "High",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "Align the connection match with curl 8.22.0's. In Curl.Console's OptionGroupConnectionSettings, drop the --connect-to entries from the compared settings, since ConnectionPoolKey already holds the host and port dialled (test2051: the mapping to the same host:port leaves the second and third groups on the first connection, num_connects 0). In Curl.Networking.UnitLibrary's ConnectionPoolKey and PoolingConnector, make the key's Host the URL's host name, never the --resolve address, so host-a and host-b at one address get one connection each (test3225, 'connects=1/connects=1/'). Rerun test3225 with --keep-logs first to confirm Curl reuses the connection rather than leaving the second one unclosed.",
+      "items": 2,
+      "tasks": [
+        "BL-2164"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0072-next-transfers-reuse-a-connection-where-curl-opens-a-new-one.md"
+    },
+    {
+      "id": "GF-0073",
+      "title": "A cookie loaded with -b from a file for a public suffix domain (.co.uk) is sent, where curl drops it",
+      "area": "behaviour",
+      "platform": "windows",
+      "severity": "High",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "In Curl.Cookies.UnitLibrary, apply the Public Suffix List to cookies loaded from a cookie file as curl 8.22.0 does: in CookieStore.LoadCookieFile (or NetscapeCookieFile.Read) drop a tailmatching cookie whose domain is a public suffix (PublicSuffixList.Embedded), so it is neither sent nor written back by -c, with the -v line curl gives for it. Add a unit test loading '.co.uk' and 'foo.co.uk' cookies.",
+      "items": 1,
+      "tasks": [
+        "BL-2165"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0073-a-cookie-loaded-with-b-from-a-file-for-a-public-suffix-domai.md"
+    },
+    {
+      "id": "GF-0074",
+      "title": "A file:// URL naming a directory lists nothing on Windows, where curl 8.22.0 writes its entry names",
+      "area": "behaviour",
+      "platform": "windows",
+      "severity": "High",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "In Curl.Protocol.File.UnitLibrary, list directories on Windows as curl 8.22.0 does: once the Windows reference curl 8.22.0 is measured listing a directory with Record-CurlExchange.ps1, make FileProtocolHandler.ListsDirectories true on every platform (or remove it) and have the Windows file system implement IDirectoryLister with the same entry names and order as the Linux and macOS listing. Update the Windows-only tests that pin exit 37 for a directory.",
+      "items": 1,
+      "tasks": [
+        "BL-2166"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0074-a-file-url-naming-a-directory-lists-nothing-on-windows-where.md"
+    },
+    {
+      "id": "GF-0075",
+      "title": "A 1 MB custom request header is sent and the transfer ends with exit 52, where curl refuses it with exit 100",
+      "area": "behaviour",
+      "platform": "windows",
+      "severity": "High",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "In Curl.Protocol.Http.UnitLibrary, cap the request head as curl 8.22.0's request buffer does: when the head HttpRequestHeadFormatter builds (custom headers included) grows past curl's limit, fail before sending with exit 100 (CurlExitCode.TooLarge) and curl's message, both measured on the reference with Record-CurlExchange.ps1. Add a unit test with a 1 MB -H value.",
+      "items": 1,
+      "tasks": [
+        "BL-2167"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0075-a-1-mb-custom-request-header-is-sent-and-the-transfer-ends-w.md"
+    },
+    {
+      "id": "GF-0076",
+      "title": "An MQTT topic with an encoded NUL (%00) is subscribed to, where curl fails with exit 3 before SUBSCRIBE",
+      "area": "behaviour",
+      "platform": "windows",
+      "severity": "High",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "In Curl.Protocol.Mqtt.UnitLibrary, make MqttTopic.Decode (or MqttSession before SUBSCRIBE and PUBLISH) reject a decoded topic holding a control byte, NUL included, with exit 3 (CurlExitCode.UrlMalformat) after CONNACK and before SUBSCRIBE is written, as curl 8.22.0 does; take the message from the reference with Record-CurlExchange.ps1. Add unit tests for %00 and %0A in the topic.",
+      "items": 1,
+      "tasks": [
+        "BL-2168"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0076-an-mqtt-topic-with-an-encoded-nul-00-is-subscribed-to-where.md"
+    },
+    {
+      "id": "GF-0079",
+      "title": "A wrong --pinnedpubkey with --cacert on the Schannel build gives exit 60 (revocation unknown) instead of 90",
+      "area": "behaviour",
+      "platform": "windows",
+      "severity": "High",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "First measure the Schannel reference curl on a loopback TLS server with '--cacert <private CA> --pinnedpubkey <wrong key>' and no --ssl-revoke-best-effort. If it exits 90 as upstream's test2035, test2038 and test2042 expect, change Curl.Networking.UnitLibrary ServerCertificateVerification.Judge so that, when matchesSchannelBuild is set and a --cacert file drives the chain check (curl's Schannel manual credential validation path), PinnedPublicKey.Refusal is judged before VerifyPeer and the revocation check. Keep the current order for the OpenSSL build and for system-store validation. Add focused tests in Curl.Networking.UnitTests for a wrong pin with an unknown-revocation --cacert chain on each build. Explained by ADR-0193: it measured 'verification is judged before the pin' on the Schannel build, but its table has no --cacert chain whose revocation status is unknown (ADR-0321), which is the path these three cases take; the ADR does not remove the gap.",
+      "items": 3,
+      "tasks": [
+        "BL-2270"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0079-a-wrong-pinnedpubkey-with-cacert-on-the-schannel-build-gives.md"
+    },
+    {
+      "id": "GF-0080",
+      "title": "--unix-socket cases throw in the gap harness: its dialer sends the Unix path to port 1, not to the sws emulation",
+      "area": "behaviour",
+      "platform": "windows",
+      "severity": "High",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "Give Curl.Conformance.UnitLibrary one public way to dial the http-unix server, for example a ConnectTarget factory on UpstreamCaseRunner that pairs HttpUnixPath with HttpPort. Use it from Curl.Conformance.UnitTests' InMemoryServerTcpDialer, and have the gap office's copy in Gap/Tools/Measure-UpstreamCases.cs call it instead of port 1 (that one-line Gap change is office work, done interactively). Pin the factory with a test in Curl.Conformance.UnitTests.",
+      "items": 2,
+      "tasks": [
+        "BL-2271"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0080-unix-socket-cases-throw-in-the-gap-harness-its-dialer-sends.md"
+    },
+    {
+      "id": "GF-0081",
+      "title": "Plain HTTP sent through -x to the HTTPS port ends in a clean close (exit 52) instead of stunnel's reset (exit 56)",
+      "area": "behaviour",
+      "platform": "windows",
+      "severity": "High",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "In Curl.Conformance.UnitLibrary TlsServerConnection.ServeAsync, end a connection whose handshake fails on a non-TLS first record as a reset rather than a clean close: let InMemoryDuplexStream fault the client's next read with an IOException carrying SocketException(ConnectionReset), as a socket closed with unread data does. Then confirm Curl.Protocol.Http.UnitLibrary maps a reset on the first response read to exit 56 'Recv failure: Connection was reset', with a focused test in Curl.Protocol.Http.UnitTests, and pin the harness change in Curl.Conformance.UnitTests.",
+      "items": 1,
+      "tasks": [
+        "BL-2272"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0081-plain-http-sent-through-x-to-the-https-port-ends-in-a-clean.md"
+    },
+    {
+      "id": "GF-0088",
+      "title": "Curl does not list SSLS-EXPORT in Features: on Linux; the curl 8.22.0 OpenSSL reference does",
+      "area": "features",
+      "platform": "linux",
+      "severity": "High",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "In Curl.Cli.UnitLibrary, CurlVersionText.FeaturesLine (CurlVersionText.cs, line 51), add SSLS-EXPORT after SSL, in curl's case-insensitive order, so it reads SSL, SSLS-EXPORT, threadsafe. Do not add it to WindowsFeaturesLine: CommandLineOptionTable marks --ssl-sessions RefusedBySchannelBuild (ADR-0397), so the Windows build does not serve it. Before listing it, confirm --ssl-sessions round-trips TLS session tickets on Linux and macOS through the hand-built client (ADR-0319) and add a test in Curl.Cli.UnitTests. Explained by ADR-0021's SSLS-EXPORT row, which says no measured build prints it: the 8.22.0 OpenSSL reference does, so that row is out of date on Linux and needs an amending ADR.",
+      "items": 1,
+      "tasks": [
+        "BL-2331"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0088-curl-does-not-list-ssls-export-in-features-on-linux-the-curl.md"
+    },
+    {
+      "id": "GF-0092",
+      "title": "An --ech ecl: handshake the server does not accept exits 35 instead of 101 (ECH required) on macOS",
+      "area": "behaviour",
+      "platform": "macos",
+      "severity": "High",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "Platform-specific (macOS). The likely cause is the harness, not Curl's ECH client. With an ecl: config list, HandBuiltTlsProvider.HandshakeAsync (Curl.Networking.UnitLibrary) offers TLS 1.3 only (settings.EchConfigs is not null, so runsTls12 is false; BL-1950), as curl's OpenSSL build does. The harness's HTTPS stand-in, Curl.Conformance.UnitLibrary/TlsServerStream.cs, is an SslStream server, and on macOS .NET's server-side SslStream negotiates at most TLS 1.2. The handshake therefore fails on the protocol version (exit 35) before the client can see that the server ignored the ECH offer and send ech_required (exit 101). Change Curl.Conformance.UnitLibrary so its HTTPS server speaks TLS 1.3 on macOS, as upstream's stunnel/OpenSSL server does: for example, serve TLS through Curl's hand-built TLS 1.3 server code (Curl.Tls.UnitLibrary) when the platform's SslStream server cannot. Add a unit test in Curl.Conformance.UnitTests that the macOS HTTPS stand-in completes a TLS 1.3-only ClientHello. Then rerun test4001 on macOS. If it still exits 35, check Tls13ClientHandshake's ech_required decision (TlsAlertDescription.EchRequired) against a server that ignores the ECH extension, and add a focused test in Curl.Tls.UnitTests (ADR-0482). Explained by ADR-0327 (ECH runs only on the hand-built client) and ADR-0359 (exit 101 text as measured with OpenSSL); neither explains the macOS-only exit 35.",
+      "items": 1,
+      "tasks": [
+        "BL-2335"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0092-an-ech-ecl-handshake-the-server-does-not-accept-exits-35-ins.md"
+    },
+    {
+      "id": "GF-0077",
+      "title": "A gzip body with a second member fails with exit 23 and 'Failed writing received data to disk/application' where curl says 'Multi-member gzip response not supported'",
+      "area": "behaviour",
+      "platform": "windows",
+      "severity": "Medium",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "In Curl.Protocol.Http.UnitLibrary, when HttpContentCodingDecoder finds a second gzip member after the first one's trailer, fail with exit 23 and a new HttpTransferMessages constant 'Multi-member gzip response not supported', as curl 8.22.0 does; keep 'Failed writing received data to disk/application' for other trailing bytes (zlib, Brotli) after checking each against the reference.",
+      "items": 1,
+      "tasks": [
+        "BL-2169"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0077-a-gzip-body-with-a-second-member-fails-with-exit-23-and-fail.md"
+    },
+    {
+      "id": "GF-0078",
+      "title": "The progress meter on stderr ends its lines differently from the reference curl (an extra restarted line for a second URL, a final line feed after -T .)",
+      "area": "behaviour",
+      "platform": "windows",
+      "severity": "Medium",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "In Curl.Console (ProgressMeterLines and the meter's line endings), match the reference curl: for test675, end the meter line and start a new one when the transfer restarts (the second URL's request on the first connection, which the server closed, retried on a new one); for test1498, leave the final line feed off when the '-T .' upload ends as the reference does. Measure both several times on the reference with Record-CurlExchange.ps1 first, to separate a fixed rule from timing.",
+      "items": 2,
+      "tasks": [
+        "BL-2170"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0078-the-progress-meter-on-stderr-ends-its-lines-differently-from.md"
+    },
+    {
+      "id": "GF-0085",
+      "title": "The stderr of a -OJ --output-dir download whose directory is a regular file differs from curl's on Linux",
+      "area": "behaviour",
+      "platform": "linux",
+      "severity": "Medium",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "Make Curl.Console's 'Warning: Failed to open the file <path>: <reason>' line (OutputFileOpenWarning.ReasonFor) give the platform's strerror text. Today it hard-codes the Windows C runtime's texts, measured with Schannel curl. Opening <file>/MMM3036MMM fails on Linux and macOS with ENOTDIR, and curl prints 'Not a directory', while Windows gives 'No such file or directory'. Map the failure to Unix's text off Windows. Curl.Engine.UnitLibrary CRuntimeErrorNumbers and Curl.Cli.UnitLibrary DiskDataFileReader already hold 'Not a directory'. This needs a FileAccessStatus value (Curl.Protocol.Abstractions.UnitLibrary) for a non-directory path component, so check any other Unix-only wording in the retry and warning lines too. This is the most likely cause; the cross-check does not store the two binaries' stderr. Pin each platform's text in its own test in Curl.Console.UnitTests, the Unix one under [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)].",
+      "items": 1,
+      "tasks": [
+        "BL-2328"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0085-the-stderr-of-a-oj-output-dir-download-whose-directory-is-a.md"
+    },
+    {
+      "id": "GF-0086",
+      "title": "Curl lists ECH in Features: on Linux; the curl 8.22.0 OpenSSL reference does not",
+      "area": "features",
+      "platform": "linux",
+      "severity": "Medium",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "In Curl.Cli.UnitLibrary, CurlVersionText.FeaturesLine (CurlVersionText.cs, line 51), drop ECH so the Linux and macOS Features: line stops listing it. Keep --ech and the hand-built EchClientHello and EchConfigList in Curl.Tls.UnitLibrary working; only the line changes. FeaturesLine is shared by Linux and macOS, so the macOS measurement must agree before the change lands. Update the pinning test in Curl.Cli.UnitTests in the same change (ADR-0021 Decision 6). explained by ADR-0448: that ADR drops ECH from the Windows line only and keeps it on Linux and macOS, on the premise that the OpenSSL build lists it; this measurement shows the 8.22.0 OpenSSL reference does not, so the Linux half needs a superseding ADR. The ADR does not remove this group.",
+      "items": 1,
+      "tasks": [
+        "BL-2329"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0086-curl-lists-ech-in-features-on-linux-the-curl-8-22-0-openssl.md"
+    },
+    {
+      "id": "GF-0087",
+      "title": "Curl lists HTTP3 in Features: on Linux; the curl 8.22.0 OpenSSL reference does not",
+      "area": "features",
+      "platform": "linux",
+      "severity": "Medium",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "In Curl.Cli.UnitLibrary, CurlVersionText.FeaturesLine (CurlVersionText.cs, line 51), drop HTTP3 so the Linux and macOS Features: line stops listing it. Keep --http3, --http3-only and the hand-built HTTP/3 and QUIC stack working; only the line changes. Update the pinning test in Curl.Cli.UnitTests in the same change. Explained by ADR-0451: it drops HTTP3 from the Windows line only and keeps it on Linux and macOS under ADR-0144 and ADR-0021; this measurement shows the 8.22.0 OpenSSL reference does not list it, so the Linux half needs a superseding ADR. The ADR does not remove this group.",
+      "items": 1,
+      "tasks": [
+        "BL-2330"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0087-curl-lists-http3-in-features-on-linux-the-curl-8-22-0-openss.md"
+    },
+    {
+      "id": "GF-0089",
+      "title": "--http3 and --http3-only are accepted on Linux; the OpenSSL reference build refuses them as unsupported",
+      "area": "options",
+      "platform": "linux",
+      "severity": "Medium",
+      "scope": "target",
+      "introducedIn": "7.66.0",
+      "suggestion": "Make the refusal follow the platform's reference build, not only the Schannel build. In Curl.Cli.UnitLibrary, change the http3 and http3-only rows of CommandLineOptionTable (and the CommandLineOption.RefusedBySchannelBuild flag, CommandLineRefusal.InstalledLibcurlDoesNotSupport) so the Linux and macOS builds answer 'option --http3: the installed libcurl version does not support this' (exit 2), as the reference built from the tarball with OpenSSL does (no ngtcp2/quiche). Measure real curl on each platform before pinning. Upstream: docs/cmdline-opts/http3.md and http3-only.md. The platform-specific cause is the reference build's HTTP/3 feature set. Keep `--ai-help` right for the options this changes (CLAUDE.md).",
+      "items": 2,
+      "tasks": [
+        "BL-2332"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0089-http3-and-http3-only-are-accepted-on-linux-the-openssl-refer.md"
+    },
+    {
+      "id": "GF-0091",
+      "title": "Curl lists the smb and smbs schemes in curl -V on Linux, and the Linux reference curl 8.22.0 with OpenSSL does not",
+      "area": "protocols",
+      "platform": "linux",
+      "severity": "Medium",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "In Curl.Cli.UnitLibrary/CurlVersionText.cs, give Linux and macOS a third Protocols text without smb and smbs, the same way WindowsProtocolsLine does for Windows, and have CurlVersionText.Lines write it on those platforms; then update CurlVersionTextTests in Curl.Cli.UnitTests. Keep CommandLineProtocolSet.KnownSchemes and the smb and smbs handlers unchanged (ADR-0189, ADR-0200). Platform-specific: the Linux reference is built with NTLM and SMB switched on (ADR-0505), and its Protocols line still omits smb, while Ubuntu's distro curl 8.18.0 listed it (ADR-0200). ADR-0453 decided that Linux and macOS keep ProtocolsLine, but its evidence is the Windows reference, so it does not settle this group; a new ADR is needed to decide whether Linux and macOS drop smb (ADR-0021 Decision 6 governs -V lists).",
+      "items": 2,
+      "tasks": [
+        "BL-2334"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0091-curl-lists-the-smb-and-smbs-schemes-in-curl-v-on-linux-and-t.md"
+    },
+    {
+      "id": "GF-0093",
+      "title": "scp and sftp exit 2 instead of 7 when the host refuses the connection",
+      "area": "protocols",
+      "platform": "macos",
+      "severity": "Medium",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "In Curl.Protocol.Ssh.UnitLibrary, make a refused or unreachable connection on scp and sftp return CurlExitCode.CouldntConnect (7), as curl does. SshProtocolHandler.cs (around line 165) passes the connector's ExitCode through unchanged, so the 2 comes from the connector Curl.Console's CurlComposition gives the SSH handler, or from SshTransferException.SessionEstablishmentFailed (FailedInit, exit 2), which should only run once a connection exists. Trace which one returns 2 on a refused connect, then pin exit 7 for both schemes in Curl.Protocol.Ssh.UnitTests. If the trace leads to the composition, add Curl.Console and Curl.Console.UnitTests to touches.",
+      "items": 2,
+      "tasks": [
+        "BL-2336"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0093-scp-and-sftp-exit-2-instead-of-7-when-the-host-refuses-the-c.md"
+    }
+  ],
+  "regressions": [],
+  "release": null
+}

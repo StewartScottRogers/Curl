@@ -1,0 +1,720 @@
+{
+    "measuredAt":  "2026-10-17T16:59:26Z",
+    "thresholds":  {
+                       "linePercent":  100,
+                       "branchPercent":  100,
+                       "complexity":  10,
+                       "crap":  30
+                   },
+    "totals":  {
+                   "linePercent":  100,
+                   "branchPercent":  100,
+                   "linesCovered":  98415,
+                   "linesTotal":  98415,
+                   "branchesCovered":  36501,
+                   "branchesTotal":  36501,
+                   "libraries":  44,
+                   "librariesAtGate":  44,
+                   "failingMembers":  0
+               },
+    "libraries":  [
+                      {
+                          "name":  "Curl.Api",
+                          "linePercent":  100,
+                          "branchPercent":  100,
+                          "linesCovered":  1902,
+                          "linesTotal":  1902,
+                          "branchesCovered":  520,
+                          "branchesTotal":  520,
+                          "members":  416,
+                          "failingMembers":  0,
+                          "worstCrap":  10
+                      },
+                      {
+                          "name":  "Curl.Api.UnitLibrary",
+                          "linePercent":  100,
+                          "branchPercent":  100,
+                          "linesCovered":  171,
+                          "linesTotal":  171,
+                          "branchesCovered":  6,
+                          "branchesTotal":  6,
+                          "members":  42,
+                          "failingMembers":  0,
+                          "worstCrap":  4
+                      },
+                      {
+                          "name":  "Curl.Authentication.UnitLibrary",
+                          "linePercent":  100,
+                          "branchPercent":  100,
+                          "linesCovered":  2107,
+                          "linesTotal":  2107,
+                          "branchesCovered":  972,
+                          "branchesTotal":  972,
+                          "members":  389,
+                          "failingMembers":  0,
+                          "worstCrap":  10
+                      },
+                      {
+                          "name":  "Curl.Cli.UnitLibrary",
+                          "linePercent":  100,
+                          "branchPercent":  100,
+                          "linesCovered":  5711,
+                          "linesTotal":  5711,
+                          "branchesCovered":  1957,
+                          "branchesTotal":  1957,
+                          "members":  1087,
+                          "failingMembers":  0,
+                          "worstCrap":  10
+                      },
+                      {
+                          "name":  "Curl.Conformance.Http2Server.UnitLibrary",
+                          "linePercent":  100,
+                          "branchPercent":  100,
+                          "linesCovered":  358,
+                          "linesTotal":  358,
+                          "branchesCovered":  130,
+                          "branchesTotal":  130,
+                          "members":  69,
+                          "failingMembers":  0,
+                          "worstCrap":  10
+                      },
+                      {
+                          "name":  "Curl.Conformance.Http3Server.UnitLibrary",
+                          "linePercent":  100,
+                          "branchPercent":  100,
+                          "linesCovered":  766,
+                          "linesTotal":  766,
+                          "branchesCovered":  272,
+                          "branchesTotal":  272,
+                          "members":  125,
+                          "failingMembers":  0,
+                          "worstCrap":  10
+                      },
+                      {
+                          "name":  "Curl.Conformance.LibTest.UnitLibrary",
+                          "linePercent":  100,
+                          "branchPercent":  100,
+                          "linesCovered":  2675,
+                          "linesTotal":  2675,
+                          "branchesCovered":  635,
+                          "branchesTotal":  635,
+                          "members":  390,
+                          "failingMembers":  0,
+                          "worstCrap":  10
+                      },
+                      {
+                          "name":  "Curl.Conformance.SshServer.UnitLibrary",
+                          "linePercent":  100,
+                          "branchPercent":  100,
+                          "linesCovered":  1001,
+                          "linesTotal":  1001,
+                          "branchesCovered":  269,
+                          "branchesTotal":  269,
+                          "members":  149,
+                          "failingMembers":  0,
+                          "worstCrap":  10
+                      },
+                      {
+                          "name":  "Curl.Conformance.UnitLibrary",
+                          "linePercent":  100,
+                          "branchPercent":  100,
+                          "linesCovered":  5462,
+                          "linesTotal":  5462,
+                          "branchesCovered":  2660,
+                          "branchesTotal":  2660,
+                          "members":  1176,
+                          "failingMembers":  0,
+                          "worstCrap":  10
+                      },
+                      {
+                          "name":  "Curl.Console",
+                          "linePercent":  100,
+                          "branchPercent":  100,
+                          "linesCovered":  5026,
+                          "linesTotal":  5026,
+                          "branchesCovered":  1877,
+                          "branchesTotal":  1877,
+                          "members":  1099,
+                          "failingMembers":  0,
+                          "worstCrap":  10
+                      },
+                      {
+                          "name":  "Curl.Cookies.UnitLibrary",
+                          "linePercent":  100,
+                          "branchPercent":  100,
+                          "linesCovered":  661,
+                          "linesTotal":  661,
+                          "branchesCovered":  340,
+                          "branchesTotal":  340,
+                          "members":  114,
+                          "failingMembers":  0,
+                          "worstCrap":  10
+                      },
+                      {
+                          "name":  "Curl.Core.UnitLibrary",
+                          "linePercent":  100,
+                          "branchPercent":  100,
+                          "linesCovered":  3401,
+                          "linesTotal":  3401,
+                          "branchesCovered":  1752,
+                          "branchesTotal":  1752,
+                          "members":  602,
+                          "failingMembers":  0,
+                          "worstCrap":  10
+                      },
+                      {
+                          "name":  "Curl.Cryptography.UnitLibrary",
+                          "linePercent":  100,
+                          "branchPercent":  100,
+                          "linesCovered":  6332,
+                          "linesTotal":  6332,
+                          "branchesCovered":  1255,
+                          "branchesTotal":  1255,
+                          "members":  786,
+                          "failingMembers":  0,
+                          "worstCrap":  10
+                      },
+                      {
+                          "name":  "Curl.Engine.UnitLibrary",
+                          "linePercent":  100,
+                          "branchPercent":  100,
+                          "linesCovered":  5383,
+                          "linesTotal":  5383,
+                          "branchesCovered":  2701,
+                          "branchesTotal":  2701,
+                          "members":  1230,
+                          "failingMembers":  0,
+                          "worstCrap":  10
+                      },
+                      {
+                          "name":  "Curl.Http2.UnitLibrary",
+                          "linePercent":  100,
+                          "branchPercent":  100,
+                          "linesCovered":  1171,
+                          "linesTotal":  1171,
+                          "branchesCovered":  351,
+                          "branchesTotal":  351,
+                          "members":  156,
+                          "failingMembers":  0,
+                          "worstCrap":  10
+                      },
+                      {
+                          "name":  "Curl.Http3.UnitLibrary",
+                          "linePercent":  100,
+                          "branchPercent":  100,
+                          "linesCovered":  1098,
+                          "linesTotal":  1098,
+                          "branchesCovered":  250,
+                          "branchesTotal":  250,
+                          "members":  169,
+                          "failingMembers":  0,
+                          "worstCrap":  10
+                      },
+                      {
+                          "name":  "Curl.HttpMessageSignatures.UnitLibrary",
+                          "linePercent":  100,
+                          "branchPercent":  100,
+                          "linesCovered":  204,
+                          "linesTotal":  204,
+                          "branchesCovered":  108,
+                          "branchesTotal":  108,
+                          "members":  37,
+                          "failingMembers":  0,
+                          "worstCrap":  8
+                      },
+                      {
+                          "name":  "Curl.Kerberos.UnitLibrary",
+                          "linePercent":  100,
+                          "branchPercent":  100,
+                          "linesCovered":  3413,
+                          "linesTotal":  3413,
+                          "branchesCovered":  890,
+                          "branchesTotal":  890,
+                          "members":  628,
+                          "failingMembers":  0,
+                          "worstCrap":  10
+                      },
+                      {
+                          "name":  "Curl.Mcp",
+                          "linePercent":  100,
+                          "branchPercent":  100,
+                          "linesCovered":  108,
+                          "linesTotal":  108,
+                          "branchesCovered":  24,
+                          "branchesTotal":  24,
+                          "members":  18,
+                          "failingMembers":  0,
+                          "worstCrap":  8
+                      },
+                      {
+                          "name":  "Curl.Mcp.UnitLibrary",
+                          "linePercent":  100,
+                          "branchPercent":  100,
+                          "linesCovered":  1135,
+                          "linesTotal":  1135,
+                          "branchesCovered":  503,
+                          "branchesTotal":  503,
+                          "members":  201,
+                          "failingMembers":  0,
+                          "worstCrap":  10
+                      },
+                      {
+                          "name":  "Curl.Networking.UnitLibrary",
+                          "linePercent":  100,
+                          "branchPercent":  100,
+                          "linesCovered":  9040,
+                          "linesTotal":  9040,
+                          "branchesCovered":  3700,
+                          "branchesTotal":  3700,
+                          "members":  1576,
+                          "failingMembers":  0,
+                          "worstCrap":  10
+                      },
+                      {
+                          "name":  "Curl.Ntlm.UnitLibrary",
+                          "linePercent":  100,
+                          "branchPercent":  100,
+                          "linesCovered":  360,
+                          "linesTotal":  360,
+                          "branchesCovered":  66,
+                          "branchesTotal":  66,
+                          "members":  46,
+                          "failingMembers":  0,
+                          "worstCrap":  10
+                      },
+                      {
+                          "name":  "Curl.Output.UnitLibrary",
+                          "linePercent":  100,
+                          "branchPercent":  100,
+                          "linesCovered":  2689,
+                          "linesTotal":  2689,
+                          "branchesCovered":  868,
+                          "branchesTotal":  868,
+                          "members":  487,
+                          "failingMembers":  0,
+                          "worstCrap":  10
+                      },
+                      {
+                          "name":  "Curl.Protocol.Abstractions.UnitLibrary",
+                          "linePercent":  100,
+                          "branchPercent":  100,
+                          "linesCovered":  1344,
+                          "linesTotal":  1344,
+                          "branchesCovered":  476,
+                          "branchesTotal":  476,
+                          "members":  266,
+                          "failingMembers":  0,
+                          "worstCrap":  10
+                      },
+                      {
+                          "name":  "Curl.Protocol.Dict.UnitLibrary",
+                          "linePercent":  100,
+                          "branchPercent":  100,
+                          "linesCovered":  251,
+                          "linesTotal":  251,
+                          "branchesCovered":  110,
+                          "branchesTotal":  110,
+                          "members":  40,
+                          "failingMembers":  0,
+                          "worstCrap":  10
+                      },
+                      {
+                          "name":  "Curl.Protocol.File.UnitLibrary",
+                          "linePercent":  100,
+                          "branchPercent":  100,
+                          "linesCovered":  697,
+                          "linesTotal":  697,
+                          "branchesCovered":  242,
+                          "branchesTotal":  242,
+                          "members":  91,
+                          "failingMembers":  0,
+                          "worstCrap":  10
+                      },
+                      {
+                          "name":  "Curl.Protocol.Ftp.UnitLibrary",
+                          "linePercent":  100,
+                          "branchPercent":  100,
+                          "linesCovered":  3215,
+                          "linesTotal":  3215,
+                          "branchesCovered":  1390,
+                          "branchesTotal":  1390,
+                          "members":  535,
+                          "failingMembers":  0,
+                          "worstCrap":  10
+                      },
+                      {
+                          "name":  "Curl.Protocol.Gopher.UnitLibrary",
+                          "linePercent":  100,
+                          "branchPercent":  100,
+                          "linesCovered":  263,
+                          "linesTotal":  263,
+                          "branchesCovered":  102,
+                          "branchesTotal":  102,
+                          "members":  39,
+                          "failingMembers":  0,
+                          "worstCrap":  10
+                      },
+                      {
+                          "name":  "Curl.Protocol.Http.UnitLibrary",
+                          "linePercent":  100,
+                          "branchPercent":  100,
+                          "linesCovered":  5602,
+                          "linesTotal":  5602,
+                          "branchesCovered":  2685,
+                          "branchesTotal":  2685,
+                          "members":  1082,
+                          "failingMembers":  0,
+                          "worstCrap":  10
+                      },
+                      {
+                          "name":  "Curl.Protocol.Imap.UnitLibrary",
+                          "linePercent":  100,
+                          "branchPercent":  100,
+                          "linesCovered":  1270,
+                          "linesTotal":  1270,
+                          "branchesCovered":  586,
+                          "branchesTotal":  586,
+                          "members":  202,
+                          "failingMembers":  0,
+                          "worstCrap":  10
+                      },
+                      {
+                          "name":  "Curl.Protocol.Ldap.UnitLibrary",
+                          "linePercent":  100,
+                          "branchPercent":  100,
+                          "linesCovered":  1450,
+                          "linesTotal":  1450,
+                          "branchesCovered":  614,
+                          "branchesTotal":  614,
+                          "members":  234,
+                          "failingMembers":  0,
+                          "worstCrap":  10
+                      },
+                      {
+                          "name":  "Curl.Protocol.Mqtt.UnitLibrary",
+                          "linePercent":  100,
+                          "branchPercent":  100,
+                          "linesCovered":  619,
+                          "linesTotal":  619,
+                          "branchesCovered":  208,
+                          "branchesTotal":  208,
+                          "members":  99,
+                          "failingMembers":  0,
+                          "worstCrap":  10
+                      },
+                      {
+                          "name":  "Curl.Protocol.Pop3.UnitLibrary",
+                          "linePercent":  100,
+                          "branchPercent":  100,
+                          "linesCovered":  830,
+                          "linesTotal":  830,
+                          "branchesCovered":  374,
+                          "branchesTotal":  374,
+                          "members":  128,
+                          "failingMembers":  0,
+                          "worstCrap":  10
+                      },
+                      {
+                          "name":  "Curl.Protocol.Rtsp.UnitLibrary",
+                          "linePercent":  100,
+                          "branchPercent":  100,
+                          "linesCovered":  651,
+                          "linesTotal":  651,
+                          "branchesCovered":  286,
+                          "branchesTotal":  286,
+                          "members":  98,
+                          "failingMembers":  0,
+                          "worstCrap":  10
+                      },
+                      {
+                          "name":  "Curl.Protocol.Smb.UnitLibrary",
+                          "linePercent":  100,
+                          "branchPercent":  100,
+                          "linesCovered":  681,
+                          "linesTotal":  681,
+                          "branchesCovered":  206,
+                          "branchesTotal":  206,
+                          "members":  101,
+                          "failingMembers":  0,
+                          "worstCrap":  10
+                      },
+                      {
+                          "name":  "Curl.Protocol.Smtp.UnitLibrary",
+                          "linePercent":  100,
+                          "branchPercent":  100,
+                          "linesCovered":  1001,
+                          "linesTotal":  1001,
+                          "branchesCovered":  398,
+                          "branchesTotal":  398,
+                          "members":  167,
+                          "failingMembers":  0,
+                          "worstCrap":  10
+                      },
+                      {
+                          "name":  "Curl.Protocol.Ssh.UnitLibrary",
+                          "linePercent":  100,
+                          "branchPercent":  100,
+                          "linesCovered":  5181,
+                          "linesTotal":  5181,
+                          "branchesCovered":  1562,
+                          "branchesTotal":  1562,
+                          "members":  930,
+                          "failingMembers":  0,
+                          "worstCrap":  10
+                      },
+                      {
+                          "name":  "Curl.Protocol.Telnet.UnitLibrary",
+                          "linePercent":  100,
+                          "branchPercent":  100,
+                          "linesCovered":  854,
+                          "linesTotal":  854,
+                          "branchesCovered":  272,
+                          "branchesTotal":  272,
+                          "members":  102,
+                          "failingMembers":  0,
+                          "worstCrap":  10
+                      },
+                      {
+                          "name":  "Curl.Protocol.Tftp.UnitLibrary",
+                          "linePercent":  100,
+                          "branchPercent":  100,
+                          "linesCovered":  954,
+                          "linesTotal":  954,
+                          "branchesCovered":  375,
+                          "branchesTotal":  375,
+                          "members":  134,
+                          "failingMembers":  0,
+                          "worstCrap":  10
+                      },
+                      {
+                          "name":  "Curl.Protocol.Ws.UnitLibrary",
+                          "linePercent":  100,
+                          "branchPercent":  100,
+                          "linesCovered":  1090,
+                          "linesTotal":  1090,
+                          "branchesCovered":  456,
+                          "branchesTotal":  456,
+                          "members":  183,
+                          "failingMembers":  0,
+                          "worstCrap":  10
+                      },
+                      {
+                          "name":  "Curl.Quic.UnitLibrary",
+                          "linePercent":  100,
+                          "branchPercent":  100,
+                          "linesCovered":  2958,
+                          "linesTotal":  2958,
+                          "branchesCovered":  1087,
+                          "branchesTotal":  1087,
+                          "members":  566,
+                          "failingMembers":  0,
+                          "worstCrap":  10
+                      },
+                      {
+                          "name":  "Curl.Tls.UnitLibrary",
+                          "linePercent":  100,
+                          "branchPercent":  100,
+                          "linesCovered":  5564,
+                          "linesTotal":  5564,
+                          "branchesCovered":  1819,
+                          "branchesTotal":  1819,
+                          "members":  972,
+                          "failingMembers":  0,
+                          "worstCrap":  10
+                      },
+                      {
+                          "name":  "Curl.Zstandard.UnitLibrary",
+                          "linePercent":  100,
+                          "branchPercent":  100,
+                          "linesCovered":  917,
+                          "linesTotal":  917,
+                          "branchesCovered":  341,
+                          "branchesTotal":  341,
+                          "members":  130,
+                          "failingMembers":  0,
+                          "worstCrap":  10
+                      },
+                      {
+                          "name":  "Libcurl",
+                          "linePercent":  100,
+                          "branchPercent":  100,
+                          "linesCovered":  2849,
+                          "linesTotal":  2849,
+                          "branchesCovered":  806,
+                          "branchesTotal":  806,
+                          "members":  942,
+                          "failingMembers":  0,
+                          "worstCrap":  10
+                      }
+                  ],
+    "failing":  [
+
+                ],
+    "exclusions":  [
+                       {
+                           "file":  "Curl.Cli.UnitLibrary\\UserDatabaseHomeDirectory.cs",
+                           "line":  19,
+                           "text":  "[ExcludeFromCodeCoverage(Justification = \"ADR-0083: a thin getpwuid_r adapter, tested off Windows.\")]"
+                       },
+                       {
+                           "file":  "Curl.Console\\NativeExtendedAttributeWriter.cs",
+                           "line":  20,
+                           "text":  "[ExcludeFromCodeCoverage(Justification = \"ADR-0083, ADR-0320: a thin libc adapter, measured by the Integration run.\")]"
+                       },
+                       {
+                           "file":  "Curl.Console\\NativeRegularFileTest.cs",
+                           "line":  19,
+                           "text":  "[ExcludeFromCodeCoverage(Justification = \"ADR-0083, ADR-0332: a thin stat adapter, tested off Windows.\")]"
+                       },
+                       {
+                           "file":  "Curl.Core.UnitLibrary\\FileSystem\\NativeFileTimeSetter.cs",
+                           "line":  19,
+                           "text":  "[ExcludeFromCodeCoverage(Justification = \"ADR-0083: a thin adapter over SetFileTime and utimes, tested on each platform by PhysicalFileSystemTests.\")]"
+                       },
+                       {
+                           "file":  "Curl.Mcp\\CurlMcpJsonContext.cs",
+                           "line":  13,
+                           "text":  "[ExcludeFromCodeCoverage(Justification = \"ADR-0575: the JSON source generator writes every member but ToolOptions; the tests reach them through CurlCommandTool and the tool schema.\")]"
+                       },
+                       {
+                           "file":  "Curl.Mcp\\Program.cs",
+                           "line":  9,
+                           "text":  "[ExcludeFromCodeCoverage(Justification = \"ADR-0083: a one-line entry point that serves the real standard input and output, measured by Curl.Mcp.IntegrationTests (BL-2390).\")]"
+                       },
+                       {
+                           "file":  "Curl.Networking.UnitLibrary\\DarwinFastOpenConnect.cs",
+                           "line":  18,
+                           "text":  "[ExcludeFromCodeCoverage(Justification = \"ADR-0083: a thin adapter over macOS system calls, measured by the macOS test.\")]"
+                       },
+                       {
+                           "file":  "Curl.Networking.UnitLibrary\\DnsServerResolver.cs",
+                           "line":  53,
+                           "text":  "[ExcludeFromCodeCoverage(Justification = \"Only passes the production pieces to the tested constructor.\")]"
+                       },
+                       {
+                           "file":  "Curl.Networking.UnitLibrary\\DnsServerResolver.cs",
+                           "line":  142,
+                           "text":  "[ExcludeFromCodeCoverage(Justification = \"Reads this machine\u0027s interfaces; the lookup it feeds is tested through the injected one.\")]"
+                       },
+                       {
+                           "file":  "Curl.Networking.UnitLibrary\\DnsSocketOpener.cs",
+                           "line":  25,
+                           "text":  "[ExcludeFromCodeCoverage(Justification = \"ADR-0083: a thin socket adapter, measured by the Integration run.\")]"
+                       },
+                       {
+                           "file":  "Curl.Networking.UnitLibrary\\QualityOfServiceSocketOptions.cs",
+                           "line":  48,
+                           "text":  "[ExcludeFromCodeCoverage(Justification = \"ADR-0083: the platform picks the branch.\")]"
+                       },
+                       {
+                           "file":  "Curl.Networking.UnitLibrary\\StreamConnection.cs",
+                           "line":  56,
+                           "text":  "[ExcludeFromCodeCoverage(Justification = \"ADR-0083: a thin socket adapter, measured by the Integration run.\")]"
+                       },
+                       {
+                           "file":  "Curl.Networking.UnitLibrary\\TcpDialer.cs",
+                           "line":  42,
+                           "text":  "[ExcludeFromCodeCoverage(Justification = \"ADR-0083: a thin socket adapter, measured by the Integration run.\")]"
+                       },
+                       {
+                           "file":  "Curl.Networking.UnitLibrary\\TcpDialer.cs",
+                           "line":  55,
+                           "text":  "[ExcludeFromCodeCoverage(Justification = \"ADR-0083: a thin socket adapter, measured by the Integration run.\")]"
+                       },
+                       {
+                           "file":  "Curl.Networking.UnitLibrary\\TcpDialer.cs",
+                           "line":  69,
+                           "text":  "[ExcludeFromCodeCoverage(Justification = \"ADR-0083: a thin socket adapter, measured by the Integration run.\")]"
+                       },
+                       {
+                           "file":  "Curl.Networking.UnitLibrary\\TcpDialer.cs",
+                           "line":  84,
+                           "text":  "[ExcludeFromCodeCoverage(Justification = \"ADR-0083: a thin socket adapter, measured by the Integration run.\")]"
+                       },
+                       {
+                           "file":  "Curl.Networking.UnitLibrary\\TcpDialer.cs",
+                           "line":  102,
+                           "text":  "[ExcludeFromCodeCoverage(Justification = \"ADR-0083: a thin socket adapter, measured by the Integration run.\")]"
+                       },
+                       {
+                           "file":  "Curl.Networking.UnitLibrary\\TcpDialer.cs",
+                           "line":  119,
+                           "text":  "[ExcludeFromCodeCoverage(Justification = \"ADR-0083: binds the real socket, as its method does.\")] (string name) =\u003e TryBindToDevice(socket, name),"
+                       },
+                       {
+                           "file":  "Curl.Networking.UnitLibrary\\TcpDialer.cs",
+                           "line":  121,
+                           "text":  "[ExcludeFromCodeCoverage(Justification = \"ADR-0083: binds the real socket, as its method does.\")] (IPEndPoint localEndPoint) =\u003e BindLocalEnd(socket, localEndPoint, localPortCount, events),"
+                       },
+                       {
+                           "file":  "Curl.Networking.UnitLibrary\\TcpDialer.cs",
+                           "line":  177,
+                           "text":  "[ExcludeFromCodeCoverage(Justification = \"ADR-0083: a thin socket adapter, measured by the Integration run.\")]"
+                       },
+                       {
+                           "file":  "Curl.Networking.UnitLibrary\\TcpDialer.cs",
+                           "line":  206,
+                           "text":  "[ExcludeFromCodeCoverage(Justification = \"ADR-0083: a thin socket adapter, measured by the Integration run.\")]"
+                       },
+                       {
+                           "file":  "Curl.Networking.UnitLibrary\\TcpDialer.cs",
+                           "line":  253,
+                           "text":  "[ExcludeFromCodeCoverage(Justification = \"ADR-0083: the platform picks the branch.\")]"
+                       },
+                       {
+                           "file":  "Curl.Networking.UnitLibrary\\TcpDialer.cs",
+                           "line":  273,
+                           "text":  "[ExcludeFromCodeCoverage(Justification = \"ADR-0083: a thin socket adapter, measured by the Integration run.\")]"
+                       },
+                       {
+                           "file":  "Curl.Networking.UnitLibrary\\TcpDialer.cs",
+                           "line":  307,
+                           "text":  "[ExcludeFromCodeCoverage(Justification = \"ADR-0083: a thin socket adapter whose branch the platform picks.\")]"
+                       },
+                       {
+                           "file":  "Curl.Networking.UnitLibrary\\TcpPendingConnection.cs",
+                           "line":  87,
+                           "text":  "[ExcludeFromCodeCoverage(Justification = \"ADR-0083: a thin socket adapter, measured by the Integration run.\")]"
+                       },
+                       {
+                           "file":  "Curl.Networking.UnitLibrary\\UdpDatagramChannel.cs",
+                           "line":  148,
+                           "text":  "[ExcludeFromCodeCoverage(Justification = \"ADR-0083: a thin socket adapter, measured by the Integration run.\")]"
+                       },
+                       {
+                           "file":  "Curl.Networking.UnitLibrary\\UdpDatagramChannel.cs",
+                           "line":  162,
+                           "text":  "[ExcludeFromCodeCoverage(Justification = \"ADR-0083: a thin socket adapter, measured by the Integration run.\")]"
+                       },
+                       {
+                           "file":  "Curl.Protocol.File.UnitLibrary\\FileProtocolHandler.cs",
+                           "line":  361,
+                           "text":  "[System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage(Justification = \"ADR-0083: the platform picks the branch.\")]"
+                       },
+                       {
+                           "file":  "Curl.Protocol.File.UnitLibrary\\FileProtocolHandler.cs",
+                           "line":  369,
+                           "text":  "[System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage(Justification = \"ADR-0083: the platform picks the branch.\")]"
+                       },
+                       {
+                           "file":  "Curl.Protocol.File.UnitLibrary\\SourceLastWriteReaders.cs",
+                           "line":  88,
+                           "text":  "[System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage(Justification = \"ADR-0083: a thin adapter over statx and fgetattrlist, tested on Linux and macOS by FileProtocolHandlerSourceLastWriteTests.\")]"
+                       },
+                       {
+                           "file":  "Curl.Protocol.Ssh.UnitLibrary\\Authentication\\SystemSshAgentConnector.cs",
+                           "line":  57,
+                           "text":  "[ExcludeFromCodeCoverage(Justification = \"ADR-0083: a thin named pipe adapter, measured by the Integration run.\")]"
+                       },
+                       {
+                           "file":  "Curl.Protocol.Ssh.UnitLibrary\\Authentication\\SystemSshAgentConnector.cs",
+                           "line":  75,
+                           "text":  "[ExcludeFromCodeCoverage(Justification = \"ADR-0083: a thin Unix socket adapter, measured by the Integration run.\")]"
+                       },
+                       {
+                           "file":  "Curl.Protocol.Ssh.UnitLibrary\\Authentication\\WindowsPageantWindow.cs",
+                           "line":  13,
+                           "text":  "[ExcludeFromCodeCoverage(Justification = \"ADR-0083: a thin Win32 adapter, measured by the Integration run.\")]"
+                       }
+                   ]
+}

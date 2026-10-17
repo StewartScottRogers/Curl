@@ -1,0 +1,12 @@
+{
+  "platform": "macOS",
+  "commit": "bed376eb431ec2d2c78963fecf5498033a6f91ce",
+  "runUrl": "https://github.com/StewartScottRogers/Curl/actions/runs/39052647008",
+  "measuredAt": "2026-10-17T17:34:24Z",
+  "resultFiles": 98,
+  "projects": 8,
+  "passed": 34,
+  "failed": 0,
+  "notRun": 8,
+  "failedTests": []
+}
