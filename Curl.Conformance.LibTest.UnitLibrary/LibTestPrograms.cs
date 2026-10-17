@@ -170,6 +170,15 @@ public sealed class LibTestPrograms
         new Lib1545(),
         new Lib1549(),
         new Lib1550(),
+        new Lib1551(),
+        new Lib1552(TimeProvider.System),
+        new Lib1553(TimeProvider.System),
+        new Lib1554(),
+        new Lib1555(),
+        new Lib1556(),
+        new Lib1557(),
+        new Lib1558(),
+        new Lib1559(),
     ]);
 
     /// <summary>The names of the programs in the table, such as <c>lib500</c>.</summary>
