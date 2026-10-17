@@ -1003,7 +1003,7 @@ internal sealed class ManagedEasyTransfer(
     /// <param name="pauseGate">The pause state a read callback's pause waits on, or <see langword="null" /> when the transfer cannot pause.</param>
     /// <param name="proxy">The proxy <see cref="TrySelectProxy" /> chose, or <see langword="null" /> to connect directly.</param>
     /// <returns>The pieces.</returns>
-    private static EngineToolTransferInputs InputsOf(
+    private EngineToolTransferInputs InputsOf(
         EngineToolTransferInputs? toolInputs,
         EasyOptions options,
         EngineTransferSettings settings,
@@ -1047,7 +1047,7 @@ internal sealed class ManagedEasyTransfer(
     /// <param name="pauseGate">The pause state a read callback's pause waits on, or <see langword="null" /> when the transfer cannot pause.</param>
     /// <param name="proxy">The proxy to connect through, or <see langword="null" /> to connect directly.</param>
     /// <returns>The pieces.</returns>
-    private static EngineToolTransferInputs OwnInputsOf(EasyOptions options, EngineTransferSettings settings, CurlUrl url, EngineTransferState state, EasyPauseGate? pauseGate, ProxyEndpoint? proxy) =>
+    private EngineToolTransferInputs OwnInputsOf(EasyOptions options, EngineTransferSettings settings, CurlUrl url, EngineTransferState state, EasyPauseGate? pauseGate, ProxyEndpoint? proxy) =>
         new(
             Proxy: proxy,
             ResumeFrom: options.Transfer.ResumeFrom > 0 ? options.Transfer.ResumeFrom : null,
@@ -1497,9 +1497,9 @@ internal sealed class ManagedEasyTransfer(
     /// <param name="options">The handle's options.</param>
     /// <param name="pauseGate">The pause state a read callback's pause waits on, or <see langword="null" /> when the transfer cannot pause.</param>
     /// <returns>The upload stream, or <see langword="null" /> when the transfer uploads nothing.</returns>
-    private static Stream? UploadOf(EasyOptions options, EasyPauseGate? pauseGate) =>
+    private Stream? UploadOf(EasyOptions options, EasyPauseGate? pauseGate) =>
         options.Transfer.Upload
-            ? options.Callbacks.Read is { } read ? CallbackUploadOf(read, options.Callbacks, pauseGate) : Stream.Null
+            ? options.Callbacks.Read is { } read ? CallbackUploadOf(read, options.Callbacks, pauseGate, WebSocketConnection.UploadFrames) : Stream.Null
             : null;
 
     /// <summary>
@@ -1509,11 +1509,12 @@ internal sealed class ManagedEasyTransfer(
     /// <param name="read">The read callback.</param>
     /// <param name="callbacks">The handle's callbacks, whose seek and trailer callbacks the stream takes.</param>
     /// <param name="pauseGate">The pause state a read callback's pause waits on, or <see langword="null" />.</param>
+    /// <param name="uploadFrames">The frames a WebSocket upload goes out in (<see cref="ManagedEasyWebSocket.UploadFrames" />), or <see langword="null" /> for a POST body.</param>
     /// <returns>The upload stream.</returns>
-    private static CallbackReadStream CallbackUploadOf(ReadCallback read, EasyCallbackOptions callbacks, EasyPauseGate? pauseGate) =>
+    private static CallbackReadStream CallbackUploadOf(ReadCallback read, EasyCallbackOptions callbacks, EasyPauseGate? pauseGate, WsUploadFrames? uploadFrames = null) =>
         callbacks.Seek is { } seek
-            ? new SeekingCallbackReadStream(read, seek, pauseGate) { Trailer = callbacks.Trailer }
-            : new CallbackReadStream(read, pauseGate) { Trailer = callbacks.Trailer };
+            ? new SeekingCallbackReadStream(read, seek, pauseGate) { Trailer = callbacks.Trailer, UploadFrames = uploadFrames }
+            : new CallbackReadStream(read, pauseGate) { Trailer = callbacks.Trailer, UploadFrames = uploadFrames };
 
     /// <summary>
     /// The curl tool's own settings for a transfer driven through the easy interface with no

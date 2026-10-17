@@ -50,6 +50,12 @@ public sealed class WsProtocolHandler(
     /// <summary>The status code that accepts the upgrade.</summary>
     internal const int SwitchingProtocols = 101;
 
+    /// <summary>
+    /// How many bytes one read of a read callback's upload asks for: libcurl's default <c>CURLOPT_UPLOAD_BUFFERSIZE</c>,
+    /// 64 KiB, the buffer <c>cr_ws_read</c> is handed (BL-2611).
+    /// </summary>
+    internal const int UploadReadSize = 64 * 1024;
+
     /// <summary>How many random bytes <c>Sec-WebSocket-Key</c> encodes.</summary>
     private const int KeyLength = 16;
 
@@ -582,7 +588,11 @@ public sealed class WsProtocolHandler(
     /// frame, because curl 8.22.0's <c>Curl_ws_accept</c> adds the frame-encoding client reader only
     /// when <c>ws_raw_mode</c> is off (BL-2526).
     /// </summary>
-    /// <returns>The frame's length, or 0 when there is no upload.</returns>
+    /// <remarks>
+    /// An upload a read callback feeds (<see cref="IWsUploadFrameSource" />) goes out read by read instead, as
+    /// <c>cr_ws_read</c> sends it (<see cref="SendFramedUploadAsync" />, BL-2611).
+    /// </remarks>
+    /// <returns>The bytes sent, or 0 when there is no upload.</returns>
     private async ValueTask<long> SendUploadAsync(IConnection connection, ITransferContext context, WsFrameTrace trace)
     {
         if (context.Upload is not { } upload)
@@ -590,6 +600,73 @@ public sealed class WsProtocolHandler(
             return 0;
         }
 
+        long sent = !RawMode && upload is IWsUploadFrameSource { UploadFrames: { } frames }
+            ? await SendFramedUploadAsync(connection, context, upload, frames, trace).ConfigureAwait(false)
+            : await SendWholeUploadAsync(connection, context, upload, trace).ConfigureAwait(false);
+        context.Events.ReportInfo(WsInfoLines.UploadSent(sent));
+        context.Progress.ReportUploaded(sent, sent);
+        return sent;
+    }
+
+    /// <summary>
+    /// Sends a read callback's upload as curl 8.22.0's <c>cr_ws_read</c> does (BL-2611, ADR-0669): each read of
+    /// up to <see cref="UploadReadSize" /> bytes goes out as one binary frame of its length, unless the callback
+    /// started a frame through <paramref name="frames" />, whose payload the reads then fill; the upload ends at the
+    /// first read that gives nothing and starts no frame, or fails.
+    /// </summary>
+    /// <returns>The bytes sent.</returns>
+    private async ValueTask<long> SendFramedUploadAsync(IConnection connection, ITransferContext context, Stream upload, WsUploadFrames frames, WsFrameTrace trace)
+    {
+        byte[] buffer = new byte[UploadReadSize];
+        long sent = 0;
+        frames.Open();
+        try
+        {
+            byte[] bytes;
+            while ((bytes = await ReadFramesAsync(context, upload, frames, buffer, trace).ConfigureAwait(false)).Length > 0)
+            {
+                context.Events.ReportDataSent(bytes);
+                await SendAsync(connection, bytes, context.CancellationToken).ConfigureAwait(false);
+                sent += bytes.Length;
+            }
+        }
+        finally
+        {
+            frames.Close();
+        }
+
+        return sent;
+    }
+
+    /// <summary>Reads the upload once and encodes what it gave, tracing and logging a binary frame it starts.</summary>
+    /// <returns>The bytes to send, empty once the upload has ended.</returns>
+    private async ValueTask<byte[]> ReadFramesAsync(ITransferContext context, Stream upload, WsUploadFrames frames, byte[] buffer, WsFrameTrace trace)
+    {
+        int count;
+        try
+        {
+            count = await upload.ReadAsync(buffer.AsMemory(0, frames.ReadLength(buffer.Length)), context.CancellationToken).ConfigureAwait(false);
+        }
+        catch (IOException)
+        {
+            // A failed read ends the upload, as the whole-upload path takes it.
+            count = 0;
+        }
+
+        byte[] bytes = frames.Encode(buffer.AsSpan(0, count), randomSource, out bool startsBinaryFrame);
+        if (startsBinaryFrame)
+        {
+            trace.FrameEncoded(WsOpcode.Binary, count);
+            new WsTransferLog(context.DiagnosticLog).Frame("sent", WsOpcode.Binary, isFinal: true, count);
+        }
+
+        return bytes;
+    }
+
+    /// <summary>Sends the whole upload as one masked binary frame, or unframed under <see cref="RawMode" />.</summary>
+    /// <returns>The bytes sent.</returns>
+    private async ValueTask<long> SendWholeUploadAsync(IConnection connection, ITransferContext context, Stream upload, WsFrameTrace trace)
+    {
         using var payload = new MemoryStream();
         try
         {
@@ -614,8 +691,6 @@ public sealed class WsProtocolHandler(
             new WsTransferLog(context.DiagnosticLog).Frame("sent", WsOpcode.Binary, isFinal: true, payload.Length);
         }
 
-        context.Events.ReportInfo(WsInfoLines.UploadSent(frame.Length));
-        context.Progress.ReportUploaded(frame.Length, frame.Length);
         return frame.Length;
     }
 

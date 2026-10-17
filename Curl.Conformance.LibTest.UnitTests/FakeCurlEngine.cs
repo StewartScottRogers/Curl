@@ -12,12 +12,15 @@ using Curl.Api.Options;
 
 namespace Curl.Conformance.LibTest.UnitTests;
 
-/// <summary>An <see cref="ICurlEngine"/> whose easy transfers perform with <see cref="PerformResult"/> and report <see cref="Info"/>, whose multi handle is <see cref="Multi"/>, and whose share and URL handles are fakes; it makes no MIME or form builder.</summary>
+/// <summary>An <see cref="ICurlEngine"/> whose easy transfers perform with <see cref="PerformResult"/> and report <see cref="Info"/>, whose multi handle is <see cref="Multi"/>, and whose share and URL handles are fakes; it makes no MIME builder, and a form builder and connect-only connection only when given one.</summary>
 internal sealed class FakeCurlEngine : ICurlEngine
 {
     public CurlCode PerformResult { get; init; } = CurlCode.Ok;
 
     public TransferInfo Info { get; init; } = new();
+
+    /// <summary>When set, gives each read of an easy transfer's info in place of <see cref="Info"/>.</summary>
+    public Func<TransferInfo>? Informing { get; init; }
 
     public CurlVersionInfo VersionInfo { get; } = new();
 
@@ -42,10 +45,13 @@ internal sealed class FakeCurlEngine : ICurlEngine
     /// <summary>What a share handle's cleanup answers.</summary>
     public CurlShareCode ShareCleanupResult { get; init; } = CurlShareCode.Ok;
 
+    /// <summary>The headers every easy transfer answers the header API from; without them, the header API throws.</summary>
+    public ITransferHeaders? Headers { get; init; }
+
     public IEasyTransfer CreateEasy()
     {
         CreatingEasy?.Invoke();
-        return new FakeEasyTransfer(PerformResult, Info, Performing);
+        return new FakeEasyTransfer(PerformResult, Info, Performing) { Informing = Informing, ConnectOnly = ConnectOnly, Pauses = Pauses, TransferHeaders = Headers };
     }
 
     public FakeMultiTransfer Multi { get; } = new();
@@ -63,11 +69,24 @@ internal sealed class FakeCurlEngine : ICurlEngine
         return LastShare;
     }
 
-    public ICurlUrlHandle CreateUrl() => new FakeUrlHandle();
+    public ICurlUrlHandle CreateUrl() => new FakeUrlHandle { SetResult = UrlSetResult };
 
-    public IMimeBuilder CreateMime() => throw new NotSupportedException();
+    public CurlUrlCode UrlSetResult { get; init; } = CurlUrlCode.Ok;
 
-    public ICurlFormBuilder CreateForm() => throw new NotSupportedException();
+    public IMimeBuilder CreateMime() => CreatingMime?.Invoke() ?? throw new NotSupportedException();
+
+    public Func<IMimeBuilder>? CreatingMime { get; init; }
+
+    public ICurlFormBuilder CreateForm() => CreatingForm?.Invoke() ?? throw new NotSupportedException();
+
+    /// <summary>Gets the form builder each <c>curl_formadd</c> that starts a form gets; none throws.</summary>
+    public Func<ICurlFormBuilder>? CreatingForm { get; init; }
+
+    /// <summary>Gets the connection every easy transfer's <c>curl_easy_send</c> and <c>curl_easy_recv</c> use; none throws.</summary>
+    public IConnectOnlyConnection? ConnectOnly { get; init; }
+
+    /// <summary>Every <c>curl_easy_pause</c> any of its easy transfers was given.</summary>
+    public List<CurlPause> Pauses { get; } = [];
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
@@ -75,23 +94,35 @@ internal sealed class FakeCurlEngine : ICurlEngine
     {
         public EasyOptions Options { get; set; } = new();
 
-        public TransferInfo Info => info;
+        public Func<TransferInfo>? Informing { get; init; }
+
+        public TransferInfo Info => Informing?.Invoke() ?? info;
 
         public string ErrorText => string.Empty;
 
-        public ITransferHeaders Headers => throw new NotSupportedException();
+        public ITransferHeaders? TransferHeaders { get; init; }
+
+        public ITransferHeaders Headers => TransferHeaders ?? throw new NotSupportedException();
 
         public IEasyWebSocket WebSocket => throw new NotSupportedException();
 
-        public IConnectOnlyConnection Connection => throw new NotSupportedException();
+        public IConnectOnlyConnection? ConnectOnly { get; init; }
+
+        public IConnectOnlyConnection Connection => ConnectOnly ?? throw new NotSupportedException();
 
         public ValueTask<CurlCode> PerformAsync(CancellationToken cancellationToken) => ValueTask.FromResult(performing?.Invoke(Options) ?? performResult);
 
-        public IEasyTransfer Duplicate() => new FakeEasyTransfer(performResult, info, performing) { Options = Options };
+        public IEasyTransfer Duplicate() => new FakeEasyTransfer(performResult, info, performing) { Options = Options, Pauses = Pauses, Informing = Informing };
 
         public void Reset() => Options = new();
 
-        public CurlCode Pause(CurlPause directions) => throw new NotSupportedException();
+        public List<CurlPause> Pauses { get; init; } = [];
+
+        public CurlCode Pause(CurlPause directions)
+        {
+            Pauses.Add(directions);
+            return CurlCode.Ok;
+        }
 
         public ValueTask<CurlCode> UpkeepAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
 

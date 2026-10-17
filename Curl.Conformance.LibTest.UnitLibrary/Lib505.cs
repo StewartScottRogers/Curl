@@ -9,9 +9,8 @@ namespace Curl.Conformance.LibTest;
 /// <c>lib505.c</c>: an FTP upload of the file the second argument names, with <c>CURLOPT_POSTQUOTE</c>
 /// <c>RNFR 505</c> and <c>RNTO 505-forreal</c> to rename it after the transfer. No second argument answers
 /// <see cref="LibTestErrorCodes.Usage"/>; a file that cannot be opened or is empty answers
-/// <see cref="LibTestErrorCodes.MajorBad"/> before <c>curl_global_init</c>. The <c>fopen()</c> line carries the
-/// .NET exception's message in place of the C library's <c>errno</c> text, and the <c>fstat</c> and
-/// <c>curl_slist_append</c> checks are left out, as neither can fail once the file is open.
+/// <see cref="LibTestErrorCodes.MajorBad"/> before <c>curl_global_init</c> (<see cref="LibTestUploadFile"/>). The
+/// <c>curl_slist_append</c> checks are left out, as neither can fail.
 /// </summary>
 public sealed class Lib505 : ILibTest
 {
@@ -19,39 +18,10 @@ public sealed class Lib505 : ILibTest
     public string ProgramName => "lib505";
 
     /// <inheritdoc/>
-    public async Task<LibTestResult> RunAsync(LibTestContext context, CancellationToken cancellationToken)
-    {
-        ArgumentNullException.ThrowIfNull(context);
-        TextWriter error = context.StandardError;
-        if (context.Argument2 is not { } path)
-        {
-            error.Write("Usage: <url> <file-to-upload>\n");
-            return LibTestResult.FromCurlCode(LibTestErrorCodes.Usage);
-        }
-
-        FileStream source;
-        try
-        {
-            source = File.OpenRead(path);
-        }
-        catch (IOException exception)
-        {
-            error.Write($"fopen() failed with error {exception.Message}\n");
-            error.Write($"Error opening file '{path}'\n");
-            return LibTestResult.FromCurlCode(LibTestErrorCodes.MajorBad);
-        }
-
-        await using (source.ConfigureAwait(false))
-        {
-            if (source.Length == 0)
-            {
-                error.Write($"File {path} has zero size!\n");
-                return LibTestResult.FromCurlCode(LibTestErrorCodes.MajorBad);
-            }
-
-            return await LibTestRun.WithLibraryAsync(context, (steps, library) => TestAsync(context, steps, library, source, cancellationToken)).ConfigureAwait(false);
-        }
-    }
+    public Task<LibTestResult> RunAsync(LibTestContext context, CancellationToken cancellationToken) =>
+        LibTestUploadFile.RunWithFileAsync(
+            context,
+            source => LibTestRun.WithLibraryAsync(context, (steps, library) => TestAsync(context, steps, library, source, cancellationToken)));
 
     /// <summary>The program's body after <c>curl_global_init</c>.</summary>
     /// <param name="context">The program's context.</param>

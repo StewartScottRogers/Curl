@@ -40,6 +40,7 @@ public sealed class CurlCommandRunnerHttp2MultiplexingTests
         Http2ServerConnector server = new() { HoldsResponses = true };
 
         Task<int> run = RunAsync(server, ["-Z", "--http2-prior-knowledge", "-s", "-w", WriteOut, "http://h/1", "http://h/2", "http://h/3"]);
+        await WhenOpenedAsync(server, "h", 1);
         await server.To("h").Single().StreamsOpenedAsync(3);
         server.Opened[0].ReleaseResponses();
 
@@ -62,6 +63,7 @@ public sealed class CurlCommandRunnerHttp2MultiplexingTests
         Http2ServerConnector server = new() { HoldsResponses = true };
 
         Task<int> run = RunAsync(server, ["-Z", "--http2-prior-knowledge", "-v", "-s", "http://h/1", "http://h/2", "http://h/3"]);
+        await WhenOpenedAsync(server, "h", 1);
         await server.To("h").Single().StreamsOpenedAsync(3);
         server.Opened[0].ReleaseResponses();
 
@@ -83,9 +85,11 @@ public sealed class CurlCommandRunnerHttp2MultiplexingTests
         Http2ServerConnector server = new(maxConcurrentStreams: 1) { HoldsResponses = true };
 
         Task<int> run = RunAsync(server, ["-Z", "--http2-prior-knowledge", "--parallel-max", "2", "-v", "-s", "-w", WriteOut, "http://h/1", "http://other/2", "http://h/3"]);
+        await WhenOpenedAsync(server, "h", 1);
         Http2ServerConnection first = server.To("h").Single();
         await first.StreamsOpenedAsync(1);
         await first.ReadsAskedAsync(2);
+        await WhenOpenedAsync(server, "other", 1);
         Http2ServerConnection other = server.To("other").Single();
         await other.StreamsOpenedAsync(1);
         other.ReleaseResponses();

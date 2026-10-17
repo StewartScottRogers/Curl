@@ -10,7 +10,9 @@
     the first <Connections> connections curl opens it:
 
       1. reads the request until the header block ends (CRLF CRLF) and, when the
-         headers carry Content-Length or Transfer-Encoding: chunked, until the body has
+         headers carry Transfer-Encoding: chunked (checked first, even beside a
+         Content-Length, as upstream's sws.c does: until the closing chunk) or
+         Content-Length, until the body has
          arrived - each read waits at most one second (RequestReadMilliseconds), so a body that never comes
          ends the read instead of hanging it;
       2. records the raw request bytes;
@@ -793,13 +795,14 @@ $serveConnections = {
         $bodyStart = $headerEnd + 4
         if ($EarlyResponseBodyBytes -ge 0) { return ($Length - $bodyStart) -ge $EarlyResponseBodyBytes }
         $headers = $text.Substring(0, $headerEnd)
-        $contentLength = [regex]::Match($headers, '(?im)^Content-Length:[ \t]*(\d+)[ \t]*\r?$')
-        if ($contentLength.Success) {
-            return ($Length - $bodyStart) -ge [long] $contentLength.Groups[1].Value
-        }
+        # Chunked wins over Content-Length, as in upstream's sws.c and RFC 9112 section 6.3.
         if ($headers -match '(?im)^Transfer-Encoding:.*\bchunked\b') {
             $body = $text.Substring($bodyStart)
             return $body.StartsWith("0`r`n`r`n") -or $body.EndsWith("`r`n0`r`n`r`n")
+        }
+        $contentLength = [regex]::Match($headers, '(?im)^Content-Length:[ \t]*(\d+)[ \t]*\r?$')
+        if ($contentLength.Success) {
+            return ($Length - $bodyStart) -ge [long] $contentLength.Groups[1].Value
         }
         return $true
     }

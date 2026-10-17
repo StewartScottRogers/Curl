@@ -1,8 +1,10 @@
 using System.Text;
+using Curl.Api.Callbacks;
 using Curl.Api.Codes;
 using Curl.Api.EngineContracts;
 using Curl.Api.EngineContracts.WebSocket;
 using Curl.Api.Options;
+using Curl.Api.Options.Behaviour;
 using Curl.Api.Options.Network;
 using Curl.Api.Options.Protocols;
 using Curl.Authentication;
@@ -199,6 +201,116 @@ public sealed partial class ManagedEasyTransferTests
         Assert.AreEqual(CurlCode.Ok, code);
         Assert.AreEqual(expectedBody, Encoding.Latin1.GetString(body.ToArray()));
         Assert.AreEqual(101, easy.Info.ResponseCode);
+    }
+
+    [TestMethod]
+    public async Task PerformAsync_WebSocketUploadThroughTheReadCallback_SendsEachReadAsOneBinaryFrame()
+    {
+        // curl 8.22.0 lib/ws.c cr_ws_read: with no frame started, the bytes of each read become one
+        // CURLWS_BINARY frame of their length (BL-2611).
+        Queue<string> reads = new(["abc", "de"]);
+        (IEasyTransfer easy, ScriptedConnector connector) = CreateWebSocketUploadEasy(buffer => GiveNext(reads, buffer));
+        await using IEasyTransfer handle = easy;
+
+        CurlCode code = await easy.PerformAsync(CancellationToken.None);
+
+        Assert.AreEqual(CurlCode.Ok, code);
+        CollectionAssert.AreEqual(
+            (byte[])[.. ManagedEasyWebSocketTests.ClientFrame(WsOpcode.Binary, true, "abc"), .. ManagedEasyWebSocketTests.ClientFrame(WsOpcode.Binary, true, "de")],
+            AfterRequest(connector.Written));
+    }
+
+    [TestMethod]
+    public async Task PerformAsync_ReadCallbackStartsATextFrame_SendsOneTextFrameAnnouncingItsBytes()
+    {
+        CurlCode started = CurlCode.SendError;
+        Queue<string> reads = new(["hello"]);
+        IEasyTransfer? self = null;
+        (IEasyTransfer easy, ScriptedConnector connector) = CreateWebSocketUploadEasy(
+            buffer =>
+            {
+                if (reads.Count > 0)
+                {
+                    started = self!.WebSocket.StartFrameAsync(CurlWebSocketFlags.Text, 5, CancellationToken.None).AsTask().GetAwaiter().GetResult();
+                }
+
+                return GiveNext(reads, buffer);
+            });
+        self = easy;
+        await using IEasyTransfer handle = easy;
+
+        CurlCode code = await easy.PerformAsync(CancellationToken.None);
+        CurlCode afterPerform = await easy.WebSocket.StartFrameAsync(CurlWebSocketFlags.Text, 1, CancellationToken.None);
+
+        Assert.AreEqual(CurlCode.Ok, code);
+        Assert.AreEqual(CurlCode.Ok, started);
+        CollectionAssert.AreEqual(ManagedEasyWebSocketTests.ClientFrame(WsOpcode.Text, true, "hello"), AfterRequest(connector.Written));
+        Assert.AreEqual(CurlCode.SendError, afterPerform);
+    }
+
+    [TestMethod]
+    public async Task PerformAsync_ReadCallbackStartsAFrameWithBadBitsOrWhileOneIsUnfinished_IsRefused()
+    {
+        List<CurlCode> answers = [];
+        bool first = true;
+        IEasyTransfer? self = null;
+        (IEasyTransfer easy, _) = CreateWebSocketUploadEasy(
+            buffer =>
+            {
+                if (!first)
+                {
+                    return 0;
+                }
+
+                first = false;
+                IEasyWebSocket webSocket = self!.WebSocket;
+                answers.Add(webSocket.StartFrameAsync(CurlWebSocketFlags.Text | CurlWebSocketFlags.Binary, 1, CancellationToken.None).AsTask().GetAwaiter().GetResult());
+                answers.Add(webSocket.StartFrameAsync(CurlWebSocketFlags.Text, -1, CancellationToken.None).AsTask().GetAwaiter().GetResult());
+                answers.Add(webSocket.StartFrameAsync(CurlWebSocketFlags.Text, 1, CancellationToken.None).AsTask().GetAwaiter().GetResult());
+                answers.Add(webSocket.StartFrameAsync(CurlWebSocketFlags.Text, 1, CancellationToken.None).AsTask().GetAwaiter().GetResult());
+                buffer[0] = (byte)'x';
+                return 1;
+            });
+        self = easy;
+        await using IEasyTransfer handle = easy;
+
+        await easy.PerformAsync(CancellationToken.None);
+
+        CollectionAssert.AreEqual(new[] { CurlCode.BadFunctionArgument, CurlCode.SendError, CurlCode.Ok, CurlCode.SendError }, answers);
+    }
+
+    private static (IEasyTransfer Easy, ScriptedConnector Connector) CreateWebSocketUploadEasy(ReadCallback read)
+    {
+        ScriptedConnector connector = new([[.. Ascii(SwitchingProtocolsHead), .. ManagedEasyWebSocketTests.ServerFrame(WsOpcode.Text, true, "hi")]]);
+        IEasyTransfer easy = new ManagedCurlEngine(TimeProvider.System, (options, state, _) => new ProtocolDispatcher(
+            [new WsProtocolHandler(connector, ManagedCurlEngine.CreateWebSocketAuthenticator(options, state), new ManagedEasyWebSocketTests.ZeroMaskSource())])).CreateEasy();
+        ((ManagedEasyTransfer)easy).WebSocketRandomSource = new ManagedEasyWebSocketTests.ZeroMaskSource();
+        EasyOptions options = new()
+        {
+            Network = new EasyNetworkOptions { Url = "ws://h/chat" },
+            Transfer = new EasyTransferOptions { Upload = true },
+            Callbacks = new() { Read = read },
+        };
+        easy.Options = options;
+        return (easy, connector);
+    }
+
+    private static long GiveNext(Queue<string> reads, Span<byte> buffer)
+    {
+        if (!reads.TryDequeue(out string? text))
+        {
+            return 0;
+        }
+
+        byte[] bytes = Ascii(text);
+        bytes.CopyTo(buffer);
+        return bytes.Length;
+    }
+
+    private static byte[] AfterRequest(byte[] written)
+    {
+        int requestEnd = Encoding.ASCII.GetString(written).IndexOf("\r\n\r\n", StringComparison.Ordinal) + 4;
+        return written[requestEnd..];
     }
 
     [TestMethod]
