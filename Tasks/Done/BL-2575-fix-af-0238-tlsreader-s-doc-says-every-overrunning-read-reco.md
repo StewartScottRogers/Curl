@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Tls.UnitLibrary]
 requirement: none
 created: 2026-10-17
-completed:
+completed: 2026-10-17
 ---
 # BL-2575 — Fix AF-0238: TlsReader's doc says every overrunning read records DecodeError, but ReadVector skips the bounds check, so ServerNameExtension.DecodeHostName throws instead of returning an alert
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+No code change needed. `TlsReader.ReadVector` already calls `Take(length)`, which records DecodeError when the vector runs past the reader's end; the check has been there since BL-698 (fdabbf7ed), as BL-2568 also found. Ran the finding's reproduction on 622139420: it prints `DecodeError`, the expected result. The audited tree likely held a planted defect or an older copy. `dotnet build` was clean (0 warnings) and the fast tests passed with no failed project.
 
 ## Log
 
 - 2026-10-17: Created.
 - 2026-10-17: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-17: Doing -> Done. AF-0238 reproduction now gives DecodeError; ReadVector bounds-checks the vector length
