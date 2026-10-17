@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Engine.UnitLibrary, Curl.Engine.UnitTests]
+touches: [Curl.Engine.UnitLibrary, Curl.Engine.UnitTests, Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
 requirement: none
 created: 2026-10-17
 completed:
@@ -29,7 +29,10 @@ Found by BL-2528 (lib514 port). curl 8.22.0 sends `HEAD /514 HTTP/1.1`; Curl sen
 
 ## Notes
 
+- 2026-10-17 (lane 2): Added `Curl.Conformance.UnitTests/PassingUpstreamCases.txt` to `touches`: acceptance criterion 2 adds test514 to it. BL-2595, in Doing, holds that file, so the task goes back to Backlog before any code; the board offers it again once BL-2595 no longer overlaps.
+
 ## Log
 
 - 2026-10-17: Created.
 - 2026-10-17: Backlog -> Doing. Criteria at claim: ad030c9b 995038b4 4272a6b9 c84701f0.
+- 2026-10-17: Doing -> Backlog. Touches Curl.Conformance.UnitTests/PassingUpstreamCases.txt, which BL-2595 (in Doing) holds; requeued until they no longer overlap.
