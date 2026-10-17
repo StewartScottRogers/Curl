@@ -31,3 +31,4 @@ Found by BL-2529 (lane 1, 2026-10-17). Its stashed work registers `LibOneVerbose
 ## Log
 
 - 2026-10-17: Created.
+- 2026-10-17: Backlog -> Deferred. Premise was wrong: the ports were not yet in the table (CRLF edit miss); once registered the runner runs the cases. Close when BL-2529 is Done
