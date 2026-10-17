@@ -27,10 +27,22 @@ public sealed class LibTestPrograms
     }
 
     /// <summary>
-    /// Every program ported so far: the table each port task appends its program to. Empty until the
-    /// first port lands, so every lib case is skipped as not ported.
+    /// Every program ported so far, over the system clock: the table each port task appends its program to.
+    /// A lib case whose program is not here is skipped as not ported.
     /// </summary>
-    public static LibTestPrograms Ported { get; } = new([]);
+    public static LibTestPrograms Ported { get; } = new(
+    [
+        new Lib500(TimeProvider.System),
+        new Lib501(),
+        new Lib502(TimeProvider.System),
+        new Lib503(TimeProvider.System),
+        new Lib504(TimeProvider.System),
+        new Lib505(),
+        new Lib506(),
+        new Lib507(TimeProvider.System),
+        new Lib508(),
+        new Lib509(() => new LibTestCountingAllocator()),
+    ]);
 
     /// <summary>The names of the programs in the table, such as <c>lib500</c>.</summary>
     public IReadOnlyCollection<string> ProgramNames => programsByName.Keys;

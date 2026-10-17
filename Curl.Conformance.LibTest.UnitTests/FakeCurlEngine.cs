@@ -21,13 +21,47 @@ internal sealed class FakeCurlEngine : ICurlEngine
 
     public CurlVersionInfo VersionInfo { get; } = new();
 
-    public IEasyTransfer CreateEasy() => new FakeEasyTransfer(PerformResult, Info);
+    /// <summary>Runs as each easy transfer is created, before it is returned.</summary>
+    public Action? CreatingEasy { get; init; }
+
+    /// <summary>Runs as the multi handle is handed out.</summary>
+    public Action? CreatingMulti { get; init; }
+
+    /// <summary>Runs as each share handle is created.</summary>
+    public Action? CreatingShare { get; init; }
+
+    /// <summary>Runs in each perform with the transfer's options, in place of a transfer; answers the perform's code.</summary>
+    public Func<EasyOptions, CurlCode>? Performing { get; init; }
+
+    /// <summary>The share handle created last.</summary>
+    public FakeShareHandle? LastShare { get; private set; }
+
+    /// <summary>What a share handle's lock-callback setter answers.</summary>
+    public CurlShareCode ShareLockResult { get; init; } = CurlShareCode.Ok;
+
+    /// <summary>What a share handle's cleanup answers.</summary>
+    public CurlShareCode ShareCleanupResult { get; init; } = CurlShareCode.Ok;
+
+    public IEasyTransfer CreateEasy()
+    {
+        CreatingEasy?.Invoke();
+        return new FakeEasyTransfer(PerformResult, Info, Performing);
+    }
 
     public FakeMultiTransfer Multi { get; } = new();
 
-    public IMultiTransfer CreateMulti() => Multi;
+    public IMultiTransfer CreateMulti()
+    {
+        CreatingMulti?.Invoke();
+        return Multi;
+    }
 
-    public IShareHandle CreateShare() => new FakeShareHandle();
+    public IShareHandle CreateShare()
+    {
+        CreatingShare?.Invoke();
+        LastShare = new FakeShareHandle { LockResult = ShareLockResult, CleanupResult = ShareCleanupResult };
+        return LastShare;
+    }
 
     public ICurlUrlHandle CreateUrl() => new FakeUrlHandle();
 
@@ -37,7 +71,7 @@ internal sealed class FakeCurlEngine : ICurlEngine
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
-    private sealed class FakeEasyTransfer(CurlCode performResult, TransferInfo info) : IEasyTransfer
+    private sealed class FakeEasyTransfer(CurlCode performResult, TransferInfo info, Func<EasyOptions, CurlCode>? performing) : IEasyTransfer
     {
         public EasyOptions Options { get; set; } = new();
 
@@ -51,7 +85,7 @@ internal sealed class FakeCurlEngine : ICurlEngine
 
         public IConnectOnlyConnection Connection => throw new NotSupportedException();
 
-        public ValueTask<CurlCode> PerformAsync(CancellationToken cancellationToken) => ValueTask.FromResult(performResult);
+        public ValueTask<CurlCode> PerformAsync(CancellationToken cancellationToken) => ValueTask.FromResult(performing?.Invoke(Options) ?? performResult);
 
         public IEasyTransfer Duplicate() => throw new NotSupportedException();
 
