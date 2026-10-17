@@ -51,3 +51,4 @@ Found by BL-2527 running test596 through the ported `lib500` (third argument `ac
 - 2026-10-17: Created.
 - 2026-10-17: Backlog -> Doing. Criteria at claim: 9f887a5f 904b57ec 3d836d5e.
 - 2026-10-17: Doing -> Backlog. Needs Curl.Conformance.UnitTests/PassingUpstreamCases.txt, which BL-2528 (Doing) touches; diagnosis and plan are in Notes
+- 2026-10-17: Backlog -> Doing. Criteria at claim: 9f887a5f 904b57ec 3d836d5e.
