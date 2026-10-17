@@ -3,8 +3,8 @@ id: AF-0241
 title: BL-2310 claimed 3 times and requeued twice: each run found its prerequisites still incomplete and filed more subtasks
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: process:BL-2310:BL-2310:redone-work
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Log
 
 - 2026-10-16: filed proposed.
+- 2026-10-16: proposed -> accepted.
