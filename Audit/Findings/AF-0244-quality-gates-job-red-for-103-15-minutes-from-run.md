@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: process:logs:QualityGates-CurlMulti.SetOption:ci-red
 reproduction: none
-task: none
-tasks:
+task: BL-2581
+tasks: BL-2581
 found: 2026-10-16
 found-at: 16500922292d0d0bcaede88acdabc2500cf08ebf
 scorecard: 2026-10-16_1623.md

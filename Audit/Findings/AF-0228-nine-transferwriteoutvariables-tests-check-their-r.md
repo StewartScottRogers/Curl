@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: quality:Curl.Output.UnitTests/TransferWriteOutVariablesFromTransferInfoTests.cs:Show:no-assertion
 reproduction: none
-task: none
-tasks:
+task: BL-2565
+tasks: BL-2565
 found: 2026-10-16
 found-at: 16500922292d0d0bcaede88acdabc2500cf08ebf
 scorecard: 2026-10-16_1623.md

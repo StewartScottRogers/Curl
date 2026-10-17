@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: quality:Curl.Cryptography.UnitLibrary/MlKemPolynomial.cs:AreAllBelowModulus-ge:surviving-mutant
 reproduction: mutation Curl.Cryptography.UnitLibrary/MlKemPolynomial.cs:202:>=
-task: none
-tasks:
+task: BL-2572
+tasks: BL-2572
 found: 2026-10-16
 found-at: 16500922292d0d0bcaede88acdabc2500cf08ebf
 scorecard: 2026-10-16_1623.md

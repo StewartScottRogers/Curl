@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: quality:Curl.Protocol.Http.UnitLibrary/HttpProtocolHandler.cs:ReportUploadRewind-ge:surviving-mutant
 reproduction: mutation Curl.Protocol.Http.UnitLibrary/HttpProtocolHandler.cs:1584:>=
-task: none
-tasks:
+task: BL-2569
+tasks: BL-2569
 found: 2026-10-16
 found-at: 16500922292d0d0bcaede88acdabc2500cf08ebf
 scorecard: 2026-10-16_1623.md

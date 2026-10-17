@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: truthfulness:Curl.Protocol.Abstractions.UnitLibrary/IDatagramConnector.cs:IDatagramConnector:false-doc-comment
 reproduction: none
-task: none
-tasks:
+task: BL-2577
+tasks: BL-2577
 found: 2026-10-16
 found-at: 16500922292d0d0bcaede88acdabc2500cf08ebf
 scorecard: 2026-10-16_1623.md

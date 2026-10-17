@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: quality:Curl.Output.UnitTests/WriteOutTransferInfoTests.cs:FromReport_Report_FillsTextsCountsAndEndPoints:no-assertion
 reproduction: none
-task: none
-tasks:
+task: BL-2566
+tasks: BL-2566
 found: 2026-10-16
 found-at: 16500922292d0d0bcaede88acdabc2500cf08ebf
 scorecard: 2026-10-16_1623.md
