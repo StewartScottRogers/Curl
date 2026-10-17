@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary]
 requirement: none
 created: 2026-10-17
-completed:
+completed: 2026-10-17
 ---
 # BL-2573 — Fix AF-0236: --sasl-authzid with --ntlm: curl sends an NTLM Type-1 Authorization header over HTTP, Curl sends none
 
@@ -41,12 +41,25 @@ The finding closes only when a later re-audit by the conformance auditor confirm
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Measured curl 8.22.0 (Schannel) on 2026-10-17 with `Record-CurlExchange.ps1`: `--sasl-authzid x --ntlm` sends the
+  same NTLM Type-1 as `-u : --ntlm` (empty user, SSPI's current Windows user); with `--basic`, `--anyauth`,
+  `--negotiate` or `--ntlm --basic` it sends no `Authorization` line, and with `-u bob:pw` the user's Type-1. So
+  curl's auth gate treats an authorization identity like credentials, but only NTLM's first request sends anything
+  without a user.
+- Fix: `TransferContextFactory.AuthorizationIdentityNtlmCredentialsOf` gives an empty user and password when
+  `--sasl-authzid` is set, NTLM is the only scheme, no lookup or `-u` gave credentials, and the scheme is `http`,
+  `https`, `ws` or `wss` (never FTP or mail, whose empty user would replace the anonymous login). The finding's
+  reproduction now shows the same `Authorization: NTLM TlRMTVNTUAABAAAAB7IIog...` line for both binaries.
+- Tests: `TransferContextFactoryTests.Create_SaslAuthzid*` and `Create_NtlmWithoutSaslAuthzid_CarriesNoCredentials`.
+  `Measure-CodeQuality.ps1 -Library Curl.Engine.UnitLibrary`: 0 failing members.
 
 ## Log
 
 - 2026-10-17: Created.
 - 2026-10-17: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-17: Doing -> Done. AF-0236 reproduction now matches curl: --sasl-authzid with --ntlm sends the NTLM Type-1 over HTTP

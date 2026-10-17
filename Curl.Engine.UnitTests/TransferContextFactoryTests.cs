@@ -905,6 +905,72 @@ public sealed class TransferContextFactoryTests
         return parsed.Options;
     }
 
+    [TestMethod]
+    [DataRow("http://example.com/")]
+    [DataRow("https://example.com/")]
+    [DataRow("ws://example.com/")]
+    [DataRow("wss://example.com/")]
+    public void Create_SaslAuthzidWithNtlmAndNoUser_CarriesEmptyCredentials(string url)
+    {
+        string[] arguments = ["--sasl-authzid", "x", "--ntlm", url];
+
+        TransferContext context = CreateContext(arguments, url);
+        Diagnostics.Act("context URL", context.Url.OriginalString);
+
+        Diagnostics.Assert("context.Credentials user:password", ":", $"{context.Credentials?.UserName}:{context.Credentials?.Password}");
+        Assert.AreEqual(string.Empty, context.Credentials!.UserName);
+        Assert.AreEqual(string.Empty, context.Credentials.Password);
+    }
+
+    [TestMethod]
+    [DataRow("http://example.com/", "--basic")]
+    [DataRow("http://example.com/", "--digest")]
+    [DataRow("http://example.com/", "--anyauth")]
+    [DataRow("ftp://example.com/", "--ntlm")]
+    public void Create_SaslAuthzidWithoutNtlmAloneOverHttp_CarriesNoCredentials(string url, string method)
+    {
+        string[] arguments = ["--sasl-authzid", "x", method, url];
+
+        TransferContext context = CreateContext(arguments, url);
+        Diagnostics.Act("context URL", context.Url.OriginalString);
+
+        Diagnostics.Assert("context.Credentials", "null", context.Credentials is null ? "null" : "set");
+        Assert.IsNull(context.Credentials);
+    }
+
+    [TestMethod]
+    public void Create_NtlmWithoutSaslAuthzid_CarriesNoCredentials()
+    {
+        string[] arguments = ["--ntlm", "http://example.com/"];
+
+        TransferContext context = CreateContext(arguments, "http://example.com/");
+        Diagnostics.Act("context URL", context.Url.OriginalString);
+
+        Diagnostics.Assert("context.Credentials", "null", context.Credentials is null ? "null" : "set");
+        Assert.IsNull(context.Credentials);
+    }
+
+    [TestMethod]
+    public void Create_SaslAuthzidWithNtlmAndUser_CarriesTheUser()
+    {
+        string[] arguments = ["--sasl-authzid", "x", "--ntlm", "-u", "bob:pw", "http://example.com/"];
+
+        TransferContext context = CreateContext(arguments, "http://example.com/");
+        Diagnostics.Act("context URL", context.Url.OriginalString);
+
+        Diagnostics.Assert("context.Credentials!.UserName", "bob", context.Credentials!.UserName);
+        Assert.AreEqual("bob", context.Credentials!.UserName);
+    }
+
+    /// <summary>Builds the context of <paramref name="url" /> under the command line <paramref name="arguments" />.</summary>
+    private TransferContext CreateContext(string[] arguments, string url)
+    {
+        using MemoryStream standardInput = new();
+        using MemoryStream output = new();
+        return new TransferContextFactory(standardInput)
+            .Create(EasyOptionsFromCommandLine.TransferSettingsOf(Parse(arguments)), HttpOf(arguments), BehaviourOf(arguments), TransferOf(arguments), ProtocolOf(arguments), ProxyOf(arguments), AuthenticationOf(arguments), NetworkOf(arguments), CurlUrl.Parse(url), output, null, null, null);
+    }
+
     /// <summary>A progress sink that records nothing, to tell the context's sink from the one given.</summary>
     private sealed class SilentTransferProgress : ITransferProgress
     {
