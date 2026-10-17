@@ -444,3 +444,7 @@ A perform from the options with `EasyHttpOptions.HttpGet` set and `Post` clear r
 ## CURLOPT_POST with a read callback (BL-2586)
 
 A perform from the options with no `ToolInputs`, `EasyHttpOptions.Post` set, no `PostFields`, no `EasyTransferOptions.Upload` and no MIME or form body posts what `EasyCallbackOptions.Read` gives (`ManagedEasyTransfer.ReadCallbackPostBodyOf`): a `StreamBody` over the read callback's `CallbackReadStream`, `application/x-www-form-urlencoded`, with `PostFieldSize` as its `Content-Length` when not negative and chunked otherwise, as libcurl 8.22.0 does (upstream test508). A `CURL_READFUNC_ABORT` from it ends the perform as an upload's does. With no read callback the perform still sends no body. Its tests are `ManagedEasyTransferTests.ReadCallbackPost.cs`.
+
+## CURLOPT_NOBODY after CURLOPT_POST (BL-2591)
+
+`HttpRequestOptionsMapping.Of` sends no body when `EasyTransferOptions.NoBody` is set (`RequestBodyOf`), whatever `PostFields` or the form body hold, so a `Libcurl` handle given `CURLOPT_POSTFIELDS`, `CURLOPT_POST` and then `CURLOPT_NOBODY` 1 sends a `HEAD` with no body and no `Content-Length`, as libcurl 8.22.0 does (upstream test514); the curl tool refuses `-I` with a body, so its requests do not change. Its tests are in `ManagedEasyTransferTests` and `HttpRequestOptionsMappingTests`.

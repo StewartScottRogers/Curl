@@ -110,7 +110,7 @@ internal static class HttpRequestOptionsMapping
             UserAgent = http.UserAgent,
             Referer = http.Referer,
             AutoReferer = http.AutoReferer,
-            Body = formBody ?? PostFieldsBodyOf(http),
+            Body = RequestBodyOf(http, transfer, formBody),
             Fail = behaviour.FailOnError ? HttpFailMode.Fail : settings.FailMode,
             FollowRedirects = http.FollowLocation != FollowLocation.None,
             MaxRedirects = (int)http.MaxRedirects,
@@ -195,6 +195,15 @@ internal static class HttpRequestOptionsMapping
     /// The <see cref="EasyHttpOptions.PostFields" /> body, or <see langword="null" /> when there is none, as
     /// under <c>-G</c>, which moved it into the query.
     /// </summary>
+    /// <summary>
+    /// The request body: none when <see cref="EasyTransferOptions.NoBody" /> is set, as libcurl's
+    /// <c>CURLOPT_NOBODY</c> set after <c>CURLOPT_POST</c> sends a HEAD (upstream test514, BL-2591; the curl
+    /// tool refuses <c>-I</c> with a body), otherwise <paramref name="formBody" /> when given, otherwise
+    /// <see cref="EasyHttpOptions.PostFields" />.
+    /// </summary>
+    private static HttpRequestBody? RequestBodyOf(EasyHttpOptions http, EasyTransferOptions transfer, HttpRequestBody? formBody) =>
+        transfer.NoBody ? null : formBody ?? PostFieldsBodyOf(http);
+
     private static BytesBody? PostFieldsBodyOf(EasyHttpOptions http) =>
         http.PostFields is { } data ? new BytesBody(data, FormUrlEncoded) : null;
 }

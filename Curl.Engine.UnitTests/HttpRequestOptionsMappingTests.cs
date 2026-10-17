@@ -83,6 +83,19 @@ public sealed class HttpRequestOptionsMappingTests
     }
 
     [TestMethod]
+    public void Of_NoBodyWithPostFieldsAndFormBody_SendsNoBody()
+    {
+        EasyHttpOptions http = new() { PostFields = "moo"u8.ToArray(), Post = true };
+        HttpRequestBody formBody = new BytesBody("x"u8.ToArray(), "text/plain");
+
+        HttpRequestOptions mapped = HttpRequestOptionsMapping.Of(EasyOptionsFromCommandLine.TransferSettingsOf(NoOptions), http, new EasyBehaviourOptions(), new EasyTransferOptions { NoBody = true }, new EasyAuthenticationOptions(), formBody);
+
+        Diagnostics.Act("body is null", mapped.Body is null);
+        Diagnostics.Assert("body is null", true, mapped.Body is null);
+        Assert.IsNull(mapped.Body);
+    }
+
+    [TestMethod]
     [DataRow(true, true, false)]
     [DataRow(false, true, false)]
     [DataRow(true, false, false)]
