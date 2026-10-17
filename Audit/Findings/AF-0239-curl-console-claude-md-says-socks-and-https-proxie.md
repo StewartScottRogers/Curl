@@ -3,8 +3,8 @@ id: AF-0239
 title: Curl.Console CLAUDE.md says SOCKS and HTTPS proxies end http/https transfers with exit 4 and other schemes ignore the proxy; the connector tunnels through them
 auditor: truthfulness
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: truthfulness:Curl.Console/CLAUDE.md:proxy-tunnel-exit-4:false-statement
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Run from the repository root:
 ## Log
 
 - 2026-10-16: filed proposed.
+- 2026-10-16: proposed -> accepted.
