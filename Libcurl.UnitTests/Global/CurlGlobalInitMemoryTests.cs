@@ -98,6 +98,23 @@ public sealed class CurlGlobalInitMemoryTests
         Assert.AreEqual(0, freed);
     }
 
+    [TestMethod]
+    public async Task FreeAll_OfTheSharedNoneFromManyHandlesAtOnce_NeverThrows()
+    {
+        var cleanups = Enumerable.Range(0, 64).Select(_ => Task.Run(() =>
+        {
+            for (var round = 0; round < 1000; round++)
+            {
+                EasyAllocations.None.FreeAll();
+            }
+        }));
+
+        Task all = Task.WhenAll(cleanups);
+        await all;
+
+        Assert.IsTrue(all.IsCompletedSuccessfully);
+    }
+
     /// <summary>Allocation callbacks that record each call and answer 1, 2, 3 and so on as the blocks.</summary>
     private sealed class RecordingAllocator
     {

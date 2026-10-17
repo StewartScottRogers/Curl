@@ -63,11 +63,21 @@ internal sealed class EasyAllocations(MemoryCallbacks? callbacks)
     }
 
     /// <summary>Frees every kept block through the <c>free</c> callback, as <c>curl_easy_cleanup</c> does.</summary>
+    /// <remarks>
+    /// Over no callbacks it touches nothing: <see cref="None"/> is shared by every handle of a <c>curl_global_init</c>
+    /// library, and even an empty <see cref="List{T}.Clear"/> bumps the list's version, so handles cleaned up at once
+    /// would break each other's enumeration.
+    /// </remarks>
     internal void FreeAll()
     {
+        if (callbacks is null)
+        {
+            return;
+        }
+
         foreach (nint block in blocks)
         {
-            callbacks!.Free(block);
+            callbacks.Free(block);
         }
 
         blocks.Clear();
