@@ -30,3 +30,4 @@ Found by BL-2585's lane on 2026-10-17 at commit 6cd5ed0bb: the test fails alone 
 ## Log
 
 - 2026-10-17: Created.
+- 2026-10-17: Backlog -> Doing. Criteria at claim: 44cec74f 3d836d5e.
