@@ -55,3 +55,4 @@ Found by BL-2527 running test580 through the ported `lib507` (multi interface): 
 - 2026-10-17: Created.
 - 2026-10-17: Backlog -> Doing. Criteria at claim: 49be4119 904b57ec 3d836d5e.
 - 2026-10-17: Doing -> Backlog. touches Curl.Protocol.Http.UnitLibrary, held by BL-2571, and Curl.Conformance.UnitTests/PassingUpstreamCases.txt, held by BL-2528
+- 2026-10-17: Backlog -> Doing. Criteria at claim: 49be4119 904b57ec 3d836d5e.
