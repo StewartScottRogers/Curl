@@ -50,3 +50,4 @@ Phase 5 of `Documentation/Planning/Curl-Api-And-libcurl.md` and ADR-0506. Upstre
 - 2026-10-16: Created.
 - 2026-10-16: Backlog -> Doing. Criteria at claim: e196db4d ceef976f 6c058a97 408cc7ba 4272a6b9 8738c7f6.
 - 2026-10-16: Doing -> Backlog. Waits on BL-2559 (no User-Agent from a Libcurl handle) and BL-2560 (judge a lib case's reply data): every case of lib500-509 fails without them
+- 2026-10-17: Backlog -> Doing. Criteria at claim: e196db4d ceef976f 6c058a97 408cc7ba 4272a6b9 8738c7f6.
