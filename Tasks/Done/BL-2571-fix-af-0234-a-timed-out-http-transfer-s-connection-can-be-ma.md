@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Http.UnitLibrary]
 requirement: none
 created: 2026-10-17
-completed:
+completed: 2026-10-17
 ---
 # BL-2571 — Fix AF-0234: A timed-out HTTP transfer's connection can be marked keep-alive with no test failing
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Added `ExecuteAsync_ServerStallsPastMaxTime_ClosesTheConnectionRatherThanLeavingItIntact` (HttpProtocolHandlerTests.Timeouts.cs): after exit 28 the `-v` lines carry no "left intact" and the last connection line is "closing connection #". Lanes may not run `Audit/Tools/Invoke-MutationTest.ps1` (audit guard), so the mutant was applied by hand (`KeepsAlive: true` at HttpProtocolHandler.cs:1348): the new test failed, the other 6 StallsPastMaxTime tests passed; mutant reverted. Test-only change, so no production quality run was needed.
 
 ## Log
 
 - 2026-10-17: Created.
 - 2026-10-17: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-17: Doing -> Done. Test kills the AF-0234 timeout keep-alive mutant
