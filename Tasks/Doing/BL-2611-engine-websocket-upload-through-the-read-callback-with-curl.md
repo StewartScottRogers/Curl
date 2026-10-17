@@ -31,3 +31,4 @@ ADR-0665 (BL-2481) made `ManagedEasyWebSocket` send frames in parts under `CURLW
 ## Log
 
 - 2026-10-17: Created.
+- 2026-10-17: Backlog -> Doing. Criteria at claim: dc315ed6 75eda62f 0f90c956.
