@@ -1257,7 +1257,7 @@ public sealed class HttpProtocolHandler(
             ReportRequestSent(context.Events, framing, upload, bodyLeftUnsent);
             exchangeLog.RequestSent(framing.Method, context.Url.AbsolutePath, request);
             exchange.RequestSent = context.TimeProvider.GetTimestamp();
-            exchange.Head = await ReadHeadAsync(headReader, newConnection, cancellationToken).ConfigureAwait(false);
+            exchange.Head = await ReadHeadAsync(headReader, context.HeaderOutput, newConnection, cancellationToken).ConfigureAwait(false);
             ThrowIfVersionMismatched(transport, streams is not null || IsSwitchedToHttp2(connection), exchange.Head);
             HttpHeadRefusal? refusal = headReader.Refusal;
             exchange.Head = HeadCurlRead(exchange.Head, refusal);
@@ -1650,10 +1650,12 @@ public sealed class HttpProtocolHandler(
     /// <summary>
     /// Reads the response head; on a reused connection, a reply that cannot begin <c>HTTP/</c>
     /// fails with exit 8, <c>Invalid status line</c>, as curl 8.21.0 never takes HTTP/0.9 on
-    /// a reused connection (upstream test1479), rather than with exit 1.
+    /// a reused connection (upstream test1479), rather than with exit 1. A failure that carries
+    /// the head bytes accepted before it writes them to the header output first (test580).
     /// </summary>
-    private static async ValueTask<HttpResponseHead> ReadHeadAsync(HttpResponseHeadReader headReader, bool newConnection, CancellationToken cancellationToken)
+    private static async ValueTask<HttpResponseHead> ReadHeadAsync(HttpResponseHeadReader headReader, Stream? headerOutput, bool newConnection, CancellationToken cancellationToken)
     {
+        HttpTransferException headFailure;
         try
         {
             return await headReader.ReadAsync(cancellationToken).ConfigureAwait(false);
@@ -1662,6 +1664,13 @@ public sealed class HttpProtocolHandler(
         {
             throw new HttpTransferException(CurlExitCode.WeirdServerReply, HttpTransferMessages.InvalidStatusLine);
         }
+        catch (HttpTransferException failure) when (failure.HeadBytesBeforeFailure.Length > 0)
+        {
+            headFailure = failure;
+        }
+
+        await WriteHeadersAsync(headerOutput, headFailure.HeadBytesBeforeFailure, cancellationToken).ConfigureAwait(false);
+        throw headFailure;
     }
 
     /// <summary>

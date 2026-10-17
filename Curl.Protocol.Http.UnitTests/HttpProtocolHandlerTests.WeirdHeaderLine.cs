@@ -55,6 +55,31 @@ public sealed partial class HttpProtocolHandlerTests
         }
     }
 
+    /// <summary>
+    /// libcurl 8.22.0 writes each header line once it accepts it, so the head before the second
+    /// <c>Location</c> reaches the header output and the refused line does not (upstream test580, BL-2587).
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_SecondDifferentLocationWithHeaderOutput_WritesTheHeadLinesBeforeIt()
+    {
+        foreach (int chunkSize in ChunkSizes)
+        {
+            MemoryStream output = new();
+            Diagnostics.Arrange("chunk size", chunkSize);
+            Diagnostics.Arrange("scripted response", "302, X-Before, Location: /a, Location: /b; header output is the output");
+
+            TransferResult result = await Handler(QueueConnector.For(Connection("HTTP/1.1 302 eat this!\r\nX-Before: 1\r\nLocation: /a\r\nLocation: /b\r\nContent-Length: 0\r\n\r\n", chunkSize)))
+                .ExecuteAsync(RefusedHeaderContext(output, output, string.Empty));
+
+            WriteResult(result);
+            Diagnostics.Assert("exit code", CurlExitCode.WeirdServerReply, result.ExitCode);
+            Diagnostics.Diff("output", OneLine("HTTP/1.1 302 eat this!\r\nX-Before: 1\r\nLocation: /a\r\n"), OneLine(Latin1(output.ToArray())));
+            Assert.AreEqual(CurlExitCode.WeirdServerReply, result.ExitCode, $"Chunk size {chunkSize}");
+            Assert.AreEqual("Multiple Location headers", result.ErrorMessage, $"Chunk size {chunkSize}");
+            Assert.AreEqual("HTTP/1.1 302 eat this!\r\nX-Before: 1\r\nLocation: /a\r\n", Latin1(output.ToArray()), $"Chunk size {chunkSize}");
+        }
+    }
+
     [TestMethod]
     [DataRow("Location: /a\r\nLocation: /a\r\n", DisplayName = "The same value twice")]
     [DataRow("Location: /a\r\nLocation:\r\n", DisplayName = "An empty value after it")]
