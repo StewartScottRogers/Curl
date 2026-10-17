@@ -1,6 +1,6 @@
 namespace Libcurl.Global;
 
-/// <summary>The five allocation callbacks <c>curl_global_init_mem</c> takes, held only to be checked.</summary>
+/// <summary>The five allocation callbacks <c>curl_global_init_mem</c> takes, which its easy handles allocate through (ADR-0664).</summary>
 /// <param name="Malloc">The allocator.</param>
 /// <param name="Free">The deallocator.</param>
 /// <param name="Realloc">The reallocator.</param>

@@ -2,6 +2,7 @@ using Curl.Api.Codes;
 using Curl.Api.EngineContracts;
 using Curl.Api.EngineContracts.ConnectOnly;
 using Curl.Api.Options;
+using Libcurl.Global;
 using Libcurl.Info;
 using Libcurl.Options;
 
@@ -22,16 +23,22 @@ public sealed class CurlEasy : IDisposable, IAsyncDisposable
 {
     private readonly IEasyTransfer transfer;
     private readonly EasyOptionDispatch dispatch;
+    private readonly EasyAllocations allocations;
     private int cleanedUp;
 
     /// <summary>Wraps the engine's <paramref name="transfer"/>, setting options through <paramref name="dispatch"/>.</summary>
     /// <param name="transfer">The engine's easy transfer; the handle disposes it on cleanup.</param>
     /// <param name="dispatch">The <c>curl_easy_setopt</c> dispatch.</param>
-    internal CurlEasy(IEasyTransfer transfer, EasyOptionDispatch dispatch)
+    /// <param name="allocations">The handle's <c>curl_global_init_mem</c> allocations; the handle frees them on cleanup.</param>
+    internal CurlEasy(IEasyTransfer transfer, EasyOptionDispatch dispatch, EasyAllocations? allocations = null)
     {
         this.transfer = transfer;
         this.dispatch = dispatch;
+        this.allocations = allocations ?? EasyAllocations.None;
     }
+
+    /// <summary>The handle's <c>curl_global_init_mem</c> allocations, which <c>curl_easy_escape</c> adds to.</summary>
+    internal EasyAllocations Allocations => allocations;
 
     /// <summary>Whether <see cref="Dispose"/> or <see cref="DisposeAsync"/> (<c>curl_easy_cleanup</c>) has run.</summary>
     public bool IsCleanedUp => Volatile.Read(ref cleanedUp) != 0;
@@ -61,6 +68,7 @@ public sealed class CurlEasy : IDisposable, IAsyncDisposable
         if (code == CurlCode.Ok)
         {
             live.Options = options;
+            StrdupString(value);
         }
 
         return code;
@@ -120,7 +128,7 @@ public sealed class CurlEasy : IDisposable, IAsyncDisposable
     /// </summary>
     /// <returns>The new handle; the caller disposes it (<c>curl_easy_cleanup</c>).</returns>
     /// <exception cref="ObjectDisposedException">The handle has been cleaned up.</exception>
-    public CurlEasy DupHandle() => new(LiveTransfer().Duplicate(), dispatch);
+    public CurlEasy DupHandle() => new(LiveTransfer().Duplicate(), dispatch, allocations.ForDuplicate());
 
     /// <summary>
     /// <c>curl_easy_pause</c>: leaves the directions set in <paramref name="directions"/> paused and
@@ -215,6 +223,7 @@ public sealed class CurlEasy : IDisposable, IAsyncDisposable
         }
 
         await transfer.DisposeAsync().ConfigureAwait(false);
+        allocations.FreeAll();
     }
 
     private static async ValueTask<CurlCode> PerformFillingErrorBufferAsync(IEasyTransfer live, CancellationToken cancellationToken)
@@ -223,6 +232,14 @@ public sealed class CurlEasy : IDisposable, IAsyncDisposable
         var code = await live.PerformAsync(cancellationToken).ConfigureAwait(false);
         EasyErrorBuffer.Fill(buffer, code, live.ErrorText);
         return code;
+    }
+
+    private void StrdupString(object? value)
+    {
+        if (value is string text)
+        {
+            allocations.Strdup(text);
+        }
     }
 
     private IEasyTransfer LiveTransfer()

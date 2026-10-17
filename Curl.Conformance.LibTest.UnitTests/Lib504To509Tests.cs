@@ -322,18 +322,22 @@ public sealed class Lib509Tests
     [TestMethod]
     public async Task RunAsync_WritesTheLineOnlyWhenTheAllocatorWasCalled()
     {
-        var used = new LibTestCountingAllocator();
-        used.Free(used.Malloc(8));
-        var quiet = new PortRun(new FakeCurlEngine(), 509, "unused");
+        var quiet = new PortRun(null, 509, "unused");
         var invoked = new PortRun(new FakeCurlEngine(), 509, "unused");
         var noEngine = new PortRun(null, 509, "unused");
+        var unused = new LibTestCountingAllocator();
 
-        LibTestResult quietResult = await new Lib509(() => new LibTestCountingAllocator()).RunAsync(quiet.Context, CancellationToken.None);
-        await new Lib509(() => used).RunAsync(invoked.Context, CancellationToken.None);
+        await using (CurlLibrary plain = CurlGlobal.Init(new FakeCurlEngine()))
+        {
+            await Lib509.TestAsync(quiet.Context, quiet.Steps, plain, unused);
+        }
+
+        LibTestResult invokedResult = await new Lib509(() => new LibTestCountingAllocator()).RunAsync(invoked.Context, CancellationToken.None);
         LibTestResult failed = await new Lib509(() => new LibTestCountingAllocator()).RunAsync(noEngine.Context, CancellationToken.None);
 
-        Assert.AreEqual(0, quietResult.ExitCode);
+        Assert.AreEqual(0, unused.Seen);
         Assert.AreEqual(string.Empty, quiet.OutputText);
+        Assert.AreEqual(0, invokedResult.ExitCode);
         Assert.AreEqual("Callbacks were invoked!\n", invoked.OutputText);
         Assert.AreEqual(20, failed.ExitCode);
         Assert.AreEqual("curl_global_init_mem() failed\n", noEngine.Error.ToString());

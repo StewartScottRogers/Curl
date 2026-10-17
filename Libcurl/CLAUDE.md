@@ -11,7 +11,10 @@ given; its `DisposeAsync` is `curl_global_cleanup`
 (ADR-0556). `CurlLibrary` is `partial`: each handle area adds its public creating method
 (`curl_easy_init` and the rest) as a `CurlLibrary` part in its own folder, over the internal
 `Create*` methods in `Global`. Tests that count inits use `CurlGlobal.InitCounting` with their own
-`GlobalInitCounter`, never the process-wide count, since tests run in parallel.
+`GlobalInitCounter`, never the process-wide count, since tests run in parallel. An `InitMemory`
+library's easy handles allocate through its callbacks (`EasyAllocations`, ADR-0664): `calloc` at init
+and `DupHandle`, `strdup` per accepted string option, `malloc` per `CurlStrings.Escape` given the
+handle, and `free` of each at cleanup.
 
 `Options` holds the options table (ADR-0560): `CurlOption` and `CurlOptions` (`curl_easy_option_by_name`,
 `_by_id`, `_next`) generated from curl 8.22.0's `lib/easyoptions.c` and `curl.h`, and the internal
