@@ -32,3 +32,4 @@ Found by BL-2528 (lib517 port, `Curl.Conformance.LibTest.UnitLibrary/Lib517.cs`)
 ## Log
 
 - 2026-10-17: Created.
+- 2026-10-17: Backlog -> Doing. Criteria at claim: 3f80acba acfea394 4272a6b9 c84701f0.
