@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.IO.Compression;
+using System.Reflection;
 using System.Xml.Linq;
 
 namespace Curl.Mcp;
@@ -7,7 +8,12 @@ namespace Curl.Mcp;
 /// <summary>
 /// Runs <c>dotnet pack</c> on Curl.Mcp into a temporary folder and reads the package it makes
 /// (BL-2388): <c>.mcp/server.json</c> inside, and the McpServer package type in its nuspec. It runs
-/// the SDK as a child process and writes to the disk, so it is an Integration test (ADR-0421).
+/// the SDK as a child process and writes to the disk, so it is an Integration test (ADR-0421). It packs
+/// with <c>-p:PublishAot=true</c>, which makes only the tool package (ADR-0599): a plain pack also builds
+/// the six self-contained runtime packages, which took over 15 minutes on CI and pushed the mcp-pack job
+/// past its time limit (BL-2561). ci.yml's own pack step still checks all seven packages. It packs in the
+/// configuration this test assembly was built in, so the pack reuses that build rather than compiling every
+/// referenced project again: Debug locally, Release in ci.yml's mcp-pack job.
 /// </summary>
 [TestClass]
 [TestCategory("Integration")]
@@ -49,7 +55,7 @@ public sealed class CurlMcpPackIntegrationTests
             RedirectStandardError = true,
             UseShellExecute = false,
         };
-        foreach (string argument in new[] { "pack", Path.Combine(RepositoryRoot(), "Curl.Mcp", "Curl.Mcp.csproj"), "-c", "Release", "-o", output, "-nologo" })
+        foreach (string argument in new[] { "pack", Path.Combine(RepositoryRoot(), "Curl.Mcp", "Curl.Mcp.csproj"), "-c", BuildConfiguration(), "-p:PublishAot=true", "-o", output, "-nologo" })
         {
             startInfo.ArgumentList.Add(argument);
         }
@@ -63,6 +69,10 @@ public sealed class CurlMcpPackIntegrationTests
         Assert.AreEqual(0, process.ExitCode, log);
         return log;
     }
+
+    private static string BuildConfiguration() =>
+        typeof(CurlMcpPackIntegrationTests).Assembly.GetCustomAttribute<AssemblyConfigurationAttribute>()?.Configuration
+        ?? throw new InvalidOperationException("The test assembly has no AssemblyConfigurationAttribute.");
 
     private static string RepositoryRoot()
     {

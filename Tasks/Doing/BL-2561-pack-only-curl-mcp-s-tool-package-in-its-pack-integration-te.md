@@ -27,12 +27,15 @@ Measured: when it still passed, the Curl.Mcp Integration tests step took 15 min 
 
 ## Acceptance criteria
 
-- [ ] `Pack_MakesAnMcpServerPackageHoldingServerJson` packs with `-p:PublishAot=true` and still checks `.mcp/server.json` and the `McpServer` package type in `Curl.Mcp.0.1.0.nupkg`.
-- [ ] The test runs in under 2 minutes locally (measured time in Notes).
-- [ ] `dotnet build` is clean and the fast tests pass; `dotnet test Curl.Mcp.IntegrationTests --filter "TestCategory=Integration"` passes.
+- [x] `Pack_MakesAnMcpServerPackageHoldingServerJson` packs with `-p:PublishAot=true` and still checks `.mcp/server.json` and the `McpServer` package type in `Curl.Mcp.0.1.0.nupkg`.
+- [x] The test runs in under 2 minutes locally (measured time in Notes).
+- [x] `dotnet build` is clean and the fast tests pass; `dotnet test Curl.Mcp.IntegrationTests --filter "TestCategory=Integration"` passes.
 - [ ] A CI run on work/dark-factory has "Pack Curl.Mcp" green on Windows, Linux and macOS.
 
 ## Notes
+
+- `-p:PublishAot=true` alone did not shorten the test locally: still 15 min 18 s. The local test assembly is built in Debug, so a `-c Release` pack compiled every referenced project cold in Release. Warm, the same Release pack took 11 s. The test now packs in the configuration its own assembly was built in (`AssemblyConfigurationAttribute`): Debug locally, Release in ci.yml's mcp-pack job, which builds the tests with `-c Release`.
+- Measured locally on Windows after the change: the test took 11 s (the `dotnet test` run, including the incremental build, took 33 s). All 12 Curl.Mcp Integration tests passed in 1 min 4 s.
 
 ## Log
 
