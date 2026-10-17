@@ -3429,6 +3429,11 @@ Rules for this unattended run, in addition to CLAUDE.md:
    work in a stash, and each requeued claim spends part of the task's cost cap, so a third
    claim can be Blocked by the cap before it lands the work (AF-0160: BL-1976 was claimed
    3 times, requeued twice and Blocked at $3.25 of $3.93, its fix stashed until BL-2041).
+   For an umbrella task ("remove every reference to X"), count the whole remaining work
+   in that first pass - search the repository for every file that still uses X, group them
+   into subtasks, file them all, and requeue once; never file only the layer you hit first
+   (AF-0241: BL-2310 was requeued at 21 turns for 4 subtasks and at 26 turns for 4 more,
+   $1.60 for two runs that produced only a requeue, before a third claim finished it).
    The board let this run claim the task only because every ID already in its
    `depends-on` is Done, so those never send it back. Before naming any other task as the
    blocker, check its folder (`ls Tasks/*/<ID>-* Tasks/Done/*/<ID>-*`): a task in Done does
@@ -3565,6 +3570,11 @@ Rules for this unattended run, in addition to CLAUDE.md:
    work in a stash, and each requeued claim spends part of the task's cost cap, so a third
    claim can be Blocked by the cap before it lands the work (AF-0160: BL-1976 was claimed
    3 times, requeued twice and Blocked at $3.25 of $3.93, its fix stashed until BL-2041).
+   For an umbrella task ("remove every reference to X"), count the whole remaining work
+   in that first pass - search the repository for every file that still uses X, group them
+   into subtasks, file them all, and requeue once; never file only the layer you hit first
+   (AF-0241: BL-2310 was requeued at 21 turns for 4 subtasks and at 26 turns for 4 more,
+   $1.60 for two runs that produced only a requeue, before a third claim finished it).
    The shift claimed the task only because every ID already in its `depends-on` is Done,
    so those never send it back. Before naming any other task as the blocker, check its
    folder (`ls Tasks/*/<ID>-* Tasks/Done/*/<ID>-*`): a task in Done does not block. And
