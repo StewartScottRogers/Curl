@@ -31,3 +31,4 @@ Found by BL-2527 running test580 through the ported `lib507` (multi interface): 
 ## Log
 
 - 2026-10-17: Created.
+- 2026-10-17: Backlog -> Doing. Criteria at claim: 49be4119 904b57ec 3d836d5e.
