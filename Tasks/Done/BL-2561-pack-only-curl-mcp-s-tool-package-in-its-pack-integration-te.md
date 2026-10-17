@@ -9,7 +9,7 @@ touches: [Curl.Mcp.IntegrationTests]
 lane: no
 requirement: none
 created: 2026-10-17
-completed:
+completed: 2026-10-16
 ---
 # BL-2561 — Pack only Curl.Mcp's tool package in its pack Integration test so CI's mcp-pack job fits its time limit
 
@@ -30,7 +30,7 @@ Measured: when it still passed, the Curl.Mcp Integration tests step took 15 min 
 - [x] `Pack_MakesAnMcpServerPackageHoldingServerJson` packs with `-p:PublishAot=true` and still checks `.mcp/server.json` and the `McpServer` package type in `Curl.Mcp.0.1.0.nupkg`.
 - [x] The test runs in under 2 minutes locally (measured time in Notes).
 - [x] `dotnet build` is clean and the fast tests pass; `dotnet test Curl.Mcp.IntegrationTests --filter "TestCategory=Integration"` passes.
-- [ ] A CI run on work/dark-factory has "Pack Curl.Mcp" green on Windows, Linux and macOS.
+- [x] A CI run on work/dark-factory has "Pack Curl.Mcp" green on Windows, Linux and macOS.
 
 ## Notes
 
@@ -42,3 +42,5 @@ Measured: when it still passed, the Curl.Mcp Integration tests step took 15 min 
 
 - 2026-10-17: Created.
 - 2026-10-16: Backlog -> Doing. Criteria at claim: d67afc00 06d04747 63c8c8b4 90196da2.
+- CI run 38996150045 (7c5f3d00c) green on every job: Pack Curl.Mcp took 4 min on Ubuntu, 9 min on Windows and 5 min on macOS.
+- 2026-10-16: Doing -> Done. Both SDK-running Curl.Mcp Integration tests pass --disable-build-servers and the pack test makes only the tool package; CI run 38996150045 green on Windows, Linux and macOS.
