@@ -29,5 +29,5 @@ which tests both this project and `Curl.Mcp.UnitLibrary`; tests that send bytes 
 live in `Curl.Mcp.IntegrationTests` (ADR-0421).
 
 It packs as a NuGet MCP server (ADR-0596): `dotnet pack` makes a `.NET` tool of `PackageType` `McpServer`
-with `.mcp/server.json`, one self-contained package per runtime, or with `-p:PublishAot=true` one native-AOT package per runtime packed on its own OS (ADR-0621); the version in the csproj and in
+with `.mcp/server.json`, and one native-AOT package per runtime, packed with `-r <rid>` on its own OS: the csproj sets `PublishAot` (ADR-0621, BL-2517); the version in the csproj and in
 `server.json` are held equal by `McpPackagingTests`.

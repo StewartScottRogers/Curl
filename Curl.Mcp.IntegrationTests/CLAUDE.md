@@ -18,7 +18,7 @@ It holds:
 - `CurlMcpNativeAotIntegrationTests`: `dotnet publish Curl.Mcp -r <this machine's runtime>
   -p:PublishAot=true` once for the class, then the native binary over stdio - `initialize`,
   `tools/list` and a `transfer` call with one request header against a loopback listener (BL-2486,
-  ADR-0599).
+  ADR-0621).
 
 Both tests that run the SDK pass `--disable-build-servers`. Otherwise the MSBuild nodes and compiler
 server the child starts inherit its redirected output and hold it open for about 15 minutes (BL-2561).

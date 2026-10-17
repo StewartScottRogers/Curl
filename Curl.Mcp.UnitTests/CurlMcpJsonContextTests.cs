@@ -6,7 +6,7 @@ namespace Curl.Mcp;
 
 /// <summary>
 /// Holds <see cref="CurlMcpJsonContext.ToolOptions" /> able to describe every tool parameter and result
-/// type from its resolver chain alone, with no reflection, as native AOT needs (BL-2486, ADR-0599).
+/// type from its resolver chain alone, with no reflection, as native AOT needs (BL-2486, ADR-0621).
 /// Under the JIT the serializer falls back to reflection, which hid that the chain once lacked these
 /// contracts.
 /// </summary>

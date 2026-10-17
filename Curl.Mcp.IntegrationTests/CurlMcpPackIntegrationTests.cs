@@ -9,9 +9,9 @@ namespace Curl.Mcp;
 /// Runs <c>dotnet pack</c> on Curl.Mcp into a temporary folder and reads the package it makes
 /// (BL-2388): <c>.mcp/server.json</c> inside, and the McpServer package type in its nuspec. It runs
 /// the SDK as a child process and writes to the disk, so it is an Integration test (ADR-0421). It packs
-/// with <c>-p:PublishAot=true</c>, which makes only the tool package (ADR-0599): a plain pack also builds
-/// the six self-contained runtime packages, which took over 15 minutes on CI and pushed the mcp-pack job
-/// past its time limit (BL-2561). ci.yml's own pack step still checks all seven packages. It packs in the
+/// with <c>-p:PublishAot=true</c>, which makes only the tool package (ADR-0621). Curl.Mcp.csproj sets the
+/// property too (BL-2517); the test passes it as well so it never packs the six runtime packages, which
+/// once pushed the mcp-pack job past its time limit (BL-2561). It packs in the
 /// configuration this test assembly was built in, so the pack reuses that build rather than compiling every
 /// referenced project again: Debug locally, Release in ci.yml's mcp-pack job. It packs with
 /// <c>--disable-build-servers</c>: MSBuild nodes and the compiler server that a pack starts inherit its
