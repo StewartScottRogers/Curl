@@ -5,10 +5,10 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Console]
+touches: [Curl.Console, Curl.Console.UnitTests]
 requirement: none
 created: 2026-10-17
-completed:
+completed: 2026-10-17
 ---
 # BL-2574 — Fix AF-0237: --parallel with a slow --interface bind failure: Curl prints meter rows before the curl: (45) line and runs the error on after them; curl prints the error first
 
@@ -41,12 +41,28 @@ The finding closes only when a later re-audit by the conformance auditor confirm
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Added `Curl.Console.UnitTests` to `touches` for the tests; no task in Doing on `origin/work/dark-factory` named it.
+- Decision (ADR-0661): a `-Z` transfer given `--interface` holds the combined meter's draws
+  (`ParallelTransferProgress.HoldsTheLoop`) until it reports itself past connect or ends, as curl's
+  `bindlocal` blocks its loop while it resolves the name. `TransferProgressRecorder` now passes
+  `ReportTransferStarted` on to the transfer's share. The hold lasts to the end of connect, not just the
+  bind, because the connector reports nothing between them; recorded as the one known difference.
+- Measured 2026-10-17 with the finding's reproduction: curl 8.22.0 (Git ucrt64) and the Release build both
+  start standard error with `curl: (45) Failed to connect to 127.0.0.1:63411 after N ms: Failed binding local
+  connection end`, then the header and two status lines.
+- `Measure-CodeQuality.ps1 -Library Curl.Console` found `ParallelProgressMeter.Draw` at complexity 12; the due
+  check moved into `IsDueAndNotHeld`, which brings it back to its old shape. No other member failed.
+- Tests: `ParallelProgressMeterTests.DrawIfDue_TransferBindingItsInterface_DrawsNothingUntilItEnds`,
+  `ReportTransferStarted_TransferThatBoundItsInterface_DrawsTheHeldLine`, and
+  `CurlCommandRunnerParallelProgressMeterTests.RunAsync_ParallelWithInterfaceBindThatFails_WritesTheErrorLineBeforeTheMeter`.
 
 ## Log
 
 - 2026-10-17: Created.
 - 2026-10-17: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-17: Doing -> Done. AF-0237 reproduction now prints curl: (45) before the -Z meter, as curl does; build and fast tests green
