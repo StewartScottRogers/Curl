@@ -32,3 +32,4 @@ Found by BL-2528 (lib513 port). test513 posts with `CURLOPT_POSTFIELDSIZE` 1 and
 ## Log
 
 - 2026-10-17: Created.
+- 2026-10-17: Backlog -> Doing. Criteria at claim: e69776de 20427775 4272a6b9 c84701f0.
