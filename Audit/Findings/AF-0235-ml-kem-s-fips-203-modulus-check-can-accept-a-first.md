@@ -3,8 +3,8 @@ id: AF-0235
 title: ML-KEM's FIPS 203 modulus check can accept a first coefficient equal to q with no test failing
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Cryptography.UnitLibrary/MlKemPolynomial.cs:AreAllBelowModulus-ge:surviving-mutant
 reproduction: mutation Curl.Cryptography.UnitLibrary/MlKemPolynomial.cs:202:>=
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Crypt
 ## Log
 
 - 2026-10-16: filed proposed.
+- 2026-10-16: proposed -> accepted.
