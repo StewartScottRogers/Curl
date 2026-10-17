@@ -19,6 +19,9 @@ internal sealed class FakeCurlEngine : ICurlEngine
 
     public TransferInfo Info { get; init; } = new();
 
+    /// <summary>When set, gives each read of an easy transfer's info in place of <see cref="Info"/>.</summary>
+    public Func<TransferInfo>? Informing { get; init; }
+
     public CurlVersionInfo VersionInfo { get; } = new();
 
     /// <summary>Runs as each easy transfer is created, before it is returned.</summary>
@@ -45,7 +48,7 @@ internal sealed class FakeCurlEngine : ICurlEngine
     public IEasyTransfer CreateEasy()
     {
         CreatingEasy?.Invoke();
-        return new FakeEasyTransfer(PerformResult, Info, Performing) { ConnectOnly = ConnectOnly, Pauses = Pauses };
+        return new FakeEasyTransfer(PerformResult, Info, Performing) { Informing = Informing, ConnectOnly = ConnectOnly, Pauses = Pauses };
     }
 
     public FakeMultiTransfer Multi { get; } = new();
@@ -88,7 +91,9 @@ internal sealed class FakeCurlEngine : ICurlEngine
     {
         public EasyOptions Options { get; set; } = new();
 
-        public TransferInfo Info => info;
+        public Func<TransferInfo>? Informing { get; init; }
+
+        public TransferInfo Info => Informing?.Invoke() ?? info;
 
         public string ErrorText => string.Empty;
 
@@ -102,7 +107,7 @@ internal sealed class FakeCurlEngine : ICurlEngine
 
         public ValueTask<CurlCode> PerformAsync(CancellationToken cancellationToken) => ValueTask.FromResult(performing?.Invoke(Options) ?? performResult);
 
-        public IEasyTransfer Duplicate() => new FakeEasyTransfer(performResult, info, performing) { Options = Options, Pauses = Pauses };
+        public IEasyTransfer Duplicate() => new FakeEasyTransfer(performResult, info, performing) { Options = Options, Pauses = Pauses, Informing = Informing };
 
         public void Reset() => Options = new();
 

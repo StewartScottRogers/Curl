@@ -63,7 +63,14 @@ internal sealed class FakeMultiTransfer : IMultiTransfer
 
     public CurlMultiCode Remove(IEasyTransfer transfer) => RemoveResult;
 
-    public ValueTask<(CurlMultiCode Code, int RunningTransfers)> PerformAsync(CancellationToken cancellationToken) => ValueTask.FromResult(PerformResults.Count > 0 ? PerformResults.Dequeue() : PerformResult);
+    /// <summary>Runs in each perform, before it answers.</summary>
+    public Action? Performing { get; set; }
+
+    public ValueTask<(CurlMultiCode Code, int RunningTransfers)> PerformAsync(CancellationToken cancellationToken)
+    {
+        Performing?.Invoke();
+        return ValueTask.FromResult(PerformResults.Count > 0 ? PerformResults.Dequeue() : PerformResult);
+    }
 
     public ValueTask<(CurlMultiCode Code, int ReadySockets)> WaitAsync(Memory<CurlWaitSocket> extraSockets, TimeSpan timeout, CancellationToken cancellationToken)
     {
