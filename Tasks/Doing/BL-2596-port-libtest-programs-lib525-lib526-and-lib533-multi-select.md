@@ -36,3 +36,4 @@ Read each program's C source in the 8.22.0 tarball's `tests/libtest`.
 ## Log
 
 - 2026-10-17: Created.
+- 2026-10-17: Backlog -> Doing. Criteria at claim: c5ca9ba0 65056636 e39e1cd8 4272a6b9.
