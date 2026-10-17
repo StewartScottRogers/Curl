@@ -209,6 +209,16 @@ public sealed class LibTestPrograms
         new Lib1903(),
         new Lib1905(),
         new Lib1906(),
+        new Lib1907(),
+        new Lib1908(),
+        new Lib1910(),
+        new Lib1911(),
+        new Lib1912(),
+        new Lib1913(),
+        new Lib1915(TimeProvider.System),
+        new Lib1916(),
+        new Lib1918(),
+        new Lib1919(),
     ]);
 
     /// <summary>The names of the programs in the table, such as <c>lib500</c>.</summary>
