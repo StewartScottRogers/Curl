@@ -31,3 +31,4 @@ Found by BL-2589: test509 now runs through `lib509` (`Curl.Conformance.LibTest.U
 ## Log
 
 - 2026-10-17: Created.
+- 2026-10-17: Backlog -> Doing. Criteria at claim: b1181a16 e4dd0d40 3d836d5e.
