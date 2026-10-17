@@ -9,7 +9,7 @@ touches: [.github/workflows/ci.yml, Curl.Mcp/Curl.Mcp.csproj, Curl.Mcp/README.md
 lane: no
 requirement: none
 created: 2026-10-16
-completed:
+completed: 2026-10-17
 ---
 # BL-2517 — Pack Curl.Mcp as native AOT per OS in ci.yml's mcp-pack job and turn PublishAot on in Curl.Mcp.csproj
 
@@ -26,16 +26,21 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] `ci.yml`'s `mcp-pack` packs the tool package once and one native runtime package per runner's runtime, and checks each as `release.yml`'s `pack-mcp` does, including an `initialize` answer from the extracted native binary.
-- [ ] `Curl.Mcp.csproj` sets `<PublishAot>true</PublishAot>` with its comment saying so; `release.yml` may keep passing the property.
-- [ ] ADR-0621 decision 2 and `Curl.Mcp/README.md`'s Package section say what the build now does.
-- [ ] Locally, `dotnet pack Curl.Mcp -c Release -r win-x64` with vswhere on PATH gives a package holding a native `Curl.Mcp.exe` and no `Curl.Mcp.dll`; `dotnet build` is clean and the fast tests pass.
-- [ ] The pull request's CI passed on Windows, Linux and macOS, with the new `mcp-pack` legs green; it is linked under Notes.
+- [x] `ci.yml`'s `mcp-pack` packs the tool package once and one native runtime package per runner's runtime, and checks each as `release.yml`'s `pack-mcp` does, including an `initialize` answer from the extracted native binary.
+- [x] `Curl.Mcp.csproj` sets `<PublishAot>true</PublishAot>` with its comment saying so; `release.yml` may keep passing the property.
+- [x] ADR-0621 decision 2 and `Curl.Mcp/README.md`'s Package section say what the build now does.
+- [x] Locally, `dotnet pack Curl.Mcp -c Release -r win-x64` with vswhere on PATH gives a package holding a native `Curl.Mcp.exe` and no `Curl.Mcp.dll`; `dotnet build` is clean and the fast tests pass.
+- [x] The pull request's CI passed on Windows, Linux and macOS, with the new `mcp-pack` legs green; it is linked under Notes.
 
 ## Notes
 - Release dry run https://github.com/StewartScottRogers/Curl/actions/runs/38947869013 on `work/dark-factory` 492774dc5 (BL-2486's AOT `pack-mcp`): all 7 Curl.Mcp legs and 6 curl Publish legs green. This is the shape `mcp-pack` should mirror. Waiting for BL-2486 to reach `master` at the shift-end merge before opening the `audit` PR, since `master` lacks the ToolOptions fix.
+- Stewart approved merging `work/dark-factory` into `master` early (2026-10-17): PR https://github.com/StewartScottRogers/Curl/pull/162, merged once its checks were green, brought BL-2486's fix to `master`.
+- Pull request https://github.com/StewartScottRogers/Curl/pull/163 (branch `guard/mcp-pack-aot`, built from `master`), merged as 95deb5715. CI runs 39001361271 (pull_request) and 39001358601 (push) passed, with `Pack Curl.Mcp` green on windows-latest, ubuntu-latest and macos-latest.
+- Locally on Windows: `dotnet pack Curl.Mcp -c Release -r win-x64` made `Curl.Mcp.win-x64.0.1.0.nupkg` (40 MB) holding `tools/any/win-x64/Curl.Mcp.exe` and no `Curl.Mcp.dll`; the extracted binary answered `initialize`. The job's check script, run unchanged from `ci.yml`, passed. `dotnet build` clean, fast tests and all 12 Curl.Mcp Integration tests pass.
+- Also fixed: five comments cited ADR-0599 (the engine's multi-socket ADR) for the AOT decision; they now cite ADR-0621.
 
 ## Log
 
 - 2026-10-16: Created.
 - 2026-10-16: Backlog -> Doing. Criteria at claim: 0e69d2b2 393380d2 dd713eb4 100b6ff2 c692587d.
+- 2026-10-17: Doing -> Done. ci.yml's mcp-pack packs native AOT per OS and Curl.Mcp.csproj sets PublishAot; PR #163 merged with CI green on Windows, Linux and macOS.
