@@ -40,14 +40,16 @@ The failure reproduces without AOT, in a minute rather than a publish: `dotnet b
    `WithTools<T>(CurlMcpJsonContext.ToolOptions)`: no SDK workaround, no schema change, no new package,
    and the hand-written server fallback is not needed. `CurlMcpJsonContextTests` holds every tool
    parameter and result type resolvable from the chain alone, without reflection.
-2. Native AOT is passed on the command line, `-p:PublishAot=true`, not set in `Curl.Mcp.csproj`. AOT cannot
-   cross-compile between operating systems, so with it a plain `dotnet pack` makes only the tool package
+2. `Curl.Mcp.csproj` sets `<PublishAot>true</PublishAot>` (BL-2517), so every Curl.Mcp package is native.
+   AOT cannot cross-compile between operating systems, so a plain `dotnet pack` makes only the tool package
    that points at the runtime packages, and each runtime's package needs `dotnet pack -r <rid>` on its own
    OS. `release.yml`'s `pack-mcp` job does exactly that, one leg per runtime on its own runner plus one for
-   the tool package, and checks each runtime package holds its native binary and no `Curl.Mcp.dll`. Without
-   the property, `dotnet pack Curl.Mcp` still makes the seven self-contained packages of ADR-0596 on any OS,
-   which `ci.yml`'s `mcp-pack` job (a guard file a lane may not change) checks. Moving that job to the
-   per-OS AOT shape, and then setting `PublishAot` in the csproj, is left to an interactive task.
+   the tool package, and checks each runtime package holds its native binary and no `Curl.Mcp.dll`.
+   `ci.yml`'s `mcp-pack` job does the same on its three runners: the runtime package of the runner's own
+   runtime (win-x64, linux-x64, osx-arm64), whose extracted binary must answer `initialize`, and on Linux
+   the tool package with `.mcp/server.json`. The seven self-contained packages of ADR-0596 are no longer
+   made. (BL-2486 first passed `-p:PublishAot=true` on the command line only, because `ci.yml` is a guard
+   file a lane may not change; BL-2517 moved the job and set the property.)
 3. `Curl.Mcp.IntegrationTests` publishes the native binary for the machine's runtime and drives it over
    stdio: `initialize`, `tools/list` and a `transfer` call with one request header against a loopback
    listener (`CurlMcpNativeAotIntegrationTests`).

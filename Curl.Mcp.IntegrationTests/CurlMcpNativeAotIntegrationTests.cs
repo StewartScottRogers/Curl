@@ -9,8 +9,8 @@ namespace Curl.Mcp;
 
 /// <summary>
 /// Publishes Curl.Mcp as native AOT for the machine's own runtime, once for the class, and drives the
-/// native binary over standard input and output (BL-2486, ADR-0599): <c>initialize</c>, <c>tools/list</c>
-/// and a <c>transfer</c> call carrying one request header against a loopback listener. Before ADR-0599 the
+/// native binary over standard input and output (BL-2486, ADR-0621): <c>initialize</c>, <c>tools/list</c>
+/// and a <c>transfer</c> call carrying one request header against a loopback listener. Before ADR-0621 the
 /// native binary stopped before <c>initialize</c>, because the tools' parameter types were unresolved without
 /// reflection. It runs the SDK and a child process and sends bytes over a socket, so it is an Integration
 /// test (ADR-0421). It publishes with <c>--disable-build-servers</c>: MSBuild nodes and the compiler server
