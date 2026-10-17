@@ -66,7 +66,7 @@ internal sealed class ManagedEasyTransfer(
             EasyOptions previous = options;
             options = value;
             optionShare = ManagedShareHandle.Reattach(optionShare, value.Behaviour.Share as ManagedShareHandle, this);
-            optionShare?.LockCookies(this, value.Http.CookieList.Count - previous.Http.CookieList.Count);
+            TakeCookieListItems(previous.Http.CookieList.Count, value.Http);
         }
     }
 
@@ -76,8 +76,60 @@ internal sealed class ManagedEasyTransfer(
     /// <summary>The share handle <c>CURLOPT_SHARE</c> attached the handle to, or <see langword="null" /> for none.</summary>
     private ManagedShareHandle? optionShare;
 
-    /// <inheritdoc />
-    public TransferInfo Info { get; private set; } = new();
+    /// <summary>
+    /// How many of the first <c>CURLOPT_COOKIELIST</c> items were applied to a share handle's cookies as they were set
+    /// (<see cref="TakeCookieListItems" />), so a perform applies only the rest.
+    /// </summary>
+    private int cookieListItemsApplied;
+
+    /// <summary>
+    /// Gets what the last perform found out (<c>curl_easy_getinfo</c>). While the handle is attached to a share handle
+    /// that shares cookies, <see cref="TransferInfo.CookieList" /> is the share's cookies, read under one cookie lock
+    /// pair when the list is first read (<see cref="ShareCookieListLines" />), as curl 8.22.0's <c>CURLINFO_COOKIELIST</c>
+    /// reads them (upstream test506).
+    /// </summary>
+    public TransferInfo Info
+    {
+        get => optionShare is { SharesCookies: true } share ? field with { CookieList = new ShareCookieListLines(share, this) } : field;
+        private set;
+    } = new();
+
+    /// <summary>
+    /// Takes the <c>CURLOPT_COOKIELIST</c> items added since <paramref name="previousCount" />: while the handle is
+    /// attached to a share handle that shares cookies and every earlier item was applied, applies each to the share's
+    /// cookies at once under its own cookie lock pair, as curl 8.22.0's <c>lib/setopt.c</c> does (upstream test506);
+    /// else takes the share's cookie lock once for each and leaves them to the next perform.
+    /// </summary>
+    /// <param name="previousCount">How many items the options held before.</param>
+    /// <param name="http">The handle's HTTP options now.</param>
+    private void TakeCookieListItems(int previousCount, Api.Options.Http.EasyHttpOptions http)
+    {
+        if (optionShare is { SharesCookies: true } share && cookieListItemsApplied == previousCount)
+        {
+            share.ApplyCookieListItems(this, http.CookieList.Skip(previousCount), (cookies, item) => ApplyCookieListItemNow(http, cookies, item));
+            cookieListItemsApplied = http.CookieList.Count;
+            return;
+        }
+
+        optionShare?.LockCookies(this, http.CookieList.Count - previousCount);
+        cookieListItemsApplied = Math.Min(cookieListItemsApplied, http.CookieList.Count);
+    }
+
+    /// <summary>
+    /// Applies one <c>CURLOPT_COOKIELIST</c> item to a share handle's cookies as it is set, waiting for a <c>RELOAD</c>'s
+    /// files or a <c>FLUSH</c>'s jar, as <c>curl_easy_setopt</c> is synchronous.
+    /// </summary>
+    /// <param name="http">The handle's HTTP options.</param>
+    /// <param name="cookies">The share handle's cookies.</param>
+    /// <param name="item">The item.</param>
+    private void ApplyCookieListItemNow(Api.Options.Http.EasyHttpOptions http, Curl.Cookies.CookieStore cookies, string item)
+    {
+        EasyTransferHost host = Host;
+        CookieEngine.OverSharedCookies(http, cookies)
+            .ApplyCookieListItemAsync(item, host.FileSystem, host.StandardInput, host.JarPrintTarget, shared.TimeProvider.GetUtcNow(), NoTransferEvents.Instance)
+            .GetAwaiter()
+            .GetResult();
+    }
 
     /// <inheritdoc />
     public string ErrorText { get; private set; } = string.Empty;
@@ -1040,7 +1092,7 @@ internal sealed class ManagedEasyTransfer(
     /// <param name="events">Where refused <c>Set-Cookie:</c> lines are reported.</param>
     /// <returns>A task that completes once every item is applied.</returns>
     private Task ApplyCookieListAsync(CookieEngine? cookies, EasyTransferHost host, ITransferEvents events) =>
-        cookies?.ApplyCookieListAsync(host.FileSystem, host.StandardInput, host.JarPrintTarget, shared.TimeProvider.GetUtcNow(), events) ?? Task.CompletedTask;
+        cookies?.ApplyCookieListAsync(cookieListItemsApplied, host.FileSystem, host.StandardInput, host.JarPrintTarget, shared.TimeProvider.GetUtcNow(), events) ?? Task.CompletedTask;
 
     /// <summary>
     /// The running transfer, the events it reports to and what records its verify codes: the runner's
@@ -1301,7 +1353,7 @@ internal sealed class ManagedEasyTransfer(
     }
 
     /// <inheritdoc />
-    public IEasyTransfer Duplicate() => new ManagedEasyTransfer(createDispatcher, shared) { Options = Options, ToolSettings = ToolSettings, Host = Host, TraceComponents = TraceComponents, CreateFormBoundary = CreateFormBoundary, CreateConnectOnlyConnector = CreateConnectOnlyConnector, WebSocketRandomSource = WebSocketRandomSource };
+    public IEasyTransfer Duplicate() => new ManagedEasyTransfer(createDispatcher, shared) { cookieListItemsApplied = cookieListItemsApplied, Options = Options, ToolSettings = ToolSettings, Host = Host, TraceComponents = TraceComponents, CreateFormBoundary = CreateFormBoundary, CreateConnectOnlyConnector = CreateConnectOnlyConnector, WebSocketRandomSource = WebSocketRandomSource };
 
     /// <inheritdoc />
     public void Reset()

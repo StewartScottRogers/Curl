@@ -405,6 +405,33 @@ public sealed class ManagedShareHandleTests
         CollectionAssert.AreEqual(new[] { "lock Cookie", "unlock Cookie", "lock Cookie", "unlock Cookie", "lock Cookie", "unlock Cookie" }, calls);
     }
 
+    [TestMethod]
+    public async Task Options_CookieListReloadThenGetInfo_LoadsTheFileAtSetoptAndListsUnderOneMoreCookieLock()
+    {
+        const string Jar = ".example.com\tTRUE\t/\tFALSE\t4102444800\tone\t1\n.example.com\tTRUE\t/\tFALSE\t4102444800\ttwo\t2\n";
+        await using ManagedCurlEngine engine = CreateEngine(new ScriptedConnector([]));
+        IShareHandle share = engine.CreateShare();
+        share.Share(CurlLockData.Cookie);
+        List<string> calls = [];
+        share.SetLockCallback((_, data, _) => calls.Add($"lock {data}"));
+        share.SetUnlockCallback((_, data) => calls.Add($"unlock {data}"));
+        await using ManagedEasyTransfer easy = (ManagedEasyTransfer)engine.CreateEasy();
+        easy.Host = new EasyTransferHost(new OneFileSystem("jar", Jar), Stream.Null, () => Stream.Null, NoDiagnosticLog.Instance, RunsOnWindows: false, AltSvcUsesOverHttp: false);
+        easy.Options = easy.Options with { Behaviour = easy.Options.Behaviour with { Share = share } };
+        easy.Options = easy.Options with { Http = easy.Options.Http with { CookieList = ["Set-Cookie: gone=yes; domain=example.com"] } };
+        easy.Options = easy.Options with { Http = easy.Options.Http with { CookieList = [.. easy.Options.Http.CookieList, "ALL"], CookieFiles = ["jar"] } };
+        calls.Clear();
+
+        easy.Options = easy.Options with { Http = easy.Options.Http with { CookieList = [.. easy.Options.Http.CookieList, "RELOAD"] } };
+        calls.Add("reloaded");
+        IReadOnlyList<string> listed = [.. easy.Info.CookieList];
+
+        CollectionAssert.AreEqual(
+            new[] { ".example.com\tTRUE\t/\tFALSE\t4102444800\tone\t1", ".example.com\tTRUE\t/\tFALSE\t4102444800\ttwo\t2" },
+            listed.ToArray());
+        CollectionAssert.AreEqual(new[] { "lock Cookie", "unlock Cookie", "reloaded", "lock Cookie", "unlock Cookie" }, calls);
+    }
+
     private static async Task<CurlCode> PerformAsync(ManagedCurlEngine engine, string url, IShareHandle share)
     {
         await using ManagedEasyTransfer easy = (ManagedEasyTransfer)engine.CreateEasy();
@@ -442,6 +469,21 @@ public sealed class ManagedShareHandleTests
             Opened++;
             return inner.ConnectAsync(target, cancellationToken);
         }
+    }
+
+    /// <summary>A file system holding one file to read and refusing every write.</summary>
+    private sealed class OneFileSystem(string name, string content) : IFileSystem
+    {
+        public ValueTask<FileOpenResult> OpenForReadAsync(string path, CancellationToken cancellationToken)
+        {
+            byte[] bytes = Encoding.Latin1.GetBytes(content);
+            return ValueTask.FromResult(path == name
+                ? FileOpenResult.Opened(new MemoryStream(bytes, writable: false), bytes.Length, null)
+                : FileOpenResult.Failed(FileAccessStatus.NotFound));
+        }
+
+        public ValueTask<FileOpenResult> OpenForWriteAsync(string path, FileWriteMode mode, UnixFileMode createMode, CancellationToken cancellationToken) =>
+            ValueTask.FromResult(FileOpenResult.Failed(FileAccessStatus.NotFound));
     }
 
     /// <summary>A file system holding no file, so a cookie file loads nothing.</summary>

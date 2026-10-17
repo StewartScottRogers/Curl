@@ -141,6 +141,38 @@ internal sealed class ManagedShareHandle(TimeProvider timeProvider) : IShareHand
         }
     }
 
+    /// <summary>Gets a value indicating whether this handle shares cookies now (<see cref="CurlLockData.Cookie" />).</summary>
+    internal bool SharesCookies => Shares(CurlLockData.Cookie);
+
+    /// <summary>
+    /// Applies each <c>CURLOPT_COOKIELIST</c> item to the shared cookies under its own <see cref="CurlLockData.Cookie" />
+    /// lock and unlock callbacks, as curl 8.22.0's <c>lib/setopt.c</c> applies an item as it is set (upstream test506).
+    /// </summary>
+    /// <param name="transfer">The transfer the callbacks are told of.</param>
+    /// <param name="items">The items, in the order set.</param>
+    /// <param name="apply">Applies one item to the shared cookies.</param>
+    internal void ApplyCookieListItems(IEasyTransfer transfer, IEnumerable<string> items, Action<CookieStore, string> apply)
+    {
+        foreach (string item in items)
+        {
+            _ = Locked(transfer, CurlLockData.Cookie, () =>
+            {
+                apply(Cookies, item);
+                return item;
+            });
+        }
+    }
+
+    /// <summary>
+    /// <c>CURLINFO_COOKIELIST</c> over the shared cookies: every cookie as one Netscape cookie-file line, in the order
+    /// stored as <see cref="CookieEngine.ListLines" /> lists them, read under one <see cref="CurlLockData.Cookie" /> lock and unlock pair, as curl 8.22.0's
+    /// <c>lib/getinfo.c</c> takes it (upstream test506).
+    /// </summary>
+    /// <param name="transfer">The transfer the callbacks are told of.</param>
+    /// <returns>The lines.</returns>
+    internal IReadOnlyList<string> ListCookies(IEasyTransfer transfer) =>
+        Locked(transfer, CurlLockData.Cookie, () => (IReadOnlyList<string>)[.. Cookies.Cookies.Select(NetscapeCookieFile.FormatLine)]);
+
     /// <summary>
     /// Gives <paramref name="engine" />'s state for one perform of an attached transfer, with each cache this handle
     /// shares in place of the engine's, taking each one under its kind's lock, the public suffix list first when it is

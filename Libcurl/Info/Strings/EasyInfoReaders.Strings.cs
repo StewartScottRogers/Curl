@@ -61,7 +61,8 @@ internal static partial class EasyInfoReaders
 
     private static object? ReadSslEngines(TransferInfo info, EasyOptions options) => info.SslEngines;
 
-    private static object? ReadCookieList(TransferInfo info, EasyOptions options) => info.CookieList;
+    // A copy, as curl_easy_getinfo hands back a new slist: reading it is when the engine lists the cookies (upstream test506).
+    private static object? ReadCookieList(TransferInfo info, EasyOptions options) => (IReadOnlyList<string>)[.. info.CookieList];
 
     private static object? ReadCertInfo(TransferInfo info, EasyOptions options) => info.CertInfo;
 

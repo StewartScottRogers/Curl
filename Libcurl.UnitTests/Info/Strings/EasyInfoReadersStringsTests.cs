@@ -97,14 +97,15 @@ public sealed class EasyInfoReadersStringsTests
     }
 
     [TestMethod]
-    public void GetInfo_Cookielist_ReadsTheCookieLines()
+    public void GetInfo_Cookielist_ReadsACopyOfTheCookieLines()
     {
         using var easy = EasyReporting(Reported);
 
         var code = easy.GetInfo(CurlInfo.Cookielist, out var value);
 
         Assert.AreEqual(CurlCode.Ok, code);
-        Assert.AreSame(Reported.CookieList, value);
+        Assert.AreNotSame(Reported.CookieList, value);
+        CollectionAssert.AreEqual(Reported.CookieList.ToArray(), ((IReadOnlyList<string>)value!).ToArray());
     }
 
     [TestMethod]
