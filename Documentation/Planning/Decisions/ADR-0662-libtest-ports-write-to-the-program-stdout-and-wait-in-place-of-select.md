@@ -28,5 +28,5 @@ between a C program and its port had to be closed the same way in every port.
 ## Consequences
 
 Ten upstream cases now hold the ratchet (500, 502, 504, 505, 507, 538, 581, 585, 586, 595). The seven
-that still fail are filed: BL-2583 (501, 509), BL-2584 (503), BL-2585 (506), BL-2586 (508),
+that still fail are filed: BL-2589 (501, 509), BL-2584 (503), BL-2585 (506), BL-2586 (508),
 BL-2587 (580) and BL-2588 (596).

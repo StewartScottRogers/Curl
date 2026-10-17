@@ -1,5 +1,5 @@
 ---
-id: BL-2583
+id: BL-2589
 title: Curl.Conformance: run a lib case that has no client command (test501, test509)
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-17
 completed:
 ---
-# BL-2583 — Curl.Conformance: run a lib case that has no client command (test501, test509)
+# BL-2589 — Curl.Conformance: run a lib case that has no client command (test501, test509)
 
 ## Goal
 
