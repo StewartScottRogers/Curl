@@ -2741,7 +2741,14 @@ function Get-CiFailures {
         if (-not $found.Contains($key)) {
             $found[$key] = [pscustomobject]@{ Key = $key; Kind = 'job'; Platforms = @(Get-CiPlatform $parts[0].Trim()); Project = ''; Message = '' }
         }
-        if (-not $found[$key].Message -and $text -match '(?i)error|fail|timed? ?out|cancel|exit code') { $found[$key].Message = $text }
+        # The quality gate annotates each member outside a gate ("X is outside a gate: ..."). Those
+        # lines are the message, not the step's echoed script (AF-0244: BL-2466 read the script
+        # line and never named CurlMulti.SetOption, so the real gap waited for a Normal task).
+        if ($text -match '(?:^|\s)(?:##\[error\])?(\S.* is outside a gate: .*)$') {
+            if (-not $found[$key].PSObject.Properties['GateMembers']) { $found[$key] | Add-Member -NotePropertyName GateMembers -NotePropertyValue @() }
+            if (@($found[$key].GateMembers).Count -lt 5) { $found[$key].GateMembers += $Matches[1].Trim() }
+            $found[$key].Message = (@($found[$key].GateMembers) -join '; ')
+        } elseif (-not $found[$key].Message -and $text -match '(?i)error|fail|timed? ?out|cancel|exit code') { $found[$key].Message = $text }
     }
     return @($found.Values)
 }
@@ -3238,6 +3245,11 @@ if ($TestCiWatch) {
         "quality${t}Measure code quality${t}2026-10-11T22:13:00.0000000Z ##[error]Process completed with exit code 1."))
     & $check 'a red job beside a named test failure is filed too (AF-0150)' 'test303|test; job quality step Measure code quality|job' `
         (($mixed | ForEach-Object { "$($_.Key)|$($_.Kind)" }) -join '; ')
+    $gate = @(Get-CiFailures @(
+        "quality${t}Measure coverage${t}2026-10-16T09:02:13.0000000Z the step script echoed first"
+        "quality${t}Measure coverage${t}2026-10-16T09:02:14.0000000Z ##[error]CurlMulti.SetOption is outside a gate: branch 87.5%"
+        "quality${t}Measure coverage${t}2026-10-16T09:02:15.0000000Z ##[error]Process completed with exit code 1."))
+    & $check 'a quality-gate failure names the members outside a gate (AF-0244)' 'CurlMulti.SetOption is outside a gate: branch 87.5%' "$($gate[0].Message)"
     $unknownJob = @(Get-CiFailures @("UNKNOWN STEP${t}Measure code quality${t}2026-10-11T23:15:00.0000000Z ##[error]Process completed with exit code 1."))
     & $check 'a failure whose job gh cannot name is still filed (AF-0178)' 'job unknown job step Measure code quality|job' `
         "$($unknownJob[0].Key)|$($unknownJob[0].Kind)"

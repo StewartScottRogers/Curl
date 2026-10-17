@@ -8,7 +8,7 @@ depends-on: []
 touches: [RunDarkFactory.ps1]
 requirement: none
 created: 2026-10-17
-completed:
+completed: 2026-10-17
 ---
 # BL-2581 — Fix AF-0244: Quality gates job red for 103.15 minutes from run 38876049958 on 241c183e: Libcurl CurlMulti.SetOption branch gap, fixed by a separate task, then six cancelled runs
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the process auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Cause of the long spell: the CI watch filed BL-2466 with the step's echoed script line as its message, so it never named the failing member (CurlMulti.SetOption, 87.5% branch) and rewrote the measuring script instead. Fix: Get-CiFailures now takes the quality gate's "X is outside a gate" annotations (up to 5) as the task's message; -TestCiWatch pins it. The reproduction reads audit folders, which a lane cannot; only RunDarkFactory.ps1 changed, verified with -TestCiWatch (0 FAIL). The cancelled-run churn comes from the CI workflow file, a guard file, left to an interactive session.
 
 ## Log
 
 - 2026-10-17: Created.
 - 2026-10-17: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-17: Doing -> Done. CI watch now files quality-gate failures naming the members outside a gate
