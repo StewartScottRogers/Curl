@@ -31,3 +31,4 @@ BL-2585 moved the `Share` lock to `CURLOPT_SHARE` and `curl_easy_cleanup` and ad
 ## Log
 
 - 2026-10-17: Created.
+- 2026-10-17: Backlog -> Doing. Criteria at claim: 4e518969 2de5f70b 3d836d5e.
