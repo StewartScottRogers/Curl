@@ -33,14 +33,26 @@ internal sealed class ParallelTransferProgress(ParallelProgressMeter meter, obje
     internal bool IsLive { get; private set; }
 
     /// <summary>
+    /// Gets a value indicating whether the transfer is binding its <c>--interface</c> and not yet past
+    /// connect, which blocks curl's loop, so the meter draws nothing until it ends or reports itself
+    /// started (AF-0237, ADR-0661).
+    /// </summary>
+    internal bool HoldsTheLoop { get; private set; }
+
+    /// <summary>
     /// Marks the transfer running, once it may connect. Nothing is drawn: curl draws once it has added
     /// every transfer it can, which the runner says (<see cref="ParallelRun.WaitForFreeSlotAsync" />).
     /// </summary>
-    internal void MarkLive()
+    /// <param name="bindsInterface">
+    /// Whether <c>--interface</c> was given, so the transfer holds the meter's draws until it is past
+    /// connect (<see cref="HoldsTheLoop" />).
+    /// </param>
+    internal void MarkLive(bool bindsInterface = false)
     {
         lock (figuresLock)
         {
             IsLive = true;
+            HoldsTheLoop = bindsInterface;
         }
     }
 
@@ -48,8 +60,23 @@ internal sealed class ParallelTransferProgress(ParallelProgressMeter meter, obje
     internal void End() => meter.EndTransfer(this);
 
     /// <inheritdoc />
+    /// <remarks>
+    /// A transfer that held the meter's draws while it bound <c>--interface</c> lets them go, and a line
+    /// is drawn when due, as curl's loop draws once its blocking connect step returns.
+    /// </remarks>
     public void ReportTransferStarted()
     {
+        bool released;
+        lock (figuresLock)
+        {
+            released = HoldsTheLoop;
+            HoldsTheLoop = false;
+        }
+
+        if (released)
+        {
+            meter.DrawIfDue();
+        }
     }
 
     /// <inheritdoc />

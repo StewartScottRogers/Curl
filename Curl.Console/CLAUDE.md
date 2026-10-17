@@ -254,7 +254,10 @@ curl 8.21.0's combined meter to standard error (ADR-0155, BL-521). Its header li
 come from `Curl.Output`'s `ParallelProgressMeterText`, drawn when a handler reports bytes (each
 transfer's `TransferProgressRecorder` passes them to its `ParallelTransferProgress`), when a transfer
 ends, when the runner has started every transfer it can, and after a second without a draw. A line
-is drawn only if more than 500 ms have passed since the last. The final line and its line ending
+is drawn only if more than 500 ms have passed since the last, and none while a transfer given
+`--interface` is not yet past connect (`ParallelTransferProgress.HoldsTheLoop`), as curl's loop is
+blocked by the bind; so a failed bind prints its `curl: (45)` line before the meter (AF-0237,
+ADR-0661). The final line and its line ending
 come once the run's reports are written. A run that started no transfer (a bad glob or a refused
 `-T` upload came first) draws no meter at all, as curl 8.21.0 draws none (BL-1683). `-s` and `--no-progress-meter` in the first option group
 hide the meter, and `-#` is ignored, as in curl. So under `-Z` no transfer ever holds the `-v`

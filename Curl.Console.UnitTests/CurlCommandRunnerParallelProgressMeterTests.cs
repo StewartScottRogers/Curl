@@ -83,11 +83,36 @@ public sealed class CurlCommandRunnerParallelProgressMeterTests
         Assert.AreEqual(expectedStandardError, StandardErrorText);
     }
 
+    [TestMethod]
+    public async Task RunAsync_ParallelWithInterfaceBindThatFails_WritesTheErrorLineBeforeTheMeter()
+    {
+        // AF-0237: curl 8.22.0 blocks its loop while it binds --interface, so it prints the
+        // curl: (45) line first, then the meter; nothing is drawn during the 2.7 s bind.
+        RecordingProtocolHandler handler = new("http", _ =>
+        {
+            clock.Advance(1000);
+            clock.Advance(1000);
+            clock.Advance(700);
+
+            return ValueTask.FromResult(TransferResult.Failure(CurlExitCode.InterfaceFailed, "Failed binding local connection end"));
+        });
+
+        int exitCode = await RunAsync(["-Z", "--interface", "-", "http://a.test/1"], handler);
+
+        string expectedStandardError = "curl: (45) Failed binding local connection end" + NewLine
+            + Header + NewLine
+            + "\r--  --      0     0     1     0           00:00:02              0      "
+            + "\r--  --      0     0     1     0           00:00:02              0     " + NewLine;
+        Diagnostics.Assert("exit code", 45, exitCode);
+        Diagnostics.Diff("stderr", Lf(expectedStandardError), Lf(StandardErrorText));
+        Assert.AreEqual(45, exitCode);
+        Assert.AreEqual(expectedStandardError, StandardErrorText);
+    }
+
     private static string Lf(string text) => text.Replace("\r\n", "\n", StringComparison.Ordinal);
 
-    private async Task<int> RunAsync(IReadOnlyList<string> arguments)
+    private Task<int> RunAsync(IReadOnlyList<string> arguments)
     {
-        Diagnostics.Arrange("arguments", string.Join(' ', arguments));
         Diagnostics.Arrange("clock advance per transfer (ms)", 600);
         RecordingProtocolHandler handler = new("http", context =>
         {
@@ -98,6 +123,12 @@ public sealed class CurlCommandRunnerParallelProgressMeterTests
             return ValueTask.FromResult(TransferResult.Success(10));
         });
 
+        return RunAsync(arguments, handler);
+    }
+
+    private async Task<int> RunAsync(IReadOnlyList<string> arguments, RecordingProtocolHandler handler)
+    {
+        Diagnostics.Arrange("arguments", string.Join(' ', arguments));
         int exitCode;
         using (Diagnostics.Phase("run"))
         {
