@@ -50,6 +50,9 @@ internal sealed class SwsHttpServerConnection : IConnection
 
     private SwsServerRecording recording;
 
+    // The http-proxy's own log once a CONNECT has moved recording to the tunnel's; null before.
+    private SwsServerRecording? proxyRecording;
+
     private readonly TimeProvider timeProvider;
 
     private readonly SwsServerAbandonment abandonment;
@@ -362,6 +365,7 @@ internal sealed class SwsHttpServerConnection : IConnection
             Serve(reply, upgradesConnection);
             if (TunnelRecording is not null && request.AsSpan().StartsWith("CONNECT "u8))
             {
+                proxyRecording ??= recording;
                 recording = TunnelRecording;
                 RelayTunnelToItsServer(request, reply);
             }
@@ -434,6 +438,8 @@ internal sealed class SwsHttpServerConnection : IConnection
         }
     }
 
+    // Upstream's http-proxy is an sws of its own: when a tunnel closes, it logs the close in its
+    // log as the server behind the tunnel does in the server's (test503, test1509).
     private void RecordDisconnectOnce()
     {
         if (!disconnected)
@@ -442,6 +448,7 @@ internal sealed class SwsHttpServerConnection : IConnection
             if (monitored)
             {
                 recording.RecordDisconnect();
+                proxyRecording?.RecordDisconnect();
             }
         }
     }

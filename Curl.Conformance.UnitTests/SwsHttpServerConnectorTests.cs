@@ -966,6 +966,39 @@ public sealed partial class SwsHttpServerConnectorTests
     }
 
     [TestMethod]
+    public async Task ConnectionMonitor_TunnelThroughTheProxyPortClosed_RecordsADisconnectInBothLogs()
+    {
+        const string Connect = "CONNECT machine.503:8990 HTTP/1.1\r\n\r\n";
+        Diagnostics.Arrange("servercmd", "connection-monitor, CONNECT through the proxy, tunnelled reply closes (test503)");
+        SwsHttpServerConnector server = new(Case(Reply("connect", "HTTP/1.1 200 OK\n\n"), Reply("data", "reply swsclose\n"), Reply("servercmd", "connection-monitor\n")));
+        IConnection proxy = (await server.ConnectAsync(new ConnectTarget("127.0.0.1", SwsHttpServerConnector.ProxyPort, false), CancellationToken.None)).Connection!;
+        await WriteAsync(proxy, Connect);
+        Diagnostics.Act("CONNECT reply", await ReadOnceAsync(proxy));
+        Diagnostics.Act("tunnelled reply", await ExchangeAsync(proxy, Get));
+
+        await proxy.DisposeAsync();
+
+        Assert.AreEqual(Connect + "[DISCONNECT]\n", Observe("proxy log", Connect + "[DISCONNECT]\n", Text(server.ProxyReceivedBytes)));
+        Assert.AreEqual(Get + "[DISCONNECT]\n", Observe("server log", Get + "[DISCONNECT]\n", Text(server.ReceivedBytes)));
+    }
+
+    [TestMethod]
+    public async Task ConnectionMonitor_SecondConnectInsideTheTunnel_StillRecordsOneDisconnectInEachLog()
+    {
+        const string Connect = "CONNECT a:8990 HTTP/1.1\r\n\r\n";
+        Diagnostics.Arrange("servercmd", "connection-monitor, a CONNECT sent again inside the tunnel");
+        SwsHttpServerConnector server = new(Case(Reply("connect", "HTTP/1.1 200 OK\n\n"), Reply("servercmd", "connection-monitor\n")));
+        IConnection proxy = (await server.ConnectAsync(new ConnectTarget("127.0.0.1", SwsHttpServerConnector.ProxyPort, false), CancellationToken.None)).Connection!;
+        Diagnostics.Act("first CONNECT reply", await ExchangeAsync(proxy, Connect));
+        Diagnostics.Act("second CONNECT reply", await ExchangeAsync(proxy, Connect));
+
+        await proxy.DisposeAsync();
+
+        Assert.AreEqual(Connect + "[DISCONNECT]\n", Observe("proxy log", Connect + "[DISCONNECT]\n", Text(server.ProxyReceivedBytes)));
+        Assert.AreEqual(Connect + "[DISCONNECT]\n", Observe("server log", Connect + "[DISCONNECT]\n", Text(server.ReceivedBytes)));
+    }
+
+    [TestMethod]
     [DataRow("connection-monitor\n", "")]
     [DataRow("", "GET /1234 HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n")]
     public async Task ConnectionMonitor_RecordsNothingWithoutARequestOrWithoutTheCommand(string serverCommands, string request)

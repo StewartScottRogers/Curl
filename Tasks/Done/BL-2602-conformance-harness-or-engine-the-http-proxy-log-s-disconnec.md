@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests, Curl.Engine.UnitLibrary, Curl.Engine.UnitTests]
 requirement: none
 created: 2026-10-17
-completed:
+completed: 2026-10-17
 ---
 # BL-2602 — Conformance harness or engine: the http-proxy log's [DISCONNECT] for a CONNECT tunnel to %HTTPPORT under connection-monitor (test503)
 
@@ -22,13 +22,16 @@ Found by BL-2584. With BL-2584's Proxy-Authorization fix (left in its stash), te
 
 ## Acceptance criteria
 
-- [ ] test503's `<verify><proxy>` and `<verify><protocol>` both match, each with its `[DISCONNECT]` line, when run with `CURL_UPSTREAM_CASE=503`.
-- [ ] A focused unit test in `Curl.Conformance.UnitTests` (or the engine's, if the fix is there) pins the fix.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] test503's `<verify><proxy>` and `<verify><protocol>` both match, each with its `[DISCONNECT]` line, when run with `CURL_UPSTREAM_CASE=503`.
+- [x] A focused unit test in `Curl.Conformance.UnitTests` (or the engine's, if the fix is there) pins the fix.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- 2026-10-17 (lane 1): Fix in the harness, not the engine. `SwsHttpServerConnection` keeps the http-proxy's own recording (`proxyRecording`) when a `CONNECT` moves recording to the tunnel's, and `RecordDisconnectOnce` writes `[DISCONNECT]` into both, as upstream's http-proxy is its own sws logging the close (the tunnelled reply's `swsclose` closes both). The engine already closes the tunnel before verification: `<verify><protocol>` had its line. Pinned by `SwsHttpServerConnectorTests.ConnectionMonitor_TunnelThroughTheProxyPortClosed_RecordsADisconnectInBothLogs` and `ConnectionMonitor_SecondConnectInsideTheTunnel_StillRecordsOneDisconnectInEachLog`. Criterion 1 checked with BL-2584's Proxy-Authorization change applied temporarily (`ProxyCredentials` from `ProxyUserName`/`ProxyPassword`): `CURL_UPSTREAM_CASE=503` passed, both `<verify><proxy>` and `<verify><protocol>` with `[DISCONNECT]`; the change was reverted and stays BL-2584's, which now has nothing left to wait for. test1509 skips (`lib1509` not ported). Measure-CodeQuality for Curl.Conformance.UnitLibrary: 0 failing members.
 
 ## Log
 
 - 2026-10-17: Created.
 - 2026-10-17: Backlog -> Doing. Criteria at claim: 34955914 e9a7e0b8 3d836d5e.
+- 2026-10-17: Doing -> Done. the http-proxy stand-in logs [DISCONNECT] when a CONNECT tunnel closes under connection-monitor (test503)
