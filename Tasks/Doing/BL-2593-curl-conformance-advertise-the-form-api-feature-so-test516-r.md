@@ -32,3 +32,4 @@ Found by BL-2528 (lib516 port, a transfer with `CURLOPT_HTTPPOST` NULL). The run
 ## Log
 
 - 2026-10-17: Created.
+- 2026-10-17: Backlog -> Doing. Criteria at claim: 9e3cf7e9 e71d5bc9 4272a6b9 c84701f0.
