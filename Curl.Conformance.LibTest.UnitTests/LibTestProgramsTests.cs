@@ -48,11 +48,11 @@ public sealed class LibTestProgramsTests
     }
 
     [TestMethod]
-    public void Ported_HoldsBatchOne_Lib500ToLib509()
+    public void Ported_HoldsBatchesOneAndTwo_Lib500ToLib519()
     {
         string[] names = [.. LibTestPrograms.Ported.ProgramNames.Order(StringComparer.Ordinal)];
 
-        CollectionAssert.AreEqual(new[] { "lib500", "lib501", "lib502", "lib503", "lib504", "lib505", "lib506", "lib507", "lib508", "lib509" }, names);
+        CollectionAssert.AreEqual(new[] { "lib500", "lib501", "lib502", "lib503", "lib504", "lib505", "lib506", "lib507", "lib508", "lib509", "lib510", "lib511", "lib512", "lib513", "lib514", "lib515", "lib516", "lib517", "lib518", "lib519" }, names);
     }
 
     private sealed class NamedProgram(string programName) : ILibTest

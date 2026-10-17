@@ -33,7 +33,7 @@ upstream case runner runs for a case whose `<client><tool>` line names `lib%TEST
 - `LibTestDebugTrace` is `testtrace.c`'s `libtest_debug_cb` and `debug_dump`; `LibTestCliTrace` is
   its `cli_debug_cb`, one instance per program, `CallbackFor(easy)` giving the `DebugCallback`.
 
-- The ports are `Lib500` to `Lib509` (BL-2527). `LibTestRun` runs a port's public `TestAsync` after
+- The ports are `Lib500` to `Lib509` (BL-2527) and `Lib510` to `Lib519` (BL-2528). `LibTestRun` runs a port's public `TestAsync` after
   `curl_global_init` (`WithLibraryAsync` for a hand-written check, `WithMacroLibraryAsync` for
   `global_init`), so a test can hand `TestAsync` a cleaned-up library; every port that transfers sets
   `CURLOPT_WRITEDATA` to the program's stdout first, and `select_test` is `SelectTestAsync`, a

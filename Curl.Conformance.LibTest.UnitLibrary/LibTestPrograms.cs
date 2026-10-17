@@ -42,6 +42,16 @@ public sealed class LibTestPrograms
         new Lib507(TimeProvider.System),
         new Lib508(),
         new Lib509(() => new LibTestCountingAllocator()),
+        new Lib510(),
+        new Lib511(),
+        new Lib512(),
+        new Lib513(),
+        new Lib514(),
+        new Lib515(),
+        new Lib516(),
+        new Lib517(),
+        new Lib518(),
+        new Lib519(),
     ]);
 
     /// <summary>The names of the programs in the table, such as <c>lib500</c>.</summary>

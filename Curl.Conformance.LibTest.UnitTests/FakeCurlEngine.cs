@@ -87,7 +87,7 @@ internal sealed class FakeCurlEngine : ICurlEngine
 
         public ValueTask<CurlCode> PerformAsync(CancellationToken cancellationToken) => ValueTask.FromResult(performing?.Invoke(Options) ?? performResult);
 
-        public IEasyTransfer Duplicate() => throw new NotSupportedException();
+        public IEasyTransfer Duplicate() => new FakeEasyTransfer(performResult, info, performing) { Options = Options };
 
         public void Reset() => throw new NotSupportedException();
 
