@@ -64,4 +64,15 @@ public sealed class LibTestClockTests
 
         Assert.IsTrue(wait.IsCompletedSuccessfully);
     }
+
+    [TestMethod]
+    public void Wait_BlocksUntilTheProvidersTimerHasRun()
+    {
+        var clock = new LibTestClock(TimeProvider.System);
+        long start = TimeProvider.System.GetTimestamp();
+
+        clock.Wait(20);
+
+        Assert.IsGreaterThanOrEqualTo(TimeSpan.FromMilliseconds(15), TimeProvider.System.GetElapsedTime(start));
+    }
 }

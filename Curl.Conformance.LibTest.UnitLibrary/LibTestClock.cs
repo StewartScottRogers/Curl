@@ -44,4 +44,16 @@ public sealed class LibTestClock(TimeProvider timeProvider)
         milliseconds <= 0
             ? Task.CompletedTask
             : Task.Delay(TimeSpan.FromMilliseconds(milliseconds), timeProvider, cancellationToken);
+
+    /// <summary>
+    /// <c>curlx_wait_ms(ms)</c> inside a callback Libcurl calls synchronously, such as a read callback: blocks the
+    /// calling thread until the provider's timer has run <paramref name="milliseconds"/>, as upstream's callback blocks.
+    /// </summary>
+    /// <param name="milliseconds">How long to wait.</param>
+    public void Wait(int milliseconds)
+    {
+        using var elapsed = new ManualResetEventSlim();
+        using ITimer timer = timeProvider.CreateTimer(_ => elapsed.Set(), null, TimeSpan.FromMilliseconds(milliseconds), Timeout.InfiniteTimeSpan);
+        elapsed.Wait();
+    }
 }
