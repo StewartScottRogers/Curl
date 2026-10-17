@@ -219,6 +219,16 @@ public sealed class LibTestPrograms
         new Lib1916(),
         new Lib1918(),
         new Lib1919(),
+        new Lib1920(),
+        new Lib1921(),
+        new Lib1922(),
+        LibAwsSigV4Request.Lib1933,
+        LibAwsSigV4Request.Lib1934,
+        LibAwsSigV4Request.Lib1935,
+        LibAwsSigV4Request.Lib1936,
+        LibAwsSigV4Request.Lib1937,
+        LibAwsSigV4Request.Lib1938,
+        new Lib1939(),
     ]);
 
     /// <summary>The names of the programs in the table, such as <c>lib500</c>.</summary>
