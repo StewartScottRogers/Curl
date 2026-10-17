@@ -55,9 +55,19 @@ internal sealed class FakeMultiTransfer : IMultiTransfer
 
     private IEasyTransfer? added;
 
+    private readonly Queue<IEasyTransfer> doneTransfers = new();
+
     public CurlMultiCode Add(IEasyTransfer transfer)
     {
         added = AddResult == CurlMultiCode.Ok ? transfer : added;
+        if (AddResult == CurlMultiCode.Ok && EachAddedDoneResult is not null)
+        {
+            lock (doneTransfers)
+            {
+                doneTransfers.Enqueue(transfer);
+            }
+        }
+
         return AddResult;
     }
 
@@ -83,12 +93,32 @@ internal sealed class FakeMultiTransfer : IMultiTransfer
         return ValueTask.FromResult(WaitResult);
     }
 
-    public ValueTask<(CurlMultiCode Code, int ReadySockets)> PollAsync(Memory<CurlWaitSocket> extraSockets, TimeSpan timeout, CancellationToken cancellationToken) => ValueTask.FromResult(PollResult);
+    /// <summary>Runs in each poll, before it answers.</summary>
+    public Action? Polling { get; set; }
+
+    /// <summary>When set, every transfer added from then on reads one done message with this code, in the order added.</summary>
+    public CurlCode? EachAddedDoneResult { get; set; }
+
+    public ValueTask<(CurlMultiCode Code, int ReadySockets)> PollAsync(Memory<CurlWaitSocket> extraSockets, TimeSpan timeout, CancellationToken cancellationToken)
+    {
+        Polling?.Invoke();
+        return ValueTask.FromResult(PollResult);
+    }
 
     public CurlMultiCode Wakeup() => WakeupResult;
 
     public bool TryReadInfo([NotNullWhen(true)] out CurlMultiMessage? message, out int remainingMessages)
     {
+        lock (doneTransfers)
+        {
+            if (EachAddedDoneResult is { } each && doneTransfers.TryDequeue(out IEasyTransfer? done))
+            {
+                message = new CurlMultiMessage(CurlMultiMessageType.Done, done, each);
+                remainingMessages = doneTransfers.Count;
+                return true;
+            }
+        }
+
         message = DoneResult is { } result && added is not null ? new CurlMultiMessage(DoneMessageType, added, result) : null;
         remainingMessages = MessagesLeftAfterRead;
         DoneResult = null;
