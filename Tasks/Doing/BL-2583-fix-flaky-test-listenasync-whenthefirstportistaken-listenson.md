@@ -30,3 +30,4 @@ On 2026-10-17 BL-2569's lane-2 run saw it fail in the full fast run (`dotnet tes
 ## Log
 
 - 2026-10-17: Created.
+- 2026-10-17: Backlog -> Doing. Criteria at claim: c4e1aef4 9742157d.
