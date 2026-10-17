@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Output.UnitTests]
 requirement: none
 created: 2026-10-17
-completed:
+completed: 2026-10-17
 ---
 # BL-2567 — Fix AF-0230: FromReport_NoReport_KeepsDefaultsAndTakesTheBytesTransferred asserts nothing; its checks only log
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- 2026-10-17: Already fixed by BL-2566 (commit 58f73d960, AF-0229), which replaced every TestDiagnostics.Assert in this file with Assert.AreEqual. The test's four checks (effective url, download size, total time, primary port) are now Assert.AreEqual at lines 69-72; the method grew by four Act lines, so the reproduction's "57-60" range moved, but every check the name promises is a real assertion. No code change in this task; build clean and fast tests green (Curl.Output.UnitTests 663 passed).
 
 ## Log
 
 - 2026-10-17: Created.
 - 2026-10-17: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-17: Doing -> Done. AF-0230's logged checks are real Assert.AreEqual calls (landed with BL-2566)
