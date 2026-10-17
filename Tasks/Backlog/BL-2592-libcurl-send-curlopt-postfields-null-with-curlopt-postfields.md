@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Engine.UnitLibrary, Curl.Engine.UnitTests]
+touches: [Curl.Engine.UnitLibrary, Curl.Engine.UnitTests, Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
 requirement: none
 created: 2026-10-17
 completed:
@@ -29,7 +29,10 @@ Found by BL-2528 (lib515 port). curl 8.22.0 sends `POST /515 HTTP/1.1` with `Con
 
 ## Notes
 
+- 2026-10-17 (lane 2): The second criterion adds test515 to `Curl.Conformance.UnitTests/PassingUpstreamCases.txt`, which `touches` did not name; added it. BL-2595 (in Doing) holds that file, so the task is requeued before any code edit until BL-2595 no longer overlaps.
+
 ## Log
 
 - 2026-10-17: Created.
 - 2026-10-17: Backlog -> Doing. Criteria at claim: 1577eda6 580ce1a6 4272a6b9 c84701f0.
+- 2026-10-17: Doing -> Backlog. Curl.Conformance.UnitTests/PassingUpstreamCases.txt is held by BL-2595 in Doing; requeued before any code edit
