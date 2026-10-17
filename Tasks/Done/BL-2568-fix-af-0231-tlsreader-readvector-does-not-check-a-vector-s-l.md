@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Tls.UnitLibrary]
 requirement: none
 created: 2026-10-17
-completed:
+completed: 2026-10-17
 ---
 # BL-2568 — Fix AF-0231: TlsReader.ReadVector does not check a vector's length against the bytes left: 23 Curl.Tls and 3 Networking ECH tests fail unmutated
 
@@ -41,12 +41,17 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- 2026-10-17 (lane 1): No code change was needed. `TlsReader.ReadVector` at 72a89926e already calls `Take(length)` (`Curl.Tls.UnitLibrary/TlsReader.cs:76`), and `git log` shows that line unchanged since BL-1713 (2026-10-07). The code the finding describes (`position += length` with no `Take`) appears in no commit, so the tree that was audited most likely held a planted defect or a mutant.
+- Reproduction `dotnet test Curl.Tls.UnitTests --filter "TestCategory!=Integration"`: Passed 1275, Failed 0. `dotnet build`: 0 errors. Full fast tests: no failures, and Curl.Networking.UnitTests passed 3229 (the three ECH tests among them).
+- No new test was added: the 23 tests that failed under the defect already catch it. Lanes may not read the finding file, so it was not checked here. A re-audit by the quality auditor closes the finding.
 
 ## Log
 
 - 2026-10-17: Created.
 - 2026-10-17: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-17: Doing -> Done. Reproduction passes, Curl.Tls.UnitTests 1275 of 1275; ReadVector already bounds-checks with Take(length), no code change needed
