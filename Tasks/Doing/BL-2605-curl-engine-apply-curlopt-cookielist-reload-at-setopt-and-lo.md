@@ -31,3 +31,4 @@ BL-2603 made test506's perform lines match; `<stdout>` now differs at line 132: 
 ## Log
 
 - 2026-10-17: Created.
+- 2026-10-17: Backlog -> Doing. Criteria at claim: 4e518969 d822afa7 3d836d5e.
