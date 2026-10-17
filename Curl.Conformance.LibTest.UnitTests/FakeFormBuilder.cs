@@ -10,6 +10,8 @@ internal sealed class FakeFormBuilder : ICurlFormBuilder
 
     public int FailingCall { get; init; }
 
+    public int? SerializedLength { get; init; }
+
     public List<IReadOnlyList<CurlFormArgument>> Calls { get; } = [];
 
     public CurlFormAddCode Add(IReadOnlyList<CurlFormArgument> arguments)
@@ -20,7 +22,7 @@ internal sealed class FakeFormBuilder : ICurlFormBuilder
 
     public int Serialize(FormGetCallback append)
     {
-        _ = append("abc"u8);
+        _ = append(SerializedLength is { } length ? new byte[length] : "abc"u8);
         return 0;
     }
 
