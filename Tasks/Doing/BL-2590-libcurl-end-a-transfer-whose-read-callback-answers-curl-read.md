@@ -37,3 +37,4 @@ Found by BL-2528 (lib513 port). test513 posts with `CURLOPT_POSTFIELDSIZE` 1 and
 - 2026-10-17: Created.
 - 2026-10-17: Backlog -> Doing. Criteria at claim: e69776de 20427775 4272a6b9 c84701f0.
 - 2026-10-17: Doing -> Backlog. Needs Curl.Conformance.UnitTests/PassingUpstreamCases.txt, which BL-2595 (in Doing) touches; engine fix and tests are done in the stash
+- 2026-10-17: Backlog -> Doing. Criteria at claim: e69776de 20427775 4272a6b9 c84701f0.
