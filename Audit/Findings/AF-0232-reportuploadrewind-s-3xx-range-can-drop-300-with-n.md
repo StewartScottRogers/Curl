@@ -3,8 +3,8 @@ id: AF-0232
 title: ReportUploadRewind's 3xx range can drop 300 with no test failing, losing curl's 'Need to rewind upload' -v line
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Protocol.Http.UnitLibrary/HttpProtocolHandler.cs:ReportUploadRewind-ge:surviving-mutant
 reproduction: mutation Curl.Protocol.Http.UnitLibrary/HttpProtocolHandler.cs:1584:>=
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Proto
 ## Log
 
 - 2026-10-16: filed proposed.
+- 2026-10-16: proposed -> accepted.
