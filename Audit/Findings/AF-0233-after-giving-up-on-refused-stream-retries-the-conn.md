@@ -3,8 +3,8 @@ id: AF-0233
 title: After giving up on refused-stream retries the connection can be kept alive with no test failing
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Protocol.Http.UnitLibrary/HttpProtocolHandler.cs:StreamRefusedOutcome-false:surviving-mutant
 reproduction: mutation Curl.Protocol.Http.UnitLibrary/HttpProtocolHandler.cs:1975:false
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Proto
 ## Log
 
 - 2026-10-16: filed proposed.
+- 2026-10-16: proposed -> accepted.
