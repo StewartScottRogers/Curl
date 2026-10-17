@@ -32,3 +32,4 @@ Split from BL-2529 (batch 3 of the libtest ports; phase 5 of `Documentation/Plan
 ## Log
 
 - 2026-10-17: Created.
+- 2026-10-17: Backlog -> Doing. Criteria at claim: 2f214e3e 528f46b8 e39e1cd8 4272a6b9.
