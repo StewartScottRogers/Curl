@@ -42,6 +42,8 @@ Run from the repository root:
 
 ## Re-audits
 
+- 2026-10-16 | 2026-10-16_1623.md | reproduces: yes | Ran the reproduction: 93, then '... 84 projects, one flat alphabetical run'. The count in CLAUDE.md changed (from 75 to 84), but it still does not match the 93 .csproj entries in Curl.slnx. 93 csproj files are also on disk (ls */*.csproj).
+
 ## Log
 
 - 2026-10-15: filed proposed.

@@ -42,6 +42,8 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-10-16 | 2026-10-16_1623.md | reproduces: yes | Ran the reproduction: the earlier window still shows 07:50:16Z-08:17:06Z, 26.83 min, run 38700283564 on 639a0aec. By mechanism over this window (ciRedMinutes 181.44 > 60), the Quality gates (windows-latest) job went red again on a lane commit: run 38876049958 on 241c183e, 103.15 min (2026-10-16T09:02:13Z-10:45:22Z). The cause was a Libcurl CurlMulti.SetOption branch gap that a lane had landed; it was fixed by BL-2467 at 03:01:55 local (DarkFactory-20261015-200601-L1.log:437).
+
 ## Log
 
 - 2026-10-15: filed proposed.

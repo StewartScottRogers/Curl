@@ -3,8 +3,8 @@ id: AF-0225
 title: Quality gates job red for 14.27 minutes from run 38666857143 on aa14b025, and green again before its fix task ran
 auditor: process
 severity: Low
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-16_1623.md: the reproduction no longer reproduces.
 key: process:logs:CI-run-38666857143:ci-red
 reproduction: none
 task: BL-2278
@@ -13,9 +13,9 @@ found: 2026-10-15
 found-at: 3e1062e68644127a82ba2f5ef33ceb1044cc6f67
 scorecard: 2026-10-15_0156.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-16
+closed-how: reliable-reaudit
+closed-by: 2026-10-16_1623.md
 ---
 # AF-0225 - Quality gates job red for 14.27 minutes from run 38666857143 on aa14b025, and green again before its fix task ran
 
@@ -42,7 +42,10 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-10-16 | 2026-10-16_1623.md | reproduces: no | Ran the reproduction: the 2026-10-14 window still lists 01:47:21Z-02:01:37Z, 14.27 min, run 38666857143 (history). By mechanism over this window (-Since 2026-10-15, 246 tasks Done), the only Quality gates red spell is run 38876049958 (09:02:13Z-10:45:22Z). It went green only after its fix tasks ran: BL-2466 Done 02:43 local and BL-2467 Done 03:01:55 local, before green at 03:45 local. No quality-gates spell in this window cleared before a fix task ran. Other spells: 38796134816 (15.18 min, test 1024 flaky on Windows, BL-2351) and 38808821626 (a Linux/macOS test failure).
+
 ## Log
 
 - 2026-10-15: filed proposed.
 - 2026-10-15: proposed -> accepted.
+- 2026-10-16: accepted -> closed. Re-audit 2026-10-16_1623.md: the reproduction no longer reproduces.
