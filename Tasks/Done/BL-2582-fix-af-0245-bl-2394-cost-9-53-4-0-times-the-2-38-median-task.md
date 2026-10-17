@@ -8,7 +8,7 @@ depends-on: []
 touches: [RunDarkFactory.ps1]
 requirement: none
 created: 2026-10-17
-completed:
+completed: 2026-10-17
 ---
 # BL-2582 — Fix AF-0245: BL-2394 cost $9.53, 4.0 times the $2.38 median task cost: three claims, a 90-turn final run and a conflict-resolve run
 
@@ -41,12 +41,20 @@ The finding describes a past run's cost, which no fix can change, so no re-audit
 
 ## Acceptance criteria
 
-- [ ] The cause of the cost is named in this task, and either fixed or recorded as unavoidable.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The cause of the cost is named in this task, and either fixed or recorded as unavoidable.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Cause of the $9.53 (AF-0245), from the finding's own breakdown (the run logs are not in this checkout, so nothing was re-measured):
+- $3.38 on two runs that ended in requeues: BL-2394 was split (19 turns, $1.47), then found to wait on BL-2479 (23 turns, $1.91). This is the requeue-early rule already in the lane prompt (AF-0147): find every prerequisite in the first pass. Each requeue was a legitimate outcome, not a bug.
+- $5.66 on a 90-turn final run, plus $0.48 on a rebase-conflict resolve run. The task was large; the resolve run is the shift's normal conflict path.
+- The denied `git stash list` at the format step was already fixed: `Restore-TaskStash` in RunDarkFactory.ps1 applies the stash itself so a lane never needs `git stash list` (AF-0091, AF-0099).
+
+Decision: no avoidable waste remains that a code change would remove; the cost is recorded as unavoidable for the past run, and the history cannot change (task-done-historical closes the finding). No code changed.
 
 ## Log
 
 - 2026-10-17: Created.
 - 2026-10-17: Backlog -> Doing. Criteria at claim: af4de8c2 9742157d.
+- 2026-10-17: Doing -> Done. Cause named in Notes; stash-list denial already fixed (AF-0091/0099); rest unavoidable
