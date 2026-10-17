@@ -1,0 +1,40 @@
+---
+id: BL-2561
+title: Pack only Curl.Mcp's tool package in its pack Integration test so CI's mcp-pack job fits its time limit
+priority: High
+assignee: Claude
+pipeline: direct
+depends-on: []
+touches: [Curl.Mcp.IntegrationTests]
+lane: no
+requirement: none
+created: 2026-10-17
+completed:
+---
+# BL-2561 — Pack only Curl.Mcp's tool package in its pack Integration test so CI's mcp-pack job fits its time limit
+
+## Goal
+
+`Pack_MakesAnMcpServerPackageHoldingServerJson` packs only the Curl.Mcp tool package, so ci.yml's `mcp-pack` job finishes inside its 30-minute limit on Windows and Ubuntu.
+
+## Context
+
+Every CI run on work/dark-factory since 2026-10-16 14:59 UTC was cancelled: "Pack Curl.Mcp" hit `timeout-minutes: 30` on windows-latest and ubuntu-latest (macos-latest passes in about 2 minutes). With CI never green, shift 20261016-081911's merge to master could not happen.
+
+Measured: when it still passed, the Curl.Mcp Integration tests step took 15 min 41 s on Ubuntu, almost all of it `Pack_MakesAnMcpServerPackageHoldingServerJson` (15 min 38 s locally on Windows). A plain `dotnet pack Curl.Mcp` builds all six self-contained runtime packages, but the test checks only the tool package's `.mcp/server.json` and `McpServer` package type. BL-2486's AOT publish test (CurlMcpNativeAotIntegrationTests, 2026-10-16 16:24 UTC) added more time and pushed the job past 30 minutes on every run.
+
+`Curl.Mcp.csproj` says with `-p:PublishAot=true` a plain `dotnet pack` makes only the tool package (ADR-0599). The job's own "Pack Curl.Mcp" step still checks all seven packages.
+
+## Acceptance criteria
+
+- [ ] `Pack_MakesAnMcpServerPackageHoldingServerJson` packs with `-p:PublishAot=true` and still checks `.mcp/server.json` and the `McpServer` package type in `Curl.Mcp.0.1.0.nupkg`.
+- [ ] The test runs in under 2 minutes locally (measured time in Notes).
+- [ ] `dotnet build` is clean and the fast tests pass; `dotnet test Curl.Mcp.IntegrationTests --filter "TestCategory=Integration"` passes.
+- [ ] A CI run on work/dark-factory has "Pack Curl.Mcp" green on Windows, Linux and macOS.
+
+## Notes
+
+## Log
+
+- 2026-10-17: Created.
+- 2026-10-16: Backlog -> Doing. Criteria at claim: d67afc00 06d04747 63c8c8b4 90196da2.
