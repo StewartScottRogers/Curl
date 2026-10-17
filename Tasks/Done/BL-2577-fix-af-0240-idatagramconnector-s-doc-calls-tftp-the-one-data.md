@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Abstractions.UnitLibrary]
 requirement: none
 created: 2026-10-17
-completed:
+completed: 2026-10-17
 ---
 # BL-2577 — Fix AF-0240: IDatagramConnector's doc calls TFTP the one datagram protocol using it; QUIC, DNS and the Kerberos KDC transport open through it too
 
@@ -41,8 +41,8 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -50,3 +50,4 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 
 - 2026-10-17: Created.
 - 2026-10-17: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-17: Doing -> Done. IDatagramConnector doc now names every datagram user, not only TFTP
