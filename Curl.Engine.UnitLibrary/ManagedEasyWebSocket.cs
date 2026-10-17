@@ -116,7 +116,7 @@ internal sealed class ManagedEasyWebSocket(Func<bool> isConnectOnly, Func<WebSoc
     /// <remarks>
     /// Under <c>CURLWS_OFFSET</c> the first call's <paramref name="fragmentSize" /> is the whole payload's size and the
     /// head announces it; while that frame has payload left, every call continues it whatever its bits, as
-    /// <c>lib/ws.c</c> does (BL-2481, ADR-0648).
+    /// <c>lib/ws.c</c> does (BL-2481, ADR-0665).
     /// </remarks>
     public async ValueTask<CurlWebSocketSendResult> SendAsync(ReadOnlyMemory<byte> buffer, long fragmentSize, CurlWebSocketFlags flags, CancellationToken cancellationToken)
     {
@@ -139,7 +139,7 @@ internal sealed class ManagedEasyWebSocket(Func<bool> isConnectOnly, Func<WebSoc
     /// bits naming no frame <see cref="CurlCode.BadFunctionArgument" />; otherwise it writes the frame's head announcing
     /// <paramref name="frameLength" /> bytes, which the following sends supply. libcurl checks no callback, so the call
     /// behaves the same inside a read callback and outside one; the engine runs WebSocket transfers only connect-only,
-    /// where no read callback is called (ADR-0648).
+    /// where no read callback is called (ADR-0665).
     /// </remarks>
     public async ValueTask<CurlCode> StartFrameAsync(CurlWebSocketFlags flags, long frameLength, CancellationToken cancellationToken)
     {
