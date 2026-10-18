@@ -41,3 +41,4 @@ Debug one with `CURL_UPSTREAM_CASE=<n>` and `dotnet test Curl.Conformance.UnitTe
 ## Log
 
 - 2026-10-17: Created.
+- 2026-10-18: Backlog -> Doing. Criteria at claim: 67d405dd 74e45cb9 21e5ddeb 4272a6b9.
