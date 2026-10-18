@@ -35,3 +35,4 @@ Found by BL-2529, whose ports lib521 and lib523 (`Curl.Conformance.LibTest.UnitL
 ## Log
 
 - 2026-10-17: Created.
+- 2026-10-17: Backlog -> Doing. Criteria at claim: 19e2562b 4e614c37 58a689e2.
