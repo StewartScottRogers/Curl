@@ -33,16 +33,19 @@ internal sealed class EasyOptionDispatch(IReadOnlyDictionary<CurlOption, EasyOpt
             return CurlCode.UnknownOption;
         }
 
-        if (!CurlOptionValues.Accepts(entry.Type, value))
-        {
-            return CurlCode.BadFunctionArgument;
-        }
-
-        if (entry.Type == CurlOptionType.String && value is string text && text.Length > MaximumInputLength)
+        if (IsRefused(entry.Type, value))
         {
             return CurlCode.BadFunctionArgument;
         }
 
         return setters.TryGetValue(option, out var setter) ? setter(ref options, value) : CurlCode.NotBuiltIn;
     }
+
+    /// <summary>Whether <paramref name="value"/> is of the wrong type for <paramref name="type"/>, or a string past <see cref="MaximumInputLength"/>.</summary>
+    /// <param name="type">The option's type.</param>
+    /// <param name="value">The value given.</param>
+    /// <returns><see langword="true"/> when <c>curl_easy_setopt</c> answers <see cref="CurlCode.BadFunctionArgument"/>.</returns>
+    private static bool IsRefused(CurlOptionType type, object? value) =>
+        !CurlOptionValues.Accepts(type, value)
+        || (type == CurlOptionType.String && value is string text && text.Length > MaximumInputLength);
 }
