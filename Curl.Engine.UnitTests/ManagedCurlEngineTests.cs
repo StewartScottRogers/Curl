@@ -227,6 +227,25 @@ public sealed class ManagedCurlEngineTests
         Assert.Contains("Credential=xxx/19700101/", request);
     }
 
+    [TestMethod]
+    public async Task PerformAsync_DialingUsesHandBuiltNtlm_SendsCurlsOwnTypeOneMessage()
+    {
+        ScriptedConnector server = new(["HTTP/1.1 401 Unauthorized\r\nContent-Length: 0\r\n\r\n"u8.ToArray()]);
+        EngineDialing dialing = new(new ScriptedTcpDialer(server), new LoopbackDnsResolver(), new RecordingDatagramConnector(Curl.Protocol.Abstractions.CurlExitCode.CouldntConnect, "no udp"), UsesHandBuiltNtlm: true);
+        await using ManagedCurlEngine engine = new(TimeProvider.System, null, dialing: dialing);
+        await using IEasyTransfer easy = engine.CreateEasy();
+        easy.Options = new EasyOptions
+        {
+            Network = new EasyNetworkOptions { Url = "http://127.0.0.1:9000/bl2635" },
+            Authentication = new Api.Options.Authentication.EasyAuthenticationOptions { UserPassword = "me:password", HttpAuthentication = Api.Options.Authentication.HttpAuthenticationMethods.Ntlm },
+        };
+
+        await easy.PerformAsync(CancellationToken.None);
+
+        string request = System.Text.Encoding.ASCII.GetString(server.Written);
+        Assert.Contains("Authorization: NTLM TlRMTVNTUAABAAAABoIIAAAAAAAAAAAAAAAAAAAAAAA=\r\n", request);
+    }
+
     private sealed class FixedClock(DateTimeOffset now) : TimeProvider
     {
         public override DateTimeOffset GetUtcNow() => now;

@@ -128,12 +128,14 @@ public sealed class ManagedCurlEngine : ICurlEngine
     internal static ProtocolDispatcher CreateDispatcher(EasyOptions options, ManagedEngineSharedState shared, ICookieStore? cookieStore, IHttp2PushSink? pushSink = null)
     {
         CurlTransports transports = CreateTransports(options, shared);
+        IConnector connector = PrerequestConnector.Over(PoolOf(transports, transports.TcpConnector, options.Callbacks, shared), options.Callbacks.Prerequest);
         return new ProtocolDispatcher(EngineComposition.CreateProtocolHandlers(
-            PrerequestConnector.Over(PoolOf(transports, transports.TcpConnector, options.Callbacks, shared), options.Callbacks.Prerequest),
+            connector,
             transports.UdpDatagramConnector,
             transports.TlsProvider,
             transports.DnsResolver,
             cookieStore,
+            securityContexts: HandBuiltNtlmContextsOf(connector, transports.UdpDatagramConnector, shared),
             proxyAuthSchemes: transports.ProxyTunnelOptions.ProxyAuthSchemes,
             negotiateOptions: NegotiateOptionsMapping.Of(options.Authentication),
             signingClock: shared.SigningClock,
@@ -177,9 +179,24 @@ public sealed class ManagedCurlEngine : ICurlEngine
     {
         CurlTransports transports = CreateTransports(options, shared);
         return EngineComposition.CreateHttpAuthenticator(
-            EngineComposition.CreateSecurityContextFactory(transports.TcpConnector, transports.UdpDatagramConnector),
+            EngineComposition.CreateDialingSecurityContextFactory(transports.TcpConnector, transports.UdpDatagramConnector, diagnosticLog: null, UsesHandBuiltNtlm(shared)),
             NegotiateOptionsMapping.Of(options.Authentication));
     }
+
+    /// <summary>
+    /// The security contexts a transfer's handlers answer NTLM, Negotiate and Kerberos with when the engine's
+    /// <see cref="EngineDialing.UsesHandBuiltNtlm" /> is set: <see cref="EngineComposition.CreateDialingSecurityContextFactory" />'s,
+    /// NTLM going to the hand-built context on every platform, as the dialing runner's do (BL-2635); else
+    /// <see langword="null" />, the handlers' own router.
+    /// </summary>
+    /// <param name="connector">Opens TCP connections to a KDC.</param>
+    /// <param name="datagramConnector">Opens UDP channels to a KDC.</param>
+    /// <param name="shared">The engine's shared state.</param>
+    /// <returns>The factory, or <see langword="null" />.</returns>
+    internal static ISecurityContextFactory? HandBuiltNtlmContextsOf(IConnector connector, IDatagramConnector datagramConnector, ManagedEngineSharedState shared) =>
+        UsesHandBuiltNtlm(shared) ? EngineComposition.CreateDialingSecurityContextFactory(connector, datagramConnector, diagnosticLog: null, usesHandBuiltNtlm: true) : null;
+
+    private static bool UsesHandBuiltNtlm(ManagedEngineSharedState shared) => shared.Dialing is { UsesHandBuiltNtlm: true };
 
     /// <summary>
     /// The pool a transfer's TCP handlers connect through: the transports' own over their <c>TcpConnector</c>, as

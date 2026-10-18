@@ -590,14 +590,15 @@ public sealed class UpstreamConformanceTests
     // dial reaching the case's in-memory servers through InMemoryServerTcpDialer, names resolved to loopback, the
     // datagram protocols on the case's datagram servers, FTP's active-mode data connections on the FTP stand-in's
     // listener (BL-2597) and the proxy environment the case's <setenv>, as RunCurlAsync composes curl. It signs AWS SigV4
-    // requests and HTTP signatures at the epoch, as upstream's debug build does under the CURL_FORCETIME its test runner sets (BL-2675).
+    // requests and HTTP signatures at the epoch, as upstream's debug build does under the CURL_FORCETIME its test runner sets (BL-2675),
+    // and answers NTLM with the hand-built context, as RunCurlAsync's usesHandBuiltNtlm does (BL-2635).
     internal static ICurlEngine CreateEngine(UpstreamCurlInvocation invocation) =>
         new ManagedCurlEngine(
             TimeProvider.System,
             createDispatcher: null,
             CurlEasyErrorText.Of,
             name => invocation.EnvironmentVariables.GetValueOrDefault(name),
-            new EngineDialing(new InMemoryServerTcpDialer(invocation.Connector), new LoopbackOnlyDnsResolver(), invocation.DatagramConnector, invocation.ConnectionListener),
+            new EngineDialing(new InMemoryServerTcpDialer(invocation.Connector), new LoopbackOnlyDnsResolver(), invocation.DatagramConnector, invocation.ConnectionListener, UsesHandBuiltNtlm: true),
             signingClock: new UnixEpochClock());
 
     // The ported libtest programs the ratchet runs a <tool> case's program from, over CreateEngine.

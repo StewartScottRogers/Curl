@@ -18,4 +18,9 @@ namespace Curl.Engine;
 /// Listens for FTP's active-mode (<c>CURLOPT_FTPPORT</c>) data connections, as the dialing runner's <c>ftpListener</c>
 /// does; <see langword="null" /> for a <see cref="TcpConnectionListener" />.
 /// </param>
-internal sealed record EngineDialing(ITcpDialer TcpDialer, IDnsResolver DnsResolver, IDatagramConnector DatagramConnector, IConnectionListener? FtpListener = null);
+/// <param name="UsesHandBuiltNtlm">
+/// Whether NTLM is answered by the hand-built context on every platform, as curl's non-SSPI build answers it and as the
+/// dialing runner's <c>usesHandBuiltNtlm</c> does (<see cref="EngineComposition.CreateDialingSecurityContextFactory" />,
+/// BL-2635); <see langword="false" /> keeps SSPI's on Windows.
+/// </param>
+internal sealed record EngineDialing(ITcpDialer TcpDialer, IDnsResolver DnsResolver, IDatagramConnector DatagramConnector, IConnectionListener? FtpListener = null, bool UsesHandBuiltNtlm = false);
