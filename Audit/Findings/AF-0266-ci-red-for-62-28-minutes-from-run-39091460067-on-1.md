@@ -3,8 +3,8 @@ id: AF-0266
 title: CI red for 62.28 minutes from run 39091460067 on 1c266d83 (BL-2551): ListenAsync_WhenTheFirstPortIsTaken_ListensOnTheNextFreeOne failed on Windows; fix done in 18 min, then 5 cancelled runs
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: process:logs:39091460067:ci-red
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Log
 
 - 2026-10-18: filed proposed.
+- 2026-10-18: proposed -> accepted.
