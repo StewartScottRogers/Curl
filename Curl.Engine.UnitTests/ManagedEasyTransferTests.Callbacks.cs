@@ -305,6 +305,73 @@ public sealed partial class ManagedEasyTransferTests
     }
 
     [TestMethod]
+    public async Task PerformAsync_RedirectResendsAReadCallbackUploadWithOnlyAnIoctlCallback_RestartsTheReadOnceAndSendsTheBodyTwice()
+    {
+        ScriptedConnector connector = new([Encoding.ASCII.GetBytes(Continue + TemporaryRedirect), Encoding.ASCII.GetBytes(Continue + Response)]);
+        await using IEasyTransfer easy = CreateEngine(connector).CreateEasy();
+        MemoryStream source = new(Encoding.ASCII.GetBytes("abc"));
+        List<IoctlCommand> commands = [];
+        easy.Options = IoctlUploadOptions(
+            buffer => source.Read(buffer),
+            command =>
+            {
+                commands.Add(command);
+                source.Position = 0;
+                return IoctlResult.Ok;
+            });
+
+        CurlCode code = await easy.PerformAsync(CancellationToken.None);
+
+        Assert.AreEqual(CurlCode.Ok, code);
+        CollectionAssert.AreEqual(new[] { IoctlCommand.RestartRead }, commands);
+        string written = Encoding.ASCII.GetString(connector.Written);
+        Assert.AreEqual(2, written.Split("\r\n3\r\nabc\r\n0\r\n\r\n").Length - 1);
+    }
+
+    [TestMethod]
+    public async Task PerformAsync_RedirectResendsAReadCallbackUploadAndTheIoctlCallbackFails_ReturnsSendFailRewindWithLibcurlsText()
+    {
+        ScriptedConnector connector = new([Encoding.ASCII.GetBytes(Continue + TemporaryRedirect), Encoding.ASCII.GetBytes(Continue + Response)]);
+        await using IEasyTransfer easy = CreateEngine(connector).CreateEasy();
+        easy.Options = IoctlUploadOptions(ReadOf("abc"), _ => IoctlResult.FailRestart);
+
+        CurlCode code = await easy.PerformAsync(CancellationToken.None);
+
+        Assert.AreEqual(CurlCode.SendFailRewind, code);
+        Assert.AreEqual("ioctl callback returned error 2", easy.ErrorText);
+    }
+
+    [TestMethod]
+    public async Task PerformAsync_SeekAndIoctlCallbacksBothSet_RewindsThroughTheSeekCallbackOnly()
+    {
+        ScriptedConnector connector = new([Encoding.ASCII.GetBytes(Continue + TemporaryRedirect), Encoding.ASCII.GetBytes(Continue + Response)]);
+        await using IEasyTransfer easy = CreateEngine(connector).CreateEasy();
+        MemoryStream source = new(Encoding.ASCII.GetBytes("abc"));
+        int ioctls = 0;
+        EasyOptions options = SeekingUploadOptions(buffer => source.Read(buffer), (offset, _) =>
+        {
+            source.Position = offset;
+            return SeekResult.Ok;
+        });
+        easy.Options = options with
+        {
+            Callbacks = options.Callbacks with
+            {
+                Ioctl = _ =>
+                {
+                    ioctls++;
+                    return IoctlResult.Ok;
+                },
+            },
+        };
+
+        CurlCode code = await easy.PerformAsync(CancellationToken.None);
+
+        Assert.AreEqual(CurlCode.Ok, code);
+        Assert.AreEqual(0, ioctls);
+    }
+
+    [TestMethod]
     public async Task PerformAsync_SeekCallbackSetWithoutARedirect_NeverCallsIt()
     {
         ScriptedConnector connector = new([Encoding.ASCII.GetBytes(Continue + Response)]);
@@ -388,6 +455,15 @@ public sealed partial class ManagedEasyTransferTests
         Transfer = new EasyTransferOptions { Upload = true },
         Http = new EasyHttpOptions { FollowLocation = FollowLocation.All },
         Callbacks = new() { Read = read, Seek = seek },
+    };
+
+    /// <summary>A <c>PUT</c> of the read callback's bytes to <c>http://h/up</c> under <c>CURLOPT_FOLLOWLOCATION</c>, with an ioctl callback and no seek callback.</summary>
+    private static EasyOptions IoctlUploadOptions(ReadCallback read, IoctlCallback ioctl) => new()
+    {
+        Network = new EasyNetworkOptions { Url = "http://h/up" },
+        Transfer = new EasyTransferOptions { Upload = true },
+        Http = new EasyHttpOptions { FollowLocation = FollowLocation.All },
+        Callbacks = new() { Read = read, Ioctl = ioctl },
     };
 
     /// <summary>Waits until a callback pauses <paramref name="direction" />, then unpauses the handle, as an application's other thread would.</summary>

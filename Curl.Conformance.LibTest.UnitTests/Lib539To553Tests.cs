@@ -1,3 +1,4 @@
+using Curl.Api.Callbacks;
 using Curl.Api.Codes;
 using Curl.Api.EngineContracts.Multi;
 using Libcurl.Easy;
@@ -325,7 +326,7 @@ public sealed class Lib544Tests
 public sealed class Lib547Tests
 {
     [TestMethod]
-    public async Task RunAsync_Case548_PostsTheFields_OthersStopAtTheIoctlOption()
+    public async Task RunAsync_Case548PostsTheFields_OthersSetTheIoctlCallbackAndPerform()
     {
         var run548 = new PortRun(new FakeCurlEngine { PerformResult = CurlCode.LoginDenied }, 548, "http://x/548", "http://proxy", "u:p");
         var run547 = new PortRun(new FakeCurlEngine(), 547, "http://x/547", "http://proxy", "u:p");
@@ -334,7 +335,7 @@ public sealed class Lib547Tests
         LibTestResult result547 = await new Lib547().RunAsync(run547.Context, CancellationToken.None);
 
         Assert.AreEqual((int)CurlCode.LoginDenied, result548.ExitCode);
-        Assert.AreEqual((int)CurlCode.NotBuiltIn, result547.ExitCode);
+        Assert.AreEqual((int)CurlCode.Ok, result547.ExitCode);
         Assert.AreEqual("lib547", new Lib547().ProgramName);
     }
 
@@ -347,8 +348,8 @@ public sealed class Lib547Tests
 
         Assert.AreEqual(Lib547.UploadThis.Length, reader.Read(buffer));
         Assert.AreEqual(0, reader.Read(buffer));
-        Assert.AreEqual(LibTestIoctl.Ok, reader.Ioctl(LibTestIoctl.RestartRead));
-        Assert.AreEqual(LibTestIoctl.Ok, reader.Ioctl(2));
+        Assert.AreEqual(IoctlResult.Ok, reader.Ioctl(IoctlCommand.RestartRead));
+        Assert.AreEqual(IoctlResult.Ok, reader.Ioctl((IoctlCommand)2));
         Assert.AreEqual(0, reader.Read(new byte[4]));
 
         Assert.AreEqual("READ!\nREAD ALREADY DONE!\nREWIND!\nREAD NOT FINE!\n", error.ToString());
@@ -369,13 +370,13 @@ public sealed class Lib547Tests
 public sealed class Lib552Tests
 {
     [TestMethod]
-    public async Task RunAsync_StopsAtTheIoctlOption()
+    public async Task RunAsync_SetsTheIoctlCallbackAndPerforms()
     {
         var run = new PortRun(new FakeCurlEngine(), 552, "http://x/552", "http://proxy");
 
         LibTestResult result = await new Lib552(TimeProvider.System).RunAsync(run.Context, CancellationToken.None);
 
-        Assert.AreEqual((int)CurlCode.NotBuiltIn, result.ExitCode);
+        Assert.AreEqual((int)CurlCode.Ok, result.ExitCode);
         Assert.AreEqual("lib552", new Lib552(TimeProvider.System).ProgramName);
     }
 
@@ -388,8 +389,8 @@ public sealed class Lib552Tests
 
         Assert.AreEqual(Lib552.DataLength, data.Read(buffer));
         Assert.AreEqual(0, data.Read(buffer));
-        Assert.AreEqual(LibTestIoctl.UnknownCommand, data.Ioctl(2));
-        Assert.AreEqual(LibTestIoctl.Ok, data.Ioctl(LibTestIoctl.RestartRead));
+        Assert.AreEqual(IoctlResult.UnknownCommand, data.Ioctl((IoctlCommand)2));
+        Assert.AreEqual(IoctlResult.Ok, data.Ioctl(IoctlCommand.RestartRead));
         Assert.AreEqual(12, data.Read(buffer.AsSpan(0, 12)));
         Assert.AreEqual(5, data.Write("ab\0cd"u8));
         Assert.AreEqual(2, data.Write("ef"u8));

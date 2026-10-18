@@ -108,13 +108,13 @@ public sealed class Lib554Tests
 public sealed class Lib555Tests
 {
     [TestMethod]
-    public async Task RunAsync_StopsAtTheIoctlOption()
+    public async Task RunAsync_SetsTheIoctlCallbackAndPerforms()
     {
         var run = new PortRun(new FakeCurlEngine(), 555, "http://x/555", "http://proxy", "u:p");
 
         LibTestResult result = await new Lib555(TimeProvider.System).RunAsync(run.Context, CancellationToken.None);
 
-        Assert.AreEqual((int)CurlCode.NotBuiltIn, result.ExitCode);
+        Assert.AreEqual((int)CurlCode.Ok, result.ExitCode);
         Assert.AreEqual("lib555", new Lib555(TimeProvider.System).ProgramName);
     }
 

@@ -48,7 +48,7 @@ public sealed class Lib555(TimeProvider timeProvider) : ILibTest
                 (CurlOption.Url, context.Url),
                 (CurlOption.Verbose, 1L),
                 (CurlOption.Header, 1L),
-                (CurlOption.Ioctlfunction, (Func<int, int>)reader.Ioctl),
+                (CurlOption.Ioctlfunction, (IoctlCallback)reader.Ioctl),
                 (CurlOption.Ioctldata, reader),
                 (CurlOption.Readfunction, (ReadCallback)reader.Read),
                 (CurlOption.Readdata, reader),

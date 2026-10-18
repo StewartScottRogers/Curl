@@ -52,7 +52,7 @@ public sealed class Lib547 : ILibTest
             else
             {
                 var reader = new BlurbReader(context.StandardError);
-                options.Add((CurlOption.Ioctlfunction, (Func<int, int>)reader.Ioctl));
+                options.Add((CurlOption.Ioctlfunction, (IoctlCallback)reader.Ioctl));
                 options.Add((CurlOption.Ioctldata, reader));
                 options.Add((CurlOption.Readfunction, (ReadCallback)reader.Read));
                 options.Add((CurlOption.Readdata, reader));
@@ -95,18 +95,18 @@ public sealed class Lib547 : ILibTest
             return 0;
         }
 
-        /// <summary>On <see cref="LibTestIoctl.RestartRead"/>, says <c>REWIND!</c> and clears the counter.</summary>
+        /// <summary>On <see cref="IoctlCommand.RestartRead"/>, says <c>REWIND!</c> and clears the counter.</summary>
         /// <param name="command">The command libcurl passes.</param>
-        /// <returns><see cref="LibTestIoctl.Ok"/>, whatever the command.</returns>
-        public int Ioctl(int command)
+        /// <returns><see cref="IoctlResult.Ok"/>, whatever the command.</returns>
+        public IoctlResult Ioctl(IoctlCommand command)
         {
-            if (command == LibTestIoctl.RestartRead)
+            if (command == IoctlCommand.RestartRead)
             {
                 standardError.Write("REWIND!\n");
                 counter = 0;
             }
 
-            return LibTestIoctl.Ok;
+            return IoctlResult.Ok;
         }
     }
 }

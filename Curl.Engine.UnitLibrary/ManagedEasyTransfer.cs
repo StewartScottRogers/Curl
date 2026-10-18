@@ -1561,7 +1561,7 @@ internal sealed class ManagedEasyTransfer(
     private static bool IsScheme(CurlUrl url, string scheme) => string.Equals(url.Scheme, scheme, StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
-    /// The read callback's upload stream: one the seek callback rewinds when one is set, carrying the trailer
+    /// The read callback's upload stream: one the seek callback rewinds when one is set, else one the ioctl callback rewinds (BL-2607), carrying the trailer
     /// callback a chunked HTTP upload asks for its trailers (BL-2475).
     /// </summary>
     /// <param name="read">The read callback.</param>
@@ -1571,9 +1571,12 @@ internal sealed class ManagedEasyTransfer(
     /// <param name="declaredLength">The length the upload is held to (<see cref="CallbackReadStream.DeclaredLength" />), or <see langword="null" />.</param>
     /// <returns>The upload stream.</returns>
     private static CallbackReadStream CallbackUploadOf(ReadCallback read, EasyCallbackOptions callbacks, EasyPauseGate? pauseGate, WsUploadFrames? uploadFrames = null, long? declaredLength = null) =>
-        callbacks.Seek is { } seek
-            ? new SeekingCallbackReadStream(read, seek, pauseGate) { Trailer = callbacks.Trailer, UploadFrames = uploadFrames, DeclaredLength = declaredLength }
-            : new CallbackReadStream(read, pauseGate) { Trailer = callbacks.Trailer, UploadFrames = uploadFrames, DeclaredLength = declaredLength };
+        (callbacks.Seek, callbacks.Ioctl) switch
+        {
+            ({ } seek, _) => new SeekingCallbackReadStream(read, seek, pauseGate) { Trailer = callbacks.Trailer, UploadFrames = uploadFrames, DeclaredLength = declaredLength },
+            (null, { } ioctl) => new IoctlRewoundCallbackReadStream(read, ioctl, pauseGate) { Trailer = callbacks.Trailer, UploadFrames = uploadFrames, DeclaredLength = declaredLength },
+            _ => new CallbackReadStream(read, pauseGate) { Trailer = callbacks.Trailer, UploadFrames = uploadFrames, DeclaredLength = declaredLength },
+        };
 
     /// <summary>
     /// The curl tool's own settings for a transfer driven through the easy interface with no

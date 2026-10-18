@@ -17,6 +17,7 @@ public sealed class EasyCallbackOptionsTests
         Assert.IsNull(Defaults.Interleave);
         Assert.IsNull(Defaults.Trailer);
         Assert.IsNull(Defaults.Seek);
+        Assert.IsNull(Defaults.Ioctl);
     }
 
     [TestMethod]
