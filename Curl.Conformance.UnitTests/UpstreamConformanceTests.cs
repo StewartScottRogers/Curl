@@ -16,6 +16,7 @@ using Curl.Console;
 using Curl.Engine;
 using Curl.Networking;
 using Curl.Protocol.Ssh;
+using Curl.Protocol.Ws;
 using Curl.Testing;
 using Curl.Tls;
 using Libcurl.Misc.ErrorText;
@@ -420,7 +421,9 @@ public sealed class UpstreamConformanceTests
     // the epoch (ADR-0671, BL-2675); the curl tool's aws cases (439, 472, 1976, 3222, 5026, 5027) get Debug too, and
     // RunCurlAsync signs an --aws-sigv4 command at the epoch. The WebSocket libtest cases (2301 to 2304) rely on Debug for
     // CURL_ENTROPY, which pins Sec-WebSocket-Key and the frame masks: the harness reports Debug to a case naming the ws
-    // feature and setting CURL_ENTROPY, and CreateEngine gives the libtest engine the forced sequence (ADR-0678, BL-2688).
+    // feature and setting CURL_ENTROPY, and CreateEngine gives the libtest engine the forced sequence (ADR-0678, BL-2688);
+    // cases 2700 to 2723 rely on it for CURL_WS_FORCE_ZERO_MASK, which zeroes the frame masks: the harness reports Debug
+    // to a case naming ws and setting it, and CreateEngine gives the libtest engine zero masks (ADR-0694, BL-2698).
     // The FTP libtest case 753 relies on Debug for CURL_FTP_PWD_STOP, which stops the first transfer before PWD: the
     // harness reports Debug to a case setting it, and CreateEngine has the libtest engine stop its first perform there (ADR-0687, BL-2636).
     private static UpstreamCurlPlatform PlatformFor(byte[] testFile)
@@ -428,7 +431,8 @@ public sealed class UpstreamConformanceTests
         string text = Encoding.Latin1.GetString(testFile);
         bool standsInForDebug = text.Contains("\nhttpsig\n", StringComparison.Ordinal)
             || text.Contains("\naws\n", StringComparison.Ordinal)
-            || (text.Contains("\nws\n", StringComparison.Ordinal) && text.Contains("\nCURL_ENTROPY=", StringComparison.Ordinal))
+            || (text.Contains("\nws\n", StringComparison.Ordinal)
+                && (text.Contains("\nCURL_ENTROPY=", StringComparison.Ordinal) || text.Contains("\nCURL_WS_FORCE_ZERO_MASK=", StringComparison.Ordinal)))
             || (text.Contains("\nHSTS\n", StringComparison.Ordinal) && text.Contains("\nCURL_TIME=", StringComparison.Ordinal))
             || (text.Contains("\nalt-svc\n", StringComparison.Ordinal) && text.Contains("\nCURL_ALTSVC_HTTP=", StringComparison.Ordinal))
             || text.Contains(":%HTTP2TLSPORT/", StringComparison.Ordinal)
@@ -608,9 +612,16 @@ public sealed class UpstreamConformanceTests
             name => invocation.EnvironmentVariables.GetValueOrDefault(name),
             new EngineDialing(new InMemoryServerTcpDialer(invocation.Connector), new LoopbackOnlyDnsResolver(), invocation.DatagramConnector, invocation.ConnectionListener, UsesHandBuiltNtlm: true),
             signingClock: new UnixEpochClock(),
-            webSocketRandomSource: invocation.EnvironmentVariables.GetValueOrDefault("CURL_ENTROPY") is { } entropy ? new ForcedEntropyWebSocketRandomSource(entropy) : null,
+            webSocketRandomSource: WebSocketRandomSourceFor(invocation.EnvironmentVariables),
             standardInput: invocation.StandardInput,
             stopsFirstFtpTransferBeforePwd: invocation.EnvironmentVariables.ContainsKey("CURL_FTP_PWD_STOP"));
+
+    // The debug build's CURL_ENTROPY sequence (BL-2688), else its zero masks under CURL_WS_FORCE_ZERO_MASK (BL-2698),
+    // else null, for the engine's system random source.
+    private static IWebSocketRandomSource? WebSocketRandomSourceFor(IReadOnlyDictionary<string, string> environment) =>
+        environment.GetValueOrDefault("CURL_ENTROPY") is { } entropy ? new ForcedEntropyWebSocketRandomSource(entropy)
+        : environment.ContainsKey("CURL_WS_FORCE_ZERO_MASK") ? new ZeroMaskWebSocketRandomSource()
+        : null;
 
     // The ported libtest programs the ratchet runs a <tool> case's program from, over CreateEngine.
     private static readonly UpstreamLibTests LibTests = new(LibTestPrograms.Ported, CreateEngine);
