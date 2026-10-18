@@ -39,3 +39,4 @@ Found by BL-2527 running test503 through the ported `lib503`: `<verify><proxy>` 
 - 2026-10-17: Doing -> Backlog. touches Curl.Conformance.UnitTests/PassingUpstreamCases.txt, which BL-2528 in Doing also touches
 - 2026-10-17: Backlog -> Doing. Criteria at claim: 6c7087d7 904b57ec 3d836d5e.
 - 2026-10-17: Doing -> Backlog. Proxy-Authorization fix done (in stash); test503 still lacks the proxy log's [DISCONNECT], filed as BL-2602
+- 2026-10-17: Backlog -> Doing. Criteria at claim: 6c7087d7 904b57ec 3d836d5e.
