@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.LibTest.UnitLibrary, Curl.Conformance.LibTest.UnitTests]
 requirement: none
 created: 2026-10-18
-completed:
+completed: 2026-10-18
 ---
 # BL-2771 — Fix AF-0260: LibTestContext's null-argument check >= 0 can become > 0 with no test failing, accepting a null first argument
 
@@ -54,3 +54,4 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 - 2026-10-18: Created.
 - 2026-10-18: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-18: Doing -> Done. New test kills the >= to > 0 mutant; build and fast tests green
