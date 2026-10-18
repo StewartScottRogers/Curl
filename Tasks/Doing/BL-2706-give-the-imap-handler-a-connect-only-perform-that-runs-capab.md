@@ -33,3 +33,4 @@ Found by BL-2623 (upstream case 660, lib597 on `imap://%HOSTIP:%IMAPPORT/660`): 
 ## Log
 
 - 2026-10-17: Created.
+- 2026-10-17: Backlog -> Doing. Criteria at claim: cab46f6c 0ba49ab3 40ad031d 9a161677 3d836d5e.
