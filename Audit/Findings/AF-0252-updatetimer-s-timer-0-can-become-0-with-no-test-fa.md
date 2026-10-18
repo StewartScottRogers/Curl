@@ -3,8 +3,8 @@ id: AF-0252
 title: UpdateTimer's timer >= 0 can become > 0 with no test failing, so a fired timer's 0 ms re-report to CURLMOPT_TIMERFUNCTION is dropped
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Engine.UnitLibrary/ManagedMultiTransfer.cs:UpdateTimer-ge:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/ManagedMultiTransfer.cs:760:>=
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Engin
 ## Log
 
 - 2026-10-18: filed proposed.
+- 2026-10-18: proposed -> accepted.
