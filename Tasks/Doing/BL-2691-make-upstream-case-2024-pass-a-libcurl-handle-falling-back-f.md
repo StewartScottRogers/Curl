@@ -31,3 +31,4 @@ Found by BL-2549, which ported lib2023 (libauthretry: request 100 with the wrong
 ## Log
 
 - 2026-10-17: Created.
+- 2026-10-18: Backlog -> Doing. Criteria at claim: 7dd24967 fd6bd9d4 3d836d5e.
