@@ -8,7 +8,7 @@ namespace Curl.Conformance;
 /// <remarks>
 /// <para>
 /// A feature is listed when Curl has it, by the name upstream's <c>runtests.pl</c> gives it: the
-/// protocols the harness can serve (<c>ws</c>, <c>wss</c> and <c>ipfs</c> among them, and <c>sftp</c>
+/// protocols the harness can serve (<c>ftp</c>, <c>ws</c>, <c>wss</c> and <c>ipfs</c> among them, and <c>sftp</c>
 /// and <c>scp</c>, which Curl serves and <c>UpstreamSshServer</c> emulates); every
 /// feature on Curl's <c>curl -V</c> <c>Features:</c> line, except that <c>ECH</c> is listed because
 /// Curl still serves <c>--ech</c>, though the line does not name it (ADR-0520), which keeps the cases
@@ -34,7 +34,7 @@ namespace Curl.Conformance;
 /// libcurl's build and API features, which a command-line tool does not have (<c>Debug</c>,
 /// <c>TrackMemory</c>, <c>unittest</c>, <c>wakeup</c>,
 /// <c>shuffle-dns</c>, <c>override-dns</c>, <c>threadsafe</c>, <c>getrlimit</c>,
-/// <c>--libcurl</c>); <c>ftp</c> and the other protocols the harness has no server for; features
+/// <c>--libcurl</c>); the other protocols the harness has no server for; features
 /// absent from Curl's <c>curl -V</c> (<c>SSPI</c>, <c>Unicode</c>, <c>MultiSSL</c>,
 /// <c>ssl-sessions</c>, <c>threaded-resolver</c>); and <c>codeset-utf8</c>, which depends on the
 /// locale of the machine running the tests.
@@ -44,7 +44,7 @@ public sealed class UpstreamCurlPlatform
 {
     private static readonly string[] CommonFeatures =
     [
-        "dict", "file", "gopher", "gophers", "http", "https", "ipfs", "mqtt", "mqtts", "scp", "sftp", "telnet", "tftp", "ws", "wss",
+        "dict", "file", "ftp", "gopher", "gophers", "http", "https", "ipfs", "mqtt", "mqtts", "scp", "sftp", "telnet", "tftp", "ws", "wss",
         "alt-svc", "AsynchDNS", "brotli", "ECH", "GSS-API", "HSTS", "HTTPS-proxy",
         "HTTPSRR", "IDN", "IPv6", "Kerberos", "Largefile", "libz", "NTLM", "PSL", "SPNEGO", "SSL",
         "UnixSockets", "zstd",

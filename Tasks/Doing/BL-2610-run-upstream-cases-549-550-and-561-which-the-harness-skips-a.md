@@ -28,6 +28,8 @@ Found by BL-2530 (lib549 port: FTP URL through an HTTP proxy with `CURLOPT_PROXY
 
 ## Notes
 
+Cause: `UpstreamCurlPlatform` left `ftp` off the feature list, though Curl serves FTP and the harness has an FTP stand-in. Listed it. Newly passing and now on the ratchet: 79, 561, 1059, 1092, 1098, 1106, 1802. Filed: BL-2718 (549, 550: no `;type=` on the proxied FTP URL), BL-2719 (208, 299, 1077). 445 and 753 still skip for imap and Debug.
+
 ## Log
 
 - 2026-10-17: Created.
