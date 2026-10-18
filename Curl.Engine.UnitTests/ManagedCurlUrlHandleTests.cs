@@ -240,7 +240,7 @@ public sealed partial class ManagedCurlUrlHandleTests
     [DataRow("..://example.net", CurlUrlFlags.None)]
     [DataRow("-ht://example.net", CurlUrlFlags.None)]
     [DataRow("+ftp://example.net", CurlUrlFlags.None)]
-    [DataRow("htt ps://user:password@example.net/get?this=and-what", CurlUrlFlags.None)]
+    [DataRow("htt ps://user:password@example.net/get?this=and-what", CurlUrlFlags.NonSupportScheme | CurlUrlFlags.AllowSpace)]
     [DataRow("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA://hostname/path", CurlUrlFlags.None)]
     [DataRow("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA://hostname/path", CurlUrlFlags.NonSupportScheme)]
     public void Set_UrlWhoseSchemeIsMalformedOrTooLong_ReturnsBadScheme(string text, CurlUrlFlags flags)

@@ -635,4 +635,31 @@ public sealed partial class ManagedCurlUrlHandleTests
 
         Assert.AreEqual(CurlUrlCode.NoHost, url.Set(CurlUrlPart.Url, "https://::1/", CurlUrlFlags.None));
     }
+
+    [TestMethod]
+    [DataRow("htt\u0002://host/file", CurlUrlFlags.NonSupportScheme)]
+    [DataRow("http\u001F://host/path/", CurlUrlFlags.UrlEncode)]
+    [DataRow("http://host/pa\u007Fth", CurlUrlFlags.None)]
+    [DataRow(" http://host/file", CurlUrlFlags.None)]
+    [DataRow(" ", CurlUrlFlags.None)]
+    [DataRow("http://host/a b", CurlUrlFlags.None)]
+    public void SetUrl_ControlByteAnywhere_IsMalformedInputBeforeTheScheme(string text, CurlUrlFlags flags)
+    {
+        using ManagedCurlUrlHandle url = new();
+
+        Assert.AreEqual(CurlUrlCode.MalformedInput, url.Set(CurlUrlPart.Url, text, flags));
+    }
+
+    [TestMethod]
+    public void SetUrl_SpaceInTheSchemeUnderAllowSpace_IsStillBadScheme()
+    {
+        using ManagedCurlUrlHandle url = new();
+
+        Assert.AreEqual(
+            CurlUrlCode.BadScheme,
+            url.Set(
+                CurlUrlPart.Url,
+                "htt ps://user:password@example.net/get?this=and-what",
+                CurlUrlFlags.NonSupportScheme | CurlUrlFlags.AllowSpace));
+    }
 }

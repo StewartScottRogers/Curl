@@ -242,18 +242,52 @@ internal sealed class ManagedCurlUrlHandle : ICurlUrlHandle
     /// </summary>
     private CurlUrlCode SetUrl(string value, CurlUrlFlags flags)
     {
-        if (UrlRelativeReference.IsAbsolute(value, flags))
+        if (HoldsControlByte(value))
         {
-            return IsAcceptedScheme(value, flags) ? Parse(value, flags) : CurlUrlCode.UnsupportedScheme;
+            return CurlUrlCode.MalformedInput;
         }
 
+        if (UrlRelativeReference.IsAbsolute(value, flags))
+        {
+            return HoldsDisallowedSpace(value, flags) ? CurlUrlCode.MalformedInput : ParseAbsolute(value, flags);
+        }
+
+        return SetRelativeUrl(value, flags);
+    }
+
+    /// <summary>
+    /// A whole URL that is not absolute: resolved against the URL held when the handle holds one, else
+    /// <see cref="CurlUrlCode.MalformedInput" /> when blank or holding a space <c>junkscan</c> rejects,
+    /// else parsed by <see cref="ParseWithoutScheme" />.
+    /// </summary>
+    private CurlUrlCode SetRelativeUrl(string value, CurlUrlFlags flags)
+    {
         if (Get(CurlUrlPart.Url, HeldUrlFlags(value, flags), out string? current) == CurlUrlCode.Ok)
         {
             return Parse(UrlRelativeReference.Resolve(current!, value), flags);
         }
 
-        return value.Length == 0 ? CurlUrlCode.MalformedInput : ParseWithoutScheme(value, flags);
+        return value.Length == 0 || HoldsDisallowedSpace(value, flags) ? CurlUrlCode.MalformedInput : ParseWithoutScheme(value, flags);
     }
+
+    private CurlUrlCode ParseAbsolute(string value, CurlUrlFlags flags) =>
+        IsAcceptedScheme(value, flags) ? Parse(value, flags) : CurlUrlCode.UnsupportedScheme;
+
+    /// <summary>
+    /// Whether <paramref name="value" /> holds a control byte (below 0x20, or 0x7f) anywhere, which
+    /// curl 8.22.0's <c>junkscan</c> rejects as <see cref="CurlUrlCode.MalformedInput" /> before
+    /// <c>parseurl</c> reads the scheme, whatever the flags.
+    /// </summary>
+    private static bool HoldsControlByte(string value) =>
+        value.AsSpan().IndexOfAnyInRange('\u0000', '\u001F') >= 0 || value.Contains('\u007F', StringComparison.Ordinal);
+
+    /// <summary>
+    /// Whether <paramref name="value" /> holds a space without <c>CURLU_ALLOW_SPACE</c>, which
+    /// <c>junkscan</c> rejects too; a relative reference resolved against the URL held is exempt, as
+    /// upstream's <c>redirect_url</c> encodes its spaces as <c>%20</c> before the scan.
+    /// </summary>
+    private static bool HoldsDisallowedSpace(string value, CurlUrlFlags flags) =>
+        !flags.HasFlag(CurlUrlFlags.AllowSpace) && value.Contains(' ', StringComparison.Ordinal);
 
     /// <summary>
     /// The flags the held URL is read with to resolve <paramref name="relative" />: the set's own without
