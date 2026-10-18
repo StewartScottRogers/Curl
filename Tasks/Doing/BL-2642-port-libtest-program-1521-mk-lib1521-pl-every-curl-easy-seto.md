@@ -38,3 +38,4 @@ Split out of BL-2538 (batch 12 of the libtest ports, phase 5 of `Documentation/P
 - 2026-10-17: Created.
 - 2026-10-18: Backlog -> Doing. Criteria at claim: 7df904cc 527e7a2f e39e1cd8 4272a6b9.
 - 2026-10-18: Doing -> Backlog. Waits on BL-2727: Libcurl answers CURLOPT_PROTOCOLS_STR, CURLOPT_REDIR_PROTOCOLS_STR, CURLOPT_SSH_HOST_PUBLIC_KEY_MD5 and CURLINFO_SIZE_DELIVERED wrongly, so case 1521 cannot print only ok
+- 2026-10-18: Backlog -> Doing. Criteria at claim: 7df904cc 527e7a2f e39e1cd8 4272a6b9.
