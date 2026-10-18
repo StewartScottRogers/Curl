@@ -3,8 +3,8 @@ id: AF-0248
 title: --path-as-is has no option-table row: curl refuses it as unknown, and 13 Curl.Cli and 1 Curl.Engine unit tests fail unmutated
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Cli.UnitLibrary/CommandLineOptionTable.cs:path-as-is:failing-tests
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ dotnet test Curl.Cli.UnitTests --filter "TestCategory!=Integration"
 ## Log
 
 - 2026-10-18: filed proposed.
+- 2026-10-18: proposed -> accepted.
