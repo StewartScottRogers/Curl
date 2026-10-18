@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
+touches: [Curl.Conformance.UnitTests/PassingUpstreamCases.txt, Curl.Networking.UnitLibrary, Curl.Networking.UnitTests, Curl.Engine.UnitLibrary, Curl.Engine.UnitTests]
 requirement: none
 created: 2026-10-18
 completed:
@@ -48,7 +48,26 @@ platform-neutral before holding it (Schannel on Windows, OpenSSL elsewhere; revo
 
 ## Notes
 
+- 2026-10-18 (lane 2, diagnosis, no code changed): reproduced with `CURL_UPSTREAM_CASE=678`. The file is
+  read: the kept `stderr678` is `URL: https://localhost:8989/678` and `Test ended with result 60`
+  (`CURLE_PEER_FAILED_VERIFICATION`). Cause: `CURLOPT_CAINFO_BLOB` stops at `Curl.Api.UnitLibrary`'s
+  `TlsPeerOptions.CertificateAuthorityBlob` (set by `Libcurl/Options/Tls/TlsPeerOptionSetters.cs:87`) and
+  nothing reads it. `Curl.Engine.UnitLibrary/TlsClientOptionsMapping.cs` (`Of`, `ProxyOf`, `DohOf`) maps
+  only `CertificateAuthorityFile`, and `Curl.Networking.UnitLibrary/TlsClientOptions.cs` has no blob member,
+  so `ServerCertificateVerification` (`CaCertificateFile is null` at lines 79/149/232/275, `ReadCaCertificateFile`
+  at 320) verifies against the system store and rejects the test CA.
+- Fix plan: add `CaCertificateBlob` (`ReadOnlyMemory<byte>?`) to `TlsClientOptions`; in
+  `ServerCertificateVerification` treat a blob like a CA file (custom trust store from the PEM/DER bytes,
+  winning over the file, as libcurl's blob does), set `TlsTrustEvent.HasCaCertificateBlob` so `-v` prints
+  `CA Blob from configuration` (OpenSSL build; `OpenSslTrustText` already handles it); map
+  `origin.CertificateAuthorityBlob` / `proxy.CertificateAuthorityBlob` in `TlsClientOptionsMapping.Of`,
+  `ProxyOf` and `DohOf`. Check the hand-built provider (`HandBuiltTlsProvider`) and `QuicDialer` (line 413)
+  read the same member. Focused unit tests in `Curl.Networking.UnitTests` and `Curl.Engine.UnitTests`.
+- Requeued because those projects overlap live tasks: `Curl.Networking.*` with BL-2730 and `Curl.Engine.*`
+  with BL-2735 (added to `touches`, rule 3).
+
 ## Log
 
 - 2026-10-18: Created.
 - 2026-10-18: Backlog -> Doing. Criteria at claim: 262ba952 c59fcab3 3d836d5e.
+- 2026-10-18: Doing -> Backlog. Needs Curl.Networking.UnitLibrary/UnitTests (held by BL-2730) and Curl.Engine.UnitLibrary/UnitTests (held by BL-2735): CURLOPT_CAINFO_BLOB never reaches TlsClientOptions, so verification fails with 60
