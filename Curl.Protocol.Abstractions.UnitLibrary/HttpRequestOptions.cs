@@ -137,6 +137,15 @@ public sealed record HttpRequestOptions
     public string? KeptDigestAuthorization { get; init; }
 
     /// <summary>
+    /// Gets the <c>WWW-Authenticate</c> values of the 401 that ended the easy handle's previous
+    /// transfer, or empty for none. When Digest is the one scheme <see cref="AuthSchemes" />
+    /// allows and there are credentials, the first request answers them before any new
+    /// challenge, as curl 8.22.0 keeps the Digest nonce on the easy handle across transfers, even
+    /// one whose <c>CURLOPT_HTTPAUTH</c> did not allow Digest (upstream test2024, BL-2747, ADR-0692).
+    /// </summary>
+    public IReadOnlyList<string> KeptDigestChallenges { get; init; } = [];
+
+    /// <summary>
     /// Gets a value indicating whether a response of an earlier hop of the transfer was
     /// HTTP/1.0, which sends this request as HTTP/1.0, as for <c>-0</c>, since curl 8.21.0 sends
     /// every later request of a transfer as HTTP/1.0 once a response in it was: a <c>-T -</c>

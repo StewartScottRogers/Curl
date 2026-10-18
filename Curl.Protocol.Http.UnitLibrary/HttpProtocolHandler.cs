@@ -292,7 +292,8 @@ public sealed class HttpProtocolHandler(
         HttpInfoLineRecorder proxyAuthorizationLines = new();
         string? proxyAuthorization = await CreateFirstProxyAuthorizationAsync(proxyAuthRequest, proxyAuthorizationLines, context.CancellationToken).ConfigureAwait(false);
         (string? authorization, HttpTransferException? authorizationFailure) = await CreateFirstAuthorizationAsync(authRequest with { Events = authorizationLines }, context.CancellationToken).ConfigureAwait(false);
-        authorization ??= RepeatKeptDigestAuthorization(options, authRequest);
+        authorization ??= RepeatKeptDigestAuthorization(options, authRequest)
+            ?? await AnswerKeptDigestChallengesAsync(options, authRequest, context.CancellationToken).ConfigureAwait(false);
         bool probes = SendsFirstProbe(framing, authRequest, authorization, proxyAuthRequest, proxyAuthorization);
         HttpRequestPlan plan = new(context, options, probes ? framing.AsAuthProbe() : framing, authRequest, authorization)
         {
@@ -426,6 +427,21 @@ public sealed class HttpProtocolHandler(
         && request.Credential is not null
         && (request.AllowedSchemes & HttpAuthSchemes.Digest) != 0
             ? Authenticator.RepeatAuthorization(request, kept)
+            : null;
+
+    /// <summary>
+    /// Answers the challenges a 401 of the handle's previous transfer offered
+    /// (<see cref="HttpRequestOptions.KeptDigestChallenges" />) on this transfer's first request,
+    /// as curl 8.22.0 builds its Digest answer from the nonce it kept on the easy handle when
+    /// Digest is the one scheme <c>CURLOPT_HTTPAUTH</c> now allows (upstream test2024, BL-2747,
+    /// ADR-0692); <see langword="null" /> when none was kept, there is no credential or Digest is
+    /// not the one scheme allowed.
+    /// </summary>
+    private async ValueTask<string?> AnswerKeptDigestChallengesAsync(HttpRequestOptions options, HttpAuthRequest request, CancellationToken cancellationToken) =>
+        options.KeptDigestChallenges.Count > 0
+        && request.Credential is not null
+        && request.AllowedSchemes == HttpAuthSchemes.Digest
+            ? await Authenticator.CreateAuthorizationAsync(request, [.. options.KeptDigestChallenges], cancellationToken).ConfigureAwait(false)
             : null;
 
     /// <summary>
