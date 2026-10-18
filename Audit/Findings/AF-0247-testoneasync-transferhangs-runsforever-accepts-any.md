@@ -3,8 +3,8 @@ id: AF-0247
 title: TestOneAsync_TransferHangs_RunsForever accepts any non-Ok result instead of LibTestErrorCodes.RunsForever
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Conformance.LibTest.UnitTests/Lib530Tests.cs:TestOneAsync_TransferHangs_RunsForever:name-lies
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Curl.Conformance.LibTest.UnitTests/Lib530Tests.cs -Pattern '
 ## Log
 
 - 2026-10-18: filed proposed.
+- 2026-10-18: proposed -> accepted.
