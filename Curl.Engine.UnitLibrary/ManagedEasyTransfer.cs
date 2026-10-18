@@ -394,7 +394,8 @@ internal sealed class ManagedEasyTransfer(
     }
 
     /// <summary>
-    /// Runs one transfer from <see cref="Options" /> over the engine's caches, or, while
+    /// Runs one transfer from <see cref="Options" />, the connections it opens the handle's own
+    /// (<see cref="OwnTheConnectionsOpened" />), over the engine's caches, or, while
     /// <see cref="Api.Options.Behaviour.EasyBehaviourOptions.Share" /> names a <see cref="ManagedShareHandle" />,
     /// attached to it and over the caches it shares (ADR-0606); a share handle of another engine kind shares nothing.
     /// </summary>
@@ -402,6 +403,7 @@ internal sealed class ManagedEasyTransfer(
     /// <returns>The transfer's code.</returns>
     private async Task<CurlCode> PerformFromOptionsAsync(CancellationToken cancellationToken)
     {
+        OwnTheConnectionsOpened();
         if (Options.Behaviour.Share is not ManagedShareHandle share)
         {
             return await PerformFromOptionsOverCachesAsync(cancellationToken).ConfigureAwait(false);
@@ -1216,6 +1218,18 @@ internal sealed class ManagedEasyTransfer(
             connectionId => Info = Info with { ConnectionId = connectionId });
 
     /// <summary>
+    /// Makes the connections the running perform opens in the engine's cache the handle's own, which
+    /// <see cref="DisposeAsync" /> closes, when the perform runs outside any multi handle: libcurl's
+    /// <c>curl_easy_perform</c> keeps them in the handle's own connection cache, which <c>curl_easy_cleanup</c> closes,
+    /// so an FTP control connection sends <c>QUIT</c> then (upstream test661, BL-2629). A multi handle's connections are
+    /// its own, and a share handle sharing connections keeps them in its own cache. The owner is set in the caller's
+    /// asynchronous flow only (<see cref="Curl.Networking.ConnectionCache.OpeningOwner" />). The curl tool's transfers (<see cref="ToolSettings" />
+    /// set) own none, as its run's connections outlive each transfer's handle.
+    /// </summary>
+    private void OwnTheConnectionsOpened() =>
+        shared.Connections.OpeningOwner = ToolSettings is null && !shared.MultiOwners.ContainsKey(this) ? this : null;
+
+    /// <summary>
     /// Wraps <paramref name="events" /> in the decorators the curl tool's runner adds under the same
     /// components (<c>CurlCommandRunner.WithTraceLineEvents</c>), in its order: under <c>timer</c> the response
     /// wait's <c>[TIMER]</c> lines through <see cref="ResponseWaitTimerTraceEvents" />, under <c>read</c>
@@ -1456,9 +1470,10 @@ internal sealed class ManagedEasyTransfer(
     /// <summary>
     /// <c>curl_easy_cleanup</c>: hands the HSTS cache to <c>CURLOPT_HSTSWRITEFUNCTION</c> (<see cref="SaveHstsToCallback" />),
     /// takes the attached share handle's cookie lock for libcurl's cookie flush and detaches from it, then closes the
-    /// connection a connect-only perform left open or upgraded, if any.
+    /// connection a connect-only perform left open or upgraded, if any, and the handle's own idle pooled connections
+    /// (<see cref="OwnTheConnectionsOpened" />), as libcurl closes the handle's connection cache, FTP's sending <c>QUIT</c>.
     /// </summary>
-    /// <returns>A task that completes once it is closed.</returns>
+    /// <returns>A task that completes once they are closed.</returns>
     public async ValueTask DisposeAsync()
     {
         SaveHstsToCallback();
@@ -1466,6 +1481,7 @@ internal sealed class ManagedEasyTransfer(
         optionShare = ManagedShareHandle.Reattach(optionShare, named: null, this);
         await (connectOnly?.CloseAsync() ?? ValueTask.CompletedTask).ConfigureAwait(false);
         await (webSocket?.CloseAsync() ?? ValueTask.CompletedTask).ConfigureAwait(false);
+        await shared.Connections.CloseIdleOwnedByAsync(this).ConfigureAwait(false);
     }
 
     /// <summary>

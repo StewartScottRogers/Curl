@@ -480,3 +480,7 @@ Under `EasyTransferOptions.Upload`, or a read-callback post, with `EasyCallbackO
 ## SSLKEYLOGFILE from the run's environment (BL-2716)
 
 `TlsClientOptionsMapping.Of` and `ProxyOf` take an optional `readEnvironmentVariable` for `SSLKEYLOGFILE` (`KeyLogFileFromEnvironment`; `null` reads the process's environment). `Curl.Console`'s dialing runner passes the run's own reader, so the conformance harness's in-process run of upstream test2090 sees its case's `<setenv>` value; `DohOf` and the managed engine still read the process's environment.
+
+## curl_easy_cleanup closes the handle's own connections (BL-2629)
+
+A perform from the options outside any multi handle and with no `ToolSettings` sets the handle as the engine cache's `ConnectionCache.OpeningOwner` (`ManagedEasyTransfer.OwnTheConnectionsOpened`), so each connection it opens there is the handle's; `DisposeAsync` closes the handle's idle ones (`ConnectionCache.CloseIdleOwnedByAsync`), an FTP control connection with `QUIT`, as libcurl's `curl_easy_cleanup` closes the handle's own pool (upstream test661, ADR-0684). Live handles still reuse each other's idle connections. Its tests are `ManagedEasyTransferTests.Cleanup.cs`.
