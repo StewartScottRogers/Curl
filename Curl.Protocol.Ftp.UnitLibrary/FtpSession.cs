@@ -1248,9 +1248,13 @@ internal sealed class FtpSession(
     /// <see cref="CheckModificationTimeAsync" /> has sent <c>MDTM</c> for a file: a directory
     /// URL sends nothing more; a file sends <c>TYPE I</c>, <c>SIZE</c> and <c>REST 0</c>,
     /// writing a <c>Content-Length</c> and <c>Accept-ranges</c> line for each that succeeded.
+    /// The path's directory part is remembered as the kept connection's <c>prevpath</c>, as curl
+    /// 8.22.0's <c>ftp_done</c> remembers it after every transfer, so a later transfer there sends
+    /// no <c>CWD</c> (upstream test661, BL-2629).
     /// </summary>
     private async ValueTask<TransferResult> ReportHeadAsync(string fileName)
     {
+        rememberedPath = directoryToRemember;
         if (fileName.Length == 0)
         {
             return await SendQuotesAsync(quotes.BeforeTransfer, FtpQuoteStage.BeforeTransfer).ConfigureAwait(false)
