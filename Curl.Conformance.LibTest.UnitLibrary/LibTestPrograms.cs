@@ -149,6 +149,7 @@ public sealed class LibTestPrograms
         new Lib1517(TimeProvider.System),
         new Lib1518(),
         new Lib1520(),
+        new Lib1521(),
         new Lib1522(TimeProvider.System),
         new Lib1523(),
         LibProxyTunnelUpload.Unified,
