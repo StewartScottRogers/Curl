@@ -22,6 +22,20 @@ public sealed class ManagedCurlEngineTests
 
         Assert.AreEqual(new EasyOptions(), easy.Options);
         Assert.IsInstanceOfType<ManagedEasyTransfer>(easy);
+        Assert.AreSame(EasyTransferHost.Library, ((ManagedEasyTransfer)easy).Host);
+    }
+
+    [TestMethod]
+    public async Task CreateEasy_EngineGivenAStandardInput_GivesAHandleReadingIt()
+    {
+        using MemoryStream standardInput = new();
+        await using ManagedCurlEngine engine = new(TimeProvider.System, null, standardInput: standardInput);
+
+        await using IEasyTransfer easy = engine.CreateEasy();
+
+        EasyTransferHost host = ((ManagedEasyTransfer)easy).Host;
+        Assert.AreSame(standardInput, host.StandardInput);
+        Assert.AreSame(EasyTransferHost.Library.FileSystem, host.FileSystem);
     }
 
     [TestMethod]

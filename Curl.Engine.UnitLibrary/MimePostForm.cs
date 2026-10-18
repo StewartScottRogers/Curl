@@ -24,6 +24,7 @@ internal static class MimePostForm
     /// Receives the stream of each <c>curl_mime_data_cb</c> part as the body is built
     /// (<see cref="MultipartFormPartMapping.FromMimeBody" />); <see langword="null" /> keeps none.
     /// </param>
+    /// <param name="standardInput">What a <c>CURLOPT_HTTPPOST</c> file part named <c>-</c> reads (<see cref="BodyOf" />).</param>
     /// <param name="cancellationToken">Cancels the file opens.</param>
     /// <returns>
     /// The body or its failure, or <see langword="null" /> when <see cref="BodyOf" /> gives none; an empty
@@ -36,9 +37,10 @@ internal static class MimePostForm
         string scheme,
         ReadCallback? read,
         ICollection<CallbackReadStream>? callbackReads,
+        Stream standardInput,
         CancellationToken cancellationToken)
     {
-        if (BodyOf(http, scheme, read) is not { } body)
+        if (BodyOf(http, scheme, read, standardInput) is not { } body)
         {
             return null;
         }
@@ -58,14 +60,42 @@ internal static class MimePostForm
     /// <summary>
     /// The body to send: <see cref="EasyHttpOptions.MimePost" />, else, to a URL that is not a mail one (curl 8.22.0
     /// sends <c>CURLOPT_HTTPPOST</c> over HTTP only), <see cref="EasyHttpOptions.HttpPost" /> with each
-    /// <c>CURLFORM_STREAM</c> part read through <paramref name="read" /> (<see cref="FormStreamData.WithReadCallback" />).
+    /// <c>CURLFORM_STREAM</c> part read through <paramref name="read" /> (<see cref="FormStreamData.WithReadCallback" />)
+    /// and each file part named <c>-</c> read from <paramref name="standardInput" /> at an unknown size, as curl 8.22.0's
+    /// <c>Curl_getformdata</c> hands <c>stdin</c> to <c>curl_mime_data_cb</c> with <c>fread</c> and <c>fseeko</c>, so the
+    /// body is sent chunked (upstream test650, BL-2625).
     /// </summary>
     /// <param name="http">The handle's HTTP options.</param>
     /// <param name="scheme">The transfer URL's scheme.</param>
     /// <param name="read">The handle's <c>CURLOPT_READFUNCTION</c>, or <see langword="null" /> when unset.</param>
+    /// <param name="standardInput">What a file part named <c>-</c> reads; <see langword="null" /> leaves such a part a file.</param>
     /// <returns>The body, or <see langword="null" /> for none.</returns>
-    internal static EasyMimeBody? BodyOf(EasyHttpOptions http, string scheme, ReadCallback? read) =>
-        http.MimePost ?? (http.HttpPost is { } form && !MailRequestOptionsMapping.SendsFormAsMimeMessage(scheme) ? FormStreamData.WithReadCallback(form, read) : null);
+    internal static EasyMimeBody? BodyOf(EasyHttpOptions http, string scheme, ReadCallback? read, Stream? standardInput = null) =>
+        http.MimePost ?? (http.HttpPost is { } form && !MailRequestOptionsMapping.SendsFormAsMimeMessage(scheme) ? FormStreamData.WithReadCallback(WithStandardInput(form, standardInput), read) : null);
+
+    /// <summary><paramref name="form" /> with each part, or file of a field's several files, named <c>-</c> read from <paramref name="standardInput" />.</summary>
+    private static EasyMimeBody WithStandardInput(EasyMimeBody form, Stream? standardInput) =>
+        standardInput is null ? form : new() { Parts = [.. form.Parts.Select(part => WithStandardInput(part, standardInput))] };
+
+    private static EasyMimePart WithStandardInput(EasyMimePart part, Stream standardInput) =>
+        part switch
+        {
+            { Data: EasyMimeStandardInput } => part with { Data = new EasyMimeCallback(-1, buffer => standardInput.Read(buffer), (offset, origin) => Seek(standardInput, offset, origin)) },
+            { SubParts: { } files } => part with { SubParts = WithStandardInput(files, standardInput) },
+            _ => part,
+        };
+
+    /// <summary><c>fseeko</c> on standard input: <see cref="SeekResult.CantSeek" /> when it cannot seek.</summary>
+    private static SeekResult Seek(Stream standardInput, long offset, SeekOrigin origin)
+    {
+        if (!standardInput.CanSeek)
+        {
+            return SeekResult.CantSeek;
+        }
+
+        standardInput.Seek(offset, origin);
+        return SeekResult.Ok;
+    }
 
     /// <summary>
     /// The transfer's inputs carrying <paramref name="body" />: as the upload of a mail URL, as the runner hands a

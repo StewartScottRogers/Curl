@@ -30,6 +30,7 @@ namespace Curl.Engine;
 public sealed class ManagedCurlEngine : ICurlEngine
 {
     private readonly ManagedEngineSharedState shared;
+    private readonly EasyTransferHost handleHost;
     private readonly Func<EasyOptions, ManagedEngineSharedState, ICookieStore?, IHttp2PushSink?, ProtocolDispatcher> createDispatcher;
 
     /// <summary>Creates the engine on the system clock and the real network, with no easy error text.</summary>
@@ -70,6 +71,12 @@ public sealed class ManagedCurlEngine : ICurlEngine
     /// Where every handle's WebSocket key and frame masks come from: the conformance harness's stand-in for the debug
     /// build's <c>CURL_ENTROPY</c> (BL-2688, ADR-0678); <see langword="null" /> for <see cref="SystemWebSocketRandomSource" />.
     /// </param>
+    /// <param name="standardInput">
+    /// The standard input every handle's <see cref="EasyTransferHost.StandardInput" /> reads, as libcurl reads the process's
+    /// <c>stdin</c> for a <c>curl_formadd</c> file named <c>-</c> and a cookie file named <c>-</c>: the conformance harness's
+    /// case <c>&lt;stdin&gt;</c> (upstream test650, BL-2625); <see langword="null" /> for <see cref="EasyTransferHost.Library" />'s
+    /// empty one.
+    /// </param>
     internal ManagedCurlEngine(
         TimeProvider timeProvider,
         Func<EasyOptions, ManagedEngineSharedState, ICookieStore?, ProtocolDispatcher>? createDispatcher,
@@ -77,9 +84,11 @@ public sealed class ManagedCurlEngine : ICurlEngine
         Func<string, string?>? readEnvironmentVariable = null,
         EngineDialing? dialing = null,
         TimeProvider? signingClock = null,
-        IWebSocketRandomSource? webSocketRandomSource = null)
+        IWebSocketRandomSource? webSocketRandomSource = null,
+        Stream? standardInput = null)
     {
         shared = new ManagedEngineSharedState(timeProvider, easyErrorText ?? (_ => string.Empty), readEnvironmentVariable, dialing, signingClock, webSocketRandomSource);
+        handleHost = standardInput is null ? EasyTransferHost.Library : EasyTransferHost.Library with { StandardInput = standardInput };
         this.createDispatcher = createDispatcher is null ? CreateDispatcher : (options, state, cookies, _) => createDispatcher(options, state, cookies);
     }
 
@@ -91,7 +100,7 @@ public sealed class ManagedCurlEngine : ICurlEngine
     public CurlVersionInfo VersionInfo { get; } = ManagedCurlVersion.For(OperatingSystem.IsWindows(), OperatingSystem.IsMacOS());
 
     /// <inheritdoc />
-    public IEasyTransfer CreateEasy() => new ManagedEasyTransfer(createDispatcher, shared);
+    public IEasyTransfer CreateEasy() => new ManagedEasyTransfer(createDispatcher, shared) { Host = handleHost };
 
     /// <summary>
     /// <c>curl_multi_init</c>: a <see cref="ManagedMultiTransfer" /> whose transfers run over the
