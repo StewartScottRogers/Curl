@@ -30,3 +30,4 @@ Found by BL-2697. Run with the Unix platform's features (http/2, h2c; the harnes
 ## Log
 
 - 2026-10-18: Created.
+- 2026-10-18: Backlog -> Doing. Criteria at claim: cb84e87e 3d836d5e.
