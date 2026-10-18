@@ -21,6 +21,9 @@ internal static class WsInfoLines
     /// <summary>The second of the two lines written once a <c>101</c> head has been read.</summary>
     internal const string SwitchedToWebSocket = "[WS] Received 101, switch to WebSocket";
 
+    /// <summary>The line curl 8.22.0 writes instead of <see cref="UploadSent" /> when an empty upload sent no frame (BL-2683).</summary>
+    internal const string UploadedNothing = "We are completely uploaded and fine";
+
     /// <summary>
     /// Formats the line for the upload frame sent after the upgrade.
     /// </summary>

@@ -101,13 +101,72 @@ public sealed class WsProtocolHandlerFramedUploadTests
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_FrameSourceWithNoFrames_SendsTheWholeUploadAsOneFrame()
+    public async Task ExecuteAsync_FrameSourceWithNoFrames_FillsEachReadBeforeFramingIt()
     {
         ScriptedFrameSourceStream upload = new(null, ScriptedFrameSourceStream.Gives("ab"), ScriptedFrameSourceStream.Gives("c"));
 
         (_, byte[] afterRequest) = await RunAsync(upload);
 
         CollectionAssert.AreEqual(Frame(WsOpcode.Binary, "abc"), afterRequest);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ToolUploadOf200000Bytes_SendsCurlsFramesOf65536And3392Bytes()
+    {
+        // Measured with curl 8.22.0 -v --trace-config ws -T <200 000-byte file> ws://127.0.0.1:18683/ (BL-2683):
+        // WS-ENC sending [BIN payload=0/65536] three times, then [BIN payload=0/3392];
+        // "upload completely sent off: 200050 bytes" and %{size_upload} 200050, the frame heads counted.
+        byte[] file = new byte[200_000];
+        for (int index = 0; index < file.Length; index++)
+        {
+            file[index] = (byte)index;
+        }
+
+        RecordingTransferEvents events = new();
+
+        (TransferResult result, byte[] afterRequest) = await RunAsync(new MemoryStream(file), events: events, tracesFrames: true);
+
+        byte[] expected = Frames(
+            BinaryFrame(file.AsSpan(0, 65_536)),
+            BinaryFrame(file.AsSpan(65_536, 65_536)),
+            BinaryFrame(file.AsSpan(131_072, 65_536)),
+            BinaryFrame(file.AsSpan(196_608, 3_392)));
+        CollectionAssert.AreEqual(expected, afterRequest);
+        CollectionAssert.AreEqual(
+            new[] { "0/65536", "0/65536", "0/65536", "0/3392" },
+            events.Info.Where(line => line.StartsWith("[WS] WS-ENC: sending", StringComparison.Ordinal)).Select(line => line[^8..^1].TrimStart('=')).ToArray());
+        CollectionAssert.Contains(events.Info, "upload completely sent off: 200050 bytes");
+        Assert.AreEqual(200_050L, result.Report!.UploadSize);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ToolUploadReadInParts_FillsEachFrameTo65536Bytes()
+    {
+        // The tool's fread fills its buffer from a pipe, so short reads of standard input still make 64 KiB frames.
+        ScriptedFrameSourceStream upload = new(
+            null,
+            ScriptedFrameSourceStream.Gives(new string('a', 40_000)),
+            ScriptedFrameSourceStream.Gives(new string('b', 25_536)),
+            ScriptedFrameSourceStream.Gives("c"));
+
+        (_, byte[] afterRequest) = await RunAsync(upload);
+
+        CollectionAssert.AreEqual(Frames(Frame(WsOpcode.Binary, new string('a', 40_000) + new string('b', 25_536)), Frame(WsOpcode.Binary, "c")), afterRequest);
+        CollectionAssert.AreEqual(new[] { UploadReadSize, 25_536, UploadReadSize, UploadReadSize - 1, UploadReadSize }, upload.AskedLengths);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_EmptyToolUpload_SendsNoFrameAndSaysItIsCompletelyUploaded()
+    {
+        // Measured with curl 8.22.0 -v -T <empty file> ws://...: nothing after the request,
+        // "We are completely uploaded and fine" and %{size_upload} 0.
+        RecordingTransferEvents events = new();
+
+        (TransferResult result, byte[] afterRequest) = await RunAsync(new MemoryStream(), events: events);
+
+        Assert.AreEqual(0, afterRequest.Length);
+        CollectionAssert.Contains(events.Info, "We are completely uploaded and fine");
+        Assert.AreEqual(0L, result.Report!.UploadSize);
     }
 
     [TestMethod]
@@ -153,6 +212,9 @@ public sealed class WsProtocolHandlerFramedUploadTests
 
     private static byte[] Frame(WsOpcode opcode, string payload) =>
         WsFrameEncoder.Encode(opcode, isFinal: true, Encoding.Latin1.GetBytes(payload), new FixedRandomSource());
+
+    private static byte[] BinaryFrame(ReadOnlySpan<byte> payload) =>
+        WsFrameEncoder.Encode(WsOpcode.Binary, isFinal: true, payload, new FixedRandomSource());
 
     private static byte[] Frames(params byte[][] frames) => [.. frames.SelectMany(frame => frame)];
 }

@@ -49,4 +49,6 @@ A read callback's upload (BL-2611, ADR-0669): an upload stream that implements `
 `WsUploadFrames` goes out read by read, as curl 8.22.0's `cr_ws_read`: each read of up to 64 KiB
 (`UploadReadSize`) is one binary frame of its length, unless `WsUploadFrames.StartFrame` (libcurl's
 `curl_ws_start_frame`, called from the callback) started a frame, whose payload the following reads fill, each asked
-for no more than its payload left. Any other upload is still one frame.
+for no more than its payload left. Any other upload (`-T`, BL-2683) goes out the same way, but each read is
+filled to 64 KiB first, as the tool's `fread` fills it: a 200 000-byte file is frames of 65 536, 65 536, 65 536
+and 3 392 bytes, and an empty one sends no frame and writes `We are completely uploaded and fine`.
