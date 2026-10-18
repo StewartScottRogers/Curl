@@ -3,8 +3,8 @@ id: AF-0265
 title: CI red for 44.63 minutes from run 39077398008 on 35c73029: two tests failed on Linux (one also on macOS); fixes were done in 15 min, then 3 cancelled runs
 auditor: process
 severity: Low
-status: accepted
-reason: 
+status: closed
+reason: Stewart closed it on 2026-10-18 as historical: one past CI red spell, which the factory already guards against ([skip ci] board pushes, the coordinator's CI watch filing the failure), and from ADR-0693 every CI run on work/dark-factory finishes instead of being cancelled.
 key: process:logs:39077398008:ci-red
 reproduction: none
 task: BL-2776
@@ -13,9 +13,9 @@ found: 2026-10-18
 found-at: 19ea231be8b4d749462d15058a3c6b97c7e70836
 scorecard: 2026-10-18_1045.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-18
+closed-how: stewart
+closed-by: stewart
 ---
 # AF-0265 - CI red for 44.63 minutes from run 39077398008 on 35c73029: two tests failed on Linux (one also on macOS); fixes were done in 15 min, then 3 cancelled runs
 
@@ -46,3 +46,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 - 2026-10-18: filed proposed.
 - 2026-10-18: proposed -> accepted.
+- 2026-10-18: accepted -> closed (stewart). Historical: one past CI red spell; no re-audit can change it.
