@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
+touches: [Curl.Conformance.UnitTests/PassingUpstreamCases.txt, Curl.Engine.UnitLibrary, Curl.Engine.UnitTests]
 requirement: none
 created: 2026-10-17
 completed:
@@ -29,7 +29,19 @@ Found by BL-2548, which ported lib1964 as `Lib1964` in `Curl.Conformance.LibTest
 
 ## Notes
 
+- 2026-10-18 (lane 3, first pass, no code edited): measured with `CURL_UPSTREAM_CASE=1964`: the request carries
+  no `Authorization` and no `Server auth using AWS_SIGV4` line, so `AwsSigV4HttpAuthenticator.Sign` returned at
+  `request.Credential is null`. Cause: `ManagedEasyTransfer.TryLookUpNetrcCredentials` returns early when
+  `EasyAuthenticationOptions.Netrc == NetrcUsage.Ignored`, so a library handle never gets the URL's user info
+  (`xxx:yyy`) as its credential; `TransferCredentialLookup.TryLookUp` already returns `CredentialsWrittenInUrl(url)`
+  under `Ignored`, so the fix is to drop the `Ignored` early return (keep the `ToolInputs` one), rename the method and
+  field to say they look up the URL's and the netrc file's credentials, and add a `ManagedEasyTransferTests` test
+  (URL credentials sent with no `CURLOPT_USERPWD`, e.g. Basic, and a SigV4-signed request). The signer itself
+  (Curl.Authentication) is not at fault as far as measured. Added `Curl.Engine.UnitLibrary` and
+  `Curl.Engine.UnitTests` to `touches`; requeued because BL-2734 (in Doing) touches both.
+
 ## Log
 
 - 2026-10-17: Created.
 - 2026-10-18: Backlog -> Doing. Criteria at claim: 29fc16eb fd6bd9d4 4272a6b9 8738c7f6.
+- 2026-10-18: Doing -> Backlog. Needs Curl.Engine.UnitLibrary and Curl.Engine.UnitTests, which BL-2734 (in Doing) touches; fix diagnosed under Notes
