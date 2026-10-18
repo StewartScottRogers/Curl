@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests]
 requirement: none
 created: 2026-10-17
-completed:
+completed: 2026-10-18
 ---
 # BL-2700 — Decide the threadsafe and threaded-resolver features for the upstream case runner so case 3026 runs
 
@@ -22,14 +22,24 @@ Found by BL-2551, which ported lib3026 (`Curl.Conformance.LibTest.UnitLibrary/Li
 
 ## Acceptance criteria
 
-- [ ] An ADR records whether Curl has the `threadsafe` and `threaded-resolver` features and why.
-- [ ] Case 3026 runs through the runner on Windows without being skipped, or the ADR says why it stays skipped.
-- [ ] If it runs and passes it is in `Curl.Conformance.UnitTests/PassingUpstreamCases.txt`.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] An ADR records whether Curl has the `threadsafe` and `threaded-resolver` features and why.
+- [x] Case 3026 runs through the runner on Windows without being skipped, or the ADR says why it stays skipped.
+- [x] If it runs and passes it is in `Curl.Conformance.UnitTests/PassingUpstreamCases.txt`.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Decision (ADR-0695): `UpstreamCurlPlatform` reports `threadsafe` and `threaded-resolver` on every platform. Curl's
+  `curl -V` already lists `threadsafe` and `ManagedCurlVersion` already sets `CURL_VERSION_THREADSAFE`, so no engine
+  change was needed. `runtests.pl` derives `threaded-resolver` from `AsynchDNS` without `c-ares`, which Curl's line
+  and both reference builds show.
+- Measured on Windows: test3026 passes and is on the ratchet. test506 (`!threaded-resolver`) is now skipped, as
+  `runtests.pl` skips it for the reference curl, so it left the ratchet.
+- Fast tests all green (Curl.Conformance.UnitTests 3513 passed, 350 skipped); Measure-CodeQuality for
+  Curl.Conformance.UnitLibrary: 0 failing members.
 
 ## Log
 
 - 2026-10-17: Created.
 - 2026-10-18: Backlog -> Doing. Criteria at claim: 2f800a4f 118cbc50 2bf5540d 3d836d5e.
+- 2026-10-18: Doing -> Done. The case runner reports threadsafe and threaded-resolver (ADR-0695); test3026 passes and is on the ratchet
