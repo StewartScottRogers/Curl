@@ -35,3 +35,4 @@ Rows (`get_parts_list` index: input, flags, wanted, got):
 ## Log
 
 - 2026-10-18: Created.
+- 2026-10-18: Backlog -> Doing. Criteria at claim: bf4b3849 d6c1964a.
