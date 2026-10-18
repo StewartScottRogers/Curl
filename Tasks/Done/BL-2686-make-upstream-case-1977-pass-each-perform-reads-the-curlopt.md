@@ -8,7 +8,7 @@ depends-on: [BL-2628]
 touches: [Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
 requirement: none
 created: 2026-10-17
-completed:
+completed: 2026-10-18
 ---
 # BL-2686 — Make upstream case 1977 pass: each perform reads the CURLOPT_CURLU handle's current URL
 
@@ -22,14 +22,17 @@ Found by BL-2548, which ported lib1977 as `Lib1977` in `Curl.Conformance.LibTest
 
 ## Acceptance criteria
 
-- [ ] Upstream case 1977 passes through the case runner on Windows and is listed in `Curl.Conformance.UnitTests/PassingUpstreamCases.txt`.
-- [ ] Any fix has a focused unit test in the fixed library's own `.UnitTests` project (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass with no test deleted, skipped or weakened.
-- [ ] `Curl.Conformance.UnitTests/PassingUpstreamCases.txt` is unchanged or grown, and every case it lists still passes.
+- [x] Upstream case 1977 passes through the case runner on Windows and is listed in `Curl.Conformance.UnitTests/PassingUpstreamCases.txt`.
+- [x] Any fix has a focused unit test in the fixed library's own `.UnitTests` project (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass with no test deleted, skipped or weakened.
+- [x] `Curl.Conformance.UnitTests/PassingUpstreamCases.txt` is unchanged or grown, and every case it lists still passes.
 
 ## Notes
+
+- 2026-10-18: Measured first, before any edit: with BL-2628 Done, `CURL_UPSTREAM_CASE=1977` and `NamedUpstreamCase_RunThroughCurl_PassesAsAListedCaseMust` already pass (all three performs, including the third that reads the `CURLU_APPENDQUERY` change without a fresh `CURLOPT_CURLU`). No product fix was needed, so no new unit test (ADR-0482 applies to fixes only) and no engine project joined `touches`. Added 1977 to `PassingUpstreamCases.txt`. The case is HTTP over loopback with no paths, file system or OS error text, so its output does not depend on the platform.
 
 ## Log
 
 - 2026-10-17: Created.
 - 2026-10-18: Backlog -> Doing. Criteria at claim: f49fc50e 2d55fa0b 4272a6b9 8738c7f6.
+- 2026-10-18: Doing -> Done. Upstream case 1977 passes and holds the ratchet: each perform reads the CURLOPT_CURLU handle's current URL
