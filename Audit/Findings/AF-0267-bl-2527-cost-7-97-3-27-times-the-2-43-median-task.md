@@ -3,8 +3,8 @@ id: AF-0267
 title: BL-2527 cost $7.97, 3.27 times the $2.43 median task cost: a 94-turn, 34-minute run plus a rebase-conflict resolve run
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: process:logs:BL-2527:cost-outlier
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Log
 
 - 2026-10-18: filed proposed.
+- 2026-10-18: proposed -> accepted.
