@@ -36,3 +36,4 @@ Keep the Rtsp library free of `Curl.Api.UnitLibrary`: define the settings as the
 ## Log
 
 - 2026-10-18: Created.
+- 2026-10-18: Backlog -> Doing. Criteria at claim: 30c46d50 5c61c2c9 2a21c1e2 8cecf683 65359435 4272a6b9.
