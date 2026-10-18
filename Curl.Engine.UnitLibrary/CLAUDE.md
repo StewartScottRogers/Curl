@@ -492,3 +492,7 @@ A perform from the options outside any multi handle and with no `ToolSettings` s
 ## CURL_FTP_PWD_STOP and curl_easy_cleanup inside a multi handle (BL-2636)
 
 `ManagedCurlEngine`'s internal constructor takes `stopsFirstFtpTransferBeforePwd`: the conformance harness's stand-in for the debug build's `CURL_FTP_PWD_STOP`. When set, `ManagedEngineSharedState.FtpPwdStop` holds a `FirstTransferFtpPwdStop`, which the engine's first `CreateDispatcher` claims, so that perform's FTP handler gets `StopsBeforeEntryPath` and waits after the login without sending `PWD`, as upstream's `ftp_state_pwd` does for `data->id` 0. The public constructor never sets it. `ManagedEasyTransfer.DisposeAsync` first removes the handle from the multi handle it is still in (`ManagedMultiTransfer.Remove`, cancelling its perform), as `curl_easy_cleanup` calls `curl_multi_remove_handle` (upstream test753, ADR-0687). Their tests are `FirstTransferFtpPwdStopTests` and `ManagedCurlEngineTests`.
+
+## curl_easy_recv and curl_easy_send inside a callback (BL-2654)
+
+`ManagedEasyTransfer.PerformAsync` sets `ConnectOnlyConnection.PerformRunning` for the length of the perform, and a `ReceiveAsync` or `SendAsync` made meanwhile answers `CurlCode.RecursiveApiCall` (93) before any other check, as libcurl 8.22.0's `Curl_is_in_callback` does (upstream test1555). A perform running is the engine's stand-in for "a callback is running": the library calls are synchronous, so a call during a perform comes from one of its callbacks. Its tests are in `ConnectOnlyConnectionTests`.

@@ -59,6 +59,12 @@ internal sealed class ConnectOnlyConnection(Func<bool> isConnectOnly) : IConnect
     /// </summary>
     internal CurlSocket Socket { get; private set; } = CurlSocket.Bad;
 
+    /// <summary>
+    /// Gets or sets whether the handle's perform is running, so a receive or send made now comes from one of its
+    /// callbacks and answers <see cref="CurlCode.RecursiveApiCall" />, as libcurl's <c>Curl_is_in_callback</c> check does.
+    /// </summary>
+    internal bool PerformRunning { get; set; }
+
     /// <summary>Gets the socket number of the connection open now while the options ask for connect-only, else <see cref="CurlSocket.Bad" />.</summary>
     internal CurlSocket LiveSocket => LiveConnection() is null ? CurlSocket.Bad : Socket;
 
@@ -113,6 +119,11 @@ internal sealed class ConnectOnlyConnection(Func<bool> isConnectOnly) : IConnect
     public async ValueTask<CurlConnectOnlyResult> ReceiveAsync(Memory<byte> buffer, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        if (PerformRunning)
+        {
+            return new CurlConnectOnlyResult(CurlCode.RecursiveApiCall, 0);
+        }
+
         if (LiveConnection() is not { } live)
         {
             return new CurlConnectOnlyResult(CurlCode.UnsupportedProtocol, 0);
@@ -148,6 +159,11 @@ internal sealed class ConnectOnlyConnection(Func<bool> isConnectOnly) : IConnect
     public async ValueTask<CurlConnectOnlyResult> SendAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        if (PerformRunning)
+        {
+            return new CurlConnectOnlyResult(CurlCode.RecursiveApiCall, 0);
+        }
+
         if (LiveConnection() is not { } live)
         {
             return new CurlConnectOnlyResult(CurlCode.UnsupportedProtocol, 0);

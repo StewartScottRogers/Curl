@@ -377,6 +377,19 @@ internal sealed class ManagedEasyTransfer(
     /// <inheritdoc />
     public async ValueTask<CurlCode> PerformAsync(CancellationToken cancellationToken)
     {
+        ConnectOnly.PerformRunning = true;
+        try
+        {
+            return await PerformRunningAsync(cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            ConnectOnly.PerformRunning = false;
+        }
+    }
+
+    private async ValueTask<CurlCode> PerformRunningAsync(CancellationToken cancellationToken)
+    {
         headers.Clear();
         headers.ResponseHeadRead = ShowResponseHeadOnInfo;
         performStartedTimestamp = shared.TimeProvider.GetTimestamp();
