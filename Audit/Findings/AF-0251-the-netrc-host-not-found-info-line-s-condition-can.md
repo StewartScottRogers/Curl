@@ -3,8 +3,8 @@ id: AF-0251
 title: The netrc 'host not found' info line's condition can flip (!= to ==) with no test failing
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Engine.UnitLibrary/TransferCredentialLookup.cs:TryLookUpInNetrcFile-ne:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/TransferCredentialLookup.cs:142:!=
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Engin
 ## Log
 
 - 2026-10-18: filed proposed.
+- 2026-10-18: proposed -> accepted.
