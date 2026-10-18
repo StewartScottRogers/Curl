@@ -124,6 +124,7 @@ public sealed partial class ManagedEasyTransferTests
     [TestMethod]
     [DataRow("silly", null, null, "silly", "")]
     [DataRow("silly:per:son", null, null, "silly", "per:son")]
+    [DataRow(":secret", null, null, "", "secret")]
     [DataRow("silly:person", "name", null, "name", "person")]
     [DataRow("silly:person", null, "word", "silly", "word")]
     [DataRow(null, "name", null, "name", "")]
