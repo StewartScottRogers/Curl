@@ -30,3 +30,4 @@ Filed by BL-2531 (lib558 ported, `Lib558.cs`). The harness skips case 558: `Curl
 ## Log
 
 - 2026-10-17: Created.
+- 2026-10-18: Backlog -> Doing. Criteria at claim: 62c257d5 4272a6b9.
