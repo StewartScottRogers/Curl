@@ -1,5 +1,5 @@
 ---
-id: BL-2752
+id: BL-2781
 title: RtspProtocolHandler sends DESCRIBE's Accept-Encoding and SETUP and DESCRIBE time conditions as lib/rtsp.c does
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-18
 completed:
 ---
-# BL-2752 — RtspProtocolHandler sends DESCRIBE's Accept-Encoding and SETUP and DESCRIBE time conditions as lib/rtsp.c does
+# BL-2781 — RtspProtocolHandler sends DESCRIBE's Accept-Encoding and SETUP and DESCRIBE time conditions as lib/rtsp.c does
 
 ## Goal
 
