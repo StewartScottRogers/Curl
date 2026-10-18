@@ -3,12 +3,12 @@ id: AF-0243
 title: CI red for 36.28 minutes from run 38808821626: OpenForWriteAsync_ParentIsAFileOnPosix_IsNotADirectory failed on Linux and macOS after BL-2328's commit 1c068661
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: process:logs:OpenForWriteAsync_ParentIsAFileOnPosix_IsNotADirectory:ci-red
 reproduction: none
-task: none
-tasks:
+task: BL-2580
+tasks: BL-2580
 found: 2026-10-16
 found-at: 16500922292d0d0bcaede88acdabc2500cf08ebf
 scorecard: 2026-10-16_1623.md
@@ -47,3 +47,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Log
 
 - 2026-10-16: filed proposed.
+- 2026-10-16: proposed -> accepted.

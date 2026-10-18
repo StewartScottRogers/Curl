@@ -7,8 +7,8 @@ status: closed
 reason: Re-audit 2026-10-18_1045.md: the reproduction no longer reproduces.
 key: truthfulness:Curl.Protocol.Abstractions.UnitLibrary/IDatagramConnector.cs:IDatagramConnector:false-doc-comment
 reproduction: none
-task: none
-tasks:
+task: BL-2577
+tasks: BL-2577
 found: 2026-10-16
 found-at: 16500922292d0d0bcaede88acdabc2500cf08ebf
 scorecard: 2026-10-16_1623.md
@@ -47,4 +47,5 @@ Run from the repository root:
 ## Log
 
 - 2026-10-16: filed proposed.
-- 2026-10-18: proposed -> closed. Re-audit 2026-10-18_1045.md: the reproduction no longer reproduces.
+- 2026-10-16: proposed -> accepted.
+- 2026-10-18: accepted -> closed. Re-audit 2026-10-18_1045.md: the reproduction no longer reproduces.

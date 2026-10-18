@@ -7,8 +7,8 @@ status: closed
 reason: Re-audit 2026-10-18_1045.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
 key: quality:Curl.Protocol.Http.UnitLibrary/HttpProtocolHandler.cs:OutcomeOfTimeout-false:surviving-mutant
 reproduction: mutation Curl.Protocol.Http.UnitLibrary/HttpProtocolHandler.cs:1348:false
-task: none
-tasks:
+task: BL-2571
+tasks: BL-2571
 found: 2026-10-16
 found-at: 16500922292d0d0bcaede88acdabc2500cf08ebf
 scorecard: 2026-10-16_1623.md
@@ -47,4 +47,5 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Proto
 ## Log
 
 - 2026-10-16: filed proposed.
-- 2026-10-18: proposed -> closed. Re-audit 2026-10-18_1045.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
+- 2026-10-16: proposed -> accepted.
+- 2026-10-18: accepted -> closed. Re-audit 2026-10-18_1045.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.

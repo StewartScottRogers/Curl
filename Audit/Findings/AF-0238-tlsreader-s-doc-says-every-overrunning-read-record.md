@@ -3,12 +3,12 @@ id: AF-0238
 title: TlsReader's doc says every overrunning read records DecodeError, but ReadVector skips the bounds check, so ServerNameExtension.DecodeHostName throws instead of returning an alert
 auditor: truthfulness
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: truthfulness:Curl.Tls.UnitLibrary/TlsReader.cs:TlsReader.ReadVector:false-doc-comment
 reproduction: none
-task: none
-tasks:
+task: BL-2575
+tasks: BL-2575
 found: 2026-10-16
 found-at: 16500922292d0d0bcaede88acdabc2500cf08ebf
 scorecard: 2026-10-16_1623.md
@@ -47,3 +47,4 @@ $d = Join-Path $env:TEMP 'tlsreader-repro'; New-Item -ItemType Directory -Force 
 ## Log
 
 - 2026-10-16: filed proposed.
+- 2026-10-16: proposed -> accepted.

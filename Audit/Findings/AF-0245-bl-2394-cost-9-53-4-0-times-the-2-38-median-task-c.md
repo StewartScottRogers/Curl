@@ -3,12 +3,12 @@ id: AF-0245
 title: BL-2394 cost $9.53, 4.0 times the $2.38 median task cost: three claims, a 90-turn final run and a conflict-resolve run
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: process:BL-2394:BL-2394:cost-outlier
 reproduction: none
-task: none
-tasks:
+task: BL-2582
+tasks: BL-2582
 found: 2026-10-16
 found-at: 16500922292d0d0bcaede88acdabc2500cf08ebf
 scorecard: 2026-10-16_1623.md
@@ -47,3 +47,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Log
 
 - 2026-10-16: filed proposed.
+- 2026-10-16: proposed -> accepted.

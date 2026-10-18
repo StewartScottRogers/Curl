@@ -7,8 +7,8 @@ status: closed
 reason: Re-audit 2026-10-18_1045.md: the reproduction no longer reproduces.
 key: process:logs:CI-run-38700283564:ci-red
 reproduction: none
-task: BL-2280
-tasks: BL-2280
+task: BL-2564
+tasks: BL-2280, BL-2564
 found: 2026-10-15
 found-at: 3e1062e68644127a82ba2f5ef33ceb1044cc6f67
 scorecard: 2026-10-15_0156.md

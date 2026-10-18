@@ -7,8 +7,8 @@ status: closed
 reason: Re-audit 2026-10-18_1045.md: the reproduction no longer reproduces.
 key: truthfulness:CLAUDE.md:repository-layout-project-count:false-statement
 reproduction: none
-task: BL-2277
-tasks: BL-2277
+task: BL-2562
+tasks: BL-2277, BL-2562
 found: 2026-10-15
 found-at: 3e1062e68644127a82ba2f5ef33ceb1044cc6f67
 scorecard: 2026-10-15_0156.md

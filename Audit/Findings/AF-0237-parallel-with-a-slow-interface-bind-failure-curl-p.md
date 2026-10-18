@@ -3,12 +3,12 @@ id: AF-0237
 title: --parallel with a slow --interface bind failure: Curl prints meter rows before the curl: (45) line and runs the error on after them; curl prints the error first
 auditor: conformance
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: conformance:Curl.Console/ParallelProgressMeter.cs:--parallel:stderr
 reproduction: none
-task: none
-tasks:
+task: BL-2574
+tasks: BL-2574
 found: 2026-10-16
 found-at: 16500922292d0d0bcaede88acdabc2500cf08ebf
 scorecard: 2026-10-16_1623.md
@@ -47,3 +47,4 @@ dotnet build Curl.Console -c Release -v q; foreach ($c in @('C:\Program Files\Gi
 ## Log
 
 - 2026-10-16: filed proposed.
+- 2026-10-16: proposed -> accepted.

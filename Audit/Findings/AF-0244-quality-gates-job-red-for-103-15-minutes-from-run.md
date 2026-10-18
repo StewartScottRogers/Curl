@@ -7,8 +7,8 @@ status: closed
 reason: Re-audit 2026-10-18_1045.md: the reproduction no longer reproduces.
 key: process:logs:QualityGates-CurlMulti.SetOption:ci-red
 reproduction: none
-task: none
-tasks:
+task: BL-2581
+tasks: BL-2581
 found: 2026-10-16
 found-at: 16500922292d0d0bcaede88acdabc2500cf08ebf
 scorecard: 2026-10-16_1623.md
@@ -47,4 +47,5 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Log
 
 - 2026-10-16: filed proposed.
-- 2026-10-18: proposed -> closed. Re-audit 2026-10-18_1045.md: the reproduction no longer reproduces.
+- 2026-10-16: proposed -> accepted.
+- 2026-10-18: accepted -> closed. Re-audit 2026-10-18_1045.md: the reproduction no longer reproduces.
