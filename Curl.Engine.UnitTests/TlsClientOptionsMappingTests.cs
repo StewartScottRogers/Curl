@@ -510,4 +510,31 @@ public sealed class TlsClientOptionsMappingTests
         Assert.AreEqual(expected, actual);
         Assert.AreEqual(matchesSchannelBuild ? null : "SSLKEYLOGFILE", askedFor);
     }
+
+    // BL-2716: the in-process run gives its case's <setenv> as its own environment, so the target's and the
+    // HTTPS proxy's key-log file come from the reader the run was given, not the process's environment.
+    [TestMethod]
+    public void Of_GivenAnEnvironmentReader_TakesTheKeyLogFileFromIt()
+    {
+        TlsClientOptions mapped = Mapped("target", [Url], TlsClientOptionsMapping.Of(EasyOptionsFromCommandLine.TlsOf(Parse([Url])), useAlpn: true, sslSessionsFile: null, KeyLogEnvironment));
+
+        Diagnostics.Assert("key log file", KeyLogFileOffWindows, mapped.KeyLogFile);
+        Assert.AreEqual(KeyLogFileOffWindows, mapped.KeyLogFile);
+    }
+
+    [TestMethod]
+    public void ProxyOf_GivenAnEnvironmentReader_TakesTheKeyLogFileFromIt()
+    {
+        TlsClientOptions mapped = Mapped("proxy", [Url], TlsClientOptionsMapping.ProxyOf(EasyOptionsFromCommandLine.TlsOf(Parse([Url])), useAlpn: true, KeyLogEnvironment));
+
+        Diagnostics.Assert("key log file", KeyLogFileOffWindows, mapped.KeyLogFile);
+        Assert.AreEqual(KeyLogFileOffWindows, mapped.KeyLogFile);
+    }
+
+    private const string KeyLogPath = "log/2090.log.ssl";
+
+    // The Schannel build Curl matches on Windows ignores SSLKEYLOGFILE; the OpenSSL build elsewhere reads it.
+    private static string? KeyLogFileOffWindows => OperatingSystem.IsWindows() ? null : KeyLogPath;
+
+    private static string? KeyLogEnvironment(string name) => name == "SSLKEYLOGFILE" ? KeyLogPath : null;
 }

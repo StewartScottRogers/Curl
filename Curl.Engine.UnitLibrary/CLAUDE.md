@@ -476,3 +476,7 @@ A perform from the options with no `ToolInputs` and `EasyAuthenticationOptions.N
 ## The ioctl callback (BL-2607)
 
 Under `EasyTransferOptions.Upload`, or a read-callback post, with `EasyCallbackOptions.Ioctl` set and no `Seek`, the upload is an `IoctlRewoundCallbackReadStream`: once the read callback has given bytes, a followed redirect or an authentication retry that resends the body calls the ioctl callback with `IoctlCommand.RestartRead`, and any result but `IoctlResult.Ok` fails the perform with `CurlCode.SendFailRewind` and `ioctl callback returned error <n>`, as curl 8.22.0's `cr_in_rewind` falls back to when no seek callback is set; a set seek callback wins (upstream tests 547, 551 and 552). Its tests are in `ManagedEasyTransferTests.Callbacks.cs`.
+
+## SSLKEYLOGFILE from the run's environment (BL-2716)
+
+`TlsClientOptionsMapping.Of` and `ProxyOf` take an optional `readEnvironmentVariable` for `SSLKEYLOGFILE` (`KeyLogFileFromEnvironment`; `null` reads the process's environment). `Curl.Console`'s dialing runner passes the run's own reader, so the conformance harness's in-process run of upstream test2090 sees its case's `<setenv>` value; `DohOf` and the managed engine still read the process's environment.

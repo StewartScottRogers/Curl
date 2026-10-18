@@ -53,8 +53,13 @@ internal static class TlsClientOptionsMapping
     /// <param name="tls">The option group's TLS options.</param>
     /// <param name="useAlpn">Whether ALPN is offered: <see langword="false" /> under <c>--no-alpn</c>, which is not on the TLS record (ADR-0514).</param>
     /// <param name="sslSessionsFile">The <c>--ssl-sessions</c> file, the tool's own and not on the TLS record (ADR-0514), or <see langword="null" />.</param>
+    /// <param name="readEnvironmentVariable">
+    /// Reads the run's environment for <c>SSLKEYLOGFILE</c> (<see cref="KeyLogFileFromEnvironment" />): the
+    /// conformance harness's in-process run gives its case's <c>&lt;setenv&gt;</c> here (BL-2716);
+    /// <see langword="null" /> for the process's environment.
+    /// </param>
     /// <returns>The target's TLS settings.</returns>
-    internal static TlsClientOptions Of(EasyTlsOptions tls, bool useAlpn, string? sslSessionsFile)
+    internal static TlsClientOptions Of(EasyTlsOptions tls, bool useAlpn, string? sslSessionsFile, Func<string, string?>? readEnvironmentVariable = null)
     {
         TlsPeerOptions origin = tls.Origin;
         return new(
@@ -87,7 +92,7 @@ internal static class TlsClientOptionsMapping
             origin.RevocationListFile,
             !tls.SessionIdCache,
             origin.SslOptions.HasFlag(SslOptions.AllowBeast),
-            KeyLogFile());
+            KeyLogFile(readEnvironmentVariable));
     }
 
     /// <summary>
@@ -106,8 +111,9 @@ internal static class TlsClientOptionsMapping
     /// </summary>
     /// <param name="tls">The option group's TLS options.</param>
     /// <param name="useAlpn">Whether ALPN is offered: <see langword="false" /> under <c>--no-alpn</c>.</param>
+    /// <param name="readEnvironmentVariable">Reads the run's environment for <c>SSLKEYLOGFILE</c>, as for <see cref="Of" />; <see langword="null" /> for the process's.</param>
     /// <returns>The HTTPS proxy's TLS settings.</returns>
-    internal static TlsClientOptions ProxyOf(EasyTlsOptions tls, bool useAlpn)
+    internal static TlsClientOptions ProxyOf(EasyTlsOptions tls, bool useAlpn, Func<string, string?>? readEnvironmentVariable = null)
     {
         TlsPeerOptions proxy = tls.Proxy;
         return new(
@@ -128,7 +134,7 @@ internal static class TlsClientOptionsMapping
             UseAlpn: useAlpn,
             NoSessionId: !tls.SessionIdCache,
             AllowBeast: proxy.SslOptions.HasFlag(SslOptions.AllowBeast),
-            KeyLogFile: KeyLogFile());
+            KeyLogFile: KeyLogFile(readEnvironmentVariable));
     }
 
     /// <summary>
@@ -159,7 +165,7 @@ internal static class TlsClientOptionsMapping
             RequireCertificateStatus: tls.DohVerifyStatus,
             AutoClientCertificate: origin.SslOptions.HasFlag(SslOptions.AutoClientCert),
             CertificateRevocationListFile: origin.RevocationListFile,
-            KeyLogFile: KeyLogFile());
+            KeyLogFile: KeyLogFile(null));
     }
 
     /// <summary>Maps a lowest TLS version from the record onto the one the TLS provider applies.</summary>
@@ -194,5 +200,6 @@ internal static class TlsClientOptionsMapping
     internal static string? KeyLogFileFromEnvironment(Func<string, string?> readEnvironmentVariable, bool matchesSchannelBuild) =>
         !matchesSchannelBuild && readEnvironmentVariable("SSLKEYLOGFILE") is { Length: > 0 } path ? path : null;
 
-    private static string? KeyLogFile() => KeyLogFileFromEnvironment(Environment.GetEnvironmentVariable, OperatingSystem.IsWindows());
+    private static string? KeyLogFile(Func<string, string?>? readEnvironmentVariable) =>
+        KeyLogFileFromEnvironment(readEnvironmentVariable ?? Environment.GetEnvironmentVariable, OperatingSystem.IsWindows());
 }

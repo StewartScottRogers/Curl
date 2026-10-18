@@ -315,7 +315,7 @@ internal static class CurlComposition
     /// <param name="runConnections">The run's connection cache.</param>
     /// <param name="diagnosticLog">The run's diagnostic log.</param>
     /// <param name="usesHandBuiltNtlm">Whether NTLM is answered by the hand-built context on every platform (<see cref="CreateDialingSecurityContextFactory" />).</param>
-    /// <param name="readEnvironmentVariable">Reads the proxy environment variables.</param>
+    /// <param name="readEnvironmentVariable">Reads the proxy environment variables and <c>SSLKEYLOGFILE</c>, which the target's and the HTTPS proxy's TLS options carry (BL-2716).</param>
     /// <param name="ftpListener">Listens for FTP's active-mode data connections, or <see langword="null" /> for a <see cref="TcpConnectionListener" />.</param>
     /// <param name="signingClock">The clock <c>--aws-sigv4</c> and the <c>--httpsig-*</c> options sign with; <see cref="TimeProvider.System" /> when <see langword="null" />.</param>
     /// <returns>The dispatch.</returns>
@@ -337,9 +337,9 @@ internal static class CurlComposition
         EasyHttpOptions http = EasyOptionsFromCommandLine.HttpOf(options);
         EasyProxyOptions proxy = EasyOptionsFromCommandLine.ProxyOf(options);
         EasyAuthenticationOptions authentication = EasyOptionsFromCommandLine.AuthenticationOf(options);
-        TlsClientOptions tlsClientOptions = TlsClientOptionsMapping.Of(tls, options.UseAlpn, options.SslSessionsFile);
+        TlsClientOptions tlsClientOptions = TlsClientOptionsMapping.Of(tls, options.UseAlpn, options.SslSessionsFile, readEnvironmentVariable);
         ITlsProviderWithWarnings tlsProvider = CreateTlsProvider(tlsClientOptions, TimeProvider.System);
-        ITlsProviderWithWarnings proxyTlsProvider = CreateTlsProvider(TlsClientOptionsMapping.ProxyOf(tls, options.UseAlpn), TimeProvider.System);
+        ITlsProviderWithWarnings proxyTlsProvider = CreateTlsProvider(TlsClientOptionsMapping.ProxyOf(tls, options.UseAlpn, readEnvironmentVariable), TimeProvider.System);
         LateBoundSecurityContextFactory proxyContexts = new() { UsesHandBuiltNtlm = usesHandBuiltNtlm };
         HttpProxyTunnelOptions proxyTunnelOptions = CreateProxyTunnelOptions(http, proxy, authentication, proxyContexts, diagnosticLog);
         EngineTraceComponents traces = EasyOptionsFromCommandLine.TraceComponentsOf(options);
