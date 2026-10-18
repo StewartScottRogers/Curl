@@ -22,7 +22,7 @@ internal sealed class FakeCurlEngine : ICurlEngine
     /// <summary>When set, gives each read of an easy transfer's info in place of <see cref="Info"/>.</summary>
     public Func<TransferInfo>? Informing { get; init; }
 
-    public CurlVersionInfo VersionInfo { get; } = new();
+    public CurlVersionInfo VersionInfo { get; init; } = new();
 
     /// <summary>Runs as each easy transfer is created, before it is returned.</summary>
     public Action? CreatingEasy { get; init; }
