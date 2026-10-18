@@ -38,3 +38,4 @@ With no `--cacert` or `--capath`, Curl takes its CA certificates from `CURL_CA_B
 ## Log
 
 - 2026-10-18: Created.
+- 2026-10-18: Backlog -> Doing. Criteria at claim: 47cc4234 b50f6b05 631fc839 e27d59d9.
