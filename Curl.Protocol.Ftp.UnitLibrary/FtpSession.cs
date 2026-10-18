@@ -349,6 +349,42 @@ internal sealed class FtpSession(
     }
 
     /// <summary>
+    /// Runs only curl's connect phase - the greeting, <c>AUTH</c>, the login, <c>PBSZ</c>,
+    /// <c>PROT</c>, <c>CCC</c> and <c>PWD</c>, or nothing on a kept connection - and sends nothing
+    /// after it, as libcurl 8.22.0's <c>CURLOPT_CONNECT_ONLY</c> 1 does for FTP (BL-2705).
+    /// </summary>
+    /// <returns>
+    /// On success the control connection the session now talks on, which the session no longer
+    /// disposes; on a failure, the same result <see cref="RunAsync" /> would end with and no
+    /// connection.
+    /// </returns>
+    public async ValueTask<FtpConnectOnlyOutcome> ConnectOnlyAsync()
+    {
+        long started = context.TimeProvider.GetTimestamp();
+        TransferResult? failed;
+        try
+        {
+            failed = reused is null ? await ConnectAsync().ConfigureAwait(false) : ResumeKeptConnection();
+        }
+        catch (FtpControlConversationFailedException lost)
+        {
+            failed = lost.Result;
+        }
+
+        var report = new TransferReport { ResponseCode = lastReplyCode, FtpEntryPath = entryPath };
+        if (failed is not null)
+        {
+            trace.Ended(failed.ExitCode);
+            log.SessionEnded(failed, context.TimeProvider.GetElapsedTime(started));
+            return new FtpConnectOnlyOutcome(failed with { Report = report }, null);
+        }
+
+        // The caller owns the connection now, AUTH's secured one included.
+        securedControl = null;
+        return new FtpConnectOnlyOutcome(TransferResult.Success(0) with { Report = report }, control.Connection);
+    }
+
+    /// <summary>
     /// Disposes the data connection, the active-mode listening port and the control
     /// connection <c>AUTH</c> secured, whichever exist. The control connection the session
     /// was given belongs to the caller.
