@@ -1339,7 +1339,27 @@ public sealed class UpstreamCaseRunnerTests
     private const string LibCase =
         "<testcase>\n<client>\n<server>\nhttp\n</server>\n<tool>\nlib%TESTNUMBER\n</tool>\n"
         + "<command>\nhttp://%HOSTIP:%HTTPPORT/%TESTNUMBER %LOGDIR/ip%TESTNUMBER\n</command>\n</client>\n"
-        + "<verify>\n<stdout>\nhello from lib5\n</stdout>\n<stderr>\nstep failed\n</stderr>\n<errorcode>\n0\n</errorcode>\n</verify>\n</testcase>\n";
+        + "<verify>\n<stdout>\nhello from lib5\n</stdout>\n<stderr>\nURL: http://%HOSTIP:%HTTPPORT/%TESTNUMBER\nstep failed\nTest ended with result 0\n</stderr>\n<errorcode>\n0\n</errorcode>\n</verify>\n</testcase>\n";
+
+    // first.c's main() writes "URL: <url>" only when a URL follows the program's name, and always "Test ended with result <N>".
+    [TestMethod]
+    [DataRow("http://%HOSTIP:%HTTPPORT/%TESTNUMBER", 0, "URL: http://127.0.0.1:8990/5\nstep failed\nTest ended with result 0\n")]
+    [DataRow("http://%HOSTIP:%HTTPPORT/%TESTNUMBER", 7, "URL: http://127.0.0.1:8990/5\nstep failed\nTest ended with result 7\n")]
+    [DataRow(null, 0, "step failed\nTest ended with result 0\n")]
+    public async Task RunAsync_PortedLibCase_WritesFirstCsUrlAndResultLinesAroundTheProgramsStderr(string? command, int exitCode, string expectedStandardError)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        UpstreamCaseRunner runner = LibRunner(new SampleLibTest("lib5", exitCode));
+        string logDirectory = CreateLogDirectory();
+        string commandPart = command is null ? string.Empty : $"<command>\n{command}\n</command>\n";
+        string testCase = "<testcase>\n<client>\n<server>\nhttp\n</server>\n<tool>\nlib%TESTNUMBER\n</tool>\n" + commandPart + "</client>\n</testcase>\n";
+
+        await RunWithLogDirectoryAsync(runner, testCase, logDirectory);
+
+        string standardError = File.ReadAllText(Path.Combine(logDirectory, "stderr5"));
+        diagnostics.Assert("stderr", expectedStandardError, standardError);
+        Assert.AreEqual(expectedStandardError, standardError);
+    }
 
     [TestMethod]
     public async Task RunAsync_PortedLibCase_RunsItsProgramInPlaceOfCurl()
@@ -1367,8 +1387,10 @@ public sealed class UpstreamCaseRunnerTests
     {
         var diagnostics = TestDiagnostics.For(TestContext);
         UpstreamCaseRunner runner = LibRunner(new SampleLibTest("lib5", exitCode: 7));
+        string libCaseVerifyingTheExitCodeAlone = LibCase.Replace(
+            "<stderr>\nURL: http://%HOSTIP:%HTTPPORT/%TESTNUMBER\nstep failed\nTest ended with result 0\n</stderr>\n", string.Empty, StringComparison.Ordinal);
 
-        UpstreamCaseOutcome outcome = await RunAsync(runner, LibCase);
+        UpstreamCaseOutcome outcome = await RunAsync(runner, libCaseVerifyingTheExitCodeAlone);
 
         diagnostics.Assert("outcome detail", "<verify><errorcode>: expected exit code 0, got 7", outcome.Detail);
         Assert.AreEqual(UpstreamCaseOutcomeKind.Failed, outcome.Kind);

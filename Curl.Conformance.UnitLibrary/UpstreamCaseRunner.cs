@@ -698,7 +698,9 @@ public sealed class UpstreamCaseRunner(
         libTest is null ? () => runCurl(invocation) : () => RunLibTestAsync(libTest, testNumber, invocation);
 
     // The program runs in place of curl, on the same invocation: its engine reaches the case's servers through
-    // the invocation's connectors, and its stdout and stderr are the run's.
+    // the invocation's connectors, and its stdout and stderr are the run's. Around it go the lines curl 8.22.0's
+    // tests/libtest/first.c main() writes on stderr: "URL: <url>" when a URL follows the program's name, before the
+    // test, and "Test ended with result <N>" after it (BL-2649; test1549).
     private async Task<int> RunLibTestAsync(ILibTest libTest, int testNumber, UpstreamCurlInvocation invocation)
     {
         // Line feeds alone, as curl's own stderr in the harness, so a case's <stderr> compares the same on every platform.
@@ -709,7 +711,13 @@ public sealed class UpstreamCaseRunner(
             StandardOutput = invocation.StandardOutput,
             StandardError = standardError,
         };
+        if (invocation.Arguments.Count > 0)
+        {
+            await standardError.WriteLineAsync($"URL: {invocation.Arguments[0]}").ConfigureAwait(false);
+        }
+
         LibTestResult result = await libTest.RunAsync(context, CancellationToken.None).ConfigureAwait(false);
+        await standardError.WriteLineAsync($"Test ended with result {result.ExitCode.ToString(CultureInfo.InvariantCulture)}").ConfigureAwait(false);
         return result.ExitCode;
     }
 
