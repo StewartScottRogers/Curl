@@ -3,8 +3,8 @@ id: AF-0253
 title: MimeCallbackReadStream.Length's part.Size >= 0 can become > 0 with no test failing, so an empty sized callback part throws
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Engine.UnitLibrary/MimeCallbackReadStream.cs:Length-ge:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/MimeCallbackReadStream.cs:39:>=
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Engin
 ## Log
 
 - 2026-10-18: filed proposed.
+- 2026-10-18: proposed -> accepted.
