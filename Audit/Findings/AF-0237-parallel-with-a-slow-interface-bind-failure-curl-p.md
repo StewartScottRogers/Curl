@@ -42,6 +42,8 @@ dotnet build Curl.Console -c Release -v q; foreach ($c in @('C:\Program Files\Gi
 
 ## Re-audits
 
+- 2026-10-18 | 2026-10-18_1045.md | reproduces: no | Ran the given reproduction against curl 8.22.0 (Schannel, debug-enabled) and Curl at planted HEAD 6dc0a81. The first stderr line is the error for both: curl 'curl: (45) Failed to connect to 127.0.0.1:63411 after 2914 ms: Failed binding local connection end', Curl the same text 'after 2728 ms'. No meter row comes before the error.
+
 ## Log
 
 - 2026-10-16: filed proposed.

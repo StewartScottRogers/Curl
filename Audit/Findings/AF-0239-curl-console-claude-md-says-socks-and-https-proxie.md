@@ -3,8 +3,8 @@ id: AF-0239
 title: Curl.Console CLAUDE.md says SOCKS and HTTPS proxies end http/https transfers with exit 4 and other schemes ignore the proxy; the connector tunnels through them
 auditor: truthfulness
 severity: High
-status: proposed
-reason:
+status: closed
+reason: Re-audit 2026-10-18_1045.md: the reproduction no longer reproduces.
 key: truthfulness:Curl.Console/CLAUDE.md:proxy-tunnel-exit-4:false-statement
 reproduction: none
 task: none
@@ -13,9 +13,9 @@ found: 2026-10-16
 found-at: 16500922292d0d0bcaede88acdabc2500cf08ebf
 scorecard: 2026-10-16_1623.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-18
+closed-how: reliable-reaudit
+closed-by: 2026-10-18_1045.md
 ---
 # AF-0239 - Curl.Console CLAUDE.md says SOCKS and HTTPS proxies end http/https transfers with exit 4 and other schemes ignore the proxy; the connector tunnels through them
 
@@ -42,6 +42,9 @@ Run from the repository root:
 
 ## Re-audits
 
+- 2026-10-18 | 2026-10-18_1045.md | reproduces: no | Ran the reproduction: 'exit 4 until the connector opens those tunnels' matches 0 lines in Curl.Console/CLAUDE.md; SocksProxyTunnel.OpenAsync( matches 1 line in TcpConnector.cs. The stale sentence is gone.
+
 ## Log
 
 - 2026-10-16: filed proposed.
+- 2026-10-18: proposed -> closed. Re-audit 2026-10-18_1045.md: the reproduction no longer reproduces.

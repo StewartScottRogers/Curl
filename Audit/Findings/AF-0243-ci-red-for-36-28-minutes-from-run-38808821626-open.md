@@ -42,6 +42,8 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-10-18 | 2026-10-18_1045.md | reproduces: yes | The original reproduction still shows the 36.28-min spell from run 38808821626 and BL-2354 filed at 14:28:17. Re-audited by mechanism over 2026-10-16 onward: a test passing on the Windows-only lanes again failed on Linux and macOS after a lane commit and kept CI red over 30 minutes. Run 39077398008 on 35c73029, RunAsync_WhenTheServersStreamsAreAllTaken_OpensAnotherConnectionForTheNextTransfer on Linux and macOS, red 44.63 min (2026-10-17T23:13:09Z to 23:57:47Z). Fix task BL-2677 (L2, 16:15:23 to 16:20:22 local).
+
 ## Log
 
 - 2026-10-16: filed proposed.

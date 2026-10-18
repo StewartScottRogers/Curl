@@ -42,6 +42,8 @@ Select-String -Path Curl.Output.UnitTests/WriteOutTransferInfoTests.cs -Pattern 
 
 ## Re-audits
 
+- 2026-10-18 | 2026-10-18_1045.md | reproduces: no | Ran the reproduction: WriteOutTransferInfoTests.cs has Assert lines 50-54 inside FromReport_Report_FillsTextsCountsAndEndPoints (AreEqual on effective URL, method, codes, sizes, end points).
+
 ## Log
 
 - 2026-10-16: filed proposed.

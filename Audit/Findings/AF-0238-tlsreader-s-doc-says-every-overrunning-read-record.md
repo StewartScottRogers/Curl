@@ -42,6 +42,8 @@ $d = Join-Path $env:TEMP 'tlsreader-repro'; New-Item -ItemType Directory -Force 
 
 ## Re-audits
 
+- 2026-10-18 | 2026-10-18_1045.md | not re-audited | overlaps planted defect PD-103 in Curl.Tls.UnitLibrary/TlsReader.cs, so the auditor's verdict (reproduces yes) is set aside: Ran the reproduction (TEMP pointed at the scratch folder): the file-based app printed 'ArgumentOutOfRangeException', so ServerNameExtension.DecodeHostName still throws on the overrunning input instead of returning a DecodeError alert. TlsReader.cs:5 still says the first read that runs past the end records TlsAlertDescription.DecodeError, and lines 8 and 72 still describe ReadVector sharing that failure.
+
 ## Log
 
 - 2026-10-16: filed proposed.

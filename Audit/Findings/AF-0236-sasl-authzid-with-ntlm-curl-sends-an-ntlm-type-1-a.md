@@ -42,6 +42,8 @@ dotnet build Curl.Console -c Release -v q; foreach ($c in @('C:\Program Files\Gi
 
 ## Re-audits
 
+- 2026-10-18 | 2026-10-18_1045.md | reproduces: no | Ran the given reproduction against curl 8.22.0 (Schannel, debug-enabled) and Curl at planted HEAD 6dc0a81. Both send the identical header 'Authorization: NTLM TlRMTVNTUAABAAAAB7IIogkACQA3AAAADwAPACgAAAAKAPRlAAAAD1NURVdBUlQtUk9HRVJTLVdPUktHUk9VUA=='.
+
 ## Log
 
 - 2026-10-16: filed proposed.

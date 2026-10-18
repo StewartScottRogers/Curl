@@ -42,6 +42,8 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-10-18 | 2026-10-18_1045.md | reproduces: yes | The original reproduction still shows BL-2310 with claims 3 (2 REQUEUEs, DONE 16:26:41). Re-audited by mechanism over 2026-10-16 onward: BL-2529 was again claimed 3 times and requeued twice because its prerequisites were incomplete and each run filed more subtasks. L5 03:23:39 to 03:35:00 on 10-17: 'Split for size: waits on BL-2595 and BL-2596'. L1 05:49:52 to 05:59:24: 'Waits on BL-2601: the case runner skips cases 520 to 537'. L1 08:27:40 to 08:37:34: DONE. Cost $4.20.
+
 ## Log
 
 - 2026-10-16: filed proposed.

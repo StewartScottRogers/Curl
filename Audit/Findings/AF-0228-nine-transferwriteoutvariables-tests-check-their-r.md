@@ -42,6 +42,8 @@ Select-String -Path Curl.Output.UnitTests/TransferWriteOutVariablesFromTransferI
 
 ## Re-audits
 
+- 2026-10-18 | 2026-10-18_1045.md | reproduces: no | Ran the reproduction: Count = 18. Each of the nine TransferWriteOutVariables tests now ends in Assert.AreEqual on its rendered text (lines 41, 57-58, 71, 90-92, 119-121, 134, 153, 168-169, 183, 208-209), plus Assert.ThrowsExactly at 219-221.
+
 ## Log
 
 - 2026-10-16: filed proposed.

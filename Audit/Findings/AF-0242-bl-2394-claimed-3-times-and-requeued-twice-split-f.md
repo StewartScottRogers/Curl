@@ -42,6 +42,8 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-10-18 | 2026-10-18_1045.md | reproduces: yes | The original reproduction still shows BL-2394 with claims 3 (REQUEUE 'Split: too big for one run', REQUEUE 'Waits on BL-2479: the engine has no hook', DONE 09:38:46). Re-audited by mechanism over 2026-10-16 onward: the same cause, split for size and then blocked on a missing piece of the runner/engine, crossed again with BL-2529. It was claimed 3 times, requeued at 03:35:00 L5 ('Split for size') and at 05:59:24 L1 ('Waits on BL-2601: the case runner skips cases 520 to 537'), and finished at 08:37:34 L1 on 2026-10-17.
+
 ## Log
 
 - 2026-10-16: filed proposed.

@@ -42,6 +42,8 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-10-18 | 2026-10-18_1045.md | reproduces: yes | The original reproduction still shows BL-2394 at $9.5261 at the top of the cost list (next: BL-2324 $6.78). Re-audited by mechanism over 2026-10-16 onward (median $2.4326, 3x = $7.30): BL-2527 cost $7.9658 (3.27x) from a 94-turn, 34.1-min run plus a rebase-conflict resolve run (11 turns, $0.47), the same pattern as the long final run plus conflict-resolve run named here. BL-2550 at $7.3905 (3.04x) also crosses.
+
 ## Log
 
 - 2026-10-16: filed proposed.

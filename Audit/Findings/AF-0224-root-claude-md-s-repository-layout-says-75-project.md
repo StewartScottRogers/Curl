@@ -3,8 +3,8 @@ id: AF-0224
 title: Root CLAUDE.md's repository layout says 75 projects; Curl.slnx lists 79
 auditor: truthfulness
 severity: Low
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-18_1045.md: the reproduction no longer reproduces.
 key: truthfulness:CLAUDE.md:repository-layout-project-count:false-statement
 reproduction: none
 task: BL-2277
@@ -13,9 +13,9 @@ found: 2026-10-15
 found-at: 3e1062e68644127a82ba2f5ef33ceb1044cc6f67
 scorecard: 2026-10-15_0156.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-18
+closed-how: reliable-reaudit
+closed-by: 2026-10-18_1045.md
 ---
 # AF-0224 - Root CLAUDE.md's repository layout says 75 projects; Curl.slnx lists 79
 
@@ -43,8 +43,10 @@ Run from the repository root:
 ## Re-audits
 
 - 2026-10-16 | 2026-10-16_1623.md | reproduces: yes | Ran the reproduction: 93, then '... 84 projects, one flat alphabetical run'. The count in CLAUDE.md changed (from 75 to 84), but it still does not match the 93 .csproj entries in Curl.slnx. 93 csproj files are also on disk (ls */*.csproj).
+- 2026-10-18 | 2026-10-18_1045.md | reproduces: no | Ran the reproduction: Curl.slnx lists 93 .csproj entries and CLAUDE.md's layout line reads '...  93 projects, one flat alphabetical run'; 93 directories under the root hold a .csproj. The counts agree.
 
 ## Log
 
 - 2026-10-15: filed proposed.
 - 2026-10-15: proposed -> accepted.
+- 2026-10-18: accepted -> closed. Re-audit 2026-10-18_1045.md: the reproduction no longer reproduces.

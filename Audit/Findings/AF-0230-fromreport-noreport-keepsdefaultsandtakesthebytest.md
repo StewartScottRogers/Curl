@@ -42,6 +42,8 @@ Select-String -Path Curl.Output.UnitTests/WriteOutTransferInfoTests.cs -Pattern 
 
 ## Re-audits
 
+- 2026-10-18 | 2026-10-18_1045.md | reproduces: no | Ran the reproduction: Assert lines 69-72 inside FromReport_NoReport_KeepsDefaultsAndTakesTheBytesTransferred (AreEqual on EffectiveUrl, SizeDownload 12, TotalTime zero, PrimaryPort 0).
+
 ## Log
 
 - 2026-10-16: filed proposed.

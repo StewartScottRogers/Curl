@@ -3,8 +3,8 @@ id: AF-0244
 title: Quality gates job red for 103.15 minutes from run 38876049958 on 241c183e: Libcurl CurlMulti.SetOption branch gap, fixed by a separate task, then six cancelled runs
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: closed
+reason: Re-audit 2026-10-18_1045.md: the reproduction no longer reproduces.
 key: process:logs:QualityGates-CurlMulti.SetOption:ci-red
 reproduction: none
 task: none
@@ -13,9 +13,9 @@ found: 2026-10-16
 found-at: 16500922292d0d0bcaede88acdabc2500cf08ebf
 scorecard: 2026-10-16_1623.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-18
+closed-how: reliable-reaudit
+closed-by: 2026-10-18_1045.md
 ---
 # AF-0244 - Quality gates job red for 103.15 minutes from run 38876049958 on 241c183e: Libcurl CurlMulti.SetOption branch gap, fixed by a separate task, then six cancelled runs
 
@@ -42,6 +42,9 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-10-18 | 2026-10-18_1045.md | reproduces: no | The original reproduction still shows the 103.15-min spell from run 38876049958, with BL-2466 filed at 02:09:50 and BL-2467 DONE at 03:01:55. Re-audited by mechanism over 2026-10-16 onward (134 tasks done): no new Quality gates job failure. The new spells (39077398008, 44.63 min; 39091460067, 62.28 min) were test failures. The tool still lists 38876049958 only because -Since 2026-10-16 overlaps that incident, already counted by the previous audit. Note: the 'cancelled runs prolong red' part of this finding recurs. After its fix was done, spell 39091460067 stayed red for 44 min through 5 cancelled runs (39092490535 to 39094393407), reported as process:logs:39091460067:ci-red.
+
 ## Log
 
 - 2026-10-16: filed proposed.
+- 2026-10-18: proposed -> closed. Re-audit 2026-10-18_1045.md: the reproduction no longer reproduces.
