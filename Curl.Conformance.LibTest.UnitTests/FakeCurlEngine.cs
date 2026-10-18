@@ -51,7 +51,7 @@ internal sealed class FakeCurlEngine : ICurlEngine
     public IEasyTransfer CreateEasy()
     {
         CreatingEasy?.Invoke();
-        return new FakeEasyTransfer(PerformResult, Info, Performing) { Informing = Informing, ConnectOnly = ConnectOnly, Pauses = Pauses, TransferHeaders = Headers };
+        return new FakeEasyTransfer(PerformResult, Info, Performing) { Informing = Informing, ConnectOnly = ConnectOnly, Pauses = Pauses, TransferHeaders = Headers, WebSocketConnection = WebSocket };
     }
 
     public FakeMultiTransfer Multi { get; } = new();
@@ -87,6 +87,9 @@ internal sealed class FakeCurlEngine : ICurlEngine
     /// <summary>Gets the connection every easy transfer's <c>curl_easy_send</c> and <c>curl_easy_recv</c> use; none throws.</summary>
     public IConnectOnlyConnection? ConnectOnly { get; init; }
 
+    /// <summary>Gets the WebSocket every easy transfer's <c>curl_ws_*</c> calls use; none throws.</summary>
+    public IEasyWebSocket? WebSocket { get; init; }
+
     /// <summary>Every <c>curl_easy_pause</c> any of its easy transfers was given.</summary>
     public List<CurlPause> Pauses { get; } = [];
 
@@ -106,7 +109,9 @@ internal sealed class FakeCurlEngine : ICurlEngine
 
         public ITransferHeaders Headers => TransferHeaders ?? throw new NotSupportedException();
 
-        public IEasyWebSocket WebSocket => throw new NotSupportedException();
+        public IEasyWebSocket? WebSocketConnection { get; init; }
+
+        public IEasyWebSocket WebSocket => WebSocketConnection ?? throw new NotSupportedException();
 
         public IConnectOnlyConnection? ConnectOnly { get; init; }
 
