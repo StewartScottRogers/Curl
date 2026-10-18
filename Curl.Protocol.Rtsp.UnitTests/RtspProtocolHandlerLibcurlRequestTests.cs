@@ -224,14 +224,114 @@ public sealed class RtspProtocolHandlerLibcurlRequestTests
         Assert.IsFalse(server.IsMarkedReusable);
     }
 
+    [TestMethod]
+    public async Task ExecuteAsync_CompressedDescribe_SendsAcceptEncodingAfterAccept()
+    {
+        var server = new ScriptedConnection(Bytes(Ok));
+        TransferContext context = Context(new HttpRequestOptions { Compressed = true, UserAgent = "agent" });
+
+        TransferResult result = await Handler(server, new RtspRequestSettings { Kind = RtspRequestKind.Describe, StreamUri = Uri }).ExecuteAsync(context);
+
+        Diagnostics.ActResult(result);
+        Assert.AreEqual(
+            "DESCRIBE rtsp://127.0.0.1:47950/media RTSP/1.0\r\nCSeq: 1\r\nAccept: application/sdp\r\nAccept-Encoding: deflate, gzip, br, zstd\r\nUser-Agent: agent\r\n\r\n",
+            Encoding.Latin1.GetString(server.Sent));
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_CompressedDescribeWithCustomAcceptEncoding_SendsOnlyTheCustomOne()
+    {
+        var server = new ScriptedConnection(Bytes(Ok));
+        TransferContext context = Context(new HttpRequestOptions { Compressed = true, Headers = ["Accept-Encoding: identity"] });
+
+        TransferResult result = await Handler(server, new RtspRequestSettings { Kind = RtspRequestKind.Describe, StreamUri = Uri }).ExecuteAsync(context);
+
+        Diagnostics.ActResult(result);
+        Assert.AreEqual(
+            "DESCRIBE rtsp://127.0.0.1:47950/media RTSP/1.0\r\nCSeq: 1\r\nAccept: application/sdp\r\nAccept-Encoding: identity\r\n\r\n",
+            Encoding.Latin1.GetString(server.Sent));
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_CompressedSetup_SendsNoAcceptEncoding()
+    {
+        var server = new ScriptedConnection(Bytes(Ok));
+        TransferContext context = Context(new HttpRequestOptions { Compressed = true });
+
+        TransferResult result = await Handler(server, new RtspRequestSettings { Kind = RtspRequestKind.Setup, StreamUri = Uri, Transport = "T" }).ExecuteAsync(context);
+
+        Diagnostics.ActResult(result);
+        Assert.AreEqual("SETUP rtsp://127.0.0.1:47950/media RTSP/1.0\r\nCSeq: 1\r\nTransport: T\r\n\r\n", Encoding.Latin1.GetString(server.Sent));
+    }
+
+    [TestMethod]
+    [DataRow(RtspRequestKind.Setup, TimeConditionKind.IfModifiedSince, "SETUP rtsp://127.0.0.1:47950/media RTSP/1.0\r\nCSeq: 1\r\nTransport: T\r\nUser-Agent: agent\r\nIf-Modified-Since: Thu, 02 Jan 2020 03:04:05 GMT\r\nX-A: 1\r\n\r\n")]
+    [DataRow(RtspRequestKind.Describe, TimeConditionKind.IfUnmodifiedSince, "DESCRIBE rtsp://127.0.0.1:47950/media RTSP/1.0\r\nCSeq: 1\r\nAccept: application/sdp\r\nUser-Agent: agent\r\nIf-Unmodified-Since: Thu, 02 Jan 2020 03:04:05 GMT\r\nX-A: 1\r\n\r\n")]
+    [DataRow(RtspRequestKind.Options, TimeConditionKind.IfModifiedSince, "OPTIONS rtsp://127.0.0.1:47950/media RTSP/1.0\r\nCSeq: 1\r\nUser-Agent: agent\r\nX-A: 1\r\n\r\n")]
+    [DataRow(RtspRequestKind.Play, TimeConditionKind.IfModifiedSince, "PLAY rtsp://127.0.0.1:47950/media RTSP/1.0\r\nCSeq: 1\r\nUser-Agent: agent\r\nX-A: 1\r\n\r\n")]
+    public async Task ExecuteAsync_TimeCondition_IsSentAfterAuthorizationOnSetupAndDescribeOnly(RtspRequestKind kind, TimeConditionKind conditionKind, string expected)
+    {
+        var server = new ScriptedConnection(Bytes(Ok));
+        TransferContext context = Context(new HttpRequestOptions { UserAgent = "agent", Headers = ["X-A: 1"] }, timeCondition: new TimeCondition(new DateTimeOffset(2020, 1, 2, 3, 4, 5, TimeSpan.Zero), conditionKind));
+
+        TransferResult result = await Handler(server, new RtspRequestSettings { Kind = kind, StreamUri = Uri, Transport = "T" }).ExecuteAsync(context);
+
+        Diagnostics.ActResult(result);
+        Diagnostics.DiffText("request sent", expected, server.Sent);
+        Assert.AreEqual(expected, Encoding.Latin1.GetString(server.Sent));
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ToolOptionsWithTimeCondition_SendsNone()
+    {
+        var server = new ScriptedConnection(Bytes(Ok));
+        TransferContext context = Context(timeCondition: new TimeCondition(DateTimeOffset.UnixEpoch, TimeConditionKind.IfModifiedSince));
+        var handler = new RtspProtocolHandler(new RecordingConnector(ConnectResult.Connected(server)), new RecordingAuthenticator());
+
+        TransferResult result = await handler.ExecuteAsync(context);
+
+        Diagnostics.ActResult(result);
+        Assert.AreEqual("OPTIONS * RTSP/1.0\r\nCSeq: 1\r\nUser-Agent: curl/8.22.0\r\n\r\n", Encoding.Latin1.GetString(server.Sent));
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_DescribeWithCustomIfModifiedSince_SendsOnlyTheCustomOne()
+    {
+        var server = new ScriptedConnection(Bytes(Ok));
+        TransferContext context = Context(new HttpRequestOptions { Headers = ["if-modified-since: never"] }, timeCondition: new TimeCondition(DateTimeOffset.UnixEpoch, TimeConditionKind.IfModifiedSince));
+
+        TransferResult result = await Handler(server, new RtspRequestSettings { Kind = RtspRequestKind.Describe, StreamUri = Uri }).ExecuteAsync(context);
+
+        Diagnostics.ActResult(result);
+        Assert.AreEqual(
+            "DESCRIBE rtsp://127.0.0.1:47950/media RTSP/1.0\r\nCSeq: 1\r\nAccept: application/sdp\r\nif-modified-since: never\r\n\r\n",
+            Encoding.Latin1.GetString(server.Sent));
+    }
+
+    [TestMethod]
+    [DataRow(1200110860800L, "Sat, 01 Jan 40000 00:00:00 GMT")]
+    [DataRow(1200116055845L, "Wed, 01 Mar 40000 03:04:05 GMT")]
+    public async Task ExecuteAsync_SetupWithTimeConditionPastYear9999_SendsTheWholeYear(long unixSeconds, string date)
+    {
+        var server = new ScriptedConnection(Bytes(Ok));
+        TransferContext context = Context(timeCondition: TimeCondition.FromUnixSeconds(unixSeconds, TimeConditionKind.IfModifiedSince));
+
+        TransferResult result = await Handler(server, new RtspRequestSettings { Kind = RtspRequestKind.Setup, StreamUri = Uri, Transport = "T" }).ExecuteAsync(context);
+
+        Diagnostics.ActResult(result);
+        Assert.AreEqual(
+            "SETUP rtsp://127.0.0.1:47950/media RTSP/1.0\r\nCSeq: 1\r\nTransport: T\r\nIf-Modified-Since: " + date + "\r\n\r\n",
+            Encoding.Latin1.GetString(server.Sent));
+    }
+
     private static byte[] Bytes(string text) => Encoding.Latin1.GetBytes(text);
 
     private RtspProtocolHandler Handler(IConnection connection, RtspRequestSettings settings, RtspSessionState? state = null) =>
         new(new RecordingConnector(ConnectResult.Connected(connection)), new RecordingAuthenticator(), null, settings, state);
 
-    private TransferContext Context(HttpRequestOptions? http = null, string? rangeText = null)
+    private TransferContext Context(HttpRequestOptions? http = null, string? rangeText = null, TimeCondition? timeCondition = null)
     {
-        TransferContext context = new() { Url = CurlUrl.Parse(Uri), Output = new MemoryStream(), Http = http, RangeText = rangeText };
+        TransferContext context = new() { Url = CurlUrl.Parse(Uri), Output = new MemoryStream(), Http = http, RangeText = rangeText, TimeCondition = timeCondition };
         Diagnostics.ArrangeContext(context);
         return context;
     }

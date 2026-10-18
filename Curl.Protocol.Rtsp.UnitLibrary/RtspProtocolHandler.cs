@@ -411,7 +411,8 @@ public sealed class RtspProtocolHandler(
             plan.SendsRange ? RtspRequestFormatter.RangeValue(context.ResumeFrom, context.RangeText) : null,
             options,
             Authorization(context, options),
-            plan);
+            plan,
+            context.TimeCondition);
 
     private string? Authorization(ITransferContext context, HttpRequestOptions options) =>
         authenticator.CreateAuthorization(

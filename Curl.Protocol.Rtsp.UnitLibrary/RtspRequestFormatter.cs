@@ -1,6 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Text;
+using Curl.Protocol.Abstractions;
 using HttpRequestOptions = Curl.Protocol.Abstractions.HttpRequestOptions;
 
 namespace Curl.Protocol.Rtsp;
@@ -24,6 +25,13 @@ internal static class RtspRequestFormatter
 {
     /// <summary>The <c>User-Agent</c> curl 8.21.0 sends when <c>-A</c> is not given.</summary>
     internal const string DefaultUserAgent = "curl/8.22.0";
+
+    /// <summary>The exit 85 message for a <c>-H</c> header that names <c>CSeq</c>.</summary>
+    /// <summary>
+    /// The <c>Accept-Encoding</c> value a libcurl <c>DESCRIBE</c> sends for <c>--compressed</c>:
+    /// the four tokens the HTTP library sends, the same on the Schannel and OpenSSL builds (ADR-0287).
+    /// </summary>
+    internal const string AcceptEncoding = "deflate, gzip, br, zstd";
 
     /// <summary>The exit 85 message for a <c>-H</c> header that names <c>CSeq</c>.</summary>
     internal const string CustomCSeqRefused = "CSeq cannot be set as a custom header.";
@@ -78,10 +86,13 @@ internal static class RtspRequestFormatter
     /// The libcurl request's kind, <c>Transport</c> and body (BL-2751), or <see langword="null" /> for
     /// the curl tool's <c>OPTIONS</c>, the one request that sends curl's default <c>User-Agent</c>.
     /// </param>
+    /// <param name="timeCondition">The <c>-z</c> condition, or <see langword="null" /> for none.</param>
     /// <returns>The request head, Latin-1 encoded, ending with the blank line; the body is not included.</returns>
     /// <remarks>
-    /// For a libcurl request, <c>lib/rtsp.c</c>'s order: <c>Transport</c> (a <c>SETUP</c> only) and
-    /// <c>Accept: application/sdp</c> (a <c>DESCRIBE</c> only) follow <c>Session</c>, and a body's
+    /// For a libcurl request, <c>lib/rtsp.c</c>'s order: <c>Transport</c> (a <c>SETUP</c> only),
+    /// <c>Accept: application/sdp</c> and, for <c>--compressed</c>, <c>Accept-Encoding</c> (a
+    /// <c>DESCRIBE</c> only) follow <c>Session</c>; the time condition (a <c>SETUP</c> or
+    /// <c>DESCRIBE</c> only) follows <c>Authorization</c> (BL-2781); and a body's
     /// <c>Content-Length</c> and <c>Content-Type</c> follow the custom headers; a custom header of
     /// the same name suppresses each.
     /// </remarks>
@@ -93,7 +104,8 @@ internal static class RtspRequestFormatter
         string? range,
         HttpRequestOptions options,
         string? authorization,
-        RtspRequestPlan? plan = null)
+        RtspRequestPlan? plan = null,
+        TimeCondition? timeCondition = null)
     {
         plan ??= RtspRequestPlan.ToolTransfer;
         RtspCustomHeader[] customHeaders = [.. options.Headers.Select(entry => RtspCustomHeader.Parse(HeadText(entry, options)))];
@@ -105,11 +117,12 @@ internal static class RtspRequestFormatter
             head.Append("Session: ").Append(sessionId).Append("\r\n");
         }
 
-        AppendRequestKindHeaders(head, customHeaders, plan);
+        AppendRequestKindHeaders(head, customHeaders, plan, options.Compressed);
         AppendUnlessOverridden(head, customHeaders, "Range", HeadText(range, options));
         AppendUnlessOverridden(head, customHeaders, "Referer", HeadText(options.Referer, options));
         AppendUnlessOverridden(head, customHeaders, "User-Agent", UserAgentValue(options, plan));
         AppendUnlessOverridden(head, customHeaders, "Authorization", authorization);
+        AppendTimeCondition(head, customHeaders, plan, timeCondition);
         AppendCustomHeaders(head, customHeaders);
         AppendBodyHeaders(head, customHeaders, plan);
         head.Append("\r\n");
@@ -121,10 +134,28 @@ internal static class RtspRequestFormatter
         HeadText(options.UserAgent, options) ?? (plan.IsToolTransfer ? DefaultUserAgent : null);
 
     /// <summary>Writes a <c>SETUP</c>'s <c>Transport</c> and a <c>DESCRIBE</c>'s <c>Accept</c>.</summary>
-    private static void AppendRequestKindHeaders(StringBuilder head, RtspCustomHeader[] customHeaders, RtspRequestPlan plan)
+    private static void AppendRequestKindHeaders(StringBuilder head, RtspCustomHeader[] customHeaders, RtspRequestPlan plan, bool compressed)
     {
+        bool describes = plan.Kind == RtspRequestKind.Describe;
         AppendUnlessOverridden(head, customHeaders, "Transport", plan.TransportValue(NamesHeader(customHeaders, "Transport")));
-        AppendUnlessOverridden(head, customHeaders, "Accept", plan.Kind == RtspRequestKind.Describe ? "application/sdp" : null);
+        AppendUnlessOverridden(head, customHeaders, "Accept", describes ? "application/sdp" : null);
+        AppendUnlessOverridden(head, customHeaders, "Accept-Encoding", describes && compressed ? AcceptEncoding : null);
+    }
+
+    /// <summary>
+    /// Writes <c>If-Modified-Since</c> for <c>-z date</c> or <c>If-Unmodified-Since</c> for
+    /// <c>-z -date</c> on a libcurl <c>SETUP</c> or <c>DESCRIBE</c> only, as <c>rtsp_do</c> calls
+    /// <c>Curl_add_timecondition</c>, unless a custom header names it.
+    /// </summary>
+    private static void AppendTimeCondition(StringBuilder head, RtspCustomHeader[] customHeaders, RtspRequestPlan plan, TimeCondition? timeCondition)
+    {
+        if (timeCondition is null || plan.Kind is not (RtspRequestKind.Setup or RtspRequestKind.Describe))
+        {
+            return;
+        }
+
+        string name = timeCondition.Kind == TimeConditionKind.IfUnmodifiedSince ? "If-Unmodified-Since" : "If-Modified-Since";
+        AppendUnlessOverridden(head, customHeaders, name, RtspConditionDate.Format(timeCondition));
     }
 
     private static void AppendCustomHeaders(StringBuilder head, RtspCustomHeader[] customHeaders)
