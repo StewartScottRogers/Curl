@@ -21,6 +21,20 @@ public sealed class UrlHandleOverrideTests
     }
 
     [TestMethod]
+    public void Apply_HandleParsedAllowingSpaces_SendsEachPathSpaceAsPercent20()
+    {
+        using ManagedCurlUrlHandle handle = new();
+        handle.Set(CurlUrlPart.Url, "http://127.0.0.1:8990/ /with/ space/ /file", CurlUrlFlags.AllowSpace);
+        EasyOptions options = new() { Network = new EasyNetworkOptions { UrlHandle = handle } };
+
+        EasyOptions applied = UrlHandleOverride.Apply(options);
+
+        Assert.AreEqual("http://127.0.0.1:8990/%20/with/%20space/%20/file", applied.Network.Url);
+        Assert.AreEqual(CurlUrlCode.Ok, handle.Get(CurlUrlPart.Path, CurlUrlFlags.None, out string? path));
+        Assert.AreEqual("/ /with/ space/ /file", path);
+    }
+
+    [TestMethod]
     public void Apply_HandleWithNoPath_GivesTheUrlWithASlashPath()
     {
         using ManagedCurlUrlHandle handle = new();
