@@ -75,7 +75,7 @@ internal static class HttpRequestOptionsMapping
     /// <see cref="HttpRequestOptions.ContinueWait" />. <see cref="EasyTransferOptions.CustomRequest" /> as
     /// <see cref="HttpRequestOptions.CustomMethod" />, and <see cref="EasyBehaviourOptions.FailOnError" /> as
     /// <see cref="HttpRequestOptions.Fail" /> <see cref="HttpFailMode.Fail" />, otherwise <c>--fail-with-body</c>'s
-    /// <see cref="EngineTransferSettings.FailMode" />. From <paramref name="authentication" />:
+    /// <see cref="EngineTransferSettings.FailMode" />; <see cref="EasyBehaviourOptions.KeepSendingOnError" /> verbatim. From <paramref name="authentication" />:
     /// <see cref="EasyAuthenticationOptions.HttpAuthentication" /> as <see cref="HttpRequestOptions.AuthSchemes" />
     /// (<see cref="AuthSchemesOf" />), <see cref="EasyAuthenticationOptions.XOAuth2Bearer" /> as
     /// <see cref="HttpRequestOptions.BearerToken" /> and <see cref="EasyAuthenticationOptions.AwsSigV4" /> verbatim;
@@ -112,6 +112,7 @@ internal static class HttpRequestOptionsMapping
             AutoReferer = http.AutoReferer,
             Body = RequestBodyOf(http, transfer, formBody),
             Fail = behaviour.FailOnError ? HttpFailMode.Fail : settings.FailMode,
+            KeepSendingOnError = behaviour.KeepSendingOnError,
             FollowRedirects = http.FollowLocation != FollowLocation.None,
             MaxRedirects = (int)http.MaxRedirects,
             AuthSchemes = HttpSignatureSetup.Of(authentication).Settings is null ? AuthSchemesOf(authentication) : HttpAuthSchemes.None,

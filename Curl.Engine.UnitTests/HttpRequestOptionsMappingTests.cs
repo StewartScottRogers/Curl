@@ -83,6 +83,19 @@ public sealed class HttpRequestOptionsMappingTests
     }
 
     [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public void Of_KeepSendingOnError_IsCopiedFromTheBehaviourOptions(bool keepSendingOnError)
+    {
+        Diagnostics.Arrange("keep sending on error", keepSendingOnError);
+
+        HttpRequestOptions mapped = HttpRequestOptionsMapping.Of(EasyOptionsFromCommandLine.TransferSettingsOf(NoOptions), new EasyHttpOptions(), new EasyBehaviourOptions { KeepSendingOnError = keepSendingOnError }, new EasyTransferOptions(), new EasyAuthenticationOptions());
+
+        Diagnostics.Assert("keep sending on error", keepSendingOnError, mapped.KeepSendingOnError);
+        Assert.AreEqual(keepSendingOnError, mapped.KeepSendingOnError);
+    }
+
+    [TestMethod]
     public void Of_NoBodyWithPostFieldsAndFormBody_SendsNoBody()
     {
         EasyHttpOptions http = new() { PostFields = "moo"u8.ToArray(), Post = true };
