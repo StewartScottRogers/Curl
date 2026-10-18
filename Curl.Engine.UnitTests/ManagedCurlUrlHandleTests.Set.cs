@@ -8,6 +8,20 @@ public sealed partial class ManagedCurlUrlHandleTests
     private const string ImapUrl = "imap://user:pw;opt@example.com:8080/p?q=1#frag";
 
     [TestMethod]
+    [DataRow(CurlUrlPart.Url)]
+    [DataRow(CurlUrlPart.Scheme)]
+    [DataRow(CurlUrlPart.User)]
+    [DataRow(CurlUrlPart.Fragment)]
+    public void Set_PartPastMaximumInputLength_IsMalformedInputAndKeepsTheUrl(CurlUrlPart part)
+    {
+        using ManagedCurlUrlHandle url = Parsed(ImapUrl);
+
+        Assert.AreEqual(CurlUrlCode.MalformedInput, url.Set(part, new string('a', 8_000_001), CurlUrlFlags.NonSupportScheme));
+
+        Assert.AreEqual(ImapUrl, GetOk(url, CurlUrlPart.Url));
+    }
+
+    [TestMethod]
     public void Set_NullUrl_ClearsEveryPart()
     {
         using ManagedCurlUrlHandle url = Parsed(FullUrl);

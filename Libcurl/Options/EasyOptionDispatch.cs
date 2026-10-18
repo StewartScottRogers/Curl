@@ -10,6 +10,9 @@ namespace Libcurl.Options;
 /// <param name="setters">The setters to dispatch through, by option.</param>
 internal sealed class EasyOptionDispatch(IReadOnlyDictionary<CurlOption, EasyOptionSetter> setters)
 {
+    /// <summary>Upstream's <c>CURL_MAX_INPUT_LENGTH</c>: the longest string option <c>Curl_setstropt</c> copies.</summary>
+    internal const int MaximumInputLength = 8_000_000;
+
     /// <summary>The dispatch over every setter the option groups have added (<see cref="EasyOptionSetters"/>).</summary>
     internal static EasyOptionDispatch Default { get; } = new(EasyOptionSetters.Create());
 
@@ -19,7 +22,7 @@ internal sealed class EasyOptionDispatch(IReadOnlyDictionary<CurlOption, EasyOpt
     /// <param name="value">The value to set it to.</param>
     /// <returns>
     /// <see cref="CurlCode.UnknownOption"/> for an option upstream's table lacks,
-    /// <see cref="CurlCode.BadFunctionArgument"/> for a value of the wrong type,
+    /// <see cref="CurlCode.BadFunctionArgument"/> for a value of the wrong type or a string past <see cref="MaximumInputLength"/>,
     /// <see cref="CurlCode.NotBuiltIn"/> for an option no group sets yet, else the setter's answer.
     /// </returns>
     internal CurlCode SetOption(ref EasyOptions options, CurlOption option, object? value)
@@ -31,6 +34,11 @@ internal sealed class EasyOptionDispatch(IReadOnlyDictionary<CurlOption, EasyOpt
         }
 
         if (!CurlOptionValues.Accepts(entry.Type, value))
+        {
+            return CurlCode.BadFunctionArgument;
+        }
+
+        if (entry.Type == CurlOptionType.String && value is string text && text.Length > MaximumInputLength)
         {
             return CurlCode.BadFunctionArgument;
         }

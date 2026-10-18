@@ -156,6 +156,19 @@ public sealed class CurlEasyTests
     }
 
     [TestMethod]
+    public async Task SetOption_StringPastMaximumInputLength_IsBadFunctionArgumentAndKeepsTheOldValue()
+    {
+        await using var library = CurlGlobal.Init(CurlGlobalFlags.Nothing);
+        using var easy = library.EasyInit();
+        Assert.AreEqual(CurlCode.Ok, easy.SetOption(CurlOption.Useragent, "before"));
+
+        Assert.AreEqual(CurlCode.BadFunctionArgument, easy.SetOption(CurlOption.Useragent, new string('a', EasyOptionDispatch.MaximumInputLength + 1)));
+        Assert.AreEqual(CurlCode.BadFunctionArgument, easy.SetOption(CurlOption.Url, new string('a', EasyOptionDispatch.MaximumInputLength + 1)));
+        Assert.AreEqual(CurlCode.Ok, easy.SetOption(CurlOption.Useragent, new string('a', EasyOptionDispatch.MaximumInputLength)));
+        Assert.AreEqual(CurlCode.Ok, easy.SetOption(CurlOption.Postfields, new string('a', EasyOptionDispatch.MaximumInputLength + 1)));
+    }
+
+    [TestMethod]
     public void SetOption_AFailingCode_LeavesTheOptionsUnchanged()
     {
         var transfer = new FakeEasyTransfer();
