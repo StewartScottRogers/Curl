@@ -4583,7 +4583,9 @@ internal sealed class CurlCommandRunner(
     private TransferResult? SetUpToolEasy(ToolEasyHandle easy, CommandLineOptions options, TransferAttemptPieces attempt)
     {
         Api.Options.EasyOptions groups = EasyOptionsFromCommandLine.EasyOptionsOf(options, url: null) with { Transfer = attempt.Transfer };
-        using CurlMime? form = CurlMimeFromFormBody.Of(engine.MimeInit, groups.Http.MimePost);
+        // Never freed here: libcurl reads a CURLOPT_MIMEPOST structure at each perform and posts nothing once it is
+        // freed (ADR-0675), and the tool keeps its form until the transfer ends, as curl's tool frees it at cleanup.
+        CurlMime? form = CurlMimeFromFormBody.Of(engine.MimeInit, groups.Http.MimePost);
         Api.Options.EasyOptions hooks = EasySetoptsFromCommandLine.KeptOnHooks(groups);
         easy.Hooks.Options = form is null ? hooks : hooks with { Http = hooks.Http with { MimePost = null } };
 
