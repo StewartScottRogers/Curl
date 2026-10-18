@@ -19,6 +19,20 @@ internal sealed class MimeCallbackReadStream(EasyMimeCallback part) : CallbackRe
     /// <inheritdoc />
     public override bool CanSeek => part.Seek is not null;
 
+    /// <summary>
+    /// Gets a value indicating whether the part has a known size and the read callback has given all of it, so it is
+    /// not asked again, as curl 8.22.0's <c>read_part_content</c> spares the read once <c>offset &gt;= datasize</c>
+    /// (upstream test 554, BL-2613).
+    /// </summary>
+    private bool AtSizedEnd => part.Size >= 0 && BytesReadSinceRewind >= part.Size;
+
+    /// <inheritdoc />
+    public override int Read(Span<byte> buffer) => AtSizedEnd ? 0 : base.Read(buffer);
+
+    /// <inheritdoc />
+    public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default) =>
+        AtSizedEnd ? ValueTask.FromResult(0) : base.ReadAsync(buffer, cancellationToken);
+
     /// <inheritdoc />
     /// <exception cref="NotSupportedException">The part's size is unknown (-1) or it has no seek callback.</exception>
     public override long Length => CanSeek && part.Size >= 0 ? part.Size : throw new NotSupportedException();
