@@ -32,3 +32,4 @@ Found by BL-2539 (port `LibProxyTunnelUpload` in `Curl.Conformance.LibTest.UnitL
 ## Log
 
 - 2026-10-17: Created.
+- 2026-10-17: Backlog -> Doing. Criteria at claim: 9503dea4 dfad422d 4272a6b9 c4aff572.
