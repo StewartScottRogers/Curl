@@ -1,0 +1,51 @@
+---
+id: BL-2766
+title: Fix AF-0255: TryLookUpNetrcCredentials' || can become && with no test failing, so tool-driven or netrc-ignored transfers still read .netrc
+priority: Normal
+assignee: Claude
+pipeline: feature
+depends-on: []
+touches: [Curl.Engine.UnitLibrary]
+requirement: none
+created: 2026-10-18
+completed:
+---
+# BL-2766 — Fix AF-0255: TryLookUpNetrcCredentials' || can become && with no test failing, so tool-driven or netrc-ignored transfers still read .netrc
+
+## Goal
+
+The defect the audit office reported as AF-0255 is fixed: its reproduction no longer reproduces, so a re-audit can close the finding.
+
+## Context
+
+Filed from audit finding AF-0255 (Medium, quality auditor), which Stewart accepted. The finding is `Audit/Findings/AF-0255-trylookupnetrccredentials-can-become-with-no-test.md`.
+
+Location: `Curl.Engine.UnitLibrary/ManagedEasyTransfer.cs:707`
+
+Location: `Curl.Engine.UnitLibrary/ManagedEasyTransfer.cs:707`
+
+Engine sample, seed 0: survived. Original `if (ToolInputs is not null || options.Authentication.Netrc == NetrcUsage.Ignored) return true;`, mutated `&&`. With the mutant, a transfer with ToolInputs and netrc enabled, or one with netrc Ignored and no ToolInputs, runs the engine's netrc lookup it should skip. That can add credentials, an info line, or an exit-26 failure. No test pins the skip.
+
+Reproduction, from the finding:
+
+Run from the repository root:
+
+```powershell
+powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Engine.UnitLibrary/ManagedEasyTransfer.cs:707:|| -Member TryLookUpNetrcCredentials -ExcludeBaselineFailures -TimeoutSeconds 600
+```
+
+- Expected: outcome killed
+- Actual: outcome survived
+
+The finding closes only when a later re-audit by the quality auditor confirms the fix, never because this task reaches Done.
+
+## Acceptance criteria
+
+- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+
+## Notes
+
+## Log
+
+- 2026-10-18: Created.

@@ -1,0 +1,51 @@
+---
+id: BL-2770
+title: Fix AF-0259: Lib1564's wakeup loop i < wakeups can become <= with no test failing, sending one wakeup too many per round
+priority: Normal
+assignee: Claude
+pipeline: feature
+depends-on: []
+touches: [Curl.Conformance.LibTest.UnitLibrary]
+requirement: none
+created: 2026-10-18
+completed:
+---
+# BL-2770 — Fix AF-0259: Lib1564's wakeup loop i < wakeups can become <= with no test failing, sending one wakeup too many per round
+
+## Goal
+
+The defect the audit office reported as AF-0259 is fixed: its reproduction no longer reproduces, so a re-audit can close the finding.
+
+## Context
+
+Filed from audit finding AF-0259 (Medium, quality auditor), which Stewart accepted. The finding is `Audit/Findings/AF-0259-lib1564-s-wakeup-loop-i-wakeups-can-become-with-no.md`.
+
+Location: `Curl.Conformance.LibTest.UnitLibrary/Lib1564.cs:65`
+
+Location: `Curl.Conformance.LibTest.UnitLibrary/Lib1564.cs:65`
+
+LibTest sample, seed 0: survived. Original `for (int i = 0; i < wakeups; i++)`, mutated `<=`. A round meant to have no wakeup gets one, so curl_multi_poll returns early where upstream's lib1564 expects it to wait. No test pins the number of MultiWakeup calls per round.
+
+Reproduction, from the finding:
+
+Run from the repository root:
+
+```powershell
+powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Conformance.LibTest.UnitLibrary/Lib1564.cs:65:< -Member TestAsync -ExcludeBaselineFailures -TimeoutSeconds 600
+```
+
+- Expected: outcome killed
+- Actual: outcome survived
+
+The finding closes only when a later re-audit by the quality auditor confirms the fix, never because this task reaches Done.
+
+## Acceptance criteria
+
+- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+
+## Notes
+
+## Log
+
+- 2026-10-18: Created.

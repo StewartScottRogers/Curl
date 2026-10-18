@@ -1,0 +1,51 @@
+---
+id: BL-2775
+title: Fix AF-0264: CI red for 103.15 minutes from run 38876049958 on 241c183e (Quality gates); fix done in 16.7 min, then 5 cancelled runs
+priority: Low
+assignee: Claude
+pipeline: direct
+depends-on: []
+touches: [RunDarkFactory.ps1]
+requirement: none
+created: 2026-10-18
+completed:
+---
+# BL-2775 — Fix AF-0264: CI red for 103.15 minutes from run 38876049958 on 241c183e (Quality gates); fix done in 16.7 min, then 5 cancelled runs
+
+## Goal
+
+The defect the audit office reported as AF-0264 is fixed: its reproduction no longer reproduces, so a re-audit can close the finding.
+
+## Context
+
+Filed from audit finding AF-0264 (Low, process auditor), which Stewart accepted. The finding is `Audit/Findings/AF-0264-ci-red-for-103-15-minutes-from-run-38876049958-on.md`.
+
+Location: `logs/ci-runs.json`
+
+Location: `logs/ci-runs.json`
+
+ciRedSpells: 2026-10-16T09:02:13Z to 10:45:22Z, 103.15 min, run 38876049958, stillRed False. Runs in ci-runs.json: 38876049958 failure (241c183e), 38878261240 cancelled, 38880310277 failure (0c71f7fb), 38882357911, 38884026379, 38884492897 and 38886128544 cancelled, 38887776973 success at 10:45:22Z. This is the same incident as AF-0244 (Quality gates job, Libcurl CurlMulti.SetOption branch gap, BL-2466/BL-2467). The window starting 2026-10-16 includes it again; the coordinator log that recorded it is in the previous audit's copy (DarkFactory-20261015-200601.log). Reported because the rule crosses; it should close as a duplicate of AF-0244.
+
+Reproduction, from the finding:
+
+Run from the repository root:
+
+```powershell
+powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-10-16 -LogRoot Z:\repos\Curl.audit\20261018-104525\logs -CiRunsJson Z:\repos\Curl.audit\20261018-104525\logs\ci-runs.json -OutFile $env:TEMP\process.json; (Get-Content $env:TEMP\process.json -Raw | ConvertFrom-Json).ciRedSpells | Format-Table
+```
+
+- Expected: No red spell over 30 minutes.
+- Actual: 2026-10-16T09:02:13Z 2026-10-16T10:45:22Z 103.15 38876049958 False
+
+The finding closes only when a later re-audit by the process auditor confirms the fix, never because this task reaches Done.
+
+## Acceptance criteria
+
+- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+
+## Notes
+
+## Log
+
+- 2026-10-18: Created.
