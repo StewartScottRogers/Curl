@@ -13,9 +13,13 @@ on:
 permissions:
   contents: read
 
+# One run per ref at a time. On work/dark-factory a running run always finishes: parallel
+# lanes push more often than a run takes, and cancelling left Linux and macOS untested for
+# hours (ADR-0693). Only the waiting run is replaced by a newer push, so the newest commit
+# is always the next one tested. Every other ref cancels its running run as before.
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/work/dark-factory' }}
 
 jobs:
   # Audit guard layer 3 (ADR-0267): fails when work/dark-factory, pushed or as a pull
