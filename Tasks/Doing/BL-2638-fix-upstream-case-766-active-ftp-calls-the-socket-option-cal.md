@@ -31,3 +31,4 @@ Found by BL-2536, which ported lib766 (`Curl.Conformance.LibTest.UnitLibrary/Lib
 ## Log
 
 - 2026-10-17: Created.
+- 2026-10-18: Backlog -> Doing. Criteria at claim: da7e849c c59fcab3 3d836d5e.
