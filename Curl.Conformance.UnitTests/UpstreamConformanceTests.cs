@@ -421,6 +421,8 @@ public sealed class UpstreamConformanceTests
     // RunCurlAsync signs an --aws-sigv4 command at the epoch. The WebSocket libtest cases (2301 to 2304) rely on Debug for
     // CURL_ENTROPY, which pins Sec-WebSocket-Key and the frame masks: the harness reports Debug to a case naming the ws
     // feature and setting CURL_ENTROPY, and CreateEngine gives the libtest engine the forced sequence (ADR-0678, BL-2688).
+    // The FTP libtest case 753 relies on Debug for CURL_FTP_PWD_STOP, which stops the first transfer before PWD: the
+    // harness reports Debug to a case setting it, and CreateEngine has the libtest engine stop its first perform there (ADR-0687, BL-2636).
     private static UpstreamCurlPlatform PlatformFor(byte[] testFile)
     {
         string text = Encoding.Latin1.GetString(testFile);
@@ -429,7 +431,8 @@ public sealed class UpstreamConformanceTests
             || (text.Contains("\nws\n", StringComparison.Ordinal) && text.Contains("\nCURL_ENTROPY=", StringComparison.Ordinal))
             || (text.Contains("\nHSTS\n", StringComparison.Ordinal) && text.Contains("\nCURL_TIME=", StringComparison.Ordinal))
             || (text.Contains("\nalt-svc\n", StringComparison.Ordinal) && text.Contains("\nCURL_ALTSVC_HTTP=", StringComparison.Ordinal))
-            || text.Contains(":%HTTP2TLSPORT/", StringComparison.Ordinal);
+            || text.Contains(":%HTTP2TLSPORT/", StringComparison.Ordinal)
+            || text.Contains("\nCURL_FTP_PWD_STOP=", StringComparison.Ordinal);
         UpstreamCurlPlatform platform = standsInForDebug ? Platform.WithFeatures(["Debug"]) : Platform;
         return text.Contains("\n<server>\n", StringComparison.Ordinal) && text.Contains("\ndns\n", StringComparison.Ordinal)
             ? platform.WithFeatures(["override-dns"])
@@ -606,7 +609,8 @@ public sealed class UpstreamConformanceTests
             new EngineDialing(new InMemoryServerTcpDialer(invocation.Connector), new LoopbackOnlyDnsResolver(), invocation.DatagramConnector, invocation.ConnectionListener, UsesHandBuiltNtlm: true),
             signingClock: new UnixEpochClock(),
             webSocketRandomSource: invocation.EnvironmentVariables.GetValueOrDefault("CURL_ENTROPY") is { } entropy ? new ForcedEntropyWebSocketRandomSource(entropy) : null,
-            standardInput: invocation.StandardInput);
+            standardInput: invocation.StandardInput,
+            stopsFirstFtpTransferBeforePwd: invocation.EnvironmentVariables.ContainsKey("CURL_FTP_PWD_STOP"));
 
     // The ported libtest programs the ratchet runs a <tool> case's program from, over CreateEngine.
     private static readonly UpstreamLibTests LibTests = new(LibTestPrograms.Ported, CreateEngine);

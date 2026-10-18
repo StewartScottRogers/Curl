@@ -1496,7 +1496,9 @@ internal sealed class ManagedEasyTransfer(
     public ValueTask<CurlCode> UpkeepAsync(CancellationToken cancellationToken) => ValueTask.FromResult(CurlCode.Ok);
 
     /// <summary>
-    /// <c>curl_easy_cleanup</c>: hands the HSTS cache to <c>CURLOPT_HSTSWRITEFUNCTION</c> (<see cref="SaveHstsToCallback" />),
+    /// <c>curl_easy_cleanup</c>: removes the handle from the multi handle it is still in, cancelling its perform, as
+    /// libcurl's <c>curl_easy_cleanup</c> calls <c>curl_multi_remove_handle</c> (upstream test753, BL-2636), hands the HSTS
+    /// cache to <c>CURLOPT_HSTSWRITEFUNCTION</c> (<see cref="SaveHstsToCallback" />),
     /// takes the attached share handle's cookie lock for libcurl's cookie flush and detaches from it, then closes the
     /// connection a connect-only perform left open or upgraded, if any, and the handle's own idle pooled connections
     /// (<see cref="OwnTheConnectionsOpened" />), as libcurl closes the handle's connection cache, FTP's sending <c>QUIT</c>.
@@ -1504,6 +1506,11 @@ internal sealed class ManagedEasyTransfer(
     /// <returns>A task that completes once they are closed.</returns>
     public async ValueTask DisposeAsync()
     {
+        if (shared.MultiOwners.TryGetValue(this, out ManagedMultiTransfer? multi))
+        {
+            _ = multi.Remove(this);
+        }
+
         SaveHstsToCallback();
         optionShare?.LockCookies(this, 1);
         optionShare = ManagedShareHandle.Reattach(optionShare, named: null, this);

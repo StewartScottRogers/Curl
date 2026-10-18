@@ -412,6 +412,7 @@ internal sealed class FtpSession(
             TransferResult? failed = await GreetAndLogInAsync().ConfigureAwait(false)
                 ?? await ProtectDataAsync().ConfigureAwait(false)
                 ?? await ClearControlTlsAsync().ConfigureAwait(false)
+                ?? await StopBeforeEntryPathAsync().ConfigureAwait(false)
                 ?? await ReadEntryPathAsync().ConfigureAwait(false);
             if (failed is null)
             {
@@ -489,6 +490,28 @@ internal sealed class FtpSession(
         return (await ExchangeAsync("CWD " + entry).ConfigureAwait(false)).IsCompletion
             ? null
             : await QuitAndFailLeavingConnectionIntactAsync(CurlExitCode.RemoteAccessDenied, FtpTransferMessages.ChangeDirectoryDenied).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Gets a value indicating whether the connect phase stops after the login, before <c>PWD</c>, as
+    /// upstream's debug build does under <c>CURL_FTP_PWD_STOP</c> (<see cref="FtpProtocolHandler.StopsBeforeEntryPath" />).
+    /// </summary>
+    internal bool StopsBeforeEntryPath { get; init; }
+
+    /// <summary>
+    /// Under <see cref="StopsBeforeEntryPath" />, waits without sending <c>PWD</c> until the transfer is
+    /// cancelled or the connect phase times out, as upstream's <c>ftp_state_pwd</c> leaves the state machine
+    /// where it is; otherwise carries straight on.
+    /// </summary>
+    private async ValueTask<TransferResult?> StopBeforeEntryPathAsync()
+    {
+        if (StopsBeforeEntryPath)
+        {
+            await Task.Delay(Timeout.Infinite, control.CancellationToken).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+        }
+
+        control.CancellationToken.ThrowIfCancellationRequested();
+        return null;
     }
 
     private ValueTask<TransferResult?> ReadEntryPathAsync() => ReadEntryPathAsync(askSystemForRelativePath: true);

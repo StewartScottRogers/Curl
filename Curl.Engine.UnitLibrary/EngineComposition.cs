@@ -127,6 +127,7 @@ internal static class EngineComposition
     /// <param name="webSocketRawMode">Whether the WebSocket handler writes the received stream unframed (<see cref="WsProtocolHandler.RawMode" />, libcurl's <c>CURLWS_RAW_MODE</c>, BL-2494).</param>
     /// <param name="http2PushSink">Where the HTTP handler offers HTTP/2 server pushes (BL-2469); <see langword="null" /> keeps <c>SETTINGS_ENABLE_PUSH</c> 0.</param>
     /// <param name="webSocketRandomSource">Where the WebSocket handler draws each <c>Sec-WebSocket-Key</c> and frame mask from (BL-2688); <see langword="null" /> for <see cref="SystemWebSocketRandomSource" />.</param>
+    /// <param name="ftpStopsBeforeEntryPath">Whether the FTP handler's new control connections stop before <c>PWD</c> (<see cref="FtpProtocolHandler.StopsBeforeEntryPath" />, BL-2636).</param>
     internal static IReadOnlyList<IProtocolHandler> CreateProtocolHandlers(
         IConnector connector,
         IDatagramConnector datagramConnector,
@@ -151,7 +152,8 @@ internal static class EngineComposition
         IRtspInterleaveSink? rtspInterleaveSink = null,
         bool webSocketRawMode = false,
         IHttp2PushSink? http2PushSink = null,
-        IWebSocketRandomSource? webSocketRandomSource = null)
+        IWebSocketRandomSource? webSocketRandomSource = null,
+        bool ftpStopsBeforeEntryPath = false)
     {
         ConnectionEndPointRecorder recorder = new();
         EndPointRecordingConnector recordingConnector = new(connector, recorder);
@@ -184,7 +186,7 @@ internal static class EngineComposition
             http,
             new LazyProtocolHandler(["ftp", "ftps"], () => new RoutingFtpProtocolHandler(
                 http,
-                CreateFtpProtocolHandler(recordingConnector, new EndPointRecordingConnector(ftpDataConnector ?? connector, recorder), tlsProvider, dnsResolver, tracesFtp, ftpListener, ftpWildcardHooks))),
+                CreateFtpProtocolHandler(recordingConnector, new EndPointRecordingConnector(ftpDataConnector ?? connector, recorder), tlsProvider, dnsResolver, tracesFtp, ftpListener, ftpWildcardHooks, ftpStopsBeforeEntryPath))),
         ];
 
         return [.. handlers.Select(handler => new EndPointReportingProtocolHandler(handler, recorder))];
@@ -224,8 +226,9 @@ internal static class EngineComposition
     /// <param name="listener">Listens for active-mode data connections; a <see cref="TcpConnectionListener" /> when not given.</param>
     /// <param name="wildcardHooks">The wildcard hooks (ADR-0615, ADR-0619); <see langword="null" /> fetches a wildcard URL as a plain path.</param>
     /// <returns>The handler.</returns>
-    internal static FtpProtocolHandler CreateFtpProtocolHandler(IConnector connector, IConnector dataConnector, ITlsProvider tlsProvider, IDnsResolver dnsResolver, bool tracesFtp = false, IConnectionListener? listener = null, IFtpWildcardHooks? wildcardHooks = null) =>
-        new(connector, dataConnector, listener ?? new TcpConnectionListener(), tlsProvider, dnsResolver, new SystemNetworkInterfaceLookup()) { TracesStateMachine = tracesFtp, WildcardHooks = wildcardHooks };
+    /// <param name="stopsBeforeEntryPath">Whether a new control connection stops before <c>PWD</c> (<see cref="FtpProtocolHandler.StopsBeforeEntryPath" />, the debug build's <c>CURL_FTP_PWD_STOP</c>, BL-2636).</param>
+    internal static FtpProtocolHandler CreateFtpProtocolHandler(IConnector connector, IConnector dataConnector, ITlsProvider tlsProvider, IDnsResolver dnsResolver, bool tracesFtp = false, IConnectionListener? listener = null, IFtpWildcardHooks? wildcardHooks = null, bool stopsBeforeEntryPath = false) =>
+        new(connector, dataConnector, listener ?? new TcpConnectionListener(), tlsProvider, dnsResolver, new SystemNetworkInterfaceLookup()) { TracesStateMachine = tracesFtp, WildcardHooks = wildcardHooks, StopsBeforeEntryPath = stopsBeforeEntryPath };
 
     /// <summary>
     /// The connector FTP's passive data connections go through: the option group's pooling

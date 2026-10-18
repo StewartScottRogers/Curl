@@ -313,6 +313,55 @@ public sealed class ManagedCurlEngineTests
         Assert.Contains("Authorization: Digest username=\"alice\", realm=\"my-backyard\", nonce=\"314156295\", uri=\"/api\", response=\"", request);
     }
 
+    [TestMethod]
+    public async Task PerformAsync_StopsFirstFtpTransferBeforePwd_FirstFtpPerformSendsNoPwdAndTimesOut()
+    {
+        ScriptedConnector server = new(["220 ready\r\n331 Password required\r\n230 Logged in\r\n257 \"/\" is current directory\r\n"u8.ToArray()]);
+        EngineDialing dialing = new(new ScriptedTcpDialer(server), new LoopbackDnsResolver(), new RecordingDatagramConnector(Curl.Protocol.Abstractions.CurlExitCode.CouldntConnect, "no udp"));
+        await using ManagedCurlEngine engine = new(TimeProvider.System, null, dialing: dialing, stopsFirstFtpTransferBeforePwd: true);
+        await using IEasyTransfer easy = engine.CreateEasy();
+        easy.Options = new EasyOptions { Network = new EasyNetworkOptions { Url = "ftp://127.0.0.1:9000/753", ConnectTimeout = TimeSpan.FromMilliseconds(200) } };
+
+        CurlCode code = await easy.PerformAsync(CancellationToken.None);
+
+        Assert.AreEqual(CurlCode.OperationTimedOut, code);
+        Assert.AreEqual("USER anonymous\r\nPASS ftp@example.com\r\n", System.Text.Encoding.ASCII.GetString(server.Written));
+    }
+
+    [TestMethod]
+    public async Task CreateDispatcher_StopsFirstFtpTransferBeforePwd_OnlyTheFirstDispatcherClaimsTheStop()
+    {
+        await using ManagedCurlEngine engine = new(TimeProvider.System, null, stopsFirstFtpTransferBeforePwd: true);
+
+        _ = ManagedCurlEngine.CreateDispatcher(new EasyOptions(), engine.Shared, cookieStore: null);
+        _ = ManagedCurlEngine.CreateDispatcher(new EasyOptions(), engine.Shared, cookieStore: null);
+
+        Assert.IsNotNull(engine.Shared.FtpPwdStop);
+        Assert.IsFalse(engine.Shared.FtpPwdStop.TryClaim());
+    }
+
+    [TestMethod]
+    public async Task Constructor_NoFtpPwdStopAsked_SharesNone()
+    {
+        await using ManagedCurlEngine engine = new(TimeProvider.System, null);
+
+        Assert.IsNull(engine.Shared.FtpPwdStop);
+    }
+
+    [TestMethod]
+    public async Task DisposeAsync_HandleStillInAMultiHandle_RemovesItFromTheMultiHandle()
+    {
+        await using ManagedCurlEngine engine = new(TimeProvider.System, null);
+        await using IMultiTransfer multi = engine.CreateMulti();
+        IEasyTransfer easy = engine.CreateEasy();
+        multi.Add(easy);
+
+        await easy.DisposeAsync();
+
+        Assert.IsEmpty(multi.GetHandles());
+        Assert.IsFalse(engine.Shared.MultiOwners.ContainsKey(easy));
+    }
+
     private sealed class FixedClock(DateTimeOffset now) : TimeProvider
     {
         public override DateTimeOffset GetUtcNow() => now;

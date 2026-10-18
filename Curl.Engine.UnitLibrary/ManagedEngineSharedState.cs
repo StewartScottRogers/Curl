@@ -27,11 +27,13 @@ internal sealed class ManagedEngineSharedState
     /// <param name="dialing">What the transfers dial and resolve through in place of sockets (ADR-0658); <see langword="null" />, in production, for sockets.</param>
     /// <param name="signingClock">The clock <c>CURLOPT_AWS_SIGV4</c> and the HTTP signatures sign with (BL-2675); <see langword="null" />, in production, for <see cref="TimeProvider.System" />.</param>
     /// <param name="webSocketRandomSource">Where every handle's WebSocket key and frame masks come from (BL-2688); <see langword="null" />, in production, for <see cref="SystemWebSocketRandomSource" />.</param>
-    internal ManagedEngineSharedState(TimeProvider timeProvider, Func<CurlExitCode, string> easyErrorText, Func<string, string?>? readEnvironmentVariable = null, EngineDialing? dialing = null, TimeProvider? signingClock = null, IWebSocketRandomSource? webSocketRandomSource = null)
+    /// <param name="ftpPwdStop">The stand-in for the debug build's <c>CURL_FTP_PWD_STOP</c> (BL-2636); <see langword="null" />, in production, for none.</param>
+    internal ManagedEngineSharedState(TimeProvider timeProvider, Func<CurlExitCode, string> easyErrorText, Func<string, string?>? readEnvironmentVariable = null, EngineDialing? dialing = null, TimeProvider? signingClock = null, IWebSocketRandomSource? webSocketRandomSource = null, FirstTransferFtpPwdStop? ftpPwdStop = null)
     {
         Dialing = dialing;
         SigningClock = signingClock;
         WebSocketRandomSource = webSocketRandomSource;
+        FtpPwdStop = ftpPwdStop;
         ReadEnvironmentVariable = readEnvironmentVariable ?? Environment.GetEnvironmentVariable;
         ProxySelector = new ProxySelector(ReadEnvironmentVariable);
         TimeProvider = timeProvider;
@@ -80,6 +82,7 @@ internal sealed class ManagedEngineSharedState
         Dialing = engine.Dialing;
         SigningClock = engine.SigningClock;
         WebSocketRandomSource = engine.WebSocketRandomSource;
+        FtpPwdStop = engine.FtpPwdStop;
     }
 
     /// <summary>
@@ -88,6 +91,12 @@ internal sealed class ManagedEngineSharedState
     /// (BL-2688, ADR-0678); <see langword="null" />, in production, for <see cref="SystemWebSocketRandomSource" />.
     /// </summary>
     internal IWebSocketRandomSource? WebSocketRandomSource { get; }
+
+    /// <summary>
+    /// Gets the conformance harness's stand-in for the debug build's <c>CURL_FTP_PWD_STOP</c>, which the engine's first perform
+    /// claims so its FTP connect phase stops before <c>PWD</c> (BL-2636, ADR-0687); <see langword="null" />, in production, for none.
+    /// </summary>
+    internal FirstTransferFtpPwdStop? FtpPwdStop { get; }
 
     /// <summary>
     /// Gets the clock the engine's transfers sign <c>CURLOPT_AWS_SIGV4</c> requests and HTTP signatures with: the

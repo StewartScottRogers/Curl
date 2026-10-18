@@ -241,6 +241,14 @@ public sealed class FtpProtocolHandler : IProtocolHandler
     /// </summary>
     public IFtpWildcardHooks? WildcardHooks { get; init; }
 
+    /// <summary>
+    /// Gets a value indicating whether a new control connection's connect phase stops after the login,
+    /// before <c>PWD</c>, and waits there until the transfer is cancelled or its connect phase times out,
+    /// as upstream's debug build does for its first transfer under <c>CURL_FTP_PWD_STOP</c> (upstream
+    /// test753, BL-2636, ADR-0687). <see langword="false" />, the default, sends <c>PWD</c> as a release build does.
+    /// </summary>
+    public bool StopsBeforeEntryPath { get; init; }
+
     /// <inheritdoc />
     /// <exception cref="ArgumentNullException">
     /// <paramref name="context" /> is <see langword="null" />.
@@ -365,7 +373,7 @@ public sealed class FtpProtocolHandler : IProtocolHandler
     {
         var connections = new FtpSessionConnections(dataConnector, listener, tlsProvider, dnsResolver, interfaceLookup, controlOpened);
         using var connectPhase = new FtpConnectPhaseLimit(context, started);
-        var session = new FtpSession(connections, new FtpControlChannel(control, context.Events, connectPhase.Token, new FtpDiagnosticLog(context.DiagnosticLog), context.DumpHeaderOutput, controlConnectEvents), name, context, implicitTls, connectPhase, trace, reused, WildcardHooks);
+        var session = new FtpSession(connections, new FtpControlChannel(control, context.Events, connectPhase.Token, new FtpDiagnosticLog(context.DiagnosticLog), context.DumpHeaderOutput, controlConnectEvents), name, context, implicitTls, connectPhase, trace, reused, WildcardHooks) { StopsBeforeEntryPath = StopsBeforeEntryPath };
         await using (session.ConfigureAwait(false))
         {
             return await run(session).ConfigureAwait(false);

@@ -77,6 +77,11 @@ public sealed class ManagedCurlEngine : ICurlEngine
     /// case <c>&lt;stdin&gt;</c> (upstream test650, BL-2625); <see langword="null" /> for <see cref="EasyTransferHost.Library" />'s
     /// empty one.
     /// </param>
+    /// <param name="stopsFirstFtpTransferBeforePwd">
+    /// Whether the engine's first perform stops its FTP connect phase after the login, before <c>PWD</c>: the conformance
+    /// harness's stand-in for the debug build's <c>CURL_FTP_PWD_STOP</c> (upstream test753, BL-2636, ADR-0687);
+    /// <see langword="false" /> sends <c>PWD</c> as a release build does.
+    /// </param>
     internal ManagedCurlEngine(
         TimeProvider timeProvider,
         Func<EasyOptions, ManagedEngineSharedState, ICookieStore?, ProtocolDispatcher>? createDispatcher,
@@ -85,9 +90,10 @@ public sealed class ManagedCurlEngine : ICurlEngine
         EngineDialing? dialing = null,
         TimeProvider? signingClock = null,
         IWebSocketRandomSource? webSocketRandomSource = null,
-        Stream? standardInput = null)
+        Stream? standardInput = null,
+        bool stopsFirstFtpTransferBeforePwd = false)
     {
-        shared = new ManagedEngineSharedState(timeProvider, easyErrorText ?? (_ => string.Empty), readEnvironmentVariable, dialing, signingClock, webSocketRandomSource);
+        shared = new ManagedEngineSharedState(timeProvider, easyErrorText ?? (_ => string.Empty), readEnvironmentVariable, dialing, signingClock, webSocketRandomSource, FirstTransferFtpPwdStop.When(stopsFirstFtpTransferBeforePwd));
         handleHost = standardInput is null ? EasyTransferHost.Library : EasyTransferHost.Library with { StandardInput = standardInput };
         this.createDispatcher = createDispatcher is null ? CreateDispatcher : (options, state, cookies, _) => createDispatcher(options, state, cookies);
     }
@@ -161,7 +167,8 @@ public sealed class ManagedCurlEngine : ICurlEngine
             ftpListener: SocketCallbackConnectionListener.Over(shared.Dialing?.FtpListener ?? new Curl.Networking.TcpConnectionListener(), options.Callbacks, shared),
             webSocketRawMode: IsWebSocketRawMode(options),
             http2PushSink: pushSink,
-            webSocketRandomSource: shared.WebSocketRandomSource));
+            webSocketRandomSource: shared.WebSocketRandomSource,
+            ftpStopsBeforeEntryPath: shared.FtpPwdStop?.TryClaim() == true));
     }
 
     /// <summary>
