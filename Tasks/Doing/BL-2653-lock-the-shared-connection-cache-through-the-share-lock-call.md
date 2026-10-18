@@ -31,3 +31,4 @@ Found by BL-2541 (lib1554 port). With `CURLSHOPT_SHARE CURL_LOCK_DATA_CONNECT` a
 ## Log
 
 - 2026-10-17: Created.
+- 2026-10-18: Backlog -> Doing. Criteria at claim: 63105f4e 52abb3eb 4272a6b9.
