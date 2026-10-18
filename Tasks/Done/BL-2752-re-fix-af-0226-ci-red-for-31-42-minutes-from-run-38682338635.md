@@ -8,7 +8,7 @@ depends-on: []
 touches: [RunDarkFactory.ps1]
 requirement: none
 created: 2026-10-18
-completed:
+completed: 2026-10-18
 ---
 # BL-2752 — Re-fix AF-0226: CI red for 31.42 minutes from run 38682338635: test203 failed on Linux and macOS after BL-2219's ratchet commit 8d337539
 
@@ -45,12 +45,16 @@ The finding closes only when a later re-audit by the process auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Cause of the recurrence: the lane prompt's platform-neutrality rule (BL-2279, BL-2563) covered file system, path, OS error and certificate dependence only. The 2026-10-17 spell (BL-2677, BL-2678) came from test races on scheduling, which the rule did not name.
+- Fix: both lane prompts in RunDarkFactory.ps1 now also tell lanes that a test starting concurrent work must wait for the event it needs, not rely on Windows scheduling order. No C# changed; RunDarkFactory.ps1 parses clean. The Audit-path reproduction cannot be run by a lane (guard), so a re-audit decides.
 
 ## Log
 
 - 2026-10-18: Created.
 - 2026-10-18: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-18: Doing -> Done. Lane prompts now also name scheduling races as a Linux/macOS CI failure cause

@@ -3513,6 +3513,11 @@ Rules for this unattended run, in addition to CLAUDE.md:
    not go red (AF-0226: BL-2219 held 108 cases on the ratchet after a Windows-only run and
    test203 failed on Linux and macOS, leaving CI red for 31 minutes; its re-audit: BL-2328's
    1c068661 broke OpenForWriteAsync_ParentIsAFileOnPosix_IsNotADirectory, red for 36 minutes).
+   Scheduling differs by platform too: a test that starts concurrent work (threads, tasks,
+   connections, servers) must wait for the event it needs (a connection opened, a thread
+   stopped) before it reads the result, never rely on Windows happening to run one side
+   first (AF-0226 re-audit: BL-2546's 35c73029 left a multiplexing test taking a connection
+   before the transfer had opened it, and Lib1565 racing its thread, red for 44 minutes).
 
 End your reply with exactly one line, either
 FACTORY: DONE {ID} <what now works>
@@ -3663,6 +3668,11 @@ Rules for this unattended run, in addition to CLAUDE.md:
    not go red (AF-0226: BL-2219 held 108 cases on the ratchet after a Windows-only run and
    test203 failed on Linux and macOS, leaving CI red for 31 minutes; its re-audit: BL-2328's
    1c068661 broke OpenForWriteAsync_ParentIsAFileOnPosix_IsNotADirectory, red for 36 minutes).
+   Scheduling differs by platform too: a test that starts concurrent work (threads, tasks,
+   connections, servers) must wait for the event it needs (a connection opened, a thread
+   stopped) before it reads the result, never rely on Windows happening to run one side
+   first (AF-0226 re-audit: BL-2546's 35c73029 left a multiplexing test taking a connection
+   before the transfer had opened it, and Lib1565 racing its thread, red for 44 minutes).
 
 End your reply with exactly one line, either
 FACTORY: DONE {ID} <what now works>
