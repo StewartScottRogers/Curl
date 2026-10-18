@@ -96,6 +96,21 @@ internal sealed record UrlHandleParts
         Fragment = Spaced(Fragment),
     };
 
+    /// <summary>
+    /// These parts with the path, query and fragment encoded as upstream's <c>parseurl</c> encodes them
+    /// under <c>CURLU_URLENCODE</c> (<c>urlencode_str</c>, <see cref="UrlPartText.Encode" />): a space
+    /// as <c>%20</c>, or <c>+</c> in the query, and a control or non-ASCII byte as <c>%XX</c>.
+    /// </summary>
+    /// <returns>The encoded parts.</returns>
+    public UrlHandleParts UrlEncoded() => this with
+    {
+        Path = Encoded(Path, query: false),
+        Query = Encoded(Query, query: true),
+        Fragment = Encoded(Fragment, query: false),
+    };
+
+    private static string? Encoded(string? text, bool query) => text is null ? null : UrlPartText.Encode(text, query);
+
     private static string? Spaced(string? text) => text?.Replace("%20", " ", StringComparison.Ordinal);
 
     private static bool IsSchemeGuessed(CurlUrl url) =>

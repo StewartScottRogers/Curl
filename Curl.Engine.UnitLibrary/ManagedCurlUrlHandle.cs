@@ -252,8 +252,9 @@ internal sealed class ManagedCurlUrlHandle : ICurlUrlHandle
 
     /// <summary>
     /// Parses a whole URL with <see cref="CurlUrl" /> under <c>CURLU_PATH_AS_IS</c> and
-    /// <c>CURLU_DISALLOW_USER</c>, its spaces read as <c>%20</c> under <c>CURLU_ALLOW_SPACE</c>, each
-    /// <see cref="CurlUrlRejection" /> mapped to its <see cref="CurlUrlCode" />.
+    /// <c>CURLU_DISALLOW_USER</c>, its spaces read as <c>%20</c> under <c>CURLU_ALLOW_SPACE</c>, its
+    /// path, query and fragment encoded under <c>CURLU_URLENCODE</c> (<see cref="UrlHandleParts.UrlEncoded" />),
+    /// each <see cref="CurlUrlRejection" /> mapped to its <see cref="CurlUrlCode" />.
     /// </summary>
     private CurlUrlCode Parse(string value, CurlUrlFlags flags)
     {
@@ -265,8 +266,9 @@ internal sealed class ManagedCurlUrlHandle : ICurlUrlHandle
 
         UrlHandleParts newParts = UrlHandleParts.Of(url!);
         bool spaced = !ReferenceEquals(text, value) && !value.Contains("%20", StringComparison.Ordinal);
+        newParts = spaced ? newParts.WithSpaces() : newParts;
 
-        return Accept(value, flags, spaced ? newParts.WithSpaces() : newParts);
+        return Accept(value, flags, flags.HasFlag(CurlUrlFlags.UrlEncode) ? newParts.UrlEncoded() : newParts);
     }
 
     /// <summary>

@@ -131,13 +131,66 @@ public sealed partial class ManagedCurlUrlHandleTests
     [DataRow(CurlUrlPart.Options)]
     [DataRow(CurlUrlPart.Fragment)]
     [DataRow(CurlUrlPart.ZoneId)]
-    public void Set_TextPart_StoresItWithItsEscapesLowerCased(CurlUrlPart part)
+    public void Set_TextPart_StoresItWithItsEscapesUpperCased(CurlUrlPart part)
     {
         using ManagedCurlUrlHandle url = Parsed("http://example.com/");
 
-        Assert.AreEqual(CurlUrlCode.Ok, url.Set(part, "a%4A%2f%G1%", CurlUrlFlags.None));
+        Assert.AreEqual(CurlUrlCode.Ok, url.Set(part, "a%4a%2f%G1%", CurlUrlFlags.None));
 
-        Assert.AreEqual("a%4a%2f%G1%", GetOk(url, part));
+        Assert.AreEqual("a%4A%2F%G1%", GetOk(url, part));
+    }
+
+    [TestMethod]
+    public void Set_PathWithMixedCaseEscapes_GivesThemUpperCasedInTheUrl()
+    {
+        using ManagedCurlUrlHandle url = Parsed("https://host/");
+
+        Assert.AreEqual(CurlUrlCode.Ok, url.Set(CurlUrlPart.Path, "%4A%4b%4C", CurlUrlFlags.None));
+
+        Assert.AreEqual("https://host/%4A%4B%4C", GetOk(url, CurlUrlPart.Url));
+    }
+
+    [TestMethod]
+    public void Set_PathUnderUrlEncode_KeepsTheCharactersAllowedInAPath()
+    {
+        using ManagedCurlUrlHandle url = Parsed("https://example.com/");
+
+        Assert.AreEqual(CurlUrlCode.Ok, url.Set(CurlUrlPart.Path, "one /$!$&'()*+;=:@{}[]%", CurlUrlFlags.UrlEncode));
+
+        Assert.AreEqual("https://example.com/one%20/$!$&'()*+;=:@{}[]%25", GetOk(url, CurlUrlPart.Url));
+    }
+
+    [TestMethod]
+    [DataRow("https://curl.se/#  ", CurlUrlPart.Fragment, "%20%20")]
+    [DataRow("https://user@example.net?hello# space ", CurlUrlPart.Fragment, "%20space%20")]
+    [DataRow("https://user:password@example.net/ge t?this=and-what", CurlUrlPart.Path, "/ge%20t")]
+    public void Set_UrlWithSpacesUnderUrlEncodeAndAllowSpace_EncodesThemInThePart(string text, CurlUrlPart part, string expected)
+    {
+        using ManagedCurlUrlHandle url = Parsed(text, CurlUrlFlags.UrlEncode | CurlUrlFlags.AllowSpace);
+
+        Assert.AreEqual(expected, GetOk(url, part));
+    }
+
+    [TestMethod]
+    public void Set_UrlWithNonAsciiPathUnderUrlEncode_EncodesItsUtf8Bytes()
+    {
+        using ManagedCurlUrlHandle url = Parsed("https://example.com/räksmörgås", CurlUrlFlags.UrlEncode);
+
+        Assert.AreEqual("https://example.com/r%C3%A4ksm%C3%B6rg%C3%A5s", GetOk(url, CurlUrlPart.Url));
+    }
+
+    [TestMethod]
+    public void Set_UrlWithSpacesInPathAndQueryUnderUrlEncodeAndAllowSpace_GivesPercentTwentyThenPlus()
+    {
+        using ManagedCurlUrlHandle url = Parsed("http://example.com/please/../gimme/%TESTNUMBER?foobar#hello");
+
+        CurlUrlCode code = url.Set(
+            CurlUrlPart.Url,
+            "http://example.net/there/it/is/../../tes t case=/%TESTNUMBER0002? yes no",
+            CurlUrlFlags.UrlEncode | CurlUrlFlags.AllowSpace);
+
+        Assert.AreEqual(CurlUrlCode.Ok, code);
+        Assert.AreEqual("http://example.net/there/tes%20t%20case=/%TESTNUMBER0002?+yes+no", GetOk(url, CurlUrlPart.Url));
     }
 
     [TestMethod]
@@ -259,7 +312,7 @@ public sealed partial class ManagedCurlUrlHandleTests
 
     [TestMethod]
     [DataRow("a/b", CurlUrlFlags.None, "/a/b")]
-    [DataRow("/a%2Fb", CurlUrlFlags.None, "/a%2fb")]
+    [DataRow("/a%2fb", CurlUrlFlags.None, "/a%2Fb")]
     [DataRow("", CurlUrlFlags.None, "/")]
     [DataRow("/x y/\u00e9", CurlUrlFlags.UrlEncode, "/x%20y/%C3%A9")]
     [DataRow("x y", CurlUrlFlags.UrlEncode, "/x%20y")]
