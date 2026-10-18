@@ -10,9 +10,9 @@ namespace Curl.Engine;
 /// (ADR-0611). The connectors ask a resolver only when their DNS cache (and a <c>--resolve</c> entry in it) does not
 /// answer, so the callback runs where curl 8.22.0's <c>Curl_resolv</c> calls it: before a resolve the cache missed,
 /// an IP address and <c>localhost</c> included. It is given 0 for the resolver's state, the managed engine having no
-/// c-ares channel to hand out. Any answer but 0 resolves nothing, so the connect fails as an unresolved name does,
-/// with <c>CURLE_COULDNT_RESOLVE_HOST</c> (exit 6) and <c>Could not resolve host: &lt;host&gt;</c> (exit 5 and
-/// <c>proxy</c> for a proxy), and nothing is cached. A resolver's failure reason passes through.
+/// c-ares channel to hand out. Any answer but 0 resolves nothing, with <see cref="DnsLookupFailure.AbortedByCallback" />,
+/// so the connect fails with <c>CURLE_ABORTED_BY_CALLBACK</c> (exit 42) and <c>Could not resolve host: &lt;host&gt;</c>
+/// (<c>proxy</c> for a proxy), as upstream test655 requires, and nothing is cached. A resolver's failure reason passes through.
 /// </summary>
 /// <param name="inner">Looks the names up.</param>
 /// <param name="resolverStart">The handle's resolver-start callback.</param>
@@ -38,12 +38,12 @@ internal sealed class ResolverStartDnsResolver(IDnsResolver inner, ResolverStart
     /// <summary>Calls the callback, then resolves <paramref name="host" /> with the inner resolver's failure reason unless it refused.</summary>
     /// <param name="host">The host name or literal address to resolve.</param>
     /// <param name="cancellationToken">Cancels the lookup.</param>
-    /// <returns>The addresses, or none and <see cref="DnsLookupFailure.None" /> when the callback refused.</returns>
+    /// <returns>The addresses, or none and <see cref="DnsLookupFailure.AbortedByCallback" /> when the callback refused.</returns>
     public async ValueTask<DnsResolution> ResolveWithFailureReasonAsync(string host, CancellationToken cancellationToken)
     {
         if (resolverStart(0) != 0)
         {
-            return new DnsResolution([], DnsLookupFailure.None);
+            return new DnsResolution([], DnsLookupFailure.AbortedByCallback);
         }
 
         return inner is IDnsResolverWithFailureReason withFailureReason

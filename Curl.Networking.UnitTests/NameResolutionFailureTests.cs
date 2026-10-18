@@ -56,6 +56,16 @@ public sealed class NameResolutionFailureTests
     }
 
     [TestMethod]
+    public void Describe_AbortedByCallback_IsExit42WithThePlainMessage()
+    {
+        var (exitCode, message) = Describe(CurlExitCode.CouldntResolveHost, "host", "failthis", 80, DnsLookupFailure.AbortedByCallback);
+
+        AssertDescription(CurlExitCode.AbortedByCallback, "Could not resolve host: failthis", exitCode, message);
+        Assert.AreEqual(CurlExitCode.AbortedByCallback, exitCode);
+        Assert.AreEqual("Could not resolve host: failthis", message);
+    }
+
+    [TestMethod]
     public void Describe_ALongHost_IsCutTo255Characters()
     {
         var (_, message) = Describe(CurlExitCode.CouldntResolveHost, "host", new string('a', 300), 1, DnsLookupFailure.NotFound);

@@ -45,7 +45,7 @@ public sealed class ResolverStartDnsResolverTests
         DnsResolution resolution = await resolver.ResolveWithFailureReasonAsync("h", CancellationToken.None);
 
         Assert.IsEmpty(resolution.Addresses);
-        Assert.AreEqual(DnsLookupFailure.None, resolution.Failure);
+        Assert.AreEqual(DnsLookupFailure.AbortedByCallback, resolution.Failure);
         Assert.IsEmpty(calls);
     }
 

@@ -47,7 +47,7 @@ public sealed partial class ManagedEasyTransferTests
     }
 
     [TestMethod]
-    public async Task PerformAsync_ResolverStartCallbackAborts_ReturnsCouldntResolveHostWithoutConnecting()
+    public async Task PerformAsync_ResolverStartCallbackAborts_ReturnsAbortedByCallbackWithoutConnecting()
     {
         int started = 0;
         await using ManagedCurlEngine engine = new();
@@ -60,7 +60,7 @@ public sealed partial class ManagedEasyTransferTests
 
         CurlCode code = await easy.PerformAsync(CancellationToken.None);
 
-        Assert.AreEqual(CurlCode.CouldntResolveHost, code);
+        Assert.AreEqual(CurlCode.AbortedByCallback, code);
         Assert.AreEqual("Could not resolve host: resolver-start.invalid", easy.ErrorText);
         Assert.AreEqual(1, started);
     }

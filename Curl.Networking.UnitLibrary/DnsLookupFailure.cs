@@ -45,4 +45,10 @@ public enum DnsLookupFailure
     /// (<c>ARES_EBADSTR</c>), which curl reports as exit 43, not exit 6.
     /// </summary>
     BadConfiguration,
+
+    /// <summary>
+    /// The handle's <c>CURLOPT_RESOLVER_START_FUNCTION</c> refused the lookup, which curl 8.22.0's <c>Curl_resolv</c>
+    /// reports as exit 42 (<c>CURLE_ABORTED_BY_CALLBACK</c>) under the plain <c>Could not resolve host</c> message.
+    /// </summary>
+    AbortedByCallback,
 }
