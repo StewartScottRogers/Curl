@@ -32,3 +32,4 @@ Found by BL-2541 (lib1559 port). libcurl 8.22.0 refuses a string option longer t
 ## Log
 
 - 2026-10-17: Created.
+- 2026-10-17: Backlog -> Doing. Criteria at claim: 676a5486 8369f03a 080facf8 4272a6b9.
