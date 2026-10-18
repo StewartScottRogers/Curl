@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Networking.UnitLibrary, Curl.Networking.UnitTests, Curl.Api.UnitLibrary, Curl.Api.UnitTests, Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
+touches: [Curl.Networking.UnitLibrary, Curl.Networking.UnitTests, Curl.Engine.UnitLibrary, Curl.Api.UnitLibrary, Curl.Api.UnitTests, Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
 requirement: none
 created: 2026-10-18
 completed:
@@ -38,7 +38,20 @@ Found by BL-2650. Case 1542 (`lib1542`, `Curl.Conformance.LibTest.UnitLibrary/Li
 
 ## Notes
 
+- 2026-10-18 (lane 4, first pass, no code written): nothing reads `EasyNetworkOptions.MaxConnectionLifetime`, and
+  the only place a transfer's `EasyNetworkOptions` reach the pool is
+  `Curl.Engine.UnitLibrary/EngineComposition.cs` `CreatePoolingConnector` (called from `CreateTransports` with the
+  perform's options, over the run's shared `ConnectionCache`). So `Curl.Engine.UnitLibrary` was added to `touches`.
+  Plan, complete apart from that: (1) `PoolEntry` gains a creation timestamp (`_cache.TimeProvider.GetTimestamp()`
+  in `OpenAsync`); (2) `PoolingConnector` gains an `init` property `MaximumConnectionLifetime` (default 24 h, zero
+  for no limit, as `CURLOPT_MAXLIFETIME_CONN`); (3) `TakeIdleAsync` treats a match whose age exceeds it like a dead
+  one: `shutting down connection #N`, close, try the next; (4) `CreatePoolingConnector` sets it from
+  `network.MaxConnectionLifetime` on both constructors' connectors; (5) unit tests in `PoolingConnectorTests` for
+  just under and just past the limit with `ManualTimeProvider`; (6) run `CURL_UPSTREAM_CASE=1542`, add 1542 to the
+  ratchet. Libcurl's `SetMaxConnectionLifetime` setter already exists. No other prerequisite found.
+
 ## Log
 
 - 2026-10-18: Created.
 - 2026-10-18: Backlog -> Doing. Criteria at claim: af82bdd2 dd52269f 03ca90eb.
+- 2026-10-18: Doing -> Backlog. touches Curl.Engine.UnitLibrary (CreatePoolingConnector must pass MaxConnectionLifetime to the pool), which BL-2735 in Doing also touches
