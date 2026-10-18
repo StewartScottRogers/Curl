@@ -31,3 +31,4 @@ Found by BL-2551, which ported lib2700 (`Curl.Conformance.LibTest.UnitLibrary/Li
 ## Log
 
 - 2026-10-17: Created.
+- 2026-10-18: Backlog -> Doing. Criteria at claim: cdfffd96 d6080d4c 3d836d5e.
