@@ -31,3 +31,4 @@ Found by BL-2530 (lib549 port: FTP URL through an HTTP proxy with `CURLOPT_PROXY
 ## Log
 
 - 2026-10-17: Created.
+- 2026-10-18: Backlog -> Doing. Criteria at claim: 7a8036c6 4272a6b9 7d0e6df3.
