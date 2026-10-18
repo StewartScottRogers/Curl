@@ -13,8 +13,8 @@ closed:
 regression: false
 items: [behaviour:test1704]
 touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests]
-task: BL-2326
-tasks: [BL-2326]
+task: BL-2715
+tasks: [BL-2326, BL-2715]
 ---
 # GF-0083 - An 'HTTP/2 101' answer to an h2c upgrade request followed by an HTTP/1.1 200 exits 0 instead of 8
 
@@ -34,8 +34,10 @@ In Curl.Protocol.Http.UnitLibrary, fail with exit 8 (CURLE_WEIRD_SERVER_REPLY) w
 
 - 2026-10-15_0751: 1 of 1 items are gaps.
 - 2026-10-15_1657: 1 of 1 items are gaps.
+- 2026-10-17_2225: 1 of 1 items are gaps.
 
 ## Log
 
 - 2026-10-15_0751: Opened by gap-behaviour.
 - 2026-10-15_0900: Filed BL-2326.
+- 2026-10-17_2318: Filed BL-2715.

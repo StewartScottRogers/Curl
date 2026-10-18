@@ -43,6 +43,7 @@ In Curl.Protocol.Ftp.UnitLibrary, keep an FTP control connection open after a tr
 - 2026-10-15_0543: 0 of 12 items are gaps.
 - 2026-10-15_0751: 0 of 12 items are gaps.
 - 2026-10-15_1657: 0 of 12 items are gaps.
+- 2026-10-17_2225: 0 of 12 items are gaps.
 
 ## Log
 

@@ -5,11 +5,11 @@ area: behaviour
 platform: macos
 key: behaviour:chunked-upload-after-expect-continue-splits-closing-chunk
 severity: High
-status: open
+status: closed
 scope: target
 introduced-in:
 opened: 2026-10-15_1657
-closed:
+closed: 2026-10-17_2225
 regression: false
 items: [behaviour:test60]
 touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests]
@@ -33,8 +33,10 @@ In Curl.Protocol.Http.UnitLibrary, HttpRequestBodyWriter.StartReading sets heldB
 ## Measurements
 
 - 2026-10-15_1657: 1 of 1 items are gaps.
+- 2026-10-17_2225: 0 of 1 items are gaps.
 
 ## Log
 
 - 2026-10-15_1657: Opened by gap-behaviour.
 - 2026-10-15_1753: Filed BL-2371.
+- 2026-10-17_2225: Closed: run 2026-10-17_2225 measured every item as match or excluded on macos.
