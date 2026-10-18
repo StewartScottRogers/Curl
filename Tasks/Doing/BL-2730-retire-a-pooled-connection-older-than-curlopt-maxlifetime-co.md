@@ -41,3 +41,4 @@ Found by BL-2650. Case 1542 (`lib1542`, `Curl.Conformance.LibTest.UnitLibrary/Li
 ## Log
 
 - 2026-10-18: Created.
+- 2026-10-18: Backlog -> Doing. Criteria at claim: af82bdd2 dd52269f 03ca90eb.
