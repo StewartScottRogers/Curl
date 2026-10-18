@@ -81,6 +81,48 @@ public sealed class ManagedShareHandleTests
     }
 
     [TestMethod]
+    public async Task PerformAsync_ConnectionsShared_LocksTheConnectionsAsLibcurlDoesAroundEachPerformAndCleanup()
+    {
+        OpenCountingConnector connector = new(new ScriptedConnector([Encoding.ASCII.GetBytes(KeepsAlive), Encoding.ASCII.GetBytes(KeepsAlive)]));
+        await using ManagedCurlEngine engine = CreateEngine(connector);
+        IShareHandle share = engine.CreateShare();
+        share.Share(CurlLockData.Connect);
+        List<string> calls = [];
+        share.SetLockCallback((_, data, _) => calls.Add($"{data}"));
+        share.SetUnlockCallback((_, _) => { });
+
+        await PerformAsync(engine, "http://h/a", share);
+        calls.Add("|");
+        await PerformAsync(engine, "http://h/b", share);
+        calls.Add("|");
+        share.Cleanup();
+
+        string[] connect = [nameof(CurlLockData.Connect)];
+        string[] expected =
+        [
+            "Share", .. Repeat(connect, 4), .. Repeat(connect, 1), "Share", "|",
+            "Share", .. Repeat(connect, 3), .. Repeat(connect, 1), "Share", "|",
+            "Share", .. Repeat(connect, 1),
+        ];
+        CollectionAssert.AreEqual(expected, calls.Where(call => call != "Cookie" && call != "Dns").ToArray());
+    }
+
+    [TestMethod]
+    public async Task PerformAsync_ConnectionsSharedAndNoUrl_LocksTheConnectionsThreeTimesAtTheStart()
+    {
+        await using ManagedCurlEngine engine = CreateEngine(new ScriptedConnector([]));
+        IShareHandle share = engine.CreateShare();
+        share.Share(CurlLockData.Connect);
+        int locks = 0;
+        share.SetLockCallback((_, data, _) => locks += data == CurlLockData.Connect ? 1 : 0);
+        share.SetUnlockCallback((_, _) => { });
+
+        await PerformAsync(engine, string.Empty, share);
+
+        Assert.AreEqual(4, locks);
+    }
+
+    [TestMethod]
     public async Task PerformAsync_NothingShared_OpensAConnectionForEachEngine()
     {
         OpenCountingConnector connector = new(new ScriptedConnector([Encoding.ASCII.GetBytes(KeepsAlive), Encoding.ASCII.GetBytes(KeepsAlive)]));
@@ -444,6 +486,8 @@ public sealed class ManagedShareHandleTests
         easy.Host = new EasyTransferHost(new NoFileSystem(), Stream.Null, () => Stream.Null, NoDiagnosticLog.Instance, RunsOnWindows: false, AltSvcUsesOverHttp: false);
         return await easy.PerformAsync(CancellationToken.None);
     }
+
+    private static IEnumerable<string> Repeat(string[] item, int times) => Enumerable.Repeat(item[0], times);
 
     private static string SecondRequestOf(ScriptedConnector connector)
     {

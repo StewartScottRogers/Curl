@@ -476,6 +476,7 @@ internal sealed class ManagedEasyTransfer(
         }
         finally
         {
+            share.LockConnectionsAtDone(this);
             share.LockDnsAtDone(this);
             performShare = null;
             attachedShared = null;
