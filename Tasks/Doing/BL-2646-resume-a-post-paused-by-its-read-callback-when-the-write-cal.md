@@ -32,3 +32,4 @@ Found by BL-2539 (port `Lib1533` with its `PausedPoster` in `Curl.Conformance.Li
 ## Log
 
 - 2026-10-17: Created.
+- 2026-10-18: Backlog -> Doing. Criteria at claim: 2d40087c 2d8c1045 4272a6b9 c4aff572.
