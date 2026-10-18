@@ -4,6 +4,7 @@ using Curl.Api.Codes;
 using Curl.Api.EngineContracts;
 using Curl.Api.EngineContracts.ConnectOnly;
 using Curl.Api.EngineContracts.Headers;
+using Curl.Api.EngineContracts.Multi;
 using Curl.Api.EngineContracts.WebSocket;
 using Curl.Api.Info;
 using Curl.Api.Options;
@@ -92,9 +93,35 @@ internal sealed class ManagedEasyTransfer(
     /// </summary>
     public TransferInfo Info
     {
-        get => optionShare is { SharesCookies: true } share ? field with { CookieList = new ShareCookieListLines(share, this) } : field;
+        get => WithConnectOnlySocket(optionShare is { SharesCookies: true } share ? field with { CookieList = new ShareCookieListLines(share, this) } : field);
         private set;
     } = new();
+
+    /// <summary>
+    /// Gives <paramref name="info" /> the socket number of the connection a <c>CURLOPT_CONNECT_ONLY</c> 1 perform left
+    /// open as <see cref="TransferInfo.ActiveSocket" /> and <see cref="TransferInfo.LastSocket" />, as libcurl answers its
+    /// socket, which a caller passes to <c>curl_multi_wait</c> (<see cref="ConnectOnlyConnection.LiveSocket" />,
+    /// upstream test677, BL-2633), and -1 (<c>CURL_SOCKET_BAD</c>) for both once it is closed or the options no longer
+    /// ask for connect-only, as for every perform that is not connect-only; before the first perform <paramref name="info" />
+    /// is unchanged.
+    /// </summary>
+    /// <param name="info">What the last perform found out.</param>
+    /// <returns><paramref name="info" />, with the connect-only socket.</returns>
+    private TransferInfo WithConnectOnlySocket(TransferInfo info) =>
+        connectOnly is { LiveSocket.Handle: var socket }
+            ? info with { ActiveSocket = socket, LastSocket = socket }
+            : info;
+
+    /// <summary>
+    /// The events of <paramref name="events" /> the connect-only connection numbered <paramref name="socket" /> is
+    /// ready for, for a <c>curl_multi_wait</c> given that socket (<see cref="ConnectOnlyConnection.ReadyEvents" />);
+    /// <see langword="null" /> when <paramref name="socket" /> is not this handle's open connect-only connection.
+    /// </summary>
+    /// <param name="socket">The socket the caller waits on.</param>
+    /// <param name="events">The events the caller waits for.</param>
+    /// <returns>The events that happened, or <see langword="null" /> for another socket.</returns>
+    internal CurlWaitEvents? ConnectOnlyReadyEvents(CurlSocket socket, CurlWaitEvents events) =>
+        connectOnly is { } open && socket != CurlSocket.Bad && open.LiveSocket == socket ? open.ReadyEvents(events) : null;
 
     /// <summary>
     /// Takes the <c>CURLOPT_COOKIELIST</c> items added since <paramref name="previousCount" />: while the handle is

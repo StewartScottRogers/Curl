@@ -1,6 +1,8 @@
 using System.Text;
+using Curl.Api.Callbacks;
 using Curl.Api.Codes;
 using Curl.Api.EngineContracts.ConnectOnly;
+using Curl.Api.EngineContracts.Multi;
 
 namespace Curl.Engine;
 
@@ -199,5 +201,83 @@ public sealed class ConnectOnlyConnectionTests
     public void UsesTls_Scheme_IsTrueForATlsScheme(string scheme, bool expected)
     {
         Assert.AreEqual(expected, ConnectOnlyConnection.UsesTls(scheme));
+    }
+
+    [TestMethod]
+    public async Task Socket_EachOpen_IsANewNumberAboveFirstSocketUntilClosed()
+    {
+        ConnectOnlyConnection connection = new(() => true);
+        CurlSocket beforeOpen = connection.Socket;
+
+        await connection.OpenAsync(new ControlledConnection());
+        CurlSocket first = connection.Socket;
+        await connection.OpenAsync(new ControlledConnection());
+        CurlSocket second = connection.Socket;
+        await connection.CloseAsync();
+
+        Assert.AreEqual(CurlSocket.Bad, beforeOpen);
+        Assert.IsGreaterThan(ConnectOnlyConnection.FirstSocket, (long)first.Handle);
+        Assert.AreNotEqual(first, second);
+        Assert.AreEqual(CurlSocket.Bad, connection.Socket);
+    }
+
+    [TestMethod]
+    public async Task LiveSocket_OptionsNoLongerConnectOnly_IsBad()
+    {
+        ConnectOnlyConnection connection = new(() => false);
+        await connection.OpenAsync(new ControlledConnection());
+
+        CurlSocket live = connection.LiveSocket;
+
+        Assert.AreNotEqual(CurlSocket.Bad, connection.Socket);
+        Assert.AreEqual(CurlSocket.Bad, live);
+    }
+
+    [TestMethod]
+    public async Task ReadyEvents_NoConnectionOpen_IsNone()
+    {
+        ConnectOnlyConnection connection = new(() => true);
+
+        CurlWaitEvents ready = connection.ReadyEvents(CurlWaitEvents.PollIn | CurlWaitEvents.PollOut);
+
+        Assert.AreEqual(CurlWaitEvents.None, ready);
+        await connection.CloseAsync();
+    }
+
+    [TestMethod]
+    public async Task ReadyEvents_PollOut_IsReadyUnlessASendStillRuns()
+    {
+        (ConnectOnlyConnection connection, ControlledConnection peer) = await OpenAsync();
+        CurlWaitEvents idle = connection.ReadyEvents(CurlWaitEvents.PollOut);
+        TaskCompletionSource gate = new();
+        peer.WriteGate = gate;
+        await connection.SendAsync("ab"u8.ToArray(), CancellationToken.None);
+
+        CurlWaitEvents sending = connection.ReadyEvents(CurlWaitEvents.PollOut);
+        gate.SetResult();
+        CurlWaitEvents sent = connection.ReadyEvents(CurlWaitEvents.PollOut);
+
+        Assert.AreEqual(CurlWaitEvents.PollOut, idle);
+        Assert.AreEqual(CurlWaitEvents.None, sending);
+        Assert.AreEqual(CurlWaitEvents.PollOut, sent);
+    }
+
+    [TestMethod]
+    public async Task ReadyEvents_PollIn_StartsAReadAndIsReadyOnceBytesArriveForTheNextReceive()
+    {
+        (ConnectOnlyConnection connection, ControlledConnection peer) = await OpenAsync();
+
+        CurlWaitEvents nothingYet = connection.ReadyEvents(CurlWaitEvents.PollIn | CurlWaitEvents.PollPriority);
+        peer.Deliver("hello"u8.ToArray());
+        CurlWaitEvents arrived = connection.ReadyEvents(CurlWaitEvents.PollIn);
+        byte[] small = new byte[2];
+        CurlConnectOnlyResult received = await connection.ReceiveAsync(small, CancellationToken.None);
+        CurlWaitEvents restWaiting = connection.ReadyEvents(CurlWaitEvents.PollIn);
+
+        Assert.AreEqual(CurlWaitEvents.None, nothingYet);
+        Assert.AreEqual(CurlWaitEvents.PollIn, arrived);
+        Assert.AreEqual(new CurlConnectOnlyResult(CurlCode.Ok, 2), received);
+        Assert.AreEqual("he", Encoding.ASCII.GetString(small));
+        Assert.AreEqual(CurlWaitEvents.PollIn, restWaiting);
     }
 }
