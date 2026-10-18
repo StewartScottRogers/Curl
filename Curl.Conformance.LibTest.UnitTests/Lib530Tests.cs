@@ -180,7 +180,7 @@ public sealed class Lib530Tests
 
         CurlCode result = await lib530.TestOneAsync(CurlGlobal.Init(engine), CancellationToken.None);
 
-        Assert.AreNotEqual(CurlCode.Ok, result);
+        Assert.AreEqual(LibTestErrorCodes.RunsForever, result);
     }
 
     [TestMethod]
