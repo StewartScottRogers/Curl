@@ -135,8 +135,8 @@ public sealed class Lib582Run(LibTestContext context, TimeProvider timeProvider,
 
     private async ValueTask RunUntilCompleteAsync(LibTestSteps steps, CurlMulti multi, CancellationToken cancellationToken)
     {
-        bool success;
-        while (!CheckForCompletion(multi, out success))
+        bool? success;
+        while ((success = CompletionOutcome(multi)) is null)
         {
             if (!await TurnAsync(steps, multi, cancellationToken).ConfigureAwait(false))
             {
@@ -144,21 +144,21 @@ public sealed class Lib582Run(LibTestContext context, TimeProvider timeProvider,
             }
         }
 
-        if (!success)
+        if (!success.Value)
         {
             context.StandardError.Write("Error uploading file.\n");
             steps.Result = LibTestErrorCodes.MajorBad;
         }
     }
 
-    // t582_checkForCompletion: whether a message came, and whether the last one was a successful done.
-    private bool CheckForCompletion(CurlMulti multi, out bool success)
+    // t582_checkForCompletion: null until a message comes, then whether the last one was a successful done.
+    // No message means no outcome rather than a default one: the C port's initial *success = 0 was never read
+    // when no message came, so a mutant flipping it survived every test (AF-0257).
+    private bool? CompletionOutcome(CurlMulti multi)
     {
-        bool completed = false;
-        success = false;
+        bool? success = null;
         while (multi.InfoRead(out _) is { } message)
         {
-            completed = true;
             success = message.Type == CurlMultiMessageType.Done && message.Result == CurlCode.Ok;
             if (message.Type != CurlMultiMessageType.Done)
             {
@@ -166,7 +166,7 @@ public sealed class Lib582Run(LibTestContext context, TimeProvider timeProvider,
             }
         }
 
-        return completed;
+        return success;
     }
 
     // One turn: select_test over the sets, socket_action on each socket of each set, then on the timer once it
