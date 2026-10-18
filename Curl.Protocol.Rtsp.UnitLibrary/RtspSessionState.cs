@@ -14,12 +14,29 @@ namespace Curl.Protocol.Rtsp;
 /// in the same reply or a later one, fails with 86,
 /// <c>Got RTSP Session ID Line [&lt;rest of the line&gt;], but wanted ID [&lt;kept ID&gt;]</c>,
 /// where the rest of the line starts at the ID and keeps its line ending.
+/// <para>
+/// A libcurl caller keeps one state on its easy handle and hands it to every perform, so a
+/// second perform continues the <c>CSeq</c> and sends the session ID an earlier reply gave, as
+/// libcurl's <c>data-&gt;state.rtsp_next_client_CSeq</c> and
+/// <c>data-&gt;set.str[STRING_RTSP_SESSION_ID]</c> do (BL-2751). A new state's counter is 0, and
+/// a perform on a new connection moves a 0 to 1, as <c>rtsp_connect</c> does; one on a reused
+/// connection keeps it.
+/// </para>
 /// </remarks>
-/// <param name="firstSequenceNumber">The <c>CSeq</c> of the transfer's first request.</param>
-internal sealed class RtspSessionState(long firstSequenceNumber)
+public sealed class RtspSessionState
 {
+    /// <summary>Initializes a new instance of the <see cref="RtspSessionState" /> class for a new easy handle.</summary>
+    public RtspSessionState()
+        : this(0)
+    {
+    }
+
+    /// <summary>Initializes a new instance of the <see cref="RtspSessionState" /> class.</summary>
+    /// <param name="firstSequenceNumber">The <c>CSeq</c> of the transfer's first request.</param>
+    internal RtspSessionState(long firstSequenceNumber) => NextSequenceNumber = firstSequenceNumber;
+
     /// <summary>Gets the <c>CSeq</c> the next request is sent with.</summary>
-    internal long NextSequenceNumber { get; private set; } = firstSequenceNumber;
+    internal long NextSequenceNumber { get; private set; }
 
     /// <summary>
     /// Gets the session ID the server gave, sent on every later request, or
@@ -33,6 +50,33 @@ internal sealed class RtspSessionState(long firstSequenceNumber)
     /// (curl's <c>streamclose</c>, measured, BL-1403).
     /// </summary>
     internal bool ClosesConnection { get; private set; }
+
+    /// <summary>
+    /// Readies the state for a perform: the connection is kept unless a reply says otherwise, a
+    /// set client <c>CSeq</c> and a set session ID take effect, and on a new connection a
+    /// <c>CSeq</c> of 0 becomes 1.
+    /// </summary>
+    /// <param name="settings">The perform's libcurl request settings, or <see langword="null" /> for the tool's transfer.</param>
+    /// <param name="connectionReused">Whether the perform runs on a reused connection.</param>
+    internal void StartTransfer(RtspRequestSettings? settings, bool connectionReused)
+    {
+        ClosesConnection = false;
+        if (settings is not null)
+        {
+            ApplySettings(settings);
+        }
+
+        if (!connectionReused && NextSequenceNumber == 0)
+        {
+            NextSequenceNumber = RtspProtocolHandler.FirstSequenceNumber;
+        }
+    }
+
+    private void ApplySettings(RtspRequestSettings settings)
+    {
+        NextSequenceNumber = settings.ClientSequenceNumber ?? NextSequenceNumber;
+        SessionId = settings.SessionId ?? SessionId;
+    }
 
     /// <summary>Marks the connection to be closed, not kept, once the transfer ends.</summary>
     internal void CloseConnection() => ClosesConnection = true;

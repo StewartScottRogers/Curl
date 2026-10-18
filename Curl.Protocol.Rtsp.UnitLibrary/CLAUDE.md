@@ -25,3 +25,10 @@ the bytes read before a reply, or during a `RECEIVE` (`RtspProtocolHandler.Recei
 hands it whole to the `IRtspInterleaveSink` injected into `RtspProtocolHandler`. With none, frames
 before a reply are skipped as the curl tool skips them, and a `RECEIVE` writes its frames to the
 body output (`RtspStreamInterleaveSink`). A sink that takes too few bytes fails with 23.
+
+libcurl requests (BL-2751, ADR-0691): `RtspProtocolHandler` takes optional `RtspRequestSettings`
+(kind, stream URI, `Transport`, session ID, client `CSeq`, body) and an `RtspSessionState` the
+engine keeps on the easy handle, so a later perform continues the `CSeq` and session ID.
+`RtspRequestPlan` turns the settings into what `lib/rtsp.c` 8.22.0 sends; with no settings the
+tool's `OPTIONS *` is unchanged. A `SETUP` with no `Transport` fails with 43; there is no
+session-ID refusal in 8.22.0.
