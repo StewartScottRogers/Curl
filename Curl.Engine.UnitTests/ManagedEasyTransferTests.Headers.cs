@@ -85,4 +85,29 @@ public sealed partial class ManagedEasyTransferTests
         Assert.AreEqual(CurlHeaderCode.Ok, afterPerform);
         Assert.AreEqual(CurlHeaderCode.NoHeaders, easy.Headers.TryGet("Content-Type", 0, CurlHeaderOrigin.Header, ITransferHeaders.LastRequest, out _));
     }
+
+    [TestMethod]
+    public async Task Info_ReadFromTheHeaderCallbackAtTheEndOfTheHead_HoldsTheResponseCodeAndContentLength()
+    {
+        ScriptedConnector connector = new([Encoding.ASCII.GetBytes(Response)]);
+        await using IEasyTransfer easy = CreateEngine(connector).CreateEasy();
+        List<(long Code, long Length)> seen = [];
+        easy.Options = new EasyOptions
+        {
+            Network = new EasyNetworkOptions { Url = "http://h/x" },
+            Callbacks = new()
+            {
+                Header = header =>
+                {
+                    seen.Add((easy.Info.ResponseCode, easy.Info.ContentLengthDownload));
+                    return header.Length;
+                },
+            },
+        };
+
+        CurlCode code = await easy.PerformAsync(CancellationToken.None);
+
+        Assert.AreEqual(CurlCode.Ok, code);
+        CollectionAssert.AreEqual(new List<(long, long)> { (200, -1), (200, 5), (200, 5), (200, 5) }, seen);
+    }
 }

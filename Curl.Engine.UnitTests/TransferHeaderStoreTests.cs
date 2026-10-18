@@ -227,4 +227,60 @@ public sealed class TransferHeaderStoreTests
         Assert.AreEqual(CurlHeaderCode.Ok, store.TryGet("C", 0, CurlHeaderOrigin.Header, 0, out _));
         Assert.AreEqual(CurlHeaderCode.Missing, store.TryGet("A", 0, CurlHeaderOrigin.Header | CurlHeaderOrigin.Connect, 0, out _));
     }
+
+    [TestMethod]
+    public void ResponseCodeAndContentLength_FinalHead_AreItsStatusAndLength()
+    {
+        TransferHeaderStore store = StoreOf("HTTP/1.1 100 Continue", "Content-Length: 99", string.Empty, "HTTP/1.1 200 OK", "Content-Length: 7");
+
+        Assert.AreEqual(200L, store.ResponseCode);
+        Assert.AreEqual(7L, store.ContentLength);
+    }
+
+    [TestMethod]
+    public void ResponseCodeAndContentLength_InformationalHead_IsItsStatusAndNoLength()
+    {
+        TransferHeaderStore store = StoreOf("HTTP/1.1 100 Continue", "Content-Length: 99");
+
+        Assert.AreEqual(100L, store.ResponseCode);
+        Assert.AreEqual(-1L, store.ContentLength);
+    }
+
+    [TestMethod]
+    public void ResponseCodeAndContentLength_ConnectReplyHead_LeavesBothUnset()
+    {
+        TransferHeaderStore store = new();
+        store.MarkConnectReplyHead();
+        store.RecordLine("HTTP/1.1 200 Connection established");
+        store.RecordLine("Content-Length: 3");
+
+        Assert.AreEqual(0L, store.ResponseCode);
+        Assert.AreEqual(-1L, store.ContentLength);
+    }
+
+    [TestMethod]
+    public void ResponseCodeAndContentLength_UnreadableStatusAndLength_AreZeroAndMinusOne()
+    {
+        TransferHeaderStore store = StoreOf("HTTP/1.1 2x0 OK", "Content-Length: -4");
+
+        Assert.AreEqual(0L, store.ResponseCode);
+        Assert.AreEqual(-1L, store.ContentLength);
+    }
+
+    [TestMethod]
+    public void ResponseHeadRead_StatusLineAndContentLength_IsCalledForEachAndClearResetsBoth()
+    {
+        List<(long Code, long Length)> seen = [];
+        TransferHeaderStore store = new();
+        store.ResponseHeadRead = () => seen.Add((store.ResponseCode, store.ContentLength));
+
+        store.RecordLine("HTTP/1.1 200 OK");
+        store.RecordLine("Server: x");
+        store.RecordLine("content-length: 7");
+        store.Clear();
+
+        CollectionAssert.AreEqual(new List<(long, long)> { (200, -1), (200, 7) }, seen);
+        Assert.AreEqual(0L, store.ResponseCode);
+        Assert.AreEqual(-1L, store.ContentLength);
+    }
 }

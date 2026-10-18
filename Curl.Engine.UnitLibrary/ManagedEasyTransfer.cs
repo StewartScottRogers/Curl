@@ -349,6 +349,7 @@ internal sealed class ManagedEasyTransfer(
     public async ValueTask<CurlCode> PerformAsync(CancellationToken cancellationToken)
     {
         headers.Clear();
+        headers.ResponseHeadRead = ShowResponseHeadOnInfo;
         await ConnectOnly.CloseAsync().ConfigureAwait(false);
         await WebSocketConnection.CloseAsync().ConfigureAwait(false);
         if (PushedResponse is { } pushed)
@@ -1724,6 +1725,15 @@ internal sealed class ManagedEasyTransfer(
         protocols?.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Select(protocol => protocol.ToLowerInvariant())
             .ToHashSet(StringComparer.Ordinal);
+
+    /// <summary>
+    /// Puts the response code and <c>Content-Length</c> the header lines have given so far on <see cref="Info" /> while
+    /// the transfer runs, before the line reaches the header callback, so a header callback reading
+    /// <c>CURLINFO_RESPONSE_CODE</c> or <c>CURLINFO_CONTENT_LENGTH_DOWNLOAD_T</c> sees them as libcurl's does once the
+    /// head is parsed (upstream test1485, BL-2639); the finished transfer's report replaces both.
+    /// </summary>
+    private void ShowResponseHeadOnInfo() =>
+        Info = Info with { ResponseCode = headers.ResponseCode, ContentLengthDownload = headers.ContentLength };
 
     private CurlCode Finish(CurlCode code, string errorText, TransferInfo info)
     {
