@@ -43,6 +43,54 @@ public sealed partial class ManagedEasyTransferTests
         Assert.AreEqual(CurlPause.Continue, easy.PausedDirections);
     }
 
+    // Upstream case 1540 (BL-2651): libcurl keeps calling the transfer-info callback while the receive is paused,
+    // and its curl_easy_pause(CURLPAUSE_CONT) there resumes the transfer.
+    [TestMethod]
+    public async Task PerformAsync_WriteCallbackPausesAndTransferInfoCallbackUnpauses_DeliversTheRestOfTheBody()
+    {
+        const string chunked = "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n5\r\nhello\r\n6\r\n world\r\n0\r\n\r\n";
+        ScriptedConnector connector = new([Encoding.ASCII.GetBytes(chunked)]);
+        await using ManagedEasyTransfer easy = (ManagedEasyTransfer)CreateEngine(connector).CreateEasy();
+        StringBuilder body = new();
+        bool halted = false;
+        int callsWhileHalted = 0;
+        easy.Options = new EasyOptions
+        {
+            Network = new EasyNetworkOptions { Url = "http://h/x" },
+            Behaviour = new EasyBehaviourOptions { NoProgress = false },
+            Callbacks = new()
+            {
+                Write = data =>
+                {
+                    if (!halted)
+                    {
+                        halted = true;
+                        return WriteCallbackResult.Pause;
+                    }
+
+                    body.Append(Encoding.ASCII.GetString(data));
+                    return data.Length;
+                },
+                TransferInfo = (_, _, _, _) =>
+                {
+                    if (halted && ++callsWhileHalted == 1)
+                    {
+                        _ = easy.Pause(CurlPause.Continue);
+                    }
+
+                    return ProgressCallbackResult.Continue;
+                },
+            },
+        };
+
+        CurlCode code = await easy.PerformAsync(CancellationToken.None);
+
+        Assert.AreEqual(CurlCode.Ok, code);
+        Assert.AreEqual("hello world", body.ToString());
+        Assert.IsGreaterThanOrEqualTo(1, callsWhileHalted);
+        Assert.AreEqual(CurlPause.Continue, easy.PausedDirections);
+    }
+
     [TestMethod]
     public async Task PerformAsync_HeaderCallbackPausesThenIsUnpaused_GetsEveryHeaderLine()
     {

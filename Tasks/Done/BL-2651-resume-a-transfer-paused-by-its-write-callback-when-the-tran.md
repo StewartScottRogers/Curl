@@ -8,7 +8,7 @@ depends-on: [BL-2540]
 touches: [Curl.Engine.UnitLibrary, Curl.Engine.UnitTests, Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
 requirement: none
 created: 2026-10-17
-completed:
+completed: 2026-10-18
 ---
 # BL-2651 — Resume a transfer paused by its write callback when the transfer-info callback unpauses it so upstream case 1540 passes
 
@@ -22,13 +22,16 @@ Found by BL-2540, which ported `lib1540` (`Curl.Conformance.LibTest.UnitLibrary/
 
 ## Acceptance criteria
 
-- [ ] A focused unit test in `Curl.Engine.UnitTests` shows a transfer paused by its write callback and unpaused from its transfer-info callback delivers the rest of the body.
-- [ ] `CURL_UPSTREAM_CASE=1540` run through `NamedUpstreamCase_RunThroughCurl_PassesAsAListedCaseMust` passes, and 1540 is added to `Curl.Conformance.UnitTests/PassingUpstreamCases.txt`.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] A focused unit test in `Curl.Engine.UnitTests` shows a transfer paused by its write callback and unpaused from its transfer-info callback delivers the rest of the body.
+- [x] `CURL_UPSTREAM_CASE=1540` run through `NamedUpstreamCase_RunThroughCurl_PassesAsAListedCaseMust` passes, and 1540 is added to `Curl.Conformance.UnitTests/PassingUpstreamCases.txt`.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- 2026-10-18: No engine change was needed: BL-2631 (ADR-0685) already calls the progress callback every second while a perform waits on its pause gate, so case 1540 passed through the runner on the first run (`CURL_UPSTREAM_CASE=1540`, 2 s). Added the focused test `ManagedEasyTransferTests.PerformAsync_WriteCallbackPausesAndTransferInfoCallbackUnpauses_DeliversTheRestOfTheBody` (it must set `NoProgress = false`, libcurl's default being on) and listed 1540. Case output is a traced chunked GET with no path, file or certificate text, so it does not depend on the platform. Checked: `dotnet build` 0 warnings 0 errors; fast tests of the two changed projects, Curl.Engine.UnitTests 1916 passed and Curl.Conformance.UnitTests 3468 passed, 0 failed; no production code changed, so no quality run.
 
 ## Log
 
 - 2026-10-17: Created.
 - 2026-10-18: Backlog -> Doing. Criteria at claim: c0508dfb 871de732 3d836d5e.
+- 2026-10-18: Doing -> Done. A transfer paused by its write callback resumes when the xferinfo callback unpauses it; upstream case 1540 is on the ratchet
