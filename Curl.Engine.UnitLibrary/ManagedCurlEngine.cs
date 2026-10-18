@@ -11,6 +11,7 @@ using Curl.Core.FileSystem;
 using Curl.Core.Multipart;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Http;
+using Curl.Protocol.Imap;
 using Curl.Protocol.Ws;
 
 namespace Curl.Engine;
@@ -173,6 +174,30 @@ public sealed class ManagedCurlEngine : ICurlEngine
     /// <returns>The connector.</returns>
     internal static IConnector CreateConnectOnlyConnector(EasyOptions options, ManagedEngineSharedState shared) =>
         PrerequestConnector.Over(SocketCallbackConnector.Over(CreateTransports(options, shared).TcpConnector, options.Callbacks, shared), options.Callbacks.Prerequest);
+
+    /// <summary>
+    /// Builds the handlers of a <c>CURLOPT_CONNECT_ONLY</c> 1 perform of a scheme whose connect phase sends commands
+    /// (BL-2623): an <see cref="FtpConnectOnlyHandler" /> and an <see cref="ImapConnectOnlyHandler" /> whose protocol
+    /// handlers dial through <paramref name="connector" /> (<see cref="CreateConnectOnlyConnector" />'s, so the connection
+    /// is the handle's own and never pooled), with <see cref="CreateDispatcher" />'s transports' TLS provider and DNS
+    /// resolver, IMAP's SASL answering as the engine's IMAP handler does, each giving the open connection to
+    /// <paramref name="connectOnly" />.
+    /// </summary>
+    /// <param name="connector">Dials the control connection.</param>
+    /// <param name="options">The transfer's options.</param>
+    /// <param name="shared">The engine's shared caches.</param>
+    /// <param name="connectOnly">Keeps the connection the connect phase leaves open.</param>
+    /// <returns>The handlers.</returns>
+    internal static IProtocolHandler[] CreateConnectOnlyLoginHandlers(IConnector connector, EasyOptions options, ManagedEngineSharedState shared, ConnectOnlyConnection connectOnly)
+    {
+        CurlTransports transports = CreateTransports(options, shared);
+        ISecurityContextFactory contexts = EngineComposition.CreateDialingSecurityContextFactory(transports.TcpConnector, transports.UdpDatagramConnector, diagnosticLog: null, UsesHandBuiltNtlm(shared));
+        return
+        [
+            new FtpConnectOnlyHandler(EngineComposition.CreateFtpProtocolHandler(connector, connector, transports.TlsProvider, transports.DnsResolver), connectOnly),
+            new ImapConnectOnlyHandler(new ImapProtocolHandler(connector, transports.TlsProvider, EngineComposition.CreateSaslAuthenticator(contexts, NegotiateOptionsMapping.Of(options.Authentication).Delegation)), connectOnly),
+        ];
+    }
 
     /// <summary>
     /// Builds the authenticator a <c>CURLOPT_CONNECT_ONLY</c> 2 perform's WebSocket upgrade answers a challenge with, as

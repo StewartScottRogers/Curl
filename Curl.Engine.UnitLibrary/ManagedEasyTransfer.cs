@@ -673,18 +673,29 @@ internal sealed class ManagedEasyTransfer(
     }
 
     /// <summary>
-    /// Whether the perform only connects (<see cref="PerformConnectOnlyAsync" />): under <c>CURLOPT_CONNECT_ONLY</c> 1,
-    /// and under 2 for a URL that is not <c>ws</c> or <c>wss</c>, as libcurl, which upgrades only those (ADR-0616).
+    /// Whether the perform only connects (<see cref="PerformConnectOnlyAsync" />): under <c>CURLOPT_CONNECT_ONLY</c> 1
+    /// for a URL whose connect phase sends nothing (not <see cref="LogsInBeforeConnectOnly" />), and under 2 for a URL
+    /// that is not <c>ws</c> or <c>wss</c>, as libcurl, which upgrades only those (ADR-0616).
     /// </summary>
     /// <param name="connectOnly">The handle's <c>CURLOPT_CONNECT_ONLY</c>.</param>
     /// <param name="url">The URL set, parsed.</param>
     /// <returns><see langword="true" /> when the perform connects and sends nothing.</returns>
     private static bool IsRawConnectOnly(Api.Options.Network.ConnectOnly connectOnly, CurlUrl url) => connectOnly switch
     {
-        Api.Options.Network.ConnectOnly.Connect => true,
+        Api.Options.Network.ConnectOnly.Connect => !LogsInBeforeConnectOnly(url),
         Api.Options.Network.ConnectOnly.WebSocket => !IsWebSocket(url),
         _ => false,
     };
+
+    /// <summary>
+    /// Whether a <c>CURLOPT_CONNECT_ONLY</c> 1 perform of <paramref name="url" /> runs the protocol's connect phase
+    /// (<see cref="ConnectOnlyLoginDispatcherOf" />): <c>ftp</c>, <c>ftps</c>, <c>imap</c> and <c>imaps</c>, whose
+    /// handlers have a connect-only entry point, as libcurl logs in before such a perform ends (upstream tests 597
+    /// and 660, BL-2623).
+    /// </summary>
+    /// <param name="url">The URL set, parsed.</param>
+    /// <returns><see langword="true" /> for those schemes.</returns>
+    private static bool LogsInBeforeConnectOnly(CurlUrl url) => url.Scheme.ToLowerInvariant() is "ftp" or "ftps" or "imap" or "imaps";
 
     /// <summary>Whether <paramref name="url" /> is a <c>ws</c> or <c>wss</c> URL.</summary>
     /// <param name="url">The URL.</param>
@@ -872,16 +883,31 @@ internal sealed class ManagedEasyTransfer(
     /// The follower the transfer runs through: the curl tool's runner's from <paramref name="toolDispatch" />, or
     /// without it one over the dispatcher the engine's factory builds from the options, the caches and the cookie
     /// store the transfer's HTTP handler keeps (BL-2479); under <c>CURLOPT_CONNECT_ONLY</c> 2 (which reaches here only
-    /// for a <c>ws</c> or <c>wss</c> URL) one over <see cref="WebSocketUpgradeDispatcherOf" /> alone.
+    /// for a <c>ws</c> or <c>wss</c> URL) one over <see cref="WebSocketUpgradeDispatcherOf" /> alone, and under 1 (which
+    /// reaches here only for a URL that <see cref="LogsInBeforeConnectOnly" />) one over <see cref="ConnectOnlyLoginDispatcherOf" />.
     /// </summary>
     /// <param name="toolDispatch">The runner's follower and context factory, or <see langword="null" /> for the handle's own.</param>
     /// <param name="options">The handle's options.</param>
     /// <param name="cookies">The transfer's cookies, or <see langword="null" /> when no cookie option is set.</param>
     /// <returns>The follower.</returns>
     private RedirectFollower FollowerOf(EngineToolTransferDispatch? toolDispatch, EasyOptions options, CookieEngine? cookies) =>
-        toolDispatch?.Follower ?? new RedirectFollower(options.Network.ConnectOnly == Api.Options.Network.ConnectOnly.WebSocket
-            ? WebSocketUpgradeDispatcherOf(options)
-            : createDispatcher(options, PerformShared, HandlerCookieStoreOf(cookies), PushSinkOf()));
+        toolDispatch?.Follower ?? new RedirectFollower(options.Network.ConnectOnly switch
+        {
+            Api.Options.Network.ConnectOnly.WebSocket => WebSocketUpgradeDispatcherOf(options),
+            Api.Options.Network.ConnectOnly.Connect => ConnectOnlyLoginDispatcherOf(options),
+            _ => createDispatcher(options, PerformShared, HandlerCookieStoreOf(cookies), PushSinkOf()),
+        });
+
+    /// <summary>
+    /// The dispatcher of a <c>CURLOPT_CONNECT_ONLY</c> 1 perform of an <c>ftp</c>, <c>ftps</c>, <c>imap</c> or
+    /// <c>imaps</c> URL: <see cref="ManagedCurlEngine.CreateConnectOnlyLoginHandlers" />' handlers over
+    /// <see cref="CreateConnectOnlyConnector" />'s connector, which run the protocol's connect phase and give the open
+    /// connection to <see cref="Connection" /> (BL-2623).
+    /// </summary>
+    /// <param name="options">The handle's options.</param>
+    /// <returns>The dispatcher.</returns>
+    private ProtocolDispatcher ConnectOnlyLoginDispatcherOf(EasyOptions options) =>
+        new(ManagedCurlEngine.CreateConnectOnlyLoginHandlers(CreateConnectOnlyConnector(options, PerformShared), options, PerformShared, ConnectOnly));
 
     /// <summary>
     /// The dispatcher of a <c>CURLOPT_CONNECT_ONLY</c> 2 perform: a <see cref="WebSocketUpgradeOnlyHandler" /> whose

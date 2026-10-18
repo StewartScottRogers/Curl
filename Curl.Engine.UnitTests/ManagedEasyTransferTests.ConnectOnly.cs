@@ -185,6 +185,64 @@ public sealed partial class ManagedEasyTransferTests
         Assert.HasCount(2, connector.Targets);
     }
 
+    private static (IEasyTransfer Easy, ScriptedConnector Connector) CreateConnectOnlyLoginEasy(params string[] replies)
+    {
+        ScriptedConnector connector = new(replies.Select(Encoding.ASCII.GetBytes));
+        ManagedEasyTransfer easy = (ManagedEasyTransfer)CreateEngine(new ScriptedConnector([])).CreateEasy();
+        easy.CreateConnectOnlyConnector = (_, _) => connector;
+        return (easy, connector);
+    }
+
+    [TestMethod]
+    public async Task PerformAsync_ConnectOnlyFtp_LogsInAndLeavesTheControlConnectionToSendAndRecv()
+    {
+        (IEasyTransfer easy, ScriptedConnector connector) = CreateConnectOnlyLoginEasy("220 hi\r\n", "331 pw\r\n", "230 in\r\n", "257 \"/\"\r\n", "200 noop\r\n");
+        await using IEasyTransfer handle = easy;
+        easy.Options = ConnectOnlyTo("ftp://h:2121/");
+
+        CurlCode code = await easy.PerformAsync(CancellationToken.None);
+        string loggedIn = Encoding.ASCII.GetString(connector.Written);
+        CurlConnectOnlyResult sent = await easy.Connection.SendAsync("NOOP\r\n"u8.ToArray(), CancellationToken.None);
+
+        Assert.AreEqual(CurlCode.Ok, code);
+        Assert.AreEqual("h", connector.Targets.Single().Host);
+        Assert.AreEqual(2121, connector.Targets.Single().Port);
+        Assert.AreEqual("USER anonymous\r\nPASS ftp@example.com\r\nPWD\r\n", loggedIn);
+        Assert.AreEqual(new CurlConnectOnlyResult(CurlCode.Ok, 6), sent);
+        Assert.EndsWith("NOOP\r\n", Encoding.ASCII.GetString(connector.Written));
+    }
+
+    [TestMethod]
+    public async Task PerformAsync_ConnectOnlyFtpLoginRefused_AnswersLoginDeniedAndLeavesNoConnection()
+    {
+        (IEasyTransfer easy, _) = CreateConnectOnlyLoginEasy("220 hi\r\n", "530 no\r\n");
+        await using IEasyTransfer handle = easy;
+        easy.Options = ConnectOnlyTo("ftp://h/");
+
+        CurlCode code = await easy.PerformAsync(CancellationToken.None);
+        CurlConnectOnlyResult receive = await easy.Connection.ReceiveAsync(new byte[1], CancellationToken.None);
+
+        Assert.AreEqual(CurlCode.LoginDenied, code);
+        Assert.AreEqual(CurlCode.UnsupportedProtocol, receive.Result);
+    }
+
+    [TestMethod]
+    public async Task PerformAsync_ConnectOnlyImap_SendsCapabilityAndLeavesTheConnectionToSendAndRecv()
+    {
+        (IEasyTransfer easy, ScriptedConnector connector) = CreateConnectOnlyLoginEasy("* OK hi\r\n", "* CAPABILITY IMAP4rev1\r\nA001 OK done\r\n");
+        await using IEasyTransfer handle = easy;
+        easy.Options = ConnectOnlyTo("imap://h/");
+
+        CurlCode code = await easy.PerformAsync(CancellationToken.None);
+        string sentBeforeEnd = Encoding.ASCII.GetString(connector.Written);
+        CurlConnectOnlyResult sent = await easy.Connection.SendAsync("A002 NOOP\r\n"u8.ToArray(), CancellationToken.None);
+
+        Assert.AreEqual(CurlCode.Ok, code);
+        Assert.AreEqual(143, connector.Targets.Single().Port);
+        Assert.AreEqual("A001 CAPABILITY\r\n", sentBeforeEnd);
+        Assert.AreEqual(new CurlConnectOnlyResult(CurlCode.Ok, 11), sent);
+    }
+
     [TestMethod]
     public async Task CreateConnectOnlyConnector_DefaultOptions_BuildsTheEnginesTcpConnector()
     {
