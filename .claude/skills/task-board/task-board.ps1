@@ -237,13 +237,21 @@ function Test-DarkFactoryLane {
     return -not [string]::IsNullOrEmpty($env:CURL_DARK_FACTORY_LANE)
 }
 
+# Lists many tasks add lines to at once. Each is read as a set and merged line by line
+# (merge=union in .gitattributes), so two tasks that both edit one never conflict, and
+# naming one in touches makes no overlap (ADR-0689).
+$script:SharedListFiles = @('Curl.Conformance.UnitTests/PassingUpstreamCases.txt')
+
 # Two tasks overlap when either may touch anything, or one names a path equal to or
 # inside a path the other names. Curl.Core.UnitLibrary overlaps
-# Curl.Core.UnitLibrary/Transfer.cs; it does not overlap Curl.Core.UnitTests.
+# Curl.Core.UnitLibrary/Transfer.cs; it does not overlap Curl.Core.UnitTests. A shared
+# list file overlaps nothing, not even the project folder it is in.
 function Test-Overlap([string[]] $A, [string[]] $B) {
     if ($A -contains '*' -or $B -contains '*') { return $true }
     foreach ($x in $A) {
+        if ($script:SharedListFiles -contains $x) { continue }
         foreach ($y in $B) {
+            if ($script:SharedListFiles -contains $y) { continue }
             if ($x -ieq $y) { return $true }
             if ($x.StartsWith("$y/", [StringComparison]::OrdinalIgnoreCase)) { return $true }
             if ($y.StartsWith("$x/", [StringComparison]::OrdinalIgnoreCase)) { return $true }
