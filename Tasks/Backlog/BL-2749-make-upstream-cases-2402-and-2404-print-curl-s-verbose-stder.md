@@ -1,5 +1,5 @@
 ---
-id: BL-2747
+id: BL-2749
 title: Make upstream cases 2402 and 2404 print curl's verbose stderr lines over HTTP/2 and hold them on the ratchet
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-18
 completed:
 ---
-# BL-2747 — Make upstream cases 2402 and 2404 print curl's verbose stderr lines over HTTP/2 and hold them on the ratchet
+# BL-2749 — Make upstream cases 2402 and 2404 print curl's verbose stderr lines over HTTP/2 and hold them on the ratchet
 
 ## Goal
 

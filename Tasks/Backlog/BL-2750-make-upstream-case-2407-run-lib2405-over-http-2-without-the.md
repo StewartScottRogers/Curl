@@ -1,5 +1,5 @@
 ---
-id: BL-2748
+id: BL-2750
 title: Make upstream case 2407 run lib2405 over HTTP/2 without the 'not a socket' SocketException and hold it on the ratchet
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-18
 completed:
 ---
-# BL-2748 — Make upstream case 2407 run lib2405 over HTTP/2 without the 'not a socket' SocketException and hold it on the ratchet
+# BL-2750 — Make upstream case 2407 run lib2405 over HTTP/2 without the 'not a socket' SocketException and hold it on the ratchet
 
 ## Goal
 

@@ -30,14 +30,14 @@ Found by BL-2550, which ported lib2402, lib2404 and lib2405. On Windows all thre
 
 Measured 2026-10-18 by running the three cases on Windows with the harness platform set to `UpstreamCurlPlatform.Unix` (http/2, h2c, OpenSSL, xattr), one local run, reverted. CI on Linux and macOS (run 39155312605) lists each as skipped with a run time, so it ran and was judged Inconclusive, but the log does not print the verdict text; the failures below come from the local run.
 
-- 2402: fails. stderr2402 differs at byte 0 (line 1): expected `* Connection #0 to host localhost:9018 left intact`, got the end of the file (empty stderr). Filed BL-2747.
-- 2404: fails the same way on stderr2404. Filed BL-2747.
-- 2407: fails: `curl threw SocketException: An operation was attempted on something that is not a socket.` Filed BL-2748.
+- 2402: fails. stderr2402 differs at byte 0 (line 1): expected `* Connection #0 to host localhost:9018 left intact`, got the end of the file (empty stderr). Filed BL-2749.
+- 2404: fails the same way on stderr2404. Filed BL-2749.
+- 2407: fails: `curl threw SocketException: An operation was attempted on something that is not a socket.` Filed BL-2750.
 
-None passes, so none is added to the ratchet and no CI result changes. The ratchet treats a listed case that is skipped as a failure unless it is skipped only for another platform's features (ADR-0488); BL-2747 and BL-2748 must account for Windows, where http/2 cases are skipped for lack of the feature, when they list a case.
+None passes, so none is added to the ratchet and no CI result changes. The ratchet treats a listed case that is skipped as a failure unless it is skipped only for another platform's features (ADR-0488); BL-2749 and BL-2750 must account for Windows, where http/2 cases are skipped for lack of the feature, when they list a case.
 
 ## Log
 
 - 2026-10-17: Created.
 - 2026-10-18: Backlog -> Doing. Criteria at claim: c0c24af7 bafcc23b 3d836d5e.
-- 2026-10-18: Doing -> Done. Measured: 2402, 2404 and 2407 fail with Unix features; nothing to list; filed BL-2747 and BL-2748
+- 2026-10-18: Doing -> Done. Measured: 2402, 2404 and 2407 fail with Unix features; nothing to list; filed BL-2749 and BL-2750
