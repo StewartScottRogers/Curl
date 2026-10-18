@@ -27,10 +27,10 @@ Found by BL-2549, which ported lib1985 and lib2023 (libauthretry). Measured on W
 
 ## Notes
 
-- 2026-10-18 (Windows, after BL-2666): 1985, 2026 and 2028 pass and are on the ratchet. 2027 fails at line 12 - the request for `/20270200` sends no `Authorization: Digest ... nonce="2"` header - filed as BL-2744. These are HTTP libtest cases with no paths, OS error text or certificates, so their output does not depend on the platform.
+- 2026-10-18 (Windows, after BL-2666): 1985, 2026 and 2028 pass and are on the ratchet. 2027 fails at line 12 - the request for `/20270200` sends no `Authorization: Digest ... nonce="2"` header - filed as BL-2745. These are HTTP libtest cases with no paths, OS error text or certificates, so their output does not depend on the platform.
 
 ## Log
 
 - 2026-10-17: Created.
 - 2026-10-18: Backlog -> Doing. Criteria at claim: ed4041ba 3d836d5e.
-- 2026-10-18: Doing -> Done. Upstream cases 1985, 2026 and 2028 hold the ratchet; 2027 filed as BL-2744
+- 2026-10-18: Doing -> Done. Upstream cases 1985, 2026 and 2028 hold the ratchet; 2027 filed as BL-2745

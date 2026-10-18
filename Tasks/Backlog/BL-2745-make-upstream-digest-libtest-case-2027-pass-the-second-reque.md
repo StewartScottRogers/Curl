@@ -1,5 +1,5 @@
 ---
-id: BL-2744
+id: BL-2745
 title: Make upstream Digest libtest case 2027 pass: the second request of each round sends no Authorization header
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-18
 completed:
 ---
-# BL-2744 — Make upstream Digest libtest case 2027 pass: the second request of each round sends no Authorization header
+# BL-2745 — Make upstream Digest libtest case 2027 pass: the second request of each round sends no Authorization header
 
 ## Goal
 
