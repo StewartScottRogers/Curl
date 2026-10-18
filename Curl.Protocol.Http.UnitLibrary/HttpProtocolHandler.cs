@@ -1233,9 +1233,7 @@ public sealed class HttpProtocolHandler(
         IConnection connection = ExchangeConnectionOf(plan, requestStream, transport);
         byte[] request = FormatRequestHead(plan, streams, connection is HttpH2cUpgradeConnection, options.EarlierResponseWasHttp10 || Http1VersionSeen.DowngradesToHttp10(transport));
         HttpFirstByteTimingConnection timedConnection = new(connection, context.TimeProvider);
-        IConnection responseConnection = framing.AwaitsContinue
-            ? new HttpContinueWaitConnection(timedConnection) { ContinueWait = options.ContinueWait }
-            : timedConnection;
+        IConnection responseConnection = ResponseConnectionOf(plan, requestStream, timedConnection);
         HttpRequestBodyWriter upload = CreateUpload(plan, connection, responseConnection, requestStream, request);
         HttpExchange exchange = CreateExchange(plan, connect, connection, timedConnection, request.Length, upload, earlier, newConnection);
         HttpExchangeLog exchangeLog = HttpExchangeLog.For(context.DiagnosticLog, streams);
@@ -1283,6 +1281,7 @@ public sealed class HttpProtocolHandler(
             bool ignoresBody = IgnoresBody(plan, actedOn, delivery, discardsBody);
             headReader.ReportHeldLines();
             await ReadBodyAsync(plan, actedOn, body, TrailerStreamOf(requestStream, connection), delivery, ignoresBody, cancellationToken).ConfigureAwait(false);
+            await upload.WriteRestAfterResponseAsync(cancellationToken).ConfigureAwait(false);
             ThrowIfFailing(fail, HttpFailMode.FailWithBody, actedOn);
         }
         catch (HttpTransferException failure)
@@ -1349,6 +1348,20 @@ public sealed class HttpProtocolHandler(
     }
 
     /// <summary>
+    /// Gives the connection an exchange reads its response from: one that waits for <c>100 Continue</c>
+    /// when the request expects it; over HTTP/1.x with a stream body, one that can read the status line
+    /// while a read of the body stays pending (<see cref="HttpEarlyResponseConnection" />, BL-2729); and
+    /// else <paramref name="timedConnection" /> itself.
+    /// </summary>
+    private static IConnection ResponseConnectionOf(HttpRequestPlan plan, IHttpStreamConnection? requestStream, IConnection timedConnection) =>
+        (plan.Framing.AwaitsContinue, plan.Framing.Body is StreamBody && requestStream is null) switch
+        {
+            (true, _) => new HttpContinueWaitConnection(timedConnection) { ContinueWait = plan.Options.ContinueWait },
+            (false, true) => new HttpEarlyResponseConnection(timedConnection),
+            _ => timedConnection,
+        };
+
+    /// <summary>
     /// Builds the request body writer of an exchange: holding the request head back when it
     /// awaits <c>100 Continue</c>, otherwise sharing it with the body's first write.
     /// </summary>
@@ -1368,6 +1381,8 @@ public sealed class HttpProtocolHandler(
             Progress = plan.Progress,
             Events = plan.Context.Events,
             EarlyResponseWatch = responseConnection as HttpContinueWaitConnection,
+            EarlyResponseRead = responseConnection as HttpEarlyResponseConnection,
+            KeepsSendingOnError = plan.Options.KeepSendingOnError,
             TracesReaders = TracesReadersOf(requestStream),
         };
     }
