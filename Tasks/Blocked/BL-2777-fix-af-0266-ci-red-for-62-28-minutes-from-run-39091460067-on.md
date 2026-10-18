@@ -46,7 +46,10 @@ The finding closes only when a later re-audit by the process auditor confirms th
 
 ## Notes
 
+- The finding is about one past CI red spell (run 39091460067, 2026-10-18); history cannot change, so its reproduction always prints the same spell. RunDarkFactory.ps1 already mitigates the chain: board pushes carry [skip ci], and the CI watch filed BL-2707 within a heartbeat. The remaining cancellations were newer code pushes by lanes plus ci.yml's cancel-in-progress concurrency (a guard file, interactive only). No change fits `touches` without slowing lanes for a one-off. Same as BL-2776/AF-0265.
+
 ## Log
 
 - 2026-10-18: Created.
 - 2026-10-18: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-18: Doing -> Blocked. Stewart: AF-0266 is one past CI red spell the factory already mitigates ([skip ci] board pushes, CI-watch filing) - reject it or close it as historical?
