@@ -8,7 +8,7 @@ depends-on: [BL-2688]
 touches: [Curl.Conformance.UnitTests]
 requirement: none
 created: 2026-10-17
-completed:
+completed: 2026-10-18
 ---
 # BL-2698 — Run upstream WebSocket libtest cases 2700 to 2723 with the Debug stand-in and hold those that pass
 
@@ -22,13 +22,25 @@ Found by BL-2551, which ported lib2700 (`Curl.Conformance.LibTest.UnitLibrary/Li
 
 ## Acceptance criteria
 
-- [ ] Each of cases 2700 to 2723 runs through the runner on Windows without being skipped for the Debug feature.
-- [ ] Every one of them that passes is in `Curl.Conformance.UnitTests/PassingUpstreamCases.txt`; each that fails is filed as a task with its differing lines.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] Each of cases 2700 to 2723 runs through the runner on Windows without being skipped for the Debug feature.
+- [x] Every one of them that passes is in `Curl.Conformance.UnitTests/PassingUpstreamCases.txt`; each that fails is filed as a task with its differing lines.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- The fault was in the harness only, so `touches` stayed `Curl.Conformance.UnitTests`. `PlatformFor` now reports
+  `Debug` to a `ws` case setting `CURL_WS_FORCE_ZERO_MASK`, and `CreateEngine` gives the libtest engine a new
+  `ZeroMaskWebSocketRandomSource` (zero 4-byte masks, random key) through ADR-0678's `IWebSocketRandomSource` seam.
+  Decision recorded in ADR-0694.
+- Measured on Windows: 23 of 24 pass and are on the ratchet. 2708 (`ws: Automatic PONG`) fails: Curl sends the
+  automatic PONG and then also returns the PING to `curl_ws_recv`, which `lib2700` echoes. Filed as BL-2782 with the
+  differing lines.
+- Platform check: these cases exchange bytes only with the in-memory `sws`. No paths, OS error text or certificates
+  are involved, so they are safe on Linux and macOS.
+- No production library changed, so no Measure-CodeQuality run was needed.
 
 ## Log
 
 - 2026-10-17: Created.
 - 2026-10-18: Backlog -> Doing. Criteria at claim: cdfffd96 d6080d4c 3d836d5e.
+- 2026-10-18: Doing -> Done. Upstream WebSocket cases 2700 to 2723 run under a CURL_WS_FORCE_ZERO_MASK stand-in; 23 hold the ratchet, 2708 filed as BL-2782
