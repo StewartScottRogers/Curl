@@ -1,4 +1,5 @@
 using System.Text;
+using Curl.Api.Callbacks;
 using Libcurl.Easy;
 using Libcurl.Global;
 using Libcurl.Misc.DatesAndLists;
@@ -77,6 +78,18 @@ public abstract class LibPipeWaitHandles(int programNumber, TimeProvider timePro
     /// <param name="index">The handle's index, from 0.</param>
     /// <returns>The options and their values, in the program's order.</returns>
     protected abstract IEnumerable<(CurlOption Option, object? Value)> ProgramOptions(LibTestContext context, int index);
+
+    /// <summary>
+    /// libcurl's own verbose output on the program's stderr, for the programs that set no debug function of their
+    /// own: the engine writes nothing without a <c>CURLOPT_DEBUGFUNCTION</c>, so this one stands in for the default.
+    /// </summary>
+    /// <param name="context">The program's context.</param>
+    /// <returns>The <c>CURLOPT_DEBUGFUNCTION</c> option and its value.</returns>
+    protected static IEnumerable<(CurlOption Option, object? Value)> DefaultVerboseOptions(LibTestContext context)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        return [(CurlOption.Debugfunction, (DebugCallback)new LibTestDefaultVerboseTrace(context.StandardError).Trace)];
+    }
 
     // Cleanup type PB: each handle removed and cleaned up, then the multi handle.
     private static async ValueTask CleanUpAsync(CurlMulti? multi, CurlEasy?[] handles)

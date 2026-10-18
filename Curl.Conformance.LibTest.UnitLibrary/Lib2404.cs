@@ -20,5 +20,6 @@ public sealed class Lib2404(TimeProvider timeProvider) : LibPipeWaitHandles(2404
         (CurlOption.SslVerifypeer, 0L),
         (CurlOption.SslVerifyhost, 0L),
         (CurlOption.StreamWeight, FirstStreamWeight + index),
+        .. DefaultVerboseOptions(context),
     ];
 }
