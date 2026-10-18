@@ -59,14 +59,20 @@ public sealed class ManagedCurlEngine : ICurlEngine
     /// sockets: the conformance harness's in-memory servers, as <c>Curl.Console</c>'s dialing runner takes them
     /// (ADR-0658); <see langword="null" /> for the real network.
     /// </param>
+    /// <param name="signingClock">
+    /// The clock the production dispatcher's HTTP handler signs <c>CURLOPT_AWS_SIGV4</c> requests and HTTP signatures with:
+    /// the conformance harness's epoch, standing in for the debug build's <c>CURL_FORCETIME</c> (BL-2675, ADR-0671);
+    /// <see langword="null" /> for <see cref="TimeProvider.System" />.
+    /// </param>
     internal ManagedCurlEngine(
         TimeProvider timeProvider,
         Func<EasyOptions, ManagedEngineSharedState, ICookieStore?, ProtocolDispatcher>? createDispatcher,
         Func<CurlExitCode, string>? easyErrorText = null,
         Func<string, string?>? readEnvironmentVariable = null,
-        EngineDialing? dialing = null)
+        EngineDialing? dialing = null,
+        TimeProvider? signingClock = null)
     {
-        shared = new ManagedEngineSharedState(timeProvider, easyErrorText ?? (_ => string.Empty), readEnvironmentVariable, dialing);
+        shared = new ManagedEngineSharedState(timeProvider, easyErrorText ?? (_ => string.Empty), readEnvironmentVariable, dialing, signingClock);
         this.createDispatcher = createDispatcher is null ? CreateDispatcher : (options, state, cookies, _) => createDispatcher(options, state, cookies);
     }
 
@@ -130,6 +136,7 @@ public sealed class ManagedCurlEngine : ICurlEngine
             cookieStore,
             proxyAuthSchemes: transports.ProxyTunnelOptions.ProxyAuthSchemes,
             negotiateOptions: NegotiateOptionsMapping.Of(options.Authentication),
+            signingClock: shared.SigningClock,
             ftpDataConnector: PoolOf(transports, transports.TcpConnector.ForFtpDataConnections(), options.Callbacks, shared),
             ftpWildcardHooks: CallbackWildcardHooks.Of(options),
             rtspInterleaveSink: CallbackInterleaveSink.Of(options.Callbacks.Interleave),

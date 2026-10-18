@@ -415,10 +415,15 @@ public sealed class UpstreamConformanceTests
     // reports Debug to a case whose command names %HTTP2TLSPORT. Every other case sees no Debug, so the other Debug cases stay skipped.
     // A case naming the dns server (2102 to 2104) relies on override-dns, the debug build's CURL_DNS_SERVER: the harness
     // reports it to that case alone, and RunCurlAsync has Curl ask the dnsd stand-in on %DNSPORT through the datagram connector (ADR-0492, BL-2232).
+    // The AWS SigV4 libtest cases (1933 to 1938) rely on Debug for CURL_FORCETIME, which signs at the epoch: the harness
+    // reports Debug to a case naming the aws feature, and CreateEngine gives the libtest engine a signing clock fixed at
+    // the epoch (ADR-0671, BL-2675); the curl tool's aws cases (439, 472, 1976, 3222, 5026, 5027) get Debug too, and
+    // RunCurlAsync signs an --aws-sigv4 command at the epoch.
     private static UpstreamCurlPlatform PlatformFor(byte[] testFile)
     {
         string text = Encoding.Latin1.GetString(testFile);
         bool standsInForDebug = text.Contains("\nhttpsig\n", StringComparison.Ordinal)
+            || text.Contains("\naws\n", StringComparison.Ordinal)
             || (text.Contains("\nHSTS\n", StringComparison.Ordinal) && text.Contains("\nCURL_TIME=", StringComparison.Ordinal))
             || (text.Contains("\nalt-svc\n", StringComparison.Ordinal) && text.Contains("\nCURL_ALTSVC_HTTP=", StringComparison.Ordinal))
             || text.Contains(":%HTTP2TLSPORT/", StringComparison.Ordinal);
@@ -574,7 +579,7 @@ public sealed class UpstreamConformanceTests
             readEnvironmentVariable: name => invocation.EnvironmentVariables.GetValueOrDefault(name),
             ftpListener: invocation.ConnectionListener,
             defaultConfigFileSearch: new DefaultConfigFileSearch(name => invocation.EnvironmentVariables.GetValueOrDefault(name), OperatingSystem.IsWindows(), executableDirectory: null, accountHomeDirectory: null),
-            signingClock: invocation.Arguments.Any(argument => argument.StartsWith("--httpsig", StringComparison.Ordinal)) ? new UnixEpochClock() : null,
+            signingClock: invocation.Arguments.Any(argument => argument.StartsWith("--httpsig", StringComparison.Ordinal) || argument == "--aws-sigv4") ? new UnixEpochClock() : null,
             honoursHstsTimeVariable: true,
             honoursHstsHttpVariable: true,
             honoursAltSvcHttpVariable: true,
@@ -584,14 +589,16 @@ public sealed class UpstreamConformanceTests
     // A ported libtest program's engine, in place of curl (BL-2558, ADR-0658): the managed Libcurl engine, every TCP
     // dial reaching the case's in-memory servers through InMemoryServerTcpDialer, names resolved to loopback, the
     // datagram protocols on the case's datagram servers, FTP's active-mode data connections on the FTP stand-in's
-    // listener (BL-2597) and the proxy environment the case's <setenv>, as RunCurlAsync composes curl.
+    // listener (BL-2597) and the proxy environment the case's <setenv>, as RunCurlAsync composes curl. It signs AWS SigV4
+    // requests and HTTP signatures at the epoch, as upstream's debug build does under the CURL_FORCETIME its test runner sets (BL-2675).
     internal static ICurlEngine CreateEngine(UpstreamCurlInvocation invocation) =>
         new ManagedCurlEngine(
             TimeProvider.System,
             createDispatcher: null,
             CurlEasyErrorText.Of,
             name => invocation.EnvironmentVariables.GetValueOrDefault(name),
-            new EngineDialing(new InMemoryServerTcpDialer(invocation.Connector), new LoopbackOnlyDnsResolver(), invocation.DatagramConnector, invocation.ConnectionListener));
+            new EngineDialing(new InMemoryServerTcpDialer(invocation.Connector), new LoopbackOnlyDnsResolver(), invocation.DatagramConnector, invocation.ConnectionListener),
+            signingClock: new UnixEpochClock());
 
     // The ported libtest programs the ratchet runs a <tool> case's program from, over CreateEngine.
     private static readonly UpstreamLibTests LibTests = new(LibTestPrograms.Ported, CreateEngine);

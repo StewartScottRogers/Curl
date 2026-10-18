@@ -203,6 +203,33 @@ public sealed class ManagedCurlEngineTests
         await using ManagedCurlEngine engine = new();
 
         Assert.IsNull(engine.Shared.Dialing);
+        Assert.IsNull(engine.Shared.SigningClock);
+    }
+
+    [TestMethod]
+    public async Task PerformAsync_SigningClockGivenAndAwsSigV4_SignsAtThatClocksTime()
+    {
+        ScriptedConnector server = new(["HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n"u8.ToArray()]);
+        EngineDialing dialing = new(new ScriptedTcpDialer(server), new LoopbackDnsResolver(), new RecordingDatagramConnector(Curl.Protocol.Abstractions.CurlExitCode.CouldntConnect, "no udp"));
+        await using ManagedCurlEngine engine = new(TimeProvider.System, null, dialing: dialing, signingClock: new FixedClock(DateTimeOffset.UnixEpoch));
+        await using IEasyTransfer easy = engine.CreateEasy();
+        easy.Options = new EasyOptions
+        {
+            Network = new EasyNetworkOptions { Url = "http://127.0.0.1:9000/bl2675" },
+            Authentication = new Api.Options.Authentication.EasyAuthenticationOptions { UserPassword = "xxx:yyy", AwsSigV4 = "xxx" },
+        };
+
+        CurlCode code = await easy.PerformAsync(CancellationToken.None);
+
+        string request = System.Text.Encoding.ASCII.GetString(server.Written);
+        Assert.AreEqual(CurlCode.Ok, code);
+        Assert.Contains("X-Xxx-Date: 19700101T000000Z\r\n", request);
+        Assert.Contains("Credential=xxx/19700101/", request);
+    }
+
+    private sealed class FixedClock(DateTimeOffset now) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => now;
     }
 
     private static long WriteTo(MemoryStream body, ReadOnlySpan<byte> data)

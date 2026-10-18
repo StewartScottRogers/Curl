@@ -24,9 +24,11 @@ internal sealed class ManagedEngineSharedState
     /// <see cref="Environment.GetEnvironmentVariable(string)" />, the default, in production; a dictionary in tests.
     /// </param>
     /// <param name="dialing">What the transfers dial and resolve through in place of sockets (ADR-0658); <see langword="null" />, in production, for sockets.</param>
-    internal ManagedEngineSharedState(TimeProvider timeProvider, Func<CurlExitCode, string> easyErrorText, Func<string, string?>? readEnvironmentVariable = null, EngineDialing? dialing = null)
+    /// <param name="signingClock">The clock <c>CURLOPT_AWS_SIGV4</c> and the HTTP signatures sign with (BL-2675); <see langword="null" />, in production, for <see cref="TimeProvider.System" />.</param>
+    internal ManagedEngineSharedState(TimeProvider timeProvider, Func<CurlExitCode, string> easyErrorText, Func<string, string?>? readEnvironmentVariable = null, EngineDialing? dialing = null, TimeProvider? signingClock = null)
     {
         Dialing = dialing;
+        SigningClock = signingClock;
         ProxySelector = new ProxySelector(readEnvironmentVariable ?? Environment.GetEnvironmentVariable);
         TimeProvider = timeProvider;
         Connections = new ConnectionCache(timeProvider);
@@ -71,7 +73,15 @@ internal sealed class ManagedEngineSharedState
         Performer = engine.Performer;
         ProxySelector = engine.ProxySelector;
         Dialing = engine.Dialing;
+        SigningClock = engine.SigningClock;
     }
+
+    /// <summary>
+    /// Gets the clock the engine's transfers sign <c>CURLOPT_AWS_SIGV4</c> requests and HTTP signatures with: the
+    /// conformance harness's stand-in for the debug build's <c>CURL_FORCETIME</c> (BL-2675); <see langword="null" />, in
+    /// production, for <see cref="TimeProvider.System" />.
+    /// </summary>
+    internal TimeProvider? SigningClock { get; }
 
     /// <summary>
     /// Gets what chooses the proxy of every handle's own perform from <c>CURLOPT_PROXY</c>, <c>CURLOPT_NOPROXY</c>
