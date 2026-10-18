@@ -8,7 +8,7 @@ depends-on: [BL-2666]
 touches: [Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
 requirement: none
 created: 2026-10-17
-completed:
+completed: 2026-10-18
 ---
 # BL-2690 — Run upstream Digest libtest cases 1985 and 2026 to 2028 once Libcurl's Digest header separates fields with a comma and space
 
@@ -22,12 +22,15 @@ Found by BL-2549, which ported lib1985 and lib2023 (libauthretry). Measured on W
 
 ## Acceptance criteria
 
-- [ ] Each of 1985, 2026, 2027 and 2028 that passes through `NamedUpstreamCase_RunThroughCurl_PassesAsAListedCaseMust` is on `Curl.Conformance.UnitTests/PassingUpstreamCases.txt`; each that fails is filed as a task with its differing line.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] Each of 1985, 2026, 2027 and 2028 that passes through `NamedUpstreamCase_RunThroughCurl_PassesAsAListedCaseMust` is on `Curl.Conformance.UnitTests/PassingUpstreamCases.txt`; each that fails is filed as a task with its differing line.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- 2026-10-18 (Windows, after BL-2666): 1985, 2026 and 2028 pass and are on the ratchet. 2027 fails at line 12 - the request for `/20270200` sends no `Authorization: Digest ... nonce="2"` header - filed as BL-2744. These are HTTP libtest cases with no paths, OS error text or certificates, so their output does not depend on the platform.
 
 ## Log
 
 - 2026-10-17: Created.
 - 2026-10-18: Backlog -> Doing. Criteria at claim: ed4041ba 3d836d5e.
+- 2026-10-18: Doing -> Done. Upstream cases 1985, 2026 and 2028 hold the ratchet; 2027 filed as BL-2744
