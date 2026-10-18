@@ -31,3 +31,4 @@ Found by BL-2535, which ported the libtest program and unit tested it over a fak
 ## Log
 
 - 2026-10-17: Created.
+- 2026-10-18: Backlog -> Doing. Criteria at claim: 92cbe6ef c59fcab3 3d836d5e.
