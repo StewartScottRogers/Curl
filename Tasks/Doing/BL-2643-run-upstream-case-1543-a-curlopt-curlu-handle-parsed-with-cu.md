@@ -31,3 +31,4 @@ Found by BL-2538, which ported lib1518 (`Curl.Conformance.LibTest.UnitLibrary/Li
 ## Log
 
 - 2026-10-17: Created.
+- 2026-10-17: Backlog -> Doing. Criteria at claim: 176cbd41 526cc4a9 3d836d5e.
