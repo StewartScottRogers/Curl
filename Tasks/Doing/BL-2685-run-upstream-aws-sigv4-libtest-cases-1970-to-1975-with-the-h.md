@@ -31,3 +31,4 @@ Found by BL-2548, which ported lib1970, lib1971, lib1973, lib1974 and lib1975 as
 ## Log
 
 - 2026-10-17: Created.
+- 2026-10-18: Backlog -> Doing. Criteria at claim: 425b835e 4272a6b9 8738c7f6.
