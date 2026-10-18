@@ -35,3 +35,4 @@ Rows (`set_parts_list` index: first URL, commands, set flags, wanted, got):
 ## Log
 
 - 2026-10-18: Created.
+- 2026-10-18: Backlog -> Doing. Criteria at claim: b5b381b2 d6c1964a.
