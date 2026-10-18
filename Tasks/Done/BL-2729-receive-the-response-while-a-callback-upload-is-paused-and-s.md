@@ -8,7 +8,7 @@ depends-on: [BL-2728]
 touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests]
 requirement: none
 created: 2026-10-18
-completed:
+completed: 2026-10-18
 ---
 # BL-2729 — Receive the response while a callback upload is paused and stop or keep sending on an early error response
 
@@ -22,14 +22,19 @@ Found by BL-2646. Upstream case 1533 (`Curl.Conformance.UnitTests/UpstreamTestDa
 
 ## Acceptance criteria
 
-- [ ] A test in `Curl.Protocol.Http.UnitTests` shows a POST whose body stream read stays pending until the response is delivered: without `KeepSendingOnError`, the response is delivered, no body byte is sent and the connection is not kept.
-- [ ] A test in `Curl.Protocol.Http.UnitTests` shows the same POST with `KeepSendingOnError`: the response is delivered, the body is sent once the read completes, and the connection is kept for reuse.
-- [ ] `dotnet build` is clean and the fast tests pass with no test deleted, skipped or weakened.
-- [ ] `Measure-CodeQuality.ps1 -Library Curl.Protocol.Http.UnitLibrary` reports 0 failing members.
+- [x] A test in `Curl.Protocol.Http.UnitTests` shows a POST whose body stream read stays pending until the response is delivered: without `KeepSendingOnError`, the response is delivered, no body byte is sent and the connection is not kept.
+- [x] A test in `Curl.Protocol.Http.UnitTests` shows the same POST with `KeepSendingOnError`: the response is delivered, the body is sent once the read completes, and the connection is kept for reuse.
+- [x] `dotnet build` is clean and the fast tests pass with no test deleted, skipped or weakened.
+- [x] `Measure-CodeQuality.ps1 -Library Curl.Protocol.Http.UnitLibrary` reports 0 failing members.
 
 ## Notes
+
+- Design (ADR-0688): over HTTP/1.x a stream body is read through `HttpEarlyResponseConnection`; a body read that does not complete at once races the response's status line in `HttpRequestBodyWriter.RaceResponseAsync`. A status of 300 or above first cancels the read and cuts the body short (connection closed), or with `KeepSendingOnError` keeps the read pending and `WriteRestAfterResponseAsync` sends the rest after the response is read. A read that wins, or a status below 300, behaves as before, so slow stdin uploads are unchanged.
+- Tests: `HttpProtocolHandlerTests.PausedUpload.cs` (4 tests, criteria 1 and 2 are the first two), `HttpEarlyResponseConnectionTests` (4); fakes `PausedReadStream`, `WriteNotifyingStream`.
+- Measured: `Measure-CodeQuality.ps1 -Library Curl.Protocol.Http.UnitLibrary` 100% line, 100% branch, 0 failing of 1099 members; build clean, fast tests green.
 
 ## Log
 
 - 2026-10-18: Created.
 - 2026-10-18: Backlog -> Doing. Criteria at claim: 9edf64c7 6304615c 4272a6b9 3bf8be13.
+- 2026-10-18: Doing -> Done. A paused callback upload no longer hangs: the HTTP handler reads the early response, stops sending and closes on 300+, or with KeepSendingOnError sends the rest and keeps the connection
