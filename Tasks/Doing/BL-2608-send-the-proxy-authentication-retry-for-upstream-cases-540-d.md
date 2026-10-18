@@ -31,3 +31,4 @@ Found by BL-2530 (lib540 and lib547 ports). Case 540 (two transfers through one 
 ## Log
 
 - 2026-10-17: Created.
+- 2026-10-17: Backlog -> Doing. Criteria at claim: 451fc7ed 4272a6b9 7d0e6df3.
