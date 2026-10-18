@@ -1430,7 +1430,8 @@ internal sealed class ManagedEasyTransfer(
     /// Performs the attempt with <see cref="TransferPerformer.FollowWatchingSpeedAsync" />, unless the
     /// progress callback aborts it: then, whether the cancel stopped the attempt or it finished first, the
     /// transfer is libcurl's <c>CURLE_ABORTED_BY_CALLBACK</c> (ADR-0543), as it is when the read callback
-    /// returned <c>CURL_READFUNC_ABORT</c> (ADR-0573).
+    /// returned <c>CURL_READFUNC_ABORT</c> (ADR-0573), whether the handler mapped the read's
+    /// <see cref="IOException" /> to a result or let it escape (BL-2640).
     /// </summary>
     /// <param name="follower">Performs the attempt, following redirects.</param>
     /// <param name="state">The running transfer, which keeps the attempt's watchdogs.</param>
@@ -1456,9 +1457,20 @@ internal sealed class ManagedEasyTransfer(
         {
             return null;
         }
+        catch (IOException) when (AnyReadAborted(reads))
+        {
+            // A handler that does not map the read's failure itself (SMTP's after DATA) lets it escape; the
+            // abort still ends the perform with CURLE_ABORTED_BY_CALLBACK (upstream test1507, BL-2640).
+            return null;
+        }
 
-        return progress is { Aborted: true } || reads.Any(read => read.Aborted) ? null : result;
+        return progress is { Aborted: true } || AnyReadAborted(reads) ? null : result;
     }
+
+    /// <summary>Whether any of <paramref name="reads" /> returned <c>CURL_READFUNC_ABORT</c>.</summary>
+    /// <param name="reads">The read callbacks' streams the transfer reads.</param>
+    /// <returns><see langword="true" /> when one aborted.</returns>
+    private static bool AnyReadAborted(IReadOnlyList<CallbackReadStream> reads) => reads.Any(read => read.Aborted);
 
     /// <inheritdoc />
     public IEasyTransfer Duplicate() => new ManagedEasyTransfer(createDispatcher, shared) { cookieListItemsApplied = cookieListItemsApplied, Options = Options, ToolSettings = ToolSettings, Host = Host, TraceComponents = TraceComponents, CreateFormBoundary = CreateFormBoundary, CreateConnectOnlyConnector = CreateConnectOnlyConnector, WebSocketRandomSource = WebSocketRandomSource };

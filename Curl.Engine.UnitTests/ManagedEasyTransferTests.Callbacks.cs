@@ -171,6 +171,28 @@ public sealed partial class ManagedEasyTransferTests
     }
 
     [TestMethod]
+    public async Task PerformAsync_SmtpUploadWhoseReadCallbackAborts_ReturnsAbortedByCallbackAfterDataWithoutThrowing()
+    {
+        ScriptedConnector connector = new([Encoding.ASCII.GetBytes("220 hi\r\n250 ok\r\n250 ok\r\n250 ok\r\n354 go\r\n")]);
+        await using IEasyTransfer easy = CreateEngine(connector).CreateEasy();
+        easy.Options = new EasyOptions
+        {
+            Network = new EasyNetworkOptions { Url = "smtp://h/1507" },
+            Transfer = new EasyTransferOptions { Upload = true },
+            Protocols = new() { Smtp = new() { MailFrom = "<f@example.com>", MailRecipients = ["<r@example.com>"] } },
+            Callbacks = new() { Read = _ => ReadCallbackResult.Abort },
+        };
+
+        CurlCode code = await easy.PerformAsync(CancellationToken.None);
+
+        Assert.AreEqual(CurlCode.AbortedByCallback, code);
+        Assert.AreEqual(CallbackReadStream.AbortedText, easy.ErrorText);
+        Assert.AreEqual(
+            "EHLO 1507\r\nMAIL FROM:<f@example.com>\r\nRCPT TO:<r@example.com>\r\nDATA\r\n",
+            Encoding.ASCII.GetString(connector.Written));
+    }
+
+    [TestMethod]
     public async Task PerformAsync_PostWithNoFieldsAndAReadCallbackThatAborts_ReturnsAbortedByCallbackWithLibcurlsText()
     {
         ScriptedConnector connector = new([Encoding.ASCII.GetBytes(Response)]);
