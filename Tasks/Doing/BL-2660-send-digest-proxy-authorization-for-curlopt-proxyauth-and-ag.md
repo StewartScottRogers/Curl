@@ -31,3 +31,4 @@ Found by BL-2542, which ported lib1588. The runner reports `differs at byte 217 
 ## Log
 
 - 2026-10-17: Created.
+- 2026-10-17: Backlog -> Doing. Criteria at claim: 63bf80fa 5b1dc09e 3d836d5e.
