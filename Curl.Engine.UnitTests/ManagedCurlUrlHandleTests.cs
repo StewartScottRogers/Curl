@@ -271,6 +271,28 @@ public sealed partial class ManagedCurlUrlHandleTests
     }
 
     [TestMethod]
+    [DataRow("data:text/html;charset=utf-8;base64,PCFET0NUWVBFIEhUTUw+PG1ldGEgY")]
+    [DataRow("d:anything-really")]
+    [DataRow("about:config")]
+    [DataRow("mailto:infobot@example.com?body=send%20current-issue")]
+    public void Set_SchemeOnlyUrlWithAnUnsupportedScheme_ReturnsUnsupportedScheme(string text)
+    {
+        // lib1560's get_url rows 106 to 108 and 110 (BL-2733).
+        using ManagedCurlUrlHandle url = new();
+
+        Assert.AreEqual(CurlUrlCode.UnsupportedScheme, url.Set(CurlUrlPart.Url, text, CurlUrlFlags.None));
+    }
+
+    [TestMethod]
+    public void Set_RelativeReferenceOnAUrlWithAnUnsupportedScheme_ReturnsUnsupportedScheme()
+    {
+        using ManagedCurlUrlHandle url = new();
+        Assert.AreEqual(CurlUrlCode.Ok, url.Set(CurlUrlPart.Url, "foo://example.com/a", CurlUrlFlags.NonSupportScheme));
+
+        Assert.AreEqual(CurlUrlCode.UnsupportedScheme, url.Set(CurlUrlPart.Url, "b", CurlUrlFlags.None));
+    }
+
+    [TestMethod]
     public void Set_PortLikeTextWithoutASchemeUnderGuessScheme_IsStillParsedAsAHost()
     {
         using ManagedCurlUrlHandle url = new();

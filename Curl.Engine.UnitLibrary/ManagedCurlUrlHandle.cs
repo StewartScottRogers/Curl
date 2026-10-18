@@ -231,7 +231,7 @@ internal sealed class ManagedCurlUrlHandle : ICurlUrlHandle
 
         if (UrlRelativeReference.IsAbsolute(value, flags))
         {
-            return Parse(value, flags);
+            return IsAcceptedScheme(value, flags) ? Parse(value, flags) : CurlUrlCode.UnsupportedScheme;
         }
 
         return Get(CurlUrlPart.Url, flags & ~CurlUrlFlags.NoGuessScheme, out string? current) == CurlUrlCode.Ok
@@ -274,8 +274,9 @@ internal sealed class ManagedCurlUrlHandle : ICurlUrlHandle
 
     /// <summary>
     /// A parsed URL with no scheme: <c>https</c> under <c>CURLU_DEFAULT_SCHEME</c>, the guessed one under
-    /// <c>CURLU_GUESS_SCHEME</c>, else <see cref="CurlUrlCode.BadScheme" />, as upstream's <c>parseurl</c>;
-    /// with one libcurl does not support, <see cref="CurlUrlCode.UnsupportedScheme" /> unless
+    /// <c>CURLU_GUESS_SCHEME</c>, else <see cref="CurlUrlCode.BadSlashes" />, as upstream's <c>parseurl</c>
+    /// answers text whose accepted scheme (<see cref="IsAcceptedScheme" />) has no <c>/</c> after its colon
+    /// (<c>http:80/x</c>); with one libcurl does not support, <see cref="CurlUrlCode.UnsupportedScheme" /> unless
     /// <c>CURLU_NON_SUPPORT_SCHEME</c>.
     /// </summary>
     private CurlUrlCode Accept(string value, CurlUrlFlags flags, UrlHandleParts newParts)
@@ -292,23 +293,18 @@ internal sealed class ManagedCurlUrlHandle : ICurlUrlHandle
             return Parse(DefaultScheme + "://" + value, flags & ~CurlUrlFlags.DefaultScheme);
         }
 
-        return flags.HasFlag(CurlUrlFlags.GuessScheme) ? Keep(newParts) : SchemeWithoutSlashes(value, flags);
+        return flags.HasFlag(CurlUrlFlags.GuessScheme) ? Keep(newParts) : CurlUrlCode.BadSlashes;
     }
 
     /// <summary>
-    /// Text <see cref="CurlUrl" /> read with no scheme although, with no guess flag, upstream's
-    /// <c>Curl_is_absolute_url</c> takes what comes before its colon as one (<c>example.com:80/x</c>):
-    /// <c>parseurl</c> answers <see cref="CurlUrlCode.UnsupportedScheme" /> for a scheme libcurl does not
-    /// support without <c>CURLU_NON_SUPPORT_SCHEME</c>, else <see cref="CurlUrlCode.BadSlashes" />, as no
-    /// <c>/</c> follows the colon.
+    /// Whether the scheme an absolute URL starts with, up to its first colon, is one libcurl supports or
+    /// <c>CURLU_NON_SUPPORT_SCHEME</c> is set: upstream's <c>parseurl</c> answers
+    /// <see cref="CurlUrlCode.UnsupportedScheme" /> otherwise, before it reads anything after the colon,
+    /// so <c>about:config</c>, <c>mailto:x@y</c> and <c>example.com:80/x</c> fail there.
     /// </summary>
-    private static CurlUrlCode SchemeWithoutSlashes(string value, CurlUrlFlags flags)
-    {
-        string scheme = value[..value.IndexOf(':', StringComparison.Ordinal)].ToLowerInvariant();
-        bool accepted = flags.HasFlag(CurlUrlFlags.NonSupportScheme) || UrlHandleParts.IsSupportedScheme(scheme);
-
-        return accepted ? CurlUrlCode.BadSlashes : CurlUrlCode.UnsupportedScheme;
-    }
+    private static bool IsAcceptedScheme(string value, CurlUrlFlags flags) =>
+        flags.HasFlag(CurlUrlFlags.NonSupportScheme)
+        || UrlHandleParts.IsSupportedScheme(value[..value.IndexOf(':', StringComparison.Ordinal)].ToLowerInvariant());
 
     private CurlUrlCode Keep(UrlHandleParts newParts)
     {
