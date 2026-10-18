@@ -33,3 +33,4 @@ Found by BL-2623 (upstream case 597, lib597): Curl's `CURLOPT_CONNECT_ONLY` 1 is
 ## Log
 
 - 2026-10-17: Created.
+- 2026-10-17: Backlog -> Doing. Criteria at claim: 347ae2b2 44de5998 7515fd57 6faaa043 3d836d5e.
