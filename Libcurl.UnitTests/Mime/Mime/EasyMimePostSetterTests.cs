@@ -35,6 +35,28 @@ public sealed class EasyMimePostSetterTests
     }
 
     [TestMethod]
+    public void SetOption_MimepostNull_LeavesAnEmptyFormSoTheHandlePostsZeroBytes()
+    {
+        var options = new EasyOptions { Transfer = new EasyOptions().Transfer with { NoBody = true } };
+
+        Assert.AreEqual(CurlCode.Ok, EasyOptionDispatch.Default.SetOption(ref options, CurlOption.Mimepost, null));
+
+        Assert.IsEmpty(options.Http.HttpPost!.Parts);
+        Assert.IsFalse(options.Transfer.NoBody);
+    }
+
+    [TestMethod]
+    public void SetOption_MimepostAHandle_ClearsNoBody()
+    {
+        using var mime = new CurlMime(new FakeMimeBuilder());
+        var options = new EasyOptions { Transfer = new EasyOptions().Transfer with { NoBody = true } };
+
+        Assert.AreEqual(CurlCode.Ok, EasyOptionDispatch.Default.SetOption(ref options, CurlOption.Mimepost, mime));
+
+        Assert.IsFalse(options.Transfer.NoBody);
+    }
+
+    [TestMethod]
     public void SetOption_MimepostNotAMimeHandle_AnswersBadFunctionArgumentAndChangesNothing()
     {
         var options = new EasyOptions();

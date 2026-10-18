@@ -162,7 +162,8 @@ kept as `UserData`. `Cleanup` is `curl_share_cleanup`; after the engine's `Ok` e
 engine's `IMimePartBuilder`, whose answer it returns; `Dispose` is `curl_mime_free`, after which the
 handle and its parts throw `ObjectDisposedException`. It implements `EasyOptionSetters`'
 `AddMimePostSetters`: `CURLOPT_MIMEPOST` takes a `CurlMime` (else `BadFunctionArgument`) and stores its
-body as it is when set; `CurlEasy` remembers the structure and writes its body as it is now into the options at each perform and `DupHandle`, or, once it is freed, an empty `HttpPost` form, a zero-length post (ADR-0675). `Mime/Form` holds the deprecated form API's `CurlForm`, marked `[Obsolete]`
+body as it is when set, or for `null` an empty `HttpPost` form, a zero-byte POST (upstream lib589,
+BL-2620); either clears `CURLOPT_NOBODY`; `CurlEasy` remembers the structure and writes its body as it is now into the options at each perform and `DupHandle`, or, once it is freed, an empty `HttpPost` form, a zero-length post (ADR-0675). `Mime/Form` holds the deprecated form API's `CurlForm`, marked `[Obsolete]`
 as upstream deprecates it (ADR-0586): `CurlForm.Add(library, ref form, ...)` is `curl_formadd`, every
 `CURLFORM_*` argument passed to the engine's `ICurlFormBuilder` as given, a `null` form started over a
 new builder and set only on `Ok`; `Get` is `curl_formget`, and `Free` or `Dispose` `curl_formfree`,

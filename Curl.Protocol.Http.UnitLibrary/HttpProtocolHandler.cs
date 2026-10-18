@@ -2103,12 +2103,13 @@ public sealed class HttpProtocolHandler(
     /// <summary>
     /// Decides whether <paramref name="plan" /> may be sent again on a fresh connection: it went
     /// out on a reused one, it has not already been sent again, and its body, if any, is bytes
-    /// that can be sent again.
+    /// that can be sent again or an empty stream, which has nothing to rewind (a libcurl handle's
+    /// zero-byte MIME post, upstream test584, BL-2620).
     /// </summary>
     private static bool CanSendAgainOnFreshConnection(HttpRequestPlan plan, bool reusedConnection) =>
         reusedConnection
             && !plan.SentOnFreshConnection
-            && plan.Framing.Body is not StreamBody;
+            && plan.Framing.Body is not StreamBody { Length: not 0 };
 
     /// <summary>
     /// Fails a request before any byte of it is sent, as curl 8.21.0 does once connected: a
