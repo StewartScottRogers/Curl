@@ -246,6 +246,32 @@ public sealed class ManagedCurlEngineTests
         Assert.Contains("Authorization: NTLM TlRMTVNTUAABAAAABoIIAAAAAAAAAAAAAAAAAAAAAAA=\r\n", request);
     }
 
+    /// <summary>
+    /// Upstream case 1686 (BL-2666): with the harness's hand-built NTLM the engine is curl's non-SSPI
+    /// build, so a Digest answer joins its fields with <c>", "</c> as curl 8.22.0's <c>lib/vauth/digest.c</c>.
+    /// </summary>
+    [TestMethod]
+    public async Task PerformAsync_DialingUsesHandBuiltNtlmAndDigest_SeparatesTheFieldsWithACommaAndASpace()
+    {
+        ScriptedConnector server = new([
+            "HTTP/1.1 401 Unauthorized\r\nWWW-Authenticate: Digest realm=\"my-backyard\", nonce=\"314156295\"\r\nContent-Length: 0\r\n\r\n"u8.ToArray(),
+            "HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n"u8.ToArray(),
+        ]);
+        EngineDialing dialing = new(new ScriptedTcpDialer(server), new LoopbackDnsResolver(), new RecordingDatagramConnector(Curl.Protocol.Abstractions.CurlExitCode.CouldntConnect, "no udp"), UsesHandBuiltNtlm: true);
+        await using ManagedCurlEngine engine = new(TimeProvider.System, null, dialing: dialing);
+        await using IEasyTransfer easy = engine.CreateEasy();
+        easy.Options = new EasyOptions
+        {
+            Network = new EasyNetworkOptions { Url = "http://127.0.0.1:9000/api" },
+            Authentication = new Api.Options.Authentication.EasyAuthenticationOptions { UserPassword = "alice:secret", HttpAuthentication = Api.Options.Authentication.HttpAuthenticationMethods.Digest },
+        };
+
+        await easy.PerformAsync(CancellationToken.None);
+
+        string request = System.Text.Encoding.ASCII.GetString(server.Written);
+        Assert.Contains("Authorization: Digest username=\"alice\", realm=\"my-backyard\", nonce=\"314156295\", uri=\"/api\", response=\"", request);
+    }
+
     private sealed class FixedClock(DateTimeOffset now) : TimeProvider
     {
         public override DateTimeOffset GetUtcNow() => now;
