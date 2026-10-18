@@ -171,11 +171,12 @@ internal static class UrlPartSetter
 
     /// <summary>
     /// A query: under <c>CURLU_URLENCODE</c> a space is <c>+</c>, and under <c>CURLU_APPENDQUERY</c> the
-    /// first <c>=</c> stays and the text is joined to a query already set with one <c>&amp;</c>.
+    /// first <c>=</c> stays and the text is joined to a query already set with one <c>&amp;</c>; an
+    /// empty text is stored as the empty query, appended or not, as curl 8.22.0 does (lib1560).
     /// </summary>
     private static UrlSetResult SetQuery(UrlHandleParts parts, string value, CurlUrlFlags flags)
     {
-        bool append = flags.HasFlag(CurlUrlFlags.AppendQuery);
+        bool append = flags.HasFlag(CurlUrlFlags.AppendQuery) && value.Length > 0;
         string query = Stored(value, flags, plusForSpace: true, keepFirstEquals: append);
         string? existing = parts.Query;
         if (append && existing is { Length: > 0 })

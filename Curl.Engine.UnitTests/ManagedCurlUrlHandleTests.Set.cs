@@ -394,14 +394,77 @@ public sealed partial class ManagedCurlUrlHandleTests
     }
 
     [TestMethod]
-    public void Set_EmptyUrl_ReturnsMalformedInput()
+    public void Set_EmptyUrlOnAHandleWithNoWholeUrl_ReturnsMalformedInput()
+    {
+        using ManagedCurlUrlHandle url = new();
+        url.Set(CurlUrlPart.Host, "example.com", CurlUrlFlags.None);
+
+        Assert.AreEqual(CurlUrlCode.MalformedInput, url.Set(CurlUrlPart.Url, string.Empty, CurlUrlFlags.None));
+    }
+
+    [TestMethod]
+    public void Set_EmptyUrlOverAWholeUrl_IsOkAndKeepsIt()
     {
         using ManagedCurlUrlHandle url = Parsed(FullUrl);
 
-        Assert.AreEqual(CurlUrlCode.MalformedInput, url.Set(CurlUrlPart.Url, string.Empty, CurlUrlFlags.None));
+        Assert.AreEqual(CurlUrlCode.Ok, url.Set(CurlUrlPart.Url, string.Empty, CurlUrlFlags.None));
         Assert.AreEqual(CurlUrlCode.MalformedInput, url.Set(CurlUrlPart.Url, "http://h/" + new string('a', 8_000_000), CurlUrlFlags.None));
 
         Assert.AreEqual(FullUrl, GetOk(url, CurlUrlPart.Url));
+    }
+
+    [TestMethod]
+    public void Set_EmptyUrlOverPartsSetOneByOne_IsOkAndKeepsThem()
+    {
+        using ManagedCurlUrlHandle url = new();
+        url.Set(CurlUrlPart.Scheme, "https", CurlUrlFlags.None);
+        url.Set(CurlUrlPart.Host, "example.com", CurlUrlFlags.None);
+        url.Set(CurlUrlPart.Path, "/", CurlUrlFlags.None);
+
+        Assert.AreEqual(CurlUrlCode.Ok, url.Set(CurlUrlPart.Url, string.Empty, CurlUrlFlags.None));
+
+        Assert.AreEqual("https://example.com/", GetOk(url, CurlUrlPart.Url));
+    }
+
+    [TestMethod]
+    public void Set_EmptyQueryAppendedAndEncoded_LeavesNoQuery()
+    {
+        using ManagedCurlUrlHandle url = Parsed("https://example.com/?param=value");
+
+        Assert.AreEqual(CurlUrlCode.Ok, url.Set(CurlUrlPart.Query, string.Empty, CurlUrlFlags.AppendQuery | CurlUrlFlags.UrlEncode));
+
+        Assert.AreEqual("https://example.com/", GetOk(url, CurlUrlPart.Url));
+    }
+
+    [TestMethod]
+    public void Set_SchemeFromImapToHttps_DropsTheOptionsFromTheUrl()
+    {
+        using ManagedCurlUrlHandle url = Parsed("imap://user:secret;optit@host/");
+
+        Assert.AreEqual(CurlUrlCode.Ok, url.Set(CurlUrlPart.Scheme, "https", CurlUrlFlags.None));
+
+        Assert.AreEqual("https://user:secret@host/", GetOk(url, CurlUrlPart.Url));
+        Assert.AreEqual("optit", GetOk(url, CurlUrlPart.Options));
+    }
+
+    [TestMethod]
+    public void Set_OptionsUnderASchemeLibcurlDoesNotSupport_StayInTheUrl()
+    {
+        using ManagedCurlUrlHandle url = Parsed("imap://user:secret;optit@host/");
+
+        Assert.AreEqual(CurlUrlCode.Ok, url.Set(CurlUrlPart.Scheme, "unknown", CurlUrlFlags.NonSupportScheme));
+
+        Assert.AreEqual("unknown://user:secret;optit@host/", GetOk(url, CurlUrlPart.Url));
+    }
+
+    [TestMethod]
+    public void Set_OnlyOptionsUnderHttps_WriteNoLogin()
+    {
+        using ManagedCurlUrlHandle url = Parsed("https://host/");
+
+        url.Set(CurlUrlPart.Options, "o", CurlUrlFlags.None);
+
+        Assert.AreEqual("https://host/", GetOk(url, CurlUrlPart.Url));
     }
 
     [TestMethod]

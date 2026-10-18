@@ -39,6 +39,12 @@ internal sealed class ManagedCurlUrlHandle : ICurlUrlHandle
         CurlUrlCode.Backslash,
     ];
 
+    /// <summary>The schemes whose handler takes login options (upstream's <c>PROTOPT_URLOPTIONS</c>).</summary>
+    private static readonly HashSet<string> SchemesWithLoginOptions = new(StringComparer.Ordinal)
+    {
+        "imap", "imaps", "pop3", "pop3s", "smtp", "smtps",
+    };
+
     /// <summary>The reader of each <see cref="CurlUrlPart" />, by its number.</summary>
     private static readonly Func<UrlHandleParts, CurlUrlFlags, UrlPartResult>[] Readers =
     [
@@ -188,7 +194,7 @@ internal sealed class ManagedCurlUrlHandle : ICurlUrlHandle
         string schemeText = flags.HasFlag(CurlUrlFlags.NoGuessScheme) && parts.SchemeGuessed ? string.Empty : scheme + "://";
 
         return UrlPartResult.Found(
-            schemeText + Login(parts) + host.Value + Suffix(':', PortText(parts.Port, scheme, flags)) + tail);
+            schemeText + Login(parts, scheme) + host.Value + Suffix(':', PortText(parts.Port, scheme, flags)) + tail);
     }
 
     /// <summary>
@@ -208,25 +214,36 @@ internal sealed class ManagedCurlUrlHandle : ICurlUrlHandle
             : UrlPartText.Punycode(host, flags);
     }
 
-    private static string Login(UrlHandleParts parts)
+    /// <summary>
+    /// The login as the whole URL writes it: the options left out under a scheme libcurl supports
+    /// whose handler takes none (no <c>PROTOPT_URLOPTIONS</c>), as <c>curl_url_get</c> does, so an
+    /// <c>imap</c> URL changed to <c>https</c> loses its <c>;options</c>.
+    /// </summary>
+    private static string Login(UrlHandleParts parts, string scheme)
     {
-        bool any = parts.User is not null || parts.Password is not null || parts.Options is not null;
+        string? options = TakesLoginOptions(scheme) ? parts.Options : null;
+        bool any = parts.User is not null || parts.Password is not null || options is not null;
 
-        return any ? parts.User + Suffix(':', parts.Password) + Suffix(';', parts.Options) + "@" : string.Empty;
+        return any ? parts.User + Suffix(':', parts.Password) + Suffix(';', options) + "@" : string.Empty;
     }
+
+    /// <summary>A scheme libcurl does not support (no handler to ask), or one of <see cref="SchemesWithLoginOptions" />.</summary>
+    private static bool TakesLoginOptions(string scheme) =>
+        SchemesWithLoginOptions.Contains(scheme) || !UrlHandleParts.IsSupportedScheme(scheme);
 
     private static string Suffix(char separator, string? value) => value is null ? string.Empty : separator + value;
 
     /// <summary>
-    /// A whole URL: empty is
-    /// <see cref="CurlUrlCode.MalformedInput" />; a relative one is resolved against the URL held, when
-    /// the handle holds one (<see cref="UrlRelativeReference" />); then it is parsed.
+    /// A whole URL: empty changes nothing and is <see cref="CurlUrlCode.Ok" /> when the handle holds a
+    /// whole URL a get gives under <paramref name="flags" />, else <see cref="CurlUrlCode.MalformedInput" />,
+    /// as upstream's <c>set_url</c>; a relative one is resolved against the URL held, when the handle
+    /// holds one (<see cref="UrlRelativeReference" />); then it is parsed.
     /// </summary>
     private CurlUrlCode SetUrl(string value, CurlUrlFlags flags)
     {
         if (value.Length == 0)
         {
-            return CurlUrlCode.MalformedInput;
+            return Get(CurlUrlPart.Url, flags, out _) == CurlUrlCode.Ok ? CurlUrlCode.Ok : CurlUrlCode.MalformedInput;
         }
 
         if (UrlRelativeReference.IsAbsolute(value, flags))
