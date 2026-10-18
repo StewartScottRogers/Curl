@@ -7,6 +7,7 @@ using Curl.Api.EngineContracts.Headers;
 using Curl.Api.EngineContracts.WebSocket;
 using Curl.Api.Info;
 using Curl.Api.Options;
+using Curl.Api.Options.Authentication;
 using Curl.Api.Options.Proxy;
 using Curl.Core;
 using Curl.Core.Hsts;
@@ -1559,7 +1560,7 @@ internal sealed class ManagedEasyTransfer(
             Engine: options.Tls.Engine,
             EchModeIsMalformed: false,
             PostData: null,
-            ProxyCredentials: null,
+            ProxyCredentials: ProxyCredentialsOf(options.Authentication),
             AllowedProtocols: ProtocolSetOf(options.Network.Protocols),
             AllowedRedirectProtocols: ProtocolSetOf(options.Network.RedirectProtocols),
             SslLevel: TransportSecurityLevel.None,
@@ -1572,6 +1573,29 @@ internal sealed class ManagedEasyTransfer(
             OverUnixSocket: options.Network.UnixSocketPath is not null,
             HappyEyeballsTimeout: HttpRequestOptionsMapping.HappyEyeballsTimeoutOf(null),
             AppendUrlQuery: url => url);
+
+    /// <summary>
+    /// The proxy credentials <c>CURLOPT_PROXYUSERPWD</c>, <c>CURLOPT_PROXYUSERNAME</c> and <c>CURLOPT_PROXYPASSWORD</c>
+    /// give, as the curl tool's <c>-U</c> gives them: <c>CURLOPT_PROXYUSERPWD</c> split at its first colon (no colon is
+    /// an empty password), the user name and password options each winning over their half of it. They replace the
+    /// proxy URL's own user information, as in libcurl (upstream test1588, BL-2660, ADR-0677).
+    /// </summary>
+    /// <param name="authentication">The handle's authentication options.</param>
+    /// <returns>The credentials, or <see langword="null" /> when none of the three is set.</returns>
+    internal static System.Net.NetworkCredential? ProxyCredentialsOf(EasyAuthenticationOptions authentication) =>
+        authentication is { ProxyUserPassword: null, ProxyUserName: null, ProxyPassword: null } ? null : ProxyCredentialOf(authentication);
+
+    private static System.Net.NetworkCredential ProxyCredentialOf(EasyAuthenticationOptions authentication)
+    {
+        (string user, string password) = SplitAtFirstColon(authentication.ProxyUserPassword ?? string.Empty);
+        return new System.Net.NetworkCredential(authentication.ProxyUserName ?? user, authentication.ProxyPassword ?? password);
+    }
+
+    private static (string User, string Password) SplitAtFirstColon(string userPassword)
+    {
+        int colon = userPassword.IndexOf(':', StringComparison.Ordinal);
+        return colon < 0 ? (userPassword, string.Empty) : (userPassword[..colon], userPassword[(colon + 1)..]);
+    }
 
     /// <summary>
     /// The schemes a <c>CURLOPT_PROTOCOLS_STR</c> or <c>CURLOPT_REDIR_PROTOCOLS_STR</c> list names, lower
