@@ -75,6 +75,7 @@ public sealed class LibTestPrograms
         new Lib554(),
         new Lib555(TimeProvider.System),
         new Lib556(),
+        new Lib557(),
         new Lib558(),
         new Lib559(),
         new Lib560(TimeProvider.System),
