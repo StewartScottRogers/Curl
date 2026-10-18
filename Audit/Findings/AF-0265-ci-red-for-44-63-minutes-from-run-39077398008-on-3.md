@@ -3,8 +3,8 @@ id: AF-0265
 title: CI red for 44.63 minutes from run 39077398008 on 35c73029: two tests failed on Linux (one also on macOS); fixes were done in 15 min, then 3 cancelled runs
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: process:logs:39077398008:ci-red
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Log
 
 - 2026-10-18: filed proposed.
+- 2026-10-18: proposed -> accepted.
