@@ -20,7 +20,10 @@ namespace Curl.Conformance;
 /// <c>large-size</c>, <c>sha512-256</c>, <c>SSLpinning</c> and <c>httpsig</c>); <c>headers-api</c>, since
 /// Curl writes <c>-w %header{name}</c> and <c>%{header_json}</c>, which curl writes only with libcurl's
 /// headers API (BL-2264); <c>form-api</c>, since <c>Libcurl</c>, which runs the ported libtest
-/// programs, has <c>CURLOPT_HTTPPOST</c> (BL-2593); <c>wakeup</c>, since that <c>Libcurl</c> has <c>curl_multi_wakeup</c> (BL-2661, ADR-0690); <c>large_file</c>;
+/// programs, has <c>CURLOPT_HTTPPOST</c> (BL-2593); <c>wakeup</c>, since that <c>Libcurl</c> has <c>curl_multi_wakeup</c> (BL-2661, ADR-0690);
+/// <c>threadsafe</c>, which Curl's <c>Features:</c> line and <c>curl_version_info</c> name, and
+/// <c>threaded-resolver</c>, which <c>runtests.pl</c> derives from <c>AsynchDNS</c> without <c>c-ares</c>
+/// (ADR-0695, BL-2700); <c>large_file</c>;
 /// <c>local-http</c> (the harness's server is at <c>127.0.0.1</c>); <c>win32</c> on Windows, as
 /// <c>runtests.pl</c> sets it there; the TLS backend; <c>xattr</c> off Windows, where curl
 /// cannot write extended attributes; <c>http/2</c> and <c>h2c</c> off Windows only, since the
@@ -33,10 +36,10 @@ namespace Curl.Conformance;
 /// These stay off, so the cases that need them are skipped rather than counted as failures:
 /// libcurl's build and API features, which a command-line tool does not have (<c>Debug</c>,
 /// <c>TrackMemory</c>, <c>unittest</c>,
-/// <c>shuffle-dns</c>, <c>override-dns</c>, <c>threadsafe</c>, <c>getrlimit</c>,
+/// <c>shuffle-dns</c>, <c>override-dns</c>, <c>getrlimit</c>,
 /// <c>--libcurl</c>); the other protocols the harness has no server for; features
 /// absent from Curl's <c>curl -V</c> (<c>SSPI</c>, <c>Unicode</c>, <c>MultiSSL</c>,
-/// <c>ssl-sessions</c>, <c>threaded-resolver</c>); and <c>codeset-utf8</c>, which depends on the
+/// <c>ssl-sessions</c>, <c>c-ares</c>); and <c>codeset-utf8</c>, which depends on the
 /// locale of the machine running the tests.
 /// </para>
 /// </remarks>
@@ -51,6 +54,7 @@ public sealed class UpstreamCurlPlatform
         "crypto", "cookies", "proxy", "Mime", "manual", "DoH", "digest", "aws", "netrc", "verbose-strings",
         "large-time", "large-size", "sha512-256", "SSLpinning",
         "large_file", "local-http", "httpsig", "headers-api", "form-api", "wakeup",
+        "threadsafe", "threaded-resolver",
     ];
 
     private UpstreamCurlPlatform(IEnumerable<string> platformFeatures, string nullDevice, string operatingSystemName)

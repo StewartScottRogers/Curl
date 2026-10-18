@@ -15,6 +15,7 @@ public sealed class UpstreamCurlPlatformTests
         "crypto", "cookies", "proxy", "Mime", "manual", "DoH", "digest", "aws", "netrc", "verbose-strings",
         "large-time", "large-size", "sha512-256", "SSLpinning",
         "large_file", "local-http", "httpsig", "headers-api", "form-api", "wakeup",
+        "threadsafe", "threaded-resolver",
     ];
 
     public TestContext TestContext { get; set; } = null!;
@@ -155,6 +156,24 @@ public sealed class UpstreamCurlPlatformTests
 
         diagnostics.Act("listed on every platform", onEvery);
         diagnostics.Assert("listed on every platform", true, onEvery);
+        Assert.IsTrue(onEvery);
+    }
+
+    // Curl's Features line names threadsafe and AsynchDNS without c-ares, which runtests.pl reads as
+    // threaded-resolver, so case 3026 runs and case 506 is skipped as for the reference curl (BL-2700, ADR-0695).
+    [TestMethod]
+    [DataRow("threadsafe", true)]
+    [DataRow("threaded-resolver", true)]
+    [DataRow("c-ares", false)]
+    public void AllPlatforms_ListTheThreadSafeLibraryAndThreadedResolver(string feature, bool expected)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("feature", feature);
+
+        bool onEvery = UpstreamCurlPlatform.All.All(platform => platform.Features.Contains(feature) == expected);
+
+        diagnostics.Act("matches on every platform", onEvery);
+        diagnostics.Assert("matches on every platform", true, onEvery);
         Assert.IsTrue(onEvery);
     }
 
