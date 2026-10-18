@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
 requirement: none
 created: 2026-10-17
-completed:
+completed: 2026-10-18
 ---
 # BL-2637 — Fix upstream case 757: a callback MIME part reused as a child part is read once per post
 
@@ -22,13 +22,17 @@ Found by BL-2536, which ported lib757 (`Curl.Conformance.LibTest.UnitLibrary/Lib
 
 ## Acceptance criteria
 
-- [ ] test757 passes through the runner on Windows and is added to `Curl.Conformance.UnitTests/PassingUpstreamCases.txt`; if it still fails it is filed with the board script with its differing lines.
-- [ ] The fix adds a focused unit test in the fixed library's own `.UnitTests` project (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] test757 passes through the runner on Windows and is added to `Curl.Conformance.UnitTests/PassingUpstreamCases.txt`; if it still fails it is filed with the board script with its differing lines.
+- [x] The fix adds a focused unit test in the fixed library's own `.UnitTests` project (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- 2026-10-18: test757 already passed when claimed (`CURL_UPSTREAM_CASE=757`, and the ratchet row said "test757 passes; add 757 to PassingUpstreamCases.txt"). The fix is BL-2613's (6701e8234): `Curl.Engine`'s `MimeCallbackReadStream` stops asking a sized `curl_mime_data_cb` part's callback once it has given the part's size, as curl 8.22.0's `read_part_content` does. Its focused unit tests are already in `Curl.Engine.UnitTests` (`MimeCallbackReadStreamTests.Read_KnownSizeAllGiven_EndsWithoutAskingTheCallbackAgain` and its `ReadAsync` twin), so this run changes no production code and adds no new test; it only lists 757 on the ratchet.
+- Platform check: the case is an in-memory HTTP MIME post with no path, file or certificate, so its output does not depend on the platform.
 
 ## Log
 
 - 2026-10-17: Created.
 - 2026-10-18: Backlog -> Doing. Criteria at claim: 6cae2d89 c59fcab3 3d836d5e.
+- 2026-10-18: Doing -> Done. test757 passes through the runner (BL-2613's sized MIME callback fix) and holds the ratchet
