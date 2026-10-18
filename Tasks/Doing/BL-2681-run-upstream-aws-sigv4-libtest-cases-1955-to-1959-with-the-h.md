@@ -31,3 +31,4 @@ Found by BL-2547, which ported lib1955 to lib1959 as `LibAwsSigV4Headers` in `Cu
 ## Log
 
 - 2026-10-17: Created.
+- 2026-10-18: Backlog -> Doing. Criteria at claim: 3ac4100f e3c7289e 4272a6b9.
