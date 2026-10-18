@@ -189,12 +189,6 @@ internal sealed class FtpSession(
     /// <summary>The most a data read asks for: curl 8.21.0's receive buffer (measured, BL-1259 Notes).</summary>
     private const int DataReadBufferSize = 102400;
 
-    /// <summary>
-    /// How long curl 8.21.0 waits for the server to open an active-mode data connection,
-    /// measured with <c>-P -</c> whatever <c>--connect-timeout</c> says.
-    /// </summary>
-    private static readonly TimeSpan AcceptTimeout = TimeSpan.FromSeconds(60);
-
     /// <summary>The <c>AUTH</c> mechanisms curl 8.21.0 offers, in the order it offers them.</summary>
     private static readonly string[] AuthMechanisms = ["SSL", "TLS"];
 
@@ -1619,7 +1613,7 @@ internal sealed class FtpSession(
             return await QuitAndFailAsync(CurlExitCode.FtpAcceptFailed, FtpTransferMessages.ServerFailedToConnectToDataPort).ConfigureAwait(false);
         }
 
-        using var timeout = new CancellationTokenSource(AcceptTimeout, context.TimeProvider);
+        using var timeout = new CancellationTokenSource(context.FtpAcceptTimeout, context.TimeProvider);
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(context.CancellationToken, timeout.Token);
         ConnectResult accepted;
         try

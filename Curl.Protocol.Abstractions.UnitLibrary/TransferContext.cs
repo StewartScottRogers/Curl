@@ -104,6 +104,15 @@ public sealed class TransferContext : ITransferContext
     /// <inheritdoc />
     public bool FtpUseEprt { get; init; } = true;
 
+    /// <summary>
+    /// curl's wait for the server to open an active-mode FTP data connection when
+    /// <c>CURLOPT_ACCEPTTIMEOUT_MS</c> is not set: 60 seconds.
+    /// </summary>
+    public static readonly TimeSpan DefaultFtpAcceptTimeout = TimeSpan.FromSeconds(60);
+
+    /// <inheritdoc />
+    public TimeSpan FtpAcceptTimeout { get; init; } = DefaultFtpAcceptTimeout;
+
     /// <inheritdoc />
     public TransportSecurityLevel SslLevel { get; init; }
 
