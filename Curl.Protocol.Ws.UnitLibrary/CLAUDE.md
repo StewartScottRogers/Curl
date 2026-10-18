@@ -38,3 +38,17 @@ through the transfer's events when the handler's `TracesFrames` is set - the chu
 upload reader after the `101`, each frame decoded and each run of payload passed on (from
 `WsFrameDecoder`), the pong sent (from `WsFrameReceiver`), the upload frame encoded and
 `websocket established, callback mode`.
+
+`CURLWS_RAW_MODE` on a transfer that exchanges frames (BL-2494): with `WsProtocolHandler.RawMode`
+set, `WsFrameReceiver` hands every byte after the `101` to the output as it came, frame heads
+included, decoding nothing and answering no ping, as curl 8.22.0's `ws_cw_write` passes the body
+on under `ws_raw_mode`; the `-T` upload goes out unframed too (BL-2526), as `Curl_ws_accept` adds the frame-encoding
+client reader only when `ws_raw_mode` is off.
+
+A read callback's upload (BL-2611, ADR-0669): an upload stream that implements `IWsUploadFrameSource` with non-null
+`WsUploadFrames` goes out read by read, as curl 8.22.0's `cr_ws_read`: each read of up to 64 KiB
+(`UploadReadSize`) is one binary frame of its length, unless `WsUploadFrames.StartFrame` (libcurl's
+`curl_ws_start_frame`, called from the callback) started a frame, whose payload the following reads fill, each asked
+for no more than its payload left. Any other upload (`-T`, BL-2683) goes out the same way, but each read is
+filled to 64 KiB first, as the tool's `fread` fills it: a 200 000-byte file is frames of 65 536, 65 536, 65 536
+and 3 392 bytes, and an empty one sends no frame and writes `We are completely uploaded and fine`.

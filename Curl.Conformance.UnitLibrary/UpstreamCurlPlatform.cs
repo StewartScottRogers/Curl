@@ -8,7 +8,7 @@ namespace Curl.Conformance;
 /// <remarks>
 /// <para>
 /// A feature is listed when Curl has it, by the name upstream's <c>runtests.pl</c> gives it: the
-/// protocols the harness can serve (<c>ws</c>, <c>wss</c> and <c>ipfs</c> among them, and <c>sftp</c>
+/// protocols the harness can serve (<c>ftp</c>, <c>ws</c>, <c>wss</c> and <c>ipfs</c> among them, and <c>sftp</c>
 /// and <c>scp</c>, which Curl serves and <c>UpstreamSshServer</c> emulates); every
 /// feature on Curl's <c>curl -V</c> <c>Features:</c> line, except that <c>ECH</c> is listed because
 /// Curl still serves <c>--ech</c>, though the line does not name it (ADR-0520), which keeps the cases
@@ -19,7 +19,8 @@ namespace Curl.Conformance;
 /// <c>digest</c>, <c>aws</c>, <c>netrc</c>, <c>verbose-strings</c>, <c>large-time</c>,
 /// <c>large-size</c>, <c>sha512-256</c>, <c>SSLpinning</c> and <c>httpsig</c>); <c>headers-api</c>, since
 /// Curl writes <c>-w %header{name}</c> and <c>%{header_json}</c>, which curl writes only with libcurl's
-/// headers API (BL-2264); <c>large_file</c>;
+/// headers API (BL-2264); <c>form-api</c>, since <c>Libcurl</c>, which runs the ported libtest
+/// programs, has <c>CURLOPT_HTTPPOST</c> (BL-2593); <c>large_file</c>;
 /// <c>local-http</c> (the harness's server is at <c>127.0.0.1</c>); <c>win32</c> on Windows, as
 /// <c>runtests.pl</c> sets it there; the TLS backend; <c>xattr</c> off Windows, where curl
 /// cannot write extended attributes; <c>http/2</c> and <c>h2c</c> off Windows only, since the
@@ -31,9 +32,9 @@ namespace Curl.Conformance;
 /// <para>
 /// These stay off, so the cases that need them are skipped rather than counted as failures:
 /// libcurl's build and API features, which a command-line tool does not have (<c>Debug</c>,
-/// <c>TrackMemory</c>, <c>unittest</c>, <c>form-api</c>, <c>wakeup</c>,
+/// <c>TrackMemory</c>, <c>unittest</c>, <c>wakeup</c>,
 /// <c>shuffle-dns</c>, <c>override-dns</c>, <c>threadsafe</c>, <c>getrlimit</c>,
-/// <c>--libcurl</c>); <c>ftp</c> and the other protocols the harness has no server for; features
+/// <c>--libcurl</c>); the other protocols the harness has no server for; features
 /// absent from Curl's <c>curl -V</c> (<c>SSPI</c>, <c>Unicode</c>, <c>MultiSSL</c>,
 /// <c>ssl-sessions</c>, <c>threaded-resolver</c>); and <c>codeset-utf8</c>, which depends on the
 /// locale of the machine running the tests.
@@ -43,13 +44,13 @@ public sealed class UpstreamCurlPlatform
 {
     private static readonly string[] CommonFeatures =
     [
-        "dict", "file", "gopher", "gophers", "http", "https", "ipfs", "mqtt", "mqtts", "scp", "sftp", "telnet", "tftp", "ws", "wss",
+        "dict", "file", "ftp", "gopher", "gophers", "http", "https", "ipfs", "mqtt", "mqtts", "scp", "sftp", "telnet", "tftp", "ws", "wss",
         "alt-svc", "AsynchDNS", "brotli", "ECH", "GSS-API", "HSTS", "HTTPS-proxy",
         "HTTPSRR", "IDN", "IPv6", "Kerberos", "Largefile", "libz", "NTLM", "PSL", "SPNEGO", "SSL",
         "UnixSockets", "zstd",
         "crypto", "cookies", "proxy", "Mime", "manual", "DoH", "digest", "aws", "netrc", "verbose-strings",
         "large-time", "large-size", "sha512-256", "SSLpinning",
-        "large_file", "local-http", "httpsig", "headers-api",
+        "large_file", "local-http", "httpsig", "headers-api", "form-api",
     ];
 
     private UpstreamCurlPlatform(IEnumerable<string> platformFeatures, string nullDevice, string operatingSystemName)

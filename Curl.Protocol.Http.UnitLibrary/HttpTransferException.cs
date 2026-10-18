@@ -31,4 +31,11 @@ internal sealed class HttpTransferException(CurlExitCode exitCode, string messag
     /// <see cref="HttpTransferMessages.ChunkedStreamReadFailed" /> after it (measured, BL-1448 Notes).
     /// </summary>
     internal IReadOnlyList<string> InfoLines { get; init; } = [];
+
+    /// <summary>
+    /// Gets the head bytes accepted before the failure, which the handler writes to the header
+    /// output before it fails, as libcurl 8.22.0 writes each header line once it accepts it
+    /// (upstream test580, BL-2587); none by default.
+    /// </summary>
+    internal byte[] HeadBytesBeforeFailure { get; init; } = [];
 }

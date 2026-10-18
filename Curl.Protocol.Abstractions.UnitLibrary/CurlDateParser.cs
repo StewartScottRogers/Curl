@@ -34,7 +34,8 @@ public static class CurlDateParser
 
     /// <summary>
     /// curl's zone names and how many minutes each is behind UTC, from <c>lib/parsedate.c</c>:
-    /// the civil zones, then the military letters with RFC 1123's corrected signs (no <c>J</c>).
+    /// the civil zones, then the military letters (no <c>J</c>) with curl 8.22.0's signs, actual
+    /// military usage: <c>A</c> to <c>M</c> east of UTC, <c>N</c> to <c>Y</c> west (test517).
     /// </summary>
     private static readonly FrozenDictionary<string, int> ZoneMinutesBehindUtc = new Dictionary<string, int>
     {
@@ -82,30 +83,30 @@ public static class CurlDateParser
         ["NZST"] = -720,
         ["NZDT"] = -780,
         ["IDLE"] = -720,
-        ["A"] = 60,
-        ["B"] = 120,
-        ["C"] = 180,
-        ["D"] = 240,
-        ["E"] = 300,
-        ["F"] = 360,
-        ["G"] = 420,
-        ["H"] = 480,
-        ["I"] = 540,
-        ["K"] = 600,
-        ["L"] = 660,
-        ["M"] = 720,
-        ["N"] = -60,
-        ["O"] = -120,
-        ["P"] = -180,
-        ["Q"] = -240,
-        ["R"] = -300,
-        ["S"] = -360,
-        ["T"] = -420,
-        ["U"] = -480,
-        ["V"] = -540,
-        ["W"] = -600,
-        ["X"] = -660,
-        ["Y"] = -720,
+        ["A"] = -60,
+        ["B"] = -120,
+        ["C"] = -180,
+        ["D"] = -240,
+        ["E"] = -300,
+        ["F"] = -360,
+        ["G"] = -420,
+        ["H"] = -480,
+        ["I"] = -540,
+        ["K"] = -600,
+        ["L"] = -660,
+        ["M"] = -720,
+        ["N"] = 60,
+        ["O"] = 120,
+        ["P"] = 180,
+        ["Q"] = 240,
+        ["R"] = 300,
+        ["S"] = 360,
+        ["T"] = 420,
+        ["U"] = 480,
+        ["V"] = 540,
+        ["W"] = 600,
+        ["X"] = 660,
+        ["Y"] = 720,
         ["Z"] = 0,
     }.ToFrozenDictionary(StringComparer.Ordinal);
 

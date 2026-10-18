@@ -39,14 +39,30 @@ starts. No upstream source or real curl was reachable from the lane, so the rule
    callback decides. `CURL_PUSH_OK` adds the pushed transfer, which starts on the next perform;
    `CURL_PUSH_ERROROUT` refuses it and ends the parent on the next perform with `CURLE_HTTP2`, as the
    failed nghttp2 callback fails the parent stream; every other answer refuses it.
-5. **Left to follow-up tasks.** `MAXCONNECTS` needs the shared cache to close idle connections past a
-   count, which `ConnectionCache` cannot do yet, so it is kept and not applied until BL-2468. The HTTP/2
-   client in `Curl.Protocol.Http.UnitLibrary` still refuses push in its `SETTINGS`, so nothing calls
-   `OfferPush` until BL-2469 wires `PUSH_PROMISE` to it.
+5. **`MAXCONNECTS` is applied when a transfer ends (BL-2468 amendment).** Each time a perform or
+   socket action queues a transfer's `CURLMSG_DONE`, the handle calls the engine's
+   `ConnectionCache.CloseIdleBeyondAsync` with `MaxConnects`, or 4 for each transfer in the handle when it
+   is 0 or less. The cache closes its oldest idle connections until no more than that many connections,
+   idle and in use, remain, never one in use, as libcurl's connection pool closes its oldest idle
+   connection while it holds more than the cap when a transfer hands a connection back. libcurl closes
+   one connection per hand-back; closing down to the cap at once reaches the same count, since each
+   transfer hands back at most one. `DisposeAsync` waits for those closes.
+6. **A server push reaches the callback (BL-2469).** While a transfer is in a multi handle with
+   `MultiOptions.Push` set, the engine gives its HTTP handler an `EngineHttp2PushSink` (the HTTP/2
+   session then sends `SETTINGS_ENABLE_PUSH` 1, BL-2515 and BL-2516); without the callback no sink
+   is given and the client keeps sending 0. Each `PUSH_PROMISE` becomes a duplicate of the parent
+   handle (`curl_easy_duphandle`, as curl 8.22.0's `push_promise` makes it) bound to the pushed
+   response and offered to `OfferPush` with the promise's `name:value` lines; a refused push is reset
+   with `RST_STREAM` `CANCEL`. The pushed transfer's perform sends no request: it hands the pushed
+   head to the header callback a line at a time and the body to the write callback, and a failed
+   pushed stream answers `CURLE_RECV_ERROR`. Decided by Claude under Stewart's delegation: the
+   header lines keep the `name:value` form curl's `h2_pushed_hdr` holds, not `name: value`.
 
 ## Consequences
 
 - Applications that cap connections see transfers queue and `XFERS_PENDING` rise, as with libcurl.
 - The connection count is the multi's own estimate; the shared cache may still reuse an idle
   connection for a transfer the estimate counts as new, which only makes the limit stricter.
-- `Curl.Engine.UnitTests`' `ManagedMultiTransferTests.Limits.cs` pins the queueing and every push answer.
+- `Curl.Engine.UnitTests`' `ManagedMultiTransferTests.Limits.cs` pins the queueing and every push answer,
+  `ManagedMultiTransferTests.MaxConnects.cs` the cap and its default, and `Curl.Networking.UnitTests`'
+  `ConnectionCacheTests` the trim's order.

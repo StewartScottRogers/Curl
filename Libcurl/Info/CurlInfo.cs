@@ -51,6 +51,9 @@ public enum CurlInfo
     /// <summary><c>CURLINFO_SIZE_DOWNLOAD_T</c> (0x600008), an off_t.</summary>
     SizeDownloadT = 0x600008,
 
+    /// <summary><c>CURLINFO_SIZE_DELIVERED</c> (0x600047), an off_t: the body bytes delivered to the write callback.</summary>
+    SizeDelivered = 0x600047,
+
     /// <summary><c>CURLINFO_SPEED_DOWNLOAD</c> (0x300009), a double; deprecated upstream for <see cref="SpeedDownloadT"/>.</summary>
     SpeedDownload = 0x300009,
 

@@ -1,15 +1,24 @@
 using System.Globalization;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
+using Curl.Api.Callbacks;
+using Curl.Api.Codes;
+using Curl.Api.EngineContracts;
+using Curl.Api.Options;
+using Curl.Api.Options.Http;
+using Curl.Api.Options.Network;
 using Curl.Cli;
 using Curl.Conformance.Http2Server;
 using Curl.Conformance.Http3Server;
+using Curl.Conformance.LibTest;
 using Curl.Conformance.SshServer;
 using Curl.Console;
+using Curl.Engine;
 using Curl.Networking;
 using Curl.Protocol.Ssh;
 using Curl.Testing;
 using Curl.Tls;
+using Libcurl.Misc.ErrorText;
 
 namespace Curl.Conformance;
 
@@ -377,7 +386,7 @@ public sealed class UpstreamConformanceTests
         DirectoryInfo logDirectory = Directory.CreateDirectory(Path.Combine(LogFolder, $"test{testNumber}-{Guid.NewGuid():N}"));
         try
         {
-            UpstreamCaseRunner runner = new(RunCurlAsync, PlatformFor(testFile), TimeProvider.System, TimeLimit, SshServer, Http2Server, Http3Server);
+            UpstreamCaseRunner runner = new(RunCurlAsync, PlatformFor(testFile), TimeProvider.System, TimeLimit, SshServer, Http2Server, Http3Server, libTests: LibTests);
             return await Task.Run(() => runner.RunAsync(testNumber, testFile, logDirectory.FullName, certificateDirectory: CertificateFolder.Value, sourceDirectory: UpstreamTestDataFolder)).WaitAsync(CaseHangLimit);
         }
         catch (TimeoutException)
@@ -406,13 +415,24 @@ public sealed class UpstreamConformanceTests
     // reports Debug to a case whose command names %HTTP2TLSPORT. Every other case sees no Debug, so the other Debug cases stay skipped.
     // A case naming the dns server (2102 to 2104) relies on override-dns, the debug build's CURL_DNS_SERVER: the harness
     // reports it to that case alone, and RunCurlAsync has Curl ask the dnsd stand-in on %DNSPORT through the datagram connector (ADR-0492, BL-2232).
+    // The AWS SigV4 libtest cases (1933 to 1938) rely on Debug for CURL_FORCETIME, which signs at the epoch: the harness
+    // reports Debug to a case naming the aws feature, and CreateEngine gives the libtest engine a signing clock fixed at
+    // the epoch (ADR-0671, BL-2675); the curl tool's aws cases (439, 472, 1976, 3222, 5026, 5027) get Debug too, and
+    // RunCurlAsync signs an --aws-sigv4 command at the epoch. The WebSocket libtest cases (2301 to 2304) rely on Debug for
+    // CURL_ENTROPY, which pins Sec-WebSocket-Key and the frame masks: the harness reports Debug to a case naming the ws
+    // feature and setting CURL_ENTROPY, and CreateEngine gives the libtest engine the forced sequence (ADR-0678, BL-2688).
+    // The FTP libtest case 753 relies on Debug for CURL_FTP_PWD_STOP, which stops the first transfer before PWD: the
+    // harness reports Debug to a case setting it, and CreateEngine has the libtest engine stop its first perform there (ADR-0687, BL-2636).
     private static UpstreamCurlPlatform PlatformFor(byte[] testFile)
     {
         string text = Encoding.Latin1.GetString(testFile);
         bool standsInForDebug = text.Contains("\nhttpsig\n", StringComparison.Ordinal)
+            || text.Contains("\naws\n", StringComparison.Ordinal)
+            || (text.Contains("\nws\n", StringComparison.Ordinal) && text.Contains("\nCURL_ENTROPY=", StringComparison.Ordinal))
             || (text.Contains("\nHSTS\n", StringComparison.Ordinal) && text.Contains("\nCURL_TIME=", StringComparison.Ordinal))
             || (text.Contains("\nalt-svc\n", StringComparison.Ordinal) && text.Contains("\nCURL_ALTSVC_HTTP=", StringComparison.Ordinal))
-            || text.Contains(":%HTTP2TLSPORT/", StringComparison.Ordinal);
+            || text.Contains(":%HTTP2TLSPORT/", StringComparison.Ordinal)
+            || text.Contains("\nCURL_FTP_PWD_STOP=", StringComparison.Ordinal);
         UpstreamCurlPlatform platform = standsInForDebug ? Platform.WithFeatures(["Debug"]) : Platform;
         return text.Contains("\n<server>\n", StringComparison.Ordinal) && text.Contains("\ndns\n", StringComparison.Ordinal)
             ? platform.WithFeatures(["override-dns"])
@@ -477,6 +497,76 @@ public sealed class UpstreamConformanceTests
         }
     }
 
+    // A sws case whose <tool> is a test-only program doing an easy GET of its URL to stdout through the ratchet's
+    // CreateEngine, so the managed engine's own transports reach the sws emulation (BL-2558, ADR-0658). Its data is
+    // nocheck: how a lib case's <reply><data> is judged against the program's stdout is BL-2560's.
+    private const string EasyGetLibCase =
+        "<testcase>\n<reply>\n<data crlf=\"headers\" nocheck=\"yes\">\nHTTP/1.1 200 OK\nContent-Length: 6\nConnection: close\n\n-foo-\n</data>\n</reply>\n"
+        + "<client>\n<server>\nhttp\n</server>\n<tool>\nlib%TESTNUMBER\n</tool>\n<name>\neasy GET through the engine\n</name>\n"
+        + "<command>\nhttp://%HOSTIP:%HTTPPORT/%TESTNUMBER\n</command>\n</client>\n"
+        + "<verify>\n<protocol crlf=\"yes\">\nGET /%TESTNUMBER HTTP/1.1\nHost: %HOSTIP:%HTTPPORT\nUser-Agent: lib%TESTNUMBER\nAccept: */*\n\n</protocol>\n"
+        + "<stdout>\n-foo-\n</stdout>\n<errorcode>\n0\n</errorcode>\n</verify>\n</testcase>\n";
+
+    [TestMethod]
+    public async Task CreateEngine_EasyGetLibTestOnAnSwsCase_MatchesTheCaseProtocolAndStdout()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        EasyGetLibTest program = new("lib9558");
+        UpstreamCaseRunner runner = new(
+            _ => throw new AssertFailedException("curl must not run for a lib case"),
+            Platform,
+            TimeProvider.System,
+            TimeLimit,
+            libTests: new UpstreamLibTests(new LibTestPrograms([program]), CreateEngine));
+        DirectoryInfo logDirectory = Directory.CreateDirectory(Path.Combine(LogFolder, $"test9558-{Guid.NewGuid():N}"));
+        UpstreamCaseOutcome outcome;
+        try
+        {
+            outcome = await runner.RunAsync(9558, Encoding.Latin1.GetBytes(EasyGetLibCase), logDirectory.FullName);
+        }
+        finally
+        {
+            DeleteOrKeepLogDirectory(logDirectory);
+        }
+
+        diagnostics.Act("outcome detail", outcome.Detail);
+        diagnostics.Assert("outcome kind", UpstreamCaseOutcomeKind.Passed, outcome.Kind);
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Passed, outcome.Kind, outcome.Detail);
+        Assert.IsInstanceOfType<ManagedCurlEngine>(program.Engine);
+    }
+
+    // Upstream's lib500 at its simplest: one easy GET of the URL, the body written to stdout, the perform's code returned.
+    // It sets CURLOPT_USERAGENT to its own name, since the engine still sends the tool's curl/8.22.0 without one (BL-2559).
+    private sealed class EasyGetLibTest(string programName) : ILibTest
+    {
+        public ICurlEngine? Engine { get; private set; }
+
+        public string ProgramName => programName;
+
+        public async Task<LibTestResult> RunAsync(LibTestContext context, CancellationToken cancellationToken)
+        {
+            Engine = context.Engine;
+            await using ICurlEngine engine = context.Engine!;
+            await using IEasyTransfer easy = engine.CreateEasy();
+            MemoryStream body = new();
+            easy.Options = new EasyOptions
+            {
+                Network = new EasyNetworkOptions { Url = context.Url },
+                Http = new EasyHttpOptions { UserAgent = programName },
+                Callbacks = new EasyCallbackOptions { Write = data => WriteTo(body, data) },
+            };
+            CurlCode code = await easy.PerformAsync(cancellationToken);
+            await context.StandardOutput.WriteAsync(body.ToArray(), cancellationToken);
+            return LibTestResult.FromCurlCode(code);
+        }
+
+        private static long WriteTo(MemoryStream body, ReadOnlySpan<byte> data)
+        {
+            body.Write(data);
+            return data.Length;
+        }
+    }
+
     // Curl as the command composes it, every TCP dial reaching the case's in-memory servers through
     // InMemoryServerTcpDialer, so TcpConnector's proxy tunnel and PROXY-line code stays in the path (ADR-0460).
     // The default config file is looked for only where the case's <setenv> points CURL_HOME, XDG_CONFIG_HOME or HOME (BL-1977).
@@ -495,12 +585,35 @@ public sealed class UpstreamConformanceTests
             readEnvironmentVariable: name => invocation.EnvironmentVariables.GetValueOrDefault(name),
             ftpListener: invocation.ConnectionListener,
             defaultConfigFileSearch: new DefaultConfigFileSearch(name => invocation.EnvironmentVariables.GetValueOrDefault(name), OperatingSystem.IsWindows(), executableDirectory: null, accountHomeDirectory: null),
-            signingClock: invocation.Arguments.Any(argument => argument.StartsWith("--httpsig", StringComparison.Ordinal)) ? new UnixEpochClock() : null,
+            signingClock: invocation.Arguments.Any(argument => argument.StartsWith("--httpsig", StringComparison.Ordinal) || argument == "--aws-sigv4") ? new UnixEpochClock() : null,
             honoursHstsTimeVariable: true,
             honoursHstsHttpVariable: true,
             honoursAltSvcHttpVariable: true,
             honoursDnsServerVariable: true,
             parsesAsQuicBuild: true).RunAsync(invocation.Arguments);
+
+    // A ported libtest program's engine, in place of curl (BL-2558, ADR-0658): the managed Libcurl engine, every TCP
+    // dial reaching the case's in-memory servers through InMemoryServerTcpDialer, names resolved to loopback, the
+    // datagram protocols on the case's datagram servers, FTP's active-mode data connections on the FTP stand-in's
+    // listener (BL-2597) and the proxy environment the case's <setenv>, as RunCurlAsync composes curl. It signs AWS SigV4
+    // requests and HTTP signatures at the epoch, as upstream's debug build does under the CURL_FORCETIME its test runner sets (BL-2675),
+    // and answers NTLM with the hand-built context, as RunCurlAsync's usesHandBuiltNtlm does (BL-2635).
+    // Under a case's CURL_ENTROPY its WebSocket key and masks follow the debug build's forced sequence (BL-2688).
+    // Its handles read the case's <stdin> where libcurl reads the process's, as a curl_formadd file named "-" does (BL-2625).
+    internal static ICurlEngine CreateEngine(UpstreamCurlInvocation invocation) =>
+        new ManagedCurlEngine(
+            TimeProvider.System,
+            createDispatcher: null,
+            CurlEasyErrorText.Of,
+            name => invocation.EnvironmentVariables.GetValueOrDefault(name),
+            new EngineDialing(new InMemoryServerTcpDialer(invocation.Connector), new LoopbackOnlyDnsResolver(), invocation.DatagramConnector, invocation.ConnectionListener, UsesHandBuiltNtlm: true),
+            signingClock: new UnixEpochClock(),
+            webSocketRandomSource: invocation.EnvironmentVariables.GetValueOrDefault("CURL_ENTROPY") is { } entropy ? new ForcedEntropyWebSocketRandomSource(entropy) : null,
+            standardInput: invocation.StandardInput,
+            stopsFirstFtpTransferBeforePwd: invocation.EnvironmentVariables.ContainsKey("CURL_FTP_PWD_STOP"));
+
+    // The ported libtest programs the ratchet runs a <tool> case's program from, over CreateEngine.
+    private static readonly UpstreamLibTests LibTests = new(LibTestPrograms.Ported, CreateEngine);
 
     // The signing time of upstream's debug build under CURL_FORCETIME and CURL_HTTPSIG_CREATED=0.
     private sealed class UnixEpochClock : TimeProvider

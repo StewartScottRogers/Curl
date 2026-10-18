@@ -117,6 +117,37 @@ public sealed partial class HttpProtocolHandlerTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_ServerStallsPastMaxTime_ClosesTheConnectionRatherThanLeavingItIntact()
+    {
+        // AF-0234: a connection abandoned mid-response by -m is closed, never kept for the next
+        // URL of the run, which would read the rest of the old response as its own.
+        FakeTimeProvider time = new(DateTimeOffset.UnixEpoch);
+        StalledConnection connection = new(Encoding.Latin1.GetBytes(ContentLengthHead + "hello"), 65536);
+        RecordingTransferEvents events = new();
+        TransferContext context = new()
+        {
+            Url = CurlUrl.Parse("http://127.0.0.1:18174/"),
+            Output = new MemoryStream(),
+            TimeProvider = time,
+            MaxTime = TimeSpan.FromSeconds(1),
+            Events = events,
+        };
+        Diagnostics.Arrange("scripted response before the stall", "200, Content-Length: 100, body hello");
+        Diagnostics.Arrange("max time", "1000 ms");
+
+        Task<TransferResult> transfer = Handler(QueueConnector.For(connection)).ExecuteAsync(context).AsTask();
+        await connection.Stalled;
+        time.Advance(TimeSpan.FromSeconds(1));
+        TransferResult result = await transfer;
+
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.OperationTimedOut, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.OperationTimedOut, result.ExitCode);
+        Assert.IsFalse(events.Info.Any(line => line.EndsWith(" left intact", StringComparison.Ordinal)), string.Join("\n", events.Info));
+        Assert.StartsWith("closing connection #", events.Info.Last(line => line.Contains("connection #", StringComparison.Ordinal)));
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_ServerStallsPastMaxTime_ReportsTheHeadAndTheBodyWritten()
     {
         FakeTimeProvider time = new(DateTimeOffset.UnixEpoch);

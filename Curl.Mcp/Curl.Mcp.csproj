@@ -18,6 +18,12 @@
     <ToolCommandName>curl-mcp</ToolCommandName>
     <RuntimeIdentifiers>win-x64;win-arm64;linux-x64;linux-arm64;osx-arm64;osx-x64</RuntimeIdentifiers>
     <PublishSelfContained>true</PublishSelfContained>
+    <!--
+      Every Curl.Mcp package is native AOT (ADR-0621, BL-2517). AOT cannot cross-compile between operating
+      systems, so a plain `dotnet pack` makes only the tool package, and each runtime package needs
+      `dotnet pack -r <rid>` on its own OS, as ci.yml's mcp-pack and release.yml's pack-mcp jobs do.
+    -->
+    <PublishAot>true</PublishAot>
     <!-- Curl.Console is referenced as a library for its InProcessCurl, never run as its own executable. -->
     <ValidateExecutableReferencesMatchSelfContained>false</ValidateExecutableReferencesMatchSelfContained>
     <PackageId>Curl.Mcp</PackageId>

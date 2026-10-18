@@ -22,6 +22,12 @@ peer's frame size and flow-control windows, and `ReadStreamFrameAsync` returns D
 whole header blocks while answering SETTINGS and PING and applying WINDOW_UPDATE itself;
 `ReadFrameAsync` handles exactly one frame, so a sender waiting for window can take in
 WINDOW_UPDATE, and `IsClosedByPeer` tells when the peer closed between frames.
+Server push (BL-2515): a connection built with `IsPushEnabled = true` sends
+`PushEnabledClientSettings` (ENABLE_PUSH 1) and returns each PUSH_PROMISE as an
+`Http2StreamFrame` of type `PushPromise` on its parent stream with `PromisedStreamId` and the
+whole header block; the promised stream is reserved (counted in `PushedStreamCount`, not
+`OpenStreamCount`) and reset with `ResetStreamAsync` like any other. Without it, the preface
+is unchanged and a PUSH_PROMISE is a PROTOCOL_ERROR.
 Failures are typed: `Http2ProtocolException` (a connection error; GOAWAY already sent),
 `Http2StreamResetException` (the peer's RST_STREAM) and `Http2GoAwayException` (the
 peer's GOAWAY). The request and response on a stream are in `Curl.Protocol.Http.UnitLibrary`

@@ -118,6 +118,15 @@ internal static class SshInfoLines
     /// <returns>The line.</returns>
     internal static string KnownHostsReadFailed(string path) => $"SSH: failed to read known hosts from {path}";
 
+    /// <summary>
+    /// The line for a known-hosts file that could not be written after
+    /// <c>CURLOPT_SSH_KEYFUNCTION</c> answered <c>CURLKHSTAT_FINE_ADD_TO_FILE</c> or
+    /// <c>CURLKHSTAT_FINE_REPLACE</c>, as libssh2.c's <c>ssh_knownhost</c> writes it.
+    /// </summary>
+    /// <param name="path">The file's path.</param>
+    /// <returns>The line.</returns>
+    internal static string KnownHostsWriteFailed(string path) => $"WARNING: writing {path} failed";
+
     /// <summary>The line for a known-hosts entry that narrows the host-key list.</summary>
     /// <param name="host">The URL's host.</param>
     /// <param name="path">The known-hosts file's path.</param>

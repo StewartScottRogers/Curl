@@ -44,6 +44,26 @@ internal sealed class EncodedReadStream : Stream
 
     private long position;
 
+    /// <summary>
+    /// Gets or sets a value indicating whether each read takes from the source at most once, as libcurl 8.22.0's
+    /// <c>read_encoded_part_content</c> calls a <c>curl_mime_data_cb</c> part's read callback once per buffer fill:
+    /// a read whose one source read leaves nothing to give returns 0 and sets <see cref="StoppedFilling" />, curl's
+    /// <c>STOP_FILLING</c> (upstream test667, BL-2630). Seeking and measuring still read the source through.
+    /// </summary>
+    internal bool ReadsSourceOncePerRead { get; set; }
+
+    /// <summary>
+    /// Gets a value indicating whether the last read returned 0 because it had already read the source once, not
+    /// because the data ended; the next read reads the source again.
+    /// </summary>
+    internal bool StoppedFilling { get; private set; }
+
+    /// <summary>
+    /// Gets a value indicating whether every encoded byte has been read: the source ended and nothing is left to
+    /// give, so the next read gives nothing without reading the source.
+    /// </summary>
+    internal bool IsAtItsEnd => sourceEnded && OutputIsEmpty && !refused;
+
     /// <summary>Initialises a stream that encodes <paramref name="source" />, which it now owns.</summary>
     /// <param name="source">The part's data.</param>
     /// <param name="createEncoding">Starts an encoding of the data from its beginning.</param>
@@ -81,14 +101,26 @@ internal sealed class EncodedReadStream : Stream
     public override int Read(byte[] buffer, int offset, int count) => Read(buffer.AsSpan(offset, count));
 
     /// <inheritdoc />
-    public override int Read(Span<byte> buffer)
+    public override int Read(Span<byte> buffer) => Read(buffer, ReadsSourceOncePerRead);
+
+    /// <summary>Encodes from the source until there is output or the data ends, reading it once only when asked.</summary>
+    private int Read(Span<byte> buffer, bool readsSourceOnce)
     {
-        while (NeedsInput)
+        StoppedFilling = false;
+        int sourceReads = 0;
+        while (NeedsInput && MayReadSource(readsSourceOnce, sourceReads++))
         {
             EncodeInput(source.Read(input.AsSpan(inputCount)));
         }
 
         return CopyOutput(buffer);
+    }
+
+    /// <summary>Whether a read may take from the source again, setting <see cref="StoppedFilling" /> when it may not.</summary>
+    private bool MayReadSource(bool readsSourceOnce, int sourceReads)
+    {
+        StoppedFilling = readsSourceOnce && sourceReads > 0;
+        return !StoppedFilling;
     }
 
     /// <inheritdoc />
@@ -98,7 +130,9 @@ internal sealed class EncodedReadStream : Stream
     /// <inheritdoc />
     public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
     {
-        while (NeedsInput)
+        StoppedFilling = false;
+        int sourceReads = 0;
+        while (NeedsInput && MayReadSource(ReadsSourceOncePerRead, sourceReads++))
         {
             EncodeInput(await source.ReadAsync(input.AsMemory(inputCount), cancellationToken).ConfigureAwait(false));
         }
@@ -206,7 +240,7 @@ internal sealed class EncodedReadStream : Stream
         int read = 1;
         while (position < target && read > 0)
         {
-            read = Read(skipped.AsSpan(0, (int)Math.Min(SkipBufferSize, target - position)));
+            read = Read(skipped.AsSpan(0, (int)Math.Min(SkipBufferSize, target - position)), readsSourceOnce: false);
         }
     }
 

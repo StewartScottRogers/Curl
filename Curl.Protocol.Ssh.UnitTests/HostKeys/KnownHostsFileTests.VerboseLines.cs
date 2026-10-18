@@ -21,7 +21,7 @@ public sealed partial class KnownHostsFileTests
 
         KnownHostsLookup lookup = knownHosts.Lookup(Host, Port, HostKey);
 
-        KnownHostsLookup expected = new(KnownHostsCheck.Mismatch, OtherKeyBase64);
+        KnownHostsLookup expected = new(KnownHostsCheck.Mismatch, OtherKeyBase64) { Entry = knownHosts.Entries[0] };
         diagnostics.Act("lookup", lookup);
         diagnostics.Assert("lookup", expected, lookup);
         Assert.AreEqual(expected, lookup);

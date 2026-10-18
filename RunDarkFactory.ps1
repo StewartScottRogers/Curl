@@ -2741,7 +2741,14 @@ function Get-CiFailures {
         if (-not $found.Contains($key)) {
             $found[$key] = [pscustomobject]@{ Key = $key; Kind = 'job'; Platforms = @(Get-CiPlatform $parts[0].Trim()); Project = ''; Message = '' }
         }
-        if (-not $found[$key].Message -and $text -match '(?i)error|fail|timed? ?out|cancel|exit code') { $found[$key].Message = $text }
+        # The quality gate annotates each member outside a gate ("X is outside a gate: ..."). Those
+        # lines are the message, not the step's echoed script (AF-0244: BL-2466 read the script
+        # line and never named CurlMulti.SetOption, so the real gap waited for a Normal task).
+        if ($text -match '(?:^|\s)(?:##\[error\])?(\S.* is outside a gate: .*)$') {
+            if (-not $found[$key].PSObject.Properties['GateMembers']) { $found[$key] | Add-Member -NotePropertyName GateMembers -NotePropertyValue @() }
+            if (@($found[$key].GateMembers).Count -lt 5) { $found[$key].GateMembers += $Matches[1].Trim() }
+            $found[$key].Message = (@($found[$key].GateMembers) -join '; ')
+        } elseif (-not $found[$key].Message -and $text -match '(?i)error|fail|timed? ?out|cancel|exit code') { $found[$key].Message = $text }
     }
     return @($found.Values)
 }
@@ -3238,6 +3245,11 @@ if ($TestCiWatch) {
         "quality${t}Measure code quality${t}2026-10-11T22:13:00.0000000Z ##[error]Process completed with exit code 1."))
     & $check 'a red job beside a named test failure is filed too (AF-0150)' 'test303|test; job quality step Measure code quality|job' `
         (($mixed | ForEach-Object { "$($_.Key)|$($_.Kind)" }) -join '; ')
+    $gate = @(Get-CiFailures @(
+        "quality${t}Measure coverage${t}2026-10-16T09:02:13.0000000Z the step script echoed first"
+        "quality${t}Measure coverage${t}2026-10-16T09:02:14.0000000Z ##[error]CurlMulti.SetOption is outside a gate: branch 87.5%"
+        "quality${t}Measure coverage${t}2026-10-16T09:02:15.0000000Z ##[error]Process completed with exit code 1."))
+    & $check 'a quality-gate failure names the members outside a gate (AF-0244)' 'CurlMulti.SetOption is outside a gate: branch 87.5%' "$($gate[0].Message)"
     $unknownJob = @(Get-CiFailures @("UNKNOWN STEP${t}Measure code quality${t}2026-10-11T23:15:00.0000000Z ##[error]Process completed with exit code 1."))
     & $check 'a failure whose job gh cannot name is still filed (AF-0178)' 'job unknown job step Measure code quality|job' `
         "$($unknownJob[0].Key)|$($unknownJob[0].Kind)"
@@ -3429,6 +3441,16 @@ Rules for this unattended run, in addition to CLAUDE.md:
    work in a stash, and each requeued claim spends part of the task's cost cap, so a third
    claim can be Blocked by the cap before it lands the work (AF-0160: BL-1976 was claimed
    3 times, requeued twice and Blocked at $3.25 of $3.93, its fix stashed until BL-2041).
+   For an umbrella task ("remove every reference to X"), count the whole remaining work
+   in that first pass - search the repository for every file that still uses X, group them
+   into subtasks, file them all, and requeue once; never file only the layer you hit first
+   (AF-0241: BL-2310 was requeued at 21 turns for 4 subtasks and at 26 turns for 4 more,
+   $1.60 for two runs that produced only a requeue, before a third claim finished it).
+   Size the task and check its engine hooks in that same pass: before the first edit,
+   name every type, method or hook the work must call, grep that each exists, and file
+   a task for each that does not, with the sizing split, so one requeue names them all
+   (AF-0242: BL-2394 was requeued for size, then again at 23 turns for a missing engine
+   hook, $3.38 for two runs that produced only a requeue, before a third claim finished it).
    The board let this run claim the task only because every ID already in its
    `depends-on` is Done, so those never send it back. Before naming any other task as the
    blocker, check its folder (`ls Tasks/*/<ID>-* Tasks/Done/*/<ID>-*`): a task in Done does
@@ -3478,11 +3500,14 @@ Rules for this unattended run, in addition to CLAUDE.md:
    running when you finish: the lane stays held until it ends (AF-0213: a `find / -maxdepth 6`
    kept BL-2180's lane busy for 22 minutes after its run was done).
    Lanes test only on Windows, so before a task adds or holds an upstream case on the
-   conformance ratchet, check that the case's output does not depend on the platform (path
-   separators, drive letters, OS error text, certificates); where it does, pin each
-   platform's answer in its own test or leave the case off the ratchet, so CI on Linux and
-   macOS does not go red (AF-0226: BL-2219 held 108 cases on the ratchet after a Windows-only
-   run and test203 failed on Linux and macOS, leaving CI red for 31 minutes).
+   conformance ratchet, or adds or changes any test that touches the file system, a path, an
+   OS error or a certificate, check that the output does not depend on the platform (path
+   separators, drive letters, POSIX file and directory semantics, OS error text,
+   certificates); where it does, pin each platform's answer in its own test (an
+   OSCondition attribute) or leave the case off the ratchet, so CI on Linux and macOS does
+   not go red (AF-0226: BL-2219 held 108 cases on the ratchet after a Windows-only run and
+   test203 failed on Linux and macOS, leaving CI red for 31 minutes; its re-audit: BL-2328's
+   1c068661 broke OpenForWriteAsync_ParentIsAFileOnPosix_IsNotADirectory, red for 36 minutes).
 
 End your reply with exactly one line, either
 FACTORY: DONE {ID} <what now works>
@@ -3562,6 +3587,16 @@ Rules for this unattended run, in addition to CLAUDE.md:
    work in a stash, and each requeued claim spends part of the task's cost cap, so a third
    claim can be Blocked by the cap before it lands the work (AF-0160: BL-1976 was claimed
    3 times, requeued twice and Blocked at $3.25 of $3.93, its fix stashed until BL-2041).
+   For an umbrella task ("remove every reference to X"), count the whole remaining work
+   in that first pass - search the repository for every file that still uses X, group them
+   into subtasks, file them all, and requeue once; never file only the layer you hit first
+   (AF-0241: BL-2310 was requeued at 21 turns for 4 subtasks and at 26 turns for 4 more,
+   $1.60 for two runs that produced only a requeue, before a third claim finished it).
+   Size the task and check its engine hooks in that same pass: before the first edit,
+   name every type, method or hook the work must call, grep that each exists, and file
+   a task for each that does not, with the sizing split, so one requeue names them all
+   (AF-0242: BL-2394 was requeued for size, then again at 23 turns for a missing engine
+   hook, $3.38 for two runs that produced only a requeue, before a third claim finished it).
    The shift claimed the task only because every ID already in its `depends-on` is Done,
    so those never send it back. Before naming any other task as the blocker, check its
    folder (`ls Tasks/*/<ID>-* Tasks/Done/*/<ID>-*`): a task in Done does not block. And
@@ -3610,11 +3645,14 @@ Rules for this unattended run, in addition to CLAUDE.md:
    running when you finish: the lane stays held until it ends (AF-0213: a `find / -maxdepth 6`
    kept BL-2180's lane busy for 22 minutes after its run was done).
    Lanes test only on Windows, so before a task adds or holds an upstream case on the
-   conformance ratchet, check that the case's output does not depend on the platform (path
-   separators, drive letters, OS error text, certificates); where it does, pin each
-   platform's answer in its own test or leave the case off the ratchet, so CI on Linux and
-   macOS does not go red (AF-0226: BL-2219 held 108 cases on the ratchet after a Windows-only
-   run and test203 failed on Linux and macOS, leaving CI red for 31 minutes).
+   conformance ratchet, or adds or changes any test that touches the file system, a path, an
+   OS error or a certificate, check that the output does not depend on the platform (path
+   separators, drive letters, POSIX file and directory semantics, OS error text,
+   certificates); where it does, pin each platform's answer in its own test (an
+   OSCondition attribute) or leave the case off the ratchet, so CI on Linux and macOS does
+   not go red (AF-0226: BL-2219 held 108 cases on the ratchet after a Windows-only run and
+   test203 failed on Linux and macOS, leaving CI red for 31 minutes; its re-audit: BL-2328's
+   1c068661 broke OpenForWriteAsync_ParentIsAFileOnPosix_IsNotADirectory, red for 36 minutes).
 
 End your reply with exactly one line, either
 FACTORY: DONE {ID} <what now works>
@@ -5219,7 +5257,7 @@ if ($Lane) {
 
 Write-Trace '-' 'shift' "start  branch=$branch model=$Model until $($shiftEnd.ToString('HH:mm'))  $LaneMarkerTrace" 'Cyan'
 
-$done = 0; $blocked = 0; $requeued = 0; $stalls = @(); $failStreak = 0; $attempted = @{}
+$done = 0; $blocked = 0; $deferred = 0; $requeued = 0; $stalls = @(); $failStreak = 0; $attempted = @{}
 # Parks whose move to Backlog never reached the shared branch, for the lane's summary.
 $parkLines = @()
 $stopWhy = ''
@@ -5378,7 +5416,7 @@ while ($true) {
     }
     Save-StrayChanges $id
 
-    if ($Lane -and $state -in 'Done', 'Blocked', 'Backlog') {
+    if ($Lane -and $state -in 'Done', 'Blocked', 'Deferred', 'Backlog') {
         $problem = Invoke-Integrate -Id $id -State $state
         if ($problem) {
             $unpushed = Invoke-Park -Id $id -Why $problem
@@ -5402,6 +5440,12 @@ while ($true) {
         if ($capWhy) { } elseif ($null -eq $script:RunResult -or $run.TimedOut) { $failStreak++ } else { $failStreak = 0 }
         $outcome = 'BLOCKED (see Tasks\Blocked)'
         Write-Trace $id 'BLOCKED' (Get-Short (Get-LastLogLine $id)) 'Yellow'
+    } elseif ($state -eq 'Deferred') {
+        # Deferred is a valid /task-run outcome (the task needs nothing more, or cannot be
+        # done yet): integrated like Blocked, reported, and no sign the runs are failing.
+        $deferred++; $failStreak = 0
+        $outcome = 'DEFERRED (see Tasks\Deferred)'
+        Write-Trace $id 'DEFERRED' (Get-Short (Get-LastLogLine $id)) 'Yellow'
     } elseif ($state -in 'Backlog', 'Parked') {
         # Waiting on other tasks, a widened touches, or work that would not integrate: back
         # in the queue for a later run, not a stall.
@@ -5438,7 +5482,7 @@ while ($true) {
   }
 }
 
-Write-Trace '-' 'shift' "end ($stopWhy)  done=$done blocked=$blocked requeued=$requeued stalled=$($stalls.Count)" 'Cyan'
+Write-Trace '-' 'shift' "end ($stopWhy)  done=$done blocked=$blocked deferred=$deferred requeued=$requeued stalled=$($stalls.Count)" 'Cyan'
 Write-Trace '-' 'shift' (Get-ModelCostSummary $LogDir "^BL-\d+-$Stamp$LaneTag[-.]") 'Cyan'
 if ($stopWhy -eq 'runs failing') { $stalls = @('FACTORY STALLED - two runs in a row failed; check ' + $LogDir) + $stalls }
 Set-HeartbeatTask ''
@@ -5449,9 +5493,9 @@ if ($Lane) {
     # The coordinator raises one alarm for every lane; a lane only reports.
     # Every line after SUMMARY reaches the coordinator's end-of-shift report: stalls, and
     # parks whose move to Backlog was never pushed (BL-1071).
-    Write-LaneSummary (@("SUMMARY lane $Lane ended ($stopWhy): done=$done blocked=$blocked requeued=$requeued stalled=$($stalls.Count)  $(Get-ModelCostSummary $LogDir "^BL-\d+-$Stamp$LaneTag[-.]")") + $stalls + $parkLines)
+    Write-LaneSummary (@("SUMMARY lane $Lane ended ($stopWhy): done=$done blocked=$blocked deferred=$deferred requeued=$requeued stalled=$($stalls.Count)  $(Get-ModelCostSummary $LogDir "^BL-\d+-$Stamp$LaneTag[-.]")") + $stalls + $parkLines)
     # A clean lane leaves an empty tab to close; one that blocked, stalled or could not park says read.
-    $endLine = "Lane $Lane ended at $(Get-Date -Format 'HH:mm') ($stopWhy): done=$done blocked=$blocked requeued=$requeued stalled=$($stalls.Count)"
+    $endLine = "Lane $Lane ended at $(Get-Date -Format 'HH:mm') ($stopWhy): done=$done blocked=$blocked deferred=$deferred requeued=$requeued stalled=$($stalls.Count)"
     if (-not $stalls.Count -and -not $parkLines.Count -and -not $blocked) { Show-LaneEmpty $endLine 'empty, close' }
     else { Show-LaneEmpty (@($endLine) + $stalls + $parkLines -join "`n") $(if ($stalls.Count -or $parkLines.Count) { 'STALLED, read' } else { 'BLOCKED, read' }) }
     try { $Host.UI.RawUI.WindowTitle = "Dark factory - lane $Lane finished" } catch { }

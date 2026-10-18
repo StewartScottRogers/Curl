@@ -10,7 +10,7 @@ namespace Curl.Protocol.Http;
 /// server, and to the exit 26 it returned for a body file that failed a read (BL-175 Notes).
 /// </summary>
 [TestClass]
-public sealed class HttpRequestBodyWriterTests
+public sealed partial class HttpRequestBodyWriterTests
 {
     public TestContext TestContext { get; set; } = null!;
 
@@ -130,6 +130,37 @@ public sealed class HttpRequestBodyWriterTests
         CollectionAssert.AreEqual(new[] { expected.Length }, connection.WriteLengths.ToArray());
         Diagnostics.Assert("writer.BytesSent", (long)expected.Length, writer.BytesSent);
         Assert.AreEqual((long)expected.Length, writer.BytesSent);
+    }
+
+    [TestMethod]
+    public async Task WriteAsync_ChunkedStdinOnAPipeAfterTheContinueWait_SendsDataAndLastChunkInOneWriteOnceThePipeCloses()
+    {
+        // upstream test60 out of process (BL-2483): stdin on a pipe gives its bytes in one read
+        // and its end in a later one; the data chunk waits for that end and goes out with
+        // 0\r\n\r\n in one write, before the server's answer is read.
+        PipeLikeStream stdin = new("more than one byte\n"u8.ToArray());
+        GatedConnection connection = new(Encoding.Latin1.GetBytes("HTTP/1.0 200 OK swsclose\r\n\r\n"), 65536, 1);
+        HttpContinueWaitConnection watch = await PastTheContinueWaitAsync(connection);
+        HttpRequestBodyWriter writer = new(connection) { EarlyResponseWatch = watch };
+        Diagnostics.Arrange("writer", Describe(writer));
+
+        Task sending = writer.WriteAsync(new StreamBody(stdin, null, "a/b"), true, CancellationToken.None).AsTask();
+        await stdin.EndReadStarted;
+        int writesWhileTheEndWasUnknown = connection.WriteLengths.Count;
+        stdin.CloseWritingEnd();
+        await sending;
+        WriteWriter(writer);
+        byte[] answer = new byte[64];
+        int answerLength = await watch.ReadAsync(answer, CancellationToken.None);
+
+        string expected = "13\r\nmore than one byte\n\r\n0\r\n\r\n";
+        Diagnostics.Assert("writes while the end was unknown", 0, writesWhileTheEndWasUnknown);
+        Assert.AreEqual(0, writesWhileTheEndWasUnknown);
+        Diagnostics.Assert("Encoding.Latin1.GetString(connection.Written)", expected, Encoding.Latin1.GetString(connection.Written));
+        Assert.AreEqual(expected, Encoding.Latin1.GetString(connection.Written));
+        Diagnostics.Assert("connection.WriteLengths", expected.Length.ToString(System.Globalization.CultureInfo.InvariantCulture), string.Join(", ", connection.WriteLengths));
+        CollectionAssert.AreEqual(new[] { expected.Length }, connection.WriteLengths.ToArray());
+        Assert.StartsWith("HTTP/1.0 200 OK swsclose\r\n", Encoding.Latin1.GetString(answer, 0, answerLength));
     }
 
     [TestMethod]

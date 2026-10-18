@@ -88,17 +88,32 @@ public sealed class TcpConnectionListenerTests
     [TestMethod]
     public async Task ListenAsync_WhenTheFirstPortIsTaken_ListensOnTheNextFreeOne()
     {
-        using var held = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-        held.Bind(new IPEndPoint(IPAddress.Loopback, 0));
-        held.Listen(1);
-        var heldPort = ((IPEndPoint)held.LocalEndPoint!).Port;
-        Diagnostics.Arrange("port range", "a port held listening and up to 64 after it");
+        // The first attempt lets the OS pick the held port (port 0); later ones hold a random port
+        // well below the top of the port space, because Windows hands out port 0 in sequence, so
+        // once its counter nears 65535 every pick leaves no room after it (BL-2707). Other test
+        // runs on the machine take ports at the same time, so a held port too close to the top,
+        // one that cannot be bound, or a block of neighbours another process holds is released
+        // and another is taken, as the test is about the next free port.
+        const int PortsAfterTheHeldOne = 64;
+        const int HighestHeldPort = 65535 - PortsAfterTheHeldOne;
+        ListenResult? listened = null;
+        var heldPort = 0;
+        for (var attempt = 0; attempt < 20 && listened?.ExitCode != CurlExitCode.Ok; attempt++)
+        {
+            using var held = TryHoldListening(attempt == 0 ? 0 : Random.Shared.Next(20000, 40000));
+            heldPort = held is null ? 0 : ((IPEndPoint)held.LocalEndPoint!).Port;
+            if (held is null || heldPort > HighestHeldPort)
+            {
+                continue;
+            }
 
-        // Up to 64 ports after the held one, so a port another process holds is skipped too.
-        var listened = await ListenAsync(
-            new TcpConnectionListener(), new ListenTarget(IPAddress.Loopback, heldPort, Math.Min(heldPort + 64, 65535)));
+            Diagnostics.Arrange("port range", "a port held listening and up to 64 after it");
+            listened = await ListenAsync(
+                new TcpConnectionListener(), new ListenTarget(IPAddress.Loopback, heldPort, heldPort + PortsAfterTheHeldOne));
+        }
 
-        Diagnostics.Assert("exit code", CurlExitCode.Ok, listened.ExitCode);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, listened?.ExitCode);
+        Assert.IsNotNull(listened, "no attempt held a port with room after it");
         Assert.AreEqual(CurlExitCode.Ok, listened.ExitCode);
         await using var pending = listened.PendingConnection!;
         Diagnostics.Act("ports past the held one", ((IPEndPoint)pending.LocalEndPoint).Port - heldPort);
@@ -255,6 +270,26 @@ public sealed class TcpConnectionListenerTests
         Assert.AreEqual(
             expectedBeforeReason is null ? null : expectedBeforeReason + ConnectFailureReason.Describe(exception, OperatingSystem.IsWindows()),
             message);
+    }
+
+    /// <summary>
+    /// Binds a loopback TCP socket on <paramref name="port" /> (0 for the OS's pick) and listens on
+    /// it, or returns <see langword="null" /> when the port cannot be bound.
+    /// </summary>
+    private static Socket? TryHoldListening(int port)
+    {
+        var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        try
+        {
+            socket.Bind(new IPEndPoint(IPAddress.Loopback, port));
+            socket.Listen(1);
+            return socket;
+        }
+        catch (SocketException)
+        {
+            socket.Dispose();
+            return null;
+        }
     }
 
     /// <summary>

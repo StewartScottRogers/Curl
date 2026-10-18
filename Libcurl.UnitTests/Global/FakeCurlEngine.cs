@@ -16,7 +16,10 @@ internal sealed class FakeCurlEngine : ICurlEngine
 
     public CurlVersionInfo VersionInfo { get; } = new();
 
-    public IEasyTransfer CreateEasy() => Remember(InertHandle.Create<IEasyTransfer>());
+    /// <summary>Makes each easy transfer <see cref="CreateEasy"/> hands out; an inert handle unless set.</summary>
+    public Func<IEasyTransfer> EasyFactory { get; init; } = InertHandle.Create<IEasyTransfer>;
+
+    public IEasyTransfer CreateEasy() => Remember(EasyFactory());
 
     public IMultiTransfer CreateMulti() => Remember(InertHandle.Create<IMultiTransfer>());
 

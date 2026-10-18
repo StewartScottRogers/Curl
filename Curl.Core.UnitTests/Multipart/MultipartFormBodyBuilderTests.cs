@@ -581,6 +581,99 @@ public sealed class MultipartFormBodyBuilderTests
         Assert.AreNotEqual(boundary, MultipartBoundary.CreateRandom());
     }
 
+    [TestMethod]
+    public async Task BuildAsync_BytesPart_SendsItsBytesUnchangedWithATextPartsHeaders()
+    {
+        const string B = "------------------------bytesbytesbytesbytesbb";
+        byte[] bytes = [0x00, 0xFF, 0x80, 0x0A];
+        MultipartFormBuildResult result = await BuildAsync(
+            [B],
+            new MultipartFormPart("b", MultipartFormPartKind.Bytes, string.Empty, null, null, NoHeaders, NoParts) { Bytes = bytes });
+
+        string expected = $"--{B}\r\nContent-Disposition: form-data; name=\"b\"\r\n\r\n\u0000ÿ\u0080\n\r\n--{B}--\r\n";
+        await AssertBodyAsync(result, expected, expected.Length, B);
+    }
+
+    [TestMethod]
+    public async Task BuildAsync_BytesPartWithBase64Encoder_SendsItsBytesEncoded()
+    {
+        const string B = "------------------------bytesbytesbytesbytesbb";
+        MultipartFormBuildResult result = await BuildAsync(
+            [B],
+            new MultipartFormPart("b", MultipartFormPartKind.Bytes, string.Empty, null, null, NoHeaders, NoParts) { Bytes = new byte[] { 0xFF }, Encoder = "base64" });
+
+        string expected = $"--{B}\r\nContent-Disposition: form-data; name=\"b\"\r\nContent-Transfer-Encoding: base64\r\n\r\n/w==\r\n--{B}--\r\n";
+        await AssertBodyAsync(result, expected, expected.Length, B);
+    }
+
+    [TestMethod]
+    [DataRow(null)]
+    [DataRow("binary")]
+    public async Task BuildAsync_ReaderPartOfKnownLength_StreamsWhatItOpensWithTheBodysLength(string? encoder)
+    {
+        const string B = "------------------------readerreaderreaderreade";
+        MultipartFormBuildResult result = await BuildAsync(
+            [B],
+            Reader("r", () => new MemoryStream("hello"u8.ToArray()), 5) with { Encoder = encoder });
+
+        string transferEncoding = encoder is null ? string.Empty : $"Content-Transfer-Encoding: {encoder}\r\n";
+        string expected = $"--{B}\r\nContent-Disposition: form-data; name=\"r\"\r\n{transferEncoding}\r\nhello\r\n--{B}--\r\n";
+        await AssertBodyAsync(result, expected, expected.Length, B);
+    }
+
+    [TestMethod]
+    public async Task BuildAsync_ReaderPartWithBase64Encoder_StreamsItEncoded()
+    {
+        const string B = "------------------------readerreaderreaderreade";
+        MultipartFormBuildResult result = await BuildAsync(
+            [B],
+            Reader("r", () => new MemoryStream("hi"u8.ToArray()), 2) with { Encoder = "base64" });
+
+        string expected = $"--{B}\r\nContent-Disposition: form-data; name=\"r\"\r\nContent-Transfer-Encoding: base64\r\n\r\naGk=\r\n--{B}--\r\n";
+        await AssertBodyAsync(result, expected, expected.Length, B);
+    }
+
+    [TestMethod]
+    public async Task BuildAsync_ReaderPartOfUnknownLength_LeavesTheBodysLengthUnknown()
+    {
+        const string B = "------------------------readerreaderreaderreade";
+        MultipartFormBuildResult result = await BuildAsync([B], Reader("r", () => new MemoryStream("hi"u8.ToArray()), null));
+
+        Assert.IsTrue(result.IsBuilt);
+        Assert.IsNull(result.Body.Length);
+        byte[] bytes = await ReadAllAsync(result.Body.Content);
+        Assert.AreEqual($"--{B}\r\nContent-Disposition: form-data; name=\"r\"\r\n\r\nhi\r\n--{B}--\r\n", Encoding.Latin1.GetString(bytes));
+    }
+
+    [TestMethod]
+    public async Task BuildAsync_ReaderPart_EachReadFillsAcrossPartsAndAsksTheReaderOnce()
+    {
+        const string B = "------------------------readerreaderreaderreade";
+        MultipartFormBuildResult result = await BuildAsync([B], Reader("r", () => new MemoryStream("hi"u8.ToArray()), null));
+        byte[] buffer = new byte[65536];
+
+        int first = await result.Body!.Content.ReadAsync(buffer, TestContext.CancellationToken);
+        string firstText = Encoding.Latin1.GetString(buffer, 0, first);
+        int second = await result.Body.Content.ReadAsync(buffer, TestContext.CancellationToken);
+        string secondText = Encoding.Latin1.GetString(buffer, 0, second);
+
+        Assert.AreEqual($"--{B}\r\nContent-Disposition: form-data; name=\"r\"\r\n\r\nhi", firstText);
+        Assert.AreEqual($"\r\n--{B}--\r\n", secondText);
+    }
+
+    [TestMethod]
+    public async Task BuildAsync_ReaderPartWithNothingToOpen_SendsAnEmptyBody()
+    {
+        const string B = "------------------------readerreaderreaderreade";
+        MultipartFormBuildResult result = await BuildAsync([B], Reader("r", null, 0));
+
+        string expected = $"--{B}\r\nContent-Disposition: form-data; name=\"r\"\r\n\r\n\r\n--{B}--\r\n";
+        await AssertBodyAsync(result, expected, expected.Length, B);
+    }
+
+    private static MultipartFormPart Reader(string name, Func<Stream>? open, long? length) =>
+        new(name, MultipartFormPartKind.Reader, string.Empty, null, null, NoHeaders, NoParts) { OpenContent = open, ContentLength = length };
+
     private static MultipartFormPart Text(string? name, string text) =>
         new(name, MultipartFormPartKind.Text, text, null, null, NoHeaders, NoParts);
 

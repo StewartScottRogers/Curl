@@ -1,6 +1,5 @@
 using System.Net;
 using System.Net.Sockets;
-using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -24,7 +23,7 @@ public sealed class CurlTransferToolIntegrationTests
         using TcpListener listener = new(IPAddress.Loopback, 0);
         listener.Start();
         int port = ((IPEndPoint)listener.LocalEndpoint).Port;
-        Task<string> served = ServeOneResponseAsync(listener, "HTTP/1.1 201 Created\r\nContent-Type: text/plain\r\nContent-Length: 5\r\nConnection: close\r\n\r\nhello");
+        Task<string> served = LoopbackHttpResponder.ServeOneResponseAsync(listener, "HTTP/1.1 201 Created\r\nContent-Type: text/plain\r\nContent-Length: 5\r\nConnection: close\r\n\r\nhello");
         using IHost host = CurlMcpHost.Build([], _ => null);
         CurlTransferTool tool = new(host.Services.GetRequiredService<McpTransferTool>());
 
@@ -38,27 +37,5 @@ public sealed class CurlTransferToolIntegrationTests
         Assert.AreEqual(201, json.RootElement.GetProperty("statusCode").GetInt64());
         Assert.AreEqual("hello", json.RootElement.GetProperty("body").GetProperty("content").GetString());
         Assert.AreEqual("text/plain", json.RootElement.GetProperty("info").GetProperty("contentType").GetString());
-    }
-
-    private static async Task<string> ServeOneResponseAsync(TcpListener listener, string response)
-    {
-        using TcpClient client = await listener.AcceptTcpClientAsync();
-        NetworkStream stream = client.GetStream();
-        StringBuilder request = new();
-        byte[] buffer = new byte[4096];
-        while (!request.ToString().Contains("\r\n\r\n", StringComparison.Ordinal))
-        {
-            int read = await stream.ReadAsync(buffer);
-            if (read == 0)
-            {
-                break;
-            }
-
-            request.Append(Encoding.ASCII.GetString(buffer, 0, read));
-        }
-
-        await stream.WriteAsync(Encoding.ASCII.GetBytes(response));
-        await stream.FlushAsync();
-        return request.ToString();
     }
 }

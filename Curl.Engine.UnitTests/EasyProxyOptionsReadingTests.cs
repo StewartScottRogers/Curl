@@ -173,4 +173,19 @@ public sealed class EasyProxyOptionsReadingTests
         Assert.AreEqual(http2, tunnel.ProxyHttp2);
         CollectionAssert.AreEqual(new[] { "X-Proxy: 1" }, tunnel.ProxyHeaders.ToArray());
     }
+
+    [TestMethod]
+    [DataRow(HeaderOption.Separate, "X-Proxy: 1")]
+    [DataRow(HeaderOption.Unified, "X-Origin: 1")]
+    public void CreateProxyTunnelOptions_HeaderOption_SendsTheProxyListWhenSeparateAndTheOriginListWhenUnified(HeaderOption option, string expected)
+    {
+        Curl.Api.Options.Http.EasyHttpOptions http = new() { HttpHeaders = ["X-Origin: 1"] };
+        EasyProxyOptions proxy = new() { ProxyHeaders = ["X-Proxy: 1"], HeaderOption = option };
+
+        HttpProxyTunnelOptions tunnel = EngineComposition.CreateProxyTunnelOptions(http, proxy, new EasyAuthenticationOptions(), new LateBoundSecurityContextFactory());
+        Diagnostics.Act("CONNECT headers", string.Join('|', tunnel.ProxyHeaders));
+
+        Diagnostics.Assert("CONNECT headers", expected, string.Join('|', tunnel.ProxyHeaders));
+        CollectionAssert.AreEqual(new[] { expected }, tunnel.ProxyHeaders.ToArray());
+    }
 }

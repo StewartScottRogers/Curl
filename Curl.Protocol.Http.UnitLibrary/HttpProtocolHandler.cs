@@ -28,6 +28,11 @@ namespace Curl.Protocol.Http;
 /// The schemes a forward proxy may be answered with: the <c>--proxy-*</c> auth switches' pick,
 /// or <see cref="HttpAuthSchemes.Basic" />, curl's default.
 /// </param>
+/// <param name="http2PushSink">
+/// Who is offered each HTTP/2 server push (BL-2516), or <see langword="null" /> for none: with one
+/// the handler's HTTP/2 connections send SETTINGS_ENABLE_PUSH 1 and each PUSH_PROMISE on a
+/// transfer's stream goes to it; without one they send 0, as curl does with no push callback.
+/// </param>
 /// <remarks>
 /// <para>
 /// The port is the URL's, or 80 for <c>http</c> and 443 for <c>https</c> when it names none.
@@ -206,7 +211,8 @@ public sealed class HttpProtocolHandler(
     IConnector connector,
     IHttpAuthenticator authenticator,
     ICookieStore? cookieStore = null,
-    HttpAuthSchemes proxyAuthSchemes = HttpAuthSchemes.Basic) : IProtocolHandler
+    HttpAuthSchemes proxyAuthSchemes = HttpAuthSchemes.Basic,
+    IHttp2PushSink? http2PushSink = null) : IProtocolHandler
 {
     /// <summary>
     /// How many times a request whose HTTP/3 stream the server refused is sent again on a new
@@ -237,6 +243,12 @@ public sealed class HttpProtocolHandler(
     /// curl's default, unless the handler was given the <c>--proxy-*</c> auth switches' pick.
     /// </summary>
     internal HttpAuthSchemes ProxyAuthSchemes { get; } = proxyAuthSchemes;
+
+    /// <summary>
+    /// Gets who is offered each HTTP/2 server push (BL-2516), or <see langword="null" /> when the
+    /// handler takes none.
+    /// </summary>
+    internal IHttp2PushSink? Http2PushSink { get; } = http2PushSink;
 
     /// <summary>
     /// Gets or sets whether an HTTP/2 transfer writes curl 8.21.0's <c>--trace-config http/2</c> lines
@@ -1118,10 +1130,10 @@ public sealed class HttpProtocolHandler(
     /// a pooled connection (BL-817), a new HTTP/2 session for a connection that speaks HTTP/2
     /// (<see cref="SpeaksHttp2" />), or <see langword="null" /> for HTTP/1.x.
     /// </summary>
-    private static IHttpStreamSession? StreamSessionOf(HttpRequestPlan plan, ConnectResult connect, IConnection connection) =>
+    private IHttpStreamSession? StreamSessionOf(HttpRequestPlan plan, ConnectResult connect, IConnection connection) =>
         (IHttpStreamSession?)(connection as Http3Session)
             ?? (connection.Session as IHttpStreamSession)
-            ?? (SpeaksHttp2(plan, connect) ? new Http2Session(connection) : null);
+            ?? (SpeaksHttp2(plan, connect) ? new Http2Session(connection, isPushEnabled: Http2PushSink is not null) : null);
 
     /// <summary>
     /// Fails a request whose <c>-z</c> time curl 8.21.0 on Windows cannot write into its header
@@ -1221,9 +1233,7 @@ public sealed class HttpProtocolHandler(
         IConnection connection = ExchangeConnectionOf(plan, requestStream, transport);
         byte[] request = FormatRequestHead(plan, streams, connection is HttpH2cUpgradeConnection, options.EarlierResponseWasHttp10 || Http1VersionSeen.DowngradesToHttp10(transport));
         HttpFirstByteTimingConnection timedConnection = new(connection, context.TimeProvider);
-        IConnection responseConnection = framing.AwaitsContinue
-            ? new HttpContinueWaitConnection(timedConnection) { ContinueWait = options.ContinueWait }
-            : timedConnection;
+        IConnection responseConnection = ResponseConnectionOf(plan, requestStream, timedConnection);
         HttpRequestBodyWriter upload = CreateUpload(plan, connection, responseConnection, requestStream, request);
         HttpExchange exchange = CreateExchange(plan, connect, connection, timedConnection, request.Length, upload, earlier, newConnection);
         HttpExchangeLog exchangeLog = HttpExchangeLog.For(context.DiagnosticLog, streams);
@@ -1245,7 +1255,7 @@ public sealed class HttpProtocolHandler(
             ReportRequestSent(context.Events, framing, upload, bodyLeftUnsent);
             exchangeLog.RequestSent(framing.Method, context.Url.AbsolutePath, request);
             exchange.RequestSent = context.TimeProvider.GetTimestamp();
-            exchange.Head = await ReadHeadAsync(headReader, newConnection, cancellationToken).ConfigureAwait(false);
+            exchange.Head = await ReadHeadAsync(headReader, context.HeaderOutput, newConnection, cancellationToken).ConfigureAwait(false);
             ThrowIfVersionMismatched(transport, streams is not null || IsSwitchedToHttp2(connection), exchange.Head);
             HttpHeadRefusal? refusal = headReader.Refusal;
             exchange.Head = HeadCurlRead(exchange.Head, refusal);
@@ -1271,6 +1281,7 @@ public sealed class HttpProtocolHandler(
             bool ignoresBody = IgnoresBody(plan, actedOn, delivery, discardsBody);
             headReader.ReportHeldLines();
             await ReadBodyAsync(plan, actedOn, body, TrailerStreamOf(requestStream, connection), delivery, ignoresBody, cancellationToken).ConfigureAwait(false);
+            await upload.WriteRestAfterResponseAsync(cancellationToken).ConfigureAwait(false);
             ThrowIfFailing(fail, HttpFailMode.FailWithBody, actedOn);
         }
         catch (HttpTransferException failure)
@@ -1337,6 +1348,20 @@ public sealed class HttpProtocolHandler(
     }
 
     /// <summary>
+    /// Gives the connection an exchange reads its response from: one that waits for <c>100 Continue</c>
+    /// when the request expects it; over HTTP/1.x with a stream body, one that can read the status line
+    /// while a read of the body stays pending (<see cref="HttpEarlyResponseConnection" />, BL-2729); and
+    /// else <paramref name="timedConnection" /> itself.
+    /// </summary>
+    private static IConnection ResponseConnectionOf(HttpRequestPlan plan, IHttpStreamConnection? requestStream, IConnection timedConnection) =>
+        (plan.Framing.AwaitsContinue, plan.Framing.Body is StreamBody && requestStream is null) switch
+        {
+            (true, _) => new HttpContinueWaitConnection(timedConnection) { ContinueWait = plan.Options.ContinueWait },
+            (false, true) => new HttpEarlyResponseConnection(timedConnection),
+            _ => timedConnection,
+        };
+
+    /// <summary>
     /// Builds the request body writer of an exchange: holding the request head back when it
     /// awaits <c>100 Continue</c>, otherwise sharing it with the body's first write.
     /// </summary>
@@ -1356,6 +1381,8 @@ public sealed class HttpProtocolHandler(
             Progress = plan.Progress,
             Events = plan.Context.Events,
             EarlyResponseWatch = responseConnection as HttpContinueWaitConnection,
+            EarlyResponseRead = responseConnection as HttpEarlyResponseConnection,
+            KeepsSendingOnError = plan.Options.KeepSendingOnError,
             TracesReaders = TracesReadersOf(requestStream),
         };
     }
@@ -1513,16 +1540,21 @@ public sealed class HttpProtocolHandler(
     /// <summary>
     /// Creates the HTTP/2 or HTTP/3 stream the exchange runs on, with the request body's length (0 for
     /// none), reporting curl's <c>OPENED stream</c> lines once it is opened (<see cref="HttpStreamOpenedLines" />),
-    /// or gives <see langword="null" /> when the connection speaks HTTP/1.x.
+    /// or gives <see langword="null" /> when the connection speaks HTTP/1.x. An HTTP/2 stream is given
+    /// <see cref="Http2PushSink" />, so the pushes promised on it are offered to it (BL-2516).
     /// </summary>
-    private IHttpStreamConnection? CreateRequestStream(HttpRequestPlan plan, IHttpStreamSession? streams) =>
-        streams?.CreateStream(
+    private IHttpStreamConnection? CreateRequestStream(HttpRequestPlan plan, IHttpStreamSession? streams)
+    {
+        IHttpStreamConnection? stream = streams?.CreateStream(
             plan.Context.Url.Scheme,
             plan.Framing.Body is null ? 0 : plan.Framing.KnownLength,
             plan.Context.NoBody,
             new HttpStreamOpenedLines(plan.Context.Events, HttpUrlText.Effective(plan.Context.Url)),
             plan.Context.DiagnosticLog,
             TracesStreamsOf(streams) ? plan.Context.Events : null);
+        (stream as Http2StreamConnection)?.PushSink = Http2PushSink;
+        return stream;
+    }
 
     /// <summary>
     /// Whether the session's version is traced: <see cref="TracesHttp3Streams" /> for HTTP/3,
@@ -1633,10 +1665,12 @@ public sealed class HttpProtocolHandler(
     /// <summary>
     /// Reads the response head; on a reused connection, a reply that cannot begin <c>HTTP/</c>
     /// fails with exit 8, <c>Invalid status line</c>, as curl 8.21.0 never takes HTTP/0.9 on
-    /// a reused connection (upstream test1479), rather than with exit 1.
+    /// a reused connection (upstream test1479), rather than with exit 1. A failure that carries
+    /// the head bytes accepted before it writes them to the header output first (test580).
     /// </summary>
-    private static async ValueTask<HttpResponseHead> ReadHeadAsync(HttpResponseHeadReader headReader, bool newConnection, CancellationToken cancellationToken)
+    private static async ValueTask<HttpResponseHead> ReadHeadAsync(HttpResponseHeadReader headReader, Stream? headerOutput, bool newConnection, CancellationToken cancellationToken)
     {
+        HttpTransferException headFailure;
         try
         {
             return await headReader.ReadAsync(cancellationToken).ConfigureAwait(false);
@@ -1645,6 +1679,13 @@ public sealed class HttpProtocolHandler(
         {
             throw new HttpTransferException(CurlExitCode.WeirdServerReply, HttpTransferMessages.InvalidStatusLine);
         }
+        catch (HttpTransferException failure) when (failure.HeadBytesBeforeFailure.Length > 0)
+        {
+            headFailure = failure;
+        }
+
+        await WriteHeadersAsync(headerOutput, headFailure.HeadBytesBeforeFailure, cancellationToken).ConfigureAwait(false);
+        throw headFailure;
     }
 
     /// <summary>
@@ -2077,12 +2118,13 @@ public sealed class HttpProtocolHandler(
     /// <summary>
     /// Decides whether <paramref name="plan" /> may be sent again on a fresh connection: it went
     /// out on a reused one, it has not already been sent again, and its body, if any, is bytes
-    /// that can be sent again.
+    /// that can be sent again or an empty stream, which has nothing to rewind (a libcurl handle's
+    /// zero-byte MIME post, upstream test584, BL-2620).
     /// </summary>
     private static bool CanSendAgainOnFreshConnection(HttpRequestPlan plan, bool reusedConnection) =>
         reusedConnection
             && !plan.SentOnFreshConnection
-            && plan.Framing.Body is not StreamBody;
+            && plan.Framing.Body is not StreamBody { Length: not 0 };
 
     /// <summary>
     /// Fails a request before any byte of it is sent, as curl 8.21.0 does once connected: a

@@ -36,12 +36,17 @@ namespace Curl.Engine;
 /// <param name="timeProvider">The clock the timeout and the waits are measured on.</param>
 /// <param name="socketPoller">Checks the extra sockets a wait or poll is given.</param>
 /// <param name="closeIdleConnections">Closes the engine's idle connections, for <see cref="CurlNetworkChange.ClearConnections" /> (<see cref="ConnectionCache.CloseIdleAsync" />).</param>
+/// <param name="closeIdleConnectionsBeyond">
+/// Closes the engine's oldest idle connections beyond a count, after each transfer ends, for
+/// <see cref="MultiOptions.MaxConnects" /> (<see cref="ConnectionCache.CloseIdleBeyondAsync" />).
+/// </param>
 /// <param name="clearDnsCache">Empties the engine's DNS cache, for <see cref="CurlNetworkChange.ClearDns" /> (<see cref="DnsCache.Clear" />).</param>
 internal sealed class ManagedMultiTransfer(
     ConcurrentDictionary<IEasyTransfer, ManagedMultiTransfer> owners,
     TimeProvider timeProvider,
     IWaitSocketPoller socketPoller,
     Func<ValueTask> closeIdleConnections,
+    Func<long, ValueTask> closeIdleConnectionsBeyond,
     Action clearDnsCache) : IMultiTransfer
 {
     private readonly List<MultiEntry> entries = [];
@@ -83,6 +88,12 @@ internal sealed class ManagedMultiTransfer(
     /// below 1 or past <see cref="int.MaxValue" />, as libcurl's <c>CURLMOPT_MAX_CONCURRENT_STREAMS</c> falls back.
     /// </summary>
     internal static long DefaultConcurrentStreams { get; } = 100;
+
+    /// <summary>
+    /// Gets the connections the engine keeps for each transfer in the handle when <see cref="MultiOptions.MaxConnects" />
+    /// is 0 or less, as libcurl's <c>CURLMOPT_MAXCONNECTS</c> default does.
+    /// </summary>
+    internal static long DefaultConnectsPerTransfer { get; } = 4;
 
     /// <summary>
     /// Gets or sets every option of the handle (<c>curl_multi_setopt</c>). <c>CURLMOPT_NETWORK_CHANGED</c>
@@ -831,12 +842,31 @@ internal sealed class ManagedMultiTransfer(
         int ready = 0;
         for (int index = 0; index < sockets.Length; index++)
         {
-            CurlWaitEvents returned = socketPoller.Poll(sockets[index].Socket, sockets[index].Events);
+            CurlWaitEvents returned = PollWaitSocket(sockets[index].Socket, sockets[index].Events);
             sockets[index] = sockets[index] with { ReturnedEvents = returned };
             ready += returned == CurlWaitEvents.None ? 0 : 1;
         }
 
         return ready;
+    }
+
+    /// <summary>
+    /// The events of <paramref name="events" /> an extra socket has now: for the socket number
+    /// <c>CURLINFO_ACTIVESOCKET</c> gave a connect-only transfer in the handle, its connection's readiness
+    /// (<see cref="ManagedEasyTransfer.ConnectOnlyReadyEvents" />, upstream test677, BL-2633), else what
+    /// <see cref="IWaitSocketPoller" /> answers for the operating system socket.
+    /// </summary>
+    private CurlWaitEvents PollWaitSocket(CurlSocket socket, CurlWaitEvents events)
+    {
+        foreach (MultiEntry entry in entries)
+        {
+            if (entry.Transfer is ManagedEasyTransfer easy && easy.ConnectOnlyReadyEvents(socket, events) is { } ready)
+            {
+                return ready;
+            }
+        }
+
+        return socketPoller.Poll(socket, events);
     }
 
     private bool WaitEnds(TimeSpan left, int extraSocketCount, bool poll)
@@ -891,6 +921,18 @@ internal sealed class ManagedMultiTransfer(
         // Done before the result is read, so a perform that threw is not read again.
         entry.Done = true;
         QueueDoneMessage(entry, entry.Perform.GetAwaiter().GetResult());
+        CloseIdleConnectionsBeyondMaxConnects();
+    }
+
+    /// <summary>
+    /// Closes the engine's oldest idle connections beyond <see cref="MultiOptions.MaxConnects" />, or 4 for
+    /// each transfer in the handle when it is 0 or less, as libcurl's pool does when a transfer hands its
+    /// connection back.
+    /// </summary>
+    private void CloseIdleConnectionsBeyondMaxConnects()
+    {
+        long keep = Options.MaxConnects > 0 ? Options.MaxConnects : DefaultConnectsPerTransfer * entries.Count;
+        idleConnectionsClosing = Task.WhenAll(idleConnectionsClosing, closeIdleConnectionsBeyond(keep).AsTask());
     }
 
     /// <summary>

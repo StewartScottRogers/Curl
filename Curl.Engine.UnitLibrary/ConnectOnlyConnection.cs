@@ -1,5 +1,7 @@
+using Curl.Api.Callbacks;
 using Curl.Api.Codes;
 using Curl.Api.EngineContracts.ConnectOnly;
+using Curl.Api.EngineContracts.Multi;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Engine;
@@ -22,6 +24,12 @@ internal sealed class ConnectOnlyConnection(Func<bool> isConnectOnly) : IConnect
         "https", "ftps", "gophers", "imaps", "ldaps", "mqtts", "pop3s", "smbs", "smtps", "wss",
     };
 
+    /// <summary>The read size a wait for <see cref="CurlWaitEvents.PollIn" /> starts a read with, before any receive names one.</summary>
+    private const int WaitReadLength = 16 * 1024;
+
+    /// <summary>The next socket number <see cref="OpenAsync" /> gives, shared by every handle in the process.</summary>
+    private static long nextSocket = FirstSocket;
+
     private IConnection? connection;
 
     private Task<int>? pendingRead;
@@ -37,14 +45,53 @@ internal sealed class ConnectOnlyConnection(Func<bool> isConnectOnly) : IConnect
     /// <returns><see langword="true" /> for a TLS scheme such as <c>https</c>.</returns>
     internal static bool UsesTls(string scheme) => TlsSchemes.Contains(scheme);
 
-    /// <summary>Closes the connection open now, if any, and keeps <paramref name="opened" /> in its place.</summary>
+    /// <summary>
+    /// Gets the first socket number a connection is given. The managed engine's connections are not operating
+    /// system descriptors, so each opened connection is one number of the engine's own, above any descriptor a
+    /// process is likely to hold and apart from <see cref="ManagedMultiTransfer.FirstTransferSocket" />'s numbers.
+    /// </summary>
+    internal const long FirstSocket = 0x6000_0000;
+
+    /// <summary>
+    /// Gets the socket number of the connection open now, for <c>CURLINFO_ACTIVESOCKET</c> and
+    /// <c>CURLINFO_LASTSOCKET</c>, or <see cref="CurlSocket.Bad" /> while none is open or the handle's options no
+    /// longer ask for connect-only (ADR-0549, BL-2633).
+    /// </summary>
+    internal CurlSocket Socket { get; private set; } = CurlSocket.Bad;
+
+    /// <summary>Gets the socket number of the connection open now while the options ask for connect-only, else <see cref="CurlSocket.Bad" />.</summary>
+    internal CurlSocket LiveSocket => LiveConnection() is null ? CurlSocket.Bad : Socket;
+
+    /// <summary>Closes the connection open now, if any, and keeps <paramref name="opened" /> in its place under a new socket number.</summary>
     /// <param name="opened">The connection the connect-only perform made.</param>
     /// <returns>A task that completes once the earlier connection is closed.</returns>
     internal async ValueTask OpenAsync(IConnection opened)
     {
         await CloseAsync().ConfigureAwait(false);
         connection = opened;
+        Socket = new CurlSocket((nint)Interlocked.Increment(ref nextSocket));
     }
+
+    /// <summary>
+    /// The events of <paramref name="events" /> the connection is ready for now, as <c>poll</c> answers for
+    /// libcurl's socket in <c>curl_multi_wait</c>'s extra sockets: <see cref="CurlWaitEvents.PollOut" /> while no
+    /// send is still running, and <see cref="CurlWaitEvents.PollIn" /> once bytes, or the peer's close, wait to be
+    /// received; a wait for <see cref="CurlWaitEvents.PollIn" /> starts the read a receive would.
+    /// </summary>
+    /// <param name="events">The events the caller waits for.</param>
+    /// <returns>The events that happened, or <see cref="CurlWaitEvents.None" /> while no connection is live.</returns>
+    internal CurlWaitEvents ReadyEvents(CurlWaitEvents events)
+    {
+        return LiveConnection() is { } live ? WritableEvents(events) | ReadableEvents(live, events) : CurlWaitEvents.None;
+    }
+
+    private CurlWaitEvents WritableEvents(CurlWaitEvents events) =>
+        events.HasFlag(CurlWaitEvents.PollOut) && pendingSend is not { IsCompleted: false } ? CurlWaitEvents.PollOut : CurlWaitEvents.None;
+
+    private CurlWaitEvents ReadableEvents(IConnection live, CurlWaitEvents events) =>
+        events.HasFlag(CurlWaitEvents.PollIn) && IsReadable(live) ? CurlWaitEvents.PollIn : CurlWaitEvents.None;
+
+    private bool IsReadable(IConnection live) => !unread.IsEmpty || (pendingRead ??= StartRead(live, WaitReadLength)).IsCompleted;
 
     /// <summary>Closes the connection open now, if any, forgetting any bytes read and not yet received.</summary>
     /// <returns>A task that completes once the connection is closed.</returns>
@@ -52,6 +99,7 @@ internal sealed class ConnectOnlyConnection(Func<bool> isConnectOnly) : IConnect
     {
         IConnection? open = connection;
         connection = null;
+        Socket = CurlSocket.Bad;
         pendingRead = null;
         pendingSend = null;
         unread = default;

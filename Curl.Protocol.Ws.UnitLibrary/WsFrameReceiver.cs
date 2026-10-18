@@ -29,6 +29,11 @@ namespace Curl.Protocol.Ws;
 /// <c>--max-filesize</c>: how many frame bytes, heads included, may be decoded before the
 /// transfer fails with exit 63; <see langword="null" /> or 0 is no limit (BL-1294).
 /// </param>
+/// <param name="rawMode">
+/// <c>CURLWS_RAW_MODE</c>: every byte received is handed on as it came, frame heads included, with
+/// nothing decoded and no pong sent, as curl 8.22.0's <c>ws_cw_write</c> passes the stream to the
+/// next writer under <c>ws_raw_mode</c> (BL-2494).
+/// </param>
 /// <remarks>
 /// Measured against curl 8.21.0 (BL-581): a close frame is neither answered nor the end, so
 /// reading goes on until the connection closes; every ping answered is echoed in one pong,
@@ -40,7 +45,7 @@ namespace Curl.Protocol.Ws;
 /// those are decoded and their payload handed on, and the transfer fails with exit 63 and no
 /// pong; a read that reaches the limit exactly does not fail (BL-1294).
 /// </remarks>
-internal sealed class WsFrameReceiver(IConnection connection, IWebSocketRandomSource randomSource, ITransferProgress progress, ITransferEvents events, IDiagnosticLog? diagnosticLog = null, WsFrameTrace? trace = null, long? maxFileSize = null)
+internal sealed class WsFrameReceiver(IConnection connection, IWebSocketRandomSource randomSource, ITransferProgress progress, ITransferEvents events, IDiagnosticLog? diagnosticLog = null, WsFrameTrace? trace = null, long? maxFileSize = null, bool rawMode = false)
 {
     private const int ReadBufferSize = 16384;
 
@@ -120,8 +125,15 @@ internal sealed class WsFrameReceiver(IConnection connection, IWebSocketRandomSo
         int allowed = LengthUnderMaxFileSize(received.Length);
         BytesReceived += allowed;
         progress.ReportDownloaded(BytesReceived, null);
-        await DeliverAsync(decoder.Decode(received.Span[..allowed]), writePayload, isCut: allowed < received.Length, cancellationToken).ConfigureAwait(false);
+        await DeliverAsync(Decode(received.Span[..allowed]), writePayload, isCut: allowed < received.Length, cancellationToken).ConfigureAwait(false);
     }
+
+    /// <summary>
+    /// Decodes <paramref name="bytes" /> into the payload curl writes, or under <c>rawMode</c> hands
+    /// them on undecoded, with no ping to answer and no violation to fail on.
+    /// </summary>
+    private WsDecodedBytes Decode(ReadOnlySpan<byte> bytes) =>
+        rawMode ? new WsDecodedBytes(bytes.ToArray(), LastPing: null, Failure: null) : decoder.Decode(bytes);
 
     /// <summary>
     /// Gives how many of the <paramref name="length" /> bytes just received stay under

@@ -8,7 +8,8 @@ It contains only attribute wiring and forwarding calls: the generic host, the st
 `[McpServerToolType]` classes whose methods each forward to one `Curl.Mcp.UnitLibrary` call
 (`CurlCommandTool`, the `curl` tool; `CurlTransferTool`, the `transfer` tool over a production
 `ManagedCurlEngine` the host creates once, as `Libcurl` does; `CurlVersionTool`, the `version` tool
-over that same engine), the `--ai-help` resource handlers over
+over that same engine; `CurlUrlTool`, the `parse_url` and `build_url` tools over that engine's URL
+handles), the `--ai-help` resource handlers over
 `McpAiHelpResourceCatalogue` (`CurlAiHelpResourceHandlers`, ADR-0589), the runner adapters over `Curl.Console` and the engine
 (`InProcessCurlCommandRunner`), and the source-generated JSON context. Tool logic - checking,
 capping, turning a result into an error - lives in `Curl.Mcp.UnitLibrary`, never here; a branch
@@ -28,5 +29,5 @@ which tests both this project and `Curl.Mcp.UnitLibrary`; tests that send bytes 
 live in `Curl.Mcp.IntegrationTests` (ADR-0421).
 
 It packs as a NuGet MCP server (ADR-0596): `dotnet pack` makes a `.NET` tool of `PackageType` `McpServer`
-with `.mcp/server.json`, one self-contained package per runtime; the version in the csproj and in
+with `.mcp/server.json`, and one native-AOT package per runtime, packed with `-r <rid>` on its own OS: the csproj sets `PublishAot` (ADR-0621, BL-2517); the version in the csproj and in
 `server.json` are held equal by `McpPackagingTests`.

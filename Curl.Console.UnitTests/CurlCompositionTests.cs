@@ -164,6 +164,7 @@ public sealed partial class CurlCompositionTests
     // IPFS_GATEWAY is set in this process only, to a gateway curl refuses (it has a query), so
     // the run reads the variable and stops with exit 3 before any connection.
     [TestMethod]
+    [DoNotParallelize]
     public async Task CreateRunner_IpfsUrl_ReadsTheGatewayFromTheProcessEnvironment()
     {
         string? saved = Environment.GetEnvironmentVariable(IpfsGatewayRewriter.GatewayVariableName);

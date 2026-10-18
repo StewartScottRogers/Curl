@@ -20,6 +20,13 @@ internal static class HttpTransferMessages
     internal const string Http09NotAllowed = "Received HTTP/0.9 when not allowed";
 
     /// <summary>
+    /// The <c>-v</c> line curl 8.22.0's <c>add_last_chunk</c> writes for a trailer line from
+    /// <c>CURLOPT_TRAILERFUNCTION</c> whose first colon is not followed by a space, which it skips
+    /// (read from upstream's <c>lib/http_chunks.c</c>, BL-2475).
+    /// </summary>
+    internal const string MalformattedTrailer = "Malformatted trailing header, skipping trailer";
+
+    /// <summary>
     /// The exit 1 message for an <c>HTTP/1</c> status line that is not <c>HTTP/1.0</c> or
     /// <c>HTTP/1.1</c> followed by a blank and three digits.
     /// </summary>
@@ -30,6 +37,18 @@ internal static class HttpTransferMessages
     /// 1, 2 or 3.
     /// </summary>
     internal const string UnsupportedHttpVersion = "Unsupported HTTP version in response";
+
+    /// <summary>
+    /// The exit 1 message for an <c>HTTP/3</c> status line over HTTP/1.x, as curl's OpenSSL
+    /// build writes it (measured, BL-2715 Notes).
+    /// </summary>
+    internal const string UnsupportedHttp3Version = "Unsupported HTTP version (3.0) in response";
+
+    /// <summary>
+    /// The exit 8 message for an <c>HTTP/2</c> status line over HTTP/1.x, as curl's OpenSSL
+    /// build writes it (measured, upstream test1704, BL-2715 Notes).
+    /// </summary>
+    internal const string VersionMismatchFromHttp1ToHttp2 = "Version mismatch (from HTTP/1 to HTTP/2)";
 
     /// <summary>
     /// The exit 1 message for a status code below 100.

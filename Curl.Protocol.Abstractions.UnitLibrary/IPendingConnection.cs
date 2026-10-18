@@ -19,6 +19,14 @@ public interface IPendingConnection : IAsyncDisposable
     EndPoint LocalEndPoint { get; }
 
     /// <summary>
+    /// Gets whether the peer has already connected, so <see cref="AcceptAsync(CancellationToken)" />
+    /// returns without waiting: curl 8.22.0's <c>ftp_do_more</c> accepts such a connection right
+    /// after <c>EPRT</c> or <c>PORT</c> is answered (upstream test 766). <see langword="false" />
+    /// unless an implementation can tell.
+    /// </summary>
+    bool HasConnectionWaiting => false;
+
+    /// <summary>
     /// Waits for the peer to connect and returns the connection.
     /// </summary>
     /// <param name="cancellationToken">Cancels the wait.</param>

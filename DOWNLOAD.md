@@ -6,9 +6,10 @@ with no .NET runtime to install. Every package is built by the
 [GitHub release](https://github.com/StewartScottRogers/Curl/releases) with a
 `SHA256SUMS` file.
 
-> **Status:** the port is in Phase 1. Until the option parser and transfer engine land,
-> the binary starts, prints `curl: not implemented yet` and exits with code 2
-> (`CURLE_FAILED_INIT`). Keep your system curl on PATH ahead of it for now.
+> **Status:** the port is still in progress. The binary parses curl's options, runs
+> transfers and returns curl's exit codes, but it does not yet match upstream curl
+> everywhere (see the [gap dashboard](https://stewartscottrogers.github.io/Curl/gaps/)).
+> Keep your system curl on PATH ahead of it until you have checked your scripts against it.
 
 ## Supported platforms
 
@@ -26,6 +27,38 @@ Current version: **[v0.1.0-preview.1](https://github.com/StewartScottRogers/Curl
 Checksums: [SHA256SUMS](https://github.com/StewartScottRogers/Curl/releases/download/v0.1.0-preview.1/SHA256SUMS).
 Older versions are on the [releases page](https://github.com/StewartScottRogers/Curl/releases).
 Linux packages are built on Ubuntu 22.04 and need glibc 2.35 or newer (Ubuntu 22.04, Debian 12 and later). Alpine and other musl-based distributions are not supported yet. Windows and macOS versions follow the [.NET 10 supported OS list](https://github.com/dotnet/core/blob/main/release-notes/10.0/supported-os.md).
+
+## Curl.Mcp (MCP server for AI agents)
+
+Curl.Mcp runs Curl for AI agents over the Model Context Protocol (standard input and
+output). Its seven NuGet packages are attached to each release, at the release's version.
+**They are not on nuget.org yet**; that waits until the port is complete, so install from
+a folder. See [Curl.Mcp/README.md](Curl.Mcp/README.md) for the tools it offers.
+
+| Package | What it is |
+| --- | --- |
+| [Curl.Mcp](https://github.com/StewartScottRogers/Curl/releases/download/v0.2.0-preview.1/Curl.Mcp.0.2.0-preview.1.nupkg) | The tool package (`curl-mcp`) with `.mcp/server.json` |
+| [Curl.Mcp.win-x64](https://github.com/StewartScottRogers/Curl/releases/download/v0.2.0-preview.1/Curl.Mcp.win-x64.0.2.0-preview.1.nupkg) | Windows x64 |
+| [Curl.Mcp.win-arm64](https://github.com/StewartScottRogers/Curl/releases/download/v0.2.0-preview.1/Curl.Mcp.win-arm64.0.2.0-preview.1.nupkg) | Windows Arm64 |
+| [Curl.Mcp.linux-x64](https://github.com/StewartScottRogers/Curl/releases/download/v0.2.0-preview.1/Curl.Mcp.linux-x64.0.2.0-preview.1.nupkg) | Linux x64 |
+| [Curl.Mcp.linux-arm64](https://github.com/StewartScottRogers/Curl/releases/download/v0.2.0-preview.1/Curl.Mcp.linux-arm64.0.2.0-preview.1.nupkg) | Linux Arm64 |
+| [Curl.Mcp.osx-x64](https://github.com/StewartScottRogers/Curl/releases/download/v0.2.0-preview.1/Curl.Mcp.osx-x64.0.2.0-preview.1.nupkg) | macOS Intel |
+| [Curl.Mcp.osx-arm64](https://github.com/StewartScottRogers/Curl/releases/download/v0.2.0-preview.1/Curl.Mcp.osx-arm64.0.2.0-preview.1.nupkg) | macOS Apple silicon |
+
+The links point at v0.2.0-preview.1, the first release to carry the Curl.Mcp packages;
+they work once that tag exists.
+
+To run one without nuget.org, download all seven into one folder and install from it
+(the tool package picks the matching `Curl.Mcp.<rid>` package from the same folder):
+
+```sh
+dotnet tool install --global --add-source ./folder-with-the-packages Curl.Mcp --prerelease
+CURL_MCP_ROOT="$HOME/curl-work" curl-mcp
+```
+
+`CURL_MCP_ROOT` is required: it is the directory every file curl reads or writes must lie
+inside. `CURL_MCP_MAX_RESPONSE_BYTES` caps the output a tool returns (1048576 when unset).
+Verify each download against the release's `SHA256SUMS`, which covers the `.nupkg` files too.
 
 ## Install with one command
 

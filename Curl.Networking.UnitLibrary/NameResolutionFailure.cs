@@ -8,7 +8,8 @@ namespace Curl.Networking;
 /// <c>Could not resolve host: &lt;host&gt;</c> (or <c>proxy</c>), followed, when the resolver said
 /// why, by the reason in brackets as curl's c-ares build prints it, or exit 43
 /// <c>Error 43 resolving &lt;host&gt;:&lt;port&gt;</c> when the c-ares options did not parse
-/// (measured on curl 8.22.0 with c-ares 1.34.8, BL-643, BL-694).
+/// (measured on curl 8.22.0 with c-ares 1.34.8, BL-643, BL-694). A lookup the resolver-start callback refused
+/// keeps the plain message but is exit 42, as upstream's test655 requires (BL-2627).
 /// </summary>
 internal static class NameResolutionFailure
 {
@@ -28,6 +29,7 @@ internal static class NameResolutionFailure
 
         var reason = DnsLookupFailureText.Describe(failure);
         var suffix = reason.Length == 0 ? string.Empty : $" ({reason})";
-        return (notResolved, CurlErrorBuffer.Truncate($"Could not resolve {subject}: {host}{suffix}"));
+        var exitCode = failure == DnsLookupFailure.AbortedByCallback ? CurlExitCode.AbortedByCallback : notResolved;
+        return (exitCode, CurlErrorBuffer.Truncate($"Could not resolve {subject}: {host}{suffix}"));
     }
 }

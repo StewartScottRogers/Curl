@@ -31,6 +31,26 @@ public sealed class SshOptionsTests
         Assert.IsNull(options.HostPublicKeyMd5);
         Assert.IsNull(options.HostPublicKeySha256);
         Assert.IsFalse(options.Compression);
+        Assert.IsNull(options.HostKeyAcceptance);
+        Assert.IsNull(options.KnownHostDecision);
+    }
+
+    [TestMethod]
+    public void SshOptions_HostKeyCallbacksSet_ReadBackTheSameDelegates()
+    {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        Func<string, ReadOnlyMemory<byte>, bool> acceptance = (_, _) => true;
+        Func<SshKnownHostQuery, SshKnownHostVerdict> decision = query => query.Match == SshKnownHostMatch.Match ? SshKnownHostVerdict.Accept : SshKnownHostVerdict.Defer;
+        diagnostics.Arrange("callbacks", "host key acceptance and known host decision");
+
+        var options = new SshOptions { HostKeyAcceptance = acceptance, KnownHostDecision = decision };
+        SshKnownHostVerdict verdict = options.KnownHostDecision!(new SshKnownHostQuery("ssh-ed25519", new byte[] { 1 }, "AAAA", SshKnownHostMatch.Mismatch));
+
+        diagnostics.Act("verdict for a mismatch", verdict);
+        diagnostics.Assert("verdict for a mismatch", SshKnownHostVerdict.Defer, verdict);
+        Assert.AreSame(acceptance, options.HostKeyAcceptance);
+        Assert.AreSame(decision, options.KnownHostDecision);
+        Assert.AreEqual(SshKnownHostVerdict.Defer, verdict);
     }
 
     [TestMethod]

@@ -15,8 +15,29 @@ internal sealed class EasyPauseGate
 
     private TaskCompletionSource resumed = NewResumed();
 
+    private int unpauses;
+
+    private Action? pausedTick;
+
+    private TimeProvider clock = TimeProvider.System;
+
+    /// <summary>How long a paused wait goes between ticks: libcurl's <c>curl_easy_perform</c> polls for at most 1000 ms.</summary>
+    internal static readonly TimeSpan PausedTickInterval = TimeSpan.FromSeconds(1);
+
     /// <summary>Gets the directions left paused.</summary>
     internal CurlPause Directions { get; private set; }
+
+    /// <summary>Gets how many times <see cref="Set" /> has run; a stream reads it before calling its callback so <see cref="Pause" /> can tell whether an unpause arrived meanwhile.</summary>
+    internal int Unpauses
+    {
+        get
+        {
+            lock (gate)
+            {
+                return unpauses;
+            }
+        }
+    }
 
     /// <summary>Leaves <paramref name="directions" /> paused and resumes every other direction, as <c>curl_easy_pause</c> does.</summary>
     /// <param name="directions">The directions to leave paused.</param>
@@ -26,6 +47,7 @@ internal sealed class EasyPauseGate
         lock (gate)
         {
             Directions = directions;
+            unpauses++;
             released = resumed;
             resumed = NewResumed();
         }
@@ -35,11 +57,15 @@ internal sealed class EasyPauseGate
 
     /// <summary>Pauses <paramref name="direction" />, keeping the other direction as it is.</summary>
     /// <param name="direction">The direction a callback paused.</param>
-    internal void Pause(CurlPause direction)
+    /// <param name="unpausesBeforeCallback">What <see cref="Unpauses" /> was before the callback ran; a <see cref="Set" /> since then already happened, so the pause is not recorded.</param>
+    internal void Pause(CurlPause direction, int unpausesBeforeCallback)
     {
         lock (gate)
         {
-            Directions |= direction;
+            if (unpauses == unpausesBeforeCallback)
+            {
+                Directions |= direction;
+            }
         }
     }
 
@@ -51,7 +77,53 @@ internal sealed class EasyPauseGate
     {
         while (WaitFor(direction) is { } released)
         {
+            await WaitOrTickAsync(released, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// Has every <see cref="PausedTickInterval" /> a transfer spends waiting in <see cref="WhenResumedAsync" /> call
+    /// <paramref name="tick" />, the perform's progress callback, as libcurl's <c>curl_easy_perform</c> wakes at least
+    /// once a second while paused and calls <c>CURLOPT_XFERINFOFUNCTION</c>, which may unpause the handle (upstream
+    /// tests 671 and 673, BL-2631); <see langword="null" /> calls nothing.
+    /// </summary>
+    /// <param name="tick">What a paused wait calls each interval, or <see langword="null" />.</param>
+    /// <param name="timeProvider">The clock the interval is measured on.</param>
+    internal void TickWhilePaused(Action? tick, TimeProvider timeProvider)
+    {
+        lock (gate)
+        {
+            pausedTick = tick;
+            clock = timeProvider;
+        }
+    }
+
+    /// <summary>Waits for <paramref name="released" />, or, with a tick set, up to <see cref="PausedTickInterval" /> and then ticks.</summary>
+    /// <param name="released">The task the next <see cref="Set" /> completes.</param>
+    /// <param name="cancellationToken">Stops the wait.</param>
+    /// <returns>A task that completes once released or ticked.</returns>
+    private async Task WaitOrTickAsync(Task released, CancellationToken cancellationToken)
+    {
+        Action? tick;
+        TimeProvider timeProvider;
+        lock (gate)
+        {
+            (tick, timeProvider) = (pausedTick, clock);
+        }
+
+        if (tick is null)
+        {
             await released.WaitAsync(cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        try
+        {
+            await released.WaitAsync(PausedTickInterval, timeProvider, cancellationToken).ConfigureAwait(false);
+        }
+        catch (TimeoutException)
+        {
+            tick();
         }
     }
 

@@ -255,6 +255,7 @@ public static class CommandLineParser
         foreach (CommandLineOptions group in options.Groups)
         {
             group.ReadMissingPasswords(passwordPrompt);
+            CaCertificateEnvironment.Apply(group);
         }
 
         return Finish(options);

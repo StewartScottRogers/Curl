@@ -897,12 +897,97 @@ public sealed class TransferContextFactoryTests
         Assert.AreEqual(expected, context.ConnectTimeout);
     }
 
+    // CURLOPT_ACCEPTTIMEOUT_MS reaches the FTP handler; zero is libcurl's not set, curl's 60 seconds (BL-2622).
+    [TestMethod]
+    [DataRow(0, 60000)]
+    [DataRow(8000, 8000)]
+    public void Create_NetworkOptionsAcceptTimeout_IsTheContextsFtpAcceptTimeoutWithZeroAsSixtySeconds(int milliseconds, int expectedMilliseconds)
+    {
+        using MemoryStream standardInput = new();
+        using MemoryStream output = new();
+        EasyNetworkOptions network = new() { AcceptTimeout = TimeSpan.FromMilliseconds(milliseconds) };
+        Diagnostics.Arrange("network.AcceptTimeout", network.AcceptTimeout);
+
+        TransferContext context = new TransferContextFactory(standardInput)
+            .Create(EasyOptionsFromCommandLine.TransferSettingsOf(Parse("ftp://h/f")), HttpOf("ftp://h/f"), new EasyBehaviourOptions(), new EasyTransferOptions(), new EasyProtocolOptions(), new EasyProxyOptions(), new EasyAuthenticationOptions(), network, CurlUrl.Parse("ftp://h/f"), output, null, null, null);
+        Diagnostics.Act("context.FtpAcceptTimeout", context.FtpAcceptTimeout);
+
+        Diagnostics.Assert("context.FtpAcceptTimeout", TimeSpan.FromMilliseconds(expectedMilliseconds), context.FtpAcceptTimeout);
+        Assert.AreEqual(TimeSpan.FromMilliseconds(expectedMilliseconds), context.FtpAcceptTimeout);
+    }
+
     private CommandLineOptions Parse(params string[] arguments)
     {
         Diagnostics.Arrange("command line", string.Join(' ', arguments));
         CommandLineParseResult parsed = CommandLineParser.Parse(arguments, _ => true);
         Assert.IsTrue(parsed.IsAccepted);
         return parsed.Options;
+    }
+
+    [TestMethod]
+    [DataRow("http://example.com/")]
+    [DataRow("https://example.com/")]
+    [DataRow("ws://example.com/")]
+    [DataRow("wss://example.com/")]
+    public void Create_SaslAuthzidWithNtlmAndNoUser_CarriesEmptyCredentials(string url)
+    {
+        string[] arguments = ["--sasl-authzid", "x", "--ntlm", url];
+
+        TransferContext context = CreateContext(arguments, url);
+        Diagnostics.Act("context URL", context.Url.OriginalString);
+
+        Diagnostics.Assert("context.Credentials user:password", ":", $"{context.Credentials?.UserName}:{context.Credentials?.Password}");
+        Assert.AreEqual(string.Empty, context.Credentials!.UserName);
+        Assert.AreEqual(string.Empty, context.Credentials.Password);
+    }
+
+    [TestMethod]
+    [DataRow("http://example.com/", "--basic")]
+    [DataRow("http://example.com/", "--digest")]
+    [DataRow("http://example.com/", "--anyauth")]
+    [DataRow("ftp://example.com/", "--ntlm")]
+    public void Create_SaslAuthzidWithoutNtlmAloneOverHttp_CarriesNoCredentials(string url, string method)
+    {
+        string[] arguments = ["--sasl-authzid", "x", method, url];
+
+        TransferContext context = CreateContext(arguments, url);
+        Diagnostics.Act("context URL", context.Url.OriginalString);
+
+        Diagnostics.Assert("context.Credentials", "null", context.Credentials is null ? "null" : "set");
+        Assert.IsNull(context.Credentials);
+    }
+
+    [TestMethod]
+    public void Create_NtlmWithoutSaslAuthzid_CarriesNoCredentials()
+    {
+        string[] arguments = ["--ntlm", "http://example.com/"];
+
+        TransferContext context = CreateContext(arguments, "http://example.com/");
+        Diagnostics.Act("context URL", context.Url.OriginalString);
+
+        Diagnostics.Assert("context.Credentials", "null", context.Credentials is null ? "null" : "set");
+        Assert.IsNull(context.Credentials);
+    }
+
+    [TestMethod]
+    public void Create_SaslAuthzidWithNtlmAndUser_CarriesTheUser()
+    {
+        string[] arguments = ["--sasl-authzid", "x", "--ntlm", "-u", "bob:pw", "http://example.com/"];
+
+        TransferContext context = CreateContext(arguments, "http://example.com/");
+        Diagnostics.Act("context URL", context.Url.OriginalString);
+
+        Diagnostics.Assert("context.Credentials!.UserName", "bob", context.Credentials!.UserName);
+        Assert.AreEqual("bob", context.Credentials!.UserName);
+    }
+
+    /// <summary>Builds the context of <paramref name="url" /> under the command line <paramref name="arguments" />.</summary>
+    private TransferContext CreateContext(string[] arguments, string url)
+    {
+        using MemoryStream standardInput = new();
+        using MemoryStream output = new();
+        return new TransferContextFactory(standardInput)
+            .Create(EasyOptionsFromCommandLine.TransferSettingsOf(Parse(arguments)), HttpOf(arguments), BehaviourOf(arguments), TransferOf(arguments), ProtocolOf(arguments), ProxyOf(arguments), AuthenticationOf(arguments), NetworkOf(arguments), CurlUrl.Parse(url), output, null, null, null);
     }
 
     /// <summary>A progress sink that records nothing, to tell the context's sink from the one given.</summary>

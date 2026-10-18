@@ -41,20 +41,36 @@ public sealed class HttpStatusLineTests
     [TestMethod]
     [DataRow("HTTP/2 101 OK", true, DisplayName = "HTTP/2 101")]
     [DataRow("HTTP/3 100", true, DisplayName = "HTTP/3 100")]
-    [DataRow("HTTP/2 200 OK", false, DisplayName = "HTTP/2 200 is final")]
-    [DataRow("HTTP/2 10", false, DisplayName = "Too short")]
-    [DataRow("HTTP/2 1x1", false, DisplayName = "Code not digits")]
+    [DataRow("HTTP/2 200 OK", true, DisplayName = "HTTP/2 200")]
+    [DataRow("HTTP/2 99 OK", false, DisplayName = "Two-digit code (measured: assumed 200)")]
+    [DataRow("HTTP/2 abc", false, DisplayName = "Code not digits (measured: assumed 200)")]
+    [DataRow("HTTP/2.0 200 OK", false, DisplayName = "HTTP/2.0 (measured: assumed 200)")]
     [DataRow("HTTP/1.1 101", false, DisplayName = "HTTP/1.1")]
     [DataRow("HTTP/4 101", false, DisplayName = "HTTP/4")]
-    public void IsHttp2OrHttp3Interim_StatusLine_TellsWhetherItIsAnHttp2OrHttp3Interim(string line, bool expected)
+    public void NamesHttp2OrHttp3_StatusLine_TellsWhetherItNamesHttp2OrHttp3(string line, bool expected)
     {
         Diagnostics.Arrange("line", line);
 
-        bool actual = HttpStatusLine.IsHttp2OrHttp3Interim(line);
+        bool actual = HttpStatusLine.NamesHttp2OrHttp3(line);
 
-        Diagnostics.Act("is interim", actual);
-        Diagnostics.Assert("is interim", expected, actual);
+        Diagnostics.Act("names HTTP/2 or HTTP/3", actual);
+        Diagnostics.Assert("names HTTP/2 or HTTP/3", expected, actual);
         Assert.AreEqual(expected, actual);
+    }
+
+    [TestMethod]
+    [DataRow("HTTP/2 101 OK", CurlExitCode.WeirdServerReply, "Version mismatch (from HTTP/1 to HTTP/2)", DisplayName = "HTTP/2 (test1704)")]
+    [DataRow("HTTP/3 200 OK", CurlExitCode.UnsupportedProtocol, "Unsupported HTTP version (3.0) in response", DisplayName = "HTTP/3")]
+    public void RefusalOverHttp1_StatusLine_GivesCurlsOpenSslFailure(string line, CurlExitCode exitCode, string message)
+    {
+        Diagnostics.Arrange("line", line);
+
+        HttpTransferException refusal = HttpStatusLine.RefusalOverHttp1(line);
+
+        Diagnostics.Act("refusal", $"exit code {refusal.ExitCode}, message '{refusal.Message}'");
+        Diagnostics.Assert("exit code", exitCode, refusal.ExitCode);
+        Assert.AreEqual(exitCode, refusal.ExitCode);
+        Assert.AreEqual(message, refusal.Message);
     }
 
     [TestMethod]

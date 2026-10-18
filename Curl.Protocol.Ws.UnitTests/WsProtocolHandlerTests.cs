@@ -293,6 +293,29 @@ public sealed class WsProtocolHandlerTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_RawMode_WritesTheFrameBytesAsTheyCameAndSendsNoPong()
+    {
+        // curl 8.22.0's ws_cw_write passes the body to the next writer unchanged under ws_raw_mode (BL-2494).
+        var diagnostics = TestDiagnostics.For(TestContext);
+        var output = new MemoryStream();
+        var connection = new ScriptedConnection(Bytes(Head101 + "\x81\x02hi"), Bytes("\x89\x01?\x88\x02\x03\xe8"));
+        diagnostics.Arrange("frames", "text hi, then ping ? and close 1000 in a later read");
+
+        TransferResult result = await new WsProtocolHandler(Connector(connection), new RecordingAuthenticator(), new FixedRandomSource()) { RawMode = true }
+            .ExecuteAsync(Context("ws://127.0.0.1:47901/chat", output));
+
+        string actualWritten = Encoding.Latin1.GetString(output.ToArray());
+        diagnostics.Act("result", Describe(result));
+        diagnostics.Act("output", actualWritten);
+        diagnostics.Diff("output", "\x81\x02hi\x89\x01?\x88\x02\x03\xe8", actualWritten);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual("\x81\x02hi\x89\x01?\x88\x02\x03\xe8", actualWritten);
+        Assert.AreEqual(Request, Encoding.Latin1.GetString(connection.Sent));
+        Assert.AreEqual(11L, result.Report!.DownloadSize);
+        Assert.AreEqual(11L, result.Report.DeliveredSize);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_101ThenNoFrame_FailsWithEmptyReplyAndKeepsCode101()
     {
         // Measured: exit 52, "Empty reply from server", -w "0 101 0 102 192".
@@ -361,6 +384,35 @@ public sealed class WsProtocolHandlerTests
         Assert.AreEqual(9L, result.Report.UploadSize);
         Assert.AreEqual(Request.Length + 9L, result.Report.RequestSize);
         CollectionAssert.AreEqual(new[] { "started", "down 4/?", "up 9/9", "done" }, progress.Reports.ToArray());
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_RawModeUpload_SendsTheBytesUnframed()
+    {
+        // curl 8.22.0 Curl_ws_accept (lib/ws.c) adds the cr_ws_read frame-encoding reader only
+        // `if(!data->set.ws_raw_mode)`, so under CURLWS_RAW_MODE the -T body goes out as it is (BL-2526).
+        var connection = new ScriptedConnection(Bytes(Head101 + "\x81\x02ok"));
+        var context = new TransferContext { Url = CurlUrl.Parse("ws://127.0.0.1:47901/chat"), Output = new MemoryStream(), Upload = new MemoryStream(Bytes("abc")) };
+
+        TransferResult result = await new WsProtocolHandler(Connector(connection), new RecordingAuthenticator(), new FixedRandomSource()) { RawMode = true }
+            .ExecuteAsync(context);
+
+        Assert.AreEqual(Request + "abc", Encoding.Latin1.GetString(connection.Sent));
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(3L, result.Report!.UploadSize);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_RawModeUploadReadFails_SendsWhatWasReadBeforeTheFailureUnframed()
+    {
+        var connection = new ScriptedConnection(Bytes(Head101 + "\x81\x02ok"));
+        var context = new TransferContext { Url = CurlUrl.Parse("ws://127.0.0.1:47901/chat"), Output = new MemoryStream(), Upload = new FailingUploadStream(Bytes("a"), new IOException("gone")) };
+
+        TransferResult result = await new WsProtocolHandler(Connector(connection), new RecordingAuthenticator(), new FixedRandomSource()) { RawMode = true }
+            .ExecuteAsync(context);
+
+        Assert.AreEqual(Request + "a", Encoding.Latin1.GetString(connection.Sent));
+        Assert.AreEqual(1L, result.Report!.UploadSize);
     }
 
     [TestMethod]

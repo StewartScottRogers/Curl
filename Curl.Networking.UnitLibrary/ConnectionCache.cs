@@ -73,6 +73,64 @@ public sealed class ConnectionCache(TimeProvider timeProvider) : IAsyncDisposabl
     }
 
     /// <summary>
+    /// Closes the oldest idle connections until no more than <paramref name="keep" /> connections, idle and
+    /// in use, remain or none is idle, as libcurl's connection pool closes its oldest idle connection while
+    /// it holds more than <c>CURLMOPT_MAXCONNECTS</c> (BL-2468). A connection in use is never closed; the ones
+    /// closed leave the cache before this returns its task.
+    /// </summary>
+    /// <param name="keep">The most connections to keep; 0 or less closes every idle one.</param>
+    /// <returns>A task that completes when every connection beyond the cap is closed.</returns>
+    public async ValueTask CloseIdleBeyondAsync(long keep)
+    {
+        List<PoolEntry> closing;
+
+        lock (Gate)
+        {
+            long excess = Idle.Count + Leased.Count - Math.Max(keep, 0);
+            closing = Idle.GetRange(0, (int)Math.Clamp(excess, 0, Idle.Count));
+            Idle.RemoveRange(0, closing.Count);
+        }
+
+        await CloseAllAsync(closing);
+    }
+
+    /// <summary>
+    /// Gets or sets the owner each connection opened from here on, in this asynchronous flow only, belongs to, which
+    /// <see cref="CloseIdleOwnedByAsync" /> closes; <see langword="null" />, the default, for none. A value set inside an
+    /// <see langword="async" /> method reaches the connects it awaits and is undone when it returns, as an
+    /// <see cref="AsyncLocal{T}" />'s is.
+    /// </summary>
+    public object? OpeningOwner
+    {
+        get => _openingOwner.Value;
+        set => _openingOwner.Value = value;
+    }
+
+    private readonly AsyncLocal<object?> _openingOwner = new();
+
+    /// <summary>
+    /// Closes the idle connections opened while <see cref="OpeningOwner" /> was <paramref name="owner" />, as libcurl's
+    /// <c>curl_easy_cleanup</c> closes the connections in the handle's own cache, an FTP one with <c>QUIT</c> (upstream
+    /// test661, BL-2629). A connection in use is never closed; the ones closed leave the cache before this returns its task.
+    /// </summary>
+    /// <param name="owner">The owner whose connections close.</param>
+    /// <returns>A task that completes when every one of them that was idle is closed.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="owner" /> is <see langword="null" />.</exception>
+    public async ValueTask CloseIdleOwnedByAsync(object owner)
+    {
+        ArgumentNullException.ThrowIfNull(owner);
+        List<PoolEntry> closing;
+
+        lock (Gate)
+        {
+            closing = Idle.FindAll(entry => ReferenceEquals(entry.Owner, owner));
+            Idle.RemoveAll(closing.Contains);
+        }
+
+        await CloseAllAsync(closing);
+    }
+
+    /// <summary>
     /// Takes the next connection number, from <c>0</c> across the whole run, whether a TCP
     /// connection, a TFTP channel or a <c>file://</c> transfer takes it (ADR-0109, BL-977).
     /// </summary>

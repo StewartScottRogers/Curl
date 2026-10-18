@@ -44,6 +44,24 @@ public sealed class WsFrameReceiverTests
     }
 
     [TestMethod]
+    public async Task ReceiveAsync_RawMode_HandsOnEveryByteUndecodedAndAnswersNoPing()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        var connection = new ScriptedConnection(Hex("89 02 68 69 ff"));
+        var output = new List<byte>();
+        diagnostics.Arrange("server read", "ping hi, then a byte no frame may start with");
+
+        var receiver = new WsFrameReceiver(connection, MeasuredMask, NoTransferProgress.Instance, NoTransferEvents.Instance, rawMode: true);
+        await receiver.ReceiveAsync(Hex("81 01 61"), Collect(output), CancellationToken.None);
+
+        diagnostics.Bytes("output", output.ToArray());
+        CollectionAssert.AreEqual(Hex("81 01 61 89 02 68 69 ff"), output.ToArray());
+        Assert.IsEmpty(connection.Sent);
+        Assert.AreEqual(8L, receiver.BytesReceived);
+        Assert.AreEqual(8L, receiver.BytesDelivered);
+    }
+
+    [TestMethod]
     public async Task ReceiveAsync_Ping_SendsCurlsMaskedPong()
     {
         var diagnostics = TestDiagnostics.For(TestContext);

@@ -189,6 +189,7 @@ internal sealed class TransferProgressRecorder : ITransferProgress
         HasTransferStarted = true;
         WriteLive();
         progressBar?.ReportTransferStarted();
+        parallelProgress?.ReportTransferStarted();
     }
 
     /// <inheritdoc />

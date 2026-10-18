@@ -15,6 +15,9 @@ public sealed class ScriptedPendingConnection(IPEndPoint localEndPoint, ConnectR
     /// <inheritdoc />
     public EndPoint LocalEndPoint => localEndPoint;
 
+    /// <summary>Gets whether the server has connected already, so curl accepts right after <c>EPRT</c> or <c>PORT</c>.</summary>
+    public bool HasConnectionWaiting { get; init; }
+
     /// <summary>Gets a value indicating whether the listening was stopped.</summary>
     public bool IsDisposed { get; private set; }
 

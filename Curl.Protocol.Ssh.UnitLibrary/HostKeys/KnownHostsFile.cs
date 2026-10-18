@@ -31,7 +31,13 @@ internal sealed class KnownHostsFile
 
     private const int ShortestKeyPart = 20;
 
+    // libssh2's fopen(filename, "w") creates the file 0666, narrowed by the umask.
+    private const UnixFileMode CreateMode =
+        UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.GroupRead | UnixFileMode.GroupWrite | UnixFileMode.OtherRead | UnixFileMode.OtherWrite;
+
     private static readonly char[] Whitespace = [' ', '\t'];
+
+    private static readonly UTF8Encoding Utf8WithoutMark = new(encoderShouldEmitUTF8Identifier: false);
 
     private readonly List<KnownHostsEntry> entries;
 
@@ -146,8 +152,67 @@ internal sealed class KnownHostsFile
 
         KnownHostsEntry? match = candidates.Find(entry => entry.Key == key);
         return match is null
-            ? new KnownHostsLookup(KnownHostsCheck.Mismatch, candidates[0].Key)
-            : new KnownHostsLookup(KnownHostsCheck.Match, match.Key);
+            ? new KnownHostsLookup(KnownHostsCheck.Mismatch, candidates[0].Key) { Entry = candidates[0] }
+            : new KnownHostsLookup(KnownHostsCheck.Match, match.Key) { Entry = match };
+    }
+
+    /// <summary>
+    /// Adds the server's host key as libssh2.c's <c>ssh_knownhost</c> does for an accepted key
+    /// that did not match: <c>libssh2_knownhost_add</c> of the URL's host name, plain and
+    /// without the port, after the entry <c>CURLKHSTAT_FINE_REPLACE</c> deletes.
+    /// </summary>
+    /// <param name="host">The URL's host name.</param>
+    /// <param name="hostKey">The server's host key blob, <c>K_S</c>.</param>
+    /// <param name="replaced">The entry to delete first, or <see langword="null" />.</param>
+    /// <returns>A new file with the entries in libssh2's order, the new one last.</returns>
+    internal KnownHostsFile WithHostKey(string host, byte[] hostKey, KnownHostsEntry? replaced)
+    {
+        string typeName = SshKeyBlobReader.ReadKeyTypeName(hostKey);
+        List<KnownHostsEntry> kept = [.. entries.Where(entry => !ReferenceEquals(entry, replaced))];
+        kept.Add(new KnownHostsEntry(host, [], [], KnownHostKeyTypeNames.FromName(typeName), Convert.ToBase64String(hostKey)) { TypeName = typeName });
+        return new KnownHostsFile(kept, ReadFailed);
+    }
+
+    /// <summary>
+    /// The file's text as <c>libssh2_knownhost_writefile</c> writes it: one line per entry,
+    /// in order, each ended with <paramref name="lineEnding" />.
+    /// </summary>
+    /// <param name="lineEnding">The line ending: libssh2's text-mode <c>fopen</c> writes CRLF on Windows, LF elsewhere.</param>
+    /// <returns>The text.</returns>
+    internal string ToText(string lineEnding) =>
+        string.Concat(entries.Select(entry => entry.ToLine() + lineEnding));
+
+    /// <summary>
+    /// Rewrites the known-hosts file with every entry, as <c>libssh2_knownhost_writefile</c>
+    /// does for <c>CURLKHSTAT_FINE_ADD_TO_FILE</c> and <c>CURLKHSTAT_FINE_REPLACE</c>; a file
+    /// that cannot be opened or written gets curl's <c>WARNING: writing &lt;path&gt; failed</c>
+    /// line, and the key stays accepted.
+    /// </summary>
+    /// <param name="fileSystem">Where the file is written.</param>
+    /// <param name="path">The file's path, from <see cref="SshOptions.KnownHostsPath" />.</param>
+    /// <param name="events">Where the warning goes.</param>
+    /// <param name="cancellationToken">Cancels the write.</param>
+    /// <returns>A task that completes when the file is written or the warning reported.</returns>
+    internal async ValueTask WriteAsync(IFileSystem fileSystem, string path, ITransferEvents events, CancellationToken cancellationToken)
+    {
+        FileOpenResult opened = await fileSystem.OpenForWriteAsync(path, FileWriteMode.Truncate, CreateMode, cancellationToken).ConfigureAwait(false);
+        if (opened.Content is not { } content)
+        {
+            events.ReportInfo(SshInfoLines.KnownHostsWriteFailed(path));
+            return;
+        }
+
+        await using (content.ConfigureAwait(false))
+        {
+            try
+            {
+                await content.WriteAsync(Utf8WithoutMark.GetBytes(ToText(Environment.NewLine)), cancellationToken).ConfigureAwait(false);
+            }
+            catch (IOException)
+            {
+                events.ReportInfo(SshInfoLines.KnownHostsWriteFailed(path));
+            }
+        }
     }
 
     private static bool NamesHostForNarrowing(string name, string host, int port)
@@ -182,29 +247,34 @@ internal sealed class KnownHostsFile
             return false;
         }
 
-        (KnownHostKeyType type, string key) = ReadKey(keyPart);
-        return TryAddNames(trimmed[..namesEnd], type, key, entries);
+        return TryAddNames(trimmed[..namesEnd], ReadKey(keyPart), entries);
     }
 
-    private static (KnownHostKeyType Type, string Key) ReadKey(string keyPart)
+    // The entry the line's key part makes, with no name yet: libssh2 keeps the type's name and
+    // the comment after the key to write the line back.
+    private static KnownHostsEntry ReadKey(string keyPart)
     {
         if (char.IsAsciiDigit(keyPart[0]))
         {
-            return (KnownHostKeyType.Rsa1, keyPart);
+            return new KnownHostsEntry(null, [], [], KnownHostKeyType.Rsa1, keyPart);
         }
 
         int typeEnd = keyPart.IndexOfAny(Whitespace);
         string typeName = typeEnd < 0 ? keyPart : keyPart[..typeEnd];
         string rest = typeEnd < 0 ? string.Empty : keyPart[typeEnd..].TrimStart(Whitespace);
         int keyEnd = rest.IndexOfAny(Whitespace);
-        return (KnownHostKeyTypeNames.FromName(typeName), keyEnd < 0 ? rest : rest[..keyEnd]);
+        return new KnownHostsEntry(null, [], [], KnownHostKeyTypeNames.FromName(typeName), keyEnd < 0 ? rest : rest[..keyEnd])
+        {
+            TypeName = typeName,
+            Comment = keyEnd < 0 ? null : rest[keyEnd..].TrimStart(Whitespace),
+        };
     }
 
-    private static bool TryAddNames(string names, KnownHostKeyType type, string key, List<KnownHostsEntry> entries)
+    private static bool TryAddNames(string names, KnownHostsEntry key, List<KnownHostsEntry> entries)
     {
         if (!names.StartsWith(HashedNamePrefix, StringComparison.Ordinal))
         {
-            entries.AddRange(names.Split(',').Reverse().Select(name => new KnownHostsEntry(name, [], [], type, key)));
+            entries.AddRange(names.Split(',').Reverse().Select(name => key with { PlainName = name }));
             return true;
         }
 
@@ -221,7 +291,7 @@ internal sealed class KnownHostsFile
             return false;
         }
 
-        entries.Add(new KnownHostsEntry(null, salt!, hash!, type, key));
+        entries.Add(key with { Salt = salt!, NameHash = hash! });
         return true;
     }
 }

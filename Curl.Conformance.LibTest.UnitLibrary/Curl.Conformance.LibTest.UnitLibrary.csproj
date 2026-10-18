@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\Curl.Protocol.Abstractions.UnitLibrary\Curl.Protocol.Abstractions.UnitLibrary.csproj" />
+    <ProjectReference Include="..\Libcurl\Libcurl.csproj" />
+  </ItemGroup>
+
+</Project>

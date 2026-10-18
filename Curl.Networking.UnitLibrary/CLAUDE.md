@@ -317,6 +317,9 @@ hands to `FileProtocolHandler`, so a `file://` transfer takes the next number in
 Per ADR-0604 (BL-2427) `ConnectionCache.CloseIdleAsync` closes the idle connections and leaves the
 cache open, and `DnsCache.Clear` drops every entry, `--resolve` ones included: libcurl's
 `CURLMNWC_CLEAR_CONNS` and `CURLMNWC_CLEAR_DNS`, which the engine's multi handle runs.
+Per BL-2468 (ADR-0605) `ConnectionCache.CloseIdleBeyondAsync(keep)` closes the oldest idle connections
+until no more than `keep`, idle and in use, remain, never one in use: the multi handle's `CURLMOPT_MAXCONNECTS`.
+Per ADR-0684 (BL-2629) `ConnectionCache.OpeningOwner`, an `AsyncLocal`, is recorded on each connection a `PoolingConnector` opens in that flow (`PoolEntry.Owner`), and `CloseIdleOwnedByAsync(owner)` closes that owner's idle connections, never one in use: the engine's `curl_easy_cleanup`.
 
 Per BL-717 a pooled connection whose `IConnectionSession` multiplexes (HTTP/2) is shared, not
 checked out: while its session's `ConcurrentTransferLimit` has streams to spare, a transfer with the
@@ -548,7 +551,8 @@ cancels and disposes local UDP sockets without sending anything.
 `SslStreamTlsProviderTests` runs real handshakes against a server-side `SslStream` over
 the in-memory `Fakes/InMemoryDuplexStream` pair, with a self-signed certificate made in
 the test, so TLS is tested without a socket. `TcpConnectionListenerTests` and
-`TcpPendingConnectionTests` bind local TCP sockets without connecting to them. The tests that
+`TcpPendingConnectionTests` bind local TCP sockets without connecting to them
+(`TcpPendingConnection.HasConnectionWaiting`, which polls the listening socket, is pinned on one nothing connects to, BL-2638). The tests that
 connect or send bytes are the loopback tests in `TcpDialerTests` (TCP and Unix socket), `UdpDatagramChannelTests`,
 `TcpConnectorTests.LocalEndPoint` (plain and over TLS) and the accepting test in `TcpConnectionListenerTests`, tagged
 `[TestCategory("Integration")]`, as is `DnsSocketOpenerTests`' TCP connect. Per ADR-0083 the members only those tests can reach,

@@ -157,8 +157,10 @@ public sealed partial class ManagedEasyTransferTests
 
     // What the runner does today around its serial attempt for -b and -c (CurlCommandRunner): the
     // performer's LoadCookieFilesAsync before it and WriteCookieJarAltSvcAndHstsFilesAsync after it.
-    private static async Task<(byte[] Written, byte[] Jar)> PerformWithThePerformersCookieStepsAsync(EasyOptions options)
+    private static async Task<(byte[] Written, byte[] Jar)> PerformWithThePerformersCookieStepsAsync(EasyOptions handleOptions)
     {
+        // The tool sets CURLOPT_USERAGENT itself; the handle's options without one send none (BL-2559).
+        EasyOptions options = ManagedEasyTransfer.WithoutDefaultUserAgent(handleOptions);
         ScriptedConnector connector = new([Encoding.ASCII.GetBytes(SetsCookie)]);
         MemoryFileSystem files = new() { Files = { ["in.txt"] = Encoding.ASCII.GetBytes(CookieFileText) } };
         TransferPerformer performer = new(TimeProvider.System, _ => string.Empty);

@@ -562,6 +562,7 @@ public sealed class PoolingConnector : IConnector, IAsyncDisposable
             connect.MappedPort)
         {
             Session = isQuic ? connect.Connection as IConnectionSession : null,
+            Owner = _cache.OpeningOwner,
         });
         if (!isQuic && MayMultiplex(target, connect))
         {

@@ -124,8 +124,8 @@ internal static class MultipartPartHeaders
     private static string? DefaultContentType(MultipartFormPart part, string? fileName) => part.Kind switch
     {
         MultipartFormPartKind.Multipart => MultipartContentTypeDefault,
-        MultipartFormPartKind.Text => ContentTypeForName(fileName),
-        _ => ContentTypeForName(fileName) ?? FileFallbackContentType(part, fileName),
+        MultipartFormPartKind.FileUpload or MultipartFormPartKind.FileContent => ContentTypeForName(fileName) ?? FileFallbackContentType(part, fileName),
+        _ => ContentTypeForName(fileName),
     };
 
     /// <summary>

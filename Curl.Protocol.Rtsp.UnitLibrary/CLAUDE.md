@@ -19,3 +19,9 @@ Diagnostic log (`--log-level`, ADR-0222, BL-929): `RtspTransferLog` writes under
 session ID (`info`), each reply header's name (`verbose`), a head the server closed before
 its blank line (`warning`) - and, for every transfer, its end: bytes and milliseconds at
 `info`, or its `CurlExitCode` at `error`. Header values and credentials are never written.
+
+Interleaved RTP (BL-2477, ADR-0612): `RtspInterleavedFrameFilter` splits each `$` frame out of
+the bytes read before a reply, or during a `RECEIVE` (`RtspProtocolHandler.ReceiveAsync`), and
+hands it whole to the `IRtspInterleaveSink` injected into `RtspProtocolHandler`. With none, frames
+before a reply are skipped as the curl tool skips them, and a `RECEIVE` writes its frames to the
+body output (`RtspStreamInterleaveSink`). A sink that takes too few bytes fails with 23.

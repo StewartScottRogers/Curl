@@ -78,7 +78,6 @@
     <ProjectReference Include="..\Curl.Api.UnitLibrary\Curl.Api.UnitLibrary.csproj" />
     <ProjectReference Include="..\Curl.Authentication.UnitLibrary\Curl.Authentication.UnitLibrary.csproj" />
     <ProjectReference Include="..\Curl.Cli.UnitLibrary\Curl.Cli.UnitLibrary.csproj" />
-    <ProjectReference Include="..\Curl.Engine.UnitLibrary\Curl.Engine.UnitLibrary.csproj" />
     <ProjectReference Include="..\Curl.Cookies.UnitLibrary\Curl.Cookies.UnitLibrary.csproj" />
     <ProjectReference Include="..\Curl.Core.UnitLibrary\Curl.Core.UnitLibrary.csproj" />
     <ProjectReference Include="..\Curl.HttpMessageSignatures.UnitLibrary\Curl.HttpMessageSignatures.UnitLibrary.csproj" />
@@ -101,6 +100,8 @@
     <ProjectReference Include="..\Curl.Protocol.Telnet.UnitLibrary\Curl.Protocol.Telnet.UnitLibrary.csproj" />
     <ProjectReference Include="..\Curl.Protocol.Tftp.UnitLibrary\Curl.Protocol.Tftp.UnitLibrary.csproj" />
     <ProjectReference Include="..\Curl.Protocol.Ws.UnitLibrary\Curl.Protocol.Ws.UnitLibrary.csproj" />
+    <!-- Libcurl's CurlEasyErrorText is curl_easy_strerror's table, which the tool prints too (BL-2450). -->
+    <ProjectReference Include="..\Libcurl\Libcurl.csproj" />
   </ItemGroup>
 
 </Project>

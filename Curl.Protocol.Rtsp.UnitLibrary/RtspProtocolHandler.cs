@@ -20,6 +20,12 @@ namespace Curl.Protocol.Rtsp;
 /// Builds the pre-emptive <c>Authorization</c> value for <c>-u</c>, <c>--basic</c> and
 /// <c>--oauth2-bearer</c>, with no challenges.
 /// </param>
+/// <param name="interleaveSink">
+/// Takes each interleaved <c>$</c> RTP frame read before a reply or during a <c>RECEIVE</c>, as
+/// libcurl's <c>CURLOPT_INTERLEAVEFUNCTION</c> does; or <see langword="null" />, the curl tool's
+/// case, to skip frames before a reply unwritten and write a <c>RECEIVE</c>'s frames to the body
+/// output (BL-2477, ADR-0612).
+/// </param>
 /// <remarks>
 /// Measured against a loopback listener (ADR-0169, BL-591). <c>-X</c>, <c>--request-target</c>,
 /// <c>-d</c>, <c>-b</c> and <c>--compressed</c> change nothing; the reply body never reaches
@@ -49,7 +55,7 @@ namespace Curl.Protocol.Rtsp;
 /// end are written to <see cref="ITransferContext.DiagnosticLog" /> under the <c>rtsp</c>
 /// component (<see cref="RtspTransferLog" />).
 /// </remarks>
-public sealed class RtspProtocolHandler(IConnector connector, IHttpAuthenticator authenticator) : IProtocolHandler
+public sealed class RtspProtocolHandler(IConnector connector, IHttpAuthenticator authenticator, IRtspInterleaveSink? interleaveSink = null) : IProtocolHandler
 {
     /// <summary>The port an <c>rtsp</c> URL without one connects to.</summary>
     internal const int DefaultPort = 554;
@@ -197,6 +203,28 @@ public sealed class RtspProtocolHandler(IConnector connector, IHttpAuthenticator
         }
     }
 
+    /// <summary>
+    /// Makes an RTSP <c>RECEIVE</c> on <paramref name="connection" /> as curl 8.22.0 does: sends
+    /// nothing, checks no <c>CSeq</c>, and hands each interleaved frame read until the server closes
+    /// to the injected sink, or writes it to the body output when none is injected (BL-2477).
+    /// </summary>
+    /// <param name="connection">The transfer's connection.</param>
+    /// <param name="context">The transfer.</param>
+    /// <returns>Success with the frame bytes taken, or the read (56) or sink (23) failure.</returns>
+    internal async Task<TransferResult> ReceiveAsync(IConnection connection, ITransferContext context)
+    {
+        var frames = new RtspInterleavedFrameFilter(interleaveSink ?? new RtspStreamInterleaveSink(context.Output));
+        try
+        {
+            await RtspReplyReader.ReceiveFramesAsync(connection, frames, context.CancellationToken).ConfigureAwait(false);
+            return TransferResult.Success(frames.BytesHanded);
+        }
+        catch (RtspTransferException failure)
+        {
+            return Fail(context.Events, failure.ExitCode, failure.Message, frames.BytesHanded);
+        }
+    }
+
     private static string SequenceMismatch(long sent, long received) =>
         string.Create(CultureInfo.InvariantCulture, $"The CSeq of this request {sent} did not match the response {received}");
 
@@ -271,7 +299,7 @@ public sealed class RtspProtocolHandler(IConnector connector, IHttpAuthenticator
         events.ReportInfo(RtspVerboseLines.RequestSent);
         var log = new RtspTransferLog(context.DiagnosticLog);
         log.RequestSent(RtspMethod.Options.Name, sequenceNumber);
-        RtspReplyHead head = await RtspReplyReader.ReadHeadAsync(connection, session, context.HeaderOutput, events, context.CancellationToken, log, context.MaxFileSize).ConfigureAwait(false);
+        RtspReplyHead head = await RtspReplyReader.ReadHeadAsync(connection, session, context.HeaderOutput, events, context.CancellationToken, log, context.MaxFileSize, Frames()).ConfigureAwait(false);
         log.ReplyRead(head, session.SessionId);
         TransferReport report = new()
         {
@@ -333,6 +361,10 @@ public sealed class RtspProtocolHandler(IConnector connector, IHttpAuthenticator
         maxFileSize > 0 && contentLength > maxFileSize
             ? Fail(events, CurlExitCode.FilesizeExceeded, RtspReplyHeadParser.MaxFileSizeExceeded)
             : null;
+
+    /// <summary>The filter that hands frames before a reply to the injected sink, or <see langword="null" /> to skip them.</summary>
+    private RtspInterleavedFrameFilter? Frames() =>
+        interleaveSink is null ? null : new RtspInterleavedFrameFilter(interleaveSink);
 
     private string? Authorization(ITransferContext context, HttpRequestOptions options) =>
         authenticator.CreateAuthorization(

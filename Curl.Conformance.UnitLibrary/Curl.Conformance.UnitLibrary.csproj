@@ -8,6 +8,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Curl.Protocol.Abstractions.UnitLibrary\Curl.Protocol.Abstractions.UnitLibrary.csproj" />
+    <!-- A <tool> libtest case runs its ported program over Libcurl (BL-2556). -->
+    <ProjectReference Include="..\Curl.Conformance.LibTest.UnitLibrary\Curl.Conformance.LibTest.UnitLibrary.csproj" />
     <!-- Curl's own TLS 1.3 server answers a TLS 1.3-only client where SslStream cannot (macOS; GF-0092). -->
     <ProjectReference Include="..\Curl.Tls.UnitLibrary\Curl.Tls.UnitLibrary.csproj" />
   </ItemGroup>

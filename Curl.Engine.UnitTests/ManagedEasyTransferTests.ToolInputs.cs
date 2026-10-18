@@ -49,15 +49,22 @@ public sealed partial class ManagedEasyTransferTests
     }
 
     [TestMethod]
-    public async Task LastResult_AToolAttempt_IsItsResult()
+    public async Task PerformAsync_ToolInputsWithAUrl_TransfersItInPlaceOfAParseOfTheOptionsUrl()
     {
         RecordingProtocolHandler handler = RecordingProtocolHandler.WritingPath("http");
         await using ManagedEasyTransfer easy = EasyOver(handler);
-        easy.ToolAttempt = AttemptOf(handler, new EngineTransferState(), "http://h/", new MemoryStream());
+        easy.Options = new EasyOptions { Network = new EasyNetworkOptions { Url = "http://[" } };
+        easy.ToolInputs = new EngineToolTransferInputs(Url: CurlUrl.Parse("http://h/abc"));
+        using MemoryStream output = new();
+        easy.ToolOutputs = new EngineToolTransferOutputs(output);
 
-        await easy.PerformAsync(CancellationToken.None);
+        CurlCode code = await easy.PerformAsync(CancellationToken.None);
 
-        Assert.AreSame(easy.ToolAttemptResult, easy.LastResult);
+        Assert.AreEqual(CurlCode.Ok, code);
+        Assert.AreEqual("/abc", Encoding.ASCII.GetString(output.ToArray()));
+        Assert.AreSame(easy.ToolInputs.Url, easy.LastContext!.Url);
+        Assert.IsTrue(easy.LastResult!.IsSuccess);
+        Assert.AreEqual("http://[", easy.Info.EffectiveUrl);
     }
 
     [TestMethod]
@@ -206,7 +213,7 @@ public sealed partial class ManagedEasyTransferTests
     }
 
     private static ManagedEasyTransfer EasyOver(RecordingProtocolHandler handler) =>
-        (ManagedEasyTransfer)new ManagedCurlEngine(TimeProvider.System, (_, _, _) => new ProtocolDispatcher([handler])).CreateEasy();
+        (ManagedEasyTransfer)new ManagedCurlEngine(TimeProvider.System, (_, _, _) => new ProtocolDispatcher([handler]), readEnvironmentVariable: _ => null).CreateEasy();
 
     // The context the handle builds with the inputs, and the one the runner's own
     // transferContextFactory.Create call builds from the same options and pieces.

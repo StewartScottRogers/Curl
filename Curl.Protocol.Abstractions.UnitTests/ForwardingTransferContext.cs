@@ -37,6 +37,7 @@ internal sealed class ForwardingTransferContext(ITransferContext inner) : ITrans
     public bool Append => inner.Append;
     public string? FtpPort => inner.FtpPort;
     public bool FtpUseEprt => inner.FtpUseEprt;
+    public TimeSpan FtpAcceptTimeout => inner.FtpAcceptTimeout;
     public TransportSecurityLevel SslLevel => inner.SslLevel;
     public bool FtpSslControlOnly => inner.FtpSslControlOnly;
 

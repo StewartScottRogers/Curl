@@ -28,6 +28,9 @@ public sealed record EasyCallbackOptions
     /// <summary><c>CURLOPT_SEEKFUNCTION</c>: rewinds the upload source. Default <see langword="null"/>.</summary>
     public SeekCallback? Seek { get; init; }
 
+    /// <summary><c>CURLOPT_IOCTLFUNCTION</c>: rewinds the upload source when no <see cref="Seek"/> is set. Default <see langword="null"/>.</summary>
+    public IoctlCallback? Ioctl { get; init; }
+
     /// <summary><c>CURLOPT_SOCKOPTFUNCTION</c>: sets options on a new socket. Default <see langword="null"/>.</summary>
     public SocketOptionCallback? SocketOption { get; init; }
 

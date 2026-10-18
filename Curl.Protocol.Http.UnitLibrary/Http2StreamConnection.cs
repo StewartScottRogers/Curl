@@ -83,6 +83,24 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
     internal Http2FrameTrace? FrameTrace => frameTrace;
 
     /// <summary>
+    /// Gets or sets who is offered the pushes the server promises on this stream (BL-2516), or
+    /// <see langword="null" /> when its transfer takes none, so each is refused.
+    /// </summary>
+    internal IHttp2PushSink? PushSink { get; set; }
+
+    /// <summary>
+    /// Makes this the stream a server's PUSH_PROMISE reserved: it sends nothing, as the client's
+    /// side of a promised stream is closed, and reads the pushed response from it.
+    /// </summary>
+    /// <param name="promisedStreamId">The promised stream's identifier.</param>
+    internal void AdoptPromised(int promisedStreamId)
+    {
+        streamId = promisedStreamId;
+        isRequestEnded = true;
+        isReceiveWindowGrown = true;
+    }
+
+    /// <summary>
     /// Echoes a line of this stream's response head, just reported as a <c>&lt;</c> line, as a
     /// <c>--trace-config http/2</c> <c>status:</c> or <c>header:</c> line (BL-1205); nothing when the
     /// transfer traces nothing.

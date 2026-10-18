@@ -114,6 +114,8 @@ public sealed class CurlAiHelpTextTests
     [DataRow("ai-help", "- Argument: `[category]`")]
     [DataRow("verbose", "- Short form: `-v`")]
     [DataRow("verbose", "- Argument: none")]
+    [DataRow("cacert", "- Environment: with neither `--cacert` nor `--capath` given and the certificate checked, `CURL_CA_BUNDLE` names the CA file; without it, `SSL_CERT_DIR` names the CA folder and `SSL_CERT_FILE` the CA file. Read on Linux and macOS; on Windows none of the three is read, as curl's Schannel build reads none.")]
+    [DataRow("capath", "- Environment: with neither `--cacert` nor `--capath` given and the certificate checked, `CURL_CA_BUNDLE` names the CA file; without it, `SSL_CERT_DIR` names the CA folder and `SSL_CERT_FILE` the CA file. Read on Linux and macOS; on Windows none of the three is read, as curl's Schannel build reads none.")]
     public void TryGetMarkdown_OptionSection_CarriesTheFact(string longName, string factLine)
     {
         string section = WrittenOptionSection(WrittenAllMarkdown(), longName);

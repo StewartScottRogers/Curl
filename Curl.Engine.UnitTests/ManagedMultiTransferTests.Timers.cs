@@ -267,6 +267,24 @@ public sealed partial class ManagedMultiTransferTests
     }
 
     [TestMethod]
+    public async Task PollAsync_TransfersWithNoConnectOnlySocket_AsksThePollerForTheExtraSocket()
+    {
+        ScriptedWaitSocketPoller poller = new();
+        poller.Ready[new CurlSocket(7)] = CurlWaitEvents.PollOut;
+        await using ManagedMultiTransfer multi = NewMulti(new TimerManualTimeProvider(), poller);
+        await using ManagedCurlEngine engine = new();
+        await using IEasyTransfer managed = engine.CreateEasy();
+        multi.Add(new ControlledEasyTransfer());
+        multi.Add(managed);
+        CurlWaitSocket[] sockets = [new(new CurlSocket(7), CurlWaitEvents.PollOut, CurlWaitEvents.None)];
+
+        (CurlMultiCode Code, int ReadySockets) result = await multi.PollAsync(sockets, TimeSpan.FromSeconds(10), CancellationToken.None);
+
+        Assert.AreEqual((CurlMultiCode.Ok, 1), result);
+        Assert.AreEqual(CurlWaitEvents.PollOut, sockets[0].ReturnedEvents);
+    }
+
+    [TestMethod]
     public async Task WaitAndPoll_NegativeTimeout_ReturnBadFunctionArgument()
     {
         await using ManagedMultiTransfer multi = NewMulti(new TimerManualTimeProvider());
@@ -302,7 +320,7 @@ public sealed partial class ManagedMultiTransferTests
     }
 
     private static ManagedMultiTransfer NewMulti(TimeProvider time, IWaitSocketPoller? poller = null) =>
-        new(new ConcurrentDictionary<IEasyTransfer, ManagedMultiTransfer>(ReferenceEqualityComparer.Instance), time, poller ?? new ScriptedWaitSocketPoller(), () => ValueTask.CompletedTask, () => { });
+        new(new ConcurrentDictionary<IEasyTransfer, ManagedMultiTransfer>(ReferenceEqualityComparer.Instance), time, poller ?? new ScriptedWaitSocketPoller(), () => ValueTask.CompletedTask, _ => ValueTask.CompletedTask, () => { });
 
     private static ControlledEasyTransfer WithTimeout(TimeSpan timeout) =>
         new() { Options = new EasyOptions { Transfer = new EasyTransferOptions { Timeout = timeout } } };

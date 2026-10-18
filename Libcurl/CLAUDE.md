@@ -11,7 +11,10 @@ given; its `DisposeAsync` is `curl_global_cleanup`
 (ADR-0556). `CurlLibrary` is `partial`: each handle area adds its public creating method
 (`curl_easy_init` and the rest) as a `CurlLibrary` part in its own folder, over the internal
 `Create*` methods in `Global`. Tests that count inits use `CurlGlobal.InitCounting` with their own
-`GlobalInitCounter`, never the process-wide count, since tests run in parallel.
+`GlobalInitCounter`, never the process-wide count, since tests run in parallel. An `InitMemory`
+library's easy handles allocate through its callbacks (`EasyAllocations`, ADR-0664): `calloc` at init
+and `DupHandle`, `strdup` per accepted string option, `malloc` per `CurlStrings.Escape` given the
+handle, and `free` of each at cleanup.
 
 `Options` holds the options table (ADR-0560): `CurlOption` and `CurlOptions` (`curl_easy_option_by_name`,
 `_by_id`, `_next`) generated from curl 8.22.0's `lib/easyoptions.c` and `curl.h`, and the internal
@@ -42,13 +45,32 @@ delegate `BadFunctionArgument`) and the `*DATA` pointers: the delegate's closure
 function is set) and any other value is taken and changes nothing. `Callbacks/Progress` sets
 `CURLOPT_PROGRESSFUNCTION`, `XFERINFOFUNCTION` and `DEBUGFUNCTION` the same way, which the engine already
 calls (ADR-0543); `XFERINFODATA` (`PROGRESSDATA` is the same option) and `DEBUGDATA` take any value and
-change nothing (ADR-0577).
+change nothing (ADR-0577). `Callbacks/Seek` sets `CURLOPT_SEEKFUNCTION` (a `SeekCallback` or `null`, any
+other value `BadFunctionArgument`), which the engine calls to rewind a read-callback upload a redirect or
+authentication retry sends again; `SEEKDATA` takes any value and changes nothing (BL-2417, ADR-0609). It sets `CURLOPT_IOCTLFUNCTION` (an `IoctlCallback` or `null`) the same way (`EasyIoctlCallbackSetters`), which the engine calls with `RestartRead` for that rewind when no seek callback is set; `IOCTLDATA` takes any value and changes nothing (BL-2607). `Callbacks/Sockets` sets
+`CURLOPT_SOCKOPTFUNCTION`, `OPENSOCKETFUNCTION` and `CLOSESOCKETFUNCTION` the same way, which the engine calls around each
+TCP connection over opaque `CurlSocket` handles; their `*DATA` options take any value and change nothing (BL-2418, ADR-0610).
+`Callbacks/Phases` sets `CURLOPT_PREREQFUNCTION` and `RESOLVER_START_FUNCTION` the same way, which the engine calls as
+each request is given its connection and before each look-up its DNS cache misses; `PREREQDATA` and
+`RESOLVER_START_DATA` take any value and change nothing, and `TRAILERFUNCTION` takes a `TrailerCallback` the same way,
+which the engine calls once a chunked HTTP/1.1 upload's body ends, sending its lines in the closing chunk; `TRAILERDATA`
+takes any value and changes nothing (BL-2419, ADR-0611; BL-2475, ADR-0646). `Callbacks/Wildcard` sets `CURLOPT_CHUNK_BGN_FUNCTION`, `CHUNK_END_FUNCTION`, `FNMATCH_FUNCTION`
+and `INTERLEAVEFUNCTION` the same way, which the engine calls around each file of an FTP wildcard download under
+`CURLOPT_WILDCARDMATCH` and for each interleaved RTP frame of an RTSP transfer; `CHUNK_DATA`, `FNMATCH_DATA` and
+`INTERLEAVEDATA` take any value and change nothing (BL-2420, ADR-0619). `Callbacks/Hsts` sets `CURLOPT_HSTSREADFUNCTION`
+and `HSTSWRITEFUNCTION` the same way, which the engine calls, while `CURLOPT_HSTS_CTRL` enables HSTS or `CURLOPT_HSTS`
+is set, for entries before each perform and with every entry at `curl_easy_cleanup`; `HSTSREADDATA` and
+`HSTSWRITEDATA` take any value and change nothing (BL-2421, ADR-0620).
 
 `Misc/ErrorText` holds `CurlErrorText`: `Multi`, `Share` and `Url` are `curl_multi_strerror`,
 `curl_share_strerror` and `curl_url_strerror` with upstream's test1538 strings and fallbacks, and
 `Header` is the header API's text, which upstream has no function for (ADR-0562). Each is a table
-lookup, so a new upstream code is one appended string. `curl_easy_strerror` is still
-`Curl.Console`'s `CurlEasyErrorText` until BL-2450 moves it.
+lookup, so a new upstream code is one appended string. `Easy` is `curl_easy_strerror` over
+`CurlEasyErrorText`, the `CURLE_*` table keyed by `CurlExitCode` (`"Unknown error"` for a code it does
+not name), which moved here from `Curl.Console` (BL-2450); `Curl.Console` references Libcurl for it,
+as the tool prints the same texts. The gap office's exit-code measurement reads
+`Misc/ErrorText/CurlEasyErrorText.cs` by path and parses its `[CurlExitCode.X] = "..."` lines
+(BL-2449), so keep the file's name and that line shape.
 
 `Misc/DatesAndLists` holds `CurlDate` and `CurlSlist` (ADR-0578). `CurlDate.Parse` is `curl_getdate`
 over `Curl.Protocol.Abstractions`' `CurlDateParser` (the plan's "Curl.Core date parser"), answering -1
@@ -68,6 +90,12 @@ and the engine's TLS backend, the tail of `curl -V`'s first line; `Info(library,
 reading text as UTF-8 bytes with lengths in bytes, `Unescape` answering `byte[]`; `null`, a negative
 length or one past the end answers `null`. `GetEnv` is `curl_getenv` (`null` for unset or empty), and
 `StrEqual`/`StrNEqual` are `curl_strequal`/`curl_strnequal`, ignoring ASCII case only.
+`Misc/Printf` holds `CurlPrintf` (ADR-0668): `MPrintf`, `MFPrintf` (a `Stream`), `MSPrintf`, `MSNPrintf`
+(a `Span<byte>` whose length is `maxlength`) and `MAPrintf`, a port of curl 8.22.0's `lib/mprintf.c`
+(`PrintfFormatParser` is `parsefmt`, `PrintfRenderer` `formatf`, `PrintfNumberWriter`, `PrintfTextWriter` and
+`PrintfDoubleWriter` its `out_*`). Each argument is read as its conversion's C type, `%ld` 32 bits on Windows
+and 64 elsewhere (`PrintfPlatform`, which tests pin both ways); the `v` forms are the same methods given an
+array. `out_double`'s `snprintf` is hand-written over `ExactDecimal`, so doubles format the same everywhere.
 
 `Easy` holds `CurlEasy`, the easy handle `CurlLibrary.EasyInit` (`curl_easy_init`) returns over the
 engine's `IEasyTransfer` (ADR-0563): `SetOption` goes through `EasyOptionDispatch` and writes the
@@ -80,6 +108,8 @@ connection) is the engine's. These and `WebSocket`'s blocking calls are Libcurl'
 engine only the `Receive` and `Send` bits, dropping the rest as libcurl does. A perform clears the
 `CURLOPT_ERRORBUFFER` buffer, if one is set, and on failure writes the engine's `ErrorText` into it
 cut to 255 UTF-8 bytes (`EasyErrorBuffer`, libcurl's 256-byte `CURL_ERROR_SIZE` less the NUL);
+when the engine gives no detail (empty `ErrorText`) the buffer stays empty, never `curl_easy_strerror`'s
+text, as libcurl 8.22.0 writes it only through `failf` (`lib/curl_trc.c`) and nowhere falls back (BL-2464);
 `CurlEasy.ErrorText` answers the same cut text with or without a buffer. `Dispose` and
 `DisposeAsync` are `curl_easy_cleanup` and dispose the transfer once; a member used afterwards throws
 `ObjectDisposedException`. `GetInfo` is `curl_easy_getinfo` and goes through `Info`'s dispatch.
@@ -132,12 +162,15 @@ kept as `UserData`. `Cleanup` is `curl_share_cleanup`; after the engine's `Ok` e
 engine's `IMimePartBuilder`, whose answer it returns; `Dispose` is `curl_mime_free`, after which the
 handle and its parts throw `ObjectDisposedException`. It implements `EasyOptionSetters`'
 `AddMimePostSetters`: `CURLOPT_MIMEPOST` takes a `CurlMime` (else `BadFunctionArgument`) and stores its
-body as it is when set. `Mime/Form` holds the deprecated form API's `CurlForm`, marked `[Obsolete]`
+body as it is when set, or for `null` an empty `HttpPost` form, a zero-byte POST (upstream lib589,
+BL-2620); either clears `CURLOPT_NOBODY`; `CurlEasy` remembers the structure and writes its body as it is now into the options at each perform and `DupHandle`, or, once it is freed, an empty `HttpPost` form, a zero-length post (ADR-0675). `Mime/Form` holds the deprecated form API's `CurlForm`, marked `[Obsolete]`
 as upstream deprecates it (ADR-0586): `CurlForm.Add(library, ref form, ...)` is `curl_formadd`, every
 `CURLFORM_*` argument passed to the engine's `ICurlFormBuilder` as given, a `null` form started over a
 new builder and set only on `Ok`; `Get` is `curl_formget`, and `Free` or `Dispose` `curl_formfree`,
 after which the form throws `ObjectDisposedException`. It implements `AddFormPostSetters`:
-`CURLOPT_HTTPPOST` takes a `CurlForm` (else `BadFunctionArgument`) and stores its body as it is when set.
+`CURLOPT_HTTPPOST` takes a `CurlForm` (else `BadFunctionArgument`) and stores its body as it is when set,
+or for `null` an empty form, which the engine posts with `Content-Length: 0` (upstream test516, BL-2599);
+either clears `CURLOPT_NOBODY`.
 
 `Url` holds `CurlUrlHandle`, the URL handle `CurlLibrary.UrlInit` (`curl_url`) returns over the
 engine's `ICurlUrlHandle` (ADR-0587): `Get` and `Set` (`curl_url_get`, `_set`) pass through to the

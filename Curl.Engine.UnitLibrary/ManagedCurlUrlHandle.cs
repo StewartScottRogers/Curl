@@ -19,7 +19,7 @@ internal sealed class ManagedCurlUrlHandle : ICurlUrlHandle
 {
     private const string FileScheme = "file";
 
-    /// <summary>The longest URL a set accepts (upstream's <c>CURL_MAX_INPUT_LENGTH</c>).</summary>
+    /// <summary>The longest string a set accepts for any part (upstream's <c>CURL_MAX_INPUT_LENGTH</c>).</summary>
     private const int MaximumInputLength = 8_000_000;
 
     private const string DefaultScheme = "https";
@@ -83,6 +83,11 @@ internal sealed class ManagedCurlUrlHandle : ICurlUrlHandle
         if ((uint)part > (uint)CurlUrlPart.ZoneId)
         {
             return CurlUrlCode.UnknownPart;
+        }
+
+        if (value?.Length > MaximumInputLength)
+        {
+            return CurlUrlCode.MalformedInput;
         }
 
         if (value is null)
@@ -212,13 +217,13 @@ internal sealed class ManagedCurlUrlHandle : ICurlUrlHandle
     private static string Suffix(char separator, string? value) => value is null ? string.Empty : separator + value;
 
     /// <summary>
-    /// A whole URL: empty or longer than upstream's <c>CURL_MAX_INPUT_LENGTH</c> is
+    /// A whole URL: empty is
     /// <see cref="CurlUrlCode.MalformedInput" />; a relative one is resolved against the URL held, when
     /// the handle holds one (<see cref="UrlRelativeReference" />); then it is parsed.
     /// </summary>
     private CurlUrlCode SetUrl(string value, CurlUrlFlags flags)
     {
-        if (value.Length is 0 or > MaximumInputLength)
+        if (value.Length == 0)
         {
             return CurlUrlCode.MalformedInput;
         }

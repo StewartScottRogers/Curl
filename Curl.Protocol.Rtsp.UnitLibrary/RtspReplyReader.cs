@@ -15,7 +15,8 @@ namespace Curl.Protocol.Rtsp;
 /// of 1. A header line followed by continuation lines (a space or tab first) is read as one line
 /// with them joined, once a byte after the last has arrived (BL-840). The bytes still unread
 /// when the server closes are written to the header output unchecked, continuation lines joined. Bytes before the first <c>RTSP/</c>, exactly - an interleaved <c>$</c>
-/// frame or other stray bytes - are skipped unwritten (BL-1663); a reply with no <c>RTSP/</c>
+/// frame or other stray bytes - are skipped unwritten (BL-1663), or each whole frame handed to the
+/// transfer's interleave sink when it has one (BL-2477); a reply with no <c>RTSP/</c>
 /// in it fails with 52, <c>Empty reply from server</c>, nothing written, once the server
 /// closes; so does a connection closed before any byte. A head longer than <see cref="MaximumHeadLength" /> fails with 100, as the HTTP
 /// library's does. A failed read fails with 56, a failed header write with 23.
@@ -46,9 +47,13 @@ internal static class RtspReplyReader
     /// <param name="cancellationToken">Cancels the read.</param>
     /// <param name="log">Receives each header line's name.</param>
     /// <param name="maxFileSize">The transfer's <c>--max-filesize</c> limit, handed to <see cref="RtspReplyHeadParser" />.</param>
+    /// <param name="frames">
+    /// Takes the interleaved frames before the reply, or <see langword="null" /> to skip them unwritten,
+    /// as the curl tool, which sets up no channel, does (BL-1663, measured again on 8.22.0 in BL-2477).
+    /// </param>
     /// <returns>What was read of the head.</returns>
     /// <exception cref="RtspTransferException">The reply is refused, or a read or write failed.</exception>
-    internal static async ValueTask<RtspReplyHead> ReadHeadAsync(IConnection connection, RtspSessionState session, Stream? headerOutput, ITransferEvents events, CancellationToken cancellationToken, RtspTransferLog log, long? maxFileSize)
+    internal static async ValueTask<RtspReplyHead> ReadHeadAsync(IConnection connection, RtspSessionState session, Stream? headerOutput, ITransferEvents events, CancellationToken cancellationToken, RtspTransferLog log, long? maxFileSize, RtspInterleavedFrameFilter? frames = null)
     {
         RtspReplyHeadParser parser = new(session, maxFileSize);
         byte[] buffer = new byte[BufferSize];
@@ -56,7 +61,7 @@ internal static class RtspReplyReader
         int processed = 0;
         while (true)
         {
-            received = SkipBytesBeforeReply(parser, buffer, received);
+            received = await SkipBytesBeforeReplyAsync(parser, frames, buffer, received, cancellationToken).ConfigureAwait(false);
             int lineEnd;
             while ((lineEnd = ReadableLineEnd(parser, buffer.AsSpan(0, received), processed)) > 0)
             {
@@ -148,10 +153,21 @@ internal static class RtspReplyReader
     /// or other stray bytes are skipped unwritten, as curl 8.21.0's <c>rtsp_filter_rtp</c> skips
     /// them on a transfer with no interleaved channel set up (measured, BL-1663).
     /// </summary>
+    /// <remarks>
+    /// With <paramref name="frames" />, each whole <c>$</c> frame is handed to it instead, and one
+    /// not yet whole stays in <paramref name="buffer" /> to be joined with the next read (BL-2477).
+    /// </remarks>
     /// <returns>How many bytes are left in <paramref name="buffer" />, from its start.</returns>
-    private static int SkipBytesBeforeReply(RtspReplyHeadParser parser, byte[] buffer, int received)
+    private static async ValueTask<int> SkipBytesBeforeReplyAsync(RtspReplyHeadParser parser, RtspInterleavedFrameFilter? frames, byte[] buffer, int received, CancellationToken cancellationToken)
     {
-        int start = parser.HasStatus ? 0 : ReplyStart(buffer.AsSpan(0, received));
+        if (parser.HasStatus)
+        {
+            return received;
+        }
+
+        int start = frames is null
+            ? ReplyStart(buffer.AsSpan(0, received))
+            : await frames.ConsumeAsync(buffer.AsMemory(0, received), stopAtReply: true, cancellationToken).ConfigureAwait(false);
         buffer.AsSpan(start, received - start).CopyTo(buffer);
         return received - start;
     }
@@ -162,21 +178,37 @@ internal static class RtspReplyReader
     /// </summary>
     private static int ReplyStart(ReadOnlySpan<byte> received)
     {
-        ReadOnlySpan<byte> prefix = "RTSP/"u8;
         int start = 0;
-        while (start < received.Length)
+        while (start < received.Length && !RtspInterleavedFrameFilter.CouldStartReply(received[start..]))
         {
-            ReadOnlySpan<byte> candidate = received[start..];
-            int length = Math.Min(candidate.Length, prefix.Length);
-            if (candidate[..length].SequenceEqual(prefix[..length]))
-            {
-                return start;
-            }
-
             start++;
         }
 
         return start;
+    }
+
+    /// <summary>
+    /// Reads interleaved frames until the server closes, handing each whole one to
+    /// <paramref name="frames" /> and skipping every other byte, as an RTSP <c>RECEIVE</c> does in
+    /// curl 8.22.0, which sends no request and expects no reply (BL-2477). A frame cut off by the
+    /// close is dropped.
+    /// </summary>
+    /// <param name="connection">The transfer's connection.</param>
+    /// <param name="frames">Takes each frame.</param>
+    /// <param name="cancellationToken">Cancels the reads.</param>
+    /// <exception cref="RtspTransferException">A read failed (56), or the sink took too few bytes (23).</exception>
+    internal static async ValueTask ReceiveFramesAsync(IConnection connection, RtspInterleavedFrameFilter frames, CancellationToken cancellationToken)
+    {
+        byte[] buffer = new byte[RtspInterleavedFrameFilter.MaximumFrameLength];
+        int held = 0;
+        int read;
+        while ((read = await ReceiveAsync(connection, buffer.AsMemory(held), cancellationToken).ConfigureAwait(false)) > 0)
+        {
+            held += read;
+            int consumed = await frames.ConsumeAsync(buffer.AsMemory(0, held), stopAtReply: false, cancellationToken).ConfigureAwait(false);
+            buffer.AsSpan(consumed, held - consumed).CopyTo(buffer);
+            held -= consumed;
+        }
     }
 
     /// <summary>
@@ -241,7 +273,7 @@ internal static class RtspReplyReader
         int received,
         CancellationToken cancellationToken)
     {
-        if (received == 0 || (!parser.HasStatus && received < "RTSP/".Length))
+        if (!parser.HasStatus && !unread.Span.StartsWith("RTSP/"u8))
         {
             throw new RtspTransferException(CurlExitCode.GotNothing, EmptyReply);
         }

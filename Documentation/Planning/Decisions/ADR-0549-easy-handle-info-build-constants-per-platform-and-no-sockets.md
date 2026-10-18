@@ -53,3 +53,5 @@ lists `dynamic` for `--engine list`.
   `TlsBuildAnswers.For` on any platform (`TlsBuildAnswersTests`), so Windows-only coverage still reaches
   the Linux and macOS answers.
 - Adding early data or connect-only support changes the matching answer and amends this ADR.
+- Amended by ADR-0686 (BL-2633): while a `CURLOPT_CONNECT_ONLY` 1 connection is open, `LastSocket` and
+  `ActiveSocket` answer its engine socket number, which `curl_multi_wait` polls.

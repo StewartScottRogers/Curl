@@ -19,7 +19,11 @@ the `transfer` tool's logic: `McpTransferRequestCheck` checks an `McpTransferReq
 it, `McpResponseHeaderCollector` keeps the last response's headers, and it answers with an
 `McpTransferToolResult` holding `McpTransferInfo`. `McpVersionTool` is the `version` tool's logic: it
 answers with an `McpVersionToolResult` holding the injected `ICurlEngine`'s `CurlVersionInfo` fields
-unchanged and the platform's first `CurlVersionText` line. The later tasks of `Documentation/Planning/Curl-Mcp.md` add the rest.
+unchanged and the platform's first `CurlVersionText` line. `McpUrlTool` is the logic of the
+`parse_url` and `build_url` tools over an injected `ICurlUrlHandle` factory: parts travel as
+`McpUrlParts` (an absent part is `null`), flags by `CurlUrlFlags` name, and a refused URL or part
+is an `McpToolFailure.UrlRefused` naming the `CurlUrlCode`; it answers with an
+`McpParseUrlToolResult` or `McpBuildUrlToolResult`. The later tasks of `Documentation/Planning/Curl-Mcp.md` add the rest.
 
 Base class library only. Only `Curl.Mcp` may take the MCP SDK packages (`ModelContextProtocol`
 and `Microsoft.Extensions.Hosting`); this library references no package. Reference

@@ -72,17 +72,24 @@ jobs:
         run: dotnet test -c Release --no-build --filter "TestCategory!=Integration"
 
   # Packs the Curl.Mcp MCP server and runs its Integration tests on every operating system
-  # (BL-2391). The packages are self-contained, not native AOT (ADR-0598), so each runner packs
-  # all seven of ADR-0596: the Curl.Mcp tool package with .mcp/server.json and one
-  # Curl.Mcp.<rid> package per runtime identifier. The packages are uploaded, never published.
+  # (BL-2391). Curl.Mcp is native AOT (ADR-0621, BL-2517), and AOT cannot cross-compile between
+  # operating systems, so each runner packs the runtime package of its own runtime, as
+  # release.yml's pack-mcp does, and the Linux runner also packs the Curl.Mcp tool package with
+  # .mcp/server.json. The packages are uploaded, never published.
   mcp-pack:
     name: Pack Curl.Mcp (${{ matrix.os }})
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, ubuntu-latest, macos-latest]
+        include:
+          - { os: windows-latest, rid: win-x64 }
+          - { os: ubuntu-latest, rid: linux-x64, tool: true }
+          - { os: macos-latest, rid: osx-arm64 }
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
+    env:
+      RID: ${{ matrix.rid }}
+      PACKAGES: curl-mcp-packages
     steps:
       - uses: actions/checkout@v4
 
@@ -90,29 +97,73 @@ jobs:
         with:
           global-json-file: global.json
 
+      # The AOT linker finds MSVC through vswhere, which must be on PATH.
+      - name: Put vswhere on PATH
+        if: runner.os == 'Windows'
+        shell: bash
+        run: echo "C:\\Program Files (x86)\\Microsoft Visual Studio\\Installer" >> "$GITHUB_PATH"
+
       - name: Curl.Mcp Integration tests
         run: dotnet test Curl.Mcp.IntegrationTests -c Release --filter "TestCategory=Integration"
 
-      - name: Pack Curl.Mcp
-        run: dotnet pack Curl.Mcp -c Release -o "${{ runner.temp }}/curl-mcp-packages"
+      - name: Pack the tool package
+        if: matrix.tool
+        shell: bash
+        run: dotnet pack Curl.Mcp -c Release -o "$PACKAGES/tool"
 
-      - name: Check the packages and the tool package's .mcp/server.json
+      - name: Pack the runtime package
+        shell: bash
+        run: dotnet pack Curl.Mcp -c Release -r "$RID" -o "$PACKAGES/runtime"
+
+      # The tool package carries .mcp/server.json; the runtime package carries its native binary,
+      # never Curl.Mcp.dll, and that binary answers initialize over standard input and output.
+      - name: Check the packages
         shell: pwsh
         run: |
           Add-Type -AssemblyName System.IO.Compression.FileSystem
-          $files = @(Get-ChildItem (Join-Path $env:RUNNER_TEMP 'curl-mcp-packages') -Filter '*.nupkg')
+          $tool = Join-Path $env:PACKAGES 'tool'
+          if (Test-Path $tool) {
+            $files = @(Get-ChildItem $tool -Filter '*.nupkg')
+            $files | ForEach-Object { Write-Host "$($_.Name) $($_.Length)" }
+            if ($files.Count -ne 1 -or $files[0].Name -notmatch '^Curl\.Mcp\.\d') { throw 'expected only the Curl.Mcp tool package' }
+            $zip = [IO.Compression.ZipFile]::OpenRead($files[0].FullName)
+            try { if ($zip.Entries.FullName -notcontains '.mcp/server.json') { throw "$($files[0].Name) has no .mcp/server.json" } }
+            finally { $zip.Dispose() }
+          }
+          $files = @(Get-ChildItem (Join-Path $env:PACKAGES 'runtime') -Filter '*.nupkg')
           $files | ForEach-Object { Write-Host "$($_.Name) $($_.Length)" }
-          if ($files.Count -ne 7) { throw "expected 7 packages, found $($files.Count)" }
-          $tool = @($files | Where-Object { $_.Name -match '^Curl\.Mcp\.\d' })
-          if ($tool.Count -ne 1) { throw 'no single Curl.Mcp tool package' }
-          $zip = [IO.Compression.ZipFile]::OpenRead($tool[0].FullName)
-          try { if ($zip.Entries.FullName -notcontains '.mcp/server.json') { throw "$($tool[0].Name) has no .mcp/server.json" } }
+          if ($files.Count -ne 1 -or $files[0].Name -notlike "Curl.Mcp.$env:RID.*") { throw "expected only the Curl.Mcp.$env:RID package" }
+          $name = $files[0].Name
+          $binary = if ($env:RID -like 'win-*') { 'Curl.Mcp.exe' } else { 'Curl.Mcp' }
+          $zip = [IO.Compression.ZipFile]::OpenRead($files[0].FullName)
+          try {
+            $entry = $zip.Entries | Where-Object { $_.FullName -eq "tools/any/$env:RID/$binary" }
+            if (-not $entry) { throw "$name has no native tools/any/$env:RID/$binary" }
+            if ($zip.Entries | Where-Object { $_.FullName -eq "tools/any/$env:RID/Curl.Mcp.dll" }) { throw "$name holds Curl.Mcp.dll: it was not published native AOT" }
+            $native = Join-Path $env:RUNNER_TEMP $binary
+            [IO.Compression.ZipFileExtensions]::ExtractToFile($entry, $native, $true)
+          }
           finally { $zip.Dispose() }
+          if (-not $IsWindows) { chmod +x $native }
+          # Standard input stays open until the answer is read: the server stops at end of input,
+          # whether or not it has answered.
+          $start = [Diagnostics.ProcessStartInfo]::new($native)
+          $start.RedirectStandardInput = $true
+          $start.RedirectStandardOutput = $true
+          $server = [Diagnostics.Process]::Start($start)
+          $server.StandardInput.WriteLine('{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"ci","version":"1"}}}')
+          $server.StandardInput.Flush()
+          $read = $server.StandardOutput.ReadLineAsync()
+          $answer = if ($read.Wait(60000)) { $read.Result } else { '' }
+          $server.StandardInput.Close()
+          if (-not $server.WaitForExit(10000)) { $server.Kill($true) }
+          Write-Host $answer
+          if ("$answer" -notlike '*"serverInfo"*') { throw "$binary did not answer initialize" }
 
       - uses: actions/upload-artifact@v4
         with:
           name: curl-mcp-${{ matrix.os }}
-          path: ${{ runner.temp }}/curl-mcp-packages/*.nupkg
+          path: curl-mcp-packages/**/*.nupkg
           if-no-files-found: error
 
   # The four quality gates (CLAUDE.md "Quality gates"): 100% line and branch coverage,

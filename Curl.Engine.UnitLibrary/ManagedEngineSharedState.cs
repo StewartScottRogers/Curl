@@ -1,8 +1,10 @@
 using System.Collections.Concurrent;
 using Curl.Cookies;
+using Curl.Core;
 using Curl.Core.Hsts;
 using Curl.Networking;
 using Curl.Protocol.Abstractions;
+using Curl.Protocol.Ws;
 
 namespace Curl.Engine;
 
@@ -17,9 +19,23 @@ internal sealed class ManagedEngineSharedState
 {
     /// <summary>Creates an engine's state, every cache its own.</summary>
     /// <param name="timeProvider">The clock the caches, the HSTS cache and the transfers run on.</param>
-    /// <param name="easyErrorText">Curl's easy error text for each exit code (<c>Curl.Console</c>'s <c>CurlEasyErrorText.Of</c> in production).</param>
-    internal ManagedEngineSharedState(TimeProvider timeProvider, Func<CurlExitCode, string> easyErrorText)
+    /// <param name="easyErrorText">Curl's easy error text for each exit code (<c>CurlEasyErrorText.Of</c> from <c>Libcurl/Misc/ErrorText</c>, passed in by <c>Curl.Console</c>, in production).</param>
+    /// <param name="readEnvironmentVariable">
+    /// Reads the proxy environment variables every handle's own perform consults (<see cref="ProxySelector" />):
+    /// <see cref="Environment.GetEnvironmentVariable(string)" />, the default, in production; a dictionary in tests.
+    /// </param>
+    /// <param name="dialing">What the transfers dial and resolve through in place of sockets (ADR-0658); <see langword="null" />, in production, for sockets.</param>
+    /// <param name="signingClock">The clock <c>CURLOPT_AWS_SIGV4</c> and the HTTP signatures sign with (BL-2675); <see langword="null" />, in production, for <see cref="TimeProvider.System" />.</param>
+    /// <param name="webSocketRandomSource">Where every handle's WebSocket key and frame masks come from (BL-2688); <see langword="null" />, in production, for <see cref="SystemWebSocketRandomSource" />.</param>
+    /// <param name="ftpPwdStop">The stand-in for the debug build's <c>CURL_FTP_PWD_STOP</c> (BL-2636); <see langword="null" />, in production, for none.</param>
+    internal ManagedEngineSharedState(TimeProvider timeProvider, Func<CurlExitCode, string> easyErrorText, Func<string, string?>? readEnvironmentVariable = null, EngineDialing? dialing = null, TimeProvider? signingClock = null, IWebSocketRandomSource? webSocketRandomSource = null, FirstTransferFtpPwdStop? ftpPwdStop = null)
     {
+        Dialing = dialing;
+        SigningClock = signingClock;
+        WebSocketRandomSource = webSocketRandomSource;
+        FtpPwdStop = ftpPwdStop;
+        ReadEnvironmentVariable = readEnvironmentVariable ?? Environment.GetEnvironmentVariable;
+        ProxySelector = new ProxySelector(ReadEnvironmentVariable);
         TimeProvider = timeProvider;
         Connections = new ConnectionCache(timeProvider);
         TlsSessions = new TlsSessionCache(timeProvider);
@@ -28,6 +44,7 @@ internal sealed class ManagedEngineSharedState
         Hsts = new HstsTransferPolicy(timeProvider);
         ConnectionIdsByPoolNumber = new ConcurrentDictionary<long, long>();
         MultiOwners = new ConcurrentDictionary<Api.EngineContracts.IEasyTransfer, ManagedMultiTransfer>(ReferenceEqualityComparer.Instance);
+        SocketHandles = new CurlSocketHandles();
         Performer = new TransferPerformer(timeProvider, easyErrorText);
     }
 
@@ -41,6 +58,7 @@ internal sealed class ManagedEngineSharedState
     /// <param name="dnsCache">The resolved names.</param>
     /// <param name="cookies">The cookies.</param>
     /// <param name="hsts">The HSTS cache.</param>
+    /// <remarks>It dials as <paramref name="engine" /> dials (<see cref="Dialing" />).</remarks>
     internal ManagedEngineSharedState(
         ManagedEngineSharedState engine,
         ConnectionCache connections,
@@ -57,8 +75,54 @@ internal sealed class ManagedEngineSharedState
         Hsts = hsts;
         ConnectionIdsByPoolNumber = engine.ConnectionIdsByPoolNumber;
         MultiOwners = engine.MultiOwners;
+        SocketHandles = engine.SocketHandles;
         Performer = engine.Performer;
+        ProxySelector = engine.ProxySelector;
+        ReadEnvironmentVariable = engine.ReadEnvironmentVariable;
+        Dialing = engine.Dialing;
+        SigningClock = engine.SigningClock;
+        WebSocketRandomSource = engine.WebSocketRandomSource;
+        FtpPwdStop = engine.FtpPwdStop;
     }
+
+    /// <summary>
+    /// Gets where every handle's WebSocket key and frame masks come from, one sequence for the whole engine as the
+    /// debug build's <c>CURL_ENTROPY</c> is one for the whole process: the conformance harness's stand-in for it
+    /// (BL-2688, ADR-0678); <see langword="null" />, in production, for <see cref="SystemWebSocketRandomSource" />.
+    /// </summary>
+    internal IWebSocketRandomSource? WebSocketRandomSource { get; }
+
+    /// <summary>
+    /// Gets the conformance harness's stand-in for the debug build's <c>CURL_FTP_PWD_STOP</c>, which the engine's first perform
+    /// claims so its FTP connect phase stops before <c>PWD</c> (BL-2636, ADR-0687); <see langword="null" />, in production, for none.
+    /// </summary>
+    internal FirstTransferFtpPwdStop? FtpPwdStop { get; }
+
+    /// <summary>
+    /// Gets the clock the engine's transfers sign <c>CURLOPT_AWS_SIGV4</c> requests and HTTP signatures with: the
+    /// conformance harness's stand-in for the debug build's <c>CURL_FORCETIME</c> (BL-2675); <see langword="null" />, in
+    /// production, for <see cref="TimeProvider.System" />.
+    /// </summary>
+    internal TimeProvider? SigningClock { get; }
+
+    /// <summary>
+    /// Gets what chooses the proxy of every handle's own perform from <c>CURLOPT_PROXY</c>, <c>CURLOPT_NOPROXY</c>
+    /// and the proxy environment variables (<c>http_proxy</c>, <c>HTTPS_PROXY</c>, <c>ALL_PROXY</c>, <c>NO_PROXY</c>
+    /// and the rest), as libcurl reads them for every handle (BL-2519, ADR-0608).
+    /// </summary>
+    internal ProxySelector ProxySelector { get; }
+
+    /// <summary>
+    /// Gets what reads an environment variable for every handle's own perform: the proxy variables
+    /// (<see cref="ProxySelector" />) and the <c>NETRC</c> and <c>HOME</c> variables the <c>.netrc</c> lookup reads.
+    /// </summary>
+    internal Func<string, string?> ReadEnvironmentVariable { get; }
+
+    /// <summary>
+    /// Gets what the engine's transfers dial and resolve through in place of sockets: the conformance harness's in-memory
+    /// servers (ADR-0658); <see langword="null" /> in production.
+    /// </summary>
+    internal EngineDialing? Dialing { get; }
 
     /// <summary>Gets the clock the engine's transfers run on.</summary>
     internal TimeProvider TimeProvider { get; }
@@ -83,6 +147,9 @@ internal sealed class ManagedEngineSharedState
 
     /// <summary>Gets the multi handle each transfer added to one of the engine's multi handles is in, so it is in one at a time (<see cref="ManagedMultiTransfer" />).</summary>
     internal ConcurrentDictionary<Api.EngineContracts.IEasyTransfer, ManagedMultiTransfer> MultiOwners { get; }
+
+    /// <summary>Gets the opaque socket handles the engine gives its connections when no open-socket callback made one (<see cref="SocketCallbackConnector" />).</summary>
+    internal CurlSocketHandles SocketHandles { get; }
 
     /// <summary>Gets the performer that numbers the engine's transfers and connections and holds curl's easy error text.</summary>
     internal TransferPerformer Performer { get; }

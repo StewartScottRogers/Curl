@@ -45,6 +45,18 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
     private static readonly byte[] LastChunk = "0\r\n\r\n"u8.ToArray();
 
     /// <summary>
+    /// The upload stream's trailer source when the body is a stream that implements
+    /// <see cref="IUploadTrailerSource" />; <see langword="null" /> for any other body.
+    /// </summary>
+    private IUploadTrailerSource? trailerSource;
+
+    /// <summary>
+    /// The closing chunk with its trailers, made once per send by <see cref="LastChunkBytes" />;
+    /// <see langword="null" /> until then.
+    /// </summary>
+    private byte[]? lastChunk;
+
+    /// <summary>
     /// Gets how many body bytes have been written, chunk framing excluded.
     /// </summary>
     internal long BytesWritten { get; private set; }
@@ -137,6 +149,38 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
     internal HttpContinueWaitConnection? EarlyResponseWatch { get; init; }
 
     /// <summary>
+    /// Gets the connection that reads the response's status line while a read of a stream body
+    /// stays pending, as a paused libcurl read callback keeps it, or <see langword="null" /> when
+    /// every read is simply awaited (upstream case 1533, BL-2729).
+    /// </summary>
+    internal HttpEarlyResponseConnection? EarlyResponseRead { get; init; }
+
+    /// <summary>
+    /// Gets a value indicating whether a read left pending by a status of 300 or above is kept and
+    /// the rest of the body sent once the response is read (<see cref="WriteRestAfterResponseAsync" />),
+    /// as libcurl's <c>CURLOPT_KEEP_SENDING_ON_ERROR</c> asks, rather than the body cut short.
+    /// </summary>
+    internal bool KeepsSendingOnError { get; init; }
+
+    /// <summary>What a read gives when it was left pending because a status of 300 or above came first.</summary>
+    private const int ReadLeftPending = -1;
+
+    /// <summary>The read of a stream body left pending for <see cref="WriteRestAfterResponseAsync" />; <see langword="null" /> when none is.</summary>
+    private Task<int>? pendingRead;
+
+    /// <summary>Whether a pending read is raced against the response; cleared once the rest of the body is sent after it.</summary>
+    private bool racesPendingReads = true;
+
+    /// <summary>The stream body being sent, kept for <see cref="WriteRestAfterResponseAsync" />.</summary>
+    private StreamBody? sendingStream;
+
+    /// <summary>Whether the stream body being sent is chunked, kept for <see cref="WriteRestAfterResponseAsync" />.</summary>
+    private bool sendingChunked;
+
+    /// <summary>The upload buffer a stream body is read into, kept so a read left pending still fills it.</summary>
+    private byte[]? readBuffer;
+
+    /// <summary>
     /// Gets a value indicating whether sending stopped before the end of the body because a
     /// status of 300 or above arrived first.
     /// </summary>
@@ -178,8 +222,7 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
     /// </exception>
     internal async ValueTask WriteAsync(HttpRequestBody body, bool isChunked, CancellationToken cancellationToken)
     {
-        expectedLength = body is BytesBody known ? known.Content.Length : ((StreamBody)body).Length;
-        heldBack = null;
+        StartSending(body);
         if (EarlyResponseWatch is null)
         {
             Progress.ReportUploaded(BytesSent, expectedLength);
@@ -195,6 +238,40 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
         }
 
         await WriteHeldHeadAsync(cancellationToken).ConfigureAwait(false);
+        if (pendingRead is null)
+        {
+            await FinishWriteAsync(isChunked, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// Sends the rest of a stream body whose read was left pending when a status of 300 or above
+    /// arrived first under <see cref="KeepsSendingOnError" />: waits for that read, then reads and
+    /// sends to the end of the body without racing the response again, as libcurl 8.x sends the
+    /// rest once the upload is unpaused (upstream case 1533, BL-2729). Does nothing when no read was
+    /// left pending.
+    /// </summary>
+    /// <param name="cancellationToken">Cancels the reads and writes.</param>
+    /// <returns>A task that completes when the rest of the body has been written.</returns>
+    /// <exception cref="HttpTransferException">As <see cref="WriteAsync" /> throws it.</exception>
+    internal async ValueTask WriteRestAfterResponseAsync(CancellationToken cancellationToken)
+    {
+        if (pendingRead is null)
+        {
+            return;
+        }
+
+        racesPendingReads = false;
+        await SendStreamReadsAsync(sendingStream!, sendingChunked, cancellationToken).ConfigureAwait(false);
+        await FinishWriteAsync(sendingChunked, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Writes the closing chunk of a chunked body not cut short, what is held back, flushes, and
+    /// ends an HTTP/2 or HTTP/3 stream.
+    /// </summary>
+    private async ValueTask FinishWriteAsync(bool isChunked, CancellationToken cancellationToken)
+    {
         if (isChunked && !CutShort)
         {
             await WriteLastChunkAsync(cancellationToken).ConfigureAwait(false);
@@ -204,6 +281,20 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
         heldBack = null;
         await HttpConnectionSend.FlushAsync(connection, cancellationToken).ConfigureAwait(false);
         await HttpConnectionSend.EndStreamRequestAsync(connection, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Resets what one send of <paramref name="body" /> keeps: its length when known, nothing held
+    /// back, and its stream's <see cref="IUploadTrailerSource" /> with no closing chunk made yet.
+    /// </summary>
+    private void StartSending(HttpRequestBody body)
+    {
+        StreamBody? stream = body as StreamBody;
+        expectedLength = stream is null ? ((BytesBody)body).Content.Length : stream.Length;
+        heldBack = null;
+        trailerSource = stream?.Content as IUploadTrailerSource;
+        lastChunk = null;
+        sendingStream = stream;
     }
 
     /// <summary>
@@ -283,7 +374,17 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
     private async ValueTask WriteStreamAsync(StreamBody body, bool isChunked, CancellationToken cancellationToken)
     {
         StartReading(body, isChunked);
-        byte[] buffer = new byte[UploadBufferSize];
+        sendingChunked = isChunked;
+        await SendStreamReadsAsync(body, isChunked, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Reads the stream body and sends each read until its end, a cut short, or a read left
+    /// pending (<see cref="ReadLeftPending" />).
+    /// </summary>
+    private async ValueTask SendStreamReadsAsync(StreamBody body, bool isChunked, CancellationToken cancellationToken)
+    {
+        byte[] buffer = readBuffer ??= new byte[UploadBufferSize];
         while (!CutShort)
         {
             int room = NextReadRoom(isChunked);
@@ -296,15 +397,37 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
             int requested = (int)Math.Min(remaining, room);
             int read = await ReadAsync(body.Content, buffer.AsMemory(0, requested), cancellationToken)
                 .ConfigureAwait(false);
-            ReportStreamRead(room, requested, body.Length, read, isChunked);
-            if (read == 0)
+            if (!await SendReadAsync(body.Length, buffer, room, requested, read, isChunked, cancellationToken).ConfigureAwait(false))
             {
-                ThrowIfShort(body.Length);
                 return;
             }
-
-            await WriteReadPieceAsync(buffer.AsMemory(0, read), isChunked, cancellationToken).ConfigureAwait(false);
         }
+    }
+
+    /// <summary>
+    /// Reports and sends one read of a stream body.
+    /// </summary>
+    /// <returns>
+    /// <see langword="false" /> when the read was left pending (<see cref="ReadLeftPending" />) or
+    /// ended the body, so reading stops; <see langword="true" /> when the next read follows.
+    /// </returns>
+    /// <exception cref="HttpTransferException">A body of known length ended early (exit 26).</exception>
+    private async ValueTask<bool> SendReadAsync(long? length, byte[] buffer, int room, int requested, int read, bool isChunked, CancellationToken cancellationToken)
+    {
+        if (read == ReadLeftPending)
+        {
+            return false;
+        }
+
+        ReportStreamRead(room, requested, length, read, isChunked);
+        if (read == 0)
+        {
+            ThrowIfShort(length);
+            return false;
+        }
+
+        await WriteReadPieceAsync(buffer.AsMemory(0, read), isChunked, cancellationToken).ConfigureAwait(false);
+        return true;
     }
 
     /// <summary>
@@ -432,13 +555,15 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
         int framed = read;
         if (isChunked)
         {
-            framed = ReportChunkMade(read) + (endOfBody ? LastChunk.Length : 0);
+            framed = ReportChunkMade(read) + (endOfBody ? LastChunkBytes().Length : 0);
             room += ChunkFramingReserve;
         }
 
         if (isChunked && endOfBody)
         {
-            Events.ReportInfo(HttpClientReaderTraceLines.AddedLastChunk);
+            Events.ReportInfo(SuppliesTrailers
+                ? HttpClientReaderTraceLines.AddedLastChunkWithTrailers
+                : HttpClientReaderTraceLines.AddedLastChunk);
         }
 
         Events.ReportInfo(HttpClientReaderTraceLines.ClientRead(room, framed, endOfBody));
@@ -481,7 +606,7 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
     {
         try
         {
-            return await stream.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
+            return await ReadOrLeavePendingAsync(stream, buffer, cancellationToken).ConfigureAwait(false);
         }
         catch (RequestBodyReadFailedException failed)
         {
@@ -494,6 +619,76 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
             return 0;
         }
     }
+
+    /// <summary>
+    /// Starts a read of the body stream, or takes back the read <see cref="pendingRead" /> left
+    /// pending. Under <see cref="EarlyResponseRead" />, a read that does not complete at once is
+    /// raced against the response's status line (<see cref="RaceResponseAsync" />).
+    /// </summary>
+    private ValueTask<int> ReadOrLeavePendingAsync(Stream stream, Memory<byte> buffer, CancellationToken cancellationToken)
+    {
+        if (pendingRead is { } pending)
+        {
+            pendingRead = null;
+            return new ValueTask<int>(pending);
+        }
+
+        if (EarlyResponseRead is not { } watch || !racesPendingReads)
+        {
+            return stream.ReadAsync(buffer, cancellationToken);
+        }
+
+        CancellationTokenSource reading = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        ValueTask<int> read = stream.ReadAsync(buffer, reading.Token);
+        if (read.IsCompleted)
+        {
+            reading.Dispose();
+            return read;
+        }
+
+        return RaceResponseAsync(watch, read.AsTask(), reading, cancellationToken);
+    }
+
+    /// <summary>
+    /// Sends the request head and what is held back, then waits for whichever comes first: the
+    /// pending <paramref name="read" />, or the response's status line. A status of 300 or above
+    /// first leaves the read pending and gives <see cref="ReadLeftPending" />: under
+    /// <see cref="KeepsSendingOnError" /> the read is kept in <see cref="pendingRead" /> for
+    /// <see cref="WriteRestAfterResponseAsync" />, and otherwise it is cancelled and the body
+    /// <see cref="CutShort" /> with nothing unsent kept, as libcurl 8.x stops sending on an early
+    /// error response (upstream case 1533, BL-2729). Any other status, or none, waits for the read.
+    /// </summary>
+    private async ValueTask<int> RaceResponseAsync(HttpEarlyResponseConnection watch, Task<int> read, CancellationTokenSource reading, CancellationToken cancellationToken)
+    {
+        await WriteHeldHeadAsync(cancellationToken).ConfigureAwait(false);
+        await ReleaseHeldBackAsync(cancellationToken).ConfigureAwait(false);
+        await HttpConnectionSend.FlushAsync(connection, cancellationToken).ConfigureAwait(false);
+        Task<int?> statusCode = watch.ReadStatusCodeAsync(cancellationToken);
+        await Task.WhenAny(read, statusCode).ConfigureAwait(false);
+        if (read.IsCompleted || !StopsSending(statusCode))
+        {
+            using (reading)
+            {
+                return await read.ConfigureAwait(false);
+            }
+        }
+
+        if (KeepsSendingOnError)
+        {
+            pendingRead = read;
+            return ReadLeftPending;
+        }
+
+        CutShort = true;
+        unsent = ReadOnlyMemory<byte>.Empty;
+        await reading.CancelAsync().ConfigureAwait(false);
+        reading.Dispose();
+        return ReadLeftPending;
+    }
+
+    /// <summary>Tells whether the status line read has a status of 300 or above.</summary>
+    private static bool StopsSending(Task<int?> statusCode) =>
+        statusCode.IsCompletedSuccessfully && statusCode.Result >= 300;
 
     private void ThrowIfShort(long? length)
     {
@@ -626,17 +821,66 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
     /// </summary>
     private async ValueTask WriteLastChunkAsync(CancellationToken cancellationToken)
     {
+        byte[] last = LastChunkBytes();
         if (watchedHeldPiece.IsEmpty)
         {
-            await SendAsync(LastChunk, cancellationToken).ConfigureAwait(false);
+            await SendAsync(last, cancellationToken).ConfigureAwait(false);
         }
-        else if (!await SendWatchedHeldPieceAsync(LastChunk, cancellationToken).ConfigureAwait(false))
+        else if (!await SendWatchedHeldPieceAsync(last, cancellationToken).ConfigureAwait(false))
         {
             return;
         }
 
-        ReportSent(LastChunk);
+        ReportSent(last);
         Progress.ReportUploaded(BytesSent, expectedLength);
+    }
+
+    /// <summary>Gets a value indicating whether the body's stream has a trailer source that is set.</summary>
+    private bool SuppliesTrailers => trailerSource is { SuppliesTrailers: true };
+
+    /// <summary>
+    /// Gives the closing chunk, made once per send when the body's end is first reached: the plain
+    /// <c>0\r\n\r\n</c>, or with a <see cref="trailerSource" /> its well-formed trailer lines between
+    /// the size line and the final CRLF, as curl 8.22.0's <c>add_last_chunk</c> makes it.
+    /// </summary>
+    /// <exception cref="HttpTransferException">The trailer source aborted (exit 42).</exception>
+    private byte[] LastChunkBytes() => lastChunk ??= SuppliesTrailers ? LastChunkWithTrailers(trailerSource!) : LastChunk;
+
+    /// <summary>
+    /// Asks <paramref name="source" /> for its trailers and gives the closing chunk that carries them,
+    /// reporting <c>Malformatted trailing header, skipping trailer</c> for each line curl 8.22.0 skips.
+    /// </summary>
+    /// <exception cref="HttpTransferException">The trailer source aborted (exit 42).</exception>
+    private byte[] LastChunkWithTrailers(IUploadTrailerSource source)
+    {
+        if (!source.TryTakeTrailers(out IReadOnlyList<string> lines))
+        {
+            throw new HttpTransferException(CurlExitCode.AbortedByCallback, IUploadTrailerSource.AbortedMessage);
+        }
+
+        StringBuilder chunk = new("0\r\n");
+        foreach (string line in lines)
+        {
+            if (IsWellFormedTrailer(line))
+            {
+                chunk.Append(line).Append("\r\n");
+            }
+            else
+            {
+                Events.ReportInfo(HttpTransferMessages.MalformattedTrailer);
+            }
+        }
+
+        return Encoding.UTF8.GetBytes(chunk.Append("\r\n").ToString());
+    }
+
+    /// <summary>
+    /// Tells whether a trailer line is one curl 8.22.0 sends: its first colon is followed by a space.
+    /// </summary>
+    private static bool IsWellFormedTrailer(string line)
+    {
+        int colon = line.IndexOf(':', StringComparison.Ordinal);
+        return colon >= 0 && colon + 1 < line.Length && line[colon + 1] == ' ';
     }
 
     /// <summary>

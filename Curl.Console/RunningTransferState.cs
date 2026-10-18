@@ -94,6 +94,13 @@ internal sealed class RunningTransferState(
     internal int RetryCount { get; set; }
 
     /// <summary>
+    /// Gets or sets what the transfer's easy handle answered to <c>curl_easy_getinfo</c> after its last perform,
+    /// which its <c>-w</c> output prints (ADR-0625, BL-2452); <see langword="null" /> without <c>-w</c>, under
+    /// <c>-Z</c>, and for a transfer that never reached its handle.
+    /// </summary>
+    internal EasyHandleWriteOutInfo? EasyWriteOutInfo { get; set; }
+
+    /// <summary>
     /// Gets or sets the warning <c>--retry</c> gave up its retries with, such as
     /// <see cref="TransferRetryWarning.RetryAfterExceedsMaxTime" />, which curl 8.21.0 prints
     /// after the transfer's progress meter (upstream test366, BL-2008); <see langword="null" />
@@ -142,25 +149,6 @@ internal sealed class RunningTransferState(
     /// under <c>--trace-ids</c> marked with its IDs (task BL-648); <see cref="NoTransferEvents.Instance" /> until then.
     /// </summary>
     internal ITransferEvents Events { get; set; } = NoTransferEvents.Instance;
-
-    /// <summary>
-    /// Gets or sets the OpenSSL verify code of the origin's last certificate check, which
-    /// <c>%{ssl_verify_result}</c> prints; <c>0</c> until one is reported (task BL-661).
-    /// </summary>
-    internal long SslVerifyResult { get; set; }
-
-    /// <summary>
-    /// Gets or sets the OpenSSL verify code of the HTTPS proxy's last certificate check, which
-    /// <c>%{proxy_ssl_verify_result}</c> prints; <c>0</c> until one is reported (task BL-661).
-    /// </summary>
-    internal long ProxySslVerifyResult { get; set; }
-
-    /// <summary>
-    /// Gets or sets the TLS 1.3 early data bytes the origin connection sent, negative when the
-    /// server rejected them, which <c>%{tls_earlydata}</c> prints; <c>0</c> until one is reported
-    /// (task BL-1150).
-    /// </summary>
-    internal long TlsEarlyDataSent { get; set; }
 
     /// <summary>
     /// Gets or sets the <c>If-None-Match</c> lines <c>--etag-compare</c> has added to the transfer's option

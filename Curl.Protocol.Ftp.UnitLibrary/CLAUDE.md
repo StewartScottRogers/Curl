@@ -43,8 +43,16 @@ the failure that ends a session as `error` with its `CurlExitCode`, the EPSV-to-
 EPRT-to-PORT fallbacks, a skipped `227` address, a refused `AUTH` or `PROT P` and an
 ignored `*` quote as `warning`, login, TLS, directory reached, data connection and
 transfer start and end as `info`, and each command and reply as `verbose`, the argument
-of `PASS` and `ACCT` never; both connect targets carry the log on. Still to
-come: the other FTP-only options.
+of `PASS` and `ACCT` never; both connect targets carry the log on. For wildcard downloads
+(BL-2476, ADR-0613), `FtpFileListParser` turns a `LIST` reply into `FtpFileListEntry` values
+as curl 8.22.0's `lib/ftplistparser.c` does (Unix `ls -l` and DOS formats; malformed is exit
+87), and `FtpWildcardPattern` matches names as the platform's curl does: curl's own `Curl_fnmatch`
+on Windows, and through `FtpWildcardMatcher` glibc's `fnmatch` on Linux (`FtpGlibcBracket`) or macOS
+libc's (`FtpAppleBracket`), with `FtpSystemFnmatch` and `FtpWideCharacterClass` (BL-2480). With
+`FtpProtocolHandler.WildcardHooks` set (`IFtpWildcardHooks`; `FtpDownloadEveryMatch` is
+libcurl's default), a download URL whose last part is a pattern lists the directory and
+downloads each match on the same connection, calling the match, chunk-begin and chunk-end
+hooks as curl 8.22.0's `wc_statemach` does (BL-2478, ADR-0615); libcurl wires them in BL-2420. `FtpProtocolHandler.ConnectOnlyAsync` runs only the connect phase (greeting, `AUTH`, login, `PBSZ`, `PROT`, `CCC`, `PWD`) and hands back the open control connection in an `FtpConnectOnlyOutcome`, libcurl's `CURLOPT_CONNECT_ONLY` 1 for `ftp://` (BL-2705). `FtpProtocolHandler.StopsBeforeEntryPath` makes a new control connection wait after the login without sending `PWD` until the transfer is cancelled or the connect phase times out, the debug build's `CURL_FTP_PWD_STOP`, which only the conformance harness turns on (BL-2636, ADR-0687). Still to come: the other FTP-only options.
 
 **URL schemes:** `ftp`, and `ftps` for a handler built with a listener and a TLS provider.
 

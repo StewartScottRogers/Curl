@@ -312,7 +312,7 @@ public sealed class FtpProtocolHandlerQuoteTests
         diagnostics.DiffSent(expectedSent, run.Sent);
         Assert.AreEqual(expectedSent, run.Sent);
         Assert.AreEqual(HeadLines, run.OutputText);
-        Assert.AreEqual(TransferResult.Success(0), run.Result);
+        Assert.AreEqual(TransferResult.Success(0) with { SourceLastWriteTimeUtc = run.Result.SourceLastWriteTimeUtc }, run.Result);
     }
 
     [TestMethod]
@@ -532,6 +532,7 @@ public sealed class FtpProtocolHandlerQuoteTests
     private static void Head(MutableContext context)
     {
         context.NoBody = true;
+        context.RemoteTime = true;
         context.HeaderOutput = context.Output;
     }
 

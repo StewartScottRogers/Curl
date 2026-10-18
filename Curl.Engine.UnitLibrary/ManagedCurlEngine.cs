@@ -1,11 +1,18 @@
+using Curl.Api.Callbacks;
 using Curl.Api.EngineContracts;
 using Curl.Api.EngineContracts.Mime;
 using Curl.Api.EngineContracts.Multi;
 using Curl.Api.EngineContracts.Share;
 using Curl.Api.EngineContracts.Url;
 using Curl.Api.Options;
+using Curl.Api.Options.Protocols;
 using Curl.Core;
+using Curl.Core.FileSystem;
+using Curl.Core.Multipart;
 using Curl.Protocol.Abstractions;
+using Curl.Protocol.Http;
+using Curl.Protocol.Imap;
+using Curl.Protocol.Ws;
 
 namespace Curl.Engine;
 
@@ -17,13 +24,14 @@ namespace Curl.Engine;
 /// ADR-0542), shared by its handles as the curl tool's transfers share them across a run, and none is
 /// static, so two engines in one process share nothing but what a <see cref="ManagedShareHandle" /> shares
 /// (ADR-0606). The multi handle is <see cref="ManagedMultiTransfer" /> and the URL handle
-/// <see cref="ManagedCurlUrlHandle" />; the MIME and form handles are phase 3 work (ADR-0506) and throw
-/// <see cref="NotSupportedException" /> here.
+/// <see cref="ManagedCurlUrlHandle" />, the MIME handle <see cref="ManagedMimeBuilder" /> and the form
+/// <see cref="ManagedFormBuilder" />.
 /// </summary>
 public sealed class ManagedCurlEngine : ICurlEngine
 {
     private readonly ManagedEngineSharedState shared;
-    private readonly Func<EasyOptions, ManagedEngineSharedState, ICookieStore?, ProtocolDispatcher> createDispatcher;
+    private readonly EasyTransferHost handleHost;
+    private readonly Func<EasyOptions, ManagedEngineSharedState, ICookieStore?, IHttp2PushSink?, ProtocolDispatcher> createDispatcher;
 
     /// <summary>Creates the engine on the system clock and the real network, with no easy error text.</summary>
     public ManagedCurlEngine()
@@ -42,41 +50,70 @@ public sealed class ManagedCurlEngine : ICurlEngine
     /// for the production one.
     /// </param>
     /// <param name="easyErrorText">
-    /// Curl's easy error text for each exit code: <c>Curl.Console</c>'s <c>CurlEasyErrorText.Of</c>, which
-    /// stays there (BL-2291); <see langword="null" /> for an empty text.
+    /// Curl's easy error text for each exit code: <c>CurlEasyErrorText.Of</c> (in <c>Libcurl/Misc/ErrorText</c>), which
+    /// <c>Curl.Console</c> passes in (BL-2291, BL-2450); <see langword="null" /> for an empty text.
+    /// </param>
+    /// <param name="readEnvironmentVariable">
+    /// Reads the proxy environment variables each handle's own perform consults, as libcurl reads them for every
+    /// handle (BL-2519); <see langword="null" /> for <see cref="Environment.GetEnvironmentVariable(string)" />.
+    /// </param>
+    /// <param name="dialing">
+    /// What the production dispatcher's transports dial, resolve and open datagram channels through in place of
+    /// sockets: the conformance harness's in-memory servers, as <c>Curl.Console</c>'s dialing runner takes them
+    /// (ADR-0658); <see langword="null" /> for the real network.
+    /// </param>
+    /// <param name="signingClock">
+    /// The clock the production dispatcher's HTTP handler signs <c>CURLOPT_AWS_SIGV4</c> requests and HTTP signatures with:
+    /// the conformance harness's epoch, standing in for the debug build's <c>CURL_FORCETIME</c> (BL-2675, ADR-0671);
+    /// <see langword="null" /> for <see cref="TimeProvider.System" />.
+    /// </param>
+    /// <param name="webSocketRandomSource">
+    /// Where every handle's WebSocket key and frame masks come from: the conformance harness's stand-in for the debug
+    /// build's <c>CURL_ENTROPY</c> (BL-2688, ADR-0678); <see langword="null" /> for <see cref="SystemWebSocketRandomSource" />.
+    /// </param>
+    /// <param name="standardInput">
+    /// The standard input every handle's <see cref="EasyTransferHost.StandardInput" /> reads, as libcurl reads the process's
+    /// <c>stdin</c> for a <c>curl_formadd</c> file named <c>-</c> and a cookie file named <c>-</c>: the conformance harness's
+    /// case <c>&lt;stdin&gt;</c> (upstream test650, BL-2625); <see langword="null" /> for <see cref="EasyTransferHost.Library" />'s
+    /// empty one.
+    /// </param>
+    /// <param name="stopsFirstFtpTransferBeforePwd">
+    /// Whether the engine's first perform stops its FTP connect phase after the login, before <c>PWD</c>: the conformance
+    /// harness's stand-in for the debug build's <c>CURL_FTP_PWD_STOP</c> (upstream test753, BL-2636, ADR-0687);
+    /// <see langword="false" /> sends <c>PWD</c> as a release build does.
     /// </param>
     internal ManagedCurlEngine(
         TimeProvider timeProvider,
         Func<EasyOptions, ManagedEngineSharedState, ICookieStore?, ProtocolDispatcher>? createDispatcher,
-        Func<CurlExitCode, string>? easyErrorText = null)
+        Func<CurlExitCode, string>? easyErrorText = null,
+        Func<string, string?>? readEnvironmentVariable = null,
+        EngineDialing? dialing = null,
+        TimeProvider? signingClock = null,
+        IWebSocketRandomSource? webSocketRandomSource = null,
+        Stream? standardInput = null,
+        bool stopsFirstFtpTransferBeforePwd = false)
     {
-        shared = new ManagedEngineSharedState(timeProvider, easyErrorText ?? (_ => string.Empty));
-        this.createDispatcher = createDispatcher ?? CreateDispatcher;
+        shared = new ManagedEngineSharedState(timeProvider, easyErrorText ?? (_ => string.Empty), readEnvironmentVariable, dialing, signingClock, webSocketRandomSource, FirstTransferFtpPwdStop.When(stopsFirstFtpTransferBeforePwd));
+        handleHost = standardInput is null ? EasyTransferHost.Library : EasyTransferHost.Library with { StandardInput = standardInput };
+        this.createDispatcher = createDispatcher is null ? CreateDispatcher : (options, state, cookies, _) => createDispatcher(options, state, cookies);
     }
 
     /// <summary>Gets what the engine's handles share.</summary>
     internal ManagedEngineSharedState Shared => shared;
 
     /// <inheritdoc />
-    public CurlVersionInfo VersionInfo { get; } = new()
-    {
-        Protocols =
-        [
-            "dict", "file", "ftp", "ftps", "gopher", "gophers", "http", "https", "imap", "imaps", "ldap", "ldaps",
-            "mqtt", "mqtts", "pop3", "pop3s", "rtsp", "scp", "sftp", "smb", "smbs", "smtp", "smtps", "telnet", "tftp",
-            "ws", "wss",
-        ],
-    };
+    /// <remarks>The build <c>curl -V</c> describes on the running platform (<see cref="ManagedCurlVersion" />, BL-2465).</remarks>
+    public CurlVersionInfo VersionInfo { get; } = ManagedCurlVersion.For(OperatingSystem.IsWindows(), OperatingSystem.IsMacOS());
 
     /// <inheritdoc />
-    public IEasyTransfer CreateEasy() => new ManagedEasyTransfer(createDispatcher, shared);
+    public IEasyTransfer CreateEasy() => new ManagedEasyTransfer(createDispatcher, shared) { Host = handleHost };
 
     /// <summary>
     /// <c>curl_multi_init</c>: a <see cref="ManagedMultiTransfer" /> whose transfers run over the
     /// engine's shared connections (ADR-0594).
     /// </summary>
     /// <returns>The new multi handle; the caller disposes it (<c>curl_multi_cleanup</c>).</returns>
-    public IMultiTransfer CreateMulti() => new ManagedMultiTransfer(shared.MultiOwners, shared.TimeProvider, SocketWaitPoller.Instance, shared.Connections.CloseIdleAsync, shared.DnsCache.Clear);
+    public IMultiTransfer CreateMulti() => new ManagedMultiTransfer(shared.MultiOwners, shared.TimeProvider, SocketWaitPoller.Instance, shared.Connections.CloseIdleAsync, shared.Connections.CloseIdleBeyondAsync, shared.DnsCache.Clear);
 
     /// <summary><c>curl_share_init</c>: a <see cref="ManagedShareHandle" /> sharing nothing yet, on the engine's clock (ADR-0606).</summary>
     /// <returns>The new share handle; the caller frees it with <see cref="IShareHandle.Cleanup" />.</returns>
@@ -90,10 +127,9 @@ public sealed class ManagedCurlEngine : ICurlEngine
     /// <returns>A <see cref="ManagedMimeBuilder" />, whose body <c>CURLOPT_MIMEPOST</c> sends.</returns>
     public IMimeBuilder CreateMime() => new ManagedMimeBuilder();
 
-    /// <summary>Not supported yet: the form API is phase 3's MIME API work (ADR-0506).</summary>
-    /// <returns>Never returns.</returns>
-    /// <exception cref="NotSupportedException">Always.</exception>
-    public ICurlFormBuilder CreateForm() => throw new NotSupportedException("The form API is phase 3 work (ADR-0506).");
+    /// <summary><c>curl_formadd</c> on a null <c>httppost</c>: a new form holding no field (BL-2440).</summary>
+    /// <returns>A <see cref="ManagedFormBuilder" /> whose <c>curl_formget</c> reads files from disk under curl's random boundary.</returns>
+    public ICurlFormBuilder CreateForm() => new ManagedFormBuilder(new PhysicalFileSystem(), MultipartBoundary.CreateRandom);
 
     /// <summary>Closes every connection the engine's transfers kept open (<c>curl_global_cleanup</c>).</summary>
     /// <returns>A task that completes once they are closed.</returns>
@@ -103,39 +139,133 @@ public sealed class ManagedCurlEngine : ICurlEngine
     /// Builds a transfer's dispatcher as <c>Curl.Console</c>'s composition builds an option group's:
     /// <c>EngineComposition.CreateTransports</c>
     /// over the engine's caches, and the handlers over its pooling connector, the HTTP handler keeping
-    /// cookies in <paramref name="cookieStore" />.
+    /// cookies in <paramref name="cookieStore" />. FTP's active-mode listener runs the handle's socket callbacks
+    /// (<see cref="SocketCallbackConnectionListener" />, BL-2588).
     /// </summary>
     /// <param name="options">The transfer's options.</param>
     /// <param name="shared">The engine's shared caches.</param>
     /// <param name="cookieStore">The cookies the HTTP handler sends and keeps, or <see langword="null" /> with the cookie engine off.</param>
+    /// <param name="pushSink">Where the HTTP handler offers HTTP/2 server pushes (<see cref="EngineHttp2PushSink" />, BL-2469), or <see langword="null" /> to refuse them.</param>
     /// <returns>The dispatcher.</returns>
-    internal static ProtocolDispatcher CreateDispatcher(EasyOptions options, ManagedEngineSharedState shared, ICookieStore? cookieStore)
+    internal static ProtocolDispatcher CreateDispatcher(EasyOptions options, ManagedEngineSharedState shared, ICookieStore? cookieStore, IHttp2PushSink? pushSink = null)
     {
         CurlTransports transports = CreateTransports(options, shared);
+        IConnector connector = PrerequestConnector.Over(PoolOf(transports, transports.TcpConnector, options.Callbacks, shared), options.Callbacks.Prerequest);
         return new ProtocolDispatcher(EngineComposition.CreateProtocolHandlers(
-            transports.PoolingConnector,
+            connector,
             transports.UdpDatagramConnector,
             transports.TlsProvider,
             transports.DnsResolver,
             cookieStore,
+            securityContexts: HandBuiltNtlmContextsOf(connector, transports.UdpDatagramConnector, shared),
             proxyAuthSchemes: transports.ProxyTunnelOptions.ProxyAuthSchemes,
             negotiateOptions: NegotiateOptionsMapping.Of(options.Authentication),
-            ftpDataConnector: EngineComposition.FtpDataConnectorOf(transports)));
+            signingClock: shared.SigningClock,
+            ftpDataConnector: PoolOf(transports, transports.TcpConnector.ForFtpDataConnections(), options.Callbacks, shared),
+            ftpWildcardHooks: CallbackWildcardHooks.Of(options),
+            rtspInterleaveSink: CallbackInterleaveSink.Of(options.Callbacks.Interleave),
+            ftpListener: SocketCallbackConnectionListener.Over(shared.Dialing?.FtpListener ?? new Curl.Networking.TcpConnectionListener(), options.Callbacks, shared),
+            webSocketRawMode: IsWebSocketRawMode(options),
+            http2PushSink: pushSink,
+            webSocketRandomSource: shared.WebSocketRandomSource,
+            ftpStopsBeforeEntryPath: shared.FtpPwdStop?.TryClaim() == true));
     }
 
     /// <summary>
+    /// Gives whether <c>CURLOPT_WS_OPTIONS</c> holds <c>CURLWS_RAW_MODE</c>, under which a WebSocket transfer that
+    /// is not connect-only hands the write callback the received stream unframed (BL-2494).
+    /// </summary>
+    /// <param name="options">The transfer's options.</param>
+    /// <returns><see langword="true" /> when <see cref="WebSocketOptionBits.RawMode" /> is set.</returns>
+    internal static bool IsWebSocketRawMode(EasyOptions options) =>
+        (options.Protocols.WebSocket.Options & WebSocketOptionBits.RawMode) != 0;
+
+    /// <summary>
     /// Builds the connector a <c>CURLOPT_CONNECT_ONLY</c> 1 perform dials through: the <c>TcpConnector</c> of
-    /// <see cref="CreateDispatcher" />'s transports, not its pool, so the connection is the handle's own (ADR-0608).
+    /// <see cref="CreateDispatcher" />'s transports, not its pool, so the connection is the handle's own (ADR-0608),
+    /// under the handle's socket callbacks (ADR-0610) and its prerequest callback (ADR-0611).
     /// </summary>
     /// <param name="options">The transfer's options.</param>
     /// <param name="shared">The engine's shared caches.</param>
     /// <returns>The connector.</returns>
     internal static IConnector CreateConnectOnlyConnector(EasyOptions options, ManagedEngineSharedState shared) =>
-        CreateTransports(options, shared).TcpConnector;
+        PrerequestConnector.Over(SocketCallbackConnector.Over(CreateTransports(options, shared).TcpConnector, options.Callbacks, shared), options.Callbacks.Prerequest);
+
+    /// <summary>
+    /// Builds the handlers of a <c>CURLOPT_CONNECT_ONLY</c> 1 perform of a scheme whose connect phase sends commands
+    /// (BL-2623): an <see cref="FtpConnectOnlyHandler" /> and an <see cref="ImapConnectOnlyHandler" /> whose protocol
+    /// handlers dial through <paramref name="connector" /> (<see cref="CreateConnectOnlyConnector" />'s, so the connection
+    /// is the handle's own and never pooled), with <see cref="CreateDispatcher" />'s transports' TLS provider and DNS
+    /// resolver, IMAP's SASL answering as the engine's IMAP handler does, each giving the open connection to
+    /// <paramref name="connectOnly" />.
+    /// </summary>
+    /// <param name="connector">Dials the control connection.</param>
+    /// <param name="options">The transfer's options.</param>
+    /// <param name="shared">The engine's shared caches.</param>
+    /// <param name="connectOnly">Keeps the connection the connect phase leaves open.</param>
+    /// <returns>The handlers.</returns>
+    internal static IProtocolHandler[] CreateConnectOnlyLoginHandlers(IConnector connector, EasyOptions options, ManagedEngineSharedState shared, ConnectOnlyConnection connectOnly)
+    {
+        CurlTransports transports = CreateTransports(options, shared);
+        ISecurityContextFactory contexts = EngineComposition.CreateDialingSecurityContextFactory(transports.TcpConnector, transports.UdpDatagramConnector, diagnosticLog: null, UsesHandBuiltNtlm(shared));
+        return
+        [
+            new FtpConnectOnlyHandler(EngineComposition.CreateFtpProtocolHandler(connector, connector, transports.TlsProvider, transports.DnsResolver), connectOnly),
+            new ImapConnectOnlyHandler(new ImapProtocolHandler(connector, transports.TlsProvider, EngineComposition.CreateSaslAuthenticator(contexts, NegotiateOptionsMapping.Of(options.Authentication).Delegation)), connectOnly),
+        ];
+    }
+
+    /// <summary>
+    /// Builds the authenticator a <c>CURLOPT_CONNECT_ONLY</c> 2 perform's WebSocket upgrade answers a challenge with, as
+    /// <see cref="EngineComposition.CreateProtocolHandlers" /> builds the WebSocket handler's: the ranked schemes over the
+    /// security contexts of <see cref="CreateDispatcher" />'s transports, Negotiate as the handle's options say (ADR-0616).
+    /// </summary>
+    /// <param name="options">The transfer's options.</param>
+    /// <param name="shared">The engine's shared caches.</param>
+    /// <returns>The authenticator.</returns>
+    internal static IHttpAuthenticator CreateWebSocketAuthenticator(EasyOptions options, ManagedEngineSharedState shared)
+    {
+        CurlTransports transports = CreateTransports(options, shared);
+        return EngineComposition.CreateHttpAuthenticator(
+            EngineComposition.CreateDialingSecurityContextFactory(transports.TcpConnector, transports.UdpDatagramConnector, diagnosticLog: null, UsesHandBuiltNtlm(shared)),
+            NegotiateOptionsMapping.Of(options.Authentication));
+    }
+
+    /// <summary>
+    /// The security contexts a transfer's handlers answer NTLM, Negotiate and Kerberos with when the engine's
+    /// <see cref="EngineDialing.UsesHandBuiltNtlm" /> is set: <see cref="EngineComposition.CreateDialingSecurityContextFactory" />'s,
+    /// NTLM going to the hand-built context on every platform, as the dialing runner's do (BL-2635); else
+    /// <see langword="null" />, the handlers' own router.
+    /// </summary>
+    /// <param name="connector">Opens TCP connections to a KDC.</param>
+    /// <param name="datagramConnector">Opens UDP channels to a KDC.</param>
+    /// <param name="shared">The engine's shared state.</param>
+    /// <returns>The factory, or <see langword="null" />.</returns>
+    internal static ISecurityContextFactory? HandBuiltNtlmContextsOf(IConnector connector, IDatagramConnector datagramConnector, ManagedEngineSharedState shared) =>
+        UsesHandBuiltNtlm(shared) ? EngineComposition.CreateDialingSecurityContextFactory(connector, datagramConnector, diagnosticLog: null, usesHandBuiltNtlm: true) : null;
+
+    private static bool UsesHandBuiltNtlm(ManagedEngineSharedState shared) => shared.Dialing is { UsesHandBuiltNtlm: true };
+
+    /// <summary>
+    /// The pool a transfer's TCP handlers connect through: the transports' own over their <c>TcpConnector</c>, as
+    /// <c>Curl.Console</c>'s composition builds it, or, when the handle sets a socket callback, one over the same cache
+    /// that opens connections through a <see cref="SocketCallbackConnector" /> over <paramref name="opener" />, so the
+    /// callbacks run once per connection opened and the close-socket callback when the pool closes it (ADR-0610).
+    /// </summary>
+    /// <param name="transports">The transfer's transports.</param>
+    /// <param name="opener">Opens the pool's new connections: the <c>TcpConnector</c>, or its FTP data connector.</param>
+    /// <param name="callbacks">The handle's callbacks.</param>
+    /// <param name="shared">The engine's shared state.</param>
+    /// <returns>The pool.</returns>
+    internal static IConnector PoolOf(CurlTransports transports, IConnector opener, EasyCallbackOptions callbacks, ManagedEngineSharedState shared)
+    {
+        IConnector socketCallbacks = SocketCallbackConnector.Over(opener, callbacks, shared);
+        return ReferenceEquals(socketCallbacks, transports.TcpConnector) ? transports.PoolingConnector : transports.PoolingConnector.Over(socketCallbacks);
+    }
 
     private static CurlTransports CreateTransports(EasyOptions options, ManagedEngineSharedState shared)
     {
         EngineToolOptions tool = new(Parallel: false, ParallelImmediate: false, SslSessionsFile: null, MaxTime: options.Transfer.Timeout > TimeSpan.Zero ? options.Transfer.Timeout : null);
-        return EngineComposition.CreateTransports(tool, options.Network, options.Tls, options.Http, options.Proxy, options.Authentication, shared.TimeProvider, shared.Connections, shared.TlsSessions, runDnsCache: shared.DnsCache);
+        return EngineComposition.CreateTransports(tool, options.Network, options.Tls, options.Http, options.Proxy, options.Authentication, shared.TimeProvider, shared.Connections, shared.TlsSessions, diagnosticLog: null, shared.DnsCache, easyErrorText: null, traces: null, resolver => ResolverStartDnsResolver.Over(resolver, options.Callbacks.ResolverStart), shared.Dialing);
     }
 }

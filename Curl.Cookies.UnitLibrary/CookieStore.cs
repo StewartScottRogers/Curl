@@ -205,6 +205,30 @@ public sealed class CookieStore : ICookieStore
         }
     }
 
+    /// <summary>
+    /// Removes every stored cookie, as libcurl's <c>Curl_cookie_clearall</c> does for <c>CURLOPT_COOKIELIST</c>
+    /// <c>ALL</c>. The strings given to <see cref="AddCookieString"/> are kept.
+    /// </summary>
+    public void RemoveAll()
+    {
+        lock (storeLock)
+        {
+            cookies.Clear();
+        }
+    }
+
+    /// <summary>
+    /// Removes every stored session cookie (<see cref="Cookie.IsSessionCookie"/>), as libcurl's
+    /// <c>Curl_cookie_clearsess</c> does for <c>CURLOPT_COOKIELIST</c> <c>SESS</c>.
+    /// </summary>
+    public void RemoveSessionCookies()
+    {
+        lock (storeLock)
+        {
+            cookies.RemoveAll(cookie => cookie.IsSessionCookie);
+        }
+    }
+
     /// <summary>Loads a Netscape cookie file (<c>-b</c> naming a file) as curl does.</summary>
     /// <remarks>
     /// Each cookie <see cref="NetscapeCookieFile.Read(TextReader, DateTimeOffset)"/> accepts is stored in file order, replacing a

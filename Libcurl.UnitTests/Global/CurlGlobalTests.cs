@@ -99,7 +99,7 @@ public sealed class CurlGlobalTests
     }
 
     [TestMethod]
-    public async Task InitMemory_AcceptsTheCallbacksAndNeverCallsThem()
+    public async Task InitMemory_AcceptsTheCallbacks_AndAnEngineTransferCallsNone()
     {
         var called = false;
 

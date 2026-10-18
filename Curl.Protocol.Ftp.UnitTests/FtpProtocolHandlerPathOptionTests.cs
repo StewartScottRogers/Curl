@@ -365,6 +365,7 @@ public sealed class FtpProtocolHandlerPathOptionTests
             {
                 NoCwd(context);
                 context.NoBody = true;
+                context.RemoteTime = true;
                 context.HeaderOutput = context.Output;
             });
 
@@ -372,7 +373,7 @@ public sealed class FtpProtocolHandlerPathOptionTests
         Assert.AreEqual(LogInSent + "MDTM a/b/f.txt\r\nTYPE I\r\nSIZE a/b/f.txt\r\nREST 0\r\nQUIT\r\n", run.Sent);
         diagnostics.Diff("output", FtpDiagnostics.Escape("Last-Modified: Sun, 27 Sep 2026 12:34:56 GMT\r\nContent-Length: 3\r\nAccept-ranges: bytes\r\n"), FtpDiagnostics.Escape(run.OutputText));
         Assert.AreEqual("Last-Modified: Sun, 27 Sep 2026 12:34:56 GMT\r\nContent-Length: 3\r\nAccept-ranges: bytes\r\n", run.OutputText);
-        Assert.AreEqual(TransferResult.Success(0), run.Result);
+        Assert.AreEqual(TransferResult.Success(0) with { SourceLastWriteTimeUtc = run.Result.SourceLastWriteTimeUtc }, run.Result);
     }
 
     [TestMethod]

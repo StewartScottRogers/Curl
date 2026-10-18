@@ -315,6 +315,7 @@ public sealed partial class ManagedMultiTransferTests
             TimeProvider.System,
             new ScriptedWaitSocketPoller(),
             () => { connectionClears++; return ValueTask.CompletedTask; },
+            _ => ValueTask.CompletedTask,
             () => dnsClears++);
 
         multi.Options = new MultiOptions { NetworkChanged = change, MaxConnects = 7 };
@@ -334,6 +335,7 @@ public sealed partial class ManagedMultiTransferTests
             TimeProvider.System,
             new ScriptedWaitSocketPoller(),
             () => new ValueTask(closing.Task),
+            _ => ValueTask.CompletedTask,
             () => { });
         multi.Options = new MultiOptions { NetworkChanged = CurlNetworkChange.ClearConnections };
 

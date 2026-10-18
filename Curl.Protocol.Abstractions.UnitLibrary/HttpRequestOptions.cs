@@ -210,6 +210,13 @@ public sealed record HttpRequestOptions
     public bool AllowHttp09Reply { get; init; }
 
     /// <summary>
+    /// Gets a value indicating whether libcurl's <c>CURLOPT_KEEP_SENDING_ON_ERROR</c> was set:
+    /// keep sending the request body after the server has answered with an error status,
+    /// instead of stopping the upload. <see langword="false" /> by default.
+    /// </summary>
+    public bool KeepSendingOnError { get; init; }
+
+    /// <summary>
     /// Gets the request line's target from <c>--request-target</c>, verbatim, or
     /// <see langword="null" /> to derive it from <see cref="ITransferContext.Url" />.
     /// </summary>

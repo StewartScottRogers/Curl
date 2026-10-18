@@ -464,7 +464,7 @@ public sealed class FtpProtocolHandlerRangeTests
         string expectedOutput = LastModified + "Content-Length: 10\r\nAccept-ranges: bytes\r\n";
         diagnostics.Diff("output", FtpDiagnostics.Escape(expectedOutput), FtpDiagnostics.Escape(run.OutputText));
         Assert.AreEqual(expectedOutput, run.OutputText);
-        Assert.AreEqual(TransferResult.Success(0), run.Result);
+        Assert.AreEqual(TransferResult.Success(0) with { SourceLastWriteTimeUtc = run.Result.SourceLastWriteTimeUtc }, run.Result);
         diagnostics.Assert("connections opened", 1, run.Connector.Targets.Count);
         Assert.HasCount(1, run.Connector.Targets);
     }
@@ -481,7 +481,7 @@ public sealed class FtpProtocolHandlerRangeTests
             "ftp://127.0.0.1:18321/dir/",
             replies,
             "",
-            c => new TransferContext { Url = c.Url, Output = c.Output, NoBody = true, HeaderOutput = c.Output });
+            c => new TransferContext { Url = c.Url, Output = c.Output, NoBody = true, RemoteTime = true, HeaderOutput = c.Output });
         diagnostics.ActRun(run);
 
         string expectedSent = "USER anonymous\r\nPASS ftp@example.com\r\nPWD\r\nCWD dir\r\nQUIT\r\n";
@@ -535,7 +535,7 @@ public sealed class FtpProtocolHandlerRangeTests
         string expectedOutput = LastModified + "Accept-ranges: bytes\r\n";
         diagnostics.Diff("output", FtpDiagnostics.Escape(expectedOutput), FtpDiagnostics.Escape(run.OutputText));
         Assert.AreEqual(expectedOutput, run.OutputText);
-        Assert.AreEqual(TransferResult.Success(0), run.Result);
+        Assert.AreEqual(TransferResult.Success(0) with { SourceLastWriteTimeUtc = run.Result.SourceLastWriteTimeUtc }, run.Result);
     }
 
     [TestMethod]
@@ -551,7 +551,7 @@ public sealed class FtpProtocolHandlerRangeTests
         string expectedOutput = LastModified + "Content-Length: 10\r\n";
         diagnostics.Diff("output", FtpDiagnostics.Escape(expectedOutput), FtpDiagnostics.Escape(run.OutputText));
         Assert.AreEqual(expectedOutput, run.OutputText);
-        Assert.AreEqual(TransferResult.Success(0), run.Result);
+        Assert.AreEqual(TransferResult.Success(0) with { SourceLastWriteTimeUtc = run.Result.SourceLastWriteTimeUtc }, run.Result);
     }
 
     [TestMethod]
@@ -598,13 +598,34 @@ public sealed class FtpProtocolHandlerRangeTests
             Url,
             replies,
             "",
-            c => new TransferContext { Url = c.Url, Output = c.Output, NoBody = true });
+            c => new TransferContext { Url = c.Url, Output = c.Output, NoBody = true, RemoteTime = true });
         diagnostics.ActRun(run);
 
         diagnostics.DiffSent(HeadSent, run.Sent);
         Assert.AreEqual(HeadSent, run.Sent);
         diagnostics.Diff("output", string.Empty, run.OutputText);
         Assert.AreEqual("", run.OutputText);
+        Assert.AreEqual(TransferResult.Success(0) with { SourceLastWriteTimeUtc = run.Result.SourceLastWriteTimeUtc }, run.Result);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_NoBodyWithoutRemoteTime_SendsTypeBeforeSizeAndNoMdtm()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        string replies = InDirectory + "200 Type set\r\n213 10\r\n" + Restarting + Bye;
+        diagnostics.ArrangeFtp(Url, replies, string.Empty);
+        diagnostics.Arrange("NOBODY without FILETIME", "no MDTM, as upstream test542 expects");
+
+        FtpRun run = await FtpRun.ExecuteAsync(
+            Url,
+            replies,
+            "",
+            c => new TransferContext { Url = c.Url, Output = c.Output, NoBody = true, HeaderOutput = c.Output });
+        diagnostics.ActRun(run);
+
+        string expectedSent = "USER anonymous\r\nPASS ftp@example.com\r\nPWD\r\nCWD dir\r\nTYPE I\r\nSIZE f.txt\r\nREST 0\r\nQUIT\r\n";
+        diagnostics.DiffSent(expectedSent, run.Sent);
+        Assert.AreEqual(expectedSent, run.Sent);
         Assert.AreEqual(TransferResult.Success(0), run.Result);
     }
 
@@ -620,7 +641,7 @@ public sealed class FtpProtocolHandlerRangeTests
             Url,
             replies,
             "",
-            c => new TransferContext { Url = c.Url, Output = c.Output, NoBody = true, HeaderOutput = new WriteRefusingStream(new IOException("full")) });
+            c => new TransferContext { Url = c.Url, Output = c.Output, NoBody = true, RemoteTime = true, HeaderOutput = new WriteRefusingStream(new IOException("full")) });
         diagnostics.ActRun(run);
 
         string expectedSent = "USER anonymous\r\nPASS ftp@example.com\r\nPWD\r\nCWD dir\r\nMDTM f.txt\r\nQUIT\r\n";
@@ -638,5 +659,5 @@ public sealed class FtpProtocolHandlerRangeTests
     }
 
     private static Task<FtpRun> RunHeadAsync(TestDiagnostics diagnostics, string replies) =>
-        RunAsync(diagnostics, replies, "", c => new TransferContext { Url = c.Url, Output = c.Output, NoBody = true, HeaderOutput = c.Output });
+        RunAsync(diagnostics, replies, "", c => new TransferContext { Url = c.Url, Output = c.Output, NoBody = true, RemoteTime = true, HeaderOutput = c.Output });
 }

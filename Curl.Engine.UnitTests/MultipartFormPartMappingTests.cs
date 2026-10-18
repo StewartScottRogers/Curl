@@ -1,3 +1,6 @@
+using System.Text;
+using Curl.Api.Callbacks;
+using Curl.Api.EngineContracts;
 using Curl.Api.Options.Http;
 using Curl.Cli;
 using Curl.Console;
@@ -98,15 +101,99 @@ public sealed class MultipartFormPartMappingTests
     }
 
     [TestMethod]
-    public void FromMimeBody_CallbackData_IsRefused()
+    [DataRow(-1L, null)]
+    [DataRow(5L, 5L)]
+    public void FromMimeBody_CallbackData_IsAReaderPartOverTheCallbackKeptInCallbackReads(long size, long? expectedLength)
     {
-        Diagnostics.Arrange("part", "a curl_mime_data_cb part");
-        EasyMimeBody body = new() { Parts = [new EasyMimePart { Data = new EasyMimeCallback(-1, _ => 0, null) }] };
+        Diagnostics.Arrange("part", $"a curl_mime_data_cb part of size {size}");
+        EasyMimeBody body = new() { Parts = [new EasyMimePart { Name = "c", Data = new EasyMimeCallback(size, _ => 0, null) }] };
+        List<CallbackReadStream> reads = [];
 
-        NotSupportedException refusal = Assert.ThrowsExactly<NotSupportedException>(() => MultipartFormPartMapping.FromMimeBody(body));
-        Diagnostics.Act("message", refusal.Message);
+        IReadOnlyList<MultipartFormPart> parts = MultipartFormPartMapping.FromMimeBody(body, reads);
+        Diagnostics.Act("kind", parts[0].Kind);
 
-        Assert.Contains("callback", refusal.Message);
+        Assert.AreEqual(MultipartFormPartKind.Reader, parts[0].Kind);
+        Assert.AreEqual(expectedLength, parts[0].ContentLength);
+        Assert.IsEmpty(reads);
+        using Stream opened = parts[0].OpenContent!();
+        Assert.IsInstanceOfType<MimeCallbackReadStream>(opened);
+        Assert.AreSame(opened, reads.Single());
+    }
+
+    [TestMethod]
+    public async Task FromMimeBody_CallbackPausesWithAGate_ReadWaitsForTheUnpauseAndAsksAgain()
+    {
+        Diagnostics.Arrange("part", "a curl_mime_data_cb part whose callback pauses once, then gives B (upstream test670)");
+        int calls = 0;
+        EasyMimeBody body = new()
+        {
+            Parts = [new EasyMimePart { Name = "field", Data = new EasyMimeCallback(1, buffer => calls++ == 0 ? ReadCallbackResult.Pause : Give(buffer, (byte)'B'), null) }],
+        };
+        EasyPauseGate gate = new();
+
+        IReadOnlyList<MultipartFormPart> parts = MultipartFormPartMapping.FromMimeBody(body, null, gate);
+        await using Stream opened = parts[0].OpenContent!();
+        byte[] buffer = new byte[4];
+        Task<int> reading = opened.ReadAsync(buffer, 0, buffer.Length);
+        bool waitedWhilePaused = !reading.IsCompleted && gate.Directions == CurlPause.Send;
+        gate.Set(CurlPause.Continue);
+        int read = await reading;
+        Diagnostics.Act("read", read);
+
+        Assert.IsTrue(waitedWhilePaused);
+        Assert.AreEqual(1, read);
+        Assert.AreEqual((byte)'B', buffer[0]);
+        Assert.AreEqual(2, calls);
+    }
+
+    private static long Give(Span<byte> buffer, byte value)
+    {
+        buffer[0] = value;
+        return 1;
+    }
+
+    [TestMethod]
+    public void FromMimeBody_CallbackDataWithoutCallbackReads_OpensAStreamKeptNowhere()
+    {
+        Diagnostics.Arrange("part", "a curl_mime_data_cb part inside a multipart, no list given");
+        EasyMimeBody inner = new() { Parts = [new EasyMimePart { Data = new EasyMimeCallback(-1, _ => 0, null) }] };
+        EasyMimeBody body = new() { Parts = [new EasyMimePart { Name = "m", SubParts = inner }] };
+
+        IReadOnlyList<MultipartFormPart> parts = MultipartFormPartMapping.FromMimeBody(body);
+        Diagnostics.Act("inner kind", parts[0].Parts[0].Kind);
+
+        using Stream opened = parts[0].Parts[0].OpenContent!();
+        Assert.IsInstanceOfType<MimeCallbackReadStream>(opened);
+    }
+
+    [TestMethod]
+    public void FromMimeBody_BytesThatAreNotUtf8_IsABytesPartHoldingThemUnchanged()
+    {
+        byte[] bytes = [0x41, 0xFF, 0x00, 0x80];
+        Diagnostics.Arrange("bytes", Convert.ToHexString(bytes));
+        EasyMimeBody body = new() { Parts = [new EasyMimePart { Name = "b", Data = new EasyMimeBytes(bytes) }] };
+
+        IReadOnlyList<MultipartFormPart> parts = MultipartFormPartMapping.FromMimeBody(body);
+        Diagnostics.Act("kind", parts[0].Kind);
+
+        Assert.AreEqual(MultipartFormPartKind.Bytes, parts[0].Kind);
+        CollectionAssert.AreEqual(bytes, parts[0].Bytes.ToArray());
+        Assert.IsNull(parts[0].OpenContent);
+        Assert.IsNull(parts[0].ContentLength);
+    }
+
+    [TestMethod]
+    public void FromMimeBody_BytesThatAreUtf8_IsTextWithNoBytes()
+    {
+        Diagnostics.Arrange("bytes", "UTF-8 of é");
+        EasyMimeBody body = new() { Parts = [new EasyMimePart { Name = "t", Data = new EasyMimeBytes(Encoding.UTF8.GetBytes("é")) }] };
+
+        IReadOnlyList<MultipartFormPart> parts = MultipartFormPartMapping.FromMimeBody(body);
+        Diagnostics.Act("kind", parts[0].Kind);
+
+        Assert.AreEqual(MultipartFormPartKind.Text, parts[0].Kind);
+        Assert.AreEqual("é", parts[0].Content);
+        Assert.IsTrue(parts[0].Bytes.IsEmpty);
     }
 
     [TestMethod]

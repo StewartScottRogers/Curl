@@ -1,8 +1,8 @@
 namespace Libcurl.Global;
 
 /// <summary>
-/// <c>curl_realloc_callback</c>, the reallocator <see cref="CurlGlobal.InitMemory"/> accepts and ignores:
-/// the managed engine reallocates through the .NET runtime, never through it.
+/// <c>curl_realloc_callback</c>, the reallocator <see cref="CurlGlobal.InitMemory"/> accepts and never
+/// calls: no Libcurl call reallocates (ADR-0664).
 /// </summary>
 /// <param name="pointer">The block to resize.</param>
 /// <param name="size">Its new size in bytes.</param>

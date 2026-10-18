@@ -13,7 +13,10 @@ namespace Curl.Engine;
 /// <see cref="DnsServerResolver" /> when a c-ares option is given (BL-694), otherwise <see cref="SystemDnsResolver" />.
 /// </param>
 /// <param name="TimeProvider">The clock both connectors share.</param>
-/// <param name="TcpDialer">Opens the plaintext TCP connections <see cref="TcpConnector" /> dials.</param>
+/// <param name="TcpDialer">
+/// Opens the plaintext TCP connections <see cref="TcpConnector" /> dials, with the options' socket options; under an
+/// <see cref="EngineDialing" /> the connector dials through that one's dialer instead (ADR-0658).
+/// </param>
 /// <param name="TlsClientOptions">The settings <see cref="TlsProvider" /> applies to every handshake.</param>
 /// <param name="TlsProvider">
 /// Upgrades a TCP connection to TLS with the client <see cref="TlsClientRouting" /> chooses for
@@ -33,7 +36,10 @@ namespace Curl.Engine;
 /// Connects the TCP protocols, with TLS when the target asks for it, and resolves each QUIC
 /// connection's host for <see cref="QuicDialer" />.
 /// </param>
-/// <param name="UdpDatagramConnector">Opens the UDP channels the datagram protocols use.</param>
+/// <param name="UdpDatagramConnector">
+/// Opens the UDP channels the datagram protocols use: a <c>UdpDatagramConnector</c>, or an
+/// <see cref="EngineDialing" />'s datagram connector (ADR-0658).
+/// </param>
 /// <param name="PoolingConnector">
 /// The option group's connection pool over <see cref="TcpConnector" />: every TCP handler connects
 /// through it, so a later URL to the same pool key reuses an earlier URL's connection, and the
@@ -59,7 +65,7 @@ internal sealed record CurlTransports(
     HttpProxyTunnelOptions ProxyTunnelOptions,
     QuicDialer QuicDialer,
     TcpConnector TcpConnector,
-    UdpDatagramConnector UdpDatagramConnector,
+    IDatagramConnector UdpDatagramConnector,
     PoolingConnector PoolingConnector,
     IDiagnosticLog? DiagnosticLog = null,
     bool TracesFtp = false,

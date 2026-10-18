@@ -83,6 +83,14 @@ internal sealed class CallbackTransferProgress(Func<long, long, long, long, int>
     /// <inheritdoc />
     public void ReportTransferDone() => Report();
 
+    /// <summary>Calls the callback again with the counts it was last given, as libcurl does each time a paused transfer wakes (<see cref="EasyPauseGate.TickWhilePaused" />, BL-2631).</summary>
+    internal void ReportWhilePaused() => Report();
+
+    /// <summary>What a paused wait of a perform reporting to <paramref name="progress" /> calls (<see cref="ReportWhilePaused" />), or <see langword="null" /> for no progress callback.</summary>
+    /// <param name="progress">The perform's progress callback sink, or <see langword="null" />.</param>
+    /// <returns>The tick, or <see langword="null" />.</returns>
+    internal static Action? PausedTickOf(CallbackTransferProgress? progress) => progress is null ? null : progress.ReportWhilePaused;
+
     private void Report()
     {
         if (Aborted)

@@ -22,16 +22,19 @@ public sealed partial class CurlLibrary : IAsyncDisposable
 {
     private readonly ICurlEngine engine;
     private readonly GlobalInitCounter counter;
+    private readonly MemoryCallbacks? memory;
     private int cleanedUp;
 
     /// <summary>Counts one <c>curl_global_init</c> on <paramref name="counter"/> and holds <paramref name="engine"/>.</summary>
     /// <param name="engine">The engine handles are created from; the library disposes it on cleanup.</param>
     /// <param name="flags">The <c>CURL_GLOBAL_*</c> flags the library was initialised with.</param>
     /// <param name="counter">The <c>curl_global_init</c> counter to count on.</param>
-    internal CurlLibrary(ICurlEngine engine, CurlGlobalFlags flags, GlobalInitCounter counter)
+    /// <param name="memory">The <c>curl_global_init_mem</c> callbacks each easy handle allocates through, or <see langword="null"/> for none.</param>
+    internal CurlLibrary(ICurlEngine engine, CurlGlobalFlags flags, GlobalInitCounter counter, MemoryCallbacks? memory = null)
     {
         this.engine = engine;
         this.counter = counter;
+        this.memory = memory;
         Flags = flags;
         counter.Increment();
     }
@@ -65,6 +68,13 @@ public sealed partial class CurlLibrary : IAsyncDisposable
     /// <returns>The engine's new easy transfer.</returns>
     /// <exception cref="ObjectDisposedException">The library has been cleaned up.</exception>
     internal IEasyTransfer CreateEasyTransfer() => LiveEngine().CreateEasy();
+
+    /// <summary>
+    /// The allocations of a new easy handle: over the <c>curl_global_init_mem</c> callbacks, with the
+    /// handle's own <c>calloc</c> already made, else <see cref="EasyAllocations.None"/>.
+    /// </summary>
+    /// <returns>The handle's allocations.</returns>
+    internal EasyAllocations CreateEasyAllocations() => EasyAllocations.ForNewHandle(memory);
 
     /// <summary><c>curl_multi_init</c>'s engine call.</summary>
     /// <returns>The engine's new multi transfer.</returns>

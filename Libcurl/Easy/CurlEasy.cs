@@ -2,7 +2,10 @@ using Curl.Api.Codes;
 using Curl.Api.EngineContracts;
 using Curl.Api.EngineContracts.ConnectOnly;
 using Curl.Api.Options;
+using Curl.Api.Options.Http;
+using Libcurl.Global;
 using Libcurl.Info;
+using Libcurl.Mime;
 using Libcurl.Options;
 
 namespace Libcurl.Easy;
@@ -22,16 +25,23 @@ public sealed class CurlEasy : IDisposable, IAsyncDisposable
 {
     private readonly IEasyTransfer transfer;
     private readonly EasyOptionDispatch dispatch;
+    private readonly EasyAllocations allocations;
+    private CurlMime? boundMime;
     private int cleanedUp;
 
     /// <summary>Wraps the engine's <paramref name="transfer"/>, setting options through <paramref name="dispatch"/>.</summary>
     /// <param name="transfer">The engine's easy transfer; the handle disposes it on cleanup.</param>
     /// <param name="dispatch">The <c>curl_easy_setopt</c> dispatch.</param>
-    internal CurlEasy(IEasyTransfer transfer, EasyOptionDispatch dispatch)
+    /// <param name="allocations">The handle's <c>curl_global_init_mem</c> allocations; the handle frees them on cleanup.</param>
+    internal CurlEasy(IEasyTransfer transfer, EasyOptionDispatch dispatch, EasyAllocations? allocations = null)
     {
         this.transfer = transfer;
         this.dispatch = dispatch;
+        this.allocations = allocations ?? EasyAllocations.None;
     }
+
+    /// <summary>The handle's <c>curl_global_init_mem</c> allocations, which <c>curl_easy_escape</c> adds to.</summary>
+    internal EasyAllocations Allocations => allocations;
 
     /// <summary>Whether <see cref="Dispose"/> or <see cref="DisposeAsync"/> (<c>curl_easy_cleanup</c>) has run.</summary>
     public bool IsCleanedUp => Volatile.Read(ref cleanedUp) != 0;
@@ -61,6 +71,8 @@ public sealed class CurlEasy : IDisposable, IAsyncDisposable
         if (code == CurlCode.Ok)
         {
             live.Options = options;
+            StrdupString(value);
+            BindMime(option, value);
         }
 
         return code;
@@ -92,12 +104,17 @@ public sealed class CurlEasy : IDisposable, IAsyncDisposable
     /// <exception cref="ObjectDisposedException">The handle has been cleaned up.</exception>
     public CurlCode Perform() => PerformAsync(CancellationToken.None).AsTask().GetAwaiter().GetResult();
 
-    /// <summary><c>curl_easy_perform</c>: runs the transfer the handle's options describe.</summary>
+    /// <summary>
+    /// <c>curl_easy_perform</c>: runs the transfer the handle's options describe. A <c>CURLOPT_MIMEPOST</c>
+    /// structure is read as its parts are now, so a part changed since the setopt sends its new data; once
+    /// <c>curl_mime_free</c> has freed it, the handle posts an empty body, as libcurl's unbound
+    /// <c>MIMEKIND_NONE</c> part does (upstream test653 and test654, ADR-0675).
+    /// </summary>
     /// <param name="cancellationToken">Stops the transfer; it then ends with the engine's error code.</param>
     /// <returns>The engine's result for the transfer.</returns>
     /// <exception cref="ObjectDisposedException">The handle has been cleaned up.</exception>
     public ValueTask<CurlCode> PerformAsync(CancellationToken cancellationToken = default) =>
-        PerformFillingErrorBufferAsync(LiveTransfer(), cancellationToken);
+        PerformFillingErrorBufferAsync(LiveTransferWithMimeAsNow(), cancellationToken);
 
     /// <summary>
     /// The text of the last perform's error as <c>CURLOPT_ERRORBUFFER</c> holds it: the engine's text cut
@@ -111,16 +128,22 @@ public sealed class CurlEasy : IDisposable, IAsyncDisposable
     /// keeps the handle's live connections, DNS cache and session cache, as libcurl does.
     /// </summary>
     /// <exception cref="ObjectDisposedException">The handle has been cleaned up.</exception>
-    public void Reset() => LiveTransfer().Reset();
+    public void Reset()
+    {
+        LiveTransfer().Reset();
+        boundMime = null;
+    }
 
     /// <summary>
     /// <c>curl_easy_duphandle</c>: a new handle with this one's options and none of its state - no
     /// connection, no last transfer's info, no received headers - over the engine's duplicate transfer.
-    /// The two handles are independent: setting an option on one leaves the other's unchanged.
+    /// The two handles are independent: setting an option on one leaves the other's unchanged. A
+    /// <c>CURLOPT_MIMEPOST</c> structure is copied as its parts are now, as libcurl's <c>Curl_mime_duppart</c>
+    /// copies it, so the duplicate posts that copy whatever later happens to the structure.
     /// </summary>
     /// <returns>The new handle; the caller disposes it (<c>curl_easy_cleanup</c>).</returns>
     /// <exception cref="ObjectDisposedException">The handle has been cleaned up.</exception>
-    public CurlEasy DupHandle() => new(LiveTransfer().Duplicate(), dispatch);
+    public CurlEasy DupHandle() => new(LiveTransferWithMimeAsNow().Duplicate(), dispatch, allocations.ForDuplicate());
 
     /// <summary>
     /// <c>curl_easy_pause</c>: leaves the directions set in <paramref name="directions"/> paused and
@@ -215,6 +238,7 @@ public sealed class CurlEasy : IDisposable, IAsyncDisposable
         }
 
         await transfer.DisposeAsync().ConfigureAwait(false);
+        allocations.FreeAll();
     }
 
     private static async ValueTask<CurlCode> PerformFillingErrorBufferAsync(IEasyTransfer live, CancellationToken cancellationToken)
@@ -223,6 +247,58 @@ public sealed class CurlEasy : IDisposable, IAsyncDisposable
         var code = await live.PerformAsync(cancellationToken).ConfigureAwait(false);
         EasyErrorBuffer.Fill(buffer, code, live.ErrorText);
         return code;
+    }
+
+    /// <summary>
+    /// The options with the bound <c>CURLOPT_MIMEPOST</c> structure's body as its parts are now, or, once it is
+    /// freed, an empty <see cref="EasyHttpOptions.HttpPost"/> form in its place, which the engine posts as a
+    /// zero-length body with no <c>Content-Type</c>, as libcurl posts its unbound part.
+    /// </summary>
+    /// <param name="options">The handle's options.</param>
+    /// <param name="mime">The bound structure.</param>
+    /// <returns>The options to perform with.</returns>
+    private static EasyOptions WithMimeAsNow(EasyOptions options, CurlMime mime) =>
+        options with
+        {
+            Http = mime.IsFreed
+                ? options.Http with { MimePost = null, HttpPost = new EasyMimeBody() }
+                : options.Http with { MimePost = mime.Build() },
+        };
+
+    /// <summary>
+    /// Remembers the structure a successful <c>CURLOPT_MIMEPOST</c> bound, so each perform reads it as it is then;
+    /// a <c>NULL</c> MIME post or a <c>CURLOPT_HTTPPOST</c> form, which libcurl then sends instead, unbinds it.
+    /// </summary>
+    /// <param name="option">The option set.</param>
+    /// <param name="value">Its value.</param>
+    private void BindMime(CurlOption option, object? value)
+    {
+        if (option is CurlOption.Mimepost or CurlOption.Httppost)
+        {
+            boundMime = value as CurlMime;
+        }
+    }
+
+    /// <summary>The live transfer, its options carrying the bound MIME structure as it is now.</summary>
+    /// <returns>The transfer.</returns>
+    /// <exception cref="ObjectDisposedException">The handle has been cleaned up.</exception>
+    private IEasyTransfer LiveTransferWithMimeAsNow()
+    {
+        var live = LiveTransfer();
+        if (boundMime is { } mime)
+        {
+            live.Options = WithMimeAsNow(live.Options, mime);
+        }
+
+        return live;
+    }
+
+    private void StrdupString(object? value)
+    {
+        if (value is string text)
+        {
+            allocations.Strdup(text);
+        }
     }
 
     private IEasyTransfer LiveTransfer()

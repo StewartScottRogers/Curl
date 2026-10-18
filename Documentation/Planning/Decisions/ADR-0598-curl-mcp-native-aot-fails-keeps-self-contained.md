@@ -1,6 +1,6 @@
 # ADR-0598: Curl.Mcp stays self-contained; native AOT builds but the server fails to start
 
-- Status: Accepted
+- Status: Superseded by ADR-0621 (the cause was Curl's own static initialization order, not the SDK)
 - Date: 2026-10-16
 - Task: BL-2389
 - Decided by Claude under Stewart's delegation.

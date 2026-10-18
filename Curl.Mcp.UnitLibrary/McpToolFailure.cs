@@ -61,6 +61,13 @@ public sealed record McpToolFailure(McpToolFailureKind Kind, string Text, int? E
     public static McpToolFailure InvalidRequest(string field, string reason) =>
         new(McpToolFailureKind.InvalidRequest, $"Invalid {field}: {reason}", null);
 
+    /// <summary>The tool error for a URL or URL part that libcurl's URL parser refused.</summary>
+    /// <param name="part">The part, as the tool names it, e.g. <c>port</c>, or <c>url</c> for the whole URL.</param>
+    /// <param name="code">The parser's result.</param>
+    /// <returns>The tool error naming the part and the code's number and name.</returns>
+    public static McpToolFailure UrlRefused(string part, CurlUrlCode code) =>
+        new(McpToolFailureKind.UrlRefused, $"The URL parser refused {part}: CURLUcode {(int)code} ({code})", null);
+
     /// <summary>The tool error for a request cancelled before curl finished.</summary>
     public static McpToolFailure Cancelled { get; } = new(McpToolFailureKind.Cancelled, CancelledText, null);
 }

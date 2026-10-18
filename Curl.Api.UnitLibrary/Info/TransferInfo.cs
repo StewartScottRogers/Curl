@@ -231,14 +231,16 @@ public sealed record TransferInfo
 
     /// <summary>
     /// <c>CURLINFO_LASTSOCKET</c>: the last connection's socket. Default -1: no socket. Curl's engine
-    /// hands libcurl no operating-system socket, so it stays -1 after a transfer too (ADR-0549).
+    /// hands libcurl no operating-system socket, so it stays -1 after a transfer too (ADR-0549), except while a
+    /// <c>CURLOPT_CONNECT_ONLY</c> 1 connection is open, whose engine socket number it is (ADR-0686).
     /// </summary>
     public long LastSocket { get; init; } = -1;
 
     /// <summary>
     /// <c>CURLINFO_ACTIVESOCKET</c>: the active connection's socket. Default -1
     /// (<c>CURL_SOCKET_BAD</c>): no socket. Curl's engine hands libcurl no operating-system socket, so
-    /// it stays -1 after a transfer too (ADR-0549).
+    /// it stays -1 after a transfer too (ADR-0549), except while a <c>CURLOPT_CONNECT_ONLY</c> 1 connection is
+    /// open, whose engine socket number it is, which <c>curl_multi_wait</c> polls (ADR-0686).
     /// </summary>
     public long ActiveSocket { get; init; } = -1;
 

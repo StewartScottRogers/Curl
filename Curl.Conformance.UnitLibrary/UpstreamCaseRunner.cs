@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Security.Cryptography.X509Certificates;
+using Curl.Conformance.LibTest;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Conformance;
@@ -63,6 +64,13 @@ namespace Curl.Conformance;
 /// <see cref="Http3Port"/> and a fresh server relaying to the case's sws emulation, presenting
 /// <c>%CERTDIR/certs/test-localhost.pem</c>, takes the datagrams to it for a case naming the <c>http/3</c> server.
 /// </param>
+/// <param name="libTests">
+/// The ported libtest programs and the engine they run over (BL-2556), or <see langword="null"/> for none.
+/// A case whose <c>&lt;client&gt;&lt;tool&gt;</c> names a ported program (<c>lib%TESTNUMBER</c> or <c>libNNN</c>)
+/// runs it in place of curl, with the command's words as its arguments and no <c>--output</c>, <c>--include</c>
+/// or trace before them, as <c>runtests.pl</c> runs a tool, and is judged as a curl case is; one whose program is
+/// not ported is skipped as <see cref="UpstreamCaseScreening.LibTestNotPorted"/>.
+/// </param>
 public sealed class UpstreamCaseRunner(
     Func<UpstreamCurlInvocation, Task<int>> runCurl,
     UpstreamCurlPlatform platform,
@@ -70,7 +78,8 @@ public sealed class UpstreamCaseRunner(
     TimeSpan timeLimit,
     UpstreamSshServer? sshServer = null,
     UpstreamHttp2Server? http2Server = null,
-    UpstreamHttp3Server? http3Server = null)
+    UpstreamHttp3Server? http3Server = null,
+    UpstreamLibTests? libTests = null)
 {
     // runtests.pl reports nghttpx-h3 when it finds the nghttpx that serves HTTP/3, which the stand-in replaces.
     private readonly UpstreamCurlPlatform platform = http3Server is null ? platform : platform.WithFeatures([Http3ServerFeature]);
@@ -107,8 +116,8 @@ public sealed class UpstreamCaseRunner(
     public const string MqttPort = "8998";
 
     /// <summary>
-    /// The value of <c>%RTSPPORT</c>. Every case naming it at <c>curl-8_21_0</c> is a <c>&lt;tool&gt;</c>
-    /// libtest, which screening skips for that reason, so no RTSP server stands behind it (ADR-0457).
+    /// The value of <c>%RTSPPORT</c>: connections to this port reach the rtspd emulation, <see cref="RtspServerConnector"/>,
+    /// whose requests follow the Gopher emulation's selector lines for <c>&lt;verify&gt;&lt;protocol&gt;</c> (BL-2617).
     /// </summary>
     public const string RtspPort = "8996";
 
@@ -213,9 +222,9 @@ public sealed class UpstreamCaseRunner(
     public const string CurlVersion = "8.22.0";
 
     /// <summary>
-    /// The value of <c>%LIBTESTS</c>, <c>runtests.pl</c>'s path to the libtest runner. Every case naming it at
-    /// <c>curl-8_22_0</c> (518, 537, 678, 1960) runs a <c>&lt;tool&gt;</c>, which screening skips for that reason,
-    /// so no runner stands behind the path.
+    /// The value of <c>%LIBTESTS</c>, <c>runtests.pl</c>'s path to the libtest runner. No program stands behind
+    /// the path: a precheck line <c>./libtest/libtests libNNN args</c> (test678's) runs the ported program
+    /// <c>libNNN</c> in process (BL-2634), and screening skips a case whose program is not ported.
     /// </summary>
     public const string LibTestsProgram = "./libtest/libtests";
 
@@ -296,7 +305,7 @@ public sealed class UpstreamCaseRunner(
             return UpstreamCaseOutcome.SkippedOnThisPlatform(otherPlatformReason);
         }
 
-        return (UpstreamCaseScreening.FindSkipReason(expansion, testCase, platform.Features, emulatesHttp2: http2Server is not null, emulatesHttp3: http3Server is not null)
+        return (UpstreamCaseScreening.FindSkipReason(expansion, testCase, platform.Features, emulatesHttp2: http2Server is not null, emulatesHttp3: http3Server is not null, isPortedLibTest: program => libTests?.Programs.Find(program) is not null)
                 ?? UpstreamCaseScreening.FindFileOutsideLogDirectory(testCase, logDirectory)) is { } reason
             ? UpstreamCaseOutcome.Skipped(reason)
             : null;
@@ -436,7 +445,7 @@ public sealed class UpstreamCaseRunner(
 
     private async Task<UpstreamCaseOutcome> RunScreenedAsync(UpstreamTestCase testCase, int testNumber, string logDirectory, string? certificateDirectory)
     {
-        if (PrecheckSkipReason(testCase) is { } skipReason)
+        if (await PrecheckSkipReasonAsync(testCase, testNumber).ConfigureAwait(false) is { } skipReason)
         {
             return UpstreamCaseOutcome.Skipped(skipReason);
         }
@@ -444,7 +453,8 @@ public sealed class UpstreamCaseRunner(
         string outputFile = $"{logDirectory}/curl{testNumber.ToString(CultureInfo.InvariantCulture)}.out";
         WriteSshClientKeyFiles(logDirectory);
         WriteClientFiles(testCase);
-        List<string> arguments = Arguments(testCase, outputFile, $"{logDirectory}/trace{testNumber.ToString(CultureInfo.InvariantCulture)}");
+        ILibTest? libTest = FindLibTest(testCase);
+        List<string> arguments = ProgramArguments(testCase, libTest, outputFile, $"{logDirectory}/trace{testNumber.ToString(CultureInfo.InvariantCulture)}");
 
         // On the real clock the server's waits make a case take seconds that a loaded machine
         // stretches past the time limit (test1677's writedelay: 5.5 seconds, BL-1355); with no
@@ -466,7 +476,8 @@ public sealed class UpstreamCaseRunner(
         SocksServerConnector socks = new(testCase, MailTlsServer(testCase, FtpsServer(testCase, pop3, certificateDirectory), certificateDirectory));
         MqttServerConnector mqtt = new(testCase, socks);
         IConnector mqtts = TlsFrontServer(testCase, MqttsServerConnector.EmulatedServers, certificateDirectory, mqtt, certificate => new MqttsServerConnector(certificate, mqtt));
-        GopherServerConnector gopher = new(testCase, mqtts);
+        RtspServerConnector rtsp = new(testCase, mqtts);
+        GopherServerConnector gopher = new(testCase, rtsp);
         IConnector gophers = TlsFrontServer(testCase, GophersServerConnector.EmulatedServers, certificateDirectory, gopher, certificate => new GophersServerConnector(certificate, gopher));
         TelnetServerConnector telnet = new(new DictServerConnector(gophers));
         IConnector servers = HttpsProxyServer(testCase, Http2Server(testCase, NothingOnHttp3TcpPort(SshServer(telnet)), server, certificateDirectory), certificateDirectory);
@@ -474,7 +485,7 @@ public sealed class UpstreamCaseRunner(
         // (test1319 to 1321, BL-2011; test714 and test715, BL-2035); one to %HTTPSPORT reaches the HTTPS stand-in, whose TLS handshake travels inside the tunnel (BL-2225).
         server.TunnelServerForPort = port => TunnelledPorts.Contains(port) ? pop3 : null;
         UpstreamCurlInvocation invocation = new(arguments, standardOutput, standardError, standardInput, servers, Http3Server(testCase, dns, server, certificateDirectory), EnvironmentVariables(testCase)) { ConnectionListener = ftp.ActiveModeListener };
-        (int exitCode, string? failure) = await RunCurlAsync(invocation, server).ConfigureAwait(false);
+        (int exitCode, string? failure) = await RunCurlAsync(ProgramRun(libTest, testNumber, invocation), server).ConfigureAwait(false);
         if (failure is not null)
         {
             return UpstreamCaseOutcome.Failed(failure);
@@ -496,10 +507,13 @@ public sealed class UpstreamCaseRunner(
             (mqtt.ProtocolLog, mqtt.ProtocolDump),
             (tftp.ProtocolLog, tftp.ProtocolDump),
             (gopher.ReceivedBytes, gopher.ReceivedDump),
+            (rtsp.ReceivedBytes, rtsp.ReceivedDump),
         ]);
-        byte[] outputFileBytes = ReadOutputFile(outputFile);
-        return Judge(testCase, () => new UpstreamCaseRun(exitCode, standardOutputBytes, standardError.ToArray(), receivedBytes, outputFileBytes)
+        // runner.pm sets $CURLOUT to a tool run's stdout, and runtests.pl compares <reply><data> with $CURLOUT (BL-2560).
+        byte[] replyDataBytes = libTest is null ? ReadOutputFile(outputFile) : standardOutputBytes;
+        return Judge(testCase, () => new UpstreamCaseRun(exitCode, standardOutputBytes, standardError.ToArray(), receivedBytes, replyDataBytes)
         {
+            ReplyDataName = libTest is null ? "the --output file" : "the program's stdout",
             ProxyReceivedBytes = server.ProxyReceivedBytes.ToArray(),
             LogDirectory = logDirectory,
             SocksLog = System.Text.Encoding.Latin1.GetBytes(socks.ConnectLog),
@@ -610,9 +624,9 @@ public sealed class UpstreamCaseRunner(
     // start and fire the limit (BL-1062). On its own thread curl starts at once, and the limit
     // starts here, synchronously, without waiting for the pool.
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "Whatever curl throws is reported as the case's failure.")]
-    private async Task<(int ExitCode, string? Failure)> RunCurlAsync(UpstreamCurlInvocation invocation, SwsHttpServerConnector server)
+    private async Task<(int ExitCode, string? Failure)> RunCurlAsync(Func<Task<int>> run, SwsHttpServerConnector server)
     {
-        Task<int> curlRun = Task.Factory.StartNew(() => runCurl(invocation), CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default).Unwrap();
+        Task<int> curlRun = Task.Factory.StartNew(run, CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default).Unwrap();
         try
         {
             return (await curlRun.WaitAsync(timeLimit, timeProvider).ConfigureAwait(false), null);
@@ -629,16 +643,83 @@ public sealed class UpstreamCaseRunner(
     }
 
     // runtests.pl skips the case with the first line a precheck prints, or with "precheck command
-    // error" when it prints nothing and exits non-zero. Screening let only interpreted one-liners through.
-    private string? PrecheckSkipReason(UpstreamTestCase testCase) =>
-        FirstFailedCheck(testCase, "client", "precheck", result => result.ExitCode != 0 || result.Output.Length > 0) is { } precheck
-            ? precheck.Output.Length > 0 ? precheck.Output.Split('\n')[0].Replace("\r", "", StringComparison.Ordinal) : "precheck command error"
-            : null;
+    // error" when it prints nothing and exits non-zero. Screening let only interpreted one-liners and %LIBTESTS lines
+    // running a ported program through.
+    private async Task<string?> PrecheckSkipReasonAsync(UpstreamTestCase testCase, int testNumber)
+    {
+        foreach (string line in UpstreamTestPartBodies.Lines(testCase.Find("client", "precheck")))
+        {
+            UpstreamPerlOneLinerResult result = UpstreamLibTestCheckLine.Parse(line) is { } libTestCheck
+                ? await RunLibTestCheckAsync(testCase, testNumber, libTestCheck.Program, libTestCheck.Arguments).ConfigureAwait(false)
+                : RunCheckLine(line);
+            if (result.ExitCode != 0 || result.Output.Length > 0)
+            {
+                return PrecheckSkipReason(result);
+            }
+        }
+
+        return null;
+    }
+
+    private static string PrecheckSkipReason(UpstreamPerlOneLinerResult precheck) =>
+        precheck.Output.Length > 0 ? precheck.Output.Split('\n')[0].Replace("\r", "", StringComparison.Ordinal) : "precheck command error";
+
+    // runtests.pl runs a %LIBTESTS precheck line as a command of its own (test678's "lib678 check", BL-2634): the
+    // ported program with the line's words after its name, its stdout the line's output; a program that throws or
+    // outruns the time limit is a precheck that failed. Its engine reaches a fresh sws emulation, as the servers are up.
+    private async Task<UpstreamPerlOneLinerResult> RunLibTestCheckAsync(UpstreamTestCase testCase, int testNumber, string program, string[] arguments)
+    {
+        SwsHttpServerConnector server = new(testCase, timeProvider);
+        MemoryStream standardOutput = new();
+        UpstreamCurlInvocation invocation = new(arguments, standardOutput, new MemoryStream(), new MemoryStream(), server, new UnreachableDatagramConnector());
+        (int exitCode, string? failure) = await RunCurlAsync(() => RunLibTestAsync(libTests!.Programs.Find(program)!, testNumber, invocation), server).ConfigureAwait(false);
+        return new UpstreamPerlOneLinerResult(failure is null ? exitCode : 1, System.Text.Encoding.Latin1.GetString(standardOutput.ToArray()));
+    }
+
+    private UpstreamPerlOneLinerResult RunCheckLine(string line) =>
+        UpstreamPerlCheckLine.RunLine(line, platform.OperatingSystemName) ?? UpstreamResolveCheck.RunLine(line)!;
 
     private UpstreamPerlOneLinerResult? FirstFailedCheck(UpstreamTestCase testCase, string section, string name, Func<UpstreamPerlOneLinerResult, bool> failed) =>
         UpstreamTestPartBodies.Lines(testCase.Find(section, name))
-            .Select(line => UpstreamPerlCheckLine.RunLine(line, platform.OperatingSystemName) ?? UpstreamResolveCheck.RunLine(line)!)
+            .Select(RunCheckLine)
             .FirstOrDefault(failed);
+
+    // Screening let a <tool> case through only when its libtest program is ported, so libTests is given then.
+    private ILibTest? FindLibTest(UpstreamTestCase testCase) =>
+        UpstreamCaseScreening.LibTestProgramName(testCase) is { } program ? libTests!.Programs.Find(program) : null;
+
+    // runtests.pl runs a libtest program with the command's words alone after its name: no --output, --include or trace.
+    private static List<string> ProgramArguments(UpstreamTestCase testCase, ILibTest? libTest, string outputFile, string traceFile) =>
+        libTest is null
+            ? Arguments(testCase, outputFile, traceFile)
+            : [.. UpstreamCommandLineSplitter.Split(UpstreamTestPartBodies.Text(testCase.Find("client", "command"))).Arguments];
+
+    private Func<Task<int>> ProgramRun(ILibTest? libTest, int testNumber, UpstreamCurlInvocation invocation) =>
+        libTest is null ? () => runCurl(invocation) : () => RunLibTestAsync(libTest, testNumber, invocation);
+
+    // The program runs in place of curl, on the same invocation: its engine reaches the case's servers through
+    // the invocation's connectors, and its stdout and stderr are the run's. Around it go the lines curl 8.22.0's
+    // tests/libtest/first.c main() writes on stderr: "URL: <url>" when a URL follows the program's name, before the
+    // test, and "Test ended with result <N>" after it (BL-2649; test1549).
+    private async Task<int> RunLibTestAsync(ILibTest libTest, int testNumber, UpstreamCurlInvocation invocation)
+    {
+        // Line feeds alone, as curl's own stderr in the harness, so a case's <stderr> compares the same on every platform.
+        await using StreamWriter standardError = new(invocation.StandardError, leaveOpen: true) { AutoFlush = true, NewLine = "\n" };
+        LibTestContext context = new(testNumber, invocation.Arguments)
+        {
+            Engine = libTests!.CreateEngine(invocation),
+            StandardOutput = invocation.StandardOutput,
+            StandardError = standardError,
+        };
+        if (invocation.Arguments.Count > 0)
+        {
+            await standardError.WriteLineAsync($"URL: {invocation.Arguments[0]}").ConfigureAwait(false);
+        }
+
+        LibTestResult result = await libTest.RunAsync(context, CancellationToken.None).ConfigureAwait(false);
+        await standardError.WriteLineAsync($"Test ended with result {result.ExitCode.ToString(CultureInfo.InvariantCulture)}").ConfigureAwait(false);
+        return result.ExitCode;
+    }
 
     private static List<string> Arguments(UpstreamTestCase testCase, string outputFile, string traceFile)
     {

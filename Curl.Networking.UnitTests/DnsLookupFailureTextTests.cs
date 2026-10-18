@@ -26,6 +26,7 @@ public sealed class DnsLookupFailureTextTests
     [DataRow(DnsLookupFailure.Unreachable, "Could not contact DNS servers")]
     [DataRow(DnsLookupFailure.Timeout, "Timeout while contacting DNS servers")]
     [DataRow(DnsLookupFailure.BadConfiguration, "Misformatted string")]
+    [DataRow(DnsLookupFailure.AbortedByCallback, "")]
     [DataRow((DnsLookupFailure)99, "")]
     [DataRow((DnsLookupFailure)(-1), "")]
     public void Describe_EachFailure_IsCaresText(DnsLookupFailure failure, string expected)
