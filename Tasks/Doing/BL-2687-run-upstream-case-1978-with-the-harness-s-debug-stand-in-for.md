@@ -31,3 +31,4 @@ Found by BL-2549, which ported lib1978 (`Curl.Conformance.LibTest.UnitLibrary/Li
 ## Log
 
 - 2026-10-17: Created.
+- 2026-10-18: Backlog -> Doing. Criteria at claim: 8b0c7749 8e85384c 3d836d5e.
