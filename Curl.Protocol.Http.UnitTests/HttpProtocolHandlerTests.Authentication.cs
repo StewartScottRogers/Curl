@@ -792,6 +792,31 @@ public sealed partial class HttpProtocolHandlerTests
     }
 
     /// <summary>
+    /// A body an <c>-H</c> value asks to send chunked keeps its chunking in the probe, which sends
+    /// only the last chunk and no <c>Content-Length</c>, as libcurl 8.22.0 does (upstream test579,
+    /// BL-2621).
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_DigestProbeOfAChunkedBody_SendsOnlyTheLastChunk()
+    {
+        TurnTakingConnection connection = new(65536, ChallengeHead + "nope", OkHead + "ok");
+        TransferContext context = DigestPostContext(new MemoryStream(), ["Transfer-Encoding: chunked"]);
+        Diagnostics.Arrange("url, body, schemes, headers", $"{AuthUrl}, -d hello, --digest, -H \"Transfer-Encoding: chunked\"");
+
+        TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), new ScriptedAuthenticator(null, DigestValue)).ExecuteAsync(context);
+
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        string[] requests = connection.Written.Split("POST ", StringSplitOptions.RemoveEmptyEntries);
+        Assert.HasCount(2, requests, connection.Written);
+        Assert.DoesNotContain("Content-Length", requests[0]);
+        Assert.Contains("Transfer-Encoding: chunked\r\n", requests[0]);
+        Assert.EndsWith("\r\n\r\n0\r\n\r\n", requests[0]);
+        Assert.EndsWith("\r\n\r\n5\r\nhello\r\n0\r\n\r\n", requests[1]);
+    }
+
+    /// <summary>
     /// With <c>--ntlm</c> the POST that carries the Type 1 message sends <c>Content-Length: 0</c>
     /// and no body; the body goes only with the Type 3 message, as upstream test176 and test267
     /// expect of curl 8.21.0 (BL-2029).
