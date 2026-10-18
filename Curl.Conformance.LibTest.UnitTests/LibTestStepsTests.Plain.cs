@@ -44,6 +44,24 @@ public sealed partial class LibTestStepsTests
     }
 
     [TestMethod]
+    public async Task MultiInitOrMajorBad_OnLiveAndCleanedUpLibraries_GoesOnOrFailsMajorBad()
+    {
+        var error = new StringWriter();
+        var steps = new LibTestSteps(error);
+        await using CurlLibrary live = CurlGlobal.Init(new FakeCurlEngine());
+
+        bool onLive = steps.MultiInitOrMajorBad(live, out var multi);
+        bool onCleaned = steps.MultiInitOrMajorBad(await PortRun.CleanedUpLibraryAsync(), out var none);
+
+        Assert.IsTrue(onLive);
+        Assert.IsFalse(onCleaned);
+        Assert.IsNull(none);
+        Assert.AreEqual(LibTestErrorCodes.MajorBad, steps.Result);
+        Assert.AreEqual("curl_multi_init() failed\n", error.ToString());
+        await multi!.DisposeAsync();
+    }
+
+    [TestMethod]
     public async Task EasySetOptions_StopsAtTheFirstRefusedOption()
     {
         var error = new StringWriter();
