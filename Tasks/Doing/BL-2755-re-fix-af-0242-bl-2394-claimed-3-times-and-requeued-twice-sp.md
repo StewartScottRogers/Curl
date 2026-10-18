@@ -50,6 +50,8 @@ The finding closes only when a later re-audit by the process auditor confirms th
 
 ## Notes
 
+The lane prompt in RunDarkFactory.ps1 is written twice; BL-2754 added the "split for size is itself a requeue" paragraph to only one copy. Added it to the other (citing the AF-0242 re-audit) so both lane prompts carry the rule. The finding's reproduction needs logs not present in this checkout; the fix is prompt text, verified by diff.
+
 ## Log
 
 - 2026-10-18: Created.
