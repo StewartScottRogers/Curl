@@ -273,21 +273,20 @@ internal sealed class ManagedCurlUrlHandle : ICurlUrlHandle
 
     /// <summary>
     /// Parses <paramref name="text" /> under <c>CURLU_PATH_AS_IS</c>, <c>CURLU_DISALLOW_USER</c> and
-    /// <c>CURLU_NO_AUTHORITY</c> (<see cref="CurlUrl.TryParseAllowingEmptyHost" />).
+    /// <c>CURLU_NO_AUTHORITY</c> as libcurl's own parser, a <c>file</c> URL keeping its backslashes and,
+    /// without <c>CURLU_GUESS_SCHEME</c> or <c>CURLU_DEFAULT_SCHEME</c>, needing no <c>/</c> after
+    /// <c>file:</c> (<see cref="CurlUrl.TryParseForUrlApi(string, bool, CurlUrlApiFlags, out CurlUrl, out CurlUrlRejection)" />).
     /// </summary>
-    private static bool TryParseUnder(string text, CurlUrlFlags flags, out CurlUrl? url, out CurlUrlRejection rejection)
-    {
-        bool pathAsIs = flags.HasFlag(CurlUrlFlags.PathAsIs);
-        bool disallowUser = flags.HasFlag(CurlUrlFlags.DisallowUser);
-        if (flags.HasFlag(CurlUrlFlags.NoAuthority))
-        {
-            return CurlUrl.TryParseAllowingEmptyHost(text, pathAsIs, disallowUser, out url, out rejection);
-        }
-
-        return disallowUser
-            ? CurlUrl.TryParseDisallowingUser(text, pathAsIs, out url, out rejection)
-            : CurlUrl.TryParse(text, pathAsIs, out url, out rejection);
-    }
+    private static bool TryParseUnder(string text, CurlUrlFlags flags, out CurlUrl? url, out CurlUrlRejection rejection) =>
+        CurlUrl.TryParseForUrlApi(
+            text,
+            flags.HasFlag(CurlUrlFlags.PathAsIs),
+            new CurlUrlApiFlags(
+                flags.HasFlag(CurlUrlFlags.DisallowUser),
+                flags.HasFlag(CurlUrlFlags.NoAuthority),
+                (flags & (CurlUrlFlags.GuessScheme | CurlUrlFlags.DefaultScheme)) != 0),
+            out url,
+            out rejection);
 
     /// <summary>
     /// A parsed URL with no scheme: <c>https</c> under <c>CURLU_DEFAULT_SCHEME</c>, the guessed one under

@@ -316,6 +316,44 @@ public sealed partial class ManagedCurlUrlHandleTests
         Assert.AreEqual(expected, url.Set(CurlUrlPart.Url, text, CurlUrlFlags.None));
     }
 
+    // lib1560's get_parts row 132 and get_url rows 189 to 193 (BL-2737): curl 8.22.0's parse_file.
+    [TestMethod]
+    [DataRow("file:/")]
+    [DataRow("file:./")]
+    [DataRow("file:foo")]
+    [DataRow("file:foo/bar")]
+    [DataRow("file:?q")]
+    [DataRow("file:#f")]
+    public void Set_FileUrlTooShortOrWithARelativePath_ReturnsBadFileUrl(string text)
+    {
+        using ManagedCurlUrlHandle url = new();
+
+        Assert.AreEqual(CurlUrlCode.BadFileUrl, url.Set(CurlUrlPart.Url, text, CurlUrlFlags.None));
+    }
+
+    // lib1560's Windows get_parts rows 105 and 106 (BL-2737): libcurl keeps a drive path's backslashes.
+    [TestMethod]
+    [OSCondition(OperatingSystems.Windows)]
+    [DataRow("file://C:\\programs\\foo")]
+    [DataRow("file:///C:\\programs\\foo")]
+    public void Set_FileUrlWithADriveAndBackslashesOnWindows_KeepsTheBackslashesInThePath(string text)
+    {
+        using ManagedCurlUrlHandle url = Parsed(text, CurlUrlFlags.DefaultScheme);
+
+        Assert.AreEqual("C:\\programs\\foo", GetOk(url, CurlUrlPart.Path));
+    }
+
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
+    [DataRow("file://C:\\programs\\foo")]
+    [DataRow("file:///C:\\programs\\foo")]
+    public void Set_FileUrlWithADriveOffWindows_ReturnsBadFileUrl(string text)
+    {
+        using ManagedCurlUrlHandle url = new();
+
+        Assert.AreEqual(CurlUrlCode.BadFileUrl, url.Set(CurlUrlPart.Url, text, CurlUrlFlags.DefaultScheme));
+    }
+
     // lib1560's get_parts rows 0 to 2 (BL-2731): a backslash where the port's digits end.
     [TestMethod]
     [DataRow("http:\\\\hostname", CurlUrlFlags.GuessScheme)]

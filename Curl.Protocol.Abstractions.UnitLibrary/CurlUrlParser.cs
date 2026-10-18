@@ -28,7 +28,11 @@ internal static class CurlUrlParser
     /// it, with <paramref name="rejection" /> saying why. With <paramref name="disallowUser" />,
     /// user information in the authority is rejected before its host and port are checked. With
     /// <paramref name="allowEmptyHost" />, as libcurl's <c>CURLU_NO_AUTHORITY</c>, at most two
-    /// slashes follow the scheme and an empty authority is an empty host.
+    /// slashes follow the scheme and an empty authority is an empty host. With
+    /// <paramref name="keepFileBackslashes" />, as libcurl's own <c>parse_file</c>, a <c>file</c> URL's
+    /// backslashes stay as typed; without it they become slashes after <c>file://</c>, as the curl tool's do.
+    /// With <paramref name="fileSchemeWithoutSlash" />, as <c>Curl_is_absolute_url</c> when it does not guess
+    /// schemes, text starting <c>file:</c> is a <c>file</c> URL even with no <c>/</c> after the colon.
     /// </summary>
     public static CurlUrl? Parse(
         string text,
@@ -36,7 +40,9 @@ internal static class CurlUrlParser
         bool driveLetters,
         bool disallowUser,
         out CurlUrlRejection rejection,
-        bool allowEmptyHost = false)
+        bool allowEmptyHost = false,
+        bool keepFileBackslashes = false,
+        bool fileSchemeWithoutSlash = false)
     {
         if (Encoding.UTF8.GetByteCount(text) > MaximumLength || text.Any(IsControlOrSpace))
         {
@@ -45,19 +51,27 @@ internal static class CurlUrlParser
             return null;
         }
 
-        string? scheme = CurlUrlScheme.Read(text, driveLetters);
+        string? scheme = ReadScheme(text, driveLetters, fileSchemeWithoutSlash);
         if (scheme != FileScheme)
         {
             return ParseWithAuthority(text, scheme, new AuthorityRules(pathAsIs, disallowUser, allowEmptyHost), out rejection);
         }
 
-        CurlUrl? url = ParseFile(text, pathAsIs, driveLetters);
+        CurlUrl? url = ParseFile(text, pathAsIs, driveLetters, keepFileBackslashes);
         rejection = url is null ? CurlUrlRejection.BadFileUrl : CurlUrlRejection.None;
 
         return url;
     }
 
     private static bool IsControlOrSpace(char character) => character <= ' ' || character == '\x7f';
+
+    /// <summary>The scheme <see cref="CurlUrlScheme.Read" /> finds, else <see cref="FileSchemeWithoutSlash" />'s.</summary>
+    private static string? ReadScheme(string text, bool driveLetters, bool fileSchemeWithoutSlash) =>
+        CurlUrlScheme.Read(text, driveLetters) ?? FileSchemeWithoutSlash(text, fileSchemeWithoutSlash);
+
+    /// <summary><c>file</c> when <paramref name="allowed" /> and the text starts <c>file:</c> in any case, else <see langword="null" />.</summary>
+    private static string? FileSchemeWithoutSlash(string text, bool allowed) =>
+        allowed && text.StartsWith(FileScheme + ":", StringComparison.OrdinalIgnoreCase) ? FileScheme : null;
 
     /// <summary>
     /// Parses a URL whose scheme is not <c>file</c>, or that has no scheme: one to three
@@ -135,15 +149,21 @@ internal static class CurlUrlParser
     /// Parses a <c>file</c> URL as curl does on the platform chosen: an authority, when
     /// there is one, must be empty, a drive letter, <c>localhost</c> or
     /// <c>127.0.0.1</c>; a slash before a drive letter is dropped on Windows, and a drive
-    /// letter is rejected elsewhere.
+    /// letter is rejected elsewhere. As curl 8.22.0's <c>parse_file</c>, <c>file:/</c> is too short
+    /// to be a file URL and the path must start with a slash or a drive letter, so <c>file:foo</c>,
+    /// <c>file:./</c>, <c>file:?q</c> and <c>file:#f</c> are rejected (lib1560; the curl tool,
+    /// measured, exits 3 for each).
     /// </summary>
-    private static CurlUrl? ParseFile(string text, bool pathAsIs, bool driveLetters)
+    private static CurlUrl? ParseFile(string text, bool pathAsIs, bool driveLetters, bool keepBackslashes)
     {
-        string? rest = SkipFileAuthority(text[(FileScheme.Length + 1)..]);
-        string? path = rest is null ? null : ApplyDriveLetterRule(rest, driveLetters);
+        string afterScheme = text[(FileScheme.Length + 1)..];
+        string? rest = afterScheme.Length < 2 ? null : SkipFileAuthority(afterScheme, keepBackslashes);
+        string? path = rest is null || !StartsAsFilePath(rest) ? null : ApplyDriveLetterRule(rest, driveLetters);
 
         return path is null ? null : Build(text, FileScheme, CurlUrlAuthority.None, path, pathAsIs);
     }
+
+    private static bool StartsAsFilePath(string rest) => rest.StartsWith('/') || StartsWithDriveLetter(rest, 0);
 
     /// <summary>
     /// Drops the slash before a drive letter when drive letters are allowed, and rejects
@@ -163,11 +183,11 @@ internal static class CurlUrlParser
     /// <summary>
     /// Returns what follows <c>file:</c> with its backslashes converted and its
     /// authority, if any, skipped, or <see langword="null" /> when the authority is not
-    /// one curl accepts.
+    /// one curl accepts. With <paramref name="keepBackslashes" /> the backslashes stay as typed.
     /// </summary>
-    private static string? SkipFileAuthority(string rest)
+    private static string? SkipFileAuthority(string rest, bool keepBackslashes)
     {
-        rest = ConvertBackslashesAfterDoubleSlash(rest);
+        rest = ConvertBackslashesAfterDoubleSlash(rest, keepBackslashes);
         bool hasAuthority = rest.StartsWith("//", StringComparison.Ordinal);
         if (hasAuthority)
         {
@@ -207,11 +227,12 @@ internal static class CurlUrlParser
     /// <summary>
     /// Turns each <c>\</c> before the first <c>?</c> or <c>#</c> into <c>/</c> when the
     /// text after <c>file:</c> starts with <c>//</c>, as curl 8.21.0 on Windows was
-    /// measured to do for a <c>file</c> URL; after a single slash they stay as typed.
+    /// measured to do for a <c>file</c> URL; after a single slash, or with <paramref name="keepBackslashes" />,
+    /// they stay as typed.
     /// </summary>
-    private static string ConvertBackslashesAfterDoubleSlash(string text)
+    private static string ConvertBackslashesAfterDoubleSlash(string text, bool keepBackslashes)
     {
-        if (!text.StartsWith("//", StringComparison.Ordinal))
+        if (keepBackslashes || !text.StartsWith("//", StringComparison.Ordinal))
         {
             return text;
         }
