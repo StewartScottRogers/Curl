@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary, Curl.Engine.UnitTests, Curl.Protocol.Abstractions.UnitLibrary, Curl.Protocol.Abstractions.UnitTests]
 requirement: none
 created: 2026-10-18
-completed:
+completed: 2026-10-18
 ---
 # BL-2735 — curl_url_set and curl_url_get percent-encode spaces, non-ASCII and reserved bytes under CURLU_URLENCODE as libcurl does (lib1560 rows)
 
@@ -31,12 +31,21 @@ Rows (input, flags, wanted, got):
 
 ## Acceptance criteria
 
-- [ ] Each row listed answers as upstream wants through `Lib1560Checks` (`GetParts`, `GetUrls`, `SetUrls`, `SetParts`) over the real engine, pinned by a focused unit test in the fixed library's `.UnitTests` project.
-- [ ] `dotnet build` is clean, the fast tests pass, and `Measure-CodeQuality.ps1` reports 0 failing members for each changed library.
+- [x] Each row listed answers as upstream wants through `Lib1560Checks` (`GetParts`, `GetUrls`, `SetUrls`, `SetParts`) over the real engine, pinned by a focused unit test in the fixed library's `.UnitTests` project.
+- [x] `dotnet build` is clean, the fast tests pass, and `Measure-CodeQuality.ps1` reports 0 failing members for each changed library.
 
 ## Notes
+
+- Three changes in `Curl.Engine.UnitLibrary`, all following curl 8.22.0's `lib/urlapi.c`; no ADR, since each is upstream's own behaviour, pinned by upstream's own lib1560 rows:
+  - Parsing a whole URL under `CURLU_URLENCODE` encodes its path, query and fragment as `parseurl` does with `urlencode_str` (`UrlHandleParts.UrlEncoded`, over `UrlPartText.Encode`): a space is `%20`, or `+` in the query, and control and non-ASCII bytes are `%XX`. This fixes get_parts 36, 47 and 97, get_url 7 and set_url 49.
+  - Setting a path under `CURLU_URLENCODE` keeps upstream's `allowed_in_path` bytes (`! $ & ' ( ) { } [ ] * + , ; = : @ /`) as well as the unreserved ones (set_parts 0).
+  - A set without `CURLU_URLENCODE` now upper-cases its `%xx` escapes (8.22.0) where it used to lower-case them (set_parts 35). Two existing tests that pinned lower case were changed to match.
+- Checked over the real `ManagedCurlEngine` with a throwaway file-based app (since deleted) that ran each lib1560 row through `Lib1560Checks` on its own. All seven rows pass. The rows still failing are host, file, fragment-clearing and other rows outside this task: get_parts 10,14,38,52,105,106,132; get_url 0-3,123,124,136,178,179,189-193; set_url 0-9,44,45; set_parts 2,7,9,23,39,43.
+- Test1560 itself is skipped by the ratchet harness ("Curl lacks the feature pop3"), so it cannot be run through `CURL_UPSTREAM_CASE`.
+- `Measure-CodeQuality.ps1 -Library Curl.Engine.UnitLibrary`: 0 failing members.
 
 ## Log
 
 - 2026-10-18: Created.
 - 2026-10-18: Backlog -> Doing. Criteria at claim: 7b0c5032 d6c1964a.
+- 2026-10-18: Doing -> Done. CURLU_URLENCODE parse encodes path, query and fragment; path set keeps allowed_in_path; %xx upper-cased; lib1560 rows pass
