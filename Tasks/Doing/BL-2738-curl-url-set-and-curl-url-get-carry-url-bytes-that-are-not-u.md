@@ -35,3 +35,4 @@ Rows (`get_url_list` index: input, flags, wanted, got):
 ## Log
 
 - 2026-10-18: Created.
+- 2026-10-18: Backlog -> Doing. Criteria at claim: d53035c7 d6c1964a.
