@@ -31,3 +31,4 @@ Found by BL-2547, which ported lib1960 (`Curl.Conformance.LibTest.UnitLibrary/Li
 ## Log
 
 - 2026-10-17: Created.
+- 2026-10-18: Backlog -> Doing. Criteria at claim: aea2b640 7875a3fd 4cf19161.
