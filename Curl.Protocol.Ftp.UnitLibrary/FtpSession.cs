@@ -1194,7 +1194,12 @@ internal sealed class FtpSession(
             ?? await ApplyTimeConditionAsync().ConfigureAwait(false);
     }
 
-    private bool AsksForModificationTime => context.NoBody || context.RemoteTime || context.TimeCondition is not null;
+    /// <summary>
+    /// Whether <c>MDTM</c> is sent: under <c>-R</c>, <c>-z</c> or libcurl's <c>CURLOPT_FILETIME</c>
+    /// (<see cref="ITransferContext.RemoteTime" />, which the command line sets for <c>-I</c> too),
+    /// not for <c>CURLOPT_NOBODY</c> alone (upstream test542, BL-2609).
+    /// </summary>
+    private bool AsksForModificationTime => context.RemoteTime || context.TimeCondition is not null;
 
     /// <summary>
     /// Applies <c>-z</c> to the <c>MDTM</c> time through <see cref="FtpTimeCondition" />: when

@@ -215,7 +215,7 @@ public sealed class FtpProtocolHandlerTransferTypeTests
         string replies = InDirectory + "213 20260927123456\r\n200 Type set\r\n213 7\r\n350 Restarting\r\n" + Bye;
         diagnostics.ArrangeFtp(Url, replies, "");
         diagnostics.Arrange("options", "-B -I");
-        FtpRun run = await FtpRun.ExecuteAsync(Url, replies, "", c => new TransferContext { Url = c.Url, Output = c.Output, NoBody = true, HeaderOutput = c.Output, UseAscii = true });
+        FtpRun run = await FtpRun.ExecuteAsync(Url, replies, "", c => new TransferContext { Url = c.Url, Output = c.Output, NoBody = true, RemoteTime = true, HeaderOutput = c.Output, UseAscii = true });
         diagnostics.ActRun(run);
 
         diagnostics.DiffSent(InDirectorySent + "MDTM f.txt\r\nTYPE A\r\nSIZE f.txt\r\nREST 0\r\nQUIT\r\n", run.Sent);

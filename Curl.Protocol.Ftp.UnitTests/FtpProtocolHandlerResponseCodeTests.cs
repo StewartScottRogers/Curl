@@ -150,7 +150,7 @@ public sealed class FtpProtocolHandlerResponseCodeTests
             Url,
             LoggedIn + "213 20260927123456\r\n200 Type set\r\n213 5\r\n350 Restarting at 0\r\n" + Bye,
             "",
-            c => new TransferContext { Url = c.Url, Output = c.Output, NoBody = true });
+            c => new TransferContext { Url = c.Url, Output = c.Output, NoBody = true, RemoteTime = true });
         diagnostics.ActRun(run);
 
         Assert.IsTrue(run.Result.IsSuccess);
