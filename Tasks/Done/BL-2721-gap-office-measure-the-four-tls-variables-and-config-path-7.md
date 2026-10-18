@@ -9,7 +9,7 @@ touches: [Gap/Tools/Measure-EnvironmentGap.ps1]
 lane: no
 requirement: none
 created: 2026-10-18
-completed:
+completed: 2026-10-18
 ---
 # BL-2721 — Gap office: measure the four TLS variables and config path 7 (getpwuid) on Linux and macOS
 
@@ -27,11 +27,15 @@ A gap-platforms run measures `environment:CURL_CA_BUNDLE`, `environment:SSL_CERT
 
 ## Acceptance criteria
 
-- [ ] `Measure-EnvironmentGap.ps1`'s help and recipes cover the four TLS variables on every platform and `config-path:7` on CI, and `-SelfTest` passes.
-- [ ] A gap-platforms run on the change is named under Notes with all five items' states on Linux and macOS, none `no-probe`.
+- [x] `Measure-EnvironmentGap.ps1`'s help and recipes cover the four TLS variables on every platform and `config-path:7` on CI, and `-SelfTest` passes.
+- [x] A gap-platforms run on the change is named under Notes with all five items' states on Linux and macOS, none `no-probe`.
 
 ## Notes
+
+- 2026-10-18: Measure-EnvironmentGap.ps1 changed on branch gap-env-probes (0a02ab5c3, with BL-2720's fc4b233dc copied as 41fa93a1d), PR #167. -SelfTest passes under PowerShell 7 and 5.1. gap-platforms run 39108080557, dispatched with --ref gap-env-probes on 41fa93a1d: no item is no-probe any more. Linux: environment 32 of 33; CURL_CA_BUNDLE gap, SSL_CERT_FILE, SSL_CERT_DIR, SSLKEYLOGFILE and config-path:7 match. macOS: 30 of 33; CURL_CA_BUNDLE, SSL_CERT_FILE and SSL_CERT_DIR gap (Curl exits 60, curl 0), SSLKEYLOGFILE and config-path:7 match. Curl reads none of the three CA variables, so BL-2723 is filed for them.
 
 ## Log
 
 - 2026-10-18: Created.
+- 2026-10-18: Backlog -> Doing. Interactive session: the gap office probes. Criteria at claim: c422af63 ded70e79.
+- 2026-10-18: Doing -> Done. All five environment items are measured on Linux and macOS; the CA variable gaps are BL-2723.
