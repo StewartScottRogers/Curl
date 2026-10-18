@@ -3,8 +3,8 @@ id: AF-0256
 title: CountTicketRecords' _finished = true can become false with no test failing, so tickets are counted again after the first read
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Networking.UnitLibrary/SessionTicketRecordDetector.cs:CountTicketRecords-true:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/SessionTicketRecordDetector.cs:92:true
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Netwo
 ## Log
 
 - 2026-10-18: filed proposed.
+- 2026-10-18: proposed -> accepted.
