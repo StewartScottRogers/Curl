@@ -30,3 +30,4 @@ BL-2652 ported lib1560 (`Lib1560`, `Lib1560Checks`, `Lib1560Tables`) and filed e
 ## Log
 
 - 2026-10-18: Created.
+- 2026-10-18: Backlog -> Doing. Criteria at claim: 379f2ef7 4272a6b9.
