@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary, Curl.Engine.UnitTests, Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
 requirement: none
 created: 2026-10-17
-completed:
+completed: 2026-10-18
 ---
 # BL-2614 — Apply CURLOPT_PORT to a proxied FTP URL and finish the FTP transfer for upstream cases 562 and 563
 
@@ -24,12 +24,15 @@ Filed by BL-2531 (lib562 ported, `Lib562.cs`, sets `CURLOPT_PORT` from `libtest_
 
 ## Acceptance criteria
 
-- [ ] Cases 562 and 563 pass through the runner on Windows and are added to `Curl.Conformance.UnitTests/PassingUpstreamCases.txt`, each fix with a focused unit test in the fixed library's `.UnitTests` (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass with no test deleted, skipped or weakened.
+- [x] Cases 562 and 563 pass through the runner on Windows and are added to `Curl.Conformance.UnitTests/PassingUpstreamCases.txt`, each fix with a focused unit test in the fixed library's `.UnitTests` (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass with no test deleted, skipped or weakened.
 
 ## Notes
+
+- 2026-10-18: Both cases already passed at claim: BL-2606 (f4836d2ec, `UrlPortOverride`) writes CURLOPT_PORT into the URL before the perform, which fixed the proxied target of 563 and the stall of 562. This run listed 562 and 563 on the ratchet and added the focused `UrlPortOverrideTests` row `ftp://127.0.0.1/562;type=A` pinning that `;type=A` survives the port (KNOWN_BUGS 59). Test-only change, no production code, so no quality run. FTP on the in-memory server, no paths: platform-neutral.
 
 ## Log
 
 - 2026-10-17: Created.
 - 2026-10-18: Backlog -> Doing. Criteria at claim: e18ea506 4272a6b9.
+- 2026-10-18: Doing -> Done. Upstream cases 562 and 563 hold on the ratchet; CURLOPT_PORT with ;type=A pinned by a unit test
