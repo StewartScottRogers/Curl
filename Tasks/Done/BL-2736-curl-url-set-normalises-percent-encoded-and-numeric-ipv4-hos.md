@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary, Curl.Engine.UnitTests, Curl.Protocol.Abstractions.UnitLibrary, Curl.Protocol.Abstractions.UnitTests]
 requirement: none
 created: 2026-10-18
-completed:
+completed: 2026-10-18
 ---
 # BL-2736 — curl_url_set normalises percent-encoded and numeric IPv4 hosts and refuses a blank host as libcurl does (lib1560 rows)
 
@@ -33,12 +33,17 @@ Rows (input, flags, wanted, got):
 
 ## Acceptance criteria
 
-- [ ] Each row listed answers as upstream wants through `Lib1560Checks` (`GetParts`, `GetUrls`, `SetParts`) over the real engine, pinned by a focused unit test in the fixed library's `.UnitTests` project.
-- [ ] `dotnet build` is clean, the fast tests pass, and `Measure-CodeQuality.ps1` reports 0 failing members for each changed library.
+- [x] Each row listed answers as upstream wants through `Lib1560Checks` (`GetParts`, `GetUrls`, `SetParts`) over the real engine, pinned by a focused unit test in the fixed library's `.UnitTests` project.
+- [x] `dotnet build` is clean, the fast tests pass, and `Measure-CodeQuality.ps1` reports 0 failing members for each changed library.
 
 ## Notes
+
+- Plan and decisions (matching curl 8.22.0's `urlapi.c`): `CurlUrlHost.TryNormalize` percent-decodes the whole host first, then reads it as IPv6 (brackets), IPv4 (`inet_aton` forms, one trailing dot) or a name, as `parse_authority` calls `urldecode_host` before `ipv4_normalize`; the zone id no longer skips a leading `25`, since `%25` is already decoded (`[::1%2525]` stays zone `25`). `UrlPartSetter.SetHost` checks a name decoded but stores it as given, as `curl_url_set(CURLUPART_HOST)` does; a blank host under `CURLU_URLENCODE` is checked (so `BadHostname`). `UrlPartText.Punycode` converts under `PUNY2IDN` when any label holds `xn--`.
+- Measured: all nine rows pass through `Lib1560Checks` over the real engine (throwaway test, not committed). Other lib1560 rows still failing (control bytes in the scheme, Windows `file:` paths, `file:` relative forms, `_%c0_` bytes, append-query `&`, scheme change dropping options) are outside this task.
+- Focused tests: `CurlUrlTests` (four decoded-host rows), `ManagedCurlUrlHandleTests.Set.cs` (`Set_HostAName_KeepsItAsGiven`, blank host row, IPv6 zone, `PUNY2IDN`). Measure-CodeQuality: 0 failing members for both libraries.
 
 ## Log
 
 - 2026-10-18: Created.
 - 2026-10-18: Backlog -> Doing. Criteria at claim: 801d03ef d6c1964a.
+- 2026-10-18: Doing -> Done. curl_url_set and whole-URL parsing decode the host before IPv4/IPv6 normalising, keep a set host as given, refuse a blank URLENCODE host, and PUNY2IDN any xn-- label; lib1560's nine rows pass
