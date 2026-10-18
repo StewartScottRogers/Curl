@@ -32,3 +32,4 @@ Found by BL-2646. Upstream case 1533 (`Curl.Conformance.UnitTests/UpstreamTestDa
 ## Log
 
 - 2026-10-18: Created.
+- 2026-10-18: Backlog -> Doing. Criteria at claim: 9edf64c7 6304615c 4272a6b9 3bf8be13.
