@@ -8,6 +8,7 @@ public sealed class UrlPortOverrideTests
 {
     [TestMethod]
     [DataRow("ftp://127.0.0.1/521/", "ftp://127.0.0.1:2121/521/")]
+    [DataRow("ftp://127.0.0.1/562;type=A", "ftp://127.0.0.1:2121/562;type=A")]
     [DataRow("http://h:999/x", "http://h:2121/x")]
     [DataRow("h/x", "http://h:2121/x")]
     public void Apply_PortSet_WritesItIntoTheUrl(string url, string expected)
