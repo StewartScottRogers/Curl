@@ -32,3 +32,4 @@ Found by BL-2546, which ported lib1933 to lib1938 as `LibAwsSigV4Request` in `Cu
 ## Log
 
 - 2026-10-17: Created.
+- 2026-10-17: Backlog -> Doing. Criteria at claim: 5819e099 21e5ddeb c59fcab3 3d836d5e.
