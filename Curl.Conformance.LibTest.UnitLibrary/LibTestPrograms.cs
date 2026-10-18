@@ -279,6 +279,15 @@ public sealed class LibTestPrograms
         new Lib3033(TimeProvider.System),
         new Lib3034(),
         new Lib3100(),
+        new Lib3101(),
+        new Lib3102(),
+        new Lib3103(),
+        new Lib3104(),
+        new Lib3105(),
+        new Lib3207(),
+        new Lib3208(TimeProvider.System),
+        new Lib5000(),
+        new Lib5004(),
     ]);
 
     /// <summary>The names of the programs in the table, such as <c>lib500</c>.</summary>

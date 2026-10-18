@@ -1,4 +1,5 @@
 using Curl.Api.Codes;
+using Curl.Api.Options;
 using Libcurl.Global;
 using Libcurl.Options;
 
@@ -77,5 +78,21 @@ public sealed class LibTestRunTests
 
         Assert.AreEqual("é\n", run.OutputText);
         Assert.IsTrue(run.Output.CanWrite);
+    }
+
+    [TestMethod]
+    public async Task SetOptionsUnchecked_SetsEachOptionAndIgnoresAFailure()
+    {
+        EasyOptions? seen = null;
+        await using CurlLibrary library = CurlGlobal.Init(new FakeCurlEngine { Performing = o => { seen = o; return CurlCode.Ok; } });
+        await using Libcurl.Easy.CurlEasy easy = library.EasyInit()!;
+
+        LibTestRun.SetOptionsUnchecked(easy, [(CurlOption.HttpsigAlgorithm, 1L), (CurlOption.Url, "http://x/"), (CurlOption.Verbose, 1L)]);
+        _ = await easy.PerformAsync(CancellationToken.None);
+
+        Assert.AreEqual("http://x/", seen!.Network.Url);
+        Assert.IsTrue(seen.Behaviour.Verbose);
+        Assert.ThrowsExactly<ArgumentNullException>(() => LibTestRun.SetOptionsUnchecked(null!, []));
+        Assert.ThrowsExactly<ArgumentNullException>(() => LibTestRun.SetOptionsUnchecked(easy, null!));
     }
 }
