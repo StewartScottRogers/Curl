@@ -3,8 +3,8 @@ id: AF-0159
 title: ADR-0473 says the gap office records test2043 as excluded with an internet-host reason; the gap converter has no such rule and records it as unmeasured
 auditor: truthfulness
 severity: Low
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-16_1623.md: the reproduction no longer reproduces.
 key: truthfulness:Documentation/Planning/Decisions/ADR-0473-upstream-test2043-is-measured-excluded-because-it-checks-a-live-internet-host.md:ADR-0473:stale-adr
 reproduction: none
 task: BL-2273
@@ -13,9 +13,9 @@ found: 2026-10-11
 found-at: 22f394602532a6922adbc7fa91b3739b62d2112a
 scorecard: 2026-10-11_0051.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-16
+closed-how: reliable-reaudit
+closed-by: 2026-10-16_1623.md
 ---
 # AF-0159 - ADR-0473 says the gap office records test2043 as excluded with an internet-host reason; the gap converter has no such rule and records it as unmeasured
 
@@ -49,8 +49,10 @@ Run from the repository root:
 - 2026-10-14 | 2026-10-14_0453.md | not re-audited | Ran the reproduction: 0 matches for 'internet|test2043' and 5 for "return @\('excluded'" in Gap/Tools/ConvertTo-BehaviourMeasurement.ps1. The converter is unchanged (still no internet-host rule), so the reproduction measures only the code side and cannot tell. ADR-0473's Decision 2 now says 'This is intent: today ... has no internet-host rule, so it records the skipped case as unmeasured', so the ADR now matches the code. Recorded as not re-audited.
 - 2026-10-14 | 2026-10-14_1815.md | not re-audited | Ran the reproduction: 'internet|test2043' matches 0 lines in Gap/Tools/ConvertTo-BehaviourMeasurement.ps1, and "return @('excluded'" matches 8. The converter output is unchanged. The fix went on the ADR side instead: ADR-0473 decision 2 now reads 'The gap office is to measure behaviour:test2043 as excluded ... This is intent: today Gap/Tools/ConvertTo-BehaviourMeasurement.ps1 has no internet-host rule, so it records the skipped case as unmeasured (harness-unsupported)'. That matches the code. The reproduction only searches the converter, so it cannot tell whether the mismatch remains; read by hand, it is gone except for the title's present-tense 'is measured excluded'.
 - 2026-10-15 | 2026-10-15_0156.md | reproduces: yes | Ran the reproduction: (Select-String ... -Pattern 'internet|test2043').Count = 0, and (Select-String ... -Pattern "return @\('excluded'").Count = 8. The converter still has no internet-host or test2043 rule, so test2043 is not excluded as ADR-0473 says.
+- 2026-10-16 | 2026-10-16_1623.md | reproduces: no | Ran the reproduction: 0 then 8. These are the same counts as before, because the reproduction only measures the converter, which has no internet-host or test2043 rule. The defect was ADR-0473 claiming such a rule. ADR-0473's Decision 2 now says test2043 is excluded by the general disabled-upstream rule ('reason disabled-upstream and evidence "disabled upstream"') and 'The converter has no internet-host rule.' The converter's line 164 ('if ($Detail -eq 'disabled upstream') { return @('excluded', 'disabled-upstream') }') matches it. The ADR and the code now agree.
 
 ## Log
 
 - 2026-10-11: filed proposed.
 - 2026-10-11: proposed -> accepted.
+- 2026-10-16: accepted -> closed. Re-audit 2026-10-16_1623.md: the reproduction no longer reproduces.

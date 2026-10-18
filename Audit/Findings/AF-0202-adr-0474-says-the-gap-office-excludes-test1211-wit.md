@@ -3,8 +3,8 @@ id: AF-0202
 title: ADR-0474 says the gap office excludes test1211 with an ADR-specific reason; the converter records the generic disabled-upstream reason
 auditor: truthfulness
 severity: Low
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-16_1623.md: the reproduction no longer reproduces.
 key: truthfulness:Documentation/Planning/Decisions/ADR-0474-upstream-test1211-is-measured-excluded-because-upstream-disables-it-and-real-curl-exits-10.md:test1211:stale-adr
 reproduction: none
 task: BL-2274
@@ -13,9 +13,9 @@ found: 2026-10-13
 found-at: c192c3e80e58636be1d282d241a7781f7df86695
 scorecard: 2026-10-13_1822.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-16
+closed-how: reliable-reaudit
+closed-by: 2026-10-16_1623.md
 ---
 # AF-0202 - ADR-0474 says the gap office excludes test1211 with an ADR-specific reason; the converter records the generic disabled-upstream reason
 
@@ -46,8 +46,10 @@ if ($Detail -eq 'disabled upstream') { return @('excluded', 'disabled-upstream')
 - 2026-10-14 | 2026-10-14_0453.md | not re-audited | Ran the reproduction: 0 matches for 'test1211|exits 10', and the generic rule line is "if ($Detail -eq 'disabled upstream') { return @('excluded', 'disabled-upstream') }". The converter is unchanged, so the reproduction cannot tell. ADR-0474's Decision 3 now says the converter's general rule records 'disabled-upstream' with evidence 'disabled upstream' and 'has no rule specific to test1211', which matches the code. Recorded as not re-audited.
 - 2026-10-14 | 2026-10-14_1815.md | not re-audited | Ran the reproduction: 'test1211|exits 10' matches 0 lines in the converter, and the excluded line is "if ($Detail -eq 'disabled upstream') { return @('excluded', 'disabled-upstream') }". The converter output is unchanged. The fix went on the ADR side instead: ADR-0474 decision 3 now says the converter's general rule 'records the reason disabled-upstream with the evidence "disabled upstream", and has no rule specific to test1211'. That matches the code. The reproduction only searches the converter, so it cannot tell whether the mismatch remains; read by hand, it is gone.
 - 2026-10-15 | 2026-10-15_0156.md | reproduces: yes | Ran the reproduction: (Select-String ... -Pattern 'test1211|exits 10').Count = 0. The disabled-upstream line is still `if ($Detail -eq 'disabled upstream') { return @('excluded', 'disabled-upstream') }`: the generic reason, not ADR-0474's specific one.
+- 2026-10-16 | 2026-10-16_1623.md | reproduces: no | Ran the reproduction: 0, then 'if ($Detail -eq 'disabled upstream') { return @('excluded', 'disabled-upstream') }'. These are the same outputs as before; the converter has no test1211 rule. ADR-0474's Decision 3 now says the converter 'records the reason `disabled-upstream` with the evidence "disabled upstream", and has no rule specific to test1211', and line 51 says the disabled-upstream rule excludes it 'with no reason specific to it'. The ADR now matches the code.
 
 ## Log
 
 - 2026-10-13: filed proposed.
 - 2026-10-13: proposed -> accepted.
+- 2026-10-16: accepted -> closed. Re-audit 2026-10-16_1623.md: the reproduction no longer reproduces.
