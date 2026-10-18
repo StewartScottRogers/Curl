@@ -181,6 +181,7 @@ public sealed class LibTestPrograms
         new Lib1557(),
         new Lib1558(),
         new Lib1559(),
+        new Lib1560(OperatingSystem.IsWindows()),
         new Lib1564(TimeProvider.System),
         new Lib1565(TimeProvider.System),
         new Lib1567(),

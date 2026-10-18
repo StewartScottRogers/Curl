@@ -69,7 +69,10 @@ internal sealed class FakeCurlEngine : ICurlEngine
         return LastShare;
     }
 
-    public ICurlUrlHandle CreateUrl() => new FakeUrlHandle { SetResult = UrlSetResult, GetResult = UrlGetResult };
+    public ICurlUrlHandle CreateUrl() => CreatingUrl?.Invoke() ?? new FakeUrlHandle { SetResult = UrlSetResult, GetResult = UrlGetResult };
+
+    /// <summary>Makes each URL handle instead of a <see cref="FakeUrlHandle"/>, when set.</summary>
+    public Func<ICurlUrlHandle>? CreatingUrl { get; init; }
 
     public CurlUrlCode? UrlGetResult { get; init; }
 
