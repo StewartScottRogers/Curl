@@ -1,5 +1,5 @@
 ---
-id: BL-2743
+id: BL-2746
 title: Print curl 8.22.0's 'No host present' for a URL rejected for having no host
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-18
 completed:
 ---
-# BL-2743 — Print curl 8.22.0's 'No host present' for a URL rejected for having no host
+# BL-2746 — Print curl 8.22.0's 'No host present' for a URL rejected for having no host
 
 ## Goal
 
