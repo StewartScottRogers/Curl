@@ -9,7 +9,7 @@ public static partial class Lib1560Tables
     /// <summary>
     /// <c>get_url_list</c>: URLs <c>get_url</c> reads back whole (<c>USE_IDN</c> and <c>LDAP</c> rows, Curl having both).
     /// A C byte that is not part of valid UTF-8 is written as <c>\uDC00</c> plus the byte, as
-    /// <c>UrlByteText</c> carries it (ADR-0695).
+    /// <c>UrlByteText</c> carries it (ADR-0697).
     /// </summary>
     public static IReadOnlyList<Lib1560UrlCase> GetUrls { get; } =
     [

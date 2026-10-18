@@ -1,4 +1,4 @@
-# ADR-0695: URL bytes that are not UTF-8 are carried as the lone surrogates U+DC80 to U+DCFF
+# ADR-0697: URL bytes that are not UTF-8 are carried as the lone surrogates U+DC80 to U+DCFF
 
 - Status: Accepted
 - Date: 2026-10-18

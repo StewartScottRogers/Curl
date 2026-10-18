@@ -423,7 +423,7 @@ public sealed class UpstreamConformanceTests
     // CURL_ENTROPY, which pins Sec-WebSocket-Key and the frame masks: the harness reports Debug to a case naming the ws
     // feature and setting CURL_ENTROPY, and CreateEngine gives the libtest engine the forced sequence (ADR-0678, BL-2688);
     // cases 2700 to 2723 rely on it for CURL_WS_FORCE_ZERO_MASK, which zeroes the frame masks: the harness reports Debug
-    // to a case naming ws and setting it, and CreateEngine gives the libtest engine zero masks (ADR-0696, BL-2698).
+    // to a case naming ws and setting it, and CreateEngine gives the libtest engine zero masks (ADR-0698, BL-2698).
     // The FTP libtest case 753 relies on Debug for CURL_FTP_PWD_STOP, which stops the first transfer before PWD: the
     // harness reports Debug to a case setting it, and CreateEngine has the libtest engine stop its first perform there (ADR-0687, BL-2636).
     private static UpstreamCurlPlatform PlatformFor(byte[] testFile)

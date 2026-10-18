@@ -31,7 +31,7 @@ Found by BL-2551, which ported lib2700 (`Curl.Conformance.LibTest.UnitLibrary/Li
 - The fault was in the harness only, so `touches` stayed `Curl.Conformance.UnitTests`. `PlatformFor` now reports
   `Debug` to a `ws` case setting `CURL_WS_FORCE_ZERO_MASK`, and `CreateEngine` gives the libtest engine a new
   `ZeroMaskWebSocketRandomSource` (zero 4-byte masks, random key) through ADR-0678's `IWebSocketRandomSource` seam.
-  Decision recorded in ADR-0696.
+  Decision recorded in ADR-0698.
 - Measured on Windows: 23 of 24 pass and are on the ratchet. 2708 (`ws: Automatic PONG`) fails: Curl sends the
   automatic PONG and then also returns the PING to `curl_ws_recv`, which `lib2700` echoes. Filed as BL-2782 with the
   differing lines.
