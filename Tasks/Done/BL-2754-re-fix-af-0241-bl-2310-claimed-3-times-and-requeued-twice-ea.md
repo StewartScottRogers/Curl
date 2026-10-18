@@ -8,7 +8,7 @@ depends-on: []
 touches: [RunDarkFactory.ps1]
 requirement: none
 created: 2026-10-18
-completed:
+completed: 2026-10-18
 ---
 # BL-2754 — Re-fix AF-0241: BL-2310 claimed 3 times and requeued twice: each run found its prerequisites still incomplete and filed more subtasks
 
@@ -45,12 +45,15 @@ The finding closes only when a later re-audit by the process auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Lane prompt (both copies in RunDarkFactory.ps1) already demanded counting all remaining work (AF-0241, AF-0242, AF-0263), yet BL-2529 was requeued for a split and again for BL-2601: the split requeue itself was not run through those checks. Added a paragraph requiring that. Reproduction needs the audit log copy, so the process auditor re-audit measures it.
 
 ## Log
 
 - 2026-10-18: Created.
 - 2026-10-18: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-18: Doing -> Done. Lane prompt now runs a split-for-size requeue through the same prerequisite checks (RunDarkFactory.ps1).

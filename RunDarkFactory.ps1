@@ -3612,6 +3612,11 @@ Rules for this unattended run, in addition to CLAUDE.md:
    ported", and file the runner work with the split (AF-0263: BL-2529 was requeued for size
    and then for BL-2601, the runner skipping cases 520 to 537, $3.24 for two runs that
    produced only a requeue).
+   A split for size is itself a requeue, so it gets the same pass: before filing the
+   subtasks, run each of them through the checks above (files still using X, hooks, the
+   case runner) and file every missing prerequisite beside them, so the claim after the
+   split finds nothing new to wait on (AF-0241 re-audit: BL-2529 was again requeued twice,
+   for the split and then for BL-2601, $4.20 over three claims).
    The shift claimed the task only because every ID already in its `depends-on` is Done,
    so those never send it back. Before naming any other task as the blocker, check its
    folder (`ls Tasks/*/<ID>-* Tasks/Done/*/<ID>-*`): a task in Done does not block. And
