@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Cli.UnitLibrary]
 requirement: none
 created: 2026-10-18
-completed:
+completed: 2026-10-18
 ---
 # BL-2759 — Fix AF-0248: --path-as-is has no option-table row: curl refuses it as unknown, and 13 Curl.Cli and 1 Curl.Engine unit tests fail unmutated
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- 2026-10-18 (lane 5): no code change needed. `CommandLineOptionTable.cs:330` already holds `NegatableFlag("path-as-is", ...)`, added in da1eaeddb long before the audit; the audited tree lacked it, so the finding most likely saw an audit-seeder planted defect (row removed) and reported it as a product defect. `dotnet test Curl.Cli.UnitTests --filter "TestCategory!=Integration"` on this checkout: Failed: 0, Passed: 3952, Skipped: 18, Total: 3970. Full `dotnet build` clean; fast tests green. Existing tests Parse_PathAsIs_SetsPathAsIs and Parse_NoPathAsIsAfterPathAsIs_TurnsPathAsIsOff already pin the row, so no new test is needed.
 
 ## Log
 
 - 2026-10-18: Created.
 - 2026-10-18: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-18: Doing -> Done. --path-as-is row is present; Curl.Cli.UnitTests fast run fails 0 of 3970
