@@ -31,3 +31,4 @@ Found by BL-2542, which ported lib1564 and lib1565: both are skipped with `Curl 
 ## Log
 
 - 2026-10-17: Created.
+- 2026-10-18: Backlog -> Doing. Criteria at claim: feccc413 756a3894 3d836d5e.
