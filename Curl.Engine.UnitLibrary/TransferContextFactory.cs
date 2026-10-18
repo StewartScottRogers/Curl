@@ -65,6 +65,13 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
     internal IHstsStore? HstsStore { get; set; }
 
     /// <summary>
+    /// Gets or sets every context's <see cref="HttpRequestOptions.KeptDigestChallenges" />: the
+    /// <c>WWW-Authenticate</c> values of the 401 that ended a Libcurl handle's previous transfer,
+    /// empty by default (BL-2747, ADR-0692).
+    /// </summary>
+    internal IReadOnlyList<string> KeptDigestChallenges { get; set; } = [];
+
+    /// <summary>
     /// Creates the context for one transfer, carrying every option a handler reads.
     /// </summary>
     /// <param name="settings">The tool settings: the post data, TLS level, FTP and mail flags and the creation mode no option group carries.</param>
@@ -248,6 +255,7 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
                 HttpRequestOptionsMapping.Of(settings, http, behaviour, transfer, authentication, formBody, proxy, commandLineTextEncoding, ifNoneMatchHeaders) with
                 {
                     HstsStore = HstsStore,
+                    KeptDigestChallenges = KeptDigestChallenges,
                     ProxyTunnel = proxyOptions.HttpProxyTunnel || ConnectToTunnelsThroughProxy(network, url, proxy),
                 },
                 altSvc),

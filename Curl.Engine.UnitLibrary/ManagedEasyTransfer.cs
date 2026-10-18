@@ -296,6 +296,26 @@ internal sealed class ManagedEasyTransfer(
     /// <summary>The headers the last perform from the options received over HTTP, for the header API (ADR-0603).</summary>
     private readonly TransferHeaderStore headers = new();
 
+    /// <summary>
+    /// The <c>WWW-Authenticate</c> values of the 401 that ended the last perform, which the next
+    /// perform's first request answers when Digest is then the one scheme allowed, as libcurl
+    /// 8.22.0 keeps its Digest state on the easy handle (BL-2747, ADR-0692); empty after any other
+    /// outcome and after <see cref="Reset" />.
+    /// </summary>
+    private IReadOnlyList<string> keptDigestChallenges = [];
+
+    /// <summary>
+    /// The <c>host:port</c> of the last perform's URL (<see cref="OriginOf" />), to which alone
+    /// <see cref="keptDigestChallenges" /> are answered, as curl 8.22.0 sends no kept Digest answer to another
+    /// host (upstream test1985); <see langword="null" /> before any perform.
+    /// </summary>
+    private string? keptDigestOrigin;
+
+    /// <summary>The <c>host:port</c> the kept Digest challenges are answered to.</summary>
+    /// <param name="url">The transfer's URL.</param>
+    /// <returns>The host and port.</returns>
+    private static string OriginOf(CurlUrl url) => $"{url.Host}:{url.Port}";
+
     /// <summary>The engine clock's timestamp when the running perform started, which the live times on <see cref="Info" /> count from.</summary>
     private long performStartedTimestamp;
 
@@ -917,6 +937,8 @@ internal sealed class ManagedEasyTransfer(
             callbackReads).ConfigureAwait(false);
         await CleanUpUnlessToolDoesAsync(toolInputs, options, settings, cookies, state, transferUrl).ConfigureAwait(false);
         LastResult = recorder is null ? result : recorder.ReportOn(result);
+        keptDigestChallenges = ChallengesOfLast401(result);
+        keptDigestOrigin = OriginOf(url);
         long connectionId = toolEvents is null ? ConnectionIdOf(result, state) : ToolConnectionIdOf(result, state, toolEvents);
         return FinishPerformed(LastResult, options, transferId, cookies, connectionId, AbortedTextOf(callbackReads), toolEvents?.State);
     }
@@ -1402,6 +1424,16 @@ internal sealed class ManagedEasyTransfer(
     }
 
     /// <summary>
+    /// The <c>WWW-Authenticate</c> values of <paramref name="result" />'s last response when it is a 401, else none.
+    /// </summary>
+    /// <param name="result">The transfer's result, or <see langword="null" /> for none.</param>
+    /// <returns>The challenges.</returns>
+    internal static IReadOnlyList<string> ChallengesOfLast401(TransferResult? result) =>
+        result is { Report: { ResponseCode: 401 } report }
+            ? [.. report.ResponseHeaders.Where(header => string.Equals(header.Key, "WWW-Authenticate", StringComparison.OrdinalIgnoreCase)).Select(header => header.Value.Trim())]
+            : [];
+
+    /// <summary>
     /// The info of a transfer that performed: what <see cref="TransferInfoFromReport.Of" /> fills from its report, the
     /// curl tool's runner's request URL standing in for the URL set when it gave one, with its IDs, cookie list and
     /// declared upload size, and the runner's answers (<see cref="WithToolAnswers" />) when it gave <paramref name="toolState" />.
@@ -1506,6 +1538,7 @@ internal sealed class ManagedEasyTransfer(
     public void Reset()
     {
         headers.Clear();
+        keptDigestChallenges = [];
         Options = new EasyOptions();
         Info = new TransferInfo { TransferId = Info.TransferId, CookieList = Info.CookieList };
         ToolSettings = null;
@@ -1587,7 +1620,7 @@ internal sealed class ManagedEasyTransfer(
         CancellationToken cancellationToken)
     {
         EngineToolTransferOutputs outputs = ToolOutputs ?? OwnOutputsOf(options.Callbacks, PauseGateFor(url), RecordsHeaders(url) ? headers : null);
-        TransferContextFactory factory = toolDispatch?.ContextFactory ?? new TransferContextFactory(Stream.Null, shared.TimeProvider) { HstsStore = PerformShared.Hsts, DiagnosticLog = Host.DiagnosticLog };
+        TransferContextFactory factory = toolDispatch?.ContextFactory ?? new TransferContextFactory(Stream.Null, shared.TimeProvider) { HstsStore = PerformShared.Hsts, DiagnosticLog = Host.DiagnosticLog, KeptDigestChallenges = OriginOf(url) == keptDigestOrigin ? keptDigestChallenges : [] };
         return LastContext = factory.Create(
             settings,
             options.Http,

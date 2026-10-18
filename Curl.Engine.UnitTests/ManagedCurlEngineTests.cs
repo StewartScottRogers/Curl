@@ -313,6 +313,104 @@ public sealed class ManagedCurlEngineTests
         Assert.Contains("Authorization: Digest username=\"alice\", realm=\"my-backyard\", nonce=\"314156295\", uri=\"/api\", response=\"", request);
     }
 
+    /// <summary>
+    /// Upstream case 2024 (BL-2747): a 401 offering Digest to a Basic transfer is kept on the handle, and the
+    /// handle's next transfer under Digest alone answers it on its first request, as curl 8.22.0's authhost state.
+    /// </summary>
+    [TestMethod]
+    public async Task PerformAsync_EarlierTransferGotDigestChallenge_NextDigestTransferAnswersItFirst()
+    {
+        ScriptedConnector server = new([
+            "HTTP/1.1 401 Unauthorized\r\nWWW-Authenticate: Digest realm=\"testrealm\", nonce=\"1\"\r\nWWW-Authenticate: Basic realm=\"testrealm\"\r\nContent-Length: 0\r\n\r\n"u8.ToArray(),
+            "HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n"u8.ToArray(),
+        ]);
+        EngineDialing dialing = new(new ScriptedTcpDialer(server), new LoopbackDnsResolver(), new RecordingDatagramConnector(Curl.Protocol.Abstractions.CurlExitCode.CouldntConnect, "no udp"), UsesHandBuiltNtlm: true);
+        await using ManagedCurlEngine engine = new(TimeProvider.System, null, dialing: dialing);
+        await using IEasyTransfer easy = engine.CreateEasy();
+        easy.Options = new EasyOptions
+        {
+            Network = new EasyNetworkOptions { Url = "http://127.0.0.1:9000/20240100" },
+            Authentication = new Api.Options.Authentication.EasyAuthenticationOptions { UserPassword = "testuser:wrongpass", HttpAuthentication = Api.Options.Authentication.HttpAuthenticationMethods.Basic },
+        };
+        await easy.PerformAsync(CancellationToken.None);
+        easy.Options = new EasyOptions
+        {
+            Network = new EasyNetworkOptions { Url = "http://127.0.0.1:9000/20240200" },
+            Authentication = new Api.Options.Authentication.EasyAuthenticationOptions { UserPassword = "testuser:testpass", HttpAuthentication = Api.Options.Authentication.HttpAuthenticationMethods.Digest },
+        };
+
+        await easy.PerformAsync(CancellationToken.None);
+
+        string request = System.Text.Encoding.ASCII.GetString(server.Written);
+        string second = request[request.IndexOf("GET /20240200", StringComparison.Ordinal)..];
+        Assert.Contains("Authorization: Digest username=\"testuser\", realm=\"testrealm\", nonce=\"1\", uri=\"/20240200\", response=\"", second);
+        Assert.AreEqual(200, easy.Info.ResponseCode);
+    }
+
+    /// <summary>Upstream case 1985: a Digest challenge kept from one host is not answered to another.</summary>
+    [TestMethod]
+    public async Task PerformAsync_EarlierTransferGotDigestChallengeFromAnotherPort_NextDigestTransferSendsNoAuthorizationFirst()
+    {
+        ScriptedConnector server = new([
+            "HTTP/1.1 401 Unauthorized\r\nWWW-Authenticate: Digest realm=\"testrealm\", nonce=\"1\"\r\nContent-Length: 0\r\n\r\n"u8.ToArray(),
+            "HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n"u8.ToArray(),
+        ]);
+        EngineDialing dialing = new(new ScriptedTcpDialer(server), new LoopbackDnsResolver(), new RecordingDatagramConnector(Curl.Protocol.Abstractions.CurlExitCode.CouldntConnect, "no udp"), UsesHandBuiltNtlm: true);
+        await using ManagedCurlEngine engine = new(TimeProvider.System, null, dialing: dialing);
+        await using IEasyTransfer easy = engine.CreateEasy();
+        easy.Options = new EasyOptions { Network = new EasyNetworkOptions { Url = "http://127.0.0.1:9000/first" } };
+        await easy.PerformAsync(CancellationToken.None);
+        easy.Options = new EasyOptions
+        {
+            Network = new EasyNetworkOptions { Url = "http://127.0.0.1:9001/second" },
+            Authentication = new Api.Options.Authentication.EasyAuthenticationOptions { UserPassword = "testuser:testpass", HttpAuthentication = Api.Options.Authentication.HttpAuthenticationMethods.Digest },
+        };
+
+        await easy.PerformAsync(CancellationToken.None);
+
+        string request = System.Text.Encoding.ASCII.GetString(server.Written);
+        string second = request[request.IndexOf("GET /second", StringComparison.Ordinal)..];
+        Assert.DoesNotContain("Authorization:", second);
+    }
+
+    [TestMethod]
+    public void ChallengesOfLast401_ResponsesOtherThanA401OrNone_KeepNoChallenges()
+    {
+        Curl.Protocol.Abstractions.TransferReport ok = new() { ResponseCode = 200, ResponseHeaders = [new("WWW-Authenticate", "Digest nonce=\"1\"")] };
+        Curl.Protocol.Abstractions.TransferReport unauthorized = new() { ResponseCode = 401, ResponseHeaders = [new("www-authenticate", " Digest nonce=\"1\" "), new("Content-Length", "0")] };
+
+        Assert.IsEmpty(ManagedEasyTransfer.ChallengesOfLast401(null));
+        Assert.IsEmpty(ManagedEasyTransfer.ChallengesOfLast401(Curl.Protocol.Abstractions.TransferResult.Success(0)));
+        Assert.IsEmpty(ManagedEasyTransfer.ChallengesOfLast401(Curl.Protocol.Abstractions.TransferResult.Success(0) with { Report = ok }));
+        CollectionAssert.AreEqual(new[] { "Digest nonce=\"1\"" }, ManagedEasyTransfer.ChallengesOfLast401(Curl.Protocol.Abstractions.TransferResult.Success(0) with { Report = unauthorized }).ToArray());
+    }
+
+    [TestMethod]
+    public async Task Reset_AfterAPerformThatEndedWithADigestChallenge_NextDigestTransferSendsNoAuthorizationFirst()
+    {
+        ScriptedConnector server = new([
+            "HTTP/1.1 401 Unauthorized\r\nWWW-Authenticate: Digest realm=\"testrealm\", nonce=\"1\"\r\nContent-Length: 0\r\n\r\n"u8.ToArray(),
+            "HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n"u8.ToArray(),
+        ]);
+        EngineDialing dialing = new(new ScriptedTcpDialer(server), new LoopbackDnsResolver(), new RecordingDatagramConnector(Curl.Protocol.Abstractions.CurlExitCode.CouldntConnect, "no udp"), UsesHandBuiltNtlm: true);
+        await using ManagedCurlEngine engine = new(TimeProvider.System, null, dialing: dialing);
+        await using IEasyTransfer easy = engine.CreateEasy();
+        easy.Options = new EasyOptions { Network = new EasyNetworkOptions { Url = "http://127.0.0.1:9000/first" } };
+        await easy.PerformAsync(CancellationToken.None);
+        easy.Reset();
+        easy.Options = new EasyOptions
+        {
+            Network = new EasyNetworkOptions { Url = "http://127.0.0.1:9000/second" },
+            Authentication = new Api.Options.Authentication.EasyAuthenticationOptions { UserPassword = "testuser:testpass", HttpAuthentication = Api.Options.Authentication.HttpAuthenticationMethods.Digest },
+        };
+
+        await easy.PerformAsync(CancellationToken.None);
+
+        string request = System.Text.Encoding.ASCII.GetString(server.Written);
+        string second = request[request.IndexOf("GET /second", StringComparison.Ordinal)..];
+        Assert.DoesNotContain("Authorization:", second);
+    }
+
     [TestMethod]
     public async Task PerformAsync_StopsFirstFtpTransferBeforePwd_FirstFtpPerformSendsNoPwdAndTimesOut()
     {
