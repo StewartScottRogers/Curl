@@ -32,3 +32,4 @@ Found by BL-2530. Libcurl has no setter for `CURLOPT_IOCTLFUNCTION` or `CURLOPT_
 ## Log
 
 - 2026-10-17: Created.
+- 2026-10-17: Backlog -> Doing. Criteria at claim: 40388131 6dc0ad3e 4272a6b9 7d0e6df3.
