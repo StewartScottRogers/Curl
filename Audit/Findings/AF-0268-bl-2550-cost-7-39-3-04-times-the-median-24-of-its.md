@@ -3,8 +3,8 @@ id: AF-0268
 title: BL-2550 cost $7.39, 3.04 times the median: 24 of its 51.6 minutes went on two shell loops reading 2,077 upstream test files one by one
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: process:logs:BL-2550:cost-outlier
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Log
 
 - 2026-10-18: filed proposed.
+- 2026-10-18: proposed -> accepted.
