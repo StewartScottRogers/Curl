@@ -32,3 +32,4 @@ Found by BL-2548, which ported lib1977 as `Lib1977` in `Curl.Conformance.LibTest
 ## Log
 
 - 2026-10-17: Created.
+- 2026-10-18: Backlog -> Doing. Criteria at claim: f49fc50e 2d55fa0b 4272a6b9 8738c7f6.
