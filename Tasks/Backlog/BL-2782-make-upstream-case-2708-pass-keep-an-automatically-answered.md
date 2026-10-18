@@ -18,7 +18,7 @@ Upstream case 2708 (`ws: Automatic PONG`, `lib2700`) passes on Windows and is on
 
 ## Context
 
-Found by BL-2698, which ran cases 2700 to 2723 under the harness's `CURL_WS_FORCE_ZERO_MASK` stand-in (ADR-0694): all
+Found by BL-2698, which ran cases 2700 to 2723 under the harness's `CURL_WS_FORCE_ZERO_MASK` stand-in (ADR-0696): all
 pass but 2708, the one case where `Lib2700` leaves libcurl's automatic PONG on. Measured on Windows:
 
 ```

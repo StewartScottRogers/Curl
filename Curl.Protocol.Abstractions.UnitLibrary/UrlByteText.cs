@@ -8,7 +8,7 @@ namespace Curl.Protocol.Abstractions;
 /// Converts between a URL's bytes and .NET text without losing a byte: valid UTF-8 is its
 /// characters, and each byte that is not part of valid UTF-8 is the lone surrogate
 /// <c>U+DC80</c> to <c>U+DCFF</c> (<c>U+DC00</c> plus the byte), so <c>%c0</c> decoded and
-/// encoded again is <c>%C0</c>, as libcurl 8.22.0's byte strings keep it (ADR-0693).
+/// encoded again is <c>%C0</c>, as libcurl 8.22.0's byte strings keep it (ADR-0695).
 /// </summary>
 public static class UrlByteText
 {

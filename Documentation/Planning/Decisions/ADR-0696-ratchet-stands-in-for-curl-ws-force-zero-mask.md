@@ -1,4 +1,4 @@
-# ADR-0694 — The ratchet stands in for the debug build's `CURL_WS_FORCE_ZERO_MASK` in the WebSocket libtest cases
+# ADR-0696 — The ratchet stands in for the debug build's `CURL_WS_FORCE_ZERO_MASK` in the WebSocket libtest cases
 
 - **Status:** Accepted
 - **Date:** 2026-10-18
