@@ -36,3 +36,4 @@ The control byte ends `UrlRelativeReference.IsAbsolute`'s scheme early, so `Mana
 ## Log
 
 - 2026-10-18: Created.
+- 2026-10-18: Backlog -> Doing. Criteria at claim: b147ebec b5bf0825 4887efa2.
