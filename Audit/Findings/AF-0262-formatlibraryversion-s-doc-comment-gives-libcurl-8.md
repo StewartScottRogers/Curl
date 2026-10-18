@@ -3,8 +3,8 @@ id: AF-0262
 title: FormatLibraryVersion's doc comment gives libcurl/8.21.0 as the -V library text; the method returns libcurl/8.22.0
 auditor: truthfulness
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: truthfulness:Curl.Output.UnitLibrary/TransferWriteOutVariables.cs:FormatLibraryVersion:false-doc-comment
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Curl.Output.UnitLibrary/TransferWriteOutVariables.cs -Patter
 ## Log
 
 - 2026-10-18: filed proposed.
+- 2026-10-18: proposed -> accepted.
