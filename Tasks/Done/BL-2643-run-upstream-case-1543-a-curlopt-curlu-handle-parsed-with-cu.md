@@ -8,7 +8,7 @@ depends-on: []
 touches: [Libcurl, Curl.Engine.UnitLibrary, Curl.Engine.UnitTests, Libcurl.UnitTests, Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
 requirement: none
 created: 2026-10-17
-completed:
+completed: 2026-10-17
 ---
 # BL-2643 — Run upstream case 1543: a CURLOPT_CURLU handle parsed with CURLU_ALLOW_SPACE sends no request
 
@@ -22,13 +22,17 @@ Found by BL-2538, which ported lib1518 (`Curl.Conformance.LibTest.UnitLibrary/Li
 
 ## Acceptance criteria
 
-- [ ] A URL handle set with `CURLU_ALLOW_SPACE` and handed over with `CURLOPT_CURLU` sends its path with each space as `%20`, with a focused unit test in the fixed library's `.UnitTests` project.
-- [ ] test1543 passes through the runner on Windows and is added to `Curl.Conformance.UnitTests/PassingUpstreamCases.txt`.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] A URL handle set with `CURLU_ALLOW_SPACE` and handed over with `CURLOPT_CURLU` sends its path with each space as `%20`, with a focused unit test in the fixed library's `.UnitTests` project.
+- [x] test1543 passes through the runner on Windows and is added to `Curl.Conformance.UnitTests/PassingUpstreamCases.txt`.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Cause: `UrlHandleOverride.Apply` read the handle's URL with no flags, so a `CURLU_ALLOW_SPACE` path kept its raw spaces and the request line broke. Fix: read the path with `CURLU_URLENCODE` on a duplicate of the handle, as curl 8.22.0's `parseurlandfillconn` does (`curl_url_get(uh, CURLUPART_PATH, ..., CURLU_URLENCODE)`), then take the whole URL; the application's handle is unchanged. Only the path is encoded, matching upstream (the query is read with no flags there).
+- Unit test: `UrlHandleOverrideTests.Apply_HandleParsedAllowingSpaces_SendsEachPathSpaceAsPercent20`. test1543 passes through `NamedUpstreamCase_RunThroughCurl_PassesAsAListedCaseMust`; no platform-dependent output. Measure-CodeQuality for Curl.Engine.UnitLibrary: 0 failing members.
 
 ## Log
 
 - 2026-10-17: Created.
 - 2026-10-17: Backlog -> Doing. Criteria at claim: 176cbd41 526cc4a9 3d836d5e.
+- 2026-10-17: Doing -> Done. A CURLOPT_CURLU handle parsed with CURLU_ALLOW_SPACE sends its path spaces as %20; test1543 holds the ratchet
