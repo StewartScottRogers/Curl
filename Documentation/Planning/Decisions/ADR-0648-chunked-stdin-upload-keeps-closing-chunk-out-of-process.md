@@ -57,3 +57,9 @@ recorded on macOS when the server answers and closes between them.
   `Transfer-Encoding: chunked`. Upstream's `tests/server/sws.c` (curl 8.22.0) reads a chunked
   request to its `\r\n0\r\n\r\n` whatever `Content-Length` says. BL-2647 makes the recorder do the
   same, and the next gap run's re-measurement closes the difference. Curl is unchanged.
+- Re-measured after BL-2647 in gap-platforms run 39079451070, dispatched from `work/dark-factory`
+  so the gap office's tools carry the fixed recorder, on commit
+  `bc4d88fbde7e060af4b8a9445afdacefe1fa7d83`: `behaviour:test60` is `match` on Linux and on
+  macOS, and no other behaviour case changed state. A run dispatched from `master` measures with
+  `master`'s recorder (run 39076579396 still found the gap), so the scheduled run agrees only
+  once BL-2647 reaches `master`.
