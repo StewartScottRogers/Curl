@@ -21,6 +21,10 @@ internal sealed class ConcatenatedReadStream : Stream
 
     private readonly bool[] files;
 
+    private readonly long?[] callbackLengths;
+
+    private readonly long[] segmentReads;
+
     private int current;
 
     /// <summary>Initialises a stream over <paramref name="segments" />, which it now owns.</summary>
@@ -42,12 +46,43 @@ internal sealed class ConcatenatedReadStream : Stream
     /// through its read function, and one that seeks is passed by in the same fill once its position reaches its
     /// length, as <c>read_part_content</c> spares the read at the part's known size (upstream test650, BL-2625).
     /// </param>
-    internal ConcatenatedReadStream(IReadOnlyList<Stream> segments, bool allowsSeeking = true, IReadOnlyCollection<int>? callbackSegments = null, IReadOnlyCollection<int>? fileSegments = null)
+    /// <param name="callbackLengths">
+    /// The known size of each callback segment that has one, by index, or <see langword="null" /> for none. Once a
+    /// fill has read that many bytes from it the segment is passed in the same fill without reading it again, so it
+    /// does not stop the fill, as <c>read_part_content</c> spares the read at <c>offset &gt;= datasize</c> (upstream
+    /// test668, BL-2630). An encoded segment (<see cref="EncodedReadStream" />) whose data has ended is passed the
+    /// same way, and one that stopped filling after its one source read ends the fill, which starts again when it
+    /// had given nothing, as curl's <c>Curl_mime_read</c> loops on <c>STOP_FILLING</c> (upstream test667).
+    /// </param>
+    internal ConcatenatedReadStream(
+        IReadOnlyList<Stream> segments,
+        bool allowsSeeking = true,
+        IReadOnlyCollection<int>? callbackSegments = null,
+        IReadOnlyCollection<int>? fileSegments = null,
+        IReadOnlyDictionary<int, long>? callbackLengths = null)
     {
         this.segments = segments;
         starts = allowsSeeking ? StartsWhenEverySegmentSeeks(segments) : null;
         files = MarkSegments(segments.Count, fileSegments ?? []);
-        readsOncePerFill = callbackSegments is { Count: > 0 } ? MarkSegments(segments.Count, [.. callbackSegments, .. fileSegments ?? []]) : null;
+        readsOncePerFill = ReadOnceMarks(segments.Count, callbackSegments, fileSegments);
+        this.callbackLengths = LengthsByIndex(segments.Count, callbackLengths ?? new Dictionary<int, long>());
+        segmentReads = new long[segments.Count];
+    }
+
+    /// <summary>One flag per segment read at most once per fill, or <see langword="null" /> when no segment is a callback.</summary>
+    private static bool[]? ReadOnceMarks(int count, IReadOnlyCollection<int>? callbackSegments, IReadOnlyCollection<int>? fileSegments) =>
+        callbackSegments is { Count: > 0 } ? MarkSegments(count, [.. callbackSegments, .. fileSegments ?? []]) : null;
+
+    /// <summary>One known length or <see langword="null" /> per segment, from <paramref name="lengths" />.</summary>
+    private static long?[] LengthsByIndex(int count, IReadOnlyDictionary<int, long> lengths)
+    {
+        long?[] byIndex = new long?[count];
+        foreach (KeyValuePair<int, long> length in lengths)
+        {
+            byIndex[length.Key] = length.Value;
+        }
+
+        return byIndex;
     }
 
     /// <summary>Where each segment stands now, or <see langword="null" /> when one cannot seek.</summary>
@@ -68,6 +103,19 @@ internal sealed class ConcatenatedReadStream : Stream
 
     /// <summary>Whether the segment at <paramref name="index" /> is a file that seeks and stands at its end.</summary>
     private bool IsFileAtItsEnd(int index) => files[index] && segments[index].CanSeek && segments[index].Position >= segments[index].Length;
+
+    /// <summary>
+    /// Whether the segment at <paramref name="index" /> is known to have nothing left without being read: a file at
+    /// its end, a callback segment that gave its known size, or an encoded segment whose data has ended.
+    /// </summary>
+    private bool IsAtItsEnd(int index) =>
+        IsFileAtItsEnd(index) || segmentReads[index] >= (callbackLengths[index] ?? long.MaxValue) || segments[index] is EncodedReadStream { IsAtItsEnd: true };
+
+    /// <summary>Whether reading the segment at <paramref name="index" /> counts as a fill's one callback or file read.</summary>
+    private static bool CountsAsTheRead(bool[] readsOnce, int index, bool atItsEnd) => readsOnce[index] && !atItsEnd;
+
+    /// <summary>Whether the read of the current segment just returned 0 because it stopped filling, not at its end.</summary>
+    private bool StoppedFilling(int read) => read == 0 && segments[current] is EncodedReadStream { StoppedFilling: true };
 
     /// <inheritdoc />
     public override bool CanRead => true;
@@ -141,40 +189,82 @@ internal sealed class ConcatenatedReadStream : Stream
     /// <summary>Fills <paramref name="buffer" /> across segments, reading a callback or file segment at most once.</summary>
     private int Fill(Span<byte> buffer, bool[] readsOnce)
     {
-        int filled = 0;
-        bool calledBack = false;
-        while (FillsOn(filled, buffer.Length, calledBack, readsOnce))
+        int filled;
+        bool stopped;
+        do
         {
-            calledBack |= readsOnce[current];
-            int read = segments[current].Read(buffer[filled..]);
-            filled += read;
-            PassSegmentWhenDone(read);
+            (filled, stopped) = FillOnce(buffer, readsOnce);
         }
+        while (filled == 0 && stopped);
 
         return filled;
     }
 
-    /// <summary>Whether a fill reads on: room is left, a segment is left, and it is not a second read-once segment.</summary>
-    private bool FillsOn(int filled, int length, bool calledBack, bool[] readsOnce) =>
-        filled < length && current < segments.Count && !(calledBack && readsOnce[current]);
-
-    /// <summary>Moves to the next segment when the current one read nothing or is a file at its end.</summary>
-    private void PassSegmentWhenDone(int read) => current += read == 0 || IsFileAtItsEnd(current) ? 1 : 0;
-
-    /// <summary>Fills <paramref name="buffer" /> across segments, reading a callback or file segment at most once.</summary>
-    private async ValueTask<int> FillAsync(Memory<byte> buffer, bool[] readsOnce, CancellationToken cancellationToken)
+    /// <summary>One buffer fill: its byte count, and whether an encoded segment stopped it.</summary>
+    private (int Filled, bool Stopped) FillOnce(Span<byte> buffer, bool[] readsOnce)
     {
         int filled = 0;
         bool calledBack = false;
         while (FillsOn(filled, buffer.Length, calledBack, readsOnce))
         {
-            calledBack |= readsOnce[current];
-            int read = await segments[current].ReadAsync(buffer[filled..], cancellationToken).ConfigureAwait(false);
+            calledBack |= CountsAsTheRead(readsOnce, current, IsAtItsEnd(current));
+            int read = segments[current].Read(buffer[filled..]);
             filled += read;
+            if (StoppedFilling(read))
+            {
+                return (filled, true);
+            }
+
             PassSegmentWhenDone(read);
         }
 
+        return (filled, false);
+    }
+
+    /// <summary>Whether a fill reads on: room is left, a segment is left, and it is not a second read-once segment.</summary>
+    private bool FillsOn(int filled, int length, bool calledBack, bool[] readsOnce) =>
+        filled < length && current < segments.Count && !(calledBack && CountsAsTheRead(readsOnce, current, IsAtItsEnd(current)));
+
+    /// <summary>Counts the bytes read, and moves to the next segment when the current one read nothing or is at its end.</summary>
+    private void PassSegmentWhenDone(int read)
+    {
+        segmentReads[current] += read;
+        current += read == 0 || IsAtItsEnd(current) ? 1 : 0;
+    }
+
+    /// <summary>Fills <paramref name="buffer" /> across segments, reading a callback or file segment at most once.</summary>
+    private async ValueTask<int> FillAsync(Memory<byte> buffer, bool[] readsOnce, CancellationToken cancellationToken)
+    {
+        int filled;
+        bool stopped;
+        do
+        {
+            (filled, stopped) = await FillOnceAsync(buffer, readsOnce, cancellationToken).ConfigureAwait(false);
+        }
+        while (filled == 0 && stopped);
+
         return filled;
+    }
+
+    /// <summary>One buffer fill: its byte count, and whether an encoded segment stopped it.</summary>
+    private async ValueTask<(int Filled, bool Stopped)> FillOnceAsync(Memory<byte> buffer, bool[] readsOnce, CancellationToken cancellationToken)
+    {
+        int filled = 0;
+        bool calledBack = false;
+        while (FillsOn(filled, buffer.Length, calledBack, readsOnce))
+        {
+            calledBack |= CountsAsTheRead(readsOnce, current, IsAtItsEnd(current));
+            int read = await segments[current].ReadAsync(buffer[filled..], cancellationToken).ConfigureAwait(false);
+            filled += read;
+            if (StoppedFilling(read))
+            {
+                return (filled, true);
+            }
+
+            PassSegmentWhenDone(read);
+        }
+
+        return (filled, false);
     }
 
     /// <inheritdoc />
@@ -215,6 +305,7 @@ internal sealed class ConcatenatedReadStream : Stream
             // A segment placed at its start needs no length, which an encoded one may have to measure.
             long offset = remaining == 0 ? 0 : Math.Min(remaining, segments[index].Length - segmentStarts[index]);
             segments[index].Position = segmentStarts[index] + offset;
+            segmentReads[index] = offset;
             remaining -= offset;
         }
 

@@ -1,3 +1,4 @@
+using System.Text;
 using Curl.Testing;
 
 namespace Curl.Core.Multipart;
@@ -399,7 +400,102 @@ public sealed class ConcatenatedReadStreamTests
         CollectionAssert.AreEqual(new[] { 2, 1 }, reads);
     }
 
+    [TestMethod]
+    public void Read_WithACallbackSegmentAtItsKnownSize_PassesItInTheSameFill()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("segments", "[1], callback [2,3] of size 2, [4], callback [5]");
+        using ConcatenatedReadStream stream = new(
+            [Segment(1), Segment(2, 3), Segment(4), Segment(5)], callbackSegments: [1, 3], callbackLengths: new Dictionary<int, long> { [1] = 2 });
+        byte[] buffer = new byte[10];
+
+        int[] reads = [stream.Read(buffer, 0, 10), stream.Read(buffer, 4, 6), stream.Read(buffer, 5, 5)];
+
+        diagnostics.Act("reads", string.Join(",", reads));
+        diagnostics.Assert("reads", "4,1,0", string.Join(",", reads));
+        CollectionAssert.AreEqual(new[] { 4, 1, 0 }, reads);
+        CollectionAssert.AreEqual(new byte[] { 1, 2, 3, 4, 5, 0, 0, 0, 0, 0 }, buffer);
+    }
+
+    [TestMethod]
+    public void Read_WithAnEmptyCallbackSegmentOfKnownSize_DoesNotCountItAsTheFillsRead()
+    {
+        using ConcatenatedReadStream stream = new(
+            [Segment(1), Segment(), Segment(2), Segment(3)], callbackSegments: [1, 3], callbackLengths: new Dictionary<int, long> { [1] = 0 });
+        byte[] buffer = new byte[10];
+
+        int first = stream.Read(buffer, 0, 10);
+
+        Assert.AreEqual(3, first);
+        CollectionAssert.AreEqual(new byte[] { 1, 2, 3, 0, 0, 0, 0, 0, 0, 0 }, buffer);
+    }
+
+    [TestMethod]
+    public void Position_SetToTheStartAfterACallbackSegmentReachedItsSize_ReadsItAgainAsTheFillsOneRead()
+    {
+        using ConcatenatedReadStream stream = new(
+            [Segment(1), Segment(2), Segment(3)], callbackSegments: [1, 2], callbackLengths: new Dictionary<int, long> { [1] = 1 });
+        byte[] buffer = new byte[3];
+        _ = stream.Read(buffer, 0, 3);
+
+        stream.Position = 0;
+        int again = stream.Read(buffer, 0, 3);
+
+        Assert.AreEqual(2, again);
+        CollectionAssert.AreEqual(new byte[] { 1, 2, 0 }, buffer);
+    }
+
+    [TestMethod]
+    public void Read_WithAnEncodedCallbackSegmentGivenOneByteACall_SendsEachEncodedGroupAsCurlDoes()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("segments", "\"[\", base64 callback over \"dummy\" one byte a call, \"]\"");
+        using ConcatenatedReadStream stream = new([Segment((byte)'['), EncodedCallback("dummy"), Segment((byte)']')], callbackSegments: [1]);
+        byte[] buffer = new byte[100];
+
+        string[] reads = [ReadText(stream, buffer), ReadText(stream, buffer), ReadText(stream, buffer), ReadText(stream, buffer)];
+
+        diagnostics.Act("reads", string.Join("|", reads));
+        diagnostics.Assert("reads", "[|ZHVt|bXk=]|", string.Join("|", reads));
+        CollectionAssert.AreEqual(new[] { "[", "ZHVt", "bXk=]", string.Empty }, reads);
+    }
+
+    [TestMethod]
+    public async Task ReadAsync_WithAnEncodedCallbackSegmentGivenOneByteACall_SendsEachEncodedGroupAsCurlDoes()
+    {
+        using ConcatenatedReadStream stream = new([Segment((byte)'['), EncodedCallback("dummy"), Segment((byte)']')], callbackSegments: [1]);
+        byte[] buffer = new byte[100];
+        List<string> reads = [];
+
+        for (int i = 0; i < 4; i++)
+        {
+            int read = await stream.ReadAsync(buffer.AsMemory(), TestContext.CancellationToken);
+            reads.Add(Encoding.ASCII.GetString(buffer, 0, read));
+        }
+
+        CollectionAssert.AreEqual(new[] { "[", "ZHVt", "bXk=]", string.Empty }, reads);
+    }
+
+    private static string ReadText(Stream stream, byte[] buffer) => Encoding.ASCII.GetString(buffer, 0, stream.Read(buffer, 0, buffer.Length));
+
+    /// <summary>A base64 callback segment over <paramref name="text" />, whose source gives one byte a read.</summary>
+    private static EncodedReadStream EncodedCallback(string text)
+    {
+        EncodedReadStream encoded = MultipartPartEncoder.Find("base64")!.EncodeWhileReading(new OneByteReadStream(Encoding.ASCII.GetBytes(text)), null);
+        encoded.ReadsSourceOncePerRead = true;
+        return encoded;
+    }
+
     private static MemoryStream Segment(params byte[] bytes) => new(bytes, writable: false);
+
+    /// <summary>A stream that gives one byte a read, as lib667's read callback does.</summary>
+    private sealed class OneByteReadStream(byte[] content) : MemoryStream(content, writable: false)
+    {
+        public override int Read(Span<byte> buffer) => base.Read(buffer[..Math.Min(1, buffer.Length)]);
+
+        public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default) =>
+            base.ReadAsync(buffer[..Math.Min(1, buffer.Length)], cancellationToken);
+    }
 
     /// <summary>A readable stream that cannot seek, as a pipe is.</summary>
     private sealed class NonSeekableStream : MemoryStream

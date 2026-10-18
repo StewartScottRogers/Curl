@@ -15,6 +15,8 @@ internal sealed class MultipartBodySegments(Encoding textEncoding) : IDisposable
 
     private readonly List<int> fileSegments = [];
 
+    private readonly Dictionary<int, long> callbackLengths = [];
+
     private readonly StringBuilder pendingText = new();
 
     private long knownLength;
@@ -53,14 +55,24 @@ internal sealed class MultipartBodySegments(Encoding textEncoding) : IDisposable
 
     /// <summary>
     /// Appends <paramref name="content" />, a <c>curl_mime_data_cb</c> part's read callback, which these
-    /// segments now own; the body reads it at most once per read, as <see cref="ConcatenatedReadStream" /> says.
+    /// segments now own; the body reads it at most once per read, and passes it once it has given its known size, as
+    /// <see cref="ConcatenatedReadStream" /> says. An encoded one reads its callback once per read too.
     /// </summary>
     /// <param name="content">The stream to send.</param>
     /// <param name="length">Its size in bytes, or <see langword="null" /> when unknown.</param>
     internal void AddCallbackStream(Stream content, long? length)
     {
+        if (content is EncodedReadStream encoded)
+        {
+            encoded.ReadsSourceOncePerRead = true;
+        }
+
         AddStream(content, length);
         callbackSegments.Add(segments.Count - 1);
+        if (length is { } known)
+        {
+            callbackLengths[segments.Count - 1] = known;
+        }
     }
 
     /// <summary>
@@ -81,10 +93,11 @@ internal sealed class MultipartBodySegments(Encoding textEncoding) : IDisposable
     internal ConcatenatedReadStream ToStream(bool allowsSeeking = true)
     {
         FlushText();
-        ConcatenatedReadStream body = new([.. segments], allowsSeeking, [.. callbackSegments], [.. fileSegments]);
+        ConcatenatedReadStream body = new([.. segments], allowsSeeking, [.. callbackSegments], [.. fileSegments], new Dictionary<int, long>(callbackLengths));
         segments.Clear();
         callbackSegments.Clear();
         fileSegments.Clear();
+        callbackLengths.Clear();
         return body;
     }
 

@@ -114,7 +114,11 @@ chunked upload's first chunk holds the headers and the callback's first bytes (`
 callback segments, upstream test645, BL-2624); any other body still reads one segment per read. In such a body an
 opened file part (`MultipartBodySegments.AddFileStream`; not an encoded one) is read at most once per fill too, and a
 seekable file at its end is passed in the same fill, as libcurl reads a file part through its read function
-(upstream test650, BL-2625, ADR-0683).
+(upstream test650, BL-2625, ADR-0683). A `Reader` part of known size that has given all of it is passed in the same
+fill without reading it again, and an encoded `Reader` part (`EncodedReadStream.ReadsSourceOncePerRead`) reads its
+callback once per fill: a fill it stops with nothing yet given starts again, as `Curl_mime_read` loops on
+`STOP_FILLING`, and `Base64DataEncoding` encodes each complete 3-byte group at once (upstream test667 and test668,
+BL-2630).
 
 `Globbing\UrlGlob` is curl 8.21.0's URL globbing (ADR-0032): `TryParse` reads `{a,b}` sets
 and `[1-10]`, `[01-10]`, `[a-z:2]` ranges as `tool_urlglob.c` does, failing with exit 3 and
