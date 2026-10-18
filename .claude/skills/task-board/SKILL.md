@@ -59,6 +59,10 @@ appends to it, so hand-written entries go there too, never above it.
   by path when the task edits it. A task that changes a shared contract
   (`Curl.Protocol.Abstractions.UnitLibrary`) touches it and so runs apart from every
   protocol task, which is the intent: contracts land first, then the protocols fan out.
+  The upstream case ratchet, `Curl.Conformance.UnitTests/PassingUpstreamCases.txt`, is
+  the one exception: list it when the task adds or removes cases, but it makes no overlap,
+  since git merges it line by line (`merge=union`) and the ratchet reads it as a set
+  (ADR-0689).
 - **Decisions are Claude's, with two exceptions.** Design and behaviour questions are
   delegated to Claude (root `CLAUDE.md`, "Decisions"): file one as a `docs` task assigned
   to `Claude` that decides and records an ADR. Only a new package or a threshold change

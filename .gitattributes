@@ -6,6 +6,10 @@
 # Shell scripts run on Linux and macOS, where CRLF breaks them.
 *.sh text eol=lf
 
+# The upstream case ratchet is one case number per line, read as a set, and dark factory
+# lanes add to it at once: a merge or rebase keeps both sides' lines (ADR-0689).
+Curl.Conformance.UnitTests/PassingUpstreamCases.txt merge=union
+
 ###############################################################################
 # Set default behavior for command prompt diff.
 #
