@@ -1,5 +1,5 @@
 ---
-id: BL-2744
+id: BL-2748
 title: Sign a library handle's AWS SigV4 request with the URL's credentials (upstream case 1978)
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-18
 completed:
 ---
-# BL-2744 — Sign a library handle's AWS SigV4 request with the URL's credentials (upstream case 1978)
+# BL-2748 — Sign a library handle's AWS SigV4 request with the URL's credentials (upstream case 1978)
 
 ## Goal
 
