@@ -3,8 +3,8 @@ id: AF-0255
 title: TryLookUpNetrcCredentials' || can become && with no test failing, so tool-driven or netrc-ignored transfers still read .netrc
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Engine.UnitLibrary/ManagedEasyTransfer.cs:TryLookUpNetrcCredentials-or:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/ManagedEasyTransfer.cs:707:||
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Engin
 ## Log
 
 - 2026-10-18: filed proposed.
+- 2026-10-18: proposed -> accepted.
