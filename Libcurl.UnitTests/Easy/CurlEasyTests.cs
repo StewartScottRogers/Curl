@@ -5,6 +5,7 @@ using Curl.Api.EngineContracts.ConnectOnly;
 using Curl.Api.Options;
 using Libcurl.Easy;
 using Libcurl.Global;
+using Libcurl.Info;
 using Libcurl.Options;
 using Libcurl.UnitTests.Global;
 
@@ -13,6 +14,24 @@ namespace Libcurl.UnitTests.Easy;
 [TestClass]
 public sealed class CurlEasyTests
 {
+    [TestMethod]
+    [DataRow("http://127.0.0.1/522", 8990L, "http://127.0.0.1:8990/522", DisplayName = "URL with no port")]
+    [DataRow("http://www.example.com:999/523", 19999L, "http://www.example.com:19999/523", DisplayName = "URL with its own port")]
+    public async Task Perform_PortOptionOnTheManagedEngine_TransfersTheUrlWithThatPort(string url, long port, string expected)
+    {
+        await using var library = CurlGlobal.Init(CurlGlobalFlags.Nothing);
+        using var easy = library.EasyInit();
+        easy.SetOption(CurlOption.Url, url);
+        easy.SetOption(CurlOption.Port, port);
+        // An unusable proxy ends the perform before anything is dialled, with the URL it would have transferred.
+        easy.SetOption(CurlOption.Proxy, "foo://proxy:1");
+
+        easy.Perform();
+
+        Assert.AreEqual(CurlCode.Ok, easy.GetInfo(CurlInfo.EffectiveUrl, out var effective));
+        Assert.AreEqual(expected, effective);
+    }
+
     private static readonly EasyOptionDispatch VerboseOnly = new(new Dictionary<CurlOption, EasyOptionSetter>
     {
         [CurlOption.Verbose] = (ref EasyOptions options, object? value) =>

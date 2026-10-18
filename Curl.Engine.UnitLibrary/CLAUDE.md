@@ -452,3 +452,7 @@ A perform from the options with no `ToolInputs`, `EasyHttpOptions.Post` set, no 
 ## CURLOPT_POSTFIELDS NULL with CURLOPT_POSTFIELDSIZE 0 (BL-2592)
 
 A perform from the options with no `ToolInputs`, `EasyHttpOptions.Post` set, no `PostFields`, no read callback and a `PostFieldSize` of 0 posts an empty `application/x-www-form-urlencoded` body with `Content-Length: 0` (`ManagedEasyTransfer.ReadCallbackPostBodyOf`), as libcurl 8.22.0 does for `CURLOPT_POSTFIELDS` NULL and `CURLOPT_POSTFIELDSIZE` 0 (upstream test515); any other size with no read callback still sends no body. Its tests are `ManagedEasyTransferTests.ReadCallbackPost.cs`.
+
+## CURLOPT_PORT (BL-2606)
+
+A perform from the options with a non-zero `EasyNetworkOptions.Port` transfers `UrlPortOverride.Apply`'s URL: the URL set with that port written in through a `ManagedCurlUrlHandle`, as curl 8.22.0's `parse_remote_port` sets `CURLUPART_PORT`, so the connect, the request target (a proxy's absolute one too), the `Host` header and `Info.EffectiveUrl` carry it (upstream tests 521 to 523); a URL that does not parse is left for the perform's malformed-URL answer (ADR-0672). Its tests are `UrlPortOverrideTests` and `ManagedEasyTransferTests.Port.cs`.
