@@ -43,14 +43,15 @@
         https://gap.invalid/", the proxy answering the CONNECT with 200.
       - NETRC: a netrc file holding "machine 127.0.0.1 login gapuser password gappass",
         NETRC naming it, "curl -s --netrc http://127.0.0.1:<port>/".
-      - CURL_CA_BUNDLE, SSL_CERT_FILE, SSL_CERT_DIR (Windows only: the TLS server's key
-        is an RSACng key): the server is a TLS server whose certificate a throwaway root
-        issued; the variable names the root's PEM file (for SSL_CERT_DIR, a folder holding
-        it as <OpenSSL subject hash>.0, as c_rehash names it), then "curl
-        --no-progress-meter --ssl-revoke-best-effort https://127.0.0.1:<port>/".
-      - SSLKEYLOGFILE (Windows only, as above): the same TLS server, --cacert <the root>
-        and SSLKEYLOGFILE naming a file; what was written there is compared as absent,
-        empty, or each line label with its count, never the secrets.
+      - CURL_CA_BUNDLE, SSL_CERT_FILE, SSL_CERT_DIR: the server is a TLS server whose
+        certificate a throwaway root issued; the variable names the root's PEM file (for
+        SSL_CERT_DIR, a folder holding it as <OpenSSL subject hash>.0, as c_rehash names
+        it), then "curl --no-progress-meter https://127.0.0.1:<port>/", with
+        --ssl-revoke-best-effort on Windows, where Schannel's revocation check would
+        otherwise fail on a root that names no CRL.
+      - SSLKEYLOGFILE: the same TLS server, --cacert <the root> and SSLKEYLOGFILE naming
+        a file; what was written there is compared as absent, empty, or each line label
+        with its count, never the secrets.
     - Home variables: one config file per placement, each writing out
       "<variable>/<file>", so stdout names the file read. CURL_HOME: $CURL_HOME/.curlrc,
       $XDG_CONFIG_HOME/curlrc and $HOME/.curlrc. XDG_CONFIG_HOME: $XDG_CONFIG_HOME/curlrc
@@ -63,7 +64,10 @@
     - config-path:<n>: a config file holding write-out = "gap-config-hit" in the location
       the item names (for item 8, the executable's folder, using copies of both binaries
       in a temporary folder), then "curl -s file:///<empty file>". Items 4 to 6 and 8 are
-      Windows only; item 7 (getpwuid) is non-Windows only and has no recipe.
+      Windows only. Item 7 (getpwuid) is non-Windows only: CURL_HOME, XDG_CONFIG_HOME and
+      HOME are removed and the .curlrc goes in the user database's home folder, the real
+      one, so it runs only on CI (GITHUB_ACTIONS is true), saving any .curlrc already there
+      and putting it back; elsewhere it has no recipe.
     - config-syntax: whitespace-separator, colon-separator, equals-separator,
       dashed-long-option, dashed-no-separator, double-quotes, escape-sequences,
       backslash-other-letter, comment, stdin (-K -), url-option, q-disables (-q with a
@@ -79,8 +83,8 @@
       excluded with reason reference-lacks:<feature>: QLOGDIR needs HTTP3 and
       CURL_SSL_BACKEND needs MultiSSL. With no matching reference, or one with the
       feature, it has no recipe.
-    - An item with no recipe is unmeasured with reason no-probe; off Windows that includes
-      the four TLS variables.
+    - An item with no recipe is unmeasured with reason no-probe; off CI that includes
+      config path 7.
     - With a matching reference: match when exit code, stdout, stderr, request bytes and
       what was written are equal, else gap. Stdout or stderr over 400 characters is shown
       in expected and actual as its first 200 and its length.
@@ -336,6 +340,29 @@ function Invoke-ExecutableFolderRecipe {
     }
 }
 
+# Runs both binaries with CURL_HOME, XDG_CONFIG_HOME and HOME removed and a .curlrc in the
+# home folder the user database names (getpwuid, read here through sh's ~user), so stdout
+# shows whether that file was read. The folder is the real home, so any .curlrc already
+# there is saved first and put back afterwards.
+function Invoke-AccountHomeRecipe {
+    $accountHome = (& sh -c 'eval echo ~$(id -un)' | Select-Object -First 1).Trim()
+    $curlrc = Join-Path $accountHome '.curlrc'
+    $saved = $null
+    if (Test-Path -LiteralPath $curlrc) { $saved = [System.IO.File]::ReadAllBytes($curlrc) }
+    $folder = New-TempFolder 'gap-env-account-'
+    try {
+        Write-Utf8File $curlrc "write-out = $Hit`n"
+        $empty = Join-Path $folder 'gap-empty.txt'
+        Write-Utf8File $empty ''
+        $probe = Invoke-GapProbe -Arguments @('-s', (ConvertTo-FileUrl $empty)) -Environment @{ CURL_HOME = $null; XDG_CONFIG_HOME = $null; HOME = $null } -WorkingDirectory $folder -CandidatePath $script:CandidatePath
+        return [pscustomobject]@{ Reference = (ConvertFrom-GapRun $probe.Reference); Candidate = (ConvertFrom-GapRun $probe.Candidate) }
+    } finally {
+        if ($null -eq $saved) { Remove-Item -LiteralPath $curlrc -Force -ErrorAction SilentlyContinue }
+        else { [System.IO.File]::WriteAllBytes($curlrc, $saved) }
+        Remove-Item -LiteralPath $folder -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+
 # Runs both binaries with one config file per placement, each placement's variable pointing
 # at that variable's own temporary folder, every name in Unset removed and every other home
 # variable pointing at an empty folder (Invoke-GapRun). Each file writes out
@@ -483,7 +510,8 @@ function Get-Recipe($Item) {
     $root = '{FOLDER}/gap-root.pem'
     # Each recorded command line starts with its URL: pwsh -File takes a -CurlArgs value
     # starting with a dash for a parameter name.
-    $tlsGet = @('https://127.0.0.1:{PORT}/', '--no-progress-meter', '--ssl-revoke-best-effort')
+    $tlsGet = @('https://127.0.0.1:{PORT}/', '--no-progress-meter')
+    if ($script:OnWindows) { $tlsGet += '--ssl-revoke-best-effort' }
     $recorded = $null
     switch -CaseSensitive ($key) {
         'environment:http_proxy' { $recorded = New-RecordedRecipe @{ http_proxy = '{SERVER}' } $plainGet }
@@ -495,17 +523,13 @@ function Get-Recipe($Item) {
         'environment:NETRC' { $recorded = New-RecordedRecipe @{ NETRC = '{FOLDER}/gap-netrc' } @('http://127.0.0.1:{PORT}/', '-s', '--netrc') @() @{ 'gap-netrc' = "machine 127.0.0.1 login gapuser password gappass`n" } }
         'environment:config-syntax:q-disables' { return @{ Run = $script:RunConfigRecipe; Arguments = @('.curlrc', "write-out = $Hit", @('CURL_HOME'), 'q'); Documented = '' } }
         'environment:COLUMNS' { return @{ Run = $script:RunCommandRecipe; Arguments = @(@{ COLUMNS = '40' }, @('-#', '-o', 'gap-output.txt', '{INPUT_URL}')); Documented = $null } }
-    }
-    if ($script:OnWindows) {
-        switch -CaseSensitive ($key) {
-            'environment:CURL_CA_BUNDLE' { $recorded = New-RecordedRecipe @{ CURL_CA_BUNDLE = $root } $tlsGet (Get-TlsRecorderArgs $root) }
-            'environment:SSL_CERT_FILE' { $recorded = New-RecordedRecipe @{ SSL_CERT_FILE = $root } $tlsGet (Get-TlsRecorderArgs $root) }
-            'environment:SSL_CERT_DIR' {
-                $hashed = "{FOLDER}/gap-certs/$(Get-OpenSslSubjectHash $script:ThrowawayRootCommonName).0"
-                $recorded = New-RecordedRecipe @{ SSL_CERT_DIR = '{FOLDER}/gap-certs' } $tlsGet (Get-TlsRecorderArgs $hashed) @{} @('{FOLDER}/gap-certs')
-            }
-            'environment:SSLKEYLOGFILE' { $recorded = New-RecordedRecipe @{ SSLKEYLOGFILE = '{FOLDER}/gap-keylog.txt' } ($tlsGet + @('--cacert', $root)) (Get-TlsRecorderArgs $root) @{} @() 'gap-keylog.txt' }
+        'environment:CURL_CA_BUNDLE' { $recorded = New-RecordedRecipe @{ CURL_CA_BUNDLE = $root } $tlsGet (Get-TlsRecorderArgs $root) }
+        'environment:SSL_CERT_FILE' { $recorded = New-RecordedRecipe @{ SSL_CERT_FILE = $root } $tlsGet (Get-TlsRecorderArgs $root) }
+        'environment:SSL_CERT_DIR' {
+            $hashed = "{FOLDER}/gap-certs/$(Get-OpenSslSubjectHash $script:ThrowawayRootCommonName).0"
+            $recorded = New-RecordedRecipe @{ SSL_CERT_DIR = '{FOLDER}/gap-certs' } $tlsGet (Get-TlsRecorderArgs $hashed) @{} @('{FOLDER}/gap-certs')
         }
+        'environment:SSLKEYLOGFILE' { $recorded = New-RecordedRecipe @{ SSLKEYLOGFILE = '{FOLDER}/gap-keylog.txt' } ($tlsGet + @('--cacert', $root)) (Get-TlsRecorderArgs $root) @{} @() 'gap-keylog.txt' }
     }
     if ($null -ne $recorded) { return @{ Run = $script:RunRecordedRecipe; Arguments = @(, $recorded); Documented = $null } }
     if ($Item.attributes.kind -eq 'variable') {
@@ -541,6 +565,8 @@ function Get-Recipe($Item) {
             }
         }
         if ($name -match 'same directory the curl executable') { return @{ Run = { Invoke-ExecutableFolderRecipe }; Arguments = $null; Documented = $Hit } }
+        # The user database's home is the real one, so only a CI runner's is written to.
+        if ($name -match 'getpwuid' -and -not $script:OnWindows -and $env:GITHUB_ACTIONS -eq 'true') { return @{ Run = { Invoke-AccountHomeRecipe }; Arguments = $null; Documented = $Hit } }
         return $null
     }
     if ($Item.attributes.kind -eq 'config-syntax') {
