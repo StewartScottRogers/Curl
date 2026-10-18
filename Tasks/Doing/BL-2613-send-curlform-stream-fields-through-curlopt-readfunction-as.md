@@ -32,3 +32,4 @@ Filed by BL-2531 (lib554 ported, `Curl.Conformance.LibTest.UnitLibrary/Lib554.cs
 ## Log
 
 - 2026-10-17: Created.
+- 2026-10-18: Backlog -> Doing. Criteria at claim: a826d0ff 4272a6b9.
