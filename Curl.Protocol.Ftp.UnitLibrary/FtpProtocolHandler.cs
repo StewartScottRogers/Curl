@@ -241,6 +241,14 @@ public sealed class FtpProtocolHandler : IProtocolHandler
     /// </summary>
     public IFtpWildcardHooks? WildcardHooks { get; init; }
 
+    /// <summary>
+    /// Gets a value indicating whether a new control connection's connect phase stops after the login,
+    /// before <c>PWD</c>, and waits there until the transfer is cancelled or its connect phase times out,
+    /// as upstream's debug build does for its first transfer under <c>CURL_FTP_PWD_STOP</c> (upstream
+    /// test753, BL-2636, ADR-0687). <see langword="false" />, the default, sends <c>PWD</c> as a release build does.
+    /// </summary>
+    public bool StopsBeforeEntryPath { get; init; }
+
     /// <inheritdoc />
     /// <exception cref="ArgumentNullException">
     /// <paramref name="context" /> is <see langword="null" />.
@@ -252,22 +260,49 @@ public sealed class FtpProtocolHandler : IProtocolHandler
     {
         ArgumentNullException.ThrowIfNull(context);
 
+        return (await RunSessionAsync(context, static async session => new FtpConnectOnlyOutcome(await session.RunAsync().ConfigureAwait(false), null)).ConfigureAwait(false)).Result;
+    }
+
+    /// <summary>
+    /// Connects and runs only FTP's connect phase exactly as <see cref="ExecuteAsync" /> does -
+    /// the greeting, <c>AUTH</c> under <c>--ssl-reqd</c> or the <c>ftps</c> scheme, <c>USER</c>,
+    /// <c>PASS</c>, <c>PBSZ</c>, <c>PROT</c> and <c>PWD</c>, with the same <c>-v</c> lines and
+    /// failures - then sends nothing more and hands back the open control connection: libcurl
+    /// 8.22.0's <c>CURLOPT_CONNECT_ONLY</c> 1 for an <c>ftp://</c> URL, whose <c>ftp_connect</c>
+    /// is the whole of its perform (BL-2705).
+    /// </summary>
+    /// <param name="context">The transfer to connect for; its URL's path is not used.</param>
+    /// <returns>
+    /// The open control connection, which the caller then owns, or the failure the tool's
+    /// transfer would end with (a refused login is exit 67, <c>Access denied: 530</c>), its
+    /// connection closed.
+    /// </returns>
+    /// <exception cref="ArgumentNullException">
+    /// <paramref name="context" /> is <see langword="null" />.
+    /// </exception>
+    /// <exception cref="OperationCanceledException">
+    /// <see cref="ITransferContext.CancellationToken" /> was cancelled.
+    /// </exception>
+    public async ValueTask<FtpConnectOnlyOutcome> ConnectOnlyAsync(ITransferContext context)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+
+        return await RunSessionAsync(context, static session => session.ConnectOnlyAsync()).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Connects the control connection and runs <paramref name="run" /> on a session over it;
+    /// the connection is closed unless the outcome hands it back.
+    /// </summary>
+    private async ValueTask<FtpConnectOnlyOutcome> RunSessionAsync(ITransferContext context, Func<FtpSession, ValueTask<FtpConnectOnlyOutcome>> run)
+    {
         long started = context.TimeProvider.GetTimestamp();
-        CurlUrl url = context.Url;
-        bool implicitTls = url.Scheme == ImplicitTlsScheme;
-        int defaultPort = implicitTls ? DefaultSecurePort : DefaultPort;
+        bool implicitTls = context.Url.Scheme == ImplicitTlsScheme;
         var trace = new FtpStateTrace(context.Events, TracesStateMachine);
         trace.SetupConnection();
         var controlConnectEvents = new InfoLineStoppingTransferEvents(context.Events);
         var connectEvents = new ConnectionOpenedCapturingTransferEvents(controlConnectEvents);
-        var target = new ConnectTarget(url.IdnHost, url.IsDefaultPort ? defaultPort : url.Port, implicitTls)
-        {
-            Proxy = context.Proxy,
-            Events = connectEvents,
-            DiagnosticLog = context.DiagnosticLog,
-            TcpIoTrace = FtpTcpIoTraces.ForControl(implicitTls, FtpTlsRequirements.Of(context)),
-            PoolScheme = url.Scheme,
-        };
+        ConnectTarget target = ControlTargetOf(context, implicitTls, connectEvents);
         ConnectResult connected = await ConnectControlAsync(target, FtpKeptConnection.LoginKeyOf(context), context.CancellationToken).ConfigureAwait(false);
         if (connected.Connection is not { } connection)
         {
@@ -276,15 +311,43 @@ public sealed class FtpProtocolHandler : IProtocolHandler
                 IsConnectionRefused = connected.IsConnectionRefused,
             };
             new FtpDiagnosticLog(context.DiagnosticLog).Failed(failed);
-            return failed;
+            return new FtpConnectOnlyOutcome(failed, null);
         }
 
         // Past the TCP connect, so -m's runner ends a stall with curl's Operation message (BL-512).
         context.Progress.ReportTransferStarted();
-        await using (connection.ConfigureAwait(false))
+        var name = new FtpControlConnectionName(connected.ConnectionNumber, target.Host, target.Port);
+        FtpKeptConnection? reused = connected.IsReused ? connection.Session as FtpKeptConnection : null;
+        return await CloseUnlessHandedBackAsync(connection, () => TransferAsync(connection, name, connectEvents.Opened, controlConnectEvents, context, implicitTls, started, trace, reused, run)).ConfigureAwait(false);
+    }
+
+    /// <summary>The control connection's target: the URL's host, and its port or the scheme's default.</summary>
+    private static ConnectTarget ControlTargetOf(ITransferContext context, bool implicitTls, ITransferEvents connectEvents)
+    {
+        CurlUrl url = context.Url;
+        int defaultPort = implicitTls ? DefaultSecurePort : DefaultPort;
+        return new ConnectTarget(url.IdnHost, url.IsDefaultPort ? defaultPort : url.Port, implicitTls)
         {
-            var name = new FtpControlConnectionName(connected.ConnectionNumber, target.Host, target.Port);
-            return await TransferAsync(connection, name, connectEvents.Opened, controlConnectEvents, context, implicitTls, started, trace, connected.IsReused ? connection.Session as FtpKeptConnection : null).ConfigureAwait(false);
+            Proxy = context.Proxy,
+            Events = connectEvents,
+            DiagnosticLog = context.DiagnosticLog,
+            TcpIoTrace = FtpTcpIoTraces.ForControl(implicitTls, FtpTlsRequirements.Of(context)),
+            PoolScheme = url.Scheme,
+        };
+    }
+
+    /// <summary>
+    /// Runs <paramref name="run" /> and closes <paramref name="connection" /> afterwards, even when
+    /// it throws, unless its outcome hands the connection back.
+    /// </summary>
+    private static async ValueTask<FtpConnectOnlyOutcome> CloseUnlessHandedBackAsync(IConnection connection, Func<ValueTask<FtpConnectOnlyOutcome>> run)
+    {
+        var lease = new FtpConnectionLease(connection);
+        await using (lease.ConfigureAwait(false))
+        {
+            FtpConnectOnlyOutcome outcome = await run().ConfigureAwait(false);
+            lease.IsHandedBack = outcome.Connection is not null;
+            return outcome;
         }
     }
 
@@ -306,14 +369,14 @@ public sealed class FtpProtocolHandler : IProtocolHandler
         return connected;
     }
 
-    private async ValueTask<TransferResult> TransferAsync(IConnection control, FtpControlConnectionName name, ConnectionOpenedEvent? controlOpened, InfoLineStoppingTransferEvents controlConnectEvents, ITransferContext context, bool implicitTls, long started, FtpStateTrace trace, FtpKeptConnection? reused)
+    private async ValueTask<FtpConnectOnlyOutcome> TransferAsync(IConnection control, FtpControlConnectionName name, ConnectionOpenedEvent? controlOpened, InfoLineStoppingTransferEvents controlConnectEvents, ITransferContext context, bool implicitTls, long started, FtpStateTrace trace, FtpKeptConnection? reused, Func<FtpSession, ValueTask<FtpConnectOnlyOutcome>> run)
     {
         var connections = new FtpSessionConnections(dataConnector, listener, tlsProvider, dnsResolver, interfaceLookup, controlOpened);
         using var connectPhase = new FtpConnectPhaseLimit(context, started);
-        var session = new FtpSession(connections, new FtpControlChannel(control, context.Events, connectPhase.Token, new FtpDiagnosticLog(context.DiagnosticLog), context.DumpHeaderOutput, controlConnectEvents), name, context, implicitTls, connectPhase, trace, reused, WildcardHooks);
+        var session = new FtpSession(connections, new FtpControlChannel(control, context.Events, connectPhase.Token, new FtpDiagnosticLog(context.DiagnosticLog), context.DumpHeaderOutput, controlConnectEvents), name, context, implicitTls, connectPhase, trace, reused, WildcardHooks) { StopsBeforeEntryPath = StopsBeforeEntryPath };
         await using (session.ConfigureAwait(false))
         {
-            return await session.RunAsync().ConfigureAwait(false);
+            return await run(session).ConfigureAwait(false);
         }
     }
 }

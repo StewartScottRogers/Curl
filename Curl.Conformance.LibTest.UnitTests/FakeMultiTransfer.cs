@@ -57,8 +57,23 @@ internal sealed class FakeMultiTransfer : IMultiTransfer
 
     private readonly Queue<IEasyTransfer> doneTransfers = new();
 
+    /// <summary>Add answers taken in turn before <see cref="AddResult"/>.</summary>
+    public Queue<CurlMultiCode> AddResults { get; } = new();
+
+    /// <summary>Runs in each add, before it answers.</summary>
+    public Action? Adding { get; set; }
+
+    /// <summary>Runs in each wait-sockets call before it counts; a code it gives is the call's answer.</summary>
+    public Func<CurlMultiCode?>? WaitSocketsAnswering { get; set; }
+
     public CurlMultiCode Add(IEasyTransfer transfer)
     {
+        Adding?.Invoke();
+        if (AddResults.TryDequeue(out CurlMultiCode next))
+        {
+            AddResult = next;
+        }
+
         added = AddResult == CurlMultiCode.Ok ? transfer : added;
         if (AddResult == CurlMultiCode.Ok && EachAddedDoneResult is not null)
         {
@@ -136,7 +151,13 @@ internal sealed class FakeMultiTransfer : IMultiTransfer
 
     public CurlMultiCode GetWaitSockets(Span<CurlWaitSocket> sockets, out int socketCount)
     {
+        CurlMultiCode? answer = WaitSocketsAnswering?.Invoke();
         socketCount = WaitSockets.Length;
+        if (answer is { } forced)
+        {
+            return forced;
+        }
+
         if (WaitSocketsResult != CurlMultiCode.Ok)
         {
             return WaitSocketsResult;

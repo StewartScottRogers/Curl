@@ -25,15 +25,14 @@ public sealed class EasySshOptionSettersTests
     }
 
     [TestMethod]
-    public void SetOption_SshHostPublicKeyMd5_TakesThirtyTwoCharactersOrNullAndRefusesOtherLengths()
+    public void SetOption_SshHostPublicKeyMd5_TakesAnyStringAndNullClearsIt()
     {
         var md5 = new string('a', 32);
         var options = SetOk(new(), CurlOption.SshHostPublicKeyMd5, md5);
 
         Assert.AreEqual(md5, options.Protocols.Ssh.HostPublicKeyMd5);
         Assert.IsNull(SetOk(options, CurlOption.SshHostPublicKeyMd5, null).Protocols.Ssh.HostPublicKeyMd5);
-        Refused(CurlOption.SshHostPublicKeyMd5, new string('a', 31));
-        Refused(CurlOption.SshHostPublicKeyMd5, new string('a', 33));
+        Assert.AreEqual("string", SetOk(options, CurlOption.SshHostPublicKeyMd5, "string").Protocols.Ssh.HostPublicKeyMd5);
     }
 
     [TestMethod]

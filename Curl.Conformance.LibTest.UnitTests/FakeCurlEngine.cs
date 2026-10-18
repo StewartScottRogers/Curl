@@ -22,7 +22,7 @@ internal sealed class FakeCurlEngine : ICurlEngine
     /// <summary>When set, gives each read of an easy transfer's info in place of <see cref="Info"/>.</summary>
     public Func<TransferInfo>? Informing { get; init; }
 
-    public CurlVersionInfo VersionInfo { get; } = new();
+    public CurlVersionInfo VersionInfo { get; init; } = new();
 
     /// <summary>Runs as each easy transfer is created, before it is returned.</summary>
     public Action? CreatingEasy { get; init; }
@@ -51,7 +51,7 @@ internal sealed class FakeCurlEngine : ICurlEngine
     public IEasyTransfer CreateEasy()
     {
         CreatingEasy?.Invoke();
-        return new FakeEasyTransfer(PerformResult, Info, Performing) { Informing = Informing, ConnectOnly = ConnectOnly, Pauses = Pauses, TransferHeaders = Headers };
+        return new FakeEasyTransfer(PerformResult, Info, Performing) { Informing = Informing, ConnectOnly = ConnectOnly, Pauses = Pauses, TransferHeaders = Headers, WebSocketConnection = WebSocket };
     }
 
     public FakeMultiTransfer Multi { get; } = new();
@@ -69,7 +69,9 @@ internal sealed class FakeCurlEngine : ICurlEngine
         return LastShare;
     }
 
-    public ICurlUrlHandle CreateUrl() => new FakeUrlHandle { SetResult = UrlSetResult };
+    public ICurlUrlHandle CreateUrl() => new FakeUrlHandle { SetResult = UrlSetResult, GetResult = UrlGetResult };
+
+    public CurlUrlCode? UrlGetResult { get; init; }
 
     public CurlUrlCode UrlSetResult { get; init; } = CurlUrlCode.Ok;
 
@@ -84,6 +86,9 @@ internal sealed class FakeCurlEngine : ICurlEngine
 
     /// <summary>Gets the connection every easy transfer's <c>curl_easy_send</c> and <c>curl_easy_recv</c> use; none throws.</summary>
     public IConnectOnlyConnection? ConnectOnly { get; init; }
+
+    /// <summary>Gets the WebSocket every easy transfer's <c>curl_ws_*</c> calls use; none throws.</summary>
+    public IEasyWebSocket? WebSocket { get; init; }
 
     /// <summary>Every <c>curl_easy_pause</c> any of its easy transfers was given.</summary>
     public List<CurlPause> Pauses { get; } = [];
@@ -104,7 +109,9 @@ internal sealed class FakeCurlEngine : ICurlEngine
 
         public ITransferHeaders Headers => TransferHeaders ?? throw new NotSupportedException();
 
-        public IEasyWebSocket WebSocket => throw new NotSupportedException();
+        public IEasyWebSocket? WebSocketConnection { get; init; }
+
+        public IEasyWebSocket WebSocket => WebSocketConnection ?? throw new NotSupportedException();
 
         public IConnectOnlyConnection? ConnectOnly { get; init; }
 

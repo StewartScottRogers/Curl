@@ -4,6 +4,7 @@ using Curl.Core;
 using Curl.Core.Hsts;
 using Curl.Networking;
 using Curl.Protocol.Abstractions;
+using Curl.Protocol.Ws;
 
 namespace Curl.Engine;
 
@@ -24,10 +25,17 @@ internal sealed class ManagedEngineSharedState
     /// <see cref="Environment.GetEnvironmentVariable(string)" />, the default, in production; a dictionary in tests.
     /// </param>
     /// <param name="dialing">What the transfers dial and resolve through in place of sockets (ADR-0658); <see langword="null" />, in production, for sockets.</param>
-    internal ManagedEngineSharedState(TimeProvider timeProvider, Func<CurlExitCode, string> easyErrorText, Func<string, string?>? readEnvironmentVariable = null, EngineDialing? dialing = null)
+    /// <param name="signingClock">The clock <c>CURLOPT_AWS_SIGV4</c> and the HTTP signatures sign with (BL-2675); <see langword="null" />, in production, for <see cref="TimeProvider.System" />.</param>
+    /// <param name="webSocketRandomSource">Where every handle's WebSocket key and frame masks come from (BL-2688); <see langword="null" />, in production, for <see cref="SystemWebSocketRandomSource" />.</param>
+    /// <param name="ftpPwdStop">The stand-in for the debug build's <c>CURL_FTP_PWD_STOP</c> (BL-2636); <see langword="null" />, in production, for none.</param>
+    internal ManagedEngineSharedState(TimeProvider timeProvider, Func<CurlExitCode, string> easyErrorText, Func<string, string?>? readEnvironmentVariable = null, EngineDialing? dialing = null, TimeProvider? signingClock = null, IWebSocketRandomSource? webSocketRandomSource = null, FirstTransferFtpPwdStop? ftpPwdStop = null)
     {
         Dialing = dialing;
-        ProxySelector = new ProxySelector(readEnvironmentVariable ?? Environment.GetEnvironmentVariable);
+        SigningClock = signingClock;
+        WebSocketRandomSource = webSocketRandomSource;
+        FtpPwdStop = ftpPwdStop;
+        ReadEnvironmentVariable = readEnvironmentVariable ?? Environment.GetEnvironmentVariable;
+        ProxySelector = new ProxySelector(ReadEnvironmentVariable);
         TimeProvider = timeProvider;
         Connections = new ConnectionCache(timeProvider);
         TlsSessions = new TlsSessionCache(timeProvider);
@@ -70,8 +78,32 @@ internal sealed class ManagedEngineSharedState
         SocketHandles = engine.SocketHandles;
         Performer = engine.Performer;
         ProxySelector = engine.ProxySelector;
+        ReadEnvironmentVariable = engine.ReadEnvironmentVariable;
         Dialing = engine.Dialing;
+        SigningClock = engine.SigningClock;
+        WebSocketRandomSource = engine.WebSocketRandomSource;
+        FtpPwdStop = engine.FtpPwdStop;
     }
+
+    /// <summary>
+    /// Gets where every handle's WebSocket key and frame masks come from, one sequence for the whole engine as the
+    /// debug build's <c>CURL_ENTROPY</c> is one for the whole process: the conformance harness's stand-in for it
+    /// (BL-2688, ADR-0678); <see langword="null" />, in production, for <see cref="SystemWebSocketRandomSource" />.
+    /// </summary>
+    internal IWebSocketRandomSource? WebSocketRandomSource { get; }
+
+    /// <summary>
+    /// Gets the conformance harness's stand-in for the debug build's <c>CURL_FTP_PWD_STOP</c>, which the engine's first perform
+    /// claims so its FTP connect phase stops before <c>PWD</c> (BL-2636, ADR-0687); <see langword="null" />, in production, for none.
+    /// </summary>
+    internal FirstTransferFtpPwdStop? FtpPwdStop { get; }
+
+    /// <summary>
+    /// Gets the clock the engine's transfers sign <c>CURLOPT_AWS_SIGV4</c> requests and HTTP signatures with: the
+    /// conformance harness's stand-in for the debug build's <c>CURL_FORCETIME</c> (BL-2675); <see langword="null" />, in
+    /// production, for <see cref="TimeProvider.System" />.
+    /// </summary>
+    internal TimeProvider? SigningClock { get; }
 
     /// <summary>
     /// Gets what chooses the proxy of every handle's own perform from <c>CURLOPT_PROXY</c>, <c>CURLOPT_NOPROXY</c>
@@ -79,6 +111,12 @@ internal sealed class ManagedEngineSharedState
     /// and the rest), as libcurl reads them for every handle (BL-2519, ADR-0608).
     /// </summary>
     internal ProxySelector ProxySelector { get; }
+
+    /// <summary>
+    /// Gets what reads an environment variable for every handle's own perform: the proxy variables
+    /// (<see cref="ProxySelector" />) and the <c>NETRC</c> and <c>HOME</c> variables the <c>.netrc</c> lookup reads.
+    /// </summary>
+    internal Func<string, string?> ReadEnvironmentVariable { get; }
 
     /// <summary>
     /// Gets what the engine's transfers dial and resolve through in place of sockets: the conformance harness's in-memory

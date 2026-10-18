@@ -333,6 +333,13 @@ public interface ITransferContext
     bool FtpUseEprt { get; }
 
     /// <summary>
+    /// Gets how long an active-mode FTP transfer waits for the server to open the data
+    /// connection, per <c>CURLOPT_ACCEPTTIMEOUT_MS</c>; 60 seconds when not set, which is
+    /// all the curl tool ever uses (upstream case 593, BL-2622).
+    /// </summary>
+    TimeSpan FtpAcceptTimeout { get; }
+
+    /// <summary>
     /// Gets whether a plaintext scheme upgrades to TLS, per <c>--ssl</c>/<c>--ftp-ssl</c>
     /// (<see cref="TransportSecurityLevel.Try" />) and <c>--ssl-reqd</c>/<c>--ftp-ssl-reqd</c>
     /// (<see cref="TransportSecurityLevel.Required" />, also under <c>--ftp-ssl-control</c>);

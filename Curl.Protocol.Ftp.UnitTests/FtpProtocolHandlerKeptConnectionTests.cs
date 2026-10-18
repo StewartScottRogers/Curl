@@ -97,6 +97,21 @@ public sealed class FtpProtocolHandlerKeptConnectionTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_SecondNoBodyUrlOfTheHomeDirectoryAfterANoBodyOne_SendsNoCwd()
+    {
+        // upstream test 661: curl 8.22.0's ftp_done remembers "" after a NOBODY transfer of the home directory too
+        var control = new KeepingConnection(new ScriptedConnection(Encoding.Latin1.GetBytes(LoggedIn)));
+        var script = new Script(control) { FileMethod = FtpFileMethod.NoCwd, NoBody = true };
+
+        TransferResult first = await script.RunAsync(Host + "/", reused: false);
+        TransferResult second = await script.RunAsync(Host + "/", reused: true);
+
+        Assert.IsTrue(first.IsSuccess);
+        Assert.IsTrue(second.IsSuccess);
+        Assert.AreEqual(LoginSent, script.Sent);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_EntryPathCwdRefused_FailsWithExit9AndKeepsTheConnection()
     {
         string replies = LoggedIn + Ok + Retrieved + "550 No\r\n";
@@ -198,6 +213,9 @@ public sealed class FtpProtocolHandlerKeptConnectionTests
 
         public FtpFileMethod FileMethod { get; init; }
 
+        /// <summary>Gets whether every transfer is a <c>-I</c> one.</summary>
+        public bool NoBody { get; init; }
+
         /// <summary>Gets the <c>-P</c> value, or <see langword="null" /> for passive mode.</summary>
         public string? FtpPort { get; init; }
 
@@ -211,7 +229,7 @@ public sealed class FtpProtocolHandlerKeptConnectionTests
             var connector = new QueuedConnector(
                 ConnectResult.Connected(control, null, isReused: reused),
                 ConnectResult.Connected(new ScriptedConnection(Encoding.Latin1.GetBytes("x"))));
-            var context = new TransferContext { Url = CurlUrl.Parse(url), Output = new MemoryStream(), FtpFileMethod = FileMethod, FtpPort = FtpPort };
+            var context = new TransferContext { Url = CurlUrl.Parse(url), Output = new MemoryStream(), FtpFileMethod = FileMethod, FtpPort = FtpPort, NoBody = NoBody };
             var handler = Listener is null ? new FtpProtocolHandler(connector) : new FtpProtocolHandler(connector, Listener, new QueuedTlsProvider());
             return await handler.ExecuteAsync(context);
         }

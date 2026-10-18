@@ -439,7 +439,6 @@ public sealed class UpstreamCaseScreeningTests
     [DataRow("<verify>\n<errorcode>\nlots\n</errorcode>\n</verify>\n", "the expected exit code lots is not a number")]
     [DataRow("<verify>\n<errorcode>\n77,lots\n</errorcode>\n</verify>\n", "the expected exit code 77,lots is not a number")]
     [DataRow("<verify>\n<protocol>\nUSER anonymous\nLPRT 4,4,127,0,0,1,2,35,46\n</protocol>\n</verify>\n", "the FTP stand-in does not carry out the case's LPRT")]
-    [DataRow("<verify>\n<protocol>\nCWD fully_simulated\n</protocol>\n</verify>\n", "the FTP stand-in does not carry out the case's CWD fully_simulated")]
     public void FindSkipReason_NamesWhatTheHarnessCannotDo(string sections, string expected)
     {
         var diagnostics = TestDiagnostics.For(TestContext);
@@ -484,6 +483,14 @@ public sealed class UpstreamCaseScreeningTests
     }
 
     [TestMethod]
+    public void FindSkipReason_FtpCaseVerifyingCwdFullySimulated_IsNullSinceTheStandInServesTheSimulatedDirectories()
+    {
+        string? reason = Screen("<client>\n<server>\nftp\n</server>\n<command>\nftp://127.0.0.1:8993/fully_simulated/UNIX/*.txt\n</command>\n</client>\n<verify>\n<protocol>\nCWD fully_simulated\n</protocol>\n</verify>\n");
+
+        Assert.IsNull(reason);
+    }
+
+    [TestMethod]
     public void FindSkipReason_TftpServer_IsNull()
     {
         string? reason = Screen("<client>\n<server>\ntftp\n</server>\n<command>\ntftp://127.0.0.1:9003//1\n</command>\n</client>\n");
@@ -492,7 +499,7 @@ public sealed class UpstreamCaseScreeningTests
     }
 
     [TestMethod]
-    [DataRow("<client>\n<server>\nhttp\nrtsp\n</server>\n<command>\na\n</command>\n</client>\n", "the harness does not emulate the rtsp server")]
+    [DataRow("<client>\n<server>\nhttp\nhttptls\n</server>\n<command>\na\n</command>\n</client>\n", "the harness does not emulate the httptls server")]
     [DataRow("<client>\n<name>\nno command\n</name>\n</client>\n", "the case has no <client><command>")]
     [DataRow("<client>\n<command type=\"perl\">\nx\n</command>\n</client>\n", "the harness does not run a perl command")]
     [DataRow("<client>\n<command>\nhttp://h/ | cat\n</command>\n</client>\n", "the command needs a shell for its |")]
@@ -639,6 +646,18 @@ public sealed class UpstreamCaseScreeningTests
         string? reason = Screen(RunnableClient + $"<{section}>\n<{name}>\n{line}\n</{name}>\n</{section}>\n");
 
         Assert.AreEqual($"the harness does not interpret the <{section}><{name}> line {line}", reason);
+    }
+
+    [TestMethod]
+    [DataRow("lib678", null)]
+    [DataRow("lib679", "the harness does not interpret the <client><precheck> line ./libtest/libtests lib679 check")]
+    public void FindSkipReason_LibTestsPrecheckLine_RunsOnlyWhenItsProgramIsPorted(string program, string? expected)
+    {
+        UpstreamTestCase testCase = ParsedTestCase.From(RunnableClient + $"<client>\n<precheck>\n./libtest/libtests {program} check\n</precheck>\n</client>\n");
+
+        string? reason = UpstreamCaseScreening.FindSkipReason(CleanExpansion, testCase, Features, isPortedLibTest: name => name == "lib678");
+
+        Assert.AreEqual(expected, reason);
     }
 
     [TestMethod]

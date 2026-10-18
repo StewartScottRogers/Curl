@@ -1339,7 +1339,27 @@ public sealed class UpstreamCaseRunnerTests
     private const string LibCase =
         "<testcase>\n<client>\n<server>\nhttp\n</server>\n<tool>\nlib%TESTNUMBER\n</tool>\n"
         + "<command>\nhttp://%HOSTIP:%HTTPPORT/%TESTNUMBER %LOGDIR/ip%TESTNUMBER\n</command>\n</client>\n"
-        + "<verify>\n<stdout>\nhello from lib5\n</stdout>\n<stderr>\nstep failed\n</stderr>\n<errorcode>\n0\n</errorcode>\n</verify>\n</testcase>\n";
+        + "<verify>\n<stdout>\nhello from lib5\n</stdout>\n<stderr>\nURL: http://%HOSTIP:%HTTPPORT/%TESTNUMBER\nstep failed\nTest ended with result 0\n</stderr>\n<errorcode>\n0\n</errorcode>\n</verify>\n</testcase>\n";
+
+    // first.c's main() writes "URL: <url>" only when a URL follows the program's name, and always "Test ended with result <N>".
+    [TestMethod]
+    [DataRow("http://%HOSTIP:%HTTPPORT/%TESTNUMBER", 0, "URL: http://127.0.0.1:8990/5\nstep failed\nTest ended with result 0\n")]
+    [DataRow("http://%HOSTIP:%HTTPPORT/%TESTNUMBER", 7, "URL: http://127.0.0.1:8990/5\nstep failed\nTest ended with result 7\n")]
+    [DataRow(null, 0, "step failed\nTest ended with result 0\n")]
+    public async Task RunAsync_PortedLibCase_WritesFirstCsUrlAndResultLinesAroundTheProgramsStderr(string? command, int exitCode, string expectedStandardError)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        UpstreamCaseRunner runner = LibRunner(new SampleLibTest("lib5", exitCode));
+        string logDirectory = CreateLogDirectory();
+        string commandPart = command is null ? string.Empty : $"<command>\n{command}\n</command>\n";
+        string testCase = "<testcase>\n<client>\n<server>\nhttp\n</server>\n<tool>\nlib%TESTNUMBER\n</tool>\n" + commandPart + "</client>\n</testcase>\n";
+
+        await RunWithLogDirectoryAsync(runner, testCase, logDirectory);
+
+        string standardError = File.ReadAllText(Path.Combine(logDirectory, "stderr5"));
+        diagnostics.Assert("stderr", expectedStandardError, standardError);
+        Assert.AreEqual(expectedStandardError, standardError);
+    }
 
     [TestMethod]
     public async Task RunAsync_PortedLibCase_RunsItsProgramInPlaceOfCurl()
@@ -1367,8 +1387,10 @@ public sealed class UpstreamCaseRunnerTests
     {
         var diagnostics = TestDiagnostics.For(TestContext);
         UpstreamCaseRunner runner = LibRunner(new SampleLibTest("lib5", exitCode: 7));
+        string libCaseVerifyingTheExitCodeAlone = LibCase.Replace(
+            "<stderr>\nURL: http://%HOSTIP:%HTTPPORT/%TESTNUMBER\nstep failed\nTest ended with result 0\n</stderr>\n", string.Empty, StringComparison.Ordinal);
 
-        UpstreamCaseOutcome outcome = await RunAsync(runner, LibCase);
+        UpstreamCaseOutcome outcome = await RunAsync(runner, libCaseVerifyingTheExitCodeAlone);
 
         diagnostics.Assert("outcome detail", "<verify><errorcode>: expected exit code 0, got 7", outcome.Detail);
         Assert.AreEqual(UpstreamCaseOutcomeKind.Failed, outcome.Kind);
@@ -1419,6 +1441,80 @@ public sealed class UpstreamCaseRunnerTests
         diagnostics.Assert("skip reason", "libtest program not ported", outcome.Detail);
         Assert.AreEqual(UpstreamCaseOutcomeKind.Skipped, outcome.Kind);
         Assert.AreEqual("libtest program not ported", outcome.Detail);
+    }
+
+    [TestMethod]
+    [DataRow("CURLOPT_CAINFO_BLOB is not supported\n", 0, "CURLOPT_CAINFO_BLOB is not supported")]
+    [DataRow("", 1, "precheck command error")]
+    public async Task RunAsync_LibTestsPrecheckThatPrintsOrFails_SkipsTheCaseWithoutRunningCurl(string output, int exitCode, string expectedReason)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        PrecheckLibTest check = new(output, exitCode);
+        UpstreamCaseRunner runner = PrecheckRunner(check, _ => throw new AssertFailedException("curl must not run after a failed precheck"));
+
+        UpstreamCaseOutcome outcome = await RunAsync(runner, LibTestsPrecheckCase);
+
+        diagnostics.Assert("skip reason", expectedReason, outcome.Detail);
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Skipped, outcome.Kind);
+        Assert.AreEqual(expectedReason, outcome.Detail);
+        CollectionAssert.AreEqual(new[] { "check" }, check.Context!.Arguments.ToArray());
+    }
+
+    [TestMethod]
+    public async Task RunAsync_LibTestsPrecheckThatPassesQuietly_RunsTheCase()
+    {
+        bool curlRan = false;
+        UpstreamCaseRunner runner = PrecheckRunner(new PrecheckLibTest("", 0), _ =>
+        {
+            curlRan = true;
+            return Task.FromResult(0);
+        });
+
+        UpstreamCaseOutcome outcome = await RunAsync(runner, LibTestsPrecheckCase);
+
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Passed, outcome.Kind, outcome.Detail);
+        Assert.IsTrue(curlRan);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_LibTestsPrecheckThatThrows_SkipsWithPrecheckCommandError()
+    {
+        UpstreamCaseRunner runner = PrecheckRunner(new PrecheckLibTest(null, 0), _ => throw new AssertFailedException("curl must not run after a failed precheck"));
+
+        UpstreamCaseOutcome outcome = await RunAsync(runner, LibTestsPrecheckCase);
+
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Skipped, outcome.Kind);
+        Assert.AreEqual("precheck command error", outcome.Detail);
+    }
+
+    private const string LibTestsPrecheckCase = "<testcase>\n<client>\n<command>\na\n</command>\n<precheck>\n%LIBTESTS lib678 check\n</precheck>\n</client>\n</testcase>\n";
+
+    private static UpstreamCaseRunner PrecheckRunner(ILibTest check, Func<UpstreamCurlInvocation, Task<int>> runCurl) =>
+        new(
+            runCurl,
+            UpstreamCurlPlatform.Unix,
+            TimeProvider.System,
+            TimeSpan.FromSeconds(10),
+            libTests: new UpstreamLibTests(new LibTestPrograms([check]), invocation => new StubCurlEngine(invocation)));
+
+    // lib678 as a precheck sees it: keeps its context, prints its output and returns its exit code, or throws for null output.
+    private sealed class PrecheckLibTest(string? output, int exitCode) : ILibTest
+    {
+        public LibTestContext? Context { get; private set; }
+
+        public string ProgramName => "lib678";
+
+        public async Task<LibTestResult> RunAsync(LibTestContext context, CancellationToken cancellationToken)
+        {
+            Context = context;
+            if (output is null)
+            {
+                throw new InvalidOperationException("the check failed to start");
+            }
+
+            await context.StandardOutput.WriteAsync(Encoding.ASCII.GetBytes(output), cancellationToken);
+            return new LibTestResult(exitCode);
+        }
     }
 
     private static UpstreamCaseRunner LibRunner(ILibTest program) =>

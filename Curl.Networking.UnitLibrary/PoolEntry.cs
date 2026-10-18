@@ -48,6 +48,12 @@ internal sealed record PoolEntry(
     public bool HasReadPeerClose { get; set; }
 
     /// <summary>
+    /// Gets the cache's <see cref="ConnectionCache.OpeningOwner" /> when the connection was opened, which
+    /// <see cref="ConnectionCache.CloseIdleOwnedByAsync" /> closes it for, or <see langword="null" /> for none.
+    /// </summary>
+    public object? Owner { get; init; }
+
+    /// <summary>
     /// Gets or sets the protocol session a transfer left with the connection, such as its
     /// HTTP/2 session, or <see langword="null" /> when none did (BL-817).
     /// </summary>

@@ -1,4 +1,6 @@
 using System.Text;
+using Curl.Api.Callbacks;
+using Curl.Api.EngineContracts;
 using Curl.Api.Options.Http;
 using Curl.Cli;
 using Curl.Console;
@@ -116,6 +118,38 @@ public sealed class MultipartFormPartMappingTests
         using Stream opened = parts[0].OpenContent!();
         Assert.IsInstanceOfType<MimeCallbackReadStream>(opened);
         Assert.AreSame(opened, reads.Single());
+    }
+
+    [TestMethod]
+    public async Task FromMimeBody_CallbackPausesWithAGate_ReadWaitsForTheUnpauseAndAsksAgain()
+    {
+        Diagnostics.Arrange("part", "a curl_mime_data_cb part whose callback pauses once, then gives B (upstream test670)");
+        int calls = 0;
+        EasyMimeBody body = new()
+        {
+            Parts = [new EasyMimePart { Name = "field", Data = new EasyMimeCallback(1, buffer => calls++ == 0 ? ReadCallbackResult.Pause : Give(buffer, (byte)'B'), null) }],
+        };
+        EasyPauseGate gate = new();
+
+        IReadOnlyList<MultipartFormPart> parts = MultipartFormPartMapping.FromMimeBody(body, null, gate);
+        await using Stream opened = parts[0].OpenContent!();
+        byte[] buffer = new byte[4];
+        Task<int> reading = opened.ReadAsync(buffer, 0, buffer.Length);
+        bool waitedWhilePaused = !reading.IsCompleted && gate.Directions == CurlPause.Send;
+        gate.Set(CurlPause.Continue);
+        int read = await reading;
+        Diagnostics.Act("read", read);
+
+        Assert.IsTrue(waitedWhilePaused);
+        Assert.AreEqual(1, read);
+        Assert.AreEqual((byte)'B', buffer[0]);
+        Assert.AreEqual(2, calls);
+    }
+
+    private static long Give(Span<byte> buffer, byte value)
+    {
+        buffer[0] = value;
+        return 1;
     }
 
     [TestMethod]

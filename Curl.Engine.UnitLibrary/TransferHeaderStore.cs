@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Runtime.CompilerServices;
 
 using Curl.Api.Codes;
@@ -42,6 +43,21 @@ internal sealed class TransferHeaderStore : ITransferHeaders
     /// <summary>The origin of the header lines arriving now.</summary>
     private CurlHeaderOrigin lineOrigin = CurlHeaderOrigin.Header;
 
+    /// <summary>
+    /// Gets the status of the last status line that was not a CONNECT reply's, 0 before one: what libcurl's
+    /// <c>CURLINFO_RESPONSE_CODE</c> answers once that status line is parsed, while the transfer runs (upstream test1485).
+    /// </summary>
+    internal long ResponseCode { get; private set; }
+
+    /// <summary>
+    /// Gets the last <c>Content-Length</c> of the current final head, -1 before one or when it does not parse: what
+    /// libcurl's <c>CURLINFO_CONTENT_LENGTH_DOWNLOAD_T</c> answers once that header is parsed, while the transfer runs.
+    /// </summary>
+    internal long ContentLength { get; private set; } = -1;
+
+    /// <summary>Gets or sets what is called each time <see cref="ResponseCode" /> or <see cref="ContentLength" /> is set by a line.</summary>
+    internal Action? ResponseHeadRead { get; set; }
+
     /// <summary>Forgets every header, as libcurl does when a transfer starts.</summary>
     internal void Clear()
     {
@@ -51,6 +67,8 @@ internal sealed class TransferHeaderStore : ITransferHeaders
         finalHeadEnded = false;
         nextHeadIsConnectReply = false;
         lineOrigin = CurlHeaderOrigin.Header;
+        ResponseCode = 0;
+        ContentLength = -1;
     }
 
     /// <summary>Marks the next status line as a CONNECT reply's, whose headers are <see cref="CurlHeaderOrigin.Connect" />.</summary>
@@ -169,6 +187,19 @@ internal sealed class TransferHeaderStore : ITransferHeaders
         {
             headers.Add(new StoredHeader(":status", status, CurlHeaderOrigin.Pseudo, request));
         }
+
+        ReadResponseCode(status);
+    }
+
+    /// <summary>Takes <paramref name="status" /> as <see cref="ResponseCode" />, 0 when it does not parse, and forgets the length, unless the head is a CONNECT reply's.</summary>
+    private void ReadResponseCode(string status)
+    {
+        if (lineOrigin != CurlHeaderOrigin.Connect)
+        {
+            ResponseCode = long.TryParse(status, NumberStyles.None, CultureInfo.InvariantCulture, out long code) ? code : 0;
+            ContentLength = -1;
+            ResponseHeadRead?.Invoke();
+        }
     }
 
     /// <summary>Starts the next request when the current one's final head has ended.</summary>
@@ -219,7 +250,19 @@ internal sealed class TransferHeaderStore : ITransferHeaders
         int colon = line.IndexOf(':', StringComparison.Ordinal);
         if (colon >= 0)
         {
-            headers.Add(new StoredHeader(line[..colon], line[(colon + 1)..].Trim(' ', '\t'), lineOrigin, request));
+            var header = new StoredHeader(line[..colon], line[(colon + 1)..].Trim(' ', '\t'), lineOrigin, request);
+            headers.Add(header);
+            ReadContentLength(header);
+        }
+    }
+
+    /// <summary>Takes a final head's <c>Content-Length</c> as <see cref="ContentLength" />, -1 when it does not parse.</summary>
+    private void ReadContentLength(StoredHeader header)
+    {
+        if (header.Origin == CurlHeaderOrigin.Header && header.IsNamed("Content-Length"))
+        {
+            ContentLength = long.TryParse(header.Value, NumberStyles.None, CultureInfo.InvariantCulture, out long length) ? length : -1;
+            ResponseHeadRead?.Invoke();
         }
     }
 

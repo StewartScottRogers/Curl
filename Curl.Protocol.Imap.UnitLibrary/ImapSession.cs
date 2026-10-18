@@ -116,7 +116,35 @@ internal sealed class ImapSession(
     /// before anything is read or sent.
     /// </summary>
     /// <returns>A success, or the failure that stopped the session.</returns>
-    public async ValueTask<TransferResult> RunAsync()
+    public ValueTask<TransferResult> RunAsync() => RunCatchingAsync(OpenAndPerformAsync);
+
+    /// <summary>
+    /// Runs only the connect phase, as curl 8.22.0's <c>imap_connect</c> does for
+    /// <c>CURLOPT_CONNECT_ONLY</c> (BL-2706): the greeting, <c>CAPABILITY</c>, <c>STARTTLS</c>
+    /// when asked for, and the login when there is something to log in with; no mailbox is
+    /// selected and no <c>LOGOUT</c> is sent. Failures are those <see cref="RunAsync" /> returns
+    /// for the same phase.
+    /// </summary>
+    /// <returns>A success with no bytes transferred, or the failure that stopped the session.</returns>
+    public ValueTask<TransferResult> ConnectOnlyAsync() => RunCatchingAsync(OpenOnlyAsync);
+
+    /// <summary>
+    /// Hands over the connection the session now talks on, the <c>STARTTLS</c>-secured one when
+    /// there is one, which the session then no longer disposes.
+    /// </summary>
+    /// <returns>The connection, which the caller now owns.</returns>
+    public IConnection TakeConnection()
+    {
+        IConnection connection = securedConnection ?? originalConnection;
+        securedConnection = null;
+        return connection;
+    }
+
+    /// <summary>
+    /// Parses the login options, exit 3 when curl rejects them, then runs <paramref name="run" />
+    /// and turns the exceptions a broken conversation leaves with into their failures.
+    /// </summary>
+    private async ValueTask<TransferResult> RunCatchingAsync(Func<ImapLoginOptions, ValueTask<TransferResult>> run)
     {
         if (ImapLoginOptions.Parse(context.Mail?.LoginOptions ?? context.Url.Options) is not { } loginOptions)
         {
@@ -125,13 +153,7 @@ internal sealed class ImapSession(
 
         try
         {
-            if (await OpenOrResumeAsync(loginOptions).ConfigureAwait(false) is { } failure)
-            {
-                return failure;
-            }
-
-            Phase = ImapSessionPhase.Performing;
-            return await PerformAsync().ConfigureAwait(false);
+            return await run(loginOptions).ConfigureAwait(false);
         }
         catch (ImapResponseMissingException)
         {
@@ -292,6 +314,24 @@ internal sealed class ImapSession(
 
         return digitsEnd < line.Length && line[digitsEnd] == ' ' ? digitsEnd + 1 : -1;
     }
+
+    /// <summary>Opens or resumes the session, then does what the URL asks.</summary>
+    private async ValueTask<TransferResult> OpenAndPerformAsync(ImapLoginOptions loginOptions)
+    {
+        if (await OpenOrResumeAsync(loginOptions).ConfigureAwait(false) is { } failure)
+        {
+            return failure;
+        }
+
+        Phase = ImapSessionPhase.Performing;
+        return await PerformAsync().ConfigureAwait(false);
+    }
+
+    /// <summary>Opens the session and logs in, and does nothing more.</summary>
+    private async ValueTask<TransferResult> OpenOnlyAsync(ImapLoginOptions loginOptions) =>
+        await OpenAsync().ConfigureAwait(false)
+        ?? await LoginAsync(loginOptions).ConfigureAwait(false)
+        ?? TransferResult.Success(0);
 
     /// <summary>
     /// Opens and logs in on a new connection; on one a previous URL left intact, carries on

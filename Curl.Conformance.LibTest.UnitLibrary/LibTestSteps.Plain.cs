@@ -4,6 +4,7 @@ using Curl.Api.Codes;
 using Curl.Api.EngineContracts;
 using Libcurl.Easy;
 using Libcurl.Global;
+using Libcurl.Multi;
 using Libcurl.Options;
 
 namespace Curl.Conformance.LibTest;
@@ -45,6 +46,22 @@ public sealed partial class LibTestSteps
         ArgumentNullException.ThrowIfNull(library);
         easy = library.IsCleanedUp ? null : library.EasyInit();
         return easy is not null || HandleMissing("curl_easy_init");
+    }
+
+    /// <summary>
+    /// <c>multi = curl_multi_init(); if(!multi)</c> on <paramref name="library"/>. A library already cleaned up
+    /// gives no handle: <c>curl_multi_init() failed</c> and <see cref="Result"/> becomes
+    /// <see cref="LibTestErrorCodes.MajorBad"/>.
+    /// </summary>
+    /// <param name="library">The library to create the handle from.</param>
+    /// <param name="multi">The handle, or <see langword="null"/> when the step failed.</param>
+    /// <returns>Whether the program goes on.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="library"/> is <see langword="null"/>.</exception>
+    public bool MultiInitOrMajorBad(CurlLibrary library, [NotNullWhen(true)] out CurlMulti? multi)
+    {
+        ArgumentNullException.ThrowIfNull(library);
+        multi = library.IsCleanedUp ? null : library.MultiInit();
+        return multi is not null || HandleMissing("curl_multi_init");
     }
 
     /// <summary>

@@ -189,12 +189,6 @@ internal sealed class FtpSession(
     /// <summary>The most a data read asks for: curl 8.21.0's receive buffer (measured, BL-1259 Notes).</summary>
     private const int DataReadBufferSize = 102400;
 
-    /// <summary>
-    /// How long curl 8.21.0 waits for the server to open an active-mode data connection,
-    /// measured with <c>-P -</c> whatever <c>--connect-timeout</c> says.
-    /// </summary>
-    private static readonly TimeSpan AcceptTimeout = TimeSpan.FromSeconds(60);
-
     /// <summary>The <c>AUTH</c> mechanisms curl 8.21.0 offers, in the order it offers them.</summary>
     private static readonly string[] AuthMechanisms = ["SSL", "TLS"];
 
@@ -248,6 +242,12 @@ internal sealed class FtpSession(
 
     /// <summary>The port an active-mode data connection is accepted on, once bound.</summary>
     private IPendingConnection? pendingConnection;
+
+    /// <summary>
+    /// The active-mode data connection accepted right after <c>EPRT</c> or <c>PORT</c> was
+    /// answered, when the server had connected already (<see cref="AcceptWaitingConnectionAsync" />).
+    /// </summary>
+    private IConnection? acceptedEarly;
 
     /// <summary>
     /// The address <c>EPRT</c> and <c>PORT</c> announce: the <c>-P</c> address, even when the
@@ -349,6 +349,42 @@ internal sealed class FtpSession(
     }
 
     /// <summary>
+    /// Runs only curl's connect phase - the greeting, <c>AUTH</c>, the login, <c>PBSZ</c>,
+    /// <c>PROT</c>, <c>CCC</c> and <c>PWD</c>, or nothing on a kept connection - and sends nothing
+    /// after it, as libcurl 8.22.0's <c>CURLOPT_CONNECT_ONLY</c> 1 does for FTP (BL-2705).
+    /// </summary>
+    /// <returns>
+    /// On success the control connection the session now talks on, which the session no longer
+    /// disposes; on a failure, the same result <see cref="RunAsync" /> would end with and no
+    /// connection.
+    /// </returns>
+    public async ValueTask<FtpConnectOnlyOutcome> ConnectOnlyAsync()
+    {
+        long started = context.TimeProvider.GetTimestamp();
+        TransferResult? failed;
+        try
+        {
+            failed = reused is null ? await ConnectAsync().ConfigureAwait(false) : ResumeKeptConnection();
+        }
+        catch (FtpControlConversationFailedException lost)
+        {
+            failed = lost.Result;
+        }
+
+        var report = new TransferReport { ResponseCode = lastReplyCode, FtpEntryPath = entryPath };
+        if (failed is not null)
+        {
+            trace.Ended(failed.ExitCode);
+            log.SessionEnded(failed, context.TimeProvider.GetElapsedTime(started));
+            return new FtpConnectOnlyOutcome(failed with { Report = report }, null);
+        }
+
+        // The caller owns the connection now, AUTH's secured one included.
+        securedControl = null;
+        return new FtpConnectOnlyOutcome(TransferResult.Success(0) with { Report = report }, control.Connection);
+    }
+
+    /// <summary>
     /// Disposes the data connection, the active-mode listening port and the control
     /// connection <c>AUTH</c> secured, whichever exist. The control connection the session
     /// was given belongs to the caller.
@@ -357,6 +393,7 @@ internal sealed class FtpSession(
     public async ValueTask DisposeAsync()
     {
         await DisposeIfOpenAsync(dataConnection).ConfigureAwait(false);
+        await DisposeIfOpenAsync(acceptedEarly).ConfigureAwait(false);
         await DisposeIfOpenAsync(pendingConnection).ConfigureAwait(false);
         await DisposeIfOpenAsync(securedControl).ConfigureAwait(false);
     }
@@ -382,6 +419,7 @@ internal sealed class FtpSession(
             TransferResult? failed = await GreetAndLogInAsync().ConfigureAwait(false)
                 ?? await ProtectDataAsync().ConfigureAwait(false)
                 ?? await ClearControlTlsAsync().ConfigureAwait(false)
+                ?? await StopBeforeEntryPathAsync().ConfigureAwait(false)
                 ?? await ReadEntryPathAsync().ConfigureAwait(false);
             if (failed is null)
             {
@@ -459,6 +497,28 @@ internal sealed class FtpSession(
         return (await ExchangeAsync("CWD " + entry).ConfigureAwait(false)).IsCompletion
             ? null
             : await QuitAndFailLeavingConnectionIntactAsync(CurlExitCode.RemoteAccessDenied, FtpTransferMessages.ChangeDirectoryDenied).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Gets a value indicating whether the connect phase stops after the login, before <c>PWD</c>, as
+    /// upstream's debug build does under <c>CURL_FTP_PWD_STOP</c> (<see cref="FtpProtocolHandler.StopsBeforeEntryPath" />).
+    /// </summary>
+    internal bool StopsBeforeEntryPath { get; init; }
+
+    /// <summary>
+    /// Under <see cref="StopsBeforeEntryPath" />, waits without sending <c>PWD</c> until the transfer is
+    /// cancelled or the connect phase times out, as upstream's <c>ftp_state_pwd</c> leaves the state machine
+    /// where it is; otherwise carries straight on.
+    /// </summary>
+    private async ValueTask<TransferResult?> StopBeforeEntryPathAsync()
+    {
+        if (StopsBeforeEntryPath)
+        {
+            await Task.Delay(Timeout.Infinite, control.CancellationToken).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+        }
+
+        control.CancellationToken.ThrowIfCancellationRequested();
+        return null;
     }
 
     private ValueTask<TransferResult?> ReadEntryPathAsync() => ReadEntryPathAsync(askSystemForRelativePath: true);
@@ -857,8 +917,10 @@ internal sealed class FtpSession(
     private async ValueTask<TransferResult?> DownloadMatchAsync(string urlPath, FtpFileMethod method, long? size)
     {
         await DisposeIfOpenAsync(dataConnection).ConfigureAwait(false);
+        await DisposeIfOpenAsync(acceptedEarly).ConfigureAwait(false);
         await DisposeIfOpenAsync(pendingConnection).ConfigureAwait(false);
         dataConnection = null;
+        acceptedEarly = null;
         pendingConnection = null;
         bytesTransferred = 0;
         expectedSize = null;
@@ -1158,7 +1220,12 @@ internal sealed class FtpSession(
             ?? await ApplyTimeConditionAsync().ConfigureAwait(false);
     }
 
-    private bool AsksForModificationTime => context.NoBody || context.RemoteTime || context.TimeCondition is not null;
+    /// <summary>
+    /// Whether <c>MDTM</c> is sent: under <c>-R</c>, <c>-z</c> or libcurl's <c>CURLOPT_FILETIME</c>
+    /// (<see cref="ITransferContext.RemoteTime" />, which the command line sets for <c>-I</c> too),
+    /// not for <c>CURLOPT_NOBODY</c> alone (upstream test542, BL-2609).
+    /// </summary>
+    private bool AsksForModificationTime => context.RemoteTime || context.TimeCondition is not null;
 
     /// <summary>
     /// Applies <c>-z</c> to the <c>MDTM</c> time through <see cref="FtpTimeCondition" />: when
@@ -1213,9 +1280,13 @@ internal sealed class FtpSession(
     /// <see cref="CheckModificationTimeAsync" /> has sent <c>MDTM</c> for a file: a directory
     /// URL sends nothing more; a file sends <c>TYPE I</c>, <c>SIZE</c> and <c>REST 0</c>,
     /// writing a <c>Content-Length</c> and <c>Accept-ranges</c> line for each that succeeded.
+    /// The path's directory part is remembered as the kept connection's <c>prevpath</c>, as curl
+    /// 8.22.0's <c>ftp_done</c> remembers it after every transfer, so a later transfer there sends
+    /// no <c>CWD</c> (upstream test661, BL-2629).
     /// </summary>
     private async ValueTask<TransferResult> ReportHeadAsync(string fileName)
     {
+        rememberedPath = directoryToRemember;
         if (fileName.Length == 0)
         {
             return await SendQuotesAsync(quotes.BeforeTransfer, FtpQuoteStage.BeforeTransfer).ConfigureAwait(false)
@@ -1362,7 +1433,7 @@ internal sealed class FtpSession(
 
             if ((await ExchangeAsync(FtpActiveCommand.Eprt(ListeningEndPoint)).ConfigureAwait(false)).IsCompletion)
             {
-                return AnnouncedActively("EPRT");
+                return await AnnouncedActivelyAsync("EPRT").ConfigureAwait(false);
             }
 
             await ReleasePendingConnectionAsync().ConfigureAwait(false);
@@ -1378,7 +1449,7 @@ internal sealed class FtpSession(
     {
         if ((await ExchangeAsync(FtpActiveCommand.Port(ListeningEndPoint)).ConfigureAwait(false)).IsCompletion)
         {
-            return AnnouncedActively("PORT");
+            return await AnnouncedActivelyAsync("PORT").ConfigureAwait(false);
         }
 
         return await QuitAndFailAsync(CurlExitCode.FtpPortFailed, FtpTransferMessages.FailedToDoPort).ConfigureAwait(false);
@@ -1386,14 +1457,37 @@ internal sealed class FtpSession(
 
     /// <summary>
     /// Reports curl 8.21.0's <c>-v</c> line for an accepted <c>EPRT</c> or <c>PORT</c>, logs
-    /// it, and goes on.
+    /// it, and goes on to <see cref="AcceptWaitingConnectionAsync" />.
     /// </summary>
-    private TransferResult? AnnouncedActively(string verb)
+    private async ValueTask<TransferResult?> AnnouncedActivelyAsync(string verb)
     {
         context.Events.ReportInfo(FtpTransferMessages.ConnectDataStreamActively);
         trace.DoPhaseComplete();
         log.ActivePortAnnounced(verb);
-        return null;
+        return await AcceptWaitingConnectionAsync().ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Accepts the server's data connection at once when it has connected already, as curl
+    /// 8.22.0's <c>ftp_do_more</c> connects the secondary socket right after <c>EPRT</c> or
+    /// <c>PORT</c> is answered; the transfer command and the <c>-v</c> lines of the accept
+    /// still follow as when it is accepted later. A failed accept, such as a socket-option
+    /// callback refusing <c>CURLSOCKTYPE_ACCEPT</c> (upstream test 766), ends the transfer with
+    /// its exit code and no <c>QUIT</c>, as curl's <c>ftp_done</c> marks the control connection
+    /// invalid for that error.
+    /// </summary>
+    private async ValueTask<TransferResult?> AcceptWaitingConnectionAsync()
+    {
+        if (!pendingConnection!.HasConnectionWaiting)
+        {
+            return null;
+        }
+
+        ConnectResult accepted = await pendingConnection.AcceptAsync(context.CancellationToken).ConfigureAwait(false);
+        acceptedEarly = accepted.Connection;
+        return acceptedEarly is null
+            ? TransferResult.Failure(accepted.ExitCode, accepted.ErrorMessage!, bytesTransferred)
+            : null;
     }
 
     /// <summary>
@@ -1578,18 +1672,21 @@ internal sealed class FtpSession(
             return await QuitAndFailAsync(CurlExitCode.FtpAcceptFailed, FtpTransferMessages.ServerFailedToConnectToDataPort).ConfigureAwait(false);
         }
 
-        using var timeout = new CancellationTokenSource(AcceptTimeout, context.TimeProvider);
+        using var timeout = new CancellationTokenSource(context.FtpAcceptTimeout, context.TimeProvider);
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(context.CancellationToken, timeout.Token);
         ConnectResult accepted;
         try
         {
-            accepted = await pending.AcceptAsync(linked.Token).ConfigureAwait(false);
+            accepted = acceptedEarly is { } early
+                ? ConnectResult.Connected(early)
+                : await pending.AcceptAsync(linked.Token).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (!context.CancellationToken.IsCancellationRequested)
         {
             return await QuitAndFailAsync(CurlExitCode.FtpAcceptTimeout, FtpTransferMessages.AcceptTimeout).ConfigureAwait(false);
         }
 
+        acceptedEarly = null;
         dataConnection = accepted.Connection;
         if (dataConnection is null)
         {

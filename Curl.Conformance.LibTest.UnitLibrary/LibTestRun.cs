@@ -116,6 +116,23 @@ public static class LibTestRun
     }
 
     /// <summary>
+    /// A program's <c>easy_setopt</c> calls with their jumps to <c>test_cleanup</c> left out, for values Libcurl takes
+    /// without fail: each option is set in turn and its answer ignored.
+    /// </summary>
+    /// <param name="easy">The handle.</param>
+    /// <param name="options">The options, in the program's order.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="easy"/> or <paramref name="options"/> is <see langword="null"/>.</exception>
+    public static void SetOptionsUnchecked(Libcurl.Easy.CurlEasy easy, IEnumerable<(Libcurl.Options.CurlOption Option, object? Value)> options)
+    {
+        ArgumentNullException.ThrowIfNull(easy);
+        ArgumentNullException.ThrowIfNull(options);
+        foreach (var (option, value) in options)
+        {
+            _ = easy.SetOption(option, value);
+        }
+    }
+
+    /// <summary>
     /// A writer over the program's <c>stdout</c> for <c>curl_mprintf</c>: UTF-8 with no byte order mark,
     /// flushed on every write, leaving the stream open.
     /// </summary>

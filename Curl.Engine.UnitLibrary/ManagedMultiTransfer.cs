@@ -842,12 +842,31 @@ internal sealed class ManagedMultiTransfer(
         int ready = 0;
         for (int index = 0; index < sockets.Length; index++)
         {
-            CurlWaitEvents returned = socketPoller.Poll(sockets[index].Socket, sockets[index].Events);
+            CurlWaitEvents returned = PollWaitSocket(sockets[index].Socket, sockets[index].Events);
             sockets[index] = sockets[index] with { ReturnedEvents = returned };
             ready += returned == CurlWaitEvents.None ? 0 : 1;
         }
 
         return ready;
+    }
+
+    /// <summary>
+    /// The events of <paramref name="events" /> an extra socket has now: for the socket number
+    /// <c>CURLINFO_ACTIVESOCKET</c> gave a connect-only transfer in the handle, its connection's readiness
+    /// (<see cref="ManagedEasyTransfer.ConnectOnlyReadyEvents" />, upstream test677, BL-2633), else what
+    /// <see cref="IWaitSocketPoller" /> answers for the operating system socket.
+    /// </summary>
+    private CurlWaitEvents PollWaitSocket(CurlSocket socket, CurlWaitEvents events)
+    {
+        foreach (MultiEntry entry in entries)
+        {
+            if (entry.Transfer is ManagedEasyTransfer easy && easy.ConnectOnlyReadyEvents(socket, events) is { } ready)
+            {
+                return ready;
+            }
+        }
+
+        return socketPoller.Poll(socket, events);
     }
 
     private bool WaitEnds(TimeSpan left, int extraSocketCount, bool poll)

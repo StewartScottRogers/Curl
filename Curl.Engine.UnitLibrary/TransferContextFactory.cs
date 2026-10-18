@@ -226,6 +226,7 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
             FtpSendPret = protocol.Ftp.UsePret,
             FtpPort = protocol.Ftp.ActiveAddress,
             FtpUseEprt = protocol.Ftp.UseEprt,
+            FtpAcceptTimeout = FtpAcceptTimeoutOf(network),
             SslLevel = settings.SslLevel,
             FtpSslControlOnly = settings.FtpSslControlOnly && !settings.SslRequired,
             FtpCommandChannelClearing = CommandChannelClearingOf(protocol.Ftp.ClearCommandChannel),
@@ -445,6 +446,16 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
     /// <returns>The context's <see cref="TransferContext.ConnectTimeout" />.</returns>
     private static TimeSpan? ConnectTimeoutOf(EasyNetworkOptions network) =>
         network.ConnectTimeout == TimeSpan.Zero ? null : network.ConnectTimeout;
+
+    /// <summary>
+    /// Gets the active-mode FTP accept wait a handler reads for <c>CURLOPT_ACCEPTTIMEOUT_MS</c>:
+    /// curl's 60 seconds when the record's <see cref="EasyNetworkOptions.AcceptTimeout" /> is zero,
+    /// which libcurl takes as not set (upstream case 593, BL-2622).
+    /// </summary>
+    /// <param name="network">The option group's network options.</param>
+    /// <returns>The context's <see cref="TransferContext.FtpAcceptTimeout" />.</returns>
+    private static TimeSpan FtpAcceptTimeoutOf(EasyNetworkOptions network) =>
+        network.AcceptTimeout == TimeSpan.Zero ? TransferContext.DefaultFtpAcceptTimeout : network.AcceptTimeout;
 
     /// <summary>
     /// Gets the path walk the FTP handler reads for <c>--ftp-method</c>: libcurl's default and

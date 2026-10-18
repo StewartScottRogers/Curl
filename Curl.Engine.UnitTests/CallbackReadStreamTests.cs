@@ -159,6 +159,128 @@ public sealed class CallbackReadStreamTests
     }
 
     [TestMethod]
+    public async Task ReadAsync_DeclaredLengthAndACallbackThatNeverEnds_AsksForWhatIsLeftThenEndsWithoutAskingAgain()
+    {
+        List<int> asked = [];
+        await using CallbackReadStream stream = new(buffer =>
+        {
+            asked.Add(buffer.Length);
+            return buffer.Length;
+        })
+        {
+            DeclaredLength = 5,
+        };
+        byte[] buffer = new byte[4];
+
+        int first = await stream.ReadAsync(buffer, CancellationToken.None);
+        int second = stream.Read(buffer, 0, 4);
+        int end = await stream.ReadAsync(buffer, CancellationToken.None);
+        int endAgain = stream.Read(buffer, 0, 4);
+
+        Assert.AreEqual(4, first);
+        Assert.AreEqual(1, second);
+        Assert.AreEqual(0, end);
+        Assert.AreEqual(0, endAgain);
+        CollectionAssert.AreEqual(new[] { 4, 1 }, asked);
+    }
+
+    [TestMethod]
+    public void Capabilities_DeclaredLength_SeeksWithThatLengthAndThePositionRead()
+    {
+        using CallbackReadStream stream = new(buffer => buffer.Length) { DeclaredLength = 13 };
+
+        int read = stream.Read(new byte[3], 0, 3);
+
+        Assert.AreEqual(3, read);
+        Assert.IsTrue(stream.CanSeek);
+        Assert.AreEqual(13, stream.Length);
+        Assert.AreEqual(3, stream.Position);
+    }
+
+    [TestMethod]
+    public void Seek_ForwardOnADeclaredLength_SkipsAheadSoTheReadsStopAtTheLength()
+    {
+        List<int> asked = [];
+        using CallbackReadStream stream = new(buffer =>
+        {
+            asked.Add(buffer.Length);
+            return buffer.Length;
+        })
+        {
+            DeclaredLength = 10,
+        };
+
+        long current = stream.Seek(4, SeekOrigin.Current);
+        long begin = stream.Seek(6, SeekOrigin.Begin);
+        stream.Position = 6;
+        long end = stream.Seek(-2, SeekOrigin.End);
+        int read = stream.Read(new byte[8], 0, 8);
+
+        Assert.AreEqual(4, current);
+        Assert.AreEqual(6, begin);
+        Assert.AreEqual(8, end);
+        Assert.AreEqual(2, read);
+        CollectionAssert.AreEqual(new[] { 2 }, asked);
+    }
+
+    [TestMethod]
+    public void Position_BackToZeroWithASeekCallback_RewindsThroughItAndReadsTheLengthAgain()
+    {
+        List<SeekOrigin> seeks = [];
+        using SeekingCallbackReadStream stream = new(buffer => buffer.Length, (_, origin) =>
+        {
+            seeks.Add(origin);
+            return SeekResult.Ok;
+        })
+        {
+            DeclaredLength = 3,
+        };
+        _ = stream.Seek(1, SeekOrigin.Current);
+        _ = stream.Read(new byte[8], 0, 8);
+
+        stream.Position = 0;
+        int again = stream.Read(new byte[8], 0, 8);
+
+        CollectionAssert.AreEqual(new[] { SeekOrigin.Begin }, seeks);
+        Assert.AreEqual(3, again);
+    }
+
+    [TestMethod]
+    public void Position_BackToZeroWhenTheSeekCallbackFails_ThrowsIOExceptionWithItsText()
+    {
+        using SeekingCallbackReadStream stream = new(buffer => buffer.Length, (_, _) => SeekResult.Fail) { DeclaredLength = 3 };
+        _ = stream.Read(new byte[8], 0, 8);
+
+        IOException failure = Assert.ThrowsExactly<IOException>(() => stream.Position = 0);
+
+        Assert.AreEqual(SeekingCallbackReadStream.SeekFailedPrefix + "1", failure.Message);
+    }
+
+    [TestMethod]
+    [DataRow(0L)]
+    [DataRow(1L)]
+    public void Position_BackWithNoSeekCallbackOrToAnywhereButZero_ThrowsIOExceptionWithLibcurlsRewindText(long target)
+    {
+        using CallbackReadStream stream = new(buffer => buffer.Length) { DeclaredLength = 3 };
+        _ = stream.Read(new byte[8], 0, 8);
+
+        IOException failure = Assert.ThrowsExactly<IOException>(() => stream.Position = target);
+
+        Assert.AreEqual(CallbackReadStream.RewindImpossibleText, failure.Message);
+    }
+
+    [TestMethod]
+    public void Position_BackToOneWithASeekCallback_ThrowsIOExceptionWithLibcurlsRewindText()
+    {
+        using SeekingCallbackReadStream stream = new(buffer => buffer.Length, (_, _) => SeekResult.Ok) { DeclaredLength = 3 };
+        _ = stream.Read(new byte[8], 0, 8);
+
+        IOException failure = Assert.ThrowsExactly<IOException>(() => stream.Position = 1);
+
+        Assert.AreEqual(CallbackReadStream.RewindImpossibleText, failure.Message);
+    }
+
+    [TestMethod]
     public void SuppliesTrailers_NoTrailerCallbackSet_IsFalse()
     {
         using CallbackReadStream stream = new(_ => 0);

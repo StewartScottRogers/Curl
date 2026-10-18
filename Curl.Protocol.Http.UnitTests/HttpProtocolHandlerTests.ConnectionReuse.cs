@@ -453,6 +453,24 @@ public sealed partial class HttpProtocolHandlerTests
         Assert.AreEqual(1, connector.Targets.Count);
     }
 
+    [TestMethod]
+    public async Task ExecuteAsync_ReusedConnectionDiedAfterAnEmptyStreamBody_SendsTheRequestAgain()
+    {
+        HttpRequestOptions options = new() { Body = new StreamBody(new MemoryStream([], writable: false), 0, string.Empty) };
+        QueueConnector connector = new(
+            ConnectResult.Connected(Connection(string.Empty, 65536), null, isReused: true),
+            ConnectResult.Connected(Connection(KeepAliveResponse, 65536), null));
+        Diagnostics.Arrange("url, stream body length", $"{ReuseUrl}, 0");
+
+        TransferResult result = await Handler(connector).ExecuteAsync(ReuseContext(new RecordingTransferEvents(), http: options));
+
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Assert("connect targets", 2, connector.Targets.Count);
+        Assert.AreEqual(2, connector.Targets.Count);
+    }
+
     /// <summary>
     /// The info lines of one request on a new connection: <c>using HTTP/1.x</c>, <c>Request
     /// completely sent off</c>, <c>HTTP 1.0, assume close after body</c> before an HTTP/1.0

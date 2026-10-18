@@ -261,9 +261,10 @@ public sealed class EasyNetworkOptionSettersTests
     [TestMethod]
     [DataRow(CurlOption.ProtocolsStr, "http,https", DisplayName = "PROTOCOLS_STR http,https")]
     [DataRow(CurlOption.ProtocolsStr, "ALL", DisplayName = "PROTOCOLS_STR ALL")]
-    [DataRow(CurlOption.ProtocolsStr, "nope,FTP", DisplayName = "PROTOCOLS_STR with an unknown name")]
+    [DataRow(CurlOption.ProtocolsStr, ",HTTP,http,", DisplayName = "PROTOCOLS_STR with empty entries")]
     [DataRow(CurlOption.RedirProtocolsStr, "https", DisplayName = "REDIR_PROTOCOLS_STR https")]
-    public void SetOption_AProtocolListNamingAKnownScheme_StoresItAsGiven(CurlOption option, string names)
+    [DataRow(CurlOption.RedirProtocolsStr, "http,MQTTS", DisplayName = "REDIR_PROTOCOLS_STR mqtts")]
+    public void SetOption_AProtocolListNamingKnownSchemes_StoresItAsGiven(CurlOption option, string names)
     {
         var options = new EasyOptions();
 
@@ -272,13 +273,37 @@ public sealed class EasyNetworkOptionSettersTests
     }
 
     [TestMethod]
-    [DataRow(CurlOption.ProtocolsStr, "nope", DisplayName = "PROTOCOLS_STR nope")]
     [DataRow(CurlOption.ProtocolsStr, "", DisplayName = "PROTOCOLS_STR empty")]
-    [DataRow(CurlOption.ProtocolsStr, null, DisplayName = "PROTOCOLS_STR null")]
-    [DataRow(CurlOption.RedirProtocolsStr, null, DisplayName = "REDIR_PROTOCOLS_STR null")]
-    public void SetOption_AProtocolListNamingNoKnownScheme_ReturnsBadFunctionArgument(CurlOption option, string? names)
+    [DataRow(CurlOption.ProtocolsStr, ",", DisplayName = "PROTOCOLS_STR a lone comma")]
+    [DataRow(CurlOption.RedirProtocolsStr, "", DisplayName = "REDIR_PROTOCOLS_STR empty")]
+    public void SetOption_AProtocolListNamingNothing_ReturnsBadFunctionArgument(CurlOption option, string? names)
     {
         AssertBadFunctionArgument(option, names);
+    }
+
+    [TestMethod]
+    [DataRow(CurlOption.ProtocolsStr, "string", DisplayName = "PROTOCOLS_STR string")]
+    [DataRow(CurlOption.ProtocolsStr, "nope", DisplayName = "PROTOCOLS_STR nope")]
+    [DataRow(CurlOption.ProtocolsStr, "http,http,ft", DisplayName = "PROTOCOLS_STR an unknown name after known ones")]
+    [DataRow(CurlOption.RedirProtocolsStr, "string", DisplayName = "REDIR_PROTOCOLS_STR string")]
+    public void SetOption_AProtocolListNamingAnUnknownScheme_ReturnsUnsupportedProtocol(CurlOption option, string names)
+    {
+        var options = new EasyOptions();
+
+        Assert.AreEqual(CurlCode.UnsupportedProtocol, Set(ref options, option, names));
+        Assert.IsNull(ProtocolsOf(options.Network, option));
+    }
+
+    [TestMethod]
+    [DataRow(CurlOption.ProtocolsStr, DisplayName = "PROTOCOLS_STR null")]
+    [DataRow(CurlOption.RedirProtocolsStr, DisplayName = "REDIR_PROTOCOLS_STR null")]
+    public void SetOption_AProtocolListNull_ResetsToTheDefault(CurlOption option)
+    {
+        var options = new EasyOptions();
+        Set(ref options, option, "http");
+
+        Assert.AreEqual(CurlCode.Ok, Set(ref options, option, null));
+        Assert.IsNull(ProtocolsOf(options.Network, option));
     }
 
     [TestMethod]

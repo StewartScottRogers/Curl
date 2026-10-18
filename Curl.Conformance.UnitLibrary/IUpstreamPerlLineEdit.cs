@@ -7,11 +7,11 @@ namespace Curl.Conformance;
 /// </summary>
 internal interface IUpstreamPerlLineEdit
 {
-    /// <summary>Reads one line of Perl as an <see cref="UpstreamPerlSubstitution"/> or, failing that, an <see cref="UpstreamPerlFieldSortProgram"/>.</summary>
+    /// <summary>Reads one line of Perl as an <see cref="UpstreamPerlSubstitution"/>, an <see cref="UpstreamPerlFieldSortProgram"/> or an <see cref="UpstreamPerlConditionalEmptying"/>, the first that reads it.</summary>
     /// <param name="line">The line, without its line feed.</param>
     /// <returns>The edit, or <see langword="null"/> when the line is Perl the harness does not carry out.</returns>
     static IUpstreamPerlLineEdit? Parse(string line) =>
-        (IUpstreamPerlLineEdit?)UpstreamPerlSubstitution.Parse(line) ?? UpstreamPerlFieldSortProgram.Parse(line);
+        (IUpstreamPerlLineEdit?)UpstreamPerlSubstitution.Parse(line) ?? (IUpstreamPerlLineEdit?)UpstreamPerlFieldSortProgram.Parse(line) ?? UpstreamPerlConditionalEmptying.Parse(line);
 
     /// <summary>Runs the code on one line.</summary>
     /// <param name="line">The line, with its line feed.</param>

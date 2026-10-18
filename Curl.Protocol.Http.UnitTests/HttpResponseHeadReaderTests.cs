@@ -86,14 +86,27 @@ public sealed class HttpResponseHeadReaderTests
 
     [TestMethod]
     [DataRow("http/1.1 404 x", DisplayName = "Lower-case http/")]
-    [DataRow("HTTP/2 404", DisplayName = "HTTP/2 over HTTP/1.x")]
     [DataRow("HTTP/3.0 404 OK", DisplayName = "HTTP/3.0 over HTTP/1.x")]
+    [DataRow("HTTP/2 abc", DisplayName = "HTTP/2 without a three-digit code over HTTP/1.x")]
     public async Task ReadAsync_StatusLinesCurlTakesAsHttp10Ok_ParseAs200(string statusLine)
     {
         foreach (HttpResponseHead head in await ReadEveryWayAsync(statusLine + "\r\nContent-Length: 0\r\n\r\n"))
         {
             AssertStatus(head, HttpVersion.Version10, 200, string.Empty);
             Assert.AreEqual(statusLine + "\r\nContent-Length: 0\r\n\r\n", Latin1(head.HeadBytes));
+        }
+    }
+
+    [TestMethod]
+    [OSCondition(OperatingSystems.Windows)]
+    public async Task ReadAsync_Http2StatusLineOnWindows_ParsesAs200()
+    {
+        // The Schannel build takes it as an assumed HTTP/1.0 200; the OpenSSL build refuses it
+        // (ReadAsync_Http2StatusLineWhereRefused_FailsAsCurlsOpenSslBuild, BL-2715).
+        foreach (HttpResponseHead head in await ReadEveryWayAsync("HTTP/2 404\r\nContent-Length: 0\r\n\r\n"))
+        {
+            AssertStatus(head, HttpVersion.Version10, 200, string.Empty);
+            Assert.AreEqual("HTTP/2 404\r\nContent-Length: 0\r\n\r\n", Latin1(head.HeadBytes));
         }
     }
 
@@ -380,29 +393,31 @@ public sealed class HttpResponseHeadReaderTests
     }
 
     [TestMethod]
-    [DataRow("HTTP/2 101 OK\r\n\r\nHTTP/1.1 200 OK\r\n\r\n", "Version mismatch (from HTTP/2 to HTTP/1)", DisplayName = "HTTP/2 101 then HTTP/1.1 200 (test1704)")]
-    [DataRow("HTTP/3 100 x\r\n\r\nHTTP/1.0 200 OK\r\n\r\n", "Version mismatch (from HTTP/3 to HTTP/1)", DisplayName = "HTTP/3 100 then HTTP/1.0 200")]
-    public async Task ReadAsync_Http2InterimThenHttp1HeadWhereParsed_ReturnsWeirdServerReplyVersionMismatch(string response, string message)
+    [DataRow("HTTP/2 101 OK\r\n\r\nHTTP/1.1 200 OK\r\n\r\n", CurlExitCode.WeirdServerReply, "Version mismatch (from HTTP/1 to HTTP/2)", DisplayName = "HTTP/2 101 then HTTP/1.1 200 (test1704)")]
+    [DataRow("HTTP/2 200 OK\r\nContent-Length: 0\r\n\r\n", CurlExitCode.WeirdServerReply, "Version mismatch (from HTTP/1 to HTTP/2)", DisplayName = "Final HTTP/2 200")]
+    [DataRow("HTTP/1.1 100 Continue\r\n\r\nHTTP/2 200 OK\r\n\r\n", CurlExitCode.WeirdServerReply, "Version mismatch (from HTTP/1 to HTTP/2)", DisplayName = "HTTP/1.1 100 then HTTP/2 200")]
+    [DataRow("HTTP/3 100 x\r\n\r\nHTTP/1.0 200 OK\r\n\r\n", CurlExitCode.UnsupportedProtocol, "Unsupported HTTP version (3.0) in response", DisplayName = "HTTP/3 100 then HTTP/1.0 200")]
+    public async Task ReadAsync_Http2StatusLineWhereRefused_FailsAsCurlsOpenSslBuild(string response, CurlExitCode exitCode, string message)
     {
         Diagnostics.Arrange("scripted response", response);
         ScriptedConnection connection = new(Encoding.Latin1.GetBytes(response), 65536);
 
         HttpTransferException thrown = await Assert.ThrowsExactlyAsync<HttpTransferException>(
-            async () => await new HttpResponseHeadReader(connection) { ParsesHttp2InterimStatusLines = true }.ReadAsync(CancellationToken.None));
+            async () => await new HttpResponseHeadReader(connection) { RefusesHttp2StatusLines = true }.ReadAsync(CancellationToken.None));
 
         Diagnostics.Act("thrown", $"exit code {thrown.ExitCode}, message '{thrown.Message}'");
-        Diagnostics.Assert("exit code", CurlExitCode.WeirdServerReply, thrown.ExitCode);
-        Assert.AreEqual(CurlExitCode.WeirdServerReply, thrown.ExitCode);
+        Diagnostics.Assert("exit code", exitCode, thrown.ExitCode);
+        Assert.AreEqual(exitCode, thrown.ExitCode);
         Assert.AreEqual(message, thrown.Message);
     }
 
     [TestMethod]
-    public async Task ReadAsync_Http2InterimWhereNotParsed_TakesItAsAssumedHttp10Ok()
+    public async Task ReadAsync_Http2InterimWhereNotRefused_TakesItAsAssumedHttp10Ok()
     {
-        Diagnostics.Arrange("scripted response", "HTTP/2 101 OK, then HTTP/1.1 200 OK; HTTP/2 interim lines not parsed (Windows)");
+        Diagnostics.Arrange("scripted response", "HTTP/2 101 OK, then HTTP/1.1 200 OK; HTTP/2 status lines not refused (Windows)");
         ScriptedConnection connection = new(Encoding.Latin1.GetBytes("HTTP/2 101 OK\r\n\r\nHTTP/1.1 200 OK\r\n\r\n"), 65536);
 
-        HttpResponseHead head = await new HttpResponseHeadReader(connection) { ParsesHttp2InterimStatusLines = false }.ReadAsync(CancellationToken.None);
+        HttpResponseHead head = await new HttpResponseHeadReader(connection) { RefusesHttp2StatusLines = false }.ReadAsync(CancellationToken.None);
 
         Diagnostics.Act("status", $"{head.StatusLine.Version} {head.StatusLine.StatusCode}");
         Diagnostics.Assert("status", "1.0 200", $"{head.StatusLine.Version} {head.StatusLine.StatusCode}");
@@ -411,12 +426,12 @@ public sealed class HttpResponseHeadReaderTests
     }
 
     [TestMethod]
-    public async Task ReadAsync_Http11InterimThenSwitchedHttp2Head_IsNoVersionMismatch()
+    public async Task ReadAsync_Http11InterimThenSwitchedHttp2Head_IsNotRefused()
     {
         Diagnostics.Arrange("scripted response", "HTTP/1.1 101, then the upgraded stream's HTTP/2 200");
         ScriptedConnection connection = new(Encoding.Latin1.GetBytes("HTTP/1.1 101 Switching Protocols\r\n\r\nHTTP/2 200 \r\n\r\n"), 65536);
         int statusLinesRead = 0;
-        HttpResponseHeadReader reader = new(connection) { ParsesHttp2InterimStatusLines = true, IsSwitchedToHttp2 = () => statusLinesRead++ > 0 };
+        HttpResponseHeadReader reader = new(connection) { RefusesHttp2StatusLines = true, IsSwitchedToHttp2 = () => statusLinesRead++ > 0 };
 
         HttpResponseHead head = await reader.ReadAsync(CancellationToken.None);
 

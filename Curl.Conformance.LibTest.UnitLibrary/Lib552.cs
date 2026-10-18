@@ -59,7 +59,7 @@ public sealed class Lib552(TimeProvider timeProvider) : ILibTest
                     (CurlOption.Postfieldsize, (long)DataLength),
                     (CurlOption.Readfunction, (ReadCallback)data.Read),
                     (CurlOption.Writefunction, (WriteCallback)data.Write),
-                    (CurlOption.Ioctlfunction, (Func<int, int>)data.Ioctl),
+                    (CurlOption.Ioctlfunction, (IoctlCallback)data.Ioctl),
                     (CurlOption.Proxy, context.Argument2),
                     (CurlOption.Url, context.Url),
                     (CurlOption.Proxyauth, (long)HttpAuthenticationMethods.Any),
@@ -97,19 +97,19 @@ public sealed class Lib552(TimeProvider timeProvider) : ILibTest
             return data.Length;
         }
 
-        /// <summary><c>ioctl_callback</c>: on <see cref="LibTestIoctl.RestartRead"/>, says so on stdout and rewinds.</summary>
+        /// <summary><c>ioctl_callback</c>: on <see cref="IoctlCommand.RestartRead"/>, says so on stdout and rewinds.</summary>
         /// <param name="command">The command libcurl passes.</param>
-        /// <returns><see cref="LibTestIoctl.Ok"/> for a rewind, else <see cref="LibTestIoctl.UnknownCommand"/>.</returns>
-        public int Ioctl(int command)
+        /// <returns><see cref="IoctlResult.Ok"/> for a rewind, else <see cref="IoctlResult.UnknownCommand"/>.</returns>
+        public IoctlResult Ioctl(IoctlCommand command)
         {
-            if (command != LibTestIoctl.RestartRead)
+            if (command != IoctlCommand.RestartRead)
             {
-                return LibTestIoctl.UnknownCommand;
+                return IoctlResult.UnknownCommand;
             }
 
             standardOutput.Write("APPLICATION received a CURLIOCMD_RESTARTREAD request\nAPPLICATION ** REWINDING! **\n"u8);
             offset = 0;
-            return LibTestIoctl.Ok;
+            return IoctlResult.Ok;
         }
 
         private static byte[] BuildData()

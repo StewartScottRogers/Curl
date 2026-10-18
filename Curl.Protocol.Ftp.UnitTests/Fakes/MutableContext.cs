@@ -45,6 +45,8 @@ public sealed class MutableContext
 
     public bool FtpUseEprt { get; set; } = true;
 
+    public TimeSpan FtpAcceptTimeout { get; set; } = TransferContext.DefaultFtpAcceptTimeout;
+
     public TransportSecurityLevel SslLevel { get; set; }
 
     public bool FtpSslControlOnly { get; set; }
@@ -91,6 +93,7 @@ public sealed class MutableContext
             HeaderOutput = mutable.HeaderOutput,
             FtpPort = mutable.FtpPort,
             FtpUseEprt = mutable.FtpUseEprt,
+            FtpAcceptTimeout = mutable.FtpAcceptTimeout,
             SslLevel = mutable.SslLevel,
             FtpSslControlOnly = mutable.FtpSslControlOnly,
             FtpCommandChannelClearing = mutable.FtpCommandChannelClearing,

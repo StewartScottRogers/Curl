@@ -14,10 +14,25 @@ namespace Curl.Engine;
 /// <see cref="SeekResult.Ok" /> fails the rewind with libcurl's <c>seek callback returned error &lt;n&gt;</c>.
 /// </summary>
 /// <param name="part">The part's data.</param>
-internal sealed class MimeCallbackReadStream(EasyMimeCallback part) : CallbackReadStream(part.Read)
+/// <param name="pauseGate">The handle's pause state, so <c>CURL_READFUNC_PAUSE</c> waits for <c>curl_easy_pause</c> (upstream tests 670 to 673, BL-2631), or <see langword="null" /> when the transfer cannot pause.</param>
+internal sealed class MimeCallbackReadStream(EasyMimeCallback part, EasyPauseGate? pauseGate = null) : CallbackReadStream(part.Read, pauseGate)
 {
     /// <inheritdoc />
     public override bool CanSeek => part.Seek is not null;
+
+    /// <summary>
+    /// Gets a value indicating whether the part has a known size and the read callback has given all of it, so it is
+    /// not asked again, as curl 8.22.0's <c>read_part_content</c> spares the read once <c>offset &gt;= datasize</c>
+    /// (upstream test 554, BL-2613).
+    /// </summary>
+    private bool AtSizedEnd => part.Size >= 0 && BytesReadSinceRewind >= part.Size;
+
+    /// <inheritdoc />
+    public override int Read(Span<byte> buffer) => AtSizedEnd ? 0 : base.Read(buffer);
+
+    /// <inheritdoc />
+    public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default) =>
+        AtSizedEnd ? ValueTask.FromResult(0) : base.ReadAsync(buffer, cancellationToken);
 
     /// <inheritdoc />
     /// <exception cref="NotSupportedException">The part's size is unknown (-1) or it has no seek callback.</exception>

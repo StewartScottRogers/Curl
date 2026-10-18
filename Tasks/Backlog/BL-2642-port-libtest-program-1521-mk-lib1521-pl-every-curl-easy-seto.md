@@ -4,7 +4,7 @@ title: Port libtest program 1521 (mk-lib1521.pl, every curl_easy_setopt and curl
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: []
+depends-on: [BL-2727]
 touches: [Curl.Conformance.LibTest.UnitLibrary, Curl.Conformance.LibTest.UnitTests, Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
 requirement: none
 created: 2026-10-17
@@ -29,6 +29,12 @@ Split out of BL-2538 (batch 12 of the libtest ports, phase 5 of `Documentation/P
 
 ## Notes
 
+- 2026-10-18 (lane 1): Port written (left uncommitted for the shift's stash): `Lib1521` (program), `Lib1521Checks` (the generated body: per-type first and secondary setopts, upstream's allowed-answer lists, `present()`, `bad_neg`, and the blob check that reads the stale `result` as the generator writes it), `Lib1521Values` (the object each object option gets) and `Lib1521Infos` (the 78 `CURLINFO_*` entries of 8.22.0's `curl.h`, generated with awk from `curl.h`, never Python), registered in `LibTestPrograms`. Options come from Libcurl's `CurlOptions.All` without aliases, ordered by option number (curl.h's order); its 311 names match curl.h's exactly.
+- Choices: `LONG_MIN`/`LONG_MAX` are `long.MinValue`/`MaxValue` (Libcurl's `long`); `on line N` gives the call's ordinal, as C# has no generated source line; `CURLOPT_CURLU` gets a real `CurlUrlHandle` (C# cannot cast a dummy struct), `CURLOPT_STDERR` `Stream.Null`, `CURLOPT_ERRORBUFFER` a `StringBuilder`.
+- Case 1521 through the runner on Windows prints `ok` plus six lines, all Libcurl's: `CURLOPT_PROTOCOLS_STR` and `CURLOPT_REDIR_PROTOCOLS_STR` answer 43 for `"string"` (upstream 1) and for NULL (upstream 0), `CURLOPT_SSH_HOST_PUBLIC_KEY_MD5` answers 43 for `"string"` (upstream 0), and `CURLINFO_SIZE_DELIVERED` answers 48 (missing from `CurlInfo`). Filed as BL-2727 per the acceptance criteria and added to `depends-on`. Left for the next claim: the unit tests over `Lib1521Checks` and the fake engine, the ratchet line, the quality run, and the CLAUDE.md port list entry.
+
 ## Log
 
 - 2026-10-17: Created.
+- 2026-10-18: Backlog -> Doing. Criteria at claim: 7df904cc 527e7a2f e39e1cd8 4272a6b9.
+- 2026-10-18: Doing -> Backlog. Waits on BL-2727: Libcurl answers CURLOPT_PROTOCOLS_STR, CURLOPT_REDIR_PROTOCOLS_STR, CURLOPT_SSH_HOST_PUBLIC_KEY_MD5 and CURLINFO_SIZE_DELIVERED wrongly, so case 1521 cannot print only ok

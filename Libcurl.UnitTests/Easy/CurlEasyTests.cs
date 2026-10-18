@@ -5,14 +5,35 @@ using Curl.Api.EngineContracts.ConnectOnly;
 using Curl.Api.Options;
 using Libcurl.Easy;
 using Libcurl.Global;
+using Libcurl.Info;
+using Libcurl.Mime;
 using Libcurl.Options;
 using Libcurl.UnitTests.Global;
+using Libcurl.UnitTests.Mime.Mime;
 
 namespace Libcurl.UnitTests.Easy;
 
 [TestClass]
 public sealed class CurlEasyTests
 {
+    [TestMethod]
+    [DataRow("http://127.0.0.1/522", 8990L, "http://127.0.0.1:8990/522", DisplayName = "URL with no port")]
+    [DataRow("http://www.example.com:999/523", 19999L, "http://www.example.com:19999/523", DisplayName = "URL with its own port")]
+    public async Task Perform_PortOptionOnTheManagedEngine_TransfersTheUrlWithThatPort(string url, long port, string expected)
+    {
+        await using var library = CurlGlobal.Init(CurlGlobalFlags.Nothing);
+        using var easy = library.EasyInit();
+        easy.SetOption(CurlOption.Url, url);
+        easy.SetOption(CurlOption.Port, port);
+        // An unusable proxy ends the perform before anything is dialled, with the URL it would have transferred.
+        easy.SetOption(CurlOption.Proxy, "foo://proxy:1");
+
+        easy.Perform();
+
+        Assert.AreEqual(CurlCode.Ok, easy.GetInfo(CurlInfo.EffectiveUrl, out var effective));
+        Assert.AreEqual(expected, effective);
+    }
+
     private static readonly EasyOptionDispatch VerboseOnly = new(new Dictionary<CurlOption, EasyOptionSetter>
     {
         [CurlOption.Verbose] = (ref EasyOptions options, object? value) =>
@@ -132,6 +153,19 @@ public sealed class CurlEasyTests
 
         Assert.IsNull(transfer.Options.Behaviour.ErrorBuffer);
         Assert.AreEqual("Could not resolve host: nowhere", easy.ErrorText);
+    }
+
+    [TestMethod]
+    public async Task SetOption_StringPastMaximumInputLength_IsBadFunctionArgumentAndKeepsTheOldValue()
+    {
+        await using var library = CurlGlobal.Init(CurlGlobalFlags.Nothing);
+        using var easy = library.EasyInit();
+        Assert.AreEqual(CurlCode.Ok, easy.SetOption(CurlOption.Useragent, "before"));
+
+        Assert.AreEqual(CurlCode.BadFunctionArgument, easy.SetOption(CurlOption.Useragent, new string('a', EasyOptionDispatch.MaximumInputLength + 1)));
+        Assert.AreEqual(CurlCode.BadFunctionArgument, easy.SetOption(CurlOption.Url, new string('a', EasyOptionDispatch.MaximumInputLength + 1)));
+        Assert.AreEqual(CurlCode.Ok, easy.SetOption(CurlOption.Useragent, new string('a', EasyOptionDispatch.MaximumInputLength)));
+        Assert.AreEqual(CurlCode.Ok, easy.SetOption(CurlOption.Postfields, new string('a', EasyOptionDispatch.MaximumInputLength + 1)));
     }
 
     [TestMethod]
@@ -432,5 +466,86 @@ public sealed class CurlEasyTests
 
         Assert.HasCount(1, engine.Created);
         Assert.IsFalse(easy.IsCleanedUp);
+    }
+
+    [TestMethod]
+    public void Perform_MimePartChangedAfterTheSetopt_PostsThePartAsItIsNow()
+    {
+        var transfer = new FakeEasyTransfer();
+        using var easy = new CurlEasy(transfer, EasyOptionDispatch.Default);
+        using var mime = new CurlMime(new FakeMimeBuilder());
+        var part = mime.AddPart();
+        part.SetName("short value");
+        easy.SetOption(CurlOption.Mimepost, mime);
+
+        part.SetName("long value for length change");
+        easy.Perform();
+
+        Assert.AreEqual("long value for length change", transfer.PerformedWith!.Http.MimePost!.Parts.Single().Name);
+    }
+
+    [TestMethod]
+    public void Perform_MimeFreedAfterTheSetopt_PostsAnEmptyFormInstead()
+    {
+        var transfer = new FakeEasyTransfer();
+        using var easy = new CurlEasy(transfer, EasyOptionDispatch.Default);
+        var mime = new CurlMime(new FakeMimeBuilder());
+        mime.AddPart().SetName("greeting");
+        easy.SetOption(CurlOption.Mimepost, mime);
+
+        mime.Dispose();
+        easy.Perform();
+
+        Assert.IsNull(transfer.PerformedWith!.Http.MimePost);
+        Assert.IsEmpty(transfer.PerformedWith.Http.HttpPost!.Parts);
+    }
+
+    [TestMethod]
+    public void DupHandle_MimeFreedAfterTheDuplicate_DuplicatePostsItsCopy()
+    {
+        var transfer = new FakeEasyTransfer();
+        using var easy = new CurlEasy(transfer, EasyOptionDispatch.Default);
+        var mime = new CurlMime(new FakeMimeBuilder());
+        var part = mime.AddPart();
+        part.SetName("before");
+        easy.SetOption(CurlOption.Mimepost, mime);
+        part.SetName("at duplicate");
+
+        using var duplicate = easy.DupHandle();
+        mime.Dispose();
+
+        Assert.AreEqual("at duplicate", duplicate.Options.Http.MimePost!.Parts.Single().Name);
+    }
+
+    [TestMethod]
+    [DataRow(CurlOption.Mimepost, DisplayName = "CURLOPT_MIMEPOST NULL")]
+    [DataRow(CurlOption.Httppost, DisplayName = "CURLOPT_HTTPPOST NULL")]
+    public void Perform_MimeUnboundByALaterPostOption_LeavesTheOptionsAsSet(CurlOption option)
+    {
+        var transfer = new FakeEasyTransfer();
+        using var easy = new CurlEasy(transfer, EasyOptionDispatch.Default);
+        using var mime = new CurlMime(new FakeMimeBuilder());
+        easy.SetOption(CurlOption.Mimepost, mime);
+        easy.SetOption(option, null);
+        var set = easy.Options;
+
+        mime.AddPart().SetName("later");
+        easy.Perform();
+
+        Assert.AreSame(set, transfer.PerformedWith);
+    }
+
+    [TestMethod]
+    public void Reset_AfterAMimePost_PerformsWithTheDefaultOptions()
+    {
+        var transfer = new FakeEasyTransfer();
+        using var easy = new CurlEasy(transfer, EasyOptionDispatch.Default);
+        using var mime = new CurlMime(new FakeMimeBuilder());
+        easy.SetOption(CurlOption.Mimepost, mime);
+
+        easy.Reset();
+        easy.Perform();
+
+        Assert.IsNull(transfer.PerformedWith!.Http.MimePost);
     }
 }

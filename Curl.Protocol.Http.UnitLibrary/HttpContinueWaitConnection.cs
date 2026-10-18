@@ -182,7 +182,11 @@ internal sealed class HttpContinueWaitConnection(IConnection connection) : IConn
         return firstStatusCode < 200;
     }
 
-    private static int? StatusCodeOf(ReadOnlySpan<byte> line)
+    /// <summary>
+    /// Gives the status code of a received first line, or <see langword="null" /> when it is not a
+    /// status line.
+    /// </summary>
+    internal static int? StatusCodeOf(ReadOnlySpan<byte> line)
     {
         try
         {

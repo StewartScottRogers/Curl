@@ -15,6 +15,30 @@ public sealed class CallbackTransferProgressTests
     }
 
     [TestMethod]
+    public void PausedTickOf_NoProgress_IsNone()
+    {
+        Assert.IsNull(CallbackTransferProgress.PausedTickOf(null));
+    }
+
+    [TestMethod]
+    public void PausedTickOf_Progress_CallsTheCallbackAgainWithTheLastCounts()
+    {
+        using CancellationTokenSource abort = new();
+        List<(long, long, long, long)> calls = [];
+        CallbackTransferProgress progress = new((dlTotal, dlNow, ulTotal, ulNow) =>
+        {
+            calls.Add((dlTotal, dlNow, ulTotal, ulNow));
+            return 0;
+        }, abort);
+        progress.ReportUploaded(1, 2);
+
+        CallbackTransferProgress.PausedTickOf(progress)!();
+
+        Assert.HasCount(2, calls);
+        Assert.AreEqual((0L, 0L, 2L, 1L), calls[1]);
+    }
+
+    [TestMethod]
     public void Of_NeitherCallbackSet_GivesNone()
     {
         using CancellationTokenSource abort = new();

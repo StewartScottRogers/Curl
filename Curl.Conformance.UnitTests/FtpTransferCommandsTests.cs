@@ -124,6 +124,77 @@ public sealed class FtpTransferCommandsTests
     }
 
     [TestMethod]
+    [DataRow("/fully_simulated/UNIX/", "-r--r--r--    1 ftp-default ftp-default      38 Jan 11 10:00 chmod1\r\n")]
+    [DataRow("/fully_simulated/DOS/", "01-11-10  10:00AM                   38 chmod1\r\n")]
+    public async Task TryAnswer_ListInSimulatedDirectory_SendsThatDirectorysListingNotTheCasesData(string directory, string expectedLine)
+    {
+        List<FtpDataConnection> opened = [];
+        FtpTransferCommands commands = Create("<data>\ncase data\n</data>\n", opened);
+        commands.ChangeDirectory(directory);
+        Answer(commands, "EPSV", string.Empty);
+
+        string answer = Answer(commands, "LIST", string.Empty);
+
+        Assert.AreEqual("226 ASCII transfer complete\r\n", answer);
+        Assert.Contains(expectedLine, await ReadToEndAsync(opened[0]));
+    }
+
+    [TestMethod]
+    [DataRow("/fully_simulated/", "")]
+    [DataRow("/other/", "case data\r\n")]
+    public async Task TryAnswer_ListAfterChangeDirectory_SendsNothingForAnUnlistedSimulatedDirectoryAndTheCasesDataElsewhere(string directory, string expectedData)
+    {
+        List<FtpDataConnection> opened = [];
+        FtpTransferCommands commands = Create("<data>\ncase data\n</data>\n", opened);
+        commands.ChangeDirectory("/fully_simulated/UNIX/");
+        commands.ChangeDirectory(directory);
+        Answer(commands, "EPSV", string.Empty);
+
+        Answer(commands, "LIST", string.Empty);
+
+        Assert.AreEqual(expectedData, await ReadToEndAsync(opened[0]));
+    }
+
+    [TestMethod]
+    [DataRow("file.txt", "150 Binary data connection for file.txt (35 bytes).\r\n226 File transfer complete\r\n", "This is content of file \"file.txt\"\n")]
+    [DataRow("empty_file.dat", "150 Binary data connection for empty_file.dat (0 bytes).\r\n226 File transfer complete\r\n", "")]
+    public async Task TryAnswer_RetrInSimulatedDirectory_SendsTheListedFilesContent(string name, string expected, string expectedData)
+    {
+        List<FtpDataConnection> opened = [];
+        FtpTransferCommands commands = Create(string.Empty, opened);
+        commands.ChangeDirectory("/fully_simulated/DOS/");
+        Answer(commands, "EPSV", string.Empty);
+
+        string answer = Answer(commands, "RETR", name);
+
+        Assert.AreEqual(expected, answer);
+        Assert.AreEqual(expectedData, await ReadToEndAsync(opened[0]));
+    }
+
+    [TestMethod]
+    [DataRow("/fully_simulated/UNIX/", "nosuchfile")]
+    [DataRow("/fully_simulated/", "file.txt")]
+    public void TryAnswer_RetrOfAFileTheSimulatedListLacks_AnswersNothing(string directory, string name)
+    {
+        FtpTransferCommands commands = Create("<data>\nhello\n</data>\n", []);
+        commands.ChangeDirectory(directory);
+        Answer(commands, "EPSV", string.Empty);
+
+        Assert.AreEqual(string.Empty, Answer(commands, "RETR", name));
+    }
+
+    [TestMethod]
+    [DataRow("someothertext.txt", "213 47\r\n")]
+    [DataRow("1", "550 1: No such file or directory.\r\n")]
+    public void TryAnswer_SizeInSimulatedDirectory_AnswersFromTheListedFile(string name, string expected)
+    {
+        FtpTransferCommands commands = Create("<data>\nhello\n</data>\n", []);
+        commands.ChangeDirectory("/fully_simulated/UNIX/");
+
+        Assert.AreEqual(expected, Answer(commands, "SIZE", name));
+    }
+
+    [TestMethod]
     public void TryAnswer_OtherCommand_IsNotATransferCommand()
     {
         bool answered = Create(string.Empty, []).TryAnswer("LPRT", "1", out string answer);

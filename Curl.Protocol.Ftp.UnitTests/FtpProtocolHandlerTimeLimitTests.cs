@@ -256,6 +256,27 @@ public sealed class FtpProtocolHandlerTimeLimitTests
         CollectionAssert.AreEqual(new[] { (5L, (long?)100) }, progress.Downloaded);
     }
 
+    [TestMethod]
+    public async Task ExecuteAsync_StopsBeforeEntryPath_SendsNoPwdAndWaitsUntilTheConnectTimeout()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("test", "ExecuteAsync_StopsBeforeEntryPath_SendsNoPwdAndWaitsUntilTheConnectTimeout");
+
+        // Upstream's debug build under CURL_FTP_PWD_STOP: ftp_state_pwd sends nothing and leaves the state machine waiting (test753).
+        var control = ScriptedConnection.FromReplies(LoggedIn);
+        var context = new TransferContext { Url = CurlUrl.Parse(Url), Output = new MemoryStream(), ConnectTimeout = OneSecond, TimeProvider = clock };
+        Task<TransferResult> run = new FtpProtocolHandler(new QueuedConnector(ConnectResult.Connected(control))) { StopsBeforeEntryPath = true }.ExecuteAsync(context).AsTask();
+        bool stillWaiting = !run.IsCompleted;
+
+        clock.Advance(OneSecond);
+        TransferResult result = await run;
+        diagnostics.Act("still waiting before the connect timeout", stillWaiting);
+        diagnostics.Assert("outcome checked by the assertions below", "passes", "checking");
+        Assert.IsTrue(stillWaiting);
+        Assert.AreEqual(CurlExitCode.OperationTimedOut, result.ExitCode);
+        Assert.AreEqual("USER anonymous\r\nPASS ftp@example.com\r\n", Encoding.Latin1.GetString(control.Sent));
+    }
+
     private Task<TransferResult> StartAsync(StallingConnection control, TimeSpan? connectTimeout) =>
         StartAsync(new QueuedConnector(ConnectResult.Connected(control)), connectTimeout, NoTransferProgress.Instance, CancellationToken.None);
 

@@ -359,6 +359,37 @@ public sealed partial class HttpProtocolHandlerTests
         Assert.IsTrue(connection.IsMarkedReusable);
     }
 
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
+    public async Task ExecuteAsync_Http2UpgradeAnsweredHttp2101ThenHttp11200_FailsWithVersionMismatchAndNoBody()
+    {
+        // Upstream test1704 (GF-0083, BL-2715): curl's OpenSSL build fails at the HTTP/2 101 line
+        // with "Version mismatch (from HTTP/1 to HTTP/2)" (measured, BL-2715 Notes). The Schannel
+        // build has no h2c, and Curl refuses --http2 there, so the case is not Windows'.
+        const string Response = "HTTP/2 101 OK\r\n\r\nHTTP/1.1 200 OK\r\nDate: Tue, 09 Nov 2010 14:49:00 GMT\r\nContent-Length: 6\r\nConnection: close\r\nContent-Type: text/html\r\n\r\n-maa-\n";
+        foreach (int chunkSize in ChunkSizes)
+        {
+            MemoryStream output = new();
+            RecordingTransferEvents events = new();
+            Diagnostics.Arrange("url, chunk size", $"http://127.0.0.1:48717/1704, {chunkSize}");
+            Diagnostics.Arrange("response", OneLine(Response));
+
+            TransferResult result = await Handler(QueueConnector.For(new ScriptedConnection(Encoding.Latin1.GetBytes(Response), chunkSize)))
+                .ExecuteAsync(UpgradeContext("http://127.0.0.1:48717/1704", output, null, events));
+
+            WriteResult(result);
+            WriteEvents("events", events.Events);
+            Diagnostics.Assert("exit code", CurlExitCode.WeirdServerReply, result.ExitCode);
+            Assert.AreEqual(CurlExitCode.WeirdServerReply, result.ExitCode, $"Chunk size {chunkSize}");
+            Diagnostics.Assert("error message", "Version mismatch (from HTTP/1 to HTTP/2)", result.ErrorMessage);
+            Assert.AreEqual("Version mismatch (from HTTP/1 to HTTP/2)", result.ErrorMessage, $"Chunk size {chunkSize}");
+            Diagnostics.Assert("status line reported", false, events.Events.Contains("< HTTP/2 101 OK\r\n"));
+            CollectionAssert.DoesNotContain(events.Events, "< HTTP/2 101 OK\r\n", $"Chunk size {chunkSize}: curl fails before it writes the line");
+            Diagnostics.Assert("body length", 0L, output.Length);
+            Assert.AreEqual(0L, output.Length, $"Chunk size {chunkSize}");
+        }
+    }
+
     /// <summary>
     /// Serializes the server's frames after the <c>101</c> as the BL-866 and BL-970 recordings
     /// sent them: its own SETTINGS first and no acknowledgement of the client's, so the client's

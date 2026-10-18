@@ -39,4 +39,29 @@ internal sealed record EasyTransferHost(
         NoDiagnosticLog.Instance,
         OperatingSystem.IsWindows(),
         AltSvcUsesOverHttp: false);
+
+    /// <summary>
+    /// Gets what reads a handle's own <c>.netrc</c> file (<c>CURLOPT_NETRC</c>, <c>CURLOPT_NETRC_FILE</c>): the path's
+    /// bytes, or <see langword="null" /> when it cannot be read. The real disk (<see cref="ReadDiskFile" />) by default.
+    /// </summary>
+    internal Func<string, byte[]?> ReadFile { get; init; } = ReadDiskFile;
+
+    /// <summary>Reads a file from the disk whole.</summary>
+    /// <param name="path">The file's path.</param>
+    /// <returns>Its bytes, or <see langword="null" /> when it is missing, a directory or not readable.</returns>
+    internal static byte[]? ReadDiskFile(string path)
+    {
+        try
+        {
+            return File.ReadAllBytes(path);
+        }
+        catch (IOException)
+        {
+            return null;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return null;
+        }
+    }
 }

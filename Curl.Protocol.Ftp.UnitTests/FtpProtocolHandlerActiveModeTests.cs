@@ -83,6 +83,51 @@ public sealed class FtpProtocolHandlerActiveModeTests
         Assert.AreEqual(expectedResult, run.Result);
     }
 
+    // test766: the server connects as it answers EPRT, curl 8.22.0's ftp_do_more accepts it before SIZE, and the
+    // socket-option callback's CURLSOCKTYPE_ACCEPT refusal ends the transfer with exit 42 and no QUIT (BL-2638).
+    [TestMethod]
+    public async Task ExecuteAsync_ServerConnectedAtEprtAndTheAcceptFails_EndsWithTheAcceptsExitCodeAndNoQuit()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        var pending = new ScriptedPendingConnection(
+            new IPEndPoint(IPAddress.Loopback, 56704),
+            ConnectResult.Failed(CurlExitCode.AbortedByCallback, "Operation was aborted by an application callback"))
+        {
+            HasConnectionWaiting = true,
+        };
+        ActiveRun run = await RunAsync(diagnostics, "/a.txt", "-", LoggedIn + EprtOk + Retrieved, pending);
+
+        var expectedSent = LogInSent + "EPRT |1|127.0.0.1|56704|\r\n";
+        diagnostics.DiffSent(expectedSent, run.Sent);
+        Assert.AreEqual(expectedSent, run.Sent);
+        Assert.IsTrue(pending.WasAccepted);
+        Assert.IsTrue(pending.IsDisposed);
+        var expectedResult = TransferResult.Failure(CurlExitCode.AbortedByCallback, "Operation was aborted by an application callback");
+        diagnostics.Assert("result", expectedResult, run.Result);
+        Assert.AreEqual(expectedResult, run.Result);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ServerConnectedAtEprt_AcceptsAtOnceAndRetrievesOverThatConnection()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        var pending = new ScriptedPendingConnection(
+            new IPEndPoint(IPAddress.Loopback, 56705),
+            ConnectResult.Connected(new ScriptedConnection(Encoding.Latin1.GetBytes("hello"))))
+        {
+            HasConnectionWaiting = true,
+        };
+        ActiveRun run = await RunAsync(diagnostics, "/a.txt", "-", LoggedIn + EprtOk + Retrieved, pending);
+
+        var expectedSent = LogInSent + "EPRT |1|127.0.0.1|56705|\r\n" + RetrieveSent;
+        diagnostics.DiffSent(expectedSent, run.Sent);
+        Assert.AreEqual(expectedSent, run.Sent);
+        Assert.AreEqual("hello", run.OutputText);
+        var expectedResult = TransferResult.Success(5);
+        diagnostics.Assert("result", expectedResult, run.Result);
+        Assert.AreEqual(expectedResult, run.Result);
+    }
+
     [TestMethod]
     public async Task ExecuteAsync_EprtRefused_BindsAFreshPortAndSendsPort()
     {
@@ -511,6 +556,33 @@ public sealed class FtpProtocolHandlerActiveModeTests
         Assert.AreEqual(expectedSent, run.Sent);
         // The wait before it is the connect phase's --connect-timeout (BL-512).
         Assert.AreEqual(TimeSpan.FromSeconds(60), clock.Waits[^1]);
+        Assert.AreEqual(
+            TransferResult.Failure(CurlExitCode.FtpAcceptTimeout, "Accept timeout occurred while waiting server connect"),
+            run.Result);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_AcceptTimeoutSet_ServerNeverConnects_QuitsWithExit12AfterThatTimeout()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        // Upstream case 593 (lib591, CURLOPT_ACCEPTTIMEOUT_MS 8000): STOR answered 150 with no
+        // connection ends after the handle's accept timeout, not curl's 60 seconds (BL-2622).
+        var clock = new ImmediateTimerTimeProvider();
+        var pending = new ScriptedPendingConnection(new IPEndPoint(IPAddress.Loopback, 52274), null);
+        ActiveRun run = await RunAsync(diagnostics,
+            "/a.txt",
+            "-",
+            LoggedIn + EprtOk + TypeSet + Sized + "150 Opening\r\n" + Bye,
+            context =>
+            {
+                context.TimeProvider = clock;
+                context.FtpAcceptTimeout = TimeSpan.FromSeconds(8);
+            },
+            pending);
+
+        diagnostics.Assert("last wait", TimeSpan.FromSeconds(8), clock.Waits[^1]);
+        Assert.AreEqual(TimeSpan.FromSeconds(8), clock.Waits[^1]);
+        Assert.IsFalse(clock.Waits.Contains(TimeSpan.FromSeconds(60)));
         Assert.AreEqual(
             TransferResult.Failure(CurlExitCode.FtpAcceptTimeout, "Accept timeout occurred while waiting server connect"),
             run.Result);

@@ -34,6 +34,10 @@ internal sealed class TcpPendingConnection : IPendingConnection
     /// <inheritdoc />
     public EndPoint LocalEndPoint { get; }
 
+    /// <inheritdoc />
+    /// <remarks>Polls the listening socket for readability without waiting, as curl's <c>SOCKET_READABLE(ctx->sock, 0)</c> does.</remarks>
+    public bool HasConnectionWaiting => _listeningSocket.Poll(0, SelectMode.SelectRead);
+
     /// <summary>
     /// Gets the step that accepts one connection on the listening socket; a seam so the fast
     /// tests reach both outcomes without a peer, as ADR-0083 keeps the socket work itself in

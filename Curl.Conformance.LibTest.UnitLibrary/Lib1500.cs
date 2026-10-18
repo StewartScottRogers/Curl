@@ -68,8 +68,23 @@ public sealed class Lib1500(TimeProvider timeProvider) : ILibTest
         }
     }
 
-    private static async ValueTask<bool> LoopAsync(LibTestContext context, LibTestSteps steps, CurlMulti multi, LibTestClock clock, CancellationToken cancellationToken)
+    /// <summary>
+    /// The loop <c>lib1500.c</c> and <c>lib3208.c</c> share: <c>multi_perform</c> and <c>abort_on_test_timeout</c>, then,
+    /// while transfers run, a <c>curl_multi_wait</c> of <c>TEST_HANG_TIMEOUT</c>, <c>abort_on_test_timeout</c>,
+    /// <c>multi_perform</c> and <c>abort_on_test_timeout</c> again. A failing wait writes
+    /// <c>curl_multi_wait() returned N</c> on stdout and sets <see cref="LibTestErrorCodes.MajorBad"/>.
+    /// </summary>
+    /// <param name="context">The program's context.</param>
+    /// <param name="steps">The program's steps, carrying its <c>result</c>.</param>
+    /// <param name="multi">The multi handle.</param>
+    /// <param name="clock">The program's clock, started by <see cref="LibTestClock.StartTestTiming"/>.</param>
+    /// <param name="cancellationToken">Stops the transfers.</param>
+    /// <returns>Whether the program goes on: no step failed.</returns>
+    /// <exception cref="ArgumentNullException">An argument is <see langword="null"/>.</exception>
+    public static async ValueTask<bool> LoopAsync(LibTestContext context, LibTestSteps steps, CurlMulti multi, LibTestClock clock, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(steps);
         var (goesOn, running) = await steps.PerformAndCheckTimeoutAsync(multi, clock, cancellationToken).ConfigureAwait(false);
         while (goesOn && running > 0)
         {

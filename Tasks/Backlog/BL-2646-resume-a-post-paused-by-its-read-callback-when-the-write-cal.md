@@ -4,7 +4,7 @@ title: Resume a POST paused by its read callback when the write callback unpause
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-2539]
+depends-on: [BL-2539, BL-2728, BL-2729]
 touches: [Curl.Engine.UnitLibrary, Curl.Engine.UnitTests, Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
 requirement: none
 created: 2026-10-17
@@ -29,6 +29,10 @@ Found by BL-2539 (port `Lib1533` with its `PausedPoster` in `Curl.Conformance.Li
 
 ## Notes
 
+- 2026-10-18 (lane 2, first pass before any edit): the stall is not in the engine. `CallbackReadStream` and `EasyPauseGate` already wait out a read pause and resume on `curl_easy_pause(CONT)`; the hang is that `Curl.Protocol.Http.UnitLibrary/HttpRequestBodyWriter.WriteAsync` awaits the paused body read before it reads any response, so the write callback that would unpause is never called. `CURLOPT_KEEP_SENDING_ON_ERROR` also reaches no further than `EasyBehaviourOptions`: `HttpRequestOptions` (`Curl.Protocol.Abstractions.UnitLibrary`) has no field for it. Filed BL-2728 (the contract field) and BL-2729 (the handler: receive while the upload is paused, stop or keep sending on an early 401). What is left here once both are Done: map `KeepSendingOnError` in `Curl.Engine.UnitLibrary/HttpRequestOptionsMapping.cs`, the engine unit test, and case 1533 on the ratchet.
+
 ## Log
 
 - 2026-10-17: Created.
+- 2026-10-18: Backlog -> Doing. Criteria at claim: 2d40087c 2d8c1045 4272a6b9 c4aff572.
+- 2026-10-18: Doing -> Backlog. Waits on BL-2728 (KeepSendingOnError in HttpRequestOptions) and BL-2729 (HTTP handler receives while the upload is paused)

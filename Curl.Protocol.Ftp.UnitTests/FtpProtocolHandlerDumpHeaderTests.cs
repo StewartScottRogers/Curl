@@ -114,11 +114,11 @@ public sealed class FtpProtocolHandlerDumpHeaderTests
         FtpRun run = await FtpRun.ExecuteAsync(
             FileUrl,
             LoggedIn + "213 20260927123456\r\n200 Type set\r\n213 7\r\n350 Restarting at 0\r\n" + Bye,
-            adjust: c => new TransferContext { Url = c.Url, Output = c.Output, NoBody = true, HeaderOutput = dump, DumpHeaderOutput = dump });
+            adjust: c => new TransferContext { Url = c.Url, Output = c.Output, NoBody = true, RemoteTime = true, HeaderOutput = dump, DumpHeaderOutput = dump });
         diagnostics.ActRun(run);
 
         diagnostics.Assert("result", TransferResult.Success(0), run.Result);
-        Assert.AreEqual(TransferResult.Success(0), run.Result);
+        Assert.AreEqual(TransferResult.Success(0) with { SourceLastWriteTimeUtc = run.Result.SourceLastWriteTimeUtc }, run.Result);
         Assert.AreEqual(
             LoggedIn + "213 20260927123456\r\nLast-Modified: Sun, 27 Sep 2026 12:34:56 GMT\r\n200 Type set\r\n213 7\r\nContent-Length: 7\r\n350 Restarting at 0\r\nAccept-ranges: bytes\r\n",
             Text(dump));

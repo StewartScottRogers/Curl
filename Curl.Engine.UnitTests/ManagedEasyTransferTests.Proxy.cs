@@ -1,5 +1,7 @@
+using System.Net;
 using Curl.Api.Codes;
 using Curl.Api.Options;
+using Curl.Api.Options.Authentication;
 using Curl.Api.Options.Network;
 using Curl.Api.Options.Proxy;
 using Curl.Core;
@@ -92,6 +94,48 @@ public sealed partial class ManagedEasyTransferTests
         Assert.AreEqual(CurlCode.CouldntConnect, code);
         Assert.AreEqual("Unsupported proxy scheme for 'foo://proxy:1'", easy.ErrorText);
         Assert.IsEmpty(handler.Contexts);
+    }
+
+    [TestMethod]
+    public async Task PerformAsync_ProxyUserPasswordSet_PutsItsCredentialsOnTheContextsProxy()
+    {
+        RecordingProtocolHandler handler = RecordingProtocolHandler.WritingPath("http");
+        await using ManagedEasyTransfer easy = EasyOver(handler, []);
+        easy.Options = new EasyOptions
+        {
+            Network = new EasyNetworkOptions { Url = "http://h/x" },
+            Proxy = new EasyProxyOptions { Proxy = "http://u:p@proxy:3128" },
+            Authentication = new EasyAuthenticationOptions { ProxyUserPassword = "silly:person", ProxyAuthentication = HttpAuthenticationMethods.Digest },
+        };
+
+        await easy.PerformAsync(CancellationToken.None);
+
+        NetworkCredential? credential = handler.Contexts.Single().Proxy?.Credential;
+        Assert.AreEqual("silly", credential?.UserName);
+        Assert.AreEqual("person", credential?.Password);
+    }
+
+    [TestMethod]
+    public void ProxyCredentialsOf_NoProxyCredentialOption_IsNull()
+    {
+        Assert.IsNull(ManagedEasyTransfer.ProxyCredentialsOf(new EasyAuthenticationOptions()));
+    }
+
+    [TestMethod]
+    [DataRow("silly", null, null, "silly", "")]
+    [DataRow("silly:per:son", null, null, "silly", "per:son")]
+    [DataRow("silly:person", "name", null, "name", "person")]
+    [DataRow("silly:person", null, "word", "silly", "word")]
+    [DataRow(null, "name", null, "name", "")]
+    [DataRow(null, null, "word", "", "word")]
+    public void ProxyCredentialsOf_ProxyCredentialOptions_SplitsUserPasswordAtTheFirstColonAndLetsTheOthersWin(string? userPassword, string? userName, string? password, string expectedUser, string expectedPassword)
+    {
+        EasyAuthenticationOptions authentication = new() { ProxyUserPassword = userPassword, ProxyUserName = userName, ProxyPassword = password };
+
+        NetworkCredential? credential = ManagedEasyTransfer.ProxyCredentialsOf(authentication);
+
+        Assert.AreEqual(expectedUser, credential?.UserName);
+        Assert.AreEqual(expectedPassword, credential?.Password);
     }
 
     [TestMethod]

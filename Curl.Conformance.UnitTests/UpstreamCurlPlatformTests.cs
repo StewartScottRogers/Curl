@@ -8,7 +8,7 @@ public sealed class UpstreamCurlPlatformTests
 {
     private static readonly string[] CommonFeatures =
     [
-        "dict", "file", "gopher", "gophers", "http", "https", "ipfs", "mqtt", "mqtts", "scp", "sftp", "telnet", "tftp", "ws", "wss",
+        "dict", "file", "ftp", "gopher", "gophers", "http", "https", "ipfs", "mqtt", "mqtts", "scp", "sftp", "telnet", "tftp", "ws", "wss",
         "alt-svc", "AsynchDNS", "brotli", "ECH", "GSS-API", "HSTS", "HTTPS-proxy",
         "HTTPSRR", "IDN", "IPv6", "Kerberos", "Largefile", "libz", "NTLM", "PSL", "SPNEGO", "SSL",
         "UnixSockets", "zstd",
@@ -87,7 +87,6 @@ public sealed class UpstreamCurlPlatformTests
     [DataRow("Debug")]
     [DataRow("TrackMemory")]
     [DataRow("unittest")]
-    [DataRow("ftp")]
     [DataRow("SSPI")]
     [DataRow("codeset-utf8")]
     public void BothPlatforms_LeaveOffWhatCurlLacks(string feature)
@@ -104,6 +103,19 @@ public sealed class UpstreamCurlPlatformTests
         diagnostics.Assert("listed on Unix", false, onUnix);
         Assert.IsFalse(UpstreamCurlPlatform.Windows.Features.Contains(feature));
         Assert.IsFalse(UpstreamCurlPlatform.Unix.Features.Contains(feature));
+    }
+
+    // Curl serves FTP, and cases such as test549 name `ftp` in <features>, so no platform leaves it off (BL-2610).
+    [TestMethod]
+    public void AllPlatforms_ListFtp()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+
+        bool onEvery = UpstreamCurlPlatform.All.All(platform => platform.Features.Contains("ftp"));
+
+        diagnostics.Act("listed on every platform", onEvery);
+        diagnostics.Assert("listed on every platform", true, onEvery);
+        Assert.IsTrue(onEvery);
     }
 
     // Curl refuses --http3 on every reference build, none of which has QUIC (ADR-0540), so runtests.pl skips

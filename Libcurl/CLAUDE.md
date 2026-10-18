@@ -47,7 +47,7 @@ function is set) and any other value is taken and changes nothing. `Callbacks/Pr
 calls (ADR-0543); `XFERINFODATA` (`PROGRESSDATA` is the same option) and `DEBUGDATA` take any value and
 change nothing (ADR-0577). `Callbacks/Seek` sets `CURLOPT_SEEKFUNCTION` (a `SeekCallback` or `null`, any
 other value `BadFunctionArgument`), which the engine calls to rewind a read-callback upload a redirect or
-authentication retry sends again; `SEEKDATA` takes any value and changes nothing (BL-2417, ADR-0609). `Callbacks/Sockets` sets
+authentication retry sends again; `SEEKDATA` takes any value and changes nothing (BL-2417, ADR-0609). It sets `CURLOPT_IOCTLFUNCTION` (an `IoctlCallback` or `null`) the same way (`EasyIoctlCallbackSetters`), which the engine calls with `RestartRead` for that rewind when no seek callback is set; `IOCTLDATA` takes any value and changes nothing (BL-2607). `Callbacks/Sockets` sets
 `CURLOPT_SOCKOPTFUNCTION`, `OPENSOCKETFUNCTION` and `CLOSESOCKETFUNCTION` the same way, which the engine calls around each
 TCP connection over opaque `CurlSocket` handles; their `*DATA` options take any value and change nothing (BL-2418, ADR-0610).
 `Callbacks/Phases` sets `CURLOPT_PREREQFUNCTION` and `RESOLVER_START_FUNCTION` the same way, which the engine calls as
@@ -162,7 +162,8 @@ kept as `UserData`. `Cleanup` is `curl_share_cleanup`; after the engine's `Ok` e
 engine's `IMimePartBuilder`, whose answer it returns; `Dispose` is `curl_mime_free`, after which the
 handle and its parts throw `ObjectDisposedException`. It implements `EasyOptionSetters`'
 `AddMimePostSetters`: `CURLOPT_MIMEPOST` takes a `CurlMime` (else `BadFunctionArgument`) and stores its
-body as it is when set. `Mime/Form` holds the deprecated form API's `CurlForm`, marked `[Obsolete]`
+body as it is when set, or for `null` an empty `HttpPost` form, a zero-byte POST (upstream lib589,
+BL-2620); either clears `CURLOPT_NOBODY`; `CurlEasy` remembers the structure and writes its body as it is now into the options at each perform and `DupHandle`, or, once it is freed, an empty `HttpPost` form, a zero-length post (ADR-0675). `Mime/Form` holds the deprecated form API's `CurlForm`, marked `[Obsolete]`
 as upstream deprecates it (ADR-0586): `CurlForm.Add(library, ref form, ...)` is `curl_formadd`, every
 `CURLFORM_*` argument passed to the engine's `ICurlFormBuilder` as given, a `null` form started over a
 new builder and set only on `Ok`; `Get` is `curl_formget`, and `Free` or `Dispose` `curl_formfree`,

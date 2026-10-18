@@ -93,6 +93,92 @@ public sealed class ImapProtocolHandler : IProtocolHandler
     }
 
     /// <summary>
+    /// Runs only IMAP's connect phase, as libcurl 8.22.0's <c>CURLOPT_CONNECT_ONLY</c> 1 does
+    /// for <c>imap://</c> (<c>imap_connect</c>, upstream test 660): connects, reads the greeting,
+    /// sends <c>CAPABILITY</c>, upgrades with <c>STARTTLS</c> as <c>--ssl</c> and <c>--ssl-reqd</c>
+    /// ask, and logs in only when the transfer has credentials to log in with; no mailbox is
+    /// selected and no <c>LOGOUT</c> is sent, and the open connection is handed back (BL-2706).
+    /// </summary>
+    /// <remarks>
+    /// The connection is a new one, never served from or left to the run's connection cache.
+    /// Commands, tags and failures are a normal transfer's (<see cref="ImapSession" />); a failure
+    /// closes the connection and writes the lines <c>-v</c> ends a failed transfer with.
+    /// </remarks>
+    /// <param name="context">The transfer whose URL, credentials and TLS settings are used.</param>
+    /// <returns>The open connection and a success, or the failure with no connection.</returns>
+    /// <exception cref="ArgumentNullException">
+    /// <paramref name="context" /> is <see langword="null" />.
+    /// </exception>
+    /// <exception cref="OperationCanceledException">
+    /// <see cref="ITransferContext.CancellationToken" /> was cancelled.
+    /// </exception>
+    public async ValueTask<ImapConnectOutcome> ConnectOnlyAsync(ITransferContext context)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+
+        long started = context.TimeProvider.GetTimestamp();
+        ImapConnectOutcome outcome = HasControlByte(context.Credentials?.UserName) || HasControlByte(context.Credentials?.Password)
+            ? new ImapConnectOutcome(TransferResult.Failure(CurlExitCode.BadFunctionArgument, ImapSessionMessages.CredentialsHaveControlCode), null)
+            : await ConnectAndOpenAsync(context).ConfigureAwait(false);
+        if (outcome.Connection is null)
+        {
+            ImapDiagnosticLogLines.TransferEnded(context.DiagnosticLog, outcome.Result, context.TimeProvider, started);
+        }
+
+        return outcome;
+    }
+
+    /// <summary>
+    /// Connects and runs the session's connect phase, handing the connection back on success
+    /// and closing it otherwise.
+    /// </summary>
+    private async ValueTask<ImapConnectOutcome> ConnectAndOpenAsync(ITransferContext context)
+    {
+        CurlUrl url = context.Url;
+        bool implicitTls = url.Scheme == ImplicitTlsScheme;
+        var connectEvents = new ConnectionOpenedCapturingTransferEvents(context.Events);
+        var target = new ConnectTarget(url.IdnHost, url.Port, implicitTls)
+        {
+            Proxy = context.Proxy,
+            Events = connectEvents,
+            DiagnosticLog = context.DiagnosticLog,
+        };
+        ConnectResult connected = await connector.ConnectAsync(target, context.CancellationToken).ConfigureAwait(false);
+        if (connected.Connection is not { } connection)
+        {
+            return new ImapConnectOutcome(
+                new TransferResult(connected.ExitCode, 0, connected.ErrorMessage) { IsConnectionRefused = connected.IsConnectionRefused }, null);
+        }
+
+        return await OpenOnlyAsync(context, connection, target, connected.ConnectionNumber, connectEvents.Opened).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Runs the session's connect phase on <paramref name="connection" />, handing the connection
+    /// back on success and closing it otherwise.
+    /// </summary>
+    private async ValueTask<ImapConnectOutcome> OpenOnlyAsync(
+        ITransferContext context, IConnection connection, ConnectTarget target, long connectionNumber, ConnectionOpenedEvent? opened)
+    {
+        var kept = new ImapKeptConnection(connection, ImapKeptConnection.LoginKeyOf(context), TagLetterOf(connectionNumber), context.TimeProvider);
+        var channel = new ImapControlChannel(
+            connection, context.Events, context.CancellationToken, context.DiagnosticLog, context.DumpHeaderOutput, kept.TagLetter, kept.CommandsSent);
+        var session = new ImapSession(channel, tlsProvider, saslAuthenticator, context, target.UseTls, opened, kept);
+        var lease = new ImapConnectOnlyLease(connection, session);
+        await using (lease.ConfigureAwait(false))
+        {
+            TransferResult result = await session.ConnectOnlyAsync().ConfigureAwait(false);
+            if (result.IsSuccess)
+            {
+                return new ImapConnectOutcome(result, lease.Release());
+            }
+
+            ReportConnectionEnd(context.Events, result, session.Phase, target, connectionNumber);
+            return new ImapConnectOutcome(result, null);
+        }
+    }
+
+    /// <summary>
     /// Whether <paramref name="value" /> holds a byte below 0x20, which curl 8.22.0 refuses in a
     /// user name or password: a CR or LF would end a command line and let a second command follow it.
     /// </summary>

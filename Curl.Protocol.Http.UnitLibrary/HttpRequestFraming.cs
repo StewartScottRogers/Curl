@@ -168,11 +168,15 @@ internal sealed class HttpRequestFraming
     /// test175, test1001; ADR-0441), or when the request starts an NTLM handshake (BL-2029). Its <c>Content-Type</c> stays, though the head leaves a <c>-F</c> form's out (<see cref="HttpRequestHeadFormatter" />); a <c>-T</c> upload still
     /// sends none. Its <c>Content-Range</c> stays too, as curl 8.21.0 sends a resumed <c>-T</c>
     /// upload's probe with it (measured, BL-2002 Notes; upstream test1001). Its
-    /// <c>Content-Length: 0</c> replaces any <c>-H</c> one (<see cref="IsAuthProbe" />).
+    /// <c>Content-Length: 0</c> replaces any <c>-H</c> one (<see cref="IsAuthProbe" />). A body an
+    /// <c>-H</c> value asks to send chunked stays chunked, its probe only the last chunk
+    /// <c>0\r\n\r\n</c> and no <c>Content-Length</c>, as libcurl 8.22.0 keeps <c>upload_chunky</c>
+    /// for the zero-length negotiation post (upstream test579, BL-2621); curl's own chunking of
+    /// a body of unknown length is dropped, the probe's length being known.
     /// </summary>
     /// <returns>The probe's framing.</returns>
     internal HttpRequestFraming AsAuthProbe() =>
-        new(Method, new BytesBody(ReadOnlyMemory<byte>.Empty, Body!.ContentType), 0, isChunked: false, addsExpect: false, awaitsContinue: false, upload: Upload, contentRange: ContentRange, isAuthProbe: true);
+        new(Method, new BytesBody(ReadOnlyMemory<byte>.Empty, Body!.ContentType), 0, isChunked: IsChunked && !ChunksForUnknownLength, addsExpect: false, awaitsContinue: false, upload: Upload, contentRange: ContentRange, isAuthProbe: true);
 
     /// <summary>
     /// Makes the same framing for an HTTP/2 or HTTP/3 stream, where DATA frames carry the body and the

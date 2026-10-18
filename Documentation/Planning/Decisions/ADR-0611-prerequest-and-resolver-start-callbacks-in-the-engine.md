@@ -16,7 +16,7 @@ its connection (new or reused) is ready and before anything is sent, with the pe
 port; any answer but `CURL_PREREQFUNC_OK` fails the transfer with `CURLE_ABORTED_BY_CALLBACK` and
 `operation aborted by pre-request callback`. `Curl_resolv` calls the resolver-start callback before a name
 resolution its DNS cache did not answer; a non-zero answer resolves nothing, so the transfer fails with
-`CURLE_COULDNT_RESOLVE_HOST` (upstream's test655 checks that code), and the failure is not cached. The trailer
+`CURLE_ABORTED_BY_CALLBACK` (upstream's test655 checks that code) under the plain `Could not resolve host` message, and the failure is not cached. The trailer
 callback fills the trailers of a chunked upload's last chunk.
 
 The managed engine's handlers ask an `IConnector` for a connection once per request, a followed redirect again,
@@ -35,8 +35,8 @@ entries) misses. The HTTP handler has no way to send request trailers.
    that wraps the resolver the TCP and UDP connectors ask (the overload without it wraps nothing, so `Curl.Console`
    is unchanged), and the managed engine wraps it in `ResolverStartDnsResolver` when the callback is set. The
    callback is given 0 for the resolver's state (no c-ares channel to hand out); a non-zero answer gives no address
-   and no failure reason, so `TcpConnector` fails as for any unresolved name (exit 6, `Could not resolve host: <h>`;
-   exit 5 for a proxy) and caches nothing. A resolver's failure reason passes through.
+   and the failure reason `DnsLookupFailure.AbortedByCallback`, so `TcpConnector` fails with exit 42 and the plain `Could not resolve host: <h>`
+   (`proxy` for a proxy) and caches nothing (BL-2627 amendment: this said exit 6, which test655 refutes). A resolver's failure reason passes through.
 3. **Trailers are split off.** Sending request trailers needs a seam in `Curl.Protocol.Abstractions` and work in
    `Curl.Protocol.Http`, outside this task; BL-2475 does it and adds the `TRAILERFUNCTION` rows. Until then
    `TRAILERFUNCTION` and `TRAILERDATA` keep answering `CURLE_NOT_BUILT_IN`, so no option is accepted and ignored.

@@ -10,8 +10,12 @@ namespace Curl.Conformance;
 /// on <see cref="FtpServerConnector.PassivePort"/>, and <c>PORT</c> and <c>EPRT</c> connect one to
 /// the port curl listens on; <c>RETR</c>, <c>LIST</c> and <c>NLST</c> send into it and close it,
 /// and <c>STOR</c> and <c>APPE</c> hand it over as the upload, whose bytes are what ftpserver.pl
-/// writes to its upload file; under <c>/// writes to its upload file; <c>SIZE</c>, <c>MDTM</c> and <c>REST</c>lt;servercmd/// writes to its upload file; <c>SIZE</c>, <c>MDTM</c> and <c>REST</c>gt;</c> <c>NODATACONN</c> (or its 425, 421 and 150 variants) no data connection is made and the transfer commands answer as ftpserver.pl does without one; <c>SIZE</c>, <c>MDTM</c> and <c>REST</c>
-/// answer from the case's <c>&lt;reply&gt;</c> parts. Each answer is what ftpserver.pl's handler
+/// writes to its upload file; under <c>&lt;servercmd&gt;</c> <c>NODATACONN</c> (or its 425, 421 and
+/// 150 variants) no data connection is made and the transfer commands answer as ftpserver.pl does
+/// without one; <c>SIZE</c>, <c>MDTM</c> and <c>REST</c> answer from the case's
+/// <c>&lt;reply&gt;</c> parts. Once <c>CWD</c> has moved into <c>/fully_simulated</c>
+/// (<see cref="ChangeDirectory"/>), <c>LIST</c>, <c>RETR</c> and <c>SIZE</c> answer from
+/// <see cref="FtpSimulatedDirectories"/> instead (BL-2618). Each answer is what ftpserver.pl's handler
 /// sends after the command's display text. A file name loads the case's data when, as
 /// ftpserver.pl reads it, it names a test number: ftpserver.pl then loads that test's file, which
 /// in a case's log directory is the case's own.
@@ -55,6 +59,9 @@ internal sealed class FtpTransferCommands
 
     private bool weirdRetrieve;
 
+    // ftpserver.pl's $ftplistparserstate with $ftptargetdir: the simulated directory CWD moved into, if any.
+    private string? simulatedDirectory;
+
     /// <summary>Creates the commands for one control connection.</summary>
     /// <param name="testCase">The expanded case whose <c>&lt;reply&gt;</c> parts are served.</param>
     /// <param name="openPassive">Called with each data connection <c>PASV</c> or <c>EPSV</c> opens, for the client to connect to.</param>
@@ -79,7 +86,7 @@ internal sealed class FtpTransferCommands
             ["EPRT"] = ExtendedPort,
             ["STOR"] = Store,
             ["APPE"] = Store,
-            ["LIST"] = _ => Transfer(Listing(), AsciiTransferComplete),
+            ["LIST"] = _ => Transfer(simulatedDirectory is null ? Listing() : FtpSimulatedDirectories.Listing(simulatedDirectory), AsciiTransferComplete),
             ["NLST"] = _ => Transfer(NameList, AsciiTransferComplete),
             ["RETR"] = Retrieve,
             ["SIZE"] = Size,
@@ -104,6 +111,14 @@ internal sealed class FtpTransferCommands
         answer = handler(argument);
         return true;
     }
+
+    /// <summary>
+    /// Tells the commands where <c>CWD</c> left the connection, as ftpserver.pl's <c>CWD_ftp</c> sets
+    /// its list parser state: on for a directory under <c>/fully_simulated</c>, off otherwise.
+    /// </summary>
+    /// <param name="directory">The current directory, with a trailing slash.</param>
+    public void ChangeDirectory(string directory) =>
+        simulatedDirectory = FtpSimulatedDirectories.IsSimulated(directory) ? directory : null;
 
     private bool HasServerCommand(string name) =>
         serverCommandLines.Any(line => line.Contains(name, StringComparison.Ordinal));
@@ -222,6 +237,11 @@ internal sealed class FtpTransferCommands
             return NoDataConnectionAnswer();
         }
 
+        return simulatedDirectory is null ? RetrieveTestFile(argument) : RetrieveSimulated(simulatedDirectory, argument);
+    }
+
+    private string RetrieveTestFile(string argument)
+    {
         int firstDigit = argument.AsSpan().IndexOfAnyInRange('0', '9');
         (string testNumber, string partNumber, bool loads) = TestFile(firstDigit < 0 ? string.Empty : argument[firstDigit..]);
         byte[]? data = loads ? RetrievableData(partNumber) : null;
@@ -238,6 +258,12 @@ internal sealed class FtpTransferCommands
             ? $"150 Binary data connection for {testNumber} () ({size} bytes).\r\n{FileTransferComplete}" + Transfer(data, string.Empty)
             : $"150 Binary data connection for {testNumber} ({partNumber}) {SizeText(size)}.\r\n" + Transfer(data, FileTransferComplete);
     }
+
+    // ftpserver.pl's RETR_ftp under the list parser state: a file the list does not hold gets no answer at all.
+    private string RetrieveSimulated(string directory, string name) =>
+        FtpSimulatedDirectories.FileContent(directory, name) is { } content
+            ? $"150 Binary data connection for {name} ({content.Length} bytes).\r\n" + Transfer(content, FileTransferComplete)
+            : string.Empty;
 
     // ftpserver.pl answers 550 for a missing part, and for an empty one unless it says sendzero.
     private byte[]? RetrievableData(string partNumber)
@@ -270,6 +296,13 @@ internal sealed class FtpTransferCommands
     // ftpserver.pl matches the argument with /(\d+)\/?$/ and sends nothing when it does not.
     private string Size(string argument)
     {
+        if (simulatedDirectory is not null)
+        {
+            return FtpSimulatedDirectories.FileContent(simulatedDirectory, argument) is { } content
+                ? $"213 {content.Length}\r\n"
+                : $"550 {argument}: No such file or directory.\r\n";
+        }
+
         string trimmed = argument.EndsWith('/') ? argument[..^1] : argument;
         string digits = trimmed[(trimmed.AsSpan().LastIndexOfAnyExceptInRange('0', '9') + 1)..];
         if (digits.Length == 0)

@@ -403,6 +403,19 @@ public sealed class WsProtocolHandlerTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_RawModeUploadReadFails_SendsWhatWasReadBeforeTheFailureUnframed()
+    {
+        var connection = new ScriptedConnection(Bytes(Head101 + "\x81\x02ok"));
+        var context = new TransferContext { Url = CurlUrl.Parse("ws://127.0.0.1:47901/chat"), Output = new MemoryStream(), Upload = new FailingUploadStream(Bytes("a"), new IOException("gone")) };
+
+        TransferResult result = await new WsProtocolHandler(Connector(connection), new RecordingAuthenticator(), new FixedRandomSource()) { RawMode = true }
+            .ExecuteAsync(context);
+
+        Assert.AreEqual(Request + "a", Encoding.Latin1.GetString(connection.Sent));
+        Assert.AreEqual(1L, result.Report!.UploadSize);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_UploadReadFails_SendsWhatWasReadBeforeTheFailure()
     {
         var diagnostics = TestDiagnostics.For(TestContext);

@@ -126,6 +126,8 @@ internal static class EngineComposition
     /// <param name="rtspInterleaveSink">Takes the RTSP handler's interleaved frames (<see cref="CallbackInterleaveSink.Of" />, ADR-0619); <see langword="null" /> writes them to the body output.</param>
     /// <param name="webSocketRawMode">Whether the WebSocket handler writes the received stream unframed (<see cref="WsProtocolHandler.RawMode" />, libcurl's <c>CURLWS_RAW_MODE</c>, BL-2494).</param>
     /// <param name="http2PushSink">Where the HTTP handler offers HTTP/2 server pushes (BL-2469); <see langword="null" /> keeps <c>SETTINGS_ENABLE_PUSH</c> 0.</param>
+    /// <param name="webSocketRandomSource">Where the WebSocket handler draws each <c>Sec-WebSocket-Key</c> and frame mask from (BL-2688); <see langword="null" /> for <see cref="SystemWebSocketRandomSource" />.</param>
+    /// <param name="ftpStopsBeforeEntryPath">Whether the FTP handler's new control connections stop before <c>PWD</c> (<see cref="FtpProtocolHandler.StopsBeforeEntryPath" />, BL-2636).</param>
     internal static IReadOnlyList<IProtocolHandler> CreateProtocolHandlers(
         IConnector connector,
         IDatagramConnector datagramConnector,
@@ -149,7 +151,9 @@ internal static class EngineComposition
         IFtpWildcardHooks? ftpWildcardHooks = null,
         IRtspInterleaveSink? rtspInterleaveSink = null,
         bool webSocketRawMode = false,
-        IHttp2PushSink? http2PushSink = null)
+        IHttp2PushSink? http2PushSink = null,
+        IWebSocketRandomSource? webSocketRandomSource = null,
+        bool ftpStopsBeforeEntryPath = false)
     {
         ConnectionEndPointRecorder recorder = new();
         EndPointRecordingConnector recordingConnector = new(connector, recorder);
@@ -171,7 +175,7 @@ internal static class EngineComposition
             new LazyProtocolHandler(["pop3", "pop3s"], () => new Pop3ProtocolHandler(recordingConnector, tlsProvider, CreateSaslAuthenticator(contexts.Value, saslDelegation, diagnosticLog))),
             new LazyProtocolHandler(["smtp", "smtps"], () => new SmtpProtocolHandler(recordingConnector, tlsProvider, CreateSaslAuthenticator(contexts.Value, saslDelegation, diagnosticLog)) { TracesStateMachine = tracesSmtp }),
             new LazyProtocolHandler(["ldap", "ldaps"], () => new LdapProtocolHandler(recordingConnector, LdapDialectFor(OperatingSystem.IsWindows()))),
-            new LazyProtocolHandler(["ws", "wss"], () => new WsProtocolHandler(recordingConnector, httpAuthenticator.Value, new SystemWebSocketRandomSource()) { TracesFrames = tracesWs, RawMode = webSocketRawMode }),
+            new LazyProtocolHandler(["ws", "wss"], () => new WsProtocolHandler(recordingConnector, httpAuthenticator.Value, webSocketRandomSource ?? new SystemWebSocketRandomSource()) { TracesFrames = tracesWs, RawMode = webSocketRawMode }),
             new LazyProtocolHandler(["rtsp"], () => new RtspProtocolHandler(recordingConnector, httpAuthenticator.Value, rtspInterleaveSink)),
             new LazyProtocolHandler(["smb", "smbs"], () => new SmbProtocolHandler(recordingConnector)),
             new LazyProtocolHandler(["scp", "sftp"], () => new SshProtocolHandler(
@@ -182,7 +186,7 @@ internal static class EngineComposition
             http,
             new LazyProtocolHandler(["ftp", "ftps"], () => new RoutingFtpProtocolHandler(
                 http,
-                CreateFtpProtocolHandler(recordingConnector, new EndPointRecordingConnector(ftpDataConnector ?? connector, recorder), tlsProvider, dnsResolver, tracesFtp, ftpListener, ftpWildcardHooks))),
+                CreateFtpProtocolHandler(recordingConnector, new EndPointRecordingConnector(ftpDataConnector ?? connector, recorder), tlsProvider, dnsResolver, tracesFtp, ftpListener, ftpWildcardHooks, ftpStopsBeforeEntryPath))),
         ];
 
         return [.. handlers.Select(handler => new EndPointReportingProtocolHandler(handler, recorder))];
@@ -222,8 +226,9 @@ internal static class EngineComposition
     /// <param name="listener">Listens for active-mode data connections; a <see cref="TcpConnectionListener" /> when not given.</param>
     /// <param name="wildcardHooks">The wildcard hooks (ADR-0615, ADR-0619); <see langword="null" /> fetches a wildcard URL as a plain path.</param>
     /// <returns>The handler.</returns>
-    internal static FtpProtocolHandler CreateFtpProtocolHandler(IConnector connector, IConnector dataConnector, ITlsProvider tlsProvider, IDnsResolver dnsResolver, bool tracesFtp = false, IConnectionListener? listener = null, IFtpWildcardHooks? wildcardHooks = null) =>
-        new(connector, dataConnector, listener ?? new TcpConnectionListener(), tlsProvider, dnsResolver, new SystemNetworkInterfaceLookup()) { TracesStateMachine = tracesFtp, WildcardHooks = wildcardHooks };
+    /// <param name="stopsBeforeEntryPath">Whether a new control connection stops before <c>PWD</c> (<see cref="FtpProtocolHandler.StopsBeforeEntryPath" />, the debug build's <c>CURL_FTP_PWD_STOP</c>, BL-2636).</param>
+    internal static FtpProtocolHandler CreateFtpProtocolHandler(IConnector connector, IConnector dataConnector, ITlsProvider tlsProvider, IDnsResolver dnsResolver, bool tracesFtp = false, IConnectionListener? listener = null, IFtpWildcardHooks? wildcardHooks = null, bool stopsBeforeEntryPath = false) =>
+        new(connector, dataConnector, listener ?? new TcpConnectionListener(), tlsProvider, dnsResolver, new SystemNetworkInterfaceLookup()) { TracesStateMachine = tracesFtp, WildcardHooks = wildcardHooks, StopsBeforeEntryPath = stopsBeforeEntryPath };
 
     /// <summary>
     /// The connector FTP's passive data connections go through: the option group's pooling
@@ -1214,12 +1219,23 @@ internal static class EngineComposition
             },
             CredentialEncoding.ForPlatform(OperatingSystem.IsWindows()))
         {
-            ProxyHeaders = proxy.ProxyHeaders,
+            ProxyHeaders = ConnectHeadersOf(http, proxy),
             CommandLineTextEncoding = CredentialEncoding.ForPlatform(OperatingSystem.IsWindows()),
             ProxyAuthSchemes = HttpRequestOptionsMapping.ProxyAuthSchemesOf(authentication),
             ProxyAuthenticator = CreateHttpAuthenticator(securityContexts, NegotiateOptionsMapping.Of(authentication), diagnosticLog),
             ProxyHttp2 = proxy.ProxyType == ProxyType.Https2,
         };
+
+    /// <summary>
+    /// The custom headers a proxy's <c>CONNECT</c> sends, as curl 8.22.0's <c>CURLOPT_HEADEROPT</c> picks them:
+    /// <c>CURLOPT_PROXYHEADER</c>'s under <see cref="HeaderOption.Separate" />, and <c>CURLOPT_HTTPHEADER</c>'s,
+    /// the origin's own, under <see cref="HeaderOption.Unified" /> (upstream test1527, BL-2645).
+    /// </summary>
+    /// <param name="http">The option group's HTTP options, for <c>CURLOPT_HTTPHEADER</c>.</param>
+    /// <param name="proxy">The option group's proxy options, for <c>CURLOPT_PROXYHEADER</c> and <c>CURLOPT_HEADEROPT</c>.</param>
+    /// <returns>The header lines.</returns>
+    internal static IReadOnlyList<string> ConnectHeadersOf(EasyHttpOptions http, EasyProxyOptions proxy) =>
+        proxy.HeaderOption == HeaderOption.Unified ? http.HttpHeaders : proxy.ProxyHeaders;
 
     /// <summary>
     /// Whether each <c>--alt-svc</c> cache learns and looks up over plain <c>http</c>: only behind the

@@ -29,7 +29,7 @@ internal static partial class EasyOptionSetters
     /// <param name="setters">The rows to add to.</param>
     static partial void AddProgressCallbackSetters(Dictionary<CurlOption, EasyOptionSetter> setters);
 
-    /// <summary>Adds the seek rows (<c>Libcurl/Callbacks/Seek</c>).</summary>
+    /// <summary>Adds the seek and ioctl rows (<c>Libcurl/Callbacks/Seek</c>).</summary>
     /// <param name="setters">The rows to add to.</param>
     static partial void AddSeekCallbackSetters(Dictionary<CurlOption, EasyOptionSetter> setters);
 

@@ -14,7 +14,7 @@ namespace Curl.Conformance;
 /// does not act on (a <c>&lt;tool&gt;</c> libtest,
 /// a <c>&lt;verify&gt;&lt;upload&gt;</c>, …); when a precheck or postcheck line is not a
 /// <c>%PERL -e</c> one-liner <see cref="UpstreamPerlOneLiner"/> interprets; when it needs a server other than <c>http</c> (the
-/// one emulated), <c>http-ipv6</c> (the same emulation on <c>%HOST6IP</c>:<c>%HTTP6PORT</c>), <c>http-unix</c> (the same emulation on the Unix socket <c>%HTTPUNIXPATH</c>),<c>http-proxy</c> (the same emulation on <c>%PROXYPORT</c>), <c>socks4</c> or <c>socks5</c> (<see cref="SocksServerConnector"/> on <c>%SOCKSPORT</c>), <c>mqtt</c> (<see cref="MqttServerConnector"/> on <c>%MQTTPORT</c>), <c>tftp</c> (<see cref="TftpServerConnector"/> on <c>%TFTPPORT</c>), <c>gopher</c> (<see cref="GopherServerConnector"/> on <c>%GOPHERPORT</c>),<c>ftp</c> (<see cref="FtpServerConnector"/> on <c>%FTPPORT</c>, control channel only, so a case whose <c>&lt;verify&gt;&lt;protocol&gt;</c> shows a data connection opening is skipped), <c>ftps</c> (<see cref="FtpsServerConnector"/> on <c>%FTPSPORT</c>, the FTP stand-in behind implicit TLS), <c>mqtts</c> and <c>gophers</c> (<see cref="MqttsServerConnector"/> and <see cref="GophersServerConnector"/>, the MQTT and Gopher stand-ins behind TLS), <c>file</c> or <c>none</c>; when it needs a feature Curl lacks, or needs absent
+/// one emulated), <c>http-ipv6</c> (the same emulation on <c>%HOST6IP</c>:<c>%HTTP6PORT</c>), <c>http-unix</c> (the same emulation on the Unix socket <c>%HTTPUNIXPATH</c>),<c>http-proxy</c> (the same emulation on <c>%PROXYPORT</c>), <c>socks4</c> or <c>socks5</c> (<see cref="SocksServerConnector"/> on <c>%SOCKSPORT</c>), <c>mqtt</c> (<see cref="MqttServerConnector"/> on <c>%MQTTPORT</c>), <c>tftp</c> (<see cref="TftpServerConnector"/> on <c>%TFTPPORT</c>), <c>gopher</c> (<see cref="GopherServerConnector"/> on <c>%GOPHERPORT</c>),<c>ftp</c> (<see cref="FtpServerConnector"/> on <c>%FTPPORT</c>, control channel only, so a case whose <c>&lt;verify&gt;&lt;protocol&gt;</c> shows a data connection opening is skipped), <c>ftps</c> (<see cref="FtpsServerConnector"/> on <c>%FTPSPORT</c>, the FTP stand-in behind implicit TLS), <c>mqtts</c> and <c>gophers</c> (<see cref="MqttsServerConnector"/> and <see cref="GophersServerConnector"/>, the MQTT and Gopher stand-ins behind TLS), <c>rtsp</c> (<see cref="RtspServerConnector"/> on <c>%RTSPPORT</c>), <c>file</c> or <c>none</c>; when it needs a feature Curl lacks, or needs absent
 /// one Curl has; when its <c>&lt;servercmd&gt;</c> holds a command the sws emulation (or, for an <c>ftp</c> or <c>ftps</c> case, the FTP stand-in) does not carry
 /// out; when it names no server and its command goes to a host name on the internet; when its
 /// command is not a plain curl command line; when a file part does not name an
@@ -47,7 +47,7 @@ internal static class UpstreamCaseScreening
     // Interpreted, not source-generated, so no generated code counts against the coverage gate.
     private static readonly Regex InternetUrlHost = new(@"\bhttps?://(?<host>[A-Za-z][A-Za-z0-9-]*(?:\.[A-Za-z0-9-]+)+)", RegexOptions.CultureInvariant);
 
-    private static readonly HashSet<string> Servers = ["http", "http-ipv6", "http-unix", "http-proxy", HttpsProxyServerConnector.EmulatedServer, "socks4", "socks5", "mqtt", "tftp", .. DnsServerConnector.EmulatedServers, "gopher", "gopher-ipv6", "ftp-ipv6", "file", "none", .. LineProtocolServerConnector.EmulatedServers, .. MailTlsServerConnector.EmulatedServers, .. FtpsServerConnector.EmulatedServers, .. MqttsServerConnector.EmulatedServers, .. GophersServerConnector.EmulatedServers, .. DictServerConnector.EmulatedServers, .. TelnetServerConnector.EmulatedServers, "sftp", "scp"];
+    private static readonly HashSet<string> Servers = ["http", "http-ipv6", "http-unix", "http-proxy", HttpsProxyServerConnector.EmulatedServer, "socks4", "socks5", "mqtt", "tftp", .. DnsServerConnector.EmulatedServers, "gopher", "gopher-ipv6", "ftp-ipv6", "file", "none", .. LineProtocolServerConnector.EmulatedServers, .. MailTlsServerConnector.EmulatedServers, .. FtpsServerConnector.EmulatedServers, .. MqttsServerConnector.EmulatedServers, .. GophersServerConnector.EmulatedServers, .. DictServerConnector.EmulatedServers, .. TelnetServerConnector.EmulatedServers, .. RtspServerConnector.EmulatedServers, "sftp", "scp"];
 
     // Upstream's nghttpx front of sws, emulated only when the runner is given an UpstreamHttp2Server.
     private const string Http2Server = "http/2";
@@ -58,7 +58,7 @@ internal static class UpstreamCaseScreening
     // The servers that read <servercmd> as ftpserver.pl does: the FTP stand-in, plain or behind TLS.
     private static readonly string[] FtpServers = ["ftp", "ftp-ipv6", .. FtpsServerConnector.EmulatedServers];
 
-    private static readonly Regex FtpDataConnectionCommand = new(@"^LPRT\b|^CWD fully_simulated", RegexOptions.CultureInvariant | RegexOptions.Multiline);
+    private static readonly Regex FtpDataConnectionCommand = new(@"^LPRT\b", RegexOptions.CultureInvariant | RegexOptions.Multiline);
     private static readonly Regex CurlConfigScript = new(@"\btest(?:1013|1022)\.pl\b", RegexOptions.CultureInvariant);
 
     private static readonly string[] FileParts = ["file", "file1", "file2", "file3", "file4"];
@@ -85,6 +85,7 @@ internal static class UpstreamCaseScreening
     public static string? FindSkipReason(UpstreamTestFileExpansion expansion, UpstreamTestCase testCase, IReadOnlySet<string> features, bool emulatesHttp2 = false, bool emulatesHttp3 = false, Func<string, bool>? isPortedLibTest = null)
     {
         HashSet<string> standIns = [.. emulatesHttp2 ? [Http2Server] : Array.Empty<string>(), .. emulatesHttp3 ? [Http3Server] : Array.Empty<string>()];
+        Func<string, bool> isPorted = isPortedLibTest ?? (_ => false);
         Func<string?>[] checks =
         [
             () => expansion.ConditionError,
@@ -92,10 +93,10 @@ internal static class UpstreamCaseScreening
             () => UnsupportedInstruction(expansion),
             () => CurlConfigComparison(testCase),
             () => UnsupportedPart(testCase, "client", ClientParts),
-            () => UnrunTool(testCase, isPortedLibTest ?? (_ => false)),
+            () => UnrunTool(testCase, isPorted),
             () => UnsupportedPart(testCase, "verify", VerifyParts),
-            () => UninterpretedCheck(testCase, "client", "precheck"),
-            () => UninterpretedCheck(testCase, "verify", "postcheck"),
+            () => UninterpretedCheck(testCase, "client", "precheck", line => UpstreamLibTestCheckLine.Parse(line) is { } check && isPorted(check.Program)),
+            () => UninterpretedCheck(testCase, "verify", "postcheck", _ => false),
             () => UnsupportedServer(testCase, standIns),
             () => FtpDataConnection(testCase),
             () => UploadOffMailServer(testCase),
@@ -175,10 +176,11 @@ internal static class UpstreamCaseScreening
                 : isPortedLibTest(program) ? null : LibTestNotPorted;
 
     // A precheck or postcheck runs only when every line is a %PERL -e one-liner that
-    // UpstreamPerlOneLiner interprets (BL-1933), a test610.pl or test613.pl line (BL-1894) or a %RESOLVE line UpstreamResolveCheck emulates (BL-1929).
-    private static string? UninterpretedCheck(UpstreamTestCase testCase, string section, string name) =>
+    // UpstreamPerlOneLiner interprets (BL-1933), a test610.pl or test613.pl line (BL-1894) or a %RESOLVE line UpstreamResolveCheck emulates (BL-1929),
+    // or, in a precheck, a %LIBTESTS line running a ported libtest program (BL-2634).
+    private static string? UninterpretedCheck(UpstreamTestCase testCase, string section, string name, Func<string, bool> runsLibTest) =>
         UpstreamTestPartBodies.Lines(testCase.Find(section, name))
-            .FirstOrDefault(line => !UpstreamPerlCheckLine.Interprets(line) && !UpstreamResolveCheck.Interprets(line)) is { } line
+            .FirstOrDefault(line => !UpstreamPerlCheckLine.Interprets(line) && !UpstreamResolveCheck.Interprets(line) && !runsLibTest(line)) is { } line
             ? $"the harness does not interpret the <{section}><{name}> line {line}"
             : null;
 

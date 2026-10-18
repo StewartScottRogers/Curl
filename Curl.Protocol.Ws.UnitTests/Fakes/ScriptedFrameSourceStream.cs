@@ -5,7 +5,7 @@ namespace Curl.Protocol.Ws.Fakes;
 /// whose reads each run the next scripted step, which fills the buffer and answers its count (or throws), and
 /// answer 0 once the steps run out. It records the length each read asked for.
 /// </summary>
-/// <param name="uploadFrames">The frames the handler sends the reads in, or <see langword="null" /> for one frame.</param>
+/// <param name="uploadFrames">The frames the handler sends the reads in, or <see langword="null" /> to have each read filled, as any other upload.</param>
 /// <param name="steps">The reads, in order.</param>
 internal sealed class ScriptedFrameSourceStream(WsUploadFrames? uploadFrames, params Func<Memory<byte>, int>[] steps) : Stream, IWsUploadFrameSource
 {
