@@ -31,3 +31,4 @@ Found by BL-2541 (lib1555 port). libcurl 8.22.0 refuses `curl_easy_recv`/`curl_e
 ## Log
 
 - 2026-10-17: Created.
+- 2026-10-18: Backlog -> Doing. Criteria at claim: 7fee8b26 7630d640 4272a6b9.
