@@ -31,3 +31,4 @@ Found by BL-2532: both cases run (no skip) but lib576 writes nothing to stdout, 
 ## Log
 
 - 2026-10-17: Created.
+- 2026-10-18: Backlog -> Doing. Criteria at claim: 57abe33b 21e5ddeb 4272a6b9.
