@@ -56,6 +56,16 @@ public static class CurlAiHelpText
         ["disable-epsv"] = "- Opposite spelling: `--epsv`, the same as `--no-disable-epsv`",
     };
 
+    /// <summary>The environment variables an option's section names, by long name, as the line it carries for them (ADR-0682).</summary>
+    private static readonly Dictionary<string, string> EnvironmentLines = new(StringComparer.Ordinal)
+    {
+        ["cacert"] = CaCertificateEnvironmentLine,
+        ["capath"] = CaCertificateEnvironmentLine,
+    };
+
+    private const string CaCertificateEnvironmentLine =
+        "- Environment: with neither `--cacert` nor `--capath` given and the certificate checked, `CURL_CA_BUNDLE` names the CA file; without it, `SSL_CERT_DIR` names the CA folder and `SSL_CERT_FILE` the CA file. Read on Linux and macOS; on Windows none of the three is read, as curl's Schannel build reads none.";
+
     /// <summary>The sentences curl's manual uses to say how a repeated option behaves, with what each means.</summary>
     private static readonly (string Sentence, string Meaning)[] RepeatSentences =
     [
@@ -178,13 +188,20 @@ public static class CurlAiHelpText
         ];
         lines.AddRange(OnOffLines(longName));
         lines.Add($"- Repeat: {RepeatMeaning(longName)}");
-        lines.AddRange(OtherSpellingLines.TryGetValue(RowName(longName), out string? otherSpelling) ? [otherSpelling] : []);
+        lines.AddRange(OtherSpellingAndEnvironmentLines(longName));
         lines.AddRange(CommandLineOptionTable.Rows.Any(row => row.LongName == RowName(longName) && !row.RefusedWhenTurnedOn) ? [] : ["- Not supported by this build yet: curl refuses it with exit 2."]);
         lines.AddRange(CommandLineOptionTable.Rows.Any(row => row.LongName == RowName(longName) && row.RefusedByWindowsSchannelBuild) ? [SchannelBuildRefusalLine] : []);
         lines.AddRange(CommandLineOptionTable.Rows.Any(row => row.LongName == RowName(longName) && row.RefusedByEveryReferenceBuild) ? [NoQuicRefusalLine] : []);
         lines.AddRange([string.Empty, CurlManualMarkdown.Escape(entry.Description) + "."]);
         lines.AddRange(CurlManualMarkdown.TryGetOptionMarkdown(longName, out IReadOnlyList<string> manual) ? [string.Empty, .. manual] : []);
         return lines;
+    }
+
+    /// <summary>The lines naming the option's other spelling and the environment variables it stands in for, when it has them.</summary>
+    private static IEnumerable<string> OtherSpellingAndEnvironmentLines(string longName)
+    {
+        IEnumerable<string> otherSpelling = OtherSpellingLines.TryGetValue(RowName(longName), out string? spellingLine) ? [spellingLine] : [];
+        return otherSpelling.Concat(EnvironmentLines.TryGetValue(longName, out string? environmentLine) ? [environmentLine] : []);
     }
 
     /// <summary>The line naming the spelling that reverses the option, when curl has one.</summary>
