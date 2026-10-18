@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Conformance.LibTest.UnitLibrary]
+touches: [Curl.Conformance.LibTest.UnitLibrary, Curl.Conformance.LibTest.UnitTests]
 requirement: none
 created: 2026-10-18
 completed:
@@ -41,10 +41,13 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Added Curl.Conformance.LibTest.UnitTests to `touches`: the fix is a test (exact-fit buffer for PartReader.Read), which lives there; no other Doing task names it. Production code is unchanged, so no quality run was needed.
+- Lanes may not run `Audit/Tools/Invoke-MutationTest.ps1` (audit guard), so the mutant was checked by hand: with `<=` in Lib510.cs:88, `PartReader_BufferExactlyThePartsLength_CopiesThePart` fails (1 of 4 Lib510Tests); with `<` restored all pass. The re-audit runs the real reproduction.
 
 ## Log
 
