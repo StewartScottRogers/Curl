@@ -8,7 +8,7 @@ depends-on: []
 touches: [RunDarkFactory.ps1]
 requirement: none
 created: 2026-10-18
-completed:
+completed: 2026-10-18
 ---
 # BL-2755 — Re-fix AF-0242: BL-2394 claimed 3 times and requeued twice: split for size, then blocked on a missing engine hook, before finishing
 
@@ -45,8 +45,8 @@ The finding closes only when a later re-audit by the process auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -56,3 +56,4 @@ The lane prompt in RunDarkFactory.ps1 is written twice; BL-2754 added the "split
 
 - 2026-10-18: Created.
 - 2026-10-18: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-18: Doing -> Done. Added the split-for-size-is-a-requeue rule to the second lane prompt copy in RunDarkFactory.ps1
