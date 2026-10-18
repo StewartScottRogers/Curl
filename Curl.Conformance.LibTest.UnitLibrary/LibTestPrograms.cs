@@ -239,6 +239,16 @@ public sealed class LibTestPrograms
         LibAwsSigV4Headers.Lib1958,
         LibAwsSigV4Headers.Lib1959,
         new Lib1960(),
+        new Lib1964(),
+        new Lib1965(),
+        new Lib1967(),
+        LibAwsSigV4S3Request.Lib1970,
+        LibAwsSigV4S3Request.Lib1971,
+        new Lib1972(),
+        LibAwsSigV4S3Request.Lib1973,
+        LibAwsSigV4S3Request.Lib1974,
+        LibAwsSigV4S3Request.Lib1975,
+        new Lib1977(),
     ]);
 
     /// <summary>The names of the programs in the table, such as <c>lib500</c>.</summary>

@@ -10,8 +10,10 @@ internal sealed class FakeUrlHandle : ICurlUrlHandle
 
     public CurlUrlCode SetResult { get; init; } = CurlUrlCode.Ok;
 
+    public CurlUrlCode? GetResult { get; init; }
+
     public CurlUrlCode Get(CurlUrlPart part, CurlUrlFlags flags, out string? value) =>
-        parts.TryGetValue(part, out value) ? CurlUrlCode.Ok : CurlUrlCode.NoHost;
+        parts.TryGetValue(part, out value) ? GetResult ?? CurlUrlCode.Ok : CurlUrlCode.NoHost;
 
     public CurlUrlCode Set(CurlUrlPart part, string? value, CurlUrlFlags flags)
     {

@@ -69,7 +69,9 @@ internal sealed class FakeCurlEngine : ICurlEngine
         return LastShare;
     }
 
-    public ICurlUrlHandle CreateUrl() => new FakeUrlHandle { SetResult = UrlSetResult };
+    public ICurlUrlHandle CreateUrl() => new FakeUrlHandle { SetResult = UrlSetResult, GetResult = UrlGetResult };
+
+    public CurlUrlCode? UrlGetResult { get; init; }
 
     public CurlUrlCode UrlSetResult { get; init; } = CurlUrlCode.Ok;
 
