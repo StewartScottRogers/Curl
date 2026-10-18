@@ -116,8 +116,8 @@ public sealed class UpstreamCaseRunner(
     public const string MqttPort = "8998";
 
     /// <summary>
-    /// The value of <c>%RTSPPORT</c>. Every case naming it at <c>curl-8_21_0</c> is a <c>&lt;tool&gt;</c>
-    /// libtest, which screening skips for that reason, so no RTSP server stands behind it (ADR-0457).
+    /// The value of <c>%RTSPPORT</c>: connections to this port reach the rtspd emulation, <see cref="RtspServerConnector"/>,
+    /// whose requests follow the Gopher emulation's selector lines for <c>&lt;verify&gt;&lt;protocol&gt;</c> (BL-2617).
     /// </summary>
     public const string RtspPort = "8996";
 
@@ -476,7 +476,8 @@ public sealed class UpstreamCaseRunner(
         SocksServerConnector socks = new(testCase, MailTlsServer(testCase, FtpsServer(testCase, pop3, certificateDirectory), certificateDirectory));
         MqttServerConnector mqtt = new(testCase, socks);
         IConnector mqtts = TlsFrontServer(testCase, MqttsServerConnector.EmulatedServers, certificateDirectory, mqtt, certificate => new MqttsServerConnector(certificate, mqtt));
-        GopherServerConnector gopher = new(testCase, mqtts);
+        RtspServerConnector rtsp = new(testCase, mqtts);
+        GopherServerConnector gopher = new(testCase, rtsp);
         IConnector gophers = TlsFrontServer(testCase, GophersServerConnector.EmulatedServers, certificateDirectory, gopher, certificate => new GophersServerConnector(certificate, gopher));
         TelnetServerConnector telnet = new(new DictServerConnector(gophers));
         IConnector servers = HttpsProxyServer(testCase, Http2Server(testCase, NothingOnHttp3TcpPort(SshServer(telnet)), server, certificateDirectory), certificateDirectory);
@@ -506,6 +507,7 @@ public sealed class UpstreamCaseRunner(
             (mqtt.ProtocolLog, mqtt.ProtocolDump),
             (tftp.ProtocolLog, tftp.ProtocolDump),
             (gopher.ReceivedBytes, gopher.ReceivedDump),
+            (rtsp.ReceivedBytes, rtsp.ReceivedDump),
         ]);
         // runner.pm sets $CURLOUT to a tool run's stdout, and runtests.pl compares <reply><data> with $CURLOUT (BL-2560).
         byte[] replyDataBytes = libTest is null ? ReadOutputFile(outputFile) : standardOutputBytes;
