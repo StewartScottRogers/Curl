@@ -91,6 +91,12 @@ public sealed class EasyInfoReadersTimesTests
     }
 
     [TestMethod]
+    public void GetInfo_SizeDelivered_IsTheBodyBytesDownloadedAsALong()
+    {
+        Assert.AreEqual(2_000L, Read(Reported, CurlInfo.SizeDelivered));
+    }
+
+    [TestMethod]
     [DataRow(CurlInfo.ContentLengthDownload, CurlInfo.ContentLengthDownloadT)]
     [DataRow(CurlInfo.ContentLengthUpload, CurlInfo.ContentLengthUploadT)]
     public void GetInfo_AContentLengthOnAFreshHandle_IsMinusOneInBothForms(CurlInfo asDouble, CurlInfo asOffT)

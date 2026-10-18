@@ -121,11 +121,19 @@ internal static class EasyNetworkOptionSetters
 
     private static CurlCode SetRedirectProtocolBits(ref EasyOptions o, object? v) => Set(ref o, n => n with { RedirectProtocols = ProtocolsOf(NumberOf(v)) });
 
-    private static CurlCode SetProtocols(ref EasyOptions o, object? v) =>
-        NamesAProtocol(v) ? Set(ref o, n => n with { Protocols = (string?)v }) : CurlCode.BadFunctionArgument;
+    private static CurlCode SetProtocols(ref EasyOptions o, object? v)
+    {
+        var check = CheckProtocolNames(v);
+        var names = (string?)v;
+        return check == CurlCode.Ok ? Set(ref o, n => n with { Protocols = names }) : check;
+    }
 
-    private static CurlCode SetRedirectProtocols(ref EasyOptions o, object? v) =>
-        NamesAProtocol(v) ? Set(ref o, n => n with { RedirectProtocols = (string?)v }) : CurlCode.BadFunctionArgument;
+    private static CurlCode SetRedirectProtocols(ref EasyOptions o, object? v)
+    {
+        var check = CheckProtocolNames(v);
+        var names = (string?)v;
+        return check == CurlCode.Ok ? Set(ref o, n => n with { RedirectProtocols = names }) : check;
+    }
 
     private static CurlCode SetDefaultProtocol(ref EasyOptions o, object? v) => Set(ref o, n => n with { DefaultProtocol = (string?)v });
 
@@ -240,13 +248,37 @@ internal static class EasyNetworkOptionSetters
     }
 
     /// <summary>
-    /// <c>CURLOPT_PROTOCOLS_STR</c>'s check (<c>protocol2num</c>): <c>all</c>, or a comma-separated list
-    /// naming at least one known scheme, in any letter case; unknown names are skipped.
+    /// <c>CURLOPT_PROTOCOLS_STR</c>'s check (<c>protocol2num</c>): <see langword="null"/> (back to the default)
+    /// and <c>all</c> are <see cref="CurlCode.Ok"/>, as is a comma-separated list naming at least one known
+    /// scheme in any letter case (empty entries are skipped); a list naming any unknown scheme is
+    /// <see cref="CurlCode.UnsupportedProtocol"/>, and one naming nothing at all (<c>""</c>, <c>","</c>) is
+    /// <see cref="CurlCode.BadFunctionArgument"/>.
     /// </summary>
-    private static bool NamesAProtocol(object? value) =>
-        value is string names
-        && (string.Equals(names, "all", StringComparison.OrdinalIgnoreCase)
-            || names.Split(',').Any(name => ProtocolNames.Contains(name, StringComparer.OrdinalIgnoreCase)));
+    private static CurlCode CheckProtocolNames(object? value)
+    {
+        if (value is not string names || string.Equals(names, "all", StringComparison.OrdinalIgnoreCase))
+        {
+            return CurlCode.Ok;
+        }
+
+        var listed = names.Split(',', StringSplitOptions.RemoveEmptyEntries);
+        if (listed.Length == 0)
+        {
+            return CurlCode.BadFunctionArgument;
+        }
+
+        return listed.All(IsSchemeName)
+            ? CurlCode.Ok
+            : CurlCode.UnsupportedProtocol;
+    }
+
+    /// <summary>
+    /// Whether <paramref name="name"/> is a scheme libcurl has a handler for: a <c>CURLPROTO_*</c> name or
+    /// <c>mqtts</c>, which shares <c>mqtt</c>'s bit.
+    /// </summary>
+    private static bool IsSchemeName(string name) =>
+        string.Equals(name, "mqtts", StringComparison.OrdinalIgnoreCase)
+        || ProtocolNames.Contains(name, StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
     /// The <c>CURLOPT_PROTOCOLS_STR</c> list for a <c>CURLPROTO_*</c> bitmask: <c>all</c> when every bit

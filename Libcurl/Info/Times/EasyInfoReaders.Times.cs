@@ -40,6 +40,7 @@ internal static partial class EasyInfoReaders
         readers[CurlInfo.SizeUploadT] = new EasyInfoReader(ReadSizeUploadT);
         readers[CurlInfo.SizeDownload] = new EasyInfoReader(ReadSizeDownload);
         readers[CurlInfo.SizeDownloadT] = new EasyInfoReader(ReadSizeDownloadT);
+        readers[CurlInfo.SizeDelivered] = new EasyInfoReader(ReadSizeDelivered);
         readers[CurlInfo.SpeedUpload] = new EasyInfoReader(ReadSpeedUpload);
         readers[CurlInfo.SpeedUploadT] = new EasyInfoReader(ReadSpeedUploadT);
         readers[CurlInfo.SpeedDownload] = new EasyInfoReader(ReadSpeedDownload);
@@ -98,6 +99,9 @@ internal static partial class EasyInfoReaders
     private static object? ReadSizeDownload(TransferInfo info, EasyOptions options) => (double)info.SizeDownload;
 
     private static object? ReadSizeDownloadT(TransferInfo info, EasyOptions options) => info.SizeDownload;
+
+    /// <summary>The body bytes delivered to the write callback: the engine counts those as the downloaded size.</summary>
+    private static object? ReadSizeDelivered(TransferInfo info, EasyOptions options) => info.SizeDownload;
 
     private static object? ReadSpeedUpload(TransferInfo info, EasyOptions options) => (double)info.SpeedUpload;
 

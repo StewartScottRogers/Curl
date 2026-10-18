@@ -11,8 +11,6 @@ namespace Libcurl.Options;
 /// </summary>
 internal static class EasyProtocolOptionSetters
 {
-    private const int Md5HexDigits = 32;
-
     private const long SmallestTftpBlockSize = 8;
 
     private const long LargestTftpBlockSize = 65464;
@@ -133,11 +131,9 @@ internal static class EasyProtocolOptionSetters
 
     private static CurlCode SetCompression(ref EasyOptions o, object? v) => Ssh(ref o, s => s with { Compression = IsOn(v) });
 
-    /// <summary><c>CURLOPT_SSH_HOST_PUBLIC_KEY_MD5</c>: a string other than 32 characters is <see cref="CurlCode.BadFunctionArgument"/>; <see langword="null"/> clears it.</summary>
+    /// <summary><c>CURLOPT_SSH_HOST_PUBLIC_KEY_MD5</c>: any string is stored, as libcurl's <c>Curl_setstropt</c> does, and the host key check at connect time refuses one that is not the key's fingerprint; <see langword="null"/> clears it.</summary>
     private static CurlCode SetHostPublicKeyMd5(ref EasyOptions o, object? v) =>
-        v is string { Length: not Md5HexDigits }
-            ? CurlCode.BadFunctionArgument
-            : Ssh(ref o, s => s with { HostPublicKeyMd5 = (string?)v });
+        Ssh(ref o, s => s with { HostPublicKeyMd5 = (string?)v });
 
     private static CurlCode SetHostPublicKeySha256(ref EasyOptions o, object? v) => Ssh(ref o, s => s with { HostPublicKeySha256 = (string?)v });
 

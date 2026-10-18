@@ -1,6 +1,7 @@
 using System.Text;
 using Curl.Api.Callbacks;
 using Curl.Api.Codes;
+using Curl.Api.EngineContracts;
 using Curl.Api.Info;
 using Curl.Api.Options.Authentication;
 using Curl.Api.Options.Behaviour;
@@ -276,14 +277,13 @@ public sealed class Lib1589To1648Tests
     [TestMethod]
     public async Task Lib1597_RunsTheStringsThroughTheHandleAndWritesTheCount()
     {
-        var run = new PortRun(new FakeCurlEngine(), 1597);
+        var engine = new FakeCurlEngine { VersionInfo = new CurlVersionInfo { Protocols = ["http", "https"] } };
+        var run = new PortRun(engine, 1597);
 
         LibTestResult result = await new Lib1597().RunAsync(run.Context, CancellationToken.None);
 
-        var expected = new StringWriter();
-        CurlCode code = Lib1597.TestStrings([], _ => CurlCode.BadFunctionArgument, expected);
-        Assert.AreEqual((int)code, result.ExitCode);
-        Assert.AreEqual(expected.ToString(), run.OutputText);
+        Assert.AreEqual(0, result.ExitCode);
+        Assert.AreEqual($"Tested {Lib1597.Cases.Count} strings\n", run.OutputText);
     }
 
     [TestMethod]
