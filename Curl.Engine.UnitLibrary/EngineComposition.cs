@@ -1214,12 +1214,23 @@ internal static class EngineComposition
             },
             CredentialEncoding.ForPlatform(OperatingSystem.IsWindows()))
         {
-            ProxyHeaders = proxy.ProxyHeaders,
+            ProxyHeaders = ConnectHeadersOf(http, proxy),
             CommandLineTextEncoding = CredentialEncoding.ForPlatform(OperatingSystem.IsWindows()),
             ProxyAuthSchemes = HttpRequestOptionsMapping.ProxyAuthSchemesOf(authentication),
             ProxyAuthenticator = CreateHttpAuthenticator(securityContexts, NegotiateOptionsMapping.Of(authentication), diagnosticLog),
             ProxyHttp2 = proxy.ProxyType == ProxyType.Https2,
         };
+
+    /// <summary>
+    /// The custom headers a proxy's <c>CONNECT</c> sends, as curl 8.22.0's <c>CURLOPT_HEADEROPT</c> picks them:
+    /// <c>CURLOPT_PROXYHEADER</c>'s under <see cref="HeaderOption.Separate" />, and <c>CURLOPT_HTTPHEADER</c>'s,
+    /// the origin's own, under <see cref="HeaderOption.Unified" /> (upstream test1527, BL-2645).
+    /// </summary>
+    /// <param name="http">The option group's HTTP options, for <c>CURLOPT_HTTPHEADER</c>.</param>
+    /// <param name="proxy">The option group's proxy options, for <c>CURLOPT_PROXYHEADER</c> and <c>CURLOPT_HEADEROPT</c>.</param>
+    /// <returns>The header lines.</returns>
+    internal static IReadOnlyList<string> ConnectHeadersOf(EasyHttpOptions http, EasyProxyOptions proxy) =>
+        proxy.HeaderOption == HeaderOption.Unified ? http.HttpHeaders : proxy.ProxyHeaders;
 
     /// <summary>
     /// Whether each <c>--alt-svc</c> cache learns and looks up over plain <c>http</c>: only behind the

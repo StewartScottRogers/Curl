@@ -7,6 +7,7 @@ using Curl.Api.EngineContracts.Headers;
 using Curl.Api.EngineContracts.WebSocket;
 using Curl.Api.Info;
 using Curl.Api.Options;
+using Curl.Api.Options.Proxy;
 using Curl.Core;
 using Curl.Core.Hsts;
 using Curl.Core.Multipart;
@@ -1051,7 +1052,7 @@ internal sealed class ManagedEasyTransfer(
         new(
             Proxy: proxy,
             ResumeFrom: options.Transfer.ResumeFrom > 0 ? options.Transfer.ResumeFrom : null,
-            Upload: UploadOf(options, pauseGate),
+            Upload: UploadOf(options, url, pauseGate),
             AltSvc: state.AltSvc,
             Ssh: SshOptionsMapping.IsSshScheme(url.Scheme) ? SshOptionsMapping.OfHandle(options.Protocols.Ssh, options.Callbacks, settings.Passphrase) : null);
 
@@ -1495,12 +1496,31 @@ internal sealed class ManagedEasyTransfer(
     /// upload is a <see cref="SeekingCallbackReadStream" />, which a resend rewinds through it (BL-2417).
     /// </summary>
     /// <param name="options">The handle's options.</param>
+    /// <param name="url">The URL to transfer: an <c>http</c> or <c>https</c> one sends <c>CURLOPT_INFILESIZE</c> bytes (<see cref="DeclaredUploadLengthOf" />).</param>
     /// <param name="pauseGate">The pause state a read callback's pause waits on, or <see langword="null" /> when the transfer cannot pause.</param>
     /// <returns>The upload stream, or <see langword="null" /> when the transfer uploads nothing.</returns>
-    private Stream? UploadOf(EasyOptions options, EasyPauseGate? pauseGate) =>
+    private Stream? UploadOf(EasyOptions options, CurlUrl url, EasyPauseGate? pauseGate) =>
         options.Transfer.Upload
-            ? options.Callbacks.Read is { } read ? CallbackUploadOf(read, options.Callbacks, pauseGate, WebSocketConnection.UploadFrames) : Stream.Null
+            ? options.Callbacks.Read is { } read ? CallbackUploadOf(read, options.Callbacks, pauseGate, WebSocketConnection.UploadFrames, DeclaredUploadLengthOf(options, url)) : Stream.Null
             : null;
+
+    /// <summary>
+    /// The length a read-callback upload is held to (BL-2645): <c>CURLOPT_INFILESIZE</c> when it is known and the
+    /// URL is <c>http</c> or <c>https</c>, so the upload stops there and goes with a <c>Content-Length</c>, as
+    /// curl 8.22.0's <c>cr_in_read</c> stops at <c>total_len</c>; else <see langword="null" />, the upload ending when
+    /// the callback returns 0 (ADR-0676).
+    /// </summary>
+    /// <param name="options">The handle's options.</param>
+    /// <param name="url">The URL to transfer.</param>
+    /// <returns>The declared length, or <see langword="null" />.</returns>
+    internal static long? DeclaredUploadLengthOf(EasyOptions options, CurlUrl url) =>
+        options.Transfer.InFileSize >= 0 && (IsScheme(url, "http") || IsScheme(url, "https")) ? options.Transfer.InFileSize : null;
+
+    /// <summary>Whether <paramref name="url" />'s scheme is <paramref name="scheme" />, in any case.</summary>
+    /// <param name="url">The URL.</param>
+    /// <param name="scheme">The scheme.</param>
+    /// <returns><see langword="true" /> when it is.</returns>
+    private static bool IsScheme(CurlUrl url, string scheme) => string.Equals(url.Scheme, scheme, StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
     /// The read callback's upload stream: one the seek callback rewinds when one is set, carrying the trailer
@@ -1510,17 +1530,18 @@ internal sealed class ManagedEasyTransfer(
     /// <param name="callbacks">The handle's callbacks, whose seek and trailer callbacks the stream takes.</param>
     /// <param name="pauseGate">The pause state a read callback's pause waits on, or <see langword="null" />.</param>
     /// <param name="uploadFrames">The frames a WebSocket upload goes out in (<see cref="ManagedEasyWebSocket.UploadFrames" />), or <see langword="null" /> for a POST body.</param>
+    /// <param name="declaredLength">The length the upload is held to (<see cref="CallbackReadStream.DeclaredLength" />), or <see langword="null" />.</param>
     /// <returns>The upload stream.</returns>
-    private static CallbackReadStream CallbackUploadOf(ReadCallback read, EasyCallbackOptions callbacks, EasyPauseGate? pauseGate, WsUploadFrames? uploadFrames = null) =>
+    private static CallbackReadStream CallbackUploadOf(ReadCallback read, EasyCallbackOptions callbacks, EasyPauseGate? pauseGate, WsUploadFrames? uploadFrames = null, long? declaredLength = null) =>
         callbacks.Seek is { } seek
-            ? new SeekingCallbackReadStream(read, seek, pauseGate) { Trailer = callbacks.Trailer, UploadFrames = uploadFrames }
-            : new CallbackReadStream(read, pauseGate) { Trailer = callbacks.Trailer, UploadFrames = uploadFrames };
+            ? new SeekingCallbackReadStream(read, seek, pauseGate) { Trailer = callbacks.Trailer, UploadFrames = uploadFrames, DeclaredLength = declaredLength }
+            : new CallbackReadStream(read, pauseGate) { Trailer = callbacks.Trailer, UploadFrames = uploadFrames, DeclaredLength = declaredLength };
 
     /// <summary>
     /// The curl tool's own settings for a transfer driven through the easy interface with no
     /// <see cref="ToolSettings" />: what the easy groups say (<c>CURLOPT_SSL_VERIFYPEER</c>,
     /// <c>CURLOPT_KEYPASSWD</c>, <c>CURLOPT_SSLENGINE</c>, <c>CURLOPT_PROTOCOLS_STR</c>,
-    /// <c>CURLOPT_REDIR_PROTOCOLS_STR</c>, <c>CURLOPT_DIRLISTONLY</c>, <c>CURLOPT_PROXYHEADER</c>,
+    /// <c>CURLOPT_REDIR_PROTOCOLS_STR</c>, <c>CURLOPT_DIRLISTONLY</c>, <c>CURLOPT_PROXYHEADER</c> (none under <c>CURLHEADER_UNIFIED</c>, whose request carries <c>CURLOPT_HTTPHEADER</c> alone),
     /// <c>CURLOPT_HTTPPROXYTUNNEL</c>, <c>CURLOPT_UNIX_SOCKET_PATH</c>), and libcurl's defaults for the
     /// rest, which are the tool's alone (ADR-0541, ADR-0542). <c>CURLOPT_FAILONERROR</c> needs nothing here:
     /// <see cref="HttpRequestOptionsMapping" /> reads it from the behaviour group.
@@ -1546,7 +1567,7 @@ internal sealed class ManagedEasyTransfer(
             SslRequired: false,
             ListOnly: options.Transfer.DirListOnly,
             UploadFlags: [],
-            ProxyHeaders: options.Proxy.ProxyHeaders,
+            ProxyHeaders: options.Proxy.HeaderOption == HeaderOption.Unified ? [] : options.Proxy.ProxyHeaders,
             ProxyTunnel: options.Proxy.HttpProxyTunnel,
             OverUnixSocket: options.Network.UnixSocketPath is not null,
             HappyEyeballsTimeout: HttpRequestOptionsMapping.HappyEyeballsTimeoutOf(null),
