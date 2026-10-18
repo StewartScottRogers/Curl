@@ -32,3 +32,4 @@ Filed by BL-2531 (lib562 ported, `Lib562.cs`, sets `CURLOPT_PORT` from `libtest_
 ## Log
 
 - 2026-10-17: Created.
+- 2026-10-18: Backlog -> Doing. Criteria at claim: e18ea506 4272a6b9.
