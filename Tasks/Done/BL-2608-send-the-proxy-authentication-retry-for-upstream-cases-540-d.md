@@ -8,7 +8,7 @@ depends-on: []
 touches: [Libcurl, Libcurl.UnitTests, Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
 requirement: none
 created: 2026-10-17
-completed:
+completed: 2026-10-17
 ---
 # BL-2608 — Send the proxy authentication retry for upstream cases 540 (Digest over multi) and 548 (NTLM POST)
 
@@ -22,13 +22,16 @@ Found by BL-2530 (lib540 and lib547 ports). Case 540 (two transfers through one 
 
 ## Acceptance criteria
 
-- [ ] Cases 540 and 548 pass through the runner and are added to `Curl.Conformance.UnitTests/PassingUpstreamCases.txt`.
-- [ ] `dotnet build` is clean and the fast tests pass with no test deleted, skipped or weakened.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project covers the fix (ADR-0482), and the cases' output does not depend on the platform.
+- [x] Cases 540 and 548 pass through the runner and are added to `Curl.Conformance.UnitTests/PassingUpstreamCases.txt`.
+- [x] `dotnet build` is clean and the fast tests pass with no test deleted, skipped or weakened.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project covers the fix (ADR-0482), and the cases' output does not depend on the platform.
 
 ## Notes
+
+No code change needed: both cases already passed through the runner when this lane measured them. The lost proxy answer was the missing CURLOPT_PROXYUSERPWD on a library handle, fixed by BL-2660 (419ea3f7f), which carries its own focused unit test. This task only holds 540 and 548 on the ratchet.
 
 ## Log
 
 - 2026-10-17: Created.
 - 2026-10-17: Backlog -> Doing. Criteria at claim: 451fc7ed 4272a6b9 7d0e6df3.
+- 2026-10-17: Doing -> Done. Cases 540 and 548 already pass (fixed by BL-2660); held on the ratchet
