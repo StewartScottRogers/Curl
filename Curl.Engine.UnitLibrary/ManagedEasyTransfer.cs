@@ -296,6 +296,15 @@ internal sealed class ManagedEasyTransfer(
     /// <summary>The headers the last perform from the options received over HTTP, for the header API (ADR-0603).</summary>
     private readonly TransferHeaderStore headers = new();
 
+    /// <summary>The engine clock's timestamp when the running perform started, which the live times on <see cref="Info" /> count from.</summary>
+    private long performStartedTimestamp;
+
+    /// <summary>
+    /// The engine clock's timestamp when the running perform's handle took a connection (<see cref="ShowConnectionOnInfo" />),
+    /// or <see langword="null" /> before it has one.
+    /// </summary>
+    private long? connectedTimestamp;
+
     /// <summary>
     /// The header API over the headers the last perform from <see cref="Options" /> received over <c>http</c>,
     /// <c>https</c>, <c>ws</c> or <c>wss</c>: every perform and <see cref="Reset" /> forget them, and a perform
@@ -350,6 +359,8 @@ internal sealed class ManagedEasyTransfer(
     {
         headers.Clear();
         headers.ResponseHeadRead = ShowResponseHeadOnInfo;
+        performStartedTimestamp = shared.TimeProvider.GetTimestamp();
+        connectedTimestamp = null;
         await ConnectOnly.CloseAsync().ConfigureAwait(false);
         await WebSocketConnection.CloseAsync().ConfigureAwait(false);
         if (PushedResponse is { } pushed)
@@ -1244,7 +1255,18 @@ internal sealed class ManagedEasyTransfer(
             state,
             shared.ConnectionIdsByPoolNumber,
             () => state.ConnectionId ??= shared.Performer.TakeConnectionId(),
-            connectionId => Info = Info with { ConnectionId = connectionId });
+            ShowConnectionOnInfo);
+
+    /// <summary>
+    /// Puts the connection the running perform took on <see cref="Info" /> at once (BL-2364) and notes when it was
+    /// taken, the first time, for the live <see cref="TransferInfo.ConnectTime" /> (<see cref="ShowResponseHeadOnInfo" />).
+    /// </summary>
+    /// <param name="connectionId">The connection's <c>%{conn_id}</c>.</param>
+    private void ShowConnectionOnInfo(long connectionId)
+    {
+        connectedTimestamp ??= shared.TimeProvider.GetTimestamp();
+        Info = Info with { ConnectionId = connectionId };
+    }
 
     /// <summary>
     /// Makes the connections the running perform opens in the engine's cache the handle's own, which
@@ -1748,10 +1770,27 @@ internal sealed class ManagedEasyTransfer(
     /// Puts the response code and <c>Content-Length</c> the header lines have given so far on <see cref="Info" /> while
     /// the transfer runs, before the line reaches the header callback, so a header callback reading
     /// <c>CURLINFO_RESPONSE_CODE</c> or <c>CURLINFO_CONTENT_LENGTH_DOWNLOAD_T</c> sees them as libcurl's does once the
-    /// head is parsed (upstream test1485, BL-2639); the finished transfer's report replaces both.
+    /// head is parsed (upstream test1485, BL-2639). It also puts the times so far there, as libcurl's are live during the
+    /// transfer (upstream test1541, curl issue #13125, BL-2648): the connect and pretransfer times from the perform's start
+    /// to the connection taken (0 when the curl tool's runner numbers the connections, as the handle then sees none), the
+    /// starttransfer time to the first head line (kept from then on) and the total time to now. The finished transfer's
+    /// report replaces them all.
     /// </summary>
-    private void ShowResponseHeadOnInfo() =>
-        Info = Info with { ResponseCode = headers.ResponseCode, ContentLengthDownload = headers.ContentLength };
+    private void ShowResponseHeadOnInfo()
+    {
+        TimeSpan sinceStart = shared.TimeProvider.GetElapsedTime(performStartedTimestamp);
+        TimeSpan connect = connectedTimestamp is { } connected ? shared.TimeProvider.GetElapsedTime(performStartedTimestamp, connected) : TimeSpan.Zero;
+        TransferInfo info = Info;
+        Info = info with
+        {
+            ResponseCode = headers.ResponseCode,
+            ContentLengthDownload = headers.ContentLength,
+            ConnectTime = connect,
+            PreTransferTime = connect,
+            StartTransferTime = info.StartTransferTime > TimeSpan.Zero ? info.StartTransferTime : sinceStart,
+            TotalTime = sinceStart,
+        };
+    }
 
     private CurlCode Finish(CurlCode code, string errorText, TransferInfo info)
     {
