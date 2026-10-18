@@ -6,6 +6,7 @@ assignee: Claude
 pipeline: direct
 depends-on: []
 touches: [RunDarkFactory.ps1]
+lane: no
 requirement: none
 created: 2026-10-18
 completed:
@@ -46,7 +47,10 @@ The finding closes only when a later re-audit by the process auditor confirms th
 
 ## Notes
 
+Interactive only: the reproduction runs a tool under the audit folder and the finding lives there, which a lane may not read (guard-audit-paths.ps1). The spell (2026-10-16, run 38876049958) is history: the Quality gates job was fixed by BL-2466/BL-2467 (same incident as AF-0244), so nothing in RunDarkFactory.ps1 is left to change. Remove `lane: no` once an interactive session has marked AF-0264 a duplicate of AF-0244 (or a re-audit closes it as historical).
+
 ## Log
 
 - 2026-10-18: Created.
 - 2026-10-18: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-18: Doing -> Backlog. Interactive only: reproduction and finding are in the audit folder, which lanes cannot read; incident is historical (AF-0244)
