@@ -56,7 +56,7 @@ internal static class UrlPartText
 
     /// <summary>
     /// Converts a host under <c>CURLU_PUNYCODE</c> (a name that is not ASCII to punycode) or, without
-    /// it, <c>CURLU_PUNY2IDN</c> (an ASCII name starting <c>xn--</c> to Unicode).
+    /// it, <c>CURLU_PUNY2IDN</c> (an ASCII name holding <c>xn--</c> to Unicode).
     /// </summary>
     /// <param name="host">The host.</param>
     /// <param name="flags">The get's flags.</param>
@@ -69,7 +69,7 @@ internal static class UrlPartText
             return ascii ? UrlPartResult.Found(host) : Convert(Idn.GetAscii, host);
         }
 
-        bool punycoded = ascii && host.StartsWith(PunycodePrefix, StringComparison.Ordinal);
+        bool punycoded = ascii && host.Contains(PunycodePrefix, StringComparison.Ordinal);
 
         return flags.HasFlag(CurlUrlFlags.PunycodeToIdn) && punycoded
             ? Convert(Idn.GetUnicode, host)

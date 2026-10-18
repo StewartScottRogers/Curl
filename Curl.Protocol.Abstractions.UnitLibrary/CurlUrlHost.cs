@@ -46,23 +46,33 @@ internal static class CurlUrlHost
         out CurlUrlRejection rejection)
     {
         zoneId = null;
-        if (host.StartsWith('['))
+        normalized = idnHost = string.Empty;
+        string? decoded = PercentDecode(host);
+        if (decoded is null)
         {
-            rejection = NormalizeIPv6(host, out normalized, out idnHost, out zoneId);
+            rejection = CurlUrlRejection.BadHostname;
+
+            return false;
+        }
+
+        if (decoded.StartsWith('['))
+        {
+            rejection = NormalizeIPv6(decoded, out normalized, out idnHost, out zoneId);
 
             return rejection == CurlUrlRejection.None;
         }
 
-        bool accepted = TryNormalizeAddressOrName(host, out normalized, out idnHost);
+        bool accepted = TryNormalizeAddressOrName(decoded, out normalized, out idnHost);
         rejection = accepted ? CurlUrlRejection.None : CurlUrlRejection.BadHostname;
 
         return accepted;
     }
 
     /// <summary>
-    /// Normalises a host that is not bracketed: an IPv4 address in any form
+    /// Normalises a percent-decoded host that is not bracketed: an IPv4 address in any form
     /// <c>inet_aton</c> reads, or else a name. One trailing dot is allowed; an empty host
-    /// or two trailing dots are not.
+    /// or two trailing dots are not. curl 8.22.0's <c>parse_authority</c> decodes the host
+    /// before <c>ipv4_normalize</c>, so <c>127.0.0.%31.</c> is <c>127.0.0.1</c> (lib1560).
     /// </summary>
     private static bool TryNormalizeAddressOrName(string host, out string normalized, out string idnHost)
     {
@@ -83,11 +93,10 @@ internal static class CurlUrlHost
         return TryNormalizeName(host, out normalized, out idnHost);
     }
 
-    private static bool TryNormalizeName(string host, out string normalized, out string idnHost)
+    private static bool TryNormalizeName(string decoded, out string normalized, out string idnHost)
     {
         normalized = idnHost = string.Empty;
-        string? decoded = PercentDecode(host);
-        if (decoded is null || !IsUsableName(decoded))
+        if (!IsUsableName(decoded))
         {
             return false;
         }
@@ -166,7 +175,7 @@ internal static class CurlUrlHost
 
     /// <summary>
     /// Checks and normalises a bracketed IPv6 address as curl's <c>ipv6_parse</c> does:
-    /// only hexadecimal digits, colons and dots, then optionally <c>%</c> (or <c>%25</c>)
+    /// only hexadecimal digits, colons and dots, then optionally <c>%</c> (a decoded <c>%25</c>)
     /// and a zone id of 1 to 15 characters, and the address printed back in its shortest
     /// form. A zone id longer than 15 characters is a bad host name to curl; every other
     /// fault is a bad IPv6 address.
@@ -203,7 +212,7 @@ internal static class CurlUrlHost
 
     /// <summary>
     /// Reads the zone id from the text after an IPv6 address, which starts with
-    /// <c>%</c>; a leading <c>25</c> is the encoded percent sign and is skipped.
+    /// <c>%</c>; the host was percent-decoded first, so <c>%2525</c> is the zone id <c>25</c>.
     /// </summary>
     /// <returns>Why curl rejects the zone id, or <see cref="CurlUrlRejection.None" />.</returns>
     private static CurlUrlRejection ReadZoneId(string text, out string? zoneId)
@@ -215,11 +224,6 @@ internal static class CurlUrlHost
         }
 
         string id = text[1..];
-        if (id.StartsWith("25", StringComparison.Ordinal))
-        {
-            id = id[2..];
-        }
-
         if (id.Length == 0)
         {
             return CurlUrlRejection.BadIPv6;

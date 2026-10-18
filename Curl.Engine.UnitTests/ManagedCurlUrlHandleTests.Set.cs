@@ -246,6 +246,7 @@ public sealed partial class ManagedCurlUrlHandleTests
     [TestMethod]
     [DataRow("", CurlUrlFlags.None)]
     [DataRow("", CurlUrlFlags.UrlEncode)]
+    [DataRow("  ", CurlUrlFlags.UrlEncode)]
     [DataRow("a/b", CurlUrlFlags.None)]
     [DataRow("a:80", CurlUrlFlags.None)]
     [DataRow("u@h", CurlUrlFlags.None)]
@@ -258,6 +259,35 @@ public sealed partial class ManagedCurlUrlHandleTests
         Assert.AreEqual(CurlUrlCode.BadHostname, url.Set(CurlUrlPart.Host, host, flags));
 
         Assert.AreEqual("example.com", GetOk(url, CurlUrlPart.Host));
+    }
+
+    [TestMethod]
+    [DataRow("%43url.se", "https://%43url.se/")]
+    [DataRow("0xff", "https://0xff/")]
+    public void Set_HostAName_KeepsItAsGiven(string host, string expected)
+    {
+        using ManagedCurlUrlHandle url = Parsed("https://example.com/");
+
+        Assert.AreEqual(CurlUrlCode.Ok, url.Set(CurlUrlPart.Host, host, CurlUrlFlags.None));
+
+        Assert.AreEqual(expected, GetOk(url, CurlUrlPart.Url));
+    }
+
+    [TestMethod]
+    public void Set_UrlWithAPercentEncodedIPv6HostAndZone_DecodesAndNormalisesIt()
+    {
+        using ManagedCurlUrlHandle url = Parsed("https://[%3A%3A13%2e1%2e68%2e3%25eth0]:1234");
+
+        Assert.AreEqual("[::13.1.68.3]", GetOk(url, CurlUrlPart.Host));
+        Assert.AreEqual("eth0", GetOk(url, CurlUrlPart.ZoneId));
+    }
+
+    [TestMethod]
+    public void Get_PunycodeToIdnOfAHostWithAPunycodeLabel_ReturnsTheInternationalName()
+    {
+        using ManagedCurlUrlHandle url = Parsed("https://www.xn--rksmrgs-5wao1o.se");
+
+        Assert.AreEqual("www.räksmörgås.se", GetOk(url, CurlUrlPart.Host, CurlUrlFlags.PunycodeToIdn));
     }
 
     [TestMethod]

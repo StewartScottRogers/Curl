@@ -121,8 +121,10 @@ internal static class UrlPartSetter
 
     /// <summary>
     /// A host, which clears the zone id: empty only under <c>CURLU_NO_AUTHORITY</c>; encoded under
-    /// <c>CURLU_URLENCODE</c>; else a name or bracketed IPv6 address Curl's URL parser accepts, its
-    /// zone id kept apart, or <see cref="CurlUrlCode.BadHostname" />.
+    /// <c>CURLU_URLENCODE</c>; else a name or bracketed IPv6 address Curl's URL parser accepts, a name
+    /// kept as given (curl 8.22.0 stores <c>%43url.se</c> and <c>0xff</c> unnormalised) and an IPv6
+    /// address normalised with its zone id kept apart, or <see cref="CurlUrlCode.BadHostname" />, which
+    /// a blank host under <c>CURLU_URLENCODE</c> is too (lib1560).
     /// </summary>
     private static UrlSetResult SetHost(UrlHandleParts parts, string value, CurlUrlFlags flags)
     {
@@ -134,14 +136,15 @@ internal static class UrlPartSetter
                 : UrlSetResult.Refused(CurlUrlCode.BadHostname);
         }
 
-        return flags.HasFlag(CurlUrlFlags.UrlEncode)
+        return flags.HasFlag(CurlUrlFlags.UrlEncode) && !string.IsNullOrWhiteSpace(value)
             ? UrlSetResult.Set(parts with { Host = host, ZoneId = null })
             : CheckedHost(parts, host);
     }
 
     private static UrlSetResult CheckedHost(UrlHandleParts parts, string host)
     {
-        bool delimited = host.StartsWith('[')
+        bool bracketed = host.StartsWith('[');
+        bool delimited = bracketed
             ? host.AsSpan().IndexOfAny('/', '?', '#') >= 0
             : host.AsSpan().IndexOfAny(HostDelimiters) >= 0;
         if (delimited || !CurlUrl.TryParse("http://" + host + "/", pathAsIs: true, out CurlUrl? url))
@@ -149,7 +152,7 @@ internal static class UrlPartSetter
             return UrlSetResult.Refused(CurlUrlCode.BadHostname);
         }
 
-        return UrlSetResult.Set(parts with { Host = url.Host, ZoneId = url.ZoneId });
+        return UrlSetResult.Set(bracketed ? parts with { Host = url.Host, ZoneId = url.ZoneId } : parts with { Host = host, ZoneId = null });
     }
 
     /// <summary>A port: decimal digits up to 65535 and nothing else, kept without leading zeros.</summary>
