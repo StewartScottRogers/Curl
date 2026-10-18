@@ -1,5 +1,5 @@
 ---
-id: BL-2749
+id: BL-2751
 title: RtspProtocolHandler makes any libcurl RTSP request from per-perform settings and a handle-lived CSeq and session
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-18
 completed:
 ---
-# BL-2749 — RtspProtocolHandler makes any libcurl RTSP request from per-perform settings and a handle-lived CSeq and session
+# BL-2751 — RtspProtocolHandler makes any libcurl RTSP request from per-perform settings and a handle-lived CSeq and session
 
 ## Goal
 

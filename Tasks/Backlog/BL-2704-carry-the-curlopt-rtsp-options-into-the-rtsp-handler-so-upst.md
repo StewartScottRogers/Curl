@@ -4,7 +4,7 @@ title: Carry the CURLOPT_RTSP_* options into the RTSP handler so upstream cases 
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-2617, BL-2749]
+depends-on: [BL-2617, BL-2751]
 touches: [Libcurl, Libcurl.UnitTests, Curl.Engine.UnitLibrary, Curl.Engine.UnitTests, Curl.Protocol.Rtsp.UnitLibrary, Curl.Protocol.Rtsp.UnitTests, Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
 requirement: none
 created: 2026-10-17
@@ -39,10 +39,10 @@ Debug one with `CURL_UPSTREAM_CASE=<n>` and `dotnet test Curl.Conformance.UnitTe
 ## Notes
 
 - 2026-10-18 (lane 3, first-pass sizing, no code edited): the Libcurl perform reaches the RTSP handler through `Curl.Engine.UnitLibrary` (`ManagedCurlEngine.CreateDispatcher` -> `EngineComposition.CreateProtocolHandlers`, which already passes the interleave sink), not through `Libcurl`, so `Curl.Engine.UnitLibrary` and `Curl.Engine.UnitTests` are added to `touches`. BL-2735 (in Doing) touches `Curl.Engine.UnitLibrary`, so the task goes back to Backlog until they no longer overlap.
-- The handler today knows only `OPTIONS *` with a per-transfer `RtspSessionState`; carrying every request kind, the stream URI, `Transport`, session ID, client `CSeq`, body and a handle-lived session is its own sizeable piece, split out as BL-2749 (Rtsp library only, ready now). What is left here: map `EasyRtspOptions` and the upload / post body to BL-2749's settings in the engine, keep the session state on the easy handle across performs, run the eight cases and add the passing ones to the ratchet.
+- The handler today knows only `OPTIONS *` with a per-transfer `RtspSessionState`; carrying every request kind, the stream URI, `Transport`, session ID, client `CSeq`, body and a handle-lived session is its own sizeable piece, split out as BL-2751 (Rtsp library only, ready now). What is left here: map `EasyRtspOptions` and the upload / post body to BL-2751's settings in the engine, keep the session state on the easy handle across performs, run the eight cases and add the passing ones to the ratchet.
 
 ## Log
 
 - 2026-10-17: Created.
 - 2026-10-18: Backlog -> Doing. Criteria at claim: 67d405dd 74e45cb9 21e5ddeb 4272a6b9.
-- 2026-10-18: Doing -> Backlog. Waits on BL-2749 (handler surface for libcurl RTSP requests) and overlaps BL-2735 on Curl.Engine.UnitLibrary
+- 2026-10-18: Doing -> Backlog. Waits on BL-2751 (handler surface for libcurl RTSP requests) and overlaps BL-2735 on Curl.Engine.UnitLibrary
