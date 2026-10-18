@@ -85,17 +85,29 @@ internal sealed class HttpStatusLine(Version version, int statusCode, string rea
             string.Empty);
 
     /// <summary>
-    /// Tells whether a status line received over HTTP/1.x is an HTTP/2 or HTTP/3 interim one,
-    /// <c>HTTP/2 1xx</c> or <c>HTTP/3 1xx</c> with a three-digit code, which curl's OpenSSL
-    /// build parses as that version's 1xx (upstream test1704, BL-2326).
+    /// Tells whether a status line received over HTTP/1.x names HTTP/2 or HTTP/3 in the shape
+    /// curl's OpenSSL build parses, <c>HTTP/2 </c> or <c>HTTP/3 </c> and a three-digit code,
+    /// rather than taking it as an assumed <c>HTTP/1.0 200</c> (measured, BL-2715 Notes).
     /// </summary>
     /// <param name="line">The line, without its terminator.</param>
-    /// <returns><see langword="true" /> when it is.</returns>
-    internal static bool IsHttp2OrHttp3Interim(string line) =>
+    /// <returns><see langword="true" /> when it does.</returns>
+    internal static bool NamesHttp2OrHttp3(string line) =>
         line.Length >= 10
         && (line.StartsWith("HTTP/2 ", StringComparison.Ordinal) || line.StartsWith("HTTP/3 ", StringComparison.Ordinal))
-        && line[7] == '1'
         && IsThreeDigits(line.AsSpan(7, 3));
+
+    /// <summary>
+    /// Gives the failure curl's OpenSSL build reports for a status line over HTTP/1.x that
+    /// <see cref="NamesHttp2OrHttp3" />: exit 8, <c>Version mismatch (from HTTP/1 to HTTP/2)</c>,
+    /// for HTTP/2 (upstream test1704), and exit 1, <c>Unsupported HTTP version (3.0) in
+    /// response</c>, for HTTP/3 (measured, BL-2715 Notes).
+    /// </summary>
+    /// <param name="line">The line, without its terminator.</param>
+    /// <returns>The failure to throw.</returns>
+    internal static HttpTransferException RefusalOverHttp1(string line) =>
+        line[5] == '2'
+            ? new(CurlExitCode.WeirdServerReply, HttpTransferMessages.VersionMismatchFromHttp1ToHttp2)
+            : Unsupported(HttpTransferMessages.UnsupportedHttp3Version);
 
     /// <summary>
     /// Tells whether bytes received so far could still begin a status line: they must match

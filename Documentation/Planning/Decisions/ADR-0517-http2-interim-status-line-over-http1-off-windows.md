@@ -1,6 +1,6 @@
 # ADR-0517: An HTTP/2 or HTTP/3 interim status line over HTTP/1.x is parsed as that version's 1xx off Windows
 
-- Status: Accepted
+- Status: Superseded by ADR-0679
 - Date: 2026-10-15
 - Task: BL-2326 (gap finding GF-0083, upstream test1704)
 - Decided by Claude under Stewart's delegation.

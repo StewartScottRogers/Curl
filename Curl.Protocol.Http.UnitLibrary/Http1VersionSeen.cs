@@ -53,8 +53,8 @@ internal sealed class Http1VersionSeen : IConnectionSession
 
     /// <summary>
     /// Fails a status line whose major version differs from <paramref name="seen" />, the one
-    /// an earlier response or interim head named, as curl does with <c>Version mismatch (from
-    /// HTTP/2 to HTTP/1)</c> (upstream test1704).
+    /// an earlier response on the connection named, as curl does with <c>Version mismatch (from
+    /// HTTP/1 to HTTP/2)</c> (upstream test471).
     /// </summary>
     /// <param name="seen">The version named before, or <see langword="null" /> for none.</param>
     /// <param name="version">The version the status line named.</param>
