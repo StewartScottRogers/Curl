@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Conformance.UnitTests]
+touches: [Curl.Conformance.UnitTests, Curl.Engine.UnitLibrary, Curl.Engine.UnitTests]
 requirement: none
 created: 2026-10-17
 completed:
@@ -28,7 +28,23 @@ Found by BL-2546, which ported lib1922 (`Curl.Conformance.LibTest.UnitLibrary/Li
 
 ## Notes
 
+- 2026-10-18 (lane 2, first pass, no code edited): the project at fault is `Curl.Engine.UnitLibrary`.
+  `ManagedEngineSharedState` builds its HSTS cache as `new HstsTransferPolicy(timeProvider)`, so the
+  libtest engine never learns `Strict-Transport-Security` over plain http; `HstsTransferPolicy` already
+  takes `learnsOverHttp` (ADR-0494), it only needs a seam. Plan: give `ManagedCurlEngine`'s internal
+  constructor a `learnsHstsOverHttp` flag passed to `ManagedEngineSharedState` and on to
+  `HstsTransferPolicy`, with a focused test in `Curl.Engine.UnitTests` (an http answer carrying
+  `Strict-Transport-Security` switches a later http URL of the same host to https only with the flag);
+  then `UpstreamConformanceTests.CreateEngine` passes
+  `invocation.EnvironmentVariables.ContainsKey("CURL_HSTS_HTTP")`, and `PlatformFor` reports Debug to a
+  case naming HSTS and setting `CURL_HSTS_HTTP=`. Nothing else is missing: `curl_easy_duphandle` needs no
+  change, as the HSTS cache is engine-wide (`ManagedEngineSharedState.Hsts`), and a refused CONNECT already
+  ends with exit 7 (`TcpConnector.cs`, `CONNECT tunnel failed, response <code>`).
+- Added `Curl.Engine.UnitLibrary` and `Curl.Engine.UnitTests` to `touches` for that seam. BL-2734, in
+  Doing, touches both, so this task goes back to Backlog until BL-2734 is done.
+
 ## Log
 
 - 2026-10-17: Created.
 - 2026-10-18: Backlog -> Doing. Criteria at claim: c007b8bb c59fcab3 3d836d5e.
+- 2026-10-18: Doing -> Backlog. Needs Curl.Engine.UnitLibrary and Curl.Engine.UnitTests (a CURL_HSTS_HTTP seam on ManagedCurlEngine), which BL-2734 in Doing touches
