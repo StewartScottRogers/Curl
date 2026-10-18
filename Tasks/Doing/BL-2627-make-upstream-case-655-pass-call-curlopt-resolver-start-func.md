@@ -32,3 +32,4 @@ Found by BL-2534; the ports in `Curl.Conformance.LibTest.UnitLibrary` are unit t
 ## Log
 
 - 2026-10-17: Created.
+- 2026-10-18: Backlog -> Doing. Criteria at claim: 92cbe6ef 4963d26c 21e5ddeb 4272a6b9.
