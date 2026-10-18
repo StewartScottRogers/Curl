@@ -278,6 +278,56 @@ public sealed class ConcatenatedReadStreamTests
         Assert.IsFalse(second.CanRead);
     }
 
+    [TestMethod]
+    public void Read_WithCallbackSegments_FillsAcrossSegmentsAndReadsEachCallbackOncePerRead()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("segments", "[1,2], callback [3,4], [5], callback [6]");
+        using ConcatenatedReadStream stream = new([Segment(1, 2), Segment(3, 4), Segment(5), Segment(6)], callbackSegments: [1, 3]);
+        byte[] buffer = new byte[10];
+
+        int[] reads = [stream.Read(buffer, 0, 10), stream.Read(buffer, 4, 6), stream.Read(buffer, 5, 5), stream.Read(buffer, 6, 4)];
+
+        diagnostics.Act("reads", string.Join(",", reads));
+        diagnostics.Assert("reads", "4,1,1,0", string.Join(",", reads));
+        CollectionAssert.AreEqual(new[] { 4, 1, 1, 0 }, reads);
+        CollectionAssert.AreEqual(new byte[] { 1, 2, 3, 4, 5, 6, 0, 0, 0, 0 }, buffer);
+    }
+
+    [TestMethod]
+    public async Task ReadAsync_WithCallbackSegments_FillsAcrossSegmentsAndReadsEachCallbackOncePerRead()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("segments", "[1,2], callback [3,4], [5], callback [6]");
+        using ConcatenatedReadStream stream = new([Segment(1, 2), Segment(3, 4), Segment(5), Segment(6)], callbackSegments: [1, 3]);
+        byte[] buffer = new byte[10];
+
+        int[] reads =
+        [
+            await stream.ReadAsync(buffer.AsMemory(0, 10), TestContext.CancellationToken),
+            await stream.ReadAsync(buffer.AsMemory(4, 6), TestContext.CancellationToken),
+            await stream.ReadAsync(buffer.AsMemory(5, 5), TestContext.CancellationToken),
+            await stream.ReadAsync(buffer.AsMemory(6, 4), TestContext.CancellationToken),
+        ];
+
+        diagnostics.Act("reads", string.Join(",", reads));
+        diagnostics.Assert("reads", "4,1,1,0", string.Join(",", reads));
+        CollectionAssert.AreEqual(new[] { 4, 1, 1, 0 }, reads);
+        CollectionAssert.AreEqual(new byte[] { 1, 2, 3, 4, 5, 6, 0, 0, 0, 0 }, buffer);
+    }
+
+    [TestMethod]
+    public void Read_WithCallbackSegmentsAndAFullBuffer_StopsAtTheBufferEnd()
+    {
+        using ConcatenatedReadStream stream = new([Segment(1, 2, 3), Segment(4)], callbackSegments: [1]);
+        byte[] buffer = new byte[2];
+
+        int first = stream.Read(buffer, 0, 2);
+
+        Assert.AreEqual(2, first);
+        CollectionAssert.AreEqual(new byte[] { 1, 2 }, buffer);
+    }
+
     private static MemoryStream Segment(params byte[] bytes) => new(bytes, writable: false);
 
     /// <summary>A readable stream that cannot seek, as a pipe is.</summary>

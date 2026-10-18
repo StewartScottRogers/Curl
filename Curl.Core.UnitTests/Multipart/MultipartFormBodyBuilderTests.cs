@@ -646,6 +646,22 @@ public sealed class MultipartFormBodyBuilderTests
     }
 
     [TestMethod]
+    public async Task BuildAsync_ReaderPart_EachReadFillsAcrossPartsAndAsksTheReaderOnce()
+    {
+        const string B = "------------------------readerreaderreaderreade";
+        MultipartFormBuildResult result = await BuildAsync([B], Reader("r", () => new MemoryStream("hi"u8.ToArray()), null));
+        byte[] buffer = new byte[65536];
+
+        int first = await result.Body!.Content.ReadAsync(buffer, TestContext.CancellationToken);
+        string firstText = Encoding.Latin1.GetString(buffer, 0, first);
+        int second = await result.Body.Content.ReadAsync(buffer, TestContext.CancellationToken);
+        string secondText = Encoding.Latin1.GetString(buffer, 0, second);
+
+        Assert.AreEqual($"--{B}\r\nContent-Disposition: form-data; name=\"r\"\r\n\r\nhi", firstText);
+        Assert.AreEqual($"\r\n--{B}--\r\n", secondText);
+    }
+
+    [TestMethod]
     public async Task BuildAsync_ReaderPartWithNothingToOpen_SendsAnEmptyBody()
     {
         const string B = "------------------------readerreaderreaderreade";

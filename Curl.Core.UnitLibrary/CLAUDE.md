@@ -108,7 +108,10 @@ under `/dev/` off Windows, which `SeekableFileLength` sends chunked as libcurl d
 (ADR-0104). Names and file names are escaped as `MultipartNameEscaping` says: `%22`, `%0D`, `%0A` by default, `\\` and `\"` under `--form-escape` (BL-625). `Curl.Console` builds every `-F` body with it. Two kinds no command line gives serve
 libcurl's MIME API (BL-2470, ADR-0627): a `Bytes` part sends `MultipartFormPart.Bytes` verbatim, and a `Reader`
 part streams what `OpenContent` opens, never read ahead, with `ContentLength` `null` leaving the body's length
-unknown (sent chunked); both take a text part's headers.
+unknown (sent chunked); both take a text part's headers. A body holding a `Reader` part reads as curl 8.22.0's
+buffer fill does: each read fills the buffer across parts and reads a `Reader` part at most once, so a
+chunked upload's first chunk holds the headers and the callback's first bytes (`ConcatenatedReadStream`'s
+callback segments, upstream test645, BL-2624); any other body still reads one segment per read.
 
 `Globbing\UrlGlob` is curl 8.21.0's URL globbing (ADR-0032): `TryParse` reads `{a,b}` sets
 and `[1-10]`, `[01-10]`, `[a-z:2]` ranges as `tool_urlglob.c` does, failing with exit 3 and

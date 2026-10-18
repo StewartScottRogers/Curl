@@ -448,11 +448,11 @@ public sealed class MultipartFormBodyBuilder(
     {
         if (encoder is null || encoder.PassesDataThrough)
         {
-            segments.AddStream(content, length);
+            segments.AddCallbackStream(content, length);
             return;
         }
 
-        segments.AddStream(encoder.EncodeWhileReading(content, length), encoder.EncodedLength(length));
+        segments.AddCallbackStream(encoder.EncodeWhileReading(content, length), encoder.EncodedLength(length));
     }
 
     private void AddTextData(MultipartBodySegments segments, MultipartFormPart part, MultipartPartEncoder? encoder, bool forMail)

@@ -11,6 +11,8 @@ internal sealed class MultipartBodySegments(Encoding textEncoding) : IDisposable
 {
     private readonly List<Stream> segments = [];
 
+    private readonly List<int> callbackSegments = [];
+
     private readonly StringBuilder pendingText = new();
 
     private long knownLength;
@@ -47,14 +49,27 @@ internal sealed class MultipartBodySegments(Encoding textEncoding) : IDisposable
         lengthIsKnown &= length.HasValue;
     }
 
+    /// <summary>
+    /// Appends <paramref name="content" />, a <c>curl_mime_data_cb</c> part's read callback, which these
+    /// segments now own; the body reads it at most once per read, as <see cref="ConcatenatedReadStream" /> says.
+    /// </summary>
+    /// <param name="content">The stream to send.</param>
+    /// <param name="length">Its size in bytes, or <see langword="null" /> when unknown.</param>
+    internal void AddCallbackStream(Stream content, long? length)
+    {
+        AddStream(content, length);
+        callbackSegments.Add(segments.Count - 1);
+    }
+
     /// <summary>Hands every segment to one stream, which then owns them.</summary>
     /// <param name="allowsSeeking">Whether the body seeks when every segment seeks.</param>
     /// <returns>The body, read segment by segment.</returns>
     internal ConcatenatedReadStream ToStream(bool allowsSeeking = true)
     {
         FlushText();
-        ConcatenatedReadStream body = new([.. segments], allowsSeeking);
+        ConcatenatedReadStream body = new([.. segments], allowsSeeking, [.. callbackSegments]);
         segments.Clear();
+        callbackSegments.Clear();
         return body;
     }
 
