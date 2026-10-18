@@ -45,6 +45,7 @@ In Curl.Console's retry loop: on a 429 with Retry-After, keep the 429's output w
 - 2026-10-15_0543: 0 of 3 items are gaps.
 - 2026-10-15_0751: 0 of 3 items are gaps.
 - 2026-10-15_1657: 0 of 3 items are gaps.
+- 2026-10-17_2225: 0 of 3 items are gaps.
 
 ## Log
 
