@@ -8,7 +8,7 @@ depends-on: []
 touches: [RunDarkFactory.ps1]
 requirement: none
 created: 2026-10-18
-completed:
+completed: 2026-10-18
 ---
 # BL-2778 — Fix AF-0267: BL-2527 cost $7.97, 3.27 times the $2.43 median task cost: a 94-turn, 34-minute run plus a rebase-conflict resolve run
 
@@ -41,12 +41,17 @@ The finding describes a past run's cost, which no fix can change, so no re-audit
 
 ## Acceptance criteria
 
-- [ ] The cause of the cost is named in this task, and either fixed or recorded as unavoidable.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The cause of the cost is named in this task, and either fixed or recorded as unavoidable.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Cause (measured by the audit, no rerun needed): BL-2527 ported ten libtest programs (500 to 509) in one run, 94 turns (60 Bash, 21 Write, 10 Edit), $7.49, plus a $0.47 rebase-conflict resolve run on the shared ratchet file in a 9-lane shift. The cost follows the task's size, not a loop, rerun or stray subagent. Decision: unavoidable for this past run; no change to RunDarkFactory.ps1. The finding names BL-2550, BL-2549, BL-2535 and BL-2536 as libtest port batches of the same shape; any batch-size cap belongs in how port tasks are filed (task-planner), not in the runner. History cannot change, so the first audit after this task is Done closes AF-0267 as task-done-historical.
+
+
 
 ## Log
 
 - 2026-10-18: Created.
 - 2026-10-18: Backlog -> Doing. Criteria at claim: af4de8c2 9742157d.
+- 2026-10-18: Doing -> Done. Cause named: ten libtest programs in one run; unavoidable, recorded in Notes
