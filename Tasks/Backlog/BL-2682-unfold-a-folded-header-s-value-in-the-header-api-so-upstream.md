@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Engine.UnitLibrary, Curl.Engine.UnitTests, Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
+touches: [Curl.Engine.UnitLibrary/TransferHeaderStore.cs, Curl.Engine.UnitTests/TransferHeaderStoreTests.cs, Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
 requirement: none
 created: 2026-10-17
 completed:
@@ -27,6 +27,8 @@ Found by BL-2547. The case's `CONNECT` response folds a header (`Server: from ` 
 - [ ] `dotnet build` is clean and the fast tests pass with no test deleted, skipped or weakened, and every case on the ratchet still passes.
 
 ## Notes
+
+- 2026-10-18: touches narrowed from Curl.Engine.UnitLibrary, Curl.Engine.UnitTests to files, by reading TransferHeaderStore, so it can run beside other Engine tasks.
 
 ## Log
 

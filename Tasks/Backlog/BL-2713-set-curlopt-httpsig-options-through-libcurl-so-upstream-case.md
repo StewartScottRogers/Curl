@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: direct
 depends-on: []
-touches: [Libcurl, Libcurl.UnitTests, Curl.Conformance.LibTest.UnitTests, Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
+touches: [Libcurl/Options/Authentication/EasyAuthenticationOptionSetters.cs, Libcurl.UnitTests/Options/Authentication/EasyAuthenticationOptionSettersTests.cs, Curl.Conformance.LibTest.UnitTests, Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
 requirement: none
 created: 2026-10-17
 completed:
@@ -28,6 +28,8 @@ Found by BL-2552. `Libcurl/Options/CurlOption.cs` names the four options, but no
 - [ ] `dotnet build` is clean and the fast tests pass; `Measure-CodeQuality.ps1 -Library Libcurl` reports 0 failing members.
 
 ## Notes
+
+- 2026-10-18: touches narrowed from Libcurl, Libcurl.UnitTests to files, by reading EasyAuthenticationOptionSetters (the AWS_SIGV4 setter is its model) and the engine HttpSignature options, so it can run beside other Engine tasks.
 
 ## Log
 

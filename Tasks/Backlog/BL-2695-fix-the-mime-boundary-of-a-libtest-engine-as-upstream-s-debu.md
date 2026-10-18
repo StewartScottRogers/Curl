@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Engine.UnitLibrary, Curl.Engine.UnitTests, Curl.Conformance.UnitTests]
+touches: [Curl.Engine.UnitLibrary/ManagedCurlEngine.cs, Curl.Engine.UnitLibrary/ManagedEngineSharedState.cs, Curl.Engine.UnitLibrary/ManagedEasyTransfer.cs, Curl.Engine.UnitTests/ManagedCurlEngineTests.cs, Curl.Engine.UnitTests/ManagedEasyTransferTests.Mime.cs, Curl.Conformance.UnitTests]
 requirement: none
 created: 2026-10-17
 completed:
@@ -27,6 +27,8 @@ Found by BL-2675 (AWS SigV4 libtest cases with the harness's Debug stand-in and 
 - [ ] dotnet build is clean and the fast tests pass.
 
 ## Notes
+
+- 2026-10-18: touches narrowed from Curl.Engine.UnitLibrary, Curl.Engine.UnitTests to files, by reading ManagedEasyTransfer.CreateFormBoundary, ManagedCurlEngine and ManagedEngineSharedState, so it can run beside other Engine tasks.
 
 ## Log
 

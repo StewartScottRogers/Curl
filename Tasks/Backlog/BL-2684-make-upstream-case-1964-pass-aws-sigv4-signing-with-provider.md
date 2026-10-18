@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Conformance.UnitTests/PassingUpstreamCases.txt, Curl.Engine.UnitLibrary, Curl.Engine.UnitTests]
+touches: [Curl.Conformance.UnitTests/PassingUpstreamCases.txt, Curl.Engine.UnitLibrary/ManagedEasyTransfer.cs, Curl.Engine.UnitLibrary/TransferCredentialLookup.cs, Curl.Engine.UnitLibrary/AwsSigV4HttpAuthenticator.cs, Curl.Engine.UnitTests/ManagedEasyTransferTests.Netrc.cs, Curl.Engine.UnitTests/AwsSigV4HttpAuthenticatorTests.cs]
 requirement: none
 created: 2026-10-17
 completed:
@@ -28,6 +28,8 @@ Found by BL-2548, which ported lib1964 as `Lib1964` in `Curl.Conformance.LibTest
 - [ ] `Curl.Conformance.UnitTests/PassingUpstreamCases.txt` is unchanged or grown, and every case it lists still passes.
 
 ## Notes
+
+- 2026-10-18: touches narrowed from Curl.Engine.UnitLibrary, Curl.Engine.UnitTests to files, by reading ManagedEasyTransfer.TryLookUpNetrcCredentials, TransferCredentialLookup and AwsSigV4HttpAuthenticator, so it can run beside other Engine tasks.
 
 - 2026-10-18 (lane 3, first pass, no code edited): measured with `CURL_UPSTREAM_CASE=1964`: the request carries
   no `Authorization` and no `Server auth using AWS_SIGV4` line, so `AwsSigV4HttpAuthenticator.Sign` returned at

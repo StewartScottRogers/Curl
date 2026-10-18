@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: [BL-2645]
-touches: [Curl.Engine.UnitLibrary, Curl.Engine.UnitTests, Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
+touches: [Curl.Engine.UnitLibrary/ManagedEasyTransfer.cs, Curl.Engine.UnitTests/ManagedEasyTransferTests.InFileSize.cs, Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
 requirement: none
 created: 2026-10-17
 completed:
@@ -27,6 +27,8 @@ Found by BL-2542, which ported lib1576. Cases 1576 to 1580 all end `curl did not
 - [ ] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- 2026-10-18: touches narrowed from Curl.Engine.UnitLibrary, Curl.Engine.UnitTests to files, by reading ManagedEasyTransfer upload-size handling (InFileSize) and its existing InFileSize tests, so it can run beside other Engine tasks.
 
 ## Log
 

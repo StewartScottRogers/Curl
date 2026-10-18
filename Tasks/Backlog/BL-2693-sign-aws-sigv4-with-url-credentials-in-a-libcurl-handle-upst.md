@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Engine.UnitLibrary, Curl.Engine.UnitTests, Curl.Conformance.UnitTests]
+touches: [Curl.Engine.UnitLibrary/ManagedEasyTransfer.cs, Curl.Engine.UnitLibrary/TransferCredentialLookup.cs, Curl.Engine.UnitLibrary/AwsSigV4HttpAuthenticator.cs, Curl.Engine.UnitTests/ManagedEasyTransferTests.Netrc.cs, Curl.Engine.UnitTests/AwsSigV4HttpAuthenticatorTests.cs, Curl.Conformance.UnitTests]
 requirement: none
 created: 2026-10-17
 completed:
@@ -27,6 +27,8 @@ Found by BL-2675, which made the AWS SigV4 libtest cases run with the harness's 
 - [ ] dotnet build is clean and the fast tests pass.
 
 ## Notes
+
+- 2026-10-18: touches narrowed from Curl.Engine.UnitLibrary, Curl.Engine.UnitTests to files, by reading ManagedEasyTransfer.TryLookUpNetrcCredentials, TransferCredentialLookup and AwsSigV4HttpAuthenticator, so it can run beside other Engine tasks.
 
 ## Log
 

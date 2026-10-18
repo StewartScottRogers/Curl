@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Libcurl, Libcurl.UnitTests, Curl.Engine.UnitLibrary, Curl.Engine.UnitTests, Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
+touches: [Libcurl, Libcurl.UnitTests, Curl.Engine.UnitLibrary/ManagedEasyTransfer.cs, Curl.Engine.UnitTests/ManagedEasyTransferTests.InFileSize.cs, Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
 requirement: none
 created: 2026-10-17
 completed:
@@ -27,6 +27,8 @@ Found by BL-2547, which ported lib1948 (`Curl.Conformance.LibTest.UnitLibrary/Li
 - [ ] `dotnet build` is clean and the fast tests pass with no test deleted, skipped or weakened, and every case on the ratchet still passes.
 
 ## Notes
+
+- 2026-10-18: touches narrowed from Curl.Engine.UnitLibrary, Curl.Engine.UnitTests to files, by reading ManagedEasyTransfer upload-size handling (InFileSize); Libcurl and Libcurl.UnitTests left as they are because the setter side was not checked, so it can run beside other Engine tasks.
 
 ## Log
 

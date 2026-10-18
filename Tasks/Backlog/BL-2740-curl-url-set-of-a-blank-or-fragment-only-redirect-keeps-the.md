@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Engine.UnitLibrary, Curl.Engine.UnitTests, Curl.Protocol.Abstractions.UnitLibrary, Curl.Protocol.Abstractions.UnitTests]
+touches: [Curl.Engine.UnitLibrary/ManagedCurlUrlHandle.cs, Curl.Engine.UnitLibrary/UrlRelativeReference.cs, Curl.Engine.UnitTests/ManagedCurlUrlHandleTests.Set.cs, Curl.Engine.UnitTests/UrlRelativeReferenceTests.cs, Curl.Protocol.Abstractions.UnitLibrary, Curl.Protocol.Abstractions.UnitTests]
 requirement: none
 created: 2026-10-18
 completed:
@@ -32,6 +32,8 @@ Rows (`set_url_list` index: base, redirect, set flags, wanted, got):
 - [ ] `dotnet build` is clean, the fast tests pass, and `Measure-CodeQuality.ps1` reports 0 failing members for each changed library.
 
 ## Notes
+
+- 2026-10-18: touches narrowed from Curl.Engine.UnitLibrary, Curl.Engine.UnitTests to files, by reading ManagedCurlUrlHandle and UrlRelativeReference.Resolve, so it can run beside other Engine tasks.
 
 ## Log
 

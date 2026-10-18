@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: direct
 depends-on: []
-touches: [Curl.Engine.UnitLibrary, Curl.Engine.UnitTests, Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
+touches: [Curl.Engine.UnitLibrary/ManagedEasyTransfer.cs, Curl.Engine.UnitLibrary/ManagedEngineSharedState.cs, Curl.Engine.UnitLibrary/CallbackHstsCache.cs, Curl.Engine.UnitTests/ManagedEasyTransferTests.Hsts.cs, Curl.Engine.UnitTests/CallbackHstsCacheTests.cs, Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
 requirement: none
 created: 2026-10-17
 completed:
@@ -27,6 +27,8 @@ Found by BL-2545 (lib1915 port). lib1915's first handle loads four entries throu
 - [ ] `dotnet build` is clean and the fast tests pass with no test deleted, skipped or weakened.
 
 ## Notes
+
+- 2026-10-18: touches narrowed from Curl.Engine.UnitLibrary, Curl.Engine.UnitTests to files, by reading ManagedEasyTransfer HSTS save (shared.Hsts), ManagedEngineSharedState and CallbackHstsCache, so it can run beside other Engine tasks.
 
 ## Log
 

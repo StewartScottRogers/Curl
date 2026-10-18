@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: direct
 depends-on: []
-touches: [Curl.Engine.UnitLibrary, Curl.Engine.UnitTests, Libcurl, Libcurl.UnitTests, Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
+touches: [Curl.Engine.UnitLibrary/ManagedEasyTransfer.cs, Curl.Engine.UnitLibrary/UrlEffective.cs, Curl.Engine.UnitLibrary/TransferInfoFromReport.cs, Curl.Engine.UnitTests/ManagedEasyTransferTests.cs, Curl.Engine.UnitTests/UrlEffectiveTests.cs, Curl.Engine.UnitTests/TransferInfoFromReportTests.cs, Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
 requirement: none
 created: 2026-10-17
 completed:
@@ -27,6 +27,8 @@ Found by BL-2545 (lib1907 port). Case 1907 runs `lib1907` on `%HOSTIP:%HTTPPORT/
 - [ ] `dotnet build` is clean and the fast tests pass with no test deleted, skipped or weakened.
 
 ## Notes
+
+- 2026-10-18: touches narrowed from Curl.Engine.UnitLibrary, Curl.Engine.UnitTests, Libcurl, Libcurl.UnitTests to files, by reading ManagedEasyTransfer (TransferInfo.EffectiveUrl), UrlEffective and TransferInfoFromReport; the Libcurl CURLINFO_EFFECTIVE_URL reader only passes TransferInfo.EffectiveUrl through, so it can run beside other Engine tasks.
 
 ## Log
 

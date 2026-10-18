@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: direct
 depends-on: []
-touches: [Libcurl, Libcurl.UnitTests, Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
+touches: [Libcurl/Options/Network/EasyNetworkOptionSetters.cs, Libcurl.UnitTests/Options/Network/EasyNetworkOptionSettersTests.cs, Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
 requirement: none
 created: 2026-10-17
 completed:
@@ -27,6 +27,8 @@ Found by BL-2543, which ported lib1597. The runner reports `<verify><stdout> dif
 - [ ] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- 2026-10-18: touches narrowed from Libcurl, Libcurl.UnitTests to files, by reading EasyNetworkOptionSetters.SetProtocols and SetRedirectProtocols, so it can run beside other Engine tasks.
 
 ## Log
 

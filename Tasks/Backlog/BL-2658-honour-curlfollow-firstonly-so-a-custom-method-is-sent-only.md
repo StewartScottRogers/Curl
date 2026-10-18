@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Engine.UnitLibrary, Curl.Engine.UnitTests, Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
+touches: [Curl.Engine.UnitLibrary/RedirectPolicyMapping.cs, Curl.Engine.UnitTests/RedirectPolicyMappingTests.cs, Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
 requirement: none
 created: 2026-10-17
 completed:
@@ -27,6 +27,8 @@ Found by BL-2542. Case 1574: `differs at byte 59 (line 5): expected "GET /157400
 - [ ] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- 2026-10-18: touches narrowed from Curl.Engine.UnitLibrary, Curl.Engine.UnitTests to files, by reading RedirectPolicyMapping.DropsCustomMethodOnSwitchToGet and the FollowLocation option, so it can run beside other Engine tasks.
 
 ## Log
 

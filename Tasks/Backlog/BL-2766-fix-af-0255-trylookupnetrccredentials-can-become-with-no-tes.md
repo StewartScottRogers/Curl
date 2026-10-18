@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Engine.UnitLibrary]
+touches: [Curl.Engine.UnitLibrary/ManagedEasyTransfer.cs, Curl.Engine.UnitTests/ManagedEasyTransferTests.Netrc.cs]
 requirement: none
 created: 2026-10-18
 completed:
@@ -45,6 +45,8 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 - [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- 2026-10-18: touches narrowed from Curl.Engine.UnitLibrary to files, by reading ManagedEasyTransfer.TryLookUpNetrcCredentials (line 707), so it can run beside other Engine tasks.
 
 ## Log
 

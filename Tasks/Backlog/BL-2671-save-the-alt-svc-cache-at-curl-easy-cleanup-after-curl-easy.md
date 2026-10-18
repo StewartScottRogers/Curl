@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: direct
 depends-on: []
-touches: [Curl.Engine.UnitLibrary, Curl.Engine.UnitTests, Libcurl, Libcurl.UnitTests, Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
+touches: [Curl.Engine.UnitLibrary/ManagedEasyTransfer.cs, Curl.Engine.UnitLibrary/TransferPerformer.Setup.cs, Curl.Engine.UnitLibrary/AltSvcTransferCache.cs, Curl.Engine.UnitTests/ManagedEasyTransferTests.Cleanup.cs, Curl.Engine.UnitTests/AltSvcTransferCacheTests.cs, Curl.Engine.UnitTests/TransferPerformerTests.Setup.cs, Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
 requirement: none
 created: 2026-10-17
 completed:
@@ -27,6 +27,8 @@ Found by BL-2545 (lib1908 port). lib1908 performs with `CURLOPT_ALTSVC` set to `
 - [ ] `dotnet build` is clean and the fast tests pass with no test deleted, skipped or weakened.
 
 ## Notes
+
+- 2026-10-18: touches narrowed from Curl.Engine.UnitLibrary, Curl.Engine.UnitTests, Libcurl, Libcurl.UnitTests to files, by reading ManagedEasyTransfer cleanup/duplicate/reset, TransferPerformer.WriteCookieJarAltSvcAndHstsFilesAsync and AltSvcTransferCache, so it can run beside other Engine tasks.
 
 ## Log
 
