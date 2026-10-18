@@ -30,3 +30,4 @@ Found by BL-2697. Run with the Unix platform's features (the `Platform` line in 
 ## Log
 
 - 2026-10-18: Created.
+- 2026-10-18: Backlog -> Doing. Criteria at claim: 7d39c3cd 3d836d5e.
