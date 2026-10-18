@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Conformance.LibTest.UnitLibrary]
+touches: [Curl.Conformance.LibTest.UnitLibrary, Curl.Conformance.LibTest.UnitTests]
 requirement: none
 created: 2026-10-18
 completed:
@@ -41,10 +41,14 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Added Curl.Conformance.LibTest.UnitTests to touches: the killing test lives in the library's own test project; no task in Doing names it.
+- Fix is test-only: Constructor_RefusesANullFirstArgument passes a null at index 0, so the `>= 0` -> `> 0` mutant fails it. Production code unchanged.
+- The audit guard refuses lanes the finding's mutation script, so the reproduction was checked by hand: with `>= 0` changed to `> 0`, LibTestContextTests failed 1 of 13 (killed); restored, 13 of 13 pass and the full fast run is green.
 
 ## Log
 

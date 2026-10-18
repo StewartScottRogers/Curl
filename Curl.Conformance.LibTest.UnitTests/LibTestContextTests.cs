@@ -90,6 +90,12 @@ public sealed class LibTestContextTests
     }
 
     [TestMethod]
+    public void Constructor_RefusesANullFirstArgument()
+    {
+        Assert.ThrowsExactly<ArgumentNullException>(() => new LibTestContext(1, [null!, "arg2"]));
+    }
+
+    [TestMethod]
     public void EngineAndStreams_WhenNotSet_AreNoEngineAndNullStreams()
     {
         var context = new LibTestContext(1, ["url"]);
