@@ -125,6 +125,7 @@ internal sealed class FtpControlChannelResponder : ILineProtocolResponder
                 return $"257 \"{CurrentDirectory()}\" is current directory\r\n";
             case "CWD":
                 SwitchDirectory(argument);
+                transferCommands?.ChangeDirectory(targetDirectory);
                 return displayText ?? string.Empty;
             default:
                 return AnswerTransferOrNotDealtWith(command, argument, displayText);

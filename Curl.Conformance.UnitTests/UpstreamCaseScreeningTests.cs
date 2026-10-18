@@ -439,7 +439,6 @@ public sealed class UpstreamCaseScreeningTests
     [DataRow("<verify>\n<errorcode>\nlots\n</errorcode>\n</verify>\n", "the expected exit code lots is not a number")]
     [DataRow("<verify>\n<errorcode>\n77,lots\n</errorcode>\n</verify>\n", "the expected exit code 77,lots is not a number")]
     [DataRow("<verify>\n<protocol>\nUSER anonymous\nLPRT 4,4,127,0,0,1,2,35,46\n</protocol>\n</verify>\n", "the FTP stand-in does not carry out the case's LPRT")]
-    [DataRow("<verify>\n<protocol>\nCWD fully_simulated\n</protocol>\n</verify>\n", "the FTP stand-in does not carry out the case's CWD fully_simulated")]
     public void FindSkipReason_NamesWhatTheHarnessCannotDo(string sections, string expected)
     {
         var diagnostics = TestDiagnostics.For(TestContext);
@@ -479,6 +478,14 @@ public sealed class UpstreamCaseScreeningTests
     public void FindSkipReason_ScpTransferCase_IsNull(string verify)
     {
         string? reason = Screen($"<client>\n<server>\nscp\n</server>\n<command>\n-u %USER: scp://127.0.0.1:%SSHPORT%SCP_PWD/f\n</command>\n</client>\n{verify}");
+
+        Assert.IsNull(reason);
+    }
+
+    [TestMethod]
+    public void FindSkipReason_FtpCaseVerifyingCwdFullySimulated_IsNullSinceTheStandInServesTheSimulatedDirectories()
+    {
+        string? reason = Screen("<client>\n<server>\nftp\n</server>\n<command>\nftp://127.0.0.1:8993/fully_simulated/UNIX/*.txt\n</command>\n</client>\n<verify>\n<protocol>\nCWD fully_simulated\n</protocol>\n</verify>\n");
 
         Assert.IsNull(reason);
     }

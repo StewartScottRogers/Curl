@@ -58,7 +58,7 @@ internal static class UpstreamCaseScreening
     // The servers that read <servercmd> as ftpserver.pl does: the FTP stand-in, plain or behind TLS.
     private static readonly string[] FtpServers = ["ftp", "ftp-ipv6", .. FtpsServerConnector.EmulatedServers];
 
-    private static readonly Regex FtpDataConnectionCommand = new(@"^LPRT\b|^CWD fully_simulated", RegexOptions.CultureInvariant | RegexOptions.Multiline);
+    private static readonly Regex FtpDataConnectionCommand = new(@"^LPRT\b", RegexOptions.CultureInvariant | RegexOptions.Multiline);
     private static readonly Regex CurlConfigScript = new(@"\btest(?:1013|1022)\.pl\b", RegexOptions.CultureInvariant);
 
     private static readonly string[] FileParts = ["file", "file1", "file2", "file3", "file4"];
