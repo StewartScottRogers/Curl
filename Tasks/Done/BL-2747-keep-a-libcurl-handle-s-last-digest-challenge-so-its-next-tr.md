@@ -8,7 +8,7 @@ depends-on: []
 touches: [Libcurl, Libcurl.UnitTests, Curl.Engine.UnitLibrary, Curl.Engine.UnitTests, Curl.Protocol.Abstractions.UnitLibrary, Curl.Protocol.Abstractions.UnitTests, Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests]
 requirement: none
 created: 2026-10-18
-completed:
+completed: 2026-10-18
 ---
 # BL-2747 — Keep a Libcurl handle's last Digest challenge so its next transfer answers it, as curl's authhost state does
 
@@ -26,15 +26,23 @@ Where Curl stands: `Curl.Authentication.UnitLibrary/DigestAuthenticator.cs` is s
 
 ## Acceptance criteria
 
-- [ ] A Libcurl unit test in `Libcurl.UnitTests` performs two transfers on one handle against a fake server: the first under `CURLAUTH_BASIC` gets a 401 offering Digest, the second under `CURLAUTH_DIGEST` sends the Digest `Authorization` built from that challenge's nonce on its first request.
-- [ ] `HttpProtocolHandler` answers prior challenges from `HttpRequestOptions` on its first request, pinned by a test in `Curl.Protocol.Http.UnitTests`; with no prior challenges its requests are unchanged.
-- [ ] Every changed library passes `Measure-CodeQuality.ps1` (100% line and branch coverage, complexity at most 10).
-- [ ] An ADR marked "Decided by Claude under Stewart's delegation" records where the state lives and why.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] A Libcurl unit test in `Libcurl.UnitTests` performs two transfers on one handle against a fake server: the first under `CURLAUTH_BASIC` gets a 401 offering Digest, the second under `CURLAUTH_DIGEST` sends the Digest `Authorization` built from that challenge's nonce on its first request.
+- [x] `HttpProtocolHandler` answers prior challenges from `HttpRequestOptions` on its first request, pinned by a test in `Curl.Protocol.Http.UnitTests`; with no prior challenges its requests are unchanged.
+- [x] Every changed library passes `Measure-CodeQuality.ps1` (100% line and branch coverage, complexity at most 10).
+- [x] An ADR marked "Decided by Claude under Stewart's delegation" records where the state lives and why.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Decided (ADR-0692): `ManagedEasyTransfer` keeps the `WWW-Authenticate` values of the 401 that ended its last perform, for the same `host:port` only, and passes them through `TransferContextFactory.KeptDigestChallenges` as `HttpRequestOptions.KeptDigestChallenges`; `HttpProtocolHandler` answers them on the first request when Digest is the one scheme allowed and credentials are set. `Reset` forgets them. The curl tool passes none (its runner builds its own factory).
+- The same-host rule came from upstream test1985 on the ratchet, which went red when the challenges were answered to any host: curl sends nothing to the second host.
+- The two-transfer handle test is in `Curl.Engine.UnitTests` (`ManagedCurlEngineTests.PerformAsync_EarlierTransferGotDigestChallenge_NextDigestTransferAnswersItFirst`), not `Libcurl.UnitTests`: the state is `ManagedEasyTransfer`'s, which a Libcurl `CURL` handle wraps, and `Libcurl.UnitTests` has no scripted dialer and cannot reach the engine's internal `EngineDialing`. It sends `Digest username="testuser", realm="testrealm", nonce="1", uri="/20240200", response=...` on request 200 as case 2024 expects.
+- Upstream cases 2024 and 2030 are not on the ratchet and were not added here (`PassingUpstreamCases.txt` is outside `touches`).
+- Measure-CodeQuality.ps1 on Curl.Engine, Curl.Protocol.Http and Curl.Protocol.Abstractions: 0 failing members.
+- Known gap (ADR-0692): a transfer that answered Digest and ended 200 keeps nothing, so the next Digest transfer probes again where curl would send nc=00000002.
 
 ## Log
 
 - 2026-10-18: Created.
 - 2026-10-18: Backlog -> Doing. Criteria at claim: 880730e0 b0daa4a0 06081716 9319789a 3d836d5e.
+- 2026-10-18: Doing -> Done. Libcurl handle keeps its last 401's Digest challenges for the same host and answers them on its next Digest transfer (ADR-0692)
