@@ -1421,6 +1421,80 @@ public sealed class UpstreamCaseRunnerTests
         Assert.AreEqual("libtest program not ported", outcome.Detail);
     }
 
+    [TestMethod]
+    [DataRow("CURLOPT_CAINFO_BLOB is not supported\n", 0, "CURLOPT_CAINFO_BLOB is not supported")]
+    [DataRow("", 1, "precheck command error")]
+    public async Task RunAsync_LibTestsPrecheckThatPrintsOrFails_SkipsTheCaseWithoutRunningCurl(string output, int exitCode, string expectedReason)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        PrecheckLibTest check = new(output, exitCode);
+        UpstreamCaseRunner runner = PrecheckRunner(check, _ => throw new AssertFailedException("curl must not run after a failed precheck"));
+
+        UpstreamCaseOutcome outcome = await RunAsync(runner, LibTestsPrecheckCase);
+
+        diagnostics.Assert("skip reason", expectedReason, outcome.Detail);
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Skipped, outcome.Kind);
+        Assert.AreEqual(expectedReason, outcome.Detail);
+        CollectionAssert.AreEqual(new[] { "check" }, check.Context!.Arguments.ToArray());
+    }
+
+    [TestMethod]
+    public async Task RunAsync_LibTestsPrecheckThatPassesQuietly_RunsTheCase()
+    {
+        bool curlRan = false;
+        UpstreamCaseRunner runner = PrecheckRunner(new PrecheckLibTest("", 0), _ =>
+        {
+            curlRan = true;
+            return Task.FromResult(0);
+        });
+
+        UpstreamCaseOutcome outcome = await RunAsync(runner, LibTestsPrecheckCase);
+
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Passed, outcome.Kind, outcome.Detail);
+        Assert.IsTrue(curlRan);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_LibTestsPrecheckThatThrows_SkipsWithPrecheckCommandError()
+    {
+        UpstreamCaseRunner runner = PrecheckRunner(new PrecheckLibTest(null, 0), _ => throw new AssertFailedException("curl must not run after a failed precheck"));
+
+        UpstreamCaseOutcome outcome = await RunAsync(runner, LibTestsPrecheckCase);
+
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Skipped, outcome.Kind);
+        Assert.AreEqual("precheck command error", outcome.Detail);
+    }
+
+    private const string LibTestsPrecheckCase = "<testcase>\n<client>\n<command>\na\n</command>\n<precheck>\n%LIBTESTS lib678 check\n</precheck>\n</client>\n</testcase>\n";
+
+    private static UpstreamCaseRunner PrecheckRunner(ILibTest check, Func<UpstreamCurlInvocation, Task<int>> runCurl) =>
+        new(
+            runCurl,
+            UpstreamCurlPlatform.Unix,
+            TimeProvider.System,
+            TimeSpan.FromSeconds(10),
+            libTests: new UpstreamLibTests(new LibTestPrograms([check]), invocation => new StubCurlEngine(invocation)));
+
+    // lib678 as a precheck sees it: keeps its context, prints its output and returns its exit code, or throws for null output.
+    private sealed class PrecheckLibTest(string? output, int exitCode) : ILibTest
+    {
+        public LibTestContext? Context { get; private set; }
+
+        public string ProgramName => "lib678";
+
+        public async Task<LibTestResult> RunAsync(LibTestContext context, CancellationToken cancellationToken)
+        {
+            Context = context;
+            if (output is null)
+            {
+                throw new InvalidOperationException("the check failed to start");
+            }
+
+            await context.StandardOutput.WriteAsync(Encoding.ASCII.GetBytes(output), cancellationToken);
+            return new LibTestResult(exitCode);
+        }
+    }
+
     private static UpstreamCaseRunner LibRunner(ILibTest program) =>
         new(
             _ => throw new AssertFailedException("curl must not run for a lib case"),

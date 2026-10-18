@@ -649,6 +649,18 @@ public sealed class UpstreamCaseScreeningTests
     }
 
     [TestMethod]
+    [DataRow("lib678", null)]
+    [DataRow("lib679", "the harness does not interpret the <client><precheck> line ./libtest/libtests lib679 check")]
+    public void FindSkipReason_LibTestsPrecheckLine_RunsOnlyWhenItsProgramIsPorted(string program, string? expected)
+    {
+        UpstreamTestCase testCase = ParsedTestCase.From(RunnableClient + $"<client>\n<precheck>\n./libtest/libtests {program} check\n</precheck>\n</client>\n");
+
+        string? reason = UpstreamCaseScreening.FindSkipReason(CleanExpansion, testCase, Features, isPortedLibTest: name => name == "lib678");
+
+        Assert.AreEqual(expected, reason);
+    }
+
+    [TestMethod]
     [DataRow("https", "test-localhost.pem")]
     [DataRow("https test-localhost-san-first.pem", "test-localhost-san-first.pem")]
     public void HttpsCertificateFile_HttpsServerLine_NamesTheCertificate(string serverLine, string expected)
