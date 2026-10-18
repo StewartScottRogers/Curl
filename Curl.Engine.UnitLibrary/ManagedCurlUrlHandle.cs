@@ -36,6 +36,7 @@ internal sealed class ManagedCurlUrlHandle : ICurlUrlHandle
         CurlUrlCode.BadHostname,
         CurlUrlCode.BadFileUrl,
         CurlUrlCode.UserNotAllowed,
+        CurlUrlCode.Backslash,
     ];
 
     /// <summary>The reader of each <see cref="CurlUrlPart" />, by its number.</summary>

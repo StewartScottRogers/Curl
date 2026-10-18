@@ -27,6 +27,10 @@ public sealed class CurlUrlRejectionTests
     [DataRow(":80/x", CurlUrlRejection.NoHost)]
     [DataRow("http://h:99999/", CurlUrlRejection.BadPortNumber)]
     [DataRow("http://h:1x/", CurlUrlRejection.BadPortNumber)]
+    [DataRow("http://hostname:1111\\path", CurlUrlRejection.Backslash)]
+    [DataRow("http:\\\\hostname", CurlUrlRejection.Backslash)]
+    [DataRow("http://h:\\x", CurlUrlRejection.Backslash)]
+    [DataRow("http://h:1x\\/", CurlUrlRejection.BadPortNumber)]
     [DataRow("http://h:-1/", CurlUrlRejection.BadPortNumber)]
     [DataRow("http://:x/", CurlUrlRejection.BadPortNumber)]
     [DataRow("http://[::1]x/", CurlUrlRejection.BadPortNumber)]
@@ -269,6 +273,7 @@ public sealed class CurlUrlRejectionTests
     [DataRow(CurlUrlRejection.BadHostname, "Bad hostname")]
     [DataRow(CurlUrlRejection.BadFileUrl, "Bad file:// URL")]
     [DataRow(CurlUrlRejection.UserNotAllowed, "Credentials was passed in the URL when prohibited")]
+    [DataRow(CurlUrlRejection.Backslash, "Found a backslash where a forward slash was expected")]
     public void ToCurlMessage_ForEachRejection_ReturnsCurlsText(CurlUrlRejection rejection, string expected)
     {
         TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);

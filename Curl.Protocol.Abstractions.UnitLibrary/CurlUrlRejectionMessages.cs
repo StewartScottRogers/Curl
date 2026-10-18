@@ -23,6 +23,7 @@ public static class CurlUrlRejectionMessages
         CurlUrlRejection.BadHostname => "Bad hostname",
         CurlUrlRejection.BadFileUrl => "Bad file:// URL",
         CurlUrlRejection.UserNotAllowed => "Credentials was passed in the URL when prohibited",
+        CurlUrlRejection.Backslash => "Found a backslash where a forward slash was expected",
         _ => throw new ArgumentOutOfRangeException(nameof(rejection), rejection, "The URL was not rejected."),
     };
 }

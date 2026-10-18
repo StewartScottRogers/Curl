@@ -250,6 +250,18 @@ public sealed partial class ManagedCurlUrlHandleTests
         Assert.AreEqual(expected, url.Set(CurlUrlPart.Url, text, CurlUrlFlags.None));
     }
 
+    // lib1560's get_parts rows 0 to 2 (BL-2731): a backslash where the port's digits end.
+    [TestMethod]
+    [DataRow("http:\\\\hostname", CurlUrlFlags.GuessScheme)]
+    [DataRow("http:\\\\hostname:1234", CurlUrlFlags.GuessScheme)]
+    [DataRow("http://hostname:1111\\path", CurlUrlFlags.None)]
+    public void Set_UrlWithABackslashWhereThePortEnds_ReturnsBackslash(string text, CurlUrlFlags flags)
+    {
+        using ManagedCurlUrlHandle url = new();
+
+        Assert.AreEqual(CurlUrlCode.Backslash, url.Set(CurlUrlPart.Url, text, flags));
+    }
+
     [TestMethod]
     public void Set_UserWithDisallowUser_ReturnsUserNotAllowed()
     {

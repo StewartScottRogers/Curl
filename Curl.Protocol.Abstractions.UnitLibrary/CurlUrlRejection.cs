@@ -39,4 +39,9 @@ public enum CurlUrlRejection
     /// <c>--disallow-username-in-url</c> does (<c>CURLUE_USER_NOT_ALLOWED</c>).
     /// </summary>
     UserNotAllowed,
+
+    /// <summary>
+    /// The port's digits end at a backslash, where a slash was expected (<c>CURLUE_BACKSLASH</c>).
+    /// </summary>
+    Backslash,
 }
