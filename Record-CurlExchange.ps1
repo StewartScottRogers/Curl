@@ -1933,11 +1933,20 @@ function Write-ThrowawayCrl {
     [System.IO.File]::WriteAllText([System.IO.Path]::GetFullPath([System.IO.Path]::Combine((Get-Location).ProviderPath, $Path)), $pem, $ascii)
 }
 
+function New-ThrowawayRsaKey {
+    # RSACng on Windows (Schannel needs it); RSACng does not exist elsewhere, where
+    # RSA.Create gives an OpenSSL-backed key.
+    if ([System.Environment]::OSVersion.Platform -eq [System.PlatformID]::Win32NT) {
+        return New-Object System.Security.Cryptography.RSACng(2048)
+    }
+    return [System.Security.Cryptography.RSA]::Create(2048)
+}
+
 function New-IssuedByThrowawayRoot {
     # Signs Request with a throwaway root CA named by no store and writes the root's PEM
     # to RootCertificateFile. Neither certificate names a CRL or OCSP endpoint.
     param($Request, $Key, [string] $RootCertificateFile, [System.DateTimeOffset] $NotBefore, [System.DateTimeOffset] $NotAfter)
-    $rootKey = New-Object System.Security.Cryptography.RSACng(2048)
+    $rootKey = New-ThrowawayRsaKey
     try {
         $rootRequest = New-Object System.Security.Cryptography.X509Certificates.CertificateRequest('CN=Record-CurlExchange throwaway root', $rootKey, [System.Security.Cryptography.HashAlgorithmName]::SHA256, [System.Security.Cryptography.RSASignaturePadding]::Pkcs1)
         $rootRequest.CertificateExtensions.Add((New-Object System.Security.Cryptography.X509Certificates.X509BasicConstraintsExtension($true, $false, 0, $true)))
@@ -1991,7 +2000,7 @@ function New-ThrowawayTlsCertificate {
     # container is deleted when the certificate is reset; no store is touched. With a
     # RootCertificateFile the leaf is issued by a throwaway root whose PEM is written there.
     param([string] $RootCertificateFile)
-    $rsa = New-Object System.Security.Cryptography.RSACng(2048)
+    $rsa = New-ThrowawayRsaKey
     try {
         $request = New-Object System.Security.Cryptography.X509Certificates.CertificateRequest('CN=127.0.0.1', $rsa, [System.Security.Cryptography.HashAlgorithmName]::SHA256, [System.Security.Cryptography.RSASignaturePadding]::Pkcs1)
         $alternativeNames = New-Object System.Security.Cryptography.X509Certificates.SubjectAlternativeNameBuilder
