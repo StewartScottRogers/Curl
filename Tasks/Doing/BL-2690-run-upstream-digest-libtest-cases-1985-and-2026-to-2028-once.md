@@ -30,3 +30,4 @@ Found by BL-2549, which ported lib1985 and lib2023 (libauthretry). Measured on W
 ## Log
 
 - 2026-10-17: Created.
+- 2026-10-18: Backlog -> Doing. Criteria at claim: ed4041ba 3d836d5e.
