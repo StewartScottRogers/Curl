@@ -31,3 +31,4 @@ Found by BL-2532, which ported lib567 to lib572 (`Curl.Conformance.LibTest.UnitL
 ## Log
 
 - 2026-10-17: Created.
+- 2026-10-17: Backlog -> Doing. Criteria at claim: 57abe33b 21e5ddeb 4272a6b9.
