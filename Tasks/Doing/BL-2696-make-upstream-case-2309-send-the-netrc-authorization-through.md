@@ -31,3 +31,4 @@ Found by BL-2550, which ported lib2309: a handle with `CURLOPT_PROXY` (`libtest_
 ## Log
 
 - 2026-10-17: Created.
+- 2026-10-17: Backlog -> Doing. Criteria at claim: d64931ca f0471b8d 3d836d5e.
