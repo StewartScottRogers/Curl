@@ -32,3 +32,4 @@ Found by BL-2533: `Lib591` passes 591 and 592 (on the ratchet), but 593 and 594 
 ## Log
 
 - 2026-10-17: Created.
+- 2026-10-18: Backlog -> Doing. Criteria at claim: 92cbe6ef 4963d26c 21e5ddeb 4272a6b9.
