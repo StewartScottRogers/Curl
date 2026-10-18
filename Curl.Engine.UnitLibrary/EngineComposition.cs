@@ -126,6 +126,7 @@ internal static class EngineComposition
     /// <param name="rtspInterleaveSink">Takes the RTSP handler's interleaved frames (<see cref="CallbackInterleaveSink.Of" />, ADR-0619); <see langword="null" /> writes them to the body output.</param>
     /// <param name="webSocketRawMode">Whether the WebSocket handler writes the received stream unframed (<see cref="WsProtocolHandler.RawMode" />, libcurl's <c>CURLWS_RAW_MODE</c>, BL-2494).</param>
     /// <param name="http2PushSink">Where the HTTP handler offers HTTP/2 server pushes (BL-2469); <see langword="null" /> keeps <c>SETTINGS_ENABLE_PUSH</c> 0.</param>
+    /// <param name="webSocketRandomSource">Where the WebSocket handler draws each <c>Sec-WebSocket-Key</c> and frame mask from (BL-2688); <see langword="null" /> for <see cref="SystemWebSocketRandomSource" />.</param>
     internal static IReadOnlyList<IProtocolHandler> CreateProtocolHandlers(
         IConnector connector,
         IDatagramConnector datagramConnector,
@@ -149,7 +150,8 @@ internal static class EngineComposition
         IFtpWildcardHooks? ftpWildcardHooks = null,
         IRtspInterleaveSink? rtspInterleaveSink = null,
         bool webSocketRawMode = false,
-        IHttp2PushSink? http2PushSink = null)
+        IHttp2PushSink? http2PushSink = null,
+        IWebSocketRandomSource? webSocketRandomSource = null)
     {
         ConnectionEndPointRecorder recorder = new();
         EndPointRecordingConnector recordingConnector = new(connector, recorder);
@@ -171,7 +173,7 @@ internal static class EngineComposition
             new LazyProtocolHandler(["pop3", "pop3s"], () => new Pop3ProtocolHandler(recordingConnector, tlsProvider, CreateSaslAuthenticator(contexts.Value, saslDelegation, diagnosticLog))),
             new LazyProtocolHandler(["smtp", "smtps"], () => new SmtpProtocolHandler(recordingConnector, tlsProvider, CreateSaslAuthenticator(contexts.Value, saslDelegation, diagnosticLog)) { TracesStateMachine = tracesSmtp }),
             new LazyProtocolHandler(["ldap", "ldaps"], () => new LdapProtocolHandler(recordingConnector, LdapDialectFor(OperatingSystem.IsWindows()))),
-            new LazyProtocolHandler(["ws", "wss"], () => new WsProtocolHandler(recordingConnector, httpAuthenticator.Value, new SystemWebSocketRandomSource()) { TracesFrames = tracesWs, RawMode = webSocketRawMode }),
+            new LazyProtocolHandler(["ws", "wss"], () => new WsProtocolHandler(recordingConnector, httpAuthenticator.Value, webSocketRandomSource ?? new SystemWebSocketRandomSource()) { TracesFrames = tracesWs, RawMode = webSocketRawMode }),
             new LazyProtocolHandler(["rtsp"], () => new RtspProtocolHandler(recordingConnector, httpAuthenticator.Value, rtspInterleaveSink)),
             new LazyProtocolHandler(["smb", "smbs"], () => new SmbProtocolHandler(recordingConnector)),
             new LazyProtocolHandler(["scp", "sftp"], () => new SshProtocolHandler(

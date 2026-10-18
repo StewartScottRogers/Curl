@@ -293,10 +293,11 @@ internal sealed class ManagedEasyTransfer(
 
     /// <summary>
     /// Gets or sets where the WebSocket API's frame masks and a WebSocket connect-only perform's
-    /// <c>Sec-WebSocket-Key</c> come from: <see cref="SystemWebSocketRandomSource" /> by default; tests fix it.
+    /// <c>Sec-WebSocket-Key</c> come from: the engine's <see cref="ManagedEngineSharedState.WebSocketRandomSource" /> when it has
+    /// one (BL-2688), else <see cref="SystemWebSocketRandomSource" />; tests fix it.
     /// <see cref="Duplicate" /> copies it and <see cref="Reset" /> leaves it, as it is not an option.
     /// </summary>
-    internal IWebSocketRandomSource WebSocketRandomSource { get; set; } = new SystemWebSocketRandomSource();
+    internal IWebSocketRandomSource WebSocketRandomSource { get; set; } = shared.WebSocketRandomSource ?? new SystemWebSocketRandomSource();
 
     /// <summary>The connection a connect-only perform left open, for <see cref="Connection" />.</summary>
     private ConnectOnlyConnection? connectOnly;

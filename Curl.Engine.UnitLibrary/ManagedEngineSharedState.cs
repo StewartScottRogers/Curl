@@ -4,6 +4,7 @@ using Curl.Core;
 using Curl.Core.Hsts;
 using Curl.Networking;
 using Curl.Protocol.Abstractions;
+using Curl.Protocol.Ws;
 
 namespace Curl.Engine;
 
@@ -25,10 +26,12 @@ internal sealed class ManagedEngineSharedState
     /// </param>
     /// <param name="dialing">What the transfers dial and resolve through in place of sockets (ADR-0658); <see langword="null" />, in production, for sockets.</param>
     /// <param name="signingClock">The clock <c>CURLOPT_AWS_SIGV4</c> and the HTTP signatures sign with (BL-2675); <see langword="null" />, in production, for <see cref="TimeProvider.System" />.</param>
-    internal ManagedEngineSharedState(TimeProvider timeProvider, Func<CurlExitCode, string> easyErrorText, Func<string, string?>? readEnvironmentVariable = null, EngineDialing? dialing = null, TimeProvider? signingClock = null)
+    /// <param name="webSocketRandomSource">Where every handle's WebSocket key and frame masks come from (BL-2688); <see langword="null" />, in production, for <see cref="SystemWebSocketRandomSource" />.</param>
+    internal ManagedEngineSharedState(TimeProvider timeProvider, Func<CurlExitCode, string> easyErrorText, Func<string, string?>? readEnvironmentVariable = null, EngineDialing? dialing = null, TimeProvider? signingClock = null, IWebSocketRandomSource? webSocketRandomSource = null)
     {
         Dialing = dialing;
         SigningClock = signingClock;
+        WebSocketRandomSource = webSocketRandomSource;
         ProxySelector = new ProxySelector(readEnvironmentVariable ?? Environment.GetEnvironmentVariable);
         TimeProvider = timeProvider;
         Connections = new ConnectionCache(timeProvider);
@@ -74,7 +77,15 @@ internal sealed class ManagedEngineSharedState
         ProxySelector = engine.ProxySelector;
         Dialing = engine.Dialing;
         SigningClock = engine.SigningClock;
+        WebSocketRandomSource = engine.WebSocketRandomSource;
     }
+
+    /// <summary>
+    /// Gets where every handle's WebSocket key and frame masks come from, one sequence for the whole engine as the
+    /// debug build's <c>CURL_ENTROPY</c> is one for the whole process: the conformance harness's stand-in for it
+    /// (BL-2688, ADR-0678); <see langword="null" />, in production, for <see cref="SystemWebSocketRandomSource" />.
+    /// </summary>
+    internal IWebSocketRandomSource? WebSocketRandomSource { get; }
 
     /// <summary>
     /// Gets the clock the engine's transfers sign <c>CURLOPT_AWS_SIGV4</c> requests and HTTP signatures with: the

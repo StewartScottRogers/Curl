@@ -11,6 +11,7 @@ using Curl.Core.FileSystem;
 using Curl.Core.Multipart;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Http;
+using Curl.Protocol.Ws;
 
 namespace Curl.Engine;
 
@@ -64,15 +65,20 @@ public sealed class ManagedCurlEngine : ICurlEngine
     /// the conformance harness's epoch, standing in for the debug build's <c>CURL_FORCETIME</c> (BL-2675, ADR-0671);
     /// <see langword="null" /> for <see cref="TimeProvider.System" />.
     /// </param>
+    /// <param name="webSocketRandomSource">
+    /// Where every handle's WebSocket key and frame masks come from: the conformance harness's stand-in for the debug
+    /// build's <c>CURL_ENTROPY</c> (BL-2688, ADR-0678); <see langword="null" /> for <see cref="SystemWebSocketRandomSource" />.
+    /// </param>
     internal ManagedCurlEngine(
         TimeProvider timeProvider,
         Func<EasyOptions, ManagedEngineSharedState, ICookieStore?, ProtocolDispatcher>? createDispatcher,
         Func<CurlExitCode, string>? easyErrorText = null,
         Func<string, string?>? readEnvironmentVariable = null,
         EngineDialing? dialing = null,
-        TimeProvider? signingClock = null)
+        TimeProvider? signingClock = null,
+        IWebSocketRandomSource? webSocketRandomSource = null)
     {
-        shared = new ManagedEngineSharedState(timeProvider, easyErrorText ?? (_ => string.Empty), readEnvironmentVariable, dialing, signingClock);
+        shared = new ManagedEngineSharedState(timeProvider, easyErrorText ?? (_ => string.Empty), readEnvironmentVariable, dialing, signingClock, webSocketRandomSource);
         this.createDispatcher = createDispatcher is null ? CreateDispatcher : (options, state, cookies, _) => createDispatcher(options, state, cookies);
     }
 
@@ -144,7 +150,8 @@ public sealed class ManagedCurlEngine : ICurlEngine
             rtspInterleaveSink: CallbackInterleaveSink.Of(options.Callbacks.Interleave),
             ftpListener: SocketCallbackConnectionListener.Over(shared.Dialing?.FtpListener ?? new Curl.Networking.TcpConnectionListener(), options.Callbacks, shared),
             webSocketRawMode: IsWebSocketRawMode(options),
-            http2PushSink: pushSink));
+            http2PushSink: pushSink,
+            webSocketRandomSource: shared.WebSocketRandomSource));
     }
 
     /// <summary>
