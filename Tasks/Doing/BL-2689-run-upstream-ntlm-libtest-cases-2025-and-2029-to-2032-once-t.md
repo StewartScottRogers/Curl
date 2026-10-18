@@ -30,3 +30,4 @@ Found by BL-2549, which ported lib2023 (libauthretry, cases 2023 to 2031) and li
 ## Log
 
 - 2026-10-17: Created.
+- 2026-10-18: Backlog -> Doing. Criteria at claim: 9a91aaa2 3d836d5e.
