@@ -71,6 +71,25 @@ public sealed class Lib1564To1588Tests
     }
 
     [TestMethod]
+    public async Task Lib1564_EachRound_SendsExactlyItsWakeupsBeforeItsPoll()
+    {
+        var time = new ManualTimeProvider(DateTimeOffset.UnixEpoch);
+        var engine = new FakeCurlEngine();
+        var wakeupsBeforeEachPoll = new List<int>();
+        engine.Multi.Polling = () =>
+        {
+            wakeupsBeforeEachPoll.Add(engine.Multi.Wakeups);
+            time.Advance(TimeSpan.FromMilliseconds(Lib1564.Rounds[wakeupsBeforeEachPoll.Count - 1].EndsEarly ? 0 : Lib1564.PollTimeoutMilliseconds));
+        };
+        var run = new PortRun(engine, 1564);
+
+        LibTestResult result = await new Lib1564(time).RunAsync(run.Context, CancellationToken.None);
+
+        Assert.AreEqual(0, result.ExitCode);
+        CollectionAssert.AreEqual(new[] { 0, 1, 1, 11, 11 }, wakeupsBeforeEachPoll);
+    }
+
+    [TestMethod]
     [DataRow(0L, "lib1564.c:51 curl_multi_poll returned too early\n")]
     [DataRow(1000L, "lib1564.c:68 curl_multi_poll returned too late\n")]
     public async Task Lib1564_OnAPollOnTheWrongSide_WritesItAndEndsMajorBad(long eachPollMilliseconds, string expected)

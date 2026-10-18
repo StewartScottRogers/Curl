@@ -120,7 +120,14 @@ internal sealed class FakeMultiTransfer : IMultiTransfer
         return ValueTask.FromResult(PollResult);
     }
 
-    public CurlMultiCode Wakeup() => WakeupResult;
+    /// <summary>How many wakeups have been sent.</summary>
+    public int Wakeups { get; private set; }
+
+    public CurlMultiCode Wakeup()
+    {
+        Wakeups++;
+        return WakeupResult;
+    }
 
     public bool TryReadInfo([NotNullWhen(true)] out CurlMultiMessage? message, out int remainingMessages)
     {
