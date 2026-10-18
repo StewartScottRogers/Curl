@@ -14,7 +14,7 @@ public sealed class UpstreamCurlPlatformTests
         "UnixSockets", "zstd",
         "crypto", "cookies", "proxy", "Mime", "manual", "DoH", "digest", "aws", "netrc", "verbose-strings",
         "large-time", "large-size", "sha512-256", "SSLpinning",
-        "large_file", "local-http", "httpsig", "headers-api", "form-api",
+        "large_file", "local-http", "httpsig", "headers-api", "form-api", "wakeup",
     ];
 
     public TestContext TestContext { get; set; } = null!;
@@ -152,6 +152,19 @@ public sealed class UpstreamCurlPlatformTests
         var diagnostics = TestDiagnostics.For(TestContext);
 
         bool onEvery = UpstreamCurlPlatform.All.All(platform => platform.Features.Contains("form-api"));
+
+        diagnostics.Act("listed on every platform", onEvery);
+        diagnostics.Assert("listed on every platform", true, onEvery);
+        Assert.IsTrue(onEvery);
+    }
+
+    // Libcurl, which runs the ported libtest programs, has curl_multi_wakeup, so cases 1564, 1565, 2412 and 2414 run (BL-2661).
+    [TestMethod]
+    public void AllPlatforms_ListWakeup()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+
+        bool onEvery = UpstreamCurlPlatform.All.All(platform => platform.Features.Contains("wakeup"));
 
         diagnostics.Act("listed on every platform", onEvery);
         diagnostics.Assert("listed on every platform", true, onEvery);

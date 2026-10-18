@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests]
 requirement: none
 created: 2026-10-17
-completed:
+completed: 2026-10-18
 ---
 # BL-2661 — Decide whether the upstream case runner lists the wakeup feature now that libtest programs run over Libcurl (cases 1564, 1565)
 
@@ -22,13 +22,16 @@ Found by BL-2542, which ported lib1564 and lib1565: both are skipped with `Curl 
 
 ## Acceptance criteria
 
-- [ ] An ADR marked "Decided by Claude under Stewart's delegation" records the decision and its row is in `Documentation/Planning/Decisions/README.md`.
-- [ ] When `wakeup` is listed, upstream cases 1564 and 1565 run through the runner and those that pass are added to `Curl.Conformance.UnitTests/PassingUpstreamCases.txt`; each that fails is filed as a task.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] An ADR marked "Decided by Claude under Stewart's delegation" records the decision and its row is in `Documentation/Planning/Decisions/README.md`.
+- [x] When `wakeup` is listed, upstream cases 1564 and 1565 run through the runner and those that pass are added to `Curl.Conformance.UnitTests/PassingUpstreamCases.txt`; each that fails is filed as a task.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+Decision: list `wakeup` (ADR-0690). Measured on Windows: 1564, 1565, 2412, 2414 pass and are on the ratchet; 2405 fails (exit 44), filed as BL-2743.
 
 ## Log
 
 - 2026-10-17: Created.
 - 2026-10-18: Backlog -> Doing. Criteria at claim: feccc413 756a3894 3d836d5e.
+- 2026-10-18: Doing -> Done. ADR-0690 lists wakeup; cases 1564, 1565, 2412, 2414 pass and join the ratchet; 2405 filed as BL-2743
