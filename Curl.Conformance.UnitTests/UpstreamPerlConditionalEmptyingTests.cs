@@ -3,13 +3,14 @@ using Curl.Testing;
 namespace Curl.Conformance;
 
 /// <summary>
-/// Pins <see cref="UpstreamPerlConditionalEmptying"/>: that it reads test1506's strip line and
+/// Pins <see cref="UpstreamPerlConditionalEmptying"/>: that it reads test1506's and test1542's strip lines and
 /// empties a line as Perl's <c>$_ = '' if(...)</c> would, and which Perl it does not read.
 /// </summary>
 [TestClass]
 public sealed class UpstreamPerlConditionalEmptyingTests
 {
     private const string Test1506Line = "$_ = '' if(($_ !~ /left intact/) and ($_ !~ /Closing connection/))";
+    private const string Test1542Line = @"$_ = '' if(($_ !~ /left intact/) and ($_ !~ /(closing|shutting down) connection #\d+/))";
 
     public TestContext TestContext { get; set; } = null!;
 
@@ -74,5 +75,21 @@ public sealed class UpstreamPerlConditionalEmptyingTests
 
         diagnostics.Act("applied", actual);
         Assert.AreEqual(string.Empty, actual);
+    }
+
+    [TestMethod]
+    [DataRow("== Info: Connection #0 to host 127.0.0.1:8990 left intact\n", "== Info: Connection #0 to host 127.0.0.1:8990 left intact\n")]
+    [DataRow("== Info: shutting down connection #0\n", "== Info: shutting down connection #0\n")]
+    [DataRow("== Info: Connected to 127.0.0.1 (127.0.0.1) port 8990\n", "")]
+    [DataRow("== Info: shutting down connection\n", "")]
+    public void LineEditParse_Test1542Line_KeepsOnlyTheConnectionLines(string line, string expected)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("line", line);
+
+        string? actual = IUpstreamPerlLineEdit.Parse(Test1542Line)?.Apply(line);
+
+        diagnostics.Act("applied", actual);
+        Assert.AreEqual(expected, actual);
     }
 }
