@@ -3,8 +3,8 @@ id: AF-0246
 title: TryParse_TextNamingNoRange_ReturnsFalseWithoutThrowing asserts nothing: both assertions are commented out
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Core.UnitTests/ByteRangeParserTests.cs:TryParse_TextNamingNoRange_ReturnsFalseWithoutThrowing:no-assertion
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Curl.Core.UnitTests/ByteRangeParserTests.cs -Pattern '^\s*//
 ## Log
 
 - 2026-10-18: filed proposed.
+- 2026-10-18: proposed -> accepted.
