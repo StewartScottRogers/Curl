@@ -4,7 +4,7 @@ title: Make upstream case 2030 pass: the Digest retry after NTLM sends its Autho
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: []
+depends-on: [BL-2747]
 touches: [Curl.Conformance.LibTest.UnitLibrary, Curl.Conformance.LibTest.UnitTests, Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
 requirement: none
 created: 2026-10-18
@@ -28,7 +28,10 @@ Found by BL-2689, which put 2025, 2029, 2031 and 2032 on the ratchet once BL-263
 
 ## Notes
 
+- 2026-10-18 (lane 5, first pass, no code edited): the fault is not in the lib2023 port. Request 100 (NTLM, wrong password) ends on a 401 that also offers `Digest realm="testrealm", nonce="2"`; curl stores that nonce in `data->state.digest` even while Digest is not allowed and answers it on request 200 under `CURLAUTH_DIGEST`. Curl's `DigestAuthenticator` is stateless and no hook carries the challenge into the handle's next transfer - exactly BL-2747 (the same cause as case 2024, BL-2691). Added BL-2747 to `depends-on` and requeued; once it is Done, rerun `CURL_UPSTREAM_CASE=2030` and hold 2030 on the ratchet. Note request 400 is expected twice with nonce 5 (curl treats the first Digest 401 as a fresh challenge, not a failure), which BL-2747's design must also produce.
+
 ## Log
 
 - 2026-10-18: Created.
 - 2026-10-18: Backlog -> Doing. Criteria at claim: b96ecbf8 fd6bd9d4 3d836d5e.
+- 2026-10-18: Doing -> Backlog. Waits on BL-2747: the handle must keep the last 401's Digest challenge for its next transfer
