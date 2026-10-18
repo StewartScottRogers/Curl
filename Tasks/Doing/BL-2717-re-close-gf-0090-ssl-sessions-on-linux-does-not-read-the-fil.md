@@ -49,3 +49,4 @@ In Curl.Cli.UnitLibrary, where SslSessionsFile (CommandLineGlobalState, CommandL
 ## Log
 
 - 2026-10-17: Created.
+- 2026-10-17: Backlog -> Doing. Criteria at claim: a577b127 8b83e917 1fd5de8c 28346828.
