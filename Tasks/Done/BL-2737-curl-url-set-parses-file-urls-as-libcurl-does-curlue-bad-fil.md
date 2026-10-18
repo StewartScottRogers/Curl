@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary, Curl.Engine.UnitTests, Curl.Protocol.Abstractions.UnitLibrary, Curl.Protocol.Abstractions.UnitTests]
 requirement: none
 created: 2026-10-18
-completed:
+completed: 2026-10-18
 ---
 # BL-2737 — curl_url_set parses file: URLs as libcurl does: CURLUE_BAD_FILE_URL for file:/ and file:foo, Windows drive paths kept (lib1560 rows)
 
@@ -27,12 +27,16 @@ Rows (input, wanted, got):
 
 ## Acceptance criteria
 
-- [ ] Each row listed answers as upstream wants through `Lib1560Checks` (`GetParts`, `GetUrls`) over the real engine, pinned by focused unit tests in the fixed library's `.UnitTests` project (each platform's answer in its own test where they differ).
-- [ ] `dotnet build` is clean, the fast tests pass, and `Measure-CodeQuality.ps1` reports 0 failing members for each changed library.
+- [x] Each row listed answers as upstream wants through `Lib1560Checks` (`GetParts`, `GetUrls`) over the real engine, pinned by focused unit tests in the fixed library's `.UnitTests` project (each platform's answer in its own test where they differ).
+- [x] `dotnet build` is clean, the fast tests pass, and `Measure-CodeQuality.ps1` reports 0 failing members for each changed library.
 
 ## Notes
+
+- Measured real curl 8.22.0 (Windows Schannel): `file:/`, `file:foo`, `file:./`, `file:?q` and `file:#f` all exit 3, and `-w %{url_effective}` of `file://C:Windowswin.ini` shows forward slashes, so the tool converts backslashes while libcurl keeps them.
+- Decision: `CurlUrlParser` now rejects `file:/` (too short) and a file path that starts with neither `/` nor a drive letter, for the tool and the URL API alike. The URL API goes through the new `CurlUrl.TryParseForUrlApi` (`CurlUrlApiFlags`), which keeps a file URL's backslashes and, without `CURLU_GUESS_SCHEME` or `CURLU_DEFAULT_SCHEME`, reads `file:` with no slash as a file URL, as `Curl_is_absolute_url` does when not guessing; the tool always guesses, so `file:foo` still reads as a host there.
 
 ## Log
 
 - 2026-10-18: Created.
 - 2026-10-18: Backlog -> Doing. Criteria at claim: 35fb7d52 d6c1964a.
+- 2026-10-18: Doing -> Done. file: URLs parse as libcurl 8.22.0 does in the URL API; lib1560 rows pass; build clean, fast tests green, quality 0 failing
