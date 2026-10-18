@@ -37,3 +37,4 @@ Where Curl stands: `Curl.Authentication.UnitLibrary/DigestAuthenticator.cs` is s
 ## Log
 
 - 2026-10-18: Created.
+- 2026-10-18: Backlog -> Doing. Criteria at claim: 880730e0 b0daa4a0 06081716 9319789a 3d836d5e.
