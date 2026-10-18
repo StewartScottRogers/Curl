@@ -31,3 +31,4 @@ Found by BL-2550, which ported lib2402, lib2404 and lib2405. On Windows all thre
 ## Log
 
 - 2026-10-17: Created.
+- 2026-10-18: Backlog -> Doing. Criteria at claim: c0c24af7 bafcc23b 3d836d5e.
