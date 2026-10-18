@@ -1476,10 +1476,16 @@ internal sealed class ManagedEasyTransfer(
     public IEasyTransfer Duplicate() => new ManagedEasyTransfer(createDispatcher, shared) { cookieListItemsApplied = cookieListItemsApplied, Options = Options, ToolSettings = ToolSettings, Host = Host, TraceComponents = TraceComponents, CreateFormBoundary = CreateFormBoundary, CreateConnectOnlyConnector = CreateConnectOnlyConnector, WebSocketRandomSource = WebSocketRandomSource };
 
     /// <inheritdoc />
+    /// <remarks>
+    /// <see cref="Info" /> starts again as a fresh handle's, keeping only the <see cref="TransferInfo.TransferId" /> and
+    /// <see cref="TransferInfo.CookieList" />, as curl 8.22.0's <c>curl_easy_reset</c> calls <c>Curl_initinfo</c> (response
+    /// code 0, file time -1) and keeps the handle's id and cookies (upstream tests 1532 and 1534).
+    /// </remarks>
     public void Reset()
     {
         headers.Clear();
         Options = new EasyOptions();
+        Info = new TransferInfo { TransferId = Info.TransferId, CookieList = Info.CookieList };
         ToolSettings = null;
         ToolInputs = null;
         ToolOutputs = null;

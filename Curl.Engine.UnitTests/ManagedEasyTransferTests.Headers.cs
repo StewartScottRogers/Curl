@@ -87,6 +87,27 @@ public sealed partial class ManagedEasyTransferTests
     }
 
     [TestMethod]
+    public async Task Reset_AfterATransferWithAFileTime_ZeroesTheResponseCodeAndSetsTheFileTimeToMinusOne()
+    {
+        const string Dated = "HTTP/1.1 200 OK\r\nLast-Modified: Thu, 01 Jan 1970 00:00:30 GMT\r\nContent-Length: 0\r\n\r\n";
+        ScriptedConnector connector = new([Encoding.ASCII.GetBytes(Dated)]);
+        await using IEasyTransfer easy = CreateEngine(connector).CreateEasy();
+        easy.Options = new EasyOptions
+        {
+            Network = new EasyNetworkOptions { Url = "http://h/x" },
+            Transfer = new() { FileTime = true },
+        };
+        await easy.PerformAsync(CancellationToken.None);
+        (long code, long fileTime) afterPerform = (easy.Info.ResponseCode, easy.Info.FileTime);
+
+        easy.Reset();
+
+        Assert.AreEqual((200L, 30L), afterPerform);
+        Assert.AreEqual(0, easy.Info.ResponseCode);
+        Assert.AreEqual(-1, easy.Info.FileTime);
+    }
+
+    [TestMethod]
     public async Task Info_ReadFromTheHeaderCallbackAtTheEndOfTheHead_HoldsTheResponseCodeAndContentLength()
     {
         ScriptedConnector connector = new([Encoding.ASCII.GetBytes(Response)]);
