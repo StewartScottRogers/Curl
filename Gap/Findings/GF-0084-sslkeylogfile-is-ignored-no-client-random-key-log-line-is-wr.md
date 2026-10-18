@@ -13,8 +13,8 @@ closed:
 regression: false
 items: [behaviour:test2090]
 touches: [Curl.Tls.UnitLibrary, Curl.Tls.UnitTests, Curl.Networking.UnitLibrary, Curl.Networking.UnitTests, Curl.Engine.UnitLibrary, Curl.Engine.UnitTests]
-task: BL-2327
-tasks: [BL-2327]
+task: BL-2716
+tasks: [BL-2327, BL-2716]
 ---
 # GF-0084 - SSLKEYLOGFILE is ignored: no CLIENT_RANDOM key-log line is written for a TLS connection
 
@@ -40,3 +40,4 @@ Implement the OpenSSL build's SSLKEYLOGFILE support. When the variable names a f
 
 - 2026-10-15_0751: Opened by gap-behaviour.
 - 2026-10-15_0900: Filed BL-2327.
+- 2026-10-17_2318: Filed BL-2716.
