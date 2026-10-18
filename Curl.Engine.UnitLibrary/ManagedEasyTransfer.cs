@@ -468,7 +468,7 @@ internal sealed class ManagedEasyTransfer(
     /// <returns>The transfer's code.</returns>
     private async Task<CurlCode> PerformFromOptionsOverCachesAsync(CancellationToken cancellationToken)
     {
-        EasyOptions options = UrlPortOverride.Apply(WithoutPostFieldsUnderHttpGet(ToolSettings is null ? WithoutDefaultUserAgent(Options) : Options));
+        EasyOptions options = UrlPortOverride.Apply(UrlHandleOverride.Apply(WithoutPostFieldsUnderHttpGet(ToolSettings is null ? WithoutDefaultUserAgent(Options) : Options)));
         LastResult = null;
         LastContext = null;
         if (options.Network.Url is not { } urlText)
