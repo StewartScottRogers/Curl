@@ -6,6 +6,7 @@ assignee: Claude
 pipeline: feature
 depends-on: []
 touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests]
+lane: no
 requirement: none
 created: 2026-10-17
 completed:
@@ -46,7 +47,30 @@ In Curl.Cli.UnitLibrary, where SslSessionsFile (CommandLineGlobalState, CommandL
 
 ## Notes
 
+- 2026-10-17 (lane 3): Interactive only. No product change is needed; the gap is the
+  measurement's order, and the fix is in the gap office's tools, which lanes may not read or
+  change (ADR-0433, BL-1209). Evidence:
+  - The gap-platforms run 39100480741 measured commit 16c54eb48, which already holds BL-2333's
+    fix (401435779): Curl loads the file before the no-URL refusal and saves it after
+    (`CurlCommandRunner.WriteRefusalAsync`, pinned on every platform by
+    `TlsSessionFileLinesTests.RunAsync_NoUrlWithSslSessions_WarnsAboutTheFileBeforeTheRefusalAndSavesIt`).
+    `TlsSessionCache.Import`'s line rules match curl 8.22.0's `my_get_line` (blank, blank-only
+    and `#` lines skipped and not counted), and `WarningLineWrapper` already wraps
+    `... in SSL session file ` / `Warning: <path>` as the expected text shows.
+  - curl 8.22.0's `operate()` calls `tool_ssls_save` after `run_all_transfers` whatever it
+    returned, and `tool_ssls_save` opens the file with `FOPEN_WRITETEXT` before exporting, so a
+    no-URL run with no sessions leaves the file empty (src/tool_operate.c, src/tool_ssls.c).
+  - The options measurement uses one placeholder for both binaries: the same
+    `/tmp/gap-options-<id>/placeholder.txt` appears in curl's and Curl's `--config` lines. So
+    curl runs first, prints the warnings and empties the file; Curl then reads an empty file and
+    rightly prints nothing, exactly what curl itself prints on a second run.
+- Remove `lane: no` once an interactive session has changed `Gap/Tools/Measure-OptionGap.ps1`
+  to write the placeholder afresh before each binary's run (or give each binary its own copy),
+  and a gap-platforms run re-measures `options:--ssl-sessions`. If it then measures `match`,
+  this task needs no lane: tick criteria 1 and 2 on that run and finish it.
+
 ## Log
 
 - 2026-10-17: Created.
 - 2026-10-17: Backlog -> Doing. Criteria at claim: a577b127 8b83e917 1fd5de8c 28346828.
+- 2026-10-17: Doing -> Backlog. Interactive only: Curl already matches curl; the gap office's option measurement shares one placeholder that curl's session save empties before Curl runs (see Notes)
