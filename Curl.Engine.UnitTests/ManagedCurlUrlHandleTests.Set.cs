@@ -405,4 +405,41 @@ public sealed partial class ManagedCurlUrlHandleTests
         Assert.AreEqual("https://user:pw@other.org:8080/p/a?q=1#frag", copied);
         Assert.AreEqual(FullUrl, GetOk(url, CurlUrlPart.Url));
     }
+
+    // lib1560's get_parts_list rows 3 and 4 and get_url_list rows 214 and 14 (BL-2734).
+    [TestMethod]
+    [DataRow("weird:///path", "/path")]
+    [DataRow("weird:////path", "//path")]
+    public void SetUrl_EmptyAuthorityUnderNoAuthority_KeepsAnEmptyHostAndThePath(string text, string path)
+    {
+        using ManagedCurlUrlHandle url = new();
+
+        Assert.AreEqual(CurlUrlCode.Ok, url.Set(CurlUrlPart.Url, text, CurlUrlFlags.NonSupportScheme | CurlUrlFlags.NoAuthority));
+
+        Assert.AreEqual(string.Empty, GetOk(url, CurlUrlPart.Host));
+        Assert.AreEqual(path, GetOk(url, CurlUrlPart.Path));
+        Assert.AreEqual(CurlUrlCode.NoPort, url.Get(CurlUrlPart.Port, CurlUrlFlags.None, out _));
+    }
+
+    [TestMethod]
+    public void SetUrl_EmptyAuthorityWithQueryUnderNoAuthority_ReadsBackWithThreeSlashes()
+    {
+        using ManagedCurlUrlHandle url = new();
+
+        CurlUrlCode code = url.Set(
+            CurlUrlPart.Url,
+            "custom-scheme://?expected=test-new-good",
+            CurlUrlFlags.NonSupportScheme | CurlUrlFlags.NoAuthority);
+
+        Assert.AreEqual(CurlUrlCode.Ok, code);
+        Assert.AreEqual("custom-scheme:///?expected=test-new-good", GetOk(url, CurlUrlPart.Url));
+    }
+
+    [TestMethod]
+    public void SetUrl_ColonsWhereTheHostShouldBe_IsNoHost()
+    {
+        using ManagedCurlUrlHandle url = new();
+
+        Assert.AreEqual(CurlUrlCode.NoHost, url.Set(CurlUrlPart.Url, "https://::1/", CurlUrlFlags.None));
+    }
 }

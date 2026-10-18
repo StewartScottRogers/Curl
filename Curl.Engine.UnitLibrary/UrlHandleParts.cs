@@ -54,7 +54,7 @@ internal sealed record UrlHandleParts
         User = url.User,
         Password = url.Password,
         Options = url.Options,
-        Host = url.Host.Length == 0 ? null : url.Host,
+        Host = url.Scheme == "file" ? null : url.Host,
         ZoneId = url.ZoneId,
         Port = WrittenPortOf(url),
         Path = url.AbsolutePath,

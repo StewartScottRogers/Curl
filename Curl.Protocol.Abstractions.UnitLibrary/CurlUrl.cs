@@ -223,6 +223,41 @@ public sealed record CurlUrl
         TryParse(text, pathAsIs, OperatingSystem.IsWindows(), disallowUser: true, out url, out rejection);
 
     /// <summary>
+    /// Parses <paramref name="text" /> as <see cref="TryParse(string, bool, out CurlUrl, out CurlUrlRejection)" />
+    /// does, but under libcurl's <c>CURLU_NO_AUTHORITY</c>: at most two slashes after the scheme
+    /// are skipped, any more starting the path, and an empty authority is an empty
+    /// <see cref="Host" /> rather than <see cref="CurlUrlRejection.NoHost" />, as curl 8.22.0's
+    /// <c>parseurl</c> reads <c>weird:///path</c> (lib1560).
+    /// </summary>
+    /// <param name="text">The URL as typed.</param>
+    /// <param name="pathAsIs">
+    /// <see langword="true" /> to keep <c>.</c> and <c>..</c> path segments, as <c>CURLU_PATH_AS_IS</c> does.
+    /// </param>
+    /// <param name="disallowUser">
+    /// <see langword="true" /> to reject user information as
+    /// <see cref="TryParseDisallowingUser" /> does.
+    /// </param>
+    /// <param name="url">The parsed URL, or <see langword="null" /> when curl rejects the text.</param>
+    /// <param name="rejection">
+    /// Why curl rejects the text, or <see cref="CurlUrlRejection.None" /> when it accepts it.
+    /// </param>
+    /// <returns><see langword="true" /> when curl accepts the text.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="text" /> is <see langword="null" />.</exception>
+    public static bool TryParseAllowingEmptyHost(
+        string text,
+        bool pathAsIs,
+        bool disallowUser,
+        [NotNullWhen(true)] out CurlUrl? url,
+        out CurlUrlRejection rejection)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+
+        url = CurlUrlParser.Parse(text, pathAsIs, OperatingSystem.IsWindows(), disallowUser, out rejection, allowEmptyHost: true);
+
+        return url is not null;
+    }
+
+    /// <summary>
     /// Parses <paramref name="text" /> with the drive-letter rules of the chosen platform,
     /// so both can be tested on either.
     /// </summary>

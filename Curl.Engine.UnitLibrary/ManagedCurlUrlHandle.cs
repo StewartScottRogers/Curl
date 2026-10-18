@@ -258,10 +258,7 @@ internal sealed class ManagedCurlUrlHandle : ICurlUrlHandle
     private CurlUrlCode Parse(string value, CurlUrlFlags flags)
     {
         string text = flags.HasFlag(CurlUrlFlags.AllowSpace) ? value.Replace(" ", "%20", StringComparison.Ordinal) : value;
-        bool parsed = flags.HasFlag(CurlUrlFlags.DisallowUser)
-            ? CurlUrl.TryParseDisallowingUser(text, flags.HasFlag(CurlUrlFlags.PathAsIs), out CurlUrl? url, out CurlUrlRejection rejection)
-            : CurlUrl.TryParse(text, flags.HasFlag(CurlUrlFlags.PathAsIs), out url, out rejection);
-        if (!parsed)
+        if (!TryParseUnder(text, flags, out CurlUrl? url, out CurlUrlRejection rejection))
         {
             return RejectionCodes[(int)rejection];
         }
@@ -270,6 +267,24 @@ internal sealed class ManagedCurlUrlHandle : ICurlUrlHandle
         bool spaced = !ReferenceEquals(text, value) && !value.Contains("%20", StringComparison.Ordinal);
 
         return Accept(value, flags, spaced ? newParts.WithSpaces() : newParts);
+    }
+
+    /// <summary>
+    /// Parses <paramref name="text" /> under <c>CURLU_PATH_AS_IS</c>, <c>CURLU_DISALLOW_USER</c> and
+    /// <c>CURLU_NO_AUTHORITY</c> (<see cref="CurlUrl.TryParseAllowingEmptyHost" />).
+    /// </summary>
+    private static bool TryParseUnder(string text, CurlUrlFlags flags, out CurlUrl? url, out CurlUrlRejection rejection)
+    {
+        bool pathAsIs = flags.HasFlag(CurlUrlFlags.PathAsIs);
+        bool disallowUser = flags.HasFlag(CurlUrlFlags.DisallowUser);
+        if (flags.HasFlag(CurlUrlFlags.NoAuthority))
+        {
+            return CurlUrl.TryParseAllowingEmptyHost(text, pathAsIs, disallowUser, out url, out rejection);
+        }
+
+        return disallowUser
+            ? CurlUrl.TryParseDisallowingUser(text, pathAsIs, out url, out rejection)
+            : CurlUrl.TryParse(text, pathAsIs, out url, out rejection);
     }
 
     /// <summary>

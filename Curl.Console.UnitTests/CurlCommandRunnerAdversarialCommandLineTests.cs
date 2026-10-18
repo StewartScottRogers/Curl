@@ -160,10 +160,11 @@ public sealed class CurlCommandRunnerAdversarialCommandLineTests
     {
         RunResult result = await RunAsync(["-s", "-S", "http://user@:80@host/"]);
 
+        // curl 8.22.0 rejects the empty host before the bad port (BL-2734).
         AssertTransferRefused(
             result,
             CurlExitCode.UrlMalformat,
-            "curl: (3) URL rejected: Port number was not a decimal number between 0 and 65535" + Environment.NewLine);
+            "curl: (3) URL rejected: No host part in the URL" + Environment.NewLine);
     }
 
     [TestMethod]

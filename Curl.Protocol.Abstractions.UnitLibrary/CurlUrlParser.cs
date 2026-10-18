@@ -15,6 +15,9 @@ internal static class CurlUrlParser
     /// <summary>The most slashes curl accepts between a scheme and its host.</summary>
     private const int MaximumSlashes = 3;
 
+    /// <summary>The slashes before an authority that may be empty (<c>CURLU_NO_AUTHORITY</c>).</summary>
+    private const int AuthoritySlashes = 2;
+
     private const string FileScheme = "file";
 
     /// <summary>The length of <c>localhost</c> and of <c>127.0.0.1</c>, the hosts a <c>file</c> URL accepts.</summary>
@@ -23,14 +26,17 @@ internal static class CurlUrlParser
     /// <summary>
     /// Parses <paramref name="text" />, or returns <see langword="null" /> when curl rejects
     /// it, with <paramref name="rejection" /> saying why. With <paramref name="disallowUser" />,
-    /// user information in the authority is rejected before its host and port are checked.
+    /// user information in the authority is rejected before its host and port are checked. With
+    /// <paramref name="allowEmptyHost" />, as libcurl's <c>CURLU_NO_AUTHORITY</c>, at most two
+    /// slashes follow the scheme and an empty authority is an empty host.
     /// </summary>
     public static CurlUrl? Parse(
         string text,
         bool pathAsIs,
         bool driveLetters,
         bool disallowUser,
-        out CurlUrlRejection rejection)
+        out CurlUrlRejection rejection,
+        bool allowEmptyHost = false)
     {
         if (Encoding.UTF8.GetByteCount(text) > MaximumLength || text.Any(IsControlOrSpace))
         {
@@ -42,7 +48,7 @@ internal static class CurlUrlParser
         string? scheme = CurlUrlScheme.Read(text, driveLetters);
         if (scheme != FileScheme)
         {
-            return ParseWithAuthority(text, scheme, pathAsIs, disallowUser, out rejection);
+            return ParseWithAuthority(text, scheme, new AuthorityRules(pathAsIs, disallowUser, allowEmptyHost), out rejection);
         }
 
         CurlUrl? url = ParseFile(text, pathAsIs, driveLetters);
@@ -55,16 +61,12 @@ internal static class CurlUrlParser
 
     /// <summary>
     /// Parses a URL whose scheme is not <c>file</c>, or that has no scheme: one to three
-    /// slashes, then an authority that must name a host.
+    /// slashes, then an authority that must name a host unless
+    /// <see cref="AuthorityRules.AllowEmptyHost" /> lets it be empty.
     /// </summary>
-    private static CurlUrl? ParseWithAuthority(
-        string text,
-        string? scheme,
-        bool pathAsIs,
-        bool disallowUser,
-        out CurlUrlRejection rejection)
+    private static CurlUrl? ParseWithAuthority(string text, string? scheme, AuthorityRules rules, out CurlUrlRejection rejection)
     {
-        string? rest = scheme is null ? text : SkipSchemeAndSlashes(text, scheme);
+        string? rest = scheme is null ? text : SkipSchemeAndSlashes(text, scheme, rules.AllowEmptyHost);
         if (rest is null)
         {
             rejection = CurlUrlRejection.BadSlashes;
@@ -73,27 +75,35 @@ internal static class CurlUrlParser
         }
 
         int hostEnd = AuthorityLength(rest);
-        if (hostEnd == 0)
-        {
-            rejection = CurlUrlRejection.NoHost;
-
-            return null;
-        }
-
-        CurlUrlAuthority? authority = CurlUrlAuthority.Parse(rest[..hostEnd], scheme, disallowUser, out rejection);
+        CurlUrlAuthority? authority = hostEnd == 0
+            ? EmptyAuthority(rules.AllowEmptyHost, out rejection)
+            : CurlUrlAuthority.Parse(rest[..hostEnd], scheme, rules.DisallowUser, out rejection);
 
         return authority is null
             ? null
-            : Build(text, scheme ?? CurlUrlScheme.Guess(authority.Host), authority, rest[hostEnd..], pathAsIs);
+            : Build(text, scheme ?? CurlUrlScheme.Guess(authority.Host), authority, rest[hostEnd..], rules.PathAsIs);
+    }
+
+    /// <summary>
+    /// An authority with nothing in it: an empty host when <paramref name="allowEmptyHost" />, as upstream's
+    /// <c>parseurl</c> accepts under <c>CURLU_NO_AUTHORITY</c>, else <see cref="CurlUrlRejection.NoHost" />.
+    /// </summary>
+    private static CurlUrlAuthority? EmptyAuthority(bool allowEmptyHost, out CurlUrlRejection rejection)
+    {
+        rejection = allowEmptyHost ? CurlUrlRejection.None : CurlUrlRejection.NoHost;
+
+        return allowEmptyHost ? CurlUrlAuthority.None : null;
     }
 
     /// <summary>
     /// Returns what follows the scheme and the one to three slashes after it, or
-    /// <see langword="null" /> when there are more than three. A backslash stays as typed:
-    /// curl 8.21.0 on Windows was measured to send <c>http://h/a\b</c> as <c>GET /a\b</c>
-    /// and to reject a backslash in the host (BL-1996).
+    /// <see langword="null" /> when there are more than three. With
+    /// <paramref name="allowEmptyHost" /> at most two are skipped and any after them start the
+    /// path, as upstream's <c>parse_scheme</c> does under <c>CURLU_NO_AUTHORITY</c>. A backslash
+    /// stays as typed: curl 8.21.0 on Windows was measured to send <c>http://h/a\b</c> as
+    /// <c>GET /a\b</c> and to reject a backslash in the host (BL-1996).
     /// </summary>
-    private static string? SkipSchemeAndSlashes(string text, string scheme)
+    private static string? SkipSchemeAndSlashes(string text, string scheme, bool allowEmptyHost)
     {
         string rest = text[(scheme.Length + 1)..];
         int slashes = rest.AsSpan().IndexOfAnyExcept('/');
@@ -102,8 +112,16 @@ internal static class CurlUrlParser
             slashes = rest.Length;
         }
 
+        if (allowEmptyHost)
+        {
+            return rest[Math.Min(slashes, AuthoritySlashes)..];
+        }
+
         return slashes > MaximumSlashes ? null : rest[slashes..];
     }
+
+    /// <summary>How a URL's authority is read: path-as-is, user information refused, an empty host allowed.</summary>
+    private readonly record struct AuthorityRules(bool PathAsIs, bool DisallowUser, bool AllowEmptyHost);
 
     /// <summary>The length of the authority: up to the first <c>/</c>, <c>?</c> or <c>#</c>.</summary>
     private static int AuthorityLength(string rest)

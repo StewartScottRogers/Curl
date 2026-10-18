@@ -32,7 +32,9 @@ public sealed class CurlUrlRejectionTests
     [DataRow("http://h:\\x", CurlUrlRejection.Backslash)]
     [DataRow("http://h:1x\\/", CurlUrlRejection.BadPortNumber)]
     [DataRow("http://h:-1/", CurlUrlRejection.BadPortNumber)]
-    [DataRow("http://:x/", CurlUrlRejection.BadPortNumber)]
+    // curl 8.22.0 (measured 2026-10-18, BL-2734): an empty host beats a bad port, as parse_authority does.
+    [DataRow("http://:x/", CurlUrlRejection.NoHost)]
+    [DataRow("https://::1/", CurlUrlRejection.NoHost)]
     [DataRow("http://[::1]x/", CurlUrlRejection.BadPortNumber)]
     [DataRow("http://[::1]]/", CurlUrlRejection.BadPortNumber)]
     [DataRow("http://[::1]:x/", CurlUrlRejection.BadPortNumber)]

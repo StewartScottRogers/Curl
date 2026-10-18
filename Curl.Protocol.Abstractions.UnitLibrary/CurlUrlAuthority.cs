@@ -67,13 +67,15 @@ internal sealed record CurlUrlAuthority(
 
     /// <summary>
     /// Parses the host and port after the user information: the port split off, the host
-    /// required and normalised.
+    /// required and normalised. An empty host is <see cref="CurlUrlRejection.NoHost" /> even when the
+    /// port is bad too, as curl 8.22.0's <c>parse_authority</c> replaces the port's error
+    /// (<c>https://::1/</c>, lib1560).
     /// </summary>
     /// <returns>An authority with no user information, or <see langword="null" /> when curl rejects it.</returns>
     private static CurlUrlAuthority? ParseHostAndPort(string hostAndPort, bool hasScheme, out CurlUrlRejection rejection)
     {
         rejection = SplitPort(hostAndPort, hasScheme, out string host, out int? port);
-        if (rejection == CurlUrlRejection.None && host.Length == 0)
+        if (host.Length == 0)
         {
             rejection = CurlUrlRejection.NoHost;
         }
