@@ -83,6 +83,51 @@ public sealed class FtpProtocolHandlerActiveModeTests
         Assert.AreEqual(expectedResult, run.Result);
     }
 
+    // test766: the server connects as it answers EPRT, curl 8.22.0's ftp_do_more accepts it before SIZE, and the
+    // socket-option callback's CURLSOCKTYPE_ACCEPT refusal ends the transfer with exit 42 and no QUIT (BL-2638).
+    [TestMethod]
+    public async Task ExecuteAsync_ServerConnectedAtEprtAndTheAcceptFails_EndsWithTheAcceptsExitCodeAndNoQuit()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        var pending = new ScriptedPendingConnection(
+            new IPEndPoint(IPAddress.Loopback, 56704),
+            ConnectResult.Failed(CurlExitCode.AbortedByCallback, "Operation was aborted by an application callback"))
+        {
+            HasConnectionWaiting = true,
+        };
+        ActiveRun run = await RunAsync(diagnostics, "/a.txt", "-", LoggedIn + EprtOk + Retrieved, pending);
+
+        var expectedSent = LogInSent + "EPRT |1|127.0.0.1|56704|\r\n";
+        diagnostics.DiffSent(expectedSent, run.Sent);
+        Assert.AreEqual(expectedSent, run.Sent);
+        Assert.IsTrue(pending.WasAccepted);
+        Assert.IsTrue(pending.IsDisposed);
+        var expectedResult = TransferResult.Failure(CurlExitCode.AbortedByCallback, "Operation was aborted by an application callback");
+        diagnostics.Assert("result", expectedResult, run.Result);
+        Assert.AreEqual(expectedResult, run.Result);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ServerConnectedAtEprt_AcceptsAtOnceAndRetrievesOverThatConnection()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        var pending = new ScriptedPendingConnection(
+            new IPEndPoint(IPAddress.Loopback, 56705),
+            ConnectResult.Connected(new ScriptedConnection(Encoding.Latin1.GetBytes("hello"))))
+        {
+            HasConnectionWaiting = true,
+        };
+        ActiveRun run = await RunAsync(diagnostics, "/a.txt", "-", LoggedIn + EprtOk + Retrieved, pending);
+
+        var expectedSent = LogInSent + "EPRT |1|127.0.0.1|56705|\r\n" + RetrieveSent;
+        diagnostics.DiffSent(expectedSent, run.Sent);
+        Assert.AreEqual(expectedSent, run.Sent);
+        Assert.AreEqual("hello", run.OutputText);
+        var expectedResult = TransferResult.Success(5);
+        diagnostics.Assert("result", expectedResult, run.Result);
+        Assert.AreEqual(expectedResult, run.Result);
+    }
+
     [TestMethod]
     public async Task ExecuteAsync_EprtRefused_BindsAFreshPortAndSendsPort()
     {

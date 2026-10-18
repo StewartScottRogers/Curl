@@ -55,6 +55,8 @@ internal sealed class FtpActiveModeListener : IConnectionListener
 
         public EndPoint LocalEndPoint { get; } = localEndPoint;
 
+        public bool HasConnectionWaiting => Accepted.Task.IsCompleted;
+
         public async ValueTask<ConnectResult> AcceptAsync(CancellationToken cancellationToken) =>
             ConnectResult.Connected(await Accepted.Task.WaitAsync(cancellationToken).ConfigureAwait(false));
 

@@ -5,13 +5,17 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Engine;
 
 /// <summary>
-/// Calls a handle's <c>CURLOPT_OPENSOCKETFUNCTION</c> and <c>CURLOPT_CLOSESOCKETFUNCTION</c> around the listening
-/// socket FTP's active mode (<c>CURLOPT_FTPPORT</c>) opens through <paramref name="inner" />, as curl 8.22.0's
-/// <c>ftp_state_use_port</c> opens it through <c>Curl_socket_open</c> (BL-2588): the open-socket callback is asked
-/// once the port is bound, and its <see cref="CurlSocket.Bad" /> stops the listening and fails with
-/// <see cref="CurlExitCode.FtpPortFailed" /> and <c>socket failure</c>; the close-socket callback is called once,
-/// when the peer's connection is accepted or, never accepted, when the listening stops. The accepted connection is
-/// not the callbacks' (curl's <c>cf_socket_close</c> closes an accepted socket without them).
+/// Calls a handle's <c>CURLOPT_OPENSOCKETFUNCTION</c>, <c>CURLOPT_SOCKOPTFUNCTION</c> and
+/// <c>CURLOPT_CLOSESOCKETFUNCTION</c> around the listening socket FTP's active mode (<c>CURLOPT_FTPPORT</c>) opens
+/// through <paramref name="inner" />, as curl 8.22.0's <c>ftp_state_use_port</c> opens it through
+/// <c>Curl_socket_open</c> (BL-2588): the open-socket callback is asked once the port is bound, and its
+/// <see cref="CurlSocket.Bad" /> stops the listening and fails with <see cref="CurlExitCode.FtpPortFailed" /> and
+/// <c>socket failure</c>; the close-socket callback is called once, when the peer's connection is accepted or, never
+/// accepted, when the listening stops. The accepted connection is not the open and close callbacks' (curl's
+/// <c>cf_socket_close</c> closes an accepted socket without them), but the socket-option callback gets it with
+/// <see cref="CurlSocketType.Accept" />, as curl's <c>cf_tcp_accept_connect</c> calls it, and its
+/// <see cref="SocketOptionResult.Error" /> closes it and fails the accept with
+/// <see cref="CurlExitCode.AbortedByCallback" /> (upstream test 766, BL-2638).
 /// </summary>
 /// <param name="inner">Binds the listening ports.</param>
 /// <param name="callbacks">The handle's socket callbacks.</param>
@@ -23,22 +27,22 @@ internal sealed class SocketCallbackConnectionListener(IConnectionListener inner
 
     /// <summary>
     /// Gives <paramref name="listener" /> wrapped in a <see cref="SocketCallbackConnectionListener" /> when
-    /// <paramref name="callbacks" /> sets an open-socket or close-socket callback, else <paramref name="listener" />
-    /// itself.
+    /// <paramref name="callbacks" /> sets an open-socket, socket-option or close-socket callback, else
+    /// <paramref name="listener" /> itself.
     /// </summary>
     /// <param name="listener">Binds the listening ports.</param>
     /// <param name="callbacks">The handle's callbacks.</param>
     /// <param name="shared">The engine's shared state, for its socket numbers.</param>
     /// <returns>The listener the transfer listens through.</returns>
     internal static IConnectionListener Over(IConnectionListener listener, EasyCallbackOptions callbacks, ManagedEngineSharedState shared) =>
-        callbacks is { OpenSocket: null, CloseSocket: null }
+        callbacks is { OpenSocket: null, SocketOption: null, CloseSocket: null }
             ? listener
             : new SocketCallbackConnectionListener(listener, callbacks, shared.SocketHandles);
 
     /// <summary>Binds through the inner listener, then runs the open-socket callback for the listening socket.</summary>
     /// <param name="target">The address and ports to bind.</param>
     /// <param name="cancellationToken">Cancels the bind.</param>
-    /// <returns>The pending connection wrapped to close the socket the callbacks saw, or the failure.</returns>
+    /// <returns>The pending connection wrapped to run the callbacks at its accept, or the failure.</returns>
     public async ValueTask<ListenResult> ListenAsync(ListenTarget target, CancellationToken cancellationToken)
     {
         ListenResult listen = await inner.ListenAsync(target, cancellationToken).ConfigureAwait(false);
@@ -56,20 +60,33 @@ internal sealed class SocketCallbackConnectionListener(IConnectionListener inner
             return ListenResult.Failed(CurlExitCode.FtpPortFailed, SocketFailureText);
         }
 
-        return ListenResult.Listening(new ClosingPendingConnection(pending, new CurlSocketCloser(socket, callbacks.CloseSocket)));
+        return ListenResult.Listening(new CallbackPendingConnection(pending, new CurlSocketCloser(socket, callbacks.CloseSocket), callbacks.SocketOption, handles));
     }
 
-    /// <summary>A pending connection that closes the listening socket's callbacks' socket once it accepts or stops.</summary>
+    /// <summary>
+    /// A pending connection that closes the listening socket's callbacks' socket once it accepts or stops, and runs
+    /// the socket-option callback for the accepted connection.
+    /// </summary>
     /// <param name="inner">The inner listener's pending connection.</param>
     /// <param name="closer">Closes the socket the callbacks saw.</param>
-    private sealed class ClosingPendingConnection(IPendingConnection inner, CurlSocketCloser closer) : IPendingConnection
+    /// <param name="socketOption">The handle's socket-option callback, or <see langword="null" />.</param>
+    /// <param name="handles">Numbers the accepted socket.</param>
+    private sealed class CallbackPendingConnection(IPendingConnection inner, CurlSocketCloser closer, SocketOptionCallback? socketOption, CurlSocketHandles handles) : IPendingConnection
     {
         public EndPoint LocalEndPoint => inner.LocalEndPoint;
+
+        public bool HasConnectionWaiting => inner.HasConnectionWaiting;
 
         public async ValueTask<ConnectResult> AcceptAsync(CancellationToken cancellationToken)
         {
             ConnectResult accepted = await inner.AcceptAsync(cancellationToken).ConfigureAwait(false);
             closer.Close();
+            if (accepted.Connection is { } connection && socketOption?.Invoke(handles.Next(), CurlSocketType.Accept) == SocketOptionResult.Error)
+            {
+                await connection.DisposeAsync().ConfigureAwait(false);
+                return ConnectResult.Failed(CurlExitCode.AbortedByCallback, SocketCallbackConnector.AbortedByCallbackText);
+            }
+
             return accepted;
         }
 

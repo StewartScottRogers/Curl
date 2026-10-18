@@ -104,13 +104,106 @@ public sealed class SocketCallbackConnectionListenerTests
         Assert.AreEqual(0, calls);
     }
 
+    // test766: curl's cf_tcp_accept_connect asks the socket-option callback for the accepted socket, and its error
+    // closes it and fails with CURLE_ABORTED_BY_CALLBACK (BL-2638).
     [TestMethod]
-    public void Over_NoOpenOrCloseSocketSet_GivesTheListenerItself()
+    public async Task AcceptAsync_SocketOptionRefusesTheAcceptedSocket_ClosesItAndFailsWithAbortedByCallback()
+    {
+        List<string> calls = [];
+        QueuedConnection connection = new();
+        FakePendingConnection pending = new() { Accepted = ConnectResult.Connected(connection), HasConnectionWaiting = true };
+        SocketCallbackConnectionListener listener = Create(new FakeListener(ListenResult.Listening(pending)), new EasyCallbackOptions
+        {
+            SocketOption = (socket, purpose) =>
+            {
+                calls.Add($"sockopt {socket.Handle} {purpose}");
+                return SocketOptionResult.Error;
+            },
+            CloseSocket = socket =>
+            {
+                calls.Add($"close {socket.Handle}");
+                return 0;
+            },
+        });
+
+        IPendingConnection wrapped = (await listener.ListenAsync(Target, CancellationToken.None)).PendingConnection!;
+        bool waiting = wrapped.HasConnectionWaiting;
+        ConnectResult accepted = await wrapped.AcceptAsync(CancellationToken.None);
+
+        Assert.IsTrue(waiting);
+        CollectionAssert.AreEqual(new[] { "close 1", "sockopt 2 Accept" }, calls);
+        Assert.AreEqual(CurlExitCode.AbortedByCallback, accepted.ExitCode);
+        Assert.AreEqual(SocketCallbackConnector.AbortedByCallbackText, accepted.ErrorMessage);
+        Assert.IsNull(accepted.Connection);
+        Assert.IsTrue(connection.IsDisposed);
+    }
+
+    [TestMethod]
+    public async Task AcceptAsync_SocketOptionAcceptsTheAcceptedSocket_GivesTheConnection()
+    {
+        CurlSocketType? purpose = null;
+        QueuedConnection connection = new();
+        FakePendingConnection pending = new() { Accepted = ConnectResult.Connected(connection) };
+        SocketCallbackConnectionListener listener = Create(new FakeListener(ListenResult.Listening(pending)), new EasyCallbackOptions
+        {
+            SocketOption = (_, type) =>
+            {
+                purpose = type;
+                return SocketOptionResult.Ok;
+            },
+        });
+
+        IPendingConnection wrapped = (await listener.ListenAsync(Target, CancellationToken.None)).PendingConnection!;
+        ConnectResult accepted = await wrapped.AcceptAsync(CancellationToken.None);
+
+        Assert.IsFalse(wrapped.HasConnectionWaiting);
+        Assert.AreSame(pending.Accepted, accepted);
+        Assert.AreEqual(CurlSocketType.Accept, purpose);
+        Assert.IsFalse(connection.IsDisposed);
+    }
+
+    [TestMethod]
+    public async Task AcceptAsync_NoSocketOptionSet_GivesTheAcceptedConnection()
+    {
+        QueuedConnection connection = new();
+        FakePendingConnection pending = new() { Accepted = ConnectResult.Connected(connection) };
+        SocketCallbackConnectionListener listener = Create(new FakeListener(ListenResult.Listening(pending)), new EasyCallbackOptions { CloseSocket = _ => 0 });
+
+        IPendingConnection wrapped = (await listener.ListenAsync(Target, CancellationToken.None)).PendingConnection!;
+        ConnectResult accepted = await wrapped.AcceptAsync(CancellationToken.None);
+
+        Assert.AreSame(pending.Accepted, accepted);
+        Assert.IsFalse(connection.IsDisposed);
+    }
+    [TestMethod]
+    public async Task AcceptAsync_AcceptFailsWithASocketOptionSet_GivesTheFailureWithoutCallingIt()
+    {
+        int calls = 0;
+        FakePendingConnection pending = new();
+        SocketCallbackConnectionListener listener = Create(new FakeListener(ListenResult.Listening(pending)), new EasyCallbackOptions
+        {
+            SocketOption = (_, _) =>
+            {
+                calls++;
+                return SocketOptionResult.Error;
+            },
+        });
+
+        IPendingConnection wrapped = (await listener.ListenAsync(Target, CancellationToken.None)).PendingConnection!;
+        ConnectResult accepted = await wrapped.AcceptAsync(CancellationToken.None);
+
+        Assert.AreSame(pending.Accepted, accepted);
+        Assert.AreEqual(0, calls);
+    }
+
+    [TestMethod]
+    public void Over_NoSocketCallbackSet_GivesTheListenerItself()
     {
         FakeListener inner = new(ListenResult.Failed(CurlExitCode.FtpPortFailed, "x"));
         ManagedEngineSharedState shared = new(TimeProvider.System, _ => string.Empty);
 
-        Assert.AreSame(inner, SocketCallbackConnectionListener.Over(inner, new EasyCallbackOptions { SocketOption = (_, _) => SocketOptionResult.Ok }, shared));
+        Assert.AreSame(inner, SocketCallbackConnectionListener.Over(inner, new EasyCallbackOptions(), shared));
+        Assert.IsInstanceOfType<SocketCallbackConnectionListener>(SocketCallbackConnectionListener.Over(inner, new EasyCallbackOptions { SocketOption = (_, _) => SocketOptionResult.Ok }, shared));
         Assert.IsInstanceOfType<SocketCallbackConnectionListener>(SocketCallbackConnectionListener.Over(inner, new EasyCallbackOptions { OpenSocket = (_, _) => CurlSocket.Bad }, shared));
         Assert.IsInstanceOfType<SocketCallbackConnectionListener>(SocketCallbackConnectionListener.Over(inner, new EasyCallbackOptions { CloseSocket = _ => 0 }, shared));
     }
@@ -124,12 +217,14 @@ public sealed class SocketCallbackConnectionListenerTests
         public ValueTask<ListenResult> ListenAsync(ListenTarget target, CancellationToken cancellationToken) => ValueTask.FromResult(result);
     }
 
-    /// <summary>A pending connection whose accept answers one failed result and which records its disposal.</summary>
+    /// <summary>A pending connection whose accept answers one result (a failed one by default) and which records its disposal.</summary>
     private sealed class FakePendingConnection : IPendingConnection
     {
         public EndPoint LocalEndPoint { get; } = new IPEndPoint(IPAddress.Loopback, 4021);
 
-        public ConnectResult Accepted { get; } = ConnectResult.Failed(CurlExitCode.FtpAcceptFailed, "accept answered");
+        public ConnectResult Accepted { get; init; } = ConnectResult.Failed(CurlExitCode.FtpAcceptFailed, "accept answered");
+
+        public bool HasConnectionWaiting { get; init; }
 
         public bool Disposed { get; private set; }
 

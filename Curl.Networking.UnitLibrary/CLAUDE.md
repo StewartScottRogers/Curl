@@ -551,7 +551,8 @@ cancels and disposes local UDP sockets without sending anything.
 `SslStreamTlsProviderTests` runs real handshakes against a server-side `SslStream` over
 the in-memory `Fakes/InMemoryDuplexStream` pair, with a self-signed certificate made in
 the test, so TLS is tested without a socket. `TcpConnectionListenerTests` and
-`TcpPendingConnectionTests` bind local TCP sockets without connecting to them. The tests that
+`TcpPendingConnectionTests` bind local TCP sockets without connecting to them
+(`TcpPendingConnection.HasConnectionWaiting`, which polls the listening socket, is pinned on one nothing connects to, BL-2638). The tests that
 connect or send bytes are the loopback tests in `TcpDialerTests` (TCP and Unix socket), `UdpDatagramChannelTests`,
 `TcpConnectorTests.LocalEndPoint` (plain and over TLS) and the accepting test in `TcpConnectionListenerTests`, tagged
 `[TestCategory("Integration")]`, as is `DnsSocketOpenerTests`' TCP connect. Per ADR-0083 the members only those tests can reach,

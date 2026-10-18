@@ -119,6 +119,27 @@ public sealed class TcpPendingConnectionTests
         Assert.IsTrue(socket.NoDelay);
     }
 
+    [TestMethod]
+    public async Task HasConnectionWaiting_NothingConnected_IsFalse()
+    {
+        Diagnostics.Arrange("listening socket", "loopback, nothing connected");
+        await using var pending = new TcpPendingConnection(ListeningSocket());
+
+        bool waiting = pending.HasConnectionWaiting;
+
+        Diagnostics.Act("has connection waiting", waiting);
+        Diagnostics.Assert("has connection waiting", false, waiting);
+        Assert.IsFalse(waiting);
+    }
+
+
+    private static Socket ListeningSocket()
+    {
+        Socket socket = BoundSocket();
+        socket.Listen(1);
+        return socket;
+    }
+
     private static Socket BoundSocket()
     {
         var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
