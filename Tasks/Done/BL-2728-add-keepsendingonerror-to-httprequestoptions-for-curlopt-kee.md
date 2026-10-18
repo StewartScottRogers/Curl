@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Abstractions.UnitLibrary, Curl.Protocol.Abstractions.UnitTests]
 requirement: none
 created: 2026-10-18
-completed:
+completed: 2026-10-18
 ---
 # BL-2728 — Add KeepSendingOnError to HttpRequestOptions for CURLOPT_KEEP_SENDING_ON_ERROR
 
@@ -22,9 +22,9 @@ Found by BL-2646 (upstream case 1533). `Curl.Api.UnitLibrary/Options/Behaviour/E
 
 ## Acceptance criteria
 
-- [ ] `HttpRequestOptions.KeepSendingOnError` exists, is `false` by default, and its XML doc comment names `CURLOPT_KEEP_SENDING_ON_ERROR`.
-- [ ] A test in `Curl.Protocol.Abstractions.UnitTests` pins its default.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] `HttpRequestOptions.KeepSendingOnError` exists, is `false` by default, and its XML doc comment names `CURLOPT_KEEP_SENDING_ON_ERROR`.
+- [x] A test in `Curl.Protocol.Abstractions.UnitTests` pins its default.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
 
@@ -32,3 +32,4 @@ Found by BL-2646 (upstream case 1533). `Curl.Api.UnitLibrary/Options/Behaviour/E
 
 - 2026-10-18: Created.
 - 2026-10-18: Backlog -> Doing. Criteria at claim: a282a041 f434e32c 3d836d5e.
+- 2026-10-18: Doing -> Done. KeepSendingOnError added with default-pinning test

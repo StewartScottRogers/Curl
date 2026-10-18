@@ -194,4 +194,19 @@ public sealed class HttpRequestOptionsTests
         Assert.IsTrue(post.FollowRedirects);
         Assert.AreNotEqual(get, post);
     }
+
+    [TestMethod]
+    public void KeepSendingOnError_NothingSet_IsFalseAndReadsBackWhenSet()
+    {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("options", "new HttpRequestOptions() and one with KeepSendingOnError = true");
+
+        var byDefault = new HttpRequestOptions();
+        var set = new HttpRequestOptions { KeepSendingOnError = true };
+
+        diagnostics.Assert("default", false, byDefault.KeepSendingOnError);
+        diagnostics.Assert("set", true, set.KeepSendingOnError);
+        Assert.IsFalse(byDefault.KeepSendingOnError);
+        Assert.IsTrue(set.KeepSendingOnError);
+    }
 }
