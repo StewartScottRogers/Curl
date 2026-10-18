@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests, Curl.Console]
 requirement: none
 created: 2026-10-18
-completed:
+completed: 2026-10-18
 ---
 # BL-2723 — Read CURL_CA_BUNDLE, SSL_CERT_FILE and SSL_CERT_DIR for the CA certificates when no --cacert or --capath is given, as curl does
 
@@ -28,14 +28,21 @@ With no `--cacert` or `--capath`, Curl takes its CA certificates from `CURL_CA_B
 
 ## Acceptance criteria
 
-- [ ] With no `--cacert`/`--capath`, `CURL_CA_BUNDLE` sets the CA file and `SSL_CERT_DIR`/`SSL_CERT_FILE` the CA path/file in curl 8.22.0's order, and `--cacert`/`--capath` still win, each pinned by a unit test in `Curl.Cli.UnitTests` (or the project that owns the mapping).
-- [ ] An ADR records what each platform's curl reads, from upstream's source and a measurement of real curl, decided by Claude under Stewart's delegation.
-- [ ] `--ai-help` names the three variables wherever it lists environment variables.
-- [ ] `dotnet build` is clean, the fast tests pass, and `Measure-CodeQuality.ps1` reports 0 failing members in the changed libraries.
+- [x] With no `--cacert`/`--capath`, `CURL_CA_BUNDLE` sets the CA file and `SSL_CERT_DIR`/`SSL_CERT_FILE` the CA path/file in curl 8.22.0's order, and `--cacert`/`--capath` still win, each pinned by a unit test in `Curl.Cli.UnitTests` (or the project that owns the mapping).
+- [x] An ADR records what each platform's curl reads, from upstream's source and a measurement of real curl, decided by Claude under Stewart's delegation.
+- [x] `--ai-help` names the three variables wherever it lists environment variables.
+- [x] `dotnet build` is clean, the fast tests pass, and `Measure-CodeQuality.ps1` reports 0 failing members in the changed libraries.
 
 ## Notes
+
+- Plan: apply curl 8.22.0's `transfer_per_config`/`cacertpaths` lookup in the CLI parser, once per option group after the command line is read (`Curl.Cli.UnitLibrary/CaCertificateEnvironment.cs`, called from `CommandLineParser.ParseArguments`). Conditions: not the Schannel build, no `--cacert`/`--capath`, and `!-k || (--doh-url && !--doh-insecure)`. `CURL_CA_BUNDLE` wins alone; else `SSL_CERT_DIR` -> CA folder, `SSL_CERT_FILE` -> CA file. Values verbatim (an empty value is kept, as curl's `curl_getenv` keeps it). ADR-0681.
+- Curl.Console needed no change: `CurlCommandRunner.ParseCommandLine` already hands the parser the process environment, so `touches` stayed as filed.
+- Measurement: the gap-platforms run 39108080557 (BL-2721) is the real-curl measurement on all three platforms; no new recording was needed. Windows (Schannel) reads none of the three, so Windows behaviour is unchanged.
+- `--ai-help` has no environment-variable list; the three variables are named in the `--cacert` and `--capath` sections (`EnvironmentLines`). The extra line pushed `CurlAiHelpText.OptionLines` to complexity 12, so the two lookup lines moved into `OtherSpellingAndEnvironmentLines`.
+- Verified: `dotnet build` clean; fast tests green in 42 test projects (Curl.Cli.UnitTests 3952 passed, 18 skipped); `Measure-CodeQuality.ps1 -Library Curl.Cli.UnitLibrary`: 100% line, 100% branch, 0 failing members, worst CRAP 10.
 
 ## Log
 
 - 2026-10-18: Created.
 - 2026-10-18: Backlog -> Doing. Criteria at claim: 47cc4234 b50f6b05 631fc839 e27d59d9.
+- 2026-10-18: Doing -> Done. Off Windows, CURL_CA_BUNDLE, SSL_CERT_DIR and SSL_CERT_FILE set the CA file and folder when no --cacert or --capath is given, in curl 8.22.0's order (ADR-0681)
