@@ -418,12 +418,15 @@ public sealed class UpstreamConformanceTests
     // The AWS SigV4 libtest cases (1933 to 1938) rely on Debug for CURL_FORCETIME, which signs at the epoch: the harness
     // reports Debug to a case naming the aws feature, and CreateEngine gives the libtest engine a signing clock fixed at
     // the epoch (ADR-0671, BL-2675); the curl tool's aws cases (439, 472, 1976, 3222, 5026, 5027) get Debug too, and
-    // RunCurlAsync signs an --aws-sigv4 command at the epoch.
+    // RunCurlAsync signs an --aws-sigv4 command at the epoch. The WebSocket libtest cases (2301 to 2304) rely on Debug for
+    // CURL_ENTROPY, which pins Sec-WebSocket-Key and the frame masks: the harness reports Debug to a case naming the ws
+    // feature and setting CURL_ENTROPY, and CreateEngine gives the libtest engine the forced sequence (ADR-0678, BL-2688).
     private static UpstreamCurlPlatform PlatformFor(byte[] testFile)
     {
         string text = Encoding.Latin1.GetString(testFile);
         bool standsInForDebug = text.Contains("\nhttpsig\n", StringComparison.Ordinal)
             || text.Contains("\naws\n", StringComparison.Ordinal)
+            || (text.Contains("\nws\n", StringComparison.Ordinal) && text.Contains("\nCURL_ENTROPY=", StringComparison.Ordinal))
             || (text.Contains("\nHSTS\n", StringComparison.Ordinal) && text.Contains("\nCURL_TIME=", StringComparison.Ordinal))
             || (text.Contains("\nalt-svc\n", StringComparison.Ordinal) && text.Contains("\nCURL_ALTSVC_HTTP=", StringComparison.Ordinal))
             || text.Contains(":%HTTP2TLSPORT/", StringComparison.Ordinal);
@@ -592,6 +595,7 @@ public sealed class UpstreamConformanceTests
     // listener (BL-2597) and the proxy environment the case's <setenv>, as RunCurlAsync composes curl. It signs AWS SigV4
     // requests and HTTP signatures at the epoch, as upstream's debug build does under the CURL_FORCETIME its test runner sets (BL-2675),
     // and answers NTLM with the hand-built context, as RunCurlAsync's usesHandBuiltNtlm does (BL-2635).
+    // Under a case's CURL_ENTROPY its WebSocket key and masks follow the debug build's forced sequence (BL-2688).
     internal static ICurlEngine CreateEngine(UpstreamCurlInvocation invocation) =>
         new ManagedCurlEngine(
             TimeProvider.System,
@@ -599,7 +603,8 @@ public sealed class UpstreamConformanceTests
             CurlEasyErrorText.Of,
             name => invocation.EnvironmentVariables.GetValueOrDefault(name),
             new EngineDialing(new InMemoryServerTcpDialer(invocation.Connector), new LoopbackOnlyDnsResolver(), invocation.DatagramConnector, invocation.ConnectionListener, UsesHandBuiltNtlm: true),
-            signingClock: new UnixEpochClock());
+            signingClock: new UnixEpochClock(),
+            webSocketRandomSource: invocation.EnvironmentVariables.GetValueOrDefault("CURL_ENTROPY") is { } entropy ? new ForcedEntropyWebSocketRandomSource(entropy) : null);
 
     // The ported libtest programs the ratchet runs a <tool> case's program from, over CreateEngine.
     private static readonly UpstreamLibTests LibTests = new(LibTestPrograms.Ported, CreateEngine);
