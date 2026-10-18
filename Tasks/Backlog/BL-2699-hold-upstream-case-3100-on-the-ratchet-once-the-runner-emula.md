@@ -4,7 +4,7 @@ title: Hold upstream case 3100 on the ratchet once the runner emulates the RTSP 
 priority: Normal
 assignee: Claude
 pipeline: direct
-depends-on: [BL-2617]
+depends-on: [BL-2617, BL-2704]
 touches: [Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
 requirement: none
 created: 2026-10-17
@@ -28,7 +28,10 @@ Found by BL-2551, which ported lib3100 (`Curl.Conformance.LibTest.UnitLibrary/Li
 
 ## Notes
 
+- 2026-10-18: Measured on Windows with CURL_UPSTREAM_CASE=3100: test3100 runs (no longer skipped) but fails, `<verify><protocol>` line 1 expected `DESCRIBE rtsp://127.0.0.1:8996/3100 RTSP/1.0`, got `OPTIONS * RTSP/1.0`. Same cause as BL-2704 (RtspProtocolHandler ignores CURLOPT_RTSP_REQUEST). Requeued behind BL-2704; then add 3100 to the ratchet if it passes (it also needs the 401 Basic retry with CURLAUTH_ANY).
+
 ## Log
 
 - 2026-10-17: Created.
 - 2026-10-18: Backlog -> Doing. Criteria at claim: d919f019 4df473d9 3d836d5e.
+- 2026-10-18: Doing -> Backlog. Needs BL-2704: RTSP handler ignores CURLOPT_RTSP_REQUEST, case 3100 sends OPTIONS * not DESCRIBE
