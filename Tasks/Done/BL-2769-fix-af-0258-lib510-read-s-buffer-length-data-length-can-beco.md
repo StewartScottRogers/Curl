@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.LibTest.UnitLibrary, Curl.Conformance.LibTest.UnitTests]
 requirement: none
 created: 2026-10-18
-completed:
+completed: 2026-10-18
 ---
 # BL-2769 — Fix AF-0258: Lib510 Read's buffer.Length < data.Length can become <= with no test failing, refusing a buffer that fits exactly
 
@@ -53,3 +53,4 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 - 2026-10-18: Created.
 - 2026-10-18: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-18: Doing -> Done. Exact-fit buffer test kills the <= mutant at Lib510.cs:88
