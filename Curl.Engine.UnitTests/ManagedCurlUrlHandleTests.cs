@@ -236,6 +236,50 @@ public sealed partial class ManagedCurlUrlHandleTests
     }
 
     [TestMethod]
+    [DataRow("1h://example.net", CurlUrlFlags.None)]
+    [DataRow("..://example.net", CurlUrlFlags.None)]
+    [DataRow("-ht://example.net", CurlUrlFlags.None)]
+    [DataRow("+ftp://example.net", CurlUrlFlags.None)]
+    [DataRow("htt ps://user:password@example.net/get?this=and-what", CurlUrlFlags.None)]
+    [DataRow("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA://hostname/path", CurlUrlFlags.None)]
+    [DataRow("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA://hostname/path", CurlUrlFlags.NonSupportScheme)]
+    public void Set_UrlWhoseSchemeIsMalformedOrTooLong_ReturnsBadScheme(string text, CurlUrlFlags flags)
+    {
+        // lib1560's get_parts rows 39 to 42 and 92, get_url row 146 and its huge-scheme row (BL-2732).
+        using ManagedCurlUrlHandle url = new();
+
+        Assert.AreEqual(CurlUrlCode.BadScheme, url.Set(CurlUrlPart.Url, text, flags));
+    }
+
+    [TestMethod]
+    public void Set_HugeSchemeUnderNonSupportScheme_ReturnsBadScheme()
+    {
+        using ManagedCurlUrlHandle url = new();
+
+        Assert.AreEqual(CurlUrlCode.BadScheme, url.Set(CurlUrlPart.Url, new string('a', 119_998) + "://h/", CurlUrlFlags.NonSupportScheme));
+    }
+
+    [TestMethod]
+    [DataRow("example.net:81/x", CurlUrlFlags.None, CurlUrlCode.UnsupportedScheme)]
+    [DataRow("Example.net:81/x", CurlUrlFlags.NonSupportScheme, CurlUrlCode.BadSlashes)]
+    [DataRow("http:81/x", CurlUrlFlags.None, CurlUrlCode.BadSlashes)]
+    public void Set_HostAndPortWithoutGuessFlags_ReadsTheHostAsAScheme(string text, CurlUrlFlags flags, CurlUrlCode expected)
+    {
+        using ManagedCurlUrlHandle url = new();
+
+        Assert.AreEqual(expected, url.Set(CurlUrlPart.Url, text, flags));
+    }
+
+    [TestMethod]
+    public void Set_PortLikeTextWithoutASchemeUnderGuessScheme_IsStillParsedAsAHost()
+    {
+        using ManagedCurlUrlHandle url = new();
+
+        Assert.AreEqual(CurlUrlCode.Ok, url.Set(CurlUrlPart.Url, "example.net:81/x", CurlUrlFlags.GuessScheme));
+        Assert.AreEqual("81", GetOk(url, CurlUrlPart.Port));
+    }
+
+    [TestMethod]
     [DataRow("http://h /", CurlUrlCode.MalformedInput)]
     [DataRow("http:////h/", CurlUrlCode.BadSlashes)]
     [DataRow("http:///", CurlUrlCode.NoHost)]
