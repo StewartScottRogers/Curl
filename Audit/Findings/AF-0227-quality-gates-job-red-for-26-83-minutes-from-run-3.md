@@ -3,19 +3,19 @@ id: AF-0227
 title: Quality gates job red for 26.83 minutes from run 38700283564 on 639a0aec, BL-2268's finish commit
 auditor: process
 severity: Low
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-18_1045.md: the reproduction no longer reproduces.
 key: process:logs:CI-run-38700283564:ci-red
 reproduction: none
-task: BL-2280
-tasks: BL-2280
+task: BL-2564
+tasks: BL-2280, BL-2564
 found: 2026-10-15
 found-at: 3e1062e68644127a82ba2f5ef33ceb1044cc6f67
 scorecard: 2026-10-15_0156.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-18
+closed-how: reliable-reaudit
+closed-by: 2026-10-18_1045.md
 ---
 # AF-0227 - Quality gates job red for 26.83 minutes from run 38700283564 on 639a0aec, BL-2268's finish commit
 
@@ -42,7 +42,11 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-10-16 | 2026-10-16_1623.md | reproduces: yes | Ran the reproduction: the earlier window still shows 07:50:16Z-08:17:06Z, 26.83 min, run 38700283564 on 639a0aec. By mechanism over this window (ciRedMinutes 181.44 > 60), the Quality gates (windows-latest) job went red again on a lane commit: run 38876049958 on 241c183e, 103.15 min (2026-10-16T09:02:13Z-10:45:22Z). The cause was a Libcurl CurlMulti.SetOption branch gap that a lane had landed; it was fixed by BL-2467 at 03:01:55 local (DarkFactory-20261015-200601-L1.log:437).
+- 2026-10-18 | 2026-10-18_1045.md | reproduces: no | The original reproduction still shows the 26.83-min spell from run 38700283564. Re-audited by mechanism over 2026-10-16 onward: shifts finished 134 tasks. The tool reports three red spells. The two that are new to this window were test failures, not quality-gate failures: 39077398008 (RunAsync_WhenTheServersStreamsAreAllTaken / Lib1565) and 39091460067 (ListenAsync_WhenTheFirstPortIsTaken). No coordinator line in DarkFactory-2026101[678]-*.log reports a 'Quality gates' job failure. The only quality-gates spell in the tool's output (38876049958, 2026-10-16T09:02Z) is AF-0244's incident, already in the previous window.
+
 ## Log
 
 - 2026-10-15: filed proposed.
 - 2026-10-15: proposed -> accepted.
+- 2026-10-18: accepted -> closed. Re-audit 2026-10-18_1045.md: the reproduction no longer reproduces.

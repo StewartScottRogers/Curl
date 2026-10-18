@@ -3,8 +3,8 @@ id: AF-0219
 title: Curl.Cli README says CurlHelpTable holds curl 8.21.0's 274 help rows; it holds 278, four of them httpsig rows 8.21.0 lacks
 auditor: truthfulness
 severity: Low
-status: accepted
-reason: Stewart accepted it on 2026-10-14.
+status: closed
+reason: Re-audit 2026-10-16_1623.md: the reproduction no longer reproduces.
 key: truthfulness:Curl.Cli.UnitLibrary/README.md:CurlHelpTable:false-statement
 reproduction: none
 task: BL-2256
@@ -13,9 +13,9 @@ found: 2026-10-14
 found-at: d86a80f0091fbf88c08d7b9b2fa37a9197854bd8
 scorecard: 2026-10-14_1815.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-16
+closed-how: reliable-reaudit
+closed-by: 2026-10-16_1623.md
 ---
 # AF-0219 - Curl.Cli README says CurlHelpTable holds curl 8.21.0's 274 help rows; it holds 278, four of them httpsig rows 8.21.0 lacks
 
@@ -43,8 +43,10 @@ Run from the repository root:
 ## Re-audits
 
 - 2026-10-15 | 2026-10-15_0156.md | reproduces: no | Ran the reproduction: CurlHelpTable.cs has 278 rows, and the README no longer says '274 help rows' (count 0). Curl.Cli.UnitLibrary/README.md:23 now says '278 help rows ... the 274 in curl 8.21.0's generated src/tool_listhelp.c, plus the four --httpsig-* rows of a curl 8.22.0 built with --enable-httpsig (ADR-0487)', which matches the table.
+- 2026-10-16 | 2026-10-16_1623.md | reproduces: no | Ran the reproduction: 278 then 0. Curl.Cli.UnitLibrary/README.md:23 now reads 'CurlHelpTable | 278 help rows ...: the 274 in curl 8.21.0's generated src/tool_listhelp.c, plus the four --httpsig-* rows of a curl 8.22.0 built with --enable-httpsig (ADR-0487)', which matches the 278 rows.
 
 ## Log
 
 - 2026-10-14: filed proposed.
 - 2026-10-14: proposed -> accepted.
+- 2026-10-16: accepted -> closed. Re-audit 2026-10-16_1623.md: the reproduction no longer reproduces.
