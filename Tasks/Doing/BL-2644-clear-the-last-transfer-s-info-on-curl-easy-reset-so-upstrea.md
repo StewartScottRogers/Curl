@@ -32,3 +32,4 @@ Found by BL-2539 (ports `Lib1532` and `Lib1534` in `Curl.Conformance.LibTest.Uni
 ## Log
 
 - 2026-10-17: Created.
+- 2026-10-18: Backlog -> Doing. Criteria at claim: 2ee28948 e9830330 4272a6b9 c4aff572.
