@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: quality:Curl.Conformance.LibTest.UnitLibrary/Lib582Run.cs:CheckForCompletion-false:surviving-mutant
 reproduction: mutation Curl.Conformance.LibTest.UnitLibrary/Lib582Run.cs:158:false
-task: none
-tasks:
+task: BL-2768
+tasks: BL-2768
 found: 2026-10-18
 found-at: 19ea231be8b4d749462d15058a3c6b97c7e70836
 scorecard: 2026-10-18_1045.md

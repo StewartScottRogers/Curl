@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: process:logs:OpenForWriteAsync_ParentIsAFileOnPosix_IsNotADirectory:ci-red
 reproduction: none
-task: BL-2580
-tasks: BL-2580
+task: BL-2756
+tasks: BL-2580, BL-2756
 found: 2026-10-16
 found-at: 16500922292d0d0bcaede88acdabc2500cf08ebf
 scorecard: 2026-10-16_1623.md

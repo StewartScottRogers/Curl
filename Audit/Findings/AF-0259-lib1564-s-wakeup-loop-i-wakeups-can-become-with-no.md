@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: quality:Curl.Conformance.LibTest.UnitLibrary/Lib1564.cs:TestAsync-lt:surviving-mutant
 reproduction: mutation Curl.Conformance.LibTest.UnitLibrary/Lib1564.cs:65:<
-task: none
-tasks:
+task: BL-2770
+tasks: BL-2770
 found: 2026-10-18
 found-at: 19ea231be8b4d749462d15058a3c6b97c7e70836
 scorecard: 2026-10-18_1045.md

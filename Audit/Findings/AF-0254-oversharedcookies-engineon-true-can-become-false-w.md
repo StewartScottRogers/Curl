@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: quality:Curl.Engine.UnitLibrary/CookieEngine.cs:OverSharedCookies-true:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/CookieEngine.cs:133:true
-task: none
-tasks:
+task: BL-2765
+tasks: BL-2765
 found: 2026-10-18
 found-at: 19ea231be8b4d749462d15058a3c6b97c7e70836
 scorecard: 2026-10-18_1045.md

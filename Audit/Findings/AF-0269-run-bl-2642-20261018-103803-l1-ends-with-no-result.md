@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: process:logs:BL-2642:unfinished-run
 reproduction: none
-task: none
-tasks:
+task: BL-2780
+tasks: BL-2780
 found: 2026-10-18
 found-at: 19ea231be8b4d749462d15058a3c6b97c7e70836
 scorecard: 2026-10-18_1045.md

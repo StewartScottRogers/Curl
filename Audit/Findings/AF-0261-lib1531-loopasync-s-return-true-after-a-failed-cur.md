@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: quality:Curl.Conformance.LibTest.UnitLibrary/Lib1531.cs:LoopAsync-true:surviving-mutant
 reproduction: mutation Curl.Conformance.LibTest.UnitLibrary/Lib1531.cs:102:true
-task: none
-tasks:
+task: BL-2772
+tasks: BL-2772
 found: 2026-10-18
 found-at: 19ea231be8b4d749462d15058a3c6b97c7e70836
 scorecard: 2026-10-18_1045.md

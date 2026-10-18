@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: quality:Curl.Protocol.Http.UnitLibrary/HttpProtocolHandler.cs:StreamRefusedOutcome-false:surviving-mutant
 reproduction: mutation Curl.Protocol.Http.UnitLibrary/HttpProtocolHandler.cs:1975:false
-task: BL-2570
-tasks: BL-2570
+task: BL-2753
+tasks: BL-2570, BL-2753
 found: 2026-10-16
 found-at: 16500922292d0d0bcaede88acdabc2500cf08ebf
 scorecard: 2026-10-16_1623.md

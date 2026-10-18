@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: process:BL-2394:BL-2394:redone-work
 reproduction: none
-task: BL-2579
-tasks: BL-2579
+task: BL-2755
+tasks: BL-2579, BL-2755
 found: 2026-10-16
 found-at: 16500922292d0d0bcaede88acdabc2500cf08ebf
 scorecard: 2026-10-16_1623.md

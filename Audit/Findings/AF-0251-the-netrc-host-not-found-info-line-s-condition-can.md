@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: quality:Curl.Engine.UnitLibrary/TransferCredentialLookup.cs:TryLookUpInNetrcFile-ne:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/TransferCredentialLookup.cs:142:!=
-task: none
-tasks:
+task: BL-2762
+tasks: BL-2762
 found: 2026-10-18
 found-at: 19ea231be8b4d749462d15058a3c6b97c7e70836
 scorecard: 2026-10-18_1045.md

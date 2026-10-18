@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: quality:Curl.Networking.UnitLibrary/SessionTicketRecordDetector.cs:CountTicketRecords-true:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/SessionTicketRecordDetector.cs:92:true
-task: none
-tasks:
+task: BL-2767
+tasks: BL-2767
 found: 2026-10-18
 found-at: 19ea231be8b4d749462d15058a3c6b97c7e70836
 scorecard: 2026-10-18_1045.md
