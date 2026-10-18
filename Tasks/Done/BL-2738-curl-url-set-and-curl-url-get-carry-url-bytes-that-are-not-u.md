@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Engine.UnitLibrary, Curl.Engine.UnitTests, Curl.Protocol.Abstractions.UnitLibrary, Curl.Protocol.Abstractions.UnitTests]
+touches: [Curl.Engine.UnitLibrary, Curl.Engine.UnitTests, Curl.Protocol.Abstractions.UnitLibrary, Curl.Protocol.Abstractions.UnitTests, Curl.Conformance.LibTest.UnitLibrary]
 requirement: none
 created: 2026-10-18
-completed:
+completed: 2026-10-18
 ---
 # BL-2738 — curl_url_set and curl_url_get carry URL bytes that are not UTF-8 through percent-decoding and encoding (lib1560 rows)
 
@@ -27,12 +27,18 @@ Rows (`get_url_list` index: input, flags, wanted, got):
 
 ## Acceptance criteria
 
-- [ ] Each row listed answers as upstream wants through `Lib1560Checks.GetUrls` over the real engine, pinned by a focused unit test in the fixed library's `.UnitTests` project, with the byte mapping recorded in an ADR.
-- [ ] `dotnet build` is clean, the fast tests pass, and `Measure-CodeQuality.ps1` reports 0 failing members for each changed library.
+- [x] Each row listed answers as upstream wants through `Lib1560Checks.GetUrls` over the real engine, pinned by a focused unit test in the fixed library's `.UnitTests` project, with the byte mapping recorded in an ADR.
+- [x] `dotnet build` is clean, the fast tests pass, and `Measure-CodeQuality.ps1` reports 0 failing members for each changed library.
 
 ## Notes
+
+- Decided (ADR-0693): a byte that is not part of valid UTF-8 is the lone surrogate U+DC00 plus the byte (`Curl.Protocol.Abstractions`' `UrlByteText`), not Latin-1, because Latin-1 cannot tell the byte 0xff from the character U+00FF, which libcurl encodes as `%C3%BF` (lib1560's räksmörgås rows). `CurlUrlHost.PercentDecode` and `UrlPartText` go through it.
+- Added `Curl.Conformance.LibTest.UnitLibrary` to `touches`: the port's rows 123 and 136 (table lines 135 and 148) now write the bytes as U+DCC0 and U+DCFF, and its CLAUDE.md note says so. No other task in Doing named it.
+- Focused tests: `UrlByteTextTests`, `ManagedCurlUrlHandleTests.Get_Url*ByteThatIsNotUtf8*`; `CurlUrlTests` now pins `a%80b` as `a` U+DC80 `b`. Lone surrogates cannot sit in a DataRow (attribute strings are UTF-8), so those are plain tests.
+- Measure-CodeQuality.ps1 for Curl.Protocol.Abstractions.UnitLibrary and Curl.Engine.UnitLibrary: 0 failing members.
 
 ## Log
 
 - 2026-10-18: Created.
 - 2026-10-18: Backlog -> Doing. Criteria at claim: d53035c7 d6c1964a.
+- 2026-10-18: Doing -> Done. UrlByteText carries non-UTF-8 URL bytes as U+DC80-U+DCFF; lib1560 rows 123, 124, 136 pass (ADR-0693)
