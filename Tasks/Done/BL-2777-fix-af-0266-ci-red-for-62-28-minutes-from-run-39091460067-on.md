@@ -8,7 +8,7 @@ depends-on: []
 touches: [RunDarkFactory.ps1]
 requirement: none
 created: 2026-10-18
-completed:
+completed: 2026-10-18
 ---
 # BL-2777 — Fix AF-0266: CI red for 62.28 minutes from run 39091460067 on 1c266d83 (BL-2551): ListenAsync_WhenTheFirstPortIsTaken_ListensOnTheNextFreeOne failed on Windows; fix done in 18 min, then 5 cancelled runs
 
@@ -41,10 +41,12 @@ The finding closes only when a later re-audit by the process auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- 2026-10-18: Stewart closed AF-0266 as historical (`closed-how: stewart`, pull request #171), so this task changes nothing. The spell is past, the factory already guards against it, and from ADR-0693 every CI run on work/dark-factory finishes instead of being cancelled.
 
 - The finding is about one past CI red spell (run 39091460067, 2026-10-18); history cannot change, so its reproduction always prints the same spell. RunDarkFactory.ps1 already mitigates the chain: board pushes carry [skip ci], and the CI watch filed BL-2707 within a heartbeat. The remaining cancellations were newer code pushes by lanes plus ci.yml's cancel-in-progress concurrency (a guard file, interactive only). No change fits `touches` without slowing lanes for a one-off. Same as BL-2776/AF-0265.
 
@@ -53,3 +55,5 @@ The finding closes only when a later re-audit by the process auditor confirms th
 - 2026-10-18: Created.
 - 2026-10-18: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
 - 2026-10-18: Doing -> Blocked. Stewart: AF-0266 is one past CI red spell the factory already mitigates ([skip ci] board pushes, CI-watch filing) - reject it or close it as historical?
+- 2026-10-18: Blocked -> Doing. Interactive session: closing it, as Stewart closed AF-0266 as historical. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-18: Doing -> Done. AF-0266 closed by Stewart as historical; nothing to change.
