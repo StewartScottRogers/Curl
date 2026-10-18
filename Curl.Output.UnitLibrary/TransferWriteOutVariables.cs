@@ -305,8 +305,8 @@ public sealed class TransferWriteOutVariables : IWriteOutVariableSource
 
     /// <summary>
     /// The library part of <c>-V</c>'s first line, which ADR-0021 limits to the TLS backend
-    /// <c>SslStream</c> sits on: <c>libcurl/8.21.0 Schannel</c> on Windows,
-    /// <c>libcurl/8.21.0 SecureTransport</c> on macOS and <c>libcurl/8.21.0 OpenSSL</c>
+    /// <c>SslStream</c> sits on: <c>libcurl/8.22.0 Schannel</c> on Windows,
+    /// <c>libcurl/8.22.0 SecureTransport</c> on macOS and <c>libcurl/8.22.0 OpenSSL</c>
     /// anywhere else.
     /// </summary>
     /// <param name="isWindows">Whether the running system is Windows.</param>
