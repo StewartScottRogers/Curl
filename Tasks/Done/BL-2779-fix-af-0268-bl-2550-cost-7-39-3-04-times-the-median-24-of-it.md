@@ -8,7 +8,7 @@ depends-on: []
 touches: [RunDarkFactory.ps1]
 requirement: none
 created: 2026-10-18
-completed:
+completed: 2026-10-18
 ---
 # BL-2779 — Fix AF-0268: BL-2550 cost $7.39, 3.04 times the median: 24 of its 51.6 minutes went on two shell loops reading 2,077 upstream test files one by one
 
@@ -41,12 +41,15 @@ The finding describes a past run's cost, which no fix can change, so no re-audit
 
 ## Acceptance criteria
 
-- [ ] The cause of the cost is named in this task, and either fixed or recorded as unavoidable.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The cause of the cost is named in this task, and either fixed or recorded as unavoidable.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Cause: BL-2550 ran two shell loops (for f in *.curltest, grep/tr/awk per file) over 2,077 upstream test files, 24 of its 51.6 minutes. Avoidable: one Select-String or grep -l does it in seconds. Fix: RunDarkFactory.ps1 run-rules text (both copies) now carries AF-0268 telling lanes to search a folder with one command, not a per-file loop. Only a prompt string in the script changed (parses clean), so no library code, build or test result is affected.
 
 ## Log
 
 - 2026-10-18: Created.
 - 2026-10-18: Backlog -> Doing. Criteria at claim: af4de8c2 9742157d.
+- 2026-10-18: Doing -> Done. AF-0268 cause named (per-file shell loops over 2,077 files); run-rules text in RunDarkFactory.ps1 now forbids it
