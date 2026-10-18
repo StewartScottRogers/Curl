@@ -30,6 +30,7 @@ public sealed class UrlRelativeReferenceTests
     [DataRow("//o/p", "http://o/p")]
     [DataRow("?n", "http://h/a/b?n")]
     [DataRow("#g", "http://h/a/b?q#g")]
+    [DataRow("", "http://h/a/b?q")]
     public void Resolve_Reference_BuildsTheUrlAsUpstreamsRedirectUrl(string relative, string expected)
     {
         string resolved = UrlRelativeReference.Resolve("http://h/a/b?q#f", relative);

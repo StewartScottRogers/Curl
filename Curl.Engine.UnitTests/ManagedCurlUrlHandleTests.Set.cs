@@ -403,14 +403,14 @@ public sealed partial class ManagedCurlUrlHandleTests
     }
 
     [TestMethod]
-    public void Set_EmptyUrlOverAWholeUrl_IsOkAndKeepsIt()
+    public void Set_EmptyUrlOverAWholeUrl_IsOkAndKeepsItWithoutItsFragment()
     {
         using ManagedCurlUrlHandle url = Parsed(FullUrl);
 
         Assert.AreEqual(CurlUrlCode.Ok, url.Set(CurlUrlPart.Url, string.Empty, CurlUrlFlags.None));
         Assert.AreEqual(CurlUrlCode.MalformedInput, url.Set(CurlUrlPart.Url, "http://h/" + new string('a', 8_000_000), CurlUrlFlags.None));
 
-        Assert.AreEqual(FullUrl, GetOk(url, CurlUrlPart.Url));
+        Assert.AreEqual(FullUrl[..FullUrl.IndexOf('#', StringComparison.Ordinal)], GetOk(url, CurlUrlPart.Url));
     }
 
     [TestMethod]
@@ -579,6 +579,53 @@ public sealed partial class ManagedCurlUrlHandleTests
 
         Assert.AreEqual(CurlUrlCode.Ok, code);
         Assert.AreEqual("custom-scheme:///?expected=test-new-good", GetOk(url, CurlUrlPart.Url));
+    }
+
+    // lib1560's set_url_list rows 0 to 9 (BL-2740).
+    [TestMethod]
+    [DataRow("https://example.com", "https://example.com/")]
+    [DataRow("file:///test?test#test", "file:///test?test")]
+    [DataRow("https://example.com/path?query#frag", "https://example.com/path?query")]
+    [DataRow("ftp://example.com/dir/file#anchor", "ftp://example.com/dir/file")]
+    [DataRow("http://example.com/path#frag", "http://example.com/path")]
+    [DataRow("http://example.com/#frag", "http://example.com/")]
+    [DataRow("http://user:pass@example.com/path?query#frag", "http://user:pass@example.com/path?query")]
+    [DataRow("http://example.com:8080/path?query#frag", "http://example.com:8080/path?query")]
+    [DataRow("https://user:pass@example.com:8443/path?query#frag", "https://user:pass@example.com:8443/path?query")]
+    [DataRow("http://[::1]/path#frag", "http://[::1]/path")]
+    public void SetUrl_BlankOverAHeldUrl_KeepsItWithoutItsFragment(string held, string expected)
+    {
+        using ManagedCurlUrlHandle url = Parsed(held);
+
+        Assert.AreEqual(CurlUrlCode.Ok, url.Set(CurlUrlPart.Url, string.Empty, CurlUrlFlags.None));
+
+        Assert.AreEqual(CurlUrlCode.Ok, url.Get(CurlUrlPart.Url, CurlUrlFlags.GetEmpty, out string? text));
+        Assert.AreEqual(expected, text);
+    }
+
+    // lib1560's set_url_list rows 44 and 45 (BL-2740).
+    [TestMethod]
+    [DataRow("http://host/path?")]
+    [DataRow("http://host/path?#")]
+    public void SetUrl_FragmentOverAnEmptyQuery_KeepsTheEmptyQuery(string held)
+    {
+        using ManagedCurlUrlHandle url = Parsed(held);
+
+        Assert.AreEqual(CurlUrlCode.Ok, url.Set(CurlUrlPart.Url, "#new", CurlUrlFlags.None));
+
+        Assert.AreEqual(CurlUrlCode.Ok, url.Get(CurlUrlPart.Url, CurlUrlFlags.GetEmpty, out string? text));
+        Assert.AreEqual("http://host/path?#new", text);
+    }
+
+    // lib1560's set_url_list row 59 (BL-2740).
+    [TestMethod]
+    public void SetUrl_HttpWithAnEmptyAuthorityUnderNoAuthority_ReadsBackWithThreeSlashes()
+    {
+        using ManagedCurlUrlHandle url = Parsed("http://user:foo@example.com/path?query#frag");
+
+        Assert.AreEqual(CurlUrlCode.Ok, url.Set(CurlUrlPart.Url, "http://?hi", CurlUrlFlags.NoAuthority));
+
+        Assert.AreEqual("http:///?hi", GetOk(url, CurlUrlPart.Url));
     }
 
     [TestMethod]

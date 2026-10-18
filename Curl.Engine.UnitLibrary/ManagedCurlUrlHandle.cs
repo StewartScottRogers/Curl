@@ -234,26 +234,37 @@ internal sealed class ManagedCurlUrlHandle : ICurlUrlHandle
     private static string Suffix(char separator, string? value) => value is null ? string.Empty : separator + value;
 
     /// <summary>
-    /// A whole URL: empty changes nothing and is <see cref="CurlUrlCode.Ok" /> when the handle holds a
-    /// whole URL a get gives under <paramref name="flags" />, else <see cref="CurlUrlCode.MalformedInput" />,
-    /// as upstream's <c>set_url</c>; a relative one is resolved against the URL held, when the handle
-    /// holds one (<see cref="UrlRelativeReference" />); then it is parsed.
+    /// A whole URL: an absolute one is parsed; a relative one is resolved against the URL held, when the
+    /// handle holds one (<see cref="UrlRelativeReference" />), then parsed, a blank or fragment-only one
+    /// keeping an empty query (read with <c>CURLU_GET_EMPTY</c>), as libcurl 8.22.0's <c>redirect_url</c>
+    /// keeps the handle's other parts; a blank one on a handle holding no URL is
+    /// <see cref="CurlUrlCode.MalformedInput" />, as upstream's <c>set_url</c>.
     /// </summary>
     private CurlUrlCode SetUrl(string value, CurlUrlFlags flags)
     {
-        if (value.Length == 0)
-        {
-            return Get(CurlUrlPart.Url, flags, out _) == CurlUrlCode.Ok ? CurlUrlCode.Ok : CurlUrlCode.MalformedInput;
-        }
-
         if (UrlRelativeReference.IsAbsolute(value, flags))
         {
             return IsAcceptedScheme(value, flags) ? Parse(value, flags) : CurlUrlCode.UnsupportedScheme;
         }
 
-        return Get(CurlUrlPart.Url, flags & ~CurlUrlFlags.NoGuessScheme, out string? current) == CurlUrlCode.Ok
-            ? Parse(UrlRelativeReference.Resolve(current!, value), flags)
-            : ParseWithoutScheme(value, flags);
+        if (Get(CurlUrlPart.Url, HeldUrlFlags(value, flags), out string? current) == CurlUrlCode.Ok)
+        {
+            return Parse(UrlRelativeReference.Resolve(current!, value), flags);
+        }
+
+        return value.Length == 0 ? CurlUrlCode.MalformedInput : ParseWithoutScheme(value, flags);
+    }
+
+    /// <summary>
+    /// The flags the held URL is read with to resolve <paramref name="relative" />: the set's own without
+    /// <c>CURLU_NO_GUESS_SCHEME</c>, and <c>CURLU_GET_EMPTY</c> for a blank or fragment-only reference,
+    /// which keeps an empty query.
+    /// </summary>
+    private static CurlUrlFlags HeldUrlFlags(string relative, CurlUrlFlags flags)
+    {
+        bool keepsTheQuery = relative.Length == 0 || relative[0] == '#';
+
+        return (flags & ~CurlUrlFlags.NoGuessScheme) | (keepsTheQuery ? CurlUrlFlags.GetEmpty : CurlUrlFlags.None);
     }
 
     /// <summary>
