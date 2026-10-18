@@ -31,3 +31,4 @@ Found by BL-2646 (upstream case 1533). `Curl.Api.UnitLibrary/Options/Behaviour/E
 ## Log
 
 - 2026-10-18: Created.
+- 2026-10-18: Backlog -> Doing. Criteria at claim: a282a041 f434e32c 3d836d5e.
