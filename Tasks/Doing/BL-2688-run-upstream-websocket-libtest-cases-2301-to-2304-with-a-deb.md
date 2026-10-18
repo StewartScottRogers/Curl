@@ -31,3 +31,4 @@ Found by BL-2549, which ported lib2301 (raw-mode WebSocket write callback answer
 ## Log
 
 - 2026-10-17: Created.
+- 2026-10-17: Backlog -> Doing. Criteria at claim: a5ed17df 4f56d8e5 3d836d5e.
