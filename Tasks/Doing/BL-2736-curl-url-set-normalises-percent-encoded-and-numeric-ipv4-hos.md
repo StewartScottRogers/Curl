@@ -41,3 +41,4 @@ Rows (input, flags, wanted, got):
 ## Log
 
 - 2026-10-18: Created.
+- 2026-10-18: Backlog -> Doing. Criteria at claim: 801d03ef d6c1964a.
