@@ -31,3 +31,4 @@ Found by BL-2530 (lib542: FTP with `CURLOPT_NOBODY` 1 and `CURLOPT_HEADER` 0). `
 ## Log
 
 - 2026-10-17: Created.
+- 2026-10-17: Backlog -> Doing. Criteria at claim: 42d45351 4272a6b9 7d0e6df3.
