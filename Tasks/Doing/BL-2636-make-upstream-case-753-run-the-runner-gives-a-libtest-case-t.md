@@ -31,3 +31,4 @@ Found by BL-2536, which ported lib753 (`Curl.Conformance.LibTest.UnitLibrary/Lib
 ## Log
 
 - 2026-10-17: Created.
+- 2026-10-18: Backlog -> Doing. Criteria at claim: 22b35c88 c59fcab3 3d836d5e.
