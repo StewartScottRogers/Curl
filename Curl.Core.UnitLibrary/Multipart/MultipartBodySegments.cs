@@ -13,6 +13,8 @@ internal sealed class MultipartBodySegments(Encoding textEncoding) : IDisposable
 
     private readonly List<int> callbackSegments = [];
 
+    private readonly List<int> fileSegments = [];
+
     private readonly StringBuilder pendingText = new();
 
     private long knownLength;
@@ -61,15 +63,28 @@ internal sealed class MultipartBodySegments(Encoding textEncoding) : IDisposable
         callbackSegments.Add(segments.Count - 1);
     }
 
+    /// <summary>
+    /// Appends <paramref name="content" />, a file part's opened file, which these segments now own; in a body
+    /// that also holds a read callback, the body reads it at most once per read, as <see cref="ConcatenatedReadStream" /> says.
+    /// </summary>
+    /// <param name="content">The stream to send.</param>
+    /// <param name="length">Its size in bytes, or <see langword="null" /> when unknown.</param>
+    internal void AddFileStream(Stream content, long? length)
+    {
+        AddStream(content, length);
+        fileSegments.Add(segments.Count - 1);
+    }
+
     /// <summary>Hands every segment to one stream, which then owns them.</summary>
     /// <param name="allowsSeeking">Whether the body seeks when every segment seeks.</param>
     /// <returns>The body, read segment by segment.</returns>
     internal ConcatenatedReadStream ToStream(bool allowsSeeking = true)
     {
         FlushText();
-        ConcatenatedReadStream body = new([.. segments], allowsSeeking, [.. callbackSegments]);
+        ConcatenatedReadStream body = new([.. segments], allowsSeeking, [.. callbackSegments], [.. fileSegments]);
         segments.Clear();
         callbackSegments.Clear();
+        fileSegments.Clear();
         return body;
     }
 

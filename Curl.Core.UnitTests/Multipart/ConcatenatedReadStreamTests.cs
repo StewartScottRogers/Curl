@@ -328,6 +328,77 @@ public sealed class ConcatenatedReadStreamTests
         CollectionAssert.AreEqual(new byte[] { 1, 2 }, buffer);
     }
 
+    [TestMethod]
+    public void Read_WithFileAndCallbackSegments_ReadsEachFileOncePerReadAndPassesItAtItsEnd()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("segments", "[1,2], file [3,4], [5], file [6], callback [7]");
+        using ConcatenatedReadStream stream = new([Segment(1, 2), Segment(3, 4), Segment(5), Segment(6), Segment(7)], callbackSegments: [4], fileSegments: [1, 3]);
+        byte[] buffer = new byte[10];
+
+        int[] reads = [stream.Read(buffer, 0, 10), stream.Read(buffer, 5, 5), stream.Read(buffer, 6, 4), stream.Read(buffer, 7, 3)];
+
+        diagnostics.Act("reads", string.Join(",", reads));
+        diagnostics.Assert("reads", "5,1,1,0", string.Join(",", reads));
+        CollectionAssert.AreEqual(new[] { 5, 1, 1, 0 }, reads);
+        CollectionAssert.AreEqual(new byte[] { 1, 2, 3, 4, 5, 6, 7, 0, 0, 0 }, buffer);
+    }
+
+    [TestMethod]
+    public async Task ReadAsync_WithFileAndCallbackSegments_ReadsEachFileOncePerReadAndPassesItAtItsEnd()
+    {
+        using ConcatenatedReadStream stream = new([Segment(1, 2), Segment(3, 4), Segment(5), Segment(6), Segment(7)], callbackSegments: [4], fileSegments: [1, 3]);
+        byte[] buffer = new byte[10];
+
+        int[] reads =
+        [
+            await stream.ReadAsync(buffer.AsMemory(0, 10), TestContext.CancellationToken),
+            await stream.ReadAsync(buffer.AsMemory(5, 5), TestContext.CancellationToken),
+            await stream.ReadAsync(buffer.AsMemory(6, 4), TestContext.CancellationToken),
+        ];
+
+        CollectionAssert.AreEqual(new[] { 5, 1, 1 }, reads);
+        CollectionAssert.AreEqual(new byte[] { 1, 2, 3, 4, 5, 6, 7, 0, 0, 0 }, buffer);
+    }
+
+    [TestMethod]
+    public void Read_WithAFileThatCannotSeek_StaysOnItUntilItReadsNothing()
+    {
+        NonSeekableStream file = new();
+        file.Write([3]);
+        file.Position = 0;
+        using ConcatenatedReadStream stream = new([Segment(1), file, Segment(5), Segment(7)], callbackSegments: [3], fileSegments: [1]);
+        byte[] buffer = new byte[10];
+
+        int[] reads = [stream.Read(buffer, 0, 10), stream.Read(buffer, 2, 8)];
+
+        CollectionAssert.AreEqual(new[] { 2, 1 }, reads);
+        CollectionAssert.AreEqual(new byte[] { 1, 3, 5, 0, 0, 0, 0, 0, 0, 0 }, buffer);
+    }
+
+    [TestMethod]
+    public void Read_WithAFileLongerThanTheBuffer_ReadsTheRestOfItInTheNextRead()
+    {
+        using ConcatenatedReadStream stream = new([Segment(1, 2, 3), Segment(4)], callbackSegments: [1], fileSegments: [0]);
+        byte[] buffer = new byte[4];
+
+        int[] reads = [stream.Read(buffer, 0, 2), stream.Read(buffer, 2, 2)];
+
+        CollectionAssert.AreEqual(new[] { 2, 1 }, reads);
+        CollectionAssert.AreEqual(new byte[] { 1, 2, 3, 0 }, buffer);
+    }
+
+    [TestMethod]
+    public void Read_WithFileSegmentsOnly_ReadsOneSegmentPerRead()
+    {
+        using ConcatenatedReadStream stream = new([Segment(1, 2), Segment(3)], fileSegments: [1]);
+        byte[] buffer = new byte[10];
+
+        int[] reads = [stream.Read(buffer, 0, 10), stream.Read(buffer, 2, 8)];
+
+        CollectionAssert.AreEqual(new[] { 2, 1 }, reads);
+    }
+
     private static MemoryStream Segment(params byte[] bytes) => new(bytes, writable: false);
 
     /// <summary>A readable stream that cannot seek, as a pipe is.</summary>

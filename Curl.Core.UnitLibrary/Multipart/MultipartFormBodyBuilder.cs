@@ -347,7 +347,7 @@ public sealed class MultipartFormBodyBuilder(
     {
         if (encoder is null || encoder.PassesDataThrough)
         {
-            segments.AddStream(content, length);
+            segments.AddFileStream(content, length);
             return ValueTask.FromResult<TransferResult?>(null);
         }
 

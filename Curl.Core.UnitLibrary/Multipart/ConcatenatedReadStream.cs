@@ -19,6 +19,8 @@ internal sealed class ConcatenatedReadStream : Stream
 
     private readonly bool[]? readsOncePerFill;
 
+    private readonly bool[] files;
+
     private int current;
 
     /// <summary>Initialises a stream over <paramref name="segments" />, which it now owns.</summary>
@@ -34,28 +36,38 @@ internal sealed class ConcatenatedReadStream : Stream
     /// a second, as curl 8.22.0's <c>read_part_content</c> answers <c>STOP_FILLING</c> once a buffer
     /// fill has called a read callback (upstream test645, BL-2624).
     /// </param>
-    internal ConcatenatedReadStream(IReadOnlyList<Stream> segments, bool allowsSeeking = true, IReadOnlyCollection<int>? callbackSegments = null)
+    /// <param name="fileSegments">
+    /// The indexes of the segments that are a file part's opened file, or <see langword="null" /> for none. While
+    /// the buffer fills across segments, a file is read at most once per fill too, as libcurl reads a file part
+    /// through its read function, and one that seeks is passed by in the same fill once its position reaches its
+    /// length, as <c>read_part_content</c> spares the read at the part's known size (upstream test650, BL-2625).
+    /// </param>
+    internal ConcatenatedReadStream(IReadOnlyList<Stream> segments, bool allowsSeeking = true, IReadOnlyCollection<int>? callbackSegments = null, IReadOnlyCollection<int>? fileSegments = null)
     {
         this.segments = segments;
         starts = allowsSeeking ? StartsWhenEverySegmentSeeks(segments) : null;
-        readsOncePerFill = callbackSegments is { Count: > 0 } ? MarkCallbackSegments(segments.Count, callbackSegments) : null;
+        files = MarkSegments(segments.Count, fileSegments ?? []);
+        readsOncePerFill = callbackSegments is { Count: > 0 } ? MarkSegments(segments.Count, [.. callbackSegments, .. fileSegments ?? []]) : null;
     }
 
     /// <summary>Where each segment stands now, or <see langword="null" /> when one cannot seek.</summary>
     private static long[]? StartsWhenEverySegmentSeeks(IReadOnlyList<Stream> segments) =>
         segments.All(segment => segment.CanSeek) ? [.. segments.Select(segment => segment.Position)] : null;
 
-    /// <summary>One flag per segment, set for each index in <paramref name="callbackSegments" />.</summary>
-    private static bool[] MarkCallbackSegments(int count, IReadOnlyCollection<int> callbackSegments)
+    /// <summary>One flag per segment, set for each index in <paramref name="indexes" />.</summary>
+    private static bool[] MarkSegments(int count, IReadOnlyCollection<int> indexes)
     {
         bool[] marks = new bool[count];
-        foreach (int index in callbackSegments)
+        foreach (int index in indexes)
         {
             marks[index] = true;
         }
 
         return marks;
     }
+
+    /// <summary>Whether the segment at <paramref name="index" /> is a file that seeks and stands at its end.</summary>
+    private bool IsFileAtItsEnd(int index) => files[index] && segments[index].CanSeek && segments[index].Position >= segments[index].Length;
 
     /// <inheritdoc />
     public override bool CanRead => true;
@@ -126,33 +138,40 @@ internal sealed class ConcatenatedReadStream : Stream
         return 0;
     }
 
-    /// <summary>Fills <paramref name="buffer" /> across segments, reading a callback segment at most once.</summary>
-    private int Fill(Span<byte> buffer, bool[] callbackSegments)
+    /// <summary>Fills <paramref name="buffer" /> across segments, reading a callback or file segment at most once.</summary>
+    private int Fill(Span<byte> buffer, bool[] readsOnce)
     {
         int filled = 0;
         bool calledBack = false;
-        while (filled < buffer.Length && current < segments.Count && !(calledBack && callbackSegments[current]))
+        while (FillsOn(filled, buffer.Length, calledBack, readsOnce))
         {
-            calledBack |= callbackSegments[current];
+            calledBack |= readsOnce[current];
             int read = segments[current].Read(buffer[filled..]);
             filled += read;
-            current += read == 0 ? 1 : 0;
+            PassSegmentWhenDone(read);
         }
 
         return filled;
     }
 
-    /// <summary>Fills <paramref name="buffer" /> across segments, reading a callback segment at most once.</summary>
-    private async ValueTask<int> FillAsync(Memory<byte> buffer, bool[] callbackSegments, CancellationToken cancellationToken)
+    /// <summary>Whether a fill reads on: room is left, a segment is left, and it is not a second read-once segment.</summary>
+    private bool FillsOn(int filled, int length, bool calledBack, bool[] readsOnce) =>
+        filled < length && current < segments.Count && !(calledBack && readsOnce[current]);
+
+    /// <summary>Moves to the next segment when the current one read nothing or is a file at its end.</summary>
+    private void PassSegmentWhenDone(int read) => current += read == 0 || IsFileAtItsEnd(current) ? 1 : 0;
+
+    /// <summary>Fills <paramref name="buffer" /> across segments, reading a callback or file segment at most once.</summary>
+    private async ValueTask<int> FillAsync(Memory<byte> buffer, bool[] readsOnce, CancellationToken cancellationToken)
     {
         int filled = 0;
         bool calledBack = false;
-        while (filled < buffer.Length && current < segments.Count && !(calledBack && callbackSegments[current]))
+        while (FillsOn(filled, buffer.Length, calledBack, readsOnce))
         {
-            calledBack |= callbackSegments[current];
+            calledBack |= readsOnce[current];
             int read = await segments[current].ReadAsync(buffer[filled..], cancellationToken).ConfigureAwait(false);
             filled += read;
-            current += read == 0 ? 1 : 0;
+            PassSegmentWhenDone(read);
         }
 
         return filled;

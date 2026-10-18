@@ -111,7 +111,10 @@ part streams what `OpenContent` opens, never read ahead, with `ContentLength` `n
 unknown (sent chunked); both take a text part's headers. A body holding a `Reader` part reads as curl 8.22.0's
 buffer fill does: each read fills the buffer across parts and reads a `Reader` part at most once, so a
 chunked upload's first chunk holds the headers and the callback's first bytes (`ConcatenatedReadStream`'s
-callback segments, upstream test645, BL-2624); any other body still reads one segment per read.
+callback segments, upstream test645, BL-2624); any other body still reads one segment per read. In such a body an
+opened file part (`MultipartBodySegments.AddFileStream`; not an encoded one) is read at most once per fill too, and a
+seekable file at its end is passed in the same fill, as libcurl reads a file part through its read function
+(upstream test650, BL-2625, ADR-0683).
 
 `Globbing\UrlGlob` is curl 8.21.0's URL globbing (ADR-0032): `TryParse` reads `{a,b}` sets
 and `[1-10]`, `[01-10]`, `[a-z:2]` ranges as `tool_urlglob.c` does, failing with exit 3 and
