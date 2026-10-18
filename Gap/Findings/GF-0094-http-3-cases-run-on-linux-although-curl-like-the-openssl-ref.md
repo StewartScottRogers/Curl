@@ -5,11 +5,11 @@ area: behaviour
 platform: linux
 key: behaviour:http3-cases-run-though-http3-refused
 severity: High
-status: open
+status: closed
 scope: target
 introduced-in:
 opened: 2026-10-15_1657
-closed:
+closed: 2026-10-17_2225
 regression: false
 items: [behaviour:test2500, behaviour:test2503]
 touches: [Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests]
@@ -33,8 +33,10 @@ In Curl.Conformance.UnitLibrary, remove 'http/3' from UpstreamCurlPlatform.Unix 
 ## Measurements
 
 - 2026-10-15_1657: 2 of 2 items are gaps.
+- 2026-10-17_2225: 0 of 2 items are gaps.
 
 ## Log
 
 - 2026-10-15_1657: Opened by gap-behaviour.
 - 2026-10-15_1753: Filed BL-2370.
+- 2026-10-17_2225: Closed: run 2026-10-17_2225 measured every item as match or excluded on linux.
