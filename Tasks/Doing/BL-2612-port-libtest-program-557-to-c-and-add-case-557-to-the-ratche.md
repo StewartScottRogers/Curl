@@ -32,3 +32,4 @@ Split out of BL-2531 (batch 5 of the libtest ports, phase 5 of `Documentation/Pl
 ## Log
 
 - 2026-10-17: Created.
+- 2026-10-18: Backlog -> Doing. Criteria at claim: a5fdd076 e20ddf2b e39e1cd8 4272a6b9.
