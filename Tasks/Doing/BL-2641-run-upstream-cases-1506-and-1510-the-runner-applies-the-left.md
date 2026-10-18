@@ -33,3 +33,4 @@ Found by BL-2537, which ported lib1506 and lib1510 (`Curl.Conformance.LibTest.Un
 ## Log
 
 - 2026-10-17: Created.
+- 2026-10-18: Backlog -> Doing. Criteria at claim: 0fbc3dad 3c9a60b7 3d836d5e.
