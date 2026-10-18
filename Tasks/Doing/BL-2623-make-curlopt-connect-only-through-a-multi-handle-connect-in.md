@@ -32,3 +32,4 @@ Found by BL-2533: `Lib597` is unit tested and matches lib597.c, but nothing reac
 ## Log
 
 - 2026-10-17: Created.
+- 2026-10-17: Backlog -> Doing. Criteria at claim: 92cbe6ef 4963d26c 21e5ddeb 4272a6b9.
