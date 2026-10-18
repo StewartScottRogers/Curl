@@ -3,8 +3,8 @@ id: AF-0250
 title: TrySelectProxyBehindPreProxy's && can become || with no test failing, refusing every HTTP proxy behind a pre-proxy with exit 5
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Engine.UnitLibrary/TransferProxySelection.cs:TrySelectProxyBehindPreProxy-and:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/TransferProxySelection.cs:184:&&
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Engin
 ## Log
 
 - 2026-10-18: filed proposed.
+- 2026-10-18: proposed -> accepted.
