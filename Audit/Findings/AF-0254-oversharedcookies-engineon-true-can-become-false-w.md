@@ -3,8 +3,8 @@ id: AF-0254
 title: OverSharedCookies' engineOn: true can become false with no test failing, turning the cookie engine off for share-handle cookies
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Engine.UnitLibrary/CookieEngine.cs:OverSharedCookies-true:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/CookieEngine.cs:133:true
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Engin
 ## Log
 
 - 2026-10-18: filed proposed.
+- 2026-10-18: proposed -> accepted.
