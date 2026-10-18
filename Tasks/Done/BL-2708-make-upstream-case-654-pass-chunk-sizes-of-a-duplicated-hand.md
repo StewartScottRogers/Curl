@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
 requirement: none
 created: 2026-10-17
-completed:
+completed: 2026-10-18
 ---
 # BL-2708 — Make upstream case 654 pass: chunk sizes of a duplicated handle's MIME post with a file part and an unknown-size callback part
 
@@ -22,14 +22,19 @@ Found by BL-2626, which made the original handle post `Content-Length: 0` after 
 
 ## Acceptance criteria
 
-- [ ] Case 654 passes through the runner on Windows and is added to `Curl.Conformance.UnitTests/PassingUpstreamCases.txt`, or, still failing, is filed with the board script with its differing lines.
-- [ ] Any product fix has a focused unit test in the fixed library's own `.UnitTests` project (ADR-0482).
-- [ ] No added case's output depends on the platform.
-- [ ] `dotnet build` is clean and the fast tests pass with no test deleted, skipped or weakened.
+- [x] Case 654 passes through the runner on Windows and is added to `Curl.Conformance.UnitTests/PassingUpstreamCases.txt`, or, still failing, is filed with the board script with its differing lines.
+- [x] Any product fix has a focused unit test in the fixed library's own `.UnitTests` project (ADR-0482).
+- [x] No added case's output depends on the platform.
+- [x] `dotnet build` is clean and the fast tests pass with no test deleted, skipped or weakened.
 
 ## Notes
+
+- Measured first: BL-2624 (Done) already fixed the cause - its fill-across read of reader segments in Curl.Core's multipart body stream fills one chunk across the greeting part, the file part and the callback part's headers up to the first callback byte. With no code change, `CURL_UPSTREAM_CASE=654` and `NamedUpstreamCase_RunThroughCurl_PassesAsAListedCaseMust` pass on Windows, so 654 is added to the ratchet. No product fix here, so no new unit test (BL-2624 added the focused Core test).
+- Platform: the case compares protocol bytes only, with the boundary stripped; the file part shows only the base name `file654.txt` and LF-only content the harness writes as given, so the output does not depend on the platform.
+- Fast tests: 42 projects, 0 failed; `dotnet build` 0 warnings, 0 errors.
 
 ## Log
 
 - 2026-10-17: Created.
 - 2026-10-18: Backlog -> Doing. Criteria at claim: 908e81ba 4963d26c 21e5ddeb 4272a6b9.
+- 2026-10-18: Doing -> Done. Upstream case 654 passes and is on the ratchet: a duplicated handle's chunked MIME post fills its first chunk up to the callback part's data
