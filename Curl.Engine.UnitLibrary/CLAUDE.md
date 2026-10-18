@@ -468,3 +468,7 @@ A read-callback upload to an `http` or `https` URL with a known `EasyTransferOpt
 ## CURLOPT_PROXYUSERPWD (BL-2660)
 
 `ManagedEasyTransfer.TransferSettingsOf` gives a perform from the options the proxy credential `ProxyCredentialsOf` makes of `EasyAuthenticationOptions.ProxyUserPassword` (split at its first colon), `ProxyUserName` and `ProxyPassword` (each winning over its half), as the curl tool's `-U`, so the chosen proxy carries it in place of the proxy URL's user information and the HTTP handler answers a 407 with it (upstream test1588, ADR-0677). Its tests are in `ManagedEasyTransferTests.Proxy.cs`.
+
+## CURLOPT_NETRC on a library handle (BL-2696)
+
+A perform from the options with no `ToolInputs` and `EasyAuthenticationOptions.Netrc` not `Ignored` looks the URL's host up in the `.netrc` file with `TransferCredentialLookup` once its proxy is chosen (`ManagedEasyTransfer.TryLookUpNetrcCredentials`), and puts what it finds on the context as `LookedUpCredentials` (`OwnInputsOf`), through a proxy and on a `Duplicate` too, as libcurl's `override_login` does (upstream test2309). The file is `CURLOPT_NETRC_FILE`, else `NETRC`, else `.netrc` in `HOME`, read through `EasyTransferHost.ReadFile` (`ReadDiskFile`, the real disk, by default) and the engine's `ManagedEngineSharedState.ReadEnvironmentVariable`; a required file missing or malformed ends the perform with `CurlCode.ReadError` and the lookup's text before anything is sent. Redirect hops are not looked up again. Its tests are `ManagedEasyTransferTests.Netrc.cs`.

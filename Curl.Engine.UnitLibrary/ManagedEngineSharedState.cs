@@ -32,7 +32,8 @@ internal sealed class ManagedEngineSharedState
         Dialing = dialing;
         SigningClock = signingClock;
         WebSocketRandomSource = webSocketRandomSource;
-        ProxySelector = new ProxySelector(readEnvironmentVariable ?? Environment.GetEnvironmentVariable);
+        ReadEnvironmentVariable = readEnvironmentVariable ?? Environment.GetEnvironmentVariable;
+        ProxySelector = new ProxySelector(ReadEnvironmentVariable);
         TimeProvider = timeProvider;
         Connections = new ConnectionCache(timeProvider);
         TlsSessions = new TlsSessionCache(timeProvider);
@@ -75,6 +76,7 @@ internal sealed class ManagedEngineSharedState
         SocketHandles = engine.SocketHandles;
         Performer = engine.Performer;
         ProxySelector = engine.ProxySelector;
+        ReadEnvironmentVariable = engine.ReadEnvironmentVariable;
         Dialing = engine.Dialing;
         SigningClock = engine.SigningClock;
         WebSocketRandomSource = engine.WebSocketRandomSource;
@@ -100,6 +102,12 @@ internal sealed class ManagedEngineSharedState
     /// and the rest), as libcurl reads them for every handle (BL-2519, ADR-0608).
     /// </summary>
     internal ProxySelector ProxySelector { get; }
+
+    /// <summary>
+    /// Gets what reads an environment variable for every handle's own perform: the proxy variables
+    /// (<see cref="ProxySelector" />) and the <c>NETRC</c> and <c>HOME</c> variables the <c>.netrc</c> lookup reads.
+    /// </summary>
+    internal Func<string, string?> ReadEnvironmentVariable { get; }
 
     /// <summary>
     /// Gets what the engine's transfers dial and resolve through in place of sockets: the conformance harness's in-memory
