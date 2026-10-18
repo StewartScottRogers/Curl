@@ -434,7 +434,6 @@ public sealed class CurlUrlTests
     [DataRow("http://h_x/", "http", "h_x")]
     [DataRow("http://h~x/", "http", "h~x")]
     [DataRow("http://a%7Fb/", "http", "a\u007fb")]
-    [DataRow("http://a%80b/", "http", "a\ufffdb")]
     [DataRow("http://a\u200bb/", "http", "a\u200bb")]
     [DataRow("example.com", "http", "example.com")]
     [DataRow("x:81", "http", "x")]
@@ -469,8 +468,9 @@ public sealed class CurlUrlTests
         CurlUrl url = Parse(diagnostics, "http://a%80b/");
 
         diagnostics.Act("idn host", url.IdnHost);
-        diagnostics.Assert("idn host", "a\ufffdb", url.IdnHost);
-        Assert.AreEqual("a\ufffdb", url.IdnHost);
+        diagnostics.Assert("idn host", "a\udc80b", url.IdnHost);
+        Assert.AreEqual("a\udc80b", url.Host);
+        Assert.AreEqual("a\udc80b", url.IdnHost);
     }
 
     [TestMethod]

@@ -6,7 +6,11 @@ namespace Curl.Conformance.LibTest;
 /// <content><c>get_url_list</c>: URLs <c>get_url</c> reads back whole (<c>USE_IDN</c> and <c>LDAP</c> rows, Curl having both).</content>
 public static partial class Lib1560Tables
 {
-    /// <summary><c>get_url_list</c>: URLs <c>get_url</c> reads back whole (<c>USE_IDN</c> and <c>LDAP</c> rows, Curl having both).</summary>
+    /// <summary>
+    /// <c>get_url_list</c>: URLs <c>get_url</c> reads back whole (<c>USE_IDN</c> and <c>LDAP</c> rows, Curl having both).
+    /// A C byte that is not part of valid UTF-8 is written as <c>\uDC00</c> plus the byte, as
+    /// <c>UrlByteText</c> carries it (ADR-0693).
+    /// </summary>
     public static IReadOnlyList<Lib1560UrlCase> GetUrls { get; } =
     [
         new("https://127.0.0.%31.", "https://127.0.0.1/", CurlUrlFlags.None, CurlUrlFlags.None, CurlUrlCode.Ok),
@@ -132,7 +136,7 @@ public static partial class Lib1560Tables
         new("https://%20", "", CurlUrlFlags.None, CurlUrlFlags.None, CurlUrlCode.BadHostname),
         new("https://%41%0D", "", CurlUrlFlags.None, CurlUrlFlags.None, CurlUrlCode.BadHostname),
         new("https://%25", "", CurlUrlFlags.None, CurlUrlFlags.None, CurlUrlCode.BadHostname),
-        new("https://_%c0_", "https://_\u00C0_/", CurlUrlFlags.None, CurlUrlFlags.None, CurlUrlCode.Ok),
+        new("https://_%c0_", "https://_\uDCC0_/",CurlUrlFlags.None, CurlUrlFlags.None, CurlUrlCode.Ok),
         new("https://_%c0_", "https://_%C0_/", CurlUrlFlags.None, CurlUrlFlags.UrlEncode, CurlUrlCode.Ok),
         new("https://16843009", "https://1.1.1.1/", CurlUrlFlags.None, CurlUrlFlags.None, CurlUrlCode.Ok),
         new("https://0177.1", "https://127.0.0.1/", CurlUrlFlags.None, CurlUrlFlags.None, CurlUrlCode.Ok),
@@ -145,7 +149,7 @@ public static partial class Lib1560Tables
         new("https://0XFF.0XFF.0377.255", "https://255.255.255.255/", CurlUrlFlags.None, CurlUrlFlags.None, CurlUrlCode.Ok),
         new("https://1.0xffffff", "https://1.255.255.255/", CurlUrlFlags.None, CurlUrlFlags.None, CurlUrlCode.Ok),
         new("https://a127.0.0.1", "https://a127.0.0.1/", CurlUrlFlags.None, CurlUrlFlags.None, CurlUrlCode.Ok),
-        new("https://\u00FF.127.0.0.1", "https://%FF.127.0.0.1/", CurlUrlFlags.None, CurlUrlFlags.UrlEncode, CurlUrlCode.Ok),
+        new("https://\uDCFF.127.0.0.1","https://%FF.127.0.0.1/", CurlUrlFlags.None, CurlUrlFlags.UrlEncode, CurlUrlCode.Ok),
         new("https://127.-0.0.1", "https://127.-0.0.1/", CurlUrlFlags.None, CurlUrlFlags.None, CurlUrlCode.Ok),
         new("https://127.0. 1", "https://127.0.0.1/", CurlUrlFlags.None, CurlUrlFlags.None, CurlUrlCode.MalformedInput),
         new("https://1.2.3.256", "https://1.2.3.256/", CurlUrlFlags.None, CurlUrlFlags.None, CurlUrlCode.Ok),

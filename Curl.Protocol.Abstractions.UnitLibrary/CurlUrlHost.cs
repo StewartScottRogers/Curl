@@ -111,13 +111,13 @@ internal static class CurlUrlHost
         !decoded.Any(IsRejectedInName) && !decoded.All(IsMappedToNothingOrDot);
 
     /// <summary>
-    /// Percent-decodes a host name as UTF-8, leaving a <c>%</c> that does not start a
+    /// Percent-decodes a host name as <see cref="UrlByteText" /> reads bytes, leaving a <c>%</c> that does not start a
     /// valid escape in place, or returns <see langword="null" /> when a decoded byte is a
     /// control character.
     /// </summary>
     private static string? PercentDecode(string text)
     {
-        byte[] encoded = Encoding.UTF8.GetBytes(text);
+        byte[] encoded = UrlByteText.ToBytes(text);
         var decoded = new List<byte>(encoded.Length);
         for (int index = 0; index < encoded.Length; index++)
         {
@@ -131,7 +131,7 @@ internal static class CurlUrlHost
             decoded.Add(value);
         }
 
-        return decoded.Any(value => value < 0x20) ? null : Encoding.UTF8.GetString([.. decoded]);
+        return decoded.Any(value => value < 0x20) ? null : UrlByteText.ToText([.. decoded]);
     }
 
     private static bool TryReadEscape(byte[] bytes, int start, out byte value)

@@ -512,6 +512,39 @@ public sealed partial class ManagedCurlUrlHandleTests
         Assert.AreEqual(FullUrl, GetOk(url, CurlUrlPart.Url));
     }
 
+    // A lone surrogate cannot sit in an attribute's UTF-8 string, so these rows are not DataRows.
+    [TestMethod]
+    public void Get_UrlWithAHostByteThatIsNotUtf8_KeepsTheByte()
+    {
+        using ManagedCurlUrlHandle url = Parsed("https://_%c0_");
+
+        Assert.AreEqual("https://_\uDCC0_/", GetOk(url, CurlUrlPart.Url));
+    }
+
+    [TestMethod]
+    public void Get_UrlEncodedWithAHostByteThatIsNotUtf8_EscapesTheByte()
+    {
+        using ManagedCurlUrlHandle url = Parsed("https://_%c0_");
+
+        Assert.AreEqual("https://_%C0_/", GetOk(url, CurlUrlPart.Url, CurlUrlFlags.UrlEncode));
+    }
+
+    [TestMethod]
+    public void Get_UrlEncodedWithARawByteThatIsNotUtf8_EscapesTheByte()
+    {
+        using ManagedCurlUrlHandle url = Parsed("https://\uDCFF.127.0.0.1");
+
+        Assert.AreEqual("https://%FF.127.0.0.1/", GetOk(url, CurlUrlPart.Url, CurlUrlFlags.UrlEncode));
+    }
+
+    [TestMethod]
+    public void Get_DecodedPathWithAByteThatIsNotUtf8_IsDc00PlusTheByte()
+    {
+        using ManagedCurlUrlHandle url = Parsed("https://h/_%c0_");
+
+        Assert.AreEqual("/_\uDCC0_", GetOk(url, CurlUrlPart.Path, CurlUrlFlags.UrlDecode));
+    }
+
     private static ManagedCurlUrlHandle Parsed(string text, CurlUrlFlags flags = CurlUrlFlags.None)
     {
         ManagedCurlUrlHandle url = new();
