@@ -51,3 +51,4 @@ platform-neutral before holding it (Schannel on Windows, OpenSSL elsewhere; revo
 ## Log
 
 - 2026-10-18: Created.
+- 2026-10-18: Backlog -> Doing. Criteria at claim: 262ba952 c59fcab3 3d836d5e.
