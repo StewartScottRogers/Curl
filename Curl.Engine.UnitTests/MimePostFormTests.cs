@@ -19,7 +19,7 @@ public sealed class MimePostFormTests
     [TestMethod]
     public async Task BuildAsync_NoMimePost_GivesNull()
     {
-        MultipartFormBuildResult? form = await MimePostForm.BuildAsync(Builder, new EasyHttpOptions(), "http", null, null, Stream.Null, CancellationToken.None);
+        MultipartFormBuildResult? form = await MimePostForm.BuildAsync(Builder, new EasyHttpOptions(), "http", null, null, null, Stream.Null, CancellationToken.None);
 
         Assert.IsNull(form);
     }
@@ -27,7 +27,7 @@ public sealed class MimePostFormTests
     [TestMethod]
     public async Task BuildAsync_HttpUrl_BuildsAFormDataBodyWithPercentEscapedNames()
     {
-        MultipartFormBuildResult? form = await MimePostForm.BuildAsync(Builder, new EasyHttpOptions { MimePost = OnePart }, "http", null, null, Stream.Null, CancellationToken.None);
+        MultipartFormBuildResult? form = await MimePostForm.BuildAsync(Builder, new EasyHttpOptions { MimePost = OnePart }, "http", null, null, null, Stream.Null, CancellationToken.None);
 
         string body = await ContentOfAsync(form!);
         Assert.AreEqual("multipart/form-data; boundary=b0", form!.Body!.ContentType);
@@ -37,7 +37,7 @@ public sealed class MimePostFormTests
     [TestMethod]
     public async Task BuildAsync_EmptyHttpPostForm_GivesAnEmptyBodyWithNoContentType()
     {
-        MultipartFormBuildResult? form = await MimePostForm.BuildAsync(Builder, new EasyHttpOptions { HttpPost = new EasyMimeBody() }, "http", null, null, Stream.Null, CancellationToken.None);
+        MultipartFormBuildResult? form = await MimePostForm.BuildAsync(Builder, new EasyHttpOptions { HttpPost = new EasyMimeBody() }, "http", null, null, null, Stream.Null, CancellationToken.None);
 
         Assert.AreEqual(0, form!.Body!.Length);
         Assert.AreEqual(string.Empty, form.Body.ContentType);
@@ -47,7 +47,7 @@ public sealed class MimePostFormTests
     [TestMethod]
     public async Task BuildAsync_EmptyMimePost_StillBuildsAFormDataBody()
     {
-        MultipartFormBuildResult? form = await MimePostForm.BuildAsync(Builder, new EasyHttpOptions { MimePost = new EasyMimeBody() }, "http", null, null, Stream.Null, CancellationToken.None);
+        MultipartFormBuildResult? form = await MimePostForm.BuildAsync(Builder, new EasyHttpOptions { MimePost = new EasyMimeBody() }, "http", null, null, null, Stream.Null, CancellationToken.None);
 
         Assert.AreEqual("multipart/form-data; boundary=b0", form!.Body!.ContentType);
     }
@@ -57,7 +57,7 @@ public sealed class MimePostFormTests
     {
         EasyHttpOptions http = new() { MimePost = OnePart, MimeOptions = MimeOptions.FormEscape };
 
-        MultipartFormBuildResult? form = await MimePostForm.BuildAsync(Builder, http, "http", null, null, Stream.Null, CancellationToken.None);
+        MultipartFormBuildResult? form = await MimePostForm.BuildAsync(Builder, http, "http", null, null, null, Stream.Null, CancellationToken.None);
 
         StringAssert.Contains(await ContentOfAsync(form!), "name=\"a\\\"b\"");
     }
@@ -67,7 +67,7 @@ public sealed class MimePostFormTests
     {
         EasyHttpOptions http = new() { MimePost = OnePart, HttpHeaders = ["Subject: hi"] };
 
-        MultipartFormBuildResult? form = await MimePostForm.BuildAsync(Builder, http, "smtp", null, null, Stream.Null, CancellationToken.None);
+        MultipartFormBuildResult? form = await MimePostForm.BuildAsync(Builder, http, "smtp", null, null, null, Stream.Null, CancellationToken.None);
 
         string message = await ContentOfAsync(form!);
         StringAssert.StartsWith(message, "Content-Type: multipart/mixed; boundary=b0\r\nMime-Version: 1.0\r\nSubject: hi\r\n");
@@ -216,7 +216,7 @@ public sealed class MimePostFormTests
         using MemoryStream standardInput = new(Encoding.ASCII.GetBytes("abc"));
         EasyHttpOptions http = new() { HttpPost = new() { Parts = [new EasyMimePart { Name = "in", Data = new EasyMimeStandardInput() }] } };
 
-        MultipartFormBuildResult? form = await MimePostForm.BuildAsync(Builder, http, "http", null, null, standardInput, CancellationToken.None);
+        MultipartFormBuildResult? form = await MimePostForm.BuildAsync(Builder, http, "http", null, null, null, standardInput, CancellationToken.None);
 
         Assert.IsNotNull(form);
         Assert.IsTrue(form.IsBuilt);

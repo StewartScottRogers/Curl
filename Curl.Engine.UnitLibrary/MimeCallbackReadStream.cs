@@ -14,7 +14,8 @@ namespace Curl.Engine;
 /// <see cref="SeekResult.Ok" /> fails the rewind with libcurl's <c>seek callback returned error &lt;n&gt;</c>.
 /// </summary>
 /// <param name="part">The part's data.</param>
-internal sealed class MimeCallbackReadStream(EasyMimeCallback part) : CallbackReadStream(part.Read)
+/// <param name="pauseGate">The handle's pause state, so <c>CURL_READFUNC_PAUSE</c> waits for <c>curl_easy_pause</c> (upstream tests 670 to 673, BL-2631), or <see langword="null" /> when the transfer cannot pause.</param>
+internal sealed class MimeCallbackReadStream(EasyMimeCallback part, EasyPauseGate? pauseGate = null) : CallbackReadStream(part.Read, pauseGate)
 {
     /// <inheritdoc />
     public override bool CanSeek => part.Seek is not null;

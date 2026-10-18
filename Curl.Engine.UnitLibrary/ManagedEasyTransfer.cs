@@ -859,6 +859,7 @@ internal sealed class ManagedEasyTransfer(
         EngineToolTransferProgress? toolProgress = ToolProgress;
         using CancellationTokenSource abort = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, AbortTokenOf(toolProgress));
         CallbackTransferProgress? callbackProgress = CallbackProgressUnlessToolGave(toolProgress, options, abort);
+        pauseGate.TickWhilePaused(CallbackTransferProgress.PausedTickOf(callbackProgress), shared.TimeProvider);
         TransferResult? result = await FollowUnlessAbortedAsync(
             follower,
             state,
@@ -947,7 +948,7 @@ internal sealed class ManagedEasyTransfer(
         ICollection<CallbackReadStream> mimeReads,
         CancellationToken cancellationToken) =>
         toolInputs is null
-            ? await MimePostForm.BuildAsync(new MultipartFormBodyBuilder(Host.FileSystem, Encoding.UTF8, CreateFormBoundary), options.Http, url.Scheme, options.Callbacks.Read, mimeReads, Host.StandardInput, cancellationToken).ConfigureAwait(false)
+            ? await MimePostForm.BuildAsync(new MultipartFormBodyBuilder(Host.FileSystem, Encoding.UTF8, CreateFormBoundary), options.Http, url.Scheme, options.Callbacks.Read, mimeReads, PauseGateFor(url), Host.StandardInput, cancellationToken).ConfigureAwait(false)
             : null;
 
     /// <summary>The token the curl tool's runner aborts the transfer through, or none without <paramref name="toolProgress" />.</summary>

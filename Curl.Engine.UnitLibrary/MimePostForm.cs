@@ -24,6 +24,7 @@ internal static class MimePostForm
     /// Receives the stream of each <c>curl_mime_data_cb</c> part as the body is built
     /// (<see cref="MultipartFormPartMapping.FromMimeBody" />); <see langword="null" /> keeps none.
     /// </param>
+    /// <param name="pauseGate">The handle's pause state a callback part's <c>CURL_READFUNC_PAUSE</c> waits on (BL-2631), or <see langword="null" /> when the transfer cannot pause.</param>
     /// <param name="standardInput">What a <c>CURLOPT_HTTPPOST</c> file part named <c>-</c> reads (<see cref="BodyOf" />).</param>
     /// <param name="cancellationToken">Cancels the file opens.</param>
     /// <returns>
@@ -37,6 +38,7 @@ internal static class MimePostForm
         string scheme,
         ReadCallback? read,
         ICollection<CallbackReadStream>? callbackReads,
+        EasyPauseGate? pauseGate,
         Stream standardInput,
         CancellationToken cancellationToken)
     {
@@ -50,7 +52,7 @@ internal static class MimePostForm
             return new MultipartFormBuildResult(new StreamBody(new MemoryStream([], writable: false), 0, string.Empty), null);
         }
 
-        IReadOnlyList<MultipartFormPart> parts = MultipartFormPartMapping.FromMimeBody(body, callbackReads);
+        IReadOnlyList<MultipartFormPart> parts = MultipartFormPartMapping.FromMimeBody(body, callbackReads, pauseGate);
         MultipartNameEscaping escaping = MultipartFormPartMapping.NameEscapingOf(http.MimeOptions.HasFlag(MimeOptions.FormEscape), scheme);
         return MailRequestOptionsMapping.SendsFormAsMimeMessage(scheme)
             ? await builder.BuildMailMessageAsync(parts, escaping, http.HttpHeaders, cancellationToken).ConfigureAwait(false)

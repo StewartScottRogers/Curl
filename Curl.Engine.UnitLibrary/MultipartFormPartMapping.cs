@@ -33,9 +33,10 @@ internal static class MultipartFormPartMapping
     /// Receives each <see cref="MimeCallbackReadStream" /> a callback part opens as the body is built, so the perform
     /// can tell that a read callback aborted it; <see langword="null" /> keeps none.
     /// </param>
+    /// <param name="pauseGate">The handle's pause state each callback part's stream waits on after <c>CURL_READFUNC_PAUSE</c>, or <see langword="null" /> when the transfer cannot pause.</param>
     /// <returns>The builder's parts, one for each of the body's parts.</returns>
-    internal static IReadOnlyList<MultipartFormPart> FromMimeBody(EasyMimeBody body, ICollection<CallbackReadStream>? callbackReads = null) =>
-        [.. body.Parts.Select(part => FromMimePart(part, callbackReads))];
+    internal static IReadOnlyList<MultipartFormPart> FromMimeBody(EasyMimeBody body, ICollection<CallbackReadStream>? callbackReads = null, EasyPauseGate? pauseGate = null) =>
+        [.. body.Parts.Select(part => FromMimePart(part, callbackReads, pauseGate))];
 
     /// <summary>
     /// The escaping the builder gives names and file names: <see cref="MultipartNameEscaping.Backslash" />
@@ -68,7 +69,7 @@ internal static class MultipartFormPartMapping
             .Select(header => header[(ContentTypeName.Length + 1)..].TrimStart(' '))
             .FirstOrDefault();
 
-    private static MultipartFormPart FromMimePart(EasyMimePart part, ICollection<CallbackReadStream>? callbackReads) =>
+    private static MultipartFormPart FromMimePart(EasyMimePart part, ICollection<CallbackReadStream>? callbackReads, EasyPauseGate? pauseGate) =>
         new(
             part.Name,
             KindOf(part),
@@ -76,11 +77,11 @@ internal static class MultipartFormPartMapping
             part.Type,
             part.FileName,
             part.Headers,
-            part.SubParts is { } subParts ? FromMimeBody(subParts, callbackReads) : [])
+            part.SubParts is { } subParts ? FromMimeBody(subParts, callbackReads, pauseGate) : [])
         {
             Encoder = part.Encoder,
             Bytes = RawBytesOf(part.Data),
-            OpenContent = OpenerOf(part.Data, callbackReads),
+            OpenContent = OpenerOf(part.Data, callbackReads, pauseGate),
             ContentLength = ContentLengthOf(part.Data),
         };
 
@@ -106,8 +107,8 @@ internal static class MultipartFormPartMapping
         data is EasyMimeBytes bytes && !Utf8.IsValid(bytes.Bytes.Span) ? bytes.Bytes : ReadOnlyMemory<byte>.Empty;
 
     /// <summary>What opens a callback part's stream, or <see langword="null" /> for any other data.</summary>
-    private static Func<Stream>? OpenerOf(EasyMimeData? data, ICollection<CallbackReadStream>? callbackReads) =>
-        data is EasyMimeCallback callback ? () => OpenCallback(callback, callbackReads) : null;
+    private static Func<Stream>? OpenerOf(EasyMimeData? data, ICollection<CallbackReadStream>? callbackReads, EasyPauseGate? pauseGate) =>
+        data is EasyMimeCallback callback ? () => OpenCallback(callback, callbackReads, pauseGate) : null;
 
     /// <summary>A callback part's size, or <see langword="null" /> when it is -1 (unknown) or the data is not a callback.</summary>
     private static long? ContentLengthOf(EasyMimeData? data) =>
@@ -123,9 +124,9 @@ internal static class MultipartFormPartMapping
         };
 
     /// <summary>Opens <paramref name="callback" />'s stream, keeping it in <paramref name="callbackReads" /> when given.</summary>
-    private static MimeCallbackReadStream OpenCallback(EasyMimeCallback callback, ICollection<CallbackReadStream>? callbackReads)
+    private static MimeCallbackReadStream OpenCallback(EasyMimeCallback callback, ICollection<CallbackReadStream>? callbackReads, EasyPauseGate? pauseGate)
     {
-        MimeCallbackReadStream stream = new(callback);
+        MimeCallbackReadStream stream = new(callback, pauseGate);
         callbackReads?.Add(stream);
         return stream;
     }
