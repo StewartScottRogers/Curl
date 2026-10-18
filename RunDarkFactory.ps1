@@ -3451,6 +3451,11 @@ Rules for this unattended run, in addition to CLAUDE.md:
    a task for each that does not, with the sizing split, so one requeue names them all
    (AF-0242: BL-2394 was requeued for size, then again at 23 turns for a missing engine
    hook, $3.38 for two runs that produced only a requeue, before a third claim finished it).
+   A task that ports or registers upstream cases also needs the case runner to run them:
+   in that pass, run the runner on one of the cases and confirm it is not skipped as "not
+   ported", and file the runner work with the split (AF-0263: BL-2529 was requeued for size
+   and then for BL-2601, the runner skipping cases 520 to 537, $3.24 for two runs that
+   produced only a requeue).
    The board let this run claim the task only because every ID already in its
    `depends-on` is Done, so those never send it back. Before naming any other task as the
    blocker, check its folder (`ls Tasks/*/<ID>-* Tasks/Done/*/<ID>-*`): a task in Done does
@@ -3597,6 +3602,11 @@ Rules for this unattended run, in addition to CLAUDE.md:
    a task for each that does not, with the sizing split, so one requeue names them all
    (AF-0242: BL-2394 was requeued for size, then again at 23 turns for a missing engine
    hook, $3.38 for two runs that produced only a requeue, before a third claim finished it).
+   A task that ports or registers upstream cases also needs the case runner to run them:
+   in that pass, run the runner on one of the cases and confirm it is not skipped as "not
+   ported", and file the runner work with the split (AF-0263: BL-2529 was requeued for size
+   and then for BL-2601, the runner skipping cases 520 to 537, $3.24 for two runs that
+   produced only a requeue).
    The shift claimed the task only because every ID already in its `depends-on` is Done,
    so those never send it back. Before naming any other task as the blocker, check its
    folder (`ls Tasks/*/<ID>-* Tasks/Done/*/<ID>-*`): a task in Done does not block. And
