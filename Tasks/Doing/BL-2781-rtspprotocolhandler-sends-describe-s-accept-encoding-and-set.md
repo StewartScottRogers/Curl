@@ -33,3 +33,4 @@ Left out of BL-2751 (ADR-0691, Consequences). `RtspRequestFormatter.Format` writ
 ## Log
 
 - 2026-10-18: Created.
+- 2026-10-18: Backlog -> Doing. Criteria at claim: 85f6256d 17037253 d09fd564 65359435 3d836d5e.
