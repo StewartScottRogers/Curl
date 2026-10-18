@@ -3,8 +3,8 @@ id: AF-0260
 title: LibTestContext's null-argument check >= 0 can become > 0 with no test failing, accepting a null first argument
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Conformance.LibTest.UnitLibrary/LibTestContext.cs:LibTestContext-ge:surviving-mutant
 reproduction: mutation Curl.Conformance.LibTest.UnitLibrary/LibTestContext.cs:25:>=
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Confo
 ## Log
 
 - 2026-10-18: filed proposed.
+- 2026-10-18: proposed -> accepted.
