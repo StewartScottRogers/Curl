@@ -1,5 +1,5 @@
 ---
-id: BL-2745
+id: BL-2747
 title: Keep a Libcurl handle's last Digest challenge so its next transfer answers it, as curl's authhost state does
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-18
 completed:
 ---
-# BL-2745 — Keep a Libcurl handle's last Digest challenge so its next transfer answers it, as curl's authhost state does
+# BL-2747 — Keep a Libcurl handle's last Digest challenge so its next transfer answers it, as curl's authhost state does
 
 ## Goal
 
