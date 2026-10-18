@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Core.UnitTests]
 requirement: none
 created: 2026-10-18
-completed:
+completed: 2026-10-18
 ---
 # BL-2757 — Fix AF-0246: TryParse_TextNamingNoRange_ReturnsFalseWithoutThrowing asserts nothing: both assertions are commented out
 
@@ -41,12 +41,23 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- 2026-10-18 (lane 5): Nothing to change. On this branch `ByteRangeParserTests.cs:80-81`
+  already read `Assert.IsFalse(parsed);` and `Assert.IsNull(range);`, and the reproduction
+  (`Select-String ... '^\s*// Assert\.'`) finds no match. `git log -S'// Assert.IsFalse(parsed);'`
+  on the file finds no commit, so the commented-out assertions were never in the product
+  history. They were most likely a defect the audit-seeder planted in the audit worktree,
+  reported as a real finding. The audit office should check this against that audit's
+  planted-defect manifest when it re-audits. All 29 ByteRangeParserTests pass, including
+  the 11 rows of this test. `dotnet build` is clean, and Curl.Core.UnitTests' fast tests
+  pass (1629 passed, 8 skipped).
 
 ## Log
 
 - 2026-10-18: Created.
 - 2026-10-18: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-18: Doing -> Done. Assertions already live; reproduction finds no match; build clean, Core fast tests green
