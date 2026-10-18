@@ -49,3 +49,4 @@ The finding closes only when a later re-audit by the process auditor confirms th
 ## Log
 
 - 2026-10-18: Created.
+- 2026-10-18: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
