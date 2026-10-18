@@ -37,3 +37,4 @@ Found by BL-2533: `Lib597` is unit tested and matches lib597.c, but nothing reac
 - 2026-10-17: Created.
 - 2026-10-17: Backlog -> Doing. Criteria at claim: 92cbe6ef 4963d26c 21e5ddeb 4272a6b9.
 - 2026-10-17: Doing -> Backlog. Waits on BL-2705 (FTP connect-only login) and BL-2706 (IMAP connect-only CAPABILITY); the engine wiring and ratchet follow
+- 2026-10-18: Backlog -> Doing. Criteria at claim: 92cbe6ef 4963d26c 21e5ddeb 4272a6b9.
