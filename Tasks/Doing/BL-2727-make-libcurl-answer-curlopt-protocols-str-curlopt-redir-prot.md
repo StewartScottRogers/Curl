@@ -39,3 +39,4 @@ Start in `Libcurl/Options/Network/EasyNetworkOptionSetters.cs` (`SetProtocols`, 
 ## Log
 
 - 2026-10-18: Created.
+- 2026-10-18: Backlog -> Doing. Criteria at claim: a6b0587e c36cc153 d16a21f8 208a64e8 4272a6b9.
