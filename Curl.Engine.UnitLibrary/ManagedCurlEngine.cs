@@ -31,7 +31,7 @@ public sealed class ManagedCurlEngine : ICurlEngine
 {
     private readonly ManagedEngineSharedState shared;
     private readonly EasyTransferHost handleHost;
-    private readonly Func<EasyOptions, ManagedEngineSharedState, ICookieStore?, IHttp2PushSink?, ProtocolDispatcher> createDispatcher;
+    private readonly Func<EasyOptions, ManagedEngineSharedState, ICookieStore?, IHttp2PushSink?, HandleRtspSession, ProtocolDispatcher> createDispatcher;
 
     /// <summary>Creates the engine on the system clock and the real network, with no easy error text.</summary>
     public ManagedCurlEngine()
@@ -95,7 +95,7 @@ public sealed class ManagedCurlEngine : ICurlEngine
     {
         shared = new ManagedEngineSharedState(timeProvider, easyErrorText ?? (_ => string.Empty), readEnvironmentVariable, dialing, signingClock, webSocketRandomSource, FirstTransferFtpPwdStop.When(stopsFirstFtpTransferBeforePwd));
         handleHost = HandleHostOf(standardInput, readEnvironmentVariable);
-        this.createDispatcher = createDispatcher is null ? CreateDispatcher : (options, state, cookies, _) => createDispatcher(options, state, cookies);
+        this.createDispatcher = createDispatcher is null ? CreateDispatcher : (options, state, cookies, _, _) => createDispatcher(options, state, cookies);
     }
 
     /// <summary>
@@ -165,8 +165,9 @@ public sealed class ManagedCurlEngine : ICurlEngine
     /// <param name="shared">The engine's shared caches.</param>
     /// <param name="cookieStore">The cookies the HTTP handler sends and keeps, or <see langword="null" /> with the cookie engine off.</param>
     /// <param name="pushSink">Where the HTTP handler offers HTTP/2 server pushes (<see cref="EngineHttp2PushSink" />, BL-2469), or <see langword="null" /> to refuse them.</param>
+    /// <param name="rtspSession">The handle's RTSP state, whose settings and session the RTSP handler sends (BL-2704), or <see langword="null" /> for the curl tool's <c>OPTIONS *</c>.</param>
     /// <returns>The dispatcher.</returns>
-    internal static ProtocolDispatcher CreateDispatcher(EasyOptions options, ManagedEngineSharedState shared, ICookieStore? cookieStore, IHttp2PushSink? pushSink = null)
+    internal static ProtocolDispatcher CreateDispatcher(EasyOptions options, ManagedEngineSharedState shared, ICookieStore? cookieStore, IHttp2PushSink? pushSink = null, HandleRtspSession? rtspSession = null)
     {
         CurlTransports transports = CreateTransports(options, shared);
         IConnector connector = PrerequestConnector.Over(PoolOf(transports, transports.TcpConnector, options.Callbacks, shared), options.Callbacks.Prerequest);
@@ -183,6 +184,8 @@ public sealed class ManagedCurlEngine : ICurlEngine
             ftpDataConnector: PoolOf(transports, transports.TcpConnector.ForFtpDataConnections(), options.Callbacks, shared),
             ftpWildcardHooks: CallbackWildcardHooks.Of(options),
             rtspInterleaveSink: CallbackInterleaveSink.Of(options.Callbacks.Interleave),
+            rtspRequestSettings: rtspSession is null ? null : () => rtspSession.SettingsFor(options),
+            rtspSessionState: rtspSession?.State,
             ftpListener: SocketCallbackConnectionListener.Over(shared.Dialing?.FtpListener ?? new Curl.Networking.TcpConnectionListener(), options.Callbacks, shared),
             webSocketRawMode: IsWebSocketRawMode(options),
             http2PushSink: pushSink,

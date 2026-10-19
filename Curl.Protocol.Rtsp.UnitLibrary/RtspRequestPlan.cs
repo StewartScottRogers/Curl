@@ -65,6 +65,26 @@ internal sealed record RtspRequestPlan(RtspRequestKind Kind, string Target, stri
             : new(settings.Kind, settings.StreamUri ?? DefaultTarget, settings.Transport, settings.Body, false);
 
     /// <summary>
+    /// Gives the plan with <paramref name="upload" />'s bytes as its body when it is a libcurl request that sends a
+    /// body and the settings gave none, as curl 8.22.0's <c>rtsp_setup_body</c> reads <c>CURLOPT_UPLOAD</c>'s read
+    /// callback for <c>ANNOUNCE</c>, <c>GET_PARAMETER</c> and <c>SET_PARAMETER</c> (BL-2704); else the plan itself.
+    /// </summary>
+    /// <param name="upload">The transfer's upload, or <see langword="null" /> for none.</param>
+    /// <param name="cancellationToken">Cancels the read.</param>
+    /// <returns>The plan to send.</returns>
+    internal async ValueTask<RtspRequestPlan> WithUploadAsync(Stream? upload, CancellationToken cancellationToken)
+    {
+        if (IsToolTransfer || Body is not null || BodyContentType is null || upload is null)
+        {
+            return this;
+        }
+
+        using MemoryStream body = new();
+        await upload.CopyToAsync(body, cancellationToken).ConfigureAwait(false);
+        return this with { Body = body.ToArray() };
+    }
+
+    /// <summary>
     /// Gives the <c>Transport</c> value written by curl, or <see langword="null" />: only a
     /// <c>SETUP</c> writes one, and not when a custom header names <c>Transport</c>.
     /// </summary>

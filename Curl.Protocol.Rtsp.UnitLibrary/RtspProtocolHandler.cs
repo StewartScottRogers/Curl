@@ -104,7 +104,7 @@ public sealed class RtspProtocolHandler(
     private readonly IHttpAuthenticator authenticator =
         authenticator ?? throw new ArgumentNullException(nameof(authenticator));
 
-    private readonly RtspRequestPlan plan = RtspRequestPlan.For(requestSettings);
+    private RtspRequestPlan plan = RtspRequestPlan.For(requestSettings);
 
     /// <inheritdoc />
     public IReadOnlyCollection<string> SupportedSchemes => Schemes;
@@ -162,6 +162,7 @@ public sealed class RtspProtocolHandler(
         {
             RtspSessionState session = sessionState ?? new RtspSessionState();
             session.StartTransfer(requestSettings, connect.IsReused);
+            plan = await plan.WithUploadAsync(context.Upload, context.CancellationToken).ConfigureAwait(false);
             TransferResult result = await RequestAsync(connection, context, session).ConfigureAwait(false);
             ReportConnectionEnd(context.Events, target, connect, result, session.ClosesConnection);
             return result;

@@ -45,6 +45,12 @@ public sealed class RtspSessionState
     internal string? SessionId { get; private set; }
 
     /// <summary>
+    /// Forgets the session ID, as libcurl's <c>CURLOPT_RTSP_SESSION_ID</c> set to <c>NULL</c> does, so the next
+    /// request sends no <c>Session</c> and takes the one its reply gives (BL-2704).
+    /// </summary>
+    public void ForgetSessionId() => SessionId = null;
+
+    /// <summary>
     /// Gets a value indicating whether a reply has made curl close the connection after the
     /// transfer instead of keeping it, as a <c>Content-Length</c> too large for 64 bits does
     /// (curl's <c>streamclose</c>, measured, BL-1403).
