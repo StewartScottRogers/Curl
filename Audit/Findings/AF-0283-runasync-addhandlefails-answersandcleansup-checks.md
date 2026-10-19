@@ -3,8 +3,8 @@ id: AF-0283
 title: RunAsync_AddHandleFails_AnswersAndCleansUp checks neither the answer's code nor the clean-up
 auditor: quality
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Conformance.LibTest.UnitTests/Lib539To553Tests.cs:RunAsync_AddHandleFails_AnswersAndCleansUp:weak-assertion
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Curl.Conformance.LibTest.UnitTests/Lib539To553Tests.cs -Patt
 ## Log
 
 - 2026-10-18: filed proposed.
+- 2026-10-19: proposed -> accepted.
