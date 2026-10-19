@@ -228,20 +228,22 @@ internal sealed class TransferHeaderStore : ITransferHeaders
     }
 
     /// <summary>
-    /// Appends a folded line to the header before it, keeping one of its leading blanks and none of its
-    /// trailing ones, as libcurl's <c>unfold_value</c> does; a fold with no header before it is dropped.
+    /// Appends a folded line to the header before it without its leading and trailing blanks, joined by one
+    /// space (none to an empty value), as libcurl 8.22.0's <c>unfold_value</c> does (upstream test1941: a fold
+    /// <c>"\t\tconnect"</c> after <c>"from the"</c> gives <c>"from the connect"</c>); a fold with no header
+    /// before it, or with nothing but blanks, is dropped.
     /// </summary>
     private void Unfold(string line)
     {
-        string piece = line.TrimEnd(' ', '\t');
+        string piece = line.Trim(' ', '\t');
         if (headers.Count == 0 || piece.Length == 0)
         {
             return;
         }
 
-        int blanks = piece.Length - piece.TrimStart(' ', '\t').Length;
         StoredHeader last = headers[^1];
-        headers[^1] = new StoredHeader(last.Name, last.Value + piece[(blanks - 1)..], last.Origin, last.Request);
+        string value = last.Value.Length == 0 ? piece : last.Value + " " + piece;
+        headers[^1] = new StoredHeader(last.Name, value, last.Origin, last.Request);
     }
 
     /// <summary>Adds a <c>name: value</c> line, its value without leading or trailing blanks; a line with no colon is not a header and is dropped.</summary>

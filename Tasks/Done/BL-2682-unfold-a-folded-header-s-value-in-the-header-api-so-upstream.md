@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary/TransferHeaderStore.cs, Curl.Engine.UnitTests/TransferHeaderStoreTests.cs, Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
 requirement: none
 created: 2026-10-17
-completed:
+completed: 2026-10-18
 ---
 # BL-2682 — Unfold a folded header's value in the header API so upstream case 1941 passes
 
@@ -22,15 +22,17 @@ Found by BL-2547. The case's `CONNECT` response folds a header (`Server: from ` 
 
 ## Acceptance criteria
 
-- [ ] A unit test in `Curl.Engine.UnitTests` shows a folded header's value unfolded as upstream's `unfold_value` does (a tab inside the continuation becoming what upstream makes it).
-- [ ] Upstream case 1941 passes through the case runner on Windows and is in `Curl.Conformance.UnitTests/PassingUpstreamCases.txt`.
-- [ ] `dotnet build` is clean and the fast tests pass with no test deleted, skipped or weakened, and every case on the ratchet still passes.
+- [x] A unit test in `Curl.Engine.UnitTests` shows a folded header's value unfolded as upstream's `unfold_value` does (a tab inside the continuation becoming what upstream makes it).
+- [x] Upstream case 1941 passes through the case runner on Windows and is in `Curl.Conformance.UnitTests/PassingUpstreamCases.txt`.
+- [x] `dotnet build` is clean and the fast tests pass with no test deleted, skipped or weakened, and every case on the ratchet still passes.
 
 ## Notes
 
 - 2026-10-18: touches narrowed from Curl.Engine.UnitLibrary, Curl.Engine.UnitTests to files, by reading TransferHeaderStore, so it can run beside other Engine tasks.
+- 2026-10-18: Upstream 8.22.0 joins a fold with one space and drops all its leading and trailing blanks (test1941 expects `from the connect` from `from `, ` the	`, `		connect`, and `text/html` from an empty `Content-Type:` folded with ` text/html`). `TransferHeaderStore.Unfold` now trims the fold and appends it after one space, or as the whole value when the value is empty; the old test pinning `one	two	three` now pins `one two three`, plus two focused tests. Case 1941 passes and is on the ratchet; Measure-CodeQuality for Curl.Engine.UnitLibrary: 0 failing members.
 
 ## Log
 
 - 2026-10-17: Created.
 - 2026-10-18: Backlog -> Doing. Criteria at claim: bdc9fca7 63afdf6b 4cf19161.
+- 2026-10-18: Doing -> Done. curl_easy_header unfolds a folded header as upstream 8.22.0 (one space, no fold blanks); upstream case 1941 passes and holds the ratchet
