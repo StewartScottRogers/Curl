@@ -27,7 +27,7 @@ internal sealed class ConnectOnlyConnection(Func<bool> isConnectOnly) : IConnect
     /// <summary>The read size a wait for <see cref="CurlWaitEvents.PollIn" /> starts a read with, before any receive names one.</summary>
     private const int WaitReadLength = 16 * 1024;
 
-    /// <summary>The next socket number <see cref="OpenAsync" /> gives, shared by every handle in the process.</summary>
+    /// <summary>The last socket number <see cref="OpenAsync" /> gave (<see cref="FirstSocket" /> before any), shared by every handle in the process.</summary>
     private static long nextSocket = FirstSocket;
 
     private IConnection? connection;
@@ -46,7 +46,8 @@ internal sealed class ConnectOnlyConnection(Func<bool> isConnectOnly) : IConnect
     internal static bool UsesTls(string scheme) => TlsSchemes.Contains(scheme);
 
     /// <summary>
-    /// Gets the first socket number a connection is given. The managed engine's connections are not operating
+    /// Gets the socket number the numbering starts from; the first connection is given <c>FirstSocket + 1</c>, the
+    /// next <c>FirstSocket + 2</c> and so on. The managed engine's connections are not operating
     /// system descriptors, so each opened connection is one number of the engine's own, above any descriptor a
     /// process is likely to hold and apart from <see cref="ManagedMultiTransfer.FirstTransferSocket" />'s numbers.
     /// </summary>

@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary]
 requirement: none
 created: 2026-10-19
-completed:
+completed: 2026-10-19
 ---
 # BL-2812 — Fix AF-0285: ConnectOnlyConnection.FirstSocket's doc calls it the first socket number a connection is given; the first one given is FirstSocket + 1
 
@@ -41,8 +41,8 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -50,3 +50,4 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 
 - 2026-10-19: Created.
 - 2026-10-19: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-19: Doing -> Done. FirstSocket and nextSocket docs now say numbering starts above FirstSocket
