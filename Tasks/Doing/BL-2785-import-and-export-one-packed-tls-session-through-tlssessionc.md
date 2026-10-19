@@ -32,3 +32,4 @@ Found by BL-2669. Today the cache only reads and writes a whole `--ssl-sessions`
 ## Log
 
 - 2026-10-18: Created.
+- 2026-10-18: Backlog -> Doing. Criteria at claim: a96ebcbf 3745c207 a549b4ea 3d836d5e.
