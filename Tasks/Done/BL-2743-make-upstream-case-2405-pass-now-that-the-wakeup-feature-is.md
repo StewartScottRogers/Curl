@@ -8,7 +8,7 @@ depends-on: [BL-2661]
 touches: [Curl.Conformance.LibTest.UnitLibrary, Curl.Conformance.LibTest.UnitTests, Curl.Conformance.UnitTests, Curl.Engine.UnitLibrary, Curl.Engine.UnitTests, Curl.Console, Curl.Console.UnitTests]
 requirement: none
 created: 2026-10-18
-completed:
+completed: 2026-10-19
 ---
 # BL-2743 — Make upstream case 2405 pass now that the wakeup feature is listed (curl_multi_waitfds, expected exit 0, got 44)
 
@@ -22,9 +22,9 @@ Found by BL-2661, which listed the `wakeup` feature (ADR-0690): 2405 now runs an
 
 ## Acceptance criteria
 
-- [ ] Case 2405 passes and is listed in `Curl.Conformance.UnitTests/PassingUpstreamCases.txt`.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project covers the fix.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] Case 2405 passes and is listed in `Curl.Conformance.UnitTests/PassingUpstreamCases.txt`.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project covers the fix.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
 
@@ -35,6 +35,8 @@ Found by BL-2661, which listed the `wakeup` feature (ADR-0690): 2405 now runs an
 - 2026-10-18 (lane 1, second claim): the engine fix is written and left uncommitted for the shift to stash, all in `ManagedMultiTransfer` and `ManagedMultiTransferTests*`: (1) `MoveOn` never queues the done message of a transfer started in the same call (`StartWhenAllowed` replaces `IsStartedOrStarting`); (2) `GetWaitSockets` appends `ResolverWakeupSocket` (0x3FFFFFFF) while any started transfer runs; (3) `PollWaitSocket` answers `None` for any socket at or above `ResolverWakeupSocket` without asking `IWaitSocketPoller` (the same fix BL-2750's stash holds, so drop BL-2750's copy when it is next claimed). Three engine tests pinned the old same-call-done behaviour and were updated; two new tests (`PerformAsync_TransferFinishedAsItStarts_IsStillRunningAfterThatCallAndDoneAfterTheNext`, `PollAsync_EngineNumberedExtraSockets_ReportNoEventWithoutAskingThePoller`). With it, `Curl.Engine.UnitTests` is green (2042) and `CURL_UPSTREAM_CASE=2405` passes; `2405` is added to `PassingUpstreamCases.txt` in the stash. Both platforms' `ManagedCurlVersion` list `AsynchDNS` with no c-ares, so lib2405 expects 2 + 1 everywhere.
 - What is left: the fast suite then fails only `Curl.Console.UnitTests`' `CurlCommandRunnerParallelProgressMeterTests.RunAsync_Parallel_WritesTheCombinedMeterInPlaceOfEachTransfersOwn` (both rows): the second status line shows `Live 2` where curl shows 1, because `ParallelTransferMulti.PerformAsync` (Curl.Console) no longer sees the first transfer's `CURLMSG_DONE` from the perform that added it and the loop's next turn has not run when the second transfer's bytes are drawn. Fix it in `Curl.Console/ParallelTransferMulti.cs` (e.g. perform again, or take messages, before the meter draws), not by changing the pinned meter text. Added `Curl.Console` and `Curl.Console.UnitTests` to `touches` for that (no task in Doing on `origin/work/dark-factory` names them). Requeued at $2.7 of the cap rather than risk the deadline.
 
+- 2026-10-19 (lane 3, third claim): `ParallelTransferMulti.PerformAsync` (Curl.Console) now performs twice after adding a handle: the first starts the transfer, the second takes the done message of one already finished, so the -Z meter's Live count is right again. Measure-CodeQuality then flagged `ManagedMultiTransfer.TellSocketCallback` at 87.5% branches (a finished transfer with no socket is no longer reached by the same-call path); `SocketActionAsync_AbortedBeforeTheSecondTransfersSocket_RemovesOnlyTheFirstsSocket` covers it. Engine and Console: 0 failing members. Fast suite green; `CURL_UPSTREAM_CASE=2405` passes.
+
 ## Log
 
 - 2026-10-18: Created.
@@ -43,3 +45,4 @@ Found by BL-2661, which listed the `wakeup` feature (ADR-0690): 2405 now runs an
 - 2026-10-18: Backlog -> Doing. Criteria at claim: 29c71c3e ab396f86 3d836d5e.
 - 2026-10-18: Doing -> Backlog. Engine fix done and stashed; left: Curl.Console ParallelTransferMulti so the -Z combined meter's Live count stays right (CurlCommandRunnerParallelProgressMeterTests), needs Curl.Console
 - 2026-10-19: Backlog -> Doing. Criteria at claim: 29c71c3e ab396f86 3d836d5e.
+- 2026-10-19: Doing -> Done. Case 2405 passes and is on the ratchet; engine never reports a transfer done in the perform that started it and lists the resolver wakeup socket; -Z multi performs twice on add
