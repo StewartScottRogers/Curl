@@ -511,6 +511,10 @@ A perform from the options outside any multi handle and with no `ToolSettings` s
 
 When `ManagedCurlEngine`'s internal constructor is given a `readEnvironmentVariable` that sets `CURL_HSTS_HTTP` (`EngineComposition.LearnsHstsOverHttp`), `ManagedEngineSharedState`'s `learnsHstsOverHttp` makes the engine's `HstsTransferPolicy` learn `Strict-Transport-Security` over plain `http`, the conformance harness's stand-in for the debug build's (ADR-0494); the process's environment never turns it on. A perform's `Info.EffectiveUrl` falls back to the URL the setup chose - the `https` one HSTS switched it to - when the report carries none, as after a failed connect (upstream test1922). Its tests are `ManagedCurlEngineTests` and `ManagedEasyTransferTests.Hsts.cs`.
 
+## CURLOPT_POSTFIELDS and CURLOPT_POST on an mqtt URL (BL-2673)
+
+`ManagedEasyTransfer.TransferSettingsOf` gives an `mqtt` or `mqtts` URL's handle `PostData` of `EasyHttpOptions.PostFields` (cut to a shorter non-negative `PostFieldSize`; empty fields are an empty payload), so the MQTT handler publishes instead of subscribing, and `PostWithoutData` when `Post` is set with no fields, which the handler fails with exit 43 after the CONNACK, as libcurl's `mqtt_do` does (upstream tests 1916 and 1917). Other schemes get neither. Its tests are `ManagedEasyTransferTests.Mqtt.cs`.
+
 ## CURLOPT_VERBOSE with no debug function (BL-2726)
 
 Under `EasyBehaviourOptions.Verbose` with no `EasyCallbackOptions.Debug`, `ManagedEasyTransfer` reports to a `DebugCallbackTransferEvents` over `StandardErrorDebugWriter`, curl 8.22.0's default `Curl_debug` output: `* `, `< ` or `> ` and then the bytes of each info text, incoming header and outgoing header call, no data or TLS bytes, written to `EasyBehaviourOptions.StandardError` (`CURLOPT_STDERR`), else `EasyTransferHost.StandardError`, the process's standard error unless `ManagedCurlEngine`'s internal constructor is given a `standardError` (the conformance harness's case stderr; upstream tests 1506 and 1510, ADR-0702). Its tests are `ManagedCurlEngineTests` and `Libcurl.UnitTests`' `CurlEasyVerboseStandardErrorTests`.

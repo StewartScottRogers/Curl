@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: direct
 depends-on: []
-touches: [Curl.Engine.UnitLibrary, Curl.Engine.UnitTests, Curl.Protocol.Mqtt.UnitLibrary, Curl.Protocol.Mqtt.UnitTests, Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
+touches: [Curl.Protocol.Abstractions.UnitLibrary, Curl.Protocol.Abstractions.UnitTests, Curl.Engine.UnitLibrary, Curl.Engine.UnitTests, Curl.Protocol.Mqtt.UnitLibrary, Curl.Protocol.Mqtt.UnitTests, Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
 requirement: none
 created: 2026-10-17
-completed:
+completed: 2026-10-19
 ---
 # BL-2673 — Send MQTT PUBLISH for CURLOPT_POSTFIELDS and fail CURLOPT_POST without fields so upstream cases 1916 and 1917 pass
 
@@ -22,13 +22,18 @@ Found by BL-2545 (lib1916 port, which serves cases 1916 and 1917). lib1916 sets 
 
 ## Acceptance criteria
 
-- [ ] Empty `CURLOPT_POSTFIELDS` on an MQTT URL publishes an empty payload, and `CURLOPT_POST` without fields fails with 43 after CONNACK, each with a focused unit test.
-- [ ] Cases 1916 and 1917 pass through the runner on Windows and are added to `Curl.Conformance.UnitTests/PassingUpstreamCases.txt`.
-- [ ] `dotnet build` is clean and the fast tests pass with no test deleted, skipped or weakened.
+- [x] Empty `CURLOPT_POSTFIELDS` on an MQTT URL publishes an empty payload, and `CURLOPT_POST` without fields fails with 43 after CONNACK, each with a focused unit test.
+- [x] Cases 1916 and 1917 pass through the runner on Windows and are added to `Curl.Conformance.UnitTests/PassingUpstreamCases.txt`.
+- [x] `dotnet build` is clean and the fast tests pass with no test deleted, skipped or weakened.
 
 ## Notes
+
+- Added Curl.Protocol.Abstractions.UnitLibrary/.UnitTests to touches: libcurl's CURLOPT_POST with no fields needs a flag on ITransferContext (PostWithoutData); no other Doing task touched them.
+- Decision: the engine sets PostData only for mqtt/mqtts URLs, so other handlers that read PostData (RTSP, SMTP) are unchanged.
+- Quality: Measure-CodeQuality over Mqtt, Abstractions and Engine libraries, 0 failing members.
 
 ## Log
 
 - 2026-10-17: Created.
 - 2026-10-19: Backlog -> Doing. Criteria at claim: 7cc27c32 c48c7d79 4272a6b9.
+- 2026-10-19: Doing -> Done. MQTT publishes for CURLOPT_POSTFIELDS (even empty) and CURLOPT_POST alone fails 43 after CONNACK; upstream cases 1916 and 1917 pass

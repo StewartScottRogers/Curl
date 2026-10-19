@@ -21,6 +21,7 @@ internal sealed class ForwardingTransferContext(ITransferContext inner) : ITrans
     public Stream? HeaderOutput => inner.HeaderOutput;
     public Stream? DumpHeaderOutput => inner.DumpHeaderOutput;
     public ReadOnlyMemory<byte>? PostData => inner.PostData;
+    public bool PostWithoutData => inner.PostWithoutData;
     public System.Net.NetworkCredential? Credentials => inner.Credentials;
     public IReadOnlyList<string> TelnetOptions => inner.TelnetOptions;
     public int? TftpBlockSize => inner.TftpBlockSize;

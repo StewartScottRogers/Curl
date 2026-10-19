@@ -227,6 +227,7 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
             MaxFileSize = MaxFileSizeOf(transfer),
             Upload = UploadOf(url, upload),
             PostData = settings.PostData,
+            PostWithoutData = settings.PostWithoutData,
             Credentials = lookedUpCredentials ?? CredentialsOf(authentication) ?? AuthorizationIdentityNtlmCredentialsOf(authentication, url),
             TelnetOptions = protocol.Telnet.TelnetOptions,
             TftpBlockSize = BlockSizeOf(protocol.Tftp),

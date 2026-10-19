@@ -52,6 +52,12 @@ internal static class MqttTransferMessages
     internal const string ConnectNotSent = "Error 55 sending MQTT CONNECT request";
 
     /// <summary>
+    /// The exit 43 message curl falls back to for a POST with nothing to publish,
+    /// <c>curl_easy_strerror(CURLE_BAD_FUNCTION_ARGUMENT)</c>.
+    /// </summary>
+    internal const string NothingToPublish = "A libcurl function was given a bad argument";
+
+    /// <summary>
     /// The exit 18 message curl falls back to for a PUBLISH cut short by the peer.
     /// </summary>
     internal const string PartialFile = "Transferred a partial file";
@@ -97,7 +103,7 @@ internal static class MqttTransferMessages
     /// <summary>The texts <see cref="IsStrerrorText" /> recognises, compared ordinally.</summary>
     private static readonly HashSet<string> StrerrorTexts = new(StringComparer.Ordinal)
     {
-        ReceiveFailed, SendFailed, PartialFile, WeirdServerReply, TooLarge, ControlByteInTopic,
+        ReceiveFailed, SendFailed, PartialFile, WeirdServerReply, TooLarge, ControlByteInTopic, NothingToPublish,
     };
 
     /// <summary>The <c>-v</c> line naming the client identifier, written before the CONNECT.</summary>

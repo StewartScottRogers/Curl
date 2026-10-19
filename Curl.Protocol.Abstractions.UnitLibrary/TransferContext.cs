@@ -57,6 +57,9 @@ public sealed class TransferContext : ITransferContext
     public ReadOnlyMemory<byte>? PostData { get; init; }
 
     /// <inheritdoc />
+    public bool PostWithoutData { get; init; }
+
+    /// <inheritdoc />
     public System.Net.NetworkCredential? Credentials { get; init; }
 
     /// <inheritdoc />

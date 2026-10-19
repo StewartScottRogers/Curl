@@ -175,6 +175,16 @@ public interface ITransferContext
     ReadOnlyMemory<byte>? PostData { get; }
 
     /// <summary>
+    /// Gets whether a POST was asked for (<c>CURLOPT_POST</c>) with no data to post, which is
+    /// always <see langword="false" /> while <see cref="PostData" /> is set.
+    /// </summary>
+    /// <remarks>
+    /// <c>mqtt://</c> fails such a transfer with exit 43 after the CONNACK, as libcurl does
+    /// (BL-2673). A scheme that has no use for request data ignores it.
+    /// </remarks>
+    bool PostWithoutData { get; }
+
+    /// <summary>
     /// Gets the user name and password from <c>-u</c>/<c>--user</c>, else from the URL's
     /// user information, or <see langword="null" /> when neither is present.
     /// </summary>

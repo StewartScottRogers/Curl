@@ -184,7 +184,8 @@ public sealed class MqttProtocolHandler : IProtocolHandler
                         context.Url,
                         ClientIdentifierPrefix + clientIdentifierSuffixSource(),
                         context.Credentials,
-                        context.PostData)
+                        context.PostData,
+                        context.PostWithoutData)
                     .ConfigureAwait(false);
                 result = TransferResult.Success(session.BytesWritten);
             }

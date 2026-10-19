@@ -30,6 +30,7 @@ namespace Curl.Engine;
 /// <param name="OverUnixSocket">Whether <c>--unix-socket</c> or <c>--abstract-unix-socket</c> was given.</param>
 /// <param name="HappyEyeballsTimeout">How long a <c>--http3</c> transfer's QUIC handshake runs alone.</param>
 /// <param name="AppendUrlQuery">Appends the <c>-G</c> / <c>--url-query</c> query to a URL.</param>
+/// <param name="PostWithoutData">Whether a POST was asked for with no data to post (<c>CURLOPT_POST</c> alone), which an MQTT transfer fails with exit 43.</param>
 public sealed record EngineTransferSettings(
     bool Silent,
     bool ShowError,
@@ -52,4 +53,5 @@ public sealed record EngineTransferSettings(
     bool ProxyTunnel,
     bool OverUnixSocket,
     TimeSpan HappyEyeballsTimeout,
-    Func<string, string> AppendUrlQuery);
+    Func<string, string> AppendUrlQuery,
+    bool PostWithoutData = false);

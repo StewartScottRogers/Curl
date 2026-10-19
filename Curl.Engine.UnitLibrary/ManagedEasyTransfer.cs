@@ -1896,7 +1896,7 @@ internal sealed partial class ManagedEasyTransfer(
             Passphrase: options.Tls.Origin.KeyPassword,
             Engine: options.Tls.Engine,
             EchModeIsMalformed: false,
-            PostData: null,
+            PostData: MqttPostDataOf(options),
             ProxyCredentials: ProxyCredentialsOf(options.Authentication),
             AllowedProtocols: ProtocolSetOf(options.Network.Protocols),
             AllowedRedirectProtocols: ProtocolSetOf(options.Network.RedirectProtocols),
@@ -1909,7 +1909,31 @@ internal sealed partial class ManagedEasyTransfer(
             ProxyTunnel: options.Proxy.HttpProxyTunnel,
             OverUnixSocket: options.Network.UnixSocketPath is not null,
             HappyEyeballsTimeout: HttpRequestOptionsMapping.HappyEyeballsTimeoutOf(null),
-            AppendUrlQuery: url => url);
+            AppendUrlQuery: url => url,
+            PostWithoutData: options.Http is { Post: true, PostFields: null } && IsMqttUrl(options));
+
+    /// <summary>
+    /// The <c>CURLOPT_POSTFIELDS</c> an MQTT transfer publishes, cut to <c>CURLOPT_POSTFIELDSIZE</c> when that is not
+    /// negative and shorter (an empty set of fields is an empty payload), or <see langword="null" /> to subscribe
+    /// instead; only an <c>mqtt</c> or <c>mqtts</c> URL reads it, as libcurl's <c>mqtt_do</c> does (upstream test1916, BL-2673).
+    /// </summary>
+    /// <param name="options">The handle's options.</param>
+    /// <returns>The payload, or <see langword="null" />.</returns>
+    private static ReadOnlyMemory<byte>? MqttPostDataOf(EasyOptions options)
+    {
+        if (options.Http.PostFields is not { } fields || !IsMqttUrl(options))
+        {
+            return null;
+        }
+
+        long size = options.Http.PostFieldSize;
+        return size < 0 || size >= fields.Length ? fields : fields[..(int)size];
+    }
+
+    /// <summary>Whether the handle's URL names the <c>mqtt</c> or <c>mqtts</c> scheme.</summary>
+    private static bool IsMqttUrl(EasyOptions options) =>
+        options.Network.Url is { } url
+        && (url.StartsWith("mqtt:", StringComparison.OrdinalIgnoreCase) || url.StartsWith("mqtts:", StringComparison.OrdinalIgnoreCase));
 
     /// <summary>
     /// The proxy credentials <c>CURLOPT_PROXYUSERPWD</c>, <c>CURLOPT_PROXYUSERNAME</c> and <c>CURLOPT_PROXYPASSWORD</c>
