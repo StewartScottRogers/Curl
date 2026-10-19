@@ -33,3 +33,4 @@ Found by BL-2547. The case's `CONNECT` response folds a header (`Server: from ` 
 ## Log
 
 - 2026-10-17: Created.
+- 2026-10-18: Backlog -> Doing. Criteria at claim: bdc9fca7 63afdf6b 4cf19161.
