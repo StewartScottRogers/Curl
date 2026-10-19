@@ -3,8 +3,8 @@ id: AF-0277
 title: ProxyFromCommandLine_TheTenTlsOptionsOfAdr0151_NeverReachTheProxy checks five options, not ten
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Engine.UnitTests/TlsClientOptionsMappingTests.cs:ProxyFromCommandLine_TheTenTlsOptionsOfAdr0151_NeverReachTheProxy:name-lies
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Curl.Engine.UnitTests/TlsClientOptionsMappingTests.cs -Patte
 ## Log
 
 - 2026-10-18: filed proposed.
+- 2026-10-19: proposed -> accepted.
