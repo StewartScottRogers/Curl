@@ -250,6 +250,109 @@ public sealed class TlsSessionCacheTests
         Assert.IsNull(cache.Take(PeerKey), "the oldest of three was dropped");
     }
 
+    [TestMethod]
+    public void ImportSession_UnderPeerKey_IsOfferedToThatPeer()
+    {
+        var packed = TlsSessionPacking.Pack(new PackedTlsSession(TlsSessionCodec.Encode(Session()), 0x0304, Received.ToUnixTimeSeconds() + 100, null, 0, null));
+        var cache = new TlsSessionCache(new FixedClock(Received));
+        Diagnostics.Arrange("peer key", PeerKey);
+
+        var code = cache.ImportSession(PeerKey, null, packed);
+
+        Diagnostics.Act("code", code);
+        Diagnostics.Assert("code", 0, code);
+        Assert.AreEqual(0, code);
+        Assert.IsNull(cache.Take("other:443:IMPL-Curl:G"));
+        CollectionAssert.AreEqual(Session().Ticket, cache.Take(PeerKey)!.Ticket);
+    }
+
+    [TestMethod]
+    public void ImportSession_UnderSaltAndHmac_IsOfferedToThePeerItNames()
+    {
+        byte[] shmac = [.. Salt, .. HMACSHA256.HashData(Salt, Encoding.ASCII.GetBytes(PeerKey))];
+        var packed = TlsSessionPacking.Pack(new PackedTlsSession(TlsSessionCodec.Encode(Session()), 0x0304, Received.ToUnixTimeSeconds() + 100, null, 0, null));
+        var cache = new TlsSessionCache(new FixedClock(Received));
+        Diagnostics.Bytes("shmac", shmac);
+
+        var code = cache.ImportSession(null, shmac, packed);
+
+        Diagnostics.Act("code", code);
+        Diagnostics.Assert("code", 0, code);
+        Assert.AreEqual(0, code);
+        Assert.IsNull(cache.Take("other:443:IMPL-Curl:G"));
+        Assert.IsNotNull(cache.Take(PeerKey));
+    }
+
+    [TestMethod]
+    public void ImportSession_Refused_AnswersCurlsCodes()
+    {
+        var packed = TlsSessionPacking.Pack(new PackedTlsSession([1], 0x0304, 1, null, 0, null));
+        var cache = new TlsSessionCache(new FixedClock(Received));
+        Diagnostics.Arrange("cases", "bad packing; neither key nor hmac; 10-byte hmac; null bytes");
+
+        var badPacking = cache.ImportSession(PeerKey, null, [0x02]);
+        var neither = cache.ImportSession(null, null, packed);
+        var shortHmac = cache.ImportSession(null, new byte[10], packed);
+
+        Diagnostics.Act("codes", $"{badPacking} {neither} {shortHmac}");
+        Diagnostics.Assert("codes", "26 43 43", $"{badPacking} {neither} {shortHmac}");
+        Assert.AreEqual(26, badPacking);
+        Assert.AreEqual(43, neither);
+        Assert.AreEqual(43, shortHmac);
+        Assert.AreEqual(string.Empty, cache.Export());
+        Assert.AreEqual("packedSession", Assert.ThrowsExactly<ArgumentNullException>(() => cache.ImportSession(PeerKey, null, null!)).ParamName);
+    }
+
+    // lib1678 imports one packet 64 times under example.test:443; every import answers OK.
+    [TestMethod]
+    public void ImportSession_Lib1678Packet64Times_AnswersOkEachTime()
+    {
+        byte[] packed =
+        [
+            0x01,
+            0x04, 0x10, 0x00, .. new byte[4096],
+            0x07, 0x00, 0x7F, .. new byte[127],
+            0x05, 0x00, 0x0A, .. "abcdefghij"u8,
+            0x04, 0x00, 0x01, 0xEE,
+            0x05, 0x00, 0x01, (byte)'z',
+            0x07, 0x00, 0x01, 0xDD,
+        ];
+        var cache = new TlsSessionCache(new FixedClock(Received));
+        Diagnostics.Arrange("imports", 64);
+
+        var codes = Enumerable.Range(0, 64).Select(_ => cache.ImportSession("example.test:443", null, packed)).ToArray();
+
+        Diagnostics.Act("distinct codes", string.Join(',', codes.Distinct()));
+        Diagnostics.Assert("distinct codes", "0", string.Join(',', codes.Distinct()));
+        Assert.IsTrue(codes.All(code => code == 0));
+    }
+
+    [TestMethod]
+    public void ListSessions_HeldSessions_ListsEachUnexpiredOneWithItsFields()
+    {
+        var cache = new TlsSessionCache(new FixedClock(Received), () => Salt);
+        var session = Session(maxEarlyData: 16384);
+        cache.Track(PeerKey, () => [session]);
+        var expired = TlsSessionPacking.Pack(new PackedTlsSession([1], 0x0304, Received.ToUnixTimeSeconds() - 1, null, 0, null));
+        cache.ImportSession("old:443:IMPL-Curl:G", null, expired);
+        Diagnostics.Arrange("held", "one tracked TLS 1.3 session, one expired imported session");
+
+        var held = cache.ListSessions();
+
+        Diagnostics.Act("listed", held.Count);
+        Diagnostics.Assert("listed", 1, held.Count);
+        Assert.HasCount(1, held);
+        var listed = held[0];
+        Assert.AreEqual(PeerKey, listed.PeerKey);
+        byte[] shmac = [.. Salt, .. HMACSHA256.HashData(Salt, Encoding.ASCII.GetBytes(PeerKey))];
+        CollectionAssert.AreEqual(shmac, listed.SaltAndHmac);
+        CollectionAssert.AreEqual(TlsSessionPacking.Pack(new PackedTlsSession(TlsSessionCodec.Encode(session), 0x0304, 1_800_007_200, "http/1.1", 16384, null)), listed.PackedSession);
+        Assert.AreEqual(1_800_007_200, listed.ValidUntil);
+        Assert.AreEqual(0x0304, listed.ProtocolId);
+        Assert.AreEqual("http/1.1", listed.ApplicationProtocol);
+        Assert.AreEqual(16384u, listed.MaxEarlyData);
+    }
+
     private static TlsSessionRecord Session(uint maxEarlyData = 0, byte ticket = 7, uint lifetime = 7200) =>
         new(0x0304, 0x1301, new byte[32], new byte[32], [ticket, 1, 2], lifetime, 5, maxEarlyData, Received)
         {
