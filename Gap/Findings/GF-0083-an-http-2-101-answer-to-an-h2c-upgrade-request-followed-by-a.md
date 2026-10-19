@@ -5,11 +5,11 @@ area: behaviour
 platform: linux
 key: behaviour:h2c-upgrade-http2-status-line-accepted
 severity: High
-status: open
+status: closed
 scope: target
 introduced-in:
 opened: 2026-10-15_0751
-closed:
+closed: 2026-10-19_0804
 regression: false
 items: [behaviour:test1704]
 touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests]
@@ -35,9 +35,11 @@ In Curl.Protocol.Http.UnitLibrary, fail with exit 8 (CURLE_WEIRD_SERVER_REPLY) w
 - 2026-10-15_0751: 1 of 1 items are gaps.
 - 2026-10-15_1657: 1 of 1 items are gaps.
 - 2026-10-17_2225: 1 of 1 items are gaps.
+- 2026-10-19_0804: 0 of 1 items are gaps.
 
 ## Log
 
 - 2026-10-15_0751: Opened by gap-behaviour.
 - 2026-10-15_0900: Filed BL-2326.
 - 2026-10-17_2318: Filed BL-2715.
+- 2026-10-19_0804: Closed: run 2026-10-19_0804 measured every item as match or excluded on linux.

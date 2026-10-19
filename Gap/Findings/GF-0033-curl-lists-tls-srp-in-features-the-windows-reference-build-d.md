@@ -46,6 +46,7 @@ In Curl.Cli.UnitLibrary/CurlVersionText.cs, make FeaturesLine platform-specific 
 - 2026-10-15_0751: 0 of 1 items are gaps. 1 not in this run's measurement.
 - 2026-10-15_1657: 0 of 1 items are gaps. 1 not in this run's measurement.
 - 2026-10-17_2225: 0 of 1 items are gaps. 1 not in this run's measurement.
+- 2026-10-19_0804: 0 of 1 items are gaps. 1 not in this run's measurement.
 
 ## Log
 

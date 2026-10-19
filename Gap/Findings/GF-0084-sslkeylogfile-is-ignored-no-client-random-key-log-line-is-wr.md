@@ -5,11 +5,11 @@ area: behaviour
 platform: linux
 key: behaviour:sslkeylogfile-not-written
 severity: High
-status: open
+status: closed
 scope: target
 introduced-in:
 opened: 2026-10-15_0751
-closed:
+closed: 2026-10-19_0804
 regression: false
 items: [behaviour:test2090]
 touches: [Curl.Tls.UnitLibrary, Curl.Tls.UnitTests, Curl.Networking.UnitLibrary, Curl.Networking.UnitTests, Curl.Engine.UnitLibrary, Curl.Engine.UnitTests]
@@ -35,9 +35,11 @@ Implement the OpenSSL build's SSLKEYLOGFILE support. When the variable names a f
 - 2026-10-15_0751: 1 of 1 items are gaps.
 - 2026-10-15_1657: 1 of 1 items are gaps.
 - 2026-10-17_2225: 1 of 1 items are gaps.
+- 2026-10-19_0804: 0 of 1 items are gaps.
 
 ## Log
 
 - 2026-10-15_0751: Opened by gap-behaviour.
 - 2026-10-15_0900: Filed BL-2327.
 - 2026-10-17_2318: Filed BL-2716.
+- 2026-10-19_0804: Closed: run 2026-10-19_0804 measured every item as match or excluded on linux.
