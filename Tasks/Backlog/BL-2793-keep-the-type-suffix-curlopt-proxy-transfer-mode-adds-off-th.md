@@ -1,5 +1,5 @@
 ---
-id: BL-2792
+id: BL-2793
 title: Keep the ;type= suffix CURLOPT_PROXY_TRANSFER_MODE adds off the effective URL of a forwarded FTP transfer
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-19
 completed:
 ---
-# BL-2792 — Keep the ;type= suffix CURLOPT_PROXY_TRANSFER_MODE adds off the effective URL of a forwarded FTP transfer
+# BL-2793 — Keep the ;type= suffix CURLOPT_PROXY_TRANSFER_MODE adds off the effective URL of a forwarded FTP transfer
 
 ## Goal
 

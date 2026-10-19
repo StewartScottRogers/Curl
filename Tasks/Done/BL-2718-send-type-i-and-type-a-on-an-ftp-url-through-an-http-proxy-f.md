@@ -35,4 +35,4 @@ Filed by BL-2610, which made the harness report the ftp feature. Case 549 expect
 
 - 2026-10-18: Created.
 - 2026-10-19: Backlog -> Doing. Criteria at claim: e6f6390a 4272a6b9.
-- 2026-10-19: Doing -> Done. Upstream cases 549 and 550 pass: CURLOPT_PROXY_TRANSFER_MODE sends ;type=i or ;type=a on an FTP URL forwarded through an HTTP proxy; effective URL follow-up filed as BL-2792
+- 2026-10-19: Doing -> Done. Upstream cases 549 and 550 pass: CURLOPT_PROXY_TRANSFER_MODE sends ;type=i or ;type=a on an FTP URL forwarded through an HTTP proxy; effective URL follow-up filed as BL-2793
