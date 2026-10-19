@@ -77,11 +77,11 @@ public sealed partial class ManagedEasyTransferTests
         byte[] buffer = new byte[8];
 
         CurlWebSocketFrame first = (await easy.WebSocket.ReceiveAsync(buffer, CancellationToken.None)).Frame;
-        CurlWebSocketFrame ping = (await easy.WebSocket.ReceiveAsync(buffer, CancellationToken.None)).Frame;
+        CurlWebSocketReceiveResult afterPing = await easy.WebSocket.ReceiveAsync(buffer, CancellationToken.None);
         CurlWebSocketFrame last = (await easy.WebSocket.ReceiveAsync(buffer, CancellationToken.None)).Frame;
 
         Assert.AreEqual(CurlWebSocketFlags.Binary | CurlWebSocketFlags.Continuation, first.Flags);
-        Assert.AreEqual(CurlWebSocketFlags.Ping, ping.Flags);
+        Assert.AreEqual(CurlCode.Again, afterPing.Result);
         Assert.AreEqual(CurlWebSocketFlags.Binary, last.Flags);
         Assert.AreEqual(last, easy.WebSocket.CurrentFrame);
         CollectionAssert.AreEqual(ManagedEasyWebSocketTests.ClientFrame(WsOpcode.Pong, true, "?"), peer.Written[requestLength..]);

@@ -13,7 +13,7 @@ namespace Curl.Engine;
 /// with the frame's <c>CURLWS_*</c> bits, offset and bytes left; it never waits: it starts one read and answers
 /// <see cref="CurlCode.Again" /> while that read runs or while only part of a frame has come. Unless
 /// <paramref name="options" /> holds <c>CURLWS_NOAUTOPONG</c> or <c>CURLWS_RAW_MODE</c>, each ping received is answered
-/// with a pong carrying its payload; the ping is still handed over. A send writes one masked frame from the bits given
+/// with a pong carrying its payload and is not handed over. A send writes one masked frame from the bits given
 /// (<see cref="WebSocketFrameFlags.TryFrameOf" />), or under <c>CURLWS_RAW_MODE</c> the bytes as they are, which
 /// <c>lib/ws.c</c> allows only with no bits and no fragment size (BL-2444). A frame may also be sent in parts, its head
 /// announcing the whole payload, under <c>CURLWS_OFFSET</c> or after <see cref="StartFrameAsync" /> (BL-2481); a receive decodes frames either way, as
@@ -381,7 +381,8 @@ internal sealed class ManagedEasyWebSocket(Func<bool> isConnectOnly, Func<WebSoc
     /// Decodes <paramref name="received" />, queueing its runs of payload, keeping a protocol violation as the stream's
     /// failure and answering the last ping completed in it with a pong unless pings go unanswered; a pong that cannot
     /// be written fails the stream with <see cref="CurlCode.SendError" />. Pings go unanswered under
-    /// <c>CURLWS_NOAUTOPONG</c> or <c>CURLWS_RAW_MODE</c>.
+    /// <c>CURLWS_NOAUTOPONG</c> or <c>CURLWS_RAW_MODE</c>, and only then are their runs queued: an answered ping is
+    /// never handed over, as <c>lib/ws.c</c>'s <c>ws_client_collect</c> keeps it from the application (upstream test2708).
     /// </summary>
     /// <param name="live">The upgraded connection.</param>
     /// <param name="received">The bytes received.</param>
@@ -389,7 +390,23 @@ internal sealed class ManagedEasyWebSocket(Func<bool> isConnectOnly, Func<WebSoc
     private async ValueTask DecodeAsync(IConnection live, ReadOnlyMemory<byte> received)
     {
         WsDecodedFrames decoded = decoder.Decode(received.Span);
-        foreach (WsFrameRun run in decoded.Runs)
+        bool answersPings = (options() & SilencesPongs) == 0;
+        QueueRuns(decoded, answersPings);
+        if (decoded.CompletedPing is { } ping && answersPings && !await TrySendFrameAsync(live, WsOpcode.Pong, true, ping).ConfigureAwait(false))
+        {
+            streamFailure ??= CurlCode.SendError;
+        }
+    }
+
+    /// <summary>
+    /// Queues the runs of <paramref name="decoded" /> to be handed over, leaving out a ping's when
+    /// <paramref name="answersPings" />, and keeps a protocol violation as the stream's failure.
+    /// </summary>
+    /// <param name="decoded">What one decode gave.</param>
+    /// <param name="answersPings">Whether received pings are answered with a pong.</param>
+    private void QueueRuns(WsDecodedFrames decoded, bool answersPings)
+    {
+        foreach (WsFrameRun run in decoded.Runs.Where(run => !answersPings || run.Opcode != WsOpcode.Ping))
         {
             runs.Enqueue(run);
         }
@@ -397,11 +414,6 @@ internal sealed class ManagedEasyWebSocket(Func<bool> isConnectOnly, Func<WebSoc
         if (decoded.ViolationMessage is not null)
         {
             streamFailure = CurlCode.RecvError;
-        }
-
-        if (decoded.CompletedPing is { } ping && (options() & SilencesPongs) == 0 && !await TrySendFrameAsync(live, WsOpcode.Pong, true, ping).ConfigureAwait(false))
-        {
-            streamFailure ??= CurlCode.SendError;
         }
     }
 

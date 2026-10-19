@@ -74,15 +74,29 @@ public sealed class ManagedEasyWebSocketTests
         CurlWebSocketReceiveResult nothingYet = await webSocket.ReceiveAsync(buffer, CancellationToken.None);
         peer.Enqueue([.. ServerFrame(WsOpcode.Text, false, "Hel"), .. ServerFrame(WsOpcode.Ping, true, "p"), .. ServerFrame(WsOpcode.Continuation, true, "lo")]);
         CurlWebSocketReceiveResult first = await webSocket.ReceiveAsync(buffer, CancellationToken.None);
-        CurlWebSocketReceiveResult ping = await webSocket.ReceiveAsync(buffer, CancellationToken.None);
         CurlWebSocketReceiveResult last = await webSocket.ReceiveAsync(buffer, CancellationToken.None);
 
         Assert.AreEqual(CurlCode.Again, nothingYet.Result);
         Assert.AreEqual(CurlWebSocketFlags.Text | CurlWebSocketFlags.Continuation, first.Frame.Flags);
-        Assert.AreEqual(CurlWebSocketFlags.Ping, ping.Frame.Flags);
         Assert.AreEqual(CurlWebSocketFlags.Text, last.Frame.Flags);
         Assert.AreEqual("lo", Text(buffer, last));
         CollectionAssert.AreEqual(ClientFrame(WsOpcode.Pong, true, "p"), peer.Written);
+    }
+
+    [TestMethod]
+    public async Task ReceiveAsync_PingWithAutoPongOn_AnswersThePingAndDoesNotHandItOver()
+    {
+        (ManagedEasyWebSocket webSocket, QueuedConnection peer) = await OpenAsync(WebSocketOptionBits.None, ServerFrame(WsOpcode.Ping, true, "test"));
+        byte[] buffer = new byte[16];
+
+        CurlWebSocketReceiveResult afterPing = await webSocket.ReceiveAsync(buffer, CancellationToken.None);
+        peer.Enqueue(ServerFrame(WsOpcode.Text, true, "next"));
+        CurlWebSocketReceiveResult next = await webSocket.ReceiveAsync(buffer, CancellationToken.None);
+
+        CollectionAssert.AreEqual(ClientFrame(WsOpcode.Pong, true, "test"), peer.Written);
+        Assert.AreEqual(CurlCode.Again, afterPing.Result);
+        Assert.AreEqual(new CurlWebSocketFrame(0, CurlWebSocketFlags.Text, 0, 0, 4), next.Frame);
+        Assert.AreEqual("next", Text(buffer, next));
     }
 
     [TestMethod]
@@ -178,17 +192,15 @@ public sealed class ManagedEasyWebSocketTests
     }
 
     [TestMethod]
-    public async Task ReceiveAsync_PongCannotBeWritten_AnswersSendErrorAfterThePing()
+    public async Task ReceiveAsync_PongCannotBeWritten_AnswersSendError()
     {
         ManagedEasyWebSocket webSocket = new(() => true, () => WebSocketOptionBits.None, new ZeroMaskSource());
         QueuedConnection peer = new() { WriteFailure = new IOException("gone") };
         await webSocket.OpenAsync(peer, ServerFrame(WsOpcode.Ping, true, "x"));
         byte[] buffer = new byte[8];
 
-        CurlWebSocketReceiveResult ping = await webSocket.ReceiveAsync(buffer, CancellationToken.None);
         CurlWebSocketReceiveResult failed = await webSocket.ReceiveAsync(buffer, CancellationToken.None);
 
-        Assert.AreEqual(CurlWebSocketFlags.Ping, ping.Frame.Flags);
         Assert.AreEqual(CurlCode.SendError, failed.Result);
     }
 
