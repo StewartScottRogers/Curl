@@ -2606,6 +2606,10 @@ if ($TestAudioOff) {
 # commit says this, so board pushes no longer cancel the run that tests the code.
 $SkipCiNote = '[skip ci] Board change only; the run on the code before it stands.'
 
+# How long the shift-end merge waits for CI on the commit it merges. 30 minutes left shift
+# 20261018-103803 unmerged once a run in progress was no longer cancelled (ADR-0693).
+$MergeCiWaitMinutes = 60
+
 function Invoke-MergeToMaster {
     # Stewart's standing permission (2026-09-27): at the end of a shift, merge the branch
     # into master through a pull request - only when the CI workflow passed, on every
@@ -2616,15 +2620,16 @@ function Invoke-MergeToMaster {
     if ([int](git -C $Root rev-list --count "origin/master..origin/$Branch") -eq 0) { return "nothing on $Branch to merge" }
     $head = (git -C $Root rev-parse "origin/$Branch").Trim()
     $short = $head.Substring(0, 7)
-    # CI on the last push takes a few minutes; wait for the run on this exact commit.
-    $deadline = (Get-Date).AddMinutes(30)
+    # Wait for the run on this exact commit. A run on the branch in progress always finishes
+    # first (ADR-0693), and each takes 15 to 25 minutes, so allow two runs and some slack.
+    $deadline = (Get-Date).AddMinutes($MergeCiWaitMinutes)
     $run = $null
     # A board-only head commit started no run (AF-0089), so start one on it by hand.
     if ("$(git -C $Root log -1 --format=%B $head)" -match '\[skip ci\]') { gh workflow run CI --ref $Branch 2>&1 | Out-Null }
     while ($true) {
         $run = @(gh run list --workflow CI --branch $Branch --commit $head --limit 1 --json status,conclusion 2>$null | ConvertFrom-Json)
         if ($run.Count -and $run[0].status -eq 'completed') { break }
-        if ((Get-Date) -ge $deadline) { return "not merged: CI did not finish on $short within 30 min" }
+        if ((Get-Date) -ge $deadline) { return "not merged: CI did not finish on $short within $MergeCiWaitMinutes min" }
         Start-Sleep -Seconds 30
     }
     if ($run[0].conclusion -ne 'success') { return "not merged: CI $($run[0].conclusion) on $short" }
