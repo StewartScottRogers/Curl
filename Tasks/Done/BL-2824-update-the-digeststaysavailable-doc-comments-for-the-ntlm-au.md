@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Abstractions.UnitLibrary]
 requirement: none
 created: 2026-10-19
-completed:
+completed: 2026-10-19
 ---
 # BL-2824 — Update the DigestStaysAvailable doc comments for the NTLM authproblem source
 
@@ -27,9 +27,9 @@ Both are now false or incomplete about the code. That breaks CLAUDE.md's "say wh
 
 ## Acceptance criteria
 
-- [ ] `TransferReport.DigestStaysAvailable`'s doc names both sources: a non-stale Digest challenge while a nonce was held, and a bare `NTLM` challenge to a request sent with an NTLM `Authorization`. It cites ADR-0709 and BL-2823.
-- [ ] The upstream case cited for each source in both docs matches the `SetsAuthProblem` doc in `HttpProtocolHandler.cs`.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] `TransferReport.DigestStaysAvailable`'s doc names both sources: a non-stale Digest challenge while a nonce was held, and a bare `NTLM` challenge to a request sent with an NTLM `Authorization`. It cites ADR-0709 and BL-2823.
+- [x] The upstream case cited for each source in both docs matches the `SetsAuthProblem` doc in `HttpProtocolHandler.cs`.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
 
@@ -37,3 +37,4 @@ Both are now false or incomplete about the code. That breaks CLAUDE.md's "say wh
 
 - 2026-10-19: Created.
 - 2026-10-19: Backlog -> Doing. Criteria at claim: 5e64001b c8484751 3d836d5e.
+- 2026-10-19: Doing -> Done. DigestStaysAvailable docs name both authproblem sources with test2027/BL-2820 and test2030/BL-2823, ADR-0709

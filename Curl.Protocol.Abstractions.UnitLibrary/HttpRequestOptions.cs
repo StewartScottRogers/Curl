@@ -148,7 +148,8 @@ public sealed record HttpRequestOptions
     /// <summary>
     /// Gets a value indicating whether the easy handle's previous transfer ended with Digest still
     /// marked available, its <see cref="TransferReport.DigestStaysAvailable" />, as libcurl 8.22.0
-    /// keeps <c>authhost.avail</c> on the easy handle (upstream test2030, BL-2820);
+    /// keeps <c>authhost.avail</c> on the easy handle (upstream test2027, BL-2820, for a Digest challenge
+    /// and test2030, BL-2823, for an NTLM one; ADR-0709);
     /// <see langword="false" /> for the handle's first transfer and after <c>curl_easy_reset</c>.
     /// </summary>
     public bool DigestStaysAvailable { get; init; }
