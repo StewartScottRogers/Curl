@@ -281,6 +281,16 @@ public sealed record HttpRequestOptions
     public ProxyEndpoint? ForwardProxy { get; init; }
 
     /// <summary>
+    /// Gets the transfer type <c>CURLOPT_PROXY_TRANSFER_MODE</c> asks for, <c>a</c> under
+    /// <c>CURLOPT_TRANSFERTEXT</c> or <c>i</c>, or <see langword="null" /> when the option is not set or the
+    /// transfer is not forwarded through an HTTP or HTTP/1.0 proxy. The absolute-form target an <c>ftp</c> URL
+    /// is sent to the proxy puts <c>;type=</c> and it on the path unless the path already names its type,
+    /// leaving the URL itself, and so the effective URL and the redirects resolved against it, without it,
+    /// as curl 8.22.0's <c>http_target</c> does (upstream tests 549 and 550, BL-2793).
+    /// </summary>
+    public char? ProxyTransferType { get; init; }
+
+    /// <summary>
     /// Gets a value indicating whether <c>-p</c>/<c>--proxytunnel</c> was given: tunnel
     /// through an HTTP-kind proxy with CONNECT even for an <c>http://</c> URL.
     /// </summary>

@@ -54,6 +54,9 @@ internal static class HttpRequestHeadFormatter
 
     private const string HostName = "Host";
 
+    /// <summary>The marker an <c>ftp</c> path's transfer type follows.</summary>
+    private const string FtpTypeMarker = ";type=";
+
     private const string ConnectionName = "Connection";
 
     private const string ContentTypeName = "Content-Type";
@@ -225,7 +228,7 @@ internal static class HttpRequestHeadFormatter
             return Encoding.Latin1.GetString(Encoding.UTF8.GetBytes(target));
         }
 
-        return proxiedCredentials is null ? HttpUrlText.RequestTarget(url) : AbsoluteForm(url, proxiedCredentials);
+        return proxiedCredentials is null ? HttpUrlText.RequestTarget(url) : AbsoluteForm(url, proxiedCredentials, options.ProxyTransferType);
     }
 
     /// <summary>
@@ -306,10 +309,29 @@ internal static class HttpRequestHeadFormatter
     /// <summary>
     /// Formats the absolute-form request target a forward proxy is sent: the scheme, the host
     /// and port as the <c>Host</c> line has them, then the path and query; for an <c>ftp</c> URL
-    /// the user and password come before the host (<see cref="FtpUserInformation" />).
+    /// the user and password come before the host (<see cref="FtpUserInformation" />), and the path ends in
+    /// <see cref="FtpTypeOf" />.
     /// </summary>
-    private static string AbsoluteForm(CurlUrl url, NetworkCredential credentials) =>
-        $"{url.Scheme}://{FtpUserInformation(url, credentials)}{HttpUrlText.HostAndPort(url)}{HttpUrlText.RequestTarget(url)}";
+    private static string AbsoluteForm(CurlUrl url, NetworkCredential credentials, char? proxyTransferType) =>
+        $"{url.Scheme}://{FtpUserInformation(url, credentials)}{HttpUrlText.HostAndPort(url)}"
+        + HttpUrlText.RequestTarget(url).Insert(HttpUrlText.Path(url).Length, FtpTypeOf(url, proxyTransferType));
+
+    /// <summary>
+    /// Gives <c>;type=</c> and <paramref name="proxyTransferType" /> for an <c>ftp</c> URL whose path does not
+    /// already end in <c>;type=</c> and one of <c>a</c>, <c>d</c> or <c>i</c> in either case, and the empty string
+    /// otherwise or without a type (<see cref="HttpRequestOptions.ProxyTransferType" />).
+    /// </summary>
+    private static string FtpTypeOf(CurlUrl url, char? proxyTransferType) =>
+        proxyTransferType is { } type && url.Scheme == "ftp" && !HasTypeCode(url.AbsolutePath) ? FtpTypeMarker + type : string.Empty;
+
+    /// <summary>Whether <paramref name="path" /> ends in <c>;type=</c> and one of <c>a</c>, <c>d</c> or <c>i</c>, in either case.</summary>
+    private static bool HasTypeCode(string path)
+    {
+        int marker = path.LastIndexOf(FtpTypeMarker, StringComparison.OrdinalIgnoreCase);
+        return marker >= 0
+            && path.Length == marker + FtpTypeMarker.Length + 1
+            && char.ToUpperInvariant(path[^1]) is 'A' or 'D' or 'I';
+    }
 
     /// <summary>
     /// Gives the user, <c>:</c> and the password, each percent-encoded, then <c>@</c>, for an

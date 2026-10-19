@@ -221,7 +221,7 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
             : watchHeaderOutput(HeaderOutputOf(behaviour, transfer, url, output, headerOutput, bodyHeaderStyles));
         return new()
         {
-            Url = ProxyTransferModeUrl.Of(url, proxy, TunnelsThroughProxy(proxyOptions, network, url, proxy), transfer.ProxyTransferMode, transfer.TransferText, network.PathAsIs),
+            Url = url,
             Output = WatchedOutput(output, lowSpeedWatchdog),
             HeaderOutput = transferHeaderOutput,
             DumpHeaderOutput = headerOutput,
@@ -274,6 +274,7 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
                     DigestStaysAvailable = KeptDigestStaysAvailable,
                     AuthSchemePicked = KeptAuthSchemePicked,
                     ProxyTunnel = TunnelsThroughProxy(proxyOptions, network, url, proxy),
+                    ProxyTransferType = ProxyTransferModeType.Of(proxy, TunnelsThroughProxy(proxyOptions, network, url, proxy), transfer.ProxyTransferMode, transfer.TransferText),
                 },
                 altSvc),
             Mail = MailRequestOptionsMapping.FromCommandLine(settings, transfer, protocol.Smtp, authentication, url.Scheme),
