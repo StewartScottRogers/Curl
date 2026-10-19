@@ -47,7 +47,7 @@ namespace Curl.Engine;
 /// <param name="createDispatcher">Builds a transfer's dispatcher from its options, the engine's shared state, the cookie store its HTTP handler keeps and the HTTP/2 push sink it offers server pushes to (<see cref="PushSinkOf" />).</param>
 /// <param name="shared">What the engine's handles share.</param>
 internal sealed partial class ManagedEasyTransfer(
-    Func<EasyOptions, ManagedEngineSharedState, ICookieStore?, IHttp2PushSink?, HandleRtspSession, ProtocolDispatcher> createDispatcher,
+    Func<EasyOptions, ManagedEngineSharedState, ICookieStore?, IHttp2PushSink?, HandleRtspSession, WsPerformConnection, ProtocolDispatcher> createDispatcher,
     ManagedEngineSharedState shared) : IToolEasyTransfer
 {
     /// <summary>libcurl's <c>CURLE_URL_MALFORMAT</c> text for a perform with no URL set.</summary>
@@ -1069,7 +1069,7 @@ internal sealed partial class ManagedEasyTransfer(
         {
             Api.Options.Network.ConnectOnly.WebSocket => WebSocketUpgradeDispatcherOf(options),
             Api.Options.Network.ConnectOnly.Connect => ConnectOnlyLoginDispatcherOf(options),
-            _ => createDispatcher(options, PerformShared, HandlerCookieStoreOf(cookies), PushSinkOf(), rtspSession),
+            _ => createDispatcher(options, PerformShared, HandlerCookieStoreOf(cookies), PushSinkOf(), rtspSession, WebSocketConnection.PerformConnection),
         }, selectHopCredentials: hopCredentials);
 
     /// <summary>

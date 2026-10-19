@@ -127,6 +127,7 @@ internal static class EngineComposition
     /// <param name="rtspRequestSettings">Gives a libcurl perform's RTSP request settings when the RTSP handler is first built (BL-2704); <see langword="null" /> for the curl tool's <c>OPTIONS *</c>.</param>
     /// <param name="rtspSessionState">The <c>CSeq</c> counter and session ID a libcurl handle keeps across performs (BL-2704); <see langword="null" /> for a fresh one per transfer.</param>
     /// <param name="webSocketRawMode">Whether the WebSocket handler writes the received stream unframed (<see cref="WsProtocolHandler.RawMode" />, libcurl's <c>CURLWS_RAW_MODE</c>, BL-2494).</param>
+    /// <param name="webSocketPerformConnection">Where the WebSocket handler shows the connection its frames flow on, for <c>curl_ws_send</c> from a write callback (<see cref="WsProtocolHandler.PerformConnection" />, BL-2710); <see langword="null" /> shows it nowhere.</param>
     /// <param name="http2PushSink">Where the HTTP handler offers HTTP/2 server pushes (BL-2469); <see langword="null" /> keeps <c>SETTINGS_ENABLE_PUSH</c> 0.</param>
     /// <param name="webSocketRandomSource">Where the WebSocket handler draws each <c>Sec-WebSocket-Key</c> and frame mask from (BL-2688); <see langword="null" /> for <see cref="SystemWebSocketRandomSource" />.</param>
     /// <param name="ftpStopsBeforeEntryPath">Whether the FTP handler's new control connections stop before <c>PWD</c> (<see cref="FtpProtocolHandler.StopsBeforeEntryPath" />, BL-2636).</param>
@@ -155,6 +156,7 @@ internal static class EngineComposition
         Func<RtspRequestSettings?>? rtspRequestSettings = null,
         RtspSessionState? rtspSessionState = null,
         bool webSocketRawMode = false,
+        WsPerformConnection? webSocketPerformConnection = null,
         IHttp2PushSink? http2PushSink = null,
         IWebSocketRandomSource? webSocketRandomSource = null,
         bool ftpStopsBeforeEntryPath = false)
@@ -180,7 +182,7 @@ internal static class EngineComposition
             new LazyProtocolHandler(["pop3", "pop3s"], () => new Pop3ProtocolHandler(recordingConnector, tlsProvider, CreateSaslAuthenticator(contexts.Value, saslDelegation, diagnosticLog))),
             new LazyProtocolHandler(["smtp", "smtps"], () => new SmtpProtocolHandler(recordingConnector, tlsProvider, CreateSaslAuthenticator(contexts.Value, saslDelegation, diagnosticLog)) { TracesStateMachine = tracesSmtp }),
             new LazyProtocolHandler(["ldap", "ldaps"], () => new LdapProtocolHandler(recordingConnector, LdapDialectFor(OperatingSystem.IsWindows()))),
-            new LazyProtocolHandler(["ws", "wss"], () => new WsProtocolHandler(recordingConnector, httpAuthenticator.Value, webSocketRandomSource ?? new SystemWebSocketRandomSource()) { TracesFrames = tracesWs, RawMode = webSocketRawMode }),
+            new LazyProtocolHandler(["ws", "wss"], () => new WsProtocolHandler(recordingConnector, httpAuthenticator.Value, webSocketRandomSource ?? new SystemWebSocketRandomSource()) { TracesFrames = tracesWs, RawMode = webSocketRawMode, PerformConnection = webSocketPerformConnection }),
             new LazyProtocolHandler(["rtsp"], () => new RtspProtocolHandler(recordingConnector, httpAuthenticator.Value, rtspInterleaveSink, rtspSettingsOf(), rtspSessionState)),
             new LazyProtocolHandler(["smb", "smbs"], () => new SmbProtocolHandler(recordingConnector)),
             new LazyProtocolHandler(["scp", "sftp"], () => new SshProtocolHandler(

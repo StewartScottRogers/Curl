@@ -31,7 +31,7 @@ public sealed class ManagedCurlEngine : ICurlEngine
 {
     private readonly ManagedEngineSharedState shared;
     private readonly EasyTransferHost handleHost;
-    private readonly Func<EasyOptions, ManagedEngineSharedState, ICookieStore?, IHttp2PushSink?, HandleRtspSession, ProtocolDispatcher> createDispatcher;
+    private readonly Func<EasyOptions, ManagedEngineSharedState, ICookieStore?, IHttp2PushSink?, HandleRtspSession, WsPerformConnection, ProtocolDispatcher> createDispatcher;
 
     /// <summary>Creates the engine on the system clock and the real network, with no easy error text.</summary>
     public ManagedCurlEngine()
@@ -109,7 +109,7 @@ public sealed class ManagedCurlEngine : ICurlEngine
     {
         shared = new ManagedEngineSharedState(timeProvider, easyErrorText ?? (_ => string.Empty), readEnvironmentVariable, dialing, signingClock, webSocketRandomSource, FirstTransferFtpPwdStop.When(stopsFirstFtpTransferBeforePwd), createFormBoundary, readEnvironmentVariable is not null && EngineComposition.LearnsHstsOverHttp(honoursHstsHttpVariable: true, readEnvironmentVariable));
         handleHost = HandleHostOf(standardInput, readEnvironmentVariable, standardError);
-        this.createDispatcher = createDispatcher is null ? CreateDispatcher : (options, state, cookies, _, _) => createDispatcher(options, state, cookies);
+        this.createDispatcher = createDispatcher is null ? CreateDispatcher : (options, state, cookies, _, _, _) => createDispatcher(options, state, cookies);
     }
 
     /// <summary>
@@ -192,8 +192,9 @@ public sealed class ManagedCurlEngine : ICurlEngine
     /// <param name="cookieStore">The cookies the HTTP handler sends and keeps, or <see langword="null" /> with the cookie engine off.</param>
     /// <param name="pushSink">Where the HTTP handler offers HTTP/2 server pushes (<see cref="EngineHttp2PushSink" />, BL-2469), or <see langword="null" /> to refuse them.</param>
     /// <param name="rtspSession">The handle's RTSP state, whose settings and session the RTSP handler sends (BL-2704), or <see langword="null" /> for the curl tool's <c>OPTIONS *</c>.</param>
+    /// <param name="webSocketPerformConnection">The handle's WebSocket perform connection, which <c>curl_ws_send</c> from a write callback writes to (BL-2710), or <see langword="null" /> for none.</param>
     /// <returns>The dispatcher.</returns>
-    internal static ProtocolDispatcher CreateDispatcher(EasyOptions options, ManagedEngineSharedState shared, ICookieStore? cookieStore, IHttp2PushSink? pushSink = null, HandleRtspSession? rtspSession = null)
+    internal static ProtocolDispatcher CreateDispatcher(EasyOptions options, ManagedEngineSharedState shared, ICookieStore? cookieStore, IHttp2PushSink? pushSink = null, HandleRtspSession? rtspSession = null, WsPerformConnection? webSocketPerformConnection = null)
     {
         CurlTransports transports = CreateTransports(options, shared);
         IConnector connector = PrerequestConnector.Over(PoolOf(transports, transports.TcpConnector, options.Callbacks, shared), options.Callbacks.Prerequest);
@@ -214,6 +215,7 @@ public sealed class ManagedCurlEngine : ICurlEngine
             rtspSessionState: rtspSession?.State,
             ftpListener: SocketCallbackConnectionListener.Over(shared.Dialing?.FtpListener ?? new Curl.Networking.TcpConnectionListener(), options.Callbacks, shared),
             webSocketRawMode: IsWebSocketRawMode(options),
+            webSocketPerformConnection: webSocketPerformConnection,
             http2PushSink: pushSink,
             webSocketRandomSource: shared.WebSocketRandomSource,
             ftpStopsBeforeEntryPath: shared.FtpPwdStop?.TryClaim() == true));

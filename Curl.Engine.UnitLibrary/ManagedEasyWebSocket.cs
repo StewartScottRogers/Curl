@@ -70,6 +70,12 @@ internal sealed class ManagedEasyWebSocket(Func<bool> isConnectOnly, Func<WebSoc
     internal WsUploadFrames UploadFrames { get; } = new();
 
     /// <summary>
+    /// Gets the connection a perform that is not connect-only exchanges frames on while it does, which a send from
+    /// the write callback writes to (BL-2710).
+    /// </summary>
+    internal WsPerformConnection PerformConnection { get; } = new();
+
+    /// <summary>
     /// Closes the connection open now, if any, keeps <paramref name="upgraded" /> in its place and decodes
     /// <paramref name="alreadyReceived" />, the bytes that came with the <c>101</c>, answering a ping among them.
     /// </summary>
@@ -127,7 +133,7 @@ internal sealed class ManagedEasyWebSocket(Func<bool> isConnectOnly, Func<WebSoc
     public async ValueTask<CurlWebSocketSendResult> SendAsync(ReadOnlyMemory<byte> buffer, long fragmentSize, CurlWebSocketFlags flags, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        CurlCode usable = UsableConnection(out IConnection? live);
+        CurlCode usable = SendableConnection(out IConnection? live);
         if (usable != CurlCode.Ok)
         {
             return new CurlWebSocketSendResult(usable, 0);
@@ -304,6 +310,24 @@ internal sealed class ManagedEasyWebSocket(Func<bool> isConnectOnly, Func<WebSoc
         return await TryWriteAsync(live, buffer).ConfigureAwait(false)
             ? new CurlWebSocketSendResult(CurlCode.Ok, buffer.Length)
             : new CurlWebSocketSendResult(CurlCode.SendError, 0);
+    }
+
+    /// <summary>
+    /// The connection a send may use: during a perform that is not connect-only, the one its frames flow on
+    /// (<see cref="PerformConnection" />), as curl 8.22.0's <c>curl_ws_send</c> writes to <c>data-&gt;conn</c> from the
+    /// write callback (upstream test2301, BL-2710); otherwise as <see cref="UsableConnection" /> answers.
+    /// </summary>
+    /// <param name="live">The connection when the answer is <see cref="CurlCode.Ok" />.</param>
+    /// <returns><see cref="CurlCode.Ok" />, <see cref="CurlCode.UnsupportedProtocol" /> or <see cref="CurlCode.BadFunctionArgument" />.</returns>
+    private CurlCode SendableConnection(out IConnection? live)
+    {
+        if (!isConnectOnly() && PerformConnection.Connection is { } performing)
+        {
+            live = performing;
+            return CurlCode.Ok;
+        }
+
+        return UsableConnection(out live);
     }
 
     /// <summary>The connection a receive or send may use, or why there is none.</summary>

@@ -2,6 +2,8 @@ using System.Text;
 using Curl.Api.Codes;
 using Curl.Api.EngineContracts.WebSocket;
 using Curl.Api.Options.Protocols;
+using Curl.Core;
+using Curl.Protocol.Abstractions;
 using Curl.Protocol.Ws;
 
 namespace Curl.Engine;
@@ -291,6 +293,38 @@ public sealed class ManagedEasyWebSocketTests
         CurlWebSocketSendResult result = await webSocket.SendAsync("x"u8.ToArray(), 0, CurlWebSocketFlags.Close, CancellationToken.None);
 
         Assert.AreEqual(new CurlWebSocketSendResult(CurlCode.SendError, 0), result);
+    }
+
+    [TestMethod]
+    public async Task SendAsync_FromTheWriteCallbackOfAPerformThatIsNotConnectOnly_WritesToTheConnectionItsFramesFlowOn()
+    {
+        // curl 8.22.0's curl_ws_send writes to data->conn from an ordinary perform's write callback: lib2301 answers
+        // the ping that came with the 101 with a raw PONG (upstream test2301, BL-2710).
+        ManagedEasyWebSocket webSocket = new(() => false, () => WebSocketOptionBits.RawMode, new ZeroMaskSource());
+        byte[] pong = [0x8a, 0x00];
+        ScriptedConnector connector = new([[.. Encoding.ASCII.GetBytes("HTTP/1.1 101 Switching Protocols\r\n\r\n"), 0x89, 0x00]]);
+        IProtocolHandler handler = EngineComposition.CreateProtocolHandlers(
+            connector,
+            new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "no datagrams"),
+            new PassThroughTlsProvider(),
+            new LoopbackDnsResolver(),
+            null,
+            webSocketRawMode: true,
+            webSocketPerformConnection: webSocket.PerformConnection).Single(candidate => candidate.SupportedSchemes.Contains("ws"));
+        List<CurlWebSocketSendResult> sends = [];
+        CallbackWriteStream output = new(data =>
+        {
+            sends.Add(webSocket.SendAsync(pong, 0, CurlWebSocketFlags.None, CancellationToken.None).AsTask().GetAwaiter().GetResult());
+            return data.Length;
+        });
+
+        TransferResult result = await handler.ExecuteAsync(new TransferContext { Url = CurlUrl.Parse("ws://h/2301"), Output = output });
+        CurlWebSocketSendResult afterPerform = await webSocket.SendAsync(pong, 0, CurlWebSocketFlags.None, CancellationToken.None);
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        CollectionAssert.AreEqual(new[] { new CurlWebSocketSendResult(CurlCode.Ok, 2) }, sends);
+        CollectionAssert.AreEqual(pong, connector.Written[^2..]);
+        Assert.AreEqual(new CurlWebSocketSendResult(CurlCode.UnsupportedProtocol, 0), afterPerform);
     }
 
     [TestMethod]
