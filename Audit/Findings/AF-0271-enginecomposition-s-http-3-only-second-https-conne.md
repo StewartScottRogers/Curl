@@ -3,8 +3,8 @@ id: AF-0271
 title: EngineComposition's HTTP/3-only second HTTPS-connect attempt can apply to every version with no Engine test failing
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Engine.UnitLibrary/EngineComposition.cs:ConnectToMappings-eq:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/EngineComposition.cs:1046:==
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Engin
 ## Log
 
 - 2026-10-18: filed proposed.
+- 2026-10-19: proposed -> accepted.
