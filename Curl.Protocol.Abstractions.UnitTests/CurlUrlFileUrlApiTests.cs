@@ -99,6 +99,28 @@ public sealed class CurlUrlFileUrlApiTests
     }
 
     [TestMethod]
+    [DataRow(true)]
+    [DataRow(false)]
+    public void TryParseForUrlApi_OneLetterSchemeWithoutGuessing_IsASchemeNotADrive(bool driveLetters)
+    {
+        // lib1560's huge group (BL-2791): curl skips a drive prefix only when it guesses the scheme.
+        bool parsed = CurlUrl.TryParseForUrlApi("c://c:c@c/c?c#c", pathAsIs: false, driveLetters, NoFlags, out CurlUrl? url, out _);
+
+        Assert.IsTrue(parsed);
+        Assert.AreEqual("c", url!.Scheme);
+        Assert.AreEqual("c", url.Host);
+    }
+
+    [TestMethod]
+    public void TryParseForUrlApi_OneLetterSchemeWhileGuessingOnWindows_IsNotAScheme()
+    {
+        bool parsed = CurlUrl.TryParseForUrlApi(
+            "c://h/", pathAsIs: false, driveLetters: true, new CurlUrlApiFlags(false, false, true), out CurlUrl? url, out _);
+
+        Assert.IsFalse(parsed && url!.Scheme == "c");
+    }
+
+    [TestMethod]
     public void TryParseForUrlApi_NullText_Throws()
     {
         Assert.ThrowsExactly<ArgumentNullException>(

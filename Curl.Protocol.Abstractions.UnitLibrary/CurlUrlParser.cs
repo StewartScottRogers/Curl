@@ -65,9 +65,14 @@ internal static class CurlUrlParser
 
     private static bool IsControlOrSpace(char character) => character <= ' ' || character == '\x7f';
 
-    /// <summary>The scheme <see cref="CurlUrlScheme.Read" /> finds, else <see cref="FileSchemeWithoutSlash" />'s.</summary>
+    /// <summary>
+    /// The scheme <see cref="CurlUrlScheme.Read" /> finds, else <see cref="FileSchemeWithoutSlash" />'s. A drive
+    /// letter hides a scheme only while schemes are guessed: curl 8.22.0's <c>Curl_is_absolute_url</c> checks
+    /// <c>STARTS_WITH_DRIVE_PREFIX</c> only under <c>guess_scheme</c>, so with <paramref name="fileSchemeWithoutSlash" />
+    /// (the URL API not guessing) <c>c://h</c> has the scheme <c>c</c> on Windows too (lib1560's huge group, BL-2791).
+    /// </summary>
     private static string? ReadScheme(string text, bool driveLetters, bool fileSchemeWithoutSlash) =>
-        CurlUrlScheme.Read(text, driveLetters) ?? FileSchemeWithoutSlash(text, fileSchemeWithoutSlash);
+        CurlUrlScheme.Read(text, driveLetters && !fileSchemeWithoutSlash) ?? FileSchemeWithoutSlash(text, fileSchemeWithoutSlash);
 
     /// <summary><c>file</c> when <paramref name="allowed" /> and the text starts <c>file:</c> in any case, else <see langword="null" />.</summary>
     private static string? FileSchemeWithoutSlash(string text, bool allowed) =>

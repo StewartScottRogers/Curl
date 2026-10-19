@@ -260,6 +260,26 @@ public sealed partial class ManagedCurlUrlHandleTests
     }
 
     [TestMethod]
+    [DataRow(1, CurlUrlPart.User, "")]
+    [DataRow(2, CurlUrlPart.Password, "")]
+    [DataRow(3, CurlUrlPart.Host, "")]
+    [DataRow(4, CurlUrlPart.Path, "/")]
+    [DataRow(5, CurlUrlPart.Query, "")]
+    [DataRow(6, CurlUrlPart.Fragment, "")]
+    public void Set_OneLetterSchemeWithAHugePartUnderNonSupportScheme_ParsesAndReadsThePartBackWhole(int index, CurlUrlPart part, string prefix)
+    {
+        // lib1560's huge group (BL-2791): c://c:c@c/c?c#c with one part 119,998 bytes long.
+        string big = new('a', 119_998);
+        string[] pieces = [.. Enumerable.Range(0, 7).Select(piece => piece == index ? big : "c")];
+        string text = $"{pieces[0]}://{pieces[1]}:{pieces[2]}@{pieces[3]}/{pieces[4]}?{pieces[5]}#{pieces[6]}";
+        using ManagedCurlUrlHandle url = new();
+
+        Assert.AreEqual(CurlUrlCode.Ok, url.Set(CurlUrlPart.Url, text, CurlUrlFlags.NonSupportScheme));
+        Assert.AreEqual(CurlUrlCode.Ok, url.Get(part, CurlUrlFlags.None, out string? value));
+        Assert.AreEqual(prefix + big, value);
+    }
+
+    [TestMethod]
     [DataRow("example.net:81/x", CurlUrlFlags.None, CurlUrlCode.UnsupportedScheme)]
     [DataRow("Example.net:81/x", CurlUrlFlags.NonSupportScheme, CurlUrlCode.BadSlashes)]
     [DataRow("http:81/x", CurlUrlFlags.None, CurlUrlCode.BadSlashes)]
