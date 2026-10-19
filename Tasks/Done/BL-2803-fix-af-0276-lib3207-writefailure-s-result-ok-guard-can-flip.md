@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.LibTest.UnitLibrary]
 requirement: none
 created: 2026-10-19
-completed:
+completed: 2026-10-19
 ---
 # BL-2803 — Fix AF-0276: Lib3207.WriteFailure's result == Ok guard can flip with no test failing, so failures go unreported and successes are reported as failures
 
@@ -55,3 +55,4 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 - 2026-10-19: Created.
 - 2026-10-19: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-19: Doing -> Done. Lib3207's test pins stderr to exactly one failure line; the == -> != mutant at Lib3207.cs:137 now fails it
