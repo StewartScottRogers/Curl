@@ -55,3 +55,4 @@ Found by BL-2650. Case 1542 (`lib1542`, `Curl.Conformance.LibTest.UnitLibrary/Li
 - 2026-10-18: Created.
 - 2026-10-18: Backlog -> Doing. Criteria at claim: af82bdd2 dd52269f 03ca90eb.
 - 2026-10-18: Doing -> Backlog. touches Curl.Engine.UnitLibrary (CreatePoolingConnector must pass MaxConnectionLifetime to the pool), which BL-2735 in Doing also touches
+- 2026-10-19: Backlog -> Doing. Criteria at claim: af82bdd2 dd52269f 03ca90eb.
