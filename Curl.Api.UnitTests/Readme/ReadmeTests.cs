@@ -124,11 +124,27 @@ public sealed partial class ReadmeTests
     }
 
     [TestMethod]
+    [DoNotParallelize] // Console.SetOut is process-wide; another sample's lines must not land in this writer.
     public async Task Sample_Cancel_SucceedsWhenNothingFails()
     {
-        await using CurlClient client = ClientOver(Scripted);
+        ScriptedEasyTransfer easy = Scripted();
+        await using CurlClient client = ClientOver(() => easy);
+        TextWriter console = Console.Out;
+        using StringWriter written = new();
+        Console.SetOut(written);
+        try
+        {
+            await ReadmeSamples.CancelAndHandleErrorsAsync(client, CancellationToken.None);
+        }
+        finally
+        {
+            Console.SetOut(console);
+        }
 
-        await ReadmeSamples.CancelAndHandleErrorsAsync(client, CancellationToken.None);
+        Assert.AreEqual("", written.ToString(), "the sample wrote a cancellation or curl error line");
+        Assert.AreEqual("https://example.com/slow", easy.PerformedOptions!.Network.Url);
+        Assert.AreEqual(5L, easy.BodyBytesTaken);
+        Assert.IsTrue(easy.Disposed);
     }
 
     [TestMethod]
