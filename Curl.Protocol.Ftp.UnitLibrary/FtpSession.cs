@@ -244,6 +244,12 @@ internal sealed class FtpSession(
     private IPendingConnection? pendingConnection;
 
     /// <summary>
+    /// When the active-mode port was bound, from which curl 8.22.0's accept timer runs, also
+    /// while the transfer command waits for its reply (BL-2796).
+    /// </summary>
+    private long listenedAt;
+
+    /// <summary>
     /// The active-mode data connection accepted right after <c>EPRT</c> or <c>PORT</c> was
     /// answered, when the server had connected already (<see cref="AcceptWaitingConnectionAsync" />).
     /// </summary>
@@ -1115,7 +1121,7 @@ internal sealed class FtpSession(
     private async ValueTask<TransferResult> SendUploadAsync(string command, Stream upload)
     {
         uploadSize = KnownSizeOf(upload);
-        FtpReply opened = await ExchangeAsync(command).ConfigureAwait(false);
+        FtpReply opened = await ExchangeTransferCommandAsync(command).ConfigureAwait(false);
         if (opened.Code >= 400)
         {
             return await QuitAndFailAsync(CurlExitCode.UploadFailed, FtpTransferMessages.UploadRefused(opened.Code)).ConfigureAwait(false);
@@ -1625,6 +1631,7 @@ internal sealed class FtpSession(
             return await QuitAndFailLeavingConnectionIntactAsync(listening.ExitCode, FtpTransferMessages.BindFailed(listening.ErrorMessage!)).ConfigureAwait(false);
         }
 
+        listenedAt = context.TimeProvider.GetTimestamp();
         trace.ActivePortListening();
         return null;
     }
@@ -2054,7 +2061,7 @@ internal sealed class FtpSession(
 
     private async ValueTask<TransferResult> RetrieveAsync(string command, bool listing)
     {
-        FtpReply opened = await ExchangeAsync(command).ConfigureAwait(false);
+        FtpReply opened = await ExchangeTransferCommandAsync(command).ConfigureAwait(false);
         if (opened.Code is 125 or 150)
         {
             log.TransferStarted(command);
@@ -2540,12 +2547,19 @@ internal sealed class FtpSession(
     /// <paramref name="closingMessage" /> and no <c>QUIT</c>, or for no reply within
     /// <see cref="ITransferContext.FtpServerResponseTimeout" /> (exit 28, no <c>QUIT</c>).
     /// </summary>
-    private async ValueTask<FtpReply> ReadReplyAsync(string closingMessage = FtpTransferMessages.TimeoutReached)
+    private async ValueTask<FtpReply> ReadReplyAsync(string closingMessage = FtpTransferMessages.TimeoutReached) =>
+        await CheckReplyAsync(ReadReplyWithinServerResponseTimeoutAsync(), closingMessage).ConfigureAwait(false);
+
+    /// <summary>
+    /// Awaits <paramref name="reading" /> and ends the conversation as
+    /// <see cref="ReadReplyAsync" /> describes for what it read or failed with.
+    /// </summary>
+    private async ValueTask<FtpReply> CheckReplyAsync(ValueTask<FtpReply?> reading, string closingMessage)
     {
         FtpReply? reply;
         try
         {
-            reply = await ReadReplyWithinServerResponseTimeoutAsync().ConfigureAwait(false);
+            reply = await reading.ConfigureAwait(false);
         }
         catch (FtpReplyNulByteException)
         {
@@ -2586,20 +2600,84 @@ internal sealed class FtpSession(
     private async ValueTask<FtpReply?> ReadReplyWithinServerResponseTimeoutAsync()
     {
         Task<FtpReply?> read = control.ReadReplyAsync().AsTask();
+        return await CompletesWithinAsync(read, context.FtpServerResponseTimeout).ConfigureAwait(false)
+            ? await read.ConfigureAwait(false)
+            : throw Failed(CurlExitCode.OperationTimedOut, FtpTransferMessages.ServerResponseTimeout);
+    }
+
+    /// <summary>
+    /// Waits until <paramref name="read" /> completes or <paramref name="limit" /> passes on
+    /// the transfer's clock, waiting out a timer that fires early, without cancelling the read.
+    /// </summary>
+    /// <returns>Whether <paramref name="read" /> completed in time.</returns>
+    private async ValueTask<bool> CompletesWithinAsync(Task read, TimeSpan limit)
+    {
         long started = context.TimeProvider.GetTimestamp();
-        TimeSpan left = context.FtpServerResponseTimeout;
+        TimeSpan left = limit;
         while (!read.IsCompleted && left > TimeSpan.Zero)
         {
             using var replied = new CancellationTokenSource();
             await Task.WhenAny(read, Task.Delay(left, context.TimeProvider, replied.Token)).ConfigureAwait(false);
             await replied.CancelAsync().ConfigureAwait(false);
-            left = context.FtpServerResponseTimeout - context.TimeProvider.GetElapsedTime(started);
+            left = limit - context.TimeProvider.GetElapsedTime(started);
         }
 
-        return read.IsCompleted
-            ? await read.ConfigureAwait(false)
-            : throw Failed(CurlExitCode.OperationTimedOut, FtpTransferMessages.ServerResponseTimeout);
+        return read.IsCompleted;
     }
+
+    /// <summary>
+    /// Sends the transfer command and reads its reply. In active mode, with no data connection
+    /// accepted yet, curl 8.22.0's accept timer runs from the listen while the reply is awaited,
+    /// as its <c>ftp_do_more</c> polls the listening socket (BL-2796): the timer running out
+    /// first ends the transfer with exit 12 (<see cref="AcceptTimedOutAwaitingReplyAsync" />),
+    /// and the server response timeout running out first with exit 28, as in passive mode.
+    /// </summary>
+    private async ValueTask<FtpReply> ExchangeTransferCommandAsync(string command)
+    {
+        if (pendingConnection is null || acceptedEarly is not null)
+        {
+            return await ExchangeAsync(command).ConfigureAwait(false);
+        }
+
+        await SendAsync(command).ConfigureAwait(false);
+        trace.Sent(command);
+        trace.AwaitingReply();
+        Task<FtpReply?> read = control.ReadReplyAsync().AsTask();
+        TimeSpan acceptLeft = context.FtpAcceptTimeout - context.TimeProvider.GetElapsedTime(listenedAt);
+        bool acceptFirst = acceptLeft <= context.FtpServerResponseTimeout;
+        if (await CompletesWithinAsync(read, acceptFirst ? acceptLeft : context.FtpServerResponseTimeout).ConfigureAwait(false))
+        {
+            return await CheckReplyAsync(new ValueTask<FtpReply?>(read), FtpTransferMessages.TimeoutReached).ConfigureAwait(false);
+        }
+
+        throw acceptFirst
+            ? await AcceptTimedOutAwaitingReplyAsync(read).ConfigureAwait(false)
+            : Failed(CurlExitCode.OperationTimedOut, FtpTransferMessages.ServerResponseTimeout);
+    }
+
+    /// <summary>
+    /// Ends an active-mode transfer whose accept timer ran out before the transfer command was
+    /// answered, as curl 8.22.0's <c>ftp_done</c> does for <c>CURLE_FTP_ACCEPT_TIMEOUT</c>: it
+    /// waits up to 60 seconds more for the pending reply, and with none says <c>FTP response
+    /// timeout</c> and <c>control connection looks dead</c> and sends no <c>QUIT</c> (measured,
+    /// exit 12 after 120128 ms, BL-2795); a reply in that time leaves the connection valid, so
+    /// <c>QUIT</c> follows. Either way the exit is 12.
+    /// </summary>
+    /// <returns>The exception carrying the transfer's result, for the caller to throw.</returns>
+    private async ValueTask<FtpControlConversationFailedException> AcceptTimedOutAwaitingReplyAsync(Task<FtpReply?> read)
+    {
+        if (await CompletesWithinAsync(read, ControlReplyWaitAfterFailure).ConfigureAwait(false))
+        {
+            return new(await QuitAndFailAsync(CurlExitCode.FtpAcceptTimeout, FtpTransferMessages.AcceptTimeout).ConfigureAwait(false));
+        }
+
+        context.Events.ReportInfo(FtpTransferMessages.FtpResponseTimeout);
+        context.Events.ReportInfo(FtpTransferMessages.ControlConnectionLooksDead);
+        return Failed(CurlExitCode.FtpAcceptTimeout, FtpTransferMessages.AcceptTimeout);
+    }
+
+    /// <summary>How long curl 8.22.0's <c>ftp_done</c> waits for a pending control reply: "only a minute".</summary>
+    private static readonly TimeSpan ControlReplyWaitAfterFailure = TimeSpan.FromSeconds(60);
 
     private FtpControlConversationFailedException Failed(CurlExitCode exitCode, string message) =>
         new(TransferResult.Failure(exitCode, message, bytesTransferred));

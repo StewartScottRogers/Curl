@@ -14,6 +14,40 @@ public sealed class SteppingTimeProvider : TimeProvider
 
     private TimeSpan elapsed;
 
+    private readonly List<(TimeSpan DueAt, TaskCompletionSource Armed)> awaitedTimers = [];
+
+    /// <summary>
+    /// Completes once a timer is armed to fall due at <paramref name="dueAt" /> on this clock,
+    /// so a test advances the clock only after the code under test started that wait.
+    /// </summary>
+    public Task TimerArmedAt(TimeSpan dueAt)
+    {
+        lock (gate)
+        {
+            if (timers.Any(timer => timer.DueAt == dueAt))
+            {
+                return Task.CompletedTask;
+            }
+
+            var armed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            awaitedTimers.Add((dueAt, armed));
+            return armed.Task;
+        }
+    }
+
+    private void ReportArmed(TimeSpan dueAt)
+    {
+        lock (gate)
+        {
+            foreach ((TimeSpan _, TaskCompletionSource armed) in awaitedTimers.Where(awaited => awaited.DueAt == dueAt))
+            {
+                armed.TrySetResult();
+            }
+
+            awaitedTimers.RemoveAll(awaited => awaited.DueAt == dueAt);
+        }
+    }
+
     public override long TimestampFrequency => TimeSpan.TicksPerSecond;
 
     public override long GetTimestamp()
@@ -27,11 +61,12 @@ public sealed class SteppingTimeProvider : TimeProvider
     public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period)
     {
         SteppingTimer timer = new(this, callback, state);
-        timer.Change(dueTime, period);
         lock (gate)
         {
             timers.Add(timer);
         }
+
+        timer.Change(dueTime, period);
 
         return timer;
     }
@@ -93,6 +128,7 @@ public sealed class SteppingTimeProvider : TimeProvider
         public bool Change(TimeSpan dueTime, TimeSpan period)
         {
             DueAt = dueTime == Timeout.InfiniteTimeSpan ? TimeSpan.MaxValue : owner.elapsed + dueTime;
+            owner.ReportArmed(DueAt);
             return true;
         }
 

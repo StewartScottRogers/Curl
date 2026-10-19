@@ -304,6 +304,86 @@ public sealed class FtpProtocolHandlerTimeLimitTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_ActiveStorUnansweredAndNeverConnected_EndsWithExit12AfterTheAcceptTimeoutAndAMinuteMoreWithNoQuit()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("test", "ExecuteAsync_ActiveStorUnansweredAndNeverConnected_EndsWithExit12AfterTheAcceptTimeoutAndAMinuteMoreWithNoQuit");
+
+        // curl -v -P - -T 594 ftp://127.0.0.1:47594/path/594, STOR=STALL: curl 8.22.0 ends
+        // after 120128 ms with "* FTP response timeout", "* control connection looks dead" and
+        // "curl: (12) Accept timeout occurred while waiting server connect", no QUIT (BL-2796).
+        var control = new StallingConnection(Encoding.Latin1.GetBytes(LoggedIn + EprtOk + "200 Type set\r\n"));
+        var events = new RecordingTransferEvents();
+        Task<TransferResult> run = StartActiveUploadAsync(control, events, acceptTimeout: TransferContext.DefaultFtpAcceptTimeout);
+        await control.Stalled;
+        await clock.TimerArmedAt(TimeSpan.FromSeconds(60));
+
+        clock.Advance(TimeSpan.FromMilliseconds(59999));
+        bool waitingForTheAccept = !run.IsCompleted;
+        clock.Advance(TimeSpan.FromMilliseconds(1));
+        await clock.TimerArmedAt(TimeSpan.FromSeconds(120));
+        clock.Advance(TimeSpan.FromMilliseconds(59999));
+        bool waitingForTheReply = !run.IsCompleted;
+        clock.Advance(TimeSpan.FromMilliseconds(1));
+        TransferResult result = await run;
+
+        diagnostics.Act("result", result with { Report = null });
+        diagnostics.Assert("outcome checked by the assertions below", "passes", "checking");
+        Assert.IsTrue(waitingForTheAccept);
+        Assert.IsTrue(waitingForTheReply);
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.FtpAcceptTimeout, "Accept timeout occurred while waiting server connect"), result with { Report = null });
+        Assert.AreEqual(ActiveUploadSent, Encoding.Latin1.GetString(control.Sent));
+        CollectionAssert.IsSubsetOf(new[] { "FTP response timeout", "control connection looks dead" }, events.Info);
+        Assert.AreEqual("control connection looks dead", events.Info[^1]);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ActiveStorAnsweredAfterTheAcceptTimeout_EndsWithExit12AfterQuit()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("test", "ExecuteAsync_ActiveStorAnsweredAfterTheAcceptTimeout_EndsWithExit12AfterQuit");
+
+        // A reply within ftp_done's minute leaves curl's control connection valid, so QUIT is sent.
+        var control = new ReleasableConnection(Encoding.Latin1.GetBytes(LoggedIn + EprtOk + "200 Type set\r\n"));
+        var events = new RecordingTransferEvents();
+        Task<TransferResult> run = StartActiveUploadAsync(control, events, acceptTimeout: TimeSpan.FromSeconds(8));
+        await control.Stalled;
+        await clock.TimerArmedAt(TimeSpan.FromSeconds(8));
+
+        clock.Advance(TimeSpan.FromSeconds(8));
+        await clock.TimerArmedAt(TimeSpan.FromSeconds(68));
+        control.Release(Encoding.Latin1.GetBytes("150 Opening\r\n221 Bye\r\n"));
+        TransferResult result = await run;
+
+        diagnostics.Act("result", result with { Report = null });
+        diagnostics.Assert("outcome checked by the assertions below", "passes", "checking");
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.FtpAcceptTimeout, "Accept timeout occurred while waiting server connect"), result with { Report = null });
+        Assert.AreEqual(ActiveUploadSent + "QUIT\r\n", Encoding.Latin1.GetString(control.Sent));
+        CollectionAssert.DoesNotContain(events.Info, "control connection looks dead");
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ActiveStorUnansweredWithALongerAcceptTimeout_EndsWithExit28ServerResponseTimeout()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("test", "ExecuteAsync_ActiveStorUnansweredWithALongerAcceptTimeout_EndsWithExit28ServerResponseTimeout");
+
+        // The server response timeout running out before the accept timer is the passive ending.
+        var control = new StallingConnection(Encoding.Latin1.GetBytes(LoggedIn + EprtOk + "200 Type set\r\n"));
+        Task<TransferResult> run = StartActiveUploadAsync(control, new RecordingTransferEvents(), acceptTimeout: TimeSpan.FromSeconds(120));
+        await control.Stalled;
+        await clock.TimerArmedAt(TimeSpan.FromSeconds(60));
+
+        clock.Advance(TimeSpan.FromSeconds(60));
+        TransferResult result = await run;
+
+        diagnostics.Act("result", result with { Report = null });
+        diagnostics.Assert("outcome checked by the assertions below", "passes", "checking");
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.OperationTimedOut, "server response timeout"), result with { Report = null });
+        Assert.AreEqual(ActiveUploadSent, Encoding.Latin1.GetString(control.Sent));
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_UserUnansweredWithoutConnectTimeout_EndsWithExit28ServerResponseTimeoutAfter60Seconds()
     {
         var diagnostics = TestDiagnostics.For(TestContext);
@@ -349,6 +429,81 @@ public sealed class FtpProtocolHandlerTimeLimitTests
     /// timeout instead of curl's default 60-second response timeout (BL-2724).
     /// </summary>
     private static readonly TimeSpan TenMinutes = TimeSpan.FromMinutes(10);
+
+    private const string EprtOk = "200 EPRT command successful\r\n";
+
+    private const string ActiveUploadSent = "USER anonymous\r\nPASS ftp@example.com\r\nPWD\r\nEPRT |1|127.0.0.1|52280|\r\nTYPE I\r\nSTOR f.txt\r\n";
+
+    /// <summary>Starts <c>-P 127.0.0.1 -T</c> against a server that never connects to port 52280.</summary>
+    private Task<TransferResult> StartActiveUploadAsync(IConnection control, RecordingTransferEvents events, TimeSpan acceptTimeout)
+    {
+        var pending = new ScriptedPendingConnection(new System.Net.IPEndPoint(System.Net.IPAddress.Loopback, 52280), null);
+        var context = new TransferContext
+        {
+            Url = CurlUrl.Parse(Url),
+            Output = new MemoryStream(),
+            Upload = new MemoryStream("hello"u8.ToArray()),
+            FtpPort = "127.0.0.1",
+            FtpAcceptTimeout = acceptTimeout,
+            Events = events,
+            TimeProvider = clock,
+        };
+        var handler = new FtpProtocolHandler(new QueuedConnector(ConnectResult.Connected(control)), new QueuedListener(ListenResult.Listening(pending)), new QueuedTlsProvider());
+        return handler.ExecuteAsync(context).AsTask();
+    }
+
+    /// <summary>
+    /// A control connection that, once its scripted reads run out, waits until the test
+    /// releases the next bytes, then reads end of stream.
+    /// </summary>
+    private sealed class ReleasableConnection(byte[] firstRead) : IConnection
+    {
+        private readonly List<byte> sent = [];
+
+        private readonly TaskCompletionSource stalled = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        private readonly TaskCompletionSource<byte[]> released = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        private int reads;
+
+        public Task Stalled => stalled.Task;
+
+        public bool IsSecure => false;
+
+        public System.Net.EndPoint? RemoteEndPoint => null;
+
+        public byte[] Sent => [.. sent];
+
+        public void Release(byte[] bytes) => released.SetResult(bytes);
+
+        public async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken)
+        {
+            byte[] read = ++reads switch
+            {
+                1 => firstRead,
+                2 => await WaitForReleaseAsync(cancellationToken),
+                _ => [],
+            };
+            read.CopyTo(buffer);
+            return read.Length;
+        }
+
+        private async Task<byte[]> WaitForReleaseAsync(CancellationToken cancellationToken)
+        {
+            stalled.TrySetResult();
+            return await released.Task.WaitAsync(cancellationToken);
+        }
+
+        public ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken)
+        {
+            sent.AddRange(buffer.Span);
+            return ValueTask.CompletedTask;
+        }
+
+        public ValueTask FlushAsync(CancellationToken cancellationToken) => ValueTask.CompletedTask;
+
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    }
 
     private Task<TransferResult> StartAsync(StallingConnection control, TimeSpan? connectTimeout, TimeSpan? serverResponseTimeout = null) =>
         StartAsync(new QueuedConnector(ConnectResult.Connected(control)), connectTimeout, NoTransferProgress.Instance, CancellationToken.None, serverResponseTimeout);

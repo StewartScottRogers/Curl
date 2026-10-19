@@ -44,6 +44,12 @@ internal static class FtpTransferMessages
     internal static string OperationTimedOut(long milliseconds) =>
         string.Create(CultureInfo.InvariantCulture, $"Operation timed out after {milliseconds} milliseconds with 0 bytes received");
 
+    /// <summary>
+    /// The <c>-v</c> line curl 8.22.0's <c>ftp_done</c> writes when the control reply it waits
+    /// for after a failure does not come within 60 seconds (BL-2796).
+    /// </summary>
+    internal const string FtpResponseTimeout = "FTP response timeout";
+
     /// <summary>The exit 28 message for a <c>421</c> reply that ends the data transfer.</summary>
     internal const string ControlConnectionLooksDead = "control connection looks dead";
 
