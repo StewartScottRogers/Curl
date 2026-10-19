@@ -30,3 +30,4 @@ Filed by BL-2610, which made the harness report the ftp feature. Case 549 expect
 ## Log
 
 - 2026-10-18: Created.
+- 2026-10-19: Backlog -> Doing. Criteria at claim: e6f6390a 4272a6b9.
