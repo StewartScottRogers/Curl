@@ -125,6 +125,7 @@ internal static class HttpRequestOptionsMapping
             Raw = !http.HttpContentDecoding && !http.HttpTransferDecoding,
             IgnoreContentLength = http.IgnoreContentLength,
             AllowHttp09Reply = http.Http09Allowed,
+            Http200Aliases = http.Http200Aliases,
             ForwardProxy = proxy,
             ProxyTunnel = settings.ProxyTunnel,
             OverUnixSocket = settings.OverUnixSocket,

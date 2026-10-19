@@ -110,20 +110,77 @@ internal sealed class HttpStatusLine(Version version, int statusCode, string rea
             : Unsupported(HttpTransferMessages.UnsupportedHttp3Version);
 
     /// <summary>
-    /// Tells whether bytes received so far could still begin a status line: they must match
-    /// <c>HTTP/</c>, in any letter case, as far as they go.
+    /// Rejects bytes received so far that cannot begin a status line: they must match
+    /// <c>HTTP/</c> or one of the <c>CURLOPT_HTTP200ALIASES</c>, in any letter case, as far as they go.
     /// </summary>
     /// <param name="received">The first bytes of the line.</param>
+    /// <param name="http200Aliases">The <c>CURLOPT_HTTP200ALIASES</c> status lines.</param>
     /// <exception cref="HttpTransferException">
     /// They cannot (exit 1, <c>Received HTTP/0.9 when not allowed</c>).
     /// </exception>
-    internal static void RejectHttp09(ReadOnlySpan<byte> received)
+    internal static void RejectHttp09(ReadOnlySpan<byte> received, IReadOnlyList<string> http200Aliases)
     {
-        if (!CanBeginHttp(received))
+        if (!CanBeginStatusLine(received, http200Aliases))
         {
             throw Unsupported(HttpTransferMessages.Http09NotAllowed);
         }
     }
+
+    /// <summary>
+    /// Tells whether bytes received so far could still begin a status line: <see cref="CanBeginHttp" />,
+    /// or they match one of the <c>CURLOPT_HTTP200ALIASES</c>, in any letter case, as far as both go,
+    /// as curl 8.22.0's <c>checkprefixmax</c> compares them.
+    /// </summary>
+    /// <param name="received">The first bytes of the response.</param>
+    /// <param name="http200Aliases">The <c>CURLOPT_HTTP200ALIASES</c> status lines.</param>
+    /// <returns><see langword="false" /> when they cannot, so the response is HTTP/0.9.</returns>
+    internal static bool CanBeginStatusLine(ReadOnlySpan<byte> received, IReadOnlyList<string> http200Aliases)
+    {
+        if (CanBeginHttp(received))
+        {
+            return true;
+        }
+
+        foreach (string alias in http200Aliases)
+        {
+            int length = Math.Min(received.Length, alias.Length);
+            if (System.Text.Ascii.EqualsIgnoreCase(received[..length], alias.AsSpan(0, length)))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Tells whether a status line begins with one of the <c>CURLOPT_HTTP200ALIASES</c>, in any
+    /// letter case, comparing as far as the shorter of the two goes, as curl 8.22.0's
+    /// <c>checkprefixmax</c> does.
+    /// </summary>
+    /// <param name="line">The line, without its terminator.</param>
+    /// <param name="http200Aliases">The <c>CURLOPT_HTTP200ALIASES</c> status lines.</param>
+    /// <returns><see langword="true" /> when it does.</returns>
+    internal static bool MatchesAlias(string line, IReadOnlyList<string> http200Aliases)
+    {
+        foreach (string alias in http200Aliases)
+        {
+            int length = Math.Min(line.Length, alias.Length);
+            if (line.AsSpan(0, length).Equals(alias.AsSpan(0, length), StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Gives the status line curl 8.22.0 takes a <c>CURLOPT_HTTP200ALIASES</c> line as:
+    /// <c>HTTP/1.0 200</c> with no reason phrase.
+    /// </summary>
+    /// <returns>The status line.</returns>
+    internal static HttpStatusLine Http200Alias() => new(HttpVersion.Version10, 200, string.Empty);
 
     /// <summary>
     /// Tells whether bytes received so far could still begin a status line: they match

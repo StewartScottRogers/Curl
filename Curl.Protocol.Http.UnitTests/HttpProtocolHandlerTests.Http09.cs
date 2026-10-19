@@ -53,6 +53,42 @@ public sealed partial class HttpProtocolHandlerTests
     }
 
     [TestMethod]
+    [DataRow(false, DisplayName = "Without --http0.9")]
+    [DataRow(true, DisplayName = "With --http0.9")]
+    public async Task ExecuteAsync_Http200AliasStatusLine_IsReadAsHttp10Status200(bool allowHttp09)
+    {
+        const string Response = "ICY 200 OK\r\nContent-Length: 7\r\n\r\nMooMoo\n";
+        foreach (int chunkSize in ChunkSizes)
+        {
+            MemoryStream output = new();
+            MemoryStream headerOutput = new();
+            RecordingTransferEvents events = new();
+            Diagnostics.Arrange("response, chunk size, allow http0.9, aliases", $"{OneLine(Response)}, {chunkSize}, {allowHttp09}, ICY 200 OK");
+
+            TransferResult result = await Handler(QueueConnector.For(Connection(Response, chunkSize, LoopbackGet)))
+                .ExecuteAsync(new TransferContext
+                {
+                    Url = CurlUrl.Parse(LoopbackUrl),
+                    Output = output,
+                    HeaderOutput = headerOutput,
+                    Events = events,
+                    Http = new HttpRequestOptions { AllowHttp09Reply = allowHttp09, Http200Aliases = ["ICY 200 OK"] },
+                });
+
+            WriteResult(result);
+            Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+            Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
+            Diagnostics.Diff("body", "MooMoo\n", Latin1(output.ToArray()));
+            Assert.AreEqual("MooMoo\n", Latin1(output.ToArray()), $"Chunk size {chunkSize}");
+            Diagnostics.Diff("headers", "ICY 200 OK\r\nContent-Length: 7\r\n\r\n", Latin1(headerOutput.ToArray()));
+            Assert.AreEqual("ICY 200 OK\r\nContent-Length: 7\r\n\r\n", Latin1(headerOutput.ToArray()), $"Chunk size {chunkSize}");
+            Diagnostics.Assert("response code, version", "200 1.0", $"{result.Report!.ResponseCode} {result.Report!.HttpVersion}");
+            Assert.AreEqual(200, result.Report!.ResponseCode, $"Chunk size {chunkSize}");
+            Assert.AreEqual(new Version(1, 0), result.Report!.HttpVersion, $"Chunk size {chunkSize}");
+        }
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_Http09ReplyWithoutHttp09Allowed_FailsWithExit1()
     {
         Diagnostics.Arrange("response, allow http0.9", "just text, False");

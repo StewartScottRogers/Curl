@@ -47,6 +47,7 @@ public sealed class HttpRequestOptionsTests
         Assert.IsFalse(options.TransferEncoding);
         Assert.IsFalse(options.Raw);
         Assert.IsFalse(options.IgnoreContentLength);
+        Assert.IsEmpty(options.Http200Aliases);
         Assert.IsNull(options.RequestTarget);
         Assert.AreEqual(HttpAuthSchemes.Basic, options.AuthSchemes);
         Assert.IsNull(options.BearerToken);
@@ -88,6 +89,7 @@ public sealed class HttpRequestOptionsTests
             TransferEncoding = true,
             Raw = true,
             IgnoreContentLength = true,
+            Http200Aliases = ["ICY 200 OK"],
             RequestTarget = "*",
             AuthSchemes = HttpAuthSchemes.Any | HttpAuthSchemes.Bearer,
             BearerToken = "token",
@@ -122,6 +124,7 @@ public sealed class HttpRequestOptionsTests
         Assert.IsTrue(options.TransferEncoding);
         Assert.IsTrue(options.Raw);
         Assert.IsTrue(options.IgnoreContentLength);
+        CollectionAssert.AreEqual(new[] { "ICY 200 OK" }, options.Http200Aliases.ToArray());
         Assert.AreEqual("*", options.RequestTarget);
         Assert.AreEqual(HttpAuthSchemes.Any | HttpAuthSchemes.Bearer, options.AuthSchemes);
         Assert.AreEqual("token", options.BearerToken);

@@ -36,6 +36,7 @@ public sealed class HttpRequestOptionsMappingTests
             TransferEncoding = true,
             IgnoreContentLength = true,
             Http09Allowed = true,
+            Http200Aliases = ["ICY 200 OK"],
             FollowLocation = FollowLocation.ObeyCode,
             MaxRedirects = 4,
             HttpVersion = HttpVersion.Http10,
@@ -57,6 +58,7 @@ public sealed class HttpRequestOptionsMappingTests
         Assert.IsTrue(mapped.TransferEncoding);
         Assert.IsTrue(mapped.IgnoreContentLength);
         Assert.IsTrue(mapped.AllowHttp09Reply);
+        CollectionAssert.AreEqual(new[] { "ICY 200 OK" }, mapped.Http200Aliases.ToArray());
         Assert.IsTrue(mapped.FollowRedirects);
         Assert.AreEqual(4, mapped.MaxRedirects);
         Assert.AreEqual(HttpVersionPreference.Http10, mapped.Version);
