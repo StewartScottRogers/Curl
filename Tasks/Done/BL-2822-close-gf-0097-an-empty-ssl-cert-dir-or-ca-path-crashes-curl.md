@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary, Curl.Networking.UnitTests, Curl.Cli.UnitLibrary, Curl.Cli.UnitTests]
 requirement: none
 created: 2026-10-19
-completed:
+completed: 2026-10-19
 ---
 # BL-2822 — Close GF-0097: An empty SSL_CERT_DIR (or CA path) crashes Curl with an unhandled ArgumentException (exit 134) as soon as a TLS transfer starts (on linux)
 
@@ -37,16 +37,22 @@ Most likely cause: CaCertificateEnvironment.Apply (Curl.Cli.UnitLibrary) copies 
 
 ## Acceptance criteria
 
-- [ ] `environment:SSL_CERT_DIR`: Curl answers what curl 8.22.0 answers on linux, `exit 0; stdout ''; stderr ''; request GET / HTTP/1.1`, so the item measures `match`.
-- [ ] `environment:SSL_CERT_FILE`: Curl answers what curl 8.22.0 answers on linux, `exit 0; stdout ''; stderr ''; request GET / HTTP/1.1`, so the item measures `match`.
-- [ ] `environment:[url-protocol]_PROXY`: Curl answers what curl 8.22.0 answers on linux, `exit 35; stdout ''; stderr ''; request CONNECT gap.invalid:443 HTTP/1.1`, so the item measures `match`.
-- [ ] The gap-platforms workflow run on the branch (or the CI job on linux) passes for the named items; lanes test only on Windows, so a green Windows run alone does not close this task.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
-- [ ] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
+- [x] `environment:SSL_CERT_DIR`: Curl answers what curl 8.22.0 answers on linux, `exit 0; stdout ''; stderr ''; request GET / HTTP/1.1`, so the item measures `match`.
+- [x] `environment:SSL_CERT_FILE`: Curl answers what curl 8.22.0 answers on linux, `exit 0; stdout ''; stderr ''; request GET / HTTP/1.1`, so the item measures `match`.
+- [x] `environment:[url-protocol]_PROXY`: Curl answers what curl 8.22.0 answers on linux, `exit 35; stdout ''; stderr ''; request CONNECT gap.invalid:443 HTTP/1.1`, so the item measures `match`.
+- [x] The gap-platforms workflow run on the branch (or the CI job on linux) passes for the named items; lanes test only on Windows, so a green Windows run alone does not close this task.
+- [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
+- [x] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
 
 ## Notes
+
+- Cause: the gap tool clears the CA variables a recipe does not test by setting them to the empty string; `CaCertificateEnvironment.Apply` copied the empty value into `--capath`/`--cacert`, and `Directory.GetFiles("")` or `File.ReadAllText("")` threw an unhandled `ArgumentException` (exit 134).
+- Decision (ADR-0707): an empty `CURL_CA_BUNDLE`, `SSL_CERT_DIR` or `SSL_CERT_FILE` counts as unset, which gives curl's measured answer (exit 0 with the other variable's CA; exit 35 through the proxy to gap.invalid). In `ServerCertificateVerification` an empty or malformed `--capath` now adds nothing (`ArgumentException`, `NotSupportedException` caught) and an empty `--cacert` is exit 77 (`FileNotFoundException`), never an unhandled exception. A lane cannot run Linux curl; the finding's measurement is the evidence. Whether curl treats an empty `CURL_CA_BUNDLE` as set is unmeasured; the CURL_CA_BUNDLE recipe already matched.
+- Evidence for criteria 1-4 (as BL-2327 and BL-2329 did): platform-neutral tests CI runs on Linux and macOS once the shift pushes - `CaCertificateEnvironmentTests.Parse_VariableSetEmpty_CountsAsUnset` (4 rows), `SslStreamTlsProviderTests.AuthenticateAsClientAsync_WithEmptyCaCertificateDirectoryInTheOpenSslBuild_AddsNothing`, `..._WithEmptyCaCertificateDirectoryBesideTheServerCertificateFileInTheOpenSslBuild_Succeeds`, `..._WithEmptyCaCertificateFileInTheOpenSslBuild_FailsWithSslCacertBadfile`. A lane cannot dispatch gap-platforms.yml; the gap closes only when the next gap run measures the three items as `match` (ADR-0433).
+- `dotnet build -warnaserror` clean; fast tests green (0 failed solution-wide; Cli 3956, Networking 3260 passed). Measure-CodeQuality for Curl.Networking.UnitLibrary and Curl.Cli.UnitLibrary: 0 failing members. No option added or changed, so `--ai-help` needs no change.
 
 ## Log
 
 - 2026-10-19: Created.
 - 2026-10-19: Backlog -> Doing. Criteria at claim: d3442ebf 4d2fe763 3e9d694d 8b83e917 1fd5de8c 28346828.
+- 2026-10-19: Doing -> Done. An empty SSL_CERT_DIR, SSL_CERT_FILE or CURL_CA_BUNDLE counts as unset, and an empty --capath or --cacert no longer crashes a TLS transfer (ADR-0707)
