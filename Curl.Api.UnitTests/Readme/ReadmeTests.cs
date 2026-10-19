@@ -148,13 +148,25 @@ public sealed partial class ReadmeTests
     }
 
     [TestMethod]
+    [DoNotParallelize] // Console.SetOut is process-wide; another sample's lines must not land in this writer.
     public async Task Sample_Cancel_CancelledToken_IsCaughtAsCancellation()
     {
         await using CurlClient client = ClientOver(Scripted);
         using CancellationTokenSource cancelled = new();
         await cancelled.CancelAsync();
+        TextWriter console = Console.Out;
+        using StringWriter written = new();
+        Console.SetOut(written);
+        try
+        {
+            await ReadmeSamples.CancelAndHandleErrorsAsync(client, cancelled.Token);
+        }
+        finally
+        {
+            Console.SetOut(console);
+        }
 
-        await ReadmeSamples.CancelAndHandleErrorsAsync(client, cancelled.Token);
+        Assert.AreEqual("Cancelled: the transfer was aborted.\n", written.ToString().ReplaceLineEndings("\n"));
     }
 
     [TestMethod]
