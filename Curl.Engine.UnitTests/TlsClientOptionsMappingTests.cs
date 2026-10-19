@@ -295,7 +295,9 @@ public sealed class TlsClientOptionsMappingTests
     {
         Assert.AreEqual(
             Expect(new TlsClientOptions()),
-            MapProxy("--curves", "X25519", "--tls-earlydata", "--ech", "true", "--tlsuser", "user", "--tlspassword", "p", Url));
+            MapProxy("--curves", "X25519", "--sigalgs", "rsa_pss_rsae_sha256", "--tls-earlydata", "--ech", "hard",
+                "--ssl-sessions", "sess.bin", "--engine", "pkcs11", "--dump-ca-embed",
+                "--tlsuser", "user", "--tlspassword", "p", "--tlsauthtype", "SRP", Url));
     }
 
     [TestMethod]

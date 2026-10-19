@@ -41,10 +41,12 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- 2026-10-19: The test now passes all ten ADR-0151 options (`--curves`, `--sigalgs`, `--tls-earlydata`, `--ech`, `--ssl-sessions`, `--engine`, `--dump-ca-embed`, `--tlsuser`, `--tlspassword`, `--tlsauthtype`) to `MapProxy`, using the values `FromCommandLine_TheSevenTlsOptionsOfAdr0151StillInUse_CopiesEachVerbatim` proves reach the target, and asserts the proxy gets default `TlsClientOptions`. Test-only change, so no quality run. Build clean; fast tests green (74/74 in the class, every project passed).
 
 ## Log
 
