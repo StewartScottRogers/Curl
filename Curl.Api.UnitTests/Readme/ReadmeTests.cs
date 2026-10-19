@@ -239,11 +239,25 @@ public sealed partial class ReadmeTests
     }
 
     [TestMethod]
+    [DoNotParallelize] // Console.SetOut is process-wide; another sample's lines must not land in this writer.
     public async Task Sample_HttpClient_ReadsTheBodyThroughTheHandler()
     {
-        await using CurlClient client = ClientOver(Scripted);
+        ScriptedEasyTransfer easy = Scripted();
+        await using CurlClient client = ClientOver(() => easy);
+        TextWriter console = Console.Out;
+        using StringWriter written = new();
+        Console.SetOut(written);
+        try
+        {
+            await ReadmeSamples.UseWithHttpClientAsync(client, CancellationToken.None);
+        }
+        finally
+        {
+            Console.SetOut(console);
+        }
 
-        await ReadmeSamples.UseWithHttpClientAsync(client, CancellationToken.None);
+        Assert.AreEqual("hello\n", written.ToString().ReplaceLineEndings("\n"));
+        Assert.AreEqual("https://example.com/", easy.PerformedOptions!.Network.Url);
     }
 
     [TestMethod]

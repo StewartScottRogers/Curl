@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Api.UnitTests]
 requirement: none
 created: 2026-10-19
-completed:
+completed: 2026-10-19
 ---
 # BL-2807 — Fix AF-0280: Sample_HttpClient_ReadsTheBodyThroughTheHandler never checks the body it names
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- The test now captures Console output (as the cancel tests do, with [DoNotParallelize]) and asserts the sample wrote "hello", the scripted body read through CurlHttpMessageHandler, and that the request went to https://example.com/. Test-only change, so no quality run was needed.
 
 ## Log
 
 - 2026-10-19: Created.
 - 2026-10-19: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-19: Doing -> Done. Sample_HttpClient test asserts the body 'hello' read through the handler
