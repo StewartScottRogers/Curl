@@ -35,3 +35,4 @@ Found by BL-2551, which ported lib3025 (`Curl.Conformance.LibTest.UnitLibrary/Li
 - 2026-10-17: Created.
 - 2026-10-19: Backlog -> Doing. Criteria at claim: 70504463 48be2d2b 3d836d5e.
 - 2026-10-19: Doing -> Backlog. Needs Curl.Engine.UnitLibrary/HttpRequestOptionsMapping.cs and its tests, which BL-2714 (Doing) holds as whole Curl.Engine projects
+- 2026-10-19: Backlog -> Doing. Criteria at claim: 70504463 48be2d2b 3d836d5e.
