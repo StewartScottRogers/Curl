@@ -47,3 +47,4 @@ Found by BL-2548, which ported lib1964 as `Lib1964` in `Curl.Conformance.LibTest
 - 2026-10-17: Created.
 - 2026-10-18: Backlog -> Doing. Criteria at claim: 29fc16eb fd6bd9d4 4272a6b9 8738c7f6.
 - 2026-10-18: Doing -> Backlog. Needs Curl.Engine.UnitLibrary and Curl.Engine.UnitTests, which BL-2734 (in Doing) touches; fix diagnosed under Notes
+- 2026-10-18: Backlog -> Doing. Criteria at claim: 29fc16eb fd6bd9d4 4272a6b9 8738c7f6.
