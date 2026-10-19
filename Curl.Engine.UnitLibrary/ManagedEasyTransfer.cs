@@ -828,7 +828,7 @@ internal sealed class ManagedEasyTransfer(
         MultipartFormBuildResult? form = await MimePostFormUnlessToolGaveAsync(toolInputs, options, url, mimeReads, cancellationToken).ConfigureAwait(false);
         return form is { IsBuilt: false }
             ? Finish(form.Failure.ExitCode.ToCurlCode(), form.Failure.ErrorMessage!, Info)
-            : await PerformDisposingFormAsync(options, settings, url, urlText, transferId, toolInputs, form?.Body ?? ReadCallbackPostBodyOf(toolInputs, options, url, mimeReads), mimeReads, cancellationToken).ConfigureAwait(false);
+            : await PerformDisposingFormAsync(options, settings, url, urlText, transferId, toolInputs, form?.Body ?? ReadCallbackPostBodyOf(toolInputs, options, url, mimeReads) ?? TrailerPostFieldsBodyOf(toolInputs, options, url), mimeReads, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -863,6 +863,30 @@ internal sealed class ManagedEasyTransfer(
         reads.Add(content);
         return new StreamBody(content, size < 0 ? null : size, HttpRequestOptionsMapping.FormUrlEncoded);
     }
+
+    /// <summary>
+    /// The <c>CURLOPT_POSTFIELDS</c> body of a handle that sets <c>CURLOPT_TRAILERFUNCTION</c>: a
+    /// <see cref="PostFieldsTrailerStream" /> of the fields' length, so a post sent chunked carries the callback's
+    /// trailers in its closing chunk (upstream test1598, BL-2665). None when the curl tool's runner gave
+    /// <paramref name="toolInputs" />, with no trailer callback or no fields, or for a <c>CURLOPT_UPLOAD</c>; the
+    /// fields then go as <see cref="HttpRequestOptionsMapping" />'s <see cref="BytesBody" />. Only for an <c>http</c> or <c>https</c> URL.
+    /// </summary>
+    /// <param name="toolInputs">The runner's chosen pieces, or <see langword="null" /> for a handle's own.</param>
+    /// <param name="options">The handle's options.</param>
+    /// <param name="url">The URL set; only an <c>http</c> or <c>https</c> one gets the body.</param>
+    /// <returns>The body, or <see langword="null" /> for none.</returns>
+    internal static StreamBody? TrailerPostFieldsBodyOf(EngineToolTransferInputs? toolInputs, EasyOptions options, CurlUrl url) =>
+        IsHandlesOwnHttpPost(toolInputs, options, url) && options.Callbacks.Trailer is { } trailer && options.Http.PostFields is { } fields
+            ? new StreamBody(new PostFieldsTrailerStream(fields.ToArray(), trailer), fields.Length, HttpRequestOptionsMapping.FormUrlEncoded)
+            : null;
+
+    /// <summary>Whether a perform with no runner's pieces posts, not uploads, to an <c>http</c> or <c>https</c> URL.</summary>
+    /// <param name="toolInputs">The runner's chosen pieces, or <see langword="null" /> for a handle's own.</param>
+    /// <param name="options">The handle's options.</param>
+    /// <param name="url">The URL set.</param>
+    /// <returns><see langword="true" /> when it does.</returns>
+    private static bool IsHandlesOwnHttpPost(EngineToolTransferInputs? toolInputs, EasyOptions options, CurlUrl url) =>
+        toolInputs is null && !options.Transfer.Upload && (IsScheme(url, "http") || IsScheme(url, "https"));
 
     /// <summary>Whether the options post with <c>CURLOPT_POST</c>, no <c>CURLOPT_POSTFIELDS</c> and no <c>CURLOPT_UPLOAD</c>.</summary>
     /// <param name="options">The handle's options.</param>
