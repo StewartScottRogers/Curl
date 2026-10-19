@@ -94,8 +94,9 @@ public sealed class WsProtocolHandler(
 
     /// <summary>
     /// Gets where each transfer that exchanges frames shows its connection while the frames flow, so a
-    /// <c>curl_ws_send</c> from the transfer's write callback reaches the server (BL-2710); <see langword="null" />
-    /// shows it nowhere.
+    /// <c>curl_ws_send</c> from the transfer's write callback reaches the server (BL-2710), and the frame of each
+    /// payload write, written a frame's run at a time outside <see cref="RawMode" />, so a <c>curl_ws_meta</c> there
+    /// answers it (BL-2711); <see langword="null" /> shows neither and writes each read's payload at once.
     /// </summary>
     public WsPerformConnection? PerformConnection { get; init; }
 
@@ -551,7 +552,7 @@ public sealed class WsProtocolHandler(
         TransferReport report,
         WsFrameTrace trace)
     {
-        var receiver = new WsFrameReceiver(connection, randomSource, context.Progress, context.Events, context.DiagnosticLog, trace, context.MaxFileSize, RawMode);
+        var receiver = new WsFrameReceiver(connection, randomSource, context.Progress, context.Events, context.DiagnosticLog, trace, context.MaxFileSize, RawMode, PerformConnection);
         Func<ReadOnlyMemory<byte>, CancellationToken, ValueTask> writePayload =
             (payload, token) => WriteAsync(context.Output, payload, token);
         long uploaded = 0;

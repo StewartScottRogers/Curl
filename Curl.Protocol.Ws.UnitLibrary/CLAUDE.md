@@ -57,3 +57,9 @@ and 3 392 bytes, and an empty one sends no frame and writes `We are completely u
 frames shows its connection on that `WsPerformConnection` from the `101` until it ends, so the engine's
 `ManagedEasyWebSocket` can write to it from inside the write callback of a perform that is not connect-only, as curl
 8.22.0's `curl_ws_send` writes to `data->conn` (upstream test2301).
+
+`curl_ws_meta` from a write callback (BL-2711): with `PerformConnection` set and `RawMode` clear, `WsFrameReceiver` also
+decodes each read with `WsFrameMetadataDecoder` and writes the payload one run at a time (pings' runs and empty runs
+left out, so the bytes written are the same), keeping each run on `WsPerformConnection.Frame` before its write, and the
+data message's opcode on `MessageOpcode`, so the engine's `CurrentFrame` answers that write's frame (upstream test2302).
+Without `PerformConnection` (the curl tool) each read's payload is still one write.

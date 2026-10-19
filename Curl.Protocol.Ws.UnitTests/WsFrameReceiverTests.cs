@@ -62,6 +62,46 @@ public sealed class WsFrameReceiverTests
     }
 
     [TestMethod]
+    public async Task ReceiveAsync_WithPerformConnection_WritesEachFramesRunAloneShowingItsFrame()
+    {
+        // libcurl's write callback gets each frame's payload with its ws->recvframe, which curl_ws_meta answers
+        // (upstream test2302, BL-2711): a ping, a text fragment, its final continuation and a binary frame in one read.
+        var diagnostics = TestDiagnostics.For(TestContext);
+        var connection = new ScriptedConnection(Hex("89 00 01 03 68 65 6c 80 02 6c 6f 82 01 21"));
+        WsPerformConnection performConnection = new();
+        List<string> writes = [];
+        diagnostics.Arrange("server read", "ping, text hel (FIN clear), continuation lo, binary !");
+
+        var receiver = new WsFrameReceiver(connection, MeasuredMask, NoTransferProgress.Instance, NoTransferEvents.Instance, performConnection: performConnection);
+        await receiver.ReceiveAsync(ReadOnlyMemory<byte>.Empty, (payload, _) =>
+        {
+            WsFrameRun frame = performConnection.Frame!;
+            writes.Add($"{Encoding.ASCII.GetString(payload.Span)} {frame.Opcode} {frame.IsFinal} {frame.Offset} {frame.BytesLeft} {performConnection.MessageOpcode}");
+            return ValueTask.CompletedTask;
+        }, CancellationToken.None);
+
+        string[] expected = ["hel Text False 0 0 Text", "lo Continuation True 0 0 Text", "! Binary True 0 0 Binary"];
+        diagnostics.Assert("writes", string.Join(" | ", expected), string.Join(" | ", writes));
+        CollectionAssert.AreEqual(expected, writes);
+        Assert.AreEqual(6L, receiver.BytesDelivered);
+    }
+
+    [TestMethod]
+    public async Task ReceiveAsync_WithPerformConnectionInRawMode_ShowsNoFrame()
+    {
+        var connection = new ScriptedConnection(Hex("81 01 61"));
+        WsPerformConnection performConnection = new();
+        var output = new List<byte>();
+
+        var receiver = new WsFrameReceiver(connection, MeasuredMask, NoTransferProgress.Instance, NoTransferEvents.Instance, rawMode: true, performConnection: performConnection);
+        await receiver.ReceiveAsync(ReadOnlyMemory<byte>.Empty, Collect(output), CancellationToken.None);
+
+        CollectionAssert.AreEqual(Hex("81 01 61"), output.ToArray());
+        Assert.IsNull(performConnection.Frame);
+        Assert.AreEqual(WsOpcode.Continuation, performConnection.MessageOpcode);
+    }
+
+    [TestMethod]
     public async Task ReceiveAsync_Ping_SendsCurlsMaskedPong()
     {
         var diagnostics = TestDiagnostics.For(TestContext);
