@@ -535,6 +535,81 @@ public sealed class PoolingConnectorTests
     }
 
     [TestMethod]
+    public async Task ConnectAsync_WhenAConnectionWasOpenedNoLongerAgoThanTheMaximumLifetime_ReusesIt()
+    {
+        // CURLOPT_MAXLIFETIME_CONN 1: a connection exactly 1 s old is still reused (BL-2730).
+        await using var pool = new PoolingConnector(_inner, _time) { MaximumConnectionLifetime = TimeSpan.FromSeconds(1) };
+        var events = new RecordingTransferEvents();
+        await ReturnToPoolAsync(pool, Target());
+        _time.Advance(1000);
+
+        var reused = await pool.ConnectAsync(Target() with { Events = events }, CancellationToken.None);
+
+        Diagnostics.Arrange("lifetime", "1 s, opened 1000 ms ago");
+        Diagnostics.Act("info", string.Join(" | ", events.Info));
+        Diagnostics.Assert("reused", true, reused.IsReused);
+
+        Assert.IsEmpty(events.Info);
+        Assert.IsTrue(reused.IsReused);
+        Assert.AreEqual(0L, reused.ConnectionNumber);
+        await reused.Connection!.DisposeAsync();
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_WhenAConnectionWasOpenedLongerAgoThanTheMaximumLifetime_ShutsItDownAndOpensANewOne()
+    {
+        // lib1542: CURLOPT_MAXLIFETIME_CONN 1, then a wait: "shutting down connection #0" and
+        // connection #1 (BL-2730).
+        await using var pool = new PoolingConnector(_inner, _time) { MaximumConnectionLifetime = TimeSpan.FromSeconds(1) };
+        var events = new RecordingTransferEvents();
+        await ReturnToPoolAsync(pool, Target());
+        _time.Advance(1001);
+
+        var fresh = await pool.ConnectAsync(Target() with { Events = events }, CancellationToken.None);
+
+        Diagnostics.Arrange("lifetime", "1 s, opened 1001 ms ago");
+        Diagnostics.Act("info", string.Join(" | ", events.Info));
+        Diagnostics.Assert("fresh reused", false, fresh.IsReused);
+
+        CollectionAssert.AreEqual(new[] { "shutting down connection #0" }, events.Info);
+        Assert.IsTrue(_inner.Opened[0].IsDisposed);
+        Assert.IsFalse(fresh.IsReused);
+        Assert.AreEqual(1L, fresh.ConnectionNumber);
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_WithAMaximumLifetimeOfZero_ReusesAConnectionHoweverOld()
+    {
+        // CURLOPT_MAXLIFETIME_CONN 0 is no limit (BL-2730).
+        await using var pool = new PoolingConnector(_inner, _time) { MaximumConnectionLifetime = TimeSpan.Zero };
+        await ReturnToPoolAsync(pool, Target());
+        _time.Advance(60_000);
+
+        var reused = await pool.ConnectAsync(Target(), CancellationToken.None);
+
+        Diagnostics.Arrange("lifetime", "0, opened 60 s ago");
+        Diagnostics.Act("reused", reused.IsReused);
+        Diagnostics.Assert("reused", true, reused.IsReused);
+
+        Assert.IsTrue(reused.IsReused);
+        await reused.Connection!.DisposeAsync();
+    }
+
+    [TestMethod]
+    public async Task Over_KeepsTheMaximumConnectionLifetime()
+    {
+        await using var pool = new PoolingConnector(_inner, _time) { MaximumConnectionLifetime = TimeSpan.FromSeconds(7) };
+
+        var over = pool.Over(new FakeConnector());
+
+        Diagnostics.Arrange("lifetime", "7 s");
+        Diagnostics.Act("over's lifetime", over.MaximumConnectionLifetime);
+        Diagnostics.Assert("over's lifetime", TimeSpan.FromSeconds(7), over.MaximumConnectionLifetime);
+
+        Assert.AreEqual(TimeSpan.FromSeconds(7), over.MaximumConnectionLifetime);
+    }
+
+    [TestMethod]
     public async Task ConnectAsync_WhenAConnectionIdleUnderASecondReportsItsPeerClosed_ReusesItWithoutAsking()
     {
         // curl 8.22.0 --rate 66/m (0.9 s apart), the server closing after each response:

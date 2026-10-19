@@ -926,7 +926,7 @@ internal static class EngineComposition
     /// 8.21.0 does (ADR-0285, BL-754); or, without one, over a pool of its own.
     /// </summary>
     /// <param name="tool">The curl tool's own settings, whose <c>-Z</c> and <c>--ssl-sessions</c> the pool's settings hold.</param>
-    /// <param name="network">The option group's network options, whose <c>--connect-to</c> entries, binding, socket and IP version the pool's settings hold.</param>
+    /// <param name="network">The option group's network options, whose <c>--connect-to</c> entries, binding, socket and IP version the pool's settings hold, and whose <c>CURLOPT_MAXLIFETIME_CONN</c> the connector retires connections by (BL-2730).</param>
     /// <param name="tls">The option group's TLS options, which the pool's settings hold.</param>
     /// <param name="http">The option group's HTTP options, whose HTTP version the pool's settings hold.</param>
     /// <param name="proxy">The option group's proxy options, whose pre-proxy and HAProxy line the pool's settings hold.</param>
@@ -946,8 +946,8 @@ internal static class EngineComposition
     {
         bool waitsForMultiplexing = WaitsForMultiplexing(tool);
         return runConnections is null
-            ? new PoolingConnector(connector, timeProvider) { WaitsForMultiplexing = waitsForMultiplexing }
-            : new PoolingConnector(connector, runConnections, OptionGroupConnectionSettings.Of(tool, network, tls, http, proxy), new ConnectToMappings(network.ConnectTo)) { WaitsForMultiplexing = waitsForMultiplexing };
+            ? new PoolingConnector(connector, timeProvider) { WaitsForMultiplexing = waitsForMultiplexing, MaximumConnectionLifetime = network.MaxConnectionLifetime }
+            : new PoolingConnector(connector, runConnections, OptionGroupConnectionSettings.Of(tool, network, tls, http, proxy), new ConnectToMappings(network.ConnectTo)) { WaitsForMultiplexing = waitsForMultiplexing, MaximumConnectionLifetime = network.MaxConnectionLifetime };
     }
 
     /// <summary>

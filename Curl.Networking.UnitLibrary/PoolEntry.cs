@@ -41,6 +41,12 @@ internal sealed record PoolEntry(
     public long IdleSince { get; set; }
 
     /// <summary>
+    /// Gets the timestamp, on the pool's <see cref="TimeProvider" />, at which the connection was
+    /// opened, which <see cref="PoolingConnector.MaximumConnectionLifetime" /> is measured from.
+    /// </summary>
+    public long OpenedAt { get; init; }
+
+    /// <summary>
     /// Gets or sets a value indicating whether a read on the connection found the end of the
     /// server's stream: the server has closed it, so curl 8.21.0 reports it dead instead of
     /// reusing it (ADR-0112).

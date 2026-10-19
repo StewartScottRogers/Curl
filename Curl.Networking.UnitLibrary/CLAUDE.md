@@ -319,6 +319,7 @@ cache open, and `DnsCache.Clear` drops every entry, `--resolve` ones included: l
 `CURLMNWC_CLEAR_CONNS` and `CURLMNWC_CLEAR_DNS`, which the engine's multi handle runs.
 Per BL-2468 (ADR-0605) `ConnectionCache.CloseIdleBeyondAsync(keep)` closes the oldest idle connections
 until no more than `keep`, idle and in use, remain, never one in use: the multi handle's `CURLMOPT_MAXCONNECTS`.
+Per BL-2730 `PoolingConnector.MaximumConnectionLifetime` (`CURLOPT_MAXLIFETIME_CONN`, 24 hours by default, zero for no limit; `Over` keeps it, and `EngineComposition.CreatePoolingConnector` sets it from `EasyNetworkOptions.MaxConnectionLifetime`) retires an idle connection opened longer ago (`PoolEntry.OpenedAt`): it is closed with `shutting down connection #N` and the next idle one tried, as curl's connection cache does (upstream test1542).
 Per ADR-0684 (BL-2629) `ConnectionCache.OpeningOwner`, an `AsyncLocal`, is recorded on each connection a `PoolingConnector` opens in that flow (`PoolEntry.Owner`), and `CloseIdleOwnedByAsync(owner)` closes that owner's idle connections, never one in use: the engine's `curl_easy_cleanup`.
 
 Per BL-717 a pooled connection whose `IConnectionSession` multiplexes (HTTP/2) is shared, not
