@@ -2537,14 +2537,15 @@ internal sealed class FtpSession(
     /// <summary>
     /// Reads the next reply, ending the conversation for a closed connection (exit 56), an
     /// oversized line (exit 100), a line holding a NUL byte (exit 8), or a <c>421</c>, which curl reports as exit 28 with
-    /// <paramref name="closingMessage" /> and no <c>QUIT</c>.
+    /// <paramref name="closingMessage" /> and no <c>QUIT</c>, or for no reply within
+    /// <see cref="ITransferContext.FtpServerResponseTimeout" /> (exit 28, no <c>QUIT</c>).
     /// </summary>
     private async ValueTask<FtpReply> ReadReplyAsync(string closingMessage = FtpTransferMessages.TimeoutReached)
     {
         FtpReply? reply;
         try
         {
-            reply = await control.ReadReplyAsync().ConfigureAwait(false);
+            reply = await ReadReplyWithinServerResponseTimeoutAsync().ConfigureAwait(false);
         }
         catch (FtpReplyNulByteException)
         {
@@ -2572,6 +2573,32 @@ internal sealed class FtpSession(
         }
 
         return reply;
+    }
+
+    /// <summary>
+    /// Reads the next reply, giving up once <see cref="ITransferContext.FtpServerResponseTimeout" />
+    /// passes without one, as curl 8.22.0's pingpong timer does: exit 28 with <c>server response
+    /// timeout</c>, measured 60 seconds after an unanswered <c>STOR</c>, with no <c>QUIT</c>
+    /// (upstream case 594, BL-2724). The read itself is never cancelled, so no half-read reply
+    /// is lost; a timer that fires early is waited out, and the control channel's own token
+    /// still ends the read.
+    /// </summary>
+    private async ValueTask<FtpReply?> ReadReplyWithinServerResponseTimeoutAsync()
+    {
+        Task<FtpReply?> read = control.ReadReplyAsync().AsTask();
+        long started = context.TimeProvider.GetTimestamp();
+        TimeSpan left = context.FtpServerResponseTimeout;
+        while (!read.IsCompleted && left > TimeSpan.Zero)
+        {
+            using var replied = new CancellationTokenSource();
+            await Task.WhenAny(read, Task.Delay(left, context.TimeProvider, replied.Token)).ConfigureAwait(false);
+            await replied.CancelAsync().ConfigureAwait(false);
+            left = context.FtpServerResponseTimeout - context.TimeProvider.GetElapsedTime(started);
+        }
+
+        return read.IsCompleted
+            ? await read.ConfigureAwait(false)
+            : throw Failed(CurlExitCode.OperationTimedOut, FtpTransferMessages.ServerResponseTimeout);
     }
 
     private FtpControlConversationFailedException Failed(CurlExitCode exitCode, string message) =>

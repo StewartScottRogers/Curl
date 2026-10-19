@@ -116,6 +116,15 @@ public sealed class TransferContext : ITransferContext
     /// <inheritdoc />
     public TimeSpan FtpAcceptTimeout { get; init; } = DefaultFtpAcceptTimeout;
 
+    /// <summary>
+    /// curl's wait for the server to answer an FTP command when
+    /// <c>CURLOPT_SERVER_RESPONSE_TIMEOUT</c> is not set: 60 seconds.
+    /// </summary>
+    public static readonly TimeSpan DefaultFtpServerResponseTimeout = TimeSpan.FromSeconds(60);
+
+    /// <inheritdoc />
+    public TimeSpan FtpServerResponseTimeout { get; init; } = DefaultFtpServerResponseTimeout;
+
     /// <inheritdoc />
     public TransportSecurityLevel SslLevel { get; init; }
 

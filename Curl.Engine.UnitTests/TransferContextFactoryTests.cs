@@ -916,6 +916,25 @@ public sealed class TransferContextFactoryTests
         Assert.AreEqual(TimeSpan.FromMilliseconds(expectedMilliseconds), context.FtpAcceptTimeout);
     }
 
+    // CURLOPT_SERVER_RESPONSE_TIMEOUT reaches the FTP handler; zero is libcurl's not set, curl's 60 seconds (BL-2724).
+    [TestMethod]
+    [DataRow(0, 60000)]
+    [DataRow(8000, 8000)]
+    public void Create_NetworkOptionsServerResponseTimeout_IsTheContextsFtpServerResponseTimeoutWithZeroAsSixtySeconds(int milliseconds, int expectedMilliseconds)
+    {
+        using MemoryStream standardInput = new();
+        using MemoryStream output = new();
+        EasyNetworkOptions network = new() { ServerResponseTimeout = TimeSpan.FromMilliseconds(milliseconds) };
+        Diagnostics.Arrange("network.ServerResponseTimeout", network.ServerResponseTimeout);
+
+        TransferContext context = new TransferContextFactory(standardInput)
+            .Create(EasyOptionsFromCommandLine.TransferSettingsOf(Parse("ftp://h/f")), HttpOf("ftp://h/f"), new EasyBehaviourOptions(), new EasyTransferOptions(), new EasyProtocolOptions(), new EasyProxyOptions(), new EasyAuthenticationOptions(), network, CurlUrl.Parse("ftp://h/f"), output, null, null, null);
+        Diagnostics.Act("context.FtpServerResponseTimeout", context.FtpServerResponseTimeout);
+
+        Diagnostics.Assert("context.FtpServerResponseTimeout", TimeSpan.FromMilliseconds(expectedMilliseconds), context.FtpServerResponseTimeout);
+        Assert.AreEqual(TimeSpan.FromMilliseconds(expectedMilliseconds), context.FtpServerResponseTimeout);
+    }
+
     private CommandLineOptions Parse(params string[] arguments)
     {
         Diagnostics.Arrange("command line", string.Join(' ', arguments));

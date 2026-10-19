@@ -350,6 +350,14 @@ public interface ITransferContext
     TimeSpan FtpAcceptTimeout { get; }
 
     /// <summary>
+    /// Gets how long an FTP transfer waits for the server to answer a command, per
+    /// <c>CURLOPT_SERVER_RESPONSE_TIMEOUT</c>; 60 seconds when not set, curl's
+    /// <c>PINGPONG_TIMEOUT_MS</c>. Past it curl ends with exit 28 and <c>server response
+    /// timeout</c> (upstream case 594, BL-2724).
+    /// </summary>
+    TimeSpan FtpServerResponseTimeout { get; }
+
+    /// <summary>
     /// Gets whether a plaintext scheme upgrades to TLS, per <c>--ssl</c>/<c>--ftp-ssl</c>
     /// (<see cref="TransportSecurityLevel.Try" />) and <c>--ssl-reqd</c>/<c>--ftp-ssl-reqd</c>
     /// (<see cref="TransportSecurityLevel.Required" />, also under <c>--ftp-ssl-control</c>);

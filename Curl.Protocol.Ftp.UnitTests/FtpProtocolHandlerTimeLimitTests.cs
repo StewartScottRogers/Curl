@@ -102,7 +102,7 @@ public sealed class FtpProtocolHandlerTimeLimitTests
         diagnostics.Arrange("test", "ExecuteAsync_NoConnectTimeout_HoldsTheLoginToCurls300Seconds");
 
         var control = new StallingConnection(Encoding.Latin1.GetBytes(Greeting));
-        Task<TransferResult> run = StartAsync(control, connectTimeout: null);
+        Task<TransferResult> run = StartAsync(control, connectTimeout: null, serverResponseTimeout: TenMinutes);
         await control.Stalled;
 
         clock.Advance(TimeSpan.FromSeconds(299));
@@ -121,7 +121,7 @@ public sealed class FtpProtocolHandlerTimeLimitTests
         diagnostics.Arrange("test", "ExecuteAsync_ZeroConnectTimeout_HoldsTheLoginToCurls300Seconds");
 
         var control = new StallingConnection(Encoding.Latin1.GetBytes(Greeting));
-        Task<TransferResult> run = StartAsync(control, TimeSpan.Zero);
+        Task<TransferResult> run = StartAsync(control, TimeSpan.Zero, serverResponseTimeout: TenMinutes);
         await control.Stalled;
 
         clock.Advance(TimeSpan.FromSeconds(300));
@@ -277,10 +277,83 @@ public sealed class FtpProtocolHandlerTimeLimitTests
         Assert.AreEqual("USER anonymous\r\nPASS ftp@example.com\r\n", Encoding.Latin1.GetString(control.Sent));
     }
 
-    private Task<TransferResult> StartAsync(StallingConnection control, TimeSpan? connectTimeout) =>
-        StartAsync(new QueuedConnector(ConnectResult.Connected(control)), connectTimeout, NoTransferProgress.Instance, CancellationToken.None);
+    [TestMethod]
+    public async Task ExecuteAsync_StorUnansweredFor60Seconds_EndsWithExit28ServerResponseTimeoutAndNoQuit()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("test", "ExecuteAsync_StorUnansweredFor60Seconds_EndsWithExit28ServerResponseTimeoutAndNoQuit");
 
-    private Task<TransferResult> StartAsync(IConnector connector, TimeSpan? connectTimeout, ITransferProgress progress, CancellationToken cancellationToken)
+        // curl -T up.txt ftp://127.0.0.1:47924/x, STOR=STALL: curl 8.22.0 ends 60 s after STOR
+        // with "curl: (28) server response timeout" and sends no QUIT (upstream case 594, BL-2724).
+        var control = new StallingConnection(Encoding.Latin1.GetBytes(LoggedIn + "229 Entering Extended Passive Mode (|||64163|)\r\n200 Type set\r\n"));
+        var connector = new QueuedConnector(ConnectResult.Connected(control), ConnectResult.Connected(new ScriptedConnection()));
+        var context = new TransferContext { Url = CurlUrl.Parse(Url), Output = new MemoryStream(), Upload = new MemoryStream("hello"u8.ToArray()), TimeProvider = clock };
+        Task<TransferResult> run = new FtpProtocolHandler(connector).ExecuteAsync(context).AsTask();
+        await control.Stalled;
+
+        clock.Advance(TimeSpan.FromMilliseconds(59999));
+        bool stillWaiting = !run.IsCompleted;
+        clock.Advance(TimeSpan.FromMilliseconds(1));
+        TransferResult result = await run;
+
+        diagnostics.Act("still waiting at 59.999 s", stillWaiting);
+        diagnostics.Assert("outcome checked by the assertions below", "passes", "checking");
+        Assert.IsTrue(stillWaiting);
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.OperationTimedOut, "server response timeout"), result with { Report = null });
+        Assert.AreEqual("USER anonymous\r\nPASS ftp@example.com\r\nPWD\r\nEPSV\r\nTYPE I\r\nSTOR f.txt\r\n", Encoding.Latin1.GetString(control.Sent));
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_UserUnansweredWithoutConnectTimeout_EndsWithExit28ServerResponseTimeoutAfter60Seconds()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("test", "ExecuteAsync_UserUnansweredWithoutConnectTimeout_EndsWithExit28ServerResponseTimeoutAfter60Seconds");
+
+        // curl ftp://127.0.0.1:47925/f.txt, USER=STALL: curl 8.22.0 ends after 60630 ms with
+        // "curl: (28) server response timeout", well before its 300 s connect timeout (BL-2724).
+        var control = new StallingConnection(Encoding.Latin1.GetBytes(Greeting));
+        Task<TransferResult> run = StartAsync(control, connectTimeout: null);
+        await control.Stalled;
+
+        clock.Advance(TimeSpan.FromSeconds(60));
+        TransferResult result = await run;
+
+        diagnostics.Act("result", result with { Report = null });
+        diagnostics.Assert("outcome checked by the assertions below", "passes", "checking");
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.OperationTimedOut, "server response timeout"), result with { Report = null });
+        Assert.AreEqual("USER anonymous\r\n", Encoding.Latin1.GetString(control.Sent));
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ServerResponseTimeoutSet_EndsTheUnansweredUserAfterThatTimeout()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("test", "ExecuteAsync_ServerResponseTimeoutSet_EndsTheUnansweredUserAfterThatTimeout");
+
+        // CURLOPT_SERVER_RESPONSE_TIMEOUT 8 replaces curl's 60 seconds (BL-2724).
+        var control = new StallingConnection(Encoding.Latin1.GetBytes(Greeting));
+        Task<TransferResult> run = StartAsync(control, connectTimeout: null, serverResponseTimeout: TimeSpan.FromSeconds(8));
+        await control.Stalled;
+
+        clock.Advance(TimeSpan.FromSeconds(8));
+        TransferResult result = await run;
+
+        diagnostics.Act("result", result with { Report = null });
+        diagnostics.Assert("outcome checked by the assertions below", "passes", "checking");
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.OperationTimedOut, "server response timeout"), result with { Report = null });
+    }
+
+    /// <summary>
+    /// A server response timeout past curl's 300-second connect timeout, as
+    /// <c>CURLOPT_SERVER_RESPONSE_TIMEOUT</c> 600 gives, so a stalled login reaches the connect
+    /// timeout instead of curl's default 60-second response timeout (BL-2724).
+    /// </summary>
+    private static readonly TimeSpan TenMinutes = TimeSpan.FromMinutes(10);
+
+    private Task<TransferResult> StartAsync(StallingConnection control, TimeSpan? connectTimeout, TimeSpan? serverResponseTimeout = null) =>
+        StartAsync(new QueuedConnector(ConnectResult.Connected(control)), connectTimeout, NoTransferProgress.Instance, CancellationToken.None, serverResponseTimeout);
+
+    private Task<TransferResult> StartAsync(IConnector connector, TimeSpan? connectTimeout, ITransferProgress progress, CancellationToken cancellationToken, TimeSpan? serverResponseTimeout = null)
     {
         var context = new TransferContext
         {
@@ -290,6 +363,7 @@ public sealed class FtpProtocolHandlerTimeLimitTests
             TimeProvider = clock,
             Progress = progress,
             CancellationToken = cancellationToken,
+            FtpServerResponseTimeout = serverResponseTimeout ?? TransferContext.DefaultFtpServerResponseTimeout,
         };
         return new FtpProtocolHandler(connector).ExecuteAsync(context).AsTask();
     }
