@@ -37,3 +37,4 @@ libcurl 8.22.0's `Curl_input_ntlm` matches the scheme with `checkprefix` (case-i
 ## Log
 
 - 2026-10-19: Created.
+- 2026-10-19: Backlog -> Doing. Criteria at claim: a2210419 46cbe634 9c4f4471 3d836d5e.
