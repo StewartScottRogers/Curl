@@ -328,6 +328,41 @@ public sealed class ManagedEasyWebSocketTests
     }
 
     [TestMethod]
+    public async Task CurrentFrame_FromTheWriteCallbackOfAPerformThatIsNotConnectOnly_IsTheFrameOfThePayloadWritten()
+    {
+        // curl 8.22.0's curl_ws_meta answers ws->recvframe from an ordinary perform's write callback: lib2302 prints
+        // RECFLAGS: 1 for the text frame after the ping (upstream test2302, BL-2711).
+        ManagedEasyWebSocket webSocket = new(() => false, () => WebSocketOptionBits.None, new ZeroMaskSource());
+        ScriptedConnector connector = new([[.. Encoding.ASCII.GetBytes("HTTP/1.1 101 Switching Protocols\r\n\r\n"), 0x89, 0x00, 0x01, 0x03, (byte)'h', (byte)'e', (byte)'l', 0x80, 0x02, (byte)'l', (byte)'o', 0x82, 0x01, (byte)'!']]);
+        IProtocolHandler handler = EngineComposition.CreateProtocolHandlers(
+            connector,
+            new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "no datagrams"),
+            new PassThroughTlsProvider(),
+            new LoopbackDnsResolver(),
+            null,
+            webSocketPerformConnection: webSocket.PerformConnection).Single(candidate => candidate.SupportedSchemes.Contains("ws"));
+        List<CurlWebSocketFrame?> frames = [];
+        CallbackWriteStream output = new(data =>
+        {
+            frames.Add(webSocket.CurrentFrame);
+            return data.Length;
+        });
+
+        TransferResult result = await handler.ExecuteAsync(new TransferContext { Url = CurlUrl.Parse("ws://h/2302"), Output = output });
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        CollectionAssert.AreEqual(
+            new CurlWebSocketFrame?[]
+            {
+                new CurlWebSocketFrame(0, CurlWebSocketFlags.Text | CurlWebSocketFlags.Continuation, 0, 0, 3),
+                new CurlWebSocketFrame(0, CurlWebSocketFlags.Text, 0, 0, 2),
+                new CurlWebSocketFrame(0, CurlWebSocketFlags.Binary, 0, 0, 1),
+            },
+            frames);
+        Assert.AreEqual(new CurlWebSocketFrame(0, CurlWebSocketFlags.Binary, 0, 0, 1), webSocket.CurrentFrame);
+    }
+
+    [TestMethod]
     public async Task SendAsync_RawMode_WritesTheBytesUnframed()
     {
         (ManagedEasyWebSocket webSocket, QueuedConnection peer) = await OpenAsync(WebSocketOptionBits.RawMode);

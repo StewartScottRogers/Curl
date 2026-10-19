@@ -57,11 +57,16 @@ internal sealed class ManagedEasyWebSocket(Func<bool> isConnectOnly, Func<WebSoc
 
     private byte[] readBuffer = [];
 
+    private CurlWebSocketFrame? receivedFrame;
+
     /// <summary>
-    /// <c>curl_ws_meta</c>: the frame of the data the last receive handed over, as libcurl's <c>ws->recvframe</c>, or
-    /// <see langword="null" /> before any since the connection was upgraded.
+    /// <c>curl_ws_meta</c>, as libcurl's <c>ws->recvframe</c>: with options not connect-only, the frame of the payload
+    /// a perform last handed to the write callback (<see cref="PerformConnection" />'s <c>Frame</c>, upstream test2302,
+    /// BL-2711); otherwise the frame of the data the last receive handed over, or <see langword="null" /> before any
+    /// since the connection was upgraded.
     /// </summary>
-    public CurlWebSocketFrame? CurrentFrame { get; private set; }
+    public CurlWebSocketFrame? CurrentFrame =>
+        !isConnectOnly() && PerformConnection.Frame is { } written ? PerformFrameOf(written, PerformConnection.MessageOpcode) : receivedFrame;
 
     /// <summary>
     /// Gets the frames a read-callback upload of a perform that is not connect-only goes out in, which
@@ -104,7 +109,7 @@ internal sealed class ManagedEasyWebSocket(Func<bool> isConnectOnly, Func<WebSoc
         sendFrameOffset = 0;
         streamFailure = null;
         pendingRead = null;
-        CurrentFrame = null;
+        receivedFrame = null;
         if (open is not null)
         {
             await open.DisposeAsync().ConfigureAwait(false);
@@ -497,7 +502,17 @@ internal sealed class ManagedEasyWebSocket(Func<bool> isConnectOnly, Func<WebSoc
         }
 
         CurlWebSocketFrame frame = new(0, flags, offset, run.BytesLeft + remaining, count);
-        CurrentFrame = frame;
+        receivedFrame = frame;
         return new CurlWebSocketReceiveResult(CurlCode.Ok, count, frame);
+    }
+
+    /// <summary>The frame of a run a perform wrote whole: its bits, its offset, the frame's bytes after it and its length.</summary>
+    /// <param name="written">The run written.</param>
+    /// <param name="messageOpcode">The opcode of the data message the run is part of.</param>
+    /// <returns>The frame <c>curl_ws_meta</c> answers.</returns>
+    private static CurlWebSocketFrame PerformFrameOf(WsFrameRun written, WsOpcode messageOpcode)
+    {
+        CurlWebSocketFlags messageType = messageOpcode == WsOpcode.Binary ? CurlWebSocketFlags.Binary : CurlWebSocketFlags.Text;
+        return new CurlWebSocketFrame(0, WebSocketFrameFlags.Of(written, messageType), written.Offset, written.BytesLeft, written.Payload.Length);
     }
 }
