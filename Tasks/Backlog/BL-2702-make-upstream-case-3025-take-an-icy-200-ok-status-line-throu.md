@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Libcurl, Libcurl.UnitTests, Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
+touches: [Curl.Engine.UnitLibrary/HttpRequestOptionsMapping.cs, Curl.Engine.UnitTests/HttpRequestOptionsMappingTests.cs, Curl.Protocol.Abstractions.UnitLibrary/HttpRequestOptions.cs, Curl.Protocol.Abstractions.UnitTests/HttpRequestOptionsTests.cs, Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests, Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
 requirement: none
 created: 2026-10-17
 completed:
@@ -28,7 +28,10 @@ Found by BL-2551, which ported lib3025 (`Curl.Conformance.LibTest.UnitLibrary/Li
 
 ## Notes
 
+- 2026-10-19 (lane 2): Libcurl is not at fault: `EasyHttpOptionSetters.SetHttp200Aliases` already stores the list in `EasyHttpOptions.Http200Aliases`, but nothing in the engine reads it. The fix: add an `Http200Aliases` list to `HttpRequestOptions` (Abstractions), map it in `Curl.Engine.UnitLibrary/HttpRequestOptionsMapping.cs` beside `AllowHttp09Reply`, and have the HTTP status-line reading (`HttpStatusLine`, `HttpLineReader`, `HttpResponseHeadReader`, `HttpProtocolHandler` near `AcceptsHttp09`) take a line that starts with an alias as an `HTTP/1.0 200` status line (curl's `checkprefixmax` over `CURLOPT_HTTP200ALIASES`), so it is neither refused as HTTP/0.9 nor treated as body. `touches` changed from Libcurl and Libcurl.UnitTests to these files. Requeued before any edit: BL-2714 (Doing) holds the whole of Curl.Engine.UnitLibrary and Curl.Engine.UnitTests.
+
 ## Log
 
 - 2026-10-17: Created.
 - 2026-10-19: Backlog -> Doing. Criteria at claim: 70504463 48be2d2b 3d836d5e.
+- 2026-10-19: Doing -> Backlog. Needs Curl.Engine.UnitLibrary/HttpRequestOptionsMapping.cs and its tests, which BL-2714 (Doing) holds as whole Curl.Engine projects
