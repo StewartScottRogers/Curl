@@ -115,7 +115,11 @@ text, as libcurl 8.22.0 writes it only through `failf` (`lib/curl_trc.c`) and no
 `ObjectDisposedException`. `GetInfo` is `curl_easy_getinfo` and goes through `Info`'s dispatch.
 `Reset` is `curl_easy_reset` and `DupHandle` is `curl_easy_duphandle`, each a call to the transfer's
 `Reset` or `Duplicate`: what survives each (connections kept by a reset, only the options carried by a
-duplicate) is the engine's contract on `IEasyTransfer`, not Libcurl's.
+duplicate) is the engine's contract on `IEasyTransfer`, not Libcurl's. `SslsImport` and `SslsExport`
+(`CurlEasy.SslSessions.cs`, BL-2669) are `curl_easy_ssls_import` and `curl_easy_ssls_export`, straight calls to the
+transfer's `ImportTlsSession` and `ExportTlsSessions` (the share's session cache while it shares
+`CURL_LOCK_DATA_SSL_SESSION`, else the engine's; `NotBuiltIn` where the build lists no `SSLS-EXPORT`); a `null`
+packet is passed as an empty one, and a `null` `CurlSslsExportCallback` answers `BadFunctionArgument` without the engine.
 
 `WebSocket` holds `CurlEasyWebSocket`, libcurl's WebSocket API as `CurlEasy` extension methods over the
 transfer's `IEasyWebSocket` (ADR-0585): `WebSocketRecv` (`curl_ws_recv`), `WebSocketSend` (`curl_ws_send`)
