@@ -80,6 +80,34 @@ public sealed partial class ManagedEasyTransferTests
         StringAssert.EndsWith(written, "Content-Length: 45\r\n\r\n" + new string('x', 45));
     }
 
+    // Upstream test 3034's shape (BL-2703): a sized upload with no seek callback followed through a 307 cannot rewind.
+    [TestMethod]
+    public async Task PerformAsync_RedirectedSizedReadCallbackUploadWithoutASeekCallback_ReturnsSendFailRewind()
+    {
+        ScriptedConnector connector = new([Encoding.ASCII.GetBytes(Continue + TemporaryRedirect), Encoding.ASCII.GetBytes(Continue + Response)]);
+        await using IEasyTransfer easy = CreateEngine(connector).CreateEasy();
+        easy.Options = new EasyOptions
+        {
+            Network = new EasyNetworkOptions { Url = "http://h/3034" },
+            Transfer = new EasyTransferOptions { Upload = true, InFileSize = 5 },
+            Http = new EasyHttpOptions { FollowLocation = FollowLocation.All },
+            Callbacks = new()
+            {
+                Read = buffer =>
+                {
+                    "hello\0"u8[..Math.Min(6, buffer.Length)].CopyTo(buffer);
+                    return Math.Min(6, buffer.Length);
+                },
+            },
+        };
+        using CancellationTokenSource stall = new(TimeSpan.FromSeconds(10));
+
+        CurlCode code = await easy.PerformAsync(stall.Token);
+
+        Assert.AreEqual(CurlCode.SendFailRewind, code);
+        Assert.AreEqual(CallbackReadStream.RewindImpossibleText, easy.ErrorText);
+    }
+
     [TestMethod]
     public async Task PerformAsync_PutWithZeroInFileSize_SendsAnEmptyBodyWithoutAskingTheReadCallback()
     {

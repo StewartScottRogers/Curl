@@ -853,6 +853,24 @@ public sealed class RedirectFollowerTests
     }
 
     [TestMethod]
+    public async Task FollowAsync_SeekableUploadThatCannotGoBack_EndsWithSendFailRewindAndTheStreamsMessage()
+    {
+        // A sized read-callback upload with no seek callback seeks but cannot go back: the next
+        // hop ends with exit 65 and its message, never an escaping IOException (upstream test3034, BL-2703).
+        ScriptedHandler handler = new(Redirect(307, Next), Ok(200, 0));
+        OneWayStream upload = new([1, 2, 3]);
+
+        TransferResult result = await Follow(handler, Context(Location(), uploadStream: upload));
+
+        Diagnostics.Assert("result.ExitCode", CurlExitCode.SendFailRewind, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.SendFailRewind, result.ExitCode);
+        Diagnostics.Assert("result.ErrorMessage", OneWayStream.Message, result.ErrorMessage);
+        Assert.AreEqual(OneWayStream.Message, result.ErrorMessage);
+        Diagnostics.Assert("handler.Contexts count", 1, handler.Contexts.Count());
+        Assert.HasCount(1, handler.Contexts);
+    }
+
+    [TestMethod]
     public async Task FollowAsync_RewinderUploadNeverRead_AsksForNoRewind()
     {
         // curl rewinds nothing when the read callback was never called (cr_in_rewind's read_len).
@@ -2111,6 +2129,18 @@ public sealed class RedirectFollowerTests
     private sealed class NonSeekableStream(byte[] content) : MemoryStream(content)
     {
         public override bool CanSeek => false;
+    }
+
+    /// <summary>A seekable stream whose position cannot be set, as a sized read-callback upload with no seek callback.</summary>
+    private sealed class OneWayStream(byte[] content) : MemoryStream(content)
+    {
+        public const string Message = "necessary data rewind wasn't possible";
+
+        public override long Position
+        {
+            get => base.Position;
+            set => throw new IOException(Message);
+        }
     }
 
     /// <summary>
