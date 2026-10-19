@@ -42,3 +42,4 @@ Found by BL-2661, which listed the `wakeup` feature (ADR-0690): 2405 now runs an
 - 2026-10-18: Doing -> Backlog. Needs Curl.Engine.UnitLibrary and Curl.Engine.UnitTests (ManagedMultiTransfer perform and waitfds), which BL-2747 in Doing touches
 - 2026-10-18: Backlog -> Doing. Criteria at claim: 29c71c3e ab396f86 3d836d5e.
 - 2026-10-18: Doing -> Backlog. Engine fix done and stashed; left: Curl.Console ParallelTransferMulti so the -Z combined meter's Live count stays right (CurlCommandRunnerParallelProgressMeterTests), needs Curl.Console
+- 2026-10-19: Backlog -> Doing. Criteria at claim: 29c71c3e ab396f86 3d836d5e.
