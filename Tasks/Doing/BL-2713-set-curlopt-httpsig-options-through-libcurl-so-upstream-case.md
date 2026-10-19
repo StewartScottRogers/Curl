@@ -34,3 +34,4 @@ Found by BL-2552. `Libcurl/Options/CurlOption.cs` names the four options, but no
 ## Log
 
 - 2026-10-17: Created.
+- 2026-10-18: Backlog -> Doing. Criteria at claim: 85a97984 e5284905 19a524ae 1ba4f3da.
