@@ -76,6 +76,40 @@ public sealed partial class ManagedEasyTransferTests
     }
 
     [TestMethod]
+    public async Task PerformAsync_NetrcIgnoredAndCredentialsInTheUrl_PutsTheUrlsCredentialsOnTheContext()
+    {
+        RecordingProtocolHandler handler = RecordingProtocolHandler.WritingPath("http");
+        await using ManagedEasyTransfer easy = EasyReadingNetrc(handler, null);
+        easy.Options = NetrcOptions(NetrcUsage.Ignored) with
+        {
+            Network = new EasyNetworkOptions { Url = "http://xxx:yyy@127.0.0.1:9000/1964/testapi/test" },
+        };
+
+        CurlCode code = await easy.PerformAsync(CancellationToken.None);
+
+        Assert.AreEqual(CurlCode.Ok, code);
+        Assert.AreEqual("xxx", handler.Contexts.Single().Credentials?.UserName);
+        Assert.AreEqual("yyy", handler.Contexts.Single().Credentials?.Password);
+    }
+
+    [TestMethod]
+    public async Task PerformAsync_UserPasswordWithAUserNameAndCredentialsInTheUrl_KeepsTheUserPassword()
+    {
+        RecordingProtocolHandler handler = RecordingProtocolHandler.WritingPath("http");
+        await using ManagedEasyTransfer easy = EasyReadingNetrc(handler, null);
+        easy.Options = NetrcOptions(NetrcUsage.Ignored) with
+        {
+            Network = new EasyNetworkOptions { Url = "http://xxx:yyy@127.0.0.1:9000/" },
+            Authentication = new EasyAuthenticationOptions { UserPassword = "user:pw" },
+        };
+
+        await easy.PerformAsync(CancellationToken.None);
+
+        Assert.AreEqual("user", handler.Contexts.Single().Credentials?.UserName);
+        Assert.AreEqual("pw", handler.Contexts.Single().Credentials?.Password);
+    }
+
+    [TestMethod]
     public void ReadDiskFile_FileExists_ReturnsItsBytes()
     {
         string directory = Directory.CreateTempSubdirectory().FullName;

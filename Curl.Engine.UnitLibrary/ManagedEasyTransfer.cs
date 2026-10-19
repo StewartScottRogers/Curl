@@ -611,9 +611,9 @@ internal sealed partial class ManagedEasyTransfer(
         }
 
         selectedProxy = proxy;
-        if (!TryLookUpNetrcCredentials(options, url, out TransferResult? netrcFailure))
+        if (!TryLookUpUrlAndNetrcCredentials(options, url, out TransferResult? credentialFailure))
         {
-            return Task.FromResult(Finish(netrcFailure.ExitCode.ToCurlCode(), netrcFailure.ErrorMessage!, Info));
+            return Task.FromResult(Finish(credentialFailure.ExitCode.ToCurlCode(), credentialFailure.ErrorMessage!, Info));
         }
 
         return PerformResumingUploadAsync(options, settings, url, urlText, transferId, cancellationToken);
@@ -725,34 +725,35 @@ internal sealed partial class ManagedEasyTransfer(
         return TransferProxySelection.TrySelect(PerformShared.ProxySelector, options.Proxy, settings.OverUnixSocket, settings.ProxyCredentials, url, out proxy, out refused, Host.DiagnosticLog);
     }
 
-    /// <summary>The credentials <see cref="TryLookUpNetrcCredentials" /> chose for the running perform, which <see cref="OwnInputsOf" /> puts on the context.</summary>
-    private System.Net.NetworkCredential? netrcCredentials;
+    /// <summary>The credentials <see cref="TryLookUpUrlAndNetrcCredentials" /> chose for the running perform, which <see cref="OwnInputsOf" /> puts on the context.</summary>
+    private System.Net.NetworkCredential? lookedUpCredentials;
 
     /// <summary>
-    /// Chooses the perform's credentials from the <c>.netrc</c> file under <c>CURLOPT_NETRC</c> with
-    /// <see cref="TransferCredentialLookup" />, as libcurl's <c>override_login</c> does for every handle, proxied or
-    /// not (upstream test2309, BL-2696): the <c>CURLOPT_NETRC_FILE</c> file, else the one <c>NETRC</c> names, else
+    /// Chooses the perform's credentials with <see cref="TransferCredentialLookup" />, as libcurl's <c>override_login</c>
+    /// does for every handle, proxied or not: with no <c>CURLOPT_USERPWD</c> user name, the URL's own user name and
+    /// password (upstream test1964, BL-2684), and under <c>CURLOPT_NETRC</c> the <c>.netrc</c> file's entry
+    /// (upstream test2309, BL-2696): the <c>CURLOPT_NETRC_FILE</c> file, else the one <c>NETRC</c> names, else
     /// <c>.netrc</c> in <c>HOME</c>, read through <see cref="EasyTransferHost.ReadFile" />. Nothing is looked up with
-    /// <see cref="ToolInputs" /> set, whose runner chose its own, or under <see cref="NetrcUsage.Ignored" />.
+    /// <see cref="ToolInputs" /> set, whose runner chose its own.
     /// </summary>
     /// <param name="options">The handle's options.</param>
     /// <param name="url">The URL set, parsed, whose host picks the entry.</param>
     /// <param name="failure">The exit-26 failure of a required file missing or malformed, or the exit-3 one of URL credentials refused.</param>
     /// <returns><see langword="false" /> when the perform must end with <paramref name="failure" />.</returns>
-    private bool TryLookUpNetrcCredentials(
+    private bool TryLookUpUrlAndNetrcCredentials(
         EasyOptions options,
         CurlUrl url,
         [System.Diagnostics.CodeAnalysis.NotNullWhen(false)] out TransferResult? failure)
     {
-        netrcCredentials = null;
+        lookedUpCredentials = null;
         failure = null;
-        if (ToolInputs is not null || options.Authentication.Netrc == NetrcUsage.Ignored)
+        if (ToolInputs is not null)
         {
             return true;
         }
 
         TransferCredentialLookup lookup = new(Host.ReadFile, shared.ReadEnvironmentVariable, Host.RunsOnWindows, Host.DiagnosticLog);
-        return lookup.TryLookUp(options.Authentication, url, out netrcCredentials, out failure);
+        return lookup.TryLookUp(options.Authentication, url, out lookedUpCredentials, out failure);
     }
 
     /// <summary>
@@ -1209,7 +1210,7 @@ internal sealed partial class ManagedEasyTransfer(
     /// <summary>
     /// The pieces a handle with no <see cref="ToolInputs" /> chooses from its options: the proxy <see cref="TrySelectProxy" />
     /// chose from <c>CURLOPT_PROXY</c> and the proxy environment (BL-2519); the credentials
-    /// <see cref="TryLookUpNetrcCredentials" /> chose from the <c>.netrc</c> file (BL-2696); no <c>If-None-Match</c> lines, range or form body of the runner's; <c>CURLOPT_RESUME_FROM</c> when
+    /// <see cref="TryLookUpUrlAndNetrcCredentials" /> chose from the URL and the <c>.netrc</c> file (BL-2696, BL-2684); no <c>If-None-Match</c> lines, range or form body of the runner's; <c>CURLOPT_RESUME_FROM</c> when
     /// positive; the read callback under <c>CURLOPT_UPLOAD</c> (<see cref="UploadOf" />); the alt-svc cache its
     /// own setup opened; and for an <c>scp</c> or <c>sftp</c> URL the handle's SSH options with its host-key
     /// callbacks (<see cref="SshOptionsMapping.OfHandle" />, ADR-0623).
@@ -1224,7 +1225,7 @@ internal sealed partial class ManagedEasyTransfer(
     private EngineToolTransferInputs OwnInputsOf(EasyOptions options, EngineTransferSettings settings, CurlUrl url, EngineTransferState state, EasyPauseGate? pauseGate, ProxyEndpoint? proxy) =>
         new(
             Proxy: proxy,
-            LookedUpCredentials: netrcCredentials,
+            LookedUpCredentials: lookedUpCredentials,
             ResumeFrom: options.Transfer.ResumeFrom > 0 ? options.Transfer.ResumeFrom : null,
             Upload: UploadOf(options, url, pauseGate),
             AltSvc: state.AltSvc,
