@@ -1746,7 +1746,8 @@ public sealed class HttpProtocolHandler(
             HttpRangeHeader.ValueFor(context, plan.Framing.Body is not null),
             context.TimeCondition,
             plan.Framing,
-            upgradesToH2c);
+            upgradesToH2c,
+            context.Credentials);
         return streams is null ? head : Http2RequestHeaders.WithRequestLineVersion(head, streams.VersionName);
     }
 

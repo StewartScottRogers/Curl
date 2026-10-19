@@ -9,7 +9,8 @@ internal static class HttpConnectionPersistence
     /// <summary>
     /// Decides whether the connection that carried <paramref name="head" /> stays open after
     /// its body: not when a <c>Connection</c> header names <c>close</c>, not for HTTP/1.0
-    /// unless a <c>Connection</c> header names <c>keep-alive</c>, and not when the body runs
+    /// unless a <c>Connection</c> header names <c>keep-alive</c>, or, through an HTTP proxy, a
+    /// <c>Proxy-Connection</c> header does (upstream test1077), and not when the body runs
     /// until the server closes (<see cref="HttpResponseBodyFraming.RunsToClose" />).
     /// </summary>
     /// <param name="head">The response head.</param>
@@ -29,7 +30,7 @@ internal static class HttpConnectionPersistence
     /// </param>
     /// <param name="throughHttpProxy">
     /// <see langword="true" /> when the transfer goes through an HTTP proxy, where curl honours
-    /// <c>Proxy-Connection: close</c>.
+    /// <c>Proxy-Connection: close</c> and, from an HTTP/1.0 proxy, <c>Proxy-Connection: keep-alive</c>.
     /// </param>
     /// <returns><see langword="true" /> when the next request may be sent on the same connection.</returns>
     internal static bool KeepsAlive(
@@ -45,7 +46,9 @@ internal static class HttpConnectionPersistence
             return false;
         }
 
-        bool persistentVersion = head.StatusLine.Version >= new Version(1, 1) || NamesConnectionOption(head, "keep-alive");
+        bool persistentVersion = head.StatusLine.Version >= new Version(1, 1)
+            || NamesConnectionOption(head, "keep-alive")
+            || (throughHttpProxy && NamesProxyConnectionOption(head, "keep-alive"));
         return persistentVersion && !BodyRunsToClose(head, noBody, passesTransferCoding, ignoresContentLength, decodesTransferCoding);
     }
 
@@ -142,10 +145,12 @@ internal static class HttpConnectionPersistence
     }
 
     private static bool ClosesHttp11Proxy(HttpResponseHead head) =>
-        head.StatusLine.Version == new Version(1, 1)
-            && head.Headers
-                .Where(header => string.Equals(header.Name, "Proxy-Connection", StringComparison.OrdinalIgnoreCase))
-                .Any(header => NamesOption(header.Value, "close"));
+        head.StatusLine.Version == new Version(1, 1) && NamesProxyConnectionOption(head, "close");
+
+    private static bool NamesProxyConnectionOption(HttpResponseHead head, string option) =>
+        head.Headers
+            .Where(header => string.Equals(header.Name, "Proxy-Connection", StringComparison.OrdinalIgnoreCase))
+            .Any(header => NamesOption(header.Value, option));
 
     private static bool NamesConnectionOption(HttpResponseHead head, string option) =>
         head.Headers

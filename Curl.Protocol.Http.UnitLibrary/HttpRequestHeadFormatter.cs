@@ -1,5 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
+using System.Net;
 using System.Text;
 using Curl.Protocol.Abstractions;
 using HttpRequestOptions = Curl.Protocol.Abstractions.HttpRequestOptions;
@@ -24,7 +25,8 @@ namespace Curl.Protocol.Http;
 /// <c>Cookie</c>, then <c>If-Modified-Since</c> or <c>If-Unmodified-Since</c> for <c>-z</c>, also
 /// left out when an <c>-H</c> value names it; <c>Cookie</c> and <c>Proxy-Authorization</c> are sent even when an <c>-H</c>
 /// value names them. Through a forward proxy the request target is the absolute form,
-/// <c>http://host[:port]/path?query</c>, with no user information or fragment. The <c>-H</c> values follow in
+/// <c>http://host[:port]/path?query</c>, with no fragment and no user information but an
+/// <c>ftp</c> URL's (<see cref="FtpUserInformation" />). The <c>-H</c> values follow in
 /// command-line order, then, through a forward proxy only, the <c>--proxy-header</c> values under the
 /// same rules; of curl's own headers they override only <c>Proxy-Connection</c> (BL-296 Notes). A custom <c>Host</c> is the exception: it takes the <c>Host</c> slot. A body of unknown length gets
 /// <c>Transfer-Encoding: chunked</c> just after <c>Proxy-Connection</c>, ahead of the <c>Cookie</c> and the
@@ -59,6 +61,9 @@ internal static class HttpRequestHeadFormatter
     private const string ContentLengthName = "Content-Length";
 
     private const string FormBoundaryPrefix = "multipart/form-data; boundary=";
+
+    /// <summary>The empty user and password a request to a forward proxy has without any.</summary>
+    private static readonly NetworkCredential NoCredentials = new();
 
     /// <summary>
     /// Formats the request head for <paramref name="url" />.
@@ -103,6 +108,10 @@ internal static class HttpRequestHeadFormatter
     /// <see langword="true" /> to ask to upgrade to h2c, for <c>--http2</c> over cleartext
     /// (<see cref="AppendH2cUpgrade" />).
     /// </param>
+    /// <param name="credentials">
+    /// The transfer's user and password, or <see langword="null" /> for none: the absolute form
+    /// of an <c>ftp</c> URL sent to a forward proxy carries them (<see cref="FtpUserInformation" />).
+    /// </param>
     /// <returns>The head's bytes, ending in the empty line.</returns>
     internal static byte[] Format(
         CurlUrl url,
@@ -115,14 +124,15 @@ internal static class HttpRequestHeadFormatter
         string? range = null,
         TimeCondition? timeCondition = null,
         HttpRequestFraming? framing = null,
-        bool upgradesToH2c = false)
+        bool upgradesToH2c = false,
+        NetworkCredential? credentials = null)
     {
         options ??= new HttpRequestOptions();
         HttpCustomHeader[] customHeaders = CustomHeadersOf(options.Headers, options);
         HttpCustomHeader[] proxyHeaders = forwardProxy ? CustomHeadersOf(options.ProxyHeaders, options) : [];
         framing = FramingOf(framing, options, customHeaders, noBody);
         StringBuilder head = new();
-        AppendRequestLine(head, framing.Method, url, forwardProxy, options);
+        AppendRequestLine(head, framing.Method, url, forwardProxy ? credentials ?? NoCredentials : null, options);
         string? hostLine = FormatHostLine(url, options.FollowedToAnotherHost ? [] : customHeaders);
         AppendHostLine(head, hostLine);
         AppendAlways(head, "Proxy-Authorization", proxyAuthorization);
@@ -197,24 +207,25 @@ internal static class HttpRequestHeadFormatter
     /// Appends the request line: the method, the target (<see cref="TargetOf" />) and the
     /// version.
     /// </summary>
-    private static void AppendRequestLine(StringBuilder head, string method, CurlUrl url, bool forwardProxy, HttpRequestOptions options) =>
-        head.Append(method).Append(' ').Append(TargetOf(url, forwardProxy, options)).Append(VersionOf(options)).Append("\r\n");
+    private static void AppendRequestLine(StringBuilder head, string method, CurlUrl url, NetworkCredential? proxiedCredentials, HttpRequestOptions options) =>
+        head.Append(method).Append(' ').Append(TargetOf(url, proxiedCredentials, options)).Append(VersionOf(options)).Append("\r\n");
 
     /// <summary>
     /// Gives the request line's target: <see cref="HttpRequestOptions.RequestTarget" />
     /// verbatim when given, its UTF-8 bytes one character each as
     /// <see cref="HttpUrlText.RequestTarget" /> writes a query; otherwise the absolute form
-    /// for a forward proxy and the path and query for the origin. curl 8.21.0 was measured
-    /// (BL-186 Notes) sending <c>--request-target</c> in place of both forms.
+    /// for a forward proxy (<paramref name="proxiedCredentials" /> not <see langword="null" />)
+    /// and the path and query for the origin. curl 8.21.0 was measured (BL-186 Notes) sending
+    /// <c>--request-target</c> in place of both forms.
     /// </summary>
-    private static string TargetOf(CurlUrl url, bool forwardProxy, HttpRequestOptions options)
+    private static string TargetOf(CurlUrl url, NetworkCredential? proxiedCredentials, HttpRequestOptions options)
     {
         if (options.RequestTarget is { } target)
         {
             return Encoding.Latin1.GetString(Encoding.UTF8.GetBytes(target));
         }
 
-        return forwardProxy ? AbsoluteForm(url) : HttpUrlText.RequestTarget(url);
+        return proxiedCredentials is null ? HttpUrlText.RequestTarget(url) : AbsoluteForm(url, proxiedCredentials);
     }
 
     /// <summary>
@@ -294,9 +305,29 @@ internal static class HttpRequestHeadFormatter
 
     /// <summary>
     /// Formats the absolute-form request target a forward proxy is sent: the scheme, the host
-    /// and port as the <c>Host</c> line has them, then the path and query.
+    /// and port as the <c>Host</c> line has them, then the path and query; for an <c>ftp</c> URL
+    /// the user and password come before the host (<see cref="FtpUserInformation" />).
     /// </summary>
-    private static string AbsoluteForm(CurlUrl url) => $"{url.Scheme}://{HttpUrlText.HostAndPort(url)}{HttpUrlText.RequestTarget(url)}";
+    private static string AbsoluteForm(CurlUrl url, NetworkCredential credentials) =>
+        $"{url.Scheme}://{FtpUserInformation(url, credentials)}{HttpUrlText.HostAndPort(url)}{HttpUrlText.RequestTarget(url)}";
+
+    /// <summary>
+    /// Gives the user, <c>:</c> and the password, each percent-encoded, then <c>@</c>, for an
+    /// <c>ftp</c> URL whose transfer has a user, and the empty string otherwise. curl 8.22.0's
+    /// <c>http_target</c> strips the user and password from every proxied URL but an <c>ftp</c>
+    /// one, and puts <c>-u</c>'s there as well as the URL's own (upstream test208 and test299);
+    /// the password and its <c>:</c> are left out when there is none.
+    /// </summary>
+    private static string FtpUserInformation(CurlUrl url, NetworkCredential credentials)
+    {
+        if (url.Scheme != "ftp" || string.IsNullOrEmpty(credentials.UserName))
+        {
+            return string.Empty;
+        }
+
+        string password = string.IsNullOrEmpty(credentials.Password) ? string.Empty : ":" + Uri.EscapeDataString(credentials.Password);
+        return Uri.EscapeDataString(credentials.UserName) + password + "@";
+    }
 
     /// <summary>
     /// Appends the authenticator's <c>Authorization</c> value as curl 8.21.0 does: a Digest, NTLM
