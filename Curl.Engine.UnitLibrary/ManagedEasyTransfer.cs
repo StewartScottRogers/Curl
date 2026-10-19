@@ -304,6 +304,9 @@ internal sealed class ManagedEasyTransfer(
     /// </summary>
     private IReadOnlyList<string> keptDigestChallenges = [];
 
+    /// <summary>The alt-svc cache the handle's first perform opened, kept across performs and <see cref="Reset" /> and saved by <see cref="DisposeAsync" /> (BL-2671).</summary>
+    private AltSvcTransferCache? handleAltSvc;
+
     /// <summary>
     /// The <c>host:port</c> of the last perform's URL (<see cref="OriginOf" />), to which alone
     /// <see cref="keptDigestChallenges" /> are answered, as curl 8.22.0 sends no kept Digest answer to another
@@ -1147,7 +1150,7 @@ internal sealed class ManagedEasyTransfer(
         if (toolInputs is null)
         {
             await shared.Performer.WriteCookieJarAltSvcAndHstsFilesAsync(
-                cookies, settings, options.Http, transferUrl, Host.JarPrintTarget, state, PerformShared.Hsts, Host.FileSystem, Host.RunsOnWindows).ConfigureAwait(false);
+                cookies, settings, options.Http, transferUrl, Host.JarPrintTarget, state, PerformShared.Hsts, Host.FileSystem, Host.RunsOnWindows, writesAltSvc: false).ConfigureAwait(false);
         }
     }
 
@@ -1246,8 +1249,31 @@ internal sealed class ManagedEasyTransfer(
         EasyTransferHost host = Host;
         await ApplyCookieListAsync(cookies, host, events).ConfigureAwait(false);
         await shared.Performer.LoadCookieFilesAsync(cookies, settings, urlText, host.FileSystem, host.StandardInput, events).ConfigureAwait(false);
-        await shared.Performer.OpenAltSvcCacheAsync(state, settings, options.Network, options.Http, urlText, host.FileSystem, host.DiagnosticLog, host.AltSvcUsesOverHttp).ConfigureAwait(false);
+        await OpenOrKeepAltSvcCacheAsync(options, settings, state, urlText, host).ConfigureAwait(false);
         return await TransferPerformer.SwitchToHttpsForHstsAsync(PerformShared.Hsts, settings, options.Network, options.Http, urlText, host.FileSystem, events).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Gives the transfer the handle's alt-svc cache: the one an earlier perform opened (libcurl keeps the handle's cache
+    /// across performs and <c>curl_easy_reset</c>, and saves it only at <c>curl_easy_cleanup</c>, BL-2671), else a new one
+    /// opened from <c>CURLOPT_ALTSVC</c>, which the handle then keeps.
+    /// </summary>
+    /// <param name="options">The handle's options.</param>
+    /// <param name="settings">The tool settings.</param>
+    /// <param name="state">The running transfer, which keeps the cache.</param>
+    /// <param name="urlText">The URL set.</param>
+    /// <param name="host">What the file system, the diagnostic log and <c>CURL_ALTSVC_HTTP</c> come from.</param>
+    /// <returns>A task that completes once the transfer holds the cache.</returns>
+    private async Task OpenOrKeepAltSvcCacheAsync(EasyOptions options, EngineTransferSettings settings, EngineTransferState state, string urlText, EasyTransferHost host)
+    {
+        if (handleAltSvc is null)
+        {
+            await shared.Performer.OpenAltSvcCacheAsync(state, settings, options.Network, options.Http, urlText, host.FileSystem, host.DiagnosticLog, host.AltSvcUsesOverHttp).ConfigureAwait(false);
+            handleAltSvc = state.AltSvc;
+            return;
+        }
+
+        state.AltSvc = handleAltSvc;
     }
 
     /// <summary>
@@ -1626,12 +1652,17 @@ internal sealed class ManagedEasyTransfer(
         }
 
         SaveHstsToCallback();
+        await SaveAltSvcAsync().ConfigureAwait(false);
         optionShare?.LockCookies(this, 1);
         optionShare = ManagedShareHandle.Reattach(optionShare, named: null, this);
         await (connectOnly?.CloseAsync() ?? ValueTask.CompletedTask).ConfigureAwait(false);
         await (webSocket?.CloseAsync() ?? ValueTask.CompletedTask).ConfigureAwait(false);
         await shared.Connections.CloseIdleOwnedByAsync(this).ConfigureAwait(false);
     }
+
+    /// <summary>Writes the handle's alt-svc cache to its <c>CURLOPT_ALTSVC</c> file, as libcurl does at cleanup (BL-2671); nothing when no perform opened one.</summary>
+    /// <returns>A task that completes once the file is written.</returns>
+    private Task SaveAltSvcAsync() => handleAltSvc?.WriteAsync(Host.FileSystem) ?? Task.CompletedTask;
 
     /// <summary>
     /// Builds the transfer's context with <paramref name="toolDispatch" />'s factory, or without one a

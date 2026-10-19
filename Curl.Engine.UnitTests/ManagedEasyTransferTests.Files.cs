@@ -46,7 +46,7 @@ public sealed partial class ManagedEasyTransferTests
     }
 
     [TestMethod]
-    public async Task PerformAsync_AltSvcAndHstsFiles_ReadsThemBeforeAndWritesThemAfterTheTransfer()
+    public async Task PerformAsync_AltSvcAndHstsFiles_ReadsThemBeforeAndWritesHstsAfterTheTransferAndAltSvcAtCleanup()
     {
         const string LearnsBoth = "HTTP/1.1 200 OK\r\nAlt-Svc: h2=\"alt:443\"; ma=3600\r\nStrict-Transport-Security: max-age=31536000\r\nContent-Length: 0\r\n\r\n";
         ScriptedConnector connector = new([Encoding.ASCII.GetBytes(LearnsBoth)]);
@@ -62,10 +62,13 @@ public sealed partial class ManagedEasyTransferTests
         CurlCode code = await easy.PerformAsync(CancellationToken.None);
 
         Assert.AreEqual(CurlCode.Ok, code);
-        CollectionAssert.AreEqual(new[] { "read altsvc.txt", "read hsts.txt", "write altsvc.txt", "write hsts.txt" }, files.Opened);
+        CollectionAssert.AreEqual(new[] { "read altsvc.txt", "read hsts.txt", "write hsts.txt" }, files.Opened);
         Assert.AreEqual(443, connector.Targets.Single().Port);
-        StringAssert.Contains(Encoding.ASCII.GetString(files.Files["altsvc.txt"]), "h2 alt 443");
         StringAssert.Contains(Encoding.ASCII.GetString(files.Files["hsts.txt"]), "h \"");
+
+        await easy.DisposeAsync();
+
+        StringAssert.Contains(Encoding.ASCII.GetString(files.Files["altsvc.txt"]), "h2 alt 443");
     }
 
     [TestMethod]

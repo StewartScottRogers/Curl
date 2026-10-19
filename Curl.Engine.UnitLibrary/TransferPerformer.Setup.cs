@@ -380,6 +380,10 @@ internal sealed partial class TransferPerformer
     /// <param name="hsts">The run's HSTS cache.</param>
     /// <param name="fileSystem">Writes the files.</param>
     /// <param name="runsOnWindows">Whether the <c>--hsts</c> file's lines end in CR LF.</param>
+    /// <param name="writesAltSvc">
+    /// Whether to write the alt-svc file now: <see langword="false" /> for an easy handle, which keeps its cache across
+    /// performs and writes it at <c>curl_easy_cleanup</c> (BL-2671).
+    /// </param>
     /// <returns>A task that completes when all are written.</returns>
     internal async Task WriteCookieJarAltSvcAndHstsFilesAsync(
         CookieEngine? cookies,
@@ -390,14 +394,15 @@ internal sealed partial class TransferPerformer
         EngineTransferState state,
         HstsTransferPolicy hsts,
         IFileSystem fileSystem,
-        bool runsOnWindows)
+        bool runsOnWindows,
+        bool writesAltSvc = true)
     {
         if (cookies is not null && IsHttpUrl(settings.AppendUrlQuery(transferUrl)))
         {
             await cookies.WriteCookieJarAsync(fileSystem, jarPrintTarget(), timeProvider.GetUtcNow()).ConfigureAwait(false);
         }
 
-        if (state.AltSvc is { } altSvc)
+        if (writesAltSvc && state.AltSvc is { } altSvc)
         {
             await altSvc.WriteAsync(fileSystem).ConfigureAwait(false);
         }

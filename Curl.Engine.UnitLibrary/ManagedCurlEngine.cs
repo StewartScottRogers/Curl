@@ -94,8 +94,27 @@ public sealed class ManagedCurlEngine : ICurlEngine
         bool stopsFirstFtpTransferBeforePwd = false)
     {
         shared = new ManagedEngineSharedState(timeProvider, easyErrorText ?? (_ => string.Empty), readEnvironmentVariable, dialing, signingClock, webSocketRandomSource, FirstTransferFtpPwdStop.When(stopsFirstFtpTransferBeforePwd));
-        handleHost = standardInput is null ? EasyTransferHost.Library : EasyTransferHost.Library with { StandardInput = standardInput };
+        handleHost = HandleHostOf(standardInput, readEnvironmentVariable);
         this.createDispatcher = createDispatcher is null ? CreateDispatcher : (options, state, cookies, _) => createDispatcher(options, state, cookies);
+    }
+
+    /// <summary>
+    /// The host every handle starts with: <see cref="EasyTransferHost.Library" /> itself, or a copy that reads
+    /// <paramref name="standardInput" /> and, when the engine's environment sets <c>CURL_ALTSVC_HTTP</c> (the harness's stand-in for
+    /// the debug build's test of it, ADR-0497), serves alt-svc over plain <c>http</c> (upstream test1908, BL-2671).
+    /// </summary>
+    /// <param name="standardInput">What the handles read for <c>-</c>, or <see langword="null" /> for the library host's.</param>
+    /// <param name="readEnvironmentVariable">The engine's environment reader, or <see langword="null" /> for the process's, which the stand-in ignores.</param>
+    /// <returns>The host.</returns>
+    private static EasyTransferHost HandleHostOf(Stream? standardInput, Func<string, string?>? readEnvironmentVariable)
+    {
+        bool altSvcUsesOverHttp = readEnvironmentVariable is not null && EngineComposition.UsesAltSvcOverHttp(honoursAltSvcHttpVariable: true, readEnvironmentVariable);
+        if (standardInput is null && !altSvcUsesOverHttp)
+        {
+            return EasyTransferHost.Library;
+        }
+
+        return EasyTransferHost.Library with { StandardInput = standardInput ?? EasyTransferHost.Library.StandardInput, AltSvcUsesOverHttp = altSvcUsesOverHttp };
     }
 
     /// <summary>Gets what the engine's handles share.</summary>
