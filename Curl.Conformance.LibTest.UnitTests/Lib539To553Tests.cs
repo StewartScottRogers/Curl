@@ -381,6 +381,24 @@ public sealed class Lib552Tests
     }
 
     [TestMethod]
+    public async Task RunAsync_TracesSentDataAsTextWithNoHexAndNoTime()
+    {
+        var engine = new FakeCurlEngine
+        {
+            Performing = o =>
+            {
+                _ = o.Callbacks.Debug!(CurlInfoType.DataOut, "ok"u8);
+                return CurlCode.Ok;
+            },
+        };
+        var run = new PortRun(engine, 552, "http://x/552", "http://proxy");
+
+        await new Lib552(TimeProvider.System).RunAsync(run.Context, CancellationToken.None);
+
+        Assert.AreEqual("=> Send data, 2 bytes (0x2)\n0000: ok\n", run.Error.ToString());
+    }
+
+    [TestMethod]
     public void DataBuffer_ReadsTheDataWritesUpToANulAndRewinds()
     {
         var output = new MemoryStream();
