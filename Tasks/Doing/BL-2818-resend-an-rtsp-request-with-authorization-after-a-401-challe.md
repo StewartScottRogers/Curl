@@ -31,3 +31,4 @@ Split from BL-2788 (cost cap). The work is done in stash c61946edb9a51c86eef042d
 ## Log
 
 - 2026-10-19: Created.
+- 2026-10-19: Backlog -> Doing. Criteria at claim: c39a9153 31329c52 5ea3895a.
