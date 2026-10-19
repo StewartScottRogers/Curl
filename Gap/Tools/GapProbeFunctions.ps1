@@ -303,6 +303,11 @@ function Invoke-GapProbe {
 
     .PARAMETER TargetVersion
         The version the reference must name. Default: Gap/Baselines/target.json.
+
+    .PARAMETER BeforeEachRun
+        Called before each binary's run, so a file both command lines name starts the same
+        for each: curl --ssl-sessions empties its file as it exits, which left Curl reading
+        an empty one (GF-0090, BL-2717).
     #>
     param(
         [Parameter(Mandatory = $true)] [AllowEmptyString()] [AllowEmptyCollection()] [string[]] $Arguments,
@@ -312,15 +317,18 @@ function Invoke-GapProbe {
         [int] $TimeoutSeconds = 20,
         [string] $CandidatePath,
         [string] $ReferencePath,
-        [string] $TargetVersion
+        [string] $TargetVersion,
+        [scriptblock] $BeforeEachRun
     )
     $run = @{ Arguments = $Arguments; Environment = $Environment; WorkingDirectory = $WorkingDirectory; StandardInput = $StandardInput; TimeoutSeconds = $TimeoutSeconds }
     $referenceResult = $null
     $reference = Get-GapReferenceCurl -TargetVersion $TargetVersion -Path $ReferencePath
     if ($null -ne $reference -and $reference.Matches) {
+        if ($BeforeEachRun) { & $BeforeEachRun }
         $referenceResult = Invoke-GapRun -Path $reference.Path @run
         $referenceResult.Stderr = Remove-GapDebugBuildWarning $referenceResult.Stderr
     }
+    if ($BeforeEachRun) { & $BeforeEachRun }
     $candidateResult = Invoke-GapRun -Path (Get-GapCandidateCurl -Path $CandidatePath) @run
     return [pscustomobject] @{ Reference = $referenceResult; Candidate = $candidateResult }
 }
@@ -359,6 +367,13 @@ function Invoke-GapProbeSelfTest {
     $both = @($removal.Reference, $removal.Candidate | ForEach-Object { [System.Text.Encoding]::UTF8.GetString($_.Stdout) | ConvertFrom-Json })
     $environmentPassed = @($both | Where-Object { $_.Environment.GAP_PROBE_ADDED -eq 'yes' -and $_.Environment.HOME -eq 'override' -and $null -eq $_.Environment.GAP_PROBE_REMOVED }).Count -eq 2
     & $report 'an -Environment entry is passed and a $null entry removes the variable' $environmentPassed ("candidate stdout: " + [System.Text.Encoding]::UTF8.GetString($removal.Candidate.Stdout))
+
+    $script:BeforeEachRunCalls = 0
+    [void] (Invoke-GapProbe -Arguments @('x') -CandidatePath $echo -ReferencePath $echo -TargetVersion '0.0.1' -BeforeEachRun { $script:BeforeEachRunCalls++ })
+    $withReference = $script:BeforeEachRunCalls
+    $script:BeforeEachRunCalls = 0
+    [void] (Invoke-GapProbe -Arguments @('x') -CandidatePath $echo -ReferencePath $echo -TargetVersion '9.9.9' -BeforeEachRun { $script:BeforeEachRunCalls++ })
+    & $report '-BeforeEachRun runs before each binary: twice with a matching reference, once without (BL-2717)' ($withReference -eq 2 -and $script:BeforeEachRunCalls -eq 1) ("calls: $withReference, then $($script:BeforeEachRunCalls)")
 
     $slow = Invoke-GapProbe -Arguments @('--probe-sleep', '30') -CandidatePath $echo -ReferencePath $echo -TargetVersion '9.9.9' -TimeoutSeconds 2
     $callerDirectory = (Get-Location).ProviderPath
