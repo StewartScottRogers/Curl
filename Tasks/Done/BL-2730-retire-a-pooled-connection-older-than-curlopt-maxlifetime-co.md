@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary, Curl.Networking.UnitTests, Curl.Engine.UnitLibrary, Curl.Api.UnitLibrary, Curl.Api.UnitTests, Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
 requirement: none
 created: 2026-10-18
-completed:
+completed: 2026-10-19
 ---
 # BL-2730 — Retire a pooled connection older than CURLOPT_MAXLIFETIME_CONN so upstream case 1542 passes
 
@@ -32,9 +32,9 @@ Found by BL-2650. Case 1542 (`lib1542`, `Curl.Conformance.LibTest.UnitLibrary/Li
 
 ## Acceptance criteria
 
-- [ ] A pooled connection older than the transfer's `MaxConnectionLifetime` is not reused: it is closed with `shutting down connection #N`, with a focused unit test in `Curl.Networking.UnitTests` for one just under and one past the limit.
-- [ ] `CURL_UPSTREAM_CASE=1542` passes and 1542 is added to `Curl.Conformance.UnitTests/PassingUpstreamCases.txt`.
-- [ ] Every case on `PassingUpstreamCases.txt` still passes; `dotnet build` is clean and the fast tests pass.
+- [x] A pooled connection older than the transfer's `MaxConnectionLifetime` is not reused: it is closed with `shutting down connection #N`, with a focused unit test in `Curl.Networking.UnitTests` for one just under and one past the limit.
+- [x] `CURL_UPSTREAM_CASE=1542` passes and 1542 is added to `Curl.Conformance.UnitTests/PassingUpstreamCases.txt`.
+- [x] Every case on `PassingUpstreamCases.txt` still passes; `dotnet build` is clean and the fast tests pass.
 
 ## Notes
 
@@ -49,6 +49,13 @@ Found by BL-2650. Case 1542 (`lib1542`, `Curl.Conformance.LibTest.UnitLibrary/Li
   `network.MaxConnectionLifetime` on both constructors' connectors; (5) unit tests in `PoolingConnectorTests` for
   just under and just past the limit with `ManualTimeProvider`; (6) run `CURL_UPSTREAM_CASE=1542`, add 1542 to the
   ratchet. Libcurl's `SetMaxConnectionLifetime` setter already exists. No other prerequisite found.
+- 2026-10-19 (lane 2): done as planned. `PoolEntry.OpenedAt`; `PoolingConnector.MaximumConnectionLifetime`
+  (init, 24 h default, zero for no limit, kept by `Over`); `TakeIdleAsync` retires a match older than it (strictly
+  greater, as upstream's `conn_maxage` compares) with only `shutting down connection #N`, the line test1542 checks;
+  `CreatePoolingConnector` sets it on both connectors. Four tests in `PoolingConnectorTests` (1000 ms reused,
+  1001 ms retired, zero no limit, `Over`). `CURL_UPSTREAM_CASE=1542` passes and is on the ratchet; fast tests green;
+  Measure-CodeQuality: Networking and Engine 100/100 line/branch, 0 failing members. The ADR-0694 touches
+  narrowing was not published, as this run may not push.
 
 ## Log
 
@@ -56,3 +63,4 @@ Found by BL-2650. Case 1542 (`lib1542`, `Curl.Conformance.LibTest.UnitLibrary/Li
 - 2026-10-18: Backlog -> Doing. Criteria at claim: af82bdd2 dd52269f 03ca90eb.
 - 2026-10-18: Doing -> Backlog. touches Curl.Engine.UnitLibrary (CreatePoolingConnector must pass MaxConnectionLifetime to the pool), which BL-2735 in Doing also touches
 - 2026-10-19: Backlog -> Doing. Criteria at claim: af82bdd2 dd52269f 03ca90eb.
+- 2026-10-19: Doing -> Done. A pooled connection older than CURLOPT_MAXLIFETIME_CONN is shut down and replaced; upstream case 1542 passes and is on the ratchet
