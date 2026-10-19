@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.UnitTests, Curl.Engine.UnitLibrary, Curl.Engine.UnitTests]
 requirement: none
 created: 2026-10-17
-completed:
+completed: 2026-10-19
 ---
 # BL-2676 — Run upstream case 1922 with the harness's Debug stand-in so CURL_HSTS_HTTP reaches the libtest engine
 
@@ -22,9 +22,9 @@ Found by BL-2546, which ported lib1922 (`Curl.Conformance.LibTest.UnitLibrary/Li
 
 ## Acceptance criteria
 
-- [ ] `CURL_UPSTREAM_CASE=1922` with `NamedUpstreamCase_RunThroughCurl_PassesAsAListedCaseMust` runs (does not skip) test1922; if it passes on Windows it is added to `Curl.Conformance.UnitTests/PassingUpstreamCases.txt`, else it is filed with the board script with its differing lines.
-- [ ] The fix adds a focused unit test in the fixed library's own `.UnitTests` project (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] `CURL_UPSTREAM_CASE=1922` with `NamedUpstreamCase_RunThroughCurl_PassesAsAListedCaseMust` runs (does not skip) test1922; if it passes on Windows it is added to `Curl.Conformance.UnitTests/PassingUpstreamCases.txt`, else it is filed with the board script with its differing lines.
+- [x] The fix adds a focused unit test in the fixed library's own `.UnitTests` project (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
 
@@ -43,9 +43,12 @@ Found by BL-2546, which ported lib1922 (`Curl.Conformance.LibTest.UnitLibrary/Li
 - Added `Curl.Engine.UnitLibrary` and `Curl.Engine.UnitTests` to `touches` for that seam. BL-2734, in
   Doing, touches both, so this task goes back to Backlog until BL-2734 is done.
 
+- 2026-10-19 (lane 1): `ManagedCurlEngine` passes `LearnsHstsOverHttp(readEnvironmentVariable)` (only when a reader is given, as the `CURL_ALTSVC_HTTP` seam does) to `ManagedEngineSharedState`, whose HSTS cache then learns over http; `PlatformFor` reports Debug to a case naming HSTS and setting `CURL_HSTS_HTTP` (only test1922 newly gains it; 446 and 780-783 already had it through `CURL_TIME`). Case 1922 then ran and failed on `Dup effective URL: http://...`: the dup did CONNECT to 443, but `Info.EffectiveUrl` fell back to the URL set when the failed connect left no report URL. `FinishPerformed` now takes the URL the setup chose (the HSTS-switched one). No ADR: this extends ADR-0494's stand-in to the libtest engine. test1922 passes on Windows and is on the ratchet; it touches no path, OS error or certificate. Measure-CodeQuality on Curl.Engine.UnitLibrary: 0 failing members. Touches left whole-project (step 2a narrowing skipped: lanes may not push).
+
 ## Log
 
 - 2026-10-17: Created.
 - 2026-10-18: Backlog -> Doing. Criteria at claim: c007b8bb c59fcab3 3d836d5e.
 - 2026-10-18: Doing -> Backlog. Needs Curl.Engine.UnitLibrary and Curl.Engine.UnitTests (a CURL_HSTS_HTTP seam on ManagedCurlEngine), which BL-2734 in Doing touches
 - 2026-10-19: Backlog -> Doing. Criteria at claim: c007b8bb c59fcab3 3d836d5e.
+- 2026-10-19: Doing -> Done. upstream case 1922 runs and passes: the libtest engine learns HSTS over http under CURL_HSTS_HTTP and reports the HSTS-switched effective URL

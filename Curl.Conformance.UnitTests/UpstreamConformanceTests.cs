@@ -409,6 +409,8 @@ public sealed class UpstreamConformanceTests
     // The HSTS cases that fix the clock with CURL_TIME (446, 780-783) rely on it too: the harness reports Debug to a
     // case naming the HSTS feature and setting CURL_TIME, and RunCurlAsync has Curl honour CURL_TIME as the HSTS clock
     // (ADR-0493, BL-2234), and CURL_HSTS_HTTP, when set, as learning HSTS over plain http (ADR-0494, BL-2250).
+    // The HSTS libtest case 1922 sets CURL_HSTS_HTTP without CURL_TIME: the harness reports Debug to a case naming HSTS
+    // and setting it too, and CreateEngine's environment reader has the libtest engine's HSTS cache learn over http (BL-2676).
     // The Alt-Svc cases that set CURL_ALTSVC_HTTP (358, 359) rely on it to learn and look up Alt-Svc over plain http:
     // the harness reports Debug to a case naming the alt-svc feature and setting CURL_ALTSVC_HTTP, and RunCurlAsync has
     // Curl honour it (ADR-0497, BL-2263). The cases against nghttpx's TLS front on %HTTP2TLSPORT (2400, 2401, 2406) name
@@ -433,7 +435,8 @@ public sealed class UpstreamConformanceTests
             || text.Contains("\naws\n", StringComparison.Ordinal)
             || (text.Contains("\nws\n", StringComparison.Ordinal)
                 && (text.Contains("\nCURL_ENTROPY=", StringComparison.Ordinal) || text.Contains("\nCURL_WS_FORCE_ZERO_MASK=", StringComparison.Ordinal)))
-            || (text.Contains("\nHSTS\n", StringComparison.Ordinal) && text.Contains("\nCURL_TIME=", StringComparison.Ordinal))
+            || (text.Contains("\nHSTS\n", StringComparison.Ordinal)
+                && (text.Contains("\nCURL_TIME=", StringComparison.Ordinal) || text.Contains("\nCURL_HSTS_HTTP=", StringComparison.Ordinal)))
             || (text.Contains("\nalt-svc\n", StringComparison.Ordinal) && text.Contains("\nCURL_ALTSVC_HTTP=", StringComparison.Ordinal))
             || text.Contains(":%HTTP2TLSPORT/", StringComparison.Ordinal)
             || text.Contains("\nCURL_FTP_PWD_STOP=", StringComparison.Ordinal);
