@@ -37,3 +37,4 @@ Measured in BL-2687: adding `CURLOPT_USERPWD "xxx"` to the port makes the reques
 ## Log
 
 - 2026-10-18: Created.
+- 2026-10-18: Backlog -> Doing. Criteria at claim: 8567759c a272e763 91a39c1d.
