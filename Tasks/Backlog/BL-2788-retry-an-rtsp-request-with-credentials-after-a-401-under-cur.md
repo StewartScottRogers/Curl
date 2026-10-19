@@ -4,8 +4,8 @@ title: Retry an RTSP request with credentials after a 401 under CURLAUTH_ANY so 
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: []
-touches: [Curl.Protocol.Rtsp.UnitLibrary, Curl.Protocol.Rtsp.UnitTests, Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
+depends-on: [BL-2789]
+touches: [Curl.Protocol.Rtsp.UnitLibrary, Curl.Protocol.Rtsp.UnitTests, Curl.Conformance.UnitTests/PassingUpstreamCases.txt, Curl.Engine.UnitLibrary/TransferContextFactory.cs, Curl.Engine.UnitTests/TransferContextFactoryTests.cs, Curl.Conformance.UnitLibrary/RtspServerConnection.cs, Curl.Conformance.UnitTests/RtspServerConnectorTests.cs]
 requirement: none
 created: 2026-10-18
 completed:
@@ -39,7 +39,14 @@ Found by BL-2699. With BL-2617 and BL-2704 Done, `CURL_UPSTREAM_CASE=3100` and `
 
 ## Notes
 
+- 2026-10-18 (lane 3, first claim): work done and left uncommitted for the shift's stash:
+  - `Curl.Protocol.Rtsp.UnitLibrary`: `RtspReplyHeadParser` keeps `WWW-Authenticate` values (`RtspReplyHead.Challenges`); `RtspProtocolHandler.ExchangeAsync` sends the request once more, next `CSeq`, with the authenticator's answer when a request sent without `Authorization` gets a successful-`CSeq` 401 with challenges (`AnswerChallenges`). Tests: `RtspProtocolHandlerAuthenticationRetryTests` (7 pass).
+  - Two prerequisites found outside `touches`, added below (no task in Doing on `origin/work/dark-factory` names them): `Curl.Engine.UnitLibrary/TransferContextFactory.cs` ignored `CURLOPT_USERNAME`/`CURLOPT_PASSWORD` (only `CURLOPT_USERPWD` made credentials), so Lib3100 had none; now `CredentialsOf(EasyAuthenticationOptions)` (test `Create_LibcurlUserNameAndPassword_CarriesThemAsCredentials`). `Curl.Conformance.UnitLibrary/RtspServerConnection.cs` lacked rtspd's `swsbounce`, so the second `DESCRIBE` got `<data>` again; now bounced to `<data1>` (test `ReplyWithSwsbounce_...` in `RtspServerConnectorTests`).
+  - With those, case 3100's `<verify><protocol>` matches; it fails next at stdout byte 273: the SDP body is never written (handler discards RTSP bodies). Filed BL-2789 for that; this task depends on it.
+  - Not yet done on resume: run the fast tests (the engine credential change may move other libcurl cases on the ratchet), Measure-CodeQuality for Rtsp, Engine and Conformance libraries, then list 3100.
+
 ## Log
 
 - 2026-10-18: Created.
 - 2026-10-18: Backlog -> Doing. Criteria at claim: 52475b47 2a0a28a6 395361c3 3d836d5e.
+- 2026-10-18: Doing -> Backlog. Waits on BL-2789 (RTSP DESCRIBE body to the write callback); 401 retry, libcurl USERNAME/PASSWORD credentials and rtspd swsbounce are done and stashed
