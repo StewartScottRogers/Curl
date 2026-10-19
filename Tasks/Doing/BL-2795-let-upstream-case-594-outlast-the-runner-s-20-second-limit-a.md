@@ -36,3 +36,4 @@ Through the runner on Windows after BL-2724, `CURL_UPSTREAM_CASE=594` still repo
 ## Log
 
 - 2026-10-19: Created.
+- 2026-10-19: Backlog -> Doing. Criteria at claim: 693d4d4d 1567690e 4272a6b9.
