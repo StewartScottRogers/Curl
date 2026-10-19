@@ -331,17 +331,18 @@ public sealed class Lib3101To5004Tests
     [TestMethod]
     [DataRow(5000, "example.com:9000:127.0.0.1:8990")]
     [DataRow(5004, null)]
-    public async Task Lib5000And5004_StopAtTheSignatureAlgorithmLibcurlDoesNotBuildIn(int program, string? connectTo)
+    public async Task Lib5000And5004_SetTheSigningOptionsOnTheTransfer(int program, string? connectTo)
     {
         LibHttpSignatureRequest port = program == 5000 ? new Lib5000() : new Lib5004();
-        int performs = 0;
+        EasyOptions? seen = null;
         string[] arguments = connectTo is null ? ["http://example.com/5004/foo"] : ["http://example.com:9000/5000/resource", connectTo];
-        var run = new PortRun(new FakeCurlEngine { Performing = _ => { performs++; return CurlCode.Ok; } }, program, arguments);
+        var run = new PortRun(new FakeCurlEngine { Performing = o => { seen = o; return CurlCode.Ok; } }, program, arguments);
 
         LibTestResult result = await port.RunAsync(run.Context, CancellationToken.None);
 
-        Assert.AreEqual((int)CurlCode.NotBuiltIn, result.ExitCode);
-        Assert.AreEqual(0, performs);
-        StringAssert.Contains(run.Error.ToString(), "curl_easy_setopt() failed, with code 4 (");
+        Assert.AreEqual(0, result.ExitCode);
+        Assert.AreEqual("ed25519", seen!.Authentication.HttpSignatureAlgorithm);
+        Assert.IsNotNull(seen.Authentication.HttpSignatureKey);
+        Assert.IsNotNull(seen.Authentication.HttpSignatureKeyId);
     }
 }

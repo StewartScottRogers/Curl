@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: direct
 depends-on: []
-touches: [Libcurl/Options/Authentication/EasyAuthenticationOptionSetters.cs, Libcurl.UnitTests/Options/Authentication/EasyAuthenticationOptionSettersTests.cs, Curl.Conformance.LibTest.UnitTests, Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
+touches: [Libcurl/Options/Authentication/EasyAuthenticationOptionSetters.cs, Libcurl.UnitTests/Options/Authentication/EasyAuthenticationOptionSettersTests.cs, Curl.Conformance.LibTest.UnitTests, Curl.Conformance.UnitTests/PassingUpstreamCases.txt, Curl.Conformance.UnitTests/UpstreamConformanceTests.cs]
 requirement: none
 created: 2026-10-17
-completed:
+completed: 2026-10-18
 ---
 # BL-2713 — Set CURLOPT_HTTPSIG options through Libcurl so upstream cases 5000 and 5004 pass
 
@@ -22,16 +22,19 @@ Found by BL-2552. `Libcurl/Options/CurlOption.cs` names the four options, but no
 
 ## Acceptance criteria
 
-- [ ] `curl_easy_setopt` with each of the four `CURLOPT_HTTPSIG_*` options answers `CURLE_OK` for a valid value and sets the matching `EasyOptions.Authentication` field, with unit tests in `Libcurl.UnitTests`; an algorithm number outside 0 to 2 answers `CURLE_BAD_FUNCTION_ARGUMENT`.
-- [ ] `Lib5000And5004_StopAtTheSignatureAlgorithmLibcurlDoesNotBuildIn` is replaced by a test that checks the signing options reach the transfer.
-- [ ] Upstream cases 5000 and 5004 pass through the runner and are added to `Curl.Conformance.UnitTests/PassingUpstreamCases.txt`, or each one still failing is filed as a task with its differing lines.
-- [ ] `dotnet build` is clean and the fast tests pass; `Measure-CodeQuality.ps1 -Library Libcurl` reports 0 failing members.
+- [x] `curl_easy_setopt` with each of the four `CURLOPT_HTTPSIG_*` options answers `CURLE_OK` for a valid value and sets the matching `EasyOptions.Authentication` field, with unit tests in `Libcurl.UnitTests`; an algorithm number outside 0 to 2 answers `CURLE_BAD_FUNCTION_ARGUMENT`.
+- [x] `Lib5000And5004_StopAtTheSignatureAlgorithmLibcurlDoesNotBuildIn` is replaced by a test that checks the signing options reach the transfer.
+- [x] Upstream cases 5000 and 5004 pass through the runner and are added to `Curl.Conformance.UnitTests/PassingUpstreamCases.txt`, or each one still failing is filed as a task with its differing lines.
+- [x] `dotnet build` is clean and the fast tests pass; `Measure-CodeQuality.ps1 -Library Libcurl` reports 0 failing members.
 
 ## Notes
 
 - 2026-10-18: touches narrowed from Libcurl, Libcurl.UnitTests to files, by reading EasyAuthenticationOptionSetters (the AWS_SIGV4 setter is its model) and the engine HttpSignature options, so it can run beside other Engine tasks.
 
+- 2026-10-18: Added UpstreamConformanceTests.cs to touches: case 5004 sets CURL_HTTPSIG_CREATED=1618884473 in `<setenv>`, so the harness's libtest signing clock (CreateEngine) now honours that variable, else the epoch as before. Algorithm numbers map 0 to cleared, 1 to ed25519, 2 to hmac-sha256.
+
 ## Log
 
 - 2026-10-17: Created.
 - 2026-10-18: Backlog -> Doing. Criteria at claim: 85a97984 e5284905 19a524ae 1ba4f3da.
+- 2026-10-18: Doing -> Done. HTTPSIG setopt options set through Libcurl; cases 5000 and 5004 pass and are on the ratchet

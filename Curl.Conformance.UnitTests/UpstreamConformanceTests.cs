@@ -589,7 +589,7 @@ public sealed class UpstreamConformanceTests
             readEnvironmentVariable: name => invocation.EnvironmentVariables.GetValueOrDefault(name),
             ftpListener: invocation.ConnectionListener,
             defaultConfigFileSearch: new DefaultConfigFileSearch(name => invocation.EnvironmentVariables.GetValueOrDefault(name), OperatingSystem.IsWindows(), executableDirectory: null, accountHomeDirectory: null),
-            signingClock: invocation.Arguments.Any(argument => argument.StartsWith("--httpsig", StringComparison.Ordinal) || argument == "--aws-sigv4") ? new UnixEpochClock() : null,
+            signingClock: invocation.Arguments.Any(argument => argument.StartsWith("--httpsig", StringComparison.Ordinal) || argument == "--aws-sigv4") ? SigningClockFor(invocation.EnvironmentVariables) : null,
             honoursHstsTimeVariable: true,
             honoursHstsHttpVariable: true,
             honoursAltSvcHttpVariable: true,
@@ -611,7 +611,7 @@ public sealed class UpstreamConformanceTests
             CurlEasyErrorText.Of,
             name => invocation.EnvironmentVariables.GetValueOrDefault(name),
             new EngineDialing(new InMemoryServerTcpDialer(invocation.Connector), new LoopbackOnlyDnsResolver(), invocation.DatagramConnector, invocation.ConnectionListener, UsesHandBuiltNtlm: true),
-            signingClock: new UnixEpochClock(),
+            signingClock: SigningClockFor(invocation.EnvironmentVariables),
             webSocketRandomSource: WebSocketRandomSourceFor(invocation.EnvironmentVariables),
             standardInput: invocation.StandardInput,
             stopsFirstFtpTransferBeforePwd: invocation.EnvironmentVariables.ContainsKey("CURL_FTP_PWD_STOP"));
@@ -626,10 +626,16 @@ public sealed class UpstreamConformanceTests
     // The ported libtest programs the ratchet runs a <tool> case's program from, over CreateEngine.
     private static readonly UpstreamLibTests LibTests = new(LibTestPrograms.Ported, CreateEngine);
 
-    // The signing time of upstream's debug build under CURL_FORCETIME and CURL_HTTPSIG_CREATED=0.
-    private sealed class UnixEpochClock : TimeProvider
+    // The signing time of upstream's debug build under CURL_FORCETIME: CURL_HTTPSIG_CREATED seconds after the epoch
+    // when the case sets it (test5004), else the epoch itself.
+    private static FixedClock SigningClockFor(IReadOnlyDictionary<string, string> environment) =>
+        environment.GetValueOrDefault("CURL_HTTPSIG_CREATED") is { } created && long.TryParse(created, NumberStyles.None, CultureInfo.InvariantCulture, out long seconds)
+            ? new FixedClock(DateTimeOffset.FromUnixTimeSeconds(seconds))
+            : new FixedClock(DateTimeOffset.UnixEpoch);
+
+    private sealed class FixedClock(DateTimeOffset now) : TimeProvider
     {
-        public override DateTimeOffset GetUtcNow() => DateTimeOffset.UnixEpoch;
+        public override DateTimeOffset GetUtcNow() => now;
     }
 
     private static string GenerateCertificates() => UpstreamCertificateFolder.Prepare(
