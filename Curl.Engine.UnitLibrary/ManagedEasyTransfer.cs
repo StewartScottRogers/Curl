@@ -755,6 +755,7 @@ internal sealed partial class ManagedEasyTransfer(
         [System.Diagnostics.CodeAnalysis.NotNullWhen(false)] out TransferResult? failure)
     {
         lookedUpCredentials = null;
+        hopCredentials = null;
         failure = null;
         if (ToolInputs is not null)
         {
@@ -762,8 +763,18 @@ internal sealed partial class ManagedEasyTransfer(
         }
 
         TransferCredentialLookup lookup = new(Host.ReadFile, shared.ReadEnvironmentVariable, Host.RunsOnWindows, Host.DiagnosticLog);
+        hopCredentials = lookup.ForRedirectHops(options.Authentication);
         return lookup.TryLookUp(options.Authentication, url, out lookedUpCredentials, out failure);
     }
+
+    /// <summary>
+    /// The lookup <see cref="TryLookUpUrlAndNetrcCredentials" /> chose for each redirect hop's credentials, which
+    /// <see cref="FollowerOf" /> gives the handle's own follower: under <c>CURLOPT_NETRC</c> the hop's own host's
+    /// <c>.netrc</c> entry, or none, whatever <c>CURLOPT_UNRESTRICTED_AUTH</c> says, as libcurl looks the file up
+    /// again for each hop (upstream test2506, BL-2701); <see langword="null" /> to carry the first hop's by the
+    /// follower's origin rules.
+    /// </summary>
+    private HopCredentialSelector? hopCredentials;
 
     /// <summary>
     /// Whether the perform only connects (<see cref="PerformConnectOnlyAsync" />): under <c>CURLOPT_CONNECT_ONLY</c> 1
@@ -1059,7 +1070,7 @@ internal sealed partial class ManagedEasyTransfer(
             Api.Options.Network.ConnectOnly.WebSocket => WebSocketUpgradeDispatcherOf(options),
             Api.Options.Network.ConnectOnly.Connect => ConnectOnlyLoginDispatcherOf(options),
             _ => createDispatcher(options, PerformShared, HandlerCookieStoreOf(cookies), PushSinkOf(), rtspSession),
-        });
+        }, selectHopCredentials: hopCredentials);
 
     /// <summary>
     /// The dispatcher of a <c>CURLOPT_CONNECT_ONLY</c> 1 perform of an <c>ftp</c>, <c>ftps</c>, <c>imap</c> or

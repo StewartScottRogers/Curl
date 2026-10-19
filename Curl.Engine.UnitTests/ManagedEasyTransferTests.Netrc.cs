@@ -199,6 +199,38 @@ public sealed partial class ManagedEasyTransferTests
         Assert.IsTrue(host >= 0 && host < authorization && authorization < date && date < custom, request);
     }
 
+    [TestMethod]
+    public async Task PerformAsync_NetrcOptionalThroughAProxyRedirectedToAHostWithNoEntry_SendsTheEntryOnlyToTheFirstHost()
+    {
+        ScriptedConnector server = new(
+        [
+            "HTTP/1.1 301 Moved\r\nLocation: http://numbertwo.example/25060002\r\nContent-Length: 0\r\n\r\n"u8.ToArray(),
+            "HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n"u8.ToArray(),
+        ]);
+        EngineDialing dialing = new(new ScriptedTcpDialer(server), new LoopbackDnsResolver(), new RecordingDatagramConnector(Curl.Protocol.Abstractions.CurlExitCode.CouldntConnect, "no udp"));
+        await using ManagedCurlEngine engine = new(TimeProvider.System, null, dialing: dialing);
+        await using ManagedEasyTransfer easy = (ManagedEasyTransfer)engine.CreateEasy();
+        easy.Host = EasyTransferHost.Library with
+        {
+            ReadFile = path => path == NetrcPath ? "machine site.example login batman password robin\n"u8.ToArray() : null,
+        };
+        easy.Options = NetrcOptions(NetrcUsage.Optional, "http://127.0.0.1:9000/") with
+        {
+            Network = new EasyNetworkOptions { Url = "http://site.example/" },
+            Authentication = new EasyAuthenticationOptions { Netrc = NetrcUsage.Optional, NetrcFile = NetrcPath, UnrestrictedAuthentication = true },
+            Http = new EasyHttpOptions { FollowLocation = FollowLocation.All },
+        };
+
+        CurlCode code = await easy.PerformAsync(CancellationToken.None);
+
+        Assert.AreEqual(CurlCode.Ok, code);
+        string written = Encoding.ASCII.GetString(server.Written);
+        int second = written.IndexOf("GET http://numbertwo.example/25060002 ", StringComparison.Ordinal);
+        Assert.IsGreaterThan(0, second, written);
+        Assert.Contains("Authorization: Basic YmF0bWFuOnJvYmlu\r\n", written[..second]);
+        Assert.DoesNotContain("Authorization:", written[second..]);
+    }
+
     /// <summary>Performs <c>http://xxx:yyy@127.0.0.1:9000/1978</c> with <paramref name="authentication" /> and <paramref name="http" /> on an engine dialing <paramref name="server" />, and gives the request it wrote.</summary>
     private static async Task<string> PerformOverScriptedServerAsync(ScriptedConnector server, EasyAuthenticationOptions authentication, EasyHttpOptions? http = null)
     {
