@@ -42,3 +42,4 @@ Found by BL-2699. With BL-2617 and BL-2704 Done, `CURL_UPSTREAM_CASE=3100` and `
 ## Log
 
 - 2026-10-18: Created.
+- 2026-10-18: Backlog -> Doing. Criteria at claim: 52475b47 2a0a28a6 395361c3 3d836d5e.
