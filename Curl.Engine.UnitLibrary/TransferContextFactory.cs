@@ -72,6 +72,13 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
     internal IReadOnlyList<string> KeptDigestChallenges { get; set; } = [];
 
     /// <summary>
+    /// Gets or sets every context's <see cref="HttpRequestOptions.AuthSchemePicked" />: the scheme a
+    /// Libcurl handle's previous transfer picked, which libcurl 8.22.0 keeps on the easy handle
+    /// (<c>data->state.authhost.picked</c>, upstream test694, BL-2709); <see cref="HttpAuthSchemes.None" /> by default.
+    /// </summary>
+    internal HttpAuthSchemes KeptAuthSchemePicked { get; set; }
+
+    /// <summary>
     /// Creates the context for one transfer, carrying every option a handler reads.
     /// </summary>
     /// <param name="settings">The tool settings: the post data, TLS level, FTP and mail flags and the creation mode no option group carries.</param>
@@ -256,6 +263,7 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
                 {
                     HstsStore = HstsStore,
                     KeptDigestChallenges = KeptDigestChallenges,
+                    AuthSchemePicked = KeptAuthSchemePicked,
                     ProxyTunnel = proxyOptions.HttpProxyTunnel || ConnectToTunnelsThroughProxy(network, url, proxy),
                 },
                 altSvc),

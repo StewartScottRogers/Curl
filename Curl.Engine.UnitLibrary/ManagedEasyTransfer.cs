@@ -307,6 +307,14 @@ internal sealed partial class ManagedEasyTransfer(
     /// </summary>
     private IReadOnlyList<string> keptDigestChallenges = [];
 
+    /// <summary>
+    /// The scheme the last perform's server picked (<see cref="TransferReport.AuthSchemePicked" />), which the next
+    /// perform starts from, as libcurl 8.22.0 keeps <c>data->state.authhost.picked</c> on the easy handle and
+    /// <c>Curl_pretransfer</c> resets only <c>want</c> (upstream test694, BL-2709); kept through a perform that ends
+    /// with no result, and <see cref="HttpAuthSchemes.None" /> before any perform and after <see cref="Reset" />.
+    /// </summary>
+    private HttpAuthSchemes keptAuthSchemePicked;
+
     /// <summary>The alt-svc cache the handle's first perform opened, kept across performs and <see cref="Reset" /> and saved by <see cref="DisposeAsync" /> (BL-2671).</summary>
     private AltSvcTransferCache? handleAltSvc;
 
@@ -983,12 +991,33 @@ internal sealed partial class ManagedEasyTransfer(
             callbackProgress,
             callbackReads).ConfigureAwait(false);
         await CleanUpUnlessToolDoesAsync(toolInputs, options, settings, cookies, state, transferUrl).ConfigureAwait(false);
-        LastResult = recorder is null ? result : recorder.ReportOn(result);
-        keptDigestChallenges = ChallengesOfLast401(result);
-        keptDigestOrigin = OriginOf(url);
+        KeepHandleStateOf(recorder, result, url);
         long connectionId = toolEvents is null ? ConnectionIdOf(result, state) : ToolConnectionIdOf(result, state, toolEvents);
         return FinishPerformed(LastResult, options, transferId, cookies, connectionId, AbortedTextOf(callbackReads), toolEvents?.State);
     }
+
+    /// <summary>
+    /// Keeps what the handle carries from a finished perform to the next: <see cref="LastResult" /> (with the
+    /// verify results <paramref name="recorder" /> kept, when there is one), the Digest challenges of a final 401 and
+    /// the origin they came from, and the scheme the server picked (<see cref="keptAuthSchemePicked" />).
+    /// </summary>
+    /// <param name="recorder">The verify-result recorder, or <see langword="null" /> when the runner's events report.</param>
+    /// <param name="result">The perform's result, or <see langword="null" /> after an abort.</param>
+    /// <param name="url">The URL performed.</param>
+    private void KeepHandleStateOf(TlsVerifyResultRecordingTransferEvents? recorder, TransferResult? result, CurlUrl url)
+    {
+        LastResult = recorder is null ? result : recorder.ReportOn(result);
+        keptDigestChallenges = ChallengesOfLast401(result);
+        keptDigestOrigin = OriginOf(url);
+        keptAuthSchemePicked = AuthSchemeKeptAfter(result, keptAuthSchemePicked);
+    }
+
+    /// <summary>The scheme the handle keeps after a perform: its report's picked scheme, else the one kept before.</summary>
+    /// <param name="result">The perform's result, or <see langword="null" /> after an abort.</param>
+    /// <param name="kept">The scheme kept before the perform.</param>
+    /// <returns>The scheme to keep.</returns>
+    internal static HttpAuthSchemes AuthSchemeKeptAfter(TransferResult? result, HttpAuthSchemes kept) =>
+        result?.Report?.AuthSchemePicked ?? kept;
 
     /// <summary>
     /// The follower the transfer runs through: the curl tool's runner's from <paramref name="toolDispatch" />, or
@@ -1611,6 +1640,7 @@ internal sealed partial class ManagedEasyTransfer(
     {
         headers.Clear();
         keptDigestChallenges = [];
+        keptAuthSchemePicked = HttpAuthSchemes.None;
         Options = new EasyOptions();
         Info = new TransferInfo { TransferId = Info.TransferId, CookieList = Info.CookieList };
         ToolSettings = null;
@@ -1697,7 +1727,7 @@ internal sealed partial class ManagedEasyTransfer(
         CancellationToken cancellationToken)
     {
         EngineToolTransferOutputs outputs = ToolOutputs ?? OwnOutputsOf(options.Callbacks, PauseGateFor(url), RecordsHeaders(url) ? headers : null);
-        TransferContextFactory factory = toolDispatch?.ContextFactory ?? new TransferContextFactory(Stream.Null, shared.TimeProvider) { HstsStore = PerformShared.Hsts, DiagnosticLog = Host.DiagnosticLog, KeptDigestChallenges = OriginOf(url) == keptDigestOrigin ? keptDigestChallenges : [] };
+        TransferContextFactory factory = toolDispatch?.ContextFactory ?? new TransferContextFactory(Stream.Null, shared.TimeProvider) { HstsStore = PerformShared.Hsts, DiagnosticLog = Host.DiagnosticLog, KeptDigestChallenges = OriginOf(url) == keptDigestOrigin ? keptDigestChallenges : [], KeptAuthSchemePicked = keptAuthSchemePicked };
         return LastContext = factory.Create(
             settings,
             options.Http,
