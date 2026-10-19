@@ -8,7 +8,7 @@ depends-on: []
 touches: [RunDarkFactory.ps1]
 requirement: none
 created: 2026-10-19
-completed:
+completed: 2026-10-19
 ---
 # BL-2813 — Fix AF-0286: BL-2652 cost $6.52, 6.3 times the median task cost of $1.04 (lib1560 port, 110 turns)
 
@@ -41,12 +41,16 @@ The finding describes a past run's cost, which no fix can change, so no re-audit
 
 ## Acceptance criteria
 
-- [ ] The cause of the cost is named in this task, and either fixed or recorded as unavoidable.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The cause of the cost is named in this task, and either fixed or recorded as unavoidable.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+Cause (from the finding's measurements; the log itself sits under the audit-guarded paths and was not read): BL-2652 ported libtest program 1560, the URL API test, 2549 lines. The 99k output tokens are the port itself, and 13.3M cache-read tokens over 110 turns are the whole context re-read on each turn, plus fix-and-retest cycles (26/29 -> 27/29 -> 1163/1164 -> ok). Opus was chosen correctly for the feature pipeline.
+Verdict: unavoidable for the port's size. A 2549-line port cannot be written in fewer output tokens, and the retest cycles were the work converging on a faithful port, not a loop on one file. The factory already carries the guards against the avoidable kinds of waste (rules on Read-once, batching, one test run per change, splitting oversize tasks). No change to RunDarkFactory.ps1 is warranted, so none was made.
+Per the finding, the first audit after this task reaches Done closes AF-0286 as task-done-historical.
 
 ## Log
 
 - 2026-10-19: Created.
 - 2026-10-19: Backlog -> Doing. Criteria at claim: af4de8c2 9742157d.
+- 2026-10-19: Doing -> Done. Cause named (size of the lib1560 port); unavoidable, recorded in Notes; no code changed.
