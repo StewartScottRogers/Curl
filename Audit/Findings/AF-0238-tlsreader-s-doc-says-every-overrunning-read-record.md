@@ -3,8 +3,8 @@ id: AF-0238
 title: TlsReader's doc says every overrunning read records DecodeError, but ReadVector skips the bounds check, so ServerNameExtension.DecodeHostName throws instead of returning an alert
 auditor: truthfulness
 severity: High
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-18_1905.md: the reproduction no longer reproduces.
 key: truthfulness:Curl.Tls.UnitLibrary/TlsReader.cs:TlsReader.ReadVector:false-doc-comment
 reproduction: none
 task: BL-2575
@@ -13,9 +13,9 @@ found: 2026-10-16
 found-at: 16500922292d0d0bcaede88acdabc2500cf08ebf
 scorecard: 2026-10-16_1623.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-18
+closed-how: reliable-reaudit
+closed-by: 2026-10-18_1905.md
 ---
 # AF-0238 - TlsReader's doc says every overrunning read records DecodeError, but ReadVector skips the bounds check, so ServerNameExtension.DecodeHostName throws instead of returning an alert
 
@@ -43,8 +43,10 @@ $d = Join-Path $env:TEMP 'tlsreader-repro'; New-Item -ItemType Directory -Force 
 ## Re-audits
 
 - 2026-10-18 | 2026-10-18_1045.md | not re-audited | overlaps planted defect PD-103 in Curl.Tls.UnitLibrary/TlsReader.cs, so the auditor's verdict (reproduces yes) is set aside: Ran the reproduction (TEMP pointed at the scratch folder): the file-based app printed 'ArgumentOutOfRangeException', so ServerNameExtension.DecodeHostName still throws on the overrunning input instead of returning a DecodeError alert. TlsReader.cs:5 still says the first read that runs past the end records TlsAlertDescription.DecodeError, and lines 8 and 72 still describe ReadVector sharing that failure.
+- 2026-10-18 | 2026-10-18_1905.md | reproduces: no | Ran the reproduction verbatim (dotnet run of the sni.cs file-based app against Curl.Tls.UnitLibrary): it printed 'DecodeError', the alert, not an exception type name. TlsReader.ReadVector (Curl.Tls.UnitLibrary/TlsReader.cs:72-77) now reads the length and calls Take(length), which records the failure, so DecodeHostName returns the alert instead of throwing.
 
 ## Log
 
 - 2026-10-16: filed proposed.
 - 2026-10-16: proposed -> accepted.
+- 2026-10-18: accepted -> closed. Re-audit 2026-10-18_1905.md: the reproduction no longer reproduces.

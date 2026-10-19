@@ -3,8 +3,8 @@ id: AF-0243
 title: CI red for 36.28 minutes from run 38808821626: OpenForWriteAsync_ParentIsAFileOnPosix_IsNotADirectory failed on Linux and macOS after BL-2328's commit 1c068661
 auditor: process
 severity: Low
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-18_1905.md: the reproduction no longer reproduces.
 key: process:logs:OpenForWriteAsync_ParentIsAFileOnPosix_IsNotADirectory:ci-red
 reproduction: none
 task: BL-2756
@@ -13,9 +13,9 @@ found: 2026-10-16
 found-at: 16500922292d0d0bcaede88acdabc2500cf08ebf
 scorecard: 2026-10-16_1623.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-18
+closed-how: reliable-reaudit
+closed-by: 2026-10-18_1905.md
 ---
 # AF-0243 - CI red for 36.28 minutes from run 38808821626: OpenForWriteAsync_ParentIsAFileOnPosix_IsNotADirectory failed on Linux and macOS after BL-2328's commit 1c068661
 
@@ -43,8 +43,10 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Re-audits
 
 - 2026-10-18 | 2026-10-18_1045.md | reproduces: yes | The original reproduction still shows the 36.28-min spell from run 38808821626 and BL-2354 filed at 14:28:17. Re-audited by mechanism over 2026-10-16 onward: a test passing on the Windows-only lanes again failed on Linux and macOS after a lane commit and kept CI red over 30 minutes. Run 39077398008 on 35c73029, RunAsync_WhenTheServersStreamsAreAllTaken_OpensAnotherConnectionForTheNextTransfer on Linux and macOS, red 44.63 min (2026-10-17T23:13:09Z to 23:57:47Z). Fix task BL-2677 (L2, 16:15:23 to 16:20:22 local).
+- 2026-10-18 | 2026-10-18_1905.md | reproduces: no | Ran the reproduction: the 2026-10-15 window still shows the 36.28-minute spell from run 38808821626 and '14:28:17 BL-2354 ci filed: regression OpenForWriteAsync_ParentIsAFileOnPosix_IsNotADirectory on Linux+macOS'. Over this window (-Since 2026-10-18, 71 tasks done, CI runs from 2026-10-16): ciRedMinutes 0, ciRedSpells empty.
 
 ## Log
 
 - 2026-10-16: filed proposed.
 - 2026-10-16: proposed -> accepted.
+- 2026-10-18: accepted -> closed. Re-audit 2026-10-18_1905.md: the reproduction no longer reproduces.

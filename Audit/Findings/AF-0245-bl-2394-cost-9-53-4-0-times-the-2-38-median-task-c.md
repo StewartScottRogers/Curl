@@ -3,8 +3,8 @@ id: AF-0245
 title: BL-2394 cost $9.53, 4.0 times the $2.38 median task cost: three claims, a 90-turn final run and a conflict-resolve run
 auditor: process
 severity: Low
-status: accepted
-reason: 
+status: closed
+reason: Audit 2026-10-18_1905.md: a cost-outlier finding records a past run's cost, which no fix can change; its tasks (BL-2582) are Done at e17dfce54cf6, so it closes without a re-audit (ADR-0422, amended 2026-10-14).
 key: process:BL-2394:BL-2394:cost-outlier
 reproduction: none
 task: BL-2582
@@ -13,9 +13,9 @@ found: 2026-10-16
 found-at: 16500922292d0d0bcaede88acdabc2500cf08ebf
 scorecard: 2026-10-16_1623.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-18
+closed-how: task-done-historical
+closed-by: 2026-10-18_1905.md
 ---
 # AF-0245 - BL-2394 cost $9.53, 4.0 times the $2.38 median task cost: three claims, a 90-turn final run and a conflict-resolve run
 
@@ -48,3 +48,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 - 2026-10-16: filed proposed.
 - 2026-10-16: proposed -> accepted.
+- 2026-10-18: accepted -> closed. Audit 2026-10-18_1905.md: a cost-outlier finding records a past run's cost, which no fix can change; its tasks (BL-2582) are Done at e17dfce54cf6, so it closes without a re-audit (ADR-0422, amended 2026-10-14).

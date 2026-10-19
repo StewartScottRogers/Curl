@@ -3,8 +3,8 @@ id: AF-0242
 title: BL-2394 claimed 3 times and requeued twice: split for size, then blocked on a missing engine hook, before finishing
 auditor: process
 severity: Low
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-18_1905.md: the reproduction no longer reproduces.
 key: process:BL-2394:BL-2394:redone-work
 reproduction: none
 task: BL-2755
@@ -13,9 +13,9 @@ found: 2026-10-16
 found-at: 16500922292d0d0bcaede88acdabc2500cf08ebf
 scorecard: 2026-10-16_1623.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-18
+closed-how: reliable-reaudit
+closed-by: 2026-10-18_1905.md
 ---
 # AF-0242 - BL-2394 claimed 3 times and requeued twice: split for size, then blocked on a missing engine hook, before finishing
 
@@ -43,8 +43,10 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Re-audits
 
 - 2026-10-18 | 2026-10-18_1045.md | reproduces: yes | The original reproduction still shows BL-2394 with claims 3 (REQUEUE 'Split: too big for one run', REQUEUE 'Waits on BL-2479: the engine has no hook', DONE 09:38:46). Re-audited by mechanism over 2026-10-16 onward: the same cause, split for size and then blocked on a missing piece of the runner/engine, crossed again with BL-2529. It was claimed 3 times, requeued at 03:35:00 L5 ('Split for size') and at 05:59:24 L1 ('Waits on BL-2601: the case runner skips cases 520 to 537'), and finished at 08:37:34 L1 on 2026-10-17.
+- 2026-10-18 | 2026-10-18_1905.md | reproduces: no | Ran the reproduction: BL-2394 claims=3, costUsd 9.5261, done; requeued 'Split: too big for one run' then 'Waits on BL-2479: the engine has no hoo~'. Over this window: tasksClaimedMoreThanOnce 0, no task claimed 3 times or requeued twice. The engine-hook cause recurred only as single requeues (BL-2669 'Needs BL-2786 (engine seam ...'), each claimed once.
 
 ## Log
 
 - 2026-10-16: filed proposed.
 - 2026-10-16: proposed -> accepted.
+- 2026-10-18: accepted -> closed. Re-audit 2026-10-18_1905.md: the reproduction no longer reproduces.

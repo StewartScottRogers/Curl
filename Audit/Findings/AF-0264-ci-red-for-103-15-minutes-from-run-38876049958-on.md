@@ -3,8 +3,8 @@ id: AF-0264
 title: CI red for 103.15 minutes from run 38876049958 on 241c183e (Quality gates); fix done in 16.7 min, then 5 cancelled runs
 auditor: process
 severity: Low
-status: accepted
-reason: 
+status: closed
+reason: Duplicate of AF-0244: the same CI red spell (run 38876049958, the Quality gates job, Libcurl CurlMulti.SetOption branch gap, fixed by BL-2466 and BL-2467), counted again because the window starting 2026-10-16 includes it.
 key: process:logs:38876049958:ci-red
 reproduction: none
 task: BL-2775
@@ -12,10 +12,10 @@ tasks: BL-2775
 found: 2026-10-18
 found-at: 19ea231be8b4d749462d15058a3c6b97c7e70836
 scorecard: 2026-10-18_1045.md
-duplicate-of:
-closed:
-closed-how:
-closed-by:
+duplicate-of: AF-0244
+closed: 2026-10-19
+closed-how: duplicate
+closed-by: session
 ---
 # AF-0264 - CI red for 103.15 minutes from run 38876049958 on 241c183e (Quality gates); fix done in 16.7 min, then 5 cancelled runs
 
@@ -46,3 +46,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 - 2026-10-18: filed proposed.
 - 2026-10-18: proposed -> accepted.
+- 2026-10-19: accepted -> closed. Duplicate of AF-0244: the same CI red spell (run 38876049958, the Quality gates job, Libcurl CurlMulti.SetOption branch gap, fixed by BL-2466 and BL-2467), counted again because the window starting 2026-10-16 includes it.

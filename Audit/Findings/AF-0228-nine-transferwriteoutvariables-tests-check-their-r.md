@@ -3,8 +3,8 @@ id: AF-0228
 title: Nine TransferWriteOutVariables tests check their rendered -w text only through Show, which never asserts
 auditor: quality
 severity: Medium
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-18_1905.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-10-18_1045.md, 2026-10-18_1905.md).
 key: quality:Curl.Output.UnitTests/TransferWriteOutVariablesFromTransferInfoTests.cs:Show:no-assertion
 reproduction: none
 task: BL-2565
@@ -13,9 +13,9 @@ found: 2026-10-16
 found-at: 16500922292d0d0bcaede88acdabc2500cf08ebf
 scorecard: 2026-10-16_1623.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-18
+closed-how: consecutive
+closed-by: 2026-10-18_1045.md, 2026-10-18_1905.md
 ---
 # AF-0228 - Nine TransferWriteOutVariables tests check their rendered -w text only through Show, which never asserts
 
@@ -43,8 +43,10 @@ Select-String -Path Curl.Output.UnitTests/TransferWriteOutVariablesFromTransferI
 ## Re-audits
 
 - 2026-10-18 | 2026-10-18_1045.md | reproduces: no | Ran the reproduction: Count = 18. Each of the nine TransferWriteOutVariables tests now ends in Assert.AreEqual on its rendered text (lines 41, 57-58, 71, 90-92, 119-121, 134, 153, 168-169, 183, 208-209), plus Assert.ThrowsExactly at 219-221.
+- 2026-10-18 | 2026-10-18_1905.md | reproduces: no | Ran the Select-String count: 18 Assert lines. Each of the file's tests now ends in real Assert.AreEqual/IsTrue/ThrowsExactly checks (lines 41, 57-58, 71, 90-92, 119-121, 134, 153, 168-169, 183-184, 208-209); none relies on Show.
 
 ## Log
 
 - 2026-10-16: filed proposed.
 - 2026-10-16: proposed -> accepted.
+- 2026-10-18: accepted -> closed. Re-audit 2026-10-18_1905.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-10-18_1045.md, 2026-10-18_1905.md).

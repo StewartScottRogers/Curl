@@ -3,8 +3,8 @@ id: AF-0263
 title: BL-2529 claimed 3 times and requeued twice: split for size, then held by a case-runner gap (BL-2601), before finishing
 auditor: process
 severity: Medium
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-18_1905.md: the reproduction no longer reproduces.
 key: process:logs:BL-2529:redone-work
 reproduction: none
 task: BL-2774
@@ -13,9 +13,9 @@ found: 2026-10-18
 found-at: 19ea231be8b4d749462d15058a3c6b97c7e70836
 scorecard: 2026-10-18_1045.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-18
+closed-how: reliable-reaudit
+closed-by: 2026-10-18_1905.md
 ---
 # AF-0263 - BL-2529 claimed 3 times and requeued twice: split for size, then held by a case-runner gap (BL-2601), before finishing
 
@@ -42,7 +42,10 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-10-18 | 2026-10-18_1905.md | reproduces: no | Ran the reproduction: BL-2529 claims=3, done; requeued 'Split for size: waits on BL-2595' then 'Waits on BL-2601: the case runner skips~'. Over this window: tasksClaimedMoreThanOnce 0, every requeued task requeued once only. Neither a split for size nor a case-runner gap repeated on the same task.
+
 ## Log
 
 - 2026-10-18: filed proposed.
 - 2026-10-18: proposed -> accepted.
+- 2026-10-18: accepted -> closed. Re-audit 2026-10-18_1905.md: the reproduction no longer reproduces.

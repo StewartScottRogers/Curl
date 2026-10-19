@@ -3,8 +3,8 @@ id: AF-0237
 title: --parallel with a slow --interface bind failure: Curl prints meter rows before the curl: (45) line and runs the error on after them; curl prints the error first
 auditor: conformance
 severity: Low
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-18_1905.md: the reproduction no longer reproduces.
 key: conformance:Curl.Console/ParallelProgressMeter.cs:--parallel:stderr
 reproduction: none
 task: BL-2574
@@ -13,9 +13,9 @@ found: 2026-10-16
 found-at: 16500922292d0d0bcaede88acdabc2500cf08ebf
 scorecard: 2026-10-16_1623.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-18
+closed-how: reliable-reaudit
+closed-by: 2026-10-18_1905.md
 ---
 # AF-0237 - --parallel with a slow --interface bind failure: Curl prints meter rows before the curl: (45) line and runs the error on after them; curl prints the error first
 
@@ -43,8 +43,10 @@ dotnet build Curl.Console -c Release -v q; foreach ($c in @('C:\Program Files\Gi
 ## Re-audits
 
 - 2026-10-18 | 2026-10-18_1045.md | reproduces: no | Ran the given reproduction against curl 8.22.0 (Schannel, debug-enabled) and Curl at planted HEAD 6dc0a81. The first stderr line is the error for both: curl 'curl: (45) Failed to connect to 127.0.0.1:63411 after 2914 ms: Failed binding local connection end', Curl the same text 'after 2728 ms'. No meter row comes before the error.
+- 2026-10-18 | 2026-10-18_1905.md | reproduces: no | Ran the given reproduction: first stderr line is `curl: (45) Failed to connect to 127.0.0.1:63411 after N ms: Failed binding local connection end` for both curl 8.22.0 and Curl, both exit 45, and the parallel meter rows follow it in both; the error is no longer run on after meter rows.
 
 ## Log
 
 - 2026-10-16: filed proposed.
 - 2026-10-16: proposed -> accepted.
+- 2026-10-18: accepted -> closed. Re-audit 2026-10-18_1905.md: the reproduction no longer reproduces.

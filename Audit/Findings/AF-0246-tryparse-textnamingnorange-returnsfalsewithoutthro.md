@@ -42,6 +42,8 @@ Select-String -Path Curl.Core.UnitTests/ByteRangeParserTests.cs -Pattern '^\s*//
 
 ## Re-audits
 
+- 2026-10-18 | 2026-10-18_1905.md | reproduces: no | Ran the Select-String: no match. TryParse_TextNamingNoRange_ReturnsFalseWithoutThrowing now has live Assert.IsFalse(parsed) and Assert.IsNull(range) (lines 80-81).
+
 ## Log
 
 - 2026-10-18: filed proposed.

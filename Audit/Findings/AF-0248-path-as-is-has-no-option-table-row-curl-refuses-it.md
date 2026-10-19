@@ -42,6 +42,8 @@ dotnet test Curl.Cli.UnitTests --filter "TestCategory!=Integration"
 
 ## Re-audits
 
+- 2026-10-18 | 2026-10-18_1905.md | reproduces: no | Ran dotnet test Curl.Cli.UnitTests --filter "TestCategory!=Integration": Passed, Failed 0, Passed 3952, Skipped 18. CommandLineOptionTable.cs:330 has the path-as-is NegatableFlag row.
+
 ## Log
 
 - 2026-10-18: filed proposed.
