@@ -31,3 +31,4 @@ Found by BL-2543, which ported lib1589. The runner reports `differs at byte 217 
 ## Log
 
 - 2026-10-17: Created.
+- 2026-10-18: Backlog -> Doing. Criteria at claim: 34787d22 48be2d2b 3d836d5e.
