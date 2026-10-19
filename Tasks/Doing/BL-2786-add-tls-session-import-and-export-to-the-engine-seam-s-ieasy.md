@@ -31,3 +31,4 @@ Found by BL-2669: `IEasyTransfer` (`Curl.Api.UnitLibrary/EngineContracts/IEasyTr
 ## Log
 
 - 2026-10-18: Created.
+- 2026-10-18: Backlog -> Doing. Criteria at claim: 0d319d3f a4536fd9 3d836d5e.
