@@ -28,8 +28,10 @@ internal sealed class ManagedEngineSharedState
     /// <param name="signingClock">The clock <c>CURLOPT_AWS_SIGV4</c> and the HTTP signatures sign with (BL-2675); <see langword="null" />, in production, for <see cref="TimeProvider.System" />.</param>
     /// <param name="webSocketRandomSource">Where every handle's WebSocket key and frame masks come from (BL-2688); <see langword="null" />, in production, for <see cref="SystemWebSocketRandomSource" />.</param>
     /// <param name="ftpPwdStop">The stand-in for the debug build's <c>CURL_FTP_PWD_STOP</c> (BL-2636); <see langword="null" />, in production, for none.</param>
-    internal ManagedEngineSharedState(TimeProvider timeProvider, Func<CurlExitCode, string> easyErrorText, Func<string, string?>? readEnvironmentVariable = null, EngineDialing? dialing = null, TimeProvider? signingClock = null, IWebSocketRandomSource? webSocketRandomSource = null, FirstTransferFtpPwdStop? ftpPwdStop = null)
+    /// <param name="createFormBoundary">What gives every handle's <c>CURLOPT_MIMEPOST</c> bodies their boundary (BL-2695); <see langword="null" />, in production, for curl's random one.</param>
+    internal ManagedEngineSharedState(TimeProvider timeProvider, Func<CurlExitCode, string> easyErrorText, Func<string, string?>? readEnvironmentVariable = null, EngineDialing? dialing = null, TimeProvider? signingClock = null, IWebSocketRandomSource? webSocketRandomSource = null, FirstTransferFtpPwdStop? ftpPwdStop = null, Func<string>? createFormBoundary = null)
     {
+        CreateFormBoundary = createFormBoundary;
         Dialing = dialing;
         SigningClock = signingClock;
         WebSocketRandomSource = webSocketRandomSource;
@@ -83,7 +85,15 @@ internal sealed class ManagedEngineSharedState
         SigningClock = engine.SigningClock;
         WebSocketRandomSource = engine.WebSocketRandomSource;
         FtpPwdStop = engine.FtpPwdStop;
+        CreateFormBoundary = engine.CreateFormBoundary;
     }
+
+    /// <summary>
+    /// Gets what gives every handle's <c>CURLOPT_MIMEPOST</c> bodies their boundary: the conformance harness's stand-in for
+    /// the debug build's boundary under <c>CURL_ENTROPY</c> (upstream test1972, BL-2695); <see langword="null" />, in production,
+    /// for curl's random one.
+    /// </summary>
+    internal Func<string>? CreateFormBoundary { get; }
 
     /// <summary>
     /// Gets where every handle's WebSocket key and frame masks come from, one sequence for the whole engine as the

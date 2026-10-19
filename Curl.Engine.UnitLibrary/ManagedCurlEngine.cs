@@ -82,6 +82,10 @@ public sealed class ManagedCurlEngine : ICurlEngine
     /// harness's stand-in for the debug build's <c>CURL_FTP_PWD_STOP</c> (upstream test753, BL-2636, ADR-0687);
     /// <see langword="false" /> sends <c>PWD</c> as a release build does.
     /// </param>
+    /// <param name="createFormBoundary">
+    /// What gives every handle's <c>CURLOPT_MIMEPOST</c> bodies their boundary: the conformance harness's stand-in for the debug
+    /// build's boundary under <c>CURL_ENTROPY</c> (upstream test1972, BL-2695); <see langword="null" /> for curl's random one.
+    /// </param>
     internal ManagedCurlEngine(
         TimeProvider timeProvider,
         Func<EasyOptions, ManagedEngineSharedState, ICookieStore?, ProtocolDispatcher>? createDispatcher,
@@ -91,9 +95,10 @@ public sealed class ManagedCurlEngine : ICurlEngine
         TimeProvider? signingClock = null,
         IWebSocketRandomSource? webSocketRandomSource = null,
         Stream? standardInput = null,
-        bool stopsFirstFtpTransferBeforePwd = false)
+        bool stopsFirstFtpTransferBeforePwd = false,
+        Func<string>? createFormBoundary = null)
     {
-        shared = new ManagedEngineSharedState(timeProvider, easyErrorText ?? (_ => string.Empty), readEnvironmentVariable, dialing, signingClock, webSocketRandomSource, FirstTransferFtpPwdStop.When(stopsFirstFtpTransferBeforePwd));
+        shared = new ManagedEngineSharedState(timeProvider, easyErrorText ?? (_ => string.Empty), readEnvironmentVariable, dialing, signingClock, webSocketRandomSource, FirstTransferFtpPwdStop.When(stopsFirstFtpTransferBeforePwd), createFormBoundary);
         handleHost = HandleHostOf(standardInput, readEnvironmentVariable);
         this.createDispatcher = createDispatcher is null ? CreateDispatcher : (options, state, cookies, _, _) => createDispatcher(options, state, cookies);
     }

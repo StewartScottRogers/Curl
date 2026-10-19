@@ -28,7 +28,7 @@ internal sealed class ForcedEntropyWebSocketRandomSource(string entropy) : IWebS
     }
 
     // The seed starts as zero and takes at most the variable's first four bytes, then ntohl reads them big-endian.
-    private static uint FirstValue(string entropy)
+    internal static uint FirstValue(string entropy)
     {
         Span<byte> seed = stackalloc byte[sizeof(uint)];
         seed.Clear();

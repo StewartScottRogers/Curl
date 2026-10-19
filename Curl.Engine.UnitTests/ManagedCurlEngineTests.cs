@@ -5,6 +5,7 @@ using Curl.Api.EngineContracts.Mime;
 using Curl.Api.EngineContracts.Multi;
 using Curl.Api.EngineContracts.Url;
 using Curl.Api.Options;
+using Curl.Api.Options.Http;
 using Curl.Api.Options.Network;
 using Curl.Api.Options.Protocols;
 
@@ -219,6 +220,33 @@ public sealed class ManagedCurlEngineTests
         Assert.IsNull(engine.Shared.Dialing);
         Assert.IsNull(engine.Shared.SigningClock);
         Assert.IsNull(engine.Shared.WebSocketRandomSource);
+        Assert.IsNull(engine.Shared.CreateFormBoundary);
+    }
+
+    [TestMethod]
+    public async Task PerformAsync_FormBoundaryGiven_SendsTheMimePostWithIt()
+    {
+        const string Boundary = "------------------------qrstuvwxyz0123456789AB";
+        ScriptedConnector server = new(["HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n"u8.ToArray()]);
+        EngineDialing dialing = new(new ScriptedTcpDialer(server), new LoopbackDnsResolver(), new RecordingDatagramConnector(Curl.Protocol.Abstractions.CurlExitCode.CouldntConnect, "no udp"));
+        await using ManagedCurlEngine engine = new(TimeProvider.System, null, dialing: dialing, createFormBoundary: () => Boundary);
+        await using IEasyTransfer easy = engine.CreateEasy();
+        IMimeBuilder mime = engine.CreateMime();
+        IMimePartBuilder part = mime.AddPart();
+        part.SetName("foo");
+        part.SetData("bar"u8.ToArray());
+        easy.Options = new EasyOptions
+        {
+            Network = new EasyNetworkOptions { Url = "http://127.0.0.1:9000/bl2695" },
+            Http = new EasyHttpOptions { MimePost = mime.Build() },
+        };
+
+        CurlCode code = await easy.PerformAsync(CancellationToken.None);
+
+        string request = System.Text.Encoding.ASCII.GetString(server.Written);
+        Assert.AreEqual(CurlCode.Ok, code);
+        Assert.Contains("Content-Type: multipart/form-data; boundary=" + Boundary + "\r\n", request);
+        Assert.Contains("--" + Boundary + "--\r\n", request);
     }
 
     [TestMethod]

@@ -602,7 +602,8 @@ public sealed class UpstreamConformanceTests
     // listener (BL-2597) and the proxy environment the case's <setenv>, as RunCurlAsync composes curl. It signs AWS SigV4
     // requests and HTTP signatures at the epoch, as upstream's debug build does under the CURL_FORCETIME its test runner sets (BL-2675),
     // and answers NTLM with the hand-built context, as RunCurlAsync's usesHandBuiltNtlm does (BL-2635).
-    // Under a case's CURL_ENTROPY its WebSocket key and masks follow the debug build's forced sequence (BL-2688).
+    // Under a case's CURL_ENTROPY its WebSocket key and masks follow the debug build's forced sequence (BL-2688), and its
+    // MIME boundary is the one that sequence gives curl_mime_init (test1972, BL-2695).
     // Its handles read the case's <stdin> where libcurl reads the process's, as a curl_formadd file named "-" does (BL-2625).
     internal static ICurlEngine CreateEngine(UpstreamCurlInvocation invocation) =>
         new ManagedCurlEngine(
@@ -614,7 +615,8 @@ public sealed class UpstreamConformanceTests
             signingClock: SigningClockFor(invocation.EnvironmentVariables),
             webSocketRandomSource: WebSocketRandomSourceFor(invocation.EnvironmentVariables),
             standardInput: invocation.StandardInput,
-            stopsFirstFtpTransferBeforePwd: invocation.EnvironmentVariables.ContainsKey("CURL_FTP_PWD_STOP"));
+            stopsFirstFtpTransferBeforePwd: invocation.EnvironmentVariables.ContainsKey("CURL_FTP_PWD_STOP"),
+            createFormBoundary: invocation.EnvironmentVariables.GetValueOrDefault("CURL_ENTROPY") is { } entropy ? () => ForcedEntropyFormBoundary.Of(entropy) : null);
 
     // The debug build's CURL_ENTROPY sequence (BL-2688), else its zero masks under CURL_WS_FORCE_ZERO_MASK (BL-2698),
     // else null, for the engine's system random source.

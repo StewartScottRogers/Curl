@@ -209,11 +209,12 @@ internal sealed partial class ManagedEasyTransfer(
     internal EngineTraceComponents TraceComponents { get; set; } = EngineTraceComponents.None;
 
     /// <summary>
-    /// Gets or sets what gives each <c>CURLOPT_MIMEPOST</c> body its boundary: <see cref="MultipartBoundary.CreateRandom" />,
-    /// curl's random one, by default; tests set a fixed one to compare bodies. <see cref="Duplicate" /> copies it and
+    /// Gets or sets what gives each <c>CURLOPT_MIMEPOST</c> body its boundary: the engine's
+    /// <see cref="ManagedEngineSharedState.CreateFormBoundary" /> when it has one (BL-2695), else <see cref="MultipartBoundary.CreateRandom" />,
+    /// curl's random one; tests set a fixed one to compare bodies. <see cref="Duplicate" /> copies it and
     /// <see cref="Reset" /> leaves it, as it is not an option.
     /// </summary>
-    internal Func<string> CreateFormBoundary { get; set; } = MultipartBoundary.CreateRandom;
+    internal Func<string> CreateFormBoundary { get; set; } = shared.CreateFormBoundary ?? MultipartBoundary.CreateRandom;
 
     /// <summary>
     /// Gets or sets the pieces of each transfer the curl tool's runner has already chosen before connecting -
