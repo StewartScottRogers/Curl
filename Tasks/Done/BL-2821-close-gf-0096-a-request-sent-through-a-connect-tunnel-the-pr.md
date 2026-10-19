@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary, Curl.Networking.UnitTests]
 requirement: none
 created: 2026-10-19
-completed:
+completed: 2026-10-19
 ---
 # BL-2821 — Close GF-0096: A request sent through a CONNECT tunnel the proxy already closed fails with 'Recv failure: Connection was reset' where curl prints 'Connection was aborted'
 
@@ -36,13 +36,24 @@ In Curl.Networking.UnitLibrary, StreamConnection.ReadAsync rewrites every Window
 
 ## Acceptance criteria
 
-- [ ] `behaviour:test1802`: Curl answers what curl 8.22.0 answers, `reference curl exits 56; stdout 0 bytes: `, so the item measures `match`.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
-- [ ] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
+- [x] `behaviour:test1802`: Curl answers what curl 8.22.0 answers, `reference curl exits 56; stdout 0 bytes: `, so the item measures `match`.
+- [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
+- [x] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
 
 ## Notes
+
+- Decided (ADR-0708, amends ADR-0419): `StreamConnection.WriteAsync` records whether the socket
+  had unread bytes (`Socket.Available > 0`) and skips the aborted-to-reset rewrite on a later
+  failed read when it did. The suggested FIN check (`HasPeerClosed`/`Poll`) and a one-byte peek
+  were measured and rejected: both also fire for `Record-CurlExchange.ps1 -Reset`'s early RST,
+  which turned BL-1450's `reset` into `aborted`.
+- Measured 2026-10-19 with the Release build: test1802's command line exit 56
+  `Recv failure: Connection was aborted` 4 of 4; `-Reset` on `http://127.0.0.1:18998/` exit 56
+  `Recv failure: Connection was reset` 4 of 4.
+- Measure-CodeQuality for Curl.Networking.UnitLibrary: 0 failing members.
 
 ## Log
 
 - 2026-10-19: Created.
 - 2026-10-19: Backlog -> Doing. Criteria at claim: 9d695601 1fd5de8c 28346828.
+- 2026-10-19: Doing -> Done. test1802 prints curl's Recv failure: Connection was aborted; BL-1450's reset shape unchanged (ADR-0708)
