@@ -31,3 +31,4 @@ Found by BL-2734. Real curl 8.22.0 (`curl.exe -sS "http://:80/"`, the Schannel m
 ## Log
 
 - 2026-10-18: Created.
+- 2026-10-18: Backlog -> Doing. Criteria at claim: b2c3e440 f6c38c81 d6c1964a.
