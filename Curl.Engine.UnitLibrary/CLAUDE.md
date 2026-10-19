@@ -502,3 +502,7 @@ A perform from the options outside any multi handle and with no `ToolSettings` s
 ## CURLOPT_USERNAME and CURLOPT_PASSWORD on the context (BL-2714)
 
 `TransferContextFactory.CredentialsOf` gives the context's credentials from `EasyAuthenticationOptions.UserPassword` split at its first colon, with `UserName` and `Password` each replacing their half, and from either of them alone, so a handle set with `CURLOPT_USERNAME`/`CURLOPT_PASSWORD` answers a 401 as one set with `CURLOPT_USERPWD` does (upstream test3101). Its tests are `ManagedCurlEngineTests`.
+
+## CURLOPT_PROXY_TRANSFER_MODE (BL-2718)
+
+`TransferContextFactory.Create` puts `ProxyTransferModeUrl.Of`'s URL on the context: with `EasyTransferOptions.ProxyTransferMode` set, an `ftp` URL forwarded through an `Http` or `Http10` proxy without a tunnel (`-p` or a tunnelling `--connect-to`, `TunnelsThroughProxy`) gets `;type=a` under `TransferText` or `;type=i` on its path, before any query, unless the path already ends in `;type=` and `a`, `d` or `i`, as curl 8.22.0's `http_target` does (upstream tests 549 and 550). Its tests are `ProxyTransferModeUrlTests`.

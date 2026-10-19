@@ -215,7 +215,7 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
             : watchHeaderOutput(HeaderOutputOf(behaviour, transfer, url, output, headerOutput, bodyHeaderStyles));
         return new()
         {
-            Url = url,
+            Url = ProxyTransferModeUrl.Of(url, proxy, TunnelsThroughProxy(proxyOptions, network, url, proxy), transfer.ProxyTransferMode, transfer.TransferText, network.PathAsIs),
             Output = WatchedOutput(output, lowSpeedWatchdog),
             HeaderOutput = transferHeaderOutput,
             DumpHeaderOutput = headerOutput,
@@ -264,7 +264,7 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
                     HstsStore = HstsStore,
                     KeptDigestChallenges = KeptDigestChallenges,
                     AuthSchemePicked = KeptAuthSchemePicked,
-                    ProxyTunnel = proxyOptions.HttpProxyTunnel || ConnectToTunnelsThroughProxy(network, url, proxy),
+                    ProxyTunnel = TunnelsThroughProxy(proxyOptions, network, url, proxy),
                 },
                 altSvc),
             Mail = MailRequestOptionsMapping.FromCommandLine(settings, transfer, protocol.Smtp, authentication, url.Scheme),
@@ -512,6 +512,15 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
     /// <param name="events">The sink given to <see cref="Create" />.</param>
     /// <returns>The sink the context carries.</returns>
     private static ITransferEvents EventsOrNone(ITransferEvents? events) => events ?? NoTransferEvents.Instance;
+
+    /// <summary>Tells whether the transfer tunnels through its proxy: <c>-p</c>, or a <c>--connect-to</c> mapping that <see cref="ConnectToTunnelsThroughProxy" /> says does.</summary>
+    /// <param name="proxyOptions">The option group's proxy options, whose <see cref="EasyProxyOptions.HttpProxyTunnel" /> is <c>-p</c>.</param>
+    /// <param name="network">The option group's network options.</param>
+    /// <param name="url">The URL to transfer.</param>
+    /// <param name="proxy">The transfer's proxy, or <see langword="null" /> for none.</param>
+    /// <returns>The context's <see cref="HttpRequestOptions.ProxyTunnel" />.</returns>
+    private static bool TunnelsThroughProxy(EasyProxyOptions proxyOptions, EasyNetworkOptions network, CurlUrl url, ProxyEndpoint? proxy) =>
+        proxyOptions.HttpProxyTunnel || ConnectToTunnelsThroughProxy(network, url, proxy);
 
     /// <summary>
     /// Tells whether a <c>--connect-to</c> mapping sends <paramref name="url" /> to another host or
