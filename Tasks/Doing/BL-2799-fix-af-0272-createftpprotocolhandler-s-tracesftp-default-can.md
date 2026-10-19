@@ -53,3 +53,4 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 - 2026-10-19: Created.
 - 2026-10-19: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
 - 2026-10-19: Doing -> Backlog. touches Curl.Engine.UnitTests/EngineCompositionFtpTraceTests.cs, inside Curl.Engine.UnitTests, which BL-2804 (Doing) holds whole
+- 2026-10-19: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
