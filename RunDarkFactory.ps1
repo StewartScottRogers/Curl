@@ -144,6 +144,13 @@
     pull request, by Stewart's standing permission - only when the CI workflow passed on
     Windows, Linux and macOS for the exact commit being merged.
 
+    After that merge, one headless run reviews what the shift merged with the PR Review
+    Toolkit plugin's five read-only reviewers (comments, tests, errors, types, code; the
+    code-simplifier edits code, so it is left out). It files a task for each Critical or
+    Important issue, High for Critical, before -Continuous decides whether work is ready,
+    so the next shift works them. The review never holds or undoes the merge: CI is the
+    merge gate (ADR-0710). It is skipped when the plugin is not installed.
+
     A commit that only changes the board and is pushed on its own - a claim, requeue,
     park, return or CI-watch filing - says [skip ci], so it starts no CI run and cancels
     none: with lanes claiming every minute or two, every run was once cancelled for two
@@ -2655,6 +2662,63 @@ function Invoke-MergeToMaster {
     # The pin has done its job once master holds the commit; it is the factory's own branch.
     Invoke-Git @('push', '-q', 'origin', '--delete', $pin) | Out-Null
     return "merged $short into master (pull request #$number)"
+}
+
+# The shift-end review (ADR-0710): how long it may run and what it may cost.
+$ShiftReviewMinutes = 45
+$ShiftReviewBudgetUsd = 15
+
+# What the review run is told. {BASE}, {HEAD}, {REPORT} and {BRANCH} are filled in.
+$ShiftReviewPrompt = @'
+You are the dark factory's shift-end reviewer (ADR-0710). This checkout is detached at {HEAD}, the commit the shift just merged into master. Review what the shift merged: git diff {BASE}...{HEAD}.
+
+1. Run /pr-review-toolkit:review-pr comments tests errors types code parallel, scoped to that diff (the changed files and lines, not the whole repository). Review only: change no file but the task files and the report below, and never run the code-simplifier.
+2. Keep only issues that are real and that the diff introduced, checked against the code, CLAUDE.md and the project's own CLAUDE.md files. Drop style preferences and anything the repository's rules already decide another way.
+3. For each Critical or Important issue left, file one task with powershell -NoProfile -ExecutionPolicy Bypass -File .claude/skills/task-board/task-board.ps1 new -Title "<what to fix>" -Priority <High for Critical, Normal for Important> -Assignee Claude -Pipeline direct -Touches "<the projects or files>", then fill its Goal, Context (the file and line, the reviewer that found it, what is wrong and why) and checkable Acceptance criteria. File none for Suggestions. Never file one that touches an audit path or a guard file.
+4. Commit only the new task files, with the message "chore(tasks): file shift-end review findings" and [skip ci] in the body, run task-board.ps1 dedupe -Since origin/{BRANCH}, and push to origin {BRANCH}: on a refused push, git pull --rebase origin {BRANCH} and push again, up to five times.
+5. Write the review summary (Critical, Important and Suggestions, each with the task ID filed for it) to {REPORT}. Its last line is exactly "FILED: <number of tasks filed>".
+'@
+
+function Invoke-ShiftReview {
+    # After the shift-end merge: one headless run of the PR Review Toolkit's five read-only
+    # reviewers over what the shift merged, filing a task for each Critical or Important
+    # issue (ADR-0710). It never holds or undoes the merge. Returns a line for the trace.
+    param([string]$Base, [string]$Head, [string]$Branch)
+    if (-not "$(& claude plugin list 2>$null)".Contains('pr-review-toolkit')) { return 'review skipped: the pr-review-toolkit plugin is not installed' }
+    $short = $Head.Substring(0, 7)
+    $dir = Join-Path $LanesDir "review-$Stamp"
+    if (-not (Invoke-Git @('worktree', 'add', '-q', '--detach', $dir, $Head))) { return "review skipped: no worktree at $short" }
+    $report = Join-Path $LogDir "review-$Stamp.md"
+    $raw = Join-Path $LogDir "review-$Stamp.jsonl"
+    try {
+        $text = $ShiftReviewPrompt.Replace('{BASE}', $Base).Replace('{HEAD}', $Head).Replace('{REPORT}', $report).Replace('{BRANCH}', $Branch)
+        $budget = $ShiftReviewBudgetUsd.ToString([System.Globalization.CultureInfo]::InvariantCulture)
+        $denied = ($Forbidden | ForEach-Object { "`"Bash($_`:*)`" `"PowerShell($_`:*)`"" }) -join ' '
+        $psi = New-ClaudeRunStartInfo "/d /c claude -p --model opus --dangerously-skip-permissions --output-format stream-json --verbose --max-budget-usd $budget --disallowedTools $denied 2>nul"
+        $psi.WorkingDirectory = $dir
+        $p = [System.Diagnostics.Process]::Start($psi)
+        $p.StandardInput.Write($text)
+        $p.StandardInput.Close()
+        $deadline = (Get-Date).AddMinutes($ShiftReviewMinutes)
+        $pending = $p.StandardOutput.ReadLineAsync()
+        while ($true) {
+            Write-HeartbeatIfDue
+            if ($pending.Wait(1000)) {
+                if ($null -eq $pending.Result) { break }
+                Add-Content -Path $raw -Value $pending.Result -Encoding UTF8
+                $pending = $p.StandardOutput.ReadLineAsync()
+            } elseif ((Get-Date) -gt $deadline) {
+                & taskkill /T /F /PID $p.Id 2>&1 | Out-Null
+                return "review of $short killed after $ShiftReviewMinutes min; see $raw"
+            }
+        }
+        $p.WaitForExit()
+        $filed = if (Test-Path $report) { [regex]::Match((Get-Content $report -Raw), 'FILED:\s*(\d+)\s*$').Groups[1].Value } else { '' }
+        if (-not $filed) { return "review of $short ended (exit $($p.ExitCode)) without a report; see $raw" }
+        return "reviewed $short; $filed task(s) filed; report $report"
+    } finally {
+        Invoke-Git @('worktree', 'remove', '--force', $dir) | Out-Null
+    }
 }
 
 # ---------------------------------------------------------------------------- CI watch
@@ -5248,8 +5312,15 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
     # merge until it has run. Other reasons do not hold the merge.
     $auditCadence = Get-AuditCadence (Get-AuditDueFromMaster -Branch $branch)
     if ($auditCadence.Line) { Show-AuditNotice $auditCadence.Line }
+    # What master held before the merge, so the shift-end review reads only what this shift merged.
+    git -C $Root fetch -q origin master 2>&1 | Out-Null
+    $masterBefore = "$(git -C $Root rev-parse origin/master 2>$null)".Trim()
     $mergeLine = if ($auditCadence.HoldMerge) { $auditCadence.MergeMessage } else { Invoke-MergeToMaster -Branch $branch }
     Write-Trace '-' 'merge' $mergeLine 'Cyan'
+    if ($mergeLine -match '^merged ([0-9a-f]{7,40}) ') {
+        $merged = "$(git -C $Root rev-parse --verify "$($Matches[1])^{commit}" 2>$null)".Trim()
+        if ($masterBefore -and $merged) { Write-Trace '-' 'review' (Invoke-ShiftReview -Base $masterBefore -Head $merged -Branch $branch) 'Cyan' }
+    }
     # The merge waited for CI on the shift's last commit; a failure there finished after the
     # loop above stopped watching, so file it now (BL-1031).
     Invoke-CiWatch -Branch $branch -Final
