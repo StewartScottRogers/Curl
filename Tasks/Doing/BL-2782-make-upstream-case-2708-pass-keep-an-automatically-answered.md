@@ -45,3 +45,4 @@ fault is elsewhere, add that project to `touches` first. Run with `CURL_UPSTREAM
 ## Log
 
 - 2026-10-18: Created.
+- 2026-10-18: Backlog -> Doing. Criteria at claim: be1ee021 6d4654cb 70e3c171 3d836d5e.
