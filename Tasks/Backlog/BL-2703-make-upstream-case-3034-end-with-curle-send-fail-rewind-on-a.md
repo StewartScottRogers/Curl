@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Libcurl, Libcurl.UnitTests, Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
+touches: [Libcurl, Libcurl.UnitTests, Curl.Engine.UnitTests/ManagedEasyTransferTests.InFileSize.cs, Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
 requirement: none
 created: 2026-10-17
 completed:
@@ -28,7 +28,12 @@ Found by BL-2551, which ported lib3034 (`Curl.Conformance.LibTest.UnitLibrary/Li
 
 ## Notes
 
+- 2026-10-19 (lane 2): case 3034 already passes through the runner on Windows (`CURL_UPSTREAM_CASE=3034`, `NamedUpstreamCase_RunThroughCurl_PassesAsAListedCaseMust`: "test3034 passes") and is on the ratchet since 11d9ca77 (BL-2645's fix in `CallbackReadStream`/`ManagedEasyTransfer`: a sized read-callback upload stops at `CURLOPT_INFILESIZE`, so the first transfer reaches the 307 and fails to rewind with 65). The hang was in the first transfer, never in the reset. Fixed library is `Curl.Engine.UnitLibrary`, not Libcurl.
+- What is left: criterion 2 only. Add to `Curl.Engine.UnitTests/ManagedEasyTransferTests.InFileSize.cs` one focused test of 3034's shape: `Upload`, `InFileSize = 5`, a read callback that copies `"hello\0"` on every call, `FollowLocation`, no seek or ioctl callback, a `ScriptedConnector` answering `Continue + TemporaryRedirect` (as `PerformAsync_RedirectResendsAReadCallbackUploadAndSeekFails_...` in `ManagedEasyTransferTests.Callbacks.cs` does), under a 10-second cancellation; assert `CurlCode.SendFailRewind` and `CallbackReadStream.RewindImpossibleText`-based error text. Then build, fast tests, tick boxes, Done.
+- Added `Curl.Engine.UnitTests/ManagedEasyTransferTests.InFileSize.cs` to `touches` for that test; BL-2714 (in Doing) holds the whole `Curl.Engine.UnitTests`, so requeued behind it.
+
 ## Log
 
 - 2026-10-17: Created.
 - 2026-10-19: Backlog -> Doing. Criteria at claim: 716b5cf3 48be2d2b 3d836d5e.
+- 2026-10-19: Doing -> Backlog. Needs Curl.Engine.UnitTests/ManagedEasyTransferTests.InFileSize.cs, which BL-2714 (Doing) holds via the whole Curl.Engine.UnitTests; case 3034 already passes, only the focused engine test is left
