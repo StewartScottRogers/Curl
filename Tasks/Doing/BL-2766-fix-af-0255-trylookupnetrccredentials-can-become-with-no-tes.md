@@ -41,12 +41,13 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
 - 2026-10-18: touches narrowed from Curl.Engine.UnitLibrary to files, by reading ManagedEasyTransfer.TryLookUpNetrcCredentials (line 707), so it can run beside other Engine tasks.
+- 2026-10-18: No production change. BL-2684 rewrote the method as `TryLookUpUrlAndNetrcCredentials` (now near line 758): the `||` is gone, the Ignored case moved into `TransferCredentialLookup` (pinned by `PerformAsync_NetrcIgnored_ReadsNoFileAndPutsNoCredentialsOnTheContext`), and only the `ToolInputs is not null` skip remains. Added `PerformAsync_NetrcRequiredWithToolInputs_ReadsNoFileAndPutsNoCredentialsOnTheContext` and `PerformAsync_NetrcRequiredWithToolInputsAndTheFileUnreadable_RunsTheTransfer` to pin that skip; a hand mutant making the skip also require Ignored (the finding's `&&`) fails both. A lane cannot run the finding's mutation tool (audit path guard), and its `:707:||` site no longer exists, so the re-audit should target the new skip line.
 
 ## Log
 

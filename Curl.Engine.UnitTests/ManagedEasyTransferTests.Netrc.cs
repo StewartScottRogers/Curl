@@ -4,6 +4,7 @@ using Curl.Api.Options;
 using Curl.Api.Options.Authentication;
 using Curl.Api.Options.Network;
 using Curl.Api.Options.Proxy;
+using Curl.Protocol.Abstractions;
 
 namespace Curl.Engine;
 
@@ -73,6 +74,44 @@ public sealed partial class ManagedEasyTransferTests
         await easy.PerformAsync(CancellationToken.None);
 
         Assert.IsNull(handler.Contexts.Single().Credentials);
+    }
+
+    [TestMethod]
+    public async Task PerformAsync_NetrcRequiredWithToolInputs_ReadsNoFileAndPutsNoCredentialsOnTheContext()
+    {
+        RecordingProtocolHandler handler = RecordingProtocolHandler.WritingPath("http");
+        await using ManagedEasyTransfer easy = EasyOver(handler, []);
+        List<string> pathsRead = [];
+        easy.Host = EasyTransferHost.Library with
+        {
+            ReadFile = path =>
+            {
+                pathsRead.Add(path);
+                return Encoding.UTF8.GetBytes("machine github.com login daniel password pw\n");
+            },
+        };
+        easy.Options = NetrcOptions(NetrcUsage.Required);
+        easy.ToolInputs = new EngineToolTransferInputs(Url: CurlUrl.Parse("http://github.com"));
+
+        CurlCode code = await easy.PerformAsync(CancellationToken.None);
+
+        Assert.AreEqual(CurlCode.Ok, code);
+        Assert.DoesNotContain(NetrcPath, pathsRead);
+        Assert.IsNull(handler.Contexts.Single().Credentials);
+    }
+
+    [TestMethod]
+    public async Task PerformAsync_NetrcRequiredWithToolInputsAndTheFileUnreadable_RunsTheTransfer()
+    {
+        RecordingProtocolHandler handler = RecordingProtocolHandler.WritingPath("http");
+        await using ManagedEasyTransfer easy = EasyReadingNetrc(handler, null);
+        easy.Options = NetrcOptions(NetrcUsage.Required);
+        easy.ToolInputs = new EngineToolTransferInputs(Url: CurlUrl.Parse("http://github.com"));
+
+        CurlCode code = await easy.PerformAsync(CancellationToken.None);
+
+        Assert.AreEqual(CurlCode.Ok, code);
+        Assert.HasCount(1, handler.Contexts);
     }
 
     [TestMethod]
