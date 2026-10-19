@@ -34,6 +34,25 @@ public sealed class CurlEasyTests
         Assert.AreEqual(expected, effective);
     }
 
+    [TestMethod]
+    public async Task Perform_PortOptionWithDigestCredentials_TransfersTheUrlWithThatPort()
+    {
+        // lib1568 (BL-2657): Digest credentials and CURLOPT_PORT apart from the URL. The port is written into the
+        // transfer URL before the first request, so the Digest retry's request and Host header carry it too.
+        await using var library = CurlGlobal.Init(CurlGlobalFlags.Nothing);
+        using var easy = library.EasyInit();
+        easy.SetOption(CurlOption.Url, "http://127.0.0.1/1568");
+        easy.SetOption(CurlOption.Userpwd, "testuser:testpass");
+        easy.SetOption(CurlOption.Httpauth, (long)Curl.Api.Options.Authentication.HttpAuthenticationMethods.Digest);
+        easy.SetOption(CurlOption.Port, 8990L);
+        easy.SetOption(CurlOption.Proxy, "foo://proxy:1");
+
+        easy.Perform();
+
+        Assert.AreEqual(CurlCode.Ok, easy.GetInfo(CurlInfo.EffectiveUrl, out var effective));
+        Assert.AreEqual("http://127.0.0.1:8990/1568", effective);
+    }
+
     private static readonly EasyOptionDispatch VerboseOnly = new(new Dictionary<CurlOption, EasyOptionSetter>
     {
         [CurlOption.Verbose] = (ref EasyOptions options, object? value) =>
