@@ -33,3 +33,4 @@ Lanes test only on Windows, so reproduce with `gh run view 39210403935 --log-fai
 ## Log
 
 - 2026-10-18: Created.
+- 2026-10-18: Backlog -> Doing. Criteria at claim: 839dc245.
