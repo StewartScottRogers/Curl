@@ -5,11 +5,11 @@ area: options
 platform: linux
 key: options:ssl-sessions-file-warnings
 severity: Medium
-status: open
+status: closed
 scope: target
 introduced-in: 8.12.0
 opened: 2026-10-15_0751
-closed:
+closed: 2026-10-19_1329
 regression: false
 items: [options:--ssl-sessions]
 touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests]
@@ -36,9 +36,11 @@ In Curl.Cli.UnitLibrary, where SslSessionsFile (CommandLineGlobalState, CommandL
 - 2026-10-15_1657: 1 of 1 items are gaps.
 - 2026-10-17_2225: 1 of 1 items are gaps.
 - 2026-10-19_0804: 1 of 1 items are gaps.
+- 2026-10-19_1329: 0 of 1 items are gaps.
 
 ## Log
 
 - 2026-10-15_0751: Opened by gap-options.
 - 2026-10-15_0900: Filed BL-2333.
 - 2026-10-17_2318: Filed BL-2717.
+- 2026-10-19_1329: Closed: run 2026-10-19_1329 measured every item as match or excluded on linux.

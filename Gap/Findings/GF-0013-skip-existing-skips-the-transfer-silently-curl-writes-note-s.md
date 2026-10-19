@@ -47,6 +47,7 @@ In Curl.Console, where --skip-existing decides to skip a transfer, write curl 8.
 - 2026-10-15_1657: 0 of 3 items are gaps.
 - 2026-10-17_2225: 0 of 3 items are gaps.
 - 2026-10-19_0804: 0 of 3 items are gaps.
+- 2026-10-19_1329: 0 of 3 items are gaps.
 
 ## Log
 
