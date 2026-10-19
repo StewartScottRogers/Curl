@@ -31,3 +31,4 @@ Found by BL-2731. Measured on 2026-10-18 with `/ucrt64/bin/curl` 8.22.0 (x86_64-
 ## Log
 
 - 2026-10-18: Created.
+- 2026-10-18: Backlog -> Doing. Criteria at claim: aadf503d 76d643cf d6c1964a.
