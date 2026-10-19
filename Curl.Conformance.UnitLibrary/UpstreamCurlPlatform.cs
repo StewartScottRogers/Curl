@@ -75,10 +75,10 @@ public sealed class UpstreamCurlPlatform
     public static UpstreamCurlPlatform Windows { get; } = new(["win32", "Schannel"], "NUL", "MSWin32");
 
     /// <summary>Linux, where Curl matches curl's OpenSSL build.</summary>
-    public static UpstreamCurlPlatform Unix { get; } = new(["OpenSSL", "xattr", "http/2", "h2c"], "/dev/null", "linux");
+    public static UpstreamCurlPlatform Unix { get; } = new(["OpenSSL", "SSLS-EXPORT", "xattr", "http/2", "h2c"], "/dev/null", "linux");
 
     /// <summary>macOS, where Curl matches curl's OpenSSL build as on Linux; only Perl's name for it differs.</summary>
-    public static UpstreamCurlPlatform MacOS { get; } = new(["OpenSSL", "xattr", "http/2", "h2c"], "/dev/null", "darwin");
+    public static UpstreamCurlPlatform MacOS { get; } = new(["OpenSSL", "SSLS-EXPORT", "xattr", "http/2", "h2c"], "/dev/null", "darwin");
 
     /// <summary>Every platform Curl's conformance run stands for: Windows, Linux and macOS.</summary>
     public static IReadOnlyList<UpstreamCurlPlatform> All { get; } = [Windows, Unix, MacOS];

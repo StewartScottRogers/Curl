@@ -15,7 +15,9 @@ internal sealed class FakeShareHandle : IShareHandle
 
     public ShareUnlockCallback? Unlock { get; private set; }
 
-    public CurlShareCode Share(CurlLockData data) => CurlShareCode.Ok;
+    public CurlShareCode ShareResult { get; init; } = CurlShareCode.Ok;
+
+    public CurlShareCode Share(CurlLockData data) => ShareResult;
 
     public CurlShareCode Unshare(CurlLockData data) => CurlShareCode.Ok;
 

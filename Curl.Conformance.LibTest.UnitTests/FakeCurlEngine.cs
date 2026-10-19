@@ -42,6 +42,12 @@ internal sealed class FakeCurlEngine : ICurlEngine
     /// <summary>What a share handle's lock-callback setter answers.</summary>
     public CurlShareCode ShareLockResult { get; init; } = CurlShareCode.Ok;
 
+    /// <summary>What a share handle's share call answers.</summary>
+    public CurlShareCode ShareResult { get; init; } = CurlShareCode.Ok;
+
+    /// <summary>Answers each easy transfer's TLS session import, given the peer key; none answers the seam's NotBuiltIn.</summary>
+    public Func<string?, CurlCode>? Importing { get; init; }
+
     /// <summary>What a share handle's cleanup answers.</summary>
     public CurlShareCode ShareCleanupResult { get; init; } = CurlShareCode.Ok;
 
@@ -51,7 +57,7 @@ internal sealed class FakeCurlEngine : ICurlEngine
     public IEasyTransfer CreateEasy()
     {
         CreatingEasy?.Invoke();
-        return new FakeEasyTransfer(PerformResult, Info, Performing) { Informing = Informing, ConnectOnly = ConnectOnly, Pauses = Pauses, TransferHeaders = Headers, WebSocketConnection = WebSocket };
+        return new FakeEasyTransfer(PerformResult, Info, Performing) { Importing = Importing, Informing = Informing, ConnectOnly = ConnectOnly, Pauses = Pauses, TransferHeaders = Headers, WebSocketConnection = WebSocket };
     }
 
     public FakeMultiTransfer Multi { get; } = new();
@@ -65,7 +71,7 @@ internal sealed class FakeCurlEngine : ICurlEngine
     public IShareHandle CreateShare()
     {
         CreatingShare?.Invoke();
-        LastShare = new FakeShareHandle { LockResult = ShareLockResult, CleanupResult = ShareCleanupResult };
+        LastShare = new FakeShareHandle { LockResult = ShareLockResult, CleanupResult = ShareCleanupResult, ShareResult = ShareResult };
         return LastShare;
     }
 
@@ -123,6 +129,10 @@ internal sealed class FakeCurlEngine : ICurlEngine
         public ValueTask<CurlCode> PerformAsync(CancellationToken cancellationToken) => ValueTask.FromResult(performing?.Invoke(Options) ?? performResult);
 
         public IEasyTransfer Duplicate() => new FakeEasyTransfer(performResult, info, performing) { Options = Options, Pauses = Pauses, Informing = Informing };
+
+        public Func<string?, CurlCode>? Importing { get; init; }
+
+        public CurlCode ImportTlsSession(string? sessionKey, byte[]? saltAndHmac, byte[] packedSession) => Importing?.Invoke(sessionKey) ?? CurlCode.NotBuiltIn;
 
         public void Reset() => Options = new();
 

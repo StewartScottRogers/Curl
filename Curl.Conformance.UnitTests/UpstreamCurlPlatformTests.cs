@@ -45,7 +45,7 @@ public sealed class UpstreamCurlPlatformTests
 
         UpstreamCurlPlatform platform = UpstreamCurlPlatform.Unix;
 
-        bool featuresMatch = platform.Features.SetEquals([.. CommonFeatures, "OpenSSL", "xattr", "http/2", "h2c"]);
+        bool featuresMatch = platform.Features.SetEquals([.. CommonFeatures, "OpenSSL", "SSLS-EXPORT", "xattr", "http/2", "h2c"]);
         diagnostics.Act("feature count", platform.Features.Count);
         diagnostics.Act("null device", platform.NullDevice);
         diagnostics.Assert("features equal common + OpenSSL + xattr", true, featuresMatch);
