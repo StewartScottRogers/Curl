@@ -33,3 +33,4 @@ Found by BL-2542. Case 1574: `differs at byte 59 (line 5): expected "GET /157400
 ## Log
 
 - 2026-10-17: Created.
+- 2026-10-18: Backlog -> Doing. Criteria at claim: db059030 a9bb9769 3d836d5e.
