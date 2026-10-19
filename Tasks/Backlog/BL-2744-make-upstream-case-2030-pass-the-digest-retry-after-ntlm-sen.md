@@ -4,13 +4,13 @@ title: Make upstream case 2030 pass: the Digest retry after NTLM sends its Autho
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-2747]
+depends-on: [BL-2747, BL-2820]
 touches: [Curl.Conformance.LibTest.UnitLibrary, Curl.Conformance.LibTest.UnitTests, Curl.Conformance.UnitTests/PassingUpstreamCases.txt, Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests, Curl.Protocol.Abstractions.UnitLibrary/HttpRequestOptions.cs, Curl.Protocol.Abstractions.UnitLibrary/TransferReport.cs, Curl.Engine.UnitLibrary/ManagedEasyTransfer.cs, Curl.Engine.UnitLibrary/TransferContextFactory.cs, Curl.Engine.UnitTests/ManagedCurlEngineTests.cs]
 requirement: none
 created: 2026-10-18
 completed:
 ---
-# BL-2744 — Make upstream case 2030 pass: the Digest retry after NTLM sends its Authorization header
+# BL-2744 â€” Make upstream case 2030 pass: the Digest retry after NTLM sends its Authorization header
 
 ## Goal
 
@@ -33,6 +33,8 @@ Found by BL-2689, which put 2025, 2029, 2031 and 2032 on the ratchet once BL-263
 - Why curl differs (lib/http.c, lib/vauth/digest.c): `Curl_http_input_auth` answers a Digest header with "Ignoring duplicate digest auth header" when `authhost.avail` already has `CURLAUTH_DIGEST`; `avail` is cleared only by `pickoneauth`, which `Curl_http_auth_act` skips once `authproblem` is set. A Digest header after a nonce is already held (not stale) fails `Curl_input_digest` (`authproblem`), but stores its nonce. In 2030 transfer 300 (NTLM) the second Digest 401 (nonce 5) sets `authproblem`, so `avail` keeps Digest into transfer 400: its first 401 is ignored as a duplicate and request 400 is resent with nonce 5; the second 401 fails it and keeps nonce 7 for request 500. In 2024 transfer 300 (Basic) its only 401 is the first Digest nonce, `pickoneauth` runs and clears `avail`, so request 400's 401 fails at once.
 - What is left: the HTTP handler reports in `TransferReport` whether the transfer ended with Digest still marked available (its last 401 offered Digest after the transfer had already held a Digest nonce, kept or received, without `stale=true`); `ManagedEasyTransfer` keeps that bit beside `keptDigestChallenges` (cleared by `Reset` and with the origin rule) and `TransferContextFactory` passes it as an `HttpRequestOptions` property; `ResendsKeptChallengesAnswer` resends only when it is set. Then rerun 2030 and 2024, add 2030 to the ratchet (the stashed diff already lists it), and add an engine test beside `PerformAsync_EarlierTransferGotDigestChallenge_NextDigestTransferAnswersItFirst`.
 - Widened `touches` for that: Curl.Protocol.Http (the resend), the two Abstractions files, and the Engine files. `Curl.Engine.UnitLibrary/ManagedEasyTransfer.cs` is in BL-2694's `touches` (in Doing), so requeued until it is free.
+- Widened `touches` for that: Curl.Protocol.Http (the resend), the two Abstractions files, and the Engine files. `Curl.Engine.UnitLibrary/ManagedEasyTransfer.cs` is in BL-2694's `touches` (in Doing), so requeued until it is free.
+- 2026-10-19 (lane 1, third claim, no code edited): the run started with under one dollar of its cost cap, too little for the five-project change. Split the handle-state plumbing (TransferReport, HttpRequestOptions, ManagedEasyTransfer, TransferContextFactory) into BL-2820 and added it to depends-on. What stays here: reapply stash 7eef9059 (HttpRequestPlan.AuthorizationAnswersKeptChallenges, ResendsKeptChallengesAnswer, its two tests, 2030 on the ratchet), make the resend conditional on BL-2820's new HttpRequestOptions property, rerun 2030 and 2024.
 
 ## Log
 
@@ -42,3 +44,4 @@ Found by BL-2689, which put 2025, 2029, 2031 and 2032 on the ratchet once BL-263
 - 2026-10-18: Backlog -> Doing. Criteria at claim: b96ecbf8 fd6bd9d4 3d836d5e.
 - 2026-10-18: Doing -> Backlog. Needs Curl.Engine.UnitLibrary/ManagedEasyTransfer.cs, which BL-2694 (in Doing) touches: the handle must keep whether Digest stayed marked available after its last 401
 - 2026-10-19: Backlog -> Doing. Criteria at claim: b96ecbf8 fd6bd9d4 3d836d5e.
+- 2026-10-19: Doing -> Backlog. Waits on BL-2820: the easy handle must carry whether Digest stayed marked available into the next transfer
