@@ -303,6 +303,7 @@ public sealed class HttpProtocolHandler(
             AuthorizationFailure = authorizationFailure,
             AuthorizationInfoLines = authorizationLines.Lines,
             AuthorizationAnswersKeptDigestChallenges = answersKeptChallenges,
+            HoldsDigestNonce = OffersDigest(options.KeptDigestChallenges),
             Started = started,
             Deadline = deadline,
             Progress = new HttpTransferProgress(context.Progress),
@@ -1446,6 +1447,7 @@ public sealed class HttpProtocolHandler(
             AuthSchemePicked = AuthSchemePickedBy(plan),
             ProxyAuthSchemePicked = plan.ProxyAuthorizationAnswersChallenge ? SchemeOfAuthorization(plan.ProxyAuthorization) : HttpAuthSchemes.None,
             DigestAuthorizationSent = DigestAuthorizationSentBy(plan),
+            HeldDigestNonce = plan.HoldsDigestNonce,
         };
 
     /// <summary>
@@ -2725,7 +2727,30 @@ public sealed class HttpProtocolHandler(
             return null;
         }
 
-        return plan.WithAuthorization(authorization, retryLines.Lines, RepeatProxyAuthorization(plan));
+        return plan.WithAuthorization(authorization, retryLines.Lines, RepeatProxyAuthorization(plan)).HoldingDigestNonceAfter(head);
+    }
+
+    /// <summary>
+    /// Decides whether <paramref name="challenges" /> offer Digest, whose nonce curl 8.22.0 stores
+    /// even when Digest is not allowed (BL-2820).
+    /// </summary>
+    private static bool OffersDigest(IEnumerable<string> challenges) =>
+        challenges.Any(challenge => SchemeOfAuthorization(challenge) == HttpAuthSchemes.Digest);
+
+    /// <summary>
+    /// Decides whether a transfer ends with Digest still marked available
+    /// (<see cref="TransferReport.DigestStaysAvailable" />): <paramref name="head" /> is a 401 offering
+    /// Digest without <c>stale=true</c> after the transfer already held a Digest nonce
+    /// (<paramref name="heldDigestNonce" />), which libcurl 8.22.0's <c>Curl_input_digest</c> fails, so
+    /// <c>pickoneauth</c> never clears <c>authhost.avail</c> (upstream test2030, BL-2820).
+    /// </summary>
+    private static bool DigestStaysAvailableAfter(bool heldDigestNonce, HttpResponseHead head)
+    {
+        string[] challenges = ValuesOf(head, "WWW-Authenticate");
+        return heldDigestNonce
+            && head.StatusLine.StatusCode == 401
+            && OffersDigest(challenges)
+            && !HttpDigestStaleChallenge.IsOfferedIn(challenges);
     }
 
     /// <summary>
@@ -3094,6 +3119,13 @@ public sealed class HttpProtocolHandler(
         internal string? DigestAuthorizationSent { get; init; }
 
         /// <summary>
+        /// Gets a value indicating whether the transfer held a Digest nonce before the exchange's
+        /// response (<see cref="HttpRequestPlan.HoldsDigestNonce" />), from which the report's
+        /// <see cref="TransferReport.DigestStaysAvailable" /> is decided (BL-2820).
+        /// </summary>
+        internal bool HeldDigestNonce { get; init; }
+
+        /// <summary>
         /// Gets or sets the moment the first request byte was about to be sent,
         /// <see langword="null" /> until then.
         /// </summary>
@@ -3139,7 +3171,7 @@ public sealed class HttpProtocolHandler(
                 RemoteEndPoint = connection.RemoteEndPoint as IPEndPoint,
                 Timings = TimingsNow(),
             };
-            return Head is null ? report : WithHead(report, Head) with { RedirectUrl = RedirectUrl };
+            return Head is null ? report : WithHead(report, Head) with { RedirectUrl = RedirectUrl, DigestStaysAvailable = DigestStaysAvailableAfter(HeldDigestNonce, Head) };
         }
 
         private long RequestSizeSoFar() => earlier?.RequestSize ?? 0;
@@ -3306,6 +3338,26 @@ public sealed class HttpProtocolHandler(
         /// value a retry sends (<see cref="RepeatsKeptDigestAnswer" />, BL-2745).
         /// </summary>
         public bool AuthorizationAnswersKeptDigestChallenges { get; init; }
+
+        /// <summary>
+        /// Gets a value indicating whether the transfer holds a Digest nonce when this request is
+        /// sent: one the handle's previous transfer kept (<see cref="HttpRequestOptions.KeptDigestChallenges" />)
+        /// or one an earlier 401 of this transfer offered, which curl 8.22.0 stores even when Digest is
+        /// not allowed (<see cref="HoldingDigestNonceAfter" />, BL-2820).
+        /// </summary>
+        public bool HoldsDigestNonce { get; set; }
+
+        /// <summary>
+        /// Marks this retry as holding a Digest nonce (<see cref="HoldsDigestNonce" />) when
+        /// <paramref name="head" />, the 401 it answers, offers Digest.
+        /// </summary>
+        /// <param name="head">The 401 the retry answers.</param>
+        /// <returns>This plan.</returns>
+        public HttpRequestPlan HoldingDigestNonceAfter(HttpResponseHead head)
+        {
+            HoldsDigestNonce |= OffersDigest(ValuesOf(head, "WWW-Authenticate"));
+            return this;
+        }
 
         /// <summary>
         /// Gets the <c>-v</c> lines the authenticator reported while it made
@@ -3526,6 +3578,7 @@ public sealed class HttpProtocolHandler(
                 AuthorizationInfoLines = authorizationInfoLines ?? AuthorizationInfoLines,
                 AuthorizationFailure = authorizationFailure ?? AuthorizationFailure,
                 StreamRefusedRetries = StreamRefusedRetries,
+                HoldsDigestNonce = HoldsDigestNonce,
             };
     }
 

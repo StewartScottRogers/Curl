@@ -92,6 +92,45 @@ public sealed partial class HttpProtocolHandlerTests
         Assert.AreEqual(expected, connection.Written);
     }
 
+    /// <summary>
+    /// Upstream case 2030 (BL-2820): a transfer whose last 401 offers Digest without <c>stale=true</c> while it holds a
+    /// kept Digest nonce ends with Digest still marked available; a stale nonce, no kept nonce (the first Digest
+    /// challenge), a 401 offering no Digest or a final response that is no 401 leaves it unmarked.
+    /// </summary>
+    [TestMethod]
+    [DataRow(true, "401 Wrong", "Digest realm=\"r\", nonce=\"7\"", true, DisplayName = "kept nonce, Digest offered again")]
+    [DataRow(true, "401 Wrong", "Digest realm=\"r\", nonce=\"7\", stale=true", false, DisplayName = "stale")]
+    [DataRow(false, "401 Wrong", "Digest realm=\"r\", nonce=\"7\"", false, DisplayName = "first Digest challenge only")]
+    [DataRow(true, "401 Wrong", "Basic realm=\"r\"", false, DisplayName = "401 offers no Digest")]
+    [DataRow(true, "200 OK", "Digest realm=\"r\", nonce=\"7\"", false, DisplayName = "no 401")]
+    public async Task ExecuteAsync_LastResponseAfterKeptDigestNonce_ReportsWhetherDigestStaysAvailable(bool kept, string status, string challenge, bool expected)
+    {
+        TurnTakingConnection connection = new(65536, "HTTP/1.1 " + status + "\r\nWWW-Authenticate: " + challenge + "\r\nContent-Length: 0\r\n\r\n");
+        Diagnostics.Arrange("kept, status, challenge", $"{kept}, {status}, {challenge}");
+
+        TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), new RepeatingAuthenticator(null)).ExecuteAsync(KeptChallengesContext(kept ? [KeptChallenge] : [], HttpAuthSchemes.Digest, credentials: true));
+
+        WriteResult(result);
+        Assert.AreEqual(expected, result.Report!.DigestStaysAvailable);
+    }
+
+    /// <summary>
+    /// Upstream case 2030 (BL-2820): a 401 offering Digest after an earlier 401 of the same transfer gave a Digest nonce
+    /// ends the transfer with Digest still marked available.
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_SecondDigest401OfOneTransfer_ReportsDigestStaysAvailable()
+    {
+        const string refused = "HTTP/1.1 401 Wrong\r\nWWW-Authenticate: Digest realm=\"r\", nonce=\"7\"\r\nContent-Length: 0\r\n\r\n";
+        TurnTakingConnection connection = new(65536, refused, refused);
+        Diagnostics.Arrange("responses", refused + refused);
+
+        TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), new RepeatingAuthenticator("Digest x")).ExecuteAsync(KeptChallengesContext([], HttpAuthSchemes.Digest, credentials: true));
+
+        WriteResult(result);
+        Assert.IsTrue(result.Report!.DigestStaysAvailable);
+    }
+
     private static TransferContext KeptChallengesContext(string[] kept, HttpAuthSchemes allowed, bool credentials, HttpAuthSchemes picked = HttpAuthSchemes.None) => new()
     {
         Url = CurlUrl.Parse(AuthUrl),

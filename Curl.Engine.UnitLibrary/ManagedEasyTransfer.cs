@@ -326,6 +326,18 @@ internal sealed partial class ManagedEasyTransfer(
     /// </summary>
     private string? keptDigestOrigin;
 
+    /// <summary>
+    /// Whether the last perform ended with Digest still marked available (<see cref="TransferReport.DigestStaysAvailable" />),
+    /// which the next perform to the same origin carries beside <see cref="keptDigestChallenges" />, as libcurl 8.22.0 keeps
+    /// <c>authhost.avail</c> on the easy handle (upstream test2030, BL-2820); <see langword="false" /> after <see cref="Reset" />.
+    /// </summary>
+    private bool keptDigestStaysAvailable;
+
+    /// <summary>Whether a perform of <paramref name="url" /> carries <see cref="keptDigestStaysAvailable" />: only to the origin it came from.</summary>
+    /// <param name="url">The transfer's URL.</param>
+    /// <returns><see langword="true" /> when Digest stays marked available for the perform.</returns>
+    private bool KeptDigestStaysAvailableFor(CurlUrl url) => keptDigestStaysAvailable && OriginOf(url) == keptDigestOrigin;
+
     /// <summary>The <c>host:port</c> the kept Digest challenges are answered to.</summary>
     /// <param name="url">The transfer's URL.</param>
     /// <returns>The host and port.</returns>
@@ -1042,6 +1054,7 @@ internal sealed partial class ManagedEasyTransfer(
     {
         LastResult = recorder is null ? result : recorder.ReportOn(result);
         keptDigestChallenges = ChallengesOfLast401(result);
+        keptDigestStaysAvailable = result?.Report?.DigestStaysAvailable ?? false;
         keptDigestOrigin = OriginOf(url);
         keptAuthSchemePicked = AuthSchemeKeptAfter(result, keptAuthSchemePicked);
     }
@@ -1679,6 +1692,7 @@ internal sealed partial class ManagedEasyTransfer(
     {
         headers.Clear();
         keptDigestChallenges = [];
+        keptDigestStaysAvailable = false;
         keptAuthSchemePicked = HttpAuthSchemes.None;
         Options = new EasyOptions();
         Info = new TransferInfo { TransferId = Info.TransferId, CookieList = Info.CookieList };
@@ -1766,7 +1780,7 @@ internal sealed partial class ManagedEasyTransfer(
         CancellationToken cancellationToken)
     {
         EngineToolTransferOutputs outputs = ToolOutputs ?? OwnOutputsOf(options.Callbacks, PauseGateFor(url), RecordsHeaders(url) ? headers : null);
-        TransferContextFactory factory = toolDispatch?.ContextFactory ?? new TransferContextFactory(Stream.Null, shared.TimeProvider) { HstsStore = PerformShared.Hsts, DiagnosticLog = Host.DiagnosticLog, KeptDigestChallenges = OriginOf(url) == keptDigestOrigin ? keptDigestChallenges : [], KeptAuthSchemePicked = keptAuthSchemePicked };
+        TransferContextFactory factory = toolDispatch?.ContextFactory ?? new TransferContextFactory(Stream.Null, shared.TimeProvider) { HstsStore = PerformShared.Hsts, DiagnosticLog = Host.DiagnosticLog, KeptDigestChallenges = OriginOf(url) == keptDigestOrigin ? keptDigestChallenges : [], KeptDigestStaysAvailable = KeptDigestStaysAvailableFor(url), KeptAuthSchemePicked = keptAuthSchemePicked };
         return LastContext = factory.Create(
             settings,
             options.Http,

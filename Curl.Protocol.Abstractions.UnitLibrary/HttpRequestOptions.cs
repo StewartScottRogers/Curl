@@ -146,6 +146,14 @@ public sealed record HttpRequestOptions
     public IReadOnlyList<string> KeptDigestChallenges { get; init; } = [];
 
     /// <summary>
+    /// Gets a value indicating whether the easy handle's previous transfer ended with Digest still
+    /// marked available, its <see cref="TransferReport.DigestStaysAvailable" />, as libcurl 8.22.0
+    /// keeps <c>authhost.avail</c> on the easy handle (upstream test2030, BL-2820);
+    /// <see langword="false" /> for the handle's first transfer and after <c>curl_easy_reset</c>.
+    /// </summary>
+    public bool DigestStaysAvailable { get; init; }
+
+    /// <summary>
     /// Gets a value indicating whether a response of an earlier hop of the transfer was
     /// HTTP/1.0, which sends this request as HTTP/1.0, as for <c>-0</c>, since curl 8.21.0 sends
     /// every later request of a transfer as HTTP/1.0 once a response in it was: a <c>-T -</c>

@@ -72,6 +72,12 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
     internal IReadOnlyList<string> KeptDigestChallenges { get; set; } = [];
 
     /// <summary>
+    /// Gets or sets every context's <see cref="HttpRequestOptions.DigestStaysAvailable" />: whether a Libcurl handle's
+    /// previous transfer ended with Digest still marked available (upstream test2030, BL-2820); <see langword="false" /> by default.
+    /// </summary>
+    internal bool KeptDigestStaysAvailable { get; set; }
+
+    /// <summary>
     /// Gets or sets every context's <see cref="HttpRequestOptions.AuthSchemePicked" />: the scheme a
     /// Libcurl handle's previous transfer picked, which libcurl 8.22.0 keeps on the easy handle
     /// (<c>data->state.authhost.picked</c>, upstream test694, BL-2709); <see cref="HttpAuthSchemes.None" /> by default.
@@ -265,6 +271,7 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
                 {
                     HstsStore = HstsStore,
                     KeptDigestChallenges = KeptDigestChallenges,
+                    DigestStaysAvailable = KeptDigestStaysAvailable,
                     AuthSchemePicked = KeptAuthSchemePicked,
                     ProxyTunnel = TunnelsThroughProxy(proxyOptions, network, url, proxy),
                 },

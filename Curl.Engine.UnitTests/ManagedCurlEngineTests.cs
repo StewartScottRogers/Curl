@@ -423,6 +423,45 @@ public sealed class ManagedCurlEngineTests
     }
 
     /// <summary>
+    /// Upstream case 2030 (BL-2820): a transfer whose last 401 offered Digest while it already held a Digest nonce, kept
+    /// from the handle's previous transfer, ends with Digest still marked available, which the handle passes to its next transfer's HTTP options
+    /// as <c>DigestStaysAvailable</c>, as libcurl 8.22.0 keeps <c>authhost.avail</c>; <c>Reset</c> clears it.
+    /// </summary>
+    [TestMethod]
+    public async Task PerformAsync_EarlierTransferEndedWithDigestStillAvailable_NextTransferCarriesItUntilReset()
+    {
+        ScriptedConnector server = new([
+            "HTTP/1.1 401 Unauthorized\r\nWWW-Authenticate: Digest realm=\"testrealm\", nonce=\"1\"\r\nWWW-Authenticate: Basic realm=\"testrealm\"\r\nContent-Length: 0\r\n\r\n"u8.ToArray(),
+            "HTTP/1.1 401 Unauthorized\r\nWWW-Authenticate: Digest realm=\"testrealm\", nonce=\"2\"\r\nWWW-Authenticate: Basic realm=\"testrealm\"\r\nContent-Length: 0\r\n\r\n"u8.ToArray(),
+            "HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n"u8.ToArray(),
+            "HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n"u8.ToArray(),
+        ]);
+        EngineDialing dialing = new(new ScriptedTcpDialer(server), new LoopbackDnsResolver(), new RecordingDatagramConnector(Curl.Protocol.Abstractions.CurlExitCode.CouldntConnect, "no udp"), UsesHandBuiltNtlm: true);
+        await using ManagedCurlEngine engine = new(TimeProvider.System, null, dialing: dialing);
+        await using IEasyTransfer easy = engine.CreateEasy();
+        ManagedEasyTransfer handle = (ManagedEasyTransfer)easy;
+        EasyOptions basic = new()
+        {
+            Network = new EasyNetworkOptions { Url = "http://127.0.0.1:9000/20300100" },
+            Authentication = new Api.Options.Authentication.EasyAuthenticationOptions { UserPassword = "testuser:wrongpass", HttpAuthentication = Api.Options.Authentication.HttpAuthenticationMethods.Basic },
+        };
+        easy.Options = basic;
+        await easy.PerformAsync(CancellationToken.None);
+        await easy.PerformAsync(CancellationToken.None);
+        bool firstCarried = handle.LastContext!.Http!.DigestStaysAvailable;
+
+        await easy.PerformAsync(CancellationToken.None);
+        bool nextCarried = handle.LastContext!.Http!.DigestStaysAvailable;
+        easy.Reset();
+        easy.Options = basic;
+        await easy.PerformAsync(CancellationToken.None);
+
+        Assert.IsFalse(firstCarried);
+        Assert.IsTrue(nextCarried);
+        Assert.IsFalse(handle.LastContext!.Http!.DigestStaysAvailable);
+    }
+
+    /// <summary>
     /// Upstream case 3101 (BL-2714): under <c>CURLAUTH_ANY</c> with credentials and redirects limited to <c>https</c>, a
     /// 401 offering an unknown scheme and Basic is answered with <c>Authorization: Basic</c>; an authentication retry is
     /// not a redirect, so the redirect-protocol list does not stop it.
