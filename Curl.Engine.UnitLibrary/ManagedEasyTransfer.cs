@@ -1027,7 +1027,7 @@ internal sealed partial class ManagedEasyTransfer(
         await CleanUpUnlessToolDoesAsync(toolInputs, options, settings, cookies, state, transferUrl).ConfigureAwait(false);
         KeepHandleStateOf(recorder, result, url);
         long connectionId = toolEvents is null ? ConnectionIdOf(result, state) : ToolConnectionIdOf(result, state, toolEvents);
-        return FinishPerformed(LastResult, options, transferId, cookies, connectionId, AbortedTextOf(callbackReads), toolEvents?.State);
+        return FinishPerformed(LastResult, options, transferUrl, transferId, cookies, connectionId, AbortedTextOf(callbackReads), toolEvents?.State);
     }
 
     /// <summary>
@@ -1529,6 +1529,10 @@ internal sealed partial class ManagedEasyTransfer(
     /// </summary>
     /// <param name="result">The attempt's result, or <see langword="null" /> when a callback aborted it.</param>
     /// <param name="options">The handle's options.</param>
+    /// <param name="transferUrl">
+    /// The URL the setup chose: the URL set, or the <c>https</c> one HSTS switched it to, which the effective URL falls back to
+    /// when the report carries none, as a connect that failed after the switch leaves it (upstream test1922, BL-2676).
+    /// </param>
     /// <param name="transferId">The transfer's <c>%{xfer_id}</c>.</param>
     /// <param name="cookies">The transfer's cookies, or <see langword="null" /> when no cookie option is set.</param>
     /// <param name="connectionId">The transfer's <c>%{conn_id}</c>.</param>
@@ -1538,22 +1542,21 @@ internal sealed partial class ManagedEasyTransfer(
     /// <see langword="null" /> for a handle's own.
     /// </param>
     /// <returns>The transfer's code.</returns>
-    private CurlCode FinishPerformed(TransferResult? result, EasyOptions options, long transferId, CookieEngine? cookies, long connectionId, string abortedText, EngineTransferState? toolState)
+    private CurlCode FinishPerformed(TransferResult? result, EasyOptions options, string transferUrl, long transferId, CookieEngine? cookies, long connectionId, string abortedText, EngineTransferState? toolState)
     {
-        string urlText = options.Network.Url!;
         IReadOnlyList<string> cookieList = cookies?.ListLines ?? [];
         if (result is null)
         {
             return Finish(
                 CurlCode.AbortedByCallback,
                 abortedText,
-                new TransferInfo { EffectiveUrl = urlText, TransferId = transferId, ConnectionId = connectionId, CookieList = cookieList });
+                new TransferInfo { EffectiveUrl = transferUrl, TransferId = transferId, ConnectionId = connectionId, CookieList = cookieList });
         }
 
         return Finish(
             result.ExitCode.ToCurlCode(),
             result.ErrorMessage ?? string.Empty,
-            PerformedInfoOf(result, options, transferId, cookieList, connectionId, toolState));
+            PerformedInfoOf(result, options, transferUrl, transferId, cookieList, connectionId, toolState));
     }
 
     /// <summary>
@@ -1573,14 +1576,15 @@ internal sealed partial class ManagedEasyTransfer(
     /// </summary>
     /// <param name="result">The attempt's result.</param>
     /// <param name="options">The handle's options.</param>
+    /// <param name="transferUrl">The URL the setup chose (<see cref="FinishPerformed" />).</param>
     /// <param name="transferId">The transfer's <c>%{xfer_id}</c>.</param>
     /// <param name="cookieList">The cookie engine's list.</param>
     /// <param name="connectionId">The transfer's <c>%{conn_id}</c>.</param>
     /// <param name="toolState">The runner's running transfer, or <see langword="null" /> for a handle's own.</param>
     /// <returns>The info.</returns>
-    private TransferInfo PerformedInfoOf(TransferResult result, EasyOptions options, long transferId, IReadOnlyList<string> cookieList, long connectionId, EngineTransferState? toolState)
+    private TransferInfo PerformedInfoOf(TransferResult result, EasyOptions options, string transferUrl, long transferId, IReadOnlyList<string> cookieList, long connectionId, EngineTransferState? toolState)
     {
-        string requestUrl = toolState?.RequestUrl ?? options.Network.Url!;
+        string requestUrl = toolState?.RequestUrl ?? transferUrl;
         TransferInfo info = TransferInfoFromReport.Of(result, requestUrl, options.Transfer.FileTime, shared.TimeProvider, options.Tls.GatherCertificateInfo) with
         {
             TransferId = transferId,

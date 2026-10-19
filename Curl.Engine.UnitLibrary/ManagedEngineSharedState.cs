@@ -29,7 +29,8 @@ internal sealed class ManagedEngineSharedState
     /// <param name="webSocketRandomSource">Where every handle's WebSocket key and frame masks come from (BL-2688); <see langword="null" />, in production, for <see cref="SystemWebSocketRandomSource" />.</param>
     /// <param name="ftpPwdStop">The stand-in for the debug build's <c>CURL_FTP_PWD_STOP</c> (BL-2636); <see langword="null" />, in production, for none.</param>
     /// <param name="createFormBoundary">What gives every handle's <c>CURLOPT_MIMEPOST</c> bodies their boundary (BL-2695); <see langword="null" />, in production, for curl's random one.</param>
-    internal ManagedEngineSharedState(TimeProvider timeProvider, Func<CurlExitCode, string> easyErrorText, Func<string, string?>? readEnvironmentVariable = null, EngineDialing? dialing = null, TimeProvider? signingClock = null, IWebSocketRandomSource? webSocketRandomSource = null, FirstTransferFtpPwdStop? ftpPwdStop = null, Func<string>? createFormBoundary = null)
+    /// <param name="learnsHstsOverHttp">Whether the HSTS cache learns <c>Strict-Transport-Security</c> over plain <c>http</c>: the stand-in for the debug build's <c>CURL_HSTS_HTTP</c> (upstream test1922, BL-2676, ADR-0494); <see langword="false" />, in production.</param>
+    internal ManagedEngineSharedState(TimeProvider timeProvider, Func<CurlExitCode, string> easyErrorText, Func<string, string?>? readEnvironmentVariable = null, EngineDialing? dialing = null, TimeProvider? signingClock = null, IWebSocketRandomSource? webSocketRandomSource = null, FirstTransferFtpPwdStop? ftpPwdStop = null, Func<string>? createFormBoundary = null, bool learnsHstsOverHttp = false)
     {
         CreateFormBoundary = createFormBoundary;
         Dialing = dialing;
@@ -43,7 +44,7 @@ internal sealed class ManagedEngineSharedState
         TlsSessions = new TlsSessionCache(timeProvider);
         DnsCache = new DnsCache();
         Cookies = new CookieStore();
-        Hsts = new HstsTransferPolicy(timeProvider);
+        Hsts = new HstsTransferPolicy(timeProvider, learnsOverHttp: learnsHstsOverHttp);
         ConnectionIdsByPoolNumber = new ConcurrentDictionary<long, long>();
         MultiOwners = new ConcurrentDictionary<Api.EngineContracts.IEasyTransfer, ManagedMultiTransfer>(ReferenceEqualityComparer.Instance);
         SocketHandles = new CurlSocketHandles();

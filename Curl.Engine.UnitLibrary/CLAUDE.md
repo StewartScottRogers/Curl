@@ -506,3 +506,7 @@ A perform from the options outside any multi handle and with no `ToolSettings` s
 ## CURLOPT_PROXY_TRANSFER_MODE (BL-2718)
 
 `TransferContextFactory.Create` puts `ProxyTransferModeUrl.Of`'s URL on the context: with `EasyTransferOptions.ProxyTransferMode` set, an `ftp` URL forwarded through an `Http` or `Http10` proxy without a tunnel (`-p` or a tunnelling `--connect-to`, `TunnelsThroughProxy`) gets `;type=a` under `TransferText` or `;type=i` on its path, before any query, unless the path already ends in `;type=` and `a`, `d` or `i`, as curl 8.22.0's `http_target` does (upstream tests 549 and 550). Its tests are `ProxyTransferModeUrlTests`.
+
+## CURL_HSTS_HTTP and the effective URL after an HSTS switch (BL-2676)
+
+When `ManagedCurlEngine`'s internal constructor is given a `readEnvironmentVariable` that sets `CURL_HSTS_HTTP` (`EngineComposition.LearnsHstsOverHttp`), `ManagedEngineSharedState`'s `learnsHstsOverHttp` makes the engine's `HstsTransferPolicy` learn `Strict-Transport-Security` over plain `http`, the conformance harness's stand-in for the debug build's (ADR-0494); the process's environment never turns it on. A perform's `Info.EffectiveUrl` falls back to the URL the setup chose - the `https` one HSTS switched it to - when the report carries none, as after a failed connect (upstream test1922). Its tests are `ManagedCurlEngineTests` and `ManagedEasyTransferTests.Hsts.cs`.

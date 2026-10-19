@@ -82,6 +82,39 @@ public sealed class ManagedCurlEngineTests
     }
 
     [TestMethod]
+    public async Task SharedHsts_EnvironmentSetsCurlHstsHttp_LearnsOverPlainHttp()
+    {
+        Dictionary<string, string> environment = new() { ["CURL_HSTS_HTTP"] = "yes" };
+        await using ManagedCurlEngine engine = new(TimeProvider.System, null, readEnvironmentVariable: name => environment.GetValueOrDefault(name));
+
+        bool stored = engine.Shared.Hsts.StoreFromResponse(Protocol.Abstractions.CurlUrl.Parse("http://hsts.example.com:8990/1922"), "max-age=31536000", DateTimeOffset.UtcNow);
+
+        Assert.IsTrue(stored);
+        Assert.IsTrue(engine.Shared.Hsts.TrySwitchToHttps("http://hsts.example.com/1922", Protocol.Abstractions.CurlUrl.Parse("http://hsts.example.com/1922"), out string? httpsUrl));
+        Assert.AreEqual("https://hsts.example.com/1922", httpsUrl);
+    }
+
+    [TestMethod]
+    public async Task SharedHsts_EnvironmentWithoutCurlHstsHttp_IgnoresPlainHttp()
+    {
+        await using ManagedCurlEngine engine = new(TimeProvider.System, null, readEnvironmentVariable: _ => null);
+
+        _ = engine.Shared.Hsts.StoreFromResponse(Protocol.Abstractions.CurlUrl.Parse("http://hsts.example.com/"), "max-age=31536000", DateTimeOffset.UtcNow);
+
+        Assert.IsFalse(engine.Shared.Hsts.TrySwitchToHttps("http://hsts.example.com/", Protocol.Abstractions.CurlUrl.Parse("http://hsts.example.com/"), out _));
+    }
+
+    [TestMethod]
+    public async Task SharedHsts_ProductionEngine_IgnoresPlainHttp()
+    {
+        await using ManagedCurlEngine engine = new();
+
+        _ = engine.Shared.Hsts.StoreFromResponse(Protocol.Abstractions.CurlUrl.Parse("http://hsts.example.com/"), "max-age=31536000", DateTimeOffset.UtcNow);
+
+        Assert.IsFalse(engine.Shared.Hsts.TrySwitchToHttps("http://hsts.example.com/", Protocol.Abstractions.CurlUrl.Parse("http://hsts.example.com/"), out _));
+    }
+
+    [TestMethod]
     public async Task VersionInfo_ProductionEngine_ListsHttpAndHttps()
     {
         await using ManagedCurlEngine engine = new();

@@ -55,7 +55,9 @@ public sealed class ManagedCurlEngine : ICurlEngine
     /// </param>
     /// <param name="readEnvironmentVariable">
     /// Reads the proxy environment variables each handle's own perform consults, as libcurl reads them for every
-    /// handle (BL-2519); <see langword="null" /> for <see cref="Environment.GetEnvironmentVariable(string)" />.
+    /// handle (BL-2519); <see langword="null" /> for <see cref="Environment.GetEnvironmentVariable(string)" />. When given and
+    /// it sets <c>CURL_HSTS_HTTP</c>, the engine's HSTS cache learns over plain <c>http</c> too, the harness's stand-in for
+    /// the debug build's (upstream test1922, BL-2676, ADR-0494); the process's environment never turns that on.
     /// </param>
     /// <param name="dialing">
     /// What the production dispatcher's transports dial, resolve and open datagram channels through in place of
@@ -98,7 +100,7 @@ public sealed class ManagedCurlEngine : ICurlEngine
         bool stopsFirstFtpTransferBeforePwd = false,
         Func<string>? createFormBoundary = null)
     {
-        shared = new ManagedEngineSharedState(timeProvider, easyErrorText ?? (_ => string.Empty), readEnvironmentVariable, dialing, signingClock, webSocketRandomSource, FirstTransferFtpPwdStop.When(stopsFirstFtpTransferBeforePwd), createFormBoundary);
+        shared = new ManagedEngineSharedState(timeProvider, easyErrorText ?? (_ => string.Empty), readEnvironmentVariable, dialing, signingClock, webSocketRandomSource, FirstTransferFtpPwdStop.When(stopsFirstFtpTransferBeforePwd), createFormBoundary, readEnvironmentVariable is not null && EngineComposition.LearnsHstsOverHttp(honoursHstsHttpVariable: true, readEnvironmentVariable));
         handleHost = HandleHostOf(standardInput, readEnvironmentVariable);
         this.createDispatcher = createDispatcher is null ? CreateDispatcher : (options, state, cookies, _, _) => createDispatcher(options, state, cookies);
     }

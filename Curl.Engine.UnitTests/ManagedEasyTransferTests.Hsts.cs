@@ -106,6 +106,18 @@ public sealed partial class ManagedEasyTransferTests
         CollectionAssert.AreEqual(new[] { (new HstsEntry("h", false, null), 0, 1) }, saved);
     }
 
+    [TestMethod]
+    public async Task PerformAsync_HstsSwitchedUrlFailsToConnect_EffectiveUrlIsTheHttpsOne()
+    {
+        await using ManagedEasyTransfer easy = (ManagedEasyTransfer)CreateEngine(new RecordingConnector(Protocol.Abstractions.CurlExitCode.CouldntConnect, ConnectFailure)).CreateEasy();
+        easy.Options = HstsOptionsOf("http://h/1922", CallbackHstsCacheTests.ReadOf([new HstsEntry("h", false, null)], HstsResult.Done), write: null);
+
+        CurlCode code = await easy.PerformAsync(CancellationToken.None);
+
+        Assert.AreEqual(CurlCode.CouldntConnect, code);
+        Assert.AreEqual("https://h/1922", easy.Info.EffectiveUrl);
+    }
+
     private static EasyOptions HstsOptionsOf(string url, HstsReadCallback read, HstsWriteCallback? write) =>
         new()
         {
