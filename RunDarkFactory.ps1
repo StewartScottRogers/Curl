@@ -144,13 +144,16 @@
     pull request, by Stewart's standing permission - only when the CI workflow passed on
     Windows, Linux and macOS for the exact commit being merged.
 
-    After that merge, one headless run reviews what the shift merged with the PR Review
-    Toolkit plugin's five read-only reviewers (comments, tests, errors, types, code; the
-    code-simplifier edits code, so it is left out). It files a task for each Critical or
-    Important issue, High for Critical, before -Continuous decides whether work is ready,
-    so the next shift works them. The review never holds or undoes the merge: CI is the
-    merge gate (ADR-0710). It is skipped when the plugin is not installed, and after its
-    trial: it runs for $ShiftReviewTrialShifts shifts (2), then stops until Stewart decides.
+    After that merge, one headless run reviews what the shift merged with three of the PR
+    Review Toolkit plugin's reviewers: errors, types and code. The audit office's quality and
+    truthfulness auditors already cover tests and comments, and the code-simplifier edits
+    code, so those are left out. It files a task for each Critical or Important issue, High
+    for Critical. Under -Continuous with work ready, the next shift starts first and this
+    process runs the review beside it, so nothing waits for it; lanes claim what it files.
+    With nothing ready, it runs first, and the next shift starts if it filed work. The
+    review never holds or undoes the merge: CI is the merge gate (ADR-0710). It is skipped
+    when the plugin is not installed, and after its trial: it runs for
+    $ShiftReviewTrialShifts shifts (2), then stops until Stewart decides.
 
     A commit that only changes the board and is pushed on its own - a claim, requeue,
     park, return or CI-watch filing - says [skip ci], so it starts no CI run and cancels
@@ -2677,7 +2680,7 @@ $ShiftReviewTrialShifts = 2
 $ShiftReviewPrompt = @'
 You are the dark factory's shift-end reviewer (ADR-0710). This checkout is detached at {HEAD}, the commit the shift just merged into master. Review what the shift merged: git diff {BASE}...{HEAD}.
 
-1. Run /pr-review-toolkit:review-pr comments tests errors types code parallel, scoped to that diff (the changed files and lines, not the whole repository). Review only: change no file but the task files and the report below, and never run the code-simplifier.
+1. Run /pr-review-toolkit:review-pr errors types code parallel, scoped to that diff (the changed files and lines, not the whole repository). Review only: change no file but the task files and the report below, and never run the code-simplifier.
 2. Keep only issues that are real and that the diff introduced, checked against the code, CLAUDE.md and the project's own CLAUDE.md files. Drop style preferences and anything the repository's rules already decide another way.
 3. For each Critical or Important issue left, file one task with powershell -NoProfile -ExecutionPolicy Bypass -File .claude/skills/task-board/task-board.ps1 new -Title "<what to fix>" -Priority <High for Critical, Normal for Important> -Assignee Claude -Pipeline direct -Touches "<the projects or files>", then fill its Goal, Context (the file and line, the reviewer that found it, what is wrong and why) and checkable Acceptance criteria. File none for Suggestions. Never file one that touches an audit path or a guard file.
 4. Commit only the new task files, with the message "chore(tasks): file shift-end review findings" and [skip ci] in the body, run task-board.ps1 dedupe -Since origin/{BRANCH}, and push to origin {BRANCH}: on a refused push, git pull --rebase origin {BRANCH} and push again, up to five times.
@@ -2685,7 +2688,7 @@ You are the dark factory's shift-end reviewer (ADR-0710). This checkout is detac
 '@
 
 function Invoke-ShiftReview {
-    # After the shift-end merge: one headless run of the PR Review Toolkit's five read-only
+    # After the shift-end merge: one headless run of three of the PR Review Toolkit's
     # reviewers over what the shift merged, filing a task for each Critical or Important
     # issue (ADR-0710). It never holds or undoes the merge. Returns a line for the trace.
     param([string]$Base, [string]$Head, [string]$Branch)
@@ -2708,8 +2711,9 @@ function Invoke-ShiftReview {
         $p.StandardInput.Close()
         $deadline = (Get-Date).AddMinutes($ShiftReviewMinutes)
         $pending = $p.StandardOutput.ReadLineAsync()
+        # No heartbeat here: the review can run beside the next shift, whose heartbeats the
+        # board page shows.
         while ($true) {
-            Write-HeartbeatIfDue
             if ($pending.Wait(1000)) {
                 if ($null -eq $pending.Result) { break }
                 Add-Content -Path $raw -Value $pending.Result -Encoding UTF8
@@ -4861,7 +4865,9 @@ if ($Restart) {
     $coordinator = Get-CimInstance Win32_Process | Where-Object {
         $_.ProcessId -ne $PID -and $_.CommandLine -match "-File\s+`"?$mine`"?(\s|$)" -and
         $_.CommandLine -notmatch '\s-Lane\s' -and $_.CommandLine -notmatch '\s-(Restart|NewTab)\b'
-    } | Select-Object -First 1
+    } | Sort-Object CreationDate -Descending | Select-Object -First 1
+    # The newest: an ended shift's coordinator can still be running its shift-end review
+    # beside the next shift (ADR-0710), and it is not the shift to restart.
     if (-not $coordinator) { Write-Host 'No dark factory shift is running in this checkout.'; exit 1 }
     # The same arguments, so a fixed lane count, -WeeklyPace or -Hours carry over.
     $rest = ($coordinator.CommandLine -split [regex]::Escape((Split-Path $PSCommandPath -Leaf)), 2)[1]
@@ -5324,9 +5330,12 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
     $masterBefore = "$(git -C $Root rev-parse origin/master 2>$null)".Trim()
     $mergeLine = if ($auditCadence.HoldMerge) { $auditCadence.MergeMessage } else { Invoke-MergeToMaster -Branch $branch }
     Write-Trace '-' 'merge' $mergeLine 'Cyan'
+    # The shift-end review (ADR-0710) runs below: beside the next shift when one starts, or
+    # before deciding whether to start one when nothing is ready.
+    $review = $null
     if ($mergeLine -match '^merged ([0-9a-f]{7,40}) ') {
         $merged = "$(git -C $Root rev-parse --verify "$($Matches[1])^{commit}" 2>$null)".Trim()
-        if ($masterBefore -and $merged) { Write-Trace '-' 'review' (Invoke-ShiftReview -Base $masterBefore -Head $merged -Branch $branch) 'Cyan' }
+        if ($masterBefore -and $merged) { $review = @{ Base = $masterBefore; Head = $merged; Branch = $branch } }
     }
     # The merge waited for CI on the shift's last commit; a failure there finished after the
     # loop above stopped watching, so file it now (BL-1031).
@@ -5340,6 +5349,13 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
     # -Continuous: while the board still has ready work, the next shift starts itself, so
     # the factory keeps going without anyone - Stewart or a Claude session - to restart it.
     $stillReady = (Invoke-Board @('next')) -join "`n"
+    # Nothing ready: the review runs now, and what it files can start the next shift.
+    if ($review -and -not ($Continuous -and (Get-NextTaskId $stillReady))) {
+        Write-Trace '-' 'review' (Invoke-ShiftReview @review) 'Cyan'
+        $review = $null
+        if (-not $moved) { git -C $Root pull -q --ff-only origin $branch 2>&1 | Out-Null }
+        $stillReady = (Invoke-Board @('next')) -join "`n"
+    }
     if ($Continuous -and (Get-NextTaskId $stillReady)) {
         foreach ($r in $reasons) { Write-Trace '-' 'note' (Get-Short $r 100) 'Yellow' }
         # An Auto shift hands on Auto, not the count it ended at; the next one starts from
@@ -5350,6 +5366,8 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
         if ($QuietAlarm) { $forward += '-QuietAlarm' }
         $next = Start-Detached -Label "DF shift starting" -Dir $Root -ScriptArgs $forward
         Write-Trace '-' 'shift' "work is still ready; next shift started ($(if ($next.Tab) { "herdr tab $($next.Tab)" } else { "pid $($next.Process.Id)" }))" 'Cyan'
+        # The review runs beside the next shift, which claims what it files (ADR-0710).
+        if ($review) { Set-OwnTabLabel 'reviewing the merge'; Write-Trace '-' 'review' (Invoke-ShiftReview @review) 'Cyan' }
         # The next shift has its own tab; this one has only notes, and they are in the log.
         if ($next.Tab) { Close-OwnHerdrTab 'shift handed over to the next one' }
         exit 0

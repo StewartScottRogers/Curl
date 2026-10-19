@@ -20,15 +20,21 @@ a code simplifier. Running them on every lane task (about 60 a day) would cost s
   It is one headless `claude -p --model opus` run in a worktree detached at the merged commit, over
   `git diff <master before the merge>...<merged commit>`. It is capped at `$ShiftReviewBudgetUsd`
   ($15) and `$ShiftReviewMinutes` (45).
-- It runs `/pr-review-toolkit:review-pr comments tests errors types code parallel`. These are the
-  five reviewers that only read. `code-simplifier` rewrites code, which a review must not do, so it
-  is left out.
+- It runs `/pr-review-toolkit:review-pr errors types code parallel`: silent failures, type design,
+  and bugs plus CLAUDE.md compliance. Changed on 2026-10-19 at Stewart's request, before the trial's
+  first run, from all five reviewers that only read. The audit office already covers tests
+  (`audit-quality`: weak assertions, surviving mutants) and comments (`audit-truthfulness`: names
+  and doc comments against the code), so those two are left out. `code-simplifier` rewrites code,
+  which a review must not do, so it is left out too.
+- Under `-Continuous` with work ready, the ended shift starts the next shift first, then runs the
+  review in its own process beside it. It publishes no heartbeat while it does, and
+  `-Restart` picks the newest coordinator. So nothing waits for the review, and lanes claim what it
+  files. With nothing ready, the review runs first, and the next shift starts if it filed work.
 - For each Critical issue it files a High task, and for each Important issue a Normal task, with the
   board script. It files none for Suggestions, and none that touches an audit path or a guard file.
   It pushes the tasks with `[skip ci]` and writes `<logs>/review-<stamp>.md`, ending
   `FILED: <n>`. The shift log traces one `review` line.
-- It never holds or undoes the merge, since CI is the merge gate. It runs before `-Continuous`
-  decides whether work is ready, so the next shift works what it filed.
+- It never holds or undoes the merge, since CI is the merge gate.
 - It is skipped when the plugin is not installed (`claude plugin list`). On this machine the plugin
   is installed for the user (`claude plugin install pr-review-toolkit@claude-plugins-official`).
 
@@ -37,6 +43,7 @@ a code simplifier. Running them on every lane task (about 60 a day) would cost s
 - Every shift's merged code is read by a reviewer once, for about $15 at most a shift, instead of six
   reviews a task.
 - A defect it finds is already on `master`, and is fixed by the next shift.
-- The next shift starts up to 45 minutes later.
+- The next shift starts as soon as before. With nothing ready, an idle factory waits up to 45
+  minutes for the review.
 - A review run on a large shift reads the diff selectively. It finds the defects it reaches, not
   every defect.
