@@ -35,3 +35,4 @@ Found by BL-2551, which ported lib3100 (`Curl.Conformance.LibTest.UnitLibrary/Li
 - 2026-10-17: Created.
 - 2026-10-18: Backlog -> Doing. Criteria at claim: d919f019 4df473d9 3d836d5e.
 - 2026-10-18: Doing -> Backlog. Needs BL-2704: RTSP handler ignores CURLOPT_RTSP_REQUEST, case 3100 sends OPTIONS * not DESCRIBE
+- 2026-10-18: Backlog -> Doing. Criteria at claim: d919f019 4df473d9 3d836d5e.
