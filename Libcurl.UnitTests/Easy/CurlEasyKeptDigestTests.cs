@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.RegularExpressions;
 using Curl.Api.Codes;
 using Curl.Api.Options.Authentication;
 using Curl.Core;
@@ -23,7 +24,8 @@ public sealed class CurlEasyKeptDigestTests
     /// <summary>
     /// lib2023's second round: a perform whose Digest answer is refused keeps the refusing 401's nonce, so the next
     /// perform answers it up front and, as libcurl ignores that perform's first 401 Digest header as a duplicate,
-    /// sends the same answer once more before the next 401 ends it.
+    /// sends the same answer once more before the next 401 ends it. The pattern takes both builds' separators: the
+    /// Schannel build's SSPI writes <c>nonce="5",uri=</c>, the OpenSSL build's own Digest code <c>nonce="5", uri=</c>.
     /// </summary>
     [TestMethod]
     public async Task Perform_AfterAPerformWhoseDigestAnswerWasRefused_SendsTheKeptNonceTwiceOnTheNextPerform()
@@ -43,7 +45,7 @@ public sealed class CurlEasyKeptDigestTests
         string second = written[written.IndexOf("GET /second", StringComparison.Ordinal)..];
         Assert.AreEqual(CurlCode.Ok, code);
         Assert.AreEqual(2, second.Split("GET /second HTTP/1.1\r\n").Length - 1);
-        Assert.AreEqual(2, second.Split("nonce=\"5\",uri=\"/second\"").Length - 1);
+        Assert.AreEqual(2, Regex.Count(second, "nonce=\"5\", ?uri=\"/second\""));
         Assert.DoesNotContain("nonce=\"7\"", second);
     }
 
