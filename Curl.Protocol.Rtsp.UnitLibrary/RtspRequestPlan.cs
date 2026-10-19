@@ -56,6 +56,14 @@ internal sealed record RtspRequestPlan(RtspRequestKind Kind, string Target, stri
     /// </summary>
     internal bool SkipsReplyBody => Kind == RtspRequestKind.GetParameter && SentBody.Length == 0;
 
+    /// <summary>
+    /// Gets a value indicating whether the reply body is written to the body output: only for a
+    /// libcurl <c>DESCRIBE</c> or <c>GET_PARAMETER</c>, the kinds <c>lib/rtsp.c</c>'s <c>rtsp_do</c>
+    /// clears <c>no_body</c> for; every other kind, and the curl tool's <c>OPTIONS *</c>, reads and
+    /// discards it (BL-2789, ADR-0169).
+    /// </summary>
+    internal bool WritesReplyBody => !IsToolTransfer && Kind is RtspRequestKind.Describe or RtspRequestKind.GetParameter;
+
     /// <summary>Gives the plan for <paramref name="settings" />, or the tool's when none are given.</summary>
     /// <param name="settings">The libcurl request settings, or <see langword="null" />.</param>
     /// <returns>The plan.</returns>

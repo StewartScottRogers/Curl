@@ -32,3 +32,7 @@ engine keeps on the easy handle, so a later perform continues the `CSeq` and ses
 `RtspRequestPlan` turns the settings into what `lib/rtsp.c` 8.22.0 sends; with no settings the
 tool's `OPTIONS *` is unchanged. A `SETUP` with no `Transport` fails with 43; there is no
 session-ID refusal in 8.22.0.
+
+Reply bodies (BL-2789): a libcurl `DESCRIBE` or `GET_PARAMETER` writes its reply body to the body
+output (the libcurl write callback), the kinds `lib/rtsp.c`'s `rtsp_do` clears `no_body` for
+(`RtspRequestPlan.WritesReplyBody`); every other kind and the tool's `OPTIONS *` read and discard it.

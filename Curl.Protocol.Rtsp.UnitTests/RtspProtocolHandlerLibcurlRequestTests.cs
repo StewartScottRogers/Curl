@@ -324,6 +324,55 @@ public sealed class RtspProtocolHandlerLibcurlRequestTests
             Encoding.Latin1.GetString(server.Sent));
     }
 
+    [TestMethod]
+    [DataRow(RtspRequestKind.Describe, "v=0\r\ns=x\r\n")]
+    [DataRow(RtspRequestKind.GetParameter, "v=0\r\ns=x\r\n")]
+    [DataRow(RtspRequestKind.Options, "")]
+    [DataRow(RtspRequestKind.Setup, "")]
+    public async Task ExecuteAsync_ReplyBody_IsWrittenToTheOutputForDescribeAndGetParameterOnly(RtspRequestKind kind, string expected)
+    {
+        // Upstream case 3100's 200 reply carries its SDP body to stdout (BL-2789).
+        var server = new ScriptedConnection(Bytes("RTSP/1.0 200 OK\r\nCSeq: 1\r\nContent-Length: 10\r\n\r\nv=0\r\n"), Bytes("s=x\r\n"));
+        TransferContext context = Context();
+        var settings = new RtspRequestSettings { Kind = kind, StreamUri = Uri, Transport = "T", Body = Bytes("p") };
+
+        TransferResult result = await Handler(server, settings).ExecuteAsync(context);
+
+        Diagnostics.ActResult(result);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(10, result.BytesTransferred);
+        Assert.AreEqual(expected, Encoding.Latin1.GetString(((MemoryStream)context.Output).ToArray()));
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ToolOptionsReplyBody_IsNotWrittenToTheOutput()
+    {
+        var server = new ScriptedConnection(Bytes("RTSP/1.0 200 OK\r\nCSeq: 1\r\nContent-Length: 5\r\n\r\nv=0\r\n"));
+        TransferContext context = Context();
+        var handler = new RtspProtocolHandler(new RecordingConnector(ConnectResult.Connected(server)), new RecordingAuthenticator());
+
+        TransferResult result = await handler.ExecuteAsync(context);
+
+        Diagnostics.ActResult(result);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(5, result.BytesTransferred);
+        Assert.AreEqual(0, context.Output.Length);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_DescribeReplyBodyWriteFails_FailsWith23()
+    {
+        var server = new ScriptedConnection(Bytes("RTSP/1.0 200 OK\r\nCSeq: 1\r\nContent-Length: 5\r\n\r\nv=0\r\n"));
+        TransferContext context = new() { Url = CurlUrl.Parse(Uri), Output = new FailingStream(new IOException("full")) };
+        Diagnostics.ArrangeContext(context);
+
+        TransferResult result = await Handler(server, new RtspRequestSettings { Kind = RtspRequestKind.Describe, StreamUri = Uri }).ExecuteAsync(context);
+
+        Diagnostics.ActResult(result);
+        Assert.AreEqual(CurlExitCode.WriteError, result.ExitCode);
+        Assert.AreEqual("Failure writing output to destination, passed 5 returned 0", result.ErrorMessage);
+    }
+
     private static byte[] Bytes(string text) => Encoding.Latin1.GetBytes(text);
 
     private RtspProtocolHandler Handler(IConnection connection, RtspRequestSettings settings, RtspSessionState? state = null) =>

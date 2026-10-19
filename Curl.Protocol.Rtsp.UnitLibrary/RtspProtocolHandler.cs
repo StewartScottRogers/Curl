@@ -9,7 +9,8 @@ namespace Curl.Protocol.Rtsp;
 /// <c>OPTIONS * RTSP/1.0</c> request with <c>CSeq: 1</c>, writes the reply head to the header
 /// output, reads and discards the body, and fails a reply whose <c>CSeq</c> does not match with
 /// exit 85 and one whose <c>Session</c> contradicts the transfer's session ID with exit 86
-/// (ADR-0169).
+/// (ADR-0169). A libcurl <c>DESCRIBE</c> or <c>GET_PARAMETER</c> writes its reply body to the
+/// body output instead, as curl 8.22.0's <c>lib/rtsp.c</c> does (BL-2789).
 /// </summary>
 /// <param name="connector">
 /// Supplies the connection to the URL's host and port (554 when the URL names none),
@@ -350,15 +351,23 @@ public sealed class RtspProtocolHandler(
             return statusFailure with { Report = report };
         }
 
-        long bodyRead = plan.SkipsReplyBody
-            ? 0
-            : await RtspReplyReader.DiscardBodyAsync(connection, head.Remaining, head.ContentLength, context.Progress, events, context.CancellationToken).ConfigureAwait(false);
+        long bodyRead = await ReadBodyAsync(connection, context, head).ConfigureAwait(false);
         context.Progress.ReportTransferDone();
         TransferResult result = head.SequenceNumber == sequenceNumber
             ? TransferResult.Success(bodyRead)
             : Fail(events, CurlExitCode.RtspCseqError, SequenceMismatch(sequenceNumber, head.SequenceNumber), bodyRead);
         return result with { Report = report with { DownloadSize = bodyRead } };
     }
+
+    /// <summary>
+    /// Reads the reply body unless the plan leaves it unread, writing it to the body output when the
+    /// plan writes it and discarding it otherwise (BL-2789).
+    /// </summary>
+    /// <returns>How many body bytes were read.</returns>
+    private async ValueTask<long> ReadBodyAsync(IConnection connection, ITransferContext context, RtspReplyHead head) =>
+        plan.SkipsReplyBody
+            ? 0
+            : await RtspReplyReader.ReadBodyAsync(connection, head.Remaining, head.ContentLength, plan.WritesReplyBody ? context.Output : null, context.Progress, context.Events, context.CancellationToken).ConfigureAwait(false);
 
     /// <summary>
     /// Fails a completed head curl refuses: a status of 400 or more under <c>-f</c> with 22, else

@@ -5,7 +5,7 @@ namespace Curl.Protocol.Rtsp;
 /// <summary>
 /// Reads an RTSP reply from the connection: the head line by line, each line written to the
 /// header output (<c>-i</c>, <c>-I</c>, <c>-D</c>) once it is read, then the body, which is
-/// counted and discarded (ADR-0169).
+/// counted and either discarded (ADR-0169) or written to the body output (BL-2789).
 /// </summary>
 /// <remarks>
 /// Measured on curl 8.21.0 (BL-591). A header line is read only once a byte after it has
@@ -91,28 +91,32 @@ internal static class RtspReplyReader
     }
 
     /// <summary>
-    /// Reads and discards the body: up to <paramref name="contentLength" /> bytes, starting with
-    /// those already received after the head, or fewer when the server closes first, which curl
-    /// 8.21.0 does not treat as an error (measured, BL-591).
+    /// Reads the body: up to <paramref name="contentLength" /> bytes, starting with those already
+    /// received after the head, or fewer when the server closes first, which curl 8.21.0 does not
+    /// treat as an error (measured, BL-591). Each piece is written to <paramref name="bodyOutput" />,
+    /// or discarded when it is <see langword="null" /> (BL-2789).
     /// </summary>
     /// <param name="connection">The connection the reply arrives on.</param>
     /// <param name="alreadyReceived">The bytes received after the head.</param>
     /// <param name="contentLength">The reply's <c>Content-Length</c>.</param>
+    /// <param name="bodyOutput">Where the body is written, or <see langword="null" /> to discard it.</param>
     /// <param name="progress">Where the running count is reported.</param>
     /// <param name="events">Where each piece of the body is reported as received data, for <c>-v</c> and <c>--trace</c>.</param>
     /// <param name="cancellationToken">Cancels the read.</param>
     /// <returns>How many body bytes were read.</returns>
-    /// <exception cref="RtspTransferException">A read failed.</exception>
-    internal static async ValueTask<long> DiscardBodyAsync(
+    /// <exception cref="RtspTransferException">A read failed (56), or a write to <paramref name="bodyOutput" /> (23).</exception>
+    internal static async ValueTask<long> ReadBodyAsync(
         IConnection connection,
         byte[] alreadyReceived,
         long contentLength,
+        Stream? bodyOutput,
         ITransferProgress progress,
         ITransferEvents events,
         CancellationToken cancellationToken)
     {
         long bodyRead = Math.Min(alreadyReceived.Length, contentLength);
         ReportReceived(events, alreadyReceived.AsSpan(0, (int)bodyRead));
+        await WriteAsync(bodyOutput, alreadyReceived.AsMemory(0, (int)bodyRead), cancellationToken).ConfigureAwait(false);
         byte[] buffer = new byte[BufferSize];
         int read = 1;
         while (bodyRead < contentLength && read > 0)
@@ -120,6 +124,7 @@ internal static class RtspReplyReader
             progress.ReportDownloaded(bodyRead, contentLength);
             read = await ReceiveAsync(connection, buffer.AsMemory(0, (int)Math.Min(buffer.Length, contentLength - bodyRead)), cancellationToken).ConfigureAwait(false);
             ReportReceived(events, buffer.AsSpan(0, read));
+            await WriteAsync(bodyOutput, buffer.AsMemory(0, read), cancellationToken).ConfigureAwait(false);
             bodyRead += read;
         }
 
