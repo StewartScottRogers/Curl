@@ -2633,19 +2633,27 @@ function Invoke-MergeToMaster {
         Start-Sleep -Seconds 30
     }
     if ($run[0].conclusion -ne 'success') { return "not merged: CI $($run[0].conclusion) on $short" }
+    # The pull request comes from a branch pinned at the commit CI passed, not from $Branch:
+    # a board push to $Branch while CI ran ([skip ci], so no checks) became the request's head,
+    # master's required check had never run on it, and gh pr merge was refused (shift
+    # 20261019-061607, pull request #174). factory/** starts no CI run of its own.
+    $pin = "factory/merge-$Stamp"
+    if (-not (Invoke-Git @('push', '-q', '-f', 'origin', "${head}:refs/heads/$pin"))) { return "not merged: could not push $pin" }
     # --jq, not ConvertFrom-Json: Windows PowerShell turns "[]" into one empty element, so
     # a missing pull request looked like one with no number and the merge was a silent no-op.
-    $number = "$(gh pr list --head $Branch --base master --state open --json number --limit 1 --jq '.[0].number // empty' 2>$null)".Trim()
+    $number = "$(gh pr list --head $pin --base master --state open --json number --limit 1 --jq '.[0].number // empty' 2>$null)".Trim()
     if (-not $number) {
         $bodyFile = Join-Path $LogDir "pr-body-$Stamp.md"
         $robot = [char]::ConvertFromUtf32(0x1F916)
-        [IO.File]::WriteAllText($bodyFile, "Dark factory shift $Stamp. CI passed on Windows, Linux and macOS for $short.`n`n$robot Generated with [Claude Code](https://claude.com/claude-code)`n", (New-Object Text.UTF8Encoding($false)))
-        $url = gh pr create --base master --head $Branch --title "Dark factory shift $Stamp" --body-file $bodyFile 2>$null
+        [IO.File]::WriteAllText($bodyFile, "Dark factory shift ${Stamp}: $Branch at $short, where CI passed on Windows, Linux and macOS.`n`n$robot Generated with [Claude Code](https://claude.com/claude-code)`n", (New-Object Text.UTF8Encoding($false)))
+        $url = gh pr create --base master --head $pin --title "Dark factory shift $Stamp" --body-file $bodyFile 2>$null
         if ("$url" -notmatch '/pull/(\d+)') { return 'not merged: could not open the pull request' }
         $number = $Matches[1]
     }
-    gh pr merge $number --merge 2>&1 | Out-Null
+    gh pr merge $number --merge --match-head-commit $head 2>&1 | Out-Null
     if ($LASTEXITCODE -ne 0) { return "not merged: gh pr merge refused pull request #$number" }
+    # The pin has done its job once master holds the commit; it is the factory's own branch.
+    Invoke-Git @('push', '-q', 'origin', '--delete', $pin) | Out-Null
     return "merged $short into master (pull request #$number)"
 }
 
