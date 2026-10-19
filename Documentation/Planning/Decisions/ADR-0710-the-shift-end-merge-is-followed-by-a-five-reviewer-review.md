@@ -1,6 +1,8 @@
 # ADR-0710: After each shift-end merge, five read-only reviewers read what the shift merged and file tasks
 
-- Status: Accepted
+- Status: Trial (2026-10-19): Stewart asked for two shifts' runs, then a decision on keeping it.
+  He fears it takes too long and repeats what the audit office already does.
+  `$ShiftReviewTrialShifts` (2) stops the review after two reports, until he decides.
 - Date: 2026-10-19
 - Decided by Claude under Stewart's delegation. Stewart chose this option (one review per shift) over a review of every lane task, or none.
 
