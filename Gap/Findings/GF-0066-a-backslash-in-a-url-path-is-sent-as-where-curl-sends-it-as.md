@@ -45,6 +45,7 @@ In Curl.Cli.UnitLibrary's URL globbing (ADR-0032), unescape only the glob charac
 - 2026-10-15_1657: 0 of 1 items are gaps.
 - 2026-10-17_2225: 0 of 1 items are gaps.
 - 2026-10-19_0804: 0 of 1 items are gaps.
+- 2026-10-19_1329: 0 of 1 items are gaps.
 
 ## Log
 

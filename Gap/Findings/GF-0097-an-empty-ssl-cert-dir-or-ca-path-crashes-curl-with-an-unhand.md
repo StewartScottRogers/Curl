@@ -5,11 +5,11 @@ area: environment
 platform: linux
 key: environment:ssl-cert-dir-empty-value-crashes
 severity: Critical
-status: open
+status: closed
 scope: target
 introduced-in:
 opened: 2026-10-19_0804
-closed:
+closed: 2026-10-19_1329
 regression: false
 items: [environment:SSL_CERT_DIR, environment:SSL_CERT_FILE, environment:[url-protocol]_PROXY]
 touches: [Curl.Networking.UnitLibrary, Curl.Networking.UnitTests, Curl.Cli.UnitLibrary, Curl.Cli.UnitTests]
@@ -33,8 +33,10 @@ Most likely cause: CaCertificateEnvironment.Apply (Curl.Cli.UnitLibrary) copies 
 ## Measurements
 
 - 2026-10-19_0804: 3 of 3 items are gaps.
+- 2026-10-19_1329: 0 of 3 items are gaps.
 
 ## Log
 
 - 2026-10-19_0804: Opened by gap-environment.
 - 2026-10-19_0927: Filed BL-2822.
+- 2026-10-19_1329: Closed: run 2026-10-19_1329 measured every item as match or excluded on linux.
