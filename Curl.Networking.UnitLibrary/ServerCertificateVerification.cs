@@ -191,13 +191,19 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
         string targetHost,
         X509Certificate2Collection anchorsBesideSystemStore)
     {
-        if (options.Insecure)
+        if (options.Insecure && !options.ChecksHostNameWhenInsecure)
         {
             return null;
         }
 
         errors = WithTheNameCheckCurlRuns(
             WithoutChainErrorsCurlTolerates(errors, chain, anchorsBesideSystemStore), chain, targetHost);
+        if (options.Insecure)
+        {
+            // CURLOPT_SSL_VERIFYHOST without CURLOPT_SSL_VERIFYPEER: only the name counts.
+            errors &= SslPolicyErrors.RemoteCertificateNameMismatch;
+        }
+
         if (errors == SslPolicyErrors.None)
         {
             return null;

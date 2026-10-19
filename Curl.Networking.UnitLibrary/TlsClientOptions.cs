@@ -177,6 +177,12 @@ namespace Curl.Networking;
 /// not set, and always on Windows, where the Schannel build ignores it. <c>SslStream</c> cannot log its
 /// secrets, so <see cref="TlsClientRouting" /> sends such a connection to <see cref="HandBuiltTlsProvider" />.
 /// </param>
+/// <param name="ChecksHostNameWhenInsecure">
+/// <see langword="true" /> for libcurl's <c>CURLOPT_SSL_VERIFYPEER</c> 0 with <c>CURLOPT_SSL_VERIFYHOST</c>
+/// still on: under <paramref name="Insecure" /> the chain is not checked, but a certificate that does not
+/// name the host is still exit 60, as curl 8.22.0 checks the name apart from the peer (upstream test2118,
+/// ADR-0703). <c>-k</c> turns both off, so the curl tool never sets it.
+/// </param>
 public sealed record TlsClientOptions(
     bool Insecure = false,
     TlsVersion MinimumVersion = TlsVersion.SystemDefault,
@@ -207,4 +213,5 @@ public sealed record TlsClientOptions(
     string? CertificateRevocationListFile = null,
     bool NoSessionId = false,
     bool AllowBeast = false,
-    string? KeyLogFile = null);
+    string? KeyLogFile = null,
+    bool ChecksHostNameWhenInsecure = false);

@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.UnitTests/PassingUpstreamCases.txt, Curl.Networking.UnitLibrary, Curl.Networking.UnitTests, Curl.Engine.UnitLibrary, Curl.Engine.UnitTests]
 requirement: none
 created: 2026-10-17
-completed:
+completed: 2026-10-19
 ---
 # BL-2692 — Make upstream case 2118 pass: CURLOPT_SSL_VERIFYHOST without VERIFYPEER rejects a wrong-name certificate with exit 60
 
@@ -22,9 +22,9 @@ Found by BL-2549, which ported lib2118 (`CURLOPT_SSL_VERIFYPEER` 0 and `CURLOPT_
 
 ## Acceptance criteria
 
-- [ ] Case 2118 passes through `NamedUpstreamCase_RunThroughCurl_PassesAsAListedCaseMust` and is on `Curl.Conformance.UnitTests/PassingUpstreamCases.txt`, or the difference left is filed as a task.
-- [ ] The fix has a focused unit test in the fixed library's own `.UnitTests` project (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] Case 2118 passes through `NamedUpstreamCase_RunThroughCurl_PassesAsAListedCaseMust` and is on `Curl.Conformance.UnitTests/PassingUpstreamCases.txt`, or the difference left is filed as a task.
+- [x] The fix has a focused unit test in the fixed library's own `.UnitTests` project (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
 
@@ -48,9 +48,12 @@ Found by BL-2549, which ported lib2118 (`CURLOPT_SSL_VERIFYPEER` 0 and `CURLOPT_
   and `Curl.Engine.UnitTests`. BL-2734 (in Doing) touches `Curl.Engine.UnitLibrary` and `Curl.Engine.UnitTests`,
   so the task goes back to Backlog until it no longer overlaps.
 
+- 2026-10-19 (lane 1): done as planned. `TlsClientOptions.ChecksHostNameWhenInsecure` (set by `TlsClientOptionsMapping.Of`/`ProxyOf` from VERIFYPEER 0 and VERIFYHOST on) makes `ServerCertificateVerification.VerifyPeer` under `Insecure` refuse only a name mismatch, exit 60 in the build's text (ADR-0703). Case 2118 passes through the runner and is on the ratchet; its only output is the exit code, and `SslStream` reports the name mismatch apart from the chain on every platform, so it is held on all three. Focused tests: `SslStreamTlsProviderTests.VerifyPeer_InsecureButCheckingTheHostName*` and `TlsClientOptionsMappingTests.Of_VerifyPeerAndVerifyHost_*`. Measure-CodeQuality on both libraries: 0 failing members. Touches not narrowed: the lane may not push mid-run.
+
 ## Log
 
 - 2026-10-17: Created.
 - 2026-10-18: Backlog -> Doing. Criteria at claim: 71ae8191 fd6bd9d4 3d836d5e.
 - 2026-10-18: Doing -> Backlog. Needs Curl.Engine.UnitLibrary and Curl.Engine.UnitTests (TlsClientOptionsMapping), which BL-2734 in Doing touches; requeued until they no longer overlap
 - 2026-10-19: Backlog -> Doing. Criteria at claim: 71ae8191 fd6bd9d4 3d836d5e.
+- 2026-10-19: Doing -> Done. Upstream case 2118 passes: CURLOPT_SSL_VERIFYHOST without VERIFYPEER refuses a wrong-name certificate with exit 60
