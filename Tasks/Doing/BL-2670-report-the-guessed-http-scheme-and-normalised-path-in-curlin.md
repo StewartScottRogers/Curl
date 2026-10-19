@@ -33,3 +33,4 @@ Found by BL-2545 (lib1907 port). Case 1907 runs `lib1907` on `%HOSTIP:%HTTPPORT/
 ## Log
 
 - 2026-10-17: Created.
+- 2026-10-18: Backlog -> Doing. Criteria at claim: 45581baa d9ef3503 4272a6b9.
