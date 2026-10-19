@@ -35,3 +35,4 @@ Found by BL-2697. Run with the Unix platform's features (the `Platform` line in 
 - 2026-10-18: Created.
 - 2026-10-18: Backlog -> Doing. Criteria at claim: 7d39c3cd 3d836d5e.
 - 2026-10-18: Doing -> Backlog. Waits on BL-2743 (waitfds sees 0 sockets because the first perform finishes both transfers; same failure as case 2405); Engine fix for the SocketException is done and uncommitted
+- 2026-10-19: Backlog -> Doing. Criteria at claim: 7d39c3cd 3d836d5e.
