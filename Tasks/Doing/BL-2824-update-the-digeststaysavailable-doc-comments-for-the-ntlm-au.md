@@ -36,3 +36,4 @@ Both are now false or incomplete about the code. That breaks CLAUDE.md's "say wh
 ## Log
 
 - 2026-10-19: Created.
+- 2026-10-19: Backlog -> Doing. Criteria at claim: 5e64001b c8484751 3d836d5e.
