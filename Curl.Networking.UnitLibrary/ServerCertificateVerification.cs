@@ -329,7 +329,7 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
     {
         var pem = options.CaCertificateBlob is { } blob
             ? Encoding.ASCII.GetString(blob.Span)
-            : File.ReadAllText(options.CaCertificateFile!);
+            : ReadCaCertificateFile(options.CaCertificateFile!);
         var certificates = new X509Certificate2Collection();
         if (matchesSchannelBuild)
         {
@@ -345,6 +345,13 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
 
         return certificates;
     }
+
+    // An empty --cacert names no file, so it is unusable (exit 77) rather than the
+    // ArgumentException File.ReadAllText throws for it (GF-0097).
+    private static string ReadCaCertificateFile(string path) =>
+        path.Length == 0
+            ? throw new FileNotFoundException("The CA certificate file name is empty.")
+            : File.ReadAllText(path);
 
     private X509Certificate2Collection ReadCaCertificateDirectory()
     {
@@ -363,15 +370,15 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
         return certificates;
     }
 
-    // A --capath that is missing, is not a directory or cannot be listed adds nothing,
-    // as in curl's OpenSSL build.
+    // A --capath that is empty, malformed, missing, not a directory or cannot be listed adds
+    // nothing, as in curl's OpenSSL build (GF-0097).
     private static string[] ListFilesOrNothing(string directory)
     {
         try
         {
             return Directory.GetFiles(directory);
         }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
         {
             return [];
         }

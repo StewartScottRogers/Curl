@@ -816,6 +816,45 @@ public sealed partial class SslStreamTlsProviderTests
     }
 
     [TestMethod]
+    public async Task AuthenticateAsClientAsync_WithEmptyCaCertificateDirectoryInTheOpenSslBuild_AddsNothing()
+    {
+        var result = await HandshakeAsync(
+            new TlsClientOptions(CaCertificateDirectory: string.Empty), CertificateHost, SslProtocols.None, OpenSslBuild);
+
+        Diagnostics.Assert("exit code", CurlExitCode.PeerFailedVerification, result.Result.ExitCode);
+        Assert.AreEqual(CurlExitCode.PeerFailedVerification, result.Result.ExitCode);
+        Assert.AreEqual("SSL certificate OpenSSL verify result: self-signed certificate (18)", result.Result.ErrorMessage);
+    }
+
+    [TestMethod]
+    public async Task AuthenticateAsClientAsync_WithEmptyCaCertificateDirectoryBesideTheServerCertificateFileInTheOpenSslBuild_Succeeds()
+    {
+        var caFile = WriteCaFile("server.pem", s_serverCertificate.ExportCertificatePem());
+
+        var result = await HandshakeAsync(
+            new TlsClientOptions(CaCertificateFile: caFile, CaCertificateDirectory: string.Empty),
+            CertificateHost,
+            SslProtocols.None,
+            OpenSslBuild);
+
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.Result.ExitCode);
+        Assert.AreEqual(CurlExitCode.Ok, result.Result.ExitCode);
+        await result.Result.Connection!.DisposeAsync();
+    }
+
+    [TestMethod]
+    public async Task AuthenticateAsClientAsync_WithEmptyCaCertificateFileInTheOpenSslBuild_FailsWithSslCacertBadfile()
+    {
+        var result = await HandshakeAsync(
+            new TlsClientOptions(CaCertificateFile: string.Empty), CertificateHost, SslProtocols.None, OpenSslBuild);
+
+        Diagnostics.Assert("exit code", CurlExitCode.SslCacertBadfile, result.Result.ExitCode);
+        Assert.AreEqual(CurlExitCode.SslCacertBadfile, result.Result.ExitCode);
+        Assert.AreEqual("error adding trust anchors from file: ", result.Result.ErrorMessage);
+        Assert.IsTrue(result.PlaintextDisposed);
+    }
+
+    [TestMethod]
     public async Task AuthenticateAsClientAsync_WithCaCertificateDirectoryAndAnUnrelatedCaCertificateFileInTheOpenSslBuild_TrustsBoth()
     {
         var caFile = WriteCaFile("unrelated.pem", CreateUnrelatedAuthorityPem());
