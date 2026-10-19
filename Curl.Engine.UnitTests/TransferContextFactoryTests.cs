@@ -1049,4 +1049,25 @@ public sealed class TransferContextFactoryTests
 
     private static EasyNetworkOptions NetworkOf(params string[] arguments) =>
         EasyOptionsFromCommandLine.NetworkOf(CommandLineParser.Parse(arguments, _ => true).Options!);
+
+    [TestMethod]
+    [DataRow(null, "user", "password", "user:password", DisplayName = "CURLOPT_USERNAME and CURLOPT_PASSWORD")]
+    [DataRow("a:b", "user", null, "user:b", DisplayName = "CURLOPT_USERNAME over CURLOPT_USERPWD")]
+    [DataRow("a:b", null, "password", "a:password", DisplayName = "CURLOPT_PASSWORD over CURLOPT_USERPWD")]
+    [DataRow(null, "user", null, "user:", DisplayName = "CURLOPT_USERNAME alone")]
+    [DataRow(null, null, "password", ":password", DisplayName = "CURLOPT_PASSWORD alone")]
+    [DataRow(null, null, null, "none", DisplayName = "none of the three")]
+    public void Create_LibcurlUserNameAndPassword_CarriesThemAsCredentials(string? userPassword, string? userName, string? password, string expected)
+    {
+        using MemoryStream standardInput = new();
+        using MemoryStream output = new();
+        EasyAuthenticationOptions authentication = AuthenticationOf("rtsp://h/x") with { UserPassword = userPassword, UserName = userName, Password = password };
+
+        TransferContext context = new TransferContextFactory(standardInput)
+            .Create(EasyOptionsFromCommandLine.TransferSettingsOf(Parse("rtsp://h/x")), HttpOf("rtsp://h/x"), BehaviourOf("rtsp://h/x"), TransferOf("rtsp://h/x"), ProtocolOf("rtsp://h/x"), ProxyOf("rtsp://h/x"), authentication, NetworkOf("rtsp://h/x"), CurlUrl.Parse("rtsp://h/x"), output, null, null, null);
+        string actual = context.Credentials is { } credentials ? $"{credentials.UserName}:{credentials.Password}" : "none";
+
+        Diagnostics.Assert("context.Credentials", expected, actual);
+        Assert.AreEqual(expected, actual);
+    }
 }

@@ -35,6 +35,20 @@ public sealed class RtspServerConnectorTests
     }
 
     [TestMethod]
+    public async Task ReplyWithSwsbounce_AnswersTheNextRequestForThatPartWithThePartAfterIt()
+    {
+        (_, IConnection connection) = await ConnectAsync("<reply>\n<data>\n401 swsbounce\n</data>\n<data1>\nok swsclose\n</data1>\n</reply>\n");
+        byte[] buffer = new byte[64];
+
+        await connection.WriteAsync("DESCRIBE rtsp://h/3100 RTSP/1.0\r\n\r\n"u8.ToArray(), CancellationToken.None);
+        int count = await connection.ReadAsync(buffer, CancellationToken.None);
+        await connection.WriteAsync("DESCRIBE rtsp://h/3100 RTSP/1.0\r\n\r\n"u8.ToArray(), CancellationToken.None);
+
+        Assert.AreEqual("401 swsbounce\n", Encoding.Latin1.GetString(buffer, 0, count));
+        Assert.AreEqual("ok swsclose\n", await ReadToEndAsync(connection));
+    }
+
+    [TestMethod]
     public async Task ReplyWithSwsclose_ClosesTheConnectionOnceRead()
     {
         (_, IConnection connection) = await ConnectAsync(Parts);

@@ -16,7 +16,8 @@ namespace Curl.Conformance;
 /// <remarks>
 /// As rtspd reads it, the test number is the number after the request path's last slash, past any characters
 /// that are not digits; a number over 10000 picks <c>&lt;dataN&gt;</c>, where N is its last four digits, and
-/// anything else <c>&lt;data&gt;</c>. The connection stays open for the next request unless the reply holds
+/// anything else <c>&lt;data&gt;</c>. After a reply holding <c>swsbounce</c>, the next request on the connection that
+/// picks the same part gets the part after it, as rtspd's <c>prevbounce</c> does (test3100, BL-2788). The connection stays open for the next request unless the reply holds
 /// <c>swsclose</c> or is empty: then, once the reply is read, reads return 0 and later writes are dropped.
 /// Every request's bytes are recorded, in the order they complete. A read with nothing to answer waits for the
 /// client's next write, as rtspd blocks reading the next request.
@@ -36,6 +37,9 @@ internal sealed class RtspServerConnection(UpstreamTestCase testCase, SwsServerR
     private TaskCompletionSource nextWrite = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     private bool closing;
+
+    // The part a reply holding swsbounce answered: the next request picking it gets the part after it.
+    private int? bouncedPart;
 
     public bool IsSecure => false;
 
@@ -98,7 +102,9 @@ internal sealed class RtspServerConnection(UpstreamTestCase testCase, SwsServerR
     private void Answer(byte[] request)
     {
         int partNumber = PartNumber(request);
+        partNumber = partNumber == bouncedPart ? partNumber + 1 : partNumber;
         byte[] reply = Reply(partNumber);
+        bouncedPart = reply.AsSpan().IndexOf("swsbounce"u8) >= 0 ? partNumber : null;
         unreadReply.AddRange(reply);
         unreadReply.AddRange(RtspInterleavedPackets.ForPart((testCase.Find("reply", "servercmd")?.Content ?? ReadOnlyMemory<byte>.Empty).Span, partNumber));
         closing = reply.Length == 0 || reply.AsSpan().IndexOf("swsclose"u8) >= 0;
