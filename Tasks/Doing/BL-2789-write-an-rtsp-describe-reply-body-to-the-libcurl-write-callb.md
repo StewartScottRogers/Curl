@@ -31,3 +31,4 @@ Found by BL-2788. With BL-2788's 401 retry in place (stashed with BL-2788 if not
 ## Log
 
 - 2026-10-18: Created.
+- 2026-10-18: Backlog -> Doing. Criteria at claim: 960d1c67 7ff73048 3d836d5e.
