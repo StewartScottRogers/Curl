@@ -141,6 +141,10 @@ public sealed class Lib540Tests
         LibTestResult result = await new Lib540(TimeProvider.System).RunAsync(run.Context, CancellationToken.None);
 
         Assert.AreEqual((int)LibTestErrorCodes.Multi, result.ExitCode);
+        Assert.AreEqual(1, engine.DisposedEasyCount, "the easy handle the multi handle refused is cleaned up");
+        Assert.AreEqual(0, engine.Multi.Removals, "a handle never added is not removed");
+        Assert.AreEqual(1, engine.Multi.Disposals, "the multi handle is cleaned up");
+        Assert.IsFalse(run.Error.ToString().Contains("again", StringComparison.Ordinal));
     }
 
     [TestMethod]

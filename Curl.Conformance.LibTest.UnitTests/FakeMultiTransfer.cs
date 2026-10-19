@@ -86,7 +86,14 @@ internal sealed class FakeMultiTransfer : IMultiTransfer
         return AddResult;
     }
 
-    public CurlMultiCode Remove(IEasyTransfer transfer) => RemoveResult;
+    /// <summary>How many transfers have been removed.</summary>
+    public int Removals { get; private set; }
+
+    public CurlMultiCode Remove(IEasyTransfer transfer)
+    {
+        Removals++;
+        return RemoveResult;
+    }
 
     /// <summary>Runs in each perform, before it answers.</summary>
     public Action? Performing { get; set; }
@@ -185,5 +192,12 @@ internal sealed class FakeMultiTransfer : IMultiTransfer
 
     public CurlMultiCode DisableNotification(CurlMultiNotification notification) => throw new NotSupportedException();
 
-    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    /// <summary>How many times the multi transfer has been disposed.</summary>
+    public int Disposals { get; private set; }
+
+    public ValueTask DisposeAsync()
+    {
+        Disposals++;
+        return ValueTask.CompletedTask;
+    }
 }

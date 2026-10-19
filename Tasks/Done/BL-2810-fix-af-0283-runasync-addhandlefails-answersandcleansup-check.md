@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.LibTest.UnitTests]
 requirement: none
 created: 2026-10-19
-completed:
+completed: 2026-10-19
 ---
 # BL-2810 — Fix AF-0283: RunAsync_AddHandleFails_AnswersAndCleansUp checks neither the answer's code nor the clean-up
 
@@ -41,12 +41,17 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Test-only fix, made directly rather than through every `/feature` stage: no production code changes, so there was nothing to plan, implement or conformance-check. BL-2809 had already pinned the exit code to `LibTestErrorCodes.Multi`; this run adds the clean-up checks.
+- `FakeMultiTransfer` now counts `Removals` and `Disposals`. The test asserts the refused easy handle is disposed once (`DisposedEasyCount`), a handle that was never added is not removed, the multi handle is disposed once, and the second request never starts.
+- Verified: the reproduction now shows the exact code plus four clean-up assertions; `dotnet build` is clean; the fast tests pass (Curl.Conformance.LibTest.UnitTests 1183/1183, no failures solution-wide).
 
 ## Log
 
 - 2026-10-19: Created.
 - 2026-10-19: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-19: Doing -> Done. Lib540's add-handle-failure test pins the Multi code and checks the easy and multi handles are cleaned up
