@@ -30,6 +30,8 @@ public sealed class CurlUrlRejectionTests
     [DataRow("http://hostname:1111\\path", CurlUrlRejection.Backslash)]
     [DataRow("http:\\\\hostname", CurlUrlRejection.Backslash)]
     [DataRow("http://h:\\x", CurlUrlRejection.Backslash)]
+    // curl 8.22.0 on Windows, run from PowerShell (measured 2026-10-18, BL-2742): exit 3, a backslash.
+    [DataRow("http://h:1\\x/", CurlUrlRejection.Backslash)]
     [DataRow("http://h:1x\\/", CurlUrlRejection.BadPortNumber)]
     [DataRow("http://h:-1/", CurlUrlRejection.BadPortNumber)]
     // curl 8.22.0 (measured 2026-10-18, BL-2734): an empty host beats a bad port, as parse_authority does.
