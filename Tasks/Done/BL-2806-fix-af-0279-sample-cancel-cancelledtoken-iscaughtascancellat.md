@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Api.UnitTests]
 requirement: none
 created: 2026-10-19
-completed:
+completed: 2026-10-19
 ---
 # BL-2806 — Fix AF-0279: Sample_Cancel_CancelledToken_IsCaughtAsCancellation never checks that the cancellation branch ran
 
@@ -52,3 +52,4 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 - 2026-10-19: Created.
 - 2026-10-19: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-19: Doing -> Done. Sample_Cancel_CancelledToken_IsCaughtAsCancellation now asserts the sample wrote the cancellation line
