@@ -160,6 +160,18 @@ public sealed partial class ManagedEasyTransferTests
     }
 
     [TestMethod]
+    public async Task PerformAsync_AwsSigV4ProviderOnlyAndCredentialsOnlyInTheUrl_SignsWithTheUrlsUserNameAndTheHostsScope()
+    {
+        ScriptedConnector server = new(["HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n"u8.ToArray()]);
+
+        string request = await PerformOverScriptedServerAsync(server, new EasyAuthenticationOptions { AwsSigV4 = "xxx", HttpAuthentication = HttpAuthenticationMethods.AwsSigV4 });
+
+        Assert.Contains("Authorization: XXX4-HMAC-SHA256 Credential=xxx/", request);
+        Assert.Contains("/0/127/xxx4_request, SignedHeaders=host;x-xxx-date, Signature=", request);
+        Assert.Contains("X-Xxx-Date: ", request);
+    }
+
+    [TestMethod]
     public async Task PerformAsync_AwsSigV4SetBackToNullAndCredentialsInTheUrl_SendsNoAuthorization()
     {
         ScriptedConnector server = new(["HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n"u8.ToArray()]);
