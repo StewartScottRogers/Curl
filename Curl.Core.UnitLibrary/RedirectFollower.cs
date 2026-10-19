@@ -245,7 +245,7 @@ public sealed class RedirectFollower(
             }
 
             // No stop means the target parsed, so next is set.
-            hop = NextHop(context, hop.Url, next!, HopMethod(http, methodDropped) with { RedirectsFollowed = chain.RedirectCount, ResponseHeadersStored = result.Report.ResponseHeadersStored, AuthSchemePicked = result.Report.AuthSchemePicked, KeptDigestAuthorization = result.Report.DigestAuthorizationSent, EarlierResponseWasHttp10 = receivedHttp10 }, hopProxy, bodyDropped, policy.LocationTrusted || IsSameOrigin(context.Url, next!), operationStarted, selectHopAltSvc, selectHopCredentials);
+            hop = NextHop(context, hop.Url, next!, HopMethod(http, methodDropped, policy) with { RedirectsFollowed = chain.RedirectCount, ResponseHeadersStored = result.Report.ResponseHeadersStored, AuthSchemePicked = result.Report.AuthSchemePicked, KeptDigestAuthorization = result.Report.DigestAuthorizationSent, EarlierResponseWasHttp10 = receivedHttp10 }, hopProxy, bodyDropped, policy.LocationTrusted || IsSameOrigin(context.Url, next!), operationStarted, selectHopAltSvc, selectHopCredentials);
         }
     }
 
@@ -542,7 +542,7 @@ public sealed class RedirectFollower(
             return $"Switch to GET because of {responseCode} response";
         }
 
-        return customMethod is null ? null : $"Stick to {customMethod} instead of GET";
+        return customMethod is null || policy.SendsCustomMethodFirstOnly ? null : $"Stick to {customMethod} instead of GET";
     }
 
     private static bool IsPlainGet(ITransferContext hop, string? customMethod) =>
@@ -560,8 +560,8 @@ public sealed class RedirectFollower(
         };
     }
 
-    private static HttpRequestOptions HopMethod(HttpRequestOptions http, bool methodDropped) =>
-        methodDropped ? http with { CustomMethod = null } : http;
+    private static HttpRequestOptions HopMethod(HttpRequestOptions http, bool methodDropped, RedirectPolicy policy) =>
+        methodDropped || policy.SendsCustomMethodFirstOnly ? http with { CustomMethod = null } : http;
 
     private static long? SeekableStart(Stream? upload) =>
         upload is { CanSeek: true } ? upload.Position : null;

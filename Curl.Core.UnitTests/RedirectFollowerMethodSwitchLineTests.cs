@@ -145,6 +145,18 @@ public sealed class RedirectFollowerMethodSwitchLineTests
     }
 
     [TestMethod]
+    public async Task FollowAsync_FirstOnlyWithCustomPostOn303_ReportsNoStickLine()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+
+        await FollowAsync(303, new HttpRequestOptions { FollowRedirects = true, CustomMethod = "POST" }, new RedirectPolicy { SendsCustomMethodFirstOnly = true });
+
+        var expected = new[] { IssueLine };
+        diagnostics.Assert("infos", string.Join(" | ", expected), string.Join(" | ", events.Infos));
+        CollectionAssert.AreEqual(expected, events.Infos);
+    }
+
+    [TestMethod]
     public async Task FollowAsync_GetOn301_ReportsNoSwitchLine()
     {
         var diagnostics = TestDiagnostics.For(TestContext);

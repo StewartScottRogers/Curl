@@ -622,6 +622,27 @@ public sealed class RedirectFollowerTests
 
     [TestMethod]
     [DataRow(301)]
+    [DataRow(307)]
+    [DataRow(308)]
+    public async Task FollowAsync_FirstOnlyCustomMethod_SecondRequestHasNoCustomMethod(int status)
+    {
+        // CURLFOLLOW_FIRSTONLY with CURLOPT_CUSTOMREQUEST "IGLOO": IGLOO /a, then the plain method (upstream 1574, 1575).
+        ScriptedHandler handler = new(Redirect(status, Next), Ok(200, 0));
+
+        await Follow(
+            handler,
+            Context(Location() with { CustomMethod = "IGLOO", Body = PostBody }, postData: true),
+            new RedirectPolicy { SendsCustomMethodFirstOnly = true, KeepPostOn301 = true });
+
+        Diagnostics.Assert("first CustomMethod", "IGLOO", handler.Contexts[0].Http!.CustomMethod);
+        Assert.AreEqual("IGLOO", handler.Contexts[0].Http!.CustomMethod);
+        Diagnostics.Assert("second CustomMethod", null, handler.Contexts[1].Http!.CustomMethod);
+        Assert.IsNull(handler.Contexts[1].Http!.CustomMethod);
+        Assert.IsNotNull(handler.Contexts[1].Http!.Body);
+    }
+
+    [TestMethod]
+    [DataRow(301)]
     [DataRow(302)]
     [DataRow(303)]
     public async Task FollowAsync_FollowCustomPutWithMatchingPostOption_KeepsMethodAndBody(int status)
