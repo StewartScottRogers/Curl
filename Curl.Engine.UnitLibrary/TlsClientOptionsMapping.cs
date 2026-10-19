@@ -93,7 +93,8 @@ internal static class TlsClientOptionsMapping
             !tls.SessionIdCache,
             origin.SslOptions.HasFlag(SslOptions.AllowBeast),
             KeyLogFile(readEnvironmentVariable),
-            ChecksHostNameWhenInsecure(origin));
+            ChecksHostNameWhenInsecure(origin),
+            origin.CertificateAuthorityBlob);
     }
 
     /// <summary>
@@ -136,7 +137,8 @@ internal static class TlsClientOptionsMapping
             NoSessionId: !tls.SessionIdCache,
             AllowBeast: proxy.SslOptions.HasFlag(SslOptions.AllowBeast),
             KeyLogFile: KeyLogFile(readEnvironmentVariable),
-            ChecksHostNameWhenInsecure: ChecksHostNameWhenInsecure(proxy));
+            ChecksHostNameWhenInsecure: ChecksHostNameWhenInsecure(proxy),
+            CaCertificateBlob: proxy.CertificateAuthorityBlob);
     }
 
     /// <summary>
@@ -175,7 +177,8 @@ internal static class TlsClientOptionsMapping
             RequireCertificateStatus: tls.DohVerifyStatus,
             AutoClientCertificate: origin.SslOptions.HasFlag(SslOptions.AutoClientCert),
             CertificateRevocationListFile: origin.RevocationListFile,
-            KeyLogFile: KeyLogFile(null));
+            KeyLogFile: KeyLogFile(null),
+            CaCertificateBlob: origin.CertificateAuthorityBlob);
     }
 
     /// <summary>Maps a lowest TLS version from the record onto the one the TLS provider applies.</summary>

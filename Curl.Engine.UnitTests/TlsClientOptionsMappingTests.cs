@@ -58,6 +58,27 @@ public sealed class TlsClientOptionsMappingTests
     }
 
     [TestMethod]
+    public void OfProxyOfAndDohOf_CertificateAuthorityBlobs_CarryEachPeersBlob()
+    {
+        byte[] originBlob = [1, 2];
+        byte[] proxyBlob = [3];
+        var tls = new EasyTlsOptions
+        {
+            Origin = new TlsPeerOptions { CertificateAuthorityBlob = originBlob },
+            Proxy = new TlsPeerOptions { CertificateAuthorityBlob = proxyBlob },
+        };
+
+        var target = TlsClientOptionsMapping.Of(tls, useAlpn: true, sslSessionsFile: null);
+        var proxy = TlsClientOptionsMapping.ProxyOf(tls, useAlpn: true);
+        var doh = TlsClientOptionsMapping.DohOf(tls);
+
+        Diagnostics.Act("target, proxy, doh blob lengths", $"{target.CaCertificateBlob?.Length}, {proxy.CaCertificateBlob?.Length}, {doh.CaCertificateBlob?.Length}");
+        CollectionAssert.AreEqual(originBlob, target.CaCertificateBlob!.Value.ToArray());
+        CollectionAssert.AreEqual(proxyBlob, proxy.CaCertificateBlob!.Value.ToArray());
+        CollectionAssert.AreEqual(originBlob, doh.CaCertificateBlob!.Value.ToArray());
+    }
+
+    [TestMethod]
     public void FromCommandLine_CaCertificateFile_CopiesThePathVerbatim()
     {
         Assert.AreEqual(Expect(new TlsClientOptions(CaCertificateFile: "x.pem")), Map("--cacert", "x.pem", Url));

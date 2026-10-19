@@ -1,6 +1,7 @@
 using System.Net.Security;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
+using System.Text;
 
 using Curl.Protocol.Abstractions;
 
@@ -76,7 +77,7 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
     private (X509ChainPolicy? ChainPolicy, X509Certificate2Collection AnchorsBesideSystemStore) ReadChainAnchors()
     {
         var directoryAnchors = ReadCaCertificateDirectory();
-        if (options.CaCertificateFile is null)
+        if (!options.HasCaCertificates)
         {
             return (null, directoryAnchors);
         }
@@ -88,7 +89,7 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
                 ? X509RevocationMode.Online
                 : X509RevocationMode.NoCheck,
         };
-        chainPolicy.CustomTrustStore.AddRange(ReadCaCertificateFile(options.CaCertificateFile));
+        chainPolicy.CustomTrustStore.AddRange(ReadCaCertificates());
         chainPolicy.CustomTrustStore.AddRange(directoryAnchors);
         return (chainPolicy, []);
     }
@@ -146,7 +147,7 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
     // (measured with curl 8.21.0, BL-2270; upstream test2035, test2038, test2042). Without
     // --cacert Schannel validates inside the handshake, before the pin.
     private bool JudgesPinnedPublicKeyBeforeVerification =>
-        matchesSchannelBuild && options.CaCertificateFile is not null;
+        matchesSchannelBuild && options.HasCaCertificates;
 
     // The pin is checked only once the certificate is accepted, and only then does curl print
     // the " public key hash:" line (ADR-0336, BL-877).
@@ -235,7 +236,7 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
         X509Chain? chain,
         string targetHost)
     {
-        var hasCaCertificateFile = options.CaCertificateFile is not null;
+        var hasCaCertificateFile = options.HasCaCertificates;
         return !hasCaCertificateFile && TlsFailureMessages.IsSchannelCertificateExpired(errors, chain)
             ? (CurlExitCode.SslConnectError, TlsFailureMessages.SchannelCertificateExpired)
             : (CurlExitCode.PeerFailedVerification,
@@ -278,7 +279,7 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
     // with no DNS subjectAltName, matches the common name, which .NET's check does not
     // (BL-415). Without --cacert Schannel's own check stands.
     private SslPolicyErrors WithoutNameMismatchSchannelAccepts(SslPolicyErrors errors, X509Chain? chain, string targetHost) =>
-        options.CaCertificateFile is not null
+        options.HasCaCertificates
         && errors.HasFlag(SslPolicyErrors.RemoteCertificateNameMismatch)
         && SchannelCommonNameCheck.CommonNameMatches(chain!.ChainElements[0].Certificate, targetHost)
             ? errors & ~SslPolicyErrors.RemoteCertificateNameMismatch
@@ -323,9 +324,12 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
     // it parses and there is at least one; ImportFromPem skips a block whose body is not
     // base64, so the blocks imported are counted against the blocks begun. The Schannel
     // build trusts whatever parses.
-    private X509Certificate2Collection ReadCaCertificateFile(string path)
+    // A CURLOPT_CAINFO_BLOB is read as the file would be, and wins over it (ADR-0704).
+    private X509Certificate2Collection ReadCaCertificates()
     {
-        var pem = File.ReadAllText(path);
+        var pem = options.CaCertificateBlob is { } blob
+            ? Encoding.ASCII.GetString(blob.Span)
+            : File.ReadAllText(options.CaCertificateFile!);
         var certificates = new X509Certificate2Collection();
         if (matchesSchannelBuild)
         {

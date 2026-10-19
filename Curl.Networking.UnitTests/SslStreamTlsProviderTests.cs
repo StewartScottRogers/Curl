@@ -576,6 +576,44 @@ public sealed partial class SslStreamTlsProviderTests
     }
 
     [TestMethod]
+    [DataRow(SchannelBuild)]
+    [DataRow(OpenSslBuild)]
+    public async Task AuthenticateAsClientAsync_WithCaCertificateBlobHoldingTheServerCertificate_Succeeds(bool matchesSchannelBuild)
+    {
+        var blob = Encoding.ASCII.GetBytes(s_serverCertificate.ExportCertificatePem());
+
+        var result = await HandshakeAsync(
+            new TlsClientOptions(CaCertificateBlob: blob), CertificateHost, SslProtocols.None, matchesSchannelBuild);
+
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.Result.ExitCode);
+        Assert.AreEqual(CurlExitCode.Ok, result.Result.ExitCode);
+        await result.Result.Connection!.DisposeAsync();
+    }
+
+    [TestMethod]
+    public async Task AuthenticateAsClientAsync_WithCaCertificateBlobAndAnUnrelatedCaCertificateFile_TrustsTheBlob()
+    {
+        var caFile = WriteCaFile("unrelated.pem", CreateUnrelatedAuthorityPem());
+        var blob = Encoding.ASCII.GetBytes(s_serverCertificate.ExportCertificatePem());
+
+        var result = await HandshakeAsync(
+            new TlsClientOptions(CaCertificateFile: caFile, CaCertificateBlob: blob), CertificateHost, SslProtocols.None, OpenSslBuild);
+
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.Result.ExitCode);
+        Assert.AreEqual(CurlExitCode.Ok, result.Result.ExitCode);
+        await result.Result.Connection!.DisposeAsync();
+    }
+
+    [TestMethod]
+    public async Task AuthenticateAsClientAsync_WithoutCaCertificateBlobOrFile_VerifiesAgainstTheSystemStore()
+    {
+        var result = await HandshakeAsync(new TlsClientOptions(), CertificateHost, SslProtocols.None, OpenSslBuild);
+
+        Diagnostics.Assert("exit code", CurlExitCode.PeerFailedVerification, result.Result.ExitCode);
+        Assert.AreEqual(CurlExitCode.PeerFailedVerification, result.Result.ExitCode);
+    }
+
+    [TestMethod]
     public async Task AuthenticateAsClientAsync_WithCaCertificateFileButAnotherHostNameInTheSchannelBuild_ReportsTheHostNameCertGetNameStringDidNotMatch()
     {
         var caFile = WriteCaFile("server.pem", s_serverCertificate.ExportCertificatePem());

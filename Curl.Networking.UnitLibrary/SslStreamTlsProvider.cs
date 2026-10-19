@@ -636,6 +636,7 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         VerifiesPeer = !options.Insecure,
         CaCertificateFile = options.CaCertificateFile ?? OpenSslDefaultCaCertificateFile,
         CaCertificateDirectory = options.CaCertificateDirectory,
+        HasCaCertificateBlob = options.CaCertificateBlob is not null,
     };
 
     // A certificate --ssl-revoke-best-effort accepted with its revocation status offline or

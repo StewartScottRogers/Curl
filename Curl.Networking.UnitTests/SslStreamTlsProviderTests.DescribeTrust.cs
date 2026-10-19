@@ -27,6 +27,21 @@ public sealed partial class SslStreamTlsProviderTests
     [TestMethod]
     [DataRow(true)]
     [DataRow(false)]
+    public void DescribeTrust_CaCertificateBlob_SaysWhetherOneIsSet(bool hasBlob)
+    {
+        Diagnostics.Arrange("CA blob", hasBlob);
+        var options = hasBlob ? new TlsClientOptions(CaCertificateBlob: new byte[] { 0x2D }) : new TlsClientOptions();
+
+        var trust = SslStreamTlsProvider.DescribeTrust(options, "localhost");
+
+        Diagnostics.Act("has CA blob", trust.HasCaCertificateBlob);
+        Diagnostics.Assert("has CA blob", hasBlob, trust.HasCaCertificateBlob);
+        Assert.AreEqual(hasBlob, trust.HasCaCertificateBlob);
+    }
+
+    [TestMethod]
+    [DataRow(true)]
+    [DataRow(false)]
     public void DescribeTrust_AutoClientCertificate_IsCarried(bool autoClientCertificate)
     {
         Diagnostics.Arrange("auto client cert", autoClientCertificate);
