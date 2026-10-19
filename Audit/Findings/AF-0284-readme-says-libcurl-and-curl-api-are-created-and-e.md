@@ -3,8 +3,8 @@ id: AF-0284
 title: README says Libcurl and Curl.Api are created and empty; both hold thousands of lines of implemented API
 auditor: truthfulness
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: truthfulness:README.md:Libcurl-and-Curl.Api-created-and-empty:false-statement
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path README.md -Pattern 'created and empty' | ForEach-Object { $_
 ## Log
 
 - 2026-10-18: filed proposed.
+- 2026-10-19: proposed -> accepted.
