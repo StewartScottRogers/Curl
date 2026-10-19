@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: [BL-2696]
-touches: [Libcurl, Libcurl.UnitTests, Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
+touches: [Libcurl, Libcurl.UnitTests, Curl.Engine.UnitLibrary, Curl.Engine.UnitTests, Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
 requirement: none
 created: 2026-10-17
-completed:
+completed: 2026-10-19
 ---
 # BL-2701 — Make upstream case 2506 send the netrc Authorization on a proxied request that follows a redirect
 
@@ -22,13 +22,17 @@ Found by BL-2551, which ported lib2506 (`Curl.Conformance.LibTest.UnitLibrary/Li
 
 ## Acceptance criteria
 
-- [ ] Case 2506 passes through the runner on Windows and is in `Curl.Conformance.UnitTests/PassingUpstreamCases.txt`.
-- [ ] A focused unit test in `Libcurl.UnitTests` (or the fixed library's own tests) covers the fix (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] Case 2506 passes through the runner on Windows and is in `Curl.Conformance.UnitTests/PassingUpstreamCases.txt`.
+- [x] A focused unit test in `Libcurl.UnitTests` (or the fixed library's own tests) covers the fix (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- The cause was in `Curl.Engine.UnitLibrary`, not `Libcurl`: BL-2696 looked the `.netrc` file up only for the first URL, and the handle's own `RedirectFollower` carried those credentials to every hop under `CURLOPT_UNRESTRICTED_AUTH`. `ManagedEasyTransfer` now gives its follower `TransferCredentialLookup.ForRedirectHops`, the per-hop lookup the curl tool's runner already used (BL-790), so `numbertwo.example`, with no entry, gets no `Authorization`. Added `Curl.Engine.UnitLibrary` and `Curl.Engine.UnitTests` to `touches` for it; no task in Doing on `origin/work/dark-factory` named either.
+- Focused test: `ManagedEasyTransferTests.PerformAsync_NetrcOptionalThroughAProxyRedirectedToAHostWithNoEntry_SendsTheEntryOnlyToTheFirstHost`. Measure-CodeQuality for Curl.Engine.UnitLibrary: 0 failing members.
 
 ## Log
 
 - 2026-10-17: Created.
 - 2026-10-19: Backlog -> Doing. Criteria at claim: 7d5d7809 a29b01ae 3d836d5e.
+- 2026-10-19: Doing -> Done. Case 2506 passes and is on the ratchet; netrc credentials are looked up again for each redirect hop on a library handle.
