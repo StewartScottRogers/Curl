@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Libcurl, Libcurl.UnitTests, Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
+touches: [Libcurl, Libcurl.UnitTests, Curl.Conformance.UnitTests/PassingUpstreamCases.txt, Curl.Engine.UnitLibrary/ManagedEasyTransfer.cs, Curl.Engine.UnitLibrary/CallbackReadStream.cs, Curl.Engine.UnitTests/ManagedEasyTransferTests.ReadCallbackPost.cs]
 requirement: none
 created: 2026-10-17
 completed:
@@ -28,7 +28,10 @@ Found by BL-2544, which ported lib1901 (`Curl.Conformance.LibTest.UnitLibrary/Li
 
 ## Notes
 
+- 2026-10-18 (lane 1): The fix is not in `Libcurl`: the body comes from the engine's `ManagedEasyTransfer.ReadCallbackPostBodyOf`, which gives the `StreamBody` `PostFieldSize` as its length even when `EasyHttpOptions.HttpHeaders` holds `Transfer-Encoding: chunked`; it must pass `null` (chunked) then. The short-buffer question the Context raises is `CallbackReadStream`'s (its `DeclaredLength` / read sizing). The focused unit test belongs in `Curl.Engine.UnitTests/ManagedEasyTransferTests.ReadCallbackPost.cs`, the engine being the fixed library. Added those three files to `touches`. `ManagedEasyTransfer.cs` is held by BL-2670 (in Doing), so this task goes back to Backlog until BL-2670 releases it; no code was edited.
+
 ## Log
 
 - 2026-10-17: Created.
 - 2026-10-18: Backlog -> Doing. Criteria at claim: 11601d33 a041bc9c 3d836d5e.
+- 2026-10-18: Doing -> Backlog. Curl.Engine.UnitLibrary/ManagedEasyTransfer.cs, where the fix lands, is held by BL-2670 in Doing
