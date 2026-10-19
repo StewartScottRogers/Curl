@@ -1448,6 +1448,7 @@ public sealed class HttpProtocolHandler(
             ProxyAuthSchemePicked = plan.ProxyAuthorizationAnswersChallenge ? SchemeOfAuthorization(plan.ProxyAuthorization) : HttpAuthSchemes.None,
             DigestAuthorizationSent = DigestAuthorizationSentBy(plan),
             HeldDigestNonce = plan.HoldsDigestNonce,
+            SentNtlmAuthorization = SchemeOfAuthorization(plan.Authorization) == HttpAuthSchemes.Ntlm,
         };
 
     /// <summary>
@@ -2681,17 +2682,17 @@ public sealed class HttpProtocolHandler(
     /// <summary>
     /// Decides whether a 401 to a first request that answered the handle's kept Digest challenges
     /// (<see cref="HttpRequestPlan.AuthorizationAnswersKeptDigestChallenges" />) is answered by sending
-    /// that answer again, counted on, when the previous perform's server picked Digest
-    /// (<see cref="HttpRequestOptions.AuthSchemePicked" />) and the 401 offers Digest: libcurl 8.22.0
-    /// keeps <c>authhost.avail</c> on the easy handle from the 401 that ended a perform whose Digest
-    /// answer was refused, so <c>Curl_http_input_auth</c> writes <c>Ignoring duplicate digest auth
+    /// that answer again, counted on, when the previous perform ended with Digest still available
+    /// (<see cref="HttpRequestOptions.DigestStaysAvailable" />) and the 401 offers Digest: libcurl 8.22.0
+    /// keeps <c>authhost.avail</c> on the easy handle from the 401 that ended a perform with
+    /// <c>authproblem</c> set, so <c>Curl_http_input_auth</c> writes <c>Ignoring duplicate digest auth
     /// header.</c> for this 401's challenge, keeps the old nonce, and retries once before the next 401
-    /// ends the transfer (upstream test2027, BL-2745, ADR-0700). After a perform that picked another
-    /// scheme, <c>pickoneauth</c> cleared <c>avail</c>, so the 401 ends the transfer (upstream test2024).
+    /// ends the transfer (upstream test2027 and test2030, BL-2745, BL-2823, ADR-0700, ADR-0709). Otherwise
+    /// <c>pickoneauth</c> cleared <c>avail</c>, so the 401 ends the transfer (upstream test2024).
     /// </summary>
     private static bool RepeatsKeptDigestAnswer(HttpRequestPlan plan, HttpResponseHead head) =>
         plan.AuthorizationAnswersKeptDigestChallenges
-            && plan.Options.AuthSchemePicked == HttpAuthSchemes.Digest
+            && plan.Options.DigestStaysAvailable
             && MayRetry(plan, head, 401)
             && ValuesOf(head, "WWW-Authenticate").Any(challenge => SchemeOfAuthorization(challenge) == HttpAuthSchemes.Digest);
 
@@ -2739,19 +2740,31 @@ public sealed class HttpProtocolHandler(
 
     /// <summary>
     /// Decides whether a transfer ends with Digest still marked available
-    /// (<see cref="TransferReport.DigestStaysAvailable" />): <paramref name="head" /> is a 401 offering
-    /// Digest without <c>stale=true</c> after the transfer already held a Digest nonce
-    /// (<paramref name="heldDigestNonce" />), which libcurl 8.22.0's <c>Curl_input_digest</c> fails, so
-    /// <c>pickoneauth</c> never clears <c>authhost.avail</c> (upstream test2030, BL-2820).
+    /// (<see cref="TransferReport.DigestStaysAvailable" />), a port of libcurl 8.22.0's
+    /// <c>Curl_http_input_auth</c> and <c>Curl_http_auth_act</c> (ADR-0709): the final 401's
+    /// Digest challenge adds Digest to <c>authhost.avail</c>, and <c>pickoneauth</c>, which clears
+    /// it, is skipped when that 401 set <c>authproblem</c> (<see cref="SetsAuthProblem" />).
     /// </summary>
-    private static bool DigestStaysAvailableAfter(bool heldDigestNonce, HttpResponseHead head)
+    private static bool DigestStaysAvailableAfter(bool heldDigestNonce, bool sentNtlmAuthorization, HttpResponseHead head)
     {
         string[] challenges = ValuesOf(head, "WWW-Authenticate");
-        return heldDigestNonce
-            && head.StatusLine.StatusCode == 401
+        return head.StatusLine.StatusCode == 401
             && OffersDigest(challenges)
-            && !HttpDigestStaleChallenge.IsOfferedIn(challenges);
+            && SetsAuthProblem(heldDigestNonce, sentNtlmAuthorization, challenges);
     }
+
+    /// <summary>
+    /// Decides whether a 401's <paramref name="challenges" /> set libcurl 8.22.0's
+    /// <c>data->state.authproblem</c> ("Authentication problem. Ignoring this."): a Digest
+    /// challenge without <c>stale=true</c> after the transfer already held a Digest nonce
+    /// (<paramref name="heldDigestNonce" />), which <c>Curl_input_digest</c> fails (upstream test2027,
+    /// BL-2820), or a bare <c>NTLM</c> challenge to a request sent with an NTLM answer
+    /// (<paramref name="sentNtlmAuthorization" />), which <c>Curl_input_ntlm</c> fails as a rejected
+    /// handshake (upstream test2030, BL-2823).
+    /// </summary>
+    private static bool SetsAuthProblem(bool heldDigestNonce, bool sentNtlmAuthorization, string[] challenges) =>
+        (heldDigestNonce && !HttpDigestStaleChallenge.IsOfferedIn(challenges))
+            || (sentNtlmAuthorization && challenges.Any(challenge => challenge.Trim().Equals("NTLM", StringComparison.OrdinalIgnoreCase)));
 
     /// <summary>
     /// Makes the <c>Authorization</c> value a retry that answers a 407 keeps: the one
@@ -3126,6 +3139,13 @@ public sealed class HttpProtocolHandler(
         internal bool HeldDigestNonce { get; init; }
 
         /// <summary>
+        /// Gets a value indicating whether the exchange's request was sent with an NTLM
+        /// <c>Authorization</c> value, whose handshake a bare <c>NTLM</c> challenge in the response
+        /// refuses (<see cref="TransferReport.DigestStaysAvailable" />, BL-2823).
+        /// </summary>
+        internal bool SentNtlmAuthorization { get; init; }
+
+        /// <summary>
         /// Gets or sets the moment the first request byte was about to be sent,
         /// <see langword="null" /> until then.
         /// </summary>
@@ -3171,7 +3191,7 @@ public sealed class HttpProtocolHandler(
                 RemoteEndPoint = connection.RemoteEndPoint as IPEndPoint,
                 Timings = TimingsNow(),
             };
-            return Head is null ? report : WithHead(report, Head) with { RedirectUrl = RedirectUrl, DigestStaysAvailable = DigestStaysAvailableAfter(HeldDigestNonce, Head) };
+            return Head is null ? report : WithHead(report, Head) with { RedirectUrl = RedirectUrl, DigestStaysAvailable = DigestStaysAvailableAfter(HeldDigestNonce, SentNtlmAuthorization, Head) };
         }
 
         private long RequestSizeSoFar() => earlier?.RequestSize ?? 0;
