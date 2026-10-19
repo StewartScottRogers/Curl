@@ -8,7 +8,7 @@ depends-on: [BL-2789, BL-2818, BL-2819]
 touches: [Curl.Protocol.Rtsp.UnitLibrary, Curl.Protocol.Rtsp.UnitTests, Curl.Conformance.UnitTests/PassingUpstreamCases.txt, Curl.Engine.UnitLibrary/TransferContextFactory.cs, Curl.Engine.UnitTests/TransferContextFactoryTests.cs, Curl.Conformance.UnitLibrary/RtspServerConnection.cs, Curl.Conformance.UnitTests/RtspServerConnectorTests.cs]
 requirement: none
 created: 2026-10-18
-completed:
+completed: 2026-10-19
 ---
 # BL-2788 — Retry an RTSP request with credentials after a 401 under CURLAUTH_ANY so upstream case 3100 passes
 
@@ -32,10 +32,10 @@ Found by BL-2699. With BL-2617 and BL-2704 Done, `CURL_UPSTREAM_CASE=3100` and `
 
 ## Acceptance criteria
 
-- [ ] A unit test in `Curl.Protocol.Rtsp.UnitTests` shows an RTSP `DESCRIBE` under any-auth sent once without `Authorization`, then after a `401` with `WWW-Authenticate: Basic` resent with the next `CSeq` and `Authorization: Basic dXNlcjpwYXNzd29yZA==`.
-- [ ] Case 3100 passes through the runner on Windows (`CURL_UPSTREAM_CASE=3100`) and is in `Curl.Conformance.UnitTests/PassingUpstreamCases.txt`.
-- [ ] `Curl.Protocol.Rtsp.UnitLibrary` stays at 100% line and branch coverage with no method past the complexity gate (`Measure-CodeQuality.ps1 -Library Curl.Protocol.Rtsp.UnitLibrary`).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] A unit test in `Curl.Protocol.Rtsp.UnitTests` shows an RTSP `DESCRIBE` under any-auth sent once without `Authorization`, then after a `401` with `WWW-Authenticate: Basic` resent with the next `CSeq` and `Authorization: Basic dXNlcjpwYXNzd29yZA==`.
+- [x] Case 3100 passes through the runner on Windows (`CURL_UPSTREAM_CASE=3100`) and is in `Curl.Conformance.UnitTests/PassingUpstreamCases.txt`.
+- [x] `Curl.Protocol.Rtsp.UnitLibrary` stays at 100% line and branch coverage with no method past the complexity gate (`Measure-CodeQuality.ps1 -Library Curl.Protocol.Rtsp.UnitLibrary`).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
 
@@ -45,6 +45,8 @@ Found by BL-2699. With BL-2617 and BL-2704 Done, `CURL_UPSTREAM_CASE=3100` and `
   - With those, case 3100's `<verify><protocol>` matches; it fails next at stdout byte 273: the SDP body is never written (handler discards RTSP bodies). Filed BL-2789 for that; this task depends on it.
   - Not yet done on resume: run the fast tests (the engine credential change may move other libcurl cases on the ratchet), Measure-CodeQuality for Rtsp, Engine and Conformance libraries, then list 3100.
 - 2026-10-19 (lane 1): split for the cost cap (about $1.14 left, not enough to apply the stash, run the fast tests and three quality runs). BL-2818 takes the RTSP 401 retry, BL-2819 the engine credentials and rtspd swsbounce, both from stash c61946edb9a51c86eef042dca7d5ca72bfc7d3ac. What is left here: list case 3100 in PassingUpstreamCases.txt once both are Done and it passes with CURL_UPSTREAM_CASE=3100.
+
+- 2026-10-19 (interactive session): BL-2789, BL-2818 and BL-2819 are Done. Checked each criterion: `RtspProtocolHandlerAuthenticationRetryTests` (7 tests, incl. the DESCRIBE resent with the next CSeq and `Authorization: Basic dXNlcjpwYXNzd29yZA==`) passes; `CURL_UPSTREAM_CASE=3100` through `NamedUpstreamCase_RunThroughCurl_PassesAsAListedCaseMust` passes (and 594 fails the same test, so it does run the case); 3100 added to the ratchet; `Measure-CodeQuality.ps1 -Library Curl.Protocol.Rtsp.UnitLibrary` reports 0 failing members; `dotnet build` 0 warnings, 0 errors; fast tests 42 projects passed, 0 failed.
 
 ## Log
 
@@ -59,3 +61,4 @@ Found by BL-2699. With BL-2617 and BL-2704 Done, `CURL_UPSTREAM_CASE=3100` and `
 - 2026-10-19: Backlog -> Doing. Criteria at claim: 52475b47 2a0a28a6 395361c3 3d836d5e.
 - 2026-10-19: Doing -> Blocked. Stewart: dark factory its runs of the last day already cost 4.61 of its 3.31 US dollar cost cap, so it was not run again; split the task; see Z:\repos\Curl.logs\BL-2788-*.jsonl
 - 2026-10-19: Blocked -> Doing. Interactive session, outside the lane cost cap: run case 3100 now its three pieces are Done. Criteria at claim: 52475b47 2a0a28a6 395361c3 3d836d5e.
+- 2026-10-19: Doing -> Done. Upstream case 3100 passes and is on the ratchet: an RTSP DESCRIBE under any-auth is resent with credentials after a 401.
