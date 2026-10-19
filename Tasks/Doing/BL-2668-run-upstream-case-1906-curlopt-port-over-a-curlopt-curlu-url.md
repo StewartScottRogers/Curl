@@ -31,3 +31,4 @@ Found by BL-2544, which ported lib1906 (`Curl.Conformance.LibTest.UnitLibrary/Li
 ## Log
 
 - 2026-10-17: Created.
+- 2026-10-18: Backlog -> Doing. Criteria at claim: 6540aefd 3f84cb54 3d836d5e.
