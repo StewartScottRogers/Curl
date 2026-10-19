@@ -10,12 +10,13 @@ namespace Curl.Protocol.Rtsp;
 /// <remarks>
 /// A frame is <c>$</c>, a channel byte, a 16-bit big-endian payload length and the payload. One
 /// not yet received whole is left unconsumed, so the caller joins it with the next read before
-/// the sink sees it. Every channel is handed on: the sink sees the channel byte and keeps the ones
-/// it set up. Any other byte is skipped, except, before a reply, one where <c>RTSP/</c> may
+/// the sink sees it. Only a channel a reply's <c>Transport</c> set up is a frame (<c>rtp_channel_mask</c>, BL-2787): a
+/// <c>$</c> on any other channel is a stray byte. Any stray byte is skipped, except, before a reply, one where <c>RTSP/</c> may
 /// begin. A sink that takes fewer bytes than the frame fails the transfer with 23.
 /// </remarks>
 /// <param name="sink">Takes each frame.</param>
-internal sealed class RtspInterleavedFrameFilter(IRtspInterleaveSink sink)
+/// <param name="isChannelSetUp">Whether a channel byte names a channel set up for interleaved RTP.</param>
+internal sealed class RtspInterleavedFrameFilter(IRtspInterleaveSink sink, Func<byte, bool> isChannelSetUp)
 {
     /// <summary>The exit 23 message for a sink that took fewer bytes than its frame, curl 8.22.0's text.</summary>
     internal const string WriteFailed = "Failed writing RTP data";
@@ -24,6 +25,8 @@ internal sealed class RtspInterleavedFrameFilter(IRtspInterleaveSink sink)
     internal const int MaximumFrameLength = FrameHeaderLength + ushort.MaxValue;
 
     private const int FrameHeaderLength = 4;
+
+    private const int ChannelOffset = 1;
 
     private const byte FrameStart = (byte)'$';
 
@@ -77,9 +80,19 @@ internal sealed class RtspInterleavedFrameFilter(IRtspInterleaveSink sink)
 
     /// <summary>Measures the frame at the start of <paramref name="received" />.</summary>
     /// <returns>Its length when it is whole, 0 when it is not yet, or -1 when no frame starts there.</returns>
-    private static int WholeFrameLength(ReadOnlySpan<byte> received)
+    private int WholeFrameLength(ReadOnlySpan<byte> received)
     {
         if (received[0] != FrameStart)
+        {
+            return -1;
+        }
+
+        if (received.Length <= ChannelOffset)
+        {
+            return 0;
+        }
+
+        if (!isChannelSetUp(received[ChannelOffset]))
         {
             return -1;
         }

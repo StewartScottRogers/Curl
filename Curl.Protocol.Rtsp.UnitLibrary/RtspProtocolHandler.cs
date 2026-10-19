@@ -198,7 +198,7 @@ public sealed class RtspProtocolHandler(
         }
 
         session.CloseConnection();
-        return await ReceiveAsync(connection, context).ConfigureAwait(false);
+        return await ReceiveAsync(connection, context, session).ConfigureAwait(false);
     }
 
     /// <summary>Reports <paramref name="message" /> as a <c>-v</c> line and returns it as the transfer's failure.</summary>
@@ -236,18 +236,22 @@ public sealed class RtspProtocolHandler(
 
     /// <summary>
     /// Makes an RTSP <c>RECEIVE</c> on <paramref name="connection" /> as curl 8.22.0 does: sends
-    /// nothing, checks no <c>CSeq</c>, and hands each interleaved frame read until the server closes
-    /// to the injected sink, or writes it to the body output when none is injected (BL-2477).
+    /// nothing, checks no <c>CSeq</c>, and hands each interleaved frame of one read (and of the reads
+    /// that finish a frame it cut) to the injected sink, or writes it to the body output when none is
+    /// injected (BL-2477, BL-2787).
     /// </summary>
     /// <param name="connection">The transfer's connection.</param>
     /// <param name="context">The transfer.</param>
+    /// <param name="session">The handle's session state, whose replies' <c>Transport</c> headers set up the channels.</param>
     /// <returns>Success with the frame bytes taken, or the read (56) or sink (23) failure.</returns>
-    internal async Task<TransferResult> ReceiveAsync(IConnection connection, ITransferContext context)
+    internal async Task<TransferResult> ReceiveAsync(IConnection connection, ITransferContext context, RtspSessionState session)
     {
-        var frames = new RtspInterleavedFrameFilter(interleaveSink ?? new RtspStreamInterleaveSink(context.Output));
+        var frames = new RtspInterleavedFrameFilter(interleaveSink ?? new RtspStreamInterleaveSink(context.Output), session.IsChannelSetUp);
         try
         {
-            await RtspReplyReader.ReceiveFramesAsync(connection, frames, context.CancellationToken).ConfigureAwait(false);
+            byte[] carried = session.CarriedBytes;
+            session.CarriedBytes = [];
+            await RtspReplyReader.ReceiveFramesAsync(connection, frames, carried, context.CancellationToken).ConfigureAwait(false);
             return TransferResult.Success(frames.BytesHanded);
         }
         catch (RtspTransferException failure)
@@ -334,7 +338,7 @@ public sealed class RtspProtocolHandler(
         events.ReportInfo(RtspVerboseLines.RequestSent);
         var log = new RtspTransferLog(context.DiagnosticLog);
         log.RequestSent(plan.MethodName, sequenceNumber);
-        RtspReplyHead head = await RtspReplyReader.ReadHeadAsync(connection, session, context.HeaderOutput, events, context.CancellationToken, log, context.MaxFileSize, Frames()).ConfigureAwait(false);
+        RtspReplyHead head = await RtspReplyReader.ReadHeadAsync(connection, session, context.HeaderOutput, events, context.CancellationToken, log, context.MaxFileSize, Frames(session)).ConfigureAwait(false);
         log.ReplyRead(head, session.SessionId);
         TransferReport report = new()
         {
@@ -352,6 +356,7 @@ public sealed class RtspProtocolHandler(
         }
 
         long bodyRead = await ReadBodyAsync(connection, context, head).ConfigureAwait(false);
+        await TakeBytesAfterReplyAsync(head, session, context.CancellationToken).ConfigureAwait(false);
         context.Progress.ReportTransferDone();
         TransferResult result = head.SequenceNumber == sequenceNumber
             ? TransferResult.Success(bodyRead)
@@ -368,6 +373,20 @@ public sealed class RtspProtocolHandler(
         plan.SkipsReplyBody
             ? 0
             : await RtspReplyReader.ReadBodyAsync(connection, head.Remaining, head.ContentLength, plan.WritesReplyBody ? context.Output : null, context.Progress, context.Events, context.CancellationToken).ConfigureAwait(false);
+
+    /// <summary>
+    /// Hands the frames that came in the same read after the reply's body to the interleave sink, as curl 8.22.0's
+    /// <c>rtsp_filter_rtp</c> does for the bytes after a response, and keeps the rest - a frame cut off, or the start of
+    /// a reply - on <paramref name="session" /> for the connection's next request (BL-2787).
+    /// </summary>
+    private async ValueTask TakeBytesAfterReplyAsync(RtspReplyHead head, RtspSessionState session, CancellationToken cancellationToken)
+    {
+        int bodyInHead = plan.SkipsReplyBody ? 0 : (int)Math.Clamp(head.ContentLength, 0, head.Remaining.Length);
+        ReadOnlyMemory<byte> after = head.Remaining.AsMemory(bodyInHead);
+        RtspInterleavedFrameFilter? frames = Frames(session);
+        int taken = frames is null ? 0 : await frames.ConsumeAsync(after, stopAtReply: true, cancellationToken).ConfigureAwait(false);
+        session.CarriedBytes = after[taken..].ToArray();
+    }
 
     /// <summary>
     /// Fails a completed head curl refuses: a status of 400 or more under <c>-f</c> with 22, else
@@ -408,8 +427,8 @@ public sealed class RtspProtocolHandler(
             : null;
 
     /// <summary>The filter that hands frames before a reply to the injected sink, or <see langword="null" /> to skip them.</summary>
-    private RtspInterleavedFrameFilter? Frames() =>
-        interleaveSink is null ? null : new RtspInterleavedFrameFilter(interleaveSink);
+    private RtspInterleavedFrameFilter? Frames(RtspSessionState session) =>
+        interleaveSink is null ? null : new RtspInterleavedFrameFilter(interleaveSink, session.IsChannelSetUp);
 
     /// <summary>Writes the request head with the session's next <c>CSeq</c> and its session ID.</summary>
     private byte[] FormatHead(ITransferContext context, HttpRequestOptions options, RtspSessionState session) =>

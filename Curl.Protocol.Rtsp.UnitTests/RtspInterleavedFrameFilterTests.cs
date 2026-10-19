@@ -15,7 +15,7 @@ public sealed class RtspInterleavedFrameFilterTests
     public async Task ConsumeAsync_TwoWholeFrames_HandsEachWithItsHeaderAndConsumesAll()
     {
         var sink = new RecordingInterleaveSink();
-        var filter = new RtspInterleavedFrameFilter(sink);
+        var filter = new RtspInterleavedFrameFilter(sink, EveryChannel);
         byte[] received = Bytes("$\0\0\u0004abcd$\u0001\0\u0002xy");
 
         int consumed = await filter.ConsumeAsync(received, stopAtReply: false, CancellationToken.None);
@@ -35,10 +35,23 @@ public sealed class RtspInterleavedFrameFilterTests
     {
         var sink = new RecordingInterleaveSink();
 
-        int consumed = await new RtspInterleavedFrameFilter(sink).ConsumeAsync(Bytes(received), stopAtReply: false, CancellationToken.None);
+        int consumed = await new RtspInterleavedFrameFilter(sink, EveryChannel).ConsumeAsync(Bytes(received), stopAtReply: false, CancellationToken.None);
 
         Assert.AreEqual(0, consumed);
         Assert.IsEmpty(sink.Frames);
+    }
+
+    [TestMethod]
+    public async Task ConsumeAsync_ChannelNotSetUp_SkipsTheDollarAsAStrayByte()
+    {
+        var sink = new RecordingInterleaveSink();
+        byte[] received = Bytes("$_12$\0\0\u0001a");
+
+        int consumed = await new RtspInterleavedFrameFilter(sink, channel => channel == 0).ConsumeAsync(received, stopAtReply: false, CancellationToken.None);
+
+        Assert.AreEqual(received.Length, consumed);
+        Assert.HasCount(1, sink.Frames);
+        CollectionAssert.AreEqual(Bytes("$\0\0\u0001a"), sink.Frames[0]);
     }
 
     [TestMethod]
@@ -50,7 +63,7 @@ public sealed class RtspInterleavedFrameFilterTests
         frame[2] = 0x01;
         frame[3] = 0x02;
 
-        int consumed = await new RtspInterleavedFrameFilter(sink).ConsumeAsync(frame, stopAtReply: false, CancellationToken.None);
+        int consumed = await new RtspInterleavedFrameFilter(sink, EveryChannel).ConsumeAsync(frame, stopAtReply: false, CancellationToken.None);
 
         Assert.AreEqual(frame.Length, consumed);
         Assert.HasCount(1, sink.Frames);
@@ -61,7 +74,7 @@ public sealed class RtspInterleavedFrameFilterTests
     {
         var sink = new RecordingInterleaveSink();
 
-        int consumed = await new RtspInterleavedFrameFilter(sink).ConsumeAsync(Bytes("xx$\0\0\u0001aRTSP/1.0"), stopAtReply: true, CancellationToken.None);
+        int consumed = await new RtspInterleavedFrameFilter(sink, EveryChannel).ConsumeAsync(Bytes("xx$\0\0\u0001aRTSP/1.0"), stopAtReply: true, CancellationToken.None);
 
         Assert.AreEqual(7, consumed);
         Assert.HasCount(1, sink.Frames);
@@ -72,7 +85,7 @@ public sealed class RtspInterleavedFrameFilterTests
     {
         var sink = new RecordingInterleaveSink();
 
-        int consumed = await new RtspInterleavedFrameFilter(sink).ConsumeAsync(Bytes("RTSP/$\0\0\0"), stopAtReply: false, CancellationToken.None);
+        int consumed = await new RtspInterleavedFrameFilter(sink, EveryChannel).ConsumeAsync(Bytes("RTSP/$\0\0\0"), stopAtReply: false, CancellationToken.None);
 
         Assert.AreEqual(9, consumed);
         Assert.HasCount(1, sink.Frames);
@@ -81,7 +94,7 @@ public sealed class RtspInterleavedFrameFilterTests
     [TestMethod]
     public async Task ConsumeAsync_SinkTakesTooFewBytes_FailsWith23()
     {
-        var filter = new RtspInterleavedFrameFilter(new RecordingInterleaveSink(shortBy: 1));
+        var filter = new RtspInterleavedFrameFilter(new RecordingInterleaveSink(shortBy: 1), EveryChannel);
 
         RtspTransferException thrown = await Assert.ThrowsExactlyAsync<RtspTransferException>(
             async () => await filter.ConsumeAsync(Bytes("$\0\0\u0001a"), stopAtReply: false, CancellationToken.None));
@@ -122,6 +135,8 @@ public sealed class RtspInterleavedFrameFilterTests
     [TestMethod]
     public void StreamSink_NullOutput_Throws() =>
         Assert.ThrowsExactly<ArgumentNullException>(() => new RtspStreamInterleaveSink(null!));
+
+    private static bool EveryChannel(byte channel) => true;
 
     private static byte[] Bytes(string text) => Encoding.Latin1.GetBytes(text);
 }

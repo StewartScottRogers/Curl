@@ -192,6 +192,10 @@ internal sealed class RtspReplyHeadParser(RtspSessionState session, long? maxFil
         {
             session.AcceptSession(line["Session:".Length..]);
         }
+        else if (line.StartsWith("Transport:", StringComparison.OrdinalIgnoreCase))
+        {
+            session.AcceptTransport(line["Transport:".Length..]);
+        }
     }
 
     /// <summary>Reads a <c>CSeq</c> value as <c>sscanf(": %ld")</c> does: blanks, a sign, digits.</summary>

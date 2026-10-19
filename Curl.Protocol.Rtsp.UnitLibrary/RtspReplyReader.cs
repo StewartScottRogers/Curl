@@ -56,8 +56,10 @@ internal static class RtspReplyReader
     internal static async ValueTask<RtspReplyHead> ReadHeadAsync(IConnection connection, RtspSessionState session, Stream? headerOutput, ITransferEvents events, CancellationToken cancellationToken, RtspTransferLog log, long? maxFileSize, RtspInterleavedFrameFilter? frames = null)
     {
         RtspReplyHeadParser parser = new(session, maxFileSize);
-        byte[] buffer = new byte[BufferSize];
-        int received = 0;
+        byte[] buffer = new byte[Math.Max(BufferSize, session.CarriedBytes.Length)];
+        session.CarriedBytes.CopyTo(buffer, 0);
+        int received = session.CarriedBytes.Length;
+        session.CarriedBytes = [];
         int processed = 0;
         while (true)
         {
@@ -193,27 +195,32 @@ internal static class RtspReplyReader
     }
 
     /// <summary>
-    /// Reads interleaved frames until the server closes, handing each whole one to
-    /// <paramref name="frames" /> and skipping every other byte, as an RTSP <c>RECEIVE</c> does in
-    /// curl 8.22.0, which sends no request and expects no reply (BL-2477). A frame cut off by the
-    /// close is dropped.
+    /// Reads interleaved frames, handing each whole one to <paramref name="frames" /> and skipping
+    /// every other byte, as an RTSP <c>RECEIVE</c> does in curl 8.22.0, which sends no request and
+    /// expects no reply (BL-2477). Like <c>rtsp_rtp_write_resp</c>, it takes one read and stops there
+    /// unless a frame is left incomplete, which it reads on to finish (BL-2787); it also stops when
+    /// the server closes, dropping a frame the close cut off.
     /// </summary>
     /// <param name="connection">The transfer's connection.</param>
     /// <param name="frames">Takes each frame.</param>
+    /// <param name="carried">The bytes an earlier reply left unread on the connection, read before the first read.</param>
     /// <param name="cancellationToken">Cancels the reads.</param>
     /// <exception cref="RtspTransferException">A read failed (56), or the sink took too few bytes (23).</exception>
-    internal static async ValueTask ReceiveFramesAsync(IConnection connection, RtspInterleavedFrameFilter frames, CancellationToken cancellationToken)
+    internal static async ValueTask ReceiveFramesAsync(IConnection connection, RtspInterleavedFrameFilter frames, byte[] carried, CancellationToken cancellationToken)
     {
-        byte[] buffer = new byte[RtspInterleavedFrameFilter.MaximumFrameLength];
-        int held = 0;
+        byte[] buffer = new byte[RtspInterleavedFrameFilter.MaximumFrameLength + carried.Length];
+        carried.CopyTo(buffer, 0);
+        int held = carried.Length;
         int read;
-        while ((read = await ReceiveAsync(connection, buffer.AsMemory(held), cancellationToken).ConfigureAwait(false)) > 0)
+        do
         {
+            read = await ReceiveAsync(connection, buffer.AsMemory(held), cancellationToken).ConfigureAwait(false);
             held += read;
             int consumed = await frames.ConsumeAsync(buffer.AsMemory(0, held), stopAtReply: false, cancellationToken).ConfigureAwait(false);
             buffer.AsSpan(consumed, held - consumed).CopyTo(buffer);
             held -= consumed;
         }
+        while (read > 0 && held > 0);
     }
 
     /// <summary>

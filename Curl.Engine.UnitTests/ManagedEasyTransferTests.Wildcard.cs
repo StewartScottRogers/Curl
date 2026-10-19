@@ -39,7 +39,8 @@ public sealed partial class ManagedEasyTransferTests
 
     private const string RtpFrame = "$\0\0\u0004abcd";
 
-    private const string RtspReply = "RTSP/1.0 200 OK\r\nCSeq: 1\r\n\r\n";
+    /// <summary>A reply whose <c>Transport</c> sets up interleaved channel 0, so the frame after it is RTP (BL-2787).</summary>
+    private const string RtspReply = "RTSP/1.0 200 OK\r\nCSeq: 1\r\nTransport: RTP/AVP/TCP;interleaved=0\r\n\r\n";
 
     [TestMethod]
     public async Task PerformAsync_WildcardMatchWithTheThreeCallbacks_CallsThemAroundEachMatchAndDownloadsTheKeptOnes()
@@ -109,10 +110,10 @@ public sealed partial class ManagedEasyTransferTests
     }
 
     [TestMethod]
-    public async Task PerformAsync_InterleaveCallbackSet_IsGivenEachFrameBeforeTheReplyWithItsHeader()
+    public async Task PerformAsync_InterleaveCallbackSet_IsGivenEachFrameAfterTheReplyWithItsHeader()
     {
         List<byte[]> frames = [];
-        PerConnectionScriptedConnector server = new(RtpFrame + RtspReply);
+        PerConnectionScriptedConnector server = new(RtspReply + RtpFrame);
         await using ManagedCurlEngine engine = CreateWildcardEngine(server);
         await using IEasyTransfer easy = engine.CreateEasy();
         easy.Options = InterleaveOptions(data =>
@@ -131,7 +132,7 @@ public sealed partial class ManagedEasyTransferTests
     [TestMethod]
     public async Task PerformAsync_InterleaveCallbackTakesTooFew_ReturnsWriteError()
     {
-        PerConnectionScriptedConnector server = new(RtpFrame + RtspReply);
+        PerConnectionScriptedConnector server = new(RtspReply + RtpFrame);
         await using ManagedCurlEngine engine = CreateWildcardEngine(server);
         await using IEasyTransfer easy = engine.CreateEasy();
         easy.Options = InterleaveOptions(data => data.Length - 1);

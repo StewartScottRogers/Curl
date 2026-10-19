@@ -215,7 +215,7 @@ public sealed class RtspProtocolHandlerLibcurlRequestTests
         var server = new ScriptedConnection(Bytes("$\0\0\u0002ab"));
         var connector = new RecordingConnector(ConnectResult.Connected(server));
 
-        TransferResult result = await new RtspProtocolHandler(connector, new RecordingAuthenticator(), sink, new RtspRequestSettings { Kind = RtspRequestKind.Receive }).ExecuteAsync(Context());
+        TransferResult result = await new RtspProtocolHandler(connector, new RecordingAuthenticator(), sink, new RtspRequestSettings { Kind = RtspRequestKind.Receive }, ChannelZero()).ExecuteAsync(Context());
 
         Diagnostics.ActResult(result);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
@@ -374,6 +374,14 @@ public sealed class RtspProtocolHandlerLibcurlRequestTests
     }
 
     private static byte[] Bytes(string text) => Encoding.Latin1.GetBytes(text);
+
+    /// <summary>A handle's session state after a <c>SETUP</c> reply's <c>Transport</c> set up interleaved channel 0.</summary>
+    private static RtspSessionState ChannelZero()
+    {
+        var session = new RtspSessionState();
+        session.AcceptTransport("RTP/AVP/TCP;interleaved=0");
+        return session;
+    }
 
     private RtspProtocolHandler Handler(IConnection connection, RtspRequestSettings settings, RtspSessionState? state = null) =>
         new(new RecordingConnector(ConnectResult.Connected(connection)), new RecordingAuthenticator(), null, settings, state);
