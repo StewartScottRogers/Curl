@@ -45,3 +45,4 @@ In Curl.Networking.UnitLibrary, StreamConnection.ReadAsync rewrites every Window
 ## Log
 
 - 2026-10-19: Created.
+- 2026-10-19: Backlog -> Doing. Criteria at claim: 9d695601 1fd5de8c 28346828.
