@@ -51,3 +51,4 @@ Found by BL-2699. With BL-2617 and BL-2704 Done, `CURL_UPSTREAM_CASE=3100` and `
 - 2026-10-18: Backlog -> Doing. Criteria at claim: 52475b47 2a0a28a6 395361c3 3d836d5e.
 - 2026-10-18: Doing -> Backlog. Waits on BL-2789 (RTSP DESCRIBE body to the write callback); 401 retry, libcurl USERNAME/PASSWORD credentials and rtspd swsbounce are done and stashed
 - 2026-10-19: Backlog -> Doing. Criteria at claim: 52475b47 2a0a28a6 395361c3 3d836d5e.
+- 2026-10-19: Doing -> Blocked. Stewart: dark factory its runs of the last day already cost 4.07 of its 4.61 US dollar cost cap, so it was not run again; split the task; see Z:\repos\Curl.logs\BL-2788-*.jsonl
