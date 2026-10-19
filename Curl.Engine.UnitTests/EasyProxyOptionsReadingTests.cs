@@ -47,6 +47,23 @@ public sealed class EasyProxyOptionsReadingTests
     }
 
     [TestMethod]
+    [DataRow(null, "proxy.example", 8992, 8992)]
+    [DataRow(null, "proxy.example:3128", 8992, 3128)]
+    [DataRow(null, "proxy.example", 0, 80)]
+    [DataRow("socks4://pre.example:1080", "proxy.example", 8992, 8992)]
+    public void TrySelect_ProxyPort_IsThePortOfProxyTextThatNamesNone(string? preProxy, string proxyText, int proxyPort, int expectedPort)
+    {
+        EasyProxyOptions options = new() { Proxy = proxyText, ProxyPort = proxyPort, PreProxy = preProxy };
+        Diagnostics.Arrange("pre-proxy / proxy / proxy port", $"{preProxy} / {proxyText} / {proxyPort}");
+
+        TransferProxySelection.TrySelect(new ProxySelector(_ => null), options, false, null, Url, out ProxyEndpoint? proxy, out _);
+        Diagnostics.Act("port", proxy?.Port);
+
+        Diagnostics.Assert("port", expectedPort, proxy?.Port);
+        Assert.AreEqual(expectedPort, proxy!.Port);
+    }
+
+    [TestMethod]
     public void TrySelect_Http10ProxyTypeWithAnHttpScheme_KeepsHttp10()
     {
         EasyProxyOptions options = new() { Proxy = "http://proxy.example:3128", ProxyType = ProxyType.Http10 };

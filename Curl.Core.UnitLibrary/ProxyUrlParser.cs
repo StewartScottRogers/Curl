@@ -92,13 +92,18 @@ public static class ProxyUrlParser
     /// </param>
     /// <param name="proxy">The proxy; <see langword="null" /> when parsing failed.</param>
     /// <param name="failure">The failure; <see langword="null" /> when parsing succeeded.</param>
+    /// <param name="portWhenTextGivesNone">
+    /// <c>CURLOPT_PROXYPORT</c>: the port used when the text names none, in place of the kind's
+    /// default; 0 (the default) keeps the kind's default port.
+    /// </param>
     /// <returns><see langword="true" /> when <paramref name="proxy" /> was produced.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="proxyText" /> is <see langword="null" />.</exception>
     public static bool TryParse(
         string proxyText,
         ProxyKind kindWithoutScheme,
         [NotNullWhen(true)] out ProxyEndpoint? proxy,
-        [NotNullWhen(false)] out TransferResult? failure)
+        [NotNullWhen(false)] out TransferResult? failure,
+        int portWhenTextGivesNone = 0)
     {
         ArgumentNullException.ThrowIfNull(proxyText);
 
@@ -118,7 +123,7 @@ public static class ProxyUrlParser
             return false;
         }
 
-        int port = parts.Port ?? kind.DefaultPort;
+        int port = parts.Port ?? (portWhenTextGivesNone > 0 ? portWhenTextGivesNone : kind.DefaultPort);
         if (port == 0)
         {
             failure = TransferResult.Failure(

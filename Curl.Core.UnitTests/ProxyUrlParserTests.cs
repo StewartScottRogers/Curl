@@ -89,6 +89,26 @@ public sealed class ProxyUrlParserTests
     }
 
     [TestMethod]
+    [DataRow("127.0.0.1", 8992, 8992)]
+    [DataRow("http://127.0.0.1", 8992, 8992)]
+    [DataRow("http://127.0.0.1:1111", 8992, 1111)]
+    [DataRow("127.0.0.1", 0, 80)]
+    public void TryParse_PortWhenTextGivesNone_AppliesOnlyToTextWithNoPort(string text, int portWhenTextGivesNone, int expectedPort)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("text", text);
+        diagnostics.Arrange("port when text gives none", portWhenTextGivesNone);
+
+        bool parsed = ProxyUrlParser.TryParse(text, ProxyKind.Http, out ProxyEndpoint? proxy, out _, portWhenTextGivesNone);
+
+        diagnostics.Act("parsed", parsed);
+        diagnostics.Act("proxy port", proxy?.Port);
+        diagnostics.Assert("proxy port", expectedPort, proxy?.Port);
+        Assert.IsTrue(parsed);
+        Assert.AreEqual(expectedPort, proxy?.Port);
+    }
+
+    [TestMethod]
     public void TryParse_SchemeWithAnOptionKind_IsTheSchemesKind()
     {
         var diagnostics = TestDiagnostics.For(TestContext);
