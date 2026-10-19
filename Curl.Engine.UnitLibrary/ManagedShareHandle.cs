@@ -345,6 +345,19 @@ internal sealed class ManagedShareHandle(TimeProvider timeProvider) : IShareHand
     internal ICookieStore? CookieStoreFor(ICookieStore? store, IEasyTransfer transfer) =>
         store is not null && Shares(CurlLockData.Cookie) ? new LockedCookieStore(store, this, transfer) : store;
 
+    /// <summary>
+    /// Calls <paramref name="use" /> on this handle's <see cref="TlsSessions" /> under the <see cref="CurlLockData.SslSession" />
+    /// lock while it shares TLS sessions, else on <paramref name="engine" /> with no lock, as curl 8.22.0's
+    /// <c>Curl_ssl_scache_lock</c> picks the cache for <c>curl_easy_ssls_import</c> and <c>curl_easy_ssls_export</c>.
+    /// </summary>
+    /// <typeparam name="T">What the use answers.</typeparam>
+    /// <param name="transfer">The transfer the lock callbacks are told of.</param>
+    /// <param name="engine">The transfer's engine's cache.</param>
+    /// <param name="use">The use.</param>
+    /// <returns>What <paramref name="use" /> answered.</returns>
+    internal T WithTlsSessions<T>(IEasyTransfer transfer, TlsSessionCache engine, Func<TlsSessionCache, T> use) =>
+        Shares(CurlLockData.SslSession) ? Locked(transfer, CurlLockData.SslSession, () => use(TlsSessions)) : use(engine);
+
     /// <summary>Calls <paramref name="access" /> between the lock and unlock callbacks for <paramref name="data" />, taken for <see cref="CurlLockAccess.Single" /> use.</summary>
     /// <typeparam name="T">What the access answers.</typeparam>
     /// <param name="transfer">The transfer asking, or <see langword="null" /> for the share handle itself.</param>

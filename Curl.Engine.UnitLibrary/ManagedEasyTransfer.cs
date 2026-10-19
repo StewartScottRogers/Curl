@@ -46,7 +46,7 @@ namespace Curl.Engine;
 /// </summary>
 /// <param name="createDispatcher">Builds a transfer's dispatcher from its options, the engine's shared state, the cookie store its HTTP handler keeps and the HTTP/2 push sink it offers server pushes to (<see cref="PushSinkOf" />).</param>
 /// <param name="shared">What the engine's handles share.</param>
-internal sealed class ManagedEasyTransfer(
+internal sealed partial class ManagedEasyTransfer(
     Func<EasyOptions, ManagedEngineSharedState, ICookieStore?, IHttp2PushSink?, ProtocolDispatcher> createDispatcher,
     ManagedEngineSharedState shared) : IToolEasyTransfer
 {
