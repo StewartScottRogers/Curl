@@ -33,3 +33,4 @@ Plumbing: `HttpProtocolHandler` reports the bit in `TransferReport`; `ManagedEas
 ## Log
 
 - 2026-10-19: Created.
+- 2026-10-19: Backlog -> Doing. Criteria at claim: 8fbcdf02 b8264556 4b2caed5.
