@@ -1493,7 +1493,9 @@ internal sealed class ManagedEasyTransfer(
             CookieList = cookieList,
             ContentLengthUpload = ContentLengthUploadOf(options),
         };
-        return toolState is null ? info : WithToolAnswers(info, result, options, toolState, requestUrl);
+        return toolState is null
+            ? info with { EffectiveUrl = UrlEffective.Normalize(info.EffectiveUrl, options.Network.PathAsIs) }
+            : WithToolAnswers(info, result, options, toolState, requestUrl);
     }
 
     /// <summary>
