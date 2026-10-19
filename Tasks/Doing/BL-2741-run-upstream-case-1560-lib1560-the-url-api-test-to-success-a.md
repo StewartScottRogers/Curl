@@ -35,3 +35,4 @@ BL-2652 ported lib1560 (`Lib1560`, `Lib1560Checks`, `Lib1560Tables`) and filed e
 - 2026-10-18: Created.
 - 2026-10-18: Backlog -> Doing. Criteria at claim: 379f2ef7 4272a6b9.
 - 2026-10-18: Doing -> Backlog. Waits on BL-2783: two lib1560 rows need a control-byte check in Curl.Engine.UnitLibrary, which BL-2653 (Doing) touches
+- 2026-10-19: Backlog -> Doing. Criteria at claim: 379f2ef7 4272a6b9.
