@@ -2,6 +2,7 @@ using System.Text;
 using Curl.Api.Codes;
 using Curl.Api.Options;
 using Curl.Api.Options.Authentication;
+using Curl.Api.Options.Http;
 using Curl.Api.Options.Network;
 using Curl.Api.Options.Proxy;
 using Curl.Protocol.Abstractions;
@@ -181,8 +182,25 @@ public sealed partial class ManagedEasyTransferTests
         Assert.DoesNotContain("Authorization", request);
     }
 
-    /// <summary>Performs <c>http://xxx:yyy@127.0.0.1:9000/1978</c> with <paramref name="authentication" /> on an engine dialing <paramref name="server" />, and gives the request it wrote.</summary>
-    private static async Task<string> PerformOverScriptedServerAsync(ScriptedConnector server, EasyAuthenticationOptions authentication)
+    [TestMethod]
+    public async Task PerformAsync_AwsSigV4WithCustomHeaders_SendsTheSignatureLinesAfterHostAndBeforeTheCustomHeaders()
+    {
+        ScriptedConnector server = new(["HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n"u8.ToArray()]);
+
+        string request = await PerformOverScriptedServerAsync(
+            server,
+            new EasyAuthenticationOptions { AwsSigV4 = "aws:amz:us-east-1:s3", HttpAuthentication = HttpAuthenticationMethods.AwsSigV4 },
+            new EasyHttpOptions { HttpHeaders = ["x-amz-meta-test: test2", "some-other-header: value"] });
+
+        int host = request.IndexOf("\r\nHost: ", StringComparison.Ordinal);
+        int authorization = request.IndexOf("\r\nAuthorization: AWS4-HMAC-SHA256 ", StringComparison.Ordinal);
+        int date = request.IndexOf("\r\nX-Amz-Date: ", StringComparison.Ordinal);
+        int custom = request.IndexOf("\r\nx-amz-meta-test: test2\r\nsome-other-header: value\r\n", StringComparison.Ordinal);
+        Assert.IsTrue(host >= 0 && host < authorization && authorization < date && date < custom, request);
+    }
+
+    /// <summary>Performs <c>http://xxx:yyy@127.0.0.1:9000/1978</c> with <paramref name="authentication" /> and <paramref name="http" /> on an engine dialing <paramref name="server" />, and gives the request it wrote.</summary>
+    private static async Task<string> PerformOverScriptedServerAsync(ScriptedConnector server, EasyAuthenticationOptions authentication, EasyHttpOptions? http = null)
     {
         EngineDialing dialing = new(new ScriptedTcpDialer(server), new LoopbackDnsResolver(), new RecordingDatagramConnector(Curl.Protocol.Abstractions.CurlExitCode.CouldntConnect, "no udp"));
         await using ManagedCurlEngine engine = new(TimeProvider.System, null, dialing: dialing);
@@ -191,6 +209,7 @@ public sealed partial class ManagedEasyTransferTests
         {
             Network = new EasyNetworkOptions { Url = "http://xxx:yyy@127.0.0.1:9000/1978" },
             Authentication = authentication,
+            Http = http ?? new EasyHttpOptions(),
         };
 
         CurlCode code = await easy.PerformAsync(CancellationToken.None);
