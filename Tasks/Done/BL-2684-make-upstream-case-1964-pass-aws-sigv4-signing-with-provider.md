@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Conformance.UnitTests/PassingUpstreamCases.txt, Curl.Engine.UnitLibrary/ManagedEasyTransfer.cs, Curl.Engine.UnitLibrary/TransferCredentialLookup.cs, Curl.Engine.UnitLibrary/AwsSigV4HttpAuthenticator.cs, Curl.Engine.UnitTests/ManagedEasyTransferTests.Netrc.cs, Curl.Engine.UnitTests/AwsSigV4HttpAuthenticatorTests.cs]
+touches: [Curl.Conformance.UnitTests/PassingUpstreamCases.txt, Curl.Engine.UnitLibrary/ManagedEasyTransfer.cs, Curl.Engine.UnitLibrary/TransferCredentialLookup.cs, Curl.Engine.UnitLibrary/AwsSigV4HttpAuthenticator.cs, Curl.Engine.UnitTests/ManagedEasyTransferTests.Netrc.cs, Curl.Engine.UnitTests/AwsSigV4HttpAuthenticatorTests.cs, Curl.Engine.UnitLibrary/CLAUDE.md]
 requirement: none
 created: 2026-10-17
-completed:
+completed: 2026-10-18
 ---
 # BL-2684 — Make upstream case 1964 pass: AWS SigV4 signing with provider xxx, credentials in the URL and an X-Xxx-Date header
 
@@ -22,10 +22,10 @@ Found by BL-2548, which ported lib1964 as `Lib1964` in `Curl.Conformance.LibTest
 
 ## Acceptance criteria
 
-- [ ] Upstream case 1964 passes through the case runner on Windows and is listed in `Curl.Conformance.UnitTests/PassingUpstreamCases.txt`.
-- [ ] The fix has a focused unit test in the fixed library's own `.UnitTests` project (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass with no test deleted, skipped or weakened.
-- [ ] `Curl.Conformance.UnitTests/PassingUpstreamCases.txt` is unchanged or grown, and every case it lists still passes.
+- [x] Upstream case 1964 passes through the case runner on Windows and is listed in `Curl.Conformance.UnitTests/PassingUpstreamCases.txt`.
+- [x] The fix has a focused unit test in the fixed library's own `.UnitTests` project (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass with no test deleted, skipped or weakened.
+- [x] `Curl.Conformance.UnitTests/PassingUpstreamCases.txt` is unchanged or grown, and every case it lists still passes.
 
 ## Notes
 
@@ -42,9 +42,18 @@ Found by BL-2548, which ported lib1964 as `Lib1964` in `Curl.Conformance.LibTest
   (Curl.Authentication) is not at fault as far as measured. Added `Curl.Engine.UnitLibrary` and
   `Curl.Engine.UnitTests` to `touches`; requeued because BL-2734 (in Doing) touches both.
 
+- 2026-10-18 (lane 1): fixed as diagnosed: `ManagedEasyTransfer.TryLookUpUrlAndNetrcCredentials` (was
+  `TryLookUpNetrcCredentials`; field `lookedUpCredentials`) now runs the lookup under `NetrcUsage.Ignored` too, so a
+  library handle with no `CURLOPT_USERPWD` user name sends the URL's user info, as libcurl's `override_login`; the
+  SigV4 signer needed no change. Tests `PerformAsync_NetrcIgnoredAndCredentialsInTheUrl_PutsTheUrlsCredentialsOnTheContext`
+  and `PerformAsync_UserPasswordWithAUserNameAndCredentialsInTheUrl_KeepsTheUserPassword`. Case 1964 passes and is on
+  the ratchet; Measure-CodeQuality for Curl.Engine.UnitLibrary: 0 failing members. Added
+  `Curl.Engine.UnitLibrary/CLAUDE.md` to `touches` to keep its BL-2696 section true (no Doing task names it).
+
 ## Log
 
 - 2026-10-17: Created.
 - 2026-10-18: Backlog -> Doing. Criteria at claim: 29fc16eb fd6bd9d4 4272a6b9 8738c7f6.
 - 2026-10-18: Doing -> Backlog. Needs Curl.Engine.UnitLibrary and Curl.Engine.UnitTests, which BL-2734 (in Doing) touches; fix diagnosed under Notes
 - 2026-10-18: Backlog -> Doing. Criteria at claim: 29fc16eb fd6bd9d4 4272a6b9 8738c7f6.
+- 2026-10-18: Doing -> Done. Upstream case 1964 passes: a library handle sends the URL's user info as its credentials, so AWS SigV4 signs with them
