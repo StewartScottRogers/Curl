@@ -37,3 +37,4 @@ Found by BL-2551, which ported lib3034 (`Curl.Conformance.LibTest.UnitLibrary/Li
 - 2026-10-17: Created.
 - 2026-10-19: Backlog -> Doing. Criteria at claim: 716b5cf3 48be2d2b 3d836d5e.
 - 2026-10-19: Doing -> Backlog. Needs Curl.Engine.UnitTests/ManagedEasyTransferTests.InFileSize.cs, which BL-2714 (Doing) holds via the whole Curl.Engine.UnitTests; case 3034 already passes, only the focused engine test is left
+- 2026-10-19: Backlog -> Doing. Criteria at claim: 716b5cf3 48be2d2b 3d836d5e.
