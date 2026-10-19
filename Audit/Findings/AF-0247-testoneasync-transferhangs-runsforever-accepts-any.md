@@ -42,6 +42,8 @@ Select-String -Path Curl.Conformance.LibTest.UnitTests/Lib530Tests.cs -Pattern '
 
 ## Re-audits
 
+- 2026-10-18 | 2026-10-18_1905.md | reproduces: no | Ran the Select-String: no match. TestOneAsync_TransferHangs_RunsForever now asserts Assert.AreEqual(LibTestErrorCodes.RunsForever, result).
+
 ## Log
 
 - 2026-10-18: filed proposed.

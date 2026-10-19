@@ -42,6 +42,8 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Engin
 
 ## Re-audits
 
+- 2026-10-18 | 2026-10-18_1905.md | reproduces: yes (runner rerun on clean commit) | Ran the -Site command: line 133 in OverSharedCookies, engineOn: true -> false survived. Runner's targeted mutation rerun on the clean audited commit: survived.
+
 ## Log
 
 - 2026-10-18: filed proposed.

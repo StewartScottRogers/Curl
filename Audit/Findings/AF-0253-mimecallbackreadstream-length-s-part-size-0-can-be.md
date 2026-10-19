@@ -3,8 +3,8 @@ id: AF-0253
 title: MimeCallbackReadStream.Length's part.Size >= 0 can become > 0 with no test failing, so an empty sized callback part throws
 auditor: quality
 severity: Medium
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-18_1905.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
 key: quality:Curl.Engine.UnitLibrary/MimeCallbackReadStream.cs:Length-ge:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/MimeCallbackReadStream.cs:39:>=
 task: BL-2764
@@ -13,9 +13,9 @@ found: 2026-10-18
 found-at: 19ea231be8b4d749462d15058a3c6b97c7e70836
 scorecard: 2026-10-18_1045.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-18
+closed-how: mechanical
+closed-by: 2026-10-18_1905.md
 ---
 # AF-0253 - MimeCallbackReadStream.Length's part.Size >= 0 can become > 0 with no test failing, so an empty sized callback part throws
 
@@ -42,7 +42,10 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Engin
 
 ## Re-audits
 
+- 2026-10-18 | 2026-10-18_1905.md | reproduces: no | Ran the -Site command: line 39, part.Size >= 0 -> > 0 killed. Runner's targeted mutation rerun on the clean audited commit: killed.
+
 ## Log
 
 - 2026-10-18: filed proposed.
 - 2026-10-18: proposed -> accepted.
+- 2026-10-18: accepted -> closed. Re-audit 2026-10-18_1905.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.

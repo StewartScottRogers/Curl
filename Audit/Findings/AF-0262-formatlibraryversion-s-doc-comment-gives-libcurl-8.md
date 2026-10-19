@@ -3,8 +3,8 @@ id: AF-0262
 title: FormatLibraryVersion's doc comment gives libcurl/8.21.0 as the -V library text; the method returns libcurl/8.22.0
 auditor: truthfulness
 severity: Medium
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-18_1905.md: the reproduction no longer reproduces.
 key: truthfulness:Curl.Output.UnitLibrary/TransferWriteOutVariables.cs:FormatLibraryVersion:false-doc-comment
 reproduction: none
 task: BL-2773
@@ -13,9 +13,9 @@ found: 2026-10-18
 found-at: 19ea231be8b4d749462d15058a3c6b97c7e70836
 scorecard: 2026-10-18_1045.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-18
+closed-how: reliable-reaudit
+closed-by: 2026-10-18_1905.md
 ---
 # AF-0262 - FormatLibraryVersion's doc comment gives libcurl/8.21.0 as the -V library text; the method returns libcurl/8.22.0
 
@@ -42,7 +42,10 @@ Select-String -Path Curl.Output.UnitLibrary/TransferWriteOutVariables.cs -Patter
 
 ## Re-audits
 
+- 2026-10-18 | 2026-10-18_1905.md | reproduces: no | Ran the reproduction: '308: /// <c>SslStream</c> sits on: <c>libcurl/8.22.0 Schannel</c> on Windows,' and '317: return isWindows ? "libcurl/8.22.0 Schannel"'. FormatLibraryVersion's doc comment now gives libcurl/8.22.0, the same as the code; no 8.21.0 text remains.
+
 ## Log
 
 - 2026-10-18: filed proposed.
 - 2026-10-18: proposed -> accepted.
+- 2026-10-18: accepted -> closed. Re-audit 2026-10-18_1905.md: the reproduction no longer reproduces.

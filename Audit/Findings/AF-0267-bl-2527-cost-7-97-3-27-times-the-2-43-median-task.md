@@ -3,8 +3,8 @@ id: AF-0267
 title: BL-2527 cost $7.97, 3.27 times the $2.43 median task cost: a 94-turn, 34-minute run plus a rebase-conflict resolve run
 auditor: process
 severity: Low
-status: accepted
-reason: 
+status: closed
+reason: Audit 2026-10-18_1905.md: a cost-outlier finding records a past run's cost, which no fix can change; its tasks (BL-2778) are Done at e17dfce54cf6, so it closes without a re-audit (ADR-0422, amended 2026-10-14).
 key: process:logs:BL-2527:cost-outlier
 reproduction: none
 task: BL-2778
@@ -13,9 +13,9 @@ found: 2026-10-18
 found-at: 19ea231be8b4d749462d15058a3c6b97c7e70836
 scorecard: 2026-10-18_1045.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-18
+closed-how: task-done-historical
+closed-by: 2026-10-18_1905.md
 ---
 # AF-0267 - BL-2527 cost $7.97, 3.27 times the $2.43 median task cost: a 94-turn, 34-minute run plus a rebase-conflict resolve run
 
@@ -46,3 +46,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 - 2026-10-18: filed proposed.
 - 2026-10-18: proposed -> accepted.
+- 2026-10-18: accepted -> closed. Audit 2026-10-18_1905.md: a cost-outlier finding records a past run's cost, which no fix can change; its tasks (BL-2778) are Done at e17dfce54cf6, so it closes without a re-audit (ADR-0422, amended 2026-10-14).

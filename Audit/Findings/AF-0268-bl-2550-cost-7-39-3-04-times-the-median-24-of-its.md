@@ -3,8 +3,8 @@ id: AF-0268
 title: BL-2550 cost $7.39, 3.04 times the median: 24 of its 51.6 minutes went on two shell loops reading 2,077 upstream test files one by one
 auditor: process
 severity: Low
-status: accepted
-reason: 
+status: closed
+reason: Audit 2026-10-18_1905.md: a cost-outlier finding records a past run's cost, which no fix can change; its tasks (BL-2779) are Done at e17dfce54cf6, so it closes without a re-audit (ADR-0422, amended 2026-10-14).
 key: process:logs:BL-2550:cost-outlier
 reproduction: none
 task: BL-2779
@@ -13,9 +13,9 @@ found: 2026-10-18
 found-at: 19ea231be8b4d749462d15058a3c6b97c7e70836
 scorecard: 2026-10-18_1045.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-18
+closed-how: task-done-historical
+closed-by: 2026-10-18_1905.md
 ---
 # AF-0268 - BL-2550 cost $7.39, 3.04 times the median: 24 of its 51.6 minutes went on two shell loops reading 2,077 upstream test files one by one
 
@@ -46,3 +46,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 - 2026-10-18: filed proposed.
 - 2026-10-18: proposed -> accepted.
+- 2026-10-18: accepted -> closed. Audit 2026-10-18_1905.md: a cost-outlier finding records a past run's cost, which no fix can change; its tasks (BL-2779) are Done at e17dfce54cf6, so it closes without a re-audit (ADR-0422, amended 2026-10-14).

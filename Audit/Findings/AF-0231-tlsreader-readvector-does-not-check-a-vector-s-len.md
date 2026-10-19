@@ -43,6 +43,7 @@ dotnet test Curl.Tls.UnitTests --filter "TestCategory!=Integration"
 ## Re-audits
 
 - 2026-10-18 | 2026-10-18_1045.md | not re-audited | overlaps planted defect PD-103 in Curl.Tls.UnitLibrary/TlsReader.cs, so the auditor's verdict (reproduces yes) is set aside: Ran dotnet test Curl.Tls.UnitTests --filter "TestCategory!=Integration": Failed: 70, Passed: 1205, Total: 1275. Examples: EchConfigListTests.AMalformedListIsADecodeError throws ArgumentOutOfRangeException and IndexOutOfRangeException, and HandshakeMessageRejectionTests.DecodeAnswersATruncatedBodyWithDecodeError also fails. TlsReader.Take (TlsReader.cs:126) advances position with no check against end, so ReadVector does not bound a vector by the bytes left. The Networking mutation baseline also had to leave out 3 HandBuiltTlsProviderTests ECH tests.
+- 2026-10-18 | 2026-10-18_1905.md | not re-audited | Ran dotnet test Curl.Tls.UnitTests --filter "TestCategory!=Integration": 8 failures, then the run hung and was stopped. Every failing stack is topped by HandshakeMessageReader.Read line 32 (a separate defect, filed as quality:Curl.Tls.UnitLibrary/HandshakeMessageReader.cs:Read:failing-test), not TlsReader. TlsReader.ReadVector now calls Take(length), which checks end - position < count. The reproduction still fails for another cause, so it cannot tell whether AF-0231 is fixed.
 
 ## Log
 

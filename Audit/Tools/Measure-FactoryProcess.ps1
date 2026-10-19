@@ -56,7 +56,10 @@
       ciRedSpells               each red spell behind ciRedMinutes: start, end (UTC), minutes,
                                 runId (the CI run that turned it red) and stillRed
       unfinishedRuns            run-log file names (<ID>-<stamp>-L<n>.jsonl) with no result
-                                event and no FACTORY: DONE or FACTORY: BLOCKED line
+                                event and no FACTORY: DONE or FACTORY: BLOCKED line, of a shift
+                                that had ended (or whose shift log is not there)
+      runningRuns               the same, of a shift still running when the logs were read: its
+                                DarkFactory-<stamp>.log has no "shift end" line (AF-0269)
     and tasks: one row per task claimed since -Since: id, claims, minutes (last claim to its
     end, or to the last line seen when still open), costUsd (its runs), outcome (done,
     requeued, blocked, parked or open).
@@ -118,6 +121,20 @@ function Get-LaneEvents([string]$Root, [datetime]$From) {
     return @($events | Where-Object { $_.At -ge $From } | Sort-Object At, Lane)
 }
 
+# Whether the shift a run log belongs to was still running when the logs were read: its shift
+# log (DarkFactory-<stamp>.log, the stamp in the run log's name) is there and has no "shift end"
+# line. A run of a live shift with no result yet is still running, not unfinished (AF-0269). A
+# run whose shift log is not there keeps the old reading.
+function Test-ShiftLive([string]$Root, [string]$RunFile) {
+    if ($RunFile -notmatch '-(\d{8}-\d{6})-L\d+') { return $false }
+    $shiftLog = Join-Path $Root "DarkFactory-$($Matches[1]).log"
+    if (-not (Test-Path -LiteralPath $shiftLog)) { return $false }
+    foreach ($line in [IO.File]::ReadLines($shiftLog)) {
+        if ($line -match '^\d\d:\d\d:\d\d -\s+shift\s+end\b') { return $false }
+    }
+    return $true
+}
+
 function Get-RunResults([string]$Root, [datetime]$From) {
     # One object per task run log with a result event: Id, Resumed, CostUsd, TokensIn, TokensOut.
     $runs = @()
@@ -142,7 +159,7 @@ function Get-RunResults([string]$Root, [datetime]$From) {
                 if ($r.usage.PSObject.Properties['output_tokens']) { $out = [long]$r.usage.output_tokens }
             }
         }
-        $runs += [pscustomobject]@{ Id = $id; File = $file.Name; Resumed = $file.Name -like '*-resumed.jsonl'; CostUsd = $cost; TokensIn = $in; TokensOut = $out; HasResult = [bool]$resultLine; Finished = ([bool]$resultLine) -or $factoryEnd }
+        $runs += [pscustomobject]@{ Id = $id; File = $file.Name; Resumed = $file.Name -like '*-resumed.jsonl'; CostUsd = $cost; TokensIn = $in; TokensOut = $out; HasResult = [bool]$resultLine; Finished = ([bool]$resultLine) -or $factoryEnd; ShiftLive = (Test-ShiftLive $Root $file.Name) }
     }
     return $runs
 }
@@ -260,7 +277,8 @@ function Measure-Process([string]$Root, [datetime]$From, [object[]]$CiRuns) {
         tokensOutput = $tokensOut
         costUsd = [math]::Round($cost, 4)
         costUsdPerTaskDone = $(if ($done) { [math]::Round($cost / $done, 4) } else { $null })
-        unfinishedRuns = @($runs | Where-Object { -not $_.Finished } | ForEach-Object { $_.File } | Sort-Object)
+        unfinishedRuns = @($runs | Where-Object { -not $_.Finished -and -not $_.ShiftLive } | ForEach-Object { $_.File } | Sort-Object)
+        runningRuns = @($runs | Where-Object { -not $_.Finished -and $_.ShiftLive } | ForEach-Object { $_.File } | Sort-Object)
         tasks = $rows
     }
 }
@@ -289,6 +307,10 @@ if ($SelfTest) {
     $ok = (@($m.unfinishedRuns) -join ',') -eq 'BL-004-20260101-100000-L2.jsonl'
     if (-not $ok) { $failed++ }
     Write-Host "$(if ($ok) { 'PASS' } else { 'FAIL' }) unfinishedRuns: $(@($m.unfinishedRuns) -join ',')"
+    # AF-0269: a run with no result whose shift log has no "shift end" line was still running.
+    $ok = (@($m.runningRuns) -join ',') -eq 'BL-006-20260102-100000-L1.jsonl'
+    if (-not $ok) { $failed++ }
+    Write-Host "$(if ($ok) { 'PASS' } else { 'FAIL' }) runningRuns: $(@($m.runningRuns) -join ',')"
     $spells = @($m.ciRedSpells)
     $ok = $spells.Count -eq 2 -and $spells[0].runId -eq 2 -and "$($spells[0].minutes)" -eq '60' -and $spells[0].start -eq '2026-01-01T10:10:00Z' -and $spells[1].runId -eq 6 -and $spells[1].end -eq '2026-01-01T13:05:00Z' -and -not $spells[1].stillRed
     if (-not $ok) { $failed++ }

@@ -43,6 +43,7 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Proto
 ## Re-audits
 
 - 2026-10-18 | 2026-10-18_1045.md | reproduces: yes (runner rerun on clean commit) | Ran the -Site command: site resolved to line 1993 ('KeepsAlive: false' -> 'KeepsAlive: true' in StreamRefusedOutcome), outcome survived, excludedTests empty. Runner's targeted mutation rerun on the clean audited commit: survived.
+- 2026-10-18 | 2026-10-18_1905.md | reproduces: yes (runner rerun on clean commit) | Ran the -Site command: line resolved to 2010 in StreamRefusedOutcome; mutant KeepsAlive: false -> true survived (baseline passed, no exclusions). Runner's targeted mutation rerun on the clean audited commit: survived.
 
 ## Log
 

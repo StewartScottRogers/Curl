@@ -42,6 +42,8 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-10-18 | 2026-10-18_1905.md | not re-audited | overlaps planted defect PD-503 in BL-9990-20261018-181500-L9.jsonl, so the auditor's verdict (reproduces no) is set aside: Ran the reproduction: the tool now gives unfinishedRuns empty even for the 2026-10-16 window, and BL-2642-20261018-103803-L1.jsonl in this copy ends with a result line and 'FACTORY: DONE BL-2642 ...'. Over this window runningRuns is empty, so no run of a live shift was cut off by the log copy. The one entry in unfinishedRuns (BL-9990-20261018-181500-L9.jsonl) has a different cause: no shift or lane owns it, and it was written 15 minutes after the only shift ended. It is filed as a new finding.
+
 ## Log
 
 - 2026-10-18: filed proposed.

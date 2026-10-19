@@ -3,8 +3,8 @@ id: AF-0256
 title: CountTicketRecords' _finished = true can become false with no test failing, so tickets are counted again after the first read
 auditor: quality
 severity: Medium
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-18_1905.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
 key: quality:Curl.Networking.UnitLibrary/SessionTicketRecordDetector.cs:CountTicketRecords-true:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/SessionTicketRecordDetector.cs:92:true
 task: BL-2767
@@ -13,9 +13,9 @@ found: 2026-10-18
 found-at: 19ea231be8b4d749462d15058a3c6b97c7e70836
 scorecard: 2026-10-18_1045.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-18
+closed-how: mechanical
+closed-by: 2026-10-18_1905.md
 ---
 # AF-0256 - CountTicketRecords' _finished = true can become false with no test failing, so tickets are counted again after the first read
 
@@ -42,7 +42,10 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Netwo
 
 ## Re-audits
 
+- 2026-10-18 | 2026-10-18_1905.md | reproduces: no | Ran the -Site command: line 92, _finished = true -> false killed (4 TcpConnectorQuicTests excluded as baseline failures). Runner's targeted mutation rerun on the clean audited commit: killed.
+
 ## Log
 
 - 2026-10-18: filed proposed.
 - 2026-10-18: proposed -> accepted.
+- 2026-10-18: accepted -> closed. Re-audit 2026-10-18_1905.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
