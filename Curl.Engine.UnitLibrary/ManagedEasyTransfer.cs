@@ -853,7 +853,8 @@ internal sealed partial class ManagedEasyTransfer(
     /// The body of a <c>CURLOPT_POST</c> with no <c>CURLOPT_POSTFIELDS</c>, read through <c>CURLOPT_READFUNCTION</c>
     /// (<see cref="CallbackUploadOf" />) and sent as <c>application/x-www-form-urlencoded</c>, with
     /// <c>CURLOPT_POSTFIELDSIZE</c> as its <c>Content-Length</c> when not negative and chunked otherwise, as libcurl
-    /// 8.22.0 posts (upstream test508, BL-2586); the stream joins <paramref name="reads" />, so its
+    /// 8.22.0 posts (upstream test508, BL-2586), and chunked whatever the size when a <c>CURLOPT_HTTPHEADER</c> line
+    /// asks for <c>Transfer-Encoding: chunked</c> (<see cref="AsksForChunked" />, upstream test1901, BL-2667); the stream joins <paramref name="reads" />, so its
     /// <c>CURL_READFUNC_ABORT</c> ends the perform. With no read callback and a <c>CURLOPT_POSTFIELDSIZE</c> of 0
     /// (<c>CURLOPT_POSTFIELDS</c> NULL), an empty body sent with <c>Content-Length: 0</c>, as libcurl 8.22.0 posts
     /// (upstream test515, BL-2592). None when the curl tool's runner gave <paramref name="toolInputs" />, for a
@@ -879,8 +880,29 @@ internal sealed partial class ManagedEasyTransfer(
 
         CallbackReadStream content = CallbackUploadOf(read, options.Callbacks, PauseGateFor(url));
         reads.Add(content);
-        return new StreamBody(content, size < 0 ? null : size, HttpRequestOptionsMapping.FormUrlEncoded);
+        return new StreamBody(content, ReadCallbackPostLengthOf(options.Http), HttpRequestOptionsMapping.FormUrlEncoded);
     }
+
+    /// <summary>
+    /// The <c>Content-Length</c> of a read callback's post: <c>CURLOPT_POSTFIELDSIZE</c>, or none (chunked) when it
+    /// is negative or a <c>CURLOPT_HTTPHEADER</c> line asks for <c>Transfer-Encoding: chunked</c>.
+    /// </summary>
+    /// <param name="http">The handle's HTTP options.</param>
+    /// <returns>The length, or <see langword="null" /> for chunked.</returns>
+    private static long? ReadCallbackPostLengthOf(Curl.Api.Options.Http.EasyHttpOptions http) =>
+        http.PostFieldSize < 0 || AsksForChunked(http.HttpHeaders) ? null : http.PostFieldSize;
+
+    /// <summary>
+    /// Whether a <c>CURLOPT_HTTPHEADER</c> line names <c>Transfer-Encoding</c> with <c>chunked</c> in its value: then
+    /// libcurl 8.22.0 ignores <c>CURLOPT_POSTFIELDSIZE</c> and sends a read callback's post as chunks (upstream
+    /// test1901, BL-2667).
+    /// </summary>
+    /// <param name="headers">The handle's <c>CURLOPT_HTTPHEADER</c> lines.</param>
+    /// <returns><see langword="true" /> when one does.</returns>
+    internal static bool AsksForChunked(IReadOnlyList<string> headers) =>
+        headers.Any(line => line.Split(':', 2) is [var name, var value]
+            && name.Trim().Equals("Transfer-Encoding", StringComparison.OrdinalIgnoreCase)
+            && value.Contains("chunked", StringComparison.OrdinalIgnoreCase));
 
     /// <summary>
     /// The <c>CURLOPT_POSTFIELDS</c> body of a handle that sets <c>CURLOPT_TRAILERFUNCTION</c>: a
