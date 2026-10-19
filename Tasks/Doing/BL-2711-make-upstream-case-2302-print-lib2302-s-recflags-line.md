@@ -31,3 +31,4 @@ Found by BL-2688, which made the WebSocket libtest cases run (ADR-0678: the harn
 ## Log
 
 - 2026-10-17: Created.
+- 2026-10-19: Backlog -> Doing. Criteria at claim: b1eff55a f0471b8d 3d836d5e.
