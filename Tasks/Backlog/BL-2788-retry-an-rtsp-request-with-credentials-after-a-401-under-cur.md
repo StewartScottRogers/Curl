@@ -1,0 +1,44 @@
+---
+id: BL-2788
+title: Retry an RTSP request with credentials after a 401 under CURLAUTH_ANY so upstream case 3100 passes
+priority: Normal
+assignee: Claude
+pipeline: feature
+depends-on: []
+touches: [Curl.Protocol.Rtsp.UnitLibrary, Curl.Protocol.Rtsp.UnitTests, Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
+requirement: none
+created: 2026-10-18
+completed:
+---
+# BL-2788 — Retry an RTSP request with credentials after a 401 under CURLAUTH_ANY so upstream case 3100 passes
+
+## Goal
+
+An RTSP request made with `CURLAUTH_ANY` (or `--anyauth`) and credentials is sent first without `Authorization`, and after the server's `401` with `WWW-Authenticate: Basic` is resent once with `CSeq` incremented and `Authorization: Basic ...`, as curl does; upstream case 3100 then passes.
+
+## Context
+
+Found by BL-2699. With BL-2617 and BL-2704 Done, `CURL_UPSTREAM_CASE=3100` and `NamedUpstreamCase_RunThroughCurl_PassesAsAListedCaseMust` run case 3100 (not skipped), and it fails at `<verify><protocol>` byte 82 (line 5): Curl sends the first `DESCRIBE` (lines 1-4 match) and then stops. Missing lines:
+
+```
+- 5: "DESCRIBE rtsp://127.0.0.1:8996/3100 RTSP/1.0\r\n"
+- 6: "CSeq: 2\r\n"
+- 7: "Accept: application/sdp\r\n"
+- 8: "Authorization: Basic dXNlcjpwYXNzd29yZA==\r\n"
+- 9: "\r\n"
+```
+
+`Curl.Protocol.Rtsp.UnitLibrary/RtspProtocolHandler.cs` builds only a pre-emptive `Authorization` (line ~418, `authenticator.CreateAuthorization`); it has no 401 retry. The client is `Curl.Conformance.LibTest.UnitLibrary/Lib3100.cs` (`CURLOPT_HTTPAUTH = CURLAUTH_ANY`, `CURLOPT_RTSP_REQUEST = DESCRIBE`). Upstream: `tests/data/test3100`, `lib/rtsp.c` / `lib/http.c` auth negotiation, curl 8.x targeted by `Gap/Baselines/target.json`.
+
+## Acceptance criteria
+
+- [ ] A unit test in `Curl.Protocol.Rtsp.UnitTests` shows an RTSP `DESCRIBE` under any-auth sent once without `Authorization`, then after a `401` with `WWW-Authenticate: Basic` resent with the next `CSeq` and `Authorization: Basic dXNlcjpwYXNzd29yZA==`.
+- [ ] Case 3100 passes through the runner on Windows (`CURL_UPSTREAM_CASE=3100`) and is in `Curl.Conformance.UnitTests/PassingUpstreamCases.txt`.
+- [ ] `Curl.Protocol.Rtsp.UnitLibrary` stays at 100% line and branch coverage with no method past the complexity gate (`Measure-CodeQuality.ps1 -Library Curl.Protocol.Rtsp.UnitLibrary`).
+- [ ] `dotnet build` is clean and the fast tests pass.
+
+## Notes
+
+## Log
+
+- 2026-10-18: Created.
