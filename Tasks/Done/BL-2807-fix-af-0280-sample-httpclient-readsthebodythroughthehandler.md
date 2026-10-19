@@ -46,7 +46,7 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Notes
 
-- The test now captures Console output (as the cancel tests do, with [DoNotParallelize]) and asserts the sample wrote "hello", the scripted body read through CurlHttpMessageHandler, and that the request went to https://example.com/. Test-only change, so no quality run was needed.
+- The test now captures Console output (as the cancel tests do, with [DoNotParallelize]) and asserts the sample wrote "hello", the scripted body read through CurlHttpMessageHandler (a ConsoleTextOfAsync helper keeps the assert within the 6 lines the finding's reproduction shows). Test-only change, so no quality run was needed.
 
 ## Log
 
