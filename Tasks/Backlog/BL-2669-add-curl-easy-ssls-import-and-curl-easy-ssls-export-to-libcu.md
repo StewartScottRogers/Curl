@@ -4,7 +4,7 @@ title: Add curl_easy_ssls_import and curl_easy_ssls_export to Libcurl and port l
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: []
+depends-on: [BL-2786]
 touches: [Libcurl, Libcurl.UnitTests, Curl.Conformance.LibTest.UnitLibrary, Curl.Conformance.LibTest.UnitTests, Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
 requirement: none
 created: 2026-10-17
@@ -29,7 +29,10 @@ Found by BL-2544. lib1678 imports one SSL session packet (`CURL_SPACK_VERSION` 1
 
 ## Notes
 
+- 2026-10-18 (lane 1): First-pass sizing before any edit. Libcurl reaches the engine only through `IEasyTransfer`, which has no TLS session member, and the engine's `TlsSessionCache` (Curl.Networking) reads and writes only whole `--ssl-sessions` files. Filed BL-2785 (cache: import one packed session under a key or salt-and-hmac, list held sessions, accept lib1678's repeated tags) and BL-2786 (seam members on `IEasyTransfer` with `NotBuiltIn` defaults, `ManagedEasyTransfer` over the share's or engine's cache; depends on BL-2785). This task then needs only `Libcurl/Easy` (`CurlEasy.SslsImport`/`SslsExport` over the seam), `Lib1678` choosing the full program where `ManagedCurlVersion` lists `SSLS-EXPORT`, and the ratchet line; nothing else missing.
+
 ## Log
 
 - 2026-10-17: Created.
 - 2026-10-18: Backlog -> Doing. Criteria at claim: 7eadc98c 342afcda 2e924e0c 3d836d5e.
+- 2026-10-18: Doing -> Backlog. Needs BL-2786 (engine seam for TLS session import and export), which needs BL-2785 (TlsSessionCache single-session import and export)
