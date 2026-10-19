@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: [BL-2661]
-touches: [Curl.Conformance.LibTest.UnitLibrary, Curl.Conformance.LibTest.UnitTests, Curl.Conformance.UnitTests, Curl.Engine.UnitLibrary, Curl.Engine.UnitTests]
+touches: [Curl.Conformance.LibTest.UnitLibrary, Curl.Conformance.LibTest.UnitTests, Curl.Conformance.UnitTests, Curl.Engine.UnitLibrary, Curl.Engine.UnitTests, Curl.Console, Curl.Console.UnitTests]
 requirement: none
 created: 2026-10-18
 completed:
@@ -32,6 +32,8 @@ Found by BL-2661, which listed the `wakeup` feature (ADR-0690): 2405 now runs an
   1. The first `PerformAsync` finishes both transfers (the in-memory servers answer synchronously, so each started perform has completed before `MoveTransfersOnAsync` queues the done messages) and answers `running == 0`, so the loop never calls `curl_multi_waitfds` on a started transfer. libcurl's first `curl_multi_perform` never finishes an HTTP transfer (the connect is non-blocking); the engine should not report a transfer it started in this call as done until a later perform.
   2. `GetWaitSockets` gives one socket per started transfer and no wakeup descriptor, while `curl_version_info` reports `AsynchDNS` without c-ares (`ManagedCurlVersion`), so lib2405 expects `2 + 1`. The engine should count one more descriptor while a started transfer runs, matching the threaded resolver's (and leave the empty-multi and added-not-run counts at 0).
 - So the fix needs `Curl.Engine.UnitLibrary` and `Curl.Engine.UnitTests` (added to `touches`). BL-2747, in Doing on `origin/work/dark-factory`, touches both, so the task goes back to Backlog until it is Done. No code was changed in this claim. BL-2750 (case 2407) holds a stashed engine fix for `PollWaitSocket` on engine-numbered sockets and depends on this task; check it does not collide.
+- 2026-10-18 (lane 1, second claim): the engine fix is written and left uncommitted for the shift to stash, all in `ManagedMultiTransfer` and `ManagedMultiTransferTests*`: (1) `MoveOn` never queues the done message of a transfer started in the same call (`StartWhenAllowed` replaces `IsStartedOrStarting`); (2) `GetWaitSockets` appends `ResolverWakeupSocket` (0x3FFFFFFF) while any started transfer runs; (3) `PollWaitSocket` answers `None` for any socket at or above `ResolverWakeupSocket` without asking `IWaitSocketPoller` (the same fix BL-2750's stash holds, so drop BL-2750's copy when it is next claimed). Three engine tests pinned the old same-call-done behaviour and were updated; two new tests (`PerformAsync_TransferFinishedAsItStarts_IsStillRunningAfterThatCallAndDoneAfterTheNext`, `PollAsync_EngineNumberedExtraSockets_ReportNoEventWithoutAskingThePoller`). With it, `Curl.Engine.UnitTests` is green (2042) and `CURL_UPSTREAM_CASE=2405` passes; `2405` is added to `PassingUpstreamCases.txt` in the stash. Both platforms' `ManagedCurlVersion` list `AsynchDNS` with no c-ares, so lib2405 expects 2 + 1 everywhere.
+- What is left: the fast suite then fails only `Curl.Console.UnitTests`' `CurlCommandRunnerParallelProgressMeterTests.RunAsync_Parallel_WritesTheCombinedMeterInPlaceOfEachTransfersOwn` (both rows): the second status line shows `Live 2` where curl shows 1, because `ParallelTransferMulti.PerformAsync` (Curl.Console) no longer sees the first transfer's `CURLMSG_DONE` from the perform that added it and the loop's next turn has not run when the second transfer's bytes are drawn. Fix it in `Curl.Console/ParallelTransferMulti.cs` (e.g. perform again, or take messages, before the meter draws), not by changing the pinned meter text. Added `Curl.Console` and `Curl.Console.UnitTests` to `touches` for that (no task in Doing on `origin/work/dark-factory` names them). Requeued at $2.7 of the cap rather than risk the deadline.
 
 ## Log
 
@@ -39,3 +41,4 @@ Found by BL-2661, which listed the `wakeup` feature (ADR-0690): 2405 now runs an
 - 2026-10-18: Backlog -> Doing. Criteria at claim: 29c71c3e ab396f86 3d836d5e.
 - 2026-10-18: Doing -> Backlog. Needs Curl.Engine.UnitLibrary and Curl.Engine.UnitTests (ManagedMultiTransfer perform and waitfds), which BL-2747 in Doing touches
 - 2026-10-18: Backlog -> Doing. Criteria at claim: 29c71c3e ab396f86 3d836d5e.
+- 2026-10-18: Doing -> Backlog. Engine fix done and stashed; left: Curl.Console ParallelTransferMulti so the -Z combined meter's Live count stays right (CurlCommandRunnerParallelProgressMeterTests), needs Curl.Console
