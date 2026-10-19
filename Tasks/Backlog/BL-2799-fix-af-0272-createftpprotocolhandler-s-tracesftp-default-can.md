@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Engine.UnitLibrary]
+touches: [Curl.Engine.UnitTests/EngineCompositionFtpTraceTests.cs]
 requirement: none
 created: 2026-10-19
 completed:
@@ -46,7 +46,10 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Notes
 
+- 2026-10-19 (lane 3): No production change is needed. The mutant survives only because no test calls `CreateFtpProtocolHandler` without `tracesFtp` and then checks `TracesStateMachine`. The fix is one test in `Curl.Engine.UnitTests/EngineCompositionFtpTraceTests.cs` that builds the handler with only the four required arguments, as `ManagedCurlEngine`'s CURLOPT_CONNECT_ONLY path does, and asserts `TracesStateMachine` is false. `touches` was narrowed from `Curl.Engine.UnitLibrary`, which stays unchanged, to that one test file. BL-2804, in Doing, holds the whole of `Curl.Engine.UnitTests`, so this task went back to Backlog until the two no longer overlap.
+
 ## Log
 
 - 2026-10-19: Created.
 - 2026-10-19: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-19: Doing -> Backlog. touches Curl.Engine.UnitTests/EngineCompositionFtpTraceTests.cs, inside Curl.Engine.UnitTests, which BL-2804 (Doing) holds whole
