@@ -375,6 +375,59 @@ public sealed class ManagedCurlEngineTests
         Assert.AreEqual(200, easy.Info.ResponseCode);
     }
 
+    /// <summary>
+    /// Upstream case 3101 (BL-2714): under <c>CURLAUTH_ANY</c> with credentials and redirects limited to <c>https</c>, a
+    /// 401 offering an unknown scheme and Basic is answered with <c>Authorization: Basic</c>; an authentication retry is
+    /// not a redirect, so the redirect-protocol list does not stop it.
+    /// </summary>
+    [TestMethod]
+    public async Task PerformAsync_AnyAuthAndHttpsOnlyRedirectProtocols_AnswersABasicChallengeWithBasic()
+    {
+        ScriptedConnector server = new([
+            "HTTP/1.1 401 Authorization Required\r\nWWW-Authenticate: Blackmagic realm=\"x\"\r\nWWW-Authenticate: Basic realm=\"x\"\r\nContent-Length: 0\r\n\r\n"u8.ToArray(),
+            "HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n"u8.ToArray(),
+        ]);
+        EngineDialing dialing = new(new ScriptedTcpDialer(server), new LoopbackDnsResolver(), new RecordingDatagramConnector(Curl.Protocol.Abstractions.CurlExitCode.CouldntConnect, "no udp"), UsesHandBuiltNtlm: true);
+        await using ManagedCurlEngine engine = new(TimeProvider.System, null, dialing: dialing);
+        await using IEasyTransfer easy = engine.CreateEasy();
+        easy.Options = new EasyOptions
+        {
+            Network = new EasyNetworkOptions { Url = "http://127.0.0.1:9000/3101", RedirectProtocols = "https" },
+            Authentication = new Api.Options.Authentication.EasyAuthenticationOptions { UserName = "user", Password = "password", HttpAuthentication = Api.Options.Authentication.HttpAuthenticationMethods.Any },
+        };
+
+        await easy.PerformAsync(CancellationToken.None);
+
+        string request = System.Text.Encoding.ASCII.GetString(server.Written);
+        Assert.Contains("Authorization: Basic dXNlcjpwYXNzd29yZA==\r\n", request);
+        Assert.AreEqual(200, easy.Info.ResponseCode);
+    }
+
+    /// <summary>CURLOPT_USERNAME and CURLOPT_PASSWORD each replace their half of CURLOPT_USERPWD, and either alone is a credential.</summary>
+    [TestMethod]
+    [DataRow(null, "u", null, "u:")]
+    [DataRow(null, null, "p", ":p")]
+    [DataRow("a:b", "u", null, "u:b")]
+    [DataRow("a:b", null, "p", "a:p")]
+    [DataRow("a", null, null, "a:")]
+    public async Task PerformAsync_UserNameAndPasswordOptions_ReplaceTheirHalfOfUserPassword(string? userPassword, string? userName, string? password, string expected)
+    {
+        ScriptedConnector server = new(["HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n"u8.ToArray()]);
+        EngineDialing dialing = new(new ScriptedTcpDialer(server), new LoopbackDnsResolver(), new RecordingDatagramConnector(Curl.Protocol.Abstractions.CurlExitCode.CouldntConnect, "no udp"), UsesHandBuiltNtlm: true);
+        await using ManagedCurlEngine engine = new(TimeProvider.System, null, dialing: dialing);
+        await using IEasyTransfer easy = engine.CreateEasy();
+        easy.Options = new EasyOptions
+        {
+            Network = new EasyNetworkOptions { Url = "http://127.0.0.1:9000/creds" },
+            Authentication = new Api.Options.Authentication.EasyAuthenticationOptions { UserPassword = userPassword, UserName = userName, Password = password },
+        };
+
+        await easy.PerformAsync(CancellationToken.None);
+
+        string request = System.Text.Encoding.ASCII.GetString(server.Written);
+        Assert.Contains("Authorization: Basic " + Convert.ToBase64String(System.Text.Encoding.ASCII.GetBytes(expected)) + "\r\n", request);
+    }
+
     /// <summary>Upstream case 1985: a Digest challenge kept from one host is not answered to another.</summary>
     [TestMethod]
     public async Task PerformAsync_EarlierTransferGotDigestChallengeFromAnotherPort_NextDigestTransferSendsNoAuthorizationFirst()

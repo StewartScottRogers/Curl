@@ -227,7 +227,7 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
             MaxFileSize = MaxFileSizeOf(transfer),
             Upload = UploadOf(url, upload),
             PostData = settings.PostData,
-            Credentials = lookedUpCredentials ?? CredentialsOf(authentication.UserPassword) ?? AuthorizationIdentityNtlmCredentialsOf(authentication, url),
+            Credentials = lookedUpCredentials ?? CredentialsOf(authentication) ?? AuthorizationIdentityNtlmCredentialsOf(authentication, url),
             TelnetOptions = protocol.Telnet.TelnetOptions,
             TftpBlockSize = BlockSizeOf(protocol.Tftp),
             TftpNoOptions = protocol.Tftp.NoOptions,
@@ -278,23 +278,31 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
     }
 
     /// <summary>
-    /// Gets the <c>-u</c> credentials: <paramref name="userPassword" /> split at its first colon into the user name
-    /// and the password (empty when there is no colon), as the curl tool splits <c>-u</c>; <see langword="null" />
-    /// without it.
+    /// Gets the <c>-u</c> credentials: <see cref="EasyAuthenticationOptions.UserPassword" /> split at its first colon
+    /// into the user name and the password (empty when there is no colon), as the curl tool splits <c>-u</c>, with
+    /// <see cref="EasyAuthenticationOptions.UserName" /> and <see cref="EasyAuthenticationOptions.Password" />
+    /// (<c>CURLOPT_USERNAME</c>, <c>CURLOPT_PASSWORD</c>) each replacing its half; <see langword="null" /> with none
+    /// of the three.
     /// </summary>
-    /// <param name="userPassword">The option group's <see cref="EasyAuthenticationOptions.UserPassword" />.</param>
+    /// <param name="authentication">The option group's authentication options.</param>
     /// <returns>The credentials the context carries when no lookup chose others.</returns>
-    private static NetworkCredential? CredentialsOf(string? userPassword)
+    private static NetworkCredential? CredentialsOf(EasyAuthenticationOptions authentication)
     {
-        if (userPassword is null)
+        if ((authentication.UserPassword ?? authentication.UserName ?? authentication.Password) is null)
         {
             return null;
         }
 
+        (string user, string password) = SplitAtFirstColon(authentication.UserPassword ?? string.Empty);
+        return new NetworkCredential(FirstGiven(authentication.UserName, user), FirstGiven(authentication.Password, password));
+    }
+
+    private static string FirstGiven(string? given, string fallback) => given ?? fallback;
+
+    private static (string User, string Password) SplitAtFirstColon(string userPassword)
+    {
         int colon = userPassword.IndexOf(':', StringComparison.Ordinal);
-        return colon < 0
-            ? new NetworkCredential(userPassword, string.Empty)
-            : new NetworkCredential(userPassword[..colon], userPassword[(colon + 1)..]);
+        return colon < 0 ? (userPassword, string.Empty) : (userPassword[..colon], userPassword[(colon + 1)..]);
     }
 
     /// <summary>

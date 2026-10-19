@@ -498,3 +498,7 @@ A perform from the options outside any multi handle and with no `ToolSettings` s
 ## curl_easy_recv and curl_easy_send inside a callback (BL-2654)
 
 `ManagedEasyTransfer.PerformAsync` sets `ConnectOnlyConnection.PerformRunning` for the length of the perform, and a `ReceiveAsync` or `SendAsync` made meanwhile answers `CurlCode.RecursiveApiCall` (93) before any other check, as libcurl 8.22.0's `Curl_is_in_callback` does (upstream test1555). A perform running is the engine's stand-in for "a callback is running": the library calls are synchronous, so a call during a perform comes from one of its callbacks. Its tests are in `ConnectOnlyConnectionTests`.
+
+## CURLOPT_USERNAME and CURLOPT_PASSWORD on the context (BL-2714)
+
+`TransferContextFactory.CredentialsOf` gives the context's credentials from `EasyAuthenticationOptions.UserPassword` split at its first colon, with `UserName` and `Password` each replacing their half, and from either of them alone, so a handle set with `CURLOPT_USERNAME`/`CURLOPT_PASSWORD` answers a 401 as one set with `CURLOPT_USERPWD` does (upstream test3101). Its tests are `ManagedCurlEngineTests`.
