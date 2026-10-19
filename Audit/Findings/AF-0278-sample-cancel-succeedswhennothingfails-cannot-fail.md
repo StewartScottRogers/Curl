@@ -3,8 +3,8 @@ id: AF-0278
 title: Sample_Cancel_SucceedsWhenNothingFails cannot fail: the sample it runs catches every cancellation and CurlException
 auditor: quality
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Api.UnitTests/Readme/ReadmeTests.cs:Sample_Cancel_SucceedsWhenNothingFails:swallowed-failure
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Curl.Api.UnitTests/Readme/ReadmeSamples.cs -Pattern 'catch \
 ## Log
 
 - 2026-10-18: filed proposed.
+- 2026-10-19: proposed -> accepted.
