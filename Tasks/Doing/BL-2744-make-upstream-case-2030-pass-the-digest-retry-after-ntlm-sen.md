@@ -35,3 +35,4 @@ Found by BL-2689, which put 2025, 2029, 2031 and 2032 on the ratchet once BL-263
 - 2026-10-18: Created.
 - 2026-10-18: Backlog -> Doing. Criteria at claim: b96ecbf8 fd6bd9d4 3d836d5e.
 - 2026-10-18: Doing -> Backlog. Waits on BL-2747: the handle must keep the last 401's Digest challenge for its next transfer
+- 2026-10-18: Backlog -> Doing. Criteria at claim: b96ecbf8 fd6bd9d4 3d836d5e.
