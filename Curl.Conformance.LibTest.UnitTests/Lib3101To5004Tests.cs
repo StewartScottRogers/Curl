@@ -5,6 +5,7 @@ using Curl.Api.Info;
 using Curl.Api.Options;
 using Curl.Api.Options.Authentication;
 using Libcurl.Global;
+using Libcurl.Misc.ErrorText;
 
 namespace Curl.Conformance.LibTest.UnitTests;
 
@@ -257,7 +258,7 @@ public sealed class Lib3101To5004Tests
 
         Assert.AreEqual((int)CurlCode.RecvError, result.ExitCode);
         Assert.AreEqual(((Lib3207.ThreadCount - 1) * Lib3207.TransfersPerThread), run.OutputText.Length);
-        StringAssert.StartsWith(run.Error.ToString(), "curl_easy_perform() failed: ");
+        Assert.AreEqual($"curl_easy_perform() failed: {CurlErrorText.Easy(CurlCode.RecvError)}\n", run.Error.ToString());
         Assert.IsNull(engine.LastShare!.Lock);
     }
 

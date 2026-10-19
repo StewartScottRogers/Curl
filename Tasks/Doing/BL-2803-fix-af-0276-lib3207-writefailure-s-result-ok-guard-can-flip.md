@@ -41,10 +41,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Cause: `Lib3207_WritesEachThreadsBodiesAndEndsWithAFailedThreadsCode` only checked that stderr starts with `curl_easy_perform() failed: `, which the flipped guard still satisfies (it writes the line for every one of the 127 successful transfers). The test now pins stderr exactly: one line, `curl_easy_perform() failed: ` plus `CurlErrorText.Easy(CurlCode.RecvError)`. No production change.
+- The test lives in `Curl.Conformance.LibTest.UnitTests`, the touched library's own test project.
+- A lane may not run `Audit/Tools/Invoke-MutationTest.ps1` (the audit guard refuses it), so the mutant was applied by hand (`==` -> `!=` at `Lib3207.cs:137`): the test failed on it, then passed again once reverted. The re-audit runs the finding's own reproduction.
+
 
 ## Log
 
