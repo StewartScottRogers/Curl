@@ -137,6 +137,21 @@ public sealed partial class ManagedEasyTransferTests
     }
 
     [TestMethod]
+    public async Task PerformAsync_WebSocketServerClosesBeforeTheHeadEnds_AnswersOkAndLeavesNoWebSocket()
+    {
+        (ManagedEasyTransfer easy, _, QueuedConnection peer) = CreateWebSocketEasy(Ascii("HTTP/1.1 101 Switching\nUpgrade: websocket\n"), []);
+        await using IEasyTransfer handle = easy;
+        easy.Options = WebSocketConnectOnlyTo("ws://h/2304");
+
+        CurlCode code = await easy.PerformAsync(CancellationToken.None);
+        CurlWebSocketSendResult sent = await easy.WebSocket.SendAsync(Ascii("foobar"), 0, CurlWebSocketFlags.Ping, CancellationToken.None);
+
+        Assert.AreEqual(CurlCode.Ok, code);
+        Assert.AreEqual(CurlCode.BadFunctionArgument, sent.Result);
+        Assert.IsTrue(peer.IsDisposed);
+    }
+
+    [TestMethod]
     public async Task PerformAsync_WebSocketConnectOnlyForAnHttpUrl_OnlyConnects()
     {
         (ManagedEasyTransfer easy, TargetRecordingConnector connector, QueuedConnection peer) = CreateWebSocketEasy();
