@@ -31,3 +31,4 @@ Found by BL-2552, which ported lib3101 (`Curl.Conformance.LibTest.UnitLibrary/Li
 ## Log
 
 - 2026-10-17: Created.
+- 2026-10-19: Backlog -> Doing. Criteria at claim: 5efe25a4 f3b42217 0f653e7b.
