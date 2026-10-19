@@ -187,11 +187,12 @@ public sealed class CurlCommandRunnerTests
         Assert.IsEmpty(files.ReadPaths);
     }
 
-    // Each line is curl 8.21.0's for the same URL, measured with /mingw64/bin/curl -gsS on
+    // Each line is curl 8.21.0's (8.22.0's for "No host present", BL-2746) for the same URL, measured with /mingw64/bin/curl -gsS on
     // 2026-09-27 (BL-324).
     [TestMethod]
     [DataRow("http:////h/", "Unsupported number of slashes following scheme")]
-    [DataRow("http://u@/", "No host part in the URL")]
+    [DataRow("http://u@/", "No host present")]
+    [DataRow("http://:80/", "No host present")]
     [DataRow("http://h:99999/", "Port number was not a decimal number between 0 and 65535")]
     [DataRow("http://[::g]/", "Bad IPv6 address")]
     [DataRow("http://a!b/", "Bad hostname")]

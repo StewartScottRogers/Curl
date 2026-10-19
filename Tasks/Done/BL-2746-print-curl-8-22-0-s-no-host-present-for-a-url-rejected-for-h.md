@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Abstractions.UnitLibrary, Curl.Protocol.Abstractions.UnitTests, Curl.Console.UnitTests, Curl.Core.UnitLibrary, Curl.Core.UnitTests]
 requirement: none
 created: 2026-10-18
-completed:
+completed: 2026-10-18
 ---
 # BL-2746 — Print curl 8.22.0's 'No host present' for a URL rejected for having no host
 
@@ -22,13 +22,16 @@ Found by BL-2734. Real curl 8.22.0 (`curl.exe -sS "http://:80/"`, the Schannel m
 
 ## Acceptance criteria
 
-- [ ] `CurlUrlRejectionMessages.ToCurlMessage(CurlUrlRejection.NoHost)` is `No host present`, pinned in `CurlUrlRejectionTests`.
-- [ ] `curl -sS http://:80/` through `Curl.Console` prints `curl: (3) URL rejected: No host present` and exits 3, pinned in `Curl.Console.UnitTests`.
-- [ ] `dotnet build` is clean, the fast tests pass, and `Measure-CodeQuality.ps1` reports 0 failing members for each changed library.
+- [x] `CurlUrlRejectionMessages.ToCurlMessage(CurlUrlRejection.NoHost)` is `No host present`, pinned in `CurlUrlRejectionTests`.
+- [x] `curl -sS http://:80/` through `Curl.Console` prints `curl: (3) URL rejected: No host present` and exits 3, pinned in `Curl.Console.UnitTests`.
+- [x] `dotnet build` is clean, the fast tests pass, and `Measure-CodeQuality.ps1` reports 0 failing members for each changed library.
 
 ## Notes
+
+- Measured 2026-10-18: `curl.exe -x http://:80` also prints `No host present`, so `ProxyUrlParser.NoHostReason` changed too. Only a string constant changed (no logic), so no Measure-CodeQuality run. Added a `http://:80/` row to `CurlCommandRunnerTests`.
 
 ## Log
 
 - 2026-10-18: Created.
 - 2026-10-18: Backlog -> Doing. Criteria at claim: b2c3e440 f6c38c81 d6c1964a.
+- 2026-10-18: Doing -> Done. URL with no host prints 'No host present' (curl 8.22.0), URL and proxy

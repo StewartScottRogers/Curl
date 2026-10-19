@@ -269,7 +269,7 @@ public sealed class CurlUrlRejectionTests
     [TestMethod]
     [DataRow(CurlUrlRejection.MalformedInput, "Malformed input to a URL function")]
     [DataRow(CurlUrlRejection.BadSlashes, "Unsupported number of slashes following scheme")]
-    [DataRow(CurlUrlRejection.NoHost, "No host part in the URL")]
+    [DataRow(CurlUrlRejection.NoHost, "No host present")]
     [DataRow(CurlUrlRejection.BadPortNumber, "Port number was not a decimal number between 0 and 65535")]
     [DataRow(CurlUrlRejection.BadIPv6, "Bad IPv6 address")]
     [DataRow(CurlUrlRejection.BadHostname, "Bad hostname")]

@@ -17,7 +17,7 @@ public static class CurlUrlRejectionMessages
     {
         CurlUrlRejection.MalformedInput => "Malformed input to a URL function",
         CurlUrlRejection.BadSlashes => "Unsupported number of slashes following scheme",
-        CurlUrlRejection.NoHost => "No host part in the URL",
+        CurlUrlRejection.NoHost => "No host present",
         CurlUrlRejection.BadPortNumber => "Port number was not a decimal number between 0 and 65535",
         CurlUrlRejection.BadIPv6 => "Bad IPv6 address",
         CurlUrlRejection.BadHostname => "Bad hostname",

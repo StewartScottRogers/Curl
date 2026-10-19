@@ -51,7 +51,7 @@ public static class ProxyUrlParser
     public const string BadPortReason = "Port number was not a decimal number between 0 and 65535";
 
     /// <summary>The reason curl gives for an empty host.</summary>
-    public const string NoHostReason = "No host part in the URL";
+    public const string NoHostReason = "No host present";
 
     /// <summary>The reason curl gives for a host holding a character no host name may hold.</summary>
     public const string BadHostnameReason = "Bad hostname";

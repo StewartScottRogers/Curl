@@ -164,7 +164,7 @@ public sealed class CurlCommandRunnerAdversarialCommandLineTests
         AssertTransferRefused(
             result,
             CurlExitCode.UrlMalformat,
-            "curl: (3) URL rejected: No host part in the URL" + Environment.NewLine);
+            "curl: (3) URL rejected: No host present" + Environment.NewLine);
     }
 
     [TestMethod]
