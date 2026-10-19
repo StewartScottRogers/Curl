@@ -1,6 +1,7 @@
 using Curl.Api.Codes;
 using Curl.Api.EngineContracts.ConnectOnly;
 using Curl.Api.EngineContracts.Headers;
+using Curl.Api.EngineContracts.Tls;
 using Curl.Api.EngineContracts.WebSocket;
 using Curl.Api.Info;
 using Curl.Api.Options;
@@ -61,4 +62,29 @@ public interface IEasyTransfer : IAsyncDisposable
     /// <param name="cancellationToken">Stops the upkeep.</param>
     /// <returns>The upkeep's result.</returns>
     ValueTask<CurlCode> UpkeepAsync(CancellationToken cancellationToken);
+
+    /// <summary>
+    /// <c>curl_easy_ssls_import</c>: add one packed TLS session to the session cache the handle uses, its share
+    /// handle's while that shares <c>CURL_LOCK_DATA_SSL_SESSION</c>, else its own.
+    /// </summary>
+    /// <param name="sessionKey">The peer key to hold the session under, or <see langword="null" /> to use <paramref name="saltAndHmac" />.</param>
+    /// <param name="saltAndHmac">The 64-byte salt and hmac of the peer, read when <paramref name="sessionKey" /> is <see langword="null" />.</param>
+    /// <param name="packedSession">The session as <see cref="ExportTlsSessions" /> handed it out.</param>
+    /// <returns>
+    /// The import's result: <see cref="CurlCode.ReadError" /> for a packet that does not unpack,
+    /// <see cref="CurlCode.BadFunctionArgument" /> for neither a key nor a 64-byte salt and hmac, and
+    /// <see cref="CurlCode.NotBuiltIn" /> where the build has no <c>SSLS-EXPORT</c>, which is all this default answers.
+    /// </returns>
+    CurlCode ImportTlsSession(string? sessionKey, byte[]? saltAndHmac, byte[] packedSession) => CurlCode.NotBuiltIn;
+
+    /// <summary>
+    /// <c>curl_easy_ssls_export</c>: hand every session the handle's session cache holds (its share handle's while that
+    /// shares <c>CURL_LOCK_DATA_SSL_SESSION</c>, else its own) to <paramref name="export" />, one call each.
+    /// </summary>
+    /// <param name="export">The <c>curl_ssls_export_cb</c>; an answer other than <see cref="CurlCode.Ok" /> stops the export with it.</param>
+    /// <returns>
+    /// <see cref="CurlCode.Ok" />, the callback's first answer other than it, or <see cref="CurlCode.NotBuiltIn" />
+    /// where the build has no <c>SSLS-EXPORT</c>, which is all this default answers.
+    /// </returns>
+    CurlCode ExportTlsSessions(Func<ExportedTlsSession, CurlCode> export) => CurlCode.NotBuiltIn;
 }
