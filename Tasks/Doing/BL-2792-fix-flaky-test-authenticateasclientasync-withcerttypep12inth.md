@@ -31,3 +31,4 @@ Failed once on Windows in BL-2669's fast run on 2026-10-19 (lane 2, with other l
 ## Log
 
 - 2026-10-19: Created.
+- 2026-10-19: Backlog -> Doing. Criteria at claim: fbecace0.
