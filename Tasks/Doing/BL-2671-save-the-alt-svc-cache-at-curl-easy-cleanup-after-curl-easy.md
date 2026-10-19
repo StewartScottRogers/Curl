@@ -33,3 +33,4 @@ Found by BL-2545 (lib1908 port). lib1908 performs with `CURLOPT_ALTSVC` set to `
 ## Log
 
 - 2026-10-17: Created.
+- 2026-10-18: Backlog -> Doing. Criteria at claim: bf0c5f01 05ce0a5e 4272a6b9.
