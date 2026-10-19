@@ -71,3 +71,4 @@ platform-neutral before holding it (Schannel on Windows, OpenSSL elsewhere; revo
 - 2026-10-18: Created.
 - 2026-10-18: Backlog -> Doing. Criteria at claim: 262ba952 c59fcab3 3d836d5e.
 - 2026-10-18: Doing -> Backlog. Needs Curl.Networking.UnitLibrary/UnitTests (held by BL-2730) and Curl.Engine.UnitLibrary/UnitTests (held by BL-2735): CURLOPT_CAINFO_BLOB never reaches TlsClientOptions, so verification fails with 60
+- 2026-10-19: Backlog -> Doing. Criteria at claim: 262ba952 c59fcab3 3d836d5e.
