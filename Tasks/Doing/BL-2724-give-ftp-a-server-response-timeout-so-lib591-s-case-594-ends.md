@@ -35,3 +35,4 @@ Measured with real curl 8.22.0 (Schannel, the tool, easy interface, default 60 s
 ## Log
 
 - 2026-10-18: Created.
+- 2026-10-19: Backlog -> Doing. Criteria at claim: e99e5beb e1300242 4272a6b9.
