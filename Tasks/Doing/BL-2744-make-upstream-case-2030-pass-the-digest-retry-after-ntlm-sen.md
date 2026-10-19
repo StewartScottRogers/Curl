@@ -45,3 +45,4 @@ Found by BL-2689, which put 2025, 2029, 2031 and 2032 on the ratchet once BL-263
 - 2026-10-18: Doing -> Backlog. Needs Curl.Engine.UnitLibrary/ManagedEasyTransfer.cs, which BL-2694 (in Doing) touches: the handle must keep whether Digest stayed marked available after its last 401
 - 2026-10-19: Backlog -> Doing. Criteria at claim: b96ecbf8 fd6bd9d4 3d836d5e.
 - 2026-10-19: Doing -> Backlog. Waits on BL-2820: the easy handle must carry whether Digest stayed marked available into the next transfer
+- 2026-10-19: Backlog -> Doing. Criteria at claim: b96ecbf8 fd6bd9d4 3d836d5e.
