@@ -73,6 +73,24 @@ public sealed partial class ManagedMultiTransferTests
     }
 
     [TestMethod]
+    public async Task SocketActionAsync_TimerFiresWithAnUnchangedZeroTimeout_ReportsZeroAgain()
+    {
+        List<string> calls = [];
+        TimerManualTimeProvider time = new();
+        await using ManagedMultiTransfer multi = NewMulti(time);
+        multi.Options = RecordingOptions(calls);
+        multi.Add(WithTimeout(TimeSpan.FromMilliseconds(4)));
+        await multi.SocketActionAsync(CurlMultiSockets.Timeout, CurlSocketSelect.None, CancellationToken.None);
+        time.Advance(4);
+        calls.Clear();
+
+        await multi.SocketActionAsync(CurlMultiSockets.Timeout, CurlSocketSelect.None, CancellationToken.None);
+        await multi.SocketActionAsync(CurlMultiSockets.Timeout, CurlSocketSelect.None, CancellationToken.None);
+
+        CollectionAssert.AreEqual(new[] { "timer 0", "timer 0" }, calls);
+    }
+
+    [TestMethod]
     public async Task SocketActionAsync_TransferTimeoutSoonerThanTheCheckInterval_IsTheTimer()
     {
         List<string> calls = [];
