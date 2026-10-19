@@ -3,8 +3,8 @@ id: AF-0281
 title: StartAsync_StatusAndShortPacketsBeforeTheVersion_SkipsThemAsMeasured has only a log-only diagnostics.Assert
 auditor: quality
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Protocol.Ssh.UnitTests/Sftp/SftpSessionTests.cs:StartAsync_StatusAndShortPacketsBeforeTheVersion_SkipsThemAsMeasured:no-assertion
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Curl.Protocol.Ssh.UnitTests/Sftp/SftpSessionTests.cs -Patter
 ## Log
 
 - 2026-10-18: filed proposed.
+- 2026-10-19: proposed -> accepted.
