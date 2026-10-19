@@ -32,6 +32,9 @@ internal sealed class ManagedShareHandle(TimeProvider timeProvider) : IShareHand
     /// <summary>The <c>host:port</c> names attached performs have resolved while DNS was shared, as libcurl's shared DNS cache holds them.</summary>
     private readonly HashSet<string> resolvedHosts = new(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>The <c>host:port</c> names attached performs have opened a connection for while connections were shared, as libcurl's shared connection pool holds them.</summary>
+    private readonly HashSet<string> connectedHosts = new(StringComparer.OrdinalIgnoreCase);
+
     private ShareLockCallback? lockCallback;
 
     private ShareUnlockCallback? unlockCallback;
@@ -92,7 +95,7 @@ internal sealed class ManagedShareHandle(TimeProvider timeProvider) : IShareHand
         {
             code = cleanedUp ? CurlShareCode.Invalid
                 : attachedTransfers > 0 ? CurlShareCode.InUse
-                : UnderShareLock(null, () => CurlShareCode.Ok);
+                : LockForCleanup();
             cleanedUp |= code == CurlShareCode.Ok;
         }
 
@@ -196,7 +199,7 @@ internal sealed class ManagedShareHandle(TimeProvider timeProvider) : IShareHand
             }
 
             _ = TakeShared(transfer, CurlLockData.Psl, own: true, engine: false);
-            ConnectionCache connections = TakeShared(transfer, CurlLockData.Connect, Connections, engine.Connections);
+            ConnectionCache connections = TakeConnections(transfer, hostKey, engine.Connections);
             TlsSessionCache tlsSessions = TakeShared(transfer, CurlLockData.SslSession, TlsSessions, engine.TlsSessions);
             CookieStore cookies = TakeCookies(transfer, loadsCookieFiles, engine.Cookies);
             return new ManagedEngineSharedState(
@@ -220,6 +223,56 @@ internal sealed class ManagedShareHandle(TimeProvider timeProvider) : IShareHand
         {
             _ = Locked(transfer, CurlLockData.Dns, () => true);
         }
+    }
+
+    /// <summary>
+    /// The locks <see cref="Cleanup" /> takes, as curl 8.22.0's <c>curl_share_cleanup</c> does: <see cref="CurlLockData.Share" />,
+    /// then <see cref="CurlLockData.Connect" /> while connections are shared, as the pool is destroyed (upstream test1554).
+    /// </summary>
+    /// <returns><see cref="CurlShareCode.Ok" />.</returns>
+    private CurlShareCode LockForCleanup()
+    {
+        CurlShareCode code = UnderShareLock(null, () => CurlShareCode.Ok);
+        return sharedKinds.Contains(CurlLockData.Connect) ? Locked(null, CurlLockData.Connect, () => code) : code;
+    }
+
+    /// <summary>
+    /// Calls the <see cref="CurlLockData.Connect" /> lock and unlock callbacks once while this handle shares
+    /// connections, as curl 8.22.0 returns the connection to the shared pool once a perform is done (upstream test1554).
+    /// </summary>
+    /// <param name="transfer">The transfer whose perform is done.</param>
+    internal void LockConnectionsAtDone(IEasyTransfer transfer)
+    {
+        if (Shares(CurlLockData.Connect))
+        {
+            _ = Locked(transfer, CurlLockData.Connect, () => true);
+        }
+    }
+
+    /// <summary>
+    /// The connection cache a perform uses: this handle's, after the connect lock three times while it shares
+    /// connections (the pool checks its limits, looks for a connection to reuse and counts it), and a fourth when
+    /// <paramref name="hostKey" /> is one this handle has not connected to yet, which adds the new connection (upstream
+    /// test1554); else <paramref name="engine" />.
+    /// </summary>
+    /// <param name="transfer">The transfer taking it.</param>
+    /// <param name="hostKey">The <c>host:port</c> the transfer connects to, or <see langword="null" />.</param>
+    /// <param name="engine">The engine's connection cache.</param>
+    /// <returns>The connection cache the transfer uses.</returns>
+    private ConnectionCache TakeConnections(IEasyTransfer transfer, string? hostKey, ConnectionCache engine)
+    {
+        if (!sharedKinds.Contains(CurlLockData.Connect))
+        {
+            return engine;
+        }
+
+        int locks = hostKey is not null && connectedHosts.Add(hostKey) ? 4 : 3;
+        for (int time = 0; time < locks; time++)
+        {
+            _ = Locked(transfer, CurlLockData.Connect, () => time);
+        }
+
+        return Connections;
     }
 
     /// <summary>
@@ -291,6 +344,19 @@ internal sealed class ManagedShareHandle(TimeProvider timeProvider) : IShareHand
     /// <returns>The store to keep.</returns>
     internal ICookieStore? CookieStoreFor(ICookieStore? store, IEasyTransfer transfer) =>
         store is not null && Shares(CurlLockData.Cookie) ? new LockedCookieStore(store, this, transfer) : store;
+
+    /// <summary>
+    /// Calls <paramref name="use" /> on this handle's <see cref="TlsSessions" /> under the <see cref="CurlLockData.SslSession" />
+    /// lock while it shares TLS sessions, else on <paramref name="engine" /> with no lock, as curl 8.22.0's
+    /// <c>Curl_ssl_scache_lock</c> picks the cache for <c>curl_easy_ssls_import</c> and <c>curl_easy_ssls_export</c>.
+    /// </summary>
+    /// <typeparam name="T">What the use answers.</typeparam>
+    /// <param name="transfer">The transfer the lock callbacks are told of.</param>
+    /// <param name="engine">The transfer's engine's cache.</param>
+    /// <param name="use">The use.</param>
+    /// <returns>What <paramref name="use" /> answered.</returns>
+    internal T WithTlsSessions<T>(IEasyTransfer transfer, TlsSessionCache engine, Func<TlsSessionCache, T> use) =>
+        Shares(CurlLockData.SslSession) ? Locked(transfer, CurlLockData.SslSession, () => use(TlsSessions)) : use(engine);
 
     /// <summary>Calls <paramref name="access" /> between the lock and unlock callbacks for <paramref name="data" />, taken for <see cref="CurlLockAccess.Single" /> use.</summary>
     /// <typeparam name="T">What the access answers.</typeparam>

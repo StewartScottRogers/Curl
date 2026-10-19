@@ -1088,6 +1088,53 @@ public sealed class MqttProtocolHandlerTests
         Assert.AreEqual(TransferResult.Success(0), result);
     }
 
+    /// <summary>Upstream test1916 (BL-2673): <c>CURLOPT_POSTFIELDS</c> of nothing publishes an empty payload.</summary>
+    [TestMethod]
+    public async Task ExecuteAsync_EmptyPostData_PublishesEmptyPayloadInsteadOfSubscribing()
+    {
+        ScriptedConnection connection = new(Connack);
+
+        TransferResult result = await RunAsync(
+            FakeConnector.For(connection),
+            new TransferContext { Url = CurlUrl.Parse("mqtt://h/%20"), Output = new RecordingStream(), PostData = ReadOnlyMemory<byte>.Empty });
+
+        CollectionAssert.AreEqual(
+            Concat(MeasuredConnect, Bytes("30 03 00 01", " ", string.Empty, string.Empty), Disconnect),
+            connection.Written);
+        Assert.AreEqual(TransferResult.Success(0), result);
+    }
+
+    /// <summary>Upstream test1917 (BL-2673): <c>CURLOPT_POST</c> with no fields is exit 43 once the CONNACK has come, with nothing sent after the CONNECT.</summary>
+    [TestMethod]
+    public async Task ExecuteAsync_PostWithoutData_IsBadFunctionArgumentAfterConnack()
+    {
+        ScriptedConnection connection = new(Connack);
+        TransferResult expected = new(CurlExitCode.BadFunctionArgument, 0, "A libcurl function was given a bad argument");
+
+        TransferResult result = await RunAsync(
+            FakeConnector.For(connection),
+            new TransferContext { Url = CurlUrl.Parse("mqtt://h/%20"), Output = new RecordingStream(), PostWithoutData = true });
+
+        Diagnostics.AssertResult(expected, result);
+        Assert.AreEqual(expected, result);
+        CollectionAssert.AreEqual(MeasuredConnect, connection.Written);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_PostWithoutDataButWithPostData_Publishes()
+    {
+        ScriptedConnection connection = new(Connack);
+
+        TransferResult result = await RunAsync(
+            FakeConnector.For(connection),
+            new TransferContext { Url = CurlUrl.Parse("mqtt://h/t"), Output = new RecordingStream(), PostData = Encoding.ASCII.GetBytes("x"), PostWithoutData = true });
+
+        CollectionAssert.AreEqual(
+            Concat(MeasuredConnect, Bytes("30 04 00 01", "t", string.Empty, "x"), Disconnect),
+            connection.Written);
+        Assert.AreEqual(TransferResult.Success(0), result);
+    }
+
     [TestMethod]
     public async Task ExecuteAsync_PublishConnackReturnCode5_IsWeirdServerReplyAndPublishesNothing()
     {

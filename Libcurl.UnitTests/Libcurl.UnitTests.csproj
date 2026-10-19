@@ -13,4 +13,12 @@
     <ProjectReference Include="..\Libcurl\Libcurl.csproj" />
   </ItemGroup>
 
+  <!-- The engine's scripted network fakes, so a handle's performs run through the real HTTP handler with no socket (BL-2745). -->
+  <ItemGroup>
+    <Compile Include="..\Curl.Engine.UnitTests\ScriptedConnector.cs" Link="Fakes\ScriptedConnector.cs" />
+    <Compile Include="..\Curl.Engine.UnitTests\LoopbackDnsResolver.cs" Link="Fakes\LoopbackDnsResolver.cs" />
+    <Compile Include="..\Curl.Engine.UnitTests\PassThroughTlsProvider.cs" Link="Fakes\PassThroughTlsProvider.cs" />
+    <Compile Include="..\Curl.Engine.UnitTests\RecordingDatagramConnector.cs" Link="Fakes\RecordingDatagramConnector.cs" />
+  </ItemGroup>
+
 </Project>

@@ -622,6 +622,27 @@ public sealed class RedirectFollowerTests
 
     [TestMethod]
     [DataRow(301)]
+    [DataRow(307)]
+    [DataRow(308)]
+    public async Task FollowAsync_FirstOnlyCustomMethod_SecondRequestHasNoCustomMethod(int status)
+    {
+        // CURLFOLLOW_FIRSTONLY with CURLOPT_CUSTOMREQUEST "IGLOO": IGLOO /a, then the plain method (upstream 1574, 1575).
+        ScriptedHandler handler = new(Redirect(status, Next), Ok(200, 0));
+
+        await Follow(
+            handler,
+            Context(Location() with { CustomMethod = "IGLOO", Body = PostBody }, postData: true),
+            new RedirectPolicy { SendsCustomMethodFirstOnly = true, KeepPostOn301 = true });
+
+        Diagnostics.Assert("first CustomMethod", "IGLOO", handler.Contexts[0].Http!.CustomMethod);
+        Assert.AreEqual("IGLOO", handler.Contexts[0].Http!.CustomMethod);
+        Diagnostics.Assert("second CustomMethod", null, handler.Contexts[1].Http!.CustomMethod);
+        Assert.IsNull(handler.Contexts[1].Http!.CustomMethod);
+        Assert.IsNotNull(handler.Contexts[1].Http!.Body);
+    }
+
+    [TestMethod]
+    [DataRow(301)]
     [DataRow(302)]
     [DataRow(303)]
     public async Task FollowAsync_FollowCustomPutWithMatchingPostOption_KeepsMethodAndBody(int status)
@@ -829,6 +850,24 @@ public sealed class RedirectFollowerTests
         Assert.AreEqual(307, result.Report!.ResponseCode);
         Diagnostics.Assert("result.Report.RedirectCount", 1, result.Report.RedirectCount);
         Assert.AreEqual(1, result.Report.RedirectCount);
+    }
+
+    [TestMethod]
+    public async Task FollowAsync_SeekableUploadThatCannotGoBack_EndsWithSendFailRewindAndTheStreamsMessage()
+    {
+        // A sized read-callback upload with no seek callback seeks but cannot go back: the next
+        // hop ends with exit 65 and its message, never an escaping IOException (upstream test3034, BL-2703).
+        ScriptedHandler handler = new(Redirect(307, Next), Ok(200, 0));
+        OneWayStream upload = new([1, 2, 3]);
+
+        TransferResult result = await Follow(handler, Context(Location(), uploadStream: upload));
+
+        Diagnostics.Assert("result.ExitCode", CurlExitCode.SendFailRewind, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.SendFailRewind, result.ExitCode);
+        Diagnostics.Assert("result.ErrorMessage", OneWayStream.Message, result.ErrorMessage);
+        Assert.AreEqual(OneWayStream.Message, result.ErrorMessage);
+        Diagnostics.Assert("handler.Contexts count", 1, handler.Contexts.Count());
+        Assert.HasCount(1, handler.Contexts);
     }
 
     [TestMethod]
@@ -2090,6 +2129,18 @@ public sealed class RedirectFollowerTests
     private sealed class NonSeekableStream(byte[] content) : MemoryStream(content)
     {
         public override bool CanSeek => false;
+    }
+
+    /// <summary>A seekable stream whose position cannot be set, as a sized read-callback upload with no seek callback.</summary>
+    private sealed class OneWayStream(byte[] content) : MemoryStream(content)
+    {
+        public const string Message = "necessary data rewind wasn't possible";
+
+        public override long Position
+        {
+            get => base.Position;
+            set => throw new IOException(Message);
+        }
     }
 
     /// <summary>

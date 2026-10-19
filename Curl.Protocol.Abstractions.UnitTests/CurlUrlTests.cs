@@ -402,6 +402,10 @@ public sealed class CurlUrlTests
     [TestMethod]
     [DataRow("HTTP://EXAMPLE.com", "http", "EXAMPLE.com")]
     [DataRow("http://H%41/", "http", "HA")]
+    [DataRow("https://127.0.0.%31.", "https", "127.0.0.1")]
+    [DataRow("https://127.0.0.0%78f%46.", "https", "127.0.0.255")]
+    [DataRow("https://%30%31%37%37%2e%31", "https", "127.0.0.1")]
+    [DataRow("https://[fe80%3A%3A20c%3A29ff%3Afe9c%3A409b]/", "https", "[fe80::20c:29ff:fe9c:409b]")]
     [DataRow("http://0x7f.1/", "http", "127.0.0.1")]
     [DataRow("http://0X7f.1/", "http", "127.0.0.1")]
     [DataRow("http://2130706433/", "http", "127.0.0.1")]
@@ -430,7 +434,6 @@ public sealed class CurlUrlTests
     [DataRow("http://h_x/", "http", "h_x")]
     [DataRow("http://h~x/", "http", "h~x")]
     [DataRow("http://a%7Fb/", "http", "a\u007fb")]
-    [DataRow("http://a%80b/", "http", "a\ufffdb")]
     [DataRow("http://a\u200bb/", "http", "a\u200bb")]
     [DataRow("example.com", "http", "example.com")]
     [DataRow("x:81", "http", "x")]
@@ -465,8 +468,9 @@ public sealed class CurlUrlTests
         CurlUrl url = Parse(diagnostics, "http://a%80b/");
 
         diagnostics.Act("idn host", url.IdnHost);
-        diagnostics.Assert("idn host", "a\ufffdb", url.IdnHost);
-        Assert.AreEqual("a\ufffdb", url.IdnHost);
+        diagnostics.Assert("idn host", "a\udc80b", url.IdnHost);
+        Assert.AreEqual("a\udc80b", url.Host);
+        Assert.AreEqual("a\udc80b", url.IdnHost);
     }
 
     [TestMethod]

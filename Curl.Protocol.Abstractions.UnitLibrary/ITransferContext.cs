@@ -175,6 +175,16 @@ public interface ITransferContext
     ReadOnlyMemory<byte>? PostData { get; }
 
     /// <summary>
+    /// Gets whether a POST was asked for (<c>CURLOPT_POST</c>) with no data to post, which is
+    /// always <see langword="false" /> while <see cref="PostData" /> is set.
+    /// </summary>
+    /// <remarks>
+    /// <c>mqtt://</c> fails such a transfer with exit 43 after the CONNACK, as libcurl does
+    /// (BL-2673). A scheme that has no use for request data ignores it.
+    /// </remarks>
+    bool PostWithoutData { get; }
+
+    /// <summary>
     /// Gets the user name and password from <c>-u</c>/<c>--user</c>, else from the URL's
     /// user information, or <see langword="null" /> when neither is present.
     /// </summary>
@@ -338,6 +348,14 @@ public interface ITransferContext
     /// all the curl tool ever uses (upstream case 593, BL-2622).
     /// </summary>
     TimeSpan FtpAcceptTimeout { get; }
+
+    /// <summary>
+    /// Gets how long an FTP transfer waits for the server to answer a command, per
+    /// <c>CURLOPT_SERVER_RESPONSE_TIMEOUT</c>; 60 seconds when not set, curl's
+    /// <c>PINGPONG_TIMEOUT_MS</c>. Past it curl ends with exit 28 and <c>server response
+    /// timeout</c> (upstream case 594, BL-2724).
+    /// </summary>
+    TimeSpan FtpServerResponseTimeout { get; }
 
     /// <summary>
     /// Gets whether a plaintext scheme upgrades to TLS, per <c>--ssl</c>/<c>--ftp-ssl</c>

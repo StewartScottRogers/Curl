@@ -17,12 +17,13 @@ public static class CurlUrlRejectionMessages
     {
         CurlUrlRejection.MalformedInput => "Malformed input to a URL function",
         CurlUrlRejection.BadSlashes => "Unsupported number of slashes following scheme",
-        CurlUrlRejection.NoHost => "No host part in the URL",
+        CurlUrlRejection.NoHost => "No host present",
         CurlUrlRejection.BadPortNumber => "Port number was not a decimal number between 0 and 65535",
         CurlUrlRejection.BadIPv6 => "Bad IPv6 address",
         CurlUrlRejection.BadHostname => "Bad hostname",
         CurlUrlRejection.BadFileUrl => "Bad file:// URL",
         CurlUrlRejection.UserNotAllowed => "Credentials was passed in the URL when prohibited",
+        CurlUrlRejection.Backslash => "Found a backslash where a forward slash was expected",
         _ => throw new ArgumentOutOfRangeException(nameof(rejection), rejection, "The URL was not rejected."),
     };
 }

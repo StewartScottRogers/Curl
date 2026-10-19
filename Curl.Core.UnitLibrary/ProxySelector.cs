@@ -81,6 +81,10 @@ public sealed class ProxySelector(Func<string, string?> readEnvironmentVariable)
     /// match, naming its entry, and no proxy text as <c>verbose</c>. <see langword="null" />
     /// writes nothing.
     /// </param>
+    /// <param name="portWhenTextGivesNone">
+    /// <c>CURLOPT_PROXYPORT</c>: the port of a chosen proxy whose text names none; 0 keeps the
+    /// kind's default port.
+    /// </param>
     /// <returns><see langword="true" /> unless the chosen proxy text is unusable.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="url" /> is <see langword="null" />.</exception>
     public bool TrySelect(
@@ -90,7 +94,8 @@ public sealed class ProxySelector(Func<string, string?> readEnvironmentVariable)
         string? noProxyOption,
         out ProxyEndpoint? proxy,
         [NotNullWhen(false)] out TransferResult? failure,
-        IDiagnosticLog? diagnosticLog = null)
+        IDiagnosticLog? diagnosticLog = null,
+        int portWhenTextGivesNone = 0)
     {
         ArgumentNullException.ThrowIfNull(url);
 
@@ -98,7 +103,7 @@ public sealed class ProxySelector(Func<string, string?> readEnvironmentVariable)
         proxy = null;
         failure = null;
         return IsReachedDirectly(url, noProxyOption, log)
-            || TryParseProxyFor(url, proxyOption, proxyOptionKind, log, out proxy, out failure);
+            || TryParseProxyFor(url, proxyOption, proxyOptionKind, portWhenTextGivesNone, log, out proxy, out failure);
     }
 
     /// <summary>
@@ -134,6 +139,7 @@ public sealed class ProxySelector(Func<string, string?> readEnvironmentVariable)
         CurlUrl url,
         string? proxyOption,
         ProxyKind proxyOptionKind,
+        int portWhenTextGivesNone,
         ProxyDiagnosticLog log,
         out ProxyEndpoint? proxy,
         [NotNullWhen(false)] out TransferResult? failure)
@@ -149,7 +155,7 @@ public sealed class ProxySelector(Func<string, string?> readEnvironmentVariable)
             return true;
         }
 
-        if (!ProxyUrlParser.TryParse(proxyText, kindWithoutScheme, out proxy, out failure))
+        if (!ProxyUrlParser.TryParse(proxyText, kindWithoutScheme, out proxy, out failure, portWhenTextGivesNone))
         {
             return false;
         }

@@ -88,7 +88,7 @@ public sealed class CurlCommandRunnerDisallowUsernameInUrlTests
     [DataRow("http://u:p@127.0.0.1:abc/", 3, "curl: (3) URL rejected: Port number was not a decimal number between 0 and 65535", DisplayName = "user, password and bad port")]
     [DataRow("http://u@exa%20mple.com/", 3, "curl: (3) URL rejected: Bad hostname", DisplayName = "user and bad host")]
     [DataRow("http://u@[::1]x/", 3, "curl: (3) URL rejected: Port number was not a decimal number between 0 and 65535", DisplayName = "user and text after an IPv6 host")]
-    [DataRow("http://u@:80/", 3, "curl: (3) URL rejected: No host part in the URL", DisplayName = "user and no host")]
+    [DataRow("http://u@:80/", 3, "curl: (3) URL rejected: No host present", DisplayName = "user and no host")]
     [DataRow("foo://u@127.0.0.1/", 1, "curl: (1) Protocol \"foo\" not supported", DisplayName = "user and unsupported scheme")]
     public async Task RunAsync_UrlWithUserInformationAndALaterBadPartWithoutTheOption_KeepsItsOwnFailure(
         string url,

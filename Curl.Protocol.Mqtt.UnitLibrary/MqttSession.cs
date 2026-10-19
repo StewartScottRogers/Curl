@@ -105,6 +105,9 @@ internal sealed class MqttSession(
     /// <summary>Whether a PINGREQ is sent and its PINGRESP not yet received.</summary>
     private bool pingSent;
 
+    /// <summary>Whether the CONNACK is to be followed by exit 43 instead of a SUBSCRIBE: a POST with nothing to publish.</summary>
+    private bool refusesPublish;
+
     /// <summary>The body length of the PUBLISH being written, reported as the expected download size.</summary>
     private long publishLength;
 
@@ -131,6 +134,10 @@ internal sealed class MqttSession(
     /// <param name="postData">
     /// The payload to publish, or <see langword="null" /> to subscribe instead.
     /// </param>
+    /// <param name="postWithoutData">
+    /// Whether a POST was asked for with nothing to publish, which fails with exit 43 once
+    /// the CONNACK has come.
+    /// </param>
     /// <returns>
     /// A task that completes when a publish has sent its DISCONNECT, or when the peer has
     /// sent DISCONNECT.
@@ -140,8 +147,10 @@ internal sealed class MqttSession(
         CurlUrl url,
         string clientIdentifier,
         NetworkCredential? credentials,
-        ReadOnlyMemory<byte>? postData)
+        ReadOnlyMemory<byte>? postData,
+        bool postWithoutData = false)
     {
+        refusesPublish = postWithoutData && postData is null;
         events.ReportInfo(MqttTransferMessages.UsingClientId(clientIdentifier));
         await SendAsync(MqttPackets.BuildConnect(clientIdentifier, credentials), MqttTransferMessages.ConnectNotSent)
             .ConfigureAwait(false);
@@ -293,6 +302,11 @@ internal sealed class MqttSession(
         ReadOnlyMemory<byte>? postData)
     {
         await VerifyConnackAsync(header).ConfigureAwait(false);
+        if (refusesPublish)
+        {
+            throw new MqttTransferException(CurlExitCode.BadFunctionArgument, MqttTransferMessages.NothingToPublish);
+        }
+
         byte[] topic = MqttTopic.Decode(url);
         if (postData is { } payload)
         {

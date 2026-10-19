@@ -137,6 +137,23 @@ public sealed record HttpRequestOptions
     public string? KeptDigestAuthorization { get; init; }
 
     /// <summary>
+    /// Gets the <c>WWW-Authenticate</c> values of the 401 that ended the easy handle's previous
+    /// transfer, or empty for none. When Digest is the one scheme <see cref="AuthSchemes" />
+    /// allows and there are credentials, the first request answers them before any new
+    /// challenge, as curl 8.22.0 keeps the Digest nonce on the easy handle across transfers, even
+    /// one whose <c>CURLOPT_HTTPAUTH</c> did not allow Digest (upstream test2024, BL-2747, ADR-0692).
+    /// </summary>
+    public IReadOnlyList<string> KeptDigestChallenges { get; init; } = [];
+
+    /// <summary>
+    /// Gets a value indicating whether the easy handle's previous transfer ended with Digest still
+    /// marked available, its <see cref="TransferReport.DigestStaysAvailable" />, as libcurl 8.22.0
+    /// keeps <c>authhost.avail</c> on the easy handle (upstream test2030, BL-2820);
+    /// <see langword="false" /> for the handle's first transfer and after <c>curl_easy_reset</c>.
+    /// </summary>
+    public bool DigestStaysAvailable { get; init; }
+
+    /// <summary>
     /// Gets a value indicating whether a response of an earlier hop of the transfer was
     /// HTTP/1.0, which sends this request as HTTP/1.0, as for <c>-0</c>, since curl 8.21.0 sends
     /// every later request of a transfer as HTTP/1.0 once a response in it was: a <c>-T -</c>
@@ -210,6 +227,13 @@ public sealed record HttpRequestOptions
     public bool AllowHttp09Reply { get; init; }
 
     /// <summary>
+    /// Gets libcurl's <c>CURLOPT_HTTP200ALIASES</c>: status lines taken as <c>HTTP/1.0 200</c>
+    /// when a response's first line begins with one, in any letter case, such as <c>ICY 200 OK</c>.
+    /// Empty by default.
+    /// </summary>
+    public IReadOnlyList<string> Http200Aliases { get; init; } = [];
+
+    /// <summary>
     /// Gets a value indicating whether libcurl's <c>CURLOPT_KEEP_SENDING_ON_ERROR</c> was set:
     /// keep sending the request body after the server has answered with an error status,
     /// instead of stopping the upload. <see langword="false" /> by default.
@@ -255,6 +279,16 @@ public sealed record HttpRequestOptions
     /// directly.
     /// </summary>
     public ProxyEndpoint? ForwardProxy { get; init; }
+
+    /// <summary>
+    /// Gets the transfer type <c>CURLOPT_PROXY_TRANSFER_MODE</c> asks for, <c>a</c> under
+    /// <c>CURLOPT_TRANSFERTEXT</c> or <c>i</c>, or <see langword="null" /> when the option is not set or the
+    /// transfer is not forwarded through an HTTP or HTTP/1.0 proxy. The absolute-form target an <c>ftp</c> URL
+    /// is sent to the proxy puts <c>;type=</c> and it on the path unless the path already names its type,
+    /// leaving the URL itself, and so the effective URL and the redirects resolved against it, without it,
+    /// as curl 8.22.0's <c>http_target</c> does (upstream tests 549 and 550, BL-2793).
+    /// </summary>
+    public char? ProxyTransferType { get; init; }
 
     /// <summary>
     /// Gets a value indicating whether <c>-p</c>/<c>--proxytunnel</c> was given: tunnel

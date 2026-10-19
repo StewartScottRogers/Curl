@@ -163,6 +163,18 @@ internal sealed class HttpResponseHeadReader
     internal bool AcceptsHttp09 { get; init; }
 
     /// <summary>
+    /// Gets the <c>CURLOPT_HTTP200ALIASES</c> status lines: an HTTP/1.x status line beginning with
+    /// one (<see cref="HttpStatusLine.MatchesAlias" />) is taken as <c>HTTP/1.0 200</c>, and bytes
+    /// that can still begin one are not HTTP/0.9, as curl 8.22.0's <c>checkhttpprefix</c> takes them.
+    /// Empty by default.
+    /// </summary>
+    internal IReadOnlyList<string> Http200Aliases
+    {
+        get => lines.Http200Aliases;
+        init => lines.Http200Aliases = value;
+    }
+
+    /// <summary>
     /// Gets a value indicating whether the request is a HEAD (<c>-I</c>), which an HTTP/0.9
     /// answer cannot satisfy even when <see cref="AcceptsHttp09" /> is set.
     /// </summary>
@@ -485,6 +497,11 @@ internal sealed class HttpResponseHeadReader
             return HttpStatusLine.ParseHttp2OrHttp3(line);
         }
 
+        if (HttpStatusLine.MatchesAlias(line, Http200Aliases))
+        {
+            return HttpStatusLine.Http200Alias();
+        }
+
         return RefusesHttp2StatusLines && HttpStatusLine.NamesHttp2OrHttp3(line)
             ? throw HttpStatusLine.RefusalOverHttp1(line)
             : HttpStatusLine.Parse(line);
@@ -497,7 +514,7 @@ internal sealed class HttpResponseHeadReader
         HttpStatusLine statusLine = ParseStatusLine(line.Content);
         SwitchedProtocols |= statusLine.StatusCode == 101;
         builder.StartHead(line);
-        if (line.Content.StartsWith("HTTP/1.0", StringComparison.Ordinal))
+        if (line.Content.StartsWith("HTTP/1.0", StringComparison.Ordinal) || HttpStatusLine.MatchesAlias(line.Content, Http200Aliases))
         {
             Events.ReportInfo(HttpConnectionInfoLines.AssumeCloseAfterBody);
         }

@@ -234,18 +234,18 @@ public sealed class RedirectFollower(
                 return chain.Merge(stop);
             }
 
-            Rewind(context.Upload, uploadStart, bodyDropped);
+            string? seekFailure = SeekUploadToStart(context.Upload, uploadStart, bodyDropped);
             Rewind(bodyContent, bodyStart, bodyDropped);
             log.Followed(responseCode, target, bodyDropped, methodDropped);
             chain.Followed(target);
-            if (UploadRewindFailure(context, uploadStart, bodyDropped, result) is { } rewindFailure)
+            if (UploadRewindFailure(context, seekFailure, uploadStart, bodyDropped, result) is { } rewindFailure)
             {
                 chain.Refused(keepsRedirectUrl: false);
                 return chain.Merge(rewindFailure);
             }
 
             // No stop means the target parsed, so next is set.
-            hop = NextHop(context, hop.Url, next!, HopMethod(http, methodDropped) with { RedirectsFollowed = chain.RedirectCount, ResponseHeadersStored = result.Report.ResponseHeadersStored, AuthSchemePicked = result.Report.AuthSchemePicked, KeptDigestAuthorization = result.Report.DigestAuthorizationSent, EarlierResponseWasHttp10 = receivedHttp10 }, hopProxy, bodyDropped, policy.LocationTrusted || IsSameOrigin(context.Url, next!), operationStarted, selectHopAltSvc, selectHopCredentials);
+            hop = NextHop(context, hop.Url, next!, HopMethod(http, methodDropped, policy) with { RedirectsFollowed = chain.RedirectCount, ResponseHeadersStored = result.Report.ResponseHeadersStored, AuthSchemePicked = result.Report.AuthSchemePicked, KeptDigestAuthorization = result.Report.DigestAuthorizationSent, EarlierResponseWasHttp10 = receivedHttp10 }, hopProxy, bodyDropped, policy.LocationTrusted || IsSameOrigin(context.Url, next!), operationStarted, selectHopAltSvc, selectHopCredentials);
         }
     }
 
@@ -542,7 +542,7 @@ public sealed class RedirectFollower(
             return $"Switch to GET because of {responseCode} response";
         }
 
-        return customMethod is null ? null : $"Stick to {customMethod} instead of GET";
+        return customMethod is null || policy.SendsCustomMethodFirstOnly ? null : $"Stick to {customMethod} instead of GET";
     }
 
     private static bool IsPlainGet(ITransferContext hop, string? customMethod) =>
@@ -560,8 +560,8 @@ public sealed class RedirectFollower(
         };
     }
 
-    private static HttpRequestOptions HopMethod(HttpRequestOptions http, bool methodDropped) =>
-        methodDropped ? http with { CustomMethod = null } : http;
+    private static HttpRequestOptions HopMethod(HttpRequestOptions http, bool methodDropped, RedirectPolicy policy) =>
+        methodDropped || policy.SendsCustomMethodFirstOnly ? http with { CustomMethod = null } : http;
 
     private static long? SeekableStart(Stream? upload) =>
         upload is { CanSeek: true } ? upload.Position : null;
@@ -578,20 +578,34 @@ public sealed class RedirectFollower(
     }
 
     /// <summary>
-    /// Rewinds a kept upload that cannot seek but implements <see cref="IUploadRewinder" />, once
-    /// some of it was read, as curl 8.22.0's <c>cr_in_rewind</c> does when the next hop starts; gives
-    /// the hop's failure when the rewind fails: exit 65 with the rewinder's message, after the
-    /// <c>-v</c> lines for it and <see cref="IUploadRewinder.ReaderRewindFailedLine" />.
-    /// <see langword="null" /> when the rewind succeeded or none was needed.
+    /// Seeks a kept seekable upload back to where it started; gives the <see cref="IOException" />'s
+    /// message when the stream cannot go back (a sized read-callback upload with no seek callback,
+    /// upstream test3034, BL-2703), <see langword="null" /> when it went back or none was needed.
     /// </summary>
-    private static TransferResult? UploadRewindFailure(ITransferContext context, long? uploadStart, bool bodyDropped, TransferResult result)
+    private static string? SeekUploadToStart(Stream? upload, long? start, bool bodyDropped)
     {
-        if (bodyDropped || uploadStart is not null || context.Upload is not IUploadRewinder { HasBeenRead: true } rewinder)
+        try
         {
+            Rewind(upload, start, bodyDropped);
             return null;
         }
+        catch (IOException exception)
+        {
+            return exception.Message;
+        }
+    }
 
-        if (rewinder.RewindToStart() is not { } message)
+    /// <summary>
+    /// Rewinds a kept upload that cannot seek but implements <see cref="IUploadRewinder" />, once
+    /// some of it was read, as curl 8.22.0's <c>cr_in_rewind</c> does when the next hop starts; gives
+    /// the hop's failure when the rewind fails, or when <paramref name="seekFailure" /> says a seekable
+    /// upload could not go back: exit 65 with that message, after the <c>-v</c> lines for it and
+    /// <see cref="IUploadRewinder.ReaderRewindFailedLine" />.
+    /// <see langword="null" /> when the rewind succeeded or none was needed.
+    /// </summary>
+    private static TransferResult? UploadRewindFailure(ITransferContext context, string? seekFailure, long? uploadStart, bool bodyDropped, TransferResult result)
+    {
+        if ((seekFailure ?? RewinderFailure(context, uploadStart, bodyDropped)) is not { } message)
         {
             return null;
         }
@@ -600,6 +614,15 @@ public sealed class RedirectFollower(
         context.Events.ReportInfo(IUploadRewinder.ReaderRewindFailedLine);
         return TransferResult.Failure(CurlExitCode.SendFailRewind, message, result.BytesTransferred);
     }
+
+    /// <summary>
+    /// The message of a failed rewind through <see cref="IUploadRewinder" /> of a kept upload that
+    /// cannot seek and was read; <see langword="null" /> when it rewound or none was needed.
+    /// </summary>
+    private static string? RewinderFailure(ITransferContext context, long? uploadStart, bool bodyDropped) =>
+        bodyDropped || uploadStart is not null || context.Upload is not IUploadRewinder { HasBeenRead: true } rewinder
+            ? null
+            : rewinder.RewindToStart();
 
     private static bool IsSameOrigin(CurlUrl first, CurlUrl next) =>
         string.Equals(first.Scheme, next.Scheme, StringComparison.Ordinal)

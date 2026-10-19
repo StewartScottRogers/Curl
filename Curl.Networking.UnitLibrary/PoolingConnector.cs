@@ -100,7 +100,15 @@ public sealed class PoolingConnector : IConnector, IAsyncDisposable
     /// <param name="innerConnector">Opens a connection when the cache has none for the key.</param>
     /// <returns>The connector.</returns>
     public PoolingConnector Over(IConnector innerConnector) =>
-        new(innerConnector, _cache, _configuration, _connectTo) { WaitsForMultiplexing = WaitsForMultiplexing };
+        new(innerConnector, _cache, _configuration, _connectTo) { WaitsForMultiplexing = WaitsForMultiplexing, MaximumConnectionLifetime = MaximumConnectionLifetime };
+
+    /// <summary>
+    /// Gets the longest since it was opened that a connection may be reused by this connector's
+    /// transfers: curl's <c>CURLOPT_MAXLIFETIME_CONN</c>, 24 hours by default, <see cref="TimeSpan.Zero" />
+    /// for no limit. An idle connection opened longer ago is closed with <c>shutting down connection #N</c>
+    /// instead of being reused, as curl's connection cache does (BL-2730).
+    /// </summary>
+    public TimeSpan MaximumConnectionLifetime { get; init; } = TimeSpan.FromHours(24);
 
     /// <summary>
     /// Gives a datagram connector that opens channels through <paramref name="datagramConnector" />
@@ -460,13 +468,25 @@ public sealed class PoolingConnector : IConnector, IAsyncDisposable
         }
 
         var match = await TakeMatchAsync(key);
-        while (match is not null && IsFoundDead(match, events))
+        while (match is not null && (IsTooOld(match, events) || IsFoundDead(match, events)))
         {
             await match.CloseAsync();
             match = await TakeMatchAsync(key);
         }
 
         return match;
+    }
+
+    private bool IsTooOld(PoolEntry match, ITransferEvents events)
+    {
+        if (MaximumConnectionLifetime <= TimeSpan.Zero
+            || _cache.TimeProvider.GetElapsedTime(match.OpenedAt) <= MaximumConnectionLifetime)
+        {
+            return false;
+        }
+
+        events.ReportInfo($"shutting down connection #{match.ConnectionNumber}");
+        return true;
     }
 
     private bool IsFoundDead(PoolEntry match, ITransferEvents events)
@@ -563,6 +583,7 @@ public sealed class PoolingConnector : IConnector, IAsyncDisposable
         {
             Session = isQuic ? connect.Connection as IConnectionSession : null,
             Owner = _cache.OpeningOwner,
+            OpenedAt = _cache.TimeProvider.GetTimestamp(),
         });
         if (!isQuic && MayMultiplex(target, connect))
         {

@@ -35,7 +35,7 @@ internal static class UrlRelativeReference
     /// <summary>
     /// The URL <paramref name="relative" /> names from <paramref name="current" />, as upstream's
     /// <c>redirect_url</c> builds it: the reference's spaces and bytes outside ASCII encoded, then
-    /// <c>//</c> keeping the scheme, <c>/</c> the authority, <c>#</c> all but the fragment, <c>?</c> the
+    /// <c>//</c> keeping the scheme, <c>/</c> the authority, <c>#</c> or a blank reference all but the fragment, <c>?</c> the
     /// path, and anything else the path up to its last <c>/</c>.
     /// </summary>
     /// <param name="current">The URL the handle holds, with a scheme and <c>://</c>.</param>
@@ -56,7 +56,7 @@ internal static class UrlRelativeReference
         }
 
         string withoutFragment = Before(current, '#');
-        if (reference.StartsWith('#'))
+        if (reference.Length == 0 || reference[0] == '#')
         {
             return withoutFragment + reference;
         }

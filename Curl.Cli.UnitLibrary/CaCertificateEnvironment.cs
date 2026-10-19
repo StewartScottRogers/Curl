@@ -22,7 +22,7 @@ internal static class CaCertificateEnvironment
     /// <summary>
     /// Sets <paramref name="group"/>'s <see cref="CommandLineOptions.CaCertificateFile"/> and
     /// <see cref="CommandLineOptions.CaCertificateDirectory"/> from the environment, verbatim, when curl's
-    /// tool would; leaves the group as it is otherwise.
+    /// tool would; a variable set to the empty string counts as unset. Leaves the group as it is otherwise.
     /// </summary>
     /// <param name="group">One option group of a fully read command line.</param>
     internal static void Apply(CommandLineOptions group)
@@ -32,7 +32,7 @@ internal static class CaCertificateEnvironment
             return;
         }
 
-        Func<string, string?> environment = group.ReadEnvironmentVariable;
+        Func<string, string?> environment = name => NullWhenEmpty(group.ReadEnvironmentVariable(name));
         string? bundle = environment(CurlCaBundleVariableName);
         if (bundle is not null)
         {
@@ -43,6 +43,10 @@ internal static class CaCertificateEnvironment
         group.CaCertificateDirectory = environment(SslCertDirVariableName);
         group.CaCertificateFile = environment(SslCertFileVariableName);
     }
+
+    // A variable set to the empty string counts as unset: curl 8.22.0's OpenSSL build with an empty
+    // SSL_CERT_DIR or SSL_CERT_FILE beside a usable one completes the transfer (GF-0097, ADR-0707).
+    private static string? NullWhenEmpty(string? value) => string.IsNullOrEmpty(value) ? null : value;
 
     private static bool ReadsEnvironment(CommandLineOptions group) =>
         !group.ActsAsWindowsSchannelBuild

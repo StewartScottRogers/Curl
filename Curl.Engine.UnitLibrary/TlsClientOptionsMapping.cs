@@ -92,7 +92,9 @@ internal static class TlsClientOptionsMapping
             origin.RevocationListFile,
             !tls.SessionIdCache,
             origin.SslOptions.HasFlag(SslOptions.AllowBeast),
-            KeyLogFile(readEnvironmentVariable));
+            KeyLogFile(readEnvironmentVariable),
+            ChecksHostNameWhenInsecure(origin),
+            origin.CertificateAuthorityBlob);
     }
 
     /// <summary>
@@ -134,8 +136,18 @@ internal static class TlsClientOptionsMapping
             UseAlpn: useAlpn,
             NoSessionId: !tls.SessionIdCache,
             AllowBeast: proxy.SslOptions.HasFlag(SslOptions.AllowBeast),
-            KeyLogFile: KeyLogFile(readEnvironmentVariable));
+            KeyLogFile: KeyLogFile(readEnvironmentVariable),
+            ChecksHostNameWhenInsecure: ChecksHostNameWhenInsecure(proxy),
+            CaCertificateBlob: proxy.CertificateAuthorityBlob);
     }
+
+    /// <summary>
+    /// Whether the name is still checked with the peer not verified: libcurl's <c>CURLOPT_SSL_VERIFYPEER</c> 0
+    /// with <c>CURLOPT_SSL_VERIFYHOST</c> on (upstream test2118, ADR-0703). <c>-k</c> turns both off.
+    /// </summary>
+    /// <param name="peer">The origin's or the proxy's verification settings.</param>
+    /// <returns><see langword="true" /> when <see cref="TlsPeerOptions.VerifyPeer" /> is off and <see cref="TlsPeerOptions.VerifyHost" /> on.</returns>
+    internal static bool ChecksHostNameWhenInsecure(TlsPeerOptions peer) => !peer.VerifyPeer && peer.VerifyHost;
 
     /// <summary>
     /// Maps the TLS options that reach the DNS-over-HTTPS server onto the <see cref="TlsClientOptions" />
@@ -165,7 +177,8 @@ internal static class TlsClientOptionsMapping
             RequireCertificateStatus: tls.DohVerifyStatus,
             AutoClientCertificate: origin.SslOptions.HasFlag(SslOptions.AutoClientCert),
             CertificateRevocationListFile: origin.RevocationListFile,
-            KeyLogFile: KeyLogFile(null));
+            KeyLogFile: KeyLogFile(null),
+            CaCertificateBlob: origin.CertificateAuthorityBlob);
     }
 
     /// <summary>Maps a lowest TLS version from the record onto the one the TLS provider applies.</summary>

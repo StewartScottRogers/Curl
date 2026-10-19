@@ -35,6 +35,20 @@ public sealed class CaCertificateEnvironmentTests
     }
 
     [TestMethod]
+    [DataRow(null, "certs", "", null, "certs")]
+    [DataRow(null, "", "file.pem", "file.pem", null)]
+    [DataRow("", "certs", "file.pem", "file.pem", "certs")]
+    [DataRow("", "", "", null, null)]
+    public void Parse_VariableSetEmpty_CountsAsUnset(string? bundle, string? directory, string? file, string? expectedFile, string? expectedDirectory)
+    {
+        Func<string, string?> environment = Environment(bundle, directory, file);
+
+        CommandLineOptions options = Accept([Url], environment, isWindows: false);
+
+        AssertCaLocations(expectedFile, expectedDirectory, options);
+    }
+
+    [TestMethod]
     [DataRow("--cacert", "given.pem", "given.pem", null)]
     [DataRow("--capath", "given", null, "given")]
     public void Parse_CaOptionGiven_WinsOverTheEnvironment(string option, string value, string? expectedFile, string? expectedDirectory)

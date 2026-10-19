@@ -67,13 +67,15 @@ internal sealed record CurlUrlAuthority(
 
     /// <summary>
     /// Parses the host and port after the user information: the port split off, the host
-    /// required and normalised.
+    /// required and normalised. An empty host is <see cref="CurlUrlRejection.NoHost" /> even when the
+    /// port is bad too, as curl 8.22.0's <c>parse_authority</c> replaces the port's error
+    /// (<c>https://::1/</c>, lib1560).
     /// </summary>
     /// <returns>An authority with no user information, or <see langword="null" /> when curl rejects it.</returns>
     private static CurlUrlAuthority? ParseHostAndPort(string hostAndPort, bool hasScheme, out CurlUrlRejection rejection)
     {
         rejection = SplitPort(hostAndPort, hasScheme, out string host, out int? port);
-        if (rejection == CurlUrlRejection.None && host.Length == 0)
+        if (host.Length == 0)
         {
             rejection = CurlUrlRejection.NoHost;
         }
@@ -159,10 +161,37 @@ internal sealed record CurlUrlAuthority(
         }
 
         host = hostAndPort[..colon];
-        string portText = hostAndPort[(colon + 1)..];
-        bool accepted = portText.Length == 0 ? hasScheme : TryParsePort(portText, out port);
+        return CheckPort(hostAndPort[(colon + 1)..], hasScheme, out port);
+    }
 
-        return accepted ? CurlUrlRejection.None : CurlUrlRejection.BadPortNumber;
+    /// <summary>
+    /// Checks the text after the port's colon: empty is accepted only with a scheme, digits up to
+    /// 65535 are the port, and anything else is rejected, as <see cref="BackslashEndsTheDigits" /> says.
+    /// </summary>
+    /// <returns>Why curl rejects the port, or <see cref="CurlUrlRejection.None" />.</returns>
+    private static CurlUrlRejection CheckPort(string portText, bool hasScheme, out int? port)
+    {
+        port = null;
+        bool accepted = portText.Length == 0 ? hasScheme : TryParsePort(portText, out port);
+        if (accepted)
+        {
+            return CurlUrlRejection.None;
+        }
+
+        return BackslashEndsTheDigits(portText) ? CurlUrlRejection.Backslash : CurlUrlRejection.BadPortNumber;
+    }
+
+    /// <summary>
+    /// Whether the first character of <paramref name="portText" /> that is not a digit is a
+    /// backslash, where curl 8.22.0's <c>Curl_parse_port</c> answers <c>CURLUE_BACKSLASH</c>
+    /// in place of <c>CURLUE_BAD_PORT_NUMBER</c> (lib1560: <c>http://hostname:1111\path</c>,
+    /// and <c>http:\\hostname</c> read with no scheme).
+    /// </summary>
+    private static bool BackslashEndsTheDigits(string portText)
+    {
+        int end = portText.AsSpan().IndexOfAnyExceptInRange('0', '9');
+
+        return end >= 0 && portText[end] == '\\';
     }
 
     /// <summary>

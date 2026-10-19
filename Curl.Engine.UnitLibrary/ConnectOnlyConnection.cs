@@ -27,7 +27,7 @@ internal sealed class ConnectOnlyConnection(Func<bool> isConnectOnly) : IConnect
     /// <summary>The read size a wait for <see cref="CurlWaitEvents.PollIn" /> starts a read with, before any receive names one.</summary>
     private const int WaitReadLength = 16 * 1024;
 
-    /// <summary>The next socket number <see cref="OpenAsync" /> gives, shared by every handle in the process.</summary>
+    /// <summary>The last socket number <see cref="OpenAsync" /> gave (<see cref="FirstSocket" /> before any), shared by every handle in the process.</summary>
     private static long nextSocket = FirstSocket;
 
     private IConnection? connection;
@@ -46,7 +46,8 @@ internal sealed class ConnectOnlyConnection(Func<bool> isConnectOnly) : IConnect
     internal static bool UsesTls(string scheme) => TlsSchemes.Contains(scheme);
 
     /// <summary>
-    /// Gets the first socket number a connection is given. The managed engine's connections are not operating
+    /// Gets the socket number the numbering starts from; the first connection is given <c>FirstSocket + 1</c>, the
+    /// next <c>FirstSocket + 2</c> and so on. The managed engine's connections are not operating
     /// system descriptors, so each opened connection is one number of the engine's own, above any descriptor a
     /// process is likely to hold and apart from <see cref="ManagedMultiTransfer.FirstTransferSocket" />'s numbers.
     /// </summary>
@@ -58,6 +59,12 @@ internal sealed class ConnectOnlyConnection(Func<bool> isConnectOnly) : IConnect
     /// longer ask for connect-only (ADR-0549, BL-2633).
     /// </summary>
     internal CurlSocket Socket { get; private set; } = CurlSocket.Bad;
+
+    /// <summary>
+    /// Gets or sets whether the handle's perform is running, so a receive or send made now comes from one of its
+    /// callbacks and answers <see cref="CurlCode.RecursiveApiCall" />, as libcurl's <c>Curl_is_in_callback</c> check does.
+    /// </summary>
+    internal bool PerformRunning { get; set; }
 
     /// <summary>Gets the socket number of the connection open now while the options ask for connect-only, else <see cref="CurlSocket.Bad" />.</summary>
     internal CurlSocket LiveSocket => LiveConnection() is null ? CurlSocket.Bad : Socket;
@@ -113,6 +120,11 @@ internal sealed class ConnectOnlyConnection(Func<bool> isConnectOnly) : IConnect
     public async ValueTask<CurlConnectOnlyResult> ReceiveAsync(Memory<byte> buffer, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        if (PerformRunning)
+        {
+            return new CurlConnectOnlyResult(CurlCode.RecursiveApiCall, 0);
+        }
+
         if (LiveConnection() is not { } live)
         {
             return new CurlConnectOnlyResult(CurlCode.UnsupportedProtocol, 0);
@@ -148,6 +160,11 @@ internal sealed class ConnectOnlyConnection(Func<bool> isConnectOnly) : IConnect
     public async ValueTask<CurlConnectOnlyResult> SendAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        if (PerformRunning)
+        {
+            return new CurlConnectOnlyResult(CurlCode.RecursiveApiCall, 0);
+        }
+
         if (LiveConnection() is not { } live)
         {
             return new CurlConnectOnlyResult(CurlCode.UnsupportedProtocol, 0);

@@ -230,6 +230,28 @@ public sealed partial class ManagedMultiTransferTests
     }
 
     [TestMethod]
+    public async Task PollAsync_EngineNumberedExtraSockets_ReportNoEventWithoutAskingThePoller()
+    {
+        ScriptedWaitSocketPoller poller = new();
+        CurlSocket transferSocket = new(ManagedMultiTransfer.FirstTransferSocket);
+        CurlSocket wakeupSocket = new(ManagedMultiTransfer.ResolverWakeupSocket);
+        poller.Ready[transferSocket] = CurlWaitEvents.PollIn;
+        poller.Ready[wakeupSocket] = CurlWaitEvents.PollIn;
+        await using ManagedMultiTransfer multi = NewMulti(new TimerManualTimeProvider(), poller);
+        CurlWaitSocket[] sockets =
+        [
+            new(transferSocket, CurlWaitEvents.PollIn, CurlWaitEvents.None),
+            new(wakeupSocket, CurlWaitEvents.PollIn, CurlWaitEvents.None),
+        ];
+
+        (CurlMultiCode Code, int ReadySockets) result = await multi.PollAsync(sockets, TimeSpan.Zero, CancellationToken.None);
+
+        Assert.AreEqual((CurlMultiCode.Ok, 0), result);
+        Assert.AreEqual(CurlWaitEvents.None, sockets[0].ReturnedEvents);
+        Assert.AreEqual(CurlWaitEvents.None, sockets[1].ReturnedEvents);
+    }
+
+    [TestMethod]
     public async Task PollAsync_ExtraSocketGetsAnEventDuringThePoll_FindsItAtTheNextSocketPollInterval()
     {
         TimerManualTimeProvider time = new();

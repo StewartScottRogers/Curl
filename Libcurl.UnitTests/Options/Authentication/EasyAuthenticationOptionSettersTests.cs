@@ -107,6 +107,24 @@ public sealed class EasyAuthenticationOptionSettersTests
     }
 
     [TestMethod]
+    public void SetOption_HttpsigAlgorithm_NamesEd25519OrHmacSha256AndZeroClearsItAndAnythingElseIsRefused()
+    {
+        Assert.AreEqual("ed25519", SetOk(CurlOption.HttpsigAlgorithm, 1L).HttpSignatureAlgorithm);
+        Assert.AreEqual("hmac-sha256", SetOk(CurlOption.HttpsigAlgorithm, 2L).HttpSignatureAlgorithm);
+        Assert.IsNull(Set(Set(new EasyOptions(), CurlOption.HttpsigAlgorithm, 1L), CurlOption.HttpsigAlgorithm, 0L).Authentication.HttpSignatureAlgorithm);
+        Refused(CurlOption.HttpsigAlgorithm, 3L);
+        Refused(CurlOption.HttpsigAlgorithm, -1L);
+    }
+
+    [TestMethod]
+    public void SetOption_HttpsigKey_SetsTheKeyAndNullClearsIt() => Text(CurlOption.HttpsigKey, a => a.HttpSignatureKey);
+
+    [TestMethod]
+    public void SetOption_HttpsigKeyid_SetsTheKeyIdAndNullClearsIt() => Text(CurlOption.HttpsigKeyid, a => a.HttpSignatureKeyId);
+
+    [TestMethod]
+    public void SetOption_HttpsigHeaders_SetsTheHeadersAndNullClearsThem() => Text(CurlOption.HttpsigHeaders, a => a.HttpSignatureHeaders);
+    [TestMethod]
     public void SetOption_TlsauthType_TakesSrpInAnyCaseOrNullAndRefusesAnythingElse() =>
         AssertTlsAuthType(CurlOption.TlsauthType, a => a.TlsAuthType);
 

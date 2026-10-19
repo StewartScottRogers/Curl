@@ -142,6 +142,7 @@ public sealed class Lib1535To1550Tests
     {
         Assert.AreEqual(1, Lib1537.LengthToNul([0x41, 0, 0x42]));
         Assert.AreEqual(2, Lib1537.LengthToNul([0x41, 0x42]));
+        Assert.AreEqual(0, Lib1537.LengthToNul([0, 0x41]));
     }
 
     [TestMethod]

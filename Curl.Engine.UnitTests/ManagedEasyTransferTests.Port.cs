@@ -25,6 +25,19 @@ public sealed partial class ManagedEasyTransferTests
     }
 
     [TestMethod]
+    public async Task PerformAsync_UrlWithNoSchemeAndDotSegments_ReportsTheGuessedSchemeAndNormalisedPathAsEffectiveUrl()
+    {
+        ScriptedConnector connector = new([Encoding.ASCII.GetBytes(Response)]);
+        await using IEasyTransfer easy = CreateEngine(connector).CreateEasy();
+        easy.Options = new EasyOptions { Network = new EasyNetworkOptions { Url = "127.0.0.1:8990/hello/../1907" } };
+
+        CurlCode code = await easy.PerformAsync(CancellationToken.None);
+
+        Assert.AreEqual(CurlCode.Ok, code);
+        Assert.AreEqual("http://127.0.0.1:8990/1907", easy.Info.EffectiveUrl);
+    }
+
+    [TestMethod]
     public async Task PerformAsync_PortOptionOverAUrlsPortThroughAProxy_SendsItInTheRequestTargetAndTheHostHeader()
     {
         EasyOptions options = new()

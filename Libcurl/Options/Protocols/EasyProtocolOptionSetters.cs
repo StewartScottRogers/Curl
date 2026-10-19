@@ -174,7 +174,9 @@ internal static class EasyProtocolOptionSetters
         return Rtsp(ref o, r => r with { Request = Enum.IsDefined(request) ? request : RtspRequest.None });
     }
 
-    private static CurlCode SetRtspSessionId(ref EasyOptions o, object? v) => Rtsp(ref o, r => r with { SessionId = (string?)v });
+    /// <summary><c>CURLOPT_RTSP_SESSION_ID</c>: every set is counted, so the engine hands on one that repeats the value before it (BL-2787).</summary>
+    private static CurlCode SetRtspSessionId(ref EasyOptions o, object? v) =>
+        Rtsp(ref o, r => r with { SessionId = (string?)v, SessionIdSetCount = r.SessionIdSetCount + 1 });
 
     /// <summary><c>CURLOPT_RTSP_STREAM_URI</c>: <see langword="null"/> restores the default <c>*</c>, which libcurl sends for no URI.</summary>
     private static CurlCode SetRtspStreamUri(ref EasyOptions o, object? v) => Rtsp(ref o, r => r with { StreamUri = (string?)v ?? "*" });

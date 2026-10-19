@@ -37,12 +37,21 @@ public sealed class CurlUrlAdversarialTests
     [DataRow("http://h:99999999999999999999/")]
     [DataRow("http://h:-1/")]
     [DataRow("http://h:+80/")]
-    [DataRow("http://user@:80@host/")]
     public void TryParse_WithAPortOutsideItsRangeOrNotDecimal_RejectsItAsABadPortNumber(string text)
     {
         TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
 
         AssertRejected(diagnostics, text, CurlUrlRejection.BadPortNumber);
+    }
+
+    // curl 8.22.0 (measured 2026-10-18, BL-2734): the empty host before the bad port wins,
+    // where 8.21.0 answered a bad port number.
+    [TestMethod]
+    public void TryParse_WithAnEmptyHostBeforeABadPort_RejectsItAsNoHost()
+    {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+
+        AssertRejected(diagnostics, "http://user@:80@host/", CurlUrlRejection.NoHost);
     }
 
     [TestMethod]

@@ -163,6 +163,7 @@ public sealed class Lib2308To2504Tests
             Assert.AreEqual(version, last.Http.HttpVersion);
             Assert.AreEqual(weight, last.Http.StreamWeight);
             Assert.IsTrue(last.Http.PipeWait);
+            Assert.IsNotNull(last.Callbacks.Debug, "a verbose handle needs a debug callback to put its lines on stderr");
             CollectionAssert.AreEqual(new[] { "localhost:9000:127.0.0.1" }, last.Network.Resolve.ToArray());
         }
     }

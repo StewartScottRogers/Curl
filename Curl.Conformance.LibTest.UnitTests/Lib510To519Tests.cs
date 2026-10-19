@@ -51,6 +51,20 @@ public sealed class Lib510Tests
     }
 
     [TestMethod]
+    public void PartReader_BufferExactlyThePartsLength_CopiesThePart()
+    {
+        var error = new StringWriter();
+        var reader = new Lib510.PartReader(["three"], error);
+        byte[] buffer = new byte[5];
+
+        long length = reader.Read(buffer);
+
+        Assert.AreEqual(5, length);
+        Assert.AreEqual("three", Encoding.ASCII.GetString(buffer));
+        Assert.AreEqual(string.Empty, error.ToString());
+    }
+
+    [TestMethod]
     public async Task TestAsync_OnACleanedUpLibrary_FailsMajorBad()
     {
         var run = new PortRun(null, 510, "http://x/");

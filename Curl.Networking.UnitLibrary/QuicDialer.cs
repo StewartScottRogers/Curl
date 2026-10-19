@@ -414,7 +414,7 @@ public sealed class QuicDialer
     private TlsTrustEvent DescribeTrust(string targetHost)
     {
         var trust = SslStreamTlsProvider.DescribeTrust(_options, targetHost) with { IsQuic = true };
-        return _matchesSchannelBuild && _options.CaCertificateFile is null
+        return _matchesSchannelBuild && !_options.HasCaCertificates
             ? trust with { CaCertificateFile = null, UsesWindowsSystemStores = true }
             : trust;
     }

@@ -77,11 +77,11 @@ public sealed partial class ManagedEasyTransferTests
         byte[] buffer = new byte[8];
 
         CurlWebSocketFrame first = (await easy.WebSocket.ReceiveAsync(buffer, CancellationToken.None)).Frame;
-        CurlWebSocketFrame ping = (await easy.WebSocket.ReceiveAsync(buffer, CancellationToken.None)).Frame;
+        CurlWebSocketReceiveResult afterPing = await easy.WebSocket.ReceiveAsync(buffer, CancellationToken.None);
         CurlWebSocketFrame last = (await easy.WebSocket.ReceiveAsync(buffer, CancellationToken.None)).Frame;
 
         Assert.AreEqual(CurlWebSocketFlags.Binary | CurlWebSocketFlags.Continuation, first.Flags);
-        Assert.AreEqual(CurlWebSocketFlags.Ping, ping.Flags);
+        Assert.AreEqual(CurlCode.Again, afterPing.Result);
         Assert.AreEqual(CurlWebSocketFlags.Binary, last.Flags);
         Assert.AreEqual(last, easy.WebSocket.CurrentFrame);
         CollectionAssert.AreEqual(ManagedEasyWebSocketTests.ClientFrame(WsOpcode.Pong, true, "?"), peer.Written[requestLength..]);
@@ -133,6 +133,21 @@ public sealed partial class ManagedEasyTransferTests
 
         Assert.AreEqual(CurlCode.HttpReturnedError, code);
         Assert.AreEqual(CurlCode.BadFunctionArgument, received.Result);
+        Assert.IsTrue(peer.IsDisposed);
+    }
+
+    [TestMethod]
+    public async Task PerformAsync_WebSocketServerClosesBeforeTheHeadEnds_AnswersOkAndLeavesNoWebSocket()
+    {
+        (ManagedEasyTransfer easy, _, QueuedConnection peer) = CreateWebSocketEasy(Ascii("HTTP/1.1 101 Switching\nUpgrade: websocket\n"), []);
+        await using IEasyTransfer handle = easy;
+        easy.Options = WebSocketConnectOnlyTo("ws://h/2304");
+
+        CurlCode code = await easy.PerformAsync(CancellationToken.None);
+        CurlWebSocketSendResult sent = await easy.WebSocket.SendAsync(Ascii("foobar"), 0, CurlWebSocketFlags.Ping, CancellationToken.None);
+
+        Assert.AreEqual(CurlCode.Ok, code);
+        Assert.AreEqual(CurlCode.BadFunctionArgument, sent.Result);
         Assert.IsTrue(peer.IsDisposed);
     }
 

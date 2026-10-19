@@ -4,6 +4,7 @@ using Curl.Api.Codes;
 using Curl.Api.EngineContracts;
 using Curl.Api.Options;
 using Curl.Api.Options.Behaviour;
+using Curl.Api.Options.Http;
 using Curl.Api.Options.Network;
 using Curl.Api.Options.Proxy;
 using Curl.Protocol.Abstractions;
@@ -42,6 +43,69 @@ public sealed partial class ManagedEasyTransferTests
         string written = Encoding.ASCII.GetString(connector.Written);
         StringAssert.StartsWith(written, "PUT /up HTTP/1.1\r\n");
         StringAssert.EndsWith(written, "Content-Length: 13\r\n\r\nHello Cloud!\n");
+    }
+
+    // Upstream test 1576's shape (BL-2659): a custom method, Expect removed, and a callback answering 45 bytes on every call.
+    [TestMethod]
+    public async Task PerformAsync_CustomRequestUploadWithInFileSizeAndACallbackThatNeverEnds_StopsAtTheUploadSize()
+    {
+        ScriptedConnector connector = new([Encoding.ASCII.GetBytes(Response)]);
+        await using IEasyTransfer easy = CreateEngine(connector).CreateEasy();
+        byte[] chunk = Encoding.ASCII.GetBytes(new string('x', 45));
+        int calls = 0;
+        easy.Options = new EasyOptions
+        {
+            Network = new EasyNetworkOptions { Url = "http://h/1576" },
+            Http = new EasyHttpOptions { HttpHeaders = ["Expect:"] },
+            Transfer = new EasyTransferOptions { Upload = true, InFileSize = 45, CustomRequest = "CURL" },
+            Callbacks = new()
+            {
+                Read = buffer =>
+                {
+                    calls++;
+                    chunk.CopyTo(buffer);
+                    return chunk.Length;
+                },
+            },
+        };
+        using CancellationTokenSource stall = new(TimeSpan.FromSeconds(10));
+
+        CurlCode code = await easy.PerformAsync(stall.Token);
+
+        Assert.AreEqual(CurlCode.Ok, code);
+        Assert.AreEqual(1, calls);
+        string written = Encoding.ASCII.GetString(connector.Written);
+        StringAssert.StartsWith(written, "CURL /1576 HTTP/1.1\r\n");
+        Assert.DoesNotContain("Expect:", written);
+        StringAssert.EndsWith(written, "Content-Length: 45\r\n\r\n" + new string('x', 45));
+    }
+
+    // Upstream test 3034's shape (BL-2703): a sized upload with no seek callback followed through a 307 cannot rewind.
+    [TestMethod]
+    public async Task PerformAsync_RedirectedSizedReadCallbackUploadWithoutASeekCallback_ReturnsSendFailRewind()
+    {
+        ScriptedConnector connector = new([Encoding.ASCII.GetBytes(Continue + TemporaryRedirect), Encoding.ASCII.GetBytes(Continue + Response)]);
+        await using IEasyTransfer easy = CreateEngine(connector).CreateEasy();
+        easy.Options = new EasyOptions
+        {
+            Network = new EasyNetworkOptions { Url = "http://h/3034" },
+            Transfer = new EasyTransferOptions { Upload = true, InFileSize = 5 },
+            Http = new EasyHttpOptions { FollowLocation = FollowLocation.All },
+            Callbacks = new()
+            {
+                Read = buffer =>
+                {
+                    "hello\0"u8[..Math.Min(6, buffer.Length)].CopyTo(buffer);
+                    return Math.Min(6, buffer.Length);
+                },
+            },
+        };
+        using CancellationTokenSource stall = new(TimeSpan.FromSeconds(10));
+
+        CurlCode code = await easy.PerformAsync(stall.Token);
+
+        Assert.AreEqual(CurlCode.SendFailRewind, code);
+        Assert.AreEqual(CallbackReadStream.RewindImpossibleText, easy.ErrorText);
     }
 
     [TestMethod]

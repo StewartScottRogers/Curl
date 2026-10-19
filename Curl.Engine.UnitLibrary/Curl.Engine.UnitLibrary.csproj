@@ -7,6 +7,7 @@
     <InternalsVisibleTo Include="Curl.Conformance.UnitTests" />
     <InternalsVisibleTo Include="Curl.Engine.IntegrationTests" />
     <InternalsVisibleTo Include="Curl.Engine.UnitTests" />
+    <InternalsVisibleTo Include="Libcurl.UnitTests" />
   </ItemGroup>
 
   <ItemGroup>

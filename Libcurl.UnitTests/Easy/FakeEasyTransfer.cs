@@ -2,6 +2,7 @@ using Curl.Api.Codes;
 using Curl.Api.EngineContracts;
 using Curl.Api.EngineContracts.ConnectOnly;
 using Curl.Api.EngineContracts.Headers;
+using Curl.Api.EngineContracts.Tls;
 using Curl.Api.EngineContracts.WebSocket;
 using Curl.Api.Info;
 using Curl.Api.Options;
@@ -78,6 +79,35 @@ internal sealed class FakeEasyTransfer : IEasyTransfer
     {
         UpkeptWith.Add(cancellationToken);
         return ValueTask.FromResult(PauseAndUpkeepResult);
+    }
+
+    /// <summary>Every <see cref="ImportTlsSession"/> call's arguments, in order.</summary>
+    public List<(string? SessionKey, byte[]? SaltAndHmac, byte[] PackedSession)> Imported { get; } = [];
+
+    /// <summary>What <see cref="ImportTlsSession"/> answers.</summary>
+    public CurlCode ImportResult { get; init; } = CurlCode.Ok;
+
+    /// <summary>The sessions <see cref="ExportTlsSessions"/> hands out, in order.</summary>
+    public List<ExportedTlsSession> HeldSessions { get; init; } = [];
+
+    public CurlCode ImportTlsSession(string? sessionKey, byte[]? saltAndHmac, byte[] packedSession)
+    {
+        Imported.Add((sessionKey, saltAndHmac, packedSession));
+        return ImportResult;
+    }
+
+    public CurlCode ExportTlsSessions(Func<ExportedTlsSession, CurlCode> export)
+    {
+        foreach (ExportedTlsSession session in HeldSessions)
+        {
+            CurlCode code = export(session);
+            if (code != CurlCode.Ok)
+            {
+                return code;
+            }
+        }
+
+        return CurlCode.Ok;
     }
 
     public ValueTask DisposeAsync()

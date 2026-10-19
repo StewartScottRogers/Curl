@@ -38,7 +38,8 @@ internal sealed class ParallelTransferMulti(CurlMulti multi) : IAsyncDisposable
 
     /// <summary>
     /// Performs one attempt of <paramref name="easy" /> through the multi handle: <c>curl_multi_add_handle</c>,
-    /// then <c>curl_multi_perform</c>, which starts its transfer, and waits for its <c>CURLMSG_DONE</c> message.
+    /// then <c>curl_multi_perform</c>, which starts its transfer, and <c>curl_multi_perform</c> again, which
+    /// reports it done if it already is, and waits for its <c>CURLMSG_DONE</c> message.
     /// </summary>
     /// <param name="easy">The transfer's easy handle, set up for the attempt and in no multi handle.</param>
     /// <returns>The attempt's result, from its message; the handle has been removed again.</returns>
@@ -53,6 +54,10 @@ internal sealed class ParallelTransferMulti(CurlMulti multi) : IAsyncDisposable
             // A handle in no multi handle is always added.
             _ = multi.AddHandle(easy);
             waiting.Add(easy, ended);
+
+            // The perform that starts a transfer never reports it done, as libcurl's first perform only begins
+            // its connect; a second takes the message of one that has already finished (BL-2743).
+            await PerformAndTakeMessagesAsync().ConfigureAwait(false);
             await PerformAndTakeMessagesAsync().ConfigureAwait(false);
             StartLoopWhileAnyWaits();
         }

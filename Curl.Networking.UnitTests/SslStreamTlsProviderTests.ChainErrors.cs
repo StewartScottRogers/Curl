@@ -196,6 +196,70 @@ public sealed partial class SslStreamTlsProviderTests
             failure);
     }
 
+    // CURLOPT_SSL_VERIFYPEER 0 with CURLOPT_SSL_VERIFYHOST on: the name still counts (upstream test2118).
+    [TestMethod]
+    [DataRow(SchannelBuild)]
+    [DataRow(OpenSslBuild)]
+    public void VerifyPeer_InsecureButCheckingTheHostNameWithAWrongNameUntrustedCertificate_IsExit60(bool matchesSchannelBuild)
+    {
+        var provider = new SslStreamTlsProvider(new TlsClientOptions(Insecure: true, ChecksHostNameWhenInsecure: true), matchesSchannelBuild);
+        using var chain = BuildUntrustedChainForCertificateHost();
+        const SslPolicyErrors errors = SslPolicyErrors.RemoteCertificateChainErrors | SslPolicyErrors.RemoteCertificateNameMismatch;
+
+        Diagnostics.Arrange("policy errors", errors);
+
+        var failure = provider.VerifyPeer(errors, chain, "localhost.nn", []);
+
+        Diagnostics.Act("failure", failure);
+        Assert.AreEqual(CurlExitCode.PeerFailedVerification, failure?.ExitCode);
+    }
+
+    [TestMethod]
+    [DataRow(SchannelBuild)]
+    [DataRow(OpenSslBuild)]
+    public void VerifyPeer_InsecureButCheckingTheHostNameWithARightNameUntrustedCertificate_Accepts(bool matchesSchannelBuild)
+    {
+        var provider = new SslStreamTlsProvider(new TlsClientOptions(Insecure: true, ChecksHostNameWhenInsecure: true), matchesSchannelBuild);
+        using var chain = new X509Chain();
+
+        Diagnostics.Arrange("policy errors", SslPolicyErrors.RemoteCertificateChainErrors);
+
+        var failure = provider.VerifyPeer(SslPolicyErrors.RemoteCertificateChainErrors, chain, CertificateHost, []);
+
+        Diagnostics.Act("failure", failure);
+        Assert.IsNull(failure);
+    }
+
+    [TestMethod]
+    public void VerifyPeer_InsecureWithAWrongNameCertificate_Accepts()
+    {
+        var provider = new SslStreamTlsProvider(new TlsClientOptions(Insecure: true), SchannelBuild);
+        using var chain = new X509Chain();
+
+        Diagnostics.Arrange("policy errors", SslPolicyErrors.RemoteCertificateNameMismatch);
+
+        var failure = provider.VerifyPeer(SslPolicyErrors.RemoteCertificateNameMismatch, chain, "localhost.nn", []);
+
+        Diagnostics.Act("failure", failure);
+        Assert.IsNull(failure);
+    }
+
+    // A self-signed certificate naming CertificateHost, its chain built against no trusted root.
+    private static X509Chain BuildUntrustedChainForCertificateHost()
+    {
+        using var key = RSA.Create(2048);
+        var request = new CertificateRequest($"CN={CertificateHost}", key, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+        var names = new SubjectAlternativeNameBuilder();
+        names.AddDnsName(CertificateHost);
+        request.CertificateExtensions.Add(names.Build());
+        var certificate = request.CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddDays(1));
+        var chain = new X509Chain();
+        chain.ChainPolicy.RevocationMode = X509RevocationMode.NoCheck;
+        chain.ChainPolicy.TrustMode = X509ChainTrustMode.CustomRootTrust;
+        chain.Build(certificate);
+        return chain;
+    }
+
     private static X509Chain BuildTrustedChainOutOfDate()
     {
         using var key = RSA.Create(2048);

@@ -1,5 +1,7 @@
 using System.Text;
 using Curl.Api.Codes;
+using Curl.Api.EngineContracts;
+using Curl.Api.EngineContracts.Share;
 using Curl.Api.Options.Authentication;
 using Libcurl.Global;
 
@@ -100,13 +102,108 @@ public sealed class Lib1649To1906Tests
     }
 
     [TestMethod]
-    public async Task Lib1678_SucceedsAtOnce()
+    public async Task Lib1678_LibraryWithoutSslsExport_SucceedsWithoutImporting()
     {
-        var run = new PortRun(null, 1678);
+        int imports = 0;
+        var engine = new FakeCurlEngine { Importing = _ => { imports++; return CurlCode.Ok; } };
+        var run = new PortRun(engine, 1678);
 
         LibTestResult result = await new Lib1678().RunAsync(run.Context, CancellationToken.None);
 
         Assert.AreEqual(0, result.ExitCode);
+        Assert.AreEqual(0, imports);
+        Assert.IsNull(engine.LastShare);
+    }
+
+    [TestMethod]
+    public async Task Lib1678_LibraryWithSslsExport_ImportsThePacket64TimesOverASharedSessionCache()
+    {
+        var keys = new List<string?>();
+        var engine = new FakeCurlEngine
+        {
+            VersionInfo = new CurlVersionInfo { Features = ["SSL", "SSLS-EXPORT"] },
+            Importing = key => { keys.Add(key); return CurlCode.Ok; },
+        };
+        var run = new PortRun(engine, 1678);
+
+        LibTestResult result = await new Lib1678().RunAsync(run.Context, CancellationToken.None);
+
+        Assert.AreEqual(0, result.ExitCode);
+        Assert.HasCount(Lib1678.ImportCount, keys);
+        Assert.IsTrue(keys.TrueForAll(key => key == "example.test:443"));
+        Assert.IsNotNull(engine.LastShare);
+        Assert.AreEqual(string.Empty, run.Error.ToString());
+    }
+
+    [TestMethod]
+    public async Task Lib1678_ThirdImportFails_WritesItsLineAndEndsWithItsCode()
+    {
+        int imports = 0;
+        var engine = new FakeCurlEngine
+        {
+            VersionInfo = new CurlVersionInfo { Features = ["SSLS-EXPORT"] },
+            Importing = _ => ++imports == 3 ? CurlCode.ReadError : CurlCode.Ok,
+        };
+        var run = new PortRun(engine, 1678);
+
+        LibTestResult result = await new Lib1678().RunAsync(run.Context, CancellationToken.None);
+
+        Assert.AreEqual(26, result.ExitCode);
+        Assert.AreEqual(3, imports);
+        Assert.AreEqual("import 2 failed: 26 (Failed to open/read local data from file/application)\n", run.Error.ToString());
+    }
+
+    [TestMethod]
+    public async Task Lib1678Test_ShareRefusesTheSessionCache_EndsWithFailedInitWithoutImporting()
+    {
+        int imports = 0;
+        await using CurlLibrary library = CurlGlobal.Init(new FakeCurlEngine { ShareResult = CurlShareCode.NotBuiltIn, Importing = _ => { imports++; return CurlCode.Ok; } });
+        var run = new PortRun(null, 1678);
+
+        Lib1678.Test(run.Context, run.Steps, library);
+
+        Assert.AreEqual(CurlCode.FailedInit, run.Steps.Result);
+        Assert.AreEqual(0, imports);
+    }
+
+    [TestMethod]
+    public async Task Lib1678Test_CleanedUpLibrary_EndsWithFailedInit()
+    {
+        CurlLibrary library = await PortRun.CleanedUpLibraryAsync();
+        var run = new PortRun(null, 1678);
+
+        Lib1678.Test(run.Context, run.Steps, library);
+
+        Assert.AreEqual(CurlCode.FailedInit, run.Steps.Result);
+        Assert.AreEqual(string.Empty, run.Error.ToString());
+    }
+
+    [TestMethod]
+    public async Task Lib1678ImportOverShare_ShareOptionRefused_EndsWithItsCodeWithoutImporting()
+    {
+        int imports = 0;
+        await using CurlLibrary library = CurlGlobal.Init(new FakeCurlEngine { Importing = _ => { imports++; return CurlCode.Ok; } });
+        using var easy = library.EasyInit();
+        var run = new PortRun(null, 1678);
+
+        CurlCode code = Lib1678.ImportOverShare(run.Context, easy, "not a share handle");
+
+        Assert.AreEqual(CurlCode.BadFunctionArgument, code);
+        Assert.AreEqual(0, imports);
+    }
+
+    [TestMethod]
+    public void Lib1678Packet_IsUpstreamsPacketWithRepeatedTags()
+    {
+        IReadOnlyList<byte> packet = Lib1678.Packet;
+
+        Assert.HasCount(1 + 3 + 4096 + 3 + 127 + 3 + 10 + 4 + 4 + 4, packet);
+        CollectionAssert.AreEqual(new byte[] { 0x01, 0x04, 0x10, 0x00, (byte)'A' }, packet.Take(5).ToArray());
+        CollectionAssert.AreEqual(new byte[] { 0x07, 0x00, 0x7F, (byte)'Q' }, packet.Skip(4100).Take(4).ToArray());
+        CollectionAssert.AreEqual(new byte[] { 0x05, 0x00, 0x0A, (byte)'a' }, packet.Skip(4230).Take(4).ToArray());
+        CollectionAssert.AreEqual(
+            new byte[] { 0x04, 0x00, 0x01, (byte)'B', 0x05, 0x00, 0x01, (byte)'b', 0x07, 0x00, 0x01, (byte)'R' },
+            packet.Skip(packet.Count - 12).ToArray());
     }
 
     [TestMethod]

@@ -223,6 +223,96 @@ public sealed record CurlUrl
         TryParse(text, pathAsIs, OperatingSystem.IsWindows(), disallowUser: true, out url, out rejection);
 
     /// <summary>
+    /// Parses <paramref name="text" /> as <see cref="TryParse(string, bool, out CurlUrl, out CurlUrlRejection)" />
+    /// does, but under libcurl's <c>CURLU_NO_AUTHORITY</c>: at most two slashes after the scheme
+    /// are skipped, any more starting the path, and an empty authority is an empty
+    /// <see cref="Host" /> rather than <see cref="CurlUrlRejection.NoHost" />, as curl 8.22.0's
+    /// <c>parseurl</c> reads <c>weird:///path</c> (lib1560).
+    /// </summary>
+    /// <param name="text">The URL as typed.</param>
+    /// <param name="pathAsIs">
+    /// <see langword="true" /> to keep <c>.</c> and <c>..</c> path segments, as <c>CURLU_PATH_AS_IS</c> does.
+    /// </param>
+    /// <param name="disallowUser">
+    /// <see langword="true" /> to reject user information as
+    /// <see cref="TryParseDisallowingUser" /> does.
+    /// </param>
+    /// <param name="url">The parsed URL, or <see langword="null" /> when curl rejects the text.</param>
+    /// <param name="rejection">
+    /// Why curl rejects the text, or <see cref="CurlUrlRejection.None" /> when it accepts it.
+    /// </param>
+    /// <returns><see langword="true" /> when curl accepts the text.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="text" /> is <see langword="null" />.</exception>
+    public static bool TryParseAllowingEmptyHost(
+        string text,
+        bool pathAsIs,
+        bool disallowUser,
+        [NotNullWhen(true)] out CurlUrl? url,
+        out CurlUrlRejection rejection)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+
+        url = CurlUrlParser.Parse(text, pathAsIs, OperatingSystem.IsWindows(), disallowUser, out rejection, allowEmptyHost: true);
+
+        return url is not null;
+    }
+
+    /// <summary>
+    /// Parses <paramref name="text" /> as libcurl 8.22.0's <c>curl_url_set(CURLUPART_URL)</c> does: as
+    /// <see cref="TryParseDisallowingUser" /> under <see cref="CurlUrlApiFlags.DisallowUser" />, as
+    /// <see cref="TryParseAllowingEmptyHost" /> under <see cref="CurlUrlApiFlags.AllowEmptyHost" />, and with a
+    /// <c>file</c> URL's backslashes kept as typed, so on Windows <c>file:///C:\programs\foo</c> has the
+    /// path <c>C:\programs\foo</c>; the curl tool alone turns them into slashes (lib1560). Unless
+    /// <see cref="CurlUrlApiFlags.GuessesScheme" />, text starting <c>file:</c> is a <c>file</c> URL with no
+    /// <c>/</c> after the colon too, so <c>file:foo</c> is <see cref="CurlUrlRejection.BadFileUrl" />.
+    /// </summary>
+    /// <param name="text">The URL as given.</param>
+    /// <param name="pathAsIs">
+    /// <see langword="true" /> to keep <c>.</c> and <c>..</c> path segments, as <c>CURLU_PATH_AS_IS</c> does.
+    /// </param>
+    /// <param name="flags">The URL API flags the parse reads.</param>
+    /// <param name="url">The parsed URL, or <see langword="null" /> when libcurl rejects the text.</param>
+    /// <param name="rejection">
+    /// Why libcurl rejects the text, or <see cref="CurlUrlRejection.None" /> when it accepts it.
+    /// </param>
+    /// <returns><see langword="true" /> when libcurl accepts the text.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="text" /> is <see langword="null" />.</exception>
+    public static bool TryParseForUrlApi(
+        string text,
+        bool pathAsIs,
+        CurlUrlApiFlags flags,
+        [NotNullWhen(true)] out CurlUrl? url,
+        out CurlUrlRejection rejection) =>
+        TryParseForUrlApi(text, pathAsIs, OperatingSystem.IsWindows(), flags, out url, out rejection);
+
+    /// <summary>
+    /// Parses <paramref name="text" /> as <see cref="TryParseForUrlApi(string, bool, CurlUrlApiFlags, out CurlUrl, out CurlUrlRejection)" />
+    /// does with the drive-letter rules of the chosen platform, so both can be tested on either.
+    /// </summary>
+    internal static bool TryParseForUrlApi(
+        string text,
+        bool pathAsIs,
+        bool driveLetters,
+        CurlUrlApiFlags flags,
+        [NotNullWhen(true)] out CurlUrl? url,
+        out CurlUrlRejection rejection)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+
+        url = CurlUrlParser.Parse(
+            text,
+            pathAsIs,
+            driveLetters,
+            flags.DisallowUser,
+            out rejection,
+            flags.AllowEmptyHost,
+            keepFileBackslashes: true,
+            fileSchemeWithoutSlash: !flags.GuessesScheme);
+
+        return url is not null;
+    }
+
+    /// <summary>
     /// Parses <paramref name="text" /> with the drive-letter rules of the chosen platform,
     /// so both can be tested on either.
     /// </summary>

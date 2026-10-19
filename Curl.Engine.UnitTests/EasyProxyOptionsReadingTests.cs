@@ -47,6 +47,23 @@ public sealed class EasyProxyOptionsReadingTests
     }
 
     [TestMethod]
+    [DataRow(null, "proxy.example", 8992, 8992)]
+    [DataRow(null, "proxy.example:3128", 8992, 3128)]
+    [DataRow(null, "proxy.example", 0, 80)]
+    [DataRow("socks4://pre.example:1080", "proxy.example", 8992, 8992)]
+    public void TrySelect_ProxyPort_IsThePortOfProxyTextThatNamesNone(string? preProxy, string proxyText, int proxyPort, int expectedPort)
+    {
+        EasyProxyOptions options = new() { Proxy = proxyText, ProxyPort = proxyPort, PreProxy = preProxy };
+        Diagnostics.Arrange("pre-proxy / proxy / proxy port", $"{preProxy} / {proxyText} / {proxyPort}");
+
+        TransferProxySelection.TrySelect(new ProxySelector(_ => null), options, false, null, Url, out ProxyEndpoint? proxy, out _);
+        Diagnostics.Act("port", proxy?.Port);
+
+        Diagnostics.Assert("port", expectedPort, proxy?.Port);
+        Assert.AreEqual(expectedPort, proxy!.Port);
+    }
+
+    [TestMethod]
     public void TrySelect_Http10ProxyTypeWithAnHttpScheme_KeepsHttp10()
     {
         EasyProxyOptions options = new() { Proxy = "http://proxy.example:3128", ProxyType = ProxyType.Http10 };
@@ -94,6 +111,35 @@ public sealed class EasyProxyOptionsReadingTests
 
         Diagnostics.Assert("selected / kind", "True / Socks5", $"{selected} / {proxy?.Kind}");
         Assert.AreEqual(ProxyKind.Socks5, proxy!.Kind);
+    }
+
+    [TestMethod]
+    public void TrySelect_SocksPreProxyAndAnHttpProxy_IsTheHttpProxy()
+    {
+        EasyProxyOptions options = new() { PreProxy = "socks5://127.0.0.1:1080", Proxy = "http://proxy.example:3128" };
+
+        bool selected = TransferProxySelection.TrySelect(new ProxySelector(_ => null), options, false, null, Url, out ProxyEndpoint? proxy, out TransferResult? failure);
+        Diagnostics.Act("selected / kind / host", $"{selected} / {proxy?.Kind} / {proxy?.Host}");
+
+        Diagnostics.Assert("selected / kind / host", "True / Http / proxy.example", $"{selected} / {proxy?.Kind} / {proxy?.Host}");
+        Assert.IsTrue(selected);
+        Assert.IsNull(failure);
+        Assert.AreEqual(ProxyKind.Http, proxy!.Kind);
+        Assert.AreEqual("proxy.example", proxy.Host);
+    }
+
+    [TestMethod]
+    public void TrySelect_SocksPreProxyAndASocksProxy_IsExit5()
+    {
+        EasyProxyOptions options = new() { PreProxy = "socks5://127.0.0.1:1080", Proxy = "socks5://proxy.example:1080" };
+
+        bool selected = TransferProxySelection.TrySelect(new ProxySelector(_ => null), options, false, null, Url, out ProxyEndpoint? proxy, out TransferResult? failure);
+        Diagnostics.Act("selected / exit code", $"{selected} / {failure?.ExitCode}");
+
+        Diagnostics.Assert("selected / exit code", "False / CouldntResolveProxy", $"{selected} / {failure?.ExitCode}");
+        Assert.IsFalse(selected);
+        Assert.IsNull(proxy);
+        Assert.AreEqual(CurlExitCode.CouldntResolveProxy, failure!.ExitCode);
     }
 
     [TestMethod]

@@ -319,6 +319,7 @@ cache open, and `DnsCache.Clear` drops every entry, `--resolve` ones included: l
 `CURLMNWC_CLEAR_CONNS` and `CURLMNWC_CLEAR_DNS`, which the engine's multi handle runs.
 Per BL-2468 (ADR-0605) `ConnectionCache.CloseIdleBeyondAsync(keep)` closes the oldest idle connections
 until no more than `keep`, idle and in use, remain, never one in use: the multi handle's `CURLMOPT_MAXCONNECTS`.
+Per BL-2730 `PoolingConnector.MaximumConnectionLifetime` (`CURLOPT_MAXLIFETIME_CONN`, 24 hours by default, zero for no limit; `Over` keeps it, and `EngineComposition.CreatePoolingConnector` sets it from `EasyNetworkOptions.MaxConnectionLifetime`) retires an idle connection opened longer ago (`PoolEntry.OpenedAt`): it is closed with `shutting down connection #N` and the next idle one tried, as curl's connection cache does (upstream test1542).
 Per ADR-0684 (BL-2629) `ConnectionCache.OpeningOwner`, an `AsyncLocal`, is recorded on each connection a `PoolingConnector` opens in that flow (`PoolEntry.Owner`), and `CloseIdleOwnedByAsync(owner)` closes that owner's idle connections, never one in use: the engine's `curl_easy_cleanup`.
 
 Per BL-717 a pooled connection whose `IConnectionSession` multiplexes (HTTP/2) is shared, not
@@ -545,7 +546,9 @@ Everything else takes the Abstractions contracts (`IDnsResolver`, `ITlsProvider`
 `StreamConnection` wraps any `Stream`, so it is tested over a `MemoryStream`. Per ADR-0419
 (BL-1450) on Windows it reports a read failing with `SocketError.ConnectionAborted` as
 `ConnectionReset` (`ReportsAbortedReadAsReset`), since Windows gives a receive issued a few
-milliseconds after a peer's RST WSAECONNABORTED where curl's prompt `recv` sees WSAECONNRESET. `UdpDatagramConnector` opens channels
+milliseconds after a peer's RST WSAECONNABORTED where curl's prompt `recv` sees WSAECONNRESET; per
+ADR-0708 (BL-2821) not when the last write found unread bytes on the socket (`HasUnreadBytesBeforeWrite`),
+as test1802's proxy leaves after its CONNECT reply before closing, where curl prints the abort. `UdpDatagramConnector` opens channels
 through an internal seam, so its tests need no socket. `UdpDatagramChannelTests` opens,
 cancels and disposes local UDP sockets without sending anything.
 `SslStreamTlsProviderTests` runs real handshakes against a server-side `SslStream` over

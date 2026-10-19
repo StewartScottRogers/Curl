@@ -64,11 +64,12 @@ as the command line ([ADR-0506](Documentation/Planning/Decisions/ADR-0506-libcur
 | [`Curl.Mcp`](Curl.Mcp) | A Model Context Protocol server over stdio, so AI agents (GitHub Copilot, Claude and others) use Curl as a tool: `curl`, `transfer`, `parse_url`, `build_url` and `version`, plus the `--ai-help` text as resources. File access is confined to `CURL_MCP_ROOT`. Run it with `dnx Curl.Mcp`; setup is in [its README](Curl.Mcp/README.md). Tested by `Curl.Mcp.UnitTests` and `Curl.Mcp.IntegrationTests`. |
 | [`Curl.Mcp.UnitLibrary`](Curl.Mcp.UnitLibrary) | All of `Curl.Mcp`'s tool logic, base class library only: the path confinement, the tool implementations, the result and error types. |
 
-Where it stands: the engine is extracted and `Curl.Api.UnitLibrary`'s seam is defined;
-the console is being re-based onto the engine through it. `Libcurl` and `Curl.Api` are
-created and empty until their own phases: `Libcurl` is filled area by area next, then
-`Curl.Api` over it, then upstream's `tests/libtest` cases are ported to measure it. Both
-are held to the same quality gates as every library here.
+Where it stands: the engine is extracted and `Curl.Api.UnitLibrary`'s seam is defined.
+`Libcurl` and `Curl.Api` are implemented, not empty: `Libcurl` holds the global and easy
+interfaces, the option table and setters, multi, share and MIME; `Curl.Api` holds
+`CurlClient` and `CurlHttpMessageHandler`. `Curl.Conformance.LibTest.UnitLibrary` ports
+upstream's `tests/libtest` cases to drive `Libcurl` and measure it. Both are held to the
+same quality gates as every library here.
 
 ## Built by a dark factory
 

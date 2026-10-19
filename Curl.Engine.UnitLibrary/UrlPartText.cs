@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Text;
 using Curl.Api.Codes;
 using Curl.Api.EngineContracts.Url;
+using Curl.Protocol.Abstractions;
 
 namespace Curl.Engine;
 
@@ -56,7 +57,7 @@ internal static class UrlPartText
 
     /// <summary>
     /// Converts a host under <c>CURLU_PUNYCODE</c> (a name that is not ASCII to punycode) or, without
-    /// it, <c>CURLU_PUNY2IDN</c> (an ASCII name starting <c>xn--</c> to Unicode).
+    /// it, <c>CURLU_PUNY2IDN</c> (an ASCII name holding <c>xn--</c> to Unicode).
     /// </summary>
     /// <param name="host">The host.</param>
     /// <param name="flags">The get's flags.</param>
@@ -69,7 +70,7 @@ internal static class UrlPartText
             return ascii ? UrlPartResult.Found(host) : Convert(Idn.GetAscii, host);
         }
 
-        bool punycoded = ascii && host.StartsWith(PunycodePrefix, StringComparison.Ordinal);
+        bool punycoded = ascii && host.Contains(PunycodePrefix, StringComparison.Ordinal);
 
         return flags.HasFlag(CurlUrlFlags.PunycodeToIdn) && punycoded
             ? Convert(Idn.GetUnicode, host)
@@ -85,7 +86,7 @@ internal static class UrlPartText
     public static string Escape(string text)
     {
         StringBuilder escaped = new();
-        foreach (byte value in Encoding.UTF8.GetBytes(text))
+        foreach (byte value in UrlByteText.ToBytes(text))
         {
             if (Unreserved.Contains(value))
             {
@@ -106,7 +107,7 @@ internal static class UrlPartText
     /// </summary>
     private static string? Decode(string text)
     {
-        byte[] bytes = Encoding.UTF8.GetBytes(text);
+        byte[] bytes = UrlByteText.ToBytes(text);
         List<byte> decoded = new(bytes.Length);
         for (int index = 0; index < bytes.Length; index++)
         {
@@ -125,7 +126,7 @@ internal static class UrlPartText
             decoded.Add(value);
         }
 
-        return Encoding.UTF8.GetString([.. decoded]);
+        return UrlByteText.ToText([.. decoded]);
     }
 
     private static bool IsHexPair(byte[] bytes, int index) =>
@@ -144,7 +145,7 @@ internal static class UrlPartText
     {
         StringBuilder encoded = new();
         bool beforeQuery = !query;
-        foreach (byte value in Encoding.UTF8.GetBytes(text))
+        foreach (byte value in UrlByteText.ToBytes(text))
         {
             if (value == Space)
             {

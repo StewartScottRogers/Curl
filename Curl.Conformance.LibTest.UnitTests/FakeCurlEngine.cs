@@ -42,6 +42,12 @@ internal sealed class FakeCurlEngine : ICurlEngine
     /// <summary>What a share handle's lock-callback setter answers.</summary>
     public CurlShareCode ShareLockResult { get; init; } = CurlShareCode.Ok;
 
+    /// <summary>What a share handle's share call answers.</summary>
+    public CurlShareCode ShareResult { get; init; } = CurlShareCode.Ok;
+
+    /// <summary>Answers each easy transfer's TLS session import, given the peer key; none answers the seam's NotBuiltIn.</summary>
+    public Func<string?, CurlCode>? Importing { get; init; }
+
     /// <summary>What a share handle's cleanup answers.</summary>
     public CurlShareCode ShareCleanupResult { get; init; } = CurlShareCode.Ok;
 
@@ -51,7 +57,7 @@ internal sealed class FakeCurlEngine : ICurlEngine
     public IEasyTransfer CreateEasy()
     {
         CreatingEasy?.Invoke();
-        return new FakeEasyTransfer(PerformResult, Info, Performing) { Informing = Informing, ConnectOnly = ConnectOnly, Pauses = Pauses, TransferHeaders = Headers, WebSocketConnection = WebSocket };
+        return new FakeEasyTransfer(PerformResult, Info, Performing) { Importing = Importing, Informing = Informing, ConnectOnly = ConnectOnly, Pauses = Pauses, TransferHeaders = Headers, WebSocketConnection = WebSocket, Disposing = () => DisposedEasyCount++ };
     }
 
     public FakeMultiTransfer Multi { get; } = new();
@@ -65,11 +71,14 @@ internal sealed class FakeCurlEngine : ICurlEngine
     public IShareHandle CreateShare()
     {
         CreatingShare?.Invoke();
-        LastShare = new FakeShareHandle { LockResult = ShareLockResult, CleanupResult = ShareCleanupResult };
+        LastShare = new FakeShareHandle { LockResult = ShareLockResult, CleanupResult = ShareCleanupResult, ShareResult = ShareResult };
         return LastShare;
     }
 
-    public ICurlUrlHandle CreateUrl() => new FakeUrlHandle { SetResult = UrlSetResult, GetResult = UrlGetResult };
+    public ICurlUrlHandle CreateUrl() => CreatingUrl?.Invoke() ?? new FakeUrlHandle { SetResult = UrlSetResult, GetResult = UrlGetResult };
+
+    /// <summary>Makes each URL handle instead of a <see cref="FakeUrlHandle"/>, when set.</summary>
+    public Func<ICurlUrlHandle>? CreatingUrl { get; init; }
 
     public CurlUrlCode? UrlGetResult { get; init; }
 
@@ -92,6 +101,9 @@ internal sealed class FakeCurlEngine : ICurlEngine
 
     /// <summary>Every <c>curl_easy_pause</c> any of its easy transfers was given.</summary>
     public List<CurlPause> Pauses { get; } = [];
+
+    /// <summary>How many of its easy transfers were disposed (<c>curl_easy_cleanup</c>).</summary>
+    public int DisposedEasyCount { get; private set; }
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
@@ -121,6 +133,10 @@ internal sealed class FakeCurlEngine : ICurlEngine
 
         public IEasyTransfer Duplicate() => new FakeEasyTransfer(performResult, info, performing) { Options = Options, Pauses = Pauses, Informing = Informing };
 
+        public Func<string?, CurlCode>? Importing { get; init; }
+
+        public CurlCode ImportTlsSession(string? sessionKey, byte[]? saltAndHmac, byte[] packedSession) => Importing?.Invoke(sessionKey) ?? CurlCode.NotBuiltIn;
+
         public void Reset() => Options = new();
 
         public List<CurlPause> Pauses { get; init; } = [];
@@ -133,6 +149,12 @@ internal sealed class FakeCurlEngine : ICurlEngine
 
         public ValueTask<CurlCode> UpkeepAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
 
-        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+        public Action? Disposing { get; init; }
+
+        public ValueTask DisposeAsync()
+        {
+            Disposing?.Invoke();
+            return ValueTask.CompletedTask;
+        }
     }
 }

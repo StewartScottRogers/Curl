@@ -42,6 +42,34 @@ public sealed class EasyAuthenticationOptionsReadingTests
     }
 
     [TestMethod]
+    public void TryLookUp_NetrcRequiredAndTheHostFound_ReportsNoHostNotFoundLine()
+    {
+        EasyAuthenticationOptions options = new() { Netrc = NetrcUsage.Required, NetrcFile = NetrcPath };
+        List<string> infoLines = [];
+        Diagnostics.Arrange("options", options);
+
+        bool looked = Lookup().TryLookUp(options, CurlUrl.Parse("http://h/"), out _, out _, infoLines.Add);
+        Diagnostics.Act("looked / info lines", $"{looked} / {string.Join(" | ", infoLines)}");
+
+        Assert.IsTrue(looked);
+        Assert.IsEmpty(infoLines);
+    }
+
+    [TestMethod]
+    public void TryLookUp_NetrcRequiredAndTheHostNotInTheFile_ReportsTheHostNotFoundLine()
+    {
+        EasyAuthenticationOptions options = new() { Netrc = NetrcUsage.Required, NetrcFile = NetrcPath };
+        List<string> infoLines = [];
+        Diagnostics.Arrange("options", options);
+
+        bool looked = Lookup().TryLookUp(options, CurlUrl.Parse("http://other/"), out _, out _, infoLines.Add);
+        Diagnostics.Act("looked / info lines", $"{looked} / {string.Join(" | ", infoLines)}");
+
+        Assert.IsTrue(looked);
+        Assert.AreEqual("Could not find host other in the my.netrc file; using defaults", infoLines.Single());
+    }
+
+    [TestMethod]
     public void TryLookUp_NetrcRequiredAndFileMissing_FailsWithExit26()
     {
         EasyAuthenticationOptions options = new() { Netrc = NetrcUsage.Required, NetrcFile = "missing.netrc" };

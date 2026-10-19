@@ -35,6 +35,49 @@ public sealed class TlsClientOptionsMappingTests
         Assert.AreEqual(Expect(new TlsClientOptions(Insecure: true)), Map("-k", Url));
     }
 
+    // CURLOPT_SSL_VERIFYPEER 0 with CURLOPT_SSL_VERIFYHOST on still checks the name (upstream test2118).
+    [TestMethod]
+    [DataRow(false, true, true)]
+    [DataRow(false, false, false)]
+    [DataRow(true, true, false)]
+    [DataRow(true, false, false)]
+    public void Of_VerifyPeerAndVerifyHost_ChecksHostNameWhenInsecureOnlyForHostWithoutPeer(bool verifyPeer, bool verifyHost, bool expected)
+    {
+        var peer = new TlsPeerOptions { VerifyPeer = verifyPeer, VerifyHost = verifyHost };
+        var tls = new EasyTlsOptions { Origin = peer, Proxy = peer };
+
+        Diagnostics.Arrange("verify peer, verify host", $"{verifyPeer}, {verifyHost}");
+
+        var target = TlsClientOptionsMapping.Of(tls, useAlpn: true, sslSessionsFile: null);
+        var proxy = TlsClientOptionsMapping.ProxyOf(tls, useAlpn: true);
+
+        Diagnostics.Act("target, proxy", $"{target.ChecksHostNameWhenInsecure}, {proxy.ChecksHostNameWhenInsecure}");
+        Assert.AreEqual(expected, target.ChecksHostNameWhenInsecure);
+        Assert.AreEqual(expected, proxy.ChecksHostNameWhenInsecure);
+        Assert.AreEqual(!verifyPeer, target.Insecure);
+    }
+
+    [TestMethod]
+    public void OfProxyOfAndDohOf_CertificateAuthorityBlobs_CarryEachPeersBlob()
+    {
+        byte[] originBlob = [1, 2];
+        byte[] proxyBlob = [3];
+        var tls = new EasyTlsOptions
+        {
+            Origin = new TlsPeerOptions { CertificateAuthorityBlob = originBlob },
+            Proxy = new TlsPeerOptions { CertificateAuthorityBlob = proxyBlob },
+        };
+
+        var target = TlsClientOptionsMapping.Of(tls, useAlpn: true, sslSessionsFile: null);
+        var proxy = TlsClientOptionsMapping.ProxyOf(tls, useAlpn: true);
+        var doh = TlsClientOptionsMapping.DohOf(tls);
+
+        Diagnostics.Act("target, proxy, doh blob lengths", $"{target.CaCertificateBlob?.Length}, {proxy.CaCertificateBlob?.Length}, {doh.CaCertificateBlob?.Length}");
+        CollectionAssert.AreEqual(originBlob, target.CaCertificateBlob!.Value.ToArray());
+        CollectionAssert.AreEqual(proxyBlob, proxy.CaCertificateBlob!.Value.ToArray());
+        CollectionAssert.AreEqual(originBlob, doh.CaCertificateBlob!.Value.ToArray());
+    }
+
     [TestMethod]
     public void FromCommandLine_CaCertificateFile_CopiesThePathVerbatim()
     {
@@ -252,7 +295,9 @@ public sealed class TlsClientOptionsMappingTests
     {
         Assert.AreEqual(
             Expect(new TlsClientOptions()),
-            MapProxy("--curves", "X25519", "--tls-earlydata", "--ech", "true", "--tlsuser", "user", "--tlspassword", "p", Url));
+            MapProxy("--curves", "X25519", "--sigalgs", "rsa_pss_rsae_sha256", "--tls-earlydata", "--ech", "hard",
+                "--ssl-sessions", "sess.bin", "--engine", "pkcs11", "--dump-ca-embed",
+                "--tlsuser", "user", "--tlspassword", "p", "--tlsauthtype", "SRP", Url));
     }
 
     [TestMethod]

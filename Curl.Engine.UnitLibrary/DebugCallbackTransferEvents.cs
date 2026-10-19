@@ -30,6 +30,19 @@ internal sealed class DebugCallbackTransferEvents(DebugCallback debug, TlsBacken
     internal static DebugCallbackTransferEvents? Of(bool verbose, DebugCallback? debug) =>
         verbose && debug is not null ? new DebugCallbackTransferEvents(debug, PlatformTlsBackend.ForProcess) : null;
 
+    /// <summary>
+    /// The events a handle's transfer reports to under <c>CURLOPT_VERBOSE</c>: the debug callback when one is set,
+    /// else libcurl's default one (<see cref="StandardErrorDebugWriter" />) writing to <paramref name="standardError" />,
+    /// as <c>Curl_debug</c> falls back to <c>CURLOPT_STDERR</c> (BL-2726); <see langword="null" />, for no events, when
+    /// verbose is off.
+    /// </summary>
+    /// <param name="verbose">Whether <c>CURLOPT_VERBOSE</c> is set.</param>
+    /// <param name="debug">The <c>CURLOPT_DEBUGFUNCTION</c>, or <see langword="null" />.</param>
+    /// <param name="standardError">Gives the stream the default writer writes to, asked for only when it is used.</param>
+    /// <returns>The events, or <see langword="null" />.</returns>
+    internal static DebugCallbackTransferEvents? Of(bool verbose, DebugCallback? debug, Func<Stream> standardError) =>
+        verbose ? new DebugCallbackTransferEvents(debug ?? new StandardErrorDebugWriter(standardError()).Write, PlatformTlsBackend.ForProcess) : null;
+
     /// <inheritdoc />
     public void ReportInfo(string text) => ReportText(text);
 

@@ -12,6 +12,14 @@ public sealed record EasyRtspOptions
     /// </summary>
     public string? SessionId { get; init; }
 
+    /// <summary>
+    /// How many times <c>CURLOPT_RTSP_SESSION_ID</c> has been set on the handle. Default 0. libcurl writes the
+    /// session ID into the handle's RTSP state at each set, so a set that repeats the value before it, a
+    /// <see langword="null"/> after a <see langword="null"/> among them, still replaces the ID the server gave
+    /// since; the count tells the engine a set happened (BL-2787).
+    /// </summary>
+    public long SessionIdSetCount { get; init; }
+
     /// <summary><c>CURLOPT_RTSP_STREAM_URI</c>: the stream URI the request names. Default <c>*</c>.</summary>
     public string StreamUri { get; init; } = "*";
 

@@ -115,6 +115,9 @@ public sealed class HttpConnectionPersistenceTests
     [DataRow("HTTP/1.1 401 Unauthorized\r\nProxy-Connection: close\r\nContent-Length: 0\r\n\r\n", false, true, DisplayName = "Without a proxy the header is ignored")]
     [DataRow("HTTP/1.0 407 Proxy\r\nProxy-Connection: close\r\nContent-Length: 0\r\n\r\n", true, false, DisplayName = "1.0 Proxy-Connection: close closes")]
     [DataRow("HTTP/1.0 407 Proxy\r\nConnection: keep-alive\r\nProxy-Connection: close\r\nContent-Length: 0\r\n\r\n", true, true, DisplayName = "1.0 keep-alive is not closed by Proxy-Connection: close")]
+    [DataRow("HTTP/1.0 200 OK\r\nContent-Length: 9\r\nproxy-connection: Keep-Alive\r\n\r\n", true, true, DisplayName = "1.0 Proxy-Connection: keep-alive through a proxy stays open (test1077)")]
+    [DataRow("HTTP/1.0 200 OK\r\nContent-Length: 9\r\nProxy-Connection: Keep-Alive\r\n\r\n", false, false, DisplayName = "1.0 Proxy-Connection: keep-alive without a proxy closes")]
+    [DataRow("HTTP/1.0 200 OK\r\nProxy-Connection: Keep-Alive\r\n\r\n", true, false, DisplayName = "1.0 Proxy-Connection: keep-alive with a body to the close closes")]
     public async Task KeepsAlive_ProxyConnectionClose_ClosesAnHttp11ResponseThroughAProxy(string response, bool throughHttpProxy, bool expected)
     {
         Diagnostics.Arrange("response", Visible(response));

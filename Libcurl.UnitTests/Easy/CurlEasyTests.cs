@@ -2,6 +2,7 @@ using System.Text;
 using Curl.Api.Codes;
 using Curl.Api.EngineContracts;
 using Curl.Api.EngineContracts.ConnectOnly;
+using Curl.Api.EngineContracts.Url;
 using Curl.Api.Options;
 using Libcurl.Easy;
 using Libcurl.Global;
@@ -10,6 +11,7 @@ using Libcurl.Mime;
 using Libcurl.Options;
 using Libcurl.UnitTests.Global;
 using Libcurl.UnitTests.Mime.Mime;
+using Libcurl.Url;
 
 namespace Libcurl.UnitTests.Easy;
 
@@ -32,6 +34,51 @@ public sealed class CurlEasyTests
 
         Assert.AreEqual(CurlCode.Ok, easy.GetInfo(CurlInfo.EffectiveUrl, out var effective));
         Assert.AreEqual(expected, effective);
+    }
+
+    [TestMethod]
+    public async Task Perform_PortOptionZeroAfterAPortOverAUrlHandle_TransfersTheUrlsOwnPortAndLeavesTheHandleUnchanged()
+    {
+        await using var library = CurlGlobal.Init(CurlGlobalFlags.Nothing);
+        using var easy = library.EasyInit();
+        using var url = library.UrlInit();
+        url.Set(CurlUrlPart.Url, "http://127.0.0.1:47/1906", CurlUrlFlags.DefaultScheme);
+        easy.SetOption(CurlOption.Curlu, url);
+        // An unusable proxy ends each perform before anything is dialled, with the URL it would have transferred.
+        easy.SetOption(CurlOption.Proxy, "foo://proxy:1");
+        easy.SetOption(CurlOption.Port, 1L);
+        easy.Perform();
+        easy.GetInfo(CurlInfo.EffectiveUrl, out var ported);
+        url.Get(CurlUrlPart.Url, CurlUrlFlags.None, out string? afterPorted);
+        easy.SetOption(CurlOption.Port, 0L);
+
+        easy.Perform();
+
+        Assert.AreEqual("http://127.0.0.1:1/1906", ported);
+        Assert.AreEqual("http://127.0.0.1:47/1906", afterPorted);
+        Assert.AreEqual(CurlCode.Ok, easy.GetInfo(CurlInfo.EffectiveUrl, out var unported));
+        Assert.AreEqual("http://127.0.0.1:47/1906", unported);
+        url.Get(CurlUrlPart.Url, CurlUrlFlags.None, out string? afterUnported);
+        Assert.AreEqual("http://127.0.0.1:47/1906", afterUnported);
+    }
+
+    [TestMethod]
+    public async Task Perform_PortOptionWithDigestCredentials_TransfersTheUrlWithThatPort()
+    {
+        // lib1568 (BL-2657): Digest credentials and CURLOPT_PORT apart from the URL. The port is written into the
+        // transfer URL before the first request, so the Digest retry's request and Host header carry it too.
+        await using var library = CurlGlobal.Init(CurlGlobalFlags.Nothing);
+        using var easy = library.EasyInit();
+        easy.SetOption(CurlOption.Url, "http://127.0.0.1/1568");
+        easy.SetOption(CurlOption.Userpwd, "testuser:testpass");
+        easy.SetOption(CurlOption.Httpauth, (long)Curl.Api.Options.Authentication.HttpAuthenticationMethods.Digest);
+        easy.SetOption(CurlOption.Port, 8990L);
+        easy.SetOption(CurlOption.Proxy, "foo://proxy:1");
+
+        easy.Perform();
+
+        Assert.AreEqual(CurlCode.Ok, easy.GetInfo(CurlInfo.EffectiveUrl, out var effective));
+        Assert.AreEqual("http://127.0.0.1:8990/1568", effective);
     }
 
     private static readonly EasyOptionDispatch VerboseOnly = new(new Dictionary<CurlOption, EasyOptionSetter>

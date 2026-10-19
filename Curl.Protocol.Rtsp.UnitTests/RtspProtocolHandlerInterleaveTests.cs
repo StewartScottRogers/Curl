@@ -28,7 +28,7 @@ public sealed class RtspProtocolHandlerInterleaveTests
         var server = new ScriptedConnection(Bytes(FrameA + FrameB));
         TransferContext context = Context();
 
-        TransferResult result = await Handler(null).ReceiveAsync(server, context);
+        TransferResult result = await Handler(null).ReceiveAsync(server, context, ChannelsZeroAndOne());
 
         Diagnostics.ActResult(result);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
@@ -44,7 +44,7 @@ public sealed class RtspProtocolHandlerInterleaveTests
         var server = new ScriptedConnection(Bytes("junk$\0"), Bytes("\0\u0004ab"), Bytes("cd" + FrameB + "$\0\0\u0009cut"));
         TransferContext context = Context();
 
-        TransferResult result = await Handler(sink).ReceiveAsync(server, context);
+        TransferResult result = await Handler(sink).ReceiveAsync(server, context, ChannelsZeroAndOne());
 
         Diagnostics.ActResult(result);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
@@ -55,12 +55,65 @@ public sealed class RtspProtocolHandlerInterleaveTests
     }
 
     [TestMethod]
+    public async Task ReceiveAsync_ReadEndsOnAWholeFrame_StopsWithoutReadingAgain()
+    {
+        var sink = new RecordingInterleaveSink();
+        var server = new ScriptedConnection(Bytes(FrameA), Bytes(FrameB));
+
+        TransferResult result = await Handler(sink).ReceiveAsync(server, Context(), ChannelsZeroAndOne());
+
+        Diagnostics.ActResult(result);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.HasCount(1, sink.Frames);
+        CollectionAssert.AreEqual(Bytes(FrameA), sink.Frames[0]);
+    }
+
+    [TestMethod]
+    public async Task ExchangeAsync_FramesAfterTheReplyBody_HandsThemAndCarriesACutFrameToTheNextReceive()
+    {
+        var sink = new RecordingInterleaveSink();
+        var server = new ScriptedConnection(
+            Bytes("RTSP/1.0 200 OK\r\nCSeq: 1\r\nContent-Length: 2\r\n\r\nhi" + FrameA + "$\u0001\0"),
+            Bytes("\u0002xy"));
+        RtspProtocolHandler handler = Handler(sink);
+        RtspSessionState session = ChannelsZeroAndOne();
+        session.StartTransfer(null, connectionReused: false);
+
+        TransferResult reply = await handler.ExchangeAsync(server, Context(), session);
+        TransferResult receive = await handler.ReceiveAsync(server, Context(), session);
+
+        Diagnostics.ActResult(receive);
+        Assert.AreEqual(CurlExitCode.Ok, reply.ExitCode);
+        Assert.AreEqual(CurlExitCode.Ok, receive.ExitCode);
+        Assert.HasCount(2, sink.Frames);
+        CollectionAssert.AreEqual(Bytes(FrameA), sink.Frames[0]);
+        CollectionAssert.AreEqual(Bytes(FrameB), sink.Frames[1]);
+        Assert.IsEmpty(session.CarriedBytes);
+    }
+
+    [TestMethod]
+    public async Task ExchangeAsync_StartOfTheNextReplyAfterThisOne_IsReadByTheNextExchange()
+    {
+        var server = new ScriptedConnection(Bytes("RTSP/1.0 200 OK\r\nCSeq: 1\r\n\r\nRTSP/1.0 200 OK\r\nCSeq: 2\r\n\r\n"));
+        RtspProtocolHandler handler = Handler(new RecordingInterleaveSink());
+        RtspSessionState session = ChannelsZeroAndOne();
+        session.StartTransfer(null, connectionReused: false);
+
+        TransferResult first = await handler.ExchangeAsync(server, Context(), session);
+        TransferResult second = await handler.ExchangeAsync(server, Context(), session);
+
+        Diagnostics.ActResult(second);
+        Assert.AreEqual(CurlExitCode.Ok, first.ExitCode);
+        Assert.AreEqual(CurlExitCode.Ok, second.ExitCode);
+    }
+
+    [TestMethod]
     public async Task ReceiveAsync_SinkTakesTooFewBytes_FailsWith23()
     {
         var events = new RecordingTransferEvents();
         var server = new ScriptedConnection(Bytes(FrameA));
 
-        TransferResult result = await Handler(new RecordingInterleaveSink(shortBy: 1)).ReceiveAsync(server, Context(events));
+        TransferResult result = await Handler(new RecordingInterleaveSink(shortBy: 1)).ReceiveAsync(server, Context(events), ChannelsZeroAndOne());
 
         Diagnostics.ActResult(result);
         Assert.AreEqual(CurlExitCode.WriteError, result.ExitCode);
@@ -73,7 +126,7 @@ public sealed class RtspProtocolHandlerInterleaveTests
     {
         var server = new FailingConnection(readFailure: new IOException("reset"));
 
-        TransferResult result = await Handler(new RecordingInterleaveSink()).ReceiveAsync(server, Context());
+        TransferResult result = await Handler(new RecordingInterleaveSink()).ReceiveAsync(server, Context(), ChannelsZeroAndOne());
 
         Diagnostics.ActResult(result);
         Assert.AreEqual(CurlExitCode.RecvError, result.ExitCode);
@@ -123,7 +176,7 @@ public sealed class RtspProtocolHandlerInterleaveTests
     {
         var sink = new RecordingInterleaveSink();
         var server = new ScriptedConnection(
-            Bytes("RTSP/1.0 200 OK\r\nCSeq: 1\r\n\r\n"),
+            Bytes("RTSP/1.0 200 OK\r\nCSeq: 1\r\nTransport: RTP/AVP/TCP;interleaved=0-1\r\n\r\n"),
             Bytes(FrameA + FrameB + "RTSP/1.0 200 OK\r\nCSeq: 2\r\n\r\n"));
         RtspProtocolHandler handler = Handler(sink);
         var session = new RtspSessionState(RtspProtocolHandler.FirstSequenceNumber);
@@ -158,7 +211,15 @@ public sealed class RtspProtocolHandlerInterleaveTests
     private static byte[] Bytes(string text) => Encoding.Latin1.GetBytes(text);
 
     private static RtspProtocolHandler Handler(IRtspInterleaveSink? sink, IConnection? connection = null) =>
-        new(new RecordingConnector(ConnectResult.Connected(connection ?? new ScriptedConnection())), new RecordingAuthenticator(), sink);
+        new(new RecordingConnector(ConnectResult.Connected(connection ?? new ScriptedConnection())), new RecordingAuthenticator(), sink, null, ChannelsZeroAndOne());
+
+    /// <summary>A new handle's session state after a reply's <c>Transport</c> set up interleaved channels 0 and 1.</summary>
+    private static RtspSessionState ChannelsZeroAndOne()
+    {
+        var session = new RtspSessionState();
+        session.AcceptTransport("RTP/AVP/TCP;interleaved=0-1");
+        return session;
+    }
 
     private TransferContext Context(RecordingTransferEvents? events = null, Stream? headerOutput = null)
     {

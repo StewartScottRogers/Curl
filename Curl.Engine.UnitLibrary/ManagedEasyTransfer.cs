@@ -46,12 +46,15 @@ namespace Curl.Engine;
 /// </summary>
 /// <param name="createDispatcher">Builds a transfer's dispatcher from its options, the engine's shared state, the cookie store its HTTP handler keeps and the HTTP/2 push sink it offers server pushes to (<see cref="PushSinkOf" />).</param>
 /// <param name="shared">What the engine's handles share.</param>
-internal sealed class ManagedEasyTransfer(
-    Func<EasyOptions, ManagedEngineSharedState, ICookieStore?, IHttp2PushSink?, ProtocolDispatcher> createDispatcher,
+internal sealed partial class ManagedEasyTransfer(
+    Func<EasyOptions, ManagedEngineSharedState, ICookieStore?, IHttp2PushSink?, HandleRtspSession, WsPerformConnection, ProtocolDispatcher> createDispatcher,
     ManagedEngineSharedState shared) : IToolEasyTransfer
 {
     /// <summary>libcurl's <c>CURLE_URL_MALFORMAT</c> text for a perform with no URL set.</summary>
     internal const string NoUrlSetText = "No URL set";
+
+    /// <summary>The RTSP <c>CSeq</c> counter and session the handle keeps from perform to perform (BL-2704).</summary>
+    private readonly HandleRtspSession rtspSession = new();
 
     /// <summary>libcurl's <c>CURLE_URL_MALFORMAT</c> text for a URL it cannot parse.</summary>
     internal const string MalformedUrlText = "URL rejected: Malformed input to a URL function";
@@ -206,11 +209,12 @@ internal sealed class ManagedEasyTransfer(
     internal EngineTraceComponents TraceComponents { get; set; } = EngineTraceComponents.None;
 
     /// <summary>
-    /// Gets or sets what gives each <c>CURLOPT_MIMEPOST</c> body its boundary: <see cref="MultipartBoundary.CreateRandom" />,
-    /// curl's random one, by default; tests set a fixed one to compare bodies. <see cref="Duplicate" /> copies it and
+    /// Gets or sets what gives each <c>CURLOPT_MIMEPOST</c> body its boundary: the engine's
+    /// <see cref="ManagedEngineSharedState.CreateFormBoundary" /> when it has one (BL-2695), else <see cref="MultipartBoundary.CreateRandom" />,
+    /// curl's random one; tests set a fixed one to compare bodies. <see cref="Duplicate" /> copies it and
     /// <see cref="Reset" /> leaves it, as it is not an option.
     /// </summary>
-    internal Func<string> CreateFormBoundary { get; set; } = MultipartBoundary.CreateRandom;
+    internal Func<string> CreateFormBoundary { get; set; } = shared.CreateFormBoundary ?? MultipartBoundary.CreateRandom;
 
     /// <summary>
     /// Gets or sets the pieces of each transfer the curl tool's runner has already chosen before connecting -
@@ -296,6 +300,49 @@ internal sealed class ManagedEasyTransfer(
     /// <summary>The headers the last perform from the options received over HTTP, for the header API (ADR-0603).</summary>
     private readonly TransferHeaderStore headers = new();
 
+    /// <summary>
+    /// The <c>WWW-Authenticate</c> values of the 401 that ended the last perform, which the next
+    /// perform's first request answers when Digest is then the one scheme allowed, as libcurl
+    /// 8.22.0 keeps its Digest state on the easy handle (BL-2747, ADR-0692); empty after any other
+    /// outcome and after <see cref="Reset" />.
+    /// </summary>
+    private IReadOnlyList<string> keptDigestChallenges = [];
+
+    /// <summary>
+    /// The scheme the last perform's server picked (<see cref="TransferReport.AuthSchemePicked" />), which the next
+    /// perform starts from, as libcurl 8.22.0 keeps <c>data->state.authhost.picked</c> on the easy handle and
+    /// <c>Curl_pretransfer</c> resets only <c>want</c> (upstream test694, BL-2709); kept through a perform that ends
+    /// with no result, and <see cref="HttpAuthSchemes.None" /> before any perform and after <see cref="Reset" />.
+    /// </summary>
+    private HttpAuthSchemes keptAuthSchemePicked;
+
+    /// <summary>The alt-svc cache the handle's first perform opened, kept across performs and <see cref="Reset" /> and saved by <see cref="DisposeAsync" /> (BL-2671).</summary>
+    private AltSvcTransferCache? handleAltSvc;
+
+    /// <summary>
+    /// The <c>host:port</c> of the last perform's URL (<see cref="OriginOf" />), to which alone
+    /// <see cref="keptDigestChallenges" /> are answered, as curl 8.22.0 sends no kept Digest answer to another
+    /// host (upstream test1985); <see langword="null" /> before any perform.
+    /// </summary>
+    private string? keptDigestOrigin;
+
+    /// <summary>
+    /// Whether the last perform ended with Digest still marked available (<see cref="TransferReport.DigestStaysAvailable" />),
+    /// which the next perform to the same origin carries beside <see cref="keptDigestChallenges" />, as libcurl 8.22.0 keeps
+    /// <c>authhost.avail</c> on the easy handle (upstream test2030, BL-2820); <see langword="false" /> after <see cref="Reset" />.
+    /// </summary>
+    private bool keptDigestStaysAvailable;
+
+    /// <summary>Whether a perform of <paramref name="url" /> carries <see cref="keptDigestStaysAvailable" />: only to the origin it came from.</summary>
+    /// <param name="url">The transfer's URL.</param>
+    /// <returns><see langword="true" /> when Digest stays marked available for the perform.</returns>
+    private bool KeptDigestStaysAvailableFor(CurlUrl url) => keptDigestStaysAvailable && OriginOf(url) == keptDigestOrigin;
+
+    /// <summary>The <c>host:port</c> the kept Digest challenges are answered to.</summary>
+    /// <param name="url">The transfer's URL.</param>
+    /// <returns>The host and port.</returns>
+    private static string OriginOf(CurlUrl url) => $"{url.Host}:{url.Port}";
+
     /// <summary>The engine clock's timestamp when the running perform started, which the live times on <see cref="Info" /> count from.</summary>
     private long performStartedTimestamp;
 
@@ -356,6 +403,19 @@ internal sealed class ManagedEasyTransfer(
 
     /// <inheritdoc />
     public async ValueTask<CurlCode> PerformAsync(CancellationToken cancellationToken)
+    {
+        ConnectOnly.PerformRunning = true;
+        try
+        {
+            return await PerformRunningAsync(cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            ConnectOnly.PerformRunning = false;
+        }
+    }
+
+    private async ValueTask<CurlCode> PerformRunningAsync(CancellationToken cancellationToken)
     {
         headers.Clear();
         headers.ResponseHeadRead = ShowResponseHeadOnInfo;
@@ -456,6 +516,7 @@ internal sealed class ManagedEasyTransfer(
         }
         finally
         {
+            share.LockConnectionsAtDone(this);
             share.LockDnsAtDone(this);
             performShare = null;
             attachedShared = null;
@@ -532,6 +593,8 @@ internal sealed class ManagedEasyTransfer(
         CurlCode loaded = LoadHstsFromCallback(options, performedHsts);
         if (loaded != CurlCode.Ok)
         {
+            // The handle's cache never loaded, so cleanup hands the write callback this handle's own empty one, not entries other handles loaded into the engine's (upstream case 1915).
+            performedHsts = new HstsTransferPolicy(shared.TimeProvider);
             return Finish(loaded, string.Empty, Info);
         }
 
@@ -569,9 +632,9 @@ internal sealed class ManagedEasyTransfer(
         }
 
         selectedProxy = proxy;
-        if (!TryLookUpNetrcCredentials(options, url, out TransferResult? netrcFailure))
+        if (!TryLookUpUrlAndNetrcCredentials(options, url, out TransferResult? credentialFailure))
         {
-            return Task.FromResult(Finish(netrcFailure.ExitCode.ToCurlCode(), netrcFailure.ErrorMessage!, Info));
+            return Task.FromResult(Finish(credentialFailure.ExitCode.ToCurlCode(), credentialFailure.ErrorMessage!, Info));
         }
 
         return PerformResumingUploadAsync(options, settings, url, urlText, transferId, cancellationToken);
@@ -683,35 +746,47 @@ internal sealed class ManagedEasyTransfer(
         return TransferProxySelection.TrySelect(PerformShared.ProxySelector, options.Proxy, settings.OverUnixSocket, settings.ProxyCredentials, url, out proxy, out refused, Host.DiagnosticLog);
     }
 
-    /// <summary>The credentials <see cref="TryLookUpNetrcCredentials" /> chose for the running perform, which <see cref="OwnInputsOf" /> puts on the context.</summary>
-    private System.Net.NetworkCredential? netrcCredentials;
+    /// <summary>The credentials <see cref="TryLookUpUrlAndNetrcCredentials" /> chose for the running perform, which <see cref="OwnInputsOf" /> puts on the context.</summary>
+    private System.Net.NetworkCredential? lookedUpCredentials;
 
     /// <summary>
-    /// Chooses the perform's credentials from the <c>.netrc</c> file under <c>CURLOPT_NETRC</c> with
-    /// <see cref="TransferCredentialLookup" />, as libcurl's <c>override_login</c> does for every handle, proxied or
-    /// not (upstream test2309, BL-2696): the <c>CURLOPT_NETRC_FILE</c> file, else the one <c>NETRC</c> names, else
+    /// Chooses the perform's credentials with <see cref="TransferCredentialLookup" />, as libcurl's <c>override_login</c>
+    /// does for every handle, proxied or not: with no <c>CURLOPT_USERPWD</c> user name, the URL's own user name and
+    /// password (upstream test1964, BL-2684), and under <c>CURLOPT_NETRC</c> the <c>.netrc</c> file's entry
+    /// (upstream test2309, BL-2696): the <c>CURLOPT_NETRC_FILE</c> file, else the one <c>NETRC</c> names, else
     /// <c>.netrc</c> in <c>HOME</c>, read through <see cref="EasyTransferHost.ReadFile" />. Nothing is looked up with
-    /// <see cref="ToolInputs" /> set, whose runner chose its own, or under <see cref="NetrcUsage.Ignored" />.
+    /// <see cref="ToolInputs" /> set, whose runner chose its own.
     /// </summary>
     /// <param name="options">The handle's options.</param>
     /// <param name="url">The URL set, parsed, whose host picks the entry.</param>
     /// <param name="failure">The exit-26 failure of a required file missing or malformed, or the exit-3 one of URL credentials refused.</param>
     /// <returns><see langword="false" /> when the perform must end with <paramref name="failure" />.</returns>
-    private bool TryLookUpNetrcCredentials(
+    private bool TryLookUpUrlAndNetrcCredentials(
         EasyOptions options,
         CurlUrl url,
         [System.Diagnostics.CodeAnalysis.NotNullWhen(false)] out TransferResult? failure)
     {
-        netrcCredentials = null;
+        lookedUpCredentials = null;
+        hopCredentials = null;
         failure = null;
-        if (ToolInputs is not null || options.Authentication.Netrc == NetrcUsage.Ignored)
+        if (ToolInputs is not null)
         {
             return true;
         }
 
         TransferCredentialLookup lookup = new(Host.ReadFile, shared.ReadEnvironmentVariable, Host.RunsOnWindows, Host.DiagnosticLog);
-        return lookup.TryLookUp(options.Authentication, url, out netrcCredentials, out failure);
+        hopCredentials = lookup.ForRedirectHops(options.Authentication);
+        return lookup.TryLookUp(options.Authentication, url, out lookedUpCredentials, out failure);
     }
+
+    /// <summary>
+    /// The lookup <see cref="TryLookUpUrlAndNetrcCredentials" /> chose for each redirect hop's credentials, which
+    /// <see cref="FollowerOf" /> gives the handle's own follower: under <c>CURLOPT_NETRC</c> the hop's own host's
+    /// <c>.netrc</c> entry, or none, whatever <c>CURLOPT_UNRESTRICTED_AUTH</c> says, as libcurl looks the file up
+    /// again for each hop (upstream test2506, BL-2701); <see langword="null" /> to carry the first hop's by the
+    /// follower's origin rules.
+    /// </summary>
+    private HopCredentialSelector? hopCredentials;
 
     /// <summary>
     /// Whether the perform only connects (<see cref="PerformConnectOnlyAsync" />): under <c>CURLOPT_CONNECT_ONLY</c> 1
@@ -794,14 +869,15 @@ internal sealed class ManagedEasyTransfer(
         MultipartFormBuildResult? form = await MimePostFormUnlessToolGaveAsync(toolInputs, options, url, mimeReads, cancellationToken).ConfigureAwait(false);
         return form is { IsBuilt: false }
             ? Finish(form.Failure.ExitCode.ToCurlCode(), form.Failure.ErrorMessage!, Info)
-            : await PerformDisposingFormAsync(options, settings, url, urlText, transferId, toolInputs, form?.Body ?? ReadCallbackPostBodyOf(toolInputs, options, url, mimeReads), mimeReads, cancellationToken).ConfigureAwait(false);
+            : await PerformDisposingFormAsync(options, settings, url, urlText, transferId, toolInputs, form?.Body ?? ReadCallbackPostBodyOf(toolInputs, options, url, mimeReads) ?? TrailerPostFieldsBodyOf(toolInputs, options, url), mimeReads, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
     /// The body of a <c>CURLOPT_POST</c> with no <c>CURLOPT_POSTFIELDS</c>, read through <c>CURLOPT_READFUNCTION</c>
     /// (<see cref="CallbackUploadOf" />) and sent as <c>application/x-www-form-urlencoded</c>, with
     /// <c>CURLOPT_POSTFIELDSIZE</c> as its <c>Content-Length</c> when not negative and chunked otherwise, as libcurl
-    /// 8.22.0 posts (upstream test508, BL-2586); the stream joins <paramref name="reads" />, so its
+    /// 8.22.0 posts (upstream test508, BL-2586), and chunked whatever the size when a <c>CURLOPT_HTTPHEADER</c> line
+    /// asks for <c>Transfer-Encoding: chunked</c> (<see cref="AsksForChunked" />, upstream test1901, BL-2667); the stream joins <paramref name="reads" />, so its
     /// <c>CURL_READFUNC_ABORT</c> ends the perform. With no read callback and a <c>CURLOPT_POSTFIELDSIZE</c> of 0
     /// (<c>CURLOPT_POSTFIELDS</c> NULL), an empty body sent with <c>Content-Length: 0</c>, as libcurl 8.22.0 posts
     /// (upstream test515, BL-2592). None when the curl tool's runner gave <paramref name="toolInputs" />, for a
@@ -827,8 +903,53 @@ internal sealed class ManagedEasyTransfer(
 
         CallbackReadStream content = CallbackUploadOf(read, options.Callbacks, PauseGateFor(url));
         reads.Add(content);
-        return new StreamBody(content, size < 0 ? null : size, HttpRequestOptionsMapping.FormUrlEncoded);
+        return new StreamBody(content, ReadCallbackPostLengthOf(options.Http), HttpRequestOptionsMapping.FormUrlEncoded);
     }
+
+    /// <summary>
+    /// The <c>Content-Length</c> of a read callback's post: <c>CURLOPT_POSTFIELDSIZE</c>, or none (chunked) when it
+    /// is negative or a <c>CURLOPT_HTTPHEADER</c> line asks for <c>Transfer-Encoding: chunked</c>.
+    /// </summary>
+    /// <param name="http">The handle's HTTP options.</param>
+    /// <returns>The length, or <see langword="null" /> for chunked.</returns>
+    private static long? ReadCallbackPostLengthOf(Curl.Api.Options.Http.EasyHttpOptions http) =>
+        http.PostFieldSize < 0 || AsksForChunked(http.HttpHeaders) ? null : http.PostFieldSize;
+
+    /// <summary>
+    /// Whether a <c>CURLOPT_HTTPHEADER</c> line names <c>Transfer-Encoding</c> with <c>chunked</c> in its value: then
+    /// libcurl 8.22.0 ignores <c>CURLOPT_POSTFIELDSIZE</c> and sends a read callback's post as chunks (upstream
+    /// test1901, BL-2667).
+    /// </summary>
+    /// <param name="headers">The handle's <c>CURLOPT_HTTPHEADER</c> lines.</param>
+    /// <returns><see langword="true" /> when one does.</returns>
+    internal static bool AsksForChunked(IReadOnlyList<string> headers) =>
+        headers.Any(line => line.Split(':', 2) is [var name, var value]
+            && name.Trim().Equals("Transfer-Encoding", StringComparison.OrdinalIgnoreCase)
+            && value.Contains("chunked", StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>
+    /// The <c>CURLOPT_POSTFIELDS</c> body of a handle that sets <c>CURLOPT_TRAILERFUNCTION</c>: a
+    /// <see cref="PostFieldsTrailerStream" /> of the fields' length, so a post sent chunked carries the callback's
+    /// trailers in its closing chunk (upstream test1598, BL-2665). None when the curl tool's runner gave
+    /// <paramref name="toolInputs" />, with no trailer callback or no fields, or for a <c>CURLOPT_UPLOAD</c>; the
+    /// fields then go as <see cref="HttpRequestOptionsMapping" />'s <see cref="BytesBody" />. Only for an <c>http</c> or <c>https</c> URL.
+    /// </summary>
+    /// <param name="toolInputs">The runner's chosen pieces, or <see langword="null" /> for a handle's own.</param>
+    /// <param name="options">The handle's options.</param>
+    /// <param name="url">The URL set; only an <c>http</c> or <c>https</c> one gets the body.</param>
+    /// <returns>The body, or <see langword="null" /> for none.</returns>
+    internal static StreamBody? TrailerPostFieldsBodyOf(EngineToolTransferInputs? toolInputs, EasyOptions options, CurlUrl url) =>
+        IsHandlesOwnHttpPost(toolInputs, options, url) && options.Callbacks.Trailer is { } trailer && options.Http.PostFields is { } fields
+            ? new StreamBody(new PostFieldsTrailerStream(fields.ToArray(), trailer), fields.Length, HttpRequestOptionsMapping.FormUrlEncoded)
+            : null;
+
+    /// <summary>Whether a perform with no runner's pieces posts, not uploads, to an <c>http</c> or <c>https</c> URL.</summary>
+    /// <param name="toolInputs">The runner's chosen pieces, or <see langword="null" /> for a handle's own.</param>
+    /// <param name="options">The handle's options.</param>
+    /// <param name="url">The URL set.</param>
+    /// <returns><see langword="true" /> when it does.</returns>
+    private static bool IsHandlesOwnHttpPost(EngineToolTransferInputs? toolInputs, EasyOptions options, CurlUrl url) =>
+        toolInputs is null && !options.Transfer.Upload && (IsScheme(url, "http") || IsScheme(url, "https"));
 
     /// <summary>Whether the options post with <c>CURLOPT_POST</c>, no <c>CURLOPT_POSTFIELDS</c> and no <c>CURLOPT_UPLOAD</c>.</summary>
     /// <param name="options">The handle's options.</param>
@@ -916,10 +1037,34 @@ internal sealed class ManagedEasyTransfer(
             callbackProgress,
             callbackReads).ConfigureAwait(false);
         await CleanUpUnlessToolDoesAsync(toolInputs, options, settings, cookies, state, transferUrl).ConfigureAwait(false);
-        LastResult = recorder is null ? result : recorder.ReportOn(result);
+        KeepHandleStateOf(recorder, result, url);
         long connectionId = toolEvents is null ? ConnectionIdOf(result, state) : ToolConnectionIdOf(result, state, toolEvents);
-        return FinishPerformed(LastResult, options, transferId, cookies, connectionId, AbortedTextOf(callbackReads), toolEvents?.State);
+        return FinishPerformed(LastResult, options, transferUrl, transferId, cookies, connectionId, AbortedTextOf(callbackReads), toolEvents?.State);
     }
+
+    /// <summary>
+    /// Keeps what the handle carries from a finished perform to the next: <see cref="LastResult" /> (with the
+    /// verify results <paramref name="recorder" /> kept, when there is one), the Digest challenges of a final 401 and
+    /// the origin they came from, and the scheme the server picked (<see cref="keptAuthSchemePicked" />).
+    /// </summary>
+    /// <param name="recorder">The verify-result recorder, or <see langword="null" /> when the runner's events report.</param>
+    /// <param name="result">The perform's result, or <see langword="null" /> after an abort.</param>
+    /// <param name="url">The URL performed.</param>
+    private void KeepHandleStateOf(TlsVerifyResultRecordingTransferEvents? recorder, TransferResult? result, CurlUrl url)
+    {
+        LastResult = recorder is null ? result : recorder.ReportOn(result);
+        keptDigestChallenges = ChallengesOfLast401(result);
+        keptDigestStaysAvailable = result?.Report?.DigestStaysAvailable ?? false;
+        keptDigestOrigin = OriginOf(url);
+        keptAuthSchemePicked = AuthSchemeKeptAfter(result, keptAuthSchemePicked);
+    }
+
+    /// <summary>The scheme the handle keeps after a perform: its report's picked scheme, else the one kept before.</summary>
+    /// <param name="result">The perform's result, or <see langword="null" /> after an abort.</param>
+    /// <param name="kept">The scheme kept before the perform.</param>
+    /// <returns>The scheme to keep.</returns>
+    internal static HttpAuthSchemes AuthSchemeKeptAfter(TransferResult? result, HttpAuthSchemes kept) =>
+        result?.Report?.AuthSchemePicked ?? kept;
 
     /// <summary>
     /// The follower the transfer runs through: the curl tool's runner's from <paramref name="toolDispatch" />, or
@@ -937,8 +1082,8 @@ internal sealed class ManagedEasyTransfer(
         {
             Api.Options.Network.ConnectOnly.WebSocket => WebSocketUpgradeDispatcherOf(options),
             Api.Options.Network.ConnectOnly.Connect => ConnectOnlyLoginDispatcherOf(options),
-            _ => createDispatcher(options, PerformShared, HandlerCookieStoreOf(cookies), PushSinkOf()),
-        });
+            _ => createDispatcher(options, PerformShared, HandlerCookieStoreOf(cookies), PushSinkOf(), rtspSession, WebSocketConnection.PerformConnection),
+        }, selectHopCredentials: hopCredentials);
 
     /// <summary>
     /// The dispatcher of a <c>CURLOPT_CONNECT_ONLY</c> 1 perform of an <c>ftp</c>, <c>ftps</c>, <c>imap</c> or
@@ -1087,7 +1232,7 @@ internal sealed class ManagedEasyTransfer(
         if (toolInputs is null)
         {
             await shared.Performer.WriteCookieJarAltSvcAndHstsFilesAsync(
-                cookies, settings, options.Http, transferUrl, Host.JarPrintTarget, state, PerformShared.Hsts, Host.FileSystem, Host.RunsOnWindows).ConfigureAwait(false);
+                cookies, settings, options.Http, transferUrl, Host.JarPrintTarget, state, PerformShared.Hsts, Host.FileSystem, Host.RunsOnWindows, writesAltSvc: false).ConfigureAwait(false);
         }
     }
 
@@ -1141,7 +1286,7 @@ internal sealed class ManagedEasyTransfer(
     /// <summary>
     /// The pieces a handle with no <see cref="ToolInputs" /> chooses from its options: the proxy <see cref="TrySelectProxy" />
     /// chose from <c>CURLOPT_PROXY</c> and the proxy environment (BL-2519); the credentials
-    /// <see cref="TryLookUpNetrcCredentials" /> chose from the <c>.netrc</c> file (BL-2696); no <c>If-None-Match</c> lines, range or form body of the runner's; <c>CURLOPT_RESUME_FROM</c> when
+    /// <see cref="TryLookUpUrlAndNetrcCredentials" /> chose from the URL and the <c>.netrc</c> file (BL-2696, BL-2684); no <c>If-None-Match</c> lines, range or form body of the runner's; <c>CURLOPT_RESUME_FROM</c> when
     /// positive; the read callback under <c>CURLOPT_UPLOAD</c> (<see cref="UploadOf" />); the alt-svc cache its
     /// own setup opened; and for an <c>scp</c> or <c>sftp</c> URL the handle's SSH options with its host-key
     /// callbacks (<see cref="SshOptionsMapping.OfHandle" />, ADR-0623).
@@ -1156,7 +1301,7 @@ internal sealed class ManagedEasyTransfer(
     private EngineToolTransferInputs OwnInputsOf(EasyOptions options, EngineTransferSettings settings, CurlUrl url, EngineTransferState state, EasyPauseGate? pauseGate, ProxyEndpoint? proxy) =>
         new(
             Proxy: proxy,
-            LookedUpCredentials: netrcCredentials,
+            LookedUpCredentials: lookedUpCredentials,
             ResumeFrom: options.Transfer.ResumeFrom > 0 ? options.Transfer.ResumeFrom : null,
             Upload: UploadOf(options, url, pauseGate),
             AltSvc: state.AltSvc,
@@ -1186,8 +1331,31 @@ internal sealed class ManagedEasyTransfer(
         EasyTransferHost host = Host;
         await ApplyCookieListAsync(cookies, host, events).ConfigureAwait(false);
         await shared.Performer.LoadCookieFilesAsync(cookies, settings, urlText, host.FileSystem, host.StandardInput, events).ConfigureAwait(false);
-        await shared.Performer.OpenAltSvcCacheAsync(state, settings, options.Network, options.Http, urlText, host.FileSystem, host.DiagnosticLog, host.AltSvcUsesOverHttp).ConfigureAwait(false);
+        await OpenOrKeepAltSvcCacheAsync(options, settings, state, urlText, host).ConfigureAwait(false);
         return await TransferPerformer.SwitchToHttpsForHstsAsync(PerformShared.Hsts, settings, options.Network, options.Http, urlText, host.FileSystem, events).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Gives the transfer the handle's alt-svc cache: the one an earlier perform opened (libcurl keeps the handle's cache
+    /// across performs and <c>curl_easy_reset</c>, and saves it only at <c>curl_easy_cleanup</c>, BL-2671), else a new one
+    /// opened from <c>CURLOPT_ALTSVC</c>, which the handle then keeps.
+    /// </summary>
+    /// <param name="options">The handle's options.</param>
+    /// <param name="settings">The tool settings.</param>
+    /// <param name="state">The running transfer, which keeps the cache.</param>
+    /// <param name="urlText">The URL set.</param>
+    /// <param name="host">What the file system, the diagnostic log and <c>CURL_ALTSVC_HTTP</c> come from.</param>
+    /// <returns>A task that completes once the transfer holds the cache.</returns>
+    private async Task OpenOrKeepAltSvcCacheAsync(EasyOptions options, EngineTransferSettings settings, EngineTransferState state, string urlText, EasyTransferHost host)
+    {
+        if (handleAltSvc is null)
+        {
+            await shared.Performer.OpenAltSvcCacheAsync(state, settings, options.Network, options.Http, urlText, host.FileSystem, host.DiagnosticLog, host.AltSvcUsesOverHttp).ConfigureAwait(false);
+            handleAltSvc = state.AltSvc;
+            return;
+        }
+
+        state.AltSvc = handleAltSvc;
     }
 
     /// <summary>
@@ -1236,7 +1404,8 @@ internal sealed class ManagedEasyTransfer(
         toolProgress is not null && !cancellationToken.CanBeCanceled ? toolProgress.AbortToken : abort.Token;
 
     /// <summary>
-    /// The transfer's events: the debug callback's under <c>CURLOPT_VERBOSE</c>, else none, with the
+    /// The transfer's events: the debug callback's under <c>CURLOPT_VERBOSE</c>, or libcurl's default lines on
+    /// <c>CURLOPT_STDERR</c>, else <see cref="EasyTransferHost.StandardError" />, when none is set (BL-2726), else none, with the
     /// <see cref="TraceComponents" />' lines added (<see cref="WithTraceComponentEvents" />), kept by
     /// <see cref="EngineConnectionIdTransferEvents" />, which gives the transfer its <c>%{conn_id}</c>
     /// when it opens a connection and the opener's when it reuses one, and puts it on <see cref="Info" />
@@ -1249,7 +1418,7 @@ internal sealed class ManagedEasyTransfer(
     private EngineConnectionIdTransferEvents EventsOf(EasyOptions options, EngineTransferState state) =>
         new(
             WithTraceComponentEvents(
-                (ITransferEvents?)DebugCallbackTransferEvents.Of(options.Behaviour.Verbose, options.Callbacks.Debug) ?? NoTransferEvents.Instance,
+                (ITransferEvents?)DebugCallbackTransferEvents.Of(options.Behaviour.Verbose, options.Callbacks.Debug, () => options.Behaviour.StandardError ?? Host.StandardError.Value) ?? NoTransferEvents.Instance,
                 options,
                 TraceComponents),
             state,
@@ -1374,6 +1543,10 @@ internal sealed class ManagedEasyTransfer(
     /// </summary>
     /// <param name="result">The attempt's result, or <see langword="null" /> when a callback aborted it.</param>
     /// <param name="options">The handle's options.</param>
+    /// <param name="transferUrl">
+    /// The URL the setup chose: the URL set, or the <c>https</c> one HSTS switched it to, which the effective URL falls back to
+    /// when the report carries none, as a connect that failed after the switch leaves it (upstream test1922, BL-2676).
+    /// </param>
     /// <param name="transferId">The transfer's <c>%{xfer_id}</c>.</param>
     /// <param name="cookies">The transfer's cookies, or <see langword="null" /> when no cookie option is set.</param>
     /// <param name="connectionId">The transfer's <c>%{conn_id}</c>.</param>
@@ -1383,23 +1556,32 @@ internal sealed class ManagedEasyTransfer(
     /// <see langword="null" /> for a handle's own.
     /// </param>
     /// <returns>The transfer's code.</returns>
-    private CurlCode FinishPerformed(TransferResult? result, EasyOptions options, long transferId, CookieEngine? cookies, long connectionId, string abortedText, EngineTransferState? toolState)
+    private CurlCode FinishPerformed(TransferResult? result, EasyOptions options, string transferUrl, long transferId, CookieEngine? cookies, long connectionId, string abortedText, EngineTransferState? toolState)
     {
-        string urlText = options.Network.Url!;
         IReadOnlyList<string> cookieList = cookies?.ListLines ?? [];
         if (result is null)
         {
             return Finish(
                 CurlCode.AbortedByCallback,
                 abortedText,
-                new TransferInfo { EffectiveUrl = urlText, TransferId = transferId, ConnectionId = connectionId, CookieList = cookieList });
+                new TransferInfo { EffectiveUrl = transferUrl, TransferId = transferId, ConnectionId = connectionId, CookieList = cookieList });
         }
 
         return Finish(
             result.ExitCode.ToCurlCode(),
             result.ErrorMessage ?? string.Empty,
-            PerformedInfoOf(result, options, transferId, cookieList, connectionId, toolState));
+            PerformedInfoOf(result, options, transferUrl, transferId, cookieList, connectionId, toolState));
     }
+
+    /// <summary>
+    /// The <c>WWW-Authenticate</c> values of <paramref name="result" />'s last response when it is a 401, else none.
+    /// </summary>
+    /// <param name="result">The transfer's result, or <see langword="null" /> for none.</param>
+    /// <returns>The challenges.</returns>
+    internal static IReadOnlyList<string> ChallengesOfLast401(TransferResult? result) =>
+        result is { Report: { ResponseCode: 401 } report }
+            ? [.. report.ResponseHeaders.Where(header => string.Equals(header.Key, "WWW-Authenticate", StringComparison.OrdinalIgnoreCase)).Select(header => header.Value.Trim())]
+            : [];
 
     /// <summary>
     /// The info of a transfer that performed: what <see cref="TransferInfoFromReport.Of" /> fills from its report, the
@@ -1408,14 +1590,15 @@ internal sealed class ManagedEasyTransfer(
     /// </summary>
     /// <param name="result">The attempt's result.</param>
     /// <param name="options">The handle's options.</param>
+    /// <param name="transferUrl">The URL the setup chose (<see cref="FinishPerformed" />).</param>
     /// <param name="transferId">The transfer's <c>%{xfer_id}</c>.</param>
     /// <param name="cookieList">The cookie engine's list.</param>
     /// <param name="connectionId">The transfer's <c>%{conn_id}</c>.</param>
     /// <param name="toolState">The runner's running transfer, or <see langword="null" /> for a handle's own.</param>
     /// <returns>The info.</returns>
-    private TransferInfo PerformedInfoOf(TransferResult result, EasyOptions options, long transferId, IReadOnlyList<string> cookieList, long connectionId, EngineTransferState? toolState)
+    private TransferInfo PerformedInfoOf(TransferResult result, EasyOptions options, string transferUrl, long transferId, IReadOnlyList<string> cookieList, long connectionId, EngineTransferState? toolState)
     {
-        string requestUrl = toolState?.RequestUrl ?? options.Network.Url!;
+        string requestUrl = toolState?.RequestUrl ?? transferUrl;
         TransferInfo info = TransferInfoFromReport.Of(result, requestUrl, options.Transfer.FileTime, shared.TimeProvider, options.Tls.GatherCertificateInfo) with
         {
             TransferId = transferId,
@@ -1423,7 +1606,9 @@ internal sealed class ManagedEasyTransfer(
             CookieList = cookieList,
             ContentLengthUpload = ContentLengthUploadOf(options),
         };
-        return toolState is null ? info : WithToolAnswers(info, result, options, toolState, requestUrl);
+        return toolState is null
+            ? info with { EffectiveUrl = UrlEffective.Normalize(info.EffectiveUrl, options.Network.PathAsIs) }
+            : WithToolAnswers(info, result, options, toolState, requestUrl);
     }
 
     /// <summary>
@@ -1506,6 +1691,9 @@ internal sealed class ManagedEasyTransfer(
     public void Reset()
     {
         headers.Clear();
+        keptDigestChallenges = [];
+        keptDigestStaysAvailable = false;
+        keptAuthSchemePicked = HttpAuthSchemes.None;
         Options = new EasyOptions();
         Info = new TransferInfo { TransferId = Info.TransferId, CookieList = Info.CookieList };
         ToolSettings = null;
@@ -1553,12 +1741,17 @@ internal sealed class ManagedEasyTransfer(
         }
 
         SaveHstsToCallback();
+        await SaveAltSvcAsync().ConfigureAwait(false);
         optionShare?.LockCookies(this, 1);
         optionShare = ManagedShareHandle.Reattach(optionShare, named: null, this);
         await (connectOnly?.CloseAsync() ?? ValueTask.CompletedTask).ConfigureAwait(false);
         await (webSocket?.CloseAsync() ?? ValueTask.CompletedTask).ConfigureAwait(false);
         await shared.Connections.CloseIdleOwnedByAsync(this).ConfigureAwait(false);
     }
+
+    /// <summary>Writes the handle's alt-svc cache to its <c>CURLOPT_ALTSVC</c> file, as libcurl does at cleanup (BL-2671); nothing when no perform opened one.</summary>
+    /// <returns>A task that completes once the file is written.</returns>
+    private Task SaveAltSvcAsync() => handleAltSvc?.WriteAsync(Host.FileSystem) ?? Task.CompletedTask;
 
     /// <summary>
     /// Builds the transfer's context with <paramref name="toolDispatch" />'s factory, or without one a
@@ -1587,7 +1780,7 @@ internal sealed class ManagedEasyTransfer(
         CancellationToken cancellationToken)
     {
         EngineToolTransferOutputs outputs = ToolOutputs ?? OwnOutputsOf(options.Callbacks, PauseGateFor(url), RecordsHeaders(url) ? headers : null);
-        TransferContextFactory factory = toolDispatch?.ContextFactory ?? new TransferContextFactory(Stream.Null, shared.TimeProvider) { HstsStore = PerformShared.Hsts, DiagnosticLog = Host.DiagnosticLog };
+        TransferContextFactory factory = toolDispatch?.ContextFactory ?? new TransferContextFactory(Stream.Null, shared.TimeProvider) { HstsStore = PerformShared.Hsts, DiagnosticLog = Host.DiagnosticLog, KeptDigestChallenges = OriginOf(url) == keptDigestOrigin ? keptDigestChallenges : [], KeptDigestStaysAvailable = KeptDigestStaysAvailableFor(url), KeptAuthSchemePicked = keptAuthSchemePicked };
         return LastContext = factory.Create(
             settings,
             options.Http,
@@ -1717,7 +1910,7 @@ internal sealed class ManagedEasyTransfer(
             Passphrase: options.Tls.Origin.KeyPassword,
             Engine: options.Tls.Engine,
             EchModeIsMalformed: false,
-            PostData: null,
+            PostData: MqttPostDataOf(options),
             ProxyCredentials: ProxyCredentialsOf(options.Authentication),
             AllowedProtocols: ProtocolSetOf(options.Network.Protocols),
             AllowedRedirectProtocols: ProtocolSetOf(options.Network.RedirectProtocols),
@@ -1730,7 +1923,31 @@ internal sealed class ManagedEasyTransfer(
             ProxyTunnel: options.Proxy.HttpProxyTunnel,
             OverUnixSocket: options.Network.UnixSocketPath is not null,
             HappyEyeballsTimeout: HttpRequestOptionsMapping.HappyEyeballsTimeoutOf(null),
-            AppendUrlQuery: url => url);
+            AppendUrlQuery: url => url,
+            PostWithoutData: options.Http is { Post: true, PostFields: null } && IsMqttUrl(options));
+
+    /// <summary>
+    /// The <c>CURLOPT_POSTFIELDS</c> an MQTT transfer publishes, cut to <c>CURLOPT_POSTFIELDSIZE</c> when that is not
+    /// negative and shorter (an empty set of fields is an empty payload), or <see langword="null" /> to subscribe
+    /// instead; only an <c>mqtt</c> or <c>mqtts</c> URL reads it, as libcurl's <c>mqtt_do</c> does (upstream test1916, BL-2673).
+    /// </summary>
+    /// <param name="options">The handle's options.</param>
+    /// <returns>The payload, or <see langword="null" />.</returns>
+    private static ReadOnlyMemory<byte>? MqttPostDataOf(EasyOptions options)
+    {
+        if (options.Http.PostFields is not { } fields || !IsMqttUrl(options))
+        {
+            return null;
+        }
+
+        long size = options.Http.PostFieldSize;
+        return size < 0 || size >= fields.Length ? fields : fields[..(int)size];
+    }
+
+    /// <summary>Whether the handle's URL names the <c>mqtt</c> or <c>mqtts</c> scheme.</summary>
+    private static bool IsMqttUrl(EasyOptions options) =>
+        options.Network.Url is { } url
+        && (url.StartsWith("mqtt:", StringComparison.OrdinalIgnoreCase) || url.StartsWith("mqtts:", StringComparison.OrdinalIgnoreCase));
 
     /// <summary>
     /// The proxy credentials <c>CURLOPT_PROXYUSERPWD</c>, <c>CURLOPT_PROXYUSERNAME</c> and <c>CURLOPT_PROXYPASSWORD</c>

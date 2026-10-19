@@ -316,6 +316,30 @@ public sealed class WsProtocolHandlerTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_WithPerformConnection_ShowsTheConnectionWhileFramesFlowSoTheOutputCanSendOnIt()
+    {
+        // curl 8.22.0's curl_ws_send writes to data->conn from the write callback of an ordinary perform: lib2301
+        // answers the ping that came with the 101 with a raw PONG (upstream test2301, BL-2710).
+        var diagnostics = TestDiagnostics.For(TestContext);
+        WsPerformConnection performConnection = new();
+        var output = new PongingOutputStream(performConnection);
+        var connection = new ScriptedConnection(Bytes(Head101 + "\x89\x00"));
+        diagnostics.Arrange("frames", "a ping with the 101, then the server closes");
+
+        TransferResult result = await new WsProtocolHandler(Connector(connection), new RecordingAuthenticator(), new FixedRandomSource()) { RawMode = true, PerformConnection = performConnection }
+            .ExecuteAsync(Context("ws://127.0.0.1:47901/chat", output));
+
+        string actualSent = Encoding.Latin1.GetString(connection.Sent);
+        diagnostics.Act("result", Describe(result));
+        diagnostics.Act("sent", actualSent);
+        diagnostics.Diff("sent", Request + "\x8a\x00", actualSent);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(Request + "\x8a\x00", actualSent);
+        CollectionAssert.AreEqual(new[] { true }, output.ConnectionShownAtWrites);
+        Assert.IsNull(performConnection.Connection);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_101ThenNoFrame_FailsWithEmptyReplyAndKeepsCode101()
     {
         // Measured: exit 52, "Empty reply from server", -w "0 101 0 102 192".

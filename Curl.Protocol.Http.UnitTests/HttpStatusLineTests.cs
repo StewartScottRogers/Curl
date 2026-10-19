@@ -132,10 +132,67 @@ public sealed class HttpStatusLineTests
     {
         Diagnostics.Arrange("received", received);
 
-        HttpStatusLine.RejectHttp09(Encoding.ASCII.GetBytes(received));
+        HttpStatusLine.RejectHttp09(Encoding.ASCII.GetBytes(received), []);
 
         Diagnostics.Act("outcome", "returned without throwing");
         Diagnostics.Assert("outcome", "no exception", "no exception");
+    }
+
+    [TestMethod]
+    [DataRow("I", DisplayName = "First byte of the alias")]
+    [DataRow("icy 2", DisplayName = "Lower-case start")]
+    [DataRow("ICY 200 OK\r", DisplayName = "The whole alias and more")]
+    public void RejectHttp09_BytesThatCanStillBeginAnHttp200Alias_AreAccepted(string received)
+    {
+        Diagnostics.Arrange("received, aliases", $"{received}, ICY 200 OK");
+
+        HttpStatusLine.RejectHttp09(Encoding.ASCII.GetBytes(received), ["ICY 200 OK"]);
+
+        Diagnostics.Act("outcome", "returned without throwing");
+        Diagnostics.Assert("outcome", "no exception", "no exception");
+    }
+
+    [TestMethod]
+    public void RejectHttp09_BytesThatBeginNoAlias_ThrowUnsupportedProtocol()
+    {
+        Diagnostics.Arrange("received, aliases", "ICX, ICY 200 OK");
+
+        HttpTransferException thrown = Assert.ThrowsExactly<HttpTransferException>(
+            () => HttpStatusLine.RejectHttp09("ICX"u8, ["ICY 200 OK"]));
+
+        Diagnostics.Act("exit code", thrown.ExitCode);
+        Diagnostics.Assert("exit code", CurlExitCode.UnsupportedProtocol, thrown.ExitCode);
+        Assert.AreEqual(CurlExitCode.UnsupportedProtocol, thrown.ExitCode);
+    }
+
+    [TestMethod]
+    [DataRow("ICY 200 OK", "ICY 200 OK", true, DisplayName = "The alias itself")]
+    [DataRow("icy 200 ok extra", "ICY 200 OK", true, DisplayName = "Another case, then more text")]
+    [DataRow("ICY", "ICY 200 OK", true, DisplayName = "A line shorter than the alias, as checkprefixmax compares")]
+    [DataRow("ICX 200 OK", "ICY 200 OK", false, DisplayName = "A different line")]
+    public void MatchesAlias_Line_TellsWhetherItBeginsAnAlias(string line, string alias, bool expected)
+    {
+        Diagnostics.Arrange("line, alias", $"{line}, {alias}");
+
+        bool matches = HttpStatusLine.MatchesAlias(line, ["OTHER", alias]);
+
+        Diagnostics.Act("matches", matches);
+        Diagnostics.Assert("matches", expected, matches);
+        Assert.AreEqual(expected, matches);
+    }
+
+    [TestMethod]
+    public void Http200Alias_IsHttp10Status200()
+    {
+        Diagnostics.Arrange("alias", "any");
+
+        HttpStatusLine statusLine = HttpStatusLine.Http200Alias();
+
+        Diagnostics.Act("version, code", $"{statusLine.Version} {statusLine.StatusCode}");
+        Diagnostics.Assert("version, code", "1.0 200", $"{statusLine.Version} {statusLine.StatusCode}");
+        Assert.AreEqual(new Version(1, 0), statusLine.Version);
+        Assert.AreEqual(200, statusLine.StatusCode);
+        Assert.IsEmpty(statusLine.ReasonPhrase);
     }
 
     [TestMethod]
@@ -147,7 +204,7 @@ public sealed class HttpStatusLineTests
         Diagnostics.Arrange("received", received);
 
         HttpTransferException thrown = Assert.ThrowsExactly<HttpTransferException>(
-            () => HttpStatusLine.RejectHttp09(Encoding.ASCII.GetBytes(received)));
+            () => HttpStatusLine.RejectHttp09(Encoding.ASCII.GetBytes(received), []));
 
         Diagnostics.Act("exception type", thrown.GetType().Name);
         Diagnostics.Act("exit code", thrown.ExitCode);

@@ -5,7 +5,7 @@ namespace Curl.Protocol.Rtsp;
 /// <summary>
 /// Reads an RTSP reply from the connection: the head line by line, each line written to the
 /// header output (<c>-i</c>, <c>-I</c>, <c>-D</c>) once it is read, then the body, which is
-/// counted and discarded (ADR-0169).
+/// counted and either discarded (ADR-0169) or written to the body output (BL-2789).
 /// </summary>
 /// <remarks>
 /// Measured on curl 8.21.0 (BL-591). A header line is read only once a byte after it has
@@ -56,8 +56,10 @@ internal static class RtspReplyReader
     internal static async ValueTask<RtspReplyHead> ReadHeadAsync(IConnection connection, RtspSessionState session, Stream? headerOutput, ITransferEvents events, CancellationToken cancellationToken, RtspTransferLog log, long? maxFileSize, RtspInterleavedFrameFilter? frames = null)
     {
         RtspReplyHeadParser parser = new(session, maxFileSize);
-        byte[] buffer = new byte[BufferSize];
-        int received = 0;
+        byte[] buffer = new byte[Math.Max(BufferSize, session.CarriedBytes.Length)];
+        session.CarriedBytes.CopyTo(buffer, 0);
+        int received = session.CarriedBytes.Length;
+        session.CarriedBytes = [];
         int processed = 0;
         while (true)
         {
@@ -91,28 +93,32 @@ internal static class RtspReplyReader
     }
 
     /// <summary>
-    /// Reads and discards the body: up to <paramref name="contentLength" /> bytes, starting with
-    /// those already received after the head, or fewer when the server closes first, which curl
-    /// 8.21.0 does not treat as an error (measured, BL-591).
+    /// Reads the body: up to <paramref name="contentLength" /> bytes, starting with those already
+    /// received after the head, or fewer when the server closes first, which curl 8.21.0 does not
+    /// treat as an error (measured, BL-591). Each piece is written to <paramref name="bodyOutput" />,
+    /// or discarded when it is <see langword="null" /> (BL-2789).
     /// </summary>
     /// <param name="connection">The connection the reply arrives on.</param>
     /// <param name="alreadyReceived">The bytes received after the head.</param>
     /// <param name="contentLength">The reply's <c>Content-Length</c>.</param>
+    /// <param name="bodyOutput">Where the body is written, or <see langword="null" /> to discard it.</param>
     /// <param name="progress">Where the running count is reported.</param>
     /// <param name="events">Where each piece of the body is reported as received data, for <c>-v</c> and <c>--trace</c>.</param>
     /// <param name="cancellationToken">Cancels the read.</param>
     /// <returns>How many body bytes were read.</returns>
-    /// <exception cref="RtspTransferException">A read failed.</exception>
-    internal static async ValueTask<long> DiscardBodyAsync(
+    /// <exception cref="RtspTransferException">A read failed (56), or a write to <paramref name="bodyOutput" /> (23).</exception>
+    internal static async ValueTask<long> ReadBodyAsync(
         IConnection connection,
         byte[] alreadyReceived,
         long contentLength,
+        Stream? bodyOutput,
         ITransferProgress progress,
         ITransferEvents events,
         CancellationToken cancellationToken)
     {
         long bodyRead = Math.Min(alreadyReceived.Length, contentLength);
         ReportReceived(events, alreadyReceived.AsSpan(0, (int)bodyRead));
+        await WriteAsync(bodyOutput, alreadyReceived.AsMemory(0, (int)bodyRead), cancellationToken).ConfigureAwait(false);
         byte[] buffer = new byte[BufferSize];
         int read = 1;
         while (bodyRead < contentLength && read > 0)
@@ -120,6 +126,7 @@ internal static class RtspReplyReader
             progress.ReportDownloaded(bodyRead, contentLength);
             read = await ReceiveAsync(connection, buffer.AsMemory(0, (int)Math.Min(buffer.Length, contentLength - bodyRead)), cancellationToken).ConfigureAwait(false);
             ReportReceived(events, buffer.AsSpan(0, read));
+            await WriteAsync(bodyOutput, buffer.AsMemory(0, read), cancellationToken).ConfigureAwait(false);
             bodyRead += read;
         }
 
@@ -188,27 +195,32 @@ internal static class RtspReplyReader
     }
 
     /// <summary>
-    /// Reads interleaved frames until the server closes, handing each whole one to
-    /// <paramref name="frames" /> and skipping every other byte, as an RTSP <c>RECEIVE</c> does in
-    /// curl 8.22.0, which sends no request and expects no reply (BL-2477). A frame cut off by the
-    /// close is dropped.
+    /// Reads interleaved frames, handing each whole one to <paramref name="frames" /> and skipping
+    /// every other byte, as an RTSP <c>RECEIVE</c> does in curl 8.22.0, which sends no request and
+    /// expects no reply (BL-2477). Like <c>rtsp_rtp_write_resp</c>, it takes one read and stops there
+    /// unless a frame is left incomplete, which it reads on to finish (BL-2787); it also stops when
+    /// the server closes, dropping a frame the close cut off.
     /// </summary>
     /// <param name="connection">The transfer's connection.</param>
     /// <param name="frames">Takes each frame.</param>
+    /// <param name="carried">The bytes an earlier reply left unread on the connection, read before the first read.</param>
     /// <param name="cancellationToken">Cancels the reads.</param>
     /// <exception cref="RtspTransferException">A read failed (56), or the sink took too few bytes (23).</exception>
-    internal static async ValueTask ReceiveFramesAsync(IConnection connection, RtspInterleavedFrameFilter frames, CancellationToken cancellationToken)
+    internal static async ValueTask ReceiveFramesAsync(IConnection connection, RtspInterleavedFrameFilter frames, byte[] carried, CancellationToken cancellationToken)
     {
-        byte[] buffer = new byte[RtspInterleavedFrameFilter.MaximumFrameLength];
-        int held = 0;
+        byte[] buffer = new byte[RtspInterleavedFrameFilter.MaximumFrameLength + carried.Length];
+        carried.CopyTo(buffer, 0);
+        int held = carried.Length;
         int read;
-        while ((read = await ReceiveAsync(connection, buffer.AsMemory(held), cancellationToken).ConfigureAwait(false)) > 0)
+        do
         {
+            read = await ReceiveAsync(connection, buffer.AsMemory(held), cancellationToken).ConfigureAwait(false);
             held += read;
             int consumed = await frames.ConsumeAsync(buffer.AsMemory(0, held), stopAtReply: false, cancellationToken).ConfigureAwait(false);
             buffer.AsSpan(consumed, held - consumed).CopyTo(buffer);
             held -= consumed;
         }
+        while (read > 0 && held > 0);
     }
 
     /// <summary>
@@ -285,7 +297,7 @@ internal static class RtspReplyReader
     }
 
     private static RtspReplyHead Head(RtspReplyHeadParser parser, int length, byte[]? endLine, byte[] remaining) =>
-        new(parser.StatusCode, parser.SequenceNumber, parser.ContentLength, length, endLine, remaining);
+        new(parser.StatusCode, parser.SequenceNumber, parser.ContentLength, length, endLine, remaining) { Challenges = parser.Challenges };
 
     private static byte[] MakeRoom(byte[] buffer, int received)
     {

@@ -36,7 +36,14 @@ internal sealed class ManagedCurlUrlHandle : ICurlUrlHandle
         CurlUrlCode.BadHostname,
         CurlUrlCode.BadFileUrl,
         CurlUrlCode.UserNotAllowed,
+        CurlUrlCode.Backslash,
     ];
+
+    /// <summary>The schemes whose handler takes login options (upstream's <c>PROTOPT_URLOPTIONS</c>).</summary>
+    private static readonly HashSet<string> SchemesWithLoginOptions = new(StringComparer.Ordinal)
+    {
+        "imap", "imaps", "pop3", "pop3s", "smtp", "smtps",
+    };
 
     /// <summary>The reader of each <see cref="CurlUrlPart" />, by its number.</summary>
     private static readonly Func<UrlHandleParts, CurlUrlFlags, UrlPartResult>[] Readers =
@@ -187,7 +194,7 @@ internal sealed class ManagedCurlUrlHandle : ICurlUrlHandle
         string schemeText = flags.HasFlag(CurlUrlFlags.NoGuessScheme) && parts.SchemeGuessed ? string.Empty : scheme + "://";
 
         return UrlPartResult.Found(
-            schemeText + Login(parts) + host.Value + Suffix(':', PortText(parts.Port, scheme, flags)) + tail);
+            schemeText + Login(parts, scheme) + host.Value + Suffix(':', PortText(parts.Port, scheme, flags)) + tail);
     }
 
     /// <summary>
@@ -207,60 +214,147 @@ internal sealed class ManagedCurlUrlHandle : ICurlUrlHandle
             : UrlPartText.Punycode(host, flags);
     }
 
-    private static string Login(UrlHandleParts parts)
+    /// <summary>
+    /// The login as the whole URL writes it: the options left out under a scheme libcurl supports
+    /// whose handler takes none (no <c>PROTOPT_URLOPTIONS</c>), as <c>curl_url_get</c> does, so an
+    /// <c>imap</c> URL changed to <c>https</c> loses its <c>;options</c>.
+    /// </summary>
+    private static string Login(UrlHandleParts parts, string scheme)
     {
-        bool any = parts.User is not null || parts.Password is not null || parts.Options is not null;
+        string? options = TakesLoginOptions(scheme) ? parts.Options : null;
+        bool any = parts.User is not null || parts.Password is not null || options is not null;
 
-        return any ? parts.User + Suffix(':', parts.Password) + Suffix(';', parts.Options) + "@" : string.Empty;
+        return any ? parts.User + Suffix(':', parts.Password) + Suffix(';', options) + "@" : string.Empty;
     }
+
+    /// <summary>A scheme libcurl does not support (no handler to ask), or one of <see cref="SchemesWithLoginOptions" />.</summary>
+    private static bool TakesLoginOptions(string scheme) =>
+        SchemesWithLoginOptions.Contains(scheme) || !UrlHandleParts.IsSupportedScheme(scheme);
 
     private static string Suffix(char separator, string? value) => value is null ? string.Empty : separator + value;
 
     /// <summary>
-    /// A whole URL: empty is
-    /// <see cref="CurlUrlCode.MalformedInput" />; a relative one is resolved against the URL held, when
-    /// the handle holds one (<see cref="UrlRelativeReference" />); then it is parsed.
+    /// A whole URL: an absolute one is parsed; a relative one is resolved against the URL held, when the
+    /// handle holds one (<see cref="UrlRelativeReference" />), then parsed, a blank or fragment-only one
+    /// keeping an empty query (read with <c>CURLU_GET_EMPTY</c>), as libcurl 8.22.0's <c>redirect_url</c>
+    /// keeps the handle's other parts; a blank one on a handle holding no URL is
+    /// <see cref="CurlUrlCode.MalformedInput" />, as upstream's <c>set_url</c>.
     /// </summary>
     private CurlUrlCode SetUrl(string value, CurlUrlFlags flags)
     {
-        if (value.Length == 0)
+        if (HoldsControlByte(value))
         {
             return CurlUrlCode.MalformedInput;
         }
 
-        string? current = null;
-        bool relative = !UrlRelativeReference.IsAbsolute(value, flags)
-            && Get(CurlUrlPart.Url, flags & ~CurlUrlFlags.NoGuessScheme, out current) == CurlUrlCode.Ok;
+        if (UrlRelativeReference.IsAbsolute(value, flags))
+        {
+            return HoldsDisallowedSpace(value, flags) ? CurlUrlCode.MalformedInput : ParseAbsolute(value, flags);
+        }
 
-        return Parse(relative ? UrlRelativeReference.Resolve(current!, value) : value, flags);
+        return SetRelativeUrl(value, flags);
     }
 
     /// <summary>
+    /// A whole URL that is not absolute: resolved against the URL held when the handle holds one, else
+    /// <see cref="CurlUrlCode.MalformedInput" /> when blank or holding a space <c>junkscan</c> rejects,
+    /// else parsed by <see cref="ParseWithoutScheme" />.
+    /// </summary>
+    private CurlUrlCode SetRelativeUrl(string value, CurlUrlFlags flags)
+    {
+        if (Get(CurlUrlPart.Url, HeldUrlFlags(value, flags), out string? current) == CurlUrlCode.Ok)
+        {
+            return Parse(UrlRelativeReference.Resolve(current!, value), flags);
+        }
+
+        return value.Length == 0 || HoldsDisallowedSpace(value, flags) ? CurlUrlCode.MalformedInput : ParseWithoutScheme(value, flags);
+    }
+
+    private CurlUrlCode ParseAbsolute(string value, CurlUrlFlags flags) =>
+        IsAcceptedScheme(value, flags) ? Parse(value, flags) : CurlUrlCode.UnsupportedScheme;
+
+    /// <summary>
+    /// Whether <paramref name="value" /> holds a control byte (below 0x20, or 0x7f) anywhere, which
+    /// curl 8.22.0's <c>junkscan</c> rejects as <see cref="CurlUrlCode.MalformedInput" /> before
+    /// <c>parseurl</c> reads the scheme, whatever the flags.
+    /// </summary>
+    private static bool HoldsControlByte(string value) =>
+        value.AsSpan().IndexOfAnyInRange('\u0000', '\u001F') >= 0 || value.Contains('\u007F', StringComparison.Ordinal);
+
+    /// <summary>
+    /// Whether <paramref name="value" /> holds a space without <c>CURLU_ALLOW_SPACE</c>, which
+    /// <c>junkscan</c> rejects too; a relative reference resolved against the URL held is exempt, as
+    /// upstream's <c>redirect_url</c> encodes its spaces as <c>%20</c> before the scan.
+    /// </summary>
+    private static bool HoldsDisallowedSpace(string value, CurlUrlFlags flags) =>
+        !flags.HasFlag(CurlUrlFlags.AllowSpace) && value.Contains(' ', StringComparison.Ordinal);
+
+    /// <summary>
+    /// The flags the held URL is read with to resolve <paramref name="relative" />: the set's own without
+    /// <c>CURLU_NO_GUESS_SCHEME</c>, and <c>CURLU_GET_EMPTY</c> for a blank or fragment-only reference,
+    /// which keeps an empty query.
+    /// </summary>
+    private static CurlUrlFlags HeldUrlFlags(string relative, CurlUrlFlags flags)
+    {
+        bool keepsTheQuery = relative.Length == 0 || relative[0] == '#';
+
+        return (flags & ~CurlUrlFlags.NoGuessScheme) | (keepsTheQuery ? CurlUrlFlags.GetEmpty : CurlUrlFlags.None);
+    }
+
+    /// <summary>
+    /// A URL that does not start with a scheme and a colon (<c>Curl_is_absolute_url</c> found none: it
+    /// starts with no letter, a character no scheme holds ends it early, or it runs past
+    /// <c>MAX_SCHEME_LEN</c>) is <see cref="CurlUrlCode.BadScheme" /> unless <c>CURLU_GUESS_SCHEME</c> or
+    /// <c>CURLU_DEFAULT_SCHEME</c> is set, as upstream's <c>parseurl</c> answers before reading a host.
+    /// </summary>
+    private CurlUrlCode ParseWithoutScheme(string value, CurlUrlFlags flags) =>
+        (flags & (CurlUrlFlags.GuessScheme | CurlUrlFlags.DefaultScheme)) == 0
+            ? CurlUrlCode.BadScheme
+            : Parse(value, flags);
+
+    /// <summary>
     /// Parses a whole URL with <see cref="CurlUrl" /> under <c>CURLU_PATH_AS_IS</c> and
-    /// <c>CURLU_DISALLOW_USER</c>, its spaces read as <c>%20</c> under <c>CURLU_ALLOW_SPACE</c>, each
-    /// <see cref="CurlUrlRejection" /> mapped to its <see cref="CurlUrlCode" />.
+    /// <c>CURLU_DISALLOW_USER</c>, its spaces read as <c>%20</c> under <c>CURLU_ALLOW_SPACE</c>, its
+    /// path, query and fragment encoded under <c>CURLU_URLENCODE</c> (<see cref="UrlHandleParts.UrlEncoded" />),
+    /// each <see cref="CurlUrlRejection" /> mapped to its <see cref="CurlUrlCode" />.
     /// </summary>
     private CurlUrlCode Parse(string value, CurlUrlFlags flags)
     {
         string text = flags.HasFlag(CurlUrlFlags.AllowSpace) ? value.Replace(" ", "%20", StringComparison.Ordinal) : value;
-        bool parsed = flags.HasFlag(CurlUrlFlags.DisallowUser)
-            ? CurlUrl.TryParseDisallowingUser(text, flags.HasFlag(CurlUrlFlags.PathAsIs), out CurlUrl? url, out CurlUrlRejection rejection)
-            : CurlUrl.TryParse(text, flags.HasFlag(CurlUrlFlags.PathAsIs), out url, out rejection);
-        if (!parsed)
+        if (!TryParseUnder(text, flags, out CurlUrl? url, out CurlUrlRejection rejection))
         {
             return RejectionCodes[(int)rejection];
         }
 
         UrlHandleParts newParts = UrlHandleParts.Of(url!);
         bool spaced = !ReferenceEquals(text, value) && !value.Contains("%20", StringComparison.Ordinal);
+        newParts = spaced ? newParts.WithSpaces() : newParts;
 
-        return Accept(value, flags, spaced ? newParts.WithSpaces() : newParts);
+        return Accept(value, flags, flags.HasFlag(CurlUrlFlags.UrlEncode) ? newParts.UrlEncoded() : newParts);
     }
 
     /// <summary>
+    /// Parses <paramref name="text" /> under <c>CURLU_PATH_AS_IS</c>, <c>CURLU_DISALLOW_USER</c> and
+    /// <c>CURLU_NO_AUTHORITY</c> as libcurl's own parser, a <c>file</c> URL keeping its backslashes and,
+    /// without <c>CURLU_GUESS_SCHEME</c> or <c>CURLU_DEFAULT_SCHEME</c>, needing no <c>/</c> after
+    /// <c>file:</c> (<see cref="CurlUrl.TryParseForUrlApi(string, bool, CurlUrlApiFlags, out CurlUrl, out CurlUrlRejection)" />).
+    /// </summary>
+    private static bool TryParseUnder(string text, CurlUrlFlags flags, out CurlUrl? url, out CurlUrlRejection rejection) =>
+        CurlUrl.TryParseForUrlApi(
+            text,
+            flags.HasFlag(CurlUrlFlags.PathAsIs),
+            new CurlUrlApiFlags(
+                flags.HasFlag(CurlUrlFlags.DisallowUser),
+                flags.HasFlag(CurlUrlFlags.NoAuthority),
+                (flags & (CurlUrlFlags.GuessScheme | CurlUrlFlags.DefaultScheme)) != 0),
+            out url,
+            out rejection);
+
+    /// <summary>
     /// A parsed URL with no scheme: <c>https</c> under <c>CURLU_DEFAULT_SCHEME</c>, the guessed one under
-    /// <c>CURLU_GUESS_SCHEME</c>, else <see cref="CurlUrlCode.BadScheme" />, as upstream's <c>parseurl</c>;
-    /// with one libcurl does not support, <see cref="CurlUrlCode.UnsupportedScheme" /> unless
+    /// <c>CURLU_GUESS_SCHEME</c>, else <see cref="CurlUrlCode.BadSlashes" />, as upstream's <c>parseurl</c>
+    /// answers text whose accepted scheme (<see cref="IsAcceptedScheme" />) has no <c>/</c> after its colon
+    /// (<c>http:80/x</c>); with one libcurl does not support, <see cref="CurlUrlCode.UnsupportedScheme" /> unless
     /// <c>CURLU_NON_SUPPORT_SCHEME</c>.
     /// </summary>
     private CurlUrlCode Accept(string value, CurlUrlFlags flags, UrlHandleParts newParts)
@@ -277,8 +371,18 @@ internal sealed class ManagedCurlUrlHandle : ICurlUrlHandle
             return Parse(DefaultScheme + "://" + value, flags & ~CurlUrlFlags.DefaultScheme);
         }
 
-        return flags.HasFlag(CurlUrlFlags.GuessScheme) ? Keep(newParts) : CurlUrlCode.BadScheme;
+        return flags.HasFlag(CurlUrlFlags.GuessScheme) ? Keep(newParts) : CurlUrlCode.BadSlashes;
     }
+
+    /// <summary>
+    /// Whether the scheme an absolute URL starts with, up to its first colon, is one libcurl supports or
+    /// <c>CURLU_NON_SUPPORT_SCHEME</c> is set: upstream's <c>parseurl</c> answers
+    /// <see cref="CurlUrlCode.UnsupportedScheme" /> otherwise, before it reads anything after the colon,
+    /// so <c>about:config</c>, <c>mailto:x@y</c> and <c>example.com:80/x</c> fail there.
+    /// </summary>
+    private static bool IsAcceptedScheme(string value, CurlUrlFlags flags) =>
+        flags.HasFlag(CurlUrlFlags.NonSupportScheme)
+        || UrlHandleParts.IsSupportedScheme(value[..value.IndexOf(':', StringComparison.Ordinal)].ToLowerInvariant());
 
     private CurlUrlCode Keep(UrlHandleParts newParts)
     {

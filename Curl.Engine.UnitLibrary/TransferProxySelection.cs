@@ -90,7 +90,7 @@ internal static class TransferProxySelection
             return TrySelectBehindPreProxy(selector, proxyOptions, proxyOptions.PreProxy, proxyUser, url, diagnosticLog, out proxy, out failure);
         }
 
-        if (!selector.TrySelect(url, proxyOptions.Proxy, KindWithoutSchemeOf(proxyOptions), proxyOptions.NoProxy, out ProxyEndpoint? selected, out failure, diagnosticLog))
+        if (!selector.TrySelect(url, proxyOptions.Proxy, KindWithoutSchemeOf(proxyOptions), proxyOptions.NoProxy, out ProxyEndpoint? selected, out failure, diagnosticLog, proxyOptions.ProxyPort))
         {
             return false;
         }
@@ -176,7 +176,7 @@ internal static class TransferProxySelection
             return true;
         }
 
-        if (!selector.TrySelect(url, proxyText, KindWithoutSchemeOf(options), options.NoProxy, out selected, out failure, log))
+        if (!selector.TrySelect(url, proxyText, KindWithoutSchemeOf(options), options.NoProxy, out selected, out failure, log, options.ProxyPort))
         {
             return false;
         }

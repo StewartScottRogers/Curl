@@ -37,6 +37,13 @@ internal sealed class HttpLineReader(IConnection connection)
     internal StopBeforeRead EndsBeforeRead { get; init; } = static _ => false;
 
     /// <summary>
+    /// Gets or sets the <c>CURLOPT_HTTP200ALIASES</c> status lines, whose beginnings a status line
+    /// may also have rather than <c>HTTP/</c> (<see cref="HttpStatusLine.CanBeginStatusLine" />).
+    /// Empty by default.
+    /// </summary>
+    internal IReadOnlyList<string> Http200Aliases { get; set; } = [];
+
+    /// <summary>
     /// Decides whether the lines end before the next read from the connection.
     /// </summary>
     /// <param name="unfinishedLine">The bytes of the unfinished line received so far.</param>
@@ -74,7 +81,7 @@ internal sealed class HttpLineReader(IConnection connection)
 
             if (isStatusLine)
             {
-                HttpStatusLine.RejectHttp09(buffer.AsSpan(start, lineLength));
+                HttpStatusLine.RejectHttp09(buffer.AsSpan(start, lineLength), Http200Aliases);
             }
 
             scanned = lineLength;
@@ -98,7 +105,7 @@ internal sealed class HttpLineReader(IConnection connection)
         while (true)
         {
             int received = end - start;
-            if (!HttpStatusLine.CanBeginHttp(buffer.AsSpan(start, received)))
+            if (!HttpStatusLine.CanBeginStatusLine(buffer.AsSpan(start, received), Http200Aliases))
             {
                 return true;
             }

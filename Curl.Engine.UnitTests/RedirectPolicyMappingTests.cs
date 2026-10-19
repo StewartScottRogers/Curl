@@ -122,6 +122,23 @@ public sealed class RedirectPolicyMappingTests
     }
 
     [TestMethod]
+    [DataRow(FollowLocation.FirstOnly, true)]
+    [DataRow(FollowLocation.ObeyCode, false)]
+    [DataRow(FollowLocation.All, false)]
+    public void Of_FollowLocation_SendsCustomMethodFirstOnlyUnderFirstOnly(FollowLocation follow, bool firstOnly)
+    {
+        EasyHttpOptions http = new() { FollowLocation = follow };
+        CommandLineOptions options = CommandLineParser.Parse([Url], _ => true).Options!;
+        Diagnostics.Arrange("follow", follow);
+
+        RedirectPolicy policy = RedirectPolicyMapping.Of(EasyOptionsFromCommandLine.TransferSettingsOf(options), http, new EasyAuthenticationOptions());
+
+        Diagnostics.Assert("sends custom method first only", firstOnly, policy.SendsCustomMethodFirstOnly);
+        Assert.AreEqual(firstOnly, policy.SendsCustomMethodFirstOnly);
+        Assert.AreEqual(follow == FollowLocation.ObeyCode, policy.DropsCustomMethodOnSwitchToGet);
+    }
+
+    [TestMethod]
     public void Of_RecordBuiltDirectly_ReadsTheRedirectSettingsFromIt()
     {
         EasyHttpOptions http = new()

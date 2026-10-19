@@ -188,13 +188,14 @@ public sealed class Lib1525To1534Tests
         var engine = new FakeCurlEngine();
         engine.Multi.PerformResult = (CurlMultiCode.Ok, 1);
         engine.Multi.WaitSocketsResult = CurlMultiCode.OutOfMemory;
+        engine.Multi.DoneResult = CurlCode.PartialFile;
         var run = new PortRun(engine, 1531, "127.0.0.1:8990/1531");
 
         LibTestResult result = await new Lib1531(TimeProvider.System).RunAsync(run.Context, CancellationToken.None);
 
         Assert.AreEqual(0, result.ExitCode);
         Assert.AreEqual($"curl_multi_fdset() failed, code {(int)CurlMultiCode.OutOfMemory}.\n", run.Error.ToString());
-        Assert.AreEqual(string.Empty, run.OutputText);
+        Assert.AreEqual($"HTTP transfer completed with status {(int)CurlCode.PartialFile}\n", run.OutputText);
     }
 
     [TestMethod]

@@ -43,7 +43,7 @@ public sealed partial class ManagedMultiTransferTests
     }
 
     [TestMethod]
-    public async Task GetWaitSockets_TransfersStartedAndNotDone_AreOnePollInSocketEachNumberedAsTheSocketCallbackIsTold()
+    public async Task GetWaitSockets_TransfersStartedAndNotDone_AreOnePollInSocketEachNumberedAsTheSocketCallbackIsToldThenTheResolverWakeup()
     {
         await using ManagedCurlEngine engine = new();
         await using IMultiTransfer multi = engine.CreateMulti();
@@ -52,7 +52,7 @@ public sealed partial class ManagedMultiTransferTests
         ControlledEasyTransfer first = new(), second = new();
         multi.Add(first);
         multi.Add(second);
-        CurlWaitSocket[] sockets = new CurlWaitSocket[3];
+        CurlWaitSocket[] sockets = new CurlWaitSocket[4];
 
         CurlMultiCode beforePerform = multi.GetWaitSockets(sockets, out int countBeforePerform);
         await multi.PerformAsync(CancellationToken.None);
@@ -66,15 +66,18 @@ public sealed partial class ManagedMultiTransferTests
         Assert.AreEqual(CurlMultiCode.Ok, beforePerform);
         Assert.AreEqual(0, countBeforePerform);
         Assert.AreEqual(CurlMultiCode.Ok, running);
-        Assert.AreEqual(2, countRunning);
+        Assert.AreEqual(3, countRunning);
         CurlSocket firstSocket = new(ManagedMultiTransfer.FirstTransferSocket);
         CurlSocket secondSocket = new(ManagedMultiTransfer.FirstTransferSocket + 1);
         Assert.AreEqual(new CurlWaitSocket(firstSocket, CurlWaitEvents.PollIn, CurlWaitEvents.None), runningSockets[0]);
         Assert.AreEqual(new CurlWaitSocket(secondSocket, CurlWaitEvents.PollIn, CurlWaitEvents.None), runningSockets[1]);
-        Assert.AreEqual(default, runningSockets[2]);
+        CurlWaitSocket wakeup = new(new CurlSocket(ManagedMultiTransfer.ResolverWakeupSocket), CurlWaitEvents.PollIn, CurlWaitEvents.None);
+        Assert.AreEqual(wakeup, runningSockets[2]);
+        Assert.AreEqual(default, runningSockets[3]);
         CollectionAssert.AreEqual(new[] { firstSocket, secondSocket, firstSocket }, told);
-        Assert.AreEqual(1, countAfterFirst);
+        Assert.AreEqual(2, countAfterFirst);
         Assert.AreEqual(new CurlWaitSocket(secondSocket, CurlWaitEvents.PollIn, CurlWaitEvents.None), afterFirst[0]);
+        Assert.AreEqual(wakeup, afterFirst[1]);
     }
 
     [TestMethod]
@@ -113,10 +116,10 @@ public sealed partial class ManagedMultiTransferTests
         CurlMultiCode emptyCode = multi.GetWaitSockets([], out int emptyCount);
 
         Assert.AreEqual(CurlMultiCode.OutOfMemory, code);
-        Assert.AreEqual(2, count);
+        Assert.AreEqual(3, count);
         Assert.AreEqual(new CurlSocket(ManagedMultiTransfer.FirstTransferSocket), sockets[0].Socket);
         Assert.AreEqual(CurlMultiCode.OutOfMemory, emptyCode);
-        Assert.AreEqual(2, emptyCount);
+        Assert.AreEqual(3, emptyCount);
     }
 
     [TestMethod]
@@ -189,6 +192,7 @@ public sealed partial class ManagedMultiTransferTests
 
         CurlMultiCode enableInfoRead = multi.EnableNotification(CurlMultiNotification.InfoRead);
         CurlMultiCode enableEasyDone = multi.EnableNotification(CurlMultiNotification.EasyDone);
+        await multi.PerformAsync(CancellationToken.None);
         first.Finish(CurlCode.Ok);
         second.Finish(CurlCode.CouldntConnect);
         await multi.PerformAsync(CancellationToken.None);
@@ -250,6 +254,7 @@ public sealed partial class ManagedMultiTransferTests
         ControlledEasyTransfer transfer = new();
         multi.Add(transfer);
         multi.EnableNotification(CurlMultiNotification.EasyDone);
+        await multi.PerformAsync(CancellationToken.None);
         transfer.Finish(CurlCode.Ok);
 
         (CurlMultiCode code, int running) = await multi.PerformAsync(CancellationToken.None);

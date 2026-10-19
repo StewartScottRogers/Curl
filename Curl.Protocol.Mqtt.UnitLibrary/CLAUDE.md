@@ -27,6 +27,10 @@ packet's type and remaining length, sent and received, as `verbose`. No packet b
 logged, so the CONNECT's user name and password never are; the connect target carries the
 log on.
 
+A POST asked for with nothing to publish (`ITransferContext.PostWithoutData`, libcurl's `CURLOPT_POST` alone) is exit 43
+after the CONNACK, with nothing sent but the CONNECT; an empty `PostData` publishes an empty payload (upstream tests
+1916 and 1917, BL-2673).
+
 `-v` and `--trace` (BL-935): after connecting, `MqttSession` reports to
 `ITransferContext.Events` `Using client id '...'`, each packet sent as a header block,
 each fixed header byte (`MqttPacketReader`) and each CONNACK or SUBACK body as header

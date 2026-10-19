@@ -172,6 +172,49 @@ public sealed class StreamConnectionTests
     }
 
     [TestMethod]
+    public async Task ReadAsync_WhenThePeerHadSentUnreadBytesBeforeTheWriteAndTheReadIsAborted_FailsWithTheAbort()
+    {
+        var aborted = new IOException("Unable to read data.", new SocketException((int)SocketError.ConnectionAborted));
+        await using var connection = new StreamConnection(new ReadFailingStream(aborted), null)
+        {
+            ReportsAbortedReadAsReset = true,
+            HasUnreadBytesBeforeWrite = _ => true,
+        };
+
+        Diagnostics.Arrange("read failure, reports abort as reset, unread bytes before write", "ConnectionAborted, true, true");
+
+        await connection.WriteAsync(new byte[] { 0x47 }, CancellationToken.None);
+        var failure = await Assert.ThrowsExactlyAsync<IOException>(() => connection.ReadAsync(new byte[8], CancellationToken.None).AsTask());
+
+        Diagnostics.Act("exception", failure.GetType().Name);
+        Diagnostics.Assert("failure is the abort", true, ReferenceEquals(aborted, failure));
+
+        Assert.AreSame(aborted, failure);
+    }
+
+    [TestMethod]
+    public async Task ReadAsync_WhenNoBytesWereUnreadBeforeTheWriteAndTheReadIsAborted_FailsWithConnectionReset()
+    {
+        var aborted = new IOException("Unable to read data.", new SocketException((int)SocketError.ConnectionAborted));
+        await using var connection = new StreamConnection(new ReadFailingStream(aborted), null)
+        {
+            ReportsAbortedReadAsReset = true,
+            HasUnreadBytesBeforeWrite = _ => false,
+        };
+
+        Diagnostics.Arrange("read failure, reports abort as reset, unread bytes before write", "ConnectionAborted, true, false");
+
+        await connection.WriteAsync(new byte[] { 0x47 }, CancellationToken.None);
+        var failure = await Assert.ThrowsExactlyAsync<IOException>(() => connection.ReadAsync(new byte[8], CancellationToken.None).AsTask());
+        var socketError = ((SocketException)failure.InnerException!).SocketErrorCode;
+
+        Diagnostics.Act("socket error", socketError);
+        Diagnostics.Assert("socket error", SocketError.ConnectionReset, socketError);
+
+        Assert.AreEqual(SocketError.ConnectionReset, socketError);
+    }
+
+    [TestMethod]
     public async Task ReadAsync_WhenTheFirstReceiveIsReset_FailsWithConnectionReset()
     {
         var reset = new IOException("Unable to read data.", new SocketException((int)SocketError.ConnectionReset));

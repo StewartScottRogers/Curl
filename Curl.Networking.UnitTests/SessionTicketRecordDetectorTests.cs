@@ -124,18 +124,22 @@ public sealed class SessionTicketRecordDetectorTests
     [TestMethod]
     public void CountTicketRecords_SecondRead_CountsNoneAndStopsWatching()
     {
-        var detector = AfterHandshake(Records(117));
-        detector.CountTicketRecords(100);
+        var detector = AfterHandshake(Records(445, 117));
+        var firstCount = detector.CountTicketRecords(100);
 
-        Diagnostics.Arrange("first read", "117-byte record, 100 bytes read");
+        Diagnostics.Arrange("first read", "445- and 117-byte records, 100 bytes read");
         Diagnostics.Arrange("second read's record lengths", "445, 117");
 
+        // A second ticket and response that a watcher still counting would count as one ticket (AF-0256).
         detector.ObserveReceived(Records(445, 117));
         var count = detector.CountTicketRecords(100);
 
+        Diagnostics.Act("ticket records on the first read", firstCount);
         Diagnostics.Act("ticket records on the second read", count);
+        Diagnostics.Assert("ticket records on the first read", 1, firstCount);
         Diagnostics.Assert("ticket records on the second read", 0, count);
 
+        Assert.AreEqual(1, firstCount);
         Assert.AreEqual(0, count);
     }
 

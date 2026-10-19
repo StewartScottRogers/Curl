@@ -2,8 +2,10 @@ using System.Text;
 using Curl.Api.Codes;
 using Curl.Api.Options;
 using Curl.Api.Options.Authentication;
+using Curl.Api.Options.Http;
 using Curl.Api.Options.Network;
 using Curl.Api.Options.Proxy;
+using Curl.Protocol.Abstractions;
 
 namespace Curl.Engine;
 
@@ -73,6 +75,179 @@ public sealed partial class ManagedEasyTransferTests
         await easy.PerformAsync(CancellationToken.None);
 
         Assert.IsNull(handler.Contexts.Single().Credentials);
+    }
+
+    [TestMethod]
+    public async Task PerformAsync_NetrcRequiredWithToolInputs_ReadsNoFileAndPutsNoCredentialsOnTheContext()
+    {
+        RecordingProtocolHandler handler = RecordingProtocolHandler.WritingPath("http");
+        await using ManagedEasyTransfer easy = EasyOver(handler, []);
+        List<string> pathsRead = [];
+        easy.Host = EasyTransferHost.Library with
+        {
+            ReadFile = path =>
+            {
+                pathsRead.Add(path);
+                return Encoding.UTF8.GetBytes("machine github.com login daniel password pw\n");
+            },
+        };
+        easy.Options = NetrcOptions(NetrcUsage.Required);
+        easy.ToolInputs = new EngineToolTransferInputs(Url: CurlUrl.Parse("http://github.com"));
+
+        CurlCode code = await easy.PerformAsync(CancellationToken.None);
+
+        Assert.AreEqual(CurlCode.Ok, code);
+        Assert.DoesNotContain(NetrcPath, pathsRead);
+        Assert.IsNull(handler.Contexts.Single().Credentials);
+    }
+
+    [TestMethod]
+    public async Task PerformAsync_NetrcRequiredWithToolInputsAndTheFileUnreadable_RunsTheTransfer()
+    {
+        RecordingProtocolHandler handler = RecordingProtocolHandler.WritingPath("http");
+        await using ManagedEasyTransfer easy = EasyReadingNetrc(handler, null);
+        easy.Options = NetrcOptions(NetrcUsage.Required);
+        easy.ToolInputs = new EngineToolTransferInputs(Url: CurlUrl.Parse("http://github.com"));
+
+        CurlCode code = await easy.PerformAsync(CancellationToken.None);
+
+        Assert.AreEqual(CurlCode.Ok, code);
+        Assert.HasCount(1, handler.Contexts);
+    }
+
+    [TestMethod]
+    public async Task PerformAsync_NetrcIgnoredAndCredentialsInTheUrl_PutsTheUrlsCredentialsOnTheContext()
+    {
+        RecordingProtocolHandler handler = RecordingProtocolHandler.WritingPath("http");
+        await using ManagedEasyTransfer easy = EasyReadingNetrc(handler, null);
+        easy.Options = NetrcOptions(NetrcUsage.Ignored) with
+        {
+            Network = new EasyNetworkOptions { Url = "http://xxx:yyy@127.0.0.1:9000/1964/testapi/test" },
+        };
+
+        CurlCode code = await easy.PerformAsync(CancellationToken.None);
+
+        Assert.AreEqual(CurlCode.Ok, code);
+        Assert.AreEqual("xxx", handler.Contexts.Single().Credentials?.UserName);
+        Assert.AreEqual("yyy", handler.Contexts.Single().Credentials?.Password);
+    }
+
+    [TestMethod]
+    public async Task PerformAsync_UserPasswordWithAUserNameAndCredentialsInTheUrl_KeepsTheUserPassword()
+    {
+        RecordingProtocolHandler handler = RecordingProtocolHandler.WritingPath("http");
+        await using ManagedEasyTransfer easy = EasyReadingNetrc(handler, null);
+        easy.Options = NetrcOptions(NetrcUsage.Ignored) with
+        {
+            Network = new EasyNetworkOptions { Url = "http://xxx:yyy@127.0.0.1:9000/" },
+            Authentication = new EasyAuthenticationOptions { UserPassword = "user:pw" },
+        };
+
+        await easy.PerformAsync(CancellationToken.None);
+
+        Assert.AreEqual("user", handler.Contexts.Single().Credentials?.UserName);
+        Assert.AreEqual("pw", handler.Contexts.Single().Credentials?.Password);
+    }
+
+    [TestMethod]
+    public async Task PerformAsync_AwsSigV4AndCredentialsOnlyInTheUrl_SignsWithTheUrlsUserName()
+    {
+        ScriptedConnector server = new(["HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n"u8.ToArray()]);
+
+        string request = await PerformOverScriptedServerAsync(server, new EasyAuthenticationOptions { AwsSigV4 = "aws:amz:us-east-1:s3", HttpAuthentication = HttpAuthenticationMethods.AwsSigV4 });
+
+        Assert.Contains("Authorization: AWS4-HMAC-SHA256 Credential=xxx/", request);
+        Assert.Contains("/us-east-1/s3/aws4_request", request);
+    }
+
+    [TestMethod]
+    public async Task PerformAsync_AwsSigV4ProviderOnlyAndCredentialsOnlyInTheUrl_SignsWithTheUrlsUserNameAndTheHostsScope()
+    {
+        ScriptedConnector server = new(["HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n"u8.ToArray()]);
+
+        string request = await PerformOverScriptedServerAsync(server, new EasyAuthenticationOptions { AwsSigV4 = "xxx", HttpAuthentication = HttpAuthenticationMethods.AwsSigV4 });
+
+        Assert.Contains("Authorization: XXX4-HMAC-SHA256 Credential=xxx/", request);
+        Assert.Contains("/0/127/xxx4_request, SignedHeaders=host;x-xxx-date, Signature=", request);
+        Assert.Contains("X-Xxx-Date: ", request);
+    }
+
+    [TestMethod]
+    public async Task PerformAsync_AwsSigV4SetBackToNullAndCredentialsInTheUrl_SendsNoAuthorization()
+    {
+        ScriptedConnector server = new(["HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n"u8.ToArray()]);
+
+        string request = await PerformOverScriptedServerAsync(server, new EasyAuthenticationOptions { AwsSigV4 = null, HttpAuthentication = HttpAuthenticationMethods.AwsSigV4 });
+
+        Assert.DoesNotContain("Authorization", request);
+    }
+
+    [TestMethod]
+    public async Task PerformAsync_AwsSigV4WithCustomHeaders_SendsTheSignatureLinesAfterHostAndBeforeTheCustomHeaders()
+    {
+        ScriptedConnector server = new(["HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n"u8.ToArray()]);
+
+        string request = await PerformOverScriptedServerAsync(
+            server,
+            new EasyAuthenticationOptions { AwsSigV4 = "aws:amz:us-east-1:s3", HttpAuthentication = HttpAuthenticationMethods.AwsSigV4 },
+            new EasyHttpOptions { HttpHeaders = ["x-amz-meta-test: test2", "some-other-header: value"] });
+
+        int host = request.IndexOf("\r\nHost: ", StringComparison.Ordinal);
+        int authorization = request.IndexOf("\r\nAuthorization: AWS4-HMAC-SHA256 ", StringComparison.Ordinal);
+        int date = request.IndexOf("\r\nX-Amz-Date: ", StringComparison.Ordinal);
+        int custom = request.IndexOf("\r\nx-amz-meta-test: test2\r\nsome-other-header: value\r\n", StringComparison.Ordinal);
+        Assert.IsTrue(host >= 0 && host < authorization && authorization < date && date < custom, request);
+    }
+
+    [TestMethod]
+    public async Task PerformAsync_NetrcOptionalThroughAProxyRedirectedToAHostWithNoEntry_SendsTheEntryOnlyToTheFirstHost()
+    {
+        ScriptedConnector server = new(
+        [
+            "HTTP/1.1 301 Moved\r\nLocation: http://numbertwo.example/25060002\r\nContent-Length: 0\r\n\r\n"u8.ToArray(),
+            "HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n"u8.ToArray(),
+        ]);
+        EngineDialing dialing = new(new ScriptedTcpDialer(server), new LoopbackDnsResolver(), new RecordingDatagramConnector(Curl.Protocol.Abstractions.CurlExitCode.CouldntConnect, "no udp"));
+        await using ManagedCurlEngine engine = new(TimeProvider.System, null, dialing: dialing);
+        await using ManagedEasyTransfer easy = (ManagedEasyTransfer)engine.CreateEasy();
+        easy.Host = EasyTransferHost.Library with
+        {
+            ReadFile = path => path == NetrcPath ? "machine site.example login batman password robin\n"u8.ToArray() : null,
+        };
+        easy.Options = NetrcOptions(NetrcUsage.Optional, "http://127.0.0.1:9000/") with
+        {
+            Network = new EasyNetworkOptions { Url = "http://site.example/" },
+            Authentication = new EasyAuthenticationOptions { Netrc = NetrcUsage.Optional, NetrcFile = NetrcPath, UnrestrictedAuthentication = true },
+            Http = new EasyHttpOptions { FollowLocation = FollowLocation.All },
+        };
+
+        CurlCode code = await easy.PerformAsync(CancellationToken.None);
+
+        Assert.AreEqual(CurlCode.Ok, code);
+        string written = Encoding.ASCII.GetString(server.Written);
+        int second = written.IndexOf("GET http://numbertwo.example/25060002 ", StringComparison.Ordinal);
+        Assert.IsGreaterThan(0, second, written);
+        Assert.Contains("Authorization: Basic YmF0bWFuOnJvYmlu\r\n", written[..second]);
+        Assert.DoesNotContain("Authorization:", written[second..]);
+    }
+
+    /// <summary>Performs <c>http://xxx:yyy@127.0.0.1:9000/1978</c> with <paramref name="authentication" /> and <paramref name="http" /> on an engine dialing <paramref name="server" />, and gives the request it wrote.</summary>
+    private static async Task<string> PerformOverScriptedServerAsync(ScriptedConnector server, EasyAuthenticationOptions authentication, EasyHttpOptions? http = null)
+    {
+        EngineDialing dialing = new(new ScriptedTcpDialer(server), new LoopbackDnsResolver(), new RecordingDatagramConnector(Curl.Protocol.Abstractions.CurlExitCode.CouldntConnect, "no udp"));
+        await using ManagedCurlEngine engine = new(TimeProvider.System, null, dialing: dialing);
+        await using Api.EngineContracts.IEasyTransfer easy = engine.CreateEasy();
+        easy.Options = new EasyOptions
+        {
+            Network = new EasyNetworkOptions { Url = "http://xxx:yyy@127.0.0.1:9000/1978" },
+            Authentication = authentication,
+            Http = http ?? new EasyHttpOptions(),
+        };
+
+        CurlCode code = await easy.PerformAsync(CancellationToken.None);
+
+        Assert.AreEqual(CurlCode.Ok, code);
+        return Encoding.ASCII.GetString(server.Written);
     }
 
     [TestMethod]

@@ -151,9 +151,13 @@ internal static class EasyHttpOptionSetters
             : Set(ref options, h => h with { PostRedirect = (PostRedirect)(number & (long)PostRedirect.All) });
     }
 
-    /// <summary><c>CURLOPT_POST</c>: non-zero makes the request a <c>POST</c> and clears <c>CURLOPT_NOBODY</c>; zero makes it a <c>GET</c>.</summary>
+    /// <summary>
+    /// <c>CURLOPT_POST</c>: non-zero makes the request a <c>POST</c> and clears <c>CURLOPT_NOBODY</c>; zero makes it a <c>GET</c>.
+    /// Either clears <c>CURLOPT_UPLOAD</c>, as libcurl's one request method replaces its <c>PUT</c> (upstream test1948, BL-2679).
+    /// </summary>
     private static CurlCode SetPost(ref EasyOptions options, object? value)
     {
+        options = options with { Transfer = options.Transfer with { Upload = false } };
         if (!IsOn(value))
         {
             return Set(ref options, h => h with { Post = false });
@@ -166,7 +170,7 @@ internal static class EasyHttpOptionSetters
     /// <summary>
     /// <c>CURLOPT_POSTFIELDS</c> keeps the caller's buffer by reference; <c>CURLOPT_COPYPOSTFIELDS</c>
     /// copies it, only the first <c>CURLOPT_POSTFIELDSIZE</c> bytes when that is set. Either makes the
-    /// request a <c>POST</c>. A string is sent as its UTF-8 bytes.
+    /// request a <c>POST</c>, clearing <c>CURLOPT_UPLOAD</c> as <c>CURLOPT_POST</c> does. A string is sent as its UTF-8 bytes.
     /// </summary>
     private static CurlCode SetPostBody(ref EasyOptions options, object? value, bool copy)
     {
@@ -182,6 +186,7 @@ internal static class EasyHttpOptionSetters
             return CurlCode.BadFunctionArgument;
         }
 
+        options = options with { Transfer = options.Transfer with { Upload = false } };
         return Set(ref options, h => h with { PostFields = copy ? CopyOf(fields, h.PostFieldSize) : fields, Post = true, HttpGet = false });
     }
 

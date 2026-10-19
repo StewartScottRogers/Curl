@@ -31,7 +31,7 @@ public sealed class ManagedCurlEngine : ICurlEngine
 {
     private readonly ManagedEngineSharedState shared;
     private readonly EasyTransferHost handleHost;
-    private readonly Func<EasyOptions, ManagedEngineSharedState, ICookieStore?, IHttp2PushSink?, ProtocolDispatcher> createDispatcher;
+    private readonly Func<EasyOptions, ManagedEngineSharedState, ICookieStore?, IHttp2PushSink?, HandleRtspSession, WsPerformConnection, ProtocolDispatcher> createDispatcher;
 
     /// <summary>Creates the engine on the system clock and the real network, with no easy error text.</summary>
     public ManagedCurlEngine()
@@ -55,7 +55,9 @@ public sealed class ManagedCurlEngine : ICurlEngine
     /// </param>
     /// <param name="readEnvironmentVariable">
     /// Reads the proxy environment variables each handle's own perform consults, as libcurl reads them for every
-    /// handle (BL-2519); <see langword="null" /> for <see cref="Environment.GetEnvironmentVariable(string)" />.
+    /// handle (BL-2519); <see langword="null" /> for <see cref="Environment.GetEnvironmentVariable(string)" />. When given and
+    /// it sets <c>CURL_HSTS_HTTP</c>, the engine's HSTS cache learns over plain <c>http</c> too, the harness's stand-in for
+    /// the debug build's (upstream test1922, BL-2676, ADR-0494); the process's environment never turns that on.
     /// </param>
     /// <param name="dialing">
     /// What the production dispatcher's transports dial, resolve and open datagram channels through in place of
@@ -82,6 +84,16 @@ public sealed class ManagedCurlEngine : ICurlEngine
     /// harness's stand-in for the debug build's <c>CURL_FTP_PWD_STOP</c> (upstream test753, BL-2636, ADR-0687);
     /// <see langword="false" /> sends <c>PWD</c> as a release build does.
     /// </param>
+    /// <param name="createFormBoundary">
+    /// What gives every handle's <c>CURLOPT_MIMEPOST</c> bodies their boundary: the conformance harness's stand-in for the debug
+    /// build's boundary under <c>CURL_ENTROPY</c> (upstream test1972, BL-2695); <see langword="null" /> for curl's random one.
+    /// </param>
+    /// <param name="standardError">
+    /// Where every handle's <c>CURLOPT_VERBOSE</c> lines go when it sets neither <c>CURLOPT_DEBUGFUNCTION</c> nor
+    /// <c>CURLOPT_STDERR</c> (<see cref="EasyTransferHost.StandardError" />), as libcurl writes them to the process's
+    /// <c>stderr</c>: the conformance harness's case stderr (upstream tests 1506 and 1510, BL-2726); <see langword="null" />
+    /// for the process's standard error.
+    /// </param>
     internal ManagedCurlEngine(
         TimeProvider timeProvider,
         Func<EasyOptions, ManagedEngineSharedState, ICookieStore?, ProtocolDispatcher>? createDispatcher,
@@ -91,12 +103,45 @@ public sealed class ManagedCurlEngine : ICurlEngine
         TimeProvider? signingClock = null,
         IWebSocketRandomSource? webSocketRandomSource = null,
         Stream? standardInput = null,
-        bool stopsFirstFtpTransferBeforePwd = false)
+        bool stopsFirstFtpTransferBeforePwd = false,
+        Func<string>? createFormBoundary = null,
+        Stream? standardError = null)
     {
-        shared = new ManagedEngineSharedState(timeProvider, easyErrorText ?? (_ => string.Empty), readEnvironmentVariable, dialing, signingClock, webSocketRandomSource, FirstTransferFtpPwdStop.When(stopsFirstFtpTransferBeforePwd));
-        handleHost = standardInput is null ? EasyTransferHost.Library : EasyTransferHost.Library with { StandardInput = standardInput };
-        this.createDispatcher = createDispatcher is null ? CreateDispatcher : (options, state, cookies, _) => createDispatcher(options, state, cookies);
+        shared = new ManagedEngineSharedState(timeProvider, easyErrorText ?? (_ => string.Empty), readEnvironmentVariable, dialing, signingClock, webSocketRandomSource, FirstTransferFtpPwdStop.When(stopsFirstFtpTransferBeforePwd), createFormBoundary, readEnvironmentVariable is not null && EngineComposition.LearnsHstsOverHttp(honoursHstsHttpVariable: true, readEnvironmentVariable));
+        handleHost = HandleHostOf(standardInput, readEnvironmentVariable, standardError);
+        this.createDispatcher = createDispatcher is null ? CreateDispatcher : (options, state, cookies, _, _, _) => createDispatcher(options, state, cookies);
     }
+
+    /// <summary>
+    /// The host every handle starts with: <see cref="EasyTransferHost.Library" /> itself, or a copy that reads
+    /// <paramref name="standardInput" /> and, when the engine's environment sets <c>CURL_ALTSVC_HTTP</c> (the harness's stand-in for
+    /// the debug build's test of it, ADR-0497), serves alt-svc over plain <c>http</c> (upstream test1908, BL-2671).
+    /// </summary>
+    /// <param name="standardInput">What the handles read for <c>-</c>, or <see langword="null" /> for the library host's.</param>
+    /// <param name="readEnvironmentVariable">The engine's environment reader, or <see langword="null" /> for the process's, which the stand-in ignores.</param>
+    /// <param name="standardError">Where the handles' default verbose lines go, or <see langword="null" /> for the library host's.</param>
+    /// <returns>The host.</returns>
+    private static EasyTransferHost HandleHostOf(Stream? standardInput, Func<string, string?>? readEnvironmentVariable, Stream? standardError)
+    {
+        bool altSvcUsesOverHttp = readEnvironmentVariable is not null && EngineComposition.UsesAltSvcOverHttp(honoursAltSvcHttpVariable: true, readEnvironmentVariable);
+        if (standardInput is null && standardError is null && !altSvcUsesOverHttp)
+        {
+            return EasyTransferHost.Library;
+        }
+
+        return EasyTransferHost.Library with
+        {
+            StandardInput = standardInput ?? EasyTransferHost.Library.StandardInput,
+            StandardError = StandardErrorOf(standardError),
+            AltSvcUsesOverHttp = altSvcUsesOverHttp,
+        };
+    }
+
+    /// <summary>The handles' standard error: <paramref name="standardError" />, else <see cref="EasyTransferHost.Library" />'s.</summary>
+    /// <param name="standardError">The engine's standard error, or <see langword="null" />.</param>
+    /// <returns>The stream, opened when first used.</returns>
+    private static Lazy<Stream> StandardErrorOf(Stream? standardError) =>
+        standardError is null ? EasyTransferHost.Library.StandardError : new Lazy<Stream>(() => standardError);
 
     /// <summary>Gets what the engine's handles share.</summary>
     internal ManagedEngineSharedState Shared => shared;
@@ -146,8 +191,10 @@ public sealed class ManagedCurlEngine : ICurlEngine
     /// <param name="shared">The engine's shared caches.</param>
     /// <param name="cookieStore">The cookies the HTTP handler sends and keeps, or <see langword="null" /> with the cookie engine off.</param>
     /// <param name="pushSink">Where the HTTP handler offers HTTP/2 server pushes (<see cref="EngineHttp2PushSink" />, BL-2469), or <see langword="null" /> to refuse them.</param>
+    /// <param name="rtspSession">The handle's RTSP state, whose settings and session the RTSP handler sends (BL-2704), or <see langword="null" /> for the curl tool's <c>OPTIONS *</c>.</param>
+    /// <param name="webSocketPerformConnection">The handle's WebSocket perform connection, which <c>curl_ws_send</c> from a write callback writes to (BL-2710), or <see langword="null" /> for none.</param>
     /// <returns>The dispatcher.</returns>
-    internal static ProtocolDispatcher CreateDispatcher(EasyOptions options, ManagedEngineSharedState shared, ICookieStore? cookieStore, IHttp2PushSink? pushSink = null)
+    internal static ProtocolDispatcher CreateDispatcher(EasyOptions options, ManagedEngineSharedState shared, ICookieStore? cookieStore, IHttp2PushSink? pushSink = null, HandleRtspSession? rtspSession = null, WsPerformConnection? webSocketPerformConnection = null)
     {
         CurlTransports transports = CreateTransports(options, shared);
         IConnector connector = PrerequestConnector.Over(PoolOf(transports, transports.TcpConnector, options.Callbacks, shared), options.Callbacks.Prerequest);
@@ -164,8 +211,11 @@ public sealed class ManagedCurlEngine : ICurlEngine
             ftpDataConnector: PoolOf(transports, transports.TcpConnector.ForFtpDataConnections(), options.Callbacks, shared),
             ftpWildcardHooks: CallbackWildcardHooks.Of(options),
             rtspInterleaveSink: CallbackInterleaveSink.Of(options.Callbacks.Interleave),
+            rtspRequestSettings: rtspSession is null ? null : () => rtspSession.SettingsFor(options),
+            rtspSessionState: rtspSession?.State,
             ftpListener: SocketCallbackConnectionListener.Over(shared.Dialing?.FtpListener ?? new Curl.Networking.TcpConnectionListener(), options.Callbacks, shared),
             webSocketRawMode: IsWebSocketRawMode(options),
+            webSocketPerformConnection: webSocketPerformConnection,
             http2PushSink: pushSink,
             webSocketRandomSource: shared.WebSocketRandomSource,
             ftpStopsBeforeEntryPath: shared.FtpPwdStop?.TryClaim() == true));

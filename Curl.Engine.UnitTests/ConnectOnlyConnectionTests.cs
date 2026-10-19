@@ -30,6 +30,19 @@ public sealed class ConnectOnlyConnectionTests
     }
 
     [TestMethod]
+    public async Task ReceiveAndSend_PerformRunning_AnswerRecursiveApiCall()
+    {
+        (ConnectOnlyConnection connection, _) = await OpenAsync();
+        connection.PerformRunning = true;
+
+        CurlConnectOnlyResult receive = await connection.ReceiveAsync(new byte[4], CancellationToken.None);
+        CurlConnectOnlyResult send = await connection.SendAsync(new byte[4], CancellationToken.None);
+
+        Assert.AreEqual(new CurlConnectOnlyResult(CurlCode.RecursiveApiCall, 0), receive);
+        Assert.AreEqual(new CurlConnectOnlyResult(CurlCode.RecursiveApiCall, 0), send);
+    }
+
+    [TestMethod]
     public async Task ReceiveAndSend_OptionsNoLongerConnectOnly_AnswerUnsupportedProtocol()
     {
         ConnectOnlyConnection connection = new(() => false);

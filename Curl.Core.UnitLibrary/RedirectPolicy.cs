@@ -54,6 +54,14 @@ public sealed record RedirectPolicy
     public bool DropsCustomMethodOnSwitchToGet { get; init; }
 
     /// <summary>
+    /// Gets a value indicating whether a <c>-X</c> method is sent on the first request only, as
+    /// libcurl's <c>CURLOPT_FOLLOWLOCATION</c> <c>CURLFOLLOW_FIRSTONLY</c> sends it: every redirect
+    /// hop uses the method its body implies, GET or POST, and no <c>Stick to</c> line is written
+    /// (libcurl 8.22.0 lib/http.c, upstream cases 1574 and 1575, BL-2658).
+    /// </summary>
+    public bool SendsCustomMethodFirstOnly { get; init; }
+
+    /// <summary>
     /// Gets the lowercase schemes a redirect may lead to; curl's default, <c>http</c>,
     /// <c>https</c>, <c>ftp</c> and <c>ftps</c>, when not given.
     /// </summary>

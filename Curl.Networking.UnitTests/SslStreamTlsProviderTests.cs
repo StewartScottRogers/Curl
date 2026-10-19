@@ -576,6 +576,44 @@ public sealed partial class SslStreamTlsProviderTests
     }
 
     [TestMethod]
+    [DataRow(SchannelBuild)]
+    [DataRow(OpenSslBuild)]
+    public async Task AuthenticateAsClientAsync_WithCaCertificateBlobHoldingTheServerCertificate_Succeeds(bool matchesSchannelBuild)
+    {
+        var blob = Encoding.ASCII.GetBytes(s_serverCertificate.ExportCertificatePem());
+
+        var result = await HandshakeAsync(
+            new TlsClientOptions(CaCertificateBlob: blob), CertificateHost, SslProtocols.None, matchesSchannelBuild);
+
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.Result.ExitCode);
+        Assert.AreEqual(CurlExitCode.Ok, result.Result.ExitCode);
+        await result.Result.Connection!.DisposeAsync();
+    }
+
+    [TestMethod]
+    public async Task AuthenticateAsClientAsync_WithCaCertificateBlobAndAnUnrelatedCaCertificateFile_TrustsTheBlob()
+    {
+        var caFile = WriteCaFile("unrelated.pem", CreateUnrelatedAuthorityPem());
+        var blob = Encoding.ASCII.GetBytes(s_serverCertificate.ExportCertificatePem());
+
+        var result = await HandshakeAsync(
+            new TlsClientOptions(CaCertificateFile: caFile, CaCertificateBlob: blob), CertificateHost, SslProtocols.None, OpenSslBuild);
+
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.Result.ExitCode);
+        Assert.AreEqual(CurlExitCode.Ok, result.Result.ExitCode);
+        await result.Result.Connection!.DisposeAsync();
+    }
+
+    [TestMethod]
+    public async Task AuthenticateAsClientAsync_WithoutCaCertificateBlobOrFile_VerifiesAgainstTheSystemStore()
+    {
+        var result = await HandshakeAsync(new TlsClientOptions(), CertificateHost, SslProtocols.None, OpenSslBuild);
+
+        Diagnostics.Assert("exit code", CurlExitCode.PeerFailedVerification, result.Result.ExitCode);
+        Assert.AreEqual(CurlExitCode.PeerFailedVerification, result.Result.ExitCode);
+    }
+
+    [TestMethod]
     public async Task AuthenticateAsClientAsync_WithCaCertificateFileButAnotherHostNameInTheSchannelBuild_ReportsTheHostNameCertGetNameStringDidNotMatch()
     {
         var caFile = WriteCaFile("server.pem", s_serverCertificate.ExportCertificatePem());
@@ -775,6 +813,45 @@ public sealed partial class SslStreamTlsProviderTests
         Diagnostics.Assert("exit code", CurlExitCode.PeerFailedVerification, result.Result.ExitCode);
         Assert.AreEqual(CurlExitCode.PeerFailedVerification, result.Result.ExitCode);
         Assert.AreEqual("SSL certificate OpenSSL verify result: self-signed certificate (18)", result.Result.ErrorMessage);
+    }
+
+    [TestMethod]
+    public async Task AuthenticateAsClientAsync_WithEmptyCaCertificateDirectoryInTheOpenSslBuild_AddsNothing()
+    {
+        var result = await HandshakeAsync(
+            new TlsClientOptions(CaCertificateDirectory: string.Empty), CertificateHost, SslProtocols.None, OpenSslBuild);
+
+        Diagnostics.Assert("exit code", CurlExitCode.PeerFailedVerification, result.Result.ExitCode);
+        Assert.AreEqual(CurlExitCode.PeerFailedVerification, result.Result.ExitCode);
+        Assert.AreEqual("SSL certificate OpenSSL verify result: self-signed certificate (18)", result.Result.ErrorMessage);
+    }
+
+    [TestMethod]
+    public async Task AuthenticateAsClientAsync_WithEmptyCaCertificateDirectoryBesideTheServerCertificateFileInTheOpenSslBuild_Succeeds()
+    {
+        var caFile = WriteCaFile("server.pem", s_serverCertificate.ExportCertificatePem());
+
+        var result = await HandshakeAsync(
+            new TlsClientOptions(CaCertificateFile: caFile, CaCertificateDirectory: string.Empty),
+            CertificateHost,
+            SslProtocols.None,
+            OpenSslBuild);
+
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.Result.ExitCode);
+        Assert.AreEqual(CurlExitCode.Ok, result.Result.ExitCode);
+        await result.Result.Connection!.DisposeAsync();
+    }
+
+    [TestMethod]
+    public async Task AuthenticateAsClientAsync_WithEmptyCaCertificateFileInTheOpenSslBuild_FailsWithSslCacertBadfile()
+    {
+        var result = await HandshakeAsync(
+            new TlsClientOptions(CaCertificateFile: string.Empty), CertificateHost, SslProtocols.None, OpenSslBuild);
+
+        Diagnostics.Assert("exit code", CurlExitCode.SslCacertBadfile, result.Result.ExitCode);
+        Assert.AreEqual(CurlExitCode.SslCacertBadfile, result.Result.ExitCode);
+        Assert.AreEqual("error adding trust anchors from file: ", result.Result.ErrorMessage);
+        Assert.IsTrue(result.PlaintextDisposed);
     }
 
     [TestMethod]

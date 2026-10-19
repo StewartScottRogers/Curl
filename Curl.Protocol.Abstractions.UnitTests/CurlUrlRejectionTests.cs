@@ -27,8 +27,16 @@ public sealed class CurlUrlRejectionTests
     [DataRow(":80/x", CurlUrlRejection.NoHost)]
     [DataRow("http://h:99999/", CurlUrlRejection.BadPortNumber)]
     [DataRow("http://h:1x/", CurlUrlRejection.BadPortNumber)]
+    [DataRow("http://hostname:1111\\path", CurlUrlRejection.Backslash)]
+    [DataRow("http:\\\\hostname", CurlUrlRejection.Backslash)]
+    [DataRow("http://h:\\x", CurlUrlRejection.Backslash)]
+    // curl 8.22.0 on Windows, run from PowerShell (measured 2026-10-18, BL-2742): exit 3, a backslash.
+    [DataRow("http://h:1\\x/", CurlUrlRejection.Backslash)]
+    [DataRow("http://h:1x\\/", CurlUrlRejection.BadPortNumber)]
     [DataRow("http://h:-1/", CurlUrlRejection.BadPortNumber)]
-    [DataRow("http://:x/", CurlUrlRejection.BadPortNumber)]
+    // curl 8.22.0 (measured 2026-10-18, BL-2734): an empty host beats a bad port, as parse_authority does.
+    [DataRow("http://:x/", CurlUrlRejection.NoHost)]
+    [DataRow("https://::1/", CurlUrlRejection.NoHost)]
     [DataRow("http://[::1]x/", CurlUrlRejection.BadPortNumber)]
     [DataRow("http://[::1]]/", CurlUrlRejection.BadPortNumber)]
     [DataRow("http://[::1]:x/", CurlUrlRejection.BadPortNumber)]
@@ -263,12 +271,13 @@ public sealed class CurlUrlRejectionTests
     [TestMethod]
     [DataRow(CurlUrlRejection.MalformedInput, "Malformed input to a URL function")]
     [DataRow(CurlUrlRejection.BadSlashes, "Unsupported number of slashes following scheme")]
-    [DataRow(CurlUrlRejection.NoHost, "No host part in the URL")]
+    [DataRow(CurlUrlRejection.NoHost, "No host present")]
     [DataRow(CurlUrlRejection.BadPortNumber, "Port number was not a decimal number between 0 and 65535")]
     [DataRow(CurlUrlRejection.BadIPv6, "Bad IPv6 address")]
     [DataRow(CurlUrlRejection.BadHostname, "Bad hostname")]
     [DataRow(CurlUrlRejection.BadFileUrl, "Bad file:// URL")]
     [DataRow(CurlUrlRejection.UserNotAllowed, "Credentials was passed in the URL when prohibited")]
+    [DataRow(CurlUrlRejection.Backslash, "Found a backslash where a forward slash was expected")]
     public void ToCurlMessage_ForEachRejection_ReturnsCurlsText(CurlUrlRejection rejection, string expected)
     {
         TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);

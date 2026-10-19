@@ -75,7 +75,7 @@ internal static class HttpRequestOptionsMapping
     /// <see cref="HttpRequestOptions.ContinueWait" />. <see cref="EasyTransferOptions.CustomRequest" /> as
     /// <see cref="HttpRequestOptions.CustomMethod" />, and <see cref="EasyBehaviourOptions.FailOnError" /> as
     /// <see cref="HttpRequestOptions.Fail" /> <see cref="HttpFailMode.Fail" />, otherwise <c>--fail-with-body</c>'s
-    /// <see cref="EngineTransferSettings.FailMode" />. From <paramref name="authentication" />:
+    /// <see cref="EngineTransferSettings.FailMode" />; <see cref="EasyBehaviourOptions.KeepSendingOnError" /> verbatim. From <paramref name="authentication" />:
     /// <see cref="EasyAuthenticationOptions.HttpAuthentication" /> as <see cref="HttpRequestOptions.AuthSchemes" />
     /// (<see cref="AuthSchemesOf" />), <see cref="EasyAuthenticationOptions.XOAuth2Bearer" /> as
     /// <see cref="HttpRequestOptions.BearerToken" /> and <see cref="EasyAuthenticationOptions.AwsSigV4" /> verbatim;
@@ -112,6 +112,7 @@ internal static class HttpRequestOptionsMapping
             AutoReferer = http.AutoReferer,
             Body = RequestBodyOf(http, transfer, formBody),
             Fail = behaviour.FailOnError ? HttpFailMode.Fail : settings.FailMode,
+            KeepSendingOnError = behaviour.KeepSendingOnError,
             FollowRedirects = http.FollowLocation != FollowLocation.None,
             MaxRedirects = (int)http.MaxRedirects,
             AuthSchemes = HttpSignatureSetup.Of(authentication).Settings is null ? AuthSchemesOf(authentication) : HttpAuthSchemes.None,
@@ -124,6 +125,7 @@ internal static class HttpRequestOptionsMapping
             Raw = !http.HttpContentDecoding && !http.HttpTransferDecoding,
             IgnoreContentLength = http.IgnoreContentLength,
             AllowHttp09Reply = http.Http09Allowed,
+            Http200Aliases = http.Http200Aliases,
             ForwardProxy = proxy,
             ProxyTunnel = settings.ProxyTunnel,
             OverUnixSocket = settings.OverUnixSocket,
@@ -148,8 +150,10 @@ internal static class HttpRequestOptionsMapping
     /// The schemes the HTTP handler may answer a challenge with, as the curl tool's parsed command line
     /// gives them (ADR-0516): <see cref="HttpAuthenticationMethods.Any" /> is every scheme the engine knows, each
     /// other <c>CURLAUTH_*</c> bit its scheme, and <see cref="HttpAuthSchemes.Bearer" /> only with
-    /// <see cref="EasyAuthenticationOptions.XOAuth2Bearer" /> set. The <c>CURLAUTH_AWS_SIGV4</c> bit is ignored, as
-    /// signing reads <see cref="EasyAuthenticationOptions.AwsSigV4" />; with no scheme left, Basic, libcurl's default.
+    /// <see cref="EasyAuthenticationOptions.XOAuth2Bearer" /> set. The <c>CURLAUTH_AWS_SIGV4</c> bit gives no scheme, as
+    /// signing reads <see cref="EasyAuthenticationOptions.AwsSigV4" />; with no scheme left, Basic, libcurl's default, unless that
+    /// bit is set: libcurl keeps <c>CURLAUTH_AWS_SIGV4</c> picked after <c>CURLOPT_AWS_SIGV4</c> is set back to <c>NULL</c> and then
+    /// sends no <c>Authorization</c> at all (upstream test1978, BL-2748), so that gives <see cref="HttpAuthSchemes.None" />.
     /// </summary>
     /// <param name="authentication">The option group's authentication options.</param>
     /// <returns>The schemes.</returns>
@@ -160,7 +164,7 @@ internal static class HttpRequestOptionsMapping
             ? HttpAuthSchemes.Any | HttpAuthSchemes.Bearer
             : SchemesOf(methods);
         HttpAuthSchemes allowed = authentication.XOAuth2Bearer is null ? wanted & ~HttpAuthSchemes.Bearer : wanted;
-        return allowed == HttpAuthSchemes.None ? HttpAuthSchemes.Basic : allowed;
+        return allowed == HttpAuthSchemes.None && (methods & HttpAuthenticationMethods.AwsSigV4) == 0 ? HttpAuthSchemes.Basic : allowed;
     }
 
     /// <summary>

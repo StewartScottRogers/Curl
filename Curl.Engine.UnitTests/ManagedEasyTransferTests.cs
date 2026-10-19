@@ -180,6 +180,67 @@ public sealed partial class ManagedEasyTransferTests
         Assert.AreEqual(CurlCode.Ok, code);
     }
 
+    /// <summary>
+    /// Upstream case 694 (BL-2709): the scheme a perform's server picked stays on the handle, so the next perform
+    /// reports it as <c>CURLINFO_HTTPAUTH_USED</c> and, as libcurl 8.22.0's kept <c>authhost.picked</c>, sends Basic
+    /// before any challenge.
+    /// </summary>
+    [TestMethod]
+    public async Task PerformAsync_EarlierPerformPickedBasic_NextPerformReportsBasicAsHttpAuthUsed()
+    {
+        ScriptedConnector connector = new([
+            "HTTP/1.1 401 Unauthorized\r\nWWW-Authenticate: Basic realm=\"r\"\r\nContent-Length: 0\r\n\r\n"u8.ToArray(),
+            "HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n"u8.ToArray(),
+            "HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n"u8.ToArray(),
+        ]);
+        await using IEasyTransfer easy = CreateEngine(connector).CreateEasy();
+        Api.Options.Authentication.EasyAuthenticationOptions anyAuth = new() { UserPassword = "alice:secret", HttpAuthentication = Api.Options.Authentication.HttpAuthenticationMethods.Any };
+        easy.Options = new EasyOptions { Network = new EasyNetworkOptions { Url = "http://h/first" }, Authentication = anyAuth };
+        await easy.PerformAsync(CancellationToken.None);
+        easy.Options = new EasyOptions { Network = new EasyNetworkOptions { Url = "http://h/second" }, Authentication = anyAuth };
+
+        CurlCode code = await easy.PerformAsync(CancellationToken.None);
+
+        string second = Encoding.ASCII.GetString(connector.Written)[Encoding.ASCII.GetString(connector.Written).IndexOf("GET /second", StringComparison.Ordinal)..];
+        Assert.AreEqual(CurlCode.Ok, code);
+        Assert.AreEqual(1, easy.Info.HttpAuthUsed);
+        Assert.Contains("Authorization: Basic YWxpY2U6c2VjcmV0", second);
+    }
+
+    [TestMethod]
+    public void AuthSchemeKeptAfter_NoResultOrNoReport_KeepsTheEarlierSchemeElseTakesTheReports()
+    {
+        TransferResult picked = TransferResult.Success(0) with { Report = new TransferReport { AuthSchemePicked = HttpAuthSchemes.Digest } };
+
+        Assert.AreEqual(HttpAuthSchemes.Basic, ManagedEasyTransfer.AuthSchemeKeptAfter(null, HttpAuthSchemes.Basic));
+        Assert.AreEqual(HttpAuthSchemes.Basic, ManagedEasyTransfer.AuthSchemeKeptAfter(TransferResult.Success(0) with { Report = null }, HttpAuthSchemes.Basic));
+        Assert.AreEqual(HttpAuthSchemes.Digest, ManagedEasyTransfer.AuthSchemeKeptAfter(picked, HttpAuthSchemes.Basic));
+    }
+
+    /// <summary><c>curl_easy_reset</c> forgets the scheme the last perform picked (BL-2709).</summary>
+    [TestMethod]
+    public async Task Reset_AfterAPerformThatPickedBasic_NextPerformReportsNoHttpAuthUsed()
+    {
+        ScriptedConnector connector = new([
+            "HTTP/1.1 401 Unauthorized\r\nWWW-Authenticate: Basic realm=\"r\"\r\nContent-Length: 0\r\n\r\n"u8.ToArray(),
+            "HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n"u8.ToArray(),
+            "HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n"u8.ToArray(),
+        ]);
+        await using IEasyTransfer easy = CreateEngine(connector).CreateEasy();
+        easy.Options = new EasyOptions
+        {
+            Network = new EasyNetworkOptions { Url = "http://h/first" },
+            Authentication = new() { UserPassword = "alice:secret", HttpAuthentication = Api.Options.Authentication.HttpAuthenticationMethods.Any },
+        };
+        await easy.PerformAsync(CancellationToken.None);
+        easy.Reset();
+        easy.Options = new EasyOptions { Network = new EasyNetworkOptions { Url = "http://h/second" } };
+
+        await easy.PerformAsync(CancellationToken.None);
+
+        Assert.AreEqual(0, easy.Info.HttpAuthUsed);
+    }
+
     [TestMethod]
     public async Task PerformAsync_WriteCallbackTakesFewerBytes_ReturnsWriteError()
     {

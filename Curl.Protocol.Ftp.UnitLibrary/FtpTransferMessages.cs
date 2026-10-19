@@ -30,6 +30,12 @@ internal static class FtpTransferMessages
     internal const string TimeoutReached = "Timeout was reached";
 
     /// <summary>
+    /// The exit 28 message for a reply that did not come within the server response timeout,
+    /// curl 8.22.0's <c>Curl_pp_statemach</c> text (BL-2724).
+    /// </summary>
+    internal const string ServerResponseTimeout = "server response timeout";
+
+    /// <summary>
     /// The exit 28 message for <c>--connect-timeout</c> passing after the TCP connect, while
     /// the greeting, the login or <c>PWD</c> is still unanswered (BL-512).
     /// </summary>
@@ -37,6 +43,12 @@ internal static class FtpTransferMessages
     /// <returns>The message curl prints.</returns>
     internal static string OperationTimedOut(long milliseconds) =>
         string.Create(CultureInfo.InvariantCulture, $"Operation timed out after {milliseconds} milliseconds with 0 bytes received");
+
+    /// <summary>
+    /// The <c>-v</c> line curl 8.22.0's <c>ftp_done</c> writes when the control reply it waits
+    /// for after a failure does not come within 60 seconds (BL-2796).
+    /// </summary>
+    internal const string FtpResponseTimeout = "FTP response timeout";
 
     /// <summary>The exit 28 message for a <c>421</c> reply that ends the data transfer.</summary>
     internal const string ControlConnectionLooksDead = "control connection looks dead";

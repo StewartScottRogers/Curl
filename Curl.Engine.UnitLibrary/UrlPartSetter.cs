@@ -11,7 +11,7 @@ namespace Curl.Engine;
 /// Sets and clears one part of a URL handle other than the whole URL, as upstream curl 8.22.0's
 /// <c>curl_url_set</c> does in <c>lib/urlapi.c</c> (ADR-0602): the parts it checks (scheme, host,
 /// port) refused with upstream's code, the text encoded under <c>CURLU_URLENCODE</c> or else its
-/// percent escapes lower cased, and the query appended to under <c>CURLU_APPENDQUERY</c>.
+/// percent escapes upper cased, and the query appended to under <c>CURLU_APPENDQUERY</c>.
 /// </summary>
 internal static class UrlPartSetter
 {
@@ -23,6 +23,12 @@ internal static class UrlPartSetter
     /// <summary>The bytes upstream's set leaves as they are under <c>CURLU_URLENCODE</c> (<c>ISUNRESERVED</c>).</summary>
     private static readonly SearchValues<byte> Unreserved =
         SearchValues.Create("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~"u8);
+
+    /// <summary>
+    /// The bytes besides the unreserved ones a path set under <c>CURLU_URLENCODE</c> keeps as they are
+    /// (upstream's <c>allowed_in_path</c>).
+    /// </summary>
+    private static readonly SearchValues<byte> AllowedInPath = SearchValues.Create("!$&'(){}[]*+,;=:@/"u8);
 
     /// <summary>The characters a host name that is not an IPv6 address may not hold, as they end it in a URL.</summary>
     private static readonly SearchValues<char> HostDelimiters = SearchValues.Create("/?#@:");
@@ -52,7 +58,7 @@ internal static class UrlPartSetter
         (parts, value, flags) => UrlSetResult.Set(parts with { Options = Stored(value, flags) }),
         SetHost,
         (parts, value, _) => SetPort(parts, value),
-        (parts, value, flags) => UrlSetResult.Set(parts with { Path = WithLeadingSlash(Stored(value, flags, keepSlash: true)) }),
+        (parts, value, flags) => UrlSetResult.Set(parts with { Path = WithLeadingSlash(Stored(value, flags, inPath: true)) }),
         SetQuery,
         (parts, value, flags) => UrlSetResult.Set(parts with { Fragment = Stored(value, flags) }),
         (parts, value, flags) => UrlSetResult.Set(parts with { ZoneId = Stored(value, flags) }),
@@ -115,8 +121,10 @@ internal static class UrlPartSetter
 
     /// <summary>
     /// A host, which clears the zone id: empty only under <c>CURLU_NO_AUTHORITY</c>; encoded under
-    /// <c>CURLU_URLENCODE</c>; else a name or bracketed IPv6 address Curl's URL parser accepts, its
-    /// zone id kept apart, or <see cref="CurlUrlCode.BadHostname" />.
+    /// <c>CURLU_URLENCODE</c>; else a name or bracketed IPv6 address Curl's URL parser accepts, a name
+    /// kept as given (curl 8.22.0 stores <c>%43url.se</c> and <c>0xff</c> unnormalised) and an IPv6
+    /// address normalised with its zone id kept apart, or <see cref="CurlUrlCode.BadHostname" />, which
+    /// a blank host under <c>CURLU_URLENCODE</c> is too (lib1560).
     /// </summary>
     private static UrlSetResult SetHost(UrlHandleParts parts, string value, CurlUrlFlags flags)
     {
@@ -128,14 +136,15 @@ internal static class UrlPartSetter
                 : UrlSetResult.Refused(CurlUrlCode.BadHostname);
         }
 
-        return flags.HasFlag(CurlUrlFlags.UrlEncode)
+        return flags.HasFlag(CurlUrlFlags.UrlEncode) && !string.IsNullOrWhiteSpace(value)
             ? UrlSetResult.Set(parts with { Host = host, ZoneId = null })
             : CheckedHost(parts, host);
     }
 
     private static UrlSetResult CheckedHost(UrlHandleParts parts, string host)
     {
-        bool delimited = host.StartsWith('[')
+        bool bracketed = host.StartsWith('[');
+        bool delimited = bracketed
             ? host.AsSpan().IndexOfAny('/', '?', '#') >= 0
             : host.AsSpan().IndexOfAny(HostDelimiters) >= 0;
         if (delimited || !CurlUrl.TryParse("http://" + host + "/", pathAsIs: true, out CurlUrl? url))
@@ -143,7 +152,7 @@ internal static class UrlPartSetter
             return UrlSetResult.Refused(CurlUrlCode.BadHostname);
         }
 
-        return UrlSetResult.Set(parts with { Host = url.Host, ZoneId = url.ZoneId });
+        return UrlSetResult.Set(bracketed ? parts with { Host = url.Host, ZoneId = url.ZoneId } : parts with { Host = host, ZoneId = null });
     }
 
     /// <summary>A port: decimal digits up to 65535 and nothing else, kept without leading zeros.</summary>
@@ -162,11 +171,12 @@ internal static class UrlPartSetter
 
     /// <summary>
     /// A query: under <c>CURLU_URLENCODE</c> a space is <c>+</c>, and under <c>CURLU_APPENDQUERY</c> the
-    /// first <c>=</c> stays and the text is joined to a query already set with one <c>&amp;</c>.
+    /// first <c>=</c> stays and the text is joined to a query already set with one <c>&amp;</c>; an
+    /// empty text is stored as the empty query, appended or not, as curl 8.22.0 does (lib1560).
     /// </summary>
     private static UrlSetResult SetQuery(UrlHandleParts parts, string value, CurlUrlFlags flags)
     {
-        bool append = flags.HasFlag(CurlUrlFlags.AppendQuery);
+        bool append = flags.HasFlag(CurlUrlFlags.AppendQuery) && value.Length > 0;
         string query = Stored(value, flags, plusForSpace: true, keepFirstEquals: append);
         string? existing = parts.Query;
         if (append && existing is { Length: > 0 })
@@ -179,25 +189,26 @@ internal static class UrlPartSetter
 
     /// <summary>
     /// The text a set stores: under <c>CURLU_URLENCODE</c> every UTF-8 byte but the unreserved ones
-    /// (and a <c>/</c> or the first <c>=</c> where asked) as an upper-case <c>%XX</c>, a space as
-    /// <c>+</c> where asked; else the text with the hex digits of its percent escapes lower cased.
+    /// (and, in a path, the ones <see cref="AllowedInPath" /> holds, or the first <c>=</c> where asked)
+    /// as an upper-case <c>%XX</c>, a space as <c>+</c> where asked; else the text with the hex digits
+    /// of its percent escapes upper cased.
     /// </summary>
     private static string Stored(
         string value,
         CurlUrlFlags flags,
-        bool keepSlash = false,
+        bool inPath = false,
         bool plusForSpace = false,
         bool keepFirstEquals = false) =>
         flags.HasFlag(CurlUrlFlags.UrlEncode)
-            ? Encoded(value, keepSlash, plusForSpace, keepFirstEquals)
-            : LowerCasedEscapes(value);
+            ? Encoded(value, inPath, plusForSpace, keepFirstEquals)
+            : UpperCasedEscapes(value);
 
-    private static string Encoded(string value, bool keepSlash, bool plusForSpace, bool keepFirstEquals)
+    private static string Encoded(string value, bool inPath, bool plusForSpace, bool keepFirstEquals)
     {
         StringBuilder encoded = new();
         foreach (byte character in Encoding.UTF8.GetBytes(value))
         {
-            bool kept = Unreserved.Contains(character) || (character == '/' && keepSlash) || (character == '=' && keepFirstEquals);
+            bool kept = Unreserved.Contains(character) || (inPath && AllowedInPath.Contains(character)) || (character == '=' && keepFirstEquals);
             keepFirstEquals &= character != '=';
             encoded.Append(EncodedByte(character, kept, plusForSpace));
         }
@@ -215,15 +226,15 @@ internal static class UrlPartSetter
         return kept ? ((char)character).ToString() : $"%{HexDigits[character >> 4]}{HexDigits[character & 0xf]}";
     }
 
-    private static string LowerCasedEscapes(string value)
+    private static string UpperCasedEscapes(string value)
     {
         char[] text = value.ToCharArray();
         for (int index = value.IndexOf('%'); index >= 0 && index + 2 < text.Length; index = value.IndexOf('%', index + 1))
         {
             if (char.IsAsciiHexDigit(text[index + 1]) && char.IsAsciiHexDigit(text[index + 2]))
             {
-                text[index + 1] = char.ToLowerInvariant(text[index + 1]);
-                text[index + 2] = char.ToLowerInvariant(text[index + 2]);
+                text[index + 1] = char.ToUpperInvariant(text[index + 1]);
+                text[index + 2] = char.ToUpperInvariant(text[index + 2]);
             }
         }
 

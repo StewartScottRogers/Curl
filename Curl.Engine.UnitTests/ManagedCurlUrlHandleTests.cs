@@ -236,6 +236,92 @@ public sealed partial class ManagedCurlUrlHandleTests
     }
 
     [TestMethod]
+    [DataRow("1h://example.net", CurlUrlFlags.None)]
+    [DataRow("..://example.net", CurlUrlFlags.None)]
+    [DataRow("-ht://example.net", CurlUrlFlags.None)]
+    [DataRow("+ftp://example.net", CurlUrlFlags.None)]
+    [DataRow("htt ps://user:password@example.net/get?this=and-what", CurlUrlFlags.NonSupportScheme | CurlUrlFlags.AllowSpace)]
+    [DataRow("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA://hostname/path", CurlUrlFlags.None)]
+    [DataRow("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA://hostname/path", CurlUrlFlags.NonSupportScheme)]
+    public void Set_UrlWhoseSchemeIsMalformedOrTooLong_ReturnsBadScheme(string text, CurlUrlFlags flags)
+    {
+        // lib1560's get_parts rows 39 to 42 and 92, get_url row 146 and its huge-scheme row (BL-2732).
+        using ManagedCurlUrlHandle url = new();
+
+        Assert.AreEqual(CurlUrlCode.BadScheme, url.Set(CurlUrlPart.Url, text, flags));
+    }
+
+    [TestMethod]
+    public void Set_HugeSchemeUnderNonSupportScheme_ReturnsBadScheme()
+    {
+        using ManagedCurlUrlHandle url = new();
+
+        Assert.AreEqual(CurlUrlCode.BadScheme, url.Set(CurlUrlPart.Url, new string('a', 119_998) + "://h/", CurlUrlFlags.NonSupportScheme));
+    }
+
+    [TestMethod]
+    [DataRow(1, CurlUrlPart.User, "")]
+    [DataRow(2, CurlUrlPart.Password, "")]
+    [DataRow(3, CurlUrlPart.Host, "")]
+    [DataRow(4, CurlUrlPart.Path, "/")]
+    [DataRow(5, CurlUrlPart.Query, "")]
+    [DataRow(6, CurlUrlPart.Fragment, "")]
+    public void Set_OneLetterSchemeWithAHugePartUnderNonSupportScheme_ParsesAndReadsThePartBackWhole(int index, CurlUrlPart part, string prefix)
+    {
+        // lib1560's huge group (BL-2791): c://c:c@c/c?c#c with one part 119,998 bytes long.
+        string big = new('a', 119_998);
+        string[] pieces = [.. Enumerable.Range(0, 7).Select(piece => piece == index ? big : "c")];
+        string text = $"{pieces[0]}://{pieces[1]}:{pieces[2]}@{pieces[3]}/{pieces[4]}?{pieces[5]}#{pieces[6]}";
+        using ManagedCurlUrlHandle url = new();
+
+        Assert.AreEqual(CurlUrlCode.Ok, url.Set(CurlUrlPart.Url, text, CurlUrlFlags.NonSupportScheme));
+        Assert.AreEqual(CurlUrlCode.Ok, url.Get(part, CurlUrlFlags.None, out string? value));
+        Assert.AreEqual(prefix + big, value);
+    }
+
+    [TestMethod]
+    [DataRow("example.net:81/x", CurlUrlFlags.None, CurlUrlCode.UnsupportedScheme)]
+    [DataRow("Example.net:81/x", CurlUrlFlags.NonSupportScheme, CurlUrlCode.BadSlashes)]
+    [DataRow("http:81/x", CurlUrlFlags.None, CurlUrlCode.BadSlashes)]
+    public void Set_HostAndPortWithoutGuessFlags_ReadsTheHostAsAScheme(string text, CurlUrlFlags flags, CurlUrlCode expected)
+    {
+        using ManagedCurlUrlHandle url = new();
+
+        Assert.AreEqual(expected, url.Set(CurlUrlPart.Url, text, flags));
+    }
+
+    [TestMethod]
+    [DataRow("data:text/html;charset=utf-8;base64,PCFET0NUWVBFIEhUTUw+PG1ldGEgY")]
+    [DataRow("d:anything-really")]
+    [DataRow("about:config")]
+    [DataRow("mailto:infobot@example.com?body=send%20current-issue")]
+    public void Set_SchemeOnlyUrlWithAnUnsupportedScheme_ReturnsUnsupportedScheme(string text)
+    {
+        // lib1560's get_url rows 106 to 108 and 110 (BL-2733).
+        using ManagedCurlUrlHandle url = new();
+
+        Assert.AreEqual(CurlUrlCode.UnsupportedScheme, url.Set(CurlUrlPart.Url, text, CurlUrlFlags.None));
+    }
+
+    [TestMethod]
+    public void Set_RelativeReferenceOnAUrlWithAnUnsupportedScheme_ReturnsUnsupportedScheme()
+    {
+        using ManagedCurlUrlHandle url = new();
+        Assert.AreEqual(CurlUrlCode.Ok, url.Set(CurlUrlPart.Url, "foo://example.com/a", CurlUrlFlags.NonSupportScheme));
+
+        Assert.AreEqual(CurlUrlCode.UnsupportedScheme, url.Set(CurlUrlPart.Url, "b", CurlUrlFlags.None));
+    }
+
+    [TestMethod]
+    public void Set_PortLikeTextWithoutASchemeUnderGuessScheme_IsStillParsedAsAHost()
+    {
+        using ManagedCurlUrlHandle url = new();
+
+        Assert.AreEqual(CurlUrlCode.Ok, url.Set(CurlUrlPart.Url, "example.net:81/x", CurlUrlFlags.GuessScheme));
+        Assert.AreEqual("81", GetOk(url, CurlUrlPart.Port));
+    }
+
+    [TestMethod]
     [DataRow("http://h /", CurlUrlCode.MalformedInput)]
     [DataRow("http:////h/", CurlUrlCode.BadSlashes)]
     [DataRow("http:///", CurlUrlCode.NoHost)]
@@ -248,6 +334,56 @@ public sealed partial class ManagedCurlUrlHandleTests
         using ManagedCurlUrlHandle url = new();
 
         Assert.AreEqual(expected, url.Set(CurlUrlPart.Url, text, CurlUrlFlags.None));
+    }
+
+    // lib1560's get_parts row 132 and get_url rows 189 to 193 (BL-2737): curl 8.22.0's parse_file.
+    [TestMethod]
+    [DataRow("file:/")]
+    [DataRow("file:./")]
+    [DataRow("file:foo")]
+    [DataRow("file:foo/bar")]
+    [DataRow("file:?q")]
+    [DataRow("file:#f")]
+    public void Set_FileUrlTooShortOrWithARelativePath_ReturnsBadFileUrl(string text)
+    {
+        using ManagedCurlUrlHandle url = new();
+
+        Assert.AreEqual(CurlUrlCode.BadFileUrl, url.Set(CurlUrlPart.Url, text, CurlUrlFlags.None));
+    }
+
+    // lib1560's Windows get_parts rows 105 and 106 (BL-2737): libcurl keeps a drive path's backslashes.
+    [TestMethod]
+    [OSCondition(OperatingSystems.Windows)]
+    [DataRow("file://C:\\programs\\foo")]
+    [DataRow("file:///C:\\programs\\foo")]
+    public void Set_FileUrlWithADriveAndBackslashesOnWindows_KeepsTheBackslashesInThePath(string text)
+    {
+        using ManagedCurlUrlHandle url = Parsed(text, CurlUrlFlags.DefaultScheme);
+
+        Assert.AreEqual("C:\\programs\\foo", GetOk(url, CurlUrlPart.Path));
+    }
+
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
+    [DataRow("file://C:\\programs\\foo")]
+    [DataRow("file:///C:\\programs\\foo")]
+    public void Set_FileUrlWithADriveOffWindows_ReturnsBadFileUrl(string text)
+    {
+        using ManagedCurlUrlHandle url = new();
+
+        Assert.AreEqual(CurlUrlCode.BadFileUrl, url.Set(CurlUrlPart.Url, text, CurlUrlFlags.DefaultScheme));
+    }
+
+    // lib1560's get_parts rows 0 to 2 (BL-2731): a backslash where the port's digits end.
+    [TestMethod]
+    [DataRow("http:\\\\hostname", CurlUrlFlags.GuessScheme)]
+    [DataRow("http:\\\\hostname:1234", CurlUrlFlags.GuessScheme)]
+    [DataRow("http://hostname:1111\\path", CurlUrlFlags.None)]
+    public void Set_UrlWithABackslashWhereThePortEnds_ReturnsBackslash(string text, CurlUrlFlags flags)
+    {
+        using ManagedCurlUrlHandle url = new();
+
+        Assert.AreEqual(CurlUrlCode.Backslash, url.Set(CurlUrlPart.Url, text, flags));
     }
 
     [TestMethod]
@@ -394,6 +530,39 @@ public sealed partial class ManagedCurlUrlHandleTests
         url.Dispose();
 
         Assert.AreEqual(FullUrl, GetOk(url, CurlUrlPart.Url));
+    }
+
+    // A lone surrogate cannot sit in an attribute's UTF-8 string, so these rows are not DataRows.
+    [TestMethod]
+    public void Get_UrlWithAHostByteThatIsNotUtf8_KeepsTheByte()
+    {
+        using ManagedCurlUrlHandle url = Parsed("https://_%c0_");
+
+        Assert.AreEqual("https://_\uDCC0_/", GetOk(url, CurlUrlPart.Url));
+    }
+
+    [TestMethod]
+    public void Get_UrlEncodedWithAHostByteThatIsNotUtf8_EscapesTheByte()
+    {
+        using ManagedCurlUrlHandle url = Parsed("https://_%c0_");
+
+        Assert.AreEqual("https://_%C0_/", GetOk(url, CurlUrlPart.Url, CurlUrlFlags.UrlEncode));
+    }
+
+    [TestMethod]
+    public void Get_UrlEncodedWithARawByteThatIsNotUtf8_EscapesTheByte()
+    {
+        using ManagedCurlUrlHandle url = Parsed("https://\uDCFF.127.0.0.1");
+
+        Assert.AreEqual("https://%FF.127.0.0.1/", GetOk(url, CurlUrlPart.Url, CurlUrlFlags.UrlEncode));
+    }
+
+    [TestMethod]
+    public void Get_DecodedPathWithAByteThatIsNotUtf8_IsDc00PlusTheByte()
+    {
+        using ManagedCurlUrlHandle url = Parsed("https://h/_%c0_");
+
+        Assert.AreEqual("/_\uDCC0_", GetOk(url, CurlUrlPart.Path, CurlUrlFlags.UrlDecode));
     }
 
     private static ManagedCurlUrlHandle Parsed(string text, CurlUrlFlags flags = CurlUrlFlags.None)

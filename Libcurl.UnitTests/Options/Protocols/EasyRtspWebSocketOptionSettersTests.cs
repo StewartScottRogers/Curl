@@ -33,6 +33,15 @@ public sealed class EasyRtspWebSocketOptionSettersTests
     }
 
     [TestMethod]
+    public void SetOption_RtspSessionIdNullTwice_CountsEachSet()
+    {
+        var options = SetOk(SetOk(new EasyOptions(), CurlOption.RtspSessionId, null), CurlOption.RtspSessionId, null);
+
+        Assert.IsNull(options.Protocols.Rtsp.SessionId);
+        Assert.AreEqual(2L, options.Protocols.Rtsp.SessionIdSetCount);
+    }
+
+    [TestMethod]
     public void SetOption_RtspTransport_SetsTheTransportAndNullClearsIt()
     {
         Text(CurlOption.RtspTransport, p => p.Rtsp.Transport);

@@ -44,14 +44,9 @@ public sealed class SftpSessionTests
     [DataRow(4u, DisplayName = "version 4, accepted as measured")]
     public async Task StartAsync_ServerNamesAnotherVersion_AcceptsIt(uint version)
     {
-        SftpServerScript script = Subsystem().Sftp([SftpPacketType.Version, .. UInt32(version)]);
-        Diagnostics.ArrangeScript(script);
-        ScriptedConnection connection = new(script.Bytes);
+        SftpServerScript script = Subsystem().Sftp([SftpPacketType.Version, .. UInt32(version)]).HomeDirectory();
 
-        SftpSession session = await SftpSession.StartAsync(Transport(connection), CancellationToken.None);
-        Diagnostics.ActRequests(connection.Written);
-
-        Diagnostics.Assert("session started", true, session is not null);
+        await AssertStartsThenAnswersRealPathAsync(script);
     }
 
     [TestMethod]
@@ -61,14 +56,10 @@ public sealed class SftpSessionTests
             .Sftp([SftpPacketType.Status, .. UInt32(0), .. UInt32(4)])
             .Sftp(SftpPacketType.Version)
             .Sftp(SftpPacketType.Version, 0, 0)
-            .Sftp(Join([SftpPacketType.Version], UInt32(3), Name("xyz"), Name("1")));
-        Diagnostics.ArrangeScript(script);
-        ScriptedConnection connection = new(script.Bytes);
+            .Sftp(Join([SftpPacketType.Version], UInt32(3), Name("xyz"), Name("1")))
+            .HomeDirectory();
 
-        SftpSession session = await SftpSession.StartAsync(Transport(connection), CancellationToken.None);
-        Diagnostics.ActRequests(connection.Written);
-
-        Diagnostics.Assert("session started", true, session is not null);
+        await AssertStartsThenAnswersRealPathAsync(script);
     }
 
     [TestMethod]
@@ -151,6 +142,33 @@ public sealed class SftpSessionTests
 
     private static SftpServerScript Subsystem() =>
         new SftpServerScript().Confirm().Ssh([SshConnectionMessageNumber.ChannelSuccess, .. UInt32(0)]);
+
+    /// <summary>
+    /// Starts a session on <paramref name="script" />, whose last packet answers <c>REALPATH .</c>,
+    /// and asserts the client sent one version 3 <c>SSH_FXP_INIT</c> and then read that answer:
+    /// a session that stopped at any earlier packet would read it as the answer and fail.
+    /// </summary>
+    private async Task AssertStartsThenAnswersRealPathAsync(SftpServerScript script)
+    {
+        Diagnostics.ArrangeScript(script);
+        ScriptedConnection connection = new(script.Bytes);
+        byte[] expectedInit = [SftpPacketType.Init, 0, 0, 0, 3];
+        byte[] expectedRealPath = Join([SftpPacketType.RealPath], UInt32(0), Name("."));
+
+        SftpSession session = await SftpSession.StartAsync(Transport(connection), CancellationToken.None);
+        byte[] home = await session.RealPathAsync("."u8.ToArray(), CancellationToken.None);
+        Diagnostics.ActRequests(connection.Written);
+
+        List<byte[]> requests = SftpServerScript.SftpRequests(connection.Written);
+        Diagnostics.Assert("request count", 2, requests.Count);
+        Diagnostics.Diff("SSH_FXP_INIT", expectedInit, requests[0]);
+        Diagnostics.Diff("SSH_FXP_REALPATH", expectedRealPath, requests[^1]);
+        Diagnostics.Assert("home directory", SftpServerScript.Home, System.Text.Encoding.UTF8.GetString(home));
+        Assert.HasCount(2, requests);
+        CollectionAssert.AreEqual(expectedInit, requests[0]);
+        CollectionAssert.AreEqual(expectedRealPath, requests[1]);
+        Assert.AreEqual(SftpServerScript.Home, System.Text.Encoding.UTF8.GetString(home));
+    }
 
     private async Task AssertStartFailsAsync(SftpServerScript script, string expected)
     {

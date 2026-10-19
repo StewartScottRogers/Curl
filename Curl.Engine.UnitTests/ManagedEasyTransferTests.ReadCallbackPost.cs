@@ -92,6 +92,40 @@ public sealed partial class ManagedEasyTransferTests
         StringAssert.EndsWith(written, "Content-Length: 0\r\nContent-Type: application/x-www-form-urlencoded\r\n\r\n");
     }
 
+    [TestMethod]
+    public async Task PerformAsync_PostWithAChunkedHeaderAndAWrongPostFieldSize_SendsEachCallbackAnswerAsAChunk()
+    {
+        ScriptedConnector connector = new([Encoding.ASCII.GetBytes(Response)]);
+        await using ManagedEasyTransfer easy = (ManagedEasyTransfer)CreateEngine(connector).CreateEasy();
+        string[] answers = ["one", "two", "three", "four"];
+        int index = 0;
+        easy.Options = new EasyOptions
+        {
+            Network = new EasyNetworkOptions { Url = "http://h/p" },
+            Http = new EasyHttpOptions { Post = true, PostFieldSize = 4, HttpHeaders = ["Expect:", "Transfer-Encoding: chunked"] },
+            Callbacks = new EasyCallbackOptions
+            {
+                Read = buffer => index == answers.Length ? 0 : Encoding.ASCII.GetBytes(answers[index++], buffer),
+            },
+        };
+
+        CurlCode code = await easy.PerformAsync(CancellationToken.None);
+
+        Assert.AreEqual(CurlCode.Ok, code);
+        string written = Encoding.ASCII.GetString(connector.Written);
+        Assert.IsFalse(written.Contains("Content-Length", StringComparison.OrdinalIgnoreCase), written);
+        StringAssert.EndsWith(written, "\r\n\r\n3\r\none\r\n3\r\ntwo\r\n5\r\nthree\r\n4\r\nfour\r\n0\r\n\r\n");
+    }
+
+    [TestMethod]
+    [DataRow("Transfer-Encoding: chunked", true)]
+    [DataRow(" transfer-encoding :gzip, Chunked", true)]
+    [DataRow("Transfer-Encoding: gzip", false)]
+    [DataRow("X-Transfer-Encoding: chunked", false)]
+    [DataRow("Transfer-Encoding chunked", false)]
+    public void AsksForChunked_OneHeaderLine_TellsWhetherItAsksForChunked(string line, bool expected) =>
+        Assert.AreEqual(expected, ManagedEasyTransfer.AsksForChunked([line]));
+
     private static async Task<CurlCode> PerformReadCallbackPostAsync(ManagedEasyTransfer easy, EasyHttpOptions http, EasyTransferOptions transfer)
     {
         easy.Options = new EasyOptions

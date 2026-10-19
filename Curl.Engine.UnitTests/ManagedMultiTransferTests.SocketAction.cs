@@ -73,6 +73,24 @@ public sealed partial class ManagedMultiTransferTests
     }
 
     [TestMethod]
+    public async Task SocketActionAsync_TimerFiresWithAnUnchangedZeroTimeout_ReportsZeroAgain()
+    {
+        List<string> calls = [];
+        TimerManualTimeProvider time = new();
+        await using ManagedMultiTransfer multi = NewMulti(time);
+        multi.Options = RecordingOptions(calls);
+        multi.Add(WithTimeout(TimeSpan.FromMilliseconds(4)));
+        await multi.SocketActionAsync(CurlMultiSockets.Timeout, CurlSocketSelect.None, CancellationToken.None);
+        time.Advance(4);
+        calls.Clear();
+
+        await multi.SocketActionAsync(CurlMultiSockets.Timeout, CurlSocketSelect.None, CancellationToken.None);
+        await multi.SocketActionAsync(CurlMultiSockets.Timeout, CurlSocketSelect.None, CancellationToken.None);
+
+        CollectionAssert.AreEqual(new[] { "timer 0", "timer 0" }, calls);
+    }
+
+    [TestMethod]
     public async Task SocketActionAsync_TransferTimeoutSoonerThanTheCheckInterval_IsTheTimer()
     {
         List<string> calls = [];
@@ -86,7 +104,7 @@ public sealed partial class ManagedMultiTransferTests
     }
 
     [TestMethod]
-    public async Task SocketActionAsync_TransferFinishedBeforeItsFirstAction_IsNeverGivenASocket()
+    public async Task SocketActionAsync_TransferFinishedBeforeItsFirstAction_IsGivenASocketThenRemovedOnTheNextAction()
     {
         List<string> calls = [];
         await using ManagedMultiTransfer multi = NewMulti(new TimerManualTimeProvider());
@@ -98,8 +116,9 @@ public sealed partial class ManagedMultiTransferTests
         (CurlMultiCode Code, int RunningTransfers) result = await multi.SocketActionAsync(CurlMultiSockets.Timeout, CurlSocketSelect.None, CancellationToken.None);
         await multi.SocketActionAsync(CurlMultiSockets.Timeout, CurlSocketSelect.None, CancellationToken.None);
 
-        Assert.AreEqual((CurlMultiCode.Ok, 0), result);
-        CollectionAssert.AreEqual(new[] { "timer 0", "timer -1" }, calls);
+        Assert.AreEqual((CurlMultiCode.Ok, 1), result);
+        string socket = $"socket {ManagedMultiTransfer.FirstTransferSocket}";
+        CollectionAssert.AreEqual(new[] { "timer 0", $"{socket} In null", "timer 0", $"{socket} Remove null", "timer -1" }, calls);
     }
 
     [TestMethod]
@@ -124,6 +143,29 @@ public sealed partial class ManagedMultiTransferTests
         Assert.IsTrue(multi.TryReadInfo(out CurlMultiMessage? second, out _));
         Assert.AreEqual(CurlCode.AbortedByCallback, first.Result);
         Assert.AreEqual(CurlCode.AbortedByCallback, second.Result);
+    }
+
+    [TestMethod]
+    public async Task SocketActionAsync_AbortedBeforeTheSecondTransfersSocket_RemovesOnlyTheFirstsSocket()
+    {
+        List<string> calls = [];
+        await using ManagedMultiTransfer multi = NewMulti(new TimerManualTimeProvider());
+        multi.Options = new MultiOptions
+        {
+            Socket = (_, socket, what, _) =>
+            {
+                calls.Add($"socket {socket.Handle} {what}");
+                return calls.Count == 1 ? -1 : 0;
+            },
+        };
+        multi.Add(new ControlledEasyTransfer());
+        multi.Add(new ControlledEasyTransfer());
+
+        await multi.SocketActionAsync(CurlMultiSockets.Timeout, CurlSocketSelect.None, CancellationToken.None);
+        (CurlMultiCode Code, int RunningTransfers) after = await multi.SocketActionAsync(CurlMultiSockets.Timeout, CurlSocketSelect.None, CancellationToken.None);
+
+        Assert.AreEqual(0, after.RunningTransfers);
+        CollectionAssert.AreEqual(new[] { $"socket {FirstSocket.Handle} In", $"socket {FirstSocket.Handle} Remove" }, calls);
     }
 
     [TestMethod]

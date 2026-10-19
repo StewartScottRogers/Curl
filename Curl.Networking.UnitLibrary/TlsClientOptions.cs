@@ -177,6 +177,18 @@ namespace Curl.Networking;
 /// not set, and always on Windows, where the Schannel build ignores it. <c>SslStream</c> cannot log its
 /// secrets, so <see cref="TlsClientRouting" /> sends such a connection to <see cref="HandBuiltTlsProvider" />.
 /// </param>
+/// <param name="ChecksHostNameWhenInsecure">
+/// <see langword="true" /> for libcurl's <c>CURLOPT_SSL_VERIFYPEER</c> 0 with <c>CURLOPT_SSL_VERIFYHOST</c>
+/// still on: under <paramref name="Insecure" /> the chain is not checked, but a certificate that does not
+/// name the host is still exit 60, as curl 8.22.0 checks the name apart from the peer (upstream test2118,
+/// ADR-0703). <c>-k</c> turns both off, so the curl tool never sets it.
+/// </param>
+/// <param name="CaCertificateBlob">
+/// libcurl's <c>CURLOPT_CAINFO_BLOB</c> (<c>CURLOPT_PROXY_CAINFO_BLOB</c> for an HTTPS proxy): PEM
+/// certificates held in memory, trusted as a <paramref name="CaCertificateFile" /> is and in its place
+/// when both are set, as libcurl's blob wins over the file (ADR-0704). <see langword="null" /> when not
+/// set; the curl tool never sets it.
+/// </param>
 public sealed record TlsClientOptions(
     bool Insecure = false,
     TlsVersion MinimumVersion = TlsVersion.SystemDefault,
@@ -207,4 +219,13 @@ public sealed record TlsClientOptions(
     string? CertificateRevocationListFile = null,
     bool NoSessionId = false,
     bool AllowBeast = false,
-    string? KeyLogFile = null);
+    string? KeyLogFile = null,
+    bool ChecksHostNameWhenInsecure = false,
+    ReadOnlyMemory<byte>? CaCertificateBlob = null)
+{
+    /// <summary>
+    /// Whether the chain must lead to roots of the handshake's own, a <see cref="CaCertificateFile" />
+    /// or a <see cref="CaCertificateBlob" />, in place of the system store.
+    /// </summary>
+    internal bool HasCaCertificates => CaCertificateFile is not null || CaCertificateBlob is not null;
+}

@@ -36,7 +36,7 @@ public sealed class EasyAuthenticationOptionsMappingTests
     [DataRow(HttpAuthenticationMethods.Basic | HttpAuthenticationMethods.Digest, null, HttpAuthSchemes.Basic | HttpAuthSchemes.Digest)]
     [DataRow(HttpAuthenticationMethods.Ntlm | HttpAuthenticationMethods.Negotiate | HttpAuthenticationMethods.Bearer, "tok", HttpAuthSchemes.Ntlm | HttpAuthSchemes.Negotiate | HttpAuthSchemes.Bearer)]
     [DataRow(HttpAuthenticationMethods.Bearer, null, HttpAuthSchemes.Basic)]
-    [DataRow(HttpAuthenticationMethods.AwsSigV4, null, HttpAuthSchemes.Basic)]
+    [DataRow(HttpAuthenticationMethods.AwsSigV4, null, HttpAuthSchemes.None)]
     [DataRow(HttpAuthenticationMethods.Basic | HttpAuthenticationMethods.AwsSigV4, null, HttpAuthSchemes.Basic)]
     public void AuthSchemesOf_Methods_GiveTheSchemesTheCommandLineGives(HttpAuthenticationMethods methods, string? bearer, HttpAuthSchemes expected)
     {

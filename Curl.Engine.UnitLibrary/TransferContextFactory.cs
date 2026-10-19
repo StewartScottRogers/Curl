@@ -65,6 +65,26 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
     internal IHstsStore? HstsStore { get; set; }
 
     /// <summary>
+    /// Gets or sets every context's <see cref="HttpRequestOptions.KeptDigestChallenges" />: the
+    /// <c>WWW-Authenticate</c> values of the 401 that ended a Libcurl handle's previous transfer,
+    /// empty by default (BL-2747, ADR-0692).
+    /// </summary>
+    internal IReadOnlyList<string> KeptDigestChallenges { get; set; } = [];
+
+    /// <summary>
+    /// Gets or sets every context's <see cref="HttpRequestOptions.DigestStaysAvailable" />: whether a Libcurl handle's
+    /// previous transfer ended with Digest still marked available (upstream test2030, BL-2820); <see langword="false" /> by default.
+    /// </summary>
+    internal bool KeptDigestStaysAvailable { get; set; }
+
+    /// <summary>
+    /// Gets or sets every context's <see cref="HttpRequestOptions.AuthSchemePicked" />: the scheme a
+    /// Libcurl handle's previous transfer picked, which libcurl 8.22.0 keeps on the easy handle
+    /// (<c>data->state.authhost.picked</c>, upstream test694, BL-2709); <see cref="HttpAuthSchemes.None" /> by default.
+    /// </summary>
+    internal HttpAuthSchemes KeptAuthSchemePicked { get; set; }
+
+    /// <summary>
     /// Creates the context for one transfer, carrying every option a handler reads.
     /// </summary>
     /// <param name="settings">The tool settings: the post data, TLS level, FTP and mail flags and the creation mode no option group carries.</param>
@@ -213,7 +233,8 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
             MaxFileSize = MaxFileSizeOf(transfer),
             Upload = UploadOf(url, upload),
             PostData = settings.PostData,
-            Credentials = lookedUpCredentials ?? CredentialsOf(authentication.UserPassword) ?? AuthorizationIdentityNtlmCredentialsOf(authentication, url),
+            PostWithoutData = settings.PostWithoutData,
+            Credentials = lookedUpCredentials ?? CredentialsOf(authentication) ?? AuthorizationIdentityNtlmCredentialsOf(authentication, url),
             TelnetOptions = protocol.Telnet.TelnetOptions,
             TftpBlockSize = BlockSizeOf(protocol.Tftp),
             TftpNoOptions = protocol.Tftp.NoOptions,
@@ -227,6 +248,7 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
             FtpPort = protocol.Ftp.ActiveAddress,
             FtpUseEprt = protocol.Ftp.UseEprt,
             FtpAcceptTimeout = FtpAcceptTimeoutOf(network),
+            FtpServerResponseTimeout = FtpServerResponseTimeoutOf(network),
             SslLevel = settings.SslLevel,
             FtpSslControlOnly = settings.FtpSslControlOnly && !settings.SslRequired,
             FtpCommandChannelClearing = CommandChannelClearingOf(protocol.Ftp.ClearCommandChannel),
@@ -248,7 +270,11 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
                 HttpRequestOptionsMapping.Of(settings, http, behaviour, transfer, authentication, formBody, proxy, commandLineTextEncoding, ifNoneMatchHeaders) with
                 {
                     HstsStore = HstsStore,
-                    ProxyTunnel = proxyOptions.HttpProxyTunnel || ConnectToTunnelsThroughProxy(network, url, proxy),
+                    KeptDigestChallenges = KeptDigestChallenges,
+                    DigestStaysAvailable = KeptDigestStaysAvailable,
+                    AuthSchemePicked = KeptAuthSchemePicked,
+                    ProxyTunnel = TunnelsThroughProxy(proxyOptions, network, url, proxy),
+                    ProxyTransferType = ProxyTransferModeType.Of(proxy, TunnelsThroughProxy(proxyOptions, network, url, proxy), transfer.ProxyTransferMode, transfer.TransferText),
                 },
                 altSvc),
             Mail = MailRequestOptionsMapping.FromCommandLine(settings, transfer, protocol.Smtp, authentication, url.Scheme),
@@ -262,23 +288,31 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
     }
 
     /// <summary>
-    /// Gets the <c>-u</c> credentials: <paramref name="userPassword" /> split at its first colon into the user name
-    /// and the password (empty when there is no colon), as the curl tool splits <c>-u</c>; <see langword="null" />
-    /// without it.
+    /// Gets the <c>-u</c> credentials: <see cref="EasyAuthenticationOptions.UserPassword" /> split at its first colon
+    /// into the user name and the password (empty when there is no colon), as the curl tool splits <c>-u</c>, with
+    /// <see cref="EasyAuthenticationOptions.UserName" /> and <see cref="EasyAuthenticationOptions.Password" />
+    /// (<c>CURLOPT_USERNAME</c>, <c>CURLOPT_PASSWORD</c>) each replacing its half; <see langword="null" /> with none
+    /// of the three.
     /// </summary>
-    /// <param name="userPassword">The option group's <see cref="EasyAuthenticationOptions.UserPassword" />.</param>
+    /// <param name="authentication">The option group's authentication options.</param>
     /// <returns>The credentials the context carries when no lookup chose others.</returns>
-    private static NetworkCredential? CredentialsOf(string? userPassword)
+    private static NetworkCredential? CredentialsOf(EasyAuthenticationOptions authentication)
     {
-        if (userPassword is null)
+        if ((authentication.UserPassword ?? authentication.UserName ?? authentication.Password) is null)
         {
             return null;
         }
 
+        (string user, string password) = SplitAtFirstColon(authentication.UserPassword ?? string.Empty);
+        return new NetworkCredential(FirstGiven(authentication.UserName, user), FirstGiven(authentication.Password, password));
+    }
+
+    private static string FirstGiven(string? given, string fallback) => given ?? fallback;
+
+    private static (string User, string Password) SplitAtFirstColon(string userPassword)
+    {
         int colon = userPassword.IndexOf(':', StringComparison.Ordinal);
-        return colon < 0
-            ? new NetworkCredential(userPassword, string.Empty)
-            : new NetworkCredential(userPassword[..colon], userPassword[(colon + 1)..]);
+        return colon < 0 ? (userPassword, string.Empty) : (userPassword[..colon], userPassword[(colon + 1)..]);
     }
 
     /// <summary>
@@ -458,6 +492,16 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
         network.AcceptTimeout == TimeSpan.Zero ? TransferContext.DefaultFtpAcceptTimeout : network.AcceptTimeout;
 
     /// <summary>
+    /// Gets the FTP reply wait a handler reads for <c>CURLOPT_SERVER_RESPONSE_TIMEOUT</c>: curl's
+    /// 60 seconds when the record's <see cref="EasyNetworkOptions.ServerResponseTimeout" /> is zero,
+    /// which libcurl takes as not set (upstream case 594, BL-2724).
+    /// </summary>
+    /// <param name="network">The option group's network options.</param>
+    /// <returns>The context's <see cref="TransferContext.FtpServerResponseTimeout" />.</returns>
+    private static TimeSpan FtpServerResponseTimeoutOf(EasyNetworkOptions network) =>
+        network.ServerResponseTimeout == TimeSpan.Zero ? TransferContext.DefaultFtpServerResponseTimeout : network.ServerResponseTimeout;
+
+    /// <summary>
     /// Gets the path walk the FTP handler reads for <c>--ftp-method</c>: libcurl's default and
     /// <c>multicwd</c> are both one <c>CWD</c> per directory.
     /// </summary>
@@ -488,6 +532,15 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
     /// <param name="events">The sink given to <see cref="Create" />.</param>
     /// <returns>The sink the context carries.</returns>
     private static ITransferEvents EventsOrNone(ITransferEvents? events) => events ?? NoTransferEvents.Instance;
+
+    /// <summary>Tells whether the transfer tunnels through its proxy: <c>-p</c>, or a <c>--connect-to</c> mapping that <see cref="ConnectToTunnelsThroughProxy" /> says does.</summary>
+    /// <param name="proxyOptions">The option group's proxy options, whose <see cref="EasyProxyOptions.HttpProxyTunnel" /> is <c>-p</c>.</param>
+    /// <param name="network">The option group's network options.</param>
+    /// <param name="url">The URL to transfer.</param>
+    /// <param name="proxy">The transfer's proxy, or <see langword="null" /> for none.</param>
+    /// <returns>The context's <see cref="HttpRequestOptions.ProxyTunnel" />.</returns>
+    private static bool TunnelsThroughProxy(EasyProxyOptions proxyOptions, EasyNetworkOptions network, CurlUrl url, ProxyEndpoint? proxy) =>
+        proxyOptions.HttpProxyTunnel || ConnectToTunnelsThroughProxy(network, url, proxy);
 
     /// <summary>
     /// Tells whether a <c>--connect-to</c> mapping sends <paramref name="url" /> to another host or

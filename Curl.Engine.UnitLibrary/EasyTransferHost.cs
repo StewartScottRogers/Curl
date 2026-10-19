@@ -46,6 +46,13 @@ internal sealed record EasyTransferHost(
     /// </summary>
     internal Func<string, byte[]?> ReadFile { get; init; } = ReadDiskFile;
 
+    /// <summary>
+    /// Gets where a handle's <c>CURLOPT_VERBOSE</c> lines go when neither <c>CURLOPT_DEBUGFUNCTION</c> nor
+    /// <c>CURLOPT_STDERR</c> is set, as libcurl writes them to the process's <c>stderr</c> (BL-2726): the process's
+    /// standard error by default, the conformance harness's case stderr for a ported libtest program.
+    /// </summary>
+    internal Lazy<Stream> StandardError { get; init; } = new(Console.OpenStandardError);
+
     /// <summary>Reads a file from the disk whole.</summary>
     /// <param name="path">The file's path.</param>
     /// <returns>Its bytes, or <see langword="null" /> when it is missing, a directory or not readable.</returns>

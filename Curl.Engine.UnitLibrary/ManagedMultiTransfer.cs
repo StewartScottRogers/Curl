@@ -71,6 +71,14 @@ internal sealed class ManagedMultiTransfer(
     internal static nint FirstTransferSocket { get; } = 0x4000_0000;
 
     /// <summary>
+    /// Gets the socket number <see cref="GetWaitSockets" /> gives after the running transfers' sockets while any
+    /// transfer runs: the wakeup descriptor of libcurl's threaded resolver, which <c>curl_version_info</c>'s
+    /// <c>AsynchDNS</c> without c-ares says this build has (<see cref="ManagedCurlVersion" />), just below
+    /// <see cref="FirstTransferSocket" />.
+    /// </summary>
+    internal static nint ResolverWakeupSocket { get; } = 0x3FFF_FFFF;
+
+    /// <summary>
     /// Gets how often a wait with extra sockets checks them again: the managed engine owns no
     /// operating system poll set to add them to, so it asks <see cref="IWaitSocketPoller" /> each interval.
     /// </summary>
@@ -380,8 +388,10 @@ internal sealed class ManagedMultiTransfer(
 
     /// <summary>
     /// <c>curl_multi_waitfds</c>: one <see cref="CurlWaitEvents.PollIn" /> socket for each transfer whose
-    /// perform has started and whose message is not yet queued, in the order added - the engine-numbered
-    /// socket the socket callback is told of for the same transfer (<see cref="FirstTransferSocket" />).
+    /// perform has started and whose message is not yet queued, in the order added (but none for one that
+    /// waits for an earlier transfer's connection, <see cref="WaitsForEarlierConnection" />) - the engine-numbered
+    /// socket the socket callback is told of for the same transfer (<see cref="FirstTransferSocket" />) -
+    /// then, while there is any, the threaded resolver's <see cref="ResolverWakeupSocket" />.
     /// </summary>
     /// <param name="sockets">Filled with up to its length of sockets, each with no returned events.</param>
     /// <param name="socketCount">How many sockets the handle waits on, even past <paramref name="sockets" />' length.</param>
@@ -398,11 +408,17 @@ internal sealed class ManagedMultiTransfer(
             return CurlMultiCode.BadHandle;
         }
 
-        List<MultiEntry> waiting = entries.FindAll(entry => !entry.Done && entry.Perform is not null);
+        List<MultiEntry> running = entries.FindAll(entry => !entry.Done && entry.Perform is not null);
+        List<CurlSocket> waiting = [.. running.Where((entry, index) => !WaitsForEarlierConnection(entry, running.Take(index))).Select(SocketNumberOf)];
+        if (waiting.Count > 0)
+        {
+            waiting.Add(new CurlSocket(ResolverWakeupSocket));
+        }
+
         socketCount = waiting.Count;
         for (int index = 0; index < Math.Min(waiting.Count, sockets.Length); index++)
         {
-            sockets[index] = new CurlWaitSocket(SocketNumberOf(waiting[index]), CurlWaitEvents.PollIn, CurlWaitEvents.None);
+            sockets[index] = new CurlWaitSocket(waiting[index], CurlWaitEvents.PollIn, CurlWaitEvents.None);
         }
 
         return waiting.Count > sockets.Length ? CurlMultiCode.OutOfMemory : CurlMultiCode.Ok;
@@ -567,6 +583,20 @@ internal sealed class ManagedMultiTransfer(
         }
     }
 
+    /// <summary>
+    /// Whether <paramref name="entry" /> holds no socket of its own: under <see cref="CurlPipelining.Multiplex" />
+    /// with <c>CURLOPT_PIPEWAIT</c> and not held to HTTP/1, it waits for a running transfer to the same
+    /// origin added before it to open the connection it then shares, as libcurl's does (upstream test2407, BL-2750).
+    /// </summary>
+    private bool WaitsForEarlierConnection(MultiEntry entry, IEnumerable<MultiEntry> earlier)
+    {
+        HttpVersion version = entry.Transfer.Options.Http.HttpVersion;
+        return Options.Pipelining.HasFlag(CurlPipelining.Multiplex)
+            && entry.Transfer.Options.Http.PipeWait
+            && version is not (HttpVersion.Http10 or HttpVersion.Http11)
+            && earlier.Any(other => other.Origin == entry.Origin);
+    }
+
     private CurlSocket SocketNumberOf(MultiEntry entry) => entry.Number ??= new CurlSocket(nextTransferSocket++);
 
     private static TaskCompletionSource NewWakeupSignal() => new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -668,10 +698,21 @@ internal sealed class ManagedMultiTransfer(
         }
     }
 
+    /// <summary>
+    /// Queues the message of a started transfer that has finished, or starts one not started. A transfer
+    /// started in this call is never reported done in it, as libcurl's first perform of an HTTP transfer
+    /// only begins its non-blocking connect (upstream test2405, BL-2743).
+    /// </summary>
     private void MoveOn(MultiEntry entry)
     {
-        if (entry.Done || EndedByForce(entry) || !IsStartedOrStarting(entry))
+        if (entry.Done || EndedByForce(entry))
         {
+            return;
+        }
+
+        if (entry.Perform is null)
+        {
+            StartWhenAllowed(entry);
             return;
         }
 
@@ -693,20 +734,12 @@ internal sealed class ManagedMultiTransfer(
     }
 
     /// <summary>Starts the transfer when it has not started and a connection limit does not hold it pending.</summary>
-    private bool IsStartedOrStarting(MultiEntry entry)
+    private void StartWhenAllowed(MultiEntry entry)
     {
-        if (entry.Perform is not null)
+        if (CanStart(entry))
         {
-            return true;
+            entry.Perform = Start(entry);
         }
-
-        if (!CanStart(entry))
-        {
-            return false;
-        }
-
-        entry.Perform = Start(entry);
-        return true;
     }
 
     private bool UpdateSockets()
@@ -854,7 +887,9 @@ internal sealed class ManagedMultiTransfer(
     /// The events of <paramref name="events" /> an extra socket has now: for the socket number
     /// <c>CURLINFO_ACTIVESOCKET</c> gave a connect-only transfer in the handle, its connection's readiness
     /// (<see cref="ManagedEasyTransfer.ConnectOnlyReadyEvents" />, upstream test677, BL-2633), else what
-    /// <see cref="IWaitSocketPoller" /> answers for the operating system socket.
+    /// <see cref="IWaitSocketPoller" /> answers for the operating system socket. Any other number of the
+    /// engine's own, from <see cref="ResolverWakeupSocket" /> up (a multi handle's transfer sockets, which
+    /// <c>curl_multi_waitfds</c> gives, upstream test2405), is no descriptor and never has an event.
     /// </summary>
     private CurlWaitEvents PollWaitSocket(CurlSocket socket, CurlWaitEvents events)
     {
@@ -866,7 +901,7 @@ internal sealed class ManagedMultiTransfer(
             }
         }
 
-        return socketPoller.Poll(socket, events);
+        return socket.Handle >= ResolverWakeupSocket ? CurlWaitEvents.None : socketPoller.Poll(socket, events);
     }
 
     private bool WaitEnds(TimeSpan left, int extraSocketCount, bool poll)

@@ -116,6 +116,32 @@ public sealed partial class ManagedEasyTransferTests
     }
 
     [TestMethod]
+    public async Task PerformAsync_ProxyUserPasswordSetThenClearedWithNoProxyAuth_PutsTheCredentialsOnTheFirstProxyOnly()
+    {
+        RecordingProtocolHandler handler = RecordingProtocolHandler.WritingPath("http");
+        await using ManagedEasyTransfer easy = EasyOver(handler, []);
+        easy.Options = new EasyOptions
+        {
+            Network = new EasyNetworkOptions { Url = "http://example.com/" },
+            Proxy = new EasyProxyOptions { Proxy = "firstproxy:8990" },
+            Authentication = new EasyAuthenticationOptions { ProxyUserPassword = "victim:secret" },
+        };
+        await easy.PerformAsync(CancellationToken.None);
+        easy.Options = easy.Options with
+        {
+            Proxy = new EasyProxyOptions { Proxy = "secondproxy:8990" },
+            Authentication = new EasyAuthenticationOptions(),
+        };
+
+        await easy.PerformAsync(CancellationToken.None);
+
+        NetworkCredential? first = handler.Contexts[0].Proxy?.Credential;
+        Assert.AreEqual("victim", first?.UserName);
+        Assert.AreEqual("secret", first?.Password);
+        Assert.AreEqual(new ProxyEndpoint(ProxyKind.Http, "secondproxy", 8990, null), handler.Contexts[1].Proxy);
+    }
+
+    [TestMethod]
     public void ProxyCredentialsOf_NoProxyCredentialOption_IsNull()
     {
         Assert.IsNull(ManagedEasyTransfer.ProxyCredentialsOf(new EasyAuthenticationOptions()));
@@ -124,6 +150,7 @@ public sealed partial class ManagedEasyTransferTests
     [TestMethod]
     [DataRow("silly", null, null, "silly", "")]
     [DataRow("silly:per:son", null, null, "silly", "per:son")]
+    [DataRow(":secret", null, null, "", "secret")]
     [DataRow("silly:person", "name", null, "name", "person")]
     [DataRow("silly:person", null, "word", "silly", "word")]
     [DataRow(null, "name", null, "name", "")]

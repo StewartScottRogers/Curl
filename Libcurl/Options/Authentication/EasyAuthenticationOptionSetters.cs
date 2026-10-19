@@ -8,12 +8,15 @@ namespace Libcurl.Options;
 /// <summary>
 /// The setter rows of every <c>CURLOPT_*</c> <see cref="EasyAuthenticationOptions"/> holds (<c>.netrc</c>,
 /// credentials, the <c>CURLAUTH_*</c> bitmasks, SASL, the bearer token, service names, GSS-API delegation,
-/// Kerberos, AWS SigV4 and TLS-SRP, with the proxy twins), each checking its value as curl 8.22.0's
+/// Kerberos, AWS SigV4, HTTP message signatures and TLS-SRP, with the proxy twins), each checking its value as curl 8.22.0's
 /// <c>lib/setopt.c</c> does (ADR-0574).
 /// </summary>
 internal static class EasyAuthenticationOptionSetters
 {
     private const string SecureRemotePassword = "SRP";
+
+    /// <summary>The <c>--httpsig-algo</c> text of each <c>CURLHTTPSIG_*</c> number, <see langword="null"/> for <c>CURLHTTPSIG_NONE</c>.</summary>
+    private static readonly string?[] HttpSignatureAlgorithmNames = [null, "ed25519", "hmac-sha256"];
 
     private const long LowestAuthenticationBit = 1L << 0;
 
@@ -55,6 +58,10 @@ internal static class EasyAuthenticationOptionSetters
         setters[CurlOption.GssapiDelegation] = new(SetGssApiDelegation);
         setters[CurlOption.Krblevel] = new(SetKerberosLevel);
         setters[CurlOption.AwsSigv4] = new(SetAwsSigV4);
+        setters[CurlOption.HttpsigAlgorithm] = new(SetHttpSignatureAlgorithm);
+        setters[CurlOption.HttpsigKey] = new(SetHttpSignatureKey);
+        setters[CurlOption.HttpsigKeyid] = new(SetHttpSignatureKeyId);
+        setters[CurlOption.HttpsigHeaders] = new(SetHttpSignatureHeaders);
     }
 
     private static void AddTlsAuthenticationSetters(Dictionary<CurlOption, EasyOptionSetter> setters)
@@ -134,6 +141,24 @@ internal static class EasyAuthenticationOptionSetters
         v is null
             ? Change(ref o, a => a with { AwsSigV4 = null })
             : Change(ref o, a => a with { AwsSigV4 = (string)v, HttpAuthentication = HttpAuthenticationMethods.AwsSigV4 });
+
+    /// <summary>
+    /// <c>CURLOPT_HTTPSIG_ALGORITHM</c>: <c>CURLHTTPSIG_NONE</c> (0) clears the algorithm, <c>CURLHTTPSIG_ED25519</c> (1) and
+    /// <c>CURLHTTPSIG_HMAC_SHA256</c> (2) name it as the <c>--httpsig-algo</c> text; any other number is <see cref="CurlCode.BadFunctionArgument"/>.
+    /// </summary>
+    private static CurlCode SetHttpSignatureAlgorithm(ref EasyOptions o, object? v)
+    {
+        var number = NumberOf(v);
+        return number is < 0 or > 2
+            ? CurlCode.BadFunctionArgument
+            : Change(ref o, a => a with { HttpSignatureAlgorithm = HttpSignatureAlgorithmNames[number] });
+    }
+
+    private static CurlCode SetHttpSignatureKey(ref EasyOptions o, object? v) => Change(ref o, a => a with { HttpSignatureKey = (string?)v });
+
+    private static CurlCode SetHttpSignatureKeyId(ref EasyOptions o, object? v) => Change(ref o, a => a with { HttpSignatureKeyId = (string?)v });
+
+    private static CurlCode SetHttpSignatureHeaders(ref EasyOptions o, object? v) => Change(ref o, a => a with { HttpSignatureHeaders = (string?)v });
 
     /// <summary><c>CURLOPT_TLSAUTH_TYPE</c>: <c>SRP</c> in any case, or <see langword="null"/>; anything else is <see cref="CurlCode.BadFunctionArgument"/>.</summary>
     private static CurlCode SetTlsAuthType(ref EasyOptions o, object? v) =>

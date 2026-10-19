@@ -36,6 +36,7 @@ public sealed class HttpRequestOptionsMappingTests
             TransferEncoding = true,
             IgnoreContentLength = true,
             Http09Allowed = true,
+            Http200Aliases = ["ICY 200 OK"],
             FollowLocation = FollowLocation.ObeyCode,
             MaxRedirects = 4,
             HttpVersion = HttpVersion.Http10,
@@ -57,6 +58,7 @@ public sealed class HttpRequestOptionsMappingTests
         Assert.IsTrue(mapped.TransferEncoding);
         Assert.IsTrue(mapped.IgnoreContentLength);
         Assert.IsTrue(mapped.AllowHttp09Reply);
+        CollectionAssert.AreEqual(new[] { "ICY 200 OK" }, mapped.Http200Aliases.ToArray());
         Assert.IsTrue(mapped.FollowRedirects);
         Assert.AreEqual(4, mapped.MaxRedirects);
         Assert.AreEqual(HttpVersionPreference.Http10, mapped.Version);
@@ -80,6 +82,19 @@ public sealed class HttpRequestOptionsMappingTests
         Assert.IsFalse(mapped.Compressed);
         Assert.AreEqual(HttpVersionPreference.Http11, mapped.Version);
         Assert.AreEqual(HttpRequestOptions.DefaultContinueWait, mapped.ContinueWait);
+    }
+
+    [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public void Of_KeepSendingOnError_IsCopiedFromTheBehaviourOptions(bool keepSendingOnError)
+    {
+        Diagnostics.Arrange("keep sending on error", keepSendingOnError);
+
+        HttpRequestOptions mapped = HttpRequestOptionsMapping.Of(EasyOptionsFromCommandLine.TransferSettingsOf(NoOptions), new EasyHttpOptions(), new EasyBehaviourOptions { KeepSendingOnError = keepSendingOnError }, new EasyTransferOptions(), new EasyAuthenticationOptions());
+
+        Diagnostics.Assert("keep sending on error", keepSendingOnError, mapped.KeepSendingOnError);
+        Assert.AreEqual(keepSendingOnError, mapped.KeepSendingOnError);
     }
 
     [TestMethod]

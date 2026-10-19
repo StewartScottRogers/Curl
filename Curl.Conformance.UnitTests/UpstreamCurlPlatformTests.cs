@@ -8,13 +8,14 @@ public sealed class UpstreamCurlPlatformTests
 {
     private static readonly string[] CommonFeatures =
     [
-        "dict", "file", "ftp", "gopher", "gophers", "http", "https", "ipfs", "mqtt", "mqtts", "scp", "sftp", "telnet", "tftp", "ws", "wss",
+        "dict", "file", "ftp", "gopher", "gophers", "http", "https", "imap", "ipfs", "mqtt", "mqtts", "pop3", "scp", "sftp", "smtp", "telnet", "tftp", "ws", "wss",
         "alt-svc", "AsynchDNS", "brotli", "ECH", "GSS-API", "HSTS", "HTTPS-proxy",
         "HTTPSRR", "IDN", "IPv6", "Kerberos", "Largefile", "libz", "NTLM", "PSL", "SPNEGO", "SSL",
         "UnixSockets", "zstd",
         "crypto", "cookies", "proxy", "Mime", "manual", "DoH", "digest", "aws", "netrc", "verbose-strings",
         "large-time", "large-size", "sha512-256", "SSLpinning",
-        "large_file", "local-http", "httpsig", "headers-api", "form-api",
+        "large_file", "local-http", "httpsig", "headers-api", "form-api", "wakeup",
+        "threadsafe", "threaded-resolver",
     ];
 
     public TestContext TestContext { get; set; } = null!;
@@ -44,7 +45,7 @@ public sealed class UpstreamCurlPlatformTests
 
         UpstreamCurlPlatform platform = UpstreamCurlPlatform.Unix;
 
-        bool featuresMatch = platform.Features.SetEquals([.. CommonFeatures, "OpenSSL", "xattr", "http/2", "h2c"]);
+        bool featuresMatch = platform.Features.SetEquals([.. CommonFeatures, "OpenSSL", "SSLS-EXPORT", "xattr", "http/2", "h2c"]);
         diagnostics.Act("feature count", platform.Features.Count);
         diagnostics.Act("null device", platform.NullDevice);
         diagnostics.Assert("features equal common + OpenSSL + xattr", true, featuresMatch);
@@ -152,6 +153,37 @@ public sealed class UpstreamCurlPlatformTests
         var diagnostics = TestDiagnostics.For(TestContext);
 
         bool onEvery = UpstreamCurlPlatform.All.All(platform => platform.Features.Contains("form-api"));
+
+        diagnostics.Act("listed on every platform", onEvery);
+        diagnostics.Assert("listed on every platform", true, onEvery);
+        Assert.IsTrue(onEvery);
+    }
+
+    // Curl's Features line names threadsafe and AsynchDNS without c-ares, which runtests.pl reads as
+    // threaded-resolver, so case 3026 runs and case 506 is skipped as for the reference curl (BL-2700, ADR-0695).
+    [TestMethod]
+    [DataRow("threadsafe", true)]
+    [DataRow("threaded-resolver", true)]
+    [DataRow("c-ares", false)]
+    public void AllPlatforms_ListTheThreadSafeLibraryAndThreadedResolver(string feature, bool expected)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("feature", feature);
+
+        bool onEvery = UpstreamCurlPlatform.All.All(platform => platform.Features.Contains(feature) == expected);
+
+        diagnostics.Act("matches on every platform", onEvery);
+        diagnostics.Assert("matches on every platform", true, onEvery);
+        Assert.IsTrue(onEvery);
+    }
+
+    // Libcurl, which runs the ported libtest programs, has curl_multi_wakeup, so cases 1564, 1565, 2412 and 2414 run (BL-2661).
+    [TestMethod]
+    public void AllPlatforms_ListWakeup()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+
+        bool onEvery = UpstreamCurlPlatform.All.All(platform => platform.Features.Contains("wakeup"));
 
         diagnostics.Act("listed on every platform", onEvery);
         diagnostics.Assert("listed on every platform", true, onEvery);

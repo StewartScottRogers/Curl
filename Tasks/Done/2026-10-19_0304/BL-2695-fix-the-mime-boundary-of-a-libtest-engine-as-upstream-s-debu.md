@@ -1,0 +1,38 @@
+---
+id: BL-2695
+title: Fix the MIME boundary of a libtest engine as upstream's debug build does (upstream test1972)
+priority: Normal
+assignee: Claude
+pipeline: feature
+depends-on: []
+touches: [Curl.Engine.UnitLibrary/ManagedCurlEngine.cs, Curl.Engine.UnitLibrary/ManagedEngineSharedState.cs, Curl.Engine.UnitLibrary/ManagedEasyTransfer.cs, Curl.Engine.UnitTests/ManagedCurlEngineTests.cs, Curl.Engine.UnitTests/ManagedEasyTransferTests.Mime.cs, Curl.Conformance.UnitTests]
+requirement: none
+created: 2026-10-17
+completed: 2026-10-18
+---
+# BL-2695 — Fix the MIME boundary of a libtest engine as upstream's debug build does (upstream test1972)
+
+## Goal
+
+Upstream case 1972 passes: the ratchet's libtest engine builds MIME bodies with the fixed boundary upstream's debug build uses (`------------------------qrstuvwxyz0123456789AB`), so a MIME post signed with AWS SigV4 matches byte for byte.
+
+## Context
+
+Found by BL-2675 (AWS SigV4 libtest cases with the harness's Debug stand-in and an epoch signing clock). test1972 (lib1972) now runs and differs at line 8: expected `--------------------------qrstuvwxyz0123456789AB`, got a random boundary. Upstream's debug build gives a fixed boundary in tests (find the debug-only hook in lib/rand.c or lib/mime.c of curl 8.22.0 first); the engine has ManagedEasyTransfer.CreateFormBoundary as an internal hook (ADR-0627). Give UpstreamConformanceTests.CreateEngine's engine the fixed boundary (an engine-level option beside signingClock, BL-2675), and check what the curl tool's ratchet already does for -F cases. Run it with `CURL_UPSTREAM_CASE=1972`.
+
+## Acceptance criteria
+
+- [x] `CURL_UPSTREAM_CASE=1972` with NamedUpstreamCase_RunThroughCurl_PassesAsAListedCaseMust passes, and 1972 is on Curl.Conformance.UnitTests/PassingUpstreamCases.txt.
+- [x] A focused unit test in Curl.Engine.UnitTests pins the engine's fixed boundary (ADR-0482).
+- [x] dotnet build is clean and the fast tests pass.
+
+## Notes
+
+- 2026-10-18: touches narrowed from Curl.Engine.UnitLibrary, Curl.Engine.UnitTests to files, by reading ManagedEasyTransfer.CreateFormBoundary, ManagedCurlEngine and ManagedEngineSharedState, so it can run beside other Engine tasks.
+- 2026-10-18: Pipeline run directly (a seam of three lines and a harness stand-in, no plan stage needed). Upstream's debug build draws the boundary through Curl_rand_alnum over the CURL_ENTROPY sequence (seed 0x31323334, remainder 42 = q). ManagedCurlEngine takes an internal createFormBoundary (on ManagedEngineSharedState), UpstreamConformanceTests.CreateEngine passes ForcedEntropyFormBoundary.Of under CURL_ENTROPY; ADR-0701. The curl tool's -F cases keep random boundaries (upstream strips them). Measure-CodeQuality for Curl.Engine.UnitLibrary: 0 failing members.
+
+## Log
+
+- 2026-10-17: Created.
+- 2026-10-18: Backlog -> Doing. Criteria at claim: 6eb95e49 f761fa3e 5ea3895a.
+- 2026-10-18: Doing -> Done. test1972 passes: the libtest engine builds MIME bodies with the debug build's CURL_ENTROPY boundary

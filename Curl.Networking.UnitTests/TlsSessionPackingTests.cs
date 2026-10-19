@@ -112,4 +112,32 @@ public sealed class TlsSessionPackingTests
         Assert.IsEmpty(session.SessionData);
         Assert.AreEqual(0, session.ProtocolId);
     }
+
+    // lib1678's packet: a 4096-byte ticket, a 127-byte QUIC block and a 10-byte ALPN, then a
+    // one-byte ticket, ALPN and QUIC block; upstream's unpack keeps each tag's later value.
+    [TestMethod]
+    public void Unpack_Lib1678RepeatedTags_KeepsTheLaterValues()
+    {
+        byte[] packed =
+        [
+            0x01,
+            0x04, 0x10, 0x00, .. new byte[4096],
+            0x07, 0x00, 0x7F, .. new byte[127],
+            0x05, 0x00, 0x0A, .. "abcdefghij"u8,
+            0x04, 0x00, 0x01, 0xEE,
+            0x05, 0x00, 0x01, (byte)'z',
+            0x07, 0x00, 0x01, 0xDD,
+        ];
+        Diagnostics.Arrange("packed length", packed.Length);
+
+        var session = TlsSessionPacking.Unpack(packed)!;
+
+        Diagnostics.Bytes("session data", session.SessionData);
+        Diagnostics.Act("application protocol", session.ApplicationProtocol);
+        Diagnostics.Assert("application protocol", "z", session.ApplicationProtocol);
+
+        CollectionAssert.AreEqual(new byte[] { 0xEE }, session.SessionData);
+        Assert.AreEqual("z", session.ApplicationProtocol);
+        CollectionAssert.AreEqual(new byte[] { 0xDD }, session.QuicTransportParameters);
+    }
 }

@@ -100,7 +100,7 @@ public sealed class Lib540Tests
 
         LibTestResult result = await new Lib540(TimeProvider.System).RunAsync(run.Context, CancellationToken.None);
 
-        Assert.AreNotEqual(0, result.ExitCode);
+        Assert.AreEqual((int)LibTestErrorCodes.Multi, result.ExitCode);
         Assert.IsFalse(run.Error.ToString().Contains("again", StringComparison.Ordinal));
     }
 
@@ -140,7 +140,11 @@ public sealed class Lib540Tests
 
         LibTestResult result = await new Lib540(TimeProvider.System).RunAsync(run.Context, CancellationToken.None);
 
-        Assert.AreNotEqual(0, result.ExitCode);
+        Assert.AreEqual((int)LibTestErrorCodes.Multi, result.ExitCode);
+        Assert.AreEqual(1, engine.DisposedEasyCount, "the easy handle the multi handle refused is cleaned up");
+        Assert.AreEqual(0, engine.Multi.Removals, "a handle never added is not removed");
+        Assert.AreEqual(1, engine.Multi.Disposals, "the multi handle is cleaned up");
+        Assert.IsFalse(run.Error.ToString().Contains("again", StringComparison.Ordinal));
     }
 
     [TestMethod]
@@ -378,6 +382,24 @@ public sealed class Lib552Tests
 
         Assert.AreEqual((int)CurlCode.Ok, result.ExitCode);
         Assert.AreEqual("lib552", new Lib552(TimeProvider.System).ProgramName);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_TracesSentDataAsTextWithNoHexAndNoTime()
+    {
+        var engine = new FakeCurlEngine
+        {
+            Performing = o =>
+            {
+                _ = o.Callbacks.Debug!(CurlInfoType.DataOut, "ok"u8);
+                return CurlCode.Ok;
+            },
+        };
+        var run = new PortRun(engine, 552, "http://x/552", "http://proxy");
+
+        await new Lib552(TimeProvider.System).RunAsync(run.Context, CancellationToken.None);
+
+        Assert.AreEqual("=> Send data, 2 bytes (0x2)\n0000: ok\n", run.Error.ToString());
     }
 
     [TestMethod]

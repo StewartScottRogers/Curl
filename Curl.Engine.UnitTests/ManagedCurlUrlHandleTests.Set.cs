@@ -131,13 +131,66 @@ public sealed partial class ManagedCurlUrlHandleTests
     [DataRow(CurlUrlPart.Options)]
     [DataRow(CurlUrlPart.Fragment)]
     [DataRow(CurlUrlPart.ZoneId)]
-    public void Set_TextPart_StoresItWithItsEscapesLowerCased(CurlUrlPart part)
+    public void Set_TextPart_StoresItWithItsEscapesUpperCased(CurlUrlPart part)
     {
         using ManagedCurlUrlHandle url = Parsed("http://example.com/");
 
-        Assert.AreEqual(CurlUrlCode.Ok, url.Set(part, "a%4A%2f%G1%", CurlUrlFlags.None));
+        Assert.AreEqual(CurlUrlCode.Ok, url.Set(part, "a%4a%2f%G1%", CurlUrlFlags.None));
 
-        Assert.AreEqual("a%4a%2f%G1%", GetOk(url, part));
+        Assert.AreEqual("a%4A%2F%G1%", GetOk(url, part));
+    }
+
+    [TestMethod]
+    public void Set_PathWithMixedCaseEscapes_GivesThemUpperCasedInTheUrl()
+    {
+        using ManagedCurlUrlHandle url = Parsed("https://host/");
+
+        Assert.AreEqual(CurlUrlCode.Ok, url.Set(CurlUrlPart.Path, "%4A%4b%4C", CurlUrlFlags.None));
+
+        Assert.AreEqual("https://host/%4A%4B%4C", GetOk(url, CurlUrlPart.Url));
+    }
+
+    [TestMethod]
+    public void Set_PathUnderUrlEncode_KeepsTheCharactersAllowedInAPath()
+    {
+        using ManagedCurlUrlHandle url = Parsed("https://example.com/");
+
+        Assert.AreEqual(CurlUrlCode.Ok, url.Set(CurlUrlPart.Path, "one /$!$&'()*+;=:@{}[]%", CurlUrlFlags.UrlEncode));
+
+        Assert.AreEqual("https://example.com/one%20/$!$&'()*+;=:@{}[]%25", GetOk(url, CurlUrlPart.Url));
+    }
+
+    [TestMethod]
+    [DataRow("https://curl.se/#  ", CurlUrlPart.Fragment, "%20%20")]
+    [DataRow("https://user@example.net?hello# space ", CurlUrlPart.Fragment, "%20space%20")]
+    [DataRow("https://user:password@example.net/ge t?this=and-what", CurlUrlPart.Path, "/ge%20t")]
+    public void Set_UrlWithSpacesUnderUrlEncodeAndAllowSpace_EncodesThemInThePart(string text, CurlUrlPart part, string expected)
+    {
+        using ManagedCurlUrlHandle url = Parsed(text, CurlUrlFlags.UrlEncode | CurlUrlFlags.AllowSpace);
+
+        Assert.AreEqual(expected, GetOk(url, part));
+    }
+
+    [TestMethod]
+    public void Set_UrlWithNonAsciiPathUnderUrlEncode_EncodesItsUtf8Bytes()
+    {
+        using ManagedCurlUrlHandle url = Parsed("https://example.com/räksmörgås", CurlUrlFlags.UrlEncode);
+
+        Assert.AreEqual("https://example.com/r%C3%A4ksm%C3%B6rg%C3%A5s", GetOk(url, CurlUrlPart.Url));
+    }
+
+    [TestMethod]
+    public void Set_UrlWithSpacesInPathAndQueryUnderUrlEncodeAndAllowSpace_GivesPercentTwentyThenPlus()
+    {
+        using ManagedCurlUrlHandle url = Parsed("http://example.com/please/../gimme/%TESTNUMBER?foobar#hello");
+
+        CurlUrlCode code = url.Set(
+            CurlUrlPart.Url,
+            "http://example.net/there/it/is/../../tes t case=/%TESTNUMBER0002? yes no",
+            CurlUrlFlags.UrlEncode | CurlUrlFlags.AllowSpace);
+
+        Assert.AreEqual(CurlUrlCode.Ok, code);
+        Assert.AreEqual("http://example.net/there/tes%20t%20case=/%TESTNUMBER0002?+yes+no", GetOk(url, CurlUrlPart.Url));
     }
 
     [TestMethod]
@@ -193,6 +246,7 @@ public sealed partial class ManagedCurlUrlHandleTests
     [TestMethod]
     [DataRow("", CurlUrlFlags.None)]
     [DataRow("", CurlUrlFlags.UrlEncode)]
+    [DataRow("  ", CurlUrlFlags.UrlEncode)]
     [DataRow("a/b", CurlUrlFlags.None)]
     [DataRow("a:80", CurlUrlFlags.None)]
     [DataRow("u@h", CurlUrlFlags.None)]
@@ -205,6 +259,35 @@ public sealed partial class ManagedCurlUrlHandleTests
         Assert.AreEqual(CurlUrlCode.BadHostname, url.Set(CurlUrlPart.Host, host, flags));
 
         Assert.AreEqual("example.com", GetOk(url, CurlUrlPart.Host));
+    }
+
+    [TestMethod]
+    [DataRow("%43url.se", "https://%43url.se/")]
+    [DataRow("0xff", "https://0xff/")]
+    public void Set_HostAName_KeepsItAsGiven(string host, string expected)
+    {
+        using ManagedCurlUrlHandle url = Parsed("https://example.com/");
+
+        Assert.AreEqual(CurlUrlCode.Ok, url.Set(CurlUrlPart.Host, host, CurlUrlFlags.None));
+
+        Assert.AreEqual(expected, GetOk(url, CurlUrlPart.Url));
+    }
+
+    [TestMethod]
+    public void Set_UrlWithAPercentEncodedIPv6HostAndZone_DecodesAndNormalisesIt()
+    {
+        using ManagedCurlUrlHandle url = Parsed("https://[%3A%3A13%2e1%2e68%2e3%25eth0]:1234");
+
+        Assert.AreEqual("[::13.1.68.3]", GetOk(url, CurlUrlPart.Host));
+        Assert.AreEqual("eth0", GetOk(url, CurlUrlPart.ZoneId));
+    }
+
+    [TestMethod]
+    public void Get_PunycodeToIdnOfAHostWithAPunycodeLabel_ReturnsTheInternationalName()
+    {
+        using ManagedCurlUrlHandle url = Parsed("https://www.xn--rksmrgs-5wao1o.se");
+
+        Assert.AreEqual("www.räksmörgås.se", GetOk(url, CurlUrlPart.Host, CurlUrlFlags.PunycodeToIdn));
     }
 
     [TestMethod]
@@ -259,7 +342,7 @@ public sealed partial class ManagedCurlUrlHandleTests
 
     [TestMethod]
     [DataRow("a/b", CurlUrlFlags.None, "/a/b")]
-    [DataRow("/a%2Fb", CurlUrlFlags.None, "/a%2fb")]
+    [DataRow("/a%2fb", CurlUrlFlags.None, "/a%2Fb")]
     [DataRow("", CurlUrlFlags.None, "/")]
     [DataRow("/x y/\u00e9", CurlUrlFlags.UrlEncode, "/x%20y/%C3%A9")]
     [DataRow("x y", CurlUrlFlags.UrlEncode, "/x%20y")]
@@ -311,14 +394,77 @@ public sealed partial class ManagedCurlUrlHandleTests
     }
 
     [TestMethod]
-    public void Set_EmptyUrl_ReturnsMalformedInput()
+    public void Set_EmptyUrlOnAHandleWithNoWholeUrl_ReturnsMalformedInput()
+    {
+        using ManagedCurlUrlHandle url = new();
+        url.Set(CurlUrlPart.Host, "example.com", CurlUrlFlags.None);
+
+        Assert.AreEqual(CurlUrlCode.MalformedInput, url.Set(CurlUrlPart.Url, string.Empty, CurlUrlFlags.None));
+    }
+
+    [TestMethod]
+    public void Set_EmptyUrlOverAWholeUrl_IsOkAndKeepsItWithoutItsFragment()
     {
         using ManagedCurlUrlHandle url = Parsed(FullUrl);
 
-        Assert.AreEqual(CurlUrlCode.MalformedInput, url.Set(CurlUrlPart.Url, string.Empty, CurlUrlFlags.None));
+        Assert.AreEqual(CurlUrlCode.Ok, url.Set(CurlUrlPart.Url, string.Empty, CurlUrlFlags.None));
         Assert.AreEqual(CurlUrlCode.MalformedInput, url.Set(CurlUrlPart.Url, "http://h/" + new string('a', 8_000_000), CurlUrlFlags.None));
 
-        Assert.AreEqual(FullUrl, GetOk(url, CurlUrlPart.Url));
+        Assert.AreEqual(FullUrl[..FullUrl.IndexOf('#', StringComparison.Ordinal)], GetOk(url, CurlUrlPart.Url));
+    }
+
+    [TestMethod]
+    public void Set_EmptyUrlOverPartsSetOneByOne_IsOkAndKeepsThem()
+    {
+        using ManagedCurlUrlHandle url = new();
+        url.Set(CurlUrlPart.Scheme, "https", CurlUrlFlags.None);
+        url.Set(CurlUrlPart.Host, "example.com", CurlUrlFlags.None);
+        url.Set(CurlUrlPart.Path, "/", CurlUrlFlags.None);
+
+        Assert.AreEqual(CurlUrlCode.Ok, url.Set(CurlUrlPart.Url, string.Empty, CurlUrlFlags.None));
+
+        Assert.AreEqual("https://example.com/", GetOk(url, CurlUrlPart.Url));
+    }
+
+    [TestMethod]
+    public void Set_EmptyQueryAppendedAndEncoded_LeavesNoQuery()
+    {
+        using ManagedCurlUrlHandle url = Parsed("https://example.com/?param=value");
+
+        Assert.AreEqual(CurlUrlCode.Ok, url.Set(CurlUrlPart.Query, string.Empty, CurlUrlFlags.AppendQuery | CurlUrlFlags.UrlEncode));
+
+        Assert.AreEqual("https://example.com/", GetOk(url, CurlUrlPart.Url));
+    }
+
+    [TestMethod]
+    public void Set_SchemeFromImapToHttps_DropsTheOptionsFromTheUrl()
+    {
+        using ManagedCurlUrlHandle url = Parsed("imap://user:secret;optit@host/");
+
+        Assert.AreEqual(CurlUrlCode.Ok, url.Set(CurlUrlPart.Scheme, "https", CurlUrlFlags.None));
+
+        Assert.AreEqual("https://user:secret@host/", GetOk(url, CurlUrlPart.Url));
+        Assert.AreEqual("optit", GetOk(url, CurlUrlPart.Options));
+    }
+
+    [TestMethod]
+    public void Set_OptionsUnderASchemeLibcurlDoesNotSupport_StayInTheUrl()
+    {
+        using ManagedCurlUrlHandle url = Parsed("imap://user:secret;optit@host/");
+
+        Assert.AreEqual(CurlUrlCode.Ok, url.Set(CurlUrlPart.Scheme, "unknown", CurlUrlFlags.NonSupportScheme));
+
+        Assert.AreEqual("unknown://user:secret;optit@host/", GetOk(url, CurlUrlPart.Url));
+    }
+
+    [TestMethod]
+    public void Set_OnlyOptionsUnderHttps_WriteNoLogin()
+    {
+        using ManagedCurlUrlHandle url = Parsed("https://host/");
+
+        url.Set(CurlUrlPart.Options, "o", CurlUrlFlags.None);
+
+        Assert.AreEqual("https://host/", GetOk(url, CurlUrlPart.Url));
     }
 
     [TestMethod]
@@ -404,5 +550,116 @@ public sealed partial class ManagedCurlUrlHandleTests
         Assert.AreEqual(CurlUrlCode.Ok, copy.Get(CurlUrlPart.Url, CurlUrlFlags.None, out string? copied));
         Assert.AreEqual("https://user:pw@other.org:8080/p/a?q=1#frag", copied);
         Assert.AreEqual(FullUrl, GetOk(url, CurlUrlPart.Url));
+    }
+
+    // lib1560's get_parts_list rows 3 and 4 and get_url_list rows 214 and 14 (BL-2734).
+    [TestMethod]
+    [DataRow("weird:///path", "/path")]
+    [DataRow("weird:////path", "//path")]
+    public void SetUrl_EmptyAuthorityUnderNoAuthority_KeepsAnEmptyHostAndThePath(string text, string path)
+    {
+        using ManagedCurlUrlHandle url = new();
+
+        Assert.AreEqual(CurlUrlCode.Ok, url.Set(CurlUrlPart.Url, text, CurlUrlFlags.NonSupportScheme | CurlUrlFlags.NoAuthority));
+
+        Assert.AreEqual(string.Empty, GetOk(url, CurlUrlPart.Host));
+        Assert.AreEqual(path, GetOk(url, CurlUrlPart.Path));
+        Assert.AreEqual(CurlUrlCode.NoPort, url.Get(CurlUrlPart.Port, CurlUrlFlags.None, out _));
+    }
+
+    [TestMethod]
+    public void SetUrl_EmptyAuthorityWithQueryUnderNoAuthority_ReadsBackWithThreeSlashes()
+    {
+        using ManagedCurlUrlHandle url = new();
+
+        CurlUrlCode code = url.Set(
+            CurlUrlPart.Url,
+            "custom-scheme://?expected=test-new-good",
+            CurlUrlFlags.NonSupportScheme | CurlUrlFlags.NoAuthority);
+
+        Assert.AreEqual(CurlUrlCode.Ok, code);
+        Assert.AreEqual("custom-scheme:///?expected=test-new-good", GetOk(url, CurlUrlPart.Url));
+    }
+
+    // lib1560's set_url_list rows 0 to 9 (BL-2740).
+    [TestMethod]
+    [DataRow("https://example.com", "https://example.com/")]
+    [DataRow("file:///test?test#test", "file:///test?test")]
+    [DataRow("https://example.com/path?query#frag", "https://example.com/path?query")]
+    [DataRow("ftp://example.com/dir/file#anchor", "ftp://example.com/dir/file")]
+    [DataRow("http://example.com/path#frag", "http://example.com/path")]
+    [DataRow("http://example.com/#frag", "http://example.com/")]
+    [DataRow("http://user:pass@example.com/path?query#frag", "http://user:pass@example.com/path?query")]
+    [DataRow("http://example.com:8080/path?query#frag", "http://example.com:8080/path?query")]
+    [DataRow("https://user:pass@example.com:8443/path?query#frag", "https://user:pass@example.com:8443/path?query")]
+    [DataRow("http://[::1]/path#frag", "http://[::1]/path")]
+    public void SetUrl_BlankOverAHeldUrl_KeepsItWithoutItsFragment(string held, string expected)
+    {
+        using ManagedCurlUrlHandle url = Parsed(held);
+
+        Assert.AreEqual(CurlUrlCode.Ok, url.Set(CurlUrlPart.Url, string.Empty, CurlUrlFlags.None));
+
+        Assert.AreEqual(CurlUrlCode.Ok, url.Get(CurlUrlPart.Url, CurlUrlFlags.GetEmpty, out string? text));
+        Assert.AreEqual(expected, text);
+    }
+
+    // lib1560's set_url_list rows 44 and 45 (BL-2740).
+    [TestMethod]
+    [DataRow("http://host/path?")]
+    [DataRow("http://host/path?#")]
+    public void SetUrl_FragmentOverAnEmptyQuery_KeepsTheEmptyQuery(string held)
+    {
+        using ManagedCurlUrlHandle url = Parsed(held);
+
+        Assert.AreEqual(CurlUrlCode.Ok, url.Set(CurlUrlPart.Url, "#new", CurlUrlFlags.None));
+
+        Assert.AreEqual(CurlUrlCode.Ok, url.Get(CurlUrlPart.Url, CurlUrlFlags.GetEmpty, out string? text));
+        Assert.AreEqual("http://host/path?#new", text);
+    }
+
+    // lib1560's set_url_list row 59 (BL-2740).
+    [TestMethod]
+    public void SetUrl_HttpWithAnEmptyAuthorityUnderNoAuthority_ReadsBackWithThreeSlashes()
+    {
+        using ManagedCurlUrlHandle url = Parsed("http://user:foo@example.com/path?query#frag");
+
+        Assert.AreEqual(CurlUrlCode.Ok, url.Set(CurlUrlPart.Url, "http://?hi", CurlUrlFlags.NoAuthority));
+
+        Assert.AreEqual("http:///?hi", GetOk(url, CurlUrlPart.Url));
+    }
+
+    [TestMethod]
+    public void SetUrl_ColonsWhereTheHostShouldBe_IsNoHost()
+    {
+        using ManagedCurlUrlHandle url = new();
+
+        Assert.AreEqual(CurlUrlCode.NoHost, url.Set(CurlUrlPart.Url, "https://::1/", CurlUrlFlags.None));
+    }
+
+    [TestMethod]
+    [DataRow("htt\u0002://host/file", CurlUrlFlags.NonSupportScheme)]
+    [DataRow("http\u001F://host/path/", CurlUrlFlags.UrlEncode)]
+    [DataRow("http://host/pa\u007Fth", CurlUrlFlags.None)]
+    [DataRow(" http://host/file", CurlUrlFlags.None)]
+    [DataRow(" ", CurlUrlFlags.None)]
+    [DataRow("http://host/a b", CurlUrlFlags.None)]
+    public void SetUrl_ControlByteAnywhere_IsMalformedInputBeforeTheScheme(string text, CurlUrlFlags flags)
+    {
+        using ManagedCurlUrlHandle url = new();
+
+        Assert.AreEqual(CurlUrlCode.MalformedInput, url.Set(CurlUrlPart.Url, text, flags));
+    }
+
+    [TestMethod]
+    public void SetUrl_SpaceInTheSchemeUnderAllowSpace_IsStillBadScheme()
+    {
+        using ManagedCurlUrlHandle url = new();
+
+        Assert.AreEqual(
+            CurlUrlCode.BadScheme,
+            url.Set(
+                CurlUrlPart.Url,
+                "htt ps://user:password@example.net/get?this=and-what",
+                CurlUrlFlags.NonSupportScheme | CurlUrlFlags.AllowSpace));
     }
 }

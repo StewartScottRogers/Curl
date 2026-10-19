@@ -18,10 +18,11 @@ namespace Libcurl.Easy;
 /// <see cref="DupHandle"/> is <c>curl_easy_duphandle</c>, <see cref="Pause"/> is <c>curl_easy_pause</c>,
 /// <see cref="Upkeep"/> and <see cref="UpkeepAsync"/> are <c>curl_easy_upkeep</c>, <see cref="Recv"/> and
 /// <see cref="RecvAsync"/> are <c>curl_easy_recv</c>, <see cref="Send"/> and <see cref="SendAsync"/> are
-/// <c>curl_easy_send</c>, and <see cref="Dispose"/> (or
+/// <c>curl_easy_send</c>, <see cref="SslsImport"/> and <see cref="SslsExport"/> are <c>curl_easy_ssls_import</c> and
+/// <c>curl_easy_ssls_export</c>, and <see cref="Dispose"/> (or
 /// <see cref="DisposeAsync"/>) is <c>curl_easy_cleanup</c>.
 /// </summary>
-public sealed class CurlEasy : IDisposable, IAsyncDisposable
+public sealed partial class CurlEasy : IDisposable, IAsyncDisposable
 {
     private readonly IEasyTransfer transfer;
     private readonly EasyOptionDispatch dispatch;

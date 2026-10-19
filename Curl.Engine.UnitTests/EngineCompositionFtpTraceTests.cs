@@ -2,6 +2,7 @@ using Curl.Console;
 using System.Text;
 using Curl.Cli;
 using Curl.Protocol.Abstractions;
+using Curl.Protocol.Ftp;
 using Curl.Testing;
 
 namespace Curl.Engine;
@@ -69,6 +70,19 @@ public sealed class EngineCompositionFtpTraceTests
 
         Diagnostics.Assert("transports trace FTP", false, transports.TracesFtp);
         Assert.IsFalse(transports.TracesFtp);
+    }
+
+    [TestMethod]
+    public void CreateFtpProtocolHandler_WithoutTracesFtp_DoesNotTraceTheStateMachine()
+    {
+        ScriptedConnector server = new([Encoding.Latin1.GetBytes(ControlReplies)]);
+
+        // ManagedCurlEngine's CURLOPT_CONNECT_ONLY login handler is built with these four arguments alone.
+        FtpProtocolHandler ftp = EngineComposition.CreateFtpProtocolHandler(server, server, new PassThroughTlsProvider(), new LoopbackDnsResolver());
+        Diagnostics.Act("handler traces the state machine", ftp.TracesStateMachine);
+
+        Diagnostics.Assert("handler traces the state machine", false, ftp.TracesStateMachine);
+        Assert.IsFalse(ftp.TracesStateMachine);
     }
 
     [TestMethod]

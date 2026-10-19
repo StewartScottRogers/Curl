@@ -271,4 +271,17 @@ public sealed record TransferReport
     /// not HTTP.
     /// </summary>
     public string? DigestAuthorizationSent { get; init; }
+
+    /// <summary>
+    /// Gets a value indicating whether the transfer ended with Digest still marked available: its
+    /// last response was a 401 offering Digest without <c>stale=true</c> after the transfer already
+    /// held a Digest nonce, kept from the easy handle's previous transfer
+    /// (<see cref="HttpRequestOptions.KeptDigestChallenges" />) or offered by an earlier 401 of its
+    /// own. libcurl 8.22.0's <c>Curl_input_digest</c> then fails (<c>authproblem</c>), so
+    /// <c>Curl_http_auth_act</c> skips <c>pickoneauth</c> and <c>authhost.avail</c> keeps
+    /// <c>CURLAUTH_DIGEST</c> into the handle's next transfer, which the easy handle carries as
+    /// <see cref="HttpRequestOptions.DigestStaysAvailable" /> (upstream test2030, BL-2820);
+    /// <see langword="false" /> otherwise, or for a transfer that is not HTTP.
+    /// </summary>
+    public bool DigestStaysAvailable { get; init; }
 }

@@ -114,6 +114,32 @@ public sealed class EasyHttpOptionSettersTests
         Assert.IsTrue(options.Transfer.NoBody);
     }
 
+    // Upstream test1948 (BL-2679): a POST on a handle that uploaded replaces the PUT, as libcurl keeps one request method.
+    [TestMethod]
+    [DataRow(1L)]
+    [DataRow(0L)]
+    public void SetOption_PostAfterUpload_ClearsTheUpload(long post)
+    {
+        var options = new EasyOptions { Transfer = new EasyTransferOptions { Upload = true, InFileSize = 22 } };
+
+        options = SetOk(options, CurlOption.Post, post);
+
+        Assert.IsFalse(options.Transfer.Upload);
+    }
+
+    [TestMethod]
+    [DataRow(CurlOption.Postfields)]
+    [DataRow(CurlOption.Copypostfields)]
+    public void SetOption_PostfieldsAfterUpload_ClearsTheUploadAndMakesAPost(CurlOption option)
+    {
+        var options = new EasyOptions { Transfer = new EasyTransferOptions { Upload = true, InFileSize = 22 } };
+
+        options = SetOk(options, option, "This is test PUT data\n");
+
+        Assert.IsFalse(options.Transfer.Upload);
+        Assert.IsTrue(options.Http.Post);
+    }
+
     [TestMethod]
     public void SetOption_PostfieldsGivenAByteArray_KeepsTheCallersBufferByReference()
     {

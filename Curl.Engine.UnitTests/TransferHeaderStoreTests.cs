@@ -148,13 +148,33 @@ public sealed class TransferHeaderStoreTests
     }
 
     [TestMethod]
-    public void RecordLine_FoldedLines_AppendToTheHeaderKeepingOneLeadingBlank()
+    public void RecordLine_FoldedLines_AppendToTheHeaderJoinedByOneSpaceWithoutTheirBlanks()
     {
         TransferHeaderStore store = StoreOf("HTTP/1.1 200 OK", "X-Long: one", "  \ttwo  ", "\tthree", "   ", string.Empty);
 
         store.TryGet("X-Long", 0, CurlHeaderOrigin.Header, Last, out CurlHeader? header);
 
-        Assert.AreEqual("one\ttwo\tthree", header?.Value);
+        Assert.AreEqual("one two three", header?.Value);
+    }
+
+    [TestMethod]
+    public void RecordLine_FoldWithLeadingTabs_UnfoldsAsUpstreamTest1941()
+    {
+        TransferHeaderStore store = StoreOf("HTTP/1.1 200 OK", "Server: from ", " the\t", "\t\tconnect", string.Empty);
+
+        store.TryGet("Server", 0, CurlHeaderOrigin.Header, Last, out CurlHeader? header);
+
+        Assert.AreEqual("from the connect", header?.Value);
+    }
+
+    [TestMethod]
+    public void RecordLine_FoldAfterAnEmptyValue_BecomesTheValueWithoutALeadingSpace()
+    {
+        TransferHeaderStore store = StoreOf("HTTP/1.1 200 OK", "Content-Type:", " text/html", string.Empty);
+
+        store.TryGet("Content-Type", 0, CurlHeaderOrigin.Header, Last, out CurlHeader? header);
+
+        Assert.AreEqual("text/html", header?.Value);
     }
 
     [TestMethod]

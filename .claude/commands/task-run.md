@@ -25,6 +25,29 @@ skip the move. Otherwise `$TB move -Id <ID> -To Doing` before touching any other
 at its new path. It is the specification: its `Goal`, `Context` and
 `Acceptance criteria` are what "done" means.
 
+### 2a. Narrow a whole-project `touches` (dark factory lanes)
+While this task's `touches` names a whole project, no other lane may start a task in that
+project. When `touches` names a whole `Curl.Engine.UnitLibrary`, `Curl.Engine.UnitTests`,
+`Libcurl` or `Libcurl.UnitTests`, first read the code the task points at. If that shows
+which files the change lands in (production files and the test files its tests belong in),
+narrow it before you edit any code, so other lanes can start Engine tasks beside this one
+(ADR-0694):
+1. Change only the task file's `touches:` line, replacing the whole-project entries with
+   those files' repo-relative paths. Keep every other entry. Add one `Notes` line saying
+   what it was narrowed from and why. Never change the acceptance criteria.
+2. With nothing else changed in the worktree (`git status --short` lists only the task
+   file), publish it at once: `git add <task file>`, then
+   `git commit -q -m "chore(tasks): narrow <ID>'s touches to files" -m "[skip ci]"`, then
+   `git push -q origin HEAD:work/dark-factory`. If the push is refused,
+   `git pull -q --rebase origin work/dark-factory` and push again, up to three times.
+   If it still fails, go on without narrowing.
+3. If the code does not show where the change lands, or the change spreads across the
+   project, leave `touches` as it is. Too broad is safe; too narrow lets two lanes edit
+   one file at once.
+
+Tasks you file (step 4) follow the same rule: name the files in those four projects
+when you know them.
+
 ## 3. Deliver, by the task's `pipeline`
 - `feature`: run the `/feature` stages, with the task file's `Goal`, `Context` and
   `Acceptance criteria` as the feature text, given verbatim to `protocol-architect`.
@@ -78,6 +101,8 @@ A task never stays in `Doing` when you finish. It ends in one of these:
   this task's `depends-on`.
 - **Follow-up work found** (an option still unimplemented, an edge case set aside):
   have `task-planner` file it as new tasks. Never widen the current task to absorb it.
+  Give it file-level `touches` in the Engine and Libcurl projects when this run showed
+  where the change lands (step 2a).
 
 ## 5. Repeat or report
 With `all`, go back to step 1 until nothing is ready or a task ends `Blocked`. Stop at

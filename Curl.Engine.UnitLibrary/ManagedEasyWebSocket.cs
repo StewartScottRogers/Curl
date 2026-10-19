@@ -13,7 +13,7 @@ namespace Curl.Engine;
 /// with the frame's <c>CURLWS_*</c> bits, offset and bytes left; it never waits: it starts one read and answers
 /// <see cref="CurlCode.Again" /> while that read runs or while only part of a frame has come. Unless
 /// <paramref name="options" /> holds <c>CURLWS_NOAUTOPONG</c> or <c>CURLWS_RAW_MODE</c>, each ping received is answered
-/// with a pong carrying its payload; the ping is still handed over. A send writes one masked frame from the bits given
+/// with a pong carrying its payload and is not handed over. A send writes one masked frame from the bits given
 /// (<see cref="WebSocketFrameFlags.TryFrameOf" />), or under <c>CURLWS_RAW_MODE</c> the bytes as they are, which
 /// <c>lib/ws.c</c> allows only with no bits and no fragment size (BL-2444). A frame may also be sent in parts, its head
 /// announcing the whole payload, under <c>CURLWS_OFFSET</c> or after <see cref="StartFrameAsync" /> (BL-2481); a receive decodes frames either way, as
@@ -57,17 +57,28 @@ internal sealed class ManagedEasyWebSocket(Func<bool> isConnectOnly, Func<WebSoc
 
     private byte[] readBuffer = [];
 
+    private CurlWebSocketFrame? receivedFrame;
+
     /// <summary>
-    /// <c>curl_ws_meta</c>: the frame of the data the last receive handed over, as libcurl's <c>ws->recvframe</c>, or
-    /// <see langword="null" /> before any since the connection was upgraded.
+    /// <c>curl_ws_meta</c>, as libcurl's <c>ws->recvframe</c>: with options not connect-only, the frame of the payload
+    /// a perform last handed to the write callback (<see cref="PerformConnection" />'s <c>Frame</c>, upstream test2302,
+    /// BL-2711); otherwise the frame of the data the last receive handed over, or <see langword="null" /> before any
+    /// since the connection was upgraded.
     /// </summary>
-    public CurlWebSocketFrame? CurrentFrame { get; private set; }
+    public CurlWebSocketFrame? CurrentFrame =>
+        !isConnectOnly() && PerformConnection.Frame is { } written ? PerformFrameOf(written, PerformConnection.MessageOpcode) : receivedFrame;
 
     /// <summary>
     /// Gets the frames a read-callback upload of a perform that is not connect-only goes out in, which
     /// <see cref="StartFrameAsync" /> starts frames in while the upload is sent (BL-2611, ADR-0669).
     /// </summary>
     internal WsUploadFrames UploadFrames { get; } = new();
+
+    /// <summary>
+    /// Gets the connection a perform that is not connect-only exchanges frames on while it does, which a send from
+    /// the write callback writes to (BL-2710).
+    /// </summary>
+    internal WsPerformConnection PerformConnection { get; } = new();
 
     /// <summary>
     /// Closes the connection open now, if any, keeps <paramref name="upgraded" /> in its place and decodes
@@ -98,7 +109,7 @@ internal sealed class ManagedEasyWebSocket(Func<bool> isConnectOnly, Func<WebSoc
         sendFrameOffset = 0;
         streamFailure = null;
         pendingRead = null;
-        CurrentFrame = null;
+        receivedFrame = null;
         if (open is not null)
         {
             await open.DisposeAsync().ConfigureAwait(false);
@@ -127,7 +138,7 @@ internal sealed class ManagedEasyWebSocket(Func<bool> isConnectOnly, Func<WebSoc
     public async ValueTask<CurlWebSocketSendResult> SendAsync(ReadOnlyMemory<byte> buffer, long fragmentSize, CurlWebSocketFlags flags, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        CurlCode usable = UsableConnection(out IConnection? live);
+        CurlCode usable = SendableConnection(out IConnection? live);
         if (usable != CurlCode.Ok)
         {
             return new CurlWebSocketSendResult(usable, 0);
@@ -306,6 +317,24 @@ internal sealed class ManagedEasyWebSocket(Func<bool> isConnectOnly, Func<WebSoc
             : new CurlWebSocketSendResult(CurlCode.SendError, 0);
     }
 
+    /// <summary>
+    /// The connection a send may use: during a perform that is not connect-only, the one its frames flow on
+    /// (<see cref="PerformConnection" />), as curl 8.22.0's <c>curl_ws_send</c> writes to <c>data-&gt;conn</c> from the
+    /// write callback (upstream test2301, BL-2710); otherwise as <see cref="UsableConnection" /> answers.
+    /// </summary>
+    /// <param name="live">The connection when the answer is <see cref="CurlCode.Ok" />.</param>
+    /// <returns><see cref="CurlCode.Ok" />, <see cref="CurlCode.UnsupportedProtocol" /> or <see cref="CurlCode.BadFunctionArgument" />.</returns>
+    private CurlCode SendableConnection(out IConnection? live)
+    {
+        if (!isConnectOnly() && PerformConnection.Connection is { } performing)
+        {
+            live = performing;
+            return CurlCode.Ok;
+        }
+
+        return UsableConnection(out live);
+    }
+
     /// <summary>The connection a receive or send may use, or why there is none.</summary>
     /// <param name="live">The upgraded connection when the answer is <see cref="CurlCode.Ok" />.</param>
     /// <returns><see cref="CurlCode.Ok" />, <see cref="CurlCode.UnsupportedProtocol" /> or <see cref="CurlCode.BadFunctionArgument" />.</returns>
@@ -381,7 +410,8 @@ internal sealed class ManagedEasyWebSocket(Func<bool> isConnectOnly, Func<WebSoc
     /// Decodes <paramref name="received" />, queueing its runs of payload, keeping a protocol violation as the stream's
     /// failure and answering the last ping completed in it with a pong unless pings go unanswered; a pong that cannot
     /// be written fails the stream with <see cref="CurlCode.SendError" />. Pings go unanswered under
-    /// <c>CURLWS_NOAUTOPONG</c> or <c>CURLWS_RAW_MODE</c>.
+    /// <c>CURLWS_NOAUTOPONG</c> or <c>CURLWS_RAW_MODE</c>, and only then are their runs queued: an answered ping is
+    /// never handed over, as <c>lib/ws.c</c>'s <c>ws_client_collect</c> keeps it from the application (upstream test2708).
     /// </summary>
     /// <param name="live">The upgraded connection.</param>
     /// <param name="received">The bytes received.</param>
@@ -389,7 +419,23 @@ internal sealed class ManagedEasyWebSocket(Func<bool> isConnectOnly, Func<WebSoc
     private async ValueTask DecodeAsync(IConnection live, ReadOnlyMemory<byte> received)
     {
         WsDecodedFrames decoded = decoder.Decode(received.Span);
-        foreach (WsFrameRun run in decoded.Runs)
+        bool answersPings = (options() & SilencesPongs) == 0;
+        QueueRuns(decoded, answersPings);
+        if (decoded.CompletedPing is { } ping && answersPings && !await TrySendFrameAsync(live, WsOpcode.Pong, true, ping).ConfigureAwait(false))
+        {
+            streamFailure ??= CurlCode.SendError;
+        }
+    }
+
+    /// <summary>
+    /// Queues the runs of <paramref name="decoded" /> to be handed over, leaving out a ping's when
+    /// <paramref name="answersPings" />, and keeps a protocol violation as the stream's failure.
+    /// </summary>
+    /// <param name="decoded">What one decode gave.</param>
+    /// <param name="answersPings">Whether received pings are answered with a pong.</param>
+    private void QueueRuns(WsDecodedFrames decoded, bool answersPings)
+    {
+        foreach (WsFrameRun run in decoded.Runs.Where(run => !answersPings || run.Opcode != WsOpcode.Ping))
         {
             runs.Enqueue(run);
         }
@@ -397,11 +443,6 @@ internal sealed class ManagedEasyWebSocket(Func<bool> isConnectOnly, Func<WebSoc
         if (decoded.ViolationMessage is not null)
         {
             streamFailure = CurlCode.RecvError;
-        }
-
-        if (decoded.CompletedPing is { } ping && (options() & SilencesPongs) == 0 && !await TrySendFrameAsync(live, WsOpcode.Pong, true, ping).ConfigureAwait(false))
-        {
-            streamFailure ??= CurlCode.SendError;
         }
     }
 
@@ -461,7 +502,17 @@ internal sealed class ManagedEasyWebSocket(Func<bool> isConnectOnly, Func<WebSoc
         }
 
         CurlWebSocketFrame frame = new(0, flags, offset, run.BytesLeft + remaining, count);
-        CurrentFrame = frame;
+        receivedFrame = frame;
         return new CurlWebSocketReceiveResult(CurlCode.Ok, count, frame);
+    }
+
+    /// <summary>The frame of a run a perform wrote whole: its bits, its offset, the frame's bytes after it and its length.</summary>
+    /// <param name="written">The run written.</param>
+    /// <param name="messageOpcode">The opcode of the data message the run is part of.</param>
+    /// <returns>The frame <c>curl_ws_meta</c> answers.</returns>
+    private static CurlWebSocketFrame PerformFrameOf(WsFrameRun written, WsOpcode messageOpcode)
+    {
+        CurlWebSocketFlags messageType = messageOpcode == WsOpcode.Binary ? CurlWebSocketFlags.Binary : CurlWebSocketFlags.Text;
+        return new CurlWebSocketFrame(0, WebSocketFrameFlags.Of(written, messageType), written.Offset, written.BytesLeft, written.Payload.Length);
     }
 }

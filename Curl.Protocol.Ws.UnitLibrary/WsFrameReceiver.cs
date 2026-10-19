@@ -34,6 +34,12 @@ namespace Curl.Protocol.Ws;
 /// nothing decoded and no pong sent, as curl 8.22.0's <c>ws_cw_write</c> passes the stream to the
 /// next writer under <c>ws_raw_mode</c> (BL-2494).
 /// </param>
+/// <param name="performConnection">
+/// Outside <c>rawMode</c>, receives the frame of each write: the payload is then written one frame's run at a time,
+/// each run kept on it first (<see cref="WsPerformConnection.Writing" />), so <c>curl_ws_meta</c> from the write
+/// callback answers that write's frame as libcurl's <c>ws->recvframe</c> (upstream test2302, BL-2711);
+/// <see langword="null" /> writes each read's payload in one write.
+/// </param>
 /// <remarks>
 /// Measured against curl 8.21.0 (BL-581): a close frame is neither answered nor the end, so
 /// reading goes on until the connection closes; every ping answered is echoed in one pong,
@@ -45,13 +51,16 @@ namespace Curl.Protocol.Ws;
 /// those are decoded and their payload handed on, and the transfer fails with exit 63 and no
 /// pong; a read that reaches the limit exactly does not fail (BL-1294).
 /// </remarks>
-internal sealed class WsFrameReceiver(IConnection connection, IWebSocketRandomSource randomSource, ITransferProgress progress, ITransferEvents events, IDiagnosticLog? diagnosticLog = null, WsFrameTrace? trace = null, long? maxFileSize = null, bool rawMode = false)
+internal sealed class WsFrameReceiver(IConnection connection, IWebSocketRandomSource randomSource, ITransferProgress progress, ITransferEvents events, IDiagnosticLog? diagnosticLog = null, WsFrameTrace? trace = null, long? maxFileSize = null, bool rawMode = false, WsPerformConnection? performConnection = null)
 {
     private const int ReadBufferSize = 16384;
 
     private readonly WsFrameTrace trace = trace ?? WsFrameTrace.Off;
 
     private readonly WsFrameDecoder decoder = new(diagnosticLog, trace);
+
+    /// <summary>Decodes the same bytes into frame runs when each write's frame is shown, else <see langword="null" />.</summary>
+    private readonly WsFrameMetadataDecoder? frames = performConnection is not null && !rawMode ? new WsFrameMetadataDecoder() : null;
 
     /// <summary>
     /// Gets how many frame bytes have been received so far, frame heads included: curl's
@@ -125,7 +134,32 @@ internal sealed class WsFrameReceiver(IConnection connection, IWebSocketRandomSo
         int allowed = LengthUnderMaxFileSize(received.Length);
         BytesReceived += allowed;
         progress.ReportDownloaded(BytesReceived, null);
-        await DeliverAsync(Decode(received.Span[..allowed]), writePayload, isCut: allowed < received.Length, cancellationToken).ConfigureAwait(false);
+        ReadOnlySpan<byte> kept = received.Span[..allowed];
+        IReadOnlyList<WsFrameRun>? runs = frames?.Decode(kept).Runs;
+        await DeliverAsync(Decode(kept), runs, writePayload, isCut: allowed < received.Length, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Writes <paramref name="payload" /> in one write, or, with <paramref name="runs" />, each run of it that is not a
+    /// ping's and holds bytes in its own write, showing the run on <c>performConnection</c> first.
+    /// </summary>
+    private async ValueTask WritePayloadAsync(
+        ReadOnlyMemory<byte> payload,
+        IReadOnlyList<WsFrameRun>? runs,
+        Func<ReadOnlyMemory<byte>, CancellationToken, ValueTask> writePayload,
+        CancellationToken cancellationToken)
+    {
+        if (runs is null)
+        {
+            await writePayload(payload, cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        foreach (WsFrameRun run in runs.Where(run => run.Opcode != WsOpcode.Ping && !run.Payload.IsEmpty))
+        {
+            performConnection!.Writing(run);
+            await writePayload(run.Payload, cancellationToken).ConfigureAwait(false);
+        }
     }
 
     /// <summary>
@@ -146,13 +180,14 @@ internal sealed class WsFrameReceiver(IConnection connection, IWebSocketRandomSo
 
     private async ValueTask DeliverAsync(
         WsDecodedBytes decoded,
+        IReadOnlyList<WsFrameRun>? runs,
         Func<ReadOnlyMemory<byte>, CancellationToken, ValueTask> writePayload,
         bool isCut,
         CancellationToken cancellationToken)
     {
         if (decoded.Payload.Length > 0)
         {
-            await writePayload(decoded.Payload, cancellationToken).ConfigureAwait(false);
+            await WritePayloadAsync(decoded.Payload, runs, writePayload, cancellationToken).ConfigureAwait(false);
             BytesDelivered += decoded.Payload.Length;
         }
 

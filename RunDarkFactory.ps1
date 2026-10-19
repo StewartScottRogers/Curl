@@ -2606,6 +2606,10 @@ if ($TestAudioOff) {
 # commit says this, so board pushes no longer cancel the run that tests the code.
 $SkipCiNote = '[skip ci] Board change only; the run on the code before it stands.'
 
+# How long the shift-end merge waits for CI on the commit it merges. 30 minutes left shift
+# 20261018-103803 unmerged once a run in progress was no longer cancelled (ADR-0693).
+$MergeCiWaitMinutes = 60
+
 function Invoke-MergeToMaster {
     # Stewart's standing permission (2026-09-27): at the end of a shift, merge the branch
     # into master through a pull request - only when the CI workflow passed, on every
@@ -2616,31 +2620,40 @@ function Invoke-MergeToMaster {
     if ([int](git -C $Root rev-list --count "origin/master..origin/$Branch") -eq 0) { return "nothing on $Branch to merge" }
     $head = (git -C $Root rev-parse "origin/$Branch").Trim()
     $short = $head.Substring(0, 7)
-    # CI on the last push takes a few minutes; wait for the run on this exact commit.
-    $deadline = (Get-Date).AddMinutes(30)
+    # Wait for the run on this exact commit. A run on the branch in progress always finishes
+    # first (ADR-0693), and each takes 15 to 25 minutes, so allow two runs and some slack.
+    $deadline = (Get-Date).AddMinutes($MergeCiWaitMinutes)
     $run = $null
     # A board-only head commit started no run (AF-0089), so start one on it by hand.
     if ("$(git -C $Root log -1 --format=%B $head)" -match '\[skip ci\]') { gh workflow run CI --ref $Branch 2>&1 | Out-Null }
     while ($true) {
         $run = @(gh run list --workflow CI --branch $Branch --commit $head --limit 1 --json status,conclusion 2>$null | ConvertFrom-Json)
         if ($run.Count -and $run[0].status -eq 'completed') { break }
-        if ((Get-Date) -ge $deadline) { return "not merged: CI did not finish on $short within 30 min" }
+        if ((Get-Date) -ge $deadline) { return "not merged: CI did not finish on $short within $MergeCiWaitMinutes min" }
         Start-Sleep -Seconds 30
     }
     if ($run[0].conclusion -ne 'success') { return "not merged: CI $($run[0].conclusion) on $short" }
+    # The pull request comes from a branch pinned at the commit CI passed, not from $Branch:
+    # a board push to $Branch while CI ran ([skip ci], so no checks) became the request's head,
+    # master's required check had never run on it, and gh pr merge was refused (shift
+    # 20261019-061607, pull request #174). factory/** starts no CI run of its own.
+    $pin = "factory/merge-$Stamp"
+    if (-not (Invoke-Git @('push', '-q', '-f', 'origin', "${head}:refs/heads/$pin"))) { return "not merged: could not push $pin" }
     # --jq, not ConvertFrom-Json: Windows PowerShell turns "[]" into one empty element, so
     # a missing pull request looked like one with no number and the merge was a silent no-op.
-    $number = "$(gh pr list --head $Branch --base master --state open --json number --limit 1 --jq '.[0].number // empty' 2>$null)".Trim()
+    $number = "$(gh pr list --head $pin --base master --state open --json number --limit 1 --jq '.[0].number // empty' 2>$null)".Trim()
     if (-not $number) {
         $bodyFile = Join-Path $LogDir "pr-body-$Stamp.md"
         $robot = [char]::ConvertFromUtf32(0x1F916)
-        [IO.File]::WriteAllText($bodyFile, "Dark factory shift $Stamp. CI passed on Windows, Linux and macOS for $short.`n`n$robot Generated with [Claude Code](https://claude.com/claude-code)`n", (New-Object Text.UTF8Encoding($false)))
-        $url = gh pr create --base master --head $Branch --title "Dark factory shift $Stamp" --body-file $bodyFile 2>$null
+        [IO.File]::WriteAllText($bodyFile, "Dark factory shift ${Stamp}: $Branch at $short, where CI passed on Windows, Linux and macOS.`n`n$robot Generated with [Claude Code](https://claude.com/claude-code)`n", (New-Object Text.UTF8Encoding($false)))
+        $url = gh pr create --base master --head $pin --title "Dark factory shift $Stamp" --body-file $bodyFile 2>$null
         if ("$url" -notmatch '/pull/(\d+)') { return 'not merged: could not open the pull request' }
         $number = $Matches[1]
     }
-    gh pr merge $number --merge 2>&1 | Out-Null
+    gh pr merge $number --merge --match-head-commit $head 2>&1 | Out-Null
     if ($LASTEXITCODE -ne 0) { return "not merged: gh pr merge refused pull request #$number" }
+    # The pin has done its job once master holds the commit; it is the factory's own branch.
+    Invoke-Git @('push', '-q', 'origin', '--delete', $pin) | Out-Null
     return "merged $short into master (pull request #$number)"
 }
 
@@ -3451,6 +3464,16 @@ Rules for this unattended run, in addition to CLAUDE.md:
    a task for each that does not, with the sizing split, so one requeue names them all
    (AF-0242: BL-2394 was requeued for size, then again at 23 turns for a missing engine
    hook, $3.38 for two runs that produced only a requeue, before a third claim finished it).
+   A task that ports or registers upstream cases also needs the case runner to run them:
+   in that pass, run the runner on one of the cases and confirm it is not skipped as "not
+   ported", and file the runner work with the split (AF-0263: BL-2529 was requeued for size
+   and then for BL-2601, the runner skipping cases 520 to 537, $3.24 for two runs that
+   produced only a requeue).
+   A split for size is itself a requeue, so it gets the same pass: before filing the
+   subtasks, run each of them through the checks above (files still using X, hooks, the
+   case runner) and file every missing prerequisite beside them, so the claim after the
+   split finds nothing new to wait on (AF-0242 re-audit: BL-2394 was again requeued
+   twice, for the split and then for BL-2601, the runner skipping cases 520 to 537).
    The board let this run claim the task only because every ID already in its
    `depends-on` is Done, so those never send it back. Before naming any other task as the
    blocker, check its folder (`ls Tasks/*/<ID>-* Tasks/Done/*/<ID>-*`): a task in Done does
@@ -3483,7 +3506,7 @@ Rules for this unattended run, in addition to CLAUDE.md:
    parallel all spend inside one turn and carry the run past the cap (AF-0052, AF-0100, AF-0102, AF-0104).
    Run a test project once per change, not in a loop of reruns to hunt a flaky test: when
    one passes alone and fails in the run, file a task for it with the board script and
-   carry on (AF-0105: about 15 test runs, three of them reruns in a loop, took BL-1499 to $3.86; AF-0106: 66 turns on a flaky cookie test cost BL-1619 $3.32 before it was parked, and a fresh lane finished it in 2.4 minutes for $0.46; AF-0107: BL-1682 cost $3.76 over three runs, 48 turns in one of them spent measuring without fixing, so park what is left as a task rather than measure again; AF-0108: 41 test runs in 45 Bash calls took BL-1645 to $3.75 in one 28-minute run, so run the fast tests once when the change is done, not after every edit; AF-0109: 38 mentions of dotnet test in one 76-turn run took BL-1556 to $3.68, 3.1 times the median; AF-0110: three Opus sub-agents in one 15-turn run took BL-1587 to $3.68, 3.1 times the median, so do the work yourself and start a sub-agent only when it saves more than it costs; AF-0111: 117 tool calls and no Read in one 118-turn run took BL-1557 to $3.63, 3.05 times the median, so read a file once with Read and batch independent calls into one turn; AF-0172: 14 edits to one file and a failed test pass sent back for 4 more took BL-2043 to $3.66, 5.2 times the median, so when a test pass fails twice on the same file, stop editing it, file what is left as a task and move this one to Backlog, rather than a third round of edit and test; AF-0190: 56 Bash calls, most of them sed -n or grep slices of the same few files, took BL-2131 to $3.11, 6.1 times the median, each one a turn re-reading a 100k+ context, so Read a file once, whole or with a wide offset and limit, rather than slicing it call by call, and decide a task's touches once rather than rewriting them mid-run; AF-0204: 37 of 49 Bash calls in one 68-turn run were sed -n, head or tail slices, which took BL-2142 to $3.11, 4.25 times the median, so Read the whole file once and do not slice it with sed -n, head or tail; AF-0205: 8 Reads with an offset and 12 sed -n slices of one large file in a 62-turn run took BL-2152 to $2.46, 3.4 times the median, so Read a large file once with a wide limit and never page it in offset slices; AF-0206: 19 of 25 Bash calls were slice reads and a repair run took test1462 off the ratchet although BL-2136 already owned that test, which took BL-2134 to $2.34, 3.2 times the median, so when a failing test is named by another live task, leave it to that task and do not repair it here).
+   carry on (AF-0105: about 15 test runs, three of them reruns in a loop, took BL-1499 to $3.86; AF-0106: 66 turns on a flaky cookie test cost BL-1619 $3.32 before it was parked, and a fresh lane finished it in 2.4 minutes for $0.46; AF-0107: BL-1682 cost $3.76 over three runs, 48 turns in one of them spent measuring without fixing, so park what is left as a task rather than measure again; AF-0108: 41 test runs in 45 Bash calls took BL-1645 to $3.75 in one 28-minute run, so run the fast tests once when the change is done, not after every edit; AF-0109: 38 mentions of dotnet test in one 76-turn run took BL-1556 to $3.68, 3.1 times the median; AF-0110: three Opus sub-agents in one 15-turn run took BL-1587 to $3.68, 3.1 times the median, so do the work yourself and start a sub-agent only when it saves more than it costs; AF-0111: 117 tool calls and no Read in one 118-turn run took BL-1557 to $3.63, 3.05 times the median, so read a file once with Read and batch independent calls into one turn; AF-0172: 14 edits to one file and a failed test pass sent back for 4 more took BL-2043 to $3.66, 5.2 times the median, so when a test pass fails twice on the same file, stop editing it, file what is left as a task and move this one to Backlog, rather than a third round of edit and test; AF-0190: 56 Bash calls, most of them sed -n or grep slices of the same few files, took BL-2131 to $3.11, 6.1 times the median, each one a turn re-reading a 100k+ context, so Read a file once, whole or with a wide offset and limit, rather than slicing it call by call, and decide a task's touches once rather than rewriting them mid-run; AF-0204: 37 of 49 Bash calls in one 68-turn run were sed -n, head or tail slices, which took BL-2142 to $3.11, 4.25 times the median, so Read the whole file once and do not slice it with sed -n, head or tail; AF-0205: 8 Reads with an offset and 12 sed -n slices of one large file in a 62-turn run took BL-2152 to $2.46, 3.4 times the median, so Read a large file once with a wide limit and never page it in offset slices; AF-0206: 19 of 25 Bash calls were slice reads and a repair run took test1462 off the ratchet although BL-2136 already owned that test, which took BL-2134 to $2.34, 3.2 times the median, so when a failing test is named by another live task, leave it to that task and do not repair it here; AF-0268: two shell loops over 2,077 upstream test files, one grep/tr/awk per file, held BL-2550 for 24 of its 51.6 minutes and cost $7.39, 3.04 times the median, so search a folder with one Select-String or grep -l over the whole folder, never a loop that starts a process per file).
 8. The shift kills this run at {DEADLINE}, {MINUTES} minutes after it started, and a
    killed run ends Blocked. While other lanes build, one Measure-CodeQuality.ps1 run can
    take 30 to 45 minutes: run it once per library you changed, with -ReportPath, and
@@ -3508,6 +3531,11 @@ Rules for this unattended run, in addition to CLAUDE.md:
    not go red (AF-0226: BL-2219 held 108 cases on the ratchet after a Windows-only run and
    test203 failed on Linux and macOS, leaving CI red for 31 minutes; its re-audit: BL-2328's
    1c068661 broke OpenForWriteAsync_ParentIsAFileOnPosix_IsNotADirectory, red for 36 minutes).
+   Scheduling differs by platform too: a test that starts concurrent work (threads, tasks,
+   connections, servers) must wait for the event it needs (a connection opened, a thread
+   stopped) before it reads the result, never rely on Windows happening to run one side
+   first (AF-0226 re-audit: BL-2546's 35c73029 left a multiplexing test taking a connection
+   before the transfer had opened it, and Lib1565 racing its thread, red for 44 minutes).
 
 End your reply with exactly one line, either
 FACTORY: DONE {ID} <what now works>
@@ -3597,6 +3625,16 @@ Rules for this unattended run, in addition to CLAUDE.md:
    a task for each that does not, with the sizing split, so one requeue names them all
    (AF-0242: BL-2394 was requeued for size, then again at 23 turns for a missing engine
    hook, $3.38 for two runs that produced only a requeue, before a third claim finished it).
+   A task that ports or registers upstream cases also needs the case runner to run them:
+   in that pass, run the runner on one of the cases and confirm it is not skipped as "not
+   ported", and file the runner work with the split (AF-0263: BL-2529 was requeued for size
+   and then for BL-2601, the runner skipping cases 520 to 537, $3.24 for two runs that
+   produced only a requeue).
+   A split for size is itself a requeue, so it gets the same pass: before filing the
+   subtasks, run each of them through the checks above (files still using X, hooks, the
+   case runner) and file every missing prerequisite beside them, so the claim after the
+   split finds nothing new to wait on (AF-0241 re-audit: BL-2529 was again requeued twice,
+   for the split and then for BL-2601, $4.20 over three claims).
    The shift claimed the task only because every ID already in its `depends-on` is Done,
    so those never send it back. Before naming any other task as the blocker, check its
    folder (`ls Tasks/*/<ID>-* Tasks/Done/*/<ID>-*`): a task in Done does not block. And
@@ -3628,7 +3666,7 @@ Rules for this unattended run, in addition to CLAUDE.md:
    parallel all spend inside one turn and carry the run past the cap (AF-0052, AF-0100, AF-0102, AF-0104).
    Run a test project once per change, not in a loop of reruns to hunt a flaky test: when
    one passes alone and fails in the run, file a task for it with the board script and
-   carry on (AF-0105: about 15 test runs, three of them reruns in a loop, took BL-1499 to $3.86; AF-0106: 66 turns on a flaky cookie test cost BL-1619 $3.32 before it was parked, and a fresh lane finished it in 2.4 minutes for $0.46; AF-0107: BL-1682 cost $3.76 over three runs, 48 turns in one of them spent measuring without fixing, so park what is left as a task rather than measure again; AF-0108: 41 test runs in 45 Bash calls took BL-1645 to $3.75 in one 28-minute run, so run the fast tests once when the change is done, not after every edit; AF-0109: 38 mentions of dotnet test in one 76-turn run took BL-1556 to $3.68, 3.1 times the median; AF-0110: three Opus sub-agents in one 15-turn run took BL-1587 to $3.68, 3.1 times the median, so do the work yourself and start a sub-agent only when it saves more than it costs; AF-0111: 117 tool calls and no Read in one 118-turn run took BL-1557 to $3.63, 3.05 times the median, so read a file once with Read and batch independent calls into one turn; AF-0172: 14 edits to one file and a failed test pass sent back for 4 more took BL-2043 to $3.66, 5.2 times the median, so when a test pass fails twice on the same file, stop editing it, file what is left as a task and move this one to Backlog, rather than a third round of edit and test; AF-0190: 56 Bash calls, most of them sed -n or grep slices of the same few files, took BL-2131 to $3.11, 6.1 times the median, each one a turn re-reading a 100k+ context, so Read a file once, whole or with a wide offset and limit, rather than slicing it call by call, and decide a task's touches once rather than rewriting them mid-run; AF-0204: 37 of 49 Bash calls in one 68-turn run were sed -n, head or tail slices, which took BL-2142 to $3.11, 4.25 times the median, so Read the whole file once and do not slice it with sed -n, head or tail; AF-0205: 8 Reads with an offset and 12 sed -n slices of one large file in a 62-turn run took BL-2152 to $2.46, 3.4 times the median, so Read a large file once with a wide limit and never page it in offset slices; AF-0206: 19 of 25 Bash calls were slice reads and a repair run took test1462 off the ratchet although BL-2136 already owned that test, which took BL-2134 to $2.34, 3.2 times the median, so when a failing test is named by another live task, leave it to that task and do not repair it here).
+   carry on (AF-0105: about 15 test runs, three of them reruns in a loop, took BL-1499 to $3.86; AF-0106: 66 turns on a flaky cookie test cost BL-1619 $3.32 before it was parked, and a fresh lane finished it in 2.4 minutes for $0.46; AF-0107: BL-1682 cost $3.76 over three runs, 48 turns in one of them spent measuring without fixing, so park what is left as a task rather than measure again; AF-0108: 41 test runs in 45 Bash calls took BL-1645 to $3.75 in one 28-minute run, so run the fast tests once when the change is done, not after every edit; AF-0109: 38 mentions of dotnet test in one 76-turn run took BL-1556 to $3.68, 3.1 times the median; AF-0110: three Opus sub-agents in one 15-turn run took BL-1587 to $3.68, 3.1 times the median, so do the work yourself and start a sub-agent only when it saves more than it costs; AF-0111: 117 tool calls and no Read in one 118-turn run took BL-1557 to $3.63, 3.05 times the median, so read a file once with Read and batch independent calls into one turn; AF-0172: 14 edits to one file and a failed test pass sent back for 4 more took BL-2043 to $3.66, 5.2 times the median, so when a test pass fails twice on the same file, stop editing it, file what is left as a task and move this one to Backlog, rather than a third round of edit and test; AF-0190: 56 Bash calls, most of them sed -n or grep slices of the same few files, took BL-2131 to $3.11, 6.1 times the median, each one a turn re-reading a 100k+ context, so Read a file once, whole or with a wide offset and limit, rather than slicing it call by call, and decide a task's touches once rather than rewriting them mid-run; AF-0204: 37 of 49 Bash calls in one 68-turn run were sed -n, head or tail slices, which took BL-2142 to $3.11, 4.25 times the median, so Read the whole file once and do not slice it with sed -n, head or tail; AF-0205: 8 Reads with an offset and 12 sed -n slices of one large file in a 62-turn run took BL-2152 to $2.46, 3.4 times the median, so Read a large file once with a wide limit and never page it in offset slices; AF-0206: 19 of 25 Bash calls were slice reads and a repair run took test1462 off the ratchet although BL-2136 already owned that test, which took BL-2134 to $2.34, 3.2 times the median, so when a failing test is named by another live task, leave it to that task and do not repair it here; AF-0268: two shell loops over 2,077 upstream test files, one grep/tr/awk per file, held BL-2550 for 24 of its 51.6 minutes and cost $7.39, 3.04 times the median, so search a folder with one Select-String or grep -l over the whole folder, never a loop that starts a process per file).
 9. The shift kills this run at {DEADLINE}, {MINUTES} minutes after it started, and a
    killed run ends Blocked. While other lanes build, one Measure-CodeQuality.ps1 run can
    take 30 to 45 minutes: run it once per library you changed, with -ReportPath, and
@@ -3653,6 +3691,11 @@ Rules for this unattended run, in addition to CLAUDE.md:
    not go red (AF-0226: BL-2219 held 108 cases on the ratchet after a Windows-only run and
    test203 failed on Linux and macOS, leaving CI red for 31 minutes; its re-audit: BL-2328's
    1c068661 broke OpenForWriteAsync_ParentIsAFileOnPosix_IsNotADirectory, red for 36 minutes).
+   Scheduling differs by platform too: a test that starts concurrent work (threads, tasks,
+   connections, servers) must wait for the event it needs (a connection opened, a thread
+   stopped) before it reads the result, never rely on Windows happening to run one side
+   first (AF-0226 re-audit: BL-2546's 35c73029 left a multiplexing test taking a connection
+   before the transfer had opened it, and Lib1565 racing its thread, red for 44 minutes).
 
 End your reply with exactly one line, either
 FACTORY: DONE {ID} <what now works>

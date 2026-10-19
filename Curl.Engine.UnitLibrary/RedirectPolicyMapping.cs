@@ -26,7 +26,8 @@ internal static class RedirectPolicyMapping
     /// The policy: <see cref="EasyHttpOptions.MaxRedirects" /> verbatim, the three
     /// <see cref="EasyHttpOptions.PostRedirect" /> bits as the <c>KeepPostOn</c> flags,
     /// <see cref="EasyHttpOptions.FollowLocation" /> <see cref="FollowLocation.ObeyCode" /> (<c>--follow</c>) as
-    /// <see cref="RedirectPolicy.DropsCustomMethodOnSwitchToGet" />,
+    /// <see cref="RedirectPolicy.DropsCustomMethodOnSwitchToGet" />, <see cref="FollowLocation.FirstOnly" /> as
+    /// <see cref="RedirectPolicy.SendsCustomMethodFirstOnly" />,
     /// <see cref="EasyAuthenticationOptions.UnrestrictedAuthentication" /> as <see cref="RedirectPolicy.LocationTrusted" />,
     /// <see cref="EngineTransferSettings.AllowedRedirectProtocols" /> as
     /// <see cref="RedirectPolicy.AllowedSchemes" /> (curl's default when not given),
@@ -43,6 +44,7 @@ internal static class RedirectPolicyMapping
             KeepPostOn303 = http.PostRedirect.HasFlag(PostRedirect.Post303),
             LocationTrusted = authentication.UnrestrictedAuthentication,
             DropsCustomMethodOnSwitchToGet = http.FollowLocation == FollowLocation.ObeyCode,
+            SendsCustomMethodFirstOnly = http.FollowLocation == FollowLocation.FirstOnly,
             AllowedTransferSchemes = settings.AllowedProtocols,
             DisallowsUserInUrl = authentication.DisallowUserNameInUrl,
         };
