@@ -8,7 +8,7 @@ depends-on: [BL-2789]
 touches: [Curl.Protocol.Rtsp.UnitLibrary, Curl.Protocol.Rtsp.UnitTests]
 requirement: none
 created: 2026-10-19
-completed:
+completed: 2026-10-19
 ---
 # BL-2818 — Resend an RTSP request with Authorization after a 401 challenge under any-auth (from BL-2788's stash c61946edb9a51c86eef042dca7d5ca72bfc7d3ac)
 
@@ -22,13 +22,16 @@ Split from BL-2788 (cost cap). The work is done in stash c61946edb9a51c86eef042d
 
 ## Acceptance criteria
 
-- [ ] RtspProtocolHandlerAuthenticationRetryTests in Curl.Protocol.Rtsp.UnitTests pass, showing a DESCRIBE sent without Authorization, then after a 401 Basic challenge resent with CSeq 2 and Authorization: Basic dXNlcjpwYXNzd29yZA==.
-- [ ] Curl.Protocol.Rtsp.UnitLibrary stays at 100% line and branch coverage with no method past the complexity gate (Measure-CodeQuality.ps1 -Library Curl.Protocol.Rtsp.UnitLibrary).
-- [ ] dotnet build is clean and the fast tests pass.
+- [x] RtspProtocolHandlerAuthenticationRetryTests in Curl.Protocol.Rtsp.UnitTests pass, showing a DESCRIBE sent without Authorization, then after a 401 Basic challenge resent with CSeq 2 and Authorization: Basic dXNlcjpwYXNzd29yZA==.
+- [x] Curl.Protocol.Rtsp.UnitLibrary stays at 100% line and branch coverage with no method past the complexity gate (Measure-CodeQuality.ps1 -Library Curl.Protocol.Rtsp.UnitLibrary).
+- [x] dotnet build is clean and the fast tests pass.
 
 ## Notes
+
+- 2026-10-19 (lane 4): Applied stash c61946ed by hand with the Edit tool (git apply was refused in this run; the handler had moved on since, with ReadBodyAsync and TakeBytesAfterReplyAsync). The first Measure-CodeQuality run put SendAndReadAsync at complexity 14 and RtspReplyHeadParser.AcceptHeader at 12, so the reply half became ReadReplyAsync and the Session, Transport and WWW-Authenticate headers moved to AcceptSessionOrAuthenticationHeader. The second run: 100% line, 100% branch, 0 failing members, worst CRAP 10. The feature pipeline was cut down to apply, test and measure: the stash already held the planned, tested work.
 
 ## Log
 
 - 2026-10-19: Created.
 - 2026-10-19: Backlog -> Doing. Criteria at claim: c39a9153 31329c52 5ea3895a.
+- 2026-10-19: Doing -> Done. An RTSP request under any-auth that gets a 401 Basic challenge is resent once with the next CSeq and Authorization: Basic (upstream case 3100)
