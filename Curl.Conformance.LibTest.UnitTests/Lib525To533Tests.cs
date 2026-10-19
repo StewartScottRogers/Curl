@@ -85,6 +85,23 @@ public sealed class Lib526Tests
     }
 
     [TestMethod]
+    [DataRow(526, Lib526.HandleCount)]
+    [DataRow(527, Lib526.HandleCount)]
+    [DataRow(528, Lib526.HandleCount)]
+    [DataRow(532, Lib526.HandleCount)]
+    [DataRow(999, 0)]
+    public async Task RunAsync_CleansUpTheEasyHandles_ForCases526_528And532AndEach527HandleAsItAdvances(int testNumber, int disposedHandles)
+    {
+        var engine = new FakeCurlEngine();
+        var run = new PortRun(engine, testNumber, "http://x/526");
+
+        LibTestResult result = await new Lib526(TimeProvider.System).RunAsync(run.Context, CancellationToken.None);
+
+        Assert.AreEqual(0, result.ExitCode);
+        Assert.AreEqual(disposedHandles, engine.DisposedEasyCount);
+    }
+
+    [TestMethod]
     [DataRow(527)]
     [DataRow(532)]
     public async Task RunAsync_ASecondAddThatFails_FailsWithTestErrMulti(int testNumber)

@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Conformance.LibTest.UnitLibrary]
+touches: [Curl.Conformance.LibTest.UnitLibrary, Curl.Conformance.LibTest.UnitTests]
 requirement: none
 created: 2026-10-19
-completed:
+completed: 2026-10-19
 ---
 # BL-2800 — Fix AF-0273: Lib526's CleansUpTheHandles || can become && with no test failing, so cases 526, 528 and 532 skip their clean-up
 
@@ -41,12 +41,17 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Added `Curl.Conformance.LibTest.UnitTests` to `touches`: the fix is a test that kills the mutant (no production change is needed), and no task in Doing on origin/work/dark-factory names that project.
+- Decision: the fake engine counts disposed easy transfers, and a test pins that 526, 528 and 532 clean up all four handles while 527 (success) cleans each up as it advances and 999 cleans up none, as upstream lib526.c does.
+- Verified by hand (a lane may not run `Audit/Tools`): with `||` changed to `&&` on Lib526.cs:147, the new test fails for 526, 528 and 532; restored, it passes.
 
 ## Log
 
 - 2026-10-19: Created.
 - 2026-10-19: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-19: Doing -> Done. Lib526's clean-up is pinned: a fake engine counts disposed easy handles and the mutant on line 147 now fails three cases

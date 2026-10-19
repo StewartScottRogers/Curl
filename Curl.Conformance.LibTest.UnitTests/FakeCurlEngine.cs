@@ -57,7 +57,7 @@ internal sealed class FakeCurlEngine : ICurlEngine
     public IEasyTransfer CreateEasy()
     {
         CreatingEasy?.Invoke();
-        return new FakeEasyTransfer(PerformResult, Info, Performing) { Importing = Importing, Informing = Informing, ConnectOnly = ConnectOnly, Pauses = Pauses, TransferHeaders = Headers, WebSocketConnection = WebSocket };
+        return new FakeEasyTransfer(PerformResult, Info, Performing) { Importing = Importing, Informing = Informing, ConnectOnly = ConnectOnly, Pauses = Pauses, TransferHeaders = Headers, WebSocketConnection = WebSocket, Disposing = () => DisposedEasyCount++ };
     }
 
     public FakeMultiTransfer Multi { get; } = new();
@@ -101,6 +101,9 @@ internal sealed class FakeCurlEngine : ICurlEngine
 
     /// <summary>Every <c>curl_easy_pause</c> any of its easy transfers was given.</summary>
     public List<CurlPause> Pauses { get; } = [];
+
+    /// <summary>How many of its easy transfers were disposed (<c>curl_easy_cleanup</c>).</summary>
+    public int DisposedEasyCount { get; private set; }
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
@@ -146,6 +149,12 @@ internal sealed class FakeCurlEngine : ICurlEngine
 
         public ValueTask<CurlCode> UpkeepAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
 
-        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+        public Action? Disposing { get; init; }
+
+        public ValueTask DisposeAsync()
+        {
+            Disposing?.Invoke();
+            return ValueTask.CompletedTask;
+        }
     }
 }
