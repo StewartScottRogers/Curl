@@ -49,3 +49,4 @@ ADR-0706 records why upstream case 594 is not listed.
 ## Log
 
 - 2026-10-19: Created.
+- 2026-10-19: Backlog -> Doing. Criteria at claim: 85e28569 388fbfb9 211b582c 4272a6b9.
