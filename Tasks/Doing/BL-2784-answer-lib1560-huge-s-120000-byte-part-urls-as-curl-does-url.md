@@ -31,3 +31,4 @@ Found by BL-2783 running upstream case 1560 with every group forced to run (pop3
 ## Log
 
 - 2026-10-18: Created.
+- 2026-10-19: Backlog -> Doing. Criteria at claim: 2493c688 37fccf5f 4887efa2.
