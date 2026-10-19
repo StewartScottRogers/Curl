@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: quality:Curl.Protocol.Ssh.UnitTests/Sftp/SftpSessionTests.cs:StartAsync_StatusAndShortPacketsBeforeTheVersion_SkipsThemAsMeasured:no-assertion
 reproduction: none
-task: none
-tasks:
+task: BL-2808
+tasks: BL-2808
 found: 2026-10-18
 found-at: e17dfce54cf6f2d08fc7c4abe0655128f237ff3b
 scorecard: 2026-10-18_1905.md

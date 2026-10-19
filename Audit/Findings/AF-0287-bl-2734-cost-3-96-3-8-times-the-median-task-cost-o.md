@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: process:logs:BL-2734:cost-outlier
 reproduction: none
-task: none
-tasks:
+task: BL-2814
+tasks: BL-2814
 found: 2026-10-18
 found-at: e17dfce54cf6f2d08fc7c4abe0655128f237ff3b
 scorecard: 2026-10-18_1905.md

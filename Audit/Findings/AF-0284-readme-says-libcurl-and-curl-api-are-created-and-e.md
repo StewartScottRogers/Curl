@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: truthfulness:README.md:Libcurl-and-Curl.Api-created-and-empty:false-statement
 reproduction: none
-task: none
-tasks:
+task: BL-2811
+tasks: BL-2811
 found: 2026-10-18
 found-at: e17dfce54cf6f2d08fc7c4abe0655128f237ff3b
 scorecard: 2026-10-18_1905.md

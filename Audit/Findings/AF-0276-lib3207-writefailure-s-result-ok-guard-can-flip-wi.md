@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: quality:Curl.Conformance.LibTest.UnitLibrary/Lib3207.cs:WriteFailure-eq:surviving-mutant
 reproduction: mutation Curl.Conformance.LibTest.UnitLibrary/Lib3207.cs:137:==
-task: none
-tasks:
+task: BL-2803
+tasks: BL-2803
 found: 2026-10-18
 found-at: e17dfce54cf6f2d08fc7c4abe0655128f237ff3b
 scorecard: 2026-10-18_1905.md

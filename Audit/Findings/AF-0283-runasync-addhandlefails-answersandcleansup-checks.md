@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: quality:Curl.Conformance.LibTest.UnitTests/Lib539To553Tests.cs:RunAsync_AddHandleFails_AnswersAndCleansUp:weak-assertion
 reproduction: none
-task: none
-tasks:
+task: BL-2810
+tasks: BL-2810
 found: 2026-10-18
 found-at: e17dfce54cf6f2d08fc7c4abe0655128f237ff3b
 scorecard: 2026-10-18_1905.md
