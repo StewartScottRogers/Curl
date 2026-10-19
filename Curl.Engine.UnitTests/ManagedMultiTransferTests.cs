@@ -77,6 +77,30 @@ public sealed partial class ManagedMultiTransferTests
     }
 
     [TestMethod]
+    public async Task PerformAsync_TransferFinishedAsItStarts_IsStillRunningAfterThatCallAndDoneAfterTheNext()
+    {
+        await using ManagedCurlEngine engine = new();
+        await using IMultiTransfer multi = engine.CreateMulti();
+        ControlledEasyTransfer transfer = new();
+        multi.Add(transfer);
+        transfer.Finish(CurlCode.Ok);
+        CurlWaitSocket[] sockets = new CurlWaitSocket[2];
+
+        (_, int runningAfterStart) = await multi.PerformAsync(CancellationToken.None);
+        bool messageAfterStart = multi.TryReadInfo(out _, out _);
+        multi.GetWaitSockets(sockets, out int socketsAfterStart);
+        (_, int runningAfterNext) = await multi.PerformAsync(CancellationToken.None);
+        bool messageAfterNext = multi.TryReadInfo(out CurlMultiMessage? message, out _);
+
+        Assert.AreEqual(1, runningAfterStart);
+        Assert.IsFalse(messageAfterStart);
+        Assert.AreEqual(2, socketsAfterStart);
+        Assert.AreEqual(0, runningAfterNext);
+        Assert.IsTrue(messageAfterNext);
+        Assert.AreEqual(CurlCode.Ok, message!.Result);
+    }
+
+    [TestMethod]
     public async Task PerformAsync_ProductionEasyHandles_RunToCompletionWithTheirCodes()
     {
         await using ManagedCurlEngine engine = new();
