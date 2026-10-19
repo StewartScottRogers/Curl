@@ -31,3 +31,4 @@ Found by BL-2543, which ported lib1648. The runner reports `differs at byte 53 (
 ## Log
 
 - 2026-10-17: Created.
+- 2026-10-18: Backlog -> Doing. Criteria at claim: 2ddb26db 48be2d2b 3d836d5e.
