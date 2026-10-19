@@ -2639,7 +2639,17 @@ function Invoke-MergeToMaster {
     if ("$(git -C $Root log -1 --format=%B $head)" -match '\[skip ci\]') { gh workflow run CI --ref $Branch 2>&1 | Out-Null }
     while ($true) {
         $run = @(gh run list --workflow CI --branch $Branch --commit $head --limit 1 --json status,conclusion 2>$null | ConvertFrom-Json)
-        if ($run.Count -and $run[0].status -eq 'completed') { break }
+        if ($run.Count -and $run[0].status -eq 'completed' -and $run[0].conclusion -ne 'cancelled') { break }
+        # A newer push replaced this commit's waiting run (ADR-0693): merge the newer commit,
+        # which holds all of this one, once CI passes on it (shift 20261019-150735 gave up here).
+        if ($run.Count -and $run[0].conclusion -eq 'cancelled') {
+            git -C $Root fetch -q origin $Branch 2>&1 | Out-Null
+            $newer = (git -C $Root rev-parse "origin/$Branch").Trim()
+            if ($newer -eq $head) { return "not merged: CI cancelled on $short" }
+            $head = $newer
+            $short = $head.Substring(0, 7)
+            if ("$(git -C $Root log -1 --format=%B $head)" -match '\[skip ci\]') { gh workflow run CI --ref $Branch 2>&1 | Out-Null }
+        }
         if ((Get-Date) -ge $deadline) { return "not merged: CI did not finish on $short within $MergeCiWaitMinutes min" }
         Start-Sleep -Seconds 30
     }
