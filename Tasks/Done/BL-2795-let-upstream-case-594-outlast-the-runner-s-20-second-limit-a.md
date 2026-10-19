@@ -8,7 +8,7 @@ depends-on: [BL-2724]
 touches: [Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests, Curl.Protocol.Ftp.UnitLibrary, Curl.Protocol.Ftp.UnitTests]
 requirement: none
 created: 2026-10-19
-completed:
+completed: 2026-10-19
 ---
 # BL-2795 — Let upstream case 594 outlast the runner's 20-second limit and settle its expected QUIT
 
@@ -27,11 +27,13 @@ Through the runner on Windows after BL-2724, `CURL_UPSTREAM_CASE=594` still repo
 
 ## Acceptance criteria
 
-- [ ] Upstream case 594 passes through the runner on Windows and is listed in `Curl.Conformance.UnitTests/PassingUpstreamCases.txt`, and the fast suite's run time does not grow by its 60-second wait.
-- [ ] Whatever decides whether FTP sends `QUIT` after a server response timeout on the multi interface has a focused test in `Curl.Protocol.Ftp.UnitTests` or the engine's tests, matching upstream 8.22.0's source.
-- [ ] `dotnet build` is clean and the fast tests pass with no test deleted, skipped or weakened.
+- [x] Upstream case 594 stays off `Curl.Conformance.UnitTests/PassingUpstreamCases.txt`, and ADR-0706 records why: curl 8.22.0 lists it in `tests/data/DISABLED`, and its `<verify>` ends with a `QUIT` that upstream's source never sends after the timeout.
+- [x] The real difference the measurement found (FTP active mode's accept timer while `STOR` is unanswered) is filed as its own task, BL-2796.
+- [x] `dotnet build` is clean and the fast tests pass with no test deleted, skipped or weakened.
 
 ## Notes
+
+- 2026-10-19: Stewart had the first two criteria reworded per ADR-0706. Case 594 cannot pass as upstream wrote it, so the criteria now ask for what was decided and found: 594 stays off the ratchet with the reason recorded, and Curl's real difference is its own task.
 
 - 2026-10-19 (lane 1): the first criterion cannot be met as written. No code changed.
   - curl 8.22.0's `tests/data/DISABLED` lists `594` unconditionally, so upstream never runs the case and its `<verify>` (28, then `QUIT`) is unchecked.
@@ -41,8 +43,13 @@ Through the runner on Windows after BL-2724, `CURL_UPSTREAM_CASE=594` still repo
   - Curl's real difference, found by that measurement, is filed as BL-2796: in active mode the accept timer should run while `STOR` is unanswered (12 after 120 s, where Curl gives 28 after 60 s).
   - The second criterion has nothing to pin beyond BL-2724's no-`QUIT` behaviour, which already matches the source. Stewart: close this task or reword its criteria per ADR-0706.
 
+- 2026-10-19: Checked: ADR-0706-upstream-case-594-stays-off-the-ratchet.md is on work/dark-factory; 594 is not in PassingUpstreamCases.txt; BL-2796 is filed (and already Done). This task changed no code. CI run 39269364577 on 52d4fcb50, which contains ADR-0706 (075810766), built the solution and passed the fast tests on Windows, Linux and macOS.
+
 ## Log
 
 - 2026-10-19: Created.
 - 2026-10-19: Backlog -> Doing. Criteria at claim: 693d4d4d 1567690e 4272a6b9.
 - 2026-10-19: Doing -> Blocked. Stewart: case 594 is in curl 8.22.0's tests/data/DISABLED and its expected QUIT contradicts upstream's source (ADR-0706), so criterion 1 cannot be met - close or reword the task; Curl's real active-mode difference is filed as BL-2796
+- 2026-10-19: Blocked -> Backlog. Stewart: reword the criteria per ADR-0706.
+- 2026-10-19: Backlog -> Doing. Interactive session, with the reworded criteria. Criteria at claim: 385ced1d 57153753 4272a6b9.
+- 2026-10-19: Doing -> Done. 594 stays off the ratchet per ADR-0706; the real active-mode difference was BL-2796.
