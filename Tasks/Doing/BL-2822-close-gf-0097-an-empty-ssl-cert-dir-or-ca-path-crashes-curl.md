@@ -49,3 +49,4 @@ Most likely cause: CaCertificateEnvironment.Apply (Curl.Cli.UnitLibrary) copies 
 ## Log
 
 - 2026-10-19: Created.
+- 2026-10-19: Backlog -> Doing. Criteria at claim: d3442ebf 4d2fe763 3e9d694d 8b83e917 1fd5de8c 28346828.
