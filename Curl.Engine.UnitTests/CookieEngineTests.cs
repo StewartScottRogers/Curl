@@ -1,6 +1,7 @@
 using System.Text;
 
 using Curl.Api.Options.Http;
+using Curl.Cookies;
 using Curl.Protocol.Abstractions;
 using Curl.Testing;
 
@@ -127,6 +128,22 @@ public sealed class CookieEngineTests
         Diagnostics.Act("stored cookie header", stored ?? "<null>");
 
         Diagnostics.Assert("stored cookie header", "a=b", stored ?? "<null>");
+        Assert.AreEqual("a=b", stored);
+    }
+
+    [TestMethod]
+    public void OverSharedCookies_OptionsLeaveTheEngineOff_StoresInTheSharedCookies()
+    {
+        Diagnostics.Arrange("http options", "none (the engine is off by the handle's options)");
+        CookieStore sharedCookies = new();
+        CookieEngine cookies = CookieEngine.OverSharedCookies(new EasyHttpOptions(), sharedCookies);
+
+        cookies.HandlerStore.StoreFromResponse(CurlUrl.Parse(Url), "a=b", 0, Now, NoTransferEvents.Instance);
+        CookieEngine otherHandle = CookieEngine.OverSharedCookies(new EasyHttpOptions(), sharedCookies);
+        string? stored = otherHandle.HandlerStore.GetStoredCookieHeader(CurlUrl.Parse(Url), false, Now, NoTransferEvents.Instance);
+        Diagnostics.Act("cookie header another handle on the share reads", stored ?? "<null>");
+
+        Diagnostics.Assert("cookie header", "a=b", stored ?? "<null>");
         Assert.AreEqual("a=b", stored);
     }
 
