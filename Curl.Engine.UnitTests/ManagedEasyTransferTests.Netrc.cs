@@ -110,6 +110,45 @@ public sealed partial class ManagedEasyTransferTests
     }
 
     [TestMethod]
+    public async Task PerformAsync_AwsSigV4AndCredentialsOnlyInTheUrl_SignsWithTheUrlsUserName()
+    {
+        ScriptedConnector server = new(["HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n"u8.ToArray()]);
+
+        string request = await PerformOverScriptedServerAsync(server, new EasyAuthenticationOptions { AwsSigV4 = "aws:amz:us-east-1:s3", HttpAuthentication = HttpAuthenticationMethods.AwsSigV4 });
+
+        Assert.Contains("Authorization: AWS4-HMAC-SHA256 Credential=xxx/", request);
+        Assert.Contains("/us-east-1/s3/aws4_request", request);
+    }
+
+    [TestMethod]
+    public async Task PerformAsync_AwsSigV4SetBackToNullAndCredentialsInTheUrl_SendsNoAuthorization()
+    {
+        ScriptedConnector server = new(["HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n"u8.ToArray()]);
+
+        string request = await PerformOverScriptedServerAsync(server, new EasyAuthenticationOptions { AwsSigV4 = null, HttpAuthentication = HttpAuthenticationMethods.AwsSigV4 });
+
+        Assert.DoesNotContain("Authorization", request);
+    }
+
+    /// <summary>Performs <c>http://xxx:yyy@127.0.0.1:9000/1978</c> with <paramref name="authentication" /> on an engine dialing <paramref name="server" />, and gives the request it wrote.</summary>
+    private static async Task<string> PerformOverScriptedServerAsync(ScriptedConnector server, EasyAuthenticationOptions authentication)
+    {
+        EngineDialing dialing = new(new ScriptedTcpDialer(server), new LoopbackDnsResolver(), new RecordingDatagramConnector(Curl.Protocol.Abstractions.CurlExitCode.CouldntConnect, "no udp"));
+        await using ManagedCurlEngine engine = new(TimeProvider.System, null, dialing: dialing);
+        await using Api.EngineContracts.IEasyTransfer easy = engine.CreateEasy();
+        easy.Options = new EasyOptions
+        {
+            Network = new EasyNetworkOptions { Url = "http://xxx:yyy@127.0.0.1:9000/1978" },
+            Authentication = authentication,
+        };
+
+        CurlCode code = await easy.PerformAsync(CancellationToken.None);
+
+        Assert.AreEqual(CurlCode.Ok, code);
+        return Encoding.ASCII.GetString(server.Written);
+    }
+
+    [TestMethod]
     public void ReadDiskFile_FileExists_ReturnsItsBytes()
     {
         string directory = Directory.CreateTempSubdirectory().FullName;

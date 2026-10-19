@@ -149,8 +149,10 @@ internal static class HttpRequestOptionsMapping
     /// The schemes the HTTP handler may answer a challenge with, as the curl tool's parsed command line
     /// gives them (ADR-0516): <see cref="HttpAuthenticationMethods.Any" /> is every scheme the engine knows, each
     /// other <c>CURLAUTH_*</c> bit its scheme, and <see cref="HttpAuthSchemes.Bearer" /> only with
-    /// <see cref="EasyAuthenticationOptions.XOAuth2Bearer" /> set. The <c>CURLAUTH_AWS_SIGV4</c> bit is ignored, as
-    /// signing reads <see cref="EasyAuthenticationOptions.AwsSigV4" />; with no scheme left, Basic, libcurl's default.
+    /// <see cref="EasyAuthenticationOptions.XOAuth2Bearer" /> set. The <c>CURLAUTH_AWS_SIGV4</c> bit gives no scheme, as
+    /// signing reads <see cref="EasyAuthenticationOptions.AwsSigV4" />; with no scheme left, Basic, libcurl's default, unless that
+    /// bit is set: libcurl keeps <c>CURLAUTH_AWS_SIGV4</c> picked after <c>CURLOPT_AWS_SIGV4</c> is set back to <c>NULL</c> and then
+    /// sends no <c>Authorization</c> at all (upstream test1978, BL-2748), so that gives <see cref="HttpAuthSchemes.None" />.
     /// </summary>
     /// <param name="authentication">The option group's authentication options.</param>
     /// <returns>The schemes.</returns>
@@ -161,7 +163,7 @@ internal static class HttpRequestOptionsMapping
             ? HttpAuthSchemes.Any | HttpAuthSchemes.Bearer
             : SchemesOf(methods);
         HttpAuthSchemes allowed = authentication.XOAuth2Bearer is null ? wanted & ~HttpAuthSchemes.Bearer : wanted;
-        return allowed == HttpAuthSchemes.None ? HttpAuthSchemes.Basic : allowed;
+        return allowed == HttpAuthSchemes.None && (methods & HttpAuthenticationMethods.AwsSigV4) == 0 ? HttpAuthSchemes.Basic : allowed;
     }
 
     /// <summary>
