@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Http.UnitLibrary]
 requirement: none
 created: 2026-10-18
-completed:
+completed: 2026-10-18
 ---
 # BL-2753 — Re-fix AF-0233: After giving up on refused-stream retries the connection can be kept alive with no test failing
 
@@ -45,12 +45,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Measured by applying each `KeepsAlive: false` -> `true` mutant in `StreamRefusedOutcome` by hand (the lane cannot run `Audit/Tools`): the give-up outcome's mutant is already killed by BL-2570's test, but the response-began outcome's (`ReceiveFailed`, the first `false` in the member, which the re-audit's `-Site ...:false` resolution can land on as lines shift) survived. Added `ExecuteAsync_Http3StreamRefusedOnceTheResponseBegan_ClosesTheConnectionRatherThanLeavingItIntact`, which fails under that mutant (`left intact` reported) and passes on the real code. Test-only change, so no quality run was needed.
 
 ## Log
 
 - 2026-10-18: Created.
 - 2026-10-18: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-18: Doing -> Done. Test added that kills the surviving response-began KeepsAlive mutant in StreamRefusedOutcome

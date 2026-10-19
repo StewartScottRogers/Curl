@@ -450,6 +450,29 @@ public sealed partial class HttpProtocolHandlerTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_Http3StreamRefusedOnceTheResponseBegan_ClosesTheConnectionRatherThanLeavingItIntact()
+    {
+        // AF-0233 re-fix: a connection whose stream was refused mid-response is closed, never
+        // kept for the next URL of the run, so -v ends with "closing connection" and no "left intact".
+        FakeMultiplexedStream refused = new(0, Http3Response(Http3Head("200", ("content-length", "5"))))
+        {
+            EndException = new MultiplexedStreamResetException(0x10b, "refused"),
+        };
+        QueueConnector connector = QuicConnector(new FakeMultiplexedConnection(refused));
+        RecordingTransferEvents events = new();
+
+        Diagnostics.Arrange("url", "https://example.com/");
+        Diagnostics.Arrange("scenario", "Http3StreamRefusedOnceTheResponseBegan_ClosesTheConnectionRatherThanLeavingItIntact");
+        TransferResult result = await Handler(connector).ExecuteAsync(Http3Context("https://example.com/", new MemoryStream(), events: events));
+
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.RecvError, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.RecvError, result.ExitCode);
+        Assert.IsFalse(events.Info.Any(line => line.EndsWith(" left intact", StringComparison.Ordinal)), string.Join("\n", events.Info));
+        Assert.StartsWith("closing connection #", events.Info.Last(line => line.Contains("connection #", StringComparison.Ordinal)));
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_Http3StreamRefusedWithASeekableUpload_RewindsItAndSendsItWholeOnANewQuicConnection()
     {
         // Curl_retry_request sets the client reader to rewind, and cr_in_rewind seeks the -T file
