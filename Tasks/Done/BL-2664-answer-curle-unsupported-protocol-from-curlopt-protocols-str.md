@@ -8,7 +8,7 @@ depends-on: []
 touches: [Libcurl/Options/Network/EasyNetworkOptionSetters.cs, Libcurl.UnitTests/Options/Network/EasyNetworkOptionSettersTests.cs, Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
 requirement: none
 created: 2026-10-17
-completed:
+completed: 2026-10-18
 ---
 # BL-2664 — Answer CURLE_UNSUPPORTED_PROTOCOL from CURLOPT_PROTOCOLS_STR for an unknown protocol (case 1597)
 
@@ -22,15 +22,18 @@ Found by BL-2543, which ported lib1597. The runner reports `<verify><stdout> dif
 
 ## Acceptance criteria
 
-- [ ] Upstream case 1597 passes through the runner and is added to `Curl.Conformance.UnitTests/PassingUpstreamCases.txt`.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project covers the fix (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] Upstream case 1597 passes through the runner and is added to `Curl.Conformance.UnitTests/PassingUpstreamCases.txt`.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project covers the fix (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
 
 - 2026-10-18: touches narrowed from Libcurl, Libcurl.UnitTests to files, by reading EasyNetworkOptionSetters.SetProtocols and SetRedirectProtocols, so it can run beside other Engine tasks.
 
+- 2026-10-18: The fix itself landed under BL-2727 (SetProtocols already answers UnsupportedProtocol); this task held case 1597 on the ratchet and added goobar and padded-space rows to the Libcurl unit test.
+
 ## Log
 
 - 2026-10-17: Created.
 - 2026-10-18: Backlog -> Doing. Criteria at claim: 08788b59 48be2d2b 3d836d5e.
+- 2026-10-18: Doing -> Done. Case 1597 held on the ratchet; unit rows added; build clean, fast tests green

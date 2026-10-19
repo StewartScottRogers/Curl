@@ -285,6 +285,10 @@ public sealed class EasyNetworkOptionSettersTests
     [DataRow(CurlOption.ProtocolsStr, "string", DisplayName = "PROTOCOLS_STR string")]
     [DataRow(CurlOption.ProtocolsStr, "nope", DisplayName = "PROTOCOLS_STR nope")]
     [DataRow(CurlOption.ProtocolsStr, "http,http,ft", DisplayName = "PROTOCOLS_STR an unknown name after known ones")]
+    [DataRow(CurlOption.ProtocolsStr, "goobar", DisplayName = "PROTOCOLS_STR goobar")]
+    [DataRow(CurlOption.ProtocolsStr, "http ", DisplayName = "PROTOCOLS_STR trailing space")]
+    [DataRow(CurlOption.ProtocolsStr, " http", DisplayName = "PROTOCOLS_STR leading space")]
+    [DataRow(CurlOption.RedirProtocolsStr, "goobar", DisplayName = "REDIR_PROTOCOLS_STR goobar")]
     [DataRow(CurlOption.RedirProtocolsStr, "string", DisplayName = "REDIR_PROTOCOLS_STR string")]
     public void SetOption_AProtocolListNamingAnUnknownScheme_ReturnsUnsupportedProtocol(CurlOption option, string names)
     {
