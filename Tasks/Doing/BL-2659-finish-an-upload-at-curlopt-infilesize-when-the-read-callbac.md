@@ -33,3 +33,4 @@ Found by BL-2542, which ported lib1576. Cases 1576 to 1580 all end `curl did not
 ## Log
 
 - 2026-10-17: Created.
+- 2026-10-18: Backlog -> Doing. Criteria at claim: 3e71f510 35a2755a 3d836d5e.
