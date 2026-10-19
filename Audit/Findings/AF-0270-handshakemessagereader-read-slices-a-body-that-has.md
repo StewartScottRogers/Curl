@@ -3,8 +3,8 @@ id: AF-0270
 title: HandshakeMessageReader.Read slices a body that has not all arrived; Curl.Tls unit tests fail unmutated
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Tls.UnitLibrary/HandshakeMessageReader.cs:Read:failing-test
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ dotnet test Curl.Tls.UnitTests --filter "FullyQualifiedName~HandshakeMessageRead
 ## Log
 
 - 2026-10-18: filed proposed.
+- 2026-10-19: proposed -> accepted.
