@@ -33,3 +33,4 @@ Found by BL-2675, which made the AWS SigV4 libtest cases run with the harness's 
 ## Log
 
 - 2026-10-17: Created.
+- 2026-10-18: Backlog -> Doing. Criteria at claim: 28bdd39a ed83a9ac 5ea3895a.
