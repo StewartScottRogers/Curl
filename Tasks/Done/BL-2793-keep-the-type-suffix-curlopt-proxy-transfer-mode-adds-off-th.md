@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests, Curl.Engine.UnitLibrary/ProxyTransferModeUrl.cs, Curl.Engine.UnitTests/ProxyTransferModeUrlTests.cs, Curl.Engine.UnitLibrary/ProxyTransferModeType.cs, Curl.Engine.UnitTests/ProxyTransferModeTypeTests.cs, Curl.Engine.UnitLibrary/TransferContextFactory.cs, Curl.Protocol.Abstractions.UnitLibrary/HttpRequestOptions.cs]
 requirement: none
 created: 2026-10-19
-completed:
+completed: 2026-10-19
 ---
 # BL-2793 — Keep the ;type= suffix CURLOPT_PROXY_TRANSFER_MODE adds off the effective URL of a forwarded FTP transfer
 
@@ -37,3 +37,4 @@ Filed by BL-2718. `Curl.Engine`'s `ProxyTransferModeUrl.Of` puts the `;type=a|i`
 
 - 2026-10-19: Created.
 - 2026-10-19: Backlog -> Doing. Criteria at claim: 88159cf1 32bc0832 4272a6b9.
+- 2026-10-19: Doing -> Done. Forward-proxy ftp targets carry ;type= via HttpRequestOptions.ProxyTransferType; the transfer URL, effective URL and redirects stay without it
