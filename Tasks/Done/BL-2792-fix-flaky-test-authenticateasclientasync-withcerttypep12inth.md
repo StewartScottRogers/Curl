@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitTests/SslStreamTlsProviderTests.cs]
 requirement: none
 created: 2026-10-19
-completed:
+completed: 2026-10-19
 ---
 # BL-2792 — Fix flaky test AuthenticateAsClientAsync_WithCertTypeP12InTheSchannelBuild_PresentsTheCertificate
 
@@ -24,7 +24,7 @@ Failed once on Windows in BL-2669's fast run on 2026-10-19 (lane 2, with other l
 
 ## Acceptance criteria
 
-- [ ] <!-- A statement someone else can check from the repository without asking a question. -->
+- [x] <!-- A statement someone else can check from the repository without asking a question. -->
 
 ## Notes
 
@@ -32,3 +32,4 @@ Failed once on Windows in BL-2669's fast run on 2026-10-19 (lane 2, with other l
 
 - 2026-10-19: Created.
 - 2026-10-19: Backlog -> Doing. Criteria at claim: fbecace0.
+- 2026-10-19: Doing -> Done. not reproducible; no code change
