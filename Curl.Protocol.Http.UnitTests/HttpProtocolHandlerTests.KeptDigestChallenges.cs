@@ -48,19 +48,19 @@ public sealed partial class HttpProtocolHandlerTests
     }
 
     /// <summary>
-    /// Upstream case 2027 (BL-2745): after a perform whose server picked Digest, a 401 offering Digest to the
+    /// Upstream case 2027 (BL-2745): after a perform that ended with Digest still available, a 401 offering Digest to the
     /// kept challenges' answer is answered once more with that answer, as libcurl ignores the 401's Digest
     /// header as a duplicate; the next 401 ends the transfer.
     /// </summary>
     [TestMethod]
-    public async Task ExecuteAsync_KeptDigestAnswerRefusedAfterAPerformThatPickedDigest_SendsTheSameAnswerOnceMore()
+    public async Task ExecuteAsync_KeptDigestAnswerRefusedWhileDigestStaysAvailable_SendsTheSameAnswerOnceMore()
     {
         const string refused = "HTTP/1.1 401 Wrong\r\nWWW-Authenticate: Digest realm=\"testrealm\", nonce=\"7\"\r\nContent-Length: 0\r\n\r\n";
         TurnTakingConnection connection = new(65536, refused, refused);
         const string answer = "Digest username=\"u\", nonce=\"5\"";
         Diagnostics.Arrange("kept challenges", KeptChallenge);
 
-        TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), new RepeatingAuthenticator(answer)).ExecuteAsync(KeptChallengesContext([KeptChallenge], HttpAuthSchemes.Digest, credentials: true, picked: HttpAuthSchemes.Digest));
+        TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), new RepeatingAuthenticator(answer)).ExecuteAsync(KeptChallengesContext([KeptChallenge], HttpAuthSchemes.Digest, credentials: true, digestStaysAvailable: true));
 
         WriteResult(result);
         string expected = "GET /a HTTP/1.1\r\nHost: 127.0.0.1:18183\r\nAuthorization: " + answer + "\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n\r\n"
@@ -70,21 +70,20 @@ public sealed partial class HttpProtocolHandlerTests
     }
 
     /// <summary>
-    /// Upstream case 2024 (BL-2745): after a perform that picked another scheme, or for a 401 offering no Digest,
+    /// Upstream case 2024 (BL-2745): after a perform that left Digest unavailable, or for a 401 offering no Digest,
     /// the kept challenges' refused answer ends the transfer.
     /// </summary>
     [TestMethod]
-    [DataRow(HttpAuthSchemes.Basic, "Digest realm=\"r\", nonce=\"7\"", DisplayName = "previous perform picked Basic")]
-    [DataRow(HttpAuthSchemes.None, "Digest realm=\"r\", nonce=\"7\"", DisplayName = "previous perform picked none")]
-    [DataRow(HttpAuthSchemes.Digest, "Basic realm=\"r\"", DisplayName = "401 offers no Digest")]
-    public async Task ExecuteAsync_KeptDigestAnswerRefusedOtherwise_SendsItOnlyOnce(HttpAuthSchemes picked, string challenge)
+    [DataRow(false, "Digest realm=\"r\", nonce=\"7\"", DisplayName = "Digest not kept available")]
+    [DataRow(true, "Basic realm=\"r\"", DisplayName = "401 offers no Digest")]
+    public async Task ExecuteAsync_KeptDigestAnswerRefusedOtherwise_SendsItOnlyOnce(bool digestStaysAvailable, string challenge)
     {
         string refused = "HTTP/1.1 401 Wrong\r\nWWW-Authenticate: " + challenge + "\r\nContent-Length: 0\r\n\r\n";
         TurnTakingConnection connection = new(65536, refused, refused);
         const string answer = "Digest username=\"u\", nonce=\"5\"";
-        Diagnostics.Arrange("picked, challenge", $"{picked}, {challenge}");
+        Diagnostics.Arrange("Digest stays available, challenge", $"{digestStaysAvailable}, {challenge}");
 
-        TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), new RepeatingAuthenticator(answer)).ExecuteAsync(KeptChallengesContext([KeptChallenge], HttpAuthSchemes.Digest, credentials: true, picked));
+        TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), new RepeatingAuthenticator(answer)).ExecuteAsync(KeptChallengesContext([KeptChallenge], HttpAuthSchemes.Digest, credentials: true, digestStaysAvailable));
 
         WriteResult(result);
         string expected = "GET /a HTTP/1.1\r\nHost: 127.0.0.1:18183\r\nAuthorization: " + answer + "\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n\r\n";
@@ -131,11 +130,34 @@ public sealed partial class HttpProtocolHandlerTests
         Assert.IsTrue(result.Report!.DigestStaysAvailable);
     }
 
-    private static TransferContext KeptChallengesContext(string[] kept, HttpAuthSchemes allowed, bool credentials, HttpAuthSchemes picked = HttpAuthSchemes.None) => new()
+    /// <summary>
+    /// Upstream case 2030's transfer 300 (BL-2823): a bare <c>NTLM</c> challenge to a request sent with an NTLM answer
+    /// is a refused handshake, which sets libcurl's <c>authproblem</c>, so a Digest challenge in the same 401 stays
+    /// available; without the refusal, or without Digest offered, it does not.
+    /// </summary>
+    [TestMethod]
+    [DataRow("WWW-Authenticate: NTLM\r\nWWW-Authenticate: Digest realm=\"r\", nonce=\"5\"\r\n", true, DisplayName = "NTLM refused, Digest offered")]
+    [DataRow("WWW-Authenticate: Digest realm=\"r\", nonce=\"5\"\r\nWWW-Authenticate: NTLM\r\n", true, DisplayName = "Digest offered before the refusal")]
+    [DataRow("WWW-Authenticate: NTLM\r\n", false, DisplayName = "NTLM refused, no Digest")]
+    [DataRow("WWW-Authenticate: NTLM TlRMTVNTUAACAAAA\r\nWWW-Authenticate: Digest realm=\"r\", nonce=\"5\"\r\n", false, DisplayName = "NTLM continued, first Digest challenge")]
+    public async Task ExecuteAsync_401ToAnNtlmAnswer_ReportsWhetherDigestStaysAvailable(string challenges, bool expected)
+    {
+        const string ntlmChallenge = "HTTP/1.1 401 NTLM\r\nWWW-Authenticate: NTLM\r\nContent-Length: 0\r\n\r\n";
+        TurnTakingConnection connection = new(65536, ntlmChallenge, "HTTP/1.1 401 Wrong\r\n" + challenges + "Content-Length: 0\r\n\r\n");
+        Diagnostics.Arrange("second 401's challenges", challenges);
+
+        TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), new RepeatingAuthenticator("NTLM TlRMTVNTUAABAAAA")).ExecuteAsync(KeptChallengesContext([], HttpAuthSchemes.Ntlm, credentials: true));
+
+        WriteResult(result);
+        StringAssert.Contains(connection.Written, "Authorization: NTLM TlRMTVNTUAABAAAA\r\n");
+        Assert.AreEqual(expected, result.Report!.DigestStaysAvailable);
+    }
+
+    private static TransferContext KeptChallengesContext(string[] kept, HttpAuthSchemes allowed, bool credentials, bool digestStaysAvailable = false) => new()
     {
         Url = CurlUrl.Parse(AuthUrl),
         Output = new MemoryStream(),
         Credentials = credentials ? new NetworkCredential("u", "p") : null,
-        Http = new HttpRequestOptions { AuthSchemes = allowed, KeptDigestChallenges = kept, AuthSchemePicked = picked },
+        Http = new HttpRequestOptions { AuthSchemes = allowed, KeptDigestChallenges = kept, DigestStaysAvailable = digestStaysAvailable },
     };
 }

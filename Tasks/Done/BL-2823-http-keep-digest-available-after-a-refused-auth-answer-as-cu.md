@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests]
 requirement: none
 created: 2026-10-19
-completed:
+completed: 2026-10-19
 ---
 # BL-2823 — HTTP: keep Digest available after a refused auth answer as curl's authproblem does (upstream case 2030)
 
@@ -31,14 +31,20 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] `HttpProtocolHandler` decides whether Digest stays available from a port of `Curl_http_input_auth`'s `authproblem` and `avail` handling, with unit tests in `Curl.Protocol.Http.UnitTests`: an NTLM refusal whose 401 also offers Digest (2030's transfer 300) keeps Digest available; a first Digest challenge alone does not (2024's transfer 300).
-- [ ] With it, `CURL_UPSTREAM_CASE=2030` through `NamedUpstreamCase_RunThroughCurl_PassesAsAListedCaseMust` sends request 400 twice, and 2024 and 2027 still pass.
-- [ ] An ADR records the ported rule, decided by Claude under Stewart's delegation.
-- [ ] `dotnet build` is clean, the fast tests pass, and `Measure-CodeQuality.ps1 -Library Curl.Protocol.Http.UnitLibrary` reports 0 failing members.
+- [x] `HttpProtocolHandler` decides whether Digest stays available from a port of `Curl_http_input_auth`'s `authproblem` and `avail` handling, with unit tests in `Curl.Protocol.Http.UnitTests`: an NTLM refusal whose 401 also offers Digest (2030's transfer 300) keeps Digest available; a first Digest challenge alone does not (2024's transfer 300).
+- [x] With it, `CURL_UPSTREAM_CASE=2030` through `NamedUpstreamCase_RunThroughCurl_PassesAsAListedCaseMust` sends request 400 twice, and 2024 and 2027 still pass.
+- [x] An ADR records the ported rule, decided by Claude under Stewart's delegation.
+- [x] `dotnet build` is clean, the fast tests pass, and `Measure-CodeQuality.ps1 -Library Curl.Protocol.Http.UnitLibrary` reports 0 failing members.
 
 ## Notes
+
+- Ported the two `authproblem` sources the lib2023 cases reach: a non-stale Digest challenge while a nonce is held (BL-2820) and a bare `NTLM` challenge to a request sent with an NTLM answer (`Curl_input_ntlm` "handshake rejected"). `DigestStaysAvailableAfter` = final 401 offers Digest and `SetsAuthProblem`. Header order does not matter: Digest joins `avail` either way. ADR-0709.
+- `RepeatsKeptDigestAnswer` now keys on `HttpRequestOptions.DigestStaysAvailable` instead of `AuthSchemePicked == Digest`; the 2024/2027 unit tests were rewritten to drive that state.
+- Measured: `CURL_UPSTREAM_CASE` 2023 to 2031 all pass through the runner. 2030 is not added to the ratchet here (not in `touches`); BL-2744 holds it.
+- Negotiate, Basic and Bearer `authproblem` sources are not modelled; no lib2023 case reaches them.
 
 ## Log
 
 - 2026-10-19: Created.
 - 2026-10-19: Backlog -> Doing. Criteria at claim: 61957160 fbb260a8 207ba9cf 72b2b029.
+- 2026-10-19: Doing -> Done. Digest stays available after a 401 that sets curl's authproblem (NTLM refusal or held-nonce Digest), so upstream 2030 sends request 400 twice
