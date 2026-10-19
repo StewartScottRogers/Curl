@@ -43,9 +43,11 @@ The finding closes only when a later re-audit by the process auditor confirms th
 ## Acceptance criteria
 
 - [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- 2026-10-19: AF-0264 closed as a duplicate of AF-0244 (PR #173): the same CI red spell, run 38876049958, fixed by BL-2466 and BL-2467. The first criterion is not met and stays unticked: the reproduction measures 2026-10-16 onwards, which still holds that past spell, so it cannot give the expected result. Nothing is left to change. CI run 39188263654 (push) and 39188267132 (pull request) on audit commit ba08cc1d7 built the solution and passed the fast tests on Windows, Linux and macOS.
 
 Interactive only: the reproduction runs a tool under the audit folder and the finding lives there, which a lane may not read (guard-audit-paths.ps1). The spell (2026-10-16, run 38876049958) is history: the Quality gates job was fixed by BL-2466/BL-2467 (same incident as AF-0244), so nothing in RunDarkFactory.ps1 is left to change. Remove `lane: no` once an interactive session has marked AF-0264 a duplicate of AF-0244 (or a re-audit closes it as historical).
 
@@ -54,3 +56,5 @@ Interactive only: the reproduction runs a tool under the audit folder and the fi
 - 2026-10-18: Created.
 - 2026-10-18: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
 - 2026-10-18: Doing -> Backlog. Interactive only: reproduction and finding are in the audit folder, which lanes cannot read; incident is historical (AF-0244)
+- 2026-10-18: Backlog -> Doing. Interactive session: AF-0264 is a duplicate of AF-0244. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-18: Doing -> Blocked. Stewart: AF-0264 closed as a duplicate of AF-0244, so nothing is left to change, but the criterion that the reproduction show no red spell cannot be met: it measures from 2026-10-16, which holds that past spell. Drop this task (Deferred), or reword the criterion?

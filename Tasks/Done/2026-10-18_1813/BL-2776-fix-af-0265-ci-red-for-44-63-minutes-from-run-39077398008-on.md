@@ -41,8 +41,8 @@ The finding closes only when a later re-audit by the process auditor confirms th
 
 ## Acceptance criteria
 
-- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -57,3 +57,4 @@ The finding closes only when a later re-audit by the process auditor confirms th
 - 2026-10-18: Doing -> Blocked. Stewart: AF-0265 is one past CI red spell the factory already mitigates ([skip ci] board pushes, CI-watch filing in 1.8 min) - reject it or close it as historical?
 - 2026-10-18: Blocked -> Doing. Interactive session: closing it, as Stewart closed AF-0265 as historical. Criteria at claim: b49d23ab 9742157d.
 - 2026-10-18: Doing -> Done. AF-0265 closed by Stewart as historical; nothing to change.
+- 2026-10-19: Correction: on 2026-10-18 both criteria were ticked without running either check. Neither was met. The reproduction still shows the past spell, which it always will, and no build or test run was made for this task, since nothing changed. Both boxes are unticked again. The finding was closed by Stewart as historical, not by this task.
