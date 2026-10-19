@@ -13,8 +13,8 @@ closed:
 regression: false
 items: [behaviour:test1802]
 touches: [Curl.Networking.UnitLibrary, Curl.Networking.UnitTests]
-task:
-tasks: []
+task: BL-2821
+tasks: [BL-2821]
 ---
 # GF-0096 - A request sent through a CONNECT tunnel the proxy already closed fails with 'Recv failure: Connection was reset' where curl prints 'Connection was aborted'
 
@@ -37,3 +37,4 @@ In Curl.Networking.UnitLibrary, StreamConnection.ReadAsync rewrites every Window
 ## Log
 
 - 2026-10-19_0804: Opened by gap-behaviour.
+- 2026-10-19_0927: Filed BL-2821.

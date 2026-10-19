@@ -13,8 +13,8 @@ closed:
 regression: false
 items: [environment:SSL_CERT_DIR, environment:SSL_CERT_FILE, environment:[url-protocol]_PROXY]
 touches: [Curl.Networking.UnitLibrary, Curl.Networking.UnitTests, Curl.Cli.UnitLibrary, Curl.Cli.UnitTests]
-task:
-tasks: []
+task: BL-2822
+tasks: [BL-2822]
 ---
 # GF-0097 - An empty SSL_CERT_DIR (or CA path) crashes Curl with an unhandled ArgumentException (exit 134) as soon as a TLS transfer starts
 
@@ -37,3 +37,4 @@ Most likely cause: CaCertificateEnvironment.Apply (Curl.Cli.UnitLibrary) copies 
 ## Log
 
 - 2026-10-19_0804: Opened by gap-environment.
+- 2026-10-19_0927: Filed BL-2822.
