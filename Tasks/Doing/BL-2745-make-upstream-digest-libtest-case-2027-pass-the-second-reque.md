@@ -37,3 +37,4 @@ The first Digest request (line 7) now matches; the request for `/20270200` goes 
 ## Log
 
 - 2026-10-18: Created.
+- 2026-10-18: Backlog -> Doing. Criteria at claim: 8c0688eb 3b60059b 3d836d5e.
