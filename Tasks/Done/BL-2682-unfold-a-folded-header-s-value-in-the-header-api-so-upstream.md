@@ -29,7 +29,7 @@ Found by BL-2547. The case's `CONNECT` response folds a header (`Server: from ` 
 ## Notes
 
 - 2026-10-18: touches narrowed from Curl.Engine.UnitLibrary, Curl.Engine.UnitTests to files, by reading TransferHeaderStore, so it can run beside other Engine tasks.
-- 2026-10-18: Upstream 8.22.0 joins a fold with one space and drops all its leading and trailing blanks (test1941 expects `from the connect` from `from `, ` the	`, `		connect`, and `text/html` from an empty `Content-Type:` folded with ` text/html`). `TransferHeaderStore.Unfold` now trims the fold and appends it after one space, or as the whole value when the value is empty; the old test pinning `one	two	three` now pins `one two three`, plus two focused tests. Case 1941 passes and is on the ratchet; Measure-CodeQuality for Curl.Engine.UnitLibrary: 0 failing members.
+- 2026-10-18: Upstream 8.22.0 joins a fold with one space and drops all its leading and trailing blanks (test1941 expects `from the connect` from `from `, ` the\t`, `\t\tconnect`, and `text/html` from an empty `Content-Type:` folded with ` text/html`). `TransferHeaderStore.Unfold` now trims the fold and appends it after one space, or as the whole value when the value is empty; the old test pinning `one\ttwo\tthree` now pins `one two three`, plus two focused tests. Case 1941 passes and is on the ratchet; Measure-CodeQuality for Curl.Engine.UnitLibrary: 0 failing members.
 
 ## Log
 
