@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitTests]
 requirement: none
 created: 2026-10-19
-completed:
+completed: 2026-10-19
 ---
 # BL-2804 — Fix AF-0277: ProxyFromCommandLine_TheTenTlsOptionsOfAdr0151_NeverReachTheProxy checks five options, not ten
 
@@ -52,3 +52,4 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 - 2026-10-19: Created.
 - 2026-10-19: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-19: Doing -> Done. ProxyFromCommandLine_TheTenTlsOptionsOfAdr0151_NeverReachTheProxy now passes all ten ADR-0151 options to MapProxy
