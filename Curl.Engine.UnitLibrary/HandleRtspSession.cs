@@ -12,13 +12,17 @@ namespace Curl.Engine;
 /// <remarks>
 /// libcurl's <c>CURLOPT_RTSP_CLIENT_CSEQ</c> and <c>CURLOPT_RTSP_SESSION_ID</c> write that state once, at
 /// <c>curl_easy_setopt</c>; here the options are a record read at each perform, so a value is handed on only when it
-/// differs from the one handed on before, and an unchanged option leaves the counter to run on.
+/// differs from the one handed on before, and an unchanged option leaves the counter to run on. A session ID is also
+/// handed on when <see cref="EasyRtspOptions.SessionIdSetCount" /> says it was set again, so a NULL set after a NULL
+/// forgets the ID the server gave since (BL-2787).
 /// </remarks>
 internal sealed class HandleRtspSession
 {
     private long appliedClientSequenceNumber;
 
     private string? appliedSessionId;
+
+    private long appliedSessionIdSetCount;
 
     /// <summary>Gets the <c>CSeq</c> counter and session ID the handle's RTSP performs share.</summary>
     internal RtspSessionState State { get; } = new();
@@ -39,20 +43,22 @@ internal sealed class HandleRtspSession
             Kind = rtsp.Request == RtspRequest.None ? RtspRequestKind.Options : (RtspRequestKind)(int)rtsp.Request,
             StreamUri = rtsp.StreamUri,
             Transport = rtsp.Transport,
-            SessionId = TakeChangedSessionId(rtsp.SessionId),
+            SessionId = TakeChangedSessionId(rtsp),
             ClientSequenceNumber = TakeChangedClientSequenceNumber(rtsp.ClientCSeq),
             Body = options.Transfer.Upload ? null : PostBodyOf(options),
         };
     }
 
-    private string? TakeChangedSessionId(string? sessionId)
+    private string? TakeChangedSessionId(EasyRtspOptions rtsp)
     {
-        if (sessionId == appliedSessionId)
+        string? sessionId = rtsp.SessionId;
+        if (sessionId == appliedSessionId && rtsp.SessionIdSetCount == appliedSessionIdSetCount)
         {
             return null;
         }
 
         appliedSessionId = sessionId;
+        appliedSessionIdSetCount = rtsp.SessionIdSetCount;
         if (sessionId is null)
         {
             State.ForgetSessionId();

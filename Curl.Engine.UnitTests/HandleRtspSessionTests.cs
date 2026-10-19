@@ -72,6 +72,24 @@ public sealed class HandleRtspSessionTests
     }
 
     [TestMethod]
+    public void SettingsFor_SameSessionIdSetAgain_IsHandedOnAgain()
+    {
+        HandleRtspSession session = new();
+        session.SettingsFor(With(new EasyRtspOptions { SessionId = "abc", SessionIdSetCount = 1 }));
+
+        Assert.AreEqual("abc", session.SettingsFor(With(new EasyRtspOptions { SessionId = "abc", SessionIdSetCount = 2 })).SessionId);
+    }
+
+    [TestMethod]
+    public void SettingsFor_NullSessionIdSetAgain_HandsOnNoId()
+    {
+        HandleRtspSession session = new();
+        session.SettingsFor(With(new EasyRtspOptions { SessionIdSetCount = 1 }));
+
+        Assert.IsNull(session.SettingsFor(With(new EasyRtspOptions { SessionIdSetCount = 2 })).SessionId);
+    }
+
+    [TestMethod]
     public void SettingsFor_PostFields_AreTheBodyCutToPostFieldSize()
     {
         EasyOptions options = With(new EasyRtspOptions()) with { Http = new EasyHttpOptions { PostFields = new byte[] { 1, 2, 3 }, PostFieldSize = 2 } };
