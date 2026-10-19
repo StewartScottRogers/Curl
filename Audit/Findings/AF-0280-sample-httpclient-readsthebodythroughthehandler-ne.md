@@ -3,8 +3,8 @@ id: AF-0280
 title: Sample_HttpClient_ReadsTheBodyThroughTheHandler never checks the body it names
 auditor: quality
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Api.UnitTests/Readme/ReadmeTests.cs:Sample_HttpClient_ReadsTheBodyThroughTheHandler:no-assertion
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Curl.Api.UnitTests/Readme/ReadmeTests.cs -Pattern 'Sample_Ht
 ## Log
 
 - 2026-10-18: filed proposed.
+- 2026-10-19: proposed -> accepted.
