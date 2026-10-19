@@ -5,11 +5,11 @@ area: behaviour
 platform: windows
 key: behaviour:aborted-read-after-peer-close-reported-as-reset
 severity: Medium
-status: open
+status: closed
 scope: target
 introduced-in:
 opened: 2026-10-19_0804
-closed:
+closed: 2026-10-19_1329
 regression: false
 items: [behaviour:test1802]
 touches: [Curl.Networking.UnitLibrary, Curl.Networking.UnitTests]
@@ -33,8 +33,10 @@ In Curl.Networking.UnitLibrary, StreamConnection.ReadAsync rewrites every Window
 ## Measurements
 
 - 2026-10-19_0804: 1 of 1 items are gaps.
+- 2026-10-19_1329: 0 of 1 items are gaps.
 
 ## Log
 
 - 2026-10-19_0804: Opened by gap-behaviour.
 - 2026-10-19_0927: Filed BL-2821.
+- 2026-10-19_1329: Closed: run 2026-10-19_1329 measured every item as match or excluded on windows.
