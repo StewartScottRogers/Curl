@@ -31,3 +31,4 @@ Found by BL-2543, which ported lib1598. The runner reports `<verify><protocol> d
 ## Log
 
 - 2026-10-17: Created.
+- 2026-10-18: Backlog -> Doing. Criteria at claim: d706bc46 48be2d2b 3d836d5e.
