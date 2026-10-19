@@ -51,3 +51,4 @@ Found by BL-2689, which put 2025, 2029, 2031 and 2032 on the ratchet once BL-263
 - 2026-10-19: Doing -> Blocked. Stewart: dark factory its runs of the last day already cost 3.16 of its 3.31 US dollar cost cap, so it was not run again; split the task; see Z:\repos\Curl.logs\BL-2744-*.jsonl
 - 2026-10-19: Blocked -> Doing. Interactive session, outside the lane cost cap: reapply stash 7eef9059 and make its resend depend on BL-2820. Criteria at claim: b96ecbf8 fd6bd9d4 3d836d5e.
 - 2026-10-19: Doing -> Backlog. Waits on BL-2823: the HTTP handler must keep Digest available after a refused auth answer, as curl's authproblem does.
+- 2026-10-19: Backlog -> Doing. Criteria at claim: b96ecbf8 fd6bd9d4 3d836d5e.
