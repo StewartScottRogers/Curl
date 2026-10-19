@@ -35,3 +35,4 @@ Found by BL-2544, which ported lib1901 (`Curl.Conformance.LibTest.UnitLibrary/Li
 - 2026-10-17: Created.
 - 2026-10-18: Backlog -> Doing. Criteria at claim: 11601d33 a041bc9c 3d836d5e.
 - 2026-10-18: Doing -> Backlog. Curl.Engine.UnitLibrary/ManagedEasyTransfer.cs, where the fix lands, is held by BL-2670 in Doing
+- 2026-10-19: Backlog -> Doing. Criteria at claim: 11601d33 a041bc9c 3d836d5e.
