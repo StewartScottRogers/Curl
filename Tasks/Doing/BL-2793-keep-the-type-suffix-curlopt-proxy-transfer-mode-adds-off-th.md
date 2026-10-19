@@ -31,3 +31,4 @@ Filed by BL-2718. `Curl.Engine`'s `ProxyTransferModeUrl.Of` puts the `;type=a|i`
 ## Log
 
 - 2026-10-19: Created.
+- 2026-10-19: Backlog -> Doing. Criteria at claim: 88159cf1 32bc0832 4272a6b9.
