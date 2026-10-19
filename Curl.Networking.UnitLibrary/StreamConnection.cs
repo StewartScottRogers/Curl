@@ -46,6 +46,15 @@ public sealed class StreamConnection(Stream stream, EndPoint? remoteEndPoint, En
     /// </remarks>
     internal bool ReportsAbortedReadAsReset { get; init; } = OperatingSystem.IsWindows();
 
+    /// <summary>
+    /// Gets the check run before each write: whether the peer had already sent bytes the stream has
+    /// not read yet. Production asks the socket under a <see cref="NetworkStream" />; tests set it
+    /// (ADR-0708, BL-2821).
+    /// </summary>
+    internal Func<Stream, bool> HasUnreadBytesBeforeWrite { get; init; } = HasSocketUnderUnreadBytes;
+
+    private bool _hadUnreadBytesAtLastWrite;
+
     /// <inheritdoc />
     /// <remarks>
     /// Asks the socket under a <see cref="NetworkStream" />: readable with nothing to read means
@@ -57,14 +66,25 @@ public sealed class StreamConnection(Stream stream, EndPoint? remoteEndPoint, En
     private static bool HasPeerClosedSocketUnder(Stream stream) =>
         stream is NetworkStream network && network.Socket.Poll(0, SelectMode.SelectRead) && network.Socket.Available == 0;
 
+    [ExcludeFromCodeCoverage(Justification = "ADR-0083: a thin socket adapter, measured by the Integration run.")]
+    private static bool HasSocketUnderUnreadBytes(Stream stream) =>
+        stream is NetworkStream network && network.Socket.Available > 0;
+
     /// <inheritdoc />
+    /// <remarks>
+    /// The aborted-to-reset rewrite (<see cref="ReportsAbortedReadAsReset" />) applies only when the
+    /// last write found no unread bytes: a peer that resets in answer to the request, or right after
+    /// accepting (ADR-0419). A peer whose bytes were still unread at the write, as a proxy leaving
+    /// bytes after its CONNECT reply and closing the tunnel (upstream test1802), keeps the abort, as
+    /// curl's Schannel build prints it (ADR-0708).
+    /// </remarks>
     public async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken)
     {
         try
         {
             return await _stream.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
         }
-        catch (IOException failure) when (ReportsAbortedReadAsReset && IsConnectionAborted(failure))
+        catch (IOException failure) when (ReportsAbortedReadAsReset && !_hadUnreadBytesAtLastWrite && IsConnectionAborted(failure))
         {
             throw new IOException(failure.Message, new SocketException((int)SocketError.ConnectionReset));
         }
@@ -74,8 +94,11 @@ public sealed class StreamConnection(Stream stream, EndPoint? remoteEndPoint, En
         failure.InnerException is SocketException { SocketErrorCode: SocketError.ConnectionAborted };
 
     /// <inheritdoc />
-    public ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken) =>
-        _stream.WriteAsync(buffer, cancellationToken);
+    public ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken)
+    {
+        _hadUnreadBytesAtLastWrite = HasUnreadBytesBeforeWrite(_stream);
+        return _stream.WriteAsync(buffer, cancellationToken);
+    }
 
     /// <inheritdoc />
     public ValueTask FlushAsync(CancellationToken cancellationToken) =>
