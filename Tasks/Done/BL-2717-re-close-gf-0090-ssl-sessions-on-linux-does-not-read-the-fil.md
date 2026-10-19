@@ -9,7 +9,7 @@ touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests]
 lane: no
 requirement: none
 created: 2026-10-17
-completed:
+completed: 2026-10-19
 ---
 # BL-2717 — Re-close GF-0090: --ssl-sessions on Linux does not read the file and print the session-file warnings real curl prints (on linux)
 
@@ -40,10 +40,10 @@ In Curl.Cli.UnitLibrary, where SslSessionsFile (CommandLineGlobalState, CommandL
 
 ## Acceptance criteria
 
-- [ ] `options:--ssl-sessions`: Curl answers what curl 8.22.0 answers on linux, `exit 2: Warning: unrecognized line 1 in SSL session file  | Warning: /tmp/gap-options-df8a0141de8e414e95913bfa3d95fbc5/placeholder.txt | Warning: invalid shmax base64 encoding in line 2 | Warning: invalid shmax base64 encoding in line 3 | Warning: unrecognized line 4 in SSL session file  | Warning: /tmp/gap-options-df8a0141de8e414e95913bfa3d95fbc5/placeholder.txt | Warning: unrecognized line 5 in SSL session file  | Warning: /tmp/gap-options-df8a0141de8e414e95913bfa3d95fbc5/placeholder.txt | Warning: unrecognized line 6 in SSL session file  | Warning: /tmp/gap-options-df8a0141de8e414e95913bfa3d95fbc5/placeholder.txt | Warning: unrecognized line 7 in SSL session file  | Warning: /tmp/gap-options-df8a0141de8e414e95913bfa3d95fbc5/placeholder.txt | Warning: unrecognized line 8 in SSL session file  | Warning: /tmp/gap-options-df8a0141de8e414e95913bfa3d95fbc5/placeholder.txt | Warning: unrecognized line 9 in SSL session file  | Warning: /tmp/gap-options-df8a0141de8e414e95913bfa3d95fbc5/placeholder.txt | Warning: unrecognized line 10 in SSL session file  | Warning: /tmp/gap-options-df8a0141de8e414e95913bfa3d95fbc5/placeholder.txt | Warning: unrecognized line 11 in SSL session file  | Warning: /tmp/gap-options-df8a0141de8e414e95913bfa3d95fbc5/placeholder.txt | Warning: unrecognized line 12 in SSL session file  | Warning: /tmp/gap-options-df8a0141de8e414e95913bfa3d95fbc5/placeholder.txt | Warning: unrecognized line 13 in SSL session file  | Warning: /tmp/gap-options-df8a0141de8e414e95913bfa3d95fbc5/placeholder.txt | Warning: unrecognized line 14 in SSL session file  | Warning: /tmp/gap-options-df8a0141de8e414e95913bfa3d95fbc5/placeholder.txt | curl: (2) no URL specified | curl: try 'curl --help' or 'curl --manual' for more information`, so the item measures `match`.
-- [ ] The gap-platforms workflow run on the branch (or the CI job on linux) passes for the named items; lanes test only on Windows, so a green Windows run alone does not close this task.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
-- [ ] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
+- [x] `options:--ssl-sessions`: Curl answers what curl 8.22.0 answers on linux, `exit 2: Warning: unrecognized line 1 in SSL session file  | Warning: /tmp/gap-options-df8a0141de8e414e95913bfa3d95fbc5/placeholder.txt | Warning: invalid shmax base64 encoding in line 2 | Warning: invalid shmax base64 encoding in line 3 | Warning: unrecognized line 4 in SSL session file  | Warning: /tmp/gap-options-df8a0141de8e414e95913bfa3d95fbc5/placeholder.txt | Warning: unrecognized line 5 in SSL session file  | Warning: /tmp/gap-options-df8a0141de8e414e95913bfa3d95fbc5/placeholder.txt | Warning: unrecognized line 6 in SSL session file  | Warning: /tmp/gap-options-df8a0141de8e414e95913bfa3d95fbc5/placeholder.txt | Warning: unrecognized line 7 in SSL session file  | Warning: /tmp/gap-options-df8a0141de8e414e95913bfa3d95fbc5/placeholder.txt | Warning: unrecognized line 8 in SSL session file  | Warning: /tmp/gap-options-df8a0141de8e414e95913bfa3d95fbc5/placeholder.txt | Warning: unrecognized line 9 in SSL session file  | Warning: /tmp/gap-options-df8a0141de8e414e95913bfa3d95fbc5/placeholder.txt | Warning: unrecognized line 10 in SSL session file  | Warning: /tmp/gap-options-df8a0141de8e414e95913bfa3d95fbc5/placeholder.txt | Warning: unrecognized line 11 in SSL session file  | Warning: /tmp/gap-options-df8a0141de8e414e95913bfa3d95fbc5/placeholder.txt | Warning: unrecognized line 12 in SSL session file  | Warning: /tmp/gap-options-df8a0141de8e414e95913bfa3d95fbc5/placeholder.txt | Warning: unrecognized line 13 in SSL session file  | Warning: /tmp/gap-options-df8a0141de8e414e95913bfa3d95fbc5/placeholder.txt | Warning: unrecognized line 14 in SSL session file  | Warning: /tmp/gap-options-df8a0141de8e414e95913bfa3d95fbc5/placeholder.txt | curl: (2) no URL specified | curl: try 'curl --help' or 'curl --manual' for more information`, so the item measures `match`.
+- [x] The gap-platforms workflow run on the branch (or the CI job on linux) passes for the named items; lanes test only on Windows, so a green Windows run alone does not close this task.
+- [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
+- [x] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
 
 ## Notes
 
@@ -69,8 +69,12 @@ In Curl.Cli.UnitLibrary, where SslSessionsFile (CommandLineGlobalState, CommandL
   and a gap-platforms run re-measures `options:--ssl-sessions`. If it then measures `match`,
   this task needs no lane: tick criteria 1 and 2 on that run and finish it.
 
+- 2026-10-19 (interactive session): the fix is in the gap office, PR #177: `Invoke-GapProbe` gains `-BeforeEachRun`, and `Measure-OptionGap.ps1` writes the placeholder afresh before each binary runs, so curl emptying it no longer leaves Curl an empty file. No Curl code changed. Checked: gap-platforms run 39300024943 (dispatched from `gap`, so the office's tools held the fix, on acc7d89af) measures `options:--ssl-sessions` as match on Linux and on macOS, options 568/568 on both; CI runs 39300027222 and 39308368738 on e2bf712ba built and passed the fast tests on Windows, Linux and macOS; no option was added or changed, so `--ai-help` needed nothing. GF-0090 closes when the next gap analysis run re-measures it.
+
 ## Log
 
 - 2026-10-17: Created.
 - 2026-10-17: Backlog -> Doing. Criteria at claim: a577b127 8b83e917 1fd5de8c 28346828.
 - 2026-10-17: Doing -> Backlog. Interactive only: Curl already matches curl; the gap office's option measurement shares one placeholder that curl's session save empties before Curl runs (see Notes)
+- 2026-10-19: Backlog -> Doing. Interactive session: the gap office's options measurement fix. Criteria at claim: a577b127 8b83e917 1fd5de8c 28346828.
+- 2026-10-19: Doing -> Done. The options measurement writes its placeholder afresh before each binary; --ssl-sessions measures match on Linux and macOS (PR #177).
