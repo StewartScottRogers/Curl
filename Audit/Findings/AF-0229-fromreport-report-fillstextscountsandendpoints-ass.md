@@ -3,8 +3,8 @@ id: AF-0229
 title: FromReport_Report_FillsTextsCountsAndEndPoints asserts nothing; its checks are TestDiagnostics.Assert log lines
 auditor: quality
 severity: Medium
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-18_1905.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-10-18_1045.md, 2026-10-18_1905.md).
 key: quality:Curl.Output.UnitTests/WriteOutTransferInfoTests.cs:FromReport_Report_FillsTextsCountsAndEndPoints:no-assertion
 reproduction: none
 task: BL-2566
@@ -13,9 +13,9 @@ found: 2026-10-16
 found-at: 16500922292d0d0bcaede88acdabc2500cf08ebf
 scorecard: 2026-10-16_1623.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-18
+closed-how: consecutive
+closed-by: 2026-10-18_1045.md, 2026-10-18_1905.md
 ---
 # AF-0229 - FromReport_Report_FillsTextsCountsAndEndPoints asserts nothing; its checks are TestDiagnostics.Assert log lines
 
@@ -43,8 +43,10 @@ Select-String -Path Curl.Output.UnitTests/WriteOutTransferInfoTests.cs -Pattern 
 ## Re-audits
 
 - 2026-10-18 | 2026-10-18_1045.md | reproduces: no | Ran the reproduction: WriteOutTransferInfoTests.cs has Assert lines 50-54 inside FromReport_Report_FillsTextsCountsAndEndPoints (AreEqual on effective URL, method, codes, sizes, end points).
+- 2026-10-18 | 2026-10-18_1905.md | reproduces: no | Ran the Select-String: FromReport_Report_FillsTextsCountsAndEndPoints now has Assert.AreEqual at lines 50-54 (effective URL, method, codes, sizes, end points).
 
 ## Log
 
 - 2026-10-16: filed proposed.
 - 2026-10-16: proposed -> accepted.
+- 2026-10-18: accepted -> closed. Re-audit 2026-10-18_1905.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-10-18_1045.md, 2026-10-18_1905.md).

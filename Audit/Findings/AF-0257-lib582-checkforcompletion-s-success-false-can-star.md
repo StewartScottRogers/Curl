@@ -42,6 +42,8 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Confo
 
 ## Re-audits
 
+- 2026-10-18 | 2026-10-18_1905.md | not re-audited | Ran the -Site command: outcome site-missing. Lib582Run.cs now has CompletionOutcome with bool? success = null (line 159); no 'success = false' site remains in the member.
+
 ## Log
 
 - 2026-10-18: filed proposed.

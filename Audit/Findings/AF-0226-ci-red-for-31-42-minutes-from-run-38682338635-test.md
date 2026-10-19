@@ -3,8 +3,8 @@ id: AF-0226
 title: CI red for 31.42 minutes from run 38682338635: test203 failed on Linux and macOS after BL-2219's ratchet commit 8d337539
 auditor: process
 severity: Low
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-18_1905.md: the reproduction no longer reproduces.
 key: process:logs:CI-run-38682338635:ci-red
 reproduction: none
 task: BL-2752
@@ -13,9 +13,9 @@ found: 2026-10-15
 found-at: 3e1062e68644127a82ba2f5ef33ceb1044cc6f67
 scorecard: 2026-10-15_0156.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-18
+closed-how: reliable-reaudit
+closed-by: 2026-10-18_1905.md
 ---
 # AF-0226 - CI red for 31.42 minutes from run 38682338635: test203 failed on Linux and macOS after BL-2219's ratchet commit 8d337539
 
@@ -44,8 +44,10 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 - 2026-10-16 | 2026-10-16_1623.md | reproduces: yes | Ran the reproduction: the earlier window still shows 04:54:01Z-05:25:26Z, 31.42 min, run 38682338635, and DarkFactory-20261014-172412.log:55-58 'not merged: CI failure on 8d33753' / 'filed: regression test203 on Linux+macOS'. By mechanism over this window, the same cause crosses the rule again. A lane commit tested only on Windows failed on Linux+macOS: BL-2328's 1c068661 (lane L1, pushed 14:18:11 local) broke OpenForWriteAsync_ParentIsAFileOnPosix_IsNotADirectory, and CI was red for 36.28 min (run 38808821626, 2026-10-15T21:27:53Z-22:04:10Z). The shift ended 'not merged: CI failure on f4a49d2' (DarkFactory-20261015-062423.log:98).
 - 2026-10-18 | 2026-10-18_1045.md | reproduces: yes | The original reproduction still shows the 2026-10-15T04:54:01Z spell (31.42 min, run 38682338635) and 'not merged: CI failure on 8d33753' / 'test203 regression, filed BL-2258'. Its 2026-10-14 spell list also holds an odd entry: 98 min, run 92375573640, on round minutes, with a run id far outside the 38.6e9 range. Re-audited by mechanism over 2026-10-16 onward: a lane commit again turned CI red for over 30 minutes with tests that pass on the Windows-only lanes but fail on Linux and macOS. Run 39077398008 on 35c73029 (BL-2546's finish commit), RunAsync_WhenTheServersStreamsAreAllTaken_OpensAnotherConnectionForTheNextTransfer on Linux and macOS and Lib1565_OnAFailingTransfer_AnswersItsCodeAndTheOtherThreadStops on Linux, red 2026-10-17T23:13:09Z to 23:57:47Z (44.63 min). Filed as BL-2677 and BL-2678 by the coordinator at 16:14:57 and 16:20:41 local.
+- 2026-10-18 | 2026-10-18_1905.md | reproduces: no | Ran the reproduction: the 2026-10-14 window still shows the 31.42-minute spell from run 38682338635 (04:54:01Z to 05:25:26Z) and 'not merged: CI failure on 8d33753' / 'run 38682342325 failure on 8d337539: test203 regression, filed BL-2258'. Re-audited by mechanism over this window (-Since 2026-10-18; one shift, 71 tasks done; ciRunsFrom 2026-10-16): ciRedMinutes 0 and ciRedSpells empty. No commit turned CI red on Linux or macOS.
 
 ## Log
 
 - 2026-10-15: filed proposed.
 - 2026-10-15: proposed -> accepted.
+- 2026-10-18: accepted -> closed. Re-audit 2026-10-18_1905.md: the reproduction no longer reproduces.
