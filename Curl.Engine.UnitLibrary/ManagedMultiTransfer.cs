@@ -388,7 +388,8 @@ internal sealed class ManagedMultiTransfer(
 
     /// <summary>
     /// <c>curl_multi_waitfds</c>: one <see cref="CurlWaitEvents.PollIn" /> socket for each transfer whose
-    /// perform has started and whose message is not yet queued, in the order added - the engine-numbered
+    /// perform has started and whose message is not yet queued, in the order added (but none for one that
+    /// waits for an earlier transfer's connection, <see cref="WaitsForEarlierConnection" />) - the engine-numbered
     /// socket the socket callback is told of for the same transfer (<see cref="FirstTransferSocket" />) -
     /// then, while there is any, the threaded resolver's <see cref="ResolverWakeupSocket" />.
     /// </summary>
@@ -407,7 +408,8 @@ internal sealed class ManagedMultiTransfer(
             return CurlMultiCode.BadHandle;
         }
 
-        List<CurlSocket> waiting = [.. entries.FindAll(entry => !entry.Done && entry.Perform is not null).Select(SocketNumberOf)];
+        List<MultiEntry> running = entries.FindAll(entry => !entry.Done && entry.Perform is not null);
+        List<CurlSocket> waiting = [.. running.Where((entry, index) => !WaitsForEarlierConnection(entry, running.Take(index))).Select(SocketNumberOf)];
         if (waiting.Count > 0)
         {
             waiting.Add(new CurlSocket(ResolverWakeupSocket));
@@ -579,6 +581,20 @@ internal sealed class ManagedMultiTransfer(
         {
             clearDnsCache();
         }
+    }
+
+    /// <summary>
+    /// Whether <paramref name="entry" /> holds no socket of its own: under <see cref="CurlPipelining.Multiplex" />
+    /// with <c>CURLOPT_PIPEWAIT</c> and not held to HTTP/1, it waits for a running transfer to the same
+    /// origin added before it to open the connection it then shares, as libcurl's does (upstream test2407, BL-2750).
+    /// </summary>
+    private bool WaitsForEarlierConnection(MultiEntry entry, IEnumerable<MultiEntry> earlier)
+    {
+        HttpVersion version = entry.Transfer.Options.Http.HttpVersion;
+        return Options.Pipelining.HasFlag(CurlPipelining.Multiplex)
+            && entry.Transfer.Options.Http.PipeWait
+            && version is not (HttpVersion.Http10 or HttpVersion.Http11)
+            && earlier.Any(other => other.Origin == entry.Origin);
     }
 
     private CurlSocket SocketNumberOf(MultiEntry entry) => entry.Number ??= new CurlSocket(nextTransferSocket++);

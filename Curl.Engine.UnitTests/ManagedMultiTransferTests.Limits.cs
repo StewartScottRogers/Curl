@@ -109,6 +109,27 @@ public sealed partial class ManagedMultiTransferTests
     }
 
     [TestMethod]
+    [DataRow(CurlPipelining.Multiplex, true, HttpVersion.Http2, "http://h.example/", 2)]
+    [DataRow(CurlPipelining.Multiplex, false, HttpVersion.Http2, "http://h.example/", 3)]
+    [DataRow(CurlPipelining.Multiplex, true, HttpVersion.Http11, "http://h.example/", 3)]
+    [DataRow(CurlPipelining.Multiplex, true, HttpVersion.Http2, "http://other.example/", 3)]
+    [DataRow(CurlPipelining.Nothing, true, HttpVersion.Http2, "http://h.example/", 3)]
+    public async Task GetWaitSockets_PipeWaitingTransferToARunningOneSOrigin_HoldsNoSocketOfItsOwnUnderMultiplex(CurlPipelining pipelining, bool pipeWait, HttpVersion version, string secondUrl, int expectedCount)
+    {
+        await using ManagedCurlEngine engine = new();
+        await using IMultiTransfer multi = engine.CreateMulti();
+        multi.Options = new MultiOptions { Pipelining = pipelining };
+        ControlledEasyTransfer first = PipeWaiting(To("http://h.example/", version), pipeWait), second = PipeWaiting(To(secondUrl, version), pipeWait);
+        multi.Add(first);
+        multi.Add(second);
+        await multi.PerformAsync(CancellationToken.None);
+
+        CurlMultiCode code = multi.GetWaitSockets(new CurlWaitSocket[3], out int count);
+
+        Assert.AreEqual((CurlMultiCode.Ok, expectedCount), (code, count));
+    }
+
+    [TestMethod]
     public async Task PerformAsync_OriginHeldByAnHttp1Connection_GivesAMultiplexingTransferNoStreamOnIt()
     {
         await using ManagedCurlEngine engine = new();
@@ -338,4 +359,10 @@ public sealed partial class ManagedMultiTransferTests
             Http = new EasyHttpOptions { HttpVersion = version },
         },
     };
+
+    private static ControlledEasyTransfer PipeWaiting(ControlledEasyTransfer transfer, bool pipeWait)
+    {
+        transfer.Options = transfer.Options with { Http = transfer.Options.Http with { PipeWait = pipeWait } };
+        return transfer;
+    }
 }
