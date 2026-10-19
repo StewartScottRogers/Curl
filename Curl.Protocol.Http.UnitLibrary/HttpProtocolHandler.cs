@@ -292,14 +292,17 @@ public sealed class HttpProtocolHandler(
         HttpInfoLineRecorder proxyAuthorizationLines = new();
         string? proxyAuthorization = await CreateFirstProxyAuthorizationAsync(proxyAuthRequest, proxyAuthorizationLines, context.CancellationToken).ConfigureAwait(false);
         (string? authorization, HttpTransferException? authorizationFailure) = await CreateFirstAuthorizationAsync(authRequest with { Events = authorizationLines }, context.CancellationToken).ConfigureAwait(false);
-        authorization ??= RepeatKeptDigestAuthorization(options, authRequest)
-            ?? await AnswerKeptDigestChallengesAsync(options, authRequest, context.CancellationToken).ConfigureAwait(false);
+        (string? keptAuthorization, bool answersKeptChallenges) = authorization is null
+            ? await KeptDigestAuthorizationAsync(options, authRequest, context.CancellationToken).ConfigureAwait(false)
+            : (null, false);
+        authorization ??= keptAuthorization;
         bool probes = SendsFirstProbe(framing, authRequest, authorization, proxyAuthRequest, proxyAuthorization);
         HttpRequestPlan plan = new(context, options, probes ? framing.AsAuthProbe() : framing, authRequest, authorization)
         {
             ProbedFraming = probes ? framing : null,
             AuthorizationFailure = authorizationFailure,
             AuthorizationInfoLines = authorizationLines.Lines,
+            AuthorizationAnswersKeptDigestChallenges = answersKeptChallenges,
             Started = started,
             Deadline = deadline,
             Progress = new HttpTransferProgress(context.Progress),
@@ -428,6 +431,23 @@ public sealed class HttpProtocolHandler(
         && (request.AllowedSchemes & HttpAuthSchemes.Digest) != 0
             ? Authenticator.RepeatAuthorization(request, kept)
             : null;
+
+    /// <summary>
+    /// Makes the first request's Digest value from what the transfer kept: the value an earlier hop
+    /// sent, counted on (<see cref="RepeatKeptDigestAuthorization" />), else the answer to the
+    /// challenges the handle's previous transfer kept (<see cref="AnswerKeptDigestChallengesAsync" />),
+    /// with whether it is that answer (<see cref="HttpRequestPlan.AuthorizationAnswersKeptDigestChallenges" />).
+    /// </summary>
+    private async ValueTask<(string? Authorization, bool AnswersKeptChallenges)> KeptDigestAuthorizationAsync(HttpRequestOptions options, HttpAuthRequest request, CancellationToken cancellationToken)
+    {
+        if (RepeatKeptDigestAuthorization(options, request) is { } repeated)
+        {
+            return (repeated, false);
+        }
+
+        string? answer = await AnswerKeptDigestChallengesAsync(options, request, cancellationToken).ConfigureAwait(false);
+        return (answer, answer is not null);
+    }
 
     /// <summary>
     /// Answers the challenges a 401 of the handle's previous transfer offered
@@ -2646,12 +2666,31 @@ public sealed class HttpProtocolHandler(
     /// </summary>
     /// <exception cref="HttpTransferException">The authenticator fails the transfer (<see cref="HttpAuthenticationFailedException" />).</exception>
     private ValueTask<string?> RetryAuthorizationAsync(HttpRequestPlan plan, HttpAuthRequest request, HttpResponseHead head, CancellationToken cancellationToken) =>
-        AnswerChallengesAsync(
-            request,
-            plan.Authorization,
-            plan.AuthorizationAnswersChallenge,
-            MayRetry(plan, head, 401) ? ValuesOf(head, "WWW-Authenticate") : [],
-            cancellationToken);
+        RepeatsKeptDigestAnswer(plan, head)
+            ? ValueTask.FromResult<string?>(Authenticator.RepeatAuthorization(request, plan.Authorization!))
+            : AnswerChallengesAsync(
+                request,
+                plan.Authorization,
+                plan.AuthorizationAnswersChallenge,
+                MayRetry(plan, head, 401) ? ValuesOf(head, "WWW-Authenticate") : [],
+                cancellationToken);
+
+    /// <summary>
+    /// Decides whether a 401 to a first request that answered the handle's kept Digest challenges
+    /// (<see cref="HttpRequestPlan.AuthorizationAnswersKeptDigestChallenges" />) is answered by sending
+    /// that answer again, counted on, when the previous perform's server picked Digest
+    /// (<see cref="HttpRequestOptions.AuthSchemePicked" />) and the 401 offers Digest: libcurl 8.22.0
+    /// keeps <c>authhost.avail</c> on the easy handle from the 401 that ended a perform whose Digest
+    /// answer was refused, so <c>Curl_http_input_auth</c> writes <c>Ignoring duplicate digest auth
+    /// header.</c> for this 401's challenge, keeps the old nonce, and retries once before the next 401
+    /// ends the transfer (upstream test2027, BL-2745, ADR-0700). After a perform that picked another
+    /// scheme, <c>pickoneauth</c> cleared <c>avail</c>, so the 401 ends the transfer (upstream test2024).
+    /// </summary>
+    private static bool RepeatsKeptDigestAnswer(HttpRequestPlan plan, HttpResponseHead head) =>
+        plan.AuthorizationAnswersKeptDigestChallenges
+            && plan.Options.AuthSchemePicked == HttpAuthSchemes.Digest
+            && MayRetry(plan, head, 401)
+            && ValuesOf(head, "WWW-Authenticate").Any(challenge => SchemeOfAuthorization(challenge) == HttpAuthSchemes.Digest);
 
     /// <summary>
     /// Makes the request <see cref="RetryAuthorizationAsync" /> answers a 401 with, or gives
@@ -3258,6 +3297,14 @@ public sealed class HttpProtocolHandler(
         /// request, whose value was made before any challenge.
         /// </summary>
         public bool AuthorizationAnswersChallenge { get; init; }
+
+        /// <summary>
+        /// Gets a value indicating whether <see cref="Authorization" /> is the transfer's first value,
+        /// made from the challenges the handle's previous transfer kept
+        /// (<see cref="HttpRequestOptions.KeptDigestChallenges" />); <see langword="false" /> for every
+        /// value a retry sends (<see cref="RepeatsKeptDigestAnswer" />, BL-2745).
+        /// </summary>
+        public bool AuthorizationAnswersKeptDigestChallenges { get; init; }
 
         /// <summary>
         /// Gets the <c>-v</c> lines the authenticator reported while it made

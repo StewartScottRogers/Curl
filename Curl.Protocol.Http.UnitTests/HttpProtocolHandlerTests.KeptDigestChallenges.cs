@@ -47,11 +47,56 @@ public sealed partial class HttpProtocolHandlerTests
         Assert.AreEqual(PlainRequest, connection.Written);
     }
 
-    private static TransferContext KeptChallengesContext(string[] kept, HttpAuthSchemes allowed, bool credentials) => new()
+    /// <summary>
+    /// Upstream case 2027 (BL-2745): after a perform whose server picked Digest, a 401 offering Digest to the
+    /// kept challenges' answer is answered once more with that answer, as libcurl ignores the 401's Digest
+    /// header as a duplicate; the next 401 ends the transfer.
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_KeptDigestAnswerRefusedAfterAPerformThatPickedDigest_SendsTheSameAnswerOnceMore()
+    {
+        const string refused = "HTTP/1.1 401 Wrong\r\nWWW-Authenticate: Digest realm=\"testrealm\", nonce=\"7\"\r\nContent-Length: 0\r\n\r\n";
+        TurnTakingConnection connection = new(65536, refused, refused);
+        const string answer = "Digest username=\"u\", nonce=\"5\"";
+        Diagnostics.Arrange("kept challenges", KeptChallenge);
+
+        TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), new RepeatingAuthenticator(answer)).ExecuteAsync(KeptChallengesContext([KeptChallenge], HttpAuthSchemes.Digest, credentials: true, picked: HttpAuthSchemes.Digest));
+
+        WriteResult(result);
+        string expected = "GET /a HTTP/1.1\r\nHost: 127.0.0.1:18183\r\nAuthorization: " + answer + "\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n\r\n"
+            + "GET /a HTTP/1.1\r\nHost: 127.0.0.1:18183\r\nAuthorization: " + answer + " again for GET /a\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n\r\n";
+        Diagnostics.Diff("connection written", expected, connection.Written);
+        Assert.AreEqual(expected, connection.Written);
+    }
+
+    /// <summary>
+    /// Upstream case 2024 (BL-2745): after a perform that picked another scheme, or for a 401 offering no Digest,
+    /// the kept challenges' refused answer ends the transfer.
+    /// </summary>
+    [TestMethod]
+    [DataRow(HttpAuthSchemes.Basic, "Digest realm=\"r\", nonce=\"7\"", DisplayName = "previous perform picked Basic")]
+    [DataRow(HttpAuthSchemes.None, "Digest realm=\"r\", nonce=\"7\"", DisplayName = "previous perform picked none")]
+    [DataRow(HttpAuthSchemes.Digest, "Basic realm=\"r\"", DisplayName = "401 offers no Digest")]
+    public async Task ExecuteAsync_KeptDigestAnswerRefusedOtherwise_SendsItOnlyOnce(HttpAuthSchemes picked, string challenge)
+    {
+        string refused = "HTTP/1.1 401 Wrong\r\nWWW-Authenticate: " + challenge + "\r\nContent-Length: 0\r\n\r\n";
+        TurnTakingConnection connection = new(65536, refused, refused);
+        const string answer = "Digest username=\"u\", nonce=\"5\"";
+        Diagnostics.Arrange("picked, challenge", $"{picked}, {challenge}");
+
+        TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), new RepeatingAuthenticator(answer)).ExecuteAsync(KeptChallengesContext([KeptChallenge], HttpAuthSchemes.Digest, credentials: true, picked));
+
+        WriteResult(result);
+        string expected = "GET /a HTTP/1.1\r\nHost: 127.0.0.1:18183\r\nAuthorization: " + answer + "\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n\r\n";
+        Diagnostics.Diff("connection written", expected, connection.Written);
+        Assert.AreEqual(expected, connection.Written);
+    }
+
+    private static TransferContext KeptChallengesContext(string[] kept, HttpAuthSchemes allowed, bool credentials, HttpAuthSchemes picked = HttpAuthSchemes.None) => new()
     {
         Url = CurlUrl.Parse(AuthUrl),
         Output = new MemoryStream(),
         Credentials = credentials ? new NetworkCredential("u", "p") : null,
-        Http = new HttpRequestOptions { AuthSchemes = allowed, KeptDigestChallenges = kept },
+        Http = new HttpRequestOptions { AuthSchemes = allowed, KeptDigestChallenges = kept, AuthSchemePicked = picked },
     };
 }
