@@ -3,8 +3,8 @@ id: AF-0282
 title: RunAsync_PerformFails_AnswersItsCode accepts any non-zero exit code instead of the code it names
 auditor: quality
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Conformance.LibTest.UnitTests/Lib539To553Tests.cs:RunAsync_PerformFails_AnswersItsCode:weak-assertion
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Curl.Conformance.LibTest.UnitTests/Lib539To553Tests.cs -Patt
 ## Log
 
 - 2026-10-18: filed proposed.
+- 2026-10-19: proposed -> accepted.
