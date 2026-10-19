@@ -33,3 +33,4 @@ Found by BL-2543, which ported lib1597. The runner reports `<verify><stdout> dif
 ## Log
 
 - 2026-10-17: Created.
+- 2026-10-18: Backlog -> Doing. Criteria at claim: 08788b59 48be2d2b 3d836d5e.
