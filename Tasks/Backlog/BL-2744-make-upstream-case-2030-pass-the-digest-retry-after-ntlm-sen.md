@@ -4,7 +4,7 @@ title: Make upstream case 2030 pass: the Digest retry after NTLM sends its Autho
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-2747, BL-2820]
+depends-on: [BL-2747, BL-2820, BL-2823]
 touches: [Curl.Conformance.LibTest.UnitLibrary, Curl.Conformance.LibTest.UnitTests, Curl.Conformance.UnitTests/PassingUpstreamCases.txt, Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests, Curl.Protocol.Abstractions.UnitLibrary/HttpRequestOptions.cs, Curl.Protocol.Abstractions.UnitLibrary/TransferReport.cs, Curl.Engine.UnitLibrary/ManagedEasyTransfer.cs, Curl.Engine.UnitLibrary/TransferContextFactory.cs, Curl.Engine.UnitTests/ManagedCurlEngineTests.cs]
 requirement: none
 created: 2026-10-18
@@ -36,6 +36,8 @@ Found by BL-2689, which put 2025, 2029, 2031 and 2032 on the ratchet once BL-263
 - Widened `touches` for that: Curl.Protocol.Http (the resend), the two Abstractions files, and the Engine files. `Curl.Engine.UnitLibrary/ManagedEasyTransfer.cs` is in BL-2694's `touches` (in Doing), so requeued until it is free.
 - 2026-10-19 (lane 1, third claim, no code edited): the run started with under one dollar of its cost cap, too little for the five-project change. Split the handle-state plumbing (TransferReport, HttpRequestOptions, ManagedEasyTransfer, TransferContextFactory) into BL-2820 and added it to depends-on. What stays here: reapply stash 7eef9059 (HttpRequestPlan.AuthorizationAnswersKeptChallenges, ResendsKeptChallengesAnswer, its two tests, 2030 on the ratchet), make the resend conditional on BL-2820's new HttpRequestOptions property, rerun 2030 and 2024.
 
+- 2026-10-19 (interactive session, no code kept): the stash 7eef9059 no longer applies: BL-2745 (ADR-0700) has since added `RepeatsKeptDigestAnswer`, which repeats the kept answer once when the previous perform picked Digest; with it 2024 and 2027 pass and 2030 still fails at request 400 (sent once). Making that repeat also follow `DigestStaysAvailable` is not enough: a trace showed `DigestStaysAvailable` is false after transfer 300, because lib2023 runs 300 to 500 on a new handle and BL-2820's rule needs a Digest nonce already held. In curl, 300's refused NTLM answer sets `authproblem`, so `pickoneauth` never clears the Digest that 300's last 401 offered. That port is BL-2823; once it is Done, what is left here is to make `RepeatsKeptDigestAnswer` follow its state, run 2030, 2024 and 2027, and list 2030 on the ratchet. Stash 7eef9059 can be dropped then.
+
 ## Log
 
 - 2026-10-18: Created.
@@ -48,3 +50,4 @@ Found by BL-2689, which put 2025, 2029, 2031 and 2032 on the ratchet once BL-263
 - 2026-10-19: Backlog -> Doing. Criteria at claim: b96ecbf8 fd6bd9d4 3d836d5e.
 - 2026-10-19: Doing -> Blocked. Stewart: dark factory its runs of the last day already cost 3.16 of its 3.31 US dollar cost cap, so it was not run again; split the task; see Z:\repos\Curl.logs\BL-2744-*.jsonl
 - 2026-10-19: Blocked -> Doing. Interactive session, outside the lane cost cap: reapply stash 7eef9059 and make its resend depend on BL-2820. Criteria at claim: b96ecbf8 fd6bd9d4 3d836d5e.
+- 2026-10-19: Doing -> Backlog. Waits on BL-2823: the HTTP handler must keep Digest available after a refused auth answer, as curl's authproblem does.
