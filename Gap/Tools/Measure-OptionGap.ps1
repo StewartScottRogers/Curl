@@ -221,7 +221,9 @@ function Measure-OptionGap($Inventory, [string] $TargetVersion, [string] $Candid
                 }
                 else {
                     $arguments = @($probe.arguments | ForEach-Object { if ($_ -ceq '<tempfile>') { $tempFile } elseif ($_ -ceq '<tempdir>') { Join-Path $scratch 'dir' } else { $_ } })
-                    $run = Invoke-GapProbe -Arguments $arguments -CandidatePath $CandidatePath -TargetVersion $TargetVersion -WorkingDirectory $scratch -TimeoutSeconds 20
+                    # The placeholder is written afresh before each binary runs: curl's
+                    # --ssl-sessions empties it as it exits, so Curl read an empty file (GF-0090).
+                    $run = Invoke-GapProbe -Arguments $arguments -CandidatePath $CandidatePath -TargetVersion $TargetVersion -WorkingDirectory $scratch -TimeoutSeconds 20 -BeforeEachRun { [System.IO.File]::WriteAllText($tempFile, "x`n") }
                     $toAnswer = { param($r) if ($null -eq $r) { $null } else { [pscustomobject] @{ exitCode = $r.ExitCode; stderr = $r.Stderr } } }
                     $answer = [pscustomobject] @{ reference = (& $toAnswer $run.Reference); candidate = (& $toAnswer $run.Candidate) }
                 }
