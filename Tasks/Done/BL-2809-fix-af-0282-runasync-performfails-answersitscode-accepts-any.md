@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.LibTest.UnitTests]
 requirement: none
 created: 2026-10-19
-completed:
+completed: 2026-10-19
 ---
 # BL-2809 — Fix AF-0282: RunAsync_PerformFails_AnswersItsCode accepts any non-zero exit code instead of the code it names
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Both Lib540 failure tests now pin `LibTestErrorCodes.Multi`, the code upstream's `multi_perform` and `multi_add_handle` macros set (`TEST_ERR_MULTI`); LibTestSteps.Multi.cs sets it for both. Test-only change, so no Measure-CodeQuality run. Pipeline feature, but the change is two assertions, so done directly.
 
 ## Log
 
 - 2026-10-19: Created.
 - 2026-10-19: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-19: Doing -> Done. Lib540's perform-fails and add-handle-fails tests assert the exact TEST_ERR_MULTI exit code

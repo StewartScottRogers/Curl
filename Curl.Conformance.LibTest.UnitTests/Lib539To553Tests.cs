@@ -100,7 +100,7 @@ public sealed class Lib540Tests
 
         LibTestResult result = await new Lib540(TimeProvider.System).RunAsync(run.Context, CancellationToken.None);
 
-        Assert.AreNotEqual(0, result.ExitCode);
+        Assert.AreEqual((int)LibTestErrorCodes.Multi, result.ExitCode);
         Assert.IsFalse(run.Error.ToString().Contains("again", StringComparison.Ordinal));
     }
 
@@ -140,7 +140,7 @@ public sealed class Lib540Tests
 
         LibTestResult result = await new Lib540(TimeProvider.System).RunAsync(run.Context, CancellationToken.None);
 
-        Assert.AreNotEqual(0, result.ExitCode);
+        Assert.AreEqual((int)LibTestErrorCodes.Multi, result.ExitCode);
     }
 
     [TestMethod]
