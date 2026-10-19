@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.UnitTests/PassingUpstreamCases.txt, Curl.Networking.UnitLibrary, Curl.Networking.UnitTests, Curl.Engine.UnitLibrary, Curl.Engine.UnitTests]
 requirement: none
 created: 2026-10-18
-completed:
+completed: 2026-10-19
 ---
 # BL-2725 — Make upstream case 678 pass: lib678's CURLOPT_CAINFO_BLOB transfer reaches the HTTPS stand-in
 
@@ -42,9 +42,9 @@ platform-neutral before holding it (Schannel on Windows, OpenSSL elsewhere; revo
 
 ## Acceptance criteria
 
-- [ ] test678 passes through the runner on Windows and is added to `Curl.Conformance.UnitTests/PassingUpstreamCases.txt`, or, if it still fails, its differing lines are filed with the board script.
-- [ ] The fix adds a focused unit test in the fixed library's own `.UnitTests` project (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] test678 passes through the runner on Windows and is added to `Curl.Conformance.UnitTests/PassingUpstreamCases.txt`, or, if it still fails, its differing lines are filed with the board script.
+- [x] The fix adds a focused unit test in the fixed library's own `.UnitTests` project (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
 
@@ -65,6 +65,14 @@ platform-neutral before holding it (Schannel on Windows, OpenSSL elsewhere; revo
   read the same member. Focused unit tests in `Curl.Networking.UnitTests` and `Curl.Engine.UnitTests`.
 - Requeued because those projects overlap live tasks: `Curl.Networking.*` with BL-2730 and `Curl.Engine.*`
   with BL-2735 (added to `touches`, rule 3).
+- 2026-10-19 (lane 1): fixed as planned. `TlsClientOptions.CaCertificateBlob` (with `HasCaCertificates`) is
+  trusted in place of the CA file by `ServerCertificateVerification` and QUIC's Windows-store choice;
+  `DescribeTrust` sets `HasCaCertificateBlob`; `TlsClientOptionsMapping.Of` and `DohOf` carry the origin's
+  blob, `ProxyOf` the proxy's (ADR-0704). test678 passes through the runner and is on the ratchet. It is
+  platform-neutral: the blob is the case's PEM test CA, read by the same rules as `--cacert` on both
+  builds, and the OpenSSL build never checks revocation. Unit tests: 4 in `SslStreamTlsProviderTests`,
+  1 in `TlsClientOptionsMappingTests`. Measure-CodeQuality for Networking and Engine: 0 failing members.
+  Narrowing the Engine `touches` (step 2a) was skipped: the permission layer refused the push.
 
 ## Log
 
@@ -72,3 +80,4 @@ platform-neutral before holding it (Schannel on Windows, OpenSSL elsewhere; revo
 - 2026-10-18: Backlog -> Doing. Criteria at claim: 262ba952 c59fcab3 3d836d5e.
 - 2026-10-18: Doing -> Backlog. Needs Curl.Networking.UnitLibrary/UnitTests (held by BL-2730) and Curl.Engine.UnitLibrary/UnitTests (held by BL-2735): CURLOPT_CAINFO_BLOB never reaches TlsClientOptions, so verification fails with 60
 - 2026-10-19: Backlog -> Doing. Criteria at claim: 262ba952 c59fcab3 3d836d5e.
+- 2026-10-19: Doing -> Done. CURLOPT_CAINFO_BLOB is trusted like a CA file; upstream test678 passes and holds the ratchet
