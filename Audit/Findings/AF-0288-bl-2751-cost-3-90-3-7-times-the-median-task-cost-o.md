@@ -3,8 +3,8 @@ id: AF-0288
 title: BL-2751 cost $3.90, 3.7 times the median task cost of $1.04 (87 turns, 27 edits)
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: process:logs:BL-2751:cost-outlier
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Log
 
 - 2026-10-18: filed proposed.
+- 2026-10-19: proposed -> accepted.
