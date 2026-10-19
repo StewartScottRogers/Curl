@@ -19,7 +19,9 @@ namespace Curl.Protocol.Rtsp;
 /// </param>
 /// <param name="authenticator">
 /// Builds the pre-emptive <c>Authorization</c> value for <c>-u</c>, <c>--basic</c> and
-/// <c>--oauth2-bearer</c>, with no challenges.
+/// <c>--oauth2-bearer</c>, with no challenges; and, when a request sent without one gets a
+/// <c>401</c> with <c>WWW-Authenticate</c> challenges, the value it is sent again with once, with
+/// the next <c>CSeq</c>, as <c>--anyauth</c> or <c>CURLAUTH_ANY</c> does (BL-2818).
 /// </param>
 /// <param name="interleaveSink">
 /// Takes each interleaved <c>$</c> RTP frame read before a reply or during a <c>RECEIVE</c>, as
@@ -90,6 +92,8 @@ public sealed class RtspProtocolHandler(
     private const int LowestStatusCode = 100;
 
     private const int LowestErrorStatusCode = 400;
+
+    private const int UnauthorizedStatusCode = 401;
 
     private const string UnsupportedResponseCode = "Unsupported response code in HTTP response";
 
@@ -226,7 +230,10 @@ public sealed class RtspProtocolHandler(
     {
         try
         {
-            return await SendAndReadAsync(connection, context, session).ConfigureAwait(false);
+            RtspExchange first = await SendAndReadAsync(connection, context, session, null).ConfigureAwait(false);
+            return first.AnswerAuthorization is { } answer
+                ? (await SendAndReadAsync(connection, context, session, answer).ConfigureAwait(false)).Result
+                : first.Result;
         }
         catch (RtspTransferException failure)
         {
@@ -313,27 +320,51 @@ public sealed class RtspProtocolHandler(
     }
 
     /// <summary>
-    /// Sends the <c>OPTIONS</c> request and reads its reply, checking the <c>Session</c>, the
-    /// status and the <c>CSeq</c> in curl's order.
+    /// Sends the request and reads its reply, checking the <c>Session</c>, the status and the
+    /// <c>CSeq</c> in curl's order.
     /// </summary>
-    private async Task<TransferResult> SendAndReadAsync(IConnection connection, ITransferContext context, RtspSessionState session)
+    /// <param name="connection">The transfer's connection.</param>
+    /// <param name="context">The transfer.</param>
+    /// <param name="session">The transfer's <c>CSeq</c> counter and session ID.</param>
+    /// <param name="answer">
+    /// The <c>Authorization</c> value answering the previous reply's <c>401</c>, or
+    /// <see langword="null" /> for the first request, which sends only a pre-emptive one.
+    /// </param>
+    private async Task<RtspExchange> SendAndReadAsync(IConnection connection, ITransferContext context, RtspSessionState session, string? answer)
     {
         HttpRequestOptions options = context.Http ?? new HttpRequestOptions();
         ITransferEvents events = context.Events;
         if (RequestRefusal(options, events) is { } refused)
         {
-            return refused;
+            return new(refused, null);
         }
 
-        long sequenceNumber = session.NextSequenceNumber;
-        byte[] requestHead = FormatHead(context, options, session);
+        string? authorization = answer ?? Authorization(context, options, []);
+        byte[] requestHead = FormatHead(context, options, session, authorization);
         events.ReportRequestHeader(requestHead);
         byte[] request = [.. requestHead, .. plan.SentBody];
         if (await SendAsync(connection, request, events, context.CancellationToken).ConfigureAwait(false) is { } sendFailure)
         {
-            return sendFailure;
+            return new(sendFailure, null);
         }
 
+        return await ReadReplyAsync(connection, context, session, options, request.Length, authorization).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Reads the reply to the request just sent, checking the <c>Session</c>, the status and the
+    /// <c>CSeq</c> in curl's order, and names the value to send it again with after a <c>401</c>.
+    /// </summary>
+    /// <param name="connection">The transfer's connection.</param>
+    /// <param name="context">The transfer.</param>
+    /// <param name="session">The transfer's <c>CSeq</c> counter and session ID.</param>
+    /// <param name="options">The transfer's request options.</param>
+    /// <param name="requestSize">How many bytes the request took, for <c>%{size_request}</c>.</param>
+    /// <param name="authorization">The <c>Authorization</c> value the request was sent with, or <see langword="null" />.</param>
+    private async Task<RtspExchange> ReadReplyAsync(IConnection connection, ITransferContext context, RtspSessionState session, HttpRequestOptions options, int requestSize, string? authorization)
+    {
+        ITransferEvents events = context.Events;
+        long sequenceNumber = session.NextSequenceNumber;
         session.TakeSequenceNumber();
         events.ReportInfo(RtspVerboseLines.RequestSent);
         var log = new RtspTransferLog(context.DiagnosticLog);
@@ -345,14 +376,14 @@ public sealed class RtspProtocolHandler(
             ResponseCode = head.StatusCode,
             Method = plan.MethodName,
             HeaderSize = head.Length,
-            RequestSize = request.Length,
+            RequestSize = requestSize,
             RtspSessionId = session.SessionId,
             RtspClientSequenceNumber = session.NextSequenceNumber,
             RtspSequenceNumberReceived = head.SequenceNumber,
         };
         if (StatusFailure(head, options, context.MaxFileSize, events) is { } statusFailure)
         {
-            return statusFailure with { Report = report };
+            return new(statusFailure with { Report = report }, null);
         }
 
         long bodyRead = await ReadBodyAsync(connection, context, head).ConfigureAwait(false);
@@ -361,8 +392,24 @@ public sealed class RtspProtocolHandler(
         TransferResult result = head.SequenceNumber == sequenceNumber
             ? TransferResult.Success(bodyRead)
             : Fail(events, CurlExitCode.RtspCseqError, SequenceMismatch(sequenceNumber, head.SequenceNumber), bodyRead);
-        return result with { Report = report with { DownloadSize = bodyRead } };
+        result = result with { Report = report with { DownloadSize = bodyRead } };
+        return new(result, result.IsSuccess && authorization is null ? AnswerChallenges(context, options, head) : null);
     }
+
+    /// <summary>
+    /// The <c>Authorization</c> value a <c>401</c> to a request sent without one is answered with,
+    /// as curl 8.22.0's <c>Curl_http_auth_act</c> sends the request again under <c>CURLAUTH_ANY</c>
+    /// (upstream test3100, BL-2818).
+    /// </summary>
+    /// <returns>
+    /// The value, or <see langword="null" /> when the reply is no <c>401</c>, offers no challenge, or
+    /// none the authenticator can answer with a header.
+    /// </returns>
+    private string? AnswerChallenges(ITransferContext context, HttpRequestOptions options, RtspReplyHead head) =>
+        head.StatusCode == UnauthorizedStatusCode && head.Challenges.Count > 0
+            && Authorization(context, options, head.Challenges) is { Length: > 0 } answer
+            ? answer
+            : null;
 
     /// <summary>
     /// Reads the reply body unless the plan leaves it unread, writing it to the body output when the
@@ -430,8 +477,8 @@ public sealed class RtspProtocolHandler(
     private RtspInterleavedFrameFilter? Frames(RtspSessionState session) =>
         interleaveSink is null ? null : new RtspInterleavedFrameFilter(interleaveSink, session.IsChannelSetUp);
 
-    /// <summary>Writes the request head with the session's next <c>CSeq</c> and its session ID.</summary>
-    private byte[] FormatHead(ITransferContext context, HttpRequestOptions options, RtspSessionState session) =>
+    /// <summary>Writes the request head with the session's next <c>CSeq</c>, its session ID and <paramref name="authorization" />.</summary>
+    private byte[] FormatHead(ITransferContext context, HttpRequestOptions options, RtspSessionState session, string? authorization) =>
         RtspRequestFormatter.Format(
             new RtspMethod(plan.MethodName),
             plan.Target,
@@ -439,11 +486,11 @@ public sealed class RtspProtocolHandler(
             session.SessionId,
             plan.SendsRange ? RtspRequestFormatter.RangeValue(context.ResumeFrom, context.RangeText) : null,
             options,
-            Authorization(context, options),
+            authorization,
             plan,
             context.TimeCondition);
 
-    private string? Authorization(ITransferContext context, HttpRequestOptions options) =>
+    private string? Authorization(ITransferContext context, HttpRequestOptions options, IReadOnlyList<string> challenges) =>
         authenticator.CreateAuthorization(
             new HttpAuthRequest(
                 plan.MethodName,
@@ -453,5 +500,10 @@ public sealed class RtspProtocolHandler(
                 options.BearerToken,
                 options.AuthSchemes,
                 IsProxy: false),
-            []);
+            challenges);
+
+    /// <summary>One request's outcome, and the <c>Authorization</c> value to send it again with after a <c>401</c>.</summary>
+    /// <param name="Result">The request's outcome.</param>
+    /// <param name="AnswerAuthorization">The value to send the request again with, or <see langword="null" /> not to.</param>
+    private sealed record RtspExchange(TransferResult Result, string? AnswerAuthorization);
 }

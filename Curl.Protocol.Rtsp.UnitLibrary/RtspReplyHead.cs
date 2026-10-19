@@ -16,4 +16,8 @@ internal sealed record RtspReplyHead(
     long ContentLength,
     int Length,
     byte[]? EndLine,
-    byte[] Remaining);
+    byte[] Remaining)
+{
+    /// <summary>Gets the value of every <c>WWW-Authenticate</c> header, in order; empty when there is none.</summary>
+    public IReadOnlyList<string> Challenges { get; init; } = [];
+}

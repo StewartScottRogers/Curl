@@ -73,6 +73,14 @@ internal sealed class RtspReplyHeadParser(RtspSessionState session, long? maxFil
 
     private string? location;
 
+    private readonly List<string> challenges = [];
+
+    /// <summary>
+    /// Gets the value of every <c>WWW-Authenticate</c> header read so far, in order, for a <c>401</c>
+    /// to be answered with credentials (BL-2818).
+    /// </summary>
+    internal IReadOnlyList<string> Challenges => challenges;
+
     /// <summary>Gets a value indicating whether the status line has been read.</summary>
     internal bool HasStatus { get; private set; }
 
@@ -188,13 +196,26 @@ internal sealed class RtspReplyHeadParser(RtspSessionState session, long? maxFil
         {
             KeepLocation(line.AsSpan("Location:".Length).Trim(WhiteSpace).ToString());
         }
-        else if (line.StartsWith("Session:", StringComparison.OrdinalIgnoreCase))
+        else
+        {
+            AcceptSessionOrAuthenticationHeader(line);
+        }
+    }
+
+    /// <summary>Reads a <c>Session</c>, <c>Transport</c> or <c>WWW-Authenticate</c> header; ignores any other.</summary>
+    private void AcceptSessionOrAuthenticationHeader(string line)
+    {
+        if (line.StartsWith("Session:", StringComparison.OrdinalIgnoreCase))
         {
             session.AcceptSession(line["Session:".Length..]);
         }
         else if (line.StartsWith("Transport:", StringComparison.OrdinalIgnoreCase))
         {
             session.AcceptTransport(line["Transport:".Length..]);
+        }
+        else if (line.StartsWith("WWW-Authenticate:", StringComparison.OrdinalIgnoreCase))
+        {
+            challenges.Add(line.AsSpan("WWW-Authenticate:".Length).Trim(WhiteSpace).ToString());
         }
     }
 

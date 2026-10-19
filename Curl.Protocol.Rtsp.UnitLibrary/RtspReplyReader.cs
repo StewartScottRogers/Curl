@@ -297,7 +297,7 @@ internal static class RtspReplyReader
     }
 
     private static RtspReplyHead Head(RtspReplyHeadParser parser, int length, byte[]? endLine, byte[] remaining) =>
-        new(parser.StatusCode, parser.SequenceNumber, parser.ContentLength, length, endLine, remaining);
+        new(parser.StatusCode, parser.SequenceNumber, parser.ContentLength, length, endLine, remaining) { Challenges = parser.Challenges };
 
     private static byte[] MakeRoom(byte[] buffer, int received)
     {
