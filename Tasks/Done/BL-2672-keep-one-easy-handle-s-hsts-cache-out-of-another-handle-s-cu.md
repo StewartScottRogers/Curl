@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary/ManagedEasyTransfer.cs, Curl.Engine.UnitLibrary/ManagedEngineSharedState.cs, Curl.Engine.UnitLibrary/CallbackHstsCache.cs, Curl.Engine.UnitTests/ManagedEasyTransferTests.Hsts.cs, Curl.Engine.UnitTests/CallbackHstsCacheTests.cs, Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
 requirement: none
 created: 2026-10-17
-completed:
+completed: 2026-10-18
 ---
 # BL-2672 — Keep one easy handle's HSTS cache out of another handle's CURLOPT_HSTSWRITEFUNCTION so upstream case 1915 passes
 
@@ -22,15 +22,17 @@ Found by BL-2545 (lib1915 port). lib1915's first handle loads four entries throu
 
 ## Acceptance criteria
 
-- [ ] A new easy handle whose HSTS read callback fails hands its write callback no entries at cleanup, with a focused unit test in `Curl.Engine.UnitTests`.
-- [ ] Case 1915 passes through the runner on Windows and is added to `Curl.Conformance.UnitTests/PassingUpstreamCases.txt`.
-- [ ] `dotnet build` is clean and the fast tests pass with no test deleted, skipped or weakened.
+- [x] A new easy handle whose HSTS read callback fails hands its write callback no entries at cleanup, with a focused unit test in `Curl.Engine.UnitTests`.
+- [x] Case 1915 passes through the runner on Windows and is added to `Curl.Conformance.UnitTests/PassingUpstreamCases.txt`.
+- [x] `dotnet build` is clean and the fast tests pass with no test deleted, skipped or weakened.
 
 ## Notes
 
 - 2026-10-18: touches narrowed from Curl.Engine.UnitLibrary, Curl.Engine.UnitTests to files, by reading ManagedEasyTransfer HSTS save (shared.Hsts), ManagedEngineSharedState and CallbackHstsCache, so it can run beside other Engine tasks.
+- 2026-10-18: Fix: a perform whose HSTS read callback fails leaves the handle with its own empty cache for cleanup (`performedHsts`), so the write callback gets nothing of another handle's entries; no branch added, so complexity is unchanged (Measure-CodeQuality not rerun). Partial entries loaded before a failing read are not written.
 
 ## Log
 
 - 2026-10-17: Created.
 - 2026-10-18: Backlog -> Doing. Criteria at claim: 821be033 aee6805f 4272a6b9.
+- 2026-10-18: Doing -> Done. HSTS write callback no longer gets another handle's entries; case 1915 listed

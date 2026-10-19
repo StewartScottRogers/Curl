@@ -572,6 +572,8 @@ internal sealed partial class ManagedEasyTransfer(
         CurlCode loaded = LoadHstsFromCallback(options, performedHsts);
         if (loaded != CurlCode.Ok)
         {
+            // The handle's cache never loaded, so cleanup hands the write callback this handle's own empty one, not entries other handles loaded into the engine's (upstream case 1915).
+            performedHsts = new HstsTransferPolicy(shared.TimeProvider);
             return Finish(loaded, string.Empty, Info);
         }
 

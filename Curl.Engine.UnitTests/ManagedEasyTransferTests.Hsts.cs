@@ -52,6 +52,24 @@ public sealed partial class ManagedEasyTransferTests
     }
 
     [TestMethod]
+    public async Task DisposeAsync_HandleWhoseHstsReadCallbackFailed_HandsTheWriteCallbackNoEntriesOfAnotherHandle()
+    {
+        ManagedCurlEngine engine = CreateEngine(new ScriptedConnector([Encoding.ASCII.GetBytes(HstsOk)]));
+        await using ManagedEasyTransfer loader = (ManagedEasyTransfer)engine.CreateEasy();
+        loader.Options = HstsOptionsOf("http://h/x", CallbackHstsCacheTests.ReadOf([new HstsEntry("h", false, null)], HstsResult.Done), write: null);
+        await loader.PerformAsync(CancellationToken.None);
+        List<(HstsEntry Entry, int Index, int Total)> saved = [];
+        ManagedEasyTransfer failing = (ManagedEasyTransfer)engine.CreateEasy();
+        failing.Options = HstsOptionsOf("http://h/x", CallbackHstsCacheTests.ReadOf([], HstsResult.Fail), RecordingHstsWrite(saved));
+
+        CurlCode code = await failing.PerformAsync(CancellationToken.None);
+        await failing.DisposeAsync();
+
+        Assert.AreEqual(CurlCode.AbortedByCallback, code);
+        Assert.IsEmpty(saved);
+    }
+
+    [TestMethod]
     public async Task PerformAsync_HstsCallbacksWithHstsDisabled_CallsNeither()
     {
         ScriptedConnector connector = new([Encoding.ASCII.GetBytes(HstsOk)]);
