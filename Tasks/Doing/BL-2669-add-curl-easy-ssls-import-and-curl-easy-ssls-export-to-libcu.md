@@ -32,3 +32,4 @@ Found by BL-2544. lib1678 imports one SSL session packet (`CURL_SPACK_VERSION` 1
 ## Log
 
 - 2026-10-17: Created.
+- 2026-10-18: Backlog -> Doing. Criteria at claim: 7eadc98c 342afcda 2e924e0c 3d836d5e.
