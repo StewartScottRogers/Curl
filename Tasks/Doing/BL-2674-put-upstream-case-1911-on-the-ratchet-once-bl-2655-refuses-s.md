@@ -31,3 +31,4 @@ Found by BL-2545 (lib1911 port). lib1911 sets every string option but four to a 
 ## Log
 
 - 2026-10-17: Created.
+- 2026-10-19: Backlog -> Doing. Criteria at claim: e34a74aa 19b5fc62 4272a6b9.
