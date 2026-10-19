@@ -92,6 +92,13 @@ public sealed class WsProtocolHandler(
     /// </summary>
     public bool RawMode { get; init; }
 
+    /// <summary>
+    /// Gets where each transfer that exchanges frames shows its connection while the frames flow, so a
+    /// <c>curl_ws_send</c> from the transfer's write callback reaches the server (BL-2710); <see langword="null" />
+    /// shows it nowhere.
+    /// </summary>
+    public WsPerformConnection? PerformConnection { get; init; }
+
     /// <inheritdoc />
     /// <exception cref="ArgumentNullException">
     /// <paramref name="context" /> is <see langword="null" />.
@@ -550,6 +557,7 @@ public sealed class WsProtocolHandler(
         long uploaded = 0;
         bool isFrameViolation = false;
         TransferResult result;
+        PerformConnection?.Open(connection);
         try
         {
             await receiver.DeliverAlreadyReceivedAsync(alreadyReceived, writePayload, context.CancellationToken).ConfigureAwait(false);
@@ -564,6 +572,10 @@ public sealed class WsProtocolHandler(
         {
             result = TransferResult.Failure(failure.ExitCode, failure.Message, receiver.BytesReceived);
             isFrameViolation = failure.IsFrameViolation;
+        }
+        finally
+        {
+            PerformConnection?.Close();
         }
 
         ReportFailure(context.Events, result, isFrameViolation);
