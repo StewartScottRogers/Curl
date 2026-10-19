@@ -46,3 +46,4 @@ Debug one with `CURL_UPSTREAM_CASE=<n>` and `dotnet test Curl.Conformance.UnitTe
 - 2026-10-17: Created.
 - 2026-10-18: Backlog -> Doing. Criteria at claim: 67d405dd 74e45cb9 21e5ddeb 4272a6b9.
 - 2026-10-18: Doing -> Backlog. Waits on BL-2751 (handler surface for libcurl RTSP requests) and overlaps BL-2735 on Curl.Engine.UnitLibrary
+- 2026-10-18: Backlog -> Doing. Criteria at claim: 67d405dd 74e45cb9 21e5ddeb 4272a6b9.
