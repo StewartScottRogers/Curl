@@ -8,7 +8,8 @@ namespace Curl.Conformance;
 /// <remarks>
 /// <para>
 /// A feature is listed when Curl has it, by the name upstream's <c>runtests.pl</c> gives it: the
-/// protocols the harness can serve (<c>ftp</c>, <c>ws</c>, <c>wss</c> and <c>ipfs</c> among them, and <c>sftp</c>
+/// protocols the harness can serve (<c>ftp</c>, <c>ws</c>, <c>wss</c> and <c>ipfs</c> among them; <c>pop3</c>, <c>smtp</c> and
+/// <c>imap</c>, which its mail stand-ins serve (BL-2741); and <c>sftp</c>
 /// and <c>scp</c>, which Curl serves and <c>UpstreamSshServer</c> emulates); every
 /// feature on Curl's <c>curl -V</c> <c>Features:</c> line, except that <c>ECH</c> is listed because
 /// Curl still serves <c>--ech</c>, though the line does not name it (ADR-0520), which keeps the cases
@@ -47,7 +48,7 @@ public sealed class UpstreamCurlPlatform
 {
     private static readonly string[] CommonFeatures =
     [
-        "dict", "file", "ftp", "gopher", "gophers", "http", "https", "ipfs", "mqtt", "mqtts", "scp", "sftp", "telnet", "tftp", "ws", "wss",
+        "dict", "file", "ftp", "gopher", "gophers", "http", "https", "imap", "ipfs", "mqtt", "mqtts", "pop3", "scp", "sftp", "smtp", "telnet", "tftp", "ws", "wss",
         "alt-svc", "AsynchDNS", "brotli", "ECH", "GSS-API", "HSTS", "HTTPS-proxy",
         "HTTPSRR", "IDN", "IPv6", "Kerberos", "Largefile", "libz", "NTLM", "PSL", "SPNEGO", "SSL",
         "UnixSockets", "zstd",
