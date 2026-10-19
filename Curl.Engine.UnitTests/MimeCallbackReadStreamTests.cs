@@ -27,6 +27,14 @@ public sealed class MimeCallbackReadStreamTests
     }
 
     [TestMethod]
+    public void Length_SeekCallbackAndSizeZero_IsZero()
+    {
+        using MimeCallbackReadStream stream = new(new EasyMimeCallback(0, _ => 0, (_, _) => SeekResult.Ok));
+
+        Assert.AreEqual(0, stream.Length);
+    }
+
+    [TestMethod]
     public void Length_SeekCallbackAndUnknownSize_Throws()
     {
         using MimeCallbackReadStream stream = new(new EasyMimeCallback(-1, _ => 0, (_, _) => SeekResult.Ok));
