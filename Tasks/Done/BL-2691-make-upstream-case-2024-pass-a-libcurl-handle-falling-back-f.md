@@ -8,7 +8,7 @@ depends-on: [BL-2747]
 touches: [Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
 requirement: none
 created: 2026-10-17
-completed:
+completed: 2026-10-18
 ---
 # BL-2691 — Make upstream case 2024 pass: a Libcurl handle falling back from Basic to Digest sends the Digest Authorization
 
@@ -22,13 +22,15 @@ Found by BL-2549, which ported lib2023 (libauthretry: request 100 with the wrong
 
 ## Acceptance criteria
 
-- [ ] Case 2024 passes through `NamedUpstreamCase_RunThroughCurl_PassesAsAListedCaseMust` and is on `Curl.Conformance.UnitTests/PassingUpstreamCases.txt`, or the difference left is filed as a task.
-- [ ] The fix has a focused unit test in the fixed library's own `.UnitTests` project (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] Case 2024 passes through `NamedUpstreamCase_RunThroughCurl_PassesAsAListedCaseMust` and is on `Curl.Conformance.UnitTests/PassingUpstreamCases.txt`, or the difference left is filed as a task.
+- [x] The fix has a focused unit test in the fixed library's own `.UnitTests` project (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
 
 - 2026-10-18 (lane 3, first pass, no code edited): the fault is not in the lib2023 port. `DigestAuthenticator` is stateless (ADR-0014) and nothing carries request 100's 401 Digest challenge into the handle's next transfer, where curl keeps it in `data->state.digest` (stored even while Digest is not allowed) and answers it on request 200. The fix spans Libcurl, Curl.Engine, Curl.Protocol.Abstractions and Curl.Protocol.Http (Engine and Abstractions are in BL-2734's touches, in Doing), so it is filed as BL-2747 and this task now only holds case 2024 on the ratchet once BL-2747 is Done. The Digest separator difference (BL-2666) may show next.
+
+- 2026-10-18 (lane 2): with BL-2747 Done, case 2024 passes through the manual runner on Windows; added to the ratchet. No product change here: the focused unit test is BL-2747's `ManagedCurlEngineTests.PerformAsync_EarlierTransferGotDigestChallenge_NextDigestTransferAnswersItFirst` in `Curl.Engine.UnitTests`. The case is HTTP auth over the in-memory server with no paths, files or OS text, so it does not depend on the platform. The Digest separator difference (BL-2666) did not show.
 
 ## Log
 
@@ -36,3 +38,4 @@ Found by BL-2549, which ported lib2023 (libauthretry: request 100 with the wrong
 - 2026-10-18: Backlog -> Doing. Criteria at claim: 7dd24967 fd6bd9d4 3d836d5e.
 - 2026-10-18: Doing -> Backlog. Waits on BL-2747: a Libcurl handle must keep the last 401's Digest challenge for its next transfer (Libcurl, Engine, Abstractions, Http; Engine and Abstractions overlap BL-2734 in Doing)
 - 2026-10-18: Backlog -> Doing. Criteria at claim: 7dd24967 fd6bd9d4 3d836d5e.
+- 2026-10-18: Doing -> Done. Case 2024 passes through the runner and holds the ratchet
