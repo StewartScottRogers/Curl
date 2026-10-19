@@ -33,3 +33,4 @@ Found by BL-2545 (lib1915 port). lib1915's first handle loads four entries throu
 ## Log
 
 - 2026-10-17: Created.
+- 2026-10-18: Backlog -> Doing. Criteria at claim: 821be033 aee6805f 4272a6b9.
