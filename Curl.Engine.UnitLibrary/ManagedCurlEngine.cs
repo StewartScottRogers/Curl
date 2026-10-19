@@ -88,6 +88,12 @@ public sealed class ManagedCurlEngine : ICurlEngine
     /// What gives every handle's <c>CURLOPT_MIMEPOST</c> bodies their boundary: the conformance harness's stand-in for the debug
     /// build's boundary under <c>CURL_ENTROPY</c> (upstream test1972, BL-2695); <see langword="null" /> for curl's random one.
     /// </param>
+    /// <param name="standardError">
+    /// Where every handle's <c>CURLOPT_VERBOSE</c> lines go when it sets neither <c>CURLOPT_DEBUGFUNCTION</c> nor
+    /// <c>CURLOPT_STDERR</c> (<see cref="EasyTransferHost.StandardError" />), as libcurl writes them to the process's
+    /// <c>stderr</c>: the conformance harness's case stderr (upstream tests 1506 and 1510, BL-2726); <see langword="null" />
+    /// for the process's standard error.
+    /// </param>
     internal ManagedCurlEngine(
         TimeProvider timeProvider,
         Func<EasyOptions, ManagedEngineSharedState, ICookieStore?, ProtocolDispatcher>? createDispatcher,
@@ -98,10 +104,11 @@ public sealed class ManagedCurlEngine : ICurlEngine
         IWebSocketRandomSource? webSocketRandomSource = null,
         Stream? standardInput = null,
         bool stopsFirstFtpTransferBeforePwd = false,
-        Func<string>? createFormBoundary = null)
+        Func<string>? createFormBoundary = null,
+        Stream? standardError = null)
     {
         shared = new ManagedEngineSharedState(timeProvider, easyErrorText ?? (_ => string.Empty), readEnvironmentVariable, dialing, signingClock, webSocketRandomSource, FirstTransferFtpPwdStop.When(stopsFirstFtpTransferBeforePwd), createFormBoundary, readEnvironmentVariable is not null && EngineComposition.LearnsHstsOverHttp(honoursHstsHttpVariable: true, readEnvironmentVariable));
-        handleHost = HandleHostOf(standardInput, readEnvironmentVariable);
+        handleHost = HandleHostOf(standardInput, readEnvironmentVariable, standardError);
         this.createDispatcher = createDispatcher is null ? CreateDispatcher : (options, state, cookies, _, _) => createDispatcher(options, state, cookies);
     }
 
@@ -112,17 +119,29 @@ public sealed class ManagedCurlEngine : ICurlEngine
     /// </summary>
     /// <param name="standardInput">What the handles read for <c>-</c>, or <see langword="null" /> for the library host's.</param>
     /// <param name="readEnvironmentVariable">The engine's environment reader, or <see langword="null" /> for the process's, which the stand-in ignores.</param>
+    /// <param name="standardError">Where the handles' default verbose lines go, or <see langword="null" /> for the library host's.</param>
     /// <returns>The host.</returns>
-    private static EasyTransferHost HandleHostOf(Stream? standardInput, Func<string, string?>? readEnvironmentVariable)
+    private static EasyTransferHost HandleHostOf(Stream? standardInput, Func<string, string?>? readEnvironmentVariable, Stream? standardError)
     {
         bool altSvcUsesOverHttp = readEnvironmentVariable is not null && EngineComposition.UsesAltSvcOverHttp(honoursAltSvcHttpVariable: true, readEnvironmentVariable);
-        if (standardInput is null && !altSvcUsesOverHttp)
+        if (standardInput is null && standardError is null && !altSvcUsesOverHttp)
         {
             return EasyTransferHost.Library;
         }
 
-        return EasyTransferHost.Library with { StandardInput = standardInput ?? EasyTransferHost.Library.StandardInput, AltSvcUsesOverHttp = altSvcUsesOverHttp };
+        return EasyTransferHost.Library with
+        {
+            StandardInput = standardInput ?? EasyTransferHost.Library.StandardInput,
+            StandardError = StandardErrorOf(standardError),
+            AltSvcUsesOverHttp = altSvcUsesOverHttp,
+        };
     }
+
+    /// <summary>The handles' standard error: <paramref name="standardError" />, else <see cref="EasyTransferHost.Library" />'s.</summary>
+    /// <param name="standardError">The engine's standard error, or <see langword="null" />.</param>
+    /// <returns>The stream, opened when first used.</returns>
+    private static Lazy<Stream> StandardErrorOf(Stream? standardError) =>
+        standardError is null ? EasyTransferHost.Library.StandardError : new Lazy<Stream>(() => standardError);
 
     /// <summary>Gets what the engine's handles share.</summary>
     internal ManagedEngineSharedState Shared => shared;

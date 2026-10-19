@@ -37,6 +37,20 @@ public sealed class ManagedCurlEngineTests
         EasyTransferHost host = ((ManagedEasyTransfer)easy).Host;
         Assert.AreSame(standardInput, host.StandardInput);
         Assert.AreSame(EasyTransferHost.Library.FileSystem, host.FileSystem);
+        Assert.AreSame(EasyTransferHost.Library.StandardError, host.StandardError);
+    }
+
+    [TestMethod]
+    public async Task CreateEasy_EngineGivenAStandardError_GivesAHandleWritingVerboseLinesToIt()
+    {
+        using MemoryStream standardError = new();
+        await using ManagedCurlEngine engine = new(TimeProvider.System, null, standardError: standardError);
+
+        await using IEasyTransfer easy = engine.CreateEasy();
+
+        EasyTransferHost host = ((ManagedEasyTransfer)easy).Host;
+        Assert.AreSame(standardError, host.StandardError.Value);
+        Assert.AreSame(EasyTransferHost.Library.StandardInput, host.StandardInput);
     }
 
     [TestMethod]

@@ -1391,7 +1391,8 @@ internal sealed partial class ManagedEasyTransfer(
         toolProgress is not null && !cancellationToken.CanBeCanceled ? toolProgress.AbortToken : abort.Token;
 
     /// <summary>
-    /// The transfer's events: the debug callback's under <c>CURLOPT_VERBOSE</c>, else none, with the
+    /// The transfer's events: the debug callback's under <c>CURLOPT_VERBOSE</c>, or libcurl's default lines on
+    /// <c>CURLOPT_STDERR</c>, else <see cref="EasyTransferHost.StandardError" />, when none is set (BL-2726), else none, with the
     /// <see cref="TraceComponents" />' lines added (<see cref="WithTraceComponentEvents" />), kept by
     /// <see cref="EngineConnectionIdTransferEvents" />, which gives the transfer its <c>%{conn_id}</c>
     /// when it opens a connection and the opener's when it reuses one, and puts it on <see cref="Info" />
@@ -1404,7 +1405,7 @@ internal sealed partial class ManagedEasyTransfer(
     private EngineConnectionIdTransferEvents EventsOf(EasyOptions options, EngineTransferState state) =>
         new(
             WithTraceComponentEvents(
-                (ITransferEvents?)DebugCallbackTransferEvents.Of(options.Behaviour.Verbose, options.Callbacks.Debug) ?? NoTransferEvents.Instance,
+                (ITransferEvents?)DebugCallbackTransferEvents.Of(options.Behaviour.Verbose, options.Callbacks.Debug, () => options.Behaviour.StandardError ?? Host.StandardError.Value) ?? NoTransferEvents.Instance,
                 options,
                 TraceComponents),
             state,
