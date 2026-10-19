@@ -31,3 +31,4 @@ Found by BL-2741 (2026-10-19, Windows): with BL-2783 done, upstream case 1560 (`
 ## Log
 
 - 2026-10-19: Created.
+- 2026-10-19: Backlog -> Doing. Criteria at claim: e8717ab5 2a6b3b39 4272a6b9.
