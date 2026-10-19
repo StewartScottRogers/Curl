@@ -33,3 +33,4 @@ Found by BL-2635, which made the libtest engine send curl's own NTLM type-1 mess
 ## Log
 
 - 2026-10-17: Created.
+- 2026-10-18: Backlog -> Doing. Criteria at claim: f1fb44e6 4cae4aeb 3d836d5e.
