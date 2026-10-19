@@ -33,7 +33,16 @@ Through the runner on Windows after BL-2724, `CURL_UPSTREAM_CASE=594` still repo
 
 ## Notes
 
+- 2026-10-19 (lane 1): the first criterion cannot be met as written. No code changed.
+  - curl 8.22.0's `tests/data/DISABLED` lists `594` unconditionally, so upstream never runs the case and its `<verify>` (28, then `QUIT`) is unchecked.
+  - Upstream's source cannot produce that `<verify>`. `ftp_done_status` clears `ctl_valid` for 28. It also clears it for the `curl_multi_cleanup` path, `multi_done(CURLE_OK, premature TRUE)`. `ftp_quit` sends `QUIT` only while `ctl_valid` is set.
+  - Real curl measured in 594's setup (`-P - -T`, `EPRT=500`, `STOR=STALL`): exit 12 after 120128 ms, no `QUIT`.
+  - Decided in ADR-0706: 594 stays off the ratchet and the runner gets no special clock.
+  - Curl's real difference, found by that measurement, is filed as BL-2796: in active mode the accept timer should run while `STOR` is unanswered (12 after 120 s, where Curl gives 28 after 60 s).
+  - The second criterion has nothing to pin beyond BL-2724's no-`QUIT` behaviour, which already matches the source. Stewart: close this task or reword its criteria per ADR-0706.
+
 ## Log
 
 - 2026-10-19: Created.
 - 2026-10-19: Backlog -> Doing. Criteria at claim: 693d4d4d 1567690e 4272a6b9.
+- 2026-10-19: Doing -> Blocked. Stewart: case 594 is in curl 8.22.0's tests/data/DISABLED and its expected QUIT contradicts upstream's source (ADR-0706), so criterion 1 cannot be met - close or reword the task; Curl's real active-mode difference is filed as BL-2796
