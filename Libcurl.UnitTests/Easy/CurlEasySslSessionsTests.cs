@@ -12,6 +12,11 @@ public sealed class CurlEasySslSessionsTests
     // A version 1 packet holding a one-byte ticket, as curl 8.22.0's vtls_spack.c packs it.
     private static readonly byte[] OneByteTicket = [0x01, 0x04, 0x00, 0x01, (byte)'B'];
 
+    // The same ticket from TLS 1.3, valid until 2100-01-01: a packet with no valid-until is already expired, so the
+    // engine's cache drops it before an export, as curl's does.
+    private static readonly byte[] OneByteTicketValidUntil2100 =
+        [0x01, 0x04, 0x00, 0x01, (byte)'B', 0x02, 0x03, 0x04, 0x03, 0x00, 0x00, 0x00, 0x00, 0xF4, 0x86, 0x57, 0x00];
+
     [TestMethod]
     public void SslsImport_AKeyAndAPacket_PassesBothToTheEngineAndAnswersItsCode()
     {
@@ -116,7 +121,7 @@ public sealed class CurlEasySslSessionsTests
         using var easy = library.EasyInit();
         var keys = new List<string?>();
 
-        CurlCode imported = easy.SslsImport("example.test:443", null, OneByteTicket);
+        CurlCode imported = easy.SslsImport("example.test:443", null, OneByteTicketValidUntil2100);
         CurlCode exported = easy.SslsExport((_, key, _, _, _, _, _, _) =>
         {
             keys.Add(key);
