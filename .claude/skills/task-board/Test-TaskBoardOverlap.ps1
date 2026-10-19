@@ -2,7 +2,8 @@
 .SYNOPSIS
     Checks that task-board.ps1 counts the upstream case ratchet as no overlap: two ready
     tasks that both name it can run at once, while two that share a project still cannot
-    (ADR-0689).
+    (ADR-0689); and that tasks naming files in a project go before an earlier one holding
+    the whole project, so they run side by side (ADR-0694).
 
 .DESCRIPTION
     Builds a scratch board in a temporary folder (CLAUDE_PROJECT_DIR points task-board.ps1
@@ -55,6 +56,7 @@ try {
     Report ((Get-Capacity $ratchet, 'Curl.Conformance.UnitTests') -eq 2) 'the ratchet does not overlap the project folder it is in'
     Report ((Get-Capacity "$ratchet;Curl.Engine.UnitLibrary", "$ratchet;Curl.Engine.UnitLibrary") -eq 1) 'two tasks sharing a project still run apart'
     Report ((Get-Capacity 'Curl.Conformance.UnitTests/Other.txt', 'Curl.Conformance.UnitTests') -eq 1) 'another file still overlaps its project folder'
+    Report ((Get-Capacity 'Curl.Engine.UnitLibrary', 'Curl.Engine.UnitLibrary/A.cs', 'Curl.Engine.UnitLibrary/B.cs') -eq 2) 'two tasks naming files in a project run before an earlier task holding the whole project'
 } finally {
     $env:CLAUDE_PROJECT_DIR = $savedProjectDir
     $env:CURL_DARK_FACTORY_LANE = $savedLane

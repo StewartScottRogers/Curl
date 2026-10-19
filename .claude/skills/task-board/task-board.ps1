@@ -325,6 +325,15 @@ function Get-WaitingCounts([object[]] $Tasks) {
     return $counts
 }
 
+# How many whole folders a task's touches name: an entry with no '/' is a project folder,
+# and '*' counts as more than any list. A shared list file counts for nothing. Of two
+# otherwise equal ready tasks the narrower goes first, so tasks that name files in a
+# busy project run side by side before one that holds the whole project (ADR-0694).
+function Get-TouchBreadth($Task) {
+    if ($Task.Touches -contains '*') { return [int]::MaxValue }
+    return @($Task.Touches | Where-Object { $script:SharedListFiles -notcontains $_ -and -not $_.Contains('/') }).Count
+}
+
 function Get-ReadyTasks([object[]] $Tasks) {
     $doneIds = Get-DoneIds $Tasks
     $waiting = Get-WaitingCounts $Tasks
@@ -334,7 +343,8 @@ function Get-ReadyTasks([object[]] $Tasks) {
             @(Get-MissingDependencies $_ $doneIds).Count -eq 0
         })
     return , @($ready | Sort-Object -Property @{ Expression = { $PriorityRank[$_.Priority] } },
-        @{ Expression = { $waiting[$_.Id] }; Descending = $true }, Number)
+        @{ Expression = { $waiting[$_.Id] }; Descending = $true },
+        @{ Expression = { Get-TouchBreadth $_ } }, Number)
 }
 
 # The ready tasks a dark factory lane may be offered: every ready task but the
