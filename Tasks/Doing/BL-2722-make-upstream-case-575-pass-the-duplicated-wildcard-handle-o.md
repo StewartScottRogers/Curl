@@ -37,3 +37,4 @@ handle lifecycle (`curl_easy_cleanup` of the original, `curl_easy_duphandle`, `c
 ## Log
 
 - 2026-10-18: Created.
+- 2026-10-19: Backlog -> Doing. Criteria at claim: 078dffb6 0bc0233d 4272a6b9.
