@@ -53,3 +53,4 @@ Found by BL-2549, which ported lib2118 (`CURLOPT_SSL_VERIFYPEER` 0 and `CURLOPT_
 - 2026-10-17: Created.
 - 2026-10-18: Backlog -> Doing. Criteria at claim: 71ae8191 fd6bd9d4 3d836d5e.
 - 2026-10-18: Doing -> Backlog. Needs Curl.Engine.UnitLibrary and Curl.Engine.UnitTests (TlsClientOptionsMapping), which BL-2734 in Doing touches; requeued until they no longer overlap
+- 2026-10-19: Backlog -> Doing. Criteria at claim: 71ae8191 fd6bd9d4 3d836d5e.
