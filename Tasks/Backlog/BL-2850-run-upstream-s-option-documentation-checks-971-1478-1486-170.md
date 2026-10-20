@@ -4,7 +4,7 @@ title: Run upstream's option-documentation checks 971, 1478, 1486, 1707, 1708 an
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: []
+depends-on: [BL-2863, BL-2864, BL-2865, BL-2866]
 touches: [Curl.Conformance.UnitTests/PassingUpstreamCases.txt, Curl.Conformance.UnitLibrary/UpstreamCaseScreening.cs, Curl.Conformance.UnitLibrary/UpstreamCaseRunner.cs, Curl.Conformance.UnitTests/UpstreamConformanceTests.cs, Curl.Conformance.UnitTests/UpstreamCaseScreeningTests.cs, Curl.Conformance.UnitTests/UpstreamTestData/README.md]
 requirement: none
 created: 2026-10-19
@@ -39,7 +39,10 @@ If six cases prove too many for one run, finish 971, 1486, 1707, 1708 and 1710 f
 
 ## Notes
 
+- 2026-10-19 (lane 2, first pass, before any code): too big for one run - it needs a perl-script dispatch seam with %CURL bound, vendored upstream docs (options-in-versions, VERSIONS.md, cmdline-opts/*.md and the generated curl.txt, which may not be in the tarball), and three script interpretations, plus files outside `touches` (the csproj, Update-UpstreamTestData.ps1, UpstreamTestDataTests.cs, new interpretation files). Split into BL-2863 (dispatch seam), BL-2864 (vendor docs), BL-2865 (971 and 1486) and BL-2866 (1707, 1708, 1710). What stays here once they are Done: judge 1478 (expected output is the C source of tool_listhelp.c) and record it in an ADR or port it, then confirm all six cases and the CI criterion.
+
 ## Log
 
 - 2026-10-19: Created.
 - 2026-10-19: Backlog -> Doing. Criteria at claim: ec51dafc a075cc9b cd7380ad dd1cc079 620ebead.
+- 2026-10-19: Doing -> Backlog. Split for size; waits on BL-2863, BL-2864, BL-2865 and BL-2866
