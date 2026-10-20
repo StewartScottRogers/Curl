@@ -34,3 +34,4 @@ Measure real curl first (`Record-CurlExchange.ps1`, local curl 8.22.0 Schannel) 
 ## Log
 
 - 2026-10-19: Created.
+- 2026-10-19: Backlog -> Doing. Criteria at claim: 46062614 aa522d3d 640c74e3 68ad5856.
