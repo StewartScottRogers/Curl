@@ -31,3 +31,4 @@ Split from BL-2850 (cases 971, 1478, 1486, 1707, 1708, 1710 of curl 8.22.0). Tod
 ## Log
 
 - 2026-10-19: Created.
+- 2026-10-19: Backlog -> Doing. Criteria at claim: 42fc4f8a 704c30a1 309149d6.
