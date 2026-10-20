@@ -41,3 +41,4 @@ Upstream: the source of each program is in https://github.com/curl/curl/tree/cur
 ## Log
 
 - 2026-10-19: Created.
+- 2026-10-19: Backlog -> Doing. Criteria at claim: d2909c59 a568f069 5b71df24 cf824f88 b3d5b9b8.
