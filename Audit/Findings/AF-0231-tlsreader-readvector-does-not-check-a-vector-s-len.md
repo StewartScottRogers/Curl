@@ -3,8 +3,8 @@ id: AF-0231
 title: TlsReader.ReadVector does not check a vector's length against the bytes left: 23 Curl.Tls and 3 Networking ECH tests fail unmutated
 auditor: quality
 severity: High
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-19_2134.md: the reproduction no longer reproduces.
 key: quality:Curl.Tls.UnitLibrary/TlsReader.cs:ReadVector:baseline-failure
 reproduction: none
 task: BL-2568
@@ -13,9 +13,9 @@ found: 2026-10-16
 found-at: 16500922292d0d0bcaede88acdabc2500cf08ebf
 scorecard: 2026-10-16_1623.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-19
+closed-how: reliable-reaudit
+closed-by: 2026-10-19_2134.md
 ---
 # AF-0231 - TlsReader.ReadVector does not check a vector's length against the bytes left: 23 Curl.Tls and 3 Networking ECH tests fail unmutated
 
@@ -44,8 +44,10 @@ dotnet test Curl.Tls.UnitTests --filter "TestCategory!=Integration"
 
 - 2026-10-18 | 2026-10-18_1045.md | not re-audited | overlaps planted defect PD-103 in Curl.Tls.UnitLibrary/TlsReader.cs, so the auditor's verdict (reproduces yes) is set aside: Ran dotnet test Curl.Tls.UnitTests --filter "TestCategory!=Integration": Failed: 70, Passed: 1205, Total: 1275. Examples: EchConfigListTests.AMalformedListIsADecodeError throws ArgumentOutOfRangeException and IndexOutOfRangeException, and HandshakeMessageRejectionTests.DecodeAnswersATruncatedBodyWithDecodeError also fails. TlsReader.Take (TlsReader.cs:126) advances position with no check against end, so ReadVector does not bound a vector by the bytes left. The Networking mutation baseline also had to leave out 3 HandBuiltTlsProviderTests ECH tests.
 - 2026-10-18 | 2026-10-18_1905.md | not re-audited | Ran dotnet test Curl.Tls.UnitTests --filter "TestCategory!=Integration": 8 failures, then the run hung and was stopped. Every failing stack is topped by HandshakeMessageReader.Read line 32 (a separate defect, filed as quality:Curl.Tls.UnitLibrary/HandshakeMessageReader.cs:Read:failing-test), not TlsReader. TlsReader.ReadVector now calls Take(length), which checks end - position < count. The reproduction still fails for another cause, so it cannot tell whether AF-0231 is fixed.
+- 2026-10-19 | 2026-10-19_2134.md | reproduces: no | Ran dotnet test Curl.Tls.UnitTests --filter "TestCategory!=Integration" in a scratch worktree of the audited HEAD: Passed! Failed: 0, Passed: 1275, Skipped: 0. No Curl.Tls test fails unmutated.
 
 ## Log
 
 - 2026-10-16: filed proposed.
 - 2026-10-16: proposed -> accepted.
+- 2026-10-19: accepted -> closed. Re-audit 2026-10-19_2134.md: the reproduction no longer reproduces.

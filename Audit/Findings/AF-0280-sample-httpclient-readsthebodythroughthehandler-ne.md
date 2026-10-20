@@ -3,8 +3,8 @@ id: AF-0280
 title: Sample_HttpClient_ReadsTheBodyThroughTheHandler never checks the body it names
 auditor: quality
 severity: Low
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-19_2134.md: the reproduction no longer reproduces.
 key: quality:Curl.Api.UnitTests/Readme/ReadmeTests.cs:Sample_HttpClient_ReadsTheBodyThroughTheHandler:no-assertion
 reproduction: none
 task: BL-2807
@@ -13,9 +13,9 @@ found: 2026-10-18
 found-at: e17dfce54cf6f2d08fc7c4abe0655128f237ff3b
 scorecard: 2026-10-18_1905.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-19
+closed-how: reliable-reaudit
+closed-by: 2026-10-19_2134.md
 ---
 # AF-0280 - Sample_HttpClient_ReadsTheBodyThroughTheHandler never checks the body it names
 
@@ -42,7 +42,10 @@ Select-String -Path Curl.Api.UnitTests/Readme/ReadmeTests.cs -Pattern 'Sample_Ht
 
 ## Re-audits
 
+- 2026-10-19 | 2026-10-19_2134.md | reproduces: no | Sample_HttpClient_ReadsTheBodyThroughTheHandler (ReadmeTests.cs:243-249) now asserts Assert.AreEqual("hello\n", written, ...), the scripted body read through CurlHttpMessageHandler.
+
 ## Log
 
 - 2026-10-18: filed proposed.
 - 2026-10-19: proposed -> accepted.
+- 2026-10-19: accepted -> closed. Re-audit 2026-10-19_2134.md: the reproduction no longer reproduces.

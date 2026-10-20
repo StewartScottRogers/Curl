@@ -3,8 +3,8 @@ id: AF-0289
 title: BL-2783 cost $3.43, 3.3 times the median task cost of $1.04 (12 builds, 2 of them failed on tooling)
 auditor: process
 severity: Low
-status: accepted
-reason: 
+status: closed
+reason: Audit 2026-10-19_2134.md: a cost-outlier finding records a past run's cost, which no fix can change; its tasks (BL-2816) are Done at 1b3c70b1436b, so it closes without a re-audit (ADR-0422, amended 2026-10-14).
 key: process:logs:BL-2783:cost-outlier
 reproduction: none
 task: BL-2816
@@ -13,9 +13,9 @@ found: 2026-10-18
 found-at: e17dfce54cf6f2d08fc7c4abe0655128f237ff3b
 scorecard: 2026-10-18_1905.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-19
+closed-how: task-done-historical
+closed-by: 2026-10-19_2134.md
 ---
 # AF-0289 - BL-2783 cost $3.43, 3.3 times the median task cost of $1.04 (12 builds, 2 of them failed on tooling)
 
@@ -46,3 +46,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 - 2026-10-18: filed proposed.
 - 2026-10-19: proposed -> accepted.
+- 2026-10-19: accepted -> closed. Audit 2026-10-19_2134.md: a cost-outlier finding records a past run's cost, which no fix can change; its tasks (BL-2816) are Done at 1b3c70b1436b, so it closes without a re-audit (ADR-0422, amended 2026-10-14).

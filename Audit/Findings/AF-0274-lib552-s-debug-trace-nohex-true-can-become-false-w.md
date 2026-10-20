@@ -3,8 +3,8 @@ id: AF-0274
 title: Lib552's debug trace noHex: true can become false with no test failing, changing its stderr dump
 auditor: quality
 severity: Medium
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-19_2134.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
 key: quality:Curl.Conformance.LibTest.UnitLibrary/Lib552.cs:TestAsync-true:surviving-mutant
 reproduction: mutation Curl.Conformance.LibTest.UnitLibrary/Lib552.cs:50:true
 task: BL-2801
@@ -13,9 +13,9 @@ found: 2026-10-18
 found-at: e17dfce54cf6f2d08fc7c4abe0655128f237ff3b
 scorecard: 2026-10-18_1905.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-19
+closed-how: mechanical
+closed-by: 2026-10-19_2134.md
 ---
 # AF-0274 - Lib552's debug trace noHex: true can become false with no test failing, changing its stderr dump
 
@@ -42,7 +42,10 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Confo
 
 ## Re-audits
 
+- 2026-10-19 | 2026-10-19_2134.md | reproduces: no | Ran the -Site command: Lib552.cs:50:true in TestAsync; outcome killed. Runner's targeted mutation rerun on the clean audited commit: killed.
+
 ## Log
 
 - 2026-10-18: filed proposed.
 - 2026-10-19: proposed -> accepted.
+- 2026-10-19: accepted -> closed. Re-audit 2026-10-19_2134.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.

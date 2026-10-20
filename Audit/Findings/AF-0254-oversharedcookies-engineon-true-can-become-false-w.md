@@ -3,8 +3,8 @@ id: AF-0254
 title: OverSharedCookies' engineOn: true can become false with no test failing, turning the cookie engine off for share-handle cookies
 auditor: quality
 severity: Medium
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-19_2134.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
 key: quality:Curl.Engine.UnitLibrary/CookieEngine.cs:OverSharedCookies-true:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/CookieEngine.cs:133:true
 task: BL-2765
@@ -13,9 +13,9 @@ found: 2026-10-18
 found-at: 19ea231be8b4d749462d15058a3c6b97c7e70836
 scorecard: 2026-10-18_1045.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-19
+closed-how: mechanical
+closed-by: 2026-10-19_2134.md
 ---
 # AF-0254 - OverSharedCookies' engineOn: true can become false with no test failing, turning the cookie engine off for share-handle cookies
 
@@ -43,8 +43,10 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Engin
 ## Re-audits
 
 - 2026-10-18 | 2026-10-18_1905.md | reproduces: yes (runner rerun on clean commit) | Ran the -Site command: line 133 in OverSharedCookies, engineOn: true -> false survived. Runner's targeted mutation rerun on the clean audited commit: survived.
+- 2026-10-19 | 2026-10-19_2134.md | reproduces: no | Ran the -Site command: CookieEngine.cs:133:true in OverSharedCookies resolved at line 133; outcome killed. Runner's targeted mutation rerun on the clean audited commit: killed.
 
 ## Log
 
 - 2026-10-18: filed proposed.
 - 2026-10-18: proposed -> accepted.
+- 2026-10-19: accepted -> closed. Re-audit 2026-10-19_2134.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.

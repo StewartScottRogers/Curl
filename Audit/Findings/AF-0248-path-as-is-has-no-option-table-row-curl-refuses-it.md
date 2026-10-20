@@ -3,8 +3,8 @@ id: AF-0248
 title: --path-as-is has no option-table row: curl refuses it as unknown, and 13 Curl.Cli and 1 Curl.Engine unit tests fail unmutated
 auditor: quality
 severity: High
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-19_2134.md: the reproduction no longer reproduces.
 key: quality:Curl.Cli.UnitLibrary/CommandLineOptionTable.cs:path-as-is:failing-tests
 reproduction: none
 task: BL-2759
@@ -13,9 +13,9 @@ found: 2026-10-18
 found-at: 19ea231be8b4d749462d15058a3c6b97c7e70836
 scorecard: 2026-10-18_1045.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-19
+closed-how: reliable-reaudit
+closed-by: 2026-10-19_2134.md
 ---
 # AF-0248 - --path-as-is has no option-table row: curl refuses it as unknown, and 13 Curl.Cli and 1 Curl.Engine unit tests fail unmutated
 
@@ -43,8 +43,10 @@ dotnet test Curl.Cli.UnitTests --filter "TestCategory!=Integration"
 ## Re-audits
 
 - 2026-10-18 | 2026-10-18_1905.md | reproduces: no | Ran dotnet test Curl.Cli.UnitTests --filter "TestCategory!=Integration": Passed, Failed 0, Passed 3952, Skipped 18. CommandLineOptionTable.cs:330 has the path-as-is NegatableFlag row.
+- 2026-10-19 | 2026-10-19_2134.md | reproduces: no | Ran dotnet test Curl.Cli.UnitTests --filter "TestCategory!=Integration": Passed! Failed: 0, Passed: 3956, Skipped: 18. The Curl.Engine.UnitTests baseline in the Engine mutation run also passed, with no excluded tests.
 
 ## Log
 
 - 2026-10-18: filed proposed.
 - 2026-10-18: proposed -> accepted.
+- 2026-10-19: accepted -> closed. Re-audit 2026-10-19_2134.md: the reproduction no longer reproduces.
