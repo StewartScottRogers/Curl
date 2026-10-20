@@ -35,3 +35,4 @@ None tests a behaviour of the `curl` command line or of the libcurl API. Curl ha
 ## Log
 
 - 2026-10-19: Created.
+- 2026-10-19: Backlog -> Doing. Criteria at claim: ef230fdc c3a889cd 0ccf662c 4bd1d3a0 c5f8cef6.
