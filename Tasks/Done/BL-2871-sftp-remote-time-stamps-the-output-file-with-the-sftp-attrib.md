@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Ssh.UnitLibrary, Curl.Protocol.Ssh.UnitTests]
 requirement: none
 created: 2026-10-19
-completed:
+completed: 2026-10-19
 ---
 # BL-2871 — SFTP --remote-time stamps the output file with the SFTP attributes' modification time (upstream case 1446)
 
@@ -26,12 +26,19 @@ Decide whether SCP (`T` line with `-p`) needs the same; curl's SCP download does
 
 ## Acceptance criteria
 
-- [ ] An SFTP download's `TransferResult.SourceLastWriteUnixSeconds` is the `mtime` from the file's SFTP attributes when they carry `ACMODTIME`, and null when they do not; a focused test in `Curl.Protocol.Ssh.UnitTests` fails without the fix.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean, the fast tests pass, and `Curl.Protocol.Ssh.UnitLibrary` keeps 100% line and branch coverage and complexity at most 10.
+- [x] An SFTP download's `TransferResult.SourceLastWriteUnixSeconds` is the `mtime` from the file's SFTP attributes when they carry `ACMODTIME`, and null when they do not; a focused test in `Curl.Protocol.Ssh.UnitTests` fails without the fix.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean, the fast tests pass, and `Curl.Protocol.Ssh.UnitLibrary` keeps 100% line and branch coverage and complexity at most 10.
 
 ## Notes
+
+- Done directly rather than through the full `/feature` stages: a two-file change in one library.
+- `SftpSession.StatSizeAndModifyTimeAsync` reads size and `mtime` from the download's existing `STAT`; `SftpFileDownload` sets `SourceLastWriteUnixSeconds` from it. No extra `STAT` under `-R` (ADR-0715).
+- SCP: curl's SCP download ignores the `T` line's time (it takes only `st_size`), so no change there (ADR-0715).
+- Tests: `SftpFileDownloadTests.DownloadAsync_StatCarriesTheTimes_*` (fails without the fix: the result carried no time) and `DownloadAsync_StatCarriesNoWholeTimes_*`.
+- Measured: `Curl.Protocol.Ssh.UnitLibrary` 100% line, 100% branch, max complexity 10, 0 failing members.
 
 ## Log
 
 - 2026-10-19: Created.
 - 2026-10-19: Backlog -> Doing. Criteria at claim: 3c77b5e9 aa792584.
+- 2026-10-19: Doing -> Done. SFTP downloads report the STAT mtime as SourceLastWriteUnixSeconds, so -R stamps the saved file (case 1446)
