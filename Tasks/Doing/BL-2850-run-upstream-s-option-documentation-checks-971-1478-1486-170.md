@@ -42,3 +42,4 @@ If six cases prove too many for one run, finish 971, 1486, 1707, 1708 and 1710 f
 ## Log
 
 - 2026-10-19: Created.
+- 2026-10-19: Backlog -> Doing. Criteria at claim: ec51dafc a075cc9b cd7380ad dd1cc079 620ebead.
