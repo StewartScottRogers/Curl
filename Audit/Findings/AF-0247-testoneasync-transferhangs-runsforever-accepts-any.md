@@ -3,8 +3,8 @@ id: AF-0247
 title: TestOneAsync_TransferHangs_RunsForever accepts any non-Ok result instead of LibTestErrorCodes.RunsForever
 auditor: quality
 severity: Medium
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-19_2134.md: the reproduction no longer reproduces.
 key: quality:Curl.Conformance.LibTest.UnitTests/Lib530Tests.cs:TestOneAsync_TransferHangs_RunsForever:name-lies
 reproduction: none
 task: BL-2758
@@ -13,9 +13,9 @@ found: 2026-10-18
 found-at: 19ea231be8b4d749462d15058a3c6b97c7e70836
 scorecard: 2026-10-18_1045.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-19
+closed-how: reliable-reaudit
+closed-by: 2026-10-19_2134.md
 ---
 # AF-0247 - TestOneAsync_TransferHangs_RunsForever accepts any non-Ok result instead of LibTestErrorCodes.RunsForever
 
@@ -43,8 +43,10 @@ Select-String -Path Curl.Conformance.LibTest.UnitTests/Lib530Tests.cs -Pattern '
 ## Re-audits
 
 - 2026-10-18 | 2026-10-18_1905.md | reproduces: no | Ran the Select-String: no match. TestOneAsync_TransferHangs_RunsForever now asserts Assert.AreEqual(LibTestErrorCodes.RunsForever, result).
+- 2026-10-19 | 2026-10-19_2134.md | reproduces: no | Select-String found no match. TestOneAsync_TransferHangs_RunsForever (Lib530Tests.cs:172) now asserts Assert.AreEqual(LibTestErrorCodes.RunsForever, result).
 
 ## Log
 
 - 2026-10-18: filed proposed.
 - 2026-10-18: proposed -> accepted.
+- 2026-10-19: accepted -> closed. Re-audit 2026-10-19_2134.md: the reproduction no longer reproduces.

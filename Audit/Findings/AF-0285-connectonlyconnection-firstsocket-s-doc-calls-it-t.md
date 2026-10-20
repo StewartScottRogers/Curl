@@ -3,8 +3,8 @@ id: AF-0285
 title: ConnectOnlyConnection.FirstSocket's doc calls it the first socket number a connection is given; the first one given is FirstSocket + 1
 auditor: truthfulness
 severity: Low
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-19_2134.md: the reproduction no longer reproduces.
 key: truthfulness:Curl.Engine.UnitLibrary/ConnectOnlyConnection.cs:FirstSocket:false-doc-comment
 reproduction: none
 task: BL-2812
@@ -13,9 +13,9 @@ found: 2026-10-18
 found-at: e17dfce54cf6f2d08fc7c4abe0655128f237ff3b
 scorecard: 2026-10-18_1905.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-19
+closed-how: reliable-reaudit
+closed-by: 2026-10-19_2134.md
 ---
 # AF-0285 - ConnectOnlyConnection.FirstSocket's doc calls it the first socket number a connection is given; the first one given is FirstSocket + 1
 
@@ -42,7 +42,10 @@ Select-String -Path Curl.Engine.UnitLibrary/ConnectOnlyConnection.cs -Pattern 'f
 
 ## Re-audits
 
+- 2026-10-19 | 2026-10-19_2134.md | reproduces: no | Ran the reproduction: the phrase 'first socket number a connection is given' no longer matches. Only '31: private static long nextSocket = FirstSocket;' and '79: Socket = new CurlSocket((nint)Interlocked.Increment(ref nextSocket));' matched. FirstSocket's doc (lines 48-53) now reads 'the socket number the numbering starts from; the first connection is given FirstSocket + 1', which matches the pre-increment.
+
 ## Log
 
 - 2026-10-18: filed proposed.
 - 2026-10-19: proposed -> accepted.
+- 2026-10-19: accepted -> closed. Re-audit 2026-10-19_2134.md: the reproduction no longer reproduces.

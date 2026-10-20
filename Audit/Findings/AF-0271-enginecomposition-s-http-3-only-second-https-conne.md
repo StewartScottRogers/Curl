@@ -3,8 +3,8 @@ id: AF-0271
 title: EngineComposition's HTTP/3-only second HTTPS-connect attempt can apply to every version with no Engine test failing
 auditor: quality
 severity: Medium
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-19_2134.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
 key: quality:Curl.Engine.UnitLibrary/EngineComposition.cs:ConnectToMappings-eq:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/EngineComposition.cs:1046:==
 task: BL-2798
@@ -13,9 +13,9 @@ found: 2026-10-18
 found-at: e17dfce54cf6f2d08fc7c4abe0655128f237ff3b
 scorecard: 2026-10-18_1905.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-19
+closed-how: mechanical
+closed-by: 2026-10-19_2134.md
 ---
 # AF-0271 - EngineComposition's HTTP/3-only second HTTPS-connect attempt can apply to every version with no Engine test failing
 
@@ -42,7 +42,10 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Engin
 
 ## Re-audits
 
+- 2026-10-19 | 2026-10-19_2134.md | reproduces: no | Ran the -Site command: EngineComposition.cs:1046:== resolved to line 1053 in ConnectToMappings; outcome killed. Runner's targeted mutation rerun on the clean audited commit: killed.
+
 ## Log
 
 - 2026-10-18: filed proposed.
 - 2026-10-19: proposed -> accepted.
+- 2026-10-19: accepted -> closed. Re-audit 2026-10-19_2134.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.

@@ -3,8 +3,8 @@ id: AF-0270
 title: HandshakeMessageReader.Read slices a body that has not all arrived; Curl.Tls unit tests fail unmutated
 auditor: quality
 severity: High
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-19_2134.md: the reproduction no longer reproduces.
 key: quality:Curl.Tls.UnitLibrary/HandshakeMessageReader.cs:Read:failing-test
 reproduction: none
 task: BL-2797
@@ -13,9 +13,9 @@ found: 2026-10-18
 found-at: e17dfce54cf6f2d08fc7c4abe0655128f237ff3b
 scorecard: 2026-10-18_1905.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-19
+closed-how: reliable-reaudit
+closed-by: 2026-10-19_2134.md
 ---
 # AF-0270 - HandshakeMessageReader.Read slices a body that has not all arrived; Curl.Tls unit tests fail unmutated
 
@@ -42,7 +42,10 @@ dotnet test Curl.Tls.UnitTests --filter "FullyQualifiedName~HandshakeMessageRead
 
 ## Re-audits
 
+- 2026-10-19 | 2026-10-19_2134.md | reproduces: no | Ran dotnet test Curl.Tls.UnitTests --filter "FullyQualifiedName~HandshakeMessageReaderTests": Passed! Failed: 0, Passed: 9.
+
 ## Log
 
 - 2026-10-18: filed proposed.
 - 2026-10-19: proposed -> accepted.
+- 2026-10-19: accepted -> closed. Re-audit 2026-10-19_2134.md: the reproduction no longer reproduces.
