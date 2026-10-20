@@ -8,7 +8,7 @@ depends-on: []
 touches: [Documentation/Wiki/Glossary.md]
 requirement: none
 created: 2026-10-19
-completed:
+completed: 2026-10-19
 ---
 # BL-2853 — Decide whether Curl ships curl-config, the question behind upstream cases 1013, 1014, 1022 and 1023 (ADR)
 
@@ -24,14 +24,17 @@ The standing rule for such questions (root CLAUDE.md, "Decisions") is to match t
 
 ## Acceptance criteria
 
-- [ ] The ADR records, with the commands run, what the reference curl's `curl-config` is on Windows, Linux and macOS (or that it does not exist there) and which curl version was checked.
-- [ ] The ADR decides (a), (b) or (c), gives the executable's project name and the exact answer of each `curl-config` option on each platform, and says what the harness does for cases 1013, 1014, 1022 and 1023.
-- [ ] `Documentation/Wiki/Glossary.md` has a `curl-config` entry that states what it does.
-- [ ] BL-2854 is edited (in Backlog, keeping its criteria checkable) so its Goal, `touches` and criteria match the ADR.
+- [x] The ADR records, with the commands run, what the reference curl's `curl-config` is on Windows, Linux and macOS (or that it does not exist there) and which curl version was checked.
+- [x] The ADR decides (a), (b) or (c), gives the executable's project name and the exact answer of each `curl-config` option on each platform, and says what the harness does for cases 1013, 1014, 1022 and 1023.
+- [x] `Documentation/Wiki/Glossary.md` has a `curl-config` entry that states what it does.
+- [x] BL-2854 is edited (in Backlog, keeping its criteria checkable) so its Goal, `touches` and criteria match the ADR.
 
 ## Notes
+
+Decided (a) in ADR-0712. Windows reference measured: no curl-config in /ucrt64/bin. Linux and macOS not runnable in this Windows lane; BL-2854 pins them from the 8.22.0 tarball script.
 
 ## Log
 
 - 2026-10-19: Created.
 - 2026-10-19: Backlog -> Doing. Criteria at claim: 71a0b573 97dc1871 d4e22e68 ff134043.
+- 2026-10-19: Doing -> Done. ADR-0712 decides curl-config ships on every platform; Glossary and BL-2854 updated
