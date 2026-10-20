@@ -72,6 +72,12 @@ factory's latest `status.json` and is force-pushed every few minutes by
 `RunDarkFactory.ps1`'s coordinator (ADR-0129). That force push, to that branch only,
 needs no confirmation.
 
+Another standing exception (Stewart, 2026-10-19: "make sure to keep these downloads updated with
+the latest builds"): on every push to `master`, `.github/workflows/release.yml` deletes the rolling
+pre-release `preview` and its tag, and makes them again at the new commit with that build's
+packages. `DOWNLOAD.md` links there. Moving that one tag needs no confirmation; numbered `v*` tags
+and releases still do.
+
 A second standing exception (Stewart, 2026-09-27): at the end of every dark factory
 shift, `RunDarkFactory.ps1` merges its branch into `master` through a pull request, but
 only when the `CI` workflow passed on Windows, Linux and macOS for the exact commit being

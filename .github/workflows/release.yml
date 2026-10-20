@@ -5,8 +5,14 @@
 #   * Pushing a tag `v*` (e.g. v0.1.0) builds all six curl packages and the seven Curl.Mcp
 #     `.nupkg` files, stamped with the tag's version, and attaches them, with a SHA256SUMS
 #     file covering all of them, to a GitHub release of that name. A tag with a hyphen
-#     (v0.1.0-preview.1) makes a pre-release. Tags and releases need Stewart's say-so
-#     (CLAUDE.md), so this workflow never creates a tag itself.
+#     (v0.1.0-preview.1) makes a pre-release. Numbered tags and releases need Stewart's
+#     say-so (CLAUDE.md), so this workflow never creates a numbered tag itself.
+#   * Every push to master (each shift-end merge, audit or gap merge) rebuilds the rolling
+#     pre-release `preview`: the old `preview` release and its tag are deleted and made again
+#     at the new commit, with packages stamped 0.2.0-rolling.<run number>. Stewart's standing
+#     permission (2026-10-19) covers moving that one tag. DOWNLOAD.md links to
+#     releases/download/preview/<package>, so the download page always offers the latest
+#     build without being edited. A newer push to master cancels an older one's build.
 #   * Running it by hand (workflow_dispatch) builds the same packages and uploads them as
 #     workflow artifacts only - a dry run that publishes nothing. A pull request that
 #     touches this file, the executable or the shared build settings gets the same dry run.
@@ -14,13 +20,14 @@
 # Native AOT cannot cross-compile between operating systems, so each package is built on
 # a runner of its own OS. Linux builds on Ubuntu 22.04 so the binary runs on glibc 2.35
 # and newer. DOWNLOAD.md, install.sh and install.ps1 rely on the package names below;
-# keep the four in step. The Curl.Mcp package names come from Curl.Mcp.csproj (ADR-0548). DOWNLOAD.md links to one version by tag, because
-# releases/latest skips pre-releases: point it at each new release's tag.
+# keep the four in step. The Curl.Mcp package names come from Curl.Mcp.csproj (ADR-0548).
+# DOWNLOAD.md links to the rolling `preview` tag, because releases/latest skips pre-releases.
 name: Release
 
 on:
   push:
     tags: ['v*']
+    branches: [master]
   pull_request:
     paths:
       - .github/workflows/release.yml
@@ -32,6 +39,11 @@ on:
 
 permissions:
   contents: read
+
+# A newer push to master replaces the rolling build in progress; a tag's build always finishes.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref == 'refs/heads/master' }}
 
 jobs:
   publish:
@@ -62,6 +74,8 @@ jobs:
         run: |
           if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
             echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+          elif [[ "$GITHUB_REF" == refs/heads/master ]]; then
+            echo "VERSION=0.2.0-rolling.${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
           else
             echo "VERSION=0.0.0-dev.${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
           fi
@@ -140,6 +154,8 @@ jobs:
         run: |
           if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
             echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+          elif [[ "$GITHUB_REF" == refs/heads/master ]]; then
+            echo "VERSION=0.2.0-rolling.${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
           else
             echo "VERSION=0.0.0-dev.${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
           fi
@@ -229,7 +245,7 @@ jobs:
   release:
     name: Create the GitHub release
     needs: [publish, pack-mcp]
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -247,6 +263,14 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          if [[ "$GITHUB_REF" == refs/heads/master ]]; then
+            # The rolling preview: drop the old one and its tag, then make it again here.
+            gh release delete preview --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes || true
+            gh release create preview dist/* --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease \
+              --title "Latest build (rolling preview)" \
+              --notes "The latest build of master, ${GITHUB_SHA:0:9}, made $(date -u +%Y-%m-%dT%H:%MZ), version 0.2.0-rolling.${GITHUB_RUN_NUMBER}. It is rebuilt on every merge to master; numbered releases are kept separately."
+            exit 0
+          fi
           flags=(--generate-notes --title "$GITHUB_REF_NAME")
           [[ "$GITHUB_REF_NAME" == *-* ]] && flags+=(--prerelease)
           gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" "${flags[@]}"
