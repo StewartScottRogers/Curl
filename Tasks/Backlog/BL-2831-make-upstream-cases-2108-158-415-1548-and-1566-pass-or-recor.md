@@ -4,7 +4,7 @@ title: Make upstream cases 2108, 158, 415, 1548 and 1566 pass, or record why cur
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: []
+depends-on: [BL-2863, BL-2864, BL-2865, BL-2866]
 touches: [Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
 requirement: none
 created: 2026-10-19
@@ -39,7 +39,15 @@ Any fix's folder must be added to this task's `touches` in the same commit (like
 
 ## Notes
 
+- 2026-10-19 (lane 8, first pass before any code): split for size. The five cases fail for four unrelated causes in four places, each needing a real-curl measurement, a fix with its own unit test and a quality run - more than one run's cost cap. The case runner runs all five (measured, not skipped), so no runner work is missing. Filed one task per cause, each owning its own verdict, list entry and any ADR:
+  - BL-2863: 158 and 415 - with `--include`, Curl writes none of the header lines received before a failure to the output (curl writes each as parsed). HTTP library or transfer writer.
+  - BL-2864: 1566 - Curl truncates the `-o` file on a bodiless 304; curl opens it lazily.
+  - BL-2865: 2108 - Curl's FTP reader accepts a NUL in a response line; curl rejects it with exit 8.
+  - BL-2866: 1548 - telnet `-m 1` exits 0; first check whether sws keeps the connection open after an empty reply (harness) before the Telnet library.
+  What is left here once they are Done: confirm all five are on `PassingUpstreamCases.txt` or named in an ADR, and that CI is green on Linux and macOS.
+
 ## Log
 
 - 2026-10-19: Created.
 - 2026-10-19: Backlog -> Doing. Criteria at claim: 0d008234 77580efe 3d4c7a1e 108a50d2 620ebead.
+- 2026-10-19: Doing -> Backlog. Split for size into BL-2863 (158, 415), BL-2864 (1566), BL-2865 (2108) and BL-2866 (1548); waits on them.
