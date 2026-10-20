@@ -34,3 +34,4 @@ First check the harness emits the NUL (`LineProtocolServerCommands` reading `\x0
 ## Log
 
 - 2026-10-19: Created.
+- 2026-10-19: Backlog -> Doing. Criteria at claim: 37fd1f16 bfe454f8 eaef7ce1 68ad5856.
