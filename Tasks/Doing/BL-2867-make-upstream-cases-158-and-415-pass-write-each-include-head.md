@@ -37,3 +37,4 @@ Hypothesis: curl writes each header line to the output as it parses it (`Curl_cl
 ## Log
 
 - 2026-10-19: Created.
+- 2026-10-19: Backlog -> Doing. Criteria at claim: 8b026f95 05ea46f1 640c74e3 68ad5856.
