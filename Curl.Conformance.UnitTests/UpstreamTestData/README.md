@@ -35,6 +35,15 @@ for byte. `UpstreamConformanceTests` passes this folder as `%SRCDIR`; any other 
 not vendored, so a case that names one fails with curl's read error. The csproj copies `data/` to
 the test output; `.gitattributes` marks the files `-text`.
 
+## docs and src
+
+`docs/` and `src/` hold what upstream's documentation check scripts open (BL-2864), byte for byte, at
+the same relative paths: `docs/options-in-versions` and `docs/VERSIONS.md` (test971.pl),
+`docs/cmdline-opts/*.md` (298 files; test971.pl, test1486.pl's `write-out.md` and test1707.pl) and
+`src/tool_writeout.c` (test1486.pl). Upstream's `docs/cmdline-opts/curl.txt` is not here: `managen`
+generates it at build time and the tarball does not ship it, so an interpretation of test1707 builds
+that text from the `.md` files. The csproj copies them to the test output; `.gitattributes` marks them `-text`.
+
 ## Refresh to another tag
 
 ```
@@ -43,6 +52,6 @@ powershell -NoProfile -ExecutionPolicy Bypass -File Curl.Conformance.UnitTests\U
 
 The script downloads the tag's source archive from GitHub, replaces every `test*.curltest` file in
 this folder, every file in `certs/` (from `tests/certs`, build files and dot files left out) and
-`COPYING` wholesale, and prints the new count. After a refresh, update the
+`COPYING` wholesale, and the files of `docs/` and `src/` above, and prints the new count. After a refresh, update the
 tag and count in this README and `VendoredTestFileCount` in `UpstreamTestDataTests.cs`.
 Run with the pinned tag, it reproduces the folder with an empty `git status`.

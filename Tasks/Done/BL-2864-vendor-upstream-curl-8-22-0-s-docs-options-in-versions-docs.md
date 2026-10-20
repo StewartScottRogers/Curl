@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.UnitTests/UpstreamTestData/Update-UpstreamTestData.ps1, Curl.Conformance.UnitTests/UpstreamTestData/README.md, Curl.Conformance.UnitTests/Curl.Conformance.UnitTests.csproj, Curl.Conformance.UnitTests/UpstreamTestDataTests.cs, Curl.Conformance.UnitTests/UpstreamTestData/docs]
 requirement: none
 created: 2026-10-19
-completed:
+completed: 2026-10-19
 ---
 # BL-2864 — Vendor upstream curl 8.22.0's docs/options-in-versions, docs/VERSIONS.md and docs/cmdline-opts beside UpstreamTestData
 
@@ -22,12 +22,16 @@ Split from BL-2850. The check scripts test971.pl, test1486.pl and test1707.pl (t
 
 ## Acceptance criteria
 
-- [ ] The vendored documentation files are listed in `UpstreamTestData/README.md`, copied beside the tests by `Curl.Conformance.UnitTests.csproj`, and refreshed by `Update-UpstreamTestData.ps1`; `UpstreamTestDataTests` pins their presence.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean and the fast tests pass.
+- [x] The vendored documentation files are listed in `UpstreamTestData/README.md`, copied beside the tests by `Curl.Conformance.UnitTests.csproj`, and refreshed by `Update-UpstreamTestData.ps1`; `UpstreamTestDataTests` pins their presence.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean and the fast tests pass.
 
 ## Notes
+
+- curl.txt is not in the tarball (managen generates it at build time); not vendored. BL-2866's interpretation builds the text from the cmdline-opts .md files.
+- Also vendored src/tool_writeout.c (test1486.pl reads it) under UpstreamTestData/src; tests/allversions.pm (test971.pl) is a script, left to BL-2865/2866.
 
 ## Log
 
 - 2026-10-19: Created.
 - 2026-10-19: Backlog -> Doing. Criteria at claim: 26f6bfaa 161fef9c.
+- 2026-10-19: Doing -> Done. Vendored docs, options-in-versions, VERSIONS.md, cmdline-opts and tool_writeout.c; build clean, fast tests green.

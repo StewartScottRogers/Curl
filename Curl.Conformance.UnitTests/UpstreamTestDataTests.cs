@@ -14,6 +14,9 @@ public sealed class UpstreamTestDataTests
     /// <summary>The number of <c>test*</c> files in <c>tests/data</c> at <c>curl-8_22_0</c>.</summary>
     private const int VendoredTestFileCount = 2072;
 
+    /// <summary>The number of <c>*.md</c> files in <c>docs/cmdline-opts</c> at <c>curl-8_22_0</c>.</summary>
+    private const int VendoredOptionDocCount = 298;
+
     private static readonly string UpstreamTestDataFolder = Path.Combine(AppContext.BaseDirectory, "UpstreamTestData");
 
     public TestContext TestContext { get; set; } = null!;
@@ -30,6 +33,29 @@ public sealed class UpstreamTestDataTests
         diagnostics.Act("file count", testFiles.Length);
         diagnostics.Assert("file count", VendoredTestFileCount, testFiles.Length);
         Assert.HasCount(VendoredTestFileCount, testFiles);
+    }
+
+    [TestMethod]
+    public void UpstreamTestData_CopiedBesideTheTests_HoldsTheFilesTheDocumentationChecksOpen()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("folder", "UpstreamTestData/docs and src");
+
+        string[] required =
+        [
+            Path.Combine("docs", "options-in-versions"),
+            Path.Combine("docs", "VERSIONS.md"),
+            Path.Combine("docs", "cmdline-opts", "write-out.md"),
+            Path.Combine("docs", "cmdline-opts", "verbose.md"),
+            Path.Combine("src", "tool_writeout.c"),
+        ];
+        string[] missing = [.. required.Where(file => !File.Exists(Path.Combine(UpstreamTestDataFolder, file)))];
+        int optionDocCount = Directory.GetFiles(Path.Combine(UpstreamTestDataFolder, "docs", "cmdline-opts"), "*.md").Length;
+
+        diagnostics.Act("missing files", string.Join(", ", missing));
+        diagnostics.Assert("missing files", 0, missing.Length);
+        Assert.IsEmpty(missing);
+        Assert.AreEqual(VendoredOptionDocCount, optionDocCount);
     }
 
     [TestMethod]
