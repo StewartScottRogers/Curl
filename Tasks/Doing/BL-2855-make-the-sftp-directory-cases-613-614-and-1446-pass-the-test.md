@@ -38,3 +38,4 @@ Upstream: curl 8.22.0 `tests/data/test613`, `test614`, `test1446` and `tests/lib
 ## Log
 
 - 2026-10-19: Created.
+- 2026-10-19: Backlog -> Doing. Criteria at claim: b18c1ec7 0f5f6907 c061550a dd1cc079 620ebead.
