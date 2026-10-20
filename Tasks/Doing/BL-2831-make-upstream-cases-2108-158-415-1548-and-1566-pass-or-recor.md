@@ -42,3 +42,4 @@ Any fix's folder must be added to this task's `touches` in the same commit (like
 ## Log
 
 - 2026-10-19: Created.
+- 2026-10-19: Backlog -> Doing. Criteria at claim: 0d008234 77580efe 3d4c7a1e 108a50d2 620ebead.
