@@ -4,7 +4,7 @@ title: Make upstream case 1548 pass: TELNET reading stdin with -m 1 ends with ex
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: []
+depends-on: [BL-2880]
 touches: [Curl.Protocol.Telnet.UnitLibrary, Curl.Protocol.Telnet.UnitTests, Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
 requirement: none
 created: 2026-10-19
@@ -31,7 +31,11 @@ Likely cause to check first: upstream's sws, given an empty reply, sends nothing
 
 ## Notes
 
+- 2026-10-19 (lane 4): real curl 8.22.0 (Schannel, `Record-CurlExchange.ps1 -Response '' -RequestReadMilliseconds 3000 -StandardInput 'GET /we/want/1548 HTTP/1.0\n\n' -CurlArgs '-m','1','telnet://127.0.0.1:18548'`) exits **28** after 1300 ms; it sends the 28 stdin bytes as they are (line feeds only, no telnet negotiation). Verdict **(b)**, harness wrong: `<data>` is one line feed, not empty, and sws never sees `\r\n\r\n` in an LF-only request, so it keeps reading and curl's `-m 1` fires; the `sws` emulation instead returns 0 from a read with no reply waiting, so Curl sees a close and exits 0. Curl's telnet handler is right; no Telnet change.
+- The fix (`ReadWithNothingSentAsync` waits for the next write whenever unserved request bytes remain) makes 1548 pass, but about 15 harness tests assert the old close-on-partial-request and hang, and the whole project needs a hang-checked run and a quality run: more than this run's remaining time and cost. Filed as BL-2880 (owning the harness files, the listing and the focused test) and added to `depends-on`; the attempted fix is left uncommitted for the shift's stash. BL-2880's ID was picked above the shared board's highest (BL-2874) because this lane's stale board made the script hand out BL-2871, which BL-2871 (SFTP) already holds. Once BL-2880 is Done, this task only checks its criteria.
+
 ## Log
 
 - 2026-10-19: Created.
 - 2026-10-19: Backlog -> Doing. Criteria at claim: 68d4214d 1b93baff bb323509 68ad5856.
+- 2026-10-19: Doing -> Backlog. Waits on BL-2880: the sws emulation must keep reading an unfinished request (verdict b; real curl exits 28)
