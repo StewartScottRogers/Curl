@@ -34,3 +34,4 @@ The standing rule for such questions (root CLAUDE.md, "Decisions") is to match t
 ## Log
 
 - 2026-10-19: Created.
+- 2026-10-19: Backlog -> Doing. Criteria at claim: 71a0b573 97dc1871 d4e22e68 ff134043.
