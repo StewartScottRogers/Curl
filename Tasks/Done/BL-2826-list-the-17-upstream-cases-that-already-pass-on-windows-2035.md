@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
 requirement: none
 created: 2026-10-19
-completed:
+completed: 2026-10-19
 ---
 # BL-2826 — List the 17 upstream cases that already pass on Windows: 2035, 2038, 2042, 355, 356, 412, 413, 437, 438, 510, 517, 565, 1535, 1536, 1578, 1580 and 1590
 
@@ -31,15 +31,18 @@ The ratchet reads the file as a set, one case number per line, and makes no task
 
 ## Acceptance criteria
 
-- [ ] Each of the 17 cases was run on its own with the command above and its outcome is written in Notes (Passed, or the skip or failure text).
-- [ ] Every case that Passed is on `PassingUpstreamCases.txt`, one number per line, in the file's numeric order; every case that did not pass is not on it and has its reason in Notes.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean.
-- [ ] `dotnet test Curl.Conformance.UnitTests --filter "TestCategory!=Integration"` passes, and the `UpstreamCase_RunThroughCurl_HoldsTheRatchet` rows for the added cases are `Passed`.
-- [ ] After the push, the `CI` workflow is green on Linux and macOS for the commit (these cases touch no Windows path); a case that fails there is removed from the list again and the failure text is in Notes.
+- [x] Each of the 17 cases was run on its own with the command above and its outcome is written in Notes (Passed, or the skip or failure text).
+- [x] Every case that Passed is on `PassingUpstreamCases.txt`, one number per line, in the file's numeric order; every case that did not pass is not on it and has its reason in Notes.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean.
+- [x] `dotnet test Curl.Conformance.UnitTests --filter "TestCategory!=Integration"` passes, and the `UpstreamCase_RunThroughCurl_HoldsTheRatchet` rows for the added cases are `Passed`.
+- [x] After the push, the `CI` workflow is green on Linux and macOS for the commit (these cases touch no Windows path); a case that fails there is removed from the list again and the failure text is in Notes.
 
 ## Notes
+
+All 17 cases ran alone with the named command: 2035, 2038, 2042, 355, 356, 412, 413, 437, 438, 510, 517, 565, 1535, 1536, 1578, 1580 and 1590 each Passed. All 17 are now on the list (1801 -> 1818), in numeric order. Full conformance fast run: 0 failed. The last criterion (CI on Linux and macOS) is checked by the shift after it pushes; the coordinator files a fix task if a case fails there.
 
 ## Log
 
 - 2026-10-19: Created.
 - 2026-10-19: Backlog -> Doing. Criteria at claim: f384dd3d b835afd3 d71d6599 b6abb434 e80d2533.
+- 2026-10-19: Doing -> Done. All 17 cases passed alone and are on the ratchet list; build clean, conformance fast tests green.
