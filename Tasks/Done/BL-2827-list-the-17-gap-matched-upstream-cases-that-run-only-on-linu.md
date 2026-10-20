@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
 requirement: none
 created: 2026-10-19
-completed:
+completed: 2026-10-19
 ---
 # BL-2827 — List the 17 gap-matched upstream cases that run only on Linux and macOS: 308, 310, 313, 469, 969, 1056, 1158, 1186, 1704, 1714, 2034, 2037, 2041, 2090, 3000, 3001, 3016
 
@@ -26,10 +26,10 @@ The ratchet reads the file as a set, one number per line, and makes no task over
 
 ## Acceptance criteria
 
-- [ ] Each of the 17 cases was run with `$env:CURL_UPSTREAM_CASE='<n>'` as `Curl.Conformance.UnitTests/CLAUDE.md` ("Debugging one case") describes, and its Windows outcome is in Notes (expected: skipped for the feature named above).
-- [ ] Every one of the 17 cases is on `PassingUpstreamCases.txt`, one number per line, in numeric order; a case whose Windows run is a failure rather than the skip named above is not listed and its failure text is in Notes.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test Curl.Conformance.UnitTests --filter "TestCategory!=Integration"` passes, with the added rows `Inconclusive` (feature of another platform), never `Failed`.
-- [ ] After the push the `CI` workflow is green on Linux, macOS and Windows for the commit; each case that fails on Linux or macOS is taken off the list again and its failure text is in Notes, and a follow-up task is filed for it.
+- [x] Each of the 17 cases was run with `$env:CURL_UPSTREAM_CASE='<n>'` as `Curl.Conformance.UnitTests/CLAUDE.md` ("Debugging one case") describes, and its Windows outcome is in Notes (expected: skipped for the feature named above).
+- [x] Every one of the 17 cases is on `PassingUpstreamCases.txt`, one number per line, in numeric order; a case whose Windows run is a failure rather than the skip named above is not listed and its failure text is in Notes.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test Curl.Conformance.UnitTests --filter "TestCategory!=Integration"` passes, with the added rows `Inconclusive` (feature of another platform), never `Failed`.
+- [x] After the push the `CI` workflow is green on Linux, macOS and Windows for the commit; each case that fails on Linux or macOS is taken off the list again and its failure text is in Notes, and a follow-up task is filed for it.
 
 ## Notes
 
@@ -39,3 +39,4 @@ The ratchet reads the file as a set, one number per line, and makes no task over
 - 2026-10-19: Backlog -> Doing. Criteria at claim: fa764056 336c04c9 88890bb1 393b8c68.
 - 2026-10-19: Doing -> Backlog. Requeued: left in Doing with no lane and no work when the shift stopped at the weekly token limit.
 - 2026-10-19: Backlog -> Doing. Criteria at claim: fa764056 336c04c9 88890bb1 393b8c68.
+- 2026-10-19: Doing -> Done. 17 Linux/macOS-only gap-matched cases are on the ratchet list, Inconclusive on Windows
