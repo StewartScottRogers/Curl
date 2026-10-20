@@ -13,18 +13,18 @@ with no .NET runtime to install. Every package is built by the
 
 ## Supported platforms
 
-Current version: **[v0.2.0-preview.1](https://github.com/StewartScottRogers/Curl/releases/tag/v0.2.0-preview.1)** (pre-release).
+Current version: **[the latest build](https://github.com/StewartScottRogers/Curl/releases/tag/preview)**, a pre-release rebuilt from `master` on every merge, so these links always give the newest Curl. The newest numbered pre-release is [v0.2.0-preview.1](https://github.com/StewartScottRogers/Curl/releases/tag/v0.2.0-preview.1).
 
 | Platform | Processor | Package |
 | --- | --- | --- |
-| Windows | x64 | [curl-win-x64.zip](https://github.com/StewartScottRogers/Curl/releases/download/v0.2.0-preview.1/curl-win-x64.zip) |
-| Windows | Arm64 | [curl-win-arm64.zip](https://github.com/StewartScottRogers/Curl/releases/download/v0.2.0-preview.1/curl-win-arm64.zip) |
-| Linux | x64 | [curl-linux-x64.tar.gz](https://github.com/StewartScottRogers/Curl/releases/download/v0.2.0-preview.1/curl-linux-x64.tar.gz) |
-| Linux | Arm64 | [curl-linux-arm64.tar.gz](https://github.com/StewartScottRogers/Curl/releases/download/v0.2.0-preview.1/curl-linux-arm64.tar.gz) |
-| macOS | Apple silicon | [curl-osx-arm64.tar.gz](https://github.com/StewartScottRogers/Curl/releases/download/v0.2.0-preview.1/curl-osx-arm64.tar.gz) |
-| macOS | Intel | [curl-osx-x64.tar.gz](https://github.com/StewartScottRogers/Curl/releases/download/v0.2.0-preview.1/curl-osx-x64.tar.gz) |
+| Windows | x64 | [curl-win-x64.zip](https://github.com/StewartScottRogers/Curl/releases/download/preview/curl-win-x64.zip) |
+| Windows | Arm64 | [curl-win-arm64.zip](https://github.com/StewartScottRogers/Curl/releases/download/preview/curl-win-arm64.zip) |
+| Linux | x64 | [curl-linux-x64.tar.gz](https://github.com/StewartScottRogers/Curl/releases/download/preview/curl-linux-x64.tar.gz) |
+| Linux | Arm64 | [curl-linux-arm64.tar.gz](https://github.com/StewartScottRogers/Curl/releases/download/preview/curl-linux-arm64.tar.gz) |
+| macOS | Apple silicon | [curl-osx-arm64.tar.gz](https://github.com/StewartScottRogers/Curl/releases/download/preview/curl-osx-arm64.tar.gz) |
+| macOS | Intel | [curl-osx-x64.tar.gz](https://github.com/StewartScottRogers/Curl/releases/download/preview/curl-osx-x64.tar.gz) |
 
-Checksums: [SHA256SUMS](https://github.com/StewartScottRogers/Curl/releases/download/v0.2.0-preview.1/SHA256SUMS).
+Checksums: [SHA256SUMS](https://github.com/StewartScottRogers/Curl/releases/download/preview/SHA256SUMS).
 Older versions are on the [releases page](https://github.com/StewartScottRogers/Curl/releases).
 Linux packages are built on Ubuntu 22.04 and need glibc 2.35 or newer (Ubuntu 22.04, Debian 12 and later). Alpine and other musl-based distributions are not supported yet. Windows and macOS versions follow the [.NET 10 supported OS list](https://github.com/dotnet/core/blob/main/release-notes/10.0/supported-os.md).
 
@@ -37,16 +37,16 @@ a folder. See [Curl.Mcp/README.md](Curl.Mcp/README.md) for the tools it offers.
 
 | Package | What it is |
 | --- | --- |
-| [Curl.Mcp](https://github.com/StewartScottRogers/Curl/releases/download/v0.2.0-preview.1/Curl.Mcp.0.2.0-preview.1.nupkg) | The tool package (`curl-mcp`) with `.mcp/server.json` |
-| [Curl.Mcp.win-x64](https://github.com/StewartScottRogers/Curl/releases/download/v0.2.0-preview.1/Curl.Mcp.win-x64.0.2.0-preview.1.nupkg) | Windows x64 |
-| [Curl.Mcp.win-arm64](https://github.com/StewartScottRogers/Curl/releases/download/v0.2.0-preview.1/Curl.Mcp.win-arm64.0.2.0-preview.1.nupkg) | Windows Arm64 |
-| [Curl.Mcp.linux-x64](https://github.com/StewartScottRogers/Curl/releases/download/v0.2.0-preview.1/Curl.Mcp.linux-x64.0.2.0-preview.1.nupkg) | Linux x64 |
-| [Curl.Mcp.linux-arm64](https://github.com/StewartScottRogers/Curl/releases/download/v0.2.0-preview.1/Curl.Mcp.linux-arm64.0.2.0-preview.1.nupkg) | Linux Arm64 |
-| [Curl.Mcp.osx-x64](https://github.com/StewartScottRogers/Curl/releases/download/v0.2.0-preview.1/Curl.Mcp.osx-x64.0.2.0-preview.1.nupkg) | macOS Intel |
-| [Curl.Mcp.osx-arm64](https://github.com/StewartScottRogers/Curl/releases/download/v0.2.0-preview.1/Curl.Mcp.osx-arm64.0.2.0-preview.1.nupkg) | macOS Apple silicon |
+| [Curl.Mcp](https://github.com/StewartScottRogers/Curl/releases/tag/preview) | The tool package (`curl-mcp`) with `.mcp/server.json` |
+| [Curl.Mcp.win-x64](https://github.com/StewartScottRogers/Curl/releases/tag/preview) | Windows x64 |
+| [Curl.Mcp.win-arm64](https://github.com/StewartScottRogers/Curl/releases/tag/preview) | Windows Arm64 |
+| [Curl.Mcp.linux-x64](https://github.com/StewartScottRogers/Curl/releases/tag/preview) | Linux x64 |
+| [Curl.Mcp.linux-arm64](https://github.com/StewartScottRogers/Curl/releases/tag/preview) | Linux Arm64 |
+| [Curl.Mcp.osx-x64](https://github.com/StewartScottRogers/Curl/releases/tag/preview) | macOS Intel |
+| [Curl.Mcp.osx-arm64](https://github.com/StewartScottRogers/Curl/releases/tag/preview) | macOS Apple silicon |
 
-The links point at v0.2.0-preview.1, the first release to carry the Curl.Mcp packages;
-they work once that tag exists.
+Each package's file name carries its build's version, which changes with every build, so these
+link to the latest build's release page, where all seven are listed.
 
 To run one without nuget.org, download all seven into one folder and install from it
 (the tool package picks the matching `Curl.Mcp.<rid>` package from the same folder):
