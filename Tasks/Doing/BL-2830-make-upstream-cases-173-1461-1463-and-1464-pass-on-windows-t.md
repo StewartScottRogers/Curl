@@ -40,3 +40,4 @@ Where the product is wrong, add a focused unit test in the fixed library's own `
 ## Log
 
 - 2026-10-19: Created.
+- 2026-10-19: Backlog -> Doing. Criteria at claim: 31758093 0dacb452 e6f99989 b47eccaf 7bd8d990 620ebead.
