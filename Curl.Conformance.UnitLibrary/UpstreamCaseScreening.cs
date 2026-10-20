@@ -81,11 +81,17 @@ internal static class UpstreamCaseScreening
     /// Whether a libtest program, by name, has a port the runner can run (BL-2556); <see langword="null"/>
     /// for none, so every case with a <c>&lt;tool&gt;</c> is skipped.
     /// </param>
+    /// <param name="interpretsPerlScript">
+    /// Whether a Perl script, by file name (<c>test1707.pl</c>), has a registered C# interpretation the runner
+    /// runs in place of Perl (BL-2863); <see langword="null"/> for none, so every <c>&lt;command type="perl"&gt;</c>
+    /// case is skipped.
+    /// </param>
     /// <returns>A sentence saying why the case is skipped, or <see langword="null"/> when it can run.</returns>
-    public static string? FindSkipReason(UpstreamTestFileExpansion expansion, UpstreamTestCase testCase, IReadOnlySet<string> features, bool emulatesHttp2 = false, bool emulatesHttp3 = false, Func<string, bool>? isPortedLibTest = null)
+    public static string? FindSkipReason(UpstreamTestFileExpansion expansion, UpstreamTestCase testCase, IReadOnlySet<string> features, bool emulatesHttp2 = false, bool emulatesHttp3 = false, Func<string, bool>? isPortedLibTest = null, Func<string, bool>? interpretsPerlScript = null)
     {
-        HashSet<string> standIns = [.. emulatesHttp2 ? [Http2Server] : Array.Empty<string>(), .. emulatesHttp3 ? [Http3Server] : Array.Empty<string>()];
-        Func<string, bool> isPorted = isPortedLibTest ?? (_ => false);
+        HashSet<string> standIns = StandIns(emulatesHttp2, emulatesHttp3);
+        Func<string, bool> isPorted = OrNone(isPortedLibTest);
+        Func<string, bool> interpretsScript = OrNone(interpretsPerlScript);
         Func<string?>[] checks =
         [
             () => expansion.ConditionError,
@@ -101,7 +107,7 @@ internal static class UpstreamCaseScreening
             () => FtpDataConnection(testCase),
             () => UploadOffMailServer(testCase),
             () => UnsupportedFeature(testCase, features),
-            () => UnsupportedCommand(testCase),
+            () => UnsupportedCommand(testCase, interpretsScript),
             () => UnsupportedServerCommand(testCase),
             () => InternetHost(testCase),
             () => UnsupportedFileName(testCase, "client"),
@@ -112,6 +118,12 @@ internal static class UpstreamCaseScreening
         ];
         return checks.Select(check => check()).FirstOrDefault(reason => reason is not null);
     }
+
+    private static HashSet<string> StandIns(bool emulatesHttp2, bool emulatesHttp3) =>
+        [.. emulatesHttp2 ? [Http2Server] : Array.Empty<string>(), .. emulatesHttp3 ? [Http3Server] : Array.Empty<string>()];
+
+    // A lookup the caller did not give finds nothing.
+    private static Func<string, bool> OrNone(Func<string, bool>? lookup) => lookup ?? (_ => false);
 
     /// <summary>
     /// Finds a <c>&lt;client&gt;</c> or <c>&lt;verify&gt;</c> file part that names a file outside the
@@ -265,7 +277,27 @@ internal static class UpstreamCaseScreening
         return null;
     }
 
-    private static string? UnsupportedCommand(UpstreamTestCase testCase)
+    /// <summary>
+    /// The file name of the Perl script a <c>&lt;command type="perl"&gt;</c> runs, its first word after the last
+    /// <c>/</c> (<c>test1707.pl</c> for <c>%SRCDIR/test1707.pl %CURL ...</c>); <see langword="null"/> when the
+    /// command is not of that type or has no word.
+    /// </summary>
+    /// <param name="testCase">The parsed, expanded case.</param>
+    /// <returns>The script's file name, or <see langword="null"/>.</returns>
+    public static string? PerlScriptName(UpstreamTestCase testCase)
+    {
+        ArgumentNullException.ThrowIfNull(testCase);
+        UpstreamTestSection? command = testCase.Find("client", "command");
+        return command?.GetAttribute("type") == "perl" && UpstreamCommandLineSplitter.Split(UpstreamTestPartBodies.Text(command)).Arguments is [var script, ..]
+            ? script[(script.LastIndexOf('/') + 1)..]
+            : null;
+    }
+
+    // runtests.pl runs a <command type="perl"> with perl; the harness runs a registered C# interpretation of its script (BL-2863) and no other.
+    private static string? UnrunCommandType(UpstreamTestCase testCase, string type, Func<string, bool> interpretsPerlScript) =>
+        PerlScriptName(testCase) is { } script && interpretsPerlScript(script) ? null : $"the harness does not run a {type} command";
+
+    private static string? UnsupportedCommand(UpstreamTestCase testCase, Func<string, bool> interpretsPerlScript)
     {
         // runtests.pl runs a <tool> with an empty command too: a libtest program then gets no arguments (test501).
         if (testCase.Find("client", "command") is not { } command)
@@ -275,7 +307,7 @@ internal static class UpstreamCaseScreening
 
         if (command.GetAttribute("type") is { } type)
         {
-            return $"the harness does not run a {type} command";
+            return UnrunCommandType(testCase, type, interpretsPerlScript);
         }
 
         return UpstreamCommandLineSplitter.Split(UpstreamTestPartBodies.Text(command)).UnsupportedShellSyntax is { } syntax

@@ -1035,6 +1035,66 @@ public sealed class UpstreamCaseRunnerTests
             ValueTask.FromResult(ConnectResult.Refused(name));
     }
 
+    private const string PerlCurlCase =
+        "<testcase>\n<client>\n<server>\nnone\n</server>\n<command type=\"perl\">\n/src/tests/test1707.pl %CURL -h all\n</command>\n</client>\n"
+        + "<verify>\n<stdout>\ncurl help\n</stdout>\n</verify>\n</testcase>\n";
+
+    // A test-only interpretation of test1707.pl: runs %CURL in process with the words after it.
+    private static readonly Func<UpstreamCurlInvocation, Func<UpstreamCurlInvocation, Task<int>>, Task<int>> CurlRunningScript =
+        (invocation, runCurl) => invocation.Arguments[0] == UpstreamCaseRunner.CurlProgram
+            ? runCurl(new UpstreamCurlInvocation([.. invocation.Arguments.Skip(1)], invocation.StandardOutput, invocation.StandardError, invocation.StandardInput, invocation.Connector, invocation.DatagramConnector))
+            : Task.FromResult(9);
+
+    [TestMethod]
+    public async Task RunAsync_PerlCommandHoldingCurlWithAnInterpretation_RunsTheInProcessCurl()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        List<string>? curlArguments = null;
+        UpstreamCaseRunner runner = new(
+            async invocation =>
+            {
+                curlArguments = [.. invocation.Arguments];
+                await invocation.StandardOutput.WriteAsync("curl help\n"u8.ToArray());
+                return 0;
+            },
+            UpstreamCurlPlatform.Unix,
+            TimeProvider.System,
+            TimeSpan.FromSeconds(10),
+            perlCommandScripts: new Dictionary<string, Func<UpstreamCurlInvocation, Func<UpstreamCurlInvocation, Task<int>>, Task<int>>> { ["test1707.pl"] = CurlRunningScript });
+
+        UpstreamCaseOutcome outcome = await RunAsync(runner, PerlCurlCase);
+
+        diagnostics.Assert("outcome kind", UpstreamCaseOutcomeKind.Passed, outcome.Kind);
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Passed, outcome.Kind, outcome.Detail);
+        diagnostics.Assert("curl's arguments", "-h all", string.Join(' ', curlArguments!));
+        CollectionAssert.AreEqual(new[] { "-h", "all" }, curlArguments);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_PerlCommandWithoutInterpretations_SkipsAsAPerlCommand()
+    {
+        UpstreamCaseOutcome outcome = await RunAsync(Runner(_ => Task.FromResult(0)), PerlCurlCase);
+
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Skipped, outcome.Kind);
+        Assert.AreEqual("the harness does not run a perl command", outcome.Detail);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_PerlCommandWhoseScriptIsNotRegistered_SkipsAsAPerlCommand()
+    {
+        UpstreamCaseRunner runner = new(
+            _ => Task.FromResult(0),
+            UpstreamCurlPlatform.Unix,
+            TimeProvider.System,
+            TimeSpan.FromSeconds(10),
+            perlCommandScripts: new Dictionary<string, Func<UpstreamCurlInvocation, Func<UpstreamCurlInvocation, Task<int>>, Task<int>>> { ["test971.pl"] = CurlRunningScript });
+
+        UpstreamCaseOutcome outcome = await RunAsync(runner, PerlCurlCase);
+
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Skipped, outcome.Kind);
+        Assert.AreEqual("the harness does not run a perl command", outcome.Detail);
+    }
+
     // The case's own command: what follows the --trace-time runtests.pl ends its arguments with.
     private static string[] CommandArguments(UpstreamCurlInvocation invocation) =>
         [.. invocation.Arguments.SkipWhile(argument => argument != "--trace-time").Skip(1)];

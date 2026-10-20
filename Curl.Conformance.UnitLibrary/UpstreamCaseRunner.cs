@@ -71,6 +71,14 @@ namespace Curl.Conformance;
 /// or trace before them, as <c>runtests.pl</c> runs a tool, and is judged as a curl case is; one whose program is
 /// not ported is skipped as <see cref="UpstreamCaseScreening.LibTestNotPorted"/>.
 /// </param>
+/// <param name="perlCommandScripts">
+/// The C# interpretations of the Perl scripts a <c>&lt;command type="perl"&gt;</c> runs, keyed by the script's file
+/// name (<c>test1707.pl</c>, <see cref="UpstreamCaseScreening.PerlScriptName"/>; BL-2863), or <see langword="null"/>
+/// for none, so every such case is skipped as <c>the harness does not run a perl command</c>. A registered one runs
+/// in place of curl, given an invocation whose arguments are the command's words after the script (with
+/// <c>%CURL</c> as <see cref="CurlProgram"/>) and the case's stdout and stderr, and the delegate that runs curl in
+/// process, which it calls with an invocation of its own for each <c>%CURL</c> run; its exit code is the run's.
+/// </param>
 public sealed class UpstreamCaseRunner(
     Func<UpstreamCurlInvocation, Task<int>> runCurl,
     UpstreamCurlPlatform platform,
@@ -79,7 +87,8 @@ public sealed class UpstreamCaseRunner(
     UpstreamSshServer? sshServer = null,
     UpstreamHttp2Server? http2Server = null,
     UpstreamHttp3Server? http3Server = null,
-    UpstreamLibTests? libTests = null)
+    UpstreamLibTests? libTests = null,
+    IReadOnlyDictionary<string, Func<UpstreamCurlInvocation, Func<UpstreamCurlInvocation, Task<int>>, Task<int>>>? perlCommandScripts = null)
 {
     // runtests.pl reports nghttpx-h3 when it finds the nghttpx that serves HTTP/3, which the stand-in replaces.
     private readonly UpstreamCurlPlatform platform = http3Server is null ? platform : platform.WithFeatures([Http3ServerFeature]);
@@ -228,6 +237,12 @@ public sealed class UpstreamCaseRunner(
     /// </summary>
     public const string LibTestsProgram = "./libtest/libtests";
 
+    /// <summary>
+    /// The value of <c>%CURL</c>, <c>runtests.pl</c>'s path to the curl under test. No program stands behind it: a
+    /// registered Perl script interpretation that meets this word runs curl in process instead (BL-2863).
+    /// </summary>
+    public const string CurlProgram = "curl";
+
     private const string HostAddress = "127.0.0.1";
 
     // runtests.pl's $HOST6IP: the IPv6 loopback, bracketed for a URL.
@@ -305,7 +320,7 @@ public sealed class UpstreamCaseRunner(
             return UpstreamCaseOutcome.SkippedOnThisPlatform(otherPlatformReason);
         }
 
-        return (UpstreamCaseScreening.FindSkipReason(expansion, testCase, platform.Features, emulatesHttp2: http2Server is not null, emulatesHttp3: http3Server is not null, isPortedLibTest: program => libTests?.Programs.Find(program) is not null)
+        return (UpstreamCaseScreening.FindSkipReason(expansion, testCase, platform.Features, emulatesHttp2: http2Server is not null, emulatesHttp3: http3Server is not null, isPortedLibTest: program => libTests?.Programs.Find(program) is not null, interpretsPerlScript: script => perlCommandScripts?.ContainsKey(script) == true)
                 ?? UpstreamCaseScreening.FindFileOutsideLogDirectory(testCase, logDirectory)) is { } reason
             ? UpstreamCaseOutcome.Skipped(reason)
             : null;
@@ -428,6 +443,7 @@ public sealed class UpstreamCaseRunner(
             ["PERL"] = UpstreamPerlOneLiner.Program,
             ["RESOLVE"] = UpstreamResolveCheck.Program,
             ["LIBTESTS"] = LibTestsProgram,
+            ["CURL"] = CurlProgram,
             ["HOST6IP"] = Host6Address,
             ["HTTP6PORT"] = Http6Port,
             ["FTP6PORT"] = Ftp6Port,
@@ -454,7 +470,8 @@ public sealed class UpstreamCaseRunner(
         WriteSshClientKeyFiles(logDirectory);
         WriteClientFiles(testCase);
         ILibTest? libTest = FindLibTest(testCase);
-        List<string> arguments = ProgramArguments(testCase, libTest, outputFile, $"{logDirectory}/trace{testNumber.ToString(CultureInfo.InvariantCulture)}");
+        Func<UpstreamCurlInvocation, Task<int>>? perlScript = FindPerlScript(testCase);
+        List<string> arguments = ProgramArguments(testCase, libTest, perlScript is not null, outputFile, $"{logDirectory}/trace{testNumber.ToString(CultureInfo.InvariantCulture)}");
 
         // On the real clock the server's waits make a case take seconds that a loaded machine
         // stretches past the time limit (test1677's writedelay: 5.5 seconds, BL-1355); with no
@@ -485,7 +502,7 @@ public sealed class UpstreamCaseRunner(
         // (test1319 to 1321, BL-2011; test714 and test715, BL-2035); one to %HTTPSPORT reaches the HTTPS stand-in, whose TLS handshake travels inside the tunnel (BL-2225).
         server.TunnelServerForPort = port => TunnelledPorts.Contains(port) ? pop3 : null;
         UpstreamCurlInvocation invocation = new(arguments, standardOutput, standardError, standardInput, servers, Http3Server(testCase, dns, server, certificateDirectory), EnvironmentVariables(testCase)) { ConnectionListener = ftp.ActiveModeListener };
-        (int exitCode, string? failure) = await RunCurlAsync(ProgramRun(libTest, testNumber, invocation), server).ConfigureAwait(false);
+        (int exitCode, string? failure) = await RunCurlAsync(perlScript is null ? ProgramRun(libTest, testNumber, invocation) : () => perlScript(invocation), server).ConfigureAwait(false);
         if (failure is not null)
         {
             return UpstreamCaseOutcome.Failed(failure);
@@ -688,11 +705,18 @@ public sealed class UpstreamCaseRunner(
     private ILibTest? FindLibTest(UpstreamTestCase testCase) =>
         UpstreamCaseScreening.LibTestProgramName(testCase) is { } program ? libTests!.Programs.Find(program) : null;
 
-    // runtests.pl runs a libtest program with the command's words alone after its name: no --output, --include or trace.
-    private static List<string> ProgramArguments(UpstreamTestCase testCase, ILibTest? libTest, string outputFile, string traceFile) =>
-        libTest is null
+    // Screening let a <command type="perl"> case through only when its script has an interpretation, so perlCommandScripts is given then.
+    private Func<UpstreamCurlInvocation, Task<int>>? FindPerlScript(UpstreamTestCase testCase) =>
+        UpstreamCaseScreening.PerlScriptName(testCase) is { } script
+            ? invocation => perlCommandScripts![script](invocation, runCurl)
+            : null;
+
+    // runtests.pl runs a libtest program with the command's words alone after its name: no --output, --include or trace;
+    // perl gets the words after the script's name.
+    private static List<string> ProgramArguments(UpstreamTestCase testCase, ILibTest? libTest, bool runsPerlScript, string outputFile, string traceFile) =>
+        libTest is null && !runsPerlScript
             ? Arguments(testCase, outputFile, traceFile)
-            : [.. UpstreamCommandLineSplitter.Split(UpstreamTestPartBodies.Text(testCase.Find("client", "command"))).Arguments];
+            : [.. UpstreamCommandLineSplitter.Split(UpstreamTestPartBodies.Text(testCase.Find("client", "command"))).Arguments.Skip(runsPerlScript ? 1 : 0)];
 
     private Func<Task<int>> ProgramRun(ILibTest? libTest, int testNumber, UpstreamCurlInvocation invocation) =>
         libTest is null ? () => runCurl(invocation) : () => RunLibTestAsync(libTest, testNumber, invocation);

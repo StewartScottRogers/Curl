@@ -608,6 +608,49 @@ public sealed class UpstreamCaseScreeningTests
         Assert.AreEqual($"{script} compares with ../curl-config, which Curl does not ship", reason);
     }
 
+    [TestMethod]
+    public void FindSkipReason_PerlCommandWhoseScriptHasAnInterpretation_IsNull()
+    {
+        string sections = "<client>\n<command type=\"perl\">\n/src/tests/test1707.pl curl /log/out1707 -h all\n</command>\n</client>\n";
+
+        string? reason = UpstreamCaseScreening.FindSkipReason(CleanExpansion, ParsedTestCase.From(sections), Features, interpretsPerlScript: script => script == "test1707.pl");
+
+        Assert.IsNull(reason);
+    }
+
+    [TestMethod]
+    public void FindSkipReason_PerlCommandWhoseScriptHasNoInterpretation_DoesNotRunAPerlCommand()
+    {
+        string sections = "<client>\n<command type=\"perl\">\n/src/tests/test971.pl /src/docs\n</command>\n</client>\n";
+
+        string? reason = UpstreamCaseScreening.FindSkipReason(CleanExpansion, ParsedTestCase.From(sections), Features, interpretsPerlScript: script => script == "test1707.pl");
+
+        Assert.AreEqual("the harness does not run a perl command", reason);
+    }
+
+    [TestMethod]
+    public void FindSkipReason_ShellCommandNamingAnInterpretedScript_DoesNotRunAShellCommand()
+    {
+        string sections = "<client>\n<command type=\"shell\">\ntest1707.pl\n</command>\n</client>\n";
+
+        string? reason = UpstreamCaseScreening.FindSkipReason(CleanExpansion, ParsedTestCase.From(sections), Features, interpretsPerlScript: _ => true);
+
+        Assert.AreEqual("the harness does not run a shell command", reason);
+    }
+
+    [TestMethod]
+    [DataRow("<client>\n<command type=\"perl\">\n/src/tests/test1707.pl curl\n</command>\n</client>\n", "test1707.pl")]
+    [DataRow("<client>\n<command type=\"perl\">\ntest971.pl\n</command>\n</client>\n", "test971.pl")]
+    [DataRow("<client>\n<command type=\"perl\">\n</command>\n</client>\n", null)]
+    [DataRow("<client>\n<command>\n/src/tests/test1707.pl\n</command>\n</client>\n", null)]
+    [DataRow("<client>\n<name>\nno command\n</name>\n</client>\n", null)]
+    public void PerlScriptName_Command_IsTheScriptsFileName(string sections, string? expected) =>
+        Assert.AreEqual(expected, UpstreamCaseScreening.PerlScriptName(ParsedTestCase.From(sections)));
+
+    [TestMethod]
+    public void PerlScriptName_NullCase_Throws() =>
+        Assert.ThrowsExactly<ArgumentNullException>(() => UpstreamCaseScreening.PerlScriptName(null!));
+
     private static string? Screen(string sections) =>
         UpstreamCaseScreening.FindSkipReason(CleanExpansion, ParsedTestCase.From(sections), Features);
 
