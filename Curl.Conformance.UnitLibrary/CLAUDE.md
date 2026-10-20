@@ -138,7 +138,7 @@ than one server, the runner puts their dumps back into the order the writes happ
 servers all append to one `server.input` (test2002 and test2003 interleave HTTP, FTP and TFTP, with
 FTP's `QUIT` at exit last); with one server the dumps follow each other as described below.
 `LineProtocolServerCommands` reads `<servercmd>`'s `REPLY <command> <text>` lines (and
-`REPLYLF`, whose text ends in a bare LF, test891) for the responders to look up by command name, reading the text as ftpserver.pl's `eval "qq{...}"` does (`\r`, `\n` and `\t` are control characters, `\@` is `@`), so one `REPLY` can send several lines. `FtpControlChannelResponder` (BL-1920) is the FTP
+`REPLYLF`, whose text ends in a bare LF, test891) for the responders to look up by command name, reading the text as ftpserver.pl's `eval "qq{...}"` does (`\r`, `\n` and `\t` are control characters, `\x` and up to two hex digits is the character with that code, so test2108's `\x00` sends a NUL byte, `\@` is `@`), so one `REPLY` can send several lines. `FtpControlChannelResponder` (BL-1920) is the FTP
 control channel's responder: the `220` curl banner (or `REPLY welcome`), a `REPLY` line's text,
 else ftpserver.pl's display text, `PWD` as `CWD` moved it, `500 <command> is not dealt with!`
 otherwise, and `500 Unrecognized command` with a close for a line that is not a three- or
