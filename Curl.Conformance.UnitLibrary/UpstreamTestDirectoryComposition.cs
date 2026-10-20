@@ -27,6 +27,12 @@ namespace Curl.Conformance;
 /// <see cref="UpstreamTest613Script"/>). Every other <c>%SRCDIR</c> is left as written, so the
 /// case is skipped for a variable with no value rather than failing on a file not vendored.
 /// </para>
+/// <para>
+/// <c>filename=%DEV_NULL</c> and <c>filename="%DEV_NULL"</c>, the faked file name of a form part
+/// (test173), become <c>/dev/null</c> on every platform: that name is only text curl sends, and the
+/// case's expected bytes hold the Unix name. <c>%DEV_NULL</c> anywhere else, such as a file curl
+/// opens (<c>-o%DEV_NULL</c>, test3015), stays the platform's null device (ADR-0716).
+/// </para>
 /// </remarks>
 public static class UpstreamTestDirectoryComposition
 {
@@ -36,6 +42,8 @@ public static class UpstreamTestDirectoryComposition
         ("%FILE_PWD/%LOGDIR", "%FILE_PWD%LOGDIR"),
         ("%SRCDIR/libtest/test610.pl", "./libtest/test610.pl"),
         ("%SRCDIR/libtest/test613.pl", "./libtest/test613.pl"),
+        ("filename=%DEV_NULL", "filename=/dev/null"),
+        ("filename=\"%DEV_NULL\"", "filename=\"/dev/null\""),
     ];
 
     /// <summary>
