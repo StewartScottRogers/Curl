@@ -37,3 +37,4 @@ The ratchet reads the file as a set, one number per line, and makes no task over
 
 - 2026-10-19: Created.
 - 2026-10-19: Backlog -> Doing. Criteria at claim: fa764056 336c04c9 88890bb1 393b8c68.
+- 2026-10-19: Doing -> Backlog. Requeued: left in Doing with no lane and no work when the shift stopped at the weekly token limit.
