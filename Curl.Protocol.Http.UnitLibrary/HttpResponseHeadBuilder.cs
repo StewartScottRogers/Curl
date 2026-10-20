@@ -119,7 +119,20 @@ internal sealed class HttpResponseHeadBuilder
     /// <param name="bodyPrefix">The bytes read past the head.</param>
     /// <returns>The head.</returns>
     internal HttpResponseHead Build(HttpStatusLine statusLine, byte[] bodyPrefix) =>
-        new(statusLine, [.. headers], Encoding.Latin1.GetBytes(headText.ToString()), bodyPrefix);
+        new(statusLine, [.. headers], HeadBytesSoFar(), bodyPrefix);
+
+    /// <summary>Gives the bytes of every head line accepted so far, 1xx heads included.</summary>
+    /// <returns>The head lines' bytes, in Latin-1.</returns>
+    internal byte[] HeadBytesSoFar() => Encoding.Latin1.GetBytes(headText.ToString());
+
+    /// <summary>
+    /// Gives the bytes of every head line received so far: <see cref="HeadBytesSoFar" /> and the
+    /// pending header, whole as a line though held in case the next line folds into it, which
+    /// curl 8.22.0 writes as soon as its line ends (upstream test415, BL-2867).
+    /// </summary>
+    /// <returns>The head lines' bytes, in Latin-1.</returns>
+    internal byte[] HeadBytesWithPendingHeader() =>
+        Encoding.Latin1.GetBytes(hasPendingHeader ? $"{headText}{pendingHeader}{pendingTerminator}" : headText.ToString());
 
     /// <summary>
     /// Determines whether a header line folds into the header before it: it is a continuation
@@ -163,7 +176,7 @@ internal sealed class HttpResponseHeadBuilder
         {
             throw new HttpTransferException(CurlExitCode.WeirdServerReply, HttpTransferMessages.MultipleLocationHeaders)
             {
-                HeadBytesBeforeFailure = Encoding.Latin1.GetBytes(headText.ToString()),
+                HeadBytesBeforeFailure = HeadBytesSoFar(),
             };
         }
 

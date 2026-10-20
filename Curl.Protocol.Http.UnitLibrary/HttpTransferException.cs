@@ -35,7 +35,8 @@ internal sealed class HttpTransferException(CurlExitCode exitCode, string messag
     /// <summary>
     /// Gets the head bytes accepted before the failure, which the handler writes to the header
     /// output before it fails, as libcurl 8.22.0 writes each header line once it accepts it
-    /// (upstream test580, BL-2587); none by default.
+    /// (upstream test580, BL-2587); none by default. The head reader sets it on a failure among
+    /// the header lines or after a 1xx head (upstream tests 158 and 415, BL-2867).
     /// </summary>
-    internal byte[] HeadBytesBeforeFailure { get; init; } = [];
+    internal byte[] HeadBytesBeforeFailure { get; set; } = [];
 }

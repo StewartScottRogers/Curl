@@ -80,6 +80,55 @@ public sealed partial class HttpProtocolHandlerTests
         }
     }
 
+    /// <summary>
+    /// curl 8.22.0 writes each header line once its line ends, so a header held in case the next
+    /// line folds into it still reaches the header output when that next line fails the head
+    /// (upstream test415, BL-2867; measured with <c>-i</c>: the status and <c>Date</c> lines, exit 8).
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_HeaderLineFailsAfterAHeldHeaderWithHeaderOutput_WritesTheLinesBeforeIt()
+    {
+        foreach (int chunkSize in ChunkSizes)
+        {
+            MemoryStream output = new();
+            Diagnostics.Arrange("chunk size", chunkSize);
+            Diagnostics.Arrange("scripted response", "200, Date, a NUL byte line; header output is the output");
+
+            TransferResult result = await Handler(QueueConnector.For(Connection("HTTP/1.1 200 OK\r\nDate: today\r\nX-A: a\0b\r\nContent-Length: 2\r\n\r\nok", chunkSize)))
+                .ExecuteAsync(RefusedHeaderContext(output, output, string.Empty));
+
+            WriteResult(result);
+            Diagnostics.Assert("exit code", CurlExitCode.WeirdServerReply, result.ExitCode);
+            Diagnostics.Diff("output", OneLine("HTTP/1.1 200 OK\r\nDate: today\r\n"), OneLine(Latin1(output.ToArray())));
+            Assert.AreEqual(CurlExitCode.WeirdServerReply, result.ExitCode, $"Chunk size {chunkSize}");
+            Assert.AreEqual("HTTP/1.1 200 OK\r\nDate: today\r\n", Latin1(output.ToArray()), $"Chunk size {chunkSize}");
+        }
+    }
+
+    /// <summary>
+    /// A peer that closes after a 1xx head ends the transfer with exit 52, and curl 8.22.0 has
+    /// already written that head to <c>-i</c>'s output (upstream test158, BL-2867).
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_ClosedAfterAnInformationalHeadWithHeaderOutput_WritesThatHead()
+    {
+        foreach (int chunkSize in ChunkSizes)
+        {
+            MemoryStream output = new();
+            Diagnostics.Arrange("chunk size", chunkSize);
+            Diagnostics.Arrange("scripted response", "100 Continue with one header, then close; header output is the output");
+
+            TransferResult result = await Handler(QueueConnector.For(Connection("HTTP/1.1 100 Continue\r\nSilly-header: yes\r\n\r\n", chunkSize)))
+                .ExecuteAsync(RefusedHeaderContext(output, output, string.Empty));
+
+            WriteResult(result);
+            Diagnostics.Assert("exit code", CurlExitCode.GotNothing, result.ExitCode);
+            Diagnostics.Diff("output", OneLine("HTTP/1.1 100 Continue\r\nSilly-header: yes\r\n\r\n"), OneLine(Latin1(output.ToArray())));
+            Assert.AreEqual(CurlExitCode.GotNothing, result.ExitCode, $"Chunk size {chunkSize}");
+            Assert.AreEqual("HTTP/1.1 100 Continue\r\nSilly-header: yes\r\n\r\n", Latin1(output.ToArray()), $"Chunk size {chunkSize}");
+        }
+    }
+
     [TestMethod]
     [DataRow("Location: /a\r\nLocation: /a\r\n", DisplayName = "The same value twice")]
     [DataRow("Location: /a\r\nLocation:\r\n", DisplayName = "An empty value after it")]
