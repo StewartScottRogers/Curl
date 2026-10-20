@@ -1,5 +1,5 @@
 ---
-id: BL-2864
+id: BL-2868
 title: Make upstream case 1566 pass: --etag-compare that gets a 304 leaves the -o file untouched
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-19
 completed:
 ---
-# BL-2864 — Make upstream case 1566 pass: --etag-compare that gets a 304 leaves the -o file untouched
+# BL-2868 — Make upstream case 1566 pass: --etag-compare that gets a 304 leaves the -o file untouched
 
 ## Goal
 

@@ -1,5 +1,5 @@
 ---
-id: BL-2863
+id: BL-2867
 title: Make upstream cases 158 and 415 pass: write each --include header line to the output before a reply that ends in error
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-19
 completed:
 ---
-# BL-2863 — Make upstream cases 158 and 415 pass: write each --include header line to the output before a reply that ends in error
+# BL-2867 — Make upstream cases 158 and 415 pass: write each --include header line to the output before a reply that ends in error
 
 ## Goal
 

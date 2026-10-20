@@ -1,5 +1,5 @@
 ---
-id: BL-2866
+id: BL-2870
 title: Make upstream case 1548 pass: TELNET reading stdin with -m 1 ends with exit 28
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-19
 completed:
 ---
-# BL-2866 — Make upstream case 1548 pass: TELNET reading stdin with -m 1 ends with exit 28
+# BL-2870 — Make upstream case 1548 pass: TELNET reading stdin with -m 1 ends with exit 28
 
 ## Goal
 

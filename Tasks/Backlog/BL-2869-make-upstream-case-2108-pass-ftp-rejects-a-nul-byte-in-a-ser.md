@@ -1,5 +1,5 @@
 ---
-id: BL-2865
+id: BL-2869
 title: Make upstream case 2108 pass: FTP rejects a NUL byte in a server response line with exit 8
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-19
 completed:
 ---
-# BL-2865 — Make upstream case 2108 pass: FTP rejects a NUL byte in a server response line with exit 8
+# BL-2869 — Make upstream case 2108 pass: FTP rejects a NUL byte in a server response line with exit 8
 
 ## Goal
 
