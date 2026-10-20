@@ -8,7 +8,7 @@ depends-on: [BL-1997, BL-2035]
 touches: [Curl.Networking.UnitLibrary, Curl.Networking.UnitTests, Curl.Protocol.Ftp.UnitLibrary, Curl.Protocol.Ftp.UnitTests, Curl.Console]
 requirement: none
 created: 2026-10-10
-completed:
+completed: 2026-10-19
 ---
 # BL-1976 — Close GF-0046: SOCKS4/5 proxies and --interface are never used in process: the request goes straight to the server and their exit codes (97, 7, 45) never arise
 
@@ -35,20 +35,7 @@ Re-measure after the InProcessCurl rewiring of behaviour:in-process-runner-bypas
 
 ## Acceptance criteria
 
-- [ ] `behaviour:test702`: Curl answers what curl 8.21.0 answers, `upstream test702 passes`, so the item measures `match`.
-- [ ] `behaviour:test703`: Curl answers what curl 8.21.0 answers, `upstream test703 passes`, so the item measures `match`.
-- [ ] `behaviour:test704`: Curl answers what curl 8.21.0 answers, `upstream test704 passes`, so the item measures `match`.
-- [ ] `behaviour:test705`: Curl answers what curl 8.21.0 answers, `upstream test705 passes`, so the item measures `match`.
-- [ ] `behaviour:test716`: Curl answers what curl 8.21.0 answers, `upstream test716 passes`, so the item measures `match`.
-- [ ] `behaviour:test728`: Curl answers what curl 8.21.0 answers, `upstream test728 passes`, so the item measures `match`.
-- [ ] `behaviour:test729`: Curl answers what curl 8.21.0 answers, `upstream test729 passes`, so the item measures `match`.
-- [ ] `behaviour:test713`: Curl answers what curl 8.21.0 answers, `upstream test713 passes`, so the item measures `match`.
-- [ ] `behaviour:test714`: Curl answers what curl 8.21.0 answers, `upstream test714 passes`, so the item measures `match`.
-- [ ] `behaviour:test715`: Curl answers what curl 8.21.0 answers, `upstream test715 passes`, so the item measures `match`.
-- [ ] `behaviour:test1084`: Curl answers what curl 8.21.0 answers, `upstream test1084 passes`, so the item measures `match`.
-- [ ] `behaviour:test1085`: Curl answers what curl 8.21.0 answers, `upstream test1085 passes`, so the item measures `match`.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
-- [ ] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
+- [x] This task is obsolete, and closes without a change: GF-0046 is closed and BL-2041 is Done.
 
 ## Notes
 
@@ -76,6 +63,8 @@ Re-measure after the InProcessCurl rewiring of behaviour:in-process-runner-bypas
   CLAUDE.md name the renamed method; no task in Doing touches it. Harness work and the test713
   diagnosis filed as BL-2035; this task waits on it.
 
+- 2026-10-19: Stewart had it closed as obsolete. Its criteria were replaced by the one above while it was in the Backlog, and the evidence was checked mechanically first.
+
 ## Log
 
 - 2026-10-10: Created.
@@ -86,3 +75,6 @@ Re-measure after the InProcessCurl rewiring of behaviour:in-process-runner-bypas
 - 2026-10-10: Backlog -> Doing.
 - 2026-10-10: Doing -> Blocked. Stewart: dark factory its runs of the last day already cost 3.25 of its 3.93 US dollar cost cap, so it was not run again; split the task; see Z:\repos\Curl.logs\BL-1976-*.jsonl
 - 2026-10-10: Blocked -> Deferred. Superseded by BL-2041, which lands its shelved work (stash 252932ba6), after the per-task cost cap stopped it
+- 2026-10-19: Deferred -> Backlog. Stewart: close it as obsolete (GF-0046 is closed and BL-2041 is Done).
+- 2026-10-19: Backlog -> Doing. Interactive session: closing it as obsolete. Criteria at claim: 39f757b2.
+- 2026-10-19: Doing -> Done. Obsolete: GF-0046 is closed and BL-2041 is Done.

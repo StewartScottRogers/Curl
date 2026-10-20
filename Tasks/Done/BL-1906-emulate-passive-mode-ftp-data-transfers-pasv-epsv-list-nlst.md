@@ -8,7 +8,7 @@ depends-on: [BL-1905]
 touches: [Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests]
 requirement: none
 created: 2026-10-09
-completed:
+completed: 2026-10-19
 ---
 # BL-1906 — Emulate passive-mode FTP data transfers (PASV, EPSV, LIST, NLST, RETR) in the case runner
 
@@ -22,13 +22,7 @@ Harness: Curl.Conformance.UnitLibrary (UpstreamCaseRunner.cs runs a case; Upstre
 
 ## Acceptance criteria
 
-- [x] At least 20 named FTP download and listing cases (passive mode, including EPSV and --disable-epsv) run through UpstreamCaseRunner and get Passed or a real Curl difference.
-- [x] UpstreamCaseScreening no longer returns a skip reason of the form "the harness has no value for %FTPPORT" for those cases (a screening test in Curl.Conformance.UnitTests pins it); any case still skipped for another reason says that reason.
-- [x] Failures the newly measured cases reveal in Curl itself are not fixed here; the next gap run files them. Cases that fail only because of a stand-in fault are fixed in the stand-in.
-- [ ] Curl.Conformance.UnitLibrary holds 100% line and branch coverage and complexity of at most 10 per method; tests run on Windows, Linux and macOS with no TestCategory=Integration.
-- [x] `dotnet build Curl.Conformance.UnitLibrary -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is green.
-- [ ] Curl.Conformance.UnitLibrary\CLAUDE.md states what the runner now does for this.
-- [ ] Interactive check, not a lane gate: `dotnet run --file Gap/Tools/Measure-UpstreamCases.cs -- "<tests/data>" <folder without blanks>/raw.json <case numbers>` reports the named cases as measured, not skipped.
+- [x] This task is obsolete, and closes without a change: BL-1956, which superseded it, is Done.
 
 ## Notes
 
@@ -39,6 +33,8 @@ Harness: Curl.Conformance.UnitLibrary (UpstreamCaseRunner.cs runs a case; Upstre
 
 - 2026-10-10 (interactive): depends-on BL-1942 dropped, it made a cycle (BL-1942 measures code that exists only in this task's shelved work). The shelved code is stash 9a4c35992 ("darkfactory BL-1906 20261009-213949"); apply it by hash (`git stash apply 9a4c35992`), never pop. This task measures its own coverage with Measure-CodeQuality.ps1 and closes any gap, then ticks the box; BL-1942 is deferred as folded in here.
 
+- 2026-10-19: Stewart had it closed as obsolete. Its criteria were replaced by the one above while it was in the Backlog, and the evidence was checked mechanically first.
+
 ## Log
 
 - 2026-10-09: Created.
@@ -47,3 +43,6 @@ Harness: Curl.Conformance.UnitLibrary (UpstreamCaseRunner.cs runs a case; Upstre
 - 2026-10-10: Backlog -> Doing.
 - 2026-10-10: Doing -> Blocked. Stewart: dark factory its runs of the last day already cost 3.32 of its 3.93 US dollar cost cap, so it was not run again; split the task; see Z:\repos\Curl.logs\BL-1906-*.jsonl
 - 2026-10-10: Blocked -> Deferred. Superseded by BL-1956, which lands its shelved code (stash 9a4c35992), after the per-task cost cap stopped it twice
+- 2026-10-19: Deferred -> Backlog. Stewart: close it as obsolete (BL-1956, which superseded it, is Done).
+- 2026-10-19: Backlog -> Doing. Interactive session: closing it as obsolete. Criteria at claim: 556740a3.
+- 2026-10-19: Doing -> Done. Obsolete: BL-1956, which superseded it, is Done.

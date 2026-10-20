@@ -9,7 +9,7 @@ touches: [RunDarkFactory.ps1]
 lane: no
 requirement: none
 created: 2026-10-02
-completed:
+completed: 2026-10-19
 ---
 # BL-1286 — Re-run AF-0025's reproduction after BL-1281 and have the process measurer count only pushed claims
 
@@ -31,10 +31,11 @@ BL-1281 changed `RunDarkFactory.ps1`: a failed claim push is traced as `race` (a
 
 ## Acceptance criteria
 
-- [x] The measurer counts a task's claims from `claim` trace lines only (or `chore(tasks): claim` commits), not from mentions in other tasks' transcripts nor from `race` lines.
-- [ ] AF-0025's reproduction, run with `-Since` set to a date after BL-1281 reached `work/dark-factory`, shows no task claimed 3 or more times.
+- [x] This task is obsolete, and closes without a change: AF-0025 is closed.
 
 ## Notes
+
+- 2026-10-19: Stewart had it closed as obsolete. Its criteria were replaced by the one above while it was in the Backlog, and the evidence was checked mechanically first.
 
 ## Log
 
@@ -42,3 +43,6 @@ BL-1281 changed `RunDarkFactory.ps1`: a failed claim push is traced as `race` (a
 - 2026-10-08: Backlog -> Doing.
 - 2026-10-08: Doing -> Blocked. Done on the audit branch; waiting on PR #72's CI before merging to master
 - 2026-10-08: Blocked -> Deferred. Measurer fixed in PR #72; the remaining 3+ claims are real requeues (see Notes), left to the process re-audit and AF-0051 and AF-0072
+- 2026-10-19: Deferred -> Backlog. Stewart: close it as obsolete (AF-0025 is closed).
+- 2026-10-19: Backlog -> Doing. Interactive session: closing it as obsolete. Criteria at claim: de5a0da6.
+- 2026-10-19: Doing -> Done. Obsolete: AF-0025 is closed.

@@ -8,7 +8,7 @@ depends-on: [BL-1899, BL-1951]
 touches: [Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests, Curl.Conformance.SshServer.UnitLibrary, Curl.Conformance.SshServer.UnitTests]
 requirement: none
 created: 2026-10-09
-completed:
+completed: 2026-10-19
 ---
 # BL-1916 — Emulate SSH user authentication and channels in the case runner
 
@@ -22,13 +22,7 @@ Harness: Curl.Conformance.UnitLibrary (UpstreamCaseRunner.cs runs a case; Upstre
 
 ## Acceptance criteria
 
-- [ ] A unit test authenticates by password and by public key against the stand-in and opens a session channel; at least 5 named SSH cases that stop at authentication or a failed login run through UpstreamCaseRunner and get Passed or a real Curl difference.
-- [ ] UpstreamCaseScreening no longer returns a skip reason of the form "the harness has no value for %USER, %SFTP_PWD, %SCP_PWD" for those cases (a screening test in Curl.Conformance.UnitTests pins it); any case still skipped for another reason says that reason.
-- [ ] Failures the newly measured cases reveal in Curl itself are not fixed here; the next gap run files them. Cases that fail only because of a stand-in fault are fixed in the stand-in.
-- [ ] Curl.Conformance.UnitLibrary holds 100% line and branch coverage and complexity of at most 10 per method; tests run on Windows, Linux and macOS with no TestCategory=Integration.
-- [ ] `dotnet build Curl.Conformance.UnitLibrary -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is green.
-- [ ] Curl.Conformance.UnitLibrary\CLAUDE.md states what the runner now does for this.
-- [ ] Interactive check, not a lane gate: `dotnet run --file Gap/Tools/Measure-UpstreamCases.cs -- "<tests/data>" <folder without blanks>/raw.json <case numbers>` reports the named cases as measured, not skipped.
+- [x] This task is obsolete, and closes without a change: BL-1953 and BL-1954, which superseded it, are Done.
 
 ## Notes
 
@@ -36,6 +30,8 @@ Harness: Curl.Conformance.UnitLibrary (UpstreamCaseRunner.cs runs a case; Upstre
 - Done so far (uncommitted, shelved by the shift): `SshServerClientAccount` (user `curltest`, password `curltest-password`, a fixed Ed25519 client key written as openssh-key-v1 and an authorized_keys line), `SshServerUserAuthentication` (none fails naming `publickey,password`; publickey PK_OK and Ed25519 signature check; password), `SshServerSessionChannel` (session open, exec/subsystem accepted and other requests refused, data both ways with window accounting, exit-status/EOF/CLOSE), `SshServerConnector.Channels`; in the runner `UpstreamSshServer` (injected, routes port 9003), `%SSHPORT` 9003, `%USER`, `%SFTP_PWD` and `%SCP_PWD` empty (as `%FILE_PWD`, `%LOGDIR` being absolute), `%SSHSRVMD5`/`%SSHSRVSHA256` from the host key, the client key files in `%LOGDIR/server/`; screening lets `sftp`/`scp` run only when the expected exit code is 2, 60 or 67, else skips naming BL-1917/BL-1918; `UpstreamConformanceTests` passes the server and `SshAuthenticationCase_RunThroughCurl_IsMeasuredNotSkipped` (606, 607, 628, 629, 630, 631, 656) shows all seven measured, not skipped. Builds clean; the full conformance run was green (907 passed, 1106 skipped).
 - Measured blocker: on Windows all seven fail with exit 2, `Failure establishing ssh session: -5, Unable to exchange encryption keys`: Curl matches libssh2's WinCNG build, which offers no curve25519 or ssh-ed25519, so the stand-in's key exchange cannot agree. That is a stand-in fault, filed as BL-1951 (WinCNG key exchange, RSA host key and RSA client key). With it, the Ed25519 client key here also needs an RSA twin on Windows.
 - Still to do after BL-1951: unit tests for the new SshServer classes (100% line and branch coverage), a screening test pinning the %USER/%SFTP_PWD/%SCP_PWD reason gone and the BL-1917/BL-1918 skip reasons, both CLAUDE.md files, and the ratchet list for any case that then passes.
+- 2026-10-19: Stewart had it closed as obsolete. Its criteria were replaced by the one above while it was in the Backlog, and the evidence was checked mechanically first.
+
 ## Log
 
 - 2026-10-09: Created.
@@ -44,3 +40,6 @@ Harness: Curl.Conformance.UnitLibrary (UpstreamCaseRunner.cs runs a case; Upstre
 - 2026-10-10: Backlog -> Doing.
 - 2026-10-10: Doing -> Blocked. Stewart: dark factory its runs of the last day already cost 3.42 of its 3.93 US dollar cost cap, so it was not run again; split the task; see Z:\repos\Curl.logs\BL-1916-*.jsonl
 - 2026-10-10: Blocked -> Deferred. Superseded by its split, BL-1953 (stand-in classes and tests) and BL-1954 (runner wiring), after the per-task cost cap stopped it; its shelved code is stash 51b9f0bb6
+- 2026-10-19: Deferred -> Backlog. Stewart: close it as obsolete (BL-1953 and BL-1954, which superseded it, are Done).
+- 2026-10-19: Backlog -> Doing. Interactive session: closing it as obsolete. Criteria at claim: 85ef4e39.
+- 2026-10-19: Doing -> Done. Obsolete: BL-1953 and BL-1954, which superseded it, are Done.

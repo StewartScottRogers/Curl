@@ -8,7 +8,7 @@ depends-on: []
 touches: [RunDarkFactory.ps1]
 requirement: none
 created: 2026-10-11
-completed:
+completed: 2026-10-19
 ---
 # BL-2056 — Fix AF-0163: CI red 32 min after test475 failed on Linux and macOS from BL-1907's commit 7b6794f4 (run 38047662088)
 
@@ -41,8 +41,7 @@ The finding closes only when a later re-audit by the process auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] This task is obsolete, and closes without a change: AF-0163 is closed.
 
 ## Notes
 
@@ -51,6 +50,8 @@ The finding closes only when a later re-audit by the process auditor confirms th
 - The reproduction reads a past audit's logs, so no code change can make it give the expected result; only a later audit can.
 - No code changed. Needs Stewart to reject AF-0163 as a single-lane wait, or to ask for lane preemption as a feature.
 
+- 2026-10-19: Stewart had it closed as obsolete. Its criteria were replaced by the one above while it was in the Backlog, and the evidence was checked mechanically first.
+
 ## Log
 
 - 2026-10-11: Created.
@@ -58,3 +59,6 @@ The finding closes only when a later re-audit by the process auditor confirms th
 - 2026-10-11: Doing -> Blocked. Stewart: reject AF-0163 (the 16 min wait was the shift's only lane finishing its task, the script already files in 3 min and claims by priority), or ask for lane preemption as a feature?
 - 2026-10-11: Blocked -> Doing.
 - 2026-10-11: Doing -> Deferred. No work: Stewart closed its finding on 2026-10-11 (closed-how: stewart) as not a factory defect - the red spell was prompt filing and claiming.
+- 2026-10-19: Deferred -> Backlog. Stewart: close it as obsolete (AF-0163 is closed).
+- 2026-10-19: Backlog -> Doing. Interactive session: closing it as obsolete. Criteria at claim: 15e3c3ca.
+- 2026-10-19: Doing -> Done. Obsolete: AF-0163 is closed.

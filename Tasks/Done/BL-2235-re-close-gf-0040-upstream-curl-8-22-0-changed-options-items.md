@@ -8,7 +8,7 @@ depends-on: []
 touches: []
 requirement: none
 created: 2026-10-14
-completed:
+completed: 2026-10-19
 ---
 # BL-2235 — Re-close GF-0040: Upstream curl 8.22.0 changed options items
 
@@ -44,18 +44,11 @@ Bring these items to Curl when the target moves to 8.22.0.
 
 ## Acceptance criteria
 
-- [ ] `options:--httpsig-algo`: Curl answers what curl 8.22.0 answers, `exit 2: curl: option --httpsig-algo: is unknown | curl: try 'curl --help' or 'curl --manual' for more information`, so the item measures `match`.
-- [ ] `options:--httpsig-headers`: Curl answers what curl 8.22.0 answers, `exit 2: curl: option --httpsig-headers: is unknown | curl: try 'curl --help' or 'curl --manual' for more information`, so the item measures `match`.
-- [ ] `options:--httpsig-key`: Curl answers what curl 8.22.0 answers, `exit 2: curl: option --httpsig-key: is unknown | curl: try 'curl --help' or 'curl --manual' for more information`, so the item measures `match`.
-- [ ] `options:--httpsig-keyid`: Curl answers what curl 8.22.0 answers, `exit 2: curl: option --httpsig-keyid: is unknown | curl: try 'curl --help' or 'curl --manual' for more information`, so the item measures `match`.
-- [ ] `options:--httpsig-algo:argument`: Curl answers what curl 8.22.0 answers, `exit 2: curl: option --httpsig-algo: is unknown | curl: try 'curl --help' or 'curl --manual' for more information`, so the item measures `match`.
-- [ ] `options:--httpsig-headers:argument`: Curl answers what curl 8.22.0 answers, `exit 2: curl: option --httpsig-headers: is unknown | curl: try 'curl --help' or 'curl --manual' for more information`, so the item measures `match`.
-- [ ] `options:--httpsig-key:argument`: Curl answers what curl 8.22.0 answers, `exit 2: curl: option --httpsig-key: is unknown | curl: try 'curl --help' or 'curl --manual' for more information`, so the item measures `match`.
-- [ ] `options:--httpsig-keyid:argument`: Curl answers what curl 8.22.0 answers, `exit 2: curl: option --httpsig-keyid: is unknown | curl: try 'curl --help' or 'curl --manual' for more information`, so the item measures `match`.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
-- [ ] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
+- [x] This task is obsolete, and closes without a change: GF-0040 is closed.
 
 ## Notes
+
+- 2026-10-19: Stewart had it closed as obsolete. Its criteria were replaced by the one above while it was in the Backlog, and the evidence was checked mechanically first.
 
 ## Log
 
@@ -63,3 +56,6 @@ Bring these items to Curl when the target moves to 8.22.0.
 
 - 2026-10-14 (Claude): nothing for a lane to do. The 8 --httpsig-* facets are now excluded as intended-difference:ADR-0485 on the gap branch (fd6b7eaf5, PR #142), so the next gap run re-measures them as excluded and closes GF-0040.
 - 2026-10-14: Backlog -> Deferred. closes at the next gap run: --httpsig-* excluded as intended difference (fd6b7eaf5)
+- 2026-10-19: Deferred -> Backlog. Stewart: close it as obsolete (GF-0040 is closed).
+- 2026-10-19: Backlog -> Doing. Interactive session: closing it as obsolete. Criteria at claim: 35476782.
+- 2026-10-19: Doing -> Done. Obsolete: GF-0040 is closed.

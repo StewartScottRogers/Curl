@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests]
 requirement: none
 created: 2026-10-17
-completed:
+completed: 2026-10-19
 ---
 # BL-2601 — Find why the case runner skips cases 520 to 537 as not ported once their libtest ports are registered
 
@@ -22,13 +22,16 @@ Found by BL-2529 (lane 1, 2026-10-17). Its stashed work registers `LibOneVerbose
 
 ## Acceptance criteria
 
-- [ ] With BL-2529's ports registered, `CURL_UPSTREAM_CASE=520` no longer reports `libtest program not ported`, and the cause is named under Notes.
-- [ ] Where the fix is in the runner, a focused unit test in `Curl.Conformance.UnitTests` pins it.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] This task is obsolete, and closes without a change: the ports of 520 to 537 are registered and 520 to 524 and 536 are on the ratchet; 537 needs getrlimit, which BL-2839 covers.
 
 ## Notes
+
+- 2026-10-19: Stewart had it closed as obsolete. Its criteria were replaced by the one above while it was in the Backlog, and the evidence was checked mechanically first.
 
 ## Log
 
 - 2026-10-17: Created.
 - 2026-10-17: Backlog -> Deferred. Premise was wrong: the ports were not yet in the table (CRLF edit miss); once registered the runner runs the cases. Close when BL-2529 is Done
+- 2026-10-19: Deferred -> Backlog. Stewart: close it as obsolete (the ports of 520 to 537 are registered and 520 to 524 and 536 are on the ratchet; 537 needs getrlimit, which BL-2839 covers).
+- 2026-10-19: Backlog -> Doing. Interactive session: closing it as obsolete. Criteria at claim: ac46aa02.
+- 2026-10-19: Doing -> Done. Obsolete: the ports of 520 to 537 are registered and 520 to 524 and 536 are on the ratchet; 537 needs getrlimit, which BL-2839 covers.

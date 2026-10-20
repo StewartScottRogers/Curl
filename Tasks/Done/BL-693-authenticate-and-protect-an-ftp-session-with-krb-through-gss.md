@@ -8,7 +8,7 @@ depends-on: [BL-630, BL-691, BL-668]
 touches: [Curl.Protocol.Ftp.UnitLibrary, Curl.Protocol.Ftp.UnitTests, Curl.Console, Curl.Console.UnitTests]
 requirement: none
 created: 2026-09-28
-completed:
+completed: 2026-10-19
 ---
 # BL-693 — Authenticate and protect an FTP session with --krb through GSS-API
 
@@ -24,14 +24,16 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] Measured first as above (the no-ticket failure on at least one platform, the full exchange where a KDC is available); record what could not be measured and why in Notes.
-- [ ] `Curl.Protocol.Ftp.UnitTests` with a fake token source pin the `AUTH GSSAPI`/`ADAT`/`PBSZ`/`PROT` exchange for each `--krb` level, a protected `USER`/`PASS`/`RETR` sequence, and the failure paths with the exit codes measured.
-- [ ] A `Curl.Console.UnitTests` test shows `--krb` reaching the FTP handler with the composed token source.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean, the fast tests pass, and `Measure-CodeQuality.ps1` reports 100% line and branch coverage and no failing member for each library changed.
+- [x] This task is obsolete, and closes without a change: curl 8.22.0 deprecated --krb: docs/cmdline-opts/krb.md says it has no function anymore (ADR-0142).
 
 ## Notes
+
+- 2026-10-19: Stewart had it closed as obsolete. Its criteria were replaced by the one above while it was in the Backlog, and the evidence was checked mechanically first.
 
 ## Log
 
 - 2026-09-28: Created.
 - 2026-09-28: Backlog -> Deferred. ADR-0142 (BL-525): --krb is deprecated with no function in curl 8.21.0 and 8.18.0, so FTP AUTH GSSAPI is not built; revisit only if a platform curl brings it back
+- 2026-10-19: Deferred -> Backlog. Stewart: close it as obsolete (curl 8.22.0 deprecated --krb: docs/cmdline-opts/krb.md says it has no function anymore (ADR-0142)).
+- 2026-10-19: Backlog -> Doing. Interactive session: closing it as obsolete. Criteria at claim: 4ab4f55a.
+- 2026-10-19: Doing -> Done. Obsolete: curl 8.22.0 deprecated --krb: docs/cmdline-opts/krb.md says it has no function anymore (ADR-0142).

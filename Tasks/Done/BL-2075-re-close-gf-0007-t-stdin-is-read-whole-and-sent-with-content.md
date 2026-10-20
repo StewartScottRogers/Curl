@@ -9,7 +9,7 @@ touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests, Curl.Con
 lane: no
 requirement: none
 created: 2026-10-11
-completed:
+completed: 2026-10-19
 ---
 # BL-2075 — Re-close GF-0007: -T - (stdin) is read whole and sent with Content-Length, not chunked; no Expect: 100-continue, and no exit 25 under HTTP/1.0
 
@@ -38,14 +38,7 @@ In Curl.Protocol.Http.UnitLibrary (HttpRequestFraming, HttpRequestBodyWriter), t
 
 ## Acceptance criteria
 
-- [ ] `behaviour:test60`: Curl answers what curl 8.21.0 answers, `reference curl exits 56; stdout 0 bytes: `, so the item measures `match`.
-- [ ] `behaviour:test98`: Curl answers what curl 8.21.0 answers, `upstream test98 passes`, so the item measures `match`.
-- [ ] `behaviour:test1068`: Curl answers what curl 8.21.0 answers, `reference curl exits 56; stdout 0 bytes: `, so the item measures `match`.
-- [ ] `behaviour:test1069`: Curl answers what curl 8.21.0 answers, `upstream test1069 passes`, so the item measures `match`.
-- [ ] `behaviour:test1072`: Curl answers what curl 8.21.0 answers, `reference curl exits 25; stdout 0 bytes: `, so the item measures `match`.
-- [ ] `behaviour:test1073`: Curl answers what curl 8.21.0 answers, `upstream test1073 passes`, so the item measures `match`.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
-- [ ] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
+- [x] This task is obsolete, and closes without a change: GF-0007 is closed.
 
 ## Notes
 
@@ -65,9 +58,14 @@ In Curl.Protocol.Http.UnitLibrary (HttpRequestFraming, HttpRequestBodyWriter), t
   reading `Gap/`.
 - 2026-10-11: Product defects found by re-measuring with the fixed gap harness (PR #119) are filed as BL-2087 and BL-2088.
 
+- 2026-10-19: Stewart had it closed as obsolete. Its criteria were replaced by the one above while it was in the Backlog, and the evidence was checked mechanically first.
+
 ## Log
 
 - 2026-10-11: Created.
 - 2026-10-11: Backlog -> Doing.
 - 2026-10-11: Doing -> Backlog. Interactive only: all six cases pass the in-repo upstream ratchet; the gap differs only under the gap tool, which lanes may not read (see Notes)
 - 2026-10-11: Backlog -> Deferred. product fixes BL-2084..BL-2092 are done (BL-2087 blocked on the cost cap); this task closes when the next gap run re-measures its items
+- 2026-10-19: Deferred -> Backlog. Stewart: close it as obsolete (GF-0007 is closed).
+- 2026-10-19: Backlog -> Doing. Interactive session: closing it as obsolete. Criteria at claim: 5dfe5593.
+- 2026-10-19: Doing -> Done. Obsolete: GF-0007 is closed.

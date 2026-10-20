@@ -9,7 +9,7 @@ touches: [Curl.Console, Curl.Console.UnitTests, Curl.Networking.UnitLibrary, Cur
 lane: no
 requirement: none
 created: 2026-10-11
-completed:
+completed: 2026-10-19
 ---
 # BL-2072 — Re-close GF-0001: In process, Curl never runs TcpConnector: no CONNECT tunnel, no HAProxy header, no .onion refusal, no name-resolution or --resolve/--connect-to failures
 
@@ -38,49 +38,14 @@ In Curl.Console, give InProcessCurl (and the CurlComposition.CreateRunner overlo
 
 ## Acceptance criteria
 
-- [ ] `behaviour:test1008`: Curl answers what curl 8.21.0 answers, `upstream test1008 passes`, so the item measures `match`.
-- [ ] `behaviour:test1021`: Curl answers what curl 8.21.0 answers, `upstream test1021 passes`, so the item measures `match`.
-- [ ] `behaviour:test1060`: Curl answers what curl 8.21.0 answers, `upstream test1060 passes`, so the item measures `match`.
-- [ ] `behaviour:test1061`: Curl answers what curl 8.21.0 answers, `upstream test1061 passes`, so the item measures `match`.
-- [ ] `behaviour:test206`: Curl answers what curl 8.21.0 answers, `upstream test206 passes`, so the item measures `match`.
-- [ ] `behaviour:test209`: Curl answers what curl 8.21.0 answers, `upstream test209 passes`, so the item measures `match`.
-- [ ] `behaviour:test213`: Curl answers what curl 8.21.0 answers, `upstream test213 passes`, so the item measures `match`.
-- [ ] `behaviour:test217`: Curl answers what curl 8.21.0 answers, `upstream test217 passes`, so the item measures `match`.
-- [ ] `behaviour:test265`: Curl answers what curl 8.21.0 answers, `upstream test265 passes`, so the item measures `match`.
-- [ ] `behaviour:test287`: Curl answers what curl 8.21.0 answers, `upstream test287 passes`, so the item measures `match`.
-- [ ] `behaviour:test718`: Curl answers what curl 8.21.0 answers, `upstream test718 passes`, so the item measures `match`.
-- [ ] `behaviour:test749`: Curl answers what curl 8.21.0 answers, `upstream test749 passes`, so the item measures `match`.
-- [ ] `behaviour:test750`: Curl answers what curl 8.21.0 answers, `upstream test750 passes`, so the item measures `match`.
-- [ ] `behaviour:test1715`: Curl answers what curl 8.21.0 answers, `upstream test1715 passes`, so the item measures `match`.
-- [ ] `behaviour:test94`: Curl answers what curl 8.21.0 answers, `upstream test94 passes`, so the item measures `match`.
-- [ ] `behaviour:test440`: Curl answers what curl 8.21.0 answers, `upstream test440 passes`, so the item measures `match`.
-- [ ] `behaviour:test441`: Curl answers what curl 8.21.0 answers, `upstream test441 passes`, so the item measures `match`.
-- [ ] `behaviour:test493`: Curl answers what curl 8.21.0 answers, `upstream test493 passes`, so the item measures `match`.
-- [ ] `behaviour:test1455`: Curl answers what curl 8.21.0 answers, `reference curl exits 0; stdout 0 bytes: `, so the item measures `match`.
-- [ ] `behaviour:test3201`: Curl answers what curl 8.21.0 answers, `reference curl exits 0; stdout 0 bytes: `, so the item measures `match`.
-- [ ] `behaviour:test3220`: Curl answers what curl 8.21.0 answers, `reference curl exits 0; stdout 0 bytes: `, so the item measures `match`.
-- [ ] `behaviour:test1471`: Curl answers what curl 8.21.0 answers, `upstream test1471 passes`, so the item measures `match`.
-- [ ] `behaviour:test1472`: Curl answers what curl 8.21.0 answers, `upstream test1472 passes`, so the item measures `match`.
-- [ ] `behaviour:test20`: Curl answers what curl 8.21.0 answers, `upstream test20 passes`, so the item measures `match`.
-- [ ] `behaviour:test3019`: Curl answers what curl 8.21.0 answers, `upstream test3019 passes`, so the item measures `match`.
-- [ ] `behaviour:test3020`: Curl answers what curl 8.21.0 answers, `upstream test3020 passes`, so the item measures `match`.
-- [ ] `behaviour:test2043`: Curl answers what curl 8.21.0 answers, as the Evidence above shows, so the item measures `match`.
-- [ ] `behaviour:test1293`: Curl answers what curl 8.21.0 answers, `reference curl exits 0; stdout 256 bytes: HTTP/1.1 200 OK\x0ADate: Tue, 09 Nov 2010 14:49:00 GMT\x0AServer: test-server/fake\x0ALast-Modified: Tue, 13 Jun 2000 12:10:00 GMT\x0AETag: "21025-dc7-39462498"\x0AAccept-Ranges: bytes\x0AContent-Length: 6\x0AConnection: `, so the item measures `match`.
-- [ ] `behaviour:test1097`: Curl answers what curl 8.21.0 answers, `upstream test1097 passes`, so the item measures `match`.
-- [ ] `behaviour:test1230`: Curl answers what curl 8.21.0 answers, `upstream test1230 passes`, so the item measures `match`.
-- [ ] `behaviour:test1456`: Curl answers what curl 8.21.0 answers, `upstream test1456 passes`, so the item measures `match`.
-- [ ] `behaviour:test3028`: Curl answers what curl 8.21.0 answers, `upstream test3028 passes`, so the item measures `match`.
-- [ ] `behaviour:test3202`: Curl answers what curl 8.21.0 answers, `upstream test3202 passes`, so the item measures `match`.
-- [ ] `behaviour:test2050`: Curl answers what curl 8.21.0 answers, `upstream test2050 passes`, so the item measures `match`.
-- [ ] `behaviour:test2055`: Curl answers what curl 8.21.0 answers, `upstream test2055 passes`, so the item measures `match`.
-- [ ] `behaviour:test795`: Curl answers what curl 8.21.0 answers, `upstream test795 passes`, so the item measures `match`.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
-- [ ] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
+- [x] This task is obsolete, and closes without a change: GF-0001 is closed.
 
 ## Notes
 
 - 2026-10-11 (lane 1): Interactive only. The product side is already in place: `InProcessCurl.RunAsync` has the dialing overload (`ITcpDialer` + `IDnsResolver`) that builds the production `TcpConnector` (BL-1831), and `UpstreamConformanceTests.RunCurlAsync` already uses it (BL-1794); BL-1997 measured 34 of the 36 cases passing that way and BL-2020 (Done) took 795 and 2043. The gap run still measures the old shapes (a GET instead of CONNECT, exit 52 instead of 6 or 49), which is what the connector overload produces, so the remaining cause is the gap office's own measuring tool, `Measure-UpstreamCases.cs` under the gap office's Tools folder, calling the `IConnector` overload of `InProcessCurl.RunAsync`. That file is an audit path (ADR-0433): the lane guard refuses reading it, changing it and even filing a task that names it, so no lane can check or fix it. Remove lane: no once an interactive session has switched `Measure-UpstreamCases.cs` to the dialing overload (wrap its in-memory server connector in an `ITcpDialer` as `UpstreamConformanceTests` does with `InMemoryServerTcpDialer` and `LoopbackOnlyDnsResolver`) and re-run the gap analysis; any case still failing after that is a product gap for a lane.
 - 2026-10-11: Product defects found by re-measuring with the fixed gap harness (PR #119) are filed as BL-2084.
+
+- 2026-10-19: Stewart had it closed as obsolete. Its criteria were replaced by the one above while it was in the Backlog, and the evidence was checked mechanically first.
 
 ## Log
 
@@ -88,3 +53,6 @@ In Curl.Console, give InProcessCurl (and the CurlComposition.CreateRunner overlo
 - 2026-10-11: Backlog -> Doing.
 - 2026-10-11: Doing -> Backlog. Interactive only: the gap office's Measure-UpstreamCases.cs still calls the IConnector overload of InProcessCurl.RunAsync; lanes may not read or change it
 - 2026-10-11: Backlog -> Deferred. product fixes BL-2084..BL-2092 are done (BL-2087 blocked on the cost cap); this task closes when the next gap run re-measures its items
+- 2026-10-19: Deferred -> Backlog. Stewart: close it as obsolete (GF-0001 is closed).
+- 2026-10-19: Backlog -> Doing. Interactive session: closing it as obsolete. Criteria at claim: 3510ca7b.
+- 2026-10-19: Doing -> Done. Obsolete: GF-0001 is closed.

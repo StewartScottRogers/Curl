@@ -8,7 +8,7 @@ depends-on: [BL-496]
 touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests]
 requirement: none
 created: 2026-09-28
-completed:
+completed: 2026-10-19
 ---
 # BL-779 — Refuse a real curl option Curl does not implement yet with 'the installed libcurl version does not support this' (ADR-0137)
 
@@ -25,16 +25,16 @@ A long name, short letter or `-K` config option that is in `CurlOptionAliasTable
 
 ## Acceptance criteria
 
-- [ ] A test shows `--ipv4` (while unparsed) is refused with `curl: option --ipv4: the installed libcurl version does not support this` and the try-help line, exit 2, and `--ipv4x` still with `is unknown`.
-- [ ] A test shows a bundle containing an unimplemented letter (e.g. `-s4`) is refused with the class-3 line spelled as the whole argument.
-- [ ] Tests show `--no-<name>` of an unimplemented option gives `cannot be reversed with a --no- prefix` when the alias table says `NotAccepted`, else the class-3 line; and `--expand-<name>` gives the class-3 line.
-- [ ] A test shows a `-K` file line naming an unimplemented option prints `config file option '<option>' the installed libcurl version does not support this` then `curl: option -K: the installed libcurl version does not support this`, exit 2.
-- [ ] A test enumerates `CurlOptionAliasTable.Aliases` and asserts every name either has a `CommandLineOptionTable` row or is refused with the class-3 line, never `is unknown`.
-- [ ] `dotnet build` clean, fast tests green, `Curl.Cli.UnitLibrary` at 100% line and branch coverage.
+- [x] This task is obsolete, and closes without a change: it duplicates BL-497, which is Done.
 
 ## Notes
+
+- 2026-10-19: Stewart had it closed as obsolete. Its criteria were replaced by the one above while it was in the Backlog, and the evidence was checked mechanically first.
 
 ## Log
 
 - 2026-09-28: Created.
 - 2026-09-28: Backlog -> Deferred. Duplicate of BL-497, which implemented ADR-0137's parser change with the same acceptance criteria
+- 2026-10-19: Deferred -> Backlog. Stewart: close it as obsolete (it duplicates BL-497, which is Done).
+- 2026-10-19: Backlog -> Doing. Interactive session: closing it as obsolete. Criteria at claim: 9f42e37a.
+- 2026-10-19: Doing -> Done. Obsolete: it duplicates BL-497, which is Done.

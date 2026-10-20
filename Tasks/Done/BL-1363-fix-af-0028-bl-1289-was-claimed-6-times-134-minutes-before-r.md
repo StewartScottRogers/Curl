@@ -8,7 +8,7 @@ depends-on: []
 touches: [RunDarkFactory.ps1]
 requirement: none
 created: 2026-10-03
-completed:
+completed: 2026-10-19
 ---
 # BL-1363 — Fix AF-0028: BL-1289 was claimed 6 times (134 minutes) before reaching Done
 
@@ -41,8 +41,7 @@ The finding closes only when a later re-audit by the process auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] This task is obsolete, and closes without a change: AF-0028 is closed and BL-1366 is Done.
 
 ## Notes
 
@@ -73,9 +72,14 @@ interactive session makes `Measure-FactoryProcess.ps1` count claims from the lan
 lines (or `claim BL-###` commits) instead of transcript text, and AF-0028 is re-read with the
 correct count of 2.
 
+- 2026-10-19: Stewart had it closed as obsolete. Its criteria were replaced by the one above while it was in the Backlog, and the evidence was checked mechanically first.
+
 ## Log
 
 - 2026-10-03: Created.
 - 2026-10-03: Backlog -> Doing.
 - 2026-10-03: Doing -> Blocked. Stewart: BL-1289 was claimed 2 times, not 6 (lane logs, git, task log); the miscount is in the audit office's Measure-FactoryProcess.ps1, which only an interactive session may fix - have one count claims from lane-log claim lines and re-read AF-0028?
 - 2026-10-03: Blocked -> Deferred. Its finding AF-0028 was closed by the reliable process re-audit of 2026-10-03 14:59 (it no longer reproduces), and the miscount it found in Measure-FactoryProcess.ps1 is covered by BL-1366; nothing left to do here. Look again only if AF-0028 reappears.
+- 2026-10-19: Deferred -> Backlog. Stewart: close it as obsolete (AF-0028 is closed and BL-1366 is Done).
+- 2026-10-19: Backlog -> Doing. Interactive session: closing it as obsolete. Criteria at claim: 97415334.
+- 2026-10-19: Doing -> Done. Obsolete: AF-0028 is closed and BL-1366 is Done.

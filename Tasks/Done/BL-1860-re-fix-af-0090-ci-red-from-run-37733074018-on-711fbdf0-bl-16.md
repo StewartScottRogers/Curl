@@ -8,7 +8,7 @@ depends-on: []
 touches: [RunDarkFactory.ps1]
 requirement: none
 created: 2026-10-09
-completed:
+completed: 2026-10-19
 ---
 # BL-1860 — Re-fix AF-0090: CI red from run 37733074018 on 711fbdf0 (BL-1609's Done commit) for 321 minutes (the tool says 179); its three fix tasks waited 5 hours for the next shift
 
@@ -45,13 +45,14 @@ The finding closes only when a later re-audit by the process auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] This task is obsolete, and closes without a change: AF-0090 is closed.
 
 ## Notes
 
 - BL-1768's fix is still in place: `RunDarkFactory.ps1` pulls the shift branch after the final CI watch (the `git pull --ff-only` before `task-board next`), so a `-Continuous` shift hands over to CI-fix tasks it just filed.
 - The re-audit "reproduces: yes" is the same historical incident (2026-10-08 logs) re-read because `-Since` is a date; those logs cannot change. The 179 vs 321 minute miscount is in `Audit/Tools/Measure-FactoryProcess.ps1`, an audit path no lane may read or change. No further change to `RunDarkFactory.ps1` is possible, so the reproduction cannot be made to give a different result.
+
+- 2026-10-19: Stewart had it closed as obsolete. Its criteria were replaced by the one above while it was in the Backlog, and the evidence was checked mechanically first.
 
 ## Log
 
@@ -59,3 +60,6 @@ The finding closes only when a later re-audit by the process auditor confirms th
 - 2026-10-09: Backlog -> Doing.
 - 2026-10-09: Doing -> Blocked. Stewart: close AF-0090 as closed-how stewart (fix is in place; the reproduction reads fixed historical logs and the miscount is in an audit path)
 - 2026-10-09: Blocked -> Deferred. No change can alter historical logs; PR #89 re-audits process findings by mechanism over the current window, so the next re-audit decides AF-0090
+- 2026-10-19: Deferred -> Backlog. Stewart: close it as obsolete (AF-0090 is closed).
+- 2026-10-19: Backlog -> Doing. Interactive session: closing it as obsolete. Criteria at claim: 71af42ee.
+- 2026-10-19: Doing -> Done. Obsolete: AF-0090 is closed.

@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests]
 requirement: none
 created: 2026-10-11
-completed:
+completed: 2026-10-19
 lane: no
 ---
 # BL-2074 — Re-close GF-0005: With --anyauth or --proxy-anyauth, a -T upload or -F form that draws a 401/407 is never resent with credentials
@@ -38,15 +38,7 @@ In Curl.Protocol.Http.UnitLibrary, make HttpProtocolHandler.MayRetry and the upl
 
 ## Acceptance criteria
 
-- [ ] `behaviour:test154`: Curl answers what curl 8.21.0 answers, `upstream test154 passes`, so the item measures `match`.
-- [ ] `behaviour:test155`: Curl answers what curl 8.21.0 answers, `upstream test155 passes`, so the item measures `match`.
-- [ ] `behaviour:test258`: Curl answers what curl 8.21.0 answers, `upstream test258 passes`, so the item measures `match`.
-- [ ] `behaviour:test259`: Curl answers what curl 8.21.0 answers, `upstream test259 passes`, so the item measures `match`.
-- [ ] `behaviour:test1030`: Curl answers what curl 8.21.0 answers, `upstream test1030 passes`, so the item measures `match`.
-- [ ] `behaviour:test1071`: Curl answers what curl 8.21.0 answers, `upstream test1071 passes`, so the item measures `match`.
-- [ ] `behaviour:test1075`: Curl answers what curl 8.21.0 answers, `reference curl exits 0; stdout 0 bytes: `, so the item measures `match`.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
-- [ ] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
+- [x] This task is obsolete, and closes without a change: GF-0005 is closed.
 
 ## Notes
 
@@ -69,9 +61,14 @@ In Curl.Protocol.Http.UnitLibrary, make HttpProtocolHandler.MayRetry and the upl
   lane can fix the cause without reading `Gap/`.
 - 2026-10-11: Product defects found by re-measuring with the fixed gap harness (PR #119) are filed as BL-2085, BL-2086 and BL-2087.
 
+- 2026-10-19: Stewart had it closed as obsolete. Its criteria were replaced by the one above while it was in the Backlog, and the evidence was checked mechanically first.
+
 ## Log
 
 - 2026-10-11: Created.
 - 2026-10-11: Backlog -> Doing.
 - 2026-10-11: Doing -> Backlog. Interactive only: reproducing GF-0005 needs the gap office's tools and upstream data, which lanes may not read; lane measurements show the resend working (see Notes)
 - 2026-10-11: Backlog -> Deferred. product fixes BL-2084..BL-2092 are done (BL-2087 blocked on the cost cap); this task closes when the next gap run re-measures its items
+- 2026-10-19: Deferred -> Backlog. Stewart: close it as obsolete (GF-0005 is closed).
+- 2026-10-19: Backlog -> Doing. Interactive session: closing it as obsolete. Criteria at claim: f791eb17.
+- 2026-10-19: Doing -> Done. Obsolete: GF-0005 is closed.

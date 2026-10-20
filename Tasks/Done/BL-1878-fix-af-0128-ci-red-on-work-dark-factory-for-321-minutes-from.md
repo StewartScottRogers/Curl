@@ -8,7 +8,7 @@ depends-on: []
 touches: [RunDarkFactory.ps1]
 requirement: none
 created: 2026-10-09
-completed:
+completed: 2026-10-19
 ---
 # BL-1878 — Fix AF-0128: CI red on work/dark-factory for 321 minutes from run 37733074018 on 711fbdf0
 
@@ -41,10 +41,11 @@ The finding closes only when a later re-audit by the process auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] This task is obsolete, and closes without a change: AF-0128 is closed.
 
 ## Notes
+
+- 2026-10-19: Stewart had it closed as obsolete. Its criteria were replaced by the one above while it was in the Backlog, and the evidence was checked mechanically first.
 
 ## Log
 
@@ -52,3 +53,6 @@ The finding closes only when a later re-audit by the process auditor confirms th
 - 2026-10-09: Backlog -> Doing.
 - 2026-10-09: Doing -> Blocked. Stewart: AF-0128 is a past 321-minute red spell in historical logs (no shift ran overnight); its reproduction needs the audit office's tool and logs outside a lane's reach, and no RunDarkFactory.ps1 change can alter that history - reject the finding or re-audit it interactively?
 - 2026-10-09: Blocked -> Deferred. No change can alter historical logs; PR #89 re-audits process findings by mechanism over the current window, so the next re-audit decides AF-0128
+- 2026-10-19: Deferred -> Backlog. Stewart: close it as obsolete (AF-0128 is closed).
+- 2026-10-19: Backlog -> Doing. Interactive session: closing it as obsolete. Criteria at claim: f6b6c417.
+- 2026-10-19: Doing -> Done. Obsolete: AF-0128 is closed.

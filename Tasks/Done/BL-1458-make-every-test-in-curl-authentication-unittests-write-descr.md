@@ -8,7 +8,7 @@ depends-on: [BL-1457]
 touches: [Curl.Authentication.UnitTests]
 requirement: none
 created: 2026-10-04
-completed:
+completed: 2026-10-19
 ---
 # BL-1458 — Make every test in Curl.Authentication.UnitTests write descriptive diagnostic output
 
@@ -27,15 +27,13 @@ Every test in `Curl.Authentication.UnitTests` writes, through BL-1457's shared `
 
 ## Acceptance criteria
 
-- [ ] `dotnet test Curl.Authentication.UnitTests --filter "TestCategory!=Integration" --logger "console;verbosity=detailed"` prints an `END` line for every test it runs (as many `END` lines as the run's total test count), and piping that output to `Select-String -Pattern 'END .*(\(arrange 0,|, act 0,|, assert 0\))'` prints nothing: every test wrote at least one `ARRANGE`, one `ACT` and one `ASSERT` or `DIFF` line.
-- [ ] The run's total test count is unchanged, and in `Curl.Authentication.UnitTests` (excluding `obj`) the numbers of `Assert.`, `[TestMethod` and `[DataRow(` matches (each counted with `Select-String -AllMatches`) are no lower than before the task; the before and after numbers are recorded in Notes.
-- [ ] `dotnet build Curl.Authentication.UnitTests -warnaserror` is clean and `dotnet test Curl.Authentication.UnitTests --filter "TestCategory!=Integration"` passes.
-- [ ] The task's commits change only files under `Curl.Authentication.UnitTests/` and this task file.
-- [ ] Notes list every test that printed a `SLOW:` line with its `PHASE` breakdown, or say none did; for each that is a real performance problem a follow-up task is filed and its ID is in Notes.
+- [x] This task is obsolete, and closes without a change: it was split into BL-1706 to BL-1710, all Done.
 
 ## Notes
 
 - Sized for one run: 426 test methods in 33 files.
+
+- 2026-10-19: Stewart had it closed as obsolete. Its criteria were replaced by the one above while it was in the Backlog, and the evidence was checked mechanically first.
 
 ## Log
 
@@ -43,3 +41,6 @@ Every test in `Curl.Authentication.UnitTests` writes, through BL-1457's shared `
 - 2026-10-07: Backlog -> Doing.
 - 2026-10-07: Doing -> Blocked. Stewart: dark factory stopped at its 5.91 US dollar cost cap (2.7 times the median run, at most -TaskBudgetUsd), so split the task; see Z:\repos\Curl.logs\BL-1458-20261006-200306-L1.jsonl
 - 2026-10-07: Blocked -> Deferred. Split into BL-1706 to BL-1710 (chained) after the run hit its cost cap; nothing left to do here. Do not reopen.
+- 2026-10-19: Deferred -> Backlog. Stewart: close it as obsolete (it was split into BL-1706 to BL-1710, all Done).
+- 2026-10-19: Backlog -> Doing. Interactive session: closing it as obsolete. Criteria at claim: da38bf1b.
+- 2026-10-19: Doing -> Done. Obsolete: it was split into BL-1706 to BL-1710, all Done.
