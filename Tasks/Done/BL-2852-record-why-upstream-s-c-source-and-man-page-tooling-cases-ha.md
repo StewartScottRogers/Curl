@@ -8,7 +8,7 @@ depends-on: []
 touches: [Documentation/Wiki/Glossary.md]
 requirement: none
 created: 2026-10-19
-completed:
+completed: 2026-10-19
 ---
 # BL-2852 — Record why upstream's C-source and man-page tooling cases have no counterpart in Curl: cases 1135, 1140, 1165, 1167, 1169, 1173, 1185, 1275, 1279, 1544, 1705 and 1706
 
@@ -24,15 +24,18 @@ None tests a behaviour of the `curl` command line or of the libcurl API. Curl ha
 
 ## Acceptance criteria
 
-- [ ] One new ADR, "Decided by Claude under Stewart's delegation", has one row for each of the twelve cases: `covered by BL-####` or `no counterpart` plus the upstream-only thing it tests.
-- [ ] Every row that says covered names a task that exists on the board; every case that needs a new task has that task filed (it names the case and depends on BL-2850 when it needs the perl-command mechanism).
-- [ ] No row gives difficulty or a missing BCL primitive as its reason.
-- [ ] `Curl.Conformance.UnitLibrary/UpstreamCaseScreening.cs` is not changed by this task; the skip reason `the harness does not run a perl command` stays for these cases and `PassingUpstreamCases.txt` is unchanged.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] One new ADR, "Decided by Claude under Stewart's delegation", has one row for each of the twelve cases: `covered by BL-####` or `no counterpart` plus the upstream-only thing it tests.
+- [x] Every row that says covered names a task that exists on the board; every case that needs a new task has that task filed (it names the case and depends on BL-2850 when it needs the perl-command mechanism).
+- [x] No row gives difficulty or a missing BCL primitive as its reason.
+- [x] `Curl.Conformance.UnitLibrary/UpstreamCaseScreening.cs` is not changed by this task; the skip reason `the harness does not run a perl command` stays for these cases and `PassingUpstreamCases.txt` is unchanged.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
+
+Decided in ADR-0718: ten cases `no counterpart`, 1705 and 1706 covered by new task BL-2881 (depends on BL-2850). Docs only: no code changed, so no build or test run was needed.
 
 ## Log
 
 - 2026-10-19: Created.
 - 2026-10-19: Backlog -> Doing. Criteria at claim: ef230fdc c3a889cd 0ccf662c 4bd1d3a0 c5f8cef6.
+- 2026-10-19: Doing -> Done. ADR-0718 records twelve verdicts; BL-2881 filed for managen cases 1705 and 1706
