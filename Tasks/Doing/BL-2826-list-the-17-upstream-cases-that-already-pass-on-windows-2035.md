@@ -42,3 +42,4 @@ The ratchet reads the file as a set, one case number per line, and makes no task
 ## Log
 
 - 2026-10-19: Created.
+- 2026-10-19: Backlog -> Doing. Criteria at claim: f384dd3d b835afd3 d71d6599 b6abb434 e80d2533.
