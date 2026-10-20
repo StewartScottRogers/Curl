@@ -8,7 +8,7 @@ depends-on: []
 touches: [Documentation/Wiki/Glossary.md]
 requirement: none
 created: 2026-10-19
-completed:
+completed: 2026-10-19
 ---
 # BL-2840 — Decide how upstream's unittest cases run against Curl and which have no C# counterpart (ADR)
 
@@ -30,15 +30,18 @@ Upstream: the source of each program is in https://github.com/curl/curl/tree/cur
 
 ## Acceptance criteria
 
-- [ ] A new `Documentation/Planning/Decisions/ADR-####-*.md`, marked "Decided by Claude under Stewart's delegation", states decisions 1 and 2 above and the reasons.
-- [ ] The ADR holds a table with one row for each of the 84 cases (every number once, none missing; check the count against the list in this task) giving `port in BL-####` plus the Curl type it exercises, or `no counterpart` plus a one-sentence reason.
-- [ ] No row's reason is that the case is hard to port or that the BCL lacks a primitive; each `no counterpart` row names the C-only thing the case tests.
-- [ ] `Documentation/Wiki/Glossary.md` has a "unit program" entry (and the ADR is linked from `Documentation/Planning/Decisions/README.md` if that index lists ADRs).
-- [ ] If the batches or project names differ from this task's proposal, BL-2841 to BL-2849 are edited (in Backlog, by hand, keeping their criteria meaningful) in the same commit.
+- [x] A new `Documentation/Planning/Decisions/ADR-####-*.md`, marked "Decided by Claude under Stewart's delegation", states decisions 1 and 2 above and the reasons.
+- [x] The ADR holds a table with one row for each of the 84 cases (every number once, none missing; check the count against the list in this task) giving `port in BL-####` plus the Curl type it exercises, or `no counterpart` plus a one-sentence reason.
+- [x] No row's reason is that the case is hard to port or that the BCL lacks a primitive; each `no counterpart` row names the C-only thing the case tests.
+- [x] `Documentation/Wiki/Glossary.md` has a "unit program" entry (and the ADR is linked from `Documentation/Planning/Decisions/README.md` if that index lists ADRs).
+- [x] If the batches or project names differ from this task's proposal, BL-2841 to BL-2849 are edited (in Backlog, by hand, keeping their criteria meaningful) in the same commit.
 
 ## Notes
+
+Decided in ADR-0711: names and batches match the proposal, so BL-2841 to BL-2849 are unchanged. 84 rows checked by script (every number once); 64 ported, 20 no counterpart (the 18 of BL-2849 plus 2602 and 3214). Upstream sources were not fetched; rows rest on the batch tasks' measured descriptions, and each batch may correct its own row in its Notes.
 
 ## Log
 
 - 2026-10-19: Created.
 - 2026-10-19: Backlog -> Doing. Criteria at claim: d2909c59 a568f069 5b71df24 cf824f88 b3d5b9b8.
+- 2026-10-19: Doing -> Done. ADR-0711 decides the unit program mechanism, home and the 84-case table
