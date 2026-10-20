@@ -36,3 +36,4 @@ No lane can run these on Linux. Use the `CI` workflow on the pushed commit as th
 ## Log
 
 - 2026-10-19: Created.
+- 2026-10-19: Backlog -> Doing. Criteria at claim: 0578e887 287c04f9 9d803be9 fa5ceaa7.
