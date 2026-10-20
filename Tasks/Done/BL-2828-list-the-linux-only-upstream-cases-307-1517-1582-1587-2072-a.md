@@ -33,7 +33,7 @@ No lane can run these on Linux. Use the `CI` workflow on the pushed commit as th
 
 ## Notes
 
-- The ratchet, not the runner, recognises the precheck skip: `UpstreamCaseRunner.cs` is in BL-2863's `touches` (Doing), and the ratchet sees only the outcome, so `JudgeSkip` treats a skip whose detail is `Test requires a Unix system` (the only `$^O`-refusing precheck line in the vendored cases) as runs-only-on-another-platform. ADR-0711 records it. Off Windows the precheck prints nothing, so 2072 runs and is judged by its run.
+- The ratchet, not the runner, recognises the precheck skip: `UpstreamCaseRunner.cs` is in BL-2863's `touches` (Doing), and the ratchet sees only the outcome, so `JudgeSkip` treats a skip whose detail is `Test requires a Unix system` (the only `$^O`-refusing precheck line in the vendored cases) as runs-only-on-another-platform. ADR-0713 records it. Off Windows the precheck prints nothing, so 2072 runs and is judged by its run.
 - Measured on Windows, 2026-10-19: all six rows are `Inconclusive` - 307, 1582, 1587, 3207 "Curl lacks the feature OpenSSL", 1517 "the case needs Curl without the feature win32", 2072 "Test requires a Unix system", each "is on PassingUpstreamCases.txt and runs only on another platform". Conformance tests: 3580 passed, 0 failed. `Measure-CodeQuality.ps1 -Library Curl.Conformance.UnitLibrary`: 100% line, 100% branch, 0 failing members.
 - Not run on Linux or macOS here (no lane can); the first CI run after the shift pushes is the check. The CI criterion is handed to the shift: a lane may not push, and the coordinator's CI watch (BL-987) files a High task naming any of the six that fails on Linux or macOS.
 
@@ -41,4 +41,4 @@ No lane can run these on Linux. Use the `CI` workflow on the pushed commit as th
 
 - 2026-10-19: Created.
 - 2026-10-19: Backlog -> Doing. Criteria at claim: 0578e887 287c04f9 9d803be9 fa5ceaa7.
-- 2026-10-19: Doing -> Done. 307, 1517, 1582, 1587, 2072 and 3207 listed; Inconclusive on Windows with reasons; ratchet treats test2072's Unix-only precheck skip as another platform's (ADR-0711)
+- 2026-10-19: Doing -> Done. 307, 1517, 1582, 1587, 2072 and 3207 listed; Inconclusive on Windows with reasons; ratchet treats test2072's Unix-only precheck skip as another platform's (ADR-0713)
