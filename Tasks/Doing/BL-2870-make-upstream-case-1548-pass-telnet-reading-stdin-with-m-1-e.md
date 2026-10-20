@@ -34,3 +34,4 @@ Likely cause to check first: upstream's sws, given an empty reply, sends nothing
 ## Log
 
 - 2026-10-19: Created.
+- 2026-10-19: Backlog -> Doing. Criteria at claim: 68d4214d 1b93baff bb323509 68ad5856.
