@@ -8,7 +8,7 @@ depends-on: [BL-2840]
 touches: [Documentation/Wiki/Glossary.md]
 requirement: none
 created: 2026-10-19
-completed:
+completed: 2026-10-19
 ---
 # BL-2849 — Record why upstream's unit cases for libcurl's private C data structures have no C# counterpart: cases 1300, 1305, 1306, 1309, 1330, 1602, 1603, 1616, 1661, 2600, 2601, 2606, 3211, 3212, 3213, 3300, 3301 and 3306
 
@@ -24,15 +24,18 @@ A case that does have a Curl counterpart is not ported here (the mechanism of BL
 
 ## Acceptance criteria
 
-- [ ] One ADR, "Decided by Claude under Stewart's delegation", has a row for each of the eighteen cases: `ported (task BL-####)` or `no counterpart` plus the C-only thing it tests (for example "`Curl_llist` is a C intrusive list; Curl uses `List<T>`").
-- [ ] No row's reason is that the case is hard or that the BCL lacks a primitive.
-- [ ] Every case recorded `ported` has a follow-up task filed that depends on BL-2841 and names the case.
-- [ ] The row for each case in the ADR from BL-2840 agrees with this ADR.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] One ADR, "Decided by Claude under Stewart's delegation", has a row for each of the eighteen cases: `ported (task BL-####)` or `no counterpart` plus the C-only thing it tests (for example "`Curl_llist` is a C intrusive list; Curl uses `List<T>`").
+- [x] No row's reason is that the case is hard or that the BCL lacks a primitive.
+- [x] Every case recorded `ported` has a follow-up task filed that depends on BL-2841 and names the case.
+- [x] The row for each case in the ADR from BL-2840 agrees with this ADR.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
+
+- Searched the repository for a Curl type matching each of the 18 C structures: none exists, so no port task is filed; every row is `no counterpart` in ADR-0717 (agrees with ADR-0711). The ADR README row is added; Glossary.md needed no change.
 
 ## Log
 
 - 2026-10-19: Created.
 - 2026-10-19: Backlog -> Doing. Criteria at claim: 1091a5ba 5ee67b04 660c849f fb97635f c5f8cef6.
+- 2026-10-19: Doing -> Done. ADR-0717 records all 18 private-C-structure unit cases as no counterpart with the C-only reason
