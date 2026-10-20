@@ -35,3 +35,4 @@ A case that does have a Curl counterpart is not ported here (the mechanism of BL
 ## Log
 
 - 2026-10-19: Created.
+- 2026-10-19: Backlog -> Doing. Criteria at claim: 1091a5ba 5ee67b04 660c849f fb97635f c5f8cef6.
