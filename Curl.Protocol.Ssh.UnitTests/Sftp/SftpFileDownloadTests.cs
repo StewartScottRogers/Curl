@@ -195,6 +195,44 @@ public sealed partial class SftpFileDownloadTests
     }
 
     [TestMethod]
+    [DataRow("00000009" + "0000000000000005" + "3A4F1FC0" + "3A4F1FC0", DisplayName = "size and times")]
+    [DataRow("0000000F" + "0000000000000005" + "000003E8000003E8" + "000081A4" + "3A4F1FC0" + "3A4F1FC0", DisplayName = "every field")]
+    public async Task DownloadAsync_StatCarriesTheTimes_ReportsTheModifyTimeAsTheSourceLastWriteTime(string attributesHex)
+    {
+        SftpServerScript script = SftpServerScript.Started()
+            .HomeDirectory()
+            .Handle()
+            .Sftp([SftpPacketType.Attributes, .. UInt32(2), .. Convert.FromHexString(attributesHex)])
+            .Data(3, Hello)
+            .Status(4, SftpStatusCode.Ok);
+
+        Outcome outcome = await DownloadAsync(script, "/rofile.txt");
+
+        TransferResult expected = TransferResult.Success(5) with { SourceLastWriteUnixSeconds = 978264000 };
+        Diagnostics.AssertResult(expected, outcome.Result);
+        Assert.AreEqual(expected, outcome.Result);
+    }
+
+    [TestMethod]
+    [DataRow("00000001" + "0000000000000005", DisplayName = "size only")]
+    [DataRow("00000009" + "0000000000000005" + "3A4F1FC0", DisplayName = "times cut short")]
+    public async Task DownloadAsync_StatCarriesNoWholeTimes_ReportsNoSourceLastWriteTime(string attributesHex)
+    {
+        SftpServerScript script = SftpServerScript.Started()
+            .HomeDirectory()
+            .Handle()
+            .Sftp([SftpPacketType.Attributes, .. UInt32(2), .. Convert.FromHexString(attributesHex)])
+            .Data(3, Hello)
+            .Status(4, SftpStatusCode.Ok);
+
+        Outcome outcome = await DownloadAsync(script, "/rofile.txt");
+
+        Diagnostics.AssertResult(TransferResult.Success(5), outcome.Result);
+        Assert.AreEqual(TransferResult.Success(5), outcome.Result);
+        Assert.IsNull(outcome.Result.SourceLastWriteUnixSeconds);
+    }
+
+    [TestMethod]
     [DataRow(2u, CurlExitCode.RemoteFileNotFound, "No such file or directory", DisplayName = "missing file, as measured")]
     [DataRow(3u, CurlExitCode.RemoteAccessDenied, "Permission denied", DisplayName = "no read permission, as measured")]
     [DataRow(4u, CurlExitCode.Ssh, "Operation failed", DisplayName = "failure")]
