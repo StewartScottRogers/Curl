@@ -30,3 +30,4 @@ Split from BL-2850. The check scripts test971.pl, test1486.pl and test1707.pl (t
 ## Log
 
 - 2026-10-19: Created.
+- 2026-10-19: Backlog -> Doing. Criteria at claim: 26f6bfaa 161fef9c.
