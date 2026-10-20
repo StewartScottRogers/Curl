@@ -34,3 +34,4 @@ Decide whether SCP (`T` line with `-p`) needs the same; curl's SCP download does
 ## Log
 
 - 2026-10-19: Created.
+- 2026-10-19: Backlog -> Doing. Criteria at claim: 3c77b5e9 aa792584.
