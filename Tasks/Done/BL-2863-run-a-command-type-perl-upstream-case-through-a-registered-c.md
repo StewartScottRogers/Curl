@@ -28,7 +28,7 @@ Split from BL-2850 (cases 971, 1478, 1486, 1707, 1708, 1710 of curl 8.22.0). Tod
 
 ## Notes
 
-- Plan (direct, no subagents to stay inside the cost cap): `UpstreamCaseRunner` takes `perlCommandScripts`, keyed by script file name (`UpstreamCaseScreening.PerlScriptName`); a registered interpretation runs in place of curl with the words after the script and the in-process curl delegate. `%CURL` is always the token `UpstreamCaseRunner.CurlProgram` (`curl`). Decision recorded in ADR-0711.
+- Plan (direct, no subagents to stay inside the cost cap): `UpstreamCaseRunner` takes `perlCommandScripts`, keyed by script file name (`UpstreamCaseScreening.PerlScriptName`); a registered interpretation runs in place of curl with the words after the script and the in-process curl delegate. `%CURL` is always the token `UpstreamCaseRunner.CurlProgram` (`curl`). Decision recorded in ADR-0714.
 - Screening: `FindSkipReason(..., interpretsPerlScript)`; `StandIns`, `OrNone` and `UnrunCommandType` extracted to keep `FindSkipReason` and `UnsupportedCommand` at complexity 10 or under.
 - Measured: Curl.Conformance.UnitLibrary 100% line, 100% branch, 0 failing members, worst CRAP 10. Build -warnaserror clean, fast tests green.
 
