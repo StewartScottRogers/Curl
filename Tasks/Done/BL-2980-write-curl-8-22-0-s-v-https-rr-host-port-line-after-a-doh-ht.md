@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Networking.UnitLibrary/HttpsRecordReportLine.cs, Curl.Networking.UnitTests/HttpsRecordReportLineTests.cs, Curl.Networking.UnitLibrary/TcpConnector.cs, Curl.Networking.UnitTests/TcpConnectorHttpsRecordReportTests.cs]
+touches: [Curl.Networking.UnitLibrary/HttpsRecordReportLine.cs, Curl.Networking.UnitTests/HttpsRecordReportLineTests.cs, Curl.Networking.UnitLibrary/TcpConnector.cs, Curl.Networking.UnitTests/TcpConnectorHttpsRecordReportTests.cs, Curl.Networking.UnitLibrary/DohDnsResolver.cs, Curl.Networking.UnitLibrary/IHttpsOriginDnsResolver.cs, Curl.Networking.UnitTests/DohDnsResolverHttpsRecordQueryTests.cs]
 requirement: none
 created: 2026-10-21
-completed:
+completed: 2026-10-21
 ---
 # BL-2980 — Write curl 8.22.0's -v HTTPS-RR host:port line after a DoH HTTPS-RR resolve
 
@@ -22,12 +22,17 @@ Found by BL-2954 (ADR-0727's BL-2954 amendment). curl 8.22.0's `lib/vdns/cf-dns.
 
 ## Acceptance criteria
 
-- [ ] Unit tests pin the three forms of the `HTTPS-RR` line and its place beside `Host <host>:<port> was resolved.`, as derived or measured and recorded in an amendment to ADR-0727.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean, `dotnet test --filter "TestCategory!=Integration"` passes, and `Curl.Networking.UnitLibrary` keeps 100% line and branch coverage and complexity at most 10.
+- [x] Unit tests pin the three forms of the `HTTPS-RR` line and its place beside `Host <host>:<port> was resolved.`, as derived or measured and recorded in an amendment to ADR-0727.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean, `dotnet test --filter "TestCategory!=Integration"` passes, and `Curl.Networking.UnitLibrary` keeps 100% line and branch coverage and complexity at most 10.
 
 ## Notes
+
+- Added `DohDnsResolver.cs`, `IHttpsOriginDnsResolver.cs` and `DohDnsResolverHttpsRecordQueryTests.cs` to `touches`: `TcpConnector` needs the kept record, so the interface gains `HttpsRecordFor`, which `DohDnsResolver` implements and the test's fake resolver must too. No other task in Doing names them.
+- Placement derived from curl 8.22.0's source, not measured: the Windows reference curl has no HTTPSRR feature (ADR-0727's BL-2980 amendment).
+- Left out and filed: ` mandatory-keys(ignored)` (BL-2981) and the line on a DNS-cache answer (BL-2982).
 
 ## Log
 
 - 2026-10-21: Created.
 - 2026-10-21: Backlog -> Doing. Criteria at claim: e3632336 2a446683.
+- 2026-10-21: Doing -> Done. -v writes curl 8.22.0's HTTPS-RR host:port line before Host ... was resolved. after a DoH HTTPS-RR resolve
