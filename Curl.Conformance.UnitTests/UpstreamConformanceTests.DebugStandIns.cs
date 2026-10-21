@@ -49,6 +49,7 @@ public sealed partial class UpstreamConformanceTests
         SetsSmallSendsVariable,
         RunsMimeLibTest,
         RunsCurlWithDohUrl,
+        SetsWriteOutDebugVariable,
     ];
 
     internal static UpstreamCurlPlatform PlatformFor(byte[] testFile)

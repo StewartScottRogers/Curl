@@ -253,6 +253,11 @@ internal static class CurlComposition
     /// Sets the <c>--xattr</c> attributes; <see langword="null" /> for a run that sets none. The conformance harness
     /// passes one that prints them as curl's debug build does under <c>CURL_FAKE_XATTR</c> (BL-2833).
     /// </param>
+    /// <param name="honoursDebugWriteOutVariables">
+    /// Whether <c>CURL_TIME</c>, <c>CURL_DEBUG_SIZE</c> and <c>CURL_VERSION</c> change what <c>-w</c> prints
+    /// (<see cref="DebugWriteOutStandIn" />), as in curl's debug build; off by default, as in curl's release
+    /// build, and turned on by the conformance harness (ADR-0732, BL-2909).
+    /// </param>
     /// <returns>The runner.</returns>
     internal static CurlCommandRunner CreateRunner(
         Stream standardOutput,
@@ -274,7 +279,8 @@ internal static class CurlComposition
         bool honoursAltSvcHttpVariable = false,
         bool? parsesAsWindowsBuild = null,
         bool parsesAsQuicBuild = false,
-        IExtendedAttributeWriter? extendedAttributeWriter = null)
+        IExtendedAttributeWriter? extendedAttributeWriter = null,
+        bool honoursDebugWriteOutVariables = false)
     {
         ConnectionCache runConnections = new(TimeProvider.System);
         LateBoundDiagnosticLog runLog = new();
@@ -303,7 +309,8 @@ internal static class CurlComposition
             parsesAsWindowsBuild: parsesAsWindowsBuild,
             parsesAsQuicBuild: parsesAsQuicBuild,
             transferPerformer: new TransferPerformer(TimeProvider.System, EasyErrorText),
-            extendedAttributeWriter: extendedAttributeWriter);
+            extendedAttributeWriter: extendedAttributeWriter,
+            debugWriteOut: DebugWriteOutStandIn.OfHonoured(honoursDebugWriteOutVariables, environment));
     }
 
     /// <summary>
@@ -324,7 +331,7 @@ internal static class CurlComposition
     }
 
     /// <summary>
-    /// Builds one option group's dispatch for the dialing <see cref="CreateRunner(Stream, Stream, Stream, ITcpDialer, IDnsResolver, IDatagramConnector, bool, IWriteOutFileOpener?, bool, Func{string, string?}?, IConnectionListener?, DefaultConfigFileSearch?, TimeProvider?, bool, bool, bool, bool, bool?, bool, IExtendedAttributeWriter?)" />:
+    /// Builds one option group's dispatch for the dialing <see cref="CreateRunner(Stream, Stream, Stream, ITcpDialer, IDnsResolver, IDatagramConnector, bool, IWriteOutFileOpener?, bool, Func{string, string?}?, IConnectionListener?, DefaultConfigFileSearch?, TimeProvider?, bool, bool, bool, bool, bool?, bool, IExtendedAttributeWriter?, bool)" />:
     /// the group's <see cref="TcpConnector" /> over <paramref name="tcpDialer" /> and
     /// <paramref name="dnsResolver" />, pooled in <paramref name="runConnections" />, with a proxy
     /// selector that reads the environment through <paramref name="readEnvironmentVariable" />, and the connector's <c>--resolve</c> entries

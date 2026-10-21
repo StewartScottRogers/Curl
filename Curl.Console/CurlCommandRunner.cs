@@ -287,6 +287,7 @@ namespace Curl.Console;
 /// </para>
 /// </remarks>
 /// <param name="lateBoundDiagnosticLog">The log the authenticators were composed with, bound to the run's diagnostic log once it is open (BL-923); <see langword="null" /> when none was composed.</param>
+/// <param name="debugWriteOut">What <c>-w</c> prints in place of the clock, the measured values and the library version under curl's debug-build test variables; <see langword="null" />, the default, prints them as measured (ADR-0732, BL-2909).</param>
 /// <param name="parsesAsWindowsBuild">Whether the command line is read as curl's Windows Schannel build reads it (<see cref="CommandLineOptions.ActsAsWindowsSchannelBuild" />); <see langword="null" />, the default, reads it as this process's platform's build does. Tests pass <see langword="false" /> to reach the HTTP/2 options and <c>--ssl-sessions</c> on any platform.</param>
 internal sealed class CurlCommandRunner(
     Func<CommandLineOptions, TransferDispatch> createTransferDispatch,
@@ -320,7 +321,8 @@ internal sealed class CurlCommandRunner(
     TransferPerformer? transferPerformer = null,
     bool parsesAsQuicBuild = false,
     ICurlEngine? curlEngine = null,
-    Func<Api.Options.EasyOptions, IReadOnlyList<EasySetopt>>? easySetoptsOf = null)
+    Func<Api.Options.EasyOptions, IReadOnlyList<EasySetopt>>? easySetoptsOf = null,
+    DebugWriteOutStandIn? debugWriteOut = null)
 {
     /// <summary>
     /// The line curl 8.21.0's own write callback prints, with no <c>(23)</c>, when standard
@@ -462,7 +464,10 @@ internal sealed class CurlCommandRunner(
         writeOutFileOpener ?? new RefusingWriteOutFileOpener(),
         writesLineFeedAsCrLf: false,
         writeOutTimeDialect,
-        timeProvider ?? TimeProvider.System);
+        DebugWriteOutStandIn.OrNone(debugWriteOut).ClockOr(timeProvider ?? TimeProvider.System));
+
+    /// <summary>What <c>-w</c> prints in place of the measured values under curl's debug-build test variables (ADR-0732, BL-2909).</summary>
+    private readonly DebugWriteOutStandIn debugWriteOut = DebugWriteOutStandIn.OrNone(debugWriteOut);
 
     /// <summary>
     /// The result of a transfer whose write to standard output failed. It is compared by
@@ -2778,10 +2783,11 @@ internal sealed class CurlCommandRunner(
         Api.Info.TransferInfo info = Running.EasyWriteOutInfo is { } easyInfo && easyInfo.Describes(result)
             ? easyInfo.Info
             : ReportWriteOutInfo(options, transfer, transferUrl, result, connectionId);
-        return new(info, result, givenUrl, transfer.UrlNumber)
+        return new(debugWriteOut.Apply(info), result, givenUrl, transfer.UrlNumber)
         {
             OutputFileName = Running.OutputFileName,
             RetryCount = Running.RetryCount,
+            LibraryVersion = debugWriteOut.LibraryVersionOr(TransferWriteOutVariables.FormatLibraryVersion(OperatingSystem.IsWindows(), OperatingSystem.IsMacOS())),
         };
     }
 
