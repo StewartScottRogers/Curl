@@ -4,7 +4,7 @@ title: Fix AF-0300: --limit-rate does not limit the upload: a -F POST at --limit
 priority: High
 assignee: Claude
 pipeline: feature
-depends-on: []
+depends-on: [BL-2952]
 touches: [Curl.Console]
 requirement: none
 created: 2026-10-21
@@ -46,7 +46,25 @@ The finding closes only when a later re-audit by the conformance auditor confirm
 
 ## Notes
 
+- 2026-10-21 (lane 3, first claim): built the send-side limit, left uncommitted in the lane stash:
+  `Curl.Console/RateLimitedUploadStream.cs` (asynchronous reads through `Curl.Core`'s
+  `RateLimitedStream`; seek, length and position pass through so a resend can rewind; forwards
+  `IRewindableUpload.CanRewind`), `CurlCommandRunner.SendRateLimited` applied in `AttemptInputsOf` to the
+  `-T` upload and the `-F` `StreamBody` content, `Curl.Console.UnitTests/RateLimitedUploadStreamTests.cs`
+  (10 tests, all passing), and ADR-0727 with its README row. Curl.Console.UnitTests was in no other
+  Doing task's `touches`, so the tests file was added there.
+- Measured with the finding's reproduction after the change: curl exit 56, 233 request bytes
+  (`Recv failure: Connection was reset`); Curl exit 55, 253 request bytes (`Send failure: Connection was
+  reset`). The body is now throttled at 10 B/s (byte counts vary with timing on both sides), but the exit
+  code still differs: while its send is held curl polls only for reading and reads before writing, so the
+  recorder's reset reaches `recv` (56); Curl's HTTP body writer meets it on the next write (55). That fix
+  belongs in `Curl.Protocol.Http.UnitLibrary`'s body writer, not in this task's `touches`: filed as
+  BL-2952 and added to `depends-on`. Next claim: apply the stash, rerun the reproduction, run the fast
+  tests and `Measure-CodeQuality.ps1 -Library Curl.Console`, then commit.
+- Filed BL-2953 for the `-d`/`--json` body (`BytesBody`), which this change does not limit.
+
 ## Log
 
 - 2026-10-21: Created.
 - 2026-10-21: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-21: Doing -> Backlog. Waits on BL-2952: upload is now throttled, but a reset during the wait must end exit 56 (HTTP body writer); code is in the lane stash
