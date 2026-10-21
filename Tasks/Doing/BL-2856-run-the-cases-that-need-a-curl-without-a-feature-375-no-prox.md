@@ -41,3 +41,4 @@ Gap scorecard 2026-10-19_1329: 375 (`!proxy`), 1454 (`!IPv6`) and 445 (`ldap`) a
 ## Log
 
 - 2026-10-19: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: 78dd162e edb7b05e f29424e7 296deadb dd1cc079 620ebead.
