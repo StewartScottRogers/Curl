@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/TcpConnector.cs, Curl.Networking.UnitTests/TcpConnectorResolveShuffleTests.cs, Curl.Engine.UnitLibrary/EngineComposition.cs]
 requirement: none
 created: 2026-10-21
-completed:
+completed: 2026-10-21
 ---
 # BL-2977 — Shuffle --resolve entries' addresses when CURLOPT_DNS_SHUFFLE_ADDRESSES is set
 
@@ -22,12 +22,16 @@ BL-2922 (ADR-0740) shuffles each look-up's answer through `Curl.Networking`'s `S
 
 ## Acceptance criteria
 
-- [ ] With the option on, a `--resolve` entry's cached addresses are shuffled (a focused test in `Curl.Networking.UnitTests` with the random source injected); with it off, they keep the written order.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean, `dotnet test --filter "TestCategory!=Integration"` passes, and each changed library keeps 100% line and branch coverage and complexity at most 10.
+- [x] With the option on, a `--resolve` entry's cached addresses are shuffled (a focused test in `Curl.Networking.UnitTests` with the random source injected); with it off, they keep the written order.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean, `dotnet test --filter "TestCategory!=Integration"` passes, and each changed library keeps 100% line and branch coverage and complexity at most 10.
 
 ## Notes
+
+- The shuffle is `TcpConnector.ShufflesResolveEntryAddresses` (a public `init` bool, like the `Traces*` settings) with an internal `ResolveEntryShuffleRandomBelow` seam defaulting to `DnsAddressShuffle.CryptographicRandomBelow`, rather than a public `Func` parameter: `DnsAddressShuffle` is internal and the engine only needs on or off. `EngineComposition.CreateTcpConnector` sets it from `EasyNetworkOptions.DnsShuffleAddresses`.
+- Measured: `Measure-CodeQuality.ps1` for `Curl.Networking.UnitLibrary` and `Curl.Engine.UnitLibrary`, 0 failing members each; fast tests green.
 
 ## Log
 
 - 2026-10-21: Created.
 - 2026-10-21: Backlog -> Doing. Criteria at claim: 0e1c93ab dd1cc079.
+- 2026-10-21: Doing -> Done. --resolve entries are shuffled into the DNS cache under CURLOPT_DNS_SHUFFLE_ADDRESSES
