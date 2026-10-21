@@ -31,3 +31,4 @@ Split from BL-2850. Needs the dispatch seam with `%CURL` bound (BL-2863) and the
 ## Log
 
 - 2026-10-19: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: 73f7d9a9 c5dc9aeb 309149d6.
