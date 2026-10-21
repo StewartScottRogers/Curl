@@ -53,3 +53,4 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 - 2026-10-21: Created.
 - 2026-10-21: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
 - 2026-10-21: Doing -> Backlog. Needs Curl.Conformance.LibTest.UnitTests/Lib1551To1559Tests.cs, which BL-2930 (Doing) holds through its whole-project touches on Curl.Conformance.LibTest.UnitTests
+- 2026-10-21: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
