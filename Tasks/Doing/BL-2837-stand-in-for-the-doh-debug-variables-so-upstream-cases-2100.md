@@ -39,3 +39,4 @@ Read `lib/doh.c`, `lib/hostip.c` and `lib/happy-eyeballs`-related `DEBUGBUILD` b
 ## Log
 
 - 2026-10-19: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: 51e1080a 3a040ea3 a6e38886 7bd8d990 620ebead.
