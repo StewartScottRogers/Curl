@@ -220,8 +220,13 @@
                  a GitHub outage never parks finished work or counts as a lost race
                  (AF-0025, BL-1281).
       run        /task-run in the lane's worktree. The run commits but never pushes.
-      integrate  The lane rebases its commits onto the shared branch, rebuilds, runs
-                 the fast tests and pushes. Red fast tests are run once more, with the
+      integrate  The lane rebases its commits onto the shared branch, builds the whole
+                 solution, runs the fast tests of the test projects its commits can
+                 affect - those of every project they change and of every project that
+                 depends on one, through a ProjectReference or a linked file; all of them
+                 when a shared build file or a .csproj changes, none when the commits
+                 change no project - and pushes (BL-2967, -TestAffectedTests). CI still
+                 runs every test on Windows, Linux and macOS. Red fast tests are run once more, with the
                  failing test names traced as "flaky?"; only red twice counts (BL-898), and not even
                  then when the projects that failed, or never reported passing, pass when run alone (AF-0092, AF-0093, AF-0101, AF-0103). A conflict gets one headless run to resolve
                  it, and a finished task whose build or tests go red on the rebased
@@ -370,6 +375,7 @@
     powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -TestMachineProbe
     powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -TestHeartbeat
     powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -TestCiWatch
+    powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -TestAffectedTests
     powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -TestTaskIds
     powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -TestTaskBudget
     powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -TestModelChoice
@@ -425,6 +431,9 @@ param(
     [switch]$TestRestart,
     # Prove how failing test names are read from dotnet test output, and exit.
     [switch]$TestFlakyTests,
+    # Prove, on a throwaway repository, which test projects a lane's commits select for the
+    # fast tests under the integrate lock (BL-2967), and exit.
+    [switch]$TestAffectedTests,
     # Prove how the CI watch reads failures from a failed run's log and which it files, and exit.
     [switch]$TestCiWatch,
     # Prove that task IDs of three digits or more (BL-992, BL-1003) are read from next output,
@@ -2575,6 +2584,116 @@ function Get-UnitTestProjectNames {
     return @(Get-ChildItem -Path $Repo -Directory -Filter '*.UnitTests' | Where-Object { Test-Path (Join-Path $_.FullName "$($_.Name).csproj") } | ForEach-Object Name)
 }
 
+function Get-AffectedTestProjects {
+    # The *.UnitTests projects of -Repo whose fast tests the commits in <Base>...HEAD can change
+    # (BL-2967): those of the projects the commits change, and of every project that depends on
+    # one of them, however indirectly. Returns All (every test project must run: a shared build
+    # file or a .csproj changed, or git could not say what changed), Projects (the names, sorted)
+    # and Why, one line for the trace. The repository is flat, so a path's project is its first
+    # folder when that folder holds <folder>.csproj; Tasks, Documentation, .claude, .github and
+    # scripts at the root are in no project and select nothing.
+    param([string]$Repo, [string]$Base)
+    $all = Get-UnitTestProjectNames $Repo
+    # The three-dot form diffs HEAD against its merge base with -Base: after the rebase that is
+    # -Base itself, and before one it is still only this lane's own commits. --no-renames lists
+    # both ends of a move, so a file moved out of a project counts for it too.
+    $changed = @(git -C $Repo diff --name-only --no-renames "$Base...HEAD" 2>$null | Where-Object { $_ })
+    if ($LASTEXITCODE -ne 0) { return [pscustomobject]@{ All = $true; Projects = $all; Why = "all $($all.Count) test projects: git diff $Base...HEAD failed" } }
+    $projects = @(Get-ChildItem -Path $Repo -Directory | Where-Object { Test-Path (Join-Path $_.FullName "$($_.Name).csproj") } | ForEach-Object Name)
+    # Every project builds against these, and a .csproj can change any project's references
+    # (and some tests read the .csproj files themselves), so any of them means every test.
+    $shared = '(?i)^(Directory\.Build\.[^/]+|Directory\.Packages\.props|global\.json|NuGet\.config|[^/]+\.slnx?|[^/]+\.props|[^/]+\.targets|CodeMetricsConfig\.txt|\.editorconfig|MSTestSettings\.cs)$'
+    $projectBuild = '(?i)(^|/)(Directory\.Build\.[^/]+|[^/]+\.props|[^/]+\.targets|[^/]+\.csproj|\.editorconfig)$'
+    $sharedHit = @($changed | Where-Object { $_ -match $shared -or ($_ -match $projectBuild -and ($_.Split('/')[0] -in $projects -or $_ -match '^([^/]+)/\1\.csproj$')) })
+    if ($sharedHit.Count) { return [pscustomobject]@{ All = $true; Projects = $all; Why = "all $($all.Count) test projects: $(($sharedHit | Select-Object -First 3) -join ', ') changed" } }
+    $touched = @($changed | Where-Object { $_.Contains('/') } | ForEach-Object { $_.Split('/')[0] } | Where-Object { $_ -in $projects } | Sort-Object -Unique)
+    # Who depends on whom. A ProjectReference passes a change on to every project above it. An
+    # item that links a file in from another project's folder (Compile
+    # Include="..\Curl.Kerberos.UnitTests\FakeKdc.cs") passes on only a change to that folder
+    # itself: what the linked file uses, its linker must reference on its own.
+    $dependents = @{}
+    $linkers = @{}
+    foreach ($project in $projects) {
+        $text = Get-Content -Raw -LiteralPath (Join-Path $Repo "$project\$project.csproj")
+        foreach ($m in [regex]::Matches("$text", '<(\w+)\s[^>]*?Include="\.\.[\\/]([^\\/"]+)[\\/]')) {
+            $used = $m.Groups[2].Value
+            if ($used -eq $project -or $used -notin $projects) { continue }
+            $edges = if ($m.Groups[1].Value -eq 'ProjectReference') { $dependents } else { $linkers }
+            if (-not $edges.ContainsKey($used)) { $edges[$used] = New-Object System.Collections.Generic.List[string] }
+            $edges[$used].Add($project)
+        }
+    }
+    $reached = New-Object System.Collections.Generic.HashSet[string]
+    $queue = New-Object System.Collections.Generic.Queue[string]
+    $seeds = @($touched) + @($touched | Where-Object { $linkers.ContainsKey($_) } | ForEach-Object { $linkers[$_] })
+    foreach ($project in $seeds) { if ($reached.Add($project)) { $queue.Enqueue($project) } }
+    while ($queue.Count) {
+        $project = $queue.Dequeue()
+        if (-not $dependents.ContainsKey($project)) { continue }
+        foreach ($dependent in $dependents[$project]) { if ($reached.Add($dependent)) { $queue.Enqueue($dependent) } }
+    }
+    $selected = @($reached | Where-Object { $_ -in $all } | Sort-Object)
+    if (-not $touched.Count) { return [pscustomobject]@{ All = $false; Projects = @(); Why = 'no test projects: the commits change no project' } }
+    $names = ($touched | Select-Object -First 3) -join ', '
+    if ($touched.Count -gt 3) { $names += " and $($touched.Count - 3) more" }
+    return [pscustomobject]@{ All = $false; Projects = $selected; Why = "$($selected.Count) of $($all.Count) test projects: $names changed" }
+}
+
+if ($TestAffectedTests) {
+    # A throwaway repository with made-up projects, never built: Lib.B.UnitLibrary uses
+    # Lib.A.UnitLibrary, each library has its tests, and Lib.D.UnitTests links a fake in from
+    # Lib.C.UnitTests' folder. Each case commits one change on top of the same base.
+    $repo = Join-Path ([IO.Path]::GetTempPath()) "df-affected-tests-$PID"
+    New-Item -ItemType Directory -Force -Path $repo | Out-Null
+    git init -q -b work $repo 2>&1 | Out-Null
+    git -C $repo config user.name t; git -C $repo config user.email t@t
+    $uses = @{
+        'Lib.A.UnitLibrary' = @(); 'Lib.A.UnitTests' = @('<ProjectReference Include="..\Lib.A.UnitLibrary\Lib.A.UnitLibrary.csproj" />')
+        'Lib.B.UnitLibrary' = @('<ProjectReference Include="..\Lib.A.UnitLibrary\Lib.A.UnitLibrary.csproj" />')
+        'Lib.B.UnitTests' = @('<ProjectReference Include="..\Lib.B.UnitLibrary\Lib.B.UnitLibrary.csproj" />')
+        'Lib.C.UnitLibrary' = @(); 'Lib.C.UnitTests' = @('<ProjectReference Include="..\Lib.C.UnitLibrary\Lib.C.UnitLibrary.csproj" />')
+        'Lib.D.UnitTests' = @('<Compile Include="..\Lib.C.UnitTests\Fake.cs" Link="Fake.cs" />')
+    }
+    foreach ($project in $uses.Keys) {
+        New-Item -ItemType Directory -Force -Path (Join-Path $repo $project) | Out-Null
+        Set-Content -Path (Join-Path $repo "$project\$project.csproj") -Value (@('<Project Sdk="Microsoft.NET.Sdk">', '  <ItemGroup>') + @($uses[$project] | ForEach-Object { "    $_" }) + @('  </ItemGroup>', '</Project>'))
+        Set-Content -Path (Join-Path $repo "$project\Code.cs") -Value '// code'
+    }
+    New-Item -ItemType Directory -Force -Path (Join-Path $repo 'Tasks'), (Join-Path $repo 'Lib.C.UnitLibrary\Build') | Out-Null
+    Set-Content -Path (Join-Path $repo 'Directory.Build.props') -Value '<Project />'
+    Set-Content -Path (Join-Path $repo 'Lib.C.UnitTests\Fake.cs') -Value '// fake'
+    Set-Content -Path (Join-Path $repo 'Tasks\BL-001-x.md') -Value 'task'
+    git -C $repo add -A 2>&1 | Out-Null
+    git -C $repo commit -q -m base 2>&1 | Out-Null
+    $base = "$(git -C $repo rev-parse HEAD)".Trim()
+    $select = {
+        param([string[]]$Paths, [string]$From = $base)
+        git -C $repo checkout -q --detach $base 2>&1 | Out-Null
+        foreach ($path in $Paths) { Add-Content -Path (Join-Path $repo $path) -Value '// changed' }
+        git -C $repo add -A 2>&1 | Out-Null
+        git -C $repo commit -q -m change 2>&1 | Out-Null
+        $r = Get-AffectedTestProjects -Repo $repo -Base $From
+        if ($r.All) { 'all' } elseif ($r.Projects.Count) { $r.Projects -join ',' } else { 'none' }
+    }
+    $cases = @(
+        ,@('a library change selects its tests and its dependents'' tests, not others', 'Lib.A.UnitTests,Lib.B.UnitTests', (& $select @('Lib.A.UnitLibrary\Code.cs')))
+        ,@('a change with no dependents selects only its own tests', 'Lib.C.UnitTests', (& $select @('Lib.C.UnitLibrary\Code.cs')))
+        ,@('a test project whose file another links in selects both', 'Lib.C.UnitTests,Lib.D.UnitTests', (& $select @('Lib.C.UnitTests\Fake.cs')))
+        ,@('a change only to Tasks selects no test project', 'none', (& $select @('Tasks\BL-001-x.md')))
+        ,@('a change to the root Directory.Build.props selects all', 'all', (& $select @('Directory.Build.props')))
+        ,@('a .props nested in a project folder selects all', 'all', (& $select @('Lib.C.UnitLibrary\Build\Extra.props')))
+        ,@('a .csproj change selects all', 'all', (& $select @('Lib.C.UnitLibrary\Lib.C.UnitLibrary.csproj')))
+        ,@('a base git cannot read selects all', 'all', (& $select @('Lib.C.UnitLibrary\Code.cs') 'no-such-ref'))
+        ,@('the trace line says how many and why', '1 of 4 test projects: Lib.C.UnitLibrary changed', $(& $select @('Lib.C.UnitLibrary\Code.cs') | Out-Null; (Get-AffectedTestProjects -Repo $repo -Base $base).Why)))
+    $failed = 0
+    foreach ($case in $cases) {
+        if ($case[1] -ceq $case[2]) { Write-Host "PASS $($case[0]): $($case[2])" -ForegroundColor Green }
+        else { Write-Host "FAIL $($case[0]): expected $($case[1]), got $($case[2])" -ForegroundColor Red; $failed++ }
+    }
+    Remove-Item -Recurse -Force -Path $repo -ErrorAction SilentlyContinue
+    exit $(if ($failed) { 1 } else { 0 })
+}
+
 if ($TestFlakyTests) {
     $cases = @(
         ,@('one named failure', 'Curl.Quic.UnitTests: Loop_ServerGoesSilent_SendsKeepAlivesThenFailsWithTheIdleTimeout', (Get-FailedTestNames @(
@@ -4458,9 +4577,25 @@ function Invoke-Claim {
 function Invoke-FastTests {
     # One fast-test run of this checkout: whether it was green, and what failed. A hung test
     # would hold the integrate lock, and so every lane, for ever: the blame collector kills
-    # a test host that stops making progress, and the run counts as red.
-    $output = @(& dotnet test $Root --no-build -nologo --filter 'TestCategory!=Integration' --blame-hang-timeout 10m 2>&1 | ForEach-Object { "$_" })
-    return [pscustomobject]@{ Green = ($LASTEXITCODE -eq 0); Failed = (Get-FailedTestNames $output); Projects = @(Get-FailedTestProjects $output (Get-UnitTestProjectNames $Root)) }
+    # a test host that stops making progress, and the run counts as red. With -Projects only
+    # those test projects run, still side by side as in the whole solution's run, through a
+    # solution filter written outside the worktree (BL-2967); without them, every one.
+    param([string[]]$Projects = @())
+    $solution = @(Get-ChildItem -Path $Root -File -Filter '*.slnx') + @(Get-ChildItem -Path $Root -File -Filter '*.sln') | Select-Object -First 1
+    $target = $Root
+    $filter = ''
+    if ($Projects.Count -and $solution) {
+        $filter = Join-Path ([IO.Path]::GetTempPath()) "df-affected-$PID-$Lane.slnf"
+        $paths = @($Projects | ForEach-Object { "$_\$_.csproj" })
+        [IO.File]::WriteAllText($filter, (@{ solution = @{ path = $solution.FullName; projects = $paths } } | ConvertTo-Json -Depth 4))
+        $target = $filter
+    }
+    $tested = if ($filter) { $Projects } else { Get-UnitTestProjectNames $Root }
+    try {
+        $output = @(& dotnet test $target --no-build -nologo --filter 'TestCategory!=Integration' --blame-hang-timeout 10m 2>&1 | ForEach-Object { "$_" })
+        $green = $LASTEXITCODE -eq 0
+    } finally { if ($filter) { Remove-Item -LiteralPath $filter -Force -ErrorAction SilentlyContinue } }
+    return [pscustomobject]@{ Green = $green; Failed = (Get-FailedTestNames $output); Projects = @(Get-FailedTestProjects $output $tested) }
 }
 
 function Test-GreenAlone {
@@ -4482,14 +4617,20 @@ function Test-Green {
     # Returns '' when green, or why not. Under six lanes' load a timing-sensitive test can
     # fail once and pass on the next run, which is no reason to throw a finished task away,
     # so a red run is run once more and only red twice counts (BL-898), unless the projects
-    # that failed pass when run alone (AF-0092).
-    param([string]$Id = '-')
+    # that failed pass when run alone (AF-0092). The whole solution is built, but only the
+    # test projects the commits since -Base can affect are run (BL-2967): every one of them
+    # under the lock took every lane's turn, and CI runs them all on three platforms anyway.
+    param([string]$Id = '-', [string]$Base = "origin/$Branch")
     & dotnet build $Root -nologo -v q 2>&1 | Out-Null
     if ($LASTEXITCODE -ne 0) { return 'build failed' }
-    $first = Invoke-FastTests
+    $affected = Get-AffectedTestProjects -Repo $Root -Base $Base
+    Write-Trace $Id 'verify' $affected.Why
+    if (-not $affected.All -and -not $affected.Projects.Count) { return '' }
+    $tests = if ($affected.All) { @() } else { @($affected.Projects) }
+    $first = Invoke-FastTests -Projects $tests
     if ($first.Green) { return '' }
     Write-Trace $Id 'flaky?' "fast tests red ($($first.Failed)); running them once more" 'DarkYellow'
-    $second = Invoke-FastTests
+    $second = Invoke-FastTests -Projects $tests
     if ($second.Green) {
         Write-Trace $Id 'flaky' "failed once, passed on the rerun: $($first.Failed)" 'Yellow'
         return ''
@@ -4526,7 +4667,7 @@ function Repair-IntegrationBreak {
         Invoke-Git @('add', '-A') | Out-Null
         Invoke-Git @('commit', '-q', '-m', "fix: repair $Id on top of the other lanes' work") | Out-Null
     }
-    $still = Test-Green -Id $Id
+    $still = Test-Green -Id $Id -Base "origin/$Branch"
     if ($still) { return "$Red, and still $still after a repair run" }
     Write-Trace $Id 'repair' 'green on the combined tree after the repair run' 'Green'
     return ''
@@ -4573,7 +4714,7 @@ function Invoke-Integrate {
             }
             if ($State -eq 'Done') {
                 Set-HeartbeatStep @('verify', 'build and fast tests on the shared branch')
-                $red = Test-Green -Id $Id
+                $red = Test-Green -Id $Id -Base "origin/$Branch"
                 if ($red) { $red = Repair-IntegrationBreak -Id $Id -Red $red }
                 if ($red) { return "$red after rebasing onto the other lanes' work" }
                 Write-Trace $Id 'verify' 'build and fast tests green on the shared branch'
