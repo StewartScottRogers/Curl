@@ -35,3 +35,4 @@ Found by BL-2852 (ADR for cases 1135 to 1706). Upstream cases 1705 "managen make
 
 - 2026-10-19: Created.
 - 2026-10-21: touches narrowed from the whole Curl.Cli.UnitLibrary, Curl.Conformance.UnitLibrary and Curl.Conformance.UnitTests to the new ManualPages folders, the managen script, its test and its registration file (see Notes), so it no longer overlaps BL-2851, BL-2968, BL-3000 and BL-2834.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: e77fbcd3 1c00a759 cd5a64f3 c5f8cef6.
