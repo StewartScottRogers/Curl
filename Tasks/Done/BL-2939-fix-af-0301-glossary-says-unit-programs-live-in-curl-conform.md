@@ -8,7 +8,7 @@ depends-on: []
 touches: [Documentation]
 requirement: none
 created: 2026-10-21
-completed:
+completed: 2026-10-21
 ---
 # BL-2939 — Fix AF-0301: Glossary says unit programs live in Curl.Conformance.UnitProgram.UnitLibrary and UnitPrograms.Ported; neither exists
 
@@ -43,12 +43,15 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+No edit needed: BL-2841 and its ports landed since AF-0301. `Curl.Conformance.UnitProgram.UnitLibrary` exists, `IUnitProgram` and `UnitPrograms` are defined, and `UpstreamCaseScreening.UnitProgramNotPorted` gives the skip reason. The reproduction now prints project exists: True and IUnitProgram defined: True, so Glossary line 33 is true as written.
 
 ## Log
 
 - 2026-10-21: Created.
 - 2026-10-21: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-21: Doing -> Done. Reproduction already gives the expected result: the project and IUnitProgram now exist, so Glossary line 33 is true; no code change in this run
