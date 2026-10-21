@@ -618,11 +618,11 @@ public sealed class UpstreamCaseRunner(
         UpstreamCaseScreening.UnitProgramName(testCase, testNumber) is { } program ? unitPrograms!.Find(program) : null;
 
     // runtests.pl runs a libtest or unit program with the command's words alone after its name: no --output, --include or trace;
-    // perl gets the words after the script's name.
+    // perl gets the words after the script's name. A case with no <command> gets runner.pm's "something silly", "-" (test1658).
     private static List<string> ProgramArguments(UpstreamTestCase testCase, bool runsTool, bool runsPerlScript, string outputFile, string traceFile) =>
         !runsTool && !runsPerlScript
             ? Arguments(testCase, outputFile, traceFile)
-            : [.. UpstreamCommandLineSplitter.Split(UpstreamTestPartBodies.Text(testCase.Find("client", "command"))).Arguments.Skip(runsPerlScript ? 1 : 0)];
+            : [.. UpstreamCommandLineSplitter.Split(testCase.Find("client", "command") is { } command ? UpstreamTestPartBodies.Text(command) : "-").Arguments.Skip(runsPerlScript ? 1 : 0)];
 
     private Func<Task<int>> ProgramRun(ILibTest? libTest, IUnitProgram? unitProgram, int testNumber, UpstreamCurlInvocation invocation)
     {

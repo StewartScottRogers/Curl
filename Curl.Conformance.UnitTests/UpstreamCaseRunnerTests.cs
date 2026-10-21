@@ -1402,11 +1402,13 @@ public sealed partial class UpstreamCaseRunnerTests
         + "<command>\nhttp://%HOSTIP:%HTTPPORT/%TESTNUMBER %LOGDIR/ip%TESTNUMBER\n</command>\n</client>\n"
         + "<verify>\n<stdout>\nhello from lib5\n</stdout>\n<stderr>\nURL: http://%HOSTIP:%HTTPPORT/%TESTNUMBER\nstep failed\nTest ended with result 0\n</stderr>\n<errorcode>\n0\n</errorcode>\n</verify>\n</testcase>\n";
 
-    // first.c's main() writes "URL: <url>" only when a URL follows the program's name, and always "Test ended with result <N>".
+    // first.c's main() writes "URL: <url>" only when a URL follows the program's name, and always "Test ended with result <N>";
+    // runner.pm passes "-" for a case with no <command>, so first.c writes "URL: -" (test1658).
     [TestMethod]
     [DataRow("http://%HOSTIP:%HTTPPORT/%TESTNUMBER", 0, "URL: http://127.0.0.1:8990/5\nstep failed\nTest ended with result 0\n")]
     [DataRow("http://%HOSTIP:%HTTPPORT/%TESTNUMBER", 7, "URL: http://127.0.0.1:8990/5\nstep failed\nTest ended with result 7\n")]
-    [DataRow(null, 0, "step failed\nTest ended with result 0\n")]
+    [DataRow(null, 0, "URL: -\nstep failed\nTest ended with result 0\n")]
+    [DataRow(" ", 0, "step failed\nTest ended with result 0\n")]
     public async Task RunAsync_PortedLibCase_WritesFirstCsUrlAndResultLinesAroundTheProgramsStderr(string? command, int exitCode, string expectedStandardError)
     {
         var diagnostics = TestDiagnostics.For(TestContext);
@@ -1591,7 +1593,8 @@ public sealed partial class UpstreamCaseRunnerTests
 
         Assert.AreEqual(UpstreamCaseOutcomeKind.Passed, outcome.Kind, outcome.Detail);
         Assert.AreEqual(5, program.Context!.TestNumber);
-        Assert.IsEmpty(program.Context.Arguments);
+        // runner.pm's "-" for a case with no <command>.
+        CollectionAssert.AreEqual(new[] { "-" }, program.Context.Arguments.ToArray());
     }
 
     [TestMethod]
