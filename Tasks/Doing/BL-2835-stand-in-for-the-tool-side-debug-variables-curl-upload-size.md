@@ -43,3 +43,4 @@ All stand-ins belong to the harness: neither `Libcurl` nor the shipped curl tool
 ## Log
 
 - 2026-10-19: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: 7f123db9 69f69475 48742285 7bd8d990 620ebead.
