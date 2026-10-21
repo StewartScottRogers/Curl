@@ -31,3 +31,4 @@ BL-2992 interpreted `test1222.pl` in `UpstreamTest1222Script` up to its `glob("$
 ## Log
 
 - 2026-10-21: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: d5897245 ca1dc66a 1861eadd.
