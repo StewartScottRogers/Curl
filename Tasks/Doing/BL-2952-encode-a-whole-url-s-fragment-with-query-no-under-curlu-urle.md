@@ -30,3 +30,4 @@ Found by BL-2926. In curl 8.22.0, `parseurl` in `lib/urlapi.c` encodes the fragm
 ## Log
 
 - 2026-10-21: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: 33d872f3 5bdfa932.
