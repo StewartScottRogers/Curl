@@ -274,7 +274,10 @@
                 work, and loses what an idle factory leaves at the reset (BL-806).
       ceilings  task-board.ps1 capacity (read in a detached worktree, <repo>.lanes\auto-board,
                 so this checkout is only pulled at shift end), the machine cap and -MaxLanes.
-      change    Up at most one lane per step, so the meter samples each count. Down
+      change    Below the unpaced floor, min(-UnpacedLanes, ceilings), straight up to the
+                floor in one step; above it, up at most one lane per step, so the meter
+                samples each count. Below the floor the board's capacity is also read
+                every 2 minutes, and a step runs early when it would add lanes. Down
                 straight to max(1, floor(desired + 0.25)) in one step, the highest lane
                 numbers first; a retiring lane finishes and integrates its task first. A
                 pace target must be low two steps running before lanes retire ("low once"
@@ -282,9 +285,15 @@
                 "lanes a -> b (reason)", e.g. "lanes 3 -> 4 (5-hour pace allows 4.9)". It
                 holds while the tokens are low or the shift's time is up.
       unpaced   Up to -UnpacedLanes lanes (default 3) are added without reading the burn
-                rate, one per step like any other: the pace decides only the lanes above
-                them and never retires below them ("lanes 1 -> 2 (up to 3 lanes run
-                unpaced)"). The ceilings still cap them, and -StopAtUsage still ends claims.
+                rate, all in one step: the pace decides only the lanes above them and
+                never retires below them ("lanes 1 -> 3 (up to 3 lanes run unpaced)").
+                The ceilings still cap them, and -StopAtUsage still ends claims.
+      split     When the board's capacity binds two steps running and a ready task waits
+                on overlapping touches, task-board.ps1 hotspots names the shared files;
+                the coordinator files and pushes one High task, "Split <path> so tasks
+                touching it can run in parallel", for the top one no live task's title
+                names. At most one a step; "hotspots unavailable" when the board has no
+                such command.
 
     auto-lanes.json is saved on each change and at shift end, and -Continuous hands on
     -Lanes Auto. -AutoLanesReport prints one step's reading without starting a lane, and exits.
@@ -1272,14 +1281,15 @@ function Get-PaceTarget {
 }
 
 function Get-NextLaneCount {
-    # One step from -Current lanes toward the pace, capped by the ceilings: up one when
-    # the desired count is a whole lane above, and when it is more than a quarter lane
-    # below, straight down to max(1, floor(desired + 0.25)) (BL-823). A measured pace must
-    # be low two steps running before lanes retire (-PreviousLow, BL-808); a ceiling below
-    # -Current retires at once. Up to -Unpaced lanes (capped by the ceilings) are wanted
-    # whatever the pace says, so the pace neither holds them back nor retires below them.
-    # Low says whether this step's pace was low. Reason is the log line, e.g.
-    # "lanes 3 -> 4 (5-hour pace allows 4.9)".
+    # One step from -Current lanes toward the pace, capped by the ceilings: below the
+    # unpaced floor, min(-Unpaced, ceiling), straight up to that floor (2026-10-21); at or
+    # above it, up one when the desired count is a whole lane above, so the meter samples
+    # each count; and when it is more than a quarter lane below, straight down to
+    # max(1, floor(desired + 0.25)) (BL-823). A measured pace must be low two steps running
+    # before lanes retire (-PreviousLow, BL-808); a ceiling below -Current retires at once.
+    # Up to -Unpaced lanes (capped by the ceilings) are wanted whatever the pace says, so the
+    # pace neither holds them back nor retires below them. Low says whether this step's
+    # pace was low. Reason is the log line, e.g. "lanes 3 -> 4 (5-hour pace allows 4.9)".
     param([int]$Current, $Pace, [int]$Capacity, [int]$MachineCap, [int]$MaxLanes, [bool]$PreviousLow = $false, [int]$Unpaced = $UnpacedLanes)
     $ceiling = [math]::Min($Capacity, [math]::Min($MachineCap, $MaxLanes))
     $unpacedFloor = [math]::Min($Unpaced, $ceiling)
@@ -1288,7 +1298,9 @@ function Get-NextLaneCount {
     $lanes = $Current
     $low = $false
     $lowOnce = $false
-    if ($desired -ge $Current + 1) { $lanes = $Current + 1 }
+    $jumped = $false
+    if ($Current -lt $unpacedFloor) { $lanes = $unpacedFloor; $jumped = $true }
+    elseif ($desired -ge $Current + 1) { $lanes = $Current + 1 }
     elseif ($desired -lt $Current - 0.25) {
         $low = $paceValue -le $ceiling
         if (-not $low -or $PreviousLow) { $lanes = [int][math]::Max(1, [math]::Floor($desired + 0.25)) } else { $lowOnce = $true }
@@ -1296,8 +1308,9 @@ function Get-NextLaneCount {
     $culture = [Globalization.CultureInfo]::InvariantCulture
     # The floor binds when the pace wants fewer lanes than it; a ceiling below -Unpaced is the
     # ceiling binding, and an -Unpaced of 1 is the max(1, ...) floor the pace always had.
+    # A jump straight to the floor is the floor binding too, whatever the pace allows above it.
     $floorBinds = $paceValue -lt $unpacedFloor -and $Unpaced -gt 1
-    if ($floorBinds -and $Unpaced -le $ceiling) {
+    if (($floorBinds -or ($jumped -and $Unpaced -gt 1)) -and $Unpaced -le $ceiling) {
         $binding = 'unpaced'
         $limit = "up to $Unpaced lanes run unpaced"
     } elseif ($paceValue -le $ceiling -and -not $floorBinds) {
@@ -1325,6 +1338,87 @@ function Get-AutoStartCount {
     $ceiling = [math]::Min($Capacity, [math]::Min($MachineCap, $Max))
     if ($count -gt $ceiling) { $count = [math]::Max(1, $ceiling); $why += ", capped at $count" }
     return [pscustomobject]@{ Count = $count; Why = $why }
+}
+
+function Test-UnpacedRampDue {
+    # Whether an early Auto step would add lanes now: -Current is below the unpaced floor,
+    # min(-Unpaced, ceiling), at the board's -Capacity. The coordinator checks this every
+    # 2 minutes between 15-minute steps, so a task finishing and freeing capacity is not
+    # left waiting for the step interval (2026-10-21).
+    param([int]$Current, [int]$Capacity, [int]$MachineCap, [int]$MaxLanes, [int]$Unpaced = $UnpacedLanes)
+    $ceiling = [math]::Min($Capacity, [math]::Min($MachineCap, $MaxLanes))
+    return ($Current -lt [math]::Min($Unpaced, $ceiling))
+}
+
+# The split-task filer (2026-10-21, ADR-0130 amendment): when a shared file keeps ready tasks
+# from running side by side, file a task to split it. Pure, so -TestAutoLanes proves it.
+$SplitHotspotMinimum = 5
+
+function Get-OverlapWaitingCount {
+    # How many ready, lane-eligible Backlog tasks cannot start now because of overlapping
+    # touches: the "ready, #n in queue" lines of task-board.ps1 status, less the "<n> more can
+    # start" of its capacity line. 0 when either cannot be read.
+    param([string[]]$StatusLines, [string]$CapacityLine)
+    $ready = @($StatusLines | Where-Object { "$_" -match '\[ready, #\d+ in queue' }).Count
+    if ($CapacityLine -match 'none more can start') { $more = 0 }
+    elseif ($CapacityLine -match '(\d+) more can start') { $more = [int]$Matches[1] }
+    else { return 0 }
+    return [math]::Max(0, $ready - $more)
+}
+
+function Get-CapacityStreak {
+    # The Auto steps running whose binding limit was the board's capacity: -Previous plus
+    # one when -Binding is 'capacity', else 0.
+    param([string]$Binding, [int]$Previous)
+    if ($Binding -eq 'capacity') { return $Previous + 1 }
+    return 0
+}
+
+function Test-SplitHotspotDue {
+    # Whether this step looks for a hotspot to split: capacity bound 2 steps running and at
+    # least one ready task waits on overlapping touches.
+    param([int]$CapacityStreak, [int]$Waiting)
+    return ($CapacityStreak -ge 2 -and $Waiting -gt 0)
+}
+
+function Get-SplitTaskTitle {
+    # The split task's title; it names the path, which is how a later step finds it live.
+    param([string]$Path)
+    return "Split $Path so tasks touching it can run in parallel"
+}
+
+function Select-SplitHotspot {
+    # What to do with task-board.ps1 hotspots' output (-Lines, -ExitCode): Action is
+    # 'unavailable' when the command failed or is unknown, 'none' for "No hotspots." or no
+    # hotspot line, 'covered' when every hotspot is named by a -LiveTitles title or -Filed
+    # (paths filed this shift), and 'file' with the top remaining hotspot's Path, Count and
+    # Ids. Reason is the trace line.
+    param([string[]]$Lines, [int]$ExitCode, [string[]]$LiveTitles = @(), [string[]]$Filed = @())
+    $text = (@($Lines) -join "`n")
+    if ($ExitCode -ne 0 -or $text -match '(?i)unknown command|cannot validate argument|does not belong to the set') {
+        return [pscustomobject]@{ Action = 'unavailable'; Path = ''; Count = 0; Ids = @(); Reason = 'hotspots unavailable' }
+    }
+    $hotspots = @(foreach ($line in @($Lines)) {
+        if ("$line" -match '^Hotspot (\d+) (.+?): (.+)$') {
+            [pscustomobject]@{ Count = [int]$Matches[1]; Path = $Matches[2].Trim(); Ids = @($Matches[3] -split ',\s*' | Where-Object { $_ }) }
+        }
+    })
+    # The command prints them sorted by count, highest first; that order is kept.
+    $hotspots = @($hotspots | Where-Object { $_.Count -ge $SplitHotspotMinimum })
+    if (-not $hotspots.Count) { return [pscustomobject]@{ Action = 'none'; Path = ''; Count = 0; Ids = @(); Reason = 'no hotspots' } }
+    foreach ($hotspot in $hotspots) {
+        $norm = $hotspot.Path.Replace('\', '/')
+        # A live title names the hotspot by its file name ("Split UpstreamCaseRunner.cs so ..."),
+        # with or without the folders before it, as a whole word.
+        $leaf = $norm.TrimEnd('/').Split('/')[-1]
+        $pattern = "(?<![\w.])$([regex]::Escape($leaf))(?![\w])"
+        $named = @($LiveTitles | Where-Object { [regex]::IsMatch("$_".Replace('\', '/'), $pattern, 'IgnoreCase') }).Count
+        $filedNow = @($Filed | Where-Object { "$_".Replace('\', '/') -ieq $norm }).Count
+        if ($named -or $filedNow) { continue }
+        return [pscustomobject]@{ Action = 'file'; Path = $hotspot.Path; Count = $hotspot.Count; Ids = $hotspot.Ids
+            Reason = "hotspot $($hotspot.Path) holds $($hotspot.Count) tasks ($($hotspot.Ids -join ', ')); filing a split task" }
+    }
+    return [pscustomobject]@{ Action = 'covered'; Path = ''; Count = 0; Ids = @(); Reason = 'every hotspot already has a live split task' }
 }
 
 # Which lane scaling touches (ADR-0130 item 6), pure so -TestAutoLanes proves them.
@@ -1420,6 +1514,18 @@ if ($TestAutoLanes) {
         New-TestSample '12:00' 0.20 ($D.AddHours(15.5)) 0.10 ($D.AddDays(3)) 0
         New-TestSample '12:30' 0.26 ($D.AddHours(15.5)) 0.11 ($D.AddDays(3)) 0)
     $infinite = New-TestPace ([double]::PositiveInfinity)
+    $splitStatus = @(
+        'Backlog (6)'
+        '  BL-5    Normal Claude  Fifth  [ready, #1 in queue]'
+        '  BL-6    Normal Claude  Sixth  [ready, #2 in queue, overlaps BL-1 in Doing]'
+        '  BL-7    Normal Claude  Seventh  [ready, #3 in queue, held back behind BL-6]'
+        '  BL-8    Normal Claude  Eighth  [ready, #4 in queue]'
+        '  BL-9    Normal Claude  Ninth  [waiting on BL-5]'
+        '  BL-10   Normal Claude  Tenth  [ready, interactive only]')
+    $splitHotspots = @(
+        'Hotspot 7 Curl.Conformance.UnitTests/KnownDivergences.cs: BL-1, BL-2, BL-3, BL-4, BL-5, BL-6, BL-7'
+        'Hotspot 5 Curl.Tests.Upstream/StandIns.cs: BL-8, BL-9, BL-10, BL-11, BL-12')
+    $splitUnknown = @('Cannot validate argument on parameter ''Command''. The argument "hotspots" does not belong to the set')
 
     $cases = @(
         ,@('five-hour-binds', 'lanes 3 -> 4 (5-hour pace allows 4.9)', (Get-SampledLaneCount $fiveHourBinds 3 $true 6 8 16))
@@ -1441,7 +1547,7 @@ if ($TestAutoLanes) {
         ,@('pace drop 5 to spent budget', 'lanes 5 -> 1 (5-hour pace allows 0.0)', (Get-NextLaneCount 5 (New-TestPace 0.0) 16 16 16 $true 1).Reason)
         ,@('ceiling drop 6 to capacity 2', 'lanes 6 -> 2 (2 ready tasks can run at once)', (Get-NextLaneCount 6 (New-TestPace 9.0) 2 16 16).Reason)
         ,@('ceiling drop 6 to machine 3', 'lanes 6 -> 3 (machine sustains 3)', (Get-NextLaneCount 6 $infinite 20 3 16).Reason)
-        ,@('up one from 2 at ceiling 6', 'lanes 2 -> 3 (lane maximum 6)', (Get-NextLaneCount 2 $infinite 20 16 6).Reason)
+        ,@('up one from 3 at ceiling 6', 'lanes 3 -> 4 (lane maximum 6)', (Get-NextLaneCount 3 $infinite 20 16 6).Reason)
         ,@('capacity-ceiling 1', 'lanes 2 -> 1 (1 ready task can run at once)', (Get-NextLaneCount 2 $null 1 16 16).Reason)
         ,@('machine-ceiling', 'lanes 7 held (machine sustains 7)', (Get-NextLaneCount 7 $infinite 20 7 16).Reason)
         ,@('max-ceiling', 'lanes 2 held (lane maximum 2)', (Get-NextLaneCount 2 $infinite 20 16 2).Reason)
@@ -1451,7 +1557,32 @@ if ($TestAutoLanes) {
         ,@('binding machine', 'machine', (Get-NextLaneCount 7 $infinite 20 7 16).Binding)
         ,@('binding maximum', 'maximum', (Get-NextLaneCount 2 $infinite 20 16 2).Binding)
         ,@('binding no rate', 'no burn rate', (Get-NextLaneCount 2 $null 6 8 16 $false 1).Binding)
-        ,@('unpaced up from 1 with no rate', 'lanes 1 -> 2 (up to 3 lanes run unpaced)', (Get-NextLaneCount 1 $null 6 8 16).Reason)
+        ,@('unpaced up from 1 with no rate', 'lanes 1 -> 3 (up to 3 lanes run unpaced)', (Get-NextLaneCount 1 $null 6 8 16).Reason)
+        ,@('unpaced jump from 1 past a high pace', 'lanes 1 -> 3 (up to 3 lanes run unpaced)', (Get-NextLaneCount 1 (New-TestPace 9.0) 6 8 16).Reason)
+        ,@('unpaced jump capped by capacity 2', 'lanes 1 -> 2 (2 ready tasks can run at once)', (Get-NextLaneCount 1 $null 2 16 16).Reason)
+        ,@('unpaced jump to -Unpaced 5', 'lanes 2 -> 5 (up to 5 lanes run unpaced)', (Get-NextLaneCount 2 $null 8 16 16 $false 5).Reason)
+        ,@('above the floor still up one', 'lanes 3 -> 4 (machine sustains 16)', (Get-NextLaneCount 3 $infinite 20 16 16).Reason)
+        ,@('jump binding unpaced', 'unpaced', (Get-NextLaneCount 1 (New-TestPace 9.0) 6 8 16).Binding)
+        ,@('ramp due 1 lane capacity 4', 'True', "$(Test-UnpacedRampDue -Current 1 -Capacity 4 -MachineCap 16 -MaxLanes 16 -Unpaced 3)")
+        ,@('ramp due 2 lanes capacity 2', 'False', "$(Test-UnpacedRampDue -Current 2 -Capacity 2 -MachineCap 16 -MaxLanes 16 -Unpaced 3)")
+        ,@('ramp due 3 lanes capacity 9', 'False', "$(Test-UnpacedRampDue -Current 3 -Capacity 9 -MachineCap 16 -MaxLanes 16 -Unpaced 3)")
+        ,@('overlap waiting 4 ready 1 more', '3', "$(Get-OverlapWaitingCount -StatusLines $splitStatus -CapacityLine 'Capacity 3: 2 in Doing, 1 more can start (BL-5).')")
+        ,@('overlap waiting none more', '4', "$(Get-OverlapWaitingCount -StatusLines $splitStatus -CapacityLine 'Capacity 2: 2 in Doing, none more can start.')")
+        ,@('overlap waiting unreadable', '0', "$(Get-OverlapWaitingCount -StatusLines $splitStatus -CapacityLine 'error')")
+        ,@('capacity streak 1 -> 2', '2', "$(Get-CapacityStreak -Binding 'capacity' -Previous 1)")
+        ,@('capacity streak reset by pace', '0', "$(Get-CapacityStreak -Binding '5-hour pace' -Previous 3)")
+        ,@('split due streak 2 waiting 3', 'True', "$(Test-SplitHotspotDue -CapacityStreak 2 -Waiting 3)")
+        ,@('split not due streak 1', 'False', "$(Test-SplitHotspotDue -CapacityStreak 1 -Waiting 3)")
+        ,@('split not due nothing waiting', 'False', "$(Test-SplitHotspotDue -CapacityStreak 4 -Waiting 0)")
+        ,@('split unknown command', 'unavailable: hotspots unavailable', "$((Select-SplitHotspot -Lines $splitUnknown -ExitCode 1) | ForEach-Object { "$($_.Action): $($_.Reason)" })")
+        ,@('split no hotspots', 'none: no hotspots', "$((Select-SplitHotspot -Lines @('No hotspots.') -ExitCode 0) | ForEach-Object { "$($_.Action): $($_.Reason)" })")
+        ,@('split files the top hotspot', 'file: hotspot Curl.Conformance.UnitTests/KnownDivergences.cs holds 7 tasks (BL-1, BL-2, BL-3, BL-4, BL-5, BL-6, BL-7); filing a split task', "$((Select-SplitHotspot -Lines $splitHotspots -ExitCode 0) | ForEach-Object { "$($_.Action): $($_.Reason)" })")
+        ,@('split skips a live one', 'file: Curl.Tests.Upstream/StandIns.cs', "$((Select-SplitHotspot -Lines $splitHotspots -ExitCode 0 -LiveTitles @((Get-SplitTaskTitle 'Curl.Conformance.UnitTests/KnownDivergences.cs'))) | ForEach-Object { "$($_.Action): $($_.Path)" })")
+        ,@('split skips one a title names by file name', 'file: Curl.Tests.Upstream/StandIns.cs', "$((Select-SplitHotspot -Lines $splitHotspots -ExitCode 0 -LiveTitles @('Split KnownDivergences.cs so each divergence lives in its own file')) | ForEach-Object { "$($_.Action): $($_.Path)" })")
+        ,@('split ignores a longer file name', 'file: Curl.Conformance.UnitTests/KnownDivergences.cs', "$((Select-SplitHotspot -Lines $splitHotspots -ExitCode 0 -LiveTitles @('Split OldKnownDivergences.cs.bak first')) | ForEach-Object { "$($_.Action): $($_.Path)" })")
+        ,@('split skips one filed this shift', 'file: Curl.Tests.Upstream/StandIns.cs', "$((Select-SplitHotspot -Lines $splitHotspots -ExitCode 0 -Filed @('Curl.Conformance.UnitTests/KnownDivergences.cs')) | ForEach-Object { "$($_.Action): $($_.Path)" })")
+        ,@('split all covered', 'covered', "$((Select-SplitHotspot -Lines $splitHotspots -ExitCode 0 -LiveTitles @((Get-SplitTaskTitle 'Curl.Conformance.UnitTests/KnownDivergences.cs'), (Get-SplitTaskTitle 'Curl.Tests.Upstream/StandIns.cs'))).Action)")
+        ,@('split title', 'Split Curl.Tests.Upstream/StandIns.cs so tasks touching it can run in parallel', (Get-SplitTaskTitle 'Curl.Tests.Upstream/StandIns.cs'))
         ,@('unpaced up from 2 past a low pace', 'lanes 2 -> 3 (up to 3 lanes run unpaced)', (Get-NextLaneCount 2 (New-TestPace 0.5) 6 8 16).Reason)
         ,@('unpaced holds 3 with no rate', 'lanes 3 held (no burn rate yet)', (Get-NextLaneCount 3 $null 6 8 16).Reason)
         ,@('paced above 3', 'lanes 3 -> 4 (5-hour pace allows 4.9)', (Get-NextLaneCount 3 (New-TestPace 4.9) 6 8 16).Reason)
@@ -3219,6 +3350,89 @@ function New-CiFailureTasks {
     } finally { $env:CLAUDE_PROJECT_DIR = $saved }
 }
 
+function Get-LiveTaskTitles {
+    # The titles of the live tasks (Backlog, Doing, Blocked) in the -Repo worktree.
+    param([string]$Repo)
+    $titles = @()
+    foreach ($state in 'Backlog', 'Doing', 'Blocked') {
+        foreach ($file in @(Get-ChildItem (Join-Path $Repo "Tasks\$state") -Filter 'BL-*.md' -ErrorAction SilentlyContinue)) {
+            $line = @(Get-Content -LiteralPath $file.FullName -TotalCount 6 | Where-Object { $_ -match '^title:\s*' })[0]
+            if ($line) { $titles += ($line -replace '^title:\s*', '').Trim() }
+        }
+    }
+    return $titles
+}
+
+function Set-SplitTaskBody {
+    # Fills a split task's Goal, Context and Acceptance criteria from -Hotspot (Path, Count, Ids).
+    param([string]$Path, $Hotspot, [int]$Waiting)
+    $ids = $Hotspot.Ids -join ', '
+    $goal = "``$($Hotspot.Path)`` no longer serialises the tasks that touch it: each unit it holds lives in its own file, so those tasks can run in parallel lanes."
+    $context = @(
+        "Filed by the dark factory's coordinator (ADR-0130, 2026-10-21 amendment): the board's capacity was the binding limit on -Lanes Auto two steps running while $Waiting ready task(s) could not start because of overlapping touches."
+        ''
+        "``task-board.ps1 hotspots`` counts $($Hotspot.Count) unfinished lane-eligible tasks touching ``$($Hotspot.Path)``: $ids. Tasks that touch the same file never run side by side, so they wait for one another."
+    ) -join "`n"
+    $criteria = @(
+        "- [ ] The per-case or per-stand-in content of ``$($Hotspot.Path)`` moves into one file per unit, and each unit registers itself, so adding or changing one touches only its own file."
+        "- [ ] After the waiting tasks' ``touches`` ($ids) are narrowed to their own files by editing their front matter, ``task-board.ps1 hotspots`` counts fewer than $SplitHotspotMinimum tasks for ``$($Hotspot.Path)``."
+        '- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.'
+    ) -join "`n"
+    $text = [IO.File]::ReadAllText($Path)
+    $text = $text.Replace('<!-- One sentence: the observable outcome once this task is done. -->', $goal)
+    $text = $text -replace '<!-- Why this matters.*?-->', $context.Replace('$', '$$')
+    $text = $text.Replace('- [ ] <!-- A statement someone else can check from the repository without asking a question. -->', $criteria)
+    [IO.File]::WriteAllText($Path, $text, (New-Object Text.UTF8Encoding $false))
+}
+
+function Invoke-SplitHotspotFiling {
+    # Called by an Auto step once the board's capacity has bound two steps running: when a
+    # ready task waits on overlapping touches, asks task-board.ps1 hotspots for the files
+    # that hold them back and files at most one High task to split the top one no live task
+    # names (Select-SplitHotspot), in the ci-watch worktree at origin/-Branch, pushed straight
+    # to -Branch like the CI-failure tasks; up to three tries when the push races a lane.
+    param([string]$Branch)
+    $saved = $env:CLAUDE_PROJECT_DIR
+    try {
+        foreach ($attempt in 1..3) {
+            git -C $Root fetch -q origin $Branch 2>&1 | Out-Null
+            if (-not (Test-Path (Join-Path $CiWatchDir '.git'))) {
+                New-Item -ItemType Directory -Force -Path $LanesDir | Out-Null
+                git -C $Root worktree add -q --detach $CiWatchDir "origin/$Branch" 2>&1 | Out-Null
+            }
+            git -C $CiWatchDir checkout -q -f --detach "origin/$Branch" 2>&1 | Out-Null
+            git -C $CiWatchDir clean -q -fd -- Tasks 2>&1 | Out-Null
+            if ($LASTEXITCODE -ne 0) { Write-Trace '-' 'split' "cannot check out origin/$Branch in $CiWatchDir" 'DarkYellow'; return }
+            $env:CLAUDE_PROJECT_DIR = $CiWatchDir
+            $board = Join-Path $CiWatchDir '.claude\skills\task-board\task-board.ps1'
+            $status = @(& powershell -NoProfile -ExecutionPolicy Bypass -File $board status 2>&1 | ForEach-Object { "$_" })
+            $capacityLine = (@(& powershell -NoProfile -ExecutionPolicy Bypass -File $board capacity 2>&1 | ForEach-Object { "$_" }) -join "`n")
+            $waiting = Get-OverlapWaitingCount -StatusLines $status -CapacityLine $capacityLine
+            if (-not (Test-SplitHotspotDue -CapacityStreak $script:Auto.CapacityStreak -Waiting $waiting)) { return }
+            $lines = @(& powershell -NoProfile -ExecutionPolicy Bypass -File $board hotspots 2>&1 | ForEach-Object { "$_" })
+            $exit = $LASTEXITCODE
+            $choice = Select-SplitHotspot -Lines $lines -ExitCode $exit -LiveTitles (Get-LiveTaskTitles $CiWatchDir) -Filed $script:Auto.SplitFiled
+            if ($choice.Action -ne 'file') { Write-Trace '-' 'split' $choice.Reason 'DarkGray'; return }
+            $newArgs = @('new', '-Title', (Get-SplitTaskTitle $choice.Path), '-Priority', 'High', '-Pipeline', 'feature', '-Touches', $choice.Path)
+            $out = (& powershell -NoProfile -ExecutionPolicy Bypass -File $board @newArgs 2>&1 | ForEach-Object { "$_" }) -join "`n"
+            if ($out -notmatch '(?m)^(BL-\d+)\s+(Tasks\S+\.md)') { Write-Trace '-' 'split' "cannot file a split task for $($choice.Path): $(Get-Short $out 60)" 'DarkYellow'; return }
+            $id = $Matches[1]; $line = $Matches[0]
+            Set-SplitTaskBody -Path (Join-Path $CiWatchDir $Matches[2]) -Hotspot $choice -Waiting $waiting
+            git -C $CiWatchDir add -A -- Tasks 2>&1 | Out-Null
+            git -C $CiWatchDir commit -q -m "chore(tasks): file $id to split $($choice.Path)" -m "Filed by the dark factory's coordinator: $($choice.Reason)." -m $SkipCiNote 2>&1 | Out-Null
+            git -C $CiWatchDir push -q origin "HEAD:$Branch" 2>&1 | Out-Null
+            if ($LASTEXITCODE -ne 0) { continue }
+            $script:Auto.SplitFiled = @(@($script:Auto.SplitFiled) + $choice.Path)
+            Write-Trace $id 'split' "filed: $($choice.Reason)" 'Yellow'
+            Send-CiWhisper $line
+            return
+        }
+        Write-Trace '-' 'split' "could not push the split task to $Branch; trying again next step" 'DarkYellow'
+    } catch {
+        Write-Trace '-' 'split' "split filing failed: $(Get-Short $_.Exception.Message 80)" 'DarkYellow'
+    } finally { $env:CLAUDE_PROJECT_DIR = $saved }
+}
+
 function Remove-CiWatch {
     # Deletes the ci-watch worktree at shift end.
     if (-not (Test-Path $CiWatchDir)) { return }
@@ -4718,7 +4932,8 @@ $AutoLanesFile = Join-Path $LanesDir 'auto-lanes.json'
 $AutoBoardDir = Join-Path $LanesDir 'auto-board'
 # The samples of the last 3 hours, the rates last metered, the saved auto-lanes.json, the
 # machine cap, and whether a capacity failure has been traced yet.
-$script:Auto = @{ Samples = @(); FiveHourRate = $null; WeeklyRate = $null; Saved = $null; MachineCap = 16; CapacityTraced = $false; LastLow = $false }
+$script:Auto = @{ Samples = @(); FiveHourRate = $null; WeeklyRate = $null; Saved = $null; MachineCap = 16; CapacityTraced = $false; LastLow = $false
+    CapacityStreak = 0; SplitFiled = @() }
 
 function Read-JsonFile {
     # The file's JSON, or $null when it is missing or does not parse.
@@ -5190,7 +5405,11 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
     function Invoke-AutoLaneStep {
         # One -Lanes Auto step (ADR-0130 items 2 to 5): sample the usage, meter the rates,
         # and add one lane or retire straight down to the step's count, highest lane numbers
-        # first (BL-823). Holds without asking while the tokens are low or the shift's time is up.
+        # first (BL-823). Below the unpaced floor it adds every lane up to it at once. Holds
+        # without asking while the tokens are low or the shift's time is up. -Capacity is the
+        # board's capacity when the caller has just read it. Then, when the board's capacity
+        # bound two steps running, it may file one split task (Invoke-SplitHotspotFiling).
+        param($Capacity = $null)
         $retiring = @($activeLanes | Where-Object { Test-Path (Get-LaneStatePath $_ 'retire') })
         $current = @($activeLanes | Where-Object { $retiring -notcontains $_ }).Count
         $low = Get-UsageStop
@@ -5207,11 +5426,13 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
             $script:Auto.Samples = @(@($script:Auto.Samples) + @(New-UsageSample -At $now -Reading $reading -ActiveLanes $busy) |
                 Where-Object { $_.At -ge $now.AddHours(-3) })
         }
-        $capacity = Get-ShiftCapacity -Fallback $current
+        $capacity = if ($null -ne $Capacity) { [int]$Capacity } else { Get-ShiftCapacity -Fallback $current }
         $step = Get-AutoLaneStep -Samples $script:Auto.Samples -Current $current -Capacity $capacity -MachineCap $script:Auto.MachineCap `
             -Saved $script:Auto.Saved -PreviousLow $script:Auto.LastLow
         $script:Auto.FiveHourRate = $step.FiveHourRate
         $script:Auto.WeeklyRate = $step.WeeklyRate
+        $script:Auto.CapacityStreak = Get-CapacityStreak -Binding $step.Next.Binding -Previous ([int]$script:Auto.CapacityStreak)
+        if ($script:Auto.CapacityStreak -ge 2) { Invoke-SplitHotspotFiling -Branch $branch }
         # A low step that retired a lane starts the count again; one that held arms the next.
         $script:Auto.LastLow = [bool]($step.Next.Low -and -not $step.Next.Changed)
         # status.json's autoLanes follows every step; the reason and time only a change.
@@ -5220,8 +5441,15 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
         if (-not $step.Next.Changed) { Write-Trace '-' 'lanes' $step.Next.Reason 'DarkGray'; return }
         Write-Trace '-' 'lanes' $step.Next.Reason 'Cyan'
         if ($step.Next.Lanes -gt $current) {
-            if ($null -eq (Add-Lane)) { Write-Trace '-' 'lanes' 'no lane to add' 'Yellow'; return }
-            $script:LaneCount = $step.Next.Lanes
+            # One lane above the unpaced floor; every lane up to the floor below it.
+            $added = 0
+            foreach ($i in 1..($step.Next.Lanes - $current)) {
+                if ($added) { Start-Sleep -Seconds 15 }
+                if ($null -eq (Add-Lane)) { break }
+                $added++
+            }
+            if (-not $added) { Write-Trace '-' 'lanes' 'no lane to add' 'Yellow'; return }
+            $script:LaneCount = $current + $added
         } else {
             # Request-LaneRetire traces each lane it asks; one that finds none left stops the run.
             $retired = 0
@@ -5275,6 +5503,7 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
     $giveUp = $shiftEnd.AddMinutes($TaskMinutes + [math]::Max(30, [int]($TaskMinutes / 4)) + 30)
     $tick = Get-Date
     $nextAutoStep = (Get-Date).AddMinutes(15)
+    $nextRampCheck = (Get-Date).AddMinutes(2)
     $nextCapacityStep = (Get-Date).AddMinutes(5)
     while ((Get-Date) -lt $giveUp) {
         # The coordinator announces the usage limit for every lane, and lanes waiting for a
@@ -5315,6 +5544,23 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
         if ($AutoLanes -and (Get-Date) -ge $nextAutoStep -and -not (Test-WaitingForSession)) {
             Invoke-AutoLaneStep
             $nextAutoStep = (Get-Date).AddMinutes(15)
+            $nextRampCheck = (Get-Date).AddMinutes(2)
+        }
+        # Below the unpaced floor, the board's capacity is read every 2 minutes, and a step
+        # runs early when it would add lanes, so a finished task's freed capacity does not
+        # wait out the 15-minute interval (2026-10-21). Not while tokens are low or time is up.
+        if ($AutoLanes -and (Get-Date) -ge $nextRampCheck -and -not (Test-WaitingForSession)) {
+            $nextRampCheck = (Get-Date).AddMinutes(2)
+            $rampRetiring = @($activeLanes | Where-Object { Test-Path (Get-LaneStatePath $_ 'retire') })
+            $rampCurrent = @($activeLanes | Where-Object { $rampRetiring -notcontains $_ }).Count
+            $belowFloor = Test-UnpacedRampDue -Current $rampCurrent -Capacity $MaxLanes -MachineCap $script:Auto.MachineCap -MaxLanes $MaxLanes
+            if ($belowFloor -and -not (Get-UsageStop) -and (Get-Date) -le $shiftEnd) {
+                $rampCapacity = Get-ShiftCapacity -Fallback $rampCurrent
+                if (Test-UnpacedRampDue -Current $rampCurrent -Capacity $rampCapacity -MachineCap $script:Auto.MachineCap -MaxLanes $MaxLanes) {
+                    Invoke-AutoLaneStep -Capacity $rampCapacity
+                    $nextAutoStep = (Get-Date).AddMinutes(15)
+                }
+            }
         }
         # A fixed count of lanes steps to the board's capacity every 5 minutes (BL-1374).
         if (-not $AutoLanes -and $requestedLanes -gt 1 -and (Get-Date) -ge $nextCapacityStep -and -not (Test-WaitingForSession)) {
