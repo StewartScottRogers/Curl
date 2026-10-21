@@ -32,3 +32,4 @@ Split from BL-2847 (too big for one run). C sources: https://github.com/curl/cur
 ## Log
 
 - 2026-10-21: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: 9b883e1f 7e874ed9 aca7e1a2 dd1cc079.
