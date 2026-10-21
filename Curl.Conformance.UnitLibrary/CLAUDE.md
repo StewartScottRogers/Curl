@@ -344,8 +344,12 @@ makes the listed folder (`asubdir`, `plainfile.txt` and `emptyfile.txt` last wri
 946728000, the read-only `rofile.txt` 978264000), and `postprocess` removes it (Perl's `die`
 exit code when it will not go), then exits 1 unless a named file was last written at a given
 time, or rewrites a listing into test613.pl's canonical form sorted from its 57th character.
-Screening skips a case whose postcheck runs test1013.pl or test1022.pl, naming the
-`../curl-config` they compare with, which Curl does not ship. The runner runs a precheck or
+`UpstreamTest1013Script` and `UpstreamTest1022Script` (BL-2854, ADR-0712) emulate
+`tests/libtest/test1013.pl` and `test1022.pl`, which compare `curl --version`'s protocols,
+features, version and numeric version with `../curl-config`: `UpstreamCurlConfig` stands in for
+that script with the answers of Curl's own `curl-config` (`Curl.Config.UnitLibrary`, over
+libcurl's `curl_version_info`), and `UpstreamCurlConfigScriptLine` carries out case 1014's
+`> FILE` redirect; 1013, 1014, 1022 and 1023 pass. The runner runs a precheck or
 postcheck whose every line is a `%PERL -e` one-liner `UpstreamPerlOneLiner` interprets (`%PERL` is
 `perl`, `$^O` is the platform's `OperatingSystemName`; BL-1933): a precheck that prints skips the
 case with its first line, one that exits non-zero with `precheck command error`, and a postcheck
@@ -357,8 +361,8 @@ only, the names `localhost` (both) and `ip6-localhost` (IPv6) resolve, and anyth
 with that line; `%HOST6IP` is `[::1]`, which lets test1085 run. A `%PERL` check line goes through `UpstreamPerlCheckLine` (BL-1894), which
 runs a `-e` one-liner with `UpstreamPerlOneLiner` and a line whose program is `test610.pl` or
 `test613.pl`, in whatever folder (`perl ./libtest/test613.pl ...`), with `UpstreamTest610Script`
-or `UpstreamTest613Script`; test1013.pl and test1022.pl, which compare with `../curl-config`, are
-not emulated. Any other check line skips the case, naming it. The result is an
+or `UpstreamTest613Script`, and a line whose program is `test1013.pl` or `test1022.pl` with
+`UpstreamTest1013Script` or `UpstreamTest1022Script`. Any other check line skips the case, naming it. The result is an
 `UpstreamCaseOutcome` (passed, failed or skipped, with its detail), which
 `UpstreamCaseRatchet.Judge` turns into the `UpstreamCaseVerdict` a test row reports, given
 whether the case is on the passing list. Before any other screening the runner asks
@@ -428,7 +432,7 @@ What it is to hold in full, per ADR-0013 decision 2:
 - the comparison of a case's results against its `<verify>` section.
 
 This library references `Curl.Protocol.Abstractions.UnitLibrary`, `Curl.Tls.UnitLibrary`
-(for the TLS 1.3 stand-in, ADR-0522) and no protocol library. It never opens a socket: every connection goes to an in-memory server. It is
+(for the TLS 1.3 stand-in, ADR-0522), `Curl.Config.UnitLibrary` (for `curl-config`'s answers, ADR-0712) and no protocol library. It never opens a socket: every connection goes to an in-memory server. It is
 held to the same quality gates as every other `.UnitLibrary` (100% line and branch
 coverage, complexity at most 10, CRAP at most 30) and is AOT-compatible like every
 production project.

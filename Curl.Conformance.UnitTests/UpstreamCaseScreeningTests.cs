@@ -721,13 +721,13 @@ public sealed class UpstreamCaseScreeningTests
     }
 
     [TestMethod]
-    [DataRow("test1013.pl", "%PERL %SRCDIR/libtest/test1013.pl ../curl-config /log/stdout1014 features > /log/result1014")]
-    [DataRow("test1022.pl", "%PERL %SRCDIR/libtest/test1022.pl ../curl-config /log/stdout1023 vernum")]
-    public void FindSkipReason_CurlConfigComparisonScript_NamesCurlConfigAsTheReason(string script, string line)
+    [DataRow("perl /src/libtest/test1013.pl ../curl-config /log/stdout1014 features > /log/result1014")]
+    [DataRow("perl /src/libtest/test1022.pl ../curl-config /log/stdout1023 vernum")]
+    public void FindSkipReason_CurlConfigComparisonScript_IsNoReasonToSkip(string line)
     {
         string? reason = Screen(RunnableClient + $"<verify>\n<postcheck>\n{line}\n</postcheck>\n</verify>\n");
 
-        Assert.AreEqual($"{script} compares with ../curl-config, which Curl does not ship", reason);
+        Assert.IsNull(reason);
     }
 
     [TestMethod]

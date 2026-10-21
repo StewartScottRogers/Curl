@@ -9,8 +9,7 @@ namespace Curl.Conformance;
 /// </summary>
 /// <remarks>
 /// A case is skipped when its expansion stopped at a stray <c>%else</c> or <c>%endif</c> or left
-/// something unresolved; when its postcheck runs test1013.pl or test1022.pl, which compare with
-/// <c>../curl-config</c>; when it has a part the harness
+/// something unresolved; when it has a part the harness
 /// does not act on (a <c>&lt;tool&gt;</c> libtest,
 /// a <c>&lt;verify&gt;&lt;upload&gt;</c>, …); when a precheck or postcheck line is not a
 /// <c>%PERL -e</c> one-liner <see cref="UpstreamPerlOneLiner"/> interprets; when it needs a server other than <c>http</c> (the
@@ -67,7 +66,6 @@ internal static class UpstreamCaseScreening
     private static readonly string[] FtpServers = ["ftp", "ftp-ipv6", .. FtpsServerConnector.EmulatedServers];
 
     private static readonly Regex FtpDataConnectionCommand = new(@"^LPRT\b", RegexOptions.CultureInvariant | RegexOptions.Multiline);
-    private static readonly Regex CurlConfigScript = new(@"\btest(?:1013|1022)\.pl\b", RegexOptions.CultureInvariant);
 
     private static readonly string[] FileParts = ["file", "file1", "file2", "file3", "file4"];
 
@@ -112,7 +110,6 @@ internal static class UpstreamCaseScreening
             () => expansion.ConditionError,
             () => UnresolvedVariable(expansion),
             () => UnsupportedInstruction(expansion),
-            () => CurlConfigComparison(testCase),
             () => UnsupportedPart(testCase, "client", ClientParts),
             () => unitProgram is null ? UnrunTool(testCase, isPorted) : UnportedUnitProgram(unitProgram, OrNone(isPortedUnitProgram)),
             () => UnsupportedPart(testCase, "verify", VerifyParts),
@@ -388,13 +385,6 @@ internal static class UpstreamCaseScreening
             ? $"the command needs a shell for its {syntax}"
             : null;
     }
-
-    // test1013.pl and test1022.pl compare curl --version with ../curl-config, a script of the
-    // upstream build that Curl does not ship (BL-1932), so their cases cannot be measured.
-    private static string? CurlConfigComparison(UpstreamTestCase testCase) =>
-        CurlConfigScript.Match(UpstreamTestPartBodies.Text(testCase.Find("verify", "postcheck"))) is { Success: true } script
-            ? $"{script.Value} compares with ../curl-config, which Curl does not ship"
-            : null;
 
     // <servercmd> is read by the server the case runs: ftpserver.pl's commands for an ftp or ftps
     // case, which the FTP stand-in carries out (DELAY and SLOWDOWNDATA too, BL-1958), sws's otherwise.
