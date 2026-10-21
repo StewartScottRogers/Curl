@@ -16,6 +16,17 @@ function Select-LanesToStop {
     } | Sort-Object)
 }
 
+function Add-StoppedShiftEnd {
+    # -Restart kills the coordinator before it can log its own "shift end", and the process
+    # audit counts any shift log without one as a live shift, so the replaced shift's
+    # unfinished runs looked running, not stopped (AF-0313). Writes the line for it, in
+    # Write-Trace's format, to the shift's trace log (-Path); returns it.
+    param([string]$Path, [datetime]$At = (Get-Date))
+    $line = '{0} {1,-6} {2,-7} {3}' -f $At.ToString('HH:mm:ss'), '-', 'shift', 'end (restarted: replaced by a new shift)'
+    Add-Content -Path $Path -Value $line.TrimEnd() -Encoding UTF8
+    return $line.TrimEnd()
+}
+
 if ($TestRestart) {
     $phases = @{ 1 = 'run'; 2 = 'integrate'; 3 = 'claim'; 4 = 'tokens'; 5 = 'wait'; 6 = 'finished'; 7 = '' }
     $got = (Select-LanesToStop $phases) -join ','
@@ -27,7 +38,13 @@ if ($TestRestart) {
     $young = (Select-LanesToStop @{ 1 = 'run'; 2 = 'run'; 3 = 'run' } @{ 1 = 8; 2 = 600 }) -join ','
     $ok3 = $young -ceq '2,3'
     Write-Host "$(if ($ok3) { 'PASS' } else { 'FAIL' }) a run under two minutes old waits; an older one and one of unknown age stop: $young" -ForegroundColor $(if ($ok3) { 'Green' } else { 'Red' })
-    exit $(if ($ok -and $ok2 -and $ok3) { 0 } else { 1 })
+    $scratch = Join-Path ([IO.Path]::GetTempPath()) "restart-test-$PID.log"
+    Set-Content $scratch 'start' -Encoding UTF8
+    $endLine = Add-StoppedShiftEnd $scratch (Get-Date '2026-10-19T19:24:24')
+    $ok4 = $endLine -match '^19:24:24 - +shift +end \(restarted' -and (Get-Content $scratch)[-1] -ceq $endLine
+    Remove-Item $scratch -ErrorAction SilentlyContinue
+    Write-Host "$(if ($ok4) { 'PASS' } else { 'FAIL' }) a restart ends the replaced shift's log with a shift end line: $endLine" -ForegroundColor $(if ($ok4) { 'Green' } else { 'Red' })
+    exit $(if ($ok -and $ok2 -and $ok3 -and $ok4) { 0 } else { 1 })
 }
 
 if ($Restart) {
@@ -70,6 +87,8 @@ if ($Restart) {
         $waiting = @($phases.Keys | Where-Object { $phases[$_] -in 'claim', 'integrate' -or ($phases[$_] -eq 'run' -and $ages.ContainsKey($_) -and $ages[$_] -lt 120) })
         if ($waiting.Count) { Start-Sleep -Seconds 5 }
     }
+    $oldTrace = if ($stamp) { Join-Path $LogDir "DarkFactory-$stamp.log" } else { '' }
+    if ($oldTrace -and (Test-Path $oldTrace)) { Add-StoppedShiftEnd $oldTrace | Out-Null }
     $where = Start-Detached -Label 'DF shift starting' -Dir $Root -ScriptArgs $forward
     Write-Host "New shift started ($(if ($where.Tab) { "herdr tab $($where.Tab)" } else { "pid $($where.Process.Id)" })) with: $($forward -join ' ')"
     exit 0
