@@ -32,3 +32,4 @@ Split from BL-2844 (2026-10-21), which ports the ten URL and address parsing uni
 ## Log
 
 - 2026-10-21: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: 994c71ca 67867c61 aca7e1a2 dd1cc079.
