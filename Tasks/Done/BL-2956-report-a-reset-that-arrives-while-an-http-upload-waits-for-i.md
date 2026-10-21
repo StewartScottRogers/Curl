@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Http.UnitLibrary/HttpRequestBodyWriter.cs, Curl.Protocol.Http.UnitLibrary/HttpConnectionSend.cs, Curl.Protocol.Http.UnitTests/HttpRequestBodyWriterWaitingPieceResetTests.cs]
 requirement: none
 created: 2026-10-21
-completed:
+completed: 2026-10-21
 ---
 # BL-2956 — Report a reset that arrives while an HTTP upload waits for its next body piece as curl's exit 56 Recv failure, not 55
 
@@ -26,13 +26,17 @@ Where to start: `HttpRequestBodyWriter` reads a `StreamBody` piece by piece (`Re
 
 ## Acceptance criteria
 
-- [ ] A unit test in `Curl.Protocol.Http.UnitTests` shows a reset arriving while the body writer waits on its upload source ends the transfer with exit 56 and `Recv failure: Connection was reset` (Windows wording; its own off-Windows test where the words differ).
-- [ ] The existing full-speed send-reset tests (`ExecuteAsync_SocketErrorFailsASend_FailsWithExit55AndTheWinsockWords` and its siblings) still pass unchanged.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] A unit test in `Curl.Protocol.Http.UnitTests` shows a reset arriving while the body writer waits on its upload source ends the transfer with exit 56 and `Recv failure: Connection was reset` (Windows wording; its own off-Windows test where the words differ).
+- [x] The existing full-speed send-reset tests (`ExecuteAsync_SocketErrorFailsASend_FailsWithExit55AndTheWinsockWords` and its siblings) still pass unchanged.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Decision (ADR-0730): rather than race a connection read against each pending body read (a concurrent read `SslStream` refuses), `HttpRequestBodyWriter` notes whether the last plain stream read completed at once; when a write of that piece fails with exit 55 after a read it waited on, it reads the connection once, and an `IOException` there is exit 56 with `HttpTransferMessages.ReceiveFailure` words. Bytes or end of stream keep 55. `HttpConnectionSend.cs` needed no change.
+- Tests: `HttpRequestBodyWriterWaitingPieceResetTests` (5: Windows and off-Windows exit 56, read gives the end keeps 55, no wait keeps 55, deferred TLS handshake keeps its code). Http unit tests 2209 passed; all fast tests green; Measure-CodeQuality for Curl.Protocol.Http.UnitLibrary: 0 failing members.
 
 ## Log
 
 - 2026-10-21: Created.
 - 2026-10-21: Backlog -> Doing. Criteria at claim: 2d0a8b2f f0833359 9742157d.
+- 2026-10-21: Doing -> Done. A reset met after the HTTP body writer waited on its upload source ends exit 56 Recv failure, as curl 8.22.0

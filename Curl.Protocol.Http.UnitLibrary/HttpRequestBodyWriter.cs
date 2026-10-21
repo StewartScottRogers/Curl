@@ -207,6 +207,12 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
     private bool tracing;
 
     /// <summary>
+    /// Whether the last read of a stream body did not complete at once, so the writer waited on its
+    /// upload source as curl waits with the socket polled for reading (<see cref="ReceiveFailureOrAsync" />).
+    /// </summary>
+    private bool waitedOnSource;
+
+    /// <summary>
     /// Writes <paramref name="body" /> and flushes the connection, then, when the connection is
     /// an HTTP/2 or HTTP/3 stream, ends the stream unless the last write already did
     /// (<see cref="HttpConnectionSend.EndStreamRequestAsync" />).
@@ -447,10 +453,42 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
     /// Writes what <see cref="heldBack" /> holds, now that a read has given more, then the piece
     /// that read gave.
     /// </summary>
+    /// <exception cref="HttpTransferException">
+    /// The connection failed the write (exit 55), or, after a read the writer had to wait for, the
+    /// connection reports a failure of its own when read (exit 56, <see cref="ReceiveFailureOrAsync" />).
+    /// </exception>
     private async ValueTask WriteReadPieceAsync(ReadOnlyMemory<byte> piece, bool isChunked, CancellationToken cancellationToken)
     {
-        await ReleaseHeldBackAsync(cancellationToken).ConfigureAwait(false);
-        await WritePieceAsync(piece, isChunked, cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await ReleaseHeldBackAsync(cancellationToken).ConfigureAwait(false);
+            await WritePieceAsync(piece, isChunked, cancellationToken).ConfigureAwait(false);
+        }
+        catch (HttpTransferException failed) when (waitedOnSource && failed.ExitCode == CurlExitCode.SendError)
+        {
+            throw await ReceiveFailureOrAsync(failed, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// Reads the connection after a write that failed once the writer had waited on its upload
+    /// source, and gives exit 56 with <c>Recv failure: </c> and the read's words when the read fails
+    /// too: while curl 8.22.0 waits for upload data it polls the socket for reading only, and reads
+    /// before it writes, so a peer that answered and reset meanwhile is met by <c>recv</c>, not
+    /// <c>send</c> (BL-2956, ADR-0040 keeps a full-speed failed write at exit 55). A read that gives
+    /// bytes or the end of the stream keeps <paramref name="sendFailure" />.
+    /// </summary>
+    private async ValueTask<HttpTransferException> ReceiveFailureOrAsync(HttpTransferException sendFailure, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await connection.ReadAsync(new byte[1], cancellationToken).ConfigureAwait(false);
+            return sendFailure;
+        }
+        catch (IOException failure)
+        {
+            return new HttpTransferException(CurlExitCode.RecvError, HttpTransferMessages.ReceiveFailure(failure));
+        }
     }
 
     /// <summary>
@@ -635,7 +673,9 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
 
         if (EarlyResponseRead is not { } watch || !racesPendingReads)
         {
-            return stream.ReadAsync(buffer, cancellationToken);
+            ValueTask<int> plainRead = stream.ReadAsync(buffer, cancellationToken);
+            waitedOnSource = !plainRead.IsCompleted;
+            return plainRead;
         }
 
         CancellationTokenSource reading = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
