@@ -69,7 +69,7 @@ internal sealed record CurlUrlAuthority(
 
         CurlUrlAuthority login = at < 0
             ? None
-            : SplitLogin(text[..at], CurlUrlScheme.HasLoginOptions(scheme));
+            : ParseLoginDetails(text[..at], CurlUrlScheme.HasLoginOptions(scheme));
 
         return hostAndPort with { User = login.User, Password = login.Password, Options = login.Options };
     }
@@ -105,16 +105,21 @@ internal sealed record CurlUrlAuthority(
     /// <summary>
     /// Splits user information as curl's <c>Curl_parse_login_details</c> does: the
     /// password starts at the first <c>:</c>, the options at the first <c>;</c> when the
-    /// scheme has them, and each runs to the other separator or the end.
+    /// scheme has them, and each runs to the other separator or the end. The user is always
+    /// there, possibly empty; an empty password is kept, but empty options are none, as curl
+    /// 8.22.0 copies the options only when they have a length (unit1620: <c>:;</c>).
     /// </summary>
-    private static CurlUrlAuthority SplitLogin(string login, bool hasLoginOptions)
+    /// <param name="login">The user information, everything before the <c>@</c>.</param>
+    /// <param name="hasLoginOptions">Whether a <c>;</c> starts login options.</param>
+    /// <returns>An authority holding only the user, password and options.</returns>
+    internal static CurlUrlAuthority ParseLoginDetails(string login, bool hasLoginOptions)
     {
         int passwordSeparator = login.IndexOf(':');
         int optionsSeparator = hasLoginOptions ? login.IndexOf(';') : -1;
 
         string user = login[..FirstSeparator(passwordSeparator, optionsSeparator, login.Length)];
         string? password = PartAfter(login, passwordSeparator, optionsSeparator);
-        string? options = PartAfter(login, optionsSeparator, passwordSeparator);
+        string? options = PartAfter(login, optionsSeparator, passwordSeparator) is { Length: > 0 } written ? written : null;
 
         return None with { User = user, Password = password, Options = options };
     }
@@ -151,8 +156,12 @@ internal sealed record CurlUrlAuthority(
     /// Splits the port from the host as curl's <c>Curl_parse_port</c> does. A colon with
     /// nothing after it is ignored when the URL has a scheme and rejected when it has not.
     /// </summary>
+    /// <param name="hostAndPort">The host and port, after any user information.</param>
+    /// <param name="hasScheme">Whether the URL was written with a scheme.</param>
+    /// <param name="host">The host, without the port.</param>
+    /// <param name="port">The port written, or <see langword="null" /> when none was.</param>
     /// <returns>Why curl rejects the host and port, or <see cref="CurlUrlRejection.None" />.</returns>
-    private static CurlUrlRejection SplitPort(string hostAndPort, bool hasScheme, out string host, out int? port)
+    internal static CurlUrlRejection SplitPort(string hostAndPort, bool hasScheme, out string host, out int? port)
     {
         host = hostAndPort;
         port = null;
