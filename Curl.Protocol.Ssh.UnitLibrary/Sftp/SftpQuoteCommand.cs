@@ -57,7 +57,8 @@ internal sealed record SftpQuoteCommand(SftpQuoteOperation Operation, bool Ignor
     /// parameter</c> when no space follows the name, <c>Syntax error: Bad first parameter to
     /// '&lt;command&gt;'</c> or the command's own text for a bad second argument,
     /// <see cref="SuspiciousData" /> for more after the last, and
-    /// <see cref="UnknownCommand" /> for a name curl does not know.
+    /// <see cref="UnknownCommand" /> for a name curl does not know; exit 100 with the same bad
+    /// first or second parameter text for a path of 65535 bytes or more (BL-2918).
     /// </exception>
     internal static SftpQuoteCommand Parse(string value, byte[] homeDirectory)
     {
@@ -97,7 +98,8 @@ internal sealed record SftpQuoteCommand(SftpQuoteOperation Operation, bool Ignor
         ArgumentReader arguments = space >= 0
             ? new ArgumentReader(text, space, homeDirectory)
             : throw SshTransferException.SftpQuoteFailed($"Syntax error command '{text}', missing parameter");
-        byte[] first = arguments.Read() ?? throw SshTransferException.SftpQuoteFailed($"Syntax error: Bad first parameter to '{text}'");
+        byte[] first = arguments.Read(out CurlExitCode firstResult)
+            ?? throw SshTransferException.SftpQuoteFailed(firstResult, $"Syntax error: Bad first parameter to '{text}'");
         (string _, SftpQuoteOperation operation, string? secondParameterFailure) = Find(text);
         byte[] second = secondParameterFailure is null ? [] : ReadSecond(arguments, text, secondParameterFailure);
         return arguments.AtEnd
@@ -113,7 +115,8 @@ internal sealed record SftpQuoteCommand(SftpQuoteOperation Operation, bool Ignor
     }
 
     private static byte[] ReadSecond(ArgumentReader arguments, string text, string failure) =>
-        arguments.Read() ?? throw SshTransferException.SftpQuoteFailed(
+        arguments.Read(out CurlExitCode result) ?? throw SshTransferException.SftpQuoteFailed(
+            result,
             failure == ChangeAttributeSecondParameter ? $"Syntax error in {text}: Bad second parameter" : failure);
 
     // curl's Curl_get_pathname over the command's text: blanks are spaces and tabs, a word
@@ -132,8 +135,13 @@ internal sealed record SftpQuoteCommand(SftpQuoteOperation Operation, bool Ignor
 
         internal bool AtEnd => position >= text.Length;
 
-        // The next argument, or null where curl finds none or a malformed one.
-        internal byte[]? Read() => ReadPathname(out byte[] path) == CurlExitCode.Ok ? path : null;
+        // The next argument, or null where curl finds none, a malformed one or one too long;
+        // result is curl's code for it, which sftp_quote returns as the transfer's.
+        internal byte[]? Read(out CurlExitCode result)
+        {
+            result = ReadPathname(out byte[] path);
+            return result == CurlExitCode.Ok ? path : null;
+        }
 
         // Curl_get_pathname: the next argument and curl's code for it.
         internal CurlExitCode ReadPathname(out byte[] path)

@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Testing;
@@ -135,6 +136,30 @@ public sealed class SftpQuoteCommandTests
         diagnostics.Diff("message", expected, failure.Message);
 
         Assert.AreEqual(CurlExitCode.QuoteError, failure.ExitCode);
+        Assert.AreEqual(expected, failure.Message);
+    }
+
+    // Measured 2026-10-21 with curl 8.22.0 (Schannel, libssh2 1.11.1) against OpenSSH's
+    // sftp-server, the 70000-byte path given through -K: exit 100 and the bad-parameter text.
+    [TestMethod]
+    [DataRow("rm ", "", "Syntax error: Bad first parameter to 'rm {0}'", DisplayName = "first path of 70000 bytes, as measured")]
+    [DataRow("rm \"", "\"", "Syntax error: Bad first parameter to 'rm \"{0}\"'", DisplayName = "quoted first path of 70000 bytes")]
+    [DataRow("rename a ", "", "Syntax error in rename: Bad second parameter", DisplayName = "second path of 70000 bytes, as measured")]
+    [DataRow("chmod 644 ", "", "Syntax error in chmod 644 {0}: Bad second parameter", DisplayName = "attribute path of 70000 bytes")]
+    public void Parse_PathOf70000Bytes_FailsWithExit100AndCurlsMessage(string prefix, string suffix, string expectedFormat)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        string path = new('a', 70000);
+        string value = prefix + path + suffix;
+        string expected = string.Format(CultureInfo.InvariantCulture, expectedFormat, path);
+        diagnostics.Arrange("-Q command", $"{prefix}<70000 bytes>{suffix}");
+
+        SshTransferException failure = Assert.ThrowsExactly<SshTransferException>(() => SftpQuoteCommand.Parse(value, Home));
+        diagnostics.Act("failure", $"exit {failure.ExitCode}, message of {failure.Message.Length} characters");
+
+        diagnostics.Assert("exit code", CurlExitCode.TooLarge, failure.ExitCode);
+
+        Assert.AreEqual(CurlExitCode.TooLarge, failure.ExitCode);
         Assert.AreEqual(expected, failure.Message);
     }
 
