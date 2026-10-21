@@ -8,7 +8,7 @@ depends-on: [BL-2863, BL-2864]
 touches: [Curl.Conformance.UnitLibrary/UpstreamTest1707Script.cs, Curl.Conformance.UnitTests/UpstreamTest1707ScriptTests.cs, Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
 requirement: none
 created: 2026-10-19
-completed:
+completed: 2026-10-21
 ---
 # BL-2866 — Interpret upstream test1707.pl in C# against curl -h <option> and put cases 1707, 1708 and 1710 on the ratchet
 
@@ -38,3 +38,6 @@ Split from BL-2850. Needs the dispatch seam with `%CURL` bound (BL-2863) and the
 
 - 2026-10-19: Created.
 - 2026-10-21: Backlog -> Doing. Criteria at claim: 73f7d9a9 c5dc9aeb 309149d6.
+- 2026-10-21: Doing -> Backlog. Criteria changed: ratchet registration split to BL-2887 (UpstreamConformanceTests.cs held by BL-2841)
+- 2026-10-21: Backlog -> Doing. Criteria at claim: 3df242fa c5dc9aeb 309149d6.
+- 2026-10-21: Doing -> Done. UpstreamTest1707Script interprets test1707.pl; cases 1707, 1708, 1710 pass through it; ratchet registration in BL-2887
