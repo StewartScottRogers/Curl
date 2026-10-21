@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Networking.UnitLibrary/DnsAnswerDecoder.cs, Curl.Networking.UnitLibrary/DnsAnswer.cs, Curl.Networking.UnitLibrary/DnsMessageFailure.cs, Curl.Networking.UnitLibrary/DohQueryResult.cs, Curl.Networking.UnitLibrary/DohTraceLines.AnswerDecoding.cs, Curl.Networking.UnitLibrary/DnsServerQuery.cs, Curl.Networking.UnitLibrary/DohDnsResolver.AnswerDecoding.cs, Curl.Networking.UnitTests/DnsAnswerDecoderTests.cs, Curl.Networking.UnitTests/DohDnsResolverTraceTests.AnswerDecoding.cs, Curl.Networking.UnitTests/NetworkingAdversarialTests.cs, Curl.Networking.UnitTests/DohDnsResolverSubTransferTests.cs, Curl.Engine.UnitTests/EngineCompositionDohSubTransferTraceTests.cs, Curl.Engine.UnitTests/EngineCompositionDohTests.cs, Documentation/Planning/Decisions/ADR-0738-doh-answers-decode-nxdomain-and-cap-ttls-as-curl-8-22-0-does.md]
+touches: [Curl.Networking.UnitLibrary/DohTraceLines.cs, Curl.Networking.UnitLibrary/DohTraceLines.ExchangeFailures.cs, Curl.Networking.UnitLibrary/DohDnsResolver.cs, Curl.Networking.UnitLibrary/DohDnsResolver.SubTransferTrace.cs, Curl.Networking.UnitTests/DohDnsResolverTraceTests.cs, Curl.Networking.UnitTests/DohDnsResolverTraceTests.ExchangeFailures.cs, Curl.Networking.UnitLibrary/DnsAnswerDecoder.cs, Curl.Networking.UnitLibrary/DnsAnswer.cs, Curl.Networking.UnitLibrary/DnsMessageFailure.cs, Curl.Networking.UnitLibrary/DohQueryResult.cs, Curl.Networking.UnitLibrary/DohTraceLines.AnswerDecoding.cs, Curl.Networking.UnitLibrary/DnsServerQuery.cs, Curl.Networking.UnitLibrary/DohDnsResolver.AnswerDecoding.cs, Curl.Networking.UnitTests/DnsAnswerDecoderTests.cs, Curl.Networking.UnitTests/DohDnsResolverTraceTests.AnswerDecoding.cs, Curl.Networking.UnitTests/NetworkingAdversarialTests.cs, Curl.Networking.UnitTests/DohDnsResolverSubTransferTests.cs, Curl.Engine.UnitTests/EngineCompositionDohSubTransferTraceTests.cs, Curl.Engine.UnitTests/EngineCompositionDohTests.cs, Documentation/Planning/Decisions/ADR-0738-doh-answers-decode-nxdomain-and-cap-ttls-as-curl-8-22-0-does.md]
 requirement: none
 created: 2026-10-21
 completed:
@@ -70,9 +70,26 @@ If too big for one run, split it: the decoder change (CNAME skipped, no NoConten
   no `a DoH request is completed` line for that query, and no hostname/TTL/A lines), amend ADR-0738,
   build, run the fast tests, and measure `Curl.Networking.UnitLibrary` once.
 
+- 2026-10-21, lane 8, second claim. The stash did not apply because BL-2981 split `DohDnsResolver`,
+  `DohTraceLines` and `DohDnsResolverTraceTests` into partial files, so their post-split files were
+  added to `touches` (no task in Doing names them; BL-2980 touches only `HttpsRecordReportLine` and
+  `TcpConnector`). **Carried over** into the working tree (left for the shift's stash): the eight
+  stash files that applied cleanly (DnsAnswer, DnsAnswerDecoder, DnsMessageFailure, DnsServerQuery,
+  DohQueryResult, DnsAnswerDecoderTests, DohDnsResolverSubTransferTests, NetworkingAdversarialTests)
+  and the library side re-done on the split files: `DohTraceLines.cs` now holds `FailureLine`,
+  `DohTraceLines.AnswerDecoding.cs` only `DecodeFailureLine` (FormatAddress and the decoded-entry
+  lines gone), `DohTraceLines.ExchangeFailures.cs` deleted, `ReportOutcome` in
+  `DohDnsResolver.SubTransferTrace.cs`, and the `Report` call dropped from `DohDnsResolver.cs`.
+  `Curl.Networking.UnitLibrary` builds clean. **Left**: port the stash's
+  `DohDnsResolverTraceTests.cs` diff (`git diff 0725a3f9^1 0725a3f9 -- Curl.Networking.UnitTests/DohDnsResolverTraceTests.cs`)
+  onto the three split test files (`FormatAddress` tests go), change the Engine tests' 8.21.0 lines
+  (see the requeue note above), amend ADR-0738, build, fast tests, one quality run. Requeued only
+  because this claim's cost cap ($1.57) could not cover that.
+
 ## Log
 
 - 2026-10-21: Created.
 - 2026-10-21: Backlog -> Doing. Criteria at claim: 582ece38 47a1bf8a 2a446683.
 - 2026-10-21: Doing -> Backlog. Needs Curl.Engine.UnitTests (EngineCompositionDoh*Tests pin the 8.21.0 DoH lines), which BL-2921 in Doing touches; code is written and stashed, see Notes
 - 2026-10-21: Backlog -> Doing. Criteria at claim: 582ece38 47a1bf8a 2a446683.
+- 2026-10-21: Doing -> Backlog. Cost cap: library side ported onto BL-2981's split files and builds; trace and Engine tests, ADR amendment and quality run left, see Notes
