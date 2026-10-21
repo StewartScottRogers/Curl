@@ -38,3 +38,4 @@ If too big for one run, split it: the decoder change (CNAME skipped, no NoConten
 ## Log
 
 - 2026-10-21: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: 582ece38 47a1bf8a 2a446683.
