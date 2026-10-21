@@ -1,0 +1,41 @@
+---
+id: BL-2906
+title: Add a Curl_get_line counterpart (curl's file line reader) the unit-program ports reach, for unit3200
+priority: Normal
+assignee: Claude
+pipeline: feature
+depends-on: []
+touches: [Curl.Core.UnitLibrary/CurlFileLineReader.cs, Curl.Core.UnitTests/CurlFileLineReaderTests.cs]
+requirement: none
+created: 2026-10-21
+completed: 2026-10-21
+---
+# BL-2906 — Add a Curl_get_line counterpart (curl's file line reader) the unit-program ports reach, for unit3200
+
+## Goal
+
+Curl has a counterpart of curl 8.22.0's `Curl_get_line` (the line reader for cookie, alt-svc, HSTS and netrc files), so the port of `tests/unit/unit3200.c` (BL-2845) passes.
+
+## Context
+
+unit3200.c writes six files to the path its command names and reads them line by line: a last line without a newline gets one, a line longer than 4096 bytes is dropped (with the rest of the file when it is last), and a `^Z` byte is kept. Check whether `AltSvcFileLineParser`, `HstsFileLineParser`, `NetrcFile` or the cookie reader already behave so; where one differs, that is a fix with its own test (and its file in `touches`). Source: https://github.com/curl/curl/blob/curl-8_22_0/lib/curl_get_line.c.
+
+## Acceptance criteria
+
+- [x] A `Curl_get_line` counterpart reading a `Stream` gives every case of unit3200.c (line text, end of file, over-long line dropped).
+- [x] `Curl.Conformance.UnitProgram.UnitLibrary` can call the counterpart (public, or `InternalsVisibleTo Include="Curl.Conformance.UnitProgram.UnitLibrary"` in its library's csproj), so BL-2845 can port the program without touching this library.
+- [x] A focused unit test in the library's own `.UnitTests` project pins every row of the C program's table (ADR-0482).
+- [x] `dotnet build Curl.slnx -warnaserror` is clean, the fast tests pass, and the changed library keeps 100% line and branch coverage and complexity at most 10.
+
+## Notes
+
+- Added `Curl.Core.UnitLibrary/CurlFileLineReader.cs`. It is public, so `Curl.Conformance.UnitProgram.UnitLibrary` calls it without an `InternalsVisibleTo` and the csproj stays out of `touches`. `new CurlFileLineReader(stream, bufferLimit = 4096)`; `ReadLineAsync()` returns the line's bytes with its newline, or `null` for curl's `CURLE_TOO_LARGE`; `EndOfFile` is `feof`. It reads in `fgets` chunks of at most 127 bytes as curl does, so the file position after a too-large line matches.
+- Choices (sensible defaults): bytes, not a string, so `^Z` and every byte round-trip (the port decodes with Latin1); async, per "async all the way"; a read after a file's last `LINE\n` returns a lone `\n` with `EndOfFile` true, as curl 8.22.0's code does (unit3200 checks only `eof` there).
+- Existing readers: `AltSvcCache.MaxFileLineLength` (4093) and `HstsCache` already model the 4095 limits. The cookie-file and netrc readers were not checked here; filed BL-2915 for them (their projects are outside this task's `touches`).
+- Measured: `Measure-CodeQuality.ps1 -Library Curl.Core.UnitLibrary` reports 0 failing members; 14 new tests in `CurlFileLineReaderTests`; full build clean and all fast tests green.
+
+## Log
+
+- 2026-10-21: Created (split from BL-2845, which waits on it).
+- 2026-10-21: Backlog -> Doing. Criteria at claim: 9354eb61 3d228e1f d3a9ab15 099d1d27.
+- 2026-10-21: Doing -> Done. CurlFileLineReader reads a Stream as curl 8.22.0's Curl_get_line does, every unit3200 row pinned
