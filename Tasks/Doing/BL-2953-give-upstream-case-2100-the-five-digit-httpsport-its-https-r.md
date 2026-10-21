@@ -31,3 +31,4 @@ Found by BL-2920 (2026-10-21). Curl now sends the DoH HTTPS query first (ADR-072
 ## Log
 
 - 2026-10-21: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: 7ea7aab7 521a8aa5 c5f8cef6.
