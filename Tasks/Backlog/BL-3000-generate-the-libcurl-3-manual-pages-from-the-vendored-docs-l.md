@@ -1,5 +1,5 @@
 ---
-id: BL-2996
+id: BL-3000
 title: Generate the libcurl .3 manual pages from the vendored docs/libcurl Markdown and interpret test1222.pl's full deprecation check
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-21
 completed:
 ---
-# BL-2996 — Generate the libcurl .3 manual pages from the vendored docs/libcurl Markdown and interpret test1222.pl's full deprecation check
+# BL-3000 — Generate the libcurl .3 manual pages from the vendored docs/libcurl Markdown and interpret test1222.pl's full deprecation check
 
 ## Goal
 

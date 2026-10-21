@@ -22,7 +22,7 @@ so the vendored data (BL-2990) has none, and the script would `die "failed getti
 - The options not in all three places are reported in ordinal order, where the script's Perl hash order
   is undefined; any order is equally upstream's.
 - `test1222.pl` likewise needs generated `.3` pages; with none it prints its own skip line and exits 0,
-  which the interpretation does too. Its full check is BL-2996.
+  which the interpretation does too. Its full check is BL-3000.
 
 ## Consequences
 
