@@ -31,3 +31,4 @@ Measured on curl 8.22.0 (mingw, Schannel) on 2026-10-21 under BL-2916 with `Reco
 ## Log
 
 - 2026-10-21: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: ba73ee62 4edb6758 8e1ce02b.
