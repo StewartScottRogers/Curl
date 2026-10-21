@@ -37,9 +37,11 @@ function Get-AuditCadence {
 function Get-ShiftStartDecision {
     # Whether a shift may start while an audit runs: start, refuse, or (with -Continuous) wait.
     # A waiting "Fix CI failure" task starts the shift anyway: CI is red and the audit reads a
-    # fixed commit, so waiting for it only lengthens the red spell (AF-0203, BL-2196).
+    # fixed commit, so waiting for it only lengthens the red spell (AF-0203, BL-2196). An audit
+    # started with -AlongsideShift was meant to share the machine with a shift, so it holds none
+    # back, not even one a -Restart starts while it runs (BL-2989).
     param([object[]]$Processes, [bool]$IsContinuous, [bool]$CiFixWaiting = $false)
-    $audits = @($Processes | Where-Object { $_.CommandLine -match 'RunAudit\.ps1' -and $_.CommandLine -notmatch '\s-(NewTab|DryRun|SelfTest)\b' })
+    $audits = @($Processes | Where-Object { $_.CommandLine -match 'RunAudit\.ps1' -and $_.CommandLine -notmatch '\s-(NewTab|DryRun|SelfTest|AlongsideShift)\b' })
     if (-not $audits.Count -or $CiFixWaiting) { return 'start' }
     if ($IsContinuous) { return 'wait' }
     return 'refuse'
@@ -75,6 +77,9 @@ if ($TestAuditCadence) {
     & $check 'with -Continuous it waits instead' ((Get-ShiftStartDecision @($audit) $true) -eq 'wait') 'wait'
     & $check 'a dry run or no audit lets the shift start' ((Get-ShiftStartDecision @($dry) $false) -eq 'start') 'start'
     & $check 'a waiting CI fix task starts the shift despite a running audit' ((Get-ShiftStartDecision @($audit) $true $true) -eq 'start') 'start'
+    $alongside = [pscustomobject]@{ CommandLine = 'powershell -NoProfile -ExecutionPolicy Bypass -File Z:\repos\Curl\Audit\RunAudit.ps1 -AlongsideShift' }
+    & $check 'an audit run -AlongsideShift lets the shift start' ((Get-ShiftStartDecision @($alongside) $true) -eq 'start') 'start'
+    & $check 'beside a plain audit it still waits' ((Get-ShiftStartDecision @($alongside, $audit) $true) -eq 'wait') 'wait'
     exit $(if ($script:auditCadenceFailed) { 1 } else { 0 })
 }
 
