@@ -34,7 +34,7 @@ Split from BL-2847 (too big for one run). C sources: https://github.com/curl/cur
 - 3304 found Curl wrong: `TlsSessionCache.PeerKey` left out the client certificate, key and their types, so sessions made with one key were offered to a connection with another. Fixed as curl 8.22.0's `cf_ssl_peer_key_add_mtls` writes it: `:CCERT-<full path>`, `:KEY-<full path>`, `:CT-<TYPE>`, `:KT-<TYPE>` (upper-cased, each only when set and not empty), never the pass phrase, before `:IMPL-Curl:G`. Focused test `TlsSessionCacheTests.PeerKey_ClientCertificateKeyAndTypes_NamedUpperCasedAndWithoutThePassPhrase`. No ADR: it copies curl's format, which is internal (the file hashes the key) and not a design choice.
 - Each failing check writes `unit330N.c Assertion FAILED: <the C program's message>` to standard error; the cases verify only the exit code.
 - Measured: `Measure-CodeQuality.ps1 -Library Curl.Networking.UnitLibrary,Curl.Conformance.UnitProgram.UnitLibrary`: both 100% line, 100% branch, 0 failing members.
-- Follow-up filed: BL-2971 (curl's reuse compares the cert and key types case-insensitively; Curl's record equality does not).
+- Follow-up filed: BL-2974 (curl's reuse compares the cert and key types case-insensitively; Curl's record equality does not).
 
 ## Log
 

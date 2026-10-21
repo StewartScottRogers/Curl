@@ -1,5 +1,5 @@
 ---
-id: BL-2971
+id: BL-2974
 title: Reuse a connection whose --cert-type or --key-type differs only in case, as curl 8.22.0 does
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-21
 completed:
 ---
-# BL-2971 — Reuse a connection whose --cert-type or --key-type differs only in case, as curl 8.22.0 does
+# BL-2974 — Reuse a connection whose --cert-type or --key-type differs only in case, as curl 8.22.0 does
 
 ## Goal
 
