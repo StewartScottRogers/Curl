@@ -4,8 +4,8 @@ title: Fail a --connect-to IPv6 literal with exit 4 when the feature mask hides 
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-2982]
-touches: [Curl.Engine.UnitLibrary/EngineComposition.cs, Curl.Networking.UnitLibrary/TcpConnector.cs, Curl.Networking.UnitLibrary/TcpConnector.UdpTunnel.cs, Curl.Networking.UnitLibrary/UdpDatagramConnector.cs, Curl.Engine.UnitTests/EngineCompositionFeatureMaskTests.cs, Curl.Networking.UnitTests/TcpConnectorConnectToNotBuiltInTests.cs, Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
+depends-on: [BL-2982, BL-2856]
+touches: [Curl.Console/CurlComposition.cs, Curl.Engine.UnitLibrary/EngineComposition.cs, Curl.Networking.UnitLibrary/TcpConnector.cs, Curl.Networking.UnitLibrary/TcpConnector.UdpTunnel.cs, Curl.Networking.UnitLibrary/UdpDatagramConnector.cs, Curl.Engine.UnitTests/EngineCompositionFeatureMaskTests.cs, Curl.Networking.UnitTests/TcpConnectorConnectToNotBuiltInTests.cs, Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
 requirement: none
 created: 2026-10-21
 completed:
@@ -33,7 +33,12 @@ Split from BL-2982, which added the parse side in `Curl.Networking.UnitLibrary`:
 
 ## Notes
 
+- 2026-10-21 (lane 7, sizing pass before any edit): requeued behind BL-2856. Criterion 3 needs the conformance harness to pass a case's `!IPv6` to `CurlComposition.CreateRunner(featureMask:)`; today nothing in `Curl.Conformance.*` sets `EngineFeatureMask` (no case runs masked; 375 is not on the ratchet either). That wiring (`UpstreamCurlPlatform.WithoutFeatures`, `PlatformFor`, `RunCurlAsync`) is BL-2856's planned work, and BL-2856 can finish with 1454's first difference in its Notes, so there is no cycle.
+- Where the mask must reach: the connectors are built before the dispatch, so `dispatch.FeatureMask` is not available in `EngineComposition`. The harness path is `CurlComposition.CreateDialingTransferDispatch` (`Curl.Console/CurlComposition.cs`, which already has `featureMask`), which calls `EngineComposition.CreateTcpConnector` and `CreatePoolingConnector`. Plan: add an optional `EngineFeatureMask featureMask = EngineFeatureMask.None` to `CreateTcpConnector`, `CreatePoolingConnector` and `CreateUdpDatagramConnector`, each building `new ConnectToMappings(network.ConnectTo, hidesIpv6: featureMask.HasFlag(EngineFeatureMask.Ipv6))`, and pass it from `CreateDialingTransferDispatch`. Added `Curl.Console/CurlComposition.cs` to `touches` for that (no Doing task holds it).
+- Connector change: at the four sites (`TcpConnector.cs` lines ~592 and ~666, `TcpConnector.UdpTunnel.cs` ~60, `UdpDatagramConnector.cs` ~118) fail with `_resolveOverrides.ParseError is null ? destination.ParseErrorCode : CurlExitCode.SetoptOptionSyntax`, so a `--resolve` error stays exit 49.
+
 ## Log
 
 - 2026-10-21: Created.
 - 2026-10-21: Backlog -> Doing. Criteria at claim: 28c72b3f dd7a4945 44346086 dd1cc079.
+- 2026-10-21: Doing -> Backlog. Needs BL-2856 first: the conformance harness does not yet pass a case's !IPv6 as EngineFeatureMask, so case 1454 cannot pass
