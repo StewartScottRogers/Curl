@@ -60,3 +60,4 @@ Deferred task BL-693 (`--krb` for FTP) is unrelated: it is about FTP `AUTH GSSAP
 - 2026-10-19: Created.
 - 2026-10-21: Backlog -> Doing. Criteria at claim: f2c0ce47 cb803305 519beea4 dd1cc079 620ebead.
 - 2026-10-21: Doing -> Backlog. Needs Curl.Console/CurlComposition.cs (a securityContexts parameter on the dialing CreateRunner), which BL-2910 in Doing touches; depends on BL-2910
+- 2026-10-21: Backlog -> Doing. Criteria at claim: f2c0ce47 cb803305 519beea4 dd1cc079 620ebead.
