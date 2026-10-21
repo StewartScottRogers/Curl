@@ -51,6 +51,12 @@ public sealed partial class UpstreamConformanceTests
 
     private static readonly string UpstreamTestDataFolder = Path.Combine(AppContext.BaseDirectory, "UpstreamTestData");
 
+    // The Perl scripts a case's <command type="perl"> runs, each interpreted in C# (BL-2887).
+    private static readonly Dictionary<string, Func<UpstreamCurlInvocation, Func<UpstreamCurlInvocation, Task<int>>, Task<int>>> PerlCommandScripts = new()
+    {
+        [UpstreamTest1707Script.ScriptName] = new UpstreamTest1707Script(UpstreamTestDataFolder).RunAsync,
+    };
+
     // Beside the tests rather than under the system's temporary folder, whose path can hold a
     // space that an unquoted %LOGDIR in a command would split, as upstream's relative log/ never does.
     private static readonly string LogFolder = Path.Combine(AppContext.BaseDirectory, "log");
@@ -158,7 +164,7 @@ public sealed partial class UpstreamConformanceTests
         DirectoryInfo logDirectory = Directory.CreateDirectory(Path.Combine(LogFolder, $"test{testNumber}-{Guid.NewGuid():N}"));
         try
         {
-            UpstreamCaseRunner runner = new(RunCurlAsync, PlatformFor(testFile), TimeProvider.System, TimeLimit, SshServer, Http2Server, Http3Server, libTests: LibTests, unitPrograms: UnitPrograms.Ported);
+            UpstreamCaseRunner runner = new(RunCurlAsync, PlatformFor(testFile), TimeProvider.System, TimeLimit, SshServer, Http2Server, Http3Server, libTests: LibTests, unitPrograms: UnitPrograms.Ported, perlCommandScripts: PerlCommandScripts);
             return await Task.Run(() => runner.RunAsync(testNumber, testFile, logDirectory.FullName, certificateDirectory: CertificateFolder.Value, sourceDirectory: UpstreamTestDataFolder)).WaitAsync(CaseHangLimit);
         }
         catch (TimeoutException)

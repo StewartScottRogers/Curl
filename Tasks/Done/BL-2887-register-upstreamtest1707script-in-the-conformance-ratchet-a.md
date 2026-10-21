@@ -8,7 +8,7 @@ depends-on: [BL-2866]
 touches: [Curl.Conformance.UnitTests/UpstreamConformanceTests.cs, Curl.Conformance.UnitTests/PassingUpstreamCases.txt, Curl.Conformance.UnitTests/UpstreamTestData/README.md]
 requirement: none
 created: 2026-10-21
-completed:
+completed: 2026-10-21
 ---
 # BL-2887 — Register UpstreamTest1707Script in the conformance ratchet and list cases 1707, 1708 and 1710
 
@@ -24,13 +24,16 @@ Steps: in `RunCaseOnceAsync` (and the manual `NamedUpstreamCase` path if it buil
 
 ## Acceptance criteria
 
-- [ ] Cases 1707, 1708 and 1710 each end `Passed` with `$env:CURL_UPSTREAM_CASE='<n>'` on Windows and are on `PassingUpstreamCases.txt`.
-- [ ] `UpstreamTestData/README.md` lists `docs/cmdline-opts/curl.txt` and where it came from.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean and the fast tests pass.
+- [x] Cases 1707, 1708 and 1710 each end `Passed` with `$env:CURL_UPSTREAM_CASE='<n>'` on Windows and are on `PassingUpstreamCases.txt`.
+- [x] `UpstreamTestData/README.md` lists `docs/cmdline-opts/curl.txt` and where it came from.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean and the fast tests pass.
 
 ## Notes
+
+Registered one static `PerlCommandScripts` dictionary in `UpstreamConformanceTests.cs`; BL-2865 adds its own entries there. Cases 1707, 1708, 1710 pass on Windows via the Manual named-case test.
 
 ## Log
 
 - 2026-10-21: Created.
 - 2026-10-21: Backlog -> Doing. Criteria at claim: 73f7d9a9 51074f64 161fef9c.
+- 2026-10-21: Doing -> Done. Registered UpstreamTest1707Script; cases 1707, 1708, 1710 pass and are listed

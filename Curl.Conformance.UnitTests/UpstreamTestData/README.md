@@ -43,9 +43,9 @@ the test output; `.gitattributes` marks the files `-text`.
 `docs/` and `src/` hold what upstream's documentation check scripts open (BL-2864), byte for byte, at
 the same relative paths: `docs/options-in-versions` and `docs/VERSIONS.md` (test971.pl),
 `docs/cmdline-opts/*.md` (298 files; test971.pl, test1486.pl's `write-out.md` and test1707.pl) and
-`src/tool_writeout.c` (test1486.pl). Upstream's `docs/cmdline-opts/curl.txt` is not here: `managen`
-generates it at build time and the tarball does not ship it, so an interpretation of test1707 builds
-that text from the `.md` files. The csproj copies them to the test output; `.gitattributes` marks them `-text`.
+`src/tool_writeout.c` (test1486.pl). `docs/cmdline-opts/curl.txt` is real curl 8.22.0's `curl -M` text (ADR-0719): `managen`
+generates it at build time and the tarball does not ship it, so it is vendored from the reference
+curl and `Update-UpstreamTestData.ps1` does not refresh it. test1707.pl reads it. The csproj copies them to the test output; `.gitattributes` marks them `-text`.
 
 ## Refresh to another tag
 
