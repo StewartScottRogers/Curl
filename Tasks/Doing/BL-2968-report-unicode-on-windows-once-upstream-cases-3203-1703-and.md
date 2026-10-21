@@ -38,3 +38,4 @@ Where the fix lands outside `touches`, add the folder in the same commit. Each p
 ## Log
 
 - 2026-10-21: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: de350832 ba7c7a94 6c1653fd dd1cc079.
