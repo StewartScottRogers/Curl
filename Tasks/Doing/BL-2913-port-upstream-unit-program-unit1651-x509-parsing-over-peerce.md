@@ -31,3 +31,4 @@ Split from BL-2843. Follow ADR-0711 (shape) and ADR-0723: unit1651 is compiled o
 ## Log
 
 - 2026-10-21: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: 4149ed1e fca137f3 450b9915.
