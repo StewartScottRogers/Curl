@@ -33,3 +33,4 @@ Gap scorecard 2026-10-19_1329 has both `excluded | reference-lacks:smb` (the ref
 ## Log
 
 - 2026-10-19: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: f307dbe0 3ac73dae 54981e65 dd1cc079 620ebead.
