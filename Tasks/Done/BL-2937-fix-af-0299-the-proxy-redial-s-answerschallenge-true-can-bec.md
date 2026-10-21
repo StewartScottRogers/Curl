@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/TcpConnector.cs, Curl.Networking.UnitTests/TcpConnectorProxyRedialTests.cs]
 requirement: none
 created: 2026-10-21
-completed:
+completed: 2026-10-21
 ---
 # BL-2937 â€” Fix AF-0299: The proxy redial's answersChallenge = true can become false with no test failing, so the reconnect after a closed 407 acts as a first request
 
@@ -41,12 +41,21 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Test-only fix: `ConnectAsync_WithProxyAnyAuth_WhenTheRedialledType1DrawsABareNtlm407_FailsWithThe407`
+  (`TcpConnectorProxyRedialTests.cs`) redials after a closing NTLM 407 and answers the redialled
+  Type 1 with a bare NTLM 407, which must be curl's `NTLM handshake failure (internal error)`.
+  With `answersChallenge = false` at the redial site (now `TcpConnector.cs:1348`, 1311 in the
+  finding) the second 407 is taken as a first request and the test fails. Verified by applying
+  the mutant by hand (test failed) and restoring it (test passed); a lane may not run the audit
+  office's mutation tool. No production code changed, so no Measure-CodeQuality run.
 
 ## Log
 
 - 2026-10-21: Created.
 - 2026-10-21: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-21: Doing -> Done. Redial test kills the answersChallenge mutant; build and Networking fast tests green
