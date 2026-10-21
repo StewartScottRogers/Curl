@@ -31,3 +31,4 @@ Found by BL-2920 (2026-10-21). ADR-0727 made `--doh-url` send the HTTPS (type 65
 ## Log
 
 - 2026-10-21: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: f7fac918 07984293 8cebb2bf.
