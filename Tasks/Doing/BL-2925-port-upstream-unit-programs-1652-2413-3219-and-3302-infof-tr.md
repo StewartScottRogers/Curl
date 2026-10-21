@@ -37,3 +37,4 @@ One `IUnitProgram` per case in `Curl.Conformance.UnitProgram.UnitLibrary/Dns/Eas
 ## Log
 
 - 2026-10-21: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: c0969e39 2e3e75ab aca7e1a2 dd1cc079.
