@@ -32,3 +32,4 @@ Split from BL-2846 for size. curl 8.22.0 `tests/unit/unit3400.c` tests `Curl_cap
 ## Log
 
 - 2026-10-21: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: 69e442a9 9bdd4a42 c29b1954 dd1cc079.
