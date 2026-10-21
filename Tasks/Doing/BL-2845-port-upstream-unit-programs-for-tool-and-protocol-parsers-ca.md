@@ -49,3 +49,4 @@ The C sources are at https://github.com/curl/curl/tree/curl-8_22_0/tests/tunit a
 - 2026-10-19: Created.
 - 2026-10-21: Backlog -> Doing. Criteria at claim: 484e6579 2e3e75ab 33133e4f c0723528 620ebead.
 - 2026-10-21: Doing -> Backlog. Waits on BL-2899 to BL-2907: ten of the eleven programs need product counterparts outside this task (Output, Console moves, Core, Ftp, Ssh, Api); see Notes
+- 2026-10-21: Backlog -> Doing. Criteria at claim: 484e6579 2e3e75ab 33133e4f c0723528 620ebead.
