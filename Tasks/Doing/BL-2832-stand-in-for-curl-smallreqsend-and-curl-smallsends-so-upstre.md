@@ -39,3 +39,4 @@ Follow ADR-0687 (`CURL_FTP_PWD_STOP`), ADR-0678 and ADR-0698: `UpstreamConforman
 ## Log
 
 - 2026-10-19: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: f1265d17 4c58990d 3c98e074 a9d93e0e 620ebead.
