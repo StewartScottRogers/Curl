@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Conformance.UnitTests/PassingUpstreamCases.txt, Curl.Conformance.UnitTests/UpstreamConformanceTests.Http3Cases.cs, Curl.Conformance.UnitLibrary/UpstreamPlatformFeatureTable.cs]
+touches: [Curl.Conformance.UnitTests/PassingUpstreamCases.txt, Curl.Conformance.UnitTests/UpstreamConformanceTests.Http3Cases.cs, Curl.Conformance.UnitLibrary/UpstreamPlatformFeatureTable.cs, Curl.Conformance.UnitTests/UpstreamConformanceTests.cs, Curl.Conformance.UnitTests/UpstreamConformanceTests.DebugStandIns.cs, Curl.Conformance.UnitTests/UpstreamCurlPlatformTests.Http3.cs, Curl.Conformance.UnitLibrary/CLAUDE.md]
 requirement: none
 created: 2026-10-19
-completed:
+completed: 2026-10-21
 ---
 # BL-2838 — Run the HTTP/3 upstream cases 2500, 2501, 2502 and 2503 through the HTTP/3 stand-in
 
@@ -28,10 +28,10 @@ Lanes only run Windows, so the pass on Linux is judged by the `CI` workflow.
 
 ## Acceptance criteria
 
-- [ ] A new ADR states for `http/3` whether the harness reports it to cases 2500, 2501, 2502 and 2503 and why, consistent with ADR-0540.
-- [ ] If reported: a unit test in `UpstreamCurlPlatformTests` pins that only a case naming the stand-in server gets `http/3`, and cases 2500, 2501, 2502 and 2503 are on `PassingUpstreamCases.txt`, `Inconclusive` on Windows and `Passed` in `CI` on Linux and macOS.
-- [ ] If not reported: each case's reason is in the ADR and in Notes, and no case is left unexplained.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean, `dotnet test --filter "TestCategory!=Integration"` passes, and each changed library keeps 100% line and branch coverage.
+- [x] A new ADR states for `http/3` whether the harness reports it to cases 2500, 2501, 2502 and 2503 and why, consistent with ADR-0540.
+- [x] If reported: a unit test in `UpstreamCurlPlatformTests` pins that only a case naming the stand-in server gets `http/3`, and cases 2500, 2501, 2502 and 2503 are on `PassingUpstreamCases.txt`, `Inconclusive` on Windows and `Passed` in `CI` on Linux and macOS.
+- [x] If not reported: each case's reason is in the ADR and in Notes, and no case is left unexplained.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean, `dotnet test --filter "TestCategory!=Integration"` passes, and each changed library keeps 100% line and branch coverage.
 
 ## Notes
 
@@ -39,3 +39,4 @@ Lanes only run Windows, so the pass on Linux is judged by the `CI` workflow.
 
 - 2026-10-19: Created.
 - 2026-10-21: Backlog -> Doing. Criteria at claim: 9bc15d2e 55a9b3c6 9830c497 7bd8d990.
+- 2026-10-21: Doing -> Done. Upstream HTTP/3 cases 2500-2503 run over the HTTP/3 stand-in and are on the ratchet, held on Linux and macOS (ADR-0720)

@@ -48,7 +48,7 @@ public sealed partial class UpstreamConformanceTests
     internal static UpstreamCurlPlatform PlatformFor(byte[] testFile)
     {
         string text = Encoding.Latin1.GetString(testFile);
-        UpstreamCurlPlatform platform = DebugStandInRules.Any(rule => rule(text)) ? Platform.WithFeatures(["Debug"]) : Platform;
+        UpstreamCurlPlatform platform = WithHttp3StandIn(DebugStandInRules.Any(rule => rule(text)) ? Platform.WithFeatures(["Debug"]) : Platform, text);
         return text.Contains("\n<server>\n", StringComparison.Ordinal) && text.Contains("\ndns\n", StringComparison.Ordinal)
             ? platform.WithFeatures(["override-dns"])
             : platform;

@@ -96,10 +96,10 @@ public sealed partial class UpstreamConformanceTests
     public async Task UpstreamCase_RunThroughCurl_HoldsTheRatchet(int testNumber)
     {
         var diagnostics = TestDiagnostics.For(TestContext);
-        bool isListed = PassingCases.Contains(testNumber) && !(OperatingSystem.IsMacOS() && NeedsTls13ServerCases.Contains(testNumber));
+        byte[] testFile = await File.ReadAllBytesAsync(Path.Combine(UpstreamTestDataFolder, $"test{testNumber}{UpstreamTestFileExtension}"));
+        bool isListed = PassingCases.Contains(testNumber) && !(OperatingSystem.IsMacOS() && NeedsTls13ServerCases.Contains(testNumber)) && IsHeldOnThisPlatform(testFile);
         diagnostics.Arrange("upstream case number", testNumber);
         diagnostics.Arrange("case is on the passing list", isListed);
-        byte[] testFile = await File.ReadAllBytesAsync(Path.Combine(UpstreamTestDataFolder, $"test{testNumber}{UpstreamTestFileExtension}"));
         UpstreamCaseOutcome outcome;
         using (diagnostics.Phase("run case through curl"))
         {
@@ -181,7 +181,7 @@ public sealed partial class UpstreamConformanceTests
     // Curl as the command composes it, every TCP dial reaching the case's in-memory servers through
     // InMemoryServerTcpDialer, so TcpConnector's proxy tunnel and PROXY-line code stays in the path (ADR-0460).
     // The default config file is looked for only where the case's <setenv> points CURL_HOME, XDG_CONFIG_HOME or HOME (BL-1977).
-    // It parses as a QUIC build, though no platform reports http/3, so upstream's http/3 cases skip as for the reference curl (ADR-0540, BL-2370).
+    // It parses as a QUIC build, though no platform reports http/3 (ADR-0540), so the http/3 cases, to which the harness reports it, run over the stand-in (ADR-0720, BL-2838).
     internal static Task<int> RunCurlAsync(UpstreamCurlInvocation invocation) =>
         CurlComposition.CreateRunner(
             invocation.StandardOutput,
