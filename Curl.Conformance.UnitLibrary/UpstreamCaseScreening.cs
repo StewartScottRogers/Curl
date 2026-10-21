@@ -326,7 +326,8 @@ internal static class UpstreamCaseScreening
     /// every one of its <c>&lt;features&gt;</c>, such as <c>Schannel</c> off Windows, so the ratchet
     /// can hold a listed case only where it can run (ADR-0488). A feature in <paramref name="features"/>
     /// that no platform reports, such as the harness's <c>Debug</c> stand-in, counts as met on every
-    /// platform, since the harness stands in for it there too (ADR-0497).
+    /// platform, since the harness stands in for it there too (ADR-0497); a feature every platform reports that
+    /// <paramref name="features"/> lacks, which the harness's feature mask took off, counts as absent on every platform (BL-2856).
     /// </summary>
     /// <param name="testCase">The expanded file, parsed.</param>
     /// <param name="features">The features Curl reports on this platform, with any the harness stands in for.</param>
@@ -336,8 +337,9 @@ internal static class UpstreamCaseScreening
         ArgumentNullException.ThrowIfNull(testCase);
         ArgumentNullException.ThrowIfNull(features);
         string[] standIns = [.. features.Where(feature => !UpstreamCurlPlatform.All.Any(platform => platform.Features.Contains(feature)))];
+        string[] hidden = [.. UpstreamPlatformFeatureTable.Common.Where(feature => !features.Contains(feature))];
         return UnsupportedFeature(testCase, features) is { } reason
-            && UpstreamCurlPlatform.All.Any(platform => UnsupportedFeature(testCase, platform.Features.Concat(standIns).ToHashSet(StringComparer.Ordinal)) is null)
+            && UpstreamCurlPlatform.All.Any(platform => UnsupportedFeature(testCase, platform.WithFeatures(standIns).WithoutFeatures(hidden).Features) is null)
             ? reason
             : null;
     }

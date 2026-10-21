@@ -158,7 +158,8 @@ public sealed partial class UpstreamConformanceTests
         DirectoryInfo logDirectory = Directory.CreateDirectory(Path.Combine(LogFolder, $"test{testNumber}-{Guid.NewGuid():N}"));
         try
         {
-            UpstreamCaseRunner runner = new(RunCurlAsync, PlatformFor(testFile), TimeProvider.System, TimeLimit, SshServer, Http2Server, Http3Server, libTests: LibTests, unitPrograms: UnitPrograms.Ported, perlCommandScripts: UpstreamPerlCommandScripts.All);
+            EngineFeatureMask featureMask = FeatureMaskFor(testFile);
+            UpstreamCaseRunner runner = new(invocation => RunCurlAsync(invocation, featureMask), PlatformFor(testFile), TimeProvider.System, TimeLimit, SshServer, Http2Server, Http3Server, libTests: LibTests, unitPrograms: UnitPrograms.Ported, perlCommandScripts: UpstreamPerlCommandScripts.All);
             return await Task.Run(() => runner.RunAsync(testNumber, testFile, logDirectory.FullName, certificateDirectory: CertificateFolder.Value, sourceDirectory: UpstreamTestDataFolder)).WaitAsync(CaseHangLimit);
         }
         catch (TimeoutException)
@@ -182,7 +183,10 @@ public sealed partial class UpstreamConformanceTests
     // InMemoryServerTcpDialer, so TcpConnector's proxy tunnel and PROXY-line code stays in the path (ADR-0460).
     // The default config file is looked for only where the case's <setenv> points CURL_HOME, XDG_CONFIG_HOME or HOME (BL-1977).
     // It parses as a QUIC build, though no platform reports http/3 (ADR-0540), so the http/3 cases, to which the harness reports it, run over the stand-in (ADR-0720, BL-2838).
-    internal static Task<int> RunCurlAsync(UpstreamCurlInvocation invocation) =>
+    // Under the case's feature mask, curl answers as a build without the features it hides (BL-2856).
+    internal static Task<int> RunCurlAsync(UpstreamCurlInvocation invocation) => RunCurlAsync(invocation, EngineFeatureMask.None);
+
+    internal static Task<int> RunCurlAsync(UpstreamCurlInvocation invocation, EngineFeatureMask featureMask) =>
         CurlComposition.CreateRunner(
             invocation.StandardOutput,
             invocation.StandardError,
@@ -207,6 +211,7 @@ public sealed partial class UpstreamConformanceTests
             webSocketRandomSource: WebSocketRandomSourceFor(invocation.EnvironmentVariables),
             fileSystem: FileSystemFor(invocation.EnvironmentVariables),
             securityContexts: SecurityContextsFor(invocation.EnvironmentVariables),
+            featureMask: featureMask,
             standardOutputIsTerminal: StandardOutputIsTerminalFor(invocation.EnvironmentVariables)).RunAsync(ArgumentsFor(invocation));
 
     // A ported libtest program's engine, in place of curl (BL-2558, ADR-0658): the managed Libcurl engine, every TCP

@@ -55,9 +55,9 @@ public sealed class UpstreamCurlPlatform
         OperatingSystemName = operatingSystemName;
     }
 
-    private UpstreamCurlPlatform(UpstreamCurlPlatform basis, IEnumerable<string> extraFeatures)
+    private UpstreamCurlPlatform(UpstreamCurlPlatform basis, IEnumerable<string> extraFeatures, IEnumerable<string> hiddenFeatures)
     {
-        Features = basis.Features.Concat(extraFeatures).ToHashSet(StringComparer.Ordinal);
+        Features = basis.Features.Concat(extraFeatures).Except(hiddenFeatures, StringComparer.Ordinal).ToHashSet(StringComparer.Ordinal);
         NullDevice = basis.NullDevice;
         OperatingSystemName = basis.OperatingSystemName;
     }
@@ -86,7 +86,20 @@ public sealed class UpstreamCurlPlatform
     public UpstreamCurlPlatform WithFeatures(IEnumerable<string> extraFeatures)
     {
         ArgumentNullException.ThrowIfNull(extraFeatures);
-        return new UpstreamCurlPlatform(this, extraFeatures);
+        return new UpstreamCurlPlatform(this, extraFeatures, []);
+    }
+
+    /// <summary>
+    /// Returns this platform without some features, for a case run with Curl's feature mask hiding them, as
+    /// upstream's suite runs a case naming <c>!proxy</c> on a build without proxy support (ADR-0746, BL-2856);
+    /// this platform is unchanged.
+    /// </summary>
+    /// <param name="hiddenFeatures">The features to take off, spelled as upstream spells them.</param>
+    /// <returns>A platform with this one's features but <paramref name="hiddenFeatures"/>, null device and operating system name.</returns>
+    public UpstreamCurlPlatform WithoutFeatures(IEnumerable<string> hiddenFeatures)
+    {
+        ArgumentNullException.ThrowIfNull(hiddenFeatures);
+        return new UpstreamCurlPlatform(this, [], hiddenFeatures);
     }
 
     /// <summary>The value of <c>%DEV_NULL</c>.</summary>
