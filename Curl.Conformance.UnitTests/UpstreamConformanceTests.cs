@@ -12,6 +12,7 @@ using Curl.Conformance.Http2Server;
 using Curl.Conformance.Http3Server;
 using Curl.Conformance.LibTest;
 using Curl.Conformance.SshServer;
+using Curl.Conformance.UnitProgram;
 using Curl.Console;
 using Curl.Engine;
 using Curl.Networking;
@@ -387,7 +388,7 @@ public sealed class UpstreamConformanceTests
         DirectoryInfo logDirectory = Directory.CreateDirectory(Path.Combine(LogFolder, $"test{testNumber}-{Guid.NewGuid():N}"));
         try
         {
-            UpstreamCaseRunner runner = new(RunCurlAsync, PlatformFor(testFile), TimeProvider.System, TimeLimit, SshServer, Http2Server, Http3Server, libTests: LibTests);
+            UpstreamCaseRunner runner = new(RunCurlAsync, PlatformFor(testFile), TimeProvider.System, TimeLimit, SshServer, Http2Server, Http3Server, libTests: LibTests, unitPrograms: UnitPrograms.Ported);
             return await Task.Run(() => runner.RunAsync(testNumber, testFile, logDirectory.FullName, certificateDirectory: CertificateFolder.Value, sourceDirectory: UpstreamTestDataFolder)).WaitAsync(CaseHangLimit);
         }
         catch (TimeoutException)

@@ -33,7 +33,7 @@ internal static class UpstreamCaseScreening
     /// <summary>The reason a case is skipped whose <c>&lt;tool&gt;</c> names a libtest program with no port yet.</summary>
     public const string LibTestNotPorted = "libtest program not ported";
 
-    /// <summary>The reason a case is skipped whose <c>&lt;tool&gt;</c> names a program other than a libtest one (a <c>unitNNNN</c> or <c>toolNNNN</c>).</summary>
+    /// <summary>The reason a case is skipped whose <c>&lt;tool&gt;</c> names a program other than a libtest one in a case without the <c>unittest</c> feature, whose unit program is screened instead (ADR-0711).</summary>
     public const string ToolNotRun = "the harness does not act on <client><tool>";
 
     // runtests.pl at curl-8_22_0 never reads a <verify><data> (test301's placeholder "[insert full protocol
@@ -86,12 +86,19 @@ internal static class UpstreamCaseScreening
     /// runs in place of Perl (BL-2863); <see langword="null"/> for none, so every <c>&lt;command type="perl"&gt;</c>
     /// case is skipped.
     /// </param>
+    /// <param name="isPortedUnitProgram">
+    /// Whether a unit program, by name (<c>unit1302</c>, <c>tool1394</c>), has a port the runner can run (BL-2841,
+    /// ADR-0711); <see langword="null"/> for none, so every <c>unittest</c> case is skipped as having no port.
+    /// </param>
+    /// <param name="testNumber">The case's number, which names the unit program of a <c>unittest</c> case with no <c>&lt;tool&gt;</c>.</param>
     /// <returns>A sentence saying why the case is skipped, or <see langword="null"/> when it can run.</returns>
-    public static string? FindSkipReason(UpstreamTestFileExpansion expansion, UpstreamTestCase testCase, IReadOnlySet<string> features, bool emulatesHttp2 = false, bool emulatesHttp3 = false, Func<string, bool>? isPortedLibTest = null, Func<string, bool>? interpretsPerlScript = null)
+    public static string? FindSkipReason(UpstreamTestFileExpansion expansion, UpstreamTestCase testCase, IReadOnlySet<string> features, bool emulatesHttp2 = false, bool emulatesHttp3 = false, Func<string, bool>? isPortedLibTest = null, Func<string, bool>? interpretsPerlScript = null, Func<string, bool>? isPortedUnitProgram = null, int testNumber = 0)
     {
         HashSet<string> standIns = StandIns(emulatesHttp2, emulatesHttp3);
         Func<string, bool> isPorted = OrNone(isPortedLibTest);
         Func<string, bool> interpretsScript = OrNone(interpretsPerlScript);
+        string? unitProgram = UnitProgramName(testCase, testNumber);
+        IReadOnlySet<string> caseFeatures = CaseFeatures(testCase, testNumber, features, isPortedUnitProgram);
         Func<string?>[] checks =
         [
             () => expansion.ConditionError,
@@ -99,15 +106,15 @@ internal static class UpstreamCaseScreening
             () => UnsupportedInstruction(expansion),
             () => CurlConfigComparison(testCase),
             () => UnsupportedPart(testCase, "client", ClientParts),
-            () => UnrunTool(testCase, isPorted),
+            () => unitProgram is null ? UnrunTool(testCase, isPorted) : UnportedUnitProgram(unitProgram, OrNone(isPortedUnitProgram)),
             () => UnsupportedPart(testCase, "verify", VerifyParts),
             () => UninterpretedCheck(testCase, "client", "precheck", line => UpstreamLibTestCheckLine.Parse(line) is { } check && isPorted(check.Program)),
             () => UninterpretedCheck(testCase, "verify", "postcheck", _ => false),
             () => UnsupportedServer(testCase, standIns),
             () => FtpDataConnection(testCase),
             () => UploadOffMailServer(testCase),
-            () => UnsupportedFeature(testCase, features),
-            () => UnsupportedCommand(testCase, interpretsScript),
+            () => UnsupportedFeature(testCase, caseFeatures),
+            () => UnsupportedCommand(testCase, interpretsScript, unitProgram),
             () => UnsupportedServerCommand(testCase),
             () => InternetHost(testCase),
             () => UnsupportedFileName(testCase, "client"),
@@ -178,6 +185,65 @@ internal static class UpstreamCaseScreening
         string tool = UpstreamTestPartBodies.Text(testCase.Find("client", "tool")).Trim();
         return tool.Length > 3 && tool.StartsWith("lib", StringComparison.Ordinal) && tool[3..].All(char.IsAsciiDigit) ? tool : null;
     }
+
+    /// <summary>
+    /// The unit program a <c>unittest</c> case runs (ADR-0711): the <c>unit&lt;n&gt;</c> or <c>tool&lt;n&gt;</c> its
+    /// <c>&lt;client&gt;&lt;tool&gt;</c> line names (<c>tool%TESTNUMBER</c> once expanded, <c>unit1305</c>), or
+    /// <c>unit&lt;testNumber&gt;</c> when it has no <c>&lt;tool&gt;</c>, as <c>runtests.pl</c> runs one;
+    /// <see langword="null"/> for a case without the <c>unittest</c> feature or whose tool is another kind of program.
+    /// </summary>
+    /// <param name="testCase">The parsed, expanded case.</param>
+    /// <param name="testNumber">The case's number.</param>
+    /// <returns>The program's name, or <see langword="null"/>.</returns>
+    public static string? UnitProgramName(UpstreamTestCase testCase, int testNumber)
+    {
+        ArgumentNullException.ThrowIfNull(testCase);
+        if (!UpstreamTestPartBodies.Lines(testCase.Find("client", "features")).Contains(UnitTestFeature, StringComparer.Ordinal))
+        {
+            return null;
+        }
+
+        string tool = UpstreamTestPartBodies.Text(testCase.Find("client", "tool")).Trim();
+        return tool.Length == 0 ? $"unit{testNumber.ToString(System.Globalization.CultureInfo.InvariantCulture)}" : UnitProgramPrefixes.Any(prefix => IsNumberedProgram(tool, prefix)) ? tool : null;
+    }
+
+    /// <summary>The feature upstream's unit test cases name, <c>unittest</c>.</summary>
+    public const string UnitTestFeature = "unittest";
+
+    // The features a ported unit program meets for its case (ADR-0711): unittest itself, and Debug and TrackMemory,
+    // which describe the C build's debug hooks and allocator tracking that the port needs neither of.
+    private static readonly string[] UnitProgramFeatures = [UnitTestFeature, "Debug", "TrackMemory"];
+
+    private static readonly string[] UnitProgramPrefixes = ["unit", "tool"];
+
+    private static bool IsNumberedProgram(string tool, string prefix) =>
+        tool.Length > prefix.Length && tool.StartsWith(prefix, StringComparison.Ordinal) && !tool.AsSpan(prefix.Length).ContainsAnyExceptInRange('0', '9');
+
+    /// <summary>
+    /// The features a case is screened against: <paramref name="features"/>, and, for a <c>unittest</c> case whose
+    /// unit program is ported, <c>unittest</c>, <c>Debug</c> and <c>TrackMemory</c> too, so the platform reports
+    /// <c>unittest</c> only through the table of ported programs, never as a feature of its own (ADR-0711).
+    /// </summary>
+    /// <param name="testCase">The parsed, expanded case.</param>
+    /// <param name="testNumber">The case's number.</param>
+    /// <param name="features">The features Curl reports.</param>
+    /// <param name="isPortedUnitProgram">Whether a unit program, by name, has a port; <see langword="null"/> for none.</param>
+    /// <returns>The features to screen the case against.</returns>
+    public static IReadOnlySet<string> CaseFeatures(UpstreamTestCase testCase, int testNumber, IReadOnlySet<string> features, Func<string, bool>? isPortedUnitProgram)
+    {
+        ArgumentNullException.ThrowIfNull(features);
+        return UnitProgramName(testCase, testNumber) is { } program && OrNone(isPortedUnitProgram)(program)
+            ? features.Union(UnitProgramFeatures).ToHashSet(StringComparer.Ordinal)
+            : features;
+    }
+
+    /// <summary>The reason a <c>unittest</c> case is skipped whose unit program has no port yet.</summary>
+    /// <param name="program">The program's name, such as <c>unit1302</c>.</param>
+    /// <returns>A sentence naming the program.</returns>
+    public static string UnitProgramNotPorted(string program) => $"Curl has no port of {program}";
+
+    private static string? UnportedUnitProgram(string program, Func<string, bool> isPortedUnitProgram) =>
+        isPortedUnitProgram(program) ? null : UnitProgramNotPorted(program);
 
     // runtests.pl runs a <tool> in place of curl; the harness runs a ported libtest program (BL-2556) and no other.
     private static string? UnrunTool(UpstreamTestCase testCase, Func<string, bool> isPortedLibTest) =>
@@ -297,12 +363,12 @@ internal static class UpstreamCaseScreening
     private static string? UnrunCommandType(UpstreamTestCase testCase, string type, Func<string, bool> interpretsPerlScript) =>
         PerlScriptName(testCase) is { } script && interpretsPerlScript(script) ? null : $"the harness does not run a {type} command";
 
-    private static string? UnsupportedCommand(UpstreamTestCase testCase, Func<string, bool> interpretsPerlScript)
+    private static string? UnsupportedCommand(UpstreamTestCase testCase, Func<string, bool> interpretsPerlScript, string? unitProgram)
     {
-        // runtests.pl runs a <tool> with an empty command too: a libtest program then gets no arguments (test501).
+        // runtests.pl runs a <tool> with an empty command too: a libtest or unit program then gets no arguments (test501, test1302).
         if (testCase.Find("client", "command") is not { } command)
         {
-            return LibTestProgramName(testCase) is null ? "the case has no <client><command>" : null;
+            return LibTestProgramName(testCase) is null && unitProgram is null ? "the case has no <client><command>" : null;
         }
 
         if (command.GetAttribute("type") is { } type)

@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Security.Cryptography.X509Certificates;
 using Curl.Conformance.LibTest;
+using Curl.Conformance.UnitProgram;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Conformance;
@@ -79,6 +80,12 @@ namespace Curl.Conformance;
 /// <c>%CURL</c> as <see cref="CurlProgram"/>) and the case's stdout and stderr, and the delegate that runs curl in
 /// process, which it calls with an invocation of its own for each <c>%CURL</c> run; its exit code is the run's.
 /// </param>
+/// <param name="unitPrograms">
+/// The ported unit programs (BL-2841, ADR-0711), or <see langword="null"/> for none. A case with the <c>unittest</c>
+/// feature whose program (<see cref="UpstreamCaseScreening.UnitProgramName"/>) is in the table runs it in place of curl,
+/// as a libtest program runs, its failure count the exit code, and is judged as a curl case is; one whose program is not
+/// there is skipped as <see cref="UpstreamCaseScreening.UnitProgramNotPorted"/>.
+/// </param>
 public sealed class UpstreamCaseRunner(
     Func<UpstreamCurlInvocation, Task<int>> runCurl,
     UpstreamCurlPlatform platform,
@@ -88,7 +95,8 @@ public sealed class UpstreamCaseRunner(
     UpstreamHttp2Server? http2Server = null,
     UpstreamHttp3Server? http3Server = null,
     UpstreamLibTests? libTests = null,
-    IReadOnlyDictionary<string, Func<UpstreamCurlInvocation, Func<UpstreamCurlInvocation, Task<int>>, Task<int>>>? perlCommandScripts = null)
+    IReadOnlyDictionary<string, Func<UpstreamCurlInvocation, Func<UpstreamCurlInvocation, Task<int>>, Task<int>>>? perlCommandScripts = null,
+    UnitPrograms? unitPrograms = null)
 {
     // runtests.pl reports nghttpx-h3 when it finds the nghttpx that serves HTTP/3, which the stand-in replaces.
     private readonly UpstreamCurlPlatform platform = http3Server is null ? platform : platform.WithFeatures([Http3ServerFeature]);
@@ -307,24 +315,28 @@ public sealed class UpstreamCaseRunner(
             return UpstreamCaseOutcome.Skipped(parsed.Failure.Message);
         }
 
-        return Screen(expansion, parsed.TestCase, logDirectory)
+        return Screen(expansion, parsed.TestCase, testNumber, logDirectory)
             ?? await RunScreenedAsync(parsed.TestCase, testNumber, logDirectoryVariable, certificateDirectory).ConfigureAwait(false);
     }
 
     // The skip outcome of a case the harness cannot run here, or null when it can run: first a
     // case only another platform's Curl has the features for (ADR-0488), then every other reason.
-    private UpstreamCaseOutcome? Screen(UpstreamTestFileExpansion expansion, UpstreamTestCase testCase, string logDirectory)
+    // A ported unit program meets its case's unittest, Debug and TrackMemory features (ADR-0711).
+    private UpstreamCaseOutcome? Screen(UpstreamTestFileExpansion expansion, UpstreamTestCase testCase, int testNumber, string logDirectory)
     {
-        if (UpstreamCaseScreening.FindFeatureOfAnotherPlatform(testCase, platform.Features) is { } otherPlatformReason)
+        IReadOnlySet<string> features = UpstreamCaseScreening.CaseFeatures(testCase, testNumber, platform.Features, IsPortedUnitProgram);
+        if (UpstreamCaseScreening.FindFeatureOfAnotherPlatform(testCase, features) is { } otherPlatformReason)
         {
             return UpstreamCaseOutcome.SkippedOnThisPlatform(otherPlatformReason);
         }
 
-        return (UpstreamCaseScreening.FindSkipReason(expansion, testCase, platform.Features, emulatesHttp2: http2Server is not null, emulatesHttp3: http3Server is not null, isPortedLibTest: program => libTests?.Programs.Find(program) is not null, interpretsPerlScript: script => perlCommandScripts?.ContainsKey(script) == true)
+        return (UpstreamCaseScreening.FindSkipReason(expansion, testCase, features, emulatesHttp2: http2Server is not null, emulatesHttp3: http3Server is not null, isPortedLibTest: program => libTests?.Programs.Find(program) is not null, interpretsPerlScript: script => perlCommandScripts?.ContainsKey(script) == true, isPortedUnitProgram: IsPortedUnitProgram, testNumber: testNumber)
                 ?? UpstreamCaseScreening.FindFileOutsideLogDirectory(testCase, logDirectory)) is { } reason
             ? UpstreamCaseOutcome.Skipped(reason)
             : null;
     }
+
+    private bool IsPortedUnitProgram(string program) => unitPrograms?.Find(program) is not null;
 
     private static void RefuseBlanks(string logDirectory, string? testsDirectory, string? certificateDirectory, string? sourceDirectory)
     {
@@ -470,8 +482,10 @@ public sealed class UpstreamCaseRunner(
         WriteSshClientKeyFiles(logDirectory);
         WriteClientFiles(testCase);
         ILibTest? libTest = FindLibTest(testCase);
+        IUnitProgram? unitProgram = FindUnitProgram(testCase, testNumber);
+        bool runsTool = libTest is not null || unitProgram is not null;
         Func<UpstreamCurlInvocation, Task<int>>? perlScript = FindPerlScript(testCase);
-        List<string> arguments = ProgramArguments(testCase, libTest, perlScript is not null, outputFile, $"{logDirectory}/trace{testNumber.ToString(CultureInfo.InvariantCulture)}");
+        List<string> arguments = ProgramArguments(testCase, runsTool, perlScript is not null, outputFile, $"{logDirectory}/trace{testNumber.ToString(CultureInfo.InvariantCulture)}");
 
         // On the real clock the server's waits make a case take seconds that a loaded machine
         // stretches past the time limit (test1677's writedelay: 5.5 seconds, BL-1355); with no
@@ -502,7 +516,7 @@ public sealed class UpstreamCaseRunner(
         // (test1319 to 1321, BL-2011; test714 and test715, BL-2035); one to %HTTPSPORT reaches the HTTPS stand-in, whose TLS handshake travels inside the tunnel (BL-2225).
         server.TunnelServerForPort = port => TunnelledPorts.Contains(port) ? pop3 : null;
         UpstreamCurlInvocation invocation = new(arguments, standardOutput, standardError, standardInput, servers, Http3Server(testCase, dns, server, certificateDirectory), EnvironmentVariables(testCase)) { ConnectionListener = ftp.ActiveModeListener };
-        (int exitCode, string? failure) = await RunCurlAsync(perlScript is null ? ProgramRun(libTest, testNumber, invocation) : () => perlScript(invocation), server).ConfigureAwait(false);
+        (int exitCode, string? failure) = await RunCurlAsync(perlScript is null ? ProgramRun(libTest, unitProgram, testNumber, invocation) : () => perlScript(invocation), server).ConfigureAwait(false);
         if (failure is not null)
         {
             return UpstreamCaseOutcome.Failed(failure);
@@ -527,10 +541,10 @@ public sealed class UpstreamCaseRunner(
             (rtsp.ReceivedBytes, rtsp.ReceivedDump),
         ]);
         // runner.pm sets $CURLOUT to a tool run's stdout, and runtests.pl compares <reply><data> with $CURLOUT (BL-2560).
-        byte[] replyDataBytes = libTest is null ? ReadOutputFile(outputFile) : standardOutputBytes;
+        byte[] replyDataBytes = runsTool ? standardOutputBytes : ReadOutputFile(outputFile);
         return Judge(testCase, () => new UpstreamCaseRun(exitCode, standardOutputBytes, standardError.ToArray(), receivedBytes, replyDataBytes)
         {
-            ReplyDataName = libTest is null ? "the --output file" : "the program's stdout",
+            ReplyDataName = runsTool ? "the program's stdout" : "the --output file",
             ProxyReceivedBytes = server.ProxyReceivedBytes.ToArray(),
             LogDirectory = logDirectory,
             SocksLog = System.Text.Encoding.Latin1.GetBytes(socks.ConnectLog),
@@ -711,38 +725,67 @@ public sealed class UpstreamCaseRunner(
             ? invocation => perlCommandScripts![script](invocation, runCurl)
             : null;
 
-    // runtests.pl runs a libtest program with the command's words alone after its name: no --output, --include or trace;
+    // Screening let a unittest case through only when its unit program is ported, so unitPrograms is given then.
+    private IUnitProgram? FindUnitProgram(UpstreamTestCase testCase, int testNumber) =>
+        UpstreamCaseScreening.UnitProgramName(testCase, testNumber) is { } program ? unitPrograms!.Find(program) : null;
+
+    // runtests.pl runs a libtest or unit program with the command's words alone after its name: no --output, --include or trace;
     // perl gets the words after the script's name.
-    private static List<string> ProgramArguments(UpstreamTestCase testCase, ILibTest? libTest, bool runsPerlScript, string outputFile, string traceFile) =>
-        libTest is null && !runsPerlScript
+    private static List<string> ProgramArguments(UpstreamTestCase testCase, bool runsTool, bool runsPerlScript, string outputFile, string traceFile) =>
+        !runsTool && !runsPerlScript
             ? Arguments(testCase, outputFile, traceFile)
             : [.. UpstreamCommandLineSplitter.Split(UpstreamTestPartBodies.Text(testCase.Find("client", "command"))).Arguments.Skip(runsPerlScript ? 1 : 0)];
 
-    private Func<Task<int>> ProgramRun(ILibTest? libTest, int testNumber, UpstreamCurlInvocation invocation) =>
-        libTest is null ? () => runCurl(invocation) : () => RunLibTestAsync(libTest, testNumber, invocation);
+    private Func<Task<int>> ProgramRun(ILibTest? libTest, IUnitProgram? unitProgram, int testNumber, UpstreamCurlInvocation invocation)
+    {
+        if (unitProgram is not null)
+        {
+            return () => RunUnitProgramAsync(unitProgram, testNumber, invocation);
+        }
+
+        return libTest is null ? () => runCurl(invocation) : () => RunLibTestAsync(libTest, testNumber, invocation);
+    }
 
     // The program runs in place of curl, on the same invocation: its engine reaches the case's servers through
-    // the invocation's connectors, and its stdout and stderr are the run's. Around it go the lines curl 8.22.0's
-    // tests/libtest/first.c main() writes on stderr: "URL: <url>" when a URL follows the program's name, before the
-    // test, and "Test ended with result <N>" after it (BL-2649; test1549).
-    private async Task<int> RunLibTestAsync(ILibTest libTest, int testNumber, UpstreamCurlInvocation invocation)
+    // the invocation's connectors, and its stdout and stderr are the run's.
+    private Task<int> RunLibTestAsync(ILibTest libTest, int testNumber, UpstreamCurlInvocation invocation) =>
+        RunToolAsync(invocation, async standardError =>
+        {
+            LibTestContext context = new(testNumber, invocation.Arguments)
+            {
+                Engine = libTests!.CreateEngine(invocation),
+                StandardOutput = invocation.StandardOutput,
+                StandardError = standardError,
+            };
+            return (await libTest.RunAsync(context, CancellationToken.None).ConfigureAwait(false)).ExitCode;
+        });
+
+    // A unit program runs from the same first.c main() in curl 8.22.0's tests/units bundle, its failure count the exit code.
+    private static Task<int> RunUnitProgramAsync(IUnitProgram unitProgram, int testNumber, UpstreamCurlInvocation invocation) =>
+        RunToolAsync(invocation, async standardError =>
+        {
+            UnitProgramContext context = new(testNumber, invocation.Arguments)
+            {
+                StandardOutput = invocation.StandardOutput,
+                StandardError = standardError,
+            };
+            return (await unitProgram.RunAsync(context, CancellationToken.None).ConfigureAwait(false)).ExitCode;
+        });
+
+    // Around the program go the lines curl 8.22.0's tests/libtest/first.c main() writes on stderr: "URL: <url>" when a
+    // URL follows the program's name, before the test, and "Test ended with result <N>" after it (BL-2649; test1549).
+    private static async Task<int> RunToolAsync(UpstreamCurlInvocation invocation, Func<TextWriter, Task<int>> runProgram)
     {
         // Line feeds alone, as curl's own stderr in the harness, so a case's <stderr> compares the same on every platform.
         await using StreamWriter standardError = new(invocation.StandardError, leaveOpen: true) { AutoFlush = true, NewLine = "\n" };
-        LibTestContext context = new(testNumber, invocation.Arguments)
-        {
-            Engine = libTests!.CreateEngine(invocation),
-            StandardOutput = invocation.StandardOutput,
-            StandardError = standardError,
-        };
         if (invocation.Arguments.Count > 0)
         {
             await standardError.WriteLineAsync($"URL: {invocation.Arguments[0]}").ConfigureAwait(false);
         }
 
-        LibTestResult result = await libTest.RunAsync(context, CancellationToken.None).ConfigureAwait(false);
-        await standardError.WriteLineAsync($"Test ended with result {result.ExitCode.ToString(CultureInfo.InvariantCulture)}").ConfigureAwait(false);
-        return result.ExitCode;
+        int exitCode = await runProgram(standardError).ConfigureAwait(false);
+        await standardError.WriteLineAsync($"Test ended with result {exitCode.ToString(CultureInfo.InvariantCulture)}").ConfigureAwait(false);
+        return exitCode;
     }
 
     private static List<string> Arguments(UpstreamTestCase testCase, string outputFile, string traceFile)

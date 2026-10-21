@@ -1,5 +1,6 @@
 using System.Text;
 using Curl.Conformance.LibTest;
+using Curl.Conformance.UnitProgram;
 using Curl.Protocol.Abstractions;
 using Curl.Testing;
 
@@ -1574,6 +1575,72 @@ public sealed class UpstreamCaseRunnerTests
 
             await context.StandardOutput.WriteAsync(Encoding.ASCII.GetBytes(output), cancellationToken);
             return new LibTestResult(exitCode);
+        }
+    }
+
+    private const string UnitCase =
+        "<testcase>\n<client>\n<features>\nunittest\nDebug\n</features>\n<name>\nunit test\n</name>\n</client>\n"
+        + "<verify>\n<stdout>\nchecks run\n</stdout>\n</verify>\n</testcase>\n";
+
+    [TestMethod]
+    public async Task RunAsync_PortedUnitProgram_RunsInPlaceOfCurlAndItsStdoutAndExitCodeAreVerified()
+    {
+        SampleUnitProgram program = new("unit5", failures: 0);
+
+        UpstreamCaseOutcome outcome = await RunAsync(UnitRunner(program), UnitCase);
+
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Passed, outcome.Kind, outcome.Detail);
+        Assert.AreEqual(5, program.Context!.TestNumber);
+        Assert.IsEmpty(program.Context.Arguments);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_UnitProgramWithFailedChecks_FailsTheCase()
+    {
+        UpstreamCaseOutcome outcome = await RunAsync(UnitRunner(new SampleUnitProgram("unit5", failures: 2)), UnitCase);
+
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Failed, outcome.Kind);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_UnitProgramNotPorted_IsSkippedNamingIt()
+    {
+        UpstreamCaseOutcome outcome = await RunAsync(UnitRunner(new SampleUnitProgram("unit6", failures: 0)), UnitCase);
+
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Skipped, outcome.Kind);
+        Assert.AreEqual("Curl has no port of unit5", outcome.Detail);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_UnittestCaseWithNoUnitPrograms_IsSkippedNamingTheProgram()
+    {
+        UpstreamCaseRunner runner = new(_ => throw new AssertFailedException("curl must not run for a unit case"), UpstreamCurlPlatform.Unix, TimeProvider.System, TimeSpan.FromSeconds(10));
+
+        UpstreamCaseOutcome outcome = await RunAsync(runner, UnitCase);
+
+        Assert.AreEqual("Curl has no port of unit5", outcome.Detail);
+    }
+
+    private static UpstreamCaseRunner UnitRunner(IUnitProgram program) =>
+        new(
+            _ => throw new AssertFailedException("curl must not run for a unit case"),
+            UpstreamCurlPlatform.Unix,
+            TimeProvider.System,
+            TimeSpan.FromSeconds(10),
+            unitPrograms: new UnitPrograms([program]));
+
+    // A unit program that keeps its context, writes a line to stdout and returns its failure count.
+    private sealed class SampleUnitProgram(string programName, int failures) : IUnitProgram
+    {
+        public UnitProgramContext? Context { get; private set; }
+
+        public string ProgramName => programName;
+
+        public async Task<UnitProgramResult> RunAsync(UnitProgramContext context, CancellationToken cancellationToken)
+        {
+            Context = context;
+            await context.StandardOutput.WriteAsync("checks run\n"u8.ToArray(), cancellationToken);
+            return new UnitProgramResult(failures);
         }
     }
 

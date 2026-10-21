@@ -403,6 +403,109 @@ public sealed class UpstreamCaseScreeningTests
     }
 
     [TestMethod]
+    [DataRow("<client>\n<features>\nunittest\n</features>\n</client>\n", "unit1302")]
+    [DataRow("<client>\n<features>\nunittest\n</features>\n<tool>\ntool1302\n</tool>\n</client>\n", "tool1302")]
+    [DataRow("<client>\n<features>\nunittest\n</features>\n<tool>\n unit1305 \n</tool>\n</client>\n", "unit1305")]
+    [DataRow("<client>\n<features>\nunittest\n</features>\n<tool>\nlib1302\n</tool>\n</client>\n", null)]
+    [DataRow("<client>\n<features>\nunittest\n</features>\n<tool>\nunit\n</tool>\n</client>\n", null)]
+    [DataRow("<client>\n<features>\nunittest\n</features>\n<tool>\nunitx2\n</tool>\n</client>\n", null)]
+    [DataRow("<client>\n<tool>\ntool1302\n</tool>\n</client>\n", null)]
+    public void UnitProgramName_IsTheToolOrUnitAndTheTestNumberOfAUnittestCase(string sections, string? expected)
+    {
+        string? program = UpstreamCaseScreening.UnitProgramName(ParsedTestCase.From(sections), 1302);
+
+        Assert.AreEqual(expected, program);
+    }
+
+    [TestMethod]
+    public void UnitProgramName_NullCase_Throws()
+    {
+        Assert.ThrowsExactly<ArgumentNullException>(() => UpstreamCaseScreening.UnitProgramName(null!, 1302));
+    }
+
+    [TestMethod]
+    public void CaseFeatures_NullFeatures_Throws()
+    {
+        Assert.ThrowsExactly<ArgumentNullException>(() => UpstreamCaseScreening.CaseFeatures(ParsedTestCase.From(UnitCaseClient), 1302, null!, null));
+    }
+
+    [TestMethod]
+    public void CaseFeatures_PortedUnitProgram_AddsUnittestDebugAndTrackMemory()
+    {
+        IReadOnlySet<string> features = UpstreamCaseScreening.CaseFeatures(ParsedTestCase.From(UnitCaseClient), 1302, Features, program => program == "unit1302");
+
+        Assert.IsTrue(features.IsSupersetOf(["unittest", "Debug", "TrackMemory"]));
+        Assert.IsTrue(features.IsSupersetOf(Features));
+    }
+
+    [TestMethod]
+    public void CaseFeatures_UnitProgramNotPorted_IsThePlatformsFeatures()
+    {
+        Assert.AreSame(Features, UpstreamCaseScreening.CaseFeatures(ParsedTestCase.From(UnitCaseClient), 1302, Features, null));
+    }
+
+    private const string UnitCaseClient = "<client>\n<features>\nunittest\nDebug\nTrackMemory\n</features>\n<name>\nbase64\n</name>\n</client>\n";
+
+    private static readonly UpstreamTestFileExpansion EmptyExpansion = new(ReadOnlyMemory<byte>.Empty, [], [], null);
+
+    [TestMethod]
+    [DataRow(UnitCaseClient, "Curl has no port of unit1302")]
+    [DataRow("<client>\n<features>\nunittest\n</features>\n<tool>\ntool1302\n</tool>\n</client>\n", "Curl has no port of tool1302")]
+    public void FindSkipReason_UnittestCaseWithNoPort_NamesTheProgram(string sections, string expected)
+    {
+        string? reason = UpstreamCaseScreening.FindSkipReason(EmptyExpansion, ParsedTestCase.From(sections), Features, isPortedUnitProgram: program => program == "unit9999", testNumber: 1302);
+
+        Assert.AreEqual(expected, reason);
+    }
+
+    [TestMethod]
+    public void FindSkipReason_UnittestCaseWithNoTable_NamesTheProgram()
+    {
+        string? reason = UpstreamCaseScreening.FindSkipReason(EmptyExpansion, ParsedTestCase.From(UnitCaseClient), Features, testNumber: 1302);
+
+        Assert.AreEqual(UpstreamCaseScreening.UnitProgramNotPorted("unit1302"), reason);
+    }
+
+    [TestMethod]
+    [DataRow(UnitCaseClient)]
+    [DataRow("<client>\n<features>\nunittest\n</features>\n<tool>\nunit1302\n</tool>\n<command>\narg\n</command>\n</client>\n")]
+    public void FindSkipReason_UnittestCaseWithAPort_IsNotSkipped(string sections)
+    {
+        string? reason = UpstreamCaseScreening.FindSkipReason(EmptyExpansion, ParsedTestCase.From(sections), Features, isPortedUnitProgram: program => program == "unit1302", testNumber: 1302);
+
+        Assert.IsNull(reason);
+    }
+
+    [TestMethod]
+    [DataRow("<client>\n<features>\nunittest\n</features>\n<killserver>\nx\n</killserver>\n<bogus>\nx\n</bogus>\n</client>\n", "the harness does not act on <client><bogus>")]
+    [DataRow("<client>\n<features>\nunittest\nno-such-feature\n</features>\n</client>\n", "Curl lacks the feature no-such-feature")]
+    public void FindSkipReason_PortedUnittestCase_AnotherReasonStillWins(string sections, string expected)
+    {
+        string? reason = UpstreamCaseScreening.FindSkipReason(EmptyExpansion, ParsedTestCase.From(sections), Features, isPortedUnitProgram: _ => true, testNumber: 1302);
+
+        Assert.AreEqual(expected, reason);
+    }
+
+    [TestMethod]
+    public void FindSkipReason_UnportedUnittestCaseWithAnUnsupportedPart_ThePartWins()
+    {
+        string? reason = UpstreamCaseScreening.FindSkipReason(EmptyExpansion, ParsedTestCase.From("<client>\n<features>\nunittest\n</features>\n<bogus>\nx\n</bogus>\n</client>\n"), Features, testNumber: 1302);
+
+        Assert.AreEqual("the harness does not act on <client><bogus>", reason);
+    }
+
+    [TestMethod]
+    [DataRow("<client>\n<tool>\ntool1302\n</tool>\n<command>\narg\n</command>\n</client>\n", UpstreamCaseScreening.ToolNotRun)]
+    [DataRow("<client>\n<features>\nTrackMemory\n</features>\n<command>\nhttp://127.0.0.1/\n</command>\n</client>\n", "Curl lacks the feature TrackMemory")]
+    [DataRow("<client>\n<name>\nno command\n</name>\n</client>\n", "the case has no <client><command>")]
+    public void FindSkipReason_CaseWithoutUnittest_IsUnaffectedByTheUnitProgramTable(string sections, string expected)
+    {
+        string? reason = UpstreamCaseScreening.FindSkipReason(EmptyExpansion, ParsedTestCase.From(sections), Features, isPortedUnitProgram: _ => true, testNumber: 1302);
+
+        Assert.AreEqual(expected, reason);
+    }
+
+    [TestMethod]
     public void LibTestProgramName_NullCase_Throws()
     {
         Assert.ThrowsExactly<ArgumentNullException>(() => UpstreamCaseScreening.LibTestProgramName(null!));
