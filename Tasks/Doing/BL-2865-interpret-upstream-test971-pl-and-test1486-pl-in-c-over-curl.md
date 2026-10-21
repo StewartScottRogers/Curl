@@ -31,3 +31,4 @@ Split from BL-2850. Needs the dispatch seam (BL-2863) and the vendored docs (BL-
 ## Log
 
 - 2026-10-19: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: a61dc661 969fe749 309149d6.
