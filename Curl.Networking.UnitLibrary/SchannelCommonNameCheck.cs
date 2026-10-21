@@ -7,9 +7,10 @@ namespace Curl.Networking;
 /// The name check curl's Schannel build runs with <c>--cacert</c> where .NET's does not
 /// match: a certificate whose subjectAltName holds no DNS name is matched by its common
 /// name, because <c>CertGetNameString(CERT_NAME_DNS_TYPE)</c> falls back to it (BL-150,
-/// measured; BL-415).
+/// measured; BL-415). Public so the port of upstream's unit1397 runs
+/// <see cref="PatternMatchesHost" /> (BL-2911).
 /// </summary>
-internal static class SchannelCommonNameCheck
+public static class SchannelCommonNameCheck
 {
     /// <summary>
     /// Whether the Schannel build accepts <paramref name="certificate" /> for
@@ -34,7 +35,7 @@ internal static class SchannelCommonNameCheck
     /// <summary>
     /// curl's <c>Curl_cert_hostcheck</c>: one trailing dot is ignored on each side and case
     /// is ignored; a pattern starting <c>*.</c> with at least one more dot stands for any
-    /// one left-most label of a host name that is not an IP literal.
+    /// one non-empty left-most label of a host name that is not an IP literal.
     /// </summary>
     /// <param name="pattern">The name in the certificate.</param>
     /// <param name="host">The host connected to.</param>
@@ -56,13 +57,14 @@ internal static class SchannelCommonNameCheck
         return WildcardMatchesHost(pattern, host);
     }
 
-    // curl requires two dots in a wildcard pattern, so "*.com" matches nothing, and never
-    // lets one match an IP literal.
+    // curl requires two dots in a wildcard pattern, so "*.com" matches nothing, makes the
+    // wildcard stand for at least one character, so ".hello.com" is no match for
+    // "*.hello.com" (unit1397), and never lets one match an IP literal.
     private static bool WildcardMatchesHost(string pattern, string host)
     {
         var patternLabelEnd = pattern.IndexOf('.', StringComparison.Ordinal);
         var hostLabelEnd = host.IndexOf('.', StringComparison.Ordinal);
-        if (pattern.LastIndexOf('.') == patternLabelEnd || hostLabelEnd < 0 || IPAddress.TryParse(host, out _))
+        if (pattern.LastIndexOf('.') == patternLabelEnd || hostLabelEnd < 1 || IPAddress.TryParse(host, out _))
         {
             return false;
         }

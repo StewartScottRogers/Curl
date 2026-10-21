@@ -57,6 +57,21 @@ public sealed class SchannelCommonNameCheckTests
         Assert.IsFalse(SchannelCommonNameCheck.PatternMatchesHost(pattern, host));
     }
 
+    // unit1397's first row: curl's wildcard must stand for at least one character, so an
+    // empty left-most host label matches nothing (BL-2911).
+    [TestMethod]
+    public void PatternMatchesHost_WildcardAgainstAnEmptyLeftMostLabel_IsFalse()
+    {
+        Diagnostics.Arrange("pattern, host", "*.hello.com, .hello.com");
+
+        var matches = SchannelCommonNameCheck.PatternMatchesHost("*.hello.com", ".hello.com");
+
+        Diagnostics.Act("matches", matches);
+        Diagnostics.Assert("matches", false, matches);
+
+        Assert.IsFalse(matches);
+    }
+
     [TestMethod]
     public void CommonNameMatches_WithOnlyAnIpAlternativeNameAndTheHostAsCommonName_IsTrue()
     {
