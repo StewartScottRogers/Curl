@@ -32,3 +32,4 @@ Split from BL-2835. 970 and 972 set `CURL_TIME=13`, `CURL_DEBUG_SIZE=4019` and `
 ## Log
 
 - 2026-10-21: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: c37c0770 b6940992 786b670f 9495a595.
