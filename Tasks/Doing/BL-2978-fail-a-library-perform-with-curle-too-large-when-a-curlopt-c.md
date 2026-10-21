@@ -31,3 +31,4 @@ BL-2971 made `TransferPerformer.LoadCookieFilesAsync` return a `TransferResult` 
 ## Log
 
 - 2026-10-21: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: 48f42234 138033cd b65be32d.
