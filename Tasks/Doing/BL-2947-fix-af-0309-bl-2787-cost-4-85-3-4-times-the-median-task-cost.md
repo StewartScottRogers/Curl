@@ -41,10 +41,12 @@ The finding describes a past run's cost, which no fix can change, so no re-audit
 
 ## Acceptance criteria
 
-- [ ] The cause of the cost is named in this task, and either fixed or recorded as unavoidable.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The cause of the cost is named in this task, and either fixed or recorded as unavoidable.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Cause: one 82-turn session with 9 builds and 27 one-line Edits, each turn re-reading ~132K of context; no retries. Avoidable: edit-build churn. Fix: AF-0309 clause added to the unattended-run rules in DarkFactory/Prompts.ps1 (both copies): make all edits before building, batch edits per file, build once per change.
 
 ## Log
 
