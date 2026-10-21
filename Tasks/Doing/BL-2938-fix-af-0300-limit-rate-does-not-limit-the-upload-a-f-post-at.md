@@ -68,3 +68,4 @@ The finding closes only when a later re-audit by the conformance auditor confirm
 - 2026-10-21: Created.
 - 2026-10-21: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
 - 2026-10-21: Doing -> Backlog. Waits on BL-2956: upload is now throttled, but a reset during the wait must end exit 56 (HTTP body writer); code is in the lane stash
+- 2026-10-21: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
