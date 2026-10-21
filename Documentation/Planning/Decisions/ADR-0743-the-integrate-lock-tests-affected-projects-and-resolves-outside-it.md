@@ -1,4 +1,4 @@
-# ADR-0742 — Under the integrate lock a lane tests only the projects its commits can affect, and resolves a rebase conflict with the lock released
+# ADR-0743 — Under the integrate lock a lane tests only the projects its commits can affect, and resolves a rebase conflict with the lock released
 
 - Status: Accepted
 - Date: 2026-10-21

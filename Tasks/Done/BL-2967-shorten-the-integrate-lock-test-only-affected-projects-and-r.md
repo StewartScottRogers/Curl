@@ -50,4 +50,4 @@ Its own ADR records the decision.
 - 2026-10-21: Backlog -> Doing. Interactive session; Stewart approved 2026-10-21. Criteria at claim: fbecace0.
 - 2026-10-21: Doing -> Backlog. Criteria were written after the claim; reclaiming with them.
 - 2026-10-21: Backlog -> Doing. Reclaimed with the written criteria. Criteria at claim: 9548ec98 af551e26 ce6af7a5 96bf6200.
-- 2026-10-21: Doing -> Done. Lanes test only affected projects under the integrate lock and resolve rebase conflicts with it released; ADR-0742; self-tests 167/167.
+- 2026-10-21: Doing -> Done. Lanes test only affected projects under the integrate lock and resolve rebase conflicts with it released; ADR-0743; self-tests 167/167.
