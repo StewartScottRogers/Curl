@@ -4,7 +4,7 @@ title: Report Unicode on Windows once upstream cases 3203, 1703 and 472 pass und
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: []
+depends-on: [BL-2975]
 touches: [Curl.Conformance.UnitLibrary/UpstreamWindowsFeatures.cs, Curl.Conformance.UnitTests/PassingUpstreamCases.txt, Curl.Protocol.File.UnitLibrary, Curl.Protocol.File.UnitTests, Curl.Authentication.UnitLibrary, Curl.Authentication.UnitTests]
 requirement: none
 created: 2026-10-21
@@ -35,7 +35,26 @@ Where the fix lands outside `touches`, add the folder in the same commit. Each p
 
 ## Notes
 
+- 2026-10-21 (lane 5): Cause of 3203 and 1703 is the harness, not Curl. It reads every case one
+  character per byte (Latin-1), so the `<file name>` `%hex[%E6%BC%A2...]hex%` was created on disk as
+  the characters U+00E6 U+00BC ... and Curl listed that name correctly as UTF-8. The fix, left in this
+  lane's stash: a new `Curl.Conformance.UnitLibrary/UpstreamUtf8Words.cs` (`AsSystemText`: the word's
+  bytes read as strict UTF-8, else the word unchanged), applied to the client `<file name>` in
+  `UpstreamCaseRunner.WriteClientFiles`, to each command argument in `UpstreamCaseRunner.Arguments`,
+  and to the `<verify><file name>` in `UpstreamCaseVerification.CompareFile`, plus `"Unicode"` in
+  `UpstreamWindowsFeatures.Names`. With it, test3203 and test1703 pass on Windows
+  (`CURL_UPSTREAM_CASE` run). Those three Conformance files lie outside `touches`. No Doing task on
+  origin/work/dark-factory names them, so add them to `touches` when resuming. Still to do on resume:
+  unit tests for `UpstreamUtf8Words` (valid UTF-8, invalid bytes, ASCII), the full fast-test run to
+  catch any listed case whose command holds high bytes that happen to be valid UTF-8, ADR-0737's
+  decision 2 superseded, test1703 and test472 on the ratchet.
+- test472 then sends `GET /472/a=? HTTP/1.1` on Windows: Curl's Windows build turns `あ` into `?`
+  because it models curl receiving argv in the ANSI code page (ADR-0022). A Unicode `curl.exe`
+  converts wide argv to UTF-8. That is a measured, cross-library change outside this task, filed as
+  BL-2975. The task is requeued behind it.
+
 ## Log
 
 - 2026-10-21: Created.
 - 2026-10-21: Backlog -> Doing. Criteria at claim: de350832 ba7c7a94 6c1653fd dd1cc079.
+- 2026-10-21: Doing -> Backlog. Waits on BL-2975: Curl on Windows turns the non-ASCII argument of test472 into '?' (ANSI argv model, ADR-0022); harness UTF-8 fix for 3203 and 1703 is in the stash
