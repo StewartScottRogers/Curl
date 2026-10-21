@@ -1,5 +1,5 @@
 ---
-id: BL-2889
+id: BL-2895
 title: Port upstream unit programs 1625 and 1626 (Curl_compareheader, Curl_copy_header_value) and split the Headers registration into one file per subarea
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-21
 completed:
 ---
-# BL-2889 — Port upstream unit programs 1625 and 1626 (Curl_compareheader, Curl_copy_header_value) and split the Headers registration into one file per subarea
+# BL-2895 — Port upstream unit programs 1625 and 1626 (Curl_compareheader, Curl_copy_header_value) and split the Headers registration into one file per subarea
 
 ## Goal
 

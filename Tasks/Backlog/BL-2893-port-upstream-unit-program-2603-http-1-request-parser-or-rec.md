@@ -4,7 +4,7 @@ title: Port upstream unit program 2603 (HTTP/1 request parser) or record it has 
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-2889]
+depends-on: [BL-2895]
 touches: [Curl.Conformance.UnitTests/PassingUpstreamCases.txt, Curl.Conformance.UnitProgram.UnitLibrary/UnitPrograms.Headers.Http1.cs, Curl.Conformance.UnitProgram.UnitLibrary/Headers/Http1, Curl.Conformance.UnitProgram.UnitTests/Headers/Http1, Documentation/Planning/Decisions/ADR-0711-upstream-unittest-cases-run-as-ported-unit-programs.md]
 requirement: none
 created: 2026-10-21
@@ -18,7 +18,7 @@ Upstream case 2603 runs as a ported unit program and is on `Curl.Conformance.Uni
 
 ## Context
 
-Split from BL-2846 for size. curl 8.22.0 `tests/unit/unit2603.c` tests `Curl_h1_req_parse_*`, libcurl's HTTP/1 *request* parser (used to turn a request into HTTP/2 or HTTP/3 frames and for proxies): it feeds request text in chunks and checks method, scheme, authority, path, header count and errors. ADR-0711's row says "port in BL-2846: the HTTP/1 response parser (`Curl.Protocol.Http.UnitLibrary`)", but the C program parses requests; a grep for a request parser outside the conformance stand-ins found none in production code. Decide whether Curl has a type with that observable behaviour (HTTP/2 or HTTP/3 request building from an HTTP/1 request, in `Curl.Protocol.Http.UnitLibrary`, `Curl.Http3.UnitLibrary` or `Curl.Engine.UnitLibrary`); port it if so, otherwise correct the ADR-0711 row with the C-only thing it tests. Mechanism: ADR-0711 and BL-2842's Hashes ports. Register in `UnitPrograms.Headers.Http1.cs`, which BL-2889 creates.
+Split from BL-2846 for size. curl 8.22.0 `tests/unit/unit2603.c` tests `Curl_h1_req_parse_*`, libcurl's HTTP/1 *request* parser (used to turn a request into HTTP/2 or HTTP/3 frames and for proxies): it feeds request text in chunks and checks method, scheme, authority, path, header count and errors. ADR-0711's row says "port in BL-2846: the HTTP/1 response parser (`Curl.Protocol.Http.UnitLibrary`)", but the C program parses requests; a grep for a request parser outside the conformance stand-ins found none in production code. Decide whether Curl has a type with that observable behaviour (HTTP/2 or HTTP/3 request building from an HTTP/1 request, in `Curl.Protocol.Http.UnitLibrary`, `Curl.Http3.UnitLibrary` or `Curl.Engine.UnitLibrary`); port it if so, otherwise correct the ADR-0711 row with the C-only thing it tests. Mechanism: ADR-0711 and BL-2842's Hashes ports. Register in `UnitPrograms.Headers.Http1.cs`, which BL-2895 creates.
 
 ## Acceptance criteria
 

@@ -1,16 +1,16 @@
 ---
-id: BL-2890
+id: BL-2896
 title: Port upstream unit program 1304 (netrc parsing) over NetrcFile
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-2889]
+depends-on: [BL-2895]
 touches: [Curl.Conformance.UnitTests/PassingUpstreamCases.txt, Curl.Conformance.UnitProgram.UnitLibrary/UnitPrograms.Headers.Netrc.cs, Curl.Conformance.UnitProgram.UnitLibrary/Headers/Netrc, Curl.Conformance.UnitProgram.UnitTests/Headers/Netrc]
 requirement: none
 created: 2026-10-21
 completed:
 ---
-# BL-2890 — Port upstream unit program 1304 (netrc parsing) over NetrcFile
+# BL-2896 — Port upstream unit program 1304 (netrc parsing) over NetrcFile
 
 ## Goal
 
@@ -18,7 +18,7 @@ Upstream case 1304 runs as a ported unit program over Curl's `NetrcFile` and is 
 
 ## Context
 
-Split from BL-2846 for size. curl 8.22.0 `tests/unit/unit1304.c` runs `Curl_netrc_scan` eight times over the netrc file the case writes to `%LOGDIR/netrc1304` (its path is the program's one argument, `UnitProgramContext.Arguments[0]`): unknown host, unknown login, unknown host and login, a login that is a substring and one that is a superstring of `admin`, host `example.com` with no login (admin/passwd), `curl.example.com` with no login (none/none), and `curl.example.com` with login `hilarious` (no match, no password). Counterpart: `Curl.Authentication.UnitLibrary/NetrcFile.cs` (its csproj already grants `InternalsVisibleTo` to the UnitProgram library, BL-2842). Mechanism: ADR-0711 and BL-2842's Hashes ports (`Hashes/UnitChecks`). Register in `UnitPrograms.Headers.Netrc.cs`, which BL-2889 creates.
+Split from BL-2846 for size. curl 8.22.0 `tests/unit/unit1304.c` runs `Curl_netrc_scan` eight times over the netrc file the case writes to `%LOGDIR/netrc1304` (its path is the program's one argument, `UnitProgramContext.Arguments[0]`): unknown host, unknown login, unknown host and login, a login that is a substring and one that is a superstring of `admin`, host `example.com` with no login (admin/passwd), `curl.example.com` with no login (none/none), and `curl.example.com` with login `hilarious` (no match, no password). Counterpart: `Curl.Authentication.UnitLibrary/NetrcFile.cs` (its csproj already grants `InternalsVisibleTo` to the UnitProgram library, BL-2842). Mechanism: ADR-0711 and BL-2842's Hashes ports (`Hashes/UnitChecks`). Register in `UnitPrograms.Headers.Netrc.cs`, which BL-2895 creates.
 
 ## Acceptance criteria
 
