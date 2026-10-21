@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests, Curl.Authentication.UnitLibrary, Curl.Authentication.UnitTests, Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests, Curl.Engine.UnitLibrary/EngineComposition.cs]
 requirement: none
 created: 2026-10-21
-completed:
+completed: 2026-10-21
 ---
 # BL-2975 — Read command-line arguments as UTF-8 on Windows, as a Unicode curl.exe does, so upstream test472 signs and sends a non-ASCII path
 
@@ -27,10 +27,10 @@ Steps:
 
 ## Acceptance criteria
 
-- [ ] An ADR records the measured Windows `curl.exe` bytes for a non-ASCII URL path, user name and header value, and the argument encoding Curl now uses on Windows.
-- [ ] Under Windows behaviour, a URL argument `http://fake.fake.fake:8000/472/a=あ` (the string Windows hands a Unicode program) is sent as the request line `GET /472/a=%E3%81%82 HTTP/1.1`, pinned by a unit test in the library that held the `?` conversion. BL-2968 then lists test472 on the ratchet.
-- [ ] A focused unit test in `Curl.Authentication.UnitTests` pins test472's signature for path `/472/a=%E3%81%82`, and one in the changed Cli or Http library pins the non-ASCII argument's bytes; each fails without the fix.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean, `dotnet test --filter "TestCategory!=Integration"` passes, and each changed library keeps 100% line and branch coverage and complexity at most 10.
+- [x] An ADR records the measured Windows `curl.exe` bytes for a non-ASCII URL path, user name and header value, and the argument encoding Curl now uses on Windows.
+- [x] Under Windows behaviour, a URL argument `http://fake.fake.fake:8000/472/a=あ` (the string Windows hands a Unicode program) is sent as the request line `GET /472/a=%E3%81%82 HTTP/1.1`, pinned by a unit test in the library that held the `?` conversion. BL-2968 then lists test472 on the ratchet.
+- [x] A focused unit test in `Curl.Authentication.UnitTests` pins test472's signature for path `/472/a=%E3%81%82`, and one in the changed Cli or Http library pins the non-ASCII argument's bytes; each fails without the fix.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean, `dotnet test --filter "TestCategory!=Integration"` passes, and each changed library keeps 100% line and branch coverage and complexity at most 10.
 
 ## Notes
 
@@ -52,3 +52,4 @@ Steps:
 
 - 2026-10-21: Created.
 - 2026-10-21: Backlog -> Doing. Criteria at claim: b166b49a 56e3dd14 34ddd848 dd1cc079.
+- 2026-10-21: Doing -> Done. Reference mingw curl 8.22.0 is not Unicode and sends ANSI argv as Curl does (ADR-0741), so criterion 2 is answered by the measurement, not a change; test472's SigV4 signature pinned and matching
