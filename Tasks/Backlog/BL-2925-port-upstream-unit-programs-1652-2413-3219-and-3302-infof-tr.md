@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Conformance.UnitTests/PassingUpstreamCases.txt, Curl.Conformance.UnitProgram.UnitLibrary/UnitPrograms.Dns.cs, Curl.Conformance.UnitProgram.UnitLibrary/Dns/Easy, Curl.Conformance.UnitProgram.UnitTests/Dns/Easy, Libcurl/Info/Longs/EasyInfoReaders.Longs.cs, Libcurl.UnitTests/Info/Longs/EasyInfoReadersLongsTests.cs, Curl.Engine.UnitLibrary/DebugCallbackTransferEvents.cs, Curl.Engine.UnitTests/DebugCallbackTransferEventsTests.cs, Curl.Core.UnitLibrary/ConnectionPeer.cs, Curl.Core.UnitTests/ConnectionPeerTests.cs]
+touches: [Curl.Conformance.UnitTests/PassingUpstreamCases.txt, Curl.Conformance.UnitProgram.UnitLibrary/UnitPrograms.Dns.cs, Curl.Conformance.UnitProgram.UnitLibrary/Dns/Easy, Curl.Conformance.UnitProgram.UnitTests/Dns/Easy, Libcurl/Info/Longs/EasyInfoReaders.Longs.cs, Libcurl.UnitTests/Info/Longs/EasyInfoReadersLongsTests.cs, Curl.Engine.UnitLibrary/DebugCallbackTransferEvents.cs, Curl.Engine.UnitTests/DebugCallbackTransferEventsTests.cs, Curl.Core.UnitLibrary/ConnectionPeer.cs, Curl.Core.UnitTests/ConnectionPeerTests.cs, Libcurl/Libcurl.csproj]
 requirement: none
 created: 2026-10-21
 completed:
@@ -47,3 +47,4 @@ One `IUnitProgram` per case in `Curl.Conformance.UnitProgram.UnitLibrary/Dns/Eas
 - 2026-10-21: Backlog -> Doing. Criteria at claim: c0969e39 2e3e75ab aca7e1a2 dd1cc079.
 - 2026-10-21: Doing -> Backlog. Needs Curl.Engine.UnitLibrary/DebugCallbackTransferEvents.cs (unit1652 infof truncation fix), and Curl.Engine.UnitLibrary is in the touches of BL-2934 (Doing); plan for all four cases is under Notes
 - 2026-10-21: Backlog -> Doing. Criteria at claim: c0969e39 2e3e75ab aca7e1a2 dd1cc079.
+- 2026-10-21: Doing -> Backlog. Run cost budget used up with the work nearly done; code is left in place, Notes list the four steps left
