@@ -46,6 +46,22 @@ public sealed class HttpRequestBodyWriterWaitingPieceResetTests
     }
 
     [TestMethod]
+    public async Task WriteAsync_ResetWhileARaceAgainstTheResponseWaitsOnTheUploadSource_FailsWithExit56()
+    {
+        // The -F POST of AF-0300 races each late body read against the response's status line
+        // (HttpEarlyResponseConnection); a wait there is a wait on the source all the same (BL-2938).
+        ResetConnection connection = new(Reset(), readFails: true);
+        HttpRequestBodyWriter writer = new(connection) { EarlyResponseRead = new HttpEarlyResponseConnection(connection) };
+
+        HttpTransferException failure = await Assert.ThrowsExactlyAsync<HttpTransferException>(
+            async () => await writer.WriteAsync(new StreamBody(new LateReadStream("abc"u8.ToArray()), 3, "a/b"), false, CancellationToken.None));
+
+        Diagnostics.Act("exit code", failure.ExitCode);
+        Assert.AreEqual(CurlExitCode.RecvError, failure.ExitCode);
+        StringAssert.StartsWith(failure.Message, "Recv failure: ");
+    }
+
+    [TestMethod]
     public async Task WriteAsync_WriteFailsAfterAWaitButTheReadGivesTheEnd_KeepsExit55()
     {
         HttpTransferException failure = await WriteFailingAsync(new LateReadStream("abc"u8.ToArray()), Reset(), readFails: false);

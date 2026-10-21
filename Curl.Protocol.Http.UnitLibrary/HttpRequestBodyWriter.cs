@@ -680,6 +680,7 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
 
         CancellationTokenSource reading = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         ValueTask<int> read = stream.ReadAsync(buffer, reading.Token);
+        waitedOnSource = !read.IsCompleted;
         if (read.IsCompleted)
         {
             reading.Dispose();
