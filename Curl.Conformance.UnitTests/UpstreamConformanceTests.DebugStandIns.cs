@@ -50,6 +50,7 @@ public sealed partial class UpstreamConformanceTests
         RunsMimeLibTest,
         RunsCurlWithDohUrl,
         SetsWriteOutDebugVariable,
+        SetsToolTransferDebugVariable,
     ];
 
     internal static UpstreamCurlPlatform PlatformFor(byte[] testFile)

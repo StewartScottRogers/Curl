@@ -209,7 +209,9 @@ public sealed partial class UpstreamConformanceTests
             honoursDnsServerVariable: true,
             parsesAsQuicBuild: true,
             extendedAttributeWriter: ExtendedAttributeWriterFor(invocation),
-            honoursDebugWriteOutVariables: true).RunAsync(invocation.Arguments);
+            honoursDebugWriteOutVariables: true,
+            webSocketRandomSource: WebSocketRandomSourceFor(invocation.EnvironmentVariables),
+            fileSystem: FileSystemFor(invocation.EnvironmentVariables)).RunAsync(ArgumentsFor(invocation));
 
     // A ported libtest program's engine, in place of curl (BL-2558, ADR-0658): the managed Libcurl engine, every TCP
     // dial reaching the case's in-memory servers through InMemoryServerTcpDialer, names resolved to loopback but
