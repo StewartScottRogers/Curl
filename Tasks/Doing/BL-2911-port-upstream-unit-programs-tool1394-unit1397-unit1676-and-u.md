@@ -37,3 +37,4 @@ Split from BL-2843. Follow ADR-0711 (shape) and ADR-0723 (which guarded branch r
 ## Log
 
 - 2026-10-21: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: 7de64f9c a717d77f 6ab2d507 c4fd7eb2.
