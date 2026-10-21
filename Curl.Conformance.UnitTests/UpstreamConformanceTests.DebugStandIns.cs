@@ -47,6 +47,7 @@ public sealed partial class UpstreamConformanceTests
         text => text.Contains("\nCURL_FTP_PWD_STOP=", StringComparison.Ordinal),
         text => text.Contains("\n" + FakeExtendedAttributesVariableName + "=", StringComparison.Ordinal),
         SetsSmallSendsVariable,
+        RunsMimeLibTest,
     ];
 
     internal static UpstreamCurlPlatform PlatformFor(byte[] testFile)
