@@ -4,7 +4,7 @@ title: Port upstream unit programs 1620, 1627, 1653 and 1675: url.c, Curl_get_sc
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-2915]
+depends-on: [BL-2926]
 touches: [Curl.Conformance.UnitProgram.UnitLibrary/UrlParsing/Unit1620UrlLoginDetails.cs, Curl.Conformance.UnitProgram.UnitLibrary/UrlParsing/Unit1627SchemeLookup.cs, Curl.Conformance.UnitProgram.UnitLibrary/UrlParsing/Unit1653PortParsing.cs, Curl.Conformance.UnitProgram.UnitLibrary/UrlParsing/Unit1675UrlApi.cs, Curl.Conformance.UnitProgram.UnitTests/UrlParsing/Unit1620UrlLoginDetailsTests.cs, Curl.Conformance.UnitProgram.UnitTests/UrlParsing/Unit1627SchemeLookupTests.cs, Curl.Conformance.UnitProgram.UnitTests/UrlParsing/Unit1653PortParsingTests.cs, Curl.Conformance.UnitProgram.UnitTests/UrlParsing/Unit1675UrlApiTests.cs, Curl.Conformance.UnitProgram.UnitLibrary/UnitPrograms.UrlParsing.cs, Curl.Conformance.UnitTests/PassingUpstreamCases.txt, Curl.Protocol.Abstractions.UnitLibrary/CurlUrlAuthority.cs, Curl.Protocol.Abstractions.UnitLibrary/Curl.Protocol.Abstractions.UnitLibrary.csproj, Curl.Protocol.Abstractions.UnitTests/CurlUrlAuthorityTests.cs]
 requirement: none
 created: 2026-10-21
@@ -45,12 +45,12 @@ Split from BL-2844 (2026-10-21), which ports the ten URL and address parsing uni
   `Curl.Conformance.UnitProgram.UnitLibrary` see its internals, so those three files joined `touches` (no task
   in Doing named them).
 - 1675 tests six urlapi.c helpers whose Curl counterparts are internal to Curl.Engine (`urlencode_str`) and
-  Curl.Core (`Curl_url_same_origin`), outside this task's files, so it is split out as BL-2915 and this task
-  waits on it. On the next claim: re-apply the stash, add 1620, 1627, 1653 (and 1675 from BL-2915) to the
+  Curl.Core (`Curl_url_same_origin`), outside this task's files, so it is split out as BL-2926 and this task
+  waits on it. On the next claim: re-apply the stash, add 1620, 1627, 1653 (and 1675 from BL-2926) to the
   ratchet if not there, run the fast tests and the quality measure, commit.
 
 ## Log
 
 - 2026-10-21: Created.
 - 2026-10-21: Backlog -> Doing. Criteria at claim: 994c71ca 67867c61 aca7e1a2 dd1cc079.
-- 2026-10-21: Doing -> Backlog. Waits on BL-2915 (port of unit1675, which needs Curl.Engine and Curl.Core internals); 1620, 1627 and 1653 are ported in the stash
+- 2026-10-21: Doing -> Backlog. Waits on BL-2926 (port of unit1675, which needs Curl.Engine and Curl.Core internals); 1620, 1627 and 1653 are ported in the stash

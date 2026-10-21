@@ -1,5 +1,5 @@
 ---
-id: BL-2915
+id: BL-2926
 title: Port upstream unit program 1675: urlapi ipv4_normalize, urlencode_str, ipv6_parse, parse_file, same origin and parse_hostname_login
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-21
 completed:
 ---
-# BL-2915 — Port upstream unit program 1675: urlapi ipv4_normalize, urlencode_str, ipv6_parse, parse_file, same origin and parse_hostname_login
+# BL-2926 — Port upstream unit program 1675: urlapi ipv4_normalize, urlencode_str, ipv6_parse, parse_file, same origin and parse_hostname_login
 
 ## Goal
 
