@@ -70,7 +70,8 @@ try {
     $dataDestination = Join-Path $destination 'data'
     New-Item -ItemType Directory -Path $dataDestination -Force | Out-Null
     Get-ChildItem -LiteralPath $dataDestination -File | Remove-Item -Force
-    foreach ($dataFile in 'data-httpsig-ed25519.key', 'data-httpsig-hmac-sha256.key', 'data-xml1') {
+    # data1461.txt and data1463.txt are curl's --help and --help file text, which cases 1461, 1463 and 1464 include (BL-2830).
+    foreach ($dataFile in 'data-httpsig-ed25519.key', 'data-httpsig-hmac-sha256.key', 'data-xml1', 'data1461.txt', 'data1463.txt') {
         Copy-Item -LiteralPath (Join-Path $upstreamData $dataFile) -Destination (Join-Path $dataDestination $dataFile)
     }
 
@@ -92,7 +93,7 @@ try {
     New-Item -ItemType Directory -Path $sourceDestination -Force | Out-Null
     Copy-Item -LiteralPath (Join-Path $workFolder "$sourceRoot/src/tool_writeout.c") -Destination (Join-Path $sourceDestination 'tool_writeout.c') -Force
 
-    Write-Output "Vendored $($upstreamTests.Count) test files, $($upstreamCerts.Count) certs files, $($upstreamOptionDocs.Count) docs/cmdline-opts files, the httpsig key files, data-xml1 and COPYING from $Tag into $destination."
+    Write-Output "Vendored $($upstreamTests.Count) test files, $($upstreamCerts.Count) certs files, $($upstreamOptionDocs.Count) docs/cmdline-opts files, the httpsig key files, data-xml1, data1461.txt, data1463.txt and COPYING from $Tag into $destination."
     Write-Output "If the count changed, update VendoredTestFileCount in UpstreamTestDataTests.cs and the tag in README.md."
 }
 finally {

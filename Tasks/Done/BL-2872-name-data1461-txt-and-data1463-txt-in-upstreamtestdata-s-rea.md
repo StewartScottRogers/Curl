@@ -5,10 +5,10 @@ priority: Low
 assignee: Claude
 pipeline: docs
 depends-on: []
-touches: [Curl.Conformance.UnitTests/UpstreamTestData/README.md]
+touches: [Curl.Conformance.UnitTests/UpstreamTestData/README.md, Curl.Conformance.UnitTests/UpstreamTestData/Update-UpstreamTestData.ps1]
 requirement: none
 created: 2026-10-19
-completed:
+completed: 2026-10-21
 ---
 # BL-2872 — Name data1461.txt and data1463.txt in UpstreamTestData's README data section
 
@@ -22,12 +22,15 @@ BL-2830 vendored curl 8.22.0's `tests/data/data1461.txt` and `data1463.txt` into
 
 ## Acceptance criteria
 
-- [ ] The README's `## data` section names `data1461.txt` and `data1463.txt` and the cases that read them (1461, 1463, 1464).
-- [ ] `Update-UpstreamTestData.ps1` keeps the two files when it refreshes the folder, or the README says they are added by hand.
+- [x] The README's `## data` section names `data1461.txt` and `data1463.txt` and the cases that read them (1461, 1463, 1464).
+- [x] `Update-UpstreamTestData.ps1` keeps the two files when it refreshes the folder, or the README says they are added by hand.
 
 ## Notes
+
+Added Update-UpstreamTestData.ps1 to touches: it wipes data/ and copies a fixed list, so it had to fetch the two files too.
 
 ## Log
 
 - 2026-10-19: Created.
 - 2026-10-21: Backlog -> Doing. Criteria at claim: f9cf11f2 840d4585.
+- 2026-10-21: Doing -> Done. README names data1461.txt and data1463.txt and cases 1461/1463/1464; Update-UpstreamTestData.ps1 keeps them
