@@ -32,3 +32,4 @@ Split from BL-2851 (2026-10-21, lane 7); the vendored `docs/libcurl/curl_version
 
 - 2026-10-21: Created.
 - 2026-10-21: touches narrowed by BL-2994: the Perl script registration moved out of UpstreamConformanceTests.cs into one UpstreamPerlCommandScripts.Test<N>.cs file per script.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: 7d1ce488 3a376b5e dd1cc079.
