@@ -30,3 +30,4 @@ BL-2905 made `SftpQuoteCommand.ReadPathname` return `CurlExitCode.TooLarge` for 
 ## Log
 
 - 2026-10-21: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: e4dee6c5 aa792584.
