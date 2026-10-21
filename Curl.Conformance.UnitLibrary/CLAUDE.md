@@ -96,8 +96,8 @@ opened tunnel) and TLS are Curl's real code; the `sws` stand-in only answers the
 1456, 3028, 3201, 3202, 3220) pass through it.
 A read before the client's first write waits for that write, as sws blocks reading the
 request (a telnet `-T` session reads while its upload is on its way; BL-1853), and a read while
-an `Expect: 100-continue` request still owes its body waits for the client's next write, since
-sws never answers 100 (test1070). Under `skip: N`, bytes past the request's end are dropped
+the bytes written hold an unfinished request (an `Expect: 100-continue` body still owed, test1070;
+a request sent in pieces, test1548) waits for the client's next write, as sws blocks reading it. Under `skip: N`, bytes past the request's end are dropped
 unrecorded, as sws's stored request ends there. Otherwise a
 read with no reply waiting returns 0, because in memory nothing else can arrive.
 

@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: direct
 depends-on: []
-touches: [Curl.Conformance.UnitLibrary/SwsHttpServerConnection.cs, Curl.Conformance.UnitLibrary/SwsHttpRequestFraming.cs, Curl.Conformance.UnitLibrary/CLAUDE.md, Curl.Conformance.UnitTests/SwsHttpServerConnectorTests.cs, Curl.Conformance.UnitTests/SwsHttpServerConnectorTests.Adversarial.cs, Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
+touches: [Curl.Conformance.UnitLibrary/SwsHttpServerConnection.cs, Curl.Conformance.UnitLibrary/SwsHttpRequestFraming.cs, Curl.Conformance.UnitLibrary/CLAUDE.md, Curl.Conformance.UnitTests/SwsHttpServerConnectorTests.cs, Curl.Conformance.UnitTests/SwsHttpServerConnectorTests.Adversarial.cs, Curl.Conformance.UnitTests/PassingUpstreamCases.txt, Curl.Conformance.UnitLibrary/TlsServerConnection.cs]
 requirement: none
 created: 2026-10-19
-completed:
+completed: 2026-10-21
 ---
 # BL-2880 — Keep the sws emulation reading an unfinished request instead of closing (test1548)
 
@@ -24,14 +24,17 @@ The fix BL-2870 tried (left in its stash): replace `SwsHttpRequestFraming.Awaits
 
 ## Acceptance criteria
 
-- [ ] `$env:CURL_UPSTREAM_CASE='1548'` with `dotnet test Curl.Conformance.UnitTests --filter "TestCategory=Manual"` passes, and 1548 is on `PassingUpstreamCases.txt`.
-- [ ] `UnfinishedRequest_ReadBeforeItsEnd_WaitsForTheClientsNextWrite` in `SwsHttpServerConnectorTests` fails without the fix and passes with it.
-- [ ] `dotnet test Curl.Conformance.UnitTests --filter "TestCategory!=Integration" --blame-hang-timeout 60s` finishes with no failure and no hang.
-- [ ] Build clean, fast tests green, `Curl.Conformance.UnitLibrary` keeps 100% line and branch coverage and complexity at most 10, and its `CLAUDE.md` says a read with an unfinished request waits for the next write.
+- [x] `$env:CURL_UPSTREAM_CASE='1548'` with `dotnet test Curl.Conformance.UnitTests --filter "TestCategory=Manual"` passes, and 1548 is on `PassingUpstreamCases.txt`.
+- [x] `UnfinishedRequest_ReadBeforeItsEnd_WaitsForTheClientsNextWrite` in `SwsHttpServerConnectorTests` fails without the fix and passes with it.
+- [x] `dotnet test Curl.Conformance.UnitTests --filter "TestCategory!=Integration" --blame-hang-timeout 60s` finishes with no failure and no hang.
+- [x] Build clean, fast tests green, `Curl.Conformance.UnitLibrary` keeps 100% line and branch coverage and complexity at most 10, and its `CLAUDE.md` says a read with an unfinished request waits for the next write.
 
 ## Notes
+
+- 2026-10-21: Added `Curl.Conformance.UnitLibrary/TlsServerConnection.cs` to touches (no other Doing task names it). Its relay read the sws side until 0 after every TLS record, which now waits for the next write when a request arrives in several records (test304, test410 over HTTPS), so the relay stops reading while `SwsHttpServerConnection.AwaitsRequestBytes` and returns to the TLS read.
 
 ## Log
 
 - 2026-10-19: Created.
 - 2026-10-21: Backlog -> Doing. Criteria at claim: 9a1e518b 7e9d4057 e4965115 5b83043b.
+- 2026-10-21: Doing -> Done. sws waits on an unfinished request; test1548 listed; HTTPS relay no longer deadlocks
