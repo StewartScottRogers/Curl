@@ -1,5 +1,5 @@
 ---
-id: BL-2983
+id: BL-2986
 title: Split RunDarkFactory.ps1 into one file per area so factory tasks can run in parallel
 priority: High
 assignee: Claude
@@ -11,7 +11,7 @@ requirement: none
 created: 2026-10-21
 completed:
 ---
-# BL-2983 — Split RunDarkFactory.ps1 into one file per area so factory tasks can run in parallel
+# BL-2986 — Split RunDarkFactory.ps1 into one file per area so factory tasks can run in parallel
 
 ## Goal
 
@@ -48,3 +48,4 @@ in `DarkFactory/` and are dot-sourced in their original order, so behaviour is u
 
 - 2026-10-21: Created.
 - 2026-10-21: Backlog -> Doing. Interactive session; Stewart approved 2026-10-21. Criteria at claim: 311cb162 31ad115a 1c2294ce 0bc8d395 a2fb7b1b.
+- 2026-10-21: Renumbered from BL-2983, which a lane filed first.
