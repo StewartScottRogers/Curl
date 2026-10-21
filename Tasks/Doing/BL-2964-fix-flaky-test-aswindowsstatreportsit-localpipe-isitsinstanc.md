@@ -30,3 +30,4 @@ Found by BL-2930's run on lane 9 (2026-10-21): the full fast run failed this one
 ## Log
 
 - 2026-10-21: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: f2c39e0b 9742157d.
