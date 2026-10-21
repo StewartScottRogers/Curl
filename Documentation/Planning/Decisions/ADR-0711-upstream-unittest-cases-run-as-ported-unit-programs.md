@@ -130,7 +130,7 @@ two noted, by its batch) with no port.
 | 2600 | no counterpart (BL-2849): connection filter chain connect and destroy; Curl connects through `IConnection`, not filters |
 | 2601 | no counterpart (BL-2849): `bufq`, libcurl's chunked buffer queue |
 | 2602 | no counterpart (BL-2846 records it): `dynhds`, libcurl's growable array of header structs; the header behaviour is covered by 1625 and 1626 |
-| 2603 | port in BL-2846: the HTTP/1 response parser (`Curl.Protocol.Http.UnitLibrary`) |
+| 2603 | no counterpart (BL-2893 records it): `h1_req_parser`, libcurl's incremental parser that rereads its own HTTP/1 request text, fed in chunks, into a request struct (method, scheme, authority, path, header count, unread bytes); Curl builds the HTTP/2 and HTTP/3 header list in one pass from the head it formats (`Http2RequestHeaders`), and the one observable behaviour, a custom method with a space (#19543), is BL-2915 |
 | 2604 | port in BL-2845: `Curl_get_pathname` (`Curl.Protocol.Ssh.UnitLibrary`) |
 | 2605 | port in BL-2845: `Curl_ssh_range` (`Curl.Protocol.Ssh.UnitLibrary`) |
 | 2606 | no counterpart (BL-2849): `Curl_conn_adjust_pollset`, adjusting a C `poll` set; Curl has no pollset |
@@ -151,9 +151,9 @@ two noted, by its batch) with no port.
 | 3306 | no counterpart (BL-2849): the thread queue's retry of failed thread starts (`CURL_DBG_THRDPOOL_FAIL_STARTS`) |
 | 3400 | port in BL-2846: capsule protocol encoder and decoder (`CapsuleDatagramChannel`) |
 
-Counts: 84 rows. 64 are ported. 20 are `no counterpart`: the 18 cases of BL-2849 (1300, 1305,
+Counts: 84 rows. 63 are ported. 21 are `no counterpart`: the 18 cases of BL-2849 (1300, 1305,
 1306, 1309, 1330, 1602, 1603, 1616, 1661, 2600, 2601, 2606, 3211, 3212, 3213, 3300, 3301, 3306),
-plus 2602 (recorded by BL-2846) and 3214 (recorded by BL-2848). A batch task that reads a C program and finds the Curl type absent, or present
+plus 2602 (recorded by BL-2846), 2603 (recorded by BL-2893) and 3214 (recorded by BL-2848). A batch task that reads a C program and finds the Curl type absent, or present
 where this table says `no counterpart`, changes its own row in its Notes and files the port or
 the record as a task; a reason it records is a C-only thing, never "hard".
 
