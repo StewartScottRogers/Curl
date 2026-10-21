@@ -18,7 +18,8 @@ namespace Curl.Conformance;
 /// <c>NTLM</c>, <c>Kerberos</c> and <c>SPNEGO</c>; the tool features a curl build has unless it
 /// disables them (<c>cookies</c>, <c>proxy</c>, <c>Mime</c>, <c>manual</c>, <c>DoH</c>,
 /// <c>digest</c>, <c>aws</c>, <c>netrc</c>, <c>verbose-strings</c>, <c>large-time</c>,
-/// <c>large-size</c>, <c>sha512-256</c>, <c>SSLpinning</c> and <c>httpsig</c>); <c>headers-api</c>, since
+/// <c>large-size</c>, <c>sha512-256</c>, <c>SSLpinning</c>, <c>httpsig</c> and <c>--libcurl</c>, since Curl
+/// writes the C program <c>--libcurl</c> names (BL-2862)); <c>headers-api</c>, since
 /// Curl writes <c>-w %header{name}</c> and <c>%{header_json}</c>, which curl writes only with libcurl's
 /// headers API (BL-2264); <c>form-api</c>, since <c>Libcurl</c>, which runs the ported libtest
 /// programs, has <c>CURLOPT_HTTPPOST</c> (BL-2593); <c>wakeup</c>, since that <c>Libcurl</c> has <c>curl_multi_wakeup</c> (BL-2661, ADR-0690);
@@ -39,8 +40,7 @@ namespace Curl.Conformance;
 /// These stay off, so the cases that need them are skipped rather than counted as failures:
 /// libcurl's build and API features, which a command-line tool does not have (<c>Debug</c>,
 /// <c>TrackMemory</c>, <c>unittest</c>,
-/// <c>shuffle-dns</c>, <c>override-dns</c>, <c>getrlimit</c>,
-/// <c>--libcurl</c>); the other protocols the harness has no server for; features
+/// <c>shuffle-dns</c>, <c>override-dns</c>, <c>getrlimit</c>); the other protocols the harness has no server for; features
 /// absent from Curl's <c>curl -V</c> (<c>SSPI</c>, <c>Unicode</c>, <c>MultiSSL</c>,
 /// <c>ssl-sessions</c>, <c>c-ares</c>).
 /// </para>
