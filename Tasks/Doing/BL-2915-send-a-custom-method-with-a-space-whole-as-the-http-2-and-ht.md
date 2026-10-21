@@ -31,3 +31,4 @@ Found by BL-2893. curl 8.22.0 `tests/unit/unit2603.c` TEST7a/TEST7b (curl issue 
 ## Log
 
 - 2026-10-21: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: 60653e23 899ec023 10a95a96.
