@@ -31,7 +31,7 @@ unit2604: quoted and unquoted words, the escapes `\"`, `\'` and `\\`, an unknown
 
 - Counterparts: `SftpQuoteCommand.ReadPathname(value, homeDirectory)` returns `(CurlExitCode Result, byte[] Path, string Remainder)`, the same `ArgumentReader` `-Q` parsing uses; `SftpDownloadPart.ReadRange(rangeText, fileSize)` returns `(CurlExitCode Result, long Start, long Size)` over the existing `Curl_ssh_range` text reader. Both internal; the csproj adds `InternalsVisibleTo Curl.Conformance.UnitProgram.UnitLibrary` (BL-2845 still adds its own project reference).
 - Read against curl-8_22_0's lib/vssh/vssh.c: the reader now returns curl's code and adds `MAX_PATHLENGTH` (65535): a path of 65535 bytes or more is `CURLE_TOO_LARGE`, a quoted one as the character is added (dynbuf's limit). For a quoted path the limit counts UTF-16 characters, the same as bytes for ASCII.
-- `-Q` parsing still turns every pathname failure into exit 21, so a path of 65535+ bytes there is now 21 (it was accepted); curl returns 100. Filed BL-2915 to measure and match that.
+- `-Q` parsing still turns every pathname failure into exit 21, so a path of 65535+ bytes there is now 21 (it was accepted); curl returns 100. Filed BL-2918 to measure and match that.
 - Tests: `SshPathnameAndRangeTests` pins all 21 rows of unit2604 and 26 of unit2605, plus the limit at 65534/65535. Measure-CodeQuality: Curl.Protocol.Ssh.UnitLibrary 100% line, 100% branch, 0 failing members (`ReadQuoted` split after a first run measured it at 12).
 
 ## Log

@@ -1,5 +1,5 @@
 ---
-id: BL-2915
+id: BL-2918
 title: Exit 100 for an SFTP -Q path of 65535 bytes or more, as curl's sftp_quote returns Curl_get_pathname's CURLE_TOO_LARGE
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-21
 completed:
 ---
-# BL-2915 — Exit 100 for an SFTP -Q path of 65535 bytes or more, as curl's sftp_quote returns Curl_get_pathname's CURLE_TOO_LARGE
+# BL-2918 — Exit 100 for an SFTP -Q path of 65535 bytes or more, as curl's sftp_quote returns Curl_get_pathname's CURLE_TOO_LARGE
 
 ## Goal
 
