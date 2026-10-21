@@ -1011,7 +1011,12 @@ internal sealed partial class ManagedEasyTransfer(
         CookieEngine? cookies = CookieEngine.FromHttpOptions(options.Http, PerformShared.Cookies);
         EngineToolTransferEvents? toolEvents = ToolEvents;
         (EngineTransferState state, ITransferEvents events, TlsVerifyResultRecordingTransferEvents? recorder) = StateAndEventsOf(toolEvents, options);
-        string transferUrl = await SetUpUnlessToolDidAsync(toolInputs, options, settings, cookies, state, urlText, events).ConfigureAwait(false);
+        (string transferUrl, TransferResult? setUpFailure) = await SetUpUnlessToolDidAsync(toolInputs, options, settings, cookies, state, urlText, events).ConfigureAwait(false);
+        if (setUpFailure is not null)
+        {
+            return Finish(setUpFailure.ExitCode.ToCurlCode(), setUpFailure.ErrorMessage!, Info);
+        }
+
         EngineToolTransferDispatch? toolDispatch = ToolDispatch;
         RedirectFollower follower = FollowerOf(toolDispatch, options, cookies);
         EngineToolTransferInputs inputs = MimePostForm.WithBody(InputsOf(toolInputs, options, settings, url, state, PauseGateFor(url), selectedProxy), formBody, url.Scheme);
@@ -1191,8 +1196,8 @@ internal sealed partial class ManagedEasyTransfer(
     /// <param name="state">The running transfer, which keeps the alt-svc cache.</param>
     /// <param name="urlText">The URL set.</param>
     /// <param name="events">Where the setup's <c>-v</c> lines go.</param>
-    /// <returns>The URL to transfer.</returns>
-    private async Task<string> SetUpUnlessToolDidAsync(
+    /// <returns>The URL to transfer, and the failure that ends the perform before anything is sent, or <see langword="null" />.</returns>
+    private async Task<(string TransferUrl, TransferResult? Failure)> SetUpUnlessToolDidAsync(
         EngineToolTransferInputs? toolInputs,
         EasyOptions options,
         EngineTransferSettings settings,
@@ -1204,7 +1209,7 @@ internal sealed partial class ManagedEasyTransfer(
         if (toolInputs is not null)
         {
             state.AltSvc = toolInputs.AltSvc;
-            return urlText;
+            return (urlText, null);
         }
 
         return await SetUpAsync(options, settings, cookies, state, urlText, events).ConfigureAwait(false);
@@ -1319,8 +1324,13 @@ internal sealed partial class ManagedEasyTransfer(
     /// <param name="state">The running transfer, which keeps the alt-svc cache.</param>
     /// <param name="urlText">The URL set.</param>
     /// <param name="events">Where the setup's <c>-v</c> lines go.</param>
-    /// <returns>The URL to transfer: <paramref name="urlText" /> itself, or the <c>https</c> one HSTS switched it to.</returns>
-    private async Task<string> SetUpAsync(
+    /// <returns>
+    /// The URL to transfer: <paramref name="urlText" /> itself, or the <c>https</c> one HSTS switched it to; and
+    /// <see langword="null" />, or exit 100 when a cookie file held a line longer than 4998 characters, which ends the
+    /// perform before the alt-svc and HSTS files are read and before anything is sent, as libcurl 8.22.0's
+    /// <c>Curl_pretransfer</c> fails with <c>Curl_cookie_loadfiles</c>' <c>CURLE_TOO_LARGE</c> (BL-2978).
+    /// </returns>
+    private async Task<(string TransferUrl, TransferResult? Failure)> SetUpAsync(
         EasyOptions options,
         EngineTransferSettings settings,
         CookieEngine? cookies,
@@ -1330,9 +1340,13 @@ internal sealed partial class ManagedEasyTransfer(
     {
         EasyTransferHost host = Host;
         await ApplyCookieListAsync(cookies, host, events).ConfigureAwait(false);
-        await shared.Performer.LoadCookieFilesAsync(cookies, settings, urlText, host.FileSystem, host.StandardInput, events).ConfigureAwait(false);
+        if (await shared.Performer.LoadCookieFilesAsync(cookies, settings, urlText, host.FileSystem, host.StandardInput, events).ConfigureAwait(false) is { } tooLarge)
+        {
+            return (urlText, tooLarge);
+        }
+
         await OpenOrKeepAltSvcCacheAsync(options, settings, state, urlText, host).ConfigureAwait(false);
-        return await TransferPerformer.SwitchToHttpsForHstsAsync(PerformShared.Hsts, settings, options.Network, options.Http, urlText, host.FileSystem, events).ConfigureAwait(false);
+        return (await TransferPerformer.SwitchToHttpsForHstsAsync(PerformShared.Hsts, settings, options.Network, options.Http, urlText, host.FileSystem, events).ConfigureAwait(false), null);
     }
 
     /// <summary>
