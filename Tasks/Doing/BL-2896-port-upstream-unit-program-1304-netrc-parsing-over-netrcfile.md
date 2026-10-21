@@ -32,3 +32,4 @@ Split from BL-2846 for size. curl 8.22.0 `tests/unit/unit1304.c` runs `Curl_netr
 ## Log
 
 - 2026-10-21: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: ff74b0c9 b8d1c68f d0b9baa3 dd1cc079.
