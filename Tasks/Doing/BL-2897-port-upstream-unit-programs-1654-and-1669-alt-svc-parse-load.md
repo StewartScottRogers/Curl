@@ -32,3 +32,4 @@ Split from BL-2846 for size. curl 8.22.0 `tests/unit/unit1654.c` loads the alt-s
 ## Log
 
 - 2026-10-21: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: 5d46eb8f f82efa1d bee7b905 dd1cc079.
