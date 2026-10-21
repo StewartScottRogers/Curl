@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Conformance.UnitTests/PassingUpstreamCases.txt, Curl.Conformance.UnitTests/UpstreamConformanceTests.FixedEntropyStandIn.cs, Curl.Authentication.UnitLibrary, Curl.Authentication.UnitTests, Curl.Ntlm.UnitLibrary, Curl.Ntlm.UnitTests]
+touches: [Curl.Conformance.UnitTests/PassingUpstreamCases.txt, Curl.Conformance.UnitTests/UpstreamConformanceTests.FixedEntropyStandIn.cs, Curl.Conformance.UnitTests/UpstreamConformanceTests.cs, Curl.Conformance.UnitTests/UpstreamConformanceTests.DebugStandIns.cs, Curl.Authentication.UnitLibrary, Curl.Authentication.UnitTests, Curl.Ntlm.UnitLibrary, Curl.Ntlm.UnitTests, Curl.Engine.UnitLibrary/EngineComposition.cs, Curl.Engine.UnitLibrary/ManagedCurlEngine.cs, Curl.Engine.UnitLibrary/ManagedEngineSharedState.cs, Curl.Engine.UnitTests/EngineCompositionDigestClientNonceTests.cs, Curl.Console/CurlComposition.cs, Curl.Console.UnitTests/CurlCompositionDigestClientNonceTests.cs]
 requirement: none
 created: 2026-10-19
 completed:
@@ -39,7 +39,30 @@ If a case still differs after the stand-in, record its first difference in Notes
 
 ## Notes
 
+- 2026-10-21 (lane 5, first pass, no code edited): the cnonce seam already exists in
+  `Curl.Authentication.UnitLibrary` (`DigestAuthenticator` and `SaslAuthenticator` take a
+  `Func<string> createClientNonce`), but the engine hard-wires it:
+  `Curl.Engine.UnitLibrary/EngineComposition.cs` builds `new DigestAuthenticator(...,
+  DigestClientNonce.ForBuild(...))` (line ~276) and `new SaslAuthenticator(...)` with the
+  default `CreateRandomHex` (line ~377), with no parameter to override them. So the harness
+  can reach neither the curl tool's (`CurlComposition.CreateRunner`, called from
+  `UpstreamConformanceTests.cs`) nor the libtest engine's (`ManagedCurlEngine`, `CreateEngine`)
+  nonce without an optional `createDigestClientNonce`-style parameter threaded through
+  `EngineComposition`, `ManagedCurlEngine`/`ManagedEngineSharedState` and `CurlComposition`,
+  as `webSocketRandomSource` already is. The Debug rule goes in `DebugStandInRules`
+  (`UpstreamConformanceTests.DebugStandIns.cs`). Added those files to `touches` (file-level).
+- The forced nonce: SASL DIGEST-MD5 is `Curl_rand_hex` (16 bytes from `Curl_rand_bytes`, hex);
+  HTTP Digest is 12 bytes from `Curl_rand_bytes`, base64; both fill from
+  `ForcedEntropyWebSocketRandomSource`'s sequence (ADR-0678).
+- NTLM (159, 1100): no `CURL_ENTROPY`; 1100's type 3 has flags `0x00018286` (no NTLM2 session
+  key), so its LM/NT responses depend only on the server challenge and its workstation is
+  `WORKSTATION`. Likely only the Debug feature must be reported; check first after the requeue.
+- Lib1647 is already ported (`Curl.Conformance.LibTest.UnitLibrary/Lib1647.cs`).
+- Requeued: BL-2921 (Doing) touches the whole `Curl.Engine.UnitLibrary` and
+  `Curl.Engine.UnitTests`. No other prerequisite found.
+
 ## Log
 
 - 2026-10-19: Created.
 - 2026-10-21: Backlog -> Doing. Criteria at claim: 2a064a5d 50019839 7f573e82 d86cdfca dd1cc079 620ebead.
+- 2026-10-21: Doing -> Backlog. Needs Curl.Engine.UnitLibrary/EngineComposition.cs (Digest and SASL nonce are hard-wired there), which BL-2921 in Doing holds as the whole Curl.Engine.UnitLibrary
