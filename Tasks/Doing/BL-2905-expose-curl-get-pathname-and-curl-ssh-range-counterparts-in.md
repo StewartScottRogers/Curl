@@ -32,3 +32,4 @@ unit2604: quoted and unquoted words, the escapes `\"`, `\'` and `\\`, an unknown
 ## Log
 
 - 2026-10-21: Created (split from BL-2845, which waits on it).
+- 2026-10-21: Backlog -> Doing. Criteria at claim: 19cda1db 3d228e1f d3a9ab15 099d1d27.
