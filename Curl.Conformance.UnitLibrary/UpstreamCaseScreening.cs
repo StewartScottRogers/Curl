@@ -44,6 +44,12 @@ internal static class UpstreamCaseScreening
         "upload", "socks", "dns", "data", "strip", "strippart", "stripfile", "stripfile1", "stripfile2", "stripfile3", "stripfile4", "limits", "valgrind", "postcheck",
     ];
 
+    /// <summary>
+    /// The host test1592 sends its transfer to, whose name lookup must never answer: the harness's resolver
+    /// stalls on it, so the case is not screened as reaching the internet (BL-2839, ADR-0721).
+    /// </summary>
+    public const string StalledLookupHost = "a-site-never-accessed.example.org";
+
     // Interpreted, not source-generated, so no generated code counts against the coverage gate.
     private static readonly Regex InternetUrlHost = new(@"\bhttps?://(?<host>[A-Za-z][A-Za-z0-9-]*(?:\.[A-Za-z0-9-]+)+)", RegexOptions.CultureInvariant);
 
@@ -403,9 +409,11 @@ internal static class UpstreamCaseScreening
     // A case that names no server, expects success and sends its command to a host name with a
     // dot (test2043's https://revoked.badssl.com/) needs the internet, which the in-process harness
     // never reaches (BL-1858); one expecting a failure (test467's http://example.com) fails first.
+    // StalledLookupHost is not on the internet: the harness's resolver stalls on it (test1592, BL-2839).
     private static string? InternetHost(UpstreamTestCase testCase) =>
         NamesNoServerAndExpectsSuccess(testCase)
             && InternetUrlHost.Match(UpstreamTestPartBodies.Text(testCase.Find("client", "command"))) is { Success: true } url
+            && !string.Equals(url.Groups["host"].Value, StalledLookupHost, StringComparison.OrdinalIgnoreCase)
             ? $"the case reaches {url.Groups["host"].Value} on the internet, which the harness does not"
             : null;
 
