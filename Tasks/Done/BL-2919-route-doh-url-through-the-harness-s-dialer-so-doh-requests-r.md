@@ -8,7 +8,7 @@ depends-on: [BL-2928]
 touches: [Curl.Engine.UnitLibrary/EngineComposition.cs, Curl.Engine.UnitTests/EngineCompositionDohDialingTests.cs]
 requirement: none
 created: 2026-10-21
-completed:
+completed: 2026-10-21
 ---
 # BL-2919 — Route --doh-url through the harness's dialer so DoH requests reach the in-memory servers
 
@@ -24,7 +24,7 @@ Found by BL-2837 (2026-10-21). `EngineComposition.CreateTransports` takes `Resol
 
 - [x] With an `EngineDialing` and a `--doh-url`, `CreateTransports`' resolver is a `DohDnsResolver` whose connections go through `dialing.TcpDialer`; a unit test in `Curl.Engine.UnitTests/EngineCompositionDohDialingTests.cs` pins it with a fake dialer that records the DoH POST.
 - [x] Without `--doh-url` the resolver is still `dialing.DnsResolver` (unit test).
-- [ ] `$env:CURL_UPSTREAM_CASE='2100'` reaches the DoH POSTs (the first difference, if any, is no longer at byte 0 of `<protocol>`); record it in Notes.
+- [x] `$env:CURL_UPSTREAM_CASE='2100'` reaches the DoH POSTs (the first difference, if any, is no longer at byte 0 of `<protocol>`); record it in Notes.
 - [x] `dotnet build Curl.slnx -warnaserror` is clean, `dotnet test --filter "TestCategory!=Integration"` passes, and Curl.Engine.UnitLibrary keeps 100% line and branch coverage.
 
 ## Notes
@@ -33,6 +33,7 @@ Found by BL-2837 (2026-10-21). `EngineComposition.CreateTransports` takes `Resol
 - Criterion 3 not checkable: `CURL_UPSTREAM_CASE=2100` ends `test2100 is skipped: Curl lacks the feature Debug` before running, so the runner never reaches the DoH POSTs. Lifting that skip is outside this task's `touches`; the unit test pins the POST reaching the dialer instead.
 - Follow-up: BL-2928 (lift the Debug skip for the named-case run).
 - `Measure-CodeQuality.ps1 -Library Curl.Engine.UnitLibrary`: 0 failing members.
+- Criterion 3 (2026-10-21, after BL-2928): `CURL_UPSTREAM_CASE=2100` with `NamedUpstreamCase_RunThroughCurl_PassesAsAListedCaseMust` now passes outright on Windows - the DoH POSTs reach sws and the whole case matches.
 
 ## Log
 
@@ -40,3 +41,4 @@ Found by BL-2837 (2026-10-21). `EngineComposition.CreateTransports` takes `Resol
 - 2026-10-21: Backlog -> Doing. Criteria at claim: 1b6f541b 37a362b9 e53a05cf 9963d6cb.
 - 2026-10-21: Doing -> Backlog. Code done and committed; criterion 3 (case 2100) waits on BL-2928, which lifts the Debug skip
 - 2026-10-21: Backlog -> Doing. Criteria at claim: 1b6f541b 37a362b9 e53a05cf 9963d6cb.
+- 2026-10-21: Doing -> Done. Under the harness, --doh-url resolves through a DohDnsResolver dialing the in-memory servers; upstream case 2100 passes
