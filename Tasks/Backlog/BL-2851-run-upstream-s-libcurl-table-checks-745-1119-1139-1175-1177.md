@@ -4,7 +4,7 @@ title: Run upstream's libcurl table checks 745, 1119, 1139, 1175, 1177, 1222, 12
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-2850]
+depends-on: [BL-2850, BL-2990, BL-2991, BL-2992, BL-2993]
 touches: [Curl.Conformance.UnitTests/PassingUpstreamCases.txt, Curl.Conformance.UnitLibrary/UpstreamCaseScreening.cs, Curl.Conformance.UnitLibrary/UpstreamPerlCheckLine.cs, Curl.Conformance.UnitTests/UpstreamCaseScreeningTests.cs, Curl.Conformance.UnitTests/UpstreamTestData/README.md]
 requirement: none
 created: 2026-10-19
@@ -32,7 +32,10 @@ Depends on BL-2850, which adds the `<command type="perl">` mechanism and the ven
 
 ## Notes
 
+- 2026-10-21 (lane 7, first pass, before any code): too big for one run, as BL-2850 was. It needs vendored `docs/libcurl` files (symbols-in-versions, libcurl-errors.md, opts/*.md, curl_version_info.3, which 1177 reads from `%PWD/../docs/libcurl`), a `Libcurl` reference from the harness, and seven script interpretations, all in files outside `touches` (csprojs, Update-UpstreamTestData.ps1, new `UpstreamTest<n>Script.cs` files, `UpstreamConformanceTests.cs`). Split into BL-2990 (vendoring and the reference), BL-2991 (1119, 1175, 1477), BL-2992 (1139, 1222, 1488) and BL-2993 (1177). What stays here once they are Done: judge 745 (typecheck-gcc over `curl.h`) and 1276 (`lib/optiontable.pl` against `lib/easyoptions.c`), both likely C-only, record them in an ADR or port them, then confirm all nine cases and the CI criterion.
+
 ## Log
 
 - 2026-10-19: Created.
 - 2026-10-21: Backlog -> Doing. Criteria at claim: 09d8956f 44ec4ea8 cfcc71e4 dd1cc079 620ebead.
+- 2026-10-21: Doing -> Backlog. Split for size; waits on BL-2990, BL-2991, BL-2992 and BL-2993
