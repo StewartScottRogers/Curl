@@ -35,3 +35,4 @@ Step 1: report `--libcurl` in `UpstreamCurlPlatform` (the tool implements it) an
 ## Log
 
 - 2026-10-19: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: 6a37415d 8a179613 1ee97f0b dd1cc079 620ebead.
