@@ -35,3 +35,4 @@ Turn the feature list into entries in one file each (partial class or small prov
 ## Log
 
 - 2026-10-21: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: 73de0a0e df0009a6 ee115027 1ff6ab0b 38e9dffd.
