@@ -1,5 +1,5 @@
 ---
-id: BL-2963
+id: BL-2964
 title: Fix flaky test AsWindowsStatReportsIt_LocalPipe_IsItsInstanceCount when lanes share the machine
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-21
 completed:
 ---
-# BL-2963 — Fix flaky test AsWindowsStatReportsIt_LocalPipe_IsItsInstanceCount when lanes share the machine
+# BL-2964 — Fix flaky test AsWindowsStatReportsIt_LocalPipe_IsItsInstanceCount when lanes share the machine
 
 ## Goal
 

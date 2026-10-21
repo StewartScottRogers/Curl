@@ -50,7 +50,7 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 - The test now asserts `engine.Multi.Removals == 1` (1503 and 1505 remove before the clean-up) and `engine.DisposedEasyCount == 2` (the original handle and its duplicate).
 - `FakeCurlEngine`'s `FakeEasyTransfer.Duplicate()` did not carry `Disposing`, so a duplicate's clean-up was never counted and `DisposedEasyCount` read 1. The duplicate now carries it; all 1184 tests in `Curl.Conformance.LibTest.UnitTests` still pass.
 - The `AddResult` setup moved into the object initializer so both new assertions fall inside the reproduction's `-Context 0,9` window.
-- Fast run: `dotnet build` clean; every project passed except one failure in `Curl.Core.UnitTests`, `AsWindowsStatReportsIt_LocalPipe_IsItsInstanceCount` (a named-pipe instance count on a machine shared by nine lanes). This task does not touch that project, so the failure is not caused here. Filed as BL-2963.
+- Fast run: `dotnet build` clean; every project passed except one failure in `Curl.Core.UnitTests`, `AsWindowsStatReportsIt_LocalPipe_IsItsInstanceCount` (a named-pipe instance count on a machine shared by nine lanes). This task does not touch that project, so the failure is not caused here. Filed as BL-2964.
 
 ## Log
 
