@@ -3,8 +3,8 @@ id: AF-0310
 title: BL-2743 cost $4.75 over two runs, 3.4 times the median, after a requeue that stashed finished engine work
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: process:logs:BL-2743:cost-outlier
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Log
 
 - 2026-10-19: filed proposed.
+- 2026-10-21: proposed -> accepted.
