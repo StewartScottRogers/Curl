@@ -1597,6 +1597,24 @@ public sealed class RedirectFollowerTests
     }
 
     [TestMethod]
+    public async Task FollowAsync_TimedHops_AddsEachHopsTimeToFirstByte()
+    {
+        MillisecondTimeProvider clock = new();
+        TransferResult first = Redirect(302, Next);
+        TransferResult last = Ok(200, 0);
+        ScriptedHandler handler = new(
+            first with { Report = first.Report! with { Timings = new TransferTimings(1000, null, null, null, 1200, 1300) } },
+            last with { Report = last.Report! with { Timings = new TransferTimings(1500, null, null, null, 1600, 1700) } });
+
+        TransferResult result = await Follow(handler, Context(Location(), timeProvider: clock));
+
+        TransferTimings timings = result.Report!.Timings!;
+        Assert.AreEqual(1000, timings.Started);
+        Assert.AreEqual(1300, timings.FirstByteReceived);
+        Assert.AreEqual(TimeSpan.FromMilliseconds(500), timings.RedirectDuration);
+    }
+
+    [TestMethod]
     public async Task FollowAsync_OnlyLastHopTimed_ReportsZeroRedirectDuration()
     {
         MillisecondTimeProvider clock = new();

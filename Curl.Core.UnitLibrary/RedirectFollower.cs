@@ -180,7 +180,8 @@ public sealed class RedirectFollower(
     /// <see cref="TransferReport.RedirectCount" />, <see cref="TransferReport.EffectiveUrl" />
     /// (the last URL requested, <see langword="null" /> when no redirect was followed),
     /// header, request and connection counts summed over every hop, and
-    /// <see cref="TransferReport.Timings" /> measured from the first hop's start with
+    /// <see cref="TransferReport.Timings" /> merged by <see cref="RedirectHopTimings" />: measured from
+    /// the first hop's start, each phase the sum of its time on every hop, and
     /// <see cref="TransferTimings.RedirectDuration" /> the time until the last hop began.
     /// </returns>
     public ValueTask<TransferResult> FollowAsync(ITransferContext context, RedirectPolicy policy)
@@ -808,9 +809,9 @@ public sealed class RedirectFollower(
     /// </summary>
     private sealed class RedirectChain(TimeProvider timeProvider)
     {
+        private readonly RedirectHopTimings timings = new(timeProvider);
         private TransferReport? lastReport;
         private string? lastReferer;
-        private long? firstStarted;
         private string? effectiveUrl;
         private long headerSize;
         private long requestSize;
@@ -830,7 +831,7 @@ public sealed class RedirectFollower(
                 return;
             }
 
-            firstStarted ??= report.Timings?.Started;
+            timings.Add(report.Timings);
             headerSize += report.HeaderSize;
             requestSize += report.RequestSize;
             connectionCount += report.ConnectionCount;
@@ -875,24 +876,8 @@ public sealed class RedirectFollower(
                     RequestSize = requestSize,
                     ConnectionCount = connectionCount,
                     EarlierResponseHeaders = [.. earlierResponseHeaders],
-                    Timings = MergeTimings(report.Timings),
+                    Timings = timings.Merge(report.Timings),
                 },
-            };
-        }
-
-        private TransferTimings? MergeTimings(TransferTimings? last)
-        {
-            if (last is null)
-            {
-                return null;
-            }
-
-            // The hop that reported these timings was added, so firstStarted is set.
-            long started = firstStarted!.Value;
-            return last with
-            {
-                Started = started,
-                RedirectDuration = timeProvider.GetElapsedTime(started, last.Started),
             };
         }
     }
