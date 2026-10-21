@@ -38,8 +38,9 @@ public sealed class ParallelProgressMeterTextAdversarialTests
     [TestMethod]
     [DataRow(1L, "00:00:01")]
     [DataRow(360_000L, "  4d 04h")]
-    [DataRow(86_400_000L, "   1000d")]
-    [DataRow(863_999_999_999L, "9999999d")]
+    [DataRow(86_400_000L, " 33m 10d")]
+    [DataRow(2_592_000_000L, "     82y")]
+    [DataRow(3_153_600_000_000L, " >99999y")]
     public void Time_AtEachLayoutChange_IsEightColumns(long seconds, string expected)
     {
         string time = ParallelProgressMeterText.Time(seconds);

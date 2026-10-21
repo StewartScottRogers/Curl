@@ -4,10 +4,11 @@ using System.Text;
 namespace Curl.Output;
 
 /// <summary>
-/// The text of curl's combined progress meter for a <c>-Z</c> run, as curl 8.21.0's
+/// The text of curl's combined progress meter for a <c>-Z</c> run, as curl's
 /// <c>progress_meter</c> in <c>src/tool_progress.c</c> writes it: one header line, then status
 /// lines each starting with a carriage return, sizes five columns wide (<c>max5data</c>) and times
-/// eight (<c>time2str</c>). Measured on curl 8.21.0 (Schannel), BL-521 Notes.
+/// eight (8.22.0's <c>timebuf</c>). Measured on curl 8.21.0 (Schannel), BL-521 Notes; times past
+/// 999 days follow 8.22.0 (ADR-0724).
 /// </summary>
 public static class ParallelProgressMeterText
 {
@@ -80,10 +81,10 @@ public static class ParallelProgressMeterText
     }
 
     /// <summary>
-    /// Formats a number of seconds in eight columns as <c>time2str</c> does: blank for none,
-    /// <c>hh:mm:ss</c> up to 99 hours, <c>ddd hhh</c> up to 999 days, then days alone, cut to eight
-    /// characters as curl's nine-byte <c>msnprintf</c> buffer cuts it, so <see cref="long.MaxValue" />
-    /// is <c>10675199</c> (ADR-0428).
+    /// Formats a number of seconds in eight columns as curl 8.22.0's <c>timebuf</c> does: blank for
+    /// none, <c>hh:mm:ss</c> up to 99 hours, <c>ddd hhh</c> up to 999 days, <c>mmmm ddd</c> (30-day
+    /// months) up to 999 months, <c>yyyyyyyy</c> (365-day years) up to 99999 years, then
+    /// <c> &gt;99999y</c>, as in <c> 51m 23d</c> and <c>    136y</c> (ADR-0724).
     /// </summary>
     /// <param name="seconds">The seconds; zero or fewer is blank.</param>
     /// <returns>Eight characters.</returns>
@@ -101,10 +102,33 @@ public static class ParallelProgressMeterText
         }
 
         long days = seconds / 86400;
+        if (days <= 999)
+        {
+            return string.Create(CultureInfo.InvariantCulture, $"{days,3}d {hours % 24:D2}h");
+        }
 
-        return days <= 999
-            ? string.Create(CultureInfo.InvariantCulture, $"{days,3}d {hours % 24:D2}h")
-            : string.Create(CultureInfo.InvariantCulture, $"{days,7}d")[..8];
+        return LongTime(days);
+    }
+
+    /// <summary>
+    /// Formats more than 999 days as <c>timebuf</c> does: <c>mmmm ddd</c> up to 999 months of 30
+    /// days, <c>yyyyyyyy</c> up to 99999 years of 365 days, then <c> &gt;99999y</c>.
+    /// </summary>
+    /// <param name="days">The whole days, more than 999.</param>
+    /// <returns>Eight characters.</returns>
+    private static string LongTime(long days)
+    {
+        long months = days / 30;
+        if (months <= 999)
+        {
+            return string.Create(CultureInfo.InvariantCulture, $"{months,3}m {days % 30:D2}d");
+        }
+
+        long years = days / 365;
+
+        return years <= 99999
+            ? string.Create(CultureInfo.InvariantCulture, $"{years,7}y")
+            : " >99999y";
     }
 
     /// <summary>
