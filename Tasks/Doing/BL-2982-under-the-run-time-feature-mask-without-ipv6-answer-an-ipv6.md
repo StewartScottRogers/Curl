@@ -30,3 +30,4 @@ Split from BL-2856. The `--connect-to` destination is resolved in `Curl.Networki
 ## Log
 
 - 2026-10-21: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: e8a15e41 dd1cc079.
