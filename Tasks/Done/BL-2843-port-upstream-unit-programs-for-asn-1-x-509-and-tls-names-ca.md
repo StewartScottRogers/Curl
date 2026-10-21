@@ -8,7 +8,7 @@ depends-on: [BL-2886, BL-2911, BL-2912, BL-2913]
 touches: [Curl.Conformance.UnitTests/PassingUpstreamCases.txt, Curl.Conformance.UnitProgram.UnitLibrary/UnitPrograms.Asn1.cs, Curl.Conformance.UnitProgram.UnitLibrary/Asn1, Curl.Conformance.UnitProgram.UnitTests/Asn1]
 requirement: none
 created: 2026-10-19
-completed:
+completed: 2026-10-21
 ---
 # BL-2843 — Port upstream unit programs for ASN.1, X.509 and TLS names: cases 1394, 1397, 1651, 1656, 1657, 1666, 1667, 1676 and 3205
 
@@ -22,11 +22,11 @@ These nine `unittest` cases (skipped today with `Curl lacks the feature unittest
 
 ## Acceptance criteria
 
-- [ ] Each of the nine cases has a port in `Curl.Conformance.UnitProgram.UnitLibrary` whose checks match the C program's row for row (named in its doc comment), registered in `UnitPrograms.Ported`, with a test in `Curl.Conformance.UnitProgram.UnitTests`; or the case has a Notes entry naming the C-only thing it tests and the ADR from BL-2840 row says so.
-- [ ] Each ported case ends `Passed` with `$env:CURL_UPSTREAM_CASE='<n>'` on Windows and is on `PassingUpstreamCases.txt`.
-- [ ] Where a port finds Curl wrong, the fix has a focused unit test in the fixed library's own `.UnitTests` project (ADR-0482) and the library folder is added to `touches` in the same commit.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean, `dotnet test --filter "TestCategory!=Integration"` passes, and each changed library and the new library keep 100% line and branch coverage and complexity at most 10.
-- [ ] After the push, `CI` is green on Linux and macOS for the commit.
+- [x] Each of the nine cases has a port in `Curl.Conformance.UnitProgram.UnitLibrary` whose checks match the C program's row for row (named in its doc comment), registered in `UnitPrograms.Ported`, with a test in `Curl.Conformance.UnitProgram.UnitTests`; or the case has a Notes entry naming the C-only thing it tests and the ADR from BL-2840 row says so.
+- [x] Each ported case ends `Passed` with `$env:CURL_UPSTREAM_CASE='<n>'` on Windows and is on `PassingUpstreamCases.txt`.
+- [x] Where a port finds Curl wrong, the fix has a focused unit test in the fixed library's own `.UnitTests` project (ADR-0482) and the library folder is added to `touches` in the same commit.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean, `dotnet test --filter "TestCategory!=Integration"` passes, and each changed library and the new library keep 100% line and branch coverage and complexity at most 10.
+- [x] After the push, `CI` is green on Linux and macOS for the commit.
 
 ## Notes
 
@@ -34,9 +34,12 @@ Ports go in Curl.Conformance.UnitProgram.UnitLibrary/Asn1/ and their tests in Cu
 
 2026-10-21 (lane 3, first pass, no code edited): nine ports with their tests and a Curl.Networking fix are too big for one run, so the work is split. Every case has a Curl counterpart, so none is recorded as C-only: tool1394 -> `ClientCertificateArgument.Split` (Curl.Networking, public); 1397 -> `SchannelCommonNameCheck.PatternMatchesHost` (Curl.Networking; Curl wrongly matches host `.hello.com` against `*.hello.com`); 1676 and 1651 -> `PeerCertificateText.Format` (Curl.Output, public); 1656, 1657, 1666, 1667 -> `DerText`/`DerReader` (Curl.Output, internal, needs InternalsVisibleTo); 3205 compiles to nothing on the Schannel and OpenSSL builds. ADR-0723 decides that a port runs a guarded check only where the platform's curl build compiles it (Schannel on Windows) and prints the C program's `not tested since ...` line elsewhere. Filed BL-2911 (1394, 1397, 1676, 3205 and the wildcard fix), BL-2912 (1656, 1657, 1666, 1667) and BL-2913 (1651); this task now only confirms all nine are on the ratchet once they are Done. Checked the runner: `CURL_UPSTREAM_CASE=1394` skips with `Curl has no port of tool1394`, so registering a port is all a case needs.
 
+2026-10-21 (lane 5, second claim): BL-2911, BL-2912 and BL-2913 are Done and registered all nine ports in `UnitPrograms.Asn1.cs`; all nine are on `PassingUpstreamCases.txt`, and `dotnet test Curl.Conformance.UnitTests --filter "Name~test<n> "` passes each on Windows (9/9). No Curl library changed in this run, so the coverage gate stands as the three port tasks measured it; build with -warnaserror clean, fast tests 0 failed. CI run on work/dark-factory commit 488f79dd (contains every port commit, including 5bc59289c for 1651) concluded success on Windows, Linux and macOS.
+
 ## Log
 
 - 2026-10-19: Created.
 - 2026-10-21: Backlog -> Doing. Criteria at claim: 8d1f9340 2e3e75ab e66ae9dd c0723528 620ebead.
 - 2026-10-21: Doing -> Backlog. Split for size: waits on BL-2911, BL-2912 and BL-2913, which port the nine cases
 - 2026-10-21: Backlog -> Doing. Criteria at claim: 8d1f9340 2e3e75ab e66ae9dd c0723528 620ebead.
+- 2026-10-21: Doing -> Done. Cases 1394, 1397, 1651, 1656, 1657, 1666, 1667, 1676 and 3205 run as ported unit programs and pass on the ratchet
