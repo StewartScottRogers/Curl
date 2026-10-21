@@ -8,7 +8,7 @@ depends-on: [BL-2841]
 touches: [Curl.Conformance.UnitLibrary/CLAUDE.md]
 requirement: none
 created: 2026-10-21
-completed:
+completed: 2026-10-21
 ---
 # BL-2888 — Say in the conformance CLAUDE.md that a unittest case runs its ported unit program
 
@@ -27,8 +27,8 @@ library's `CLAUDE.md` still says any `unitNNNN` or `toolNNNN` tool skips with
 
 ## Acceptance criteria
 
-- [ ] The libtest paragraph of `Curl.Conformance.UnitLibrary/CLAUDE.md` says that a `unittest` case runs the unit program its `<tool>` names (or `unit<testnumber>` with none) from the runner's optional `UnitPrograms`, that the platform reports `unittest`, `Debug` and `TrackMemory` to such a case only when its program is ported, and that an unported one skips with `Curl has no port of <program>`.
-- [ ] The paragraph says `the harness does not act on <client><tool>` only for a `unitNNNN` or `toolNNNN` tool in a case without the `unittest` feature.
+- [x] The libtest paragraph of `Curl.Conformance.UnitLibrary/CLAUDE.md` says that a `unittest` case runs the unit program its `<tool>` names (or `unit<testnumber>` with none) from the runner's optional `UnitPrograms`, that the platform reports `unittest`, `Debug` and `TrackMemory` to such a case only when its program is ported, and that an unported one skips with `Curl has no port of <program>`.
+- [x] The paragraph says `the harness does not act on <client><tool>` only for a `unitNNNN` or `toolNNNN` tool in a case without the `unittest` feature.
 
 ## Notes
 
@@ -36,3 +36,4 @@ library's `CLAUDE.md` still says any `unitNNNN` or `toolNNNN` tool skips with
 
 - 2026-10-21: Created.
 - 2026-10-21: Backlog -> Doing. Criteria at claim: 65e72a6d 6341d5f6.
+- 2026-10-21: Doing -> Done. CLAUDE.md libtest paragraph now describes unittest cases
