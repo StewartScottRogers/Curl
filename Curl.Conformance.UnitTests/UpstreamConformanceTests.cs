@@ -201,7 +201,8 @@ public sealed partial class UpstreamConformanceTests
             honoursHstsHttpVariable: true,
             honoursAltSvcHttpVariable: true,
             honoursDnsServerVariable: true,
-            parsesAsQuicBuild: true).RunAsync(invocation.Arguments);
+            parsesAsQuicBuild: true,
+            extendedAttributeWriter: ExtendedAttributeWriterFor(invocation)).RunAsync(invocation.Arguments);
 
     // A ported libtest program's engine, in place of curl (BL-2558, ADR-0658): the managed Libcurl engine, every TCP
     // dial reaching the case's in-memory servers through InMemoryServerTcpDialer, names resolved to loopback, the

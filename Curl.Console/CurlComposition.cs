@@ -249,6 +249,10 @@ internal static class CurlComposition
     /// <c>--http3-only</c>; off by default, as every reference build refuses them (ADR-0540). Tests and the conformance
     /// harness turn it on to reach the hand-built HTTP/3 (BL-2260, BL-2332).
     /// </param>
+    /// <param name="extendedAttributeWriter">
+    /// Sets the <c>--xattr</c> attributes; <see langword="null" /> for a run that sets none. The conformance harness
+    /// passes one that prints them as curl's debug build does under <c>CURL_FAKE_XATTR</c> (BL-2833).
+    /// </param>
     /// <returns>The runner.</returns>
     internal static CurlCommandRunner CreateRunner(
         Stream standardOutput,
@@ -269,7 +273,8 @@ internal static class CurlComposition
         bool honoursHstsHttpVariable = false,
         bool honoursAltSvcHttpVariable = false,
         bool? parsesAsWindowsBuild = null,
-        bool parsesAsQuicBuild = false)
+        bool parsesAsQuicBuild = false,
+        IExtendedAttributeWriter? extendedAttributeWriter = null)
     {
         ConnectionCache runConnections = new(TimeProvider.System);
         LateBoundDiagnosticLog runLog = new();
@@ -297,11 +302,12 @@ internal static class CurlComposition
             altSvcUsesOverHttp: UsesAltSvcOverHttp(honoursAltSvcHttpVariable, environment),
             parsesAsWindowsBuild: parsesAsWindowsBuild,
             parsesAsQuicBuild: parsesAsQuicBuild,
-            transferPerformer: new TransferPerformer(TimeProvider.System, EasyErrorText));
+            transferPerformer: new TransferPerformer(TimeProvider.System, EasyErrorText),
+            extendedAttributeWriter: extendedAttributeWriter);
     }
 
     /// <summary>
-    /// Builds one option group's dispatch for the dialing <see cref="CreateRunner(Stream, Stream, Stream, ITcpDialer, IDnsResolver, IDatagramConnector, bool, IWriteOutFileOpener?, bool, Func{string, string?}?, IConnectionListener?, DefaultConfigFileSearch?, TimeProvider?, bool, bool, bool, bool, bool?, bool)" />:
+    /// Builds one option group's dispatch for the dialing <see cref="CreateRunner(Stream, Stream, Stream, ITcpDialer, IDnsResolver, IDatagramConnector, bool, IWriteOutFileOpener?, bool, Func{string, string?}?, IConnectionListener?, DefaultConfigFileSearch?, TimeProvider?, bool, bool, bool, bool, bool?, bool, IExtendedAttributeWriter?)" />:
     /// the group's <see cref="TcpConnector" /> over <paramref name="tcpDialer" /> and
     /// <paramref name="dnsResolver" />, pooled in <paramref name="runConnections" />, with a proxy
     /// selector that reads the environment through <paramref name="readEnvironmentVariable" />, and the connector's <c>--resolve</c> entries

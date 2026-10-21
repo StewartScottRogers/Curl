@@ -42,9 +42,10 @@ public sealed partial class UpstreamConformanceTests
         text => text.Contains("\nalt-svc\n", StringComparison.Ordinal) && text.Contains("\nCURL_ALTSVC_HTTP=", StringComparison.Ordinal),
         text => text.Contains(":%HTTP2TLSPORT/", StringComparison.Ordinal),
         text => text.Contains("\nCURL_FTP_PWD_STOP=", StringComparison.Ordinal),
+        text => text.Contains("\n" + FakeExtendedAttributesVariableName + "=", StringComparison.Ordinal),
     ];
 
-    private static UpstreamCurlPlatform PlatformFor(byte[] testFile)
+    internal static UpstreamCurlPlatform PlatformFor(byte[] testFile)
     {
         string text = Encoding.Latin1.GetString(testFile);
         UpstreamCurlPlatform platform = DebugStandInRules.Any(rule => rule(text)) ? Platform.WithFeatures(["Debug"]) : Platform;
