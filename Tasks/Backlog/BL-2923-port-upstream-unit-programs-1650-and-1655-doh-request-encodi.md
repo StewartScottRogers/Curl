@@ -1,5 +1,5 @@
 ---
-id: BL-2918
+id: BL-2923
 title: Port upstream unit programs 1650 and 1655: DoH request encoding and response parsing
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-21
 completed:
 ---
-# BL-2918 — Port upstream unit programs 1650 and 1655: DoH request encoding and response parsing
+# BL-2923 — Port upstream unit programs 1650 and 1655: DoH request encoding and response parsing
 
 ## Goal
 

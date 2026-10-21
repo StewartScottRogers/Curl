@@ -1,5 +1,5 @@
 ---
-id: BL-2919
+id: BL-2924
 title: Port upstream unit program 1658: DoH HTTPS resource record decoding
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-21
 completed:
 ---
-# BL-2919 — Port upstream unit program 1658: DoH HTTPS resource record decoding
+# BL-2924 — Port upstream unit program 1658: DoH HTTPS resource record decoding
 
 ## Goal
 

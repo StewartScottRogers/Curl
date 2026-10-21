@@ -1,5 +1,5 @@
 ---
-id: BL-2920
+id: BL-2925
 title: Port upstream unit programs 1652, 2413, 3219 and 3302: infof truncation, peer host parsing, protocol mask and GSSAPI delegation
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-21
 completed:
 ---
-# BL-2920 — Port upstream unit programs 1652, 2413, 3219 and 3302: infof truncation, peer host parsing, protocol mask and GSSAPI delegation
+# BL-2925 — Port upstream unit programs 1652, 2413, 3219 and 3302: infof truncation, peer host parsing, protocol mask and GSSAPI delegation
 
 ## Goal
 

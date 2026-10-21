@@ -1,5 +1,5 @@
 ---
-id: BL-2917
+id: BL-2922
 title: Shuffle resolved addresses when CURLOPT_DNS_SHUFFLE_ADDRESSES is set, and port upstream unit program 1608
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-21
 completed:
 ---
-# BL-2917 — Shuffle resolved addresses when CURLOPT_DNS_SHUFFLE_ADDRESSES is set, and port upstream unit program 1608
+# BL-2922 — Shuffle resolved addresses when CURLOPT_DNS_SHUFFLE_ADDRESSES is set, and port upstream unit program 1608
 
 ## Goal
 
