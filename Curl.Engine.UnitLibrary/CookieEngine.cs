@@ -170,39 +170,63 @@ internal sealed class CookieEngine
     /// <param name="standardInput">What <c>-b -</c> reads; it is left open.</param>
     /// <param name="now">The time that decides which loaded cookies have expired.</param>
     /// <param name="events">Where the <c>-v</c> line for each refused <c>Set-Cookie:</c> line is reported.</param>
-    /// <returns>A task that completes when every file is loaded.</returns>
-    internal async Task LoadCookieFilesAsync(IFileSystem fileSystem, Stream standardInput, DateTimeOffset now, ITransferEvents events)
+    /// <returns>
+    /// <see langword="false" /> when this call loaded the files and one of them held a line longer than
+    /// <see cref="NetscapeCookieFile.LongestLine" />, curl 8.22.0's <c>CURLE_TOO_LARGE</c>, which fails the
+    /// transfer with exit 100 before it sends anything (BL-2971); otherwise <see langword="true" />.
+    /// </returns>
+    internal async Task<bool> LoadCookieFilesAsync(IFileSystem fileSystem, Stream standardInput, DateTimeOffset now, ITransferEvents events)
     {
         if (cookieFilesLoaded)
         {
-            return;
+            return true;
         }
 
         cookieFilesLoaded = true;
-        await LoadEveryCookieFileAsync(fileSystem, standardInput, now, events).ConfigureAwait(false);
+        return await LoadEveryCookieFileAsync(fileSystem, standardInput, now, events).ConfigureAwait(false);
     }
 
-    /// <summary>Loads every <c>-b</c> file, in command-line order, as <see cref="LoadCookieFilesAsync" /> does, however often it is called.</summary>
+    /// <summary>
+    /// Loads every <c>-b</c> file, in command-line order, as <see cref="LoadCookieFilesAsync" /> does, however often it is
+    /// called, stopping after the first file that holds a line too long, as curl's <c>Curl_cookie_loadfiles</c> stops at
+    /// its first error.
+    /// </summary>
     /// <param name="fileSystem">Opens the files.</param>
     /// <param name="standardInput">What <c>-b -</c> reads; it is left open.</param>
     /// <param name="now">The time that decides which loaded cookies have expired.</param>
     /// <param name="events">Where the <c>-v</c> line for each refused <c>Set-Cookie:</c> line is reported.</param>
-    /// <returns>A task that completes when every file is loaded.</returns>
-    private async Task LoadEveryCookieFileAsync(IFileSystem fileSystem, Stream standardInput, DateTimeOffset now, ITransferEvents events)
+    /// <returns><see langword="false" /> when a file held a line longer than <see cref="NetscapeCookieFile.LongestLine" />.</returns>
+    private async Task<bool> LoadEveryCookieFileAsync(IFileSystem fileSystem, Stream standardInput, DateTimeOffset now, ITransferEvents events)
     {
         foreach (string cookieFile in cookieFiles)
         {
-            if (cookieFile == StandardInputCookieFile)
+            if (!await LoadCookieFileAsync(cookieFile, fileSystem, standardInput, now, events).ConfigureAwait(false))
             {
-                using StreamReader reader = new(standardInput, Encoding.Latin1, detectEncodingFromByteOrderMarks: false, leaveOpen: true);
-                using StringReader text = new(await reader.ReadToEndAsync().ConfigureAwait(false));
-                store.LoadCookieFile(text, discardSessionCookies, now, events);
-                continue;
+                return false;
             }
+        }
 
-            await store.LoadCookieFileAsync(fileSystem, cookieFile, discardSessionCookies, now, events, CancellationToken.None)
+        return true;
+    }
+
+    /// <summary>Loads one <c>-b</c> file, <c>-</c> reading standard input to its end.</summary>
+    /// <param name="cookieFile">The file's name, or <c>-</c>.</param>
+    /// <param name="fileSystem">Opens the file.</param>
+    /// <param name="standardInput">What <c>-b -</c> reads; it is left open.</param>
+    /// <param name="now">The time that decides which loaded cookies have expired.</param>
+    /// <param name="events">Where the <c>-v</c> line for each refused <c>Set-Cookie:</c> line is reported.</param>
+    /// <returns><see langword="false" /> when the file held a line longer than <see cref="NetscapeCookieFile.LongestLine" />.</returns>
+    private async Task<bool> LoadCookieFileAsync(string cookieFile, IFileSystem fileSystem, Stream standardInput, DateTimeOffset now, ITransferEvents events)
+    {
+        if (cookieFile != StandardInputCookieFile)
+        {
+            return await store.LoadCookieFileAsync(fileSystem, cookieFile, discardSessionCookies, now, events, CancellationToken.None)
                 .ConfigureAwait(false);
         }
+
+        using StreamReader reader = new(standardInput, Encoding.Latin1, detectEncodingFromByteOrderMarks: false, leaveOpen: true);
+        using StringReader text = new(await reader.ReadToEndAsync().ConfigureAwait(false));
+        return store.LoadCookieFile(text, discardSessionCookies, now, events);
     }
 
     /// <summary>

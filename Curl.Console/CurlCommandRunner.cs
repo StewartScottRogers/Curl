@@ -2248,7 +2248,11 @@ internal sealed class CurlCommandRunner(
 
         dispatch.LoadResolveEntries(eventsBeforeConnecting);
         TraceTransferStart(options, eventsBeforeConnecting);
-        await transferPerformer.LoadCookieFilesAsync(dispatch.Cookies, EasyOptionsFromCommandLine.TransferSettingsOf(options), transferUrl, fileSystem, standardInput, eventsBeforeConnecting).ConfigureAwait(false);
+        if (await transferPerformer.LoadCookieFilesAsync(dispatch.Cookies, EasyOptionsFromCommandLine.TransferSettingsOf(options), transferUrl, fileSystem, standardInput, eventsBeforeConnecting).ConfigureAwait(false) is { } cookieFileFailure)
+        {
+            return (cookieFileFailure, givenUrl, transferUrl);
+        }
+
         EasyHttpOptions http = EasyOptionsFromCommandLine.HttpOf(options);
         await transferPerformer.OpenAltSvcCacheAsync(Running, EasyOptionsFromCommandLine.TransferSettingsOf(options), EasyOptionsFromCommandLine.NetworkOf(options), http, transferUrl, fileSystem, diagnosticLog, altSvcUsesOverHttp).ConfigureAwait(false);
         transferUrl = await TransferPerformer.SwitchToHttpsForHstsAsync(Hsts, EasyOptionsFromCommandLine.TransferSettingsOf(options), EasyOptionsFromCommandLine.NetworkOf(options), http, transferUrl, fileSystem, eventsBeforeConnecting).ConfigureAwait(false);

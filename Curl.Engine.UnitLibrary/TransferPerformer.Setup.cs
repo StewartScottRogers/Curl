@@ -249,8 +249,12 @@ internal sealed partial class TransferPerformer
     /// <param name="fileSystem">Opens the files.</param>
     /// <param name="standardInput">What <c>-b -</c> reads.</param>
     /// <param name="events">Where the files' <c>-v</c> lines go.</param>
-    /// <returns>A task that completes when the files are loaded.</returns>
-    internal async Task LoadCookieFilesAsync(
+    /// <returns>
+    /// <see langword="null" /> when the transfer goes ahead; exit 100 with <c>A value or data field grew larger than
+    /// allowed</c> when a file held a line longer than 4998 characters, as curl 8.22.0 fails the transfer before it
+    /// sends anything (measured 2026-10-21, BL-2916 and BL-2971).
+    /// </returns>
+    internal async Task<TransferResult?> LoadCookieFilesAsync(
         CookieEngine? cookies,
         EngineTransferSettings settings,
         string transferUrl,
@@ -258,10 +262,13 @@ internal sealed partial class TransferPerformer
         Stream standardInput,
         ITransferEvents events)
     {
-        if (cookies is not null && IsHttpUrl(settings.AppendUrlQuery(transferUrl)))
+        if (cookies is null || !IsHttpUrl(settings.AppendUrlQuery(transferUrl))
+            || await cookies.LoadCookieFilesAsync(fileSystem, standardInput, timeProvider.GetUtcNow(), events).ConfigureAwait(false))
         {
-            await cookies.LoadCookieFilesAsync(fileSystem, standardInput, timeProvider.GetUtcNow(), events).ConfigureAwait(false);
+            return null;
         }
+
+        return TransferResult.Failure(CurlExitCode.TooLarge, easyErrorText(CurlExitCode.TooLarge));
     }
 
     /// <summary>
