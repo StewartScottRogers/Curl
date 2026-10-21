@@ -1,3 +1,4 @@
+using Curl.Conformance.UnitProgram.Asn1.Certinfo;
 using Curl.Conformance.UnitProgram.Asn1.Der;
 using Curl.Conformance.UnitProgram.Asn1.Names;
 
@@ -16,5 +17,6 @@ public sealed partial class UnitPrograms
         new Unit1657IndefiniteNesting(),
         new Unit1666ObjectIdentifierEncoding(),
         new Unit1667ElementText(),
+        new Unit1651CertificateExtraction(),
     ];
 }
