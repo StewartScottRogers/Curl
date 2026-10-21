@@ -33,3 +33,4 @@ Split from BL-2848 (ADR-0711 row 1303). `tests/unit/unit1303.c` of curl 8.22.0 (
 ## Log
 
 - 2026-10-21: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: 4f2fd27b baef796f a33759f5 cbaf0a82 620ebead.
