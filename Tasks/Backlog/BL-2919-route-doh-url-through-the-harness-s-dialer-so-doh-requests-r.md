@@ -1,5 +1,5 @@
 ---
-id: BL-2917
+id: BL-2919
 title: Route --doh-url through the harness's dialer so DoH requests reach the in-memory servers
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-21
 completed:
 ---
-# BL-2917 — Route --doh-url through the harness's dialer so DoH requests reach the in-memory servers
+# BL-2919 — Route --doh-url through the harness's dialer so DoH requests reach the in-memory servers
 
 ## Goal
 

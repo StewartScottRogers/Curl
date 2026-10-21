@@ -1,5 +1,5 @@
 ---
-id: BL-2918
+id: BL-2920
 title: Send the DoH HTTPS-RR query for an http-family URL as curl 8.22.0's HTTPSRR build does
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-21
 completed:
 ---
-# BL-2918 — Send the DoH HTTPS-RR query for an http-family URL as curl 8.22.0's HTTPSRR build does
+# BL-2920 — Send the DoH HTTPS-RR query for an http-family URL as curl 8.22.0's HTTPSRR build does
 
 ## Goal
 
