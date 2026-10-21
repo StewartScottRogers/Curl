@@ -6,6 +6,7 @@ assignee: Claude
 pipeline: direct
 depends-on: []
 touches: [Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
+lane: no
 requirement: none
 created: 2026-10-21
 completed:
@@ -29,7 +30,11 @@ How to measure without listing: find a finished `CI` run on `work/dark-factory` 
 
 ## Notes
 
+- Interactive only (lane 6, 2026-10-21): CI run 39688343648 (success, after e75f7d1bd) shows test959, test960 and test961 as `Skipped` on Linux, macOS and Windows alike - unlisted cases are skipped by the ratchet, so the log carries no outcome for them. The only measuring routes are a CI job that sets `CURL_UPSTREAM_CASE` (needs `.github/workflows/ci.yml`, a guard file) or the gap platforms run (`Gap/`, which a lane may not read). Listing them unmeasured risks a red CI (AF-0226).
+- Remove `lane: no` once a Linux and macOS run has measured 959, 960 and 961 (an interactive session runs them with `CURL_UPSTREAM_CASE` on the `audit` branch's workflow, or reads the gap-platforms behaviour measurement) and the outcomes are pasted here.
+
 ## Log
 
 - 2026-10-21: Created.
 - 2026-10-21: Backlog -> Doing. Criteria at claim: 49f7fc8c 55566d96.
+- 2026-10-21: Doing -> Backlog. Interactive only: measuring 959-961 on Linux and macOS needs the CI workflow file or the gap folder, both off limits to a lane; lane: no set
