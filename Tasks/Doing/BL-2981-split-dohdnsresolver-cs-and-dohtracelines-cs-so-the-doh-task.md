@@ -44,3 +44,4 @@ parallel fashion").
 ## Log
 
 - 2026-10-21: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: 8482f913 9da47be0 725feaad 2c6c346b.
