@@ -1,5 +1,5 @@
 ---
-id: BL-2894
+id: BL-2904
 title: Read an MDTM 213 timestamp as ftp_213_date does, reachable from the unit-program ports, for unit1668
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-21
 completed:
 ---
-# BL-2894 — Read an MDTM 213 timestamp as ftp_213_date does, reachable from the unit-program ports, for unit1668
+# BL-2904 — Read an MDTM 213 timestamp as ftp_213_date does, reachable from the unit-program ports, for unit1668
 
 ## Goal
 

@@ -4,7 +4,7 @@ title: Port upstream unit programs for tool and protocol parsers: cases 1604, 16
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-2886, BL-2889, BL-2890, BL-2891, BL-2892, BL-2893, BL-2894, BL-2895, BL-2896, BL-2897]
+depends-on: [BL-2886, BL-2899, BL-2900, BL-2901, BL-2902, BL-2903, BL-2904, BL-2905, BL-2906, BL-2907]
 touches: [Curl.Conformance.UnitTests/PassingUpstreamCases.txt, Curl.Conformance.UnitProgram.UnitLibrary/UnitPrograms.ToolParsers.cs, Curl.Conformance.UnitProgram.UnitLibrary/ToolParsers, Curl.Conformance.UnitProgram.UnitTests/ToolParsers]
 requirement: none
 created: 2026-10-19
@@ -34,13 +34,13 @@ Ports go in Curl.Conformance.UnitProgram.UnitLibrary/ToolParsers/ and their test
 
 2026-10-21, lane 1 prerequisite pass (before any code): of the eleven programs only tool1623 runs over Curl as it is (`CommandLineNumber.ParseSize`, public, with `BadlyUsedHere`/`TooLargeNumber`/`ExpectedProperNumericalParameter` for `PARAM_BAD_USE`/`PARAM_NUMBER_TOO_LARGE`/`PARAM_BAD_NUMERIC`). The other ten need product work outside this task's `touches`, filed as one task per library so they run in parallel:
 
-- tool1622: `ParallelProgressMeterText.Time` is 8.21's format; 8.22's `timebuf` has months and years (BL-2889).
-- unit1636 (BL-2890), tool1621 (BL-2891), tool1720 (BL-2892): the counterparts live in the executable `Curl.Console`, which this library cannot reference.
-- tool1604: `WindowsOutputFileNameSanitizer` lacks `SANITIZE_ALLOW_PATH`/`SANITIZE_ALLOW_RESERVED` (BL-2893).
-- unit1668: `FtpModificationTime` refuses dates `ftp_213_date` accepts (month 00, day 00, 31 February) and is internal with no `InternalsVisibleTo` for this library (BL-2894).
-- unit2604, unit2605: `Curl_get_pathname` and `Curl_ssh_range` counterparts are private inside `SftpQuoteCommand` and `SftpDownloadPart` (BL-2895).
-- unit3200: no `Curl_get_line` counterpart (BL-2896).
-- unit3227: no mail-strategy CR/LF check on a MIME part's name and file name was found (BL-2897).
+- tool1622: `ParallelProgressMeterText.Time` is 8.21's format; 8.22's `timebuf` has months and years (BL-2899).
+- unit1636 (BL-2900), tool1621 (BL-2901), tool1720 (BL-2902): the counterparts live in the executable `Curl.Console`, which this library cannot reference.
+- tool1604: `WindowsOutputFileNameSanitizer` lacks `SANITIZE_ALLOW_PATH`/`SANITIZE_ALLOW_RESERVED` (BL-2903).
+- unit1668: `FtpModificationTime` refuses dates `ftp_213_date` accepts (month 00, day 00, 31 February) and is internal with no `InternalsVisibleTo` for this library (BL-2904).
+- unit2604, unit2605: `Curl_get_pathname` and `Curl_ssh_range` counterparts are private inside `SftpQuoteCommand` and `SftpDownloadPart` (BL-2905).
+- unit3200: no `Curl_get_line` counterpart (BL-2906).
+- unit3227: no mail-strategy CR/LF check on a MIME part's name and file name was found (BL-2907).
 
 The C sources are at https://github.com/curl/curl/tree/curl-8_22_0/tests/tunit and /tests/unit. Port all eleven together once these are Done; tool1622 and unit1636 also compare the program's stdout with the case's `<stdout>` block, so those ports write each line to `context.StandardOutput`. `UnitChecks` (in `Hashes/`) can be reused for `fail_unless`.
 
@@ -48,4 +48,4 @@ The C sources are at https://github.com/curl/curl/tree/curl-8_22_0/tests/tunit a
 
 - 2026-10-19: Created.
 - 2026-10-21: Backlog -> Doing. Criteria at claim: 484e6579 2e3e75ab 33133e4f c0723528 620ebead.
-- 2026-10-21: Doing -> Backlog. Waits on BL-2889 to BL-2897: ten of the eleven programs need product counterparts outside this task (Output, Console moves, Core, Ftp, Ssh, Api); see Notes
+- 2026-10-21: Doing -> Backlog. Waits on BL-2899 to BL-2907: ten of the eleven programs need product counterparts outside this task (Output, Console moves, Core, Ftp, Ssh, Api); see Notes

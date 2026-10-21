@@ -1,5 +1,5 @@
 ---
-id: BL-2892
+id: BL-2902
 title: Move create_dir_hierarchy (OutputFileDirectories) into a library the unit-program ports reach, for tool1720
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-21
 completed:
 ---
-# BL-2892 — Move create_dir_hierarchy (OutputFileDirectories) into a library the unit-program ports reach, for tool1720
+# BL-2902 — Move create_dir_hierarchy (OutputFileDirectories) into a library the unit-program ports reach, for tool1720
 
 ## Goal
 

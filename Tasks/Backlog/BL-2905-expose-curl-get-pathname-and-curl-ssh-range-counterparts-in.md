@@ -1,5 +1,5 @@
 ---
-id: BL-2895
+id: BL-2905
 title: Expose Curl_get_pathname and Curl_ssh_range counterparts in Curl.Protocol.Ssh to the unit-program ports, for unit2604 and unit2605
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-21
 completed:
 ---
-# BL-2895 — Expose Curl_get_pathname and Curl_ssh_range counterparts in Curl.Protocol.Ssh to the unit-program ports, for unit2604 and unit2605
+# BL-2905 — Expose Curl_get_pathname and Curl_ssh_range counterparts in Curl.Protocol.Ssh to the unit-program ports, for unit2604 and unit2605
 
 ## Goal
 

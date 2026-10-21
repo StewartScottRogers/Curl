@@ -1,5 +1,5 @@
 ---
-id: BL-2889
+id: BL-2899
 title: Update the parallel progress meter time field to curl 8.22.0 timebuf for tool1622
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-21
 completed:
 ---
-# BL-2889 — Update the parallel progress meter time field to curl 8.22.0 timebuf for tool1622
+# BL-2899 — Update the parallel progress meter time field to curl 8.22.0 timebuf for tool1622
 
 ## Goal
 

@@ -1,5 +1,5 @@
 ---
-id: BL-2897
+id: BL-2907
 title: Reject CR and LF in a mail MIME part's name and file name as curl 8.22.0 does, for unit3227
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-21
 completed:
 ---
-# BL-2897 — Reject CR and LF in a mail MIME part's name and file name as curl 8.22.0 does, for unit3227
+# BL-2907 — Reject CR and LF in a mail MIME part's name and file name as curl 8.22.0 does, for unit3227
 
 ## Goal
 

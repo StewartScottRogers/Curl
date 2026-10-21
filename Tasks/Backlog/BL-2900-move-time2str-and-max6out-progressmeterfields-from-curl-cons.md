@@ -1,5 +1,5 @@
 ---
-id: BL-2890
+id: BL-2900
 title: Move time2str and max6out (ProgressMeterFields) from Curl.Console into Curl.Output for unit1636
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-21
 completed:
 ---
-# BL-2890 — Move time2str and max6out (ProgressMeterFields) from Curl.Console into Curl.Output for unit1636
+# BL-2900 — Move time2str and max6out (ProgressMeterFields) from Curl.Console into Curl.Output for unit1636
 
 ## Goal
 

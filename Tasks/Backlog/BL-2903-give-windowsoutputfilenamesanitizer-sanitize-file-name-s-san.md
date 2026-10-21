@@ -1,5 +1,5 @@
 ---
-id: BL-2893
+id: BL-2903
 title: Give WindowsOutputFileNameSanitizer sanitize_file_name's SANITIZE_ALLOW_PATH and SANITIZE_ALLOW_RESERVED modes for tool1604
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-21
 completed:
 ---
-# BL-2893 — Give WindowsOutputFileNameSanitizer sanitize_file_name's SANITIZE_ALLOW_PATH and SANITIZE_ALLOW_RESERVED modes for tool1604
+# BL-2903 — Give WindowsOutputFileNameSanitizer sanitize_file_name's SANITIZE_ALLOW_PATH and SANITIZE_ALLOW_RESERVED modes for tool1604
 
 ## Goal
 

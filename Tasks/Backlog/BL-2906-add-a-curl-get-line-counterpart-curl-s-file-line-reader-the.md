@@ -1,5 +1,5 @@
 ---
-id: BL-2896
+id: BL-2906
 title: Add a Curl_get_line counterpart (curl's file line reader) the unit-program ports reach, for unit3200
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-21
 completed:
 ---
-# BL-2896 — Add a Curl_get_line counterpart (curl's file line reader) the unit-program ports reach, for unit3200
+# BL-2906 — Add a Curl_get_line counterpart (curl's file line reader) the unit-program ports reach, for unit3200
 
 ## Goal
 

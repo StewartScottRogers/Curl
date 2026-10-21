@@ -1,5 +1,5 @@
 ---
-id: BL-2891
+id: BL-2901
 title: Move stripcredentials (OutputFileExtendedAttributes.WithoutCredentials) into a library the unit-program ports reach, for tool1621
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-21
 completed:
 ---
-# BL-2891 — Move stripcredentials (OutputFileExtendedAttributes.WithoutCredentials) into a library the unit-program ports reach, for tool1621
+# BL-2901 — Move stripcredentials (OutputFileExtendedAttributes.WithoutCredentials) into a library the unit-program ports reach, for tool1621
 
 ## Goal
 
