@@ -56,7 +56,7 @@ If too big for one run, split it: the decoder change (CNAME skipped, no NoConten
   or `error: <curl_easy_strerror>` on the DoH trace sink right after that query (traced) or in query
   order (untraced), in place of the completed line, and the decoded-entry lines are gone.
   Left to new tasks: the `[DoH] ` sub-transfer prefix, `DoH request complete` wording and AAAA-first
-  order (BL-2971, in `Curl.Output`'s `DohSubTransferEvents`), and the non-2xx `HTTP status N` failure
+  order (BL-2973, in `Curl.Output`'s `DohSubTransferEvents`), and the non-2xx `HTTP status N` failure
   (BL-2972, `DohResponseReader`).
 - **Requeued** before finishing: the change breaks the 8.21.0 DoH lines pinned in
   `Curl.Engine.UnitTests/EngineCompositionDohSubTransferTraceTests.cs` (lines 59-60, 77-80) and

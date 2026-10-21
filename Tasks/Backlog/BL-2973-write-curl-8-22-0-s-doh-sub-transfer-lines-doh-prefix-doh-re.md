@@ -1,5 +1,5 @@
 ---
-id: BL-2971
+id: BL-2973
 title: Write curl 8.22.0's DoH sub-transfer lines: [DoH] prefix, DoH request complete, AAAA probe first
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-21
 completed:
 ---
-# BL-2971 — Write curl 8.22.0's DoH sub-transfer lines: [DoH] prefix, DoH request complete, AAAA probe first
+# BL-2973 — Write curl 8.22.0's DoH sub-transfer lines: [DoH] prefix, DoH request complete, AAAA probe first
 
 ## Goal
 
