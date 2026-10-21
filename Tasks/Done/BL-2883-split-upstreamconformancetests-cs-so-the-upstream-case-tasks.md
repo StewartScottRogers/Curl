@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.UnitTests/UpstreamConformanceTests.cs]
 requirement: none
 created: 2026-10-21
-completed:
+completed: 2026-10-21
 ---
 # BL-2883 — Split UpstreamConformanceTests.cs so the upstream-case tasks that add tests to it can run in parallel
 
@@ -24,15 +24,18 @@ Make UpstreamConformanceTests a partial class (or a set of small test classes sh
 
 ## Acceptance criteria
 
-- [ ] Curl.Conformance.UnitTests/UpstreamConformanceTests.cs keeps only the shared code; every case-, stand-in- or feature-specific piece is in its own file.
-- [ ] Adding a new one needs a new file plus at most one line in a registration table, and the table is the only shared edit.
-- [ ] No behaviour changes: the same upstream cases pass (PassingUpstreamCases.txt unchanged) and the moved tests keep their names.
-- [ ] The waiting tasks listed in Context have their `touches` narrowed by editing their front matter to the new files they need (or the registration table), so `task-board.ps1 capacity` counts more of them as able to start together.
-- [ ] `dotnet build` clean and the fast tests green; Curl.Conformance.UnitLibrary stays inside the quality gates.
+- [x] Curl.Conformance.UnitTests/UpstreamConformanceTests.cs keeps only the shared code; every case-, stand-in- or feature-specific piece is in its own file.
+- [x] Adding a new one needs a new file plus at most one line in a registration table, and the table is the only shared edit.
+- [x] No behaviour changes: the same upstream cases pass (PassingUpstreamCases.txt unchanged) and the moved tests keep their names.
+- [x] The waiting tasks listed in Context have their `touches` narrowed by editing their front matter to the new files they need (or the registration table), so `task-board.ps1 capacity` counts more of them as able to start together.
+- [x] `dotnet build` clean and the fast tests green; Curl.Conformance.UnitLibrary stays inside the quality gates.
 
 ## Notes
+
+Split into UpstreamConformanceTests.{SetenvCases,PerlCheckCases,MailTlsCases,SshCases,ConnectionReuseCases,EasyGetLibCase,NamedCase,DebugStandIns}.cs. The registration table is `DebugStandInRules` in DebugStandIns.cs (one line per Debug stand-in rule); a task needing one adds a line there. The 12 waiting tasks now name `UpstreamConformanceTests.<Topic>.cs` (the new file they add) instead of the shared file; none lists DebugStandIns.cs, so a task adding a rule line makes that small additive edit and the rebase resolves it.
 
 ## Log
 
 - 2026-10-21: Created.
 - 2026-10-21: Backlog -> Doing. Criteria at claim: 631f3dbd df0009a6 ee115027 1ff6ab0b 38e9dffd.
+- 2026-10-21: Doing -> Done. UpstreamConformanceTests split into one partial file per case group plus a Debug stand-in rule table; waiting tasks' touches narrowed
