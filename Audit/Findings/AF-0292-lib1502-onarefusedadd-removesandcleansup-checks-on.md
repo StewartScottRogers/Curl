@@ -3,8 +3,8 @@ id: AF-0292
 title: Lib1502_OnARefusedAdd_RemovesAndCleansUp checks only the exit code, neither the removal nor the clean-up
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Conformance.LibTest.UnitTests/Lib1485To1511Tests.cs:Lib1502_OnARefusedAdd_RemovesAndCleansUp:name-lies
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Curl.Conformance.LibTest.UnitTests/Lib1485To1511Tests.cs -Pa
 ## Log
 
 - 2026-10-19: filed proposed.
+- 2026-10-21: proposed -> accepted.
