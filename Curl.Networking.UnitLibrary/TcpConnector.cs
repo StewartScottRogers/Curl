@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Sockets;
 using System.Runtime.CompilerServices;
@@ -204,6 +205,10 @@ public sealed partial class TcpConnector(
     private readonly ResolveOverrides _resolveOverrides = resolveOverrides ?? ResolveOverrides.None;
     private readonly ConnectToMappings _connectToMappings = connectToMappings ?? ConnectToMappings.None;
     private readonly DnsCache _dnsCache = dnsCache ?? new DnsCache();
+
+    // The host:port keys an IHttpsOriginDnsResolver has answered an HTTPS-RR resolve for: curl 8.22.0
+    // caches that answer as an entry of its own, beside the addresses (ADR-0727's BL-2986 amendment).
+    private readonly ConcurrentDictionary<string, bool> _httpsRecordsResolved = new(StringComparer.Ordinal);
 
     /// <summary>
     /// Gets the DNS cache this connector answers from and adds to: the <c>dnsCache</c> it was
@@ -1147,6 +1152,7 @@ public sealed partial class TcpConnector(
         var cacheKey = DnsCacheKey(host, port);
         if ((_dnsCache.Find(cacheKey) ?? _dnsCache.Find(DnsCacheKey(AnyHost, port))) is { } cached)
         {
+            ReportCachedHttpsRecord(host, port, cacheKey, target);
             var fromCache = AnswerFromCache(host, cached, target.Events);
             LogResolution(log, host, port, fromCache, fromCache: true, resolveStarted);
             return (new DnsResolution(fromCache, DnsLookupFailure.None), true);
@@ -1215,9 +1221,10 @@ public sealed partial class TcpConnector(
     private async ValueTask<DnsResolution> LookUpAsync(string host, int port, ConnectTarget target, CancellationToken cancellationToken)
     {
         ResolverEvents?.Current = target.Events;
-        if (dnsResolver is IHttpsOriginDnsResolver httpsOriginResolver && target.Proxy is null && IsHttpsOrigin(target))
+        if (HttpsOriginResolverFor(target) is { } httpsOriginResolver)
         {
             var addresses = await httpsOriginResolver.ResolveHttpsOriginAsync(host, port, cancellationToken).ConfigureAwait(false);
+            _httpsRecordsResolved[DnsCacheKey(host, port)] = true;
             ReportHttpsRecord(host, port, httpsOriginResolver.HttpsRecordFor(host, port), target.Events);
             return new DnsResolution(addresses, DnsLookupFailure.None);
         }
@@ -1227,6 +1234,12 @@ public sealed partial class TcpConnector(
             : new DnsResolution(await dnsResolver.ResolveAsync(host, cancellationToken).ConfigureAwait(false), DnsLookupFailure.None);
     }
 
+    // The resolver that asks a direct connect's https:// origin for its HTTPS record, or null.
+    private IHttpsOriginDnsResolver? HttpsOriginResolverFor(ConnectTarget target) =>
+        dnsResolver is IHttpsOriginDnsResolver httpsOriginResolver && target.Proxy is null && IsHttpsOrigin(target)
+            ? httpsOriginResolver
+            : null;
+
     // curl 8.22.0's HTTPS resolve filter sits above the address one (cf-dns.c), so its report comes
     // first; like the address report it names no IP address literal (ADR-0727's BL-2980 amendment).
     private static void ReportHttpsRecord(string host, int port, ServiceBindingRecord? record, ITransferEvents events)
@@ -1234,6 +1247,18 @@ public sealed partial class TcpConnector(
         if (!IPAddress.TryParse(host.Trim('[', ']'), out _))
         {
             events.ReportInfo(HttpsRecordReportLine.Format(host, port, record));
+        }
+    }
+
+    // A connect whose addresses the DNS cache answers finds its HTTPS-RR answer cached too, when an
+    // earlier resolve asked it: curl 8.22.0's HTTPS resolve filter, above the address one, writes its
+    // own `found in DNS cache` line and then its report (ADR-0727's BL-2986 amendment).
+    private void ReportCachedHttpsRecord(string host, int port, string cacheKey, ConnectTarget target)
+    {
+        if (HttpsOriginResolverFor(target) is { } httpsOriginResolver && _httpsRecordsResolved.ContainsKey(cacheKey))
+        {
+            target.Events.ReportInfo($"Hostname {host} was found in DNS cache");
+            ReportHttpsRecord(host, port, httpsOriginResolver.HttpsRecordFor(host, port), target.Events);
         }
     }
 

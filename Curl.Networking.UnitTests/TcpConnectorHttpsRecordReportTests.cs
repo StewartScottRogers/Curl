@@ -10,7 +10,8 @@ namespace Curl.Networking;
 /// Pins where <see cref="TcpConnector" /> writes curl 8.22.0's <c>-v</c>
 /// <c>HTTPS-RR &lt;host&gt;:&lt;port&gt;:</c> line after an <c>https://</c> origin's HTTPS-RR resolve:
 /// just before <c>Host &lt;host&gt;:&lt;port&gt; was resolved.</c>, since <c>cf-dns.c</c>'s HTTPS
-/// resolve filter sits above the address one (ADR-0727's BL-2980 amendment).
+/// resolve filter sits above the address one (ADR-0727's BL-2980 amendment), and again, after its own
+/// <c>found in DNS cache</c> line, when the DNS cache answers a later connect (BL-2986 amendment).
 /// </summary>
 [TestClass]
 public sealed class TcpConnectorHttpsRecordReportTests
@@ -72,6 +73,47 @@ public sealed class TcpConnectorHttpsRecordReportTests
         _ = await Connector(resolver).ConnectAsync(Target("127.0.0.1", events), CancellationToken.None);
 
         Diagnostics.Act("info lines", string.Join(" | ", events.Info));
+        Assert.IsFalse(events.Info.Any(line => line.StartsWith("HTTPS-RR", StringComparison.Ordinal)));
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_ASecondTimeToAnHttpsOriginAnsweredFromTheDnsCache_WritesTheCachedRecordLineBeforeTheAddresses()
+    {
+        var resolver = new HttpsRecordResolver(new ServiceBindingRecord(1, ".") { ApplicationProtocols = ["h2"] });
+        var connector = Connector(resolver);
+        var events = new RecordingTransferEvents();
+        Diagnostics.Arrange("record", "1 . alpn=h2, connected once before");
+        _ = await connector.ConnectAsync(Target("foo.example.com", new RecordingTransferEvents()), CancellationToken.None);
+
+        _ = await connector.ConnectAsync(Target("foo.example.com", events), CancellationToken.None);
+
+        Diagnostics.Act("info lines", string.Join(" | ", events.Info));
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                "Hostname foo.example.com was found in DNS cache",
+                "HTTPS-RR foo.example.com:443: 1 . alpn=h2",
+                "Hostname foo.example.com was found in DNS cache",
+                "Host foo.example.com:443 was resolved.",
+                "IPv6: (none)",
+                "IPv4: 127.0.0.1",
+            },
+            events.Info.Take(6).ToArray());
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_ToAnHttpsOriginWhoseAddressesAnHttpConnectCached_WritesNoRecordLine()
+    {
+        var resolver = new HttpsRecordResolver(null);
+        var connector = Connector(resolver);
+        var events = new RecordingTransferEvents();
+        Diagnostics.Arrange("first connect", "http://foo.example.com:443/");
+        _ = await connector.ConnectAsync(new ConnectTarget("foo.example.com", 443, UseTls: false) { PoolScheme = "http", Events = new RecordingTransferEvents() }, CancellationToken.None);
+
+        _ = await connector.ConnectAsync(Target("foo.example.com", events), CancellationToken.None);
+
+        Diagnostics.Act("info lines", string.Join(" | ", events.Info));
+        Assert.AreEqual("Hostname foo.example.com was found in DNS cache", events.Info.FirstOrDefault());
         Assert.IsFalse(events.Info.Any(line => line.StartsWith("HTTPS-RR", StringComparison.Ordinal)));
     }
 

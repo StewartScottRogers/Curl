@@ -118,3 +118,28 @@ as that resolve returns, before the address report, for every host that is not a
 and filed: the ` mandatory-keys(ignored)` part, since `ServiceBindingRecord` does not keep whether
 the record had a `mandatory` key, and the line for an origin whose addresses the DNS cache answers,
 for which `TcpConnector` asks no resolver.
+
+## Amendment (BL-2986, 2026-10-21): the `HTTPS-RR` line for an origin the DNS cache answers
+
+Decided by Claude under Stewart's delegation.
+
+**How it was found.** Derived from curl 8.22.0's source at tag `curl-8_22_0`, not measured (the
+reference curl on this machine lists no `HTTPSRR` feature). `Curl_resolv_https` (`lib/vdns/hostip.c`)
+is `Curl_resolv` with `CURL_DNSQ_HTTPS`, which looks in the DNS cache first and writes
+`Hostname <host> was found in DNS cache` for a hit. `fetch_addr` (`lib/vdns/dnscache.c`) keys the
+HTTPS answer under a type of its own (`CURL_DNST_HTTPS`), beside the addresses' entry, and `doh.c`
+caches it whether or not it held a record (`Curl_dnsc_mk_https`). `cf_dns_connect`
+(`lib/vdns/cf-dns.c`) calls `cf_dns_report` once its filter has an entry, cached or not, and the
+HTTPS filter connects, and so reports, before the address filter below it starts.
+
+**The lines** of a second connect to the same `https://` origin through `--doh-url`, under `-v`:
+`Hostname <host> was found in DNS cache`, `HTTPS-RR <host>:<port>: <record, - or not applicable>`,
+then the address filter's `Hostname <host> was found in DNS cache`, `Host <host>:<port> was resolved.`,
+`IPv6: ...` and `IPv4: ...`.
+
+**Decision.** `TcpConnector` remembers each host and port an `IHttpsOriginDnsResolver` answered an
+HTTPS-origin resolve for, and when the DNS cache later answers that host and port for a direct
+`https://` connect it writes the HTTPS filter's `found in DNS cache` line and
+`HttpsRecordReportLine.Format`'s line from `HttpsRecordFor` before the address lines. An address entry
+that no HTTPS resolve accompanied (a `--resolve` entry, or one an `http://` connect cached) writes no
+`HTTPS-RR` line; curl would send the HTTPS query there, which Curl does not yet do.
