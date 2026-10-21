@@ -18,6 +18,8 @@
 
   <ItemGroup>
     <None Update="UpstreamTestData\test*.curltest;UpstreamTestData\COPYING;UpstreamTestData\certs\*;UpstreamTestData\data\*;UpstreamTestData\docs\options-in-versions;UpstreamTestData\docs\VERSIONS.md;UpstreamTestData\docs\cmdline-opts\*;UpstreamTestData\src\*;PassingUpstreamCases.txt" CopyToOutputDirectory="PreserveNewest" />
+    <!-- Again beside UpstreamTestData, the %SRCDIR, as upstream's docs and src sit beside its tests folder, where test971.pl and test1486.pl look (BL-2865). -->
+    <ContentWithTargetPath Include="UpstreamTestData\docs\**;UpstreamTestData\src\**" TargetPath="$([System.String]::Copy('%(RelativeDir)').Substring(17))%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

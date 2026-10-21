@@ -8,7 +8,7 @@ depends-on: [BL-2863, BL-2864]
 touches: [Curl.Conformance.UnitLibrary/UpstreamTest971Script.cs, Curl.Conformance.UnitLibrary/UpstreamTest1486Script.cs, Curl.Conformance.UnitTests/UpstreamTest971ScriptTests.cs, Curl.Conformance.UnitTests/UpstreamTest1486ScriptTests.cs, Curl.Conformance.UnitTests/PassingUpstreamCases.txt, Curl.Conformance.UnitTests/Curl.Conformance.UnitTests.csproj, Curl.Conformance.UnitTests/UpstreamConformanceTests.cs]
 requirement: none
 created: 2026-10-19
-completed:
+completed: 2026-10-21
 ---
 # BL-2865 — Interpret upstream test971.pl and test1486.pl in C# over Curl's option and write-out tables and put cases 971 and 1486 on the ratchet
 
@@ -22,9 +22,9 @@ Split from BL-2850. Needs the dispatch seam (BL-2863) and the vendored docs (BL-
 
 ## Acceptance criteria
 
-- [ ] Cases 971 and 1486 each end `Passed` with `$env:CURL_UPSTREAM_CASE='<n>'` on Windows and are on `PassingUpstreamCases.txt`.
-- [ ] Each interpretation has its own unit tests (a matching and a differing input).
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean, the fast tests pass, and `Curl.Conformance.UnitLibrary` keeps 100% line and branch coverage and complexity at most 10.
+- [x] Cases 971 and 1486 each end `Passed` with `$env:CURL_UPSTREAM_CASE='<n>'` on Windows and are on `PassingUpstreamCases.txt`.
+- [x] Each interpretation has its own unit tests (a matching and a differing input).
+- [x] `dotnet build Curl.slnx -warnaserror` is clean, the fast tests pass, and `Curl.Conformance.UnitLibrary` keeps 100% line and branch coverage and complexity at most 10.
 
 ## Notes
 
@@ -34,6 +34,7 @@ Split from BL-2850. Needs the dispatch seam (BL-2863) and the vendored docs (BL-
   - `Curl.Conformance.UnitTests.csproj` (added to touches; no Doing task names it): the vendored `docs/` and `src/` are copied a second time beside `UpstreamTestData` (`ContentWithTargetPath`), because the cases name `%SRCDIR/../docs` and `%SRCDIR` is `UpstreamTestData`; the copy inside `UpstreamTestData` stays for `UpstreamTestDataTests` (BL-2829's file).
   - Decision: the interpretations read the vendored upstream files the command names, as the scripts do, not Curl's own option and write-out tables; the cases check upstream's docs against upstream's source, and comparing Curl's tables is the gap office's options and write-out measurement. So no Curl difference was found and no Cli task filed.
   - Measured: cases 971 and 1486 `Passed` with `CURL_UPSTREAM_CASE`; `Measure-CodeQuality.ps1 -Library Curl.Conformance.UnitLibrary`: 100% line, 100% branch, 0 failing members, worst CRAP 10; build -warnaserror clean; fast tests green.
+- 2026-10-21 (lane 3, second claim): the stash did not apply because BL-2887 had meanwhile added a `PerlCommandScripts` dictionary (with test1707.pl) to `UpstreamConformanceTests.cs` and passed it to the runner; the four new files were restored from the stash and 971 and 1486 added as two entries of that dictionary. Re-measured on this branch: build -warnaserror clean, cases 971 and 1486 `Passed`, `Curl.Conformance.UnitTests` fast tests 3899 passed / 0 failed, `Curl.Conformance.UnitLibrary` 100% line, 100% branch, 0 failing members, worst CRAP 10.
 
 ## Log
 
@@ -41,3 +42,4 @@ Split from BL-2850. Needs the dispatch seam (BL-2863) and the vendored docs (BL-
 - 2026-10-21: Backlog -> Doing. Criteria at claim: a61dc661 969fe749 309149d6.
 - 2026-10-21: Doing -> Backlog. Needs Curl.Conformance.UnitTests/UpstreamConformanceTests.cs, which BL-2841 (Doing) also touches; work is complete in the stash, next claim commits it
 - 2026-10-21: Backlog -> Doing. Criteria at claim: a61dc661 969fe749 309149d6.
+- 2026-10-21: Doing -> Done. Cases 971 and 1486 pass through C# readings of test971.pl and test1486.pl and are on the ratchet
