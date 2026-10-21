@@ -131,7 +131,7 @@ internal sealed class FakeCurlEngine : ICurlEngine
 
         public ValueTask<CurlCode> PerformAsync(CancellationToken cancellationToken) => ValueTask.FromResult(performing?.Invoke(Options) ?? performResult);
 
-        public IEasyTransfer Duplicate() => new FakeEasyTransfer(performResult, info, performing) { Options = Options, Pauses = Pauses, Informing = Informing };
+        public IEasyTransfer Duplicate() => new FakeEasyTransfer(performResult, info, performing) { Options = Options, Pauses = Pauses, Informing = Informing, Disposing = Disposing };
 
         public Func<string?, CurlCode>? Importing { get; init; }
 

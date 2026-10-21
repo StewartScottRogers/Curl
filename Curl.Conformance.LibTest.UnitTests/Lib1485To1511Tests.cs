@@ -291,13 +291,14 @@ public sealed class Lib1485To1511Tests
     [DataRow(1505)]
     public async Task Lib1502_OnARefusedAdd_RemovesAndCleansUp(int testNumber)
     {
-        var engine = new FakeCurlEngine();
-        engine.Multi.AddResult = CurlMultiCode.BadEasyHandle;
+        var engine = new FakeCurlEngine { Multi = { AddResult = CurlMultiCode.BadEasyHandle } };
         var run = new PortRun(engine, testNumber, "http://google.com:8990/1502", "8990", "127.0.0.1");
 
         LibTestResult result = await new Lib1502(TimeProvider.System).RunAsync(run.Context, CancellationToken.None);
 
         Assert.AreEqual((int)LibTestErrorCodes.Multi, result.ExitCode);
+        Assert.AreEqual(1, engine.Multi.Removals, "the refused handle is removed from the multi handle");
+        Assert.AreEqual(2, engine.DisposedEasyCount, "the original and the duplicated easy handle are both cleaned up");
     }
 
     [TestMethod]
