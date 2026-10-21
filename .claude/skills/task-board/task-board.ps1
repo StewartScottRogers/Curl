@@ -34,7 +34,7 @@
                only ones included; of the ready tasks, only lane-eligible ones do.
       hotspots The paths that serialise the board: for every path in the touches of
                an unfinished, lane-eligible task (Backlog, Doing, Blocked; not 'lane:
-               no', not an audit path, not a shared list file such as the ratchet),
+               no', not an audit path, not a shared list file: the ratchet or a SharedListFiles.txt entry),
                the tasks whose touches cover it: name it, a folder that holds it, or
                '*'. A task naming only something beneath it does not count, so every
                task counted for a path overlaps every other one there. One line
@@ -251,10 +251,38 @@ function Test-DarkFactoryLane {
     return -not [string]::IsNullOrEmpty($env:CURL_DARK_FACTORY_LANE)
 }
 
-# Lists many tasks add lines to at once. Each is read as a set and merged line by line
-# (merge=union in .gitattributes), so two tasks that both edit one never conflict, and
-# naming one in touches makes no overlap (ADR-0689).
-$script:SharedListFiles = @('Curl.Conformance.UnitTests/PassingUpstreamCases.txt')
+# Lists many tasks add lines to at once: the upstream case ratchet, plus every path in
+# Tasks/SharedListFiles.txt (one repo-relative path per line, forward slashes, '*'
+# matching any characters except '/'; blank and '#' lines ignored; a missing file adds
+# nothing). Each is one entry per line, order-free and marked merge=union in
+# .gitattributes, so two tasks that both edit one never conflict, and naming one in
+# touches makes no overlap (ADR-0689).
+$script:RatchetFile = 'Curl.Conformance.UnitTests/PassingUpstreamCases.txt'
+$script:SharedListPatterns = $null
+
+function Get-SharedListPatterns {
+    if ($null -ne $script:SharedListPatterns) { return $script:SharedListPatterns }
+    $entries = @($script:RatchetFile)
+    $listFile = Join-Path $Board 'SharedListFiles.txt'
+    if (Test-Path -LiteralPath $listFile) {
+        foreach ($line in [IO.File]::ReadAllLines($listFile)) {
+            $entry = $line.Trim()
+            if ($entry -ne '' -and -not $entry.StartsWith('#')) { $entries += $entry }
+        }
+    }
+    $script:SharedListPatterns = @($entries | ForEach-Object {
+            $regex = '^' + ([regex]::Escape($_) -replace '\\\*', '[^/]*') + '$'
+            [regex]::new($regex, [Text.RegularExpressions.RegexOptions]::IgnoreCase)
+        })
+    return $script:SharedListPatterns
+}
+
+# True when a touches path is a shared list file: the ratchet, or a SharedListFiles.txt
+# entry, read as a wildcard where '*' matches anything but '/'.
+function Test-SharedListFile([string] $Path) {
+    foreach ($pattern in (Get-SharedListPatterns)) { if ($pattern.IsMatch($Path)) { return $true } }
+    return $false
+}
 
 # Two tasks overlap when either may touch anything, or one names a path equal to or
 # inside a path the other names. Curl.Core.UnitLibrary overlaps
@@ -263,9 +291,9 @@ $script:SharedListFiles = @('Curl.Conformance.UnitTests/PassingUpstreamCases.txt
 function Test-Overlap([string[]] $A, [string[]] $B) {
     if ($A -contains '*' -or $B -contains '*') { return $true }
     foreach ($x in $A) {
-        if ($script:SharedListFiles -contains $x) { continue }
+        if (Test-SharedListFile $x) { continue }
         foreach ($y in $B) {
-            if ($script:SharedListFiles -contains $y) { continue }
+            if (Test-SharedListFile $y) { continue }
             if ($x -ieq $y) { return $true }
             if ($x.StartsWith("$y/", [StringComparison]::OrdinalIgnoreCase)) { return $true }
             if ($y.StartsWith("$x/", [StringComparison]::OrdinalIgnoreCase)) { return $true }
@@ -345,7 +373,7 @@ function Get-WaitingCounts([object[]] $Tasks) {
 # busy project run side by side before one that holds the whole project (ADR-0694).
 function Get-TouchBreadth($Task) {
     if ($Task.Touches -contains '*') { return [int]::MaxValue }
-    return @($Task.Touches | Where-Object { $script:SharedListFiles -notcontains $_ -and -not $_.Contains('/') }).Count
+    return @($Task.Touches | Where-Object { -not (Test-SharedListFile $_) -and -not $_.Contains('/') }).Count
 }
 
 function Get-ReadyTasks([object[]] $Tasks) {
@@ -407,7 +435,7 @@ function Get-StartOrder([object[]] $Ready, [object[]] $Tasks) {
 function Test-TouchesCover([string[]] $Touches, [string] $Path) {
     foreach ($touch in $Touches) {
         if ($touch -eq '*') { return $true }
-        if ($script:SharedListFiles -contains $touch) { continue }
+        if (Test-SharedListFile $touch) { continue }
         if ($Path -ieq $touch -or $Path.StartsWith("$touch/", [StringComparison]::OrdinalIgnoreCase)) { return $true }
     }
     return $false
@@ -422,7 +450,7 @@ function Get-Hotspots([object[]] $Tasks, [int] $Minimum) {
     $paths = @{}
     foreach ($task in $open) {
         foreach ($path in $task.Touches) {
-            if ($path -eq '*' -or $script:SharedListFiles -contains $path) { continue }
+            if ($path -eq '*' -or (Test-SharedListFile $path)) { continue }
             if (-not $paths.ContainsKey($path.ToLowerInvariant())) { $paths[$path.ToLowerInvariant()] = $path }
         }
     }

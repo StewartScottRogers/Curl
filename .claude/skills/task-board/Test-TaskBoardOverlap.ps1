@@ -83,6 +83,35 @@ try {
     Report ((Get-Capacity 'Curl.Conformance.UnitTests/Other.txt', 'Curl.Conformance.UnitTests') -eq 1) 'another file still overlaps its project folder'
     Report ((Get-Capacity 'Curl.Engine.UnitLibrary', 'Curl.Engine.UnitLibrary/A.cs', 'Curl.Engine.UnitLibrary/B.cs') -eq 2) 'two tasks naming files in a project run before an earlier task holding the whole project'
 
+    # Tasks/SharedListFiles.txt
+    $listed = 'Curl.Conformance.UnitProgram.UnitLibrary/UnitPrograms.Core.cs'
+    Report ((Get-Capacity $listed, $listed) -eq 1) 'a file in no list file still overlaps (missing SharedListFiles.txt leaves only the ratchet)'
+    New-Board @($listed, $listed, 'Curl.Conformance.UnitProgram.UnitLibrary')
+    [IO.File]::WriteAllText((Join-Path $root 'Tasks/SharedListFiles.txt'), "# registration tables`n`n$listed`n")
+    $output = (Invoke-Board @('capacity')).Lines -join "`n"
+    Report ($output -match 'Capacity 3:') 'a file listed in SharedListFiles.txt overlaps nothing, not even its project folder'
+    New-Board @('Curl.Conformance.UnitProgram.UnitLibrary/UnitPrograms.A.cs', 'Curl.Conformance.UnitProgram.UnitLibrary/UnitPrograms.B.cs')
+    [IO.File]::WriteAllText((Join-Path $root 'Tasks/SharedListFiles.txt'), "Curl.Conformance.UnitProgram.UnitLibrary/UnitPrograms.*.cs`n")
+    $output = (Invoke-Board @('capacity')).Lines -join "`n"
+    Report ($output -match 'Capacity 2:') 'a wildcard entry matches files that differ in the starred part'
+    New-Board @('Curl.Conformance.UnitProgram.UnitLibrary/sub/X.cs', 'Curl.Conformance.UnitProgram.UnitLibrary/sub/X.cs')
+    [IO.File]::WriteAllText((Join-Path $root 'Tasks/SharedListFiles.txt'), "Curl.Conformance.UnitProgram.UnitLibrary/*.cs`n")
+    $output = (Invoke-Board @('capacity')).Lines -join "`n"
+    Report ($output -match 'Capacity 1:') 'a wildcard does not cross a slash'
+    New-Board @($listed, $listed, $listed)
+    [IO.File]::WriteAllText((Join-Path $root 'Tasks/SharedListFiles.txt'), "$listed`n")
+    $lines = (Invoke-Board @('hotspots', '-Min', '2')).Lines
+    Report (($lines -join '|') -eq 'No hotspots.') 'hotspots skips a file listed in SharedListFiles.txt'
+
+    # check warns about a listed file with no merge=union line.
+    New-Board @('A')
+    [IO.File]::WriteAllText((Join-Path $root 'Tasks/SharedListFiles.txt'), "P/Listed.txt`nP/Unlisted.txt`n")
+    [IO.File]::WriteAllText((Join-Path $root '.gitattributes'), "P/Listed.txt merge=union`n")
+    Rename-Item (Join-Path $root 'Tasks/Backlog/BL-001-case-1.md') 'BL-000-case-1.md'
+    $check = @(& $shell -NoProfile -ExecutionPolicy Bypass -File $adminScript check 2>&1 | ForEach-Object { "$_" })
+    Report (@($check | Where-Object { $_ -like "*warning: SharedListFiles.txt entry 'P/Unlisted.txt'*" }).Count -eq 1 -and @($check | Where-Object { $_ -like "*P/Listed.txt*" }).Count -eq 0) 'check warns about a list entry with no merge=union line and not about one with it'
+    Remove-Item (Join-Path $root '.gitattributes')
+
     # hotspots
     $lines = Get-HotspotLines @('A', 'A', 'A', 'B', 'B') @('-Min', '3')
     Report (($lines -join '|') -eq 'Hotspot 3 A: BL-001, BL-002, BL-003') 'hotspots lists a path at the threshold in the contract format and leaves one below it out'
