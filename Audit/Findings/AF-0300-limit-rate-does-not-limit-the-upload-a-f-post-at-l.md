@@ -3,8 +3,8 @@ id: AF-0300
 title: --limit-rate does not limit the upload: a -F POST at --limit-rate 10 sends its whole body at once and exits 0 where curl exits 56
 auditor: conformance
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: conformance:--limit-rate:upload-not-throttled:exit-code
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ dotnet build Curl.Console -c Release -nologo | Out-Null; $r=(Get-Location).Path;
 ## Log
 
 - 2026-10-19: filed proposed.
+- 2026-10-21: proposed -> accepted.
