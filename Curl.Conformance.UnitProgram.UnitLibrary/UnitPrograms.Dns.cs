@@ -1,4 +1,5 @@
 using Curl.Conformance.UnitProgram.Dns.HttpsRecord;
+using Curl.Conformance.UnitProgram.Dns.Tls;
 
 namespace Curl.Conformance.UnitProgram;
 
@@ -8,5 +9,7 @@ public sealed partial class UnitPrograms
     private static IUnitProgram[] DnsPrograms =>
     [
         new Unit1658HttpsRecordDecoding(),
+        new Unit3303MutualTlsConnectionReuse(),
+        new Unit3304TlsSessionPeerKey(),
     ];
 }
