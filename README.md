@@ -45,8 +45,10 @@ invoked. It publishes as a single native-AOT executable with no runtime to insta
 The port is behavioural, not a line-by-line translation of curl's C source. curl's
 documentation, its manual page and its test suite are the specification; every protocol
 is reimplemented against its RFCs in its own class library, behind interfaces that can be
-driven from a unit test without touching a network. The only dependency is the .NET base
-class library.
+driven from a unit test without touching a network. The only dependency of the curl port is
+the .NET base class library; the one exception is the MCP server host `Curl.Mcp`, which
+references the `ModelContextProtocol` and `Microsoft.Extensions.Hosting` NuGet packages
+(ADR-0548).
 
 ## Use it from .NET: `Libcurl` and `Curl.Api`
 
