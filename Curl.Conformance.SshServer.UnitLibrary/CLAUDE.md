@@ -65,8 +65,11 @@ upstream's `tests/data` can run in memory (BL-1899). Read ADR-0456 before changi
   then end of file), `REMOVE`, `MKDIR`, `RMDIR`, `REALPATH` (`.` is the current directory,
   given with forward slashes and a slash before a drive) and `RENAME` are answered in
   arrival order; anything else is `SSH_FX_OP_UNSUPPORTED`. Every file is reported as mode
-  0644 and every directory as 0755, owner and group 0, and `SETSTAT` changes nothing,
-  since Windows files carry no Unix mode. A missing path is `SSH_FX_NO_SUCH_FILE`, a refused
+  0644 and every directory as 0755, owner and group 0, since Windows files carry no Unix
+  mode; `SETSTAT` changes only a file's read-only flag, from the owner write bit of the
+  permissions it carries (`chmod 444` in test614), and a read-only file's long name starts
+  `-r--r--r--`. Long names follow OpenSSH's `ls_file` (`Jan  1  2000`, `%b %e`), so
+  test613.pl's postprocess turns them into the canonical lines 613 and 614 expect (BL-2855). A missing path is `SSH_FX_NO_SUCH_FILE`, a refused
   one `SSH_FX_PERMISSION_DENIED`, and anything else (an existing target, a full directory,
   an unknown handle) `SSH_FX_FAILURE`, as `sftp-server` maps `errno` for version 3. The
   process ends at the client's `EOF` with exit status 0.
