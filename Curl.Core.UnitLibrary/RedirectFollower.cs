@@ -624,7 +624,7 @@ public sealed class RedirectFollower(
             ? null
             : rewinder.RewindToStart();
 
-    private static bool IsSameOrigin(CurlUrl first, CurlUrl next) =>
+    internal static bool IsSameOrigin(CurlUrl first, CurlUrl next) =>
         string.Equals(first.Scheme, next.Scheme, StringComparison.Ordinal)
         && string.Equals(first.Host, next.Host, StringComparison.OrdinalIgnoreCase)
         && first.Port == next.Port;

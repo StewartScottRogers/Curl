@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
+    <InternalsVisibleTo Include="Curl.Conformance.UnitProgram.UnitLibrary" />
     <InternalsVisibleTo Include="Curl.Protocol.Abstractions.UnitTests" />
   </ItemGroup>
 
