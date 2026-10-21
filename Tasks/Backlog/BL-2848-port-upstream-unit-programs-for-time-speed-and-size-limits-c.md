@@ -4,8 +4,8 @@ title: Port upstream unit programs for time, speed and size limits: cases 1303, 
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-2841]
-touches: [Curl.Conformance.UnitTests/PassingUpstreamCases.txt, Curl.Conformance.UnitProgram.UnitLibrary, Curl.Conformance.UnitProgram.UnitTests]
+depends-on: [BL-2886]
+touches: [Curl.Conformance.UnitTests/PassingUpstreamCases.txt, Curl.Conformance.UnitProgram.UnitLibrary/UnitPrograms.Limits.cs, Curl.Conformance.UnitProgram.UnitLibrary/Limits, Curl.Conformance.UnitProgram.UnitTests/Limits]
 requirement: none
 created: 2026-10-19
 completed:
@@ -29,6 +29,8 @@ These seven `unittest` cases (skipped today with `Curl lacks the feature unittes
 - [ ] After the push, `CI` is green on Linux and macOS for the commit.
 
 ## Notes
+
+Ports go in Curl.Conformance.UnitProgram.UnitLibrary/Limits/ and their tests in Curl.Conformance.UnitProgram.UnitTests/Limits/; register them only in Curl.Conformance.UnitProgram.UnitLibrary/UnitPrograms.Limits.cs, which BL-2886 creates. Its project references are added by BL-2886; if one is missing, add it in a separate one-line commit and say so in the Log (Stewart, 2026-10-21: keep the seven ports parallel).
 
 ## Log
 

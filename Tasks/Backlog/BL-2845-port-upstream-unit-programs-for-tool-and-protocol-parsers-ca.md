@@ -4,8 +4,8 @@ title: Port upstream unit programs for tool and protocol parsers: cases 1604, 16
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-2841]
-touches: [Curl.Conformance.UnitTests/PassingUpstreamCases.txt, Curl.Conformance.UnitProgram.UnitLibrary, Curl.Conformance.UnitProgram.UnitTests]
+depends-on: [BL-2886]
+touches: [Curl.Conformance.UnitTests/PassingUpstreamCases.txt, Curl.Conformance.UnitProgram.UnitLibrary/UnitPrograms.ToolParsers.cs, Curl.Conformance.UnitProgram.UnitLibrary/ToolParsers, Curl.Conformance.UnitProgram.UnitTests/ToolParsers]
 requirement: none
 created: 2026-10-19
 completed:
@@ -29,6 +29,8 @@ These eleven `unittest` cases (skipped today with `Curl lacks the feature unitte
 - [ ] After the push, `CI` is green on Linux and macOS for the commit.
 
 ## Notes
+
+Ports go in Curl.Conformance.UnitProgram.UnitLibrary/ToolParsers/ and their tests in Curl.Conformance.UnitProgram.UnitTests/ToolParsers/; register them only in Curl.Conformance.UnitProgram.UnitLibrary/UnitPrograms.ToolParsers.cs, which BL-2886 creates. Its project references are added by BL-2886; if one is missing, add it in a separate one-line commit and say so in the Log (Stewart, 2026-10-21: keep the seven ports parallel).
 
 ## Log
 
