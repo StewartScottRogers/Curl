@@ -31,3 +31,4 @@ Found by BL-2861 (2026-10-21), which reports `codeset-utf8` to the harness so th
 ## Log
 
 - 2026-10-21: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: 4c09db1c 583918e6 39956c59.
