@@ -4,7 +4,7 @@ title: Port upstream unit programs 1650 and 1655: DoH request encoding and respo
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-2967]
+depends-on: [BL-2969]
 touches: [Curl.Conformance.UnitTests/PassingUpstreamCases.txt, Curl.Conformance.UnitProgram.UnitLibrary/UnitPrograms.Dns.cs, Curl.Conformance.UnitProgram.UnitLibrary/Dns/Doh, Curl.Conformance.UnitProgram.UnitTests/Dns/Doh, Curl.Networking.UnitLibrary/DohDnsResolver.cs, Curl.Networking.UnitLibrary/DohResponseReader.cs, Curl.Networking.UnitLibrary/DnsAnswerDecoder.cs, Curl.Networking.UnitTests]
 requirement: none
 created: 2026-10-21
@@ -31,10 +31,10 @@ Split from BL-2847 (too big for one run). C sources: https://github.com/curl/cur
 
 - 2026-10-21 (lane 1, first pass, no code written): read unit1650.c, unit1655.c and curl 8.22.0's `lib/vdns/doh.c` against Curl's codec.
   - unit1655 needs no production change. The encoder is `DnsQueryEncoder.Encode` (not `DohDnsResolver`), which allocates exactly the query's length, so the port emulates `doh_req_encode(name, type, buffer, len, &olen)` as: Encode's failure if any, else `TooSmall` (curl's `DOH_TOO_SMALL_BUFFER`) when `len` is below the bytes' length, else `olen` = that length. The canary rows become "the 255-character `max` encodes to 272 bytes, one past the 271-byte `dohbuffer`" and "every refused name writes nothing". Checked by hand: toolong (256 with trailing dot) gives 273 > 272, `NameTooLong`; the empty and 64-byte labels give `BadLabel`; `a.com` and `a.com.` both 23, `aa.com` 24.
-  - unit1650's three request rows and resp rows 0-2, 4-10 and 12 match Curl's decoder today. Three rows do not, because Curl's decoder is curl 8.21.0's: row 3 (RCODE 3, curl 8.22.0 `DOH_DNS_NXDOMAIN`, Curl `BadRcode`), row 11 (self-pointing CNAME, 8.22.0 `DOH_OK` since it no longer parses CNAME data, Curl `LabelLoop`) and row 13 (TTL capped at 86400 in 8.22.0, Curl 16776999). Fixing them changes `DnsMessageFailure`, `DohQueryResult`, `DohTraceLines` and `DnsServerQuery`, outside this task's touches, and needs real-curl measurement of the trace lines: filed as BL-2967 and added to `depends-on`. Once it is Done, port both programs as planned above.
+  - unit1650's three request rows and resp rows 0-2, 4-10 and 12 match Curl's decoder today. Three rows do not, because Curl's decoder is curl 8.21.0's: row 3 (RCODE 3, curl 8.22.0 `DOH_DNS_NXDOMAIN`, Curl `BadRcode`), row 11 (self-pointing CNAME, 8.22.0 `DOH_OK` since it no longer parses CNAME data, Curl `LabelLoop`) and row 13 (TTL capped at 86400 in 8.22.0, Curl 16776999). Fixing them changes `DnsMessageFailure`, `DohQueryResult`, `DohTraceLines` and `DnsServerQuery`, outside this task's touches, and needs real-curl measurement of the trace lines: filed as BL-2969 and added to `depends-on`. Once it is Done, port both programs as planned above.
 
 ## Log
 
 - 2026-10-21: Created.
 - 2026-10-21: Backlog -> Doing. Criteria at claim: 3b68dec0 42440f53 52e5bf94 dd1cc079.
-- 2026-10-21: Doing -> Backlog. Waits on BL-2967: unit1650 rows 3, 11 and 13 need Curl's DoH decoder to match curl 8.22.0 (NXDOMAIN, CNAME data skipped, TTL cap)
+- 2026-10-21: Doing -> Backlog. Waits on BL-2969: unit1650 rows 3, 11 and 13 need Curl's DoH decoder to match curl 8.22.0 (NXDOMAIN, CNAME data skipped, TTL cap)

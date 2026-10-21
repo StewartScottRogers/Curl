@@ -1,5 +1,5 @@
 ---
-id: BL-2967
+id: BL-2969
 title: Decode DoH answers as curl 8.22.0 does: NXDOMAIN, CNAME data skipped, TTL capped at 86400
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-21
 completed:
 ---
-# BL-2967 — Decode DoH answers as curl 8.22.0 does: NXDOMAIN, CNAME data skipped, TTL capped at 86400
+# BL-2969 — Decode DoH answers as curl 8.22.0 does: NXDOMAIN, CNAME data skipped, TTL capped at 86400
 
 ## Goal
 
