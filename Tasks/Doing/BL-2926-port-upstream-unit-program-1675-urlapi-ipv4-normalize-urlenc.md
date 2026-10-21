@@ -42,3 +42,4 @@ Where Curl's answer differs from the C table, fix Curl in its own library with a
 ## Log
 
 - 2026-10-21: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: 1b131cfd d384e230 ecb0e5d8 dd1cc079.
