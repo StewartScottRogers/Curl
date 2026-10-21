@@ -3,8 +3,8 @@ id: AF-0296
 title: TransferSettingsOf's ShowError: false can become true with no test failing, so a libcurl-API SSH transfer writes the tool's known_hosts error line
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Engine.UnitLibrary/ManagedEasyTransfer.cs:TransferSettingsOf-false:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/ManagedEasyTransfer.cs:1906:false
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Engin
 ## Log
 
 - 2026-10-19: filed proposed.
+- 2026-10-21: proposed -> accepted.
