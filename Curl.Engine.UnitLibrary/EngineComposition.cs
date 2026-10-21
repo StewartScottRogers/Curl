@@ -730,10 +730,11 @@ internal static class EngineComposition
     /// <param name="tls">The option group's TLS options.</param>
     /// <param name="tcpDialer">Opens each plaintext connection.</param>
     /// <param name="timeProvider">The clock the connector and its TLS provider time on.</param>
+    /// <param name="hostResolver">Resolves the DoH server's own name; <see langword="null" /> for the <see cref="SystemDnsResolver" />. The conformance harness passes its in-memory resolver (BL-2919).</param>
     /// <returns>The connector.</returns>
-    internal static TcpConnector CreateDohConnector(EngineTraceComponents traces, EasyTlsOptions tls, ITcpDialer tcpDialer, TimeProvider timeProvider) =>
+    internal static TcpConnector CreateDohConnector(EngineTraceComponents traces, EasyTlsOptions tls, ITcpDialer tcpDialer, TimeProvider timeProvider, IDnsResolver? hostResolver = null) =>
         new(
-            new SystemDnsResolver(),
+            hostResolver ?? new SystemDnsResolver(),
             tcpDialer,
             CreateTlsProvider(TlsClientOptionsMapping.DohOf(tls), timeProvider),
             timeProvider)
@@ -822,7 +823,9 @@ internal static class EngineComposition
         traces ??= EngineTraceComponents.None;
         TcpDialer tcpDialer = new(TcpSocketOptionsOf(network));
         FlowScopedTransferEvents? resolverEvents = TracesDns(traces) ? new() : null;
-        IDnsResolver dnsResolver = ResolverOf(dialing, () => CreateDnsResolver(network, tls, timeProvider, tcpDialer, resolverEvents, easyErrorText, traces));
+        IDnsResolver dnsResolver = dialing is null
+            ? CreateDnsResolver(network, tls, timeProvider, tcpDialer, resolverEvents, easyErrorText, traces)
+            : DialingResolverOf(dialing, network, tls, timeProvider, resolverEvents, easyErrorText, traces);
         IDnsResolver lookUps = wrapLookUps(dnsResolver);
         TlsClientOptions tlsClientOptions = TlsClientOptionsMapping.Of(tls, http.SslEnableAlpn, tool.SslSessionsFile);
         ITlsProviderWithWarnings tlsProvider = CreateTlsProvider(tlsClientOptions, timeProvider, tlsSessions, dnsResolver as IEchConfigListLookup);
@@ -860,12 +863,23 @@ internal static class EngineComposition
             TracesRead(traces));
     }
 
-    /// <summary>The resolver the transports use: <paramref name="dialing" />'s, or, without one, the one <paramref name="createResolver" /> builds from the options (ADR-0658).</summary>
-    /// <param name="dialing">What the harness's engine dials through, or <see langword="null" />.</param>
-    /// <param name="createResolver">Builds the resolver the options pick.</param>
+    /// <summary>
+    /// The resolver the transports use under the harness: <paramref name="dialing" />'s, or, when <c>--doh-url</c> is given,
+    /// the <see cref="CreateDohResolver" /> one whose connections dial through <paramref name="dialing" />'s dialer and
+    /// whose server name resolves through its resolver, so the DoH POSTs reach the in-memory servers (ADR-0658, BL-2919).
+    /// </summary>
+    /// <param name="dialing">What the harness's engine dials through.</param>
+    /// <param name="network">The option group's network options, whose DoH URL and IP version pick the resolver.</param>
+    /// <param name="tls">The option group's TLS options, whose DoH settings the DoH connector's handshakes apply.</param>
+    /// <param name="timeProvider">The clock the DoH connections time on.</param>
+    /// <param name="dohTrace">Receives the DoH resolver's <c>--trace-config doh</c> lines; <see langword="null" /> for none.</param>
+    /// <param name="easyErrorText">Curl's easy error text for each exit code; <see langword="null" /> for an empty text.</param>
+    /// <param name="traces">The run's <c>--trace-config</c> components.</param>
     /// <returns>The resolver.</returns>
-    private static IDnsResolver ResolverOf(EngineDialing? dialing, Func<IDnsResolver> createResolver) =>
-        dialing is null ? createResolver() : dialing.DnsResolver;
+    private static IDnsResolver DialingResolverOf(EngineDialing dialing, EasyNetworkOptions network, EasyTlsOptions tls, TimeProvider timeProvider, ITransferEvents? dohTrace, Func<CurlExitCode, string>? easyErrorText, EngineTraceComponents traces) =>
+        network.DohUrl is { } dohUrl
+            ? CreateDohResolver(dohUrl, CreateDohConnector(traces, tls, dialing.TcpDialer, timeProvider, dialing.DnsResolver), AddressFamilyOf(network), dohTrace, easyErrorText)
+            : dialing.DnsResolver;
 
     /// <summary>
     /// The QUIC dialer, the dialer the <see cref="TcpConnector" /> dials through and the datagram connector the transports
