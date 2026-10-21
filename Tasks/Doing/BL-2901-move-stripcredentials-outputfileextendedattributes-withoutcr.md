@@ -32,3 +32,4 @@ The C table: an unsupported scheme (`ninja://`) and a bad host (`http://odd%40ho
 ## Log
 
 - 2026-10-21: Created (split from BL-2845, which waits on it).
+- 2026-10-21: Backlog -> Doing. Criteria at claim: eaa8e49a 3d228e1f d3a9ab15 099d1d27.
