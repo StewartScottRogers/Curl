@@ -35,3 +35,4 @@ Cases 959, 960 and 961 need `!IDN` as well and are in BL-2856, not here. The 17 
 ## Log
 
 - 2026-10-19: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: a080513c a97196e5 027f9a45 dd1cc079 6686bba8.
