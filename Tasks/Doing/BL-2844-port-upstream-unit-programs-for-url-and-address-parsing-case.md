@@ -41,3 +41,4 @@ Case 1395 is done and left uncommitted (rule 6), so the shift stashes it for the
 - 2026-10-19: Created.
 - 2026-10-21: Backlog -> Doing. Criteria at claim: 759c7e24 2e3e75ab e66ae9dd c0723528 620ebead.
 - 2026-10-21: Doing -> Backlog. Split for size: waits on BL-2889, BL-2890, BL-2891 and BL-2892 for the other nine cases; case 1395 is done and stashed.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: 759c7e24 2e3e75ab e66ae9dd c0723528 620ebead.
