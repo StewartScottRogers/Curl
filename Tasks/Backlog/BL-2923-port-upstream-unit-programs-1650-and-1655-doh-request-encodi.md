@@ -4,8 +4,8 @@ title: Port upstream unit programs 1650 and 1655: DoH request encoding and respo
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-2969]
-touches: [Curl.Conformance.UnitTests/PassingUpstreamCases.txt, Curl.Conformance.UnitProgram.UnitLibrary/UnitPrograms.Dns.cs, Curl.Conformance.UnitProgram.UnitLibrary/Dns/Doh, Curl.Conformance.UnitProgram.UnitTests/Dns/Doh, Curl.Networking.UnitLibrary/DohDnsResolver.RequestEncoding.cs, Curl.Networking.UnitLibrary/DohResponseReader.cs, Curl.Networking.UnitLibrary/DnsAnswerDecoder.cs, Curl.Networking.UnitTests/DohRequestEncodingTests.cs]
+depends-on: [BL-2970]
+touches: [Curl.Conformance.UnitTests/PassingUpstreamCases.txt, Curl.Conformance.UnitProgram.UnitLibrary/UnitPrograms.Dns.cs, Curl.Conformance.UnitProgram.UnitLibrary/Dns/Doh, Curl.Conformance.UnitProgram.UnitTests/Dns/Doh, Curl.Networking.UnitLibrary/DnsAnswerDecoder.cs, Curl.Networking.UnitTests/DohRequestEncodingTests.cs]
 requirement: none
 created: 2026-10-21
 completed:
@@ -38,3 +38,4 @@ Split from BL-2847 (too big for one run). C sources: https://github.com/curl/cur
 - 2026-10-21: Created.
 - 2026-10-21: Backlog -> Doing. Criteria at claim: 3b68dec0 42440f53 52e5bf94 dd1cc079.
 - 2026-10-21: Doing -> Backlog. Waits on BL-2969: unit1650 rows 3, 11 and 13 need Curl's DoH decoder to match curl 8.22.0 (NXDOMAIN, CNAME data skipped, TTL cap)
+- 2026-10-21: depends-on changed from BL-2969 to BL-2970: BL-2969 landed rows 3 and 13 (NXDOMAIN, TTL cap, commit 8677cc087) and its own Notes give the CNAME row 11 to BL-2970; what is left of BL-2969 only re-checks BL-2970's result. touches narrowed: dropped DohDnsResolver.RequestEncoding.cs and DohResponseReader.cs, since the first pass found the encoder is DnsQueryEncoder and unit1650/1655 decode DNS bytes, not the HTTP response; this frees BL-2972 (DohResponseReader) to run beside it.

@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: [BL-2850]
-touches: [Curl.Cli.UnitLibrary, Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests]
+touches: [Curl.Cli.UnitLibrary/ManualPages, Curl.Cli.UnitTests/ManualPages, Curl.Conformance.UnitLibrary/UpstreamManagenScript.cs, Curl.Conformance.UnitLibrary/Curl.Conformance.UnitLibrary.csproj, Curl.Conformance.UnitTests/UpstreamManagenScriptTests.cs, Curl.Conformance.UnitTests/UpstreamPerlCommandScripts.Managen.cs, Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
 requirement: none
 created: 2026-10-19
 completed:
@@ -29,6 +29,9 @@ Found by BL-2852 (ADR for cases 1135 to 1706). Upstream cases 1705 "managen make
 
 ## Notes
 
+- 2026-10-21 (interactive replan): where it lands, so it can run beside the other Conformance tasks. The generator goes in a new folder `Curl.Cli.UnitLibrary/ManualPages/` (one type per file), its tests in `Curl.Cli.UnitTests/ManualPages/`. The `managen` interpretation is `Curl.Conformance.UnitLibrary/UpstreamManagenScript.cs`, tested in `Curl.Conformance.UnitTests/UpstreamManagenScriptTests.cs`, and registers itself from its own `Curl.Conformance.UnitTests/UpstreamPerlCommandScripts.Managen.cs` through a module initializer, as `UpstreamPerlCommandScripts.Test1222.cs` does (BL-2994); `UpstreamCaseScreening` admits any registered script, so it needs no change. If `Curl.Conformance.UnitLibrary` lacks a project reference to `Curl.Cli.UnitLibrary`, add it (`Curl.Conformance.UnitLibrary/Curl.Conformance.UnitLibrary.csproj` is in `touches`). If a new ADR is written, add its file to `touches` in the same commit. BL-3000 ports the `cd2nroff` parts `test1222.pl` reads into `Curl.Conformance.UnitLibrary`; whichever lands second may reuse the other's `cd2nroff` code.
+
 ## Log
 
 - 2026-10-19: Created.
+- 2026-10-21: touches narrowed from the whole Curl.Cli.UnitLibrary, Curl.Conformance.UnitLibrary and Curl.Conformance.UnitTests to the new ManualPages folders, the managen script, its test and its registration file (see Notes), so it no longer overlaps BL-2851, BL-2968, BL-3000 and BL-2834.

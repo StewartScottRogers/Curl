@@ -4,7 +4,7 @@ title: Fail a --connect-to IPv6 literal with exit 4 when the feature mask hides 
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-2982, BL-2856]
+depends-on: [BL-2982, BL-2856, BL-2996]
 touches: [Curl.Console/CurlComposition.cs, Curl.Engine.UnitLibrary/EngineComposition.Connectors.cs, Curl.Networking.UnitLibrary/TcpConnector.cs, Curl.Networking.UnitLibrary/TcpConnector.UdpTunnel.cs, Curl.Networking.UnitLibrary/UdpDatagramConnector.cs, Curl.Engine.UnitTests/EngineCompositionFeatureMaskTests.cs, Curl.Networking.UnitTests/TcpConnectorConnectToNotBuiltInTests.cs, Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
 requirement: none
 created: 2026-10-21
@@ -42,3 +42,4 @@ Split from BL-2982, which added the parse side in `Curl.Networking.UnitLibrary`:
 - 2026-10-21: Created.
 - 2026-10-21: Backlog -> Doing. Criteria at claim: 28c72b3f dd7a4945 44346086 dd1cc079.
 - 2026-10-21: Doing -> Backlog. Needs BL-2856 first: the conformance harness does not yet pass a case's !IPv6 as EngineFeatureMask, so case 1454 cannot pass
+- 2026-10-21: now depends on BL-2996, which does this task's steps 1 to 3 for case 1454 (ConnectToMappingsOf, ResolveOverrides.ParseFailureCodeWith at the four connector sites, 1454 on the ratchet) and holds that work in the shift's stash. Running this task first would redo it and make the stash fail to apply. Once BL-2996 is Done, this task checks its criteria against that work and adds only what is missing (likely the TcpConnector unit test in Curl.Networking.UnitTests).

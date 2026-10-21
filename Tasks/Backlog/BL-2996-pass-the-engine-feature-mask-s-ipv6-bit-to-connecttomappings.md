@@ -1,20 +1,20 @@
 ---
 id: BL-2996
-title: Pass the engine feature mask's IPv6 bit to ConnectToMappings so upstream case 1454 exits 4, and list 959 to 961 once measured on Linux and macOS
+title: Pass the engine feature mask's IPv6 bit to ConnectToMappings so upstream case 1454 exits 4
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-2997]
-touches: [Curl.Engine.UnitLibrary/EngineComposition.Connectors.cs, Curl.Engine.UnitTests, Curl.Conformance.UnitTests/PassingUpstreamCases.txt, Curl.Console/CurlComposition.cs, Curl.Networking.UnitLibrary/ResolveOverrides.cs, Curl.Networking.UnitLibrary/TcpConnector.cs, Curl.Networking.UnitLibrary/TcpConnector.UdpTunnel.cs, Curl.Networking.UnitLibrary/UdpDatagramConnector.cs, Curl.Networking.UnitTests/ResolveOverridesParseFailureCodeTests.cs]
+depends-on: []
+touches: [Curl.Engine.UnitLibrary/EngineComposition.Connectors.cs, Curl.Engine.UnitTests/EngineCompositionConnectToFeatureMaskTests.cs, Curl.Conformance.UnitTests/PassingUpstreamCases.txt, Curl.Console/CurlComposition.cs, Curl.Networking.UnitLibrary/ResolveOverrides.cs, Curl.Networking.UnitLibrary/TcpConnector.cs, Curl.Networking.UnitLibrary/TcpConnector.UdpTunnel.cs, Curl.Networking.UnitLibrary/UdpDatagramConnector.cs, Curl.Networking.UnitTests/ResolveOverridesParseFailureCodeTests.cs]
 requirement: none
 created: 2026-10-21
 completed:
 ---
-# BL-2996 — Pass the engine feature mask's IPv6 bit to ConnectToMappings so upstream case 1454 exits 4, and list 959 to 961 once measured on Linux and macOS
+# BL-2996 — Pass the engine feature mask's IPv6 bit to ConnectToMappings so upstream case 1454 exits 4
 
 ## Goal
 
-Upstream case 1454 (`--connect-to localhost:80:[::1]:80` with `!IPv6`) exits 4 in the conformance harness, and 959, 960 and 961 (`!IDN`, `!win32`) are measured on Linux and macOS and listed if they pass.
+Upstream case 1454 (`--connect-to localhost:80:[::1]:80` with `!IPv6`) exits 4 in the conformance harness. Measuring and listing 959, 960 and 961 (`!IDN`, `!win32`) on Linux and macOS is BL-2997's.
 
 ## Context
 
@@ -24,7 +24,7 @@ BL-2856 made the harness take `!proxy`, `!IPv6` and `!IDN` off the platform and 
 
 - [x] `EngineComposition` builds `ConnectToMappings` with `hidesIpv6` set from `EngineFeatureMask.Ipv6`, and an engine unit test pins exit 4 with the mask and no change without it.
 - [x] `$env:CURL_UPSTREAM_CASE='1454'` passes on Windows and 1454 is on `PassingUpstreamCases.txt`.
-- [ ] 959, 960 and 961 are on `PassingUpstreamCases.txt` once a CI run shows them passing on Linux and macOS, or their first difference is in Notes.
+- [ ] `dotnet build Curl.slnx -warnaserror` is clean, `dotnet test --filter "TestCategory!=Integration"` passes, and `Measure-CodeQuality.ps1 -Library Curl.Engine.UnitLibrary,Curl.Networking.UnitLibrary,Curl.Console` reports no member outside a gate.
 
 ## Notes
 
@@ -39,3 +39,4 @@ BL-2856 made the harness take `!proxy`, `!IPv6` and `!IDN` off the platform and 
 - 2026-10-21: Created.
 - 2026-10-21: Backlog -> Doing. Criteria at claim: bc4e5432 2ede4afd 1c6ad2a8.
 - 2026-10-21: Doing -> Backlog. Waits on BL-2997: cases 959-961 are !win32 and need a Linux/macOS CI measurement; the 1454 fix is done and left for the stash
+- 2026-10-21: depends-on BL-2997 removed and the third criterion (959-961 on the ratchet once measured on Linux and macOS) handed to BL-2997, whose own first criterion is that same measurement, word for word; the 1454 work does not need it, and BL-2997 is interactive only, so the wait kept the finished 1454 fix out of every lane. Replaced it with the build, fast-test and quality run the Notes say the next claim still owes. Title and Goal follow. touches narrowed from the whole Curl.Engine.UnitTests to the one test file the stash adds (EngineCompositionConnectToFeatureMaskTests.cs).
