@@ -42,3 +42,4 @@ Read the cases at tag `curl-8_22_0` (https://github.com/curl/curl/tree/curl-8_22
 - 2026-10-19: Created.
 - 2026-10-21: Backlog -> Doing. Criteria at claim: 27c464c3 fb93b735 8ce8c460 c768a82b 5ff94941.
 - 2026-10-21: Doing -> Backlog. Waits on BL-2955: Curl cannot reach a SOCKS proxy over a Unix socket, which cases 1467, 1468 and 1470 need
+- 2026-10-21: Backlog -> Doing. Criteria at claim: 27c464c3 fb93b735 8ce8c460 c768a82b 5ff94941.
