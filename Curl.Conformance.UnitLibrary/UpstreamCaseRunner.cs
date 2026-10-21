@@ -721,7 +721,7 @@ public sealed class UpstreamCaseRunner(
     {
         foreach (UpstreamTestSection part in ClientFileParts.SelectMany(name => testCase.FindAll("client", name)))
         {
-            string path = part.GetAttribute("name")!;
+            string path = UpstreamUtf8Words.AsSystemText(part.GetAttribute("name")!);
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
             File.WriteAllBytes(path, ClientBytes(part));
         }

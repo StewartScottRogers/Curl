@@ -176,7 +176,7 @@ internal static class UpstreamCaseVerification
             return null;
         }
 
-        string path = part.GetAttribute("name")!;
+        string path = UpstreamUtf8Words.AsSystemText(part.GetAttribute("name")!);
         byte[] actual = File.Exists(path) ? File.ReadAllBytes(path) : [];
         return UpstreamFirstDifference.Describe(
             $"<verify><file{suffix}> ({path})",
