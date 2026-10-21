@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary, Curl.Engine.UnitTests, Curl.Console/CurlComposition.cs, Curl.Console.UnitTests/CurlCompositionFeatureMaskTests.cs]
 requirement: none
 created: 2026-10-21
-completed:
+completed: 2026-10-21
 ---
 # BL-2984 — Add a run-time feature mask to the engine and the curl tool, off by default, and refuse --proxy under it as a build without proxy does (case 375)
 
@@ -25,14 +25,19 @@ Split from BL-2856 (which runs cases 375, 1454, 959-961 and 445 in the harness a
 
 ## Acceptance criteria
 
-- [ ] One ADR, marked "Decided by Claude under Stewart's delegation", names the mask type, where it lives, which features it can hide (`proxy`, `IPv6`, `IDN`), and states that neither the shipped curl tool nor `Libcurl` enables it by default.
-- [ ] `Curl.Engine.UnitTests` shows that with the mask hiding `proxy` a transfer with a proxy set answers `CURLE_NOT_BUILT_IN`, and without the mask nothing changes.
-- [ ] A test in `Curl.Console.UnitTests` shows `CreateRunner` with the mask hiding `proxy` runs `-x wohoo http://example.com/` to exit 4 with stderr `curl: proxy support is disabled in this libcurl` and a line feed, and without the mask the run is unchanged.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean, `dotnet test --filter "TestCategory!=Integration"` passes, and each changed library keeps 100% line and branch coverage and complexity at most 10.
+- [x] One ADR, marked "Decided by Claude under Stewart's delegation", names the mask type, where it lives, which features it can hide (`proxy`, `IPv6`, `IDN`), and states that neither the shipped curl tool nor `Libcurl` enables it by default.
+- [x] `Curl.Engine.UnitTests` shows that with the mask hiding `proxy` a transfer with a proxy set answers `CURLE_NOT_BUILT_IN`, and without the mask nothing changes.
+- [x] A test in `Curl.Console.UnitTests` shows `CreateRunner` with the mask hiding `proxy` runs `-x wohoo http://example.com/` to exit 4 with stderr `curl: proxy support is disabled in this libcurl` and a line feed, and without the mask the run is unchanged.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean, `dotnet test --filter "TestCategory!=Integration"` passes, and each changed library keeps 100% line and branch coverage and complexity at most 10.
 
 ## Notes
+
+- ADR-0746 records the design: `EngineFeatureMask` ([Flags]: None, Proxy, Ipv6, Idn) in `Curl.Engine.UnitLibrary`, carried on `TransferDispatch.FeatureMask`, passed by `CreateRunner(featureMask:)`; default None, so the curl tool and Libcurl are unchanged.
+- The stderr line is written through the dispatch's pre-transfer lines (as other setopt refusals are), and the engine fails with exit 4 and no error text, so no `curl: (4)` line follows - curl's tool marks the error synthetic (tool_operate.c).
+- Measure-CodeQuality.ps1 -Library Curl.Engine.UnitLibrary,Curl.Console: 0 failing members.
 
 ## Log
 
 - 2026-10-21: Created.
 - 2026-10-21: Backlog -> Doing. Criteria at claim: cab62466 9e889420 695eb15d dd1cc079.
+- 2026-10-21: Doing -> Done. Feature mask in the engine and CreateRunner; under Proxy, -x answers exit 4 with curl's line (ADR-0746)
