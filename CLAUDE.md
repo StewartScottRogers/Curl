@@ -311,7 +311,11 @@ Curl/
   `Curl.Api.UnitTests` come first, before `Curl.Authentication.UnitLibrary`.
 
 In `Curl.slnx`, projects are listed as one flat run with no solution folders around
-them. The `Solution Items` and `Scripts` solution folders hold loose files only.
+them, except the protocols: each `Curl.Protocol.<Name>.*` project sits with its tests in
+the `/Protocols/<Name>/` solution folder, `Curl.Protocol.Abstractions.*` in
+`/Protocols/Abstractions/` (ADR-0731). Solution folders change only the solution file; the
+directories on disk stay flat. The `Solution Items` and `Scripts` solution folders hold
+loose files only.
 
 Each project folder may contain its own `CLAUDE.md` with project-specific rules; follow it when working in that folder.
 

@@ -17,7 +17,9 @@ There is no `src/` and no `tests/` — do not create them.
 4. Create the matching test project beside it:
    `dotnet new mstest --name Curl.<Area>.UnitTests --output Curl.<Area>.UnitTests --framework net10.0`
 5. Add both to the solution with no solution folder, so they stay in the flat run:
-   `dotnet sln Curl.slnx add Curl.<Area>.UnitLibrary Curl.<Area>.UnitTests`
+   `dotnet sln Curl.slnx add Curl.<Area>.UnitLibrary Curl.<Area>.UnitTests`.
+   A protocol goes in its own folder under `Protocols` instead (ADR-0731):
+   `dotnet sln Curl.slnx add --solution-folder Protocols/<Name> Curl.Protocol.<Name>.UnitLibrary Curl.Protocol.<Name>.UnitTests`
 6. Reference production from test:
    `dotnet add Curl.<Area>.UnitTests reference Curl.<Area>.UnitLibrary`
 7. For a protocol library, also reference the contracts, and nothing else horizontal:
@@ -52,5 +54,7 @@ agent - live only in `Curl.<Area>.IntegrationTests`, never in `Curl.<Area>.UnitT
    csproj only when the tests use its internals.
 4. Add it to `Curl.slnx` in its alphabetical place, with no solution folder:
    `dotnet sln Curl.slnx add Curl.<Area>.IntegrationTests`. It sorts immediately before
-   `Curl.<Area>.UnitLibrary` (for `Curl.Console`, before `Curl.Console.UnitTests`).
+   `Curl.<Area>.UnitLibrary` (for `Curl.Console`, before `Curl.Console.UnitTests`). A
+   protocol's goes in its `Protocols/<Name>` folder, before the library there:
+   `dotnet sln Curl.slnx add --solution-folder Protocols/<Name> Curl.Protocol.<Name>.IntegrationTests`.
 5. Run `dotnet build` and `dotnet test Curl.<Area>.IntegrationTests --filter "TestCategory=Integration"`.
