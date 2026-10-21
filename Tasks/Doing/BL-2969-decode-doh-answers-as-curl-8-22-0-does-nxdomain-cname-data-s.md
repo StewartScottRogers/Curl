@@ -37,3 +37,4 @@ If this is too big for one run, split it: the TTL cap and NXDOMAIN code are smal
 ## Log
 
 - 2026-10-21: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: bd93dc30 0841b2d7 2a446683.
