@@ -35,3 +35,4 @@ Depends on BL-2850, which adds the `<command type="perl">` mechanism and the ven
 ## Log
 
 - 2026-10-19: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: 09d8956f 44ec4ea8 cfcc71e4 dd1cc079 620ebead.
