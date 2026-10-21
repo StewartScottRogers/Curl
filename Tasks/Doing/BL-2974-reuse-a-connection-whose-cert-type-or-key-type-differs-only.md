@@ -30,3 +30,4 @@ Found by BL-2921. Upstream `tests/unit/unit3304.c` (curl-8_22_0) says the peer k
 ## Log
 
 - 2026-10-21: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: 1cb9911f b65be32d.
