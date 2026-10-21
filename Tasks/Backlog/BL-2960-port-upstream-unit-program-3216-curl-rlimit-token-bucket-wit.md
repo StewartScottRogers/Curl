@@ -1,5 +1,5 @@
 ---
-id: BL-2955
+id: BL-2960
 title: Port upstream unit program 3216 (Curl_rlimit token bucket with burst and block)
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-21
 completed:
 ---
-# BL-2955 — Port upstream unit program 3216 (Curl_rlimit token bucket with burst and block)
+# BL-2960 — Port upstream unit program 3216 (Curl_rlimit token bucket with burst and block)
 
 ## Goal
 

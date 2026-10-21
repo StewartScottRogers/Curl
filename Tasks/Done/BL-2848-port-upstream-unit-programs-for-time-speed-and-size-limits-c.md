@@ -24,7 +24,7 @@ These seven `unittest` cases (skipped today with `Curl lacks the feature unittes
 
 - [x] Cases 1605 and 1606 each have a port in `Curl.Conformance.UnitProgram.UnitLibrary` whose checks match the C program's row for row (named in its doc comment), registered in `UnitPrograms.Ported`, with a test in `Curl.Conformance.UnitProgram.UnitTests`.
 - [x] Cases 1323 and 3214 each have a Notes entry naming the C-only thing they test, and an ADR row says so (ADR-0729 for 1323, ADR-0711 for 3214).
-- [x] The ports of 1303, 1399 and 3216 are filed as BL-2953, BL-2954 and BL-2955, each naming the Curl counterpart it must build first, and ADR-0729 records the split.
+- [x] The ports of 1303, 1399 and 3216 are filed as BL-2958, BL-2959 and BL-2960, each naming the Curl counterpart it must build first, and ADR-0729 records the split.
 - [x] Each ported case ends `Passed` with `$env:CURL_UPSTREAM_CASE='<n>'` on Windows and is on `PassingUpstreamCases.txt`.
 - [x] Where a port finds Curl wrong, the fix has a focused unit test in the fixed library's own `.UnitTests` project (ADR-0482) and the library folder is added to `touches` in the same commit. (Neither port found Curl wrong.)
 - [x] `dotnet build Curl.slnx -warnaserror` is clean, `dotnet test --filter "TestCategory!=Integration"` passes, and each changed library and the new library keep 100% line and branch coverage and complexity at most 10.
@@ -37,9 +37,9 @@ These seven `unittest` cases (skipped today with `Curl lacks the feature unittes
   - **1606 ported**: `Limits/Unit1606SpeedCheck.cs`, the six `runawhile` rows over `LowSpeedWatchdog` on `Limits/SteppedTimeProvider.cs` (a hand-moved clock firing the watchdog's timer once per one-second step). The C program fakes `current_speed`; the watchdog measures bytes over its last five seconds, so the port writes before each check the bytes that make that measure the row's speed (B(n) = B(max(0, n-5)) + min(n, 5) x speed). `Passed`, on the ratchet. Curl was right: no fix needed.
   - **1323 no counterpart** (ADR-0729): `curlx_timediff_ms` is arithmetic on `struct curltime` (`tv_sec`/`tv_usec`); Curl measures elapsed time as `TimeSpan` from `TimeProvider`, so there is nothing of Curl's to run it over.
   - **3214 no counterpart** (ADR-0711 row, unchanged): `sizeof` checks of C structs.
-  - **1303 -> BL-2953**: Curl has no single `Curl_timeleft_ms`; `-m` and `--connect-timeout` are counted apart, so a `TransferTimeLeft` in `Curl.Core` comes first.
-  - **1399 -> BL-2954**: finding (and fixing if needed) where Curl sums phase timers across redirect hops is work of its own.
-  - **3216 -> BL-2955**: `RateLimitedStream` is not libcurl's token bucket (no burst, block or balance), so a `TransferRateLimit` in `Curl.Core` comes first.
+  - **1303 -> BL-2958**: Curl has no single `Curl_timeleft_ms`; `-m` and `--connect-timeout` are counted apart, so a `TransferTimeLeft` in `Curl.Core` comes first.
+  - **1399 -> BL-2959**: finding (and fixing if needed) where Curl sums phase timers across redirect hops is work of its own.
+  - **3216 -> BL-2960**: `RateLimitedStream` is not libcurl's token bucket (no burst, block or balance), so a `TransferRateLimit` in `Curl.Core` comes first.
 - Quality: `Measure-CodeQuality.ps1 -Library Curl.Conformance.UnitProgram.UnitLibrary`: 100% line, 100% branch, 0 failing members, worst CRAP 10.
 
 Ports go in Curl.Conformance.UnitProgram.UnitLibrary/Limits/ and their tests in Curl.Conformance.UnitProgram.UnitTests/Limits/; register them only in Curl.Conformance.UnitProgram.UnitLibrary/UnitPrograms.Limits.cs, which BL-2886 creates. Its project references are added by BL-2886; if one is missing, add it in a separate one-line commit and say so in the Log (Stewart, 2026-10-21: keep the seven ports parallel).
@@ -48,6 +48,6 @@ Ports go in Curl.Conformance.UnitProgram.UnitLibrary/Limits/ and their tests in 
 
 - 2026-10-19: Created.
 - 2026-10-21: Backlog -> Doing. Criteria at claim: 84511890 2e3e75ab e66ae9dd c0723528 620ebead.
-- 2026-10-21: Doing -> Backlog. Narrowing the criteria to the split of ADR-0729 (1605 and 1606 ported, 1323 and 3214 recorded; 1303, 1399 and 3216 moved to BL-2953, BL-2954 and BL-2955), then reclaiming to close
+- 2026-10-21: Doing -> Backlog. Narrowing the criteria to the split of ADR-0729 (1605 and 1606 ported, 1323 and 3214 recorded; 1303, 1399 and 3216 moved to BL-2958, BL-2959 and BL-2960), then reclaiming to close
 - 2026-10-21: Backlog -> Doing. Criteria at claim: 32682e55 3e457fdb d2a5356d 2e3e75ab ea3799dc c0723528 0a06e05d.
-- 2026-10-21: Doing -> Done. Upstream cases 1605 and 1606 run as ported unit programs and pass on the ratchet; 1323 and 3214 recorded as C-only; 1303, 1399 and 3216 split to BL-2953, BL-2954 and BL-2955 (ADR-0729)
+- 2026-10-21: Doing -> Done. Upstream cases 1605 and 1606 run as ported unit programs and pass on the ratchet; 1323 and 3214 recorded as C-only; 1303, 1399 and 3216 split to BL-2958, BL-2959 and BL-2960 (ADR-0729)

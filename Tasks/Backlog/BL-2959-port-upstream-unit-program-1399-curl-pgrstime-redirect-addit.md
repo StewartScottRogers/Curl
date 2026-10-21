@@ -1,5 +1,5 @@
 ---
-id: BL-2954
+id: BL-2959
 title: Port upstream unit program 1399 (Curl_pgrsTime redirect-additive timers)
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-21
 completed:
 ---
-# BL-2954 — Port upstream unit program 1399 (Curl_pgrsTime redirect-additive timers)
+# BL-2959 — Port upstream unit program 1399 (Curl_pgrsTime redirect-additive timers)
 
 ## Goal
 

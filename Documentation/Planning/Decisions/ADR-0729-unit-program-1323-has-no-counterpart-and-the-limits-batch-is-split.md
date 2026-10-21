@@ -35,7 +35,7 @@ C program and finds the Curl type absent change its own row. Reading curl 8.22.0
 - BL-2848 ports 1605 (`CurlStrings.Escape` and `Unescape` given length -1, `Libcurl`) and 1606
   (`LowSpeedWatchdog` stepped second by second on a hand-moved `SteppedTimeProvider`) and holds
   both on the ratchet.
-- 1303, 1399 and 3216 stay `port` rows, now owned by BL-2953, BL-2954 and BL-2955, each of which
+- 1303, 1399 and 3216 stay `port` rows, now owned by BL-2958, BL-2959 and BL-2960, each of which
   builds the Curl counterpart it needs and ports the program over it.
 
 ## Consequences
