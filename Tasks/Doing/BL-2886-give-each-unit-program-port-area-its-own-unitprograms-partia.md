@@ -33,3 +33,4 @@ Stewart, 2026-10-21: "always function in a highly parallel fashion". BL-2841 add
 ## Log
 
 - 2026-10-21: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: d8b55c76 6dd7cfce 6157d435 0f33084e 3dbaac52.
