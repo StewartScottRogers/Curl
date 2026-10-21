@@ -1420,6 +1420,8 @@ public sealed class HttpProtocolHandler(
             EarlyResponseWatch = responseConnection as HttpContinueWaitConnection,
             EarlyResponseRead = responseConnection as HttpEarlyResponseConnection,
             KeepsSendingOnError = plan.Options.KeepSendingOnError,
+            SendBytesPerSecond = plan.Options.SendBytesPerSecond,
+            TimeProvider = plan.Context.TimeProvider,
             TracesReaders = TracesReadersOf(requestStream),
         };
     }

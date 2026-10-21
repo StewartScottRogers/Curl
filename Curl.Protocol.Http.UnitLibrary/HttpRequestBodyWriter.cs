@@ -162,6 +162,15 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
     /// </summary>
     internal bool KeepsSendingOnError { get; init; }
 
+    /// <summary>
+    /// Gets the most bytes a second a body of bytes is sent at (<c>--limit-rate</c>), or
+    /// <see langword="null" /> to send it unpaced; a stream body is never paced here (BL-2957).
+    /// </summary>
+    internal long? SendBytesPerSecond { get; init; }
+
+    /// <summary>Gets the clock <see cref="SendBytesPerSecond" /> paces the body on.</summary>
+    internal TimeProvider TimeProvider { get; init; } = TimeProvider.System;
+
     /// <summary>What a read gives when it was left pending because a status of 300 or above came first.</summary>
     private const int ReadLeftPending = -1;
 
@@ -362,6 +371,12 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
     /// </summary>
     private async ValueTask WriteBytesAsync(ReadOnlyMemory<byte> content, bool isChunked, CancellationToken cancellationToken)
     {
+        if (SendBytesPerSecond is { } rate)
+        {
+            await WriteBytesAtRateAsync(content, rate, isChunked, cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
         if (EarlyResponseWatch is null && !tracing)
         {
             await WritePieceAsync(content, isChunked, cancellationToken).ConfigureAwait(false);
@@ -371,6 +386,30 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
         while (BytesWritten < content.Length && !CutShort)
         {
             int room = NextReadRoom(isChunked);
+            int length = (int)Math.Min(room, content.Length - BytesWritten);
+            ReportBufferRead(room, length, BytesWritten + length == content.Length, isChunked);
+            await WritePieceAsync(content.Slice((int)BytesWritten, length), isChunked, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// Writes a body of bytes no faster than <paramref name="rate" /> bytes a second: pieces of at
+    /// most <paramref name="rate" /> bytes, each after the wait on <see cref="TimeProvider" /> that
+    /// keeps the bytes sent before it within the rate, as curl's <c>CURLOPT_MAX_SEND_SPEED_LARGE</c>
+    /// pauses the send (BL-2957).
+    /// </summary>
+    private async ValueTask WriteBytesAtRateAsync(ReadOnlyMemory<byte> content, long rate, bool isChunked, CancellationToken cancellationToken)
+    {
+        long start = TimeProvider.GetTimestamp();
+        while (BytesWritten < content.Length && !CutShort)
+        {
+            TimeSpan due = TimeSpan.FromSeconds((double)BytesWritten / rate) - TimeProvider.GetElapsedTime(start);
+            if (due > TimeSpan.Zero)
+            {
+                await Task.Delay(due, TimeProvider, cancellationToken).ConfigureAwait(false);
+            }
+
+            int room = (int)Math.Min(NextReadRoom(isChunked), rate);
             int length = (int)Math.Min(room, content.Length - BytesWritten);
             ReportBufferRead(room, length, BytesWritten + length == content.Length, isChunked);
             await WritePieceAsync(content.Slice((int)BytesWritten, length), isChunked, cancellationToken).ConfigureAwait(false);

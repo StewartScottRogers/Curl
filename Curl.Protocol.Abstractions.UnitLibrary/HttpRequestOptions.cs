@@ -352,4 +352,15 @@ public sealed record HttpRequestOptions
     /// store decides whether a plain <c>http</c> origin's header is learned (ADR-0494).
     /// </summary>
     public IHstsStore? HstsStore { get; init; }
+
+    /// <summary>
+    /// Gets the most bytes a second a body of bytes (<c>-d</c>, <c>--data*</c>, <c>--json</c>) is
+    /// sent at (<c>--limit-rate</c>, libcurl's <c>CURLOPT_MAX_SEND_SPEED_LARGE</c>), or
+    /// <see langword="null" />, the default, to send it at once.
+    /// </summary>
+    /// <remarks>
+    /// A stream body (<c>-T</c>, <c>-F</c>) is held to the rate by the stream the caller hands over,
+    /// so the handler limits only a body of bytes (BL-2957).
+    /// </remarks>
+    public long? SendBytesPerSecond { get; init; }
 }
