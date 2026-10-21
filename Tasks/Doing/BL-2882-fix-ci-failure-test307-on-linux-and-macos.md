@@ -30,6 +30,10 @@ Lanes test only on Windows, so reproduce with `gh run view 39370101714 --log-fai
 
 ## Notes
 
+- Cause: BL-2873 decided to take 307 off `PassingUpstreamCases.txt` (its precheck `test307.pl` wants an `openssl` engine in `curl --engine list`, which neither Curl nor curl on OpenSSL 3 lists, so the case skips on every platform), but its commit b7222390d changed only the task file: the `307` line stayed on the ratchet, and on Linux and macOS the listed case is skipped at its precheck and fails.
+- Fix: removed `307` from `Curl.Conformance.UnitTests/PassingUpstreamCases.txt`, as BL-2873 decided. No production code changed, so no quality run.
+- Measured on Windows, 2026-10-21: `dotnet build` clean; fast tests green (Curl.Conformance.UnitTests 3622 passed, 0 failed). The Linux and macOS CI check is the shift's (BL-987 watch).
+
 ## Log
 
 - 2026-10-19: Created.
