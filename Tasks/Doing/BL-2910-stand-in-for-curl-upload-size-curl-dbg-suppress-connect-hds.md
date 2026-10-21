@@ -32,3 +32,4 @@ Split from BL-2835. Read upstream's source at tag `curl-8_22_0` for each variabl
 ## Log
 
 - 2026-10-21: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: cee4fab0 ca97a32f 3b310db3 9495a595.
