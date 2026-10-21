@@ -30,3 +30,4 @@ BL-2922 (ADR-0740) shuffles each look-up's answer through `Curl.Networking`'s `S
 ## Log
 
 - 2026-10-21: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: 0e1c93ab dd1cc079.
