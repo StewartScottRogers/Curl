@@ -4,7 +4,7 @@ title: Port upstream unit programs for ASN.1, X.509 and TLS names: cases 1394, 1
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-2886, BL-2889, BL-2890, BL-2891]
+depends-on: [BL-2886, BL-2911, BL-2912, BL-2913]
 touches: [Curl.Conformance.UnitTests/PassingUpstreamCases.txt, Curl.Conformance.UnitProgram.UnitLibrary/UnitPrograms.Asn1.cs, Curl.Conformance.UnitProgram.UnitLibrary/Asn1, Curl.Conformance.UnitProgram.UnitTests/Asn1]
 requirement: none
 created: 2026-10-19
@@ -32,10 +32,10 @@ These nine `unittest` cases (skipped today with `Curl lacks the feature unittest
 
 Ports go in Curl.Conformance.UnitProgram.UnitLibrary/Asn1/ and their tests in Curl.Conformance.UnitProgram.UnitTests/Asn1/; register them only in Curl.Conformance.UnitProgram.UnitLibrary/UnitPrograms.Asn1.cs, which BL-2886 creates. Its project references are added by BL-2886; if one is missing, add it in a separate one-line commit and say so in the Log (Stewart, 2026-10-21: keep the seven ports parallel).
 
-2026-10-21 (lane 3, first pass, no code edited): nine ports with their tests and a Curl.Networking fix are too big for one run, so the work is split. Every case has a Curl counterpart, so none is recorded as C-only: tool1394 -> `ClientCertificateArgument.Split` (Curl.Networking, public); 1397 -> `SchannelCommonNameCheck.PatternMatchesHost` (Curl.Networking; Curl wrongly matches host `.hello.com` against `*.hello.com`); 1676 and 1651 -> `PeerCertificateText.Format` (Curl.Output, public); 1656, 1657, 1666, 1667 -> `DerText`/`DerReader` (Curl.Output, internal, needs InternalsVisibleTo); 3205 compiles to nothing on the Schannel and OpenSSL builds. ADR-0720 decides that a port runs a guarded check only where the platform's curl build compiles it (Schannel on Windows) and prints the C program's `not tested since ...` line elsewhere. Filed BL-2889 (1394, 1397, 1676, 3205 and the wildcard fix), BL-2890 (1656, 1657, 1666, 1667) and BL-2891 (1651); this task now only confirms all nine are on the ratchet once they are Done. Checked the runner: `CURL_UPSTREAM_CASE=1394` skips with `Curl has no port of tool1394`, so registering a port is all a case needs.
+2026-10-21 (lane 3, first pass, no code edited): nine ports with their tests and a Curl.Networking fix are too big for one run, so the work is split. Every case has a Curl counterpart, so none is recorded as C-only: tool1394 -> `ClientCertificateArgument.Split` (Curl.Networking, public); 1397 -> `SchannelCommonNameCheck.PatternMatchesHost` (Curl.Networking; Curl wrongly matches host `.hello.com` against `*.hello.com`); 1676 and 1651 -> `PeerCertificateText.Format` (Curl.Output, public); 1656, 1657, 1666, 1667 -> `DerText`/`DerReader` (Curl.Output, internal, needs InternalsVisibleTo); 3205 compiles to nothing on the Schannel and OpenSSL builds. ADR-0723 decides that a port runs a guarded check only where the platform's curl build compiles it (Schannel on Windows) and prints the C program's `not tested since ...` line elsewhere. Filed BL-2911 (1394, 1397, 1676, 3205 and the wildcard fix), BL-2912 (1656, 1657, 1666, 1667) and BL-2913 (1651); this task now only confirms all nine are on the ratchet once they are Done. Checked the runner: `CURL_UPSTREAM_CASE=1394` skips with `Curl has no port of tool1394`, so registering a port is all a case needs.
 
 ## Log
 
 - 2026-10-19: Created.
 - 2026-10-21: Backlog -> Doing. Criteria at claim: 8d1f9340 2e3e75ab e66ae9dd c0723528 620ebead.
-- 2026-10-21: Doing -> Backlog. Split for size: waits on BL-2889, BL-2890 and BL-2891, which port the nine cases
+- 2026-10-21: Doing -> Backlog. Split for size: waits on BL-2911, BL-2912 and BL-2913, which port the nine cases

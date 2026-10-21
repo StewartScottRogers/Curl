@@ -1,5 +1,5 @@
 ---
-id: BL-2891
+id: BL-2913
 title: Port upstream unit program unit1651 (x509 parsing) over PeerCertificateText
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-21
 completed:
 ---
-# BL-2891 — Port upstream unit program unit1651 (x509 parsing) over PeerCertificateText
+# BL-2913 — Port upstream unit program unit1651 (x509 parsing) over PeerCertificateText
 
 ## Goal
 
@@ -18,7 +18,7 @@ Upstream case 1651 runs as a ported unit program over `Curl.Output.PeerCertifica
 
 ## Context
 
-Split from BL-2843. Follow ADR-0711 (shape) and ADR-0720: unit1651 is compiled only into the GnuTLS and Schannel builds, so on Linux and macOS the port prints `not tested since Curl_extract_certinfo() is not built in` and passes. C source: https://github.com/curl/curl/blob/curl-8_22_0/tests/unit/unit1651.c - a 3,935-byte certificate captured from curl.se in 2018; `Curl_extract_certinfo` must succeed on it (one check), then the "poor man's fuzzing" overwrites each of the first 45 bytes with 1, 18, 35, ... 254 in turn and extracts again, results ignored. Port it over the public `Curl.Output.PeerCertificateText.Format(ReadOnlyMemory<byte>)`: the first call must not throw; in the fuzzing loop a `FormatException` (Curl's refusal) is ignored as the C program ignores the result, and any other exception is a failure. Keep the certificate bytes in their own file (e.g. `Unit1651Certificate.cs`). One `IUnitProgram` in `Curl.Conformance.UnitProgram.UnitLibrary/Asn1/Certinfo/`, registered in `UnitPrograms.Asn1.cs`, tests in `Curl.Conformance.UnitProgram.UnitTests/Asn1/Certinfo/`.
+Split from BL-2843. Follow ADR-0711 (shape) and ADR-0723: unit1651 is compiled only into the GnuTLS and Schannel builds, so on Linux and macOS the port prints `not tested since Curl_extract_certinfo() is not built in` and passes. C source: https://github.com/curl/curl/blob/curl-8_22_0/tests/unit/unit1651.c - a 3,935-byte certificate captured from curl.se in 2018; `Curl_extract_certinfo` must succeed on it (one check), then the "poor man's fuzzing" overwrites each of the first 45 bytes with 1, 18, 35, ... 254 in turn and extracts again, results ignored. Port it over the public `Curl.Output.PeerCertificateText.Format(ReadOnlyMemory<byte>)`: the first call must not throw; in the fuzzing loop a `FormatException` (Curl's refusal) is ignored as the C program ignores the result, and any other exception is a failure. Keep the certificate bytes in their own file (e.g. `Unit1651Certificate.cs`). One `IUnitProgram` in `Curl.Conformance.UnitProgram.UnitLibrary/Asn1/Certinfo/`, registered in `UnitPrograms.Asn1.cs`, tests in `Curl.Conformance.UnitProgram.UnitTests/Asn1/Certinfo/`.
 
 ## Acceptance criteria
 
