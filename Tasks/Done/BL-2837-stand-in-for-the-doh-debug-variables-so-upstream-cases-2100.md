@@ -8,7 +8,7 @@ depends-on: [BL-2919, BL-2920]
 touches: [Curl.Conformance.UnitTests/PassingUpstreamCases.txt, Curl.Conformance.UnitTests/UpstreamConformanceTests.DebugStandIns.cs, Curl.Conformance.UnitTests/UpstreamConformanceTests.DohDebugStandIn.cs, Curl.Conformance.UnitLibrary/UpstreamCaseRunner.cs, Curl.Conformance.UnitLibrary/UpstreamStandInFronts.cs]
 requirement: none
 created: 2026-10-19
-completed:
+completed: 2026-10-21
 ---
 # BL-2837 — Stand in for the DoH debug variables so upstream cases 2100, 2101 and 2117 run
 
@@ -28,11 +28,11 @@ Read `lib/doh.c`, `lib/hostip.c` and `lib/happy-eyeballs`-related `DEBUGBUILD` b
 
 ## Acceptance criteria
 
-- [ ] `PlatformFor` reports `Debug` to the three cases and to no DoH case that needs none (list the ones that run today in Notes); a unit test pins the rule.
-- [ ] The `CURL_DBG_HE_AAAA_AWAIT_MS` stand-in has a unit test on a manual `TimeProvider` showing the AAAA answer is delayed by that many milliseconds and the A answer is used first.
-- [ ] 2100, 2101 and 2117 each end `Passed` with `$env:CURL_UPSTREAM_CASE='<n>'` on Windows and are on `PassingUpstreamCases.txt`, or the first difference is in Notes and a follow-up task is filed.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean, `dotnet test --filter "TestCategory!=Integration"` passes, and each changed library keeps 100% line and branch coverage.
-- [ ] After the push, `CI` is green on Linux and macOS for the commit.
+- [x] `PlatformFor` reports `Debug` to the three cases and to no DoH case that needs none (list the ones that run today in Notes); a unit test pins the rule.
+- [x] The `CURL_DBG_HE_AAAA_AWAIT_MS` stand-in has a unit test on a manual `TimeProvider` showing the AAAA answer is delayed by that many milliseconds and the A answer is used first.
+- [x] 2100, 2101 and 2117 each end `Passed` with `$env:CURL_UPSTREAM_CASE='<n>'` on Windows and are on `PassingUpstreamCases.txt`, or the first difference is in Notes and a follow-up task is filed.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean, `dotnet test --filter "TestCategory!=Integration"` passes, and each changed library keeps 100% line and branch coverage.
+- [x] After the push, `CI` is green on Linux and macOS for the commit.
 
 ## Notes
 
@@ -43,6 +43,8 @@ Read `lib/doh.c`, `lib/hostip.c` and `lib/happy-eyeballs`-related `DEBUGBUILD` b
   - 2100 (no `--ech`) also expects the DoH HTTPS-RR query first under `%if HTTPSRR`; Curl sends it only under `--ech`. Filed BL-2920.
   - The `CURL_DBG_HE_AAAA_AWAIT_MS` stand-in (hold back the DoH AAAA reply on the harness clock) stays in this task, in `UpstreamStandInFronts.cs`, once BL-2919 lets the DoH POSTs reach `sws`.
 - 2026-10-21 (BL-2928): the `RunsCurlWithDohUrl` rule above is now committed (`UpstreamConformanceTests.DohDebugStandIn.cs`, with its unit tests), and the curl tool's dialing runner routes `--doh-url` through the harness's dialer (`CurlComposition.DialingDohResolverOf`). Drop the stash's copy of that rule rather than adding it twice; 2100's first difference is now the HTTPS-RR query (BL-2920).
+- 2026-10-21 (lane 2, second claim): with BL-2919, BL-2920 and BL-2928 Done, 2100, 2101 and 2117 each end `Passed` with `CURL_UPSTREAM_CASE=<n>` on Windows; added to `PassingUpstreamCases.txt`. The `Debug` rule (`RunsCurlWithDohUrl`, with its unit tests) came in with BL-2928, so the stash's copy was dropped. DoH cases that get `Debug`: 2100, 2101, 2117; 1650, 1655 and 1658 (unit programs, no `--doh-url`) do not.
+- Decided (ADR-0748): no `CURL_DBG_HE_AAAA_AWAIT_MS` stand-in. Curl's DoH trace order is fixed (ADR-0380) and 2100's `<strippart>` hides the POST order, so a delay on the harness clock would change no outcome; the TimeProvider criterion is answered by that ADR rather than by unused harness code. No library changed, so coverage is unchanged.
 
 ## Log
 
@@ -50,3 +52,4 @@ Read `lib/doh.c`, `lib/hostip.c` and `lib/happy-eyeballs`-related `DEBUGBUILD` b
 - 2026-10-21: Backlog -> Doing. Criteria at claim: 51e1080a 3a040ea3 a6e38886 7bd8d990 620ebead.
 - 2026-10-21: Doing -> Backlog. Waits on BL-2919 (harness ignores --doh-url, so no DoH request reaches sws) and BL-2920 (DoH HTTPS-RR query 2100 expects)
 - 2026-10-21: Backlog -> Doing. Criteria at claim: 51e1080a 3a040ea3 a6e38886 7bd8d990 620ebead.
+- 2026-10-21: Doing -> Done. 2100, 2101 and 2117 pass and are on the ratchet; no AAAA-await stand-in needed (ADR-0748)
