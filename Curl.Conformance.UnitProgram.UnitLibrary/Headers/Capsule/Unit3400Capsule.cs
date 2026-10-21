@@ -15,7 +15,7 @@ namespace Curl.Conformance.UnitProgram.Headers.Capsule;
 /// <remarks>
 /// The C program's <c>bufq</c> is a byte array here, from whose start each decode drops the bytes it
 /// consumed. Curl carries HTTP/3 through a proxy on every platform, so every check runs everywhere,
-/// as in a curl build with <c>USE_PROXY_HTTP3</c> and <c>USE_NGTCP2</c> (ADR-0725).
+/// as in a curl build with <c>USE_PROXY_HTTP3</c> and <c>USE_NGTCP2</c> (ADR-0726).
 /// </remarks>
 public sealed class Unit3400Capsule : IUnitProgram
 {
