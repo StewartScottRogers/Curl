@@ -67,3 +67,4 @@ If a case still differs after the stand-in, record its first difference in Notes
 - 2026-10-21: Backlog -> Doing. Criteria at claim: 2a064a5d 50019839 7f573e82 d86cdfca dd1cc079 620ebead.
 - 2026-10-21: Doing -> Backlog. Needs Curl.Engine.UnitLibrary/EngineComposition.cs (Digest and SASL nonce are hard-wired there), which BL-2921 in Doing holds as the whole Curl.Engine.UnitLibrary
 - 2026-10-21: touches narrowed from the whole Curl.Authentication.UnitLibrary and .UnitTests to the four files that hold the Digest and SASL cnonce seam (DigestClientNonce, DigestAuthenticator, SaslAuthenticator and DigestClientNonceTests), per lane 5's Notes that the seam already exists there; if another Authentication file must change, add it in the same commit.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: 2a064a5d 50019839 7f573e82 d86cdfca dd1cc079 620ebead.
