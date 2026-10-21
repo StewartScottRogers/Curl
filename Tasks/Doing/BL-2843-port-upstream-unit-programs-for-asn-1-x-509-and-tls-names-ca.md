@@ -35,3 +35,4 @@ Ports go in Curl.Conformance.UnitProgram.UnitLibrary/Asn1/ and their tests in Cu
 ## Log
 
 - 2026-10-19: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: 8d1f9340 2e3e75ab e66ae9dd c0723528 620ebead.
