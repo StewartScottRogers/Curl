@@ -32,3 +32,4 @@ Found by BL-2859, which needs it for upstream cases 1467, 1468 and 1470 (feature
 ## Log
 
 - 2026-10-21: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: e440f871 5c6bbdcf 9641394d dd1cc079.
