@@ -29,6 +29,9 @@ public sealed partial class UpstreamConformanceTests
     // to a case naming ws and setting it, and CreateEngine gives the libtest engine zero masks (ADR-0698, BL-2698).
     // The FTP libtest case 753 relies on Debug for CURL_FTP_PWD_STOP, which stops the first transfer before PWD: the
     // harness reports Debug to a case setting it, and CreateEngine has the libtest engine stop its first perform there (ADR-0687, BL-2636).
+    // The cases that split curl's sends with CURL_SMALLREQSEND or CURL_SMALLSENDS (363, 1294, 1295, 5028) rely on Debug
+    // too: the harness reports it to a case setting either, and the runner splits the writes on every connection the
+    // case makes (UpstreamSmallSendsFront, ADR-0721, BL-2832).
     // The table below is the one shared edit a case needing a Debug stand-in makes: one line per rule, each telling
     // from the test file's text whether the case gets the Debug feature.
     private static readonly Func<string, bool>[] DebugStandInRules =
@@ -43,6 +46,7 @@ public sealed partial class UpstreamConformanceTests
         text => text.Contains(":%HTTP2TLSPORT/", StringComparison.Ordinal),
         text => text.Contains("\nCURL_FTP_PWD_STOP=", StringComparison.Ordinal),
         text => text.Contains("\n" + FakeExtendedAttributesVariableName + "=", StringComparison.Ordinal),
+        SetsSmallSendsVariable,
     ];
 
     internal static UpstreamCurlPlatform PlatformFor(byte[] testFile)

@@ -36,6 +36,8 @@ internal sealed class UpstreamStandInFronts
             fronts.Insert(fronts.Count - 2, new UpstreamHttp3Front(http3Server));
         }
 
+        // Outside every other front, so it splits the writes curl makes, whichever stand-in they reach.
+        fronts.Add(new UpstreamSmallSendsFront());
         return new UpstreamStandInFronts([.. fronts]);
     }
 

@@ -511,8 +511,8 @@ public sealed class UpstreamCaseRunner(
     // runtests.pl sets each NAME=value line of every <client><setenv> part (getpart joins parts of one
     // name, as test433 has two) for the run, an empty value as an
     // empty variable, and unsets a NAME with no '='. The run's environment holds nothing else, so
-    // nothing is left to restore after it.
-    private static Dictionary<string, string> EnvironmentVariables(UpstreamTestCase testCase)
+    // nothing is left to restore after it. UpstreamSmallSendsFront reads it too.
+    internal static Dictionary<string, string> EnvironmentVariables(UpstreamTestCase testCase)
     {
         Dictionary<string, string> variables = new(StringComparer.Ordinal);
         foreach (string line in testCase.FindAll("client", "setenv").SelectMany(UpstreamTestPartBodies.Lines))
