@@ -1,4 +1,5 @@
 using System.Text;
+using Curl.Protocol.Abstractions;
 
 namespace Curl.Protocol.Ssh.Sftp;
 
@@ -67,6 +68,27 @@ internal sealed record SftpQuoteCommand(SftpQuoteOperation Operation, bool Ignor
             : ParseWithArguments(text, ignoresFailure, homeDirectory);
     }
 
+    /// <summary>
+    /// curl 8.22.0's <c>Curl_get_pathname</c> on its own, for the port of upstream's
+    /// <c>unit2604</c> (BL-2905): reads one path from the start of <paramref name="value" />
+    /// as each argument of a <c>-Q</c> command is read.
+    /// </summary>
+    /// <param name="value">The text the path starts in, blanks before it allowed.</param>
+    /// <param name="homeDirectory">The home directory an unquoted <c>/~/</c> path starts from.</param>
+    /// <returns>
+    /// curl's code (<see cref="CurlExitCode.Ok" />; <see cref="CurlExitCode.QuoteError" /> for
+    /// no path, an empty or unclosed quote or an unknown escape;
+    /// <see cref="CurlExitCode.TooLarge" /> for a path of 65535 bytes or more), the path, and
+    /// the text after the path and its blanks; the path and the rest are empty unless the
+    /// code is <see cref="CurlExitCode.Ok" />.
+    /// </returns>
+    internal static (CurlExitCode Result, byte[] Path, string Remainder) ReadPathname(string value, byte[] homeDirectory)
+    {
+        ArgumentReader reader = new(value, 0, homeDirectory);
+        CurlExitCode result = reader.ReadPathname(out byte[] path);
+        return result == CurlExitCode.Ok ? (result, path, value[reader.Position..]) : (result, [], "");
+    }
+
     // curl takes the first argument before it looks at the name, so a bad one is reported
     // even for a name it does not know.
     private static SftpQuoteCommand ParseWithArguments(string text, bool ignoresFailure, byte[] homeDirectory)
@@ -96,26 +118,40 @@ internal sealed record SftpQuoteCommand(SftpQuoteOperation Operation, bool Ignor
 
     // curl's Curl_get_pathname over the command's text: blanks are spaces and tabs, a word
     // ends at a space, a quoted path unescapes \", \' and \\, and an unquoted /~/ becomes
-    // the home directory and a slash.
-    private sealed class ArgumentReader(string text, int position, byte[] homeDirectory)
+    // the home directory and a slash. A path must stay under curl's MAX_PATHLENGTH.
+    private sealed class ArgumentReader(string text, int start, byte[] homeDirectory)
     {
+        // curl's MAX_PATHLENGTH: its buffer refuses a path of this many bytes or more.
+        private const int MaximumPathLength = 65535;
+
         private static readonly byte[] Slash = "/"u8.ToArray();
+
+        private int position = start;
+
+        internal int Position => position;
 
         internal bool AtEnd => position >= text.Length;
 
         // The next argument, or null where curl finds none or a malformed one.
-        internal byte[]? Read()
+        internal byte[]? Read() => ReadPathname(out byte[] path) == CurlExitCode.Ok ? path : null;
+
+        // Curl_get_pathname: the next argument and curl's code for it.
+        internal CurlExitCode ReadPathname(out byte[] path)
         {
+            path = [];
             if (AtEnd)
             {
-                return null;
+                return CurlExitCode.QuoteError;
             }
 
             SkipBlanks();
-            byte[]? argument = position < text.Length && text[position] is '"' or '\'' ? ReadQuoted() : ReadWord();
+            CurlExitCode result = position < text.Length && text[position] is '"' or '\'' ? ReadQuoted(out path) : ReadWord(out path);
             SkipBlanks();
-            return argument;
+            return result;
         }
+
+        private static CurlExitCode Measured(byte[] path) =>
+            path.Length < MaximumPathLength ? CurlExitCode.Ok : CurlExitCode.TooLarge;
 
         private static bool IsBlank(char character) => character is ' ' or '\t';
 
@@ -127,37 +163,47 @@ internal sealed record SftpQuoteCommand(SftpQuoteOperation Operation, bool Ignor
             }
         }
 
-        private byte[]? ReadQuoted()
+        private CurlExitCode ReadQuoted(out byte[] path)
         {
             char quote = text[position++];
             StringBuilder argument = new();
-            while (position < text.Length && text[position] != quote)
-            {
-                if (!TryAppendCharacter(argument))
-                {
-                    return null;
-                }
-            }
-
-            // Past the closing quote; curl refuses an unclosed or an empty one.
-            return position++ < text.Length && argument.Length > 0 ? Encoding.UTF8.GetBytes(argument.ToString()) : null;
+            CurlExitCode result = AppendUntil(quote, argument);
+            path = Encoding.UTF8.GetBytes(argument.ToString());
+            return result == CurlExitCode.Ok ? PassClosingQuote(argument.Length) : result;
         }
 
-        // A backslash takes the character after it, which must be a quote or a backslash.
-        private bool TryAppendCharacter(StringBuilder argument)
+        private CurlExitCode AppendUntil(char quote, StringBuilder argument)
+        {
+            CurlExitCode result = CurlExitCode.Ok;
+            while (result == CurlExitCode.Ok && position < text.Length && text[position] != quote)
+            {
+                result = AppendCharacter(argument);
+            }
+
+            return result;
+        }
+
+        // Past the closing quote; curl refuses an unclosed or an empty one.
+        private CurlExitCode PassClosingQuote(int length) =>
+            position++ < text.Length && length > 0 ? CurlExitCode.Ok : CurlExitCode.QuoteError;
+
+        // A backslash takes the character after it, which must be a quote or a backslash;
+        // curl's buffer refuses the character that makes the path too long, as it is added.
+        private CurlExitCode AppendCharacter(StringBuilder argument)
         {
             if (text[position] == '\\' && !IsEscapable(++position))
             {
-                return false;
+                return CurlExitCode.QuoteError;
             }
 
             argument.Append(text[position++]);
-            return true;
+            return argument.Length < MaximumPathLength ? CurlExitCode.Ok : CurlExitCode.TooLarge;
         }
 
         private bool IsEscapable(int index) => index < text.Length && text[index] is '"' or '\'' or '\\';
 
-        private byte[]? ReadWord()
+        // An empty word is a missing path unless /~/ gave it the home directory.
+        private CurlExitCode ReadWord(out byte[] path)
         {
             bool fromHome = text.AsSpan(position).StartsWith("/~/", StringComparison.Ordinal);
             position += fromHome ? 3 : 0;
@@ -166,7 +212,8 @@ internal sealed record SftpQuoteCommand(SftpQuoteOperation Operation, bool Ignor
             byte[] word = Encoding.UTF8.GetBytes(text[position..end]);
             position = end;
             byte[] start = fromHome ? [.. homeDirectory, .. Slash] : [];
-            return word.Length > 0 || fromHome ? [.. start, .. word] : null;
+            path = [.. start, .. word];
+            return word.Length > 0 || fromHome ? Measured(path) : CurlExitCode.QuoteError;
         }
     }
 }
