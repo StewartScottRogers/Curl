@@ -29,3 +29,4 @@ BL-2919 routed `--doh-url` through the harness's dialer, but its criterion 3 cou
 ## Log
 
 - 2026-10-21: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: 17acd8f2.
