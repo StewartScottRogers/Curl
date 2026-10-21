@@ -40,3 +40,4 @@ Run each case with `$env:CURL_UPSTREAM_CASE='<n>'` as `Curl.Conformance.UnitTest
 ## Log
 
 - 2026-10-19: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: 970768a5 bf92cf5e 722fd9db dd1cc079 620ebead.
