@@ -4,7 +4,7 @@ title: Add stand-ins for the https-mtls and socks5unix servers so upstream cases
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: []
+depends-on: [BL-2955]
 touches: [Curl.Conformance.UnitTests/PassingUpstreamCases.txt, Curl.Conformance.UnitLibrary/UpstreamCaseScreening.cs, Curl.Conformance.UnitLibrary/UpstreamCaseRunner.cs, Curl.Conformance.UnitTests/UpstreamConformanceTests.MtlsSocksUnixCases.cs, Curl.Conformance.UnitTests/UpstreamCaseScreeningTests.cs, Curl.Conformance.UnitLibrary/UpstreamTestVariableSubstitution.cs, Curl.Conformance.UnitLibrary/HttpsServerConnector.cs, Curl.Conformance.UnitLibrary/SocksServerConnector.cs, Curl.Conformance.UnitLibrary/UpstreamStandInFronts.cs]
 requirement: none
 created: 2026-10-19
@@ -35,7 +35,10 @@ Read the cases at tag `curl-8_22_0` (https://github.com/curl/curl/tree/curl-8_22
 
 ## Notes
 
+- 2026-10-21 (lane 5, prerequisite pass before any edit): the mTLS half is ready - Curl sends client certificates (`ClientCertificateLoader`, `HandBuiltTlsProvider`) and `UpstreamTestCertificateGenerator` already generates `test-client-eku-only` and `test-client-cert` from their `.prm` files. The socks5unix half is not: Curl has no SOCKS-proxy-over-Unix-socket path (`TransferProxySelection`, `TcpConnector` and `SocksProxyTunnel` dial host and port only), so 1467, 1468 and 1470 cannot pass whatever the stand-in does. Filed BL-2955 for that engine work and added it to `depends-on`; nothing else is missing. Nothing was edited.
+
 ## Log
 
 - 2026-10-19: Created.
 - 2026-10-21: Backlog -> Doing. Criteria at claim: 27c464c3 fb93b735 8ce8c460 c768a82b 5ff94941.
+- 2026-10-21: Doing -> Backlog. Waits on BL-2955: Curl cannot reach a SOCKS proxy over a Unix socket, which cases 1467, 1468 and 1470 need
