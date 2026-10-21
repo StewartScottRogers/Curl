@@ -42,3 +42,4 @@ If a case still differs after the stand-in, record its first difference in Notes
 ## Log
 
 - 2026-10-19: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: 2a064a5d 50019839 7f573e82 d86cdfca dd1cc079 620ebead.
