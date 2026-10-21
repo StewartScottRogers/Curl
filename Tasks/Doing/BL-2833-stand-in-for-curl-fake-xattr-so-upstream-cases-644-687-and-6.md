@@ -39,3 +39,4 @@ Because Windows cannot run these cases, a lane cannot see them pass; the `CI` wo
 ## Log
 
 - 2026-10-19: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: d13ab093 7b704265 6e7fdf92 ac32fd53 c971d4dc.
