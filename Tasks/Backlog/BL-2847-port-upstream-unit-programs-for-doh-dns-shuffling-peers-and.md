@@ -4,7 +4,7 @@ title: Port upstream unit programs for DoH, DNS shuffling, peers and TLS setting
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-2886]
+depends-on: [BL-2886, BL-2917, BL-2918, BL-2919, BL-2920, BL-2921]
 touches: [Curl.Conformance.UnitTests/PassingUpstreamCases.txt, Curl.Conformance.UnitProgram.UnitLibrary/UnitPrograms.Dns.cs, Curl.Conformance.UnitProgram.UnitLibrary/Dns, Curl.Conformance.UnitProgram.UnitTests/Dns]
 requirement: none
 created: 2026-10-19
@@ -32,7 +32,19 @@ These ten `unittest` cases (skipped today with `Curl lacks the feature unittest`
 
 Ports go in Curl.Conformance.UnitProgram.UnitLibrary/Dns/ and their tests in Curl.Conformance.UnitProgram.UnitTests/Dns/; register them only in Curl.Conformance.UnitProgram.UnitLibrary/UnitPrograms.Dns.cs, which BL-2886 creates. Its project references are added by BL-2886; if one is missing, add it in a separate one-line commit and say so in the Log (Stewart, 2026-10-21: keep the seven ports parallel).
 
+- 2026-10-21 (lane 1, first pass, no code edited): split for size. The ten C programs span DoH encode/decode
+  (1650, 1655; 1658 alone is 564 lines of vectors), Libcurl option and trace behaviour (1652, 3219, 3302), host
+  parsing (2413), TLS reuse and session keys (3303, 3304) and DNS shuffling (1608) - four libraries plus likely
+  fixes, more than one run and one quality measurement. Hook check: DoH (`DohDnsResolver`, `DnsAnswerDecoder`,
+  `ServiceBindingRecordDecoder`), `TlsSessionCache.PeerKey`, Libcurl's `GssApiDelegation` and protocol-bit setters
+  exist; `DnsShuffleAddresses` is stored but nothing shuffles, so 1608 needs the shuffle implemented (BL-2917).
+  Filed BL-2917 (shuffle + 1608), BL-2918 (1650, 1655), BL-2919 (1658), BL-2920 (1652, 2413, 3219, 3302),
+  BL-2921 (3303, 3304); each touches its own `Dns/<sub>` folders, and `UnitPrograms.Dns.cs` is union-merged, so
+  they can run in parallel. Once all five are Done this task only confirms the ten cases pass, ticks its boxes
+  and checks CI.
+
 ## Log
 
 - 2026-10-19: Created.
 - 2026-10-21: Backlog -> Doing. Criteria at claim: 759c7e24 2e3e75ab e66ae9dd c0723528 620ebead.
+- 2026-10-21: Doing -> Backlog. Split for size: waits on BL-2917, BL-2918, BL-2919, BL-2920 and BL-2921, which port the ten cases between them
