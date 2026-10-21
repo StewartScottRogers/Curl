@@ -34,7 +34,7 @@ internal static class CurlUrlParser
     /// With <paramref name="fileSchemeWithoutSlash" />, as <c>Curl_is_absolute_url</c> when it does not guess
     /// schemes, text starting <c>file:</c> is a <c>file</c> URL even with no <c>/</c> after the colon.
     /// With <paramref name="refuseUnconvertibleName" />, as for the URL of a transfer, a host name that
-    /// cannot be converted to punycode is <see cref="CurlUrlRejection.BadHostname" /> (ADR-0731).
+    /// cannot be converted to punycode is <see cref="CurlUrlRejection.BadHostname" /> (ADR-0734).
     /// </summary>
     public static CurlUrl? Parse(
         string text,
