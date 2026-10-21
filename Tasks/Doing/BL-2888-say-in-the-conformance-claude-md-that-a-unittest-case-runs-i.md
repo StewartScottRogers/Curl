@@ -35,3 +35,4 @@ library's `CLAUDE.md` still says any `unitNNNN` or `toolNNNN` tool skips with
 ## Log
 
 - 2026-10-21: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: 65e72a6d 6341d5f6.
