@@ -32,3 +32,4 @@ Split from BL-2835. Curl has no binary-output-to-terminal refusal at all (no `Bi
 ## Log
 
 - 2026-10-21: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: c652770a 999fa8c2 8a66be86 e5c59a3b.
