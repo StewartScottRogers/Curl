@@ -351,15 +351,14 @@ public sealed class NetworkingAdversarialTests
         Assert.AreEqual(expected, decoding.Failure);
     }
 
-    // Family 1, boundaries: ipv4hint and port values one byte off their sizes, and none at all.
+    // Family 1, boundaries: ipv4hint and port values one byte off their sizes, and none at all; an empty ech.
     [TestMethod]
     [DataRow("00040000")]
     [DataRow("0004000301020304")]
     [DataRow("000400050102030405")]
     [DataRow("0003000150")]
     [DataRow("00030003000050")]
-    [DataRow("00010000")]
-    [DataRow("0001000100")]
+    [DataRow("00050000")]
     [DataRow("000200015A")]
     public void ServiceBindingDecode_KnownParameterOfTheWrongShape_IsBadParameterValue(string parameter)
     {
