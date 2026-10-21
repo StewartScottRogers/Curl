@@ -3,8 +3,8 @@ id: AF-0298
 title: EventsWritingConnectReplyHeads' && can become || with no test failing, wrapping a null header output for every tunnel without -i/-D
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Engine.UnitLibrary/TransferContextFactory.cs:EventsWritingConnectReplyHeads-and:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/TransferContextFactory.cs:592:&&
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Engin
 ## Log
 
 - 2026-10-19: filed proposed.
+- 2026-10-21: proposed -> accepted.
