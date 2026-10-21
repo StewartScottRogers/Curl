@@ -8,7 +8,7 @@ depends-on: []
 touches: [RunDarkFactory.ps1]
 requirement: none
 created: 2026-10-21
-completed:
+completed: 2026-10-21
 ---
 # BL-2940 — Fix AF-0302: -StopAtWeeklyUsage's help says a used-up weekly window raises the alarm; the shift waits it out with a notice
 
@@ -45,8 +45,8 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -54,3 +54,4 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 
 - 2026-10-21: Created.
 - 2026-10-21: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-21: Doing -> Done. Help comment for -StopAtWeeklyUsage now says the shift waits out a used-up weekly window with a notice, matching the DESCRIPTION

@@ -474,7 +474,8 @@ param(
     # shift waits for a fresh 5-hour window. 1 means never stop early.
     [ValidateRange(0.1, 1)][double]$StopAtUsage = 0.85,
     # The same for the weekly usage window, which is days from resetting, so the shift
-    # runs it closer to empty (Stewart, 2026-09-28); a used-up weekly window raises the alarm.
+    # runs it closer to empty (Stewart, 2026-09-28); a used-up weekly window is waited out until the
+    # weekly reset, with a notice rather than the alarm (BL-806).
     [ValidateRange(0.1, 1)][double]$StopAtWeeklyUsage = 0.97,
     # How many tasks run at once, each in its own worktree and window. 1 is the classic
     # single-runner shift in this checkout. Auto sizes the shift itself (ADR-0130): every
