@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Conformance.UnitTests/PassingUpstreamCases.txt, Curl.Conformance.UnitTests/UpstreamConformanceTests.FixedEntropyStandIn.cs, Curl.Conformance.UnitLibrary/UpstreamPlatformFeatureTable.cs, Curl.Authentication.UnitLibrary, Curl.Authentication.UnitTests, Curl.Ntlm.UnitLibrary, Curl.Ntlm.UnitTests]
+touches: [Curl.Conformance.UnitTests/PassingUpstreamCases.txt, Curl.Conformance.UnitTests/UpstreamConformanceTests.FixedEntropyStandIn.cs, Curl.Authentication.UnitLibrary, Curl.Authentication.UnitTests, Curl.Ntlm.UnitLibrary, Curl.Ntlm.UnitTests]
 requirement: none
 created: 2026-10-19
 completed:
