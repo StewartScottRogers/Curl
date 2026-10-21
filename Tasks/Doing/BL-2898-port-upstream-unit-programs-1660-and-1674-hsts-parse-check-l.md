@@ -32,3 +32,4 @@ Split from BL-2846 for size. curl 8.22.0 `tests/unit/unit1660.c` loads the HSTS 
 ## Log
 
 - 2026-10-21: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: 5e0ade9e f82efa1d aca7e1a2 dd1cc079.
