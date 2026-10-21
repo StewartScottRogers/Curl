@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.UnitProgram.UnitLibrary/UrlParsing/Unit1614NoProxyMatching.cs, Curl.Conformance.UnitProgram.UnitTests/UrlParsing/Unit1614NoProxyMatchingTests.cs, Curl.Conformance.UnitProgram.UnitLibrary/UnitPrograms.UrlParsing.cs, Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
 requirement: none
 created: 2026-10-21
-completed:
+completed: 2026-10-21
 ---
 # BL-2890 — Port upstream unit program 1614: noproxy and CIDR comparisons
 
@@ -22,14 +22,17 @@ Split from BL-2844 (2026-10-21), which ports the ten URL and address parsing uni
 
 ## Acceptance criteria
 
-- [ ] Each case named in the Goal has a port in `Curl.Conformance.UnitProgram.UnitLibrary/UrlParsing` whose checks match the C program's row for row (named in its doc comment), registered in `UnitPrograms.UrlParsing.cs`, with a test in `Curl.Conformance.UnitProgram.UnitTests/UrlParsing`; or the case has a Notes entry naming the C-only thing it tests.
-- [ ] Each ported case ends `Passed` with `CURL_UPSTREAM_CASE` set to it on Windows and is on `PassingUpstreamCases.txt`.
-- [ ] Where a port finds Curl wrong, the fix has a focused unit test in the fixed library's own `.UnitTests` project (ADR-0482).
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean, `dotnet test --filter "TestCategory!=Integration"` passes, and each changed library keeps 100% line and branch coverage and complexity at most 10.
+- [x] Each case named in the Goal has a port in `Curl.Conformance.UnitProgram.UnitLibrary/UrlParsing` whose checks match the C program's row for row (named in its doc comment), registered in `UnitPrograms.UrlParsing.cs`, with a test in `Curl.Conformance.UnitProgram.UnitTests/UrlParsing`; or the case has a Notes entry naming the C-only thing it tests.
+- [x] Each ported case ends `Passed` with `CURL_UPSTREAM_CASE` set to it on Windows and is on `PassingUpstreamCases.txt`.
+- [x] Where a port finds Curl wrong, the fix has a focused unit test in the fixed library's own `.UnitTests` project (ADR-0482).
+- [x] `dotnet build Curl.slnx -warnaserror` is clean, `dotnet test --filter "TestCategory!=Integration"` passes, and each changed library keeps 100% line and branch coverage and complexity at most 10.
 
 ## Notes
+
+- 2026-10-21: Ported unit1614 as `UrlParsing/Unit1614NoProxyMatching` over Curl.Core's `NoProxyMatcher.Matches`; every `list4`, `list6` and `list` row (the `USE_IPV6` rows included) passes, so Curl needed no fix (criterion 3 holds with nothing to fix). Curl has no separate `cidr4_match`/`cidr6_match`, so the CIDR rows ask `Matches(address, "network/bits")`, the path `proxy_check_noproxy` takes to them (`/0` compares the whole address, as `bits == 0` does); chosen over widening `NoProxyMatcher`'s API to stay inside `touches`. Row lines are written unprefixed, as `curl_mfprintf` writes them, then the one `fail_if(err, "errors")` failure. Quality: Curl.Conformance.UnitProgram.UnitLibrary 100% line, 100% branch, 0 failing members. The matching uses no OS text or paths, so the case is platform-neutral.
 
 ## Log
 
 - 2026-10-21: Created.
 - 2026-10-21: Backlog -> Doing. Criteria at claim: 994c71ca 67867c61 aca7e1a2 dd1cc079.
+- 2026-10-21: Doing -> Done. unit1614 (noproxy and CIDR comparisons) runs as a ported unit program and case 1614 is on the ratchet

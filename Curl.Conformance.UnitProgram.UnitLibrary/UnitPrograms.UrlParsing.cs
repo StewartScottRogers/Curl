@@ -8,6 +8,7 @@ public sealed partial class UnitPrograms
     private static IUnitProgram[] UrlParsingPrograms =>
     [
         new Unit1607ResolveParsing(),
+        new Unit1614NoProxyMatching(),
         new Unit1663InterfaceParsing(),
     ];
 }
