@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/TcpConnector.cs, Curl.Networking.UnitTests/TcpConnectorHttpsRecordReportTests.cs]
 requirement: none
 created: 2026-10-21
-completed:
+completed: 2026-10-21
 ---
 # BL-2986 — Write -v's HTTPS-RR line when the DNS cache answers an https origin resolved through --doh-url
 
@@ -22,12 +22,17 @@ Found by BL-2980 (ADR-0727's BL-2980 amendment). `TcpConnector.LookUpAsync` writ
 
 ## Acceptance criteria
 
-- [ ] A unit test in `TcpConnectorHttpsRecordReportTests` pins the lines of a second connect to the same `https://` origin through an `IHttpsOriginDnsResolver`, as derived and recorded in an ADR-0727 amendment.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean, `dotnet test --filter "TestCategory!=Integration"` passes, and `Curl.Networking.UnitLibrary` keeps 100% line and branch coverage and complexity at most 10.
+- [x] A unit test in `TcpConnectorHttpsRecordReportTests` pins the lines of a second connect to the same `https://` origin through an `IHttpsOriginDnsResolver`, as derived and recorded in an ADR-0727 amendment.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean, `dotnet test --filter "TestCategory!=Integration"` passes, and `Curl.Networking.UnitLibrary` keeps 100% line and branch coverage and complexity at most 10.
 
 ## Notes
+
+- Derived from curl-8_22_0 source (hostip.c Curl_resolv, dnscache.c fetch_addr keys HTTPS under CURL_DNST_HTTPS, cf-dns.c cf_dns_connect reports cached entries): a cached second connect writes the HTTPS filter's own Hostname H was found in DNS cache and its HTTPS-RR line before the address filter's cache and resolved lines. Recorded in ADR-0727's BL-2986 amendment.
+- TcpConnector remembers host:port keys an IHttpsOriginDnsResolver answered; an address entry without an HTTPS resolve (--resolve, an http:// connect) writes no line (curl would send the HTTPS query there; left out, recorded in the ADR). HttpsOriginResolverFor is shared by both paths so branch coverage stays whole.
+- Measured: build -warnaserror clean, all fast tests pass, Curl.Networking.UnitLibrary 100% line and branch, 0 failing members, worst CRAP 10.
 
 ## Log
 
 - 2026-10-21: Created.
 - 2026-10-21: Backlog -> Doing. Criteria at claim: 815b6b35 2a446683.
+- 2026-10-21: Doing -> Done. -v writes the HTTPS-RR line, after its own found-in-DNS-cache line, when the DNS cache answers a DoH-resolved https origin
