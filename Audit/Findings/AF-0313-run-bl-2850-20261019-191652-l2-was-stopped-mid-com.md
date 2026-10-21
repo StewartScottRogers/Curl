@@ -3,8 +3,8 @@ id: AF-0313
 title: Run BL-2850-20261019-191652-L2 was stopped mid-command when shift 191652 was replaced after 7 minutes, but the tool lists it as running, not unfinished
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: process:logs:BL-2850:unfinished-run
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Log
 
 - 2026-10-19: filed proposed.
+- 2026-10-21: proposed -> accepted.
