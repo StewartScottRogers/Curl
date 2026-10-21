@@ -1,5 +1,5 @@
 ---
-id: BL-2930
+id: BL-2954
 title: Write the -v and --trace-config doh lines of the DoH HTTPS-RR query as curl 8.22.0 does
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-21
 completed:
 ---
-# BL-2930 — Write the -v and --trace-config doh lines of the DoH HTTPS-RR query as curl 8.22.0 does
+# BL-2954 — Write the -v and --trace-config doh lines of the DoH HTTPS-RR query as curl 8.22.0 does
 
 ## Goal
 
