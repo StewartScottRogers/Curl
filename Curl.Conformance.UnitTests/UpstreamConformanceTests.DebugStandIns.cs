@@ -51,6 +51,7 @@ public sealed partial class UpstreamConformanceTests
         RunsCurlWithDohUrl,
         SetsWriteOutDebugVariable,
         SetsToolTransferDebugVariable,
+        SetsStubGssCredentialsVariable,
     ];
 
     internal static UpstreamCurlPlatform PlatformFor(byte[] testFile)

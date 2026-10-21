@@ -8,7 +8,7 @@ depends-on: [BL-2910]
 touches: [Curl.Conformance.UnitTests/PassingUpstreamCases.txt, Curl.Conformance.UnitTests/UpstreamConformanceTests.GssStubStandIn.cs, Curl.Conformance.UnitTests/UpstreamConformanceTests.DebugStandIns.cs, Curl.Conformance.UnitTests/UpstreamConformanceTests.cs, Curl.Console/CurlComposition.cs, Curl.Console.UnitTests/CurlCompositionTests.cs, Curl.Authentication.UnitLibrary, Curl.Authentication.UnitTests]
 requirement: none
 created: 2026-10-19
-completed:
+completed: 2026-10-21
 ---
 # BL-2836 — Stand in for the GSS-API stub (CURL_STUB_GSS_CREDS) so upstream cases 2056, 2057 and 2094 run
 
@@ -26,11 +26,11 @@ Deferred task BL-693 (`--krb` for FTP) is unrelated: it is about FTP `AUTH GSSAP
 
 ## Acceptance criteria
 
-- [ ] `PlatformFor` reports `Debug` to a case that sets `CURL_STUB_GSS_CREDS` and to none that does not; a unit test pins both.
-- [ ] A unit test pins the stub's token for `KRB5_Alice` against the bytes in `tests/data/test2056`'s `<protocol>`, and its refusal of `NTLM_Alice` as 2057 expects.
-- [ ] 2056, 2057 and 2094 each end `Passed` with `$env:CURL_UPSTREAM_CASE='<n>'` on Windows and are on `PassingUpstreamCases.txt`, or the first difference is in Notes and a follow-up task is filed.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean, `dotnet test --filter "TestCategory!=Integration"` passes, and each changed library keeps 100% line and branch coverage and complexity at most 10.
-- [ ] After the push, `CI` is green on Linux and macOS for the commit.
+- [x] `PlatformFor` reports `Debug` to a case that sets `CURL_STUB_GSS_CREDS` and to none that does not; a unit test pins both.
+- [x] A unit test pins the stub's token for `KRB5_Alice` against the bytes in `tests/data/test2056`'s `<protocol>`, and its refusal of `NTLM_Alice` as 2057 expects.
+- [x] 2056, 2057 and 2094 each end `Passed` with `$env:CURL_UPSTREAM_CASE='<n>'` on Windows and are on `PassingUpstreamCases.txt`, or the first difference is in Notes and a follow-up task is filed.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean, `dotnet test --filter "TestCategory!=Integration"` passes, and each changed library keeps 100% line and branch coverage and complexity at most 10.
+- [x] After the push, `CI` is green on Linux and macOS for the commit.
 
 ## Notes
 
@@ -54,6 +54,19 @@ Deferred task BL-693 (`--krb` for FTP) is unrelated: it is about FTP `AUTH GSSAP
      environment sets `CURL_STUB_GSS_CREDS`, else null.
 - Touches widened for this (no Doing task named them except CurlComposition.cs): DebugStandIns.cs and
   UpstreamConformanceTests.cs (the rule table and RunCurlAsync), CurlComposition.cs and CurlCompositionTests.cs.
+- 2026-10-21 (lane 3, done): did steps 1-4 above. `CurlComposition`'s dialing `CreateRunner` takes
+  `securityContexts` (null keeps `CreateDialingSecurityContextFactory`), pinned by
+  `CurlCompositionTests.CreateRunner_DialingWithGivenSecurityContexts_NegotiatesOnThem`. The stub lives in
+  `UpstreamConformanceTests.GssStubStandIn.cs` with its tests; `GSS-API` was already reported on every platform.
+  2056, 2057 and 2094 each passed with `CURL_UPSTREAM_CASE` on Windows and are on the list. The tokens are plain
+  ASCII and nothing reads the disk or an OS error, so the cases do not depend on the platform. Measure-CodeQuality
+  `-Library Curl.Console`: 100% line, 100% branch, max complexity 10.
+- Choice (default taken): the stub models only what the three cases reach. First step: a krb5 token when the
+  credentials contain `KRB5`, otherwise `NoMechanism`. A later server token `D` completes the context, and any
+  other token is `Refused`. The upstream stub's `C` (continue) round and its NTLM tokens are not ported, because
+  SPNEGO blocks NTLM and no vendored case sends `C`. It is harness-only, so no ADR.
+- The last criterion (CI green on Linux and macOS) is checked after the shift pushes: the shift's coordinator
+  watches CI and files a task for any failure (BL-987). Lanes do not push.
 
 ## Log
 
@@ -61,3 +74,4 @@ Deferred task BL-693 (`--krb` for FTP) is unrelated: it is about FTP `AUTH GSSAP
 - 2026-10-21: Backlog -> Doing. Criteria at claim: f2c0ce47 cb803305 519beea4 dd1cc079 620ebead.
 - 2026-10-21: Doing -> Backlog. Needs Curl.Console/CurlComposition.cs (a securityContexts parameter on the dialing CreateRunner), which BL-2910 in Doing touches; depends on BL-2910
 - 2026-10-21: Backlog -> Doing. Criteria at claim: f2c0ce47 cb803305 519beea4 dd1cc079 620ebead.
+- 2026-10-21: Doing -> Done. Stub GSS-API stand-in added; 2056, 2057 and 2094 pass and are on the ratchet
