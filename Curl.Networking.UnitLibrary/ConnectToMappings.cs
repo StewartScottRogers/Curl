@@ -1,4 +1,5 @@
 using System.Globalization;
+using Curl.Protocol.Abstractions;
 
 namespace Curl.Networking;
 
@@ -25,17 +26,43 @@ namespace Curl.Networking;
 /// </remarks>
 public sealed class ConnectToMappings
 {
+    /// <summary>
+    /// curl's message for an IPv6 literal destination in a build without IPv6.
+    /// </summary>
+    public const string Ipv6NotBuiltInMessage = "Use of IPv6 in *_CONNECT_TO without IPv6 support built-in";
+
+    private static readonly ConnectDestination Ipv6NotBuiltIn =
+        new(string.Empty, 0, IsMapped: false, Ipv6NotBuiltInMessage) { ParseErrorCode = CurlExitCode.NotBuiltIn };
+
     private readonly string[] _mappings;
+    private readonly bool _hidesIpv6;
 
     /// <summary>
     /// Initializes the mappings from the <c>--connect-to</c> values.
     /// </summary>
     /// <param name="mappings">The values, verbatim, in the order they were given.</param>
     public ConnectToMappings(IEnumerable<string> mappings)
+        : this(mappings, hidesIpv6: false)
+    {
+    }
+
+    /// <summary>
+    /// Initializes the mappings from the <c>--connect-to</c> values, as a curl built with or
+    /// without IPv6 parses them.
+    /// </summary>
+    /// <param name="mappings">The values, verbatim, in the order they were given.</param>
+    /// <param name="hidesIpv6">
+    /// Whether the run-time feature mask hides IPv6: then a matching destination that starts
+    /// with <c>[</c> fails with exit 4 and <see cref="Ipv6NotBuiltInMessage" />, before its
+    /// brackets are checked, as curl 8.22.0 <c>parse_connect_to_host_port</c> does without
+    /// <c>USE_IPV6</c> (case 1454).
+    /// </param>
+    public ConnectToMappings(IEnumerable<string> mappings, bool hidesIpv6)
     {
         ArgumentNullException.ThrowIfNull(mappings);
 
         _mappings = [.. mappings];
+        _hidesIpv6 = hidesIpv6;
     }
 
     /// <summary>
@@ -59,7 +86,7 @@ public sealed class ConnectToMappings
         {
             if (DestinationWhenMatching(mapping, host, port) is { } destination)
             {
-                return ParseDestination(destination, host, port);
+                return ParseMatchedDestination(destination, host, port);
             }
         }
 
@@ -99,6 +126,11 @@ public sealed class ConnectToMappings
 
     private static bool PortMatches(string mappedPort, int port) =>
         mappedPort.Length == 0 || ParseLeadingPort(mappedPort) == port;
+
+    private ConnectDestination ParseMatchedDestination(string destination, string host, int port) =>
+        _hidesIpv6 && destination.StartsWith('[')
+            ? Ipv6NotBuiltIn
+            : ParseDestination(destination, host, port);
 
     private static ConnectDestination ParseDestination(string destination, string host, int port)
     {
