@@ -51,3 +51,4 @@ Any fix's folder must be added to this task's `touches` in the same commit (like
 - 2026-10-19: Created.
 - 2026-10-19: Backlog -> Doing. Criteria at claim: 0d008234 77580efe 3d4c7a1e 108a50d2 620ebead.
 - 2026-10-19: Doing -> Backlog. Split for size into BL-2867 (158, 415), BL-2868 (1566), BL-2869 (2108) and BL-2870 (1548); waits on them.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: 0d008234 77580efe 3d4c7a1e 108a50d2 620ebead.
