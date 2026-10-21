@@ -40,3 +40,4 @@ Follow ADR-0687/0678/0698 for any stand-in and keep it in the harness. Lanes run
 ## Log
 
 - 2026-10-19: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: 465a238c 5ca354be c46d4ed8 a9d93e0e 620ebead.
