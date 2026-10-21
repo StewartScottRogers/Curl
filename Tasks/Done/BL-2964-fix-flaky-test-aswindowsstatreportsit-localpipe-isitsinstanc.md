@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Core.UnitTests/Multipart/UnseekableFileLengthTests.cs]
 requirement: none
 created: 2026-10-21
-completed:
+completed: 2026-10-21
 ---
 # BL-2964 — Fix flaky test AsWindowsStatReportsIt_LocalPipe_IsItsInstanceCount when lanes share the machine
 
@@ -22,12 +22,15 @@ Found by BL-2930's run on lane 9 (2026-10-21): the full fast run failed this one
 
 ## Acceptance criteria
 
-- [ ] The test names a pipe no other process or test can share, or asserts only what this test itself opened, and the reason is written in the test.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The test names a pipe no other process or test can share, or asserts only what this test itself opened, and the reason is written in the test.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+The pipe name was already a fresh GUID, so nothing else shares it. The remaining cause is the `\.pipe` listing lagging the instance creation on a busy machine, so the test now re-reads the listing (up to 10 s, Task.Delay) until it shows the instances this test opened. Test-only change; no library code touched.
 
 ## Log
 
 - 2026-10-21: Created.
 - 2026-10-21: Backlog -> Doing. Criteria at claim: f2c39e0b 9742157d.
+- 2026-10-21: Doing -> Done. Test re-reads the pipe listing until it shows its own instances

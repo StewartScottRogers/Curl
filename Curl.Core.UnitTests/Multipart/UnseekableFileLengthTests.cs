@@ -100,12 +100,16 @@ public sealed class UnseekableFileLengthTests
     [OSCondition(OperatingSystems.Windows)]
     [DataRow(1)]
     [DataRow(3)]
-    public void AsWindowsStatReportsIt_LocalPipe_IsItsInstanceCount(int instances)
+    public async Task AsWindowsStatReportsIt_LocalPipe_IsItsInstanceCount(int instances)
     {
         var diagnostics = TestDiagnostics.For(TestContext);
         diagnostics.Arrange("pipe server instances", instances);
 
         // Measured: a pipe with 3 instances declared 2 bytes more than one with 1 instance.
+        // The name is a fresh GUID, so no other test or lane shares the pipe. What can differ is
+        // when the \\.\pipe\ listing shows this process's new instances: on a machine busy with
+        // other lanes it can lag the creation, so wait (up to 10 s) until the listing agrees
+        // instead of reading it once (BL-2964).
         string name = $"bl401-test-{Guid.NewGuid():N}";
         List<NamedPipeServerStream> servers = [];
         try
@@ -115,7 +119,13 @@ public sealed class UnseekableFileLengthTests
                 servers.Add(new NamedPipeServerStream(name, PipeDirection.Out, 10));
             }
 
-            long? length = UnseekableFileLength.AsWindowsStatReportsIt(@"\\.\pipe\" + name.ToUpperInvariant());
+            string path = @"\\.\pipe\" + name.ToUpperInvariant();
+            long? length = UnseekableFileLength.AsWindowsStatReportsIt(path);
+            for (int attempt = 0; attempt < 200 && length != instances; attempt++)
+            {
+                await Task.Delay(50);
+                length = UnseekableFileLength.AsWindowsStatReportsIt(path);
+            }
 
             diagnostics.Act("declared length", length?.ToString() ?? "null");
             diagnostics.Assert("declared length", instances, length);
