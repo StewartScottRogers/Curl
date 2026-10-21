@@ -268,6 +268,11 @@ internal static class CurlComposition
     /// for <see cref="PhysicalFileSystem" />. The conformance harness passes one that cuts an upload to the debug build's
     /// <c>CURL_UPLOAD_SIZE</c> (ADR-0735, BL-2910).
     /// </param>
+    /// <param name="securityContexts">
+    /// Makes the NTLM, Negotiate and Kerberos contexts every option group's handlers and CONNECT proxy run on;
+    /// <see langword="null" />, the default, for <see cref="CreateDialingSecurityContextFactory" />. The conformance
+    /// harness passes its stand-in for the debug build's stub GSS-API under <c>CURL_STUB_GSS_CREDS</c> (BL-2836).
+    /// </param>
     /// <returns>The runner.</returns>
     internal static CurlCommandRunner CreateRunner(
         Stream standardOutput,
@@ -292,14 +297,15 @@ internal static class CurlComposition
         IExtendedAttributeWriter? extendedAttributeWriter = null,
         bool honoursDebugWriteOutVariables = false,
         IWebSocketRandomSource? webSocketRandomSource = null,
-        IFileSystem? fileSystem = null)
+        IFileSystem? fileSystem = null,
+        ISecurityContextFactory? securityContexts = null)
     {
         ConnectionCache runConnections = new(TimeProvider.System);
         LateBoundDiagnosticLog runLog = new();
         Func<string, string?> environment = readEnvironmentVariable ?? (_ => null);
         string? dnsServer = honoursDnsServerVariable ? environment(DnsServerVariableName) : null;
         return new(
-            SharingRunCookies((options, cookies) => CreateDialingTransferDispatch(tcpDialer, DialingDohResolverOf(options, tcpDialer, DnsServerVariableResolverOf(EasyOptionsFromCommandLine.NetworkOf(options), dnsServer, dnsResolver, datagramConnector)), datagramConnector, cookies, options, runConnections, runLog, usesHandBuiltNtlm, environment, ftpListener, signingClock, webSocketRandomSource)),
+            SharingRunCookies((options, cookies) => CreateDialingTransferDispatch(tcpDialer, DialingDohResolverOf(options, tcpDialer, DnsServerVariableResolverOf(EasyOptionsFromCommandLine.NetworkOf(options), dnsServer, dnsResolver, datagramConnector)), datagramConnector, cookies, options, runConnections, runLog, usesHandBuiltNtlm, environment, ftpListener, signingClock, webSocketRandomSource, securityContexts)),
             RunFileSystemOf(fileSystem),
             new PhysicalFileSystem(),
             standardOutput,
@@ -355,7 +361,7 @@ internal static class CurlComposition
     }
 
     /// <summary>
-    /// Builds one option group's dispatch for the dialing <see cref="CreateRunner(Stream, Stream, Stream, ITcpDialer, IDnsResolver, IDatagramConnector, bool, IWriteOutFileOpener?, bool, Func{string, string?}?, IConnectionListener?, DefaultConfigFileSearch?, TimeProvider?, bool, bool, bool, bool, bool?, bool, IExtendedAttributeWriter?, bool, IWebSocketRandomSource?, IFileSystem?)" />:
+    /// Builds one option group's dispatch for the dialing <see cref="CreateRunner(Stream, Stream, Stream, ITcpDialer, IDnsResolver, IDatagramConnector, bool, IWriteOutFileOpener?, bool, Func{string, string?}?, IConnectionListener?, DefaultConfigFileSearch?, TimeProvider?, bool, bool, bool, bool, bool?, bool, IExtendedAttributeWriter?, bool, IWebSocketRandomSource?, IFileSystem?, ISecurityContextFactory?)" />:
     /// the group's <see cref="TcpConnector" /> over <paramref name="tcpDialer" /> and
     /// <paramref name="dnsResolver" />, pooled in <paramref name="runConnections" />, with a proxy
     /// selector that reads the environment through <paramref name="readEnvironmentVariable" />, and the connector's <c>--resolve</c> entries
@@ -373,6 +379,7 @@ internal static class CurlComposition
     /// <param name="ftpListener">Listens for FTP's active-mode data connections, or <see langword="null" /> for a <see cref="TcpConnectionListener" />.</param>
     /// <param name="signingClock">The clock <c>--aws-sigv4</c> and the <c>--httpsig-*</c> options sign with; <see cref="TimeProvider.System" /> when <see langword="null" />.</param>
     /// <param name="webSocketRandomSource">Where the WebSocket handler draws its keys and masks from; <see cref="SystemWebSocketRandomSource" /> when <see langword="null" />.</param>
+    /// <param name="givenSecurityContexts">Makes the group's NTLM, Negotiate and Kerberos contexts; <see cref="CreateDialingSecurityContextFactory" /> when <see langword="null" />.</param>
     /// <returns>The dispatch.</returns>
     private static TransferDispatch CreateDialingTransferDispatch(
         ITcpDialer tcpDialer,
@@ -386,7 +393,8 @@ internal static class CurlComposition
         Func<string, string?> readEnvironmentVariable,
         IConnectionListener? ftpListener,
         TimeProvider? signingClock,
-        IWebSocketRandomSource? webSocketRandomSource)
+        IWebSocketRandomSource? webSocketRandomSource,
+        ISecurityContextFactory? givenSecurityContexts)
     {
         EasyNetworkOptions network = EasyOptionsFromCommandLine.NetworkOf(options);
         EasyTlsOptions tls = EasyOptionsFromCommandLine.TlsOf(options);
@@ -403,7 +411,7 @@ internal static class CurlComposition
         QuicDialer quicDialer = CreateDatagramConnectorQuicDialer(traces, tlsClientOptions, datagramConnector);
         TcpConnector tcpConnector = CreateTcpConnector(tool, traces, network, http, proxy, authentication, dnsResolver, tcpDialer, tlsProvider, TimeProvider.System, proxyTunnelOptions, proxyTlsProvider, quicDialer, socks5SecurityContexts: proxyContexts);
         PoolingConnector poolingConnector = CreatePoolingConnector(tool, network, tls, http, proxy, tcpConnector, TimeProvider.System, runConnections);
-        ISecurityContextFactory securityContexts = CreateDialingSecurityContextFactory(poolingConnector, datagramConnector, diagnosticLog, usesHandBuiltNtlm);
+        ISecurityContextFactory securityContexts = givenSecurityContexts ?? CreateDialingSecurityContextFactory(poolingConnector, datagramConnector, diagnosticLog, usesHandBuiltNtlm);
         proxyContexts.Bind(securityContexts);
         return new(
             new ProtocolDispatcher(CreateProtocolHandlers(poolingConnector, datagramConnector, tlsProvider, dnsResolver, cookies?.HandlerStore, securityContexts, proxyAuthSchemes: proxyTunnelOptions.ProxyAuthSchemes, negotiateOptions: NegotiateOptionsMapping.Of(authentication), signingClock: signingClock, ftpDataConnector: poolingConnector.Over(tcpConnector.ForFtpDataConnections()), diagnosticLog: diagnosticLog, ftpListener: ftpListener, webSocketRandomSource: webSocketRandomSource)),

@@ -598,6 +598,24 @@ public sealed partial class CurlCompositionTests
         return (exitCode, Encoding.UTF8.GetString(standardError.ToArray()));
     }
 
+    [TestMethod]
+    public async Task CreateRunner_DialingWithGivenSecurityContexts_NegotiatesOnThem()
+    {
+        RecordingSecurityContexts securityContexts = new();
+        ScriptedConnector server = new([Encoding.Latin1.GetBytes("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n")]);
+        using MemoryStream standardOutput = new();
+        using MemoryStream standardError = new();
+        using MemoryStream standardInput = new();
+
+        int exitCode = await CurlComposition
+            .CreateRunner(standardOutput, standardError, standardInput, new ScriptedTcpDialer(server), new LoopbackDnsResolver(), new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), securityContexts: securityContexts)
+            .RunAsync(["--negotiate", "-u", ":", "http://127.0.0.1:18527/p"]);
+
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual(new SecurityContextRequest(SecurityMechanism.Negotiate, "HTTP", "127.0.0.1"), securityContexts.Requests.Single());
+        StringAssert.Contains(Encoding.Latin1.GetString(server.Written), "Authorization: Negotiate YAEA\r\n");
+    }
+
     private static CommandLineOptions NoOptions() => Parse("gophers://example.com/");
 
     /// <summary>
@@ -681,6 +699,34 @@ public sealed partial class CurlCompositionTests
 
                     break;
             }
+        }
+    }
+
+    // Records each context request and answers it with one token, 60 01 00, which never completes.
+    private sealed class RecordingSecurityContexts : ISecurityContextFactory
+    {
+        public List<SecurityContextRequest> Requests { get; } = [];
+
+        public ISecurityContext Create(SecurityContextRequest request)
+        {
+            Requests.Add(request);
+            return new OneTokenContext();
+        }
+    }
+
+    private sealed class OneTokenContext : ISecurityContext
+    {
+        public bool IsCompleted => false;
+
+        public ValueTask<SecurityContextStep> NextTokenAsync(ReadOnlyMemory<byte> incomingToken, CancellationToken cancellationToken) =>
+            ValueTask.FromResult(new SecurityContextStep(SecurityContextStatus.ContinueNeeded, [0x60, 0x01, 0x00]));
+
+        public byte[]? Wrap(ReadOnlySpan<byte> message, bool encrypt) => throw new NotSupportedException();
+
+        public byte[]? Unwrap(ReadOnlySpan<byte> wrappedMessage) => throw new NotSupportedException();
+
+        public void Dispose()
+        {
         }
     }
 
