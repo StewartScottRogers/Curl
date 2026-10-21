@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.LibTest.UnitTests]
 requirement: none
 created: 2026-10-21
-completed:
+completed: 2026-10-21
 ---
 # BL-2931 — Fix AF-0293: RunAsync_UploadsTheFile_InEitherCleanupOrder never checks that the file was uploaded
 
@@ -41,12 +41,16 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- The test now hooks the fake multi handle's perform (`engine.Multi.Performing`), reads the added transfer's options while Lib525 still holds the file open, and asserts the URL, the upload flag, `InFileSize` 14, FTPPORT `-` (`Protocols.Ftp.ActiveAddress`), and that the read callback yields exactly `Moooooooooooo\n` (14 bytes), for 525 and 529. A port that never set up the upload now fails. The new assertions sit just past the reproduction's 12-line context; `-Context 0,26` shows them all.
+- Test-only change, so no Measure-CodeQuality run. `dotnet build` clean; fast tests: 43 projects passed, 0 failed.
 
 ## Log
 
 - 2026-10-21: Created.
 - 2026-10-21: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-21: Doing -> Done. Lib525's upload test now asserts the uploaded bytes, upload flag, file size and FTPPORT for 525 and 529
