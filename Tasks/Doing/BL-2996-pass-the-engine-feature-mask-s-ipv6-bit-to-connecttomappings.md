@@ -31,3 +31,4 @@ BL-2856 made the harness take `!proxy`, `!IPv6` and `!IDN` off the platform and 
 ## Log
 
 - 2026-10-21: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: bc4e5432 2ede4afd 1c6ad2a8.
