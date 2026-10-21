@@ -36,3 +36,4 @@ Split from BL-2982, which added the parse side in `Curl.Networking.UnitLibrary`:
 ## Log
 
 - 2026-10-21: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: 28c72b3f dd7a4945 44346086 dd1cc079.
