@@ -4,7 +4,8 @@
 
 .DESCRIPTION
     The audit office's cadence (ADR-0267): audits run on demand, before each roadmap-milestone
-    merge to master, and after changes to RunDarkFactory.ps1. This script reports the last two
+    merge to master, and after changes to the dark factory's script: RunDarkFactory.ps1 and the
+    area files under DarkFactory/ it dot-sources (BL-2988). This script reports the last two
     from git alone; it never fetches (fetch first) and never writes.
 
     The last audit is the newest scorecard Audit/Scorecards/yyyy-MM-dd_HHmm.md at -ScorecardsRef,
@@ -12,7 +13,8 @@
     "Audited commit" is the last audited commit. Reasons, each reported when it holds:
 
       no-audit        no scorecard exists at -ScorecardsRef
-      factory-script  RunDarkFactory.ps1 differs between the last audited commit and -Ref
+      factory-script  RunDarkFactory.ps1 or a file under DarkFactory/ differs between the last
+                      audited commit and -Ref
       milestone:<N>   in Documentation/Planning/Roadmap.md, the "- **Status:**" line under
                       "## Milestone <N>" does not start with Done at the last audited commit and
                       does at -Ref
@@ -148,7 +150,7 @@ function Get-AuditDue([string]$Repo, [string]$At, [string]$ScorecardsAt) {
     $text = (Invoke-Git $Repo @('show', "${ScorecardsAt}:Audit/Scorecards/$last")) -join "`n"
     $commit = if ($text -match '\| Audited commit \| ([0-9a-f]{7,40}) \|') { $Matches[1] } else { throw "$last has no Audited commit" }
     $reasons = @()
-    $diff = @(Invoke-Git $Repo @('diff', '--name-only', $commit, $At, '--', 'RunDarkFactory.ps1'))
+    $diff = @(Invoke-Git $Repo @('diff', '--name-only', $commit, $At, '--', 'RunDarkFactory.ps1', 'DarkFactory'))
     if (@($diff | Where-Object { $_ }).Count) { $reasons += 'factory-script' }
     $before = Get-MilestoneStatuses $Repo $commit
     $after = Get-MilestoneStatuses $Repo $At
@@ -201,6 +203,12 @@ if ($SelfTest) {
         Set-Roadmap 'Done.'
         $milestone = Commit-All 'milestone only'
         Check 'a milestone moving to Done gives milestone:1' 'Audit due: milestone:1' (Format-Due (Get-AuditDue $repo $milestone $scored))
+        $null = Invoke-Git $repo @('checkout', '-q', '-b', 'only-area-file', $scored)
+        New-Item -ItemType Directory -Force (Join-Path $repo 'DarkFactory') | Out-Null
+        [IO.File]::WriteAllText((Join-Path $repo 'DarkFactory\Integrate.ps1'), "# v1`n")
+        $areaFile = Commit-All 'factory area file'
+        Check 'a change under DarkFactory/ gives factory-script' 'Audit due: factory-script' (Format-Due (Get-AuditDue $repo $areaFile $scored))
+        $null = Invoke-Git $repo @('checkout', '-q', 'only-milestone')
         $parsed = [pscustomobject](Get-AuditDue $repo $both $scored) | ConvertTo-Json -Compress | ConvertFrom-Json
         Check '-Json has the four fields' 'due,reasons,lastScorecard,lastCommit' (($parsed.PSObject.Properties | ForEach-Object { $_.Name }) -join ',')
         # Accepted findings waiting on a re-audit, or on a task no lane will take (ADR-0422).
