@@ -5,7 +5,7 @@ namespace Curl.Protocol.Ftp;
 /// <summary>
 /// Pins <see cref="FtpModificationTime.TryReadDate" /> to every row of curl 8.22.0's
 /// <c>tests/unit/unit1668.c</c> (ADR-0482), and <see cref="FtpModificationTime.Of" /> to the
-/// times real curl's <c>-I</c> printed for odd <c>MDTM</c> replies (BL-2904, ADR-0724).
+/// times real curl's <c>-I</c> printed for odd <c>MDTM</c> replies (BL-2904, ADR-0725).
 /// </summary>
 [TestClass]
 public sealed class FtpModificationTimeTests

@@ -2,7 +2,7 @@ namespace Curl.Protocol.Ftp;
 
 /// <summary>
 /// Reads the modification time a reply to <c>MDTM</c> carries, as curl 8.22.0 reads it for
-/// <c>-z</c>, <c>-R</c> and <c>-I</c> (BL-438, BL-637, BL-2904, ADR-0724).
+/// <c>-z</c>, <c>-R</c> and <c>-I</c> (BL-438, BL-637, BL-2904, ADR-0725).
 /// </summary>
 internal static class FtpModificationTime
 {
