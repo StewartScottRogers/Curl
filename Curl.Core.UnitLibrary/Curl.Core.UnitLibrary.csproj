@@ -11,6 +11,8 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Curl.Core.UnitTests" />
+    <!-- Its port of upstream unit3227 calls MultipartPartHeaders (BL-2907, BL-2845). -->
+    <InternalsVisibleTo Include="Curl.Conformance.UnitProgram.UnitLibrary" />
     <!-- Curl.Console's assembly: it is published as curl.exe. -->
     <InternalsVisibleTo Include="curl" />
   </ItemGroup>

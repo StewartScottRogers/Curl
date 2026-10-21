@@ -92,6 +92,12 @@ public sealed class MultipartFormBodyBuilder(
     /// <summary>The message curl 8.21.0 gives, with exit 43, for an <c>;encoder=</c> it does not know.</summary>
     public const string UnknownEncoderMessage = "A libcurl function was given a bad argument";
 
+    /// <summary>
+    /// The message curl 8.22.0 gives, with exit 43, for a CR or LF in a mail part's name or file
+    /// name, or in any part's under <c>--form-escape</c>: <c>curl_easy_strerror(CURLE_BAD_FUNCTION_ARGUMENT)</c>.
+    /// </summary>
+    public const string LineBreakInNameMessage = "A libcurl function was given a bad argument";
+
     private const string FormDataDisposition = "form-data";
 
     /// <summary>Builds the body for <paramref name="parts" />.</summary>
@@ -242,7 +248,8 @@ public sealed class MultipartFormBodyBuilder(
         foreach (MultipartFormPart part in parts)
         {
             segments.AddText($"{lineBefore}--{boundary}\r\n");
-            TransferResult? failure = await AddPartAsync(segments, part, disposition, nameEscaping, forMail, cancellationToken).ConfigureAwait(false);
+            TransferResult? failure = RefuseLineBreakInName(part, nameEscaping, forMail)
+                ?? await AddPartAsync(segments, part, disposition, nameEscaping, forMail, cancellationToken).ConfigureAwait(false);
             if (failure is not null)
             {
                 return failure;
@@ -284,6 +291,15 @@ public sealed class MultipartFormBodyBuilder(
 
         return await AddFilePartAsync(segments, part, disposition, nameEscaping, forMail, encoder, cancellationToken).ConfigureAwait(false);
     }
+
+    /// <summary>
+    /// Gives exit 43 for a part whose name or file name holds a CR or LF that its escaping cannot
+    /// write, as <see cref="MultipartPartHeaders.RefusesLineBreakInName" /> tells; otherwise <see langword="null" />.
+    /// </summary>
+    private static TransferResult? RefuseLineBreakInName(MultipartFormPart part, MultipartNameEscaping nameEscaping, bool forMail) =>
+        MultipartPartHeaders.RefusesLineBreakInName(part, nameEscaping, forMail)
+            ? TransferResult.Failure(CurlExitCode.BadFunctionArgument, LineBreakInNameMessage)
+            : null;
 
     /// <summary>Whether <paramref name="part" /> is a <see cref="MultipartFormPartKind.FileUpload" /> or <see cref="MultipartFormPartKind.FileContent" /> part.</summary>
     private static bool ReadsAFile(MultipartFormPart part) =>
