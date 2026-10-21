@@ -64,3 +64,4 @@ Where the fix lands outside `touches`, add the folder in the same commit. Each p
 - 2026-10-21: Created.
 - 2026-10-21: Backlog -> Doing. Criteria at claim: de350832 ba7c7a94 6c1653fd dd1cc079.
 - 2026-10-21: Doing -> Backlog. Waits on BL-2975: Curl on Windows turns the non-ASCII argument of test472 into '?' (ANSI argv model, ADR-0022); harness UTF-8 fix for 3203 and 1703 is in the stash
+- 2026-10-21: Backlog -> Doing. Criteria at claim: de350832 ba7c7a94 6c1653fd dd1cc079.
