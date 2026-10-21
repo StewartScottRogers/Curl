@@ -37,3 +37,4 @@ Steps:
 ## Log
 
 - 2026-10-21: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: b166b49a 56e3dd14 34ddd848 dd1cc079.
