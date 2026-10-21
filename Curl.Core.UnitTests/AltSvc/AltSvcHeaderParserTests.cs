@@ -48,6 +48,15 @@ public sealed class AltSvcHeaderParserTests
             new AltSvcAlternative(AltSvcAlpn.H2, null, 8443, Day, false),
             new AltSvcAlternative(AltSvcAlpn.H3, "Alt.Example.", 1, Day, false));
 
+    // curl 8.22.0's tests/unit/unit1654.c: unknown parameters before ma and persist must not hide them,
+    // a quoted value holding ';', ',' or an escaped quote included (ADR-0482).
+    [TestMethod]
+    public void Parse_QuotedUnknownParameterHoldingSeparatorsAndAnEscapedQuote_StillReadsMaAndPersist() =>
+        AssertAlternatives(
+            "h2=\":443\"; long-extension-parameter=token; ext=token; quoted=\"a;\\\"b\"; ma=120; persist=1\r\n, h3=\":1\"; q=\"x,y\\\\\"; ma=9",
+            new AltSvcAlternative(AltSvcAlpn.H2, null, 443, 120, true),
+            new AltSvcAlternative(AltSvcAlpn.H3, null, 1, 9, false));
+
     [TestMethod]
     public void Parse_UnreadableMaxAge_KeepsTheDefault() =>
         AssertAlternatives(
