@@ -1,5 +1,5 @@
 ---
-id: BL-2928
+id: BL-2952
 title: Encode a whole URL's fragment with QUERY_NO under CURLU_URLENCODE, as curl 8.22.0's parseurl does
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-21
 completed:
 ---
-# BL-2928 — Encode a whole URL's fragment with QUERY_NO under CURLU_URLENCODE, as curl 8.22.0's parseurl does
+# BL-2952 — Encode a whole URL's fragment with QUERY_NO under CURLU_URLENCODE, as curl 8.22.0's parseurl does
 
 ## Goal
 
