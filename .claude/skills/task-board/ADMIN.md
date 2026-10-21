@@ -50,6 +50,12 @@ It also prints `task-board.ps1 hotspots`' lines as warnings: paths so many unfin
 tasks touch that they serialise the board. A hotspot is advice, never a problem, so it
 never fails the check, with or without `-FailOnProblem`.
 
+It also warns about each `Tasks/SharedListFiles.txt` entry that has no matching
+`merge=union` line in `.gitattributes`. A file belongs in that list (and so is exempt from
+the `touches` overlap check) only if it is one entry per line, order-free, and marked
+`merge=union`; without the attribute two tasks adding lines would conflict. Also advice,
+never a failure.
+
 **A finding is not automatically a task to fix.** It is either a task that needs editing
 or a rule that needs changing. Deciding which is the point. Two rules were removed from
 this checker after they flagged every task on the board and meant nothing:

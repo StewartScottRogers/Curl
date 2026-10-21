@@ -18,7 +18,8 @@
               (a lane other than yes or no among them),
               dependencies that do not exist, dependency cycles, finished tasks
               with unticked boxes, missing sections, non-ASCII bytes. Also prints
-              task-board.ps1 hotspots' lines as warnings, which never fail it.
+              task-board.ps1 hotspots' lines as warnings, and any Tasks/SharedListFiles.txt
+              entry that .gitattributes does not mark merge=union; neither fails it.
       report  Counts by state, assignee, pipeline and priority, and completions
               by date.
 
@@ -413,6 +414,32 @@ function Write-HotspotWarnings {
     foreach ($line in $lines) { Write-Output "  warning: $line" }
 }
 
+# Warns about each Tasks/SharedListFiles.txt entry with no merge=union line for the same
+# pattern in .gitattributes: without it git conflicts on the file, so the overlap
+# exemption would let two tasks collide. Advice, never a problem.
+function Write-SharedListFileWarnings {
+    $listFile = Join-Path $Board 'SharedListFiles.txt'
+    if (-not (Test-Path -LiteralPath $listFile)) { return }
+    $attributes = Join-Path $RepoRoot '.gitattributes'
+    $unionPatterns = @()
+    if (Test-Path -LiteralPath $attributes) {
+        foreach ($line in [IO.File]::ReadAllLines($attributes)) {
+            $parts = @($line.Trim() -split '\s+')
+            if ($parts.Count -ge 2 -and -not $parts[0].StartsWith('#') -and $parts[1..($parts.Count - 1)] -contains 'merge=union') { $unionPatterns += $parts[0] }
+        }
+    }
+    $warnings = @()
+    foreach ($line in [IO.File]::ReadAllLines($listFile)) {
+        $entry = $line.Trim()
+        if ($entry -eq '' -or $entry.StartsWith('#')) { continue }
+        if ($unionPatterns -notcontains $entry) { $warnings += "SharedListFiles.txt entry '$entry' has no merge=union line in .gitattributes" }
+    }
+    if ($warnings.Count -eq 0) { return }
+    Write-Output ''
+    Write-Output "$($warnings.Count) shared list file warning(s) (not problems):"
+    foreach ($warning in $warnings) { Write-Output "  warning: $warning" }
+}
+
 function Invoke-Check([object[]] $Tasks) {
     $problems = @()
     $doneIds = Get-DoneIds $Tasks
@@ -510,6 +537,7 @@ function Invoke-Check([object[]] $Tasks) {
 
     Write-Output "Checked $($Tasks.Count) task(s) on the board."
     Write-HotspotWarnings
+    Write-SharedListFileWarnings
     if ($problems.Count -eq 0) {
         Write-Output 'No problems found.'
         return
