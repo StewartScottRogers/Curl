@@ -1,6 +1,6 @@
 using System.Globalization;
 
-namespace Curl.Console;
+namespace Curl.Output;
 
 /// <summary>
 /// Formats and computes the fields of curl's progress meter status line as curl 8.21.0's
@@ -8,7 +8,7 @@ namespace Curl.Console;
 /// columns wide (<c>time2str</c>), percentages (<c>pgrs_est_percent</c>) and average speeds
 /// (<c>trspeed</c>).
 /// </summary>
-internal static class ProgressMeterFields
+public static class ProgressMeterFields
 {
     /// <summary>The unit letters <c>max6out</c> appends, one for each division by 1024.</summary>
     private const string SizeUnits = "kMGTPE";
@@ -20,7 +20,7 @@ internal static class ProgressMeterFields
     /// </summary>
     /// <param name="bytes">The count, never negative.</param>
     /// <returns>Six characters.</returns>
-    internal static string Size(long bytes)
+    public static string Size(long bytes)
     {
         if (bytes < 100000)
         {
@@ -49,7 +49,7 @@ internal static class ProgressMeterFields
     /// </summary>
     /// <param name="seconds">The seconds; zero or fewer is blank.</param>
     /// <returns>Seven characters.</returns>
-    internal static string Time(long seconds)
+    public static string Time(long seconds)
     {
         if (seconds <= 0)
         {
@@ -69,7 +69,7 @@ internal static class ProgressMeterFields
     /// <param name="total">The expected size.</param>
     /// <param name="current">The size so far.</param>
     /// <returns>The percentage, truncated.</returns>
-    internal static long Percent(long total, long current)
+    public static long Percent(long total, long current)
     {
         if (total > 10000)
         {
@@ -86,7 +86,7 @@ internal static class ProgressMeterFields
     /// <param name="size">The bytes.</param>
     /// <param name="microseconds">The time they took.</param>
     /// <returns>The speed, capped at <see cref="long.MaxValue" />.</returns>
-    internal static long Speed(long size, long microseconds)
+    public static long Speed(long size, long microseconds)
     {
         if (microseconds < 1)
         {

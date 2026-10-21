@@ -1,4 +1,5 @@
 using System.Text;
+using Curl.Output;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Console;
