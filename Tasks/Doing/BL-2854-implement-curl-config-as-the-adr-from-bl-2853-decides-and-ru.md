@@ -34,3 +34,4 @@ BL-2853 decided (ADR-0712): Curl ships `curl-config` on every platform as `Curl.
 ## Log
 
 - 2026-10-19: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: 559fbc46 63fcc09a 4f405f24 7707a773 2045c672 620ebead.
