@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.UnitTests/PassingUpstreamCases.txt, Curl.Conformance.UnitProgram.UnitLibrary/UnitPrograms.Asn1.cs, Curl.Conformance.UnitProgram.UnitLibrary/Asn1/Names, Curl.Conformance.UnitProgram.UnitTests/Asn1/Names, Curl.Networking.UnitLibrary/SchannelCommonNameCheck.cs, Curl.Networking.UnitTests/SchannelCommonNameCheckTests.cs]
 requirement: none
 created: 2026-10-21
-completed:
+completed: 2026-10-21
 ---
 # BL-2911 — Port upstream unit programs tool1394, unit1397, unit1676 and unit3205 and fix the empty-label wildcard match
 
@@ -27,14 +27,21 @@ Split from BL-2843. Follow ADR-0711 (shape) and ADR-0723 (which guarded branch r
 
 ## Acceptance criteria
 
-- [ ] `tool1394`, `unit1397`, `unit1676` and `unit3205` ports exist in `Curl.Conformance.UnitProgram.UnitLibrary/Asn1/Names/`, each doc comment naming the C program its rows come from, registered in `UnitPrograms.Asn1.cs`, each with tests in `Curl.Conformance.UnitProgram.UnitTests/Asn1/Names/` (platform-specific answers pinned with `OSCondition`).
-- [ ] With `$env:CURL_UPSTREAM_CASE` set to each of 1394, 1397, 1676 and 3205, `dotnet test Curl.Conformance.UnitTests --filter "TestCategory=Manual"` passes on Windows, and the four numbers are on `PassingUpstreamCases.txt`.
-- [ ] `PatternMatchesHost("*.hello.com", ".hello.com")` is false, pinned by a test in `Curl.Networking.UnitTests/SchannelCommonNameCheckTests.cs`.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean, `dotnet test --filter "TestCategory!=Integration"` passes, and `Measure-CodeQuality.ps1 -Library Curl.Conformance.UnitProgram.UnitLibrary,Curl.Networking.UnitLibrary` shows 100% line and branch coverage and complexity at most 10 for both.
+- [x] `tool1394`, `unit1397`, `unit1676` and `unit3205` ports exist in `Curl.Conformance.UnitProgram.UnitLibrary/Asn1/Names/`, each doc comment naming the C program its rows come from, registered in `UnitPrograms.Asn1.cs`, each with tests in `Curl.Conformance.UnitProgram.UnitTests/Asn1/Names/` (platform-specific answers pinned with `OSCondition`).
+- [x] With `$env:CURL_UPSTREAM_CASE` set to each of 1394, 1397, 1676 and 3205, `dotnet test Curl.Conformance.UnitTests --filter "TestCategory=Manual"` passes on Windows, and the four numbers are on `PassingUpstreamCases.txt`.
+- [x] `PatternMatchesHost("*.hello.com", ".hello.com")` is false, pinned by a test in `Curl.Networking.UnitTests/SchannelCommonNameCheckTests.cs`.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean, `dotnet test --filter "TestCategory!=Integration"` passes, and `Measure-CodeQuality.ps1 -Library Curl.Conformance.UnitProgram.UnitLibrary,Curl.Networking.UnitLibrary` shows 100% line and branch coverage and complexity at most 10 for both.
 
 ## Notes
+
+- Reached `PatternMatchesHost` by making `SchannelCommonNameCheck` public (in `touches`) rather than adding `InternalsVisibleTo` to `Curl.Networking.UnitLibrary.csproj`, which BL-2894 in Doing touches.
+- Fix: `WildcardMatchesHost` now needs a host label of at least one character (`hostLabelEnd < 1`), as upstream's `hostname_label_end - hostname >= pattern_label_end - pattern`; pinned by `PatternMatchesHost_WildcardAgainstAnEmptyLeftMostLabel_IsFalse`. Every other unit1397 row already matched.
+- Each port takes its Curl function and platform choice through its constructor (default: the real function and `OperatingSystem.IsWindows()`), so both ADR-0723 branches are covered on Windows; `OSCondition` tests pin the registered port's branch per platform. Failure lines go through `Hashes.UnitChecks` to standard error; unit1676's OpenSSL-build line goes to standard output, as `puts` does.
+- `PeerCertificateText.Format` already gives `dh(p):17`, `dh(g):34`, `dh(pub_key):51` for unit1676's certificate; no Curl.Output change.
+- Measured: 4 manual upstream cases pass on Windows; Measure-CodeQuality: Curl.Conformance.UnitProgram.UnitLibrary 100/100, max complexity 8; Curl.Networking.UnitLibrary 100/100, max 10; 0 failing members.
 
 ## Log
 
 - 2026-10-21: Created.
 - 2026-10-21: Backlog -> Doing. Criteria at claim: 7de64f9c a717d77f 6ab2d507 c4fd7eb2.
+- 2026-10-21: Doing -> Done. Upstream cases 1394, 1397, 1676 and 3205 run as ported unit programs and are on the ratchet; *.hello.com no longer matches .hello.com
