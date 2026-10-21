@@ -31,3 +31,4 @@ Found by BL-2861 (2026-10-21), which made the `Host:` line and a proxy's absolut
 ## Log
 
 - 2026-10-21: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: 3ad1c32b 1f5f797a dd1cc079.
