@@ -13,7 +13,9 @@ namespace Curl.Api.Readme;
 /// </summary>
 internal static class ReadmeSamples
 {
-    public static async Task CreateClientAsync()
+    /// <summary>Runs the <c>create</c> sample and returns its client, already disposed by the sample's <c>await using</c>.</summary>
+    /// <returns>The sample's client.</returns>
+    public static async Task<CurlClient> CreateClientAsync()
     {
         // <sample create>
         await using CurlClient client = CurlClient.Create(new CurlClientOptions
@@ -23,7 +25,7 @@ internal static class ReadmeSamples
             ConnectTimeout = TimeSpan.FromSeconds(5),
         });
         // </sample>
-        await Task.CompletedTask;
+        return client;
     }
 
     public static async Task SendAndStreamAsync(CurlClient client, Stream destination, CancellationToken cancellationToken)

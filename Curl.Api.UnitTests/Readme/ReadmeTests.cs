@@ -78,7 +78,16 @@ public sealed partial class ReadmeTests
     [TestMethod]
     public async Task Sample_Create_BuildsAClientOverTheManagedEngineWithoutSendingAnything()
     {
-        await ReadmeSamples.CreateClientAsync();
+        CurlClient client = await ReadmeSamples.CreateClientAsync();
+
+        Assert.IsInstanceOfType<Curl.Engine.ManagedCurlEngine>(client.Engine);
+        Assert.IsTrue(client.OwnsEngine);
+        Assert.AreEqual("my-app/1.0", client.Options.UserAgent);
+        Assert.AreEqual(TimeSpan.FromSeconds(30), client.Options.Timeout);
+        Assert.AreEqual(TimeSpan.FromSeconds(5), client.Options.ConnectTimeout);
+        FieldInfo? transfers = typeof(CurlClient).GetField("_transfers", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.IsNotNull(transfers, "CurlClient no longer has the _transfers driver this test reads");
+        Assert.IsNull(transfers.GetValue(client), "the sample started a transfer: the client created its multi-transfer driver");
     }
 
     [TestMethod]
