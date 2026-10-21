@@ -35,3 +35,4 @@ Split from BL-2856 (which runs cases 375, 1454, 959-961 and 445 in the harness a
 ## Log
 
 - 2026-10-21: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: cab62466 9e889420 695eb15d dd1cc079.
