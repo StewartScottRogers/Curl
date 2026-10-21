@@ -1711,6 +1711,14 @@ public sealed partial class UpstreamCaseRunnerTests
     }
 
     [TestMethod]
+    public void HttpsPort_IsFiveDigitsAndMatchesTheConnectorPort()
+    {
+        // Upstream's runner picks ports above 9999; test2100's Content-Length: 47 assumes a five-digit %HTTPSPORT.
+        Assert.HasCount(5, UpstreamCaseRunner.HttpsPort);
+        Assert.AreEqual(UpstreamCaseRunner.HttpsPort, HttpsServerConnector.HttpsPort.ToString(System.Globalization.CultureInfo.InvariantCulture));
+    }
+
+    [TestMethod]
     [Timeout(60_000, CooperativeCancellation = true)]
     public async Task RunAsync_HttpsCaseWithACertificateDirectory_ServesTlsOnTheHttpsPort()
     {

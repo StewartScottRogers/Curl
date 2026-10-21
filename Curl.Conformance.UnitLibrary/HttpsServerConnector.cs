@@ -21,7 +21,7 @@ namespace Curl.Conformance;
 public sealed class HttpsServerConnector(SwsHttpServerConnector sws, X509Certificate2 certificate, IConnector backend) : IConnector
 {
     /// <summary>The port of the HTTPS server, <c>%HTTPSPORT</c>.</summary>
-    public const int HttpsPort = 8989;
+    public const int HttpsPort = 18989;
 
     /// <summary>
     /// The certificate file upstream's stunnel presents when a case's <c>&lt;server&gt;</c> line

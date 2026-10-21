@@ -147,7 +147,7 @@ public sealed class UpstreamCaseRunner(
     public const string TftpPort = "9003";
 
     /// <summary>The value of <c>%HTTPSPORT</c> when the caller names a certificate directory: connections to this port reach the sws emulation through TLS, <see cref="HttpsServerConnector"/>, presenting the certificate the case's <c>https</c> server line names from <c>%CERTDIR/certs/</c>.</summary>
-    public const string HttpsPort = "8989";
+    public const string HttpsPort = "18989";
 
     /// <summary>The value of <c>%SMTPSPORT</c> when the caller names a certificate directory: connections to this port reach the SMTP server through TLS, <see cref="MailTlsServerConnector"/>, presenting <c>%CERTDIR/certs/test-localhost.pem</c>.</summary>
     public const string SmtpsPort = "9000";

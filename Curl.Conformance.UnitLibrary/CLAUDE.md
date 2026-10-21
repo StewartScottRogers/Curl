@@ -165,7 +165,7 @@ test4001's `--ech` client exits 101 there as on Windows and Linux; any other fir
 back to `SslStream` through `ReplayedPrefixStream`. `ShutdownAsync` sends close_notify on either.
 
 `HttpsServerConnector` (BL-1912) stands in for upstream's HTTPS server, `sws` behind stunnel, on
-port 8989, the runner's `%HTTPSPORT`, which has a value only when the caller names a certificate
+port 18989 (five digits, as upstream's are), the runner's `%HTTPSPORT`, which has a value only when the caller names a certificate
 directory: a `TlsServerConnection` runs `TlsServerStream` over an `InMemoryDuplexStream` pair with
 the certificate the case's `<server>` line `https [file]` names from `%CERTDIR/certs/`
 (`test-localhost.pem` when none, loaded by `LoadCertificate`), offers no ALPN and asks for no client

@@ -93,7 +93,7 @@ public sealed class HttpsServerConnectorTests
     [Timeout(60_000, CooperativeCancellation = true)]
     public async Task ConnectAsync_HttpsPortThroughTheProxyTunnel_RecordsTheConnectAsProxyBytesAndTheRequestDecrypted()
     {
-        const string Connect = "CONNECT localhost:8989 HTTP/1.1\r\n\r\n";
+        const string Connect = "CONNECT localhost:18989 HTTP/1.1\r\n\r\n";
         using X509Certificate2 certificate = CreateCertificate();
         SwsHttpServerConnector sws = new(ParsedTestCase.From(KeptOpenReply.Replace("<reply>\n", "<reply>\n<connect nonewline=\"yes\">\nHTTP/1.1 200 OK\r\n\r\n\n</connect>\n", StringComparison.Ordinal)));
         HttpsServerConnector https = new(sws, certificate, sws);

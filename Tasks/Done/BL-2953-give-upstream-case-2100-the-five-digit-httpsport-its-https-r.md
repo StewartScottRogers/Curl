@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: direct
 depends-on: []
-touches: [Curl.Conformance.UnitTests/UpstreamConformanceTests.NamedCase.cs]
+touches: [Curl.Conformance.UnitTests/UpstreamConformanceTests.NamedCase.cs, Curl.Conformance.UnitLibrary/HttpsServerConnector.cs, Curl.Conformance.UnitLibrary/UpstreamCaseRunner.cs, Curl.Conformance.UnitLibrary/CLAUDE.md, Curl.Conformance.UnitTests/HttpsServerConnectorTests.cs, Curl.Conformance.UnitTests/UpstreamCaseRunnerTests.cs]
 requirement: none
 created: 2026-10-21
-completed:
+completed: 2026-10-21
 ---
 # BL-2953 — Give upstream case 2100 the five-digit HTTPSPORT its HTTPS-RR query length assumes
 
@@ -22,13 +22,16 @@ Found by BL-2920 (2026-10-21). Curl now sends the DoH HTTPS query first (ADR-072
 
 ## Acceptance criteria
 
-- [ ] `CURL_UPSTREAM_CASE=2100 dotnet test Curl.Conformance.UnitTests --filter "FullyQualifiedName~NamedUpstreamCase"` no longer reports a difference at `Content-Length: 47`.
-- [ ] A unit test pins that the harness's substituted `%HTTPSPORT` has five digits.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] `CURL_UPSTREAM_CASE=2100 dotnet test Curl.Conformance.UnitTests --filter "FullyQualifiedName~NamedUpstreamCase"` no longer reports a difference at `Content-Length: 47`.
+- [x] A unit test pins that the harness's substituted `%HTTPSPORT` has five digits.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
+
+- %HTTPSPORT was 8989 (HttpsServerConnector.HttpsPort and UpstreamCaseRunner.HttpsPort); both are now 18989. Widened touches to the files that name it. Case 2100 now passes in full on Windows; it is not added to PassingUpstreamCases.txt because only Windows was measured (add it once Linux and macOS are checked).
 
 ## Log
 
 - 2026-10-21: Created.
 - 2026-10-21: Backlog -> Doing. Criteria at claim: 7ea7aab7 521a8aa5 c5f8cef6.
+- 2026-10-21: Doing -> Done. HTTPSPORT is now 18989; case 2100 passes
