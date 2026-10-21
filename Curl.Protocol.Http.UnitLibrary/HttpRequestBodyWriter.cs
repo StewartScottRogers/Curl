@@ -383,6 +383,15 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
             return;
         }
 
+        await WriteBytesInPiecesAsync(content, isChunked, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Writes a body of bytes in the pieces curl's upload buffer holds, reporting each read,
+    /// until they are all sent or one is cut short.
+    /// </summary>
+    private async ValueTask WriteBytesInPiecesAsync(ReadOnlyMemory<byte> content, bool isChunked, CancellationToken cancellationToken)
+    {
         while (BytesWritten < content.Length && !CutShort)
         {
             int room = NextReadRoom(isChunked);
