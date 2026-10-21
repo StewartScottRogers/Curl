@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Engine.UnitLibrary]
+touches: [Curl.Engine.UnitLibrary/UrlPartSetter.cs, Curl.Engine.UnitTests/ManagedCurlUrlHandleTests.Set.cs]
 requirement: none
 created: 2026-10-21
-completed:
+completed: 2026-10-21
 ---
 # BL-2935 — Fix AF-0297: UpperCasedEscapes' && can become || with no test failing, upper-casing escapes that are not two hex digits
 
@@ -41,12 +41,17 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- The fix is a test only: `Set_TextPartWithAnEscapeOfOnlyOneHexDigit_LeavesItsCaseAsItIs` sets a fragment of `%ag` and `%ga` and expects it back unchanged, which kills the `&&` to `||` mutant (`%ag` would become `%AG`). Production code was already right.
+- Touches narrowed from the whole Curl.Engine.UnitLibrary to UrlPartSetter.cs, and widened to Curl.Engine.UnitTests/ManagedCurlUrlHandleTests.Set.cs, where the test belongs; no task in Doing on origin/work/dark-factory names either.
+- The audit guard refuses a lane running `Audit/Tools/Invoke-MutationTest.ps1`, so the mutant was applied by hand (line 234 `&&` to `||`): both new DataRows failed, 238 others passed; with the line restored all 240 pass. The quality auditor's re-audit runs the tool itself.
 
 ## Log
 
 - 2026-10-21: Created.
 - 2026-10-21: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-21: Doing -> Done. A URL part set with a one-hex-digit escape (%ag, %ga) is now pinned unchanged, killing AF-0297's && to || mutant
