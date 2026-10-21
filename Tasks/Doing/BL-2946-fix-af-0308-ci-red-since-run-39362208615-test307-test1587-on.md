@@ -46,6 +46,8 @@ The finding closes only when a later re-audit by the process auditor confirms th
 
 ## Notes
 
+Fixed in RunDarkFactory.ps1 per ADR-0744: past the usage stop a lane claims only CI-fix tasks (Invoke-Claim -CiFixOnly). The reproduction reads a past log, so only the next audit can confirm. Self-test: -TestCiWatch passes.
+
 ## Log
 
 - 2026-10-21: Created.

@@ -1228,6 +1228,13 @@ function Get-UsageReading {
     return $null
 }
 
+function Test-CiFixTitle {
+    # Whether a task title is one the coordinator files for a red CI: "Fix CI failure ..." or
+    # "Fix flaky CI test ...".
+    param([string]$Title)
+    return [bool]($Title -match '^(Fix CI failure|Fix flaky CI test)\b')
+}
+
 function Get-UsageStop {
     # Why no new task should be claimed now - the weekly window is at least
     # -StopAtWeeklyUsage used or the 5-hour one -StopAtUsage - or '' when there is room or
@@ -3618,6 +3625,7 @@ if ($TestCiWatch) {
     & $check 'build error: regression at once' 'regression error CS1002 in X.cs run 9 from sha9 on Linux' `
         (& $show (Get-CiVerdicts -Now $now -Runs @((& $run 9 2 @(& $f 'error CS1002 in X.cs' @('Linux') 'build')))))
     & $check 'flaky title' 'Fix flaky CI test A that failed once on Linux' (Get-CiTaskTitle ([pscustomobject]@{ Key = 'A'; Kind = 'test'; Verdict = 'flaky'; Platforms = @('Linux') }))
+    & $check 'CI fix title is claimable past the usage stop' 'True True False' ("$(Test-CiFixTitle 'Fix CI failure A on Linux') $(Test-CiFixTitle 'Fix flaky CI test A') $(Test-CiFixTitle 'Add --foo option')")
     & $check 'touches' 'Curl.Protocol.Ssh.UnitTests,Curl.Protocol.Ssh.UnitLibrary' ((Get-CiTouches -Project 'Curl.Protocol.Ssh.UnitTests' -Repo $Root) -join ',')
     & $check 'integration touches' 'Curl.Networking.IntegrationTests,Curl.Networking.UnitLibrary' ((Get-CiTouches -Project 'Curl.Networking.IntegrationTests' -Repo $Root) -join ',')
     & $check 'console integration touches' 'Curl.Console.IntegrationTests,Curl.Console' ((Get-CiTouches -Project 'Curl.Console.IntegrationTests' -Repo $Root) -join ',')
@@ -4536,7 +4544,7 @@ function Invoke-Claim {
     # Returns @{ Id = 'BL-###' } on success, or @{ Wait = $true } when every ready task
     # overlaps work in progress (or nothing is ready but other lanes may unlock more), or
     # @{ None = $true } when the board has nothing left for this shift.
-    param([string[]]$Skip)
+    param([string[]]$Skip, [switch]$CiFixOnly)
     $lock = Enter-Lock
     try {
         foreach ($attempt in 1..5) {
@@ -4564,6 +4572,8 @@ function Invoke-Claim {
                 if ($next -match 'can start yet' -or (Get-DoingCount) -gt 0) { return @{ Wait = $true; Why = (Get-Short (Get-WaitReason $next) 80) } }
                 return @{ None = $true }
             }
+            # With the usage stop on, only a CI fix is claimed (AF-0308); any other task waits.
+            if ($CiFixOnly -and -not (Test-CiFixTitle (Get-TaskTitle $id))) { return @{ None = $true } }
             $moved = (Invoke-Board @('move', '-Id', $id, '-To', 'Doing')) -join ' '
             if ((Get-TaskState $id) -ne 'Doing') {
                 # The board refuses an ID that names two live tasks, and no claim can win
@@ -6036,8 +6046,16 @@ while ($true) {
         if ($failStreak -ge 2) { $stopWhy = 'runs failing'; break }
         # The coordinator asked this lane to retire; its last task is already integrated.
         if ($Lane -and (Test-Path (Get-LaneStatePath $Lane 'retire'))) { $stopWhy = 'retired'; break }
+        # A red CI is fixed even past the usage stop: a lane that claims nothing leaves the red
+        # spell to last until the window resets (AF-0308: 43 min unclaimed at 97% weekly use).
+        # Running out of tokens mid-task is already waited out, so only CI-fix tasks go on.
         $low = Get-UsageStop
-        if ($low) { $stopWhy = "tokens low: $low"; break }
+        $ciFixOnly = $false
+        if ($low) {
+            $ciFixWaiting = [bool](Get-ChildItem (Join-Path $Root 'Tasks\Backlog') -Filter 'BL-*.md' -ErrorAction SilentlyContinue | Select-String -Pattern '^title: .*(Fix CI failure|Fix flaky CI test)' -List)
+            if (-not ($Lane -and $ciFixWaiting)) { $stopWhy = "tokens low: $low"; break }
+            $ciFixOnly = $true
+        }
     }
 
     if ($resuming) {
@@ -6047,8 +6065,8 @@ while ($true) {
         Set-HeartbeatTask ''
         Set-OwnTabLabel 'empty'
         Write-Heartbeat 'claim'
-        $claim = Invoke-Claim -Skip (@($attempted.Keys) + @(Get-ShiftRequeued) | Select-Object -Unique)
-        if ($claim.None) { $stopWhy = 'nothing ready'; break }
+        $claim = Invoke-Claim -Skip (@($attempted.Keys) + @(Get-ShiftRequeued) | Select-Object -Unique) -CiFixOnly:$ciFixOnly
+        if ($claim.None) { $stopWhy = $(if ($ciFixOnly) { "tokens low: $low" } else { 'nothing ready' }); break }
         if ($claim.Wait) {
             if ($claim.Why -match '^No task is ready') {
                 $holdNote = Get-InteractiveHoldNote (Join-Path $Root 'Tasks\Backlog')
