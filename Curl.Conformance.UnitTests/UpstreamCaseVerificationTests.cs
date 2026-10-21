@@ -217,6 +217,31 @@ public sealed class UpstreamCaseVerificationTests
         Assert.AreEqual("<verify><stdout> differs at byte 0 (line 1): expected \"a\\n\", got \"b\\n\"", FirstLine(difference));
     }
 
+    // Curl's --help adds lines naming --ai-help (BL-2985); test1461 compares curl's own lines only.
+    [TestMethod]
+    public void FindFirstDifference_StdoutWithCurlOnlyAiHelpLines_ComparesTheRest()
+    {
+        string sections = "<verify>\n<stdout mode=\"text\">\nUse \"--help all\" to list all options\n</stdout>\n</verify>\n";
+        string help = "Use \"--help all\" to list all options\r\nUse \"--ai-help\" for Markdown help written for AI agents (Curl only)\r\n";
+
+        string? difference = Verify(sections, Run(standardOutput: help));
+
+        ExpectDifference(null, difference);
+        Assert.IsNull(difference);
+    }
+
+    [TestMethod]
+    public void FindFirstDifference_StdoutWithAnUnexpectedExtraLine_StillDiffers()
+    {
+        string sections = "<verify>\n<stdout mode=\"text\">\nUse \"--help all\" to list all options\n</stdout>\n</verify>\n";
+        string help = "Use \"--help all\" to list all options\r\nUse \"--ai-help\" for Markdown help written for AI agents (Curl only)\r\nextra\r\n";
+
+        string? difference = Verify(sections, Run(standardOutput: help));
+
+        ExpectPresent(difference);
+        Assert.IsNotNull(difference);
+    }
+
     [TestMethod]
     public void FindFirstDifference_StderrInTextMode_IgnoresLineEndings()
     {
