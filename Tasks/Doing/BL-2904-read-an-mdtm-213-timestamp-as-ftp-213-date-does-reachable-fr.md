@@ -32,3 +32,4 @@ Curl reads a `213` MDTM timestamp as curl 8.22.0's `ftp_213_date` does, reachabl
 ## Log
 
 - 2026-10-21: Created (split from BL-2845, which waits on it).
+- 2026-10-21: Backlog -> Doing. Criteria at claim: 54b456c3 3d228e1f d3a9ab15 099d1d27.
