@@ -39,3 +39,4 @@ Likely cause to check first: upstream's sws, given an empty reply, sends nothing
 - 2026-10-19: Created.
 - 2026-10-19: Backlog -> Doing. Criteria at claim: 68d4214d 1b93baff bb323509 68ad5856.
 - 2026-10-19: Doing -> Backlog. Waits on BL-2880: the sws emulation must keep reading an unfinished request (verdict b; real curl exits 28)
+- 2026-10-21: Backlog -> Doing. Criteria at claim: 68d4214d 1b93baff bb323509 68ad5856.
