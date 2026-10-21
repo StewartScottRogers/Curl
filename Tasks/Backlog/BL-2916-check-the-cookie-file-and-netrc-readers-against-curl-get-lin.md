@@ -1,5 +1,5 @@
 ---
-id: BL-2915
+id: BL-2916
 title: Check the cookie-file and netrc readers against Curl_get_line's line rules (CurlFileLineReader)
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-21
 completed:
 ---
-# BL-2915 — Check the cookie-file and netrc readers against Curl_get_line's line rules (CurlFileLineReader)
+# BL-2916 — Check the cookie-file and netrc readers against Curl_get_line's line rules (CurlFileLineReader)
 
 ## Goal
 
