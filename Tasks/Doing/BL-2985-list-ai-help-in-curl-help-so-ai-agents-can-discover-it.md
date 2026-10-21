@@ -51,3 +51,4 @@ cases 1461 to 1464 (all in `PassingUpstreamCases.txt`) check `--help` output; th
 ## Log
 
 - 2026-10-21: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: 502cad86 abf01d69 b846daec 0d3ecba0 e0e3e432 478f1298.
