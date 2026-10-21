@@ -28,16 +28,16 @@ whole solution and runs all ~40,000 fast tests, and a rebase conflict runs a Cla
 
 ## Acceptance criteria
 
-- [ ] Under the lock, a finished task's verify runs only the `*.UnitTests` projects that reference,
+- [x] Under the lock, a finished task's verify runs only the `*.UnitTests` projects that reference,
       directly or through other projects, a project its commits change; a change to
       `Directory.Build.props`, `Directory.Build.targets`, `Directory.Packages.props`, `global.json`,
       `Curl.slnx`, `CodeMetricsConfig.txt` or `.editorconfig` runs all of them; a change to no project
       runs none. The build stays a whole-solution build.
-- [ ] A rebase conflict is resolved with the lock released; the lane then takes the lock again and
+- [x] A rebase conflict is resolved with the lock released; the lane then takes the lock again and
       rebases once more before verifying and pushing.
-- [ ] A self-test switch proves the affected-project selection and the release-and-retake on a
+- [x] A self-test switch proves the affected-project selection and the release-and-retake on a
       throwaway repository, and passes; `-TestAutoLanes` and `-TestCiWatch` still pass.
-- [ ] The script header and `CLAUDE.md` say what a lane tests before pushing, and that CI still
+- [x] The script header and `CLAUDE.md` say what a lane tests before pushing, and that CI still
       runs every test on all three platforms.
 
 ## Notes

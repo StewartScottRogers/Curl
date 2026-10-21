@@ -228,8 +228,12 @@
                  change no project - and pushes (BL-2967, -TestAffectedTests). CI still
                  runs every test on Windows, Linux and macOS. Red fast tests are run once more, with the
                  failing test names traced as "flaky?"; only red twice counts (BL-898), and not even
-                 then when the projects that failed, or never reported passing, pass when run alone (AF-0092, AF-0093, AF-0101, AF-0103). A conflict gets one headless run to resolve
-                 it, and a finished task whose build or tests go red on the rebased
+                 then when the projects that failed, or never reported passing, pass when run alone (AF-0092, AF-0093, AF-0101, AF-0103). The lane rebases once
+                 before taking the lock, and a conflict gets a headless run to resolve it
+                 with the lock released, so other lanes go on integrating; a rebase under
+                 the lock that still conflicts releases it for another resolve, up to 3
+                 resolves in all, and only a rebase made under the lock is pushed
+                 (BL-2967). -TestIntegrateLock proves it. A finished task whose build or tests go red on the rebased
                  tree gets one headless repair run there, still holding the lock,
                  traced as "repair" (AF-0051). Work that still will not integrate is pushed to its own branch,
                  factory/<ID>-lane-<n>-<stamp>, and the task goes back to Backlog on the
@@ -237,7 +241,7 @@
                  pushed is in the lane's summary and the end-of-shift report (BL-1071).
 
     Claims and integrations hold ..\<repo>.lanes\integrate.lock, so they happen one at
-    a time; runs overlap freely. This window coordinates: it starts the lanes, waits
+    a time; runs, and the resolves of rebase conflicts, overlap freely. This window coordinates: it starts the lanes, waits
     for them, pulls the result and raises the alarm once for all of them. Each lane
     traces to <repo>.logs\DarkFactory-<stamp>-L<n>.log beside this checkout.
 
@@ -380,6 +384,7 @@
     powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -TestTaskBudget
     powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -TestModelChoice
     powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -TestClaimDuplicates
+    powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -TestIntegrateLock
 #>
 [CmdletBinding()]
 param(
@@ -464,6 +469,10 @@ param(
     # ID renumbers the later one, pushes that and claims, and that a claim the board refuses
     # for another reason is traced with the board's own words (BL-2014), and exit.
     [switch]$TestClaimDuplicates,
+    # Prove, on a throwaway repository with a stand-in resolver, that an integration pushes,
+    # that a rebase conflict is resolved with the integrate lock released and the rebased
+    # work pushed, and that a resolver that fails leaves no rebase in progress (BL-2967), and exit.
+    [switch]$TestIntegrateLock,
     # Prove the trace labels an Edit or Write whose input names its file as path or
     # notebook_path or not at all, as it does one naming file_path (BL-2036), and exit.
     [switch]$TestToolLabels,
@@ -4230,6 +4239,9 @@ $Forbidden = @(
 $LaneForbidden = $Forbidden + @('git push', 'git pull', 'git fetch', 'git rebase', 'git checkout', 'git switch', 'git worktree', 'git stash')
 # The conflict resolver needs `git rebase --continue`, and nothing that throws work away.
 $ResolveForbidden = $Forbidden + @('git push', 'git pull', 'git rebase --abort', 'git rebase --skip', 'git checkout', 'git switch', 'git worktree', 'git stash')
+# The run that resolves a rebase conflict for task -Id, which Invoke-Integrate makes with the
+# integrate lock released. A variable so -TestIntegrateLock can stand in a resolver of its own.
+$script:ResolveRebaseConflict = { param([string]$Id) Invoke-TaskRun -Id $Id -Text $ResolvePrompt -Deny $ResolveForbidden -Suffix '-resolve' -Minutes 45 | Out-Null }
 
 function Get-ToolFileName {
     # The leaf of the file an Edit or Write call names: its file_path, else path or
@@ -4673,56 +4685,105 @@ function Repair-IntegrationBreak {
     return ''
 }
 
+function Invoke-RebaseOntoShared {
+    # Fetches the shared branch and rebases this lane's commits onto it. Returns 'clean',
+    # 'conflict' (git stopped on conflicts and the rebase is still in progress), 'fetch failed'
+    # or 'rebase failed'. -Unlocked fetches into this worktree's own FETCH_HEAD and leaves
+    # refs/remotes/origin/<branch>, which every lane's worktree shares, alone: a lane rebasing
+    # outside the integrate lock never holds that ref's lock against the lane holding it.
+    param([switch]$Unlocked)
+    $fetch = if ($Unlocked) { @('fetch', '-q', '--refmap=', 'origin', $Branch) } else { @('fetch', '-q', 'origin', $Branch) }
+    $onto = if ($Unlocked) { 'FETCH_HEAD' } else { "origin/$Branch" }
+    if (-not (Invoke-Git $fetch)) { return 'fetch failed' }
+    if (Invoke-Git @('rebase', '-q', $onto)) { return 'clean' }
+    if (Test-Rebasing) { return 'conflict' }
+    return 'rebase failed'
+}
+
+function Resolve-RebaseConflictUnlocked {
+    # One resolver run for the rebase in progress, made while this lane does NOT hold the
+    # integrate lock, so the other lanes go on integrating for the 6 to 8 minutes it takes
+    # (BL-2967). True once the rebase has finished; false after aborting one it left unsettled.
+    param([string]$Id)
+    Write-Trace $Id 'resolve' 'rebase conflict; resolving with the integrate lock released' 'DarkYellow'
+    Set-HeartbeatStep @('resolve', 'rebase conflict, lock released')
+    & $script:ResolveRebaseConflict -Id $Id
+    if (-not (Test-Rebasing)) { return $true }
+    & git -C $Root rebase --abort 2>&1 | Out-Null
+    return $false
+}
+
 function Invoke-Integrate {
     # Rebases this lane's commits onto the shared branch, checks them, and pushes. Returns
-    # '' on success or why it could not.
-    param([string]$Id, [string]$State)
+    # '' on success or why it could not. A rebase conflict is resolved with the integrate lock
+    # released (BL-2967): first in a rebase made before taking the lock, then, should the
+    # rebase under the lock still conflict, by releasing it, resolving and taking it again, up
+    # to -MaxResolves resolver runs in all. Nothing is pushed but a rebase made under the lock.
+    param([string]$Id, [string]$State, [int]$MaxResolves = 3)
+    $unsettled = 'rebase conflict the resolver could not settle'
     Set-HeartbeatTask $Id
-    Write-Heartbeat 'integrate' 'waiting for the integrate lock'
-    $lock = Enter-Lock
-    Write-Heartbeat 'integrate'
-    try {
-        foreach ($attempt in 1..3) {
-            # Finished work is parked only for what origin refused, never because origin was
-            # out of reach (AF-0025): each attempt starts once origin answers.
-            if (-not (Wait-RemoteReachable -Id $Id)) { return 'origin stayed out of reach for an hour' }
-            if (-not (Invoke-Git @('fetch', '-q', 'origin', $Branch))) { Start-Sleep -Seconds 10; continue }
-            if (-not (Invoke-Git @('rebase', '-q', "origin/$Branch"))) {
-                if (Test-Rebasing) {
-                    Write-Trace $Id 'resolve' 'rebase conflict; resolving' 'DarkYellow'
-                    Invoke-TaskRun -Id $Id -Text $ResolvePrompt -Deny $ResolveForbidden -Suffix '-resolve' -Minutes 45 | Out-Null
-                    if (Test-Rebasing) { & git -C $Root rebase --abort 2>&1 | Out-Null; return 'rebase conflict the resolver could not settle' }
-                } else { return 'rebase failed' }
+    # Finished work is parked only for what origin refused, never because origin was out of
+    # reach (AF-0025): each rebase starts once origin answers.
+    if (-not (Wait-RemoteReachable -Id $Id)) { return 'origin stayed out of reach for an hour' }
+    # The rebase before the lock puts the other lanes' work under ours now, so the rebase
+    # under the lock only meets what was pushed meanwhile and is almost always clean. Only a
+    # conflict counts here; any other failure is met again, and reported, under the lock.
+    Write-Heartbeat 'integrate' 'rebase onto the shared branch before the lock'
+    $resolves = 0
+    if ((Invoke-RebaseOntoShared -Unlocked) -eq 'conflict') {
+        $resolves++
+        if (-not (Resolve-RebaseConflictUnlocked -Id $Id)) { return $unsettled }
+    }
+    $attempt = 0
+    while ($true) {
+        Write-Heartbeat 'integrate' 'waiting for the integrate lock'
+        $lock = Enter-Lock
+        Write-Heartbeat 'integrate'
+        $conflict = $false
+        try {
+            # Three attempts for a fetch or a push origin refused; a conflict is no attempt.
+            while ($attempt -lt 3) {
+                $attempt++
+                if (-not (Wait-RemoteReachable -Id $Id)) { return 'origin stayed out of reach for an hour' }
+                $rebase = Invoke-RebaseOntoShared
+                if ($rebase -eq 'fetch failed') { Start-Sleep -Seconds 10; continue }
+                if ($rebase -eq 'rebase failed') { return 'rebase failed' }
+                if ($rebase -eq 'conflict') { $attempt--; $conflict = $true; break }
+                # Lanes number the tasks they file from their own copy of the board, so two
+                # lanes can file the same ID. The other lane's is already shared and keeps it;
+                # ours are renumbered, with our own references, before anyone else sees them.
+                $dedupe = (Invoke-Board @('dedupe', '-Since', "origin/$Branch")) | Where-Object { $_ -match '->' }
+                if ($dedupe) {
+                    Invoke-Git @('add', '-A') | Out-Null
+                    Invoke-Git @('commit', '-q', '-m', "chore(tasks): renumber task IDs another lane took first`n`n$($dedupe -join "`n")") | Out-Null
+                    foreach ($line in $dedupe) { Write-Trace $Id 'renum' $line 'DarkYellow' }
+                }
+                # Keep Done short enough for Stewart to read at a glance. Only the lane holding
+                # this lock archives, on top of every other lane's work, so two lanes never
+                # move the same finished tasks into different folders.
+                $archived = (Invoke-Board @('archive', '-WhenDoneIsLong')) | Where-Object { $_ -match '^Archived ' }
+                if ($archived) {
+                    Invoke-Git @('add', '-A', '--', 'Tasks/Done') | Out-Null
+                    Invoke-Git @('commit', '-q', '-m', "chore(tasks): archive Done once it grew past the short list`n`n$archived") | Out-Null
+                    Write-Trace $Id 'archive' $archived
+                }
+                if ($State -eq 'Done') {
+                    Set-HeartbeatStep @('verify', 'build and fast tests on the shared branch')
+                    $red = Test-Green -Id $Id -Base "origin/$Branch"
+                    if ($red) { $red = Repair-IntegrationBreak -Id $Id -Red $red }
+                    if ($red) { return "$red after rebasing onto the other lanes' work" }
+                    Write-Trace $Id 'verify' 'build and fast tests green on the shared branch'
+                }
+                if (Invoke-Git @('push', '-q', 'origin', "HEAD:$Branch")) { return '' }
             }
-            # Lanes number the tasks they file from their own copy of the board, so two
-            # lanes can file the same ID. The other lane's is already shared and keeps it;
-            # ours are renumbered, with our own references, before anyone else sees them.
-            $dedupe = (Invoke-Board @('dedupe', '-Since', "origin/$Branch")) | Where-Object { $_ -match '->' }
-            if ($dedupe) {
-                Invoke-Git @('add', '-A') | Out-Null
-                Invoke-Git @('commit', '-q', '-m', "chore(tasks): renumber task IDs another lane took first`n`n$($dedupe -join "`n")") | Out-Null
-                foreach ($line in $dedupe) { Write-Trace $Id 'renum' $line 'DarkYellow' }
-            }
-            # Keep Done short enough for Stewart to read at a glance. Only the lane holding
-            # this lock archives, on top of every other lane's work, so two lanes never
-            # move the same finished tasks into different folders.
-            $archived = (Invoke-Board @('archive', '-WhenDoneIsLong')) | Where-Object { $_ -match '^Archived ' }
-            if ($archived) {
-                Invoke-Git @('add', '-A', '--', 'Tasks/Done') | Out-Null
-                Invoke-Git @('commit', '-q', '-m', "chore(tasks): archive Done once it grew past the short list`n`n$archived") | Out-Null
-                Write-Trace $Id 'archive' $archived
-            }
-            if ($State -eq 'Done') {
-                Set-HeartbeatStep @('verify', 'build and fast tests on the shared branch')
-                $red = Test-Green -Id $Id -Base "origin/$Branch"
-                if ($red) { $red = Repair-IntegrationBreak -Id $Id -Red $red }
-                if ($red) { return "$red after rebasing onto the other lanes' work" }
-                Write-Trace $Id 'verify' 'build and fast tests green on the shared branch'
-            }
-            if (Invoke-Git @('push', '-q', 'origin', "HEAD:$Branch")) { return '' }
-        }
-        return 'push kept being refused'
-    } finally { $lock.Dispose() }
+            if (-not $conflict) { return 'push kept being refused' }
+        } finally { $lock.Dispose() }
+        # Work pushed while this lane resolved conflicts with its own: the lock is released
+        # again for the resolve, and taken again for a fresh rebase once it has finished.
+        if ($resolves -ge $MaxResolves) { & git -C $Root rebase --abort 2>&1 | Out-Null; return $unsettled }
+        $resolves++
+        if (-not (Resolve-RebaseConflictUnlocked -Id $Id)) { return $unsettled }
+    }
 }
 
 function Invoke-Park {
@@ -4909,6 +4970,99 @@ if ($TestClaimDuplicates) {
         foreach ($case in $cases) {
             if ($case[1] -ceq $case[2]) { Write-Host "PASS $($case[0]): $($case[2])" -ForegroundColor Green }
             else { Write-Host "FAIL $($case[0]): expected $($case[1]), got $($case[2])" -ForegroundColor Red; $failed++ }
+        }
+    } finally {
+        Remove-Item -Recurse -Force -Path $temp -ErrorAction SilentlyContinue
+    }
+    exit $(if ($failed) { 1 } else { 0 })
+}
+
+if ($TestIntegrateLock) {
+    # Lane 9 integrates in a throwaway repository with a bare origin, while a second clone
+    # stands in for the other lanes. The stand-in resolver settles a conflict with git, notes
+    # whether the integrate lock was held as it ran, and can push more work from the other
+    # clone meanwhile, as a lane integrating during the resolve would (BL-2967).
+    $temp = Join-Path ([IO.Path]::GetTempPath()) "df-integrate-lock-$PID"
+    $origin = Join-Path $temp 'origin.git'
+    $repo = Join-Path $temp 'lane-9'
+    $other = Join-Path $temp 'other'
+    New-Item -ItemType Directory -Force -Path $temp | Out-Null
+    git init -q --bare -b work $origin 2>&1 | Out-Null
+    git clone -q $origin $repo 2>&1 | Out-Null
+    git -C $repo config user.name t; git -C $repo config user.email t@t
+    git -C $repo checkout -q -b work 2>&1 | Out-Null
+    foreach ($state in 'Doing', 'Backlog', 'Blocked', 'Deferred', 'Done') { New-Item -ItemType Directory -Force -Path (Join-Path $repo "Tasks\$state") | Out-Null; Set-Content -Path (Join-Path $repo "Tasks\$state\.gitkeep") -Value '' }
+    Set-Content -Path (Join-Path $repo 'c.txt') -Value 'base'
+    git -C $repo add -A 2>&1 | Out-Null
+    git -C $repo commit -q -m base 2>&1 | Out-Null
+    git -C $repo push -q origin work 2>&1 | Out-Null
+    git clone -q -b work $origin $other 2>&1 | Out-Null
+    git -C $other config user.name o; git -C $other config user.email o@o
+    $script:Root = $repo; $script:Branch = 'work'; $script:Lane = 9; $script:Stamp = 'test'
+    $script:LanesDir = $temp; $script:LockFile = Join-Path $temp 'integrate.lock'; $script:LogDir = Join-Path $temp 'logs'
+    # No heartbeat is written, and the task it names is set already: the lane state files
+    # Set-HeartbeatTask reads are defined further down this script.
+    $script:WritesHeartbeat = $false; $script:Beat.Task = 'BL-001'
+    $env:CLAUDE_PROJECT_DIR = $repo
+    $testLockHeld = { try { ([IO.File]::Open($script:LockFile, 'OpenOrCreate', 'ReadWrite', 'None')).Dispose(); $false } catch { $true } }
+    # Commits c.txt as -Text in a clone, pushing it from the other one.
+    $commit = {
+        param([string]$Dir, [string]$Text)
+        if ($Dir -eq $other) { git -C $other pull -q --rebase origin work 2>&1 | Out-Null }
+        Set-Content -Path (Join-Path $Dir 'c.txt') -Value $Text
+        git -C $Dir add -A 2>&1 | Out-Null; git -C $Dir commit -q -m $Text 2>&1 | Out-Null
+        if ($Dir -eq $other) { git -C $other push -q origin work 2>&1 | Out-Null }
+    }
+    $fresh = { git -C $repo fetch -q origin work 2>&1 | Out-Null; git -C $repo reset -q --hard origin/work 2>&1 | Out-Null }
+    $shared = { git -C $repo fetch -q origin work 2>&1 | Out-Null; "$(git -C $repo show origin/work:c.txt)".Trim() }
+    # The stand-in resolver notes whether the lock was held, has the other lanes push first
+    # on the resolves -PushesOn names, and settles the conflict unless -Settles is false.
+    $script:Resolves = @()
+    $script:ResolveRebaseConflict = {
+        param([string]$Id)
+        $script:Resolves += , (& $testLockHeld)
+        if ($script:Resolves.Count -in $script:PushesOn) { & $commit $other "theirs-$($script:Resolves.Count + 1)" }
+        if (-not $script:Settles) { return }
+        Set-Content -Path (Join-Path $repo 'c.txt') -Value "resolved-$($script:Resolves.Count)"
+        git -C $repo add c.txt 2>&1 | Out-Null
+        git -C $repo -c core.editor=true rebase --continue 2>&1 | Out-Null
+    }
+    $integrate = {
+        param([bool]$Settles = $true, [int[]]$PushesOn = @())
+        $script:Resolves = @(); $script:Settles = $Settles; $script:PushesOn = $PushesOn
+        # Git's refusals on a conflict are expected here, so their traces are not printed.
+        return (Invoke-Integrate -Id 'BL-001' -State 'Blocked' 6>$null)
+    }
+    $failed = 0
+    try {
+        $cases = @(
+            ,@('the probe sees the integrate lock while it is held', 'True False', {
+                $lock = Enter-Lock; $held = & $testLockHeld; $lock.Dispose()
+                "$held $(& $testLockHeld)" })
+            ,@('a clean integration pushes, with no resolve', "'' ours-1 0 resolves", {
+                & $commit $repo 'ours-1'
+                $r = & $integrate
+                "'$r' $(& $shared) $($script:Resolves.Count) resolves" })
+            ,@('a conflict is resolved with the lock released, and the rebased work pushed', "'' resolved-1 lock held: False", {
+                & $fresh; & $commit $other 'theirs-1'; & $commit $repo 'ours-2'
+                $r = & $integrate
+                "'$r' $(& $shared) lock held: $($script:Resolves -join ',')" })
+            ,@('work pushed during a resolve is resolved again, the lock released each time', "'' resolved-2 lock held: False,False", {
+                & $fresh; & $commit $other 'theirs-a'; & $commit $repo 'ours-3'
+                $r = & $integrate -PushesOn @(1)
+                "'$r' $(& $shared) lock held: $($script:Resolves -join ',')" })
+            ,@('a lane that meets a new conflict after every resolve gives up after 3', "'rebase conflict the resolver could not settle' 3 resolves, rebasing: False", {
+                & $fresh; & $commit $other 'theirs-x'; & $commit $repo 'ours-4'
+                $r = & $integrate -PushesOn @(1, 2, 3)
+                "'$r' $($script:Resolves.Count) resolves, rebasing: $(Test-Rebasing)" })
+            ,@('a resolver that fails leaves no rebase in progress and pushes nothing', "'rebase conflict the resolver could not settle' rebasing: False, shared: theirs-y", {
+                & $fresh; & $commit $other 'theirs-y'; & $commit $repo 'ours-5'
+                $r = & $integrate -Settles $false
+                "'$r' rebasing: $(Test-Rebasing), shared: $(& $shared)" }))
+        foreach ($case in $cases) {
+            $got = & $case[2]
+            if ($case[1] -ceq $got) { Write-Host "PASS $($case[0]): $got" -ForegroundColor Green }
+            else { Write-Host "FAIL $($case[0]): expected $($case[1]), got $got" -ForegroundColor Red; $failed++ }
         }
     } finally {
         Remove-Item -Recurse -Force -Path $temp -ErrorAction SilentlyContinue

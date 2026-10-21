@@ -131,7 +131,10 @@ an ADR that decides a feature stays out.
 of the shift. `-Lanes N` runs N tasks at once, each in its own git worktree beside the
 checkout (`<repo>.lanes\lane-<n>`); the board never gives two lanes tasks whose
 `touches` overlap, and each lane rebases, rebuilds, tests and pushes its own work, one
-lane at a time. `-Lanes Auto` sizes the shift itself to the measured burn rate, the board's parallel
+lane at a time. Under that integrate lock a lane builds the whole solution but runs only the
+fast tests of the test projects its commits can affect (all of them when a shared build
+file or a `.csproj` changes), and it resolves a rebase conflict with the lock released;
+CI still runs every test on Windows, Linux and macOS (BL-2967, ADR-0742). `-Lanes Auto` sizes the shift itself to the measured burn rate, the board's parallel
 capacity and the machine's cap - straight up to its unpaced lanes, then one lane at a
 time above them, and straight down when a limit falls - so
 it suits whichever Claude plan is in use. Running out of tokens is not a stall: the shift announces it with the
