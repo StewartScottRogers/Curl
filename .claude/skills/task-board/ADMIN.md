@@ -46,6 +46,10 @@ verifiable. Gaps in the ID sequence, because IDs are never reused.
 
 `-FailOnProblem` makes it exit 1, so it can run as a hook or a build step.
 
+It also prints `task-board.ps1 hotspots`' lines as warnings: paths so many unfinished
+tasks touch that they serialise the board. A hotspot is advice, never a problem, so it
+never fails the check, with or without `-FailOnProblem`.
+
 **A finding is not automatically a task to fix.** It is either a task that needs editing
 or a rule that needs changing. Deciding which is the point. Two rules were removed from
 this checker after they flagged every task on the board and meant nothing:

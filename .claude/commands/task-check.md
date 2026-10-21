@@ -13,6 +13,9 @@ Validate the board.
    unfinished task carrying a completion date, a `Doing` task whose dependencies are not
    done, more than one task in `Doing`, a missing required section, content after
    `## Log`, an unfinished task with no acceptance criteria, and gaps in the ID sequence.
+   It also prints `task-board.ps1 hotspots`' lines (`warning: Hotspot <count> <path>: BL-...`)
+   as warnings: paths so many unfinished tasks touch that they serialise the board. Report
+   them as warnings, not problems; they never fail the check.
 3. Report every problem. Do not fix anything as part of this command: a problem is either
    a task that needs editing or a rule that needs changing, and which one it is matters.
 4. If a finding looks like the checker is wrong rather than the board, say so — that has
