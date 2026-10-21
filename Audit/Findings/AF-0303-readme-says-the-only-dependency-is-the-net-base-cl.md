@@ -3,8 +3,8 @@ id: AF-0303
 title: README says the only dependency is the .NET base class library; Curl.Mcp references two NuGet packages
 auditor: truthfulness
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: truthfulness:README.md:OnlyDependencyIsTheBcl:false-statement
 reproduction: none
 task: none
@@ -47,3 +47,4 @@ Select-String -Path README.md -Pattern 'The only dependency is the .NET base' | 
 ## Log
 
 - 2026-10-19: filed proposed.
+- 2026-10-21: proposed -> accepted.
