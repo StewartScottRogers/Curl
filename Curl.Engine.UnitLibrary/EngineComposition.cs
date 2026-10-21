@@ -1078,6 +1078,7 @@ internal static class EngineComposition
             HttpsConnectFirstAttemptVersion = HttpsConnectFirstAttemptVersionOf(http.HttpVersion),
             HttpsConnectSecondAttemptVersion = http.HttpVersion == HttpVersion.Http3 ? "h2" : null,
             ResolverEvents = resolverEvents,
+            ShufflesResolveEntryAddresses = network.DnsShuffleAddresses,
         };
 
     /// <summary>

@@ -212,6 +212,17 @@ public sealed partial class TcpConnector(
     public DnsCache DnsCache => _dnsCache;
 
     /// <summary>
+    /// Gets a value indicating whether a <c>--resolve</c> entry's addresses are shuffled with
+    /// <see cref="DnsAddressShuffle" /> as <see cref="LoadResolveEntries" /> puts them in the DNS cache, for
+    /// <c>CURLOPT_DNS_SHUFFLE_ADDRESSES</c>, as curl 8.22.0's <c>dnsc_entry_assign_addr</c> shuffles every
+    /// address entry (BL-2977). The <c>Added H:P:A to DNS cache</c> line keeps the entry as written.
+    /// </summary>
+    public bool ShufflesResolveEntryAddresses { get; init; }
+
+    // Gives a random index below its argument for ShufflesResolveEntryAddresses; tests pin it.
+    internal Func<int, int> ResolveEntryShuffleRandomBelow { get; init; } = DnsAddressShuffle.CryptographicRandomBelow;
+
+    /// <summary>
     /// Gets a value indicating whether a direct connect writes the <c>[DNS]</c> lines curl 8.21.0
     /// writes for its DNS connection filter under <c>--trace-config dns</c>, <c>doh</c> or <c>all</c>
     /// (<see cref="DnsFilterTraceEvents" />, BL-1102).
@@ -1040,7 +1051,10 @@ public sealed partial class TcpConnector(
             events.ReportInfo($"RESOLVE {entry.Host}:{entry.Port} - old addresses discarded");
         }
 
-        _dnsCache.Store(cacheKey, new DnsCacheEntry(entry.Host, entry.Port, entry.Addresses));
+        IReadOnlyList<IPAddress> addresses = ShufflesResolveEntryAddresses
+            ? DnsAddressShuffle.Shuffle(entry.Addresses, ResolveEntryShuffleRandomBelow)
+            : entry.Addresses;
+        _dnsCache.Store(cacheKey, new DnsCacheEntry(entry.Host, entry.Port, addresses));
         events.ReportInfo($"Added {entry.Host}:{entry.Port}:{entry.AddressText} to DNS cache{(entry.IsPermanent ? string.Empty : " (non-permanent)")}");
         if (entry.Host == AnyHost)
         {
