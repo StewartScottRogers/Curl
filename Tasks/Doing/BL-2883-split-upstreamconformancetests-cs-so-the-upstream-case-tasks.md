@@ -35,3 +35,4 @@ Make UpstreamConformanceTests a partial class (or a set of small test classes sh
 ## Log
 
 - 2026-10-21: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: 631f3dbd df0009a6 ee115027 1ff6ab0b 38e9dffd.
