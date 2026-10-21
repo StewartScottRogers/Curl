@@ -4,7 +4,7 @@ title: Run the cases that need a Curl without a feature: 375 (no proxy), 1454 (n
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-2981, BL-2982, BL-2983]
+depends-on: [BL-2984, BL-2982, BL-2983]
 touches: [Curl.Conformance.UnitTests/PassingUpstreamCases.txt, Curl.Conformance.UnitLibrary/UpstreamServedProtocolFeatures.cs, Curl.Conformance.UnitTests/UpstreamConformanceTests.MissingFeatureCases.cs, Curl.Engine.UnitLibrary, Curl.Engine.UnitTests, Curl.Conformance.UnitLibrary/UpstreamCurlPlatform.cs, Curl.Conformance.UnitLibrary/UpstreamCaseScreening.cs, Curl.Conformance.UnitTests/UpstreamCurlPlatformTests.Ldap.cs, Curl.Conformance.UnitTests/UpstreamConformanceTests.cs, Curl.Conformance.UnitTests/UpstreamConformanceTests.DebugStandIns.cs]
 requirement: none
 created: 2026-10-19
@@ -38,11 +38,11 @@ Gap scorecard 2026-10-19_1329: 375 (`!proxy`), 1454 (`!IPv6`) and 445 (`ldap`) a
 
 ## Notes
 
-- 2026-10-21 (lane 2, sizing pass before any edit): too big for one run, and it reaches code outside this task's projects. The mask must reach the curl tool through `CurlComposition.CreateRunner` (`Curl.Console`, held by BL-2938 in Doing); the IPv6 refusal belongs where `--connect-to` is resolved (`Curl.Networking.UnitLibrary/ConnectDestination.cs`); the IDN switch belongs in `Curl.Protocol.Smtp.UnitLibrary/SmtpMailbox.cs`, which punycodes the mailbox host with `IdnMapping`. Filed BL-2981 (the mask in the engine and the tool, the ADR, and the `--proxy` refusal for 375), BL-2982 (IPv6 literal under the mask, 1454) and BL-2983 (IDN under the mask, 959-961), and made them `depends-on`. Together they meet this task's ADR and engine-unit-test criteria.
+- 2026-10-21 (lane 2, sizing pass before any edit): too big for one run, and it reaches code outside this task's projects. The mask must reach the curl tool through `CurlComposition.CreateRunner` (`Curl.Console`, held by BL-2938 in Doing); the IPv6 refusal belongs where `--connect-to` is resolved (`Curl.Networking.UnitLibrary/ConnectDestination.cs`); the IDN switch belongs in `Curl.Protocol.Smtp.UnitLibrary/SmtpMailbox.cs`, which punycodes the mailbox host with `IdnMapping`. Filed BL-2984 (the mask in the engine and the tool, the ADR, and the `--proxy` refusal for 375), BL-2982 (IPv6 literal under the mask, 1454) and BL-2983 (IDN under the mask, 959-961), and made them `depends-on`. Together they meet this task's ADR and engine-unit-test criteria.
 - What is left here once they are Done: report `ldap` (Curl's `curl -V` lists `ldap` and `ldaps` on every platform, `ManagedCurlVersion`) in `UpstreamServedProtocolFeatures` with a pin in `UpstreamCurlPlatformTests.Ldap.cs`, and check that 445's `rtsp` feature is reported too (no feature table names `rtsp` today); add `UpstreamCurlPlatform.WithoutFeatures` and have the conformance tests, for a case whose `<features>` list `!proxy`, `!IPv6` or `!IDN`, take those features off the platform (`PlatformFor`, in `UpstreamConformanceTests.DebugStandIns.cs`) and pass the mask to `CreateRunner` in `RunCurlAsync` (`UpstreamConformanceTests.cs`, also in BL-2865's touches - the board orders them). `FindFeatureOfAnotherPlatform` must count a feature the harness takes off as absent on every platform, so 959-961 (`!win32`) are `SkippedOnThisPlatform` on Windows and run on Linux and macOS. Added those files to `touches`.
 
 ## Log
 
 - 2026-10-19: Created.
 - 2026-10-21: Backlog -> Doing. Criteria at claim: 78dd162e edb7b05e f29424e7 296deadb dd1cc079 620ebead.
-- 2026-10-21: Doing -> Backlog. Needs BL-2981 (feature mask in engine and tool, Curl.Console held by BL-2938), BL-2982 (IPv6) and BL-2983 (IDN) first
+- 2026-10-21: Doing -> Backlog. Needs BL-2984 (feature mask in engine and tool, Curl.Console held by BL-2938), BL-2982 (IPv6) and BL-2983 (IDN) first

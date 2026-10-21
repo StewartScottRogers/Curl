@@ -1,5 +1,5 @@
 ---
-id: BL-2981
+id: BL-2984
 title: Add a run-time feature mask to the engine and the curl tool, off by default, and refuse --proxy under it as a build without proxy does (case 375)
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-21
 completed:
 ---
-# BL-2981 — Add a run-time feature mask to the engine and the curl tool, off by default, and refuse --proxy under it as a build without proxy does (case 375)
+# BL-2984 — Add a run-time feature mask to the engine and the curl tool, off by default, and refuse --proxy under it as a build without proxy does (case 375)
 
 ## Goal
 

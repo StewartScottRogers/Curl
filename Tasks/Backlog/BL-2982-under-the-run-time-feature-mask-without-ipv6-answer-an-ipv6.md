@@ -4,7 +4,7 @@ title: Under the run-time feature mask without IPv6, answer an IPv6 literal (--c
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-2981]
+depends-on: [BL-2984]
 touches: [Curl.Networking.UnitLibrary/ConnectDestination.cs, Curl.Networking.UnitTests/ConnectDestinationFeatureMaskTests.cs]
 requirement: none
 created: 2026-10-21
@@ -14,11 +14,11 @@ completed:
 
 ## Goal
 
-With BL-2981's run-time feature mask hiding `IPv6`, `--connect-to localhost:80:[::1]:80 localhost` ends with exit 4 (`CURLE_NOT_BUILT_IN`), as upstream case 1454 expects of a curl built without IPv6.
+With BL-2984's run-time feature mask hiding `IPv6`, `--connect-to localhost:80:[::1]:80 localhost` ends with exit 4 (`CURLE_NOT_BUILT_IN`), as upstream case 1454 expects of a curl built without IPv6.
 
 ## Context
 
-Split from BL-2856. The `--connect-to` destination is resolved in `Curl.Networking.UnitLibrary` (`ConnectDestination.cs`; check where the IPv6 literal is read and add the file that does it to `touches` if it is another). curl 8.22.0 `lib/conncache.c` / `lib/url.c` `parse_connect_to_host_port`: without `USE_IPV6` a bracketed IPv6 host answers `CURLE_NOT_BUILT_IN`. Wire the mask from BL-2981 through to that code; without the mask nothing changes.
+Split from BL-2856. The `--connect-to` destination is resolved in `Curl.Networking.UnitLibrary` (`ConnectDestination.cs`; check where the IPv6 literal is read and add the file that does it to `touches` if it is another). curl 8.22.0 `lib/conncache.c` / `lib/url.c` `parse_connect_to_host_port`: without `USE_IPV6` a bracketed IPv6 host answers `CURLE_NOT_BUILT_IN`. Wire the mask from BL-2984 through to that code; without the mask nothing changes.
 
 ## Acceptance criteria
 

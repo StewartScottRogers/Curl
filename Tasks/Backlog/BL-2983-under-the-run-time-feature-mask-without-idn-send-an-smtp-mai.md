@@ -4,7 +4,7 @@ title: Under the run-time feature mask without IDN, send an SMTP mailbox host as
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-2981]
+depends-on: [BL-2984]
 touches: [Curl.Protocol.Smtp.UnitLibrary/SmtpMailbox.cs, Curl.Protocol.Smtp.UnitTests/SmtpMailboxFeatureMaskTests.cs]
 requirement: none
 created: 2026-10-21
@@ -14,7 +14,7 @@ completed:
 
 ## Goal
 
-With BL-2981's run-time feature mask hiding `IDN`, Curl's SMTP sends a `--mail-from` / `--mail-rcpt` address whose host part is non-ASCII as written (UTF-8) rather than converted to an IDNA A-label, so upstream cases 959 (exit 55 after `MAIL FROM`), 960 (exit 55 after `RCPT TO`) and 961 (exit 8 after `VRFY`) can pass against the SMTP stand-in, which refuses UTF-8 without `SMTPUTF8`.
+With BL-2984's run-time feature mask hiding `IDN`, Curl's SMTP sends a `--mail-from` / `--mail-rcpt` address whose host part is non-ASCII as written (UTF-8) rather than converted to an IDNA A-label, so upstream cases 959 (exit 55 after `MAIL FROM`), 960 (exit 55 after `RCPT TO`) and 961 (exit 8 after `VRFY`) can pass against the SMTP stand-in, which refuses UTF-8 without `SMTPUTF8`.
 
 ## Context
 
