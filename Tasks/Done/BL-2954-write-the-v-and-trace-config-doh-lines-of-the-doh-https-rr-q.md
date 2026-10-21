@@ -30,7 +30,7 @@ Found by BL-2920 (2026-10-21). ADR-0727 made `--doh-url` send the HTTPS (type 65
 
 - Derived from curl 8.22.0 source (tag `curl-8_22_0`: `lib/vdns/doh.c` `doh_probe_done` and `doh_resp_decode_httpsrr`, `lib/vdns/httpsrr.c`, `lib/curl_trc.c`), not measured: the Windows reference curl has no HTTPSRR feature. Prefix form confirmed against BL-2973's measured A/AAAA lines on the same build. Recorded in ADR-0727's BL-2954 amendment.
 - The HTTPS query now runs on `SubTransferEvents` (connection #1), and `DohTraceLines.ReportHttpsRecord` writes its lines verbatim on the doh trace sink before the A and AAAA lines; this also covers `ResolveHttpsRecordAsync` (the `--ech` path), the same resolve in curl.
-- Choice: the `[DNS] [HTTPS]` lines are written whenever the doh trace sink is real (Curl's one sink for dns/doh/network/all); 8.22.0's finer gating and the `HTTP status N` error are BL-2979 (after BL-2973). The main-transfer `-v` line `HTTPS-RR host:port: ...` (`cf-dns.c`) is BL-2978.
+- Choice: the `[DNS] [HTTPS]` lines are written whenever the doh trace sink is real (Curl's one sink for dns/doh/network/all); 8.22.0's finer gating and the `HTTP status N` error are BL-2979 (after BL-2973). The main-transfer `-v` line `HTTPS-RR host:port: ...` (`cf-dns.c`) is BL-2980.
 - Quality: Curl.Networking.UnitLibrary 100% line, 100% branch, 0 failing members (worst CRAP 10) after splitting `FormatHttpsRecord` and making the CURLcode map a table.
 
 ## Log

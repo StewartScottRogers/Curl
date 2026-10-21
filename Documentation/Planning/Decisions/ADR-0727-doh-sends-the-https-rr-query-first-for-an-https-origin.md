@@ -88,4 +88,4 @@ query has finished and before the A and AAAA queries start. The lines are writte
 sink is real; curl 8.22.0 writes the `[DNS] [HTTPS]` ones only when the `dns` feature is on as
 well, and refuses a non-2xx DoH answer with `[DoH] [DoH] [HTTPS] error: HTTP status N`: both are
 BL-2979, after BL-2973 settles 8.22.0's sub-transfer prefix and gating. The `-v` line
-`HTTPS-RR <host>:<port>: ...` that `lib/vdns/cf-dns.c` writes on the main transfer is BL-2978.
+`HTTPS-RR <host>:<port>: ...` that `lib/vdns/cf-dns.c` writes on the main transfer is BL-2980.

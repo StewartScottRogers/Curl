@@ -1,5 +1,5 @@
 ---
-id: BL-2978
+id: BL-2980
 title: Write curl 8.22.0's -v HTTPS-RR host:port line after a DoH HTTPS-RR resolve
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-21
 completed:
 ---
-# BL-2978 — Write curl 8.22.0's -v HTTPS-RR host:port line after a DoH HTTPS-RR resolve
+# BL-2980 — Write curl 8.22.0's -v HTTPS-RR host:port line after a DoH HTTPS-RR resolve
 
 ## Goal
 
