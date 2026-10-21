@@ -36,6 +36,9 @@ function Restore-TaskStash {
 STASHED WORK. An earlier run of $Id went back to Backlog with uncommitted work, which the
 shift kept as stash $sha and has applied to this worktree. Read git status, git diff and
 the task file before changing anything, and carry on from that work rather than starting over.
+Do not rebuild or rerun the whole fast test suite to re-verify it (AF-0310: BL-2743's second
+run re-ran 33813 and 3573 tests the first had passed, about 38% of $4.75 over two runs): build
+once, run only the tests of the work still to be done, and run the full set once at the end.
 
 "@
     }
@@ -73,6 +76,7 @@ if ($TestTaskStash) {
         $note = Restore-TaskStash -Id 'BL-1' -Repo $repo
         & $check 'its own stash is applied' 'two new' "$(& $read 'a.txt') $(& $read 'b.txt')"
         & $check 'the note says it was applied' 'True' "$($note -match 'has applied to this worktree')"
+        & $check 'the note says not to re-verify finished work' 'True' "$($note -match 'Do not rebuild or rerun')"
         # Back to clean, then a branch that moved under the stash: it cannot apply.
         git -C $repo reset -q --hard HEAD 2>&1 | Out-Null; git -C $repo clean -fdq 2>&1 | Out-Null
         Set-Content -Path (Join-Path $repo 'a.txt') -Value 'three'

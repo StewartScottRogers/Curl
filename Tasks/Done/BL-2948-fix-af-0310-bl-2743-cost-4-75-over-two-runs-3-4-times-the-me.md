@@ -8,7 +8,7 @@ depends-on: []
 touches: [DarkFactory/TaskStash.ps1, DarkFactory/Prompts.ps1]
 requirement: none
 created: 2026-10-21
-completed:
+completed: 2026-10-21
 ---
 # BL-2948 — Fix AF-0310: BL-2743 cost $4.75 over two runs, 3.4 times the median, after a requeue that stashed finished engine work
 
@@ -41,12 +41,15 @@ The finding describes a past run's cost, which no fix can change, so no re-audit
 
 ## Acceptance criteria
 
-- [ ] The cause of the cost is named in this task, and either fixed or recorded as unavoidable.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The cause of the cost is named in this task, and either fixed or recorded as unavoidable.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Cause: run 1 requeued with finished engine work stashed; run 2 spent about 38% of the cost re-building and re-running the full suites (33813 and 3573 tests) the first run had passed. Stash 3b7b8a47 staying in the list after apply is intended (the shift never drops stashes; lanes may not run git stash). Fixed: the note Restore-TaskStash puts before the run now tells it not to re-verify stashed work (build once, run only affected tests, full set once at the end). Pinned by a -TestTaskStash check. No C# changed; build unaffected.
 
 ## Log
 
 - 2026-10-21: Created.
 - 2026-10-21: Backlog -> Doing. Criteria at claim: af4de8c2 9742157d.
+- 2026-10-21: Doing -> Done. Stash-restore note now stops re-verification of stashed work (AF-0310)
