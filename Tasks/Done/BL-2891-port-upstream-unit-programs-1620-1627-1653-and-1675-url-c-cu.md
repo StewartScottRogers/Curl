@@ -8,7 +8,7 @@ depends-on: [BL-2926]
 touches: [Curl.Conformance.UnitProgram.UnitLibrary/UrlParsing/Unit1620UrlLoginDetails.cs, Curl.Conformance.UnitProgram.UnitLibrary/UrlParsing/Unit1627SchemeLookup.cs, Curl.Conformance.UnitProgram.UnitLibrary/UrlParsing/Unit1653PortParsing.cs, Curl.Conformance.UnitProgram.UnitLibrary/UrlParsing/Unit1675UrlApi.cs, Curl.Conformance.UnitProgram.UnitTests/UrlParsing/Unit1620UrlLoginDetailsTests.cs, Curl.Conformance.UnitProgram.UnitTests/UrlParsing/Unit1627SchemeLookupTests.cs, Curl.Conformance.UnitProgram.UnitTests/UrlParsing/Unit1653PortParsingTests.cs, Curl.Conformance.UnitProgram.UnitTests/UrlParsing/Unit1675UrlApiTests.cs, Curl.Conformance.UnitProgram.UnitLibrary/UnitPrograms.UrlParsing.cs, Curl.Conformance.UnitTests/PassingUpstreamCases.txt, Curl.Protocol.Abstractions.UnitLibrary/CurlUrlAuthority.cs, Curl.Protocol.Abstractions.UnitLibrary/Curl.Protocol.Abstractions.UnitLibrary.csproj, Curl.Protocol.Abstractions.UnitTests/CurlUrlAuthorityTests.cs]
 requirement: none
 created: 2026-10-21
-completed:
+completed: 2026-10-21
 ---
 # BL-2891 — Port upstream unit programs 1620, 1627, 1653 and 1675: url.c, Curl_get_scheme, port parsing and the URL API
 
@@ -22,10 +22,10 @@ Split from BL-2844 (2026-10-21), which ports the ten URL and address parsing uni
 
 ## Acceptance criteria
 
-- [ ] Each case named in the Goal has a port in `Curl.Conformance.UnitProgram.UnitLibrary/UrlParsing` whose checks match the C program's row for row (named in its doc comment), registered in `UnitPrograms.UrlParsing.cs`, with a test in `Curl.Conformance.UnitProgram.UnitTests/UrlParsing`; or the case has a Notes entry naming the C-only thing it tests.
-- [ ] Each ported case ends `Passed` with `CURL_UPSTREAM_CASE` set to it on Windows and is on `PassingUpstreamCases.txt`.
-- [ ] Where a port finds Curl wrong, the fix has a focused unit test in the fixed library's own `.UnitTests` project (ADR-0482).
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean, `dotnet test --filter "TestCategory!=Integration"` passes, and each changed library keeps 100% line and branch coverage and complexity at most 10.
+- [x] Each case named in the Goal has a port in `Curl.Conformance.UnitProgram.UnitLibrary/UrlParsing` whose checks match the C program's row for row (named in its doc comment), registered in `UnitPrograms.UrlParsing.cs`, with a test in `Curl.Conformance.UnitProgram.UnitTests/UrlParsing`; or the case has a Notes entry naming the C-only thing it tests.
+- [x] Each ported case ends `Passed` with `CURL_UPSTREAM_CASE` set to it on Windows and is on `PassingUpstreamCases.txt`.
+- [x] Where a port finds Curl wrong, the fix has a focused unit test in the fixed library's own `.UnitTests` project (ADR-0482).
+- [x] `dotnet build Curl.slnx -warnaserror` is clean, `dotnet test --filter "TestCategory!=Integration"` passes, and each changed library keeps 100% line and branch coverage and complexity at most 10.
 
 ## Notes
 
@@ -48,6 +48,11 @@ Split from BL-2844 (2026-10-21), which ports the ten URL and address parsing uni
   Curl.Core (`Curl_url_same_origin`), outside this task's files, so it is split out as BL-2926 and this task
   waits on it. On the next claim: re-apply the stash, add 1620, 1627, 1653 (and 1675 from BL-2926) to the
   ratchet if not there, run the fast tests and the quality measure, commit.
+- 2026-10-21 (lane 4, second claim): BL-2926 had already ported and listed 1675. Added 1620, 1627 and 1653 to
+  `PassingUpstreamCases.txt`; fixed `CurlUrlAuthorityTests` for `Parse`'s new `refuseUnconvertibleName`
+  parameter. `dotnet build Curl.slnx -warnaserror` clean, every fast test project green, and
+  `Measure-CodeQuality.ps1` over Curl.Conformance.UnitProgram.UnitLibrary and Curl.Protocol.Abstractions.UnitLibrary
+  reports 0 failing members.
 
 ## Log
 
@@ -55,3 +60,4 @@ Split from BL-2844 (2026-10-21), which ports the ten URL and address parsing uni
 - 2026-10-21: Backlog -> Doing. Criteria at claim: 994c71ca 67867c61 aca7e1a2 dd1cc079.
 - 2026-10-21: Doing -> Backlog. Waits on BL-2926 (port of unit1675, which needs Curl.Engine and Curl.Core internals); 1620, 1627 and 1653 are ported in the stash
 - 2026-10-21: Backlog -> Doing. Criteria at claim: 994c71ca 67867c61 aca7e1a2 dd1cc079.
+- 2026-10-21: Doing -> Done. 1620, 1627 and 1653 ported and on the ratchet; 1675 via BL-2926

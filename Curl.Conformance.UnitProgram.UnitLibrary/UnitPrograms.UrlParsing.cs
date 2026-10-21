@@ -9,6 +9,9 @@ public sealed partial class UnitPrograms
     [
         new Unit1607ResolveParsing(),
         new Unit1614NoProxyMatching(),
+        new Unit1620UrlLoginDetails(),
+        new Unit1627SchemeLookup(),
+        new Unit1653PortParsing(),
         new Unit1663InterfaceParsing(),
         new Unit1961InetAddressText(),
         new Unit1675UrlApi(),
