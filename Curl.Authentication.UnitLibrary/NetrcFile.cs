@@ -29,7 +29,20 @@ namespace Curl.Authentication;
 /// </remarks>
 public static class NetrcFile
 {
-    /// <summary>Looks the host up in netrc text.</summary>
+    /// <summary>
+    /// The <c>dynbuf</c> limit curl 8.22.0's netrc parser reads each line into with <c>Curl_get_line</c>:
+    /// a line of this many bytes or more, its line feed included (one is added to a last line without
+    /// one), fails the whole file as a syntax error, wherever in the file it is (measured 2026-10-21, BL-2916).
+    /// </summary>
+    public const int LineBufferLimit = 16384;
+
+    /// <summary>
+    /// Whether this platform's curl opens the netrc file in text mode (<c>FOPEN_READTEXT</c>, <c>"rt"</c>):
+    /// on Windows, where the C runtime then ends the file at its first <c>^Z</c> and reads CR LF as LF.
+    /// </summary>
+    private static readonly bool PlatformReadsInTextMode = OperatingSystem.IsWindows();
+
+    /// <summary>Looks the host up in netrc text, read as this platform's curl reads the file.</summary>
     /// <param name="text">The netrc file's text.</param>
     /// <param name="hostName">The host name of the URL.</param>
     /// <param name="userName">
@@ -41,11 +54,33 @@ public static class NetrcFile
     /// (BL-1151); <see langword="null" /> logs nothing.
     /// </param>
     /// <returns>The entry curl picks, no entry, or a syntax error.</returns>
-    public static NetrcLookupResult Find(string text, string hostName, string? userName, IDiagnosticLog? diagnosticLog = null)
+    public static NetrcLookupResult Find(string text, string hostName, string? userName, IDiagnosticLog? diagnosticLog = null) =>
+        FindWithReadMode(text, hostName, userName, PlatformReadsInTextMode, diagnosticLog);
+
+    /// <summary>
+    /// Looks the host up in netrc text as <see cref="Find(string, string, string?, IDiagnosticLog?)" /> does,
+    /// reading it in text mode (as curl on Windows does) or in binary mode (as curl on Linux and macOS does).
+    /// </summary>
+    /// <remarks>
+    /// In text mode the text ends at its first <c>^Z</c> (0x1A) and each CR LF is one line feed, as the
+    /// Windows C runtime reads a file opened <c>"rt"</c> (measured 2026-10-21 on curl 8.22.0 for Windows,
+    /// BL-2916). In binary mode every character is kept. Then any line whose UTF-8 bytes and line feed
+    /// reach <see cref="LineBufferLimit" /> makes the file a syntax error.
+    /// </remarks>
+    /// <param name="text">The netrc file's text.</param>
+    /// <param name="hostName">The host name of the URL.</param>
+    /// <param name="userName">The user name of the URL; <see langword="null" /> when the URL has none.</param>
+    /// <param name="readsInTextMode"><see langword="true" /> to read the text as a file opened in Windows text mode.</param>
+    /// <param name="diagnosticLog">Where a matching entry is logged; <see langword="null" /> logs nothing.</param>
+    /// <returns>The entry curl picks, no entry, or a syntax error.</returns>
+    internal static NetrcLookupResult FindWithReadMode(string text, string hostName, string? userName, bool readsInTextMode, IDiagnosticLog? diagnosticLog = null)
     {
         ArgumentNullException.ThrowIfNull(text);
         ArgumentNullException.ThrowIfNull(hostName);
-        NetrcLookupResult result = new NetrcLookup(new NetrcTokenScanner(text), hostName, userName).Run();
+        string fileText = readsInTextMode ? AsReadInTextMode(text) : text;
+        NetrcLookupResult result = HasLineTooLong(fileText)
+            ? NetrcLookupResult.SyntaxError
+            : new NetrcLookup(new NetrcTokenScanner(fileText), hostName, userName).Run();
         if (result.Outcome == NetrcLookupOutcome.Found)
         {
             new AuthDiagnosticLog(diagnosticLog).NetrcEntryMatched(hostName, result.Login);
@@ -80,6 +115,16 @@ public static class NetrcFile
         string text = await reader.ReadToEndAsync(cancellationToken).ConfigureAwait(false);
         return Find(text, hostName, userName);
     }
+
+    private static string AsReadInTextMode(string text)
+    {
+        int controlZ = text.IndexOf('\u001A', StringComparison.Ordinal);
+        string beforeControlZ = controlZ < 0 ? text : text[..controlZ];
+        return beforeControlZ.Replace("\r\n", "\n", StringComparison.Ordinal);
+    }
+
+    private static bool HasLineTooLong(string text) =>
+        text.Split('\n').Any(line => Encoding.UTF8.GetByteCount(line) + 1 >= LineBufferLimit);
 
     private sealed class NetrcLookup(NetrcTokenScanner scanner, string hostName, string? userName)
     {

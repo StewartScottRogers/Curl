@@ -3,26 +3,22 @@ using System.Text;
 namespace Curl.Authentication;
 
 /// <summary>
-/// Splits netrc text into tokens as curl 8.21.0 does, and enforces its limits: a line of
-/// 16383 bytes or more, or a token of 4096 bytes or more, is a syntax error, and so is a
-/// quoted token that never closes. Lines are checked only when the scanner reaches them, so
-/// text after the point where a lookup stops is never judged. A NUL byte ends its line: the
-/// scanner skips from it to the line feed, as curl reads each line as a C string.
+/// Splits netrc text into tokens as curl 8.21.0 does, and enforces its limits: a token of
+/// 4096 bytes or more is a syntax error, and so is a quoted token that never closes. Tokens
+/// are checked only when the scanner reaches them, so text after the point where a lookup
+/// stops is never judged; the line limit, which curl checks over the whole file first, is
+/// <see cref="NetrcFile.LineBufferLimit" />'s. A NUL byte ends its line: the scanner skips
+/// from it to the line feed, as curl reads each line as a C string.
 /// </summary>
 /// <param name="text">The netrc text.</param>
 internal sealed class NetrcTokenScanner(string text)
 {
-    /// <summary>The most UTF-8 bytes a line may hold, not counting its line feed.</summary>
-    internal const int MaximumLineBytes = 16382;
-
     /// <summary>The most UTF-8 bytes a token may hold, after its quotes and escapes are removed.</summary>
     internal const int MaximumTokenBytes = 4095;
 
     private const int EndOfText = -1;
 
     private int position;
-
-    private int uncheckedLineStart;
 
     /// <summary>Gets whether the scanner met a syntax error; once set, it reads nothing more.</summary>
     internal bool HasSyntaxError { get; private set; }
@@ -187,11 +183,6 @@ internal sealed class NetrcTokenScanner(string text)
             return EndOfText;
         }
 
-        if (position >= uncheckedLineStart && !CheckLineAtUncheckedStart())
-        {
-            return EndOfText;
-        }
-
         if (text[position] == '\0')
         {
             SkipToEndOfLine();
@@ -206,19 +197,5 @@ internal sealed class NetrcTokenScanner(string text)
     {
         int lineFeed = text.IndexOf('\n', position);
         position = lineFeed < 0 ? text.Length : lineFeed;
-    }
-
-    private bool CheckLineAtUncheckedStart()
-    {
-        int lineFeed = text.IndexOf('\n', uncheckedLineStart);
-        int end = lineFeed < 0 ? text.Length : lineFeed;
-        if (Encoding.UTF8.GetByteCount(text.AsSpan(uncheckedLineStart, end - uncheckedLineStart)) > MaximumLineBytes)
-        {
-            HasSyntaxError = true;
-            return false;
-        }
-
-        uncheckedLineStart = end + 1;
-        return true;
     }
 }
