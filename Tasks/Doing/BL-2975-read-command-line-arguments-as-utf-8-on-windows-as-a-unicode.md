@@ -34,6 +34,20 @@ Steps:
 
 ## Notes
 
+- 2026-10-21 (lane 3): Measured with `Record-CurlExchange.ps1` (URL path `a=あ`, `-u "äあ:pä"`,
+  `-H "X-A: ä"`). The Windows reference, Git for Windows' mingw curl 8.22.0 (ADR-0018), is not a
+  `Unicode` build and sends `GET /472/a=?`, `Basic 5D86cOQ=` (Windows-1252, best fit) and `X-A` as
+  `E4` - Curl's bytes today. Only System32's `Unicode` curl.exe 8.21.0 sends UTF-8. Decision
+  (ADR-0741): keep ADR-0022's ANSI argument model, so no Cli, Http or Engine change. Acceptance
+  criterion 2 (`%E3%81%82` under Windows behaviour) is not met by design: it would make Curl differ
+  from its reference. Criterion 3's Cli/Http half has nothing to pin beyond ADR-0067's existing
+  Windows-1252 header test, since no argument handling changed.
+- test472's signature already matches: new test
+  `AwsSigV4SignerTests.Sign_Upstream472NonAsciiPathForEs_EscapesThePercentEncodedPathAgainAndGivesTheCasesSignature`
+  pins `b8783c83...` with canonical URI `/472/a%3D%25E3%2581%2582` (the double-encoded candidate).
+  Tests only, so no quality run.
+- BL-2968 needs re-scoping: reporting `Unicode` on Windows conflicts with ADR-0741; noted on it.
+
 ## Log
 
 - 2026-10-21: Created.

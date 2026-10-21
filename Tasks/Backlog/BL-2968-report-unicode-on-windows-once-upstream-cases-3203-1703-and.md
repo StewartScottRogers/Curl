@@ -35,6 +35,12 @@ Where the fix lands outside `touches`, add the folder in the same commit. Each p
 
 ## Notes
 
+- 2026-10-21 (lane 3, BL-2975): ADR-0741 measured the Windows reference (mingw curl 8.22.0): it is
+  not a `Unicode` build and sends `あ` as `?`, as Curl does. Curl keeps the ANSI argument model and
+  its `-V` does not list `Unicode`, so ADR-0737's decision 2 stands and test472 stays off the
+  ratchet. On resume, land the harness's UTF-8 case-word fix for test3203 and test1703 (list
+  test1703) without adding `Unicode`, drop the `Unicode` and test472 criteria, and record why.
+
 - 2026-10-21 (lane 5): Cause of 3203 and 1703 is the harness, not Curl. It reads every case one
   character per byte (Latin-1), so the `<file name>` `%hex[%E6%BC%A2...]hex%` was created on disk as
   the characters U+00E6 U+00BC ... and Curl listed that name correctly as UTF-8. The fix, left in this
