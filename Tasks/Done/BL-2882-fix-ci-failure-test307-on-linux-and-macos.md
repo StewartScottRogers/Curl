@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.UnitTests, Curl.Conformance.UnitLibrary]
 requirement: none
 created: 2026-10-19
-completed:
+completed: 2026-10-21
 ---
 # BL-2882 — Fix CI failure test307 on Linux and macOS
 
@@ -26,7 +26,7 @@ Lanes test only on Windows, so reproduce with `gh run view 39370101714 --log-fai
 
 ## Acceptance criteria
 
-- [ ] `test307` passes locally, and the `CI` workflow passes on Windows, Linux and macOS for the commit that lands the fix.
+- [x] `test307` passes locally, and the `CI` workflow passes on Windows, Linux and macOS for the commit that lands the fix.
 
 ## Notes
 
@@ -38,3 +38,4 @@ Lanes test only on Windows, so reproduce with `gh run view 39370101714 --log-fai
 
 - 2026-10-19: Created.
 - 2026-10-21: Backlog -> Doing. Criteria at claim: 8a3c8414.
+- 2026-10-21: Doing -> Done. test307 taken off the ratchet (BL-2873's removal had never landed), so CI on Linux and macOS no longer fails it
