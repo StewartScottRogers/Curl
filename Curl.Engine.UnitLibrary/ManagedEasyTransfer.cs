@@ -1822,7 +1822,8 @@ internal sealed partial class ManagedEasyTransfer(
             altSvc: inputs.AltSvc,
             bodyHeaderStyles: outputs.BodyHeaderStyles,
             abortToken: cancellationToken,
-            ssh: inputs.Ssh);
+            ssh: inputs.Ssh,
+            featureMask: state.FeatureMask);
     }
 
     /// <summary>

@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using Curl.Protocol.Abstractions;
 
 namespace Curl.Protocol.Smtp;
 
@@ -15,8 +16,10 @@ namespace Curl.Protocol.Smtp;
 /// that does not loses one trailing <c>&gt;</c> and has no suffix (BL-1993). The part after the
 /// first <c>@</c> is converted to an IDNA A-label with the BCL's <see cref="IdnMapping" />,
 /// sent as received when it is ASCII or has none: <c>c@dü.de</c> goes out as
-/// <c>c@xn--d-eha.de</c>. The local part is sent as its argv bytes: <c>ö</c> is <c>F6</c> on
-/// Windows-1252 and <c>C3 B6</c> in UTF-8.
+/// <c>c@xn--d-eha.de</c>; under a run that hides IDN
+/// (<see cref="MailRequestOptions.SendsMailboxHostAsWritten" />) it is sent as written, as curl
+/// 8.22.0's <c>smtp_parse_address</c> does in a build without <c>USE_IDN</c> (BL-2983). The local
+/// part is sent as its argv bytes: <c>ö</c> is <c>F6</c> on Windows-1252 and <c>C3 B6</c> in UTF-8.
 /// </remarks>
 internal static class SmtpMailbox
 {
@@ -25,9 +28,10 @@ internal static class SmtpMailbox
     /// </summary>
     /// <param name="address">The address as given on the command line.</param>
     /// <param name="commandLineText">The argv encoding of the platform being matched.</param>
+    /// <param name="hostAsWritten"><see langword="true" /> to send the host as written rather than as an A-label.</param>
     /// <returns>The address without its brackets or suffix and with its host as an A-label, one character per byte.</returns>
-    public static string Bare(string address, SmtpCommandLineText commandLineText) =>
-        Split(address, commandLineText).Address;
+    public static string Bare(string address, SmtpCommandLineText commandLineText, bool hostAsWritten) =>
+        Split(address, commandLineText, hostAsWritten).Address;
 
     /// <summary>
     /// Writes <paramref name="address" /> in angle brackets followed by its suffix, as
@@ -36,10 +40,11 @@ internal static class SmtpMailbox
     /// </summary>
     /// <param name="address">The address as given on the command line, or <see langword="null" />.</param>
     /// <param name="commandLineText">The argv encoding of the platform being matched.</param>
+    /// <param name="hostAsWritten"><see langword="true" /> to send the host as written rather than as an A-label.</param>
     /// <returns>The bracketed address and its suffix, one character per byte.</returns>
-    public static string Bracketed(string? address, SmtpCommandLineText commandLineText)
+    public static string Bracketed(string? address, SmtpCommandLineText commandLineText, bool hostAsWritten)
     {
-        (string bare, string suffix) = Split(address ?? string.Empty, commandLineText);
+        (string bare, string suffix) = Split(address ?? string.Empty, commandLineText, hostAsWritten);
         return "<" + bare + ">" + suffix;
     }
 
@@ -55,17 +60,18 @@ internal static class SmtpMailbox
         address is not null && !Ascii.IsValid(commandLineText.ToWire(address));
 
     /// <summary>
-    /// Splits <paramref name="address" /> into its bare address, host as an A-label, and the
-    /// suffix after the last <c>&gt;</c> of one starting <c>&lt;</c>, both one character per byte.
+    /// Splits <paramref name="address" /> into its bare address, host as an A-label unless
+    /// <paramref name="hostAsWritten" />, and the suffix after the last <c>&gt;</c> of one starting
+    /// <c>&lt;</c>, both one character per byte.
     /// </summary>
-    private static (string Address, string Suffix) Split(string address, SmtpCommandLineText commandLineText)
+    private static (string Address, string Suffix) Split(string address, SmtpCommandLineText commandLineText, bool hostAsWritten)
     {
         string received = commandLineText.AsReceived(address);
         (string bare, string suffix) = received.StartsWith('<')
             ? CutAtLastClosingBracket(received[1..])
             : (received.EndsWith('>') ? received[..^1] : received, string.Empty);
         int at = bare.IndexOf('@', StringComparison.Ordinal);
-        string mailbox = at < 0 ? bare : bare[..at] + "@" + ToAsciiHost(bare[(at + 1)..]);
+        string mailbox = at < 0 ? bare : bare[..at] + "@" + (hostAsWritten ? bare[(at + 1)..] : ToAsciiHost(bare[(at + 1)..]));
         return (commandLineText.ToWire(mailbox), commandLineText.ToWire(suffix));
     }
 

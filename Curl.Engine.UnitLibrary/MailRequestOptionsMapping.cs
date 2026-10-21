@@ -49,6 +49,10 @@ internal static class MailRequestOptionsMapping
     /// <c>--oauth2-bearer</c> and <c>--service-name</c>.
     /// </param>
     /// <param name="scheme">The transfer URL's scheme.</param>
+    /// <param name="featureMask">
+    /// The features the run behaves as built without (ADR-0746): hiding <see cref="EngineFeatureMask.Idn" /> sets
+    /// <see cref="MailRequestOptions.SendsMailboxHostAsWritten" />, as curl built without IDN sends an address's host (BL-2983).
+    /// </param>
     /// <returns>
     /// <see langword="null" /> for every scheme but <c>smtp</c>, <c>smtps</c>, <c>pop3</c>,
     /// <c>pop3s</c>, <c>imap</c> and <c>imaps</c>; for those, every mail option verbatim, the
@@ -60,7 +64,7 @@ internal static class MailRequestOptionsMapping
     /// <see cref="EasyAuthenticationOptions.XOAuth2Bearer" />, and <see cref="MailRequestOptions.ServiceName" />
     /// is <see cref="EasyAuthenticationOptions.ServiceName" />, <see langword="null" /> for the scheme's default (ADR-0188).
     /// </returns>
-    internal static MailRequestOptions? FromCommandLine(EngineTransferSettings settings, EasyTransferOptions transfer, EasySmtpOptions smtp, EasyAuthenticationOptions authentication, string scheme) =>
+    internal static MailRequestOptions? FromCommandLine(EngineTransferSettings settings, EasyTransferOptions transfer, EasySmtpOptions smtp, EasyAuthenticationOptions authentication, string scheme, EngineFeatureMask featureMask = EngineFeatureMask.None) =>
         !MailSchemes.Contains(scheme)
             ? null
             : new MailRequestOptions
@@ -76,5 +80,6 @@ internal static class MailRequestOptionsMapping
                 SaslInitialResponse = authentication.SaslInitialResponse,
                 BearerToken = authentication.XOAuth2Bearer,
                 ServiceName = authentication.ServiceName,
+                SendsMailboxHostAsWritten = featureMask.HasFlag(EngineFeatureMask.Idn),
             };
 }

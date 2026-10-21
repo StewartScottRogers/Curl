@@ -113,14 +113,14 @@ internal sealed class SmtpCommandTransfer(
                 ?? TransferResult.Success(0);
         }
 
-        return await SendRecipientCommandsAsync(custom, mail.Recipients).ConfigureAwait(false);
+        return await SendRecipientCommandsAsync(custom, mail.Recipients, mail.SendsMailboxHostAsWritten).ConfigureAwait(false);
     }
 
     /// <summary>
     /// Sends <c>VRFY</c>, or the <c>-X</c> command <paramref name="custom" />, for each recipient
     /// in turn, stopping at the first one that fails.
     /// </summary>
-    private async ValueTask<TransferResult> SendRecipientCommandsAsync(string? custom, IReadOnlyList<string> recipients)
+    private async ValueTask<TransferResult> SendRecipientCommandsAsync(string? custom, IReadOnlyList<string> recipients, bool hostAsWritten)
     {
         foreach (string recipient in recipients)
         {
@@ -129,7 +129,7 @@ internal sealed class SmtpCommandTransfer(
                 return TransferResult.Failure(CurlExitCode.BadFunctionArgument, SmtpSessionMessages.AddressHasLineBreak);
             }
 
-            if (await ExchangeAsync(RecipientCommand(custom, recipient), recipientCommand: true).ConfigureAwait(false) is { } failure)
+            if (await ExchangeAsync(RecipientCommand(custom, recipient, hostAsWritten), recipientCommand: true).ConfigureAwait(false) is { } failure)
             {
                 return failure;
             }
@@ -146,13 +146,13 @@ internal sealed class SmtpCommandTransfer(
     private static bool IsRefusedVerifyAddress(string? custom, string recipient) =>
         custom is null && recipient.AsSpan().IndexOfAny('\r', '\n') >= 0;
 
-    private string RecipientCommand(string? custom, string recipient) =>
-        custom is null ? VerifyCommand(recipient) : CustomRecipientCommand(custom, recipient);
+    private string RecipientCommand(string? custom, string recipient, bool hostAsWritten) =>
+        custom is null ? VerifyCommand(recipient, hostAsWritten) : CustomRecipientCommand(custom, recipient);
 
-    private string VerifyCommand(string recipient)
+    private string VerifyCommand(string recipient, bool hostAsWritten)
     {
         bool utf8 = smtpUtf8Advertised && SmtpMailbox.NeedsSmtpUtf8(recipient, commandLineText);
-        return "VRFY " + SmtpMailbox.Bare(recipient, commandLineText) + (utf8 ? SmtpUtf8Keyword : string.Empty);
+        return "VRFY " + SmtpMailbox.Bare(recipient, commandLineText, hostAsWritten) + (utf8 ? SmtpUtf8Keyword : string.Empty);
     }
 
     private string CustomRecipientCommand(string custom, string recipient)

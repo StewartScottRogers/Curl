@@ -146,7 +146,8 @@ internal sealed partial class TransferPerformer
     /// <summary>
     /// Chooses the transfer's proxy with <see cref="TransferProxySelection" />, then its credentials
     /// with <see cref="TransferCredentialLookup" />, which it keeps as the running transfer's
-    /// <see cref="EngineTransferState.LookedUpCredentials" /> for every attempt's context. A scheme no
+    /// <see cref="EngineTransferState.LookedUpCredentials" /> for every attempt's context, as it keeps the dispatch's
+    /// <see cref="TransferDispatch.FeatureMask" /> as <see cref="EngineTransferState.FeatureMask" />. A scheme no
     /// handler serves fails first, with exit 1; before that, a proxy set under a dispatch whose
     /// <see cref="TransferDispatch.FeatureMask" /> hides <see cref="EngineFeatureMask.Proxy" /> fails with
     /// <see cref="ProxyNotBuiltInFailure" />, as libcurl's setopt does in a build without proxy support.
@@ -180,6 +181,7 @@ internal sealed partial class TransferPerformer
         [NotNullWhen(false)] out TransferResult? failure)
     {
         proxy = null;
+        state.FeatureMask = dispatch.FeatureMask;
         if (dispatch.FeatureMask.HasFlag(EngineFeatureMask.Proxy) && proxyOptions.Proxy is not null)
         {
             failure = ProxyNotBuiltInFailure;

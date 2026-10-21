@@ -81,6 +81,13 @@ internal class EngineTransferState
     internal System.Net.NetworkCredential? LookedUpCredentials { get; set; }
 
     /// <summary>
+    /// Gets or sets the features the transfer behaves as built without, which
+    /// <c>TransferPerformer.TrySelectProxyAndCredentials</c> keeps from the option group's dispatch for every
+    /// attempt's context (ADR-0746, BL-2983); <see cref="EngineFeatureMask.None" /> for a library handle.
+    /// </summary>
+    internal EngineFeatureMask FeatureMask { get; set; }
+
+    /// <summary>
     /// Gets or sets the SSH options of an <c>scp</c> or <c>sftp</c> transfer, with the known-hosts file the
     /// performer resolved (task BL-576); <see langword="null" /> for any other scheme.
     /// </summary>
