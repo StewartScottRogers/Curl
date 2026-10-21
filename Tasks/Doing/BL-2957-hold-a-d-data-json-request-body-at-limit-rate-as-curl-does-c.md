@@ -31,3 +31,4 @@ Found by BL-2938 (AF-0300), which holds a `-T` or `-F` upload at `--limit-rate` 
 ## Log
 
 - 2026-10-21: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: 2ec42394 8b1b0c37 9742157d.
