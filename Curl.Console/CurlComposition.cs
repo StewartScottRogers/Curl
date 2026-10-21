@@ -281,7 +281,7 @@ internal static class CurlComposition
         Func<string, string?> environment = readEnvironmentVariable ?? (_ => null);
         string? dnsServer = honoursDnsServerVariable ? environment(DnsServerVariableName) : null;
         return new(
-            SharingRunCookies((options, cookies) => CreateDialingTransferDispatch(tcpDialer, DnsServerVariableResolverOf(EasyOptionsFromCommandLine.NetworkOf(options), dnsServer, dnsResolver, datagramConnector), datagramConnector, cookies, options, runConnections, runLog, usesHandBuiltNtlm, environment, ftpListener, signingClock)),
+            SharingRunCookies((options, cookies) => CreateDialingTransferDispatch(tcpDialer, DialingDohResolverOf(options, tcpDialer, DnsServerVariableResolverOf(EasyOptionsFromCommandLine.NetworkOf(options), dnsServer, dnsResolver, datagramConnector)), datagramConnector, cookies, options, runConnections, runLog, usesHandBuiltNtlm, environment, ftpListener, signingClock)),
             new PhysicalFileSystem(),
             new PhysicalFileSystem(),
             standardOutput,
@@ -304,6 +304,23 @@ internal static class CurlComposition
             parsesAsQuicBuild: parsesAsQuicBuild,
             transferPerformer: new TransferPerformer(TimeProvider.System, EasyErrorText),
             extendedAttributeWriter: extendedAttributeWriter);
+    }
+
+    /// <summary>
+    /// The resolver of one option group of the dialing runner: with <c>--doh-url</c>, a DoH resolver whose POSTs dial
+    /// through <paramref name="tcpDialer" /> and whose DoH server name resolves through <paramref name="dnsResolver" />,
+    /// so the conformance harness's in-memory servers answer them (BL-2928); otherwise <paramref name="dnsResolver" />.
+    /// </summary>
+    /// <param name="options">The option group, whose DoH URL, DoH TLS options, IP version and trace components pick the resolver.</param>
+    /// <param name="tcpDialer">Opens the DoH server connections.</param>
+    /// <param name="dnsResolver">The resolver the runner was given.</param>
+    /// <returns>The resolver.</returns>
+    internal static IDnsResolver DialingDohResolverOf(CommandLineOptions options, ITcpDialer tcpDialer, IDnsResolver dnsResolver)
+    {
+        EasyNetworkOptions network = EasyOptionsFromCommandLine.NetworkOf(options);
+        return network.DohUrl is { } dohUrl
+            ? CreateDohResolver(dohUrl, CreateDohConnector(EasyOptionsFromCommandLine.TraceComponentsOf(options), EasyOptionsFromCommandLine.TlsOf(options), tcpDialer, TimeProvider.System, dnsResolver), AddressFamilyOf(network), easyErrorText: EasyErrorText)
+            : dnsResolver;
     }
 
     /// <summary>
