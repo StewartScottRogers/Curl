@@ -62,7 +62,7 @@ difference a script could trip on.
 | `--configure` | an empty line |
 | `--checkfor <ver>` | exit 0 when 8.22.0 is at least `<ver>`, else the upstream message on stdout and exit 1 |
 | `--help` | upstream's usage text, exit 0 |
-| an unknown option | upstream's usage on stderr, exit 1; BL-2854 measures the exact text on the tarball's script |
+| an unknown option | `unknown option: <option>` and the usage, both on standard output, exit 1, as the 8.22.0 tarball's `curl-config.in` writes them (measured by BL-2854) |
 
 An empty answer for the compiler options is truthful: a .NET program has no C flags.
 
@@ -79,3 +79,23 @@ built `curl-config` and comparing as the Perl script does.
 - A new Glossary entry, `curl-config`, records what it does.
 - A test reads both `curl --version` and `curl-config` from `Libcurl`'s version information so
   they cannot drift.
+
+## Amendment (BL-2854, 2026-10-21)
+
+Decided by Claude under Stewart's delegation. Read from curl 8.22.0's `curl-config.in`:
+
+- An unknown option prints `unknown option: <option>` and the usage on **standard output**, not
+  standard error, and exits 1; no option at all prints the usage and exits 1. Curl does the same.
+- `--features` is the option upstream's usage names, and case 1014 runs it; `--feature` is accepted
+  too, as the script accepts both.
+- `--version`, `--vernum`, `--help` and `--checkfor` end the run; other options print in turn.
+- `--checkfor` compares field by field with `cut` and `sh test` semantics (a field that is not a
+  number fails every comparison), so `--checkfor` with no version says
+  `requested version  is newer than existing 8.22.0` and exits 1, as the script does.
+- `--protocols` is libcurl's `curl_version_info` protocols with `ipfs` and `ipns` added beside
+  `http`, sorted and upper-cased, because the curl tool adds those two to `curl -V` and upstream's
+  configure lists them in `curl-config`.
+- The `Curl.Config` host holds one statement forwarding to `CurlConfigProgram.RunAsync`; the
+  gated code is `Curl.Config.UnitLibrary`. `Measure-CodeQuality.ps1` does not list the host.
+- The conformance harness runs the same `CurlConfigCommand` in process in place of `../curl-config`,
+  rather than starting the executable, so the four cases stay unit tests with no child process.

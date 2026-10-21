@@ -131,6 +131,9 @@
   <Project Path="Curl.Cli.IntegrationTests/Curl.Cli.IntegrationTests.csproj" />
   <Project Path="Curl.Cli.UnitLibrary/Curl.Cli.UnitLibrary.csproj" />
   <Project Path="Curl.Cli.UnitTests/Curl.Cli.UnitTests.csproj" />
+  <Project Path="Curl.Config/Curl.Config.csproj" />
+  <Project Path="Curl.Config.UnitLibrary/Curl.Config.UnitLibrary.csproj" />
+  <Project Path="Curl.Config.UnitTests/Curl.Config.UnitTests.csproj" />
   <Project Path="Curl.Conformance.Http2Server.UnitLibrary/Curl.Conformance.Http2Server.UnitLibrary.csproj" />
   <Project Path="Curl.Conformance.Http2Server.UnitTests/Curl.Conformance.Http2Server.UnitTests.csproj" />
   <Project Path="Curl.Conformance.Http3Server.UnitLibrary/Curl.Conformance.Http3Server.UnitLibrary.csproj" />

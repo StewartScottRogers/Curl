@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>curl-config</AssemblyName>
+    <RootNamespace>Curl.Config</RootNamespace>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <!-- Published native AOT on every platform, as curl-config is shipped beside curl (ADR-0712). -->
+    <PublishAot>true</PublishAot>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Curl.Config.UnitLibrary\Curl.Config.UnitLibrary.csproj" />
+  </ItemGroup>
+
+</Project>
