@@ -39,3 +39,4 @@ Found by BL-2837 (2026-10-21). `EngineComposition.CreateTransports` takes `Resol
 - 2026-10-21: Created.
 - 2026-10-21: Backlog -> Doing. Criteria at claim: 1b6f541b 37a362b9 e53a05cf 9963d6cb.
 - 2026-10-21: Doing -> Backlog. Code done and committed; criterion 3 (case 2100) waits on BL-2928, which lifts the Debug skip
+- 2026-10-21: Backlog -> Doing. Criteria at claim: 1b6f541b 37a362b9 e53a05cf 9963d6cb.
