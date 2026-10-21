@@ -30,3 +30,4 @@ BL-2830 vendored curl 8.22.0's `tests/data/data1461.txt` and `data1463.txt` into
 ## Log
 
 - 2026-10-19: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: f9cf11f2 840d4585.
