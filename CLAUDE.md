@@ -143,7 +143,10 @@ parallel fashion"). `-Lanes Auto` adds its first `-UnpacedLanes` (3) lanes witho
 reading the burn rate; a task's `touches` names files or narrow subfolders, never a whole
 project it only adds to; new cases, stand-ins and handlers go in one file each that
 registers itself, not in a central switch or test class; and a file many tasks touch is
-split as its own High task rather than waited on (`task-board.ps1 hotspots`). An
+split as its own High task rather than waited on (`task-board.ps1 hotspots`). A
+registration table that tasks only add lines to is kept one entry per line, marked
+`merge=union` in `.gitattributes` and listed in `Tasks/SharedListFiles.txt`, so tasks
+that each add to it do not count as overlapping. An
 interactive session sends independent steps as parallel tool calls or subagents.
 
 When Claude starts a shift it always passes `-NewTab`, e.g.

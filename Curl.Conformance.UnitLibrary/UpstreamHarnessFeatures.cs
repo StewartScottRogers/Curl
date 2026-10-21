@@ -9,7 +9,12 @@ internal static class UpstreamHarnessFeatures
 {
     public static readonly string[] Names =
     [
-        "large_file", "local-http", "headers-api", "form-api", "wakeup",
-        "threadsafe", "threaded-resolver",
+        "large_file",
+        "local-http",
+        "headers-api",
+        "form-api",
+        "wakeup",
+        "threadsafe",
+        "threaded-resolver",
     ];
 }

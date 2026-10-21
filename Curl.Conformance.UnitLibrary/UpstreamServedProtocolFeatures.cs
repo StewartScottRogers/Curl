@@ -5,6 +5,24 @@ internal static class UpstreamServedProtocolFeatures
 {
     public static readonly string[] Names =
     [
-        "dict", "file", "ftp", "gopher", "gophers", "http", "https", "imap", "ipfs", "mqtt", "mqtts", "pop3", "scp", "sftp", "smtp", "telnet", "tftp", "ws", "wss",
+        "dict",
+        "file",
+        "ftp",
+        "gopher",
+        "gophers",
+        "http",
+        "https",
+        "imap",
+        "ipfs",
+        "mqtt",
+        "mqtts",
+        "pop3",
+        "scp",
+        "sftp",
+        "smtp",
+        "telnet",
+        "tftp",
+        "ws",
+        "wss",
     ];
 }

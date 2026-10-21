@@ -1,0 +1,9 @@
+# Files that tasks may change side by side: task-board.ps1 leaves them out of the touches
+# overlap check (Stewart, 2026-10-21: always run highly parallel). The ratchet,
+# Curl.Conformance.UnitTests/PassingUpstreamCases.txt, is built in.
+# A file belongs here only when it is one entry per line, order-free, and .gitattributes
+# marks it merge=union, so concurrent additions merge cleanly. A line may use * for any
+# characters except /.
+Curl.Conformance.UnitLibrary/Upstream*Features.cs
+Curl.Conformance.UnitLibrary/UpstreamPlatformFeatureTable.cs
+Curl.Conformance.UnitProgram.UnitLibrary/UnitPrograms.*.cs

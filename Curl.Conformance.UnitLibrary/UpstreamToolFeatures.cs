@@ -5,7 +5,20 @@ internal static class UpstreamToolFeatures
 {
     public static readonly string[] Names =
     [
-        "crypto", "cookies", "proxy", "Mime", "manual", "DoH", "digest", "aws", "netrc", "verbose-strings",
-        "large-time", "large-size", "sha512-256", "SSLpinning", "httpsig",
+        "crypto",
+        "cookies",
+        "proxy",
+        "Mime",
+        "manual",
+        "DoH",
+        "digest",
+        "aws",
+        "netrc",
+        "verbose-strings",
+        "large-time",
+        "large-size",
+        "sha512-256",
+        "SSLpinning",
+        "httpsig",
     ];
 }

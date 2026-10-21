@@ -5,8 +5,24 @@ internal static class UpstreamCurlVersionLineFeatures
 {
     public static readonly string[] Names =
     [
-        "alt-svc", "AsynchDNS", "brotli", "ECH", "GSS-API", "HSTS", "HTTPS-proxy",
-        "HTTPSRR", "IDN", "IPv6", "Kerberos", "Largefile", "libz", "NTLM", "PSL", "SPNEGO", "SSL",
-        "UnixSockets", "zstd",
+        "alt-svc",
+        "AsynchDNS",
+        "brotli",
+        "ECH",
+        "GSS-API",
+        "HSTS",
+        "HTTPS-proxy",
+        "HTTPSRR",
+        "IDN",
+        "IPv6",
+        "Kerberos",
+        "Largefile",
+        "libz",
+        "NTLM",
+        "PSL",
+        "SPNEGO",
+        "SSL",
+        "UnixSockets",
+        "zstd",
     ];
 }
