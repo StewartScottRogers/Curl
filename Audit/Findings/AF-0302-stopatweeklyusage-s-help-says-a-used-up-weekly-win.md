@@ -3,8 +3,8 @@ id: AF-0302
 title: -StopAtWeeklyUsage's help says a used-up weekly window raises the alarm; the shift waits it out with a notice
 auditor: truthfulness
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: truthfulness:RunDarkFactory.ps1:StopAtWeeklyUsage:false-help
 reproduction: none
 task: none
@@ -49,3 +49,4 @@ return ''
 ## Log
 
 - 2026-10-19: filed proposed.
+- 2026-10-21: proposed -> accepted.
