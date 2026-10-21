@@ -30,3 +30,4 @@ Split from BL-2856. `Curl.Protocol.Smtp.UnitLibrary/SmtpMailbox.cs` converts the
 ## Log
 
 - 2026-10-21: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: 0c4ccaba dd1cc079.
