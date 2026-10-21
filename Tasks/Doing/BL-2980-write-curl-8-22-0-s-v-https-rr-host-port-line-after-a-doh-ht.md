@@ -30,3 +30,4 @@ Found by BL-2954 (ADR-0727's BL-2954 amendment). curl 8.22.0's `lib/vdns/cf-dns.
 ## Log
 
 - 2026-10-21: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: e3632336 2a446683.
