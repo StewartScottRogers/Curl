@@ -41,6 +41,11 @@ One `IUnitProgram` per case in `Curl.Conformance.UnitProgram.UnitLibrary/Dns/Eas
   - **3302**: no fix needed: `EasyAuthenticationOptionSetters.SetGssApiDelegation` already masks to FLAG|POLICY_FLAG; the port reads `EasyOptions.Authentication.GssApiDelegation` back.
   - Requeued because `Curl.Engine.UnitLibrary` (whole project) is in the touches of BL-2934, in Doing.
 
+- 2026-10-21 (lane 1, second claim; run cost budget used up, code left uncommitted for the shift to stash and reapply):
+  - Done and building: engine cut in `DebugCallbackTransferEvents.ReportText` (`MaxInfoLineBytes` 2046, test added); `Curl.Core.UnitLibrary/ConnectionPeer.cs` with `ConnectionPeerTests.cs`; Libcurl `ReadProtocol` masked with `ProtocolMask` 0x3fffffff (test added); the four ports in `Dns/Easy/`, registered in `UnitPrograms.Dns.cs`, tested in `Dns/Easy/UnitProgramsDnsEasyTests.cs`. Core, Engine and Libcurl fast tests pass; all four ports pass over Curl.
+  - Added `Libcurl/Libcurl.csproj` to touches: an `InternalsVisibleTo` for `Curl.Conformance.UnitProgram.UnitLibrary` so the 3219 port reads `EasyInfoDispatch.Default`; no Doing task named it.
+  - Left: (1) one failing row of `Unit2413_PeerWrongInOneField_...` (the `ipv6=1` row): read its actual stderr once and fix the expected count or first line; (2) run 1652, 2413, 3219, 3302 with `CURL_UPSTREAM_CASE` and add them to `PassingUpstreamCases.txt`; (3) Measure-CodeQuality.ps1 for Core, Engine, Libcurl and the unit-program library (not run); (4) full build and fast tests, then Done.
+
 ## Log
 
 - 2026-10-21: Created.
