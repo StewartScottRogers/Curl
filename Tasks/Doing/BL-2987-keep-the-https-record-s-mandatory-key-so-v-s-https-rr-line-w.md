@@ -30,3 +30,4 @@ Found by BL-2980 (ADR-0727's BL-2980 amendment). `ServiceBindingRecord` does not
 ## Log
 
 - 2026-10-21: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: 36ac6bfc 2a446683.
