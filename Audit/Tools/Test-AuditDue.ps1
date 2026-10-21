@@ -5,7 +5,7 @@
 .DESCRIPTION
     The audit office's cadence (ADR-0267): audits run on demand, before each roadmap-milestone
     merge to master, and after changes to the dark factory's script: RunDarkFactory.ps1 and the
-    area files under DarkFactory/ it dot-sources (BL-2983). This script reports the last two
+    area files under DarkFactory/ it dot-sources (BL-2986). This script reports the last two
     from git alone; it never fetches (fetch first) and never writes.
 
     The last audit is the newest scorecard Audit/Scorecards/yyyy-MM-dd_HHmm.md at -ScorecardsRef,
