@@ -32,3 +32,4 @@ Found by BL-2837 (2026-10-21). Upstream test 2100 (no `--ech`) expects three DoH
 ## Log
 
 - 2026-10-21: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: a281346a 423467d0 74c730bd 7bd8d990.
