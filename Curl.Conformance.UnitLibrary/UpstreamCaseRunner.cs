@@ -98,8 +98,10 @@ public sealed class UpstreamCaseRunner(
     IReadOnlyDictionary<string, Func<UpstreamCurlInvocation, Func<UpstreamCurlInvocation, Task<int>>, Task<int>>>? perlCommandScripts = null,
     UnitPrograms? unitPrograms = null)
 {
-    // runtests.pl reports nghttpx-h3 when it finds the nghttpx that serves HTTP/3, which the stand-in replaces.
-    private readonly UpstreamCurlPlatform platform = http3Server is null ? platform : platform.WithFeatures([Http3ServerFeature]);
+    // Every stand-in front, each in a file of its own; the platform reports the features the fronts stand in for.
+    private readonly UpstreamStandInFronts fronts = UpstreamStandInFronts.Create(sshServer, http2Server, http3Server);
+
+    private readonly UpstreamCurlPlatform platform = UpstreamStandInFronts.Create(sshServer, http2Server, http3Server).WithFeatures(platform);
 
     /// <summary>The value of <c>%HTTPPORT</c>; every connection reaches the emulation whatever its port.</summary>
     public const string HttpPort = "8990";
@@ -304,9 +306,7 @@ public sealed class UpstreamCaseRunner(
         string logDirectoryVariable = logDirectory.Replace('\\', '/');
         Dictionary<string, string> variables = Variables(testNumber, logDirectoryVariable);
         AddDirectoryVariables(variables, testsDirectory, certificateDirectory, sourceDirectory);
-        AddTlsPorts(variables, certificateDirectory);
-        AddHttp3Port(variables, certificateDirectory);
-        AddSshVariables(variables);
+        fronts.AddVariables(variables, certificateDirectory);
 
         UpstreamTestFileExpansion expansion = UpstreamTestFileExpander.Expand(UpstreamTestDirectoryComposition.Rewrite(testFile.Span), variables, platform.Features, ReadIncludedFile, timeProvider);
         UpstreamTestCaseParseResult parsed = expansion.Parse();
@@ -370,65 +370,6 @@ public sealed class UpstreamCaseRunner(
         }
     }
 
-    // Upstream's stunnel-fronted servers present a certificate from %CERTDIR/certs/, so their ports have a value only with it.
-    private static void AddTlsPorts(Dictionary<string, string> variables, string? certificateDirectory)
-    {
-        if (certificateDirectory is not null)
-        {
-            variables["HTTPSPORT"] = HttpsPort;
-            variables["SMTPSPORT"] = SmtpsPort;
-            variables["IMAPSPORT"] = ImapsPort;
-            variables["POP3SPORT"] = Pop3sPort;
-            variables["FTPSPORT"] = FtpsPort;
-            variables["HTTPSPROXYPORT"] = HttpsProxyPort;
-            variables["MQTTSPORT"] = MqttsPort;
-            variables["GOPHERSPORT"] = GophersPort;
-            variables["HTTP2TLSPORT"] = Http2TlsPort;
-        }
-    }
-
-    // nghttpx-h3 presents a certificate from %CERTDIR/certs/, so its port has a value only with it and the stand-in.
-    private void AddHttp3Port(Dictionary<string, string> variables, string? certificateDirectory)
-    {
-        if (http3Server is not null && certificateDirectory is not null)
-        {
-            variables["HTTP3PORT"] = Http3Port;
-        }
-    }
-
-    private void AddSshVariables(Dictionary<string, string> variables)
-    {
-        if (sshServer is not null)
-        {
-            variables["SSHPORT"] = UpstreamSshServer.SshPort.ToString(CultureInfo.InvariantCulture);
-            variables["USER"] = sshServer.User;
-            variables["SFTP_PWD"] = string.Empty;
-            variables["SCP_PWD"] = string.Empty;
-            variables["SSHSRVMD5"] = sshServer.HostKeyMd5;
-            variables["SSHSRVSHA256"] = sshServer.HostKeySha256;
-            variables["SSHKEYALGO"] = sshServer.HostKeyAlgorithm;
-        }
-    }
-
-    // sshserver.pl writes the client's key pair into the server's log folder before the case runs.
-    // Upstream's sshd runs the real scp and sftp-server, which write an upload where the URL names it; the SCP and SFTP
-    // cases name %LOGDIR/upload.%TESTNUMBER, the file runtests.pl compares with <verify><upload>.
-    private byte[] SshUpload(string logDirectory, int testNumber)
-    {
-        string upload = $"{logDirectory}/upload.{testNumber.ToString(CultureInfo.InvariantCulture)}";
-        return sshServer is not null && File.Exists(upload) ? File.ReadAllBytes(upload) : [];
-    }
-
-    private void WriteSshClientKeyFiles(string logDirectory)
-    {
-        if (sshServer is not null)
-        {
-            Directory.CreateDirectory($"{logDirectory}/server");
-            File.WriteAllBytes($"{logDirectory}/server/curl_client_key", sshServer.ClientPrivateKeyFile.ToArray());
-            File.WriteAllBytes($"{logDirectory}/server/curl_client_key.pub", sshServer.ClientPublicKeyFile.ToArray());
-        }
-    }
-
     private Dictionary<string, string> Variables(int testNumber, string logDirectory) =>
         new(StringComparer.Ordinal)
         {
@@ -479,7 +420,7 @@ public sealed class UpstreamCaseRunner(
         }
 
         string outputFile = $"{logDirectory}/curl{testNumber.ToString(CultureInfo.InvariantCulture)}.out";
-        WriteSshClientKeyFiles(logDirectory);
+        fronts.PrepareLogDirectory(logDirectory);
         WriteClientFiles(testCase);
         ILibTest? libTest = FindLibTest(testCase);
         IUnitProgram? unitProgram = FindUnitProgram(testCase, testNumber);
@@ -500,22 +441,21 @@ public sealed class UpstreamCaseRunner(
         MemoryStream standardOutput = new();
         MemoryStream standardError = new();
         MemoryStream standardInput = new(StandardInput(testCase));
-        FtpServerConnector ftp = new(testCase, new NoListenPortConnector(HttpsServer(testCase, server, certificateDirectory)), serverClock);
+        UpstreamStandInContext standIns = new(testCase, certificateDirectory, server);
+        FtpServerConnector ftp = new(testCase, new NoListenPortConnector(fronts.Wrap(UpstreamStandInStage.Sws, server, standIns)), serverClock);
         SmtpServerConnector smtp = new(testCase, ftp);
         ImapServerConnector imap = new(testCase, smtp);
         Pop3ServerConnector pop3 = new(testCase, imap);
-        SocksServerConnector socks = new(testCase, MailTlsServer(testCase, FtpsServer(testCase, pop3, certificateDirectory), certificateDirectory));
+        SocksServerConnector socks = new(testCase, fronts.Wrap(UpstreamStandInStage.Pop3, pop3, standIns));
         MqttServerConnector mqtt = new(testCase, socks);
-        IConnector mqtts = TlsFrontServer(testCase, MqttsServerConnector.EmulatedServers, certificateDirectory, mqtt, certificate => new MqttsServerConnector(certificate, mqtt));
-        RtspServerConnector rtsp = new(testCase, mqtts);
+        RtspServerConnector rtsp = new(testCase, fronts.Wrap(UpstreamStandInStage.Mqtt, mqtt, standIns));
         GopherServerConnector gopher = new(testCase, rtsp);
-        IConnector gophers = TlsFrontServer(testCase, GophersServerConnector.EmulatedServers, certificateDirectory, gopher, certificate => new GophersServerConnector(certificate, gopher));
-        TelnetServerConnector telnet = new(new DictServerConnector(gophers));
-        IConnector servers = HttpsProxyServer(testCase, Http2Server(testCase, NothingOnHttp3TcpPort(SshServer(telnet)), server, certificateDirectory), certificateDirectory);
+        TelnetServerConnector telnet = new(new DictServerConnector(fronts.Wrap(UpstreamStandInStage.Gopher, gopher, standIns)));
+        IConnector servers = fronts.Wrap(UpstreamStandInStage.Outermost, telnet, standIns);
         // A CONNECT through the http-proxy to a mail port or the FTP control or passive port reaches that stand-in
         // (test1319 to 1321, BL-2011; test714 and test715, BL-2035); one to %HTTPSPORT reaches the HTTPS stand-in, whose TLS handshake travels inside the tunnel (BL-2225).
         server.TunnelServerForPort = port => TunnelledPorts.Contains(port) ? pop3 : null;
-        UpstreamCurlInvocation invocation = new(arguments, standardOutput, standardError, standardInput, servers, Http3Server(testCase, dns, server, certificateDirectory), EnvironmentVariables(testCase)) { ConnectionListener = ftp.ActiveModeListener };
+        UpstreamCurlInvocation invocation = new(arguments, standardOutput, standardError, standardInput, servers, fronts.WrapDatagram(dns, standIns), EnvironmentVariables(testCase)) { ConnectionListener = ftp.ActiveModeListener };
         (int exitCode, string? failure) = await RunCurlAsync(perlScript is null ? ProgramRun(libTest, unitProgram, testNumber, invocation) : () => perlScript(invocation), server).ConfigureAwait(false);
         if (failure is not null)
         {
@@ -550,7 +490,7 @@ public sealed class UpstreamCaseRunner(
             SocksLog = System.Text.Encoding.Latin1.GetBytes(socks.ConnectLog),
             DnsLog = dns.QueryLog,
             // A case reaches one uploading server, so at most one of these holds an upload.
-            UploadedBytes = [.. smtp.UploadedMessage.Span, .. imap.UploadedMessage.Span, .. tftp.UploadedBytes.Span, .. ftp.UploadedBytes.Span, .. SshUpload(logDirectory, testNumber)],
+            UploadedBytes = [.. smtp.UploadedMessage.Span, .. imap.UploadedMessage.Span, .. tftp.UploadedBytes.Span, .. ftp.UploadedBytes.Span, .. fronts.UploadedBytes(logDirectory, testNumber)],
         });
     }
 
@@ -586,58 +526,6 @@ public sealed class UpstreamCaseRunner(
 
         return variables;
     }
-
-    // A case naming the https server (`https` or `https <certificate file>`) reaches it on %HTTPSPORT, which has a value only with a certificate directory.
-    private static IConnector HttpsServer(UpstreamTestCase testCase, SwsHttpServerConnector server, string? certificateDirectory) =>
-        UpstreamCaseScreening.HttpsCertificateFile(testCase) is { } certificateFile && certificateDirectory is not null
-            ? new HttpsServerConnector(server, HttpsServerConnector.LoadCertificate(Path.Combine(certificateDirectory, "certs", certificateFile)), server)
-            : server;
-
-    // A case naming an implicit-TLS mail server (smtps, imaps or pop3s) reaches it on its port, which has a value only with a certificate directory; stunnel presents test-localhost.pem.
-    private static IConnector MailTlsServer(UpstreamTestCase testCase, IConnector mail, string? certificateDirectory) =>
-        certificateDirectory is not null && UpstreamTestPartBodies.Lines(testCase.Find("client", "server")).Intersect(MailTlsServerConnector.EmulatedServers).Any()
-            ? new MailTlsServerConnector(HttpsServerConnector.LoadCertificate(Path.Combine(certificateDirectory, "certs", HttpsServerConnector.DefaultCertificateFile)), mail)
-            : mail;
-
-    // A case naming the ftps server reaches it on %FTPSPORT, which has a value only with a certificate directory; stunnel presents test-localhost.pem.
-    private static IConnector FtpsServer(UpstreamTestCase testCase, IConnector ftp, string? certificateDirectory) =>
-        certificateDirectory is not null && UpstreamTestPartBodies.Lines(testCase.Find("client", "server")).Intersect(FtpsServerConnector.EmulatedServers).Any()
-            ? new FtpsServerConnector(HttpsServerConnector.LoadCertificate(Path.Combine(certificateDirectory, "certs", HttpsServerConnector.DefaultCertificateFile)), ftp)
-            : ftp;
-
-    // A case naming the mqtts or gophers server reaches it on its port, which has a value only with a certificate directory; stunnel presents test-localhost.pem.
-    private static IConnector TlsFrontServer(UpstreamTestCase testCase, IReadOnlyList<string> emulatedServers, string? certificateDirectory, IConnector plain, Func<X509Certificate2, IConnector> createFront) =>
-        certificateDirectory is not null && UpstreamTestPartBodies.Lines(testCase.Find("client", "server")).Intersect(emulatedServers).Any()
-            ? createFront(HttpsServerConnector.LoadCertificate(Path.Combine(certificateDirectory, "certs", HttpsServerConnector.DefaultCertificateFile)))
-            : plain;
-
-    // A case naming the https-proxy server reaches it on %HTTPSPROXYPORT, which has a value only with a certificate directory; stunnel presents test-localhost.pem.
-    private static IConnector HttpsProxyServer(UpstreamTestCase testCase, IConnector servers, string? certificateDirectory) =>
-        certificateDirectory is not null && UpstreamTestPartBodies.Lines(testCase.Find("client", "server")).Contains(HttpsProxyServerConnector.EmulatedServer)
-            ? new HttpsProxyServerConnector(HttpsServerConnector.LoadCertificate(Path.Combine(certificateDirectory, "certs", HttpsServerConnector.DefaultCertificateFile)), servers)
-            : servers;
-
-    private IConnector SshServer(IConnector otherPorts) => sshServer?.InFrontOf(otherPorts) ?? otherPorts;
-
-    // nghttpx relays each stream to sws as HTTP/1.1, so the relayed requests land in the sws emulation's ReceivedBytes.
-    // Its TLS front on %HTTP2TLSPORT presents test-localhost.pem, loaded only for a case naming the http/2 server when a certificate directory is named (BL-2245).
-    private IConnector Http2Server(UpstreamTestCase testCase, IConnector otherPorts, SwsHttpServerConnector sws, string? certificateDirectory) =>
-        http2Server?.InFrontOf(otherPorts, sws, Http2TlsCertificate(testCase, certificateDirectory)) ?? otherPorts;
-
-    private static X509Certificate2? Http2TlsCertificate(UpstreamTestCase testCase, string? certificateDirectory) =>
-        certificateDirectory is not null && UpstreamTestPartBodies.Lines(testCase.Find("client", "server")).Contains("http/2")
-            ? HttpsServerConnector.LoadCertificate(Path.Combine(certificateDirectory, "certs", HttpsServerConnector.DefaultCertificateFile))
-            : null;
-
-    // nghttpx-h3 relays each request to sws as HTTP/1.1, so the relayed requests land in the sws emulation's ReceivedBytes.
-    // It presents test-localhost.pem, loaded only for a case naming the http/3 server when a certificate directory is named (BL-2261).
-    // nghttpx-h3 takes only datagrams on %HTTP3PORT, so --http3's TCP leg is refused there and the race settles on QUIC (ADR-0498).
-    private IConnector NothingOnHttp3TcpPort(IConnector otherPorts) => http3Server is null ? otherPorts : UpstreamHttp3Server.RefusingTcpOnHttp3Port(otherPorts);
-
-    private IDatagramConnector Http3Server(UpstreamTestCase testCase, IDatagramConnector otherPorts, SwsHttpServerConnector sws, string? certificateDirectory) =>
-        http3Server is not null && certificateDirectory is not null && UpstreamTestPartBodies.Lines(testCase.Find("client", "server")).Contains("http/3")
-            ? http3Server.InFrontOf(otherPorts, sws, HttpsServerConnector.LoadCertificate(Path.Combine(certificateDirectory, "certs", HttpsServerConnector.DefaultCertificateFile)))
-            : otherPorts;
 
     private static readonly int[] TunnelledPorts = [Pop3ServerConnector.Pop3Port, ImapServerConnector.ImapPort, SmtpServerConnector.SmtpPort, FtpServerConnector.FtpPort, FtpServerConnector.PassivePort, HttpsServerConnector.HttpsPort];
 

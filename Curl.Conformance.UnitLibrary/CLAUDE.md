@@ -367,6 +367,8 @@ another platform's Curl (`UpstreamCurlPlatform.All`) and not this one's; such a 
 `UpstreamCaseOutcome.SkippedOnThisPlatform`, which the ratchet reports `Inconclusive` even when
 it is listed (ADR-0488, BL-2176).
 
+Each stand-in that wraps, or adds variables or features beside, the runner's plain servers (BL-2884) is an `UpstreamStandInFront` in a file of its own (`UpstreamHttpsFront`, `UpstreamFtpsFront`, `UpstreamMailTlsFront`, `UpstreamMqttsFront`, `UpstreamGophersFront`, `UpstreamHttp2Front`, `UpstreamHttpsProxyFront`, `UpstreamSshFront`, `UpstreamHttp3Front`): it names its `UpstreamStandInStage` in the chain, adds its `%NAME` variables and features, wraps the connector built so far, and writes or reads back its own files. `UpstreamStandInFronts.Create` is the one registration table, so a new stand-in is a new file plus a line there; `UpstreamCaseRunner` keeps only the shared code.
+
 The stand-in for upstream's test `sshd` is not here but in its own library,
 `Curl.Conformance.SshServer.UnitLibrary` (ADR-0456, BL-1934, BL-1935), because it reuses
 the SSH client's internal wire code from `Curl.Protocol.Ssh.UnitLibrary`, which this library

@@ -12,7 +12,7 @@ namespace Curl.Conformance;
 /// the failures it turns a hang or an exception into.
 /// </summary>
 [TestClass]
-public sealed class UpstreamCaseRunnerTests
+public sealed partial class UpstreamCaseRunnerTests
 {
     public TestContext TestContext { get; set; } = null!;
 

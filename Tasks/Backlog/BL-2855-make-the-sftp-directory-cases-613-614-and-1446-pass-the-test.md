@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: [BL-2871]
-touches: [Curl.Conformance.UnitTests/PassingUpstreamCases.txt, Curl.Conformance.UnitLibrary/UpstreamCaseRunner.cs, Curl.Conformance.UnitTests/UpstreamCaseRunnerTests.cs, Curl.Conformance.UnitLibrary/UpstreamTest613Script.cs, Curl.Conformance.UnitLibrary/UpstreamSshServer.cs, Curl.Conformance.UnitTests/UpstreamSshServerTests.cs, Curl.Conformance.UnitTests/UpstreamTest613ScriptTests.cs, Curl.Conformance.SshServer.UnitLibrary, Curl.Conformance.SshServer.UnitTests]
+touches: [Curl.Conformance.UnitTests/PassingUpstreamCases.txt, Curl.Conformance.UnitLibrary/UpstreamTest613Script.cs, Curl.Conformance.UnitLibrary/UpstreamSshServer.cs, Curl.Conformance.UnitTests/UpstreamSshServerTests.cs, Curl.Conformance.UnitTests/UpstreamTest613ScriptTests.cs, Curl.Conformance.SshServer.UnitLibrary, Curl.Conformance.SshServer.UnitTests]
 requirement: none
 created: 2026-10-19
 completed:
