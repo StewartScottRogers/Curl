@@ -3,8 +3,8 @@ id: AF-0309
 title: BL-2787 cost $4.85, 3.4 times the median task cost of $1.42
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: process:logs:BL-2787:cost-outlier
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Log
 
 - 2026-10-19: filed proposed.
+- 2026-10-21: proposed -> accepted.
