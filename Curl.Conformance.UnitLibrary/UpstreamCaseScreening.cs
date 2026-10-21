@@ -27,8 +27,10 @@ internal static class UpstreamCaseScreening
     // test212, test407) is a comment it never checks; the harness accepts the case and ignores it too.
     // Nor do runtests.pl, runner.pm or servers.pm read a <client><connectport> (test1316): the
     // http-proxy sws tunnels to the port the CONNECT request names, as the proxy stand-in does (BL-2239).
+    // test1651 nests its <verify><limits> inside <client>, where runtests.pl never looks for it, so that
+    // <client><verify> is accepted and ignored too (BL-2913).
     private static readonly HashSet<string> ClientParts =
-        ["name", "command", "server", "features", "file", "file1", "file2", "file3", "file4", "stdin", "stdout", "connectport", "killserver", "disable", "precheck", "setenv", "tool"];
+        ["name", "command", "server", "features", "file", "file1", "file2", "file3", "file4", "stdin", "stdout", "connectport", "killserver", "disable", "precheck", "setenv", "tool", "verify"];
 
     /// <summary>The reason a case is skipped whose <c>&lt;tool&gt;</c> names a libtest program with no port yet.</summary>
     public const string LibTestNotPorted = "libtest program not ported";

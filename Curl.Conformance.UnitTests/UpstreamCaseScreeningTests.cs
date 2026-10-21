@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text;
 using Curl.Testing;
 
 namespace Curl.Conformance;
@@ -90,6 +91,23 @@ public sealed class UpstreamCaseScreeningTests
 
         diagnostics.Act("skip reason", reason);
         Assert.IsNotNull(testCase.Find("client", "connectport"));
+        Assert.IsNull(reason, reason);
+    }
+
+    // test1651 nests a <verify><limits> inside <client>, where runtests.pl at curl-8_22_0 never reads
+    // it, so the part is accepted and ignored (BL-2913).
+    [TestMethod]
+    public void FindSkipReason_ClientVerify_IsAcceptedAsRuntestsPlIgnoresIt()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        byte[] testFile = Encoding.ASCII.GetBytes("<testcase>\n<client>\n<server>\nnone\n</server>\n<command>\nfile:///dir/x\n</command>\n<verify>\n<limits>\nAllocations: 14000\n</limits>\n</verify>\n</client>\n</testcase>\n");
+        UpstreamTestFileExpansion expansion = UpstreamTestFileExpander.Expand(testFile, new Dictionary<string, string>(StringComparer.Ordinal), Features);
+        UpstreamTestCase testCase = expansion.Parse().TestCase!;
+
+        string? reason = UpstreamCaseScreening.FindSkipReason(expansion, testCase, Features);
+
+        diagnostics.Act("skip reason", reason);
+        Assert.IsNotNull(testCase.Find("client", "verify"));
         Assert.IsNull(reason, reason);
     }
 
