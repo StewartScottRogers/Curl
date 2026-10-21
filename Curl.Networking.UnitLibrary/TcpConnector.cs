@@ -1138,7 +1138,7 @@ public sealed partial class TcpConnector(
             return (new DnsResolution(fromCache, DnsLookupFailure.None), true);
         }
 
-        var (addresses, failure) = await LookUpAsync(host, target.Events, cancellationToken).ConfigureAwait(false);
+        var (addresses, failure) = await LookUpAsync(host, port, target, cancellationToken).ConfigureAwait(false);
         var answered = IsLocalhost(host) ? addresses : AddressFamilyFilter.Dialable(host, addresses, addressFamily);
         CacheLookUp(new DnsCacheEntry(host, port, answered), cacheKey, failure, target.Events);
         var dialable = AddressFamilyFilter.Dialable(host, answered, addressFamily);
@@ -1191,14 +1191,20 @@ public sealed partial class TcpConnector(
         }
     }
 
-    /// <summary>Asks the resolver, with its failure reason when it gives one.</summary>
     /// <summary>
     /// Asks the resolver, with its failure reason when it gives one, with <see cref="ResolverEvents" />
-    /// pointed at <paramref name="events" /> for the look-up.
+    /// pointed at the target's events for the look-up. A direct connect's <c>https://</c> origin is
+    /// asked of an <see cref="IHttpsOriginDnsResolver" /> with its port, so the DoH resolver sends the
+    /// HTTPS query first, as curl 8.22.0's HTTPSRR build does (ADR-0727, BL-2920).
     /// </summary>
-    private async ValueTask<DnsResolution> LookUpAsync(string host, ITransferEvents events, CancellationToken cancellationToken)
+    private async ValueTask<DnsResolution> LookUpAsync(string host, int port, ConnectTarget target, CancellationToken cancellationToken)
     {
-        ResolverEvents?.Current = events;
+        ResolverEvents?.Current = target.Events;
+        if (dnsResolver is IHttpsOriginDnsResolver httpsOriginResolver && target.Proxy is null && IsHttpsOrigin(target))
+        {
+            return new DnsResolution(await httpsOriginResolver.ResolveHttpsOriginAsync(host, port, cancellationToken).ConfigureAwait(false), DnsLookupFailure.None);
+        }
+
         return dnsResolver is IDnsResolverWithFailureReason withFailureReason
             ? await withFailureReason.ResolveWithFailureReasonAsync(host, cancellationToken).ConfigureAwait(false)
             : new DnsResolution(await dnsResolver.ResolveAsync(host, cancellationToken).ConfigureAwait(false), DnsLookupFailure.None);

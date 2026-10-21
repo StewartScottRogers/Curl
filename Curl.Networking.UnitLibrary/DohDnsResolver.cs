@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -34,8 +35,11 @@ namespace Curl.Networking;
 /// only for that option.
 /// </para>
 /// </remarks>
-public sealed class DohDnsResolver : IDnsResolver, IEchConfigListLookup
+public sealed class DohDnsResolver : IHttpsOriginDnsResolver, IEchConfigListLookup
 {
+    // The HTTPS records ResolveHttpsOriginAsync asked for, by host and port, null for none.
+    private readonly ConcurrentDictionary<(string Host, int Port), ServiceBindingRecord?> _httpsRecords = new();
+
     private readonly IConnector _connector;
     private readonly Uri _dohUrl;
     private readonly ConnectTarget _dohServer;
@@ -146,13 +150,13 @@ public sealed class DohDnsResolver : IDnsResolver, IEchConfigListLookup
     {
         if (ReferenceEquals(SubTransferEvents, NoTransferEvents.Instance))
         {
-            return await Task.WhenAll(queries.Select(query => QueryAsync(query.Query, query.Type, cancellationToken))).ConfigureAwait(false);
+            return await Task.WhenAll(queries.Select(query => QueryAsync(query.Query, query.Type, SubTransferEvents, cancellationToken))).ConfigureAwait(false);
         }
 
         var results = new DohQueryResult[queries.Count];
         for (var index = 0; index < queries.Count; index++)
         {
-            results[index] = await QueryAsync(queries[index].Query, queries[index].Type, cancellationToken).ConfigureAwait(false);
+            results[index] = await QueryAsync(queries[index].Query, queries[index].Type, SubTransferEvents, cancellationToken).ConfigureAwait(false);
             SubTransferEvents.ReportInfo($"a DoH request is completed, {queries.Count - index - 1} to go");
         }
 
@@ -188,7 +192,9 @@ public sealed class DohDnsResolver : IDnsResolver, IEchConfigListLookup
     /// query curl 8.21.0 adds to the A and AAAA ones under <c>--ech true</c> or <c>hard</c> to find
     /// the host's ECHConfigList (ADR-0312, BL-707). The name asked for is the host itself on port
     /// 443 and <c>_&lt;port&gt;._https.&lt;host&gt;</c> on any other port (RFC 9460 section 9.1), and
-    /// the first HTTPS record of the answer is decoded, as curl decodes only the first.
+    /// the first HTTPS record of the answer is decoded, as curl decodes only the first. A record
+    /// <see cref="ResolveHttpsOriginAsync" /> already asked for the host and port is returned without
+    /// asking again.
     /// </summary>
     /// <param name="host">The host name, already converted to its ASCII form.</param>
     /// <param name="port">The port the transfer connects to.</param>
@@ -202,12 +208,39 @@ public sealed class DohDnsResolver : IDnsResolver, IEchConfigListLookup
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(host);
 
+        return _httpsRecords.TryGetValue((host, port), out var known)
+            ? known
+            : await QueryHttpsRecordAsync(host, port, SubTransferEvents, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Resolves an <c>https://</c> origin as curl 8.22.0's HTTPSRR build does (ADR-0727, BL-2920): its
+    /// HTTPS query first, for the host on port 443 and <c>_&lt;port&gt;._https.&lt;host&gt;</c> on any
+    /// other, answered before the A and AAAA queries <see cref="ResolveAsync" /> then sends. The record
+    /// is kept, so <see cref="ResolveHttpsRecordAsync" /> for the same host and port asks nothing more,
+    /// as curl reuses the one resolve under <c>--ech</c>; the query writes no <c>-v</c> lines.
+    /// </summary>
+    /// <param name="host">The origin's host name or literal address.</param>
+    /// <param name="port">The port the transfer connects to.</param>
+    /// <param name="cancellationToken">Cancels the look-up.</param>
+    /// <returns>The addresses <see cref="ResolveAsync" /> returns for <paramref name="host" />.</returns>
+    public async ValueTask<IReadOnlyList<IPAddress>> ResolveHttpsOriginAsync(string host, int port, CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(host);
+
+        _httpsRecords[(host, port)] = await QueryHttpsRecordAsync(host, port, NoTransferEvents.Instance, cancellationToken).ConfigureAwait(false);
+        return await ResolveAsync(host, cancellationToken).ConfigureAwait(false);
+    }
+
+    // Posts the HTTPS query and decodes the answer's first record; null when nothing is asked or answered.
+    private async ValueTask<ServiceBindingRecord?> QueryHttpsRecordAsync(string host, int port, ITransferEvents events, CancellationToken cancellationToken)
+    {
         if (HttpsQueryFor(host, port) is not { } query)
         {
             return null;
         }
 
-        var result = await QueryAsync(query, DnsRecordType.Https, cancellationToken).ConfigureAwait(false);
+        var result = await QueryAsync(query, DnsRecordType.Https, events, cancellationToken).ConfigureAwait(false);
         return result.Answer is { Failure: DnsMessageFailure.None, HttpsRecordData: [var first, ..] }
             ? ServiceBindingRecordDecoder.Decode(first).Record
             : null;
@@ -258,9 +291,8 @@ public sealed class DohDnsResolver : IDnsResolver, IEchConfigListLookup
         return Encoding.Latin1.GetBytes(head);
     }
 
-    private async Task<DohQueryResult> QueryAsync(byte[] query, DnsRecordType recordType, CancellationToken cancellationToken)
+    private async Task<DohQueryResult> QueryAsync(byte[] query, DnsRecordType recordType, ITransferEvents events, CancellationToken cancellationToken)
     {
-        var events = SubTransferEvents;
         var connectionNumber = Interlocked.Increment(ref _connectionCount);
         var connected = await _connector.ConnectAsync(_dohServer with { Events = events }, cancellationToken).ConfigureAwait(false);
         if (connected.Connection is not { } connection)
