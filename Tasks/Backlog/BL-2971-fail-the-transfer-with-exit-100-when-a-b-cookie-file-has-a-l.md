@@ -1,5 +1,5 @@
 ---
-id: BL-2970
+id: BL-2971
 title: Fail the transfer with exit 100 when a -b cookie file has a line too long (CookieStore's CURLE_TOO_LARGE)
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-21
 completed:
 ---
-# BL-2970 — Fail the transfer with exit 100 when a -b cookie file has a line too long (CookieStore's CURLE_TOO_LARGE)
+# BL-2971 — Fail the transfer with exit 100 when a -b cookie file has a line too long (CookieStore's CURLE_TOO_LARGE)
 
 ## Goal
 
@@ -18,7 +18,7 @@ completed:
 
 ## Context
 
-Measured on curl 8.22.0 (mingw, Schannel) on 2026-10-21 under BL-2916 with `Record-CurlExchange.ps1`: `curl -s -b cf.txt http://127.0.0.1:<port>/` with a 4999-character first line made no request and exited 100; without `-s`, stderr was `curl: (100) A value or data field grew larger than allowed`. The same holds for a CR LF line of 4999 characters with the CR and for a last line of 4999 characters without a line feed. BL-2916 made `CookieStore.LoadCookieFile` and `LoadCookieFileAsync` return `false` in that case (ADR-0738); nothing reads the result yet. Start at `CookieEngine.LoadEveryCookieFileAsync` (`Curl.Engine.UnitLibrary/CookieEngine.cs`), called from `TransferPerformer.LoadCookieFilesAsync` (`TransferPerformer.Setup.cs`) and `CurlCommandRunner` (`Curl.Console/CurlCommandRunner.cs:2251`). Check whether `-b -` (standard input) and a cookie-list `RELOAD` fail the same way before pinning them.
+Measured on curl 8.22.0 (mingw, Schannel) on 2026-10-21 under BL-2916 with `Record-CurlExchange.ps1`: `curl -s -b cf.txt http://127.0.0.1:<port>/` with a 4999-character first line made no request and exited 100; without `-s`, stderr was `curl: (100) A value or data field grew larger than allowed`. The same holds for a CR LF line of 4999 characters with the CR and for a last line of 4999 characters without a line feed. BL-2916 made `CookieStore.LoadCookieFile` and `LoadCookieFileAsync` return `false` in that case (ADR-0739); nothing reads the result yet. Start at `CookieEngine.LoadEveryCookieFileAsync` (`Curl.Engine.UnitLibrary/CookieEngine.cs`), called from `TransferPerformer.LoadCookieFilesAsync` (`TransferPerformer.Setup.cs`) and `CurlCommandRunner` (`Curl.Console/CurlCommandRunner.cs:2251`). Check whether `-b -` (standard input) and a cookie-list `RELOAD` fail the same way before pinning them.
 
 ## Acceptance criteria
 
