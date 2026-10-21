@@ -46,7 +46,7 @@ internal static class UpstreamCaseScreening
 
     /// <summary>
     /// The host test1592 sends its transfer to, whose name lookup must never answer: the harness's resolver
-    /// stalls on it, so the case is not screened as reaching the internet (BL-2839, ADR-0721).
+    /// stalls on it, so the case is not screened as reaching the internet (BL-2839, ADR-0722).
     /// </summary>
     public const string StalledLookupHost = "a-site-never-accessed.example.org";
 

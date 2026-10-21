@@ -206,7 +206,7 @@ public sealed partial class UpstreamConformanceTests
 
     // A ported libtest program's engine, in place of curl (BL-2558, ADR-0658): the managed Libcurl engine, every TCP
     // dial reaching the case's in-memory servers through InMemoryServerTcpDialer, names resolved to loopback but
-    // test1592's host, whose lookup never answers (BL-2839, ADR-0721), the
+    // test1592's host, whose lookup never answers (BL-2839, ADR-0722), the
     // datagram protocols on the case's datagram servers, FTP's active-mode data connections on the FTP stand-in's
     // listener (BL-2597) and the proxy environment the case's <setenv>, as RunCurlAsync composes curl. It signs AWS SigV4
     // requests and HTTP signatures at the epoch, as upstream's debug build does under the CURL_FORCETIME its test runner sets (BL-2675),

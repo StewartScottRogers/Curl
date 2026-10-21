@@ -6,7 +6,7 @@ public sealed partial class UpstreamConformanceTests
 {
     // test1592 removes its handle while the lookup of a-site-never-accessed.example.org is unanswered: the
     // harness's resolver stalls on that name, so the case runs instead of being screened as reaching the
-    // internet (BL-2839, ADR-0721).
+    // internet (BL-2839, ADR-0722).
     [TestMethod]
     [TestCategory("Conformance")]
     public async Task StalledLookupCase_RunThroughLibcurl_Passes()
