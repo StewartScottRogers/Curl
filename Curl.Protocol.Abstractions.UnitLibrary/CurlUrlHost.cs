@@ -184,18 +184,10 @@ internal static class CurlUrlHost
     private static CurlUrlRejection NormalizeIPv6(string host, out string normalized, out string idnHost, out string? zoneId)
     {
         normalized = idnHost = string.Empty;
-        zoneId = null;
-        string inner = host[1..^1];
-        int addressLength = inner.AsSpan().IndexOfAnyExcept(IPv6Characters);
-        if (addressLength >= 0)
+        CurlUrlRejection rejection = SplitBracketedAddress(host, out string inner, out zoneId);
+        if (rejection != CurlUrlRejection.None)
         {
-            CurlUrlRejection zoneRejection = ReadZoneId(inner[addressLength..], out zoneId);
-            if (zoneRejection != CurlUrlRejection.None)
-            {
-                return zoneRejection;
-            }
-
-            inner = inner[..addressLength];
+            return rejection;
         }
 
         if (!IPAddress.TryParse(inner, out IPAddress? address) || address.AddressFamily != AddressFamily.InterNetworkV6)
@@ -208,6 +200,32 @@ internal static class CurlUrlHost
         idnHost = zoneId is null ? text : $"{text}%{zoneId}";
 
         return CurlUrlRejection.None;
+    }
+
+    /// <summary>
+    /// Splits a bracketed host into the address and its zone id. curl 8.22.0's <c>ipv6_parse</c>
+    /// refuses a host with no closing bracket (unit1675: <c>[::1</c>).
+    /// </summary>
+    /// <returns>Why curl rejects the host, or <see cref="CurlUrlRejection.None" />.</returns>
+    private static CurlUrlRejection SplitBracketedAddress(string host, out string address, out string? zoneId)
+    {
+        address = string.Empty;
+        zoneId = null;
+        if (host.Length < 2 || host[^1] != ']')
+        {
+            return CurlUrlRejection.BadIPv6;
+        }
+
+        address = host[1..^1];
+        int addressLength = address.AsSpan().IndexOfAnyExcept(IPv6Characters);
+        if (addressLength < 0)
+        {
+            return CurlUrlRejection.None;
+        }
+
+        CurlUrlRejection zoneRejection = ReadZoneId(address[addressLength..], out zoneId);
+        address = address[..addressLength];
+        return zoneRejection;
     }
 
     /// <summary>
