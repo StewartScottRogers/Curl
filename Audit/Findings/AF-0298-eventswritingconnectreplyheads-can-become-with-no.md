@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: quality:Curl.Engine.UnitLibrary/TransferContextFactory.cs:EventsWritingConnectReplyHeads-and:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/TransferContextFactory.cs:592:&&
-task: none
-tasks:
+task: BL-2936
+tasks: BL-2936
 found: 2026-10-19
 found-at: 1b3c70b1436b2d499099c5c6dd7bb119e11f5631
 scorecard: 2026-10-19_2134.md

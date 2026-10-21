@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: truthfulness:RunDarkFactory.ps1:StopAtWeeklyUsage:false-help
 reproduction: none
-task: none
-tasks:
+task: BL-2940
+tasks: BL-2940
 found: 2026-10-19
 found-at: 1b3c70b1436b2d499099c5c6dd7bb119e11f5631
 scorecard: 2026-10-19_2134.md

@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: quality:Curl.Networking.UnitLibrary/TcpConnector.cs:TunnelRequest-true:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/TcpConnector.cs:1311:true
-task: none
-tasks:
+task: BL-2937
+tasks: BL-2937
 found: 2026-10-19
 found-at: 1b3c70b1436b2d499099c5c6dd7bb119e11f5631
 scorecard: 2026-10-19_2134.md

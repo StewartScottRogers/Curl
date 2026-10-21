@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: truthfulness:Documentation/Wiki/Glossary.md:Unit-program:false-statement
 reproduction: none
-task: none
-tasks:
+task: BL-2939
+tasks: BL-2939
 found: 2026-10-19
 found-at: 1b3c70b1436b2d499099c5c6dd7bb119e11f5631
 scorecard: 2026-10-19_2134.md
