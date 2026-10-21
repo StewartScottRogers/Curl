@@ -46,7 +46,10 @@ The finding closes only when a later re-audit by the process auditor confirms th
 
 ## Notes
 
+Investigated 2026-10-21 (shift log DarkFactory-20261018-192454.log lines 104-125). Detection was fast: the CI watch filed BL-2794 2.7 min after the run finished. The 45.5 min red spell was: one lane busy with a task that overlapped BL-2794 touches (board capacity stayed 1, so no second lane could start it; the board already holds other work back behind a waiting task), then 17.5 min wait, then about 21 min of CI on the fix commit, with the two commits pushed meanwhile (runs 39229063830, 39232372348) also failing because they predate the fix. No RunDarkFactory.ps1 change shortens that without pre-empting a running task or testing off Windows in lanes; the 30 min gate is the audit office threshold (Audit paths, not factory-editable). The reproduction reads logs of the past run, so no code change can alter it.
+
 ## Log
 
 - 2026-10-21: Created.
 - 2026-10-21: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-21: Doing -> Blocked. Stewart: accept AF-0307 as inherent (CI about 21 min plus a busy overlapping lane), or authorise pre-empting a running lane for High CI-fix tasks?
