@@ -1,5 +1,5 @@
 ---
-id: BL-2959
+id: BL-2962
 title: Fail with exit 3 when an IDN host name cannot be converted so upstream cases 1034 and 1035 pass
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-21
 completed:
 ---
-# BL-2959 — Fail with exit 3 when an IDN host name cannot be converted so upstream cases 1034 and 1035 pass
+# BL-2962 — Fail with exit 3 when an IDN host name cannot be converted so upstream cases 1034 and 1035 pass
 
 ## Goal
 

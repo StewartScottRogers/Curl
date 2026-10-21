@@ -1,5 +1,5 @@
 ---
-id: BL-2958
+id: BL-2961
 title: Keep a UTF-8 IDN host intact through a relative redirect so upstream cases 2046 and 2047 pass
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-21
 completed:
 ---
-# BL-2958 — Keep a UTF-8 IDN host intact through a relative redirect so upstream cases 2046 and 2047 pass
+# BL-2961 — Keep a UTF-8 IDN host intact through a relative redirect so upstream cases 2046 and 2047 pass
 
 ## Goal
 
