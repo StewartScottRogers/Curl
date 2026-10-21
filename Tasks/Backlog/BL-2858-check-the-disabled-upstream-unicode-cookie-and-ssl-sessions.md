@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Conformance.UnitTests/PassingUpstreamCases.txt, Curl.Conformance.UnitLibrary/UpstreamCurlPlatform.cs, Curl.Conformance.UnitTests/UpstreamCurlPlatformTests.cs, Curl.Cookies.UnitLibrary, Curl.Cookies.UnitTests]
+touches: [Curl.Conformance.UnitTests/PassingUpstreamCases.txt, Curl.Conformance.UnitLibrary/UpstreamPlatformFeatureTable.cs, Curl.Cookies.UnitLibrary, Curl.Cookies.UnitTests]
 requirement: none
 created: 2026-10-19
 completed:

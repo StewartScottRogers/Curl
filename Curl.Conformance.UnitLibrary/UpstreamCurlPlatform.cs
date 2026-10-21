@@ -46,21 +46,9 @@ namespace Curl.Conformance;
 /// </remarks>
 public sealed class UpstreamCurlPlatform
 {
-    private static readonly string[] CommonFeatures =
-    [
-        "dict", "file", "ftp", "gopher", "gophers", "http", "https", "imap", "ipfs", "mqtt", "mqtts", "pop3", "scp", "sftp", "smtp", "telnet", "tftp", "ws", "wss",
-        "alt-svc", "AsynchDNS", "brotli", "ECH", "GSS-API", "HSTS", "HTTPS-proxy",
-        "HTTPSRR", "IDN", "IPv6", "Kerberos", "Largefile", "libz", "NTLM", "PSL", "SPNEGO", "SSL",
-        "UnixSockets", "zstd",
-        "crypto", "cookies", "proxy", "Mime", "manual", "DoH", "digest", "aws", "netrc", "verbose-strings",
-        "large-time", "large-size", "sha512-256", "SSLpinning",
-        "large_file", "local-http", "httpsig", "headers-api", "form-api", "wakeup",
-        "threadsafe", "threaded-resolver",
-    ];
-
     private UpstreamCurlPlatform(IEnumerable<string> platformFeatures, string nullDevice, string operatingSystemName)
     {
-        Features = CommonFeatures.Concat(platformFeatures).ToHashSet(StringComparer.Ordinal);
+        Features = UpstreamPlatformFeatureTable.Common.Concat(platformFeatures).ToHashSet(StringComparer.Ordinal);
         NullDevice = nullDevice;
         OperatingSystemName = operatingSystemName;
     }
@@ -73,13 +61,13 @@ public sealed class UpstreamCurlPlatform
     }
 
     /// <summary>Windows, where Curl matches curl's Schannel build.</summary>
-    public static UpstreamCurlPlatform Windows { get; } = new(["win32", "Schannel"], "NUL", "MSWin32");
+    public static UpstreamCurlPlatform Windows { get; } = new(UpstreamPlatformFeatureTable.Windows, "NUL", "MSWin32");
 
     /// <summary>Linux, where Curl matches curl's OpenSSL build.</summary>
-    public static UpstreamCurlPlatform Unix { get; } = new(["OpenSSL", "SSLS-EXPORT", "xattr", "http/2", "h2c"], "/dev/null", "linux");
+    public static UpstreamCurlPlatform Unix { get; } = new(UpstreamPlatformFeatureTable.Unix, "/dev/null", "linux");
 
     /// <summary>macOS, where Curl matches curl's OpenSSL build as on Linux; only Perl's name for it differs.</summary>
-    public static UpstreamCurlPlatform MacOS { get; } = new(["OpenSSL", "SSLS-EXPORT", "xattr", "http/2", "h2c"], "/dev/null", "darwin");
+    public static UpstreamCurlPlatform MacOS { get; } = new(UpstreamPlatformFeatureTable.Unix, "/dev/null", "darwin");
 
     /// <summary>Every platform Curl's conformance run stands for: Windows, Linux and macOS.</summary>
     public static IReadOnlyList<UpstreamCurlPlatform> All { get; } = [Windows, Unix, MacOS];

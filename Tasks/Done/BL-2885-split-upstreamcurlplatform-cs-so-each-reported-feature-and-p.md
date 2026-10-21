@@ -5,10 +5,10 @@ priority: High
 assignee: Claude
 pipeline: direct
 depends-on: []
-touches: [Curl.Conformance.UnitLibrary/UpstreamCurlPlatform.cs, Curl.Conformance.UnitTests/UpstreamCurlPlatformTests.cs]
+touches: [Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests/UpstreamCurlPlatformTests.cs]
 requirement: none
 created: 2026-10-21
-completed:
+completed: 2026-10-21
 ---
 # BL-2885 — Split UpstreamCurlPlatform.cs so each reported feature and platform answer lives in its own file
 
@@ -24,15 +24,18 @@ Turn the feature list into entries in one file each (partial class or small prov
 
 ## Acceptance criteria
 
-- [ ] Curl.Conformance.UnitLibrary/UpstreamCurlPlatform.cs keeps only the shared code; every case-, stand-in- or feature-specific piece is in its own file.
-- [ ] Adding a new one needs a new file plus at most one line in a registration table, and the table is the only shared edit.
-- [ ] No behaviour changes: the same upstream cases pass (PassingUpstreamCases.txt unchanged) and the moved tests keep their names.
-- [ ] The waiting tasks listed in Context have their `touches` narrowed by editing their front matter to the new files they need (or the registration table), so `task-board.ps1 capacity` counts more of them as able to start together.
-- [ ] `dotnet build` clean and the fast tests green; Curl.Conformance.UnitLibrary stays inside the quality gates.
+- [x] Curl.Conformance.UnitLibrary/UpstreamCurlPlatform.cs keeps only the shared code; every case-, stand-in- or feature-specific piece is in its own file.
+- [x] Adding a new one needs a new file plus at most one line in a registration table, and the table is the only shared edit.
+- [x] No behaviour changes: the same upstream cases pass (PassingUpstreamCases.txt unchanged) and the moved tests keep their names.
+- [x] The waiting tasks listed in Context have their `touches` narrowed by editing their front matter to the new files they need (or the registration table), so `task-board.ps1 capacity` counts more of them as able to start together.
+- [x] `dotnet build` clean and the fast tests green; Curl.Conformance.UnitLibrary stays inside the quality gates.
 
 ## Notes
+
+- Registration table is UpstreamPlatformFeatureTable.cs; feature lists moved to one file per group (no reflection). Waiting tasks now name the table instead of UpstreamCurlPlatform.cs; new tests go in new UpstreamCurlPlatformTests.<Feature>.cs partial files.
 
 ## Log
 
 - 2026-10-21: Created.
 - 2026-10-21: Backlog -> Doing. Criteria at claim: 73de0a0e df0009a6 ee115027 1ff6ab0b 38e9dffd.
+- 2026-10-21: Doing -> Done. Feature lists split one file per group behind UpstreamPlatformFeatureTable; waiting tasks' touches narrowed; build clean, 3622 tests pass
