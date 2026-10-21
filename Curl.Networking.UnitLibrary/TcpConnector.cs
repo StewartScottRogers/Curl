@@ -1280,11 +1280,15 @@ public sealed partial class TcpConnector(
         CancellationToken cancellationToken)
     {
         var (firstHop, headOutput, started) = route;
-        var (addresses, failure) = await ResolveWithFailureReasonAsync(firstHop.Host, firstHop.Port, target, cancellationToken).ConfigureAwait(false);
-        if (addresses.Count == 0)
+        IReadOnlyList<IPAddress> addresses = [];
+        if (firstHop.UnixSocketPath is null)
         {
-            var (exitCode, message) = NameResolutionFailure.Describe(CurlExitCode.CouldntResolveProxy, "proxy", firstHop.Host, firstHop.Port, failure);
-            return ConnectResult.Failed(exitCode, message);
+            (addresses, var failure) = await ResolveWithFailureReasonAsync(firstHop.Host, firstHop.Port, target, cancellationToken).ConfigureAwait(false);
+            if (addresses.Count == 0)
+            {
+                var (exitCode, message) = NameResolutionFailure.Describe(CurlExitCode.CouldntResolveProxy, "proxy", firstHop.Host, firstHop.Port, failure);
+                return ConnectResult.Failed(exitCode, message);
+            }
         }
 
         var nameResolved = timeProvider.GetTimestamp();
@@ -1354,7 +1358,9 @@ public sealed partial class TcpConnector(
     {
         var (target, destination, proxy, started, nameResolved, _, _) = tunnel;
         var firstHop = FirstHopTo(proxy);
-        var (dialed, lastDialError, lastBindFailure) = await DialFirstReachableAsync(addresses, firstHop.Port, firstHop.Host, target, cancellationToken).ConfigureAwait(false);
+        var (dialed, lastDialError, lastBindFailure) = firstHop.UnixSocketPath is { } socketPath
+            ? await DialProxyUnixSocketAsync(socketPath, firstHop.Host, target, cancellationToken).ConfigureAwait(false)
+            : await DialFirstReachableAsync(addresses, firstHop.Port, firstHop.Host, target, cancellationToken).ConfigureAwait(false);
         if (dialed is null)
         {
             return (ProxyDialFailure(tunnel, firstHop, lastDialError, lastBindFailure), null);
@@ -1647,13 +1653,21 @@ public sealed partial class TcpConnector(
 
         // curl 8.21.0 names the destination as given, not the address SOCKS4 or SOCKS5 sent for it,
         // and the proxy by the address it dialled (measured for every kind and --preproxy, BL-1038).
-        // A SOCKS hop is always dialled over TCP, so both end points are known.
-        var local = dialed.LocalEndPoint!;
-        var via = dialed.RemoteEndPoint!;
-        target.Events.ReportInfo(
-            $"Opened SOCKS connection from {local.Address} port {local.Port} to {destination.Host} port {destination.Port} (via {via.Address} port {via.Port})");
+        target.Events.ReportInfo(SocksOpenedLine(dialed, destination));
         log.TunnelEstablished(socks, destination.Host, destination.Port, statusCode: 0);
         return null;
+    }
+
+    /// <summary>
+    /// curl's <c>Opened SOCKS connection from ... (via ...)</c> line. A hop dialled over TCP names
+    /// both end points; one over a Unix domain socket (BL-2955) has none, so it names no local
+    /// address on port 0 and the socket's path on port 0, as curl's <c>ipquad</c> reads a Unix socket.
+    /// </summary>
+    private static string SocksOpenedLine(DialedSocket dialed, ConnectDestination destination)
+    {
+        var (localAddress, localPort) = dialed.LocalEndPoint is { } local ? (local.Address.ToString(), local.Port) : (string.Empty, 0);
+        var (viaAddress, viaPort) = dialed.RemoteEndPoint is { } via ? (via.Address.ToString(), via.Port) : (dialed.UnixSocketRemoteIp, 0);
+        return $"Opened SOCKS connection from {localAddress} port {localPort} to {destination.Host} port {destination.Port} (via {viaAddress} port {viaPort})";
     }
 
     /// <summary>
@@ -2327,6 +2341,32 @@ public sealed partial class TcpConnector(
         return dialed is null
             ? (null, lastError, lastBindFailure)
             : (new DialedSocket(dialed.Connection, dialed.LocalEndPoint, hostName, remoteEndPoint) { TracesHappyEyeballsFilter = trace?.TracesHappyEyeballs == true, TracesTcpFilter = trace?.TracesTcp == true }, SocketError.Success, null);
+    }
+
+    /// <summary>
+    /// Dials the Unix domain socket a SOCKS proxy at <c>localhost</c> names in its path
+    /// (<see cref="ProxyEndpoint.UnixSocketPath" />, BL-2955) in place of resolving and dialling its
+    /// host and port, writing <c>Trying &lt;name&gt;:0...</c> as a <c>--unix-socket</c> dial does; a
+    /// refused dial gives its <see cref="SocketError" />, which the caller turns into exit 7.
+    /// </summary>
+    private async ValueTask<(DialedSocket? Dialed, SocketError LastError, LocalBindFailure? LastBindFailure)> DialProxyUnixSocketAsync(
+        string socketPath,
+        string hostName,
+        ConnectTarget target,
+        CancellationToken cancellationToken)
+    {
+        var unixSocket = new UnixSocketAddress(socketPath, IsAbstract: false);
+        var name = unixSocket.RemoteIpText;
+        target.Events.ReportInfo($"  Trying {name}:0...");
+        try
+        {
+            var connection = await tcpDialer.DialUnixSocketAsync(unixSocket, cancellationToken).ConfigureAwait(false);
+            return (new DialedSocket(connection, null, hostName, null, name), SocketError.Success, null);
+        }
+        catch (SocketException exception)
+        {
+            return (null, exception.SocketErrorCode, null);
+        }
     }
 
     /// <summary>

@@ -14,6 +14,34 @@ public sealed class ProxyUrlParserTests
 {
     public TestContext TestContext { get; set; } = null!;
 
+    // Upstream's parse_proxy (curl-8_22_0): a SOCKS proxy at localhost with a path other than /
+    // is reached over the Unix domain socket that path names (tests 1467, 1468, 1470; BL-2955).
+    [TestMethod]
+    [DataRow("socks5h://localhost/some/path", ProxyKind.Http, "/some/path")]
+    [DataRow("socks5://localhost/some/path", ProxyKind.Http, "/some/path")]
+    [DataRow("socks4://LOCALHOST/some/path", ProxyKind.Http, "/some/path")]
+    [DataRow("socks4a://localhost:1/s%20p?q#f", ProxyKind.Http, "/s p")]
+    [DataRow("localhost/some/path", ProxyKind.Socks5, "/some/path")]
+    [DataRow("localhost/some/path", ProxyKind.Socks5Hostname, "/some/path")]
+    [DataRow("socks5h://localhost/", ProxyKind.Http, null)]
+    [DataRow("socks5h://localhost", ProxyKind.Http, null)]
+    [DataRow("socks5h://localhost?/x", ProxyKind.Http, null)]
+    [DataRow("socks5h://127.0.0.1/some/path", ProxyKind.Http, null)]
+    [DataRow("http://localhost/some/path", ProxyKind.Http, null)]
+    [DataRow("localhost/some/path", ProxyKind.Http, null)]
+    public void TryParse_SocksAtLocalhostWithAPath_IsReachedOverThatUnixSocket(string text, ProxyKind kindWithoutScheme, string? expectedPath)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("text / kind without scheme", $"{text} / {kindWithoutScheme}");
+
+        bool parsed = ProxyUrlParser.TryParse(text, kindWithoutScheme, out ProxyEndpoint? proxy, out _);
+        diagnostics.Act("unix socket path", proxy?.UnixSocketPath ?? "(null)");
+
+        diagnostics.Assert("unix socket path", expectedPath ?? "(null)", proxy?.UnixSocketPath ?? "(null)");
+        Assert.IsTrue(parsed);
+        Assert.AreEqual(expectedPath, proxy!.UnixSocketPath);
+    }
+
     [TestMethod]
     [DataRow("127.0.0.1", ProxyKind.Http, "127.0.0.1", 80)]
     [DataRow("http://127.0.0.1", ProxyKind.Http, "127.0.0.1", 80)]

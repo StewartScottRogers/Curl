@@ -37,6 +37,13 @@ public sealed record ProxyEndpoint(
     /// </summary>
     public int Port { get; } = RequirePort(Port);
 
+    /// <summary>
+    /// Gets the Unix domain socket a SOCKS proxy is reached over in place of <see cref="Host" />
+    /// and <see cref="Port" />, as curl reads <c>socks5h://localhost/path/to/sock</c> since 7.84.0;
+    /// <see langword="null" /> to dial the host and port.
+    /// </summary>
+    public string? UnixSocketPath { get; init; }
+
     private static string RequireHost(string host)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(host, nameof(Host));
