@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: [BL-2990]
-touches: [Curl.Conformance.UnitLibrary/UpstreamTest1139Script.cs, Curl.Conformance.UnitLibrary/UpstreamTest1222Script.cs, Curl.Conformance.UnitLibrary/UpstreamTest1488Script.cs, Curl.Conformance.UnitTests/UpstreamTest1139ScriptTests.cs, Curl.Conformance.UnitTests/UpstreamTest1222ScriptTests.cs, Curl.Conformance.UnitTests/UpstreamTest1488ScriptTests.cs, Curl.Conformance.UnitTests/UpstreamConformanceTests.cs, Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
+touches: [Curl.Conformance.UnitLibrary/UpstreamTest1139Script.cs, Curl.Conformance.UnitLibrary/UpstreamTest1222Script.cs, Curl.Conformance.UnitLibrary/UpstreamTest1488Script.cs, Curl.Conformance.UnitTests/UpstreamTest1139ScriptTests.cs, Curl.Conformance.UnitTests/UpstreamTest1222ScriptTests.cs, Curl.Conformance.UnitTests/UpstreamTest1488ScriptTests.cs, Curl.Conformance.UnitTests/UpstreamPerlCommandScripts.Test1139.cs, Curl.Conformance.UnitTests/UpstreamPerlCommandScripts.Test1222.cs, Curl.Conformance.UnitTests/UpstreamPerlCommandScripts.Test1488.cs, Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
 requirement: none
 created: 2026-10-21
 completed:
@@ -18,7 +18,7 @@ Upstream cases 1139, 1222 and 1488 run through C# interpretations of curl 8.22.0
 
 ## Context
 
-Split from BL-2851 (2026-10-21, lane 7); the vendored docs come from BL-2990. Follow the pattern of `UpstreamTest971Script.cs` (BL-2865): one script class per file, registered in `UpstreamConformanceTests.cs`, a focused test class per script. Where a check finds `Libcurl` differing from upstream, fix `Libcurl` with a focused unit test in `Libcurl.UnitTests` (ADR-0482) and add those files to `touches`. Before code, run each case with `$env:CURL_UPSTREAM_CASE` and confirm it reaches the perl dispatch rather than being skipped for another reason.
+Split from BL-2851 (2026-10-21, lane 7); the vendored docs come from BL-2990. Follow the pattern of `UpstreamTest971Script.cs` (BL-2865): one script class per file, registered from its own `UpstreamPerlCommandScripts.Test<N>.cs` file (BL-2994), a focused test class per script. Where a check finds `Libcurl` differing from upstream, fix `Libcurl` with a focused unit test in `Libcurl.UnitTests` (ADR-0482) and add those files to `touches`. Before code, run each case with `$env:CURL_UPSTREAM_CASE` and confirm it reaches the perl dispatch rather than being skipped for another reason.
 
 ## Acceptance criteria
 
@@ -31,3 +31,4 @@ Split from BL-2851 (2026-10-21, lane 7); the vendored docs come from BL-2990. Fo
 ## Log
 
 - 2026-10-21: Created.
+- 2026-10-21: touches narrowed by BL-2994: the Perl script registration moved out of UpstreamConformanceTests.cs into one UpstreamPerlCommandScripts.Test<N>.cs file per script.

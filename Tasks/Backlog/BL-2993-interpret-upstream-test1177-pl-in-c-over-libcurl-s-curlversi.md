@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: [BL-2990]
-touches: [Curl.Conformance.UnitLibrary/UpstreamTest1177Script.cs, Curl.Conformance.UnitTests/UpstreamTest1177ScriptTests.cs, Curl.Conformance.UnitTests/UpstreamConformanceTests.cs, Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
+touches: [Curl.Conformance.UnitLibrary/UpstreamTest1177Script.cs, Curl.Conformance.UnitTests/UpstreamTest1177ScriptTests.cs, Curl.Conformance.UnitTests/UpstreamPerlCommandScripts.Test1177.cs, Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
 requirement: none
 created: 2026-10-21
 completed:
@@ -31,3 +31,4 @@ Split from BL-2851 (2026-10-21, lane 7); the vendored `docs/libcurl/curl_version
 ## Log
 
 - 2026-10-21: Created.
+- 2026-10-21: touches narrowed by BL-2994: the Perl script registration moved out of UpstreamConformanceTests.cs into one UpstreamPerlCommandScripts.Test<N>.cs file per script.
