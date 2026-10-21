@@ -46,3 +46,4 @@ If six cases prove too many for one run, finish 971, 1486, 1707, 1708 and 1710 f
 - 2026-10-19: Created.
 - 2026-10-19: Backlog -> Doing. Criteria at claim: ec51dafc a075cc9b cd7380ad dd1cc079 620ebead.
 - 2026-10-19: Doing -> Backlog. Split for size; waits on BL-2863, BL-2864, BL-2865 and BL-2866
+- 2026-10-21: Backlog -> Doing. Criteria at claim: ec51dafc a075cc9b cd7380ad dd1cc079 620ebead.
