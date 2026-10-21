@@ -27,7 +27,7 @@ Turn the feature list into entries in one file each (partial class or small prov
 - [ ] Curl.Conformance.UnitLibrary/UpstreamCurlPlatform.cs keeps only the shared code; every case-, stand-in- or feature-specific piece is in its own file.
 - [ ] Adding a new one needs a new file plus at most one line in a registration table, and the table is the only shared edit.
 - [ ] No behaviour changes: the same upstream cases pass (PassingUpstreamCases.txt unchanged) and the moved tests keep their names.
-- [ ] The waiting tasks listed in Context have their `touches` narrowed with `task-board.ps1 edit` to the new files they need (or the registration table), so `task-board.ps1 capacity` counts more of them as able to start together.
+- [ ] The waiting tasks listed in Context have their `touches` narrowed by editing their front matter to the new files they need (or the registration table), so `task-board.ps1 capacity` counts more of them as able to start together.
 - [ ] `dotnet build` clean and the fast tests green; Curl.Conformance.UnitLibrary stays inside the quality gates.
 
 ## Notes
