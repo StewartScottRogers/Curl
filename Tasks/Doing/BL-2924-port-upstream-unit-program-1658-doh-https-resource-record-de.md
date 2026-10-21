@@ -32,3 +32,4 @@ Split from BL-2847 (too big for one run; 1658 alone is a 564-line C program, mos
 ## Log
 
 - 2026-10-21: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: bf960bc6 1c32b31e a1753666 dd1cc079.
