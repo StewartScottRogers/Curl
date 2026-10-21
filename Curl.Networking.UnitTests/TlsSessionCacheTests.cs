@@ -40,6 +40,20 @@ public sealed class TlsSessionCacheTests
     }
 
     [TestMethod]
+    public void PeerKey_ClientCertificateKeyAndTypes_NamedUpperCasedAndWithoutThePassPhrase()
+    {
+        var options = new TlsClientOptions(ClientCertificate: "client.pem", PrivateKey: "client.key", CertificateType: "pem", PrivateKeyType: "Der", Passphrase: "secret");
+        Diagnostics.Arrange("options", options);
+
+        var key = TlsSessionCache.PeerKey("h", 1, options);
+
+        Diagnostics.Act("key", key);
+        Assert.AreEqual($"h:1:CCERT-{Path.GetFullPath("client.pem")}:KEY-{Path.GetFullPath("client.key")}:CT-PEM:KT-DER:IMPL-Curl:G", key);
+        Assert.AreEqual(key, TlsSessionCache.PeerKey("h", 1, options with { Passphrase = null }), "the pass phrase is not part of the key (upstream test3304)");
+        Assert.AreEqual("h:1:IMPL-Curl:G", TlsSessionCache.PeerKey("h", 1, new TlsClientOptions(ClientCertificate: "", PrivateKey: "", CertificateType: "", PrivateKeyType: "")), "empty values add nothing");
+    }
+
+    [TestMethod]
     public void Constructor_WithoutClock_Throws()
     {
         Diagnostics.Arrange("time provider", "null");
