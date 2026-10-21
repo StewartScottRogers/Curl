@@ -1,5 +1,5 @@
 ---
-id: BL-2990
+id: BL-2994
 title: Fail a --connect-to IPv6 literal with exit 4 when the feature mask hides IPv6, end to end (case 1454)
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-21
 completed:
 ---
-# BL-2990 — Fail a --connect-to IPv6 literal with exit 4 when the feature mask hides IPv6, end to end (case 1454)
+# BL-2994 — Fail a --connect-to IPv6 literal with exit 4 when the feature mask hides IPv6, end to end (case 1454)
 
 ## Goal
 

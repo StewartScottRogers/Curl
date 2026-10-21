@@ -29,11 +29,11 @@ Split from BL-2856. The `--connect-to` destination is resolved in `Curl.Networki
 
 - The IPv6 literal is read in `ConnectToMappings.cs`, not `ConnectDestination.cs`, so it was added to `touches` (no Doing task on `origin/work/dark-factory` names it).
 - Design: `new ConnectToMappings(mappings, hidesIpv6: true)` answers a matching destination starting with `[` with `ParseError` = `Ipv6NotBuiltInMessage` ("Use of IPv6 in *_CONNECT_TO without IPv6 support built-in", curl 8.22.0 `parse_connect_to_host_port` without `USE_IPV6`) and the new `ConnectDestination.ParseErrorCode` = `CurlExitCode.NotBuiltIn`; the check runs before the bracket check, as upstream's `#else` does. `ParseErrorCode` defaults to exit 49, so every existing consumer is unchanged. Networking cannot see `EngineFeatureMask` (Engine references Networking), so the mask arrives as a bool.
-- The consumers (`TcpConnector.cs`, held by BL-2986; `TcpConnector.UdpTunnel.cs`; `UdpDatagramConnector.cs`) and the engine wiring (`EngineComposition.cs`, held by BL-2919) are filed as BL-2990, with case 1454 on the ratchet.
+- The consumers (`TcpConnector.cs`, held by BL-2986; `TcpConnector.UdpTunnel.cs`; `UdpDatagramConnector.cs`) and the engine wiring (`EngineComposition.cs`, held by BL-2919) are filed as BL-2994, with case 1454 on the ratchet.
 - Measure-CodeQuality.ps1 -Library Curl.Networking.UnitLibrary: 100% line, 100% branch, 0 failing members (the first run had `ParseDestination` at complexity 14; the mask check moved to `ParseMatchedDestination`). Fast tests: 44 test assemblies passed.
 
 ## Log
 
 - 2026-10-21: Created.
 - 2026-10-21: Backlog -> Doing. Criteria at claim: e8a15e41 dd1cc079.
-- 2026-10-21: Doing -> Done. ConnectToMappings with IPv6 hidden answers a [::1] destination with exit 4 (NotBuiltIn); end-to-end wiring is BL-2990
+- 2026-10-21: Doing -> Done. ConnectToMappings with IPv6 hidden answers a [::1] destination with exit 4 (NotBuiltIn); end-to-end wiring is BL-2994
