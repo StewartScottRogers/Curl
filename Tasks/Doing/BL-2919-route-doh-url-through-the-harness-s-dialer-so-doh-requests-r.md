@@ -32,3 +32,4 @@ Found by BL-2837 (2026-10-21). `EngineComposition.CreateTransports` takes `Resol
 ## Log
 
 - 2026-10-21: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: 1b6f541b 37a362b9 e53a05cf 9963d6cb.
