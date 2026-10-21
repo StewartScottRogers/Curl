@@ -137,6 +137,14 @@ it suits whichever Claude plan is in use. Running out of tokens is not a stall: 
 reset time, waits (the wait does not count against `-Hours`), warns a minute before the
 new session and reruns the cut-off task. See the script's header for the details.
 
+Work runs as parallel as it can (Stewart, 2026-10-21: "always function in a highly
+parallel fashion"). `-Lanes Auto` adds its first `-UnpacedLanes` (3) lanes without
+reading the burn rate; a task's `touches` names files or narrow subfolders, never a whole
+project it only adds to; new cases, stand-ins and handlers go in one file each that
+registers itself, not in a central switch or test class; and a file many tasks touch is
+split as its own High task rather than waited on (`task-board.ps1 hotspots`). An
+interactive session sends independent steps as parallel tool calls or subagents.
+
 When Claude starts a shift it always passes `-NewTab`, e.g.
 `RunDarkFactory.cmd -NewTab -Lanes Auto -Continuous`; `-Continuous` makes a shift that
 ends with work still ready start the next one itself. A shift ends before the tokens run
