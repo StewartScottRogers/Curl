@@ -47,6 +47,18 @@ the same relative paths: `docs/options-in-versions` and `docs/VERSIONS.md` (test
 generates it at build time and the tarball does not ship it, so it is vendored from the reference
 curl and `Update-UpstreamTestData.ps1` does not refresh it. test1707.pl reads it. The csproj copies them to the test output; `.gitattributes` marks them `-text`.
 
+`src/tool_getparam.c` and `src/tool_listhelp.c` (test1139.pl) sit beside it.
+
+## docs/libcurl and include
+
+`docs/libcurl/` (105 files: `symbols-in-versions` and the `*.md` pages; `opts/*.md`, 422 files) and
+`include/curl/*.h` (12 headers) hold what upstream's libcurl table checks open (BL-2990), byte for byte, at
+the same relative paths: test1119.pl, test1139.pl, test1175.pl, test1222.pl, test1477.pl and test1488.pl read them
+through `%SRCDIR/..`, and test1177.pl reads `docs/libcurl/curl_version_info.3` through `%PWD/..`. The tarball ships that
+page only as `curl_version_info.md` (upstream generates the `.3` at build time), so the `.3` is not vendored, and
+`lib/version.c` is not vendored: `Libcurl`'s tables stand for it. The csproj copies both folders to the test output and
+again beside `UpstreamTestData`; `.gitattributes` marks them `-text`.
+
 ## Refresh to another tag
 
 ```

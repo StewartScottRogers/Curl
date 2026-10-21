@@ -443,7 +443,7 @@ What it is to hold in full, per ADR-0013 decision 2:
 - the comparison of a case's results against its `<verify>` section.
 
 This library references `Curl.Protocol.Abstractions.UnitLibrary`, `Curl.Tls.UnitLibrary`
-(for the TLS 1.3 stand-in, ADR-0522), `Curl.Config.UnitLibrary` (for `curl-config`'s answers, ADR-0712) and no protocol library. It never opens a socket: every connection goes to an in-memory server. It is
+(for the TLS 1.3 stand-in, ADR-0522), `Curl.Config.UnitLibrary` (for `curl-config`'s answers, ADR-0712), `Libcurl` (whose tables script interpretations read where upstream's libcurl table checks read `curl.h` and `version.c`; BL-2990) and no protocol library. It never opens a socket: every connection goes to an in-memory server. It is
 held to the same quality gates as every other `.UnitLibrary` (100% line and branch
 coverage, complexity at most 10, CRAP at most 30) and is AOT-compatible like every
 production project.

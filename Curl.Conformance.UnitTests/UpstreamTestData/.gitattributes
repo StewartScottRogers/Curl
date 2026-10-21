@@ -4,3 +4,4 @@ certs/* -text
 data/* -text
 docs/** -text
 src/* -text
+include/** -text

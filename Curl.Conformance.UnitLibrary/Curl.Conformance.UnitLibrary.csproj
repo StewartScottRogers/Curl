@@ -14,6 +14,8 @@
     <ProjectReference Include="..\Curl.Conformance.UnitProgram.UnitLibrary\Curl.Conformance.UnitProgram.UnitLibrary.csproj" />
     <!-- curl-config's answers stand in for ../curl-config in test1013.pl and test1022.pl (ADR-0712). -->
     <ProjectReference Include="..\Curl.Config.UnitLibrary\Curl.Config.UnitLibrary.csproj" />
+    <!-- Script interpretations read Libcurl's tables where upstream's libcurl table checks read curl.h and version.c (BL-2990). -->
+    <ProjectReference Include="..\Libcurl\Libcurl.csproj" />
     <!-- Curl's own TLS 1.3 server answers a TLS 1.3-only client where SslStream cannot (macOS; GF-0092). -->
     <ProjectReference Include="..\Curl.Tls.UnitLibrary\Curl.Tls.UnitLibrary.csproj" />
   </ItemGroup>

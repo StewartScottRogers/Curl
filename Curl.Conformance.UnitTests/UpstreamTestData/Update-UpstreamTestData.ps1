@@ -39,7 +39,7 @@ try {
     # Windows' own bsdtar: a Git Bash GNU tar earlier on PATH reads "C:\..." as a remote host.
     $tar = Join-Path $env:SystemRoot 'System32\tar.exe'
     if (-not (Test-Path -LiteralPath $tar)) { $tar = 'tar' }
-    & $tar -xzf $archive -C $workFolder "$sourceRoot/COPYING" "$sourceRoot/tests/data" "$sourceRoot/tests/certs" "$sourceRoot/docs/options-in-versions" "$sourceRoot/docs/VERSIONS.md" "$sourceRoot/docs/cmdline-opts" "$sourceRoot/src/tool_writeout.c"
+    & $tar -xzf $archive -C $workFolder "$sourceRoot/COPYING" "$sourceRoot/tests/data" "$sourceRoot/tests/certs" "$sourceRoot/docs/options-in-versions" "$sourceRoot/docs/VERSIONS.md" "$sourceRoot/docs/cmdline-opts" "$sourceRoot/src/tool_writeout.c" "$sourceRoot/src/tool_getparam.c" "$sourceRoot/src/tool_listhelp.c" "$sourceRoot/docs/libcurl" "$sourceRoot/include/curl"
     if ($LASTEXITCODE -ne 0) { throw "tar could not extract $sourceRoot from $archive." }
 
     $upstreamData = Join-Path $workFolder "$sourceRoot/tests/data"
@@ -81,7 +81,7 @@ try {
     $docsDestination = Join-Path $destination 'docs'
     $cmdlineOptsDestination = Join-Path $docsDestination 'cmdline-opts'
     New-Item -ItemType Directory -Path $cmdlineOptsDestination -Force | Out-Null
-    Get-ChildItem -LiteralPath $cmdlineOptsDestination -File | Remove-Item -Force
+    Get-ChildItem -LiteralPath $cmdlineOptsDestination -File | Where-Object { $_.Name -ne 'curl.txt' } | Remove-Item -Force
     Copy-Item -LiteralPath (Join-Path $workFolder "$sourceRoot/docs/options-in-versions") -Destination (Join-Path $docsDestination 'options-in-versions') -Force
     Copy-Item -LiteralPath (Join-Path $workFolder "$sourceRoot/docs/VERSIONS.md") -Destination (Join-Path $docsDestination 'VERSIONS.md') -Force
     $upstreamOptionDocs = @(Get-ChildItem -LiteralPath (Join-Path $workFolder "$sourceRoot/docs/cmdline-opts") -File -Filter '*.md')
@@ -93,7 +93,39 @@ try {
     New-Item -ItemType Directory -Path $sourceDestination -Force | Out-Null
     Copy-Item -LiteralPath (Join-Path $workFolder "$sourceRoot/src/tool_writeout.c") -Destination (Join-Path $sourceDestination 'tool_writeout.c') -Force
 
-    Write-Output "Vendored $($upstreamTests.Count) test files, $($upstreamCerts.Count) certs files, $($upstreamOptionDocs.Count) docs/cmdline-opts files, the httpsig key files, data-xml1, data1461.txt, data1463.txt and COPYING from $Tag into $destination."
+    Copy-Item -LiteralPath (Join-Path $workFolder "$sourceRoot/src/tool_getparam.c") -Destination (Join-Path $sourceDestination 'tool_getparam.c') -Force
+    Copy-Item -LiteralPath (Join-Path $workFolder "$sourceRoot/src/tool_listhelp.c") -Destination (Join-Path $sourceDestination 'tool_listhelp.c') -Force
+
+    # The files the libcurl table check scripts test1119.pl, test1139.pl, test1175.pl, test1177.pl, test1222.pl,
+    # test1477.pl and test1488.pl open (BL-2990): docs/libcurl (symbols-in-versions and the *.md pages, with
+    # opts\*.md) and include/curl/*.h, at the same relative paths. curl_version_info.3, which test1177.pl reads,
+    # is generated from curl_version_info.md at upstream's build time and is not vendored; lib/version.c is
+    # not vendored either, because Libcurl's tables stand for it.
+    $libcurlDocsDestination = Join-Path $docsDestination 'libcurl'
+    $libcurlOptsDestination = Join-Path $libcurlDocsDestination 'opts'
+    New-Item -ItemType Directory -Path $libcurlOptsDestination -Force | Out-Null
+    Get-ChildItem -LiteralPath $libcurlDocsDestination -File | Remove-Item -Force
+    Get-ChildItem -LiteralPath $libcurlOptsDestination -File | Remove-Item -Force
+    $upstreamLibcurlDocs = @(Get-ChildItem -LiteralPath (Join-Path $workFolder "$sourceRoot/docs/libcurl") -File |
+        Where-Object { $_.Extension -eq '.md' -or $_.Name -eq 'symbols-in-versions' })
+    $upstreamLibcurlOptionDocs = @(Get-ChildItem -LiteralPath (Join-Path $workFolder "$sourceRoot/docs/libcurl/opts") -File -Filter '*.md')
+    if ($upstreamLibcurlDocs.Count -eq 0 -or $upstreamLibcurlOptionDocs.Count -eq 0) { throw "No docs/libcurl files found at $Tag." }
+    foreach ($libcurlDoc in $upstreamLibcurlDocs) {
+        Copy-Item -LiteralPath $libcurlDoc.FullName -Destination (Join-Path $libcurlDocsDestination $libcurlDoc.Name)
+    }
+    foreach ($libcurlOptionDoc in $upstreamLibcurlOptionDocs) {
+        Copy-Item -LiteralPath $libcurlOptionDoc.FullName -Destination (Join-Path $libcurlOptsDestination $libcurlOptionDoc.Name)
+    }
+    $includeDestination = Join-Path $destination 'include\curl'
+    New-Item -ItemType Directory -Path $includeDestination -Force | Out-Null
+    Get-ChildItem -LiteralPath $includeDestination -File | Remove-Item -Force
+    $upstreamHeaders = @(Get-ChildItem -LiteralPath (Join-Path $workFolder "$sourceRoot/include/curl") -File -Filter '*.h')
+    if ($upstreamHeaders.Count -eq 0) { throw "No include/curl/*.h files found at $Tag." }
+    foreach ($header in $upstreamHeaders) {
+        Copy-Item -LiteralPath $header.FullName -Destination (Join-Path $includeDestination $header.Name)
+    }
+
+    Write-Output "Vendored $($upstreamTests.Count) test files, $($upstreamCerts.Count) certs files, $($upstreamOptionDocs.Count) docs/cmdline-opts files, $($upstreamLibcurlDocs.Count) docs/libcurl files, $($upstreamLibcurlOptionDocs.Count) docs/libcurl/opts files, $($upstreamHeaders.Count) include/curl headers, the httpsig key files, data-xml1, data1461.txt, data1463.txt and COPYING from $Tag into $destination."
     Write-Output "If the count changed, update VendoredTestFileCount in UpstreamTestDataTests.cs and the tag in README.md."
 }
 finally {
