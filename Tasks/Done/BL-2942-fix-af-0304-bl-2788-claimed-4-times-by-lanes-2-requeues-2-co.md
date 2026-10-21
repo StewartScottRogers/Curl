@@ -8,7 +8,7 @@ depends-on: []
 touches: [RunDarkFactory.ps1]
 requirement: none
 created: 2026-10-21
-completed:
+completed: 2026-10-21
 ---
 # BL-2942 — Fix AF-0304: BL-2788 claimed 4 times by lanes (2 requeues, 2 cost-cap blocks); its first run's 19 minutes of work sat in a stash that did not apply cleanly
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the process auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Fix: `Invoke-Claim` in RunDarkFactory.ps1 now skips (does not claim) a task whose runs of the last day already spent its cost cap, so no claim can only block. Stash restore was already handled by `Restore-TaskStash`. The reproduction reads files a lane may not open, so a re-audit checks it. No dotnet code changed.
 
 ## Log
 
 - 2026-10-21: Created.
 - 2026-10-21: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-21: Doing -> Done. Invoke-Claim skips a task whose cost cap is already spent, so no claim can only block

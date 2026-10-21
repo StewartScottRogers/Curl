@@ -4416,10 +4416,18 @@ function Invoke-Claim {
                 Invoke-Git @('commit', '-q', '-m', "chore(tasks): requeue $($requeued -join ', ') - blockers Done", '-m', $SkipCiNote) | Out-Null
                 if (-not (Invoke-Git @('push', '-q', 'origin', "HEAD:$Branch"))) { continue }
             }
-            $boardArgs = @('next')
-            if ($Skip.Count) { $boardArgs += @('-Skip', ($Skip -join ',')) }
-            $next = (Invoke-Board $boardArgs) -join "`n"
-            $id = Get-NextTaskId $next
+            # A task whose runs of the last day already spent its cost cap is left in Backlog
+            # rather than claimed only to be Blocked at once, which cost BL-2788 two claims
+            # that could only block (AF-0304); the next claim offers it once the window passes.
+            $skipNow = @($Skip)
+            do {
+                $boardArgs = @('next')
+                if ($skipNow.Count) { $boardArgs += @('-Skip', ($skipNow -join ',')) }
+                $next = (Invoke-Board $boardArgs) -join "`n"
+                $id = Get-NextTaskId $next
+                $overCap = [bool]($id -and (Get-TaskCapSpentWhy $id))
+                if ($overCap) { Write-Trace $id 'cost cap' 'its runs of the last day already spent its cost cap; not claimed' 'Yellow'; $skipNow += $id }
+            } while ($overCap)
             if (-not $id) {
                 if ($next -match 'can start yet' -or (Get-DoingCount) -gt 0) { return @{ Wait = $true; Why = (Get-Short (Get-WaitReason $next) 80) } }
                 return @{ None = $true }
