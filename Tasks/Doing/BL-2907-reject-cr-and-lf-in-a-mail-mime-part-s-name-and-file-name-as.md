@@ -32,3 +32,4 @@ Find where Curl builds a MIME part's `Content-Disposition` for mail (`Curl.Api.U
 ## Log
 
 - 2026-10-21: Created (split from BL-2845, which waits on it).
+- 2026-10-21: Backlog -> Doing. Criteria at claim: e4bae39a 3d228e1f d3a9ab15 099d1d27.
