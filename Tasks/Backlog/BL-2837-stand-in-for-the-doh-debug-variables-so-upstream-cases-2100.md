@@ -42,6 +42,7 @@ Read `lib/doh.c`, `lib/hostip.c` and `lib/happy-eyeballs`-related `DEBUGBUILD` b
   - 2100 and 2117 fail at byte 0 of `<protocol>` (`curl: (6) Could not resolve host: foo.example.com`, no request recorded). Cause: `EngineComposition.CreateTransports` uses `dialing.DnsResolver` whenever the harness's `EngineDialing` is given, so `--doh-url` is ignored under the harness. Filed BL-2919 (route `--doh-url` through the harness's dialer).
   - 2100 (no `--ech`) also expects the DoH HTTPS-RR query first under `%if HTTPSRR`; Curl sends it only under `--ech`. Filed BL-2920.
   - The `CURL_DBG_HE_AAAA_AWAIT_MS` stand-in (hold back the DoH AAAA reply on the harness clock) stays in this task, in `UpstreamStandInFronts.cs`, once BL-2919 lets the DoH POSTs reach `sws`.
+- 2026-10-21 (BL-2928): the `RunsCurlWithDohUrl` rule above is now committed (`UpstreamConformanceTests.DohDebugStandIn.cs`, with its unit tests), and the curl tool's dialing runner routes `--doh-url` through the harness's dialer (`CurlComposition.DialingDohResolverOf`). Drop the stash's copy of that rule rather than adding it twice; 2100's first difference is now the HTTPS-RR query (BL-2920).
 
 ## Log
 
