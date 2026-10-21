@@ -8,7 +8,7 @@ depends-on: []
 touches: [DarkFactory/Prompts.ps1, DarkFactory/TaskBudget.ps1]
 requirement: none
 created: 2026-10-21
-completed:
+completed: 2026-10-21
 ---
 # BL-2947 — Fix AF-0309: BL-2787 cost $4.85, 3.4 times the median task cost of $1.42
 
@@ -52,3 +52,4 @@ Cause: one 82-turn session with 9 builds and 27 one-line Edits, each turn re-rea
 
 - 2026-10-21: Created.
 - 2026-10-21: Backlog -> Doing. Criteria at claim: af4de8c2 9742157d.
+- 2026-10-21: Doing -> Done. Cause named; prompt rule added
