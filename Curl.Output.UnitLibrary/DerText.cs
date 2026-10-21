@@ -3,6 +3,7 @@
 
 using System.Globalization;
 using System.Text;
+using Curl.Api.Codes;
 
 namespace Curl.Output;
 
@@ -12,8 +13,8 @@ namespace Curl.Output;
 /// for <see cref="PeerCertificateText" /> (ADR-0054).
 /// </summary>
 /// <remarks>
-/// A value curl cannot print throws <see cref="FormatException" />, which makes curl give
-/// up on the whole certificate. Where curl's C string would carry a character a .NET string
+/// A value curl cannot print throws <see cref="DerTextException" />, carrying the code curl
+/// returns, which makes curl give up on the whole certificate. Where curl's C string would carry a character a .NET string
 /// cannot (a lone UTF-16 surrogate, a code point past U+10FFFF, or an invalid UTF-8
 /// sequence in a <c>UTF8String</c>), U+FFFD takes its place.
 /// </remarks>
@@ -303,14 +304,26 @@ internal static class DerText
     {
         if (codePoint >= 0x200000)
         {
-            throw Unprintable();
+            throw new DerTextException(CurlCode.WeirdServerReply);
         }
 
         return Rune.TryCreate(codePoint, out var rune) ? rune.ToString() : "�";
     }
 
-    private static string EncodeObjectIdentifier(byte[] content)
+    /// <summary>
+    /// Prints object identifier content in dotted form as <c>encodeOID</c> does, with no name
+    /// lookup.
+    /// </summary>
+    /// <param name="content">The content bytes.</param>
+    /// <returns>The dotted form.</returns>
+    /// <exception cref="DerTextException">The content is empty or not a valid encoding.</exception>
+    internal static string EncodeObjectIdentifier(byte[] content)
     {
+        if (content.Length == 0)
+        {
+            throw Unprintable();
+        }
+
         var text = new StringBuilder();
         var position = 0;
         uint first = content[position++];
@@ -460,6 +473,5 @@ internal static class DerText
     private static string Ascii(byte[] content, int start, int length) =>
         Encoding.Latin1.GetString(content, start, length);
 
-    private static FormatException Unprintable() =>
-        new("The certificate holds a value curl cannot print.");
+    private static DerTextException Unprintable() => new(CurlCode.BadFunctionArgument);
 }

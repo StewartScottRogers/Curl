@@ -1,3 +1,4 @@
+using Curl.Api.Codes;
 using Curl.Testing;
 
 namespace Curl.Output;
@@ -57,16 +58,16 @@ public sealed class DerTextTests
     [DataRow(new byte[] { 0x03, 0x00 }, DisplayName = "empty bit string")]
     [DataRow(new byte[] { 0x03, 0x02, 0x08, 0x00 }, DisplayName = "eight unused bits")]
     [DataRow(new byte[] { 0x1E, 0x01, 0x00 }, DisplayName = "odd BMPString")]
-    [DataRow(new byte[] { 0x1C, 0x04, 0x00, 0x20, 0x00, 0x00 }, DisplayName = "code point past 0x1FFFFF")]
-    public void Format_ValueCurlCannotPrint_ThrowsFormatException(byte[] der)
+    public void Format_ValueCurlCannotPrint_ThrowsBadFunctionArgument(byte[] der)
     {
         var diagnostics = TestDiagnostics.For(TestContext);
         diagnostics.Bytes("der", der);
         diagnostics.Arrange("der length", der.Length);
 
-        var exception = Assert.ThrowsExactly<FormatException>(() => Format(der));
+        var exception = Assert.ThrowsExactly<DerTextException>(() => Format(der));
 
         ReportException(diagnostics, exception);
+        Assert.AreEqual(CurlCode.BadFunctionArgument, exception.Code);
     }
 
     [TestMethod]
@@ -95,15 +96,16 @@ public sealed class DerTextTests
     [DataRow(new byte[] { 0x2A, 0x80, 0x01 }, DisplayName = "later arc padded")]
     [DataRow(new byte[] { 0x2A, 0x81 }, DisplayName = "later arc cut short")]
     [DataRow(new byte[] { 0x2A, 0x8F, 0xFF, 0xFF, 0xFF, 0xFF, 0x7F }, DisplayName = "later arc past 32 bits")]
-    public void FormatObjectIdentifier_ContentCurlRefuses_ThrowsFormatException(byte[] content)
+    public void FormatObjectIdentifier_ContentCurlRefuses_ThrowsBadFunctionArgument(byte[] content)
     {
         var diagnostics = TestDiagnostics.For(TestContext);
         diagnostics.Bytes("content", content);
         diagnostics.Arrange("content length", content.Length);
 
-        var exception = Assert.ThrowsExactly<FormatException>(() => DerText.FormatObjectIdentifier(content));
+        var exception = Assert.ThrowsExactly<DerTextException>(() => DerText.FormatObjectIdentifier(content));
 
         ReportException(diagnostics, exception);
+        Assert.AreEqual(CurlCode.BadFunctionArgument, exception.Code);
     }
 
     [TestMethod]
@@ -124,14 +126,15 @@ public sealed class DerTextTests
     [TestMethod]
     [DataRow("26092705190Z", DisplayName = "eleven digits")]
     [DataRow("260927051908", DisplayName = "no zone")]
-    public void Format_UtcTimeCurlRefuses_ThrowsFormatException(string time)
+    public void Format_UtcTimeCurlRefuses_ThrowsBadFunctionArgument(string time)
     {
         var diagnostics = TestDiagnostics.For(TestContext);
         diagnostics.Arrange("time", time);
 
-        var exception = Assert.ThrowsExactly<FormatException>(() => Format(Der.Element(0x17, Der.Ascii(time))));
+        var exception = Assert.ThrowsExactly<DerTextException>(() => Format(Der.Element(0x17, Der.Ascii(time))));
 
         ReportException(diagnostics, exception);
+        Assert.AreEqual(CurlCode.BadFunctionArgument, exception.Code);
     }
 
     [TestMethod]
@@ -158,14 +161,15 @@ public sealed class DerTextTests
     [TestMethod]
     [DataRow("21260903051Z", DisplayName = "eleven digits")]
     [DataRow("21260903051907.Z", DisplayName = "fraction without digits")]
-    public void Format_GeneralizedTimeCurlRefuses_ThrowsFormatException(string time)
+    public void Format_GeneralizedTimeCurlRefuses_ThrowsBadFunctionArgument(string time)
     {
         var diagnostics = TestDiagnostics.For(TestContext);
         diagnostics.Arrange("time", time);
 
-        var exception = Assert.ThrowsExactly<FormatException>(() => Format(Der.Element(0x18, Der.Ascii(time))));
+        var exception = Assert.ThrowsExactly<DerTextException>(() => Format(Der.Element(0x18, Der.Ascii(time))));
 
         ReportException(diagnostics, exception);
+        Assert.AreEqual(CurlCode.BadFunctionArgument, exception.Code);
     }
 
     [TestMethod]
@@ -202,16 +206,57 @@ public sealed class DerTextTests
     }
 
     [TestMethod]
-    public void FormatDistinguishedName_AttributeTypeWithEmptyName_ThrowsFormatException()
+    public void FormatDistinguishedName_AttributeTypeWithEmptyName_ThrowsBadFunctionArgument()
     {
         var diagnostics = TestDiagnostics.For(TestContext);
         var name = Der.Sequenced(Der.Element(Der.Set, Der.Sequenced(Der.Element(0x06), Der.Utf8("a"))));
         diagnostics.Bytes("name", name);
         diagnostics.Arrange("name length", name.Length);
 
-        var exception = Assert.ThrowsExactly<FormatException>(() => FormatName(name));
+        var exception = Assert.ThrowsExactly<DerTextException>(() => FormatName(name));
 
         ReportException(diagnostics, exception);
+        Assert.AreEqual(CurlCode.BadFunctionArgument, exception.Code);
+    }
+
+    [TestMethod]
+    [DataRow(new byte[] { 0x1C, 0x04, 0x00, 0x20, 0x00, 0x00 }, DisplayName = "code point 0x200000")]
+    [DataRow(new byte[] { 0x1C, 0x04, 0x61, 0x62, 0x63, 0x64 }, DisplayName = "unit1667's abcd")]
+    public void Format_UniversalStringCodePointPastUtf8_ThrowsWeirdServerReply(byte[] der)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Bytes("der", der);
+
+        var exception = Assert.ThrowsExactly<DerTextException>(() => Format(der));
+
+        ReportException(diagnostics, exception);
+        Assert.AreEqual(CurlCode.WeirdServerReply, exception.Code);
+    }
+
+    [TestMethod]
+    [DataRow(new byte[] { 0x55, 0x04, 0x03 }, "2.5.4.3")]
+    [DataRow(new byte[] { 0x8F, 0xFF, 0xFF, 0xFF, 0x7F }, "2.4294967215")]
+    [DataRow(new byte[] { 0x00 }, "0.0")]
+    public void EncodeObjectIdentifier_ValidContent_PrintsDottedFormWithoutName(byte[] content, string expected)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Bytes("content", content);
+
+        var actual = DerText.EncodeObjectIdentifier(content);
+
+        ReportText(diagnostics, expected, actual);
+        Assert.AreEqual(expected, actual);
+    }
+
+    [TestMethod]
+    public void EncodeObjectIdentifier_Empty_ThrowsBadFunctionArgument()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+
+        var exception = Assert.ThrowsExactly<DerTextException>(() => DerText.EncodeObjectIdentifier([]));
+
+        ReportException(diagnostics, exception);
+        Assert.AreEqual(CurlCode.BadFunctionArgument, exception.Code);
     }
 
     private static void ReportText(TestDiagnostics diagnostics, string expected, string actual)
@@ -220,11 +265,11 @@ public sealed class DerTextTests
         diagnostics.Diff("text", expected, actual);
     }
 
-    private static void ReportException(TestDiagnostics diagnostics, FormatException exception)
+    private static void ReportException(TestDiagnostics diagnostics, DerTextException exception)
     {
         diagnostics.Act("exception type", exception.GetType().Name);
         diagnostics.Act("exception message", exception.Message);
-        diagnostics.Assert("exception type", nameof(FormatException), exception.GetType().Name);
+        diagnostics.Assert("exception type", nameof(DerTextException), exception.GetType().Name);
     }
 
     private static string Format(byte[] der) => DerText.Format(der, DerReader.Read(der, 0, der.Length));
