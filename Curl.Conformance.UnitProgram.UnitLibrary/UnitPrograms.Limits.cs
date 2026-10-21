@@ -10,5 +10,6 @@ public sealed partial class UnitPrograms
         new Unit1605NegativeLengths(),
         new Unit1606SpeedCheck(),
         new Unit1303TimeLeft(),
+        new Unit3216RateLimit(),
     ];
 }
