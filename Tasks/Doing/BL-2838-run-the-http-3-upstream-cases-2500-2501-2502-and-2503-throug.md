@@ -38,3 +38,4 @@ Lanes only run Windows, so the pass on Linux is judged by the `CI` workflow.
 ## Log
 
 - 2026-10-19: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: 9bc15d2e 55a9b3c6 9830c497 7bd8d990.
