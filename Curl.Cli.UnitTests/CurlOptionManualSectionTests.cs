@@ -75,6 +75,17 @@ public sealed class CurlOptionManualSectionTests
     }
 
     [TestMethod]
+    public void TryGetLines_AiHelp_IsCurlsOwnSectionForIt()
+    {
+        bool found = TryGetLines("--ai-help", out IReadOnlyList<string> lines);
+
+        Diagnostics.Assert("found", true, found);
+        Diagnostics.Assert("first line", "    --ai-help <category>", lines[0]);
+        Assert.IsTrue(found);
+        CollectionAssert.AreEqual(CurlHelpText.AiHelpSectionLines.ToArray(), lines.ToArray());
+    }
+
+    [TestMethod]
     [DataRow("--no-compressed")]
     [DataRow("--include")]
     public void TryGetLines_OptionTheManualHasNoHeadingFor_IsTrueWithNoLines(string subject)

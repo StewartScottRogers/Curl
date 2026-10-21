@@ -4,7 +4,8 @@ namespace Curl.Cli;
 /// Every row curl 8.22.0 prints in its option help, in its order: the option as shown, its one-line
 /// description and its categories, copied from curl's generated <c>src/tool_listhelp.c</c> at tag
 /// <c>curl-8_21_0</c> and re-measured against the curl 8.22.0 reference build's help pages (BL-2136). It lists all of curl's options, not only those <see cref="CommandLineOptionTable"/>
-/// parses, because curl's help lists them all (ADR-0069).
+/// parses, because curl's help lists them all (ADR-0069). One row is Curl's own and not curl's:
+/// <c>--ai-help</c>, so an AI agent running <c>curl --help all</c> finds the Markdown help (BL-2985, ADR-0224).
 /// </summary>
 internal static class CurlHelpTable
 {
@@ -12,6 +13,7 @@ internal static class CurlHelpTable
     internal static readonly IReadOnlyList<CurlHelpEntry> Entries =
     [
         new("    --abstract-unix-socket <path>", "Connect via abstract Unix domain socket", CurlHelpCategories.Connection | CurlHelpCategories.Http),
+        new(CurlHelpText.AiHelpOption, CurlHelpText.AiHelpDescription, CurlHelpCategories.Curl),
         new("    --alt-svc <filename>", "Enable alt-svc with this cache file", CurlHelpCategories.Http),
         new("    --anyauth", "Pick any authentication method", CurlHelpCategories.Http | CurlHelpCategories.Proxy | CurlHelpCategories.Auth),
         new("-a, --append", "Append to target file when uploading", CurlHelpCategories.Ftp | CurlHelpCategories.Sftp),

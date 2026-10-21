@@ -52,8 +52,8 @@ public sealed class CurlHelpTextTests
     {
         IReadOnlyList<string> lines = Lines(subject, CurlHelpText.DefaultColumns);
 
-        AssertReferenceLines(referenceFile, lines);
-        CollectionAssert.AreEqual(ReferenceLines(referenceFile), lines.ToArray());
+        AssertReferenceLines(referenceFile, WithoutCurlOnlyLines(lines));
+        CollectionAssert.AreEqual(ReferenceLines(referenceFile), WithoutCurlOnlyLines(lines));
     }
 
     [TestMethod]
@@ -66,19 +66,66 @@ public sealed class CurlHelpTextTests
     {
         IReadOnlyList<string> lines = Lines(subject, columns);
 
-        AssertReferenceLines(referenceFile, lines);
-        CollectionAssert.AreEqual(ReferenceLines(referenceFile), lines.ToArray());
+        AssertReferenceLines(referenceFile, WithoutCurlOnlyLines(lines));
+        CollectionAssert.AreEqual(ReferenceLines(referenceFile), WithoutCurlOnlyLines(lines));
     }
 
     [TestMethod]
-    public void Lines_Usage_JoinedWithCrLf_IsTheMeasuredByteCount()
+    public void Lines_Usage_JoinedWithCrLf_IsTheMeasuredByteCountPlusTheAiHelpLine()
     {
-        // curl 8.22.0 -h > file on Windows wrote 1291 bytes: 23 lines, each ended with CR LF.
+        // curl 8.22.0 -h > file on Windows wrote 1291 bytes: 23 lines, each ended with CR LF. Curl adds one line (BL-2985).
         IReadOnlyList<string> lines = Lines(null, CurlHelpText.DefaultColumns);
 
         int length = string.Concat(lines.Select(line => line + "\r\n")).Length;
-        Diagnostics.Assert("length joined with CR LF", 1291, length);
-        Assert.AreEqual(1291, string.Concat(lines.Select(line => line + "\r\n")).Length);
+        Diagnostics.Assert("length joined with CR LF", 1291 + CurlHelpText.AiHelpUsageLine.Length + 2, length);
+        Assert.AreEqual(1291 + CurlHelpText.AiHelpUsageLine.Length + 2, length);
+    }
+
+    [TestMethod]
+    [DataRow(CurlHelpText.DefaultColumns)]
+    [DataRow(21)]
+    [DataRow(200)]
+    public void Lines_Usage_EndsWithTheAiHelpLineAfterCurlsLastLine(int columns)
+    {
+        IReadOnlyList<string> lines = Lines(null, columns);
+
+        Diagnostics.Assert("last line", "Use \"--ai-help\" for Markdown help written for AI agents (Curl only)", lines[^1]);
+        Assert.AreEqual("Use \"--ai-help\" for Markdown help written for AI agents (Curl only)", lines[^1]);
+        Assert.AreEqual("Use \"--help [option]\" to view documentation for a given option", lines[^2]);
+    }
+
+    [TestMethod]
+    [DataRow("all", "     --abstract-unix-socket <path>", "     --alt-svc <filename>")]
+    [DataRow("curl", "curl: The command line tool itself", " -K, --config <file>")]
+    [DataRow("Curl", "curl: The command line tool itself", " -K, --config <file>")]
+    public void Lines_AllAndCurl_ListAiHelpAlignedInItsAlphabeticalPlace(string subject, string previousLineStart, string nextRowStart)
+    {
+        List<string> lines = [.. Lines(subject, CurlHelpText.DefaultColumns)];
+
+        int row = lines.FindIndex(line => line.StartsWith("     --ai-help <category> ", StringComparison.Ordinal));
+        Diagnostics.Act("row", row);
+        Diagnostics.Assert("next row", nextRowStart, lines[row + 1]);
+        Assert.EndsWith("  Markdown help for AI agents (Curl only)", lines[row]);
+        Assert.StartsWith(previousLineStart, lines[row - 1]);
+        Assert.StartsWith(nextRowStart, lines[row + 1]);
+        Assert.AreEqual(DescriptionColumn(lines[row + 1]), DescriptionColumn(lines[row]));
+    }
+
+    /// <summary>Where a row's description starts: after the padded option and its two spaces.</summary>
+    private static int DescriptionColumn(string row) => row.LastIndexOf("  ", StringComparison.Ordinal) + 2;
+
+    private static string[] WithoutCurlOnlyLines(IReadOnlyList<string> lines) =>
+        [.. lines.Where(line => line != CurlHelpText.AiHelpUsageLine && !line.StartsWith(" " + CurlHelpText.AiHelpOption + " ", StringComparison.Ordinal))];
+
+    [TestMethod]
+    [DataRow("ai-help")]
+    [DataRow("AI-Help")]
+    public void Lines_AiHelpSubject_IsItsSection(string subject)
+    {
+        IReadOnlyList<string> lines = Lines(subject, CurlHelpText.DefaultColumns);
+
+        Diagnostics.Assert("first line", "    --ai-help <category>", lines[0]);
+        CollectionAssert.AreEqual(CurlHelpText.AiHelpSectionLines.ToArray(), lines.ToArray());
     }
 
     [TestMethod]
@@ -91,8 +138,8 @@ public sealed class CurlHelpTextTests
     {
         IReadOnlyList<string> lines = Lines(subject, CurlHelpText.DefaultColumns);
 
-        AssertReferenceLines(referenceFile, lines);
-        CollectionAssert.AreEqual(ReferenceLines(referenceFile), lines.ToArray());
+        AssertReferenceLines(referenceFile, WithoutCurlOnlyLines(lines));
+        CollectionAssert.AreEqual(ReferenceLines(referenceFile), WithoutCurlOnlyLines(lines));
     }
 
     [TestMethod]

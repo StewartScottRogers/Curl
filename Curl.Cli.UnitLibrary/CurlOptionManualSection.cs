@@ -7,7 +7,8 @@ namespace Curl.Cli;
 /// name (after dropping a <c>--no-</c> prefix, which only a boolean may carry) or by its single letter; the
 /// manual after <c>ALL OPTIONS</c> is searched for the option's heading and printed up to the next heading,
 /// or up to <c>FILES</c> for <c>--xattr</c>, the last option. A name curl knows whose heading the manual does
-/// not carry (<c>--help --no-compressed</c>, <c>--help --include</c>) prints nothing, as curl does. The lines
+/// not carry (<c>--help --no-compressed</c>, <c>--help --include</c>) prints nothing, as curl does. Curl's own
+/// <c>--help --ai-help</c> prints <see cref="CurlHelpText.AiHelpSectionLines"/> (BL-2985). The lines
 /// carry no line terminator; the console layer chooses the newline.
 /// </summary>
 public static class CurlOptionManualSection
@@ -35,6 +36,12 @@ public static class CurlOptionManualSection
     /// </returns>
     public static bool TryGetLines(string subject, out IReadOnlyList<string> lines)
     {
+        if (subject == "--ai-help")
+        {
+            lines = CurlHelpText.AiHelpSectionLines;
+            return true;
+        }
+
         CurlOptionAlias? alias = FindAlias(subject);
         lines = alias is null ? [] : SectionLines(Heading(alias, subject), alias.Name == LastOptionName ? FilesHeading : NextOptionHeading);
         return alias is not null;
