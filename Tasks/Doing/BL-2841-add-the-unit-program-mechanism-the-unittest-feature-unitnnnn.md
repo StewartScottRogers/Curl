@@ -36,3 +36,4 @@ In the runner (`Curl.Conformance.UnitLibrary/UpstreamCaseScreening.cs`, `Upstrea
 ## Log
 
 - 2026-10-19: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: b5f01ec6 81432b77 c5c245cb 59f1e430 e8a42364 2bb4cd17.
