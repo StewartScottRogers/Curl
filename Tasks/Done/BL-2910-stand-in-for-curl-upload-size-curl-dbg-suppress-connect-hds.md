@@ -29,7 +29,7 @@ Split from BL-2835. Read upstream's source at tag `curl-8_22_0` for each variabl
 
 ## Notes
 
-- Decided in ADR-0733 (Claude under Stewart's delegation). `CreateRunner` takes `webSocketRandomSource` and `fileSystem`, both off by default; the harness passes `WebSocketRandomSourceFor` (2300) and, under `CURL_UPLOAD_SIZE`, `UploadSizeCappingFileSystem` (447). Upstream's `lib/sendf.c` makes `CURL_DBG_SUPPRESS_CONNECT_HDS` the same check as `--suppress-connect-headers`, so `RunCurlAsync` appends that option under it (2349).
+- Decided in ADR-0735 (Claude under Stewart's delegation). `CreateRunner` takes `webSocketRandomSource` and `fileSystem`, both off by default; the harness passes `WebSocketRandomSourceFor` (2300) and, under `CURL_UPLOAD_SIZE`, `UploadSizeCappingFileSystem` (447). Upstream's `lib/sendf.c` makes `CURL_DBG_SUPPRESS_CONNECT_HDS` the same check as `--suppress-connect-headers`, so `RunCurlAsync` appends that option under it (2349).
 - Touches widened to `UpstreamConformanceTests.cs` (`RunCurlAsync` passes the stand-ins) and `UpstreamConformanceTests.DebugStandIns.cs` (one rule line); no task in Doing on `origin/work/dark-factory` named either.
 - The existing ws + `CURL_ENTROPY` rule already gave 2300 Debug; `PlatformFor_ToolTransferDebugVariable_ReportsDebugOnlyThen` pins it with the other two.
 - `CreateRunner` went to complexity 12 with the new `??`; the HSTS clock ternary and the file-system fallback moved to `HonouredHstsClockOf` and `RunFileSystemOf`. Measure-CodeQuality -Library Curl.Console: 100% line, 100% branch, 0 failing.
