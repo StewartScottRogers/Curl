@@ -11,7 +11,26 @@ public sealed class UpstreamStandInFrontsTests
 
         UpstreamStandInFronts.Create(null, null, null).AddVariables(variables, certificateDirectory: null);
 
-        Assert.IsEmpty(variables);
+        CollectionAssert.AreEquivalent(new[] { "SMBPORT" }, variables.Keys.ToArray());
+    }
+
+    [TestMethod]
+    public void AddVariables_GivesSmbPortTheSmbStandInsPort()
+    {
+        Dictionary<string, string> variables = [];
+
+        UpstreamStandInFronts.Create(null, null, null).AddVariables(variables, certificateDirectory: null);
+
+        Assert.AreEqual(UpstreamCaseRunner.SmbPort, variables["SMBPORT"]);
+        Assert.AreEqual(UpstreamCaseRunner.SmbPort, SmbServerConnector.SmbPort.ToString(System.Globalization.CultureInfo.InvariantCulture));
+    }
+
+    [TestMethod]
+    public void WithFeatures_ReportsTheSmbProtocol()
+    {
+        UpstreamCurlPlatform platform = UpstreamStandInFronts.Create(null, null, null).WithFeatures(UpstreamCurlPlatform.All[0]);
+
+        Assert.Contains("smb", platform.Features);
     }
 
     [TestMethod]
@@ -22,7 +41,7 @@ public sealed class UpstreamStandInFrontsTests
         UpstreamStandInFronts.Create(null, null, null).AddVariables(variables, certificateDirectory: "/certs");
 
         CollectionAssert.AreEquivalent(
-            new[] { "HTTPSPORT", "FTPSPORT", "SMTPSPORT", "IMAPSPORT", "POP3SPORT", "MQTTSPORT", "GOPHERSPORT", "HTTP2TLSPORT", "HTTPSPROXYPORT" },
+            new[] { "HTTPSPORT", "FTPSPORT", "SMTPSPORT", "IMAPSPORT", "POP3SPORT", "MQTTSPORT", "GOPHERSPORT", "HTTP2TLSPORT", "HTTPSPROXYPORT", "SMBPORT" },
             variables.Keys.ToArray());
         Assert.AreEqual(UpstreamCaseRunner.Http2TlsPort, variables["HTTP2TLSPORT"]);
     }

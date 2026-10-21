@@ -55,7 +55,7 @@ internal static class UpstreamCaseScreening
     // Interpreted, not source-generated, so no generated code counts against the coverage gate.
     private static readonly Regex InternetUrlHost = new(@"\bhttps?://(?<host>[A-Za-z][A-Za-z0-9-]*(?:\.[A-Za-z0-9-]+)+)", RegexOptions.CultureInvariant);
 
-    private static readonly HashSet<string> Servers = ["http", "http-ipv6", "http-unix", "http-proxy", HttpsProxyServerConnector.EmulatedServer, "socks4", "socks5", "mqtt", "tftp", .. DnsServerConnector.EmulatedServers, "gopher", "gopher-ipv6", "ftp-ipv6", "file", "none", .. LineProtocolServerConnector.EmulatedServers, .. MailTlsServerConnector.EmulatedServers, .. FtpsServerConnector.EmulatedServers, .. MqttsServerConnector.EmulatedServers, .. GophersServerConnector.EmulatedServers, .. DictServerConnector.EmulatedServers, .. TelnetServerConnector.EmulatedServers, .. RtspServerConnector.EmulatedServers, "sftp", "scp"];
+    private static readonly HashSet<string> Servers = ["http", "http-ipv6", "http-unix", "http-proxy", HttpsProxyServerConnector.EmulatedServer, "socks4", "socks5", "mqtt", "tftp", .. DnsServerConnector.EmulatedServers, "gopher", "gopher-ipv6", "ftp-ipv6", "file", "none", .. LineProtocolServerConnector.EmulatedServers, .. MailTlsServerConnector.EmulatedServers, .. FtpsServerConnector.EmulatedServers, .. MqttsServerConnector.EmulatedServers, .. GophersServerConnector.EmulatedServers, .. DictServerConnector.EmulatedServers, .. TelnetServerConnector.EmulatedServers, .. RtspServerConnector.EmulatedServers, .. SmbServerConnector.EmulatedServers, "sftp", "scp"];
 
     // Upstream's nghttpx front of sws, emulated only when the runner is given an UpstreamHttp2Server.
     private const string Http2Server = "http/2";

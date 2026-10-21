@@ -23,6 +23,7 @@ internal sealed class UpstreamStandInFronts
             new UpstreamMailTlsFront(),
             new UpstreamMqttsFront(),
             new UpstreamGophersFront(),
+            new UpstreamSmbFront(),
             new UpstreamHttp2Front(http2Server),
             new UpstreamHttpsProxyFront(),
         ];

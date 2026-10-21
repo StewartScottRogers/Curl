@@ -140,6 +140,9 @@ public sealed class UpstreamCaseRunner(
     /// </summary>
     public const string RtspPort = "8996";
 
+    /// <summary>The value of <c>%SMBPORT</c>: connections to this port reach the smbserver.py emulation, <see cref="SmbServerConnector"/>, which writes no protocol dump (BL-2860).</summary>
+    public const string SmbPort = "9020";
+
     /// <summary>The value of <c>%TFTPPORT</c>: datagrams to this port reach the tftpd emulation, <see cref="TftpServerConnector"/>, whose request dump follows the mqttd emulation's for <c>&lt;verify&gt;&lt;protocol&gt;</c>.</summary>
     public const string TftpPort = "9003";
 
