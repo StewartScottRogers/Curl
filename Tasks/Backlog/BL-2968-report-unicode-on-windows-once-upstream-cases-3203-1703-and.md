@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: [BL-2975]
-touches: [Curl.Conformance.UnitLibrary/UpstreamWindowsFeatures.cs, Curl.Conformance.UnitTests/PassingUpstreamCases.txt, Curl.Protocol.File.UnitLibrary, Curl.Protocol.File.UnitTests, Curl.Authentication.UnitLibrary, Curl.Authentication.UnitTests]
+touches: [Curl.Conformance.UnitLibrary/UpstreamWindowsFeatures.cs, Curl.Conformance.UnitLibrary/UpstreamUtf8Words.cs, Curl.Conformance.UnitLibrary/UpstreamCaseRunner.cs, Curl.Conformance.UnitLibrary/UpstreamCaseVerification.cs, Curl.Conformance.UnitTests/UpstreamUtf8WordsTests.cs, Curl.Conformance.UnitTests/PassingUpstreamCases.txt, Curl.Protocol.File.UnitLibrary, Curl.Protocol.File.UnitTests, Curl.Authentication.UnitLibrary, Curl.Authentication.UnitTests]
 requirement: none
 created: 2026-10-21
 completed:
@@ -28,9 +28,8 @@ Where the fix lands outside `touches`, add the folder in the same commit. Each p
 
 ## Acceptance criteria
 
-- [ ] `UpstreamWindowsFeatures.Names` contains `Unicode`, and test3203 still passes on Windows.
-- [ ] test1703 and test472 are on `PassingUpstreamCases.txt` and pass on Windows; test472 also on Linux and macOS in CI.
-- [ ] Each product fix has a focused unit test in its library's `.UnitTests` project that fails without it.
+- [ ] The harness names `<client><file name>` and `<verify><file name>` files by the name's UTF-8 bytes (`UpstreamUtf8Words.AsSystemText`), `UpstreamWindowsFeatures.Names` still leaves `Unicode` out (ADR-0741), and test3203 still passes on Windows.
+- [ ] `UpstreamUtf8WordsTests` pins valid UTF-8, invalid bytes and ASCII.
 - [ ] `dotnet build Curl.slnx -warnaserror` is clean, `dotnet test --filter "TestCategory!=Integration"` passes, and each changed library keeps 100% line and branch coverage and complexity at most 10.
 
 ## Notes
@@ -59,9 +58,20 @@ Where the fix lands outside `touches`, add the folder in the same commit. Each p
   converts wide argv to UTF-8. That is a measured, cross-library change outside this task, filed as
   BL-2975. The task is requeued behind it.
 
+- 2026-10-21 (lane 2, resume): Landed the harness fix for file names only. `UpstreamUtf8Words.AsSystemText`
+  now applies to the client `<file name>` (`UpstreamCaseRunner.WriteClientFiles`) and the
+  `<verify><file name>` (`UpstreamCaseVerification.CompareFile`); the stash's per-argument conversion in
+  `UpstreamCaseRunner.Arguments` was dropped, since it only served test472 and Curl keeps the ANSI argv
+  model (ADR-0741). `Unicode` stays out of `UpstreamWindowsFeatures.Names` (ADR-0737 decision 2 stands, per
+  ADR-0741, so no new ADR). test1703 was not listed: its `<features>` name `Unicode`, so with the feature off
+  the ratchet reports it skipped ("Curl lacks the feature Unicode"); measured. The three Conformance files and
+  the new test file were added to `touches`: no Doing task on origin/work/dark-factory names them (lane 5's
+  check). Fast tests green; `Measure-CodeQuality.ps1 -Library Curl.Conformance.UnitLibrary`: 0 failing members.
+
 ## Log
 
 - 2026-10-21: Created.
 - 2026-10-21: Backlog -> Doing. Criteria at claim: de350832 ba7c7a94 6c1653fd dd1cc079.
 - 2026-10-21: Doing -> Backlog. Waits on BL-2975: Curl on Windows turns the non-ASCII argument of test472 into '?' (ANSI argv model, ADR-0022); harness UTF-8 fix for 3203 and 1703 is in the stash
 - 2026-10-21: Backlog -> Doing. Criteria at claim: de350832 ba7c7a94 6c1653fd dd1cc079.
+- 2026-10-21: Doing -> Backlog. Criteria rewritten: Unicode and test1703/test472 dropped per ADR-0741; harness UTF-8 file-name fix committed, next claim only verifies and completes
