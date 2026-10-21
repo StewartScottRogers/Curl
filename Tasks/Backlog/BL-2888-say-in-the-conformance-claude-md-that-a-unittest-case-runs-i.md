@@ -1,5 +1,5 @@
 ---
-id: BL-2883
+id: BL-2888
 title: Say in the conformance CLAUDE.md that a unittest case runs its ported unit program
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-21
 completed:
 ---
-# BL-2883 — Say in the conformance CLAUDE.md that a unittest case runs its ported unit program
+# BL-2888 — Say in the conformance CLAUDE.md that a unittest case runs its ported unit program
 
 ## Goal
 

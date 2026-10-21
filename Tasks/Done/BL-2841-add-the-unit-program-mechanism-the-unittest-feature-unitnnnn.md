@@ -37,7 +37,7 @@ In the runner (`Curl.Conformance.UnitLibrary/UpstreamCaseScreening.cs`, `Upstrea
 - The unit program runs through the same `first.c`-style wrapper as a libtest program (`URL:` and `Test ended with result <N>` on stderr), its failure count the exit code.
 - `Curl.slnx`: the new pair sits right after `Curl.Conformance.UnitTests`, not between `Curl.Conformance.UnitLibrary` and its `.UnitTests`, since keeping each `.UnitTests` directly after its library is the stronger layout rule.
 - Coverage: `IsNumberedProgram` was at 83% branch because the `char.IsAsciiDigit` method-group delegate is cached per type and shared with `LibTestProgramName`, so its null-cache branch never ran there; replaced with `ContainsAnyExceptInRange('0', '9')`. Measure-CodeQuality: `Curl.Conformance.UnitLibrary` 100/100, `Curl.Conformance.UnitProgram.UnitLibrary` 100/100, complexity at most 10.
-- `Curl.Conformance.UnitLibrary/CLAUDE.md` still describes `unitNNNN` tools as never run; BL-2880 holds that file, so the doc fix is filed as BL-2883.
+- `Curl.Conformance.UnitLibrary/CLAUDE.md` still describes `unitNNNN` tools as never run; BL-2880 holds that file, so the doc fix is filed as BL-2888.
 
 ## Log
 
