@@ -44,3 +44,4 @@ Prerequisite pass: the runner already runs ported unit programs (1302 and 1600 p
 - 2026-10-19: Created.
 - 2026-10-21: Backlog -> Doing. Criteria at claim: 759c7e24 2e3e75ab e66ae9dd c0723528 620ebead.
 - 2026-10-21: Doing -> Backlog. Split for size into BL-2895 to BL-2894 (one port group each, disjoint touches); waits on them
+- 2026-10-21: Backlog -> Doing. Criteria at claim: 759c7e24 2e3e75ab e66ae9dd c0723528 620ebead.
