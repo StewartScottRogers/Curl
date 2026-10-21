@@ -5,7 +5,7 @@ namespace Curl.Conformance.UnitProgram;
 /// looks a <c>unittest</c> case's program up in (ADR-0711). An explicit table, never a reflection scan,
 /// since every production project is published native AOT.
 /// </summary>
-public sealed class UnitPrograms
+public sealed partial class UnitPrograms
 {
     private readonly Dictionary<string, IUnitProgram> programsByName = new(StringComparer.Ordinal);
 
@@ -27,10 +27,20 @@ public sealed class UnitPrograms
     }
 
     /// <summary>
-    /// Every program ported so far: the table each port task (BL-2842 to BL-2848) appends its program to.
+    /// Every program ported so far: the programs of the seven area files <c>UnitPrograms.&lt;Area&gt;.cs</c>
+    /// (BL-2842 to BL-2848), each port task appending to its own area's file only.
     /// A <c>unittest</c> case whose program is not here is skipped as having no port.
     /// </summary>
-    public static UnitPrograms Ported { get; } = new([]);
+    public static UnitPrograms Ported { get; } = new(
+    [
+        .. HashesPrograms,
+        .. Asn1Programs,
+        .. UrlParsingPrograms,
+        .. ToolParsersPrograms,
+        .. HeadersPrograms,
+        .. DnsPrograms,
+        .. LimitsPrograms,
+    ]);
 
     /// <summary>The names of the programs in the table, such as <c>unit1302</c>.</summary>
     public IReadOnlyCollection<string> ProgramNames => programsByName.Keys;

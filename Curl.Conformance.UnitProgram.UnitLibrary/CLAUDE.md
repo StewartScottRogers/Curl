@@ -13,7 +13,7 @@ which the upstream case runner runs for a case with the `unittest` feature (ADR-
 - `UnitProgramResult` is `unitcheck.h`'s `unitfail`: `FailureCount`, which is the `ExitCode`; `Success` is 0.
 - `UnitPrograms` is the table of ported programs by `ProgramName` the case runner looks a case's program
   up in: an explicit list, never a reflection scan (AOT). Two programs of one name throw.
-  `UnitPrograms.Ported` is the table each port task (BL-2842 to BL-2848) appends its program to.
+  `UnitPrograms.Ported` is built from one file per area, `UnitPrograms.<Area>.cs` (Hashes, Asn1, UrlParsing, ToolParsers, Headers, Dns, Limits); each port task (BL-2842 to BL-2848) appends its program to its own area's file only. The csproj already references every library the ports run against.
 
 The case runner (`Curl.Conformance.UnitLibrary`) names a `unittest` case's program from its
 `<client><tool>` (`tool%TESTNUMBER`, `unit1305`) or, with no `<tool>`, as `unit%TESTNUMBER`, and skips the

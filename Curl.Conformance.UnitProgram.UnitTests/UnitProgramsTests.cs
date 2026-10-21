@@ -1,3 +1,5 @@
+using System.Reflection;
+
 namespace Curl.Conformance.UnitProgram.UnitTests;
 
 [TestClass]
@@ -53,6 +55,20 @@ public sealed class UnitProgramsTests
         string[] names = [.. UnitPrograms.Ported.ProgramNames];
 
         Assert.AreEqual(names.Length, names.Distinct(StringComparer.Ordinal).Count());
+    }
+
+    [TestMethod]
+    public void Ported_HoldsTheProgramsOfEveryAreaFile()
+    {
+        string[] areas = ["Hashes", "Asn1", "UrlParsing", "ToolParsers", "Headers", "Dns", "Limits"];
+        List<string> expected = [];
+        foreach (string area in areas)
+        {
+            PropertyInfo property = typeof(UnitPrograms).GetProperty(area + "Programs", BindingFlags.NonPublic | BindingFlags.Static)!;
+            expected.AddRange(((IUnitProgram[])property.GetValue(null)!).Select(program => program.ProgramName));
+        }
+
+        CollectionAssert.AreEquivalent(expected, UnitPrograms.Ported.ProgramNames.ToArray());
     }
 
     [TestMethod]
