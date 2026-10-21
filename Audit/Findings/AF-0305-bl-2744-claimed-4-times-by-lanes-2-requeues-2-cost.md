@@ -3,8 +3,8 @@ id: AF-0305
 title: BL-2744 claimed 4 times by lanes (2 requeues, 2 cost-cap blocks): a file outside its touches, a stash that did not apply, then claims refused by the cost cap
 auditor: process
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: process:logs:BL-2744:redone-work
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Log
 
 - 2026-10-19: filed proposed.
+- 2026-10-21: proposed -> accepted.
