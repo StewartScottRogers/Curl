@@ -35,3 +35,4 @@ Where to start: `HttpRequestBodyWriter` reads a `StreamBody` piece by piece (`Re
 ## Log
 
 - 2026-10-21: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: 2d0a8b2f f0833359 9742157d.
