@@ -330,3 +330,18 @@ with a default of 9 lanes." `-MaxLanes` now defaults to 9, so a default `-Lanes 
 shift starts at `min(capacity, machineCap, 9)` and paces down from there as before. The
 board's capacity and the probed machine cap still bind first when lower. A fixed count is
 still `-Lanes 9`.
+
+## Amendment 2026-10-21: the first three lanes run unpaced
+
+Stewart: "Lets not check token use for new lanes until after we are running more than 3
+lanes", and, asked where pacing takes over, "3". `-UnpacedLanes` (default 3) sets the floor
+the pace works above: `desired = max(min(pace, ceiling), min(UnpacedLanes, ceiling))`.
+
+- Below three lanes each step adds one lane, burn rate or not, and traces
+  "lanes 1 -> 2 (up to 3 lanes run unpaced)".
+- The pace decides only the lanes above three, and a low pace retires straight down to
+  three, never below.
+- The board's capacity, the machine cap and `-MaxLanes` still cap the count, and a ceiling
+  below three still retires lanes at once. `-StopAtUsage` and `-StopAtWeeklyUsage` still
+  end claims, so the unpaced lanes cannot run the windows dry.
+- `-UnpacedLanes 1` is the behaviour before this amendment.
