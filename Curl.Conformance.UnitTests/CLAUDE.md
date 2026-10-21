@@ -91,3 +91,10 @@ system without `TestCategory("Integration")`: a case's `%LOGDIR` files and curl'
 are real files, as upstream's are, and ADR-0013 puts the ratchet in the fast suite. Every file
 stays under the test output's `log/` folder, and a case naming a file outside its own log
 directory is skipped.
+
+## Perl command scripts
+
+A case's `<command type="perl">` runs only when its script has a C# interpretation registered in
+`UpstreamPerlCommandScripts`. Each script registers itself from its own
+`UpstreamPerlCommandScripts.Test<N>.cs` file through a `[ModuleInitializer]` (BL-2994), so a task
+adding one touches only that file, never `UpstreamConformanceTests.cs`.

@@ -49,15 +49,7 @@ public sealed partial class UpstreamConformanceTests
     // Past it the case is judged failed, so only a listed case fails its row.
     private static readonly TimeSpan CaseHangLimit = TimeSpan.FromSeconds(30);
 
-    private static readonly string UpstreamTestDataFolder = Path.Combine(AppContext.BaseDirectory, "UpstreamTestData");
-
-    // The Perl scripts a case's <command type="perl"> runs, each interpreted in C# (BL-2887, BL-2865).
-    private static readonly Dictionary<string, Func<UpstreamCurlInvocation, Func<UpstreamCurlInvocation, Task<int>>, Task<int>>> PerlCommandScripts = new()
-    {
-        [UpstreamTest1707Script.ScriptName] = new UpstreamTest1707Script(UpstreamTestDataFolder).RunAsync,
-        [UpstreamTest971Script.ScriptName] = UpstreamTest971Script.RunAsync,
-        [UpstreamTest1486Script.ScriptName] = UpstreamTest1486Script.RunAsync,
-    };
+    internal static readonly string UpstreamTestDataFolder = Path.Combine(AppContext.BaseDirectory, "UpstreamTestData");
 
     // Beside the tests rather than under the system's temporary folder, whose path can hold a
     // space that an unquoted %LOGDIR in a command would split, as upstream's relative log/ never does.
@@ -166,7 +158,7 @@ public sealed partial class UpstreamConformanceTests
         DirectoryInfo logDirectory = Directory.CreateDirectory(Path.Combine(LogFolder, $"test{testNumber}-{Guid.NewGuid():N}"));
         try
         {
-            UpstreamCaseRunner runner = new(RunCurlAsync, PlatformFor(testFile), TimeProvider.System, TimeLimit, SshServer, Http2Server, Http3Server, libTests: LibTests, unitPrograms: UnitPrograms.Ported, perlCommandScripts: PerlCommandScripts);
+            UpstreamCaseRunner runner = new(RunCurlAsync, PlatformFor(testFile), TimeProvider.System, TimeLimit, SshServer, Http2Server, Http3Server, libTests: LibTests, unitPrograms: UnitPrograms.Ported, perlCommandScripts: UpstreamPerlCommandScripts.All);
             return await Task.Run(() => runner.RunAsync(testNumber, testFile, logDirectory.FullName, certificateDirectory: CertificateFolder.Value, sourceDirectory: UpstreamTestDataFolder)).WaitAsync(CaseHangLimit);
         }
         catch (TimeoutException)
