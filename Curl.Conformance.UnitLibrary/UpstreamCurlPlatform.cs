@@ -41,8 +41,9 @@ namespace Curl.Conformance;
 /// libcurl's build and API features, which a command-line tool does not have (<c>Debug</c>,
 /// <c>TrackMemory</c>, <c>unittest</c>,
 /// <c>shuffle-dns</c>, <c>override-dns</c>, <c>getrlimit</c>); the other protocols the harness has no server for; features
-/// absent from Curl's <c>curl -V</c> (<c>SSPI</c>, <c>Unicode</c>, <c>MultiSSL</c>,
-/// <c>ssl-sessions</c>, <c>c-ares</c>).
+/// absent from Curl's <c>curl -V</c> (<c>SSPI</c>, <c>Unicode</c>, <c>MultiSSL</c>, <c>c-ares</c>), and
+/// <c>ssl-sessions</c> on Windows, where the Schannel build has no <c>SSLS-EXPORT</c>; off Windows
+/// <c>runtests.pl</c> derives <c>ssl-sessions</c> from <c>SSLS-EXPORT</c>, and so does this list (ADR-0737, BL-2858).
 /// </para>
 /// </remarks>
 public sealed class UpstreamCurlPlatform
