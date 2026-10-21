@@ -32,3 +32,4 @@ curl's `time2str` and `max6out` (Curl's `ProgressMeterFields`, now in `Curl.Cons
 ## Log
 
 - 2026-10-21: Created (split from BL-2845, which waits on it).
+- 2026-10-21: Backlog -> Doing. Criteria at claim: 5fcee81b 3d228e1f d3a9ab15 099d1d27.
