@@ -37,13 +37,13 @@ Run each case with `$env:CURL_UPSTREAM_CASE='<n>'` as `Curl.Conformance.UnitTest
 
 ## Notes
 
-Windows outcomes, each case run once with `CURL_UPSTREAM_CASE` on 2026-10-21 (decisions in ADR-0734):
+Windows outcomes, each case run once with `CURL_UPSTREAM_CASE` on 2026-10-21 (decisions in ADR-0737):
 
 - 8: **passes, listed.** Cause: Curl tail-matched `partialip=nono; domain=.0.0.1` against the IP host `127.0.0.1`; curl's `Curl_cookie_getlist` sends a cookie to an IP host only when its domain equals the address. Fixed in `CookieStore.DomainMatches`; `CookieStoreTests.GetCookieHeader_HostIsAnIpAddress_SendsOnlyACookieForThatExactAddress` fails in two rows with the fix taken out (checked). Upstream's own expected output was the reference; real curl not re-recorded.
 - 777: skipped on Windows (`ssl-sessions`, the Schannel build has no `SSLS-EXPORT` and refuses `--ssl-sessions`); **listed** for Linux and macOS, where `UpstreamUnixFeatures` now names `ssl-sessions` beside `SSLS-EXPORT` as `runtests.pl` derives it. The case verifies only exit 0, and `TlsSessionCache.Import` returns warnings for undecodable lines rather than failing. Not runnable on a Windows lane, so CI on Linux and macOS is its first run.
 - 1703: not listed - with `Unicode` added on Windows it failed (`--output` empty), and `Unicode` stays off (below).
 - 472: not listed - with `Unicode` added it failed (`Signature=ea8d5ce0...` where the case expects `b8783c83...`).
-- `Unicode` stays off: adding it changed listed test3203's expansion and 3203 then failed (the file name's UTF-8 encoded twice in the `file://` listing). Filed BL-2965 to fix 3203, 1703 and 472 under `Unicode` and then report it.
+- `Unicode` stays off: adding it changed listed test3203's expansion and 3203 then failed (the file name's UTF-8 encoded twice in the `file://` listing). Filed BL-2968 to fix 3203, 1703 and 472 under `Unicode` and then report it.
 - 594: not listed - curl did not finish within 20 seconds (upstream disables it as unreliable).
 - 836: not listed - differs, Curl sends `B004 UID FETCH 2 BODY[]` where the case expects `B004 FETCH 2 BODY[]`.
 - 938: not listed - differs, the `AUTH PLAIN` initial response is `AHVzZXIub25lAHNlY3JldA==` where the case expects `dXNlci5vbmUAdXNlci5vbmUAc2VjcmV0`.
@@ -61,4 +61,4 @@ Windows outcomes, each case run once with `CURL_UPSTREAM_CASE` on 2026-10-21 (de
 
 - 2026-10-19: Created.
 - 2026-10-21: Backlog -> Doing. Criteria at claim: 970768a5 bf92cf5e 722fd9db dd1cc079 620ebead.
-- 2026-10-21: Doing -> Done. test8 passes (IP hosts get only exact-domain cookies), test777 runs on Linux/macOS via ssl-sessions; the other ten recorded in ADR-0734, Unicode work filed as BL-2965
+- 2026-10-21: Doing -> Done. test8 passes (IP hosts get only exact-domain cookies), test777 runs on Linux/macOS via ssl-sessions; the other ten recorded in ADR-0737, Unicode work filed as BL-2968
