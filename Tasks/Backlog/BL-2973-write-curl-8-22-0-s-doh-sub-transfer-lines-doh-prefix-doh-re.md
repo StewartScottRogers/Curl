@@ -1,16 +1,16 @@
----
+﻿---
 id: BL-2973
 title: Write curl 8.22.0's DoH sub-transfer lines: [DoH] prefix, DoH request complete, AAAA probe first
 priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: [BL-2970]
-touches: [Curl.Output.UnitLibrary/DohSubTransferEvents.cs, Curl.Output.UnitTests/DohSubTransferEventsTests.cs, Curl.Engine.UnitTests/EngineCompositionDohSubTransferTraceTests.cs, Curl.Engine.UnitTests/EngineCompositionDohTests.cs, Curl.Networking.UnitLibrary/DohDnsResolver.cs, Curl.Networking.UnitLibrary/DohTraceLines.cs, Curl.Networking.UnitTests/DohDnsResolverSubTransferTests.cs, Curl.Networking.UnitTests/DohDnsResolverTraceTests.cs]
+touches: [Curl.Output.UnitLibrary/DohSubTransferEvents.cs, Curl.Output.UnitTests/DohSubTransferEventsTests.cs, Curl.Engine.UnitTests/EngineCompositionDohSubTransferTraceTests.cs, Curl.Engine.UnitTests/EngineCompositionDohTests.cs, Curl.Networking.UnitLibrary/DohDnsResolver.SubTransferTrace.cs, Curl.Networking.UnitLibrary/DohTraceLines.cs, Curl.Networking.UnitTests/DohDnsResolverSubTransferTests.cs, Curl.Networking.UnitTests/DohDnsResolverTraceTests.cs]
 requirement: none
 created: 2026-10-21
 completed:
 ---
-# BL-2973 — Write curl 8.22.0's DoH sub-transfer lines: [DoH] prefix, DoH request complete, AAAA probe first
+# BL-2973 â€” Write curl 8.22.0's DoH sub-transfer lines: [DoH] prefix, DoH request complete, AAAA probe first
 
 ## Goal
 

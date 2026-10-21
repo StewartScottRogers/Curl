@@ -1,16 +1,16 @@
----
+﻿---
 id: BL-2923
 title: Port upstream unit programs 1650 and 1655: DoH request encoding and response parsing
 priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: [BL-2969]
-touches: [Curl.Conformance.UnitTests/PassingUpstreamCases.txt, Curl.Conformance.UnitProgram.UnitLibrary/UnitPrograms.Dns.cs, Curl.Conformance.UnitProgram.UnitLibrary/Dns/Doh, Curl.Conformance.UnitProgram.UnitTests/Dns/Doh, Curl.Networking.UnitLibrary/DohDnsResolver.cs, Curl.Networking.UnitLibrary/DohResponseReader.cs, Curl.Networking.UnitLibrary/DnsAnswerDecoder.cs, Curl.Networking.UnitTests]
+touches: [Curl.Conformance.UnitTests/PassingUpstreamCases.txt, Curl.Conformance.UnitProgram.UnitLibrary/UnitPrograms.Dns.cs, Curl.Conformance.UnitProgram.UnitLibrary/Dns/Doh, Curl.Conformance.UnitProgram.UnitTests/Dns/Doh, Curl.Networking.UnitLibrary/DohDnsResolver.RequestEncoding.cs, Curl.Networking.UnitLibrary/DohResponseReader.cs, Curl.Networking.UnitLibrary/DnsAnswerDecoder.cs, Curl.Networking.UnitTests/DohRequestEncodingTests.cs]
 requirement: none
 created: 2026-10-21
 completed:
 ---
-# BL-2923 — Port upstream unit programs 1650 and 1655: DoH request encoding and response parsing
+# BL-2923 â€” Port upstream unit programs 1650 and 1655: DoH request encoding and response parsing
 
 ## Goal
 

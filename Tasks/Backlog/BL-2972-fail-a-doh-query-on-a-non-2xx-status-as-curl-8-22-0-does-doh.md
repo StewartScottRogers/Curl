@@ -1,16 +1,16 @@
----
+﻿---
 id: BL-2972
 title: Fail a DoH query on a non-2xx status as curl 8.22.0 does: [DoH] [A] error: HTTP status N
 priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: [BL-2970]
-touches: [Curl.Networking.UnitLibrary/DohResponseReader.cs, Curl.Networking.UnitLibrary/DohDnsResolver.cs, Curl.Networking.UnitLibrary/DohTraceLines.cs, Curl.Networking.UnitTests/DohResponseReaderTests.cs, Curl.Networking.UnitTests/DohDnsResolverTraceTests.cs]
+touches: [Curl.Networking.UnitLibrary/DohResponseReader.cs, Curl.Networking.UnitLibrary/DohDnsResolver.Exchange.cs, Curl.Networking.UnitLibrary/DohTraceLines.ExchangeFailures.cs, Curl.Networking.UnitTests/DohResponseReaderTests.cs, Curl.Networking.UnitTests/DohDnsResolverTraceTests.ExchangeFailures.cs]
 requirement: none
 created: 2026-10-21
 completed:
 ---
-# BL-2972 — Fail a DoH query on a non-2xx status as curl 8.22.0 does: [DoH] [A] error: HTTP status N
+# BL-2972 â€” Fail a DoH query on a non-2xx status as curl 8.22.0 does: [DoH] [A] error: HTTP status N
 
 ## Goal
 

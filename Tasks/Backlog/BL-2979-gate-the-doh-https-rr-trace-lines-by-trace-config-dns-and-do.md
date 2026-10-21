@@ -1,16 +1,16 @@
----
+﻿---
 id: BL-2979
 title: Gate the DoH HTTPS-RR trace lines by --trace-config dns and doh as curl 8.22.0 does
 priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: [BL-2973]
-touches: [Curl.Networking.UnitLibrary/DohTraceLines.cs, Curl.Networking.UnitLibrary/DohDnsResolver.cs, Curl.Networking.UnitTests/DohDnsResolverHttpsRecordTraceTests.cs, Curl.Engine.UnitLibrary/EngineComposition.cs]
+touches: [Curl.Networking.UnitLibrary/DohTraceLines.HttpsRecord.cs, Curl.Networking.UnitLibrary/DohDnsResolver.HttpsRecord.cs, Curl.Networking.UnitTests/DohDnsResolverHttpsRecordTraceTests.cs, Curl.Engine.UnitLibrary/EngineComposition.cs]
 requirement: none
 created: 2026-10-21
 completed:
 ---
-# BL-2979 — Gate the DoH HTTPS-RR trace lines by --trace-config dns and doh as curl 8.22.0 does
+# BL-2979 â€” Gate the DoH HTTPS-RR trace lines by --trace-config dns and doh as curl 8.22.0 does
 
 ## Goal
 

@@ -1,16 +1,16 @@
----
+﻿---
 id: BL-2970
 title: Decode DoH CNAME answers as curl 8.22.0 does and write its A and AAAA --trace-config doh lines
 priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Networking.UnitLibrary/DnsAnswerDecoder.cs, Curl.Networking.UnitLibrary/DnsAnswer.cs, Curl.Networking.UnitLibrary/DnsMessageFailure.cs, Curl.Networking.UnitLibrary/DohQueryResult.cs, Curl.Networking.UnitLibrary/DohTraceLines.cs, Curl.Networking.UnitLibrary/DnsServerQuery.cs, Curl.Networking.UnitLibrary/DohDnsResolver.cs, Curl.Networking.UnitTests/DnsAnswerDecoderTests.cs, Curl.Networking.UnitTests/DohDnsResolverTraceTests.cs, Curl.Networking.UnitTests/NetworkingAdversarialTests.cs, Curl.Networking.UnitTests/DohDnsResolverSubTransferTests.cs, Curl.Engine.UnitTests/EngineCompositionDohSubTransferTraceTests.cs, Curl.Engine.UnitTests/EngineCompositionDohTests.cs, Documentation/Planning/Decisions/ADR-0738-doh-answers-decode-nxdomain-and-cap-ttls-as-curl-8-22-0-does.md]
+touches: [Curl.Networking.UnitLibrary/DnsAnswerDecoder.cs, Curl.Networking.UnitLibrary/DnsAnswer.cs, Curl.Networking.UnitLibrary/DnsMessageFailure.cs, Curl.Networking.UnitLibrary/DohQueryResult.cs, Curl.Networking.UnitLibrary/DohTraceLines.AnswerDecoding.cs, Curl.Networking.UnitLibrary/DnsServerQuery.cs, Curl.Networking.UnitLibrary/DohDnsResolver.AnswerDecoding.cs, Curl.Networking.UnitTests/DnsAnswerDecoderTests.cs, Curl.Networking.UnitTests/DohDnsResolverTraceTests.AnswerDecoding.cs, Curl.Networking.UnitTests/NetworkingAdversarialTests.cs, Curl.Networking.UnitTests/DohDnsResolverSubTransferTests.cs, Curl.Engine.UnitTests/EngineCompositionDohSubTransferTraceTests.cs, Curl.Engine.UnitTests/EngineCompositionDohTests.cs, Documentation/Planning/Decisions/ADR-0738-doh-answers-decode-nxdomain-and-cap-ttls-as-curl-8-22-0-does.md]
 requirement: none
 created: 2026-10-21
 completed:
 ---
-# BL-2970 — Decode DoH CNAME answers as curl 8.22.0 does and write its A and AAAA --trace-config doh lines
+# BL-2970 â€” Decode DoH CNAME answers as curl 8.22.0 does and write its A and AAAA --trace-config doh lines
 
 ## Goal
 

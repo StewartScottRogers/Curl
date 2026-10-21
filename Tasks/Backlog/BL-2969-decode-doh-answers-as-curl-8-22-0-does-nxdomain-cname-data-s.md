@@ -1,16 +1,16 @@
----
+﻿---
 id: BL-2969
 title: Decode DoH answers as curl 8.22.0 does: NXDOMAIN, CNAME data skipped, TTL capped at 86400
 priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: [BL-2970]
-touches: [Curl.Networking.UnitLibrary/DnsAnswerDecoder.cs, Curl.Networking.UnitLibrary/DnsAnswer.cs, Curl.Networking.UnitLibrary/DnsMessageFailure.cs, Curl.Networking.UnitLibrary/DnsMessageFailureText.cs, Curl.Networking.UnitLibrary/DohQueryResult.cs, Curl.Networking.UnitLibrary/DohTraceLines.cs, Curl.Networking.UnitLibrary/DnsServerQuery.cs, Curl.Networking.UnitLibrary/DohDnsResolver.cs, Curl.Networking.UnitTests]
+touches: [Curl.Networking.UnitLibrary/DnsAnswerDecoder.cs, Curl.Networking.UnitLibrary/DnsAnswer.cs, Curl.Networking.UnitLibrary/DnsMessageFailure.cs, Curl.Networking.UnitLibrary/DnsMessageFailureText.cs, Curl.Networking.UnitLibrary/DohQueryResult.cs, Curl.Networking.UnitLibrary/DohTraceLines.AnswerDecoding.cs, Curl.Networking.UnitLibrary/DnsServerQuery.cs, Curl.Networking.UnitLibrary/DohDnsResolver.AnswerDecoding.cs, Curl.Networking.UnitTests/DnsAnswerDecoderTests.cs, Curl.Networking.UnitTests/DohDnsResolverTraceTests.AnswerDecoding.cs]
 requirement: none
 created: 2026-10-21
 completed:
 ---
-# BL-2969 — Decode DoH answers as curl 8.22.0 does: NXDOMAIN, CNAME data skipped, TTL capped at 86400
+# BL-2969 â€” Decode DoH answers as curl 8.22.0 does: NXDOMAIN, CNAME data skipped, TTL capped at 86400
 
 ## Goal
 

@@ -1,16 +1,16 @@
----
+﻿---
 id: BL-2937
 title: Fix AF-0299: The proxy redial's answersChallenge = true can become false with no test failing, so the reconnect after a closed 407 acts as a first request
 priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Networking.UnitLibrary]
+touches: [Curl.Networking.UnitLibrary/TcpConnector.cs, Curl.Networking.UnitTests/TcpConnectorProxyRedialTests.cs]
 requirement: none
 created: 2026-10-21
 completed:
 ---
-# BL-2937 — Fix AF-0299: The proxy redial's answersChallenge = true can become false with no test failing, so the reconnect after a closed 407 acts as a first request
+# BL-2937 â€” Fix AF-0299: The proxy redial's answersChallenge = true can become false with no test failing, so the reconnect after a closed 407 acts as a first request
 
 ## Goal
 
