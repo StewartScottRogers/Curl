@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Sockets;
+using System.Threading.Tasks.Sources;
 using Curl.Protocol.Abstractions;
 using Curl.Testing;
 
@@ -86,13 +87,30 @@ public sealed class HttpRequestBodyWriterWaitingPieceResetTests
             async () => await writer.WriteAsync(new StreamBody(source, 3, "a/b"), false, CancellationToken.None));
     }
 
-    /// <summary>A stream whose reads complete only after the caller has started waiting on them, as a slow upload source's do.</summary>
+    /// <summary>
+    /// A stream whose reads complete only after the caller has started waiting on them, as a slow upload
+    /// source's do. A read stays pending until its continuation is registered, so no thread pool can
+    /// finish it before the writer looks (a <c>Task.Yield</c> read raced the check on Linux, BL-2976).
+    /// </summary>
     private sealed class LateReadStream(byte[] content) : MemoryStream(content)
     {
-        public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+        public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default) =>
+            new(new CompletesWhenAwaited(Read(buffer.Span)), 0);
+    }
+
+    /// <summary>A read result that reports pending until a continuation is registered, then completes with <paramref name="result" />.</summary>
+    private sealed class CompletesWhenAwaited(int result) : IValueTaskSource<int>
+    {
+        private volatile bool awaited;
+
+        public int GetResult(short token) => result;
+
+        public ValueTaskSourceStatus GetStatus(short token) => awaited ? ValueTaskSourceStatus.Succeeded : ValueTaskSourceStatus.Pending;
+
+        public void OnCompleted(Action<object?> continuation, object? state, short token, ValueTaskSourceOnCompletedFlags flags)
         {
-            await Task.Yield();
-            return Read(buffer.Span);
+            awaited = true;
+            ThreadPool.QueueUserWorkItem(continuation, state, preferLocal: false);
         }
     }
 
