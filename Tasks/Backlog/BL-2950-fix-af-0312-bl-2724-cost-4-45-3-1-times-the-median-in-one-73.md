@@ -5,7 +5,7 @@ priority: Low
 assignee: Claude
 pipeline: direct
 depends-on: []
-touches: [RunDarkFactory.ps1]
+touches: [DarkFactory/Prompts.ps1]
 requirement: none
 created: 2026-10-21
 completed:

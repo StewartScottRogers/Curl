@@ -5,7 +5,7 @@ priority: High
 assignee: Claude
 pipeline: direct
 depends-on: []
-touches: [RunDarkFactory.ps1, DarkFactory]
+touches: [RunDarkFactory.ps1, DarkFactory, CLAUDE.md, Curl.slnx]
 lane: no
 requirement: none
 created: 2026-10-21

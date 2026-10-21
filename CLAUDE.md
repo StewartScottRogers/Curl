@@ -128,7 +128,10 @@ an ADR that decides a feature stays out.
 ## Dark factory
 `RunDarkFactory.cmd` works the board unattended: each ready task goes to a headless
 `/task-run`, and anything that needs Stewart ends in `Blocked` with an alarm at the end
-of the shift. `-Lanes N` runs N tasks at once, each in its own git worktree beside the
+of the shift. Its code is `RunDarkFactory.ps1` (the help, the parameters and a loader) and
+one file per area under `DarkFactory/` (claims, integration, CI watch, lane pacing and so
+on), which the loader dot-sources in a fixed order (BL-2983); a factory task names the area
+files it changes in `touches`. `-Lanes N` runs N tasks at once, each in its own git worktree beside the
 checkout (`<repo>.lanes\lane-<n>`); the board never gives two lanes tasks whose
 `touches` overlap, and each lane rebases, rebuilds, tests and pushes its own work, one
 lane at a time. Under that integrate lock a lane builds the whole solution but runs only the
