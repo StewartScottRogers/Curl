@@ -12,6 +12,9 @@ namespace Curl.Networking;
 /// <param name="TargetName">The TargetName, dotted, without the root's trailing dot; <c>.</c> for the root name itself.</param>
 public sealed record ServiceBindingRecord(ushort Priority, string TargetName)
 {
+    /// <summary>Gets a value indicating whether the record carries a <c>mandatory</c> (key 0) parameter, whose keys curl ignores.</summary>
+    public bool HasMandatoryKeys { get; init; }
+
     /// <summary>Gets the <c>alpn</c> protocol identifiers, in record order.</summary>
     public IReadOnlyList<string> ApplicationProtocols { get; init; } = [];
 

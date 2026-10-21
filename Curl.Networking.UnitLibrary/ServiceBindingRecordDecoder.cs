@@ -9,8 +9,9 @@ namespace Curl.Networking;
 /// uncompressed TargetName, then SvcParams as key, length and value while 4 or more bytes remain
 /// (fewer trailing bytes are ignored), the way curl 8.22.0's <c>doh_resp_decode_httpsrr</c> reads
 /// the first HTTPS record of a DoH answer (ADR-0312, upstream unit1658). The keys curl reads are
-/// kept: <c>alpn</c> (1), <c>no-default-alpn</c> (2), <c>port</c> (3), <c>ipv4hint</c> (4),
-/// <c>ech</c> (5) and <c>ipv6hint</c> (6); any other key, <c>mandatory</c> (0) included, is
+/// kept: whether there was a <c>mandatory</c> (0) list, whose keys curl ignores, <c>alpn</c> (1),
+/// <c>no-default-alpn</c> (2), <c>port</c> (3), <c>ipv4hint</c> (4),
+/// <c>ech</c> (5) and <c>ipv6hint</c> (6); any other key is
 /// skipped. Keys must rise strictly, as RFC 9460 requires and curl checks. A malformed record is
 /// refused with a <see cref="ServiceBindingFailure" /> rather than read past its end.
 /// </summary>
@@ -18,6 +19,7 @@ public static class ServiceBindingRecordDecoder
 {
     private const int MaximumLabelLength = 63;
     private const int ParameterHeaderLength = 4;
+    private const ushort MandatoryKey = 0;
     private const ushort AlpnKey = 1;
     private const ushort NoDefaultAlpnKey = 2;
     private const ushort PortKey = 3;
@@ -124,12 +126,14 @@ public static class ServiceBindingRecordDecoder
         private readonly List<string> _applicationProtocols = [];
         private readonly List<IPAddress> _ipv4Hints = [];
         private readonly List<IPAddress> _ipv6Hints = [];
+        private bool _hasMandatoryKeys;
         private bool _noDefaultApplicationProtocol;
         private ushort? _port;
         private byte[] _echConfigList = [];
 
         public ServiceBindingFailure Store(ushort key, ReadOnlySpan<byte> value) => key switch
         {
+            MandatoryKey => StoreMandatoryKeys(),
             AlpnKey => StoreApplicationProtocols(value),
             NoDefaultAlpnKey => StoreNoDefaultApplicationProtocol(value),
             PortKey => StorePort(value),
@@ -141,6 +145,7 @@ public static class ServiceBindingRecordDecoder
 
         public ServiceBindingRecord ToRecord(ushort priority, string targetName) => new(priority, targetName)
         {
+            HasMandatoryKeys = _hasMandatoryKeys,
             ApplicationProtocols = _applicationProtocols,
             NoDefaultApplicationProtocol = _noDefaultApplicationProtocol,
             Port = _port,
@@ -161,6 +166,13 @@ public static class ServiceBindingRecordDecoder
                 hints.Add(new IPAddress(value.Slice(offset, addressLength)));
             }
 
+            return ServiceBindingFailure.None;
+        }
+
+        // curl notes that the record had a mandatory list and ignores the keys it names.
+        private ServiceBindingFailure StoreMandatoryKeys()
+        {
+            _hasMandatoryKeys = true;
             return ServiceBindingFailure.None;
         }
 

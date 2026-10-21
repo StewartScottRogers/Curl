@@ -27,7 +27,7 @@ internal static class HttpsRecordReportLine
         }
 
         return IsApplicable(record, port)
-            ? prefix + DohTraceLines.FormatHttpsRecord(record, hasMandatoryKeys: false)
+            ? prefix + DohTraceLines.FormatHttpsRecord(record, record.HasMandatoryKeys)
             : prefix + "not applicable";
     }
 

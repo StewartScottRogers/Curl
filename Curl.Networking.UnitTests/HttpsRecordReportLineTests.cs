@@ -39,6 +39,18 @@ public sealed class HttpsRecordReportLineTests
     }
 
     [TestMethod]
+    public void Format_WithARecordThatHadAMandatoryList_WritesMandatoryKeysIgnored()
+    {
+        var record = new ServiceBindingRecord(1, ".") { HasMandatoryKeys = true, ApplicationProtocols = ["h2"] };
+        Diagnostics.Arrange("record", "1 . mandatory=alpn alpn=h2");
+
+        var line = HttpsRecordReportLine.Format("foo.example.com", 443, record);
+
+        Diagnostics.Assert("line", "HTTPS-RR foo.example.com:443: 1 . mandatory-keys(ignored) alpn=h2", line);
+        Assert.AreEqual("HTTPS-RR foo.example.com:443: 1 . mandatory-keys(ignored) alpn=h2", line);
+    }
+
+    [TestMethod]
     [DataRow("", null, DisplayName = "an empty target and no port")]
     [DataRow(".", 41443, DisplayName = "the root target and the origin's port")]
     public void Format_WithAnApplicableRecord_WritesTheRecord(string target, int? port)

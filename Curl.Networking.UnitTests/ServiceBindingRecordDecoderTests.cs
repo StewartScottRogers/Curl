@@ -147,6 +147,29 @@ public sealed class ServiceBindingRecordDecoderTests
     }
 
     [TestMethod]
+    public void Decode_ARecordWithAMandatoryList_KeepsThatItHadOneAndIgnoresItsKeys()
+    {
+        // 1 . (mandatory=alpn alpn=h2)
+        var record = Decoded("000100" + "000000020001" + "00010003026832");
+
+        Diagnostics.Assert("has mandatory keys", true, record.HasMandatoryKeys);
+        Diagnostics.Assert("alpn", "h2", string.Join(", ", record.ApplicationProtocols));
+
+        Assert.IsTrue(record.HasMandatoryKeys);
+        CollectionAssert.AreEqual(new[] { "h2" }, record.ApplicationProtocols.ToArray());
+    }
+
+    [TestMethod]
+    public void Decode_ARecordWithoutAMandatoryList_HasNoMandatoryKeys()
+    {
+        var record = Decoded("000100" + "00010003026832");
+
+        Diagnostics.Assert("has mandatory keys", false, record.HasMandatoryKeys);
+
+        Assert.IsFalse(record.HasMandatoryKeys);
+    }
+
+    [TestMethod]
     [DataRow("00010000010000", DisplayName = "empty alpn")]
     [DataRow("0001000001000100", DisplayName = "empty alpn identifier")]
     public void Decode_AnEmptyAlpnOrAlpnIdentifier_IsAcceptedAsCurlAcceptsIt(string hex)
