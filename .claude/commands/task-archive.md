@@ -10,7 +10,7 @@ which archives all of `Done` once it holds more than 20 tasks and otherwise does
 If days is given, run
 `powershell -NoProfile -ExecutionPolicy Bypass -File .claude/skills/task-board/task-board.ps1 archive -OlderThanDays <days>`.
 
-Report the folder it created and the task IDs it moved, or why nothing was archived.
+Report the day folder it archived to and the task IDs it moved, or why nothing was archived.
 Pass on any warning about a task with no `completed` date.
 
 Archived tasks are final: never edit a file inside `Tasks/Done/<timestamp>/`
