@@ -1,4 +1,4 @@
-﻿---
+---
 id: BL-2970
 title: Decode DoH CNAME answers as curl 8.22.0 does and write its A and AAAA --trace-config doh lines
 priority: Normal
@@ -75,3 +75,4 @@ If too big for one run, split it: the decoder change (CNAME skipped, no NoConten
 - 2026-10-21: Created.
 - 2026-10-21: Backlog -> Doing. Criteria at claim: 582ece38 47a1bf8a 2a446683.
 - 2026-10-21: Doing -> Backlog. Needs Curl.Engine.UnitTests (EngineCompositionDoh*Tests pin the 8.21.0 DoH lines), which BL-2921 in Doing touches; code is written and stashed, see Notes
+- 2026-10-21: Backlog -> Doing. Criteria at claim: 582ece38 47a1bf8a 2a446683.
