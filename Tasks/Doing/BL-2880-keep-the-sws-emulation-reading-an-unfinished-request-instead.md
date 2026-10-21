@@ -34,3 +34,4 @@ The fix BL-2870 tried (left in its stash): replace `SwsHttpRequestFraming.Awaits
 ## Log
 
 - 2026-10-19: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: 9a1e518b 7e9d4057 e4965115 5b83043b.
