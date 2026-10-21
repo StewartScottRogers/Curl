@@ -35,3 +35,4 @@ Move each case- or stand-in-specific branch out of UpstreamCaseRunner.cs into it
 ## Log
 
 - 2026-10-21: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: 566bfbec df0009a6 ee115027 1ff6ab0b 38e9dffd.
