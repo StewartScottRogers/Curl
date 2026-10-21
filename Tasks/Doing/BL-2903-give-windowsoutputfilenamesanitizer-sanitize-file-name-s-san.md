@@ -32,3 +32,4 @@ Today it has one mode, `Sanitize(string)`. tool1604.c's table covers banned char
 ## Log
 
 - 2026-10-21: Created (split from BL-2845, which waits on it).
+- 2026-10-21: Backlog -> Doing. Criteria at claim: e68820c6 3d228e1f d3a9ab15 099d1d27.
