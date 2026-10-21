@@ -131,8 +131,9 @@ an ADR that decides a feature stays out.
 of the shift. `-Lanes N` runs N tasks at once, each in its own git worktree beside the
 checkout (`<repo>.lanes\lane-<n>`); the board never gives two lanes tasks whose
 `touches` overlap, and each lane rebases, rebuilds, tests and pushes its own work, one
-lane at a time. `-Lanes Auto` sizes the shift itself, adding or retiring one lane at a
-time to the measured burn rate, the board's parallel capacity and the machine's cap, so
+lane at a time. `-Lanes Auto` sizes the shift itself to the measured burn rate, the board's parallel
+capacity and the machine's cap - straight up to its unpaced lanes, then one lane at a
+time above them, and straight down when a limit falls - so
 it suits whichever Claude plan is in use. Running out of tokens is not a stall: the shift announces it with the
 reset time, waits (the wait does not count against `-Hours`), warns a minute before the
 new session and reruns the cut-off task. See the script's header for the details.
