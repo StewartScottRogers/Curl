@@ -31,3 +31,4 @@ BL-2906 added `Curl.Core.UnitLibrary/CurlFileLineReader.cs`, curl 8.22.0's `Curl
 ## Log
 
 - 2026-10-21: Created (follow-up from BL-2906).
+- 2026-10-21: Backlog -> Doing. Criteria at claim: 1413993f a07b7fe6 8e1ce02b.
