@@ -48,6 +48,7 @@ public sealed partial class UpstreamConformanceTests
         text => text.Contains("\n" + FakeExtendedAttributesVariableName + "=", StringComparison.Ordinal),
         SetsSmallSendsVariable,
         RunsMimeLibTest,
+        RunsCurlWithDohUrl,
     ];
 
     internal static UpstreamCurlPlatform PlatformFor(byte[] testFile)
