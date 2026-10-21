@@ -37,3 +37,4 @@ Deferred task BL-693 (`--krb` for FTP) is unrelated: it is about FTP `AUTH GSSAP
 ## Log
 
 - 2026-10-19: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: f2c0ce47 cb803305 519beea4 dd1cc079 620ebead.
