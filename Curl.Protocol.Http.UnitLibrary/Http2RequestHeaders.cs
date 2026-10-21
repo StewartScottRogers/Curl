@@ -23,7 +23,9 @@ internal static class Http2RequestHeaders
     /// <summary>
     /// Gives the header list for <paramref name="head" />. A <c>TE</c> header is sent only as
     /// <c>te: trailers</c>, and only when it lists <c>trailers</c>; a head with no <c>Host</c>
-    /// sends no <c>:authority</c>.
+    /// sends no <c>:authority</c>. The request target is the request line's last word before
+    /// its version, since a target holds no space, so a custom method with a space
+    /// (<c>-X "IN SANE"</c>) is sent whole as <c>:method</c>, as curl 8.22.0 does (#19543).
     /// </summary>
     /// <param name="head">The request head: request line, header lines and empty line.</param>
     /// <param name="scheme">The URL's scheme, sent as <c>:scheme</c>.</param>
@@ -31,15 +33,16 @@ internal static class Http2RequestHeaders
     internal static List<HeaderField> Of(ReadOnlySpan<byte> head, string scheme)
     {
         string[] lines = Encoding.Latin1.GetString(head).Split("\r\n");
-        string[] requestLine = lines[0].Split(' ');
+        string methodAndTarget = lines[0][..lines[0].LastIndexOf(' ')];
+        int targetStart = methodAndTarget.LastIndexOf(' ');
         List<(string Name, string Value)> headers = [.. lines.Skip(1).TakeWhile(line => line.Length > 0).Select(Split)];
-        List<HeaderField> fields = [new(":method", requestLine[0]), new(":scheme", scheme)];
+        List<HeaderField> fields = [new(":method", methodAndTarget[..targetStart]), new(":scheme", scheme)];
         if (headers.FindIndex(header => header.Name == "host") is var hostIndex and >= 0)
         {
             fields.Add(new(":authority", headers[hostIndex].Value));
         }
 
-        fields.Add(new(":path", requestLine[1]));
+        fields.Add(new(":path", methodAndTarget[(targetStart + 1)..]));
         fields.AddRange(headers.Select(Permitted).OfType<HeaderField>());
         return fields;
     }

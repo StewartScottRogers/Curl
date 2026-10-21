@@ -54,6 +54,19 @@ public sealed class Http2RequestHeadersTests
     }
 
     [TestMethod]
+    public void Of_CustomMethodWithSpace_SendsWholeMethodAndTargetAsPath()
+    {
+        Diagnostics.Arrange("request head", "IN SANE /path HTTP/1.1 (custom method IN SANE), no Host");
+
+        List<HeaderField> fields = Http2RequestHeaders.Of("IN SANE /path HTTP/1.1\r\n\r\n"u8, "https");
+
+        Diagnostics.Act("header fields", string.Join(", ", fields));
+        Diagnostics.Assert("header field count", 3, fields.Count);
+
+        CollectionAssert.AreEqual(new HeaderField[] { new(":method", "IN SANE"), new(":scheme", "https"), new(":path", "/path") }, fields);
+    }
+
+    [TestMethod]
     [DataRow("TE: gzip, Trailers", true, DisplayName = "TE listing trailers")]
     [DataRow("TE: gzip", false, DisplayName = "TE without trailers")]
     public void Of_TeHeader_IsSentAsTrailersOnlyWhenItListsTrailers(string line, bool sent)
