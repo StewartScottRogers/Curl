@@ -32,3 +32,4 @@ How to measure without listing: find a finished `CI` run on `work/dark-factory` 
 ## Log
 
 - 2026-10-21: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: 49f7fc8c 55566d96.
