@@ -454,6 +454,15 @@ public sealed class UpstreamCaseScreeningTests
 
         Assert.IsTrue(features.IsSupersetOf(["unittest", "Debug", "TrackMemory"]));
         Assert.IsTrue(features.IsSupersetOf(Features));
+        Assert.IsFalse(features.Contains("shuffle-dns"));
+    }
+
+    [TestMethod]
+    public void CaseFeatures_PortedUnit1608_AlsoAddsShuffleDns()
+    {
+        IReadOnlySet<string> features = UpstreamCaseScreening.CaseFeatures(ParsedTestCase.From(UnitCaseClient), 1608, Features, program => program == "unit1608");
+
+        Assert.IsTrue(features.IsSupersetOf(["unittest", "shuffle-dns"]));
     }
 
     [TestMethod]

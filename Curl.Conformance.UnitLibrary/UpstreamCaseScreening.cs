@@ -219,6 +219,14 @@ internal static class UpstreamCaseScreening
     // which describe the C build's debug hooks and allocator tracking that the port needs neither of.
     private static readonly string[] UnitProgramFeatures = [UnitTestFeature, "Debug", "TrackMemory"];
 
+    // The build features one ported program's case also meets, because the port runs the Curl code the feature
+    // names, though the platform reports it to no other case: unit1608 runs the CURLOPT_DNS_SHUFFLE_ADDRESSES
+    // shuffle, which libcurl builds only with shuffle-dns (BL-2922).
+    private static readonly Dictionary<string, string[]> UnitProgramOwnFeatures = new(StringComparer.Ordinal)
+    {
+        ["unit1608"] = ["shuffle-dns"],
+    };
+
     private static readonly string[] UnitProgramPrefixes = ["unit", "tool"];
 
     private static bool IsNumberedProgram(string tool, string prefix) =>
@@ -227,7 +235,8 @@ internal static class UpstreamCaseScreening
     /// <summary>
     /// The features a case is screened against: <paramref name="features"/>, and, for a <c>unittest</c> case whose
     /// unit program is ported, <c>unittest</c>, <c>Debug</c> and <c>TrackMemory</c> too, so the platform reports
-    /// <c>unittest</c> only through the table of ported programs, never as a feature of its own (ADR-0711).
+    /// <c>unittest</c> only through the table of ported programs, never as a feature of its own (ADR-0711), and the
+    /// build features that program's port alone stands for (<c>shuffle-dns</c> for <c>unit1608</c>, BL-2922).
     /// </summary>
     /// <param name="testCase">The parsed, expanded case.</param>
     /// <param name="testNumber">The case's number.</param>
@@ -238,7 +247,7 @@ internal static class UpstreamCaseScreening
     {
         ArgumentNullException.ThrowIfNull(features);
         return UnitProgramName(testCase, testNumber) is { } program && OrNone(isPortedUnitProgram)(program)
-            ? features.Union(UnitProgramFeatures).ToHashSet(StringComparer.Ordinal)
+            ? features.Union(UnitProgramFeatures).Union(UnitProgramOwnFeatures.GetValueOrDefault(program, [])).ToHashSet(StringComparer.Ordinal)
             : features;
     }
 
