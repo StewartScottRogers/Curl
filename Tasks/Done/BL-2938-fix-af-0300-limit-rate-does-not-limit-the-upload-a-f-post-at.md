@@ -5,10 +5,10 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: [BL-2956]
-touches: [Curl.Console]
+touches: [Curl.Console, Curl.Console.UnitTests/RateLimitedUploadStreamTests.cs, Curl.Protocol.Http.UnitLibrary/HttpRequestBodyWriter.cs, Curl.Protocol.Http.UnitTests/HttpRequestBodyWriterWaitingPieceResetTests.cs]
 requirement: none
 created: 2026-10-21
-completed:
+completed: 2026-10-21
 ---
 # BL-2938 — Fix AF-0300: --limit-rate does not limit the upload: a -F POST at --limit-rate 10 sends its whole body at once and exits 0 where curl exits 56
 
@@ -41,8 +41,8 @@ The finding closes only when a later re-audit by the conformance auditor confirm
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -62,6 +62,19 @@ The finding closes only when a later re-audit by the conformance auditor confirm
   BL-2956 and added to `depends-on`. Next claim: apply the stash, rerun the reproduction, run the fast
   tests and `Measure-CodeQuality.ps1 -Library Curl.Console`, then commit.
 - Filed BL-2957 for the `-d`/`--json` body (`BytesBody`), which this change does not limit.
+- 2026-10-21 (lane 1, second claim): carried the stash over by hand; its ADR-0727 was taken meanwhile,
+  so it is ADR-0745 now (references to BL-2952/BL-2953 corrected to BL-2956/BL-2957). With BL-2956
+  landed the reproduction still gave Curl exit 55: the `-F` POST's body reads go through
+  `HttpRequestBodyWriter`'s race against the early response (`EarlyResponseRead`), where BL-2956's
+  `waitedOnSource` was never set. Set it there too (one line) and pinned it with
+  `WriteAsync_ResetWhileARaceAgainstTheResponseWaitsOnTheUploadSource_FailsWithExit56`. Added
+  `Curl.Protocol.Http.UnitLibrary/HttpRequestBodyWriter.cs` and its test file to `touches`: no task in
+  Doing on `origin/work/dark-factory` named either.
+- Measured after the fix: candidate exit 56 `Recv failure: Connection was reset`, 243 request bytes
+  (body at 10 B/s). Real curl gave exit 55 `Send failure: Connection was aborted` with 243 bytes on
+  that run (exit 56 / 233 on lane 3's): curl's own answer races the recorder's close, so the request
+  byte counts match and the exit code is curl's usual one. Fast tests: 44 projects green.
+  `Measure-CodeQuality.ps1 -Library Curl.Console,Curl.Protocol.Http.UnitLibrary`: 0 failing members.
 
 ## Log
 
@@ -69,3 +82,4 @@ The finding closes only when a later re-audit by the conformance auditor confirm
 - 2026-10-21: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
 - 2026-10-21: Doing -> Backlog. Waits on BL-2956: upload is now throttled, but a reset during the wait must end exit 56 (HTTP body writer); code is in the lane stash
 - 2026-10-21: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-21: Doing -> Done. --limit-rate holds a -T or -F upload at the rate, and a reset while it waits ends exit 56 as curl 8.22.0

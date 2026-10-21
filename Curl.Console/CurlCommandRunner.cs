@@ -3607,7 +3607,7 @@ internal sealed class CurlCommandRunner(
                     RateLimited(options, toStandardOutput ? FlushedEachWriteUnderNoBuffer(options, InTextModeUnderUseAscii(options, Running.GatedStandardOutput)) : Stream.Null),
                     headerOutput,
                     BodyHeaderStyles: toStandardOutput ? HeaderStylesFor(options, url) : null),
-                _ => AttemptInputsOf(range, options.ResumeFrom, formBody, upload, proxy));
+                _ => AttemptInputsOf(options, range, options.ResumeFrom, formBody, upload, proxy));
             TransferResult result = toStandardOutput
                 ? await TransferToStandardOutputAsync(follower, options, attempt).ConfigureAwait(false)
                 : await FollowRetryingAsync(follower, options, attempt, options.ResumeFrom, null).ConfigureAwait(false);
@@ -4429,7 +4429,7 @@ internal sealed class CurlCommandRunner(
                         url,
                         transferOptions,
                         () => new EngineToolTransferOutputs(RateLimited(options, FlushedEachWriteUnderNoBuffer(options, output)), headerOutput, watchHeaderOutput),
-                        attemptResumeFrom => AttemptInputsOf(range, attemptResumeFrom, formBody, upload, proxy)),
+                        attemptResumeFrom => AttemptInputsOf(options, range, attemptResumeFrom, formBody, upload, proxy)),
                     resumeFrom,
                     output)
                 .ConfigureAwait(false);
@@ -4512,19 +4512,38 @@ internal sealed class CurlCommandRunner(
     /// <summary>
     /// The pieces of one attempt the runner chose before connecting: the proxy and the running transfer's looked-up
     /// credentials, SSH options, <c>If-None-Match</c> lines and alt-svc cache, beside the range, offset, form body
-    /// and upload given.
+    /// and upload given, each read at the <c>--limit-rate</c> (<see cref="SendRateLimited(CommandLineOptions, Stream?)" />).
     /// </summary>
+    /// <param name="options">The accepted command line.</param>
     /// <param name="range">The parsed <c>-r</c> range, or <see langword="null" />.</param>
     /// <param name="resumeFrom">The <c>-C</c> offset the attempt resumes from, or <see langword="null" />.</param>
     /// <param name="formBody">The <c>-F</c> body, or <see langword="null" />.</param>
     /// <param name="upload">The <c>-T</c> source, or <see langword="null" />.</param>
     /// <param name="proxy">The proxy chosen, or <see langword="null" /> to connect directly.</param>
     /// <returns>The pieces.</returns>
-    private EngineToolTransferInputs AttemptInputsOf(ByteRange? range, long? resumeFrom, HttpRequestBody? formBody, Stream? upload, ProxyEndpoint? proxy)
+    private EngineToolTransferInputs AttemptInputsOf(CommandLineOptions options, ByteRange? range, long? resumeFrom, HttpRequestBody? formBody, Stream? upload, ProxyEndpoint? proxy)
     {
         RunningTransferState state = Running;
-        return new(proxy, state.LookedUpCredentials, state.Ssh, state.IfNoneMatchHeaders, range, resumeFrom, formBody, upload, state.AltSvc);
+        HttpRequestBody? sentFormBody = formBody is StreamBody streamBody
+            ? streamBody with { Content = SendRateLimited(options, streamBody.Content) }
+            : formBody;
+        return new(proxy, state.LookedUpCredentials, state.Ssh, state.IfNoneMatchHeaders, range, resumeFrom, sentFormBody, SendRateLimited(options, upload), state.AltSvc);
     }
+
+    /// <summary>
+    /// Holds the reads of <paramref name="upload" /> at the <c>--limit-rate</c> with a
+    /// <see cref="RateLimitedUploadStream" /> on the runner's clock, as curl 8.22.0 sends a request body
+    /// no faster than it (<c>CURLOPT_MAX_SEND_SPEED_LARGE</c>, AF-0300, ADR-0745); a rate of zero, like
+    /// no rate, sets no limit.
+    /// </summary>
+    /// <param name="options">The accepted command line.</param>
+    /// <param name="upload">The <c>-T</c> or <c>-F</c> source, or <see langword="null" /> for none.</param>
+    /// <returns>The limited stream, or <paramref name="upload" /> when there is no limit or no upload.</returns>
+    [return: NotNullIfNotNull(nameof(upload))]
+    private Stream? SendRateLimited(CommandLineOptions options, Stream? upload) =>
+        upload is not null && options.LimitRate is > 0 and long bytesPerSecond
+            ? new RateLimitedUploadStream(upload, bytesPerSecond, timeProvider)
+            : upload;
 
     /// <summary>
     /// Performs one transfer through <paramref name="follower" />, run again by
