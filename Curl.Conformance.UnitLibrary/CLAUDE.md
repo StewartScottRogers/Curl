@@ -398,10 +398,10 @@ run's `<verify><upload>` bytes (screening records `<verify><upload>` for `scp` a
 607, 628, 629, 630, 631 and 656 pass, and so do the SCP transfers 601, 603, 605, 617, 619, 621, 623,
 641, 665 and 3022 and the SFTP transfers and quote commands 600, 602, 604, 608, 609, 611, 612, 615,
 616, 618, 620, 622, 624, 625, 626, 627, 633 to 640, 642, 664, 1583, 2007 and 3021, and 632 and 1459,
-whose `<features>` name `sftp`, which `UpstreamCurlPlatform` lists with `scp` (BL-2240). 610 and 2004 pass (BL-2219); 614 and 1446
-are measured and differ. The runner reads the upload after the case's `<postcheck>`, as
-`runtests.pl` does, because 624 and 625 upload into a folder and the postcheck moves the file to
-`%LOGDIR/upload.%TESTNUMBER` (BL-1955).
+whose `<features>` name `sftp`, which `UpstreamCurlPlatform` lists with `scp` (BL-2240). 610 and 2004 pass (BL-2219), and 613, 614 and 1446 (BL-2855). The runner reads the upload and the
+`--output` file after the case's `<postcheck>`, as `runtests.pl` does, because 624 and 625 upload
+into a folder and the postcheck moves the file to `%LOGDIR/upload.%TESTNUMBER` (BL-1955), and
+test613.pl's postprocess rewrites 613's and 614's listing into its canonical form (BL-2855).
 
 A case whose `<client><tool>` names a libtest program (`lib%TESTNUMBER` or `libNNN`,
 `UpstreamCaseScreening.LibTestProgramName`) runs its ported `ILibTest` in place of curl (BL-2556,

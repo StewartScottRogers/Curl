@@ -468,7 +468,7 @@ public sealed class UpstreamCaseRunner(
         byte[] standardOutputBytes = RedirectStandardOutput(testCase, standardOutput.ToArray());
         File.WriteAllBytes($"{logDirectory}/stdout{testNumber}", standardOutputBytes);
         File.WriteAllBytes($"{logDirectory}/stderr{testNumber}", standardError.ToArray());
-        // Read before the postcheck, as before: only the SSH upload is read after it.
+        // Read before the postcheck, as before: only the uploads and the --output file are read after it.
         // Upstream's servers all append to one server.input, so a case that reaches several
         // (test2002, test2003) sees their lines in the order curl sent them.
         byte[] receivedBytes = UpstreamProtocolDump.Merge(
@@ -484,8 +484,8 @@ public sealed class UpstreamCaseRunner(
             (rtsp.ReceivedBytes, rtsp.ReceivedDump),
         ]);
         // runner.pm sets $CURLOUT to a tool run's stdout, and runtests.pl compares <reply><data> with $CURLOUT (BL-2560).
-        byte[] replyDataBytes = runsTool ? standardOutputBytes : ReadOutputFile(outputFile);
-        return Judge(testCase, () => new UpstreamCaseRun(exitCode, standardOutputBytes, standardError.ToArray(), receivedBytes, replyDataBytes)
+        // The --output file is read after the postcheck too: test613.pl rewrites the listing 613 and 614 compare (BL-2855).
+        return Judge(testCase, () => new UpstreamCaseRun(exitCode, standardOutputBytes, standardError.ToArray(), receivedBytes, runsTool ? standardOutputBytes : ReadOutputFile(outputFile))
         {
             ReplyDataName = runsTool ? "the program's stdout" : "the --output file",
             ProxyReceivedBytes = server.ProxyReceivedBytes.ToArray(),

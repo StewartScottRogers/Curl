@@ -807,6 +807,26 @@ public sealed partial class UpstreamCaseRunnerTests
     }
 
     [TestMethod]
+    public async Task RunAsync_PostcheckRewritesTheOutputFile_ComparesReplyDataWithTheRewrite()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        UpstreamCaseRunner runner = Runner(invocation =>
+        {
+            File.WriteAllText(CommandArguments(invocation)[0], "rewritten\n");
+            List<string> arguments = [.. invocation.Arguments];
+            File.WriteAllText(arguments[arguments.IndexOf("--output") + 1], "raw listing\n");
+            return Task.FromResult(0);
+        });
+        string testFile = "<testcase>\n<reply>\n<data>\nrewritten\n</data>\n</reply>\n<client>\n<command>\n%LOGDIR/rewrite%TESTNUMBER\n</command>\n</client>\n"
+            + "<verify>\n<postcheck>\n%PERL %SRCDIR/libtest/test610.pl rm %LOGDIR/curl%TESTNUMBER.out move %LOGDIR/rewrite%TESTNUMBER %LOGDIR/curl%TESTNUMBER.out\n</postcheck>\n</verify>\n</testcase>\n";
+
+        UpstreamCaseOutcome outcome = await RunAsync(runner, testFile);
+
+        diagnostics.Assert("outcome kind", UpstreamCaseOutcomeKind.Passed, outcome.Kind);
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Passed, outcome.Kind, outcome.Detail);
+    }
+
+    [TestMethod]
     public async Task RunAsync_Http2CaseWithoutHttp2Server_IsSkippedForTheServer()
     {
         var diagnostics = TestDiagnostics.For(TestContext);
