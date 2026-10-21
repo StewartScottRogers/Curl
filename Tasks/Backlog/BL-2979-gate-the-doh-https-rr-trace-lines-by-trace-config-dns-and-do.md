@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: [BL-2973]
-touches: [Curl.Networking.UnitLibrary/DohTraceLines.HttpsRecord.cs, Curl.Networking.UnitLibrary/DohDnsResolver.HttpsRecord.cs, Curl.Networking.UnitTests/DohDnsResolverHttpsRecordTraceTests.cs, Curl.Engine.UnitLibrary/EngineComposition.cs]
+touches: [Curl.Networking.UnitLibrary/DohTraceLines.HttpsRecord.cs, Curl.Networking.UnitLibrary/DohDnsResolver.HttpsRecord.cs, Curl.Networking.UnitTests/DohDnsResolverHttpsRecordTraceTests.cs, Curl.Engine.UnitLibrary/EngineComposition.Dns.cs]
 requirement: none
 created: 2026-10-21
 completed:

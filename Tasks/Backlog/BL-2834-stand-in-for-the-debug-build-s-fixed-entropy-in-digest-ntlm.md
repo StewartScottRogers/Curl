@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Conformance.UnitTests/PassingUpstreamCases.txt, Curl.Conformance.UnitTests/UpstreamConformanceTests.FixedEntropyStandIn.cs, Curl.Conformance.UnitTests/UpstreamConformanceTests.cs, Curl.Conformance.UnitTests/UpstreamConformanceTests.DebugStandIns.cs, Curl.Authentication.UnitLibrary, Curl.Authentication.UnitTests, Curl.Ntlm.UnitLibrary, Curl.Ntlm.UnitTests, Curl.Engine.UnitLibrary/EngineComposition.cs, Curl.Engine.UnitLibrary/ManagedCurlEngine.cs, Curl.Engine.UnitLibrary/ManagedEngineSharedState.cs, Curl.Engine.UnitTests/EngineCompositionDigestClientNonceTests.cs, Curl.Console/CurlComposition.cs, Curl.Console.UnitTests/CurlCompositionDigestClientNonceTests.cs]
+touches: [Curl.Conformance.UnitTests/PassingUpstreamCases.txt, Curl.Conformance.UnitTests/UpstreamConformanceTests.FixedEntropyStandIn.cs, Curl.Conformance.UnitTests/UpstreamConformanceTests.cs, Curl.Conformance.UnitTests/UpstreamConformanceTests.DebugStandIns.cs, Curl.Authentication.UnitLibrary, Curl.Authentication.UnitTests, Curl.Ntlm.UnitLibrary, Curl.Ntlm.UnitTests, Curl.Engine.UnitLibrary/EngineComposition.cs, Curl.Engine.UnitLibrary/EngineComposition.Authentication.cs, Curl.Engine.UnitLibrary/ManagedCurlEngine.cs, Curl.Engine.UnitLibrary/ManagedEngineSharedState.cs, Curl.Engine.UnitTests/EngineCompositionDigestClientNonceTests.cs, Curl.Console/CurlComposition.cs, Curl.Console.UnitTests/CurlCompositionDigestClientNonceTests.cs]
 requirement: none
 created: 2026-10-19
 completed:
