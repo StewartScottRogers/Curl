@@ -35,3 +35,4 @@ Ports go in Curl.Conformance.UnitProgram.UnitLibrary/Hashes/ and their tests in 
 ## Log
 
 - 2026-10-19: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: 131b7e48 78f5629b 603a1553 c0723528 620ebead.
