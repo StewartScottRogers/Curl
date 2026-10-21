@@ -4,7 +4,7 @@ title: Fix AF-0300: --limit-rate does not limit the upload: a -F POST at --limit
 priority: High
 assignee: Claude
 pipeline: feature
-depends-on: [BL-2952]
+depends-on: [BL-2956]
 touches: [Curl.Console]
 requirement: none
 created: 2026-10-21
@@ -59,12 +59,12 @@ The finding closes only when a later re-audit by the conformance auditor confirm
   code still differs: while its send is held curl polls only for reading and reads before writing, so the
   recorder's reset reaches `recv` (56); Curl's HTTP body writer meets it on the next write (55). That fix
   belongs in `Curl.Protocol.Http.UnitLibrary`'s body writer, not in this task's `touches`: filed as
-  BL-2952 and added to `depends-on`. Next claim: apply the stash, rerun the reproduction, run the fast
+  BL-2956 and added to `depends-on`. Next claim: apply the stash, rerun the reproduction, run the fast
   tests and `Measure-CodeQuality.ps1 -Library Curl.Console`, then commit.
-- Filed BL-2953 for the `-d`/`--json` body (`BytesBody`), which this change does not limit.
+- Filed BL-2957 for the `-d`/`--json` body (`BytesBody`), which this change does not limit.
 
 ## Log
 
 - 2026-10-21: Created.
 - 2026-10-21: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
-- 2026-10-21: Doing -> Backlog. Waits on BL-2952: upload is now throttled, but a reset during the wait must end exit 56 (HTTP body writer); code is in the lane stash
+- 2026-10-21: Doing -> Backlog. Waits on BL-2956: upload is now throttled, but a reset during the wait must end exit 56 (HTTP body writer); code is in the lane stash

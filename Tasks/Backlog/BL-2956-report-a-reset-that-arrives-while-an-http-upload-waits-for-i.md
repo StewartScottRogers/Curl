@@ -1,5 +1,5 @@
 ---
-id: BL-2952
+id: BL-2956
 title: Report a reset that arrives while an HTTP upload waits for its next body piece as curl's exit 56 Recv failure, not 55
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-21
 completed:
 ---
-# BL-2952 — Report a reset that arrives while an HTTP upload waits for its next body piece as curl's exit 56 Recv failure, not 55
+# BL-2956 — Report a reset that arrives while an HTTP upload waits for its next body piece as curl's exit 56 Recv failure, not 55
 
 ## Goal
 

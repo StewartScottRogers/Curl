@@ -1,5 +1,5 @@
 ---
-id: BL-2953
+id: BL-2957
 title: Hold a -d / --data / --json request body at --limit-rate as curl does (CURLOPT_MAX_SEND_SPEED_LARGE)
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-21
 completed:
 ---
-# BL-2953 — Hold a -d / --data / --json request body at --limit-rate as curl does (CURLOPT_MAX_SEND_SPEED_LARGE)
+# BL-2957 — Hold a -d / --data / --json request body at --limit-rate as curl does (CURLOPT_MAX_SEND_SPEED_LARGE)
 
 ## Goal
 
