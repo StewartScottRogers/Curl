@@ -88,6 +88,9 @@ public sealed class HttpUrlTextTests
     [DataRow("http://h:8080/", "h:8080", DisplayName = "http other port kept")]
     [DataRow("ftp://example.com/f.txt", "example.com:21", DisplayName = "ftp default port kept")]
     [DataRow("ftp://[::1]:2121/", "[::1]:2121", DisplayName = "ftp IPv6 bracketed")]
+    [DataRow("http://[::1]:8990/", "[::1]:8990", DisplayName = "http IPv6 bracketed")]
+    [DataRow("http://åäö.se:8990/", "xn--4cab6c.se:8990", DisplayName = "http IDN host in punycode (test1448)")]
+    [DataRow("ftp://åäö.se/", "xn--4cab6c.se:21", DisplayName = "ftp IDN host in punycode")]
     public void HostHeaderAuthority_GivesTheHostAndPortTheHostLineCarries(string url, string expected)
     {
         Diagnostics.Arrange("url", url);
@@ -96,6 +99,20 @@ public sealed class HttpUrlTextTests
 
         Diagnostics.Act("host header authority", actual);
         Diagnostics.Assert("host header authority", expected, actual);
+        Assert.AreEqual(expected, actual);
+    }
+
+    [TestMethod]
+    [DataRow("http://www.åäö.se/", "www.xn--4cab6c.se", DisplayName = "IDN host in punycode, default port dropped (test165)")]
+    [DataRow("http://Example.com:81/", "Example.com:81", DisplayName = "ASCII host as typed")]
+    public void WireHostAndPort_GivesTheAuthorityAProxyTargetCarries(string url, string expected)
+    {
+        Diagnostics.Arrange("url", url);
+
+        string actual = HttpUrlText.WireHostAndPort(CurlUrl.Parse(url));
+
+        Diagnostics.Act("wire host and port", actual);
+        Diagnostics.Assert("wire host and port", expected, actual);
         Assert.AreEqual(expected, actual);
     }
 }

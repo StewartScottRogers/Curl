@@ -313,7 +313,7 @@ internal static class HttpRequestHeadFormatter
     /// <see cref="FtpTypeOf" />.
     /// </summary>
     private static string AbsoluteForm(CurlUrl url, NetworkCredential credentials, char? proxyTransferType) =>
-        $"{url.Scheme}://{FtpUserInformation(url, credentials)}{HttpUrlText.HostAndPort(url)}"
+        $"{url.Scheme}://{FtpUserInformation(url, credentials)}{HttpUrlText.WireHostAndPort(url)}"
         + HttpUrlText.RequestTarget(url).Insert(HttpUrlText.Path(url).Length, FtpTypeOf(url, proxyTransferType));
 
     /// <summary>
