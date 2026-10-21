@@ -3,8 +3,8 @@ id: AF-0297
 title: UpperCasedEscapes' && can become || with no test failing, upper-casing escapes that are not two hex digits
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Engine.UnitLibrary/UrlPartSetter.cs:UpperCasedEscapes-and:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/UrlPartSetter.cs:234:&&
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Engin
 ## Log
 
 - 2026-10-19: filed proposed.
+- 2026-10-21: proposed -> accepted.
