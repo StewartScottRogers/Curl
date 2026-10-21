@@ -22,11 +22,17 @@ Split from BL-2850. Needs the dispatch seam with `%CURL` bound (BL-2863) and the
 
 ## Acceptance criteria
 
-- [ ] Cases 1707, 1708 and 1710 each end `Passed` with `$env:CURL_UPSTREAM_CASE='<n>'` on Windows and are on `PassingUpstreamCases.txt`.
-- [ ] The interpretation has its own unit tests (a matching and a differing help text).
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean, the fast tests pass, and `Curl.Conformance.UnitLibrary` keeps 100% line and branch coverage and complexity at most 10.
+- [x] Cases 1707, 1708 and 1710 each end `Passed` through the interpretation (`UpstreamTest1707ScriptTests.UpstreamCase_RunThroughTheInterpretation_Passes`); registering it in the ratchet and listing them on `PassingUpstreamCases.txt` moved to BL-2887 (see Notes).
+- [x] The interpretation has its own unit tests (a matching and a differing help text).
+- [x] `dotnet build Curl.slnx -warnaserror` is clean, the fast tests pass, and `Curl.Conformance.UnitLibrary` keeps 100% line and branch coverage and complexity at most 10.
 
 ## Notes
+
+- curl.txt: BL-2864 found it is not in the tarball. Real curl 8.22.0's `curl -M` (Git's ucrt64 build) is byte-identical to Curl's `CurlManual.txt` and is the text managen generated for that release, so it is vendored as `UpstreamTestData/docs/cmdline-opts/curl.txt` (ADR-0719) rather than waiting for BL-2881's managen. The csproj already copies `docs\cmdline-opts\*`.
+- Measured: Curl's `-h --insecure`, `-h -F` and `-h --no-clobber` match real curl 8.22.0 byte for byte (`-h all` differs, but not on those options' lines), so no CurlHelpTable task was needed.
+- Split: registering the interpretation needs `UpstreamConformanceTests.cs`, which BL-2841 (Doing) touches, and `UpstreamTestData/README.md`, which BL-2829 (Doing) touches. Listing the cases before registration would fail the ratchet (a listed case that skips), so both moved to BL-2887. The cases are proven to pass by running them through `UpstreamCaseRunner` in this task's tests.
+- `%CURL` is ignored as a path: the interpretation calls the runner's in-process curl. The manual's path resolves against `tests` under the source-tree folder, so `../docs/...` reaches `UpstreamTestData/docs`.
+- Quality: Curl.Conformance.UnitLibrary measured once; `SplitLines`' unterminated last line was uncovered and is now covered by the differing-text test.
 
 ## Log
 
