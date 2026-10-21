@@ -91,7 +91,11 @@ try {
     $run = Invoke-Board @('hotspots')
     Report ($run.ExitCode -eq 0) 'hotspots exits 0 when there are none'
     $lines = Get-HotspotLines @('Curl.Engine.UnitLibrary', 'Curl.Engine.UnitLibrary/A.cs', 'Curl.Engine.UnitLibrary/B.cs') @('-Min', '2')
-    Report (($lines -join '|') -eq 'Hotspot 3 Curl.Engine.UnitLibrary: BL-001, BL-002, BL-003|Hotspot 2 Curl.Engine.UnitLibrary/A.cs: BL-001, BL-002|Hotspot 2 Curl.Engine.UnitLibrary/B.cs: BL-001, BL-003') 'hotspots counts a folder entry as covering every file under it, sorted by count then path'
+    Report (($lines -join '|') -eq 'Hotspot 2 Curl.Engine.UnitLibrary/A.cs: BL-001, BL-002|Hotspot 2 Curl.Engine.UnitLibrary/B.cs: BL-001, BL-003') 'hotspots counts a folder entry as covering every file under it, sorted by count then path'
+    $lines = Get-HotspotLines @('P/A.cs', 'P/B.cs', 'P/C.cs', 'P/D.cs', 'P/E.cs', 'P/F.cs;Q') @('-Min', '2')
+    Report (($lines -join '|') -eq 'No hotspots.') 'hotspots does not list a folder whose tasks touch distinct files beneath it'
+    $lines = Get-HotspotLines @('P/A.cs', 'P/A.cs', 'P/A.cs', 'P', 'P')
+    Report (($lines -join '|') -eq 'Hotspot 5 P/A.cs: BL-001, BL-002, BL-003, BL-004, BL-005') 'hotspots counts a file named by 3 tasks and its folder named by 2 as 5'
     $lines = Get-HotspotLines @($ratchet, $ratchet, $ratchet) @('-Min', '2')
     Report (($lines -join '|') -eq 'No hotspots.') 'hotspots never lists the ratchet'
     $lines = Get-HotspotLines @('A', 'A|lane-no', 'A') @('-Min', '2')

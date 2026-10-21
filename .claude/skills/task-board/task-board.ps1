@@ -35,8 +35,9 @@
       hotspots The paths that serialise the board: for every path in the touches of
                an unfinished, lane-eligible task (Backlog, Doing, Blocked; not 'lane:
                no', not an audit path, not a shared list file such as the ratchet),
-               the tasks whose touches overlap it the way 'next' decides overlap (a
-               folder covers every path under it, '*' covers everything). One line
+               the tasks whose touches cover it: name it, a folder that holds it, or
+               '*'. A task naming only something beneath it does not count, so every
+               task counted for a path overlaps every other one there. One line
                per path that -Min (default 5) or more tasks touch, most first, then
                by path: 'Hotspot <count> <path>: BL-a, BL-b, ...' with IDs ascending,
                or 'No hotspots.'. Always exits 0. RunDarkFactory.ps1's coordinator
@@ -400,11 +401,22 @@ function Get-StartOrder([object[]] $Ready, [object[]] $Tasks) {
     }
 }
 
-# The paths at least $Minimum unfinished lane-eligible tasks overlap, most first, as
-# objects with Count, Path and Ids. Every path named in such a task's touches is a
-# candidate, except '*' and a shared list file; a task counts for a path when
-# Test-Overlap says its touches overlap that one path, so a folder entry covers the
-# files under it and '*' covers everything.
+# True when a task's touches cover a path: they name '*', the path itself, or a folder
+# that holds it. A touch beneath the path does not cover it, so every task that covers
+# a path overlaps every other task that covers it. A shared list file covers nothing.
+function Test-TouchesCover([string[]] $Touches, [string] $Path) {
+    foreach ($touch in $Touches) {
+        if ($touch -eq '*') { return $true }
+        if ($script:SharedListFiles -contains $touch) { continue }
+        if ($Path -ieq $touch -or $Path.StartsWith("$touch/", [StringComparison]::OrdinalIgnoreCase)) { return $true }
+    }
+    return $false
+}
+
+# The paths at least $Minimum unfinished lane-eligible tasks cover (Test-TouchesCover),
+# most first, as objects with Count, Path and Ids. Every path named in such a task's
+# touches is a candidate, except '*' and a shared list file. Since the tasks counted for
+# a path all overlap each other on it, each hotspot is a real queue of serialised work.
 function Get-Hotspots([object[]] $Tasks, [int] $Minimum) {
     $open = @($Tasks | Where-Object { @('Backlog', 'Doing', 'Blocked') -contains $_.State -and $_.LaneAllowed })
     $paths = @{}
@@ -415,7 +427,7 @@ function Get-Hotspots([object[]] $Tasks, [int] $Minimum) {
         }
     }
     $hotspots = @(foreach ($path in $paths.Values) {
-            $ids = @($open | Where-Object { Test-Overlap $_.Touches @($path) } | Sort-Object Number | ForEach-Object { $_.Id } | Select-Object -Unique)
+            $ids = @($open | Where-Object { Test-TouchesCover $_.Touches $path } | Sort-Object Number | ForEach-Object { $_.Id } | Select-Object -Unique)
             if ($ids.Count -ge $Minimum) { [pscustomobject]@{ Count = $ids.Count; Path = $path; Ids = $ids } }
         })
     return , @($hotspots | Sort-Object -Property @{ Expression = { $_.Count }; Descending = $true }, @{ Expression = { $_.Path.ToLowerInvariant() } })
