@@ -41,15 +41,24 @@ internal sealed record OptionGroupConnectionSettings(
     /// <param name="tls">The option group's TLS options, for the target's and the HTTPS proxy's handshakes.</param>
     /// <param name="http">The option group's HTTP options, for the HTTP version and ALPN setting the ALPN list follows.</param>
     /// <param name="proxy">The option group's proxy options, for its pre-proxy and HAProxy line.</param>
-    /// <returns>The settings.</returns>
+    /// <returns>The settings, the certificate and key types upper-cased, as curl 8.22.0's
+    /// <c>match_ssl_primary_config</c> compares <c>cert_type</c> and <c>key_type</c> with
+    /// <c>curl_strequal</c>, so <c>PEM</c> and <c>pem</c> share a connection (BL-2974).</returns>
     internal static OptionGroupConnectionSettings Of(EngineToolOptions tool, EasyNetworkOptions network, EasyTlsOptions tls, EasyHttpOptions http, EasyProxyOptions proxy) =>
         new(
-            TlsClientOptionsMapping.Of(tls, http.SslEnableAlpn, tool.SslSessionsFile),
-            TlsClientOptionsMapping.ProxyOf(tls, http.SslEnableAlpn),
+            WithUpperCaseTypes(TlsClientOptionsMapping.Of(tls, http.SslEnableAlpn, tool.SslSessionsFile)),
+            WithUpperCaseTypes(TlsClientOptionsMapping.ProxyOf(tls, http.SslEnableAlpn)),
             EngineComposition.UnixSocketOf(network),
             EngineComposition.LocalBindingOf(network),
             EngineComposition.AddressFamilyOf(network),
             EngineComposition.HaproxyProtocolOf(proxy),
             EngineComposition.PreProxyOf(proxy),
             string.Join('\n', HttpVersionMapping.HttpOverTlsApplicationProtocolsOf(http.HttpVersion)));
+
+    private static TlsClientOptions WithUpperCaseTypes(TlsClientOptions options) =>
+        options with
+        {
+            CertificateType = options.CertificateType?.ToUpperInvariant(),
+            PrivateKeyType = options.PrivateKeyType?.ToUpperInvariant(),
+        };
 }
