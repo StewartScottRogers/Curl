@@ -4,7 +4,7 @@ title: Port upstream unit programs for headers, alt-svc, HSTS, netrc and HTTP/1 
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-2886]
+depends-on: [BL-2886, BL-2889, BL-2890, BL-2891, BL-2892, BL-2893, BL-2894]
 touches: [Curl.Conformance.UnitTests/PassingUpstreamCases.txt, Curl.Conformance.UnitProgram.UnitLibrary/UnitPrograms.Headers.cs, Curl.Conformance.UnitProgram.UnitLibrary/Headers, Curl.Conformance.UnitProgram.UnitTests/Headers]
 requirement: none
 created: 2026-10-19
@@ -32,7 +32,15 @@ These ten `unittest` cases (skipped today with `Curl lacks the feature unittest`
 
 Ports go in Curl.Conformance.UnitProgram.UnitLibrary/Headers/ and their tests in Curl.Conformance.UnitProgram.UnitTests/Headers/; register them only in Curl.Conformance.UnitProgram.UnitLibrary/UnitPrograms.Headers.cs, which BL-2886 creates. Its project references are added by BL-2886; if one is missing, add it in a separate one-line commit and say so in the Log (Stewart, 2026-10-21: keep the seven ports parallel).
 
+2026-10-21, lane 6, split for size before any code: nine C programs (about 1,400 lines) over five Curl subsystems, with file-backed stores, a fixed clock, a missing alt-svc 5000-entry cap and two parsers whose counterparts need finding, is more than one run. Subtasks, each with disjoint `touches` so they run in parallel once BL-2889 lands:
+- BL-2889 (High): 1625, 1626, and splits `UnitPrograms.Headers.cs` into six `UnitPrograms.Headers.<Subarea>.cs` files so the others never touch one file.
+- BL-2890: 1304 netrc. BL-2891: 1654, 1669 alt-svc (likely adds the 5000-entry cap to `AltSvcCache`). BL-2892: 1660, 1674 HSTS. BL-2893: 2603, which tests libcurl's HTTP/1 *request* parser, not the response parser ADR-0711's row names; port or correct the row. BL-2894: 3400 capsules over `CapsuleDatagramChannel`.
+Prerequisite pass: the runner already runs ported unit programs (1302 and 1600 pass on the ratchet), passes `%LOGDIR` paths as arguments and writes `<client><file>`; `UnitProgramContext` carries no environment, so `CURL_TIME` is a fixed injected `TimeProvider` in the ports. `NetrcFile`, `AltSvcCache`, `HstsCache` (with `MaxEntries = 10_000`) and `CapsuleDatagramChannel` exist; no Curl type is named after `Curl_compareheader` or `Curl_copy_header_value` (BL-2889 finds the HTTP code that does that).
+
+2602: no port. It tests `dynhds`, libcurl's growable array of `dynhds_entry` structs (`Curl_dynhds_add`, `_cadd`, `_h1_cadd_line`, `_count`, `_getn`, its entry and size limits); Curl keeps headers in .NET collections, so there is no type with that observable behaviour. ADR-0711's row for 2602 already says "no counterpart (BL-2846 records it)"; when this task returns after its subtasks it confirms the ten cases and ticks the criteria.
+
 ## Log
 
 - 2026-10-19: Created.
 - 2026-10-21: Backlog -> Doing. Criteria at claim: 759c7e24 2e3e75ab e66ae9dd c0723528 620ebead.
+- 2026-10-21: Doing -> Backlog. Split for size into BL-2889 to BL-2894 (one port group each, disjoint touches); waits on them
