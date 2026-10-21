@@ -104,12 +104,13 @@ internal sealed record UrlHandleParts
     /// <returns>The encoded parts.</returns>
     public UrlHandleParts UrlEncoded() => this with
     {
-        Path = Encoded(Path, query: false),
-        Query = Encoded(Query, query: true),
-        Fragment = Encoded(Fragment, query: false),
+        Path = Encoded(Path, UrlEncodeQuery.No),
+        Query = Encoded(Query, UrlEncodeQuery.Yes),
+        Fragment = Encoded(Fragment, UrlEncodeQuery.No),
     };
 
-    private static string? Encoded(string? text, bool query) => text is null ? null : UrlPartText.Encode(text, query);
+    private static string? Encoded(string? text, UrlEncodeQuery query) =>
+        text is null ? null : UrlPartText.UrlEncodeString(text, relative: true, query);
 
     private static string? Spaced(string? text) => text?.Replace("%20", " ", StringComparison.Ordinal);
 

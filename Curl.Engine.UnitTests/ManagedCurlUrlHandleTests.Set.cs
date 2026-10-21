@@ -184,6 +184,14 @@ public sealed partial class ManagedCurlUrlHandleTests
     }
 
     [TestMethod]
+    public void Set_UrlWithQuestionMarkInFragmentUnderUrlEncode_EncodesEverySpaceAsPercentTwenty()
+    {
+        using ManagedCurlUrlHandle url = Parsed("http://h/p#a?b c", CurlUrlFlags.UrlEncode | CurlUrlFlags.AllowSpace);
+
+        Assert.AreEqual("a?b%20c", GetOk(url, CurlUrlPart.Fragment));
+    }
+
+    [TestMethod]
     public void Set_UrlWithNonAsciiPathUnderUrlEncode_EncodesItsUtf8Bytes()
     {
         using ManagedCurlUrlHandle url = Parsed("https://example.com/räksmörgås", CurlUrlFlags.UrlEncode);
