@@ -24,7 +24,9 @@ namespace Curl.Conformance;
 /// programs, has <c>CURLOPT_HTTPPOST</c> (BL-2593); <c>wakeup</c>, since that <c>Libcurl</c> has <c>curl_multi_wakeup</c> (BL-2661, ADR-0690);
 /// <c>threadsafe</c>, which Curl's <c>Features:</c> line and <c>curl_version_info</c> name, and
 /// <c>threaded-resolver</c>, which <c>runtests.pl</c> derives from <c>AsynchDNS</c> without <c>c-ares</c>
-/// (ADR-0695, BL-2700); <c>large_file</c>;
+/// (ADR-0695, BL-2700); <c>codeset-utf8</c>, which <c>runtests.pl</c> derives from a UTF-8 locale on
+/// the machine running the tests: Curl reads URLs, mail addresses and <c>-w</c> text as UTF-8 whatever
+/// the locale, so the harness stands in for a UTF-8 locale on every platform (BL-2861); <c>large_file</c>;
 /// <c>local-http</c> (the harness's server is at <c>127.0.0.1</c>); <c>win32</c> on Windows, as
 /// <c>runtests.pl</c> sets it there; the TLS backend; <c>xattr</c> off Windows, where curl
 /// cannot write extended attributes; <c>http/2</c> and <c>h2c</c> off Windows only, since the
@@ -40,8 +42,7 @@ namespace Curl.Conformance;
 /// <c>shuffle-dns</c>, <c>override-dns</c>, <c>getrlimit</c>,
 /// <c>--libcurl</c>); the other protocols the harness has no server for; features
 /// absent from Curl's <c>curl -V</c> (<c>SSPI</c>, <c>Unicode</c>, <c>MultiSSL</c>,
-/// <c>ssl-sessions</c>, <c>c-ares</c>); and <c>codeset-utf8</c>, which depends on the
-/// locale of the machine running the tests.
+/// <c>ssl-sessions</c>, <c>c-ares</c>).
 /// </para>
 /// </remarks>
 public sealed class UpstreamCurlPlatform

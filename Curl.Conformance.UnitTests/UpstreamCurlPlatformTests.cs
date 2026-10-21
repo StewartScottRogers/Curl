@@ -90,7 +90,6 @@ public sealed partial class UpstreamCurlPlatformTests
     [DataRow("TrackMemory")]
     [DataRow("unittest")]
     [DataRow("SSPI")]
-    [DataRow("codeset-utf8")]
     public void BothPlatforms_LeaveOffWhatCurlLacks(string feature)
     {
         var diagnostics = TestDiagnostics.For(TestContext);
