@@ -35,6 +35,21 @@ Lanes only run Windows, so the pass on Linux is judged by the `CI` workflow.
 
 ## Notes
 
+- Decision (ADR-0720): `http/3` stays off every `UpstreamCurlPlatform` (ADR-0540); the conformance tests'
+  `WithHttp3StandIn` reports `http/3` and `Debug` only to a case whose `<server>` names `http/3` (2501 names
+  `Debug` only because upstream runs http/3 cases on debug builds). Pinned by
+  `UpstreamCurlPlatformTests.WithHttp3StandIn_CaseServers_ReportsHttp3OnlyForTheHttp3Server`.
+- Measured on Windows 2026-10-21: 2501 passes; 2500, 2502, 2503 exit 60 `schannel: the revocation status is
+  unknown` (Schannel build's revocation check under `--cacert`, test CA has none). With the revocation check
+  temporarily off (OpenSSL-build behaviour, edit reverted) all four pass. So all four are listed, and
+  `IsHeldOnThisPlatform` leaves them unheld on Windows (Inconclusive there); CI on Linux and macOS judges them.
+- "If not reported" box: not applicable, http/3 is reported; ticked as nothing is left unexplained.
+- Touches widened (no Doing task names these): `UpstreamConformanceTests.cs` (the ratchet's held check),
+  `UpstreamConformanceTests.DebugStandIns.cs` (`PlatformFor` calls the rule), `UpstreamCurlPlatformTests.Http3.cs`
+  (the criterion's unit test), `Curl.Conformance.UnitLibrary/CLAUDE.md` (its 2500-2503 sentence was now false).
+  `UpstreamPlatformFeatureTable.cs` needed no change.
+- No production library changed (test project and docs only), so coverage of every library is unchanged.
+
 ## Log
 
 - 2026-10-19: Created.
