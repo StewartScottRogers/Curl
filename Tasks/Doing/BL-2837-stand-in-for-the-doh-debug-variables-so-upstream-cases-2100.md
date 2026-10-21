@@ -49,3 +49,4 @@ Read `lib/doh.c`, `lib/hostip.c` and `lib/happy-eyeballs`-related `DEBUGBUILD` b
 - 2026-10-19: Created.
 - 2026-10-21: Backlog -> Doing. Criteria at claim: 51e1080a 3a040ea3 a6e38886 7bd8d990 620ebead.
 - 2026-10-21: Doing -> Backlog. Waits on BL-2919 (harness ignores --doh-url, so no DoH request reaches sws) and BL-2920 (DoH HTTPS-RR query 2100 expects)
+- 2026-10-21: Backlog -> Doing. Criteria at claim: 51e1080a 3a040ea3 a6e38886 7bd8d990 620ebead.
