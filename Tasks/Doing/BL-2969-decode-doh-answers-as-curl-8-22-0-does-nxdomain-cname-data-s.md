@@ -28,11 +28,15 @@ If this is too big for one run, split it: the TTL cap and NXDOMAIN code are smal
 
 ## Acceptance criteria
 
-- [ ] `Curl.Networking.UnitTests` has focused tests that `DnsAnswerDecoder.Decode` gives `NxDomain` for RCODE 3, `None` for unit1650's self-pointing CNAME row, and a TTL of 86400 for an answer TTL above 86400.
-- [ ] The DoH resolver's exit code and `--trace-config doh` lines for an NXDOMAIN answer and a CNAME-only answer match curl 8.22.0 as measured, recorded in an ADR and pinned in `Curl.Networking.UnitTests`.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean, `dotnet test --filter "TestCategory!=Integration"` passes, and `Curl.Networking.UnitLibrary` keeps 100% line and branch coverage and complexity at most 10.
+- [x] `Curl.Networking.UnitTests` has focused tests that `DnsAnswerDecoder.Decode` gives `NxDomain` for RCODE 3 and a TTL of 86400 for an answer TTL above 86400 (`Decode_AnNxdomainRcode_FailsWithNxDomain`, `Decode_AnAnswerTtlAboveOneDay_IsCappedAtOneDay`). The self-pointing CNAME row moved to BL-2970.
+- [x] The DoH resolver's exit code for an NXDOMAIN answer (6, unchanged) and its failure text ("No such name") follow curl 8.22.0's source, recorded in ADR-0738 and pinned in `DohDnsResolverTraceTests`. The 8.22.0 line form and the CNAME-only answer, measured, moved to BL-2970.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean, `dotnet test --filter "TestCategory!=Integration"` passes (44 projects), and `Measure-CodeQuality.ps1 -Library Curl.Networking.UnitLibrary` reports 0 failing members.
 
 ## Notes
+
+- Split (as the Context allowed) after reading curl 8.22.0's `lib/vdns/doh.c`: besides the three decoder changes, 8.22.0 rewrote the A/AAAA `--trace-config doh` lines (`[DoH] [A] error decoding response: ...`, `DoH request complete, N to go`, no `hostname:`/`TTL:`/`CNAME:` entry). Skipping CNAME data and dropping `NoContent` changes that entry, so they go together with the new line form to BL-2970, which measures them with the local curl 8.22.0. This task did NXDOMAIN and the TTL cap.
+- Choice: `NxDomain` is appended at the end of `DnsMessageFailure`, so `DnsMessageFailureText`'s table stays indexed by value. Until BL-2970 the trace keeps 8.21.0's form with the new text: `[DNS] DoH: No such name type A for <host>` (ADR-0738).
+- `DnsServerQuery` (c-ares) reads RCODE itself before decoding, so it is unchanged.
 
 ## Log
 

@@ -29,7 +29,7 @@ public enum DnsMessageFailure
     /// <summary>Bytes are left over after the last record.</summary>
     Malformed,
 
-    /// <summary>The response code is not 0 (NOERROR), e.g. 2 (SERVFAIL) or 3 (NXDOMAIN).</summary>
+    /// <summary>The response code is neither 0 (NOERROR) nor 3 (NXDOMAIN), e.g. 2 (SERVFAIL).</summary>
     BadRcode,
 
     /// <summary>An answer record is neither the type asked for, a CNAME nor a DNAME.</summary>
@@ -46,4 +46,7 @@ public enum DnsMessageFailure
 
     /// <summary>The host name makes a query longer than curl's 272-byte limit.</summary>
     NameTooLong,
+
+    /// <summary>The response code is 3 (NXDOMAIN): the name does not exist (curl 8.22.0's <c>DOH_DNS_NXDOMAIN</c>, BL-2969).</summary>
+    NxDomain,
 }

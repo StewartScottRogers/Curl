@@ -87,8 +87,10 @@ public sealed class DohDnsResolverTraceTests
     }
 
     [TestMethod]
-    public async Task ResolveAsync_AnNxdomainAnswer_ReportsBadRcodeForBothTypes()
+    public async Task ResolveAsync_AnNxdomainAnswer_ReportsNoSuchNameForBothTypes()
     {
+        // curl 8.22.0 decodes RCODE 3 as DOH_DNS_NXDOMAIN, "No such name" (BL-2969); the line's
+        // 8.21.0 form stays until BL-2970 writes 8.22.0's.
         var nxdomain = Convert.FromHexString(MeasuredAAnswer);
         nxdomain[3] = 0x83;
 
@@ -96,8 +98,8 @@ public sealed class DohDnsResolverTraceTests
 
         var expectedLines = new[]
             {
-                "[DNS] DoH: Bad RCODE type A for example.test",
-                "[DNS] DoH: Bad RCODE type AAAA for example.test",
+                "[DNS] DoH: No such name type A for example.test",
+                "[DNS] DoH: No such name type AAAA for example.test",
             };
         Diagnostics.Diff("trace lines", string.Join("\n", expectedLines), string.Join("\n", lines));
         CollectionAssert.AreEqual(expectedLines, lines);

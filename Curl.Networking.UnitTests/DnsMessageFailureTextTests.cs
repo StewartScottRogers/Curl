@@ -24,6 +24,7 @@ public sealed class DnsMessageFailureTextTests
     [DataRow(DnsMessageFailure.NoContent, "No content")]
     [DataRow(DnsMessageFailure.BadId, "Bad ID")]
     [DataRow(DnsMessageFailure.NameTooLong, "Name too long")]
+    [DataRow(DnsMessageFailure.NxDomain, "No such name")]
     public void Describe_ReturnsCurlsText(DnsMessageFailure failure, string expected)
     {
         Diagnostics.Arrange("failure", failure);
