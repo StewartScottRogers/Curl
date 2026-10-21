@@ -50,13 +50,12 @@ public static class ParallelProgressMeterText
     }
 
     /// <summary>
-    /// Formats a byte count or speed in five columns as <c>max5data</c> does: right-aligned below
-    /// 100000; then, dividing by 1024 for each unit, <c>xx.yU</c> while under 100 of the unit and
-    /// <c>xxxxU</c> while under 10000, as in <c> 292k</c>, <c>71.5M</c> and <c>1589M</c>. Petabytes are
-    /// the last unit, and <see cref="long.MaxValue" /> is <c>8191P</c>. The text is cut to five
-    /// characters as curl's six-byte <c>msnprintf</c> buffer cuts it: because <c>unitSize / 10</c>
-    /// rounds down, the tenths digit reaches 10 just below 100 of a unit, so 100 MiB less one byte is
-    /// <c>99.10</c>, the unit letter cut off (ADR-0428).
+    /// Formats a byte count or speed in five columns as curl 8.22.0's <c>max5data</c> does:
+    /// right-aligned below 100000; then, dividing by 1024 for each unit, <c>xx.yU</c> while under 100
+    /// of the unit (the tenths <c>(bytes % 1024) * 10 / 1024</c> of the count before the division) and
+    /// <c>xxxxU</c> while under 10000, as in <c>97.6k</c>, <c> 292k</c>, <c>71.5M</c> and <c>1588M</c>.
+    /// <see cref="long.MaxValue" /> is <c>8191P</c>, so petabytes are the last unit reached
+    /// (upstream tool1622; 8.21.0's <c>99.10</c> for 100 MiB less one byte is now <c>99.9M</c>).
     /// </summary>
     /// <param name="bytes">The count, never negative.</param>
     /// <returns>Five characters.</returns>
@@ -67,17 +66,18 @@ public static class ParallelProgressMeterText
             return string.Create(CultureInfo.InvariantCulture, $"{bytes,5}");
         }
 
-        long unitSize = 1024;
         int unit = 0;
-        while (unit < SizeUnits.Length - 1 && bytes >= 10000 * unitSize)
+        long units = bytes / 1024;
+        while (units >= 10000)
         {
-            unitSize *= 1024;
+            bytes = units;
+            units = bytes / 1024;
             unit++;
         }
 
-        return unit > 0 && bytes < 100 * unitSize
-            ? string.Create(CultureInfo.InvariantCulture, $"{bytes / unitSize,2}.{bytes % unitSize / (unitSize / 10)}{SizeUnits[unit]}")[..5]
-            : string.Create(CultureInfo.InvariantCulture, $"{bytes / unitSize,4}{SizeUnits[unit]}");
+        return units < 100
+            ? string.Create(CultureInfo.InvariantCulture, $"{units,2}.{bytes % 1024 * 10 / 1024}{SizeUnits[unit]}")
+            : string.Create(CultureInfo.InvariantCulture, $"{units,4}{SizeUnits[unit]}");
     }
 
     /// <summary>
