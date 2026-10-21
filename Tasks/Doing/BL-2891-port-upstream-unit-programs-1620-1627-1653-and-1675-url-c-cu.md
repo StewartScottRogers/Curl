@@ -54,3 +54,4 @@ Split from BL-2844 (2026-10-21), which ports the ten URL and address parsing uni
 - 2026-10-21: Created.
 - 2026-10-21: Backlog -> Doing. Criteria at claim: 994c71ca 67867c61 aca7e1a2 dd1cc079.
 - 2026-10-21: Doing -> Backlog. Waits on BL-2926 (port of unit1675, which needs Curl.Engine and Curl.Core internals); 1620, 1627 and 1653 are ported in the stash
+- 2026-10-21: Backlog -> Doing. Criteria at claim: 994c71ca 67867c61 aca7e1a2 dd1cc079.
