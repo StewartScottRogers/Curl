@@ -32,6 +32,16 @@
                parseable with '^Capacity (\d+):'. The dark factory's -Lanes Auto
                caps its lane count with it. Every task in Doing counts, interactive-
                only ones included; of the ready tasks, only lane-eligible ones do.
+      hotspots The paths that serialise the board: for every path in the touches of
+               an unfinished, lane-eligible task (Backlog, Doing, Blocked; not 'lane:
+               no', not an audit path, not a shared list file such as the ratchet),
+               the tasks whose touches cover it: name it, a folder that holds it, or
+               '*'. A task naming only something beneath it does not count, so every
+               task counted for a path overlaps every other one there. One line
+               per path that -Min (default 5) or more tasks touch, most first, then
+               by path: 'Hotspot <count> <path>: BL-a, BL-b, ...' with IDs ascending,
+               or 'No hotspots.'. Always exits 0. RunDarkFactory.ps1's coordinator
+               parses these lines; task-admin.ps1 check prints them as warnings.
       next-id  The next free task ID.
       new      Create a task in Backlog from TASK-TEMPLATE.md. -NoLane writes
                'lane: no' so no dark factory lane is offered it.
@@ -66,7 +76,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true, Position = 0)]
-    [ValidateSet('status', 'next', 'capacity', 'next-id', 'new', 'move', 'archive', 'dedupe')]
+    [ValidateSet('status', 'next', 'capacity', 'hotspots', 'next-id', 'new', 'move', 'archive', 'dedupe')]
     [string] $Command,
 
     [string] $Id,
@@ -110,7 +120,11 @@ param(
 
     # For 'archive': archive all of Done, whatever its age, but only once Done holds
     # more than $DoneListLimit tasks; otherwise do nothing.
-    [switch] $WhenDoneIsLong
+    [switch] $WhenDoneIsLong,
+
+    # For 'hotspots': the fewest tasks a path must have touching it to be listed.
+    [ValidateRange(1, 100000)]
+    [int] $Min = 5
 )
 
 $ErrorActionPreference = 'Stop'
@@ -387,6 +401,38 @@ function Get-StartOrder([object[]] $Ready, [object[]] $Tasks) {
     }
 }
 
+# True when a task's touches cover a path: they name '*', the path itself, or a folder
+# that holds it. A touch beneath the path does not cover it, so every task that covers
+# a path overlaps every other task that covers it. A shared list file covers nothing.
+function Test-TouchesCover([string[]] $Touches, [string] $Path) {
+    foreach ($touch in $Touches) {
+        if ($touch -eq '*') { return $true }
+        if ($script:SharedListFiles -contains $touch) { continue }
+        if ($Path -ieq $touch -or $Path.StartsWith("$touch/", [StringComparison]::OrdinalIgnoreCase)) { return $true }
+    }
+    return $false
+}
+
+# The paths at least $Minimum unfinished lane-eligible tasks cover (Test-TouchesCover),
+# most first, as objects with Count, Path and Ids. Every path named in such a task's
+# touches is a candidate, except '*' and a shared list file. Since the tasks counted for
+# a path all overlap each other on it, each hotspot is a real queue of serialised work.
+function Get-Hotspots([object[]] $Tasks, [int] $Minimum) {
+    $open = @($Tasks | Where-Object { @('Backlog', 'Doing', 'Blocked') -contains $_.State -and $_.LaneAllowed })
+    $paths = @{}
+    foreach ($task in $open) {
+        foreach ($path in $task.Touches) {
+            if ($path -eq '*' -or $script:SharedListFiles -contains $path) { continue }
+            if (-not $paths.ContainsKey($path.ToLowerInvariant())) { $paths[$path.ToLowerInvariant()] = $path }
+        }
+    }
+    $hotspots = @(foreach ($path in $paths.Values) {
+            $ids = @($open | Where-Object { Test-TouchesCover $_.Touches $path } | Sort-Object Number | ForEach-Object { $_.Id } | Select-Object -Unique)
+            if ($ids.Count -ge $Minimum) { [pscustomobject]@{ Count = $ids.Count; Path = $path; Ids = $ids } }
+        })
+    return , @($hotspots | Sort-Object -Property @{ Expression = { $_.Count }; Descending = $true }, @{ Expression = { $_.Path.ToLowerInvariant() } })
+}
+
 function Get-NextId([object[]] $Tasks) {
     $highest = -1
     foreach ($task in $Tasks) { if ($task.Number -gt $highest) { $highest = $task.Number } }
@@ -564,6 +610,14 @@ switch ($Command) {
         if ($picked.Count -eq 0) { $more = 'none more can start' }
         else { $more = '{0} more can start ({1})' -f $picked.Count, ($picked -join ', ') }
         Write-Output ('Capacity {0}: {1} in Doing, {2}.' -f ($doing.Count + $picked.Count), $doing.Count, $more)
+    }
+
+    'hotspots' {
+        $hotspots = Get-Hotspots (Get-Tasks) $Min
+        if ($hotspots.Count -eq 0) { Write-Output 'No hotspots.'; break }
+        foreach ($hotspot in $hotspots) {
+            Write-Output ('Hotspot {0} {1}: {2}' -f $hotspot.Count, $hotspot.Path, ($hotspot.Ids -join ', '))
+        }
     }
 
     'next-id' {

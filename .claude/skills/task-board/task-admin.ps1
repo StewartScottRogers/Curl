@@ -17,7 +17,8 @@
       check   Validate the board: duplicate or missing IDs, unknown field values
               (a lane other than yes or no among them),
               dependencies that do not exist, dependency cycles, finished tasks
-              with unticked boxes, missing sections, non-ASCII bytes.
+              with unticked boxes, missing sections, non-ASCII bytes. Also prints
+              task-board.ps1 hotspots' lines as warnings, which never fail it.
       report  Counts by state, assignee, pipeline and priority, and completions
               by date.
 
@@ -395,6 +396,23 @@ function Get-DependencyCycles([object[]] $Tasks) {
     return , $cycles
 }
 
+# Prints task-board.ps1 hotspots' lines as warnings: paths so many unfinished tasks touch
+# that they serialise the board. They are advice, never problems, so they never fail the
+# check. The board script owns the overlap rule, so it is asked rather than copied here.
+function Write-HotspotWarnings {
+    $boardScript = Join-Path $PSScriptRoot 'task-board.ps1'
+    # By name, not this process's path: pwsh installed as a dotnet tool runs as dotnet.exe.
+    $shell = if ($PSVersionTable.PSEdition -eq 'Core') { 'pwsh' } else { 'powershell' }
+    $lines = @()
+    try {
+        $lines = @(& $shell -NoProfile -ExecutionPolicy Bypass -File $boardScript hotspots 2>$null | Where-Object { $_ -like 'Hotspot *' })
+    } catch { }
+    if ($lines.Count -eq 0) { return }
+    Write-Output ''
+    Write-Output "$($lines.Count) hotspot warning(s) (paths that serialise the board; not problems):"
+    foreach ($line in $lines) { Write-Output "  warning: $line" }
+}
+
 function Invoke-Check([object[]] $Tasks) {
     $problems = @()
     $doneIds = Get-DoneIds $Tasks
@@ -491,6 +509,7 @@ function Invoke-Check([object[]] $Tasks) {
     }
 
     Write-Output "Checked $($Tasks.Count) task(s) on the board."
+    Write-HotspotWarnings
     if ($problems.Count -eq 0) {
         Write-Output 'No problems found.'
         return
