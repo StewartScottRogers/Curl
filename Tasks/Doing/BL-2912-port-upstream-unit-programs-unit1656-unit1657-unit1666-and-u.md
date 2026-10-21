@@ -33,3 +33,4 @@ Curl's counterparts are `internal` in `Curl.Output.UnitLibrary`: `DerReader.Read
 ## Log
 
 - 2026-10-21: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: 18dcba38 b0b30ff9 da19ee8c.
