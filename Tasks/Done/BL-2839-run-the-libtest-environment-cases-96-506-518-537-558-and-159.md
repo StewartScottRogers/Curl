@@ -37,7 +37,7 @@ Follow ADR-0687/0678/0698 for any stand-in and keep it in the harness. Lanes run
 
 ## Notes
 
-Decisions in ADR-0721 (Decided by Claude under Stewart's delegation):
+Decisions in ADR-0722 (Decided by Claude under Stewart's delegation):
 
 - 96 stays off: its memdump lists C allocator calls in upstream source files (`MEM tool_cfgable.c`), which Curl has no allocator to write.
 - 558 stays off: the same `TrackMemory` memdump (`MEM easy.c: malloc()`), a record of libcurl's C allocator.
@@ -54,4 +54,4 @@ Decisions in ADR-0721 (Decided by Claude under Stewart's delegation):
 
 - 2026-10-19: Created.
 - 2026-10-21: Backlog -> Doing. Criteria at claim: 465a238c 5ca354be c46d4ed8 a9d93e0e 620ebead.
-- 2026-10-21: Doing -> Done. Upstream case 1592 runs on a stalled-lookup resolver stand-in and is listed; 96, 506, 518, 537 and 558 stay off per ADR-0721
+- 2026-10-21: Doing -> Done. Upstream case 1592 runs on a stalled-lookup resolver stand-in and is listed; 96, 506, 518, 537 and 558 stay off per ADR-0722
