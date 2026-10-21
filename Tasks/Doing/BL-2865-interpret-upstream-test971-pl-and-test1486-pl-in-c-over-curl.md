@@ -40,3 +40,4 @@ Split from BL-2850. Needs the dispatch seam (BL-2863) and the vendored docs (BL-
 - 2026-10-19: Created.
 - 2026-10-21: Backlog -> Doing. Criteria at claim: a61dc661 969fe749 309149d6.
 - 2026-10-21: Doing -> Backlog. Needs Curl.Conformance.UnitTests/UpstreamConformanceTests.cs, which BL-2841 (Doing) also touches; work is complete in the stash, next claim commits it
+- 2026-10-21: Backlog -> Doing. Criteria at claim: a61dc661 969fe749 309149d6.
