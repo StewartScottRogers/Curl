@@ -1,4 +1,4 @@
-﻿---
+---
 id: BL-2937
 title: Fix AF-0299: The proxy redial's answersChallenge = true can become false with no test failing, so the reconnect after a closed 407 acts as a first request
 priority: Normal
@@ -49,3 +49,4 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 ## Log
 
 - 2026-10-21: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
