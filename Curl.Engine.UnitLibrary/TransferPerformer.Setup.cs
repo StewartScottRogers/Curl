@@ -69,6 +69,14 @@ internal sealed partial class TransferPerformer
     internal static readonly TransferResult EchSetoptFailure =
         TransferResult.Failure(CurlExitCode.BadFunctionArgument, EchSetoptMessage);
 
+    /// <summary>
+    /// The result of a transfer with a proxy set under a <see cref="EngineFeatureMask" /> hiding
+    /// <see cref="EngineFeatureMask.Proxy" />: <c>CURLE_NOT_BUILT_IN</c> (exit 4) with no error text, as
+    /// a build without proxy support refuses <c>CURLOPT_PROXY</c> and curl's tool, having written its
+    /// own line, marks the error synthetic so no <c>curl: (4)</c> line follows (ADR-0746, BL-2984).
+    /// </summary>
+    internal static readonly TransferResult ProxyNotBuiltInFailure = new(CurlExitCode.NotBuiltIn, 0);
+
     private const string InterfaceSetoptMessage = "setopt 0x274e got bad argument";
 
     private const string EchSetoptMessage = "setopt 0x2855 got bad argument";
@@ -139,7 +147,9 @@ internal sealed partial class TransferPerformer
     /// Chooses the transfer's proxy with <see cref="TransferProxySelection" />, then its credentials
     /// with <see cref="TransferCredentialLookup" />, which it keeps as the running transfer's
     /// <see cref="EngineTransferState.LookedUpCredentials" /> for every attempt's context. A scheme no
-    /// handler serves fails first, with exit 1.
+    /// handler serves fails first, with exit 1; before that, a proxy set under a dispatch whose
+    /// <see cref="TransferDispatch.FeatureMask" /> hides <see cref="EngineFeatureMask.Proxy" /> fails with
+    /// <see cref="ProxyNotBuiltInFailure" />, as libcurl's setopt does in a build without proxy support.
     /// </summary>
     /// <param name="dispatch">The run's dispatch: its dispatcher says whether the URL's scheme is served, its proxy selector chooses the proxy.</param>
     /// <param name="settings">The tool settings, for <c>-U</c> and <c>--unix-socket</c>.</param>
@@ -170,6 +180,12 @@ internal sealed partial class TransferPerformer
         [NotNullWhen(false)] out TransferResult? failure)
     {
         proxy = null;
+        if (dispatch.FeatureMask.HasFlag(EngineFeatureMask.Proxy) && proxyOptions.Proxy is not null)
+        {
+            failure = ProxyNotBuiltInFailure;
+            return false;
+        }
+
         if (!dispatch.Dispatcher.Serves(url.Scheme))
         {
             failure = TransferResult.Failure(CurlExitCode.UnsupportedProtocol, $"Protocol \"{url.Scheme.ToLowerInvariant()}\" not supported");
