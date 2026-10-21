@@ -1,5 +1,5 @@
 ---
-id: BL-2982
+id: BL-2986
 title: Write -v's HTTPS-RR line when the DNS cache answers an https origin resolved through --doh-url
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-21
 completed:
 ---
-# BL-2982 — Write -v's HTTPS-RR line when the DNS cache answers an https origin resolved through --doh-url
+# BL-2986 — Write -v's HTTPS-RR line when the DNS cache answers an https origin resolved through --doh-url
 
 ## Goal
 
