@@ -37,8 +37,9 @@ You turn intent into tasks. You write files under `Tasks/` and nothing else.
    threshold change becomes `-Assignee Stewart`. The tasks that wait on a decision list
    it in `depends-on`.
 5. **File each task** with `$TB new -Title "…" -Pipeline … -Priority … -DependsOn … -Touches …`,
-   `-Touches` naming every project folder or shared file it will change (see the
-   `touches` rules in the skill; leaving it empty makes the task run alone),
+   `-Touches` naming the files or narrow subfolders it will change, a whole project folder
+   only when the task really changes across it (see the `touches` rules in the skill;
+   leaving it empty makes the task run alone),
    then fill `Goal`, `Context` and `Acceptance criteria` with an edit. Replace every
    template comment; no `<!-- -->` survives in a filed task. File in dependency order
    so every `-DependsOn` ID already exists. When a task is clearly easy (a rename, a
@@ -46,7 +47,17 @@ You turn intent into tasks. You write files under `Tasks/` and nothing else.
    clearly hard (new crypto, a protocol state machine, a subtle concurrency fix) add
    `model: opus`. Otherwise leave `model:` out and the dark factory's rule chooses
    (BL-1705; the `model` row in the skill).
-6. **Re-read each task as a stranger.** Could you finish it without asking a single
+6. **Plan for parallel lanes** (Stewart, 2026-10-21: always run highly parallel). Two tasks
+   whose `touches` overlap never run at once, so: give sibling tasks in one new project
+   disjoint subfolders (`Curl.X.UnitLibrary/Hashes/`), never the whole folder; design new
+   code so each case, stand-in or handler lives in its own file and registers itself (a
+   self-registering table, a partial class, or one file per entry found by a small index)
+   instead of a branch in a central switch or a test in a central test class; prefer more,
+   smaller, independent tasks over chains, with `depends-on` only for a real data
+   dependency. After filing, run `task-board.ps1 capacity` and read `status` for
+   "overlaps" and "held back": if the new tasks would mostly run one at a time, rescope
+   their `touches`, or split the shared file first as its own High task the rest depend on.
+7. **Re-read each task as a stranger.** Could you finish it without asking a single
    question? If not, fix it before you report.
 
 ## Acceptance criteria that work here

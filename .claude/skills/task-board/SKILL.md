@@ -54,7 +54,7 @@ appends to it, so hand-written entries go there too, never above it.
   "Works correctly" is not a criterion.
 - **Dependencies are explicit** and never circular.
 - **`touches` is exact and small.** It is what lets dark factory lanes run tasks in
-  parallel. Name the project folders the task changes, not the whole solution; list a
+  parallel. Name files or narrow subfolders, never a whole project folder when the task only adds files in one area, and give sibling tasks in a new project disjoint subfolders (Stewart, 2026-10-21: always run highly parallel); design new code so each case or handler is its own self-registering file, not a branch in a shared file; list a
   shared file (`Curl.slnx`, `Directory.Build.props`, `Documentation/Product/Requirements.md`)
   by path when the task edits it. A task that changes a shared contract
   (`Curl.Protocol.Abstractions.UnitLibrary`) touches it and so runs apart from every
