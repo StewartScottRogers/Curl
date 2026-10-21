@@ -11,5 +11,6 @@ public sealed partial class UnitPrograms
         new Unit1606SpeedCheck(),
         new Unit1303TimeLeft(),
         new Unit3216RateLimit(),
+        new Limits.Unit1399.Unit1399RedirectAdditiveTimers(),
     ];
 }
