@@ -280,6 +280,19 @@ public sealed class CommandLineInterfaceAndLocalPortOptionTests
         Diagnostics.Assert("exception", nameof(ArgumentNullException), exception.GetType().Name);
     }
 
+    [TestMethod]
+    public void InterfaceBindingParse_EmptyValue_IsMalformedAsCurlParseInterfaceRefusesIt()
+    {
+        Diagnostics.Arrange("value", string.Empty);
+
+        InterfaceBinding binding = InterfaceBinding.Parse(string.Empty);
+
+        Diagnostics.Assert("malformed", true, binding.IsMalformed);
+        Diagnostics.Assert("interface or host name", null, binding.InterfaceOrHostName);
+        Assert.IsTrue(binding.IsMalformed);
+        Assert.IsNull(binding.InterfaceOrHostName);
+    }
+
     private void AssertBinding(InterfaceBinding binding, string? interfaceName, string? hostName)
     {
         Diagnostics.Assert("interface or host name", null, binding.InterfaceOrHostName);
