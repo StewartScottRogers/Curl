@@ -32,3 +32,4 @@ Split from BL-2851 (2026-10-21, lane 7); the vendored docs come from BL-2990. Fo
 
 - 2026-10-21: Created.
 - 2026-10-21: touches narrowed by BL-2994: the Perl script registration moved out of UpstreamConformanceTests.cs into one UpstreamPerlCommandScripts.Test<N>.cs file per script.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: 5fec9bf1 9a48bfcc dd1cc079.
