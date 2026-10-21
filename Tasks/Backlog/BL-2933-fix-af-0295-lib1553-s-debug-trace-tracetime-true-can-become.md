@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Conformance.LibTest.UnitLibrary]
+touches: [Curl.Conformance.LibTest.UnitLibrary, Curl.Conformance.LibTest.UnitTests/Lib1551To1559Tests.cs]
 requirement: none
 created: 2026-10-21
 completed:
@@ -46,7 +46,10 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Notes
 
+- 2026-10-21 (lane 4): only a test kills the mutant at `Lib1553.cs:72`, so `touches` now also names `Curl.Conformance.LibTest.UnitTests/Lib1551To1559Tests.cs`. Plan: add a test there that calls the Debug callback Lib1553 sets, the way `Lib552Tests.RunAsync_TracesSentDataAsTextWithNoHexAndNoTime` does for AF-0274, and asserts that the stderr line starts with a `HH:mm:ss.ffffff ` time prefix and holds no hex. Requeued because BL-2930 (Doing) touches the whole `Curl.Conformance.LibTest.UnitTests`.
+
 ## Log
 
 - 2026-10-21: Created.
 - 2026-10-21: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-21: Doing -> Backlog. Needs Curl.Conformance.LibTest.UnitTests/Lib1551To1559Tests.cs, which BL-2930 (Doing) holds through its whole-project touches on Curl.Conformance.LibTest.UnitTests
