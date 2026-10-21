@@ -48,3 +48,4 @@ After BL-2871 is Done and BL-2863 no longer holds `UpstreamCaseRunner.cs`: fix 1
 - 2026-10-19: Created.
 - 2026-10-19: Backlog -> Doing. Criteria at claim: b18c1ec7 0f5f6907 c061550a dd1cc079 620ebead.
 - 2026-10-19: Doing -> Backlog. Needs BL-2871 (SFTP --remote-time product fix for 1446), and UpstreamCaseRunner.cs (output file read before the postcheck) is held by BL-2863 in Doing; all three causes are in Notes
+- 2026-10-21: Backlog -> Doing. Criteria at claim: b18c1ec7 0f5f6907 c061550a dd1cc079 620ebead.
