@@ -9,7 +9,7 @@ touches: [RunDarkFactory.ps1, DarkFactory, CLAUDE.md, Curl.slnx]
 lane: no
 requirement: none
 created: 2026-10-21
-completed:
+completed: 2026-10-21
 ---
 # BL-2988 — Split RunDarkFactory.ps1 into one file per area so factory tasks can run in parallel
 
@@ -28,19 +28,19 @@ in `DarkFactory/` and are dot-sourced in their original order, so behaviour is u
 
 ## Acceptance criteria
 
-- [ ] `RunDarkFactory.ps1` keeps the header help, the param block and the entry, and dot-sources the
+- [x] `RunDarkFactory.ps1` keeps the header help, the param block and the entry, and dot-sources the
       area files in `DarkFactory/`; no area file is more than about 800 lines, each holds one area's
       functions with that area's self-test block, and each is ASCII only.
-- [ ] Every self-test switch passes: -TestLaneMarker, -TestAlarm, -TestAutoLanes, -TestMachineProbe,
+- [x] Every self-test switch passes: -TestLaneMarker, -TestAlarm, -TestAutoLanes, -TestMachineProbe,
       -TestOutOfTokens, -TestTaskIds, -TestModelChoice, -TestTaskBudget, -TestAffectedTests,
       -TestFlakyTests, -TestShiftBranch, -TestAuditCadence, -TestAudioOff, -TestCiWatch,
       -TestTaskStash, -TestToolLabels, -TestPark, -TestClaimDuplicates, -TestIntegrateLock,
       -TestHeartbeat, -TestRestart; and -AutoLanesReport prints its reading.
-- [ ] The waiting factory tasks (BL-2945 to BL-2951) name in `touches` the area files their work
+- [x] The waiting factory tasks (BL-2945 to BL-2951) name in `touches` the area files their work
       lands in, edited in Backlog by the task board's rules.
-- [ ] `Audit/Tools/Test-AuditDue.ps1` counts a change under `DarkFactory/` as a factory-script
+- [x] `Audit/Tools/Test-AuditDue.ps1` counts a change under `DarkFactory/` as a factory-script
       change, through a pull request from `master` (an audit path).
-- [ ] CLAUDE.md says where the factory's code lives.
+- [x] CLAUDE.md says where the factory's code lives.
 
 ## Notes
 
@@ -50,3 +50,4 @@ in `DarkFactory/` and are dot-sourced in their original order, so behaviour is u
 - 2026-10-21: Backlog -> Doing. Interactive session; Stewart approved 2026-10-21. Criteria at claim: 311cb162 31ad115a 1c2294ce 0bc8d395 a2fb7b1b.
 - 2026-10-21: Renumbered from BL-2983, which a lane filed first.
 - 2026-10-21: Renumbered from BL-2986, which a lane filed first.
+- 2026-10-21: Doing -> Done. RunDarkFactory.ps1 split into 31 DarkFactory area files; all 22 self-test and report runs match the unsplit script; the waiting factory tasks touch area files; Test-AuditDue watches DarkFactory/ (PR #186).
