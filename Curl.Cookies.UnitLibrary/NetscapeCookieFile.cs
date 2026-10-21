@@ -19,8 +19,11 @@ namespace Curl.Cookies;
 public static class NetscapeCookieFile
 {
     /// <summary>
-    /// The longest line curl reads, in characters, counting a carriage return but not the line feed.
-    /// A longer line ends the reading: it and every line after it are ignored.
+    /// The longest line curl reads, in characters, counting a carriage return but not the line feed:
+    /// curl 8.22.0's <c>Curl_get_line</c> reads into a <c>dynbuf</c> of <c>MAX_COOKIE_LINE</c> (5000),
+    /// which holds the line, its line feed (one is added to a last line without one) and no more than
+    /// 4999 bytes. A longer line fails the read with <c>CURLE_TOO_LARGE</c>: no line from it on is read,
+    /// and curl ends the transfer with exit 100 (measured 2026-10-21, BL-2916).
     /// </summary>
     public const int LongestLine = 4998;
 
@@ -61,14 +64,33 @@ public static class NetscapeCookieFile
     /// <param name="events">Where the refusal lines are reported.</param>
     /// <returns>The cookies read, oldest (first in the file) first. Expired cookies are included.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="reader"/> or <paramref name="events"/> is <see langword="null"/>.</exception>
-    public static IReadOnlyList<Cookie> Read(TextReader reader, DateTimeOffset now, ITransferEvents events)
+    public static IReadOnlyList<Cookie> Read(TextReader reader, DateTimeOffset now, ITransferEvents events) =>
+        Read(reader, now, events, out _);
+
+    /// <summary>
+    /// Reads every cookie in <paramref name="reader"/> as <see cref="Read(TextReader, DateTimeOffset, ITransferEvents)"/>
+    /// does, and tells whether the reading ended at a line longer than <see cref="LongestLine"/>, the
+    /// <c>CURLE_TOO_LARGE</c> that fails curl's transfer with exit 100.
+    /// </summary>
+    /// <remarks>
+    /// Every byte is kept as it is: a <c>^Z</c> (0x1A) is neither the end of the file nor dropped, as curl
+    /// opens the file in binary mode, so a line holding one in its name or value is refused as any other
+    /// control character is. A last line without a line feed is read as if it had one.
+    /// </remarks>
+    /// <param name="reader">The file's text, one character per byte.</param>
+    /// <param name="now">The time the file is read, which a <c>Set-Cookie:</c> line's <c>Max-Age</c> counts from.</param>
+    /// <param name="events">Where the refusal lines are reported.</param>
+    /// <param name="isLineTooLong"><see langword="true"/> when the reading ended at a line longer than <see cref="LongestLine"/>.</param>
+    /// <returns>The cookies read before that line, oldest (first in the file) first. Expired cookies are included.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="reader"/> or <paramref name="events"/> is <see langword="null"/>.</exception>
+    public static IReadOnlyList<Cookie> Read(TextReader reader, DateTimeOffset now, ITransferEvents events, out bool isLineTooLong)
     {
         ArgumentNullException.ThrowIfNull(reader);
         ArgumentNullException.ThrowIfNull(events);
 
         List<Cookie> cookies = [];
         StringBuilder line = new();
-        while (TryReadLine(reader, line))
+        while (TryReadLine(reader, line, out isLineTooLong))
         {
             Cookie? cookie = ParseLine(line.ToString(), now, out string? refusal);
             if (refusal is not null)
@@ -86,9 +108,10 @@ public static class NetscapeCookieFile
     }
 
     /// <summary>Reads the next line, without its line feed; <see langword="false"/> at the end of the text or at a line that is too long.</summary>
-    private static bool TryReadLine(TextReader reader, StringBuilder line)
+    private static bool TryReadLine(TextReader reader, StringBuilder line, out bool isLineTooLong)
     {
         line.Clear();
+        isLineTooLong = false;
         int character = reader.Read();
         if (character < 0)
         {
@@ -101,7 +124,8 @@ public static class NetscapeCookieFile
             character = reader.Read();
         }
 
-        return line.Length <= LongestLine;
+        isLineTooLong = line.Length > LongestLine;
+        return !isLineTooLong;
     }
 
     /// <summary>Reads one line of a cookie file as curl does, or refuses it.</summary>
