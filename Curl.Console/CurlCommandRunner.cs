@@ -3600,16 +3600,17 @@ internal sealed class CurlCommandRunner(
         {
             bool toStandardOutput = !transfer.DiscardsBody;
             StartTransferProgress(options, options.ResumeFrom, toStandardOutput);
+            TerminalBinaryOutputRefusingStream? terminalGuard = TerminalBinaryOutputGuardOf(options);
             TransferAttemptPieces attempt = new(
                 url,
                 transferOptions,
                 () => new EngineToolTransferOutputs(
-                    RateLimited(options, toStandardOutput ? FlushedEachWriteUnderNoBuffer(options, InTextModeUnderUseAscii(options, Running.GatedStandardOutput)) : Stream.Null),
+                    RateLimited(options, toStandardOutput ? FlushedEachWriteUnderNoBuffer(options, InTextModeUnderUseAscii(options, GuardedStandardOutput(terminalGuard))) : Stream.Null),
                     headerOutput,
                     BodyHeaderStyles: toStandardOutput ? HeaderStylesFor(options, url) : null),
                 _ => AttemptInputsOf(options, range, options.ResumeFrom, formBody, upload, proxy));
             TransferResult result = toStandardOutput
-                ? await TransferToStandardOutputAsync(follower, options, attempt).ConfigureAwait(false)
+                ? await TransferToStandardOutputAsync(follower, options, attempt, terminalGuard).ConfigureAwait(false)
                 : await FollowRetryingAsync(follower, options, attempt, options.ResumeFrom, null).ConfigureAwait(false);
 
             return await WriteProgressAndAbandonedRetryWarningAsync(options, result, options.ResumeFrom, toStandardOutput)
@@ -4489,7 +4490,13 @@ internal sealed class CurlCommandRunner(
     /// <param name="follower">Performs the transfer with the handler for its scheme, following redirects under <c>-L</c>.</param>
     /// <param name="options">The accepted command line, whose redirect options the follower applies.</param>
     /// <param name="attempt">What each attempt, whose output is standard output, is built from.</param>
+    /// <param name="terminalGuard">
+    /// The guard the body is written through when standard output is a terminal and <c>--output -</c> was not
+    /// given (<see cref="TerminalBinaryOutputGuardOf" />), or <see langword="null" />.
+    /// </param>
     /// <returns>
+    /// <see cref="TerminalBinaryOutputRefusal" />, after <see cref="TerminalBinaryOutputRefusingStream.RefusalWarning" />
+    /// unless <c>-s</c>, when <paramref name="terminalGuard" /> refused binary bytes;
     /// <see cref="StandardOutputWriteFailure" /> when the handler succeeded but standard
     /// output failed, which is curl's failed flush at the end of the transfer; otherwise the
     /// handler's result, including its own write failure when curl's stdio buffer would have
@@ -4498,16 +4505,46 @@ internal sealed class CurlCommandRunner(
     private async Task<TransferResult> TransferToStandardOutputAsync(
         RedirectFollower follower,
         CommandLineOptions options,
-        TransferAttemptPieces attempt)
+        TransferAttemptPieces attempt,
+        TerminalBinaryOutputRefusingStream? terminalGuard)
     {
         RunningTransferState state = Running;
         state.StandardOutput.ClearWriteFailure();
         TransferResult result = await FollowRetryingAsync(follower, options, attempt, options.ResumeFrom, null)
             .ConfigureAwait(false);
         await state.GatedStandardOutput.FlushAsync().ConfigureAwait(false);
+        if (terminalGuard is { HasRefused: true })
+        {
+            await WriteWarningUnlessSilentAsync(options, TerminalBinaryOutputRefusingStream.RefusalWarning).ConfigureAwait(false);
+            return TerminalBinaryOutputRefusal;
+        }
 
         return result.IsSuccess && state.StandardOutput.HasWriteFailed ? StandardOutputWriteFailure : result;
     }
+
+    /// <summary>
+    /// The result of a transfer whose binary body <see cref="TerminalBinaryOutputRefusingStream" /> refused:
+    /// exit 23 with no error text, as curl 8.22.0's <c>tool_write_cb</c> marks the write error synthetic once it
+    /// has warned, so no <c>curl: (23)</c> line follows.
+    /// </summary>
+    private static readonly TransferResult TerminalBinaryOutputRefusal = new(CurlExitCode.WriteError, 0);
+
+    /// <summary>
+    /// The guard a body written to standard output goes through, as curl 8.22.0's <c>tool_write_cb</c> checks it:
+    /// only when standard output is a terminal and the option group did not give <c>--output -</c>.
+    /// </summary>
+    /// <param name="options">The accepted command line.</param>
+    /// <returns>A guard over the running transfer's standard output, or <see langword="null" /> for none.</returns>
+    private TerminalBinaryOutputRefusingStream? TerminalBinaryOutputGuardOf(CommandLineOptions options) =>
+        standardOutputIsTerminal && !options.UrlOutputs.Any(output => output.FileName == UrlTransfer.StandardOutputFileName)
+            ? new TerminalBinaryOutputRefusingStream(Running.GatedStandardOutput)
+            : null;
+
+    /// <summary>The stream a body to standard output is written through: <paramref name="terminalGuard" />, or the running transfer's standard output when there is none.</summary>
+    /// <param name="terminalGuard">The guard <see cref="TerminalBinaryOutputGuardOf" /> gave, or <see langword="null" />.</param>
+    /// <returns>The stream.</returns>
+    private Stream GuardedStandardOutput(TerminalBinaryOutputRefusingStream? terminalGuard) =>
+        terminalGuard ?? Running.GatedStandardOutput;
 
     /// <summary>
     /// The pieces of one attempt the runner chose before connecting: the proxy and the running transfer's looked-up

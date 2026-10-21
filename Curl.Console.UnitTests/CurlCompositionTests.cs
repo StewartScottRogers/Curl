@@ -145,7 +145,7 @@ public sealed partial class CurlCompositionTests
 
             int exitCode = await CurlComposition
                 .CreateRunner(standardOutput, standardError, standardInput, standardOutputIsTerminal: true)
-                .RunAsync([new Uri(path).AbsoluteUri]);
+                .RunAsync([new Uri(path).AbsoluteUri, "--output", "-"]);
 
             Diagnostics.Act("exit code", exitCode);
             Diagnostics.Bytes("standard output", standardOutput.ToArray());

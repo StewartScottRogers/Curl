@@ -278,6 +278,10 @@ internal static class CurlComposition
     /// <see cref="EngineFeatureMask.Proxy" /> an option group with <c>-x</c> writes <see cref="ProxySupportDisabledLine" />
     /// before each transfer and the transfer ends with exit 4, as a curl built without proxy support does (ADR-0746, BL-2984).
     /// </param>
+    /// <param name="standardOutputIsTerminal">
+    /// Whether the run treats standard output as a terminal; <see langword="false" />, the default. The conformance
+    /// harness passes <see langword="true" /> for a case setting the debug build's <c>CURL_ISATTY</c> (BL-2908).
+    /// </param>
     /// <returns>The runner.</returns>
     internal static CurlCommandRunner CreateRunner(
         Stream standardOutput,
@@ -304,7 +308,8 @@ internal static class CurlComposition
         IWebSocketRandomSource? webSocketRandomSource = null,
         IFileSystem? fileSystem = null,
         ISecurityContextFactory? securityContexts = null,
-        EngineFeatureMask featureMask = EngineFeatureMask.None)
+        EngineFeatureMask featureMask = EngineFeatureMask.None,
+        bool standardOutputIsTerminal = false)
     {
         ConnectionCache runConnections = new(TimeProvider.System);
         LateBoundDiagnosticLog runLog = new();
@@ -320,6 +325,7 @@ internal static class CurlComposition
             OperatingSystem.IsWindows(),
             terminalColumns: TerminalColumns.Resolve(environment(TerminalColumns.ColumnsVariableName), () => null),
             writesProgressMeter: writesProgressMeter,
+            standardOutputIsTerminal: standardOutputIsTerminal,
             writeOutFileOpener: writeOutFileOpener,
             writeOutTimeDialect: WriteOutTimeDialectFor(OperatingSystem.IsWindows()),
             outputPaths: new PhysicalOutputPaths(),
@@ -367,7 +373,7 @@ internal static class CurlComposition
     }
 
     /// <summary>
-    /// Builds one option group's dispatch for the dialing <see cref="CreateRunner(Stream, Stream, Stream, ITcpDialer, IDnsResolver, IDatagramConnector, bool, IWriteOutFileOpener?, bool, Func{string, string?}?, IConnectionListener?, DefaultConfigFileSearch?, TimeProvider?, bool, bool, bool, bool, bool?, bool, IExtendedAttributeWriter?, bool, IWebSocketRandomSource?, IFileSystem?, ISecurityContextFactory?, EngineFeatureMask)" />:
+    /// Builds one option group's dispatch for the dialing <see cref="CreateRunner(Stream, Stream, Stream, ITcpDialer, IDnsResolver, IDatagramConnector, bool, IWriteOutFileOpener?, bool, Func{string, string?}?, IConnectionListener?, DefaultConfigFileSearch?, TimeProvider?, bool, bool, bool, bool, bool?, bool, IExtendedAttributeWriter?, bool, IWebSocketRandomSource?, IFileSystem?, ISecurityContextFactory?, EngineFeatureMask, bool)" />:
     /// the group's <see cref="TcpConnector" /> over <paramref name="tcpDialer" /> and
     /// <paramref name="dnsResolver" />, pooled in <paramref name="runConnections" />, with a proxy
     /// selector that reads the environment through <paramref name="readEnvironmentVariable" />, and the connector's <c>--resolve</c> entries

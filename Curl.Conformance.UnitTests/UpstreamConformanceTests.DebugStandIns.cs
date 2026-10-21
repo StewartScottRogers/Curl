@@ -52,6 +52,7 @@ public sealed partial class UpstreamConformanceTests
         SetsWriteOutDebugVariable,
         SetsToolTransferDebugVariable,
         SetsStubGssCredentialsVariable,
+        SetsToolIsAttyVariable,
     ];
 
     internal static UpstreamCurlPlatform PlatformFor(byte[] testFile)
