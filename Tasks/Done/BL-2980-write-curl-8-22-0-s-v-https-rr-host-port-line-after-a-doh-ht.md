@@ -29,7 +29,7 @@ Found by BL-2954 (ADR-0727's BL-2954 amendment). curl 8.22.0's `lib/vdns/cf-dns.
 
 - Added `DohDnsResolver.cs`, `IHttpsOriginDnsResolver.cs` and `DohDnsResolverHttpsRecordQueryTests.cs` to `touches`: `TcpConnector` needs the kept record, so the interface gains `HttpsRecordFor`, which `DohDnsResolver` implements and the test's fake resolver must too. No other task in Doing names them.
 - Placement derived from curl 8.22.0's source, not measured: the Windows reference curl has no HTTPSRR feature (ADR-0727's BL-2980 amendment).
-- Left out and filed: ` mandatory-keys(ignored)` (BL-2985) and the line on a DNS-cache answer (BL-2986).
+- Left out and filed: ` mandatory-keys(ignored)` (BL-2987) and the line on a DNS-cache answer (BL-2986).
 
 ## Log
 

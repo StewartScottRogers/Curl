@@ -1,5 +1,5 @@
 ---
-id: BL-2985
+id: BL-2987
 title: Keep the HTTPS record's mandatory key so -v's HTTPS-RR line writes mandatory-keys(ignored)
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-21
 completed:
 ---
-# BL-2985 — Keep the HTTPS record's mandatory key so -v's HTTPS-RR line writes mandatory-keys(ignored)
+# BL-2987 — Keep the HTTPS record's mandatory key so -v's HTTPS-RR line writes mandatory-keys(ignored)
 
 ## Goal
 
