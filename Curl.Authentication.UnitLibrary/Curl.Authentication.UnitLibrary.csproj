@@ -9,6 +9,8 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Curl.Authentication.UnitTests" />
+    <!-- For Sha512Slash256 and AwsSigV4UriEncoding, which the ports of unit1615, unit1979 and unit1980 run (BL-2842, ADR-0711). -->
+    <InternalsVisibleTo Include="Curl.Conformance.UnitProgram.UnitLibrary" />
   </ItemGroup>
 
 </Project>
