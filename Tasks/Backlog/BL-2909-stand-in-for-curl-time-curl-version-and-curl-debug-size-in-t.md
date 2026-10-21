@@ -1,5 +1,5 @@
 ---
-id: BL-2890
+id: BL-2909
 title: Stand in for CURL_TIME, CURL_VERSION and CURL_DEBUG_SIZE in the curl tool's --write-out so upstream cases 970, 972 and 1981 run
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-21
 completed:
 ---
-# BL-2890 — Stand in for CURL_TIME, CURL_VERSION and CURL_DEBUG_SIZE in the curl tool's --write-out so upstream cases 970, 972 and 1981 run
+# BL-2909 — Stand in for CURL_TIME, CURL_VERSION and CURL_DEBUG_SIZE in the curl tool's --write-out so upstream cases 970, 972 and 1981 run
 
 ## Goal
 

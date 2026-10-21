@@ -1,5 +1,5 @@
 ---
-id: BL-2891
+id: BL-2910
 title: Stand in for CURL_UPLOAD_SIZE, CURL_DBG_SUPPRESS_CONNECT_HDS and the tool's CURL_ENTROPY WebSocket key so upstream cases 447, 2349 and 2300 run
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-21
 completed:
 ---
-# BL-2891 — Stand in for CURL_UPLOAD_SIZE, CURL_DBG_SUPPRESS_CONNECT_HDS and the tool's CURL_ENTROPY WebSocket key so upstream cases 447, 2349 and 2300 run
+# BL-2910 — Stand in for CURL_UPLOAD_SIZE, CURL_DBG_SUPPRESS_CONNECT_HDS and the tool's CURL_ENTROPY WebSocket key so upstream cases 447, 2349 and 2300 run
 
 ## Goal
 

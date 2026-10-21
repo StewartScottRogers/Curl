@@ -1,5 +1,5 @@
 ---
-id: BL-2889
+id: BL-2908
 title: Refuse binary output to a terminal and stand in for CURL_ISATTY so upstream cases 1425 and 1426 run
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-21
 completed:
 ---
-# BL-2889 — Refuse binary output to a terminal and stand in for CURL_ISATTY so upstream cases 1425 and 1426 run
+# BL-2908 — Refuse binary output to a terminal and stand in for CURL_ISATTY so upstream cases 1425 and 1426 run
 
 ## Goal
 

@@ -43,13 +43,13 @@ All stand-ins belong to the harness: neither `Libcurl` nor the shipped curl tool
 - Touches: added Curl.Conformance.UnitTests/UpstreamConformanceTests.DebugStandIns.cs for its one-line rule-table entry (the table is the shared edit every Debug stand-in makes); no task in Doing on origin/work/dark-factory names it.
 - 1662: reported Debug to a libtest case naming Mime (RunsMimeLibTest in UpstreamConformanceTests.ToolDebugVariablesStandIn.cs, pinned by PlatformFor_MimeLibTestCase_ReportsDebugOnlyThen, whose first row fails without the rule). The case verifies only stdout -bar-, so no boundary stand-in was needed; CreateEngine already gives the forced boundary under CURL_ENTROPY. Passes with CURL_UPSTREAM_CASE=1662; on the ratchet. Its output holds no path or OS text, so it is platform-neutral.
 - The other eight need product or composition work beyond a Debug report, so per the Context's split rule they are filed, not done here (decided for cost: one run could not land all eight):
-  - 1425, 1426: Curl has no binary-output-to-terminal refusal at all (no Binary output can mess up your terminal anywhere), and the dialing CurlComposition.CreateRunner takes no standardOutputIsTerminal. First difference: skipped Curl lacks the feature Debug. Filed BL-2889.
-  - 970, 972, 1981: the dialing CreateRunner passes the runner no -w clock, version or debug size; 1981 also needs the debug clock's microseconds (CURL_TIME % 1000000: expected 08:31:43.037103). First difference: skipped Curl lacks the feature Debug. Filed BL-2890.
-  - 447, 2349, 2300: no upload-size, CONNECT-header suppression or tool WebSocket random source seam in CreateRunner; 2300 differs at Sec-WebSocket-Key (task Context). Filed BL-2891.
+  - 1425, 1426: Curl has no binary-output-to-terminal refusal at all (no Binary output can mess up your terminal anywhere), and the dialing CurlComposition.CreateRunner takes no standardOutputIsTerminal. First difference: skipped Curl lacks the feature Debug. Filed BL-2908.
+  - 970, 972, 1981: the dialing CreateRunner passes the runner no -w clock, version or debug size; 1981 also needs the debug clock's microseconds (CURL_TIME % 1000000: expected 08:31:43.037103). First difference: skipped Curl lacks the feature Debug. Filed BL-2909.
+  - 447, 2349, 2300: no upload-size, CONNECT-header suppression or tool WebSocket random source seam in CreateRunner; 2300 differs at Sec-WebSocket-Key (task Context). Filed BL-2910.
 - No library changed (only Curl.Conformance.UnitTests), so no coverage run was needed. The CI criterion is handed to the shift: a lane may not push, and the coordinator's CI watch (BL-987) files a High task naming any case that fails on Linux or macOS.
 
 ## Log
 
 - 2026-10-19: Created.
 - 2026-10-21: Backlog -> Doing. Criteria at claim: 7f123db9 69f69475 48742285 7bd8d990 620ebead.
-- 2026-10-21: Doing -> Done. Upstream case 1662 runs on the Debug stand-in and is on the ratchet; the other eight are filed as BL-2889, BL-2890 and BL-2891
+- 2026-10-21: Doing -> Done. Upstream case 1662 runs on the Debug stand-in and is on the ratchet; the other eight are filed as BL-2908, BL-2909 and BL-2910
