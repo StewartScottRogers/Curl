@@ -1,10 +1,11 @@
+using Curl.Core;
 using Curl.Engine;
 namespace Curl.Console;
 
 /// <summary>
 /// Creates the directories an output file's path names, for <c>--create-dirs</c>, as curl
-/// 8.21.0's <c>create_dir_hierarchy</c> does: each leading part of the path up to a
-/// separator, in order, the file's own name excepted.
+/// 8.22.0's <c>create_dir_hierarchy</c> does: each directory
+/// <see cref="OutputDirectoryHierarchy.DirectoriesToCreate" /> gives, in order.
 /// </summary>
 /// <remarks>
 /// Measured on Windows with curl 8.21.0 on 2026-09-27 (BL-239 Notes):
@@ -28,11 +29,9 @@ internal static class OutputFileDirectories
     /// </returns>
     internal static DirectoryCreationFailure? CreateLeadingDirectories(IOutputPaths outputPaths, string outputFile, bool runsOnWindows)
     {
-        char[] separators = runsOnWindows ? ['/', '\\'] : ['/'];
-
-        for (int end = outputFile.IndexOfAny(separators); end >= 0; end = outputFile.IndexOfAny(separators, end + 1))
+        foreach (string directory in OutputDirectoryHierarchy.DirectoriesToCreate(outputFile, runsOnWindows))
         {
-            if (CreateDirectory(outputPaths, outputFile[..end], separators) is { } failure)
+            if (CreateDirectory(outputPaths, directory) is { } failure)
             {
                 return failure;
             }
@@ -46,25 +45,13 @@ internal static class OutputFileDirectories
     /// </summary>
     /// <param name="outputPaths">Checks and creates the directory.</param>
     /// <param name="directory">The leading part of the path.</param>
-    /// <param name="separators">The directory separators.</param>
     /// <returns>
-    /// The failure, or <see langword="null" /> when there was nothing to create, it exists now,
-    /// or it failed with <c>EACCES</c> or <c>EEXIST</c>.
+    /// The failure, or <see langword="null" /> when it exists now, or it failed with
+    /// <c>EACCES</c> or <c>EEXIST</c>.
     /// </returns>
-    private static DirectoryCreationFailure? CreateDirectory(IOutputPaths outputPaths, string directory, char[] separators) =>
-        IsRootOrRepeatedSeparator(directory, separators)
-        || outputPaths.TryCreateDirectory(directory, out int errorNumber)
+    private static DirectoryCreationFailure? CreateDirectory(IOutputPaths outputPaths, string directory) =>
+        outputPaths.TryCreateDirectory(directory, out int errorNumber)
         || errorNumber is CRuntimeErrorNumbers.PermissionDenied or CRuntimeErrorNumbers.AlreadyExists
             ? null
             : new DirectoryCreationFailure(directory, errorNumber);
-
-    /// <summary>
-    /// Tells whether a leading part of the path names no directory to create: it is empty,
-    /// the part before a leading separator, or ends in a separator, from a doubled one.
-    /// </summary>
-    /// <param name="directory">The leading part.</param>
-    /// <param name="separators">The directory separators.</param>
-    /// <returns><see langword="true" /> when there is nothing to create.</returns>
-    private static bool IsRootOrRepeatedSeparator(string directory, char[] separators) =>
-        directory.Length == 0 || separators.Contains(directory[^1]);
 }
