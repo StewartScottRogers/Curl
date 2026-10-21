@@ -444,6 +444,18 @@ internal static class EngineComposition
     }
 
     /// <summary>
+    /// The resolver the TCP and UDP connectors ask on a DNS cache miss: <paramref name="resolver" />, its addresses
+    /// shuffled under <see cref="EasyNetworkOptions.DnsShuffleAddresses" /> (<c>CURLOPT_DNS_SHUFFLE_ADDRESSES</c>,
+    /// <see cref="ShufflingDnsResolver" />, BL-2922), then wrapped by <paramref name="wrapLookUps" />.
+    /// </summary>
+    /// <param name="resolver">The resolver the options pick.</param>
+    /// <param name="network">The option group's network options.</param>
+    /// <param name="wrapLookUps">Wraps the resolver the connectors look names up through.</param>
+    /// <returns>The resolver the connectors look names up through.</returns>
+    internal static IDnsResolver LookUpsOf(IDnsResolver resolver, EasyNetworkOptions network, Func<IDnsResolver, IDnsResolver> wrapLookUps) =>
+        wrapLookUps(ShufflingDnsResolver.Over(resolver, network.DnsShuffleAddresses));
+
+    /// <summary>
     /// Creates the resolver <c>--doh-url</c> asks for: a <see cref="DohDnsResolver" /> over
     /// <paramref name="connector" /> for the URL <see cref="DohUrlOf" /> makes of the value, or, when it
     /// makes none, an <see cref="UnusableDohUrlResolver" />, so every name fails to resolve with exit 6
@@ -826,7 +838,7 @@ internal static class EngineComposition
         IDnsResolver dnsResolver = dialing is null
             ? CreateDnsResolver(network, tls, timeProvider, tcpDialer, resolverEvents, easyErrorText, traces)
             : DialingResolverOf(dialing, network, tls, timeProvider, resolverEvents, easyErrorText, traces);
-        IDnsResolver lookUps = wrapLookUps(dnsResolver);
+        IDnsResolver lookUps = LookUpsOf(dnsResolver, network, wrapLookUps);
         TlsClientOptions tlsClientOptions = TlsClientOptionsMapping.Of(tls, http.SslEnableAlpn, tool.SslSessionsFile);
         ITlsProviderWithWarnings tlsProvider = CreateTlsProvider(tlsClientOptions, timeProvider, tlsSessions, dnsResolver as IEchConfigListLookup);
         TlsClientOptions proxyTlsClientOptions = TlsClientOptionsMapping.ProxyOf(tls, http.SslEnableAlpn);
