@@ -46,3 +46,4 @@ Gap scorecard 2026-10-19_1329: 375 (`!proxy`), 1454 (`!IPv6`) and 445 (`ldap`) a
 - 2026-10-19: Created.
 - 2026-10-21: Backlog -> Doing. Criteria at claim: 78dd162e edb7b05e f29424e7 296deadb dd1cc079 620ebead.
 - 2026-10-21: Doing -> Backlog. Needs BL-2984 (feature mask in engine and tool, Curl.Console held by BL-2938), BL-2982 (IPv6) and BL-2983 (IDN) first
+- 2026-10-21: Backlog -> Doing. Criteria at claim: 78dd162e edb7b05e f29424e7 296deadb dd1cc079 620ebead.
