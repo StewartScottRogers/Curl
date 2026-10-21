@@ -35,3 +35,4 @@ The six `UnitPrograms.Headers.<Subarea>.cs` files are created by this task and a
 ## Log
 
 - 2026-10-21: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: 2a82be6e 99a1f494 f82efa1d 50be8c6c dd1cc079.
