@@ -46,3 +46,46 @@ protocol with `%if HTTPSRR`. curl.se's release builds and the OpenSSL builds Cur
 
 Case 2100's DoH POSTs now come in curl's order. A connect through a proxy sends no HTTPS query,
 as before; whether curl 8.22.0 asks the origin's HTTPS record there is not measured.
+
+## Amendment (BL-2954, 2026-10-21): the HTTPS-RR query's `--trace-config doh` lines
+
+Decided by Claude under Stewart's delegation.
+
+**How the lines were found.** Derived from curl 8.22.0's source at tag `curl-8_22_0`, not
+measured: the reference curl on this machine (Git for Windows 8.22.0, Schannel) lists no
+`HTTPSRR` feature and never sends the query. The prefixes follow from `lib/curl_trc.c`: `infof`
+on a DoH sub-transfer writes its feature name, `[DoH] ` (`doh.c` sets `doh->state.feat` to
+`Curl_trc_feat_doh`), and `Curl_trc_dns` writes `[DNS] `. BL-2973's measurement of the A and AAAA
+lines on the same build (`* [DoH] [DoH] [AAAA] error decoding response: No such name`,
+`* [DoH] DoH request complete, 0 to go`) confirms the doubled `[DoH] ` and the form.
+
+**The lines,** from `doh_probe_done` and `doh_resp_decode_httpsrr` (`lib/vdns/doh.c`) and
+`Curl_httpsrr_trace` and `Curl_httpsrr_print` (`lib/vdns/httpsrr.c`), each after the query's own
+sub-transfer lines:
+
+- a connection or exchange that failed: `[DoH] [DoH] [HTTPS] error: <curl_easy_strerror>`, and
+  nothing more;
+- an answer that did not decode: `[DoH] [DoH] [HTTPS] error decoding response: <text>`, an answer
+  with no content reading `No such name` (curl turns `DOH_NO_CONTENT` into `DOH_DNS_NXDOMAIN` for
+  the HTTPS type), and nothing more;
+- an answer holding records: `[DNS] [HTTPS] got N records` (at most 4 kept), then for the first
+  record a `[DNS] [HTTPS] record: <record so far>` line after each parameter read, the record
+  printed as `<priority> <target>.` (`.` for the root) with ` mandatory-keys(ignored)`,
+  ` alpn=` (only `http/1.1`, `h2`, `h3`, each once), ` port=`, ` no-default-alpn`, ` ipv6hint=`,
+  ` ipv4hint=` and ` ech=<N bytes>` where present; a record curl refuses ends with
+  `[DoH] [DoH] error decoding HTTPS RR: <curl_easy_strerror>` of the code curl returns
+  (`Out of memory` for a target name that does not read, as the code is never reassigned;
+  `A libcurl function was given a bad argument` for two bytes or a bad `no-default-alpn`, `port`,
+  hint or `ech` value; `Unrecognized or bad HTTP Content or Transfer-Encoding` for a bad `alpn`
+  list; `Weird server reply` otherwise), and nothing more;
+- otherwise `[DoH] DoH request complete, 0 to go`: the HTTPS query is a resolve of its own, so
+  its count never includes A and AAAA.
+
+**Decision.** `DohDnsResolver` runs the HTTPS query on `SubTransferEvents`, as the A and AAAA
+queries run, numbered connection #1 since it opens first, and `DohTraceLines.ReportHttpsRecord`
+writes the lines above on the `--trace-config doh` sink, verbatim, prefixes included, once the
+query has finished and before the A and AAAA queries start. The lines are written whenever that
+sink is real; curl 8.22.0 writes the `[DNS] [HTTPS]` ones only when the `dns` feature is on as
+well, and refuses a non-2xx DoH answer with `[DoH] [DoH] [HTTPS] error: HTTP status N`: both are
+BL-2979, after BL-2973 settles 8.22.0's sub-transfer prefix and gating. The `-v` line
+`HTTPS-RR <host>:<port>: ...` that `lib/vdns/cf-dns.c` writes on the main transfer is BL-2978.

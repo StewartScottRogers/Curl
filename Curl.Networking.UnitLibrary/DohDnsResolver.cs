@@ -210,7 +210,7 @@ public sealed class DohDnsResolver : IHttpsOriginDnsResolver, IEchConfigListLook
 
         return _httpsRecords.TryGetValue((host, port), out var known)
             ? known
-            : await QueryHttpsRecordAsync(host, port, SubTransferEvents, cancellationToken).ConfigureAwait(false);
+            : await QueryHttpsRecordAsync(host, port, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -218,7 +218,10 @@ public sealed class DohDnsResolver : IHttpsOriginDnsResolver, IEchConfigListLook
     /// HTTPS query first, for the host on port 443 and <c>_&lt;port&gt;._https.&lt;host&gt;</c> on any
     /// other, answered before the A and AAAA queries <see cref="ResolveAsync" /> then sends. The record
     /// is kept, so <see cref="ResolveHttpsRecordAsync" /> for the same host and port asks nothing more,
-    /// as curl reuses the one resolve under <c>--ech</c>; the query writes no <c>-v</c> lines.
+    /// as curl reuses the one resolve under <c>--ech</c>. Its sub-transfer reports on
+    /// <see cref="SubTransferEvents" /> and its <c>--trace-config doh</c> lines
+    /// (<see cref="DohTraceLines.ReportHttpsRecord" />, ADR-0727's BL-2954 amendment) all come before the
+    /// A and AAAA queries' lines.
     /// </summary>
     /// <param name="host">The origin's host name or literal address.</param>
     /// <param name="port">The port the transfer connects to.</param>
@@ -228,19 +231,21 @@ public sealed class DohDnsResolver : IHttpsOriginDnsResolver, IEchConfigListLook
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(host);
 
-        _httpsRecords[(host, port)] = await QueryHttpsRecordAsync(host, port, NoTransferEvents.Instance, cancellationToken).ConfigureAwait(false);
+        _httpsRecords[(host, port)] = await QueryHttpsRecordAsync(host, port, cancellationToken).ConfigureAwait(false);
         return await ResolveAsync(host, cancellationToken).ConfigureAwait(false);
     }
 
-    // Posts the HTTPS query and decodes the answer's first record; null when nothing is asked or answered.
-    private async ValueTask<ServiceBindingRecord?> QueryHttpsRecordAsync(string host, int port, ITransferEvents events, CancellationToken cancellationToken)
+    // Posts the HTTPS query, reports its trace lines and decodes the answer's first record; null
+    // when nothing is asked or answered.
+    private async ValueTask<ServiceBindingRecord?> QueryHttpsRecordAsync(string host, int port, CancellationToken cancellationToken)
     {
         if (HttpsQueryFor(host, port) is not { } query)
         {
             return null;
         }
 
-        var result = await QueryAsync(query, DnsRecordType.Https, events, cancellationToken).ConfigureAwait(false);
+        var result = await QueryAsync(query, DnsRecordType.Https, SubTransferEvents, cancellationToken).ConfigureAwait(false);
+        DohTraceLines.ReportHttpsRecord(_dohTrace, _describeExitCode, result);
         return result.Answer is { Failure: DnsMessageFailure.None, HttpsRecordData: [var first, ..] }
             ? ServiceBindingRecordDecoder.Decode(first).Record
             : null;
