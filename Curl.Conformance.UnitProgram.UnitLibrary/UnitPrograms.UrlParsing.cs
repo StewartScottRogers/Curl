@@ -15,5 +15,6 @@ public sealed partial class UnitPrograms
         new Unit1663InterfaceParsing(),
         new Unit1961InetAddressText(),
         new Unit1675UrlApi(),
+        new Unit1395DotSegmentRemoval(),
     ];
 }
