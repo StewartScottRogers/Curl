@@ -1,5 +1,5 @@
 ---
-id: BL-2975
+id: BL-2977
 title: Shuffle --resolve entries' addresses when CURLOPT_DNS_SHUFFLE_ADDRESSES is set
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-21
 completed:
 ---
-# BL-2975 — Shuffle --resolve entries' addresses when CURLOPT_DNS_SHUFFLE_ADDRESSES is set
+# BL-2977 — Shuffle --resolve entries' addresses when CURLOPT_DNS_SHUFFLE_ADDRESSES is set
 
 ## Goal
 

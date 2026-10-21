@@ -31,7 +31,7 @@ Split from BL-2847 (too big for one run). Today the option is only stored: `Libc
 - 2026-10-21 (lane 3): `touches` narrowed from the whole Networking and Engine projects to the files changed (ADR-0694), and `Curl.Conformance.UnitLibrary/UpstreamCaseScreening.cs` with its tests added for the case-1608-only `shuffle-dns` feature (no task in Doing named them).
 - Upstream's shuffle is in `lib/vdns/dnscache.c` at curl-8_22_0 (not `hostip.c`): `dns_shuffle_addr` runs in `dnsc_entry_assign_addr`, before the entry is cached.
 - Built: `Curl.Networking`'s `DnsAddressShuffle` (Fisher-Yates, random source injected, `RandomNumberGenerator.GetInt32` in production) and `ShufflingDnsResolver`; `EngineComposition.LookUpsOf` wraps the connectors' resolver when `DnsShuffleAddresses` is set; `Unit1608DnsShuffle` ported and registered; `UpstreamCaseScreening` reports `shuffle-dns` to unit1608's case alone. ADR-0740 records the choices.
-- `--resolve` entries skip the resolver and are not shuffled yet: filed as BL-2975.
+- `--resolve` entries skip the resolver and are not shuffled yet: filed as BL-2977.
 - Measured: case 1608 passes with `CURL_UPSTREAM_CASE=1608`; fast tests green; `Measure-CodeQuality.ps1` over Networking, Engine, Conformance.UnitProgram and Conformance: 0 failing members.
 
 ## Log
