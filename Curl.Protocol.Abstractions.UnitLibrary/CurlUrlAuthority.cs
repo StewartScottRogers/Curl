@@ -40,9 +40,18 @@ internal sealed record CurlUrlAuthority(
     /// <see langword="true" /> to reject user information, even an empty user, before the host
     /// and port are checked, as curl's <c>CURLU_DISALLOW_USER</c> does.
     /// </param>
+    /// <param name="refuseUnconvertibleName">
+    /// <see langword="true" /> to reject a host name that cannot be converted to punycode, as a
+    /// transfer does; <see langword="false" /> to keep it, as the URL API does (ADR-0734).
+    /// </param>
     /// <param name="rejection">Why curl rejects the authority, or <see cref="CurlUrlRejection.None" />.</param>
     /// <returns>The authority, or <see langword="null" /> when curl rejects it.</returns>
-    public static CurlUrlAuthority? Parse(string text, string? scheme, bool disallowUser, out CurlUrlRejection rejection)
+    public static CurlUrlAuthority? Parse(
+        string text,
+        string? scheme,
+        bool disallowUser,
+        bool refuseUnconvertibleName,
+        out CurlUrlRejection rejection)
     {
         int at = text.IndexOf('@');
         if (disallowUser && at >= 0)
@@ -52,7 +61,7 @@ internal sealed record CurlUrlAuthority(
             return null;
         }
 
-        CurlUrlAuthority? hostAndPort = ParseHostAndPort(text[(at + 1)..], scheme is not null, out rejection);
+        CurlUrlAuthority? hostAndPort = ParseHostAndPort(text[(at + 1)..], scheme is not null, refuseUnconvertibleName, out rejection);
         if (hostAndPort is null)
         {
             return null;
@@ -72,7 +81,11 @@ internal sealed record CurlUrlAuthority(
     /// (<c>https://::1/</c>, lib1560).
     /// </summary>
     /// <returns>An authority with no user information, or <see langword="null" /> when curl rejects it.</returns>
-    private static CurlUrlAuthority? ParseHostAndPort(string hostAndPort, bool hasScheme, out CurlUrlRejection rejection)
+    private static CurlUrlAuthority? ParseHostAndPort(
+        string hostAndPort,
+        bool hasScheme,
+        bool refuseUnconvertibleName,
+        out CurlUrlRejection rejection)
     {
         rejection = SplitPort(hostAndPort, hasScheme, out string host, out int? port);
         if (host.Length == 0)
@@ -81,7 +94,7 @@ internal sealed record CurlUrlAuthority(
         }
 
         if (rejection != CurlUrlRejection.None
-            || !CurlUrlHost.TryNormalize(host, out string normalizedHost, out string idnHost, out string? zoneId, out rejection))
+            || !CurlUrlHost.TryNormalize(host, refuseUnconvertibleName, out string normalizedHost, out string idnHost, out string? zoneId, out rejection))
         {
             return null;
         }

@@ -33,6 +33,8 @@ internal static class CurlUrlParser
     /// backslashes stay as typed; without it they become slashes after <c>file://</c>, as the curl tool's do.
     /// With <paramref name="fileSchemeWithoutSlash" />, as <c>Curl_is_absolute_url</c> when it does not guess
     /// schemes, text starting <c>file:</c> is a <c>file</c> URL even with no <c>/</c> after the colon.
+    /// With <paramref name="refuseUnconvertibleName" />, as for the URL of a transfer, a host name that
+    /// cannot be converted to punycode is <see cref="CurlUrlRejection.BadHostname" /> (ADR-0731).
     /// </summary>
     public static CurlUrl? Parse(
         string text,
@@ -42,7 +44,8 @@ internal static class CurlUrlParser
         out CurlUrlRejection rejection,
         bool allowEmptyHost = false,
         bool keepFileBackslashes = false,
-        bool fileSchemeWithoutSlash = false)
+        bool fileSchemeWithoutSlash = false,
+        bool refuseUnconvertibleName = false)
     {
         if (Encoding.UTF8.GetByteCount(text) > MaximumLength || text.Any(IsControlOrSpace))
         {
@@ -54,7 +57,7 @@ internal static class CurlUrlParser
         string? scheme = ReadScheme(text, driveLetters, fileSchemeWithoutSlash);
         if (scheme != FileScheme)
         {
-            return ParseWithAuthority(text, scheme, new AuthorityRules(pathAsIs, disallowUser, allowEmptyHost), out rejection);
+            return ParseWithAuthority(text, scheme, new AuthorityRules(pathAsIs, disallowUser, allowEmptyHost, refuseUnconvertibleName), out rejection);
         }
 
         CurlUrl? url = ParseFile(text, pathAsIs, driveLetters, keepFileBackslashes);
@@ -96,7 +99,7 @@ internal static class CurlUrlParser
         int hostEnd = AuthorityLength(rest);
         CurlUrlAuthority? authority = hostEnd == 0
             ? EmptyAuthority(rules.AllowEmptyHost, out rejection)
-            : CurlUrlAuthority.Parse(rest[..hostEnd], scheme, rules.DisallowUser, out rejection);
+            : CurlUrlAuthority.Parse(rest[..hostEnd], scheme, rules.DisallowUser, rules.RefuseUnconvertibleName, out rejection);
 
         return authority is null
             ? null
@@ -140,7 +143,7 @@ internal static class CurlUrlParser
     }
 
     /// <summary>How a URL's authority is read: path-as-is, user information refused, an empty host allowed.</summary>
-    private readonly record struct AuthorityRules(bool PathAsIs, bool DisallowUser, bool AllowEmptyHost);
+    private readonly record struct AuthorityRules(bool PathAsIs, bool DisallowUser, bool AllowEmptyHost, bool RefuseUnconvertibleName);
 
     /// <summary>The length of the authority: up to the first <c>/</c>, <c>?</c> or <c>#</c>.</summary>
     private static int AuthorityLength(string rest)

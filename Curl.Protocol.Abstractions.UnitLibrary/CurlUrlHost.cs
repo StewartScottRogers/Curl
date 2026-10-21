@@ -36,10 +36,14 @@ internal static class CurlUrlHost
 
     /// <summary>
     /// Normalises <paramref name="host" />, or returns <see langword="false" /> when curl
-    /// rejects it, with <paramref name="rejection" /> saying why.
+    /// rejects it, with <paramref name="rejection" /> saying why. With
+    /// <paramref name="refuseUnconvertibleName" />, as for the URL of a transfer, a name
+    /// <see cref="IdnMapping" /> cannot convert is <see cref="CurlUrlRejection.BadHostname" />;
+    /// without it the name is kept as decoded and resolved as written.
     /// </summary>
     public static bool TryNormalize(
         string host,
+        bool refuseUnconvertibleName,
         out string normalized,
         out string idnHost,
         out string? zoneId,
@@ -62,7 +66,7 @@ internal static class CurlUrlHost
             return rejection == CurlUrlRejection.None;
         }
 
-        bool accepted = TryNormalizeAddressOrName(decoded, out normalized, out idnHost);
+        bool accepted = TryNormalizeAddressOrName(decoded, refuseUnconvertibleName, out normalized, out idnHost);
         rejection = accepted ? CurlUrlRejection.None : CurlUrlRejection.BadHostname;
 
         return accepted;
@@ -74,7 +78,7 @@ internal static class CurlUrlHost
     /// or two trailing dots are not. curl 8.22.0's <c>parse_authority</c> decodes the host
     /// before <c>ipv4_normalize</c>, so <c>127.0.0.%31.</c> is <c>127.0.0.1</c> (lib1560).
     /// </summary>
-    private static bool TryNormalizeAddressOrName(string host, out string normalized, out string idnHost)
+    private static bool TryNormalizeAddressOrName(string host, bool refuseUnconvertibleName, out string normalized, out string idnHost)
     {
         idnHost = normalized = string.Empty;
         string withoutTrailingDot = host.EndsWith('.') ? host[..^1] : host;
@@ -90,10 +94,10 @@ internal static class CurlUrlHost
             return true;
         }
 
-        return TryNormalizeName(host, out normalized, out idnHost);
+        return TryNormalizeName(host, refuseUnconvertibleName, out normalized, out idnHost);
     }
 
-    private static bool TryNormalizeName(string decoded, out string normalized, out string idnHost)
+    private static bool TryNormalizeName(string decoded, bool refuseUnconvertibleName, out string normalized, out string idnHost)
     {
         normalized = idnHost = string.Empty;
         if (!IsUsableName(decoded))
@@ -101,8 +105,14 @@ internal static class CurlUrlHost
             return false;
         }
 
+        string? converted = Ascii.IsValid(decoded) ? decoded : ToPunycode(decoded);
+        if (converted is null && refuseUnconvertibleName)
+        {
+            return false;
+        }
+
         normalized = decoded;
-        idnHost = Ascii.IsValid(decoded) ? decoded : ToPunycode(decoded);
+        idnHost = converted ?? decoded;
 
         return true;
     }
@@ -156,12 +166,13 @@ internal static class CurlUrlHost
         CharactersMappedToNothingOrDot.Contains(character);
 
     /// <summary>
-    /// Converts a host name that is not ASCII to punycode. A name <see cref="IdnMapping" />
-    /// cannot convert is kept as decoded, because curl 8.21.0 accepted the hosts
-    /// <c>a%80b</c> and <c>a%FFb</c>; bytes that are not UTF-8 were already decoded to
-    /// U+FFFD, so both of those become <c>a</c>, U+FFFD, <c>b</c>.
+    /// Converts a host name that is not ASCII to punycode, or returns <see langword="null" />
+    /// when <see cref="IdnMapping" /> cannot convert it: bytes that are not UTF-8
+    /// (<c>invalid-utf8-%e2%90.local</c>, upstream test 1034) or a label longer than 63
+    /// characters once converted (test 1035). curl 8.22.0 in a UTF-8 locale fails a transfer
+    /// to such a host with exit 3, while its URL API keeps the name (ADR-0734).
     /// </summary>
-    private static string ToPunycode(string name)
+    private static string? ToPunycode(string name)
     {
         try
         {
@@ -169,7 +180,7 @@ internal static class CurlUrlHost
         }
         catch (ArgumentException)
         {
-            return name;
+            return null;
         }
     }
 

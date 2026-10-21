@@ -350,7 +350,7 @@ public sealed record CurlUrl
     {
         ArgumentNullException.ThrowIfNull(text);
 
-        url = CurlUrlParser.Parse(text, pathAsIs, driveLetters, disallowUser, out rejection);
+        url = CurlUrlParser.Parse(text, pathAsIs, driveLetters, disallowUser, out rejection, refuseUnconvertibleName: true);
 
         return url is not null;
     }

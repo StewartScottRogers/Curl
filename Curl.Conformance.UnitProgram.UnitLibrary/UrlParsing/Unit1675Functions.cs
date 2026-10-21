@@ -41,13 +41,13 @@ public sealed record Unit1675Functions(
         OperatingSystem.IsWindows());
 
     private static (string Host, string? Zone)? ParseCurlIPv6(string host) =>
-        CurlUrlHost.TryNormalize(host, out string normalized, out _, out string? zoneId, out _) ? (normalized, zoneId) : null;
+        CurlUrlHost.TryNormalize(host, refuseUnconvertibleName: false, out string normalized, out _, out string? zoneId, out _) ? (normalized, zoneId) : null;
 
     // struct Curl_URL starts with user "u", password "p" and options "o": a login replaces the user and password,
     // and the options only for a scheme that has them; no login clears all three.
     private static (CurlUrlRejection Result, Unit1675Login Login) ParseCurlLogin(string text, string? scheme, bool disallowUser)
     {
-        CurlUrlAuthority? authority = CurlUrlAuthority.Parse(text, scheme, disallowUser, out CurlUrlRejection rejection);
+        CurlUrlAuthority? authority = CurlUrlAuthority.Parse(text, scheme, disallowUser, refuseUnconvertibleName: false, out CurlUrlRejection rejection);
         if (authority?.User is not { } user)
         {
             return (rejection, new Unit1675Login(null, null, null, 0));
