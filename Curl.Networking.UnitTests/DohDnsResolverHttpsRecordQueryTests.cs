@@ -78,6 +78,28 @@ public sealed class DohDnsResolverHttpsRecordQueryTests
     }
 
     [TestMethod]
+    public async Task HttpsRecordFor_AfterResolveHttpsOriginAsync_GivesTheKeptRecordForThatPortOnly()
+    {
+        var question = FooExampleCom + "00410001";
+        var httpsAnswer = Convert.FromHexString("000081800001000100000000" + question + "C00C004100010000003C0014" + "000100" + "00010003026832" + "00050006AABBCCDDEEFF");
+        var queryA = Convert.FromHexString(Header + FooExampleCom + "00010001");
+        var queryAaaa = Convert.FromHexString(Header + FooExampleCom + "001C0001");
+        var connector = Answering(Ok(httpsAnswer), Ok(DnsTestReplies.Answer(queryA, [IPAddress.Loopback])), Ok(DnsTestReplies.Answer(queryAaaa, [])));
+        var resolver = new DohDnsResolver(connector, DohUrl);
+        Diagnostics.Arrange("origin", "https://foo.example.com/ with an HTTPS record 1 . alpn=h2 ech");
+
+        _ = await resolver.ResolveHttpsOriginAsync("foo.example.com", 443, CancellationToken.None);
+        var kept = resolver.HttpsRecordFor("foo.example.com", 443);
+        var otherPort = resolver.HttpsRecordFor("foo.example.com", 8443);
+
+        Diagnostics.Act("kept record", kept is null ? "(none)" : DohTraceLines.FormatHttpsRecord(kept, hasMandatoryKeys: false));
+        Diagnostics.Assert("other port", "(none)", otherPort is null ? "(none)" : "a record");
+        Assert.IsNotNull(kept);
+        Assert.AreEqual("1 . alpn=h2 ech=<6 bytes>", DohTraceLines.FormatHttpsRecord(kept, hasMandatoryKeys: false));
+        Assert.IsNull(otherPort);
+    }
+
+    [TestMethod]
     [DataRow(null)]
     [DataRow("")]
     [DataRow(" ")]
@@ -181,5 +203,7 @@ public sealed class DohDnsResolverHttpsRecordQueryTests
             Calls.Add($"https-origin {host}:{port}");
             return ValueTask.FromResult<IReadOnlyList<IPAddress>>([IPAddress.Loopback]);
         }
+
+        public ServiceBindingRecord? HttpsRecordFor(string host, int port) => null;
     }
 }

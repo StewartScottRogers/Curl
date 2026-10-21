@@ -1209,19 +1209,32 @@ public sealed partial class TcpConnector(
     /// Asks the resolver, with its failure reason when it gives one, with <see cref="ResolverEvents" />
     /// pointed at the target's events for the look-up. A direct connect's <c>https://</c> origin is
     /// asked of an <see cref="IHttpsOriginDnsResolver" /> with its port, so the DoH resolver sends the
-    /// HTTPS query first, as curl 8.22.0's HTTPSRR build does (ADR-0727, BL-2920).
+    /// HTTPS query first, as curl 8.22.0's HTTPSRR build does (ADR-0727, BL-2920), and reports its
+    /// <c>HTTPS-RR</c> line before the addresses' <c>Host ... was resolved.</c> (BL-2980).
     /// </summary>
     private async ValueTask<DnsResolution> LookUpAsync(string host, int port, ConnectTarget target, CancellationToken cancellationToken)
     {
         ResolverEvents?.Current = target.Events;
         if (dnsResolver is IHttpsOriginDnsResolver httpsOriginResolver && target.Proxy is null && IsHttpsOrigin(target))
         {
-            return new DnsResolution(await httpsOriginResolver.ResolveHttpsOriginAsync(host, port, cancellationToken).ConfigureAwait(false), DnsLookupFailure.None);
+            var addresses = await httpsOriginResolver.ResolveHttpsOriginAsync(host, port, cancellationToken).ConfigureAwait(false);
+            ReportHttpsRecord(host, port, httpsOriginResolver.HttpsRecordFor(host, port), target.Events);
+            return new DnsResolution(addresses, DnsLookupFailure.None);
         }
 
         return dnsResolver is IDnsResolverWithFailureReason withFailureReason
             ? await withFailureReason.ResolveWithFailureReasonAsync(host, cancellationToken).ConfigureAwait(false)
             : new DnsResolution(await dnsResolver.ResolveAsync(host, cancellationToken).ConfigureAwait(false), DnsLookupFailure.None);
+    }
+
+    // curl 8.22.0's HTTPS resolve filter sits above the address one (cf-dns.c), so its report comes
+    // first; like the address report it names no IP address literal (ADR-0727's BL-2980 amendment).
+    private static void ReportHttpsRecord(string host, int port, ServiceBindingRecord? record, ITransferEvents events)
+    {
+        if (!IPAddress.TryParse(host.Trim('[', ']'), out _))
+        {
+            events.ReportInfo(HttpsRecordReportLine.Format(host, port, record));
+        }
     }
 
     private IReadOnlyList<IPAddress> AnswerFromCache(string host, DnsCacheEntry cached, ITransferEvents events)

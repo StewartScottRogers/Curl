@@ -57,6 +57,9 @@ public sealed partial class DohDnsResolver
         return await ResolveAsync(host, cancellationToken).ConfigureAwait(false);
     }
 
+    /// <inheritdoc />
+    public ServiceBindingRecord? HttpsRecordFor(string host, int port) => _httpsRecords.GetValueOrDefault((host, port));
+
     // Posts the HTTPS query, reports its trace lines and decodes the answer's first record; null
     // when nothing is asked or answered.
     private async ValueTask<ServiceBindingRecord?> QueryHttpsRecordAsync(string host, int port, CancellationToken cancellationToken)

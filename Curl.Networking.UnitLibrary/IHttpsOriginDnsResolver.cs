@@ -21,4 +21,14 @@ public interface IHttpsOriginDnsResolver : IDnsResolver
     /// <param name="cancellationToken">Cancels the look-up.</param>
     /// <returns>The addresses for <paramref name="host" />, in the order they should be tried.</returns>
     ValueTask<IReadOnlyList<IPAddress>> ResolveHttpsOriginAsync(string host, int port, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Gives the HTTPS record <see cref="ResolveHttpsOriginAsync" /> found for <paramref name="host" />
+    /// and <paramref name="port" />, which <see cref="TcpConnector" /> reports as curl 8.22.0's
+    /// <c>HTTPS-RR &lt;host&gt;:&lt;port&gt;:</c> line (ADR-0727's BL-2980 amendment).
+    /// </summary>
+    /// <param name="host">The origin's host name, as given to <see cref="ResolveHttpsOriginAsync" />.</param>
+    /// <param name="port">The port, as given to <see cref="ResolveHttpsOriginAsync" />.</param>
+    /// <returns>The first record the answer held, decoded; <see langword="null" /> when there was none or nothing was asked.</returns>
+    ServiceBindingRecord? HttpsRecordFor(string host, int port);
 }

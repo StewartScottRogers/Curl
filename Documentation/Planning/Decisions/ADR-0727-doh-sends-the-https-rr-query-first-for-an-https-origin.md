@@ -89,3 +89,32 @@ sink is real; curl 8.22.0 writes the `[DNS] [HTTPS]` ones only when the `dns` fe
 well, and refuses a non-2xx DoH answer with `[DoH] [DoH] [HTTPS] error: HTTP status N`: both are
 BL-2979, after BL-2973 settles 8.22.0's sub-transfer prefix and gating. The `-v` line
 `HTTPS-RR <host>:<port>: ...` that `lib/vdns/cf-dns.c` writes on the main transfer is BL-2980.
+
+## Amendment (BL-2980, 2026-10-21): the `-v` `HTTPS-RR <host>:<port>:` line
+
+Decided by Claude under Stewart's delegation.
+
+**How the line was found.** Derived from curl 8.22.0's source at tag `curl-8_22_0`, not measured:
+the reference curl on this machine lists no `HTTPSRR` feature. `cf_dns_report` in
+`lib/vdns/cf-dns.c` writes it with `infof` on the main transfer, so plain `-v` shows it, once the
+HTTPS resolve's own DNS filter has its answer, for a host that is neither empty nor an IP address:
+
+- no record (`dns->hinfo` NULL): `HTTPS-RR <host>:<port>: -`;
+- a record `Curl_httpsrr_applicable` (`lib/vdns/httpsrr.c`) refuses - its target is neither empty
+  nor `.`, or it names a port other than the origin's: `HTTPS-RR <host>:<port>: not applicable`;
+- otherwise `HTTPS-RR <host>:<port>: <record>`, the record as `Curl_httpsrr_print` writes it, which
+  is `DohTraceLines.FormatHttpsRecord`.
+
+**Its place.** `cf_hc_add` (`lib/cf-https-connect.c`) adds the HTTPS resolve filter first, and
+`Curl_conn_setup` (`lib/connect.c`) then adds the address resolve, which `cf_dns_add_resolve` inserts
+after it. The HTTPS filter therefore connects, and reports, above the address filter; and since
+Curl's HTTPS query is answered before the A and AAAA queries are sent (this ADR), its line comes
+after the HTTPS query's `--trace-config doh` lines and just before `Host <host>:<port> was resolved.`.
+
+**Decision.** `IHttpsOriginDnsResolver.HttpsRecordFor` gives the record `ResolveHttpsOriginAsync`
+kept, and `TcpConnector` writes `HttpsRecordReportLine.Format`'s line on the target's events as soon
+as that resolve returns, before the address report, for every host that is not an IP literal
+(`localhost` writes `-`, as curl's resolver answers it without a record). Two parts are left out
+and filed: the ` mandatory-keys(ignored)` part, since `ServiceBindingRecord` does not keep whether
+the record had a `mandatory` key, and the line for an origin whose addresses the DNS cache answers,
+for which `TcpConnector` asks no resolver.
