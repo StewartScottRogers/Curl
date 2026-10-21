@@ -32,3 +32,4 @@ Curl's `Time` follows 8.21.0 (`ddd hhh`, then days cut to eight). 8.22.0's tool1
 ## Log
 
 - 2026-10-21: Created (split from BL-2845, which waits on it).
+- 2026-10-21: Backlog -> Doing. Criteria at claim: 297cb2a7 3d228e1f d3a9ab15 099d1d27.
