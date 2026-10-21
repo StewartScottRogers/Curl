@@ -32,3 +32,4 @@ Prerequisite of BL-2851 (split 2026-10-21, lane 7). Read each script at https://
 ## Log
 
 - 2026-10-21: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: d7e06177 1d747bfb b8530a0c c5f8cef6.
