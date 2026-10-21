@@ -59,6 +59,21 @@ public sealed class UpstreamTestDataTests
     }
 
     [TestMethod]
+    public void UpstreamTestData_CopiedBesideTheTests_HoldsTheXmlDocumentTheCompressedReplyCasesInclude()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        string xmlPath = Path.Combine(UpstreamTestDataFolder, "data", "data-xml1");
+        diagnostics.Arrange("file", "UpstreamTestData/data/data-xml1");
+
+        byte[] xml = File.ReadAllBytes(xmlPath);
+
+        diagnostics.Act("length in bytes", xml.Length);
+        diagnostics.Assert("length in bytes", 5059, xml.Length);
+        Assert.HasCount(5059, xml);
+        Assert.StartsWith("<?xml version=\"1.0\" encoding=\"ISO-8859-1\"?>\n", System.Text.Encoding.Latin1.GetString(xml));
+    }
+
+    [TestMethod]
     public void UpstreamTestData_CopiedBesideTheTests_CarriesCurlsCopyingNotice()
     {
         var diagnostics = TestDiagnostics.For(TestContext);

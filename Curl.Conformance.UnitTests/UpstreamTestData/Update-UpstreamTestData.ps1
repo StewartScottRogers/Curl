@@ -65,11 +65,12 @@ try {
         Copy-Item -LiteralPath $certFile.FullName -Destination (Join-Path $certsDestination $certFile.Name)
     }
 
-    # The data files cases name as %SRCDIR/data/<file>: only those the harness can use, one by one (BL-2183).
+    # The data files cases name as %SRCDIR/data/<file>: only those the harness can use, one by one (BL-2183);
+    # data-xml1 is the document the compressed-reply cases 222, 230, 232, 314, 396, 1123 and 1277 include (BL-2829).
     $dataDestination = Join-Path $destination 'data'
     New-Item -ItemType Directory -Path $dataDestination -Force | Out-Null
     Get-ChildItem -LiteralPath $dataDestination -File | Remove-Item -Force
-    foreach ($dataFile in 'data-httpsig-ed25519.key', 'data-httpsig-hmac-sha256.key') {
+    foreach ($dataFile in 'data-httpsig-ed25519.key', 'data-httpsig-hmac-sha256.key', 'data-xml1') {
         Copy-Item -LiteralPath (Join-Path $upstreamData $dataFile) -Destination (Join-Path $dataDestination $dataFile)
     }
 
@@ -91,7 +92,7 @@ try {
     New-Item -ItemType Directory -Path $sourceDestination -Force | Out-Null
     Copy-Item -LiteralPath (Join-Path $workFolder "$sourceRoot/src/tool_writeout.c") -Destination (Join-Path $sourceDestination 'tool_writeout.c') -Force
 
-    Write-Output "Vendored $($upstreamTests.Count) test files, $($upstreamCerts.Count) certs files, $($upstreamOptionDocs.Count) docs/cmdline-opts files, the httpsig key files and COPYING from $Tag into $destination."
+    Write-Output "Vendored $($upstreamTests.Count) test files, $($upstreamCerts.Count) certs files, $($upstreamOptionDocs.Count) docs/cmdline-opts files, the httpsig key files, data-xml1 and COPYING from $Tag into $destination."
     Write-Output "If the count changed, update VendoredTestFileCount in UpstreamTestDataTests.cs and the tag in README.md."
 }
 finally {
