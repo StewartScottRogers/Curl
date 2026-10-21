@@ -3,8 +3,8 @@ id: AF-0291
 title: Sample_Create_BuildsAClientOverTheManagedEngineWithoutSendingAnything has no assertion
 auditor: quality
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Api.UnitTests/Readme/ReadmeTests.cs:Sample_Create_BuildsAClientOverTheManagedEngineWithoutSendingAnything:no-assertion
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Curl.Api.UnitTests/Readme/ReadmeTests.cs -Pattern 'Sample_Cr
 ## Log
 
 - 2026-10-19: filed proposed.
+- 2026-10-21: proposed -> accepted.
