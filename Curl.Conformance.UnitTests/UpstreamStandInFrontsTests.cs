@@ -41,9 +41,10 @@ public sealed class UpstreamStandInFrontsTests
         UpstreamStandInFronts.Create(null, null, null).AddVariables(variables, certificateDirectory: "/certs");
 
         CollectionAssert.AreEquivalent(
-            new[] { "HTTPSPORT", "FTPSPORT", "SMTPSPORT", "IMAPSPORT", "POP3SPORT", "MQTTSPORT", "GOPHERSPORT", "HTTP2TLSPORT", "HTTPSPROXYPORT", "SMBPORT" },
+            new[] { "HTTPSPORT", "HTTPS-MTLSPORT", "FTPSPORT", "SMTPSPORT", "IMAPSPORT", "POP3SPORT", "MQTTSPORT", "GOPHERSPORT", "HTTP2TLSPORT", "HTTPSPROXYPORT", "SMBPORT" },
             variables.Keys.ToArray());
         Assert.AreEqual(UpstreamCaseRunner.Http2TlsPort, variables["HTTP2TLSPORT"]);
+        Assert.AreEqual("9021", variables["HTTPS-MTLSPORT"]);
     }
 
     [TestMethod]

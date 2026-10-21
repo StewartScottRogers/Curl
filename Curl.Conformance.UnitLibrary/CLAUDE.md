@@ -269,6 +269,17 @@ wherever the harness's log directory is. Nothing listens on it: upstream's `http
 the connector chain at `%HTTPPORT` through `UpstreamCaseRunner.HttpUnixSocketTarget` (BL-2271, the one
 public way to dial it, for the gap office's tool too), so it reaches `SwsHttpServerConnector` through `TcpConnector`'s own
 Unix-socket code. Screening lets `http-unix` cases run: 1435 and 1436 pass.
+`%SOCKSUNIXPATH` is `/log/server/socks5.sock` (`SocksServerConnector.SocksUnixPath`, BL-2859), absolute as
+`runtests.pl` makes it, since curl reads `localhost%SOCKSUNIXPATH` as a host and a path. Upstream's `socks5unix`
+server is the socksd emulation: `SocksServerConnector` answers a dial whose host is that path, which the dialer's
+`HttpUnixSocketTarget` makes, as it answers `%SOCKSPORT`. Screening lets `socks5unix` cases run: 1467, 1468 and
+1470 are listed, `SkippedOnThisPlatform` on Windows (`!win32`) and passing as the Unix build.
+`%HTTPS-MTLSPORT` is 9021 (`HttpsServerConnector.HttpsMtlsPort`), with a value only when the caller names a
+certificate directory: `UpstreamHttpsMtlsFront` puts an `HttpsServerConnector` there for a case naming
+`https-mtls`, presenting `test-localhost.pem` and, through a `TlsClientCertificateVerifier` over
+`%CERTDIR/certs/test-ca.crt` (`TlsServerOptions.ClientCertificateVerifier`), demanding a client certificate the
+test CA signed, as stunnel at `verify = 2` does: the handshake fails without one, and every certificate presented
+is recorded in `ReceivedCertificates`. 2088 and 2089 are listed and run only on Linux and macOS (`!Schannel`).
 A `<client><stdout>` part is accepted and never compared, since `runtests.pl` at `curl-8_22_0` reads
 stdout only from `<verify>` (BL-2221): 210 passes, and 211 and 212 differ (Curl retries a refused
 `EPSV` or `EPRT` on the reused connection; BL-2236).

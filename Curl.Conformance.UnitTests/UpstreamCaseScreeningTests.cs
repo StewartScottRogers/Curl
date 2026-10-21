@@ -652,6 +652,8 @@ public sealed class UpstreamCaseScreeningTests
     [DataRow("<client>\n<server>\nhttp\nsocks4\n</server>\n<command>\n--socks4 127.0.0.1:8994 http://127.0.0.1:8990/x\n</command>\n</client>\n")]
     [DataRow("<client>\n<server>\nsocks5\n</server>\n<command>\n--socks5 127.0.0.1:8994 http://127.0.0.1:8990/x\n</command>\n</client>\n")]
     [DataRow("<client>\n<server>\nmqtt\n</server>\n<command>\nmqtt://127.0.0.1:8998/1190\n</command>\n</client>\n")]
+    [DataRow("<client>\n<server>\nhttp\nsocks5unix\n</server>\n<command>\n--socks5 localhost/log/server/socks5.sock http://127.0.0.1:8990/x\n</command>\n</client>\n")]
+    [DataRow("<client>\n<server>\nhttps-mtls\n</server>\n<command>\nhttps://localhost:9021/x\n</command>\n</client>\n")]
     [DataRow("<client>\n<setenv>\nhttp_proxy=http://127.0.0.1:8990/\n</setenv>\n<command>\nhttp://127.0.0.1:8990/x\n</command>\n</client>\n")]
     [DataRow("<client>\n<command>\nhttp://127.0.0.1:8990/x\n</command>\n<stdout>\nignored\n</stdout>\n</client>\n")]
     [DataRow("<client>\n<command>\nhttp://a-site-never-accessed.example.org/1592\n</command>\n</client>\n")]

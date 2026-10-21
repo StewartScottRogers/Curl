@@ -56,6 +56,33 @@ public sealed class SocksServerConnectorTests
         Assert.AreEqual("hello\n", await ExchangeAsync(connection, Get));
     }
 
+    // The socks5unix server (BL-2859): curl's dial to %SOCKSUNIXPATH reaches the same emulation, as InMemoryServerTcpDialer sends it.
+    [TestMethod]
+    public async Task Socks5_OverTheSocksUnixPath_ConnectsAndRelays()
+    {
+        (SocksServerConnector socks, SwsHttpServerConnector server) = Server(string.Empty);
+        IConnection connection = (await socks.ConnectAsync(UpstreamCaseRunner.HttpUnixSocketTarget(SocksServerConnector.SocksUnixPath), CancellationToken.None)).Connection!;
+
+        await connection.WriteAsync(Socks5NoAuthGreeting, CancellationToken.None);
+        CollectionAssert.AreEqual(new byte[] { 5, 0 }, await ReadAsync(connection));
+        await connection.WriteAsync(Socks5Ipv4Connect, CancellationToken.None);
+
+        CollectionAssert.AreEqual(new byte[] { 5, 0, 0, 1, 127, 0, 0, 1, 0x23, 0x1E }, await ReadAsync(connection));
+        Assert.AreEqual("hello\n", await ExchangeAsync(connection, Get));
+        Assert.AreEqual(Get, Encoding.Latin1.GetString(server.ReceivedBytes.Span));
+        Assert.AreEqual("atyp 1 => 127.0.0.1\n", socks.ConnectLog);
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_TheHttpUnixPath_ReachesTheWrappedServer()
+    {
+        (SocksServerConnector socks, _) = Server(string.Empty);
+
+        ConnectResult result = await socks.ConnectAsync(UpstreamCaseRunner.HttpUnixSocketTarget(UpstreamCaseRunner.HttpUnixPath), CancellationToken.None);
+
+        Assert.IsInstanceOfType<SwsHttpServerConnection>(result.Connection);
+    }
+
     // socksd.c's dump file: "atyp %u =>", then " a.b.c.d", " name" or " %02x" for each IPv6 byte (test719 to test721).
     [TestMethod]
     public async Task ConnectLog_Socks5Connects_HoldsSocksdsDumpLines()

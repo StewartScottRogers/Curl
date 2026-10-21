@@ -139,7 +139,9 @@ public static class TlsServerStream
     {
         ServerCertificate = options.Certificate,
         ClientCertificateRequired = options.RequestClientCertificate,
-        RemoteCertificateValidationCallback = static (_, _, _, _) => true,
+        RemoteCertificateValidationCallback = options.ClientCertificateVerifier is { } verifier
+            ? (_, certificate, _, _) => verifier.Verify(certificate)
+            : static (_, _, _, _) => true,
         ApplicationProtocols = options.ApplicationProtocols.Count == 0
             ? null
             : [.. options.ApplicationProtocols.Select(protocol => new SslApplicationProtocol(protocol))],

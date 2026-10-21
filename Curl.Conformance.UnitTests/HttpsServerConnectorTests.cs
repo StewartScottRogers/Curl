@@ -7,7 +7,7 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Conformance;
 
 [TestClass]
-public sealed class HttpsServerConnectorTests
+public sealed partial class HttpsServerConnectorTests
 {
     private const string KeptOpenReply = "<reply>\n<data nonewline=\"yes\">\nHTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nhi\n</data>\n</reply>\n";
 

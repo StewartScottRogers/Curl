@@ -19,6 +19,7 @@ internal sealed class UpstreamStandInFronts
         List<UpstreamStandInFront> fronts =
         [
             new UpstreamHttpsFront(),
+            new UpstreamHttpsMtlsFront(),
             new UpstreamFtpsFront(),
             new UpstreamMailTlsFront(),
             new UpstreamMqttsFront(),

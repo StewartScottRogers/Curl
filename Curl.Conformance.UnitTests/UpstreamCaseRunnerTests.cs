@@ -205,12 +205,12 @@ public sealed partial class UpstreamCaseRunnerTests
         var diagnostics = TestDiagnostics.For(TestContext);
         UpstreamCaseRunner runner = Runner(_ => throw new AssertFailedException("curl must not run"));
 
-        UpstreamCaseOutcome outcome = await RunAsync(runner, "<testcase>\n<client>\n<command>\nhttp://%SOCKSUNIXPATH/\n</command>\n</client>\n</testcase>\n");
+        UpstreamCaseOutcome outcome = await RunAsync(runner, "<testcase>\n<client>\n<command>\nhttp://%HTTPTLS6PORT/\n</command>\n</client>\n</testcase>\n");
 
         diagnostics.Assert("outcome kind", UpstreamCaseOutcomeKind.Skipped, outcome.Kind);
         Assert.AreEqual(UpstreamCaseOutcomeKind.Skipped, outcome.Kind);
-        diagnostics.Assert("detail", "the harness has no value for %SOCKSUNIXPATH", outcome.Detail);
-        Assert.AreEqual("the harness has no value for %SOCKSUNIXPATH", outcome.Detail);
+        diagnostics.Assert("detail", "the harness has no value for %HTTPTLS6PORT", outcome.Detail);
+        Assert.AreEqual("the harness has no value for %HTTPTLS6PORT", outcome.Detail);
     }
 
     [TestMethod]
@@ -1364,6 +1364,37 @@ public sealed partial class UpstreamCaseRunnerTests
 
         Assert.AreNotEqual(UpstreamCaseOutcomeKind.Skipped, outcome.Kind, outcome.Detail);
         Assert.Contains("--unix-socket " + UpstreamCaseRunner.HttpUnixPath + " ", commandLine!);
+    }
+
+    [TestMethod]
+    [DataRow(1467)]
+    [DataRow(1468)]
+    public async Task RunAsync_SocksUnixCase_RunsCurlWithTheSocksUnixPath(int testNumber)
+    {
+        string? commandLine = null;
+        UpstreamCaseRunner runner = Runner(invocation =>
+        {
+            commandLine = string.Join(' ', invocation.Arguments);
+            return Task.FromResult(0);
+        });
+        string testFile = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "UpstreamTestData", $"test{testNumber}.curltest"));
+
+        UpstreamCaseOutcome outcome = await RunAsync(runner, testFile);
+
+        Assert.AreNotEqual(UpstreamCaseOutcomeKind.Skipped, outcome.Kind, outcome.Detail);
+        Assert.Contains("localhost" + SocksServerConnector.SocksUnixPath, commandLine!);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_HttpsMtlsCaseWithoutACertificateDirectory_SkipsForTheMtlsPort()
+    {
+        UpstreamCaseRunner runner = Runner(_ => Task.FromResult(0));
+        string testFile = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "UpstreamTestData", "test2088.curltest"));
+
+        UpstreamCaseOutcome outcome = await RunAsync(runner, testFile);
+
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Skipped, outcome.Kind);
+        Assert.Contains("%HTTPS-MTLSPORT", outcome.Detail);
     }
 
     [TestMethod]
