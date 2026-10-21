@@ -4,8 +4,8 @@ title: Stand in for the GSS-API stub (CURL_STUB_GSS_CREDS) so upstream cases 205
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: []
-touches: [Curl.Conformance.UnitTests/PassingUpstreamCases.txt, Curl.Conformance.UnitTests/UpstreamConformanceTests.GssStubStandIn.cs, Curl.Authentication.UnitLibrary, Curl.Authentication.UnitTests]
+depends-on: [BL-2910]
+touches: [Curl.Conformance.UnitTests/PassingUpstreamCases.txt, Curl.Conformance.UnitTests/UpstreamConformanceTests.GssStubStandIn.cs, Curl.Conformance.UnitTests/UpstreamConformanceTests.DebugStandIns.cs, Curl.Conformance.UnitTests/UpstreamConformanceTests.cs, Curl.Console/CurlComposition.cs, Curl.Console.UnitTests/CurlCompositionTests.cs, Curl.Authentication.UnitLibrary, Curl.Authentication.UnitTests]
 requirement: none
 created: 2026-10-19
 completed:
@@ -34,7 +34,29 @@ Deferred task BL-693 (`--krb` for FTP) is unrelated: it is about FTP `AUTH GSSAP
 
 ## Notes
 
+- 2026-10-21 (lane 5, first pass, no code written): the seam already exists. `NegotiateHttpAuthenticator` asks an
+  `ISecurityContextFactory` (Curl.Protocol.Abstractions), and `RankedHttpAuthenticator` already sends `--negotiate`
+  pre-emptively on the first request, so `Curl.Authentication.UnitLibrary` needs no change. What the work does need:
+  1. `Curl.Console/CurlComposition.cs`: the dialing `CreateRunner(..., ITcpDialer, IDnsResolver, ...)` overload, which
+     `RunCurlAsync` uses, takes no `ISecurityContextFactory`. It needs an optional `securityContexts` parameter, passed
+     to `CreateDialingTransferDispatch` in place of `CreateDialingSecurityContextFactory(...)` when given (plus a test
+     in `Curl.Console.UnitTests/CurlCompositionTests.cs`). **BL-2910 (in Doing) touches this file**, so the task goes
+     back to Backlog until BL-2910 is done.
+  2. `UpstreamConformanceTests.GssStubStandIn.cs` (new): a harness-only `ISecurityContextFactory` that reads the
+     case's `CURL_STUB_GSS_CREDS`, ported from upstream's `lib/curl_gssapi.c` at curl-8_22_0 (`stub_gss_init_sec_context`;
+     note it lives in lib/, not tests/libtest/). First token = `<creds>:<service>@<host>:<sent>:` padded with `A` to
+     187 bytes (250*3/4), `sent` 1 for KRB5 and 2 for NTLM1. The creds value keeps its quotes (`"KRB5_Alice"`), as the
+     2056 `<protocol>` shows. SPNEGO's credential allows krb5 only, so creds without `KRB5` (2057's `"NTLM_Alice"`) fail
+     with no mechanism: no header, exit 0. A `D` server token completes; `C` continues; anything else fails.
+  3. `UpstreamConformanceTests.DebugStandIns.cs`: one rule line, `text.Contains("\nCURL_STUB_GSS_CREDS=")`, so
+     `PlatformFor` reports Debug. 2056/2094 also need `GSS-API`. Check `Platform` reports it; if not, add it with `WithFeatures`.
+  4. `UpstreamConformanceTests.cs`: `RunCurlAsync` passes `securityContexts:` the stub factory when the case's
+     environment sets `CURL_STUB_GSS_CREDS`, else null.
+- Touches widened for this (no Doing task named them except CurlComposition.cs): DebugStandIns.cs and
+  UpstreamConformanceTests.cs (the rule table and RunCurlAsync), CurlComposition.cs and CurlCompositionTests.cs.
+
 ## Log
 
 - 2026-10-19: Created.
 - 2026-10-21: Backlog -> Doing. Criteria at claim: f2c0ce47 cb803305 519beea4 dd1cc079 620ebead.
+- 2026-10-21: Doing -> Backlog. Needs Curl.Console/CurlComposition.cs (a securityContexts parameter on the dialing CreateRunner), which BL-2910 in Doing touches; depends on BL-2910
