@@ -74,6 +74,10 @@ public sealed class RedirectFollowerTests
     [DataRow("http://h/?n=Ø¢", "http://h/?n=%D8%A2", DisplayName = "raw bytes as themselves (upstream test1138)")]
     [DataRow("http://h/x~", "http://h/x~", DisplayName = "ASCII unchanged")]
     [DataRow("http://h/Ā", "http://h/Ā", DisplayName = "character above Latin-1 unchanged")]
+    [DataRow("http://åäö.se:8990/20460001", "http://åäö.se:8990/20460001", DisplayName = "IDN host as text kept (upstream test2046)")]
+    [DataRow("http://Ā å.se/x y", "http://Ā å.se/x%20y", DisplayName = "authority above Latin-1 kept as text")]
+    [DataRow("http://Ã¥.se/Ã¥", "http://%C3%A5.se/%C3%A5", DisplayName = "authority of raw UTF-8 header bytes escaped")]
+    [DataRow("mailto:å", "mailto:%E5", DisplayName = "no authority")]
     public void EncodedForFollow_Target_EncodesAsCurlFollows(string target, string expected) =>
         Assert.AreEqual(expected, RedirectFollower.EncodedForFollow(target));
 

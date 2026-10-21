@@ -458,21 +458,52 @@ public sealed class RedirectFollower(
     /// <summary>
     /// The target as curl 8.21.0 follows it (CURLU_URLENCODE with CURLU_ALLOW_SPACE): a space
     /// becomes <c>+</c> in the query and <c>%20</c> elsewhere, and a raw byte at or above 0x80
-    /// (one Latin-1 character of the header) becomes its own percent escape (BL-1801).
+    /// (one Latin-1 character of the header) becomes its own percent escape (BL-1801). An
+    /// authority that is text rather than header bytes - the request URL's own, which a relative
+    /// <c>Location</c> keeps, such as the IDN host <c>åäö.se</c> - is kept as it is, so its host
+    /// stays that name (upstream tests 2046 and 2047, BL-2961).
     /// </summary>
     internal static string EncodedForFollow(string target)
     {
         System.Text.StringBuilder encoded = new(target.Length);
         int hash = target.IndexOf('#', StringComparison.Ordinal);
         int question = target.IndexOf('?', StringComparison.Ordinal);
+        int queryStart = question < 0 ? target.Length : question + 1;
         int queryEnd = hash < 0 ? target.Length : hash;
+        (int textStart, int textEnd) = TextAuthority(target);
         for (int index = 0; index < target.Length; index++)
         {
-            encoded.Append(EncodedCharacter(target[index], question >= 0 && index > question && index < queryEnd));
+            encoded.Append(IsWithin(index, textStart, textEnd)
+                ? target[index].ToString()
+                : EncodedCharacter(target[index], IsWithin(index, queryStart, queryEnd)));
         }
 
         return encoded.ToString();
     }
+
+    private static bool IsWithin(int index, int start, int end) => index >= start && index < end;
+
+    /// <summary>
+    /// The start and end of <paramref name="target" />'s authority when it is text: when it holds
+    /// a character above <c>U+00FF</c>, or Latin-1 characters whose bytes are not valid UTF-8, so
+    /// they cannot be the raw bytes of a header. An empty range otherwise.
+    /// </summary>
+    private static (int Start, int End) TextAuthority(string target)
+    {
+        int separator = target.IndexOf("://", StringComparison.Ordinal);
+        if (separator < 0)
+        {
+            return (0, 0);
+        }
+
+        int start = separator + 3;
+        ReadOnlySpan<char> rest = target.AsSpan(start);
+        ReadOnlySpan<char> authority = rest[..IndexOrLength(rest, rest.IndexOfAny('/', '?', '#'))];
+        return IsHeaderBytes(authority) ? (0, 0) : (start, start + authority.Length);
+    }
+
+    private static bool IsHeaderBytes(ReadOnlySpan<char> authority) =>
+        !authority.ContainsAnyExceptInRange('\0', 'ÿ') && System.Text.Unicode.Utf8.IsValid(System.Text.Encoding.Latin1.GetBytes(authority.ToArray()));
 
     private static string EncodedCharacter(char character, bool inQuery) => character switch
     {
