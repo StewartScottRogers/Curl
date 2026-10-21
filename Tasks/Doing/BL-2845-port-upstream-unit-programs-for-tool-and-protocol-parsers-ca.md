@@ -35,3 +35,4 @@ Ports go in Curl.Conformance.UnitProgram.UnitLibrary/ToolParsers/ and their test
 ## Log
 
 - 2026-10-19: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: 484e6579 2e3e75ab 33133e4f c0723528 620ebead.
