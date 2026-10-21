@@ -1,3 +1,4 @@
+using Curl.Conformance.UnitProgram.Asn1.Der;
 using Curl.Conformance.UnitProgram.Asn1.Names;
 
 namespace Curl.Conformance.UnitProgram;
@@ -11,5 +12,9 @@ public sealed partial class UnitPrograms
         new Unit1397CertHostCheck(),
         new Unit1676DhPublicKey(),
         new Unit3205CipherSuiteNames(),
+        new Unit1656GeneralizedTime(),
+        new Unit1657IndefiniteNesting(),
+        new Unit1666ObjectIdentifierEncoding(),
+        new Unit1667ElementText(),
     ];
 }
