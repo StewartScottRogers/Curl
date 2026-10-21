@@ -5,10 +5,10 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Engine.UnitLibrary]
+touches: [Curl.Engine.UnitTests/ManagedEasyTransferTests.TransferSettings.cs]
 requirement: none
 created: 2026-10-21
-completed:
+completed: 2026-10-21
 ---
 # BL-2934 — Fix AF-0296: TransferSettingsOf's ShowError: false can become true with no test failing, so a libcurl-API SSH transfer writes the tool's known_hosts error line
 
@@ -41,12 +41,18 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- `touches` changed from `Curl.Engine.UnitLibrary` to the one new test file: the fix is a test only (no production change), and no task in Doing on `origin/work/dark-factory` names `Curl.Engine.UnitTests`.
+- Fix: `ManagedEasyTransferTests.TransferSettings.cs` adds `TransferSettingsOf_DefaultOptions_IsSilentAndShowsNoError`, which asserts `Silent` is true and `ShowError` is false for `new EasyOptions()`.
+- Reproduction: the audit guard refuses a lane any read of `Audit/`, so `Audit/Tools/Invoke-MutationTest.ps1` could not run here. The same mutant was applied by hand (`ManagedEasyTransfer.cs:1906` `ShowError: false` -> `true`): the new test failed (killed), and passed again once reverted. The quality auditor's re-audit confirms it with the tool.
+- Fast tests: all green, Curl.Engine.UnitTests 2172 passed, 5 skipped. No production code changed, so no Measure-CodeQuality run was needed.
 
 ## Log
 
 - 2026-10-21: Created.
 - 2026-10-21: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-21: Doing -> Done. A test now pins TransferSettingsOf's Silent true and ShowError false, killing AF-0296's mutant
