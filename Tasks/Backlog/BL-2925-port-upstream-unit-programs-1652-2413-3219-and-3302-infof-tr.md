@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Conformance.UnitTests/PassingUpstreamCases.txt, Curl.Conformance.UnitProgram.UnitLibrary/UnitPrograms.Dns.cs, Curl.Conformance.UnitProgram.UnitLibrary/Dns/Easy, Curl.Conformance.UnitProgram.UnitTests/Dns/Easy, Libcurl, Libcurl.UnitTests]
+touches: [Curl.Conformance.UnitTests/PassingUpstreamCases.txt, Curl.Conformance.UnitProgram.UnitLibrary/UnitPrograms.Dns.cs, Curl.Conformance.UnitProgram.UnitLibrary/Dns/Easy, Curl.Conformance.UnitProgram.UnitTests/Dns/Easy, Libcurl/Info/Longs/EasyInfoReaders.Longs.cs, Libcurl.UnitTests/Info/Longs/EasyInfoReadersLongsTests.cs, Curl.Engine.UnitLibrary/DebugCallbackTransferEvents.cs, Curl.Engine.UnitTests/DebugCallbackTransferEventsTests.cs, Curl.Core.UnitLibrary/ConnectionPeer.cs, Curl.Core.UnitTests/ConnectionPeerTests.cs]
 requirement: none
 created: 2026-10-21
 completed:
@@ -34,7 +34,15 @@ One `IUnitProgram` per case in `Curl.Conformance.UnitProgram.UnitLibrary/Dns/Eas
 
 ## Notes
 
+- 2026-10-21 (lane 6, first claim, prerequisite pass before any edit; C sources read from curl-8_22_0):
+  - **1652**: upstream `Curl_debug`/`trc_end_buf` (`lib/curl_trc.c`, `TRC_LINE_MAX` 2048): an info line whose text is 2046 bytes or more is cut to 2043 bytes plus `...\n` (2047), else gets `\n`. Curl does not truncate anywhere; the info text reaches `CURLOPT_DEBUGFUNCTION` in `Curl.Engine.UnitLibrary/DebugCallbackTransferEvents.cs` (`ReportText`), so the fix lands there (added to touches with its test file). `(nil)` for a NULL `%s` and the printf format are C-only (C# formats before calling); the port checks the delivered lines. The runner already allows feature `verbose-strings` (`UpstreamToolFeatures.cs`).
+  - **2413**: Curl has no `Curl_peer` (host string to hostname, port, IPv6 flag, zone id): `CurlUrlHost` (Protocol.Abstractions) normalises URL hosts and drops the zone. Plan: a new internal `Curl.Core.UnitLibrary/ConnectionPeer.cs` (Core is visible to the unit-program library) with `ConnectionPeerTests.cs`; read upstream `lib/peer.c` first. Added to touches.
+  - **3219**: measured upstream: `setopt.c` stores `CURLOPT_PROTOCOLS` unmasked (`s->allowed_protocols = (curl_prot_t)arg`), so the task's suggested setter change would be wrong. `CURLPROTO_MASK` (0x3fffffff) is used only in `url.c` for `data->info.conn_protocol`, i.e. `CURLINFO_PROTOCOL`: a ws, wss or mqtts transfer reports 0. Curl's engine reports `1<<30`/`1<<31` for ws/wss; fix in Libcurl's reader (`Libcurl/Info/Longs/EasyInfoReaders.Longs.cs`, `ReadProtocol` masks with 0x3fffffff, as upstream masks at the info level) and port 3219 over that reader. Touches narrowed from whole `Libcurl`/`Libcurl.UnitTests` to those two files (ADR-0694).
+  - **3302**: no fix needed: `EasyAuthenticationOptionSetters.SetGssApiDelegation` already masks to FLAG|POLICY_FLAG; the port reads `EasyOptions.Authentication.GssApiDelegation` back.
+  - Requeued because `Curl.Engine.UnitLibrary` (whole project) is in the touches of BL-2934, in Doing.
+
 ## Log
 
 - 2026-10-21: Created.
 - 2026-10-21: Backlog -> Doing. Criteria at claim: c0969e39 2e3e75ab aca7e1a2 dd1cc079.
+- 2026-10-21: Doing -> Backlog. Needs Curl.Engine.UnitLibrary/DebugCallbackTransferEvents.cs (unit1652 infof truncation fix), and Curl.Engine.UnitLibrary is in the touches of BL-2934 (Doing); plan for all four cases is under Notes
