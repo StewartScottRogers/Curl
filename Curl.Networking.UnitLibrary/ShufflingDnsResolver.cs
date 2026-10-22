@@ -26,6 +26,11 @@ public sealed class ShufflingDnsResolver(IDnsResolver inner, Func<int, int> rand
     public static IDnsResolver Over(IDnsResolver resolver, bool shuffleAddresses) =>
         shuffleAddresses ? new ShufflingDnsResolver(resolver, DnsAddressShuffle.CryptographicRandomBelow) : resolver;
 
+    /// <summary>Shuffles <paramref name="addresses" /> the way this resolver shuffles its own answers, for a caller that took them from <see cref="Inner" /> by another call.</summary>
+    /// <param name="addresses">The addresses in the order they resolved.</param>
+    /// <returns>The addresses, shuffled.</returns>
+    public IReadOnlyList<IPAddress> Shuffle(IReadOnlyList<IPAddress> addresses) => DnsAddressShuffle.Shuffle(addresses, randomBelow);
+
     /// <summary>Resolves <paramref name="host" /> and shuffles its addresses.</summary>
     /// <param name="host">The host name or literal address to resolve.</param>
     /// <param name="cancellationToken">Cancels the lookup.</param>

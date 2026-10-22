@@ -43,6 +43,31 @@ public sealed class TcpConnectorShuffledResolverTests
     }
 
     [TestMethod]
+    public async Task ConnectAsync_ToAnHttpsOriginThroughAShuffledDohResolver_DialsTheAddressesShuffledAfterTheHttpsRecordQuery()
+    {
+        var httpsQuery = Convert.FromHexString(Header + "065F3431343433065F6874747073" + FooExampleCom + "00410001");
+        var queryA = Convert.FromHexString(Header + FooExampleCom + "00010001");
+        var queryAaaa = Convert.FromHexString(Header + FooExampleCom + "001C0001");
+        var first = IPAddress.Parse("192.0.2.1");
+        var second = IPAddress.Parse("192.0.2.2");
+        var third = IPAddress.Parse("192.0.2.3");
+        var dohConnector = new FakeConnector();
+        dohConnector.BytesToRead.AddRange([
+            Ok(DnsTestReplies.Answer(httpsQuery, [])),
+            Ok(DnsTestReplies.Answer(queryA, [first, second, third])),
+            Ok(DnsTestReplies.Answer(queryAaaa, [])),
+        ]);
+        var dialer = new FakeTcpDialer();
+        var resolver = new ShufflingDnsResolver(new DohDnsResolver(dohConnector, DohUrl), _ => 0);
+        var connector = new TcpConnector(resolver, dialer, new FakeTlsProvider(), new ManualTimeProvider());
+
+        _ = await connector.ConnectAsync(new ConnectTarget("foo.example.com", OriginPort, UseTls: true) { PoolScheme = "https" }, CancellationToken.None);
+
+        Assert.HasCount(3, dohConnector.Opened);
+        CollectionAssert.AreEqual(new[] { second, third, first }, dialer.DialedEndPoints.Select(endPoint => endPoint.Address).ToArray());
+    }
+
+    [TestMethod]
     public async Task ConnectAsync_WhenAShuffledDohResolverAnswersNothing_WritesTheSameInfoLinesAsUnshuffled()
     {
         var plain = await FailedDohInfoAsync(shuffleAddresses: false);

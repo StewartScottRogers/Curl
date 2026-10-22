@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/TcpConnector.cs, Curl.Networking.UnitLibrary/ShufflingDnsResolver.cs, Curl.Networking.UnitTests/TcpConnectorShuffledResolverTests.cs]
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-22
 ---
 # BL-3029 — Shuffle a direct https:// origin's DoH addresses under CURLOPT_DNS_SHUFFLE_ADDRESSES again
 
@@ -29,17 +29,20 @@ With `--dns-shuffle-addresses` (`CURLOPT_DNS_SHUFFLE_ADDRESSES`) and `--doh-url`
 
 ## Acceptance criteria
 
-- [ ] A new test in `Curl.Networking.UnitTests/TcpConnectorShuffledResolverTests.cs` meets these conditions:
+- [x] A new test in `Curl.Networking.UnitTests/TcpConnectorShuffledResolverTests.cs` meets these conditions:
   - Setup: a `ShufflingDnsResolver` over a DoH resolver with a fixed `randomBelow`, and a direct `https://` target.
   - It asserts that the addresses are dialled in the shuffled order, not the DoH answer's order.
   - It asserts that the HTTPS-RR query is still sent.
-- [ ] The existing test `ConnectAsync_ToAnHttpsOriginThroughAShuffledDohResolver_SendsTheHttpsRecordQuery` still passes.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` is green.
-- [ ] `Curl.Networking.UnitLibrary` keeps 100% line and branch coverage, and no method goes over complexity 10.
+- [x] The existing test `ConnectAsync_ToAnHttpsOriginThroughAShuffledDohResolver_SendsTheHttpsRecordQuery` still passes.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` is green.
+- [x] `Curl.Networking.UnitLibrary` keeps 100% line and branch coverage, and no method goes over complexity 10.
 
 ## Notes
+
+- Fix: ShufflingDnsResolver.Shuffle (new public) is applied by TcpConnector.LookUpAsync to the HTTPS-origin answer; the wrapper stays unwrapped for the kind checks. Networking.UnitLibrary measured 100% line and branch, 0 failing members.
 
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: 217724c8 61a6aa9d 44447f62 d51ffe83.
+- 2026-10-22: Doing -> Done. A direct https origin's DoH addresses are shuffled again under --dns-shuffle-addresses, HTTPS-RR query still first
