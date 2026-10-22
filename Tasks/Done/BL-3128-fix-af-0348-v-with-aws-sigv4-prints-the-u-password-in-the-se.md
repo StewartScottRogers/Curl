@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary]
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-22
 ---
 # BL-3128 — Fix AF-0348: -v with --aws-sigv4 prints the -u password in the 'Server auth using AWS_SIGV4' line; curl prints only the user
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the conformance auditor confirm
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- No code change was needed: `AwsSigV4HttpAuthenticator.cs:118` already prints only the user, and has not changed since BL-2286 (c8265cee7), so the audit most likely ran against a tree with the line changed (for example a planted defect). On this tree the reproduction gives `curl: * Server auth using AWS_SIGV4 with user 'AKID'` and `candidate: * Server auth using AWS_SIGV4 with user 'AKID'`. The existing tests (AwsSigV4HttpAuthenticatorTests.cs:99, CurlCompositionAwsSigV4Tests.cs:166, HttpProtocolHandlerTests.AwsSigV4.cs:223) already pin the line with the user only. dotnet build is clean and the fast tests are green.
 
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-22: Doing -> Done. Reproduction gives the expected user-only line; the code already printed only the user, no change needed
