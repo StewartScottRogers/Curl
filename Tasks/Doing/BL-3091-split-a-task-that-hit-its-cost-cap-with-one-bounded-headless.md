@@ -42,3 +42,4 @@ Write an ADR under `Documentation/Planning/Decisions/` ("Decided by Claude under
 ## Log
 
 - 2026-10-22: Created.
+- 2026-10-22: Backlog -> Doing. Criteria at claim: eb81d285 b1cf7e4a dab410e4 3adf2d41 406b27f7 04e7bc94 de7e55ae 7193fd91.
