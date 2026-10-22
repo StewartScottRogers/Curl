@@ -41,3 +41,4 @@ Existing tests: `RunDarkFactory.ps1 -TestCiWatch` (the check blocks at the end o
 ## Log
 
 - 2026-10-22: Created.
+- 2026-10-22: Backlog -> Doing. Criteria at claim: ee3e0e47 bfef5946 978ecf9e 1f1d7069 b2a44ef2 e35c9f7d 2b993f16.
