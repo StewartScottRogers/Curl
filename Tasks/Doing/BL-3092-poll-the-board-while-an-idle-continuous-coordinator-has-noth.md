@@ -38,3 +38,4 @@ Depends on BL-3090 for the claimable-now predicate (it also makes this file's ov
 ## Log
 
 - 2026-10-22: Created.
+- 2026-10-22: Backlog -> Doing. Criteria at claim: 607229d4 5b3f2fcd 30be321b 956f59f8 fd9eac29 7193fd91.
