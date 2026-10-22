@@ -6,7 +6,7 @@ namespace Curl.Cli.ManualPages;
 /// An option document's header block between its two <c>---</c> lines, read as <c>single</c> in upstream's
 /// <c>scripts/managen</c> reads it, with the script's checks for the fields every option must have.
 /// </summary>
-internal sealed class ManualOptionHeader
+public sealed class ManualOptionHeader
 {
     private const RegexOptions Options = RegexOptions.IgnoreCase | RegexOptions.CultureInvariant;
 
@@ -38,35 +38,51 @@ internal sealed class ManualOptionHeader
 
     private int list;
     private bool duplicateSeeAlso;
+    private bool started;
 
+    /// <summary>The one-letter short name (<c>Short:</c>), or <see langword="null"/> when the option has none.</summary>
     public string? Short { get; private set; }
 
+    /// <summary>The long name (<c>Long:</c>).</summary>
     public string Long { get; private set; } = "";
 
+    /// <summary>The curl version that added the option (<c>Added:</c>).</summary>
     public string? Added { get; private set; }
 
+    /// <summary>The argument the option takes (<c>Arg:</c>).</summary>
     public string? Arg { get; private set; }
 
+    /// <summary>The space-separated options this one excludes (<c>Mutexed:</c>).</summary>
     public string? Mutexed { get; private set; }
 
+    /// <summary>The space-separated protocols the option applies to (<c>Protocols:</c>).</summary>
     public string? Protocols { get; private set; }
 
+    /// <summary>The feature libcurl must be built with (<c>Requires:</c>).</summary>
     public string? Requires { get; private set; }
 
+    /// <summary>The help categories (<c>Category:</c>).</summary>
     public string Category { get; private set; } = "";
 
+    /// <summary>What giving the option several times does (<c>Multi:</c>).</summary>
     public string Multi { get; private set; } = "";
 
+    /// <summary>The option's scope (<c>Scope:</c>), <c>global</c> or unset.</summary>
     public string? Scope { get; private set; }
 
+    /// <summary>Whether the option is marked <c>Experimental: yes</c>.</summary>
     public bool Experimental { get; private set; }
 
+    /// <summary>The copyright line (<c>C:</c>).</summary>
     public string? Copyright { get; private set; }
 
+    /// <summary>The licence (<c>SPDX-License-Identifier:</c>).</summary>
     public string? Spdx { get; private set; }
 
+    /// <summary>The options named under <c>See-also:</c>, inline or as a list.</summary>
     public List<string> SeeAlso { get; } = [];
 
+    /// <summary>The example command lines under <c>Example:</c>, inline or as a list.</summary>
     public List<string> Examples { get; } = [];
 
     /// <summary>The line of the closing <c>---</c>, which the script's messages name.</summary>
@@ -83,24 +99,10 @@ internal sealed class ManualOptionHeader
     public static (ManualOptionHeader Header, int? Failure) Parse(ManualPageContext context, string fileName, IReadOnlyList<string> lines)
     {
         ManualOptionHeader header = new();
-        bool started = false;
         for (int index = 0; index < lines.Count; index++)
         {
-            string text = lines[index];
             header.LineNumber = index + 1;
-            if (Regex.IsMatch(text, "^ *<!--", Options) || !started)
-            {
-                started = started || text.StartsWith("---", StringComparison.Ordinal);
-                continue;
-            }
-
-            if (text.StartsWith("---", StringComparison.Ordinal))
-            {
-                header.BodyStart = index + 1;
-                return (header, header.Check(context, fileName));
-            }
-
-            if (header.ApplyField(context, fileName, text) is { } failure)
+            if (header.ReadLine(context, fileName, lines[index], out int? failure))
             {
                 return (header, failure);
             }
@@ -108,6 +110,27 @@ internal sealed class ManualOptionHeader
 
         context.Error.Append($"{fileName}:1:1:ERROR: no proper meta-data header\n");
         return (header, 2);
+    }
+
+    // Reads one line; true when the header ends there, with the code the script returns when it refuses the header.
+    private bool ReadLine(ManualPageContext context, string fileName, string text, out int? failure)
+    {
+        failure = null;
+        if (Regex.IsMatch(text, "^ *<!--", Options) || !started)
+        {
+            started = started || text.StartsWith("---", StringComparison.Ordinal);
+            return false;
+        }
+
+        if (text.StartsWith("---", StringComparison.Ordinal))
+        {
+            BodyStart = LineNumber;
+            failure = Check(context, fileName);
+            return true;
+        }
+
+        failure = ApplyField(context, fileName, text);
+        return failure is not null;
     }
 
     private int? ApplyField(ManualPageContext context, string fileName, string text)

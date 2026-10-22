@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.RegularExpressions;
 
 namespace Curl.Cli.ManualPages;
@@ -9,7 +10,7 @@ namespace Curl.Cli.ManualPages;
 /// </summary>
 /// <param name="context">The run.</param>
 /// <param name="manpage">Whether the page is nroff.</param>
-internal sealed class ManualOptionPage(ManualPageContext context, bool manpage)
+public sealed class ManualOptionPage(ManualPageContext context, bool manpage)
 {
     private const int ExampleWidth = 60;
 
@@ -19,9 +20,21 @@ internal sealed class ManualOptionPage(ManualPageContext context, bool manpage)
         "SMTP", "SSL", "TELNET", "TFTP", "TLS",
     };
 
+    // The line each Multi adds: {0} is the paragraph prefix, {1} the option's name, {2} the option that disables it.
+    private static readonly Dictionary<string, string> MultiLines = new(StringComparer.Ordinal)
+    {
+        ["single"] = "{0}If {1} is provided several times, the last set value is used.\n",
+        ["append"] = "{0}{1} can be used several times in a command line.\n",
+        ["boolean"] = "{0}Providing {1} multiple times has no extra effect.\nDisable it again with {2}.\n",
+        ["mutex"] = "{0}Providing {1} multiple times has no extra effect.\n",
+        ["per-URL"] = "{0}{1} is associated with a single URL. Use it once per URL when you use several URLs in a command line.\n",
+    };
+
     private readonly ManualAsciiLayout layout = new(context);
 
     private string Prefix => manpage ? "\n" : "[1]";
+
+    private string LeadingPrefix => manpage ? "" : "[1]";
 
     /// <summary>Writes the option document <paramref name="fileName"/>.</summary>
     /// <param name="fileName">The document's name in the run's folder.</param>
@@ -30,32 +43,24 @@ internal sealed class ManualOptionPage(ManualPageContext context, bool manpage)
     {
         List<string> lines = context.ReadLines(context.PathOf(fileName), $"could not find {context.PathOf(fileName)}");
         (ManualOptionHeader header, int? failure) = ManualOptionHeader.Parse(context, fileName, lines);
-        if (failure is { } code)
-        {
-            return code;
-        }
+        return failure ?? WriteOption(header, fileName, lines);
+    }
 
+    private int WriteOption(ManualOptionHeader header, string fileName, List<string> lines)
+    {
         List<string> description = new ManualMarkdownRenderer(context, manpage, fileName, header.LineNumber).Render(lines.Skip(header.BodyStart));
         WriteNames(header);
         List<string> leading = Leading(header, fileName);
         List<string> extra = [];
-        if ((Scope(header, fileName, description) ?? Extra(header, fileName, extra)) is { } refused)
-        {
-            return refused;
-        }
+        return Scope(header, fileName, description) ?? Extra(header, fileName, extra) ?? WriteDescription(header, fileName, [.. leading, .. description, .. extra]);
+    }
 
-        layout.PrintDescription(manpage, 2, [.. leading, .. description, .. extra]);
+    private int WriteDescription(ManualOptionHeader header, string fileName, List<string> description)
+    {
+        layout.PrintDescription(manpage, 2, description);
         string seeAlso = SeeAlso(header, fileName);
         List<string> foot = Foot(header, fileName);
-        if (Examples(header, fileName) is { } badExample)
-        {
-            return badExample;
-        }
-
-        foot.Add(ManualNroffText.IsTooOld(header.Added!) ? "" : $"Added in {header.Added}. ");
-        foot.Add($"See also {seeAlso}. ");
-        WriteFoot(string.Concat(foot));
-        return 0;
+        return Examples(header, fileName) ?? WriteFoot(header, foot, seeAlso);
     }
 
     private void WriteNames(ManualOptionHeader header)
@@ -75,21 +80,28 @@ internal sealed class ManualOptionPage(ManualPageContext context, bool manpage)
         List<string> leading = [];
         if (ManualPerlValues.IsTrue(header.Protocols))
         {
-            foreach (string protocol in ManualPerlValues.Split(header.Protocols, " +").Where(protocol => !KnownProtocols.Contains(protocol)))
-            {
-                context.Error.Append($"{fileName}:{header.LineNumber}:1:ERROR: unrecognized protocol: {protocol}\n");
-                throw new ManualPageExit(2);
-            }
-
-            leading.Add($"{(manpage ? "" : "[1]")}({header.Protocols}) ");
+            RefuseUnknownProtocol(header.Protocols, header.LineNumber, fileName);
+            leading.Add($"{LeadingPrefix}({header.Protocols}) ");
         }
 
         if (header.Experimental)
         {
-            leading.Add($"{(manpage ? "" : "[1]")}**WARNING**: this option is experimental. Do not use in production.\n\n");
+            leading.Add($"{LeadingPrefix}**WARNING**: this option is experimental. Do not use in production.\n\n");
         }
 
         return leading;
+    }
+
+    private void RefuseUnknownProtocol(string protocols, int lineNumber, string fileName)
+    {
+        string? unknown = ManualPerlValues.Split(protocols, " +").FirstOrDefault(protocol => !KnownProtocols.Contains(protocol));
+        if (unknown is null)
+        {
+            return;
+        }
+
+        context.Error.Append($"{fileName}:{lineNumber}:1:ERROR: unrecognized protocol: {unknown}\n");
+        throw new ManualPageExit(2);
     }
 
     private int? Scope(ManualOptionHeader header, string fileName, List<string> description)
@@ -115,19 +127,13 @@ internal sealed class ManualOptionPage(ManualPageContext context, bool manpage)
 
     private int? Extra(ManualOptionHeader header, string fileName, List<string> extra)
     {
-        string name = ManualNroffText.Manpageify(header.Long, manpage);
-        string reverse = header.Long.StartsWith("no-", StringComparison.Ordinal) ? header.Long[3..] : $"no-{header.Long}";
-        string? line = header.Multi switch
+        if (MultiLines.TryGetValue(header.Multi, out string? template))
         {
-            "single" => $"{Prefix}If {name} is provided several times, the last set value is used.\n",
-            "append" => $"{Prefix}{name} can be used several times in a command line.\n",
-            "boolean" => $"{Prefix}Providing {name} multiple times has no extra effect.\nDisable it again with {(manpage ? "\\-\\-" : "--")}{reverse}.\n",
-            "mutex" => $"{Prefix}Providing {name} multiple times has no extra effect.\n",
-            "per-URL" => $"{Prefix}{name} is associated with a single URL. Use it once per URL when you use several URLs in a command line.\n",
-            _ => null,
-        };
-        extra.AddRange(line is null ? [] : [line]);
-        if (line is null && header.Multi != "custom" && ManualPerlValues.IsTrue(header.Multi))
+            extra.Add(string.Format(CultureInfo.InvariantCulture, template, Prefix, ManualNroffText.Manpageify(header.Long, manpage), Disabler(header.Long)));
+            return null;
+        }
+
+        if (header.Multi != "custom" && ManualPerlValues.IsTrue(header.Multi))
         {
             context.Error.Append($"{fileName}:{header.LineNumber}:1:ERROR: unrecognized Multi: '{header.Multi}'\n");
             return 2;
@@ -136,23 +142,18 @@ internal sealed class ManualOptionPage(ManualPageContext context, bool manpage)
         return null;
     }
 
+    // The option that turns a boolean off again: --no-name, or --name for an option already named no-name.
+    private string Disabler(string longName) =>
+        (manpage ? "\\-\\-" : "--") + (longName.StartsWith("no-", StringComparison.Ordinal) ? longName[3..] : $"no-{longName}");
+
     private string SeeAlso(ManualOptionHeader header, string fileName)
     {
-        int last = header.SeeAlso.Count > 2 ? header.SeeAlso.Count - 1 : 0;
-        string names = "";
-        for (int index = 0; index < header.SeeAlso.Count; index++)
+        foreach (string option in header.SeeAlso.Where(option => !context.Index.HasHelp(option)))
         {
-            string option = header.SeeAlso[index];
-            if (!context.Index.HasHelp(option))
-            {
-                context.Error.Append($"{fileName}:{header.LineNumber}:1:WARN: see-also a non-existing option: {option}\n");
-            }
-
-            string separator = last != 0 && index < last ? "," : " and";
-            names += (names.Length > 0 ? $"{separator} " : "") + ManualNroffText.Manpageify(option, manpage);
+            context.Error.Append($"{fileName}:{header.LineNumber}:1:WARN: see-also a non-existing option: {option}\n");
         }
 
-        return names;
+        return JoinNames(header.SeeAlso);
     }
 
     private List<string> Foot(ManualOptionHeader header, string fileName)
@@ -166,34 +167,39 @@ internal sealed class ManualOptionPage(ManualPageContext context, bool manpage)
         if (ManualPerlValues.IsTrue(header.Mutexed))
         {
             List<string> options = ManualPerlValues.Split(header.Mutexed, " ");
-            string names = "";
-            for (int index = 0; index < options.Count; index++)
+            foreach (string option in options.Where(option => !context.Index.HasHelp(option)))
             {
-                if (!context.Index.HasHelp(options[index]))
-                {
-                    context.Error.Append($"WARN: {fileName} mutexes a non-existing option: {options[index]}\n");
-                }
-
-                names += (names.Length > 0 ? index == options.Count - 1 ? " and " : ", " : "") + ManualNroffText.Manpageify(options[index], manpage);
+                context.Error.Append($"WARN: {fileName} mutexes a non-existing option: {option}\n");
             }
 
-            foot.Add($"This option is mutually exclusive with {names}.\n");
+            foot.Add($"This option is mutually exclusive with {JoinNames(options)}.\n");
         }
 
         return foot;
     }
 
+    // Names the options as the script lists them: "a", "a and b", "a, b and c".
+    private string JoinNames(List<string> options)
+    {
+        List<string> names = [.. options.Select(option => ManualNroffText.Manpageify(option, manpage))];
+        return names.Count < 2 ? string.Concat(names) : $"{string.Join(", ", names.Take(names.Count - 1))} and {names[^1]}";
+    }
+
     private int? Examples(ManualOptionHeader header, string fileName)
     {
-        foreach (string word in header.Examples.SelectMany(example => example.Split(' ')))
+        string? unknown = header.Examples.SelectMany(example => example.Split(' ')).Select(UnknownExampleOption).FirstOrDefault(option => option is not null);
+        if (unknown is not null)
         {
-            if (UnknownExampleOption(word) is { } unknown)
-            {
-                context.Error.Append($"{fileName}:{header.LineNumber}:1:ERROR: unknown option in example: {unknown}\n");
-                return 2;
-            }
+            context.Error.Append($"{fileName}:{header.LineNumber}:1:ERROR: unknown option in example: {unknown}\n");
+            return 2;
         }
 
+        WriteExamples(header);
+        return null;
+    }
+
+    private void WriteExamples(ManualOptionHeader header)
+    {
         string plural = header.Examples.Count > 1 && ManualPerlValues.IsTrue(header.Examples[1]) ? "s" : "";
         List<string> examples = [.. header.Examples.Select(example => example.Replace("$URL", "https://example.com", StringComparison.Ordinal))];
         if (manpage)
@@ -201,29 +207,30 @@ internal sealed class ManualOptionPage(ManualPageContext context, bool manpage)
             context.Output.Append($"\nExample{plural}:\n.nf\n");
             context.Output.AppendJoin("", examples.Select(example => $"curl {example.Replace("\\", "\\\\", StringComparison.Ordinal)}\n"));
             context.Output.Append(".fi\n");
-            return null;
+            return;
         }
 
         List<string> lines = [$"[0q]Example{plural}:\n"];
         examples.ForEach(example => AddAsciiExample(lines, example));
         layout.PrintDescription(false, 2, lines);
-        return null;
     }
 
     private string? UnknownExampleOption(string word)
     {
-        if (Regex.Match(word, "^-([^- ])", RegexOptions.CultureInvariant) is { Success: true } shortOption)
+        Match shortOption = Regex.Match(word, "^-([^- ])", RegexOptions.CultureInvariant);
+        if (shortOption.Success)
         {
             return context.Index.HasShort(shortOption.Groups[1].Value) ? null : $"-{shortOption.Groups[1].Value}";
         }
 
-        if (Regex.Match(word, "^--([^ =]*)", RegexOptions.CultureInvariant) is { Success: true } longOption)
+        Match longOption = Regex.Match(word, "^--([^ =]*)", RegexOptions.CultureInvariant);
+        if (!longOption.Success)
         {
-            string name = Regex.Replace(longOption.Groups[1].Value, "^expand-", "", RegexOptions.CultureInvariant);
-            return context.Index.HasHelp(name) ? null : $"'--{name}'";
+            return null;
         }
 
-        return null;
+        string name = Regex.Replace(longOption.Groups[1].Value, "^expand-", "", RegexOptions.CultureInvariant);
+        return context.Index.HasHelp(name) ? null : $"'--{name}'";
     }
 
     // Long ASCII examples wrap at the last space before the margin, or a colon, or else at the margin itself.
@@ -250,15 +257,19 @@ internal sealed class ManualOptionPage(ManualPageContext context, bool manpage)
         }
     }
 
-    private void WriteFoot(string foot)
+    private int WriteFoot(ManualOptionHeader header, List<string> foot, string seeAlso)
     {
+        foot.Add(ManualNroffText.IsTooOld(header.Added!) ? "" : $"Added in {header.Added}. ");
+        foot.Add($"See also {seeAlso}. ");
+        string text = string.Concat(foot);
         context.Output.Append('\n');
         if (manpage)
         {
-            context.Output.Append(foot.TrimEnd(' ')).Append('\n');
-            return;
+            context.Output.Append(text.TrimEnd(' ')).Append('\n');
+            return 0;
         }
 
-        layout.PrintDescription(false, 2, [$"[1]{foot}"]);
+        layout.PrintDescription(false, 2, [$"[1]{text}"]);
+        return 0;
     }
 }
