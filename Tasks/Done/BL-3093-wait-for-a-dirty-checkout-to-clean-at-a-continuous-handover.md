@@ -8,7 +8,7 @@ depends-on: [BL-3091, BL-3092]
 touches: [DarkFactory/Park.ps1, DarkFactory/ShiftCoordinator.ps1, DarkFactory/ShiftRunner.ps1]
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-22
 ---
 # BL-3093 — Wait for a dirty checkout to clean at a -Continuous handover instead of alarming at once
 
@@ -26,15 +26,19 @@ Depends on BL-3092 (shares `ShiftCoordinator.ps1`) and BL-3091 (shares `ShiftRun
 
 ## Acceptance criteria
 
-- [ ] `Wait-ForCleanTree` exists in `DarkFactory/Park.ps1` and both `ShiftCoordinator.ps1` and `ShiftRunner.ps1` call it instead of the inline `Get-Dirty` refusal.
-- [ ] `RunDarkFactory.ps1 -TestPark` (extended) passes with injected-clock cases: dirty then clean after 3 polls returns clean having slept 3 times 2 minutes; always dirty returns the dirty list after exactly 30 minutes of injected time (15 polls) and the caller alarms; clean at once does not sleep; a non-hand-over start refuses at once without sleeping.
-- [ ] The same self-test shows the dirty paths are traced and the trace is not repeated on every poll.
-- [ ] A grep of the new code finds no `git stash`, `git reset`, `git checkout`, `git clean` or `Remove-Item` call.
-- [ ] All `RunDarkFactory.ps1 -Test*` switches that passed before still pass.
+- [x] `Wait-ForCleanTree` exists in `DarkFactory/Park.ps1` and both `ShiftCoordinator.ps1` and `ShiftRunner.ps1` call it instead of the inline `Get-Dirty` refusal.
+- [x] `RunDarkFactory.ps1 -TestPark` (extended) passes with injected-clock cases: dirty then clean after 3 polls returns clean having slept 3 times 2 minutes; always dirty returns the dirty list after exactly 30 minutes of injected time (15 polls) and the caller alarms; clean at once does not sleep; a non-hand-over start refuses at once without sleeping.
+- [x] The same self-test shows the dirty paths are traced and the trace is not repeated on every poll.
+- [x] A grep of the new code finds no `git stash`, `git reset`, `git checkout`, `git clean` or `Remove-Item` call.
+- [x] All `RunDarkFactory.ps1 -Test*` switches that passed before still pass.
 
 ## Notes
+
+- Delivered directly (a PowerShell change to three DarkFactory scripts; no protocol-architect plan needed). `Wait-ForCleanTree` in `DarkFactory/Park.ps1` takes injected `GetDirty`, `Sleep`, `Now` and `Trace` scriptblocks; hand-over is `[bool]$ShiftBranch`. It polls at t=0,2,...,30 minutes and gives up at the poll that sees 30 minutes elapsed (15 sleeps), as the criteria ask. Both call sites keep the same refusal text, so an alarm reads as before; the trace adds the dirty paths once, a "wait" line, and a "still not clean after 30 minutes" line.
+- Checked: `-TestPark` 14 cases pass (5 new); all 23 `RunDarkFactory.ps1 -Test*` switches exit 0; a grep of the added lines finds no git stash/reset/checkout/clean or Remove-Item; dotnet build clean and the fast tests green.
 
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: eb6f06bd 81817d88 0fbe131c 8f7f27e9 7193fd91.
+- 2026-10-22: Doing -> Done. A -Continuous hand-over that finds the checkout dirty traces the paths once, retries every 2 minutes for 30 minutes, and alarms only if still dirty
