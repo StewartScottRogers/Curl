@@ -1,4 +1,4 @@
-﻿---
+---
 id: BL-2979
 title: Gate the DoH HTTPS-RR trace lines by --trace-config dns and doh as curl 8.22.0 does
 priority: Normal
@@ -30,3 +30,4 @@ Found by BL-2954 (ADR-0727's BL-2954 amendment). Today `EngineComposition.Create
 ## Log
 
 - 2026-10-21: Created.
+- 2026-10-22: Backlog -> Doing. Criteria at claim: 762745af 8b2b45e3.
