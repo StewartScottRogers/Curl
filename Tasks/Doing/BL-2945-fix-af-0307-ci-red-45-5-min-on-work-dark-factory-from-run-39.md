@@ -41,8 +41,8 @@ The finding closes only when a later re-audit by the process auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] ~~The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.~~ Withdrawn: the reproduction reads one past run's logs, which no change can alter. Stewart, 2026-10-21: accept AF-0307 as inherent (about 21 min of CI on the fix plus a busy overlapping lane) rather than pre-empt running lanes.
+- [x] ~~`dotnet build` and the fast tests pass.~~ Withdrawn: the task changes no code.
 
 ## Notes
 
