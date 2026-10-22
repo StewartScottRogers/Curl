@@ -14,6 +14,7 @@ namespace Curl.Api.Options.Authentication;
 /// </summary>
 public sealed record EasyAuthenticationOptions
 {
+    /// <summary>What <see cref="ToString"/> prints in place of a secret that is set.</summary>
     private const string RedactedSecret = "<redacted>";
 
     /// <summary>
@@ -208,6 +209,11 @@ public sealed record EasyAuthenticationOptions
     /// </summary>
     public string? HttpSignatureHeaders { get; init; }
 
+    /// <summary>
+    /// The record's synthesized <c>ToString</c> calls this to list its members; it is written by hand
+    /// so every secret goes through <see cref="Redact"/> instead of being printed. Always returns
+    /// <see langword="true"/>, as the record contract requires of a member that appended output.
+    /// </summary>
     private bool PrintMembers(StringBuilder builder)
     {
         builder.Append($"Netrc = {Netrc}, NetrcFile = {NetrcFile}, ");
@@ -230,5 +236,6 @@ public sealed record EasyAuthenticationOptions
         return true;
     }
 
+    /// <summary>The placeholder for a set secret, or <see langword="null"/> when none is set, so an unset one stays visible as unset.</summary>
     private static string? Redact(string? secret) => secret is null ? null : RedactedSecret;
 }

@@ -31,6 +31,8 @@ Stewart, 2026-10-22: "Fully document and comment all code in each Host." Hosts a
 
 ## Notes
 
+Audit found every public and enum member in scope already documented accurately; the only undocumented members were the three private ones in EasyAuthenticationOptions (RedactedSecret, PrintMembers, Redact), now documented. No other change needed.
+
 ## Log
 
 - 2026-10-22: Created.
