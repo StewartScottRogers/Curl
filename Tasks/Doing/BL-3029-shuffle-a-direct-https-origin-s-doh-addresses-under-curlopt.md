@@ -42,3 +42,4 @@ With `--dns-shuffle-addresses` (`CURLOPT_DNS_SHUFFLE_ADDRESSES`) and `--doh-url`
 ## Log
 
 - 2026-10-22: Created.
+- 2026-10-22: Backlog -> Doing. Criteria at claim: 217724c8 61a6aa9d 44447f62 d51ffe83.
