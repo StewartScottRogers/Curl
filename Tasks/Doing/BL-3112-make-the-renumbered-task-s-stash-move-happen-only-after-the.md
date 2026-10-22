@@ -47,3 +47,4 @@ Found by the shift-end review (ADR-0710) of 585348e22...432525fe2. silent-failur
 ## Log
 
 - 2026-10-22: Created.
+- 2026-10-22: Backlog -> Doing. Criteria at claim: fb854554 eabfc875 93a7bb37 8e01f45b 88a76509 95ad9451.
