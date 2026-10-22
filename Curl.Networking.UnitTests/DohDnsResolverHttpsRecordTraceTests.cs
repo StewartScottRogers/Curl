@@ -245,7 +245,12 @@ public sealed class DohDnsResolverHttpsRecordTraceTests
         var record = await new DohDnsResolver(connector, DohUrl, new RecordingTransferEvents(), DescribeExitCode).ResolveHttpsRecordAsync("foo.example.com", 443, CancellationToken.None);
 
         Assert.IsNotNull(record);
+        Assert.AreEqual(1, record.Priority);
+        CollectionAssert.AreEqual(new[] { "h2" }, record.ApplicationProtocols.ToArray());
+        Assert.IsNull(record.Port);
+        CollectionAssert.AreEqual(Convert.FromHexString("AABBCCDDEEFF"), record.EchConfigList.ToArray());
     }
+
     // Traced, the AAAA query's sub-transfer runs before the A query's (BL-2973); untraced, A's connects first.
     private static FakeConnector AnsweringAllThree(bool aaaaFirst)
     {
