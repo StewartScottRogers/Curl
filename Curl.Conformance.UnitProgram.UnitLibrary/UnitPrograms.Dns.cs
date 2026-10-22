@@ -20,5 +20,6 @@ public sealed partial class UnitPrograms
         new Unit3219ProtocolMask(),
         new Unit3302GssApiDelegation(),
         new Unit1655DohRequestEncoding(),
+        new Unit1650DohEncodingAndDecoding(),
     ];
 }
