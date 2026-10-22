@@ -32,3 +32,4 @@ Split from BL-2925, after BL-3014 commits the ports. For each case run the upstr
 ## Log
 
 - 2026-10-21: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: 0ea83a0d e21840f1 4cecdd08.
