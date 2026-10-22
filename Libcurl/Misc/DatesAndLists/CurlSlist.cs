@@ -18,6 +18,7 @@ public sealed class CurlSlist : IReadOnlyList<string>
 {
     private readonly List<string> strings = [];
 
+    // Private so a list only comes from Append, as upstream starts a list with curl_slist_append(NULL, ...).
     private CurlSlist()
     {
     }

@@ -169,6 +169,7 @@ public static class CurlStrings
         return CompareIgnoringAsciiCase(first, second, maximum);
     }
 
+    // Compares as C strings: a character past a string's end reads as NUL, so a shorter string differs from a longer one.
     private static bool CompareIgnoringAsciiCase(string first, string second, nuint maximum)
     {
         int index = 0;
@@ -186,10 +187,13 @@ public static class CurlStrings
         return maximum == 0 || AsciiUpper(CharAt(first, index)) == AsciiUpper(CharAt(second, index));
     }
 
+    // The character at index, or NUL past the end, as a C string's terminator reads.
     private static char CharAt(string text, int index) => index < text.Length ? text[index] : '\0';
 
     private static char AsciiUpper(char character) => char.IsAsciiLetterLower(character) ? (char)(character - ('a' - 'A')) : character;
 
+    // The UTF-8 bytes of text cut to length bytes (0 or the full length means all), or null where libcurl answers NULL:
+    // no text, a negative length, or a length past the end.
     private static byte[]? SelectBytes(string? text, int length)
     {
         if (text is null || length < 0)
@@ -224,6 +228,7 @@ public static class CurlStrings
     private static bool IsUnreserved(byte value) =>
         char.IsAsciiLetterOrDigit((char)value) || value is (byte)'-' or (byte)'.' or (byte)'_' or (byte)'~';
 
+    // Whether bytes[index] is a % followed by two hex digits that are both inside bytes; anything else is kept literally.
     private static bool IsEscapeAt(ReadOnlySpan<byte> bytes, int index) =>
         bytes[index] == (byte)'%' && index + 2 < bytes.Length && char.IsAsciiHexDigit((char)bytes[index + 1]) && char.IsAsciiHexDigit((char)bytes[index + 2]);
 

@@ -79,6 +79,7 @@ public sealed class CurlMimePart
     /// <returns>The engine's answer.</returns>
     public CurlCode SetHeaders(IEnumerable<string>? headers) => Live().SetHeaders(headers is null ? null : [.. headers]);
 
+    // The engine's part builder, after checking the part's handle has not been freed (freeing a handle frees its parts).
     private IMimePartBuilder Live()
     {
         owner.ThrowIfFreed();
