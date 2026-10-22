@@ -93,3 +93,4 @@ If too big for one run, split it: the decoder change (CNAME skipped, no NoConten
 - 2026-10-21: Doing -> Backlog. Needs Curl.Engine.UnitTests (EngineCompositionDoh*Tests pin the 8.21.0 DoH lines), which BL-2921 in Doing touches; code is written and stashed, see Notes
 - 2026-10-21: Backlog -> Doing. Criteria at claim: 582ece38 47a1bf8a 2a446683.
 - 2026-10-21: Doing -> Backlog. Cost cap: library side ported onto BL-2981's split files and builds; trace and Engine tests, ADR amendment and quality run left, see Notes
+- 2026-10-21: Backlog -> Doing. Criteria at claim: 582ece38 47a1bf8a 2a446683.

@@ -118,6 +118,7 @@ internal static partial class EngineComposition
     /// <param name="http2PushSink">Where the HTTP handler offers HTTP/2 server pushes (BL-2469); <see langword="null" /> keeps <c>SETTINGS_ENABLE_PUSH</c> 0.</param>
     /// <param name="webSocketRandomSource">Where the WebSocket handler draws each <c>Sec-WebSocket-Key</c> and frame mask from (BL-2688); <see langword="null" /> for <see cref="SystemWebSocketRandomSource" />.</param>
     /// <param name="ftpStopsBeforeEntryPath">Whether the FTP handler's new control connections stop before <c>PWD</c> (<see cref="FtpProtocolHandler.StopsBeforeEntryPath" />, BL-2636).</param>
+    /// <param name="digestRandomBytes">Where Digest and DIGEST-MD5 draw their client nonce's bytes from (ADR-0751, BL-2834); <see langword="null" /> for <see cref="System.Security.Cryptography.RandomNumberGenerator" />.</param>
     internal static IReadOnlyList<IProtocolHandler> CreateProtocolHandlers(
         IConnector connector,
         IDatagramConnector datagramConnector,
@@ -146,14 +147,15 @@ internal static partial class EngineComposition
         WsPerformConnection? webSocketPerformConnection = null,
         IHttp2PushSink? http2PushSink = null,
         IWebSocketRandomSource? webSocketRandomSource = null,
-        bool ftpStopsBeforeEntryPath = false)
+        bool ftpStopsBeforeEntryPath = false,
+        Func<int, byte[]>? digestRandomBytes = null)
     {
         Func<RtspRequestSettings?> rtspSettingsOf = rtspRequestSettings ?? (() => null);
         ConnectionEndPointRecorder recorder = new();
         EndPointRecordingConnector recordingConnector = new(connector, recorder);
         EndPointRecordingDatagramConnector recordingDatagramConnector = new(NumberedDatagramsOf(connector, datagramConnector), recorder);
         Lazy<ISecurityContextFactory> contexts = new(() => securityContexts ?? CreateSecurityContextFactory(connector, datagramConnector, diagnosticLog));
-        Lazy<RankedHttpAuthenticator> httpAuthenticator = new(() => CreateHttpAuthenticator(contexts.Value, negotiateOptions, diagnosticLog));
+        Lazy<RankedHttpAuthenticator> httpAuthenticator = new(() => CreateHttpAuthenticator(contexts.Value, negotiateOptions, diagnosticLog, digestRandomBytes));
         SecurityDelegation saslDelegation = (negotiateOptions ?? NegotiateOptions.Default).Delegation;
         LazyProtocolHandler http = new(["http", "https"], () => new HttpProtocolHandler(recordingConnector, new HttpSignatureHttpAuthenticator(new AwsSigV4HttpAuthenticator(httpAuthenticator.Value, new AwsSigV4Signer(signingClock ?? TimeProvider.System, CredentialEncoding.ForPlatform(OperatingSystem.IsWindows()), diagnosticLog)), signingClock ?? TimeProvider.System), cookieStore, proxyAuthSchemes, http2PushSink) { TracesHttp2Frames = tracesHttp2, TracesHttp3Streams = tracesHttp3, TracesClientReaders = tracesRead });
 
@@ -165,9 +167,9 @@ internal static partial class EngineComposition
             new LazyProtocolHandler(["telnet"], () => new TelnetProtocolHandler(recordingConnector)),
             new LazyProtocolHandler(["tftp"], () => new TftpProtocolHandler(recordingDatagramConnector, recordingConnector, CredentialEncoding.ForPlatform(OperatingSystem.IsWindows()))),
             new LazyProtocolHandler(["mqtt", "mqtts"], () => new MqttProtocolHandler(recordingConnector)),
-            new LazyProtocolHandler(["imap", "imaps"], () => new ImapProtocolHandler(recordingConnector, tlsProvider, CreateSaslAuthenticator(contexts.Value, saslDelegation, diagnosticLog))),
-            new LazyProtocolHandler(["pop3", "pop3s"], () => new Pop3ProtocolHandler(recordingConnector, tlsProvider, CreateSaslAuthenticator(contexts.Value, saslDelegation, diagnosticLog))),
-            new LazyProtocolHandler(["smtp", "smtps"], () => new SmtpProtocolHandler(recordingConnector, tlsProvider, CreateSaslAuthenticator(contexts.Value, saslDelegation, diagnosticLog)) { TracesStateMachine = tracesSmtp }),
+            new LazyProtocolHandler(["imap", "imaps"], () => new ImapProtocolHandler(recordingConnector, tlsProvider, CreateSaslAuthenticator(contexts.Value, saslDelegation, diagnosticLog, digestRandomBytes))),
+            new LazyProtocolHandler(["pop3", "pop3s"], () => new Pop3ProtocolHandler(recordingConnector, tlsProvider, CreateSaslAuthenticator(contexts.Value, saslDelegation, diagnosticLog, digestRandomBytes))),
+            new LazyProtocolHandler(["smtp", "smtps"], () => new SmtpProtocolHandler(recordingConnector, tlsProvider, CreateSaslAuthenticator(contexts.Value, saslDelegation, diagnosticLog, digestRandomBytes)) { TracesStateMachine = tracesSmtp }),
             new LazyProtocolHandler(["ldap", "ldaps"], () => new LdapProtocolHandler(recordingConnector, LdapDialectFor(OperatingSystem.IsWindows()))),
             new LazyProtocolHandler(["ws", "wss"], () => new WsProtocolHandler(recordingConnector, httpAuthenticator.Value, webSocketRandomSource ?? new SystemWebSocketRandomSource()) { TracesFrames = tracesWs, RawMode = webSocketRawMode, PerformConnection = webSocketPerformConnection }),
             new LazyProtocolHandler(["rtsp"], () => new RtspProtocolHandler(recordingConnector, httpAuthenticator.Value, rtspInterleaveSink, rtspSettingsOf(), rtspSessionState)),

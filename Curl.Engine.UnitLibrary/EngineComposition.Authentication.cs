@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using System.Text;
 using Curl.Authentication;
 using Curl.Kerberos;
@@ -9,12 +10,15 @@ namespace Curl.Engine;
 
 internal static partial class EngineComposition
 {
+    /// <summary>The system's cryptographically random bytes, which Digest and DIGEST-MD5 draw their client nonce from in production.</summary>
+    private static readonly Func<int, byte[]> SystemRandomBytes = RandomNumberGenerator.GetBytes;
+
     /// <summary>
     /// Creates the HTTP authenticator: a <see cref="RankedHttpAuthenticator" /> that answers the
     /// scheme curl 8.21.0 picks among those <c>--basic</c>, <c>--digest</c>, <c>--ntlm</c>, <c>--negotiate</c> and <c>--anyauth</c>
     /// allow, with a <see cref="BasicAndBearerAuthenticator" /> for Basic, Bearer
     /// (<c>--oauth2-bearer</c>) and the first request, and a <see cref="DigestAuthenticator" />
-    /// drawing each client nonce from the matched build's <see cref="DigestClientNonce.ForBuild" />, both encoding
+    /// drawing each client nonce from the matched build's <see cref="DigestClientNonce.ForBuild(bool)" />, both encoding
     /// credentials in the platform's encoding (<see cref="CredentialEncoding.ForPlatform" />),
     /// and a <see cref="NegotiateHttpAuthenticator" /> and an <see cref="NtlmHttpAuthenticator" /> over <paramref name="securityContexts" />
     /// for <c>--negotiate</c> and <c>--ntlm</c> (ADR-0176, ADR-0181), a refused NTLM Type 2 message failing the transfer
@@ -25,14 +29,15 @@ internal static partial class EngineComposition
     /// <param name="negotiateOptions">The service names and delegation level; <see cref="NegotiateOptions.Default" /> when <see langword="null" />.</param>
     /// <returns>The authenticator.</returns>
     /// <param name="diagnosticLog">The run's diagnostic log, which the authenticators and security contexts write their choices to (BL-923); <see langword="null" /> for none.</param>
-    internal static RankedHttpAuthenticator CreateHttpAuthenticator(ISecurityContextFactory securityContexts, NegotiateOptions? negotiateOptions = null, IDiagnosticLog? diagnosticLog = null)
+    /// <param name="digestRandomBytes">Where Digest draws its client nonce's bytes from (ADR-0751, BL-2834); <see langword="null" /> for <see cref="RandomNumberGenerator" />.</param>
+    internal static RankedHttpAuthenticator CreateHttpAuthenticator(ISecurityContextFactory securityContexts, NegotiateOptions? negotiateOptions = null, IDiagnosticLog? diagnosticLog = null, Func<int, byte[]>? digestRandomBytes = null)
     {
         Encoding credentialEncoding = CredentialEncoding.ForPlatform(OperatingSystem.IsWindows());
         bool digestMatchesSspiBuild = MatchesSspiBuild(securityContexts);
 
         return new RankedHttpAuthenticator(
             new BasicAndBearerAuthenticator(credentialEncoding),
-            new DigestAuthenticator(credentialEncoding, DigestClientNonce.ForBuild(digestMatchesSspiBuild), diagnosticLog, matchesSspiBuild: digestMatchesSspiBuild),
+            new DigestAuthenticator(credentialEncoding, DigestClientNonce.ForBuild(digestMatchesSspiBuild, digestRandomBytes ?? SystemRandomBytes), diagnosticLog, matchesSspiBuild: digestMatchesSspiBuild),
             new NegotiateHttpAuthenticator(securityContexts, negotiateOptions, diagnosticLog: diagnosticLog),
             new NtlmHttpAuthenticator(securityContexts, matchesSspiBuild: OperatingSystem.IsWindows(), diagnosticLog),
             diagnosticLog);
@@ -132,6 +137,7 @@ internal static partial class EngineComposition
     /// <param name="gssapiDelegation">The <c>--delegation</c> level; <see cref="SecurityDelegation.None" /> when not given.</param>
     /// <returns>The authenticator.</returns>
     /// <param name="diagnosticLog">The run's diagnostic log, which the authenticators and security contexts write their choices to (BL-923); <see langword="null" /> for none.</param>
-    internal static ISaslAuthenticator CreateSaslAuthenticator(ISecurityContextFactory securityContexts, SecurityDelegation gssapiDelegation = SecurityDelegation.None, IDiagnosticLog? diagnosticLog = null) =>
-        new SaslAuthenticator(CredentialEncoding.ForPlatform(OperatingSystem.IsWindows()), securityContexts, diagnosticLog) { GssapiDelegation = gssapiDelegation };
+    /// <param name="digestRandomBytes">Where DIGEST-MD5 draws its client nonce's bytes from (ADR-0751, BL-2834); <see langword="null" /> for <see cref="RandomNumberGenerator" />. DIGEST-MD5 answers in curl's own form, not SSPI's, over the hand-built contexts, as for HTTP Digest.</param>
+    internal static ISaslAuthenticator CreateSaslAuthenticator(ISecurityContextFactory securityContexts, SecurityDelegation gssapiDelegation = SecurityDelegation.None, IDiagnosticLog? diagnosticLog = null, Func<int, byte[]>? digestRandomBytes = null) =>
+        new SaslAuthenticator(CredentialEncoding.ForPlatform(OperatingSystem.IsWindows()), DigestClientNonce.HexFrom(digestRandomBytes ?? SystemRandomBytes), MatchesSspiBuild(securityContexts), securityContexts, diagnosticLog) { GssapiDelegation = gssapiDelegation };
 }

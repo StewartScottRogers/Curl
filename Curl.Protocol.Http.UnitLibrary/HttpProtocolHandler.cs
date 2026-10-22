@@ -1052,6 +1052,21 @@ public sealed class HttpProtocolHandler(
     }
 
     /// <summary>
+    /// Gives the first request of a redirect hop the plan it goes out with on a pooled connection
+    /// that the transfer's earlier hop's NTLM handshake authenticated
+    /// (<see cref="HttpRequestOptions.AuthSchemePicked" /> NTLM): without the Type 1 message and
+    /// with the body a probe held back (<see cref="HttpRequestPlan.WithoutNtlmType1Probe" />), as
+    /// curl 8.22.0's <c>Curl_output_ntlm</c> sends nothing once the connection's NTLM state is past
+    /// Type 3 (upstream test1100, BL-3003); <paramref name="plan" /> itself otherwise. A new
+    /// connection, and the next transfer of an easy handle, start the handshake again with Type 1
+    /// (upstream test2025, test2028 and test2031).
+    /// </summary>
+    private static HttpRequestPlan OnNtlmAuthenticatedConnection(HttpRequestPlan plan, ConnectResult connect, TransferReport? earlier) =>
+        earlier is null && connect.IsReused && plan.Options.RedirectsFollowed > 0 && plan.Options.AuthSchemePicked == HttpAuthSchemes.Ntlm
+            ? plan.WithoutNtlmType1Probe()
+            : plan;
+
+    /// <summary>
     /// Hands an HTTP/2 session to its connection to hold (BL-817), and gives it back when the
     /// connection holds none, so the handler sends its closing GOAWAY itself; gives
     /// <see langword="null" /> for any other session, or none.
@@ -1101,7 +1116,8 @@ public sealed class HttpProtocolHandler(
         TransferReport? earlier,
         IHttpStreamSession? streams)
     {
-        HttpRequestPlan first = streams is null ? plan : plan.ForHttp2OrHttp3();
+        HttpRequestPlan unprobed = OnNtlmAuthenticatedConnection(plan, connect, earlier);
+        HttpRequestPlan first = streams is null ? unprobed : unprobed.ForHttp2OrHttp3();
         HttpAttemptOutcome outcome = await ExchangeAsync(first, connect, connection, earlier, newConnection: !connect.IsReused, streams).ConfigureAwait(false);
         Http2Session? upgradedSession = outcome.UpgradedSession;
         streams ??= upgradedSession;
@@ -3423,6 +3439,17 @@ public sealed class HttpProtocolHandler(
         /// <returns>The resent request's plan.</returns>
         public HttpRequestPlan WithProbedBody() =>
             With(ProbedFraming!, WithoutNtlmType1(Authorization), SentOnFreshConnection, RedirectsFollowed, AuthorizationAnswersChallenge, WithoutNtlmType1(ProxyAuthorization), ProxyAuthorizationAnswersChallenge, endsProbe: true);
+
+        /// <summary>
+        /// Makes the same request without the NTLM Type 1 <c>Authorization</c> value it carries,
+        /// with the body a probe held back for it, for a connection NTLM already authenticated
+        /// (BL-3003); this plan itself when its value is no Type 1.
+        /// </summary>
+        /// <returns>The request's plan on the authenticated connection.</returns>
+        public HttpRequestPlan WithoutNtlmType1Probe() =>
+            IsNtlmType1(Authorization)
+                ? With(ProbedFraming ?? Framing, authorization: null, SentOnFreshConnection, RedirectsFollowed, AuthorizationAnswersChallenge, ProxyAuthorization, ProxyAuthorizationAnswersChallenge, endsProbe: true)
+                : this;
 
         private static string? WithoutNtlmType1(string? value) => IsNtlmType1(value) ? null : value;
 
