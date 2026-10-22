@@ -7,8 +7,8 @@ status: accepted
 reason:
 key: process:logs:BL-2834:redone-work
 reproduction: none
-task: none
-tasks:
+task: BL-3082
+tasks: BL-3082
 found: 2026-10-22
 found-at: 167e765b2a009a4887fc971075283ef9d24a73a1
 scorecard: 2026-10-22_0130.md

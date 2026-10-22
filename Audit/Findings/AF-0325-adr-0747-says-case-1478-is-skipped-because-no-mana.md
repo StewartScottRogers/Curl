@@ -7,8 +7,8 @@ status: accepted
 reason:
 key: truthfulness:Documentation/Planning/Decisions/ADR-0747-upstream-case-1478-stays-off-the-ratchet.md:Case1478Skip:stale-adr
 reproduction: none
-task: none
-tasks:
+task: BL-3078
+tasks: BL-3078
 found: 2026-10-22
 found-at: 167e765b2a009a4887fc971075283ef9d24a73a1
 scorecard: 2026-10-22_0130.md

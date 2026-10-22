@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: process:logs:39362208615:ci-red
 reproduction: none
-task: BL-2946
-tasks: BL-2946
+task: BL-3066
+tasks: BL-2946, BL-3066
 found: 2026-10-19
 found-at: 1b3c70b1436b2d499099c5c6dd7bb119e11f5631
 scorecard: 2026-10-19_2134.md

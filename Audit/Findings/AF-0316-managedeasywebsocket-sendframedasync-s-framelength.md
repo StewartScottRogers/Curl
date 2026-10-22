@@ -7,8 +7,8 @@ status: accepted
 reason:
 key: quality:Curl.Engine.UnitLibrary/ManagedEasyWebSocket.cs:SendFramedAsync-ge:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/ManagedEasyWebSocket.cs:231:>=
-task: none
-tasks:
+task: BL-3069
+tasks: BL-3069
 found: 2026-10-22
 found-at: 167e765b2a009a4887fc971075283ef9d24a73a1
 scorecard: 2026-10-22_0130.md

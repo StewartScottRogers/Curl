@@ -7,8 +7,8 @@ status: accepted
 reason:
 key: quality:Curl.Engine.UnitLibrary/AltSvcTransferCache.cs:ApplyTo-true:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/AltSvcTransferCache.cs:144:true
-task: none
-tasks:
+task: BL-3067
+tasks: BL-3067
 found: 2026-10-22
 found-at: 167e765b2a009a4887fc971075283ef9d24a73a1
 scorecard: 2026-10-22_0130.md

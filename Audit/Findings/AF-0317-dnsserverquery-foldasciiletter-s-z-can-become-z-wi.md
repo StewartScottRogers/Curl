@@ -7,8 +7,8 @@ status: accepted
 reason:
 key: quality:Curl.Networking.UnitLibrary/DnsServerQuery.cs:FoldAsciiLetter-le:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/DnsServerQuery.cs:143:<=
-task: none
-tasks:
+task: BL-3070
+tasks: BL-3070
 found: 2026-10-22
 found-at: 167e765b2a009a4887fc971075283ef9d24a73a1
 scorecard: 2026-10-22_0130.md

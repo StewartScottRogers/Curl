@@ -7,8 +7,8 @@ status: accepted
 reason:
 key: quality:Curl.Networking.UnitLibrary/HttpProxyTunnel.cs:ReplyAfterLineEnd-eq:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/HttpProxyTunnel.cs:221:==
-task: none
-tasks:
+task: BL-3071
+tasks: BL-3071
 found: 2026-10-22
 found-at: 167e765b2a009a4887fc971075283ef9d24a73a1
 scorecard: 2026-10-22_0130.md
