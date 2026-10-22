@@ -3,8 +3,8 @@ id: AF-0301
 title: Glossary says unit programs live in Curl.Conformance.UnitProgram.UnitLibrary and UnitPrograms.Ported; neither exists
 auditor: truthfulness
 severity: High
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-22_1120.md: the reproduction no longer reproduces.
 key: truthfulness:Documentation/Wiki/Glossary.md:Unit-program:false-statement
 reproduction: none
 task: BL-2939
@@ -13,9 +13,9 @@ found: 2026-10-19
 found-at: 1b3c70b1436b2d499099c5c6dd7bb119e11f5631
 scorecard: 2026-10-19_2134.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-22
+closed-how: reliable-reaudit
+closed-by: 2026-10-22_1120.md
 ---
 # AF-0301 - Glossary says unit programs live in Curl.Conformance.UnitProgram.UnitLibrary and UnitPrograms.Ported; neither exists
 
@@ -45,8 +45,10 @@ IUnitProgram defined: False
 ## Re-audits
 
 - 2026-10-22 | 2026-10-22_0130.md | reproduces: no | Ran the reproduction: '33: glossary says it lives there', 'project exists: True', 'IUnitProgram defined: True'. Curl.Conformance.UnitProgram.UnitLibrary exists, and UnitPrograms.Ported is defined at Curl.Conformance.UnitProgram.UnitLibrary/UnitPrograms.cs:34, so the glossary's statement is now true.
+- 2026-10-22 | 2026-10-22_1120.md | reproduces: no | Ran the reproduction: the glossary (line 33) still says unit programs live in Curl.Conformance.UnitProgram.UnitLibrary, and that is now true: 'project exists: True', 'IUnitProgram defined: True', and UnitPrograms.Ported is defined in that project.
 
 ## Log
 
 - 2026-10-19: filed proposed.
 - 2026-10-21: proposed -> accepted.
+- 2026-10-22: accepted -> closed. Re-audit 2026-10-22_1120.md: the reproduction no longer reproduces.

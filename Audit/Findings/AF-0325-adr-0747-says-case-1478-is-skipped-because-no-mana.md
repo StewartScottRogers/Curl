@@ -3,8 +3,8 @@ id: AF-0325
 title: ADR-0747 says case 1478 is skipped because no managen interpretation is registered; one is now registered
 auditor: truthfulness
 severity: Low
-status: accepted
-reason:
+status: closed
+reason: Re-audit 2026-10-22_1120.md: the reproduction no longer reproduces.
 key: truthfulness:Documentation/Planning/Decisions/ADR-0747-upstream-case-1478-stays-off-the-ratchet.md:Case1478Skip:stale-adr
 reproduction: none
 task: BL-3078
@@ -13,9 +13,9 @@ found: 2026-10-22
 found-at: 167e765b2a009a4887fc971075283ef9d24a73a1
 scorecard: 2026-10-22_0130.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-22
+closed-how: reliable-reaudit
+closed-by: 2026-10-22_1120.md
 ---
 # AF-0325 - ADR-0747 says case 1478 is skipped because no managen interpretation is registered; one is now registered
 
@@ -42,7 +42,10 @@ Select-String -Path Documentation/Planning/Decisions/ADR-0747-*.md -Pattern 'no 
 
 ## Re-audits
 
+- 2026-10-22 | 2026-10-22_1120.md | reproduces: no | Ran the reproduction: ADR-0747 no longer matches 'no interpretation of'. Lines 28-31 now say the harness registers a managen script (UpstreamPerlCommandScripts.Managen.cs, [ModuleInitializer] Register at lines 7-9), so 1478 no longer skips for that reason and stays off the ratchet because it does not pass.
+
 ## Log
 
 - 2026-10-22: filed proposed.
 - 2026-10-22: proposed -> accepted.
+- 2026-10-22: accepted -> closed. Re-audit 2026-10-22_1120.md: the reproduction no longer reproduces.

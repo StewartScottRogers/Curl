@@ -3,8 +3,8 @@ id: AF-0324
 title: Curl.Console/CLAUDE.md says it is the only project without a .UnitLibrary suffix; Curl.Api, Curl.Config, Curl.Mcp and Libcurl also lack it
 auditor: truthfulness
 severity: Low
-status: accepted
-reason:
+status: closed
+reason: Re-audit 2026-10-22_1120.md: the reproduction no longer reproduces.
 key: truthfulness:Curl.Console/CLAUDE.md:OnlyProjectWithoutUnitLibrarySuffix:false-statement
 reproduction: none
 task: BL-3077
@@ -13,9 +13,9 @@ found: 2026-10-22
 found-at: 167e765b2a009a4887fc971075283ef9d24a73a1
 scorecard: 2026-10-22_0130.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-22
+closed-how: reliable-reaudit
+closed-by: 2026-10-22_1120.md
 ---
 # AF-0324 - Curl.Console/CLAUDE.md says it is the only project without a .UnitLibrary suffix; Curl.Api, Curl.Config, Curl.Mcp and Libcurl also lack it
 
@@ -42,7 +42,10 @@ Select-String -Path Curl.Console/CLAUDE.md -Pattern 'only project without'; Get-
 
 ## Re-audits
 
+- 2026-10-22 | 2026-10-22_1120.md | reproduces: no | Ran the reproduction: Curl.Console/CLAUDE.md no longer says 'only project without'. Lines 6-7 now say Curl.Api, Curl.Config, Curl.Mcp and Libcurl lack the suffix too, which matches the command's list.
+
 ## Log
 
 - 2026-10-22: filed proposed.
 - 2026-10-22: proposed -> accepted.
+- 2026-10-22: accepted -> closed. Re-audit 2026-10-22_1120.md: the reproduction no longer reproduces.

@@ -45,6 +45,7 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Confo
 - 2026-10-18 | 2026-10-18_1905.md | not re-audited | Ran the -Site command: outcome site-missing. Lib582Run.cs now has CompletionOutcome with bool? success = null (line 159); no 'success = false' site remains in the member.
 - 2026-10-19 | 2026-10-19_2134.md | not re-audited | Ran the -Site command: outcome site-missing (resolvedLine null). Lib582Run's completion check is now CompletionOutcome/RunUntilCompleteAsync (bool? success), with no CheckForCompletion member and no success = false site, so the mutant could not be run. Not re-audited.
 - 2026-10-22 | 2026-10-22_0130.md | not re-audited | Ran the -Site reproduction: outcome site-missing (no mutant ran). Lib582Run.CheckForCompletion and its 'success = false' are gone. The port now uses CompletionOutcome, which returns a bool? that starts as null (Lib582Run.cs:158-170, its comment citing AF-0257). Not re-audited.
+- 2026-10-22 | 2026-10-22_1120.md | not re-audited | Ran the reproduction: outcome site-missing, no mutant ran. Lib582Run.CheckForCompletion now starts 'bool? success = null' (line 159), with no 'false' site left in the member. Not re-audited.
 
 ## Log
 

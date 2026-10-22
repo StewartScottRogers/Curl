@@ -3,8 +3,8 @@ id: AF-0308
 title: CI red since run 39362208615 (test307, test1587 on Linux and macOS) and still red at log copy; fix tasks sat 43 min unclaimed because the weekly window was used up
 auditor: process
 severity: Low
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-22_1120.md: the reproduction no longer reproduces.
 key: process:logs:39362208615:ci-red
 reproduction: none
 task: BL-3066
@@ -13,9 +13,9 @@ found: 2026-10-19
 found-at: 1b3c70b1436b2d499099c5c6dd7bb119e11f5631
 scorecard: 2026-10-19_2134.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-22
+closed-how: reliable-reaudit
+closed-by: 2026-10-22_1120.md
 ---
 # AF-0308 - CI red since run 39362208615 (test307, test1587 on Linux and macOS) and still red at log copy; fix tasks sat 43 min unclaimed because the weekly window was used up
 
@@ -44,8 +44,10 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 - 2026-10-22 | 2026-10-22_0130.md | reproduces: yes | still reported
 - 2026-10-22 | 2026-10-22_0130.md | reproduces: yes | The original reproduction gave 49 min, stillRed=true at that log copy. In this window the same spell 39362208615 runs to 2034.67 min, ending 2026-10-21T13:23:52Z. About 32 h of that was with no shift running: DarkFactory-20261019-215417.log 21:54:28 'weekly tokens 97% used; this shift starts when they reset, Wednesday 21 Oct 06:00'. There were no CI runs between 2026-10-20T06:56Z and 2026-10-21T13:09Z. The cause crossed the rule inside this window. Since BL-2946 (ADR-0744, Done 2026-10-21 14:15), the later spells 39691487971 and 39718635967 were not held by a usage stop.
+- 2026-10-22 | 2026-10-22_1120.md | reproduces: no | Historical spell from run 39362208615 is still 49 min, stillRed. In this window there are no red spells and ciRedMinutes = 0, and no fix task waited on a used-up weekly window.
 
 ## Log
 
 - 2026-10-19: filed proposed.
 - 2026-10-21: proposed -> accepted.
+- 2026-10-22: accepted -> closed. Re-audit 2026-10-22_1120.md: the reproduction no longer reproduces.

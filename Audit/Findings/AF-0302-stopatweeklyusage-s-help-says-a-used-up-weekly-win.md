@@ -3,8 +3,8 @@ id: AF-0302
 title: -StopAtWeeklyUsage's help says a used-up weekly window raises the alarm; the shift waits it out with a notice
 auditor: truthfulness
 severity: Low
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-22_1120.md: the reproduction no longer reproduces.
 key: truthfulness:RunDarkFactory.ps1:StopAtWeeklyUsage:false-help
 reproduction: none
 task: BL-2940
@@ -13,9 +13,9 @@ found: 2026-10-19
 found-at: 1b3c70b1436b2d499099c5c6dd7bb119e11f5631
 scorecard: 2026-10-19_2134.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-22
+closed-how: reliable-reaudit
+closed-by: 2026-10-22_1120.md
 ---
 # AF-0302 - -StopAtWeeklyUsage's help says a used-up weekly window raises the alarm; the shift waits it out with a notice
 
@@ -47,8 +47,10 @@ return ''
 ## Re-audits
 
 - 2026-10-22 | 2026-10-22_0130.md | not re-audited | overlaps planted defect PD-403 in RunDarkFactory.ps1, so the auditor's verdict (reproduces no) is set aside: Ran the reproduction. Select-String found no 'used-up weekly window raises the alarm' in RunDarkFactory.ps1, so the .Line.Trim() call failed on null. The help now says (RunDarkFactory.ps1:150-151) 'a used-up weekly window is waited out the same way, with a notice rather than the alarm', and the parameter comment (lines 525-526) says the same. Wait-ForFreshSession has moved to DarkFactory/OutOfTokens.ps1:180. It waits for the weekly reset via Wait-ForNewSession -UsageOnly with a trace notice and returns '', with no alarm, which matches the help.
+- 2026-10-22 | 2026-10-22_1120.md | reproduces: no | Ran the reproduction: 'used-up weekly window raises the alarm' no longer appears in RunDarkFactory.ps1 (the Select-String returned null). The help (line 150-151) now says 'a used-up weekly window is waited out the same way, with a notice rather than the alarm'. Wait-ForFreshSession has moved to DarkFactory/OutOfTokens.ps1:180.
 
 ## Log
 
 - 2026-10-19: filed proposed.
 - 2026-10-21: proposed -> accepted.
+- 2026-10-22: accepted -> closed. Re-audit 2026-10-22_1120.md: the reproduction no longer reproduces.

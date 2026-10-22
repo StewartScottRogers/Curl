@@ -3,8 +3,8 @@ id: AF-0331
 title: CI red 46.0 min from run 39718635967 (Windows quality gate after BL-3022). Its fix task BL-3026 was filed with empty touches, so no lane would claim it, and lane 1 idled about 230 min on it
 auditor: process
 severity: Low
-status: accepted
-reason:
+status: closed
+reason: Re-audit 2026-10-22_1120.md: the reproduction no longer reproduces.
 key: process:logs:39718635967:ci-red
 reproduction: none
 task: BL-3084
@@ -13,9 +13,9 @@ found: 2026-10-22
 found-at: 167e765b2a009a4887fc971075283ef9d24a73a1
 scorecard: 2026-10-22_0130.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-22
+closed-how: reliable-reaudit
+closed-by: 2026-10-22_1120.md
 ---
 # AF-0331 - CI red 46.0 min from run 39718635967 (Windows quality gate after BL-3022). Its fix task BL-3026 was filed with empty touches, so no lane would claim it, and lane 1 idled about 230 min on it
 
@@ -42,7 +42,10 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-10-22 | 2026-10-22_1120.md | reproduces: no | Historical spell from run 39718635967 is still 46.02 min (ended 04:58:27Z, before the window); the old log still has 203 BL-3026 lines. In this window, ciRedMinutes = 0. The incident's idle tail still shows: DarkFactory-20261021-203534-L1.log has 77 'only unready tasks are ready (BL-3026)' waits from 00:00:58 to 01:29:25 local, counted in waitOtherMinutes 77. BL-3026 now has touches and is Done (CI 39723672567 green), and BL-3028 changed the CI watch to file real touches, so no new empty-touches fix task appears.
+
 ## Log
 
 - 2026-10-22: filed proposed.
 - 2026-10-22: proposed -> accepted.
+- 2026-10-22: accepted -> closed. Re-audit 2026-10-22_1120.md: the reproduction no longer reproduces.
