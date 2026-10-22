@@ -39,3 +39,4 @@ For example, `Process.Start` can fail because `claude` is not on PATH, or a git 
 ## Log
 
 - 2026-10-22: Created.
+- 2026-10-22: Backlog -> Doing. Criteria at claim: 88e1eeeb f131c006 74336906.
