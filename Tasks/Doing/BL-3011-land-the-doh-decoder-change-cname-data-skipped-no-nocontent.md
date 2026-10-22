@@ -42,3 +42,4 @@ What is left, all in this task:
 - 2026-10-21: Created.
 - 2026-10-21: Backlog -> Doing. Criteria at claim: cb9752a7 96fe7f29 785e37e5 8b4aeea1.
 - 2026-10-21: Doing -> Backlog. Lane 1 could not integrate: push kept being refused. The work is on branch factory/BL-3011-lane-1-20261021-203534; start with git cherry-pick --no-commit factory/BL-3011-lane-1-20261021-203534 and fix it.
+- 2026-10-22: Backlog -> Doing. Criteria at claim: cb9752a7 96fe7f29 785e37e5 8b4aeea1.
