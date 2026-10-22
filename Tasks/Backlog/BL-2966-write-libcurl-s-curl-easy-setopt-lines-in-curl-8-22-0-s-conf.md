@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: [BL-2965]
-touches: [Curl.Cli.UnitLibrary/LibcurlSourceCode.cs, Curl.Cli.UnitLibrary/LibcurlSourceCode.ProtocolOptions.cs, Curl.Cli.UnitLibrary/LibcurlSourceCode.ProxyTlsAndAuthentication.cs, Curl.Cli.UnitLibrary/LibcurlSourceCode.TransferOptions.cs, Curl.Cli.UnitLibrary/LibcurlSourceCode.TransferFiles.cs, Curl.Cli.UnitTests/LibcurlSourceCodeTests.cs, Curl.Cli.UnitTests/LibcurlSourceCodeOptionTests.cs, Curl.Cli.UnitTests/LibcurlSourceCodeProxyTlsAndAuthenticationTests.cs, Curl.Cli.UnitTests/LibcurlSourceCodeTransferFileTests.cs, Curl.Cli.UnitTests/LibcurlSourceCodeTransferOptionTests.cs, Curl.Cli.UnitTests/LibcurlSourceCodeProtocolOptionTests.cs, Curl.Cli.UnitTests/LibcurlSourceCodeOptionCoverageTests.cs, Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
+touches: [Curl.Cli.UnitLibrary/LibcurlSourceCode.cs, Curl.Cli.UnitLibrary/LibcurlSourceCode.ProtocolOptions.cs, Curl.Cli.UnitLibrary/LibcurlSourceCode.ProxyTlsAndAuthentication.cs, Curl.Cli.UnitLibrary/LibcurlSourceCode.TransferOptions.cs, Curl.Cli.UnitLibrary/LibcurlSourceCode.TransferFiles.cs, Curl.Cli.UnitTests/LibcurlSourceCodeTests.cs, Curl.Cli.UnitTests/LibcurlSourceCodeOptionTests.cs, Curl.Cli.UnitTests/LibcurlSourceCodeProxyTlsAndAuthenticationTests.cs, Curl.Cli.UnitTests/LibcurlSourceCodeTransferFileTests.cs, Curl.Cli.UnitTests/LibcurlSourceCodeTransferOptionTests.cs, Curl.Cli.UnitTests/LibcurlSourceCodeProtocolOptionTests.cs, Curl.Cli.UnitTests/LibcurlSourceCodeOptionCoverageTests.cs, Curl.Conformance.UnitTests/PassingUpstreamCases.txt, Curl.Console.UnitTests/CurlCommandRunnerLibcurlTests.cs]
 requirement: none
 created: 2026-10-21
 completed:
@@ -36,7 +36,10 @@ The other nine `--libcurl` cases (1400 to 1404, 1406, 1420, 1465, 1481) already 
 
 - BL-2965 measured with the vendored files: 1402, 1404, 1406 and 1465 also fail on order, CURLOPT_USERAGENT written after POSTFIELDS, the mime parts or CURLOPT_UPLOAD instead of in credentials_and_headers_setopts. Moving the whole generator to 8.22.0 order should fix them too; add each that then passes to PassingUpstreamCases.txt. Only 1400, 1401, 1403, 1420 and 1481 are listed so far.
 
+- 2026-10-21 (lane 8, BL-2966 run 1): generator moved to 8.22.0 order (measured with real curl 8.22.0: proxy, credentials_and_headers, transfer, http/ftp, ssh, tls, dns_and_network, mail_and_sasl, misc; misc writes GSSAPI_DELEGATION, MAIL_AUTH, SASL_AUTHZID, SASL_IR a second time). Cases 1400-1407, 1420, 1465, 1481 all pass; 1402, 1404-1407 and 1465 added to the ratchet. Curl.Cli.UnitTests updated (94 order expectations, 5 renames) and the focused test added in LibcurlSourceCodeProtocolOptionTests.cs; all pass. Left: Curl.Console.UnitTests CurlCommandRunnerLibcurlTests.RunAsync_LibcurlWithAnUploadFile_WritesItsUrlUploadAndSize pins the old order (added to touches; no Doing task names it), then the fast suite and Measure-CodeQuality.ps1 -Library Curl.Cli.UnitLibrary. The run ran out of its cost cap; the code is in the shift stash.
+
 ## Log
 
 - 2026-10-21: Created.
 - 2026-10-21: Backlog -> Doing. Criteria at claim: 0b924be1 61dab663 782ca8e4 7eaf8a6e.
+- 2026-10-21: Doing -> Backlog. Run hit its cost cap: generator reordered and Cli tests pass (stashed); left one Curl.Console.UnitTests order expectation, the fast suite and the quality run
