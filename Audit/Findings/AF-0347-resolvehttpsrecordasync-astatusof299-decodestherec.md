@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: quality:Curl.Networking.UnitTests/DohDnsResolverHttpsRecordTraceTests.cs:ResolveHttpsRecordAsync_AStatusOf299_DecodesTheRecord:weak-assertion
 reproduction: none
-task: none
-tasks:
+task: BL-3127
+tasks: BL-3127
 found: 2026-10-22
 found-at: 608a755586679cf34031a0e5b137f01b9d7fb329
 scorecard: 2026-10-22_1120.md

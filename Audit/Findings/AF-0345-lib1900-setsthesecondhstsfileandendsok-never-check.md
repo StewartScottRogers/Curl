@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: quality:Curl.Conformance.LibTest.UnitTests/Lib1649To1906Tests.cs:Lib1900_SetsTheSecondHstsFileAndEndsOk:name-lies
 reproduction: none
-task: none
-tasks:
+task: BL-3125
+tasks: BL-3125
 found: 2026-10-22
 found-at: 608a755586679cf34031a0e5b137f01b9d7fb329
 scorecard: 2026-10-22_1120.md

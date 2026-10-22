@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: truthfulness:.claude/skills/task-board/task-board.ps1:next:false-help
 reproduction: none
-task: none
-tasks:
+task: BL-3131
+tasks: BL-3131
 found: 2026-10-22
 found-at: 608a755586679cf34031a0e5b137f01b9d7fb329
 scorecard: 2026-10-22_1120.md
