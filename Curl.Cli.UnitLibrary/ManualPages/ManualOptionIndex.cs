@@ -29,31 +29,45 @@ public sealed class ManualOptionIndex
     public void Add(ManualPageContext context, string file)
     {
         string name = Regex.Replace(file, "^.*/", "", RegexOptions.CultureInvariant);
-        string? shortName = null;
-        string? longName = null;
-        string? help = null;
+        HeaderFields fields = new();
         int line = 0;
         bool start = false;
         foreach (string text in context.ReadLines(context.PathOf(name), $"could not find {context.PathOf(name)}"))
         {
             line++;
-            if (!start || text.StartsWith("---", StringComparison.Ordinal))
+            if (!start)
             {
-                if (start)
-                {
-                    break;
-                }
-
-                start = text.StartsWith("---", StringComparison.Ordinal);
+                start = IsHeaderMarker(text);
                 continue;
             }
 
-            shortName = Field(text, "^Short: (.)") ?? shortName;
-            longName = Field(text, "^Long: (.*)") ?? longName;
-            help = Help(context, name, line, text) ?? help;
+            if (IsHeaderMarker(text))
+            {
+                break;
+            }
+
+            ReadHeaderLine(context, name, line, text, fields);
         }
 
-        Record(shortName, longName, help);
+        Record(fields.ShortName, fields.LongName, fields.Help);
+    }
+
+    private static bool IsHeaderMarker(string text) => text.StartsWith("---", StringComparison.Ordinal);
+
+    private static void ReadHeaderLine(ManualPageContext context, string name, int line, string text, HeaderFields fields)
+    {
+        fields.ShortName = Field(text, "^Short: (.)") ?? fields.ShortName;
+        fields.LongName = Field(text, "^Long: (.*)") ?? fields.LongName;
+        fields.Help = Help(context, name, line, text) ?? fields.Help;
+    }
+
+    private sealed class HeaderFields
+    {
+        public string? ShortName { get; set; }
+
+        public string? LongName { get; set; }
+
+        public string? Help { get; set; }
     }
 
     private void Record(string? shortName, string? longName, string? help)

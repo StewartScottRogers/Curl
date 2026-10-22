@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Cli.UnitLibrary/ManualPages/ManualOptionIndex.cs, Curl.Cli.UnitTests/ManualPages/ManualOptionIndexTests.cs]
 requirement: none
 created: 2026-10-21
-completed:
+completed: 2026-10-21
 ---
 # BL-3025 — Bring ManualOptionIndex.Add inside the complexity gate
 
@@ -22,8 +22,8 @@ Found by BL-3019: `Measure-CodeQuality.ps1 -Library Curl.Cli.UnitLibrary` report
 
 ## Acceptance criteria
 
-- [ ] Measure-CodeQuality reports no uncovered line or branch, complexity above 10 or CRAP above 30 in `ManualOptionIndex`.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` passes for `Curl.Cli.UnitTests`.
+- [x] Measure-CodeQuality reports no uncovered line or branch, complexity above 10 or CRAP above 30 in `ManualOptionIndex`.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` passes for `Curl.Cli.UnitTests`.
 
 ## Notes
 
@@ -31,3 +31,4 @@ Found by BL-3019: `Measure-CodeQuality.ps1 -Library Curl.Cli.UnitLibrary` report
 
 - 2026-10-21: Created.
 - 2026-10-21: Backlog -> Doing. Criteria at claim: 408a2668 48b212cd.
+- 2026-10-21: Doing -> Done. ManualOptionIndex.Add split into IsHeaderMarker and ReadHeaderLine, inside the gates
