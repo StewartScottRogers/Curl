@@ -44,3 +44,4 @@ The drop's exit code is also ignored. A drop that fails without a trace brings b
 ## Log
 
 - 2026-10-22: Created.
+- 2026-10-22: Backlog -> Doing. Criteria at claim: e7b7d54c 51bae7b1 3243c4f5 95ad9451.
