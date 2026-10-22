@@ -31,3 +31,4 @@ Split from BL-2847. Needs BL-3095 done first.
 ## Log
 
 - 2026-10-22: Created.
+- 2026-10-22: Backlog -> Doing. Criteria at claim: 4f71693d.
