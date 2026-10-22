@@ -8,7 +8,7 @@ depends-on: []
 touches: [DarkFactory/TaskStash.ps1]
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-22
 ---
 # BL-3102 — Make Invoke-TaskSplit's git failure path reset only its own commit and abort a failed rebase
 
@@ -34,14 +34,17 @@ A failed commit causes the same problem, for example when `index.lock` is held o
 
 ## Acceptance criteria
 
-- [ ] `Invoke-TaskSplit` records HEAD before its split commit. The failure path resets to that recorded hash, and only when the commit succeeded. It never resets to `HEAD~1`.
-- [ ] A failed `pull --rebase` is followed by `git rebase --abort` before the failure path runs.
-- [ ] `-TestTaskStash` covers a failed commit and a conflicting pull, using a stubbed `-Git`, and checks which git commands are issued, with no reset to `HEAD~1`. These cases fail on the current code.
-- [ ] `RunDarkFactory.ps1 -TestTaskStash` passes.
+- [x] `Invoke-TaskSplit` records HEAD before its split commit. The failure path resets to that recorded hash, and only when the commit succeeded. It never resets to `HEAD~1`.
+- [x] A failed `pull --rebase` is followed by `git rebase --abort` before the failure path runs.
+- [x] `-TestTaskStash` covers a failed commit and a conflicting pull, using a stubbed `-Git`, and checks which git commands are issued, with no reset to `HEAD~1`. These cases fail on the current code.
+- [x] `RunDarkFactory.ps1 -TestTaskStash` passes.
 
 ## Notes
+
+- Added a `-HeadSha` scriptblock (default `git rev-parse HEAD`) because `-Git` returns only success. A failed commit is now blocked as "the commit of the split failed" (it used to count as split) and nothing is reset.
 
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: 0bf8c043 c341d42b 8e6335df 95ad9451.
+- 2026-10-22: Doing -> Done. Invoke-TaskSplit resets only to its recorded hash, aborts a failed rebase; tests cover both

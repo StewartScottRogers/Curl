@@ -165,6 +165,7 @@ function Invoke-TaskSplit {
         [scriptblock]$TaskState = { param($SplitId) Get-TaskState $SplitId },
         [scriptblock]$EnterLock = { Enter-Lock },
         [scriptblock]$Git = { param([string[]]$GitArgs) Invoke-Git $GitArgs },
+        [scriptblock]$HeadSha = { "$(& git -C $Root rev-parse HEAD 2>$null)".Trim() },
         [scriptblock]$Board = { param([string[]]$BoardArgs) Invoke-Board $BoardArgs },
         [switch]$PullOnRefusal)
     if (-not (Register-TaskSplitAttempt $Id $Now $MarkerDir)) { return 'skipped' }
@@ -186,15 +187,20 @@ function Invoke-TaskSplit {
             # The shift stores the stash once per new task that says it continues the work.
             if ($sha) { foreach ($newId in $new) { if (& $ContinuesStash $newId $Id) { $stored += @(& $StoreStash $newId $sha $Now.ToString('yyyyMMdd-HHmmss')) } } }
             & $Git @('add', '-A', 'Tasks') | Out-Null
-            & $Git @('commit', '-q', '-m', "chore(tasks): split $Id into $($new -join ', ') - over its cost cap", '-m', $SkipCiNote) | Out-Null
-            $pushed = & $Git @('push', '-q', 'origin', "HEAD:$Branch")
+            $headBefore = & $HeadSha
+            $committed = & $Git @('commit', '-q', '-m', "chore(tasks): split $Id into $($new -join ', ') - over its cost cap", '-m', $SkipCiNote)
+            $pushed = $committed -and (& $Git @('push', '-q', 'origin', "HEAD:$Branch"))
             # A claim synced this checkout to the shared branch, so it may take what other lanes
             # pushed since; after a run the lane may hold commits of its own, which only the
             # shift's integration may push, so there the split commit is left for it.
-            if (-not $pushed -and $PullOnRefusal -and (& $Git @('pull', '-q', '--rebase', 'origin', $Branch))) { $pushed = & $Git @('push', '-q', 'origin', "HEAD:$Branch") }
-            if ($pushed -or -not $PullOnRefusal) { Write-Trace $Id 'split' "split into $($new -join ', ')$(if (-not $pushed) { '; left for the shift to integrate' })" 'Cyan'; return 'split' }
-            $failure = 'the push of the split was refused'
-            & $Git @('reset', '-q', '--hard', 'HEAD~1') | Out-Null
+            if ($committed -and -not $pushed -and $PullOnRefusal) {
+                if (& $Git @('pull', '-q', '--rebase', 'origin', $Branch)) { $pushed = & $Git @('push', '-q', 'origin', "HEAD:$Branch") }
+                else { & $Git @('rebase', '--abort') | Out-Null }
+            }
+            if ($committed -and ($pushed -or -not $PullOnRefusal)) { Write-Trace $Id 'split' "split into $($new -join ', ')$(if (-not $pushed) { '; left for the shift to integrate' })" 'Cyan'; return 'split' }
+            $failure = if ($committed) { 'the push of the split was refused' } else { 'the commit of the split failed' }
+            # Only the split's own commit is removed, by the hash HEAD had before it; never HEAD~1.
+            if ($committed -and $headBefore) { & $Git @('reset', '-q', '--hard', $headBefore) | Out-Null }
         }
         # A failed split leaves nothing of its own behind: the board goes back to how it
         # was and the task is blocked as before the split existed, with the stashes it stored dropped.
@@ -290,6 +296,17 @@ if ($TestTaskStash) {
         $script:splitPushes = $false
         & $check 'a claim''s refused push is blocked after a pull' 'blocked True' "$(& $split '2026-10-28' $okRun -Pull) $(($script:splitSteps -join ' ') -match 'push pull push reset drop copy-BL-2 checkout clean board Blocked: .*push of the split was refused')"
         & $check 'after a run a refused push is left to integration' 'split 0' "$(& $split '2026-10-29' $okRun) $(@($script:splitSteps | Where-Object { $_ -like 'board*' }).Count)"
+        # A failed commit or a conflicting pull resets only the split's own commit and aborts the rebase (BL-3102).
+        $script:splitCmds = [System.Collections.Generic.List[string]]::new()
+        $script:failGit = ''
+        $cmdStub = { param([string[]]$GitArgs) $script:splitCmds.Add($GitArgs -join ' '); $GitArgs[0] -ne $script:failGit -and $GitArgs[0] -ne 'push' }
+        $cmdSplit = { param($Day, $Fail)
+            $script:splitCmds.Clear(); $script:splitIds = @('BL-1'); $script:failGit = $Fail
+            Invoke-TaskSplit 'BL-1' 'cost cap' -Now ([datetime]$Day) -MarkerDir $markers -RunSplit $okRun -ListTaskIds { $script:splitIds } `
+                -StashSha { '' } -TaskState { 'Deferred' } -EnterLock $lockStub -Git $cmdStub -HeadSha { 'cafe01' } -Board $boardStub -PullOnRefusal }
+        & $check 'a failed commit is blocked without any reset' 'blocked False False' "$(& $cmdSplit '2026-11-10' 'commit') $(($script:splitCmds -join '|') -match 'reset') $(($script:splitCmds -join '|') -match 'HEAD~1')"
+        & $check 'a failed commit never pulls or pushes the split' 'False' "$(($script:splitCmds -join '|') -match '^pull|\|pull|push.*push')"
+        & $check 'a conflicting pull aborts the rebase before the reset to the recorded hash' 'blocked True False' "$(& $cmdSplit '2026-11-11' 'pull') $(($script:splitCmds -join '|') -match 'pull[^|]*\|rebase --abort\|reset -q --hard cafe01') $(($script:splitCmds -join '|') -match 'HEAD~1')"
         & $check 'Claim.ps1 and ShiftRunner.ps1 call Invoke-TaskSplit' 'True' "$((Get-Content (Join-Path $PSScriptRoot 'Claim.ps1') -Raw) -match 'Invoke-TaskSplit \$due' -and (Get-Content (Join-Path $PSScriptRoot 'ShiftRunner.ps1') -Raw) -match 'Invoke-TaskSplit \$id')"
         # Real git: one stash for several tasks (BL-3095).
         git -C $repo reset -q --hard HEAD 2>&1 | Out-Null; git -C $repo clean -fdq 2>&1 | Out-Null; git -C $repo stash clear
