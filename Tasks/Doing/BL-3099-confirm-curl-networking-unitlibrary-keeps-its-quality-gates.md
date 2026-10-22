@@ -32,3 +32,4 @@ Gate half of BL-2969, run after BL-3097 and BL-3098. BL-3013 already measured th
 ## Log
 
 - 2026-10-22: Created.
+- 2026-10-22: Backlog -> Doing. Criteria at claim: c5f8cef6 990cf5be.
