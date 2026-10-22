@@ -9,7 +9,7 @@ touches: [Curl.Api/README.md, Curl.Api.UnitTests/Readme]
 model: sonnet
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-22
 ---
 # BL-3054 — Review the Curl.Api README against the code
 
@@ -23,14 +23,17 @@ Stewart, 2026-10-22: "Fully document and comment all code in each Host." The com
 
 ## Acceptance criteria
 
-- [ ] The README exists in the project folder and states what the project is, how it is used (a short example that compiles or is a command that runs), its folder or type map, and its quality gates and relationship to its sibling projects.
-- [ ] Every type, member, option, file and command the README names exists in the code as it is now.
-- [ ] If a test reads or checks the README, it still passes; any code sample in it is exercised by that test where the project already does so.
-- [ ] No source file other than the README changes, and `dotnet build` of the project is clean with warnings as errors and the fast tests of Curl.Api.UnitTests pass (`dotnet test Curl.Api.UnitTests --filter "TestCategory!=Integration"`).
+- [x] The README exists in the project folder and states what the project is, how it is used (a short example that compiles or is a command that runs), its folder or type map, and its quality gates and relationship to its sibling projects.
+- [x] Every type, member, option, file and command the README names exists in the code as it is now.
+- [x] If a test reads or checks the README, it still passes; any code sample in it is exercised by that test where the project already does so.
+- [x] No source file other than the README changes, and `dotnet build` of the project is clean with warnings as errors and the fast tests of Curl.Api.UnitTests pass (`dotnet test Curl.Api.UnitTests --filter "TestCategory!=Integration"`).
 
 ## Notes
+
+- Reviewed every claim against the code (types, members, folders); the existing text was true. Added the missing folder map and quality gates and siblings sections. README tests pass (898 passed, 2 skipped on other OSes).
 
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: cdc198fa fc2f372c 0e267b12 e9da25d9.
+- 2026-10-22: Doing -> Done. Curl.Api README reviewed against the code; folder map, quality gates and siblings added

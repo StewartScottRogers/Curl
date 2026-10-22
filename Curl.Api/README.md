@@ -274,3 +274,32 @@ format. Give clients one `CurlStores` through `CurlClientOptions.Stores` to shar
 | `CurlAltSvcEntry` | One alt-svc cache line. |
 | `CurlNetworkOptions`, `CurlTlsOptions`, `CurlTlsPeerOptions`, `CurlProxyOptions` | The transport option groups. |
 | `CurlHttpOptions`, `CurlAuthenticationOptions`, `CurlFtpOptions`, `CurlSshOptions`, `CurlMailOptions`, `CurlTftpOptions`, `CurlTelnetOptions`, `CurlRtspOptions` | The protocol option groups. |
+
+## Folder map
+
+Every folder of `Curl.Api` is one concern; the namespace is `Curl.Api` (`Curl.Api.Errors` for
+`Errors/`).
+
+| Folder | Holds |
+| --- | --- |
+| `Client/`, `Composition/` | `CurlClient` and `CurlClientOptions`; the half of `CurlClient` that builds its engine (`Create`). |
+| `Messages/` | `CurlRequest`, `CurlResponse` and the `SendAsync` half of `CurlClient`. |
+| `RequestBodies/`, `Mime/` | `CurlContent` and its bytes and stream bodies; `CurlMultipartContent` and `CurlMimePart`. |
+| `ResponseBodies/` | The streamed, async-only `CurlResponse.Body`. |
+| `Options/` | The transport and protocol option groups and their guards. |
+| `Cancellation/`, `Progress/` | Cancelling a transfer by token; `CurlTransferProgress` reporting. |
+| `Concurrency/` | The shared multi handle behind every `SendAsync`, and the connection limits. |
+| `Stores/` | `CurlStores` and the cookie, HSTS and Alt-Svc stores. |
+| `WebSockets/` | `CurlWebSocket` and its messages. |
+| `HttpMessageHandler/` | `CurlHttpMessageHandler` (`Core/`, `Versions/`, `Proxy/`, `Behaviour/`). |
+| `Errors/` | `CurlException` and `CurlCodeText`. |
+
+## Quality gates and sibling projects
+
+`Curl.Api` is held to the solution's gates: 100% line and branch coverage from the fast tests,
+cyclomatic complexity at most 10 per method and a CRAP score at most 30. Its tests are
+`Curl.Api.UnitTests`, which also test `Curl.Api.UnitLibrary`: run
+`dotnet test Curl.Api.UnitTests --filter "TestCategory!=Integration"`. `Curl.Api` references
+`Curl.Api.UnitLibrary` (the engine contracts, callbacks, codes, info and option records that carry
+no I/O) and `Curl.Engine.UnitLibrary` (the engine it sends through); `Curl.Api` is not itself a
+`Curl.<Area>.UnitLibrary`, but a naming exception like `Curl.Console` and `Libcurl`.
