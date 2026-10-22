@@ -3,8 +3,8 @@ id: AF-0323
 title: CLAUDE.md's layout says 93 projects; the root holds 98 C# projects (103 in Curl.slnx with the shared projects)
 auditor: truthfulness
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: truthfulness:CLAUDE.md:ProjectCount:false-statement
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path CLAUDE.md -Pattern '\d+ projects, one flat'; (Get-ChildItem 
 ## Log
 
 - 2026-10-22: filed proposed.
+- 2026-10-22: proposed -> accepted.
