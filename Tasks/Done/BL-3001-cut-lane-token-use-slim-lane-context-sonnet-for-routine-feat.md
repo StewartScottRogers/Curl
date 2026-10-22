@@ -9,7 +9,7 @@ touches: [DarkFactory/TaskRun.ps1, DarkFactory/LaneRules.md, DarkFactory/ModelCh
 lane: no
 requirement: none
 created: 2026-10-21
-completed:
+completed: 2026-10-21
 ---
 # BL-3001 — Cut lane token use: slim lane context, Sonnet for routine features, pre-claim check, exploration limits, turn cap, count killed runs' cost
 
@@ -54,3 +54,4 @@ per-task cost cap undercounts them.
 
 - 2026-10-21: Created.
 - 2026-10-21: Backlog -> Doing. Interactive session; Stewart approved 2026-10-21. Criteria at claim: ee41eb31 cf7c206e 010da289 e39c15bf 9cf48b79 ebe252a9 ed488d39.
+- 2026-10-21: Doing -> Done. Lane runs load a slim context (51K -> 29K tokens at the first call), routine features run on Sonnet, an 80-turn cap, a pre-claim check, tighter exploration rules and killed runs priced from usage; ADR-0753; 22 self-tests 374/374.
