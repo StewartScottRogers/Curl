@@ -42,6 +42,8 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-10-22 | 2026-10-22_0130.md | reproduces: yes | The original reproduction still lists BL-2787 at 4.8482 as the top cost. By mechanism, this window has 5 tasks over 3 times the median cost of $1.8006: BL-2845 7.4985, BL-2938 5.7798, BL-2970 5.602, BL-2924 5.5624, BL-2859 5.4413. BL-2924's single 83-turn run cost $5.06, the same single-long-run cause as BL-2787.
+
 ## Log
 
 - 2026-10-19: filed proposed.

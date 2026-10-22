@@ -42,6 +42,8 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-10-22 | 2026-10-22_0130.md | reproduces: yes | The original reproduction still gives BL-2724 claims=1, costUsd=4.4497. The same cause, one long run, recurs in this window: BL-2924 had one 83-turn run (BL-2924-20261021-064209-L4.jsonl, $5.06, 10.9M cache-read tokens) plus a $0.51 resolve, $5.56 in total, 3.1 times the median.
+
 ## Log
 
 - 2026-10-19: filed proposed.

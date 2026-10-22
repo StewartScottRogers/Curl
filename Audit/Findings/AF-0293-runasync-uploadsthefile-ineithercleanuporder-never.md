@@ -3,8 +3,8 @@ id: AF-0293
 title: RunAsync_UploadsTheFile_InEitherCleanupOrder never checks that the file was uploaded
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: closed
+reason: Re-audit 2026-10-22_0130.md: the reproduction no longer reproduces.
 key: quality:Curl.Conformance.LibTest.UnitTests/Lib525To533Tests.cs:RunAsync_UploadsTheFile_InEitherCleanupOrder:name-lies
 reproduction: none
 task: none
@@ -13,9 +13,9 @@ found: 2026-10-19
 found-at: 1b3c70b1436b2d499099c5c6dd7bb119e11f5631
 scorecard: 2026-10-19_2134.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-22
+closed-how: reliable-reaudit
+closed-by: 2026-10-22_0130.md
 ---
 # AF-0293 - RunAsync_UploadsTheFile_InEitherCleanupOrder never checks that the file was uploaded
 
@@ -42,6 +42,9 @@ Select-String -Path Curl.Conformance.LibTest.UnitTests/Lib525To533Tests.cs -Patt
 
 ## Re-audits
 
+- 2026-10-22 | 2026-10-22_0130.md | reproduces: no | Ran the Select-String reproduction and read the whole test (Lib525To533Tests.cs:13-37). It now reads the upload through the read callback during perform and asserts Upload, InFileSize 14, 14 bytes read and the bytes 'Moooooooooooo\n', so it checks that the file was uploaded.
+
 ## Log
 
 - 2026-10-19: filed proposed.
+- 2026-10-22: proposed -> closed. Re-audit 2026-10-22_0130.md: the reproduction no longer reproduces.

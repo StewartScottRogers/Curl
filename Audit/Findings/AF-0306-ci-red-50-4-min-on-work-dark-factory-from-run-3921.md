@@ -42,6 +42,8 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-10-22 | 2026-10-22_0130.md | reproduces: yes | The original reproduction gives spell 39210403935: 50.38 min. This window has the same mechanism, a lane push turning CI red for over 30 minutes before a fix landed. Spell 39691487971 lasted 48.35 min (2026-10-21T23:21:56Z to 2026-10-22T00:10:17Z) after commit 01deb2980; the Windows quality gate was fixed by BL-2998. Spell 39718635967 lasted 46.02 min after d6d35bf61.
+
 ## Log
 
 - 2026-10-19: filed proposed.

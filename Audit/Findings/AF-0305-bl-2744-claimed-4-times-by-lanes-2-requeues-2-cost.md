@@ -42,6 +42,8 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-10-22 | 2026-10-22_0130.md | reproduces: yes | The original reproduction still shows BL-2744 claims=4, outcome blocked. The same cause recurs in this window: a file outside touches, a stash that did not apply, then cost-cap refusals. BL-2970 (064209-L1 13:03:22 REQUEUE 'Needs Curl.Engine.UnitTests... which BL-2921 in Doing touches'; 140711-L8 14:39:13 stash did not apply cleanly; cost-cap REQUEUEs at 14:44:43 and 17:43:14). BL-2925 (outside touches at 10:17:52, cost budget at 15:37:20, cost-cap BLOCKED at 17:52:01).
+
 ## Log
 
 - 2026-10-19: filed proposed.

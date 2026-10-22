@@ -42,6 +42,8 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-10-22 | 2026-10-22_0130.md | reproduces: yes | The original reproduction still gives BL-2788 claims=4, costUsd=4.6076, outcome=blocked. The same cause recurs in this window: a cost outlier the factory never finished. BL-2970 cost $5.60 (3.1 times the median of $1.80) over 3 runs and ended requeued, then Deferred and split into BL-3011 to BL-3013.
+
 ## Log
 
 - 2026-10-19: filed proposed.

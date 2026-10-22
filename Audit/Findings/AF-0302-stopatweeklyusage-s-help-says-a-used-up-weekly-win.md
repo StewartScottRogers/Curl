@@ -46,6 +46,8 @@ return ''
 
 ## Re-audits
 
+- 2026-10-22 | 2026-10-22_0130.md | not re-audited | overlaps planted defect PD-403 in RunDarkFactory.ps1, so the auditor's verdict (reproduces no) is set aside: Ran the reproduction. Select-String found no 'used-up weekly window raises the alarm' in RunDarkFactory.ps1, so the .Line.Trim() call failed on null. The help now says (RunDarkFactory.ps1:150-151) 'a used-up weekly window is waited out the same way, with a notice rather than the alarm', and the parameter comment (lines 525-526) says the same. Wait-ForFreshSession has moved to DarkFactory/OutOfTokens.ps1:180. It waits for the weekly reset via Wait-ForNewSession -UsageOnly with a trace notice and returns '', with no alarm, which matches the help.
+
 ## Log
 
 - 2026-10-19: filed proposed.

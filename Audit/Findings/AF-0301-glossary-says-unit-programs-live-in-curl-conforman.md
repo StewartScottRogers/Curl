@@ -44,6 +44,8 @@ IUnitProgram defined: False
 
 ## Re-audits
 
+- 2026-10-22 | 2026-10-22_0130.md | reproduces: no | Ran the reproduction: '33: glossary says it lives there', 'project exists: True', 'IUnitProgram defined: True'. Curl.Conformance.UnitProgram.UnitLibrary exists, and UnitPrograms.Ported is defined at Curl.Conformance.UnitProgram.UnitLibrary/UnitPrograms.cs:34, so the glossary's statement is now true.
+
 ## Log
 
 - 2026-10-19: filed proposed.

@@ -3,8 +3,8 @@ id: AF-0295
 title: Lib1553's debug trace traceTime: true can become false with no test failing, dropping the timestamps from its stderr trace
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: closed
+reason: Re-audit 2026-10-22_0130.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
 key: quality:Curl.Conformance.LibTest.UnitLibrary/Lib1553.cs:TestAsync-true:surviving-mutant
 reproduction: mutation Curl.Conformance.LibTest.UnitLibrary/Lib1553.cs:72:true
 task: none
@@ -13,9 +13,9 @@ found: 2026-10-19
 found-at: 1b3c70b1436b2d499099c5c6dd7bb119e11f5631
 scorecard: 2026-10-19_2134.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-22
+closed-how: mechanical
+closed-by: 2026-10-22_0130.md
 ---
 # AF-0295 - Lib1553's debug trace traceTime: true can become false with no test failing, dropping the timestamps from its stderr trace
 
@@ -42,6 +42,9 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Confo
 
 ## Re-audits
 
+- 2026-10-22 | 2026-10-22_0130.md | reproduces: no | Ran the -Site reproduction: resolvedLine 72, mutant Curl.Conformance.LibTest.UnitLibrary/Lib1553.cs:72:true [TestAsync] killed. Runner's targeted mutation rerun on the clean audited commit: killed.
+
 ## Log
 
 - 2026-10-19: filed proposed.
+- 2026-10-22: proposed -> closed. Re-audit 2026-10-22_0130.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.

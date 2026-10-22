@@ -42,6 +42,9 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-10-22 | 2026-10-22_0130.md | reproduces: yes | still reported
+- 2026-10-22 | 2026-10-22_0130.md | reproduces: yes | The original reproduction gives spell 39226925458: 45.47 min, and this window (since 2026-10-19) contains that spell again. The same cause, a test failing only off Windows where lanes never test, crosses the rule again with spell 39362208615: test307 and test1587 on Linux and macOS, 2034.67 min, ended 2026-10-21T13:23:52Z.
+
 ## Log
 
 - 2026-10-19: filed proposed.

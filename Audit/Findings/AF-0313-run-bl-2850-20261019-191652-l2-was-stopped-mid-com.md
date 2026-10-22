@@ -3,8 +3,8 @@ id: AF-0313
 title: Run BL-2850-20261019-191652-L2 was stopped mid-command when shift 191652 was replaced after 7 minutes, but the tool lists it as running, not unfinished
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: closed
+reason: Re-audit 2026-10-22_0130.md: the reproduction no longer reproduces.
 key: process:logs:BL-2850:unfinished-run
 reproduction: none
 task: none
@@ -13,9 +13,9 @@ found: 2026-10-19
 found-at: 1b3c70b1436b2d499099c5c6dd7bb119e11f5631
 scorecard: 2026-10-19_2134.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-22
+closed-how: reliable-reaudit
+closed-by: 2026-10-22_0130.md
 ---
 # AF-0313 - Run BL-2850-20261019-191652-L2 was stopped mid-command when shift 191652 was replaced after 7 minutes, but the tool lists it as running, not unfinished
 
@@ -42,6 +42,9 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-10-22 | 2026-10-22_0130.md | reproduces: no | The original reproduction still lists runningRuns = BL-2850-20261019-191652-L2.jsonl in the 20261019-213437 logs, with 'lane 2 adopts BL-2850' at 19:24:40. Over this window, which has 150 tasks done and several shift replacements (063457 by 064209, 175054 by 192752 with 4 adoptions), runningRuns = [] and unfinishedRuns = []. Every BL-*.jsonl, including the runs cut over at 06:42 (BL-2841-063457-L1, BL-2866-063457-L5, BL-2865-063457-L2), has a result line. No stopped run is listed as running.
+
 ## Log
 
 - 2026-10-19: filed proposed.
+- 2026-10-22: proposed -> closed. Re-audit 2026-10-22_0130.md: the reproduction no longer reproduces.
