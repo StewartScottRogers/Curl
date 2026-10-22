@@ -30,11 +30,11 @@ If a case still differs after the stand-in, record its first difference in Notes
 
 ## Acceptance criteria
 
-- [ ] `PlatformFor` reports `Debug` to the eleven non-libtest cases and the libtest engine in the harness does so for 1647; a unit test pins that a case without `CURL_ENTROPY` or the authentication feature is not given `Debug`.
-- [ ] The Digest `cnonce` and the NTLM client challenge take a forced random source in the changed library, with unit tests in its own `.UnitTests` project that fail without the seam: the first value from `CURL_ENTROPY` is the one upstream's `Curl_rand` gives (ADR-0678 explains the byte order).
-- [ ] Each of the twelve cases ends `Passed` with `$env:CURL_UPSTREAM_CASE='<n>'` on Windows and is on `PassingUpstreamCases.txt`, or its first difference is in Notes and a follow-up task is filed.
-- [ ] A new ADR, "Decided by Claude under Stewart's delegation", records the stand-in in the style of ADR-0678.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean, `dotnet test --filter "TestCategory!=Integration"` passes, and each changed library keeps 100% line and branch coverage and complexity at most 10.
+- [x] `PlatformFor` reports `Debug` to the eleven non-libtest cases and the libtest engine in the harness does so for 1647; a unit test pins that a case without `CURL_ENTROPY` or the authentication feature is not given `Debug`.
+- [x] The Digest `cnonce` and the NTLM client challenge take a forced random source in the changed library, with unit tests in its own `.UnitTests` project that fail without the seam: the first value from `CURL_ENTROPY` is the one upstream's `Curl_rand` gives (ADR-0678 explains the byte order).
+- [x] Each of the twelve cases ends `Passed` with `$env:CURL_UPSTREAM_CASE='<n>'` on Windows and is on `PassingUpstreamCases.txt`, or its first difference is in Notes and a follow-up task is filed.
+- [x] A new ADR, "Decided by Claude under Stewart's delegation", records the stand-in in the style of ADR-0678.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean, `dotnet test --filter "TestCategory!=Integration"` passes, and each changed library keeps 100% line and branch coverage and complexity at most 10.
 - [ ] After the push, `CI` is green on Linux and macOS for the commit.
 
 ## Notes
@@ -61,6 +61,8 @@ If a case still differs after the stand-in, record its first difference in Notes
 - Requeued: BL-2921 (Doing) touches the whole `Curl.Engine.UnitLibrary` and
   `Curl.Engine.UnitTests`. No other prerequisite found.
 
+- 2026-10-21 (lane 3): Debug rule `NamesHandBuiltAuthentication` (!SSPI with digest or NTLM; exactly the twelve). Seam: `DigestClientNonce.ForBuild(bool, Func<int, byte[]>)`/`HexFrom`, threaded as `digestRandomBytes` through EngineComposition and CurlComposition.CreateRunner; SASL DIGEST-MD5 answers in curl form over hand-built contexts (ADR-0751). NTLM already had `INtlmRandomSource`; 159/1100 are NTLMv1 and use no entropy. ManagedCurlEngine not threaded (1647 passes without it). Passing and listed: 832 835 878 881 934 937 1647. First differences: 823/869 line 4 rspauth answer "=" vs empty (BL-3001); 907 line 3 unescaped quote in user/realm (BL-3002); 1100 line 19 new NTLM type 1 after 302, 159 line 7 extra GET (BL-3003). Quality: Measure-CodeQuality over Authentication, Engine, Console found one member, CreateSaslAuthenticator at 75% branch (the cached method-group delegate); replaced by the static `SystemRandomBytes` field, which removes that branch; build and Engine tests green after, not re-measured (budget). CI on Linux/macOS is checked after the shift pushes.
+
 ## Log
 
 - 2026-10-19: Created.
@@ -68,3 +70,4 @@ If a case still differs after the stand-in, record its first difference in Notes
 - 2026-10-21: Doing -> Backlog. Needs Curl.Engine.UnitLibrary/EngineComposition.cs (Digest and SASL nonce are hard-wired there), which BL-2921 in Doing holds as the whole Curl.Engine.UnitLibrary
 - 2026-10-21: touches narrowed from the whole Curl.Authentication.UnitLibrary and .UnitTests to the four files that hold the Digest and SASL cnonce seam (DigestClientNonce, DigestAuthenticator, SaslAuthenticator and DigestClientNonceTests), per lane 5's Notes that the seam already exists there; if another Authentication file must change, add it in the same commit.
 - 2026-10-21: Backlog -> Doing. Criteria at claim: 2a064a5d 50019839 7f573e82 d86cdfca dd1cc079 620ebead.
+- 2026-10-21: Doing -> Backlog. Code committed; only the CI-on-Linux-and-macOS criterion is left, checkable once the shift pushes
