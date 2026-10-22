@@ -34,3 +34,4 @@ Found by the shift-end review (ADR-0710) of 1c1f9cb05...ea67815c6: the first cas
 ## Log
 
 - 2026-10-22: Created.
+- 2026-10-22: Backlog -> Doing. Criteria at claim: a81ce1f4 e0d82eeb d84a124a 95ad9451.
