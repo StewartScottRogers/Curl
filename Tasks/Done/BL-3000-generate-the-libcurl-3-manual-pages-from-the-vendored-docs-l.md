@@ -28,7 +28,7 @@ BL-2992 interpreted `test1222.pl` in `UpstreamTest1222Script` up to its `glob("$
 
 ## Notes
 
-- Decision (ADR-0751): the `.3` pages are converted in memory by the new `UpstreamCd2nroff` (a port of `scripts/cd2nroff`) from `ROOT/docs/libcurl` when `BUILDROOT/docs/libcurl` has no built `.3` pages. Nothing is generated on disk, so there is no output folder to add to `touches`. The two new files (`UpstreamCd2nroff.cs` and its tests) were added to `touches` because no other task in Doing on `origin/work/dark-factory` names them.
+- Decision (ADR-0752): the `.3` pages are converted in memory by the new `UpstreamCd2nroff` (a port of `scripts/cd2nroff`) from `ROOT/docs/libcurl` when `BUILDROOT/docs/libcurl` has no built `.3` pages. Nothing is generated on disk, so there is no output folder to add to `touches`. The two new files (`UpstreamCd2nroff.cs` and its tests) were added to `touches` because no other task in Doing on `origin/work/dark-factory` names them.
 - `UpstreamTest1222Script` now ports `scan_header`, `scan_man_page` (with `.so man3/` includes), `scan_man_for_opts` (whose findings land in the function-page table, as upstream's do), symbols-in-versions reading and the table print. Perl's undefined hash and readdir order is replaced by ordinal order.
 - Measured: `UpstreamTest1222ScriptTests.Check_VendoredRelease_FindsTheSourcesAgreeOverItsConvertedManual` runs the full check on the vendored 8.22.0 data and gets exit 0 with empty output. Case 1222 passes with `CURL_UPSTREAM_CASE=1222`. Measure-CodeQuality on `Curl.Conformance.UnitLibrary` reports 0 failing members.
 
