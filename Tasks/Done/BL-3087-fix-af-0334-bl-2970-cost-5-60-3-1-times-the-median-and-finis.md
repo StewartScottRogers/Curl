@@ -8,7 +8,7 @@ depends-on: []
 touches: [DarkFactory/Claim.ps1]
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-22
 ---
 # BL-3087 — Fix AF-0334: BL-2970 cost $5.60, 3.1 times the median, and finished nothing itself: it was deferred and split
 
@@ -41,12 +41,15 @@ The finding describes a past run's cost, which no fix can change, so no re-audit
 
 ## Acceptance criteria
 
-- [ ] The cause of the cost is named in this task, and either fixed or recorded as unavoidable.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The cause of the cost is named in this task, and either fixed or recorded as unavoidable.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Cause (from git history of BL-2970, logs are not in the lane checkout): the task was large and its `touches` did not name every file the work needed (the exit-100 cookie-file fix landed across Engine test files). Run 1 spent 72 turns before requeueing for a file outside touches; later claims spent their caps re-applying a stash that no longer applied after other lanes changed the same files, then were cost-cap requeued and carried into BL-3011. Already addressed by the existing rules: the lane rules require the touches/size/prerequisite pass before the first edit, and BL-2981 split the contended files; the cap-split into BL-3011 to BL-3023 is the fix. No further avoidable waste is fixable in DarkFactory/Claim.ps1: recorded as unavoidable now, cost is historical. No code changed; build and fast tests unaffected (no source edits).
 
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: af4de8c2 9742157d.
+- 2026-10-22: Doing -> Done. AF-0334 cause named (touches too narrow, stash churn, cap splits); no avoidable waste left to fix
