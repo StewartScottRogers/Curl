@@ -82,6 +82,36 @@ public sealed class SaslDigestMd5Tests
     }
 
     [TestMethod]
+    public void AnswerAsCurl_QuoteInUserAndRealm_HashedAsGivenAndSentEscaped()
+    {
+        // Upstream case 907: user us"er, challenge realm="cu\"rl", CURL_ENTROPY=12345678.
+        var diagnostics = TestDiagnostics.For(TestContext);
+        const string challenge = "realm=\"cu\\\"rl\",nonce=\"5300d17a1d695bd411e4cdf96f9548c23ced6175\",algorithm=md5-sess,qop=\"auth\"";
+        diagnostics.Arrange("challenge", challenge);
+
+        string answer = Encoding.Latin1.GetString(SaslDigestMd5.AnswerAsCurl(Encoding.ASCII.GetBytes(challenge), Encoding.UTF8, "us\"er", "secret", "smtp/127.0.0.1", "34333231353332313633323137333231")!);
+
+        const string expected = "username=\"us\\\"er\",realm=\"cu\\\"rl\",nonce=\"5300d17a1d695bd411e4cdf96f9548c23ced6175\",cnonce=\"34333231353332313633323137333231\",nc=\"00000001\",digest-uri=\"smtp/127.0.0.1\",response=53d3347e1b559d23be78934ae4a78488,qop=auth";
+        diagnostics.Act("answer", answer);
+        diagnostics.Assert("answer", expected, answer);
+        Assert.AreEqual(expected, answer);
+    }
+
+    [TestMethod]
+    public void AnswerAsCurl_BackslashEndingTheChallengeRealm_KeptAndSentEscaped()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        const string challenge = "nonce=\"n\",qop=\"auth\",algorithm=md5-sess,realm=\"ab\\";
+        diagnostics.Arrange("challenge", challenge);
+
+        string answer = Encoding.Latin1.GetString(SaslDigestMd5.AnswerAsCurl(Encoding.ASCII.GetBytes(challenge), Encoding.UTF8, "u\\", "p", "smtp/h", "c")!);
+
+        diagnostics.Act("answer", answer);
+        diagnostics.Assert("starts with", true, answer.StartsWith("username=\"u\\\\\",realm=\"ab\\\\\",", StringComparison.Ordinal));
+        StringAssert.StartsWith(answer, "username=\"u\\\\\",realm=\"ab\\\\\",");
+    }
+
+    [TestMethod]
     public void AnswerAsCurl_ChallengeEndsAtNul()
     {
         var diagnostics = TestDiagnostics.For(TestContext);

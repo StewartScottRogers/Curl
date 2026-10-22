@@ -20,7 +20,7 @@ internal static class SaslDigestMd5
     /// </summary>
     /// <param name="challenge">The decoded challenge.</param>
     /// <param name="credentialEncoding">The encoding the user name and password are sent in.</param>
-    /// <param name="user">The user name, sent as given.</param>
+    /// <param name="user">The user name, hashed as given.</param>
     /// <param name="password">The password.</param>
     /// <param name="digestUri">The <c>service/host</c> principal name.</param>
     /// <param name="clientNonce">The client nonce.</param>
@@ -33,13 +33,15 @@ internal static class SaslDigestMd5
     /// Each value is found as curl finds it, by the first occurrence of its key anywhere in
     /// the challenge, and cut at curl's buffer size less one: <c>nonce</c> 63 characters,
     /// <c>realm</c> 127, <c>algorithm</c> and <c>qop</c> 63. A missing <c>realm</c> is sent
-    /// empty.
+    /// empty. A backslash in the challenge's <c>realm</c> escapes the character after it; the
+    /// user name and realm are hashed as they are and sent with each double quote and
+    /// backslash escaped (upstream case 907).
     /// </remarks>
     internal static byte[]? AnswerAsCurl(byte[] challenge, Encoding credentialEncoding, string user, string password, string digestUri, string clientNonce)
     {
         string text = ChallengeText(challenge);
         string? nonce = ValueAfter(text, "nonce=\"", '"', 64);
-        string realm = ValueAfter(text, "realm=\"", '"', 128) ?? string.Empty;
+        string realm = QuotedValueAfter(text, "realm=\"", 128) ?? string.Empty;
         string? algorithm = ValueAfter(text, "algorithm=", ',', 64);
         string? qopOptions = ValueAfter(text, "qop=\"", '"', 64);
         if (nonce is null || algorithm != "md5-sess" || !OffersAuth(qopOptions))
@@ -51,8 +53,8 @@ internal static class SaslDigestMd5
         return Concatenate(
             credentialEncoding,
             "username=\"",
-            user,
-            $"\",realm=\"{realm}\",nonce=\"{nonce}\",cnonce=\"{clientNonce}\",nc=\"{NonceCount}\",digest-uri=\"{digestUri}\",response={response},qop=auth");
+            Quoted(user),
+            $"\",realm=\"{Quoted(realm)}\",nonce=\"{nonce}\",cnonce=\"{clientNonce}\",nc=\"{NonceCount}\",digest-uri=\"{digestUri}\",response={response},qop=auth");
     }
 
     /// <summary>
@@ -138,6 +140,32 @@ internal static class SaslDigestMd5
         int length = (end < 0 ? text.Length : end) - start;
         return text.Substring(start, Math.Min(length, capacity - 1));
     }
+
+    // ValueAfter for a quoted string up to its closing quote, a backslash taking the
+    // character after it as it is (curl's own build reads realm="cu\"rl" as cu"rl).
+    private static string? QuotedValueAfter(string text, string key, int capacity)
+    {
+        int start = text.IndexOf(key, StringComparison.Ordinal);
+        return start < 0 ? null : UnescapedUpToQuote(text, start + key.Length, capacity - 1);
+    }
+
+    // The characters from start up to the first unescaped double quote, at most maxLength of
+    // them, each backslash dropped and the character after it taken as it is.
+    private static string UnescapedUpToQuote(string text, int start, int maxLength)
+    {
+        var value = new StringBuilder();
+        for (int index = start; index < text.Length && text[index] != '"' && value.Length < maxLength; index++)
+        {
+            index += text[index] == '\\' && index + 1 < text.Length ? 1 : 0;
+            value.Append(text[index]);
+        }
+
+        return value.ToString();
+    }
+
+    // A value as curl's own build writes it between quotes: each double quote and backslash
+    // escaped with a backslash.
+    private static string Quoted(string value) => value.Replace("\\", "\\\\").Replace("\"", "\\\"");
 
     // Whether the comma-separated qop list holds "auth", in any case.
     private static bool OffersAuth(string? qopOptions) =>
