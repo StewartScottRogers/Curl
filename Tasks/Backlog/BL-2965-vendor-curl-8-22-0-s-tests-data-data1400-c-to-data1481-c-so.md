@@ -6,7 +6,6 @@ assignee: Claude
 pipeline: feature
 depends-on: []
 touches: [Curl.Conformance.UnitTests/UpstreamTestData/data/data14xx.c, Curl.Conformance.UnitTests/UpstreamTestData/Update-UpstreamTestData.ps1, Curl.Conformance.UnitTests/UpstreamTestData/README.md, Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
-lane: no
 requirement: none
 created: 2026-10-21
 completed:
@@ -35,3 +34,4 @@ Remove `lane: no` once a lane's permissions let it write under `Curl.Conformance
 ## Log
 
 - 2026-10-21: Created.
+- 2026-10-21: lane: no removed; PR #187 anchors the data deny at the project root (`/data/**`), so lanes can write under Curl.Conformance.UnitTests/UpstreamTestData/data/.
