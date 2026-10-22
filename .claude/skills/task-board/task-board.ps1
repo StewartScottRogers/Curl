@@ -12,7 +12,9 @@
     Commands:
       status   The whole board, with each Backlog task marked ready, waiting on
                its dependencies, or needing Stewart.
-      next     The task /task-run should take next, or "No task is ready.". A ready
+      next     The task /task-run should take next; "No task is ready." when no
+               task is ready; or "No task can start yet: ..." when every ready task
+               overlaps one in Doing or waits behind one that does. A ready
                task whose touches overlap a task in Doing is not offered, so lanes
                of the dark factory never work on the same files at once. A task
                whose front matter says 'lane: no', or whose touches name an audit
