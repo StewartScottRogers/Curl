@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Http.UnitLibrary]
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-22
 ---
 # BL-3072 — Fix AF-0319: -v auth-using line prints the -u password: 'Server auth using Basic with user 'u' password 'secret'' where curl prints only the user
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the conformance auditor confirm
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- 2026-10-22 (lane 3): No code change needed. On this branch `HttpAuthUsingLines.cs:28` already formats the line without a password (unchanged since BL-954, last touched by BL-2182), and the doc comment and unit tests already expect that. The finding's reproduction gives `curl: * Server auth using Basic with user 'u'` and `candidate: * Server auth using Basic with user 'u'`, and the seed's `--negotiate -v` case gives `* Server auth using Negotiate with user ''` for both. The audited tree most likely carried a defect planted by the audit seeder (ADR-0267) that was reported as a real finding. `dotnet build` is clean and the fast tests pass (44 test projects, 0 failed). The pipeline is `feature`, but its stages were skipped because there is nothing to build.
 
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-22: Doing -> Done. -u u:secret -v prints * Server auth using Basic with user 'u' with no password, matching curl (already true on this branch)
