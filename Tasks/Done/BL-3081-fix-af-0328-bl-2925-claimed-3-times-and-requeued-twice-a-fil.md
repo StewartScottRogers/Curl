@@ -8,7 +8,7 @@ depends-on: []
 touches: [DarkFactory/Requeue.ps1]
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-22
 ---
 # BL-3081 — Fix AF-0328: BL-2925 claimed 3 times and requeued twice: a file outside its touches, then a used-up run cost budget, then blocked by the cost cap and split
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the process auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+BL-2925's causes: (a) claim 1 requeued because a file it needed was under BL-2934's touches: the rule-3 overlap path working as designed. (b) claim 2 spent its run cost budget with the work nearly done, a genuine cost, and its work was stashed. (c) claim 3 was blocked 19 seconds after the claim by the cost cap: fixed by BL-2942 (a5984505d, an ancestor of this branch), which makes Invoke-Claim skip a task whose runs of the last day spent its cap; BL-3090 shares that predicate. BL-2925 would now be claimed twice, below the expected 3. No change to DarkFactory/Requeue.ps1 is needed. The reproduction reads archived audit logs (an audit path, closed to lanes), so it was not rerun; the re-audit confirms. dotnet build clean, fast tests green.
 
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-22: Doing -> Done. AF-0328 cause (cost-cap-blocked claim) already fixed by BL-2942; other requeues by design; no code change
