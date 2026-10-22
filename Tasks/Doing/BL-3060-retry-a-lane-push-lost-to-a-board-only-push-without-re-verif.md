@@ -39,3 +39,4 @@ The existing self-test is `RunDarkFactory.ps1 -TestIntegrateLock` (body in `Dark
 ## Log
 
 - 2026-10-22: Created.
+- 2026-10-22: Backlog -> Doing. Criteria at claim: fdb4f146 4e309858 9f16808d d4846cb4 270ab631.
