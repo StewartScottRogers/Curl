@@ -230,11 +230,22 @@ function Invoke-TaskSplitRun {
     return @{ ExitCode = $p.ExitCode }
 }
 
+function Test-TaskSplitLeavesBlockToCaller {
+    # True when the caller of Invoke-TaskSplit must block the task itself (and commit that): the
+    # split was not attempted ('skipped') or left the task out of Blocked ('failed'). False for
+    # every other result, 'reset-failed' included: the split commit stays and nothing goes on top.
+    param([string]$SplitResult)
+    return $SplitResult -in 'skipped', 'failed'
+}
+
 function Invoke-TaskSplit {
     # Splits -Id, which is over its cost cap for -Why, into smaller tasks with one split run,
     # then commits and pushes the board change under the integrate lock. Returns 'skipped'
     # when -Id was already offered for a split on -Now's day, 'split' when the run filed new
-    # tasks and deferred -Id, 'blocked' when it failed and -Id is now in Blocked, or 'failed' when it\n    # failed and -Id is not in Blocked or a reset of the split commit failed; the caller then blocks -Id itself.
+    # tasks and deferred -Id, 'blocked' when it failed and -Id is now in Blocked, 'failed' when it
+    # failed and -Id is not in Blocked (the caller then blocks -Id itself), or 'reset-failed' when the
+    # reset of the split commit failed: that commit stays, -Id stays Deferred as in it, and the caller
+    # makes no commit and no push on top of it (Test-TaskSplitLeavesBlockToCaller).
     # The stash is only ever copied under the new IDs, never popped.
     param(
         [string]$Id, [string]$Why, [datetime]$Now = (Get-Date), [string]$MarkerDir = (Join-Path $LogDir 'splits'),
@@ -297,8 +308,13 @@ function Invoke-TaskSplit {
                 elseif ($committed -and $headBefore) { @('reset', '-q', '--hard', $headBefore) }
                 elseif (-not $committed) { @('reset', '-q', '--', 'Tasks') }
             if ($resetArgs -and -not (& $Git $resetArgs)) {
-                Write-Trace $Id 'split' "failed: $failure; its reset failed, so nothing more is committed or pushed on top of the split" 'Red'
-                return 'failed'
+                # A split commit that cannot be reset stays; nothing more goes on top of it. A failed
+                # unstaging reset has no commit to keep, so the restore below still runs.
+                if ($committed) {
+                    Write-Trace $Id 'split' "failed: $failure; its reset failed, so the split commit stays and nothing more is committed or pushed on top of it" 'Red'
+                    return 'reset-failed'
+                }
+                Write-Trace $Id 'split' "the unstaging reset failed; the restore of Tasks still runs" 'Yellow'
             }
         }
         # A failed split leaves nothing of its own behind: the board goes back to how it
@@ -325,10 +341,11 @@ function Invoke-TaskSplit {
         if ($resetArgs) {
             $reset = @{ Ok = $false }
             & $undo { $reset.Ok = [bool](& $Git $resetArgs) }
-            if (-not $reset.Ok) {
-                Write-Trace $Id 'split' "threw: $thrown; its reset failed, so nothing more is committed or pushed on top of the split" 'Red'
-                return 'failed'
+            if (-not $reset.Ok -and $committed) {
+                Write-Trace $Id 'split' "threw: $thrown; its reset failed, so the split commit stays and nothing more is committed or pushed on top of it" 'Red'
+                return 'reset-failed'
             }
+            if (-not $reset.Ok) { Write-Trace $Id 'split' "threw: $thrown; the unstaging reset failed; the restore of Tasks still runs" 'Yellow' }
         }
         if ($stored.Count) { & $undo { & $DropStash $stored } }
         & $undo { & $Git @('checkout', '-q', '--', 'Tasks') }
@@ -567,19 +584,32 @@ if ($TestTaskStash) {
         $r = Invoke-TaskSplit 'BL-1' 'cost cap' -Now ([datetime]'2026-11-07') -MarkerDir $markers -RunSplit $okRun -ListTaskIds { $script:splitIds } -StashSha { '' } `
             -ContinuesStash { $true } -StoreStash $failingStore -DropStash { param($h) } -TaskState $stateStub -EnterLock $lockStub -Git $resetRefusingGit -Board $boardStub -PullOnRefusal
         $joined = $script:splitSteps -join ' '
-        & $check 'a refused reset after a failed push stops: no checkout, block commit or second push' 'failed 2 1 False' "$r $(@($script:splitSteps | Where-Object { $_ -eq 'push' }).Count) $(@($script:splitSteps | Where-Object { $_ -eq 'commit' }).Count) $($joined -match 'checkout|board')"
+        & $check 'a refused reset after a failed push stops: no checkout, block commit or second push' 'reset-failed 2 1 False' "$r $(@($script:splitSteps | Where-Object { $_ -eq 'push' }).Count) $(@($script:splitSteps | Where-Object { $_ -eq 'commit' }).Count) $($joined -match 'checkout|board')"
         $script:splitSteps.Clear(); $script:splitIds = @('BL-1')
         $throwingGitOnPush = { param([string[]]$GitArgs) $script:splitSteps.Add($GitArgs[0]); if ($GitArgs[0] -eq 'reset') { $false } elseif ($GitArgs[0] -eq 'checkout') { $true } elseif ($GitArgs[0] -eq 'push') { throw 'push exploded' } else { $true } }
         $r = Invoke-TaskSplit 'BL-1' 'cost cap' -Now ([datetime]'2026-11-08') -MarkerDir $markers -RunSplit $okRun -ListTaskIds { $script:splitIds } -StashSha { '' } `
             -ContinuesStash { $true } -StoreStash $failingStore -DropStash { param($h) } -TaskState $stateStub -EnterLock $lockStub -Git $throwingGitOnPush -Board $boardStub -PullOnRefusal
         $joined = $script:splitSteps -join ' '
-        & $check 'a refused reset after a throw stops: no checkout, block commit or second push' 'failed 1 1 False' "$r $(@($script:splitSteps | Where-Object { $_ -eq 'push' }).Count) $(@($script:splitSteps | Where-Object { $_ -eq 'commit' }).Count) $($joined -match 'checkout|board')"
+        & $check 'a refused reset after a throw stops: no checkout, block commit or second push' 'reset-failed 1 1 False' "$r $(@($script:splitSteps | Where-Object { $_ -eq 'push' }).Count) $(@($script:splitSteps | Where-Object { $_ -eq 'commit' }).Count) $($joined -match 'checkout|board')"
         # Board moves that all throw leave the task out of Blocked, so the caller blocks it (BL-3113).
         $script:splitSteps.Clear(); $script:splitIds = @('BL-1'); $script:splitPushes = $true
         $allThrowBoard = { param([string[]]$BoardArgs) throw 'board down' }
         $r = Invoke-TaskSplit 'BL-1' 'cost cap' -Now ([datetime]'2026-11-09') -MarkerDir $markers -RunSplit $okRun -ListTaskIds { $script:splitIds } -StashSha { '' } `
             -ContinuesStash { $true } -StoreStash $failingStore -DropStash { param($h) } -TaskState { 'Deferred' } -EnterLock $lockStub -Git { param([string[]]$GitArgs) $script:splitSteps.Add($GitArgs[0]); if ($GitArgs[0] -eq 'push') { $false } else { $true } } -Board $allThrowBoard -PullOnRefusal
         & $check 'when every board move throws the split does not report blocked' 'failed' "$r"
+        # The failure path's own state check: the board stub returns, the task stays Deferred (BL-3114).
+        $script:splitSteps.Clear(); $script:splitIds = @('BL-1')
+        $r = Invoke-TaskSplit 'BL-1' 'cost cap' -Now ([datetime]'2026-11-10') -MarkerDir $markers -RunSplit $okRun -ListTaskIds { $script:splitIds } -StashSha { '' } `
+            -ContinuesStash { $true } -StoreStash $failingStore -DropStash { param($h) } -TaskState { 'Deferred' } -EnterLock $lockStub -Git { param([string[]]$GitArgs) $script:splitSteps.Add($GitArgs[0]); if ($GitArgs[0] -eq 'push') { $false } else { $true } } -Board $boardStub -PullOnRefusal
+        & $check 'a board move that returns while the task stays Deferred reports failed' 'failed' "$r"
+        # A failed unstaging reset (the commit itself failed) still restores Tasks (BL-3114).
+        $script:splitSteps.Clear(); $script:splitIds = @('BL-1')
+        $r = Invoke-TaskSplit 'BL-1' 'cost cap' -Now ([datetime]'2026-11-11') -MarkerDir $markers -RunSplit $okRun -ListTaskIds { $script:splitIds } -StashSha { '' } `
+            -ContinuesStash { $true } -StoreStash $failingStore -DropStash { param($h) } -TaskState $stateStub -EnterLock $lockStub -Git { param([string[]]$GitArgs) $script:splitSteps.Add($GitArgs[0]); if ($GitArgs[0] -in 'reset', 'commit') { $false } else { $true } } -Board $boardStub
+        & $check 'a failed unstaging reset still runs checkout and clean' 'True' "$(($script:splitSteps -join ' ') -match 'checkout clean')"
+        # The caller makes no commit and no push for reset-failed (BL-3114).
+        & $check 'the caller blocks only skipped and failed splits, never reset-failed' 'True True False False False' "$(Test-TaskSplitLeavesBlockToCaller 'skipped') $(Test-TaskSplitLeavesBlockToCaller 'failed') $(Test-TaskSplitLeavesBlockToCaller 'reset-failed') $(Test-TaskSplitLeavesBlockToCaller 'split') $(Test-TaskSplitLeavesBlockToCaller 'blocked')"
+        & $check 'ShiftRunner.ps1 asks Test-TaskSplitLeavesBlockToCaller before its block commit' 'True' "$((Get-Content (Join-Path $PSScriptRoot 'ShiftRunner.ps1') -Raw) -match 'if \(Test-TaskSplitLeavesBlockToCaller \$split\)')"
         # A split with a stash and no continuing task traces it in red.
         $script:splitSteps.Clear(); $script:splitIds = @('BL-1')
         $traceText = & { Invoke-TaskSplit 'BL-1' 'cost cap' -Now ([datetime]'2026-11-04') -MarkerDir $markers -RunSplit $okRun -ListTaskIds { $script:splitIds } -StashSha { 'abc123' } `
