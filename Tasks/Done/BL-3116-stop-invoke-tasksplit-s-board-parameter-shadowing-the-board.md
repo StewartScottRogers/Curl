@@ -8,7 +8,7 @@ depends-on: []
 touches: [DarkFactory/TaskStash.ps1]
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-22
 ---
 # BL-3116 — Stop Invoke-TaskSplit's Board parameter shadowing the board script path
 
@@ -24,13 +24,16 @@ Invoke-TaskSplit (DarkFactory/TaskStash.ps1) has a `[scriptblock]$Board` paramet
 
 ## Acceptance criteria
 
-- [ ] The parameter no longer shadows the board script path, and a self-test shows the default board call moves a task to Blocked.
-- [ ] `RunDarkFactory.ps1 -TestTaskStash` passes.
-- [ ] <!-- A statement someone else can check from the repository without asking a question. -->
+- [x] The parameter no longer shadows the board script path, and a self-test shows the default board call moves a task to Blocked.
+- [x] `RunDarkFactory.ps1 -TestTaskStash` passes.
+- [x] <!-- A statement someone else can check from the repository without asking a question. -->
 
 ## Notes
+
+- Renamed Invoke-TaskSplit's `-Board` to `-BoardCall` (the old name shadowed the `$Board` script path Invoke-Board reads by dynamic scope); added a self-test running the default board with `$Board` pointed at a recording script. The third criterion is an empty template placeholder; ticked as vacuous.
 
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: bc876eef 95ad9451 fbecace0.
+- 2026-10-22: Doing -> Done. Invoke-TaskSplit's parameter renamed BoardCall; default board call moves to Blocked, self-test added
