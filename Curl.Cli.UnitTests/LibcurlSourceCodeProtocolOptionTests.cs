@@ -5,6 +5,7 @@ namespace Curl.Cli;
 /// <summary>
 /// Pins the <c>curl_easy_setopt</c> lines <see cref="LibcurlSourceCode" /> writes for the FTP, SSH, TFTP,
 /// telnet, mail, verbose, rate-limit, query and protocol options against curl 8.21.0 (mingw, Schannel),
+/// reordered to curl 8.22.0 (config2setopts.c order),
 /// measured on 2026-10-02 with <c>Record-CurlExchange.ps1 -NoServer</c> and <c>--libcurl - -s</c> (BL-1174
 /// Notes). Each row is one measured command line; the transfer's lines are compared byte for byte.
 /// </summary>
@@ -52,7 +53,7 @@ public sealed class LibcurlSourceCodeProtocolOptionTests
     [DataRow("--ftp-ssl-control", Ftp + PassiveIp + Tls + "  curl_easy_setopt(curl, CURLOPT_USE_SSL, (long)CURLUSESSL_CONTROL);\n" + KeepAlive)]
     [DataRow("--ssl|--ftp-ssl-control|--ssl-reqd", Ftp + PassiveIp + Tls + "  curl_easy_setopt(curl, CURLOPT_USE_SSL, (long)CURLUSESSL_ALL);\n" + KeepAlive)]
     [DataRow("--ftp-create-dirs", Ftp + PassiveIp + Tls + "  curl_easy_setopt(curl, CURLOPT_FTP_CREATE_MISSING_DIRS, 2L);\n" + KeepAlive)]
-    [DataRow("--limit-rate|100", Ftp + PassiveIp + "  curl_easy_setopt(curl, CURLOPT_MAX_SEND_SPEED_LARGE, (curl_off_t)100);\n  curl_easy_setopt(curl, CURLOPT_MAX_RECV_SPEED_LARGE, (curl_off_t)100);\n" + After)]
+    [DataRow("--limit-rate|100", Ftp + "  curl_easy_setopt(curl, CURLOPT_MAX_SEND_SPEED_LARGE, (curl_off_t)100);\n  curl_easy_setopt(curl, CURLOPT_MAX_RECV_SPEED_LARGE, (curl_off_t)100);\n" + PassiveIp + After)]
     public void Generate_FtpOption_WritesCurlsLines(string arguments, string transfer)
     {
         string expected = arguments.StartsWith("--limit-rate", StringComparison.Ordinal) ? transfer.Replace("102400L", "100L", StringComparison.Ordinal) : transfer;
@@ -73,14 +74,14 @@ public sealed class LibcurlSourceCodeProtocolOptionTests
     [DataRow("--proto|=https,http,ftp", "  curl_easy_setopt(curl, CURLOPT_PROTOCOLS_STR, \"ftp,http,https\");\n")]
     [DataRow("--proto|all", "  curl_easy_setopt(curl, CURLOPT_PROTOCOLS_STR, \"dict,file,ftp,ftps,gopher,gophers,http,https,imap,imaps,ldap,ldaps,mqtt,mqtts,pop3,pop3s,rtsp,scp,sftp,smtp,smtps,telnet,tftp,ws,wss\");\n")]
     [DataRow("--proto-redir|=http", "  curl_easy_setopt(curl, CURLOPT_REDIR_PROTOCOLS_STR, \"http\");\n")]
-    [DataRow("--mail-auth|a@b", "  curl_easy_setopt(curl, CURLOPT_MAIL_AUTH, \"a@b\");\n")]
+    [DataRow("--mail-auth|a@b", "  curl_easy_setopt(curl, CURLOPT_MAIL_AUTH, \"a@b\");\n" + "  curl_easy_setopt(curl, CURLOPT_MAIL_AUTH, \"a@b\");\n")]
     [DataRow("--proto-default|FtP", "  curl_easy_setopt(curl, CURLOPT_DEFAULT_PROTOCOL, \"FtP\");\n")]
     [DataRow("--tftp-no-options", "  curl_easy_setopt(curl, CURLOPT_TFTP_NO_OPTIONS, 1L);\n")]
     [DataRow("--upload-flags|deleted", "  curl_easy_setopt(curl, CURLOPT_UPLOAD_FLAGS, 18L);\n")]
     [DataRow("--upload-flags|answered", "  curl_easy_setopt(curl, CURLOPT_UPLOAD_FLAGS, 17L);\n")]
     [DataRow("--upload-flags|draft", "  curl_easy_setopt(curl, CURLOPT_UPLOAD_FLAGS, 20L);\n")]
     [DataRow("--upload-flags|-seen", "  curl_easy_setopt(curl, CURLOPT_UPLOAD_FLAGS, 0L);\n")]
-    public void Generate_OptionWrittenLast_FollowsTheKeepaliveLines(string arguments, string lines)
+    public void Generate_OptionWrittenAmongTheLastLines_FollowsTheKeepaliveLines(string arguments, string lines)
     {
         string actual = SetoptLinesFor(arguments + "|" + HttpUrl);
 
@@ -114,10 +115,10 @@ public sealed class LibcurlSourceCodeProtocolOptionTests
     [DataRow("--limit-rate|1G", "102400L", "1073741824")]
     public void Generate_LimitRate_LowersTheBufferAndCapsBothDirections(string arguments, string buffer, string rate)
     {
-        string expected = Http.Replace("102400L", buffer, StringComparison.Ordinal)
+        string expected = Http[..^MaxRedirs.Length].Replace("102400L", buffer, StringComparison.Ordinal)
             + $"  curl_easy_setopt(curl, CURLOPT_MAX_SEND_SPEED_LARGE, (curl_off_t){rate});\n"
             + $"  curl_easy_setopt(curl, CURLOPT_MAX_RECV_SPEED_LARGE, (curl_off_t){rate});\n"
-            + After;
+            + MaxRedirs + After;
         string actual = SetoptLinesFor(arguments + "|" + HttpUrl);
 
         Diagnostics.Diff("setopt lines", expected, actual);
@@ -247,9 +248,20 @@ public sealed class LibcurlSourceCodeProtocolOptionTests
             + "  curl_easy_setopt(curl, CURLOPT_BUFFERSIZE, 1024L);\n"
             + "  curl_easy_setopt(curl, CURLOPT_URL, \"ftp://127.0.0.1:1/f\");\n"
             + NoProgress
+            + Agent
             + "  curl_easy_setopt(curl, CURLOPT_DIRLISTONLY, 1L);\n"
             + "  curl_easy_setopt(curl, CURLOPT_TRANSFERTEXT, 1L);\n"
-            + Agent
+            + "  curl_easy_setopt(curl, CURLOPT_LOW_SPEED_LIMIT, 1L);\n"
+            + "  curl_easy_setopt(curl, CURLOPT_LOW_SPEED_TIME, 30L);\n"
+            + "  curl_easy_setopt(curl, CURLOPT_MAX_SEND_SPEED_LARGE, (curl_off_t)1024);\n"
+            + "  curl_easy_setopt(curl, CURLOPT_MAX_RECV_SPEED_LARGE, (curl_off_t)1024);\n"
+            + "  curl_easy_setopt(curl, CURLOPT_RESUME_FROM_LARGE, (curl_off_t)5);\n"
+            + "  curl_easy_setopt(curl, CURLOPT_CRLF, 1L);\n"
+            + "  curl_easy_setopt(curl, CURLOPT_QUOTE, slist1);\n"
+            + "  curl_easy_setopt(curl, CURLOPT_POSTQUOTE, slist2);\n"
+            + "  curl_easy_setopt(curl, CURLOPT_PREQUOTE, slist3);\n"
+            + "  curl_easy_setopt(curl, CURLOPT_TIMECONDITION, (long)CURL_TIMECOND_IFMODSINCE);\n"
+            + "  curl_easy_setopt(curl, CURLOPT_TIMEVALUE_LARGE, (curl_off_t)1577836800);\n"
             + "  curl_easy_setopt(curl, CURLOPT_FTPPORT, \"-\");\n"
             + "  curl_easy_setopt(curl, CURLOPT_FTP_SSL_CCC, (long)CURLFTPSSL_CCC_ACTIVE);\n"
             + "  curl_easy_setopt(curl, CURLOPT_FTP_ACCOUNT, \"acc\");\n"
@@ -257,19 +269,8 @@ public sealed class LibcurlSourceCodeProtocolOptionTests
             + "  curl_easy_setopt(curl, CURLOPT_FTP_FILEMETHOD, 2L);\n"
             + "  curl_easy_setopt(curl, CURLOPT_FTP_ALTERNATIVE_TO_USER, \"alt\");\n"
             + "  curl_easy_setopt(curl, CURLOPT_FTP_USE_PRET, 1L);\n"
-            + "  curl_easy_setopt(curl, CURLOPT_LOW_SPEED_LIMIT, 1L);\n"
-            + "  curl_easy_setopt(curl, CURLOPT_LOW_SPEED_TIME, 30L);\n"
-            + "  curl_easy_setopt(curl, CURLOPT_MAX_SEND_SPEED_LARGE, (curl_off_t)1024);\n"
-            + "  curl_easy_setopt(curl, CURLOPT_MAX_RECV_SPEED_LARGE, (curl_off_t)1024);\n"
-            + "  curl_easy_setopt(curl, CURLOPT_RESUME_FROM_LARGE, (curl_off_t)5);\n"
             + Tls
             + "  curl_easy_setopt(curl, CURLOPT_USE_SSL, (long)CURLUSESSL_ALL);\n"
-            + "  curl_easy_setopt(curl, CURLOPT_CRLF, 1L);\n"
-            + "  curl_easy_setopt(curl, CURLOPT_QUOTE, slist1);\n"
-            + "  curl_easy_setopt(curl, CURLOPT_POSTQUOTE, slist2);\n"
-            + "  curl_easy_setopt(curl, CURLOPT_PREQUOTE, slist3);\n"
-            + "  curl_easy_setopt(curl, CURLOPT_TIMECONDITION, (long)CURL_TIMECOND_IFMODSINCE);\n"
-            + "  curl_easy_setopt(curl, CURLOPT_TIMEVALUE_LARGE, (curl_off_t)1577836800);\n"
             + "  curl_easy_setopt(curl, CURLOPT_INTERFACE, \"lo\");\n"
             + "  curl_easy_setopt(curl, CURLOPT_FTP_CREATE_MISSING_DIRS, 2L);\n"
             + "  curl_easy_setopt(curl, CURLOPT_MAXFILESIZE_LARGE, (curl_off_t)9);\n"
@@ -303,17 +304,32 @@ public sealed class LibcurlSourceCodeProtocolOptionTests
     }
 
     [TestMethod]
+    public void Generate_FtpCredentialsListOnlyQuotesAndSkipPasvIp_WritesUserPwdBeforeDirListOnlyAndSkipPasvIpAfterPrequote()
+    {
+        string source = GenerateSource("-u|user:pw|-l|-Q|NOOP|-Q|+PRE|--ftp-skip-pasv-ip|" + FtpUrl);
+
+        int userPwd = source.IndexOf("CURLOPT_USERPWD", StringComparison.Ordinal);
+        int dirListOnly = source.IndexOf("CURLOPT_DIRLISTONLY", StringComparison.Ordinal);
+        int preQuote = source.IndexOf("CURLOPT_PREQUOTE", StringComparison.Ordinal);
+        int skipPasvIp = source.IndexOf("CURLOPT_FTP_SKIP_PASV_IP", StringComparison.Ordinal);
+        Diagnostics.Assert("CURLOPT_USERPWD is written", true, userPwd >= 0);
+        Diagnostics.Assert("CURLOPT_USERPWD precedes CURLOPT_DIRLISTONLY", true, userPwd < dirListOnly);
+        Diagnostics.Assert("CURLOPT_FTP_SKIP_PASV_IP follows CURLOPT_PREQUOTE", true, preQuote < skipPasvIp);
+        Assert.IsGreaterThanOrEqualTo(0, userPwd);
+        Assert.IsLessThan(dirListOnly, userPwd);
+        Assert.IsGreaterThanOrEqualTo(0, preQuote);
+        Assert.IsLessThan(skipPasvIp, preQuote);
+    }
+
+    [TestMethod]
     public void Generate_OptionsOnHttpTogether_WriteEveryLineInCurlsOrder()
     {
         string expected =
             Buffer
             + "  curl_easy_setopt(curl, CURLOPT_URL, \"http://127.0.0.1:1/\");\n"
             + NoProgress
+            + Agent
             + "  curl_easy_setopt(curl, CURLOPT_NOBODY, 1L);\n"
-            + Agent + MaxRedirs + Tls
-            + "  curl_easy_setopt(curl, CURLOPT_SSL_CIPHER_LIST, \"x\");\n"
-            + "  curl_easy_setopt(curl, CURLOPT_USE_SSL, (long)CURLUSESSL_TRY);\n"
-            + "  curl_easy_setopt(curl, CURLOPT_SSL_ENABLE_ALPN, 0L);\n"
             + "  curl_easy_setopt(curl, CURLOPT_PATH_AS_IS, 1L);\n"
             + "  curl_easy_setopt(curl, CURLOPT_FILETIME, 1L);\n"
             + "  curl_easy_setopt(curl, CURLOPT_CRLF, 1L);\n"
@@ -321,6 +337,11 @@ public sealed class LibcurlSourceCodeProtocolOptionTests
             + "  curl_easy_setopt(curl, CURLOPT_TIMECONDITION, (long)CURL_TIMECOND_IFMODSINCE);\n"
             + "  curl_easy_setopt(curl, CURLOPT_TIMEVALUE_LARGE, (curl_off_t)1577836800);\n"
             + "  curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, \"GET\");\n"
+            + MaxRedirs
+            + Tls
+            + "  curl_easy_setopt(curl, CURLOPT_SSL_CIPHER_LIST, \"x\");\n"
+            + "  curl_easy_setopt(curl, CURLOPT_USE_SSL, (long)CURLUSESSL_TRY);\n"
+            + "  curl_easy_setopt(curl, CURLOPT_SSL_ENABLE_ALPN, 0L);\n"
             + "  curl_easy_setopt(curl, CURLOPT_INTERFACE, \"lo\");\n"
             + "  curl_easy_setopt(curl, CURLOPT_TELNETOPTIONS, slist2);\n"
             + "  curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT_MS, 5000L);\n"
@@ -336,11 +357,15 @@ public sealed class LibcurlSourceCodeProtocolOptionTests
             + "  curl_easy_setopt(curl, CURLOPT_MAIL_FROM, \"f\");\n"
             + "  curl_easy_setopt(curl, CURLOPT_MAIL_RCPT, slist3);\n"
             + "  curl_easy_setopt(curl, CURLOPT_MAIL_RCPT_ALLOWFAILS, 1L);\n"
+            + "  curl_easy_setopt(curl, CURLOPT_MAIL_AUTH, \"a\");\n"
+            + "  curl_easy_setopt(curl, CURLOPT_SASL_AUTHZID, \"z\");\n"
+            + "  curl_easy_setopt(curl, CURLOPT_SASL_IR, 1L);\n"
             + "  curl_easy_setopt(curl, CURLOPT_NEW_FILE_PERMS, 384L);\n"
-            + "  curl_easy_setopt(curl, CURLOPT_PROTOCOLS_STR, \"http\");\n"
-            + "  curl_easy_setopt(curl, CURLOPT_REDIR_PROTOCOLS_STR, \"http\");\n"
             + "  curl_easy_setopt(curl, CURLOPT_RESOLVE, slist4);\n"
             + "  curl_easy_setopt(curl, CURLOPT_CONNECT_TO, slist5);\n"
+            + "  curl_easy_setopt(curl, CURLOPT_GSSAPI_DELEGATION, 2L);\n"
+            + "  curl_easy_setopt(curl, CURLOPT_PROTOCOLS_STR, \"http\");\n"
+            + "  curl_easy_setopt(curl, CURLOPT_REDIR_PROTOCOLS_STR, \"http\");\n"
             + "  curl_easy_setopt(curl, CURLOPT_GSSAPI_DELEGATION, 2L);\n"
             + "  curl_easy_setopt(curl, CURLOPT_MAIL_AUTH, \"a\");\n"
             + "  curl_easy_setopt(curl, CURLOPT_SASL_AUTHZID, \"z\");\n"

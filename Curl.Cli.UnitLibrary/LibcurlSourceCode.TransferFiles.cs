@@ -2,7 +2,7 @@ namespace Curl.Cli;
 
 /// <summary>
 /// The <c>--libcurl</c> lines that need what the console learns about a transfer's files (BL-1177), measured
-/// with curl 8.21.0 (Schannel) on 2026-10-02: the <c>-T</c> URL, upload flag and file size, the
+/// with curl 8.21.0 (Schannel) on 2026-10-02 and checked with curl 8.22.0 on 2026-10-21: the <c>-T</c> URL, upload flag and file size, the
 /// <c>--etag-compare</c> header, the <c>-C -</c> offset and the SSH known-hosts file.
 /// </summary>
 public static partial class LibcurlSourceCode

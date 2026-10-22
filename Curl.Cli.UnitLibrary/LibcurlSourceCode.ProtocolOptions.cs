@@ -4,7 +4,7 @@ namespace Curl.Cli;
 
 /// <summary>
 /// The <c>--libcurl</c> lines for the FTP, SSH, TFTP, telnet, mail, verbose, rate-limit and protocol options
-/// BL-1174 measured with curl 8.21.0 (Schannel) on 2026-10-02: each method writes its options' lines in the
+/// BL-1174 measured with curl 8.21.0 (Schannel) on 2026-10-02, in the order BL-2966 measured with curl 8.22.0 on 2026-10-21: each method writes its options' lines in the
 /// order curl writes them, and <see cref="LibcurlSourceCode" />'s other parts call each at its place in that
 /// order. Only the FTP and SSH lines depend on the URL's scheme; curl writes the others for every scheme.
 /// </summary>
@@ -13,7 +13,7 @@ public static partial class LibcurlSourceCode
     /// <summary>The buffer size curl's tool sets, and the largest a <c>--limit-rate</c> lowers it from.</summary>
     private const long DefaultBufferSize = 102400;
 
-    /// <summary>The schemes curl 8.21.0's Schannel build writes for <c>--proto all</c>: it has no SMB.</summary>
+    /// <summary>The schemes curl 8.22.0's Schannel build writes for <c>--proto all</c>: it has no SMB.</summary>
     private static readonly HashSet<string> SchemesWithoutLibcurlSupport = ["smb", "smbs"];
 
     private static readonly string[] DebugCallbackLines =
@@ -30,7 +30,7 @@ public static partial class LibcurlSourceCode
 
     /// <summary>
     /// The list of options that cannot be written as source and the <c>curl_easy_perform</c> call; nothing
-    /// with <c>-Z</c>, as curl 8.21.0 writes neither for a parallel transfer. <c>-v</c> and <c>--trace</c>
+    /// with <c>-Z</c>, as curl 8.22.0 writes neither for a parallel transfer. <c>-v</c> and <c>--trace</c>
     /// add the debug callback first, <c>--mptcp</c> the open-socket callback and a non-zero
     /// <c>--ip-tos</c> or <c>--vlan-priority</c> the socket-option callback last.
     /// </summary>
@@ -67,7 +67,7 @@ public static partial class LibcurlSourceCode
     }
 
     /// <summary>
-    /// The lines curl 8.21.0 writes for an <c>ftp</c> or <c>ftps</c> URL, in its order: <c>-P</c>, the CCC
+    /// The lines curl 8.22.0 writes for an <c>ftp</c> or <c>ftps</c> URL, in its order: <c>-P</c>, the CCC
     /// mode and <c>--ftp-account</c>, the passive-IP skip (on unless <c>--no-ftp-skip-pasv-ip</c>), then
     /// <c>--ftp-method</c> (written whenever given, <c>multicwd</c> as <c>1L</c>),
     /// <c>--ftp-alternative-to-user</c> and <c>--ftp-pret</c>.
@@ -86,7 +86,7 @@ public static partial class LibcurlSourceCode
     }
 
     /// <summary>
-    /// The lines curl 8.21.0 writes for an <c>scp</c> or <c>sftp</c> URL, after the key passwords: the private
+    /// The lines curl 8.22.0 writes for an <c>scp</c> or <c>sftp</c> URL, after the FTP lines: the private
     /// and public key files, the host key hashes, <c>--compressed-ssh</c> and the known-hosts file.
     /// </summary>
     private static List<string> SshLines(LibcurlTransfer transfer, string scheme)
@@ -131,20 +131,46 @@ public static partial class LibcurlSourceCode
     }
 
     /// <summary>
-    /// The lines after the keepalive ones and before <c>CURLOPT_RESOLVE</c>: <c>--tftp-blksize</c> (any value
-    /// given), the mail sender and recipients, a non-zero <c>--create-file-mode</c>, and the <c>--proto</c> and
-    /// <c>--proto-redir</c> schemes.
+    /// The lines of curl 8.22.0's <c>dns_and_network_setopts</c>, after the TLS ones: the connection, SOCKS
+    /// and socket lines, then <c>--tftp-blksize</c> (any value given).
     /// </summary>
-    private static List<string> MailFileModeAndProtocolLines(CommandLineOptions options, LibcurlSourceVariables variables)
+    private static List<string> DnsAndNetworkLines(CommandLineOptions options, LibcurlSourceVariables variables)
+    {
+        List<string> lines = [.. ConnectionLines(options, variables), .. SocksAndServiceLines(options), .. SocketLines(options)];
+        AddIf(lines, options.TftpBlockSize is not null, () => Setopt("CURLOPT_TFTP_BLKSIZE", $"{options.TftpBlockSize}L"));
+        return lines;
+    }
+
+    /// <summary>
+    /// The lines of curl 8.22.0's <c>mail_and_sasl_setopts</c>: the mail sender and recipients, the mail
+    /// authentication and SASL lines, and a non-zero <c>--create-file-mode</c>.
+    /// </summary>
+    private static List<string> MailAndSaslLines(CommandLineOptions options, LibcurlSourceVariables variables)
     {
         List<string> lines = [];
-        AddIf(lines, options.TftpBlockSize is not null, () => Setopt("CURLOPT_TFTP_BLKSIZE", $"{options.TftpBlockSize}L"));
         AddStringIf(lines, "CURLOPT_MAIL_FROM", options.MailFrom);
         AddStringListIf(lines, "CURLOPT_MAIL_RCPT", options.MailRecipients, variables);
         AddIf(lines, options.MailRecipientAllowFails, SetoptOn("CURLOPT_MAIL_RCPT_ALLOWFAILS"));
+        lines.AddRange(MailAuthAndSaslLines(options));
         AddIf(lines, options.CreateFileMode is { } mode && mode != 0, () => Setopt("CURLOPT_NEW_FILE_PERMS", $"{(int)options.CreateFileMode!.Value}L"));
+        return lines;
+    }
+
+    /// <summary>
+    /// The lines of curl 8.22.0's <c>misc_setopts</c>, the last of a transfer's before the upload size:
+    /// <c>--resolve</c>, <c>--connect-to</c>, <c>--delegation</c>, the <c>--proto</c> and <c>--proto-redir</c>
+    /// schemes, <c>--delegation</c> and the mail authentication and SASL lines again, the socket and URL
+    /// lines and <c>--upload-flags</c>.
+    /// </summary>
+    private static List<string> MiscellaneousLines(CommandLineOptions options, LibcurlSourceVariables variables)
+    {
+        List<string> lines = [];
+        AddStringListIf(lines, "CURLOPT_RESOLVE", options.ResolveEntries, variables);
+        AddStringListIf(lines, "CURLOPT_CONNECT_TO", options.ConnectToEntries, variables);
+        lines.AddRange(DelegationLines(options));
         AddStringIf(lines, "CURLOPT_PROTOCOLS_STR", ProtocolList(options.AllowedProtocols));
         AddStringIf(lines, "CURLOPT_REDIR_PROTOCOLS_STR", ProtocolList(options.AllowedRedirectProtocols));
+        lines.AddRange([.. DelegationLines(options), .. MailAuthAndSaslLines(options), .. UnixSocketAndUrlLines(options), .. UploadFlagLines(options)]);
         return lines;
     }
 
@@ -155,7 +181,7 @@ public static partial class LibcurlSourceCode
             : string.Join(",", schemes.Select(scheme => scheme.ToLowerInvariant()).Where(scheme => !SchemesWithoutLibcurlSupport.Contains(scheme)).Order(StringComparer.Ordinal));
 
     /// <summary>
-    /// The <c>--upload-flags</c> line, the last of a transfer's lines: written whenever the flags are not
+    /// The <c>--upload-flags</c> line, the last of <c>misc_setopts</c>: written whenever the flags are not
     /// libcurl's default of <c>\Seen</c> alone.
     /// </summary>
     private static List<string> UploadFlagLines(CommandLineOptions options) =>

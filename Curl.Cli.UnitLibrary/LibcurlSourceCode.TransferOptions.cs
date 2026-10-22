@@ -5,7 +5,7 @@ namespace Curl.Cli;
 
 /// <summary>
 /// The <c>--libcurl</c> lines for the transfer, redirect, speed, time-condition and socket options BL-1106
-/// measured with curl 8.21.0 (Schannel) on 2026-10-02: each method writes its options' lines in the order
+/// measured with curl 8.21.0 (Schannel) on 2026-10-02, in the order BL-2966 measured with curl 8.22.0 on 2026-10-21: each method writes its options' lines in the order
 /// curl writes them, and <see cref="LibcurlSourceCode" />'s other parts call each at its place in that order.
 /// </summary>
 public static partial class LibcurlSourceCode
@@ -16,7 +16,7 @@ public static partial class LibcurlSourceCode
         [RequestedHttpVersion.Http11] = "(long)CURL_HTTP_VERSION_1_1",
     }.ToFrozenDictionary();
 
-    /// <summary>The <c>--request-target</c>, <c>-T</c> upload, <c>-l</c> and <c>-a</c> lines, after <c>CURLOPT_FAILONERROR</c> and before the netrc lines.</summary>
+    /// <summary>The <c>--request-target</c>, <c>-T</c> upload, <c>-l</c>, <c>-a</c> and <c>-B</c> lines, after <c>CURLOPT_FAILONERROR</c> and before <c>CURLOPT_RANGE</c>.</summary>
     private static List<string> TransferModeLines(CommandLineOptions options, bool uploads)
     {
         List<string> lines = [];
@@ -24,6 +24,7 @@ public static partial class LibcurlSourceCode
         AddIf(lines, uploads, SetoptOn("CURLOPT_UPLOAD"));
         AddIf(lines, options.ListOnly, SetoptOn("CURLOPT_DIRLISTONLY"));
         AddIf(lines, options.Append, SetoptOn("CURLOPT_APPEND"));
+        AddIf(lines, options.UseAscii, SetoptOn("CURLOPT_TRANSFERTEXT"));
         return lines;
     }
 
@@ -61,7 +62,7 @@ public static partial class LibcurlSourceCode
     }
 
     /// <summary>
-    /// The <c>-Y</c>/<c>-y</c> and <c>-C</c> lines, after the scheme's lines: <c>-Y</c> alone also writes a
+    /// The <c>-Y</c>/<c>-y</c>, <c>--limit-rate</c> and <c>-C</c> lines, after the request body.s: <c>-Y</c> alone also writes a
     /// 30-second time and <c>-y</c> alone a limit of 1, and a zero limit, time or offset is not written.
     /// </summary>
     private static List<string> SpeedAndResumeLines(CommandLineOptions options, long resumeOffset)
@@ -77,8 +78,8 @@ public static partial class LibcurlSourceCode
     }
 
     /// <summary>
-    /// The lines after the TLS ones: <c>--path-as-is</c>, the file time <c>-I</c> or <c>-R</c> asks for,
-    /// <c>--crlf</c> and the <c>-z</c> condition, its time in seconds since 1970.
+    /// The lines after the resume one: <c>--path-as-is</c>, the file time <c>-I</c> or <c>-R</c> asks for,
+    /// <c>--crlf</c>, the <c>-Q</c> lists and the <c>-z</c> condition, its time in seconds since 1970.
     /// </summary>
     private static List<string> PathFileTimeAndConditionLines(CommandLineOptions options, LibcurlSourceVariables variables)
     {
@@ -97,11 +98,10 @@ public static partial class LibcurlSourceCode
         return lines;
     }
 
-    /// <summary>The <c>-X</c>, <c>--interface</c>, <c>--connect-timeout</c>, <c>--doh-url</c>, <c>--max-filesize</c>, <c>-4</c> and <c>-6</c> lines, in that order.</summary>
-    private static List<string> RequestAndConnectionLines(CommandLineOptions options, LibcurlSourceVariables variables)
+    /// <summary>The <c>--interface</c>, <c>--telnet-option</c>, <c>--connect-timeout</c>, <c>--doh-url</c>, <c>--max-filesize</c>, <c>-4</c> and <c>-6</c> lines, in that order.</summary>
+    private static List<string> ConnectionLines(CommandLineOptions options, LibcurlSourceVariables variables)
     {
         List<string> lines = [];
-        AddStringIf(lines, "CURLOPT_CUSTOMREQUEST", options.RequestMethod);
         AddStringIf(lines, "CURLOPT_INTERFACE", options.Interface?.Value);
         AddStringListIf(lines, "CURLOPT_TELNETOPTIONS", options.TelnetOptions, variables);
         AddIf(lines, options.ConnectTimeout > TimeSpan.Zero, () => SetoptMilliseconds("CURLOPT_CONNECTTIMEOUT_MS", options.ConnectTimeout!.Value));
@@ -138,7 +138,7 @@ public static partial class LibcurlSourceCode
         return lines;
     }
 
-    /// <summary>The last lines of a transfer: the Unix socket, <c>--happy-eyeballs-timeout-ms</c> and <c>--disallow-username-in-url</c>.</summary>
+    /// <summary>The Unix socket, <c>--proto-default</c>, <c>--tftp-no-options</c>, <c>--happy-eyeballs-timeout-ms</c> and <c>--disallow-username-in-url</c> lines, before <c>--upload-flags</c>.</summary>
     private static List<string> UnixSocketAndUrlLines(CommandLineOptions options)
     {
         List<string> lines = [];

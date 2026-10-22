@@ -4,7 +4,7 @@ namespace Curl.Cli;
 
 /// <summary>
 /// Pins the <c>curl_easy_setopt</c> lines <see cref="LibcurlSourceCode" /> writes for the proxy, TLS and
-/// authentication options against curl 8.21.0 (mingw, Schannel), measured on 2026-10-01 with
+/// authentication options against curl 8.21.0 (mingw, Schannel), measured on 2026-10-01 and reordered to curl 8.22.0 (config2setopts.c order) with
 /// <c>Record-CurlExchange.ps1 -NoServer</c> and <c>--libcurl - -s</c> (BL-654 Notes). Each row is one
 /// measured command line; the transfer's lines are compared byte for byte.
 /// </summary>
@@ -44,22 +44,22 @@ public sealed class LibcurlSourceCodeProxyTlsAndAuthenticationTests
     [DataRow("-k", Start + Agent + MaxRedirs + "  curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);\n  curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);\n" + Tls + KeepAlive)]
     [DataRow("--cacert|ca.pem", Start + Agent + MaxRedirs + "  curl_easy_setopt(curl, CURLOPT_CAINFO, \"ca.pem\");\n" + Tls + KeepAlive)]
     [DataRow("--cert|c.pem", Start + Agent + MaxRedirs + "  curl_easy_setopt(curl, CURLOPT_SSLCERT, \"c.pem\");\n" + Tls + KeepAlive)]
-    [DataRow("--cert|c.pem:pw", Start + Agent + MaxRedirs + "  curl_easy_setopt(curl, CURLOPT_KEYPASSWD, \"pw\");\n  curl_easy_setopt(curl, CURLOPT_SSLCERT, \"c.pem\");\n" + Tls + KeepAlive)]
-    [DataRow("--cert|c.pem:pw|--pass|qq", Start + Agent + MaxRedirs + "  curl_easy_setopt(curl, CURLOPT_KEYPASSWD, \"qq\");\n  curl_easy_setopt(curl, CURLOPT_SSLCERT, \"c.pem\");\n" + Tls + KeepAlive)]
-    [DataRow("--cert|C:/x/c.pem:pw", Start + Agent + MaxRedirs + "  curl_easy_setopt(curl, CURLOPT_KEYPASSWD, \"pw\");\n  curl_easy_setopt(curl, CURLOPT_SSLCERT, \"C:/x/c.pem\");\n" + Tls + KeepAlive)]
-    [DataRow("--cert|a\\:b:pw", Start + Agent + MaxRedirs + "  curl_easy_setopt(curl, CURLOPT_KEYPASSWD, \"pw\");\n  curl_easy_setopt(curl, CURLOPT_SSLCERT, \"a:b\");\n" + Tls + KeepAlive)]
-    [DataRow("--cert|a\\\\b:pw", Start + Agent + MaxRedirs + "  curl_easy_setopt(curl, CURLOPT_KEYPASSWD, \"pw\");\n  curl_easy_setopt(curl, CURLOPT_SSLCERT, \"a\\\\b\");\n" + Tls + KeepAlive)]
+    [DataRow("--cert|c.pem:pw", Start + Agent + "  curl_easy_setopt(curl, CURLOPT_KEYPASSWD, \"pw\");\n" + MaxRedirs + "  curl_easy_setopt(curl, CURLOPT_SSLCERT, \"c.pem\");\n" + Tls + KeepAlive)]
+    [DataRow("--cert|c.pem:pw|--pass|qq", Start + Agent + "  curl_easy_setopt(curl, CURLOPT_KEYPASSWD, \"qq\");\n" + MaxRedirs + "  curl_easy_setopt(curl, CURLOPT_SSLCERT, \"c.pem\");\n" + Tls + KeepAlive)]
+    [DataRow("--cert|C:/x/c.pem:pw", Start + Agent + "  curl_easy_setopt(curl, CURLOPT_KEYPASSWD, \"pw\");\n" + MaxRedirs + "  curl_easy_setopt(curl, CURLOPT_SSLCERT, \"C:/x/c.pem\");\n" + Tls + KeepAlive)]
+    [DataRow("--cert|a\\:b:pw", Start + Agent + "  curl_easy_setopt(curl, CURLOPT_KEYPASSWD, \"pw\");\n" + MaxRedirs + "  curl_easy_setopt(curl, CURLOPT_SSLCERT, \"a:b\");\n" + Tls + KeepAlive)]
+    [DataRow("--cert|a\\\\b:pw", Start + Agent + "  curl_easy_setopt(curl, CURLOPT_KEYPASSWD, \"pw\");\n" + MaxRedirs + "  curl_easy_setopt(curl, CURLOPT_SSLCERT, \"a\\\\b\");\n" + Tls + KeepAlive)]
     [DataRow("--cert|pkcs11:a:b", Start + Agent + MaxRedirs + "  curl_easy_setopt(curl, CURLOPT_SSLCERT, \"pkcs11:a:b\");\n  curl_easy_setopt(curl, CURLOPT_SSLCERTTYPE, \"ENG\");\n" + Tls + KeepAlive)]
     [DataRow("--cert|c.pem:", Start + Agent + MaxRedirs + "  curl_easy_setopt(curl, CURLOPT_SSLCERT, \"c.pem\");\n" + Tls + KeepAlive)]
-    [DataRow("--cert|a:b:c", Start + Agent + MaxRedirs + "  curl_easy_setopt(curl, CURLOPT_KEYPASSWD, \"b:c\");\n  curl_easy_setopt(curl, CURLOPT_SSLCERT, \"a\");\n" + Tls + KeepAlive)]
+    [DataRow("--cert|a:b:c", Start + Agent + "  curl_easy_setopt(curl, CURLOPT_KEYPASSWD, \"b:c\");\n" + MaxRedirs + "  curl_easy_setopt(curl, CURLOPT_SSLCERT, \"a\");\n" + Tls + KeepAlive)]
     [DataRow("--cert|C:", Start + Agent + MaxRedirs + "  curl_easy_setopt(curl, CURLOPT_SSLCERT, \"C\");\n" + Tls + KeepAlive)]
-    [DataRow("--cert|1:/x", Start + Agent + MaxRedirs + "  curl_easy_setopt(curl, CURLOPT_KEYPASSWD, \"/x\");\n  curl_easy_setopt(curl, CURLOPT_SSLCERT, \"1\");\n" + Tls + KeepAlive)]
+    [DataRow("--cert|1:/x", Start + Agent + "  curl_easy_setopt(curl, CURLOPT_KEYPASSWD, \"/x\");\n" + MaxRedirs + "  curl_easy_setopt(curl, CURLOPT_SSLCERT, \"1\");\n" + Tls + KeepAlive)]
     [DataRow("--cert|a\\b", Start + Agent + MaxRedirs + "  curl_easy_setopt(curl, CURLOPT_SSLCERT, \"a\\\\b\");\n" + Tls + KeepAlive)]
     [DataRow("--cert|a\\", Start + Agent + MaxRedirs + "  curl_easy_setopt(curl, CURLOPT_SSLCERT, \"a\\\\\");\n" + Tls + KeepAlive)]
     [DataRow("--key|k.pem", Start + Agent + MaxRedirs + "  curl_easy_setopt(curl, CURLOPT_SSLKEY, \"k.pem\");\n" + Tls + KeepAlive)]
     [DataRow("--cert-type|DER", Start + Agent + MaxRedirs + "  curl_easy_setopt(curl, CURLOPT_SSLCERTTYPE, \"DER\");\n" + Tls + KeepAlive)]
     [DataRow("--key-type|DER", Start + Agent + MaxRedirs + "  curl_easy_setopt(curl, CURLOPT_SSLKEYTYPE, \"DER\");\n" + Tls + KeepAlive)]
-    [DataRow("--pass|pw", Start + Agent + MaxRedirs + "  curl_easy_setopt(curl, CURLOPT_KEYPASSWD, \"pw\");\n" + Tls + KeepAlive)]
+    [DataRow("--pass|pw", Start + Agent + "  curl_easy_setopt(curl, CURLOPT_KEYPASSWD, \"pw\");\n" + MaxRedirs + Tls + KeepAlive)]
     [DataRow("--ciphers|ECDHE", Start + Agent + MaxRedirs + Tls + "  curl_easy_setopt(curl, CURLOPT_SSL_CIPHER_LIST, \"ECDHE\");\n" + KeepAlive)]
     [DataRow("--pinnedpubkey|sha256//abc=", Start + Agent + MaxRedirs + "  curl_easy_setopt(curl, CURLOPT_PINNEDPUBLICKEY, \"sha256//abc=\");\n" + Tls + KeepAlive)]
     [DataRow("--ssl-no-revoke", Start + Agent + MaxRedirs + Tls + "  curl_easy_setopt(curl, CURLOPT_SSL_OPTIONS, (long)CURLSSLOPT_NO_REVOKE);\n" + KeepAlive)]
@@ -128,7 +128,7 @@ public sealed class LibcurlSourceCodeProxyTlsAndAuthenticationTests
     [DataRow("--proxy-key|k.pem|-x|https://p:3128", Start + HttpsProxy + Agent + MaxRedirs + HeaderOpt + "  curl_easy_setopt(curl, CURLOPT_PROXY_SSLKEY, \"k.pem\");\n" + Tls + KeepAlive)]
     [DataRow("--proxy-cert-type|DER|-x|https://p:3128", Start + HttpsProxy + Agent + MaxRedirs + HeaderOpt + "  curl_easy_setopt(curl, CURLOPT_PROXY_SSLCERTTYPE, \"DER\");\n" + Tls + KeepAlive)]
     [DataRow("--proxy-key-type|DER|-x|https://p:3128", Start + HttpsProxy + Agent + MaxRedirs + HeaderOpt + "  curl_easy_setopt(curl, CURLOPT_PROXY_SSLKEYTYPE, \"DER\");\n" + Tls + KeepAlive)]
-    [DataRow("--proxy-pass|pw|-x|https://p:3128", Start + HttpsProxy + Agent + MaxRedirs + HeaderOpt + "  curl_easy_setopt(curl, CURLOPT_PROXY_KEYPASSWD, \"pw\");\n" + Tls + KeepAlive)]
+    [DataRow("--proxy-pass|pw|-x|https://p:3128", Start + HttpsProxy + "  curl_easy_setopt(curl, CURLOPT_PROXY_KEYPASSWD, \"pw\");\n" + Agent + MaxRedirs + HeaderOpt + Tls + KeepAlive)]
     [DataRow("--proxy-ciphers|ECDHE|-x|https://p:3128", Start + HttpsProxy + Agent + MaxRedirs + HeaderOpt + Tls + "  curl_easy_setopt(curl, CURLOPT_PROXY_SSL_CIPHER_LIST, \"ECDHE\");\n" + KeepAlive)]
     [DataRow("--proxy-tls13-ciphers|TLS_AES_128_GCM_SHA256|-x|https://p:3128", Start + HttpsProxy + Agent + MaxRedirs + HeaderOpt + Tls + KeepAlive)]
     [DataRow("--proxy-pinnedpubkey|sha256//abc=|-x|https://p:3128", Start + HttpsProxy + Agent + MaxRedirs + HeaderOpt + "  curl_easy_setopt(curl, CURLOPT_PROXY_PINNEDPUBLICKEY, \"sha256//abc=\");\n" + Tls + KeepAlive)]
@@ -137,7 +137,7 @@ public sealed class LibcurlSourceCodeProxyTlsAndAuthenticationTests
     [DataRow("--proxy-ssl-allow-beast|-x|https://p:3128", Start + HttpsProxy + Agent + MaxRedirs + HeaderOpt + Tls + "  curl_easy_setopt(curl, CURLOPT_PROXY_SSL_OPTIONS, (long)CURLSSLOPT_ALLOW_BEAST);\n" + KeepAlive)]
     [DataRow("--proxy-tlsv1|-x|https://p:3128", Start + HttpsProxy + Agent + MaxRedirs + HeaderOpt + Tls + "  curl_easy_setopt(curl, CURLOPT_PROXY_SSLVERSION, (long)CURL_SSLVERSION_TLSv1);\n" + KeepAlive)]
     [DataRow("--proxy-tlsv1", Start + Plain)]
-    [DataRow("--proxy-cert|pc:pp|--proxy-key|pkcs11:x", Start + Agent + MaxRedirs + "  curl_easy_setopt(curl, CURLOPT_PROXY_KEYPASSWD, \"pp\");\n  curl_easy_setopt(curl, CURLOPT_PROXY_SSLCERT, \"pc\");\n  curl_easy_setopt(curl, CURLOPT_PROXY_SSLKEY, \"pkcs11:x\");\n  curl_easy_setopt(curl, CURLOPT_PROXY_SSLKEYTYPE, \"ENG\");\n" + Tls + KeepAlive)]
+    [DataRow("--proxy-cert|pc:pp|--proxy-key|pkcs11:x", Start + "  curl_easy_setopt(curl, CURLOPT_PROXY_KEYPASSWD, \"pp\");\n" + Agent + MaxRedirs + "  curl_easy_setopt(curl, CURLOPT_PROXY_SSLCERT, \"pc\");\n  curl_easy_setopt(curl, CURLOPT_PROXY_SSLKEY, \"pkcs11:x\");\n  curl_easy_setopt(curl, CURLOPT_PROXY_SSLKEYTYPE, \"ENG\");\n" + Tls + KeepAlive)]
     public void Generate_ProxyOption_WritesCurlsLines(string arguments, string transfer)
     {
         string actual = TransferLinesFor(arguments + "|" + Url);
@@ -159,15 +159,15 @@ public sealed class LibcurlSourceCodeProxyTlsAndAuthenticationTests
     [DataRow("--oauth2-bearer|t|--basic", Start + "  curl_easy_setopt(curl, CURLOPT_XOAUTH2_BEARER, \"t\");\n  curl_easy_setopt(curl, CURLOPT_HTTPAUTH, (long)CURLAUTH_BASIC |\n" + Indent + "(long)CURLAUTH_NONE |\n" + Indent + "64UL);\n" + Plain)]
     [DataRow("-u|a:b|--oauth2-bearer|t|--anyauth", Start + "  curl_easy_setopt(curl, CURLOPT_XOAUTH2_BEARER, \"t\");\n" + Credentials + "  curl_easy_setopt(curl, CURLOPT_HTTPAUTH, (long)CURLAUTH_ANY);\n" + Plain)]
     [DataRow("--aws-sigv4|aws:amz:us-east-1:s3|-u|a:b", Start + Credentials + "  curl_easy_setopt(curl, CURLOPT_HTTPAUTH, (long)CURLAUTH_NONE |\n" + Indent + "128UL);\n" + Agent + "  curl_easy_setopt(curl, CURLOPT_AWS_SIGV4, \"aws:amz:us-east-1:s3\");\n" + MaxRedirs + Tls + KeepAlive)]
-    [DataRow("--delegation|always", Start + Plain + "  curl_easy_setopt(curl, CURLOPT_GSSAPI_DELEGATION, 2L);\n")]
-    [DataRow("--delegation|policy", Start + Plain + "  curl_easy_setopt(curl, CURLOPT_GSSAPI_DELEGATION, 1L);\n")]
+    [DataRow("--delegation|always", Start + Plain + "  curl_easy_setopt(curl, CURLOPT_GSSAPI_DELEGATION, 2L);\n  curl_easy_setopt(curl, CURLOPT_GSSAPI_DELEGATION, 2L);\n")]
+    [DataRow("--delegation|policy", Start + Plain + "  curl_easy_setopt(curl, CURLOPT_GSSAPI_DELEGATION, 1L);\n  curl_easy_setopt(curl, CURLOPT_GSSAPI_DELEGATION, 1L);\n")]
     [DataRow("--delegation|none", Start + Plain)]
     [DataRow("--service-name|svc", Start + Agent + MaxRedirs + Tls + "  curl_easy_setopt(curl, CURLOPT_SERVICE_NAME, \"svc\");\n" + KeepAlive)]
     [DataRow("-n", Start + "  curl_easy_setopt(curl, CURLOPT_NETRC, (long)CURL_NETRC_REQUIRED);\n" + Plain)]
     [DataRow("--netrc-optional", Start + "  curl_easy_setopt(curl, CURLOPT_NETRC, (long)CURL_NETRC_OPTIONAL);\n" + Plain)]
     [DataRow("--netrc-file|n.txt", Start + "  curl_easy_setopt(curl, CURLOPT_NETRC, (long)CURL_NETRC_REQUIRED);\n  curl_easy_setopt(curl, CURLOPT_NETRC_FILE, \"n.txt\");\n" + Plain)]
-    [DataRow("--sasl-authzid|z", Start + Plain + "  curl_easy_setopt(curl, CURLOPT_SASL_AUTHZID, \"z\");\n")]
-    [DataRow("--sasl-ir", Start + Plain + "  curl_easy_setopt(curl, CURLOPT_SASL_IR, 1L);\n")]
+    [DataRow("--sasl-authzid|z", Start + Plain + "  curl_easy_setopt(curl, CURLOPT_SASL_AUTHZID, \"z\");\n  curl_easy_setopt(curl, CURLOPT_SASL_AUTHZID, \"z\");\n")]
+    [DataRow("--sasl-ir", Start + Plain + "  curl_easy_setopt(curl, CURLOPT_SASL_IR, 1L);\n  curl_easy_setopt(curl, CURLOPT_SASL_IR, 1L);\n")]
     [DataRow("--login-options|AUTH=*", Start + "  curl_easy_setopt(curl, CURLOPT_LOGIN_OPTIONS, \"AUTH=*\");\n" + Plain)]
     [DataRow("--location-trusted|--no-location|-u|a:b", Start + Credentials + Agent + "  curl_easy_setopt(curl, CURLOPT_UNRESTRICTED_AUTH, 1L);\n" + MaxRedirs + Tls + KeepAlive)]
     public void Generate_AuthenticationOption_WritesCurlsLines(string arguments, string transfer)
@@ -197,16 +197,16 @@ public sealed class LibcurlSourceCodeProxyTlsAndAuthenticationTests
             + "  curl_easy_setopt(curl, CURLOPT_PROXY_SERVICE_NAME, \"s\");\n"
             + "  curl_easy_setopt(curl, CURLOPT_HAPROXYPROTOCOL, 1L);\n"
             + "  curl_easy_setopt(curl, CURLOPT_HAPROXY_CLIENT_IP, \"1.2.3.4\");\n"
+            + "  curl_easy_setopt(curl, CURLOPT_PROXY_KEYPASSWD, \"pw\");\n"
             + "  curl_easy_setopt(curl, CURLOPT_NETRC, (long)CURL_NETRC_OPTIONAL);\n"
             + "  curl_easy_setopt(curl, CURLOPT_LOGIN_OPTIONS, \"L\");\n"
             + Credentials
             + "  curl_easy_setopt(curl, CURLOPT_HTTPAUTH, (long)CURLAUTH_DIGEST);\n"
             + Agent
+            + "  curl_easy_setopt(curl, CURLOPT_KEYPASSWD, \"pw\");\n"
             + "  curl_easy_setopt(curl, CURLOPT_PROXYHEADER, slist1);\n"
             + MaxRedirs
             + HeaderOpt
-            + "  curl_easy_setopt(curl, CURLOPT_KEYPASSWD, \"pw\");\n"
-            + "  curl_easy_setopt(curl, CURLOPT_PROXY_KEYPASSWD, \"pw\");\n"
             + "  curl_easy_setopt(curl, CURLOPT_CAINFO, \"ca.pem\");\n"
             + "  curl_easy_setopt(curl, CURLOPT_PROXY_CAINFO, \"ca.pem\");\n"
             + "  curl_easy_setopt(curl, CURLOPT_PINNEDPUBLICKEY, \"sha256//a\");\n"
@@ -241,6 +241,9 @@ public sealed class LibcurlSourceCodeProxyTlsAndAuthenticationTests
             + sslIndent + "(long)CURLAUTH_GSSNEGOTIATE);\n"
             + "  curl_easy_setopt(curl, CURLOPT_SERVICE_NAME, \"s\");\n"
             + KeepAlive
+            + "  curl_easy_setopt(curl, CURLOPT_SASL_AUTHZID, \"z\");\n"
+            + "  curl_easy_setopt(curl, CURLOPT_SASL_IR, 1L);\n"
+            + "  curl_easy_setopt(curl, CURLOPT_GSSAPI_DELEGATION, 1L);\n"
             + "  curl_easy_setopt(curl, CURLOPT_GSSAPI_DELEGATION, 1L);\n"
             + "  curl_easy_setopt(curl, CURLOPT_SASL_AUTHZID, \"z\");\n"
             + "  curl_easy_setopt(curl, CURLOPT_SASL_IR, 1L);\n";
@@ -256,12 +259,10 @@ public sealed class LibcurlSourceCodeProxyTlsAndAuthenticationTests
     {
         string arguments = "-f|-I|--oauth2-bearer|t|-x|http://p:1|-U|u:p|--haproxy-protocol|-n|--login-options|L|-u|a:b|-H|A: 1|-e|r|--aws-sigv4|aws|--proxy-header|X: 1|-L|--compressed|-b|c=1|-c|j|--negotiate|-X|PUT|--connect-timeout|2|-4|--resolve|h:1:1.1.1.1|" + Url;
         string expected = Start
-            + "  curl_easy_setopt(curl, CURLOPT_NOBODY, 1L);\n"
-            + "  curl_easy_setopt(curl, CURLOPT_XOAUTH2_BEARER, \"t\");\n"
             + "  curl_easy_setopt(curl, CURLOPT_PROXY, \"http://p:1\");\n"
             + "  curl_easy_setopt(curl, CURLOPT_PROXYUSERPWD, \"u:p\");\n"
             + "  curl_easy_setopt(curl, CURLOPT_HAPROXYPROTOCOL, 1L);\n"
-            + "  curl_easy_setopt(curl, CURLOPT_FAILONERROR, 1L);\n"
+            + "  curl_easy_setopt(curl, CURLOPT_XOAUTH2_BEARER, \"t\");\n"
             + "  curl_easy_setopt(curl, CURLOPT_NETRC, (long)CURL_NETRC_REQUIRED);\n"
             + "  curl_easy_setopt(curl, CURLOPT_LOGIN_OPTIONS, \"L\");\n"
             + Credentials
@@ -269,6 +270,10 @@ public sealed class LibcurlSourceCodeProxyTlsAndAuthenticationTests
             + "  curl_easy_setopt(curl, CURLOPT_HTTPHEADER, slist1);\n"
             + "  curl_easy_setopt(curl, CURLOPT_REFERER, \"r\");\n"
             + Agent
+            + "  curl_easy_setopt(curl, CURLOPT_NOBODY, 1L);\n"
+            + "  curl_easy_setopt(curl, CURLOPT_FAILONERROR, 1L);\n"
+            + "  curl_easy_setopt(curl, CURLOPT_FILETIME, 1L);\n"
+            + "  curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, \"PUT\");\n"
             + "  curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);\n"
             + "  curl_easy_setopt(curl, CURLOPT_AWS_SIGV4, \"aws\");\n"
             + "  curl_easy_setopt(curl, CURLOPT_PROXYHEADER, slist2);\n"
@@ -278,8 +283,6 @@ public sealed class LibcurlSourceCodeProxyTlsAndAuthenticationTests
             + "  curl_easy_setopt(curl, CURLOPT_COOKIEJAR, \"j\");\n"
             + HeaderOpt
             + Tls
-            + "  curl_easy_setopt(curl, CURLOPT_FILETIME, 1L);\n"
-            + "  curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, \"PUT\");\n"
             + "  curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT_MS, 2000L);\n"
             + "  curl_easy_setopt(curl, CURLOPT_IPRESOLVE, 1L);\n"
             + KeepAlive
@@ -297,10 +300,10 @@ public sealed class LibcurlSourceCodeProxyTlsAndAuthenticationTests
     [DataRow("-x|http://p:1|-p|" + HttpUrl, HttpStart + "  curl_easy_setopt(curl, CURLOPT_PROXY, \"http://p:1\");\n  curl_easy_setopt(curl, CURLOPT_HTTPPROXYTUNNEL, 1L);\n" + Agent + MaxRedirs + HeaderOpt + Tls + KeepAlive)]
     [DataRow("--anyauth|--proxy-digest|-x|http://p:1|" + Url, Start + "  curl_easy_setopt(curl, CURLOPT_PROXY, \"http://p:1\");\n  curl_easy_setopt(curl, CURLOPT_PROXYAUTH, (long)CURLAUTH_DIGEST);\n  curl_easy_setopt(curl, CURLOPT_HTTPAUTH, (long)CURLAUTH_ANY);\n" + Agent + MaxRedirs + HeaderOpt + Tls + KeepAlive)]
     [DataRow("--proxy-basic|--proxy-negotiate|-x|p:1|" + HttpUrl, HttpStart + "  curl_easy_setopt(curl, CURLOPT_PROXY, \"p:1\");\n  curl_easy_setopt(curl, CURLOPT_PROXYAUTH, (long)CURLAUTH_GSSNEGOTIATE);\n" + Plain)]
-    [DataRow("-R|--socks5-gssapi-nec|--service-name|s|-X|G|--delegation|none|" + HttpUrl, HttpStart + Agent + MaxRedirs + Tls + "  curl_easy_setopt(curl, CURLOPT_FILETIME, 1L);\n  curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, \"G\");\n  curl_easy_setopt(curl, CURLOPT_SOCKS5_GSSAPI_NEC, 1L);\n  curl_easy_setopt(curl, CURLOPT_SERVICE_NAME, \"s\");\n" + KeepAlive)]
-    [DataRow("--socks5-gssapi-nec|--service-name|s|--sasl-ir|--connect-timeout|2|-4|--resolve|h:1:1.1.1.1|--connect-to|h:1:h:2|-X|G|" + Url, Start + Agent + MaxRedirs + Tls + "  curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, \"G\");\n  curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT_MS, 2000L);\n  curl_easy_setopt(curl, CURLOPT_IPRESOLVE, 1L);\n  curl_easy_setopt(curl, CURLOPT_SOCKS5_GSSAPI_NEC, 1L);\n  curl_easy_setopt(curl, CURLOPT_SERVICE_NAME, \"s\");\n" + KeepAlive + "  curl_easy_setopt(curl, CURLOPT_RESOLVE, slist1);\n  curl_easy_setopt(curl, CURLOPT_CONNECT_TO, slist2);\n  curl_easy_setopt(curl, CURLOPT_SASL_IR, 1L);\n")]
-    [DataRow("-k|--ssl-no-revoke|--ciphers|E|--proxy-ciphers|F|--no-alpn|-R|-X|G|--connect-timeout|2|-4|--socks5-gssapi-nec|--proxy-cert|pc:pp|--proxy-key|pkcs11:x|--socks4|p:1|-U|u:p|" + HttpUrl, HttpStart + "  curl_easy_setopt(curl, CURLOPT_PROXY, \"p:1\");\n  curl_easy_setopt(curl, CURLOPT_PROXYTYPE, (long)CURLPROXY_SOCKS4);\n  curl_easy_setopt(curl, CURLOPT_PROXYUSERPWD, \"u:p\");\n" + Agent + MaxRedirs + "  curl_easy_setopt(curl, CURLOPT_PROXY_KEYPASSWD, \"pp\");\n  curl_easy_setopt(curl, CURLOPT_PROXY_SSLCERT, \"pc\");\n  curl_easy_setopt(curl, CURLOPT_PROXY_SSLKEY, \"pkcs11:x\");\n  curl_easy_setopt(curl, CURLOPT_PROXY_SSLKEYTYPE, \"ENG\");\n  curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);\n  curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);\n" + Tls + "  curl_easy_setopt(curl, CURLOPT_SSL_OPTIONS, (long)CURLSSLOPT_NO_REVOKE);\n  curl_easy_setopt(curl, CURLOPT_SSL_CIPHER_LIST, \"E\");\n  curl_easy_setopt(curl, CURLOPT_PROXY_SSL_CIPHER_LIST, \"F\");\n  curl_easy_setopt(curl, CURLOPT_SSL_ENABLE_ALPN, 0L);\n  curl_easy_setopt(curl, CURLOPT_FILETIME, 1L);\n  curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, \"G\");\n  curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT_MS, 2000L);\n  curl_easy_setopt(curl, CURLOPT_IPRESOLVE, 1L);\n  curl_easy_setopt(curl, CURLOPT_SOCKS5_GSSAPI_NEC, 1L);\n" + KeepAlive)]
-    [DataRow("-x|http://p:1|--proxy-header|X: 1|--oauth2-bearer|t|--ntlm|-u|a:b|-k|--cert|c|ftp://127.0.0.1:1/", "  curl_easy_setopt(curl, CURLOPT_BUFFERSIZE, 102400L);\n  curl_easy_setopt(curl, CURLOPT_URL, \"ftp://127.0.0.1:1/\");\n  curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 1L);\n  curl_easy_setopt(curl, CURLOPT_XOAUTH2_BEARER, \"t\");\n  curl_easy_setopt(curl, CURLOPT_PROXY, \"http://p:1\");\n" + Credentials + "  curl_easy_setopt(curl, CURLOPT_HTTPAUTH, (long)CURLAUTH_NTLM |\n" + Indent + "(long)CURLAUTH_NONE |\n" + Indent + "64UL);\n" + Agent + "  curl_easy_setopt(curl, CURLOPT_FTP_SKIP_PASV_IP, 1L);\n  curl_easy_setopt(curl, CURLOPT_SSLCERT, \"c\");\n  curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);\n  curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);\n" + Tls + KeepAlive)]
+    [DataRow("-R|--socks5-gssapi-nec|--service-name|s|-X|G|--delegation|none|" + HttpUrl, HttpStart + Agent + "  curl_easy_setopt(curl, CURLOPT_FILETIME, 1L);\n  curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, \"G\");\n" + MaxRedirs + Tls + "  curl_easy_setopt(curl, CURLOPT_SOCKS5_GSSAPI_NEC, 1L);\n  curl_easy_setopt(curl, CURLOPT_SERVICE_NAME, \"s\");\n" + KeepAlive)]
+    [DataRow("--socks5-gssapi-nec|--service-name|s|--sasl-ir|--connect-timeout|2|-4|--resolve|h:1:1.1.1.1|--connect-to|h:1:h:2|-X|G|" + Url, Start + Agent + "  curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, \"G\");\n" + MaxRedirs + Tls + "  curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT_MS, 2000L);\n  curl_easy_setopt(curl, CURLOPT_IPRESOLVE, 1L);\n  curl_easy_setopt(curl, CURLOPT_SOCKS5_GSSAPI_NEC, 1L);\n  curl_easy_setopt(curl, CURLOPT_SERVICE_NAME, \"s\");\n" + KeepAlive + "  curl_easy_setopt(curl, CURLOPT_SASL_IR, 1L);\n  curl_easy_setopt(curl, CURLOPT_RESOLVE, slist1);\n  curl_easy_setopt(curl, CURLOPT_CONNECT_TO, slist2);\n  curl_easy_setopt(curl, CURLOPT_SASL_IR, 1L);\n")]
+    [DataRow("-k|--ssl-no-revoke|--ciphers|E|--proxy-ciphers|F|--no-alpn|-R|-X|G|--connect-timeout|2|-4|--socks5-gssapi-nec|--proxy-cert|pc:pp|--proxy-key|pkcs11:x|--socks4|p:1|-U|u:p|" + HttpUrl, HttpStart + "  curl_easy_setopt(curl, CURLOPT_PROXY, \"p:1\");\n  curl_easy_setopt(curl, CURLOPT_PROXYTYPE, (long)CURLPROXY_SOCKS4);\n  curl_easy_setopt(curl, CURLOPT_PROXYUSERPWD, \"u:p\");\n  curl_easy_setopt(curl, CURLOPT_PROXY_KEYPASSWD, \"pp\");\n" + Agent + "  curl_easy_setopt(curl, CURLOPT_FILETIME, 1L);\n  curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, \"G\");\n" + MaxRedirs + "  curl_easy_setopt(curl, CURLOPT_PROXY_SSLCERT, \"pc\");\n  curl_easy_setopt(curl, CURLOPT_PROXY_SSLKEY, \"pkcs11:x\");\n  curl_easy_setopt(curl, CURLOPT_PROXY_SSLKEYTYPE, \"ENG\");\n  curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);\n  curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);\n" + Tls + "  curl_easy_setopt(curl, CURLOPT_SSL_OPTIONS, (long)CURLSSLOPT_NO_REVOKE);\n  curl_easy_setopt(curl, CURLOPT_SSL_CIPHER_LIST, \"E\");\n  curl_easy_setopt(curl, CURLOPT_PROXY_SSL_CIPHER_LIST, \"F\");\n  curl_easy_setopt(curl, CURLOPT_SSL_ENABLE_ALPN, 0L);\n  curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT_MS, 2000L);\n  curl_easy_setopt(curl, CURLOPT_IPRESOLVE, 1L);\n  curl_easy_setopt(curl, CURLOPT_SOCKS5_GSSAPI_NEC, 1L);\n" + KeepAlive)]
+    [DataRow("-x|http://p:1|--proxy-header|X: 1|--oauth2-bearer|t|--ntlm|-u|a:b|-k|--cert|c|ftp://127.0.0.1:1/", "  curl_easy_setopt(curl, CURLOPT_BUFFERSIZE, 102400L);\n  curl_easy_setopt(curl, CURLOPT_URL, \"ftp://127.0.0.1:1/\");\n  curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 1L);\n  curl_easy_setopt(curl, CURLOPT_PROXY, \"http://p:1\");\n  curl_easy_setopt(curl, CURLOPT_XOAUTH2_BEARER, \"t\");\n" + Credentials + "  curl_easy_setopt(curl, CURLOPT_HTTPAUTH, (long)CURLAUTH_NTLM |\n" + Indent + "(long)CURLAUTH_NONE |\n" + Indent + "64UL);\n" + Agent + "  curl_easy_setopt(curl, CURLOPT_FTP_SKIP_PASV_IP, 1L);\n  curl_easy_setopt(curl, CURLOPT_SSLCERT, \"c\");\n  curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);\n  curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);\n" + Tls + KeepAlive)]
     public void Generate_OptionsTogether_WriteCurlsLinesInCurlsOrder(string arguments, string transfer)
     {
         string actual = TransferLinesFor(arguments);
