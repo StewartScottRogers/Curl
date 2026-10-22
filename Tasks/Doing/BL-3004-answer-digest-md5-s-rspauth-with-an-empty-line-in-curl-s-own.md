@@ -31,3 +31,4 @@ Found by BL-2834 (ADR-0751): with Debug and the forced cnonce, test823 and test8
 ## Log
 
 - 2026-10-21: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: fbecace0.
