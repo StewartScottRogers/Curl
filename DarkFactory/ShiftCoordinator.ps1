@@ -29,7 +29,7 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
     if ($ShiftBranch) { $moved = Restore-ShiftBranch -Branch $ShiftBranch; if ($moved) { Write-Trace '-' 'branch' $moved 'Red' } }
     $branch = (git -C $Root rev-parse --abbrev-ref HEAD).Trim()
     if ($branch -in 'master', 'main') { Stop-ShiftStart "on $branch; switch to a feature branch"; exit 1 }
-    if (Get-Dirty) { Stop-ShiftStart 'working tree not clean; commit or stash first'; exit 1 }
+    if (Wait-ForCleanTree) { Stop-ShiftStart 'working tree not clean; commit or stash first'; exit 1 }
     git -C $Root fetch -q origin $branch
     $syncRefusal = Sync-CheckoutWithOrigin -Repo $Root -Branch $branch
     if ($syncRefusal) { Stop-ShiftStart $syncRefusal; exit 1 }
