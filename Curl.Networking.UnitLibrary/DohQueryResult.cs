@@ -8,14 +8,18 @@ namespace Curl.Networking;
 /// <see cref="CurlExitCode.Ok" /> when the response was read; otherwise the exit code the connection
 /// or the exchange failed with, and then <paramref name="Answer" /> is <see langword="null" />.
 /// </param>
-/// <param name="Answer">The decoded answer, or <see langword="null" /> when the exchange failed.</param>
+/// <param name="Answer">
+/// The decoded answer, or <see langword="null" /> when the exchange failed or the status was outside
+/// 200-299, whose body curl 8.22.0 does not decode (BL-2972).
+/// </param>
 internal sealed record DohQueryResult(DnsRecordType RecordType, CurlExitCode ExchangeFailure, DnsAnswer? Answer)
 {
     private const int MaximumEntryAddresses = 24;
 
     /// <summary>
-    /// Gets the response's HTTP status code, which only the HTTPS query looks at (curl 8.22.0's
-    /// <c>doh_probe_done</c>, ADR-0727's BL-2979 amendment); 200 when the exchange failed.
+    /// Gets the response's HTTP status code, outside 200-299 of which curl 8.22.0's
+    /// <c>doh_probe_done</c> fails the query (ADR-0727's BL-2979 amendment, BL-2972); 200 when the
+    /// exchange failed.
     /// </summary>
     public int StatusCode { get; init; } = 200;
 

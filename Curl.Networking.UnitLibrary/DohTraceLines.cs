@@ -7,7 +7,8 @@ namespace Curl.Networking;
 /// failed, in place of its <c>DoH request complete, N to go</c> line (measured with
 /// <c>Record-CurlExchange.ps1 -DohPort</c> and <c>-Tls</c>, BL-2970, ADR-0738):
 /// <c>[DoH] [DoH] [A] error: &lt;curl_easy_strerror&gt;</c> for a query whose connection or
-/// exchange failed, and <c>[DoH] [DoH] [A] error decoding response: &lt;doh_strerror&gt;</c> for an
+/// exchange failed, <c>[DoH] [DoH] [A] error: HTTP status N</c> for a response whose status is
+/// outside 200-299 (BL-2972), and <c>[DoH] [DoH] [A] error decoding response: &lt;doh_strerror&gt;</c> for an
 /// answer that did not decode, <c>[AAAA]</c> for the AAAA query. A decoded answer, with or without an
 /// address, has no line here: 8.22.0 no longer prints the decoded entry.
 /// </summary>
@@ -26,7 +27,7 @@ internal static partial class DohTraceLines
         var probe = $"[DoH] [DoH] [{TypeName(result.RecordType)}] error";
         if (result.Answer is not { } answer)
         {
-            return $"{probe}: {describeExitCode(result.ExchangeFailure)}";
+            return ExchangeFailureLine(describeExitCode, probe, result);
         }
 
         return DecodeFailureLine(probe, answer);

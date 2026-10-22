@@ -399,8 +399,10 @@ resolver and the DoH TLS options) and the DoH URL, and for each name POSTs the A
 query in parallel on two connections, A first, each request written byte for byte as curl 8.21.0
 writes it (no `User-Agent`; `Host` with the port only when it is not the default). The target
 carries `PoolScheme` `https`, so the handshake offers ALPN `http/1.1`. `DohResponseReader` reads the
-response as curl does: status and `Content-Type` ignored, a `Content-Length` or chunked body of at
-most 3000 bytes, anything else a failure. It returns the AAAA answer's addresses, then the A
+response as curl does: `Content-Type` ignored, a `Content-Length` or chunked body of at
+most 3000 bytes, anything else a failure; it hands on the status code, and a status outside 200-299
+fails the query undecoded with `[DoH] [DoH] [A] error: HTTP status N`, as curl 8.22.0's
+`doh_probe_done` does (BL-2972). It returns the AAAA answer's addresses, then the A
 answer's; a query that fails yields none, and none from both makes `TcpConnector` fail with exit 6.
 Both answers fill one entry, as curl's `struct dohentry`: `DohQueryResult.AsOneEntry` cuts each,
 A first, to the 24 addresses the earlier ones left room for (measured, BL-1153). A query that

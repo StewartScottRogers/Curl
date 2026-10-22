@@ -33,6 +33,28 @@ public sealed partial class DohDnsResolverTraceTests
     }
 
     [TestMethod]
+    public async Task ResolveAsync_A500WithAnEmptyBody_ReportsTheHttpStatusAndResolvesNothing()
+    {
+        // Measured with curl 8.22.0 (Schannel) under -4: the status line, then exit 6 (BL-2972).
+        var (lines, addresses) = await TraceOnlyAAsync(Response("HTTP/1.1 500 Internal Server Error\r\nContent-Length: 0\r\n\r\n"));
+
+        AssertLines(["[DoH] [DoH] [A] error: HTTP status 500"], lines);
+        Assert.IsEmpty(addresses);
+    }
+
+    [TestMethod]
+    [DataRow("HTTP/1.1 301 Moved Permanently", "[DoH] [DoH] [AAAA] error: HTTP status 301", "[DoH] [DoH] [A] error: HTTP status 301")]
+    [DataRow("HTTP/1.1 199 Early", "[DoH] [DoH] [AAAA] error: HTTP status 199", "[DoH] [DoH] [A] error: HTTP status 199")]
+    public async Task ResolveAsync_AStatusOutside2xxWithAnAnswerBody_ReportsTheHttpStatusWithoutDecoding(string statusLine, string aaaaLine, string aLine)
+    {
+        // doh_probe_done (curl-8_22_0) fails any status below 200 or from 300 before doh_resp_decode.
+        byte[] answer = Convert.FromHexString(MeasuredAAnswer);
+        var lines = await TraceAsync([.. Response($"{statusLine}\r\nContent-Length: {answer.Length}\r\n\r\n"), .. answer]);
+
+        AssertLines([aaaaLine, aLine], lines);
+    }
+
+    [TestMethod]
     public async Task ResolveAsync_OneExchangeFailingAndOneDecoding_ReportsTheFailureAndResolvesTheDecodedAddress()
     {
         var connector = new FakeConnector();
