@@ -36,7 +36,7 @@
 // (upstream runs curl from tests/) is deleted with it.
 //
 // Host variables (BL-1839): the runner supplies %HOSTIP, %HTTPPORT, %LOGDIR and the like, but not
-// the three that name the machine, so this tool replaces them in each case's bytes before the
+// the two that name the machine, so this tool replaces them in each case's bytes before the
 // runner reads it, with the values upstream's runtests.pl (servers.pm subvariables) gives them:
 //   %SRCDIR  the release's tests folder (the parent of <tests/data folder>), forward slashes;
 //   %PWD     the folder runtests.pl runs from, which is that same tests folder, so %PWD/../docs
@@ -44,11 +44,11 @@
 //            upstream's %LOGDIR is relative ("log") and here it is already absolute;
 //            when the tests folder's path holds a blank (a cache under C:\Users\<first last>),
 //            the release is first copied to <out.json's folder>/upstream-release and both name
-//            the copy, since an unquoted blank splits the command line (GF-0044);
-//   %PERL    the perl found on PATH, or else the one of the Git for Windows that provides git
-//            (<git root>/usr/bin/perl.exe), by an absolute path with forward slashes. With no perl
-//            %PERL stays as written, so the runner skips the case for it and the converter
-//            (ConvertTo-BehaviourMeasurement.ps1) files it as unmeasured, no-perl.
+//            the copy, since an unquoted blank splits the command line (GF-0044).
+// %PERL is left as written (BL-2857): the runner binds it to the bare program name "perl"
+// (UpstreamPerlOneLiner.Program), the only one its C# interpretations of precheck and postcheck
+// lines recognise, and it never starts a real perl. An absolute path to a perl found on the
+// machine made every such line "the harness does not interpret ..." and the case unmeasured.
 // REPLY escapes (BL-2012): \xHH and \x{H...} in a <servercmd> REPLY or REPLYLF line are expanded to the byte
 // they name, as ftpserver.pl's eval "qq{...}" does; the runner expands \r, \n, \t and \\ itself.
 // Disabled cases (BL-2027): a case the release's tests/data/DISABLED lists (its %if blocks tested
@@ -88,7 +88,7 @@ const string KeepLogsOption = "--keep-logs";
 
 if (IsSelfTestRequest(args))
 {
-    return RunSelfTest();
+    return await RunSelfTestAsync();
 }
 
 bool keepLogs = args.Contains(KeepLogsOption);
@@ -136,7 +136,6 @@ Directory.CreateDirectory(logFolder);
 string commit = ReadCommit();
 string releaseCopy = Path.Combine(Path.GetDirectoryName(outputPath)!, "upstream-release");
 string testsFolder = NameTestsFolder((Path.GetDirectoryName(testDataFolder.TrimEnd('\\', '/')) ?? testDataFolder).Replace('\\', '/'), releaseCopy);
-string? perl = FindPerl();
 string disabledFile = Path.Combine(testDataFolder, "DISABLED");
 IReadOnlySet<int> disabledCases = File.Exists(disabledFile)
     ? DisabledCases.Read(File.ReadAllLines(disabledFile), platform.Features)
@@ -172,7 +171,7 @@ await Parallel.ForEachAsync(
     async (index, _) =>
     {
         int number = ordered[index];
-        byte[] testFile = ReplyEscapes.ExpandReplyHexEscapes(SubstituteHostVariables(await File.ReadAllBytesAsync(Path.Combine(testDataFolder, $"test{number}")), testsFolder, perl));
+        byte[] testFile = ReplyEscapes.ExpandReplyHexEscapes(SubstituteHostVariables(await File.ReadAllBytesAsync(Path.Combine(testDataFolder, $"test{number}")), testsFolder));
         Stopwatch stopwatch = Stopwatch.StartNew();
         UpstreamCaseOutcome outcome = disabledCases.Contains(number)
             ? UpstreamCaseOutcome.Skipped(DisabledCases.Reason)
@@ -265,9 +264,9 @@ static async Task<UpstreamCaseOutcome> RunCaseAsync(int number, byte[] testFile,
     }
 }
 
-// Replaces %SRCDIR, %PWD and %PERL in a case's bytes (one character per byte, so binary data
-// survives); a null perl leaves %PERL as written.
-static byte[] SubstituteHostVariables(byte[] testFile, string testsFolder, string? perl)
+// Replaces %SRCDIR and %PWD in a case's bytes (one character per byte, so binary data survives);
+// %PERL is left for the runner to bind.
+static byte[] SubstituteHostVariables(byte[] testFile, string testsFolder)
 {
     string text = System.Text.Encoding.Latin1.GetString(testFile);
     if (!text.Contains('%', StringComparison.Ordinal))
@@ -278,43 +277,12 @@ static byte[] SubstituteHostVariables(byte[] testFile, string testsFolder, strin
     text = text.Replace("%PWD/%LOGDIR", "%LOGDIR", StringComparison.Ordinal)
         .Replace("%SRCDIR", testsFolder, StringComparison.Ordinal)
         .Replace("%PWD", testsFolder, StringComparison.Ordinal);
-    if (perl is not null)
-    {
-        text = text.Replace("%PERL", perl, StringComparison.Ordinal);
-    }
-
     return System.Text.Encoding.Latin1.GetBytes(text);
-}
-
-// A perl on PATH, else the perl of the Git for Windows that provides git; null when there is none.
-static string? FindPerl()
-{
-    string[] names = OperatingSystem.IsWindows() ? ["perl.exe"] : ["perl"];
-    List<string> candidates = [.. (Environment.GetEnvironmentVariable("PATH") ?? string.Empty)
-        .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-        .SelectMany(folder => names.Select(name => Path.Combine(folder.Trim('"'), name)))];
-    if (OperatingSystem.IsWindows())
-    {
-        foreach (string folder in (Environment.GetEnvironmentVariable("PATH") ?? string.Empty).Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries))
-        {
-            if (File.Exists(Path.Combine(folder.Trim('"'), "git.exe")))
-            {
-                // <git root>\cmd\git.exe or <git root>\bin\git.exe or <git root>\mingw64\bin\git.exe
-                for (DirectoryInfo? root = new DirectoryInfo(folder.Trim('"')).Parent; root is not null; root = root.Parent)
-                {
-                    candidates.Add(Path.Combine(root.FullName, "usr", "bin", "perl.exe"));
-                }
-            }
-        }
-    }
-
-    string? found = candidates.FirstOrDefault(File.Exists);
-    return found is null ? null : Path.GetFullPath(found).Replace('\\', '/');
 }
 
 static bool IsSelfTestRequest(string[] arguments) => arguments is ["--self-test"];
 
-static int RunSelfTest()
+static async Task<int> RunSelfTestAsync()
 {
     bool failed = false;
     void Check(bool passed, string check)
@@ -323,15 +291,43 @@ static int RunSelfTest()
         failed |= !passed;
     }
 
-    string Substitute(string line, string? perl) =>
-        System.Text.Encoding.Latin1.GetString(SubstituteHostVariables(System.Text.Encoding.Latin1.GetBytes(line), "/rel/tests", perl));
+    string Substitute(string line) =>
+        System.Text.Encoding.Latin1.GetString(SubstituteHostVariables(System.Text.Encoding.Latin1.GetBytes(line), "/rel/tests"));
 
-    Check(Substitute("%SRCDIR/data/data-xml1 %SRCDIR/..", null) == "/rel/tests/data/data-xml1 /rel/tests/..", "%SRCDIR is the tests folder, wherever it stands");
-    Check(Substitute("%PWD/../docs/ %FILE_PWD", null) == "/rel/tests/../docs/ %FILE_PWD", "%PWD is the tests folder and %FILE_PWD is left to the runner");
-    Check(Substitute("--proto-default file %PWD/%LOGDIR/test%TESTNUMBER.txt", null) == "--proto-default file %LOGDIR/test%TESTNUMBER.txt", "%PWD/%LOGDIR is reduced to the absolute %LOGDIR");
-    Check(Substitute("%PERL %SRCDIR/x.pl", "/usr/bin/perl") == "/usr/bin/perl /rel/tests/x.pl", "%PERL is the perl found");
-    Check(Substitute("%PERL -e 1", null) == "%PERL -e 1", "with no perl, %PERL stays as written for the runner to skip");
-    Check(Substitute("http://%HOSTIP:%HTTPPORT/1 100%", "/usr/bin/perl") == "http://%HOSTIP:%HTTPPORT/1 100%", "other variables and a lone percent are untouched");
+    Check(Substitute("%SRCDIR/data/data-xml1 %SRCDIR/..") == "/rel/tests/data/data-xml1 /rel/tests/..", "%SRCDIR is the tests folder, wherever it stands");
+    Check(Substitute("%PWD/../docs/ %FILE_PWD") == "/rel/tests/../docs/ %FILE_PWD", "%PWD is the tests folder and %FILE_PWD is left to the runner");
+    Check(Substitute("--proto-default file %PWD/%LOGDIR/test%TESTNUMBER.txt") == "--proto-default file %LOGDIR/test%TESTNUMBER.txt", "%PWD/%LOGDIR is reduced to the absolute %LOGDIR");
+    Check(Substitute("%PERL %SRCDIR/libtest/test610.pl mkdir %LOGDIR/x") == "%PERL /rel/tests/libtest/test610.pl mkdir %LOGDIR/x", "%PERL is left for the runner, which binds it to the bare perl its interpretations recognise (BL-2857)");
+    Check(Substitute("%PERL -e 1") == "%PERL -e 1", "%PERL before a one-liner is left for the runner");
+    Check(Substitute("http://%HOSTIP:%HTTPPORT/1 100%") == "http://%HOSTIP:%HTTPPORT/1 100%", "other variables and a lone percent are untouched");
+
+    // The runner, given a case's precheck as the tool leaves it, interprets the line rather than
+    // skipping the case as "the harness does not interpret ..." (BL-2857): a printing one-liner
+    // skips the case with what it printed, as runtests.pl does, and a test610.pl line runs.
+    async Task<UpstreamCaseOutcome> RunPrecheckCase(string precheck)
+    {
+        string testCase = "<testcase>\n<info>\n<keywords>\nFILE\n</keywords>\n</info>\n<client>\n<server>\nfile\n</server>\n<name>\nself-test\n</name>\n"
+            + $"<command>\nfile://localhost/%LOGDIR/x\n</command>\n<precheck>\n{precheck}\n</precheck>\n</client>\n<verify>\n</verify>\n</testcase>\n";
+        // The runner refuses a log folder with a blank, as a temp folder under C:\Users\<first last> has.
+        string temporaryFolder = Path.GetTempPath();
+        DirectoryInfo logDirectory = temporaryFolder.Contains(' ', StringComparison.Ordinal)
+            ? Directory.CreateDirectory(Path.Combine(AppContext.GetData("EntryPointFileDirectoryPath") as string ?? Environment.CurrentDirectory, $"gap-self-test-{Guid.NewGuid():N}"))
+            : Directory.CreateTempSubdirectory("gap-self-test-");
+        try
+        {
+            UpstreamCaseRunner runner = new(_ => Task.FromResult(0), OperatingSystem.IsWindows() ? UpstreamCurlPlatform.Windows : UpstreamCurlPlatform.Unix, TimeProvider.System, TimeSpan.FromSeconds(20));
+            return await runner.RunAsync(1, SubstituteHostVariables(System.Text.Encoding.Latin1.GetBytes(testCase), "/rel/tests"), logDirectory.FullName.Replace('\\', '/'));
+        }
+        finally
+        {
+            DeleteLogDirectory(logDirectory);
+        }
+    }
+
+    UpstreamCaseOutcome oneLiner = await RunPrecheckCase("%PERL -e \"print 'Test requires default test client host address' if('%CLIENTIP' ne '127.0.0.2');\"");
+    Check(oneLiner.Kind == UpstreamCaseOutcomeKind.Skipped && oneLiner.Detail == "Test requires default test client host address", $"the runner interprets a %PERL -e precheck as the tool leaves it (got {oneLiner.Kind}: {oneLiner.Detail})");
+    UpstreamCaseOutcome script = await RunPrecheckCase("%PERL %SRCDIR/libtest/test610.pl mkdir %LOGDIR/test610.dir");
+    Check(!script.Detail.StartsWith("the harness does not interpret", StringComparison.Ordinal), $"the runner interprets a %PERL test610.pl precheck as the tool leaves it (got {script.Kind}: {script.Detail})");
 
     string Expand(string file) =>
         System.Text.Encoding.Latin1.GetString(ReplyEscapes.ExpandReplyHexEscapes(System.Text.Encoding.Latin1.GetBytes(file)));
