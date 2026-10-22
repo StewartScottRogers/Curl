@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary]
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-22
 ---
 # BL-3069 — Fix AF-0316: ManagedEasyWebSocket.SendFramedAsync's frameLength >= 0 can become > 0 with no test failing, so a CURLWS_OFFSET send with fragment size 0 is sent instead of refused
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- The finding's reproduction script belongs to the audit office, which a lane may not run. Box 1 is checked by reasoning: with fragmentSize 0 and a one-byte buffer, `>= 0` refuses, while the mutant `> 0` skips the check and writes a frame. The new test SendAsync_NonEmptyFirstPartWithFragmentSizeZero_AnswersBadFunctionArgumentAndWritesNothing asserts the refusal and that nothing is written, so it fails under the mutant. Not run against the mutant.
 
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-22: Doing -> Done. test pins the CURLWS_OFFSET fragment-size-0 refusal, killing the mutant
