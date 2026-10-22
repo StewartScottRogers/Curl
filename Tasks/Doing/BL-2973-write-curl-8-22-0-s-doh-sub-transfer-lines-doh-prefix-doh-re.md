@@ -1,4 +1,4 @@
-﻿---
+---
 id: BL-2973
 title: Write curl 8.22.0's DoH sub-transfer lines: [DoH] prefix, DoH request complete, AAAA probe first
 priority: Normal
@@ -41,3 +41,4 @@ With `-4` and an A answer: `* [DoH] Connection #1 ... left intact`, `* [DoH] DoH
 ## Log
 
 - 2026-10-21: Created.
+- 2026-10-22: Backlog -> Doing. Criteria at claim: 829bc65e 8b2b45e3.
