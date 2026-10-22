@@ -1,5 +1,5 @@
 ---
-id: BL-3060
+id: BL-3062
 title: Port upstream unit program 1650: DoH request encoding and response decoding
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-22
 completed:
 ---
-# BL-3060 — Port upstream unit program 1650: DoH request encoding and response decoding
+# BL-3062 — Port upstream unit program 1650: DoH request encoding and response decoding
 
 ## Goal
 
