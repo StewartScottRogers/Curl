@@ -46,7 +46,10 @@ The finding closes only when a later re-audit by the process auditor confirms th
 
 ## Notes
 
+- 2026-10-22: BL-2998 (Done 2026-10-21) fixed the red quality gate (WriteBytesAsync split) and run 39696631298 went green. The reproduction reads a past audit log copy through audit-office tools a lane may not run; that spell is history and cannot change, and no code change is left in DarkFactory/CiWatch.ps1. Only a later process re-audit can close AF-0330.
+
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-22: Doing -> Blocked. Stewart: reproduction reads a past audit log so it cannot change; fix already shipped via BL-2998 - close AF-0330 at the next process re-audit and drop this task?
