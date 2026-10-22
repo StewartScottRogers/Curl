@@ -9,7 +9,7 @@ touches: [Curl.Api.UnitLibrary/Options/Network, Curl.Api.UnitLibrary/Options/Pro
 model: sonnet
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-22
 ---
 # BL-3034 — Document the Curl.Api.UnitLibrary option code, part 2
 
@@ -23,15 +23,18 @@ Stewart, 2026-10-22: "Fully document and comment all code in each Host." Hosts a
 
 ## Acceptance criteria
 
-- [ ] Every internal or private type or member in scope whose name does not fully say what it does has an accurate XML doc comment; none restates its own name.
-- [ ] Every existing comment in the touched files is true of the code as it is now; any found wrong or vague is corrected.
-- [ ] New inline comments explain why or name the curl behaviour matched, and none narrates what the next line plainly does.
-- [ ] The diff changes comments and docs only: no logic, signature, accessibility or public name changed.
-- [ ] `dotnet build` of the project is clean with warnings as errors, and the fast tests of Curl.Api.UnitTests pass (`dotnet test Curl.Api.UnitTests --filter "TestCategory!=Integration"`).
+- [x] Every internal or private type or member in scope whose name does not fully say what it does has an accurate XML doc comment; none restates its own name.
+- [x] Every existing comment in the touched files is true of the code as it is now; any found wrong or vague is corrected.
+- [x] New inline comments explain why or name the curl behaviour matched, and none narrates what the next line plainly does.
+- [x] The diff changes comments and docs only: no logic, signature, accessibility or public name changed.
+- [x] `dotnet build` of the project is clean with warnings as errors, and the fast tests of Curl.Api.UnitTests pass (`dotnet test Curl.Api.UnitTests --filter "TestCategory!=Integration"`).
 
 ## Notes
+
+Audited all 27 files in Network, Protocols, Proxy and Tls: every type and member is public, already carries an accurate XML doc comment (curl option, default, behaviour), and there is no internal or private member or inline comment to add. No change needed; build and Curl.Api.UnitTests (898 passed, 2 skipped on other OSes) are green.
 
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: a8624aa0 d77f9e20 4a195610 ea3eb31b 1f740ef3.
+- 2026-10-22: Doing -> Done. Options Network/Protocols/Proxy/Tls audited: docs already complete and accurate, no change needed
