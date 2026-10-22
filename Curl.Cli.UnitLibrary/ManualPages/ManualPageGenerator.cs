@@ -41,16 +41,7 @@ public sealed class ManualPageGenerator(Func<string, string?> readFile, string d
 
     private static int Run(ManualPageContext context, Queue<string> arguments, string? version)
     {
-        string include = "../../include";
-        string command = Shift(arguments);
-        for (; command is "-d" or "-I" or "-c"; command = Shift(arguments))
-        {
-            string value = Shift(arguments);
-            context.Directory = command == "-d" ? value : context.Directory;
-            include = command == "-I" ? value : include;
-            context.ColumnWidth = command == "-c" ? ManualPerlValues.Number(value) : context.ColumnWidth;
-        }
-
+        (string command, string include) = ReadOptions(context, arguments);
         List<string> files = [.. arguments];
         context.Version = ManualPerlValues.IsTrue(version) ? version : ReadVersion(context, include);
         files.ForEach(file => context.Index.Add(context, file));
@@ -67,6 +58,35 @@ public sealed class ManualPageGenerator(Func<string, string?> readFile, string d
         return context.Errors;
     }
 
+    // The leading -d, -I and -c options; returns the command after them and the include folder.
+    private static (string Command, string Include) ReadOptions(ManualPageContext context, Queue<string> arguments)
+    {
+        string include = "../../include";
+        string command = Shift(arguments);
+        for (; command is "-d" or "-I" or "-c"; command = Shift(arguments))
+        {
+            include = ApplyOption(context, command, Shift(arguments)) ?? include;
+        }
+
+        return (command, include);
+    }
+
+    // Sets -d's folder or -c's width on the context; returns -I's folder, which only the version read needs.
+    private static string? ApplyOption(ManualPageContext context, string option, string value)
+    {
+        switch (option)
+        {
+            case "-d":
+                context.Directory = value;
+                return null;
+            case "-c":
+                context.ColumnWidth = ManualPerlValues.Number(value);
+                return null;
+            default:
+                return value;
+        }
+    }
+
     private static string Shift(Queue<string> arguments) => arguments.TryDequeue(out string? argument) ? argument : "";
 
     private static string ReadVersion(ManualPageContext context, string include)
@@ -80,25 +100,37 @@ public sealed class ManualPageGenerator(Func<string, string?> readFile, string d
     // The global options' names, for `%GLOBALS`: "--a, --b and --c".
     private static void ListGlobals(ManualPageContext context, List<string> files)
     {
-        List<string> globals = [];
-        foreach (string file in files.Order(StringComparer.Ordinal))
+        List<string> globals = [.. files.Order(StringComparer.Ordinal).Select(file => GlobalName(context, file)).OfType<string>()];
+        context.Globals = string.Concat(globals.Select((name, index) => GlobalSeparator(globals, index) + $"--{name}"));
+    }
+
+    // The document's long name ("" when it has none) when its header scopes it global, or null when it does not.
+    private static string? GlobalName(ManualPageContext context, string file)
+    {
+        string? longName = null;
+        foreach (string line in HeaderLines(context.ReadLines(context.PathOf(file), $"could not read {context.PathOf(file)}")))
         {
-            string? longName = null;
-            foreach (string line in context.ReadLines(context.PathOf(file), $"could not read {context.PathOf(file)}").SkipWhile(line => !line.StartsWith("---", StringComparison.Ordinal)).Skip(1)
-                .TakeWhile(line => !line.StartsWith("---", StringComparison.Ordinal)))
+            longName = LongName(line) ?? longName;
+            if (Regex.IsMatch(line, "^Scope: global", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant))
             {
-                longName = Regex.Match(line, "^Long: *(.*)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant) is { Success: true } match ? match.Groups[1].Value : longName;
-                if (Regex.IsMatch(line, "^Scope: global", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant))
-                {
-                    globals.Add(longName ?? "");
-                    break;
-                }
+                return longName ?? "";
             }
         }
 
-        context.Globals = string.Concat(globals.Select((name, index) =>
-            (index == 0 ? "" : index + 1 < globals.Count && ManualPerlValues.IsTrue(globals[index + 1]) ? ", " : " and ") + $"--{name}"));
+        return null;
     }
+
+    // The lines between a document's first two "---" lines.
+    private static IEnumerable<string> HeaderLines(List<string> lines) =>
+        lines.SkipWhile(line => !line.StartsWith("---", StringComparison.Ordinal)).Skip(1).TakeWhile(line => !line.StartsWith("---", StringComparison.Ordinal));
+
+    // The name a "Long:" line gives, or null for any other line.
+    private static string? LongName(string line) =>
+        Regex.Match(line, "^Long: *(.*)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant) is { Success: true } match ? match.Groups[1].Value : null;
+
+    // What goes before the global option at index: nothing first, ", " before one followed by a true name, else " and ".
+    private static string GlobalSeparator(List<string> globals, int index) =>
+        index == 0 ? "" : index + 1 < globals.Count && ManualPerlValues.IsTrue(globals[index + 1]) ? ", " : " and ";
 
     private static void MainPage(ManualPageContext context, bool manpage, List<string> files)
     {
@@ -108,19 +140,18 @@ public sealed class ManualPageGenerator(Func<string, string?> readFile, string d
             context.Output.Append(ManHeader(context));
         }
 
-        int failures = 0;
-        foreach (string line in index.Where(line => !line.StartsWith('#')))
-        {
-            failures += line.StartsWith("%options", StringComparison.Ordinal)
-                ? files.OrderBy(NoExtension, StringComparer.Ordinal).Sum(file => new ManualOptionPage(context, manpage).Write(file))
-                : WriteTopLevelPage(context, manpage, ManualPerlValues.Chomp(line));
-        }
-
+        int failures = index.Where(line => !line.StartsWith('#')).Sum(line => WriteIndexLine(context, manpage, files, line));
         if (failures != 0)
         {
             throw new ManualPageExit(failures & 0xFF);
         }
     }
+
+    // One mainpage.idx line: every option document for %options, else the top-level page it names.
+    private static int WriteIndexLine(ManualPageContext context, bool manpage, List<string> files, string line) =>
+        line.StartsWith("%options", StringComparison.Ordinal)
+            ? files.OrderBy(NoExtension, StringComparer.Ordinal).Sum(file => new ManualOptionPage(context, manpage).Write(file))
+            : WriteTopLevelPage(context, manpage, ManualPerlValues.Chomp(line));
 
     private static int WriteTopLevelPage(ManualPageContext context, bool manpage, string fileName)
     {
