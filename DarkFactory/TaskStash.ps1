@@ -126,6 +126,31 @@ function Remove-TaskStashEntries {
     }
 }
 
+function Move-RenumberedTaskStash {
+    # A split stored a copy of the parent's stash as "darkfactory <old> <stamp>" for a new task, and
+    # the task was then renumbered <old> -> <new> as a duplicate ID (Invoke-RenumberDuplicates). The
+    # copy follows it: re-stored under <new>, the old entry dropped by hash, so no stash is offered
+    # to the other task that kept <old>. Only a copy stored by Copy-TaskStash (bare subject, no
+    # "On <branch>:" prefix, which Save-StrayChanges writes for a task's own run) moves, and only
+    # when the renumbered task's file says it continues the stashed work. Returns the new hashes.
+    # -ContinuesStash is a test hook.
+    param(
+        [string]$OldId, [string]$NewId, [string]$Repo = $Root,
+        [scriptblock]$ContinuesStash = { param($Id) @(Get-ChildItem (Join-Path $Root 'Tasks') -Recurse -Filter "$Id-*.md" | Select-String -Pattern 'Continues the stashed work of' -List).Count -gt 0 })
+    if (-not (& $ContinuesStash $NewId)) { return @() }
+    $moved = @()
+    $pattern = "^(\S+) darkfactory $([regex]::Escape($OldId)) (\S+)$"
+    foreach ($entry in @(git -C $Repo stash list --format='%H %gs' 2>$null | Where-Object { $_ -match $pattern })) {
+        $null = $entry -match $pattern
+        $sha = $Matches[1]; $stamp = $Matches[2]
+        $copy = Copy-TaskStash $NewId $sha $stamp $Repo
+        Remove-TaskStashEntries @($sha) $Repo -Id $NewId
+        $moved += $copy
+        Write-Trace $NewId 'stash' "moved the stash copy $($sha.Substring(0, 8)) of $OldId to $NewId, which was renumbered from it (now $($copy.Substring(0, 8)))" 'Yellow'
+    }
+    return $moved
+}
+
 function Register-TaskSplitAttempt {
     # $true the first time -Id is offered for a split on -Now's day, which it records as a
     # marker file in -MarkerDir; $false on every later offer that day.
@@ -465,6 +490,23 @@ if ($TestTaskStash) {
         # Real git: a stash hash git does not know fails Copy-TaskStash.
         $threw = $false; try { $null = Copy-TaskStash 'BL-4' ('0' * 40) '20260103-000002' $repo } catch { $threw = $true }
         & $check 'Copy-TaskStash throws when git cannot copy the stash' 'True' "$threw"
+        # A split's stash copy under BL-8 follows its task when that task is renumbered BL-8 -> BL-9 (BL-3109).
+        git -C $repo reset -q --hard HEAD 2>&1 | Out-Null; git -C $repo clean -fdq 2>&1 | Out-Null; git -C $repo stash clear
+        Set-Content -Path (Join-Path $repo 'a.txt') -Value 'parent'
+        git -C $repo stash push -q -m 'darkfactory BL-7 20260105-000000' 2>&1 | Out-Null
+        $parentSha = "$(git -C $repo rev-parse 'stash@{0}')".Trim()
+        $null = Copy-TaskStash 'BL-8' $parentSha '20260105-000001' $repo
+        Set-Content -Path (Join-Path $repo 'a.txt') -Value 'theirs'
+        git -C $repo stash push -q -m 'darkfactory BL-8 20260105-000002' 2>&1 | Out-Null
+        $notContinuing = Move-RenumberedTaskStash 'BL-8' 'BL-9' $repo { $false }
+        & $check 'a renumbered task that continues no stash moves nothing' '0' "$(@($notContinuing).Count)"
+        $traceText = & { $script:movedStash = @(Move-RenumberedTaskStash 'BL-8' 'BL-9' $repo { $true }) } 6>&1 | Out-String
+        $subjects = @(git -C $repo stash list --format='%gs')
+        & $check 'the copy is re-stored under the new ID' '1' "$(@($subjects | Where-Object { $_ -eq 'darkfactory BL-9 20260105-000001' }).Count)"
+        & $check 'the old ID keeps no copy' '0' "$(@($subjects | Where-Object { $_ -eq 'darkfactory BL-8 20260105-000001' }).Count)"
+        & $check 'the other task''s own stash and the parent stash stay' '2' "$(@($subjects | Where-Object { $_ -match 'darkfactory BL-8 20260105-000002$|darkfactory BL-7 ' }).Count)"
+        & $check 'the moved copy is found for the new ID, not offered to the old' 'True False' "$((Get-TaskStashSha 'BL-9' $repo) -eq $script:movedStash[0]) $((Get-TaskStashSha 'BL-8' $repo) -eq $script:movedStash[0])"
+        & $check 'the trace says the stash moved to the renumbered ID' 'True' "$($traceText -match 'moved the stash copy' -and $traceText -match 'BL-8 to BL-9')"
     } finally {
         Remove-Item -Recurse -Force -Path $repo -ErrorAction SilentlyContinue
     }

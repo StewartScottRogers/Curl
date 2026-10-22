@@ -8,7 +8,7 @@ depends-on: []
 touches: [DarkFactory/Claim.ps1, DarkFactory/TaskStash.ps1]
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-22
 ---
 # BL-3109 — Move a split's stored stash copy to the new ID when a duplicate task ID is renumbered
 
@@ -26,13 +26,16 @@ Found by the shift-end review of 2026-10-22 (silent-failure-hunter, ADR-0710) in
 
 ## Acceptance criteria
 
-- [ ] When `Invoke-RenumberDuplicates` renumbers a task `BL-n` -> `BL-m`, any `darkfactory BL-n <stamp>` stash entry belonging to the renumbered task is re-stored as `darkfactory BL-m <stamp>` and the old entry is dropped by hash; or `Restore-TaskStash` applies a stash to a task only when that task's file says "Continues the stashed work of" its source (or the stash was saved by that task's own run).
-- [ ] A self-test in `DarkFactory/Claim.ps1` or `DarkFactory/TaskStash.ps1` pins the duplicate-renumber case and passes.
-- [ ] The trace says when a stash is moved to a renumbered ID.
+- [x] When `Invoke-RenumberDuplicates` renumbers a task `BL-n` -> `BL-m`, any `darkfactory BL-n <stamp>` stash entry belonging to the renumbered task is re-stored as `darkfactory BL-m <stamp>` and the old entry is dropped by hash; or `Restore-TaskStash` applies a stash to a task only when that task's file says "Continues the stashed work of" its source (or the stash was saved by that task's own run).
+- [x] A self-test in `DarkFactory/Claim.ps1` or `DarkFactory/TaskStash.ps1` pins the duplicate-renumber case and passes.
+- [x] The trace says when a stash is moved to a renumbered ID.
 
 ## Notes
+
+- Chose the first option: `Move-RenumberedTaskStash` (TaskStash.ps1) re-stores a bare-subject copy `darkfactory BL-n <stamp>` under BL-m and drops the old by hash, called from `Invoke-RenumberDuplicates`. It moves only when the renumbered task file says "Continues the stashed work of"; the other task's own "On <branch>:" stashes stay. Self-test cases added to -TestTaskStash; -TestClaimDuplicates still passes.
 
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: 9630b876 0ec3b444 8bcd5d04.
+- 2026-10-22: Doing -> Done. A renumbered duplicate task ID takes its split's stash copy with it
