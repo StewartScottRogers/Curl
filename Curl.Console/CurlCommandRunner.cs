@@ -674,6 +674,7 @@ internal sealed class CurlCommandRunner(
     /// <returns>The engine.</returns>
     private static ICurlEngine GivenOrManagedEngine(ICurlEngine? curlEngine, TimeProvider? timeProvider) =>
         curlEngine ?? new ManagedCurlEngine(timeProvider ?? TimeProvider.System, null, EasyErrorText);
+
     /// <summary>
     /// The run's HSTS cache, shared by every transfer of every option group and on with or without
     /// <c>--hsts</c>, as curl 8.21.0's tool shares one through its share handle: an <c>https</c>
@@ -768,7 +769,9 @@ internal sealed class CurlCommandRunner(
     private IDiagnosticLog diagnosticLog = NoDiagnosticLog.Instance;
 
     /// <summary>
-    /// Runs <paramref name="arguments" /> to completion.
+    /// Runs <paramref name="arguments" /> to completion: parses them, writes the parser's warnings,
+    /// runs the accepted command line or prints its refusal, and closes the run's diagnostic log and
+    /// <c>--stderr</c> file whatever the outcome.
     /// </summary>
     /// <param name="arguments">The command-line arguments, without the program name.</param>
     /// <returns>The process exit code.</returns>
@@ -815,6 +818,8 @@ internal sealed class CurlCommandRunner(
     /// <returns>The work's result.</returns>
     private static async Task<T> ThenCleanUpAsync<T>(Task<T> work, Func<Task> cleanUp)
     {
+        // WhenAny completes when the work ends, faulted or cancelled included, without throwing,
+        // so the clean-up runs before the awaited result rethrows.
         await Task.WhenAny(work).ConfigureAwait(false);
         await cleanUp().ConfigureAwait(false);
 
@@ -1025,12 +1030,18 @@ internal sealed class CurlCommandRunner(
 
     /// <summary>
     /// Runs an accepted command line, for <see cref="RunAsync" />, once standard error is where
-    /// <c>--stderr</c> sends it.
+    /// <c>--stderr</c> sends it. <c>--ai-help</c>, the information options (<see cref="InformationLines" />)
+    /// and an option's manual section (<c>--help &lt;option&gt;</c>) are answered with no transfer; otherwise
+    /// the groups are transferred, the <c>--libcurl</c> source is written whether or not they succeeded,
+    /// and the parser's warning lines meant for after the transfers are written last.
     /// </summary>
     /// <param name="options">The accepted command line's first option group.</param>
     /// <param name="groups">The option groups to run, <paramref name="options" /> first.</param>
     /// <param name="warningLinesAfterTransfers">The parser's warning lines printed after the transfers.</param>
-    /// <returns>The process exit code.</returns>
+    /// <returns>
+    /// The process exit code: the transfers' (<see cref="TransferAllGroupsAsync" />), or
+    /// <see cref="CurlExitCode.FailedInit" /> when a group's request methods conflict.
+    /// </returns>
     private async Task<int> RunAcceptedAsync(
         CommandLineOptions options,
         IReadOnlyList<CommandLineOptions> groups,
@@ -1726,6 +1737,7 @@ internal sealed class CurlCommandRunner(
         transferPerformer.RecordSerialAttemptStart(runsInParallel: false);
         TransferResult result = await TransferAndReportAsync(dispatch, options, transfer).ConfigureAwait(false);
 
+        // A transfer skipped for its --etag-save file is not reported, so it neither sets the exit code nor ends the run.
         return ReferenceEquals(result, EtagSaveFileSkippedTransfer)
             ? (exitCode, false)
             : (result.ExitCode, EndsTheRun(options, result));

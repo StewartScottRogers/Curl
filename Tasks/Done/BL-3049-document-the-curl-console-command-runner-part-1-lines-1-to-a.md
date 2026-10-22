@@ -9,7 +9,7 @@ touches: [Curl.Console/CurlCommandRunner.cs]
 model: sonnet
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-22
 ---
 # BL-3049 — Document the Curl.Console command runner, part 1 (lines 1 to about 1800)
 
@@ -23,15 +23,18 @@ Stewart, 2026-10-22: "Fully document and comment all code in each Host." Hosts a
 
 ## Acceptance criteria
 
-- [ ] Every internal or private type or member in scope whose name does not fully say what it does has an accurate XML doc comment; none restates its own name.
-- [ ] Every existing comment in the touched files is true of the code as it is now; any found wrong or vague is corrected.
-- [ ] New inline comments explain why or name the curl behaviour matched, and none narrates what the next line plainly does.
-- [ ] The diff changes comments and docs only: no logic, signature, accessibility or public name changed.
-- [ ] `dotnet build` of the project is clean with warnings as errors, and the fast tests of Curl.Console.UnitTests pass (`dotnet test Curl.Console.UnitTests --filter "TestCategory!=Integration"`).
+- [x] Every internal or private type or member in scope whose name does not fully say what it does has an accurate XML doc comment; none restates its own name.
+- [x] Every existing comment in the touched files is true of the code as it is now; any found wrong or vague is corrected.
+- [x] New inline comments explain why or name the curl behaviour matched, and none narrates what the next line plainly does.
+- [x] The diff changes comments and docs only: no logic, signature, accessibility or public name changed.
+- [x] `dotnet build` of the project is clean with warnings as errors, and the fast tests of Curl.Console.UnitTests pass (`dotnet test Curl.Console.UnitTests --filter "TestCategory!=Integration"`).
 
 ## Notes
+
+Part 1 was already almost fully documented; added missing flow docs to RunAsync and RunAcceptedAsync, two inline whys, and a missing blank line. Comments only.
 
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: a8624aa0 d77f9e20 4a195610 ea3eb31b b928bf9e.
+- 2026-10-22: Doing -> Done. Part 1 documented; build clean, 2825 fast tests pass
