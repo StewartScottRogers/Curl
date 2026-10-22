@@ -31,3 +31,4 @@ Split from BL-2881, after BL-3018 commits the generator. `Curl.Cli.UnitTests` ha
 ## Log
 
 - 2026-10-21: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: 36eaf022 82109722 48b212cd.
