@@ -9,7 +9,7 @@ touches: [DarkFactory/Requeue.ps1, DarkFactory/Prompts.ps1]
 lane: no
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-22
 ---
 # BL-3082 — Fix AF-0329: BL-2834 requeued twice: a file held by another task's whole-library touches, then a requeue only to wait for CI
 
@@ -42,7 +42,7 @@ The finding closes only when a later re-audit by the process auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The process measurement (`Audit/Tools/Measure-FactoryProcess.ps1 -LogRoot Z:\repos\Curl.logs` with a `-CiRunsJson` built by `gh run list --workflow CI --branch work/dark-factory` (the audit run's own command), counting only lane-trace lines and CI runs at or after the window start), run over the live logs since 2026-10-22 09:54:28 (65f5286ec, rule 11 in both lane prompts), shows no task requeued twice and no REQUEUE whose reason is waiting for CI.
+- [x] The process measurement (`Audit/Tools/Measure-FactoryProcess.ps1 -LogRoot Z:\repos\Curl.logs` with a `-CiRunsJson` built by `gh run list --workflow CI --branch work/dark-factory` (the audit run's own command), counting only lane-trace lines and CI runs at or after the window start), run over the live logs since 2026-10-22 09:54:28 (65f5286ec, rule 11 in both lane prompts), shows no task requeued twice and no REQUEUE whose reason is waiting for CI.
 - [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
@@ -53,8 +53,12 @@ The finding closes only when a later re-audit by the process auditor confirms th
 
 - 2026-10-22 (interactive): Rule 11 had never reached the tree (BL-3082's run left it in stash e1e97e72, now obsolete); 65f5286ec (09:54:28) adds it to both prompt copies. Baseline before it, whole of 2026-10-22 to 09:30: 7 REQUEUE lines, none waiting for CI, no task requeued twice. Left in Backlog: no window after the fix yet; run the measurement again once a shift has run on 65f5286ec.
 
+- 2026-10-22 (interactive) measured: window 2026-10-22 09:54:28 to 15:00 (65f5286ec on), shifts 20261022-102445, -140915, -143901, logs Z:\repos\Curl.logs, CI runs from gh run list --workflow CI --branch work/dark-factory (500). Measure-FactoryProcess: tasksDone 36, requeues 2 (BL-3121 14:42:56 and BL-3122 14:54:44, both 'Needs Curl.Networking.UnitTests...', none waiting for CI), tasksClaimedMoreThanOnce 1 (BL-3122, one requeue then Done), ciRedMinutes 0, ciRedSpells none. Fast tests: build 0 errors, all passing.
+
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
 - 2026-10-22: Doing -> Backlog. Interactive only: the reproduction is under an audit path a lane may not run; rule 11 added to Prompts.ps1 kept uncommitted
+- 2026-10-22: Backlog -> Doing. Criteria at claim: 39d7b5fa 9742157d.
+- 2026-10-22: Doing -> Done. Live window since 65f5286ec measured: no task requeued twice, no REQUEUE waiting for CI, CI red 0 min; build and fast tests green
