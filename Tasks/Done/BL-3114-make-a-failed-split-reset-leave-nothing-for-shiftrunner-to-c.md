@@ -8,7 +8,7 @@ depends-on: []
 touches: [DarkFactory/TaskStash.ps1, DarkFactory/ShiftRunner.ps1]
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-22
 ---
 # BL-3114 — Make a failed split reset leave nothing for ShiftRunner to commit on top of the split
 
@@ -45,3 +45,4 @@ Found by the shift-end review (ADR-0710) of 7fb0a59c7...18cf553c9. silent-failur
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: d04e8347 491dceb3 7cf0e0fa b5b58323 dc9fd233 95ad9451.
+- 2026-10-22: Doing -> Done. reset-failed result added; caller commits nothing on top of a stuck split; -TestTaskStash passes
