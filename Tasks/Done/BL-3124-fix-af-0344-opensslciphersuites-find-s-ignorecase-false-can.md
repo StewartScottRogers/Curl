@@ -5,10 +5,10 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Networking.UnitLibrary]
+touches: [Curl.Networking.UnitLibrary, Curl.Networking.UnitTests/OpenSslCipherSuitesTests.cs]
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-22
 ---
 # BL-3124 — Fix AF-0344: OpenSslCipherSuites.Find's ignoreCase: false can become true with no test failing, so cipher names in the wrong case are accepted
 
@@ -41,12 +41,18 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Added `Curl.Networking.UnitTests/OpenSslCipherSuitesTests.cs` to touches: the fix is a test, and no other task in Doing on origin/work/dark-factory names it.
+- The existing row `tls_aes_128_gcm_sha256` never reached `Enum.TryParse`, because it fails the ordinal `TLS_` prefix check first. I added `TLS_aes_128_gcm_sha256` and `TLS_ECDHE_RSA_WITH_AES_128_GCM_sha256` to `Find_WithANameNeitherTableHolds_ReturnsNull`. They pass the prefix check, so only a case-sensitive parse refuses them.
+- A lane may not run the audit office's mutation tool (guarded path). I applied the mutant by hand (`ignoreCase: true`) and ran `OpenSslCipherSuitesTests`: both new rows failed, so the mutant is killed. Then I reverted it. There is no production change, so no quality run was needed.
+- The tests are pure string lookups and do not depend on the platform, so CI on Linux and macOS is unaffected.
 
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-22: Doing -> Done. Two wrong-case IANA names pin Find's case-sensitive parse; the hand-applied mutant is killed

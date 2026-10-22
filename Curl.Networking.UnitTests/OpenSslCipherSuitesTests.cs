@@ -158,6 +158,8 @@ public sealed class OpenSslCipherSuitesTests
     [DataRow("49199")]
     [DataRow("ecdhe-rsa-aes128-gcm-sha256")]
     [DataRow("tls_aes_128_gcm_sha256")]
+    [DataRow("TLS_aes_128_gcm_sha256")]
+    [DataRow("TLS_ECDHE_RSA_WITH_AES_128_GCM_sha256")]
     [DataRow("HIGH")]
     [DataRow("!aNULL")]
     public void Find_WithANameNeitherTableHolds_ReturnsNull(string entry)
