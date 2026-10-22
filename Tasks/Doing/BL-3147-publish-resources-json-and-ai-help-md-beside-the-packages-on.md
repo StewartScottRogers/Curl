@@ -34,3 +34,4 @@ Stewart approved this on 2026-10-22. The goal: an AI agent starting from one kno
 ## Log
 
 - 2026-10-22: Created.
+- 2026-10-22: Backlog -> Doing. Criteria at claim: 1f83275d b584d5cc 7e2d8c47 6b653068.
