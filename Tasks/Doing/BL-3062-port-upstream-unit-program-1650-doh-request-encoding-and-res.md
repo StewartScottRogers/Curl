@@ -32,3 +32,4 @@ Split from BL-2923 (which ported unit1655 as `Curl.Conformance.UnitProgram.UnitL
 ## Log
 
 - 2026-10-22: Created.
+- 2026-10-22: Backlog -> Doing. Criteria at claim: ec1a9147 dc9e6844 a1753666 8e1ce02b.
