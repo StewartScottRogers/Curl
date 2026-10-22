@@ -54,3 +54,4 @@ One `IUnitProgram` per case in `Curl.Conformance.UnitProgram.UnitLibrary/Dns/Eas
 - 2026-10-21: Backlog -> Doing. Criteria at claim: c0969e39 2e3e75ab aca7e1a2 dd1cc079.
 - 2026-10-21: Doing -> Backlog. Run cost budget used up with the work nearly done; code is left in place, Notes list the four steps left
 - 2026-10-21: Backlog -> Doing. Criteria at claim: c0969e39 2e3e75ab aca7e1a2 dd1cc079.
+- 2026-10-21: Doing -> Blocked. Stewart: dark factory its runs of the last day already cost 4.49 of its 5.48 US dollar cost cap, so it was not run again; split the task; see Z:\repos\Curl.logs\BL-2925-*.jsonl
