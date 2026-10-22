@@ -3,8 +3,8 @@ id: AF-0338
 title: TransferCredentialLookup.HasControlCode's && can become || with no test failing, so every non-null URL credential on a non-http scheme is refused
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Engine.UnitLibrary/TransferCredentialLookup.cs:HasControlCode-and:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/TransferCredentialLookup.cs:238:&&
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Engin
 ## Log
 
 - 2026-10-22: filed proposed.
+- 2026-10-22: proposed -> accepted.
