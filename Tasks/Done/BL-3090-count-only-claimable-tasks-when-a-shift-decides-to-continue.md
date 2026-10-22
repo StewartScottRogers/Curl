@@ -5,10 +5,10 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [DarkFactory/TaskIds.ps1, DarkFactory/TaskBudget.ps1, DarkFactory/Claim.ps1, DarkFactory/AutoLanesState.ps1, DarkFactory/ShiftCoordinator.ps1]
+touches: [DarkFactory/TaskIds.ps1, DarkFactory/TaskBudget.ps1, DarkFactory/Claim.ps1, DarkFactory/AutoLanesState.ps1, DarkFactory/ShiftCoordinator.ps1, DarkFactory/AutoLanes.ps1]
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-22
 ---
 # BL-3090 — Count only claimable tasks when a shift decides to continue, size lanes or wait
 
@@ -28,18 +28,25 @@ Record the decision in a short ADR under `Documentation/Planning/Decisions/` mar
 
 ## Acceptance criteria
 
-- [ ] A shared claimable-now function exists in `DarkFactory/TaskIds.ps1`, and `DarkFactory/Claim.ps1` (claim loop), `DarkFactory/ShiftCoordinator.ps1` (continue decision) and `DarkFactory/AutoLanesState.ps1` (`Get-BoardCapacity`) all call it; no second inline cap check remains.
-- [ ] `RunDarkFactory.ps1 -TestTaskIds` (extended) passes with cases for: a ready uncapped task is claimable; a ready capped task is not; only capped tasks ready gives no claimable task; an interactive-only task is not.
-- [ ] `RunDarkFactory.ps1 -TestTaskBudget` (extended) passes with cases for the cap-reset time: two logged runs inside 24 h give the time the oldest run leaves the window so spend drops below the cap, and no capped task gives none.
-- [ ] `RunDarkFactory.ps1 -TestAutoLanes` still passes, with a case showing a board capacity of capped-only tasks sizes the shift to 0 claimable lanes' worth (no lane added for them).
-- [ ] The shift-end path traces "only cost-capped tasks ready; next cap frees at <time>" and does not start a next shift when every ready task is capped (shown by a self-test of the decision function).
-- [ ] `task-board.ps1` is unchanged (`git diff --stat` shows no change to it) and this task's `touches` has no guard file.
-- [ ] An ADR in `Documentation/Planning/Decisions/` records the decision.
-- [ ] All `RunDarkFactory.ps1 -Test*` switches that passed before still pass.
+- [x] A shared claimable-now function exists in `DarkFactory/TaskIds.ps1`, and `DarkFactory/Claim.ps1` (claim loop), `DarkFactory/ShiftCoordinator.ps1` (continue decision) and `DarkFactory/AutoLanesState.ps1` (`Get-BoardCapacity`) all call it; no second inline cap check remains.
+- [x] `RunDarkFactory.ps1 -TestTaskIds` (extended) passes with cases for: a ready uncapped task is claimable; a ready capped task is not; only capped tasks ready gives no claimable task; an interactive-only task is not.
+- [x] `RunDarkFactory.ps1 -TestTaskBudget` (extended) passes with cases for the cap-reset time: two logged runs inside 24 h give the time the oldest run leaves the window so spend drops below the cap, and no capped task gives none.
+- [x] `RunDarkFactory.ps1 -TestAutoLanes` still passes, with a case showing a board capacity of capped-only tasks sizes the shift to 0 claimable lanes' worth (no lane added for them).
+- [x] The shift-end path traces "only cost-capped tasks ready; next cap frees at <time>" and does not start a next shift when every ready task is capped (shown by a self-test of the decision function).
+- [x] `task-board.ps1` is unchanged (`git diff --stat` shows no change to it) and this task's `touches` has no guard file.
+- [x] An ADR in `Documentation/Planning/Decisions/` records the decision.
+- [x] All `RunDarkFactory.ps1 -Test*` switches that passed before still pass.
 
 ## Notes
+
+- Added `DarkFactory/AutoLanes.ps1` to touches: it loads before `TaskIds.ps1` and holds the `-TestAutoLanes` cases, so the pure `Get-ClaimableCapacity` (and `Get-CapacityReadyIds`) live there. No task in Doing on `origin/work/dark-factory` names it.
+- The capacity line's count less its parenthesised ready IDs that are not claimable now; a task behind a capped one is not added back (conservative: one lane fewer at worst, corrected next step).
+- The cap reset time uses today's cap (`Get-RunBudgetUsd`), though the median behind it may move by then.
+- `ShiftRunner.ps1`'s check before a run (`Get-TaskCapSpentWhy`) stays: it guards a claimed or resumed task's run, not which task to claim, and is outside touches.
+- Decision recorded in ADR-0757. Only PowerShell under DarkFactory changed; all 23 `RunDarkFactory.ps1 -Test*` switches pass.
 
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: 45da9160 9adb2d10 c5eb2107 4fe08f63 5a5f154d 7adb49ac de7e55ae 7193fd91.
+- 2026-10-22: Doing -> Done. One claimable-now predicate drives the claim loop, the -Continuous decision and -Lanes Auto capacity; capped-only boards end the shift and trace when the next cap frees (ADR-0757)
